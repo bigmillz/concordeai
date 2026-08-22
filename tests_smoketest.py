@@ -469,6 +469,34 @@ check("your name reaches every model",
       'id="user-name"' in page
       and "Your name (or nickname)" in page
       and "The user's name is " in _MILLENAI_SRC)
+# 6b258, per Patrick ("this pane is glitchy"): NO checkboxes — every
+# roster row carries a text action, install on one side and remove on
+# the other, so both read the same. And the LIST scrolls: 20+ models
+# used to stretch the dialog past the screen, which is why Manage kept
+# ending up unreachable below the fold.
+check("roster: text actions, no checkboxes, and it scrolls",
+      'class="rin"' in page and 'class="rrm"' in page
+      and "rpick" not in page and "manual-install" not in page
+      and "#roster{max-height:230px;overflow-y:auto" in page)
+# 6b258: Manage leads with the inventory (models installed, space
+# taken) and offers four honestly-labelled sizes. Only the last can
+# hurt — it installs models bigger than this Mac's memory — so it
+# wears a warning triangle and confirms in place before it runs.
+check("manage: inventory + four sizes, the risky one warned",
+      'id="mg-count"' in page and 'id="mg-space"' in page
+      and '"rec","Recommended"' in page.replace(" ", "")
+      and 'classList.contains("risky")' in page
+      and "may crash it if memory runs out" in page
+      and '"plan_n"' in _MILLENAI_SRC
+      and 'if plan == "rec":' in _MILLENAI_SRC
+      and "def _family_of" in _MILLENAI_SRC)
+# 6b258: a release body is hard-wrapped at ~72 columns for git, and
+# rendering it pre-wrap dropped those breaks mid-sentence in a narrow
+# pane. The notes reflow now: paragraphs rejoin, list items survive.
+check("release notes reflow instead of keeping git's wraps",
+      "function notesHTML" in page
+      and "#up-notes{" in page
+      and "pre-wrap" not in page.split("#up-notes{")[1][:260])
 # 6b257: THE OWNER HAS NO COOKIE — they are authenticated by the mere
 # absence of proxy headers, so SameSite protects them from nothing and
 # any web page could POST to 127.0.0.1 and erase their chats or delete

@@ -1864,11 +1864,79 @@ def _starter_labels() -> list:
 STARTER_LABELS = _starter_labels()
 
 
+def _gen_of(label: str) -> float:
+    """The GENERATION in a model's name, never its parameter count —
+    'Qwen 2.5 Coder 7B' is generation 2.5 at size 7B. Any token ending
+    in B is a size and skipped; 'Phi-4' hands over its tail. Unknown
+    reads as 0, which simply lets size decide within that family."""
+    best = 0.0
+    for tok in label.split():
+        if tok[-1:] in ("B", "b"):
+            continue
+        try:
+            best = max(best, float(tok))
+            continue
+        except ValueError:
+            pass
+        if "-" in tok:
+            try:
+                best = max(best, float(tok.rsplit("-", 1)[-1]))
+            except ValueError:
+                pass
+    return best
+
+
+def _family_of(label: str) -> str:
+    """Models that are versions of THE SAME THING. Role splits a family
+    (6b258): a coder or a vision model is not an older sibling of the
+    chat model, it does a different job, so it is never superseded by
+    one."""
+    base = label.split()[0]
+    if "Coder" in label:
+        return base + ":coder"
+    if "Vision" in label or "LLaVA" in label:
+        return "vision"
+    return base
+
+
 def plan_labels(plan: str) -> list:
-    """First-run size choice, hardware-aware. The user never sees model
-    names — just Basic / Pro / Max."""
+    """Install plans. basic/pro/max belong to the first-run wizard and
+    are unchanged; min/rec/full/all drive the Manage-models selector
+    (6b258, per Patrick):
+
+      min   the lightest footprint that still answers
+      rec   ONE model per family, newest generation — an efficient
+            spread that never spends disk on a superseded version
+      full  everything this machine's memory can actually run
+      all   every model there is, including ones that do NOT fit — the
+            pane warns, because this is how a Mac gets OOM-killed
+    """
     fits = [l for l in MODEL_INFO
             if SUPPORTED.get(l) and model_fits_machine(l)]
+    if plan == "min":
+        small = sorted(fits, key=lambda l: MODEL_INFO[l]["gb"])
+        picks = [l for l in ("Llama 3.2 1B", "Llama 3.2 3B") if l in fits]
+        return picks or small[:2]
+    if plan == "rec":
+        groups = {}
+        for l in fits:
+            groups.setdefault(_family_of(l), []).append(l)
+        picks = []
+        for _fam, ls in groups.items():
+            # newest generation first, then the largest of that
+            # generation: the best of the family, exactly once
+            ls.sort(key=lambda l: (_gen_of(l), MODEL_INFO[l]["gb"]),
+                    reverse=True)
+            picks.append(ls[0])
+        # a quick model earns its disk however big the rest are
+        for extra in ("Llama 3.2 3B", "Llama 3.2 1B"):
+            if extra in fits and extra not in picks:
+                picks.append(extra)
+        return picks
+    if plan == "full":
+        return list(fits)
+    if plan == "all":
+        return [l for l in MODEL_INFO if SUPPORTED.get(l)]
     if plan == "basic":
         # the smallest capable brain: ~1 GB, instant town
         small = sorted(fits, key=lambda l: MODEL_INFO[l]["gb"])
@@ -3439,10 +3507,17 @@ def setup_status() -> dict:
         # header download strip with it) on any python without psutil
         "mem_gb": (round(psutil.virtual_memory().total / 1e9)
                    if HAS_PSUTIL else 0),
+        # remaining GB per plan — basic/pro/max for the first-run
+        # wizard, min/rec/full/all for the Manage selector (6b258)
         "plans": {pl: round(sum(
             MODEL_INFO[l]["gb"] for l in plan_labels(pl)
             if not model_cached(l, pulled)), 1)
-            for pl in ("basic", "pro", "max")},
+            for pl in ("basic", "pro", "max",
+                       "min", "rec", "full", "all")},
+        # how many models each plan ends up with, so the pane can talk
+        # in models ("11 of 20") and not only in gigabytes
+        "plan_n": {pl: len(plan_labels(pl))
+                   for pl in ("min", "rec", "full", "all")},
         "ready_n": ready_n,
         "mlx_ok": _has_mlx() if IS_ARM else True,
         "ollama": _ollama_bin() is not None,
@@ -11101,20 +11176,47 @@ body:not(.perf) #mic.rec{animation:blink 1s ease infinite}
 .ros-row .rg{flex:none;color:var(--faint);font-size:9.5px}
 .ros-row .rd{color:var(--faint);overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap;min-width:0}
-.ros-row .rrm{flex:none;color:var(--faint);cursor:pointer;
-  border-bottom:1px dotted rgba(255,255,255,.3)}
+/* 6b258, per Patrick: no checkboxes. Every row carries a text action —
+   install or remove — the same shape on both sides, so the list reads
+   as one thing instead of a form. */
+.ros-row .rrm,.ros-row .rin{flex:none;color:var(--faint);cursor:pointer;
+  border-bottom:1px dotted rgba(255,255,255,.3);margin-left:auto}
 .ros-row .rrm:hover{color:#e5605c}
-.ros-row input[type=checkbox]{margin:0 2px 0 0;vertical-align:-1px}
+.ros-row .rin:hover{color:#57c98e}
+/* THE LIST SCROLLS, THE WINDOW DOESN'T (6b258): 20+ models used to
+   stretch the dialog past the screen, which is also why Manage kept
+   ending up out of reach below the fold. */
+#roster{max-height:230px;overflow-y:auto;overscroll-behavior:contain;
+  padding-right:4px}
+#roster::-webkit-scrollbar{width:7px}
+#roster::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);
+  border-radius:99px}
+#roster::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.28)}
+#roster::-webkit-scrollbar-track{background:transparent}
 #roster-foot{display:flex;gap:8px}
-#manage-box{margin-top:10px}
-#plan-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+#manage-box{margin-top:10px;border-top:1px solid var(--line);
+  padding-top:10px}
+/* the inventory line: what is on disk, and what it costs */
+#mg-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;
+  margin-bottom:10px}
+#mg-stats div{background:var(--panel);border:1px solid var(--line);
+  border-radius:9px;padding:8px 10px}
+#mg-stats dt{font-family:var(--mono);font-size:8.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--faint)}
+#mg-stats dd{margin:2px 0 0;font-family:var(--mono);font-size:14px;
+  font-variant-numeric:tabular-nums;color:var(--text)}
+#plan-row{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;
   margin-bottom:8px}
 .plan-card{background:var(--panel);border:1px solid var(--line);
-  border-radius:9px;padding:9px 10px;cursor:pointer}
+  border-radius:9px;padding:9px 10px;cursor:pointer;position:relative}
 .plan-card:hover{border-color:var(--dim)}
 .plan-card b{display:block;font-size:12px}
-.plan-card span{font-size:10.5px;color:var(--faint)}
-#manual-note{font-size:11px;color:var(--faint);margin:6px 0 2px}
+.plan-card span{font-size:10.5px;color:var(--faint);line-height:1.4;
+  display:block}
+.plan-card .warn{color:#d9a95a}
+.plan-card.risky:hover{border-color:rgba(217,169,90,.6)}
+.plan-card .gb{font-family:var(--mono);font-size:9.5px;color:var(--dim);
+  display:block;margin-top:3px}
 #manage-note{font-size:11px;color:var(--faint);margin-top:6px;
   min-height:14px}
 /* Updates: version front and centre */
@@ -11122,11 +11224,23 @@ body:not(.perf) #mic.rec{animation:blink 1s ease infinite}
   text-transform:uppercase;text-align:center;color:#fff;margin:6px 0 2px}
 #up-reldate{font-size:11px;color:var(--faint);text-align:center;
   margin-bottom:12px;min-height:13px}
+/* 6b258: NOT pre-wrap. A release body is hard-wrapped at ~72 columns
+   for git, and honouring those breaks put a ragged edge mid-sentence
+   in a narrow pane. The renderer reflows paragraphs and keeps only the
+   breaks that mean something (list items, blank lines). */
 #up-notes{background:var(--panel);border:1px solid var(--line);
-  border-radius:9px;padding:9px 12px;font-size:11.5px;color:var(--dim);
-  line-height:1.55;margin-bottom:12px;white-space:pre-wrap;
-  max-height:180px;overflow-y:auto}
+  border-radius:9px;padding:10px 13px;font-size:11.5px;color:var(--dim);
+  line-height:1.6;margin-bottom:12px;
+  max-height:190px;overflow-y:auto;overscroll-behavior:contain}
 #up-notes b{color:var(--text)}
+#up-notes p{margin:0 0 7px}
+#up-notes p:last-child{margin-bottom:0}
+#up-notes ul{margin:0 0 7px;padding-left:15px}
+#up-notes li{margin:3px 0}
+#up-notes::-webkit-scrollbar{width:7px}
+#up-notes::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);
+  border-radius:99px}
+#up-notes::-webkit-scrollbar-track{background:transparent}
 /* the two veil titles, distinct ids (6b257): about-name existed THREE
    times and every bare query found a hidden copy — the id is retired.
    The em rule died with the pre-rail platform line it styled. */
@@ -12187,9 +12301,11 @@ __CODE_ROWS__
         <button class="about-btn slim" id="open-setup">Model updates&hellip;</button>
       </div>
       <div id="manage-box" hidden>
+        <dl id="mg-stats">
+          <div><dt>models installed</dt><dd id="mg-count">&mdash;</dd></div>
+          <div><dt>space taken</dt><dd id="mg-space">&mdash;</dd></div>
+        </dl>
         <div id="plan-row"></div>
-        <div id="manual-note">&hellip;or tick models in the list above, then</div>
-        <button class="about-btn slim" id="manual-install" disabled>Install selected</button>
         <div id="manage-note"></div>
       </div>
     </section>
@@ -16851,23 +16967,25 @@ $("#idleon").addEventListener("change",()=>{
 /* ------------------------------------------ the Models roster (6b257,
    per Patrick — option B): one mono line per mind, status mark, size,
    what it's for (ADV_USE — the same dict the Advanced picker reads, so
-   the two can never drift). Manage mode adds tick-to-install, the
-   Minimal/Recommended/Maximum plan cards (the same plans first-run
-   offers), and a remove affordance on ready rows — owner at the
-   machine only, and the server refuses mid-download removals. */
+   the two can never drift). 6b258: NO CHECKBOXES. Every row carries a
+   text action instead — install on the ones that are missing, remove
+   on the ones that are here — so both sides read the same and the
+   pane stops behaving like a form. Owner at the machine only; the
+   server refuses a mid-download removal either way. */
 let lastSetup=null,lastCloud=null,manageOn=false;
 function rosRow(m,ready){
   const dot=ready?'<span class="rs rok">✓</span>'
                  :'<span class="rs rno">✕</span>';
-  const tick=(manageOn&&!ready)
-    ?'<input type="checkbox" class="rpick" data-l="'+esc(m.label)+'">':"";
-  const rm=(manageOn&&ready&&IS_LOCAL)
-    ?'<span class="rrm" data-l="'+esc(m.label)+'" data-gb="'+m.est_gb
-      +'">remove</span>':"";
-  return '<div class="ros-row">'+dot+tick
+  const act=!IS_LOCAL?""
+    :ready
+      ?'<span class="rrm" data-l="'+esc(m.label)+'" data-gb="'+m.est_gb
+        +'">remove</span>'
+      :'<span class="rin" data-l="'+esc(m.label)+'" data-gb="'+m.est_gb
+        +'">install</span>';
+  return '<div class="ros-row">'+dot
     +'<span class="rn">'+esc(m.label)+'</span>'
     +'<span class="rg">'+(m.est_gb?m.est_gb+"G":"")+'</span>'
-    +'<span class="rd">'+esc(ADV_USE[m.label]||"")+'</span>'+rm+'</div>';
+    +'<span class="rd">'+esc(ADV_USE[m.label]||"")+'</span>'+act+'</div>';
 }
 function paintRoster(st,cloud){
   const host=$("#roster");if(!host||!st)return;
@@ -16896,59 +17014,90 @@ function paintRoster(st,cloud){
       +'<span class="rg"></span>'
       +'<span class="rd">'+esc(ADV_CLOUD[k][1])+'</span></div>').join("");
   host.innerHTML=h;
-  // the repaint wipes every tick, so the button must not stay armed
-  // over a selection that no longer exists (6b257)
-  const mi=$("#manual-install");
-  if(mi)mi.disabled=true;
+  paintMgStats();
+}
+/* THE INVENTORY (6b258, per Patrick): what is on disk and what it
+   costs, in models and in gigabytes, read from the same /api/setup
+   rows the roster draws — so the two can never disagree. */
+function paintMgStats(){
+  if(!lastSetup||!$("#mg-count"))return;
+  const rows=(lastSetup.models||[]).filter(m=>m.label!=="Ollama engine");
+  const rdy=rows.filter(m=>m.status==="ready");
+  const gb=rdy.reduce((a,m)=>a+(+m.est_gb||0),0);
+  $("#mg-count").textContent=rdy.length+" / "+rows.length;
+  $("#mg-space").textContent=(gb>=10?Math.round(gb):Math.round(gb*10)/10)
+    +" GB";
 }
 function paintPlans(){
   if(!lastSetup)return;
-  const P=[["basic","Minimal","quick answers, tiny download"],
-           ["pro","Recommended","great everyday quality"],
-           ["max","Maximum","the best this machine can run"]];
+  // FOUR SIZES, HONESTLY LABELLED (6b258, per Patrick). Only the last
+  // one can hurt: it installs models this machine cannot hold, so it
+  // wears a warning triangle and says what happens.
+  const P=[["min","Minimum",
+            "the lightest models — smallest footprint that still answers",0],
+           ["rec","Recommended",
+            "one of each kind, newest generation, no superseded versions",0],
+           ["full","Full",
+            "every model this Mac's memory can actually run",0],
+           ["all","Max",
+            "every model there is, including ones too big for this Mac — "
+            +"they may crash it if memory runs out",1]];
   $("#plan-row").innerHTML=P.map(p=>{
-    const gb=lastSetup.plans&&lastSetup.plans[p[0]];
-    return '<div class="plan-card" data-plan="'+p[0]+'"><b>'+p[1]
-      +'</b><span>'+p[2]
-      +(gb?" · "+gb+" GB to get":" · installed")+'</span></div>';
+    const gb=(lastSetup.plans||{})[p[0]];
+    const n=(lastSetup.plan_n||{})[p[0]];
+    return '<div class="plan-card'+(p[3]?" risky":"")+'" data-plan="'
+      +p[0]+'"><b>'+(p[3]?'<span class="warn">⚠</span> ':"")+p[1]
+      +'</b><span>'+esc(p[2])+'</span>'
+      +'<span class="gb">'+(n?n+" models":"")
+      +(gb?" · "+gb+" GB to download":" · already installed")+'</span></div>';
   }).join("");
+}
+async function ensureSetup(){
+  // /api/setup walks the model cache and can take seconds — Manage may
+  // be clicked before openAbout's copy lands, and empty cards were the
+  // glitch (6b258)
+  if(lastSetup)return lastSetup;
+  try{lastSetup=await(await fetch("/api/setup")).json();}catch(e){}
+  return lastSetup;
 }
 $("#roster-manage").addEventListener("click",async()=>{
   manageOn=!manageOn;
   $("#manage-box").hidden=!manageOn;
   if(manageOn){
-    // Manage can be clicked before openAbout's /api/setup lands (it
-    // walks the model cache and takes seconds) — fetch on demand
-    // rather than rendering three empty cards
-    if(!lastSetup){
-      $("#plan-row").innerHTML='<div class="plan-card">reading disk…</div>';
-      try{lastSetup=await(await fetch("/api/setup")).json();}catch(e){}
-    }
-    paintPlans();
+    $("#plan-row").innerHTML='<div class="plan-card">reading disk…</div>';
+    await ensureSetup();
+    paintPlans();paintMgStats();
   }
-  if(lastSetup)paintRoster(lastSetup,lastCloud);
 });
 $("#plan-row").addEventListener("click",async e=>{
-  const c=e.target.closest(".plan-card");if(!c)return;
+  const c=e.target.closest(".plan-card");if(!c||!c.dataset.plan)return;
+  // the risky one asks twice, in place, naming the risk
+  if(c.classList.contains("risky")&&c.dataset.sure!=="1"){
+    c.dataset.sure="1";
+    c.querySelector("span").textContent=
+      "this installs models bigger than this Mac's memory and can crash "
+      +"it — click again to go ahead";
+    return;
+  }
   await fetch("/api/setup/install",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({plan:c.dataset.plan})});
   $("#manage-note").textContent=
     "downloading — watch the strip in the sidebar";
+  setTimeout(async()=>{lastSetup=null;await ensureSetup();
+    paintRoster(lastSetup,lastCloud);paintPlans();},2500);
 });
-$("#roster").addEventListener("change",()=>{
-  $("#manual-install").disabled=
-    !$("#roster").querySelectorAll(".rpick:checked").length;
-});
-$("#manual-install").addEventListener("click",async()=>{
-  const labels=[...$("#roster").querySelectorAll(".rpick:checked")]
-    .map(x=>x.dataset.l);
-  if(!labels.length)return;
-  await fetch("/api/model/download",{method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({labels:labels})});
-  $("#manage-note").textContent="downloading "+labels.length
-    +" — watch the strip in the sidebar";
+$("#roster").addEventListener("click",async e=>{
+  const i=e.target.closest(".rin");if(!i)return;
+  i.textContent="starting…";
+  try{
+    await fetch("/api/model/download",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({labels:[i.dataset.l]})});
+    i.textContent="downloading";
+    $("#manage-note").textContent=esc(i.dataset.l)
+      +" — watch the strip in the sidebar";
+  }catch(e2){i.textContent="failed";}
 });
 $("#roster").addEventListener("click",async e=>{
   const r=e.target.closest(".rrm");if(!r)return;
@@ -16972,6 +17121,33 @@ $("#roster").addEventListener("click",async e=>{
 /* -------------------------------------------- the Updates face (6b257):
    version front and centre, the release date under it, and the release
    notes card — the gh release body already rides /api/update/check. */
+/* 6b258, per Patrick ("fix the line breaks... looks sloppy"): a
+   release body is hard-wrapped at ~72 columns because that is how git
+   likes it, and rendering it pre-wrap dropped those breaks into the
+   middle of sentences in a narrow pane. REFLOW: paragraphs join back
+   into one run and let the box wrap them; only breaks that carry
+   meaning survive — a blank line ends a paragraph, and a leading "-"
+   starts a list item (its continuation lines fold into it). */
+function notesHTML(md){
+  const lines=String(md).replace(/\r/g,"").split("\n");
+  let out="",para=[],list=[];
+  const inline=s=>esc(s).replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>")
+                        .replace(/`([^`]+)`/g,"<b>$1</b>");
+  const flushP=()=>{if(para.length){out+="<p>"+inline(para.join(" "))+"</p>";
+    para=[];}};
+  const flushL=()=>{if(list.length){out+="<ul>"+list.map(x=>
+    "<li>"+inline(x)+"</li>").join("")+"</ul>";list=[];}};
+  lines.forEach(raw=>{
+    const t=raw.trim();
+    if(!t){flushP();flushL();return;}
+    const li=/^[-*]\s+(.*)$/.exec(t);
+    if(li){flushP();list.push(li[1]);return;}
+    if(list.length){list[list.length-1]+=" "+t;return;}  // wrapped item
+    para.push(t);
+  });
+  flushP();flushL();
+  return out;
+}
 async function paintUpdatesPane(){
   try{
     const r=await(await fetch("/api/update/check")).json();
@@ -16984,9 +17160,8 @@ async function paintUpdatesPane(){
     const nb=$("#up-notes");
     if(r.notes){
       nb.hidden=false;
-      nb.innerHTML="<b>What's new"
-        +(r.available?" in "+esc(r.latest):"")+"</b>\n"
-        +esc(r.notes).replace(/\*\*([^*\n]+)\*\*/g,"<b>$1</b>");
+      nb.innerHTML='<p><b>What’s new'
+        +(r.available?" in "+esc(r.latest):"")+"</b></p>"+notesHTML(r.notes);
     }else nb.hidden=true;
   }catch(e){}
 }

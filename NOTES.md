@@ -4180,3 +4180,47 @@ one of which made a SUCCESSFUL job look like a failure:
 - The lesson generalises past this file: any handler that answers
   WITHOUT reading the request body must drain it first, or its
   refusal arrives as a network error rather than a refusal.
+
+## 6 beta 258 (pending) — the Models pane stops being glitchy
+- NO CHECKBOXES (per Patrick). Ticking boxes and then hunting for an
+  Install button made the roster behave like a form; every row now
+  carries a text action instead — "install" where "remove" sits on the
+  other side — so both halves of the list read as one thing. The
+  manual-install button and its note are gone with them.
+- THE LIST SCROLLS, THE WINDOW DOESN'T. 20+ models stretched the
+  dialog past the bottom of the screen, which is ALSO why Manage kept
+  being unreachable: it lives under the roster, and the roster had no
+  ceiling. #roster is max-height 230px with its own thin scrollbar.
+- MANAGE, REBUILT. It opens with the inventory — "models installed:
+  11 / 20" and "space taken: 75 GB", computed from the same
+  /api/setup rows the roster draws, so the two can never disagree —
+  then four honestly-labelled sizes:
+    min   the lightest models, smallest footprint that still answers
+    rec   ONE per family, newest generation: Gemma 4 instead of
+          Gemma 2, no disk spent on superseded versions
+    full  everything this machine's memory can actually run
+    all   every model there is, INCLUDING ones too big for this Mac
+  Only the last can hurt, so it wears a ⚠ and says what happens, and
+  clicking it re-labels itself into a confirm rather than starting a
+  1 TB download on one click. Measured here: min 2 models, rec 11,
+  full 20, all 26 / 1063 GB — the spread is real, not decorative.
+- FAMILY/GENERATION PARSING is the interesting part of "rec".
+  _gen_of() reads the GENERATION out of a name and never the parameter
+  count (any token ending in B is a size; "Phi-4" hands over its
+  tail), and _family_of() splits by ROLE — a coder or a vision model
+  is not an older sibling of the chat model, so it is never superseded
+  by one. Checked against the real catalog: Gemma 4 26B beats Gemma 2
+  9B, both Qwen coders stay their own family, LLaVA is "vision".
+- RELEASE NOTES REFLOW (per Patrick: "looks sloppy"). A release body
+  is hard-wrapped at ~72 columns because that is how git wants it, and
+  #up-notes was rendering it white-space:pre-wrap — so every one of
+  those breaks landed mid-sentence in a narrow pane. notesHTML() now
+  rejoins paragraphs and keeps only the breaks that MEAN something (a
+  blank line ends a paragraph, a leading "-" starts a list item, and a
+  wrapped item folds back into itself). Verified against the real v257
+  body: zero mid-sentence breaks, six list items, bold intact.
+- Version holds at 6.1.0 beta by design (per Patrick): 6.1 proper
+  ships when sign-on and cloud sync land, so cuts until then are build
+  bumps inside 6.1.0 — use `./release.sh 6.1.0`, never `minor`.
+- Gauntlet 111/111 (+3: roster actions/scroll, manage inventory +
+  four sizes with the risky one warned, notes reflow).
