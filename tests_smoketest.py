@@ -355,7 +355,45 @@ check("ConcordeAI brand, no stray MillenAI or bare Concorde",
 # above), bolded by one shared rule across all three lockups
 check("wordmark splits ConcordeAI with a bold AI",
       "Concorde<b>AI</b></b>" in page
-      and "#wiz-brand b b{font-weight:700}" in page)
+      and "#wiz-brand b b{" in page)
+# 6b258, per Patrick: EXTRA extra bold, the same recipe ConcordeVPN
+# uses for its own second word. Michroma ships ONE weight, so a
+# synthetic 700 barely moves — 800 plus a hair of text-stroke actually
+# fattens the outline. The doors clip a gradient to the text, so their
+# fill is transparent and a currentColor stroke would draw nothing:
+# there the AI takes a solid silver of its own.
+check("AI is extra-extra bold in every wordmark",
+      "font-weight:800;-webkit-text-stroke:.55px currentColor" in page
+      # the superseded synthetic-700 wordmark rule must not linger
+      and "#wiz-brand b b{font-weight:700}" not in page)
+s, h, b = req("/", headers={"X-Forwarded-For": "1.2.3.4"})
+door = b.decode("utf-8", "replace")
+check("the door's AI is fattened too, against its gradient",
+      "-webkit-text-fill-color:#f5f6f8" in door
+      and "-webkit-text-stroke:.6px #f5f6f8" in door
+      and "Concorde<b>AI</b>" in door)
+# 6b258: the titlebar wears the lockup as a real accessory (the
+# ConcordeVPN look, minus its gear — settings live in the sidebar
+# here). Michroma has to be BUNDLED: a native NSTextField cannot pull
+# a webfont the way the page does.
+# 6b258, per Patrick ("almost there"): this line is a RELEASE
+# CANDIDATE, not a beta — the label changes on every display surface
+# while the prerelease hold stays exactly as it was, so /releases/latest
+# still never offers it to a stable install.
+check("release candidate labelling, prerelease hold intact",
+      "APP_RC = 1" in _MILLENAI_SRC
+      # named, not numbered: "6.1 RC1" carries no build suffix
+      and 'return v + " RC%d" % APP_RC' in _MILLENAI_SRC
+      and "APP_BETA = True" in _MILLENAI_SRC
+      and 'SHOW="$SHOW RC$RC"' in open("release.sh").read())
+check("titlebar lockup: accessory + bundled font",
+      "NSTitlebarAccessoryViewController" in _MILLENAI_SRC
+      and "def _brand_accessory" in _MILLENAI_SRC
+      and '"NSStrokeWidth": -12.0' in _MILLENAI_SRC
+      and "def _load_michroma" in _MILLENAI_SRC
+      and "CTFontManagerRegisterFontsForURL" in _MILLENAI_SRC
+      and len(open("fonts/Michroma-Regular.ttf", "rb").read(8)) == 8
+      and "cp -R fonts" in open("build_macos_app.sh").read())
 # 6b257: the app checks for updates BY ITSELF — hourly while open,
 # owner only (a tunnel visitor can't run the install, so never tempt
 # them), skipping hidden windows and settling up on wake; the server

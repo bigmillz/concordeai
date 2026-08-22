@@ -4224,3 +4224,48 @@ one of which made a SUCCESSFUL job look like a failure:
   bumps inside 6.1.0 — use `./release.sh 6.1.0`, never `minor`.
 - Gauntlet 111/111 (+3: roster actions/scroll, manage inventory +
   four sizes with the risky one warned, notes reflow).
+
+## 6 beta 258 (cont.) — EXTRA extra bold, and the bar wears the lockup
+- THE AI IS NOW AS BOLD AS THE VPN'S SECOND WORD (per Patrick), which
+  is a real recipe rather than a heavier number: Michroma ships ONE
+  weight, so a synthetic 700 barely moved the glyph. 800 PLUS a hair
+  of -webkit-text-stroke fattens the actual outline, and that is
+  exactly what the sibling app does. Applied to all three in-page
+  lockups; the two door pages needed their own rule because they clip
+  a GRADIENT to the text — their fill is transparent, so a
+  currentColor stroke would have drawn precisely nothing. There the AI
+  takes a solid bright silver of its own, which also makes it read as
+  its own word against the moving ramp.
+- THE TITLEBAR WEARS THE LOCKUP, MINUS THE GEAR (per Patrick: same
+  look as the VPN app, but that app's settings button stays over
+  there — settings live in this one's sidebar). A real
+  NSTitlebarAccessoryViewController, not a hand-planted subview of the
+  theme frame: accessories sit beside the traffic lights as first-class
+  citizens and survive fullscreen, which the subview approach did not.
+  The AI's weight there is a NEGATIVE NSStrokeWidth (-12), which means
+  stroke AND fill — it thickens the glyph instead of outlining it.
+- MICHROMA IS NOW BUNDLED (fonts/, SIL OFL, copied into
+  Contents/Resources by build_macos_app.sh). The page can pull the
+  webfont from Google; a native NSTextField in the titlebar cannot,
+  and would have silently fallen back to the system face. Registered
+  through CoreText by raw ctypes because the app's venv has no pyobjc
+  CoreText module. Verified end to end in that venv: the font
+  registers, NSFont resolves "Michroma", and the fat stroke lands on
+  the AI run only.
+- THE BRAND GUARD BIT ME, CORRECTLY. The first run failed because a
+  CSS comment I had just written named the VPN app in full — and
+  "Concorde" not followed by AI is exactly what the guard forbids in
+  the page. Second time this build's own commentary has tripped it
+  (the ">AI</span>" one was the first). Comments ship; write them as
+  if they do.
+- 6.1 RC1: APP_RC relabels every display surface from "beta" to
+  "RC<n>" and titles the release the same, while KEEPING the
+  prerelease hold — an RC is still not the stable build, so
+  /releases/latest must not hand it to a stable install. NO build
+  number rides along (per Patrick): an RC is NAMED, not numbered —
+  "6.1 RC1", full stop — so check_update's build-appending suffix rule
+  stays beta-only. The updater still compares the TAG's build, so a
+  newer RC1 cut is offered correctly even though both read the same on
+  screen. Set APP_RC = 0 when 6.1 ships for real, after sign-on and
+  cloud sync.
+- Gauntlet 115/115.

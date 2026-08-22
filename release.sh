@@ -79,8 +79,15 @@ SHOW="$VERSION"; [[ "$VERSION" == *.*.0 ]] && SHOW="${VERSION%.0}"
 # BETA HOLD: while APP_BETA is True, publish as a PRERELEASE — the
 # desktop updater reads /releases/latest (prereleases excluded), so
 # existing installs stay on the last stable until the beta graduates.
+# APP_RC > 0 relabels the same held cut as a RELEASE CANDIDATE (6b258):
+# still a prerelease, just further along than "beta".
 PRE=()
-grep -q "APP_BETA = True" millenai.py && { PRE=(--prerelease); SHOW="$SHOW beta"; }
+RC="$(grep -oE '^APP_RC = [0-9]+' millenai.py | grep -oE '[0-9]+$' || true)"
+if [[ -n "$RC" && "$RC" != "0" ]]; then
+  PRE=(--prerelease); SHOW="$SHOW RC$RC"
+elif grep -q "APP_BETA = True" millenai.py; then
+  PRE=(--prerelease); SHOW="$SHOW beta"
+fi
 # WHAT'S NEW, IN HUMAN (6b257): the Updates pane renders the release
 # BODY now — /api/update/check carries it — so every cut deserves a
 # short bulleted summary a person would actually read. Write it into

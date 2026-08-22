@@ -88,6 +88,12 @@ APP_VERSION = "6.1.0"   # bump here — UI, window, DMG all follow
 # stays parked on the last stable (v197 / 5.3.7). The live :9889
 # instance follows raw tags and DOES run betas: that's the testbed.
 APP_BETA = True
+# RELEASE CANDIDATE (6b258, per Patrick: "almost there"). >0 renames
+# the label from "beta" to "RC<n>" on every display surface and in the
+# release title, while KEEPING the prerelease hold above — an RC is
+# still not the stable build, so /releases/latest must not offer it.
+# Set back to 0 when 6.1 ships for real (after sign-on + cloud sync).
+APP_RC = 1
 # THE BRAND (6b257): ConcordeAI — Concorde grew its AI, and the AI is
 # BOLD in every lockup (nested <b>, see .vghost). Every user-facing
 # surface says ConcordeAI; everything load-bearing stays "MillenAI" —
@@ -108,13 +114,19 @@ def short_version(v: str = None) -> str:
     as they are. The old loop kept going and turned 6.0.0 into a bare
     '6', which reads like a major line rather than a version.
 
-    Display-ONLY — the beta suffix rides along here. Anything that
+    Display-ONLY — the beta/RC suffix rides along here. Anything that
     compares or builds artifacts uses APP_VERSION raw."""
     v = v or APP_VERSION
     if v.count(".") >= 2 and v.endswith(".0"):
         v = v[:-2]
+    if APP_RC:
+        # NO build number here (per Patrick): an RC is named, not
+        # numbered — "6.1 RC1", full stop. The updater still compares
+        # the TAG's build, so a newer RC1 cut is offered correctly even
+        # though both read the same on screen.
+        return v + " RC%d" % APP_RC
     return v + (" beta %d" % APP_BUILD if APP_BETA else "")
-APP_BUILD = 257               # integer compared against the GitHub release tag
+APP_BUILD = 258               # integer compared against the GitHub release tag
 APP_BUILD_DATE = ""         # ISO date; blank falls back to this file's mtime
 
 # Set to "youruser/yourrepo" once this is on GitHub. Publish each build as a
@@ -251,6 +263,46 @@ def app_dir() -> str:
 def log_dir() -> str:
     return (os.path.join(app_dir(), "logs") if IS_WIN
             else os.path.expanduser("~/Library/Logs/MillenAI"))
+
+
+# THE TITLEBAR LOCKUP'S FONT (6b258). The page pulls Michroma from
+# Google, but a native NSTextField in the titlebar cannot — it needs a
+# real font file registered with CoreText. Bundled beside this file
+# (fonts/) and copied into Contents/Resources by build_macos_app.sh.
+_CHROME = {}            # pins the accessory so ObjC can't collect it
+
+
+def resource(*parts) -> str:
+    """A bundled file, whether we're running from the .app or the repo."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(here, *parts)
+
+
+def _load_michroma():
+    """Register the bundled Michroma with CoreText — raw ctypes because
+    the app's venv has no pyobjc CoreText module. Silent on failure:
+    the titlebar just falls back to the system face."""
+    if _CHROME.get("font"):
+        return
+    try:
+        import ctypes
+        path = resource("fonts", "Michroma-Regular.ttf")
+        if not os.path.exists(path):
+            return
+        CF = ctypes.CDLL("/System/Library/Frameworks/"
+                         "CoreFoundation.framework/CoreFoundation")
+        CT = ctypes.CDLL("/System/Library/Frameworks/"
+                         "CoreText.framework/CoreText")
+        CF.CFStringCreateWithCString.restype = ctypes.c_void_p
+        CF.CFURLCreateWithFileSystemPath.restype = ctypes.c_void_p
+        cfs = CF.CFStringCreateWithCString(
+            None, path.encode("utf-8"), 0x08000100)
+        cfu = CF.CFURLCreateWithFileSystemPath(
+            None, ctypes.c_void_p(cfs), 0, False)
+        CT.CTFontManagerRegisterFontsForURL(ctypes.c_void_p(cfu), 1, None)
+        _CHROME["font"] = True
+    except Exception:
+        pass
 
 
 def reveal(path: str):
@@ -2895,6 +2947,9 @@ def _check_update_live():
     shown = (rel.get("name") or "").strip() or tag
     # betas all share a title ("6.0 beta") — append the tag's build so
     # the offer reads "6 beta 208", never "update 6.0.0 to 6.0.0"
+    # betas all share one title, so the tag's build disambiguates them.
+    # An RC does NOT get that treatment (6b258, per Patrick): "6.1 RC1"
+    # is the name, and appending a build would put the number back.
     if re.search(r"beta$", shown):
         shown = "%s %d" % (shown, _build_from_tag(tag))
     # and the numeric part obeys the same trailing-.0 truncation
@@ -6616,6 +6671,12 @@ h1{font-family:'Michroma','Space Grotesk',sans-serif;
   -webkit-background-clip:text;background-clip:text;color:transparent;
   -webkit-text-fill-color:transparent;
   animation:rainbow 16s linear infinite}
+/* 6b258, per Patrick: EXTRA extra bold AI. The gradient is clipped to
+   the text so the fill is TRANSPARENT and a currentColor stroke would
+   draw nothing — the AI gets a solid bright silver and the fattening
+   stroke, which also lets it read as its own word against the ramp. */
+h1 b{font-weight:800;-webkit-text-fill-color:#f5f6f8;
+  -webkit-text-stroke:.6px #f5f6f8;animation:none}
 /* the tube's halo — a blurred twin behind the letters */
 .halo{position:absolute;left:0;top:0;z-index:-1;pointer-events:none;
   filter:blur(20px) saturate(1.5);opacity:.9}
@@ -6804,6 +6865,13 @@ h1{font-family:'Michroma','Space Grotesk',sans-serif;
   background:linear-gradient(90deg,#f5f6f8,#c8ccd5,#9aa0ac,#e2e5ea,#8f95a1,#d5d8df,#f5f6f8,#ff8fd8);
   -webkit-background-clip:text;background-clip:text;color:transparent;
   filter:drop-shadow(0 0 22px rgba(140,150,255,.25))}
+/* 6b258, per Patrick: EXTRA extra bold AI, everywhere the wordmark
+   appears. These doors clip a gradient to the text, so the fill is
+   TRANSPARENT — a currentColor stroke would be invisible. The AI
+   takes a solid bright silver of its own plus the fattening stroke,
+   which also makes it read as its own word against the ramp. */
+h1 b{font-weight:800;-webkit-text-fill-color:#f5f6f8;
+  -webkit-text-stroke:.6px #f5f6f8}
 p{color:#8e8e8e;margin:0 0 26px;font-size:15px}
 .err{color:#e26d5a;min-height:20px;margin:12px 0 0;font-size:14px}
 form{display:flex;gap:10px;justify-content:center}
@@ -9537,10 +9605,18 @@ body.resizing{cursor:col-resize;user-select:none}
    nested <b> inside each quiet 400-weight lockup. NOT a span: the
    gauntlet's tab guard forbids a span whose content is exactly AI
    (this comment ships in the page, so it can't spell the literal
-   either — it already tripped the guard once). Michroma ships one
-   weight, so the 700 is synthesized — heavier stroke, same face, and
-   both engines (Blink pane, WKWebView app) do it. */
-.vghost b b,#set-brand b b,#wiz-brand b b{font-weight:700}
+   either — it already tripped the guard once).
+   6b258, per Patrick: EXTRA extra bold — the exact recipe the sibling
+   VPN app uses for its own second word (naming it in full here would
+   trip the brand guard, which forbids the bare old name in the page:
+   that is the guard working, not a false alarm). Michroma ships ONE
+   weight, so a
+   synthetic 700 barely thickens it; 800 plus a hair of text-stroke
+   genuinely fattens the glyph outline, and both engines (the Blink
+   pane and the shipped WKWebView) draw it. currentColor keeps the
+   stroke on whatever the lockup is painted in. */
+.vghost b b,#set-brand b b,#wiz-brand b b{
+  font-weight:800;-webkit-text-stroke:.55px currentColor}
 /* 6b241, per Patrick's sketch: the dock icon's diagonal bars become a
    swept wedge that runs INTO the C — a delta wing whose trailing edge
    is the letter, which is the right idea for something called ConcordeAI.
@@ -18083,6 +18159,95 @@ if __name__ == "__main__":
                                 "NSAppearanceNameDarkAqua")
                             if ap:
                                 _w.setAppearance_(ap)
+                        except Exception:
+                            pass
+                        _brand_accessory(_w)
+
+                    def _brand_accessory(_w):
+                        """THE LOCKUP IN THE BAR (6b258, per Patrick:
+                        the ConcordeVPN look, minus its gear — that app
+                        puts a settings button on the right and this one
+                        keeps settings in the sidebar). A titlebar
+                        ACCESSORY, not a hand-planted subview of the
+                        theme frame: accessories sit beside the traffic
+                        lights as real citizens and survive fullscreen,
+                        which the subview approach did not."""
+                        if _CHROME.get("acc"):
+                            return          # added once, survives repasses
+                        try:
+                            from AppKit import (NSColor, NSFont,
+                                                NSImageView, NSTextField,
+                                                NSTitlebarAccessoryViewController,
+                                                NSView)
+                            from AppKit import NSBezierPath as _BP
+                            from AppKit import NSImage as _NI
+                            from Foundation import NSMutableAttributedString
+                            _load_michroma()
+                            BARH = 28.0
+                            # the wing, same geometry as the page's SVG
+                            wing = _NI.alloc().initWithSize_((15, 12.6))
+                            wing.lockFocus()
+                            NSColor.colorWithSRGBRed_green_blue_alpha_(
+                                0xb7 / 255, 0xbc / 255, 0xc6 / 255,
+                                1.0).set()
+                            for x1, y1, x2, y2 in (
+                                    (3.2, 17.5, 20.4, 3.5),
+                                    (7.5, 17.5, 20.4, 7.0),
+                                    (11.8, 17.5, 20.4, 10.5),
+                                    (16.1, 17.5, 20.4, 14.0),
+                                    (19.3, 17.5, 20.4, 16.6)):
+                                p = _BP.bezierPath()
+                                p.setLineWidth_(1.85)
+                                p.setLineCapStyle_(1)
+                                p.moveToPoint_(((x1 - 2) * 15 / 19.6,
+                                                (18.7 - y1) * 12.6 / 16.4))
+                                p.lineToPoint_(((x2 - 2) * 15 / 19.6,
+                                                (18.7 - y2) * 12.6 / 16.4))
+                                p.stroke()
+                            wing.unlockFocus()
+                            name, tld = "CONCORDE", "AI"
+                            att = NSMutableAttributedString.alloc().\
+                                initWithString_(name + tld)
+                            mich = None
+                            for fname in ("Michroma", "Michroma-Regular",
+                                          "MichromaRoman"):
+                                mich = NSFont.fontWithName_size_(fname, 11.5)
+                                if mich is not None:
+                                    break
+                            if mich is None:
+                                mich = NSFont.systemFontOfSize_weight_(
+                                    11.5, 0.3)
+                            white = NSColor.whiteColor()
+                            att.addAttributes_range_(
+                                {"NSFont": mich, "NSColor": white,
+                                 "NSKern": 1.7}, (0, len(name + tld)))
+                            # Michroma ships ONE weight, so "extra extra
+                            # bold" is a fat NEGATIVE stroke — negative
+                            # means stroke AND fill, which thickens the
+                            # glyph instead of outlining it
+                            att.addAttributes_range_(
+                                {"NSStrokeWidth": -12.0,
+                                 "NSStrokeColor": white},
+                                (len(name), len(tld)))
+                            label = NSTextField.\
+                                labelWithAttributedString_(att)
+                            lw = label.frame().size.width
+                            lh = label.frame().size.height
+                            left = NSView.alloc().initWithFrame_(
+                                ((0, 0), (6 + 15 + 6 + lw + 10, BARH)))
+                            wiv = NSImageView.alloc().initWithFrame_(
+                                ((6, (BARH - 12.6) / 2), (15, 12.6)))
+                            wiv.setImage_(wing)
+                            left.addSubview_(wiv)
+                            label.setFrameOrigin_(
+                                (27, (BARH - lh) / 2.0 - 0.5))
+                            left.addSubview_(label)
+                            acc = NSTitlebarAccessoryViewController.\
+                                alloc().init()
+                            acc.setView_(left)
+                            acc.setLayoutAttribute_(1)      # left
+                            _w.addTitlebarAccessoryViewController_(acc)
+                            _CHROME["acc"] = acc
                         except Exception:
                             pass
 

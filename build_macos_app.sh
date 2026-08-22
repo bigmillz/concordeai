@@ -40,6 +40,9 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cp millenai.py "$APP/Contents/Resources/"
 [[ -f MillenAI.icns ]] && cp MillenAI.icns "$APP/Contents/Resources/"
+# the titlebar lockup is a native NSTextField and cannot pull Michroma
+# from Google the way the page does — it needs the real file (6b258)
+[[ -d fonts ]] && cp -R fonts "$APP/Contents/Resources/"
 
 # --- Info.plist
 cat > "$APP/Contents/Info.plist" <<PLIST
