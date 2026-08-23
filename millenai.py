@@ -93,7 +93,7 @@ APP_BETA = True
 # release title, while KEEPING the prerelease hold above — an RC is
 # still not the stable build, so /releases/latest must not offer it.
 # Set back to 0 when 6.1 ships for real (after sign-on + cloud sync).
-APP_RC = 1
+APP_RC = 2
 # THE BRAND (6b257): ConcordeAI — Concorde grew its AI, and the AI is
 # BOLD in every lockup (nested <b>, see .vghost). Every user-facing
 # surface says ConcordeAI; everything load-bearing stays "MillenAI" —
@@ -126,7 +126,7 @@ def short_version(v: str = None) -> str:
         # though both read the same on screen.
         return v + " RC%d" % APP_RC
     return v + (" beta %d" % APP_BUILD if APP_BETA else "")
-APP_BUILD = 258               # integer compared against the GitHub release tag
+APP_BUILD = 259               # integer compared against the GitHub release tag
 APP_BUILD_DATE = ""         # ISO date; blank falls back to this file's mtime
 
 # Set to "youruser/yourrepo" once this is on GitHub. Publish each build as a

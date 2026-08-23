@@ -4289,5 +4289,12 @@ one of which made a SUCCESSFUL job look like a failure:
   fails loudly instead of silently desynchronising the panel.
 - STANDING RULE FROM HERE (per Patrick): do NOT cut a release or touch
   APP_VERSION / APP_BUILD / APP_RC unless he asks. Build, test, commit,
-  push — then stop and say it is ready to cut. This entry is therefore
-  unreleased: 258 is still the newest tag.
+  push — then stop and say it is ready to cut.
+- Cut as 6.1 RC2 when he asked, one build later. Two things rode along:
+  the DMG FILENAME is hyphenated now (ConcordeAI-6.1.0.dmg) because
+  GitHub rewrites spaces to dots in asset names, which is why RC1's
+  disk image landed as "ConcordeAI.6.1.0.dmg" while the zip and msi
+  were already hyphenated — the volume LABEL keeps its space, being a
+  human label rather than a filename. And the RC gauntlet check now
+  matches any RC number instead of the literal 1, so it doesn't need
+  hand-editing on every cut.

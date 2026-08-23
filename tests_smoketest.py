@@ -381,7 +381,8 @@ check("the door's AI is fattened too, against its gradient",
 # while the prerelease hold stays exactly as it was, so /releases/latest
 # still never offers it to a stable install.
 check("release candidate labelling, prerelease hold intact",
-      "APP_RC = 1" in _MILLENAI_SRC
+      # any RC number — the check must not need editing every cut
+      re.search(r"^APP_RC = [1-9]\d*$", _MILLENAI_SRC, re.M)
       # named, not numbered: "6.1 RC1" carries no build suffix
       and 'return v + " RC%d" % APP_RC' in _MILLENAI_SRC
       and "APP_BETA = True" in _MILLENAI_SRC

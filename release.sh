@@ -64,7 +64,7 @@ PY
 
 echo "→ building macOS"
 ./build_dmg.sh >/dev/null
-DMG="ConcordeAI ${VERSION}.dmg"   # build_dmg.sh derives this from millenai.py
+DMG="ConcordeAI-${VERSION}.dmg"   # build_dmg.sh derives this from millenai.py
 [[ -f "$DMG" ]] || { echo "expected $DMG but it wasn't built"; exit 1; }
 
 echo "→ building Windows"

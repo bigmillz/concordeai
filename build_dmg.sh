@@ -7,7 +7,11 @@ cd "$(dirname "$0")"
 ./build_macos_app.sh
 
 VER="$(python3 -c "import re;print(re.search(r'APP_VERSION = \"([^\"]+)\"', open('millenai.py').read()).group(1))")"
-VOL="ConcordeAI $VER"
+VOL="ConcordeAI $VER"          # VOLUME label - a human label, keeps the space
+# FILENAME - hyphenated on purpose. GitHub rewrites spaces to dots in
+# release-asset names, which is why the .dmg used to land as
+# "ConcordeAI.6.1.0.dmg" while the zip and msi were hyphenated.
+DMGFILE="ConcordeAI-$VER.dmg"
 # DISPLAY form only — one trailing .0 falls away, matching short_version()
 # in the app (6.0.0 -> 6.0, 6.1.1 stays). The volume and the filename keep
 # the raw version, because those are artifacts, not labels.
@@ -187,13 +191,13 @@ print("background written")
 PYEOF
 
 # --- writable image first, style it via Finder, then compress
-rm -f "$VOL.dmg" MillenAI.dmg MillenAI-rw.dmg
+rm -f "$DMGFILE" "$VOL.dmg" MillenAI.dmg ConcordeAI-rw.dmg MillenAI-rw.dmg
 hdiutil create -volname "$VOL" -srcfolder "$STAGE" -ov -format UDRW \
-  -quiet MillenAI-rw.dmg
+  -quiet ConcordeAI-rw.dmg
 # detach any leftover mount of this volume first — a stale one makes the
 # Finder styling step fail with "Can't get disk ..."
 hdiutil detach -quiet "/Volumes/$VOL" 2>/dev/null || true
-hdiutil attach -readwrite -noverify -noautoopen -quiet MillenAI-rw.dmg
+hdiutil attach -readwrite -noverify -noautoopen -quiet ConcordeAI-rw.dmg
 
 # wait for Finder to actually see the volume before scripting it
 for i in $(seq 1 40); do
@@ -243,9 +247,9 @@ fi
 
 sync
 hdiutil detach -quiet "/Volumes/$VOL"
-hdiutil convert -quiet MillenAI-rw.dmg -format UDZO -o "$VOL.dmg"
-rm -f MillenAI-rw.dmg
+hdiutil convert -quiet ConcordeAI-rw.dmg -format UDZO -o "$DMGFILE"
+rm -f ConcordeAI-rw.dmg
 rm -rf "$(dirname "$STAGE")"
 
 echo ""
-echo "✓ built $VOL.dmg ($(du -h "$VOL.dmg" | cut -f1 | tr -d ' '))"
+echo "✓ built $DMGFILE ($(du -h "$DMGFILE" | cut -f1 | tr -d ' '))"
