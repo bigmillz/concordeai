@@ -4298,3 +4298,24 @@ one of which made a SUCCESSFUL job look like a failure:
   human label rather than a filename. And the RC gauntlet check now
   matches any RC number instead of the literal 1, so it doesn't need
   hand-editing on every cut.
+
+## Moved: the working folder now lives in Projects (2026-08-22)
+- FROM `My Drive/Downloads/files` TO
+  `My Drive/Projects/Concorde/ConcordeAI` (per Patrick). Same volume,
+  so `mv` was a rename rather than a 189 MB copy — Drive re-uploads
+  nothing and git is untouched: history, remote and a clean status all
+  came across intact.
+- Timed for the safest possible window: immediately after the v259 /
+  6.1 RC2 cut, with the tree clean and no peer sessions left holding
+  the directory open. A move with uncommitted work in flight, or with
+  another session writing into the old path, is how a folder ends up
+  half in each place.
+- CLAUDE.md's gauntlet `cd` line was repointed. Older entries in THIS
+  file still say `Downloads/files` and that is correct — they were
+  true when written and the log is not rewritten; this entry is the
+  forwarding address.
+- Unaffected, because none of them ever referenced the repo path: the
+  app's data lives in `~/Library/Application Support/MillenAI`, the
+  live deployment is its own checkout at `~/Library/MillenAI-live/repo`
+  (still the trap — never edit there), and every build script already
+  used `cd "$(dirname "$0")"` rather than an absolute path.

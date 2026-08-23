@@ -62,7 +62,7 @@ few sit in loops, so the scorecard reads a little higher) run against a **live s
 does not start**. Start one on 9894 first (above), then:
 
 ```bash
-cd "/Users/patrickmiller/My Drive/Downloads/files"
+cd "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI"
 "$VENV" tests_smoketest.py > /tmp/gauntlet.log 2>&1; echo "exit=$?"; tail -20 /tmp/gauntlet.log
 ```
 
