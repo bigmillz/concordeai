@@ -464,16 +464,33 @@ check("seamless dark title bar",
       and "NSAppearanceNameDarkAqua" in _MILLENAI_SRC
       and "fullSizeContentView" not in _MILLENAI_SRC.replace(
           "NO fullSizeContentView", ""))
-# 6b257 settings round 2 (per Patrick's concept picks): every pane
-# opens with a one-breath description, Account leads the rail with
-# /api/me behind it, and Forget Me is scoped + triple-locked
+# 6b257 settings round 2 (per Patrick's concept picks): panes open
+# with a one-breath description, /api/me sits behind the Account pane,
+# and Forget Me is scoped + triple-locked. 6b259: About is the
+# exception — the version right under the title says it better than a
+# sentence would — so five descriptions across six panes.
 check("settings: descriptions + Account pane + scoped forget",
-      page.count('class="tdesc"') == 6
+      page.count('class="tdesc"') == 5
       and 'data-pane="p-account"' in page
       and '"/api/me"' in _MILLENAI_SRC
       and '"/api/logout"' in _MILLENAI_SRC
       and '"/api/forget"' in _MILLENAI_SRC
       and "FORGET ME" in page)
+# 6b259, per Patrick: About leads the rail (it is what people open the
+# panel to see) and Account closes it (the exits belong at the foot).
+# The pane ids and the nav must agree on that order, and the first pane
+# is the one that opens.
+_nav = re.findall(r'data-pane="(p-[a-z]+)"', page)
+_panes = re.findall(r'class="spane[^"]*" id="(p-[a-z]+)"', page)
+_want = ["p-about", "p-persona", "p-cloud", "p-community", "p-models",
+         "p-account"]
+check("About leads the rail, Account closes it",
+      _nav == _want and _panes == _want
+      and '<button class="snav on" data-pane="p-about">About</button>' in page
+      and '<section class="spane on" id="p-about">' in page
+      and "p-updates" not in page
+      # the removed blurb must not creep back
+      and "What version you're flying" not in page)
 # 6b257: the Community pane tells the truth — a ledger this Mac
 # measured (its own file: prefs.json rewrites would race the worker
 # thread), a TIME share that rests between jobs (no honest GPU-percent

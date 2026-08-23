@@ -12255,47 +12255,31 @@ __CODE_ROWS__
         <div><dt>accel</dt><dd id="spec-accel">&mdash;</dd></div>
         <div><dt>models</dt><dd id="about-facts">&mdash;</dd></div>
       </dl>
+      <!-- 6b259, per Patrick: About leads (it is what people open the
+           panel to see), Account sits at the foot with the exits. -->
       <div id="set-nav">
-        <button class="snav on" data-pane="p-account">Account</button>
+        <button class="snav on" data-pane="p-about">About</button>
         <button class="snav" data-pane="p-persona">Personality</button>
         <button class="snav" data-pane="p-cloud">Cloud power</button>
         <button class="snav" data-pane="p-community">Community</button>
         <button class="snav" data-pane="p-models">Models</button>
-        <button class="snav" data-pane="p-updates">Updates</button>
+        <button class="snav" data-pane="p-account">Account</button>
       </div>
     </nav>
 
     <div id="set-main">
     <div id="about-body">
-    <section class="spane on" id="p-account">
-      <div class="set-h">Account</div>
-      <p class="tdesc">Who you're signed in as, on this Mac and anywhere
-      else you use MillenAI &mdash; and the exits: sign out, or erase
-      what it knows about you.</p>
-      <div id="acct-card">
-        <div id="acct-av">&#128187;</div>
-        <div><b id="acct-kind">&mdash;</b>
-        <span id="acct-sub"></span></div>
-      </div>
-      <button class="about-btn slim" id="acct-logout" hidden>Sign out</button>
-      <button class="about-btn danger" id="about-forget">Forget me&hellip;</button>
-      <div id="forget-steps" hidden>
-        <div id="forget-what">
-          <label class="fscope"><input type="checkbox" id="fs-mem" checked>
-            <span>Memories</span></label>
-          <label class="fscope"><input type="checkbox" id="fs-chats">
-            <span>Chats</span></label>
-          <label class="fscope"><input type="checkbox" id="fs-prefs">
-            <span>Personal settings</span></label>
-        </div>
-        <input id="forget-pin" type="password" inputmode="numeric"
-               maxlength="12" placeholder="owner PIN to confirm" hidden
-               autocomplete="off">
-        <input id="forget-word" placeholder="type FORGET ME to confirm"
-               autocomplete="off" spellcheck="false" autocapitalize="characters">
-        <div id="forget-note"></div>
-        <button class="about-btn danger" id="forget-go" disabled>Erase forever</button>
-      </div>
+    <!-- ABOUT leads the panel (6b259, per Patrick) — the version, when
+         it shipped and what changed. No description line: the version
+         sitting right underneath says it better than a sentence would. -->
+    <section class="spane on" id="p-about">
+      <div class="set-h">About</div>
+      <div id="up-version">__APP_VER__</div>
+      <div id="up-reldate"></div>
+      <div id="up-notes" hidden></div>
+      <button class="about-btn" id="about-check">Check for updates</button>
+      <label id="beta-row"><input type="checkbox" id="betaup">
+        <span>Include Beta Releases</span></label>
     </section>
     <section class="spane" id="p-persona">
       <div class="set-h">Personality</div>
@@ -12385,17 +12369,37 @@ __CODE_ROWS__
         <div id="manage-note"></div>
       </div>
     </section>
-    <section class="spane" id="p-updates">
-      <div class="set-h">Updates</div>
-      <p class="tdesc">What version you're flying, what changed in the
-      latest build, and the beta lane if you want tomorrow's build
-      today.</p>
-      <div id="up-version">__APP_VER__</div>
-      <div id="up-reldate"></div>
-      <div id="up-notes" hidden></div>
-      <button class="about-btn" id="about-check">Check for updates</button>
-      <label id="beta-row"><input type="checkbox" id="betaup">
-        <span>Include Beta Releases</span></label>
+    <!-- ACCOUNT closes the panel (6b259, per Patrick): who you are and
+         the exits belong at the foot, not the front door. -->
+    <section class="spane" id="p-account">
+      <div class="set-h">Account</div>
+      <p class="tdesc">Who you're signed in as, on this Mac and anywhere
+      else you use MillenAI &mdash; and the exits: sign out, or erase
+      what it knows about you.</p>
+      <div id="acct-card">
+        <div id="acct-av">&#128187;</div>
+        <div><b id="acct-kind">&mdash;</b>
+        <span id="acct-sub"></span></div>
+      </div>
+      <button class="about-btn slim" id="acct-logout" hidden>Sign out</button>
+      <button class="about-btn danger" id="about-forget">Forget me&hellip;</button>
+      <div id="forget-steps" hidden>
+        <div id="forget-what">
+          <label class="fscope"><input type="checkbox" id="fs-mem" checked>
+            <span>Memories</span></label>
+          <label class="fscope"><input type="checkbox" id="fs-chats">
+            <span>Chats</span></label>
+          <label class="fscope"><input type="checkbox" id="fs-prefs">
+            <span>Personal settings</span></label>
+        </div>
+        <input id="forget-pin" type="password" inputmode="numeric"
+               maxlength="12" placeholder="owner PIN to confirm" hidden
+               autocomplete="off">
+        <input id="forget-word" placeholder="type FORGET ME to confirm"
+               autocomplete="off" spellcheck="false" autocapitalize="characters">
+        <div id="forget-note"></div>
+        <button class="about-btn danger" id="forget-go" disabled>Erase forever</button>
+      </div>
     </section>
     </div>
     <div id="about-foot">

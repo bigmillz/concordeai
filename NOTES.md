@@ -4269,3 +4269,25 @@ one of which made a SUCCESSFUL job look like a failure:
   screen. Set APP_RC = 0 when 6.1 ships for real, after sign-on and
   cloud sync.
 - Gauntlet 115/115.
+
+## 6 beta 259 (pending) — About leads, Account closes
+- THE RAIL READS TOP TO BOTTOM AS A STORY NOW (per Patrick): About
+  first — it is what people open the panel to see — then the settings
+  proper, and Account last, because "who am I / sign out / erase
+  everything" belongs at the foot rather than the front door. Updates
+  is renamed About; the pane id moved with it (p-updates -> p-about)
+  and the default-open class went with it too, so the panel opens on
+  About instead of on the exits.
+- NO DESCRIPTION LINE ON ABOUT (per Patrick). The version number sits
+  directly under the title and says it better than a sentence could;
+  five descriptions across six panes is the shape now, and the
+  gauntlet counts exactly that so a stray one can't creep back in.
+  The removed blurb is asserted absent by name for the same reason.
+- The new order is checked structurally rather than by eyeball: the
+  nav's data-pane list and the sections' id list must BOTH equal the
+  intended order, so a future edit that moves one without the other
+  fails loudly instead of silently desynchronising the panel.
+- STANDING RULE FROM HERE (per Patrick): do NOT cut a release or touch
+  APP_VERSION / APP_BUILD / APP_RC unless he asks. Build, test, commit,
+  push — then stop and say it is ready to cut. This entry is therefore
+  unreleased: 258 is still the newest tag.
