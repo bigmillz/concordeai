@@ -4229,7 +4229,10 @@ _PLACE_FILLER = frozenset("""
 def _place_terms(prompt: str) -> str:
     """'is ables in bushwick open tonight' -> 'ables bushwick'."""
     words = re.findall(r"[a-z0-9'&-]+", prompt.lower())
-    return " ".join(w for w in words if w not in _PLACE_FILLER)[:80]
+    out = " ".join(w for w in words if w not in _PLACE_FILLER)
+    if len(out) > 80:            # cut BETWEEN words — the old mid-word
+        out = out[:80].rsplit(" ", 1)[0]   # cap minted "in Som" (6b260)
+    return out
 
 
 _GOOD_HOSTS = ("yelp.", "theinfatuation.", "timeout.", "eater.",
@@ -8727,10 +8730,20 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # gating only on hours/open/address sent exactly the
                 # queries the places module exists for down the plain
                 # web-search path instead
-                placey = bool(re.search(
+                # A VENUE LOOKUP IS SHORT (6b260, seen live): a sixty-word
+                # message about a friend, money and maybe-booking a hotel
+                # contains "hotel" and "book" — and got shredded into a
+                # fake venue name ("Challenging Tokyo-Haneda Airport
+                # Should Be Grabbing Wifi Needed Sitting Down in Som")
+                # and answered with the not-found script. Real lookups
+                # ("is lucali open tonight", "late night restaurants in
+                # 11221") are short; long prose goes to plain search,
+                # which handles it fine.
+                placey = (len(query.split()) <= 14
+                          and bool(re.search(
                     r"\bhours\b|\bopen\b|\bclosed?\b|\bphone\b|"
                     r"\baddress\b|\bmenu\b|\breservation", query, re.I)
-                    or _VENUE_RX.search(query))
+                    or _VENUE_RX.search(query)))
                 matched = True
                 bookish = bool(_BOOKING_RX.search(query.lower())
                                or _ASKY_RX.search(query))
@@ -8900,10 +8913,22 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # last term is the locality, the rest is the name:
                     # "qzxvbn cafe bushwick" -> "Qzxvbn Cafe" in "Bushwick"
                     pt = _place_terms(query).split()
+                    if len(pt) > 6:
+                        # no venue is named by seven-plus words of
+                        # leftover prose — this is a sentence, not a
+                        # name. Answer it as a question, honestly.
+                        strictness = (
+                            "The searches found nothing directly "
+                            "relevant. Answer from your own knowledge, "
+                            "be plain about what you're unsure of, and "
+                            "never invent a venue, price or hour. Do "
+                            "NOT claim you searched for a place by "
+                            "name.\n")
+                        pt = []
                     ent = (" ".join(pt[:-1]) or pt[0]).title() if pt \
                         else "that"
                     loc = (" in " + pt[-1].title()) if len(pt) > 1 else ""
-                    strictness = (
+                    if pt: strictness = (
                         "IMPORTANT: nothing you found actually mentions "
                         "the place the user asked about. Do not pretend "
                         "it does, and never present other places as if "

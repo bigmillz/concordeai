@@ -195,6 +195,17 @@ check("web answers blend sources with real knowledge",
 check("supermarkets reach OSM shop tag",
       "supermarket|convenience" in _MILLENAI_SRC
       and 'node["shop"~' in _MILLENAI_SRC)
+# 6b260, seen live: a sixty-word message about a friend, money and
+# maybe-booking a hotel was shredded into a fake venue name and
+# answered with the not-found script ("...Sitting Down in Som" — the
+# 80-char cap cutting "somewhere" mid-word). Three layers now: the
+# lookup classifier only fires on short lookup-shaped queries, a
+# prose-length "entity" is never dictated as a venue name, and the
+# terms cap cuts between words.
+check("venue lookup can't eat a conversation",
+      "len(query.split()) <= 14" in _MILLENAI_SRC
+      and "len(pt) > 6" in _MILLENAI_SRC
+      and 'out[:80].rsplit(" ", 1)[0]' in _MILLENAI_SRC)
 # the picker used to scroll sideways: 1fr columns won't shrink below
 # max-content, and .tn is nowrap. minmax(0,1fr) is the fix.
 check("task picker: no horizontal scroll",

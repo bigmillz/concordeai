@@ -62,6 +62,33 @@ CHAT_WEB = [
     "best pizza slice near myrtle-broadway, open now",
     "when does daylight savings end this year",
 ]
+# The class that produced the worst live answer yet (6b260): long,
+# messy, multi-intent, mid-message self-corrections — a human thinking
+# out loud. These contain venue-ish words ("hotel", "book") that used
+# to trip the place-lookup path into inventing a venue name from the
+# user's own prose. Paraphrased from real usage — the repo is public,
+# so no verbatim personal content.
+CHAT_MESSY = [
+    "should i be ok just grabbing wifi somewhere on my laptop and "
+    "finding a hotel last minute if my friend doesnt move her train "
+    "up to the 24th? i have one in mind, just wasnt going to book it "
+    "if shes coming - wait actually i could. but shes already asking "
+    "to borrow money so now i feel weird using my card credit on a "
+    "room thats not 100% for me",
+    "ok so my landlord says the leak is fixed but theres still a "
+    "stain spreading on the ceiling and im supposed to host dinner "
+    "friday, do i push him again or just get a dehumidifier and deal "
+    "after, also can i even paint over that or does it need to dry "
+    "out first",
+    "trying to decide if i sell my old camera gear before the trip "
+    "or after - prices drop when the new model comes out right? but "
+    "i kind of want it FOR the trip, ugh. is there like a rule of "
+    "thumb for when used gear loses value",
+    "my sister wants to split a beach house in september with her "
+    "college friends and me, im wfh that week so i need decent wifi "
+    "and a quiet corner, is that a thing you can actually check "
+    "before booking or am i just gambling",
+]
 FUNNELS = [
     {"goal": "Should I get a pet?", "reqs": "studio apartment, active",
      "typed": {2: "maybe 2 hours a day"}},
@@ -140,7 +167,7 @@ def main():
     ap.add_argument("--batch", type=int, default=8,
                     help="questions per lane (funnels capped at bank size)")
     ap.add_argument("--seed", type=int, default=None)
-    ap.add_argument("--modes", default="chat,web,funnel")
+    ap.add_argument("--modes", default="chat,web,messy,funnel")
     a = ap.parse_args()
     seed = a.seed if a.seed is not None else int(time.time()) % 100000
     rng = random.Random(seed)
@@ -168,6 +195,10 @@ def main():
         for q in rng.sample(CHAT_PLAIN, min(a.batch, len(CHAT_PLAIN))):
             try: emit(drill_chat(q, web=False))
             except Exception as e: emit({"mode":"chat","question":q,"error":str(e)[:200]})
+    if "messy" in modes:
+        for q in rng.sample(CHAT_MESSY, min(a.batch, len(CHAT_MESSY))):
+            try: emit(drill_chat(q, web=True))
+            except Exception as e: emit({"mode":"messy","question":q,"error":str(e)[:200]})
     if "web" in modes:
         for q in rng.sample(CHAT_WEB, min(a.batch, len(CHAT_WEB))):
             try: emit(drill_chat(q, web=True))
