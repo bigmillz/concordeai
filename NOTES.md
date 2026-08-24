@@ -4319,3 +4319,64 @@ one of which made a SUCCESSFUL job look like a failure:
   live deployment is its own checkout at `~/Library/MillenAI-live/repo`
   (still the trap — never edit there), and every build script already
   used `cd "$(dirname "$0")"` rather than an absolute path.
+
+## 6 beta 260 (pending) — the answers themselves, and a rig to keep them honest
+- PATRICK'S TWO COMPLAINTS WERE THREE BUGS. "Chat gives useless
+  answers" and "the funnel just parrots my choices back" turned out to
+  be four separate causes, each fixed here, plus a fifth the new rig
+  found within one batch.
+- THE FUNNEL WAS ECHOING BECAUSE OF A ONE-LINE FALLBACK:
+  `"summary": out or "\n".join(picks)`. When the summariser produced
+  nothing, the "recommendation" was literally the user's own answers
+  joined by newlines — exactly "something strawberry, frozen, with
+  sprinkles". It never says that now: if no model can be reached it
+  says so plainly and points at Settings.
+- AND THE SUMMARISER WAS WEARING THE WRONG PROMPT. It ran under
+  FUNNEL_SYS, whose entire job is "offer options that narrow the
+  decision", then was asked for a single verdict — contradictory
+  instructions, so it restated or re-offered. The verdict now has its
+  own voice, FUNNEL_SUMMARY_SYS ("restating the user's answers back to
+  them is failure"), with care mode carried across for tender
+  decisions. Its model ladder widened from three hard-coded labels to
+  MERGE_RANK, so a Mac without those exact three no longer falls
+  through to the echo.
+- THE STAGES HAD NO MEMORY OF THEIR OWN QUESTIONS. Only the ANSWERS
+  were sent back, so the model happily asked "city or nature?" four
+  times running, and ignored a typed "strawberry" to ask about texture
+  again. Both ends now carry an `asked` list, paired with the answers
+  ("asked X -> they answered Y"), and the prompt forbids repeating or
+  re-asking what an answer already settles. Measured before/after on
+  the same seed: 4 questions collapsing to 1-2 distinct -> 4 of 4
+  distinct, and the candy funnel's second question became "what
+  texture for your STRAWBERRY fix" — it finally hears the typed word.
+- THE WEB VOICE WAS HEDGING BY INSTRUCTION. RESEARCH_WRITE said "using
+  ONLY the numbered sources", and REVISE_INSTRUCTION said to "delete
+  any named business the draft cannot vouch is real" — rules written
+  against hallucination that also deleted every real, well-known place
+  the model knew, leaving "there's a place, try it". Split the
+  difference the way a good local would: volatile facts (hours,
+  prices, open-now) stay source-bound and cited; stable knowledge is
+  used freely and uncited; a non-answer is named as the worst outcome.
+- SUPERMARKETS WERE UNREACHABLE. _OSM_KINDS only mapped amenity= tags,
+  but a supermarket is shop=supermarket — so the one query type that
+  prompted this whole round ("is there a supermarket open now") could
+  never find a venue with real hours. The Overpass query is a union
+  over amenity= and shop= now, and grocery/bodega/deli words route to
+  it.
+- THE RIG (drill.py + drill_rubric.md): fires real questions at a live
+  instance across chat / web / funnel, walks funnels to completion
+  with a MIX of clicked and TYPED answers, and records everything
+  verbatim to ~/Library/Application Support/MillenAI/drill_runs (out
+  of Drive on purpose — a days-long grind would sync thousands of
+  files, and a write into a freshly-created Drive directory came back
+  0 bytes in testing). It deliberately does NOT grade itself: the
+  judge is Claude reading the transcript against the rubric, so the
+  same code never both answers and marks its own work.
+- IT EARNED ITS KEEP IMMEDIATELY. Batch one caught the repeated
+  questions above, and batch two caught a live geography failure:
+  "best pizza slice near myrtle-broadway, open now" — a Bushwick
+  intersection — was answered with pizzerias in MYRTLE BEACH, SOUTH
+  CAROLINA. The search planner doesn't pass the user's locality, so
+  "myrtle" resolves to the famous place. That is the next fix, and it
+  is written down rather than half-done at the end of a long session.
+

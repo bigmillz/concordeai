@@ -4046,6 +4046,12 @@ _OSM_KINDS = (
      r"restaurants?|eater|eats|dinner|lunch|brunch|diner)\b",
      "restaurant|fast_food"),
     (r"\b(pharmac|chemist|drugstore)\b", "pharmacy"),
+    # 6b260: supermarkets are shop=, not amenity= — the query below
+    # matches both tags, so "is there a supermarket open now" finally
+    # gets real venues with real hours instead of a hedge
+    (r"\b(supermarkets?|grocer(?:y|ies)|bodegas?|corner ?stores?|"
+     r"delis?|food ?(?:store|market))\b",
+     "supermarket|convenience|greengrocer|deli"),
 )
 _OSM_CACHE = {}
 _OSM_TTL = 1800.0
@@ -4136,9 +4142,15 @@ def osm_places(terms: str, locality: str, limit: int = 8) -> list:
     geo = _geocode(locality)
     if not geo:
         return []
-    q = ('[out:json][timeout:20];node["amenity"~"^(%s)$"]["name"]'
-         '(around:1400,%s,%s);out body 60;'
-         % (amenity, geo["lat"], geo["lon"]))
+    # a UNION over both tags: eateries and bars live under amenity=,
+    # supermarkets and delis under shop= (6b260) — one regex serves
+    # both since the value sets don't collide
+    q = ('[out:json][timeout:20];('
+         'node["amenity"~"^(%s)$"]["name"](around:1400,%s,%s);'
+         'node["shop"~"^(%s)$"]["name"](around:1400,%s,%s);'
+         ');out body 60;'
+         % (amenity, geo["lat"], geo["lon"],
+            amenity, geo["lat"], geo["lon"]))
     try:
         req = urllib.request.Request(
             "https://overpass-api.de/api/interpreter",
@@ -4830,10 +4842,15 @@ REVISE_INSTRUCTION = (
     "- if the draft opens with a title or heading, delete it — the "
     "first line must be a plain sentence spoken to the person, in "
     "their register (casual question, casual answer)\n"
-    "- delete any named business, program, retreat or price the draft "
-    "cannot vouch is real, and any fake vouching ('tried-and-tested', "
-    "'highly rated'); replace with the honest category and where to "
-    "find real listings\n"
+    "- keep real, widely-known names — chains, landmarks, institutions "
+    "you recognise from your own knowledge — and every specific backed "
+    "by the material; delete only inventions (names, prices or claims "
+    "you can neither recognise nor trace) and fake vouching "
+    "('tried-and-tested', 'highly rated') with nothing behind it. An "
+    "answer stripped to 'there's a place, try it' is a WORSE failure "
+    "than an unvarnished detail — if the draft names no concrete "
+    "options, ADD the best-known real ones, plainly labelled as worth "
+    "checking\n"
     "- match the length to the question: tighten a simple answer to its "
     "essentials, deepen a substantial one\n"
     "- SHAPE it to be scanned: short paragraphs with blank lines "
@@ -5383,11 +5400,25 @@ RESEARCH_PLAN = (
     "no commentary.\n\nQUESTION: ")
 
 RESEARCH_WRITE = (
-    "Write a short research brief answering the question, using ONLY the "
-    "numbered sources below. Cite them inline as [1], [2] and so on, matching "
-    "the numbers exactly as given. Lead with the answer, then the supporting "
-    "detail. If the sources disagree or don't cover something, say so plainly "
-    "rather than filling the gap. Never invent a fact or a source.")
+    "Write the answer as a knowledgeable local expert, drawing on BOTH "
+    "the numbered sources and what you reliably know (6b260 — the old "
+    "sources-only rule produced useless hedges like 'the only place I "
+    "can confirm from my data').\n"
+    "- Facts that CHANGE — hours, prices, events, whether somewhere is "
+    "open right now — come only from the sources, cited inline as "
+    "[1], [2] matching the numbers exactly. If the sources don't "
+    "settle such a fact, say in one clause what to check and where.\n"
+    "- STABLE facts you are confident of from general knowledge — that "
+    "well-known chains, landmarks or institutions exist in an area, "
+    "how something generally works — belong in the answer, uncited. "
+    "Never drop a true, useful fact because the sources missed it.\n"
+    "- A non-answer is the worst outcome. If the sources are thin, "
+    "still name the best real candidates you know, plainly flagged "
+    "('long-standing in the area — tonight's hours not in what I "
+    "pulled'), and say how to confirm in one clause.\n"
+    "- Never invent a name, number or source; if the sources disagree, "
+    "say so.\n"
+    "Lead with the answer, then the supporting detail.")
 
 
 def _plan_queries(label: str, question: str, status) -> list:
@@ -6504,26 +6535,76 @@ FUNNEL_CARE = (
     "being processed.")
 
 
+# THE VERDICT VOICE (6b260, per Patrick: the summary used to parrot the
+# picks back — "something strawberry, frozen, with sprinkles" — because
+# it was driven by FUNNEL_SYS, whose entire job is to OFFER OPTIONS).
+# The summary is not a stage; it gets its own system prompt whose only
+# job is a decision.
+FUNNEL_SUMMARY_SYS = (
+    "You are the decisive final step of a decision funnel. The "
+    "narrowing is DONE — your only job is the verdict. Speak like a "
+    "sharp, warm expert who has heard every answer and knows exactly "
+    "what to suggest: one concrete, specific, real recommendation. "
+    "Restating the user's own answers back to them is failure; so is "
+    "offering a list of options — they came for a recommendation and "
+    "you give exactly one, with the reason it fits and the next step.")
+
+
+def funnel_summary_sys_for(goal: str) -> str:
+    """Care mode applies to the verdict too — a tender decision gets a
+    tender recommendation, same detection as the stages."""
+    return FUNNEL_SUMMARY_SYS + (FUNNEL_CARE
+                                 if _TENDER_RX.search(goal or "")
+                                 else "")
+
+
 def funnel_sys_for(goal: str) -> str:
     """The funnel's system prompt, softened when the decision deserves
     it (6b253). One place, so every funnel entry point agrees."""
     return FUNNEL_SYS + (FUNNEL_CARE if _TENDER_RX.search(goal or "") else "")
 
 
-def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False):
-    """One stage: a question plus `opts` options, as structured data."""
-    chosen = ("\n".join("- stage %d: %s" % (i + 1, p)
-                         for i, p in enumerate(picks))
-              if picks else "(nothing chosen yet)")
+def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
+                 asked=None):
+    """One stage: a question plus `opts` options, as structured data.
+
+    `asked` is every question already put to the user. Without it the
+    model re-asked the SAME question every stage — "city or nature?"
+    four times running, ignoring a typed answer in between (6b260,
+    caught by drill.py on its first batch). Knowing the ANSWERS is not
+    enough; it has to know what it already ASKED."""
+    asked = [a for a in (asked or []) if a]
+    chosen = ("\n".join(
+        "- stage %d: asked \"%s\" -> they answered \"%s\""
+        % (i + 1, asked[i] if i < len(asked) else "(not recorded)", p)
+        for i, p in enumerate(picks))
+        if picks else "(nothing chosen yet)")
+    prior = ("\n".join("- %s" % q for q in asked)
+             if asked else "(none yet)")
+    # the closer a funnel gets to done, the easier it is for the model
+    # to coast — "Which direction?" as stage 5 of 5 was seen live
+    # (6b260, per Patrick). The last stage is told it is last.
+    final = (" This is the FINAL question before the recommendation "
+             "— ask the one thing that would most change what you "
+             "recommend." if stage == total else "")
     ask = (
         "DECISION: %s\nREQUIREMENTS: %s\nCHOICES SO FAR:\n%s\n\n"
-        "This is stage %d of %d. Write ONE short question (under 12 "
-        "words) that moves this decision forward, then exactly %d "
+        "QUESTIONS ALREADY ASKED — never repeat or rephrase any of "
+        "these, and never ask what an answer above already "
+        "settles:\n%s\n\n"
+        "This is stage %d of %d.%s Write ONE short question (under 12 "
+        "words) that MATERIALLY narrows this decision, then exactly %d "
         "options that follow from the choices so far.\n"
+        "Never a vague or rhetorical question ('Which direction?', "
+        "'What matters most?'), and never one whose answer the "
+        "choices already imply. When the big choice is settled, "
+        "narrow the practical side that matters most next: budget, "
+        "size, timing, or where to get it.\n"
         "Reply as STRICT JSON, nothing else:\n"
         '{"q":"the question","options":[{"label":"short name",'
         '"why":"one clause on the tradeoff"}]}'
-        % (goal, reqs or "none stated", chosen, stage, total, opts))
+        % (goal, reqs or "none stated", chosen, prior, stage, total,
+           final, opts))
     label = next((l for l in ("Gemma 4 26B", "Gemma 4 12B", "Qwen 3.6 35B MoE",
                               "Llama 3.1 8B")
                   if model_cached(l) and model_fits_memory(l)), "")
@@ -8094,23 +8175,41 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             opts = max(2, min(6, int(d.get("opts", 3) or 3)))
             total = max(1, min(20, int(d.get("stages", 5) or 5)))
             want_img = bool(d.get("images"))
+            asked = [str(x)[:160] for x in (d.get("asked") or [])][:20]
             stage = len(picks) + 1
             if stage > total:
                 # the funnel is spent — summarise the path taken
-                msgs = [{"role": "system", "content": funnel_sys_for(goal)},
+                msgs = [{"role": "system",
+                         "content": funnel_summary_sys_for(goal)},
                         {"role": "user", "content":
-                         "DECISION: %s\nREQUIREMENTS: %s\nThe user chose, "
-                         "in order: %s\n\nIn under 120 words, state the "
-                         "single recommendation these choices point to and "
-                         "the one thing to do next. No preamble."
-                         % (goal, reqs or "none", "; ".join(picks))}]
+                         "DECISION: %s\nREQUIREMENTS: %s\nThe user "
+                         "answered each narrowing question, in order: "
+                         "%s\n(the questions asked were: %s)\n\n"
+                         "Give your recommendation:\n"
+                         "- NAME the specific thing in the first "
+                         "sentence — a real, concrete pick (a breed, a "
+                         "product, a place, a plan), never a category "
+                         "and never a restatement of their answers.\n"
+                         "- Then two or three sentences on why it fits "
+                         "THESE answers and the requirements — woven "
+                         "in, not listed back.\n"
+                         "- End with the single most useful next step, "
+                         "as a plain instruction.\n"
+                         "- If two picks genuinely tie, lead with your "
+                         "winner and give the runner-up one clause.\n"
+                         "Under 160 words. No preamble."
+                         % (goal, reqs or "none", "; ".join(picks),
+                            "; ".join(asked) or "not recorded")}]
                 out = ""
                 if load_prefs(None).get("turbo") and cloud_conf():
                     out = cloud_text(cloud_conf(), msgs, timeout=45)
                 if not out:
-                    lbl = next((l for l in ("Gemma 4 26B", "Gemma 4 12B",
-                                            "Llama 3.1 8B")
-                                if model_cached(l)
+                    # ANY strong cached model beats none (6b260): the
+                    # old three-label ladder meant a Mac without those
+                    # exact models fell through to parroting the picks
+                    lbl = next((l for l in MERGE_RANK
+                                if l not in BLEND_EXCLUDE
+                                and model_cached(l)
                                 and model_fits_memory(l)), "")
                     if lbl:
                         parts = []
@@ -8119,12 +8218,22 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             out = strip_think("".join(parts))
                         except Exception:
                             out = ""
+                # NEVER hand the picks back as if they were an answer
+                # (6b260, per Patrick) — if no model can weigh in, say
+                # so honestly and point at the fix
                 self._send_json({"done": True, "stage": total,
                                  "total": total,
-                                 "summary": out or "\n".join(picks)})
+                                 "summary": out or (
+                                     "I couldn't reach a model to weigh "
+                                     "these, so no recommendation yet — "
+                                     "your path was: "
+                                     + " \u2192 ".join(picks)
+                                     + ". Add a local model in Settings "
+                                     "\u2192 Models (or a cloud key) and "
+                                     "finish the funnel again.")})
                 return
             st = funnel_stage(goal, reqs, opts, stage, total, picks,
-                              want_img)
+                              want_img, asked)
             self._send_json({"done": False, "stage": stage,
                              "total": total, "q": st["q"],
                              "options": st["options"]})
@@ -12259,11 +12368,11 @@ __CODE_ROWS__
            panel to see), Account sits at the foot with the exits. -->
       <div id="set-nav">
         <button class="snav on" data-pane="p-about">About</button>
+        <button class="snav" data-pane="p-account">Account</button>
         <button class="snav" data-pane="p-persona">Personality</button>
         <button class="snav" data-pane="p-cloud">Cloud power</button>
         <button class="snav" data-pane="p-community">Community</button>
         <button class="snav" data-pane="p-models">Models</button>
-        <button class="snav" data-pane="p-account">Account</button>
       </div>
     </nav>
 
@@ -12280,6 +12389,38 @@ __CODE_ROWS__
       <button class="about-btn" id="about-check">Check for updates</button>
       <label id="beta-row"><input type="checkbox" id="betaup">
         <span>Include Beta Releases</span></label>
+    </section>
+    <!-- ACCOUNT sits directly under About (6b260, per Patrick):
+         identity reads as part of the front matter, not a footnote. -->
+    <section class="spane" id="p-account">
+      <div class="set-h">Account</div>
+      <p class="tdesc">Who you're signed in as, on this Mac and anywhere
+      else you use MillenAI &mdash; and the exits: sign out, or erase
+      what it knows about you.</p>
+      <div id="acct-card">
+        <div id="acct-av">&#128187;</div>
+        <div><b id="acct-kind">&mdash;</b>
+        <span id="acct-sub"></span></div>
+      </div>
+      <button class="about-btn slim" id="acct-logout" hidden>Sign out</button>
+      <button class="about-btn danger" id="about-forget">Forget me&hellip;</button>
+      <div id="forget-steps" hidden>
+        <div id="forget-what">
+          <label class="fscope"><input type="checkbox" id="fs-mem" checked>
+            <span>Memories</span></label>
+          <label class="fscope"><input type="checkbox" id="fs-chats">
+            <span>Chats</span></label>
+          <label class="fscope"><input type="checkbox" id="fs-prefs">
+            <span>Personal settings</span></label>
+        </div>
+        <input id="forget-pin" type="password" inputmode="numeric"
+               maxlength="12" placeholder="owner PIN to confirm" hidden
+               autocomplete="off">
+        <input id="forget-word" placeholder="type FORGET ME to confirm"
+               autocomplete="off" spellcheck="false" autocapitalize="characters">
+        <div id="forget-note"></div>
+        <button class="about-btn danger" id="forget-go" disabled>Erase forever</button>
+      </div>
     </section>
     <section class="spane" id="p-persona">
       <div class="set-h">Personality</div>
@@ -12367,38 +12508,6 @@ __CODE_ROWS__
         </dl>
         <div id="plan-row"></div>
         <div id="manage-note"></div>
-      </div>
-    </section>
-    <!-- ACCOUNT closes the panel (6b259, per Patrick): who you are and
-         the exits belong at the foot, not the front door. -->
-    <section class="spane" id="p-account">
-      <div class="set-h">Account</div>
-      <p class="tdesc">Who you're signed in as, on this Mac and anywhere
-      else you use MillenAI &mdash; and the exits: sign out, or erase
-      what it knows about you.</p>
-      <div id="acct-card">
-        <div id="acct-av">&#128187;</div>
-        <div><b id="acct-kind">&mdash;</b>
-        <span id="acct-sub"></span></div>
-      </div>
-      <button class="about-btn slim" id="acct-logout" hidden>Sign out</button>
-      <button class="about-btn danger" id="about-forget">Forget me&hellip;</button>
-      <div id="forget-steps" hidden>
-        <div id="forget-what">
-          <label class="fscope"><input type="checkbox" id="fs-mem" checked>
-            <span>Memories</span></label>
-          <label class="fscope"><input type="checkbox" id="fs-chats">
-            <span>Chats</span></label>
-          <label class="fscope"><input type="checkbox" id="fs-prefs">
-            <span>Personal settings</span></label>
-        </div>
-        <input id="forget-pin" type="password" inputmode="numeric"
-               maxlength="12" placeholder="owner PIN to confirm" hidden
-               autocomplete="off">
-        <input id="forget-word" placeholder="type FORGET ME to confirm"
-               autocomplete="off" spellcheck="false" autocapitalize="characters">
-        <div id="forget-note"></div>
-        <button class="about-btn danger" id="forget-go" disabled>Erase forever</button>
       </div>
     </section>
     </div>
@@ -15234,6 +15343,7 @@ async function fnStep(){
     if(!fnState)return;
     b.innerHTML='<div class="fpath">stage '+d.stage+' \u00b7 '
       +esc(d.q)+'</div><b>'+esc(label)+'</b>';
+    fnState.asked=(fnState.asked||[]).concat([d.q||""]);
     fnState.picks.push(String(label).slice(0,90));
     messages.push({role:"assistant",content:d.q+" \u2192 "+label});
     fnAnswer=null;persistCurrent();fnStep();
@@ -15251,7 +15361,7 @@ $("#fn-go").addEventListener("click",()=>{
   if(!goal){$("#fn-goal").focus();return;}
   fnState={goal:goal,reqs:$("#fn-reqs").value.trim(),
     opts:+$("#fn-opts").value,stages:+$("#fn-stages").value,
-    images:$("#fn-type").value==="images",picks:[]};
+    images:$("#fn-type").value==="images",picks:[],asked:[]};
   curChat=null;messages=[];inner.innerHTML="";
   addMsg("user","Funnel: "+goal);
   messages.push({role:"user",content:"Funnel: "+goal});

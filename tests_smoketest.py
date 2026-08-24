@@ -171,8 +171,30 @@ check("funnel decision chips + persistent stuck chip",
 check("funnel care mode for tender decisions",
       "_TENDER_RX" in _MILLENAI_SRC and "FUNNEL_CARE" in _MILLENAI_SRC
       and "def funnel_sys_for" in _MILLENAI_SRC
-      and _MILLENAI_SRC.count("funnel_sys_for(goal)") == 2
+      # 6b260: the SUMMARY got its own voice — one stage-prompt call
+      # site remains, and the verdict helper carries care mode too
+      and _MILLENAI_SRC.count("funnel_sys_for(goal)") == 1
+      and _MILLENAI_SRC.count("funnel_summary_sys_for(goal)") == 1
+      and "FUNNEL_SUMMARY_SYS" in _MILLENAI_SRC
       and "FUNNEL_SYS}," not in _MILLENAI_SRC)
+# 6b260, per Patrick: the funnel verdict must never parrot the picks
+# back ("something strawberry, frozen, with sprinkles"), the web voice
+# must never shrink to sources-only hedging, and supermarket queries
+# reach OSM's shop= tag for real open-now hours
+check("funnel verdict is a verdict, not an echo",
+      '"\\n".join(picks)' not in _MILLENAI_SRC
+      and "NAME the specific thing" in _MILLENAI_SRC
+      and "couldn't reach a model to weigh" in _MILLENAI_SRC
+      and "MATERIALLY narrows" in _MILLENAI_SRC)
+check("web answers blend sources with real knowledge",
+      "drawing on BOTH" in _MILLENAI_SRC
+      # scoped to RESEARCH_WRITE's old wording — the live-data/weather
+      # prompt is legitimately source-bound and keeps its own "ONLY"
+      and "using ONLY the numbered sources" not in _MILLENAI_SRC
+      and "ADD the best-known real ones" in _MILLENAI_SRC)
+check("supermarkets reach OSM shop tag",
+      "supermarket|convenience" in _MILLENAI_SRC
+      and 'node["shop"~' in _MILLENAI_SRC)
 # the picker used to scroll sideways: 1fr columns won't shrink below
 # max-content, and .tn is nowrap. minmax(0,1fr) is the fix.
 check("task picker: no horizontal scroll",
@@ -483,9 +505,9 @@ check("settings: descriptions + Account pane + scoped forget",
 # is the one that opens.
 _nav = re.findall(r'data-pane="(p-[a-z]+)"', page)
 _panes = re.findall(r'class="spane[^"]*" id="(p-[a-z]+)"', page)
-_want = ["p-about", "p-persona", "p-cloud", "p-community", "p-models",
-         "p-account"]
-check("About leads the rail, Account closes it",
+_want = ["p-about", "p-account", "p-persona", "p-cloud", "p-community",
+         "p-models"]
+check("About leads the rail, Account right under it",
       _nav == _want and _panes == _want
       and '<button class="snav on" data-pane="p-about">About</button>' in page
       and '<section class="spane on" id="p-about">' in page

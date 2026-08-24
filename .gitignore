@@ -32,3 +32,6 @@ dist/
 # icon build intermediates — make_icon.py output; the .icns/.ico are the product
 MillenAI.iconset/
 icon_preview.png
+
+# drill transcripts live in ~/Library/Application Support/MillenAI/drill_runs
+drill_runs/
