@@ -51,3 +51,29 @@ Carries cycles 0-1: cloud repair, funnel verdict/axis fixes, chat
 voice fixes, venue-eater fix, messy bank. Gauntlet 120/120 at cut.
 Cycle 2 next: fresh-seed re-judge (did the 6 edits move funnel/chat?),
 then locality.
+
+## cycle 2 — 2026-08-25T18:55Z — fresh seed 20260826, RC3 tree
+scores: chat 4.37 (was 3.97 ✓) · web 3.57 (was 4.00, harder seed:
+movies punt 2.6, weekend-forecast gap 3.4) · messy 4.35 · funnel 3.23
+(was 3.37 — flat). CONFIRMED WINS from cycle 1: zero engagement-bait
+closers (was 5/6), funnel verdicts all specific with zero pick-echoes
+(was 4/6 echoes). ROOT CAUSE of flat funnels found: all six ran while
+Groq (the single "active" provider) was quota-resting → every stage
+fell to local 4-bit silently. funnel_stage/summary used cloud_conf()
+alone, never the ladder.
+landed (6): funnel stages + summary walk compositor_ladder (one
+resting provider = one rung, not the whole funnel); reworded-axis rule
+(texture asked once is texture asked); summary can't shrink stated
+budgets or launder inventions as "since you want" (suggestion voice +
+no invented logistics — a demolished hotel got recommended as
+bookable); chat volatile-number age flags hardened (never "the current
+model" from memory); one-structure-per-comparison rule; never OPEN
+with a profile fact. Instrumentation: funnel stages now record which
+engine served them (judges kept inferring from timing).
+next (ranked):
+1. Re-drill funnels with ladder routing live — expect the cycle-1
+   prompt fixes to finally bite through a strong engine.
+2. Web mode: "this weekend" forecast gap (answers today when asked
+   about Saturday) + movies punt (zero titles from a web-mode lookup —
+   query planner never searched showtimes).
+3. Locality into search planning (standing).

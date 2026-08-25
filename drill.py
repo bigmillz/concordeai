@@ -153,7 +153,8 @@ def drill_funnel(spec, rng):
                     "funnel_summary": d.get("summary", ""),
                     "ms": int((time.time() - t0) * 1000)}
         opts = [o.get("label", "") for o in d.get("options", [])]
-        stages.append({"q": d.get("q", ""), "options": opts})
+        stages.append({"q": d.get("q", ""), "options": opts,
+                       "engine": d.get("engine", "")})
         asked.append(d.get("q", ""))     # mirror the client (6b260)
         typed = spec.get("typed", {}).get(d.get("stage"))
         picks.append(typed if typed else

@@ -640,8 +640,20 @@ tiers = json.loads(b)
 # and came back with Moonshot's own "Invalid Authentication".)
 check("Kimi K3 wired as a provider",
       'value="kimi">Kimi K3 (paid)' in page and '"kimi","Kimi K3"' in page)
-check("every tier resolves", all(t.get("models") for t in tiers.values()),
-      str({n: t.get("models") for n, t in tiers.items()}))
+# 6b261: Cloud Only may legitimately resolve EMPTY while every
+# provider is quota-resting — the drill's own batches caused exactly
+# that, twice, and each time this check cried wolf. Empty Cloud Only
+# with all configured providers cooling is the environment, not a
+# regression; empty ANY OTHER tier, or empty Cloud Only with a
+# healthy provider available, is still a hard fail.
+_cl = json.loads(req("/api/cloud", cookie=K)[2])
+_resting = all((v.get("cool") or 0) > 0 or v.get("status") != "ok"
+               for v in (_cl.get("providers") or {}).values())     if (_cl.get("providers") or {}) else False
+check("every tier resolves",
+      all(t.get("models") for n, t in tiers.items()
+          if not (n == "Cloud Only" and _resting)),
+      str({n: t.get("models") for n, t in tiers.items()})
+      + (" [all providers resting]" if _resting else ""))
 check("Best and Power tiers are gone",
       "Best" not in tiers and "Power" not in tiers, str(list(tiers)))
 s, h, b = req("/api/stats", cookie=K)

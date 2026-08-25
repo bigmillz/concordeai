@@ -222,12 +222,19 @@ SYSTEM_PROMPT = {
         "renders it as a real "
         "diagram, so use it whenever boxes-and-arrows would beat a "
         "paragraph.\n"
+        "- ONE structure per comparison: a table OR a diagram, never "
+        "both saying the same thing — a diagram that restates the "
+        "table above it is padding. Two-option answers need neither; "
+        "prose carries two options fine.\n"
         "- No wall of text, no run-on paragraphs, no bullet soup where a "
         "sentence would do.\n\n"
         "Facts that move — OS support windows, current product "
-        "lineups, prices, versions — get an age flag when you answer "
-        "from memory ('as of my training'), never asserted as today's "
-        "truth.\n"
+        "lineups, prices, versions — get a short inline age flag when "
+        "you answer from memory ('as of my last data — worth "
+        "verifying'), never asserted as today's truth. Never name "
+        "'the current' or 'the base' model of anything from memory — "
+        "name the newest one you KNOW and flag it. A price you can't "
+        "flag, drop.\n"
         "When you don't know, say so plainly. NEVER "
         "invent verifiable specifics — phone numbers, street addresses, "
         "business hours, prices at a specific place, URLs — and NEVER "
@@ -6611,7 +6618,9 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
         "DECISION: %s\nREQUIREMENTS: %s\nCHOICES SO FAR:\n%s\n\n"
         "QUESTIONS ALREADY ASKED — never repeat or rephrase any of "
         "these, and never ask what an answer above already "
-        "settles:\n%s\n\n"
+        "settles. Rewording is repeating: texture asked once is "
+        "texture asked, whatever the words. Each new question probes "
+        "an AXIS no prior stage touched:\n%s\n\n"
         "This is stage %d of %d.%s Write ONE short question (under 12 "
         "words) that MATERIALLY narrows this decision, then exactly %d "
         "options that follow from the choices so far.\n"
@@ -6631,13 +6640,25 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
     msgs = [{"role": "system", "content": funnel_sys_for(goal)},
             {"role": "user", "content": ask}]
     raw = ""
-    if load_prefs(None).get("turbo") and cloud_conf():
-        raw = cloud_text(cloud_conf(), msgs, timeout=45)
+    engine = ""
+    # THE LADDER, not the single active provider (6b261, measured):
+    # cycle 2's funnels all ran while Groq — the "active" conf — was
+    # quota-resting, so every stage silently fell to a 4-bit local
+    # model that shrugged at the axis rules. One resting provider must
+    # cost one rung, not the whole funnel.
+    if load_prefs(None).get("turbo"):
+        for _conf in (compositor_ladder() or
+                      ([cloud_conf()] if cloud_conf() else [])):
+            raw = cloud_text(_conf, msgs, timeout=45)
+            if raw:
+                engine = str(_conf.get("model") or "cloud")
+                break
     if not raw and label:
         parts = []
         try:
             run_model(label, msgs, parts.append)
             raw = strip_think("".join(parts))
+            engine = "local:" + label
         except Exception:
             raw = ""
     m = re.search(r"\{[\s\S]*\}", raw or "")
@@ -6655,7 +6676,8 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
     if want_img and out:
         for o in out:
             o["img"] = _funnel_image("%s %s" % (goal, o["label"]))
-    return {"q": str(data.get("q", ""))[:120] or "Which direction?",
+    return {"engine": engine,
+            "q": str(data.get("q", ""))[:120] or "Which direction?",
             "options": out}
 
 
@@ -8218,10 +8240,20 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          "- When you refer to their preferences, use "
                          "ONLY their exact words from the answers — "
                          "never invent a budget, timeline or living "
-                         "situation they didn't state. If a typed "
-                         "answer skipped a question's axis, or two "
-                         "answers conflict, say so in one plain clause "
-                         "and resolve it — never silently default.\n"
+                         "situation they didn't state, and never "
+                         "SHRINK a stated one (picked 'up to $2000' "
+                         "can't become 'a $1500 budget'). A fact they "
+                         "didn't give is YOUR suggestion — say 'worth "
+                         "checking', never 'since you want'. If a "
+                         "typed answer skipped a question's axis, or "
+                         "two answers conflict, say so in one plain "
+                         "clause and resolve it — never silently "
+                         "default.\n"
+                         "- No invented logistics: never assert a "
+                         "shuttle, opening status, travel time or "
+                         "bookable venue you have no data for — "
+                         "recommend the THING, and mark the logistics "
+                         "as to-verify.\n"
                          "- The thing you name must be word-for-word "
                          "identical in the verdict and the next step.\n"
                          "- Then two or three sentences on why it fits "
@@ -8235,8 +8267,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          % (goal, reqs or "none", "; ".join(picks),
                             "; ".join(asked) or "not recorded")}]
                 out = ""
-                if load_prefs(None).get("turbo") and cloud_conf():
-                    out = cloud_text(cloud_conf(), msgs, timeout=45)
+                if load_prefs(None).get("turbo"):
+                    for _conf in (compositor_ladder() or
+                                  ([cloud_conf()] if cloud_conf()
+                                   else [])):
+                        out = cloud_text(_conf, msgs, timeout=45)
+                        if out:
+                            break
                 if not out:
                     # ANY strong cached model beats none (6b260): the
                     # old three-label ladder meant a Mac without those
@@ -8270,7 +8307,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                               want_img, asked)
             self._send_json({"done": False, "stage": stage,
                              "total": total, "q": st["q"],
-                             "options": st["options"]})
+                             "options": st["options"],
+                             "engine": st.get("engine", "")})
             return
         if self.path == "/api/prefs":
             n = int(self.headers.get("Content-Length", 0))
@@ -9062,7 +9100,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             dated_system["content"] += (
                 "\n\nFrom earlier conversations you remember these facts "
                 "about the user:\n" + mem +
-                "\nUse a remembered fact ONLY when it changes the "
+                "\nNever OPEN an answer with a remembered fact — "
+                "even a load-bearing one enters after the substance "
+                "starts, or it reads as surveillance. "
+                "Use a remembered fact ONLY when it changes the "
                 "advice — a protein target doesn't care what borough "
                 "they live in. Never decorate an answer with their "
                 "job, kids, dog or neighbourhood to show you know "
