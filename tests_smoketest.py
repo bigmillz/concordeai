@@ -202,9 +202,13 @@ check("supermarkets reach OSM shop tag",
 # lookup classifier only fires on short lookup-shaped queries, a
 # prose-length "entity" is never dictated as a venue name, and the
 # terms cap cuts between words.
+# (6b261 tightened the entity guard 6 -> 4 terms and added the
+# existence gate after "is there a supermarket that sells msg" slipped
+# through at exactly six)
 check("venue lookup can't eat a conversation",
       "len(query.split()) <= 14" in _MILLENAI_SRC
-      and "len(pt) > 6" in _MILLENAI_SRC
+      and "len(pt) > 4" in _MILLENAI_SRC
+      and '(is|are)\\s+there' in _MILLENAI_SRC
       and 'out[:80].rsplit(" ", 1)[0]' in _MILLENAI_SRC)
 # the picker used to scroll sideways: 1fr columns won't shrink below
 # max-content, and .tn is nowrap. minmax(0,1fr) is the fix.
@@ -461,6 +465,18 @@ check("sources fold into the disclosure on every path",
 # first: the new-models veil title, invisible behind announceModels'
 # own rewrite. Veil titles now carry distinct ids, the rail lockup is
 # just #set-brand b, and no rule or query names the old id at all.
+# 6b261, per Patrick ("make AI HDR too"): the lockup's AI sits in a
+# pool of REAL light — a PQ clip masked behind it, the sibling app's
+# proven beacon trick. Gated on (dynamic-range: high) so SDR displays
+# never even attach the src, off in perf mode, and the video wrapper
+# must not resurrect the forbidden span-with-bare-AI shape.
+check("the AI glows: beacon route + gated markup",
+      'id="hdrai"' in page and 'class="aiglow"' in page
+      and "dynamic-range: high" in page
+      and '"/vfx/hdr-beacon.mp4"' in _MILLENAI_SRC
+      and req("/vfx/hdr-beacon.mp4", cookie=K)[0] in (200, 206)
+      and req("/vfx/hdr-beacon.mp4", cookie=K,
+              headers={"Range": "bytes=0-99"})[0] == 206)
 check("about-name id retired, veil titles distinct",
       'id="about-name"' not in page
       and 'id="new-title"' in page and 'id="up-title"' in page

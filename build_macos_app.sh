@@ -43,6 +43,8 @@ cp millenai.py "$APP/Contents/Resources/"
 # the titlebar lockup is a native NSTextField and cannot pull Michroma
 # from Google the way the page does — it needs the real file (6b258)
 [[ -d fonts ]] && cp -R fonts "$APP/Contents/Resources/"
+# the HDR light source (6b261): one tiny PQ clip, same as ConcordeVPN
+[[ -d vfx ]] && cp -R vfx "$APP/Contents/Resources/"
 
 # --- Info.plist
 cat > "$APP/Contents/Info.plist" <<PLIST

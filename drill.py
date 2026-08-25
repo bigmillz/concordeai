@@ -122,6 +122,10 @@ def strip_frames(raw):
     srcs = len(re.findall(NUL + r"SOURCES:", txt))
     txt = re.sub(NUL + r"[A-Z0-9]+:.*?" + NUL, "", txt, flags=re.S)
     txt = txt.replace(NUL + "RESET" + NUL, "").replace(NUL, "")
+    # parity with the real client (6b261): it strips a [[PLACES]]
+    # trailer before anyone reads the answer — judges must see what
+    # users see, or they score phantom leaks
+    txt = re.sub(r"\n?\[\[PLACES\]\][\s\S]*$", "", txt)
     return txt.strip(), srcs
 
 def drill_chat(q, web):

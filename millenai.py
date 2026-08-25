@@ -4023,6 +4023,18 @@ def _geocode(q: str):
     q = (q or "").strip().lower()
     if not q:
         return None
+    # HOME DISAMBIGUATION (6b261, measured twice by the drill): bare
+    # "williamsburg" geocoded to Williamsburg, VIRGINIA and answered a
+    # Brooklyn question with another state's coffee shops. A bare
+    # neighbourhood name (no comma, no zip) is tried WITH the owner's
+    # home area first; if that finds nothing — "paris" + Brooklyn —
+    # the bare name still geocodes as itself, so world queries are
+    # untouched.
+    _home = str(load_prefs(None).get("home_area") or "").strip()
+    if _home and "," not in q and not any(ch.isdigit() for ch in q):
+        biased = _geocode("%s, %s" % (q, _home.lower()))
+        if biased:
+            return biased
     if q in _geo_cache:
         return _geo_cache[q]
     out = None
@@ -4888,7 +4900,7 @@ REVISE_INSTRUCTION = (
     "- keep it flowing prose in a confident, natural voice\n"
     "If the draft ends with a [[PLACES]] line, keep that line EXACTLY "
     "as written, still the very last line — it is machine-read, not "
-    "filler.\n"
+    "filler. If the draft has NO such line, never add one.\n"
     "Output ONLY the improved answer itself. Never begin with a preamble "
     "like 'Here is the improved answer' or 'Here's a rewritten version' — "
     "start directly with the substance.\n\n")
@@ -7393,6 +7405,41 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             m = re.search(r"[?&]i=(\d+)", self.path)
             self._send_json(sky_status(int(m.group(1)) if m else 0,
                                        warm="warm=1" in self.path))
+        elif self.path == "/vfx/hdr-beacon.mp4":
+            # THE LIGHT SOURCE (6b261, per Patrick: "make AI HDR too").
+            # A PQ/BT.2020 clip is the only thing a WKWebView page can
+            # paint brighter than SDR white — same 6.7KB asset and same
+            # trick as ConcordeVPN's beacon ("measured: display headroom
+            # 1.0 -> 8.7x, +0.1% CPU — hardware HEVC decode"). WebKit
+            # asks for Ranges, so answer them.
+            try:
+                _vp = os.path.join(os.path.dirname(
+                    os.path.abspath(__file__)), "vfx", "hdr-beacon.mp4")
+                with open(_vp, "rb") as f:
+                    _blob = f.read()
+            except Exception:
+                self.send_error(404)
+                return
+            _m = re.match(r"bytes=(\d+)-(\d*)",
+                          self.headers.get("Range", "") or "")
+            _a, _b = 0, len(_blob) - 1
+            if _m:
+                _a = int(_m.group(1))
+                if _m.group(2):
+                    _b = min(int(_m.group(2)), _b)
+            _chunk = _blob[_a:_b + 1]
+            self.send_response(206 if _m else 200)
+            self.send_header("Content-Type", "video/mp4")
+            self.send_header("Accept-Ranges", "bytes")
+            if _m:
+                self.send_header("Content-Range", "bytes %d-%d/%d"
+                                 % (_a, _b, len(_blob)))
+            self.send_header("Content-Length", str(len(_chunk)))
+            self.end_headers()
+            try:
+                self.wfile.write(_chunk)
+            except Exception:
+                pass
         elif self.path.startswith("/sky/"):
             self._send_sky()
         elif self.path == "/api/fleet/mine":
@@ -8982,10 +9029,16 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # last term is the locality, the rest is the name:
                     # "qzxvbn cafe bushwick" -> "Qzxvbn Cafe" in "Bushwick"
                     pt = _place_terms(query).split()
-                    if len(pt) > 6:
-                        # no venue is named by seven-plus words of
-                        # leftover prose — this is a sentence, not a
-                        # name. Answer it as a question, honestly.
+                    _existence = re.match(
+                        r"\s*(is|are)\s+there\b|\s*any\b", query, re.I)
+                    if _existence or len(pt) > 4:
+                        # "is there a supermarket that sells X" is a
+                        # CATEGORY question, not a venue named
+                        # "Supermarket Sells X" (6b261, the drill
+                        # caught the script firing at exactly the old
+                        # 6-term boundary) — and no venue is named by
+                        # five-plus words of leftover prose either.
+                        # Answer it as a question, honestly.
                         strictness = (
                             "The searches found nothing directly "
                             "relevant. Answer from your own knowledge, "
@@ -9813,6 +9866,25 @@ body.resizing{cursor:col-resize;user-select:none}
   margin-right:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
 }
 .vghost b{font-weight:400}
+/* THE AI GLOWS (6b261, per Patrick: "make AI HDR too" / "100000%
+   beautiful"). The masked video underneath is a PQ clip — on an HDR
+   display it composites brighter than #fff, so the AI sits in a pool
+   of real light instead of a faked highlight. Gated in JS on
+   (dynamic-range: high) and off in perf mode; SDR displays never
+   attach the src at all. */
+.aiglow{position:relative;display:inline-block}
+.aiglow video{position:absolute;left:-14px;top:-10px;
+  width:calc(100% + 28px);height:calc(100% + 20px);
+  object-fit:fill;z-index:0;opacity:0;pointer-events:none;
+  mix-blend-mode:screen;
+  -webkit-mask-image:radial-gradient(ellipse 60% 55% at center,
+    #000 18%,transparent 70%);
+  mask-image:radial-gradient(ellipse 60% 55% at center,
+    #000 18%,transparent 70%);
+  transition:opacity 1.2s ease}
+.aiglow b{position:relative;z-index:1}
+body.hdrglow .aiglow video{opacity:.85}
+body.perf .aiglow video{opacity:0}
 /* 6b257, per Patrick: the name grew an AI and the AI is BOLD — a
    nested <b> inside each quiet 400-weight lockup. NOT a span: the
    gauntlet's tab guard forbids a span whose content is exactly AI
@@ -12174,7 +12246,7 @@ body:not(.perf) .big-bar i{animation:barBreathe 2.4s ease-in-out infinite}
   <div id="sb-resize" title="Drag to resize"></div>
   <div id="brand-wrap">
     <div id="brand-row">
-    <span class="vghost" title="MillenAI"><svg id="vmark" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="vmg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#vmg)" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>Concorde<b>AI</b></b> <i class="vsub">__APP_VER__</i></span>
+    <span class="vghost" title="MillenAI"><svg id="vmark" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="vmg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#vmg)" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><span class="aiglow"><video id="hdrai" muted loop playsinline preload="auto"></video><b>Concorde<b>AI</b></b></span> <i class="vsub">__APP_VER__</i></span>
 <button id="newchat" title="New chat">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
            stroke-linecap="round" stroke-linejoin="round">
@@ -17649,6 +17721,23 @@ addEventListener("resize",()=>{     // a narrower window fits fewer chips
   const b=$("#suggest");
   if(b&&!b.hidden){b.hidden=true;syncSuggest();}
 });
+/* THE AI GLOWS (6b261): attach the PQ light source only on displays
+   that can use it, and keep nudging play() — the sibling app learned
+   a paused element composites as plain SDR and a rejected autoplay
+   promise used to freeze the light permanently. */
+const HDR_OK=!!(window.matchMedia&&matchMedia("(dynamic-range: high)").matches);
+function hdrSync(){
+  const v=$("#hdrai");if(!v)return;
+  const on=HDR_OK&&!document.body.classList.contains("perf");
+  document.body.classList.toggle("hdrglow",on);
+  if(on){
+    if(!v.src)v.src="/vfx/hdr-beacon.mp4";
+    if(v.paused)v.play().catch(()=>{});
+  }else if(v.src)v.pause();
+}
+hdrSync();
+setInterval(hdrSync,8000);
+
 if(IS_LOCAL){                       // install nudges belong to the owner
                                     // sitting at the machine, never to
                                     // a tunnel visitor (who can't run
