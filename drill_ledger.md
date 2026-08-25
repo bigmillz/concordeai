@@ -151,3 +151,28 @@ next (ranked):
    verdict/bullets/quip skeleton (judge flagged sameness — do NOT
    over-tune a done mode; revisit only if maintenance batch dips).
 4. HDR skies wiring.
+
+## cycle 7 — 2026-08-26T06:15Z — the funnel was framed
+scores: chat 4.97 (maintenance pass — judge: "do not churn") · messy
+4.80 (third straight) · web 3.80 (flat: movies 2.0 and coffee 2.2
+remain; pharmacy verdict-shaped at 3.8) · funnel 3.63 worst 1.6.
+THE FINDING: the funnel judge suspected "the collector's hidden
+persona leaking" — inverted but right. The drill sends REQS
+("studio apartment, active", "vegetarian, small kitchen", "under
+$400", "video editing under $1500", "im 28, 10 years") that were
+NEVER LOGGED in records. Every "fabricated user fact" docked across
+cycles 2, 6 and 7 was a stated requirement the funnel HONORED. Funnel
+scores have been systematically understated for three cycles; my
+cycle-6 no-presuppose edit fought a phantom (harmless, kept).
+REAL funnel faults confirmed: local-Gemma stages emit garbage when
+the ladder exhausts — the literal "Which direction?" with an EMPTY
+options array, and a 1.6 "weekend trip" verdict landing in Bay Ridge.
+landed (2): reqs_given + typed_given now logged in every funnel
+record (judges see the full contract); empty-options local stage
+earns exactly one retry up the ladder before defeat.
+web notes for cycle 8 edits: OSM authority must not read as
+exhaustive (an area-wide "tonight's a wash" from eight rows) —
+one-clause call-ahead hedge on area negatives; credit OSM ONCE, not
+per line; movies/showtimes search plan still the top web sink.
+next: cycle 8 with sighted funnel judges — expect funnel's true
+level to surface; then movies plan; then HDR skies.

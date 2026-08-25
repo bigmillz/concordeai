@@ -165,6 +165,8 @@ def drill_funnel(spec, rng):
                      (rng.choice(opts) if opts else "(no options)"))
     return {"mode": "funnel", "question": spec["goal"],
             "error": "never finished in 9 hops",
+            "reqs_given": spec.get("reqs", ""),
+            "typed_given": spec.get("typed", {}),
             "funnel_stages": stages, "ms": int((time.time()-t0)*1000)}
 
 def main():

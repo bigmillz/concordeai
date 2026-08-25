@@ -6724,6 +6724,29 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
         if isinstance(o, dict) and o.get("label"):
             out.append({"label": str(o["label"])[:90],
                         "why": str(o.get("why", ""))[:160]})
+    # A STAGE WITH NO OPTIONS IS NOT A STAGE (6b263, measured): the
+    # local fallback once emitted the literal banned "Which direction?"
+    # with an EMPTY options array — a dead end shipped to the user.
+    # Providers recover fast, so an empty local result earns exactly
+    # one more walk up the ladder before we accept defeat.
+    if not out and engine.startswith("local:")             and load_prefs(None).get("turbo"):
+        for _conf in compositor_ladder():
+            raw2 = cloud_text(_conf, msgs, timeout=45)
+            m2 = re.search(r"\{[\s\S]*\}", raw2 or "")
+            if not m2:
+                continue
+            try:
+                d2 = json.loads(m2.group(0))
+            except Exception:
+                continue
+            for o in (d2.get("options") or [])[:opts]:
+                if isinstance(o, dict) and o.get("label"):
+                    out.append({"label": str(o["label"])[:90],
+                                "why": str(o.get("why", ""))[:160]})
+            if out:
+                engine = str(_conf.get("model") or "cloud") + ":retry"
+                data = d2
+                break
     if want_img and out:
         for o in out:
             o["img"] = _funnel_image("%s %s" % (goal, o["label"]))
