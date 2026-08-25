@@ -176,3 +176,26 @@ one-clause call-ahead hedge on area negatives; credit OSM ONCE, not
 per line; movies/showtimes search plan still the top web sink.
 next: cycle 8 with sighted funnel judges — expect funnel's true
 level to surface; then movies plan; then HDR skies.
+
+## cycle 8 — 2026-08-26T08:30Z — sighted judges, and the Beijing clock
+scores (funnel judged WITH the reqs contract): funnel 4.27 (was 3.63
+blind — the exoneration confirmed; zero fabrication dockings, worst
+3.0) · chat 4.93 · messy 4.75 (both holding done) · web 3.13.
+THE SMOKING GUN: web answers assert the WRONG WEEKDAY. Runs stamped
+Tuesday ~6pm EDT answered "it's Wednesday"; the coffee record's
+"noon-8pm... kicks in later" is only possible on a weekday MORNING —
+consistent with UTC+8. That is KIMI'S BEIJING CLOCK: the date
+injection carried only a date, so a Beijing-hosted model filled in
+its own "today" and overrode the pipeline's correct data. Every
+open-now verdict computed from the wrong day.
+landed (3): the clock injection now binds weekday + local time
+("RIGHT NOW for the user it is Tuesday, August 25, 6:14PM... never
+assert a different weekday, even if your own clock disagrees");
+sources credited ONCE at first use; area-wide negatives must scope to
+the listed venues + one call-ahead clause.
+ops note: drill.py edits can be SERVED STALE by Drive minutes after
+writing (reqs_given was on disk before cycle 8 launched, absent from
+its records, present again later) — verify the marker in the same
+command that launches a batch.
+next: cycle 9 — web with a correct clock is the last big lever;
+movies plan still queued; funnel needs 4.5×2 sighted.

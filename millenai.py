@@ -8967,6 +8967,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             "hours — prefer these over any hours mentioned "
                             "in the web snippets below; %d of %d are open "
                             "right now):\n%s\n"
+                            "This list covers NEARBY venues, not the "
+                            "whole neighbourhood: a nothing-is-open "
+                            "verdict must say it covers the listed "
+                            "spots and add ONE call-ahead clause.\n"
                             "NAME VENUES ONLY FROM THIS VENUE DATA. The "
                             "web snippets below may describe same-named "
                             "places in OTHER CITIES (a Williamsburg "
@@ -9078,9 +9082,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         "under 120 words. If the data truly lacks the answer, "
                         "say that in ONE sentence and stop.\n"
                         "When you state hours, a price or a phone number, "
-                        "credit the source in-line — 'per their site', "
-                        "'per Yelp' — so the reader knows whose word it "
-                        "is.\n"
+                        "credit the source — 'per their site', 'per "
+                        "OpenStreetMap' — ONCE, at its first use; "
+                        "stamping every line reads as pipeline residue.\n"
                         "THEN, as the very last line, write [[PLACES]] "
                         "followed by a compact JSON array of the real "
                         "places you named — like [[PLACES]] [{\"n\":"
@@ -9201,7 +9205,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         dated_system = dict(SYSTEM_PROMPT)
         if ag_system:
             dated_system["content"] = ag_system
-        dated_system["content"] += f"\n\nToday's date is {today}."
+        _now_local = time.strftime("%A, %B %-d, %Y, %-I:%M%p")
+        dated_system["content"] += (
+            "\n\nRIGHT NOW for the user it is " + _now_local +
+            " (their local time). Every 'today', 'tonight' and 'right "
+            "now' in your answer means THIS moment — never assert a "
+            "different weekday, date or hour, even if your own clock "
+            "disagrees: yours may be in another timezone; the user's "
+            "is not.")
         if tier == "Thinking" and messages:
             messages[-1] = dict(messages[-1])
             messages[-1]["content"] += "\n\n" + THINK_HINT
