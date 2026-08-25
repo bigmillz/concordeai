@@ -93,7 +93,7 @@ APP_BETA = True
 # release title, while KEEPING the prerelease hold above — an RC is
 # still not the stable build, so /releases/latest must not offer it.
 # Set back to 0 when 6.1 ships for real (after sign-on + cloud sync).
-APP_RC = 2
+APP_RC = 3
 # THE BRAND (6b257): ConcordeAI — Concorde grew its AI, and the AI is
 # BOLD in every lockup (nested <b>, see .vghost). Every user-facing
 # surface says ConcordeAI; everything load-bearing stays "MillenAI" —
