@@ -4199,15 +4199,28 @@ def osm_places(terms: str, locality: str, limit: int = 8) -> list:
          ');out center body 60;'
          % (amenity, geo["lat"], geo["lon"],
             amenity, geo["lat"], geo["lon"]))
-    try:
-        req = urllib.request.Request(
-            "https://overpass-api.de/api/interpreter",
-            data=urllib.parse.urlencode({"data": q}).encode(),
-            headers={"User-Agent": "MillenAI/%s (contact: "
-                                   "millertechnology.net)" % APP_VERSION})
-        with urllib.request.urlopen(req, timeout=25) as r:
-            els = json.load(r).get("elements", [])
-    except Exception:
+    els = []
+    # TWO RUNGS (6b262, measured): overpass-api.de throttles under the
+    # drill's request pressure and the old single-endpoint call
+    # returned zero venues for a corner with NINE pizzerias — the same
+    # silent one-provider failure the cloud ladder fixed. One resting
+    # mirror costs one rung, never the answer.
+    for _ep in ("https://overpass-api.de/api/interpreter",
+                "https://overpass.kumi.systems/api/interpreter"):
+        try:
+            req = urllib.request.Request(
+                _ep,
+                data=urllib.parse.urlencode({"data": q}).encode(),
+                headers={"User-Agent": "MillenAI/%s (contact: "
+                                       "millertechnology.net)"
+                                       % APP_VERSION})
+            with urllib.request.urlopen(req, timeout=25) as r:
+                els = json.load(r).get("elements", [])
+            if els:
+                break
+        except Exception:
+            continue
+    if not els:
         return []
     rows = []
     for e in els:
@@ -4917,9 +4930,12 @@ REVISE_INSTRUCTION = (
     "closing summary or generic offer to help — but KEEP a specific "
     "closing question that asks for details needed to keep going "
     "(dates, budget); that's momentum, not filler\n"
-    "- cut any mention of 'snippets', 'search results', 'excerpts' or "
-    "'live data' — the reader never sees those; state the facts as "
-    "your own knowledge\n"
+    "- cut any mention of 'snippets', 'search results', 'excerpts', "
+    "'live data', 'the data', 'in the data', 'what I turned up' or "
+    "'I can't pull' — the reader never sees the machinery; state facts "
+    "as your own knowledge, credit named sources ('per OpenStreetMap', "
+    "'per their site'), and when something truly isn't knowable, say "
+    "what to CHECK in one clause, never what you lack\n"
     "- keep it flowing prose in a confident, natural voice\n"
     "If the draft ends with a [[PLACES]] line, keep that line EXACTLY "
     "as written, still the very last line — it is machine-read, not "

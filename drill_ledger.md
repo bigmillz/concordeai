@@ -127,3 +127,27 @@ next (ranked):
    or extended fetch) + movies/showtimes search plan.
 3. Messy hold + funnel hold — both one clean batch from done.
 4. HDR skies wiring (still queued).
+
+## cycle 6 — 2026-08-26T05:10Z — messy done, web climbing, funnels regress under severity
+scores: chat 4.87 (third straight ≥4.5 — maintenance confirmed; the
+world-facing flags and no-recap rules verifiably landed) · messy 4.75
+(4.55 then 4.75 — TWO consecutive: MESSY MEETS THE STOP CONDITION) ·
+web 3.80 (2.47→3.40→3.80; pharmacy scored 4.6 with the model shape) ·
+funnel 3.97 (full-severity hold check FAILED: the STAGE GENERATOR
+itself invents persona facts — "your $1,500 budget", "your studio
+apartment" for bare questions — both kimi and Gemma, so the shared
+prompt; my earlier user-words-only rule policed only the summary).
+landed (3): FUNNEL_SYS never-presuppose rule (stages ASK, never
+assume); banned-meta broadened ("the data"/"in the data"/"what I
+turned up"/"I can't pull" — cost pharmacy 2 register points); OSM
+endpoint LADDER (overpass-api.de throttled under drill pressure and
+returned zero venues at a corner with nine pizzerias — kumi mirror is
+rung two; verified: pizza @ myrtle-broadway 0→8 venues, OMG Pizza
+24/7 open now).
+next (ranked):
+1. Cycle 7: funnel re-hold under severity + web with OSM ladder.
+2. Movies/showtimes search plan (only remaining web sink class).
+3. Chat maintenance watch: one-directional size drift + identical
+   verdict/bullets/quip skeleton (judge flagged sameness — do NOT
+   over-tune a done mode; revisit only if maintenance batch dips).
+4. HDR skies wiring.
