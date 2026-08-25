@@ -45,3 +45,9 @@ next (ranked):
    is the hard lever.
 2. LOCALITY into search planning (myrtle-broadway ≠ Myrtle Beach SC).
 3. Re-judge funnels + chat on fresh seed (did 6 edits move scores?).
+
+## RC3 cut — 2026-08-25T17:45Z — v260 (per Patrick)
+Carries cycles 0-1: cloud repair, funnel verdict/axis fixes, chat
+voice fixes, venue-eater fix, messy bank. Gauntlet 120/120 at cut.
+Cycle 2 next: fresh-seed re-judge (did the 6 edits move funnel/chat?),
+then locality.
