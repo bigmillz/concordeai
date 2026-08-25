@@ -106,3 +106,24 @@ next (ranked):
    sentence when the feed doesn't reach the weekend).
 3. Movies/showtimes: needs a listings-shaped search plan.
 4. HDR skies wiring (map ready, 89/89 clips).
+
+## cycle 5 — 2026-08-26T03:45Z — the surge
+scores: chat 4.73 (4.83 then 4.73 — TWO consecutive ≥4.5: CHAT MEETS
+THE STOP CONDITION, drops to maintenance cadence) · messy 4.55 (back
+at the bar, needs one hold) · funnel 4.33 (3.23→3.73→4.33 — ladder +
+axis rules compounding) · web 3.40 (2.47→3.40).
+THE MADDENING ONE: coffee-near-williamsburg finally produced the
+perfect answer shape — verdict, OSM-credited hours — around VIRGINIA
+venues. Geocoder is fixed (OSM data was Brooklyn); the WEB SNIPPETS
+carry same-named wrong-city venues and the model blended them.
+landed (3): VENUE DATA authority rule (when the OSM block exists,
+venue names come ONLY from it — snippets are colour, never names);
+staleness flags must be world-facing ("~$20 — check current"), the
+meta "as of my last data" is banned (record 6 proved the model knows
+the clean form); say-each-thing-once (no Quick-version recap blocks).
+next (ranked):
+1. Judge cycle 6 — expect web to jump with venue-name authority.
+2. Weekend-forecast reach (feed stops Thursday; verdict-first honesty
+   or extended fetch) + movies/showtimes search plan.
+3. Messy hold + funnel hold — both one clean batch from done.
+4. HDR skies wiring (still queued).
