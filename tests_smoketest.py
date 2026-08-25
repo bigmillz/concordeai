@@ -192,9 +192,16 @@ check("web answers blend sources with real knowledge",
       # prompt is legitimately source-bound and keeps its own "ONLY"
       and "using ONLY the numbered sources" not in _MILLENAI_SRC
       and "ADD the best-known real ones" in _MILLENAI_SRC)
+# 6b262: nwr, not node — chains are mapped as building WAYS, and the
+# node-only query returned zero pharmacies for all of Bushwick. Also
+# guard the prefix stubs: \bpharmac\b can never match "pharmacy" (the
+# trailing boundary), so those categories never had OSM data at all.
 check("supermarkets reach OSM shop tag",
       "supermarket|convenience" in _MILLENAI_SRC
-      and 'node["shop"~' in _MILLENAI_SRC)
+      and 'nwr["shop"~' in _MILLENAI_SRC
+      and 'nwr["amenity"~' in _MILLENAI_SRC
+      and "out center body" in _MILLENAI_SRC
+      and "pharmac\\w*" in _MILLENAI_SRC)
 # 6b260, seen live: a sixty-word message about a friend, money and
 # maybe-booking a hotel was shredded into a fake venue name and
 # answered with the not-found script ("...Sitting Down in Som" — the

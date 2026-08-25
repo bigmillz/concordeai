@@ -216,8 +216,10 @@ SYSTEM_PROMPT = {
         "in parentheses: 'Hermes runtime (loop, memory, tools) -> "
         "Model endpoint (local or hosted)'. Three to eight edges; "
         "node names stay short. ONLY when the structure genuinely "
-        "branches, cycles or fans out — a linear chain that restates "
-        "the paragraph above it is padding, not a diagram; sourdough "
+        "branches, cycles or fans out AND the prose has not already "
+        "walked the same steps — a diagram after a complete prose "
+        "walkthrough duplicates it, whatever its shape; a linear chain "
+        "restating the paragraph above is padding; sourdough "
         "care and a two-item comparison never need one. The app "
         "renders it as a real "
         "diagram, so use it whenever boxes-and-arrows would beat a "
@@ -228,13 +230,19 @@ SYSTEM_PROMPT = {
         "prose carries two options fine.\n"
         "- No wall of text, no run-on paragraphs, no bullet soup where a "
         "sentence would do.\n\n"
+        "No absolutes about product families ('every model', 'all "
+        "versions') unless the edge cases would survive a bet — if "
+        "your own answer names an exception, the absolute was false; "
+        "fix the claim, not the aside.\n"
         "Facts that move — OS support windows, current product "
         "lineups, prices, versions — get a short inline age flag when "
         "you answer from memory ('as of my last data — worth "
         "verifying'), never asserted as today's truth. Never name "
         "'the current' or 'the base' model of anything from memory — "
-        "name the newest one you KNOW and flag it. A price you can't "
-        "flag, drop.\n"
+        "name the newest one you KNOW and flag it. Flag EVERY such "
+        "figure, not just the first — three unflagged prices beside "
+        "one flagged one reads as three facts and a disclaimer. A "
+        "price you can't flag, drop.\n"
         "When you don't know, say so plainly. NEVER "
         "invent verifiable specifics — phone numbers, street addresses, "
         "business hours, prices at a specific place, URLs — and NEVER "
@@ -4069,13 +4077,13 @@ def _geocode(q: str):
 # knowing the door is open.
 _OSM_KINDS = (
     (r"\b(night ?club|clubs?|nightlife|disco)\b", "nightclub|bar"),
-    (r"\b(bars?|pubs?|speakeas|brewer|cocktail)\b", "bar|pub|biergarten"),
+    (r"\b(bars?|pubs?|speakeas\w*|brewer\w*|cocktail)\b", "bar|pub|biergarten"),
     (r"\b(cafes?|cafés?|coffee|espresso)\b", "cafe"),
-    (r"\b(bakery|bakeries|pastr)\b", "bakery"),
+    (r"\b(bakery|bakeries|pastr\w*)\b", "bakery"),
     (r"\b(pizza|sushi|ramen|tacos?|burgers?|noodles?|bbq|barbecue|"
      r"restaurants?|eater|eats|dinner|lunch|brunch|diner)\b",
      "restaurant|fast_food"),
-    (r"\b(pharmac|chemist|drugstore)\b", "pharmacy"),
+    (r"\b(pharmac\w*|chemists?|drugstores?)\b", "pharmacy"),
     # 6b260: supermarkets are shop=, not amenity= — the query below
     # matches both tags, so "is there a supermarket open now" finally
     # gets real venues with real hours instead of a hedge
@@ -4175,10 +4183,15 @@ def osm_places(terms: str, locality: str, limit: int = 8) -> list:
     # a UNION over both tags: eateries and bars live under amenity=,
     # supermarkets and delis under shop= (6b260) — one regex serves
     # both since the value sets don't collide
+    # nwr, not node (6b262, measured): chain pharmacies, supermarkets
+    # and plenty of restaurants are mapped as building WAYS, so a
+    # node-only query returned ZERO pharmacies for all of Bushwick and
+    # the open-now feature was silently blind to exactly the venues
+    # people ask about. "out center" gives ways a point to pin.
     q = ('[out:json][timeout:20];('
-         'node["amenity"~"^(%s)$"]["name"](around:1400,%s,%s);'
-         'node["shop"~"^(%s)$"]["name"](around:1400,%s,%s);'
-         ');out body 60;'
+         'nwr["amenity"~"^(%s)$"]["name"](around:1400,%s,%s);'
+         'nwr["shop"~"^(%s)$"]["name"](around:1400,%s,%s);'
+         ');out center body 60;'
          % (amenity, geo["lat"], geo["lon"],
             amenity, geo["lat"], geo["lon"]))
     try:
@@ -4213,7 +4226,12 @@ def osm_places(terms: str, locality: str, limit: int = 8) -> list:
     rows = rows[:limit]
     if len(_OSM_CACHE) > 60:
         _OSM_CACHE.clear()
-    _OSM_CACHE[key] = (now, rows)
+    # cache only SUCCESS (6b262): a transient Overpass timeout used to
+    # park an empty list here for 30 minutes, so every "pharmacy open
+    # late" in that window answered from bare web snippets while the
+    # hours data sat one retry away — the drill scored the wreckage
+    if rows:
+        _OSM_CACHE[key] = (now, rows)
     return rows
 
 

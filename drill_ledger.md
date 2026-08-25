@@ -77,3 +77,32 @@ next (ranked):
    about Saturday) + movies punt (zero titles from a web-mode lookup —
    query planner never searched showtimes).
 3. Locality into search planning (standing).
+
+## cycle 4 — 2026-08-26T01:50Z — the ladder's first scored test
+scores: chat 4.83 (3.97→4.37→3.90→4.83 — TWO perfect 5s, zero
+closers, zero mojibake; essentially at the bar) · funnel 3.73 (ladder
+routing +0.5, first movement in three cycles) · messy 3.90 · web 2.47
+(the crisis mode — now ONE class: live-status questions. Movies punt,
+pharmacy no-verdict, weekend forecast answering Tue-Thu, and an L-train
+question answered from INDIAN RAILWAYS).
+landed: 3 chat polish rules (per-figure age flags, no diagram after a
+prose walkthrough of the same steps, no product-family absolutes).
+Plus the web dig hit gold — two ANCIENT bugs, not regressions:
+- osm_places queried node[...] only: chain pharmacies/supermarkets/
+  restaurants are mapped as building WAYS, so open-now was blind to
+  exactly the venues people ask about. nwr + out center; supermarket
+  bushwick 0→8 venues (two 24/7), coffee williamsburg 0→8.
+- _OSM_KINDS prefix stubs (\bpharmac\b, \bpastr\b, \bspeakeas\b,
+  \bbrewer\b) can NEVER match their words — trailing \b after a stub.
+  Pharmacy/brewery/speakeasy/pastry lookups have never once had OSM
+  data. Fixed with \w*; pharmacy bushwick 0→8 venues incl. CVS
+  Mo-Su 08:00-22:00, Duane Reade to 23:00.
+- Overpass empty results no longer cached (30-min empty-poisoning).
+next (ranked):
+1. Judge cycle 5 with OSM actually feeding open-now — expect web to
+   finally move.
+2. Transit-status query planning ("is the L train running" must search
+   MTA status, never generic) + weekend-forecast honesty (verdict
+   sentence when the feed doesn't reach the weekend).
+3. Movies/showtimes: needs a listings-shaped search plan.
+4. HDR skies wiring (map ready, 89/89 clips).
