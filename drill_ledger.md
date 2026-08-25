@@ -22,3 +22,26 @@ next (ranked):
    measured local-only or partially).
 3. Judge pass on funnel stage-question quality (options concrete?
    typed answers steering?) now that repetition is fixed.
+
+## cycle 1 — 2026-08-25T02:40Z — first scored batch (cloud ON)
+batch: seed 20260825, 22 records. scores: chat 3.97 · web 4.00 ·
+messy 4.85 · funnel 3.37. meter 44%.
+landed (6): funnel stages = one axis per stage, options never a final
+answer; summary names beyond the picks + quotes only user's words +
+flags skipped/conflicting axes; chat memory-fact gate (only when it
+changes advice); engagement-bait closers banned (fork stated up front
+instead); linear flow-diagrams banned; from-memory freshness flags.
+verified: worst funnel (trip) replays clean — verdict names a thing
+not in any option, honest tie-backs.
+reverted: none. gauntlet 119/120 — the 1 fail ("every tier resolves",
+Cloud Only=[]) was ALL FOUR providers quota-resting at once from batch
+pressure, recovered minutes later; re-run pending. NOT an edit
+regression.
+next (ranked):
+1. QUOTA RESILIENCE — the grind can rest every provider at once; then
+   drills score the LOCAL fallback and real users get Corolla answers
+   mid-conversation. Space cycles 60-90min; consider surfacing "cloud
+   resting — answers may be simpler" in-app; note Patrick's API tier
+   is the hard lever.
+2. LOCALITY into search planning (myrtle-broadway ≠ Myrtle Beach SC).
+3. Re-judge funnels + chat on fresh seed (did 6 edits move scores?).

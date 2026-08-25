@@ -26,8 +26,23 @@ PROTOCOL LIVES HERE, NOT IN THE CONVERSATION.
    the ledger, move on. Green → commit with scores in the message.
    NO releases, NO version bumps, ever (standing rule; the human cuts).
 6. **LOG + LOOP** — append the cycle to `drill_ledger.md` (scores by
-   mode, edits landed/reverted, next hypotheses). Schedule the next
-   cycle via ScheduleWakeup (~45-60 min cadence; collection dominates).
+   mode, edits landed/reverted, next hypotheses), update the FERRARI
+   METER dashboard at ~/Library/Application Support/MillenAI/
+   drill_runs/ferrari-meter.html (scores, %, cycle log, timestamp) and
+   REPUBLISH it with the Artifact tool — same file path keeps the URL
+   https://claude.ai/code/artifact/2229c32d-013b-4343-8020-8efc150be01c
+   (favicon 🏎️, keep it). Meter % = mean over modes of
+   min(avg/4.5, 1) × (0.5 single batch at bar, 1.0 two consecutive).
+   The meter is ALSO served locally at http://127.0.0.1:9897
+   (meter_server.py in drill_runs/, plain stdlib, auto-refreshes the
+   open tab every 5 min). Each cycle: confirm it's alive
+   (`lsof -tnP -iTCP:9897 -sTCP:LISTEN`) and restart it with nohup if
+   not — Patrick has the link bookmarked.
+   Then ScheduleWakeup the next cycle (~45-60 min).
+   PUSH NOTIFICATIONS (promised to Patrick): send exactly one when the
+   meter reaches 100% ("Ferrari bar reached — ready to cut"), and one
+   if the loop stalls needing him (server won't start, repo conflict,
+   budget floor). Never ping for ordinary progress.
 
 ## Anti-overfitting rules
 
