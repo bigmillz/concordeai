@@ -126,7 +126,7 @@ def short_version(v: str = None) -> str:
         # though both read the same on screen.
         return v + " RC%d" % APP_RC
     return v + (" beta %d" % APP_BUILD if APP_BETA else "")
-APP_BUILD = 259               # integer compared against the GitHub release tag
+APP_BUILD = 260               # integer compared against the GitHub release tag
 APP_BUILD_DATE = ""         # ISO date; blank falls back to this file's mtime
 
 # Set to "youruser/yourrepo" once this is on GitHub. Publish each build as a
