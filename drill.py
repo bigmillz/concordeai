@@ -153,6 +153,8 @@ def drill_funnel(spec, rng):
                     "error": d["err"], "ms": int((time.time()-t0)*1000)}
         if d.get("done"):
             return {"mode": "funnel", "question": spec["goal"],
+                    "reqs_given": spec.get("reqs", ""),
+                    "typed_given": spec.get("typed", {}),
                     "funnel_stages": stages, "picks": list(picks),
                     "funnel_summary": d.get("summary", ""),
                     "ms": int((time.time() - t0) * 1000)}

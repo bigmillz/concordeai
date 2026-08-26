@@ -6729,7 +6729,7 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
     # with an EMPTY options array — a dead end shipped to the user.
     # Providers recover fast, so an empty local result earns exactly
     # one more walk up the ladder before we accept defeat.
-    if not out and engine.startswith("local:")             and load_prefs(None).get("turbo"):
+    if not out and load_prefs(None).get("turbo"):
         for _conf in compositor_ladder():
             raw2 = cloud_text(_conf, msgs, timeout=45)
             m2 = re.search(r"\{[\s\S]*\}", raw2 or "")
@@ -9293,6 +9293,17 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         _lv = max(1, min(5, _lv))
         if _LEN.get(_lv):
             dated_system["content"] += "\n\nLENGTH: " + _LEN[_lv]
+        if auto_web and messages:
+            # THE CLOCK RIDES THE QUESTION (6b264): the system-prompt
+            # binding lost to a Beijing-hosted model's own calendar
+            # twice — "Wednesday morning" on a Tuesday evening, an
+            # open/closed verdict inverted. The user turn is the one
+            # place no model ignores.
+            messages[-1] = dict(messages[-1])
+            messages[-1]["content"] = (
+                "[for time-sensitive parts: it is %s where I am]\n"
+                % time.strftime("%A %-I:%M%p")
+                + str(messages[-1]["content"]))
         full_messages = [dated_system] + messages
 
         # stream plain text back; the browser reads it progressively

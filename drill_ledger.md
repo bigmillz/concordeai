@@ -193,9 +193,42 @@ landed (3): the clock injection now binds weekday + local time
 assert a different weekday, even if your own clock disagrees");
 sources credited ONCE at first use; area-wide negatives must scope to
 the listed venues + one call-ahead clause.
-ops note: drill.py edits can be SERVED STALE by Drive minutes after
-writing (reqs_given was on disk before cycle 8 launched, absent from
-its records, present again later) — verify the marker in the same
-command that launches a batch.
+ops note CORRECTED in cycle 9: the "Drive served drill.py stale"
+theory was WRONG — drill_funnel has three return paths and the
+reqs_given patch had landed on the never-finished ERROR path only, so
+successful funnels never carried it. Patched the success path; the
+lesson is about multi-exit functions and lazy anchors, not Drive.
 next: cycle 9 — web with a correct clock is the last big lever;
 movies plan still queued; funnel needs 4.5×2 sighted.
+
+## cycle 9 — 2026-08-26T09:30Z — the clock instruction lost; the clock moves
+scores: chat 4.90 · messy 4.75 (both holding done) · funnel 3.90
+(sighted; the empty-options "Which direction?" came from GEMINI-FLASH
+this time — my retry only fired on local engines; kimi stages
+uniformly fine) · web 3.40 — PROBE FAILED: the system-prompt clock
+binding lost to Kimi's Beijing calendar AGAIN ("Wednesday-morning
+rush hour" at Tue 7:47pm; a pizza verdict INVERTED — "nothing's open
+this early" for a noon-midnight shop at 7:48pm). Also: Yelp marks
+Norbert's Pizza closed since early 2026 while its own site (our
+## cycle 9 — 2026-08-26T09:35Z — the clock instruction lost; the clock moves into the question
+scores: chat 4.90 · messy 4.75 (both holding done) · funnel 3.90
+sighted (empty "Which direction?" stage came from GEMINI-FLASH this
+time — the retry only fired on local engines; now fires on any) ·
+web 3.40 with the probe verdict: THE SYSTEM-PROMPT CLOCK BINDING
+FAILED. "Wednesday morning rush hour" at Tuesday 7:47pm; a pizza
+verdict INVERTED by the wrong clock ("nothing's open this early" for
+a noon-midnight shop at 7:48pm — it was OPEN). Kimi's own calendar
+beat our instruction twice running.
+landed (2): the moment now rides the USER MESSAGE in web mode
+("[for time-sensitive parts: it is Tuesday 7:47PM where I am]") —
+the one place no model ignores; empty-options stage retry fires for
+ANY engine. Also caught by a judge doing real verification: Norbert's
+Pizza is marked closed on Yelp since early 2026 while its own site
+says open — stale-single-source risk, noted for the venue-data
+trust rules if it recurs.
+correction: cycle 7's "Drive served drill.py stale" theory was wrong
+— the reqs_given patch had landed on drill_funnel's error path only
+(three return exits, lazy anchor). Success path patched; cycle 10
+records will carry the contract.
+next: cycle 10 = user-message clock on trial. Funnel needs 4.5×2
+sighted. Movies plan still queued.
