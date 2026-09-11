@@ -137,10 +137,14 @@ check("no ungated weather-claim greetings",
       "Ninety degrees" in page and "m:[6,7]" in page
       and "First snow" not in page          # needs a precip signal
       and "umbrella's toast" not in page)   # ditto
-# 6.0b4: the wordmark went SMALL (gpt/gemini corner mark) — assert the
-# compact form + the beta-updates opt-in
-check("corner wordmark + version row", "font-size:12.5px" in page
-      and 'class="vsub"' in page)
+# 6.0b4 made the wordmark small; 6b264 (per Patrick) moved the
+# version OUT of the lockup entirely — it lives at the sidebar foot
+# under the system monitor, the VPN treatment (italic, dim, centered)
+check("corner wordmark clean, version at the foot",
+      "font-size:12.5px" in page
+      and 'class="vsub"' not in page.split("</aside>")[0]
+      and 'id="ver-foot"' in page
+      and ">Version " in page)
 check("beta updates opt-in present", 'id="betaup"' in page
       and "beta_updates" in page)
 # 6.0b7: engine dropdown at the chip, Hermes agent, 300px rail
@@ -407,14 +411,14 @@ check("wordmark splits ConcordeAI with a bold AI",
 # fill is transparent and a currentColor stroke would draw nothing:
 # there the AI takes a solid silver of its own.
 check("AI is extra-extra bold in every wordmark",
-      "font-weight:800;-webkit-text-stroke:.55px currentColor" in page
+      "font-weight:800;-webkit-text-stroke:.12em currentColor" in page
       # the superseded synthetic-700 wordmark rule must not linger
       and "#wiz-brand b b{font-weight:700}" not in page)
 s, h, b = req("/", headers={"X-Forwarded-For": "1.2.3.4"})
 door = b.decode("utf-8", "replace")
 check("the door's AI is fattened too, against its gradient",
       "-webkit-text-fill-color:#f5f6f8" in door
-      and "-webkit-text-stroke:.6px #f5f6f8" in door
+      and "-webkit-text-stroke:.12em #f5f6f8" in door
       and "Concorde<b>AI</b>" in door)
 # 6b258: the titlebar wears the lockup as a real accessory (the
 # ConcordeVPN look, minus its gear — settings live in the sidebar
@@ -472,18 +476,14 @@ check("sources fold into the disclosure on every path",
 # first: the new-models veil title, invisible behind announceModels'
 # own rewrite. Veil titles now carry distinct ids, the rail lockup is
 # just #set-brand b, and no rule or query names the old id at all.
-# 6b261, per Patrick ("make AI HDR too"): the lockup's AI sits in a
-# pool of REAL light — a PQ clip masked behind it, the sibling app's
-# proven beacon trick. Gated on (dynamic-range: high) so SDR displays
-# never even attach the src, off in perf mode, and the video wrapper
-# must not resurrect the forbidden span-with-bare-AI shape.
-check("the AI glows: beacon route + gated markup",
-      'id="hdrai"' in page and 'class="aiglow"' in page
-      and "dynamic-range: high" in page
-      and '"/vfx/hdr-beacon.mp4"' in _MILLENAI_SRC
-      and req("/vfx/hdr-beacon.mp4", cookie=K)[0] in (200, 206)
-      and req("/vfx/hdr-beacon.mp4", cookie=K,
-              headers={"Range": "bytes=0-99"})[0] == 206)
+# 6b264, per Patrick ("get rid of that bubble/oval"): the HDR glint
+# is PULLED — the radial mask read as an oval pill behind the wordmark
+# on dark ground. The beacon file and route stay for a future
+# glyph-masked attempt; the PAGE must be clean of the machinery.
+check("no glow oval behind the wordmark",
+      "aiglow" not in page and "hdrai" not in page
+      and "hdrglow" not in page
+      and req("/vfx/hdr-beacon.mp4", cookie=K)[0] in (200, 206))
 check("about-name id retired, veil titles distinct",
       'id="about-name"' not in page
       and 'id="new-title"' in page and 'id="up-title"' in page

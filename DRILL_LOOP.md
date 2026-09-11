@@ -25,6 +25,14 @@ PROTOCOL LIVES HERE, NOT IN THE CONVERSATION.
 5. **GATE** — full gauntlet. Red → revert the edit, log the attempt in
    the ledger, move on. Green → commit with scores in the message.
    NO releases, NO version bumps, ever (standing rule; the human cuts).
+   THEN REFRESH THE TEST BUILD (per Patrick, 2026-08-26, the VPN
+   flow): a WINDOWED instance on port 9895 — kill the old one
+   (`lsof -tnP -iTCP:9895 -sTCP:LISTEN`), relaunch WITHOUT
+   MILLENAI_HEADLESS so the pywebview window pops on his desktop:
+   `MILLENAI_PORT=9895 MILLENAI_KEY=... "$VENV" millenai.py &`.
+   That window IS his playground for the accumulated batch; tell him
+   it refreshed. 9894 stays the headless drill/gauntlet server.
+   Version numbers move only when he says cut.
 6. **LOG + LOOP** — append the cycle to `drill_ledger.md` (scores by
    mode, edits landed/reverted, next hypotheses), update the FERRARI
    METER dashboard at ~/Library/Application Support/MillenAI/

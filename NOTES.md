@@ -4380,3 +4380,39 @@ one of which made a SUCCESSFUL job look like a failure:
   "myrtle" resolves to the famous place. That is the next fix, and it
   is written down rather than half-done at the end of a long session.
 
+
+## 6 beta 264 (pending) — the app stops talking shop
+
+(Numbering note: 6b261–263 are the drill-loop batches — locality,
+nwr/ladder/cache-success, any-engine stage retry — recorded in
+drill_ledger.md cycles 5–9. This entry is the UI pass that rode
+alongside them. When the next build is cut it should carry
+APP_BUILD ≥ 265 so the source tags stay truthful.)
+
+- THE MACHINERY GOES BACKSTAGE (per Patrick: "we still don't really
+  need to know what model is compositing. Make it clean for the
+  average user"). Answer bubbles say the brand, not the compositor:
+  the who-label is "you" or the app name, never a model id. The
+  models pane still tells the whole truth — curiosity has a home,
+  it's just not the chat transcript.
+- THE MENU SAYS THE APP'S NAME. The macOS menu bar read "Python"
+  because the process IS the venv python3 — CFBundleName comes from
+  the interpreter's bundle. NSBundle.mainBundle().infoDictionary()
+  is mutable before the first window; overriding CFBundleName /
+  CFBundleDisplayName there renames the menu without a wrapper app.
+- ONE WEIGHT FOR "AI" EVERYWHERE (per Patrick: "weight AI the same
+  as both"). The extra-bold stroke was .55px/.6px — absolute px, so
+  the titlebar lockup (small font) wore proportionally MORE stroke
+  than the sidebar (large font). It's .12em currentColor now: same
+  relative weight at every size, matching NSStrokeWidth -12 on the
+  AppKit side.
+- THE GLOW OVAL IS GONE (per Patrick: "get rid of that bubble/oval").
+  The HDR glint's radial mask read as a pill floating behind the
+  wordmark. Feature pulled — markup, CSS, and the hdrSync timer;
+  /vfx/hdr-beacon.mp4 stays served for the future HDR-skies work.
+- THE VERSION MOVES TO THE FOOT (per Patrick: "find a spot for the
+  version number under the system monitor similar to the vpn.
+  remove it from the top"). The lockup's vsub tag is gone; a quiet
+  italic "Version 6.1 RC3" (#ver-foot) sits under the COMMUNITY GPU
+  meter — the ConcordeVPN treatment. Gauntlet now asserts the foot
+  exists AND the sidebar carries no vsub.

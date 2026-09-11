@@ -6873,7 +6873,7 @@ h1{font-family:'Michroma','Space Grotesk',sans-serif;
    draw nothing — the AI gets a solid bright silver and the fattening
    stroke, which also lets it read as its own word against the ramp. */
 h1 b{font-weight:800;-webkit-text-fill-color:#f5f6f8;
-  -webkit-text-stroke:.6px #f5f6f8;animation:none}
+  -webkit-text-stroke:.12em #f5f6f8;animation:none}
 /* the tube's halo — a blurred twin behind the letters */
 .halo{position:absolute;left:0;top:0;z-index:-1;pointer-events:none;
   filter:blur(20px) saturate(1.5);opacity:.9}
@@ -7068,7 +7068,7 @@ h1{font-family:'Michroma','Space Grotesk',sans-serif;
    takes a solid bright silver of its own plus the fattening stroke,
    which also makes it read as its own word against the ramp. */
 h1 b{font-weight:800;-webkit-text-fill-color:#f5f6f8;
-  -webkit-text-stroke:.6px #f5f6f8}
+  -webkit-text-stroke:.12em #f5f6f8}
 p{color:#8e8e8e;margin:0 0 26px;font-size:15px}
 .err{color:#e26d5a;min-height:20px;margin:12px 0 0;font-size:14px}
 form{display:flex;gap:10px;justify-content:center}
@@ -9956,25 +9956,6 @@ body.resizing{cursor:col-resize;user-select:none}
   margin-right:auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
 }
 .vghost b{font-weight:400}
-/* THE AI GLOWS (6b261, per Patrick: "make AI HDR too" / "100000%
-   beautiful"). The masked video underneath is a PQ clip — on an HDR
-   display it composites brighter than #fff, so the AI sits in a pool
-   of real light instead of a faked highlight. Gated in JS on
-   (dynamic-range: high) and off in perf mode; SDR displays never
-   attach the src at all. */
-.aiglow{position:relative;display:inline-block}
-.aiglow video{position:absolute;left:-14px;top:-10px;
-  width:calc(100% + 28px);height:calc(100% + 20px);
-  object-fit:fill;z-index:0;opacity:0;pointer-events:none;
-  mix-blend-mode:screen;
-  -webkit-mask-image:radial-gradient(ellipse 60% 55% at center,
-    #000 18%,transparent 70%);
-  mask-image:radial-gradient(ellipse 60% 55% at center,
-    #000 18%,transparent 70%);
-  transition:opacity 1.2s ease}
-.aiglow b{position:relative;z-index:1}
-body.hdrglow .aiglow video{opacity:.85}
-body.perf .aiglow video{opacity:0}
 /* 6b257, per Patrick: the name grew an AI and the AI is BOLD — a
    nested <b> inside each quiet 400-weight lockup. NOT a span: the
    gauntlet's tab guard forbids a span whose content is exactly AI
@@ -9990,7 +9971,10 @@ body.perf .aiglow video{opacity:0}
    pane and the shipped WKWebView) draw it. currentColor keeps the
    stroke on whatever the lockup is painted in. */
 .vghost b b,#set-brand b b,#wiz-brand b b{
-  font-weight:800;-webkit-text-stroke:.55px currentColor}
+  /* .12em == the titlebar's NSStrokeWidth -12 (12% of font size) —
+     the SAME relative weight at every size (6b264, per Patrick:
+     "weight AI the same as both") */
+  font-weight:800;-webkit-text-stroke:.12em currentColor}
 /* 6b241, per Patrick's sketch: the dock icon's diagonal bars become a
    swept wedge that runs INTO the C — a delta wing whose trailing edge
    is the letter, which is the right idea for something called ConcordeAI.
@@ -11643,6 +11627,8 @@ body:not(.perf) #mic.rec{animation:blink 1s ease infinite}
   border-radius:99px}
 #roster::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.28)}
 #roster::-webkit-scrollbar-track{background:transparent}
+#ver-foot{font-style:italic;font-size:10.5px;color:var(--faint);
+  text-align:center;margin-top:12px;letter-spacing:.02em}
 #roster-foot{display:flex;gap:8px}
 #manage-box{margin-top:10px;border-top:1px solid var(--line);
   padding-top:10px}
@@ -12336,7 +12322,7 @@ body:not(.perf) .big-bar i{animation:barBreathe 2.4s ease-in-out infinite}
   <div id="sb-resize" title="Drag to resize"></div>
   <div id="brand-wrap">
     <div id="brand-row">
-    <span class="vghost" title="MillenAI"><svg id="vmark" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="vmg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#vmg)" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><span class="aiglow"><video id="hdrai" muted loop playsinline preload="auto"></video><b>Concorde<b>AI</b></b></span> <i class="vsub">__APP_VER__</i></span>
+    <span class="vghost" title="MillenAI"><svg id="vmark" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="vmg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#vmg)" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>Concorde<b>AI</b></b></span>
 <button id="newchat" title="New chat">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
            stroke-linecap="round" stroke-linejoin="round">
@@ -12464,6 +12450,9 @@ __CODE_ROWS__
       <div class="meter-label"><span>COMMUNITY GPU</span></div>
       <div class="meter" id="fleet-meter"></div>
     </div>
+    <!-- the VPN treatment (6b264, per Patrick): the version lives
+         quietly at the foot, not next to the wordmark -->
+    <div id="ver-foot">Version __APP_VER__</div>
   </div>
 </aside>
 
@@ -14287,7 +14276,9 @@ function addMsg(role,text,drafts,srcs,mapd,ph,places,loc){
   const sl=$("#skyload"); if(sl)sl.hidden=true;
   const div=document.createElement("div");
   div.className="msg "+(role==="user"?"user":"ai");
-  const who=role==="user"?"you":(whoLabel(lastModels)||tier);
+  // the brand, not the machinery (6b264, per Patrick): which model
+  // composited is a power-user detail (ZITO board still has it all)
+  const who=role==="user"?"you":"MillenAI";
   div.innerHTML='<div class="who">'+who+'</div><div class="body"></div>';
   const body=div.querySelector(".body");
   // a [[FORM]] trailer becomes a clickable question card (6b250) and is
@@ -14509,7 +14500,7 @@ async function send(){
     if(searched)stepPlan.push("search","read","geo");
     if((lastModels||"").split(",").length>1)stepPlan.push("council");
     stepPlan.push("draft","polish");
-    if(lastModels){const w=aiDiv.querySelector(".who");if(w)w.textContent=whoLabel(lastModels);}
+
     // the label speaks plainly (6b223, per Patrick): "Running… a, b"
     // with every simultaneously active model, then "Compositor: name" —
     // driven by dedicated RUN markers, not status-sniffing
@@ -14650,8 +14641,7 @@ async function send(){
   // 6b242, per Patrick: name the ROLE, then who filled it — "Compositor"
   // in bold, the model that actually wrote the final answer after it
   {const w=aiDiv.querySelector(".who");
-   const nm=whoLabel(lastModels)||tier||"";
-   if(w)w.innerHTML=nm?'<b>Compositor</b> '+esc(nm):"";}
+   if(w)w.textContent="MillenAI";}   // brand() renders the real name
   paintDrafts(aiDiv,drafts,false);   // merge done: collapse (or clear bar)
   // the stream died but good drafts exist — the best one IS the answer;
   // never show "engine returned nothing" over a usable draft
@@ -17811,22 +17801,6 @@ addEventListener("resize",()=>{     // a narrower window fits fewer chips
   const b=$("#suggest");
   if(b&&!b.hidden){b.hidden=true;syncSuggest();}
 });
-/* THE AI GLOWS (6b261): attach the PQ light source only on displays
-   that can use it, and keep nudging play() — the sibling app learned
-   a paused element composites as plain SDR and a rejected autoplay
-   promise used to freeze the light permanently. */
-const HDR_OK=!!(window.matchMedia&&matchMedia("(dynamic-range: high)").matches);
-function hdrSync(){
-  const v=$("#hdrai");if(!v)return;
-  const on=HDR_OK&&!document.body.classList.contains("perf");
-  document.body.classList.toggle("hdrglow",on);
-  if(on){
-    if(!v.src)v.src="/vfx/hdr-beacon.mp4";
-    if(v.paused)v.play().catch(()=>{});
-  }else if(v.src)v.pause();
-}
-hdrSync();
-setInterval(hdrSync,8000);
 
 if(IS_LOCAL){                       // install nudges belong to the owner
                                     // sitting at the machine, never to
@@ -18720,6 +18694,19 @@ if __name__ == "__main__":
         # skyhist and millen.sky all vanished, so every boot looked like
         # a first run (5.3.6, per Patrick: "STILL defaults to that earth
         # one each time"). Persist the profile in app_dir.
+        # THE MENU SAYS THE APP'S NAME (6b264, per Patrick: it said
+        # "Python"). The process is the venv's python3, so macOS
+        # attributes the app menu to Python's bundle — overriding the
+        # in-memory CFBundleName before the app activates renames the
+        # menu without touching the interpreter on disk.
+        try:
+            from Foundation import NSBundle
+            _bi = NSBundle.mainBundle().infoDictionary()
+            if _bi is not None:
+                _bi["CFBundleName"] = APP_NAME
+                _bi["CFBundleDisplayName"] = APP_NAME
+        except Exception:
+            pass
         webview.start(private_mode=False,
                       storage_path=os.path.join(app_dir(), "webkit"))
         print("  window closed — shutting down. o7\n")
