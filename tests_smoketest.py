@@ -419,8 +419,13 @@ check("wordmark splits ConcordeAI with a bold AI",
 # fattens the outline. The doors clip a gradient to the text, so their
 # fill is transparent and a currentColor stroke would draw nothing:
 # there the AI takes a solid silver of its own.
+# 6b268 (per Patrick, "the bottom one not so much"): the boldness is
+# the STROKE alone — synthetic 800 was WebKit double-striking the AI
+# sideways, fattening it differently than the titlebar's pure
+# AppKit stroke. One recipe now: regular weight + .12em.
 check("AI is extra-extra bold in every wordmark",
-      "font-weight:800;-webkit-text-stroke:.12em currentColor" in page
+      "font-weight:400;-webkit-text-stroke:.12em currentColor" in page
+      and "font-weight:800;-webkit-text-stroke" not in page
       # the superseded synthetic-700 wordmark rule must not linger
       and "#wiz-brand b b{font-weight:700}" not in page
       # 6b264, per Patrick ("the font height is different"): the
@@ -449,6 +454,18 @@ check("auto-cleanup wired end to end",
       and 'id="autoclean"' in page)
 s, h, b = req("/api/setup", cookie=K, timeout=180)
 check("setup reports the reclaimable set", b'"cleanup"' in b)
+# 6b268, per Patrick's RC4 trial: the page AI tucks to the titlebar's
+# measured coupling, the memory %% is gone (the bar carries it), and
+# Clean now opens a pop-up naming the superseded models + GB and runs
+# the guarded sweep on demand (force skips only the pref gate)
+check("clean-now flow wired",
+      'id="clean-now"' in page and 'id="clean-veil"' in page
+      and 'id="clean-go"' in page
+      and "font-weight:400;-webkit-text-stroke:.12em currentColor" in page
+      and 'id="autoclean-bar"' in page
+      and "#roster:not(.managing) .rrm{display:none}" in page
+      and "def _auto_cleanup_pass(manual=False)" in _MILLENAI_SRC
+      and '_b.get("force")' in _MILLENAI_SRC)
 # 6b267, cycle 12 of the drill: local-Gemma stages wrote malformed
 # options and reworded re-asks (three cycles running), one verdict
 # invented an NJ Transit route to Jim Thorpe, another served gnudi to
@@ -742,7 +759,7 @@ check("stats has users + memory", "users_total" in st and "mem_total_gb" in st)
 # (wired+compressed, what Activity Monitor gauges), used% elsewhere.
 # psutil's used% would have read ~2x higher on a healthy Mac.
 check("memory meter replaced the models meter",
-      'id="mem-meter"' in page and 'id="mem-val"' in page
+      'id="mem-meter"' in page and 'id="mem-val"' not in page  # 6b268
       and "models-meter" not in page
       and ("MEMORY PRESSURE" in page or "MEMORY USED" in page)
       and "def mem_pressure" in _MILLENAI_SRC

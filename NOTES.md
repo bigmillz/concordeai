@@ -4464,3 +4464,26 @@ foot, one AI weight, no glow, brand-only labels, real menu name),
 the 6b265 trial-run fixes (mtime ETag, titlebar truly centered,
 system-italic foot, auto-cleanup), all gated 121-127/127 green.
 Still a prerelease: APP_BETA holds, sync sign-in gates "6.1 proper".
+
+## 6 beta 268-era (pending) — RC4 morning feedback
+
+- ONE RECIPE FOR THE BOLD AI (per Patrick: "spacing between concord
+  and the letter A is different... the bottom one not so much").
+  Canvas glyph metrics proved page and titlebar spacing were ALREADY
+  identical (E-to-A = 0.51 of a letter gap in both) — the visible
+  difference was the page's synthetic font-weight:800: WebKit fakes
+  bold as a horizontal double-strike, fattening the AI sideways in a
+  way AppKit's pure negative-stroke never does. Every page lockup now
+  uses the titlebar's exact recipe: regular weight + .12em stroke +
+  .865em + .06em lift. Measure before tucking: the first fix was a
+  -.08em margin that "corrected" a gap that was never wrong.
+- THE MEMORY % IS GONE (per Patrick) — the bar carries the reading;
+  label + meter only.
+- CLEAN UP NOW (per Patrick: "a pop-up showing how much space will
+  be freed... allow the user to clean them out right now"). A button
+  under the auto-clean checkbox opens a veil naming each superseded
+  model and the GB freed; Remove runs the same guarded sweep with
+  force=true (skips only the pref gate, never the safety guards).
+  The checkbox itself had already earned its keep: Patrick ticked it
+  during the trial and the sweep freed 9.7 GB on the spot (Llama 3.1
+  8B + Gemma 2 9B IT, both with newer family generations installed).

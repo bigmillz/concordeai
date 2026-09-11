@@ -3682,14 +3682,17 @@ def _remove_models(want: list) -> tuple:
     return removed, errors
 
 
-def _auto_cleanup_pass() -> list:
+def _auto_cleanup_pass(manual=False) -> list:
     """The auto-clean sweep (6b265, per Patrick's checkbox). Runs only
     when the pref is on; stands down entirely while an app update or
     ANY model download is in flight (the process can vanish or a dir
     can be mid-write); skips a model whose engine is resident — here
     OR in a sibling instance (ports are shared machine-wide)."""
     try:
-        if not load_prefs(None).get("auto_cleanup"):
+        # manual == the Clean-now button (6b268, per Patrick): the
+        # user is asking RIGHT NOW, so the standing pref doesn't
+        # gate it — every safety guard below still does.
+        if not manual and not load_prefs(None).get("auto_cleanup"):
             return []
         if _update.get("state") not in (None, "", "idle", "error"):
             return []
@@ -7330,7 +7333,7 @@ h1{font-family:'Michroma','Space Grotesk',sans-serif;
    TRANSPARENT — a currentColor stroke would be invisible. The AI
    takes a solid bright silver of its own plus the fattening stroke,
    which also makes it read as its own word against the ramp. */
-h1 b{font-weight:800;-webkit-text-fill-color:#f5f6f8;
+h1 b{font-weight:400;-webkit-text-fill-color:#f5f6f8;
   -webkit-text-stroke:.12em #f5f6f8;font-size:.865em;vertical-align:.06em}
 p{color:#8e8e8e;margin:0 0 26px;font-size:15px}
 .err{color:#e26d5a;min-height:20px;margin:12px 0 0;font-size:14px}
@@ -8858,8 +8861,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             return
         if self.path == "/api/model/cleanup":
             # run the auto-clean sweep NOW — the checkbox's first act
-            # (6b265); the janitor repeats it every 6 hours
-            removed = _auto_cleanup_pass()
+            # (6b265); the janitor repeats it every 6 hours. force
+            # (6b268, the Clean-now button) skips only the pref gate.
+            _n = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                _b = json.loads(self.rfile.read(_n)) if _n else {}
+            except Exception:
+                _b = {}
+            removed = _auto_cleanup_pass(
+                manual=bool(isinstance(_b, dict) and _b.get("force")))
             self._send_json({"removed": removed,
                              "freed_gb": round(sum(
                                  MODEL_INFO[l]["gb"]
@@ -10247,7 +10257,14 @@ body.resizing{cursor:col-resize;user-select:none}
      "weight AI the same as both"). The .865em/.06em pair cancels the
      stroke's growth: cap tops and baseline line up with CONCORDE
      (6b264 again, per Patrick: "the font height is different") */
-  font-weight:800;-webkit-text-stroke:.12em currentColor;
+  /* REGULAR weight + stroke — the titlebar's exact recipe (6b268,
+     per Patrick: "spacing... the bottom one not so much"). Canvas
+     metrics showed page and bar spacing already identical (E-to-A
+     0.51 of a letter gap in both); the visible difference was the
+     page's SYNTHETIC 800 — WebKit fakes bold as a horizontal
+     double-strike, fattening the AI sideways and crowding the gap
+     in a way AppKit's pure stroke never does. One recipe now. */
+  font-weight:400;-webkit-text-stroke:.12em currentColor;
   font-size:.865em;vertical-align:.06em}
 /* 6b241, per Patrick's sketch: the dock icon's diagonal bars become a
    swept wedge that runs INTO the C — a delta wing whose trailing edge
@@ -10734,11 +10751,8 @@ input.crename{flex:1;min-width:0;background:rgba(0,0,0,.45);
 }
 #telemetry .t-head span{white-space:nowrap}
 /* the memory readout: quiet mono digits beside the label, tabular so
-   the number doesn't jitter as it climbs (6b254). Replaced #models-up,
-   whose ↑ chip went with the MODELS meter. */
-#mem-val{font-family:var(--mono);font-size:10px;font-weight:400;
-  color:var(--faint);font-variant-numeric:tabular-nums;
-  letter-spacing:.04em}
+   the number doesn't jitter as it climbs (6b254). The % itself was
+   dropped in 6b268 (per Patrick) — the bar carries the reading. */
 #telemetry .t-head .live{color:var(--text);white-space:nowrap}
 .meter-row{margin-bottom:7px}
 .meter-row:last-child{margin-bottom:0}
@@ -11689,6 +11703,16 @@ body:not(.perf) #mic.rec{animation:blink 1s ease infinite}
 #accel-chip.cpu{--ac:#6b6f77}
 
 /* -------------------------------------------------------------- about */
+#clean-veil{position:fixed;inset:0;z-index:61;display:flex;
+  align-items:center;justify-content:center;background:rgba(6,7,10,.72);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#clean-veil[hidden]{display:none}
+#clean-card{max-width:430px;margin:24px;padding:26px 26px 20px;
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--radius);text-align:center;
+  animation:doorPop .5s cubic-bezier(.16,1,.3,1) both}
+#clean-card .sh-icon{font-size:30px;margin-bottom:4px}
+#clean-card p{font-size:13px;color:var(--dim);line-height:1.55}
 #dlhelp-veil{position:fixed;inset:0;z-index:61;display:flex;
   align-items:center;justify-content:center;background:rgba(6,7,10,.72);
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
@@ -11887,6 +11911,11 @@ body:not(.perf) #mic.rec{animation:blink 1s ease infinite}
 /* 6b258, per Patrick: no checkboxes. Every row carries a text action —
    install or remove — the same shape on both sides, so the list reads
    as one thing instead of a form. */
+/* remove is a MANAGE action (6b268, per Patrick: "only show the
+   remove buttons after someone clicks manage models; otherwise it's
+   basically just an informative list") — the links exist in every
+   row but only paint while the Manage panel is open */
+#roster:not(.managing) .rrm{display:none}
 .ros-row .rrm,.ros-row .rin{flex:none;color:var(--faint);cursor:pointer;
   border-bottom:1px dotted rgba(255,255,255,.3);margin-left:auto}
 .ros-row .rrm:hover{color:#e5605c}
@@ -12081,7 +12110,9 @@ body:not(.perf) #mic.rec{animation:blink 1s ease infinite}
   color:var(--text);font-size:12.5px;outline:none;
 }
 #fleet-box input:not([type=checkbox]):focus{border-color:var(--accent-dim)}
-#autoclean-row{margin-top:10px}
+#autoclean-bar{display:flex;align-items:center;gap:10px;
+  justify-content:space-between;margin-top:10px;flex-wrap:wrap}
+#autoclean-bar #clean-now{margin:0;flex:none}
 #autoclean-note{font-size:11.5px;color:var(--faint);margin-top:4px}
 #acon-row,#idleon-row,#autoclean-row{display:flex;gap:7px;align-items:center;
   font-size:12px;color:var(--text);margin:6px 0}
@@ -12719,8 +12750,7 @@ __CODE_ROWS__
       <div class="meter" id="gpu-meter"></div>
     </div>
     <div class="meter-row">
-      <div class="meter-label"><span>__MEM_LABEL__</span>
-        <b id="mem-val"></b></div>
+      <div class="meter-label"><span>__MEM_LABEL__</span></div>
       <div class="meter" id="mem-meter"></div>
     </div>
     <div class="meter-row">
@@ -13038,8 +13068,11 @@ __CODE_ROWS__
           <div><dt>space taken</dt><dd id="mg-space">&mdash;</dd></div>
         </dl>
         <div id="plan-row"></div>
-        <label id="autoclean-row"><input type="checkbox" id="autoclean">
-          <span>Automatically remove superseded models</span></label>
+        <div id="autoclean-bar">
+          <label id="autoclean-row"><input type="checkbox" id="autoclean">
+            <span>Automatically remove superseded models</span></label>
+          <button class="about-btn slim" id="clean-now">Clean up now&hellip;</button>
+        </div>
         <div id="autoclean-note"></div>
         <div id="manage-note"></div>
       </div>
@@ -13054,6 +13087,18 @@ __CODE_ROWS__
 <!-- NB: the 5.1 Settings rebuild dropped about-veil's closing div, which
      swallowed every veil below it as a CHILD of the hidden modal — the
      setup panel "opened" at 0x0. Keep the tag count honest here. -->
+
+<div id="clean-veil" hidden>
+  <div id="clean-card">
+    <div class="sh-icon">&#129529;</div>
+    <h2>Free up space</h2>
+    <p id="clean-body"></p>
+    <div class="sh-foot">
+      <button id="clean-go" class="primary">Remove</button>
+      <button id="clean-cancel">Keep everything</button>
+    </div>
+  </div>
+</div>
 
 <div id="dlhelp-veil" hidden>
   <div id="dlhelp-card">
@@ -16084,8 +16129,6 @@ async function pollStats(){
    else{
      if(row)row.hidden=false;
      paintMeter($("#mem-meter"),memPct);
-     const mv=$("#mem-val");
-     if(mv)mv.textContent=Math.round(memPct)+"%";
    }}
   // COMMUNITY GPU: each friend online lights a quarter of the bar;
   // it burns hot while any of them is actually working
@@ -17789,6 +17832,7 @@ async function ensureSetup(){
 $("#roster-manage").addEventListener("click",async()=>{
   manageOn=!manageOn;
   $("#manage-box").hidden=!manageOn;
+  $("#roster").classList.toggle("managing",manageOn);
   if(manageOn){
     $("#plan-row").innerHTML='<div class="plan-card">reading disk…</div>';
     await ensureSetup();
@@ -17802,6 +17846,44 @@ function paintCleanNote(){
       +c.labels.join(", ")+")"
     :"nothing superseded — everything installed is current";
 }
+$("#clean-now").addEventListener("click",async()=>{
+  await ensureSetup();
+  const c=(lastSetup&&lastSetup.cleanup)||{labels:[],gb:0};
+  const body=$("#clean-body"),go=$("#clean-go");
+  if(!c.labels.length){
+    body.textContent="Nothing to clean \u2014 every installed model "
+      +"is the newest of its kind.";
+    go.hidden=true;
+  }else{
+    body.innerHTML="These have newer replacements already installed:"
+      +"<br><b>"+c.labels.join("</b><br><b>")+"</b><br><br>"
+      +"Removing them frees about <b>"+c.gb+" GB</b>. Any of them "
+      +"can be reinstalled from the roster later.";
+    go.hidden=false;go.disabled=false;
+    go.textContent="Remove "+c.labels.length+" \u2014 free "+c.gb+" GB";
+  }
+  $("#clean-veil").hidden=false;
+});
+$("#clean-cancel").addEventListener("click",()=>{
+  $("#clean-veil").hidden=true;});
+$("#clean-go").addEventListener("click",async()=>{
+  const go=$("#clean-go");
+  go.textContent="Cleaning\u2026";go.disabled=true;
+  try{
+    const r=await(await fetch("/api/model/cleanup",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({force:true})})).json();
+    $("#clean-body").textContent=r.removed.length
+      ?"Removed "+r.removed.length+" \u2014 freed "+r.freed_gb+" GB."
+      :"Nothing could be removed right now \u2014 a model may be "
+       +"in use or downloading. Try again in a minute.";
+  }catch(e){
+    $("#clean-body").textContent="Cleanup hit a snag \u2014 try again.";
+  }
+  go.hidden=true;
+  lastSetup=null;await ensureSetup();
+  paintRoster(lastSetup,lastCloud);paintMgStats();paintCleanNote();
+});
 $("#autoclean").addEventListener("change",async()=>{
   await fetch("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
