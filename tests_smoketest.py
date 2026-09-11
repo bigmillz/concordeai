@@ -413,13 +413,23 @@ check("wordmark splits ConcordeAI with a bold AI",
 check("AI is extra-extra bold in every wordmark",
       "font-weight:800;-webkit-text-stroke:.12em currentColor" in page
       # the superseded synthetic-700 wordmark rule must not linger
-      and "#wiz-brand b b{font-weight:700}" not in page)
+      and "#wiz-brand b b{font-weight:700}" not in page
+      # 6b264, per Patrick ("the font height is different"): the
+      # centered stroke grows the caps, so the AI is scale-compensated
+      # to sit flush with CONCORDE's cap line and baseline
+      and "font-size:.865em;vertical-align:.06em" in page)
 s, h, b = req("/", headers={"X-Forwarded-For": "1.2.3.4"})
 door = b.decode("utf-8", "replace")
 check("the door's AI is fattened too, against its gradient",
       "-webkit-text-fill-color:#f5f6f8" in door
       and "-webkit-text-stroke:.12em #f5f6f8" in door
       and "Concorde<b>AI</b>" in door)
+# 6b264, seen live: APP_BUILD holds still between releases (Patrick's
+# rule), so a build-only ETag answered 304 to a WKWebView holding a
+# cached weeks-old page — the test window kept showing stale UI. The
+# ETag now carries the source mtime; a foreign tag must fetch fresh.
+s, h, b = req("/", headers={"If-None-Match": '"b260"'}, cookie=K)
+check("a stale cached page can never 304 its way back", s == 200)
 # 6b258: the titlebar wears the lockup as a real accessory (the
 # ConcordeVPN look, minus its gear — settings live in the sidebar
 # here). Michroma has to be BUNDLED: a native NSTextField cannot pull

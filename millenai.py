@@ -128,6 +128,10 @@ def short_version(v: str = None) -> str:
     return v + (" beta %d" % APP_BUILD if APP_BETA else "")
 APP_BUILD = 260               # integer compared against the GitHub release tag
 APP_BUILD_DATE = ""         # ISO date; blank falls back to this file's mtime
+try:                          # feeds the page ETag: an edited source must
+    _SRC_MTIME = int(os.path.getmtime(__file__))   # never 304 as "unchanged"
+except Exception:
+    _SRC_MTIME = APP_BUILD
 
 # Set to "youruser/yourrepo" once this is on GitHub. Publish each build as a
 # Release whose tag ends in the build number (e.g. "v5") with the .dmg
@@ -6873,7 +6877,8 @@ h1{font-family:'Michroma','Space Grotesk',sans-serif;
    draw nothing — the AI gets a solid bright silver and the fattening
    stroke, which also lets it read as its own word against the ramp. */
 h1 b{font-weight:800;-webkit-text-fill-color:#f5f6f8;
-  -webkit-text-stroke:.12em #f5f6f8;animation:none}
+  -webkit-text-stroke:.12em #f5f6f8;animation:none;
+  font-size:.865em;vertical-align:.06em}
 /* the tube's halo — a blurred twin behind the letters */
 .halo{position:absolute;left:0;top:0;z-index:-1;pointer-events:none;
   filter:blur(20px) saturate(1.5);opacity:.9}
@@ -7068,7 +7073,7 @@ h1{font-family:'Michroma','Space Grotesk',sans-serif;
    takes a solid bright silver of its own plus the fattening stroke,
    which also makes it read as its own word against the ramp. */
 h1 b{font-weight:800;-webkit-text-fill-color:#f5f6f8;
-  -webkit-text-stroke:.12em #f5f6f8}
+  -webkit-text-stroke:.12em #f5f6f8;font-size:.865em;vertical-align:.06em}
 p{color:#8e8e8e;margin:0 0 26px;font-size:15px}
 .err{color:#e26d5a;min-height:20px;margin:12px 0 0;font-size:14px}
 form{display:flex;gap:10px;justify-content:center}
@@ -7335,15 +7340,22 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     .replace("__SKY_N__", str(len(SKY_SOURCES)))
                     .replace("__SKY_DARK__", json.dumps(SKY_DARK))
                     .replace("__SKY_NYC__", json.dumps(SKY_NYC))
-                    .replace("__APP_VER__", short_version()))
+                    .replace("__APP_VER__", short_version()
+                             + (" \u00b7 test build" if os.environ.get(
+                                 "MILLENAI_TESTBUILD") else "")))
             # THE PAGE CAN NEVER GO STALE AGAIN (6b248, per Patrick:
             # "the hosted web ui is not up to date" — the server was
             # current, his BROWSER was serving a heuristically-cached
             # copy: this page shipped with no cache headers at all).
-            # ETag = the build number, no-cache = revalidate every
-            # load: a fresh build turns the next reload into a full
-            # fetch, an unchanged one into an instant tiny 304.
-            etag = '"b%d"' % APP_BUILD
+            # ETag = build number + source mtime, no-cache =
+            # revalidate every load: a fresh build turns the next
+            # reload into a full fetch, an unchanged one into an
+            # instant tiny 304. The mtime is load-bearing (6b264,
+            # seen live): between releases APP_BUILD holds still by
+            # rule, so a build-only ETag told WKWebView "unchanged"
+            # while the page had changed for days — Patrick's test
+            # window kept re-serving a cached weeks-old UI off 304s.
+            etag = '"b%d-%d"' % (APP_BUILD, _SRC_MTIME)
             if self.headers.get("If-None-Match") == etag:
                 self.send_response(304)
                 self.send_header("ETag", etag)
@@ -9973,8 +9985,11 @@ body.resizing{cursor:col-resize;user-select:none}
 .vghost b b,#set-brand b b,#wiz-brand b b{
   /* .12em == the titlebar's NSStrokeWidth -12 (12% of font size) —
      the SAME relative weight at every size (6b264, per Patrick:
-     "weight AI the same as both") */
-  font-weight:800;-webkit-text-stroke:.12em currentColor}
+     "weight AI the same as both"). The .865em/.06em pair cancels the
+     stroke's growth: cap tops and baseline line up with CONCORDE
+     (6b264 again, per Patrick: "the font height is different") */
+  font-weight:800;-webkit-text-stroke:.12em currentColor;
+  font-size:.865em;vertical-align:.06em}
 /* 6b241, per Patrick's sketch: the dock icon's diagonal bars become a
    swept wedge that runs INTO the C — a delta wing whose trailing edge
    is the letter, which is the right idea for something called ConcordeAI.
@@ -18594,10 +18609,22 @@ if __name__ == "__main__":
                             # Michroma ships ONE weight, so "extra extra
                             # bold" is a fat NEGATIVE stroke — negative
                             # means stroke AND fill, which thickens the
-                            # glyph instead of outlining it
+                            # glyph instead of outlining it. The stroke
+                            # is centered on the outline, so it grows
+                            # the caps ~16% (6b264, per Patrick: "the
+                            # font height is different") — the AI runs
+                            # at .865x with a half-stroke baseline lift
+                            # so its stroked caps sit flush with the
+                            # plain ones, mirroring the page CSS
+                            # (.865em / .06em).
+                            tsz = 11.5 * 0.865
+                            tfont = NSFont.fontWithName_size_(
+                                mich.fontName(), tsz) or mich
                             att.addAttributes_range_(
                                 {"NSStrokeWidth": -12.0,
-                                 "NSStrokeColor": white},
+                                 "NSStrokeColor": white,
+                                 "NSFont": tfont,
+                                 "NSBaselineOffset": tsz * 0.06},
                                 (len(name), len(tld)))
                             label = NSTextField.\
                                 labelWithAttributedString_(att)
@@ -18680,7 +18707,9 @@ if __name__ == "__main__":
     elif HAS_WEBVIEW:
         # Native macOS window (WKWebView). Blocks until the window closes.
         window = webview.create_window(
-            f"{APP_NAME} {short_version()}",
+            f"{APP_NAME} {short_version()}"
+            + (" \u2014 TEST BUILD" if os.environ.get(
+                "MILLENAI_TESTBUILD") else ""),
             url,
             width=1320,
             height=860,
