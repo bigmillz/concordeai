@@ -449,6 +449,15 @@ check("auto-cleanup wired end to end",
       and 'id="autoclean"' in page)
 s, h, b = req("/api/setup", cookie=K, timeout=180)
 check("setup reports the reclaimable set", b'"cleanup"' in b)
+# 6b266, cycle 11 of the drill: wttr.in died silently one night and
+# the answer invented "71°F and sunny" at 10:30 PM; the L-train
+# answer opened with capability meta; a candy verdict gave Nerds
+# sprinkles they don't have
+check("cycle-12 fixes: weather ladder + honesty, meta ban, no fake fits",
+      "api.open-meteo.com" in _MILLENAI_SRC
+      and "No live weather data reached you" in _MILLENAI_SRC
+      and "Never describe your own data access" in _MILLENAI_SRC
+      and "No fake fits" in _MILLENAI_SRC)
 # 6b264, seen live: APP_BUILD holds still between releases (Patrick's
 # rule), so a build-only ETag answered 304 to a WKWebView holding a
 # cached weeks-old page — the test window kept showing stale UI. The

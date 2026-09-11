@@ -269,3 +269,41 @@ sprinkles" for portion) sail through; only the verdict recovers.
 4) local-Gemma stage echo — dinner stages 3+4 re-asked stages 2+1.
 5) home hedge — answers hedge "if you're in NYC" while sibling
 records use 11221.
+
+## cycle 11 — 2026-09-12T06:4xZ — app f43187e
+batch: seed 20260911, 22 records (6 chat / 10 web / 6 funnel),
+collected Fri ~10:22 PM ET. scores: chat 4.33 (DIP — new classes) ·
+web 4.06 · funnel 4.27 (sighted). 4/4 rechecks upheld.
+verdict on cycle 10's edits — ALL THREE HELD:
+- williamsburg -> BROOKLYN (4.8, "per OpenStreetMap", minutes-left
+  computed at 10:30 PM). venue-noun fix confirmed.
+- movies named four real dated titles w/ verdicts (4.4); Fandango as
+  coda, not referral. listings fix confirmed.
+- funnel verdicts real in 3/4 trials; the clicked "16-inch" STAYED a
+  16-inch (prior override pattern did not recur).
+new sinks (confirmed): weather fabrication — wttr.in died silently,
+answer invented "71°F and sunny right now" at 10:30 PM, sources_n=0
+(web[6] 2.0); no-data fallback opens with capability meta and 200
+words of how-to-check (L train, web[5] 3.2); funnel constraint-fit
+fabrication — told strawberry+frozen+"with sprinkles", verdict gave
+Nerds Gummy Clusters sprinkles they don't have (funnel[2] 2.8).
+chat's dip = persona HEDGE-GUESSING ("a writer or an engineer", "if
+you live in a dense area like Bushwick" — profile facts as guesses),
+explainer drift (H2s + flow blocks on a whistling lesson), hedge-tic
+on stable facts ("Python 3.14 (~check current)").
+landed (3, tagged 6b266):
+- weather_snippets gets the two-rung ladder (wttr.in -> open-meteo
+  via home-biased _geocode) + weekday-labeled forecast lines; and an
+  is_weather strictness branch when BOTH rungs fail: no invented
+  numbers, one clause + seasonal pattern only.
+- universal ban in the searched-answer block: never describe your own
+  data access; one clause of where-to-check, then real knowledge.
+- FUNNEL_SUMMARY_SYS rule 4, "No fake fits": impossible constraint
+  sets get the closest REAL option with the miss named.
+next (ranked): 1) chat persona rule — a profile fact is known (state
+once, plainly, when it changes advice) or omitted; never hedge-guess
+a persona. 2) explainer-drift cap: no tables/flow blocks on simple
+how-tos. 3) stage-time reconciliation of off-axis typed answers
+(three cycles running). 4) route funnel stage generation off local
+Gemma (it wrote the off-taxonomy + redundant stages; the all-kimi
+record was flawless). 5) hedge-tic scoping to prices/hours only.

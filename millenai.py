@@ -2176,6 +2176,15 @@ def weather_snippets(q: str):
         "", q, flags=re.I).strip(" ?.!") or ""
     if not loc or len(loc) > 60:
         return None
+    # weekday names on every forecast line — a Friday "this weekend"
+    # ask once shipped Saturday only because mapping bare dates to
+    # weekdays was left to the model (6b265, judged)
+    def _wd(datestr):
+        try:
+            return time.strftime(
+                "%A", time.strptime(datestr, "%Y-%m-%d"))
+        except Exception:
+            return datestr
     try:
         with urllib.request.urlopen(
                 "https://wttr.in/%s?format=j1" % urllib.parse.quote(loc),
@@ -2192,9 +2201,54 @@ def weather_snippets(q: str):
                    cur["weatherDesc"][0]["value"],
                    cur["windspeedMiles"], cur["humidity"])]
         for day in d.get("weather", [])[:3]:
-            out.append("%s: high %s°F / low %s°F, %s" % (
-                day["date"], day["maxtempF"], day["mintempF"],
+            out.append("%s %s: high %s°F / low %s°F, %s" % (
+                _wd(day["date"]), day["date"],
+                day["maxtempF"], day["mintempF"],
                 day["hourly"][4]["weatherDesc"][0]["value"]))
+        return "\n".join(out)
+    except Exception:
+        pass
+    # SECOND RUNG (6b266, judged 2.0: wttr.in died silently one night
+    # and the model invented "71°F and sunny" at 10:30 PM). Same
+    # two-endpoint ladder the venue data wears: open-meteo is keyless
+    # and geocodes through the same home-biased _geocode.
+    try:
+        g = _geocode(loc.replace(",us", ""))
+        if not g:
+            return None
+        with urllib.request.urlopen(
+                "https://api.open-meteo.com/v1/forecast?"
+                "latitude=%s&longitude=%s"
+                "&current=temperature_2m,apparent_temperature,"
+                "weather_code,wind_speed_10m,relative_humidity_2m"
+                "&daily=temperature_2m_max,temperature_2m_min,"
+                "weather_code&temperature_unit=fahrenheit"
+                "&wind_speed_unit=mph&timezone=auto&forecast_days=3"
+                % (g["lat"], g["lon"]), timeout=8) as r:
+            d = json.load(r)
+        _WMO = ((0, "clear"), (3, "partly cloudy"), (48, "fog"),
+                (57, "drizzle"), (67, "rain"), (77, "snow"),
+                (82, "rain showers"), (86, "snow showers"),
+                (99, "thunderstorms"))
+        def _sky(code):
+            for hi, word in _WMO:
+                if code <= hi:
+                    return word
+            return "mixed"
+        cur = d["current"]
+        out = ["LIVE WEATHER for %s (source: open-meteo, real data):"
+               % g.get("name", loc),
+               "Right now: %.0f°F (feels like %.0f°F), %s, wind "
+               "%.0f mph, humidity %s%%" % (
+                   cur["temperature_2m"], cur["apparent_temperature"],
+                   _sky(cur["weather_code"]), cur["wind_speed_10m"],
+                   cur["relative_humidity_2m"])]
+        dl = d.get("daily", {})
+        for i, ds in enumerate(dl.get("time", [])[:3]):
+            out.append("%s %s: high %.0f°F / low %.0f°F, %s" % (
+                _wd(ds), ds, dl["temperature_2m_max"][i],
+                dl["temperature_2m_min"][i],
+                _sky(dl["weather_code"][i])))
         return "\n".join(out)
     except Exception:
         return None
@@ -6790,7 +6844,13 @@ FUNNEL_SUMMARY_SYS = (
     "rationalize a different spec as close enough.\n"
     "- Stated requirements (budget, no car, timeframe) bind the "
     "verdict; if the picks make one impossible, name the conflict "
-    "and resolve it in the requirement's favor.")
+    "and resolve it in the requirement's favor.\n"
+    # 6b266, judged 2.8: told strawberry + frozen + "with sprinkles",
+    # the verdict gave Nerds Gummy Clusters sprinkles they don't have
+    "- No fake fits: if NO real option satisfies every answer, say so "
+    "plainly, recommend the closest REAL one, and name which wish it "
+    "misses — inventing an attribute to claim a perfect match is the "
+    "worst possible verdict.")
 
 
 def funnel_summary_sys_for(goal: str) -> str:
@@ -9287,6 +9347,20 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         "[{\"n\":\"name\",\"d\":\"five words\","
                         "\"h\":\"hours or ''\"}] — max 4, data only, "
                         "nothing after it.\n")
+                elif is_weather:
+                    # both weather rungs came back empty — live numbers
+                    # exist NOWHERE in this context (6b266, judged: a
+                    # sunny 71°F "right now" at 10:30 PM, invented).
+                    strictness = (
+                        "No live weather data reached you. Do NOT "
+                        "state any current temperature, sky condition, "
+                        "wind or forecast number — a made-up 'right "
+                        "now' is the worst possible answer. One clause "
+                        "says the live numbers didn't come through and "
+                        "where to glance (a weather app, weather.gov); "
+                        "then give only what you truly know — the "
+                        "area's seasonal pattern and any planning "
+                        "advice the question implies.\n")
                 elif _LISTINGS_RX.search(query):
                     # "what movies are playing this week" once answered
                     # with ZERO titles and a homework list of other
@@ -9333,6 +9407,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         "never mention, summarize or apologize for an "
                         "off-topic result. The reader must never learn "
                         "what the search happened to return.\n"
+                        # 6b266, judged 3.2: the L-train answer OPENED
+                        # with "I can't pull live MTA service data from
+                        # here" and spent 200 words on how-to-check
+                        "Never describe your own data access — 'I "
+                        "can't pull live data', 'the data I have', "
+                        "'from here' are banned. When something live "
+                        "is missing, ONE clause says what to check "
+                        "and where; the rest answers from what you "
+                        "actually know.\n"
                         f"{strictness}"
                         f"PROMPT: {query}"
                     ),
