@@ -232,3 +232,40 @@ correction: cycle 7's "Drive served drill.py stale" theory was wrong
 records will carry the contract.
 next: cycle 10 = user-message clock on trial. Funnel needs 4.5×2
 sighted. Movies plan still queued.
+
+## cycle 10 — 2026-09-12T02:20Z — app 1b79a1a
+batch: seed 20260903, 22 records (6 chat / 10 web / 6 funnel).
+scores: chat 4.67 (HOLDS, 4th straight) · web 4.22 · funnel 3.97
+(sighted). All 6 sub-4 records adversarially re-checked: 6/6 upheld.
+verdict on cycle 9's edits: the user-message clock HELD — 10/10 web
+records clock-correct, incl. "dinner friday"=tonight and an open-now
+verdict citing 1:20 PM exactly. Any-engine stage retry: no empty
+stages this batch.
+landed (3):
+- _VENUE_RX += shops/stores/joints/venues -> "coffee shops near
+  williamsburg" left _loc="shops williamsburg", the home bias missed,
+  Nominatim answered VIRGINIA (web[4] 3.4, recheck upheld). Generic
+  container nouns now strip like venue words.
+- _LISTINGS_RX + what's-on strictness branch -> movies question
+  punted with ZERO titles and a homework list despite sources_n=1
+  (web[9] 2.2). Listings queries must commit to known current
+  releases; referral-instead-of-answer banned.
+- FUNNEL_SUMMARY_SYS three hard rules -> trip verdict invented "The
+  Clam House" B&B + a nonexistent Calais-Lubec ferry, violating both
+  stated reqs (funnel[4] 2.0); laptop verdict shipped a discontinued
+  2022 config AND overrode the clicked "14-inch" pick with a 15.6"
+  machine (funnel[5] 3.4). Verdicts: REAL only, picks binding, stated
+  reqs bind.
+also this cycle (trial-run, committed 1b79a1a): build-only page ETag
+let WKWebView 304 a weeks-old cached page while APP_BUILD held still
+by rule — ETag now carries source mtime, with a gauntlet tripwire.
+Stroked AI cap-height compensated (.865em/.06em, CSS + AppKit).
+next (ranked): 1) chat truncation — longest gen (135s) cut mid-
+sentence (chat[2] 3.8, recheck upheld): find the output-token cap on
+the long path. 2) weekend forecast horizon — Friday "this weekend"
+fetched Sat only, plus "this feed" register meta (web[6] 3.8).
+3) stage-time reconciliation — off-axis typed answers ("with
+sprinkles" for portion) sail through; only the verdict recovers.
+4) local-Gemma stage echo — dinner stages 3+4 re-asked stages 2+1.
+5) home hedge — answers hedge "if you're in NYC" while sibling
+records use 11221.

@@ -190,6 +190,15 @@ check("funnel verdict is a verdict, not an echo",
       and "NAME the specific thing" in _MILLENAI_SRC
       and "couldn't reach a model to weigh" in _MILLENAI_SRC
       and "MATERIALLY narrows" in _MILLENAI_SRC)
+# 6b265, cycle 10 of the drill: "coffee shops near williamsburg"
+# answered from VIRGINIA (generic venue nouns poisoned the locality),
+# the movies question punted with zero titles, and funnel verdicts
+# invented a B&B and overrode a clicked pick
+check("cycle-10 fixes: venue nouns, listings commit, grounded verdicts",
+      "shops?|stores?|joints?|venues?" in _MILLENAI_SRC
+      and "_LISTINGS_RX" in _MILLENAI_SRC
+      and "This is a what's-on question" in _MILLENAI_SRC
+      and "Picks are binding" in _MILLENAI_SRC)
 check("web answers blend sources with real knowledge",
       "drawing on BOTH" in _MILLENAI_SRC
       # scoped to RESEARCH_WRITE's old wording — the live-data/weather

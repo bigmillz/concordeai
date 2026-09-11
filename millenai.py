@@ -2310,10 +2310,20 @@ _VENUE_RX = re.compile(
     r"eats|takeout|takeaway|brunch|bakery|bakeries|delis?|bodegas?|"
     r"pizza|sushi|ramen|tacos?|burgers?|noodles?|barbecue|bbq|"
     r"grocery|groceries|hotels?|motels?|hostels?|gyms?|barbers?|salons?|"
+    # shops/stores/joints/venues are venue words too (6b265, measured:
+    # "coffee shops near williamsburg" left _loc = "shops williamsburg",
+    # the home bias missed, and Nominatim answered with VIRGINIA)
+    r"shops?|stores?|joints?|venues?|"
     r"pharmac(y|ies)|hospitals?|clinics?|dentists?|bookstores?|"
     r"laundromats?|nightlife|nightclubs?|clubs?|breweries|brewery|"
     r"speakeas(y|ies)|dispensar(y|ies))\b", re.I)
 _ZIP_RX = re.compile(r"\b\d{5}\b")
+# what's-on questions: current movies, showtimes, live events. Kept
+# narrow — "movies" alone would catch "best movies of all time".
+_LISTINGS_RX = re.compile(
+    r"(\b(movies?|films?)\b.{0,40}\b(playing|out|new|this\s+week(end)?|"
+    r"theat(er|re)s?)\b|\bshowtimes?\b|\bin\s+theat(er|re)s?\b|"
+    r"\bwhat'?s\s+(playing|showing)\b)", re.I)
 # "do you have any photos?" — an explicit ask for something to LOOK at
 _WANTS_IMAGES = re.compile(
     r"\b(photos?|pics?|pictures?|images?|screenshots?|diagrams?|"
@@ -6629,7 +6639,25 @@ FUNNEL_SUMMARY_SYS = (
     "what to suggest: one concrete, specific, real recommendation. "
     "Restating the user's own answers back to them is failure; so is "
     "offering a list of options — they came for a recommendation and "
-    "you give exactly one, with the reason it fits and the next step.")
+    "you give exactly one, with the reason it fits and the next step. "
+    # 6b265, judged: a trip verdict invented a B&B ("The Clam House")
+    # and a ferry that does not run; a laptop verdict shipped a
+    # discontinued 2022 config as current; another overrode the
+    # user's clicked "14-inch" with a 15.6" machine and called it
+    # "closest to your preference". Three hard rules:
+    "Three hard rules.\n"
+    "- REAL only: never invent or half-remember a business, product, "
+    "route or service. A specific name you cannot vouch is real "
+    "loses to a well-known one you can — recommend what you KNOW "
+    "exists, current as of your knowledge, and put what to double-"
+    "check in one clause.\n"
+    "- Picks are binding: never override an option the user clicked "
+    "or typed. If a pick cannot be honored exactly, say so plainly "
+    "and recommend the closest thing that DOES honor it — never "
+    "rationalize a different spec as close enough.\n"
+    "- Stated requirements (budget, no car, timeframe) bind the "
+    "verdict; if the picks make one impossible, name the conflict "
+    "and resolve it in the requirement's favor.")
 
 
 def funnel_summary_sys_for(goal: str) -> str:
@@ -9179,6 +9207,24 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         "[{\"n\":\"name\",\"d\":\"five words\","
                         "\"h\":\"hours or ''\"}] — max 4, data only, "
                         "nothing after it.\n")
+                elif _LISTINGS_RX.search(query):
+                    # "what movies are playing this week" once answered
+                    # with ZERO titles and a homework list of other
+                    # websites (6b265, judged 2.2/5). Listings retrieval
+                    # is often thin, but the model KNOWS what's in wide
+                    # release — the punt is a choice, and it's banned.
+                    strictness = (
+                        "This is a what's-on question. Sending the "
+                        "reader to other sites is failure: never open "
+                        "with what you can't see, never hand over a "
+                        "list of places to go look instead of an "
+                        "answer. Commit — name the actual current "
+                        "wide releases or major events you know of "
+                        "this month, plus anything the data adds, "
+                        "each with a few honest words on what it is "
+                        "and who it's for. One closing clause may say "
+                        "where to confirm local times — after the "
+                        "real answer, never instead of it.\n")
                 else:
                     strictness = ""
                 # data FIRST, instructions LAST — an instruction buried
