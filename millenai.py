@@ -6838,10 +6838,13 @@ FUNNEL_SUMMARY_SYS = (
     "loses to a well-known one you can — recommend what you KNOW "
     "exists, current as of your knowledge, and put what to double-"
     "check in one clause.\n"
-    "- Picks are binding: never override an option the user clicked "
-    "or typed. If a pick cannot be honored exactly, say so plainly "
-    "and recommend the closest thing that DOES honor it — never "
-    "rationalize a different spec as close enough.\n"
+    "- Picks are binding, LITERALLY: the verdict must be an instance "
+    "of the clicked option itself, not an adjacent category — if "
+    "they clicked Handmade pasta over Gnocchi, a gnudi (a dumpling) "
+    "is an override, however lovely. If a pick cannot be honored "
+    "exactly, say so plainly and recommend the closest thing that "
+    "DOES honor it — never rationalize a different spec as close "
+    "enough.\n"
     "- Stated requirements (budget, no car, timeframe) bind the "
     "verdict; if the picks make one impossible, name the conflict "
     "and resolve it in the requirement's favor.\n"
@@ -6850,7 +6853,10 @@ FUNNEL_SUMMARY_SYS = (
     "- No fake fits: if NO real option satisfies every answer, say so "
     "plainly, recommend the closest REAL one, and name which wish it "
     "misses — inventing an attribute to claim a perfect match is the "
-    "worst possible verdict.")
+    "worst possible verdict. FEASIBILITY IS AN ATTRIBUTE: a train "
+    "that runs there, a ferry, a place being reachable car-free — "
+    "never assert a route or service you cannot vouch exists; say "
+    "which leg needs checking instead.")
 
 
 def funnel_summary_sys_for(goal: str) -> str:
@@ -6865,6 +6871,34 @@ def funnel_sys_for(goal: str) -> str:
     """The funnel's system prompt, softened when the decision deserves
     it (6b253). One place, so every funnel entry point agrees."""
     return FUNNEL_SYS + (FUNNEL_CARE if _TENDER_RX.search(goal or "") else "")
+
+
+def _stage_ok(data, asked, opts) -> bool:
+    """Is a generated stage actually a stage? (6b267, judged three
+    cycles running: the local fallback writes malformed options
+    ("High-engagement engagement"), options that don't answer their
+    own question, and REPHRASED RE-ASKS of earlier stages.) The
+    mechanical tells: too few options, a doubled word inside a label,
+    or a question sharing most of its content words with one already
+    asked. A failed gate costs one more walk up the cloud ladder."""
+    q = str((data or {}).get("q", "")).lower()
+    rows = [o for o in ((data or {}).get("options") or [])
+            if isinstance(o, dict) and o.get("label")]
+    if not q or len(rows) < min(2, opts):
+        return False
+    for o in rows:
+        w = re.findall(r"[a-z]+", str(o["label"]).lower())
+        if any(a == b for a, b in zip(w, w[1:])):
+            return False               # "engagement engagement"
+    stop = {"the", "a", "an", "of", "for", "your", "you", "to", "in",
+            "what", "which", "how", "do", "does", "is", "are", "it",
+            "on", "or", "and", "with", "much", "many", "kind", "type"}
+    qw = set(re.findall(r"[a-z]+", q)) - stop
+    for prev in (asked or []):
+        pw = set(re.findall(r"[a-z]+", str(prev).lower())) - stop
+        if qw and pw and len(qw & pw) / len(qw | pw) >= 0.6:
+            return False               # a reworded repeat
+    return True
 
 
 def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
@@ -6949,12 +6983,13 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
         if isinstance(o, dict) and o.get("label"):
             out.append({"label": str(o["label"])[:90],
                         "why": str(o.get("why", ""))[:160]})
-    # A STAGE WITH NO OPTIONS IS NOT A STAGE (6b263, measured): the
-    # local fallback once emitted the literal banned "Which direction?"
-    # with an EMPTY options array — a dead end shipped to the user.
-    # Providers recover fast, so an empty local result earns exactly
-    # one more walk up the ladder before we accept defeat.
-    if not out and load_prefs(None).get("turbo"):
+    # A STAGE WITH NO OPTIONS IS NOT A STAGE (6b263, measured), and
+    # a malformed or re-asked one is no better (6b267): the gate
+    # covers both, and a failure earns exactly one more walk up the
+    # ladder before we accept defeat.
+    if ((not out or not _stage_ok(data, asked, opts))
+            and load_prefs(None).get("turbo")):
+        out = []
         for _conf in compositor_ladder():
             raw2 = cloud_text(_conf, msgs, timeout=45)
             m2 = re.search(r"\{[\s\S]*\}", raw2 or "")
@@ -6963,6 +6998,8 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
             try:
                 d2 = json.loads(m2.group(0))
             except Exception:
+                continue
+            if not _stage_ok(d2, asked, opts):
                 continue
             for o in (d2.get("options") or [])[:opts]:
                 if isinstance(o, dict) and o.get("label"):
@@ -9257,7 +9294,17 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         "Tuesday' beats a generic hours range.\n"
                         "2. Then at most three options as short bold-name "
                         "lines: **Name** — what it is — tonight's hours.\n"
-                        "3. One practical heads-up if the data supports one. "
+                        "3. When everything named is CLOSED at this "
+                        "hour, still commit: name ONE real place "
+                        "likely open right now (a 24-hour spot from "
+                        "the data or one you know is long-standing, "
+                        "flagged honestly) or state the earliest "
+                        "reopening time — 'try a delivery app' or "
+                        "'a 24-hour bodega' with no name is a "
+                        "non-answer. A 'best X' ask still gets a "
+                        "best (and one runner-up) even when the "
+                        "verdict is 'closed until noon'.\n"
+                        "4. One practical heads-up if the data supports one. "
                         "Nothing else: no 'best bet is to check', no filler, "
                         "under 120 words. If the data truly lacks the answer, "
                         "say that in ONE sentence and stop.\n"
@@ -9412,8 +9459,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         # here" and spent 200 words on how-to-check
                         "Never describe your own data access — 'I "
                         "can't pull live data', 'the data I have', "
-                        "'from here' are banned. When something live "
-                        "is missing, ONE clause says what to check "
+                        "'from here' are banned, and so are the "
+                        "softened forms: 'I can't confirm', 'nothing "
+                        "I found verifies', 'no hours were listed in "
+                        "what I found'. When something live is "
+                        "missing, ONE clause says what to check "
                         "and where; the rest answers from what you "
                         "actually know.\n"
                         f"{strictness}"

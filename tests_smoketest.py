@@ -449,6 +449,18 @@ check("auto-cleanup wired end to end",
       and 'id="autoclean"' in page)
 s, h, b = req("/api/setup", cookie=K, timeout=180)
 check("setup reports the reclaimable set", b'"cleanup"' in b)
+# 6b267, cycle 12 of the drill: local-Gemma stages wrote malformed
+# options and reworded re-asks (three cycles running), one verdict
+# invented an NJ Transit route to Jim Thorpe, another served gnudi to
+# a Handmade-pasta click, and softened capability meta slipped the ban
+check("cycle-13 fixes: stage gate, literal picks, honest negatives",
+      "def _stage_ok" in _MILLENAI_SRC
+      and "_stage_ok(data, asked, opts)" in _MILLENAI_SRC
+      and "_stage_ok(d2, asked, opts)" in _MILLENAI_SRC
+      and "FEASIBILITY IS AN ATTRIBUTE" in _MILLENAI_SRC
+      and "Picks are binding, LITERALLY" in _MILLENAI_SRC
+      and "softened forms" in _MILLENAI_SRC
+      and "still commit: name ONE real place" in _MILLENAI_SRC)
 # 6b266, cycle 11 of the drill: wttr.in died silently one night and
 # the answer invented "71°F and sunny" at 10:30 PM; the L-train
 # answer opened with capability meta; a candy verdict gave Nerds

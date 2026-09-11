@@ -307,3 +307,45 @@ how-tos. 3) stage-time reconciliation of off-axis typed answers
 (three cycles running). 4) route funnel stage generation off local
 Gemma (it wrote the off-taxonomy + redundant stages; the all-kimi
 record was flawless). 5) hedge-tic scoping to prices/hours only.
+
+## cycle 12 — 2026-09-12T07:5xZ — app 16b8062
+batch: seed 20260912, 22 records, collected Sat ~1:50-2:40 AM ET (a
+2 AM batch — the harshest open-now clock yet). scores: chat 4.70
+(back above bar) · web 4.68 (FIRST BATCH ABOVE 4.5 — needs one more
+to close) · funnel 4.13. 2/2 rechecks upheld.
+verdict on cycle 11's edits:
+- persona hedge-guessing and the (~check current) tic: GONE from
+  chat entirely. explainer drift milder (no flow blocks; H2s twice).
+- 2 AM clock PERFECT in all ten web records ("barely past 2am...
+  supermarkets are essentially never open"; "closed at midnight,
+  reopen at noon today"; L train "at 2:19 on a Saturday morning").
+- meta ban HALF-held: canonical forms gone, softened forms slipped
+  ("I can't confirm live status", "nothing here verifies").
+- no-fake-fits held for PRODUCTS but not LOGISTICS: verdict invented
+  an NJ Transit route to Jim Thorpe, PA (funnel[0] 2.8, upheld).
+- pick override recurred SUBTLER: clicked "Handmade pasta" over
+  "Gnocchi/Dumplings", verdict served Ricotta Gnudi — a dumpling
+  (funnel[4] 3.4, upheld). local-Gemma stages named the weak link a
+  third straight cycle (malformed "High-engagement engagement",
+  reworded re-asks; the all-cloud runs were 5.0 twice running).
+landed (3, tagged 6b267):
+- _stage_ok() quality gate on EVERY generated stage (cloud or
+  local): rejects <2 options, doubled-word labels, and questions
+  sharing >=60% content words with one already asked; a failed gate
+  walks the cloud ladder once more (the 6b263 retry, widened).
+- FUNNEL_SUMMARY_SYS: picks binding LITERALLY (an instance of the
+  clicked option, not an adjacent category — gnudi is not handmade
+  pasta); FEASIBILITY IS AN ATTRIBUTE (never assert an unvouchable
+  route/service; name the leg to check).
+- web: meta ban extended to softened forms; negative open-now
+  verdicts must still commit (ONE named likely-open place or the
+  earliest reopen; "best X" still gets a best + runner-up).
+next (ranked): 1) chat structure cap — H2s/tables only when a
+document is asked for; bold labels + lists otherwise. 2) "One fork"
+prompt-vocabulary leak — the memory rules say "state the fork";
+model echoes it verbatim; reword the instruction. 3) derived-number
+consistency pass (protein 130-160 vs own 0.7-1 g/lb rule). 4)
+stage-time reconciliation of off-axis typed answers (4th cycle —
+funnel[2] showed the verdict-time repair pattern to standardize).
+5) weather ladder still unexercised by a seed — needs a weather
+draw to verify live.
