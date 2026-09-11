@@ -433,6 +433,22 @@ check("the door's AI is fattened too, against its gradient",
       "-webkit-text-fill-color:#f5f6f8" in door
       and "-webkit-text-stroke:.12em #f5f6f8" in door
       and "Concorde<b>AI</b>" in door)
+# 6b265, per Patrick ("checkbox or similar for auto cleanup"): the
+# Manage panel grows an auto-clean toggle; the sweep removes a model
+# only when a newer generation of its family is ALSO installed, shares
+# the /api/model/remove guards verbatim, and stands down during any
+# download or app update
+check("auto-cleanup wired end to end",
+      "def superseded_installed" in _MILLENAI_SRC
+      and "def _remove_models" in _MILLENAI_SRC
+      and "def _auto_cleanup_pass" in _MILLENAI_SRC
+      and "_auto_cleanup_pass()" in
+          _MILLENAI_SRC.split("def _mlx_janitor")[1][:1200]
+      and '"/api/model/cleanup"' in _MILLENAI_SRC
+      and _MILLENAI_SRC.count('"/api/model/cleanup"') >= 2  # + ADMIN_PATHS
+      and 'id="autoclean"' in page)
+s, h, b = req("/api/setup", cookie=K, timeout=180)
+check("setup reports the reclaimable set", b'"cleanup"' in b)
 # 6b264, seen live: APP_BUILD holds still between releases (Patrick's
 # rule), so a build-only ETag answered 304 to a WKWebView holding a
 # cached weeks-old page — the test window kept showing stale UI. The

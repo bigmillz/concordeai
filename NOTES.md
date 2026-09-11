@@ -4416,3 +4416,38 @@ APP_BUILD ≥ 265 so the source tags stay truthful.)
   italic "Version 6.1 RC3" (#ver-foot) sits under the COMMUNITY GPU
   meter — the ConcordeVPN treatment. Gauntlet now asserts the foot
   exists AND the sidebar carries no vsub.
+
+## 6 beta 265 (pending) — the trial run pays for itself
+
+Patrick trialled the test build and each complaint traced to something
+real (see also the drill entries in drill_ledger.md, cycles 10-11):
+
+- THE STALE-PAGE 304 (committed as 1b79a1a): APP_BUILD holds still
+  between releases by rule, so the build-only ETag told a WKWebView
+  holding a weeks-old cached page "unchanged" — his test window
+  re-served the glow-era UI for days. ETag now carries source mtime.
+- THE TITLEBAR SAT 3PT LOW — always had. Centering used the label's
+  own box height; Michroma carries more slack under its baseline than
+  above its caps, and the accessory pins to the bottom of a bar taller
+  than BARH. Measured on-screen (cap ink vs the traffic-light row) and
+  corrected +2.5; the raised-AI line-box growth is now centered
+  against a plain reference string so the lift can't sink it again.
+- THE WING SAGGED once the text was right: box-centered, its ink hung
+  4pt below the baseline. The sidebar is the approved reference —
+  wing ink and cap ink share top AND bottom — so the titlebar wing is
+  sized to cap height (ink fractions computed from the bezier) and
+  lifted the same measured amount.
+- THE OUT-OF-PLACE i: the version foot was italic MONO — the face has
+  no italic, and the synthesized oblique at 10.5px detaches the i's
+  dot into a floating speck. The foot now uses the system face (a real
+  italic), the ConcordeVPN verline treatment.
+- AUTO-CLEANUP (per Patrick: "checkbox or similar for auto cleanup to
+  remove models that are no longer supported"). superseded_installed()
+  names an installed model only when a NEWER generation of its family
+  is ALSO complete on disk (the rec doctrine, never the only copy of
+  anything); _remove_models() is the /api/model/remove body extracted
+  verbatim so both paths share every guard; _auto_cleanup_pass()
+  stands down during any download or app update and skips resident
+  engines (port-probe, not just _mlx_procs — siblings own ports too);
+  the janitor runs it 6-hourly, the Manage checkbox runs it on tick.
+  On this Mac it names Llama 3.1 8B + Gemma 2 9B IT — 9.7 GB back.

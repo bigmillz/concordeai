@@ -3527,6 +3527,137 @@ def _dl_speed(have: int) -> float:
 _job_watch = {}   # label -> (pct, ts of last movement)
 
 
+def superseded_installed(pulled=None) -> list:
+    """Installed models made redundant by an installed NEWER generation
+    of the same family — Gemma 2 9B once a Gemma 4 is on disk (6b265,
+    per Patrick: "remove models that are no longer supported"). Only
+    ever names a model whose replacement is ALREADY complete locally,
+    so a sweep can never leave a family with nothing. Generation ties
+    (unparsable gens read 0) are never named — conservative by design.
+    """
+    if pulled is None:
+        pulled = ollama_pulled_tags()
+    have = [l for l in SUPPORTED if model_cached(l, pulled)]
+    fams = {}
+    for l in have:
+        fams.setdefault(_family_of(l), []).append(l)
+    out = []
+    for ls in fams.values():
+        best = max(_gen_of(l) for l in ls)
+        out.extend(l for l in ls if _gen_of(l) < best)
+    return out
+
+
+def _cleanup_stat(pulled=None) -> dict:
+    ls = superseded_installed(pulled)
+    return {"labels": ls,
+            "gb": round(sum(MODEL_INFO[l]["gb"] for l in ls), 1)}
+
+
+def _remove_models(want: list) -> tuple:
+    """Delete model weights, the ONE careful way — extracted verbatim
+    from /api/model/remove (6b265) so the auto-clean sweep shares every
+    guard instead of growing a second, subtly different deleter. Ready
+    models only; MLX deletes exactly the vetted repo's dir pair after
+    stopping the engine under _engine_lock; Ollama is never touched on
+    disk — the daemon (or `ollama rm`) does it."""
+    removed, errors = [], {}
+    for label in want:
+        if label not in MODEL_INFO or label not in MODEL_ROUTES:
+            errors[label] = "unknown model"
+            continue
+        with _setup_lock:
+            _st = (_setup_jobs.get(label) or {}).get("status", "")
+        if _st in ("downloading", "queued"):
+            errors[label] = "still downloading"
+            continue
+        kind, target = MODEL_ROUTES[label]
+        try:
+            if kind == "mlx":
+                # _engine_lock guards the process table everywhere
+                # else (see run_model) — take it, or a warm-up racing
+                # this delete resurrects a half-removed engine
+                with _engine_lock:
+                    proc = _mlx_procs.pop(label, None)
+                if proc and proc.poll() is None:
+                    proc.terminate()
+                    try:
+                        proc.wait(8)
+                    except Exception:
+                        proc.kill()
+                        try:
+                            proc.wait(6)
+                        except Exception:
+                            pass
+                repo = MLX_REPOS[label]
+                _mdir = _hf_model_dir(repo)
+                _hub = os.path.dirname(_mdir)
+                for _p in (_mdir, os.path.join(
+                        _hub, ".locks",
+                        "models--" + repo.replace("/", "--"))):
+                    if os.path.isdir(_p):
+                        shutil.rmtree(_p, ignore_errors=True)
+            else:
+                try:
+                    _rq = urllib.request.Request(
+                        "http://127.0.0.1:11434/api/delete",
+                        data=json.dumps({"name": target}).encode(),
+                        headers={"Content-Type":
+                                 "application/json"},
+                        method="DELETE")
+                    urllib.request.urlopen(_rq, timeout=15).read()
+                except Exception:
+                    _ob = _ollama_bin()
+                    if not _ob:
+                        raise RuntimeError("Ollama engine offline")
+                    _rr = subprocess.run([_ob, "rm", target],
+                                         capture_output=True,
+                                         timeout=30)
+                    if _rr.returncode != 0:
+                        # a silent non-zero here reported
+                        # "removed" while the weights stayed
+                        raise RuntimeError(
+                            (_rr.stderr or b"").decode(
+                                "utf-8", "replace").strip()[:80]
+                            or "ollama rm failed")
+            with _setup_lock:
+                _setup_jobs.pop(label, None)
+            removed.append(label)
+        except Exception as exc:
+            errors[label] = str(exc)[:80]
+    return removed, errors
+
+
+def _auto_cleanup_pass() -> list:
+    """The auto-clean sweep (6b265, per Patrick's checkbox). Runs only
+    when the pref is on; stands down entirely while an app update or
+    ANY model download is in flight (the process can vanish or a dir
+    can be mid-write); skips a model whose engine is resident — here
+    OR in a sibling instance (ports are shared machine-wide)."""
+    try:
+        if not load_prefs(None).get("auto_cleanup"):
+            return []
+        if _update.get("state") not in (None, "", "idle", "error"):
+            return []
+        with _setup_lock:
+            if any((j or {}).get("status") in ("downloading", "queued")
+                   for j in _setup_jobs.values()):
+                return []
+        targets = []
+        for label in superseded_installed():
+            kind, tgt = MODEL_ROUTES.get(label, (None, None))
+            if kind == "mlx" and (label in _mlx_procs
+                                  or _port_in_use(tgt)):
+                continue        # resident somewhere — next pass gets it
+            targets.append(label)
+        if not targets:
+            return []
+        removed, _errs = _remove_models(targets)
+        return removed
+    except Exception:
+        return []
+
+
 def setup_status() -> dict:
     # WATCHDOG: a download thread that dies mid-write leaves its job in
     # "downloading" forever, and the whole setup panel reads busy for the
@@ -3618,6 +3749,8 @@ def setup_status() -> dict:
         # in models ("11 of 20") and not only in gigabytes
         "plan_n": {pl: len(plan_labels(pl))
                    for pl in ("min", "rec", "full", "all")},
+        # what the auto-clean sweep would reclaim right now (6b265)
+        "cleanup": _cleanup_stat(pulled),
         "ready_n": ready_n,
         "mlx_ok": _has_mlx() if IS_ARM else True,
         "ollama": _ollama_bin() is not None,
@@ -7192,6 +7325,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
     # guests in the chat, not operators of the computer.
     ADMIN_PATHS = ("/api/open-logs", "/api/setup/install",
                    "/api/model/download", "/api/model/remove",
+                   "/api/model/cleanup",
                    "/api/update/install",
                    "/api/speak", "/api/voice/prepare",
                    "/api/remote/config", "/api/remote/test",
@@ -8625,6 +8759,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 want = []
             self._send_json({"started": start_model_downloads(want)})
             return
+        if self.path == "/api/model/cleanup":
+            # run the auto-clean sweep NOW — the checkbox's first act
+            # (6b265); the janitor repeats it every 6 hours
+            removed = _auto_cleanup_pass()
+            self._send_json({"removed": removed,
+                             "freed_gb": round(sum(
+                                 MODEL_INFO[l]["gb"]
+                                 for l in removed), 1)})
+            return
         if self.path == "/api/model/remove":
             # REMOVE A MODEL (6b257, per Patrick's Manage flow). Ready
             # models only — a downloading one has a live writer thread
@@ -8642,71 +8785,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         if isinstance(_b, dict) else [])
             except (ValueError, json.JSONDecodeError):
                 want = []
-            removed, errors = [], {}
-            for label in [str(x) for x in want][:20]:
-                if label not in MODEL_INFO or label not in MODEL_ROUTES:
-                    errors[label] = "unknown model"
-                    continue
-                with _setup_lock:
-                    _st = (_setup_jobs.get(label) or {}).get("status", "")
-                if _st in ("downloading", "queued"):
-                    errors[label] = "still downloading"
-                    continue
-                kind, target = MODEL_ROUTES[label]
-                try:
-                    if kind == "mlx":
-                        # _engine_lock guards the process table
-                        # everywhere else (see run_model) — take it, or
-                        # a warm-up racing this delete resurrects a
-                        # half-removed engine
-                        with _engine_lock:
-                            proc = _mlx_procs.pop(label, None)
-                        if proc and proc.poll() is None:
-                            proc.terminate()
-                            try:
-                                proc.wait(8)
-                            except Exception:
-                                proc.kill()
-                                try:
-                                    proc.wait(6)
-                                except Exception:
-                                    pass
-                        repo = MLX_REPOS[label]
-                        _mdir = _hf_model_dir(repo)
-                        _hub = os.path.dirname(_mdir)
-                        for _p in (_mdir, os.path.join(
-                                _hub, ".locks",
-                                "models--" + repo.replace("/", "--"))):
-                            if os.path.isdir(_p):
-                                shutil.rmtree(_p, ignore_errors=True)
-                    else:
-                        try:
-                            _rq = urllib.request.Request(
-                                "http://127.0.0.1:11434/api/delete",
-                                data=json.dumps({"name": target}).encode(),
-                                headers={"Content-Type":
-                                         "application/json"},
-                                method="DELETE")
-                            urllib.request.urlopen(_rq, timeout=15).read()
-                        except Exception:
-                            _ob = _ollama_bin()
-                            if not _ob:
-                                raise RuntimeError("Ollama engine offline")
-                            _rr = subprocess.run([_ob, "rm", target],
-                                                 capture_output=True,
-                                                 timeout=30)
-                            if _rr.returncode != 0:
-                                # a silent non-zero here reported
-                                # "removed" while the weights stayed
-                                raise RuntimeError(
-                                    (_rr.stderr or b"").decode(
-                                        "utf-8", "replace").strip()[:80]
-                                    or "ollama rm failed")
-                    with _setup_lock:
-                        _setup_jobs.pop(label, None)
-                    removed.append(label)
-                except Exception as exc:
-                    errors[label] = str(exc)[:80]
+            removed, errors = _remove_models(
+                [str(x) for x in want][:20])
             self._send_json({"removed": removed,
                              "freed_gb": round(sum(
                                  MODEL_INFO[l]["gb"] for l in removed), 1),
@@ -11689,6 +11769,7 @@ body:not(.perf) #mic.rec{animation:blink 1s ease infinite}
 #roster::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.28)}
 #roster::-webkit-scrollbar-track{background:transparent}
 #ver-foot{font-style:italic;font-size:10.5px;color:var(--faint);
+  font-family:-apple-system,'Helvetica Neue',sans-serif;
   text-align:center;margin-top:12px;letter-spacing:.02em}
 #roster-foot{display:flex;gap:8px}
 #manage-box{margin-top:10px;border-top:1px solid var(--line);
@@ -11867,7 +11948,9 @@ body:not(.perf) #mic.rec{animation:blink 1s ease infinite}
   color:var(--text);font-size:12.5px;outline:none;
 }
 #fleet-box input:not([type=checkbox]):focus{border-color:var(--accent-dim)}
-#acon-row,#idleon-row{display:flex;gap:7px;align-items:center;
+#autoclean-row{margin-top:10px}
+#autoclean-note{font-size:11.5px;color:var(--faint);margin-top:4px}
+#acon-row,#idleon-row,#autoclean-row{display:flex;gap:7px;align-items:center;
   font-size:12px;color:var(--text);margin:6px 0}
 #acon-row input,#idleon-row input{flex:none;margin:0}
 /* #about-facts carries no rule of its own anymore (6b245): it is a row
@@ -12822,6 +12905,9 @@ __CODE_ROWS__
           <div><dt>space taken</dt><dd id="mg-space">&mdash;</dd></div>
         </dl>
         <div id="plan-row"></div>
+        <label id="autoclean-row"><input type="checkbox" id="autoclean">
+          <span>Automatically remove superseded models</span></label>
+        <div id="autoclean-note"></div>
         <div id="manage-note"></div>
       </div>
     </section>
@@ -17293,6 +17379,7 @@ async function openAbout(){
       $("#turbo").checked=!!pr2.turbo;
       $("#contrib").checked=!!pr2.contrib_on;
       $("#betaup").checked=!!pr2.beta_updates;
+      $("#autoclean").checked=!!pr2.auto_cleanup;
       // unchecked features fold their furniture away (6.0b5)
       $("#fleet-box").hidden=!pr2.contrib_on;
       try{
@@ -17572,8 +17659,33 @@ $("#roster-manage").addEventListener("click",async()=>{
   if(manageOn){
     $("#plan-row").innerHTML='<div class="plan-card">reading disk…</div>';
     await ensureSetup();
-    paintPlans();paintMgStats();
+    paintPlans();paintMgStats();paintCleanNote();
   }
+});
+function paintCleanNote(){
+  const c=(lastSetup&&lastSetup.cleanup)||{labels:[],gb:0};
+  $("#autoclean-note").textContent=c.labels.length
+    ?c.labels.length+" superseded on disk — reclaims "+c.gb+" GB ("
+      +c.labels.join(", ")+")"
+    :"nothing superseded — everything installed is current";
+}
+$("#autoclean").addEventListener("change",async()=>{
+  await fetch("/api/prefs",{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({auto_cleanup:$("#autoclean").checked})});
+  if(!$("#autoclean").checked)return;
+  $("#autoclean-note").textContent="cleaning up\u2026";
+  try{
+    const r=await(await fetch("/api/model/cleanup",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:"{}"})).json();
+    $("#autoclean-note").textContent=r.removed.length
+      ?"removed "+r.removed.length+" \u2014 freed "+r.freed_gb+" GB"
+      :"nothing to clean right now";
+  }catch(e){
+    $("#autoclean-note").textContent="cleanup hit a snag \u2014 try again";
+  }
+  lastSetup=null;await ensureSetup();
+  paintRoster(lastSetup,lastCloud);paintMgStats();
 });
 $("#plan-row").addEventListener("click",async e=>{
   const c=e.target.closest(".plan-card");if(!c||!c.dataset.plan)return;
@@ -18347,6 +18459,7 @@ def _mlx_janitor():
         if time.time() - swept[0] > 6 * 3600:
             swept[0] = time.time()
             _purge_stale_guests()
+            _auto_cleanup_pass()   # no-op unless the pref is on
         try:
             if _mlx_procs and _mlx_last_use and \
                     time.time() - _mlx_last_use > 300:
@@ -18675,15 +18788,48 @@ if __name__ == "__main__":
                             label = NSTextField.\
                                 labelWithAttributedString_(att)
                             lw = label.frame().size.width
-                            lh = label.frame().size.height
+                            # the raised AI grows the line box UPWARD
+                            # only, so centering by the label's own
+                            # height sank the text (6b265, per Patrick:
+                            # "doesn't look vertically centered").
+                            # Center by the height the line has in the
+                            # base font alone — the descent side is
+                            # untouched by the lift, so this pins the
+                            # baseline where the plain lockup had it.
+                            _ref = NSMutableAttributedString.alloc().\
+                                initWithString_(name + tld)
+                            _ref.addAttributes_range_(
+                                {"NSFont": mich, "NSKern": 1.7},
+                                (0, len(name + tld)))
+                            lh = NSTextField.\
+                                labelWithAttributedString_(_ref).\
+                                frame().size.height
                             left = NSView.alloc().initWithFrame_(
                                 ((0, 0), (6 + 15 + 6 + lw + 10, BARH)))
+                            # ink occupies 10.75/12.6 of the wing
+                            # box (bezier margins) — size the box so
+                            # wing ink == cap ink, and lift it the
+                            # same measured 2.5 as the label (the
+                            # accessory pins to the BOTTOM of a bar
+                            # taller than BARH, so pure box-centering
+                            # sits 2.25pt low — measured on screen,
+                            # 6b265). Sidebar pact: wing ink and cap
+                            # ink share top and bottom exactly.
+                            _wh = mich.capHeight() * (12.6 / 10.75)
+                            _ww = _wh * (15.0 / 12.6)
                             wiv = NSImageView.alloc().initWithFrame_(
-                                ((6, (BARH - 12.6) / 2), (15, 12.6)))
+                                ((6, (BARH - _wh) / 2.0 + 1.75),
+                                 (_ww, _wh)))
                             wiv.setImage_(wing)
                             left.addSubview_(wiv)
+                            # +2.5, measured (6b265, per Patrick:
+                            # "doesn't look vertically centered"): with
+                            # the box centered, the CAP ink sat 3pt
+                            # below the bar's true center (traffic-
+                            # light row) — Michroma carries more slack
+                            # under its baseline than above its caps.
                             label.setFrameOrigin_(
-                                (27, (BARH - lh) / 2.0 - 0.5))
+                                (27, (BARH - lh) / 2.0 + 2.5))
                             left.addSubview_(label)
                             acc = NSTitlebarAccessoryViewController.\
                                 alloc().init()
