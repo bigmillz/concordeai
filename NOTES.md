@@ -4451,3 +4451,16 @@ real (see also the drill entries in drill_ledger.md, cycles 10-11):
   engines (port-probe, not just _mlx_procs — siblings own ports too);
   the janitor runs it 6-hourly, the Manage checkbox runs it on tick.
   On this Mac it names Llama 3.1 8B + Gemma 2 9B IT — 9.7 GB back.
+
+## 6.1 RC4 — build 268
+
+Cut on Patrick's word after twelve drill cycles and the trial-run
+fixes. Build jumps 260 -> 268 so every 6b261-267 source tag lands
+inside a shipped build. Ships: cycles 10-12's answer-quality edits
+(locality nouns, listings commit, grounded + literally-pick-honoring
+funnel verdicts, the weather ladder + honesty, the data-access meta
+ban, the stage quality gate), the 6b264 UI pass (version at the
+foot, one AI weight, no glow, brand-only labels, real menu name),
+the 6b265 trial-run fixes (mtime ETag, titlebar truly centered,
+system-italic foot, auto-cleanup), all gated 121-127/127 green.
+Still a prerelease: APP_BETA holds, sync sign-in gates "6.1 proper".
