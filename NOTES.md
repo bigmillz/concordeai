@@ -4487,3 +4487,33 @@ Still a prerelease: APP_BETA holds, sync sign-in gates "6.1 proper".
   The checkbox itself had already earned its keep: Patrick ticked it
   during the trial and the sweep freed 9.7 GB on the spot (Llama 3.1
   8B + Gemma 2 9B IT, both with newer family generations installed).
+
+## 6 beta 269-era (pending) — the morning-after list
+
+- THE PRUNE (per Patrick: "what models can we prune that are basically
+  redundant or outdated"). Six catalog rows retired — Gemma 2 2B and
+  9B (the Gemma 4 line), Llama 3.1 8B (3.2/3.3), Qwen 2.5 7B (3.6),
+  the ollama-default "DeepSeek R1" (a duplicate of the R1 7B distill),
+  Mistral Small 24B (squeezed between Gemma 4 26B and Nemo). Presets
+  and the wizard's plans derive from the catalog, so they dropped out
+  of every plan for free; the hardcoded tier/agent/funnel/remote
+  ladders were scrubbed by hand (a grep for each label is the test).
+  RETIRED_MODELS keeps their vetted repo/tag/port/GB so auto-clean
+  still recognises and deletes their weights on any user's disk.
+- THE WIZARD gets the auto-clean checkbox beside "ignore system
+  limits" (per Patrick) — same pref, no button there.
+- THE HERO GREETS YOU (per Patrick: "how Claude will say good evening
+  Pat... how's Tokyo tonight, Pat?"). The 150 NYC lines are gone; the
+  new bank is anywhere-on-earth, tokened with {name} (first word of
+  the Settings name) and {city} (first segment of home_area), gated
+  by hour/day/month as before, and NEVER asserts weather. A line
+  needing a token the app lacks is never drawn.
+- CHAT SEARCH under the lane tabs (per Patrick): titles filter as you
+  type; from three characters /api/chats/search greps message content
+  too, so an answer you remember finds its chat.
+- TITLEBAR LOCKUP CENTERED (per Patrick, "similar to the VPN"):
+  accessories only know left/right, so the left one spans the bar and
+  the lockup container is parked on the window's midpoint, re-parked
+  on resize/layout notifications by a tiny NSObject observer.
+- REMOVE LINKS are manage-mode only (per Patrick): the roster reads
+  as an informative list until Manage models opens.

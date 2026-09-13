@@ -133,10 +133,18 @@ check("greetings are condition-gated",
       and "a<=b?(hr>=a&&hr<=b):(hr>=a||hr<=b)" in page   # wraparound
       and "h:[0,0]" in page                              # midnight kept
       and 'd:[5],h:[15,18]' in page)                     # Friday is real
+# 6b269, per Patrick ("less NYC, but still fun... use the user's
+# nickname... the user's location"): the bank is anywhere-on-earth,
+# tokened with {name}/{city} (a line needing a token the app lacks is
+# never drawn), and NO line asserts weather — vibes only.
 check("no ungated weather-claim greetings",
-      "Ninety degrees" in page and "m:[6,7]" in page
-      and "First snow" not in page          # needs a precip signal
-      and "umbrella's toast" not in page)   # ditto
+      "Ninety degrees" not in page and "Hawk's out" not in page
+      and "Slush season" not in page and "First snow" not in page
+      and "umbrella's toast" not in page
+      and "Summer, {name}. What's the move?" in page   # month vibe
+      and "{name}" in page and "{city}" in page
+      and "function greetHas" in page and "function greetFill" in page
+      and "How's {city} tonight, {name}?" in page)
 # 6.0b4 made the wordmark small; 6b264 (per Patrick) moved the
 # version OUT of the lockup entirely — it lives at the sidebar foot
 # under the system monitor, the VPN treatment (italic, dim, centered)
@@ -458,6 +466,30 @@ check("setup reports the reclaimable set", b'"cleanup"' in b)
 # measured coupling, the memory %% is gone (the bar carries it), and
 # Clean now opens a pop-up naming the superseded models + GB and runs
 # the guarded sweep on demand (force skips only the pref gate)
+# 6b269: the prune (six rows retired into RETIRED_MODELS so their
+# weights stay deletable), the wizard's own auto-clean box, the hero
+# that greets by name and town, and chat search under the lane tabs
+check("prune: retired registry + ladders scrubbed",
+      "RETIRED_MODELS = {" in _MILLENAI_SRC
+      and '"Gemma 2 9B IT":     ("mlx-community/gemma-2-9b-it-4bit"' in _MILLENAI_SRC
+      and _MILLENAI_SRC.count('("Gemma 2 9B IT",') == 0
+      and _MILLENAI_SRC.count('"Llama 3.1 8B"') == 1     # registry only
+      and '"Mistral Small 24B":' in _MILLENAI_SRC
+      and "def _gb_of" in _MILLENAI_SRC
+      and "elif label in RETIRED_MODELS:" in _MILLENAI_SRC)
+check("wizard has the auto-clean box, no button",
+      'id="wiz-ac"' in page and "wiz-clean-now" not in page)
+check("hero greets by name and town",
+      "const NICK=" in page and "const CITY=" in page
+      and "__USER_NICK__" not in page and "__USER_CITY__" not in page)
+check("chat search under the tabs",
+      'id="chat-q"' in page and "/api/chats/search?q=" in page
+      and '"/api/chats/search"' in _MILLENAI_SRC)
+s, h, b = req("/api/chats/search?q=zzqxv", cookie=K)
+check("chat search endpoint answers", s == 200 and b'"ids"' in b)
+check("titlebar lockup centers on the window",
+      "_center_lockup" in _MILLENAI_SRC
+      and "NSWindowDidResizeNotification" in _MILLENAI_SRC)
 check("clean-now flow wired",
       'id="clean-now"' in page and 'id="clean-veil"' in page
       and 'id="clean-go"' in page

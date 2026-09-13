@@ -10,7 +10,6 @@ Optional extras:
 Backends (any subset is fine — missing ones just report offline):
   MLX / llama.cpp OpenAI-compatible servers on:
     127.0.0.1:8888  -> Llama 3.2 3B
-    127.0.0.1:8890  -> Gemma 2 9B IT
     127.0.0.1:8892  -> Mistral Nemo 12B
   Ollama on 127.0.0.1:11434 for the heavy models.
 
@@ -357,22 +356,16 @@ CATALOG = [
     # label,               icon, size, group, mlx repo, ollama tag, port, mem_gb, gb, star
     ("Llama 3.2 1B",       "🪶", "1B",  "core", "mlx-community/Llama-3.2-1B-Instruct-4bit",        "llama3.2:1b",       8884,  1.2,  0.8, True),
     ("Llama 3.2 3B",       "⚡️", "3B",  "core", "mlx-community/Llama-3.2-3B-Instruct-4bit",        "llama3.2:3b",       8888,  2.5,  1.8, True),
-    ("Gemma 2 9B IT",      "💎", "9B",  "core", "mlx-community/gemma-2-9b-it-4bit",                "gemma2:9b",         8890,  6.2,  5.2, True),
     ("Mistral Nemo 12B",   "🌪️", "12B", "core", "mlx-community/Mistral-Nemo-Instruct-2407-4bit",   "mistral-nemo:12b",  8892,  7.8,  6.9, True),
-    ("Gemma 2 2B",         "🌱", "2B",  "core", "mlx-community/gemma-2-2b-it-4bit",                "gemma2:2b",         8886,  2.0,  1.6, False),
-    ("Llama 3.1 8B",       "🦙", "8B",  "core", "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit",   "llama3.1:8b",       8894,  5.5,  4.5, False),
     # tuned for tool use and structured output — the Research agent's first pick
     ("Hermes 3 8B",        "🪽", "8B",  "core", "mlx-community/Hermes-3-Llama-3.1-8B-4bit",        "hermes3:8b",        8912,  5.5,  4.6, False),
-    ("Qwen 2.5 7B",        "🧭", "7B",  "core", "mlx-community/Qwen2.5-7B-Instruct-4bit",          "qwen2.5:7b",        8896,  5.0,  4.3, False),
     ("Qwen 2.5 Coder 7B",  "💻", "7B",  "code", "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit",    "qwen2.5-coder:7b",  8898,  5.0,  4.3, False),
     ("Qwen 2.5 Coder 14B", "🛠️", "14B", "code", "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit",   "qwen2.5-coder:14b", 8900,  9.5,  8.1, False),
     ("Gemma 4 12B",        "💠", "12B", "core", "mlx-community/gemma-4-12B-it-4bit",               "gemma4:12b",        8908,  8.2,  6.8, True),
     ("Gemma 4 26B",        "🔷", "26B", "core", "mlx-community/gemma-4-26b-a4b-it-4bit",           "gemma4:26b",        8910, 17.0, 15.4, False),
     ("Phi-4 14B",          "🔬", "14B", "core", "mlx-community/phi-4-4bit",                        "phi4:14b",          8902,  9.5,  8.2, False),
     ("DeepSeek R1 7B",     "🧠", "7B",  "core", "mlx-community/DeepSeek-R1-Distill-Qwen-7B-4bit",  "deepseek-r1:7b",    8904,  5.0,  4.3, False),
-    ("Mistral Small 24B",  "🧊", "24B", "big",  "mlx-community/Mistral-Small-24B-Instruct-2501-4bit", "mistral-small:24b", 8906, 15.0, 13.0, False),
     ("LLaVA Vision 7B",    "👁️", "7B",  "code", None,                                              "llava:7b",          None,  5.0,  4.7, False),
-    ("DeepSeek R1",        "☁️", "R1",  "core", None,                                              "deepseek-r1",       None,  5.5,  4.7, False),
     # ---- the 2026 ladder: every repo/tag verified against HF + the Ollama
     # registry on 2026-08-01. Strongest model per hardware class; anything
     # that can't fit the machine is filtered out of the UI entirely.
@@ -386,6 +379,30 @@ CATALOG = [
     ("GLM-5.2",            "👑", "744B", "big",  "mlx-community/GLM-5.2-4bit",                     None,                8928, 375.0, 360.0, False),
     ("DeepSeek R1 671B",   "🌊", "671B", "big",  "mlx-community/DeepSeek-R1-0528-4bit",            None,                8930, 380.0, 360.0, False),
 ]
+
+# PRUNED, NOT FORGOTTEN (6b269, per Patrick: "what models can we prune
+# that are basically redundant or outdated"). Six rows left the
+# catalog — each superseded or duplicated by a better row that stays:
+# Gemma 2 2B/9B (the Gemma 4 line), Llama 3.1 8B (3.2/3.3), Qwen 2.5
+# 7B (the 3.6 line), the ollama-default "DeepSeek R1" (a duplicate of
+# the R1 7B distill), Mistral Small 24B (squeezed between Gemma 4 26B
+# and Nemo). The registry keeps their VETTED file identities — repo,
+# tag, old engine port, disk GB — so auto-clean can still recognise
+# and delete their weights from any user's disk through the same
+# guarded deleter, and nothing else in the app ever offers them.
+RETIRED_MODELS = {
+    "Gemma 2 2B":        ("mlx-community/gemma-2-2b-it-4bit",
+                          "gemma2:2b", 8886, 1.6),
+    "Gemma 2 9B IT":     ("mlx-community/gemma-2-9b-it-4bit",
+                          "gemma2:9b", 8890, 5.2),
+    "Llama 3.1 8B":      ("mlx-community/Meta-Llama-3.1-8B-Instruct-4bit",
+                          "llama3.1:8b", 8894, 4.5),
+    "Qwen 2.5 7B":       ("mlx-community/Qwen2.5-7B-Instruct-4bit",
+                          "qwen2.5:7b", 8896, 4.3),
+    "DeepSeek R1":       (None, "deepseek-r1", None, 4.7),
+    "Mistral Small 24B": ("mlx-community/Mistral-Small-24B-Instruct-2501-4bit",
+                          "mistral-small:24b", 8906, 13.0),
+}
 
 GROUP_TITLES = {"core": "General Models", "code": "Coding & Vision",
                 "big": "Large Models"}
@@ -1591,8 +1608,8 @@ TIERS = {
         "picks": ["Qwen 3 235B MoE", "GPT-OSS 120B", "Llama 4 Scout",
                   "Llama 3.3 70B", "Gemma 4 26B", "Qwen 3.6 27B",
                   "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Gemma 4 12B",
-                  "Phi-4 14B", "Mistral Nemo 12B", "Llama 3.1 8B",
-                  "Llama 3.2 3B", "Gemma 2 2B", "Llama 3.2 1B"],
+                  "Phi-4 14B", "Mistral Nemo 12B",
+                  "Llama 3.2 3B", "Llama 3.2 1B"],
         "count": 1,
     },
     # "Best" is gone (5.3, per Patrick: "same as fast") — without a
@@ -1612,7 +1629,7 @@ TIERS = {
         "picks": ["Qwen 3 235B MoE", "GPT-OSS 120B", "Llama 4 Scout",
                   "Llama 3.3 70B", "Gemma 4 26B", "Qwen 3.6 35B MoE",
                   "GPT-OSS 20B", "Phi-4 14B", "DeepSeek R1 7B",
-                  "DeepSeek R1", "Qwen 2.5 Coder 14B", "Gemma 4 12B"],
+                  "Qwen 2.5 Coder 14B", "Gemma 4 12B"],
         "count": 3,
     },
     # Pro absorbed Power (5.3, per Patrick): every model that fits takes
@@ -1675,7 +1692,7 @@ AGENTS = {
         "icon": "\U0001f5c2\ufe0f", "desc": "answers about your own code",
         "picks": ["Qwen 2.5 Coder 14B", "Gemma 4 26B",
                   "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Qwen 2.5 Coder 7B",
-                  "Gemma 4 12B", "Llama 3.1 8B"],
+                  "Gemma 4 12B"],
         "workspace": True,
         "system": (
             "You are a senior engineer reading the user's actual "
@@ -1697,16 +1714,14 @@ AGENTS = {
         # when keyed). Lives in the Code tab beside Coding/Workspace.
         "icon": "🛰️", "desc": "runs commands on your server over SSH",
         "picks": ["Qwen 2.5 Coder 14B", "Qwen 3.6 35B MoE", "GPT-OSS 20B",
-                  "Gemma 4 26B", "Qwen 2.5 Coder 7B", "Gemma 4 12B",
-                  "Llama 3.1 8B"],
+                  "Gemma 4 26B", "Qwen 2.5 Coder 7B", "Gemma 4 12B"],
         "remote": True,
         "system": "",       # the loop supplies REMOTE_SYSTEM itself
     },
     "Coding": {
         "icon": "💻", "desc": "working code, tight explanations",
         "picks": ["Qwen 2.5 Coder 14B", "Qwen 2.5 Coder 7B",
-                  "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Gemma 4 12B",
-                  "Llama 3.1 8B"],
+                  "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Gemma 4 12B"],
         "system": (
             "You are a senior software engineer. Give WORKING code first, "
             "in fenced blocks with the language tag, then a tight "
@@ -1721,7 +1736,7 @@ AGENTS = {
         # system prompt sets TONE, not permissions: it still refuses
         # what must be refused, it just skips the sermon.
         "icon": "\U0001fabd", "desc": "the infamous one — direct, no varnish",
-        "picks": ["Hermes 3 8B", "Mistral Nemo 12B", "Llama 3.1 8B"],
+        "picks": ["Hermes 3 8B", "Mistral Nemo 12B", "Llama 3.2 3B"],
         "system": (
             "You are Hermes — direct, sharp, personality-forward. "
             "Answer exactly what was asked. Take real positions when "
@@ -1735,7 +1750,7 @@ AGENTS = {
     "Resumes": {
         "icon": "📄", "desc": "bullets that get interviews",
         "picks": ["Hermes 3 8B", "Qwen 3.6 35B MoE", "Gemma 4 12B",
-                  "Mistral Nemo 12B", "Llama 3.1 8B"],
+                  "Mistral Nemo 12B"],
         "system": (
             "You are an expert resume writer and hiring manager. Turn "
             "experience into crisp, quantified bullet points: strong verb "
@@ -1761,7 +1776,7 @@ AGENTS = {
     "Mnemosyne": {
         "icon": "\U0001f9e0", "desc": "total recall — and how to remember",
         "picks": ["Qwen 3.6 35B MoE", "Gemma 4 26B", "Hermes 3 8B",
-                  "Mistral Nemo 12B", "Llama 3.1 8B"],
+                  "Mistral Nemo 12B"],
         "system": (
             "You are Mnemosyne, the memory specialist. Two jobs.\n"
             "1) RECALL: when asked what you know or remember about the "
@@ -1794,7 +1809,7 @@ AGENTS = {
     "Research": {
         "icon": "🔎", "desc": "searches the web, writes a cited brief",
         "picks": ["Hermes 3 8B", "Qwen 3.6 35B MoE", "Gemma 4 12B",
-                  "Mistral Nemo 12B", "Llama 3.1 8B"],
+                  "Mistral Nemo 12B"],
         "research": True,
         "system": "",
     },
@@ -2051,7 +2066,7 @@ def merge_pref_label() -> str:
     uses it to put the merger LAST in the council roster and run_council
     uses it to pick the merger — if these two ever disagree, the roster
     ordering optimisation warms the wrong engine."""
-    for pref in ("Gemma 4 26B", "Gemma 4 12B", "Gemma 2 9B IT"):
+    for pref in ("Gemma 4 26B", "Gemma 4 12B"):
         if model_cached(pref) and model_fits_memory(pref):
             return pref
     return ""
@@ -3599,13 +3614,26 @@ def superseded_installed(pulled=None) -> list:
     for ls in fams.values():
         best = max(_gen_of(l) for l in ls)
         out.extend(l for l in ls if _gen_of(l) < best)
+    # retired rows: still on disk == still deletable (6b269)
+    for l, (repo, tag, _port, _gb) in RETIRED_MODELS.items():
+        if repo and IS_ARM:
+            if mlx_model_cached(repo):
+                out.append(l)
+        elif tag and pulled and (tag in pulled):
+            out.append(l)
     return out
+
+
+def _gb_of(label: str) -> float:
+    if label in MODEL_INFO:
+        return MODEL_INFO[label]["gb"]
+    return RETIRED_MODELS.get(label, (None, None, None, 0))[3]
 
 
 def _cleanup_stat(pulled=None) -> dict:
     ls = superseded_installed(pulled)
     return {"labels": ls,
-            "gb": round(sum(MODEL_INFO[l]["gb"] for l in ls), 1)}
+            "gb": round(sum(_gb_of(l) for l in ls), 1)}
 
 
 def _remove_models(want: list) -> tuple:
@@ -3617,7 +3645,16 @@ def _remove_models(want: list) -> tuple:
     disk — the daemon (or `ollama rm`) does it."""
     removed, errors = [], {}
     for label in want:
-        if label not in MODEL_INFO or label not in MODEL_ROUTES:
+        if label in MODEL_INFO and label in MODEL_ROUTES:
+            kind, target = MODEL_ROUTES[label]
+            repo = MLX_REPOS.get(label)
+        elif label in RETIRED_MODELS:
+            # a pruned row (6b269): the registry carries its vetted
+            # identity so its weights stay deletable forever
+            repo, _tag, _port, _gb = RETIRED_MODELS[label]
+            kind, target = (("mlx", _port) if (repo and IS_ARM)
+                            else ("ollama", _tag))
+        else:
             errors[label] = "unknown model"
             continue
         with _setup_lock:
@@ -3625,7 +3662,6 @@ def _remove_models(want: list) -> tuple:
         if _st in ("downloading", "queued"):
             errors[label] = "still downloading"
             continue
-        kind, target = MODEL_ROUTES[label]
         try:
             if kind == "mlx":
                 # _engine_lock guards the process table everywhere
@@ -3643,7 +3679,6 @@ def _remove_models(want: list) -> tuple:
                             proc.wait(6)
                         except Exception:
                             pass
-                repo = MLX_REPOS[label]
                 _mdir = _hf_model_dir(repo)
                 _hub = os.path.dirname(_mdir)
                 for _p in (_mdir, os.path.join(
@@ -3702,9 +3737,14 @@ def _auto_cleanup_pass(manual=False) -> list:
                 return []
         targets = []
         for label in superseded_installed():
-            kind, tgt = MODEL_ROUTES.get(label, (None, None))
+            if label in MODEL_ROUTES:
+                kind, tgt = MODEL_ROUTES[label]
+            else:
+                _r = RETIRED_MODELS.get(label)
+                kind, tgt = (("mlx", _r[2]) if (_r and _r[2])
+                             else (None, None))
             if kind == "mlx" and (label in _mlx_procs
-                                  or _port_in_use(tgt)):
+                                  or (tgt and _port_in_use(tgt))):
                 continue        # resident somewhere — next pass gets it
             targets.append(label)
         if not targets:
@@ -6096,7 +6136,7 @@ def remote_driver():
     pulled = ollama_pulled_tags() or set()
     for l in ("Qwen 2.5 Coder 14B", "Qwen 3.6 35B MoE", "GPT-OSS 20B",
               "Gemma 4 26B", "Qwen 2.5 Coder 7B", "Gemma 4 12B",
-              "Llama 3.1 8B"):
+              "Llama 3.2 3B"):
         if l in MODEL_ROUTES and model_cached(l, pulled) \
                 and model_fits_memory(l):
             return ("local", l)
@@ -6948,7 +6988,7 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
         % (goal, reqs or "none stated", chosen, prior, stage, total,
            final, opts))
     label = next((l for l in ("Gemma 4 26B", "Gemma 4 12B", "Qwen 3.6 35B MoE",
-                              "Llama 3.1 8B")
+                              "Llama 3.2 3B")
                   if model_cached(l) and model_fits_memory(l)), "")
     msgs = [{"role": "system", "content": funnel_sys_for(goal)},
             {"role": "user", "content": ask}]
@@ -7602,6 +7642,18 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     .replace("__SKY_N__", str(len(SKY_SOURCES)))
                     .replace("__SKY_DARK__", json.dumps(SKY_DARK))
                     .replace("__SKY_NYC__", json.dumps(SKY_NYC))
+                    .replace("__USER_NICK__", json.dumps(
+                        (str(load_prefs(self._data_base()).get(
+                            "user_name") or "").strip().split(" ")[0]
+                         or "")[:24]))
+                    # the home town for the hero ("how's Tokyo tonight"):
+                    # the first segment of home_area, "Brooklyn, NY" ->
+                    # "Brooklyn"; blank when unset, and the pool skips
+                    # every line that would need it
+                    .replace("__USER_CITY__", json.dumps(
+                        (str(load_prefs(self._data_base()).get(
+                            "home_area") or "").split(",")[0].strip()
+                         )[:32]))
                     .replace("__APP_VER__", short_version()
                              + (" \u00b7 test build" if os.environ.get(
                                  "MILLENAI_TESTBUILD") else "")))
@@ -7904,6 +7956,26 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         elif self.path == "/api/chats":
             with _chats_lock:
                 self._send_json({"chats": load_chats(self._data_base())})
+        elif self.path.startswith("/api/chats/search"):
+            # full-text over the user's own chats (6b269, per Patrick:
+            # "search through existing conversations") — titles match
+            # instantly client-side; this covers message CONTENT
+            _q = (urllib.parse.parse_qs(urllib.parse.urlparse(
+                self.path).query).get("q", [""])[0] or "")
+            _q = _q.strip().lower()[:80]
+            hits = []
+            if _q:
+                with _chats_lock:
+                    _cs = load_chats(self._data_base())
+                for c in _cs:
+                    try:
+                        if _q in str(c.get("title", "")).lower() or any(
+                                _q in str(m.get("content", "")).lower()
+                                for m in (c.get("messages") or [])[:400]):
+                            hits.append(c.get("id"))
+                    except Exception:
+                        continue
+            self._send_json({"ids": hits})
         elif self.path == "/api/memory":
             self._send_json({"facts": _load_memory(self._data_base())})
         elif self.path == "/api/me":
@@ -8872,8 +8944,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 manual=bool(isinstance(_b, dict) and _b.get("force")))
             self._send_json({"removed": removed,
                              "freed_gb": round(sum(
-                                 MODEL_INFO[l]["gb"]
-                                 for l in removed), 1)})
+                                 _gb_of(l) for l in removed), 1)})
             return
         if self.path == "/api/model/remove":
             # REMOVE A MODEL (6b257, per Patrick's Manage flow). Ready
@@ -8896,7 +8967,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 [str(x) for x in want][:20])
             self._send_json({"removed": removed,
                              "freed_gb": round(sum(
-                                 MODEL_INFO[l]["gb"] for l in removed), 1),
+                                 _gb_of(l) for l in removed), 1),
                              "errors": errors})
             return
         if self.path != "/api/chat":
@@ -10484,6 +10555,16 @@ body.perf #tab-glide{transition:none}
 .chat-item:hover .cx{visibility:visible}
 .chat-item .cx:hover{color:var(--red)}
 /* day grouping, pinning, in-place rename */
+/* the search bubble under the lane tabs (6b269, per Patrick):
+   filters the list live — titles instantly, full text via the
+   server once three characters are in */
+#chat-search{margin:2px 10px 8px}
+#chat-search input{width:100%;background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.09);border-radius:99px;
+  padding:6px 13px;color:inherit;font:inherit;font-size:12px;
+  outline:none;-webkit-appearance:none}
+#chat-search input::placeholder{color:rgba(255,255,255,.32)}
+#chat-search input:focus{border-color:rgba(255,255,255,.22)}
 .cgroup{font-family:var(--mono);font-size:9px;letter-spacing:.16em;
   text-transform:uppercase;color:var(--faint);opacity:.75;
   padding:12px 10px 5px;user-select:none}
@@ -12278,9 +12359,10 @@ body:not(.perf) #mic.rec{animation:blink 1s ease infinite}
 .wplan span{display:block;color:var(--dim);font-size:11px;line-height:1.4}
 .wplan .wgb{font-family:var(--mono);font-size:9.5px;color:var(--faint);
   letter-spacing:.1em;margin-top:5px;display:block}
-#wiz-nolimits{display:flex;gap:8px;align-items:flex-start;
+#wiz-autoclean,#wiz-nolimits{display:flex;gap:8px;align-items:flex-start;
   font-size:11px;color:var(--faint);line-height:1.5;cursor:pointer}
-#wiz-nolimits input{margin-top:2px}
+#wiz-autoclean input,#wiz-nolimits input{margin-top:2px}
+#wiz-autoclean{margin-bottom:6px}
 .wprov{border:1px solid var(--line);border-radius:11px;
   padding:10px 12px;margin-bottom:8px;background:rgba(255,255,255,.03)}
 .wprov-row{display:flex;align-items:center;gap:9px;font-size:13px}
@@ -12731,6 +12813,9 @@ __CODE_ROWS__
     </div>
   </div>
   <div id="model-list">
+  <div id="chat-search"><input id="chat-q" type="search"
+    placeholder="Search chats&hellip;" autocomplete="off"
+    spellcheck="false"></div>
   <div class="group-label chats">Chats</div>
   <div id="chat-list"></div>
 
@@ -13158,6 +13243,9 @@ __CODE_ROWS__
       several at once on hard questions, and composites their drafts
       into one answer. Pick how much to install:</p>
       <div id="wiz-plans"></div>
+      <label id="wiz-autoclean"><input type="checkbox" id="wiz-ac">
+        Automatically remove superseded models once a newer generation
+        is installed</label>
       <label id="wiz-nolimits"><input type="checkbox" id="wiz-nl">
         Ignore system limits &mdash; offer every model in each list even
         beyond this machine&rsquo;s memory. May swap hard or crash;
@@ -13455,11 +13543,7 @@ let advOn=localStorage.getItem("millen.advon")==="1"&&!!adv;
 const ADV_USE={
   "Llama 3.2 1B":"instant drafts, the simplest questions",
   "Llama 3.2 3B":"quick everyday answers",
-  "Gemma 2 2B":"tiny and fast",
-  "Gemma 2 9B IT":"solid all-rounder, capable merge writer",
-  "Llama 3.1 8B":"general chat, light reasoning",
   "Hermes 3 8B":"creative writing and roleplay",
-  "Qwen 2.5 7B":"multilingual, decent math",
   "Qwen 2.5 Coder 7B":"code completion and review",
   "Qwen 2.5 Coder 14B":"stronger code work",
   "Mistral Nemo 12B":"long context, natural prose",
@@ -13467,8 +13551,6 @@ const ADV_USE={
   "Gemma 4 26B":"the house heavyweight — best local compositor",
   "Phi-4 14B":"reasoning and STEM",
   "DeepSeek R1 7B":"step-by-step reasoning",
-  "DeepSeek R1":"step-by-step reasoning",
-  "Mistral Small 24B":"sharp, concise general answers",
   "GPT-OSS 20B":"strong open reasoning",
   "Qwen 3.6 27B":"heavyweight generalist",
   "Qwen 3.6 35B MoE":"heavyweight generalist, fast for its size",
@@ -15068,160 +15150,110 @@ async function send(){
 
 /* ------------------------------------------------------------- greeting */
 const GREETINGS=[
-  // 150 NYC lines from Patrick (6b255). `m` months 0-11, `d` days
-  // 0=Sun, `h` [from,to] inclusive and WRAPS when from>to, `dom` a
-  // day-of-month window. No keys at all = safe any time.
-  {t:"Hawk's out today — pull up a chair.",m:[0,1]},
-  {t:"It's giving three-coats-and-a-hoodie. What you need?",m:[0,1]},
-  {t:"Radiator's clanking, tea's hot — talk to me.",m:[11,0,1,2]},
-  {t:"Sun's out, stoops are full. What's the move?",m:[3,4,5,6,7,8],h:[9,18]},
-  {t:"Ninety degrees and the train has no AC. Let's make this quick.",m:[6,7],h:[11,19]},
-  {t:"Hydrant's open, block's happy. What's good?",m:[6,7],h:[11,20]},
-  {t:"Slush season. Wipe your feet, take a seat.",m:[0,1,2]},
-  {t:"That April fake-out weather. Don't trust it, trust me.",m:[3]},
-  {t:"Humidity's winning today. What can I do for you?",m:[5,6,7,8]},
-  {t:"Sweater weather finally hit different. What's on your mind?",m:[9]},
-  {t:"Fall in the city, no notes. What you working on?",m:[8,9,10]},
-  {t:"Heat wave's got the whole block moving slow. Not me.",m:[6,7],h:[11,19]},
-  {t:"Wind's whipping down the avenue. Warmer in here.",m:[10,11,0,1,2]},
-  {t:"Leaves are turning, prices are too. What's up?",m:[9,10]},
-  {t:"It's beach day at the Rockaways. Or we can just talk.",m:[5,6,7],h:[8,18]},
-  {t:"Clear sky, cold air, big city. Let's go.",m:[11,0,1]},
-  {t:"Steam coming out the manhole. Yeah, it's winter.",m:[11,0,1]},
-  {t:"Fire escape's got a breeze tonight. What's the question?",m:[5,6,7],h:[19,23]},
-  {t:"Train's running local. Plenty of time to talk."},
-  {t:"Swipe in, sit down — what's good?"},
-  {t:"Signal problems at Jay Street. Take your time."},
-  {t:"Showtime kid just got off. Floor's yours."},
-  {t:"G train's coming in 14 minutes. Ask me anything."},
-  {t:"Held at the station momentarily. So, what's on your mind?"},
-  {t:"Doors closing — get your question in."},
-  {t:"Made the transfer with no running. Feeling generous today."},
-  {t:"L train's actually on time. Anything's possible today."},
-  {t:"Ferry's cheaper than therapy. So am I."},
-  {t:"Stand clear of the closing doors — and hit me with it."},
-  {t:"Uptown, downtown, either way I got you."},
-  {t:"Express just passed the local. That's us right now."},
-  {t:"Bus is stuck behind a double-parked truck. Let's talk."},
-  {t:"Citi Bike had one dock left. Winning already."},
-  {t:"Two transfers deep. What's the mission?"},
-  {t:"Got a seat on a Monday? Blessed. What's up?",d:[1]},
-  {t:"Got the whole car to yourself? Suspicious. What's up?",h:[21,4]},
-  {t:"Bacon, egg and cheese, salt pepper ketchup. And your question?"},
-  {t:"Bodega cat's asleep on the chips. Quiet in here. Talk."},
-  {t:"Chopped cheese energy. What you need?"},
-  {t:"Dollar slice, folded right. Now what?"},
-  {t:"Halal cart, white sauce, no red. What's up?"},
-  {t:"Arizona still 99 cents. Some things hold. What's on your mind?"},
-  {t:"Coffee's regular, cup's blue. Let's get into it."},
-  {t:"Deli guy already knows my order. Do you know yours?"},
-  {t:"Fresh bagel, still warm. Ask away."},
-  {t:"Two dumplings for a dollar somewhere. I'll help you find it."},
-  {t:"Egg roll and a mango lassi kinda day. What's the move?"},
-  {t:"Pizza's too hot, still eating it. Multitasking. What's up?"},
-  {t:"Line's out the door at the taco spot. Worth it? Ask me."},
-  {t:"Corner store got everything except what you came for. I don't."},
-  {t:"Cannoli's fresh downtown. So are my answers."},
-  {t:"Order's up. What's yours?"},
-  {t:"Nothing in the fridge but condiments. Let's figure it out."},
-  {t:"Cold seltzer, folding chair, good question. That's all I need.",m:[4,5,6,7,8],h:[12,21]},
-  {t:"3 AM and the city's still up. So am I.",h:[2,4]},
-  {t:"Sun's not up yet. I am. What's good?",h:[4,5]},
-  {t:"First coffee hasn't hit yet. Second one might.",h:[6,9]},
-  {t:"Lunch break clock is ticking. What you need?",h:[11,13]},
-  {t:"Golden hour on the rooftops. Ask me something.",m:[9,10,11,0,1,2],h:[15,17]},
-  {t:"Golden hour on the rooftops. Ask me something.",m:[3,4,5,6,7,8],h:[18,20]},
-  {t:"Friday at 4:58. Let's make it count.",d:[5],h:[15,18]},
-  {t:"Sunday reset in progress. What's on the list?",d:[0],h:[10,20]},
-  {t:"Late night, low volume, deep questions. Go ahead.",h:[23,2]},
-  {t:"Monday's here whether we like it or not. What's first?",d:[1],h:[5,11]},
-  {t:"Nobody's answering emails today. But I'm up.",d:[0,6],h:[9,17]},
-  {t:"Midnight in the city that pretends it sleeps. Talk to me.",h:[0,0]},
-  {t:"Early enough that the block is still quiet. What's up?",h:[5,8]},
-  {t:"Sun's going down over Jersey. Perfect time to think.",m:[9,10,11,0,1,2],h:[16,17]},
-  {t:"Sun's going down over Jersey. Perfect time to think.",m:[3,4,5,6,7,8],h:[19,20]},
-  {t:"Been up since the birds. Let's get into it.",h:[5,7]},
-  {t:"Whole weekend ahead. What are we doing?",d:[5],h:[16,23]},
-  {t:"Whole weekend ahead. What are we doing?",d:[6],h:[6,11]},
-  {t:"Brooklyn's up. What's the move?"},
-  {t:"BX in the building. What you need?"},
-  {t:"Queens got the best food and I'll defend that. What's up?"},
-  {t:"Shaolin represent. Ask away."},
-  {t:"Uptown to the top of the island. Let's go."},
-  {t:"Bushwick's awake. What's good?"},
-  {t:"From the Rockaways to Riverdale, I got you."},
-  {t:"Flatbush energy today. What's on your mind?"},
-  {t:"Harlem got the blueprint. What are we building?"},
-  {t:"Jackson Heights got the whole world on one avenue. Where we going?"},
-  {t:"Bed-Stuy do or die — the do part. What's up?"},
-  {t:"Coney Island air's got salt in it. Ask me something."},
-  {t:"Five boroughs, one question. Which one's yours?"},
-  {t:"Sunset Park to Sunnyside, say the word."},
-  {t:"Astoria in the morning, that's a vibe. Talk to me.",h:[5,11]},
-  {t:"Shells laced loose, no strings needed. What's up?"},
-  {t:"I actually do have the answers. Try me."},
-  {t:"Fitted low, brim flat, listening."},
-  {t:"Queensbridge raised the bar. I'm just trying to clear it."},
-  {t:"Boom bap in the headphones. What's on your mind?"},
-  {t:"Diamond up, Brooklyn's finest energy. What you need?"},
-  {t:"Beat's looping, mic's open. Go ahead."},
-  {t:"Crate digging for a good question. Got one?"},
-  {t:"Tribe on the aux. Nothing but smooth from here."},
-  {t:"Villain mask off, helpful mode on. Talk to me."},
-  {t:"Bronx built the whole thing. Respect. What's up?"},
-  {t:"Freestyle round — say anything, I'll run with it."},
-  {t:"Sample flipped, question welcome."},
-  {t:"Turntable's spinning, timer's not. Take your time."},
-  {t:"Bars are for rappers. Answers are for me. Go."},
-  {t:"Radio's on 97-point-something. What's your request?"},
-  {t:"Hollis, Queens taught the world how to walk. Step in."},
-  {t:"Verse two, back to the beat. What's up?"},
-  {t:"Pink everything today. Dipset winter. What's good?",m:[11,0,1]},
-  {t:"Summer Jam energy. Let's get loud.",m:[5,6]},
-  {t:"Friendly neighborhood assistant. Queens raised me."},
-  {t:"Who you gonna call? Right here, actually."},
-  {t:"Times Square Elmo waved at me. Weird day. What's yours?"},
-  {t:"Season finale energy. What's the big question?"},
-  {t:"New York minute — but I'll take as long as you need."},
-  {t:"Everybody's got a podcast now. I just have answers."},
-  {t:"Group chat's been quiet. Let's talk."},
-  {t:"Doorman nodded at me like I live here. What's up?"},
-  {t:"That opening-credits shot of the skyline. Roll it."},
-  {t:"Feed's all the same today. Ask me something real."},
-  {t:"Broadway's dark tonight. I'm not.",d:[1],h:[18,23]},
-  {t:"Rom-com montage weather. What's the plot?",m:[3,4,8,9]},
-  {t:"Yankee fitted, Mets patience. Balanced. What's up?"},
-  {t:"Ball's in your court."},
-  {t:"Free throw line, no crowd, just focus. What's on your mind?"},
-  {t:"Knicks got a real shot. So do you. Ask me.",m:[9,10,11,0,1,2,3,4,5]},
-  {t:"Rucker Park in July. Bring your best.",m:[6]},
-  {t:"Cage at West 4th, no easy buckets. Let's go.",m:[4,5,6,7,8]},
-  {t:"Handball courts are packed. Meet me here instead.",m:[4,5,6,7,8],h:[10,20]},
-  {t:"Garden's loud tonight. Still hear you though.",h:[18,23]},
-  {t:"Marathon's got the streets closed. We're going anyway.",m:[10],d:[0],dom:[1,7]},
-  {t:"Chess tables in the park are full. I'll play.",m:[3,4,5,6,7,8,9],h:[10,19]},
-  {t:"Deadass, what's up?"},
-  {t:"Talk to me, nice."},
-  {t:"Say less — actually, say a little more."},
-  {t:"What's good? I got time today."},
-  {t:"No cap, ask me anything."},
-  {t:"I'm listening. Hard."},
-  {t:"Pull up a chair, the stoop's free."},
-  {t:"Wildin' or working? Either way I'm here."},
-  {t:"You came to the right corner."},
-  {t:"Hit me with it."},
-  {t:"What's the word?"},
-  {t:"Locked in. What's the mission?"},
-  {t:"All gas, no meter running. What's up?"},
-  {t:"Whatever it is, we can figure it out."},
-  {t:"Bet. What are we doing?"},
-  {t:"Ready when you are — and I'm always ready."},
-  {t:"City never blinks. Neither do I."},
-  {t:"Big question or small one, both welcome."},
-  {t:"You bring the question, I bring the work."},
-  {t:"Let's get it."},
-  {t:"Concrete, coffee, curiosity. What's yours?"},
-  {t:"Whole city's out here figuring it out. Let's figure yours out."},
+  // The bank (6b269, per Patrick: "less NYC, but still fun... use the
+  // user's nickname... even better, the user's location"). `m` months
+  // 0-11, `d` days 0=Sun, `h` [from,to] inclusive and WRAPS when
+  // from>to, `dom` a day-of-month window. No keys = safe any time.
+  // {name} and {city} are filled from Settings; a line that needs one
+  // the app doesn't have is simply never drawn. No line asserts the
+  // weather — it doesn't know it (see the greetOK guard).
+  // ---- any time
+  {t:"What's up, {name}?"},
+  {t:"Good to see you, {name}. What are we solving?"},
+  {t:"{name}. Talk to me."},
+  {t:"Pull up a chair. What's on your mind?"},
+  {t:"Ask me anything. The weirder the better."},
+  {t:"Big question or small one — both welcome."},
+  {t:"What's the word in {city}?"},
+  {t:"Reporting for duty, {name}. What's first?"},
+  {t:"I've got all day. Well, all the compute. What's up?"},
+  {t:"Where do we start?"},
+  {t:"Fresh page. Fill it."},
+  {t:"Plotting something? I'm in."},
+  {t:"Let's make something today, {name}."},
+  {t:"What are we figuring out?"},
+  {t:"Hit me."},
+  {t:"Something's on your mind. Out with it."},
+  {t:"Quick one or a deep dive? I'm good either way."},
+  {t:"Say the word, {name}."},
+  {t:"Right. What's the plan?"},
+  {t:"You bring the question, I'll bring the receipts."},
+  {t:"What's cooking in {city}, {name}?"},
+  {t:"Same team, {name}. What do you need?"},
+  {t:"Ideas welcome. Half-formed ones especially."},
+  {t:"What's the mission?"},
+  // ---- morning
+  {t:"Morning, {name}. Coffee first, questions second.",h:[5,9]},
+  {t:"Good morning. What are we making of today?",h:[5,10]},
+  {t:"Early bird. What's up, {name}?",h:[5,7]},
+  {t:"Morning in {city}. What's first on the list?",h:[6,10]},
+  {t:"Good morning, {name}. Let's get ahead of the day.",h:[6,10]},
+  {t:"Up and at it. What do you need?",h:[6,9]},
+  {t:"The day's wide open. Where to?",h:[7,11]},
+  {t:"Morning brain, meet a fresh page.",h:[6,10]},
+  // ---- midday / afternoon
+  {t:"Afternoon, {name}. How's it going?",h:[12,17]},
+  {t:"Midday check-in. What can I take off your plate?",h:[11,14]},
+  {t:"How's {city} treating you this afternoon?",h:[13,17]},
+  {t:"Post-lunch brain? I've got you.",h:[13,15]},
+  {t:"Afternoon push. What's the next thing?",h:[14,17]},
+  {t:"Halfway through the day. What's still open?",h:[12,15]},
+  {t:"Good afternoon, {name}. Ask away.",h:[12,17]},
+  // ---- evening
+  {t:"Good evening, {name}.",h:[17,21]},
+  {t:"How's {city} tonight, {name}?",h:[18,23]},
+  {t:"Evening. What's on your mind?",h:[17,21]},
+  {t:"Winding down or winding up? Either way, I'm here.",h:[18,22]},
+  {t:"Good evening. What are we settling tonight?",h:[18,22]},
+  {t:"Dinner's done, thoughts are loose. What's up?",h:[19,22]},
+  {t:"Evening in {city}. What did the day leave you with?",h:[18,22]},
+  {t:"The night's young, {name}. What are we into?",h:[19,22]},
+  // ---- late night
+  {t:"Late one, {name}. Big idea or can't sleep?",h:[23,2]},
+  {t:"It's late in {city}. What's keeping you up?",h:[23,3]},
+  {t:"Night owl hours. I'm awake too.",h:[0,4]},
+  {t:"Midnight. The good ideas come out now.",h:[0,0]},
+  {t:"Still up? Let's make it worth it.",h:[0,3]},
+  {t:"The house is quiet. Good time to think.",h:[23,3]},
+  {t:"3 a.m. thoughts are welcome here.",h:[2,4]},
+  // ---- days of the week
+  {t:"Monday, {name}. Let's set the tone.",d:[1],h:[6,12]},
+  {t:"New week. What's the one thing that matters?",d:[1],h:[6,11]},
+  {t:"Midweek. Still standing? Good.",d:[3]},
+  {t:"Wednesday's the hump. Let's get you over it.",d:[3],h:[9,17]},
+  {t:"Almost Friday. What's left to knock out?",d:[4],h:[9,18]},
+  {t:"Friday, {name}. Let's make it count.",d:[5],h:[8,14]},
+  {t:"Friday afternoon. Finish strong or coast — I'll help either way.",d:[5],h:[15,18]},
+  {t:"Friday night. Plans, or plotting?",d:[5],h:[19,23]},
+  {t:"Saturday. No agenda required.",d:[6]},
+  {t:"Weekend brain engaged. What's up, {name}?",d:[0,6]},
+  {t:"Sunday. Slow questions welcome.",d:[0]},
+  {t:"Sunday evening. Getting ahead of the week?",d:[0],h:[17,22]},
+  // ---- seasons (vibes, never forecasts)
+  {t:"New year, new questions. What's first, {name}?",m:[0],dom:[1,7]},
+  {t:"January. Fresh calendar, fresh ideas.",m:[0]},
+  {t:"Deep winter. Good time for big plans.",m:[0,1]},
+  {t:"March already. What are we building this spring?",m:[2]},
+  {t:"Spring mode. What's the project?",m:[3,4]},
+  {t:"Long days ahead. What are we doing with them?",m:[5,6]},
+  {t:"Summer, {name}. What's the move?",m:[6,7]},
+  {t:"August. Everyone's away; let's get things done.",m:[7]},
+  {t:"September energy. Back at it.",m:[8]},
+  {t:"October. Cozy questions season.",m:[9]},
+  {t:"November. Time to close out the year strong.",m:[10]},
+  {t:"Holiday season, {name}. What can I help with?",m:[11]},
+  {t:"Last days of the year. Wrapping up or planning?",m:[11],dom:[26,31]},
+  // ---- a little personality
+  {t:"I read the manual so you don't have to. What's up?"},
+  {t:"No question too dumb. Several too smart, but bring them."},
+  {t:"I run on your Mac and good intentions. What do you need?"},
+  {t:"Local, private, awake. Go."},
+  {t:"Your brain, my patience. Great combo."},
+  {t:"I don't sleep, {name}. Might as well use that."},
+  {t:"Two heads. One of them is me. Let's go."},
+  {t:"Tell me the thing you'd rather not Google."},
+  {t:"Consider me caffeinated."},
+  {t:"Okay {name}, what's the situation?"},
 ];
 // CONDITION-GATED (6b255, per Patrick: gate the weather and time lines on
 // live conditions — "ninety degrees and the train has no AC" landing in
@@ -15244,20 +15276,67 @@ function greetOK(g,mo,hr,dw,dm){
   }
   return true;
 }
+const NICK=__USER_NICK__;
+const CITY=__USER_CITY__;
+/* a greeting is drawn only if the app can fill every token it uses */
+function greetFill(t){
+  return t.replace(/\{name\}/g,NICK).replace(/\{city\}/g,CITY);
+}
+function greetHas(t){
+  if(t.indexOf("{name}")>=0&&!NICK)return false;
+  if(t.indexOf("{city}")>=0&&!CITY)return false;
+  return true;
+}
+/* the hero greets YOU when the app knows your name (6b269, per
+   Patrick: 'what's up, Peter?'). Only a SHORT closing question takes
+   the name — long ones and ones already carrying a comma stay put. */
+function persGreet(t){
+  if(!NICK||!/\?\s*$/.test(t))return t;
+  const cut=t.replace(/\?\s*$/,"");
+  const tail=cut.split(/[.?!]\s*/).pop();
+  if(!tail||tail.includes(",")
+     ||tail.trim().split(/\s+/).length>4)return t;
+  return cut+", "+NICK+"?";
+}
 function greetPool(){
   const d=new Date(),mo=d.getMonth(),hr=d.getHours(),
         dw=d.getDay(),dm=d.getDate();
-  return GREETINGS.filter(g=>greetOK(g,mo,hr,dw,dm));
+  return GREETINGS.filter(g=>greetOK(g,mo,hr,dw,dm)&&greetHas(g.t));
 }
 function greeting(){
   let p=greetPool();
   // belt and braces: if a filter bug ever emptied the pool, fall back to
   // the always-safe lines rather than showing nothing at all
-  if(!p.length)p=GREETINGS.filter(g=>!g.m&&!g.h&&!g.d&&!g.dom);
-  if(!p.length)p=GREETINGS;
-  return p[Math.floor(Math.random()*p.length)].t;
+  if(!p.length)p=GREETINGS.filter(g=>!g.m&&!g.h&&!g.d&&!g.dom&&greetHas(g.t));
+  if(!p.length)p=GREETINGS.filter(g=>greetHas(g.t));
+  const t=p[Math.floor(Math.random()*p.length)].t;
+  // tokened lines are already personal; untokened short questions
+  // still take the name the old way
+  return t.indexOf("{")>=0?greetFill(t):persGreet(t);
 }
 (function(){const g=$(".greet");if(g)g.textContent=greeting();})();
+/* chat search: type-to-filter; three characters on, the server also
+   greps message CONTENT so an answer you remember finds its chat */
+(function(){
+  const inp=$("#chat-q");if(!inp)return;
+  let t=null,seq=0;
+  inp.addEventListener("input",()=>{
+    window.chatQ=inp.value.trim();
+    clearTimeout(t);
+    t=setTimeout(async()=>{
+      const q=window.chatQ,my=++seq;
+      if(q.length>=3){
+        try{
+          const r=await(await fetch("/api/chats/search?q="
+            +encodeURIComponent(q))).json();
+          if(my===seq)window.chatQHits=new Set(r.ids||[]);
+        }catch(e){window.chatQHits=null;}
+      }else window.chatQHits=null;
+      if(my===seq)renderChats();
+    },220);
+    renderChats();
+  });
+})();
 
 /* ------------------------------------------------- chats: list + store */
 // Chats are owned by the backend (survives app updates); localStorage is
@@ -15736,7 +15815,10 @@ function renderChats(){
   const laneOK=c=>(uiMode==="code"||uiMode==="funnel")
     ?(c.lane||"ai")===uiMode
     :((c.lane||"ai")!=="code"&&(c.lane||"ai")!=="funnel");
-  const mine=chats.filter(laneOK);
+  const q=(window.chatQ||"").toLowerCase();
+  const qOK=c=>!q||(c.title||"").toLowerCase().includes(q)
+    ||(window.chatQHits&&window.chatQHits.has(c.id));
+  const mine=chats.filter(c=>laneOK(c)&&qOK(c));
   const pins=mine.filter(c=>c.pin);
   const rest=mine.filter(c=>!c.pin);
   const row=c=>
@@ -15757,7 +15839,8 @@ function renderChats(){
     html+=row(c);
   });
   if(!html)html='<div class="cempty">'
-    +(uiMode==="code"?"No code chats yet"
+    +(q?"Nothing matches \u201c"+esc(window.chatQ)+"\u201d"
+      :uiMode==="code"?"No code chats yet"
       :uiMode==="funnel"?"No funnels yet":"No chats yet")+'</div>';
   el.innerHTML=html;
   el.querySelectorAll(".chat-item").forEach(it=>{
@@ -17323,6 +17406,12 @@ $("#wiz-plans").addEventListener("click",e=>{
   wizPlan=c.dataset.plan;
   $$("#wiz-plans .wplan").forEach(el=>
     el.classList.toggle("on",el===c));
+});
+$("#wiz-ac").addEventListener("change",async()=>{
+  await fetch("/api/prefs",{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({auto_cleanup:$("#wiz-ac").checked})});
+  const s=$("#autoclean");if(s)s.checked=$("#wiz-ac").checked;
 });
 $("#wiz-nl").addEventListener("change",async()=>{
   await fetch("/api/prefs",{method:"POST",
@@ -19019,8 +19108,19 @@ if __name__ == "__main__":
                             lh = NSTextField.\
                                 labelWithAttributedString_(_ref).\
                                 frame().size.height
+                            # CENTERED (6b269, per Patrick: "center the
+                            # title similar to [the VPN]"). Accessories
+                            # only know left/right, so the left one is
+                            # made as wide as the bar and the lockup is
+                            # a sub-container parked on the WINDOW's
+                            # midpoint — re-parked on every resize by
+                            # the observer below.
+                            _lockw = 6 + _ww + 6 + lw + 10
+                            lock = NSView.alloc().initWithFrame_(
+                                ((0, 0), (_lockw, BARH)))
+                            _winw = _w.frame().size.width
                             left = NSView.alloc().initWithFrame_(
-                                ((0, 0), (6 + 15 + 6 + lw + 10, BARH)))
+                                ((0, 0), (max(_lockw, _winw - 90), BARH)))
                             # ink occupies 10.75/12.6 of the wing
                             # box (bezier margins) — size the box so
                             # wing ink == cap ink, and lift it the
@@ -19036,7 +19136,7 @@ if __name__ == "__main__":
                                 ((6, (BARH - _wh) / 2.0 + 1.75),
                                  (_ww, _wh)))
                             wiv.setImage_(wing)
-                            left.addSubview_(wiv)
+                            lock.addSubview_(wiv)
                             # +2.5, measured (6b265, per Patrick:
                             # "doesn't look vertically centered"): with
                             # the box centered, the CAP ink sat 3pt
@@ -19045,13 +19145,57 @@ if __name__ == "__main__":
                             # under its baseline than above its caps.
                             label.setFrameOrigin_(
                                 (27, (BARH - lh) / 2.0 + 2.5))
-                            left.addSubview_(label)
+                            lock.addSubview_(label)
+                            left.addSubview_(lock)
                             acc = NSTitlebarAccessoryViewController.\
                                 alloc().init()
                             acc.setView_(left)
                             acc.setLayoutAttribute_(1)      # left
                             _w.addTitlebarAccessoryViewController_(acc)
                             _CHROME["acc"] = acc
+                            _CHROME["lock"] = lock
+                            _CHROME["left"] = left
+                            _CHROME["lockw"] = _lockw
+
+                            def _center_lockup():
+                                try:
+                                    W = _w.frame().size.width
+                                    fr = left.frame()
+                                    # the accessory's own x is where the
+                                    # traffic lights end; AppKit sets it
+                                    # once the bar lays out (fallback:
+                                    # Tahoe's measured 79pt)
+                                    inset = fr.origin.x or 79.0
+                                    left.setFrameSize_((max(_lockw,
+                                                            W - inset - 8),
+                                                        BARH))
+                                    lock.setFrameOrigin_(
+                                        (max(0.0, W / 2.0 - inset
+                                             - _lockw / 2.0), 0))
+                                except Exception:
+                                    pass
+                            _CHROME["center"] = _center_lockup
+                            _center_lockup()
+                            try:
+                                from Foundation import (NSNotificationCenter,
+                                                        NSObject)
+                                import objc as _objc
+
+                                class _AIChrome(NSObject):
+                                    def windowDidResize_(self, note):
+                                        _center_lockup()
+                                    def windowDidLayout_(self, note):
+                                        _center_lockup()
+                                _tgt = _AIChrome.alloc().init()
+                                _CHROME["tgt"] = _tgt      # keep alive
+                                nc = NSNotificationCenter.defaultCenter()
+                                for _nm in ("NSWindowDidResizeNotification",
+                                            "NSWindowDidBecomeKeyNotification",
+                                            "NSWindowDidEndLiveResizeNotification"):
+                                    nc.addObserver_selector_name_object_(
+                                        _tgt, "windowDidResize:", _nm, _w)
+                            except Exception:
+                                pass
                         except Exception:
                             pass
 
