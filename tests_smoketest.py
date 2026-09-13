@@ -498,6 +498,19 @@ check("clean-now flow wired",
       and "#roster:not(.managing) .rrm{display:none}" in page
       and "def _auto_cleanup_pass(manual=False)" in _MILLENAI_SRC
       and '_b.get("force")' in _MILLENAI_SRC)
+# 6b270, cycle 13 of the drill: a stale daytime reading shipped as
+# "sunny 87°F at 3:30 AM" (now: age + above-high sanity, night sky
+# words, the feed logged as a source); movie DESCRIPTORS shipped as
+# titles (now: names only); "Conservative" got an all-equity fund and
+# a trip verdict invented rail to Cape May (now: picks bind in
+# meaning, transit claims need a named real line)
+check("cycle-14 fixes: weather sanity, names only, semantic picks",
+      "stale or impossible reading" in _MILLENAI_SRC
+      and "relative_humidity_2m,is_day" in _MILLENAI_SRC
+      and "_tl_search.weather_src" in _MILLENAI_SRC
+      and "NAMES ONLY: an item is" in _MILLENAI_SRC
+      and "LITERALLY AND IN MEANING" in _MILLENAI_SRC
+      and "NAMED real line or operator" in _MILLENAI_SRC)
 # 6b267, cycle 12 of the drill: local-Gemma stages wrote malformed
 # options and reworded re-asks (three cycles running), one verdict
 # invented an NJ Transit route to Jim Thorpe, another served gnudi to

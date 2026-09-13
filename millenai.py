@@ -2209,17 +2209,39 @@ def weather_snippets(q: str):
         area = d["nearest_area"][0]
         name = "%s, %s" % (area["areaName"][0]["value"],
                            area["region"][0]["value"])
-        out = ["LIVE WEATHER for %s (source: wttr.in, real data):" % name,
+        # SANITY (6b270, judged 2.0: "87°F and sunny right now" at
+        # 3:30 AM — a stale daytime observation served as current,
+        # above the day's own high). A reading older than two hours
+        # or hotter than today's forecast high is not "right now";
+        # this rung steps aside and the next one answers.
+        _obs = str(cur.get("localObsDateTime") or "")
+        try:
+            _age = time.time() - time.mktime(
+                time.strptime(_obs, "%Y-%m-%d %I:%M %p"))
+        except Exception:
+            _age = 0.0
+        _hi = float(d["weather"][0]["maxtempF"]) if d.get("weather") else 999
+        if _age > 2 * 3600 or float(cur["temp_F"]) > _hi + 3:
+            raise ValueError("stale or impossible reading")
+        _desc = cur["weatherDesc"][0]["value"]
+        _hr = time.localtime().tm_hour
+        if _hr < 6 or _hr >= 20:
+            # no sun at night: the feed says "Sunny" for a clear sky
+            _desc = re.sub(r"\bsunny\b", "clear", _desc, flags=re.I)
+        out = ["LIVE WEATHER for %s (source: wttr.in, observed %s):"
+               % (name, _obs or "just now"),
                "Right now: %s°F (feels like %s°F), %s, wind %s mph, "
                "humidity %s%%" % (
-                   cur["temp_F"], cur["FeelsLikeF"],
-                   cur["weatherDesc"][0]["value"],
+                   cur["temp_F"], cur["FeelsLikeF"], _desc,
                    cur["windspeedMiles"], cur["humidity"])]
         for day in d.get("weather", [])[:3]:
             out.append("%s %s: high %s°F / low %s°F, %s" % (
                 _wd(day["date"]), day["date"],
                 day["maxtempF"], day["mintempF"],
                 day["hourly"][4]["weatherDesc"][0]["value"]))
+        _tl_search.weather_src = {"t": "Live weather — " + name,
+                                  "u": "https://wttr.in/%s"
+                                       % urllib.parse.quote(loc)}
         return "\n".join(out)
     except Exception:
         pass
@@ -2235,7 +2257,7 @@ def weather_snippets(q: str):
                 "https://api.open-meteo.com/v1/forecast?"
                 "latitude=%s&longitude=%s"
                 "&current=temperature_2m,apparent_temperature,"
-                "weather_code,wind_speed_10m,relative_humidity_2m"
+                "weather_code,wind_speed_10m,relative_humidity_2m,is_day"
                 "&daily=temperature_2m_max,temperature_2m_min,"
                 "weather_code&temperature_unit=fahrenheit"
                 "&wind_speed_unit=mph&timezone=auto&forecast_days=3"
@@ -2251,14 +2273,22 @@ def weather_snippets(q: str):
                     return word
             return "mixed"
         cur = d["current"]
-        out = ["LIVE WEATHER for %s (source: open-meteo, real data):"
-               % g.get("name", loc),
+        dl = d.get("daily", {})
+        _hi = (dl.get("temperature_2m_max") or [999])[0]
+        if float(cur["temperature_2m"]) > float(_hi) + 3:
+            return None            # impossible "now"; honesty branch
+        _skyw = _sky(cur["weather_code"])
+        if not cur.get("is_day", 1) and _skyw == "clear":
+            _skyw = "clear (night)"
+        out = ["LIVE WEATHER for %s (source: open-meteo, observed %s):"
+               % (g.get("name", loc), str(cur.get("time") or "now")),
                "Right now: %.0f°F (feels like %.0f°F), %s, wind "
                "%.0f mph, humidity %s%%" % (
                    cur["temperature_2m"], cur["apparent_temperature"],
-                   _sky(cur["weather_code"]), cur["wind_speed_10m"],
+                   _skyw, cur["wind_speed_10m"],
                    cur["relative_humidity_2m"])]
-        dl = d.get("daily", {})
+        _tl_search.weather_src = {"t": "Live weather — " + str(
+            g.get("name", loc))[:60], "u": "https://open-meteo.com/"}
         for i, ds in enumerate(dl.get("time", [])[:3]):
             out.append("%s %s: high %.0f°F / low %.0f°F, %s" % (
                 _wd(ds), ds, dl["temperature_2m_max"][i],
@@ -6881,10 +6911,13 @@ FUNNEL_SUMMARY_SYS = (
     "loses to a well-known one you can — recommend what you KNOW "
     "exists, current as of your knowledge, and put what to double-"
     "check in one clause.\n"
-    "- Picks are binding, LITERALLY: the verdict must be an instance "
-    "of the clicked option itself, not an adjacent category — if "
-    "they clicked Handmade pasta over Gnocchi, a gnudi (a dumpling) "
-    "is an override, however lovely. If a pick cannot be honored "
+    "- Picks are binding, LITERALLY AND IN MEANING: the verdict must "
+    "be an instance of the clicked option itself, not an adjacent "
+    "category — if they clicked Handmade pasta over Gnocchi, a gnudi "
+    "(a dumpling) is an override, however lovely; if they clicked "
+    "Conservative, an all-equity fund is an override however you "
+    "phrase it; a monthly budget is not met by a one-time fee. Never "
+    "relabel the thing to fit the click. If a pick cannot be honored "
     "exactly, say so plainly and recommend the closest thing that "
     "DOES honor it — never rationalize a different spec as close "
     "enough.\n"
@@ -6898,8 +6931,11 @@ FUNNEL_SUMMARY_SYS = (
     "misses — inventing an attribute to claim a perfect match is the "
     "worst possible verdict. FEASIBILITY IS AN ATTRIBUTE: a train "
     "that runs there, a ferry, a place being reachable car-free — "
-    "never assert a route or service you cannot vouch exists; say "
-    "which leg needs checking instead.")
+    "never assert a route or service you cannot vouch exists. A "
+    "transit claim needs a NAMED real line or operator you are sure "
+    "of ('the NJ Transit 319 bus from Port Authority'); 'bus or "
+    "regional rail' is a guess, and a guess gets 'check the actual "
+    "route' instead.")
 
 
 def funnel_summary_sys_for(goal: str) -> str:
@@ -9184,7 +9220,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             is_weather = bool(re.search(
                 r"\bweather\b|\bforecast\b|\btemperature\b", query, re.I))
             if is_weather:
+                _tl_search.weather_src = None
                 snippets = weather_snippets(query)
+                # the feed is a SOURCE (6b270): the chip shows, the
+                # drill logs sources_n=1, and a stale reading is
+                # traceable instead of "zero sources, 87°F"
+                if snippets is not None and getattr(
+                        _tl_search, "weather_src", None):
+                    _tl_search.rows = [_tl_search.weather_src]
             if snippets is not None:
                 # data answers need the DATA: a 3B given real degrees once
                 # replied "warm the cockles" with no numbers at all
@@ -9195,7 +9238,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         "your reply with the current temperature and "
                         "conditions (e.g. \'It\'s 74\u00b0F and clear "
                         "right now\'), then wind and the forecast days. "
-                        "Never omit the temperature.\n"
+                        "Never omit the temperature. Use the data's own "
+                        "sky word — never 'sunny' between dusk and dawn "
+                        "— and never call a number 'sticky', 'dry' or "
+                        "'unusual' unless the data says so.\n"
                         f"{snippets}\n\nQUESTION: {query}"
                     ),
                 }
@@ -9504,9 +9550,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         "wide releases or major events you know of "
                         "this month, plus anything the data adds, "
                         "each with a few honest words on what it is "
-                        "and who it's for. One closing clause may say "
-                        "where to confirm local times — after the "
-                        "real answer, never instead of it.\n")
+                        "and who it's for. NAMES ONLY: an item is "
+                        "reported under its real proper title or not "
+                        "at all — a description the data left in "
+                        "place of a title ('the zombie sequel', 'the "
+                        "Pacino true-crime project') is not a title; "
+                        "drop it and name one you can vouch for. One "
+                        "closing clause may say where to confirm local "
+                        "times — after the real answer, never instead "
+                        "of it.\n")
                 else:
                     strictness = ""
                 # data FIRST, instructions LAST — an instruction buried
