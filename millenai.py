@@ -2266,7 +2266,10 @@ def weather_snippets(q: str):
     # two-endpoint ladder the venue data wears: open-meteo is keyless
     # and geocodes through the same home-biased _geocode.
     try:
-        g = _geocode(loc.replace(",us", ""))
+        # a bare 5-digit zip is ambiguous worldwide — "11221" alone
+        # geocoded to VILNIUS (seen live, 6b272); the country hint
+        # the first rung carries as ",us" becomes Nominatim's ", USA"
+        g = _geocode(loc.replace(",us", ", USA"))
         if not g:
             return None
         with urllib.request.urlopen(
@@ -2277,8 +2280,8 @@ def weather_snippets(q: str):
                 "&daily=temperature_2m_max,temperature_2m_min,"
                 "weather_code&temperature_unit=fahrenheit"
                 "&wind_speed_unit=mph&timezone=auto&forecast_days=%d"
-                % (7 if weekend else 3)
-                % (g["lat"], g["lon"]), timeout=8) as r:
+                % (g["lat"], g["lon"], 7 if weekend else 3),
+                timeout=8) as r:
             d = json.load(r)
         _WMO = ((0, "clear"), (3, "partly cloudy"), (48, "fog"),
                 (57, "drizzle"), (67, "rain"), (77, "snow"),
