@@ -8780,6 +8780,47 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             out = strip_think("".join(parts))
                         except Exception:
                             out = ""
+                # THE VERIFY PASS (6b271, judged three cycles running:
+                # "Conservative" -> an all-equity fund, "social
+                # companion" -> a solitary hamster, an invented NJ
+                # Transit line). Rules alone did not hold, so a second
+                # call audits the verdict against every pick and
+                # requirement and rewrites what fails. Cloud only —
+                # a 4-bit local auditor would rubber-stamp.
+                if out and load_prefs(None).get("turbo"):
+                    _audit = [
+                        {"role": "system", "content":
+                         "You audit a recommendation against what the "
+                         "user actually chose. Be literal and "
+                         "unforgiving."},
+                        {"role": "user", "content":
+                         "DECISION: %s\nREQUIREMENTS: %s\nTHE USER'S "
+                         "PICKS, in order: %s\n\nVERDICT UNDER AUDIT:\n"
+                         "%s\n\nCheck, pick by pick: does the thing "
+                         "recommended ACTUALLY have the property the "
+                         "user chose, in plain meaning (an all-equity "
+                         "fund is not 'conservative'; a solitary "
+                         "nocturnal animal is not a 'social companion'; "
+                         "a one-time fee does not meet a monthly "
+                         "budget)? Does every requirement hold? Is "
+                         "every route, service, venue or product real "
+                         "and named exactly — no invented transit "
+                         "lines, no relabeled products? If everything "
+                         "holds, reply with exactly: OK\nOtherwise "
+                         "reply with a corrected verdict in the same "
+                         "shape and length (name the real closest "
+                         "thing, say plainly which pick it misses, and "
+                         "replace any unvouched logistics with 'check "
+                         "the actual route'). No preamble either way."
+                         % (goal, reqs or "none", "; ".join(picks), out)}]
+                    _fix = ""
+                    for _conf in (compositor_ladder() or []):
+                        _fix = cloud_text(_conf, _audit, timeout=45)
+                        if _fix:
+                            break
+                    _fix = (_fix or "").strip()
+                    if _fix and _fix.upper() != "OK" and len(_fix) > 40:
+                        out = _fix
                 # NEVER hand the picks back as if they were an answer
                 # (6b260, per Patrick) — if no model can weigh in, say
                 # so honestly and point at the fix
@@ -9644,8 +9685,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 "they live in. Never decorate an answer with their "
                 "job, kids, dog or neighbourhood to show you know "
                 "them, never build the answer on an ASSUMED situation "
-                "(state the fork instead), and never use a remembered "
-                "fact in a closing line.")
+                "(give both branches plainly instead), and never use "
+                "a remembered fact in a closing line. A remembered "
+                "fact is either KNOWN — state it plainly, once, when "
+                "it changes the advice — or it is left out entirely; "
+                "never hedge one into a guess ('if you're at a desk "
+                "job', 'you're likely hunched over a laptop'), and "
+                "never guess a job, habit or household the facts "
+                "don't contain.")
         # standing preferences the user wrote themselves (About panel) — they
         # outrank remembered facts, which are extracted guesses
         _prefs = load_prefs(user_base)
@@ -9676,7 +9723,18 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 "more. No headings, no lists, no preamble."),
             2: ("Keep it short — one or two tight paragraphs. Lead "
                 "with the answer, add only what genuinely helps."),
-            3: "",                       # the prompt's own calibration
+            # the default rung carries the SHAPE law (6b271, judged:
+            # tables in 5/6 simple answers, H2s in 4/6): a chat answer
+            # is prose with bold lead-ins and a list where one earns
+            # it — headings, tables and diagram blocks only when the
+            # person asked for a document, a comparison or a plan
+            3: ("Shape: prose, with bold lead-ins and a numbered or "
+                "bulleted list only where steps or options genuinely "
+                "need one. No headings, no tables, no code-fenced "
+                "diagrams unless the person asked for a document, a "
+                "side-by-side comparison or a plan. Say each thing "
+                "once — a table that restates the paragraphs above "
+                "it is padding."),
             4: ("Go deep when the question earns it: several "
                 "developed paragraphs, with headings or a list where "
                 "they genuinely organise the material. Cover the "

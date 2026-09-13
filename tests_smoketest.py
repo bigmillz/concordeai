@@ -498,6 +498,15 @@ check("clean-now flow wired",
       and "#roster:not(.managing) .rrm{display:none}" in page
       and "def _auto_cleanup_pass(manual=False)" in _MILLENAI_SRC
       and '_b.get("force")' in _MILLENAI_SRC)
+# 6b271, cycle 14 of the drill: tables/H2s in 5 of 6 simple chat
+# answers (the default rung now carries the shape law), remembered
+# facts hedged into guesses again (plainly or not at all), and funnel
+# verdicts bending picks in meaning — now audited by a second call
+check("cycle-15 fixes: shape law, plain memory, verdict audit",
+      "No headings, no tables, no code-fenced" in _MILLENAI_SRC
+      and "never hedge one into a guess" in _MILLENAI_SRC
+      and "VERDICT UNDER AUDIT" in _MILLENAI_SRC
+      and "state the fork instead" not in _MILLENAI_SRC)
 # 6b270, cycle 13 of the drill: a stale daytime reading shipped as
 # "sunny 87°F at 3:30 AM" (now: age + above-high sanity, night sky
 # words, the feed logged as a source); movie DESCRIPTORS shipped as
