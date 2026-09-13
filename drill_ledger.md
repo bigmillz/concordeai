@@ -433,3 +433,44 @@ night category fallback (24h pharmacy chain / diner / bodega) and
 never say "nothing's open". 3) strip impersonal scope meta ('the
 list', 'per Yelp's list' as a sentence) — cite inline only. 4) fix
 drill.py's run stamp to wall-clock ISO.
+
+## cycle 15 — 2026-09-15 — app 5c976b7
+CLOCK CORRECTION FOR THE WHOLE LEDGER: the host Mac has been in
+Asia/Tokyo (Patrick's trip) — `date` output I labeled "ET" was JST,
+13 hours ahead. Cycles 12-15's "2 AM / 4 AM / 6 AM" batches actually
+ran at 1 PM / 3 PM / 5 PM Eastern the previous afternoon. The app
+computed every open-now verdict on the host (Tokyo) clock, and the
+judges were briefed with the same wrong premise — so their clock
+scores measured CONSISTENCY with a wrong clock, not correctness for
+a Brooklyn user. Fixed structurally after this batch (6b273, commit
+above): the venue's own timezone now drives open-now, the closed-day
+check, the clock lines, and weather.
+batch: seed 20260915, 22 records (ran Sun ~5:20-6:05 PM ET). scores:
+chat 4.87 · web 3.90 · funnel 3.04. Rechecks 4/4 upheld.
+verdict on cycle 15's edits:
+- SHAPE LAW: HELD 6/6 — zero headings, tables or fences (vs 5/6
+  tables the cycle before); three perfect 5.0s. Chat is back.
+- PLAIN MEMORY: HELD — the one remembered fact used was stated
+  plainly once; new micro-class: inferring a neighbor of a fact
+  ("borrow checker" implies Rust) — rule: never infer adjacent detail.
+- VERDICT AUDIT: DID NOT HOLD (3/6 capped at 2) — the auditor
+  verifies by MENTION, not meaning: failing verdicts quote every pick
+  and assert compliance while contradicting it; invented venue
+  ("North Mountain House, North Woodstock, Vermont" — no such inn,
+  no such place), a "Deconstructed Lasagna kit" (a recipe genre, not
+  a product). Held 2/6 cleanly (investing 4.8, candy 4.4).
+- an EMPTY-options stage shipped (kimi-k3, stage 3) — the gate's
+  ladder retry exhausted; needs a valid fallback stage.
+- web: the wrong-weekend answer (pre-fix batch, fixed since — probe-
+  verified); Norbert's Pizza recommended though permanently closed
+  ("per their site" beat Yelp's CLOSED); universal negative from a
+  two-shop blog list (Blue Bottle was open); egg price from stale
+  memory ($3-4 vs BLS $2.28) despite a search.
+next (ranked, cycle 16): 1) audit rewrite — the auditor must first
+STATE each pick's real attribute of the recommended thing in its
+own words, then judge; it may not accept the verdict's claims; any
+venue/product it cannot vouch for -> rewrite with "check". 2) a
+valid fallback stage when every rung fails the gate. 3) closure
+rule: a source saying "permanently closed" wins over the venue's
+own site; and no universal negative from a thin list. 4) "current
+price" asks must lead with a DATED sourced figure.
