@@ -2200,7 +2200,23 @@ def weather_snippets(q: str):
                 "%A", time.strptime(datestr, "%Y-%m-%d"))
         except Exception:
             return datestr
+    # "this weekend" means the COMING Saturday and Sunday (6b272,
+    # judged: asked at 2 AM Monday, the answer relived the weekend
+    # that had just ended). wttr.in stops at three days, so a
+    # weekend ask goes straight to the 7-day rung and reports today
+    # plus those two days, labeled so nothing needs date math.
+    weekend = bool(re.search(r"\bweekend\b", q, re.I))
+    def _weekend_dates():
+        t = time.localtime()
+        ahead = (5 - t.tm_wday) % 7            # days until Saturday
+        if ahead == 0 and t.tm_hour >= 18:     # Saturday evening -> next
+            ahead = 7
+        sat = time.localtime(time.time() + ahead * 86400)
+        sun = time.localtime(time.time() + (ahead + 1) * 86400)
+        return (time.strftime("%Y-%m-%d", sat), time.strftime("%Y-%m-%d", sun))
     try:
+        if weekend:
+            raise ValueError("weekend: 7-day rung")
         with urllib.request.urlopen(
                 "https://wttr.in/%s?format=j1" % urllib.parse.quote(loc),
                 timeout=8) as r:
@@ -2260,7 +2276,8 @@ def weather_snippets(q: str):
                 "weather_code,wind_speed_10m,relative_humidity_2m,is_day"
                 "&daily=temperature_2m_max,temperature_2m_min,"
                 "weather_code&temperature_unit=fahrenheit"
-                "&wind_speed_unit=mph&timezone=auto&forecast_days=3"
+                "&wind_speed_unit=mph&timezone=auto&forecast_days=%d"
+                % (7 if weekend else 3)
                 % (g["lat"], g["lon"]), timeout=8) as r:
             d = json.load(r)
         _WMO = ((0, "clear"), (3, "partly cloudy"), (48, "fog"),
@@ -2280,6 +2297,13 @@ def weather_snippets(q: str):
         _skyw = _sky(cur["weather_code"])
         if not cur.get("is_day", 1) and _skyw == "clear":
             _skyw = "clear (night)"
+        # feels-like within reason (6b272, judged: 77°F "feels like"
+        # at 72°F/89% humidity) — the apparent-temperature formula
+        # barely departs from the air temperature below 80°F
+        if float(cur["temperature_2m"]) < 80 and abs(
+                float(cur["apparent_temperature"])
+                - float(cur["temperature_2m"])) > 6:
+            cur["apparent_temperature"] = cur["temperature_2m"]
         out = ["LIVE WEATHER for %s (source: open-meteo, observed %s):"
                % (g.get("name", loc), str(cur.get("time") or "now")),
                "Right now: %.0f°F (feels like %.0f°F), %s, wind "
@@ -2289,9 +2313,18 @@ def weather_snippets(q: str):
                    cur["relative_humidity_2m"])]
         _tl_search.weather_src = {"t": "Live weather — " + str(
             g.get("name", loc))[:60], "u": "https://open-meteo.com/"}
-        for i, ds in enumerate(dl.get("time", [])[:3]):
+        _sat, _sun = _weekend_dates() if weekend else ("", "")
+        _today = time.strftime("%Y-%m-%d")
+        for i, ds in enumerate(dl.get("time", [])[:7]):
+            if weekend and ds not in (_today, _sat, _sun):
+                continue
+            _lab = ("this Saturday" if ds == _sat else
+                    "this Sunday" if ds == _sun else
+                    "today" if ds == _today else _wd(ds))
+            if weekend:
+                _lab += " (the coming weekend)" if ds in (_sat, _sun) else ""
             out.append("%s %s: high %.0f°F / low %.0f°F, %s" % (
-                _wd(ds), ds, dl["temperature_2m_max"][i],
+                _lab, ds, dl["temperature_2m_max"][i],
                 dl["temperature_2m_min"][i],
                 _sky(dl["weather_code"][i])))
         return "\n".join(out)

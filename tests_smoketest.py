@@ -498,6 +498,15 @@ check("clean-now flow wired",
       and "#roster:not(.managing) .rrm{display:none}" in page
       and "def _auto_cleanup_pass(manual=False)" in _MILLENAI_SRC
       and '_b.get("force")' in _MILLENAI_SRC)
+# 6b272, cycle 14 of the drill (web): "this weekend" asked on a Monday
+# answered the weekend just ended — weekend asks now take the 7-day
+# rung and report today + the COMING Sat/Sun, labeled; feels-like is
+# bounded near the air temperature below 80°F
+check("weekend asks resolve to the coming Sat/Sun",
+      "def _weekend_dates" in _MILLENAI_SRC
+      and "the coming weekend" in _MILLENAI_SRC
+      and "forecast_days=%d" in _MILLENAI_SRC
+      and "apparent_temperature\"] = cur[\"temperature_2m\"]" in _MILLENAI_SRC)
 # 6b271, cycle 14 of the drill: tables/H2s in 5 of 6 simple chat
 # answers (the default rung now carries the shape law), remembered
 # facts hedged into guesses again (plainly or not at all), and funnel
