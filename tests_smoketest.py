@@ -498,6 +498,16 @@ check("clean-now flow wired",
       and "#roster:not(.managing) .rrm{display:none}" in page
       and "def _auto_cleanup_pass(manual=False)" in _MILLENAI_SRC
       and '_b.get("force")' in _MILLENAI_SRC)
+# 6b273, cycle 15 of the drill: the host Mac sat in Asia/Tokyo on a
+# trip and every Brooklyn "open now" answer was computed on Tokyo's
+# hour — the venue's own clock now rides the request (OSM hours, the
+# closed-day check, the system and user-turn clock lines, weather)
+check("open-now answers use the venue's clock, not the host's",
+      "def _tz_of" in _MILLENAI_SRC and "def _venue_now" in _MILLENAI_SRC
+      and "_oh_open_now(oh, _vnow)" in _MILLENAI_SRC
+      and 'wd = time.strftime("%A", _venue_now())' in _MILLENAI_SRC
+      and '_venue_stamp("%A %-I:%M%p")' in _MILLENAI_SRC
+      and "_tl_search.tz = _tz_of(" in _MILLENAI_SRC)
 # 6b272, cycle 14 of the drill (web): "this weekend" asked on a Monday
 # answered the weekend just ended — weekend asks now take the 7-day
 # rung and report today + the COMING Sat/Sun, labeled; feels-like is

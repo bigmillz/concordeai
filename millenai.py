@@ -2206,14 +2206,22 @@ def weather_snippets(q: str):
     # weekend ask goes straight to the 7-day rung and reports today
     # plus those two days, labeled so nothing needs date math.
     weekend = bool(re.search(r"\bweekend\b", q, re.I))
-    def _weekend_dates():
-        t = time.localtime()
-        ahead = (5 - t.tm_wday) % 7            # days until Saturday
-        if ahead == 0 and t.tm_hour >= 18:     # Saturday evening -> next
+    def _weekend_dates(tzname=""):
+        # computed on the LOCATION's calendar (6b273): a Brooklyn
+        # weekend asked from Tokyo is still Brooklyn's Saturday
+        import datetime as _dt
+        try:
+            from zoneinfo import ZoneInfo
+            now = _dt.datetime.now(ZoneInfo(tzname)) if tzname \
+                else _dt.datetime.now()
+        except Exception:
+            now = _dt.datetime.now()
+        ahead = (5 - now.weekday()) % 7        # days until Saturday
+        if ahead == 0 and now.hour >= 18:      # Saturday evening -> next
             ahead = 7
-        sat = time.localtime(time.time() + ahead * 86400)
-        sun = time.localtime(time.time() + (ahead + 1) * 86400)
-        return (time.strftime("%Y-%m-%d", sat), time.strftime("%Y-%m-%d", sun))
+        sat = now + _dt.timedelta(days=ahead)
+        sun = now + _dt.timedelta(days=ahead + 1)
+        return (sat.strftime("%Y-%m-%d"), sun.strftime("%Y-%m-%d"))
     try:
         if weekend:
             raise ValueError("weekend: 7-day rung")
@@ -2240,7 +2248,10 @@ def weather_snippets(q: str):
         if _age > 2 * 3600 or float(cur["temp_F"]) > _hi + 3:
             raise ValueError("stale or impossible reading")
         _desc = cur["weatherDesc"][0]["value"]
-        _hr = time.localtime().tm_hour
+        try:      # the observation's own local hour, not the host's
+            _hr = time.strptime(_obs, "%Y-%m-%d %I:%M %p").tm_hour
+        except Exception:
+            _hr = _venue_now().tm_hour
         if _hr < 6 or _hr >= 20:
             # no sun at night: the feed says "Sunny" for a clear sky
             _desc = re.sub(r"\bsunny\b", "clear", _desc, flags=re.I)
@@ -2316,8 +2327,12 @@ def weather_snippets(q: str):
                    cur["relative_humidity_2m"])]
         _tl_search.weather_src = {"t": "Live weather — " + str(
             g.get("name", loc))[:60], "u": "https://open-meteo.com/"}
-        _sat, _sun = _weekend_dates() if weekend else ("", "")
-        _today = time.strftime("%Y-%m-%d")
+        _tzn = str(d.get("timezone") or "")
+        if _tzn:
+            _tl_search.tz = _tzn
+            _tl_search.tz_place = str(g.get("name", loc)).split(",")[0][:40]
+        _sat, _sun = _weekend_dates(_tzn) if weekend else ("", "")
+        _today = time.strftime("%Y-%m-%d", _venue_now(_tzn))
         for i, ds in enumerate(dl.get("time", [])[:7]):
             if weekend and ds not in (_today, _sat, _sun):
                 continue
@@ -4481,6 +4496,67 @@ def _oh_open_now(spec: str, now=None) -> bool:
     return False
 
 
+_TZ_CACHE = {}
+
+
+def _tz_of(lat, lon) -> str:
+    """IANA zone for a coordinate — the venue's clock, not the host's
+    (6b273, judged: the Mac sat in Asia/Tokyo on a trip and every
+    Brooklyn "open now" verdict was computed on Tokyo's hour). Keyless
+    via open-meteo's timezone=auto; cached; '' on any failure."""
+    try:
+        key = (round(float(lat), 1), round(float(lon), 1))
+    except Exception:
+        return ""
+    if key in _TZ_CACHE:
+        return _TZ_CACHE[key]
+    tz = ""
+    try:
+        with urllib.request.urlopen(
+                "https://api.open-meteo.com/v1/forecast?latitude=%s"
+                "&longitude=%s&current=temperature_2m&timezone=auto"
+                % key, timeout=6) as r:
+            tz = str(json.load(r).get("timezone") or "")
+    except Exception:
+        tz = ""
+    if len(_TZ_CACHE) > 300:
+        _TZ_CACHE.clear()
+    _TZ_CACHE[key] = tz
+    return tz
+
+
+def _venue_now(tzname: str = ""):
+    """time.struct_time in the venue's zone; the host's when unknown."""
+    tzname = tzname or getattr(_tl_search, "tz", "") or ""
+    if tzname:
+        try:
+            from zoneinfo import ZoneInfo
+            import datetime as _dt
+            return _dt.datetime.now(ZoneInfo(tzname)).timetuple()
+        except Exception:
+            pass
+    return time.localtime()
+
+
+def _venue_stamp(fmt: str) -> str:
+    """strftime on the venue's clock, suffixed with the place when it
+    differs from the host's — 'Sunday 5:38PM in Brooklyn'."""
+    tzname = getattr(_tl_search, "tz", "") or ""
+    out = time.strftime(fmt, _venue_now(tzname))
+    where = getattr(_tl_search, "tz_place", "") or ""
+    if tzname and where and tzname != _host_tz():
+        out += " in " + where
+    return out
+
+
+def _host_tz() -> str:
+    try:
+        return os.path.basename(os.path.realpath("/etc/localtime")) and \
+            "/".join(os.path.realpath("/etc/localtime").split("/")[-2:])
+    except Exception:
+        return ""
+
+
 def osm_places(terms: str, locality: str, limit: int = 8) -> list:
     """Named venues near `locality` with real hours. [] on any failure —
     this is an enhancement to the snippet path, never a dependency."""
@@ -4495,6 +4571,10 @@ def osm_places(terms: str, locality: str, limit: int = 8) -> list:
     geo = _geocode(locality)
     if not geo:
         return []
+    # the venue's clock rides the request from here on (6b273)
+    _tl_search.tz = _tz_of(geo["lat"], geo["lon"])
+    _tl_search.tz_place = (geo.get("name") or locality).split(",")[0][:40]
+    _vnow = _venue_now(_tl_search.tz)
     # a UNION over both tags: eateries and bars live under amenity=,
     # supermarkets and delis under shop= (6b260) — one regex serves
     # both since the value sets don't collide
@@ -4546,7 +4626,7 @@ def osm_places(terms: str, locality: str, limit: int = 8) -> list:
             "d": " · ".join(b for b in bits if b)[:60],
             "h": oh[:90],
             "lat": e.get("lat"), "lon": e.get("lon"),
-            "open": _oh_open_now(oh) if oh else None,
+            "open": _oh_open_now(oh, _vnow) if oh else None,
         })
     # open now first, then anything with published hours, then the rest
     rows.sort(key=lambda r: (r["open"] is not True,
@@ -9293,6 +9373,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             _tl_search.photos = []
             _tl_search.geo = None
             _tl_search.locq = ""
+            _tl_search.tz = ""          # the venue's clock, per request
+            _tl_search.tz_place = ""
             snippets = None
             is_weather = bool(re.search(
                 r"\bweather\b|\bforecast\b|\btemperature\b", query, re.I))
@@ -9469,7 +9551,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # given run's snippets — and whether a 4-bit model
                     # notices it — is a coin flip (Lucali came back "open
                     # tonight 5-11pm" on a Tuesday, twice in three runs)
-                    wd = time.strftime("%A")
+                    wd = time.strftime("%A", _venue_now())
                     closed_hit = re.search(
                         r"(close[sd]?[^.\n]{0,40}\b%s|\b%s[^.\n]{0,15}"
                         r"close[sd]?)" % (wd[:3], wd[:3]), snippets, re.I)
@@ -9686,7 +9768,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         dated_system = dict(SYSTEM_PROMPT)
         if ag_system:
             dated_system["content"] = ag_system
-        _now_local = time.strftime("%A, %B %-d, %Y, %-I:%M%p")
+        _now_local = _venue_stamp("%A, %B %-d, %Y, %-I:%M%p")
         dated_system["content"] += (
             "\n\nRIGHT NOW for the user it is " + _now_local +
             " (their local time). Every 'today', 'tonight' and 'right "
@@ -9799,8 +9881,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # place no model ignores.
             messages[-1] = dict(messages[-1])
             messages[-1]["content"] = (
-                "[for time-sensitive parts: it is %s where I am]\n"
-                % time.strftime("%A %-I:%M%p")
+                "[for time-sensitive parts: it is %s%s]\n"
+                % (_venue_stamp("%A %-I:%M%p"),
+                   "" if getattr(_tl_search, "tz", "") else " where I am")
                 + str(messages[-1]["content"]))
         full_messages = [dated_system] + messages
 
