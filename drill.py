@@ -182,7 +182,7 @@ def main():
     rng = random.Random(seed)
     modes = set(a.modes.split(","))
 
-    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    stamp = time.strftime("%Y%m%dT%H%M%S%z")
     root = os.environ.get("DRILL_HOME") or os.path.expanduser(
         "~/Library/Application Support/MillenAI/drill_runs")
     outdir = os.path.join(root, stamp)
