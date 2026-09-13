@@ -349,3 +349,43 @@ stage-time reconciliation of off-axis typed answers (4th cycle —
 funnel[2] showed the verdict-time repair pattern to standardize).
 5) weather ladder still unexercised by a seed — needs a weather
 draw to verify live.
+
+## cycle 13 — 2026-09-14 — app f1aa923 (collected Sat 3:40-4:35 AM ET)
+batch: seed 20260913, 22 records. scores: chat 4.77 (holds) · web
+4.28 (did NOT close) · funnel 4.00. Rechecks: NONE completed — the
+verify agents hit the session limit; the sub-4 records below stand
+unverified (weighted accordingly).
+verdict on cycle 12's edits:
+- stage gate: no malformed labels in the batch (held) — but SEMANTIC
+  mismatch slips through: option sets that don't answer their own
+  question, 3x (dinner "how heavy" -> Vegetable-Forward/Cheese-Centric).
+- literal picks: FAILED by reclassification — clicked "Conservative"
+  got an all-equity index fund "conservative-leaning" (funnel[1]
+  3.4); "Under $50" monthly answered with one-time adoption fees
+  (funnel[5] 3.6).
+- feasibility-as-attribute: FAILED again — "NJ Transit bus or
+  regional rail" to Cape May; no rail serves Cape May (funnel[4] 3.0).
+- meta ban (softened forms): HELD everywhere. negative-verdict commit:
+  HELD in all three all-closed records (Mr. Kiwi named; reopen times).
+web's two dragons (both 2.0-class, unverified): movies shipped
+snippet DESCRIPTORS as titles ("The Zombie Sequel", "Al Pacino True
+Crime Project") plus a listings punt (web[4] 1.8); weather said "87°F
+and sunny right now" at 3:30 AM — current above the day's own high,
+"sunny" pre-dawn — with the honesty branch never reached (a rung
+returned data; likely stale daytime cache) (web[8] 2.0).
+chat: persona-guessing and the (~check current) tic stay gone; H2/flow
+scaffolding recurs 2/6; a new micro-class — confident false absolutes
+used to simplify ("a will is all-or-nothing at death").
+landed this cycle: none from the drill — the day went to Patrick's
+RC4 feedback list (6b268/269: recipe, clean-now, prune, wizard box,
+greetings, chat search, centered lockup).
+next (ranked, cycle 14): 1) weather SANITY: gate sky words on
+is_day, reject a "current" above the day's high, treat contradiction
+as re-fetch, and log weather as a source (sources_n=0 hid it). 2)
+listings ENTITY commitment: an item may only be reported under a
+proper name — descriptors are not titles; re-fetch or commit to the
+one verifiable film. 3) funnel picks by MEANING: a clicked option
+binds its category semantics (Conservative != all-equity; a monthly
+budget != a one-time fee) and transit claims need a named, real
+line. 4) chat structure cap (H2/tables/flow only for documents).
+5) "simplify by omission, never by a false absolute."
