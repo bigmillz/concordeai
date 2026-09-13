@@ -389,3 +389,47 @@ binds its category semantics (Conservative != all-equity; a monthly
 budget != a one-time fee) and transit claims need a named, real
 line. 4) chat structure cap (H2/tables/flow only for documents).
 5) "simplify by omission, never by a false absolute."
+
+## cycle 14 — 2026-09-15 — app d713bd1 (collected Mon ~1:35-2:28 AM ET)
+batch: seed 20260914, 22 records. scores: chat 3.80 (DIP) · web 4.20 ·
+funnel 3.07 (DIP). Rechecks 5/6 upheld; web[9] disputed on a time
+premise the verifier took from the run-dir stamp — drill.py's stamps
+are NOT wall clock (a launch at 1:35 AM ET stamped 16:58Z the day
+before); `date` at collection end read Monday 2:29 AM ET, so the
+2 AM premise stands. (Fix the stamp: it misleads verifiers.)
+confounds on the chat dip: prefs.json was rewritten at 1:57 AM,
+INSIDE the batch window; the judge model changed with Patrick's
+/model switch (5 -> 5.1) between cycles 13 and 14. Same engine
+(Gemma 4 26B, tier Fast) and same memory file in both cycles. The
+objective finding survives either way: tables in 5/6 and H2s in 4/6
+simple answers, 330-480 words each; persona hedge-guessing back 2/6.
+verdict on cycle 13's edits:
+- weather sanity: HELD (current 72°F < the day's 77°F high; "patchy
+  rain nearby", no "sunny"; sources_n=1 — the feed is a source now).
+  NEW: "this weekend" at 2 AM Monday resolved to the weekend just
+  ENDED (Sunday's past numbers + Mon/Tue); feels-like unchecked.
+- names-only listings: not drawn this seed.
+- picks in meaning: FAILED 3/6 — '4+ hours' answered with a 1.5-h
+  Bordentown; 'Social companion' -> solitary Syrian hamsters, with
+  'a pair' contradicted by 'two separate habitats'; a shelf KitKat
+  sold as 'frozen-style' with invented sprinkles (funnel[0] 2.0,
+  [2] 2.0, [3] 2.6 — all upheld).
+- named transit: FAILED — 'NJ Transit Trenton Line' does not exist.
+- all-closed -> option/reopen: HELD 4/4; best-X ranked: HELD.
+- data-scope meta is BACK in 4/5 local records in impersonal form
+  ('every coffee spot on the list', 'names per Yelp's list', 'none
+  of the four pharmacies listed') and universal negatives ('Nothing's
+  open right now') asserted from 1-4-item lists that omit the late-
+  night category (24h pharmacy chains, diners, bodegas, Dunkin').
+landed AFTER this batch (cycle 15, tagged 6b271): the shape law on
+the default length rung; remembered facts plainly or not at all; a
+second-call VERDICT AUDIT on every funnel (rules failed three cycles
+running — structure now). On trial in cycle 15.
+next (ranked, cycle 16): 1) "this weekend" resolves to the NEXT
+Sat/Sun on Mon-Fri (compute the dates in code; label the forecast
+lines "this Saturday"); feels-like bounded. 2) universal-negative
+guard: an all-closed verdict from a thin list must name the late-
+night category fallback (24h pharmacy chain / diner / bodega) and
+never say "nothing's open". 3) strip impersonal scope meta ('the
+list', 'per Yelp's list' as a sentence) — cite inline only. 4) fix
+drill.py's run stamp to wall-clock ISO.
