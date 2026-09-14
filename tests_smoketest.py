@@ -501,6 +501,13 @@ check("clean-now flow wired",
       and "#roster:not(.managing) .rrm{display:none}" in page
       and "def _auto_cleanup_pass(manual=False)" in _MILLENAI_SRC
       and '_b.get("force")' in _MILLENAI_SRC)
+# 6b284, per Patrick ("keep the design consistent"): the clean-up dialog
+# wears the house chrome, reports the real reason a removal failed, and
+# a retired Ollama row deletes the tag that is actually pulled
+check("clean-up dialog: house chrome, honest errors, exact tags",
+      "#clean-card .ghost{" in page and "#clean-card .primary{" in page
+      and '"errors": dict(_CLEANUP_LAST_ERRORS)' in _MILLENAI_SRC
+      and "resolve the" in _MILLENAI_SRC and "t.split(\":\")[0] == _tag" in _MILLENAI_SRC)
 # 6b283, per Patrick (twice): the Clean-up button and note were clipped
 # below the settings card — the card is a grid whose row grew to its
 # content; the row is bounded now and the pane scrolls

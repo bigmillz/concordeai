@@ -3733,6 +3733,14 @@ def _remove_models(want: list) -> tuple:
             repo, _tag, _port, _gb = RETIRED_MODELS[label]
             kind, target = (("mlx", _port) if (repo and IS_ARM)
                             else ("ollama", _tag))
+            if kind == "ollama" and _tag and ":" not in _tag:
+                # the daemon deletes exact names only: resolve the
+                # bare tag to whatever is really pulled (6b284)
+                _pulled = ollama_pulled_tags() or set()
+                _exact = sorted(t for t in _pulled
+                                if ":" in t and t.split(":")[0] == _tag)
+                if _exact:
+                    target = _exact[0]
         else:
             errors[label] = "unknown model"
             continue
@@ -3796,6 +3804,9 @@ def _remove_models(want: list) -> tuple:
     return removed, errors
 
 
+_CLEANUP_LAST_ERRORS = {}
+
+
 def _auto_cleanup_pass(manual=False) -> list:
     """The auto-clean sweep (6b265, per Patrick's checkbox). Runs only
     when the pref is on; stands down entirely while an app update or
@@ -3829,6 +3840,8 @@ def _auto_cleanup_pass(manual=False) -> list:
         if not targets:
             return []
         removed, _errs = _remove_models(targets)
+        _CLEANUP_LAST_ERRORS.clear()
+        _CLEANUP_LAST_ERRORS.update(_errs or {})
         return removed
     except Exception:
         return []
@@ -9313,7 +9326,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 manual=bool(isinstance(_b, dict) and _b.get("force")))
             self._send_json({"removed": removed,
                              "freed_gb": round(sum(
-                                 _gb_of(l) for l in removed), 1)})
+                                 _gb_of(l) for l in removed), 1),
+                             "errors": dict(_CLEANUP_LAST_ERRORS)})
             return
         if self.path == "/api/model/remove":
             # REMOVE A MODEL (6b257, per Patrick's Manage flow). Ready
@@ -12298,7 +12312,17 @@ body:not(.perf) #mic.rec{animation:blink 1s ease infinite}
   border-radius:var(--radius);text-align:center;
   animation:doorPop .5s cubic-bezier(.16,1,.3,1) both}
 #clean-card .sh-icon{font-size:30px;margin-bottom:4px}
-#clean-card p{font-size:13px;color:var(--dim);line-height:1.55}
+#clean-card h2{font-family:var(--disp);font-size:15px;letter-spacing:.06em}
+#clean-card p{font-size:13px;color:var(--dim);line-height:1.55;margin:6px 0 16px}
+#clean-card .sh-foot{display:flex;gap:10px;justify-content:center}
+#clean-card button{font:inherit;font-size:13px;font-weight:600;
+  padding:9px 22px;border-radius:99px;cursor:pointer;border:1px solid transparent}
+#clean-card .primary{background:var(--text);color:var(--panel)}
+#clean-card .primary:hover{filter:brightness(.92)}
+#clean-card .ghost{background:transparent;color:var(--dim);
+  border-color:var(--line)}
+#clean-card .ghost:hover{color:var(--text);border-color:rgba(255,255,255,.25)}
+#clean-card .primary[hidden]{display:none}
 #dlhelp-veil{position:fixed;inset:0;z-index:61;display:flex;
   align-items:center;justify-content:center;background:rgba(6,7,10,.72);
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
@@ -13706,7 +13730,7 @@ __CODE_ROWS__
     <p id="clean-body"></p>
     <div class="sh-foot">
       <button id="clean-go" class="primary">Remove</button>
-      <button id="clean-cancel">Keep everything</button>
+      <button id="clean-cancel" class="ghost">Keep everything</button>
     </div>
   </div>
 </div>
@@ -18504,10 +18528,12 @@ $("#clean-go").addEventListener("click",async()=>{
     const r=await(await fetch("/api/model/cleanup",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({force:true})})).json();
+    const errs=Object.entries(r.errors||{});
     $("#clean-body").textContent=r.removed.length
       ?"Removed "+r.removed.length+" \u2014 freed "+r.freed_gb+" GB."
-      :"Nothing could be removed right now \u2014 a model may be "
-       +"in use or downloading. Try again in a minute.";
+      :(errs.length
+        ?"Couldn\u2019t remove "+errs.map(([n,e])=>n+" ("+e+")").join(", ")+"."
+        :"Nothing to remove right now.");
   }catch(e){
     $("#clean-body").textContent="Cleanup hit a snag \u2014 try again.";
   }
