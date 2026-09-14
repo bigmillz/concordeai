@@ -147,7 +147,15 @@ def drill_funnel(spec, rng):
              "stages": 4, "images": False, "picks": picks,
              "asked": asked}
     for hop in range(1, 10):
-        d = json.loads(req("/api/funnel", state))
+        try:
+            d = json.loads(req("/api/funnel", state))
+        except Exception as exc:
+            # a dead endpoint must be localizable from the transcript
+            # (6b277: six "connection closed" records carried nothing)
+            return {"mode": "funnel", "question": spec["goal"],
+                    "error": "%s: %s" % (type(exc).__name__, str(exc)[:120]),
+                    "hop": hop, "stages_so_far": stages,
+                    "ms": int((time.time() - t0) * 1000)}
         if d.get("err"):
             return {"mode": "funnel", "question": spec["goal"],
                     "error": d["err"], "ms": int((time.time()-t0)*1000)}

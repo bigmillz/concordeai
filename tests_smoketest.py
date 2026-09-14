@@ -501,6 +501,31 @@ check("clean-now flow wired",
       and "#roster:not(.managing) .rrm{display:none}" in page
       and "def _auto_cleanup_pass(manual=False)" in _MILLENAI_SRC
       and '_b.get("force")' in _MILLENAI_SRC)
+# 6b277: a bare % in the verdict-audit prompt killed EVERY funnel
+# verdict for two drill cycles while the gauntlet stayed green — the
+# funnel checks were source-level only. This walks a real funnel to
+# its verdict, the way drill.py does, so the verdict path is exercised
+# on every run.
+_fs = {"goal": "Which candy should I try next?", "reqs": "", "opts": 4,
+       "stages": 3, "images": False, "picks": [], "asked": []}
+_fdone, _ferr = False, ""
+for _hop in range(1, 8):
+    _st, _h, _b = req("/api/funnel", "POST", _fs, cookie=K, timeout=240)
+    if _st != 200:
+        _ferr = "http %s at hop %d" % (_st, _hop); break
+    try:
+        _fd = json.loads(_b)
+    except Exception:
+        _ferr = "non-json at hop %d" % _hop; break
+    if _fd.get("err"):
+        _ferr = str(_fd["err"])[:80]; break
+    if _fd.get("done"):
+        _fdone = len(str(_fd.get("summary") or "")) > 40; break
+    _fo = [o.get("label", "") for o in _fd.get("options", [])]
+    if not _fo:
+        _ferr = "empty options at hop %d" % _hop; break
+    _fs["asked"].append(_fd.get("q", "")); _fs["picks"].append(_fo[0])
+check("a real funnel reaches its verdict", _fdone, _ferr)
 # 6b276, cycle 16's other two: committed plans re-add their numbers
 # (a "20-minute" workout summed to 24), and listing/price asks rank
 # the authoritative hosts first

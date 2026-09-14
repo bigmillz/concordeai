@@ -8945,7 +8945,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # call audits the verdict against every pick and
                 # requirement and rewrites what fails. Cloud only —
                 # a 4-bit local auditor would rubber-stamp.
-                if out and load_prefs(None).get("turbo"):
+                try:
+                  if out and load_prefs(None).get("turbo"):
                     _audit = [
                         {"role": "system", "content":
                          "You audit a recommendation against what the "
@@ -8959,7 +8960,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          "the recommended thing ACTUALLY is on that axis "
                          "from what you know of it — not what the "
                          "verdict claims (e.g. 'Syrian hamster: solitary, "
-                         "nocturnal, 2-3 yr lifespan'; 'VTSAX: 100% "
+                         "nocturnal, 2-3 yr lifespan'; 'VTSAX: 100%% "
                          "equities'; 'Bordentown: ~1.5 h from Penn'). "
                          "Then, for each named venue, product, route or "
                          "service, one line: real and exactly named, or "
@@ -9000,6 +9001,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         _m = re.search(r"VERDICT:\s*([\s\S]{40,})$", _fix)
                         if _m:
                             out = _m.group(1).strip()
+                except Exception:
+                    # an auditor that crashes forfeits its say; the
+                    # verdict ships un-audited rather than not at all
+                    # (6b277 — the bare-% crash closed the socket)
+                    pass
                 # NEVER hand the picks back as if they were an answer
                 # (6b260, per Patrick) — if no model can weigh in, say
                 # so honestly and point at the fix
