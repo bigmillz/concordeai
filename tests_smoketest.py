@@ -501,6 +501,18 @@ check("clean-now flow wired",
       and "#roster:not(.managing) .rrm{display:none}" in page
       and "def _auto_cleanup_pass(manual=False)" in _MILLENAI_SRC
       and '_b.get("force")' in _MILLENAI_SRC)
+# 6b281, cycle 19 of the drill: the host clock leaked on questions
+# that named no place (home zone now frames every request), a two-
+# venue list became "nothing's open" (thin lists are scoped), an
+# answer claimed lived experience, chat asserted "every 2015 MacBook",
+# a $1,999 laptop was sold against "under $1500"
+check("cycle-20 fixes: home zone always, thin lists scoped, walls, no fake experience",
+      "_tl_search.tz, _tl_search.tz_place = _home_tz()" in _MILLENAI_SRC
+      and "_tl_search.thin_closed" in _MILLENAI_SRC
+      and "THIN LIST: only" in _MILLENAI_SRC
+      and "Never claim lived experience" in _MILLENAI_SRC
+      and "A stated NUMBER is a wall" in _MILLENAI_SRC
+      and "At most ONE remembered fact per" in _MILLENAI_SRC)
 # 6b280, the 6.0.1 pre-release review: the nine-day weekend fetch was
 # clipped by an unchanged [:7]; CLOSED matched any lowercase "closed";
 # the OSM row cache returned before the venue zone was set; a failed

@@ -7170,7 +7170,15 @@ FUNNEL_SUMMARY_SYS = (
     "transit claim needs a NAMED real line or operator you are sure "
     "of ('the NJ Transit 319 bus from Port Authority'); 'bus or "
     "regional rail' is a guess, and a guess gets 'check the actual "
-    "route' instead.")
+    "route' instead.\n"
+    # 6b281, judged: a $1,999 laptop against "under $1500", softened
+    # to "sits just above that ceiling"; a typed "2 hours a day"
+    # dropped by the verdict
+    "- A stated NUMBER is a wall, not a hint: a budget, a time limit, "
+    "a weight — the pick sits inside it or you say plainly nothing "
+    "real does and name the closest that fits. 'Slightly above' is a "
+    "miss. Every TYPED answer appears in the verdict — honored, or "
+    "named and reconciled in one clause; never silently dropped.")
 
 
 def funnel_summary_sys_for(goal: str) -> str:
@@ -9063,7 +9071,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          "solitary animal is not a 'social companion'; "
                          "a one-time fee does not meet a monthly budget; "
                          "a 90-minute town does not honor '4+ hours')? "
-                         "Does every requirement hold? The verdict's "
+                         "Does every requirement hold — a stated number "
+                         "(budget, hours) is a hard wall, and a price "
+                         "above it fails even by a little? Does every "
+                         "TYPED answer appear, honored or reconciled? "
+                         "The verdict's "
                          "own assurances count for nothing. Identifiers "
                          "must be EXACT — a ticker, model number or "
                          "product name you are not certain of is a "
@@ -9538,9 +9550,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # the clock for this request: the home area's for any
             # local-intent ask (6b275), the venue's once one geocodes,
             # the host's otherwise
-            _tl_search.tz, _tl_search.tz_place = "", ""
-            if _LOCAL_INTENT_RX.search(query) or _VENUE_RX.search(query):
-                _tl_search.tz, _tl_search.tz_place = _home_tz()
+            # the home area's clock frames EVERY request when it is
+            # set (6b281): "today" and "tonight" belong to the user's
+            # life, not the host machine's — a geocoded venue still
+            # overrides it below
+            _tl_search.tz, _tl_search.tz_place = _home_tz()
             snippets = None
             is_weather = bool(re.search(
                 r"\bweather\b|\bforecast\b|\btemperature\b", query, re.I))
@@ -9625,6 +9639,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     if _osm:
                         _tl_search.osm = _osm
                         _open = [p for p in _osm if p.get("open")]
+                        if len(_osm) <= 3 and not _open:
+                            _tl_search.thin_closed = len(_osm)
+                        else:
+                            _tl_search.thin_closed = 0
                         _lines = "\n".join(
                             "- %s%s — %s%s" % (
                                 p["n"], (" (" + p["d"] + ")") if p["d"] else "",
@@ -9757,6 +9775,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         "Tuesday' beats a generic hours range.\n"
                         "2. Then at most three options as short bold-name "
                         "lines: **Name** — what it is — tonight's hours.\n"
+                        (("THIN LIST: only %d venue(s) could be checked "
+                          "and none is open — say 'of the %d I could "
+                          "check' in those words, never 'nothing is "
+                          "open', and name the late-night or early "
+                          "category (24-hour pharmacy chain, diner, "
+                          "bodega) as the honest move.\n"
+                          % (getattr(_tl_search, "thin_closed", 0),
+                             getattr(_tl_search, "thin_closed", 0)))
+                         if getattr(_tl_search, "thin_closed", 0) else "") +
                         "CLOSED MEANS CLOSED: if any source marks a "
                         "place permanently closed, it is closed — its "
                         "own website is the LAST source to trust, "
@@ -9949,7 +9976,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         "what I found'. When something live is "
                         "missing, ONE clause says what to check "
                         "and where; the rest answers from what you "
-                        "actually know.\n"
+                        "actually know. Never claim lived experience "
+                        "or memories of a place ('I've seen it in "
+                        "enough corner stores') — you have none.\n"
                         # 6b275, judged: eggs "$3-4 right now" from
                         # memory against a BLS $2.28 released two days
                         # earlier; a movie slate from memory with
@@ -10013,7 +10042,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 "never hedge one into a guess ('if you're at a desk "
                 "job', 'you're likely hunched over a laptop'), and "
                 "never guess a job, habit or household the facts "
-                "don't contain.")
+                "don't contain. At most ONE remembered fact per "
+                "answer, and only when it changes the advice; a "
+                "framing the user states in the question ('like I'm "
+                "not an engineer') overrides anything remembered.")
         # standing preferences the user wrote themselves (About panel) — they
         # outrank remembered facts, which are extracted guesses
         _prefs = load_prefs(user_base)
@@ -10063,7 +10095,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 "the headline number must satisfy it. A statistic or "
                 "ranking is real stable knowledge or it is phrased as "
                 "a rough expectation — never invent 'most people "
-                "under-eat by 30 g' or 'the #2 mistake'."),
+                "under-eat by 30 g' or 'the #2 mistake'. An 'every', "
+                "'only' or 'always' over a product family or a "
+                "single test result is narrowed to the cases it is "
+                "true for, or hedged in one clause ('every 2015 "
+                "MacBook' — the 12-inch stopped a version earlier). "
+                "An explain-me ask is still prose: a numbered list is "
+                "the ceiling, and a diagram that restates a list is "
+                "padding."),
             4: ("Go deep when the question earns it: several "
                 "developed paragraphs, with headings or a list where "
                 "they genuinely organise the material. Cover the "
