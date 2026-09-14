@@ -574,13 +574,10 @@ check("a stale cached page can never 304 its way back", s == 200)
 # CANDIDATE, not a beta — the label changes on every display surface
 # while the prerelease hold stays exactly as it was, so /releases/latest
 # still never offers it to a stable install.
-check("release candidate labelling, prerelease hold intact",
-      # any RC number — the check must not need editing every cut
-      re.search(r"^APP_RC = [1-9]\d*$", _MILLENAI_SRC, re.M)
-      # named, not numbered: "6.1 RC1" carries no build suffix
-      and 'return v + " RC%d" % APP_RC' in _MILLENAI_SRC
-      and "APP_BETA = True" in _MILLENAI_SRC
-      and 'SHOW="$SHOW RC$RC"' in open("release.sh").read())
+check("release labelling: 6.0 final, no RC, no beta hold",
+      "APP_RC = 0" in _MILLENAI_SRC and "APP_BETA = False" in _MILLENAI_SRC
+      and re.search(r">Version 6\.0(\b|<| \xb7)", page) is not None
+      and " RC" not in re.search(r">Version [^<]*<", page).group(0))
 check("titlebar lockup: accessory + bundled font",
       "NSTitlebarAccessoryViewController" in _MILLENAI_SRC
       and "def _brand_accessory" in _MILLENAI_SRC

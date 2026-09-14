@@ -4517,3 +4517,15 @@ Still a prerelease: APP_BETA holds, sync sign-in gates "6.1 proper".
   on resize/layout notifications by a tiny NSObject observer.
 - REMOVE LINKS are manage-mode only (per Patrick): the roster reads
   as an informative list until Manage models opens.
+
+## 6.0 — build 269 (the release)
+
+Cut on Patrick's word: "sort the version numbers and push this as
+version 6.0 and publish it." The 6.1 label was a mistake — the line
+never left 6.0 — so APP_VERSION goes 6.1.0 -> 6.0.0, APP_RC 4 -> 0,
+APP_BETA True -> False: a full release on the stable channel, build
+269, and the 6.1-titled prereleases (v257-v260, v268) are retitled
+"6.0 beta / RC1-4" on GitHub so the history reads straight. The
+updater keys on build numbers only, so every install — beta, RC or
+older stable — moves to 269 normally. Ships everything through
+6b273 (the venue-clock fix, probe-verified from the Tokyo-set Mac).

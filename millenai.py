@@ -79,20 +79,20 @@ try:
 except ImportError:
     HAS_WEBVIEW = False
 
-APP_VERSION = "6.1.0"   # bump here — UI, window, DMG all follow
+APP_VERSION = "6.0.0"   # bump here — UI, window, DMG all follow
 # BETA HOLD (per Patrick): the 6.x line is beta until the kinks are out.
 # While True: every display surface says "beta", release.sh publishes
 # as a GitHub PRERELEASE, and — because the desktop updater reads
 # /releases/latest, which EXCLUDES prereleases — every existing install
 # stays parked on the last stable (v197 / 5.3.7). The live :9889
 # instance follows raw tags and DOES run betas: that's the testbed.
-APP_BETA = True
+APP_BETA = False
 # RELEASE CANDIDATE (6b258, per Patrick: "almost there"). >0 renames
 # the label from "beta" to "RC<n>" on every display surface and in the
 # release title, while KEEPING the prerelease hold above — an RC is
 # still not the stable build, so /releases/latest must not offer it.
 # Set back to 0 when 6.1 ships for real (after sign-on + cloud sync).
-APP_RC = 4
+APP_RC = 0
 # THE BRAND (6b257): ConcordeAI — Concorde grew its AI, and the AI is
 # BOLD in every lockup (nested <b>, see .vghost). Every user-facing
 # surface says ConcordeAI; everything load-bearing stays "MillenAI" —
@@ -125,7 +125,7 @@ def short_version(v: str = None) -> str:
         # though both read the same on screen.
         return v + " RC%d" % APP_RC
     return v + (" beta %d" % APP_BUILD if APP_BETA else "")
-APP_BUILD = 268               # integer compared against the GitHub release tag
+APP_BUILD = 269               # integer compared against the GitHub release tag
 APP_BUILD_DATE = ""         # ISO date; blank falls back to this file's mtime
 try:                          # feeds the page ETag: an edited source must
     _SRC_MTIME = int(os.path.getmtime(__file__))   # never 304 as "unchanged"
