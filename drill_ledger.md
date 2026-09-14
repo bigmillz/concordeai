@@ -552,3 +552,45 @@ verdict from ≤4 rows must name the late-night category fallback and
 never "nothing is open"; 2) impersonal scope meta ('the nearby
 list', 'per Yelp's list') — cite inline only; 3) route funnel stages
 off local engines when any cloud rung answers.
+
+## cycle 19 — 2026-09-14 — app 397e66d (collected Mon ~5:35-6:25 AM ET)
+batch: seed 20260919, 22 records. scores: chat 4.20 (DIP) · web 3.90
+· funnel 3.77 (the verdict path is back). Rechecks 6/6 upheld.
+verdict on cycle 19's edits:
+- closure notices: HELD where a directory flag surfaced (Sea Town,
+  Gimme!); did NOT fire for the dead pizzeria (search never surfaces
+  Yelp's flag reliably) — the "listed, unverified" rule landed after
+  this batch and is on trial next.
+- listings-site search: real titles and dates, but from announced
+  studio schedules rather than a listings page — partial.
+- no invented "most people" stats: HELD 6/6 (one soft superlative).
+new/recurring:
+- HOST CLOCK on questions naming NO place ("is the L train running
+  normally today" -> Tokyo evening frame at 5:45 AM Brooklyn; "get the
+  email out tonight" at dawn) — the local-intent regex missed "today".
+  Fixed after: the home zone frames EVERY request; a venue overrides.
+- universal negatives from two-venue lists ("nothing's open this exact
+  second" ... then bodegas named as "the move"); fixed: THIN LIST
+  scoping injected when <=3 rows and none open.
+- fabricated lived experience ("I've seen it in enough corner
+  stores") — banned in the searched-answer block.
+- chat: confident false absolutes 3/6 ("every 2015 MacBook topped out
+  at Monterey"), one SHAPE breach (H2s + a flow block on an explain
+  ask), memory used AGAINST the user's stated framing ("since you're
+  a software engineer" to "like I'm not an engineer"), three memory
+  hooks on one answer. Rules: absolutes narrowed; explain-asks stay
+  prose; one memory hook max; the question's framing wins.
+- funnel: a $1,999 M4 Pro (non-existent 18GB config) against "under
+  $1500", softened to "sits just above that ceiling"; a typed "2
+  hours a day" dropped; the canned fallback stage showed up twice
+  with options that fit neither a laptop nor a trip. Rules: a stated
+  number is a wall; every typed answer appears reconciled; audit
+  checks both. Fallback options: queued to derive from the goal.
+landed after this batch (cycle 20, tagged 6b281) — on trial next.
+6.0.1 (build 270) shipped between this batch and its judging, after an
+adversarial diff review caught seven defects (see NOTES 6.0.1).
+next (ranked, cycle 21): 1) goal-aware fallback stage options; 2)
+route funnel stages off local engines when any cloud rung answers
+(Gemma re-asks, 7 cycles running); 3) listings answers must cite the
+listings page, not announced dates; 4) chat over-length on simple
+asks (5-6 paragraphs, 7-8 bolds) — cap.
