@@ -12357,7 +12357,7 @@ body:not(.perf) #mic.rec{animation:blink 1s ease infinite}
 #about-veil #about-card{
   width:660px;text-align:left;
   display:grid;grid-template-columns:212px 1fr;align-items:stretch;
-}
+;grid-template-rows:minmax(0,1fr)}
 #set-rail{
   background:var(--panel);border-right:1px solid var(--line-soft);
   padding:18px 0 14px;display:flex;flex-direction:column;min-width:0;
@@ -12395,7 +12395,12 @@ body:not(.perf) #mic.rec{animation:blink 1s ease infinite}
   border-left-color:#ececec}
 .snav:focus-visible{outline:2px solid rgba(255,255,255,.35);
   outline-offset:-2px}
-#set-main{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+#set-main{display:flex;flex-direction:column;min-width:0;min-height:0;
+  overflow:hidden auto}
+/* the card is a GRID: without a bounded row track its items grow to
+   their content and the card's overflow:hidden clips them — the
+   Clean-up button vanished below the fold twice (6b283) */
+#set-rail{min-height:0}
 #about-veil #about-body{padding:18px 22px 4px}
 #about-veil #about-foot{border-top:1px solid var(--line-soft);
   padding:12px 22px 14px;display:flex}
@@ -12697,8 +12702,12 @@ body:not(.perf) #mic.rec{animation:blink 1s ease infinite}
 }
 #fleet-box input:not([type=checkbox]):focus{border-color:var(--accent-dim)}
 #autoclean-bar{display:flex;align-items:center;gap:10px;
-  justify-content:space-between;margin-top:10px;flex-wrap:wrap}
-#autoclean-bar #clean-now{margin:0;flex:none}
+  justify-content:space-between;margin-top:10px;flex-wrap:nowrap}
+#autoclean-bar #autoclean-row{flex:1;min-width:0;margin:0}
+#autoclean-bar #autoclean-row span{white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+#autoclean-bar #clean-now{margin:0;flex:none;white-space:nowrap;
+  display:inline-block;width:auto}
 #autoclean-note{font-size:11.5px;color:var(--faint);margin-top:4px}
 #acon-row,#idleon-row,#autoclean-row{display:flex;gap:7px;align-items:center;
   font-size:12px;color:var(--text);margin:6px 0}
@@ -13658,12 +13667,12 @@ __CODE_ROWS__
           <div><dt>space taken</dt><dd id="mg-space">&mdash;</dd></div>
         </dl>
         <div id="plan-row"></div>
+        <div id="autoclean-note"></div>
         <div id="autoclean-bar">
           <label id="autoclean-row"><input type="checkbox" id="autoclean">
             <span>Automatically remove superseded models</span></label>
           <button class="about-btn slim" id="clean-now">Clean up now&hellip;</button>
         </div>
-        <div id="autoclean-note"></div>
         <div id="manage-note"></div>
       </div>
     </section>

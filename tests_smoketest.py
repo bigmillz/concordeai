@@ -501,6 +501,14 @@ check("clean-now flow wired",
       and "#roster:not(.managing) .rrm{display:none}" in page
       and "def _auto_cleanup_pass(manual=False)" in _MILLENAI_SRC
       and '_b.get("force")' in _MILLENAI_SRC)
+# 6b283, per Patrick (twice): the Clean-up button and note were clipped
+# below the settings card — the card is a grid whose row grew to its
+# content; the row is bounded now and the pane scrolls
+check("settings card grid is bounded and the clean row is one line",
+      "grid-template-rows:minmax(0,1fr)" in page
+      and "#set-rail{min-height:0}" in page
+      and "flex-wrap:nowrap}" in page
+      and 'display:inline-block;width:auto}' in page)
 # 6b282, per Patrick: the full-screen version zoom after an update is
 # retired for an in-app dialog with a scrolling release-notes box
 check("post-update dialog replaces the zoom",
