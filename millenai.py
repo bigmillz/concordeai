@@ -79,7 +79,7 @@ try:
 except ImportError:
     HAS_WEBVIEW = False
 
-APP_VERSION = "6.0.0"   # bump here — UI, window, DMG all follow
+APP_VERSION = "6.0.1"   # bump here — UI, window, DMG all follow
 # BETA HOLD (per Patrick): the 6.x line is beta until the kinks are out.
 # While True: every display surface says "beta", release.sh publishes
 # as a GitHub PRERELEASE, and — because the desktop updater reads
@@ -125,7 +125,7 @@ def short_version(v: str = None) -> str:
         # though both read the same on screen.
         return v + " RC%d" % APP_RC
     return v + (" beta %d" % APP_BUILD if APP_BETA else "")
-APP_BUILD = 269               # integer compared against the GitHub release tag
+APP_BUILD = 270               # integer compared against the GitHub release tag
 APP_BUILD_DATE = ""         # ISO date; blank falls back to this file's mtime
 try:                          # feeds the page ETag: an edited source must
     _SRC_MTIME = int(os.path.getmtime(__file__))   # never 304 as "unchanged"

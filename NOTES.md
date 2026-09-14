@@ -4543,3 +4543,17 @@ no notification observer. Measured on screen: ink center within 1.5
 device px of the window's; wing and cap seats within 0.5 device px
 of the bar's center. The gauntlet now asserts the define-before-use
 order so this class of silent vanish can't recur.
+
+## 6.0.1 — build 270
+
+Cut on Patrick's word ("if we're good, then let's push this version
+6.0.1") after an adversarial diff review of everything since v269 and
+the full gauntlet. Ships 6b274-6b279: the describe-first verdict
+audit (and the bare-% crash that killed every verdict in unreleased
+builds — 6.0 itself never had it), the fallback stage, closed-means-
+closed with closure searches and "listed, unverified" own-site hours,
+the venue clock with the home area as default, the nine-day weekend,
+dated headline facts, listings-site search, the arithmetic and
+invented-precision rules, the centered titlebar lockup (rebuilt after
+the use-before-define vanish), and a gauntlet that walks a real
+funnel to its verdict on every run.
