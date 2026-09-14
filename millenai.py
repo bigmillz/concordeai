@@ -2291,7 +2291,7 @@ def weather_snippets(q: str):
                 "&daily=temperature_2m_max,temperature_2m_min,"
                 "weather_code&temperature_unit=fahrenheit"
                 "&wind_speed_unit=mph&timezone=auto&forecast_days=%d"
-                % (g["lat"], g["lon"], 7 if weekend else 3),
+                % (g["lat"], g["lon"], 9 if weekend else 3),
                 timeout=8) as r:
             d = json.load(r)
         _WMO = ((0, "clear"), (3, "partly cloudy"), (48, "fog"),
@@ -2339,8 +2339,8 @@ def weather_snippets(q: str):
             _lab = ("this Saturday" if ds == _sat else
                     "this Sunday" if ds == _sun else
                     "today" if ds == _today else _wd(ds))
-            if weekend:
-                _lab += " (the coming weekend)" if ds in (_sat, _sun) else ""
+            if weekend and ds in (_sat, _sun):
+                _lab = "this coming " + _lab.split()[-1]
             out.append("%s %s: high %.0f°F / low %.0f°F, %s" % (
                 _lab, ds, dl["temperature_2m_max"][i],
                 dl["temperature_2m_min"][i],
@@ -4523,6 +4523,31 @@ def _tz_of(lat, lon) -> str:
         _TZ_CACHE.clear()
     _TZ_CACHE[key] = tz
     return tz
+
+
+_HOME_TZ = {"key": None, "tz": "", "place": ""}
+
+
+def _home_tz():
+    """(tz, place) for the owner's home_area — the default clock for
+    every local-intent question (6b275). Geocoded once per setting."""
+    home = str(load_prefs(None).get("home_area") or "").strip()
+    if not home:
+        return "", ""
+    if _HOME_TZ["key"] != home:
+        _HOME_TZ.update(key=home, tz="", place=home.split(",")[0][:40])
+        try:
+            g = _geocode(home)
+            if g:
+                _HOME_TZ["tz"] = _tz_of(g["lat"], g["lon"])
+        except Exception:
+            pass
+    return _HOME_TZ["tz"], _HOME_TZ["place"]
+
+
+_LOCAL_INTENT_RX = re.compile(
+    r"\b(open|opens?|closed?|closes?|hours|near|nearby|tonight|"
+    r"right now|weather|forecast|this weekend|late)\b", re.I)
 
 
 def _venue_now(tzname: str = ""):
@@ -8874,7 +8899,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          "identical in the verdict and the next step.\n"
                          "- Then two or three sentences on why it fits "
                          "THESE answers and the requirements — woven "
-                         "in, not listed back.\n"
+                         "in, not listed back. Paraphrase their picks "
+                         "into natural sentences; never paste an "
+                         "option label as a clause ('since you are "
+                         "traveling no car' is pasted; 'since you're "
+                         "going car-free' is written).\n"
                          "- End with the single most useful next step, "
                          "as a plain instruction.\n"
                          "- If two picks genuinely tie, lead with your "
@@ -8937,14 +8966,22 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          "a one-time fee does not meet a monthly budget; "
                          "a 90-minute town does not honor '4+ hours')? "
                          "Does every requirement hold? The verdict's "
-                         "own assurances count for nothing. THIRD: if "
-                         "everything holds, end with exactly: OK. "
+                         "own assurances count for nothing. Identifiers "
+                         "must be EXACT — a ticker, model number or "
+                         "product name you are not certain of is a "
+                         "fail; the correction names the thing "
+                         "descriptively without the identifier. THIRD: "
+                         "if everything holds, end with exactly: OK. "
                          "Otherwise end with a corrected verdict, "
                          "beginning on a line that says VERDICT:, in "
                          "the same shape and length — the real closest "
                          "thing, plainly naming which pick it misses, "
                          "and 'check the actual route' in place of any "
-                         "logistics you could not vouch for."
+                         "logistics you could not vouch for. The "
+                         "corrected verdict must read as a fresh "
+                         "recommendation to the user — never mention "
+                         "the audit, a wrong name, or that anything "
+                         "was invented."
                          % (goal, reqs or "none", "; ".join(picks), out)}]
                     _fix = ""
                     for _conf in (compositor_ladder() or []):
@@ -9395,8 +9432,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             _tl_search.photos = []
             _tl_search.geo = None
             _tl_search.locq = ""
-            _tl_search.tz = ""          # the venue's clock, per request
-            _tl_search.tz_place = ""
+            # the clock for this request: the home area's for any
+            # local-intent ask (6b275), the venue's once one geocodes,
+            # the host's otherwise
+            _tl_search.tz, _tl_search.tz_place = "", ""
+            if _LOCAL_INTENT_RX.search(query) or _VENUE_RX.search(query):
+                _tl_search.tz, _tl_search.tz_place = _home_tz()
             snippets = None
             is_weather = bool(re.search(
                 r"\bweather\b|\bforecast\b|\btemperature\b", query, re.I))
@@ -9790,6 +9831,17 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         "missing, ONE clause says what to check "
                         "and where; the rest answers from what you "
                         "actually know.\n"
+                        # 6b275, judged: eggs "$3-4 right now" from
+                        # memory against a BLS $2.28 released two days
+                        # earlier; a movie slate from memory with
+                        # "(announced date)" hedges
+                        "A CURRENT PRICE, CURRENT LINEUP or WHAT'S-"
+                        "PLAYING fact comes from the data WITH its "
+                        "date and source in the same sentence ('$2.28 "
+                        "a dozen — BLS, August'); if the data holds no "
+                        "dated figure, say so in one clause and label "
+                        "anything from memory with the month it was "
+                        "true — never 'right now' from memory.\n"
                         f"{strictness}"
                         f"PROMPT: {query}"
                     ),

@@ -498,6 +498,18 @@ check("clean-now flow wired",
       and "#roster:not(.managing) .rrm{display:none}" in page
       and "def _auto_cleanup_pass(manual=False)" in _MILLENAI_SRC
       and '_b.get("force")' in _MILLENAI_SRC)
+# 6b275, cycle 16 of the drill: the host clock leaked back in when a
+# venue failed to geocode (home area's zone is now the default for
+# local-intent asks), Sunday was missing from a weekend forecast (nine
+# days fetched), the audit's correction leaked "that name was
+# invented" and passed a mangled ticker, and prices/lineups shipped
+# from memory as "right now"
+check("cycle-17 fixes: home-zone default, nine-day weekend, exact audit, dated facts",
+      "def _home_tz" in _MILLENAI_SRC and "_LOCAL_INTENT_RX" in _MILLENAI_SRC
+      and "9 if weekend else 3" in _MILLENAI_SRC
+      and "must be EXACT" in _MILLENAI_SRC
+      and "the audit, a wrong name" in _MILLENAI_SRC
+      and "A CURRENT PRICE, CURRENT LINEUP" in _MILLENAI_SRC)
 # 6b274, cycle 15 of the drill: the verdict auditor verified by
 # MENTION (now it must describe each pick's real attribute before it
 # may pass), an empty-options stage shipped (now a plain fallback
@@ -524,7 +536,7 @@ check("open-now answers use the venue's clock, not the host's",
 # bounded near the air temperature below 80°F
 check("weekend asks resolve to the coming Sat/Sun",
       "def _weekend_dates" in _MILLENAI_SRC
-      and "the coming weekend" in _MILLENAI_SRC
+      and "this coming " in _MILLENAI_SRC
       and "forecast_days=%d" in _MILLENAI_SRC
       and "apparent_temperature\"] = cur[\"temperature_2m\"]" in _MILLENAI_SRC)
 # 6b271, cycle 14 of the drill: tables/H2s in 5 of 6 simple chat
