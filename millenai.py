@@ -7207,8 +7207,17 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
     if want_img and out:
         for o in out:
             o["img"] = _funnel_image("%s %s" % (goal, o["label"]))
+    if not out:
+        # every rung failed the gate: a plain, always-answerable
+        # narrowing question beats a dead end (6b274)
+        engine = engine + ":fallback" if engine else "fallback"
+        data = {"q": "In the final call, what matters most?"}
+        out = [{"label": "Lowest cost", "why": "spend the least"},
+               {"label": "Best quality", "why": "the one that lasts"},
+               {"label": "Easiest to get", "why": "available now, no hunting"},
+               {"label": "Fastest result", "why": "sorted this week"}][:max(2, opts)]
     return {"engine": engine,
-            "q": str(data.get("q", ""))[:120] or "Which direction?",
+            "q": str(data.get("q", ""))[:120] or "In the final call, what matters most?",
             "options": out}
 
 
@@ -8912,22 +8921,30 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         {"role": "user", "content":
                          "DECISION: %s\nREQUIREMENTS: %s\nTHE USER'S "
                          "PICKS, in order: %s\n\nVERDICT UNDER AUDIT:\n"
-                         "%s\n\nCheck, pick by pick: does the thing "
-                         "recommended ACTUALLY have the property the "
-                         "user chose, in plain meaning (an all-equity "
-                         "fund is not 'conservative'; a solitary "
-                         "nocturnal animal is not a 'social companion'; "
-                         "a one-time fee does not meet a monthly "
-                         "budget)? Does every requirement hold? Is "
-                         "every route, service, venue or product real "
-                         "and named exactly — no invented transit "
-                         "lines, no relabeled products? If everything "
-                         "holds, reply with exactly: OK\nOtherwise "
-                         "reply with a corrected verdict in the same "
-                         "shape and length (name the real closest "
-                         "thing, say plainly which pick it misses, and "
-                         "replace any unvouched logistics with 'check "
-                         "the actual route'). No preamble either way."
+                         "%s\n\nDo this in order. FIRST, for each pick, "
+                         "write one line in your own words stating what "
+                         "the recommended thing ACTUALLY is on that axis "
+                         "from what you know of it — not what the "
+                         "verdict claims (e.g. 'Syrian hamster: solitary, "
+                         "nocturnal, 2-3 yr lifespan'; 'VTSAX: 100% "
+                         "equities'; 'Bordentown: ~1.5 h from Penn'). "
+                         "Then, for each named venue, product, route or "
+                         "service, one line: real and exactly named, or "
+                         "not vouchable. SECOND, judge: does each real "
+                         "attribute match the pick in plain meaning (an "
+                         "all-equity fund is not 'conservative'; a "
+                         "solitary animal is not a 'social companion'; "
+                         "a one-time fee does not meet a monthly budget; "
+                         "a 90-minute town does not honor '4+ hours')? "
+                         "Does every requirement hold? The verdict's "
+                         "own assurances count for nothing. THIRD: if "
+                         "everything holds, end with exactly: OK. "
+                         "Otherwise end with a corrected verdict, "
+                         "beginning on a line that says VERDICT:, in "
+                         "the same shape and length — the real closest "
+                         "thing, plainly naming which pick it misses, "
+                         "and 'check the actual route' in place of any "
+                         "logistics you could not vouch for."
                          % (goal, reqs or "none", "; ".join(picks), out)}]
                     _fix = ""
                     for _conf in (compositor_ladder() or []):
@@ -8935,8 +8952,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         if _fix:
                             break
                     _fix = (_fix or "").strip()
-                    if _fix and _fix.upper() != "OK" and len(_fix) > 40:
-                        out = _fix
+                    # the audit's working lines stay private: only a
+                    # VERDICT: block replaces the answer; a bare OK
+                    # (or an audit with no verdict) leaves it alone
+                    if _fix and not _fix.rstrip().endswith("OK"):
+                        _m = re.search(r"VERDICT:\s*([\s\S]{40,})$", _fix)
+                        if _m:
+                            out = _m.group(1).strip()
                 # NEVER hand the picks back as if they were an answer
                 # (6b260, per Patrick) — if no model can weigh in, say
                 # so honestly and point at the fix
@@ -9580,6 +9602,16 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         "Tuesday' beats a generic hours range.\n"
                         "2. Then at most three options as short bold-name "
                         "lines: **Name** — what it is — tonight's hours.\n"
+                        "CLOSED MEANS CLOSED: if any source marks a "
+                        "place permanently closed, it is closed — its "
+                        "own website is the LAST source to trust, "
+                        "never the reason to recommend it. And the "
+                        "data is a sample, not the town: never say "
+                        "'nothing is open' from a handful of rows — "
+                        "say what's open among what was found and "
+                        "name the late-night or early category that "
+                        "usually is (a 24-hour pharmacy chain, a "
+                        "diner, a bodega) as the honest fallback.\n"
                         "3. When everything named is CLOSED at this "
                         "hour, still commit: name ONE real place "
                         "likely open right now (a 24-hour spot from "

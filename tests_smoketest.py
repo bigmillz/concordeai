@@ -498,6 +498,16 @@ check("clean-now flow wired",
       and "#roster:not(.managing) .rrm{display:none}" in page
       and "def _auto_cleanup_pass(manual=False)" in _MILLENAI_SRC
       and '_b.get("force")' in _MILLENAI_SRC)
+# 6b274, cycle 15 of the drill: the verdict auditor verified by
+# MENTION (now it must describe each pick's real attribute before it
+# may pass), an empty-options stage shipped (now a plain fallback
+# stage), and a permanently closed pizzeria was recommended off its
+# own website (now: closed means closed, a thin list is not the town)
+check("cycle-16 fixes: describe-first audit, fallback stage, closure rule",
+      "FIRST, for each pick" in _MILLENAI_SRC
+      and "VERDICT:" in _MILLENAI_SRC
+      and "In the final call, what matters most?" in _MILLENAI_SRC
+      and "CLOSED MEANS CLOSED" in _MILLENAI_SRC)
 # 6b273, cycle 15 of the drill: the host Mac sat in Asia/Tokyo on a
 # trip and every Brooklyn "open now" answer was computed on Tokyo's
 # hour — the venue's own clock now rides the request (OSM hours, the
@@ -813,7 +823,12 @@ check("Kimi K3 wired as a provider",
 # regression; empty ANY OTHER tier, or empty Cloud Only with a
 # healthy provider available, is still a hard fail.
 _cl = json.loads(req("/api/cloud", cookie=K)[2])
+# 6b274: a provider can be resting with cool==0 ("rate limited —
+# resting" in its note) or simply "not responding" — both are the
+# environment, not a regression, and both cried wolf after a batch
 _resting = all((v.get("cool") or 0) > 0 or v.get("status") != "ok"
+               or "resting" in str(v.get("note") or "")
+               or "not responding" in str(v.get("note") or "")
                for v in (_cl.get("providers") or {}).values())     if (_cl.get("providers") or {}) else False
 check("every tier resolves",
       all(t.get("models") for n, t in tiers.items()
