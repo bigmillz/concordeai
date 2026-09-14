@@ -4878,6 +4878,37 @@ def _stash_sources(rows: list):
                        for r in rows if (r.get("href") or r.get("url"))][:5]
 
 
+_CLOSED_RX = re.compile(r"\b(permanently|temporarily) closed\b|"
+                        r"\bCLOSED\b|\bhas closed\b|\bclosed (its|their) doors\b|"
+                        r"\bshut(tered)? (down|for good)\b", re.I)
+
+
+def closure_notices(query: str) -> str:
+    """One extra search per venue question — "<terms> permanently
+    closed" — filtered to hits that actually say so. Injected above
+    the venue data as CLOSURE NOTICES so the model can honour "closed
+    means closed" on evidence instead of a rule (6b278, judged three
+    cycles running: a venue's own dead website was the only source)."""
+    try:
+        terms = _place_terms(query)
+        if not terms:
+            return ""
+        out = []
+        for h in _ddg_text(terms + " permanently closed", 6):
+            t = str(h.get("title") or "")[:90]
+            b = str(h.get("body") or "")[:200]
+            if _CLOSED_RX.search(t + " " + b):
+                out.append("- %s — %s" % (t, b))
+        if not out:
+            return ""
+        return ("CLOSURE NOTICES (a venue named here is CLOSED — never "
+                "recommend it, never quote its hours; if it was the "
+                "only candidate, say so and name the honest fallback):\n"
+                + "\n".join(out[:4]) + "\n\n")
+    except Exception:
+        return ""
+
+
 def run_search(query: str) -> str:
     """DuckDuckGo snippets with a 60s cache. Never raises."""
     if not HAS_SEARCH:
@@ -9508,6 +9539,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     placey = bookish = False
                 if placey:
                     snippets, matched = place_search(query)
+                    snippets = closure_notices(query) + (snippets or "")
                     pt_ = _place_terms(query).split()
                     _tl_search.locq = pt_[-1] if len(pt_) > 1 else ""
                     # REAL HOURS, ON TOP OF THE SNIPPETS (6b242). Overpass
@@ -9578,6 +9610,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                  if _BOOKING_RX.search(s.lower())
                                  or _ASKY_RX.search(s)), query)
                     snippets = run_search_deep(srch, pages=3)
+                elif _LISTINGS_RX.search(query):
+                    # the listing beats the open web (6b278): a
+                    # site-restricted pass first, the general pass
+                    # for colour
+                    snippets = (run_search(
+                        query + " site:rottentomatoes.com OR "
+                        "site:fandango.com OR site:boxofficemojo.com")
+                        + "\n" + run_search(query))
                 else:
                     snippets = run_search(query)
                 # ASKED FOR PICTURES, SO FETCH SOME (6b244, per Patrick).
@@ -9950,7 +9990,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 "or ratios, re-add them before you send: the parts "
                 "must sum to the total that was asked for, and one "
                 "figure per fact — never 'a few drops' and '1 part "
-                "to 2' for the same thing."),
+                "to 2' for the same thing. If you show a formula, "
+                "the headline number must satisfy it. A statistic or "
+                "ranking is real stable knowledge or it is phrased as "
+                "a rough expectation — never invent 'most people "
+                "under-eat by 30 g' or 'the #2 mistake'."),
             4: ("Go deep when the question earns it: several "
                 "developed paragraphs, with headings or a list where "
                 "they genuinely organise the material. Cover the "
