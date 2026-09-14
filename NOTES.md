@@ -4529,3 +4529,17 @@ APP_BETA True -> False: a full release on the stable channel, build
 updater keys on build numbers only, so every install — beta, RC or
 older stable — moves to 269 normally. Ships everything through
 6b273 (the venue-clock fix, probe-verified from the Tokyo-set Mac).
+
+## 6.0-era (pending) — the lockup that vanished
+
+The centered-titlebar rewrite (6b269) referenced `_ww` seven lines
+before it was computed; the NameError was swallowed by the chrome
+block's catch-all and the lockup simply never got added — "the logo
+vanished from the title bar" (per Patrick). Rebuilt: the wing +
+wordmark view goes straight into the titlebar view (the traffic
+lights' superview) with flexible left+right margins, so AppKit keeps
+it on the window's midpoint through every resize — no wide accessory,
+no notification observer. Measured on screen: ink center within 1.5
+device px of the window's; wing and cap seats within 0.5 device px
+of the bar's center. The gauntlet now asserts the define-before-use
+order so this class of silent vanish can't recur.

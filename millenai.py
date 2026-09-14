@@ -19429,94 +19429,68 @@ if __name__ == "__main__":
                             lh = NSTextField.\
                                 labelWithAttributedString_(_ref).\
                                 frame().size.height
-                            # CENTERED (6b269, per Patrick: "center the
-                            # title similar to [the VPN]"). Accessories
-                            # only know left/right, so the left one is
-                            # made as wide as the bar and the lockup is
-                            # a sub-container parked on the WINDOW's
-                            # midpoint — re-parked on every resize by
-                            # the observer below.
-                            _lockw = 6 + _ww + 6 + lw + 10
-                            lock = NSView.alloc().initWithFrame_(
-                                ((0, 0), (_lockw, BARH)))
-                            _winw = _w.frame().size.width
-                            left = NSView.alloc().initWithFrame_(
-                                ((0, 0), (max(_lockw, _winw - 90), BARH)))
-                            # ink occupies 10.75/12.6 of the wing
-                            # box (bezier margins) — size the box so
-                            # wing ink == cap ink, and lift it the
-                            # same measured 2.5 as the label (the
-                            # accessory pins to the BOTTOM of a bar
-                            # taller than BARH, so pure box-centering
-                            # sits 2.25pt low — measured on screen,
-                            # 6b265). Sidebar pact: wing ink and cap
-                            # ink share top and bottom exactly.
+                            # ink occupies 10.75/12.6 of the wing box
+                            # (bezier margins) — size the box so wing
+                            # ink == cap ink, the sidebar pact (6b265):
+                            # wing ink and cap ink share top and bottom.
                             _wh = mich.capHeight() * (12.6 / 10.75)
                             _ww = _wh * (15.0 / 12.6)
+                            _lockw = 6 + _ww + 6 + lw + 10
+                            # CENTERED (6b276, per Patrick: "center the
+                            # entire logo and wordmark in the title
+                            # bar"). Accessories only know left/right,
+                            # so the lockup goes straight into the
+                            # titlebar view — the traffic lights'
+                            # superview — with flexible left+right
+                            # margins: AppKit keeps it on the window's
+                            # midpoint through every resize, no
+                            # observer. (The first attempt referenced
+                            # _ww before it existed; the NameError was
+                            # swallowed and the lockup simply vanished
+                            # — "the logo vanished from the title bar".)
+                            tbv = None
+                            try:
+                                tbv = _w.standardWindowButton_(0).superview()
+                            except Exception:
+                                tbv = None
+                            H = float(tbv.bounds().size.height) if tbv is not None \
+                                else float(BARH)
+                            lock = NSView.alloc().initWithFrame_(
+                                ((0, 0), (_lockw, H)))
+                            # vertical seats carry the measured
+                            # corrections (6b265) re-based on the bar's
+                            # true height: +2.5/+1.75 against a 27pt
+                            # box pinned to a 31.5pt bar == +0.25/-0.5
+                            # against the bar itself
                             wiv = NSImageView.alloc().initWithFrame_(
-                                ((6, (BARH - _wh) / 2.0 + 1.75),
-                                 (_ww, _wh)))
+                                ((6, (H - _wh) / 2.0 + 0.25), (_ww, _wh)))
                             wiv.setImage_(wing)
                             lock.addSubview_(wiv)
-                            # +2.5, measured (6b265, per Patrick:
-                            # "doesn't look vertically centered"): with
-                            # the box centered, the CAP ink sat 3pt
-                            # below the bar's true center (traffic-
-                            # light row) — Michroma carries more slack
-                            # under its baseline than above its caps.
                             label.setFrameOrigin_(
-                                (27, (BARH - lh) / 2.0 + 2.5))
+                                (27, (H - lh) / 2.0 + 1.0))
                             lock.addSubview_(label)
-                            left.addSubview_(lock)
-                            acc = NSTitlebarAccessoryViewController.\
-                                alloc().init()
-                            acc.setView_(left)
-                            acc.setLayoutAttribute_(1)      # left
-                            _w.addTitlebarAccessoryViewController_(acc)
-                            _CHROME["acc"] = acc
+                            if tbv is not None:
+                                W = float(tbv.bounds().size.width)
+                                # +2: the box pads 6 left / 10 right, so
+                                # its INK center sits 2pt left of its
+                                # box center (measured 6b276)
+                                lock.setFrameOrigin_(((W - _lockw) / 2.0 + 2.0, 0))
+                                lock.setAutoresizingMask_(1 | 4)  # MinX|MaxX flex
+                                tbv.addSubview_(lock)
+                            else:
+                                # no titlebar view to hand: the VPN's
+                                # own left accessory, uncentered but
+                                # present beats absent
+                                left = NSView.alloc().initWithFrame_(
+                                    ((0, 0), (_lockw, BARH)))
+                                left.addSubview_(lock)
+                                acc = NSTitlebarAccessoryViewController.\
+                                    alloc().init()
+                                acc.setView_(left)
+                                acc.setLayoutAttribute_(1)      # left
+                                _w.addTitlebarAccessoryViewController_(acc)
+                                _CHROME["acc"] = acc
                             _CHROME["lock"] = lock
-                            _CHROME["left"] = left
-                            _CHROME["lockw"] = _lockw
-
-                            def _center_lockup():
-                                try:
-                                    W = _w.frame().size.width
-                                    fr = left.frame()
-                                    # the accessory's own x is where the
-                                    # traffic lights end; AppKit sets it
-                                    # once the bar lays out (fallback:
-                                    # Tahoe's measured 79pt)
-                                    inset = fr.origin.x or 79.0
-                                    left.setFrameSize_((max(_lockw,
-                                                            W - inset - 8),
-                                                        BARH))
-                                    lock.setFrameOrigin_(
-                                        (max(0.0, W / 2.0 - inset
-                                             - _lockw / 2.0), 0))
-                                except Exception:
-                                    pass
-                            _CHROME["center"] = _center_lockup
-                            _center_lockup()
-                            try:
-                                from Foundation import (NSNotificationCenter,
-                                                        NSObject)
-                                import objc as _objc
-
-                                class _AIChrome(NSObject):
-                                    def windowDidResize_(self, note):
-                                        _center_lockup()
-                                    def windowDidLayout_(self, note):
-                                        _center_lockup()
-                                _tgt = _AIChrome.alloc().init()
-                                _CHROME["tgt"] = _tgt      # keep alive
-                                nc = NSNotificationCenter.defaultCenter()
-                                for _nm in ("NSWindowDidResizeNotification",
-                                            "NSWindowDidBecomeKeyNotification",
-                                            "NSWindowDidEndLiveResizeNotification"):
-                                    nc.addObserver_selector_name_object_(
-                                        _tgt, "windowDidResize:", _nm, _w)
-                            except Exception:
-                                pass
                         except Exception:
                             pass
 

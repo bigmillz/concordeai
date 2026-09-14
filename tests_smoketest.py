@@ -488,8 +488,11 @@ check("chat search under the tabs",
 s, h, b = req("/api/chats/search?q=zzqxv", cookie=K)
 check("chat search endpoint answers", s == 200 and b'"ids"' in b)
 check("titlebar lockup centers on the window",
-      "_center_lockup" in _MILLENAI_SRC
-      and "NSWindowDidResizeNotification" in _MILLENAI_SRC)
+      "standardWindowButton_(0).superview()" in _MILLENAI_SRC
+      and "setAutoresizingMask_(1 | 4)" in _MILLENAI_SRC
+      # the vanishing bug: _lockw must never be computed before _ww
+      and _MILLENAI_SRC.find("_ww = _wh * (15.0 / 12.6)")
+          < _MILLENAI_SRC.find("_lockw = 6 + _ww"))
 check("clean-now flow wired",
       'id="clean-now"' in page and 'id="clean-veil"' in page
       and 'id="clean-go"' in page
