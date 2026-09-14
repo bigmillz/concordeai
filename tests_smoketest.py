@@ -507,7 +507,10 @@ check("clean-now flow wired",
 # searched first), and chat invented "most people" statistics
 check("cycle-19 fixes: closure notices, listings sites, no invented precision",
       "def closure_notices" in _MILLENAI_SRC
-      and "snippets = closure_notices(query) + (snippets or \"\")" in _MILLENAI_SRC
+      and "def _venue_names" in _MILLENAI_SRC
+      and "_CLOSED_TITLE_RX" in _MILLENAI_SRC
+      and 'snippets = closure_notices(query) + (snippets or "")' in _MILLENAI_SRC
+      and "'listed, unverified'" in _MILLENAI_SRC
       and "site:rottentomatoes.com OR" in _MILLENAI_SRC
       and "never invent 'most people" in _MILLENAI_SRC)
 # 6b277: a bare % in the verdict-audit prompt killed EVERY funnel

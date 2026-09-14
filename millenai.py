@@ -4878,33 +4878,67 @@ def _stash_sources(rows: list):
                        for r in rows if (r.get("href") or r.get("url"))][:5]
 
 
-_CLOSED_RX = re.compile(r"\b(permanently|temporarily) closed\b|"
-                        r"\bCLOSED\b|\bhas closed\b|\bclosed (its|their) doors\b|"
-                        r"\bshut(tered)? (down|for good)\b", re.I)
+_CLOSED_TITLE_RX = re.compile(r"\bCLOSED\b|\bpermanently closed\b", re.I)
+
+
+def _venue_names(limit: int = 4) -> list:
+    """Candidate venue names for this request: the OSM rows first,
+    then the leading chunk of each web-source title ("Norbert's Pizza
+    - 4 Stuyvesant Avenue..." -> "Norbert's Pizza")."""
+    names = []
+    for r in (getattr(_tl_search, "osm", None) or []):
+        n = str(r.get("n") or "").strip()
+        if n:
+            names.append(n)
+    for r in (getattr(_tl_search, "rows", None) or []):
+        t = str(r.get("t") or "")
+        head = re.split(r"\s+[-|\u2013\u2014:]\s+|,", t, 1)[0].strip()
+        if 2 <= len(head) <= 40 and re.search(r"[A-Za-z]", head) \
+                and len(head.split()) <= 5:
+            names.append(head)
+    out = []
+    for n in names:
+        if n.lower() not in [o.lower() for o in out]:
+            out.append(n)
+    return out[:limit]
 
 
 def closure_notices(query: str) -> str:
-    """One extra search per venue question — "<terms> permanently
-    closed" — filtered to hits that actually say so. Injected above
-    the venue data as CLOSURE NOTICES so the model can honour "closed
-    means closed" on evidence instead of a rule (6b278, judged three
-    cycles running: a venue's own dead website was the only source)."""
+    """One plain name+city search per candidate venue, matching CLOSED
+    in the result TITLE only (Yelp: "- CLOSED -"; Google: "Permanently
+    closed"). Injected above the venue data so "closed means closed"
+    fires on evidence instead of a rule (6b278, judged three cycles
+    running: a pizzeria dead since 2021 kept being recommended off its
+    own 2015 website). Runs the searches in parallel; never raises."""
     try:
-        terms = _place_terms(query)
-        if not terms:
+        names = _venue_names()
+        if not names:
             return ""
-        out = []
-        for h in _ddg_text(terms + " permanently closed", 6):
-            t = str(h.get("title") or "")[:90]
-            b = str(h.get("body") or "")[:200]
-            if _CLOSED_RX.search(t + " " + b):
-                out.append("- %s — %s" % (t, b))
-        if not out:
+        loc = (getattr(_tl_search, "tz_place", "") or
+               str(load_prefs(None).get("home_area") or "").split(",")[0])
+        import concurrent.futures as _cf
+        def _probe(name):
+            key = next((w for w in re.findall(r"[a-z]{4,}", name.lower())
+                        if w not in ("pizza", "cafe", "coffee", "bar",
+                                     "shop", "store", "restaurant")),
+                       name.lower().split()[0])
+            for h in _ddg_text("%s %s" % (name, loc), 6):
+                t = str(h.get("title") or "")
+                if _CLOSED_TITLE_RX.search(t) and key in t.lower():
+                    return "- %s: %s" % (name, t[:110])
             return ""
-        return ("CLOSURE NOTICES (a venue named here is CLOSED — never "
-                "recommend it, never quote its hours; if it was the "
-                "only candidate, say so and name the honest fallback):\n"
-                + "\n".join(out[:4]) + "\n\n")
+        found = []
+        with _cf.ThreadPoolExecutor(max_workers=4) as ex:
+            for r in ex.map(_probe, names, timeout=12):
+                if r:
+                    found.append(r)
+        if not found:
+            return ""
+        return ("CLOSURE NOTICES (each venue below is marked CLOSED by a "
+                "directory — never recommend it, never quote its hours "
+                "or prices; if it was the only candidate, say so and "
+                "name the honest fallback):\n" + "\n".join(found)
+                + "\n\n")
     except Exception:
         return ""
 
@@ -9539,7 +9573,6 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     placey = bookish = False
                 if placey:
                     snippets, matched = place_search(query)
-                    snippets = closure_notices(query) + (snippets or "")
                     pt_ = _place_terms(query).split()
                     _tl_search.locq = pt_[-1] if len(pt_) > 1 else ""
                     # REAL HOURS, ON TOP OF THE SNIPPETS (6b242). Overpass
@@ -9587,6 +9620,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             "colour and context, never venue names.\n\n%s"
                             % (len(_open), len(_osm), _lines, snippets or ""))
                         matched = True
+                    # closure evidence rides above the venue data, once
+                    # the OSM rows and web sources are both known (6b278)
+                    snippets = closure_notices(query) + (snippets or "")
                     if matched:
                         # a pin only counts when the geocoder actually
                         # landed in the right neighborhood — "food
@@ -9696,8 +9732,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         "CLOSED MEANS CLOSED: if any source marks a "
                         "place permanently closed, it is closed — its "
                         "own website is the LAST source to trust, "
-                        "never the reason to recommend it. And the "
-                        "data is a sample, not the town: never say "
+                        "never the reason to recommend it. Hours or "
+                        "prices that come ONLY from a venue's own "
+                        "website are 'listed, unverified' — say so in "
+                        "those words, never 'open now' or 'opens at "
+                        "noon today' on that alone (6b278: a site "
+                        "from 2015 was quoted as today's hours). And "
+                        "the data is a sample, not the town: never say "
                         "'nothing is open' from a handful of rows — "
                         "say what's open among what was found and "
                         "name the late-night or early category that "
@@ -19545,6 +19586,16 @@ if __name__ == "__main__":
                             pass
 
                     _chrome_pass(self.window)
+                    # a TEST build's window follows the user to their
+                    # active Space when activated (6b279, per Patrick:
+                    # "now lets see it" — the window kept popping up
+                    # on another desktop). The real app keeps macOS's
+                    # default: NSWindowCollectionBehaviorMoveToActiveSpace
+                    if os.environ.get("MILLENAI_TESTBUILD"):
+                        try:
+                            self.window.setCollectionBehavior_(2)
+                        except Exception:
+                            pass
 
                     self.window.setOpaque_(False)
                     self.window.setBackgroundColor_(NSColor.clearColor())
