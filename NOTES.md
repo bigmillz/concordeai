@@ -4567,3 +4567,11 @@ its last_version bookkeeping but only records that an update landed;
 the page shows #updated-veil once — "Updated to X · You were on Y" —
 with the release body from /api/update/check in a scrolling box, the
 same text the Updates pane shows. Queued for the next cut.
+
+## 6.0.2 — build 271
+
+Cut on Patrick's word ("push the update for the cleanup now and
+expanded window... make it version 6.0.2"). Ships 6b281-6b283: the
+home clock on every request, thin-list scoping, numeric walls in
+verdicts, the post-update dialog, and the bounded settings grid that
+finally shows the Clean-up row.
