@@ -474,3 +474,41 @@ valid fallback stage when every rung fails the gate. 3) closure
 rule: a source saying "permanently closed" wins over the venue's
 own site; and no universal negative from a thin list. 4) "current
 price" asks must lead with a DATED sourced figure.
+
+## cycle 16 — 2026-09-14 — app 7fff387 (6.0, build 269)
+batch: seed 20260916, 22 records, collected Sun ~10:35-11:25 PM ET
+(host clock Mon 11:37 AM JST). scores: chat 4.67 (holds; shape law
+6/6 again) · web 3.94 · funnel 3.20. Rechecks 4/4 upheld.
+verdict on cycle 15/16's edits:
+- venue clock: HELD where a venue geocoded (weather answered on the
+  Sunday-night frame) but LEAKED where geocoding failed — "best
+  pizza near myrtle-broadway" (hyphenated intersection) set no zone,
+  so the host's Tokyo Monday drove "opens in 13 minutes... lunch
+  rush" at Brooklyn 10:45 PM (web[5] 2.2, upheld). Fixed after the
+  batch: the HOME AREA's zone is the default for any local-intent
+  ask; a venue zone overrides it.
+- weekend fix: resolved to the coming weekend (held) but forecast
+  covered Saturday only — from a Sunday, next Sunday is +7 and the
+  7-day fetch stopped short. Nine days now. The "(the coming
+  weekend)" label became a template seam in the prose; relabeled.
+- names-only listings: HELD on the letter (six real titles) but the
+  slate was memory with "(announced date)" hedges — Clayface moved
+  to Oct 23 in Feb 2026; Practical Magic 2 had already opened.
+- current price: "$3-4 right now" from memory vs BLS $2.28 (Aug 2026,
+  released two days before). Dated-source rule landed after.
+- funnel: the audit's own correction leaked to the user ("that name
+  was invented"); a mangled ticker (VTHX) passed as exact; 5/6
+  verdicts paste pick labels as clauses ("since you are traveling no
+  car"); local-engine stages break narrowing while every kimi stage
+  held. Audit now demands exact identifiers and a fresh-reading
+  correction; picks are paraphrased. (Local-stage routing: queued.)
+landed after this batch (cycle 17, tagged 6b275): home-zone default,
+nine-day weekend fetch, exact-identifier + fresh-correction audit,
+no pick-echo, dated headline facts for prices/lineups. Gate pending
+(cycle-17 collection holds the dev instance).
+next (ranked, cycle 18): 1) stage generation off the local engines
+when any cloud rung answers (every Gemma/Qwen stage broke narrowing;
+every kimi stage held); 2) arithmetic self-check when an answer
+commits to durations/counts/ratios (chat idx 3: 24 min "20-minute"
+workout); 3) listings/prices route the search to an authoritative
+listing source (Fandango/BoxOfficeMojo, BLS/USDA) not general web.
