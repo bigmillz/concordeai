@@ -501,6 +501,21 @@ check("clean-now flow wired",
       and "#roster:not(.managing) .rrm{display:none}" in page
       and "def _auto_cleanup_pass(manual=False)" in _MILLENAI_SRC
       and '_b.get("force")' in _MILLENAI_SRC)
+# 6b280, the 6.0.1 pre-release review: the nine-day weekend fetch was
+# clipped by an unchanged [:7]; CLOSED matched any lowercase "closed";
+# the OSM row cache returned before the venue zone was set; a failed
+# home geocode was pinned; the closure executor's exit waited on
+# stragglers; the chrome pass had no re-entry guard
+check("6.0.1 review fixes",
+      'enumerate(dl.get("time", []))' in _MILLENAI_SRC
+      and '(?i:\\bpermanently closed\\b)' in _MILLENAI_SRC
+      and "open-now is a function of NOW" in _MILLENAI_SRC
+      and "only a SUCCESS is remembered" in _MILLENAI_SRC
+      and "ex.shutdown(wait=False, cancel_futures=True)" in _MILLENAI_SRC
+      and '_CHROME.get("acc") or _CHROME.get("lock") is not None' in _MILLENAI_SRC
+      # and the geocoder caches only successes — a rate-limited miss
+      # used to poison every later weather ask in the process
+      and "    if out:\n        _geo_cache[q] = out" in _MILLENAI_SRC)
 # 6b278, cycles 17-18 of the drill: a dead pizzeria kept getting
 # recommended off its own website (closure notices are now fetched
 # and injected), movie slates came from memory (listings sites are

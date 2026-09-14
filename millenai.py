@@ -2333,14 +2333,12 @@ def weather_snippets(q: str):
             _tl_search.tz_place = str(g.get("name", loc)).split(",")[0][:40]
         _sat, _sun = _weekend_dates(_tzn) if weekend else ("", "")
         _today = time.strftime("%Y-%m-%d", _venue_now(_tzn))
-        for i, ds in enumerate(dl.get("time", [])[:7]):
+        for i, ds in enumerate(dl.get("time", [])):   # the request bounds it
             if weekend and ds not in (_today, _sat, _sun):
                 continue
-            _lab = ("this Saturday" if ds == _sat else
-                    "this Sunday" if ds == _sun else
-                    "today" if ds == _today else _wd(ds))
-            if weekend and ds in (_sat, _sun):
-                _lab = "this coming " + _lab.split()[-1]
+            _lab = ("today" if ds == _today else
+                    "this coming Saturday" if ds == _sat else
+                    "this coming Sunday" if ds == _sun else _wd(ds))
             out.append("%s %s: high %.0f°F / low %.0f°F, %s" % (
                 _lab, ds, dl["temperature_2m_max"][i],
                 dl["temperature_2m_min"][i],
@@ -4392,7 +4390,12 @@ def _geocode(q: str):
         pass
     if len(_geo_cache) > 200:
         _geo_cache.clear()
-    _geo_cache[q] = out
+    # cache only SUCCESS (6b280, the 6.0.1 review chase): a Nominatim
+    # rate-limit during a burst cached None for the process lifetime,
+    # and every later weather ask in that process fell to web search —
+    # the "flaky weather check" was this, not the weather feeds
+    if out:
+        _geo_cache[q] = out
     return out
 
 
@@ -4535,13 +4538,20 @@ def _home_tz():
     if not home:
         return "", ""
     if _HOME_TZ["key"] != home:
-        _HOME_TZ.update(key=home, tz="", place=home.split(",")[0][:40])
+        tz = ""
         try:
             g = _geocode(home)
             if g:
-                _HOME_TZ["tz"] = _tz_of(g["lat"], g["lon"])
+                tz = _tz_of(g["lat"], g["lon"])
         except Exception:
-            pass
+            tz = ""
+        # only a SUCCESS is remembered — a failed geocode (network
+        # blip) must not pin an empty zone until the setting changes
+        # (review, 6b280)
+        if tz:
+            _HOME_TZ.update(key=home, tz=tz, place=home.split(",")[0][:40])
+        else:
+            return "", home.split(",")[0][:40]
     return _HOME_TZ["tz"], _HOME_TZ["place"]
 
 
@@ -4590,16 +4600,22 @@ def osm_places(terms: str, locality: str, limit: int = 8) -> list:
         return []
     key = (amenity, locality.lower())
     now = time.time()
-    hit = _OSM_CACHE.get(key)
-    if hit and now - hit[0] < _OSM_TTL:
-        return hit[1]
-    geo = _geocode(locality)
+    geo = _geocode(locality)          # cached; cheap on a repeat
     if not geo:
         return []
-    # the venue's clock rides the request from here on (6b273)
+    # the venue's clock rides the request from here on (6b273) — set
+    # BEFORE the row cache can short-circuit, or a repeat question
+    # inside the TTL fell back to the host clock (review, 6b280)
     _tl_search.tz = _tz_of(geo["lat"], geo["lon"])
     _tl_search.tz_place = (geo.get("name") or locality).split(",")[0][:40]
     _vnow = _venue_now(_tl_search.tz)
+    hit = _OSM_CACHE.get(key)
+    if hit and now - hit[0] < _OSM_TTL:
+        # open-now is a function of NOW, not of the cached fetch
+        for r in hit[1]:
+            if r.get("h"):
+                r["open"] = _oh_open_now(r["h"], _vnow)
+        return hit[1]
     # a UNION over both tags: eateries and bars live under amenity=,
     # supermarkets and delis under shop= (6b260) — one regex serves
     # both since the value sets don't collide
@@ -4878,7 +4894,8 @@ def _stash_sources(rows: list):
                        for r in rows if (r.get("href") or r.get("url"))][:5]
 
 
-_CLOSED_TITLE_RX = re.compile(r"\bCLOSED\b|\bpermanently closed\b", re.I)
+_CLOSED_TITLE_RX = re.compile(r"(?:^|[-|(\u2013\u2014]\s*)CLOSED(?:\s*[-|)\u2013\u2014]|$)"
+                              r"|(?i:\bpermanently closed\b)")
 
 
 def _venue_names(limit: int = 4) -> list:
@@ -4920,7 +4937,8 @@ def closure_notices(query: str) -> str:
         def _probe(name):
             key = next((w for w in re.findall(r"[a-z]{4,}", name.lower())
                         if w not in ("pizza", "cafe", "coffee", "bar",
-                                     "shop", "store", "restaurant")),
+                                     "shop", "store", "restaurant", "best",
+                                     "good", "great", "little", "grill")),
                        name.lower().split()[0])
             for h in _ddg_text("%s %s" % (name, loc), 6):
                 t = str(h.get("title") or "")
@@ -4928,10 +4946,17 @@ def closure_notices(query: str) -> str:
                     return "- %s: %s" % (name, t[:110])
             return ""
         found = []
-        with _cf.ThreadPoolExecutor(max_workers=4) as ex:
-            for r in ex.map(_probe, names, timeout=12):
+        ex = _cf.ThreadPoolExecutor(max_workers=4)
+        try:
+            futs = [ex.submit(_probe, n) for n in names]
+            for f in _cf.as_completed(futs, timeout=12):
+                r = f.result()
                 if r:
                     found.append(r)
+        except Exception:
+            pass
+        finally:
+            ex.shutdown(wait=False, cancel_futures=True)
         if not found:
             return ""
         return ("CLOSURE NOTICES (each venue below is marked CLOSED by a "
@@ -7305,7 +7330,10 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
         # every rung failed the gate: a plain, always-answerable
         # narrowing question beats a dead end (6b274)
         engine = engine + ":fallback" if engine else "fallback"
-        data = {"q": "In the final call, what matters most?"}
+        _fq = "In the final call, what matters most?"
+        if _fq in (asked or []):
+            _fq = "Which of these would you give up last?"
+        data = {"q": _fq}
         out = [{"label": "Lowest cost", "why": "spend the least"},
                {"label": "Best quality", "why": "the one that lasts"},
                {"label": "Easiest to get", "why": "available now, no hunting"},
@@ -19432,7 +19460,10 @@ if __name__ == "__main__":
                         theme frame: accessories sit beside the traffic
                         lights as real citizens and survive fullscreen,
                         which the subview approach did not."""
-                        if _CHROME.get("acc"):
+                        # re-entry guard (review, 6b280): the centered
+                        # lockup sets "lock", not "acc" — without this a
+                        # second pass stacked a second lockup on the first
+                        if _CHROME.get("acc") or _CHROME.get("lock") is not None:
                             return          # added once, survives repasses
                         try:
                             from AppKit import (NSColor, NSFont,
