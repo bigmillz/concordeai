@@ -498,6 +498,13 @@ check("clean-now flow wired",
       and "#roster:not(.managing) .rrm{display:none}" in page
       and "def _auto_cleanup_pass(manual=False)" in _MILLENAI_SRC
       and '_b.get("force")' in _MILLENAI_SRC)
+# 6b276, cycle 16's other two: committed plans re-add their numbers
+# (a "20-minute" workout summed to 24), and listing/price asks rank
+# the authoritative hosts first
+check("cycle-18 side fixes: arithmetic self-check, authoritative hosts",
+      "re-add them before you send" in _MILLENAI_SRC
+      and '"fandango.", "rottentomatoes.", "boxofficemojo."' in _MILLENAI_SRC
+      and '"bls.gov"' in _MILLENAI_SRC)
 # 6b275, cycle 16 of the drill: the host clock leaked back in when a
 # venue failed to geocode (home area's zone is now the default for
 # local-intent asks), Sunday was missing from a weekend forecast (nine

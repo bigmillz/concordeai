@@ -4725,7 +4725,11 @@ _GOOD_HOSTS = ("yelp.", "theinfatuation.", "timeout.", "eater.",
                "google.com/maps", "nytimes.",
                "grubstreet.", "seriouseats.", "bkmag.",
                "brooklynmagazine.", "secretnyc.", "atlasobscura.",
-               "michelin.", "zagat.")
+               "michelin.", "zagat.",
+               # what's-on and price asks want the LISTING, not a
+               # blog (6b276): showtimes, box office, official stats
+               "fandango.", "rottentomatoes.", "boxofficemojo.",
+               "bls.gov", "usda.gov", "eia.gov")
 _JUNK_HOSTS = ("pinterest.", "tiktok.", "youtube.", "quora.",
                "superpages.", "yellowpages.", "restaurantji.",
                "tagvenue.", "manta.com", "chamberofcommerce.",
@@ -9936,7 +9940,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 "diagrams unless the person asked for a document, a "
                 "side-by-side comparison or a plan. Say each thing "
                 "once — a table that restates the paragraphs above "
-                "it is padding."),
+                "it is padding. When you commit to durations, counts "
+                "or ratios, re-add them before you send: the parts "
+                "must sum to the total that was asked for, and one "
+                "figure per fact — never 'a few drops' and '1 part "
+                "to 2' for the same thing."),
             4: ("Go deep when the question earns it: several "
                 "developed paragraphs, with headings or a list where "
                 "they genuinely organise the material. Cover the "
