@@ -4557,3 +4557,13 @@ dated headline facts, listings-site search, the arithmetic and
 invented-precision rules, the centered titlebar lockup (rebuilt after
 the use-before-define vanish), and a gauntlet that walks a real
 funnel to its verdict on every run.
+
+## 6.0.x (pending) — the post-update moment
+
+The full-screen version zoom after an update is retired (per Patrick:
+"a more professional looking pop up saying it's been updated and show
+a little scroll box of the release notes"). maybe_version_splash keeps
+its last_version bookkeeping but only records that an update landed;
+the page shows #updated-veil once — "Updated to X · You were on Y" —
+with the release body from /api/update/check in a scrolling box, the
+same text the Updates pane shows. Queued for the next cut.

@@ -501,6 +501,12 @@ check("clean-now flow wired",
       and "#roster:not(.managing) .rrm{display:none}" in page
       and "def _auto_cleanup_pass(manual=False)" in _MILLENAI_SRC
       and '_b.get("force")' in _MILLENAI_SRC)
+# 6b282, per Patrick: the full-screen version zoom after an update is
+# retired for an in-app dialog with a scrolling release-notes box
+check("post-update dialog replaces the zoom",
+      'id="updated-veil"' in page and 'id="updated-notes"' in page
+      and "__JUST_UPDATED__" not in page
+      and "_JUST_UPDATED[0] = str(last)" in _MILLENAI_SRC)
 # 6b281, cycle 19 of the drill: the host clock leaked on questions
 # that named no place (home zone now frames every request), a two-
 # venue list became "nothing's open" (thin lists are scoped), an

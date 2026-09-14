@@ -7945,6 +7945,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         (str(load_prefs(self._data_base()).get(
                             "home_area") or "").split(",")[0].strip()
                          )[:32]))
+                    .replace("__JUST_UPDATED__", json.dumps(
+                        _JUST_UPDATED[0] if not self._remote() else ""))
                     .replace("__APP_VER__", short_version()
                              + (" \u00b7 test build" if os.environ.get(
                                  "MILLENAI_TESTBUILD") else "")))
@@ -12263,6 +12265,30 @@ body:not(.perf) #mic.rec{animation:blink 1s ease infinite}
 #accel-chip.cpu{--ac:#6b6f77}
 
 /* -------------------------------------------------------------- about */
+#updated-veil{position:fixed;inset:0;z-index:62;display:flex;
+  align-items:center;justify-content:center;background:rgba(6,7,10,.72);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#updated-veil[hidden]{display:none}
+#updated-card{width:min(460px,calc(100vw - 48px));padding:26px 26px 20px;
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--radius);text-align:center;
+  animation:doorPop .5s cubic-bezier(.16,1,.3,1) both}
+#updated-card .sh-icon{font-size:30px;margin-bottom:4px}
+#updated-card h2{font-family:var(--disp);font-size:15px;letter-spacing:.06em}
+#updated-sub{font-size:12.5px;color:var(--dim);margin:4px 0 12px}
+#updated-notes{max-height:min(46vh,340px);overflow-y:auto;text-align:left;
+  font-size:12.5px;line-height:1.55;color:var(--dim);
+  background:rgba(255,255,255,.03);border:1px solid var(--line);
+  border-radius:10px;padding:12px 14px;margin-bottom:14px}
+#updated-notes b{color:var(--text)}
+#updated-notes p{margin:0 0 7px}
+#updated-notes ul{margin:0 0 7px;padding-left:15px}
+#updated-notes li{margin:3px 0}
+#updated-card .sh-foot{display:flex;justify-content:center}
+#updated-card .primary{font:inherit;font-size:13px;font-weight:600;
+  padding:9px 26px;border-radius:99px;border:0;cursor:pointer;
+  background:var(--text);color:var(--panel)}
+#updated-card .primary:hover{filter:brightness(.92)}
 #clean-veil{position:fixed;inset:0;z-index:61;display:flex;
   align-items:center;justify-content:center;background:rgba(6,7,10,.72);
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
@@ -13651,6 +13677,18 @@ __CODE_ROWS__
 <!-- NB: the 5.1 Settings rebuild dropped about-veil's closing div, which
      swallowed every veil below it as a CHILD of the hidden modal — the
      setup panel "opened" at 0x0. Keep the tag count honest here. -->
+
+<div id="updated-veil" hidden>
+  <div id="updated-card">
+    <div class="sh-icon">&#10024;</div>
+    <h2>Updated to <span id="updated-ver"></span></h2>
+    <p id="updated-sub">Here&rsquo;s what changed.</p>
+    <div id="updated-notes"></div>
+    <div class="sh-foot">
+      <button id="updated-ok" class="primary">Nice</button>
+    </div>
+  </div>
+</div>
 
 <div id="clean-veil" hidden>
   <div id="clean-card">
@@ -15794,6 +15832,22 @@ function greeting(){
   return t.indexOf("{")>=0?greetFill(t):persGreet(t);
 }
 (function(){const g=$(".greet");if(g)g.textContent=greeting();})();
+/* the post-update moment (6b282): a dialog, not a full-screen zoom.
+   Notes come from the current release's body — the same text the
+   Updates pane shows — so both always agree. */
+(async function(){
+  const prev=__JUST_UPDATED__;
+  if(!prev||!$("#updated-veil"))return;
+  $("#updated-ver").textContent="__APP_VER__";
+  $("#updated-sub").textContent="You were on "+prev+". Here\u2019s what changed.";
+  let notes="";
+  try{const r=await(await fetch("/api/update/check")).json();
+      if(r&&r.notes&&!r.available)notes=r.notes;}catch(e){}
+  $("#updated-notes").innerHTML=notes?notesHTML(notes)
+    :"<p>The full notes are in Settings \u2192 About.</p>";
+  $("#updated-veil").hidden=false;
+  $("#updated-ok").addEventListener("click",()=>{$("#updated-veil").hidden=true;});
+})();
 /* chat search: type-to-filter; three characters on, the server also
    greps message CONTENT so an answer you remember finds its chat */
 (function(){
@@ -19328,6 +19382,7 @@ for(let i=0;i<30;i++){
 
 
 _splash_shown = [False]
+_JUST_UPDATED = [""]          # previous version, set on the first run after an update
 
 
 def maybe_version_splash():
@@ -19341,6 +19396,13 @@ def maybe_version_splash():
         store_prefs(prefs)
         if last is None or not (HAS_WEBVIEW and IS_MAC):
             return          # fresh install gets the boot wipe, not this
+        # THE ZOOM IS RETIRED (6b282, per Patrick: "eliminate the full
+        # screen version number thing... a more professional looking
+        # pop up saying it's been updated, with a scroll box of the
+        # release notes"). The page shows an in-app dialog instead;
+        # this only records that an update just landed.
+        _JUST_UPDATED[0] = str(last)
+        return
         _splash_shown[0] = True
         # the WHOLE screen, per Patrick — the version zoom is the
         # marquee moment after an update, not a little box
