@@ -512,3 +512,43 @@ every kimi stage held); 2) arithmetic self-check when an answer
 commits to durations/counts/ratios (chat idx 3: 24 min "20-minute"
 workout); 3) listings/prices route the search to an authoritative
 listing source (Fandango/BoxOfficeMojo, BLS/USDA) not general web.
+
+## cycles 17 + 18 — 2026-09-14 — apps 0ae5dd3 / 5f27144
+cycle 17: seed 20260917, collected Sun ~11:20 PM ET on the cycle-16
+edits. scores: chat 4.83 (holds) · web 4.06 · funnel VOID.
+cycle 18: seed 20260918, collected Mon ~12:10 AM ET on the cycle-17
+edits. scores: chat 4.87 (holds — six of six clean shape, zero
+memory hedges) · web 4.10 · funnel VOID. Rechecks 4/4 + 4/4 upheld.
+THE FUNNEL WAS DEAD IN BOTH (6b277): every verdict request closed the
+socket without a response — the cycle-16 describe-first audit prompt
+carried a bare "100% equities" inside a %-formatted string, the
+ValueError escaped the handler, and the gauntlet stayed green because
+its funnel checks were source-level. The shipped 6.0 (7fff387)
+predates the bug (cycle 16's funnels ran on it and scored). Fixed
+228b091: % escaped, the audit wrapped so a crashing auditor forfeits
+its say, drill.py error records carry hop/elapsed/exception, and the
+gauntlet now walks a real funnel to its verdict every run.
+web findings across the two batches:
+- CLOSED MEANS CLOSED failed AGAIN as a rule: Norbert's Pizza (dead
+  since 2021) recommended off its own 2015 site both times; the
+  pipeline never fetched any evidence of closure. Cycle 19 lands a
+  closure search per candidate venue (opportunistic — DDG surfaces
+  Yelp's "- CLOSED -" title only sometimes; Yelp itself 403s) plus a
+  mechanical honesty rule: own-site-only hours are "listed,
+  unverified", never "opens at noon today".
+- host-clock leak on a non-geocoding intersection (cycle 17, pre-fix)
+  — cycle 18 ran on the home-zone default and its clock evidence was
+  correct throughout.
+- what's-playing narrated from memory with stale dates; egg price
+  from memory vs BLS $2.28; both now search listing sites first and
+  must carry a date + source.
+- thin-list universal negatives and impersonal scope meta persist in
+  the local open-now answers (queued).
+chat: shape law + plain memory held in both; residual classes are
+arithmetic in a plan's tail, folk absolutes, invented "most people"
+numbers (rule landed cycle 19).
+next (ranked, cycle 20): 1) thin-list negatives — an all-closed
+verdict from ≤4 rows must name the late-night category fallback and
+never "nothing is open"; 2) impersonal scope meta ('the nearby
+list', 'per Yelp's list') — cite inline only; 3) route funnel stages
+off local engines when any cloud rung answers.
