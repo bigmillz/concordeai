@@ -4649,3 +4649,11 @@ from the new /api/update/whatsnew — the nightly release body when its
 commit is ours, else GitHub's compare between the previous identity
 and our commit; numbered releases read their own tag's body. Test and
 dev instances never move the shared last_ident record.
+
+## 6.0.3 — build 272
+
+Cut on Patrick's word ("cut this as 6.0.3 stable. future nightlies are
+for 6.0.4"). Ships 6b285-6b288: three channels, numbered betas, the
+truthful disk image in Michroma, the provider-notice fallback, and the
+nightly-aware post-update card. Working line moves to 6.0.4; nightlies
+run ahead on it.

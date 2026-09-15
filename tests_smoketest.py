@@ -195,7 +195,7 @@ try:
 except Exception:
     _wn = {}
 check("what's new endpoint answers for this build",
-      _wn.get("title") == "6.0.3" and "notes" in _wn
+      _wn.get("title") == "6.0.4" and "notes" in _wn
       and 'fetch("/api/update/whatsnew")' in page
       and 'prefs.get("last_ident")' in _MILLENAI_SRC
       and "ident = short_version()" in _MILLENAI_SRC)
