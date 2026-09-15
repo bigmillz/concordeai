@@ -4575,3 +4575,32 @@ expanded window... make it version 6.0.2"). Ships 6b281-6b283: the
 home clock on every request, thin-list scoping, numeric walls in
 verdicts, the post-update dialog, and the bounded settings grid that
 finally shows the Clean-up row.
+
+## 6b285 — three channels: stable, beta, nightly (uncut)
+
+Per Patrick ("split this up so we now have the stable release, the
+beta release, and the nightly releases… nightly releases flagged with
+a commit number… when it's pretty clean, I'll tell you to commit it to
+the beta and then eventually stable"), and the scheme he gave the VPN
+session so the site parses both apps the same way.
+
+- Nightly = ONE rolling GitHub prerelease, tag `nightly`, rebuilt by
+  `.github/workflows/nightly.yml` on every push to main (macos-latest,
+  no laptop needed). Title `<short-version> nightly <sha7>`; body line 1
+  `ConcordeAI <short-version> nightly <sha7>` then one bullet per
+  commit since the previous nightly. The release and tag are deleted
+  and recreated, never edited, so published_at moves.
+- CI stamps `APP_NIGHTLY = "<run> <sha7>"`; `short_version()` then reads
+  "6.0.2 nightly a1b2c3d" on every surface. Beta/stable builds carry an
+  empty constant and show no commit.
+- `update_channel()` pref (stable / beta / nightly; legacy
+  `beta_updates` still maps to beta). `_channel_release()` picks by
+  channel: nightly = the `nightly` tag, newer when its SHA differs from
+  ours; beta = newest prerelease that is not the nightly; stable =
+  /releases/latest. Update-check cache is keyed per channel.
+- Settings → About: a channel <select> replaces the beta checkbox and
+  re-checks on change. The version line leaves the main window (the
+  sidebar foot is gone); it lives at the top of Settings only.
+- MSI workflow skips the `nightly` tag.
+- Rollback: tag `pre-channels` (0b07e85). Revert, delete the workflow,
+  `gh release delete nightly --cleanup-tag`.

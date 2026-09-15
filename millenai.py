@@ -93,6 +93,11 @@ APP_BETA = False
 # still not the stable build, so /releases/latest must not offer it.
 # Set back to 0 when 6.1 ships for real (after sign-on + cloud sync).
 APP_RC = 0
+# CHANNELS (6b285, per Patrick): stable, beta, nightly. A nightly is the
+# single rolling `nightly` release GitHub Actions rebuilds on every push
+# to main; CI stamps this constant with "<run> <sha7>" so the app knows
+# which commit it is and the updater can tell a newer nightly by SHA.
+APP_NIGHTLY = ""
 # THE BRAND (6b257): ConcordeAI — Concorde grew its AI, and the AI is
 # BOLD in every lockup (nested <b>, see .vghost). Every user-facing
 # surface says ConcordeAI; everything load-bearing stays "MillenAI" —
@@ -118,6 +123,8 @@ def short_version(v: str = None) -> str:
     v = v or APP_VERSION
     if v.count(".") >= 2 and v.endswith(".0"):
         v = v[:-2]
+    if APP_NIGHTLY:
+        return v + " nightly " + APP_NIGHTLY.split()[-1]
     if APP_RC:
         # NO build number here (per Patrick): an RC is named, not
         # numbered — "6.1 RC1", full stop. The updater still compares
@@ -3073,6 +3080,18 @@ def download_links() -> dict:
     return out
 
 
+def update_channel() -> str:
+    """stable | beta | nightly. The old beta_updates checkbox migrates
+    to beta once; a nightly build defaults to the nightly channel."""
+    pr = load_prefs(None)
+    ch = str(pr.get("update_channel") or "").strip().lower()
+    if ch in ("stable", "beta", "nightly"):
+        return ch
+    if pr.get("beta_updates"):
+        return "beta"
+    return "nightly" if APP_NIGHTLY else "stable"
+
+
 def _channel_release():
     """The newest release this machine's CHANNEL allows. Stable reads
     /releases/latest (GitHub excludes prereleases there); the beta
@@ -3080,13 +3099,22 @@ def _channel_release():
     prereleases included. That's the whole beta programme (6.0b4)."""
     hdrs = {"Accept": "application/vnd.github+json",
             "User-Agent": "MillenAI"}
-    if load_prefs(None).get("beta_updates"):
+    ch = update_channel()
+    if ch in ("beta", "nightly"):
         req = urllib.request.Request(
-            "https://api.github.com/repos/%s/releases?per_page=10"
+            "https://api.github.com/repos/%s/releases?per_page=20"
             % UPDATE_REPO, headers=hdrs)
         with urllib.request.urlopen(req, timeout=8) as r:
             rels = json.loads(r.read().decode("utf-8"))
         rels = [x for x in rels if not x.get("draft")]
+        if ch == "nightly":
+            # the one rolling nightly (6b285) — if it is missing, the
+            # newest release of any kind is the honest fallback
+            rels = ([x for x in rels if x.get("tag_name") == "nightly"]
+                    or rels)
+        else:
+            # beta: newest release that is not the nightly
+            rels = [x for x in rels if x.get("tag_name") != "nightly"]
         if not rels:
             raise urllib.error.HTTPError(
                 UPDATE_REPO, 404, "no releases", None, None)
@@ -3098,7 +3126,7 @@ def _channel_release():
         return json.loads(r.read().decode("utf-8"))
 
 
-_chk_cache = {"ts": 0.0, "data": None, "beta": None}
+_chk_cache = {"ts": 0.0, "data": None, "beta": None, "chan": None}
 
 
 def check_update(force=False):
@@ -3113,7 +3141,7 @@ def check_update(force=False):
     other channel's verdict."""
     if not UPDATE_REPO:
         return {"configured": False, "available": False}
-    beta = bool(load_prefs(None).get("beta_updates"))
+    beta = update_channel()          # the cache is keyed per channel
     if not force and _chk_cache["data"] is not None \
             and _chk_cache["beta"] == beta \
             and time.time() - _chk_cache["ts"] < 900:
@@ -3163,7 +3191,15 @@ def _check_update_live():
     # (The old published-after-my-build-time clause false-alarmed on every
     # release when the bundle had been hot-patched: its mtime never moves,
     # so "Update available 2.0.1 — you have 2.0.1". Seen live.)
-    newer = _build_from_tag(tag) > APP_BUILD
+    if tag == "nightly":
+        # a nightly is "newer" when its commit differs from ours; a
+        # stable/beta install switching to nightly always gets one
+        _m = re.search(r"nightly\s+([0-9a-f]{7,40})", rel.get("name") or "")
+        _rsha = _m.group(1)[:7] if _m else ""
+        _mine = APP_NIGHTLY.split()[-1] if APP_NIGHTLY else ""
+        newer = bool(_rsha) and _rsha != _mine
+    else:
+        newer = _build_from_tag(tag) > APP_BUILD
     return {"configured": True,
             "available": bool(dmg) and newer
                          and _app_bundle_path() is not None,
@@ -12545,9 +12581,6 @@ body:not(.perf) #mic.rec{animation:blink 1s ease infinite}
   border-radius:99px}
 #roster::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.28)}
 #roster::-webkit-scrollbar-track{background:transparent}
-#ver-foot{font-style:italic;font-size:10.5px;color:var(--faint);
-  font-family:-apple-system,'Helvetica Neue',sans-serif;
-  text-align:center;margin-top:12px;letter-spacing:.02em}
 #roster-foot{display:flex;gap:8px}
 #manage-box{margin-top:10px;border-top:1px solid var(--line);
   padding-top:10px}
@@ -12659,6 +12692,9 @@ body:not(.perf) #mic.rec{animation:blink 1s ease infinite}
    sat at the same weight as "Check for updates" right above it */
 #beta-row{font-size:11.5px;font-style:italic;color:var(--faint)}
 #beta-row:hover{color:var(--dim)}
+#beta-row select{margin-left:auto;font:inherit;font-style:normal;
+  font-size:12px;color:var(--text);background:var(--panel);
+  border:1px solid var(--line);border-radius:8px;padding:3px 8px}
 /* "Forget Me" is the quiet way out, not a button competing with Close */
 #about-forget.about-btn.danger{
   background:none;border:none;padding:6px 2px;
@@ -13380,9 +13416,6 @@ __CODE_ROWS__
       <div class="meter-label"><span>COMMUNITY GPU</span></div>
       <div class="meter" id="fleet-meter"></div>
     </div>
-    <!-- the VPN treatment (6b264, per Patrick): the version lives
-         quietly at the foot, not next to the wordmark -->
-    <div id="ver-foot">Version __APP_VER__</div>
   </div>
 </aside>
 
@@ -13571,8 +13604,13 @@ __CODE_ROWS__
       <div id="up-reldate"></div>
       <div id="up-notes" hidden></div>
       <button class="about-btn" id="about-check">Check for updates</button>
-      <label id="beta-row"><input type="checkbox" id="betaup">
-        <span>Include Beta Releases</span></label>
+      <!-- 6b285: three channels. Stable is the default; Beta gets
+           the RCs; Nightly follows the rolling "nightly" release that
+           GitHub Actions rebuilds on every push to main. -->
+      <label id="beta-row"><span>Update channel</span>
+        <select id="upchan"><option value="stable">Stable</option>
+          <option value="beta">Beta</option>
+          <option value="nightly">Nightly</option></select></label>
     </section>
     <!-- ACCOUNT sits directly under About (6b260, per Patrick):
          identity reads as part of the front matter, not a footnote. -->
@@ -18209,7 +18247,7 @@ async function openAbout(){
       const mine=await(await fetch("/api/fleet/mine")).json();
       $("#turbo").checked=!!pr2.turbo;
       $("#contrib").checked=!!pr2.contrib_on;
-      $("#betaup").checked=!!pr2.beta_updates;
+      if($("#upchan"))$("#upchan").value=pr2.update_channel||(pr2.beta_updates?"beta":"stable");
       $("#autoclean").checked=!!pr2.auto_cleanup;
       // unchecked features fold their furniture away (6.0b5)
       $("#fleet-box").hidden=!pr2.contrib_on;
@@ -18746,13 +18784,14 @@ $("#turbo").addEventListener("change",()=>{
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({turbo:$("#turbo").checked})});
 });
-$("#betaup").addEventListener("change",async()=>{
+$("#upchan").addEventListener("change",async()=>{
+  const ch=$("#upchan").value;
   await fetch("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({beta_updates:$("#betaup").checked})});
-  // joining the beta should feel like something happened: re-check
-  // immediately so a waiting beta shows the UPDATE flag right away
-  if($("#betaup").checked)$("#about-check").click();
+    body:JSON.stringify({update_channel:ch,beta_updates:ch==="beta"})});
+  // switching channels should feel like something happened: re-check
+  // immediately so a waiting build shows the UPDATE flag right away
+  $("#about-check").click();
 });
 $("#contrib").addEventListener("change",async()=>{
   const on=$("#contrib").checked;

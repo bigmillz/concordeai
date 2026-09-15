@@ -21,6 +21,8 @@ permissions:
 
 jobs:
   msi:
+    # nightlies ship the zip only — an MSI per commit is noise (6b285)
+    if: ${{ (github.event.release.tag_name || '') != 'nightly' }}
     runs-on: windows-latest
     steps:
       - name: resolve tag

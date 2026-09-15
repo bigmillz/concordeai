@@ -4,6 +4,7 @@ Runs against a locally spawned instance with a key (so every gate is
 exercised) and reports a scorecard. Engine tests run REAL models.
 """
 import json
+import os
 import re
 import sys
 import time
@@ -145,16 +146,23 @@ check("no ungated weather-claim greetings",
       and "{name}" in page and "{city}" in page
       and "function greetHas" in page and "function greetFill" in page
       and "How's {city} tonight, {name}?" in page)
-# 6.0b4 made the wordmark small; 6b264 (per Patrick) moved the
-# version OUT of the lockup entirely — it lives at the sidebar foot
-# under the system monitor, the VPN treatment (italic, dim, centered)
-check("corner wordmark clean, version at the foot",
+# 6.0b4 made the wordmark small; 6b264 moved the version out of the
+# lockup; 6b285 (per Patrick, the VPN scheme) took it out of the main
+# window altogether — it lives at the top of Settings → About only
+check("corner wordmark clean, version out of the main window",
       "font-size:12.5px" in page
       and 'class="vsub"' not in page.split("</aside>")[0]
-      and 'id="ver-foot"' in page
-      and ">Version " in page)
-check("beta updates opt-in present", 'id="betaup"' in page
-      and "beta_updates" in page)
+      and 'id="ver-foot"' not in page
+      and 'id="up-version"' in page)
+# 6b285: three update channels replace the beta checkbox
+check("update channel picker: stable / beta / nightly",
+      'id="upchan"' in page and 'value="nightly"' in page
+      and "update_channel" in page and 'id="betaup"' not in page
+      and "def update_channel" in _MILLENAI_SRC
+      and 'APP_NIGHTLY = ""' in _MILLENAI_SRC
+      and 'x.get("tag_name") == "nightly"' in _MILLENAI_SRC
+      and os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                      ".github", "workflows", "nightly.yml")))
 # 6.0b7: engine dropdown at the chip, Hermes agent, 300px rail
 check("engine dropdown js + meta", "openEngMenu" in page
       and '"Fast"' in page and "engrow" in page)
@@ -693,8 +701,8 @@ check("a stale cached page can never 304 its way back", s == 200)
 # still never offers it to a stable install.
 check("release labelling: 6.0 final, no RC, no beta hold",
       "APP_RC = 0" in _MILLENAI_SRC and "APP_BETA = False" in _MILLENAI_SRC
-      and re.search(r">Version 6\.0(\b|<| \xb7)", page) is not None
-      and " RC" not in re.search(r">Version [^<]*<", page).group(0))
+      and re.search(r'id="up-version">6\.0(\b|<| \xb7)', page) is not None
+      and " RC" not in re.search(r'id="up-version">[^<]*<', page).group(0))
 check("titlebar lockup: accessory + bundled font",
       "NSTitlebarAccessoryViewController" in _MILLENAI_SRC
       and "def _brand_accessory" in _MILLENAI_SRC

@@ -1,0 +1,62 @@
+# NIGHTLY (6b285, per Patrick): every push to main becomes a prerelease
+# rebuilt under the single tag `nightly`, built here so nothing depends on a laptop being
+# open. Beta and stable stay hand-cut by release.sh on Patrick's word.
+# Roll back: git revert the channels commit (tag pre-channels), delete
+# this file, and `gh release delete nightly --cleanup-tag`.
+name: nightly
+on:
+  push:
+    branches: [main]
+    paths: [millenai.py, build_dmg.sh, build_windows.sh, fonts/**, icons/**]
+  workflow_dispatch:
+concurrency: { group: nightly, cancel-in-progress: true }
+permissions: { contents: write }
+jobs:
+  nightly:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Stamp the nightly identity into the app
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          python3 - "$SHA" "${{ github.run_number }}" <<'PY'
+          import re, sys, pathlib
+          sha, run = sys.argv[1], sys.argv[2]
+          p = pathlib.Path("millenai.py"); s = p.read_text()
+          s, n = re.subn(r'^APP_NIGHTLY = ""', 'APP_NIGHTLY = "%s %s"' % (run, sha), s, count=1, flags=re.M)
+          assert n == 1, "APP_NIGHTLY constant not found"
+          p.write_text(s)
+          PY
+          echo "SHA=$SHA" >> "$GITHUB_ENV"
+      - name: Build the macOS DMG and the Windows zip
+        run: |
+          mkdir -p "$HOME/Library/Application Support/MillenAI"
+          python3 -m venv "$HOME/Library/Application Support/MillenAI/venv"
+          ./build_dmg.sh
+          ./build_windows.sh
+          ls -la *.dmg *.zip
+      - name: Publish the nightly prerelease
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          VER=$(python3 -c "import re;print(re.search(r'APP_VERSION = \"([^\"]+)\"', open('millenai.py').read()).group(1))")
+          # ONE trailing .0 falls away, never more (short_version in the app)
+          SHOW=$(python3 -c "import sys;v=sys.argv[1];print(v[:-2] if v.count('.')>=2 and v.endswith('.0') else v)" "$VER")
+          # notes: one bullet per commit since the previous nightly (its
+          # SHA is in the old title); first nightly lists the last 10
+          PREV=$(gh release view nightly --json name -q .name 2>/dev/null | grep -oE 'nightly +[0-9a-f]{7,40}' | awk '{print $2}' || true)
+          if [ -n "$PREV" ] && git cat-file -e "$PREV^{commit}" 2>/dev/null; then
+            BULLETS=$(git log --format='- %s' "$PREV..HEAD" | head -10)
+          else
+            BULLETS=$(git log --format='- %s' -10)
+          fi
+          [ -n "$BULLETS" ] || BULLETS="- rebuilt at commit $SHA"
+          # ONE rolling nightly (per Pat): delete the release AND the tag,
+          # then recreate — never edit in place, so published_at moves
+          gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
+          git push origin :refs/tags/nightly 2>/dev/null || true
+          gh release create nightly *.dmg *.zip --prerelease --latest=false \
+            --title "$SHOW nightly $SHA" \
+            --notes "$(printf 'ConcordeAI %s nightly %s\n\n%s\n' "$SHOW" "$SHA" "$BULLETS")"
