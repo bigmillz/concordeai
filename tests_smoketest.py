@@ -154,6 +154,17 @@ check("corner wordmark clean, version out of the main window",
       and 'class="vsub"' not in page.split("</aside>")[0]
       and 'id="ver-foot"' not in page
       and 'id="up-version"' in page)
+# 6b286, per Patrick (the macOS way): betas are numbered per version
+# line from 1 — "6.1 beta 2" — never by build number ("beta 268")
+_REL_SH = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "release.sh"), encoding="utf-8").read()
+check("betas numbered per line, not by build",
+      '" beta %d" % APP_BETA' in _MILLENAI_SRC
+      and "APP_BUILD if APP_BETA" not in _MILLENAI_SRC
+      and re.search(r"^APP_BETA = \d+$", _MILLENAI_SRC, re.M) is not None
+      and 'SHOW="$SHOW beta $BETA"' in _REL_SH
+      and 'if arg == "beta":' in _REL_SH and 'elif arg == "rc":' in _REL_SH
+      and "APP_BETA = True" not in _REL_SH)
 # 6b285: three update channels replace the beta checkbox
 check("update channel picker: stable / beta / nightly",
       'id="upchan"' in page and 'value="nightly"' in page
@@ -700,7 +711,7 @@ check("a stale cached page can never 304 its way back", s == 200)
 # while the prerelease hold stays exactly as it was, so /releases/latest
 # still never offers it to a stable install.
 check("release labelling: 6.0 final, no RC, no beta hold",
-      "APP_RC = 0" in _MILLENAI_SRC and "APP_BETA = False" in _MILLENAI_SRC
+      "APP_RC = 0" in _MILLENAI_SRC and "APP_BETA = 0" in _MILLENAI_SRC
       and re.search(r'id="up-version">6\.0(\b|<| \xb7)', page) is not None
       and " RC" not in re.search(r'id="up-version">[^<]*<', page).group(0))
 check("titlebar lockup: accessory + bundled font",

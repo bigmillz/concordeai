@@ -81,12 +81,16 @@ except ImportError:
 
 APP_VERSION = "6.0.2"   # bump here — UI, window, DMG all follow
 # BETA HOLD (per Patrick): the 6.x line is beta until the kinks are out.
-# While True: every display surface says "beta", release.sh publishes
+# While > 0: every display surface says "beta N", release.sh publishes
 # as a GitHub PRERELEASE, and — because the desktop updater reads
-# /releases/latest, which EXCLUDES prereleases — every existing install
-# stays parked on the last stable (v197 / 5.3.7). The live :9889
-# instance follows raw tags and DOES run betas: that's the testbed.
-APP_BETA = False
+# /releases/latest, which EXCLUDES prereleases — every stable install
+# stays parked on the last stable. The live :9889 instance follows raw
+# tags and DOES run betas: that's the testbed.
+# NUMBERED PER LINE (6b286, per Patrick, the macOS way): "6.1 beta 1",
+# "6.1 beta 2"… four or five a line, restarting at 1 with each new
+# version — never the build number ("beta 268"). 0 = not a beta.
+# `./release.sh beta` cuts the next one; a stable cut resets it to 0.
+APP_BETA = 0
 # RELEASE CANDIDATE (6b258, per Patrick: "almost there"). >0 renames
 # the label from "beta" to "RC<n>" on every display surface and in the
 # release title, while KEEPING the prerelease hold above — an RC is
@@ -131,7 +135,7 @@ def short_version(v: str = None) -> str:
         # the TAG's build, so a newer RC1 cut is offered correctly even
         # though both read the same on screen.
         return v + " RC%d" % APP_RC
-    return v + (" beta %d" % APP_BUILD if APP_BETA else "")
+    return v + (" beta %d" % APP_BETA if APP_BETA else "")
 APP_BUILD = 271               # integer compared against the GitHub release tag
 APP_BUILD_DATE = ""         # ISO date; blank falls back to this file's mtime
 try:                          # feeds the page ETag: an edited source must

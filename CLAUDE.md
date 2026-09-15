@@ -104,9 +104,12 @@ Two things to internalise:
 - **The release tag is `v<APP_BUILD>`, not the version** (`v256`). `APP_BUILD` is a
   monotonic counter and is what the in-app updater compares; the marketing version can
   move independently.
-- **While `APP_BETA = True`, releases publish as prereleases.** `/releases/latest`
-  excludes prereleases, so stable users are held back and only those who tick
-  `beta_updates` are offered them. This is deliberate, not a bug.
+- **While `APP_BETA > 0` (or `APP_RC > 0`), releases publish as prereleases.**
+  `/releases/latest` excludes prereleases, so stable users are held back and only
+  the Beta channel (`update_channel` pref) is offered them. This is deliberate.
+  Betas are numbered per version line from 1 (`6.1 beta 2`), never by build;
+  `./release.sh beta` cuts the next one, a stable cut resets it to 0. Nightlies
+  are the rolling `nightly` release built by GitHub Actions on every push.
 
 ## Architecture
 

@@ -4604,3 +4604,16 @@ session so the site parses both apps the same way.
 - MSI workflow skips the `nightly` tag.
 - Rollback: tag `pre-channels` (0b07e85). Revert, delete the workflow,
   `gh release delete nightly --cleanup-tag`.
+
+## 6b286 — betas numbered per line, the macOS way (uncut)
+
+Per Patrick ("number the betas once they're committed and start with
+1… like Apple does with macOS… we don't need beta 26"). APP_BETA is
+now the small counter (0 = not a beta), never the build number:
+"6.1 beta 1", "6.1 beta 2"… restarting at 1 with each new version line,
+nine at most. `./release.sh beta 6.1.0` opens a line at beta 1;
+`./release.sh beta` cuts the next; `./release.sh rc` moves the line to
+RC1, RC2…; `./release.sh 6.1.0` (or patch/minor/major) ships stable and
+clears the hold. release.sh stamps APP_BETA/APP_RC itself and names the
+commit and the GitHub title by the same label. Nightlies keep rolling
+on every push and never touch the counter.
