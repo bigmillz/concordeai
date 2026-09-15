@@ -4677,3 +4677,13 @@ GB · 49% · 38 MB/s · Gemma 4 12B 61%, Qwen 3 8B 20% · 6 waiting"),
 says "already installed — nothing to download" when there is nothing
 to do, and lists failures with a retry hint; the preset exactly on disk
 wears a "✓ current" badge and a firm edge.
+
+## 6b291 — one download indicator (uncut)
+
+Per Patrick ("here we go again", screenshot: the sidebar pill reading
+"DOWNLOADING MODELS · 52%" over a strip reading "models · 53% · 13.9
+MB/s"). Two pollers painted two surfaces that disagreed, and the pill
+faked a bar with a hard gradient split under its text. Now the strip
+alone speaks while anything downloads ("downloading models · 52% ·
+13.9 MB/s · ~4 min"), the pill hides, and one read drives both. The
+pill's own poller only runs when nothing is downloading.

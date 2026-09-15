@@ -199,6 +199,13 @@ check("what's new endpoint answers for this build",
       and 'fetch("/api/update/whatsnew")' in page
       and 'prefs.get("last_ident")' in _MILLENAI_SRC
       and "ident = short_version()" in _MILLENAI_SRC)
+# 6b291, per Patrick ("here we go again"): ONE download indicator — the
+# pill hides while the strip speaks; no gradient hack, no second poller
+check("one download indicator: the strip alone while busy",
+      "DOWNLOADING MODELS" not in page
+      and "linear-gradient(90deg,#e26d5a" not in page
+      and '"downloading models \\u00b7 "' in page
+      and "paintModelsFlag(st);            // the same read drives the pill" in page)
 # 6b290, per Patrick ("sitting at 100% doing nothing… idiot proof it"):
 # the bar counts the batch in play, MLX runs two at a time and is judged
 # by bytes, the pane reports live, and the preset on disk is marked

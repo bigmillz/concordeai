@@ -18002,11 +18002,13 @@ async function dlStripTick(){
     const st=await(await fetch("/api/setup")).json();
     const bg=st.busy&&veil.hidden;
     dlStrip.hidden=!bg;
+    paintModelsFlag(st);            // the same read drives the pill
     if(bg){
       dlStrip.querySelector(".dlfill").style.width=(st.overall_pct||0)+"%";
       dlStrip.querySelector(".dllbl").textContent=
-        "models \u00b7 "+(st.overall_pct||0)+"%"
-        +(st.speed_mbs>0?" \u00b7 "+st.speed_mbs+" MB/s":"");
+        "downloading models \u00b7 "+(st.overall_pct||0)+"%"
+        +(st.speed_mbs>0?" \u00b7 "+st.speed_mbs+" MB/s":"")
+        +(st.eta_min?" \u00b7 ~"+st.eta_min+" min":"");
     }
   }catch(e){}
 }
@@ -18313,14 +18315,15 @@ $("#wiz-skip").addEventListener("click",()=>{
   wizVeil.hidden=true;
 });
 function paintModelsFlag(st){
+  // ONE progress surface (6b291, per Patrick: "here we go again" — this
+  // pill said 52% while the strip under it said 53%, from two pollers,
+  // with a hard gradient split under the text). While anything
+  // downloads the pill steps aside and the strip alone speaks.
   const f=$("#models-flag");
+  f.style.background="";
   if(st.busy){
-    f.hidden=!veil.hidden?true:false;
-    f.textContent="DOWNLOADING MODELS \u00b7 "+st.overall_pct+"%";
-    f.style.background="linear-gradient(90deg,#e26d5a "+st.overall_pct
-      +"%,#4b1f18 "+st.overall_pct+"%)";
+    f.hidden=true;
   }else{
-    f.style.background="";
     f.textContent="MODELS AVAILABLE";
     f.hidden=!(st.mlx_ok&&!st.needs_setup&&
       st.models.some(m=>m.star&&m.status!=="ready"));
@@ -18328,14 +18331,13 @@ function paintModelsFlag(st){
 }
 // keep the chip honest while downloads run behind a closed panel
 (function flagTick(){
-  const busyish=$("#models-flag").textContent.startsWith("DOWNLOADING");
   setTimeout(async()=>{
-    if(veil.hidden){
+    if(veil.hidden&&dlStrip&&dlStrip.hidden){   // busy: the strip's tick paints
       try{paintModelsFlag(await(await fetch("/api/setup")).json());}
       catch(e){}
     }
     flagTick();
-  },busyish?6000:240000);
+  },240000);
 })();
 // Every launch opens with the wipe. It deliberately does *not* wait on the
 // /api/setup round trip below — that call enumerates every model on disk and
