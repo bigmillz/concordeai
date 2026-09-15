@@ -4629,3 +4629,23 @@ read it). The wordmark is set in the bundled Michroma (fonts/) with the
 app's exact AI recipe instead of the old Helvetica stand-in. Working
 version moved to 6.0.3: 6.0.2 has shipped, so nightlies run ahead of
 it; `./release.sh beta 6.0.3` opens that line at beta 1.
+
+## 6b288 — a provider's error notice is never the answer; the update moment knows a nightly (uncut)
+
+Per Patrick (screenshot: "The API key used for this request has
+reached its budget…" shown as the reply to "How fast can electric cars
+actually go?", sources and all — "major bug… the user should always
+get an answer"). Some endpoints return the failure as a 200 with the
+notice in the content field, so the HTTP-error paths never saw it.
+`_is_provider_error()` recognises short key/budget/quota/billing
+notices; the free tier rests an hour and returns False, keyed
+providers rest an hour via `_cloud_budget_hit()` and return "", and
+the streaming path holds the first ~240 characters so a notice never
+reaches the reader — every rung then falls through to the next, down
+to local silicon. Post-update dialog: the identity compared is
+short_version(), so a nightly with a new commit is an update ("just
+another 6.0.3 nightly, with an updated commit number"); notes come
+from the new /api/update/whatsnew — the nightly release body when its
+commit is ours, else GitHub's compare between the previous identity
+and our commit; numbered releases read their own tag's body. Test and
+dev instances never move the shared last_ident record.

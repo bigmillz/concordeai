@@ -570,6 +570,42 @@ FREE_CLOUD = {"name": "Community cloud",
 
 _free_cold = [0.0]      # unix time until which the free tier is skipped
 
+# A PROVIDER'S ERROR NOTICE IS NOT AN ANSWER (6b288, per Patrick, seen
+# live: "The API key used for this request has reached its budget…" was
+# shown to the reader as the reply, sources and all). Some endpoints
+# return the failure as a 200 with the notice in the content field, so
+# the HTTP-error paths never see it. Short text about keys, budgets,
+# quotas or billing instead of the question IS the provider failing —
+# treat it like a 402: skip that rung, rest the key, and let the next
+# rung answer, down to local silicon. The reader always gets an answer.
+_PROVIDER_ERR_RX = re.compile(
+    r"(api[ _-]?key\b.{0,80}\b(budget|quota|limit|invalid|expired|missing|"
+    r"required|revoked|rejected)|reached its budget|raise the key budget|"
+    r"topping up the wallet|rate[ -]?limit(ed)?\b|too many requests|"
+    r"insufficient[ _](credits?|balance|quota|funds)|payment required|"
+    r"quota (exceeded|exhausted)|billing (issue|required|account)|"
+    r"contact whoever runs the app|^\s*\{\s*\"error\"|^\s*error code:? \d)",
+    re.I | re.S)
+
+
+def _is_provider_error(text: str) -> bool:
+    """True when a completion's CONTENT is the provider's own failure
+    notice rather than an answer. Only short texts qualify — a real
+    answer about API budgets runs long and talks about the question."""
+    t = (text or "").strip()
+    return 0 < len(t) < 700 and _PROVIDER_ERR_RX.search(t[:600]) is not None
+
+
+def _cloud_budget_hit(c: dict):
+    """Rest a keyed provider whose reply was its own budget/quota notice
+    — an hour, like the free tier: the key works, the wallet doesn't."""
+    try:
+        pid = _provider_of(c)
+        if pid:
+            cloud_cool(pid, "key out of budget \u2014 resting", 3600.0)
+    except Exception:
+        pass
+
 
 def free_cloud_stream(messages: list, emit, timeout: int = 15) -> bool:
     """Answer from the keyless public endpoint. False = fall back local.
@@ -600,6 +636,10 @@ def free_cloud_stream(messages: list, emit, timeout: int = 15) -> bool:
         _free_cold[0] = time.time() + 3600
         return False
     txt = strip_think(txt).strip()
+    if _is_provider_error(txt):
+        # the anonymous tier's wallet is dry: an hour off, next rung now
+        _free_cold[0] = time.time() + 3600
+        return False
     if len(txt) < 20 or _looks_degenerate(txt):
         return False
     for i in range(0, len(txt), 24):
@@ -931,6 +971,9 @@ def cloud_text(c: dict, messages: list, timeout: int = 60,
                 if d.get("stop_reason") == "max_tokens":
                     return ""
                 cloud_glitch(c, "returned nothing")
+            if _is_provider_error(out):
+                _cloud_budget_hit(c)
+                return ""
             return out
         body = {"model": c["model"], "messages": messages,
                 "max_tokens": 4096, "temperature": 0.75}
@@ -955,6 +998,9 @@ def cloud_text(c: dict, messages: list, timeout: int = 60,
             # answered, said nothing: still "not working" as far as the
             # council is concerned, so rest it rather than ask again
             cloud_glitch(c, "returned nothing")
+        if _is_provider_error(out):
+            _cloud_budget_hit(c)
+            return ""
         return out
     except urllib.error.HTTPError as exc:
         cloud_note_failure(c, exc)
@@ -1264,6 +1310,17 @@ def cloud_stream_conf(c: dict, messages: list, emit) -> bool:
                  "User-Agent": "MillenAI/%s" % APP_VERSION,
                  "Authorization": "Bearer " + c["key"]})
     got = False
+    # HOLD THE HEAD (6b288): the first ~240 characters wait in a buffer
+    # so a budget/quota notice sent as content never reaches the reader;
+    # once the head reads like an answer it streams as before. A stream
+    # that dies inside the head emits nothing and lets the next rung
+    # answer whole, instead of leaving a two-line stub on screen.
+    head = []
+
+    def _flush():
+        for t in head:
+            emit(t)
+        head.clear()
     try:
         with urllib.request.urlopen(req, timeout=90) as r:
             for raw in r:
@@ -1279,15 +1336,30 @@ def cloud_stream_conf(c: dict, messages: list, emit) -> bool:
                         "delta", {}).get("content") or ""
                 except Exception:
                     tok = ""
-                if tok:
-                    got = True
+                if not tok:
+                    continue
+                if got:
                     emit(tok)
+                    continue
+                head.append(tok)
+                if sum(len(t) for t in head) >= 240:
+                    if _is_provider_error("".join(head)):
+                        _cloud_budget_hit(c)
+                        return False
+                    got = True
+                    _flush()
     except urllib.error.HTTPError as exc:
         if not got:
             cloud_note_failure(c, exc)
         return got
     except Exception:
         return got
+    if not got and head:
+        if _is_provider_error("".join(head)):
+            _cloud_budget_hit(c)
+            return False
+        got = True
+        _flush()
     return got
 
 
@@ -3211,6 +3283,63 @@ def _check_update_live():
             "published": rel.get("published_at", ""),
             "notes": (rel.get("body") or "")[:4000],
             "size_mb": round(dmg.get("size", 0) / 1e6, 1) if dmg else 0}
+
+
+_whatsnew_cache = {}
+
+
+def whats_new(prev: str) -> dict:
+    """The notes for THIS build, for the post-update dialog (6b288).
+    Nightly: the rolling release's body when its commit is ours, else
+    the commits between the previous identity and ours straight from
+    GitHub's compare API. Stable/beta: OUR release by tag — never the
+    channel's newest, which may be a different build."""
+    key = (prev or "", short_version())
+    if key in _whatsnew_cache:
+        return _whatsnew_cache[key]
+    hdrs = {"Accept": "application/vnd.github+json",
+            "User-Agent": "MillenAI"}
+
+    def _get(path):
+        req = urllib.request.Request(
+            "https://api.github.com/repos/%s/%s" % (UPDATE_REPO, path),
+            headers=hdrs)
+        with urllib.request.urlopen(req, timeout=8) as r:
+            return json.loads(r.read().decode("utf-8"))
+    notes = ""
+    try:
+        if APP_NIGHTLY:
+            sha = APP_NIGHTLY.split()[-1]
+            try:
+                rel = _get("releases/tags/nightly")
+                mm = re.search(r"nightly\s+([0-9a-f]{7,40})",
+                               rel.get("name") or "")
+                if mm and mm.group(1)[:7] == sha[:7]:
+                    notes = (rel.get("body") or "")[:4000]
+            except Exception:
+                pass
+            if not notes:
+                # a newer nightly has replaced ours: list our commits
+                # ourselves, from the previous identity (or the last
+                # numbered release) up to our commit
+                pm = re.search(r"nightly\s+([0-9a-f]{7,40})", prev or "")
+                base = pm.group(1) if pm else "v%d" % APP_BUILD
+                cmp_ = _get("compare/%s...%s" % (base, sha))
+                subs = [((c.get("commit") or {}).get("message") or "")
+                        .split("\n")[0].strip()
+                        for c in (cmp_.get("commits") or [])]
+                subs = [x for x in subs if x][::-1][:12]
+                if subs:
+                    notes = "ConcordeAI %s\n\n%s" % (
+                        short_version(), "\n".join("- " + x for x in subs))
+        else:
+            rel = _get("releases/tags/v%d" % APP_BUILD)
+            notes = (rel.get("body") or "")[:4000]
+    except Exception:
+        notes = ""
+    out = {"title": short_version(), "prev": prev or "", "notes": notes}
+    _whatsnew_cache[key] = out
+    return out
 
 
 def _do_update():
@@ -8272,6 +8401,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._send_json(check_update(force=force))
         elif self.path == "/api/update/status":
             self._send_json(dict(_update))
+        elif self.path == "/api/update/whatsnew":
+            self._send_json(whats_new(_JUST_UPDATED[0]))
         elif self.path == "/api/tiers":
             pulled = ollama_pulled_tags() or set()
             bench = [lbl for lbl, _c in cloud_bench()]
@@ -15916,8 +16047,11 @@ function greeting(){
   $("#updated-ver").textContent="__APP_VER__";
   $("#updated-sub").textContent="You were on "+prev+". Here\u2019s what changed.";
   let notes="";
-  try{const r=await(await fetch("/api/update/check")).json();
-      if(r&&r.notes&&!r.available)notes=r.notes;}catch(e){}
+  // THIS build's notes (6b288): a nightly lists its own commits, a
+  // numbered release its own body — never the channel's newest, which
+  // may already be a different build
+  try{const r=await(await fetch("/api/update/whatsnew")).json();
+      if(r&&r.notes)notes=r.notes;}catch(e){}
   $("#updated-notes").innerHTML=notes?notesHTML(notes)
     :"<p>The full notes are in Settings \u2192 About.</p>";
   $("#updated-veil").hidden=false;
@@ -19464,44 +19598,28 @@ _JUST_UPDATED = [""]          # previous version, set on the first run after an 
 
 
 def maybe_version_splash():
-    """Show the WELCOME splash on the first launch of a NEW version."""
+    """Record that an update just landed; the page shows the dialog
+    (6b282). The identity compared is short_version() — "6.0.3 nightly
+    a9d6da1" — so a nightly with a new commit counts as an update
+    (6b288, per Patrick: "just another 6.0.3 nightly, with an updated
+    commit number") and the dialog can say exactly that."""
     try:
+        ident = short_version()
         prefs = load_prefs()
-        last = prefs.get("last_version")
-        if last == APP_VERSION:
+        last = prefs.get("last_ident") or prefs.get("last_version")
+        if last == ident:
             return
-        prefs["last_version"] = APP_VERSION
-        store_prefs(prefs)
+        # dev and test instances share this prefs file with the real
+        # app: they may show the moment but never move the record
+        if not os.environ.get("MILLENAI_TESTBUILD") and PORT == 8889:
+            prefs["last_ident"] = ident
+            prefs["last_version"] = APP_VERSION
+            store_prefs(prefs)
         if last is None or not (HAS_WEBVIEW and IS_MAC):
             return          # fresh install gets the boot wipe, not this
-        # THE ZOOM IS RETIRED (6b282, per Patrick: "eliminate the full
-        # screen version number thing... a more professional looking
-        # pop up saying it's been updated, with a scroll box of the
-        # release notes"). The page shows an in-app dialog instead;
-        # this only records that an update just landed.
         _JUST_UPDATED[0] = str(last)
-        return
-        _splash_shown[0] = True
-        # the WHOLE screen, per Patrick — the version zoom is the
-        # marquee moment after an update, not a little box
-        try:
-            scr = webview.screens[0]
-            sw, sh = scr.width, scr.height
-        except Exception:
-            sw, sh = 1728, 1117
-        w = webview.create_window(
-            "", html=SPLASH_HTML.replace("__V__", short_version()),
-            frameless=True, transparent=True, on_top=True,
-            x=0, y=0, width=sw, height=sh, focus=False)
-
-        def _bye():
-            try:
-                w.destroy()
-            except Exception:
-                pass
-        threading.Timer(3.1, _bye).start()
     except Exception:
-        pass          # theatre must never block the app
+        pass
 
 
 def reap_orphan_engines():

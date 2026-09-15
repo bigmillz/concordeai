@@ -165,6 +165,40 @@ check("betas numbered per line, not by build",
       and 'SHOW="$SHOW beta $BETA"' in _REL_SH
       and 'if arg == "beta":' in _REL_SH and 'elif arg == "rc":' in _REL_SH
       and "APP_BETA = True" not in _REL_SH)
+# 6b288, per Patrick ("major bug"): a provider's budget/quota notice sent
+# as content is a FAILURE that falls to the next rung, never the answer
+_ns = {"re": re}
+_seg = re.search(r"_PROVIDER_ERR_RX = re\.compile\(.*?\n\n\ndef _cloud_budget_hit",
+                 _MILLENAI_SRC, re.S)
+exec(_seg.group(0).rsplit("\n\n\ndef _cloud_budget_hit", 1)[0], _ns) if _seg else None
+_pe = _ns.get("_is_provider_error", lambda t: None)
+check("provider error notice is a failure, not an answer",
+      _pe("The API key used for this request has reached its budget. "
+          "Please raise the key budget, then try again.\n\nTopping up the "
+          "wallet does not raise this limit. If this isn\u2019t your "
+          "Pollinations account, contact whoever runs the app or service "
+          "you\u2019re using.") is True
+      and _pe('{"error": {"message": "Rate limit exceeded"}}') is True
+      and _pe("Production electric cars top out around 200 mph today: the "
+              "Rimac Nevera has been clocked at 258 mph, Tesla's Model S "
+              "Plaid at 200 mph, and Lucid's Air Sapphire at 205 mph. Most "
+              "everyday EVs are limited to 100 to 130 mph to protect range "
+              "and the battery, since drag rises with the square of speed "
+              "and cooling limits sustained output.") is False
+      and _MILLENAI_SRC.count("_is_provider_error(") >= 5
+      and "_cloud_budget_hit(c)" in _MILLENAI_SRC
+      and "head.append(tok)" in _MILLENAI_SRC)
+# the post-update dialog reads THIS build's notes, and a nightly with a
+# new commit counts as an update
+try:
+    _wn = json.loads(req("/api/update/whatsnew", cookie=K)[2])
+except Exception:
+    _wn = {}
+check("what's new endpoint answers for this build",
+      _wn.get("title") == "6.0.3" and "notes" in _wn
+      and 'fetch("/api/update/whatsnew")' in page
+      and 'prefs.get("last_ident")' in _MILLENAI_SRC
+      and "ident = short_version()" in _MILLENAI_SRC)
 # 6b287, per Patrick: the disk image's window title and the line under
 # the mark carry the app's own label (nightly + commit, beta N, RC), and
 # the wordmark is set in the bundled Michroma, not a Helvetica stand-in
