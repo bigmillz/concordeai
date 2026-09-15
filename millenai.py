@@ -3007,11 +3007,20 @@ _setup_lock = threading.Lock()
 _setup_jobs = {}  # label -> {"status": "downloading"|"done"|"error", "note": str}
 
 
+# TWO AT A TIME (6b290): a preset used to start every MLX download in
+# its own thread at once — eleven streams sharing one pipe, each too slow
+# to show a pulse. The rest wait as "queued", the way Ollama pulls do.
+_MLX_GATE = threading.Semaphore(2)
+
+
 def _download_model(label: str):
     repo = MLX_REPOS[label]
     try:
         from huggingface_hub import snapshot_download  # ships with mlx-lm
-        snapshot_download(repo)
+        with _MLX_GATE:
+            with _setup_lock:
+                _setup_jobs[label] = {"status": "downloading", "note": ""}
+            snapshot_download(repo)
         # sweep carcasses: a KILLED earlier attempt leaves *.incomplete
         # blobs that poison the completeness check forever — a finished
         # 35B sat uncrowned behind eight of them (seen live)
@@ -3797,7 +3806,7 @@ def start_model_downloads(labels=None) -> list:
                 continue
         if kind == "mlx":
             with _setup_lock:
-                _setup_jobs[label] = {"status": "downloading", "note": ""}
+                _setup_jobs[label] = {"status": "queued", "note": ""}
             threading.Thread(target=_download_model, args=(label,),
                              daemon=True).start()
         else:
@@ -3815,10 +3824,24 @@ def start_model_downloads(labels=None) -> list:
 _dl_sample = {"bytes": 0, "ts": 0.0, "bps": 0.0}
 
 
+def _batch_labels() -> list:
+    """The models the progress bar is ABOUT (6b290, per Patrick: the
+    Recommended preset "just sits at 100% doing nothing"). The bar used
+    to count the first-run starter set only — every starter was already
+    on disk, so a preset that added OTHER models read 100% with a speed
+    of nothing while eleven downloads ran unseen. Now: every model that
+    has ever been queued this session, and the starters only until
+    something has."""
+    with _setup_lock:
+        batch = [l for l in _setup_jobs
+                 if l != ENGINE_ROW and l in MODEL_ROUTES]
+    return batch or list(STARTER_LABELS)
+
+
 def _downloaded_bytes(pulled) -> tuple:
-    """(bytes on disk, bytes expected) across every first-run model."""
+    """(bytes on disk, bytes expected) across the batch in play."""
     have = want = 0
-    for label in STARTER_LABELS:
+    for label in _batch_labels():
         est = MLX_EST_BYTES.get(label, 0)
         want += est
         kind = MODEL_ROUTES.get(label, ("",))[0]
@@ -4036,7 +4059,15 @@ def setup_status() -> dict:
             if job.get("status") != "downloading":
                 _job_watch.pop(label, None)
                 continue
-            pct = job.get("pct", 0)
+            # an MLX job carries no pct — its progress is the hub cache
+            # growing on disk. Judging it by a pct that never moved
+            # branded every download longer than ten minutes "stalled"
+            # (6b290). Bytes, to the megabyte, are the honest pulse.
+            if (MODEL_ROUTES.get(label, ("",))[0] == "mlx"
+                    and label in MLX_REPOS):
+                pct = _dir_bytes(_hf_model_dir(MLX_REPOS[label])) // 1_000_000
+            else:
+                pct = job.get("pct", 0)
             prev = _job_watch.get(label)
             if prev is None or prev[0] != pct:
                 _job_watch[label] = (pct, now)
@@ -4091,7 +4122,28 @@ def setup_status() -> dict:
     have, want = _downloaded_bytes(pulled)
     bps = _dl_speed(have)
     busy = any(m["status"] in ("downloading", "queued") for m in models)
+    # WHICH PRESET IS ON DISK (6b290, per Patrick: "highlight that so
+    # the user knows which one they're on"). current = exactly this
+    # set; installed = all of it plus extras; partial = some; none.
+    installed = {l for l in SUPPORTED if model_cached(l, pulled)}
+    plan_state = {}
+    for pl in ("min", "rec", "full", "all"):
+        want_set = set(plan_labels(pl))
+        if want_set and want_set == installed:
+            plan_state[pl] = "current"
+        elif want_set and want_set <= installed:
+            plan_state[pl] = "installed"
+        elif want_set & installed:
+            plan_state[pl] = "partial"
+        else:
+            plan_state[pl] = "none"
     return {
+        # the models moving right now, and how many wait behind them —
+        # so the bar is never the only sign of life
+        "now": [{"label": m["label"], "pct": m["pct"]}
+                for m in models if m["status"] == "downloading"][:4],
+        "queued_n": sum(1 for m in models if m["status"] == "queued"),
+        "plan_state": plan_state,
         "have_gb": round(have / 1e9, 1), "want_gb": round(want / 1e9, 1),
         "overall_pct": round(have / want * 100) if want else 100,
         "speed_mbs": round(bps / 1e6, 1) if busy else 0,
@@ -9136,8 +9188,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 plan = (json.loads(self.rfile.read(n)) or {}).get("plan", "max")
             except (ValueError, json.JSONDecodeError):
                 plan = "max"
-            self._send_json(
-                {"started": start_model_downloads(plan_labels(plan))})
+            _want = plan_labels(plan)
+            _started = start_model_downloads(_want)
+            self._send_json({"started": _started, "n": len(_want),
+                             "already": len(_want) - len(_started),
+                             "gb": round(sum(MODEL_INFO[l]["gb"]
+                                             for l in _started), 1)})
             return
         if self.path == "/api/update/install":
             if _update["state"] in ("idle", "error"):
@@ -12750,6 +12806,13 @@ body:not(.perf) #mic.rec{animation:blink 1s ease infinite}
 .plan-card.risky:hover{border-color:rgba(217,169,90,.6)}
 .plan-card .gb{font-family:var(--mono);font-size:9.5px;color:var(--dim);
   display:block;margin-top:3px}
+/* the preset on disk (6b290): a firm edge and a small badge, nothing loud */
+.plan-card.current{border-color:var(--text);box-shadow:inset 0 0 0 1px var(--text)}
+.plan-card .cur{position:absolute;top:8px;right:10px;font-style:normal;
+  font-family:var(--mono);font-size:9px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--text)}
+.big-now{font-family:var(--mono);font-size:10.5px;color:var(--faint);
+  margin-top:6px;line-height:1.5}
 #manage-note{font-size:11px;color:var(--faint);margin-top:6px;
   min-height:14px}
 /* Updates: version front and centre */
@@ -17656,7 +17719,8 @@ function renderSetup(st){
     '<span>'+(anyDl?pct+'%':(setupAllReady?'complete':'not started'))+'</span></div>'+
     (anyDl?'<div class="big-speed">'+
       (st.speed_mbs>0?st.speed_mbs+' MB/s':'starting\u2026')+
-      (st.eta_min?' \u00b7 about '+st.eta_min+' min left':'')+'</div>':'');
+      (st.eta_min?' \u00b7 about '+st.eta_min+' min left':'')+'</div>'
+      +'<div class="big-now">'+nowLine(st)+'</div>':'');
 
   // WHILE DOWNLOADING (first run or updates): one bar, bandwidth,
   // percent — never a wall of per-model rows
@@ -17744,6 +17808,12 @@ function setTitle(t,s){
   const h=$("#setup-title"),p=$("#setup-sub");
   if(h)h.textContent=t;
   if(p)p.textContent=s;
+}
+// the models moving right now, by name — a bar alone can look frozen
+function nowLine(st){
+  const now=(st.now||[]).map(m=>esc(m.label)+" \u00b7 "+m.pct+"%");
+  const q=st.queued_n?(st.queued_n+" waiting"):"";
+  return [now.join("  \u00b7  "),q].filter(Boolean).join("  \u00b7  ");
 }
 function planCards(st){
   const rem=st.plans||{};
@@ -18652,15 +18722,53 @@ function paintPlans(){
            ["all","Max",
             "every model there is, including ones too big for this Mac — "
             +"they may crash it if memory runs out",1]];
+  const ps=lastSetup.plan_state||{};
   $("#plan-row").innerHTML=P.map(p=>{
     const gb=(lastSetup.plans||{})[p[0]];
     const n=(lastSetup.plan_n||{})[p[0]];
-    return '<div class="plan-card'+(p[3]?" risky":"")+'" data-plan="'
-      +p[0]+'"><b>'+(p[3]?'<span class="warn">⚠</span> ':"")+p[1]
+    const stt=ps[p[0]]||"";
+    // the set on disk wears a badge (6b290, per Patrick): "current"
+    // is exactly this preset; a preset fully contained in what is
+    // installed reads installed; anything else says what is left
+    return '<div class="plan-card'+(p[3]?" risky":"")
+      +(stt==="current"?" current":"")+'" data-plan="'+p[0]+'">'
+      +(stt==="current"?'<i class="cur">\u2713 current</i>':"")
+      +'<b>'+(p[3]?'<span class="warn">⚠</span> ':"")+p[1]
       +'</b><span>'+esc(p[2])+'</span>'
       +'<span class="gb">'+(n?n+" models":"")
-      +(gb?" · "+gb+" GB to download":" · already installed")+'</span></div>';
+      +(gb?" · "+gb+" GB to download"
+          :(stt==="current"?" · this is what you have":" · already installed"))
+      +'</span></div>';
   }).join("");
+}
+// LIVE WHILE IT RUNS (6b290): the pane used to say "watch the strip in
+// the sidebar" and go quiet. Now it re-reads the disk every two seconds
+// until the batch is done, naming what is moving and what is left.
+let mgTimer=null;
+function manageTick(){
+  clearTimeout(mgTimer);
+  mgTimer=setTimeout(async()=>{
+    if($("#manage-box").hidden)return;
+    try{lastSetup=await(await fetch("/api/setup")).json();}catch(e){return;}
+    paintPlans();paintMgStats();paintCleanNote();
+    const st=lastSetup;
+    if(st.busy){
+      $("#manage-note").textContent="downloading \u2014 "+st.have_gb+" of "
+        +st.want_gb+" GB \u00b7 "+st.overall_pct+"%"
+        +(st.speed_mbs>0?" \u00b7 "+st.speed_mbs+" MB/s":"")
+        +(st.eta_min?" \u00b7 about "+st.eta_min+" min left":"")
+        +(st.now&&st.now.length?" \u2014 "+st.now.map(m=>m.label+" "+m.pct+"%").join(", "):"")
+        +(st.queued_n?" \u00b7 "+st.queued_n+" waiting":"");
+      manageTick();
+    }else{
+      const bad=(st.models||[]).filter(m=>m.status==="error");
+      $("#manage-note").textContent=bad.length
+        ?bad.length+" download"+(bad.length>1?"s":"")+" failed \u2014 "
+          +bad.map(m=>m.label).join(", ")+" \u00b7 pick the preset again to retry"
+        :"done \u2014 "+st.ready_n+" models installed";
+      paintRoster(lastSetup,lastCloud);
+    }
+  },2000);
 }
 async function ensureSetup(){
   // /api/setup walks the model cache and can take seconds — Manage may
@@ -18678,6 +18786,7 @@ $("#roster-manage").addEventListener("click",async()=>{
     $("#plan-row").innerHTML='<div class="plan-card">reading disk…</div>';
     await ensureSetup();
     paintPlans();paintMgStats();paintCleanNote();
+    if(lastSetup&&lastSetup.busy)manageTick();   // a batch is already running
   }
 });
 function paintCleanNote(){
@@ -18755,13 +18864,22 @@ $("#plan-row").addEventListener("click",async e=>{
       +"it — click again to go ahead";
     return;
   }
-  await fetch("/api/setup/install",{method:"POST",
+  $("#manage-note").textContent="starting\u2026";
+  let r={};
+  try{r=await(await fetch("/api/setup/install",{method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({plan:c.dataset.plan})});
-  $("#manage-note").textContent=
-    "downloading — watch the strip in the sidebar";
-  setTimeout(async()=>{lastSetup=null;await ensureSetup();
-    paintRoster(lastSetup,lastCloud);paintPlans();},2500);
+    body:JSON.stringify({plan:c.dataset.plan})})).json();}
+  catch(e2){$("#manage-note").textContent="could not start \u2014 try again";return;}
+  if(!(r.started||[]).length){
+    $("#manage-note").textContent=r.n
+      ?"already installed \u2014 nothing to download"
+      :"nothing to install";
+    return;
+  }
+  $("#manage-note").textContent="downloading "+r.started.length+" model"
+    +(r.started.length>1?"s":"")+" \u00b7 "+r.gb+" GB"
+    +(r.already?" ("+r.already+" already here)":"")+" \u2014 starting\u2026";
+  manageTick();
 });
 $("#roster").addEventListener("click",async e=>{
   const i=e.target.closest(".rin");if(!i)return;
@@ -18771,8 +18889,8 @@ $("#roster").addEventListener("click",async e=>{
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({labels:[i.dataset.l]})});
     i.textContent="downloading";
-    $("#manage-note").textContent=esc(i.dataset.l)
-      +" — watch the strip in the sidebar";
+    $("#manage-note").textContent=esc(i.dataset.l)+" \u2014 starting\u2026";
+    manageTick();
   }catch(e2){i.textContent="failed";}
 });
 $("#roster").addEventListener("click",async e=>{

@@ -4657,3 +4657,23 @@ for 6.0.4"). Ships 6b285-6b288: three channels, numbered betas, the
 truthful disk image in Michroma, the provider-notice fallback, and the
 nightly-aware post-update card. Working line moves to 6.0.4; nightlies
 run ahead on it.
+
+## 6b290 — model downloads that tell the truth (uncut)
+
+Per Patrick (Recommended preset "sitting at 100% doing nothing… idiot
+proof it"). Root cause: `_downloaded_bytes` counted the first-run
+STARTER set only — every starter was already on disk, so a preset that
+added other models read 100% with no speed while eleven downloads ran
+unseen. Now `_batch_labels()` = every model queued this session. Also:
+the stall watchdog judged MLX jobs by a pct they never carry (every
+download over ten minutes was branded "stalled"); it now watches bytes
+on disk. MLX downloads run two at a time (`_MLX_GATE`), the rest wait
+as "queued". `/api/setup` adds `now` (moving models + pct), `queued_n`
+and `plan_state` (current / installed / partial / none per preset);
+the install route reports what it started and what was already here.
+UI: the download dialog names what is moving; the Manage pane ticks
+every two seconds until the batch is done ("downloading — 12.1 of 24.4
+GB · 49% · 38 MB/s · Gemma 4 12B 61%, Qwen 3 8B 20% · 6 waiting"),
+says "already installed — nothing to download" when there is nothing
+to do, and lists failures with a retry hint; the preset exactly on disk
+wears a "✓ current" badge and a firm edge.

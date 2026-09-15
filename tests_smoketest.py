@@ -199,6 +199,26 @@ check("what's new endpoint answers for this build",
       and 'fetch("/api/update/whatsnew")' in page
       and 'prefs.get("last_ident")' in _MILLENAI_SRC
       and "ident = short_version()" in _MILLENAI_SRC)
+# 6b290, per Patrick ("sitting at 100% doing nothing… idiot proof it"):
+# the bar counts the batch in play, MLX runs two at a time and is judged
+# by bytes, the pane reports live, and the preset on disk is marked
+try:
+    _st = json.loads(req("/api/setup", cookie=K)[2])
+except Exception:
+    _st = {}
+check("model downloads: batch-true progress, live pane, current preset",
+      "def _batch_labels" in _MILLENAI_SRC
+      and "for label in _batch_labels():" in _MILLENAI_SRC
+      and "_MLX_GATE = threading.Semaphore(2)" in _MILLENAI_SRC
+      and "with _MLX_GATE:" in _MILLENAI_SRC
+      and "// 1_000_000" in _MILLENAI_SRC
+      and set((_st.get("plan_state") or {}).keys()) == {"min", "rec", "full", "all"}
+      and all(v in ("current", "installed", "partial", "none")
+              for v in (_st.get("plan_state") or {}).values())
+      and "now" in _st and "queued_n" in _st
+      and "function manageTick" in page and "function nowLine" in page
+      and 'class="cur"' in page and "already installed \\u2014 nothing to download" in page
+      and "watch the strip in the sidebar" not in page.split("#roster\").addEventListener")[0])
 # 6b289, per Patrick: the rail's VERSION cell never ellipsizes a nightly —
 # the word "nightly" goes, the commit stays ("6.0.4 · e6fb576")
 _ns2 = {"os": os, "re": re, "APP_VERSION": "6.0.4", "APP_NIGHTLY": "3 e6fb576", "APP_RC": 0,
