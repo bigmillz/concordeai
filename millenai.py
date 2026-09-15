@@ -79,7 +79,7 @@ try:
 except ImportError:
     HAS_WEBVIEW = False
 
-APP_VERSION = "6.0.2"   # bump here — UI, window, DMG all follow
+APP_VERSION = "6.0.3"   # bump here — UI, window, DMG all follow
 # BETA HOLD (per Patrick): the 6.x line is beta until the kinks are out.
 # While > 0: every display surface says "beta N", release.sh publishes
 # as a GitHub PRERELEASE, and — because the desktop updater reads

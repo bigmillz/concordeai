@@ -4617,3 +4617,15 @@ RC1, RC2…; `./release.sh 6.1.0` (or patch/minor/major) ships stable and
 clears the hold. release.sh stamps APP_BETA/APP_RC itself and names the
 commit and the GitHub title by the same label. Nightlies keep rolling
 on every push and never touch the counter.
+
+## 6b287 — the disk image tells the truth, in the wordmark's face (uncut)
+
+Per Patrick (screenshot of the nightly DMG reading "6.0.2"): the DMG
+window title and the line under the mark now carry the app's own
+label — "6.0.3 nightly 7a23650", "6.1 beta 2", "6.1 RC1" — mirrored in
+build_dmg.sh from the same constants CI stamps before building. The
+filename stays ConcordeAI-<raw version>.dmg (the site and the updater
+read it). The wordmark is set in the bundled Michroma (fonts/) with the
+app's exact AI recipe instead of the old Helvetica stand-in. Working
+version moved to 6.0.3: 6.0.2 has shipped, so nightlies run ahead of
+it; `./release.sh beta 6.0.3` opens that line at beta 1.

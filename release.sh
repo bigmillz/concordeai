@@ -53,8 +53,11 @@ if arg == "beta":
             cur, beta, rc, new_line = arg2, 0, 0, True
     if rc:
         sys.exit(f"{cur} is already at RC{rc} — ./release.sh rc, or ./release.sh {cur} for stable")
-    if not beta and not new_line:
-        sys.exit(f"{cur} is a stable line — start a new one: ./release.sh beta X.Y.Z")
+    if not beta and not arg2:
+        # the working version runs ahead of the last stable (nightlies
+        # are 6.0.3 while 6.0.2 is out), so an explicit version opens
+        # its line at beta 1; a bare "beta" on a stable line is ambiguous
+        sys.exit(f"{cur} has no betas yet — name the line: ./release.sh beta {cur}")
     if beta >= 9:
         # single-digit, Apple-style: nine betas is the cap for a line
         sys.exit(f"{cur} already has {beta} betas — ./release.sh rc, or ./release.sh {cur} for stable")

@@ -7,15 +7,32 @@ cd "$(dirname "$0")"
 ./build_macos_app.sh
 
 VER="$(python3 -c "import re;print(re.search(r'APP_VERSION = \"([^\"]+)\"', open('millenai.py').read()).group(1))")"
-VOL="ConcordeAI $VER"          # VOLUME label - a human label, keeps the space
-# FILENAME - hyphenated on purpose. GitHub rewrites spaces to dots in
-# release-asset names, which is why the .dmg used to land as
-# "ConcordeAI.6.1.0.dmg" while the zip and msi were hyphenated.
+# THE LABEL (6b287, per Patrick: "keep the version numbers in the DMG
+# window accurate… this should be one of the nightlies and reflect as
+# such"). The window title and the line under the mark carry the app's
+# own short_version() — "6.0.3 nightly 7a23650", "6.1 beta 2", "6.1 RC1",
+# "6.1" — mirrored here from the same constants CI stamps before building.
+LABEL="$(python3 - <<'PY'
+import re
+s = open("millenai.py", encoding="utf-8").read()
+v = re.search(r'APP_VERSION = "([^"]+)"', s).group(1)
+nightly = re.search(r'^APP_NIGHTLY = "([^"]*)"', s, re.M).group(1)
+beta = int(re.search(r"^APP_BETA = (\d+)", s, re.M).group(1))
+rc = int(re.search(r"^APP_RC = (\d+)", s, re.M).group(1))
+show = v[:-2] if v.count(".") >= 2 and v.endswith(".0") else v
+if nightly: show += " nightly " + nightly.split()[-1]
+elif rc:    show += " RC%d" % rc
+elif beta:  show += " beta %d" % beta
+print(show)
+PY
+)"
+VOL="ConcordeAI $LABEL"        # VOLUME label = window title, keeps the spaces
+# FILENAME - hyphenated on purpose, RAW version only: the site and the
+# updater read the version off the asset name, and GitHub rewrites spaces
+# to dots in release-asset names ("ConcordeAI.6.1.0.dmg").
 DMGFILE="ConcordeAI-$VER.dmg"
-# DISPLAY form only — one trailing .0 falls away, matching short_version()
-# in the app (6.0.0 -> 6.0, 6.1.1 stays). The volume and the filename keep
-# the raw version, because those are artifacts, not labels.
-SHOW_VER="$VER"; [[ "$VER" == *.*.0 ]] && SHOW_VER="${VER%.0}"
+SHOW_VER="$LABEL"
+echo "→ label: $LABEL"
 
 VENV="$HOME/Library/Application Support/MillenAI/venv"
 "$VENV/bin/pip" install --quiet pillow
@@ -130,31 +147,43 @@ for py in range(gh):
         gp[px, py] = ramp((u - v + 1) / 2) + (255,)
 overlay.paste(grad, (int(wx), int(wy)), mask)
 
-# The wordmark. Michroma is a webfont the app pulls from Google and PIL
-# only has the system faces, so Helvetica stands in — sized to the SAME
-# cap height and tracked at the SAME rhythm. The letterforms differ;
-# the lockup's proportions do not. 6b257: the mark grew an AI, and the
-# AI is BOLD — the last two letters get a same-color stroke, the way
-# the app's synthetic 700 thickens single-weight Michroma. Tracking
-# still derives from the measured 8-letter ink width (6.7982 WH was
-# taken off "CONCORDE"), so the rhythm is unchanged and the two new
-# letters simply extend the mark; total ink is computed, not assumed.
-probe = font("/System/Library/Fonts/Helvetica.ttc", 100)
-bb = od.textbbox((0, 0), "CONCORDEAI", font=probe)
+# The wordmark, in the wordmark's own face (6b287, per Patrick: "fix the
+# font… to our wordmark"). The bundled Michroma the titlebar registers
+# (fonts/) is right here for PIL, so the disk image and the app carry ONE
+# lockup: size from the measured cap height, tracking from the measured
+# ink width (6.7982 WH off "CONCORDE" — the app's .2em rhythm), and the
+# AI exactly as the app sets it: regular weight at .865em with a .12em
+# same-colour stroke, raised .06em. No synthetic bold, no stand-in face.
+import os
+MICHROMA = "fonts/Michroma-Regular.ttf"
+assert os.path.exists(MICHROMA), "fonts/Michroma-Regular.ttf is missing"
+WHITE = (255, 255, 255, 255)
+probe = font(MICHROMA, 100)
+bb = od.textbbox((0, 0), "CONCORDE", font=probe)
 FS = int(round(100 * CAP / (bb[3] - bb[1])))
-wm = font("/System/Library/Fonts/Helvetica.ttc", FS)
+wm = font(MICHROMA, FS)
 track = (WORD_W - sum(od.textlength(ch, font=wm)
                       for ch in "CONCORDE")) / 7.0
-BOLD = max(1, int(round(FS * 0.035)))
-INK = (sum(od.textlength(ch, font=wm) for ch in "CONCORDEAI")
-       + track * 9.0 + BOLD * 2)
-cx, base = (W - INK) / 2, wy + WH + GAP
-topy = base - od.textbbox((0, 0), "C", font=wm)[1]
-for i, ch in enumerate("CONCORDEAI"):
-    sw = BOLD if i >= 8 else 0
-    od.text((cx, topy), ch, font=wm, fill=(255, 255, 255, 255),
-            stroke_width=sw, stroke_fill=(255, 255, 255, 255))
-    cx += od.textlength(ch, font=wm) + track + (sw * 2 if sw else 0)
+AI_FS = int(round(FS * 0.865))
+ai = font(MICHROMA, AI_FS)
+# a CSS stroke straddles the outline (half out); PIL's grows outward only
+AI_SW = max(1, int(round(AI_FS * 0.12 / 2)))
+AI_UP = AI_FS * 0.06
+INK = (sum(od.textlength(ch, font=wm) for ch in "CONCORDE")
+       + sum(od.textlength(ch, font=ai) + AI_SW * 2 for ch in "AI")
+       + track * 9.0)
+cx, base = (W - INK) / 2, wy + WH + GAP      # base = the cap TOP line
+hb, hab = od.textbbox((0, 0), "H", font=wm), od.textbbox((0, 0), "H", font=ai)
+topy = base - hb[1]
+# the smaller AI shares the baseline (cap bottom), then rises .06em
+ai_topy = base + (hb[3] - hb[1]) - (hab[3] - hab[1]) - AI_UP - hab[1]
+for ch in "CONCORDE":
+    od.text((cx, topy), ch, font=wm, fill=WHITE)
+    cx += od.textlength(ch, font=wm) + track
+for ch in "AI":
+    od.text((cx + AI_SW, ai_topy), ch, font=ai, fill=WHITE,
+            stroke_width=AI_SW, stroke_fill=WHITE)
+    cx += od.textlength(ch, font=ai) + AI_SW * 2 + track
 
 # the version sits quietly under the mark, not welded into it
 sub = font("/System/Library/Fonts/Helvetica.ttc", 30)

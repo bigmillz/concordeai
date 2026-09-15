@@ -165,6 +165,17 @@ check("betas numbered per line, not by build",
       and 'SHOW="$SHOW beta $BETA"' in _REL_SH
       and 'if arg == "beta":' in _REL_SH and 'elif arg == "rc":' in _REL_SH
       and "APP_BETA = True" not in _REL_SH)
+# 6b287, per Patrick: the disk image's window title and the line under
+# the mark carry the app's own label (nightly + commit, beta N, RC), and
+# the wordmark is set in the bundled Michroma, not a Helvetica stand-in
+_DMG_SH = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "build_dmg.sh"), encoding="utf-8").read()
+check("dmg window: true label, wordmark in Michroma",
+      'VOL="ConcordeAI $LABEL"' in _DMG_SH
+      and "APP_NIGHTLY" in _DMG_SH and "APP_BETA" in _DMG_SH
+      and 'MICHROMA = "fonts/Michroma-Regular.ttf"' in _DMG_SH
+      and "Helvetica.ttc\", FS)" not in _DMG_SH
+      and 'DMGFILE="ConcordeAI-$VER.dmg"' in _DMG_SH)
 # 6b285: three update channels replace the beta checkbox
 check("update channel picker: stable / beta / nightly",
       'id="upchan"' in page and 'value="nightly"' in page
