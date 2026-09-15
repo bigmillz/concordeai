@@ -199,6 +199,18 @@ check("what's new endpoint answers for this build",
       and 'fetch("/api/update/whatsnew")' in page
       and 'prefs.get("last_ident")' in _MILLENAI_SRC
       and "ident = short_version()" in _MILLENAI_SRC)
+# 6b289, per Patrick: the rail's VERSION cell never ellipsizes a nightly —
+# the word "nightly" goes, the commit stays ("6.0.4 · e6fb576")
+_ns2 = {"os": os, "re": re, "APP_VERSION": "6.0.4", "APP_NIGHTLY": "3 e6fb576", "APP_RC": 0,
+        "APP_BETA": 0}
+_sv = re.search(r"def short_version\(.*?def spec_version\(.*?"
+                r"return short_version\(\)\.replace\(\" nightly \", \" \\u00b7 \"\)\n",
+                _MILLENAI_SRC, re.S)
+exec(_sv.group(0), _ns2) if _sv else None
+check("rail version cell: nightly reads '6.0.4 · e6fb576'",
+      _ns2.get("spec_version", lambda: "")() == "6.0.4 \u00b7 e6fb576"
+      and 'id="about-ver">6.0.4<' in page
+      and "__APP_VER_SPEC__" not in page)
 # 6b287, per Patrick: the disk image's window title and the line under
 # the mark carry the app's own label (nightly + commit, beta N, RC), and
 # the wordmark is set in the bundled Michroma, not a Helvetica stand-in

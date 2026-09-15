@@ -136,6 +136,15 @@ def short_version(v: str = None) -> str:
         # though both read the same on screen.
         return v + " RC%d" % APP_RC
     return v + (" beta %d" % APP_BETA if APP_BETA else "")
+
+
+def spec_version() -> str:
+    """The rail's spec cell is a few mono characters short of a nightly's
+    full name (6b289, per Patrick: "VERSION 6.0.4 NIGHTLY E6F…" —
+    "consolidate that version number so there's no ellipsis"). There the
+    commit alone says nightly — no other build carries one — so the
+    word goes: "6.0.4 · e6fb576". Betas and RCs already fit."""
+    return short_version().replace(" nightly ", " \u00b7 ")
 APP_BUILD = 272               # integer compared against the GitHub release tag
 APP_BUILD_DATE = ""         # ISO date; blank falls back to this file's mtime
 try:                          # feeds the page ETag: an edited source must
@@ -8129,6 +8138,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          )[:32]))
                     .replace("__JUST_UPDATED__", json.dumps(
                         _JUST_UPDATED[0] if not self._remote() else ""))
+                    .replace("__APP_VER_SPEC__", spec_version())
                     .replace("__APP_VER__", short_version()
                              + (" \u00b7 test build" if os.environ.get(
                                  "MILLENAI_TESTBUILD") else "")))
@@ -13710,7 +13720,7 @@ __CODE_ROWS__
         <svg id="set-wing" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="swg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#swg)" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>Concorde<b>AI</b></b>
       </div>
       <dl id="set-spec">
-        <div><dt>version</dt><dd id="about-ver">__APP_VER__</dd></div>
+        <div><dt>version</dt><dd id="about-ver">__APP_VER_SPEC__</dd></div>
         <div><dt>chip</dt><dd id="spec-chip">__CHIP__</dd></div>
         <div><dt>memory</dt><dd id="spec-mem">&mdash;</dd></div>
         <div><dt>accel</dt><dd id="spec-accel">&mdash;</dd></div>
