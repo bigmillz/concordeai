@@ -3260,8 +3260,10 @@ def generate_image(prompt: str) -> tuple:
         os.makedirs(IMAGE_DIR, exist_ok=True)
         iid = "%d-%s" % (int(time.time()), secrets.token_hex(3))
         out = os.path.join(IMAGE_DIR, iid + ".png")
+        # mflux 0.19: a local/third-party model is --model <dir> with
+        # --base-model naming the architecture (the old --path is gone)
         cmd = [os.path.join(IMAGE_VENV, "bin", "mflux-generate"),
-               "--model", "schnell", "--path", _image_snapshot(),
+               "--model", _image_snapshot(), "--base-model", "schnell",
                "--prompt", prompt, "--steps", "4",
                "--seed", str(secrets.randbelow(10 ** 6)),
                "--width", "1024", "--height", "1024", "--output", out]
@@ -10774,7 +10776,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             except Exception as exc:
                 step("image", "Couldn\u2019t generate the image", "done",
                      str(exc)[:70])
-                if image_supported():
+                if image_ready():
+                    emit("The painter on this Mac hit a snag and the cloud "
+                         "couldn\u2019t step in \u2014 try once more in a moment. "
+                         "(%s)" % str(exc)[:160])
+                elif image_supported():
                     emit("I can\u2019t make pictures on this Mac yet. Add image "
                          "generation under **Settings \u203a Models \u203a Manage "
                          "models** \u2014 FLUX.1 schnell, about %.1f GB, runs "
