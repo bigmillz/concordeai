@@ -3238,9 +3238,15 @@ def image_status() -> dict:
 
 
 def _write_image_bytes(data: bytes) -> str:
+    """Save what a cloud painter returned under its TRUE type — the
+    community cloud sends JPEG, Gemini PNG — so the route can serve an
+    honest Content-Type (a JPEG called .png is a coin toss in WebKit)."""
     os.makedirs(IMAGE_DIR, exist_ok=True)
+    ext = (".jpg" if data[:2] == b"\xff\xd8"
+           else ".webp" if data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+           else ".png")
     iid = "%d-%s" % (int(time.time()), secrets.token_hex(3))
-    out = os.path.join(IMAGE_DIR, iid + ".png")
+    out = os.path.join(IMAGE_DIR, iid + ext)
     with open(out, "wb") as f:
         f.write(data)
     return out
@@ -3268,7 +3274,9 @@ def generate_image(prompt: str) -> tuple:
             errs.append("local: %s" % exc)
     gem = (_cloud_all().get("providers") or {}).get("gemini") or {}
     if gem.get("key") and gem.get("status", "ok") == "ok":
-        for mdl in ("gemini-2.5-flash-image", "gemini-2.5-flash-image-preview"):
+        # newest first, as Google lists them today (6b294, probed live)
+        for mdl in ("gemini-3.1-flash-lite-image", "gemini-3.1-flash-image",
+                    "gemini-2.5-flash-image"):
             try:
                 req = urllib.request.Request(
                     "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -3298,6 +3306,9 @@ def generate_image(prompt: str) -> tuple:
             ct = r.headers.get("Content-Type", "")
             data = r.read()
         if ct.startswith("image/") and len(data) > 4000:
+            if errs:
+                print("image: fell through to the community cloud: "
+                      + "; ".join(errs)[:400], file=sys.stderr)
             return _write_image_bytes(data), "community"
         errs.append("community: not an image")
     except Exception as exc:
@@ -8716,16 +8727,18 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._send_json(dict(_update))
         elif self.path == "/api/update/whatsnew":
             self._send_json(whats_new(_JUST_UPDATED[0]))
-        elif self.path.startswith("/api/image/") and self.path.endswith(".png"):
+        elif self.path.startswith("/api/image/") and self.path.endswith(
+                (".png", ".jpg", ".webp")):
             iid = self.path[len("/api/image/"):]
             pth = os.path.join(IMAGE_DIR, iid)
-            if not re.fullmatch(r"[\w-]+\.png", iid) or not os.path.exists(pth):
+            if not re.fullmatch(r"[\w-]+\.(png|jpg|webp)", iid) or not os.path.exists(pth):
                 self.send_error(404)
                 return
             with open(pth, "rb") as f:
                 data = f.read()
             self.send_response(200)
-            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Type", {"png": "image/png", "jpg": "image/jpeg",
+                                              "webp": "image/webp"}[iid.rsplit(".", 1)[1]])
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", "private, max-age=86400")
             self.end_headers()
