@@ -4687,3 +4687,18 @@ faked a bar with a hard gradient split under its text. Now the strip
 alone speaks while anything downloads ("downloading models · 52% ·
 13.9 MB/s · ~4 min"), the pill hides, and one read drives both. The
 pill's own poller only runs when nothing is downloading.
+
+## 6b292 — visual effects, the cog, and update checks by choice (uncut)
+
+Per Patrick. (1) "Performance mode" leaves the sidebar and becomes
+"Enable visual effects" in Settings › About under the update settings.
+(2) It now touches ONE thing: the moving backdrop (`body.novideo` hides
+#skyline, solid composer and sidebar). Spinners, halos, theatre, message
+animations and telemetry no longer care; the eleven other body.perf
+rules are gone and the body:not(.perf) rules are unconditional. The old
+localStorage key migrates (perf on -> video off). (3) The settings cog
+moves into the brand row, left of the new-chat pen. (4) "Check for
+updates automatically" switch (pref `auto_update_check`, default on):
+on = at launch and daily (was hourly); off = only the button asks —
+the server answers automatic calls with an honest "off", uncached, and
+the About pane says so.

@@ -3233,6 +3233,12 @@ def check_update(force=False):
     as an authoritative "no update" for 15 minutes — and the cache is
     keyed to the beta pref, so toggling the channel never serves the
     other channel's verdict."""
+    # AUTOMATIC CHECKS ARE A CHOICE (6b292, per Patrick): with the About
+    # switch off, only the button (force) reaches GitHub — the launch and
+    # daily calls get an honest "off", uncached.
+    if not force and load_prefs(None).get("auto_update_check") is False:
+        return {"configured": True, "available": False, "auto": False,
+                "note": "automatic checks are off"}
     if not UPDATE_REPO:
         return {"configured": False, "available": False}
     beta = update_channel()          # the cache is keyed per channel
@@ -10868,8 +10874,7 @@ if("__WIN_WIPE__"==="1"&&
   // hostname check: remote/tunnel visitors share this server but sit in a
   // real browser, where a transparent page is a white flash, not a desktop
   try{
-    if(localStorage.getItem("millen.perf")!=="1")
-      document.documentElement.classList.add("winwipe");
+    document.documentElement.classList.add("winwipe");
   }catch(e){}
   // DEAD-MAN'S SWITCH, in THIS script: the unclip normally runs from the
   // main script — when a bug killed the main script, the page stayed
@@ -10959,7 +10964,7 @@ html.winwipe.winwipe-run body{
   box-shadow:inset -1px 0 0 rgba(0,0,0,.25);
   display:flex;flex-direction:column;padding:16px 16px;gap:8px;
 }
-body.perf #sidebar{
+body.novideo #sidebar{
   background:var(--panel);
   -webkit-backdrop-filter:none;backdrop-filter:none;
 }
@@ -10980,6 +10985,10 @@ body.resizing{cursor:col-resize;user-select:none}
    never drops below the text */
 #brand-row{display:flex;align-items:center;gap:5px;flex-wrap:nowrap}
 #brand-row #newchat{margin-left:2px}
+/* 6b292, per Patrick: the cog sits left of the pen, top left */
+#brand-row #settings-btn{margin-left:2px}
+#p-about .toggle-row{margin-top:10px;font-size:12px;padding:2px 2px}
+#p-about .toggle-row span{color:var(--dim)}
 #update-flag{margin-top:4px}
 #update-flag{
   font-family:var(--mono);font-size:10px;letter-spacing:.12em;
@@ -11121,9 +11130,7 @@ body.resizing{cursor:col-resize;user-select:none}
   color:var(--accent-hot);cursor:pointer;padding:0;
   transition:border-color .15s,background .15s,color .15s;
 }
-#settings-btn{color:var(--dim);margin-top:14px}
-#settings{display:flex;align-items:center;gap:8px}
-#settings #perf-toggle{flex:1}
+#settings-btn{color:var(--dim)}
 #newchat svg{width:15px;height:15px}
 #settings-btn svg{width:15px;height:15px}
 #newchat:hover,#settings-btn:hover{border-color:var(--accent-hot);background:var(--accent-dim);color:var(--text)}
@@ -11159,7 +11166,7 @@ body.resizing{cursor:col-resize;user-select:none}
   background:rgba(255,255,255,.07)}
 #dlstrip .dlfill{height:100%;width:0;border-radius:0;background:#ecedf2;
   transition:width .6s cubic-bezier(.4,0,.2,1)}
-body:not(.perf) #dlstrip .dlfill{animation:barBreathe 2.4s ease-in-out infinite}
+#dlstrip .dlfill{animation:barBreathe 2.4s ease-in-out infinite}
 #dlstrip .dllbl{font-family:var(--mono);font-size:9.5px;
   letter-spacing:.12em;color:var(--faint);white-space:nowrap}
 #dlstrip:hover .dllbl{color:var(--dim)}
@@ -11177,7 +11184,6 @@ body:not(.perf) #dlstrip .dlfill{animation:barBreathe 2.4s ease-in-out infinite}
   pointer-events:none}
 #mode-tabs.code #tab-glide{transform:translateX(100%)}
 #mode-tabs.funnel #tab-glide{transform:translateX(200%)}
-body.perf #tab-glide{transition:none}
 #mode-tabs .ltab{
   position:relative;z-index:1;
   flex:1;font-family:var(--mono);font-size:11px;
@@ -11529,7 +11535,6 @@ input.crename{flex:1;min-width:0;background:rgba(0,0,0,.45);
    above the monitor panel. margin-top:auto already pins this
    row to the bottom of the rail, so closing the gap UNDER it is
    what actually moves it down. */
-#settings{padding:14px 6px 0;margin-top:auto}
 .toggle-row{
   display:flex;align-items:center;gap:10px;cursor:pointer;
   color:var(--dim);font-size:12.5px;user-select:none;
@@ -11591,7 +11596,7 @@ input.crename{flex:1;min-width:0;background:rgba(0,0,0,.45);
   background:rgba(255,255,255,.07)}
 .pbar-fill{height:100%;width:0;border-radius:0;background:#ecedf2;
   transition:width .5s cubic-bezier(.4,0,.2,1)}
-body:not(.perf) .pbar-fill{animation:barBreathe 2.4s ease-in-out infinite}
+.pbar-fill{animation:barBreathe 2.4s ease-in-out infinite}
 .meter{height:2px;border-radius:0;background:rgba(255,255,255,.07);
   overflow:hidden}
 .meter .mfill{height:100%;width:0;border-radius:0;
@@ -11609,7 +11614,6 @@ body:not(.perf) .pbar-fill{animation:barBreathe 2.4s ease-in-out infinite}
 /* ------------------------------------------------------------------ main */
 #main{flex:1;height:100%;display:flex;flex-direction:column;position:relative}
 #stars{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
-body.perf #stars{display:none}
 /* The skyline: one of Apple's ATV aerial clips of New York, hidden behind
    the same travelling diagonal mask that paints the wordmark — the launch
    wash REVEALS the city out of darkness as its front crosses, and the
@@ -11658,7 +11662,7 @@ body.gen #skyload{display:none!important}
   background:rgba(255,255,255,.10)}
 #skyload .fill{height:100%;width:0;border-radius:0;background:#ecedf2;
   transition:width .5s cubic-bezier(.4,0,.2,1)}
-body:not(.perf) #skyload .fill{animation:barBreathe 2.4s ease-in-out infinite}
+#skyload .fill{animation:barBreathe 2.4s ease-in-out infinite}
 #skyload .lbl{margin-top:13px;font-size:13px;letter-spacing:.24em;
   text-transform:uppercase;color:#dfe3ee;font-family:var(--mono);
   text-shadow:0 2px 14px rgba(0,0,0,.7)}
@@ -11667,9 +11671,8 @@ body:not(.perf) #skyload .fill{animation:barBreathe 2.4s ease-in-out infinite}
 body.painting #sky-color{
   transition:-webkit-mask-position 4.2s linear .3s,mask-position 4.2s linear .3s;
 }
-body.perf #skyline{display:none}
+body.novideo #skyline{display:none}
 #chat-scroll{flex:1;overflow-y:auto;overflow-x:hidden;scroll-behavior:smooth;position:relative;z-index:1}
-body.perf #chat-scroll{scroll-behavior:auto}
 #chat-inner{
   max-width:780px;margin:0 auto;padding:36px 24px 150px;
   -webkit-user-select:text;user-select:text;   /* chat is copyable */
@@ -11726,7 +11729,6 @@ body.perf #chat-scroll{scroll-behavior:auto}
 #hero h1 .halo{display:none}
 #halo-cv{position:absolute;z-index:-1;pointer-events:none;opacity:0}
 body.painted #halo-cv{opacity:1;transition:opacity 1.2s ease .3s}
-body.perf #halo-cv{display:none}
 /* once painted it stays painted */
 body.painted #hero h1 .halo span,body.painted #hero h1::after{
   -webkit-mask-position:0 0;mask-position:0 0;
@@ -11758,11 +11760,7 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
   36%{opacity:1}46%{opacity:.8}56%,100%{opacity:1}
 }
 @keyframes rainbow{from{background-position:0% 50%}to{background-position:200% 50%}}
-body.perf #hero h1{animation:none}
 /* performance mode skips the theatre — show it lit immediately */
-body.perf #hero h1 .halo span,body.perf #hero h1::after{
-  animation:none;-webkit-mask-position:0 0;mask-position:0 0;
-}
 #hero p{color:var(--dim);font-size:15px}
 /* the greeting reads as a headline, not a caption */
 #hero .greet{
@@ -11782,7 +11780,6 @@ body.perf #hero h1 .halo span,body.perf #hero h1::after{
 #hero .beta-tag .vnum{color:#c9c9c9;font-weight:700;letter-spacing:.18em}
 
 .msg{margin-bottom:20px;animation:rise .25s ease both}
-body.perf .msg{animation:none}
 @keyframes rise{from{opacity:0;transform:translateY(6px)}}
 .msg .who{
   font-family:var(--mono);font-size:10px;letter-spacing:.14em;
@@ -11885,7 +11882,7 @@ body.perf .msg{animation:none}
 .autoseg[data-a="full"].on{border-color:rgba(226,109,90,.85);
   background:rgba(226,109,90,.15);
   box-shadow:inset 0 0 0 1px rgba(226,109,90,.45)}
-body:not(.perf) .autoseg[data-a="full"].on .ai{animation:flameP 1.5s ease infinite}
+.autoseg[data-a="full"].on .ai{animation:flameP 1.5s ease infinite}
 @keyframes flameP{0%,100%{transform:scale(1);opacity:.85}
   50%{transform:scale(1.18);opacity:1}}
 #remote-row{display:flex;gap:6px;margin-bottom:6px}
@@ -11934,13 +11931,13 @@ body:not(.perf) .autoseg[data-a="full"].on .ai{animation:flameP 1.5s ease infini
   overflow:hidden;margin-bottom:10px}
 .wtbar i{display:block;height:100%;border-radius:0;background:#ecedf2;
   transition:width .45s cubic-bezier(.4,0,.2,1)}
-body:not(.perf) .wtbar i{animation:barBreathe 2.4s ease-in-out infinite}
+.wtbar i{animation:barBreathe 2.4s ease-in-out infinite}
 /* 6b257: the machinery holds back for the run's first 5s — quick
    answers stay machinery-free, slow ones fade the card in when
    paintSteps lifts .warm. max-height snaps (no transition to auto);
    only the opacity fades, which is the part the eye follows. */
 .worktree.warm{opacity:0;max-height:0;overflow:hidden;margin:0;padding:0}
-body:not(.perf) .worktree{transition:opacity .5s ease}
+.worktree{transition:opacity .5s ease}
 /* the bare boot spinner yields once the card is showing */
 .worktree:not(.warm)~.statusline{display:none}
 .wtsub{display:flex;align-items:center;gap:10px;margin:-4px 0 8px}
@@ -11960,7 +11957,6 @@ body:not(.perf) .worktree{transition:opacity .5s ease}
   border-top-color:rgba(255,255,255,.9);vertical-align:-3px;
   animation:cspin .7s linear infinite}
 @keyframes cspin{to{transform:rotate(360deg)}}
-body.perf .cspin{animation:none}
 .statusline .cspin{width:12px;height:12px;margin-right:6px}
 .wthead .wtbar{flex:1;margin-bottom:0}
 .wtspin{display:inline-block;flex:none;font-style:normal;font-size:14px;
@@ -11968,7 +11964,7 @@ body.perf .cspin{animation:none}
   background:linear-gradient(120deg,#f5f6f8,#c8ccd5,#9aa0ac,#e2e5ea,#8f95a1,#d5d8df,#f5f6f8);
   -webkit-background-clip:text;background-clip:text;color:transparent;
   filter:drop-shadow(0 0 8px rgba(220,225,235,.35))}
-body:not(.perf) .wtspin{animation:wtspin 1.5s linear infinite}
+.wtspin{animation:wtspin 1.5s linear infinite}
 @keyframes wtspin{to{transform:rotate(360deg)}}
 .wtrow{display:flex;align-items:center;gap:9px;padding:3px 0;
   font-size:12.5px;color:var(--faint)}
@@ -11977,7 +11973,7 @@ body:not(.perf) .wtspin{animation:wtspin 1.5s linear infinite}
   background:rgba(255,255,255,.25)}
 .wtrow.ok .wtdot{background:#8fe0a8}
 .wtrow.run .wtdot{background:#e6d48f}
-body:not(.perf) .wtrow.run .wtdot{animation:blink 1s ease-in-out infinite}
+.wtrow.run .wtdot{animation:blink 1s ease-in-out infinite}
 .wtl{flex:none}
 .wtd{flex:1;min-width:0;color:var(--faint);opacity:.75;font-size:11.5px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -12174,7 +12170,7 @@ body:not(.perf) .wtrow.run .wtdot{animation:blink 1s ease-in-out infinite}
   background:rgba(255,255,255,.07)}
 .blendprog .fill{height:100%;width:0;border-radius:0;background:#ecedf2;
   transition:width .5s cubic-bezier(.4,0,.2,1)}
-body:not(.perf) .blendprog .fill{animation:barBreathe 2.4s ease-in-out infinite}
+.blendprog .fill{animation:barBreathe 2.4s ease-in-out infinite}
 
 .draft{
   border-left:2px solid var(--line);margin:8px 0 0;padding:2px 0 2px 12px;
@@ -12188,13 +12184,12 @@ body:not(.perf) .blendprog .fill{animation:barBreathe 2.4s ease-in-out infinite}
 .draft .dt{color:var(--dim);font-size:13px;line-height:1.55;margin-top:3px;
   max-height:150px;overflow:hidden;white-space:pre-wrap}
 .draft.empty .dt{color:var(--faint);font-style:italic}
-body.perf .draft{animation:none}
 
 .statusline{
   display:block;font-family:var(--mono);font-size:11px;
   color:var(--accent);margin-bottom:9px;letter-spacing:.04em;
 }
-body:not(.perf) .statusline{animation:blink 1.4s ease infinite}
+.statusline{animation:blink 1.4s ease infinite}
 .model.picked{
   color:var(--text);background:var(--accent-dim);
   border-color:rgba(255,255,255,.22);
@@ -12325,7 +12320,7 @@ body:not(.perf) .statusline{animation:blink 1.4s ease infinite}
 /* 6b243, per Patrick: no hairline. Perf mode drew a 1px rule right
    across the window under the hero — the backdrop is off in perf mode
    so nothing needed separating, and it read as a rendering artefact. */
-body.perf #composer-wrap{background:var(--bg);padding-top:14px}
+body.novideo #composer-wrap{background:var(--bg);padding-top:14px}
 /* the box sits IN FLOW under the greeting — a pinned percentage
    collided with two-line greetings (seen live) */
 #main:has(#hero) #chat-scroll{flex:0 0 auto;overflow:visible}
@@ -12351,7 +12346,6 @@ body.gen #skyline{filter:brightness(.62) saturate(.9)}
 .msg.ai .body{animation:answerIn .5s ease both}
 @keyframes answerIn{from{opacity:0;transform:translateY(3px)}
                     to{opacity:1;transform:none}}
-body.perf .msg.ai .body{animation:none}
 #composer:focus-within{border-color:rgba(255,255,255,.28);
   box-shadow:0 0 0 1px var(--accent-dim),
              0 10px 34px -14px var(--bwglow,rgba(150,160,255,.4))}
@@ -12382,7 +12376,6 @@ body.gen #composer{
   box-shadow:0 0 34px rgba(255,255,255,.10),0 0 90px rgba(255,255,255,.05);
 }
 body.gen #chip-model{color:var(--accent)}
-body.perf #composer{box-shadow:none}
 #input{
   flex:1;background:none;border:none;outline:none;resize:none;
   color:var(--text);font:14.5px/1.5 var(--sans);max-height:180px;
@@ -12416,7 +12409,7 @@ body.perf #composer{box-shadow:none}
    once the voice path has its own fast lane. */
 #voicebtn.parked{opacity:.3;cursor:not-allowed}
 #voicebtn.parked:hover{background:none;color:rgba(255,255,255,.78)}
-body:not(.perf) #mic.rec{animation:blink 1s ease infinite}
+#mic.rec{animation:blink 1s ease infinite}
 /* the settings row INSIDE the box (6.0b3, Claude-style): engine pill
    left, actions right */
 #crow{display:flex;align-items:center;justify-content:space-between;
@@ -13204,7 +13197,7 @@ body:not(.perf) #mic.rec{animation:blink 1s ease infinite}
   overflow:hidden;margin:10px 0 12px}
 .big-bar i{display:block;height:100%;width:0;border-radius:0;
   background:#ecedf2;transition:width .5s cubic-bezier(.4,0,.2,1)}
-body:not(.perf) .big-bar i{animation:barBreathe 2.4s ease-in-out infinite}
+.big-bar i{animation:barBreathe 2.4s ease-in-out infinite}
 .big-stat{display:flex;justify-content:space-between;font-family:var(--mono);
   font-size:11px;color:var(--dim)}
 .big-speed{font-family:var(--mono);font-size:11px;color:var(--teal);margin-top:6px}
@@ -13495,6 +13488,7 @@ body:not(.perf) .big-bar i{animation:barBreathe 2.4s ease-in-out infinite}
   <div id="brand-wrap">
     <div id="brand-row">
     <span class="vghost" title="MillenAI"><svg id="vmark" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="vmg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#vmg)" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>Concorde<b>AI</b></b></span>
+<button id="settings-btn" title="Settings — preferences &amp; about"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg></button>
 <button id="newchat" title="New chat">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
            stroke-linecap="round" stroke-linejoin="round">
@@ -13603,13 +13597,6 @@ __CODE_ROWS__
 
   </div>
 
-  <div id="settings">
-    <div class="toggle-row" id="perf-toggle" style="margin-top:14px">
-      <div class="switch"></div>
-      Performance mode
-    </div>
-    <button id="settings-btn" title="Settings — preferences &amp; about"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg></button>
-  </div>
 
   <div id="telemetry">
     <div class="t-head"><span>__CHIP__</span></div>
@@ -13819,6 +13806,15 @@ __CODE_ROWS__
         <select id="upchan"><option value="stable">Stable</option>
           <option value="beta">Beta</option>
           <option value="nightly">Nightly</option></select></label>
+      <!-- 6b292, per Patrick: automatic checks are a choice — on, the
+           app checks at launch and daily; off, the button above is the
+           only check. And "performance mode" is now just the backdrop. -->
+      <div class="toggle-row" id="autochk-toggle"
+           title="On: checks at launch and once a day. Off: only when you click Check for updates.">
+        <div class="switch"></div><span>Check for updates automatically</span></div>
+      <div class="toggle-row" id="fx-toggle"
+           title="The moving backdrop behind the chat. Everything else stays as it is.">
+        <div class="switch"></div><span>Enable visual effects</span></div>
     </section>
     <!-- ACCOUNT sits directly under About (6b260, per Patrick):
          identity reads as part of the front matter, not a footnote. -->
@@ -14166,11 +14162,16 @@ const IS_LOCAL=location.hostname==="127.0.0.1"||location.hostname==="localhost";
 /* ------------------------------------------------------------- state */
 let messages=[], generating=false, abortCtl=null;
 let model=localStorage.getItem("millen.model")||"Llama 3.2 3B";
-let perf=localStorage.getItem("millen.perf")==="1";
+// VISUAL EFFECTS (6b292, per Patrick): the old "performance mode"
+// switched off spinners, halos, theatre and telemetry too. Now it is ONE
+// thing — the moving backdrop — and lives in Settings › About. The old
+// key migrates: a machine that had performance mode on keeps its video off.
+let noVideo=localStorage.getItem("millen.video")==="0"
+  ||(localStorage.getItem("millen.video")===null&&localStorage.getItem("millen.perf")==="1");
 const autoWeb=true;   // live web is ALWAYS on now — no switch
 let combine=false;   // superseded by tiers
 let voiceChat=localStorage.getItem("millen.voice")==="1";
-let statsTimer=null;   // telemetry poll handle; perf mode clears it
+let statsTimer=null;   // telemetry poll handle (paused while hidden)
 let lastModels="";  // line-up the backend actually used
 let councilManual=false;
 // declared up here: setCombine() runs during boot and reads it, which would
@@ -14214,15 +14215,21 @@ function selectModel(name){
 }
 $$(".model").forEach(el=>el.addEventListener("click",()=>selectModel(el.dataset.model)));
 
-/* --------------------------------------------------------- perf mode */
-function setPerf(on){
-  perf=on; document.body.classList.toggle("perf",on);
-  $("#perf-toggle").classList.toggle("on",on);
-  localStorage.setItem("millen.perf",on?"1":"0");
-  applyStatsPolling();   // hoisted; safe to call before the telemetry block
+/* ---------------------------------------------------- visual effects */
+function setVideo(on){
+  noVideo=!on; document.body.classList.toggle("novideo",noVideo);
+  const t=$("#fx-toggle");if(t)t.classList.toggle("on",on);
+  localStorage.setItem("millen.video",on?"1":"0");
+  const v=$("#sky-color");
+  if(!on){if(v&&!v.paused)v.pause();}
+  else if(typeof bootSkyline==="function"){
+    if(v&&v.paused&&!skyline.hidden){const p=v.play();if(p&&p.catch)p.catch(()=>{});}
+    else bootSkyline();
+  }
 }
-$("#perf-toggle").addEventListener("click",()=>setPerf(!perf));
-setPerf(perf);
+document.body.classList.toggle("novideo",noVideo);
+(function(){const t=$("#fx-toggle");if(t){t.classList.toggle("on",!noVideo);
+  t.addEventListener("click",()=>setVideo(noVideo));}})();
 
 
 /* ------------------------------------------------------- voice chat */
@@ -16858,8 +16865,8 @@ function palActions(){
     {k:"new",t:"New chat",run:()=>$("#newchat").click()},
     {k:"go",t:"Settings",run:()=>openAbout()},
     {k:"go",t:"Model updates\u2026",run:()=>openSetup()},
-    {k:"set",t:"Toggle performance mode",
-     run:()=>$("#perf-toggle").click()},
+    {k:"set",t:"Toggle visual effects",
+     run:()=>$("#fx-toggle").click()},
   ];
   // tier names come from TIER_META — the same object the composer's
   // picker is built from, so ⌘K can never drift from the dropdown
@@ -17036,15 +17043,11 @@ async function pollStats(){
     fm.firstChild.classList.toggle("hot",(fleetStat.busy||0)>0);
   }
 }
-// polling is owned by applyStatsPolling so perf mode can shut it off
+// polling is owned by applyStatsPolling (paused only while hidden)
 // (statsTimer is declared with the rest of the state — re-declaring it here
 //  would orphan the timer setPerf already started at boot)
 function applyStatsPolling(){
-  if(perf){
-    if(statsTimer){clearInterval(statsTimer);statsTimer=null;}
-  }else if(!statsTimer){
-    pollStats();statsTimer=setInterval(pollStats,2000);
-  }
+  if(!statsTimer){pollStats();statsTimer=setInterval(pollStats,2000);}
 }
 applyStatsPolling();
 
@@ -17129,8 +17132,10 @@ document.addEventListener("visibilitychange",()=>{
 // its moment; a different clip plays every launch, nothing stockpiles.
 const SKY_N=parseInt("__SKY_N__",10)||5;   // injected: len(SKY_SOURCES)
 const skyline=$("#skyline");
+let skyBooted=false;
 async function bootSkyline(){
-  if(perf||!skyline)return;
+  if(noVideo||!skyline||skyBooted)return;
+  skyBooted=true;
   // NO STOCKPILE, per Patrick: pick fresh every launch and let the bar
   // play its moment — the loading bar IS part of the show. The server
   // keeps only the last couple of files, never a 20 GB archive.
@@ -17532,7 +17537,7 @@ if(matchMedia("(pointer:fine)").matches){
   // forever, even with the mouse still (M4 "gobbling", per Patrick)
   const skv=$("#sky-color");let pxT=0,pyT=0,pxN=0,pyN=0,paraOn=false;
   function paraStep(){
-    if(document.body.classList.contains("perf")||generating){paraOn=false;return;}
+    if(generating){paraOn=false;return;}
     pxN+=(pxT-pxN)*.04;pyN+=(pyT-pyN)*.04;
     skv.style.transform="scale(1.05) translate("+(-pxN*16).toFixed(1)+"px,"+(-pyN*11).toFixed(1)+"px)";
     if(Math.abs(pxT-pxN)+Math.abs(pyT-pyN)<.0008){paraOn=false;return;}
@@ -17569,7 +17574,7 @@ function haloCap(){
   return haloOK;
 }
 function haloTick(){
-  if(perf||document.hidden||!haloCap())return;
+  if(document.hidden||!haloCap())return;
   const row=document.querySelector("#hero .h1row");
   const h1=row&&row.querySelector("h1");
   let cv=document.getElementById("halo-cv");
@@ -17925,7 +17930,7 @@ function techParty(cel){
 }
 function rainbowWipe(){
   const cel=$("#celebrate");
-  if(perf||!cel||wipeBusy)return;         // performance mode: no theatre
+  if(!cel||wipeBusy)return;
   wipeBusy=true;
   cel.hidden=false;
   cel.innerHTML="";
@@ -17970,7 +17975,6 @@ let setupManual=false;
 let setupPlan="pro";
 function celebrateDownloads(){
   const card=$("#setup-card"),veil=$("#setup-veil");
-  if(perf){closeSetup();return;}          // performance mode: no theatre
   // the card grows and dissolves, then the wipe runs
   card.classList.add("done");veil.classList.add("fading");
   setTimeout(()=>{
@@ -18468,6 +18472,7 @@ async function openAbout(){
       $("#turbo").checked=!!pr2.turbo;
       $("#contrib").checked=!!pr2.contrib_on;
       if($("#upchan"))$("#upchan").value=pr2.update_channel||(pr2.beta_updates?"beta":"stable");
+      $("#autochk-toggle").classList.toggle("on",pr2.auto_update_check!==false);
       $("#autoclean").checked=!!pr2.auto_cleanup;
       // unchecked features fold their furniture away (6.0b5)
       $("#fleet-box").hidden=!pr2.contrib_on;
@@ -18949,6 +18954,8 @@ async function paintUpdatesPane(){
     const r=await(await fetch("/api/update/check")).json();
     if(r.available)
       $("#up-reldate").textContent=r.latest+" is available";
+    else if(r.auto===false)
+      $("#up-reldate").textContent="Automatic checks are off \u2014 use Check for updates";
     else if(r.published)
       $("#up-reldate").textContent="Released on "
         +new Date(r.published).toLocaleDateString("en-US",
@@ -19051,6 +19058,15 @@ $("#turbo").addEventListener("change",()=>{
   fetch("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({turbo:$("#turbo").checked})});
+});
+$("#autochk-toggle").addEventListener("click",async()=>{
+  const on=!$("#autochk-toggle").classList.contains("on");
+  $("#autochk-toggle").classList.toggle("on",on);
+  await fetch("/api/prefs",{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({auto_update_check:on})});
+  if(on)checkUpdate();           // switching it on is a check
+  paintUpdatesPane();
 });
 $("#upchan").addEventListener("change",async()=>{
   const ch=$("#upchan").value;
@@ -19166,9 +19182,12 @@ if(IS_LOCAL){                       // install nudges belong to the owner
   // updates). A hidden window skips the poll — the pollEngines idiom —
   // and settles up on wake if it slept through a tick, so the badge is
   // waiting by the time anyone is looking.
-  setInterval(()=>{if(!document.hidden)checkUpdate();},3600000);
+  // ...and DAILY while running (6b292, per Patrick: "on startup as well
+  // as daily"). The server answers these automatic calls with nothing
+  // when the switch in About is off; the button there always asks.
+  setInterval(()=>{if(!document.hidden)checkUpdate();},86400000);
   document.addEventListener("visibilitychange",()=>{
-    if(!document.hidden&&Date.now()-lastUpCheck>3600000)checkUpdate();
+    if(!document.hidden&&Date.now()-lastUpCheck>86400000)checkUpdate();
   });
 }
 
@@ -19252,7 +19271,7 @@ async function zBuild(){
     ["workspace",root,"--n8"],
     ["fleet",peers+" peer"+(peers===1?"":"s"),"--n1"],
     ["pantry",clips+" clip"+(clips===1?"":"s"),"--zb"],
-    ["telemetry",perf?"paused":"live","--n3"],
+    ["telemetry","live","--n3"],
     ["guardrail","armed","--n5"],
     ["updater",ver||"current","--n4"],
     ["vibes","unbeatable","--n1"]];

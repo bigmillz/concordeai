@@ -199,6 +199,25 @@ check("what's new endpoint answers for this build",
       and 'fetch("/api/update/whatsnew")' in page
       and 'prefs.get("last_ident")' in _MILLENAI_SRC
       and "ident = short_version()" in _MILLENAI_SRC)
+# 6b292, per Patrick: performance mode is now "Enable visual effects" in
+# About and touches ONLY the backdrop; the cog sits left of the pen;
+# automatic update checks are a switch (launch + daily) with the button
+# as the manual path
+check("visual effects switch: backdrop only, in About; cog left of pen",
+      'id="fx-toggle"' in page and 'id="perf-toggle"' not in page
+      and "body.perf" not in page and "body:not(.perf)" not in page
+      and "body.novideo #skyline{display:none}" in page
+      and page.count("body.novideo ") == 3
+      and 0 < page.index('id="settings-btn"') < page.index('id="newchat"')
+      and 'id="settings">' not in page
+      and "Toggle visual effects" in page)
+_auto = json.loads(req("/api/update/check", cookie=K)[2])
+check("automatic update checks: switch, daily cadence, server gate",
+      'id="autochk-toggle"' in page and "auto_update_check" in page
+      and "checkUpdate();},86400000)" in page
+      and '"auto_update_check") is False' in _MILLENAI_SRC
+      and "Automatic checks are off" in page
+      and isinstance(_auto, dict) and "configured" in _auto)
 # 6b291, per Patrick ("here we go again"): ONE download indicator — the
 # pill hides while the strip speaks; no gradient hack, no second poller
 check("one download indicator: the strip alone while busy",
@@ -811,8 +830,9 @@ check("titlebar lockup: accessory + bundled font",
 # them), skipping hidden windows and settling up on wake; the server
 # answers the hourly pollers from a 15-min cache and only a human
 # click on the Settings button forces a real GitHub hit
-check("auto update check: hourly, owner-only, wake-aware, cached",
-      "setInterval(()=>{if(!document.hidden)checkUpdate();},3600000)" in page
+# 6b292: daily, not hourly — and only while the About switch is on
+check("auto update check: daily, owner-only, wake-aware, cached",
+      "setInterval(()=>{if(!document.hidden)checkUpdate();},86400000)" in page
       and "visibilitychange" in page
       and "/api/update/check?force=1" in page
       and "def check_update(force=False)" in _MILLENAI_SRC
