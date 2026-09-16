@@ -4702,3 +4702,14 @@ updates automatically" switch (pref `auto_update_check`, default on):
 on = at launch and daily (was hourly); off = only the button asks —
 the server answers automatic calls with an honest "off", uncached, and
 the About pane says so.
+
+## 6b293 — tests never spend cloud quota (uncut)
+
+Per Patrick ("why are we hitting quotas when we're not even running
+queries?"). Two causes, both mine: the gauntlet's live-generation
+section fanned every question out to all four providers, and the dev
+instance shared cloud.json with the real app, so its ten-minute rests
+showed in his Settings. Now the gauntlet parks Turbo for the whole
+live section (restored at exit), and any instance not on 8889/9889
+works from a private copy of the provider file seeded with the real
+keys at boot — its rests never reach the app a person is looking at.

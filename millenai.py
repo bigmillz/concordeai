@@ -542,6 +542,21 @@ OLLAMA_TAGS = {l: i["ollama"] for l, i in MODEL_INFO.items() if i["ollama"]}
 # llama-3.3-70b-versatile, which Groq decommissioned 2026-08-16.
 # Nothing is sent anywhere until the Turbo switch in Settings is on.
 CLOUD_FILE = os.path.join(app_dir(), "cloud.json")
+# DEV AND TEST INSTANCES KEEP THEIR OWN PROVIDER STATE (6b293, per
+# Patrick: "why are we hitting quotas when we're not even running
+# queries?" — the gauntlet's instance rested Claude and Kimi, and the
+# real app showed it). Only the desktop app (8889) and the hosted
+# instance (9889) share the real file; every other port works from a
+# private copy seeded with the real keys at boot, so its rests, notes
+# and picks never reach the app a person is looking at.
+if PORT not in (8889, 9889):
+    _CLOUD_DEV = os.path.join(app_dir(), "cloud-dev-%d.json" % PORT)
+    try:
+        shutil.copyfile(CLOUD_FILE, _CLOUD_DEV)
+        os.chmod(_CLOUD_DEV, 0o600)
+    except Exception:
+        pass
+    CLOUD_FILE = _CLOUD_DEV
 
 # WHAT EACH PROVIDER'S KEY LOOKS LIKE (6b234). A half-pasted key and a
 # revoked one both come back "Invalid API Key", and telling them apart by

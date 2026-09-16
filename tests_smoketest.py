@@ -1081,6 +1081,19 @@ check("memory meter replaced the models meter",
       and "Pages occupied by compressor" in _MILLENAI_SRC)
 
 print("== engines (live generations) ==")
+# LOCAL SILICON ONLY (6b293, per Patrick): a gauntlet run used to fan
+# every live question out to all four cloud providers and rest them for
+# ten minutes — quota burned by a test. Turbo is parked for the whole
+# section and restored at the very end, whatever happens.
+_prefs_gauntlet = json.loads(req("/api/prefs", cookie=K)[2])
+req("/api/prefs", "POST", {"turbo": False}, cookie=K)
+import atexit as _atexit
+_atexit.register(lambda: req("/api/prefs", "POST",
+                             {"turbo": bool(_prefs_gauntlet.get("turbo"))},
+                             cookie=K))
+check("gauntlet never spends cloud quota: turbo parked, dev state private",
+      'cloud-dev-%d.json' in _MILLENAI_SRC
+      and "if PORT not in (8889, 9889):" in _MILLENAI_SRC)
 
 
 def chat(payload, timeout=600):
