@@ -199,6 +199,33 @@ check("what's new endpoint answers for this build",
       and 'fetch("/api/update/whatsnew")' in page
       and 'prefs.get("last_ident")' in _MILLENAI_SRC
       and "ident = short_version()" in _MILLENAI_SRC)
+# 6b294, per Patrick: image generation — local FLUX first, cloud after;
+# the intent is caught before the web search; the extra sits under the
+# presets and in the wizard; the update pill is an arrow the size of its
+# neighbours
+_ins = {"re": re}
+_iseg = _MILLENAI_SRC[_MILLENAI_SRC.index("_IMG_VERBS = "):_MILLENAI_SRC.index("def image_supported")]
+exec(_iseg, _ins)
+_ii = _ins["image_intent"]
+try:
+    _ist = json.loads(req("/api/setup", cookie=K)[2]).get("image") or {}
+except Exception:
+    _ist = {}
+check("image generation: intent, engine ladder, settings box, wizard, arrow pill",
+      _ii("Generate an image of a cat.") == "a cat"
+      and _ii("draw me a red bicycle") == "a red bicycle"
+      and _ii("make a logo for a coffee shop") == "a logo for a coffee shop"
+      and _ii("what is an image sensor") is None
+      and _ii("generate a list of image formats") is None
+      and "def generate_image" in _MILLENAI_SRC
+      and "mflux-generate" in _MILLENAI_SRC and "image.pollinations.ai" in _MILLENAI_SRC
+      and "gemini-2.5-flash-image" in _MILLENAI_SRC
+      and '"/api/image/install",' in _MILLENAI_SRC
+      and set(_ist.keys()) >= {"supported", "ready", "gb", "status", "pct"}
+      and 'id="img-box"' in page and 'id="wiz-img"' in page
+      and 'class="genimg"' in page and "function paintImageBox" in page
+      and ">UPDATE<" not in page
+      and '<div id="update-flag" hidden title="Install the update"><svg' in page)
 # 6b292, per Patrick: performance mode is now "Enable visual effects" in
 # About and touches ONLY the backdrop; the cog sits left of the pen;
 # automatic update checks are a switch (launch + daily) with the button

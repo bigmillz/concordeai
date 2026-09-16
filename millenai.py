@@ -3095,6 +3095,216 @@ def make_title(text: str) -> str:
     return ""
 
 
+# ---------------------------------------------------- image generation
+# PICTURES FROM A DESCRIPTION (6b294, per Patrick: "add image generation
+# capability… cleanly integrate that into the model settings… a smaller
+# box under the presets… also in the first start wizard"). Local first:
+# FLUX.1 schnell, pre-quantised to 4-bit for MLX, driven by mflux in its
+# OWN venv (its mlx pins must never touch the chat engine's). Not there
+# yet? A Gemini key can paint, then the community cloud; and when nothing
+# can, the reply says exactly where to add it.
+IMAGE_ROW = "Image generation"
+IMAGE_REPO = "dhairyashil/FLUX.1-schnell-mflux-4bit"
+IMAGE_GB = 9.6
+IMAGE_VENV = os.path.join(app_dir(), "venv-image")
+IMAGE_DIR = os.path.join(app_dir(), "images")
+_IMG_VERBS = r"(?:generate|create|make|draw|paint|render|produce|design|illustrate|sketch)"
+_IMG_NOUNS = (r"(?:image|picture|photo(?:graph)?|illustration|drawing|painting|"
+              r"logo|poster|sketch|artwork|icon|wallpaper|portrait|banner)s?")
+_IMAGE_RX = re.compile(
+    r"^\s*(?:please\s+|hey\s+|ok(?:ay)?\s+)?(?:(?:can|could|would|will)\s+you\s+)?"
+    r"(?:please\s+)?" + _IMG_VERBS + r"\s+(?:me\s+)?(?:an?\s+|some\s+|the\s+|\d+\s+)?"
+    r"(?:(?!of\b)\w+\s+){0,2}" + _IMG_NOUNS +
+    r"\b\s*(?:of|showing|depicting|featuring|with|for|:|-|—)?\s*(?P<subject>.*)$",
+    re.I | re.S)
+_DRAW_RX = re.compile(
+    r"^\s*(?:please\s+)?(?:draw|paint|sketch|illustrate)\s+(?:me\s+)?(?P<subject>.+)$",
+    re.I | re.S)
+
+
+def image_intent(text: str):
+    """The subject to paint when the message asks for a picture, else
+    None. "Generate an image of a cat." -> "a cat"; "draw me a red
+    bicycle" -> "a red bicycle"; "what is an image sensor" -> None."""
+    t = (text or "").strip()
+    if len(t) > 600:
+        return None
+    m = _IMAGE_RX.match(t) or _DRAW_RX.match(t)
+    if not m:
+        return None
+    # the prompt is everything after the verb — "a realistic photo of the
+    # Eiffel tower at night", "a logo for a coffee shop" — minus a bare
+    # "an image of", which says nothing a painter needs
+    rest = re.match(r"^\s*(?:please\s+|hey\s+|ok(?:ay)?\s+)?"
+                    r"(?:(?:can|could|would|will)\s+you\s+)?(?:please\s+)?"
+                    r"(?:generate|create|make|draw|paint|render|produce|design|"
+                    r"illustrate|sketch)\s+(?:me\s+)?(?P<rest>.*)$", t, re.I | re.S)
+    subj = (rest.group("rest") if rest else m.group("subject")).strip()
+    subj = re.sub(r"^(?:an?|some|the)\s+(?:image|picture|pic|photo(?:graph)?)s?"
+                  r"\s+(?:of|showing|depicting)\s+", "", subj, flags=re.I)
+    subj = subj.strip().strip(".!?").strip()
+    return subj or "something beautiful"
+
+
+def image_supported() -> bool:
+    return IS_MAC and IS_ARM
+
+
+def image_engine_ok() -> bool:
+    return os.path.exists(os.path.join(IMAGE_VENV, "bin", "mflux-generate"))
+
+
+def _image_snapshot() -> str:
+    d = _hf_model_dir(IMAGE_REPO)
+    snaps = glob.glob(os.path.join(d, "snapshots", "*", "config.json"))
+    return os.path.dirname(snaps[0]) if snaps else ""
+
+
+def image_model_ok() -> bool:
+    snap = _image_snapshot()
+    if not snap:
+        return False
+    if glob.glob(os.path.join(_hf_model_dir(IMAGE_REPO), "blobs", "*.incomplete")):
+        return False
+    return bool(glob.glob(os.path.join(snap, "**", "*.safetensors"), recursive=True))
+
+
+def image_ready() -> bool:
+    return image_supported() and image_engine_ok() and image_model_ok()
+
+
+def _install_image_worker():
+    try:
+        with _setup_lock:
+            _setup_jobs[IMAGE_ROW] = {"status": "downloading",
+                                      "note": "installing the engine", "pct": 0}
+        if not image_engine_ok():
+            py = os.path.join(app_dir(), "venv", "bin", "python3")
+            if not os.path.exists(py):
+                py = sys.executable
+            subprocess.run([py, "-m", "venv", IMAGE_VENV], check=True,
+                           timeout=300, capture_output=True)
+            subprocess.run([os.path.join(IMAGE_VENV, "bin", "pip"), "install",
+                            "--quiet", "--upgrade", "pip"],
+                           timeout=300, capture_output=True)
+            r = subprocess.run([os.path.join(IMAGE_VENV, "bin", "pip"),
+                                "install", "--quiet", "mflux"],
+                               timeout=1800, capture_output=True, text=True)
+            if r.returncode != 0 or not image_engine_ok():
+                raise RuntimeError("engine install failed: "
+                                   + (r.stderr or "")[-160:])
+        with _setup_lock:
+            _setup_jobs[IMAGE_ROW]["note"] = ""
+        if not image_model_ok():
+            from huggingface_hub import snapshot_download
+            snapshot_download(IMAGE_REPO)
+            for pth in glob.glob(os.path.join(_hf_model_dir(IMAGE_REPO),
+                                              "blobs", "*.incomplete")):
+                try:
+                    os.remove(pth)
+                except Exception:
+                    pass
+        with _setup_lock:
+            _setup_jobs[IMAGE_ROW] = {"status": "done", "note": "", "pct": 100}
+    except Exception as exc:
+        with _setup_lock:
+            _setup_jobs[IMAGE_ROW] = {"status": "error",
+                                      "note": str(exc)[:200], "pct": 0}
+
+
+def start_image_install() -> bool:
+    if not image_supported() or image_ready():
+        return False
+    with _setup_lock:
+        if _setup_jobs.get(IMAGE_ROW, {}).get("status") in ("downloading", "queued"):
+            return False
+        _setup_jobs[IMAGE_ROW] = {"status": "queued", "note": "", "pct": 0}
+    threading.Thread(target=_install_image_worker, daemon=True).start()
+    return True
+
+
+def image_status() -> dict:
+    with _setup_lock:
+        job = dict(_setup_jobs.get(IMAGE_ROW, {}))
+    ready = image_ready()
+    est = int(IMAGE_GB * 1e9)
+    pct = 100 if ready else min(99, round(
+        _dir_bytes(_hf_model_dir(IMAGE_REPO)) / est * 100))
+    return {"supported": image_supported(), "ready": ready,
+            "engine": image_engine_ok(), "model": image_model_ok(),
+            "gb": IMAGE_GB, "pct": pct,
+            "status": "ready" if ready else job.get("status", "missing"),
+            "note": job.get("note", "")}
+
+
+def _write_image_bytes(data: bytes) -> str:
+    os.makedirs(IMAGE_DIR, exist_ok=True)
+    iid = "%d-%s" % (int(time.time()), secrets.token_hex(3))
+    out = os.path.join(IMAGE_DIR, iid + ".png")
+    with open(out, "wb") as f:
+        f.write(data)
+    return out
+
+
+def generate_image(prompt: str) -> tuple:
+    """(png path, source) — local FLUX first, a Gemini key second, the
+    community cloud last. Raises when none of them could paint."""
+    errs = []
+    if image_ready():
+        os.makedirs(IMAGE_DIR, exist_ok=True)
+        iid = "%d-%s" % (int(time.time()), secrets.token_hex(3))
+        out = os.path.join(IMAGE_DIR, iid + ".png")
+        cmd = [os.path.join(IMAGE_VENV, "bin", "mflux-generate"),
+               "--model", "schnell", "--path", _image_snapshot(),
+               "--prompt", prompt, "--steps", "4",
+               "--seed", str(secrets.randbelow(10 ** 6)),
+               "--width", "1024", "--height", "1024", "--output", out]
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+            if r.returncode == 0 and os.path.exists(out):
+                return out, "local"
+            errs.append("local: " + (r.stderr or r.stdout or "")[-200:].strip())
+        except Exception as exc:
+            errs.append("local: %s" % exc)
+    gem = (_cloud_all().get("providers") or {}).get("gemini") or {}
+    if gem.get("key") and gem.get("status", "ok") == "ok":
+        for mdl in ("gemini-2.5-flash-image", "gemini-2.5-flash-image-preview"):
+            try:
+                req = urllib.request.Request(
+                    "https://generativelanguage.googleapis.com/v1beta/models/"
+                    "%s:generateContent?key=%s" % (mdl, gem["key"]),
+                    data=json.dumps({
+                        "contents": [{"parts": [{"text": prompt}]}],
+                        "generationConfig": {"responseModalities": ["IMAGE"]}
+                    }).encode(),
+                    headers={"Content-Type": "application/json",
+                             "User-Agent": "MillenAI/%s" % APP_VERSION})
+                with urllib.request.urlopen(req, timeout=120) as r:
+                    d = json.loads(r.read().decode("utf-8", "replace"))
+                for part in ((d.get("candidates") or [{}])[0]
+                             .get("content") or {}).get("parts") or []:
+                    inl = part.get("inlineData") or part.get("inline_data") or {}
+                    if inl.get("data"):
+                        return _write_image_bytes(base64.b64decode(inl["data"])), "gemini"
+                errs.append("gemini: no image in the reply")
+            except Exception as exc:
+                errs.append("gemini: %s" % str(exc)[:120])
+    try:
+        url = ("https://image.pollinations.ai/prompt/%s?width=1024&height=1024"
+               "&nologo=true&seed=%d" % (urllib.parse.quote(prompt[:400]),
+                                         secrets.randbelow(10 ** 6)))
+        req = urllib.request.Request(url, headers={"User-Agent": "MillenAI/%s" % APP_VERSION})
+        with urllib.request.urlopen(req, timeout=120) as r:
+            ct = r.headers.get("Content-Type", "")
+            data = r.read()
+        if ct.startswith("image/") and len(data) > 4000:
+            return _write_image_bytes(data), "community"
+        errs.append("community: not an image")
+    except Exception as exc:
+        errs.append("community: %s" % str(exc)[:120])
+    raise RuntimeError("; ".join(errs) or "no image engine")
+
+
 # ------------------------------------------------------------- updates
 _update = {"state": "idle", "pct": 0, "note": "", "latest": "", "url": "",
            "size": 0}
@@ -3855,7 +4065,7 @@ def _batch_labels() -> list:
     something has."""
     with _setup_lock:
         batch = [l for l in _setup_jobs
-                 if l != ENGINE_ROW and l in MODEL_ROUTES]
+                 if l != ENGINE_ROW and (l in MODEL_ROUTES or l == IMAGE_ROW)]
     return batch or list(STARTER_LABELS)
 
 
@@ -3863,6 +4073,12 @@ def _downloaded_bytes(pulled) -> tuple:
     """(bytes on disk, bytes expected) across the batch in play."""
     have = want = 0
     for label in _batch_labels():
+        if label == IMAGE_ROW:
+            est = int(IMAGE_GB * 1e9)
+            want += est
+            have += est if image_model_ok() else min(
+                est, _dir_bytes(_hf_model_dir(IMAGE_REPO)))
+            continue
         est = MLX_EST_BYTES.get(label, 0)
         want += est
         kind = MODEL_ROUTES.get(label, ("",))[0]
@@ -4084,7 +4300,9 @@ def setup_status() -> dict:
             # growing on disk. Judging it by a pct that never moved
             # branded every download longer than ten minutes "stalled"
             # (6b290). Bytes, to the megabyte, are the honest pulse.
-            if (MODEL_ROUTES.get(label, ("",))[0] == "mlx"
+            if label == IMAGE_ROW:
+                pct = _dir_bytes(_hf_model_dir(IMAGE_REPO)) // 1_000_000
+            elif (MODEL_ROUTES.get(label, ("",))[0] == "mlx"
                     and label in MLX_REPOS):
                 pct = _dir_bytes(_hf_model_dir(MLX_REPOS[label])) // 1_000_000
             else:
@@ -4139,7 +4357,17 @@ def setup_status() -> dict:
                        "supported": SUPPORTED.get(label, True),
                        "note": job.get("note", "")})
 
-    ready_n = sum(1 for x in models if x["status"] == "ready")
+    # the image engine rides the same strip and pane while it installs
+    with _setup_lock:
+        ijob = dict(_setup_jobs.get(IMAGE_ROW, {}))
+    if ijob and ijob.get("status") != "done":
+        _ist = image_status()
+        models.append({"label": IMAGE_ROW, "est_gb": IMAGE_GB,
+                       "status": ijob.get("status", "missing"),
+                       "pct": _ist["pct"], "star": False, "supported": True,
+                       "note": ijob.get("note", "")})
+    ready_n = sum(1 for x in models
+                  if x["status"] == "ready" and x["label"] != IMAGE_ROW)
     have, want = _downloaded_bytes(pulled)
     bps = _dl_speed(have)
     busy = any(m["status"] in ("downloading", "queued") for m in models)
@@ -4191,6 +4419,7 @@ def setup_status() -> dict:
                    for pl in ("min", "rec", "full", "all")},
         # what the auto-clean sweep would reclaim right now (6b265)
         "cleanup": _cleanup_stat(pulled),
+        "image": image_status(),
         "ready_n": ready_n,
         "mlx_ok": _has_mlx() if IS_ARM else True,
         "ollama": _ollama_bin() is not None,
@@ -8020,6 +8249,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
     # guests in the chat, not operators of the computer.
     ADMIN_PATHS = ("/api/open-logs", "/api/setup/install",
                    "/api/model/download", "/api/model/remove",
+                   "/api/image/install",
                    "/api/model/cleanup",
                    "/api/update/install",
                    "/api/speak", "/api/voice/prepare",
@@ -8486,6 +8716,20 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._send_json(dict(_update))
         elif self.path == "/api/update/whatsnew":
             self._send_json(whats_new(_JUST_UPDATED[0]))
+        elif self.path.startswith("/api/image/") and self.path.endswith(".png"):
+            iid = self.path[len("/api/image/"):]
+            pth = os.path.join(IMAGE_DIR, iid)
+            if not re.fullmatch(r"[\w-]+\.png", iid) or not os.path.exists(pth):
+                self.send_error(404)
+                return
+            with open(pth, "rb") as f:
+                data = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "private, max-age=86400")
+            self.end_headers()
+            self.wfile.write(data)
         elif self.path == "/api/tiers":
             pulled = ollama_pulled_tags() or set()
             bench = [lbl for lbl, _c in cloud_bench()]
@@ -9563,6 +9807,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 _speak(req["text"])
             self._send_json({"ok": True})
             return
+        if self.path == "/api/image/install":
+            self._send_json({"started": start_image_install(),
+                             "image": image_status()})
+            return
         if self.path == "/api/model/download":
             n = int(self.headers.get("Content-Length", 0))
             try:
@@ -9677,6 +9925,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # live). The resolved council leader IS the model.
         model_name = model_name or (council[0] if council[0:] else "")
         prompt = messages[-1]["content"] if messages else ""
+        # A PICTURE, NOT PROSE (6b294): "generate an image of a cat" used
+        # to get four paragraphs describing a cat. The intent is settled
+        # here, before the web search, and answered below with a real image.
+        img_subject = image_intent(prompt) if not images else None
+        if img_subject:
+            auto_web = False
 
         # a selected AGENT owns the request: its best installed model, its
         # specialist system prompt; Research routes to the research flow
@@ -10491,6 +10745,35 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             last_status[0] = text
             _write(f"{NUL}STATUS:{text}{NUL}".encode("utf-8"))
 
+        if img_subject:
+            where = ("FLUX.1 schnell on this Mac" if image_ready()
+                     else "the cloud")
+            step("image", "Generating the image", "run", where)
+            status("painting \u00b7 " + where)
+            try:
+                path, src = generate_image(img_subject)
+                made = {"local": "FLUX.1 schnell, on this Mac",
+                        "gemini": "Gemini", "community": "the community cloud"}[src]
+                step("image", "Generated the image", "done", made)
+                emit("![%s](/api/image/%s)\n\n*%s \u2014 %s*"
+                     % (img_subject.replace("]", ""), os.path.basename(path),
+                        img_subject[:1].upper() + img_subject[1:], made))
+            except Exception as exc:
+                step("image", "Couldn\u2019t generate the image", "done",
+                     str(exc)[:70])
+                if image_supported():
+                    emit("I can\u2019t make pictures on this Mac yet. Add image "
+                         "generation under **Settings \u203a Models \u203a Manage "
+                         "models** \u2014 FLUX.1 schnell, about %.1f GB, runs "
+                         "entirely on this Mac \u2014 and ask again. A Gemini key "
+                         "under Cloud power also works." % IMAGE_GB)
+                else:
+                    emit("Image generation runs locally on Apple Silicon Macs; "
+                         "on this machine it needs a Gemini key under "
+                         "**Settings \u203a Cloud power**.")
+            hb_stop.set()
+            return
+
         # the search ran earlier on THIS thread — hand the client its
         # structured hits so the answer carries a clickable sources row
         if query:
@@ -11004,13 +11287,14 @@ body.resizing{cursor:col-resize;user-select:none}
 #brand-row #settings-btn{margin-left:2px}
 #p-about .toggle-row{margin-top:10px;font-size:12px;padding:2px 2px}
 #p-about .toggle-row span{color:var(--dim)}
-#update-flag{margin-top:4px}
+/* 6b294, per Patrick: an arrow, sized like the buttons beside it */
 #update-flag{
-  font-family:var(--mono);font-size:10px;letter-spacing:.12em;
-  color:#fff;background:#e26d5a;border-radius:8px;padding:5px 9px;
-  cursor:pointer;font-weight:700;align-self:center;
+  width:26px;height:26px;flex-shrink:0;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;background:#e26d5a;cursor:pointer;
   animation:updatePulse 2.2s ease-in-out infinite;
 }
+#update-flag svg{width:14px;height:14px}
 @keyframes updatePulse{0%,100%{opacity:1}50%{opacity:.65}}
 #models-flag{
   font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;
@@ -12814,6 +13098,12 @@ body.gen #chip-model{color:var(--accent)}
 .plan-card.risky:hover{border-color:rgba(217,169,90,.6)}
 .plan-card .gb{font-family:var(--mono);font-size:9.5px;color:var(--dim);
   display:block;margin-top:3px}
+.genimg{display:block;max-width:min(100%,640px);border-radius:12px;
+  margin:6px 0 10px;box-shadow:0 12px 40px -18px rgba(0,0,0,.8)}
+/* the extra under the presets (6b294): image generation */
+#img-box{margin-top:8px;cursor:default}
+#img-box .about-btn{margin-top:8px}
+#img-box[hidden]{display:none}
 /* the preset on disk (6b290): a firm edge and a small badge, nothing loud */
 .plan-card.current{border-color:var(--text);box-shadow:inset 0 0 0 1px var(--text)}
 .plan-card .cur{position:absolute;top:8px;right:10px;font-style:normal;
@@ -13512,7 +13802,7 @@ body.gen #chip-model{color:var(--accent)}
       </svg>
     </button>
     
-    <div id="update-flag" hidden title="Install the update">UPDATE</div>
+    <div id="update-flag" hidden title="Install the update"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg></div>
     <div id="models-flag" hidden
          title="More models fit this machine">MODELS AVAILABLE</div>
     <a id="get-app" hidden target="_blank" rel="noopener">DOWNLOAD NOW<i
@@ -13948,6 +14238,15 @@ __CODE_ROWS__
           <div><dt>space taken</dt><dd id="mg-space">&mdash;</dd></div>
         </dl>
         <div id="plan-row"></div>
+        <!-- 6b294, per Patrick: image generation is an extra under the
+             presets, not a preset — a smaller box, one button -->
+        <div id="img-box" class="plan-card" hidden>
+          <b>Image generation</b>
+          <span>make pictures from a description &mdash; FLUX.1 schnell,
+          4-bit, runs entirely on this Mac</span>
+          <span class="gb" id="img-state"></span>
+          <button class="about-btn slim" id="img-add">Add image generation \u00b7 9.6 GB</button>
+        </div>
         <div id="autoclean-note"></div>
         <div id="autoclean-bar">
           <label id="autoclean-row"><input type="checkbox" id="autoclean">
@@ -14053,6 +14352,9 @@ __CODE_ROWS__
       <label id="wiz-autoclean"><input type="checkbox" id="wiz-ac">
         Automatically remove superseded models once a newer generation
         is installed</label>
+      <label id="wiz-image"><input type="checkbox" id="wiz-img">
+        Also add image generation &mdash; make pictures from a description,
+        entirely on this Mac (FLUX.1 schnell, 9.6 GB)</label>
       <label id="wiz-nolimits"><input type="checkbox" id="wiz-nl">
         Ignore system limits &mdash; offer every model in each list even
         beyond this machine&rsquo;s memory. May swap hard or crash;
@@ -15008,6 +15310,9 @@ function renderMD(raw){
   s=s.replace(/^### (.*)$/gm,"<h3>$1</h3>").replace(/^## (.*)$/gm,"<h2>$1</h2>").replace(/^# (.*)$/gm,"<h1>$1</h1>");
   // markdown links — research briefs cite their sources this way. Only
   // http(s) is allowed through, so a model cannot emit javascript: or data:
+  // generated pictures (6b294): our own /api/image/ files or https only
+  s=s.replace(/!\[([^\]\n]*)\]\(((?:\/api\/image\/[\w.-]+)|https?:\/\/[^\s)]+)\)/g,
+    (_,a,u)=>'<img class="genimg" src="'+u+'" alt="'+a+'" loading="lazy">');
   s=s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g,
     (_,t,u)=>'<a href="'+u+'" target="_blank" rel="noopener noreferrer">'+t+"</a>");
   // PIPE TABLES — models reach for them constantly and they used to
@@ -18234,6 +18539,8 @@ async function wizPaintPlans(){
   let st={};
   try{st=await(await fetch("/api/setup")).json();}catch(e){return;}
   const rem=st.plans||{};
+  const wi=$("#wiz-image");
+  if(wi)wi.hidden=!(st.image&&st.image.supported&&!st.image.ready);
   const meta=[["basic","Basic","Quick answers, tiny download"],
               ["pro","Pro","Great everyday quality"],
               ["max","Max","The best this machine can run"]];
@@ -18317,6 +18624,8 @@ async function wizFinish(){
   await fetch("/api/setup/install",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({plan:wizPlan})});
+  if($("#wiz-img")&&$("#wiz-img").checked)
+    fetch("/api/image/install",{method:"POST"});
   wizVeil.hidden=true;
   openSetup();setupManual=false;   // the familiar progress bar takes over
 }
@@ -18723,7 +19032,7 @@ function paintRoster(st,cloud){
    rows the roster draws — so the two can never disagree. */
 function paintMgStats(){
   if(!lastSetup||!$("#mg-count"))return;
-  const rows=(lastSetup.models||[]).filter(m=>m.label!=="Ollama engine");
+  const rows=(lastSetup.models||[]).filter(m=>m.label!=="Ollama engine"&&m.label!=="Image generation");
   const rdy=rows.filter(m=>m.status==="ready");
   const gb=rdy.reduce((a,m)=>a+(+m.est_gb||0),0);
   $("#mg-count").textContent=rdy.length+" / "+rows.length;
@@ -18763,6 +19072,32 @@ function paintPlans(){
       +'</span></div>';
   }).join("");
 }
+function paintImageBox(){
+  const b=$("#img-box");if(!b||!lastSetup)return;
+  const im=lastSetup.image||{};
+  b.hidden=!im.supported;
+  const st=$("#img-state"),btn=$("#img-add");
+  if(im.ready){
+    st.textContent="installed \u2713 \u00b7 ask for \u201cgenerate an image of\u2026\u201d in chat";
+    btn.hidden=true;
+  }else if(im.status==="downloading"||im.status==="queued"){
+    st.textContent=(im.note||"downloading")+" \u00b7 "+im.pct+"%";
+    btn.hidden=true;
+  }else if(im.status==="error"){
+    st.textContent="failed \u2014 "+(im.note||"try again");
+    btn.hidden=false;btn.textContent="Retry \u00b7 "+im.gb+" GB";
+  }else{
+    st.textContent=im.gb+" GB to download";
+    btn.hidden=false;btn.textContent="Add image generation \u00b7 "+im.gb+" GB";
+  }
+}
+$("#img-add").addEventListener("click",async()=>{
+  $("#img-add").disabled=true;
+  try{await fetch("/api/image/install",{method:"POST"});}catch(e){}
+  $("#img-add").disabled=false;
+  $("#manage-note").textContent="image generation \u2014 starting\u2026";
+  manageTick();
+});
 // LIVE WHILE IT RUNS (6b290): the pane used to say "watch the strip in
 // the sidebar" and go quiet. Now it re-reads the disk every two seconds
 // until the batch is done, naming what is moving and what is left.
@@ -18772,7 +19107,7 @@ function manageTick(){
   mgTimer=setTimeout(async()=>{
     if($("#manage-box").hidden)return;
     try{lastSetup=await(await fetch("/api/setup")).json();}catch(e){return;}
-    paintPlans();paintMgStats();paintCleanNote();
+    paintPlans();paintMgStats();paintCleanNote();paintImageBox();
     const st=lastSetup;
     if(st.busy){
       $("#manage-note").textContent="downloading \u2014 "+st.have_gb+" of "
@@ -18807,7 +19142,7 @@ $("#roster-manage").addEventListener("click",async()=>{
   if(manageOn){
     $("#plan-row").innerHTML='<div class="plan-card">reading disk…</div>';
     await ensureSetup();
-    paintPlans();paintMgStats();paintCleanNote();
+    paintPlans();paintMgStats();paintCleanNote();paintImageBox();
     if(lastSetup&&lastSetup.busy)manageTick();   // a batch is already running
   }
 });

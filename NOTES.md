@@ -4713,3 +4713,22 @@ showed in his Settings. Now the gauntlet parks Turbo for the whole
 live section (restored at exit), and any instance not on 8889/9889
 works from a private copy of the provider file seeded with the real
 keys at boot — its rests never reach the app a person is looking at.
+
+## 6b294 — image generation; the update pill is an arrow (uncut)
+
+Per Patrick ("add image generation capability… cleanly integrate that
+into the model settings… a smaller box under the presets… also in the
+first start wizard"; "replace the missized update button… an up arrow
+icon only"). "Generate an image of a cat" used to earn four paragraphs
+describing a cat. Now `image_intent()` catches the ask before the web
+search and `generate_image()` paints: FLUX.1 schnell, pre-quantised
+4-bit for MLX (dhairyashil/FLUX.1-schnell-mflux-4bit, 9.6 GB), driven
+by mflux in its OWN venv (venv-image — its mlx pins never touch the
+chat engine); then a Gemini key (gemini-2.5-flash-image); then the
+community cloud; and when nothing can paint, the reply says where to
+add it. Pictures land in app_dir/images and are served at
+/api/image/<id>.png; the markdown renderer draws our own images.
+Manage models grows an "Image generation" box under the presets with
+one button; the wizard's model step grows a checkbox; the install
+rides the same strip and pane as model downloads (IMAGE_ROW). Apple
+Silicon only for the local engine. The UPDATE pill is a 26px arrow.
