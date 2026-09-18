@@ -328,6 +328,15 @@ check("image generation: intent, engine ladder, settings box, wizard, arrow pill
       and '"/api/image/install",' in _MILLENAI_SRC
       and set(_ist.keys()) >= {"supported", "ready", "gb", "status", "pct"}
       and 'id="img-box"' in page and 'id="wiz-img"' in page
+      and 'id="img-rm"' in page and "/api/image/remove" in _MILLENAI_SRC
+      and "def image_remove" in _MILLENAI_SRC
+      and "def _dir_bytes_real" in _MILLENAI_SRC
+      and "make pictures from a description" not in
+          (re.search(r'<div id="img-box".*?</div>\s*</div>', page, re.S)
+           or re.match("(x)", "x")).group(0)
+      and "\\u00b7" not in (re.search(r'<div id="img-box".*?</div>\s*</div>',
+                                     page, re.S)
+                            or re.match("(x)", "x")).group(0)
       and 'class="genimg"' in page and "function paintImageBox" in page
       and ">UPDATE<" not in page
       and '<div id="update-flag" hidden title="Install the update"><svg' in page)

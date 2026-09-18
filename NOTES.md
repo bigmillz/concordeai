@@ -4776,3 +4776,19 @@ download path that silently does nothing.
   optional pip line with `|| true`.
 - Working line moves to 6.1.0. Gauntlet 165/165, with functional checks
   that run the real router and the real engines.
+
+## 6b297 — the image box is a line, not a paragraph (uncut)
+
+Per Patrick ("we don't need this whole sloppy description in here…
+italics, installed with a checkmark, and a way to remove it, like an
+uninstall feature"). Installed now reads `Image generation` with an
+italic `installed ✓ · 10.9 GB` beside it and a Remove button; the
+description only appears when it is NOT installed, which is the only
+time it needs explaining. Remove takes both halves — the engine's own
+venv and the weights — clears the job entry so the box reads as a
+fresh install afterwards, and uses the two-step inline confirm the
+roster already uses ("really remove? frees 10.9 GB"). New
+`_dir_bytes_real()` does not follow symlinks: the hub cache keeps one
+copy in blobs/ and links to it from snapshots/, so the old measure
+reported a 9 GB model as 18 and would have promised twice the disk an
+uninstall could actually free.

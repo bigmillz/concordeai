@@ -3263,6 +3263,48 @@ def start_image_install() -> bool:
     return True
 
 
+def _dir_bytes_real(path: str) -> int:
+    """Bytes actually occupied, symlinks NOT followed. The hub cache
+    stores one copy in blobs/ and links to it from snapshots/, so
+    _dir_bytes (which follows links) reports a 9 GB model as 18 and would
+    have promised twice the disk an uninstall could free."""
+    total = 0
+    for root, _dirs, files in os.walk(path):
+        for f in files:
+            fp = os.path.join(root, f)
+            try:
+                if not os.path.islink(fp):
+                    total += os.path.getsize(fp)
+            except OSError:
+                pass
+    return total
+
+
+def image_bytes() -> int:
+    """What image generation is costing on disk right now."""
+    return _dir_bytes_real(IMAGE_VENV) + _dir_bytes_real(
+        _hf_model_dir(IMAGE_REPO))
+
+
+def image_remove() -> dict:
+    """Uninstall it (6b297, per Patrick: "a way to remove it, like an
+    uninstall feature"). Both halves go — the engine's own venv and the
+    9.6 GB of weights — and the job entry with them, so the box reads as
+    a fresh install afterwards rather than a finished one."""
+    freed = image_bytes()
+    errs = []
+    for target in (IMAGE_VENV, _hf_model_dir(IMAGE_REPO)):
+        try:
+            if os.path.isdir(target):
+                shutil.rmtree(target)
+        except OSError as exc:
+            errs.append(str(exc)[:120])
+    with _setup_lock:
+        _setup_jobs.pop(IMAGE_ROW, None)
+    return {"ok": not errs, "freed_gb": round(freed / 1e9, 1),
+            "errors": errs}
+
+
 def image_status() -> dict:
     with _setup_lock:
         job = dict(_setup_jobs.get(IMAGE_ROW, {}))
@@ -3273,6 +3315,7 @@ def image_status() -> dict:
     return {"supported": image_supported(), "ready": ready,
             "engine": image_engine_ok(), "model": image_model_ok(),
             "gb": IMAGE_GB, "pct": pct,
+            "on_disk_gb": round(image_bytes() / 1e9, 1) if ready else 0,
             "status": "ready" if ready else job.get("status", "missing"),
             "note": job.get("note", "")}
 
@@ -9307,7 +9350,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
     # guests in the chat, not operators of the computer.
     ADMIN_PATHS = ("/api/open-logs", "/api/setup/install",
                    "/api/model/download", "/api/model/remove",
-                   "/api/image/install", "/api/export/reveal",
+                   "/api/image/install", "/api/image/remove",
+                   "/api/export/reveal",
                    "/api/model/cleanup",
                    "/api/update/install",
                    "/api/speak", "/api/voice/prepare",
@@ -10905,6 +10949,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             ok = bool(_X_ID_RX.match(str(iid))) and os.path.exists(pth) \
                 and reveal_in_finder(pth)
             self._send_json({"ok": ok})
+            return
+        if self.path == "/api/image/remove":
+            self._send_json(image_remove())
             return
         if self.path == "/api/image/install":
             self._send_json({"started": start_image_install(),
@@ -14308,8 +14355,19 @@ body.gen #chip-model{color:var(--accent)}
   margin:6px 0 10px;box-shadow:0 12px 40px -18px rgba(0,0,0,.8)}
 /* the extra under the presets (6b294): image generation */
 #img-box{margin-top:8px;cursor:default}
-#img-box .about-btn{margin-top:8px}
 #img-box[hidden]{display:none}
+#img-box .imghead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+#img-box .imghead em{font-style:italic;font-size:10.5px;color:var(--faint);
+  font-family:-apple-system,'Helvetica Neue',sans-serif;letter-spacing:.01em}
+#img-box.on .imghead em{color:var(--dim)}
+#img-box .imgdesc{font-size:10.5px;color:var(--faint);line-height:1.4;
+  display:block;margin-top:2px}
+#img-box .imgdesc[hidden]{display:none}
+#img-box .imgacts{display:flex;gap:7px;margin-top:8px}
+#img-box .imgacts button[hidden]{display:none}
+#img-box .ghost.slim{background:none;border:1px solid var(--line);
+  color:var(--faint)}
+#img-box .ghost.slim:hover{color:var(--text);border-color:var(--dim)}
 /* the preset on disk (6b290): a firm edge and a small badge, nothing loud */
 .plan-card.current{border-color:var(--text);box-shadow:inset 0 0 0 1px var(--text)}
 .plan-card .cur{position:absolute;top:8px;right:10px;font-style:normal;
@@ -15446,12 +15504,17 @@ __CODE_ROWS__
         <div id="plan-row"></div>
         <!-- 6b294, per Patrick: image generation is an extra under the
              presets, not a preset — a smaller box, one button -->
+        <!-- 6b297, per Patrick: no paragraph. Installed is one italic
+             line and a way to take it back off. -->
         <div id="img-box" class="plan-card" hidden>
-          <b>Image generation</b>
-          <span>make pictures from a description &mdash; FLUX.1 schnell,
-          4-bit, runs entirely on this Mac</span>
-          <span class="gb" id="img-state"></span>
-          <button class="about-btn slim" id="img-add">Add image generation \u00b7 9.6 GB</button>
+          <div class="imghead"><b>Image generation</b>
+            <em id="img-state"></em></div>
+          <span class="imgdesc" id="img-desc">pictures from a description,
+            made on this Mac</span>
+          <div class="imgacts">
+            <button class="about-btn slim" id="img-add">Add · 9.6 GB</button>
+            <button class="ghost slim" id="img-rm">Remove</button>
+          </div>
         </div>
         <div id="autoclean-note"></div>
         <div id="autoclean-bar">
@@ -20336,21 +20399,48 @@ function paintImageBox(){
   const b=$("#img-box");if(!b||!lastSetup)return;
   const im=lastSetup.image||{};
   b.hidden=!im.supported;
-  const st=$("#img-state"),btn=$("#img-add");
+  const st=$("#img-state"),add=$("#img-add"),rm=$("#img-rm"),
+        desc=$("#img-desc");
+  const busy=im.status==="downloading"||im.status==="queued";
+  b.classList.toggle("on",!!im.ready);
+  // installed says so in one line and offers the way out; only the
+  // uninstalled state needs to explain what the thing is
+  desc.hidden=!!im.ready||busy;
+  add.hidden=!!im.ready||busy;
+  rm.hidden=!im.ready;
+  rm.dataset.sure="";
+  rm.textContent="Remove";
   if(im.ready){
-    st.textContent="installed \u2713 \u00b7 ask for \u201cgenerate an image of\u2026\u201d in chat";
-    btn.hidden=true;
-  }else if(im.status==="downloading"||im.status==="queued"){
+    st.textContent="installed \u2713"+(im.on_disk_gb?" \u00b7 "+im.on_disk_gb+" GB":"");
+  }else if(busy){
     st.textContent=(im.note||"downloading")+" \u00b7 "+im.pct+"%";
-    btn.hidden=true;
   }else if(im.status==="error"){
     st.textContent="failed \u2014 "+(im.note||"try again");
-    btn.hidden=false;btn.textContent="Retry \u00b7 "+im.gb+" GB";
+    add.textContent="Retry \u00b7 "+im.gb+" GB";
   }else{
-    st.textContent=im.gb+" GB to download";
-    btn.hidden=false;btn.textContent="Add image generation \u00b7 "+im.gb+" GB";
+    st.textContent="";
+    add.textContent="Add \u00b7 "+im.gb+" GB";
   }
 }
+$("#img-rm").addEventListener("click",async()=>{
+  const r=$("#img-rm");
+  if(r.dataset.sure!=="1"){        // the inline two-step, as everywhere else
+    r.dataset.sure="1";
+    const gb=((lastSetup&&lastSetup.image)||{}).on_disk_gb||0;
+    r.textContent="really remove?"+(gb?" frees "+gb+" GB":"");
+    return;
+  }
+  r.disabled=true;r.textContent="removing\u2026";
+  let out={};
+  try{out=await(await fetch("/api/image/remove",{method:"POST"})).json();}
+  catch(e){}
+  r.disabled=false;
+  $("#manage-note").textContent=out.ok
+    ?"image generation removed \u2014 freed "+out.freed_gb+" GB"
+    :"couldn\u2019t remove it \u2014 "+((out.errors||[])[0]||"try again");
+  lastSetup=null;await ensureSetup();
+  paintPlans();paintMgStats();paintCleanNote();paintImageBox();
+});
 $("#img-add").addEventListener("click",async()=>{
   $("#img-add").disabled=true;
   try{await fetch("/api/image/install",{method:"POST"});}catch(e){}
