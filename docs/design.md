@@ -789,3 +789,80 @@ that scored in secret would be a second product — and the first thing that wou
 
 The route cards are built from the corpus: `Bushwick → London · EWR/JFK → LHR · 3 options`.
 A step whose options are empty is dropped rather than shown blank.
+
+
+---
+
+# The ledger narrator
+
+Build step five, done. `concorde-travel/narrator.py`.
+
+Hard rule 1 says the LLM narrates and does not rank. This module is the whole of the
+"narrates" half, and it is built so the rule holds by construction rather than by good
+intentions.
+
+## The model does not do arithmetic
+
+`brief()` precomputes **every number the prose is allowed to contain** — the saving
+percentage, the gap, each effective cost, each grade, each duration — and hands the model
+a closed list of them. The model picks words. It cannot divide two figures and quote the
+result, because a figure it computed would not be in the allowed set.
+
+That inversion is the whole design. The usual approach hands a model the data and asks it
+to be careful; this one makes carelessness structurally detectable.
+
+## Verify, then fall back
+
+Every generated sentence is checked: each dollar figure, percentage, duration and airport
+code must be one the arithmetic produced, and a list of certainty phrases — *"you will
+have"*, *"guaranteed"*, *"is equipped with"* — is banned outright, because hard rule 2
+forbids unhedged equipment claims. Anything failing is discarded and the deterministic
+template ships.
+
+The template is the **floor, not a degraded mode**. No key, no package, no network, or a
+failed check, and the page still says something true. Nothing external is load-bearing.
+
+## Why there is no temperature
+
+`temperature` is removed on Claude Opus 5 and returns a 400 — so determinism cannot be
+bought with sampling settings even in principle. Verification carries it instead, which is
+the sturdier answer anyway: a checked sentence at any temperature beats an unchecked one at
+zero.
+
+Narration is the one non-deterministic surface in ConcordeGo, and the only one where that
+is safe. Prose cannot reorder a list.
+
+## The one dependency, and why it is optional
+
+The narrator uses the official `anthropic` SDK rather than hand-rolled HTTP. It is imported
+**lazily, inside the call**, so `pip install anthropic` buys better prose and its absence
+costs nothing: the scorer, the fixtures and every test remain stdlib-only and offline. That
+keeps the stdlib commitment where it matters — the deterministic core — without hand-rolling
+an API client next to a maintained one.
+
+## Wiring
+
+`/api/score` carries the template narration inline, so the page never paints an empty box.
+`/api/narrate` re-scores the same request and upgrades the prose if a model is reachable;
+the page swaps it in when it arrives, keyed by a sequence number so a slow answer cannot
+overwrite a newer search. The UI's own `narrate()` is gone — same lesson as the scorer.
+
+The strapline under the box changes with the source, because the reader should know which
+they are looking at: *"Written from the ledger"* for the template, *"Written by a model from
+the ledger, and checked against it — every figure here was computed, not phrased"* for the
+model.
+
+## Tests
+
+```bash
+python3 concorde-travel/tests/test_narrator.py     # 42 checks, no key or network needed
+```
+
+The verifier is tested adversarially with sentences that are fluent, plausible and wrong: a
+dollar figure nobody computed, a percentage nobody computed, an airport not in the brief, an
+unhedged wifi promise, a guarantee about the aircraft, an invented duration, an essay.
+
+It also tests the **false-positive** direction, which caught a real bug: the money regex
+swallowed a trailing sentence comma, so `"at $455, $933 effective"` read as an invented
+`$455,` and the verifier rejected its own template. Every narration would have silently
+degraded to the fallback — and nobody would have noticed, because the fallback is fine.

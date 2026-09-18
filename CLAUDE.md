@@ -344,8 +344,11 @@ the moat.
 ## Build order
 
 fixtures → scorer → enrichment DB → intent parser → ledger narrator → live inventory
-adapter. **Fixtures and scorer are done.** Stack is Python, stdlib only — chosen in
-`docs/design.md`, and the reasoning there is worth reading before proposing otherwise.
+adapter. **Fixtures, scorer and narrator are done.** Stack is Python, stdlib only —
+chosen in `docs/design.md`, and the reasoning there is worth reading before proposing
+otherwise. The one exception is the narrator, which uses the official `anthropic` SDK,
+imported lazily and entirely optional: with no key and no package the deterministic
+template ships and nothing else changes.
 
 ## Working on it
 
@@ -354,6 +357,7 @@ python3 concorde-travel/server.py             # the draft UI, http://127.0.0.1:9
 python3 concorde-travel/scorer.py             # print every fixture's ledger, every profile
 python3 fixtures/validate.py                  # fixture schema + semantics
 python3 concorde-travel/tests/test_scorer.py  # the fixtures' own assertions, executed
+python3 concorde-travel/tests/test_narrator.py   # the narrator's guard rails (no key needed)
 python3 concorde-travel/tests/test_faststart.py
 ```
 
@@ -370,3 +374,11 @@ curve it is meant to be testing is a fixture that tests nothing.
 **The test suites are mutation-tested.** Before changing either, know that `test_scorer.py`
 catches 12 of 12 seeded faults and `validate.py` 10 of 10. If a change makes a suite pass
 that should not, the suite has lost a guard.
+
+**The narrator is the only non-deterministic surface, and it is fenced.** `narrator.brief()`
+precomputes every number the prose may contain — the model picks words, never arithmetic —
+and `narrator.verify()` rejects any sentence containing a figure, percentage, duration or
+airport the brief did not supply, plus a list of unhedged certainty phrases (hard rule 2).
+Anything rejected falls back to the deterministic template. Do not relax the verifier to
+make nicer copy: it is the entire reason a model is allowed near this product. Note there
+is no `temperature` to reach for — it is removed on Claude Opus 5 and returns a 400.

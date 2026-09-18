@@ -1565,30 +1565,9 @@ function optionHTML(o, rank, hidden){
   return h + '</article>';
 }
 
-function narrate(opts){
-  if (!opts.length) return "";
-  var top = opts[0];
-  var cheap = opts.slice().sort(function(a,b){ return a.ticket_cents - b.ticket_cents; })[0];
-  var lead;
-  if (cheap.option_id === top.option_id){
-    lead = "The cheapest ticket here is also the one that costs you least. That is rarer than it sounds.";
-  } else {
-    var save = Math.round((1 - cheap.ticket_cents / top.ticket_cents) * 100);
-    var gap = liveTotal(cheap) - liveTotal(top);
-    var worst = null;
-    cheap.lines.forEach(function(l){
-      if (l.kind !== "base" && l.code !== "time" && (!worst || l.amount_cents > worst.amount_cents)) worst = l;
-    });
-    lead = "You can save " + save + "% on the ticket at " + money(cheap.ticket_cents) +
-           " — it lands " + money(gap) + " worse once everything is counted" +
-           (worst ? ", mostly " + (/^\d/.test(worst.label) ? "its " : "") +
-                    worst.label.charAt(0).toLowerCase() + worst.label.slice(1) : "") + ".";
-  }
-  var sub = "Top pick " + top.route.replace(/ - /g, "→") + " at " + money(top.ticket_cents) +
-            ", " + money(liveTotal(top)) + " effective, " + hm(top.door_to_door_minutes) +
-            " door to door. Grade " + top.grade + ".";
-  return '<div class="lead">' + esc(lead) + '</div><div class="sub">' + esc(sub) + '</div>';
-}
+/* narrate() used to live here. The server writes the prose now - the same
+   ledger, one implementation - and /api/narrate upgrades it when a model is
+   reachable. */
 
 function paint(){
   var host = document.getElementById("results");
@@ -1602,13 +1581,21 @@ function paint(){
   var opts = LAST.options, hidden = LAST.hidden;
   if (STATE.firstPaint && opts.length){ STATE.expanded[opts[0].option_id] = true; STATE.firstPaint = false; }
 
-  var h = '<div class="narrator glass">' + narrate(opts);
+  var n = LAST.narration || {lead:"", sub:"", source:"template"};
+  var h = '<div class="narrator glass">' +
+          '<div class="lead">' + esc(n.lead) + '</div>' +
+          (n.sub ? '<div class="sub">' + esc(n.sub) + '</div>' : '');
   if (STATE.understood.length){
     h += '<div class="understood"><span class="eyebrow" style="margin-right:4px">Understood</span>';
     STATE.understood.forEach(function(u){ h += '<span class="uchip ' + u.cls + '">' + esc(u.text) + '</span>'; });
     h += '</div>';
   }
-  h += '<div class="src">Written from the ledger. It states nothing the arithmetic did not produce.</div></div>';
+  h += '<div class="src">' +
+       (n.source === "model"
+          ? 'Written by a model from the ledger, and checked against it \u2014 every figure here was computed, not phrased.'
+          : 'Written from the ledger. It states nothing the arithmetic did not produce.') +
+       (n.note ? ' <span style="opacity:.7">(' + esc(n.note) + ')</span>' : '') +
+       '</div></div>';
 
   if (!opts.length){
     h += '<div class="sectionhead"><span class="eyebrow">Nothing left</span><span class="rule"></span></div>';
@@ -1671,12 +1658,14 @@ function render(scroll){
   var host = document.getElementById("results");
   host.hidden = false;
   if (!LAST) host.innerHTML = '<div class="narrator glass"><div class="sub">Scoring…</div></div>';
+  var body = requestBody();
   fetch("/api/score", {method:"POST", headers:{"Content-Type":"application/json"},
-                       body: JSON.stringify(requestBody())})
+                       body: JSON.stringify(body)})
     .then(function(r){ return r.json(); })
     .then(function(d){
       LAST = d; paint();
       if (scroll) host.scrollIntoView({behavior:"smooth", block:"start"});
+      upgradeNarration(body);
     })
     .catch(function(e){
       LAST = {error:"Could not reach the scorer. Start it with: python3 concorde-travel/server.py"};
@@ -1684,6 +1673,23 @@ function render(scroll){
     });
 }
 function runSearch(scroll){ render(scroll); }
+
+/* The scores are already on screen by now. If a model is reachable it writes
+   better prose over the same ledger; if it is not, or if what it wrote failed
+   the server's check, the deterministic sentence simply stays. */
+var NARRATION_SEQ = 0;
+function upgradeNarration(body){
+  var seq = ++NARRATION_SEQ;
+  fetch("/api/narrate", {method:"POST", headers:{"Content-Type":"application/json"},
+                         body: JSON.stringify(body)})
+    .then(function(r){ return r.json(); })
+    .then(function(n){
+      if (seq !== NARRATION_SEQ) return;      /* a newer search has landed */
+      if (!LAST || n.error || n.source !== "model") return;
+      LAST.narration = n; paint();
+    })
+    .catch(function(){});
+}
 
 function openBook(id){
   var o = null;

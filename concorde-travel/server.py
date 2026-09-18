@@ -36,6 +36,7 @@ import time
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import narrator                                          # noqa: E402
 import scorer                                            # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -404,17 +405,34 @@ def score_request(req):
     hidden = [v for v in views if v["filtered_reason"] or v["infeasible_reason"]]
     kept.sort(key=lambda v: (v["effective_cents"], v["option_id"]))
 
-    return {
-        "fixture": {"fixture_id": sc["fixture_id"], "title": sc["title"],
+    fixture_meta = {"fixture_id": sc["fixture_id"], "title": sc["title"],
                     "origin": sc["query"]["origin"]["label"],
                     "destination": sc["query"]["destination"]["label"],
                     "depart_date": sc["query"]["depart_date"],
                     "route_par_cents": sc["query"]["route_par_cents"],
-                    "profiles": list(sc["query"]["profiles"])},
+                    "profiles": list(sc["query"]["profiles"])}
+
+    # The deterministic narration rides along with the scores - it costs
+    # nothing and means the page never paints an empty box. /api/narrate
+    # upgrades it afterwards if a model is reachable.
+    b = narrator.brief(fixture_meta, kept, profile)
+    return {
+        "fixture": fixture_meta,
         "profile": profile,
         "options": kept,
         "hidden": hidden,
+        "narration": narrator.narrate(b, allow_model=False),
     }
+
+
+def narrate_request(req):
+    """Prose over an already-computed ledger. Never re-ranks - it scores the
+    same request and narrates the order it was given."""
+    scored = score_request(req)
+    if "error" in scored:
+        return scored
+    b = narrator.brief(scored["fixture"], scored["options"], scored["profile"])
+    return narrator.narrate(b, allow_model=True)
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -455,7 +473,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     # --------------------------------------------------------------- POST
     def do_POST(self):
-        if self.path.split("?")[0] != "/api/score":
+        path = self.path.split("?")[0]
+        if path not in ("/api/score", "/api/narrate"):
             return self.send_error(404)
         try:
             n = int(self.headers.get("Content-Length") or 0)
@@ -463,7 +482,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except Exception as exc:
             return self._json({"error": "bad request: %s" % exc})
         try:
-            return self._json(score_request(req))
+            fn = score_request if path == "/api/score" else narrate_request
+            return self._json(fn(req))
         except Exception as exc:
             # a broken fixture should say so on the page, not 500 silently
             import traceback
