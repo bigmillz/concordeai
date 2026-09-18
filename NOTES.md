@@ -4732,3 +4732,47 @@ Manage models grows an "Image generation" box under the presets with
 one button; the wizard's model step grows a checkbox; the install
 rides the same strip and pane as model downloads (IMAGE_ROW). Apple
 Silicon only for the local engine. The UPDATE pill is a 26px arrow.
+
+## 6b295 — export, to twenty formats, routed from plain language (uncut)
+
+Per Patrick ("add export for all the following formats … performed
+intelligently, so that if the user asks 'can I export a mermaid file of
+this', then it knows exactly which engine to go to … a small box with a
+download link similar to how Claude presents downloads"). Designed by a
+seven-dimension workflow, each design then attacked by an adversarial
+verifier that TESTED claims rather than trusting them — which caught two
+shipping blockers, a missing `import html`, a stored-XSS vector and a
+download path that silently does nothing.
+
+- ROUTER. `export_intent()` anchors on the FORMAT WORD, not a leading
+  verb (image_intent's `^verb` shape misses "…as a PDF"), scores the
+  frame around it, and needs 3 to fire. Absolute vetoes kill "what is a
+  PDF" and "write a python script that makes a PDF"; soft vetoes yield to
+  an explicit `as a <fmt>` frame. A filename only counts with a naming
+  cue, so "the error in Main.java" is not an export. 38/38 on a corpus
+  that includes every case the verifiers flagged.
+- TWO LANES. "export this as X" converts the previous answer and returns
+  early; "make me a PDF guide" shapes the answer first (via
+  `dated_system`, never `messages[-1]` — the /search path replaces that
+  message wholesale) and exports what was written.
+- ENGINES, one per KIND not per format: doc (reportlab / python-docx),
+  slides (python-pptx), table (openpyxl with real Excel charts, formula
+  validation, and negatives that stay numeric), calendar (hand-rolled RFC
+  5545 with octet folding and day-after DTEND), cards, archive, text.
+  Mermaid gets synthetic ids and quoted labels, because multi-word
+  labels are not legal bare node ids.
+- DELIVERY. Files sit under the same per-identity base as chats, so the
+  existing tenancy boundary covers them. Ids are token_urlsafe(16); the
+  sidecar is `.meta`, not `.json`, which would collide with a JSON
+  export. Every download is application/octet-stream + attachment +
+  nosniff, never the format's own MIME — model-authored HTML served as
+  text/html from our origin is stored XSS against the app. Filenames use
+  RFC 6266 so a CJK name cannot blow up latin-1 header encoding.
+- THE BOX. One durable `[[dl:{...}]]` token, stashed as a placeholder the
+  instant renderMD escapes the text so no inline rule can chew it, and
+  stripped from the clipboard and the voice. Desktop click reveals in
+  Finder; a browser over the tunnel gets the plain anchor.
+- The wheels (69 MB, all pure) install on demand, and ride the build's
+  optional pip line with `|| true`.
+- Working line moves to 6.1.0. Gauntlet 165/165, with functional checks
+  that run the real router and the real engines.

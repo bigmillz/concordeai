@@ -112,6 +112,16 @@ page = b.decode("utf-8", "replace")
 check("SKY_N injected", re.search(r'parseInt\("\d+",10\)', page))
 check("dark list injected", "darkSet=new Set(JSON.parse('[0, 3, 4" in page)
 
+# THE VERSION FACTS, read once: the checks below assert that every
+# surface agrees with the constants, never that the line is some
+# particular number — pinning one is why three checks broke on a beta cut
+_vsrc = dict(re.findall(r'^APP_(VERSION|BETA|RC) = "?([^"\n]+?)"?\s*(?:#.*)?$',
+                        _MILLENAI_SRC, re.M))
+_vraw = _vsrc.get("VERSION", "")
+_vwant = _vraw[:-2] if (_vraw.count(".") >= 2 and _vraw.endswith(".0")) else _vraw
+_vshown = (re.search(r'id="up-version">([^<]*)<', page) or
+           re.match("(x)", "x")).group(1)
+
 print("== page integrity ==")
 leftovers = [t for t in re.findall(r"__[A-Z_]{3,}__", page)
              if t not in ("__MAIN__",)]
@@ -195,10 +205,86 @@ try:
 except Exception:
     _wn = {}
 check("what's new endpoint answers for this build",
-      _wn.get("title") == "6.0.4" and "notes" in _wn
+      _wn.get("title", "").startswith(_vwant) and "notes" in _wn
       and 'fetch("/api/update/whatsnew")' in page
       and 'prefs.get("last_ident")' in _MILLENAI_SRC
       and "ident = short_version()" in _MILLENAI_SRC)
+# 6b295, per Patrick: export to ~20 formats, routed from plain language,
+# delivered in a download box. These run the REAL router and the REAL
+# engines rather than asserting that strings exist.
+_XNS = {"re": re, "html": __import__("html")}
+try:
+    _xseg = _MILLENAI_SRC[_MILLENAI_SRC.index("EXPORT_KEEP_N ="):
+                          _MILLENAI_SRC.index("def _x_size(")]
+    exec(_xseg, _XNS)
+except Exception as _e:
+    _XNS = {}
+_xi = _XNS.get("export_intent", lambda *a, **k: None)
+_XPOS = [("export this as a PDF", "pdf"), ("can I export a mermaid file of this", "mmd"),
+         ("give me that as a spreadsheet", "xlsx"), ("turn this into slides", "pptx"),
+         ("save the code above as run.py", "py"), ("convert this to markdown", "md"),
+         ("Generate an Excel file of a budget", "xlsx"), ("download this as an ics file", "ics")]
+_XNEG = ["what is a PDF", "how do I export from Excel", "explain the CSV format",
+         "write a python script that makes a PDF", "respond in markdown please",
+         "does this app support pdf export", "we use Next.js on the frontend",
+         "the error is at Main.java line 40", "summarize the pdf i attached"]
+check("export router: routes every format, vetoes the lookalikes",
+      all((_xi(q, True) or {}).get("ext") == e for q, e in _XPOS)
+      and all(_xi(q, True) is None for q in _XNEG))
+
+_XSAMPLE = ("# Trip\n\nPick one.\n\n| City | Cost |\n| --- | --- |\n"
+            "| Lisbon | 540 |\n| Tokyo | 890 |\n\n## Flow\n\nA -> B -> C\n\n"
+            "```python\nx = 1\n```\n\nQ: Which?\nA: Lisbon.\n")
+_xmade = {}
+if _XNS:
+    import tempfile as _tf
+    for _e, _fn in (("csv", "ex_table"), ("md", "ex_text"), ("mmd", "ex_text"),
+                    ("py", "ex_text"), ("anki", "ex_cards"), ("zip", "ex_archive")):
+        try:
+            _pp = os.path.join(_tf.gettempdir(), "gaunt_x." + _e)
+            if _fn == "ex_table":
+                _XNS[_fn](_XSAMPLE, _e, _pp)
+            elif _fn in ("ex_cards", "ex_archive"):
+                _XNS[_fn](_XSAMPLE, _e, _pp)
+            else:
+                _XNS[_fn](_XSAMPLE, _e, _pp)
+            _xmade[_e] = os.path.getsize(_pp)
+        except Exception as _ex:
+            _xmade[_e] = str(_ex)[:60]
+check("export engines: stdlib formats all write real files",
+      all(isinstance(_xmade.get(e), int) and _xmade[e] > 0
+          for e in ("csv", "md", "mmd", "py", "anki", "zip")), str(_xmade))
+# a Mermaid export must be valid Mermaid, not whatever fence came first
+_xmmd = ""
+try:
+    _xmmd = open(os.path.join(__import__("tempfile").gettempdir(),
+                              "gaunt_x.mmd"), encoding="utf-8").read()
+except Exception:
+    pass
+check("export: mermaid is real mermaid, with quoted labels",
+      _xmmd.startswith("graph TD") and '"' in _xmmd and "-->" in _xmmd
+      and "x = 1" not in _xmmd, _xmmd[:80])
+
+# the download route: never the format's own MIME, always an attachment
+_xst, _xhd, _xbody = req("/api/export/../../prefs.json", cookie=K)
+_xst2, _, _ = req("/api/export/nope.csv", cookie=K)
+check("export route: traversal and unknown ids are 404",
+      _xst == 404 and _xst2 == 404, "%s/%s" % (_xst, _xst2))
+check("export delivery: octet-stream, attachment, nosniff, per-identity",
+      "application/octet-stream" in _MILLENAI_SRC
+      and "X-Content-Type-Options" in _MILLENAI_SRC
+      and "_x_disposition(nm)" in _MILLENAI_SRC
+      and "export_dir(base)" in _MILLENAI_SRC
+      and "self._data_base()" in _MILLENAI_SRC
+      and "filename*=UTF-8''" in _MILLENAI_SRC)
+# the box, and the token that must never reach a clipboard
+check("download box: placeholder-safe, stripped from copy and speak",
+      "function dlBox(" in page and 'class="dlbox"' in page
+      and "\\u0000DL" in page and "function stripTokens(" in page
+      and "msgActions(aiDiv,\"assistant\",stripTokens(full))" in page
+      and "stripTokens(full)})" in page
+      and "ALLOW_DOWNLOADS" in _MILLENAI_SRC
+      and "/api/export/reveal" in _MILLENAI_SRC)
 # 6b294, per Patrick: image generation — local FLUX first, cloud after;
 # the intent is caught before the web search; the extra sits under the
 # presets and in the wizard; the update pill is an arrow the size of its
@@ -280,9 +366,11 @@ _sv = re.search(r"def short_version\(.*?def spec_version\(.*?"
                 r"return short_version\(\)\.replace\(\" nightly \", \" \\u00b7 \"\)\n",
                 _MILLENAI_SRC, re.S)
 exec(_sv.group(0), _ns2) if _sv else None
-check("rail version cell: nightly reads '6.0.4 · e6fb576'",
+check("rail version cell: a nightly reads '<ver> \u00b7 <sha>', no ellipsis",
       _ns2.get("spec_version", lambda: "")() == "6.0.4 \u00b7 e6fb576"
-      and 'id="about-ver">6.0.4<' in page
+      and re.search(r'id="about-ver">' + re.escape(_vwant), page) is not None
+      and " nightly " not in re.search(r'id="about-ver">([^<]*)<',
+                                       page).group(1)
       and "__APP_VER_SPEC__" not in page)
 # 6b287, per Patrick: the disk image's window title and the line under
 # the mark carry the app's own label (nightly + commit, beta N, RC), and
@@ -840,10 +928,14 @@ check("a stale cached page can never 304 its way back", s == 200)
 # CANDIDATE, not a beta — the label changes on every display surface
 # while the prerelease hold stays exactly as it was, so /releases/latest
 # still never offers it to a stable install.
-check("release labelling: 6.0 final, no RC, no beta hold",
-      "APP_RC = 0" in _MILLENAI_SRC and "APP_BETA = 0" in _MILLENAI_SRC
-      and re.search(r'id="up-version">6\.0(\b|<| \xb7)', page) is not None
-      and " RC" not in re.search(r'id="up-version">[^<]*<', page).group(0))
+# every surface names the same build: the constants, the page and the
+# release label cannot drift apart, whatever line we are on
+check("release labelling: the page and the constants name one build",
+      _vshown.startswith(_vwant)
+      and ((" beta " in _vshown) == (_vsrc.get("BETA", "0") != "0"))
+      and ((" RC" in _vshown) == (_vsrc.get("RC", "0") != "0")),
+      "%s vs %s/%s/%s" % (_vshown, _vsrc.get("VERSION"), _vsrc.get("BETA"),
+                          _vsrc.get("RC")))
 check("titlebar lockup: accessory + bundled font",
       "NSTitlebarAccessoryViewController" in _MILLENAI_SRC
       and "def _brand_accessory" in _MILLENAI_SRC

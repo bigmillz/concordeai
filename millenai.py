@@ -33,6 +33,7 @@ import signal
 import socket
 import base64
 import hashlib
+import html
 import secrets
 import struct
 import subprocess
@@ -79,7 +80,7 @@ try:
 except ImportError:
     HAS_WEBVIEW = False
 
-APP_VERSION = "6.0.4"   # bump here — UI, window, DMG all follow
+APP_VERSION = "6.1.0"   # bump here — UI, window, DMG all follow
 # BETA HOLD (per Patrick): the 6.x line is beta until the kinks are out.
 # While > 0: every display surface says "beta N", release.sh publishes
 # as a GitHub PRERELEASE, and — because the desktop updater reads
@@ -90,7 +91,7 @@ APP_VERSION = "6.0.4"   # bump here — UI, window, DMG all follow
 # "6.1 beta 2"… four or five a line, restarting at 1 with each new
 # version — never the build number ("beta 268"). 0 = not a beta.
 # `./release.sh beta` cuts the next one; a stable cut resets it to 0.
-APP_BETA = 1
+APP_BETA = 0
 # RELEASE CANDIDATE (6b258, per Patrick: "almost there"). >0 renames
 # the label from "beta" to "RC<n>" on every display surface and in the
 # release title, while KEEPING the prerelease hold above — an RC is
@@ -3316,6 +3317,1011 @@ def generate_image(prompt: str) -> tuple:
     except Exception as exc:
         errs.append("community: %s" % str(exc)[:120])
     raise RuntimeError("; ".join(errs) or "no image engine")
+
+
+# ---------------------------------------------------------------- export
+# FILES OUT (6b295, per Patrick: "add export for all the following formats
+# … performed intelligently, so that if the user asks 'can I export a
+# mermaid file of this', then it knows exactly which engine to go to").
+#
+# THE SHAPE. One registry keyed by extension; one router that decides
+# format and where the bytes come from; one writer per KIND, not per
+# format. Light formats (text, data, calendar, cards, archives) are pure
+# stdlib and work the moment you ask. The four heavy document formats
+# need wheels, fetched once on demand — so the app ships small and export
+# still works out of the box for most of what people ask for.
+#
+# EVERY export is served as application/octet-stream with an attachment
+# disposition and nosniff, never the format's real MIME. Model-authored
+# HTML served as text/html from the app's own origin would be stored XSS
+# against the app itself; octet-stream closes that and costs nothing.
+
+EXPORT_KEEP_N = 60               # per identity, newest kept
+EXPORT_TTL_H = 72                # and nothing older than this
+EXPORT_MAX_BYTES = 25_000_000
+EXPORT_DEPS = ("reportlab", "openpyxl", "python-docx", "python-pptx")
+
+# ext -> (kind, human name). KIND picks the writer; there is no per-format
+# branching anywhere else. "text" means the model's own text is the file.
+EXPORT_KIND = {
+    "pdf": ("doc", "PDF"), "docx": ("doc", "Word document"),
+    "pptx": ("slides", "PowerPoint deck"),
+    "xlsx": ("table", "Excel workbook"), "csv": ("table", "CSV"),
+    "ics": ("calendar", "calendar file"), "anki": ("cards", "Anki deck"),
+    "zip": ("archive", "archive"),
+    "md": ("text", "Markdown"), "txt": ("text", "text file"),
+    "json": ("text", "JSON"), "yaml": ("text", "YAML"),
+    "toml": ("text", "TOML"), "env": ("text", ".env file"),
+    "html": ("text", "HTML page"), "svg": ("text", "SVG"),
+    "mmd": ("text", "Mermaid diagram"), "xml": ("text", "XML"),
+    "py": ("text", "Python script"), "js": ("text", "JavaScript"),
+    "jsx": ("text", "JSX component"), "ts": ("text", "TypeScript"),
+    "tsx": ("text", "TSX component"), "sh": ("text", "shell script"),
+    "sql": ("text", "SQL"), "tf": ("text", "Terraform config"),
+    "rb": ("text", "Ruby script"), "go": ("text", "Go source"),
+    "rs": ("text", "Rust source"), "css": ("text", "stylesheet"),
+}
+# the heavy four; everything else is stdlib
+EXPORT_NEEDS_DEPS = {"pdf", "docx", "pptx", "xlsx"}
+
+# what the user might call each one. Longest match wins, so "xlsx" beats
+# "excel" beats "sheet" — order matters inside each list only for display.
+EXPORT_WORDS = {
+    "pdf": ["pdf"],
+    "docx": ["docx", "word doc", "word document", "word file", "word"],
+    "pptx": ["pptx", "powerpoint", "power point", "keynote", "slide deck",
+             "slides", "deck", "presentation"],
+    "xlsx": ["xlsx", "excel", "spreadsheet", "workbook", "google sheet",
+             "sheets", "sheet"],
+    "csv": ["csv", "comma separated", "comma-separated"],
+    "ics": ["ics", "ical", "icalendar", "calendar file", "calendar invite",
+            "calendar event"],
+    "anki": ["anki", "flashcard", "flash card", "flashcards", "flash cards"],
+    "zip": ["zip", "zip file", "archive", "bundle"],
+    "md": ["md", "markdown", "readme"],
+    "txt": ["txt", "text file", "plain text", "plaintext"],
+    "json": ["json"], "yaml": ["yaml", "yml"], "toml": ["toml"],
+    "env": ["dotenv", ".env", "env file"],
+    "html": ["html", "web page", "webpage", "landing page"],
+    "svg": ["svg", "vector"], "png": ["png"],
+    "mmd": ["mermaid", "mmd"],
+    "xml": ["xml"],
+    "py": ["python script", "python file", "py file", ".py"],
+    "js": ["javascript file", "js file", ".js"],
+    "jsx": ["jsx", ".jsx"], "ts": ["typescript file", ".ts"],
+    "tsx": ["tsx", ".tsx"],
+    "sh": ["shell script", "bash script", "sh file", ".sh"],
+    "sql": ["sql", "sql file", "migration"],
+    "tf": ["terraform", ".tf"],
+    "rb": ["ruby script", ".rb"], "go": ["go file", ".go"],
+    "rs": ["rust file", ".rs"], "css": ["css file", "stylesheet"],
+}
+# png is drawn, not written — it rides the image path but is named here so
+# "export that chart as a png" routes rather than falling to the painter
+EXPORT_KIND["png"] = ("image", "PNG image")
+
+_EXPORT_ALIASES = sorted(
+    ((w, ext) for ext, ws in EXPORT_WORDS.items() for w in ws),
+    key=lambda p: -len(p[0]))
+
+
+def _export_deps_ok() -> bool:
+    try:
+        import reportlab, openpyxl, docx, pptx      # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+_export_install = {"state": "idle", "note": ""}
+
+
+def _install_export_deps_worker():
+    try:
+        _export_install.update(state="installing", note="")
+        pip = os.path.join(app_dir(), "venv", "bin", "pip")
+        if not os.path.exists(pip):
+            pip = os.path.join(os.path.dirname(sys.executable), "pip")
+        r = subprocess.run([pip, "install", "--quiet", "--only-binary=:all:"]
+                           + list(EXPORT_DEPS),
+                           capture_output=True, text=True, timeout=900)
+        if r.returncode != 0:
+            raise RuntimeError((r.stderr or "")[-200:])
+        _export_install.update(state="ready" if _export_deps_ok() else "error",
+                               note="")
+    except Exception as exc:
+        _export_install.update(state="error", note=str(exc)[:200])
+
+
+def ensure_export_deps(block_s: float = 0.0) -> bool:
+    """True when the document engines are importable. Kicks off a one-time
+    background install otherwise; never blocks the answer path by default."""
+    if _export_deps_ok():
+        return True
+    if _export_install["state"] not in ("installing",):
+        threading.Thread(target=_install_export_deps_worker,
+                         daemon=True).start()
+    if block_s > 0:
+        end = time.time() + block_s
+        while time.time() < end and _export_install["state"] == "installing":
+            time.sleep(0.5)
+            if _export_deps_ok():
+                return True
+    return _export_deps_ok()
+
+
+# ---------------------------------------------------------- the router
+# Anchored on the FORMAT WORD, not on a leading verb. An export ask puts
+# its discriminating token near the end ("…as a PDF", "…to run.py"), so
+# image_intent()'s ^verb shape would miss most of them. Score the frame
+# around the format word; 3 fires, less does not.
+_XF_AS = re.compile(                                     # "... as a PDF"
+    r"\b(?:as|into)\s+(?:an?\s+|the\s+)?(?:\w+\s+){0,2}$", re.I)
+# "make me a CSV", "get a PDF of ..." — produce-a-thing, article included
+_XF_ARTICLE = re.compile(r"\b(?:an?|the)\s+$", re.I)
+_XF_CONVERT = re.compile(
+    r"\b(?:convert|turn|change|export|save|render|translate)\b", re.I)
+_XF_TOFILE = re.compile(
+    r"\b(?:to|in)\s+(?:an?\s+|the\s+)?$", re.I)            # weak on its own
+_XF_NOUN = re.compile(
+    r"^\s*(?:file|doc|document|version|copy|format|export|download)\b", re.I)
+_XF_VERB = re.compile(
+    r"\b(?:export|download|save|convert|turn|render|generate|produce|"
+    r"write|give|make|send|attach|get)\b", re.I)
+# a real filename, but ONLY with a naming cue in front of it — otherwise
+# "the error in Main.java" and "we use Next.js" become exports
+_XF_FILENAME = re.compile(
+    r"\b(?:save|export|write|download|call(?:\s+it)?|name(?:\s+it)?)\b"
+    r"[^.\n]{0,40}?\b(?:as|to|named|called)\s+[\"'`]?"
+    r"(?P<fn>[\w][\w.-]{0,60}\.(?P<ext>[A-Za-z][A-Za-z0-9]{0,5}))", re.I)
+# hard vetoes: the format word is the TOPIC, not the destination
+_XV_ABSOLUTE = [
+    re.compile(r"\b(?:what|which|whats|what's)\s+(?:is|are)\s+(?:an?\s+)?"
+               r"(?:\w+\s+){0,2}(?:file|format)\b", re.I),
+    re.compile(r"\b(?:how\s+do\s+i|how\s+can\s+i|how\s+to)\b.{0,40}"
+               r"\b(?:open|read|import|convert|edit)\b", re.I),
+    re.compile(r"\b(?:respond|reply|answer|format\s+your\s+(?:reply|answer))"
+               r"\s+(?:in|with|using)\b", re.I),
+    re.compile(r"\b(?:i|we)\s+(?:attached|uploaded|sent|pasted)\b", re.I),
+    re.compile(r"\b(?:summari[sz]e|read|analy[sz]e|explain|review)\s+"
+               r"(?:the|this|my|that)\s+(?:attached\s+)?\w{2,6}\b", re.I),
+    # a capability question is never a request, however it scores
+    re.compile(r"\b(?:do(?:es)?\s+(?:you|this|the|it)\s+"
+               r"(?:app|support|handle|do)|are\s+you\s+able|"
+               r"can\s+(?:you|this|it)\s+(?:even|actually)?\s*"
+               r"(?:support|handle|do)\b)", re.I),
+]
+# conditional: an interrogative opener only vetoes when no strong frame
+_XV_SOFT = [
+    re.compile(r"^\s*(?:what|why|when|who|explain|describe|tell\s+me\s+about)"
+               r"\b", re.I),
+    re.compile(r"\b(?:are\s+you\s+able|can\s+you\s+(?:even|actually)|"
+               r"do\s+you\s+support|does\s+(?:this|the)\s+app)\b", re.I),
+]
+# "write a python script that makes a PDF" — the format is the SCRIPT's
+# output, not ours. Absolute, unless a cued filename names our own output
+# ("...and save it as gen.py"), which is the only unambiguous signal there is.
+_XV_PROGRAM = re.compile(
+    r"\b(?:script|program|code|function|app|tool|cli|command)\s+"
+    r"(?:that|which|to|for)\b", re.I)
+
+
+def _export_shape(text: str) -> str:
+    """What the previous answer looks like, when no format was named."""
+    t = text or ""
+    if re.search(r"^\|.*\|\s*$", t, re.M) and re.search(r"^\|[\s:|-]+\|\s*$",
+                                                        t, re.M):
+        return "table"
+    if re.search(r"^```", t, re.M):
+        return "code"
+    if re.search(r"(?:-->|->|\bflowchart\b|\bgraph\s+(?:TD|LR)\b)", t):
+        return "diagram"
+    if re.search(r"^#{1,3}\s", t, re.M):
+        return "doc"
+    return "prose"
+
+
+_SHAPE_FMT = {"table": "xlsx", "code": "txt", "diagram": "mmd",
+              "doc": "pdf", "prose": "md"}
+
+
+def export_intent(text: str, has_prior: bool = False):
+    """None, or what to export and where the content comes from.
+
+    {"ext", "lane", "filename", "score"} — lane "retro" converts the
+    previous answer, lane "draft" asks the model to write it first.
+    """
+    t = (text or "").strip()
+    if not t or len(t) > 600:
+        return None
+    low = t.lower()
+
+    fn_m = _XF_FILENAME.search(t)
+    fn_ext = (fn_m.group("ext") or "").lower() if fn_m else ""
+    if fn_ext and fn_ext not in EXPORT_KIND:
+        fn_ext, fn_m = "", None
+
+    # find the last format word that is a whole-word match
+    hit_ext, hit_at, hit_word = "", -1, ""
+    for word, ext in _EXPORT_ALIASES:
+        for m in re.finditer(r"(?<!\w)" + re.escape(word) + r"(?!\w)", low):
+            if m.start() > hit_at:
+                hit_ext, hit_at, hit_word = ext, m.start(), word
+    if not hit_ext and not fn_ext:
+        # no format named at all: only an explicit export verb about a
+        # previous answer opens the shape path
+        if has_prior and re.search(r"\b(?:export|download|save)\b", low) \
+                and re.search(r"\b(?:this|that|it|the above|them)\b", low):
+            return {"ext": "", "lane": "retro", "filename": "", "score": 3,
+                    "shape": True}
+        return None
+
+    score = 0
+    if hit_at >= 0:
+        before = t[:hit_at]
+        after = t[hit_at + len(hit_word):]
+        win = before[-70:] if len(before) > 70 else before
+        noun_after = _XF_NOUN.search(after)
+        if _XF_AS.search(before):
+            score = 3
+        elif noun_after and _XF_TOFILE.search(before):
+            score = 3
+        elif _XF_TOFILE.search(before) and _XF_CONVERT.search(win):
+            score = 3                     # "convert this to markdown"
+        elif _XF_ARTICLE.search(before) and _XF_VERB.search(win):
+            score = 3                     # "make me a CSV", "get a PDF of"
+        elif noun_after:
+            score = max(score, 2)
+        # a verb NEAR the format word corroborates — but the word right
+        # after it cannot count as both the noun and the verb ("pdf export")
+        if _XF_VERB.search(win):
+            score += 2
+        elif not noun_after and _XF_VERB.search(after[:40]):
+            score += 1
+    if fn_ext:
+        score += 3                       # a cued filename is near-decisive
+
+    for rx in _XV_ABSOLUTE:
+        if rx.search(t):
+            return None
+    if _XV_PROGRAM.search(t) and not fn_ext:
+        return None
+    if score < 3:
+        for rx in _XV_SOFT:
+            if rx.search(t):
+                return None
+    if score < 3:
+        return None
+
+    ext = fn_ext or hit_ext
+    # LANE. "convert/export/save this" needs content that already exists;
+    # "make me a PDF guide for tomorrow" needs it written first.
+    retro_vb = re.search(r"\b(?:export|convert|save|turn|render|download|"
+                         r"give\s+me\s+(?:this|that|it))\b", low)
+    anaphor = re.search(r"\b(?:this|that|it|the above|them|these|those)\b", low)
+    lane = "retro" if (has_prior and retro_vb and anaphor) else \
+           ("retro" if (has_prior and anaphor and not
+                        re.search(r"\b(?:make|create|generate|build|write|"
+                                  r"draft|design)\b", low)) else "draft")
+    return {"ext": ext, "lane": lane,
+            "filename": (fn_m.group("fn") if fn_m else ""),
+            "score": score, "shape": False}
+
+
+# ------------------------------------------------------- reading the answer
+# The fence grammar has to survive real model output: attributes in the
+# info string (```python title="app.py"), tilde fences, and four or more
+# backticks. Anchored to line start, closing fence matched by backreference.
+_X_FENCE = re.compile(
+    r"^(?P<f>`{3,}|~{3,})[ \t]*(?P<lang>[\w.+-]*)[^\n]*\n"
+    r"(?P<code>.*?)^(?P=f)[ \t]*$", re.S | re.M)
+# a line that is JUST a filename, sitting above a fence
+_X_FNLINE = re.compile(
+    r"^[\s#>*`_-]*([\w][\w./-]*\.[A-Za-z][A-Za-z0-9]{0,5})[`*_:]{0,3}\s*$")
+# a pipe table, gated on a real divider row the way the client renderer is
+_X_TABLE = re.compile(r"(?:^\|[^\n]*\|[ \t]*$\n?){2,}", re.M)
+_X_DIVIDER = re.compile(r"^\|[\s:|-]+\|$")
+_X_LANG_EXT = {
+    "python": "py", "py": "py", "javascript": "js", "js": "js",
+    "jsx": "jsx", "typescript": "ts", "ts": "ts", "tsx": "tsx",
+    "bash": "sh", "sh": "sh", "shell": "sh", "zsh": "sh",
+    "sql": "sql", "terraform": "tf", "hcl": "tf", "tf": "tf",
+    "ruby": "rb", "rb": "rb", "go": "go", "rust": "rs", "rs": "rs",
+    "json": "json", "yaml": "yaml", "yml": "yaml", "toml": "toml",
+    "html": "html", "css": "css", "xml": "xml", "markdown": "md",
+    "md": "md", "mermaid": "mmd", "svg": "svg", "csv": "csv",
+    "dotenv": "env", "env": "env",
+}
+# unlabelled fences: sniff the first few lines. re.M throughout, because
+# ^ without it only ever matches position zero.
+_X_SNIFF = [
+    ("sh", re.compile(r"^[ \t]*#!/", re.M)),
+    ("py", re.compile(r"^[ \t]*(?:def |class |import |from \w+ import)", re.M)),
+    ("mmd", re.compile(r"^[ \t]*(?:flowchart|graph\s+(?:TD|LR|RL|BT)|"
+                       r"sequenceDiagram|classDiagram|gantt|erDiagram)", re.M)),
+    ("sql", re.compile(r"^[ \t]*(?:SELECT|INSERT|UPDATE|CREATE|ALTER|WITH)\b",
+                       re.I | re.M)),
+    ("tf", re.compile(r"^[ \t]*(?:resource|provider|variable|module)\s+\"",
+                      re.M)),
+    ("html", re.compile(r"^[ \t]*<(?:!DOCTYPE|html|div|body)\b", re.I | re.M)),
+    ("json", re.compile(r"^[ \t]*[\{\[]", re.M)),
+    ("js", re.compile(r"^[ \t]*(?:const |let |function |export |import )", re.M)),
+]
+
+
+def x_code_blocks(text: str) -> list:
+    """[(ext, code, suggested_filename)] for every fenced block."""
+    out = []
+    for m in _X_FENCE.finditer(text or ""):
+        code = m.group("code")
+        lang = (m.group("lang") or "").lower()
+        ext = _X_LANG_EXT.get(lang, "")
+        if not ext:
+            for cand, rx in _X_SNIFF:
+                if rx.search(code):
+                    ext = cand
+                    break
+        ext = ext or "txt"
+        name = ""
+        head = (text[:m.start()].rstrip().rsplit("\n", 1) or [""])[-1]
+        fm = _X_FNLINE.match(head.strip())
+        if fm and fm.group(1).rsplit(".", 1)[-1].lower() == ext:
+            name = fm.group(1)
+        out.append((ext, code.rstrip("\n"), name))
+    return out
+
+
+def x_tables(text: str) -> list:
+    """Every pipe table as a list of rows, divider row dropped. Uses the
+    same divider gate the client renderer applies, so what the file holds
+    and what the screen showed can never disagree."""
+    out = []
+    for m in _X_TABLE.finditer(text or ""):
+        rows = [r.strip() for r in m.group(0).strip().split("\n") if r.strip()]
+        if len(rows) < 2 or not _X_DIVIDER.match(re.sub(r"\s+", "", rows[1])):
+            continue
+        cells = []
+        for i, r in enumerate(rows):
+            if i == 1:
+                continue
+            parts = r.strip().strip("|").split("|")
+            cells.append([p.strip() for p in parts])
+        if cells:
+            out.append(cells)
+    return out
+
+
+def x_blocks(text: str) -> list:
+    """Markdown to a flat block list the document writers share:
+    ('h', level, text) ('p', text) ('li', text) ('table', rows) ('code', s)"""
+    blocks, pos = [], 0
+    marks = []
+    for m in _X_FENCE.finditer(text or ""):
+        marks.append((m.start(), m.end(), "code", m.group("code").rstrip("\n")))
+    for m in _X_TABLE.finditer(text or ""):
+        rows = [r.strip() for r in m.group(0).strip().split("\n") if r.strip()]
+        if len(rows) >= 2 and _X_DIVIDER.match(re.sub(r"\s+", "", rows[1])):
+            cells = [[c.strip() for c in r.strip().strip("|").split("|")]
+                     for i, r in enumerate(rows) if i != 1]
+            marks.append((m.start(), m.end(), "table", cells))
+    marks.sort()
+    def _prose(chunk):
+        for line in (chunk or "").split("\n"):
+            t = line.rstrip()
+            if not t.strip():
+                continue
+            hm = re.match(r"^(#{1,6})\s+(.*)$", t)
+            if hm:
+                blocks.append(("h", len(hm.group(1)), hm.group(2).strip()))
+                continue
+            lm = re.match(r"^\s*(?:[-*+]|\d+[.)])\s+(.*)$", t)
+            if lm:
+                blocks.append(("li", lm.group(1).strip()))
+                continue
+            if re.match(r"^\s*(?:-{3,}|\*{3,}|_{3,})\s*$", t):
+                continue
+            if blocks and blocks[-1][0] == "p":
+                blocks[-1] = ("p", blocks[-1][1] + " " + t.strip())
+            else:
+                blocks.append(("p", t.strip()))
+    for a, b, kind, payload in marks:
+        _prose(text[pos:a])
+        blocks.append((kind, payload))
+        pos = b
+    _prose(text[pos:])
+    return blocks
+
+
+_X_MD_INLINE = [
+    (re.compile(r"\*\*([^*]+)\*\*"), r"<b>\1</b>"),
+    (re.compile(r"(?<![\w*])\*([^*\n]+)\*(?![\w*])"), r"<i>\1</i>"),
+    (re.compile(r"`([^`\n]+)`"), r"<font face='Courier'>\1</font>"),
+]
+_X_MD_LINK = re.compile(r"\[([^\]\n]+)\]\(([^)\s]+)\)")
+
+
+def x_inline_pdf(s: str) -> str:
+    """Markdown inline to reportlab's mini-markup. Escape EVERYTHING first,
+    then reintroduce only the tags Paragraph parses — and allow a link only
+    when its scheme is http(s), so a model-authored javascript: URI can
+    never become a live annotation in the PDF."""
+    out = html.escape(s or "", quote=False)
+    for rx, rep in _X_MD_INLINE:
+        out = rx.sub(rep, out)
+    def _a(m):
+        url = html.unescape(m.group(2))
+        if not re.match(r"^https?://", url, re.I):
+            return m.group(1)
+        return '<a href="%s" color="#2a6bd4">%s</a>' % (
+            html.escape(url, quote=True), m.group(1))
+    return _X_MD_LINK.sub(_a, out)
+
+
+def x_strip_md(s: str) -> str:
+    s = re.sub(r"\*\*([^*]+)\*\*", r"\1", s or "")
+    s = re.sub(r"(?<![\w*])\*([^*\n]+)\*(?![\w*])", r"\1", s)
+    s = re.sub(r"`([^`\n]+)`", r"\1", s)
+    return _X_MD_LINK.sub(r"\1", s)
+
+
+# ------------------------------------------------------------- the writers
+_X_FORMULA = re.compile(r"^=[A-Za-z_$][A-Za-z0-9_.$]*\s*\(")
+
+
+def _x_cell(ws, row, col, raw):
+    """One spreadsheet cell, honestly typed. A string that merely starts
+    with '=' is NOT a formula — openpyxl validates nothing and Excel calls
+    the result damaged — so only a well-formed call with balanced parens
+    goes in live. Numbers stay numbers, negatives included."""
+    c = ws.cell(row=row, column=col)
+    s = (raw or "").strip()
+    if s and _X_FORMULA.match(s) and s.count("(") == s.count(")"):
+        c.value = s
+        return c
+    try:
+        if s and re.fullmatch(r"-?\d{1,15}(?:\.\d+)?", s.replace(",", "")):
+            c.value = float(s.replace(",", "")) if "." in s \
+                else int(s.replace(",", ""))
+            return c
+    except (ValueError, OverflowError):
+        pass
+    # anything that could be read as a formula by a spreadsheet — including
+    # the leading-whitespace evasion — is pinned to text
+    t = s.lstrip("\t\r\n\x00 ")
+    c.value = s
+    if t[:1] in ("=", "+", "-", "@"):
+        c.data_type = "s"          # assign first: the setter re-infers type
+    return c
+
+
+def ex_table(text, ext, path):
+    rows_all = x_tables(text)
+    if not rows_all:
+        raise RuntimeError("no table in that answer to export")
+    if ext == "csv":
+        import csv as _csv
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            w = _csv.writer(f)
+            for r in rows_all[0]:
+                w.writerow([("'" + c) if c.lstrip("\t\r\n ")[:1]
+                            in ("=", "+", "-", "@")
+                            and not re.fullmatch(r"-?[\d.,]+", c.strip())
+                            else c for c in r])
+        return
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment
+    from openpyxl.chart import BarChart, Reference
+    wb = Workbook()
+    for i, rows in enumerate(rows_all[:8]):
+        ws = wb.active if i == 0 else wb.create_sheet()
+        ws.title = ("Sheet%d" % (i + 1)) if i else "Data"
+        for r, row in enumerate(rows, 1):
+            for c, val in enumerate(row, 1):
+                cell = _x_cell(ws, r, c, x_strip_md(val))
+                if r == 1:
+                    cell.font = Font(bold=True)
+                    cell.alignment = Alignment(horizontal="center")
+        for c in range(1, len(rows[0]) + 1):
+            width = max((len(str(rows[r][c - 1])) for r in range(len(rows))
+                         if c - 1 < len(rows[r])), default=10)
+            ws.column_dimensions[chr(64 + c) if c <= 26 else "A"].width = \
+                min(48, max(10, width + 2))
+        ws.freeze_panes = "A2"
+        # a numeric column earns a real Excel chart — the point of xlsx
+        if i == 0 and len(rows) > 2 and len(rows[0]) > 1:
+            num_col = 0
+            for c in range(2, len(rows[0]) + 1):
+                vals = [rows[r][c - 1] for r in range(1, len(rows))
+                        if c - 1 < len(rows[r])]
+                if vals and all(re.fullmatch(r"-?[\d.,]+\s*%?", (v or "").strip())
+                                for v in vals):
+                    num_col = c
+                    break
+            if num_col:
+                ch = BarChart()
+                ch.title = rows[0][num_col - 1]
+                ch.add_data(Reference(ws, min_col=num_col, min_row=1,
+                                      max_row=len(rows)), titles_from_data=True)
+                ch.set_categories(Reference(ws, min_col=1, min_row=2,
+                                            max_row=len(rows)))
+                ch.height, ch.width = 8, 16
+                ws.add_chart(ch, "A%d" % (len(rows) + 3))
+    wb.save(path)
+
+
+def ex_doc(text, ext, path, title=""):
+    blocks = x_blocks(text)
+    if ext == "docx":
+        from docx import Document
+        from docx.shared import Pt
+        d = Document()
+        if title:
+            d.add_heading(x_strip_md(title)[:120], 0)
+        for b in blocks:
+            if b[0] == "h":
+                d.add_heading(x_strip_md(b[2])[:200], min(4, max(1, b[1])))
+            elif b[0] == "p":
+                d.add_paragraph(x_strip_md(b[1]))
+            elif b[0] == "li":
+                d.add_paragraph(x_strip_md(b[1]), style="List Bullet")
+            elif b[0] == "code":
+                p = d.add_paragraph()
+                run = p.add_run(b[1])
+                run.font.name = "Courier New"
+                run.font.size = Pt(9)
+            elif b[0] == "table" and b[1]:
+                rows = b[1]
+                t = d.add_table(rows=len(rows), cols=len(rows[0]))
+                t.style = "Table Grid"
+                for r, row in enumerate(rows):
+                    for c, val in enumerate(row[:len(rows[0])]):
+                        t.cell(r, c).text = x_strip_md(val)
+        d.save(path)
+        return
+    # PDF. Base-14 fonts on purpose: reportlab substitutes Symbol and
+    # ZapfDingbats for glyphs Helvetica lacks, so checks, arrows and
+    # bullets render for free. Registering a custom TTF is what silently
+    # drops them — so we do not.
+    from reportlab.lib.pagesizes import LETTER
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.lib import colors
+    from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+                                    Table, TableStyle, Preformatted)
+    ss = getSampleStyleSheet()
+    body = ParagraphStyle("b", parent=ss["BodyText"], fontSize=10.5,
+                          leading=15, spaceAfter=7)
+    mono = ParagraphStyle("m", parent=ss["Code"], fontSize=8.5, leading=11)
+    doc = SimpleDocTemplate(path, pagesize=LETTER,
+                            leftMargin=0.9 * inch, rightMargin=0.9 * inch,
+                            topMargin=0.9 * inch, bottomMargin=0.8 * inch,
+                            title=(title or "ConcordeAI export")[:120])
+    story, drawn = [], 0
+    if title:
+        story += [Paragraph(x_inline_pdf(title), ss["Title"]), Spacer(1, 10)]
+    for b in blocks:
+        if drawn > 400_000:        # pre-flight bound: reportlab buffers it all
+            story.append(Paragraph("<i>(truncated)</i>", body))
+            break
+        if b[0] == "h":
+            story += [Spacer(1, 6),
+                      Paragraph(x_inline_pdf(b[2]),
+                                ss["Heading%d" % min(4, max(1, b[1]))])]
+            drawn += len(b[2])
+        elif b[0] == "p":
+            story.append(Paragraph(x_inline_pdf(b[1]), body))
+            drawn += len(b[1])
+        elif b[0] == "li":
+            story.append(Paragraph("• " + x_inline_pdf(b[1]), body))
+            drawn += len(b[1])
+        elif b[0] == "code":
+            story += [Preformatted(b[1][:6000], mono), Spacer(1, 6)]
+            drawn += min(6000, len(b[1]))
+        elif b[0] == "table" and b[1]:
+            rows = [[Paragraph(x_inline_pdf(c), body) for c in r]
+                    for r in b[1][:80]]
+            t = Table(rows, hAlign="LEFT", repeatRows=1)
+            t.setStyle(TableStyle([
+                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#c9ccd4")),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eef0f4")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
+            story += [t, Spacer(1, 9)]
+            drawn += sum(len(c) for r in b[1] for c in r)
+    if not story:
+        story = [Paragraph("(empty)", body)]
+    doc.build(story)
+
+
+def ex_slides(text, ext, path, title=""):
+    from pptx import Presentation
+    from pptx.util import Inches, Pt
+    prs = Presentation()
+    blocks = x_blocks(text)
+    s = prs.slides.add_slide(prs.slide_layouts[0])
+    s.shapes.title.text = x_strip_md(title or "ConcordeAI")[:120]
+    if len(s.placeholders) > 1:
+        s.placeholders[1].text = _venue_stamp() if "_venue_stamp" in globals() \
+            else ""
+    cur, bullets = None, []
+
+    def flush():
+        if cur is None and not bullets:
+            return
+        sl = prs.slides.add_slide(prs.slide_layouts[1])
+        sl.shapes.title.text = (cur or "Notes")[:120]
+        tf = sl.placeholders[1].text_frame
+        tf.clear()
+        for i, bl in enumerate(bullets[:9]):
+            p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+            p.text = bl[:220]
+            p.font.size = Pt(18)
+    for b in blocks:
+        if b[0] == "h" and b[1] <= 2:
+            flush()
+            cur, bullets = x_strip_md(b[2]), []
+        elif b[0] in ("p", "li"):
+            bullets.append(x_strip_md(b[1]))
+        elif b[0] == "table" and b[1]:
+            for r in b[1][1:8]:
+                bullets.append(" — ".join(x_strip_md(c) for c in r[:3]))
+    flush()
+    if len(prs.slides) == 1:
+        sl = prs.slides.add_slide(prs.slide_layouts[1])
+        sl.shapes.title.text = "Notes"
+        sl.placeholders[1].text_frame.text = x_strip_md(text)[:800]
+    prs.save(path)
+
+
+_X_ICS_ESC = str.maketrans({"\\": r"\\", ";": r"\;", ",": r"\,", "\n": r"\n"})
+
+
+def _ics_fold(line: str) -> str:
+    """RFC 5545 octet folding at 75, continuation lines start with a space."""
+    out, buf = [], line.encode("utf-8")
+    while len(buf) > 73:
+        cut = 73
+        while cut > 1 and (buf[cut] & 0xC0) == 0x80:
+            cut -= 1                        # never split a UTF-8 sequence
+        out.append(buf[:cut].decode("utf-8"))
+        buf = b" " + buf[cut:]
+    out.append(buf.decode("utf-8"))
+    return "\r\n".join(out)
+
+
+def ex_calendar(text, ext, path, title=""):
+    """RFC 5545 from a schedule. All-day events take DTEND as the day AFTER
+    the last day, which is what the spec requires and what every calendar
+    app expects."""
+    tz = _home_tz() if "_home_tz" in globals() else None
+    now = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    evs = []
+    for line in x_strip_md(text).split("\n"):
+        t = line.strip().lstrip("-*+ ").strip()
+        if not t:
+            continue
+        dm = re.search(r"\b(\d{4})-(\d{2})-(\d{2})\b", t)
+        tm = re.search(r"\b([01]?\d|2[0-3]):([0-5]\d)\s*(am|pm)?\b", t, re.I)
+        tm2 = re.search(r"\b(1[0-2]|0?[1-9])\s*(am|pm)\b", t, re.I)
+        if not dm and not (tm or tm2):
+            continue
+        day = ("%s%s%s" % dm.groups()) if dm else \
+            time.strftime("%Y%m%d", time.localtime())
+        summary = re.sub(r"\s{2,}", " ", re.sub(
+            r"\b\d{4}-\d{2}-\d{2}\b|\b([01]?\d|2[0-3]):[0-5]\d\s*(am|pm)?\b",
+            "", t, flags=re.I)).strip(" —-:,") or "Event"
+        if tm or tm2:
+            if tm:
+                hh, mm = int(tm.group(1)), int(tm.group(2))
+                ap = (tm.group(3) or "").lower()
+            else:
+                hh, mm = int(tm2.group(1)), 0
+                ap = tm2.group(2).lower()
+            if ap == "pm" and hh < 12:
+                hh += 12
+            if ap == "am" and hh == 12:
+                hh = 0
+            st = "%sT%02d%02d00" % (day, hh, mm)
+            en = "%sT%02d%02d00" % (day, (hh + 1) % 24, mm)
+            evs.append(("DTSTART%s:%s" % (";TZID=" + tz if tz else "", st),
+                        "DTEND%s:%s" % (";TZID=" + tz if tz else "", en),
+                        summary))
+        else:
+            nxt = time.strftime("%Y%m%d", time.localtime(
+                time.mktime(time.strptime(day, "%Y%m%d")) + 86400))
+            evs.append(("DTSTART;VALUE=DATE:" + day,
+                        "DTEND;VALUE=DATE:" + nxt, summary))
+    if not evs:
+        raise RuntimeError("no dated items in that answer to put in a calendar")
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0",
+             "PRODID:-//ConcordeAI//EN", "CALSCALE:GREGORIAN"]
+    for i, (st, en, summary) in enumerate(evs[:200]):
+        lines += ["BEGIN:VEVENT",
+                  "UID:%s-%d@concordeai" % (secrets.token_hex(8), i),
+                  "DTSTAMP:" + now, st, en,
+                  "SUMMARY:" + summary.translate(_X_ICS_ESC)[:300],
+                  "END:VEVENT"]
+    lines.append("END:VCALENDAR")
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        f.write("\r\n".join(_ics_fold(x) for x in lines) + "\r\n")
+
+
+def ex_cards(text, ext, path):
+    """Anki's plain importer: one note per line, fields separated by tab,
+    the separator declared up front so the import dialog needs no fiddling."""
+    pairs = []
+    for m in re.finditer(r"^\s*(?:[-*+]\s*)?(?:\*\*)?(?:Q|Question)"
+                             r"(?:\*\*)?\s*[:.)]\s*(.+?)\s*\n+\s*"
+                             r"(?:[-*+]\s*)?(?:\*\*)?(?:A|Answer)(?:\*\*)?"
+                             r"\s*[:.)]\s*(.+?)\s*$",
+                         text or "", re.I | re.M):
+        pairs.append((x_strip_md(m.group(1)), x_strip_md(m.group(2))))
+    if not pairs:
+        # a two-column table is card-shaped; a wider one is a comparison
+        for rows in x_tables(text):
+            if rows and len(rows[0]) == 2:
+                for r in rows[1:]:
+                    if len(r) >= 2 and r[0].strip():
+                        pairs.append((x_strip_md(r[0]), x_strip_md(r[1])))
+    if not pairs:
+        raise RuntimeError("no question-and-answer pairs found to make cards")
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        f.write("#separator:tab\n#html:false\n")
+        for q, a in pairs[:2000]:
+            f.write("%s\t%s\n" % (q.replace("\t", " "), a.replace("\t", " ")))
+
+
+def ex_archive(text, ext, path):
+    import zipfile
+    blocks = x_code_blocks(text)
+    if not blocks:
+        raise RuntimeError("no files in that answer to put in an archive")
+    seen = {}
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        for i, (bext, code, name) in enumerate(blocks[:60]):
+            nm = name or ("file%d.%s" % (i + 1, bext))
+            nm = re.sub(r"[^\w./-]", "_", nm).lstrip("./")
+            while ".." in nm:
+                nm = nm.replace("..", "_")
+            seen[nm] = seen.get(nm, 0) + 1
+            if seen[nm] > 1:
+                nm = "%s-%d.%s" % (nm.rsplit(".", 1)[0], seen[nm],
+                                   nm.rsplit(".", 1)[-1])
+            z.writestr(nm, code)
+
+
+def ex_text(text, ext, path):
+    """The model's own text IS the file. For code and diagrams take the
+    matching fenced block; otherwise the answer, markdown intact."""
+    body = text or ""
+    if ext in ("md", "txt"):
+        body = text if ext == "md" else x_strip_md(text)
+    else:
+        blocks = x_code_blocks(text)
+        exact = [b for b in blocks if b[0] == ext]
+        if exact:
+            body = exact[0][1]
+        elif ext == "mmd":
+            # NEVER fall back to an unrelated fence here: a Mermaid export
+            # that hands back a Python function is worse than an honest miss
+            body = _mermaid_from(text)
+        elif ext in ("json", "yaml", "toml", "env", "html", "svg", "xml",
+                     "css"):
+            raise RuntimeError("no %s block in that answer to export"
+                               % ext.upper())
+        elif blocks:
+            body = blocks[0][1]          # a code ask takes the only code
+        else:
+            body = x_strip_md(text)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(body.rstrip("\n") + "\n")
+
+
+def _mermaid_from(text: str) -> str:
+    """Turn an arrow sketch into valid Mermaid. Every label gets a synthetic
+    id and quotes — multi-word labels and parentheses are not legal bare
+    node ids, and a diagram that will not render is worse than none."""
+    edges, ids, order = [], {}, []
+    for line in (text or "").split("\n"):
+        t = x_strip_md(line).strip().lstrip("-*+ ").strip()
+        if "-->" not in t and "->" not in t and "→" not in t:
+            continue
+        parts = re.split(r"\s*(?:-->|->|→)\s*", t)
+        parts = [p.strip(" .;:") for p in parts if p.strip(" .;:")]
+        for a, b in zip(parts, parts[1:]):
+            for nm in (a, b):
+                if nm not in ids:
+                    ids[nm] = "n%d" % len(ids)
+                    order.append(nm)
+            edges.append((ids[a], ids[b]))
+    if not edges:
+        raise RuntimeError("no diagram in that answer to export as Mermaid")
+    out = ["graph TD"]
+    for nm in order:
+        out.append('    %s["%s"]' % (ids[nm], nm.replace('"', "'")[:80]))
+    for a, b in edges[:200]:
+        out.append("    %s --> %s" % (a, b))
+    return "\n".join(out)
+
+
+# ------------------------------------------------------------- delivery
+# Files live under the SAME per-identity base the chats and memory use
+# (_data_base), so the tenancy boundary that already exists covers exports
+# for free: a tunnel guest cannot address the owner's files at all.
+EXPORT_DIRNAME = "exports"
+_X_ID_RX = re.compile(r"^[A-Za-z0-9_-]{16,48}\.[a-z0-9]{1,5}$")
+
+
+def export_dir(base=None) -> str:
+    d = os.path.join(base or app_dir(), EXPORT_DIRNAME)
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def export_name(want: str, ext: str, title: str = "") -> str:
+    """The pretty name the browser saves as. Never touches the filesystem —
+    on disk everything is an opaque token."""
+    stem = (want.rsplit(".", 1)[0] if want else "") or x_strip_md(title or "")
+    stem = re.sub(r"\s+", "-", stem.strip())[:60]
+    stem = re.sub(r"[^\w.-]", "", stem, flags=re.UNICODE).strip("-.") or "export"
+    return "%s.%s" % (stem, ext)
+
+
+def _x_disposition(name: str) -> str:
+    """RFC 6266. http.server encodes headers as latin-1 strict, so a CJK or
+    Cyrillic filename in a bare filename= raises inside send_header and kills
+    the response — the ascii fold plus filename* is what makes it survive."""
+    ascii_name = unicodedata.normalize("NFKD", name).encode(
+        "ascii", "ignore").decode("ascii")
+    ascii_name = re.sub(r'[^\w.\-()\[\] ]', "", ascii_name).strip() or (
+        "export." + (name.rsplit(".", 1)[-1] if "." in name else "txt"))
+    out = 'attachment; filename="%s"' % ascii_name.replace('"', "")
+    if ascii_name != name:
+        out += "; filename*=UTF-8''" + urllib.parse.quote(name, safe="")
+    return out
+
+
+def run_export(text: str, ext: str, title: str = "", base=None,
+               want_name: str = "") -> dict:
+    """Write one export and describe it. Raises with a sentence a person can
+    act on — never a traceback."""
+    text = x_clean(text)
+    ext = (ext or "").lower().lstrip(".")
+    if ext not in EXPORT_KIND:
+        raise RuntimeError("I don't know how to write a .%s file" % ext)
+    kind = EXPORT_KIND[ext][0]
+    if ext in EXPORT_NEEDS_DEPS and not ensure_export_deps(block_s=90):
+        raise RuntimeError(
+            "the document engines are still installing (about 70 MB, once) "
+            "— ask again in a minute")
+    d = export_dir(base)
+    token = secrets.token_urlsafe(16)
+    suffix = "csv" if ext == "anki" else ext
+    path = os.path.join(d, "%s.%s" % (token, suffix))
+    if kind == "table":
+        ex_table(text, ext, path)
+    elif kind == "doc":
+        ex_doc(text, ext, path, title)
+    elif kind == "slides":
+        ex_slides(text, ext, path, title)
+    elif kind == "calendar":
+        ex_calendar(text, ext, path, title)
+    elif kind == "cards":
+        ex_cards(text, ext, path)
+    elif kind == "archive":
+        ex_archive(text, ext, path)
+    else:
+        ex_text(text, ext, path)
+    size = os.path.getsize(path)
+    if size > EXPORT_MAX_BYTES:
+        os.remove(path)
+        raise RuntimeError("that came out larger than the %d MB limit"
+                           % (EXPORT_MAX_BYTES // 1_000_000))
+    name = export_name(want_name, ext, title)
+    try:
+        with open(os.path.join(d, token + ".meta"), "w") as f:
+            json.dump({"name": name, "ext": ext, "ts": time.time(),
+                       "size": size}, f)
+    except OSError:
+        pass
+    _sweep_exports(d)
+    return {"id": "%s.%s" % (token, suffix), "name": name, "ext": ext,
+            "size": size, "kind": EXPORT_KIND[ext][1]}
+
+
+_X_SENTINEL = re.compile("\x00[A-Z0-9]+:.*?\x00", re.S)
+
+
+def x_clean(text: str) -> str:
+    """The answer as prose, with the stream's control markers removed.
+    _run_lbl() emits RUN through emit(), so anything reading answer_buf
+    gets sentinels glued to the first line of real text (found live: a
+    perfectly good budget table would not export)."""
+    t = _X_SENTINEL.sub("", text or "")
+    t = re.sub("\x00[A-Z0-9]+:[^\x00]*$", "", t)
+    return t.replace("\x00", "")
+
+
+_X_NAME_STRIP = re.compile(
+    r"^\s*(?:please\s+|can\s+you\s+|could\s+you\s+|i\s+(?:want|need)\s+)?"
+    r"(?:generate|create|make|build|write|draft|export|save|give|produce|"
+    r"turn|convert|send)\s+(?:me\s+)?(?:an?\s+|the\s+)?"
+    r"(?:\w+\s+)?(?:file|doc|document|sheet|deck|copy|version)?\s*"
+    r"(?:of|for|with|about|on|showing)?\s*", re.I)
+
+
+def x_title(prompt: str, text: str = "") -> str:
+    """A filename a person would have chosen. The answer's own first
+    heading beats the request, and the request beats nothing — but the
+    request has its 'generate an excel file of' preamble removed first,
+    or every budget is called Generate-an-Excel-file-of-a-budget."""
+    for b in x_blocks(text or ""):
+        if b[0] == "h" and len(b[2].strip()) > 2:
+            return x_strip_md(b[2]).strip()[:60]
+    t = _X_NAME_STRIP.sub("", x_strip_md(prompt or "").strip())
+    t = re.split(r"[.:;\n]| based on | using | that ", t)[0]
+    return " ".join(t.split()[:7])[:60] or "export"
+
+
+def _x_size(n: int) -> str:
+    return ("%.1f MB" % (n / 1e6)) if n >= 1e6 else ("%d KB" % max(1, n // 1000))
+
+
+def _sweep_exports(d: str):
+    """Newest EXPORT_KEEP_N per identity, nothing past the TTL. Exports are
+    cover letters and budgets — they should not pile up forever."""
+    try:
+        cut = time.time() - EXPORT_TTL_H * 3600
+        files = []
+        for nm in os.listdir(d):
+            if nm.endswith(".meta"):
+                continue
+            p = os.path.join(d, nm)
+            try:
+                files.append((os.path.getmtime(p), p))
+            except OSError:
+                pass
+        files.sort(reverse=True)
+        for i, (mt, p) in enumerate(files):
+            if i >= EXPORT_KEEP_N or mt < cut:
+                for q in (p, os.path.splitext(p)[0] + ".meta"):
+                    try:
+                        os.remove(q)
+                    except OSError:
+                        pass
+    except OSError:
+        pass
+
+
+def sweep_all_exports():
+    """Every identity's export dir, on the janitor's tick."""
+    try:
+        roots = [app_dir()]
+        udir = os.path.join(app_dir(), "users")
+        if os.path.isdir(udir):
+            roots += [os.path.join(udir, u) for u in os.listdir(udir)]
+        for r in roots:
+            d = os.path.join(r, EXPORT_DIRNAME)
+            if os.path.isdir(d):
+                _sweep_exports(d)
+    except OSError:
+        pass
+
+
+def reveal_in_finder(path: str) -> bool:
+    """The native move: put the file in front of the user rather than
+    fighting WKWebView's download plumbing. Desktop only."""
+    if not (IS_MAC and os.path.exists(path)):
+        return False
+    try:
+        subprocess.run(["open", "-R", path], timeout=10,
+                       capture_output=True)
+        return True
+    except Exception:
+        return False
 
 
 # ------------------------------------------------------------- updates
@@ -8262,7 +9268,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
     # guests in the chat, not operators of the computer.
     ADMIN_PATHS = ("/api/open-logs", "/api/setup/install",
                    "/api/model/download", "/api/model/remove",
-                   "/api/image/install",
+                   "/api/image/install", "/api/export/reveal",
                    "/api/model/cleanup",
                    "/api/update/install",
                    "/api/speak", "/api/voice/prepare",
@@ -8729,6 +9735,34 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._send_json(dict(_update))
         elif self.path == "/api/update/whatsnew":
             self._send_json(whats_new(_JUST_UPDATED[0]))
+        elif self.path.startswith("/api/export/"):
+            # EVERY export is octet-stream with an attachment disposition,
+            # never the format's real MIME (6b295). Model-authored HTML
+            # served as text/html from our own origin would be stored XSS
+            # against the app itself; this closes it and costs nothing.
+            iid = urllib.parse.unquote(self.path[len("/api/export/"):]
+                                       .split("?")[0])
+            base = self._data_base()
+            pth = os.path.join(export_dir(base), iid)
+            if not _X_ID_RX.match(iid) or not os.path.exists(pth):
+                self.send_error(404)
+                return
+            try:
+                with open(os.path.join(export_dir(base),
+                                       os.path.splitext(iid)[0] + ".meta")) as mf:
+                    nm = (json.load(mf) or {}).get("name") or iid
+            except Exception:
+                nm = iid
+            with open(pth, "rb") as f:
+                data = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Content-Disposition", _x_disposition(nm))
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "private, max-age=3600")
+            self.end_headers()
+            self.wfile.write(data)
         elif self.path.startswith("/api/image/") and self.path.endswith(
                 (".png", ".jpg", ".webp")):
             iid = self.path[len("/api/image/"):]
@@ -9822,6 +10856,17 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 _speak(req["text"])
             self._send_json({"ok": True})
             return
+        if self.path == "/api/export/reveal":
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                iid = (json.loads(self.rfile.read(n)) or {}).get("id", "")
+            except (ValueError, json.JSONDecodeError):
+                iid = ""
+            pth = os.path.join(export_dir(self._data_base()), str(iid))
+            ok = bool(_X_ID_RX.match(str(iid))) and os.path.exists(pth) \
+                and reveal_in_finder(pth)
+            self._send_json({"ok": ok})
+            return
         if self.path == "/api/image/install":
             self._send_json({"started": start_image_install(),
                              "image": image_status()})
@@ -9943,7 +10988,23 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # A PICTURE, NOT PROSE (6b294): "generate an image of a cat" used
         # to get four paragraphs describing a cat. The intent is settled
         # here, before the web search, and answered below with a real image.
+        # A FILE, NOT PROSE (6b295). Settled BEFORE the web search, and
+        # before the painter: "export this chart as a png" is an export,
+        # "draw me a cat" is not. A weak export score always yields to
+        # image_intent, so today's painting behaviour is untouched.
+        _prior = [m for m in messages[:-1]
+                  if m.get("role") == "assistant"
+                  and len(str(m.get("content") or "").strip()) > 40]
+        export_req = None if images else export_intent(prompt, bool(_prior))
+        if export_req and export_req.get("score", 0) < 3:
+            export_req = None
         img_subject = image_intent(prompt) if not images else None
+        if export_req and img_subject and export_req["score"] < 5 \
+                and export_req["ext"] in ("png", "svg", ""):
+            export_req = None            # the painter wins a weak tie
+        if export_req:
+            img_subject = None
+            auto_web = False
         if img_subject:
             auto_web = False
 
@@ -10541,6 +11602,32 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # local models have no clock — without this "today" is meaningless
         today = time.strftime("%A, %B %-d, %Y")
         dated_system = dict(SYSTEM_PROMPT)
+        if export_req and export_req["lane"] == "draft":
+            _xk = EXPORT_KIND.get(export_req["ext"] or "md", ("text", "file"))
+            dated_system = dict(dated_system)
+            dated_system["content"] = dated_system.get("content", "") + (
+                "\n\nTHIS ANSWER BECOMES A %s. Write the CONTENT of that "
+                "file and nothing else \u2014 no preamble, no 'here is', no "
+                "closing offer. %s"
+                % (_xk[1].upper(),
+                   {"table": "Put the data in ONE markdown pipe table with a "
+                             "header row. Numbers bare, no currency symbols "
+                             "inside the cells. A running total may be an "
+                             "Excel formula like =SUM(B2:B13).",
+                    "doc": "Use markdown headings, short paragraphs and "
+                           "tables. It will be typeset, so structure it.",
+                    "slides": "One '## Heading' per slide, then 3 to 6 "
+                              "bullet lines under it.",
+                    "calendar": "One line per event, each starting with an "
+                                "ISO date (2026-03-14) and a 24-hour time "
+                                "where there is one.",
+                    "cards": "One 'Q: ...' line then an 'A: ...' line per "
+                             "card, nothing else.",
+                    "text": "Put the whole file in ONE fenced code block "
+                            "tagged with its language.",
+                    "archive": "One fenced code block per file, each with a "
+                               "filename on the line directly above it.",
+                    "image": ""}.get(_xk[0], "")))
         if ag_system:
             dated_system["content"] = ag_system
         _now_local = _venue_stamp("%A, %B %-d, %Y, %-I:%M%p")
@@ -10759,6 +11846,32 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # ending up inside the answer text
             last_status[0] = text
             _write(f"{NUL}STATUS:{text}{NUL}".encode("utf-8"))
+
+        if export_req and export_req["lane"] == "retro":
+            src = str(_prior[-1].get("content") or "") if _prior else ""
+            ext = export_req["ext"] or _SHAPE_FMT.get(
+                _export_shape(src), "md")
+            if export_req.get("shape") and ext == "txt":
+                blks = x_code_blocks(src)
+                ext = blks[0][0] if blks else "md"
+            ttl = next((b[2] for b in x_blocks(src) if b[0] == "h"), "") \
+                or (make_title(src[:600]) if len(src) > 200 else "")
+            step("export", "Writing the file", "run",
+                 EXPORT_KIND.get(ext, ("", ext))[1])
+            status("writing the %s" % EXPORT_KIND.get(ext, ("", ext))[1])
+            try:
+                info = run_export(src, ext, ttl, self._data_base(),
+                                  export_req.get("filename", ""))
+                step("export", "Wrote the file", "done", info["name"])
+                emit("Here it is \u2014 **%s**, %s.\n\n[[dl:%s]]"
+                     % (info["name"], _x_size(info["size"]),
+                        json.dumps(info, separators=(",", ":"))))
+            except Exception as exc:
+                step("export", "Couldn\u2019t write the file", "done",
+                     str(exc)[:70])
+                emit("I couldn\u2019t make that file: %s." % str(exc)[:200])
+            hb_stop.set()
+            return
 
         if img_subject:
             where = ("FLUX.1 schnell on this Mac" if image_ready()
@@ -11138,6 +12251,19 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                 + NUL).encode("utf-8"))
             except Exception:
                 pass
+            if export_req and export_req["lane"] == "draft":
+                _txt = x_clean("".join(answer_buf))
+                _ext = export_req["ext"] or _SHAPE_FMT.get(
+                    _export_shape(_txt), "md")
+                try:
+                    _info = run_export(_txt, _ext, x_title(prompt, _txt),
+                                       self._data_base(),
+                                       export_req.get("filename", ""))
+                    emit("\n\n[[dl:%s]]" % json.dumps(
+                        _info, separators=(",", ":")))
+                except Exception as _exc:
+                    emit("\n\nI wrote the answer but couldn\u2019t package "
+                         "it: %s." % str(_exc)[:200])
             hb_stop.set()
             # the quality ledger: one line per answer, so "make it
             # better" has numbers instead of vibes (grep-able JSONL)
@@ -13117,6 +14243,28 @@ body.gen #chip-model{color:var(--accent)}
 .plan-card.risky:hover{border-color:rgba(217,169,90,.6)}
 .plan-card .gb{font-family:var(--mono);font-size:9.5px;color:var(--dim);
   display:block;margin-top:3px}
+.dlbox{display:flex;align-items:center;gap:11px;margin:10px 0;
+  padding:10px 12px;background:var(--panel);border:1px solid var(--line);
+  border-radius:11px;max-width:min(100%,440px)}
+.dlbox .dlext{flex:0 0 auto;width:38px;height:38px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.055);border:1px solid var(--line);
+  font-family:var(--mono);font-size:9px;letter-spacing:.06em;
+  color:var(--dim);font-weight:600}
+.dlbox .dlmeta{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.dlbox .dlmeta b{font-weight:500;font-size:12.5px;color:var(--text);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dlbox .dlmeta i{font-style:normal;font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.04em;color:var(--faint)}
+.dlbox .dlgo{flex:0 0 auto;width:30px;height:30px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;color:var(--dim);
+  border:1px solid var(--line);text-decoration:none;
+  transition:color .15s,border-color .15s,background .15s}
+.dlbox .dlgo:hover{color:var(--text);border-color:var(--dim);
+  background:rgba(255,255,255,.05)}
+.dlbox .dlgo svg{width:15px;height:15px}
+.dlbox.done .dlext{color:var(--text);border-color:var(--dim)}
+@media (max-width:520px){.dlbox{max-width:100%}}
 .genimg{display:block;max-width:min(100%,640px);border-radius:12px;
   margin:6px 0 10px;box-shadow:0 12px 40px -18px rgba(0,0,0,.8)}
 /* the extra under the presets (6b294): image generation */
@@ -15280,6 +16428,50 @@ function showApprove(host,d){
   card.querySelector(".apbtn.ok").addEventListener("click",()=>decide(true));
   card.querySelector(".apbtn.no").addEventListener("click",()=>decide(false));
 }
+/* THE DOWNLOAD BOX (6b295, per Patrick: "a small box with a download link
+   similar to how Claude presents downloads"). On the desktop the click
+   reveals the file in Finder — WKWebView's own download plumbing is off by
+   default and fighting it is not worth it. In a real browser over the
+   tunnel the same box is a plain anchor, where the cookie rides along and
+   the attachment disposition does the work. */
+// what belongs in the answer but not in a clipboard or a spoken line
+function stripTokens(t){
+  return String(t||"").replace(/\n*\[\[dl:\{.*?\}\]\]/g,"")
+                      .replace(/!\[[^\]]*\]\(\/api\/image\/[^)]*\)/g,"")
+                      .trim();
+}
+function dlBox(d){
+  if(!d||!d.id)return "";
+  const nm=esc(d.name||"file"), ext=esc((d.ext||"").toUpperCase().slice(0,4)),
+        sz=d.size>=1e6?((d.size/1e6).toFixed(1)+" MB")
+                      :(Math.max(1,Math.round(d.size/1000))+" KB"),
+        href="/api/export/"+encodeURIComponent(d.id);
+  return '<div class="dlbox" data-id="'+esc(d.id)+'">'
+    +'<span class="dlext">'+ext+'</span>'
+    +'<span class="dlmeta"><b>'+nm+'</b><i>'+esc(d.kind||"file")+" \u00b7 "+sz+'</i></span>'
+    +'<a class="dlgo" href="'+href+'" download="'+nm+'" '
+    +'title="Save this file">'
+    +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+    +'stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">'
+    +'<path d="M12 4v11"/><path d="M6.5 10.5L12 16l5.5-5.5"/>'
+    +'<path d="M5 19h14"/></svg></a></div>';
+}
+// the desktop app cannot save through WKWebView, so put the file in front
+// of the user the native way instead: reveal it in Finder.
+document.addEventListener("click",async e=>{
+  const a=e.target.closest(".dlbox .dlgo");
+  if(!a||!IS_LOCAL)return;
+  e.preventDefault();
+  const box=a.closest(".dlbox"),was=box.getAttribute("data-said")||"";
+  try{
+    const r=await(await fetch("/api/export/reveal",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({id:box.dataset.id})})).json();
+    box.classList.toggle("done",!!(r&&r.ok));
+    if(!(r&&r.ok))window.location.href=a.getAttribute("href");
+  }catch(e2){window.location.href=a.getAttribute("href");}
+  if(was)box.setAttribute("data-said",was);
+});
 function renderMD(raw){
   // pull out think blocks first (DeepSeek R1)
   let thinks=[];
@@ -15288,6 +16480,15 @@ function renderMD(raw){
   if(openThink){thinks.push(openThink[1].trim());raw=raw.replace(/<think>[\s\S]*$/,"\u0000THINKOPEN"+(thinks.length-1)+"\u0000");}
 
   let s=esc(raw);
+  // the download box (6b295): stashed as a placeholder the instant the
+  // text is escaped, so bold/italic/inline-code rules can never touch the
+  // filename or the JSON, and restored next to the THINK restores below
+  const dls=[];
+  s=s.replace(/\[\[dl:(\{.*?\})\]\]/g,(_,j)=>{
+    try{dls.push(JSON.parse(j.replace(/&quot;/g,'"').replace(/&amp;/g,"&")));}
+    catch(e){dls.push(null);}
+    return "\u0000DL"+(dls.length-1)+"\u0000";});
+  s=s.replace(/\[\[dl:[^\]]{0,400}\]?$/,"");   // a half-arrived token
   // fenced code — ```flow becomes a real diagram, everything else a
   // language-labeled card with the mini-highlighter (6.0b206)
   // the third group is the CLOSING fence — or $ while the block is
@@ -15374,6 +16575,7 @@ function renderMD(raw){
     return "<p>"+p.replace(/\n/g,"<br>")+"</p>";
   }).join("");
   // restore think blocks
+  s=s.replace(/\u0000DL(\d+)\u0000/g,(_,i)=>dlBox(dls[+i]));
   s=s.replace(/\u0000THINKOPEN(\d+)\u0000/g,(_,i)=>
     '<details open><summary>◈ reasoning…</summary><div class="think-body">'+esc(thinks[+i]).replace(/\n/g,"<br>")+"</div></details>");
   s=s.replace(/\u0000THINK(\d+)\u0000/g,(_,i)=>
@@ -16241,7 +17443,7 @@ async function send(){
   curHid="";liveDrafts=0;
   const isErr=full.trim().startsWith("⚠️")||full.includes("\n⚠️");
   if(full&&!isErr&&!aiDiv.querySelector(".mact"))
-    msgActions(aiDiv,"assistant",full);
+    msgActions(aiDiv,"assistant",stripTokens(full));
   if(!full&&!wasAborted){
     const rb=document.createElement("button");
     rb.className="retrybtn";rb.textContent="Try again";
@@ -16281,7 +17483,7 @@ async function send(){
   if(voiceChat&&full&&!isErr&&!wasAborted){
     fetch("/api/speak",{method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({text:full})});
+      body:JSON.stringify({text:stripTokens(full)})});
   }
   setToks(0,"idle");
   generating=false;abortCtl=null;document.body.classList.remove("gen");
@@ -20026,6 +21228,7 @@ def _mlx_janitor():
         if time.time() - swept[0] > 6 * 3600:
             swept[0] = time.time()
             _purge_stale_guests()
+            sweep_all_exports()
             _auto_cleanup_pass()   # no-op unless the pref is on
         try:
             if _mlx_procs and _mlx_last_use and \
@@ -20527,6 +21730,10 @@ if __name__ == "__main__":
             if _bi is not None:
                 _bi["CFBundleName"] = APP_NAME
                 _bi["CFBundleDisplayName"] = APP_NAME
+        except Exception:
+            pass
+        try:                       # 6b295: without this the WKDownload
+            webview.settings["ALLOW_DOWNLOADS"] = True   # chain never runs
         except Exception:
             pass
         webview.start(private_mode=False,

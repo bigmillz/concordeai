@@ -23,6 +23,11 @@ fi
 echo "installing dependencies into the venv…"
 "$VENV/bin/pip" install --quiet --upgrade pip
 "$VENV/bin/pip" install --quiet pywebview ddgs psutil mlx-lm mlx-whisper
+# 6b295: the export engines. Their own line with || true — a wheel that
+# fails to fetch must degrade to the in-app on-demand install, never to a
+# build that cannot run.
+"$VENV/bin/pip" install --quiet --only-binary=:all: \
+  reportlab openpyxl python-docx python-pptx || true
 PY="$VENV/bin/python3"
 echo "app will run on: $PY"
 
@@ -101,6 +106,8 @@ if [[ ! -x "$PY" ]] || ! "$PY" -c "import webview" 2>/dev/null; then
   # which the app downloads for itself on first use
   if [[ "$(uname -m)" == "arm64" ]]; then
     "$VENV/bin/pip" install mlx-lm mlx-whisper >> "$LOGDIR/bootstrap.log" 2>&1 || true
+    "$VENV/bin/pip" install --only-binary=:all: reportlab openpyxl \
+      python-docx python-pptx >> "$LOGDIR/bootstrap.log" 2>&1 || true
   fi
   if [[ ! -x "$PY" ]] || ! "$PY" -c "import webview" 2>/dev/null; then
     /usr/bin/osascript -e 'display dialog "ConcordeAI could not set up its Python engine. Install the Apple Command Line Tools (run: xcode-select --install), check your internet connection, and open ConcordeAI again." buttons {"OK"} with title "ConcordeAI"' 2>/dev/null || true
