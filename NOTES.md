@@ -4792,3 +4792,38 @@ roster already uses ("really remove? frees 10.9 GB"). New
 copy in blobs/ and links to it from snapshots/, so the old measure
 reported a 9 GB model as 18 and would have promised twice the disk an
 uninstall could actually free.
+
+## 6b299-6b301 — video generation, a size ladder, and intent that reads the room (uncut)
+
+Per Patrick, across several notes in one sitting.
+
+- VIDEO alongside image. Both are now "studios": an optional generator
+  with its own venv and a LADDER of models. Video runs Wan2.2 TI2V-5B via
+  mlx-video locally, falls back to Veo through the Gemini key the user
+  already has (predictLongRunning: submit, poll, fetch), and renders
+  inline with a Range-serving /api/video route so WKWebView can scrub.
+  The wizard offers both; Manage models removes either, and Remove takes
+  the venv AND every ladder rung that was downloaded.
+- THE LADDER. Notches, one per model, colour-coded against THIS machine's
+  memory: green under half of RAM, amber under 80%, red above — and red
+  refuses the click rather than pretending. A legend under it says what
+  each colour means. Built by hand rather than as <input type=range> so
+  each notch owns its colour.
+- NO ENGINE NAMES. "A cookie — FLUX.1 schnell, on this Mac" became
+  "A cookie — made on this Mac", and the name above every answer is gone.
+  The user is using ConcordeAI, not a pile of engines we assembled.
+- FETCH OR PAINT. "a picture of a cookie from the Internet" searches;
+  "create me a picture of a cookie" paints. An explicit make-verb always
+  commissions; "show me"/"find me"/"from the web" always looks.
+- REFINEMENTS. "make the piano white" after a piano used to earn "I
+  cannot generate or modify images". The default is flipped: right after
+  a picture, a short message that is not a question and not a fresh
+  commission refines it. Detection is deterministic; the new prompt is
+  written by a RESIDENT model (never a cold load) with string surgery as
+  the floor. Verified live: "make the piano white" returns a white piano
+  with the room intact.
+- THE ESTIMATE. /api/setup is polled by four tickers at once, and the old
+  speed sample was mutated by every one of them — two calls 0.4s apart
+  see the same byte count, so the rate read zero and the ETA climbed
+  forever. Replaced with a rolling 60s window sampled at most every 2s,
+  and no time is quoted until there is a real measurement.

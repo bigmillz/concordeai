@@ -297,6 +297,73 @@ try:
     _ist = json.loads(req("/api/setup", cookie=K)[2]).get("image") or {}
 except Exception:
     _ist = {}
+# 6b299/6b300/6b301, per Patrick: video alongside image, a colour-coded
+# size ladder, both removable, and intent that understands "make the
+# piano white" without being told the word "generate".
+_SNS = {"re": re, "html": __import__("html"), "os": os, "sys": sys,
+        "time": time, "secrets": __import__("secrets"), "json": json,
+        "threading": __import__("threading"),
+        "subprocess": __import__("subprocess"), "app_dir": lambda: "/tmp"}
+try:
+    exec(_MILLENAI_SRC[_MILLENAI_SRC.index("EXPORT_KEEP_N ="):
+                       _MILLENAI_SRC.index("def _x_size(")], _SNS)
+    exec(_MILLENAI_SRC[_MILLENAI_SRC.index("_IMG_VERBS = "):
+                       _MILLENAI_SRC.index("def image_supported()")], _SNS)
+    exec(_MILLENAI_SRC[_MILLENAI_SRC.index("_VID_VERBS = "):
+                       _MILLENAI_SRC.index("def video_ready()")], _SNS)
+except Exception:
+    pass
+_fu = _SNS.get("image_followup", lambda *a: None)
+_wf = _SNS.get("image_wants_fetch", lambda *a: False)
+_vi = _SNS.get("video_intent", lambda *a: None)
+check("a picture that exists is fetched, one that doesn't is painted",
+      _wf("I would like to see a picture of a cookie from the Internet")
+      and _wf("find me a photo of a red panda")
+      and _wf("show me a real photo of Saturn")
+      and not _wf("create me a picture of a cookie")
+      and not _wf("draw me a red panda"))
+check("a follow-up refines the picture just made",
+      _fu("make the piano white", "a piano") == "a white piano"
+      and _fu("make it blue", "a piano") == "a blue piano"
+      and _fu("redo it", "a piano") == "a piano"
+      and _fu("what is a piano", "a piano") is None
+      and _fu("how do pianos work", "a piano") is None
+      and _fu("tell me about jazz history", "a piano") is None
+      and _fu("generate an image of a cat", "a piano") is None
+      and _fu("export this as a PDF", "a piano") is None
+      and "def _refine_with_model" in _MILLENAI_SRC)
+check("video generation: intent, engine, cloud fallback, inline player",
+      _vi("make a video of a cat") == "a cat"
+      and _vi("create an animation of a rocket launch") == "a rocket launch"
+      and _vi("what is a video codec") is None
+      and "def generate_video" in _MILLENAI_SRC
+      and "mlx_video.models.wan_2.generate" in _MILLENAI_SRC
+      and "predictLongRunning" in _MILLENAI_SRC
+      and 'class="genvid"' in page and "/api/video/" in _MILLENAI_SRC)
+try:
+    _ss = json.loads(req("/api/setup", cookie=K)[2]).get("studios") or {}
+except Exception:
+    _ss = {}
+check("both studios expose a colour-coded ladder",
+      set(_ss) == {"image", "video"}
+      and all(len(v.get("tiers") or []) >= 3 for v in _ss.values())
+      and all(t["fit"] in ("green", "amber", "red")
+              for v in _ss.values() for t in v["tiers"])
+      and all({"gb", "mem_gb", "note", "have"} <= set(t)
+              for v in _ss.values() for t in v["tiers"])
+      and "def tier_fit" in _MILLENAI_SRC
+      and "def studio_remove" in _MILLENAI_SRC
+      and 'class="stnotch ' in page and "stlegend" in page
+      and "green \\u2014 runs comfortably here" in page,
+      str({k: [t["fit"] for t in v.get("tiers", [])] for k, v in _ss.items()}))
+check("download estimate uses a rolling window, not two polls",
+      "_dl_hist = []" in _MILLENAI_SRC
+      and "now - _dl_hist[-1][0] >= 2.0" in _MILLENAI_SRC
+      and "if dt < 4.0 or db <= 0:" in _MILLENAI_SRC
+      and "bps > 2e5" in _MILLENAI_SRC)
+check("no brand or model name above an answer",
+      ".msg.ai .who{display:none}" in page
+      and "FLUX" not in page and "schnell" not in page)
 # 6b296, per Patrick ("image generation doesn't seem to be working"):
 # a conversational lead-in must not change what the request IS. Both
 # matchers were ^-anchored on the verb, so "try again, generate an image
@@ -327,17 +394,11 @@ check("image generation: intent, engine ladder, settings box, wizard, arrow pill
       and "gemini-2.5-flash-image" in _MILLENAI_SRC
       and '"/api/image/install",' in _MILLENAI_SRC
       and set(_ist.keys()) >= {"supported", "ready", "gb", "status", "pct"}
-      and 'id="img-box"' in page and 'id="wiz-img"' in page
-      and 'id="img-rm"' in page and "/api/image/remove" in _MILLENAI_SRC
-      and "def image_remove" in _MILLENAI_SRC
+      and 'id="studio-row"' in page and 'id="wiz-img"' in page
+      and 'id="wiz-vid"' in page and "/api/studio/remove" in _MILLENAI_SRC
+      and "def studio_remove" in _MILLENAI_SRC
       and "def _dir_bytes_real" in _MILLENAI_SRC
-      and "make pictures from a description" not in
-          (re.search(r'<div id="img-box".*?</div>\s*</div>', page, re.S)
-           or re.match("(x)", "x")).group(0)
-      and "\\u00b7" not in (re.search(r'<div id="img-box".*?</div>\s*</div>',
-                                     page, re.S)
-                            or re.match("(x)", "x")).group(0)
-      and 'class="genimg"' in page and "function paintImageBox" in page
+      and 'class="genimg"' in page and "function paintStudios" in page
       and ">UPDATE<" not in page
       and '<div id="update-flag" hidden title="Install the update"><svg' in page)
 # 6b292, per Patrick: performance mode is now "Enable visual effects" in

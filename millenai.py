@@ -2913,6 +2913,23 @@ def _dir_bytes(path: str) -> int:
     return total
 
 
+def _dir_bytes_real(path: str) -> int:
+    """Bytes actually occupied, symlinks NOT followed. The hub cache
+    stores one copy in blobs/ and links to it from snapshots/, so
+    _dir_bytes (which follows links) reports a 9 GB model as 18 and would
+    promise twice the disk an uninstall could free."""
+    total = 0
+    for root, _dirs, files in os.walk(path):
+        for f in files:
+            fp = os.path.join(root, f)
+            try:
+                if not os.path.islink(fp):
+                    total += os.path.getsize(fp)
+            except OSError:
+                pass
+    return total
+
+
 def _spawn_mlx_engine(label: str) -> bool:
     kind, port = MODEL_ROUTES[label]
     if kind != "mlx" or _port_in_use(port) or not _has_mlx():
@@ -3113,6 +3130,257 @@ def make_title(text: str) -> str:
 # OWN venv (its mlx pins must never touch the chat engine's). Not there
 # yet? A Gemini key can paint, then the community cloud; and when nothing
 # can, the reply says exactly where to add it.
+# ---------------------------------------------------------------- studios
+# THE HEAVY EXTRAS (6b299, per Patrick: video generation alongside image,
+# both removable, and "an option to select the size of the model with
+# models that are too large simply unavailable … a slider from small to
+# most accurate … green … yellow … red").
+#
+# A "studio" is an optional generator that costs real disk: its own venv
+# so its pinned MLX never touches the chat engine's, and a LADDER of
+# models the user picks from. The ladder is the whole point of the
+# slider: further right is more accurate and hungrier, and a rung this
+# machine cannot hold is offered as unavailable rather than hidden.
+#
+# mem_gb is what the rung wants RESIDENT while it runs, which is what
+# decides its colour — not the download size, which only decides the wait.
+STUDIOS = {
+    "image": {
+        "row": "Image generation",
+        "noun": "pictures",
+        "verb": "make pictures from a description",
+        "venv": os.path.join(app_dir(), "venv-image"),
+        "pip": ["mflux"],
+        "probe": "mflux-generate",
+        "tiers": [
+            {"id": "quick", "name": "Quick",
+             "repo": "dhairyashil/FLUX.1-schnell-mflux-4bit",
+             "gb": 9.6, "mem_gb": 12.0, "steps": 4, "base": "schnell",
+             "note": "four steps, about a minute a picture"},
+            {"id": "accurate", "name": "Accurate",
+             "repo": "dhairyashil/FLUX.1-dev-mflux-4bit",
+             "gb": 9.6, "mem_gb": 12.5, "steps": 20, "base": "dev",
+             "note": "follows the prompt more closely, slower"},
+            {"id": "finest", "name": "Finest",
+             "repo": "dhairyashil/FLUX.1-dev-mflux-8bit",
+             "gb": 18.0, "mem_gb": 22.0, "steps": 20, "base": "dev",
+             "note": "the most detail this engine can draw"},
+        ],
+    },
+    "video": {
+        "row": "Video generation",
+        "noun": "video",
+        "verb": "make short video from a description",
+        "venv": os.path.join(app_dir(), "venv-video"),
+        "pip": ["git+https://github.com/Blaizzy/mlx-video.git"],
+        "probe": None,                     # module-run, not a console script
+        "module": "mlx_video.models.wan_2.generate",
+        "tiers": [
+            {"id": "quick", "name": "Quick",
+             "repo": "Anes1032/Wan2.2-TI2V-5B-mlx-q8",
+             "gb": 19.6, "mem_gb": 24.0, "steps": 20,
+             "note": "a few seconds of video, several minutes to make"},
+            {"id": "accurate", "name": "Accurate",
+             "repo": "rickylin20260522/Wan2.2-TI2V-5B-mlx",
+             "gb": 24.2, "mem_gb": 30.0, "steps": 24,
+             "note": "the same model at full precision"},
+            {"id": "finest", "name": "Finest",
+             "repo": "prince-canuma/LTX-2.3-distilled",
+             "gb": 95.1, "mem_gb": 46.0, "steps": 20,
+             "note": "a much larger engine — a workstation's worth of memory"},
+        ],
+    },
+}
+_STUDIO_ROWS = {v["row"]: k for k, v in STUDIOS.items()}
+
+
+def studio_supported() -> bool:
+    return IS_MAC and IS_ARM
+
+
+def studio_tier_id(key: str) -> str:
+    want = str(load_prefs(None).get("studio_" + key) or "").strip()
+    ids = [t["id"] for t in STUDIOS[key]["tiers"]]
+    return want if want in ids else ids[0]
+
+
+def studio_tier(key: str, tid: str = "") -> dict:
+    tid = tid or studio_tier_id(key)
+    for t in STUDIOS[key]["tiers"]:
+        if t["id"] == tid:
+            return t
+    return STUDIOS[key]["tiers"][0]
+
+
+def tier_fit(mem_gb: float) -> str:
+    """green / amber / red for one rung on THIS machine.
+
+    green  comfortably inside what the machine can hold and stay quick
+    amber  it fits, but only with the machine reasonably clear
+    red    more memory than there is; offered, never pretended
+    """
+    if not HAS_PSUTIL:
+        return "amber"                      # unknown: never promise green
+    total = psutil.virtual_memory().total / 1e9
+    if mem_gb <= total * 0.5:
+        return "green"
+    if mem_gb <= total * 0.8:
+        return "amber"
+    return "red"
+
+
+def _studio_engine_ok(key: str) -> bool:
+    st = STUDIOS[key]
+    if st.get("probe"):
+        return os.path.exists(os.path.join(st["venv"], "bin", st["probe"]))
+    py = os.path.join(st["venv"], "bin", "python3")
+    if not os.path.exists(py):
+        return False
+    try:
+        r = subprocess.run([py, "-c", "import %s" % st["module"].rsplit(
+            ".", 1)[0]], capture_output=True, timeout=60)
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+def _snap_dir(repo: str) -> str:
+    snaps = glob.glob(os.path.join(_hf_model_dir(repo), "snapshots", "*",
+                                   "config.json"))
+    return os.path.dirname(snaps[0]) if snaps else ""
+
+
+def _studio_model_ok(key: str, tid: str = "") -> bool:
+    repo = studio_tier(key, tid)["repo"]
+    snap = _snap_dir(repo)
+    if not snap:
+        return False
+    if glob.glob(os.path.join(_hf_model_dir(repo), "blobs", "*.incomplete")):
+        return False
+    return bool(glob.glob(os.path.join(snap, "**", "*.safetensors"),
+                          recursive=True))
+
+
+def studio_ready(key: str, tid: str = "") -> bool:
+    return (studio_supported() and _studio_engine_ok(key)
+            and _studio_model_ok(key, tid))
+
+
+def studio_bytes(key: str) -> int:
+    """Everything this studio occupies: its venv and EVERY rung of its
+    ladder that was ever downloaded, so Remove promises the truth."""
+    total = _dir_bytes_real(STUDIOS[key]["venv"])
+    for t in STUDIOS[key]["tiers"]:
+        total += _dir_bytes_real(_hf_model_dir(t["repo"]))
+    return total
+
+
+def _studio_install_worker(key: str, tid: str):
+    st, row = STUDIOS[key], STUDIOS[key]["row"]
+    try:
+        with _setup_lock:
+            _setup_jobs[row] = {"status": "downloading", "pct": 0,
+                                "note": "installing the engine"}
+        if not _studio_engine_ok(key):
+            py = os.path.join(app_dir(), "venv", "bin", "python3")
+            if not os.path.exists(py):
+                py = sys.executable
+            subprocess.run([py, "-m", "venv", st["venv"]], check=True,
+                           timeout=300, capture_output=True)
+            subprocess.run([os.path.join(st["venv"], "bin", "pip"), "install",
+                            "--quiet", "--upgrade", "pip"],
+                           timeout=300, capture_output=True)
+            r = subprocess.run([os.path.join(st["venv"], "bin", "pip"),
+                                "install", "--quiet"] + st["pip"],
+                               timeout=2400, capture_output=True, text=True)
+            if r.returncode != 0 or not _studio_engine_ok(key):
+                raise RuntimeError("engine install failed: "
+                                   + (r.stderr or "")[-160:])
+        with _setup_lock:
+            _setup_jobs[row]["note"] = ""
+        if not _studio_model_ok(key, tid):
+            from huggingface_hub import snapshot_download
+            snapshot_download(studio_tier(key, tid)["repo"])
+            for pth in glob.glob(os.path.join(
+                    _hf_model_dir(studio_tier(key, tid)["repo"]),
+                    "blobs", "*.incomplete")):
+                try:
+                    os.remove(pth)
+                except OSError:
+                    pass
+        with _setup_lock:
+            _setup_jobs[row] = {"status": "done", "note": "", "pct": 100}
+    except Exception as exc:
+        with _setup_lock:
+            _setup_jobs[row] = {"status": "error", "note": str(exc)[:200],
+                                "pct": 0}
+
+
+def start_studio_install(key: str, tid: str = "") -> bool:
+    if key not in STUDIOS or not studio_supported():
+        return False
+    tid = tid or studio_tier_id(key)
+    if tid not in [t["id"] for t in STUDIOS[key]["tiers"]]:
+        return False
+    pr = load_prefs(None)
+    pr["studio_" + key] = tid
+    store_prefs(pr)
+    if studio_ready(key, tid):
+        return False
+    row = STUDIOS[key]["row"]
+    with _setup_lock:
+        if _setup_jobs.get(row, {}).get("status") in ("downloading", "queued"):
+            return False
+        _setup_jobs[row] = {"status": "queued", "note": "", "pct": 0}
+    _reset_dl_window()
+    threading.Thread(target=_studio_install_worker, args=(key, tid),
+                     daemon=True).start()
+    return True
+
+
+def studio_remove(key: str) -> dict:
+    """Take the whole studio back off the disk — the venv and every rung
+    that was downloaded — and clear the job so the box reads as a fresh
+    install rather than a finished one."""
+    freed, errs = studio_bytes(key), []
+    targets = [STUDIOS[key]["venv"]] + [_hf_model_dir(t["repo"])
+                                        for t in STUDIOS[key]["tiers"]]
+    for target in targets:
+        try:
+            if os.path.isdir(target):
+                shutil.rmtree(target)
+        except OSError as exc:
+            errs.append(str(exc)[:120])
+    with _setup_lock:
+        _setup_jobs.pop(STUDIOS[key]["row"], None)
+    return {"ok": not errs, "freed_gb": round(freed / 1e9, 1), "errors": errs}
+
+
+def studio_status(key: str) -> dict:
+    st = STUDIOS[key]
+    with _setup_lock:
+        job = dict(_setup_jobs.get(st["row"], {}))
+    tid = studio_tier_id(key)
+    tier = studio_tier(key, tid)
+    ready = studio_ready(key, tid)
+    est = int(tier["gb"] * 1e9)
+    pct = 100 if ready else min(99, round(
+        _dir_bytes_real(_hf_model_dir(tier["repo"])) / est * 100))
+    return {
+        "key": key, "supported": studio_supported(), "ready": ready,
+        "engine": _studio_engine_ok(key), "tier": tid,
+        "gb": tier["gb"], "pct": pct,
+        "on_disk_gb": round(studio_bytes(key) / 1e9, 1) if ready else 0,
+        "status": "ready" if ready else job.get("status", "missing"),
+        "note": job.get("note", ""),
+        "tiers": [{"id": t["id"], "name": t["name"], "gb": t["gb"],
+                   "mem_gb": t["mem_gb"], "note": t["note"],
+                   "fit": tier_fit(t["mem_gb"]),
+                   "have": _studio_model_ok(key, t["id"])}
+                  for t in st["tiers"]],
+    }
+
+
 IMAGE_ROW = "Image generation"
 IMAGE_REPO = "dhairyashil/FLUX.1-schnell-mflux-4bit"
 IMAGE_GB = 9.6
@@ -3186,138 +3454,184 @@ def image_intent(text: str):
     return subj or "something beautiful"
 
 
+# the image studio's old names, kept so every existing caller works
+# FETCH OR PAINT (6b300, per Patrick: "if they say 'I'd like to see a
+# picture of a cookie from the Internet' it will try to fetch an image
+# that already exists online. However, if the user says create me a
+# picture of a cookie, it should generate").
+_IMG_FIND = re.compile(
+    r"\b(?:from\s+(?:the\s+)?(?:internet|web|google|online)|on\s+the\s+"
+    r"(?:internet|web)|online|search\s+for|look\s+up|google|find\s+me|"
+    r"find\s+(?:an?|some)|real\s+(?:photo|picture|image)|actual\s+"
+    r"(?:photo|picture|image)|existing|stock\s+(?:photo|image))\b", re.I)
+# a bare "show me / I'd like to see a picture of X" is a LOOK request, not
+# a commission — only an explicit make-verb commissions a new one
+_IMG_SEE = re.compile(
+    r"^\s*(?:(?:i(?:'| a)?d\s+like\s+to\s+see|i\s+want\s+to\s+see|"
+    r"show\s+me|let\s+me\s+see|got\s+(?:any|a))\b)", re.I)
+_IMG_MAKE_VERB = re.compile(
+    r"\b(?:generate|create|draw|paint|render|illustrate|sketch|design|"
+    r"make\s+me|make\s+a|make\s+an|imagine)\b", re.I)
+
+
+def image_wants_fetch(text: str) -> bool:
+    """True when the ask is for a picture that already exists."""
+    t = (text or "").strip()
+    if _IMG_MAKE_VERB.search(t) and not _IMG_FIND.search(t):
+        return False              # an explicit commission always paints
+    return bool(_IMG_FIND.search(t) or _IMG_SEE.match(_img_strip_pre(t)))
+
+
+# REFINEMENTS (6b300/6b301, per Patrick: "we've got to do way better at
+# detecting when a query is applying to a previously generated image or
+# video … my query was to regenerate the image, but make the piano
+# white"). Pattern-matching a handful of phrasings was never going to
+# hold. The default flips instead: right after a picture, a SHORT message
+# that is not a question and not a fresh commission is about that
+# picture. That is what a person means essentially every time.
+_IMG_NEWTOPIC = re.compile(
+    r"^\s*(?:what|why|how|who|when|where|which|is|are|was|were|do|does|did|"
+    r"can\s+you\s+(?:explain|tell|describe|list|write|help)|tell\s+me|"
+    r"explain|describe|summari[sz]e|translate|write|code|search|find\s+out|"
+    r"look\s+up|remind|calculate|convert)\b", re.I)
+_IMG_CHANGE = re.compile(
+    r"^\s*(?:please\s+)?(?:(?:can|could|would)\s+you\s+)?(?:please\s+)?"
+    r"(?:now\s+|instead\s+|but\s+|also\s+|and\s+)?"
+    r"(?:make|turn|change|paint|colou?r|set|give|add|put|remove|drop|"
+    r"swap|replace|redo|regenerate|re-?draw|re-?make|try|do)\b\s*"
+    r"(?P<rest>.*)$", re.I | re.S)
+_IMG_LEADIN = re.compile(
+    r"^\s*(?:it|them|this|that|these|those|the\s+image|the\s+picture|"
+    r"the\s+photo|the\s+video|the\s+clip|again|it\s+again)\b[\s,]*", re.I)
+
+
+def _subject_words(subject: str) -> set:
+    return {w for w in re.findall(r"[a-z]{3,}", (subject or "").lower())
+            if w not in ("the", "and", "with", "for", "from", "that")}
+
+
+def image_followup(text: str, prev_subject: str):
+    """A new prompt when this message refines the picture just made, else
+    None. Liberal by design: after an image, the burden is on a message
+    to look like a NEW topic, not on it to look like a refinement.
+
+    DETECTION is deterministic (it has to be trustworthy). Composing the
+    new prompt is not: "remove the lamp" and "now put it in a jazz club"
+    defeat string surgery, so a resident model rewrites it when there is
+    one, and the surgery below is the floor when there is not."""
+    t = re.sub(r"\s+", " ", (text or "").strip())
+    if not prev_subject or not t or len(t.split()) > 16 or t.endswith("?"):
+        return None
+    if _IMG_NEWTOPIC.match(t):
+        return None
+    if image_intent(t) or video_intent(t) or export_intent(t, True):
+        return None               # a fresh commission, or a file request
+    m = _IMG_CHANGE.match(t)
+    known = _subject_words(prev_subject)
+    words = set(re.findall(r"[a-z]{3,}", t.lower()))
+    # either it is phrased as a change, or it names something already in
+    # the picture ("the piano ..."), or it is a bare descriptive fragment
+    if not m and not (words & known) and len(t.split()) > 4:
+        return None
+    rest = (m.group("rest") if m else t).strip()
+    rest = _IMG_LEADIN.sub("", rest).strip().strip(".!?,")
+    # drop a reference to something the subject already names, so
+    # "the piano white" becomes "white" and can be folded in properly
+    toks = rest.split()
+    while toks and re.sub(r"[^a-z]", "", toks[0].lower()) in (
+            "a", "an", "the", "its", "his", "her", "their"):
+        toks.pop(0)
+    while toks and re.sub(r"[^a-z]", "", toks[0].lower()) in known:
+        toks.pop(0)
+    rest = " ".join(toks).strip(" ,.")
+    said = _refine_with_model(prev_subject, t)
+    if said:
+        return said
+    if not rest:
+        return prev_subject                     # "redo it", "try again"
+    if len(rest.split()) >= 4:
+        return rest                             # a subject of its own
+    # a short modifier reads best folded into the subject itself:
+    # "a piano" + "white" -> "a white piano"
+    ps = prev_subject.split()
+    if len(ps) >= 2 and len(rest.split()) <= 2:
+        return " ".join(ps[:-1] + rest.split() + ps[-1:])
+    return prev_subject + ", " + rest
+
+
+_REFINE_PROMPT = (
+    "You rewrite image prompts. The last picture was made from this "
+    "prompt:\n  %s\nThe person now says:\n  %s\n\nWrite the FULL new "
+    "image prompt: the original subject with their change applied. Keep "
+    "everything they did not ask to change. Reply with ONLY the prompt, "
+    "one line, under 30 words, no quotes, no preamble, no explanation.")
+
+
+def _refine_with_model(prev_subject: str, said: str) -> str:
+    """Let a model fold the change into the prompt. Only a model that is
+    ALREADY resident is used — a cold multi-GB load to rewrite eight
+    words would cost more than the picture (make_title, 6b247, uses the
+    same rule). Returns "" when there is nothing suitable or the answer
+    does not look like a prompt."""
+    try:
+        pulled = ollama_pulled_tags() or set()
+        live = [l for l in MODEL_ROUTES
+                if MODEL_ROUTES[l][0] == "mlx" and model_cached(l, pulled)
+                and _port_in_use(MODEL_ROUTES[l][1])]
+        if not live:
+            return ""
+        parts = []
+        run_model(live[0], [{"role": "user",
+                             "content": _REFINE_PROMPT % (prev_subject,
+                                                          said)}],
+                  parts.append)
+        out = " ".join(strip_think(strip_special("".join(parts))).split())
+        out = out.split("\n")[0].strip().strip('"\u201c\u201d\'*`')
+        out = re.sub(r"^(?:prompt|new prompt|here(?:'s| is)[^:]*)\s*:\s*",
+                     "", out, flags=re.I).strip()
+        if not (3 <= len(out.split()) <= 40) or _looks_degenerate(out):
+            return ""
+        if re.search(r"\b(?:i can(?:not|'t)|as an ai|sorry)\b", out, re.I):
+            return ""
+        return out
+    except Exception:
+        return ""
+
+
 def image_supported() -> bool:
-    return IS_MAC and IS_ARM
+    return studio_supported()
 
 
 def image_engine_ok() -> bool:
-    return os.path.exists(os.path.join(IMAGE_VENV, "bin", "mflux-generate"))
+    return _studio_engine_ok("image")
 
 
 def _image_snapshot() -> str:
-    d = _hf_model_dir(IMAGE_REPO)
-    snaps = glob.glob(os.path.join(d, "snapshots", "*", "config.json"))
-    return os.path.dirname(snaps[0]) if snaps else ""
+    return _snap_dir(studio_tier("image")["repo"])
 
 
 def image_model_ok() -> bool:
-    snap = _image_snapshot()
-    if not snap:
-        return False
-    if glob.glob(os.path.join(_hf_model_dir(IMAGE_REPO), "blobs", "*.incomplete")):
-        return False
-    return bool(glob.glob(os.path.join(snap, "**", "*.safetensors"), recursive=True))
+    return _studio_model_ok("image")
 
 
 def image_ready() -> bool:
-    return image_supported() and image_engine_ok() and image_model_ok()
+    return studio_ready("image")
 
 
-def _install_image_worker():
-    try:
-        with _setup_lock:
-            _setup_jobs[IMAGE_ROW] = {"status": "downloading",
-                                      "note": "installing the engine", "pct": 0}
-        if not image_engine_ok():
-            py = os.path.join(app_dir(), "venv", "bin", "python3")
-            if not os.path.exists(py):
-                py = sys.executable
-            subprocess.run([py, "-m", "venv", IMAGE_VENV], check=True,
-                           timeout=300, capture_output=True)
-            subprocess.run([os.path.join(IMAGE_VENV, "bin", "pip"), "install",
-                            "--quiet", "--upgrade", "pip"],
-                           timeout=300, capture_output=True)
-            r = subprocess.run([os.path.join(IMAGE_VENV, "bin", "pip"),
-                                "install", "--quiet", "mflux"],
-                               timeout=1800, capture_output=True, text=True)
-            if r.returncode != 0 or not image_engine_ok():
-                raise RuntimeError("engine install failed: "
-                                   + (r.stderr or "")[-160:])
-        with _setup_lock:
-            _setup_jobs[IMAGE_ROW]["note"] = ""
-        if not image_model_ok():
-            from huggingface_hub import snapshot_download
-            snapshot_download(IMAGE_REPO)
-            for pth in glob.glob(os.path.join(_hf_model_dir(IMAGE_REPO),
-                                              "blobs", "*.incomplete")):
-                try:
-                    os.remove(pth)
-                except Exception:
-                    pass
-        with _setup_lock:
-            _setup_jobs[IMAGE_ROW] = {"status": "done", "note": "", "pct": 100}
-    except Exception as exc:
-        with _setup_lock:
-            _setup_jobs[IMAGE_ROW] = {"status": "error",
-                                      "note": str(exc)[:200], "pct": 0}
-
-
-def start_image_install() -> bool:
-    if not image_supported() or image_ready():
-        return False
-    with _setup_lock:
-        if _setup_jobs.get(IMAGE_ROW, {}).get("status") in ("downloading", "queued"):
-            return False
-        _setup_jobs[IMAGE_ROW] = {"status": "queued", "note": "", "pct": 0}
-    threading.Thread(target=_install_image_worker, daemon=True).start()
-    return True
-
-
-def _dir_bytes_real(path: str) -> int:
-    """Bytes actually occupied, symlinks NOT followed. The hub cache
-    stores one copy in blobs/ and links to it from snapshots/, so
-    _dir_bytes (which follows links) reports a 9 GB model as 18 and would
-    have promised twice the disk an uninstall could free."""
-    total = 0
-    for root, _dirs, files in os.walk(path):
-        for f in files:
-            fp = os.path.join(root, f)
-            try:
-                if not os.path.islink(fp):
-                    total += os.path.getsize(fp)
-            except OSError:
-                pass
-    return total
+def start_image_install(tid: str = "") -> bool:
+    return start_studio_install("image", tid)
 
 
 def image_bytes() -> int:
-    """What image generation is costing on disk right now."""
-    return _dir_bytes_real(IMAGE_VENV) + _dir_bytes_real(
-        _hf_model_dir(IMAGE_REPO))
+    return studio_bytes("image")
 
 
 def image_remove() -> dict:
-    """Uninstall it (6b297, per Patrick: "a way to remove it, like an
-    uninstall feature"). Both halves go — the engine's own venv and the
-    9.6 GB of weights — and the job entry with them, so the box reads as
-    a fresh install afterwards rather than a finished one."""
-    freed = image_bytes()
-    errs = []
-    for target in (IMAGE_VENV, _hf_model_dir(IMAGE_REPO)):
-        try:
-            if os.path.isdir(target):
-                shutil.rmtree(target)
-        except OSError as exc:
-            errs.append(str(exc)[:120])
-    with _setup_lock:
-        _setup_jobs.pop(IMAGE_ROW, None)
-    return {"ok": not errs, "freed_gb": round(freed / 1e9, 1),
-            "errors": errs}
+    return studio_remove("image")
 
 
 def image_status() -> dict:
-    with _setup_lock:
-        job = dict(_setup_jobs.get(IMAGE_ROW, {}))
-    ready = image_ready()
-    est = int(IMAGE_GB * 1e9)
-    pct = 100 if ready else min(99, round(
-        _dir_bytes(_hf_model_dir(IMAGE_REPO)) / est * 100))
-    return {"supported": image_supported(), "ready": ready,
-            "engine": image_engine_ok(), "model": image_model_ok(),
-            "gb": IMAGE_GB, "pct": pct,
-            "on_disk_gb": round(image_bytes() / 1e9, 1) if ready else 0,
-            "status": "ready" if ready else job.get("status", "missing"),
-            "note": job.get("note", "")}
+    return studio_status("image")
 
 
 def _write_image_bytes(data: bytes) -> str:
@@ -3345,9 +3659,11 @@ def generate_image(prompt: str) -> tuple:
         out = os.path.join(IMAGE_DIR, iid + ".png")
         # mflux 0.19: a local/third-party model is --model <dir> with
         # --base-model naming the architecture (the old --path is gone)
-        cmd = [os.path.join(IMAGE_VENV, "bin", "mflux-generate"),
-               "--model", _image_snapshot(), "--base-model", "schnell",
-               "--prompt", prompt, "--steps", "4",
+        _t = studio_tier("image")
+        cmd = [os.path.join(STUDIOS["image"]["venv"], "bin", "mflux-generate"),
+               "--model", _snap_dir(_t["repo"]),
+               "--base-model", _t.get("base", "schnell"),
+               "--prompt", prompt, "--steps", str(_t.get("steps", 4)),
                "--seed", str(secrets.randbelow(10 ** 6)),
                "--width", "1024", "--height", "1024", "--output", out]
         try:
@@ -4406,6 +4722,143 @@ def reveal_in_finder(path: str) -> bool:
         return False
 
 
+VIDEO_DIR = os.path.join(app_dir(), "videos")
+_VID_VERBS = (r"(?:generate|create|make|render|produce|animate|shoot|film|"
+              r"put\s+together)")
+_VID_NOUNS = (r"(?:video|clip|animation|movie|short|reel|gif|"
+              r"time-?lapse|montage)s?")
+_VIDEO_RX = re.compile(
+    r"^\s*(?:please\s+|hey\s+|ok(?:ay)?\s+)?(?:(?:can|could|would|will)"
+    r"\s+you\s+)?(?:please\s+)?" + _VID_VERBS +
+    r"\s+(?:me\s+)?(?:an?\s+|some\s+|the\s+|\d+\s+)?"
+    r"(?:(?!of\b)\w+\s+){0,2}" + _VID_NOUNS +
+    r"\b\s*(?:of|showing|depicting|featuring|with|for|:|-|\u2014)?\s*"
+    r"(?P<subject>.*)$", re.I | re.S)
+
+
+def video_intent(text: str):
+    """The subject to film when the message asks for a video, else None.
+    Shares image_intent's preamble strip, so "try again, make a video of a
+    cat" works the same way (6b296)."""
+    t = (text or "").strip()
+    if len(t) > 600:
+        return None
+    m = _VIDEO_RX.match(t)
+    if not m:
+        t2 = _img_strip_pre(t)
+        if t2 != t and t2:
+            m = _VIDEO_RX.match(t2)
+            if m:
+                t = t2
+    if not m:
+        return None
+    rest = re.match(r"^\s*(?:please\s+|hey\s+|ok(?:ay)?\s+)?"
+                    r"(?:(?:can|could|would|will)\s+you\s+)?(?:please\s+)?"
+                    + _VID_VERBS + r"\s+(?:me\s+)?(?P<rest>.*)$",
+                    t, re.I | re.S)
+    subj = (rest.group("rest") if rest else m.group("subject")).strip()
+    subj = re.sub(r"^(?:an?|some|the)\s+(?:short\s+)?" + _VID_NOUNS +
+                  r"\s+(?:of|showing|depicting)\s+", "", subj, flags=re.I)
+    subj = subj.strip().strip(".!?").strip()
+    return subj or "something beautiful"
+
+
+def video_ready() -> bool:
+    return studio_ready("video")
+
+
+def _veo_video(prompt: str) -> str:
+    """Google's Veo, via the key the user already added. It is a long
+    running operation: submit, then poll until the file is there."""
+    gem = (_cloud_all().get("providers") or {}).get("gemini") or {}
+    if not (gem.get("key") and gem.get("status", "ok") == "ok"):
+        raise RuntimeError("no cloud key that can make video")
+    key = gem["key"]
+    base = "https://generativelanguage.googleapis.com/v1beta/"
+    last = ""
+    for mdl in ("veo-3.1-fast-generate-preview", "veo-3.1-lite-generate-preview",
+                "veo-3.1-generate-preview"):
+        try:
+            req = urllib.request.Request(
+                base + "models/%s:predictLongRunning?key=%s" % (mdl, key),
+                data=json.dumps({"instances": [{"prompt": prompt}]}).encode(),
+                headers={"Content-Type": "application/json",
+                         "User-Agent": "MillenAI/%s" % APP_VERSION})
+            with urllib.request.urlopen(req, timeout=60) as r:
+                op = json.loads(r.read().decode("utf-8", "replace"))
+            name = op.get("name") or ""
+            if not name:
+                last = "no operation returned"
+                continue
+            for _ in range(90):               # up to ~7 minutes
+                time.sleep(5)
+                pr = urllib.request.Request(base + name + "?key=" + key,
+                                            headers={"User-Agent": "MillenAI"})
+                with urllib.request.urlopen(pr, timeout=30) as r:
+                    st = json.loads(r.read().decode("utf-8", "replace"))
+                if not st.get("done"):
+                    continue
+                if st.get("error"):
+                    last = str(st["error"].get("message", ""))[:160]
+                    break
+                resp = st.get("response") or {}
+                vids = (resp.get("generateVideoResponse", {})
+                        .get("generatedSamples")
+                        or resp.get("generatedSamples") or [])
+                uri = ((vids[0].get("video") or {}).get("uri") if vids else "")
+                if not uri:
+                    last = "no video in the reply"
+                    break
+                vr = urllib.request.Request(
+                    uri + ("&" if "?" in uri else "?") + "key=" + key,
+                    headers={"User-Agent": "MillenAI"})
+                with urllib.request.urlopen(vr, timeout=300) as r:
+                    data = r.read()
+                os.makedirs(VIDEO_DIR, exist_ok=True)
+                out = os.path.join(VIDEO_DIR, "%d-%s.mp4" % (
+                    int(time.time()), secrets.token_hex(3)))
+                with open(out, "wb") as f:
+                    f.write(data)
+                return out
+            else:
+                last = "timed out waiting for the render"
+        except Exception as exc:
+            last = str(exc)[:160]
+    raise RuntimeError(last or "the cloud could not make that video")
+
+
+def generate_video(prompt: str) -> tuple:
+    """(mp4 path, source). Local first, then a cloud key. Video has no
+    keyless tier — nobody gives it away — so when neither is there the
+    caller says so plainly rather than pretending."""
+    errs = []
+    if video_ready():
+        os.makedirs(VIDEO_DIR, exist_ok=True)
+        out = os.path.join(VIDEO_DIR, "%d-%s.mp4" % (
+            int(time.time()), secrets.token_hex(3)))
+        t = studio_tier("video")
+        cmd = [os.path.join(STUDIOS["video"]["venv"], "bin", "python3"),
+               "-m", STUDIOS["video"]["module"],
+               "--model-dir", _snap_dir(t["repo"]), "--prompt", prompt,
+               "--num-frames", "49", "--width", "704", "--height", "480",
+               "--steps", str(t.get("steps", 20)),
+               "--seed", str(secrets.randbelow(10 ** 6)),
+               "--output-path", out]
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True,
+                               timeout=3600)
+            if r.returncode == 0 and os.path.exists(out):
+                return out, "local"
+            errs.append("local: " + (r.stderr or r.stdout or "")[-200:].strip())
+        except Exception as exc:
+            errs.append("local: %s" % str(exc)[:160])
+    try:
+        return _veo_video(prompt), "cloud"
+    except Exception as exc:
+        errs.append("cloud: %s" % str(exc)[:160])
+    raise RuntimeError("; ".join(errs) or "no video engine")
+
+
 # ------------------------------------------------------------- updates
 _update = {"state": "idle", "pct": 0, "note": "", "latest": "", "url": "",
            "size": 0}
@@ -5156,6 +5609,10 @@ def start_model_downloads(labels=None) -> list:
 _dl_sample = {"bytes": 0, "ts": 0.0, "bps": 0.0}
 
 
+def _reset_dl_window():
+    del _dl_hist[:]
+
+
 def _batch_labels() -> list:
     """The models the progress bar is ABOUT (6b290, per Patrick: the
     Recommended preset "just sits at 100% doing nothing"). The bar used
@@ -5166,7 +5623,8 @@ def _batch_labels() -> list:
     something has."""
     with _setup_lock:
         batch = [l for l in _setup_jobs
-                 if l != ENGINE_ROW and (l in MODEL_ROUTES or l == IMAGE_ROW)]
+                 if l != ENGINE_ROW and (l in MODEL_ROUTES
+                                         or l in _STUDIO_ROWS)]
     return batch or list(STARTER_LABELS)
 
 
@@ -5174,11 +5632,13 @@ def _downloaded_bytes(pulled) -> tuple:
     """(bytes on disk, bytes expected) across the batch in play."""
     have = want = 0
     for label in _batch_labels():
-        if label == IMAGE_ROW:
-            est = int(IMAGE_GB * 1e9)
+        if label in _STUDIO_ROWS:
+            _k = _STUDIO_ROWS[label]
+            _t = studio_tier(_k)
+            est = int(_t["gb"] * 1e9)
             want += est
-            have += est if image_model_ok() else min(
-                est, _dir_bytes(_hf_model_dir(IMAGE_REPO)))
+            have += est if _studio_model_ok(_k) else min(
+                est, _dir_bytes_real(_hf_model_dir(_t["repo"])))
             continue
         est = MLX_EST_BYTES.get(label, 0)
         want += est
@@ -5196,19 +5656,35 @@ def _downloaded_bytes(pulled) -> tuple:
     return have, want
 
 
+_dl_hist = []          # (ts, bytes) over the last minute, one per 2s
+
+
 def _dl_speed(have: int) -> float:
-    """Bytes/sec, smoothed, from the change since the last poll."""
+    """Bytes/sec measured across a ROLLING WINDOW, not between two polls.
+
+    The old estimate sampled on every call, and this endpoint is polled by
+    four different tickers at once (the strip every 4s, the manage pane
+    every 2s, the setup dialog every 1.2s, the flag). Two calls 0.4s apart
+    usually see the same byte count, so the instantaneous rate read as
+    zero, the smoothed rate decayed toward zero, and the ETA climbed
+    forever (seen live, 6b299). A window immune to poll frequency fixes
+    it: at most one sample every 2s, speed taken end to end across up to
+    60s of them."""
     now = time.time()
-    last_ts, last_b = _dl_sample["ts"], _dl_sample["bytes"]
-    if last_ts and now > last_ts + 0.4:
-        inst = max(0.0, (have - last_b) / (now - last_ts))
-        # ignore the jump when a finished model flips to its full size
-        if inst < 300e6:
-            _dl_sample["bps"] = (0.6 * _dl_sample["bps"] + 0.4 * inst
-                                 if _dl_sample["bps"] else inst)
-    if not last_ts or now > last_ts + 0.4:
-        _dl_sample.update(bytes=have, ts=now)
-    return _dl_sample["bps"]
+    if not _dl_hist or now - _dl_hist[-1][0] >= 2.0:
+        _dl_hist.append((now, have))
+        while len(_dl_hist) > 2 and now - _dl_hist[0][0] > 60:
+            _dl_hist.pop(0)
+    # a batch that restarted (bytes went backwards) invalidates the window
+    if len(_dl_hist) >= 2 and have < _dl_hist[0][1]:
+        del _dl_hist[:-1]
+    if len(_dl_hist) < 2:
+        return 0.0
+    dt = _dl_hist[-1][0] - _dl_hist[0][0]
+    db = _dl_hist[-1][1] - _dl_hist[0][1]
+    if dt < 4.0 or db <= 0:
+        return 0.0            # no honest measurement yet: say nothing
+    return db / dt
 
 
 _job_watch = {}   # label -> (pct, ts of last movement)
@@ -5401,8 +5877,9 @@ def setup_status() -> dict:
             # growing on disk. Judging it by a pct that never moved
             # branded every download longer than ten minutes "stalled"
             # (6b290). Bytes, to the megabyte, are the honest pulse.
-            if label == IMAGE_ROW:
-                pct = _dir_bytes(_hf_model_dir(IMAGE_REPO)) // 1_000_000
+            if label in _STUDIO_ROWS:
+                pct = _dir_bytes_real(_hf_model_dir(
+                    studio_tier(_STUDIO_ROWS[label])["repo"])) // 1_000_000
             elif (MODEL_ROUTES.get(label, ("",))[0] == "mlx"
                     and label in MLX_REPOS):
                 pct = _dir_bytes(_hf_model_dir(MLX_REPOS[label])) // 1_000_000
@@ -5459,16 +5936,17 @@ def setup_status() -> dict:
                        "note": job.get("note", "")})
 
     # the image engine rides the same strip and pane while it installs
-    with _setup_lock:
-        ijob = dict(_setup_jobs.get(IMAGE_ROW, {}))
-    if ijob and ijob.get("status") != "done":
-        _ist = image_status()
-        models.append({"label": IMAGE_ROW, "est_gb": IMAGE_GB,
-                       "status": ijob.get("status", "missing"),
-                       "pct": _ist["pct"], "star": False, "supported": True,
-                       "note": ijob.get("note", "")})
+    for _row, _k in _STUDIO_ROWS.items():
+        with _setup_lock:
+            _j = dict(_setup_jobs.get(_row, {}))
+        if _j and _j.get("status") != "done":
+            _s = studio_status(_k)
+            models.append({"label": _row, "est_gb": _s["gb"],
+                           "status": _j.get("status", "missing"),
+                           "pct": _s["pct"], "star": False, "supported": True,
+                           "note": _j.get("note", "")})
     ready_n = sum(1 for x in models
-                  if x["status"] == "ready" and x["label"] != IMAGE_ROW)
+                  if x["status"] == "ready" and x["label"] not in _STUDIO_ROWS)
     have, want = _downloaded_bytes(pulled)
     bps = _dl_speed(have)
     busy = any(m["status"] in ("downloading", "queued") for m in models)
@@ -5497,8 +5975,10 @@ def setup_status() -> dict:
         "have_gb": round(have / 1e9, 1), "want_gb": round(want / 1e9, 1),
         "overall_pct": round(have / want * 100) if want else 100,
         "speed_mbs": round(bps / 1e6, 1) if busy else 0,
-        "eta_min": (round((want - have) / bps / 60)
-                    if busy and bps > 1e5 and want > have else None),
+        # only quote a time once the window holds a real rate, and never
+        # quote a silly one — an hour-plus reads as "we don't know"
+        "eta_min": (min(999, max(1, round((want - have) / bps / 60)))
+                    if busy and bps > 2e5 and want > have else None),
         "busy": busy,
         # nag on first run only: once a couple of models work, the welcome
         # screen is opt-in via "Add models…"
@@ -5521,6 +6001,7 @@ def setup_status() -> dict:
         # what the auto-clean sweep would reclaim right now (6b265)
         "cleanup": _cleanup_stat(pulled),
         "image": image_status(),
+        "studios": {k: studio_status(k) for k in STUDIOS},
         "ready_n": ready_n,
         "mlx_ok": _has_mlx() if IS_ARM else True,
         "ollama": _ollama_bin() is not None,
@@ -9351,6 +9832,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
     ADMIN_PATHS = ("/api/open-logs", "/api/setup/install",
                    "/api/model/download", "/api/model/remove",
                    "/api/image/install", "/api/image/remove",
+                   "/api/studio/install", "/api/studio/remove",
                    "/api/export/reveal",
                    "/api/model/cleanup",
                    "/api/update/install",
@@ -9844,6 +10326,35 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Disposition", _x_disposition(nm))
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", "private, max-age=3600")
+            self.end_headers()
+            self.wfile.write(data)
+        elif self.path.startswith("/api/video/") and self.path.endswith(".mp4"):
+            vid = self.path[len("/api/video/"):]
+            pth = os.path.join(VIDEO_DIR, vid)
+            if not re.fullmatch(r"[\w-]+\.mp4", vid) or not os.path.exists(pth):
+                self.send_error(404)
+                return
+            # Range matters here: a WKWebView <video> asks for one
+            rng = self.headers.get("Range", "")
+            total = os.path.getsize(pth)
+            a, b = 0, total - 1
+            m = re.match(r"bytes=(\d*)-(\d*)", rng or "")
+            partial = bool(m and (m.group(1) or m.group(2)))
+            if partial:
+                a = int(m.group(1) or 0)
+                b = int(m.group(2) or (total - 1))
+                b = min(b, total - 1)
+            with open(pth, "rb") as f:
+                f.seek(a)
+                data = f.read(b - a + 1)
+            self.send_response(206 if partial else 200)
+            self.send_header("Content-Type", "video/mp4")
+            self.send_header("Accept-Ranges", "bytes")
+            if partial:
+                self.send_header("Content-Range",
+                                 "bytes %d-%d/%d" % (a, b, total))
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "private, max-age=86400")
             self.end_headers()
             self.wfile.write(data)
         elif self.path.startswith("/api/image/") and self.path.endswith(
@@ -10950,12 +11461,23 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 and reveal_in_finder(pth)
             self._send_json({"ok": ok})
             return
-        if self.path == "/api/image/remove":
-            self._send_json(image_remove())
-            return
-        if self.path == "/api/image/install":
-            self._send_json({"started": start_image_install(),
-                             "image": image_status()})
+        if self.path in ("/api/studio/install", "/api/studio/remove",
+                         "/api/image/install", "/api/image/remove"):
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                d = json.loads(self.rfile.read(n)) if n else {}
+            except (ValueError, json.JSONDecodeError):
+                d = {}
+            key = str(d.get("key") or "image")
+            if key not in STUDIOS:
+                self._send_json({"ok": False, "error": "no such studio"})
+                return
+            if self.path.endswith("remove"):
+                self._send_json(studio_remove(key))
+            else:
+                started = start_studio_install(key, str(d.get("tier") or ""))
+                self._send_json({"started": started,
+                                 "studio": studio_status(key)})
             return
         if self.path == "/api/model/download":
             n = int(self.headers.get("Content-Length", 0))
@@ -11084,12 +11606,35 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         export_req = None if images else export_intent(prompt, bool(_prior))
         if export_req and export_req.get("score", 0) < 3:
             export_req = None
-        img_subject = image_intent(prompt) if not images else None
+        # the picture just made, if there was one — its alt text is the
+        # subject, which is what a refinement refines
+        _prev_img = ""
+        for _m in reversed(messages[:-1]):
+            if _m.get("role") == "assistant":
+                _am = re.search(r"!\[([^\]]*)\]\(/api/image/",
+                                str(_m.get("content") or ""))
+                if _am:
+                    _prev_img = _am.group(1)
+                break
+        vid_subject = video_intent(prompt) if not images else None
+        img_subject = (image_intent(prompt)
+                       if not images and not vid_subject else None)
+        # a picture that already exists is a search, not a commission
+        if img_subject and image_wants_fetch(prompt):
+            img_subject = None
+        # and a short follow-up after a picture renders it again
+        if not img_subject and not vid_subject and _prev_img \
+                and not images:
+            _fu = image_followup(prompt, _prev_img)
+            if _fu:
+                img_subject = _fu
         if export_req and img_subject and export_req["score"] < 5 \
                 and export_req["ext"] in ("png", "svg", ""):
             export_req = None            # the painter wins a weak tie
         if export_req:
-            img_subject = None
+            img_subject = vid_subject = None
+            auto_web = False
+        if vid_subject:
             auto_web = False
         if img_subject:
             auto_web = False
@@ -11959,15 +12504,47 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             hb_stop.set()
             return
 
+        if vid_subject:
+            where = "on this Mac" if video_ready() else "in the cloud"
+            step("video", "Making the video", "run", where)
+            status("filming \u00b7 " + where)
+            try:
+                vpath, vsrc = generate_video(vid_subject)
+                vmade = "made on this Mac" if vsrc == "local" \
+                    else "made in the cloud"
+                step("video", "Made the video", "done", vmade)
+                emit("[[vid:%s]]\n\n*%s \u2014 %s*"
+                     % (json.dumps({"id": os.path.basename(vpath),
+                                    "t": vid_subject[:80]},
+                                   separators=(",", ":")),
+                        vid_subject[:1].upper() + vid_subject[1:], vmade))
+            except Exception as exc:
+                step("video", "Couldn\u2019t make the video", "done",
+                     str(exc)[:70])
+                if video_ready():
+                    emit("The video engine on this Mac hit a snag and the "
+                         "cloud couldn\u2019t step in \u2014 try once more in a "
+                         "moment. (%s)" % str(exc)[:160])
+                elif studio_supported():
+                    emit("I can\u2019t make video on this Mac yet. Add video "
+                         "generation under **Settings \u203a Models \u203a "
+                         "Manage models**, then ask again. A cloud key under "
+                         "Cloud power also works.")
+                else:
+                    emit("Video generation runs on this Mac only on Apple "
+                         "Silicon; here it needs a cloud key under "
+                         "**Settings \u203a Cloud power**.")
+            hb_stop.set()
+            return
+
         if img_subject:
-            where = ("FLUX.1 schnell on this Mac" if image_ready()
-                     else "the cloud")
+            where = "on this Mac" if image_ready() else "in the cloud"
             step("image", "Generating the image", "run", where)
             status("painting \u00b7 " + where)
             try:
                 path, src = generate_image(img_subject)
-                made = {"local": "FLUX.1 schnell, on this Mac",
-                        "gemini": "Gemini", "community": "the community cloud"}[src]
+                made = "made on this Mac" if src == "local" \
+                    else "made in the cloud"
                 step("image", "Generated the image", "done", made)
                 emit("![%s](/api/image/%s)\n\n*%s \u2014 %s*"
                      % (img_subject.replace("]", ""), os.path.basename(path),
@@ -11980,14 +12557,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          "couldn\u2019t step in \u2014 try once more in a moment. "
                          "(%s)" % str(exc)[:160])
                 elif image_supported():
-                    emit("I can\u2019t make pictures on this Mac yet. Add image "
-                         "generation under **Settings \u203a Models \u203a Manage "
-                         "models** \u2014 FLUX.1 schnell, about %.1f GB, runs "
-                         "entirely on this Mac \u2014 and ask again. A Gemini key "
+                    emit("I can\u2019t make pictures on this Mac yet. Add "
+                         "image generation under **Settings \u203a Models \u203a "
+                         "Manage models** \u2014 about %.0f GB, and it runs "
+                         "entirely here \u2014 then ask again. A cloud key "
                          "under Cloud power also works." % IMAGE_GB)
                 else:
-                    emit("Image generation runs locally on Apple Silicon Macs; "
-                         "on this machine it needs a Gemini key under "
+                    emit("Image generation runs on this Mac only on Apple "
+                         "Silicon; here it needs a cloud key under "
                          "**Settings \u203a Cloud power**.")
             hb_stop.set()
             return
@@ -13331,6 +13908,7 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
    the right; the answer is flat serif prose on the backdrop */
 .msg.user{display:flex;flex-direction:column;align-items:flex-end}
 .msg.user .who{display:none}
+.msg.ai .who{display:none}
 /* 6b241, per Patrick: the question reads in the SAME face as the box it
    was typed into. It was inheriting Helvetica Neue at 23.9 leading
    against the composer's Space Grotesk at 21.75 — same size, different
@@ -14354,6 +14932,64 @@ body.gen #chip-model{color:var(--accent)}
 .genimg{display:block;max-width:min(100%,640px);border-radius:12px;
   margin:6px 0 10px;box-shadow:0 12px 40px -18px rgba(0,0,0,.8)}
 /* the extra under the presets (6b294): image generation */
+/* THE SIZE LADDER (6b299). Notches, not a native range: each one owns
+   its colour, and red refuses the click rather than pretending. */
+#studio-row{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.studio{cursor:default}
+.studio .sthead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.studio .sthead em{font-style:italic;font-size:10.5px;color:var(--faint);
+  font-family:-apple-system,'Helvetica Neue',sans-serif}
+.studio.on .sthead em{color:var(--dim)}
+.studio .stdesc{display:block;font-size:10.5px;color:var(--faint);
+  line-height:1.4;margin-top:2px}
+.studio .stslider{margin-top:9px}
+.studio .sttrack{display:flex;align-items:stretch;gap:0;
+  border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.studio .stnotch{flex:1;min-width:0;background:none;border:none;
+  border-right:1px solid var(--line);cursor:pointer;padding:7px 4px 6px;
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--faint);
+  transition:background .15s,color .15s}
+.studio .stnotch:last-child{border-right:none}
+.studio .stnotch i{width:100%;height:4px;border-radius:99px;
+  background:var(--line)}
+.studio .stnotch.green i{background:#4fae6a}
+.studio .stnotch.amber i{background:#d9a95a}
+.studio .stnotch.red i{background:#c9584c}
+.studio .stnotch:not(.off):hover{background:rgba(255,255,255,.04);
+  color:var(--dim)}
+.studio .stnotch.sel{background:rgba(255,255,255,.07);color:var(--text)}
+.studio .stnotch.off{cursor:not-allowed;opacity:.45}
+.studio .sttier{margin-top:7px;font-size:10.5px;color:var(--dim);
+  line-height:1.45}
+.studio .sttier i{font-style:italic;color:var(--faint)}
+.studio .sttier u{text-decoration:none;color:#c9584c}
+.studio .stlegend{margin-top:7px;display:flex;flex-direction:column;gap:2px}
+.studio .stlegend .lg{font-size:9.5px;color:var(--faint);
+  padding-left:11px;position:relative;line-height:1.45}
+.studio .stlegend .lg::before{content:"";position:absolute;left:0;top:5px;
+  width:6px;height:6px;border-radius:50%}
+.studio .stlegend .green::before{background:#4fae6a}
+.studio .stlegend .amber::before{background:#d9a95a}
+.studio .stlegend .red::before{background:#c9584c}
+.studio .stprog{margin-top:9px}
+.studio .stbar{height:3px;border-radius:99px;overflow:hidden;
+  background:rgba(255,255,255,.08)}
+.studio .stbar i{display:block;height:100%;background:#ecedf2;
+  transition:width .6s cubic-bezier(.4,0,.2,1)}
+.studio .stnums{display:flex;justify-content:space-between;margin-top:5px;
+  font-family:var(--mono);font-size:9.5px;color:var(--faint)}
+.studio .stacts{display:flex;gap:7px;margin-top:9px}
+.studio .stacts button[hidden]{display:none}
+.studio .ghost.slim{background:none;border:1px solid var(--line);
+  color:var(--faint)}
+.studio .ghost.slim:hover{color:var(--text);border-color:var(--dim)}
+.studio .about-btn.slim[disabled]{opacity:.4;cursor:not-allowed}
+.genvid{display:block;max-width:min(100%,640px);border-radius:12px;
+  margin:6px 0 10px;background:#000;
+  box-shadow:0 12px 40px -18px rgba(0,0,0,.8)}
+@media (max-width:520px){.studio .stnotch span{font-size:8px}}
 #img-box{margin-top:8px;cursor:default}
 #img-box[hidden]{display:none}
 #img-box .imghead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
@@ -15504,18 +16140,10 @@ __CODE_ROWS__
         <div id="plan-row"></div>
         <!-- 6b294, per Patrick: image generation is an extra under the
              presets, not a preset — a smaller box, one button -->
-        <!-- 6b297, per Patrick: no paragraph. Installed is one italic
-             line and a way to take it back off. -->
-        <div id="img-box" class="plan-card" hidden>
-          <div class="imghead"><b>Image generation</b>
-            <em id="img-state"></em></div>
-          <span class="imgdesc" id="img-desc">pictures from a description,
-            made on this Mac</span>
-          <div class="imgacts">
-            <button class="about-btn slim" id="img-add">Add · 9.6 GB</button>
-            <button class="ghost slim" id="img-rm">Remove</button>
-          </div>
-        </div>
+        <!-- 6b297/6b299, per Patrick: no paragraph. Installed is one
+             italic line and a way to take it back off; adding offers a
+             ladder of sizes, colour-coded against this Mac's memory. -->
+        <div id="studio-row"></div>
         <div id="autoclean-note"></div>
         <div id="autoclean-bar">
           <label id="autoclean-row"><input type="checkbox" id="autoclean">
@@ -15623,7 +16251,10 @@ __CODE_ROWS__
         is installed</label>
       <label id="wiz-image"><input type="checkbox" id="wiz-img">
         Also add image generation &mdash; make pictures from a description,
-        entirely on this Mac (FLUX.1 schnell, 9.6 GB)</label>
+        entirely on this Mac (9.6 GB)</label>
+      <label id="wiz-video"><input type="checkbox" id="wiz-vid">
+        Also add video generation &mdash; short video from a description,
+        entirely on this Mac (19.6 GB)</label>
       <label id="wiz-nolimits"><input type="checkbox" id="wiz-nl">
         Ignore system limits &mdash; offer every model in each list even
         beyond this machine&rsquo;s memory. May swap hard or crash;
@@ -16538,7 +17169,7 @@ function showApprove(host,d){
    the attachment disposition does the work. */
 // what belongs in the answer but not in a clipboard or a spoken line
 function stripTokens(t){
-  return String(t||"").replace(/\n*\[\[dl:\{.*?\}\]\]/g,"")
+  return String(t||"").replace(/\n*\[\[(?:dl|vid):\{.*?\}\]\]/g,"")
                       .replace(/!\[[^\]]*\]\(\/api\/image\/[^)]*\)/g,"")
                       .trim();
 }
@@ -16591,6 +17222,12 @@ function renderMD(raw){
     catch(e){dls.push(null);}
     return "\u0000DL"+(dls.length-1)+"\u0000";});
   s=s.replace(/\[\[dl:[^\]]{0,400}\]?$/,"");   // a half-arrived token
+  const vds=[];
+  s=s.replace(/\[\[vid:(\{.*?\})\]\]/g,(_,j)=>{
+    try{vds.push(JSON.parse(j.replace(/&quot;/g,'"').replace(/&amp;/g,"&")));}
+    catch(e){vds.push(null);}
+    return "\u0000VD"+(vds.length-1)+"\u0000";});
+  s=s.replace(/\[\[vid:[^\]]{0,400}\]?$/,"");
   // fenced code — ```flow becomes a real diagram, everything else a
   // language-labeled card with the mini-highlighter (6.0b206)
   // the third group is the CLOSING fence — or $ while the block is
@@ -16678,6 +17315,10 @@ function renderMD(raw){
   }).join("");
   // restore think blocks
   s=s.replace(/\u0000DL(\d+)\u0000/g,(_,i)=>dlBox(dls[+i]));
+  s=s.replace(/\u0000VD(\d+)\u0000/g,(_,i)=>{
+    const v=vds[+i];
+    return v&&v.id?'<video class="genvid" controls playsinline preload="metadata"'
+      +' src="/api/video/'+encodeURIComponent(v.id)+'"></video>':"";});
   s=s.replace(/\u0000THINKOPEN(\d+)\u0000/g,(_,i)=>
     '<details open><summary>◈ reasoning…</summary><div class="think-body">'+esc(thinks[+i]).replace(/\n/g,"<br>")+"</div></details>");
   s=s.replace(/\u0000THINK(\d+)\u0000/g,(_,i)=>
@@ -19862,8 +20503,11 @@ async function wizPaintPlans(){
   let st={};
   try{st=await(await fetch("/api/setup")).json();}catch(e){return;}
   const rem=st.plans||{};
+  const ss=st.studios||{};
   const wi=$("#wiz-image");
-  if(wi)wi.hidden=!(st.image&&st.image.supported&&!st.image.ready);
+  if(wi)wi.hidden=!(ss.image&&ss.image.supported&&!ss.image.ready);
+  const wv=$("#wiz-video");
+  if(wv)wv.hidden=!(ss.video&&ss.video.supported&&!ss.video.ready);
   const meta=[["basic","Basic","Quick answers, tiny download"],
               ["pro","Pro","Great everyday quality"],
               ["max","Max","The best this machine can run"]];
@@ -19947,8 +20591,11 @@ async function wizFinish(){
   await fetch("/api/setup/install",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({plan:wizPlan})});
-  if($("#wiz-img")&&$("#wiz-img").checked)
-    fetch("/api/image/install",{method:"POST"});
+  for(const [el,k] of [["#wiz-img","image"],["#wiz-vid","video"]])
+    if($(el)&&$(el).checked)
+      fetch("/api/studio/install",{method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({key:k})});
   wizVeil.hidden=true;
   openSetup();setupManual=false;   // the familiar progress bar takes over
 }
@@ -20395,58 +21042,102 @@ function paintPlans(){
       +'</span></div>';
   }).join("");
 }
-function paintImageBox(){
-  const b=$("#img-box");if(!b||!lastSetup)return;
-  const im=lastSetup.image||{};
-  b.hidden=!im.supported;
-  const st=$("#img-state"),add=$("#img-add"),rm=$("#img-rm"),
-        desc=$("#img-desc");
-  const busy=im.status==="downloading"||im.status==="queued";
-  b.classList.toggle("on",!!im.ready);
-  // installed says so in one line and offers the way out; only the
-  // uninstalled state needs to explain what the thing is
-  desc.hidden=!!im.ready||busy;
-  add.hidden=!!im.ready||busy;
-  rm.hidden=!im.ready;
-  rm.dataset.sure="";
-  rm.textContent="Remove";
-  if(im.ready){
-    st.textContent="installed \u2713"+(im.on_disk_gb?" \u00b7 "+im.on_disk_gb+" GB":"");
-  }else if(busy){
-    st.textContent=(im.note||"downloading")+" \u00b7 "+im.pct+"%";
-  }else if(im.status==="error"){
-    st.textContent="failed \u2014 "+(im.note||"try again");
-    add.textContent="Retry \u00b7 "+im.gb+" GB";
-  }else{
-    st.textContent="";
-    add.textContent="Add \u00b7 "+im.gb+" GB";
+// THE SIZE LADDER (6b299, per Patrick: "a slider from small to most
+// accurate … green … yellow … red … notches one for each model"). Built
+// by hand rather than as <input type=range> so each notch can carry its
+// own colour and a rung this Mac cannot hold can refuse the click.
+const STUDIO_META={image:{title:"Image generation",
+    desc:"make pictures from a description, on this Mac"},
+  video:{title:"Video generation",
+    desc:"make short video from a description, on this Mac"}};
+const stPick={};              // key -> tier id the user is looking at
+function studioHTML(key,st){
+  const meta=STUDIO_META[key]||{},tiers=st.tiers||[];
+  const busy=st.status==="downloading"||st.status==="queued";
+  const sel=stPick[key]||st.tier||(tiers[0]||{}).id;
+  const cur=tiers.find(t=>t.id===sel)||tiers[0]||{};
+  let h='<div class="studio plan-card'+(st.ready?" on":"")+'" data-k="'+key+'">'
+    +'<div class="sthead"><b>'+esc(meta.title)+'</b><em>'
+    +(st.ready?("installed \u2713"+(st.on_disk_gb?" \u00b7 "+st.on_disk_gb+" GB":""))
+      :busy?esc((st.note||"downloading"))+" \u00b7 "+st.pct+"%"
+      :st.status==="error"?("failed \u2014 "+esc(st.note||"try again")):"")
+    +'</em></div>';
+  if(!st.ready&&!busy){
+    h+='<span class="stdesc">'+esc(meta.desc)+'</span>'
+      +'<div class="stslider"><div class="sttrack">'
+      +tiers.map((t,i)=>'<button class="stnotch '+t.fit
+        +(t.id===sel?" sel":"")+(t.fit==="red"?" off":"")
+        +'" data-t="'+t.id+'" title="'+esc(t.name+" \u00b7 "+t.gb+" GB")
+        +'"><i></i><span>'+esc(t.name)+'</span></button>').join("")
+      +'</div>'
+      +'<div class="sttier"><b>'+esc(cur.name||"")+'</b> \u00b7 '
+      +(cur.gb||0)+' GB to download \u00b7 <i>'+esc(cur.note||"")+'</i>'
+      +(cur.fit==="red"?' <u>needs more memory than this Mac has</u>':"")
+      +'</div>'
+      +'<div class="stlegend">'
+      +'<span class="lg green">green \u2014 runs comfortably here</span>'
+      +'<span class="lg amber">amber \u2014 fits, if the Mac is otherwise clear</span>'
+      +'<span class="lg red">red \u2014 more memory than this Mac has</span>'
+      +'</div></div>';
   }
+  if(busy){
+    const sp=(lastSetup&&lastSetup.speed_mbs)||0,
+          et=(lastSetup&&lastSetup.eta_min)||0;
+    h+='<div class="stprog"><div class="stbar"><i style="width:'+st.pct+'%"></i></div>'
+      +'<div class="stnums"><span>'+st.pct+'%</span><span>'
+      +(sp?sp+" MB/s":"starting\u2026")+(et?" \u00b7 about "+et+" min left":"")
+      +'</span></div></div>';
+  }
+  h+='<div class="stacts">';
+  if(st.ready) h+='<button class="ghost slim strm">Remove</button>';
+  else if(busy) h+='<button class="ghost slim stbg">Continue in background</button>';
+  else h+='<button class="about-btn slim stadd"'
+    +(cur.fit==="red"?" disabled":"")+'>'
+    +(st.status==="error"?"Retry":"Add")+' \u00b7 '+(cur.gb||0)+' GB</button>';
+  return h+'</div></div>';
 }
-$("#img-rm").addEventListener("click",async()=>{
-  const r=$("#img-rm");
-  if(r.dataset.sure!=="1"){        // the inline two-step, as everywhere else
-    r.dataset.sure="1";
-    const gb=((lastSetup&&lastSetup.image)||{}).on_disk_gb||0;
-    r.textContent="really remove?"+(gb?" frees "+gb+" GB":"");
-    return;
+function paintStudios(){
+  const row=$("#studio-row");if(!row||!lastSetup)return;
+  const ss=lastSetup.studios||{};
+  const keys=Object.keys(STUDIO_META).filter(k=>ss[k]&&ss[k].supported);
+  row.innerHTML=keys.map(k=>studioHTML(k,ss[k])).join("");
+}
+$("#studio-row").addEventListener("click",async e=>{
+  const box=e.target.closest(".studio");if(!box)return;
+  const key=box.dataset.k;
+  const notch=e.target.closest(".stnotch");
+  if(notch){
+    if(notch.classList.contains("off"))return;   // red refuses the click
+    stPick[key]=notch.dataset.t;paintStudios();return;
   }
-  r.disabled=true;r.textContent="removing\u2026";
-  let out={};
-  try{out=await(await fetch("/api/image/remove",{method:"POST"})).json();}
-  catch(e){}
-  r.disabled=false;
-  $("#manage-note").textContent=out.ok
-    ?"image generation removed \u2014 freed "+out.freed_gb+" GB"
-    :"couldn\u2019t remove it \u2014 "+((out.errors||[])[0]||"try again");
-  lastSetup=null;await ensureSetup();
-  paintPlans();paintMgStats();paintCleanNote();paintImageBox();
-});
-$("#img-add").addEventListener("click",async()=>{
-  $("#img-add").disabled=true;
-  try{await fetch("/api/image/install",{method:"POST"});}catch(e){}
-  $("#img-add").disabled=false;
-  $("#manage-note").textContent="image generation \u2014 starting\u2026";
-  manageTick();
+  if(e.target.closest(".stadd")){
+    const b=e.target.closest(".stadd");b.disabled=true;
+    try{await fetch("/api/studio/install",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({key:key,tier:stPick[key]||""})});}catch(e2){}
+    $("#manage-note").textContent=STUDIO_META[key].title+" \u2014 starting\u2026";
+    manageTick();return;
+  }
+  if(e.target.closest(".stbg")){ aboutVeil.hidden=true; return; }
+  if(e.target.closest(".strm")){
+    const r=e.target.closest(".strm");
+    if(r.dataset.sure!=="1"){
+      r.dataset.sure="1";
+      const gb=((lastSetup.studios||{})[key]||{}).on_disk_gb||0;
+      r.textContent="really remove?"+(gb?" frees "+gb+" GB":"");
+      return;
+    }
+    r.disabled=true;r.textContent="removing\u2026";
+    let out={};
+    try{out=await(await fetch("/api/studio/remove",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({key:key})})).json();}catch(e2){}
+    $("#manage-note").textContent=out.ok
+      ?STUDIO_META[key].title+" removed \u2014 freed "+out.freed_gb+" GB"
+      :"couldn\u2019t remove it \u2014 "+((out.errors||[])[0]||"try again");
+    lastSetup=null;await ensureSetup();
+    paintPlans();paintMgStats();paintCleanNote();paintStudios();
+  }
 });
 // LIVE WHILE IT RUNS (6b290): the pane used to say "watch the strip in
 // the sidebar" and go quiet. Now it re-reads the disk every two seconds
@@ -20457,7 +21148,7 @@ function manageTick(){
   mgTimer=setTimeout(async()=>{
     if($("#manage-box").hidden)return;
     try{lastSetup=await(await fetch("/api/setup")).json();}catch(e){return;}
-    paintPlans();paintMgStats();paintCleanNote();paintImageBox();
+    paintPlans();paintMgStats();paintCleanNote();paintStudios();
     const st=lastSetup;
     if(st.busy){
       $("#manage-note").textContent="downloading \u2014 "+st.have_gb+" of "
@@ -20492,7 +21183,7 @@ $("#roster-manage").addEventListener("click",async()=>{
   if(manageOn){
     $("#plan-row").innerHTML='<div class="plan-card">reading disk…</div>';
     await ensureSetup();
-    paintPlans();paintMgStats();paintCleanNote();paintImageBox();
+    paintPlans();paintMgStats();paintCleanNote();paintStudios();
     if(lastSetup&&lastSetup.busy)manageTick();   // a batch is already running
   }
 });
