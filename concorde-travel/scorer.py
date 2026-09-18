@@ -238,6 +238,13 @@ class Ledger:
 
 # --------------------------------------------------------------- the terms
 
+def _ground_pref(scenario: Dict[str, Any]) -> Optional[str]:
+    """"Rideshare, yes or no" off the form. None means let the arithmetic
+    decide, which is the default and usually the better answer."""
+    p = (scenario["query"].get("preferences") or {}).get("ground_mode")
+    return p if p in ("rideshare", "transit") else None
+
+
 def _party_checked_bags(scenario: Dict[str, Any]) -> List[int]:
     return [sum(1 for b in p["bags"] if b["kind"] == "checked")
             for p in scenario["query"]["party"]]
@@ -287,30 +294,49 @@ def _bag_cost(option, scenario, tuning) -> Tuple[int, List[str]]:
     return total, notes
 
 
-def _pick_ground(modes: Sequence[Dict[str, Any]], hourly: int):
+def _pick_ground(modes: Sequence[Dict[str, Any]], hourly: int,
+                 prefer: Optional[str] = None):
     """Cheapest by the traveller's own arithmetic, not by fare. A $3.00
     three-transfer route and an $11.75 one-transfer route are different
     products at the same duration, and which one wins is the judgment this
-    whole product exists to make."""
+    whole product exists to make.
+
+    `prefer` is a mode CLASS the traveller asked for. It narrows the field
+    rather than overriding it: if nothing of that class can be flown at this
+    hour the honest answer is the feasible mode plus a note saying the
+    preference could not be met, never a silent substitution."""
     feasible = [m for m in modes if m["feasible"]]
     if not feasible:
         why = next((m.get("infeasible_reason") for m in modes
                     if m.get("infeasible_reason")), "no feasible mode")
         return None, why
+
     def cost(m):
         fare = m["fare_cents"] + (m.get("tolls_cents") or {}).get("outbound", 0)
         return fare + m["door_to_door_minutes"]["p50"] * hourly // 60
-    return min(feasible, key=lambda m: (cost(m), m["mode_id"])), None
+
+    unmet = None
+    if prefer:
+        wanted = [m for m in feasible if m.get("mode_kind") == prefer]
+        if wanted:
+            feasible = wanted
+        else:
+            blocked = [m for m in modes
+                       if m.get("mode_kind") == prefer and not m["feasible"]]
+            unmet = (blocked[0].get("infeasible_reason") if blocked
+                     else "no %s option on this leg" % prefer)
+    return min(feasible, key=lambda m: (cost(m), m["mode_id"])), unmet
 
 
-def chosen_ground(option: Dict[str, Any], prof: Dict[str, Any], which: str = "outbound"):
+def chosen_ground(option: Dict[str, Any], prof: Dict[str, Any], which: str = "outbound",
+                  prefer: Optional[str] = None):
     """The mode the ledger charged for. The bar reads this too - if the two
     picked independently they would eventually disagree, and the page would be
     lying in one of two places."""
     modes = option["ground"].get(which) or []
     if not modes:
         return None, None
-    return _pick_ground(modes, prof["hourly_value_cents"])
+    return _pick_ground(modes, prof["hourly_value_cents"], prefer)
 
 
 @dataclass(frozen=True)
@@ -340,7 +366,7 @@ def timeline(scenario: Dict[str, Any], option: Dict[str, Any],
     segs = {s["segment_id"]: s for s in option["segments"]}
     legs: List[Leg] = []
 
-    out, _ = chosen_ground(option, prof, "outbound")
+    out, _ = chosen_ground(option, prof, "outbound", _ground_pref(scenario))
     if out:
         m = out["door_to_door_minutes"]["p50"]
         ap = option["segments"][0]["origin"]["iata"]
@@ -383,7 +409,7 @@ def timeline(scenario: Dict[str, Any], option: Dict[str, Any],
                             "Layover \u00b7 %s \u00b7 %s \u00b7 lands %02d:%02d"
                             % (lay["airport"], _hm(m), clock // 60, clock % 60)))
 
-    inb, _ = chosen_ground(option, prof, "arrival")
+    inb, _ = chosen_ground(option, prof, "arrival", _ground_pref(scenario))
     if inb:
         m = inb["door_to_door_minutes"]["p50"]
         dest = scenario["query"]["destination"]["label"].split(",")[0]
@@ -779,13 +805,16 @@ def score(scenario: Dict[str, Any], option: Dict[str, Any],
 
     # --- ground, both ends ----------------------------------------------
     ground_minutes = 0
-    out_mode, why = _pick_ground(option["ground"]["outbound"], hourly)
+    pref = _ground_pref(scenario)
+    out_mode, unmet = _pick_ground(option["ground"]["outbound"], hourly, pref)
     if out_mode is None:
         return Ledger(option["option_id"], tuple(lines), 0, 0, profile_name,
-                      infeasible_reason=why)
+                      infeasible_reason=unmet)
     dep_clock = local_minutes(option["segments"][0]["departure_local"])
     rejected = [m for m in option["ground"]["outbound"] if not m["feasible"]]
     ev = "%s - %s" % (out_mode["mode"], _hm(out_mode["door_to_door_minutes"]["p50"]))
+    if unmet:
+        ev += ". You asked for %s: %s" % (pref, unmet)
     if rejected:
         r = rejected[0]
         ev += ". %s" % (r.get("infeasible_reason") or "another mode was not feasible")
@@ -800,7 +829,7 @@ def score(scenario: Dict[str, Any], option: Dict[str, Any],
 
     in_modes = option["ground"].get("arrival") or []
     if in_modes:
-        in_mode, _ = _pick_ground(in_modes, hourly)
+        in_mode, _ = _pick_ground(in_modes, hourly, pref)
         if in_mode:
             lines.append(Line(
                 code="ground_in",

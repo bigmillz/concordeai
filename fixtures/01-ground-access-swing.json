@@ -227,6 +227,7 @@
           {
             "mode_id": "ewr-njt-rail",
             "mode": "Subway to Penn Station, NJ Transit, AirTrain Newark",
+            "mode_kind": "transit",
             "fare_cents": 2025,
             "fare_components": [
               {
@@ -273,6 +274,7 @@
           {
             "mode_id": "ewr-rideshare",
             "mode": "Rideshare",
+            "mode_kind": "rideshare",
             "fare_cents": 9200,
             "fare_components": [
               {
@@ -301,6 +303,7 @@
           {
             "mode_id": "lhr-elizabeth",
             "mode": "Elizabeth line to Liverpool Street",
+            "mode_kind": "transit",
             "fare_cents": 1700,
             "door_to_door_minutes": {
               "p50": 44,
@@ -316,6 +319,20 @@
                 "day": 8
               }
             }
+          },
+          {
+            "mode_id": "lhr-cab",
+            "mode": "Black cab",
+            "mode_kind": "rideshare",
+            "fare_cents": 9200,
+            "door_to_door_minutes": {
+              "p50": 52,
+              "p90": 95
+            },
+            "transfers": 0,
+            "feasible": true,
+            "infeasible_reason": null,
+            "source": "Slower than the Elizabeth line at almost any hour, and five times the price."
           }
         ]
       },
@@ -472,6 +489,7 @@
           {
             "mode_id": "jfk-lefferts-free-airtrain",
             "mode": "Subway, Q10 bus, then AirTrain from Lefferts Blvd",
+            "mode_kind": "transit",
             "fare_cents": 300,
             "fare_components": [
               {
@@ -501,6 +519,7 @@
           {
             "mode_id": "jfk-airtrain-howard-beach",
             "mode": "Subway then AirTrain at Howard Beach",
+            "mode_kind": "transit",
             "fare_cents": 1175,
             "fare_components": [
               {
@@ -535,6 +554,7 @@
           {
             "mode_id": "jfk-rideshare",
             "mode": "Rideshare",
+            "mode_kind": "rideshare",
             "fare_cents": 6200,
             "door_to_door_minutes": {
               "p50": 37,
@@ -554,6 +574,7 @@
           {
             "mode_id": "lhr-elizabeth",
             "mode": "Elizabeth line to Liverpool Street",
+            "mode_kind": "transit",
             "fare_cents": 1700,
             "door_to_door_minutes": {
               "p50": 44,
@@ -569,6 +590,20 @@
                 "day": 8
               }
             }
+          },
+          {
+            "mode_id": "lhr-cab",
+            "mode": "Black cab",
+            "mode_kind": "rideshare",
+            "fare_cents": 9200,
+            "door_to_door_minutes": {
+              "p50": 52,
+              "p90": 95
+            },
+            "transfers": 0,
+            "feasible": true,
+            "infeasible_reason": null,
+            "source": "Slower than the Elizabeth line at almost any hour, and five times the price."
           }
         ]
       },
@@ -724,6 +759,7 @@
           {
             "mode_id": "ewr-njt-rail-evening",
             "mode": "Subway to Penn, NJ Transit, AirTrain Newark",
+            "mode_kind": "transit",
             "fare_cents": 2025,
             "fare_components": [
               {
@@ -758,6 +794,7 @@
           {
             "mode_id": "ewr-rideshare-evening",
             "mode": "Rideshare",
+            "mode_kind": "rideshare",
             "fare_cents": 6200,
             "door_to_door_minutes": {
               "p50": 52,
@@ -776,6 +813,7 @@
           {
             "mode_id": "lhr-elizabeth",
             "mode": "Elizabeth line to Liverpool Street",
+            "mode_kind": "transit",
             "fare_cents": 1700,
             "door_to_door_minutes": {
               "p50": 44,
@@ -791,6 +829,20 @@
                 "day": 8
               }
             }
+          },
+          {
+            "mode_id": "lhr-cab",
+            "mode": "Black cab",
+            "mode_kind": "rideshare",
+            "fare_cents": 9200,
+            "door_to_door_minutes": {
+              "p50": 52,
+              "p90": 95
+            },
+            "transfers": 0,
+            "feasible": true,
+            "infeasible_reason": null,
+            "source": "Slower than the Elizabeth line at almost any hour, and five times the price."
           }
         ]
       },

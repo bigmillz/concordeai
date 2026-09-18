@@ -214,6 +214,7 @@
           {
             "mode_id": "jfk-airtrain-howard-beach",
             "mode": "Subway then AirTrain at Howard Beach",
+            "mode_kind": "transit",
             "fare_cents": 1175,
             "door_to_door_minutes": {
               "p50": 78,
@@ -222,12 +223,31 @@
             "transfers": 1,
             "feasible": true,
             "infeasible_reason": null
+          },
+          {
+            "mode_id": "jfk-rideshare",
+            "mode": "Rideshare",
+            "mode_kind": "rideshare",
+            "fare_cents": 6200,
+            "door_to_door_minutes": {
+              "p50": 37,
+              "p90": 62
+            },
+            "transfers": 0,
+            "tolls_cents": {
+              "outbound": 0,
+              "inbound": 0
+            },
+            "feasible": true,
+            "infeasible_reason": null,
+            "source": "Published route average, Bushwick to JFK."
           }
         ],
         "arrival": [
           {
             "mode_id": "mad-metro",
             "mode": "Metro line 8 to Nuevos Ministerios",
+            "mode_kind": "transit",
             "fare_cents": 500,
             "door_to_door_minutes": {
               "p50": 42,
@@ -236,6 +256,20 @@
             "transfers": 1,
             "feasible": true,
             "infeasible_reason": null
+          },
+          {
+            "mode_id": "mad-rideshare",
+            "mode": "Rideshare",
+            "mode_kind": "rideshare",
+            "fare_cents": 3800,
+            "door_to_door_minutes": {
+              "p50": 28,
+              "p90": 45
+            },
+            "transfers": 0,
+            "feasible": true,
+            "infeasible_reason": null,
+            "source": "Fixed-rate airport fare into central Madrid."
           }
         ]
       },
@@ -387,6 +421,7 @@
           {
             "mode_id": "jfk-airtrain-howard-beach",
             "mode": "Subway then AirTrain at Howard Beach",
+            "mode_kind": "transit",
             "fare_cents": 1175,
             "door_to_door_minutes": {
               "p50": 78,
@@ -395,12 +430,31 @@
             "transfers": 1,
             "feasible": true,
             "infeasible_reason": null
+          },
+          {
+            "mode_id": "jfk-rideshare",
+            "mode": "Rideshare",
+            "mode_kind": "rideshare",
+            "fare_cents": 6200,
+            "door_to_door_minutes": {
+              "p50": 37,
+              "p90": 62
+            },
+            "transfers": 0,
+            "tolls_cents": {
+              "outbound": 0,
+              "inbound": 0
+            },
+            "feasible": true,
+            "infeasible_reason": null,
+            "source": "Published route average, Bushwick to JFK."
           }
         ],
         "arrival": [
           {
             "mode_id": "mad-metro",
             "mode": "Metro line 8 to Nuevos Ministerios",
+            "mode_kind": "transit",
             "fare_cents": 500,
             "door_to_door_minutes": {
               "p50": 42,
@@ -409,6 +463,20 @@
             "transfers": 1,
             "feasible": true,
             "infeasible_reason": null
+          },
+          {
+            "mode_id": "mad-rideshare",
+            "mode": "Rideshare",
+            "mode_kind": "rideshare",
+            "fare_cents": 3800,
+            "door_to_door_minutes": {
+              "p50": 28,
+              "p90": 45
+            },
+            "transfers": 0,
+            "feasible": true,
+            "infeasible_reason": null,
+            "source": "Fixed-rate airport fare into central Madrid."
           }
         ]
       },
@@ -627,6 +695,7 @@
           {
             "mode_id": "jfk-airtrain-howard-beach",
             "mode": "Subway then AirTrain at Howard Beach",
+            "mode_kind": "transit",
             "fare_cents": 1175,
             "door_to_door_minutes": {
               "p50": 78,
@@ -635,12 +704,31 @@
             "transfers": 1,
             "feasible": true,
             "infeasible_reason": null
+          },
+          {
+            "mode_id": "jfk-rideshare",
+            "mode": "Rideshare",
+            "mode_kind": "rideshare",
+            "fare_cents": 6200,
+            "door_to_door_minutes": {
+              "p50": 37,
+              "p90": 62
+            },
+            "transfers": 0,
+            "tolls_cents": {
+              "outbound": 0,
+              "inbound": 0
+            },
+            "feasible": true,
+            "infeasible_reason": null,
+            "source": "Published route average, Bushwick to JFK."
           }
         ],
         "arrival": [
           {
             "mode_id": "mad-metro",
             "mode": "Metro line 8 to Nuevos Ministerios",
+            "mode_kind": "transit",
             "fare_cents": 500,
             "door_to_door_minutes": {
               "p50": 42,
@@ -649,6 +737,20 @@
             "transfers": 1,
             "feasible": true,
             "infeasible_reason": null
+          },
+          {
+            "mode_id": "mad-rideshare",
+            "mode": "Rideshare",
+            "mode_kind": "rideshare",
+            "fare_cents": 3800,
+            "door_to_door_minutes": {
+              "p50": 28,
+              "p90": 45
+            },
+            "transfers": 0,
+            "feasible": true,
+            "infeasible_reason": null,
+            "source": "Fixed-rate airport fare into central Madrid."
           }
         ]
       },
@@ -909,6 +1011,7 @@
           {
             "mode_id": "jfk-airtrain-howard-beach",
             "mode": "Subway then AirTrain at Howard Beach",
+            "mode_kind": "transit",
             "fare_cents": 1175,
             "door_to_door_minutes": {
               "p50": 78,
@@ -917,12 +1020,31 @@
             "transfers": 1,
             "feasible": true,
             "infeasible_reason": null
+          },
+          {
+            "mode_id": "jfk-rideshare",
+            "mode": "Rideshare",
+            "mode_kind": "rideshare",
+            "fare_cents": 6200,
+            "door_to_door_minutes": {
+              "p50": 37,
+              "p90": 62
+            },
+            "transfers": 0,
+            "tolls_cents": {
+              "outbound": 0,
+              "inbound": 0
+            },
+            "feasible": true,
+            "infeasible_reason": null,
+            "source": "Published route average, Bushwick to JFK."
           }
         ],
         "arrival": [
           {
             "mode_id": "mad-metro",
             "mode": "Metro line 8 to Nuevos Ministerios",
+            "mode_kind": "transit",
             "fare_cents": 500,
             "door_to_door_minutes": {
               "p50": 42,
@@ -931,6 +1053,20 @@
             "transfers": 1,
             "feasible": true,
             "infeasible_reason": null
+          },
+          {
+            "mode_id": "mad-rideshare",
+            "mode": "Rideshare",
+            "mode_kind": "rideshare",
+            "fare_cents": 3800,
+            "door_to_door_minutes": {
+              "p50": 28,
+              "p90": 45
+            },
+            "transfers": 0,
+            "feasible": true,
+            "infeasible_reason": null,
+            "source": "Fixed-rate airport fare into central Madrid."
           }
         ]
       },

@@ -746,3 +746,46 @@ ones. Hovering a segment now highlights it, dims its neighbours and shows one sh
 `Flight · BA 178 · 7h30m`, `Layover · CDG · 6h35m · lands 01:40`. Flight blocks are blue;
 the green-to-red ramp is reserved for the parts of a trip that cost you time. The tooltip
 text comes from `Leg.tip` in the scorer, so it cannot drift from the bar it describes.
+
+
+---
+
+# Rideshare, and the Guide me wizard
+
+## Rideshare, yes or no
+
+A three-way beside the budget numbers: **Yes** prices a car both ends, **No** prices public
+transport, **Either** lets the arithmetic pick (the default, and usually the better answer).
+
+Ground modes now carry `mode_kind` — `transit | rideshare | drive | walk` — because
+deciding this by pattern-matching the prose in `mode` would be the same mistake as reading
+"closes by 23:30" as a service window. "Subway to Penn, NJ Transit, AirTrain Newark" is
+transit, and nothing should have to parse that string to know it.
+
+The preference **narrows** the choice, it does not override it. Ask for public transport on
+the 06:10 Newark departure and you still get the car, with the ledger saying why: *"You
+asked for transit: NJ Transit's Newark Liberty Airport rail stop is served roughly
+05:00–01:00."* A silent substitution would be the worst of both.
+
+Time follows automatically, because the rideshare mode carries its own door-to-door
+figure. On the JFK option: **+$134 in fares, −47 minutes door to door, +$107 effective.**
+That trade is the whole point of asking.
+
+Rideshare options were added to every scenario that lacked one, so the control is never
+inert. Two tests guard it — that the preference is honoured where it can be, and that the
+ledger says so where it cannot.
+
+## Guide me
+
+Six steps, one question each, big answers: where you are headed, how many bags, what an
+hour of your time is worth today, how you are getting to the airport, what matters on
+board, and what would ruin the trip. A single-answer step advances on click; multi-answer
+steps wait for Next. "Skip the questions" is always available.
+
+**It is not a second search.** The last step writes every answer into the same `STATE` and
+the same form controls the manual path uses, switches to the Round trip tab so the user can
+*see* what was filled in on their behalf, and hands over to the same `render()`. A wizard
+that scored in secret would be a second product — and the first thing that would drift.
+
+The route cards are built from the corpus: `Bushwick → London · EWR/JFK → LHR · 3 options`.
+A step whose options are empty is dropped rather than shown blank.

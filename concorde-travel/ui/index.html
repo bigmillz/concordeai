@@ -245,6 +245,17 @@ body.novideo .glass{background:var(--panel);-webkit-backdrop-filter:none;backdro
   color:var(--dim);flex:0 0 auto;font-size:14px}
 .swap:hover{border-color:rgba(255,255,255,.4);color:#fff;background:var(--accent-dim)}
 
+/* a three-way that fits the height of a text field beside it */
+.yesno{display:flex;gap:3px;margin-top:2px}
+.yesno button{
+  flex:1;border:1px solid var(--line);background:rgba(255,255,255,.04);
+  border-radius:7px;padding:6px 4px;font-size:12px;color:var(--dim);min-width:0;
+  white-space:nowrap;
+}
+.yesno button:hover{color:var(--text);border-color:var(--line-2)}
+.yesno button[aria-pressed="true"]{background:var(--accent);color:#1a1a1a;
+  border-color:var(--accent);font-weight:600}
+
 .points{display:flex;flex-direction:column;gap:7px}
 .ptrow{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
 .ptrow select{flex:1 1 220px;background:rgba(255,255,255,.04);border:1px solid var(--line);
@@ -367,12 +378,41 @@ body.novideo .glass{background:var(--panel);-webkit-backdrop-filter:none;backdro
 #wish-foot .primary{border:0;font-weight:600;background:var(--text);color:var(--panel)}
 #wish-foot .primary:hover{filter:brightness(.92);color:var(--panel)}
 
-.guidepane{padding:26px 18px;display:flex;flex-direction:column;gap:13px;align-items:flex-start}
-.guidepane p{color:var(--dim);max-width:64ch;font-size:14.5px}
-.guidesteps{display:flex;flex-wrap:wrap;gap:7px;margin:0;padding:0;list-style:none}
-.guidesteps li{font-size:12.5px;color:var(--dim);background:rgba(255,255,255,.04);
-  border:1px solid var(--line);border-radius:9px;padding:6px 12px}
-.guidesteps li b{font-family:var(--mono);color:var(--text);font-size:11px;margin-right:6px}
+/* The wizard. One question at a time, big answers, and it ends by filling
+   in the form rather than running a different search. */
+.guidepane{padding:30px 22px 24px;display:flex;flex-direction:column;gap:20px;min-height:320px}
+.wiz-top{display:flex;align-items:center;gap:14px}
+.wiz-dots{display:flex;gap:5px;margin-left:auto}
+.wiz-dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.18);
+  display:block;transition:all .2s}
+.wiz-dots i.on{background:var(--accent-hot);transform:scale(1.25)}
+.wiz-dots i.done{background:var(--dim)}
+.wiz-q{font-family:var(--helv);font-size:clamp(20px,2.6vw,27px);font-weight:400;
+  letter-spacing:-.01em;color:var(--text);text-wrap:balance}
+.wiz-sub{color:var(--faint);font-size:13px;margin-top:-12px;max-width:60ch}
+.wiz-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:9px}
+.wiz-opt{
+  display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;
+  padding:14px 15px;border-radius:11px;min-height:70px;justify-content:center;
+  background:rgba(255,255,255,.04);border:1px solid var(--line);
+  color:var(--text);transition:all .13s;
+}
+.wiz-opt:hover{background:rgba(255,255,255,.08);border-color:var(--line-2)}
+.wiz-opt[aria-pressed="true"]{background:var(--accent-dim);border-color:rgba(255,255,255,.45)}
+.wiz-opt b{font-weight:500;font-size:14.5px}
+.wiz-opt span{font-size:12px;color:var(--faint);line-height:1.4}
+.wiz-opt[aria-pressed="true"] span{color:var(--dim)}
+.wiz-foot{display:flex;align-items:center;gap:10px;margin-top:auto;padding-top:6px}
+.wiz-foot .spacer{flex:1}
+.wiz-back{background:transparent;border:1px solid var(--line);border-radius:9px;
+  padding:9px 18px;font-size:13.5px;color:var(--faint)}
+.wiz-back:hover{color:var(--text);border-color:var(--line-2)}
+.wiz-next{border:0;background:var(--accent);color:#1a1a1a;border-radius:9px;
+  padding:11px 26px;font-size:14px;font-weight:600}
+.wiz-next:hover{background:var(--accent-hot)}
+.wiz-skip{background:transparent;border:0;color:var(--faint);font-size:12.5px;
+  text-decoration:underline;text-underline-offset:3px}
+.wiz-skip:hover{color:var(--text)}
 
 /* ----------------------------------------------------------- results */
 .results{display:flex;flex-direction:column;gap:13px;margin-top:24px}
@@ -600,18 +640,7 @@ footer.note code{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
       <button class="tab" role="tab" aria-selected="false" data-tab="multi">Multi-city</button>
     </div>
 
-    <div class="guidepane" id="pane-guide" hidden>
-      <span class="eyebrow">Wizard — not built yet</span>
-      <p>The questions that change the answer, one at a time. Same profile, same scorer, same list — just asked rather than filled in.</p>
-      <ol class="guidesteps">
-        <li><b>1</b> Where are you leaving from, exactly?</li>
-        <li><b>2</b> What's waiting for you when you land?</li>
-        <li><b>3</b> How many bags, really?</li>
-        <li><b>4</b> What's an hour of your time worth today?</li>
-        <li><b>5</b> Any points you'd like to burn?</li>
-        <li><b>6</b> What would ruin this trip?</li>
-      </ol>
-    </div>
+    <div class="guidepane" id="pane-guide" hidden></div>
 
     <div class="panelbody" id="pane-form">
       <div class="row">
@@ -644,6 +673,13 @@ footer.note code{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
         <div class="row">
           <div class="field money narrow"><label for="f-max">Maximum<span class="tip" tabindex="0" role="note" data-tip="A hard ceiling. Anything over it is hidden, with a reason and a way back.">i</span></label><input id="f-max" value="$1,150" inputmode="numeric"></div>
           <div class="field money narrow"><label for="f-target">Target<span class="tip" tabindex="0" role="note" data-tip="A nudge, not a filter.">i</span></label><input id="f-target" value="$700" inputmode="numeric"></div>
+          <div class="field" style="flex:0 1 212px"><label>Rideshare<span class="tip" tabindex="0" role="note" data-tip="Yes prices a car to and from the airport. No prices public transport. Either way we use the real fare and the real door-to-door time for that hour — and say so if what you asked for is not running.">i</span></label>
+            <div class="yesno" id="f-ride" role="group" aria-label="Rideshare">
+              <button type="button" data-v="rideshare" aria-pressed="false">Yes</button>
+              <button type="button" data-v="transit" aria-pressed="false">No</button>
+              <button type="button" data-v="" aria-pressed="true">Either</button>
+            </div>
+          </div>
         </div>
         <div class="points" id="f-points"></div>
         <button class="addpt" id="f-addpt" type="button">+ Add a points balance</button>
@@ -843,7 +879,7 @@ var STATE = {
   target:"comfort", bags:2,
   nonstop:false, oneticket:false, redeyeOK:false, shortlay:false, excursion:false,
   wifi:false, legroom:false, lieflat:false, lounge:false, bagsinc:false,
-  wishWeights:{},
+  wishWeights:{}, groundMode:null,
   balances:{}, filters:[], understood:[], overrides:{}, expanded:{},
   showFiltered:false, searched:false, firstPaint:true, fixture:"ground-access-swing"
 };
@@ -942,6 +978,170 @@ document.getElementById("f-addpt").onclick = function(){
   });
 })();
 
+
+/* ===================================================================
+   GUIDE ME — the wizard. It is not a second search. Every answer writes
+   into the same STATE and the same form controls the manual path uses,
+   and the last step hands over to the same render(). If these ever
+   diverge, one of the two paths is quietly scoring something else.
+   =================================================================== */
+var FIXTURE_LIST = [];
+var WIZ_STEP = 0;
+var WIZ_ANS = {};
+
+function wizSteps(){
+  var all = [
+    {id:"route", q:"Where are you headed?",
+     sub:"Three routes are loaded from the fixture corpus.",
+     kind:"single",
+     opts: FIXTURE_LIST.map(function(f){
+       return {v:f.fixture_id,
+               label:f.origin_short + " \u2192 " + f.dest_short,
+               sub:f.airports + " \u00b7 " + f.options + " options"};
+     })},
+    {id:"bags", q:"How many bags are you checking?",
+     sub:"This is where the cheapest fare usually stops being the cheapest.",
+     kind:"single",
+     opts:[{v:0,label:"None",sub:"Carry-on only"},
+           {v:1,label:"One",sub:"The usual"},
+           {v:2,label:"Two",sub:"Most fares charge for the second"},
+           {v:3,label:"Three",sub:"Now it is really costing you"}]},
+    {id:"value", q:"What is an hour of your time worth today?",
+     sub:"The same flights, weighed differently. Nothing is hidden either way.",
+     kind:"single",
+     opts:[{v:"cheapest",label:"I have time",sub:"Save me money"},
+           {v:"reference",label:"Normal",sub:"A working day"},
+           {v:"fastest",label:"Every hour counts",sub:"Get me there"},
+           {v:"comfort",label:"Arrive human",sub:"I have something on"}]},
+    {id:"ground", q:"How are you getting to the airport?",
+     sub:"We price the real fare and the real door-to-door time for that hour.",
+     kind:"single",
+     opts:[{v:"rideshare",label:"Car",sub:"Rideshare both ends"},
+           {v:"transit",label:"Public transport",sub:"Train or bus"},
+           {v:"",label:"Whichever wins",sub:"Let the arithmetic pick"}]},
+    {id:"onboard", q:"What matters once you are on board?",
+     sub:"Pick as many as you like, or none.",
+     kind:"multi",
+     opts:[{v:"wifi",label:"Working wi-fi"},{v:"legroom",label:"Legroom"},
+           {v:"lounge",label:"Lounge access"},{v:"bagsinc",label:"Bags included"},
+           {v:"lieflat",label:"Lie-flat seat"}]},
+    {id:"ruin", q:"What would ruin this trip?",
+     sub:"These become filters and weights. You will see every one of them applied.",
+     kind:"multi",
+     opts:[{v:"missed",label:"Missing a connection",sub:"Nonstop, one ticket"},
+           {v:"deadlay",label:"A long dead layover",sub:"Short connections"},
+           {v:"redeyebad",label:"An overnight flight",sub:"Daytime only"},
+           {v:"gatefees",label:"Paying at the gate",sub:"Bags included"}]}
+  ];
+  /* a step with nothing to pick is not a step */
+  return all.filter(function(st){ return st.opts.length; });
+}
+
+function wizRender(){
+  var steps = wizSteps(), st = steps[WIZ_STEP], host = document.getElementById("pane-guide");
+  var h = '<div class="wiz-top"><span class="eyebrow">Step ' + (WIZ_STEP+1) +
+          ' of ' + steps.length + '</span><span class="wiz-dots">';
+  steps.forEach(function(_, i){
+    h += '<i class="' + (i === WIZ_STEP ? "on" : i < WIZ_STEP ? "done" : "") + '"></i>';
+  });
+  h += '</span></div><div class="wiz-q">' + esc(st.q) + '</div>';
+  if (st.sub) h += '<div class="wiz-sub">' + esc(st.sub) + '</div>';
+
+  h += '<div class="wiz-opts">';
+  st.opts.forEach(function(o){
+    var on = st.kind === "multi"
+      ? (WIZ_ANS[st.id] || []).indexOf(o.v) >= 0
+      : WIZ_ANS[st.id] === o.v;
+    h += '<button type="button" class="wiz-opt" aria-pressed="' + (on ? "true" : "false") +
+         '" data-v="' + esc(String(o.v)) + '"><b>' + esc(o.label) + '</b>' +
+         (o.sub ? '<span>' + esc(o.sub) + '</span>' : '') + '</button>';
+  });
+  h += '</div>';
+
+  h += '<div class="wiz-foot">' +
+       (WIZ_STEP ? '<button class="wiz-back" id="wiz-back">Back</button>' : '') +
+       '<button class="wiz-skip" id="wiz-skip">Skip the questions</button>' +
+       '<span class="spacer"></span>' +
+       '<button class="wiz-next" id="wiz-next">' +
+       (WIZ_STEP === steps.length - 1 ? "Show me the flights" : "Next") + '</button></div>';
+  host.innerHTML = h;
+
+  Array.prototype.forEach.call(host.querySelectorAll(".wiz-opt"), function(b){
+    b.onclick = function(){
+      var v = b.dataset.v;
+      if (st.id === "bags") v = parseInt(v, 10);
+      if (st.kind === "multi"){
+        var cur = WIZ_ANS[st.id] || [];
+        var i = cur.indexOf(v);
+        if (i >= 0) cur.splice(i, 1); else cur.push(v);
+        WIZ_ANS[st.id] = cur;
+        wizRender();
+      } else {
+        WIZ_ANS[st.id] = v;
+        if (WIZ_STEP < steps.length - 1){ WIZ_STEP++; wizRender(); }   /* single answer advances */
+        else wizFinish();
+      }
+    };
+  });
+  var back = host.querySelector("#wiz-back");
+  if (back) back.onclick = function(){ WIZ_STEP--; wizRender(); };
+  host.querySelector("#wiz-next").onclick = function(){
+    if (WIZ_STEP === steps.length - 1) wizFinish();
+    else { WIZ_STEP++; wizRender(); }
+  };
+  host.querySelector("#wiz-skip").onclick = function(){ wizFinish(); };
+}
+
+/* The handover. Everything the wizard learned is written into the same
+   controls the manual form uses, then the manual tab is shown - so the
+   user can see exactly what was filled in on their behalf and change any
+   of it. A wizard that scored in secret would be a second product. */
+function wizFinish(){
+  if (WIZ_ANS.route && WIZ_ANS.route !== STATE.fixture){
+    STATE.fixture = WIZ_ANS.route;
+    var sel = document.getElementById("f-fixture");
+    if (sel){ sel.value = WIZ_ANS.route; }
+    var f = FIXTURE_LIST.filter(function(x){ return x.fixture_id === WIZ_ANS.route; })[0];
+    if (f){
+      document.getElementById("f-origin").value = f.origin;
+      document.getElementById("f-dest").value = f.destination;
+      document.getElementById("f-out").value = f.depart_date;
+    }
+    STATE.expanded = {}; STATE.overrides = {}; STATE.firstPaint = true; LAST = null;
+  }
+  if (WIZ_ANS.bags != null){
+    STATE.bags = WIZ_ANS.bags;
+    document.getElementById("f-bags").value = String(WIZ_ANS.bags);
+  }
+  if (WIZ_ANS.value){
+    STATE.target = WIZ_ANS.value === "reference" ? "comfort" : WIZ_ANS.value;
+    Array.prototype.forEach.call(document.querySelectorAll("#f-target-seg button"), function(x){
+      x.setAttribute("aria-pressed", x.dataset.t === STATE.target ? "true" : "false");
+    });
+  }
+  if (WIZ_ANS.ground != null){
+    STATE.groundMode = WIZ_ANS.ground || null;
+    Array.prototype.forEach.call(document.querySelectorAll("#f-ride button"), function(x){
+      x.setAttribute("aria-pressed", (x.dataset.v || "") === (STATE.groundMode || "") ? "true" : "false");
+    });
+  }
+  (WIZ_ANS.onboard || []).forEach(function(k){ STATE[k] = true; });
+  (WIZ_ANS.ruin || []).forEach(function(k){
+    if (k === "missed"){ STATE.nonstop = true; STATE.oneticket = true; }
+    if (k === "deadlay") STATE.shortlay = true;
+    if (k === "redeyebad") STATE.redeyeOK = false;
+    if (k === "gatefees") STATE.bagsinc = true;
+  });
+  /* the tiles have to show what was chosen, or the form is lying */
+  Array.prototype.forEach.call(document.querySelectorAll(".feat"), function(b, i){
+    if (FEATURES[i]) b.setAttribute("aria-pressed", STATE[FEATURES[i].k] ? "true" : "false");
+  });
+
+  var manual = document.querySelector('.tab[data-tab="round"]');
+  if (manual) manual.click();
+  render(true);
+}
+
 /* ---- tabs ---- */
 Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(t){
   t.onclick = function(){
@@ -950,6 +1150,7 @@ Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(t){
     var guide = t.dataset.tab === "guide";
     document.getElementById("pane-guide").hidden = !guide;
     document.getElementById("pane-form").hidden = guide;
+    if (guide){ WIZ_STEP = 0; wizRender(); }
   };
 });
 
@@ -970,6 +1171,16 @@ document.getElementById("f-swap").onclick = function(){
 document.getElementById("f-bags").onchange = function(e){
   STATE.bags = parseInt(e.target.value,10); if (STATE.searched) render();
 };
+Array.prototype.forEach.call(document.querySelectorAll("#f-ride button"), function(b){
+  b.onclick = function(){
+    Array.prototype.forEach.call(document.querySelectorAll("#f-ride button"),
+      function(x){ x.setAttribute("aria-pressed", "false"); });
+    b.setAttribute("aria-pressed", "true");
+    STATE.groundMode = b.dataset.v || null;
+    if (STATE.searched) render(false);
+  };
+});
+
 ["f-max","f-target"].forEach(function(id){
   var e = document.getElementById(id);
   if (e) e.onchange = function(){ if (STATE.searched) render(false); };
@@ -979,9 +1190,11 @@ document.getElementById("f-bags").onchange = function(e){
    them rather than hard-coding one. */
 fetch("/api/fixtures").then(function(r){ return r.json(); }).then(function(list){
   if (!list.length) return;
+  FIXTURE_LIST = list;
+  if (!document.getElementById("pane-guide").hidden) wizRender();
   var sel = document.getElementById("f-fixture");
   list.forEach(function(f){
-    var o = el("option", null, esc(f.title.split(":")[0]));
+    var o = el("option", null, esc(f.origin_short + " \u2192 " + f.dest_short));
     o.value = f.fixture_id;
     if (f.fixture_id === STATE.fixture) o.selected = true;
     sel.appendChild(o);
@@ -1153,7 +1366,8 @@ function parseWish(text){
 }
 
 document.getElementById("f-wish").onclick = openWish;
-if (location.hash === "#wish") openWish();   /* handy while building it */
+if (location.hash === "#wish") openWish();     /* handy while building it */
+if (location.hash === "#guide"){ var gt = document.querySelector('.tab[data-tab="guide"]'); if (gt) gt.click(); }
 document.getElementById("f-go").onclick = function(){ render(true); };
 
 /* ===================================================================
@@ -1192,6 +1406,7 @@ function requestBody(){
     if (f.filter) filters.push(f.filter);
     if (f.pref) prefs[f.pref] = true;
   });
+  if (STATE.groundMode) prefs.ground_mode = STATE.groundMode;
   STATE.filters.forEach(function(f){ filters.push({kind:"carrier", value:f.value}); });
   Object.keys(STATE.wishWeights || {}).forEach(function(k){ weights[k] = STATE.wishWeights[k]; });
   return {

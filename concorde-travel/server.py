@@ -277,14 +277,35 @@ def _fixture_path(fid):
     return None
 
 
+def _place_short(label):
+    """"Shoreditch, London EC2A" -> "London". The city is the part a person
+    would say out loud; the postcode is not."""
+    parts = [p.strip() for p in label.split(",")]
+    pick = parts[1] if len(parts) > 1 else parts[0]
+    words = [w for w in pick.split() if not any(c.isdigit() for c in w)]
+    return " ".join(words) or pick
+
+
 def list_fixtures():
     out = []
     for f in _fixture_files():
         d = json.load(open(f, encoding="utf-8"))
+        origins, dests = [], []
+        for o in d["options"]:
+            a = o["segments"][0]["origin"]["iata"]
+            b = o["segments"][-1]["destination"]["iata"]
+            if a not in origins:
+                origins.append(a)
+            if b not in dests:
+                dests.append(b)
         out.append({"fixture_id": d["fixture_id"], "title": d["title"],
                     "pins_down": d["pins_down"],
                     "origin": d["query"]["origin"]["label"],
                     "destination": d["query"]["destination"]["label"],
+                    "origin_short": _place_short(d["query"]["origin"]["label"]),
+                    "dest_short": _place_short(d["query"]["destination"]["label"]),
+                    "airports": "/".join(origins) + " \u2192 " + "/".join(dests),
+                    "options": len(d["options"]),
                     "depart_date": d["query"]["depart_date"],
                     "profiles": list(d["query"]["profiles"])})
     return out

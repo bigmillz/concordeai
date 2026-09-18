@@ -24,8 +24,8 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
-from scorer import (score, score_all, grade, timeline, load_scenario,  # noqa: E402
-                    DEFAULT, Line)
+from scorer import (score, score_all, grade, timeline, chosen_ground,  # noqa: E402
+                    load_scenario, DEFAULT, Line)
 
 FAILS = []
 CHECKS = [0]
@@ -190,6 +190,32 @@ def run(path):
                   sum(l.minutes for l in tl) == led.door_to_door_minutes,
                   "bar sums to %d, ledger says %d"
                   % (sum(l.minutes for l in tl), led.door_to_door_minutes))
+
+    # "Rideshare, yes or no" narrows the choice; it never silently substitutes.
+    # The interesting half is the leg where the preference CANNOT be met.
+    import copy
+    for want in ("rideshare", "transit"):
+        biased = copy.deepcopy(sc)
+        biased["query"]["preferences"] = {"ground_mode": want}
+        for oid, o in {x["option_id"]: x for x in biased["options"]}.items():
+            modes = o["ground"]["outbound"]
+            kinds = {m["mode_kind"] for m in modes}
+            if want not in kinds:
+                continue
+            got, _ = chosen_ground(o, biased["query"]["profiles"]["reference"],
+                                   "outbound", want)
+            avail = [m for m in modes if m["mode_kind"] == want and m["feasible"]]
+            led = score(biased, o, "reference")
+            ev = (led.by_code("ground_out") or Line("", "", 0)).evidence.lower()
+            if avail:
+                check("[%s] %s honours a %s preference" % (name, oid, want),
+                      got["mode_kind"] == want,
+                      "picked %s instead" % got.get("mode_kind"))
+            else:
+                # the preference exists in the data but is not flyable at this hour
+                check("[%s] %s says so when %s is not possible" % (name, oid, want),
+                      "you asked for" in ev,
+                      "evidence was %r" % ev[:120])
 
     # A credit for going into the city, given at an hour when there is no city to
     # go into, is the single most embarrassing thing this model could do. The

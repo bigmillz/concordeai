@@ -608,6 +608,7 @@
       "required": [
         "mode_id",
         "mode",
+        "mode_kind",
         "fare_cents",
         "door_to_door_minutes",
         "feasible"
@@ -619,6 +620,15 @@
         },
         "mode": {
           "type": "string"
+        },
+        "mode_kind": {
+          "enum": [
+            "transit",
+            "rideshare",
+            "drive",
+            "walk"
+          ],
+          "description": "What CLASS of thing this is, so a preference can be honoured without pattern-matching the prose in `mode`. 'Subway to Penn, NJ Transit, AirTrain Newark' is transit; nothing about that string should have to be parsed to know it."
         },
         "fare_cents": {
           "$ref": "#/$defs/money"

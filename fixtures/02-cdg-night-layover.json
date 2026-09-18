@@ -366,6 +366,7 @@
           {
             "mode_id": "jfk-airtrain-howard-beach",
             "mode": "Subway then AirTrain at Howard Beach",
+            "mode_kind": "transit",
             "fare_cents": 1175,
             "door_to_door_minutes": {
               "p50": 78,
@@ -374,12 +375,31 @@
             "transfers": 1,
             "feasible": true,
             "infeasible_reason": null
+          },
+          {
+            "mode_id": "jfk-rideshare",
+            "mode": "Rideshare",
+            "mode_kind": "rideshare",
+            "fare_cents": 6200,
+            "door_to_door_minutes": {
+              "p50": 37,
+              "p90": 62
+            },
+            "transfers": 0,
+            "tolls_cents": {
+              "outbound": 0,
+              "inbound": 0
+            },
+            "feasible": true,
+            "infeasible_reason": null,
+            "source": "Published route average, Bushwick to JFK."
           }
         ],
         "arrival": [
           {
             "mode_id": "mxp-malpensa-express",
             "mode": "Malpensa Express to Cadorna",
+            "mode_kind": "transit",
             "fare_cents": 1450,
             "door_to_door_minutes": {
               "p50": 62,
@@ -395,6 +415,20 @@
                 "day": 30
               }
             }
+          },
+          {
+            "mode_id": "mxp-rideshare",
+            "mode": "Rideshare",
+            "mode_kind": "rideshare",
+            "fare_cents": 11500,
+            "door_to_door_minutes": {
+              "p50": 52,
+              "p90": 85
+            },
+            "transfers": 0,
+            "feasible": true,
+            "infeasible_reason": null,
+            "source": "Malpensa is 50km out; the car saves ten minutes and costs eight times the train."
           }
         ]
       },
@@ -616,6 +650,7 @@
           {
             "mode_id": "jfk-airtrain-howard-beach",
             "mode": "Subway then AirTrain at Howard Beach",
+            "mode_kind": "transit",
             "fare_cents": 1175,
             "door_to_door_minutes": {
               "p50": 78,
@@ -624,12 +659,31 @@
             "transfers": 1,
             "feasible": true,
             "infeasible_reason": null
+          },
+          {
+            "mode_id": "jfk-rideshare",
+            "mode": "Rideshare",
+            "mode_kind": "rideshare",
+            "fare_cents": 6200,
+            "door_to_door_minutes": {
+              "p50": 37,
+              "p90": 62
+            },
+            "transfers": 0,
+            "tolls_cents": {
+              "outbound": 0,
+              "inbound": 0
+            },
+            "feasible": true,
+            "infeasible_reason": null,
+            "source": "Published route average, Bushwick to JFK."
           }
         ],
         "arrival": [
           {
             "mode_id": "mxp-malpensa-express",
             "mode": "Malpensa Express to Cadorna",
+            "mode_kind": "transit",
             "fare_cents": 1450,
             "door_to_door_minutes": {
               "p50": 62,
@@ -638,6 +692,20 @@
             "transfers": 1,
             "feasible": true,
             "infeasible_reason": null
+          },
+          {
+            "mode_id": "mxp-rideshare",
+            "mode": "Rideshare",
+            "mode_kind": "rideshare",
+            "fare_cents": 11500,
+            "door_to_door_minutes": {
+              "p50": 52,
+              "p90": 85
+            },
+            "transfers": 0,
+            "feasible": true,
+            "infeasible_reason": null,
+            "source": "Malpensa is 50km out; the car saves ten minutes and costs eight times the train."
           }
         ]
       },
@@ -859,6 +927,7 @@
           {
             "mode_id": "jfk-airtrain-howard-beach",
             "mode": "Subway then AirTrain at Howard Beach",
+            "mode_kind": "transit",
             "fare_cents": 1175,
             "door_to_door_minutes": {
               "p50": 78,
@@ -867,12 +936,31 @@
             "transfers": 1,
             "feasible": true,
             "infeasible_reason": null
+          },
+          {
+            "mode_id": "jfk-rideshare",
+            "mode": "Rideshare",
+            "mode_kind": "rideshare",
+            "fare_cents": 6200,
+            "door_to_door_minutes": {
+              "p50": 37,
+              "p90": 62
+            },
+            "transfers": 0,
+            "tolls_cents": {
+              "outbound": 0,
+              "inbound": 0
+            },
+            "feasible": true,
+            "infeasible_reason": null,
+            "source": "Published route average, Bushwick to JFK."
           }
         ],
         "arrival": [
           {
             "mode_id": "mxp-malpensa-express",
             "mode": "Malpensa Express to Cadorna",
+            "mode_kind": "transit",
             "fare_cents": 1450,
             "door_to_door_minutes": {
               "p50": 62,
@@ -881,6 +969,20 @@
             "transfers": 1,
             "feasible": true,
             "infeasible_reason": null
+          },
+          {
+            "mode_id": "mxp-rideshare",
+            "mode": "Rideshare",
+            "mode_kind": "rideshare",
+            "fare_cents": 11500,
+            "door_to_door_minutes": {
+              "p50": 52,
+              "p90": 85
+            },
+            "transfers": 0,
+            "feasible": true,
+            "infeasible_reason": null,
+            "source": "Malpensa is 50km out; the car saves ten minutes and costs eight times the train."
           }
         ]
       },
