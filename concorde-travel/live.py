@@ -95,10 +95,14 @@ PROFILES = {
         "date_format": "%Y-%m-%d",
         "static_params": {},
         "quota": dict(_QUOTA_DEFAULT),
-        "_note": ("Wire format from Amadeus's published Flight Offers Search v2 docs "
-                  "and UNVERIFIED against the live service - no credential was "
-                  "available on the machine this was written on. Correct the params "
-                  "here rather than in Python."),
+        "_note": ("SELF-SERVICE IS GONE. Amadeus decommissioned the Self-Service "
+                  "developer portal on 2026-07-17 and disabled its keys; what remains "
+                  "at developers.amadeus.com is the Enterprise portal, which is a "
+                  "sales process, not a signup. This profile is kept because Amadeus "
+                  "Enterprise speaks the same Flight Offers Search v2 schema, so the "
+                  "adapter still applies to anyone who has that access. Wire format is "
+                  "from the published docs and UNVERIFIED against the live service. "
+                  "For a self-serve key today, see docs/design.md."),
     },
     "kiwi-tequila": {
         "provider": "kiwi-tequila",
@@ -122,9 +126,12 @@ PROFILES = {
     },
 }
 
-# Amadeus is the default because it is the one you can actually get a key for,
-# and because it carries the operating carrier, the equipment code and the fare
-# brand - the three fields the scorer has to abstain on with the Kiwi feed.
+# Amadeus is the default for its SCHEMA, not its availability: it carries the
+# operating carrier, the equipment code and the fare brand - the three fields the
+# scorer has to abstain on with the Kiwi feed - and Amadeus Enterprise still
+# speaks it. Neither shipped profile is self-serve any more: Amadeus retired
+# Self-Service on 2026-07-17 and Kiwi closed Tequila signups in 2024. The
+# self-serve option today is Duffel, which has no adapter yet.
 # Switch with `live.py provider kiwi-tequila`.
 DEFAULTS = json.loads(json.dumps(PROFILES["amadeus"]))
 

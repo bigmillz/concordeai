@@ -422,8 +422,16 @@ very little else:
 means the marketing carrier flies it, which is information, not a gap), it carries an
 equipment code, and it carries a fare brand with an included-bag count. It cannot see
 self-transfer or virtual interlining at all, which is why both adapters are kept rather
-than one replacing the other. Kiwi also closed self-serve Tequila signup in 2024, so
-Amadeus is the default because it is the key you can actually get.
+than one replacing the other.
+
+**Neither shipped profile is self-serve any more.** Amadeus decommissioned its
+Self-Service portal on 2026-07-17 and disabled those keys; Kiwi closed Tequila signups in
+2024. Amadeus is the default for its *schema* — Enterprise still speaks it, and it is the
+reference for what a rich feed looks like — not because you can get a key. **The self-serve
+option today is Duffel** (`app.duffel.com/join`, instant free sandbox), whose Offer schema
+carries the same operating carrier / aircraft / fare brand / baggage fields. There is no
+`from_duffel` yet. Do not re-recommend Amadeus Self-Service or Google Flights; see the
+table in `docs/design.md`.
 
 **An equipment code is not a cabin.** `aircraft.code` names a *type*; one carrier's 789 may
 be several configurations, and the frame is swapped after booking regardless. It is joined

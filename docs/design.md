@@ -1003,21 +1003,31 @@ provider -> saw exactly 3 requests; the cache hit never reached it
 The User-Agent guard is proven by that run: the stand-in refuses `Python-urllib` and the
 real call got a 200.
 
-## A second provider, and why it became the default
+## A second provider, and the state of the market
 
-Kiwi closed self-serve Tequila registration in May 2024. New access is an application
-through the partner portal, and they want to see a live travel product with real
-distribution — which a pre-launch re-ranker does not have. The Tequila profile still
-ships and still works, but it is not a key you can go and get this afternoon.
+**Read this before shopping for a key, because three of the obvious answers are gone.**
 
-There is also no Google Flights API to compare it against. Google retired QPX Express on
-10 April 2018 and never replaced it publicly; everything marketed as a "Google Flights
-API" today scrapes the consumer page, which returns **less** structured data than Kiwi,
-not more, and is fragile besides.
+| Provider | Self-serve today? | |
+| --- | --- | --- |
+| Amadeus Self-Service | **No** | Portal decommissioned 2026-07-17, keys disabled. Enterprise only now, which is a sales process. |
+| Kiwi Tequila | **No** | Self-serve closed May 2024; invite-only partner program. |
+| Google Flights | **Never existed** | QPX Express retired 2018-04-10. Everything sold as one scrapes the consumer page and returns *less* structured data than Kiwi. |
+| Travelpayouts | Yes, free | But the free tier is **cached price data** — no aircraft, no fare brand, no operating carrier. The real-time search API needs 50,000 MAU. |
+| Sabre / Travelport | No | Account-rep activation. |
+| **Duffel** | **Yes** | ~1 minute at `app.duffel.com/join`, instant sandbox, permanently free test mode. Live prices need identity verification. |
 
-So the default provider is now **Amadeus Self-Service**: self-serve signup, a free test
-environment, and roughly 2,000 free production calls a month on Flight Offers Search.
-More to the point, it carries the three fields the scorer has to abstain on with Kiwi.
+The Amadeus profile is kept for its **schema**, not its availability: Amadeus Enterprise
+still speaks Flight Offers Search v2, so `from_amadeus` applies to anyone with that access,
+and it remains the reference for what a rich feed looks like. It is not a key you can go
+and get.
+
+**Duffel is the self-serve path**, and its Offer schema carries the same three fields —
+`operating_carrier` and `marketing_carrier` per segment, `aircraft`, `fare_brand_name`, and
+per-passenger `baggages`. Its test mode is a fictional carrier with fake prices, so the
+curated joins will not light up against it, but the *shape* is real, which is enough to
+build and verify an adapter. There is no `from_duffel` yet.
+
+The Amadeus profile carries the three fields the scorer has to abstain on with Kiwi:
 
 | What the scorer needs | Kiwi | Amadeus |
 | --- | --- | --- |
