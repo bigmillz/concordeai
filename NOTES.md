@@ -4827,3 +4827,24 @@ Per Patrick, across several notes in one sitting.
   see the same byte count, so the rate read zero and the ETA climbed
   forever. Replaced with a rolling 60s window sampled at most every 2s,
   and no time is quoted until there is a real measurement.
+
+## 6b302 — video generation, measured (uncut)
+
+The local path is proven, not assumed: Wan2.2 TI2V-5B q8 (18 GB on
+disk) through mlx-video, driven by the app's own install route. A red
+balloon over a city at sunset came back correct at 49 frames /
+704x480 / 20 steps in 6m10s.
+
+Timings measured on an M4 Pro, and they set the ladder:
+- 49f 704x480 20 steps -> 6m10s
+- 33f 640x384 15 steps -> 2m29s, but WASHED OUT — 15 steps is below
+  the floor where it still looks photographic
+- 33f 640x384 20 steps -> 3m07s, and it looks right
+
+So the rung now decides the RENDER, not just the download: Quick is
+33 frames at 640x384, Accurate 49 at 704x480, Finest 65 at 832x480.
+Steps stay at 20 or above everywhere.
+
+Also fixed: two rungs share a repo (they differ only in frames and
+size), and studio_bytes counted it twice — Remove was promising 40.2 GB
+of a 19.2 GB install. Repos are deduped in both the size and the sweep.

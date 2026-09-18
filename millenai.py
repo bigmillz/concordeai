@@ -3178,16 +3178,22 @@ STUDIOS = {
         "tiers": [
             {"id": "quick", "name": "Quick",
              "repo": "Anes1032/Wan2.2-TI2V-5B-mlx-q8",
+             # MEASURED (6b302): 15 steps renders in 2m29s and comes out
+             # washed out; 20 is the floor where it still looks like a
+             # photograph. Frames and size are where the time is saved.
              "gb": 19.6, "mem_gb": 24.0, "steps": 20,
-             "note": "a few seconds of video, several minutes to make"},
+             "frames": 33, "w": 640, "h": 384,
+             "note": "about two seconds of video, three minutes to make"},
             {"id": "accurate", "name": "Accurate",
-             "repo": "rickylin20260522/Wan2.2-TI2V-5B-mlx",
-             "gb": 24.2, "mem_gb": 30.0, "steps": 24,
-             "note": "the same model at full precision"},
+             "repo": "Anes1032/Wan2.2-TI2V-5B-mlx-q8",
+             "gb": 19.6, "mem_gb": 26.0, "steps": 20,
+             "frames": 49, "w": 704, "h": 480,
+             "note": "three seconds, larger and sharper, around six minutes"},
             {"id": "finest", "name": "Finest",
-             "repo": "prince-canuma/LTX-2.3-distilled",
-             "gb": 95.1, "mem_gb": 46.0, "steps": 20,
-             "note": "a much larger engine — a workstation's worth of memory"},
+             "repo": "rickylin20260522/Wan2.2-TI2V-5B-mlx",
+             "gb": 24.2, "mem_gb": 32.0, "steps": 24,
+             "frames": 65, "w": 832, "h": 480,
+             "note": "the same engine at full precision \u2014 slowest by far"},
         ],
     },
 }
@@ -3270,8 +3276,11 @@ def studio_bytes(key: str) -> int:
     """Everything this studio occupies: its venv and EVERY rung of its
     ladder that was ever downloaded, so Remove promises the truth."""
     total = _dir_bytes_real(STUDIOS[key]["venv"])
-    for t in STUDIOS[key]["tiers"]:
-        total += _dir_bytes_real(_hf_model_dir(t["repo"]))
+    # rungs may SHARE a repo (quick and accurate differ only in how many
+    # frames they render), so count each repo once or Remove promises
+    # twice the disk it can free
+    for repo in dict.fromkeys(t["repo"] for t in STUDIOS[key]["tiers"]):
+        total += _dir_bytes_real(_hf_model_dir(repo))
     return total
 
 
@@ -3343,8 +3352,9 @@ def studio_remove(key: str) -> dict:
     that was downloaded — and clear the job so the box reads as a fresh
     install rather than a finished one."""
     freed, errs = studio_bytes(key), []
-    targets = [STUDIOS[key]["venv"]] + [_hf_model_dir(t["repo"])
-                                        for t in STUDIOS[key]["tiers"]]
+    targets = [STUDIOS[key]["venv"]] + [
+        _hf_model_dir(r) for r in
+        dict.fromkeys(t["repo"] for t in STUDIOS[key]["tiers"])]
     for target in targets:
         try:
             if os.path.isdir(target):
@@ -4840,8 +4850,10 @@ def generate_video(prompt: str) -> tuple:
         cmd = [os.path.join(STUDIOS["video"]["venv"], "bin", "python3"),
                "-m", STUDIOS["video"]["module"],
                "--model-dir", _snap_dir(t["repo"]), "--prompt", prompt,
-               "--num-frames", "49", "--width", "704", "--height", "480",
-               "--steps", str(t.get("steps", 20)),
+               "--num-frames", str(t.get("frames", 33)),
+               "--width", str(t.get("w", 640)),
+               "--height", str(t.get("h", 384)),
+               "--steps", str(t.get("steps", 15)),
                "--seed", str(secrets.randbelow(10 ** 6)),
                "--output-path", out]
         try:
