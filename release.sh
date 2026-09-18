@@ -20,6 +20,19 @@
 set -e
 cd "$(dirname "$0")"
 
+# The website checkout, wherever it lives on this machine. This repo sits in
+# Drive and the site does not sit beside it, so it is searched for rather
+# than assumed; CONCORDE_SITE overrides. Its download blocks are generated
+# from GitHub Releases, so a cut has to be synced there or the page waits on
+# the site's scheduled Action — which GitHub runs every few HOURS, not the
+# 15 minutes its cron asks for.
+SITE="${CONCORDE_SITE:-}"
+if [[ -z "$SITE" ]]; then
+  for candidate in "../concorde-site" "$HOME/Code/concorde-site"; do
+    [[ -d "$candidate/.git" ]] && { SITE="$candidate"; break; }
+  done
+fi
+
 ARG="$1"; ARG2="${2:-}"
 if [[ -z "$ARG" ]]; then
   echo "usage: ./release.sh beta [X.Y.Z]   next numbered beta (or beta 1 of a new line)"
@@ -161,5 +174,59 @@ if [[ -x "$HOME/Library/MillenAI-live/update.sh" ]]; then
     || echo "  (live update failed — it will catch up on its hourly tick)"
 fi
 
+# THE WEBSITE (flyconcordefly.com). Land on its current tip and regenerate
+# there — never rebase generated content: two syncs that each INSERT the
+# same block at the same anchor replay as two insertions with no conflict,
+# and the page ships a channel twice (it did, on 2026-09-18). Nightlies do
+# not need this — they are built by Actions and the site reads a nightly's
+# commit and date live — but a beta, RC or stable only reaches the page
+# from here or from that slow scheduled sync.
+if [[ -n "$SITE" ]]; then
+  echo "→ syncing the website"
+  # Resetting is what makes this immune to that race, so it must never run
+  # over work that is not pushed — a curated release note written just
+  # before a cut is exactly the thing that would be sitting there.
+  if [[ -n "$(git -C "$SITE" status --porcelain)" ]]; then
+    echo "  site checkout has uncommitted changes — leaving it alone:"
+    git -C "$SITE" status --short | sed 's/^/    /'
+  elif [[ "$(git -C "$SITE" rev-list --count origin/main..HEAD 2>/dev/null || echo 0)" != "0" ]]; then
+    echo "  site checkout has unpushed commits — leaving it alone"
+  else
+    for attempt in 1 2 3; do
+      # Every git step is guarded: the release is already published, so a
+      # blip here must not abort with an exit that reads like it failed.
+      if ! { git -C "$SITE" fetch -q origin main \
+             && git -C "$SITE" reset -q --hard origin/main; }; then
+        echo "  could not reach the site repo — leaving it to the Action"; break
+      fi
+      if ! python3 "$SITE/tools/sync-releases.py"; then
+        if [[ "$attempt" != 3 ]]; then
+          echo "  site sync failed (attempt $attempt) — retrying"; sleep 20; continue
+        fi
+        echo "  site sync failed — leaving it to the Action"; break
+      fi
+      if git -C "$SITE" diff --quiet -- index.html; then
+        echo "  site already current"; SITE_OK=1; break
+      fi
+      if ! { git -C "$SITE" add index.html \
+             && git -C "$SITE" commit -q -m "ConcordeAI $SHOW"; }; then
+        echo "  could not commit the site change — leaving it to the Action"; break
+      fi
+      if git -C "$SITE" push -q origin main 2>/dev/null; then
+        echo "  site pushed"; SITE_OK=1; break
+      fi
+      echo "  site push rejected (attempt $attempt) — regenerating on the new tip"
+      [[ "$attempt" == 3 ]] && echo "  gave up; the Action will catch it"
+    done
+  fi
+else
+  echo "  (no concorde-site checkout found — set CONCORDE_SITE to sync the website)"
+fi
+
 echo ""
 echo "✓ published $SHOW — installs on the right channel will offer it within the hour."
+if [[ -n "$SITE_OK" ]]; then
+  echo "  the website is up to date"
+elif [[ -n "$SITE" ]]; then
+  echo "  the website is NOT updated — the scheduled sync will catch it"
+fi
