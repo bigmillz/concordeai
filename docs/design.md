@@ -703,3 +703,46 @@ rather than a paragraph under the field — "Incidentals" with *"padding for ext
 buying: a lounge pass, a change fee, a seat with legroom"* on hover, instead of forty words
 of explanation the user reads once and never again. Five explanatory paragraphs became six
 tooltips.
+
+
+---
+
+# Interface, second pass
+
+**Incidentals is gone from the form.** It was a dollar box asking the user to price
+something they have no way to price. The scorer still has the term and still reads
+`incidental_allowance_cents` from the scenario — a lounge credit is gated on it — the page
+just stopped asking. Budget is now two fields, Maximum and Target, each with a hover note.
+
+**"What you'll put up with" became "Features"**: ten square tiles, icon over a word, five to
+a row and three at phone width. Every tile maps to something the scorer already reads —
+eight bounded weights and two hard filters — because a control that changes nothing is
+worse than no control.
+
+| Tile | What it does |
+|---|---|
+| Nonstop, One ticket | hard filters (`nonstop_only`, `no_self_transfer`) |
+| Lie-flat | hard filter (`min_cabin`) |
+| Red-eyes fine | `prefs.redeye_ok` |
+| Short layovers, A day in town | `weights.layover`, `weights.excursion` |
+| Fast wi-fi, Legroom, Lounge, Bags included | `weights.wifi / pitch / lounge / bags` |
+
+*Overhead bin* was dropped: every aircraft has one, and transatlantic Basic Economy has
+carried a full-size cabin bag for years. What survives of that idea is a boarding-group
+line in the ledger, which is a different thing.
+
+*Lie-flat* filters every option out of the current corpus, which is all economy — and says
+so, in the disclosure row. That is the honest answer and it exercises the filter path.
+
+**Make a wish** replaces the old dream-trip modal. A starred button beside Search flights
+opens a chromeless card — no title bar, no close box, the shape the desktop app uses for
+its update sheet. It explains what is about to happen, then **Let's go** starts the
+microphone: the pitch is replaced by a live transcript with a pulsing Recording indicator,
+and **Grant it** applies what was heard. Without a speech engine the same card becomes a
+text box rather than a dead end.
+
+**The bar lost its inline labels.** They clipped on narrow segments and were noise on wide
+ones. Hovering a segment now highlights it, dims its neighbours and shows one short line —
+`Flight · BA 178 · 7h30m`, `Layover · CDG · 6h35m · lands 01:40`. Flight blocks are blue;
+the green-to-red ramp is reserved for the parts of a trip that cost you time. The tooltip
+text comes from `Leg.tip` in the scorer, so it cannot drift from the bar it describes.

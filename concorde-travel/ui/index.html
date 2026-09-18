@@ -53,8 +53,8 @@
   --q-fair:#d9b45c;
   --q-poor:#e08d5a;
   --q-bad:#e26d5a;
-  --q-fly:#474b55;
-  --q-fly2:#3a3e47;
+  --q-fly:#3f6fa8;
+  --q-fly2:#33598a;
   --glass:rgba(6,7,10,.34);
   --glass-2:rgba(6,7,10,.52);
   --hair:rgba(255,255,255,.07);
@@ -260,6 +260,33 @@ body.novideo .glass{background:var(--panel);-webkit-backdrop-filter:none;backdro
   border-radius:9px;padding:8px 13px;font-size:12.5px;color:var(--faint)}
 .addpt:hover{border-color:rgba(255,255,255,.4);color:var(--text)}
 
+/* Features: square tiles, icon over a word. Five to a row on a wide
+   window, three on a phone. A tile is a claim about what you want, so it
+   reads as a thing you pick up, not a checkbox you tick. */
+.features{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+@media (max-width:820px){.features{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:420px){.features{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.feat{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:7px;padding:13px 6px 11px;border-radius:10px;min-height:78px;
+  background:rgba(255,255,255,.04);border:1px solid var(--line);
+  color:var(--dim);transition:all .13s;user-select:none;text-align:center;
+}
+.feat:hover{background:rgba(255,255,255,.08);color:var(--text);border-color:var(--line-2)}
+.feat[aria-pressed="true"]{
+  background:var(--accent-dim);border-color:rgba(255,255,255,.45);color:#fff;
+}
+.feat svg{width:21px;height:21px;stroke:currentColor;fill:none;
+  stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.feat[aria-pressed="true"] svg{stroke-width:1.9}
+.feat span{font-size:11px;line-height:1.25;letter-spacing:.01em}
+.feat .dotmark{
+  position:absolute;top:7px;right:7px;width:6px;height:6px;border-radius:50%;
+  background:var(--accent-hot);opacity:0;transition:opacity .13s;
+}
+.feat{position:relative}
+.feat[aria-pressed="true"] .dotmark{opacity:1}
+
 /* option chips — the AI app's .qopt, same geometry */
 .chips{display:flex;flex-wrap:wrap;gap:7px}
 .chip{
@@ -285,6 +312,60 @@ body.novideo .glass{background:var(--panel);-webkit-backdrop-filter:none;backdro
 .go{border:0;background:var(--accent);color:#1a1a1a;border-radius:10px;
   padding:12px 30px;font-size:14.5px;font-weight:600}
 .go:hover{background:var(--accent-hot)}
+.gorow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.wish{
+  display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);
+  background:rgba(255,255,255,.04);border-radius:10px;padding:11px 18px;
+  font-size:14px;color:var(--dim);
+}
+.wish svg{width:17px;height:17px;fill:currentColor;stroke:none;flex:none;opacity:.85}
+.wish:hover{border-color:rgba(255,255,255,.45);color:#fff;background:var(--accent-dim)}
+.wish:hover svg{opacity:1}
+
+/* The wish card. Chromeless on purpose — no title bar, no close chrome,
+   the same shape the desktop app uses for its update sheet. It explains
+   itself and offers one way forward. */
+#wish-veil{position:fixed;inset:0;z-index:70;display:flex;align-items:center;
+  justify-content:center;padding:16px;background:rgba(6,7,10,.72);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#wish-veil[hidden]{display:none}
+#wish-card{
+  width:min(440px,calc(100vw - 48px));padding:30px 28px 22px;
+  background:var(--panel2);border:1px solid var(--line);border-radius:16px;
+  text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.6);
+  animation:doorPop .5s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes doorPop{from{opacity:0;transform:translateY(18px) scale(.97)}
+                   to{opacity:1;transform:none}}
+#wish-card .star{display:block;margin:0 auto 12px;width:34px;height:34px;fill:var(--text);opacity:.9}
+#wish-card h2{font-family:var(--disp);font-size:14px;letter-spacing:.09em;
+  text-transform:uppercase;margin-bottom:11px}
+#wish-card p{color:var(--dim);font-size:13.5px;line-height:1.62;margin:0 auto;max-width:34ch}
+#wish-card p + p{margin-top:9px}
+#wish-transcript{
+  display:none;margin-top:16px;text-align:left;min-height:76px;max-height:32vh;
+  overflow-y:auto;font-size:13.5px;line-height:1.55;color:var(--text);
+  background:rgba(255,255,255,.03);border:1px solid var(--line);
+  border-radius:10px;padding:12px 14px;
+}
+#wish-transcript:empty::before{content:"Listening…";color:var(--faint);font-style:italic}
+#wish-card.live #wish-transcript{display:block}
+#wish-card.live .intro{display:none}
+.rec{display:none;align-items:center;justify-content:center;gap:9px;margin-top:15px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red)}
+#wish-card.live .rec{display:flex}
+.rec .blob{width:9px;height:9px;border-radius:50%;background:var(--red);
+  box-shadow:0 0 0 0 rgba(226,109,90,.6);animation:recPulse 1.5s ease-out infinite}
+@keyframes recPulse{
+  0%{box-shadow:0 0 0 0 rgba(226,109,90,.55)}
+  70%{box-shadow:0 0 0 13px rgba(226,109,90,0)}
+  100%{box-shadow:0 0 0 0 rgba(226,109,90,0)}}
+#wish-foot{display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap}
+#wish-foot button{font:inherit;font-size:13px;padding:10px 26px;border-radius:99px;
+  border:1px solid var(--line);background:transparent;color:var(--dim)}
+#wish-foot button:hover{color:#fff;border-color:rgba(255,255,255,.45)}
+#wish-foot .primary{border:0;font-weight:600;background:var(--text);color:var(--panel)}
+#wish-foot .primary:hover{filter:brightness(.92);color:var(--panel)}
 
 .guidepane{padding:26px 18px;display:flex;flex-direction:column;gap:13px;align-items:flex-start}
 .guidepane p{color:var(--dim);max-width:64ch;font-size:14.5px}
@@ -338,11 +419,26 @@ body.novideo .glass{background:var(--panel);-webkit-backdrop-filter:none;backdro
 .barwrap{display:grid;grid-template-columns:1fr auto;gap:15px;align-items:center;padding:0 16px 12px}
 .bar{display:flex;height:24px;border-radius:6px;overflow:hidden;
   background:rgba(255,255,255,.05);border:1px solid var(--line)}
-.seg-b{position:relative;min-width:2px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+/* No labels inside the segments. They clipped on every narrow block and
+   read as noise on the wide ones; hovering says it properly instead. */
+.seg-b{position:relative;min-width:3px;cursor:default;transition:filter .12s}
 .seg-b + .seg-b{border-left:1px solid rgba(0,0,0,.35)}
-.seg-b span{font-family:var(--mono);font-size:10px;color:rgba(0,0,0,.72);white-space:nowrap;
-  padding:0 5px;font-weight:500}
-.seg-b.dark span{color:rgba(255,255,255,.8)}
+.seg-b:hover{filter:brightness(1.25)}
+.bar:hover .seg-b:not(:hover){filter:brightness(.68)}
+.seg-b::after{
+  content:"";position:absolute;inset:0;border:1.5px solid #fff;border-radius:2px;
+  opacity:0;transition:opacity .12s;pointer-events:none;
+}
+.seg-b:hover::after{opacity:.9}
+/* one shared bubble, parked outside the bar so nothing clips it */
+#bartip{
+  position:fixed;z-index:55;pointer-events:none;opacity:0;transition:opacity .12s;
+  background:var(--panel2);border:1px solid var(--line-2);border-radius:8px;
+  padding:7px 11px;font-size:12px;line-height:1.4;color:var(--text);
+  white-space:nowrap;box-shadow:0 12px 30px -10px rgba(0,0,0,.85);
+  transform:translate(-50%,-100%);
+}
+#bartip[data-on="1"]{opacity:1}
 .seg-b.q-good{background:var(--q-good)} .seg-b.q-fair{background:var(--q-fair)}
 .seg-b.q-poor{background:var(--q-poor)} .seg-b.q-bad{background:var(--q-bad)}
 .seg-b.q-fly{background:var(--q-fly)} .seg-b.q-fly2{background:var(--q-fly2)}
@@ -465,8 +561,6 @@ footer.note code{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
 @media (max-width:640px){
   .barwrap{grid-template-columns:1fr;gap:11px}
   .grade{justify-self:start}
-  .seg-b span{display:none}
-  .seg-b.wide span{display:inline}
   #tb{grid-template-columns:auto 1fr auto}
   #tb .tb-note{display:none}
 }
@@ -546,19 +640,18 @@ footer.note code{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
       </div>
 
       <fieldset class="fset">
-        <div class="fs-head"><span class="eyebrow">Budget &amp; points</span><span class="tip" tabindex="0" role="note" data-tip="Maximum is a hard ceiling. Target is a nudge, not a filter.">i</span><span class="rule"></span></div>
+        <div class="fs-head"><span class="eyebrow">Budget &amp; points</span><span class="rule"></span></div>
         <div class="row">
-          <div class="field money narrow"><label for="f-max">Maximum</label><input id="f-max" value="$1,150" inputmode="numeric"></div>
-          <div class="field money narrow"><label for="f-target">Target</label><input id="f-target" value="$700" inputmode="numeric"></div>
-          <div class="field money"><label for="f-incid">Incidentals<span class="tip" tabindex="0" role="note" data-tip="Padding for extras worth buying — a lounge pass, a change fee, a seat with legroom.">i</span></label><input id="f-incid" value="$180" inputmode="numeric" placeholder="Lounge pass, change fee, extra bag, seat"></div>
+          <div class="field money narrow"><label for="f-max">Maximum<span class="tip" tabindex="0" role="note" data-tip="A hard ceiling. Anything over it is hidden, with a reason and a way back.">i</span></label><input id="f-max" value="$1,150" inputmode="numeric"></div>
+          <div class="field money narrow"><label for="f-target">Target<span class="tip" tabindex="0" role="note" data-tip="A nudge, not a filter.">i</span></label><input id="f-target" value="$700" inputmode="numeric"></div>
         </div>
         <div class="points" id="f-points"></div>
         <button class="addpt" id="f-addpt" type="button">+ Add a points balance</button>
       </fieldset>
 
       <fieldset class="fset">
-        <div class="fs-head"><span class="eyebrow">What you'll put up with</span><span class="tip" tabindex="0" role="note" data-tip="Practical trade-offs, not departure-time pickers — those narrow the search before you have seen anything.">i</span><span class="rule"></span></div>
-        <div class="chips" id="f-opts"></div>
+        <div class="fs-head"><span class="eyebrow">Features</span><span class="tip" tabindex="0" role="note" data-tip="What you want, not what you will tolerate. Each one changes the arithmetic — nothing here is decoration.">i</span><span class="rule"></span></div>
+        <div class="features" id="f-opts"></div>
       </fieldset>
 
       <div class="targetbar">
@@ -570,7 +663,13 @@ footer.note code{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
             <button data-t="comfort" aria-pressed="true">Most comfortable</button>
           </div>
         </div>
-        <button class="go" id="f-go">Search flights</button>
+        <div class="gorow">
+          <button class="wish" id="f-wish" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 4.6L18.5 9l-4.6 1.4L12 15l-1.9-4.6L5.5 9l4.6-1.4z"/><path d="M18.5 15.5l.7 1.7 1.8.6-1.8.6-.7 1.7-.7-1.7-1.8-.6 1.8-.6z"/><path d="M5.5 16l.5 1.2 1.3.4-1.3.4-.5 1.2-.5-1.2L3.7 17.6l1.3-.4z"/></svg>
+            Make a wish
+          </button>
+          <button class="go" id="f-go">Search flights</button>
+        </div>
       </div>
     </div>
   </section>
@@ -583,6 +682,7 @@ footer.note code{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
   </footer>
 </div>
 
+<div id="bartip" data-on="0"></div>
 <div id="modal-root"></div>
 <!-- The model used to live here: about 350 lines of fixture data and a
      JavaScript scorer. Both are gone. The page asks concorde-travel/scorer.py
@@ -740,19 +840,41 @@ footer.note code{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
    STATE + the form
    =================================================================== */
 var STATE = {
-  target:"comfort", bags:2, redeyeOK:false, wifiMatters:false, tightArrival:false,
-  needBin:false, longLayoverOK:true, selfTransferOK:true,
+  target:"comfort", bags:2,
+  nonstop:false, oneticket:false, redeyeOK:false, shortlay:false, excursion:false,
+  wifi:false, legroom:false, lieflat:false, lounge:false, bagsinc:false,
+  wishWeights:{},
   balances:{}, filters:[], understood:[], overrides:{}, expanded:{},
   showFiltered:false, searched:false, firstPaint:true, fixture:"ground-access-swing"
 };
 
-var OPTIONS = [
-  {k:"redeyeOK",       label:"Red-eyes are fine"},
-  {k:"longLayoverOK",  label:"Long layovers welcome if I can leave the airport"},
-  {k:"needBin",        label:"I need an overhead bin"},
-  {k:"wifiMatters",    label:"Working wifi matters"},
-  {k:"tightArrival",   label:"I have something the morning I land"},
-  {k:"selfTransferOK", label:"Separate tickets are OK"}
+/* Every tile changes the arithmetic. Two map to hard filters, the rest to
+   bounded weights the scorer already reads. Nothing here is decoration —
+   a control that does nothing is worse than no control, and "overhead bin"
+   was exactly that: every aircraft has one. */
+var ICON = {
+  nonstop:  '<path d="M3 12h18"/><path d="M15 6l6 6-6 6"/>',
+  ticket:   '<path d="M3 9a2 2 0 002-2h14a2 2 0 002 2v1a2 2 0 000 4v1a2 2 0 00-2 2H5a2 2 0 00-2-2v-1a2 2 0 000-4z"/><path d="M14 7v10"/>',
+  moon:     '<path d="M20 14.5A8.2 8.2 0 019.5 4 8.3 8.3 0 1020 14.5z"/>',
+  fast:     '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/>',
+  city:     '<path d="M3 21h18"/><path d="M5 21V9l5-3v15"/><path d="M14 21V11l5 2.5V21"/><path d="M7.5 12h0M7.5 15h0M16.5 16h0"/>',
+  wifi:     '<path d="M4.5 9.5a11 11 0 0115 0"/><path d="M7.5 13a7 7 0 019 0"/><path d="M10.5 16.3a2.8 2.8 0 013 0"/><path d="M12 19.5h0"/>',
+  legroom:  '<path d="M7 4v8a3 3 0 003 3h4"/><path d="M17 15v5"/><path d="M5 20h9"/>',
+  lieflat:  '<path d="M3 17v-3a2 2 0 012-2h14a2 2 0 012 2v3"/><path d="M3 17h18"/><path d="M6 12V9a2 2 0 012-2h3"/>',
+  lounge:   '<path d="M5 11V8a2 2 0 012-2h10a2 2 0 012 2v3"/><path d="M4 11h16v5H4z"/><path d="M6 16v3M18 16v3"/>',
+  bag:      '<rect x="4" y="8" width="16" height="12" rx="2"/><path d="M9 8V6a2 2 0 012-2h2a2 2 0 012 2v2"/>'
+};
+var FEATURES = [
+  {k:"nonstop",   label:"Nonstop",        icon:"nonstop", filter:{kind:"nonstop_only", value:true}},
+  {k:"oneticket", label:"One ticket",     icon:"ticket",  filter:{kind:"no_self_transfer", value:true}},
+  {k:"redeyeOK",  label:"Red-eyes fine",  icon:"moon",    pref:"redeye_ok"},
+  {k:"shortlay",  label:"Short layovers", icon:"fast",    weight:["layover", 1.9]},
+  {k:"excursion", label:"A day in town",  icon:"city",    weight:["excursion", 2.2]},
+  {k:"wifi",      label:"Fast wi-fi",     icon:"wifi",    weight:["wifi", 1.8]},
+  {k:"legroom",   label:"Legroom",        icon:"legroom", weight:["pitch", 1.9]},
+  {k:"lieflat",   label:"Lie-flat",       icon:"lieflat", filter:{kind:"min_cabin", value:"business"}},
+  {k:"lounge",    label:"Lounge",         icon:"lounge",  weight:["lounge", 1.8]},
+  {k:"bagsinc",   label:"Bags included",  icon:"bag",     weight:["bags", 1.6]}
 ];
 
 function el(tag, cls, html){
@@ -801,17 +923,20 @@ document.getElementById("f-addpt").onclick = function(){
   ptRows.push({prog:"Amex Membership Rewards", pts:0}); renderPoints(); sync();
 };
 
-/* ---- option chips ---- */
+/* ---- feature tiles ---- */
 (function(){
   var host = document.getElementById("f-opts");
-  OPTIONS.forEach(function(o){
-    var b = el("button","chip",'<span class="qbox"></span>' + esc(o.label));
+  FEATURES.forEach(function(f){
+    var b = el("button","feat",
+      '<span class="dotmark"></span>' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICON[f.icon] + '</svg>' +
+      '<span>' + esc(f.label) + '</span>');
     b.type = "button";
-    b.setAttribute("aria-pressed", STATE[o.k] ? "true" : "false");
+    b.setAttribute("aria-pressed", STATE[f.k] ? "true" : "false");
     b.onclick = function(){
-      STATE[o.k] = !STATE[o.k];
-      b.setAttribute("aria-pressed", STATE[o.k] ? "true" : "false");
-      if (STATE.searched) render();
+      STATE[f.k] = !STATE[f.k];
+      b.setAttribute("aria-pressed", STATE[f.k] ? "true" : "false");
+      if (STATE.searched) render(false);
     };
     host.appendChild(b);
   });
@@ -845,7 +970,7 @@ document.getElementById("f-swap").onclick = function(){
 document.getElementById("f-bags").onchange = function(e){
   STATE.bags = parseInt(e.target.value,10); if (STATE.searched) render();
 };
-["f-max","f-incid"].forEach(function(id){
+["f-max","f-target"].forEach(function(id){
   var e = document.getElementById(id);
   if (e) e.onchange = function(){ if (STATE.searched) render(false); };
 });
@@ -889,104 +1014,147 @@ document.getElementById("tb-sky").onclick = function(){
    what was understood before it is applied.
    =================================================================== */
 var CARRIER_WORDS = [
-  {name:"American Airlines", pats:["american","aa"]},
-  {name:"United", pats:["united"]},
-  {name:"Delta", pats:["delta"]},
-  {name:"British Airways", pats:["british airways","ba"]},
-  {name:"Air France", pats:["air france"]},
-  {name:"KLM", pats:["klm"]},
-  {name:"TAP Air Portugal", pats:["tap","portugal"]},
-  {name:"PLAY", pats:["play"]}
+  {code:"AA", name:"American",        pats:["american","aa"]},
+  {code:"UA", name:"United",          pats:["united"]},
+  {code:"DL", name:"Delta",           pats:["delta"]},
+  {code:"BA", name:"British Airways", pats:["british airways","ba"]},
+  {code:"AF", name:"Air France",      pats:["air france"]},
+  {code:"KL", name:"KLM",             pats:["klm"]},
+  {code:"TP", name:"TAP",             pats:["tap","portugal"]},
+  {code:"ZZ", name:"the budget carrier", pats:["budget","cheap airline"]}
 ];
-function parseDream(text){
-  var t = (" " + text.toLowerCase() + " ").replace(/[^\w\s']/g," ");
-  var filters = [], understood = [];
-  var NEG = /(don'?t|do not|never|avoid|rather not|no more|not)\s+(?:want\s+to\s+)?(?:ever\s+)?(?:fly\s+)?(?:on\s+)?(?:with\s+)?/;
 
-  CARRIER_WORDS.forEach(function(c){
-    for (var i = 0; i < c.pats.length; i++){
-      var idx = t.indexOf(" " + c.pats[i] + " ");
-      if (idx < 0) continue;
-      var before = t.slice(Math.max(0, idx - 42), idx);
-      if (NEG.test(before)){
-        filters.push({kind:"carrier", value:c.name, why:"you excluded " + c.name});
-        understood.push({cls:"filter", text:"exclude " + c.name});
-        return;
-      }
-    }
-  });
+/* THE WISH CARD. Chromeless on purpose: no title bar, no close box, the same
+   shape the desktop app uses for its update sheet. It says what is about to
+   happen, then does exactly that. Two states in one card - the pitch, and
+   then the microphone with a live transcript where the pitch was. */
+function openWish(){
+  var veil = el("div", null, "");
+  veil.id = "wish-veil";
+  var card = el("div", null,
+    '<svg class="star" viewBox="0 0 24 24" aria-hidden="true">' +
+      '<path d="M12 2.5l2.3 5.6L20.5 10l-5.6 2.3L12 18l-2.3-5.7L4.1 10l5.6-1.9z"/>' +
+      '<path d="M19 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>' +
+    '</svg>' +
+    '<h2>Make a wish</h2>' +
+    '<div class="intro">' +
+      '<p>Tell us about your dream flight. Anything at all — the seat you want, ' +
+      'the airline you would rather avoid, the aircraft you have been hoping to fly, ' +
+      'what would ruin the trip.</p>' +
+      '<p>Press <b>Let\'s go</b> and we start listening. Talk as long as you like. ' +
+      'We will read it back before anything is applied, and then do our best to ' +
+      'grant it in the flights we find.</p>' +
+    '</div>' +
+    '<div id="wish-transcript"></div>' +
+    '<div class="rec"><span class="blob"></span> Recording</div>');
+  card.id = "wish-card";
+  veil.appendChild(card);
 
-  var likes = [
-    {re:/bulkhead/,            w:"bulkhead seat", key:"seat"},
-    {re:/aisle/,               w:"aisle seat", key:"seat"},
-    {re:/787|789|dreamliner/,  w:"prefers the 787", key:"equip"},
-    {re:/a350|350/,            w:"prefers the A350", key:"equip"},
-    {re:/non.?stop|direct/,    w:"nonstop weighted up", key:"nonstop"},
-    {re:/wi.?fi|internet/,     w:"connectivity weighted up", key:"wifi"},
-    {re:/lounge/,              w:"lounge access weighted up", key:"lounge"},
-    {re:/legroom|pitch|space/, w:"legroom weighted up", key:"pitch"}
-  ];
-  likes.forEach(function(L){ if (L.re.test(t)) understood.push({cls:"weight", text:L.w}); });
-  if (/wi.?fi|internet/.test(t)) STATE.wifiMatters = true;
+  var foot = el("div", null, ""); foot.id = "wish-foot";
+  var cancel = el("button", null, "Not now"); cancel.type = "button";
+  var go = el("button", "primary", "Let’s go"); go.type = "button";
+  foot.appendChild(cancel); foot.appendChild(go);
+  card.appendChild(foot);
+  document.getElementById("modal-root").appendChild(veil);
 
-  return {filters:filters, understood:understood};
-}
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var rec = null, settled = "", live = false;
+  var box = card.querySelector("#wish-transcript");
 
-function openDream(){
-  var root = document.getElementById("modal-root");
-  root.innerHTML = "";
-  var scrim = el("div","scrim");
-  var m = el("div","modal");
-  m.innerHTML =
-    '<h3>Anything that would make this your ideal flight?</h3>' +
-    '<p>Say it how you would to a person. We show you what we understood before applying it.</p>' +
-    '<textarea id="dream-txt" placeholder="Speak or type…"></textarea>' +
-    '<div class="examples">"I\'d really like a bulkhead seat, I\'d like to fly a 787 if possible, and I really don\'t want to fly American."</div>';
-  var dict = el("button","dictate",'<span class="dot"></span> Dictate');
-  dict.type = "button";
-  var acts = el("div","acts");
-  var skip = el("button","btn-ghost","Skip"); skip.type = "button";
-  var apply = el("button","go","Apply and search"); apply.type = "button";
-  acts.appendChild(skip); acts.appendChild(apply);
-  m.appendChild(dict); m.appendChild(acts);
-  scrim.appendChild(m); root.appendChild(scrim);
+  function close(){ try { rec && rec.stop(); } catch(e){} document.getElementById("modal-root").innerHTML = ""; }
+  cancel.onclick = close;
+  veil.onclick = function(e){ if (e.target === veil) close(); };
 
-  var ta = m.querySelector("#dream-txt");
-  ta.focus();
+  function finish(){
+    var said = (box.textContent || "").trim();
+    close();
+    if (!said) return;
+    var parsed = parseWish(said);
+    STATE.filters = parsed.filters;
+    STATE.understood = parsed.understood;
+    STATE.wishWeights = parsed.weights;
+    render(true);
+  }
 
-  var SR = window.SpeechRecognition || window.webkitSpeechRecognition, rec = null, on = false;
-  dict.onclick = function(){
+  go.onclick = function(){
+    if (live) return finish();
     if (!SR){
-      dict.innerHTML = '<span class="dot"></span> Dictation needs Chrome or Safari — type instead';
-      dict.disabled = true; return;
+      /* no speech engine here — the card still works, you just type */
+      card.classList.add("live");
+      box.contentEditable = "true";
+      box.setAttribute("role", "textbox");
+      box.focus();
+      card.querySelector(".rec").innerHTML =
+        '<span class="blob" style="animation:none;background:var(--faint)"></span> ' +
+        'Dictation needs Chrome or Safari — type instead';
+      go.textContent = "Grant it";
+      live = true;
+      return;
     }
-    if (on){ rec && rec.stop(); return; }
-    rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = "en-US";
-    var settled = ta.value;
+    rec = new SR();
+    rec.continuous = true; rec.interimResults = true; rec.lang = "en-US";
     rec.onresult = function(e){
       var interim = "";
       for (var i = e.resultIndex; i < e.results.length; i++){
         if (e.results[i].isFinal) settled += e.results[i][0].transcript;
         else interim += e.results[i][0].transcript;
       }
-      ta.value = (settled + interim).replace(/\s+/g," ").trim();
+      box.textContent = (settled + interim).replace(/\s+/g, " ").trim();
     };
-    rec.onend = function(){ on = false; dict.dataset.on = "0"; dict.innerHTML = '<span class="dot"></span> Dictate'; };
-    rec.onerror = rec.onend;
-    rec.start(); on = true; dict.dataset.on = "1";
-    dict.innerHTML = '<span class="dot"></span> Listening — tap to stop';
+    rec.onerror = function(){ card.querySelector(".rec").lastChild.textContent = " Could not hear you"; };
+    rec.start();
+    card.classList.add("live");
+    go.textContent = "Grant it";
+    live = true;
   };
-
-  function close(){ try{ rec && rec.stop(); }catch(e){} root.innerHTML = ""; }
-  skip.onclick = function(){ close(); STATE.filters = []; STATE.understood = []; runSearch(); };
-  apply.onclick = function(){
-    var parsed = parseDream(ta.value);
-    STATE.filters = parsed.filters; STATE.understood = parsed.understood;
-    close(); runSearch(true);
-  };
-  scrim.onclick = function(e){ if (e.target === scrim) { close(); STATE.filters=[]; STATE.understood=[]; runSearch(true); } };
 }
-document.getElementById("f-go").onclick = openDream;
+
+/* In the shipped product this goes to a model, which returns a bounded weight
+   vector and a filter list and nothing else. Here it is a local pattern match,
+   so the demo stays deterministic and works offline. Either way the user sees
+   what was understood before it is applied. */
+function parseWish(text){
+  var t = (" " + text.toLowerCase() + " ").replace(/[^\w\s']/g, " ");
+  var filters = [], understood = [], weights = {};
+  var NEG = /(don'?t|do not|never|avoid|rather not|no more|not|hate)\s+(?:want\s+to\s+)?(?:ever\s+)?(?:fly\s+)?(?:on\s+)?(?:with\s+)?/;
+
+  CARRIER_WORDS.forEach(function(c){
+    for (var i = 0; i < c.pats.length; i++){
+      var idx = t.indexOf(" " + c.pats[i] + " ");
+      if (idx < 0) continue;
+      if (NEG.test(t.slice(Math.max(0, idx - 42), idx))){
+        filters.push({kind:"carrier", value:c.code, why:"you excluded " + c.name});
+        understood.push({cls:"filter", text:"no " + c.name});
+        return;
+      }
+    }
+  });
+
+  var WISHES = [
+    {re:/bulkhead|legroom|leg room|pitch|stretch/, w:["pitch",1.9],      say:"legroom"},
+    {re:/lie.?flat|flat bed|business class|first class/, w:null,          say:"lie-flat", filter:{kind:"min_cabin", value:"business"}},
+    {re:/wi.?fi|internet|online|work on the plane/,  w:["wifi",1.8],      say:"working wi-fi"},
+    {re:/lounge/,                                    w:["lounge",1.8],    say:"lounge access"},
+    {re:/non.?stop|direct|no connection/,            w:null,              say:"nonstop only", filter:{kind:"nonstop_only", value:true}},
+    {re:/quick layover|short layover|tight connection|straight through/, w:["layover",1.9], say:"short layovers"},
+    {re:/explore|see the city|day in|wander|stop over|stopover/, w:["excursion",2.2], say:"a day in the city"},
+    {re:/red.?eye|overnight/,                        w:null,              say:"red-eyes are fine"},
+    {re:/bag|luggage|suitcase/,                      w:["bags",1.6],      say:"bags included"},
+    {re:/787|dreamliner|a350|new plane|newer aircraft/, w:["cabin",2.0],  say:"a consistent, current cabin"}
+  ];
+  WISHES.forEach(function(x){
+    if (!x.re.test(t)) return;
+    if (x.w) weights[x.w[0]] = x.w[1];
+    if (x.filter) filters.push(x.filter);
+    understood.push({cls: x.filter ? "filter" : "weight", text:x.say});
+  });
+  if (!understood.length) understood.push({cls:"weight", text:"nothing we could act on — say more"});
+  return {filters:filters, understood:understood, weights:weights};
+}
+
+document.getElementById("f-wish").onclick = openWish;
+if (location.hash === "#wish") openWish();   /* handy while building it */
+document.getElementById("f-go").onclick = function(){ render(true); };
 
 /* ===================================================================
    RENDER — the page owns none of the model. It posts the form to
@@ -1006,7 +1174,8 @@ var CARRIER_TINT = {BA:"#1d4e89", UA:"#1b3a6b", DL:"#153b6e", AF:"#0a2f6b", KL:"
                     XX:"#3f4a5e", OG:"#c8102e"};
 
 function money(c){ return "$" + Math.abs(Math.round(c/100)).toLocaleString("en-US"); }
-function hm(m){ return Math.floor(m/60) + "h" + (m%60 < 10 ? "0" : "") + (m%60) + "m"; }
+function hm(m){ var h = Math.floor(m/60), r = m%60;
+  return h ? h + "h" + (r<10?"0":"") + r + "m" : r + "m"; }
 function tint(code){ return CARRIER_TINT[code] || "#3f4a5e"; }
 function gradeClass(g){
   return g.charAt(0) === "A" ? "g-good" : g.charAt(0) === "B" ? "g-fair"
@@ -1016,22 +1185,22 @@ function gradeClass(g){
 var LAST = null;     /* the most recent server answer */
 
 function requestBody(){
+  var weights = {}, filters = [], prefs = {};
+  FEATURES.forEach(function(f){
+    if (!STATE[f.k]) return;
+    if (f.weight) weights[f.weight[0]] = f.weight[1];
+    if (f.filter) filters.push(f.filter);
+    if (f.pref) prefs[f.pref] = true;
+  });
+  STATE.filters.forEach(function(f){ filters.push({kind:"carrier", value:f.value}); });
+  Object.keys(STATE.wishWeights || {}).forEach(function(k){ weights[k] = STATE.wishWeights[k]; });
   return {
-    fixture: STATE.fixture,
-    profile: STATE.target,
-    bags: STATE.bags,
-    prefs: {redeye_ok: STATE.redeyeOK},
-    weights: (function(){
-      var w = {};
-      if (STATE.wifiMatters) w.wifi = 1.8;
-      return w;
-    })(),
-    filters: STATE.filters.map(function(f){ return {kind:"carrier", value:f.value}; })
-      .concat(STATE.needBin ? [{kind:"requires_cabin_bag", value:true}] : []),
-    incidental_cents: dollars("f-incid"),
+    fixture: STATE.fixture, profile: STATE.target, bags: STATE.bags,
+    prefs: prefs, weights: weights, filters: filters,
     max_cents: dollars("f-max")
   };
 }
+
 function dollars(id){
   var el = document.getElementById(id);
   if (!el) return null;
@@ -1052,12 +1221,11 @@ function barHTML(o){
   var total = 0;
   o.bar.forEach(function(b){ total += b.minutes; });
   var h = '<div class="bar" role="img" aria-label="' + hm(total) + ' door to door">';
-  o.bar.forEach(function(b){
+  o.bar.forEach(function(b, i){
     var pct = (b.minutes / total) * 100;
-    var cls = b.kind === "flight" ? "q-fly dark" : "q-" + b.quality;
-    h += '<div class="seg-b ' + cls + (pct > 11 ? " wide" : "") +
-         '" style="width:' + pct.toFixed(2) + '%" title="' + esc(b.detail) + '">' +
-         (pct > 7 ? '<span>' + esc(b.label) + '</span>' : '') + '</div>';
+    var cls = b.kind === "flight" ? (i % 2 ? "q-fly2" : "q-fly") : "q-" + b.quality;
+    h += '<div class="seg-b ' + cls + '" style="width:' + pct.toFixed(2) +
+         '%" data-tip="' + esc(b.tip || b.label) + '"></div>';
   });
   return h + '</div>';
 }
@@ -1227,7 +1395,13 @@ function paint(){
   }
   h += '<div class="src">Written from the ledger. It states nothing the arithmetic did not produce.</div></div>';
 
-  h += '<div class="sectionhead"><span class="eyebrow">Top three</span><span class="rule"></span></div>';
+  if (!opts.length){
+    h += '<div class="sectionhead"><span class="eyebrow">Nothing left</span><span class="rule"></span></div>';
+    h += '<div class="hidden-row glass" style="border-style:solid">Your filters ruled out every option on this route. ' +
+         '<button id="clearfilters">Clear them</button></div>';
+  } else
+  h += '<div class="sectionhead"><span class="eyebrow">Top ' + (opts.length < 3 ? opts.length : "three") +
+       '</span><span class="rule"></span></div>';
   opts.slice(0,3).forEach(function(o,i){ h += optionHTML(o, i+1, false); });
   if (opts.length > 3){
     h += '<div class="sectionhead"><span class="eyebrow">' + (opts.length-3) + ' more</span><span class="rule"></span></div>';
@@ -1251,6 +1425,28 @@ function paint(){
   Array.prototype.forEach.call(host.querySelectorAll("[data-book]"), function(b){
     b.onclick = function(){ openBook(b.dataset.book); };
   });
+  var tipEl = document.getElementById("bartip");
+  host.onmousemove = function(e){
+    var seg = e.target.closest ? e.target.closest(".seg-b") : null;
+    if (!seg){ tipEl.dataset.on = "0"; return; }
+    var r = seg.getBoundingClientRect();
+    tipEl.textContent = seg.dataset.tip || "";
+    tipEl.style.left = Math.round(r.left + r.width / 2) + "px";
+    tipEl.style.top = Math.round(r.top - 9) + "px";
+    tipEl.dataset.on = "1";
+  };
+  host.onmouseleave = function(){ tipEl.dataset.on = "0"; };
+
+  var cf = host.querySelector("#clearfilters");
+  if (cf) cf.onclick = function(){
+    FEATURES.forEach(function(f){ if (f.filter) STATE[f.k] = false; });
+    STATE.filters = []; STATE.understood = []; STATE.wishWeights = {};
+    Array.prototype.forEach.call(document.querySelectorAll(".feat"), function(b, i){
+      if (FEATURES[i] && FEATURES[i].filter) b.setAttribute("aria-pressed", "false");
+    });
+    render(false);
+  };
+
   var sh = host.querySelector("#showhid");
   if (sh) sh.onclick = function(){ STATE.showFiltered = !STATE.showFiltered; paint(); };
 }

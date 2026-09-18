@@ -352,7 +352,7 @@ def _view(sc, opt, profile):
                    "amount_cents": l.amount_cents, "evidence": l.evidence,
                    "kind": l.kind, "overridable": l.overridable} for l in led.lines],
         "bar": [{"kind": l.kind, "label": l.label, "minutes": l.minutes,
-                 "quality": l.quality, "detail": l.detail} for l in tl],
+                 "quality": l.quality, "detail": l.detail, "tip": l.tip} for l in tl],
         "segments": [{
             "flight": "%s %d" % (s["marketing"]["carrier"], s["marketing"]["number"]),
             "from": s["origin"]["iata"] + (("/" + s["origin"]["terminal"]) if s["origin"].get("terminal") else ""),

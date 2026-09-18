@@ -522,7 +522,9 @@
                   "carrier",
                   "max_price",
                   "requires_cabin_bag",
-                  "no_self_transfer"
+                  "no_self_transfer",
+                  "nonstop_only",
+                  "min_cabin"
                 ]
               },
               "value": {}

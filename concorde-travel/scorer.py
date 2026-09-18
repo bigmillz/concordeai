@@ -322,6 +322,7 @@ class Leg:
     minutes: int
     quality: str         # good | fair | poor | bad | flight
     detail: str = ""
+    tip: str = ""        # the one line the bar shows on hover. Short on purpose.
 
 
 def _band(minutes: int, band: Tuple[int, int, int]) -> str:
@@ -342,15 +343,17 @@ def timeline(scenario: Dict[str, Any], option: Dict[str, Any],
     out, _ = chosen_ground(option, prof, "outbound")
     if out:
         m = out["door_to_door_minutes"]["p50"]
-        legs.append(Leg("ground", "to " + option["segments"][0]["origin"]["iata"], m,
-                        _band(m, tuning.band_ground),
-                        "%s - %s" % (out["mode"], _hm(m))))
+        ap = option["segments"][0]["origin"]["iata"]
+        legs.append(Leg("ground", "to " + ap, m, _band(m, tuning.band_ground),
+                        "%s - %s" % (out["mode"], _hm(m)),
+                        "To %s \u00b7 %s \u00b7 %s" % (ap, _hm(m), out["mode"])))
 
     proc = (option.get("airport_process_minutes") or {}).get("p50", 0)
     if proc:
         legs.append(Leg("process", "airport", proc, _band(proc, tuning.band_process),
                         "Check-in, security and the walk to the gate at %s"
-                        % option["segments"][0]["origin"]["iata"]))
+                        % option["segments"][0]["origin"]["iata"],
+                        "At the airport \u00b7 %s" % _hm(proc)))
 
     for i, seg in enumerate(option["segments"]):
         m = minutes_between(seg["departure_local"], seg["arrival_local"])
@@ -358,7 +361,8 @@ def timeline(scenario: Dict[str, Any], option: Dict[str, Any],
         legs.append(Leg("flight", fl, m, "flight",
                         "%s %s to %s - %s on a %s"
                         % (fl, seg["origin"]["iata"], seg["destination"]["iata"],
-                           _hm(m), seg.get("equipment_code", "?"))))
+                           _hm(m), seg.get("equipment_code", "?")),
+                        "Flight \u00b7 %s \u00b7 %s" % (fl, _hm(m))))
         lay = next((l for l in option.get("layovers", [])
                     if l["arrive_segment_id"] == seg["segment_id"]), None)
         if lay:
@@ -375,14 +379,17 @@ def timeline(scenario: Dict[str, Any], option: Dict[str, Any],
             legs.append(Leg("layover", "%s %s" % (lay["airport"], _hm(m)), m, q,
                             "%s - %s, landing %02d:%02d local. %s"
                             % (lay["airport"], _hm(m), clock // 60, clock % 60,
-                               lay.get("note", ""))))
+                               lay.get("note", "")),
+                            "Layover \u00b7 %s \u00b7 %s \u00b7 lands %02d:%02d"
+                            % (lay["airport"], _hm(m), clock // 60, clock % 60)))
 
     inb, _ = chosen_ground(option, prof, "arrival")
     if inb:
         m = inb["door_to_door_minutes"]["p50"]
-        legs.append(Leg("ground", "to " + scenario["query"]["destination"]["label"].split(",")[0],
-                        m, _band(m, tuning.band_ground),
-                        "%s - %s" % (inb["mode"], _hm(m))))
+        dest = scenario["query"]["destination"]["label"].split(",")[0]
+        legs.append(Leg("ground", "to " + dest, m, _band(m, tuning.band_ground),
+                        "%s - %s" % (inb["mode"], _hm(m)),
+                        "To %s \u00b7 %s \u00b7 %s" % (dest, _hm(m), inb["mode"])))
     return tuple(legs)
 
 
@@ -390,6 +397,10 @@ def _layover_lines(option, scenario, prof, tuning) -> List[Line]:
     lines: List[Line] = []
     segs = {s["segment_id"]: s for s in option["segments"]}
     comfort = float(prof.get("comfort_weight", 1.0))
+    w = prof.get("weights") or {}
+    w_layover = float(w.get("layover", 1.0))      # "short layovers"
+    w_excursion = float(w.get("excursion", 1.0))  # "a day in the city"
+    w_lounge = float(w.get("lounge", 1.0))
 
     for lay in option.get("layovers", []):
         arr = segs[lay["arrive_segment_id"]]
@@ -432,7 +443,7 @@ def _layover_lines(option, scenario, prof, tuning) -> List[Line]:
                     else tuning.layover_frac_leavable if leavable
                     else tuning.layover_frac_open if open_now
                     else tuning.layover_frac_shut)
-            pen += int(excess * prof["hourly_value_cents"] * frac / 60)
+            pen += int(excess * prof["hourly_value_cents"] * frac * w_layover / 60)
             why.append("%s on the ground at %s" % (_hm(mins), lay["airport"]))
         if dead:
             pen += tuning.layover_dead_cents
@@ -454,7 +465,7 @@ def _layover_lines(option, scenario, prof, tuning) -> List[Line]:
             why.append("terminal change by %s" % mode.replace("_", " "))
 
         if leavable:
-            pen -= tuning.layover_leave_airport_credit_cents
+            pen -= int(tuning.layover_leave_airport_credit_cents * w_excursion)
 
         if leavable:
             out = next((s["what"] for s in open_now if "train" in s["what"].lower()
@@ -481,7 +492,7 @@ def _layover_lines(option, scenario, prof, tuning) -> List[Line]:
                 usable_lounge = [s for s in lounges
                                  if s.get("eligible", True)
                                  and window_covers(s["hours_local"], clock)]
-                credit = -tuning.lounge_day_pass_cents if usable_lounge else 0
+                credit = -int(tuning.lounge_day_pass_cents * w_lounge) if usable_lounge else 0
                 allowance = (scenario["query"].get("budget") or {}).get("incidental_allowance_cents") or 0
                 if credit and allowance < tuning.lounge_day_pass_cents:
                     credit = 0
@@ -615,7 +626,8 @@ def _comfort_lines(option, scenario, prof, tuning) -> List[Line]:
             lines.append(Line(
                 code="cabin_uncertain",
                 label="The cabin is close to a coin flip",
-                amount_cents=int(tuning.cabin_uncertainty_cents * short * comfort),
+                amount_cents=int(tuning.cabin_uncertainty_cents * short * comfort
+                                 * float(weights.get("cabin", 1.0))),
                 evidence="%s on only %d%% of %s, and equipment is swapped after booking"
                          % (sub["value"], round(f * 100), sub["observation_window"]),
                 overridable=True))
@@ -719,6 +731,15 @@ def filter_reason(option, scenario, prof) -> Optional[str]:
         elif f["kind"] == "no_self_transfer":
             if len(option["tickets"]) > 1:
                 return "sold as separate tickets"
+        elif f["kind"] == "min_cabin":
+            want = str(f["value"]).lower()
+            if all(str(sg.get("cabin_marketed", "economy")).lower() != want
+                   for sg in option["segments"]):
+                return "no %s cabin on this itinerary" % want
+        elif f["kind"] == "nonstop_only":
+            if len(option["segments"]) > 1:
+                return "%d stop%s, and you asked for nonstop"  % (
+                    len(option["segments"]) - 1, "" if len(option["segments"]) == 2 else "s")
     budget = (scenario["query"].get("budget") or {}).get("maximum_cents")
     if budget and sum(_ticket_total_cents(t) for t in option["tickets"]) > budget:
         return "over your %s maximum" % _money(budget)
@@ -744,6 +765,7 @@ def score(scenario: Dict[str, Any], option: Dict[str, Any],
 
     # --- bags -----------------------------------------------------------
     bag_total, bag_notes = _bag_cost(option, scenario, tuning)
+    bag_total = int(bag_total * float((prof.get("weights") or {}).get("bags", 1.0)))
     if bag_total:
         n = sum(_party_checked_bags(scenario))
         lines.append(Line(
@@ -849,7 +871,8 @@ def score_all(scenario: Dict[str, Any], profile_name: str,
 # ------------------------------------------------------------------ helpers
 
 def _hm(minutes: int) -> str:
-    return "%dh%02dm" % (minutes // 60, minutes % 60)
+    h, m = minutes // 60, minutes % 60
+    return "%dh%02dm" % (h, m) if h else "%dm" % m
 
 
 def _money(c: int) -> str:
