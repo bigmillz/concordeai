@@ -297,6 +297,25 @@ try:
     _ist = json.loads(req("/api/setup", cookie=K)[2]).get("image") or {}
 except Exception:
     _ist = {}
+# 6b296, per Patrick ("image generation doesn't seem to be working"):
+# a conversational lead-in must not change what the request IS. Both
+# matchers were ^-anchored on the verb, so "try again, generate an image
+# of a cat" fell through to the chat path and the model answered with a
+# hallucinated tool call.
+_IMPOS = ["try again, generate an image of a cat", "now generate an image of a cat",
+          "actually, draw me a cat", "great. now paint a sunset",
+          "ok try again, generate an image of a cat",
+          "one more time - generate an image of a cat",
+          "please try again and draw a red bicycle"]
+_IMNEG = ["try again, but explain it simply", "now explain what a picture element is",
+          "how do I draw a circle in CSS", "generate a list of image formats",
+          "what is an image sensor"]
+check("image intent survives a conversational lead-in",
+      all(_ii(q) for q in _IMPOS) and all(_ii(q) is None for q in _IMNEG)
+      and "def _img_strip_pre" in _MILLENAI_SRC)
+check("models are told they have no tools",
+      "You have NO tools and NO function calling" in _MILLENAI_SRC
+      and "dalle" in _MILLENAI_SRC)
 check("image generation: intent, engine ladder, settings box, wizard, arrow pill",
       _ii("Generate an image of a cat.") == "a cat"
       and _ii("draw me a red bicycle") == "a red bicycle"

@@ -176,6 +176,15 @@ SYSTEM_PROMPT = {
     "role": "system",
     "content": (
         "You are a warm, authentic, adaptive, and insightful AI collaborator. "
+        # 6b296, seen live: a local model answered "generate an image of a
+        # cat" with a hallucinated OpenAI tool call ({\"action\":
+        # \"dalle.text2im\"...}) printed as the answer. The app calls its
+        # own engines; the model never does.
+        "You have NO tools and NO function calling. Never emit a tool "
+        "call, an action JSON, or anything like {\"action\": ...} or "
+        "{\"name\": ..., \"arguments\": ...} \u2014 pictures, files, "
+        "searches and the web are handled by the app around you, not by "
+        "you. If you cannot do something, say so in one plain sentence. "
         "Avoid sounding like a rigid textbook, robot, or bullet-point generator. "
         "Speak naturally in clear, engaging prose as if talking to a smart peer "
         "— contractions, natural rhythm, a little dry humour when it fits. "
@@ -3123,6 +3132,30 @@ _DRAW_RX = re.compile(
     re.I | re.S)
 
 
+# A CONVERSATIONAL LEAD-IN IS NOT A DIFFERENT REQUEST (6b296, per Patrick:
+# "try again, generate an image of a cat" produced a model's hallucinated
+# tool call instead of a picture). Both matchers below are ^-anchored on
+# the verb, so ANY preamble — "try again,", "now", "actually," — made them
+# miss and the ask fell through to the chat path. Strip the filler first.
+_IMG_PRE = re.compile(
+    r"^\s*(?:(?:ok(?:ay)?|alright|sure|cool|great|nice|thanks|thank\s+you|"
+    r"hey|hi|hmm+|um+|so|and|but|well|now|then|next|also|too|actually|"
+    r"instead|again|please|just|quick(?:ly)?|final(?:ly)?|"
+    r"(?:lets|let\u2019s|let's)|"
+    r"try(?:\s+(?:it|that|this))?\s+again|one\s+more\s+time|"
+    r"another\s+(?:one|go|try))"
+    r"[\s,.;:!\u2014-]+){1,4}", re.I)
+
+
+def _img_strip_pre(t: str) -> str:
+    """Drop up to four filler openers, leaving the actual request."""
+    prev = None
+    while prev != t:
+        prev = t
+        t = _IMG_PRE.sub("", t, count=1).lstrip()
+    return t
+
+
 def image_intent(text: str):
     """The subject to paint when the message asks for a picture, else
     None. "Generate an image of a cat." -> "a cat"; "draw me a red
@@ -3131,6 +3164,12 @@ def image_intent(text: str):
     if len(t) > 600:
         return None
     m = _IMAGE_RX.match(t) or _DRAW_RX.match(t)
+    if not m:
+        t2 = _img_strip_pre(t)
+        if t2 != t and t2:
+            m = _IMAGE_RX.match(t2) or _DRAW_RX.match(t2)
+            if m:
+                t = t2
     if not m:
         return None
     # the prompt is everything after the verb — "a realistic photo of the
