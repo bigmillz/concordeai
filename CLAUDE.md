@@ -318,7 +318,10 @@ If a number cannot be explained in one line of that form, it does not belong in 
 ## Enrichment layers, easiest first
 
 1. **Ground access** — geocode the *actual* origin, not the city, and model time of day.
-   Bushwick→EWR at 6am is a ~$90 car (transit doesn't run); Bushwick→JFK is $2.90.
+   Bushwick→EWR at 6am is a ~$92 car; Bushwick→JFK is $11.75 the sensible way. **The
+   original brief's numbers here were wrong and are corrected in `docs/design.md`** — the
+   subway is $3.00 and runs 24h, so "transit doesn't run" is not the reason; NJ Transit's
+   airport rail stop (~05:00–01:00) is what breaks the chain.
 2. **Baggage / fare families** — basic economy plus two bags often loses to the main cabin
    fare it undercut. Pure arithmetic.
 3. **Layover quality** — a situation, not a number: airport, terminal, **local clock
@@ -332,13 +335,38 @@ If a number cannot be explained in one line of that form, it does not belong in 
 
 ## Scope
 
-NYC origin, transatlantic long-haul only: JFK/EWR/LGA, ~12 European arrival airports, ~40
-aircraft configs. **Do not generalize the enrichment data until the scorer works end to
-end** — that curated data is the moat.
+NYC origin, transatlantic long-haul only: **JFK and EWR** (LGA has zero European nonstops
+and cannot have any — the perimeter rule bars flights beyond 1,500 miles; it survives only
+as a ground-access case), ~12 European arrival airports, ~40 aircraft configs. **Do not
+generalize the enrichment data until the scorer works end to end** — that curated data is
+the moat.
 
 ## Build order
 
 fixtures → scorer → enrichment DB → intent parser → ledger narrator → live inventory
-adapter. Stack is chosen in `docs/design.md`; the only hard constraint is that the scorer
-must be **trivially testable in isolation** — pure function, structured data in, ledger
-out, no network, no clock, no I/O.
+adapter. **Fixtures and scorer are done.** Stack is Python, stdlib only — chosen in
+`docs/design.md`, and the reasoning there is worth reading before proposing otherwise.
+
+## Working on it
+
+```bash
+python3 concorde-travel/server.py             # the draft UI, http://127.0.0.1:9897
+python3 concorde-travel/scorer.py             # print every fixture's ledger, every profile
+python3 fixtures/validate.py                  # fixture schema + semantics
+python3 concorde-travel/tests/test_scorer.py  # the fixtures' own assertions, executed
+python3 concorde-travel/tests/test_faststart.py
+```
+
+**Ports 8884–8930 are the model engines' — never bind there.** ConcordeGo uses 9897.
+
+Three things about the scorer that look like fussiness and are not, each with a comment in
+`scorer.py` saying why: money is **integer cents end to end** (float accumulation makes
+ties sort by rounding noise); timestamps carry an **explicit UTC offset** and no timezone
+database is ever consulted (01:30 on 2026-11-01 at JFK happens twice); and **unknown is
+never zero** (otherwise the least-documented itinerary accumulates the fewest penalties and
+wins). Every constant lives in `scorer.Tuning`, never in a fixture — a fixture carrying the
+curve it is meant to be testing is a fixture that tests nothing.
+
+**The test suites are mutation-tested.** Before changing either, know that `test_scorer.py`
+catches 12 of 12 seeded faults and `validate.py` 10 of 10. If a change makes a suite pass
+that should not, the suite has lost a guard.

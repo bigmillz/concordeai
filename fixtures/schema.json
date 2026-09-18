@@ -48,7 +48,8 @@
         "destination",
         "depart_date",
         "party",
-        "profiles"
+        "profiles",
+        "route_par_cents"
       ],
       "additionalProperties": false,
       "properties": {
@@ -68,6 +69,10 @@
             "null"
           ],
           "format": "date"
+        },
+        "route_par_cents": {
+          "$ref": "#/$defs/money",
+          "description": "The all-in effective cost a CLEAN option achieves on this route and date - a nonstop, bags sorted, sane ground at both ends. The GRADE is an option measured against this, which is why the grade does not move when the user switches target. A property of the route, not of any option, and curated: derive it from the option set and it stops being the same yardstick for every user."
         },
         "party": {
           "type": "array",
@@ -299,6 +304,10 @@
               },
               "why": {
                 "type": "string"
+              },
+              "ref": {
+                "type": "string",
+                "description": "Which layover or segment the line is about, when an itinerary has more than one and 'the layover line' would otherwise be ambiguous."
               }
             }
           }
@@ -322,6 +331,10 @@
               },
               "why": {
                 "type": "string"
+              },
+              "ref": {
+                "type": "string",
+                "description": "Which layover or segment the line is about, when an itinerary has more than one and 'the layover line' would otherwise be ambiguous."
               }
             }
           }
@@ -349,6 +362,76 @@
         "reconciles": {
           "type": "boolean",
           "description": "Ledger lines must sum to the reported effective cost, exactly, in integer cents."
+        },
+        "target_reorders": {
+          "type": "boolean",
+          "description": "Assert that switching profile produces a DIFFERENT order. Without this, a scorer that ignored the weight vector entirely would pass every other assertion in the file."
+        },
+        "line_relations": {
+          "type": "array",
+          "description": "Comparisons BETWEEN ledger lines. A per-line bound cannot say 'these two must differ by a lot', which is exactly what a contrast fixture exists to prove - three layovers of the same length can each sit inside a generous bound and still be priced as if duration were all that mattered.",
+          "items": {
+            "type": "object",
+            "required": [
+              "a",
+              "op",
+              "b",
+              "why"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "a": {
+                "type": "object",
+                "required": [
+                  "option_id",
+                  "code"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "option_id": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "ref": {
+                    "type": "string"
+                  }
+                }
+              },
+              "b": {
+                "type": "object",
+                "required": [
+                  "option_id",
+                  "code"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "option_id": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "ref": {
+                    "type": "string"
+                  }
+                }
+              },
+              "op": {
+                "enum": [
+                  "at_least_x_times",
+                  "costs_more_than"
+                ]
+              },
+              "x": {
+                "type": "number"
+              },
+              "why": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     }
@@ -468,6 +551,10 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "outcome": {
+          "type": "boolean",
+          "description": "Whether the observed value is the GOOD case, which is what gives observed_frequency a polarity the scorer can use: P(good) = observed_frequency if outcome else 1 - observed_frequency. Omit it for a claim that is descriptive only (a subfleet name) - such a claim feeds prose and the cabin-uncertainty term, never a term of its own."
         },
         "sample_size": {
           "type": "integer",
@@ -957,13 +1044,19 @@
                 "type": "string"
               },
               "hours_local": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(\\d{2}:\\d{2}-\\d{2}:\\d{2}|24h)$",
+                "description": "A strict OPEN window, or 24h. Never prose: a scorer that string-matches 'closes by 23:30' is one rewording away from silently crediting a closed lounge. Express an overnight closure as its open window."
               },
               "eligibility": {
                 "type": "string"
               },
               "source": {
                 "type": "string"
+              },
+              "eligible": {
+                "type": "boolean",
+                "description": "Whether THIS passenger can actually use it. YOTELAIR at CDG is open around the clock and bars exactly the passenger in fixture 02, who clears immigration to a Schengen onward flight. Absent means eligible."
               }
             }
           },
@@ -974,6 +1067,35 @@
         },
         "note": {
           "type": "string"
+        },
+        "recovery": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "What happens if this connection is missed. Severity, not probability - and severity is dominated by ticketing topology, which the brief's formula never names as an input.",
+          "required": [
+            "protected"
+          ],
+          "properties": {
+            "protected": {
+              "type": "boolean",
+              "description": "true = one ticket, the carrier owes a rebooking. false = separate tickets, nobody owes anything and the next leg is bought again at the walk-up fare."
+            },
+            "next_departure_minutes": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Minutes to the next usable onward departure. Null means none the same day."
+            },
+            "overnight_implied": {
+              "type": "boolean",
+              "description": "A miss means a hotel night. That is CASH, not discomfort."
+            },
+            "walkup_fare_cents": {
+              "$ref": "#/$defs/money",
+              "description": "What the replacement leg costs when the connection is not protected."
+            }
+          }
         }
       }
     },
@@ -992,6 +1114,33 @@
         },
         "display_name": {
           "type": "string"
+        },
+        "carrier_rating": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rating",
+            "source",
+            "as_of"
+          ],
+          "description": "How good this carrier is to fly, 0 to 1, on the transatlantic economy product. A CURATED, REVIEWED number in the enrichment data - authored once, with LLM help, and version stamped. It is deliberately not a live judgement: if a model decided at query time that Emirates beats Frontier, the same search would return a different order tomorrow and hard rule 1 would be dead. The model may write this table; only the arithmetic may read it.",
+          "properties": {
+            "rating": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "source": {
+              "type": "string"
+            },
+            "as_of": {
+              "type": "string",
+              "format": "date"
+            },
+            "note": {
+              "type": "string"
+            }
+          }
         },
         "tickets": {
           "type": "array",

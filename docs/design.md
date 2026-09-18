@@ -579,3 +579,92 @@ Basic.
 **Award availability is not in cash inventory.** No cash flight API knows whether a saver
 seat exists, so the points path can only ever say *"if a saver seat is open, this costs
 100k + $12"* — and the interface must say "if".
+
+---
+
+# The scorer
+
+Build step two, done. `concorde-travel/scorer.py`, ~500 lines, stdlib only.
+
+```python
+from scorer import score, score_all, grade
+ledger = score(scenario, option, "reference")
+```
+
+`score()` is a pure function of `(scenario, option, profile)`. No clock, no network, no
+file reads, no imports from the rest of the project. Hand it the same dict twice and it
+returns the same integers twice, on any machine, forever. That is hard rule 1 — and it is
+the only reason an LLM can be let near this product at all: the model shapes the weights
+going in and writes the prose coming out, and neither can move a row.
+
+Run `python3 concorde-travel/scorer.py` to print every fixture's ledger under every
+profile.
+
+## What it does that a simpler thing would not
+
+**Ground access is a choice, not a lookup.** Each end carries a list of modes and the
+scorer picks the one that minimises `fare + duration × hourly` for *this* traveller. The
+same Bushwick→JFK query resolves to the $3.00 three-transfer route at a low hourly value
+and a $62 car at a high one. An infeasible mode is rejected with the leg that breaks it
+named in the ledger, never a blanket "no transit".
+
+**Baggage is a reduction over ticket topology.** Fees index from the first piece *beyond*
+the included allowance, tiers reset per passenger, and the whole calculation runs once per
+ticketing boundary — which is why the self-transfer in fixture 03 pays $368 for two bags
+and the intra-Europe leg costs more than the ocean crossing.
+
+**Layover time is priced by whether it can be used.** This was the one real modelling
+mistake found while building: charging every layover hour at one rate made a Schiphol
+afternoon score like a night on the floor at CDG. The fraction of the hourly rate now
+depends on the situation — dead 0.70, stuck-in-the-terminal 0.35, able-to-leave 0.10 —
+and the same 250 minutes now prices at **+$36 at AMS, −$68 at LHR and −$340 at CDG**.
+
+**A closed lounge is worth nothing.** Service windows are strict `HH:MM-HH:MM`, matched
+against the local clock at landing, with an eligibility flag. Crediting a lounge the
+passenger cannot enter is how a ledger starts lying.
+
+**Carrier quality is curated data, read not decided.** `option.carrier_rating` is a
+reviewed number with a source and an as-of date. The model may *author* that table; only
+the arithmetic may read it. A rating decided at query time would return a different order
+tomorrow.
+
+**Unknown costs something.** Abstentions are priced, so the least-documented itinerary
+does not win by saying nothing.
+
+## The grade, once more
+
+`grade()` scores the option at the **reference** profile against the route's
+`route_par_cents` and maps the ratio onto bands. It does not take the caller's profile.
+In fixture 01 the budget carrier tops the Cheapest list and sits last everywhere else,
+and its `B+` does not move — which is the behaviour the whole target selector exists for.
+
+## Tests
+
+```bash
+python3 concorde-travel/tests/test_scorer.py    # 81 checks
+```
+
+It executes each fixture's own `expect` block — which lines appear, with what sign, what
+their evidence must mention, what must *not* appear, and what order the options land in
+under each profile — plus properties no single fixture can state: determinism,
+reconciliation to the cent, an **independent** grade oracle, relational comparisons
+between fixtures' lines, and the model's own invariants.
+
+**Both suites are mutation-tested**: 12 of 12 seeded scorer faults caught, 10 of 10
+fixture faults. Two of those guards exist because a mutant walked through first — the
+grade-stability check was asking the same broken function the same question twice, and the
+"don't credit an excursion into a shut airport" guard had nothing exercising it.
+
+## Known gaps
+
+- **Cascading misconnects.** Each layover's risk is computed independently, so missing the
+  first connection in fixture 02 does not propagate to the second. Real, and it understates
+  multi-stop risk.
+- **No tight-buffer self-transfer in the corpus.** Fixture 03's has a 4h50m buffer, so its
+  misconnect probability sits at the floor and the severity term never dominates. The
+  fixture that would make it dominate is owed.
+- Round trips, parties larger than one, and arrival-time-of-day value remain unmodelled —
+  see *Corrections and gaps* above.
+- **The draft interface still runs its own JavaScript stand-in**, not this scorer. Wiring
+  the page to a `/api/score` endpoint is the next obvious step and would delete about 200
+  lines of duplicated model from `ui/index.html`.

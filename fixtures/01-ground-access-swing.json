@@ -8,57 +8,129 @@
     "Deliberately dated 2026-03-12: the US moved to DST on Mar 8 and the EU does not until Mar 29, so the NYC-London gap is FOUR hours here, not five. A scorer that assumes a constant offset gets every elapsed time in this file wrong by 60 minutes.",
     "The brief said 'Bushwick to EWR at 6am is a ~$90 car because transit doesn't run.' The reason is wrong and the wrong reason is more dangerous than a wrong number: the NYC subway runs 24 hours and the L runs all night at ~12-minute headways. What actually breaks is the NEW JERSEY end - NJ Transit's Newark Liberty Airport rail stop is served roughly 05:00-01:00, and a 06:10 departure needs you at the terminal around 04:30. The chain fails at its weakest link, and the ledger has to say which link.",
     "The brief also said 'Bushwick to JFK is $2.90.' Two corrections. The MTA base fare became $3.00 on 2026-01-04. And $3.00 only buys the Lefferts Blvd route - three transfers, one of them a bus, roughly 90 minutes - because the JFK AirTrain is free everywhere EXCEPT Jamaica and Howard Beach. The realistic one-transfer path is $11.75. Both are carried, because which one wins is exactly the judgment the scorer exists to make.",
-    "Outbound tolls to New Jersey are ZERO. Every Port Authority Hudson and Staten Island crossing is tolled NY-bound only. A symmetric toll model overcharges this trip by about $15 and would wrongly demote every EWR itinerary in the corpus."
+    "Outbound tolls to New Jersey are ZERO. Every Port Authority Hudson and Staten Island crossing is tolled NY-bound only. A symmetric toll model overcharges this trip by about $15 and would wrongly demote every EWR itinerary in the corpus.",
+    "A third option was added once the scorer existed: a cheap, uncomfortable evening departure. Without it the corpus never exercised the behaviour the whole target selector exists for - a bargain climbing the list under Cheapest while its grade, which is scored at the reference profile, does not move. Three options that always sort the same way would have let a scorer that ignored the weights pass every test."
   ],
-
   "query": {
     "origin": {
       "label": "Wyckoff Ave & Myrtle Ave, Bushwick, Brooklyn, NY 11237",
-      "lat": 40.6994, "lon": -73.9119, "postal_code": "11237", "geocode_precision": "street"
+      "lat": 40.6994,
+      "lon": -73.9119,
+      "postal_code": "11237",
+      "geocode_precision": "street"
     },
     "destination": {
-      "label": "Shoreditch, London EC2A", "lat": 51.5245, "lon": -0.0795,
-      "postal_code": "EC2A", "geocode_precision": "neighbourhood"
+      "label": "Shoreditch, London EC2A",
+      "lat": 51.5245,
+      "lon": -0.0795,
+      "postal_code": "EC2A",
+      "geocode_precision": "neighbourhood"
     },
     "depart_date": "2026-03-12",
     "return_date": null,
+    "route_par_cents": 105000,
     "party": [
       {
-        "passenger_id": "p1", "type": "adult",
+        "passenger_id": "p1",
+        "type": "adult",
         "bags": [
-          { "kind": "checked", "weight_kg": 21 },
-          { "kind": "checked", "weight_kg": 18 },
-          { "kind": "cabin", "weight_kg": 8 },
-          { "kind": "personal_item" }
+          {
+            "kind": "checked",
+            "weight_kg": 21
+          },
+          {
+            "kind": "checked",
+            "weight_kg": 18
+          },
+          {
+            "kind": "cabin",
+            "weight_kg": 8
+          },
+          {
+            "kind": "personal_item"
+          }
         ]
       }
     ],
-    "budget": { "maximum_cents": 115000, "target_cents": 70000, "incidental_allowance_cents": 18000 },
+    "budget": {
+      "maximum_cents": 115000,
+      "target_cents": 70000,
+      "incidental_allowance_cents": 18000
+    },
     "profiles": {
-      "reference": { "label": "neutral reference", "hourly_value_cents": 3500, "comfort_weight": 1.0, "risk_weight": 1.0 },
-      "cheapest":  { "label": "Cheapest",         "hourly_value_cents": 1200, "comfort_weight": 0.45, "risk_weight": 1.0 },
-      "fastest":   { "label": "Fastest",          "hourly_value_cents": 9500, "comfort_weight": 0.85, "risk_weight": 1.0 },
-      "comfort":   { "label": "Most comfortable", "hourly_value_cents": 5500, "comfort_weight": 2.0, "risk_weight": 1.0 }
+      "reference": {
+        "label": "neutral reference",
+        "hourly_value_cents": 3500,
+        "comfort_weight": 1.0,
+        "risk_weight": 1.0
+      },
+      "cheapest": {
+        "label": "Cheapest",
+        "hourly_value_cents": 1200,
+        "comfort_weight": 0.45,
+        "risk_weight": 1.0
+      },
+      "fastest": {
+        "label": "Fastest",
+        "hourly_value_cents": 9500,
+        "comfort_weight": 0.85,
+        "risk_weight": 1.0
+      },
+      "comfort": {
+        "label": "Most comfortable",
+        "hourly_value_cents": 5500,
+        "comfort_weight": 2.0,
+        "risk_weight": 1.0
+      }
     }
   },
-
   "options": [
     {
       "option_id": "ua-ewr-0610",
       "display_name": "United 934, Newark 06:10",
+      "carrier_rating": {
+        "rating": 0.66,
+        "source": "ConcordeGo curated carrier table, human-reviewed",
+        "as_of": "2026-03-01",
+        "note": "Full service, but an ageing transatlantic cabin on this route"
+      },
       "tickets": [
         {
           "ticket_id": "t-ua",
           "issuing_carrier": "UA",
           "fare_brand_name": "Basic Economy",
           "price": {
-            "currency": "USD", "base_cents": 39100, "fx_rate_to_usd": 1.0,
+            "currency": "USD",
+            "base_cents": 39100,
+            "fx_rate_to_usd": 1.0,
             "taxes": [
-              { "code": "US", "amount_cents": 2930, "label": "US transportation tax", "refundable_on_cancel": true },
-              { "code": "XF", "amount_cents": 450, "label": "Passenger facility charge", "refundable_on_cancel": true },
-              { "code": "GB", "amount_cents": 0, "label": "UK APD (not levied on arrival)", "refundable_on_cancel": true }
+              {
+                "code": "US",
+                "amount_cents": 2930,
+                "label": "US transportation tax",
+                "refundable_on_cancel": true
+              },
+              {
+                "code": "XF",
+                "amount_cents": 450,
+                "label": "Passenger facility charge",
+                "refundable_on_cancel": true
+              },
+              {
+                "code": "GB",
+                "amount_cents": 0,
+                "label": "UK APD (not levied on arrival)",
+                "refundable_on_cancel": true
+              }
             ],
-            "carrier_imposed": [ { "code": "YQ", "amount_cents": 3020, "label": "Carrier-imposed surcharge", "refundable_on_cancel": false } ],
+            "carrier_imposed": [
+              {
+                "code": "YQ",
+                "amount_cents": 3020,
+                "label": "Carrier-imposed surcharge",
+                "refundable_on_cancel": false
+              }
+            ],
             "agency_fees": []
           },
           "entitlements": {
@@ -72,43 +144,77 @@
             "boarding_group": "Group 6"
           },
           "checked_bag_fee_tiers": [
-            { "piece": 1, "amount_cents": 8500, "note": "Transatlantic Basic Economy, prepaid online" },
-            { "piece": 2, "amount_cents": 11000 }
+            {
+              "piece": 1,
+              "amount_cents": 8500,
+              "note": "Transatlantic Basic Economy, prepaid online"
+            },
+            {
+              "piece": 2,
+              "amount_cents": 11000
+            }
           ],
-          "segment_ids": ["s-ua-1"]
+          "segment_ids": [
+            "s-ua-1"
+          ]
         }
       ],
       "segments": [
         {
           "segment_id": "s-ua-1",
-          "marketing": { "carrier": "UA", "number": 934 },
-          "operating": { "carrier": "UA", "number": 934 },
-          "origin": { "iata": "EWR", "terminal": "B", "iata_area": 1, "schengen": false },
-          "destination": { "iata": "LHR", "terminal": "2", "iata_area": 2, "schengen": false },
+          "marketing": {
+            "carrier": "UA",
+            "number": 934
+          },
+          "operating": {
+            "carrier": "UA",
+            "number": 934
+          },
+          "origin": {
+            "iata": "EWR",
+            "terminal": "B",
+            "iata_area": 1,
+            "schengen": false
+          },
+          "destination": {
+            "iata": "LHR",
+            "terminal": "2",
+            "iata_area": 2,
+            "schengen": false
+          },
           "departure_local": "2026-03-12T06:10:00-04:00",
           "arrival_local": "2026-03-12T17:35:00+00:00",
-          "tz_hint": { "departure": "America/New_York", "arrival": "Europe/London" },
+          "tz_hint": {
+            "departure": "America/New_York",
+            "arrival": "Europe/London"
+          },
           "equipment_code": "763",
           "cabin_marketed": "economy",
           "claims": {
             "subfleet": {
               "value": "767-300ER, pre-refresh cabin",
-              "observed_frequency": 0.79, "sample_size": 60,
+              "observed_frequency": 0.79,
+              "sample_size": 60,
               "observation_window": "last 60 departures of UA934",
-              "source": "self-collected equipment log", "as_of": "2026-03-01"
+              "source": "self-collected equipment log",
+              "as_of": "2026-03-01"
             },
             "connectivity_oceanic": {
               "value": "no oceanic-capable connectivity",
-              "observed_frequency": 0.73, "sample_size": 60,
+              "observed_frequency": 0.73,
+              "sample_size": 60,
               "observation_window": "last 60 departures of UA934",
-              "source": "self-collected equipment log", "as_of": "2026-03-01"
+              "source": "self-collected equipment log",
+              "as_of": "2026-03-01",
+              "outcome": false
             },
             "seat_pitch_inches": 31,
             "power": "USB-A only on the pre-refresh cabin"
           },
           "reliability": {
             "on_time_fraction": 0.74,
-            "delay_minutes_p50": 6, "delay_minutes_p90": 71,
+            "delay_minutes_p50": 6,
+            "delay_minutes_p90": 71,
             "sample_size": 60,
             "observation_window": "departures 2025-12-01 to 2026-02-28",
             "source": "US DOT/BTS on-time performance, UA is a reporting carrier"
@@ -123,20 +229,43 @@
             "mode": "Subway to Penn Station, NJ Transit, AirTrain Newark",
             "fare_cents": 2025,
             "fare_components": [
-              { "what": "MTA subway", "amount_cents": 300, "effective_date": "2026-01-04", "source": "MTA fare change" },
-              { "what": "NJ Transit NY Penn to Newark Liberty Airport, AirTrain included", "amount_cents": 1725, "effective_date": "2026-07-01", "needs_primary_source": true }
+              {
+                "what": "MTA subway",
+                "amount_cents": 300,
+                "effective_date": "2026-01-04",
+                "source": "MTA fare change"
+              },
+              {
+                "what": "NJ Transit NY Penn to Newark Liberty Airport, AirTrain included",
+                "amount_cents": 1725,
+                "effective_date": "2026-07-01",
+                "needs_primary_source": true
+              }
             ],
-            "door_to_door_minutes": { "p50": 115, "p90": 150 },
+            "door_to_door_minutes": {
+              "p50": 115,
+              "p90": 150
+            },
             "transfers": 3,
             "feasible": false,
             "infeasible_reason": "NJ Transit's Newark Liberty Airport rail stop is served roughly 05:00-01:00. A 06:10 departure needs you at the terminal by about 04:30, and no train reaches the airport station at that hour.",
             "weakest_link": "njt-ewr-airport-rail",
-            "service_window": { "first_local": "05:00", "last_local": "01:00", "headway_minutes": { "peak": 20, "offpeak": 40 } },
+            "service_window": {
+              "first_local": "05:00",
+              "last_local": "01:00",
+              "headway_minutes": {
+                "peak": 20,
+                "offpeak": 40
+              }
+            },
             "disruptions": [
               {
                 "what": "AirTrain Newark bus-substituted for the AirTrain replacement programme",
-                "starts": "2026-09-14", "ends": null, "weekdays_only": true,
-                "window_local": "05:00-15:00", "added_minutes": 15,
+                "starts": "2026-09-14",
+                "ends": null,
+                "weekdays_only": true,
+                "window_local": "05:00-15:00",
+                "added_minutes": 15,
                 "source": "Port Authority AirTrain replacement programme"
               }
             ]
@@ -146,11 +275,22 @@
             "mode": "Rideshare",
             "fare_cents": 9200,
             "fare_components": [
-              { "what": "Rideshare fare, 04:15 pickup, no surge", "amount_cents": 9200, "effective_date": "2026-03-01", "source": "route average $116 all-hours; the pre-dawn no-surge trip runs $80-95" }
+              {
+                "what": "Rideshare fare, 04:15 pickup, no surge",
+                "amount_cents": 9200,
+                "effective_date": "2026-03-01",
+                "source": "route average $116 all-hours; the pre-dawn no-surge trip runs $80-95"
+              }
             ],
-            "door_to_door_minutes": { "p50": 47, "p90": 68 },
+            "door_to_door_minutes": {
+              "p50": 47,
+              "p90": 68
+            },
             "transfers": 0,
-            "tolls_cents": { "outbound": 0, "inbound": 1679 },
+            "tolls_cents": {
+              "outbound": 0,
+              "inbound": 1679
+            },
             "feasible": true,
             "infeasible_reason": null,
             "weakest_link": null,
@@ -162,36 +302,82 @@
             "mode_id": "lhr-elizabeth",
             "mode": "Elizabeth line to Liverpool Street",
             "fare_cents": 1700,
-            "door_to_door_minutes": { "p50": 44, "p90": 58 },
+            "door_to_door_minutes": {
+              "p50": 44,
+              "p90": 58
+            },
             "transfers": 1,
             "feasible": true,
             "infeasible_reason": null,
-            "service_window": { "first_local": "05:30", "last_local": "23:40", "headway_minutes": { "day": 8 } }
+            "service_window": {
+              "first_local": "05:30",
+              "last_local": "23:40",
+              "headway_minutes": {
+                "day": 8
+              }
+            }
           }
         ]
       },
-      "airport_process_minutes": { "p50": 70, "p90": 105, "source": "EWR Terminal B, international, early-morning bank" },
+      "airport_process_minutes": {
+        "p50": 70,
+        "p90": 105,
+        "source": "EWR Terminal B, international, early-morning bank"
+      },
       "booking": [
-        { "who": "united.com", "price_cents": 45500, "direct": true },
-        { "who": "Priceline", "price_cents": 44900, "direct": false, "note": "Cheaper, but changes and irregular operations go through the reseller" }
+        {
+          "who": "united.com",
+          "price_cents": 45500,
+          "direct": true
+        },
+        {
+          "who": "Priceline",
+          "price_cents": 44900,
+          "direct": false,
+          "note": "Cheaper, but changes and irregular operations go through the reseller"
+        }
       ]
     },
-
     {
       "option_id": "ba-jfk-1925",
       "display_name": "British Airways 178, JFK 19:25",
+      "carrier_rating": {
+        "rating": 0.78,
+        "source": "ConcordeGo curated carrier table, human-reviewed",
+        "as_of": "2026-03-01",
+        "note": "Full service, current cabin, through bags, real irregular-ops desk"
+      },
       "tickets": [
         {
           "ticket_id": "t-ba",
           "issuing_carrier": "BA",
           "fare_brand_name": "World Traveller Standard",
           "price": {
-            "currency": "USD", "base_cents": 48600, "fx_rate_to_usd": 1.0,
+            "currency": "USD",
+            "base_cents": 48600,
+            "fx_rate_to_usd": 1.0,
             "taxes": [
-              { "code": "US", "amount_cents": 3640, "label": "US transportation tax", "refundable_on_cancel": true },
-              { "code": "XF", "amount_cents": 450, "label": "Passenger facility charge", "refundable_on_cancel": true }
+              {
+                "code": "US",
+                "amount_cents": 3640,
+                "label": "US transportation tax",
+                "refundable_on_cancel": true
+              },
+              {
+                "code": "XF",
+                "amount_cents": 450,
+                "label": "Passenger facility charge",
+                "refundable_on_cancel": true
+              }
             ],
-            "carrier_imposed": [ { "code": "YQ", "amount_cents": 8510, "label": "Carrier-imposed surcharge", "refundable_on_cancel": false } ],
+            "carrier_imposed": [
+              {
+                "code": "YQ",
+                "amount_cents": 8510,
+                "label": "Carrier-imposed surcharge",
+                "refundable_on_cancel": false
+              }
+            ],
             "agency_fees": []
           },
           "entitlements": {
@@ -206,36 +392,69 @@
             "boarding_group": "Group 5"
           },
           "checked_bag_fee_tiers": [
-            { "piece": 1, "amount_cents": 10000, "note": "Second bag overall - the first is included" },
-            { "piece": 2, "amount_cents": 20000 }
+            {
+              "piece": 1,
+              "amount_cents": 10000,
+              "note": "Second bag overall - the first is included"
+            },
+            {
+              "piece": 2,
+              "amount_cents": 20000
+            }
           ],
-          "segment_ids": ["s-ba-1"]
+          "segment_ids": [
+            "s-ba-1"
+          ]
         }
       ],
       "segments": [
         {
           "segment_id": "s-ba-1",
-          "marketing": { "carrier": "BA", "number": 178 },
-          "operating": { "carrier": "BA", "number": 178 },
-          "origin": { "iata": "JFK", "terminal": "7", "iata_area": 1, "schengen": false },
-          "destination": { "iata": "LHR", "terminal": "5", "iata_area": 2, "schengen": false },
+          "marketing": {
+            "carrier": "BA",
+            "number": 178
+          },
+          "operating": {
+            "carrier": "BA",
+            "number": 178
+          },
+          "origin": {
+            "iata": "JFK",
+            "terminal": "7",
+            "iata_area": 1,
+            "schengen": false
+          },
+          "destination": {
+            "iata": "LHR",
+            "terminal": "5",
+            "iata_area": 2,
+            "schengen": false
+          },
           "departure_local": "2026-03-12T19:25:00-04:00",
           "arrival_local": "2026-03-13T06:55:00+00:00",
-          "tz_hint": { "departure": "America/New_York", "arrival": "Europe/London" },
+          "tz_hint": {
+            "departure": "America/New_York",
+            "arrival": "Europe/London"
+          },
           "equipment_code": "351",
           "cabin_marketed": "economy",
           "claims": {
             "subfleet": {
               "value": "A350-1000 with the current World Traveller cabin",
-              "observed_frequency": 0.91, "sample_size": 60,
+              "observed_frequency": 0.91,
+              "sample_size": 60,
               "observation_window": "last 60 departures of BA178",
-              "source": "self-collected equipment log", "as_of": "2026-03-01"
+              "source": "self-collected equipment log",
+              "as_of": "2026-03-01"
             },
             "connectivity_oceanic": {
               "value": "oceanic-capable connectivity fitted",
-              "observed_frequency": 0.88, "sample_size": 60,
+              "observed_frequency": 0.88,
+              "sample_size": 60,
               "observation_window": "last 60 departures of BA178",
-              "source": "self-collected equipment log", "as_of": "2026-03-01"
+              "source": "self-collected equipment log",
+              "as_of": "2026-03-01",
+              "outcome": true
             },
             "seat_pitch_inches": 31,
             "power": "AC and USB-C at every seat"
@@ -255,13 +474,28 @@
             "mode": "Subway, Q10 bus, then AirTrain from Lefferts Blvd",
             "fare_cents": 300,
             "fare_components": [
-              { "what": "MTA subway, free OMNY bus transfer, AirTrain free zone", "amount_cents": 300, "effective_date": "2026-01-04", "source": "AirTrain JFK charges only at Jamaica and Howard Beach; Lefferts Blvd, Federal Circle and the terminals are free" }
+              {
+                "what": "MTA subway, free OMNY bus transfer, AirTrain free zone",
+                "amount_cents": 300,
+                "effective_date": "2026-01-04",
+                "source": "AirTrain JFK charges only at Jamaica and Howard Beach; Lefferts Blvd, Federal Circle and the terminals are free"
+              }
             ],
-            "door_to_door_minutes": { "p50": 92, "p90": 125 },
+            "door_to_door_minutes": {
+              "p50": 92,
+              "p90": 125
+            },
             "transfers": 3,
             "feasible": true,
             "infeasible_reason": null,
-            "service_window": { "first_local": "00:00", "last_local": "23:59", "headway_minutes": { "day": 8, "overnight": 20 } },
+            "service_window": {
+              "first_local": "00:00",
+              "last_local": "23:59",
+              "headway_minutes": {
+                "day": 8,
+                "overnight": 20
+              }
+            },
             "source": "L to Broadway Junction, A to Ozone Park-Lefferts Blvd, Q10 bus, AirTrain. The cheapest path in New York and the slowest."
           },
           {
@@ -269,23 +503,48 @@
             "mode": "Subway then AirTrain at Howard Beach",
             "fare_cents": 1175,
             "fare_components": [
-              { "what": "MTA subway", "amount_cents": 300, "effective_date": "2026-01-04" },
-              { "what": "JFK AirTrain", "amount_cents": 875, "effective_date": "2026-03-01", "needs_primary_source": true }
+              {
+                "what": "MTA subway",
+                "amount_cents": 300,
+                "effective_date": "2026-01-04"
+              },
+              {
+                "what": "JFK AirTrain",
+                "amount_cents": 875,
+                "effective_date": "2026-03-01",
+                "needs_primary_source": true
+              }
             ],
-            "door_to_door_minutes": { "p50": 78, "p90": 98 },
+            "door_to_door_minutes": {
+              "p50": 78,
+              "p90": 98
+            },
             "transfers": 1,
             "feasible": true,
             "infeasible_reason": null,
-            "service_window": { "first_local": "00:00", "last_local": "23:59", "headway_minutes": { "day": 8, "overnight": 20 } },
+            "service_window": {
+              "first_local": "00:00",
+              "last_local": "23:59",
+              "headway_minutes": {
+                "day": 8,
+                "overnight": 20
+              }
+            },
             "source": "The default path. $8.75 buys about 15 minutes and removes two transfers."
           },
           {
             "mode_id": "jfk-rideshare",
             "mode": "Rideshare",
             "fare_cents": 6200,
-            "door_to_door_minutes": { "p50": 37, "p90": 62 },
+            "door_to_door_minutes": {
+              "p50": 37,
+              "p90": 62
+            },
             "transfers": 0,
-            "tolls_cents": { "outbound": 0, "inbound": 0 },
+            "tolls_cents": {
+              "outbound": 0,
+              "inbound": 0
+            },
             "feasible": true,
             "infeasible_reason": null,
             "source": "Route average. At an evening departure there is no surge premium worth modelling separately."
@@ -296,61 +555,348 @@
             "mode_id": "lhr-elizabeth",
             "mode": "Elizabeth line to Liverpool Street",
             "fare_cents": 1700,
-            "door_to_door_minutes": { "p50": 44, "p90": 58 },
+            "door_to_door_minutes": {
+              "p50": 44,
+              "p90": 58
+            },
             "transfers": 1,
             "feasible": true,
             "infeasible_reason": null,
-            "service_window": { "first_local": "05:30", "last_local": "23:40", "headway_minutes": { "day": 8 } }
+            "service_window": {
+              "first_local": "05:30",
+              "last_local": "23:40",
+              "headway_minutes": {
+                "day": 8
+              }
+            }
           }
         ]
       },
-      "airport_process_minutes": { "p50": 55, "p90": 85, "source": "JFK Terminal 7, international, evening bank" },
+      "airport_process_minutes": {
+        "p50": 55,
+        "p90": 85,
+        "source": "JFK Terminal 7, international, evening bank"
+      },
       "booking": [
-        { "who": "britishairways.com", "price_cents": 61200, "direct": true },
-        { "who": "Expedia", "price_cents": 61800, "direct": false }
+        {
+          "who": "britishairways.com",
+          "price_cents": 61200,
+          "direct": true
+        },
+        {
+          "who": "Expedia",
+          "price_cents": 61800,
+          "direct": false
+        }
+      ]
+    },
+    {
+      "option_id": "zz-ewr-2130",
+      "display_name": "Budget carrier, Newark 21:30",
+      "carrier_rating": {
+        "rating": 0.38,
+        "source": "ConcordeGo curated carrier table, human-reviewed",
+        "as_of": "2026-03-01",
+        "note": "Single-class high-density, no interline, thin recovery when it goes wrong"
+      },
+      "tickets": [
+        {
+          "ticket_id": "t-zz",
+          "issuing_carrier": "ZZ",
+          "issue_date": "2026-02-10",
+          "fare_brand_name": "Basic",
+          "price": {
+            "currency": "USD",
+            "base_cents": 19800,
+            "fx_rate_to_usd": 1.0,
+            "taxes": [
+              {
+                "code": "US",
+                "amount_cents": 1480,
+                "refundable_on_cancel": true
+              },
+              {
+                "code": "XF",
+                "amount_cents": 450,
+                "refundable_on_cancel": true
+              }
+            ],
+            "carrier_imposed": [
+              {
+                "code": "YQ",
+                "amount_cents": 270,
+                "refundable_on_cancel": false
+              }
+            ],
+            "agency_fees": []
+          },
+          "entitlements": {
+            "checked_included": 0,
+            "cabin_bag_included": false,
+            "personal_item_included": true,
+            "seat_selection": "paid",
+            "changes": "fee",
+            "change_fee_cents": 9000,
+            "refundable": false,
+            "earns_redeemable_miles": false,
+            "boarding_group": "Group 9"
+          },
+          "checked_bag_fee_tiers": [
+            {
+              "piece": 1,
+              "amount_cents": 7500,
+              "note": "At booking; about $130 at the airport"
+            },
+            {
+              "piece": 2,
+              "amount_cents": 9500
+            }
+          ],
+          "segment_ids": [
+            "s-zz-1"
+          ]
+        }
+      ],
+      "segments": [
+        {
+          "segment_id": "s-zz-1",
+          "marketing": {
+            "carrier": "ZZ",
+            "number": 812,
+            "synthetic": true
+          },
+          "operating": {
+            "carrier": "ZZ",
+            "number": 812,
+            "synthetic": true
+          },
+          "origin": {
+            "iata": "EWR",
+            "terminal": "B",
+            "iata_area": 1,
+            "schengen": false
+          },
+          "destination": {
+            "iata": "LHR",
+            "terminal": "2",
+            "iata_area": 2,
+            "schengen": false
+          },
+          "departure_local": "2026-03-12T21:30:00-04:00",
+          "arrival_local": "2026-03-13T09:05:00+00:00",
+          "tz_hint": {
+            "departure": "America/New_York",
+            "arrival": "Europe/London"
+          },
+          "equipment_code": "789",
+          "cabin_marketed": "economy",
+          "claims": {
+            "subfleet": {
+              "value": "787-9 in a single-class high-density layout",
+              "observed_frequency": 0.96,
+              "sample_size": 60,
+              "observation_window": "last 60 departures",
+              "source": "self-collected equipment log",
+              "as_of": "2026-03-01"
+            },
+            "connectivity_oceanic": {
+              "value": "no connectivity fitted",
+              "outcome": false,
+              "observed_frequency": 1.0,
+              "sample_size": 60,
+              "observation_window": "last 60 departures",
+              "source": "self-collected equipment log",
+              "as_of": "2026-03-01"
+            },
+            "seat_pitch_inches": 28,
+            "power": "none"
+          },
+          "reliability": {
+            "coverage": "none",
+            "reason": "Not a BTS reporting carrier, and no free per-flight-number record exists.",
+            "policy": "route_median"
+          }
+        }
+      ],
+      "layovers": [],
+      "ground": {
+        "outbound": [
+          {
+            "mode_id": "ewr-njt-rail-evening",
+            "mode": "Subway to Penn, NJ Transit, AirTrain Newark",
+            "fare_cents": 2025,
+            "fare_components": [
+              {
+                "what": "MTA subway",
+                "amount_cents": 300,
+                "effective_date": "2026-01-04"
+              },
+              {
+                "what": "NJ Transit NY Penn to Newark Liberty Airport, AirTrain included",
+                "amount_cents": 1725,
+                "effective_date": "2026-07-01",
+                "needs_primary_source": true
+              }
+            ],
+            "door_to_door_minutes": {
+              "p50": 115,
+              "p90": 150
+            },
+            "transfers": 3,
+            "feasible": true,
+            "infeasible_reason": null,
+            "service_window": {
+              "first_local": "05:00",
+              "last_local": "01:00",
+              "headway_minutes": {
+                "peak": 20,
+                "offpeak": 40
+              }
+            },
+            "source": "A 21:30 departure sits comfortably inside the airport rail window, which is exactly what the 06:10 departure does not."
+          },
+          {
+            "mode_id": "ewr-rideshare-evening",
+            "mode": "Rideshare",
+            "fare_cents": 6200,
+            "door_to_door_minutes": {
+              "p50": 52,
+              "p90": 78
+            },
+            "transfers": 0,
+            "tolls_cents": {
+              "outbound": 0,
+              "inbound": 1679
+            },
+            "feasible": true,
+            "infeasible_reason": null
+          }
+        ],
+        "arrival": [
+          {
+            "mode_id": "lhr-elizabeth",
+            "mode": "Elizabeth line to Liverpool Street",
+            "fare_cents": 1700,
+            "door_to_door_minutes": {
+              "p50": 44,
+              "p90": 58
+            },
+            "transfers": 1,
+            "feasible": true,
+            "infeasible_reason": null,
+            "service_window": {
+              "first_local": "05:30",
+              "last_local": "23:40",
+              "headway_minutes": {
+                "day": 8
+              }
+            }
+          }
+        ]
+      },
+      "airport_process_minutes": {
+        "p50": 70,
+        "p90": 110,
+        "source": "EWR Terminal B, international, evening bank"
+      },
+      "booking": [
+        {
+          "who": "Carrier direct",
+          "price_cents": 22000,
+          "direct": true,
+          "note": "Changes $90 plus the fare difference"
+        }
       ]
     }
   ],
-
   "expect": {
     "grades_stable_across_profiles": true,
     "reconciles": true,
     "ledger_must_contain": [
       {
-        "option_id": "ua-ewr-0610", "code": "ground_out", "sign": "cost",
-        "min_cents": 9200, "max_cents": 9200,
-        "evidence_mentions": ["NJ Transit", "05:00", "04:30"],
+        "option_id": "ua-ewr-0610",
+        "code": "ground_out",
+        "sign": "cost",
+        "min_cents": 9200,
+        "max_cents": 9200,
+        "evidence_mentions": [
+          "NJ Transit",
+          "05:00",
+          "04:30"
+        ],
         "why": "The car is not chosen because it is nice. It is chosen because it is the only feasible mode at that hour, and the ledger must name the leg that made the others infeasible."
       },
       {
-        "option_id": "ua-ewr-0610", "code": "bags", "sign": "cost",
-        "min_cents": 19500, "max_cents": 19500,
+        "option_id": "ua-ewr-0610",
+        "code": "bags",
+        "sign": "cost",
+        "min_cents": 19500,
+        "max_cents": 19500,
         "why": "Two checked bags on a fare that includes none: $85 + $110. Basic Economy's headline price does not survive the bag load."
       },
       {
-        "option_id": "ba-jfk-1925", "code": "ground_out", "sign": "cost",
-        "min_cents": 300, "max_cents": 6200,
+        "option_id": "ba-jfk-1925",
+        "code": "ground_out",
+        "sign": "cost",
+        "min_cents": 300,
+        "max_cents": 6200,
         "why": "Ground access is an ABSOLUTE term, not a delta, so the winner shows its ground line too. The brief's own worked ledger shows a ground line only on the option it is demoting, which means that ledger does not reconcile to its own total."
       },
       {
-        "option_id": "ba-jfk-1925", "code": "bags", "sign": "cost",
-        "min_cents": 10000, "max_cents": 10000,
+        "option_id": "ba-jfk-1925",
+        "code": "bags",
+        "sign": "cost",
+        "min_cents": 10000,
+        "max_cents": 10000,
         "why": "One bag included, so only the second is charged. The fee tiers index from BEYOND the allowance, not from the first bag the traveller happens to own."
       },
       {
-        "option_id": "ua-ewr-0610", "code": "connectivity", "sign": "cost",
-        "evidence_mentions": ["73%", "60"],
+        "option_id": "ua-ewr-0610",
+        "code": "connectivity",
+        "sign": "cost",
+        "evidence_mentions": [
+          "73%",
+          "60"
+        ],
         "why": "Hard rule 2: the claim is a frequency over a stated sample, never 'you will not have wifi'."
+      },
+      {
+        "option_id": "ba-jfk-1925",
+        "code": "reliability",
+        "sign": "cost",
+        "min_cents": 1,
+        "evidence_mentions": [
+          "BTS"
+        ],
+        "why": "BA is not a BTS reporting carrier, so the segment abstains — and the abstention COSTS something. Corrected from an earlier assertion that wanted no line at all: silence would have read as a clean record, and unknown scoring as zero is what makes the least-documented itinerary win."
+      },
+      {
+        "option_id": "zz-ewr-2130",
+        "code": "carrier",
+        "sign": "cost",
+        "min_cents": 5000,
+        "evidence_mentions": [
+          "curated",
+          "baseline"
+        ],
+        "why": "Carrier quality is a reviewed number in the enrichment data, not a live opinion — the evidence has to say so, because a rating decided at query time would break determinism."
+      },
+      {
+        "option_id": "zz-ewr-2130",
+        "code": "ground_out",
+        "sign": "cost",
+        "max_cents": 2500,
+        "evidence_mentions": [
+          "NJ Transit"
+        ],
+        "why": "Same origin and same airport as the 06:10 departure, and here the train works — because 21:30 sits inside the airport rail window. Ground access is a function of the hour, not of the airport."
       }
     ],
     "ledger_must_not_contain": [
       {
-        "option_id": "ua-ewr-0610", "code": "tolls",
+        "option_id": "ua-ewr-0610",
+        "code": "tolls",
         "why": "Brooklyn to New Jersey pays no bridge or tunnel toll outbound. Charging one here would be a ~$15 phantom that demotes every EWR itinerary in the corpus."
-      },
-      {
-        "option_id": "ba-jfk-1925", "code": "reliability",
-        "why": "BA is not a BTS reporting carrier. The segment abstains, and an abstention must not read as a clean record - unknown scoring as zero would make the least-documented itinerary win."
       }
     ],
     "infeasible": [
@@ -358,6 +904,24 @@
         "ref": "ua-ewr-0610/ground.outbound/ewr-njt-rail",
         "why": "Not 'transit does not run' - the subway runs all night. NJ Transit's airport rail stop does not open early enough, and that is the link the ledger names."
       }
-    ]
+    ],
+    "target_reorders": true,
+    "order": {
+      "reference": [
+        "ba-jfk-1925",
+        "ua-ewr-0610",
+        "zz-ewr-2130"
+      ],
+      "cheapest": [
+        "zz-ewr-2130",
+        "ba-jfk-1925",
+        "ua-ewr-0610"
+      ],
+      "comfort": [
+        "ba-jfk-1925",
+        "ua-ewr-0610",
+        "zz-ewr-2130"
+      ]
+    }
   }
 }

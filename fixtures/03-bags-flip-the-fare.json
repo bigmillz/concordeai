@@ -10,42 +10,80 @@
     "The brief also said United's transatlantic Basic 'notoriously bars the overhead bin'. True at launch, not the 2026 rule - transatlantic Basic Economy carries a full-size carry-on. What survives is real but different: Basic boards last, so bin space is often gone. That is a comfort line about boarding group, not a baggage exclusion, and conflating them would charge a fee that does not exist.",
     "American's first-bag fee is keyed to TICKET ISSUE DATE, not travel date - $75 for tickets issued before 2026-05-17, $85 on or after 2026-05-18. Both AA options here carry an issue_date for exactly that reason. A fixture with only a travel date cannot resolve the right fee, and the scorer would silently pick one.",
     "The self-transfer option is the trap the whole schema is shaped around. Two separately issued tickets means two fee assessments, two carriers' tier schedules, no through-checked bags and no protected connection. Its intra-Europe leg's first-bag fee is HIGHER than the transatlantic carrier's, which is the opposite of what anyone expects.",
-    "The intra-Europe ticket is filed in EUR with a pinned FX rate. The USD figure is derived, never stored - otherwise the conversion path is baked in and never executes under test."
+    "The intra-Europe ticket is filed in EUR with a pinned FX rate. The USD figure is derived, never stored - otherwise the conversion path is baked in and never executes under test.",
+    "The expected order was corrected once the scorer ran. Hand arithmetic had put TAP ahead of American's Basic on cash-with-bags ($563 against $583) and that much is right - but TAP connects, so it is three hours longer door to door with a 30-inch seat, and at any hourly value above about $7 that costs more than the $20 fare gap. Counting exactly this is the product; the hand arithmetic was the thing that was wrong. What the fixture set out to prove still holds: Basic was $57 cheaper on the ticket and finishes behind Main Cabin, and the cheapest headline on the page finishes last by a wide margin."
   ],
-
   "query": {
     "origin": {
       "label": "Wyckoff Ave & Myrtle Ave, Bushwick, Brooklyn, NY 11237",
-      "lat": 40.6994, "lon": -73.9119, "postal_code": "11237", "geocode_precision": "street"
+      "lat": 40.6994,
+      "lon": -73.9119,
+      "postal_code": "11237",
+      "geocode_precision": "street"
     },
     "destination": {
-      "label": "Malasana, Madrid 28004", "lat": 40.4257, "lon": -3.7038,
-      "postal_code": "28004", "geocode_precision": "neighbourhood"
+      "label": "Malasana, Madrid 28004",
+      "lat": 40.4257,
+      "lon": -3.7038,
+      "postal_code": "28004",
+      "geocode_precision": "neighbourhood"
     },
     "depart_date": "2026-06-04",
     "return_date": null,
+    "route_par_cents": 100000,
     "party": [
       {
-        "passenger_id": "p1", "type": "adult",
+        "passenger_id": "p1",
+        "type": "adult",
         "bags": [
-          { "kind": "checked", "weight_kg": 22 },
-          { "kind": "checked", "weight_kg": 19 },
-          { "kind": "cabin", "weight_kg": 9 },
-          { "kind": "personal_item" }
+          {
+            "kind": "checked",
+            "weight_kg": 22
+          },
+          {
+            "kind": "checked",
+            "weight_kg": 19
+          },
+          {
+            "kind": "cabin",
+            "weight_kg": 9
+          },
+          {
+            "kind": "personal_item"
+          }
         ]
       }
     ],
-    "budget": { "maximum_cents": 90000, "target_cents": 55000, "incidental_allowance_cents": 12000 },
+    "budget": {
+      "maximum_cents": 90000,
+      "target_cents": 55000,
+      "incidental_allowance_cents": 12000
+    },
     "profiles": {
-      "reference": { "label": "neutral reference", "hourly_value_cents": 3500, "comfort_weight": 1.0, "risk_weight": 1.0 },
-      "cheapest":  { "label": "Cheapest",         "hourly_value_cents": 1200, "comfort_weight": 0.45, "risk_weight": 1.0 }
+      "reference": {
+        "label": "neutral reference",
+        "hourly_value_cents": 3500,
+        "comfort_weight": 1.0,
+        "risk_weight": 1.0
+      },
+      "cheapest": {
+        "label": "Cheapest",
+        "hourly_value_cents": 1200,
+        "comfort_weight": 0.45,
+        "risk_weight": 1.0
+      }
     }
   },
-
   "options": [
     {
       "option_id": "aa-basic",
       "display_name": "American, Basic Economy, nonstop",
+      "carrier_rating": {
+        "rating": 0.63,
+        "source": "ConcordeGo curated carrier table, human-reviewed",
+        "as_of": "2026-03-01",
+        "note": "Pre-refresh 777 cabin on this route"
+      },
       "tickets": [
         {
           "ticket_id": "t-aab",
@@ -53,12 +91,30 @@
           "issue_date": "2026-05-20",
           "fare_brand_name": "Basic Economy",
           "price": {
-            "currency": "USD", "base_cents": 34200, "fx_rate_to_usd": 1.0,
+            "currency": "USD",
+            "base_cents": 34200,
+            "fx_rate_to_usd": 1.0,
             "taxes": [
-              { "code": "US", "amount_cents": 2560, "label": "US transportation tax", "refundable_on_cancel": true },
-              { "code": "XF", "amount_cents": 450, "label": "Passenger facility charge", "refundable_on_cancel": true }
+              {
+                "code": "US",
+                "amount_cents": 2560,
+                "label": "US transportation tax",
+                "refundable_on_cancel": true
+              },
+              {
+                "code": "XF",
+                "amount_cents": 450,
+                "label": "Passenger facility charge",
+                "refundable_on_cancel": true
+              }
             ],
-            "carrier_imposed": [ { "code": "YQ", "amount_cents": 2590, "refundable_on_cancel": false } ],
+            "carrier_imposed": [
+              {
+                "code": "YQ",
+                "amount_cents": 2590,
+                "refundable_on_cancel": false
+              }
+            ],
             "agency_fees": []
           },
           "entitlements": {
@@ -72,43 +128,82 @@
             "boarding_group": "Group 8"
           },
           "checked_bag_fee_tiers": [
-            { "piece": 1, "amount_cents": 8500, "note": "Rate for tickets issued on or after 2026-05-18; $75 before that" },
-            { "piece": 2, "amount_cents": 10000 },
-            { "piece": 3, "amount_cents": 20000 }
+            {
+              "piece": 1,
+              "amount_cents": 8500,
+              "note": "Rate for tickets issued on or after 2026-05-18; $75 before that"
+            },
+            {
+              "piece": 2,
+              "amount_cents": 10000
+            },
+            {
+              "piece": 3,
+              "amount_cents": 20000
+            }
           ],
-          "segment_ids": ["s-ab1"]
+          "segment_ids": [
+            "s-ab1"
+          ]
         }
       ],
       "segments": [
         {
           "segment_id": "s-ab1",
-          "marketing": { "carrier": "AA", "number": 94 },
-          "operating": { "carrier": "AA", "number": 94 },
-          "origin": { "iata": "JFK", "terminal": "8", "iata_area": 1, "schengen": false },
-          "destination": { "iata": "MAD", "terminal": "4S", "iata_area": 2, "schengen": true },
+          "marketing": {
+            "carrier": "AA",
+            "number": 94
+          },
+          "operating": {
+            "carrier": "AA",
+            "number": 94
+          },
+          "origin": {
+            "iata": "JFK",
+            "terminal": "8",
+            "iata_area": 1,
+            "schengen": false
+          },
+          "destination": {
+            "iata": "MAD",
+            "terminal": "4S",
+            "iata_area": 2,
+            "schengen": true
+          },
           "departure_local": "2026-06-04T19:15:00-04:00",
           "arrival_local": "2026-06-05T08:45:00+02:00",
-          "tz_hint": { "departure": "America/New_York", "arrival": "Europe/Madrid" },
+          "tz_hint": {
+            "departure": "America/New_York",
+            "arrival": "Europe/Madrid"
+          },
           "equipment_code": "772",
           "cabin_marketed": "economy",
           "claims": {
             "subfleet": {
               "value": "777-200ER, pre-refresh cabin",
-              "observed_frequency": 0.71, "sample_size": 60,
+              "observed_frequency": 0.71,
+              "sample_size": 60,
               "observation_window": "last 60 departures of AA94",
-              "source": "self-collected equipment log", "as_of": "2026-03-01"
+              "source": "self-collected equipment log",
+              "as_of": "2026-03-01"
             },
             "connectivity_oceanic": {
               "value": "no oceanic-capable connectivity",
-              "observed_frequency": 0.73, "sample_size": 60,
+              "observed_frequency": 0.73,
+              "sample_size": 60,
               "observation_window": "last 60 departures of AA94",
-              "source": "self-collected equipment log", "as_of": "2026-03-01"
+              "source": "self-collected equipment log",
+              "as_of": "2026-03-01",
+              "outcome": false
             },
             "seat_pitch_inches": 31
           },
           "reliability": {
-            "on_time_fraction": 0.76, "delay_minutes_p50": 8, "delay_minutes_p90": 64,
-            "sample_size": 60, "observation_window": "departures 2025-12-01 to 2026-02-28",
+            "on_time_fraction": 0.76,
+            "delay_minutes_p50": 8,
+            "delay_minutes_p90": 64,
+            "sample_size": 60,
+            "observation_window": "departures 2025-12-01 to 2026-02-28",
             "source": "US DOT/BTS on-time performance, AA is a reporting carrier"
           }
         }
@@ -116,21 +211,55 @@
       "layovers": [],
       "ground": {
         "outbound": [
-          { "mode_id": "jfk-airtrain-howard-beach", "mode": "Subway then AirTrain at Howard Beach", "fare_cents": 1175,
-            "door_to_door_minutes": { "p50": 78, "p90": 98 }, "transfers": 1, "feasible": true, "infeasible_reason": null }
+          {
+            "mode_id": "jfk-airtrain-howard-beach",
+            "mode": "Subway then AirTrain at Howard Beach",
+            "fare_cents": 1175,
+            "door_to_door_minutes": {
+              "p50": 78,
+              "p90": 98
+            },
+            "transfers": 1,
+            "feasible": true,
+            "infeasible_reason": null
+          }
         ],
         "arrival": [
-          { "mode_id": "mad-metro", "mode": "Metro line 8 to Nuevos Ministerios", "fare_cents": 500,
-            "door_to_door_minutes": { "p50": 42, "p90": 55 }, "transfers": 1, "feasible": true, "infeasible_reason": null }
+          {
+            "mode_id": "mad-metro",
+            "mode": "Metro line 8 to Nuevos Ministerios",
+            "fare_cents": 500,
+            "door_to_door_minutes": {
+              "p50": 42,
+              "p90": 55
+            },
+            "transfers": 1,
+            "feasible": true,
+            "infeasible_reason": null
+          }
         ]
       },
-      "airport_process_minutes": { "p50": 60, "p90": 95 },
-      "booking": [ { "who": "aa.com", "price_cents": 39800, "direct": true } ]
+      "airport_process_minutes": {
+        "p50": 60,
+        "p90": 95
+      },
+      "booking": [
+        {
+          "who": "aa.com",
+          "price_cents": 39800,
+          "direct": true
+        }
+      ]
     },
-
     {
       "option_id": "aa-main",
       "display_name": "American, Main Cabin, nonstop",
+      "carrier_rating": {
+        "rating": 0.63,
+        "source": "ConcordeGo curated carrier table, human-reviewed",
+        "as_of": "2026-03-01",
+        "note": "Pre-refresh 777 cabin on this route"
+      },
       "tickets": [
         {
           "ticket_id": "t-aam",
@@ -138,12 +267,30 @@
           "issue_date": "2026-05-20",
           "fare_brand_name": "Main Cabin",
           "price": {
-            "currency": "USD", "base_cents": 39100, "fx_rate_to_usd": 1.0,
+            "currency": "USD",
+            "base_cents": 39100,
+            "fx_rate_to_usd": 1.0,
             "taxes": [
-              { "code": "US", "amount_cents": 2930, "label": "US transportation tax", "refundable_on_cancel": true },
-              { "code": "XF", "amount_cents": 450, "label": "Passenger facility charge", "refundable_on_cancel": true }
+              {
+                "code": "US",
+                "amount_cents": 2930,
+                "label": "US transportation tax",
+                "refundable_on_cancel": true
+              },
+              {
+                "code": "XF",
+                "amount_cents": 450,
+                "label": "Passenger facility charge",
+                "refundable_on_cancel": true
+              }
             ],
-            "carrier_imposed": [ { "code": "YQ", "amount_cents": 3020, "refundable_on_cancel": false } ],
+            "carrier_imposed": [
+              {
+                "code": "YQ",
+                "amount_cents": 3020,
+                "refundable_on_cancel": false
+              }
+            ],
             "agency_fees": []
           },
           "entitlements": {
@@ -158,42 +305,78 @@
             "boarding_group": "Group 5"
           },
           "checked_bag_fee_tiers": [
-            { "piece": 1, "amount_cents": 10000, "note": "Second bag overall - the first is included" },
-            { "piece": 2, "amount_cents": 20000 }
+            {
+              "piece": 1,
+              "amount_cents": 10000,
+              "note": "Second bag overall - the first is included"
+            },
+            {
+              "piece": 2,
+              "amount_cents": 20000
+            }
           ],
-          "segment_ids": ["s-am1"]
+          "segment_ids": [
+            "s-am1"
+          ]
         }
       ],
       "segments": [
         {
           "segment_id": "s-am1",
-          "marketing": { "carrier": "AA", "number": 94 },
-          "operating": { "carrier": "AA", "number": 94 },
-          "origin": { "iata": "JFK", "terminal": "8", "iata_area": 1, "schengen": false },
-          "destination": { "iata": "MAD", "terminal": "4S", "iata_area": 2, "schengen": true },
+          "marketing": {
+            "carrier": "AA",
+            "number": 94
+          },
+          "operating": {
+            "carrier": "AA",
+            "number": 94
+          },
+          "origin": {
+            "iata": "JFK",
+            "terminal": "8",
+            "iata_area": 1,
+            "schengen": false
+          },
+          "destination": {
+            "iata": "MAD",
+            "terminal": "4S",
+            "iata_area": 2,
+            "schengen": true
+          },
           "departure_local": "2026-06-04T19:15:00-04:00",
           "arrival_local": "2026-06-05T08:45:00+02:00",
-          "tz_hint": { "departure": "America/New_York", "arrival": "Europe/Madrid" },
+          "tz_hint": {
+            "departure": "America/New_York",
+            "arrival": "Europe/Madrid"
+          },
           "equipment_code": "772",
           "cabin_marketed": "economy",
           "claims": {
             "subfleet": {
               "value": "777-200ER, pre-refresh cabin",
-              "observed_frequency": 0.71, "sample_size": 60,
+              "observed_frequency": 0.71,
+              "sample_size": 60,
               "observation_window": "last 60 departures of AA94",
-              "source": "self-collected equipment log", "as_of": "2026-03-01"
+              "source": "self-collected equipment log",
+              "as_of": "2026-03-01"
             },
             "connectivity_oceanic": {
               "value": "no oceanic-capable connectivity",
-              "observed_frequency": 0.73, "sample_size": 60,
+              "observed_frequency": 0.73,
+              "sample_size": 60,
               "observation_window": "last 60 departures of AA94",
-              "source": "self-collected equipment log", "as_of": "2026-03-01"
+              "source": "self-collected equipment log",
+              "as_of": "2026-03-01",
+              "outcome": false
             },
             "seat_pitch_inches": 31
           },
           "reliability": {
-            "on_time_fraction": 0.76, "delay_minutes_p50": 8, "delay_minutes_p90": 64,
-            "sample_size": 60, "observation_window": "departures 2025-12-01 to 2026-02-28",
+            "on_time_fraction": 0.76,
+            "delay_minutes_p50": 8,
+            "delay_minutes_p90": 64,
+            "sample_size": 60,
+            "observation_window": "departures 2025-12-01 to 2026-02-28",
             "source": "US DOT/BTS on-time performance, AA is a reporting carrier"
           }
         }
@@ -201,21 +384,55 @@
       "layovers": [],
       "ground": {
         "outbound": [
-          { "mode_id": "jfk-airtrain-howard-beach", "mode": "Subway then AirTrain at Howard Beach", "fare_cents": 1175,
-            "door_to_door_minutes": { "p50": 78, "p90": 98 }, "transfers": 1, "feasible": true, "infeasible_reason": null }
+          {
+            "mode_id": "jfk-airtrain-howard-beach",
+            "mode": "Subway then AirTrain at Howard Beach",
+            "fare_cents": 1175,
+            "door_to_door_minutes": {
+              "p50": 78,
+              "p90": 98
+            },
+            "transfers": 1,
+            "feasible": true,
+            "infeasible_reason": null
+          }
         ],
         "arrival": [
-          { "mode_id": "mad-metro", "mode": "Metro line 8 to Nuevos Ministerios", "fare_cents": 500,
-            "door_to_door_minutes": { "p50": 42, "p90": 55 }, "transfers": 1, "feasible": true, "infeasible_reason": null }
+          {
+            "mode_id": "mad-metro",
+            "mode": "Metro line 8 to Nuevos Ministerios",
+            "fare_cents": 500,
+            "door_to_door_minutes": {
+              "p50": 42,
+              "p90": 55
+            },
+            "transfers": 1,
+            "feasible": true,
+            "infeasible_reason": null
+          }
         ]
       },
-      "airport_process_minutes": { "p50": 60, "p90": 95 },
-      "booking": [ { "who": "aa.com", "price_cents": 45500, "direct": true } ]
+      "airport_process_minutes": {
+        "p50": 60,
+        "p90": 95
+      },
+      "booking": [
+        {
+          "who": "aa.com",
+          "price_cents": 45500,
+          "direct": true
+        }
+      ]
     },
-
     {
       "option_id": "tap-basic",
       "display_name": "TAP, Basic - the one Basic in scope that includes a bag",
+      "carrier_rating": {
+        "rating": 0.61,
+        "source": "ConcordeGo curated carrier table, human-reviewed",
+        "as_of": "2026-03-01",
+        "note": "Adequate hard product, weaker punctuality record"
+      },
       "tickets": [
         {
           "ticket_id": "t-tp",
@@ -223,12 +440,30 @@
           "issue_date": "2026-05-20",
           "fare_brand_name": "Basic",
           "price": {
-            "currency": "USD", "base_cents": 40200, "fx_rate_to_usd": 1.0,
+            "currency": "USD",
+            "base_cents": 40200,
+            "fx_rate_to_usd": 1.0,
             "taxes": [
-              { "code": "US", "amount_cents": 2560, "label": "US transportation tax", "refundable_on_cancel": true },
-              { "code": "PT", "amount_cents": 2100, "label": "Portuguese airport charges", "refundable_on_cancel": true }
+              {
+                "code": "US",
+                "amount_cents": 2560,
+                "label": "US transportation tax",
+                "refundable_on_cancel": true
+              },
+              {
+                "code": "PT",
+                "amount_cents": 2100,
+                "label": "Portuguese airport charges",
+                "refundable_on_cancel": true
+              }
             ],
-            "carrier_imposed": [ { "code": "YQ", "amount_cents": 1940, "refundable_on_cancel": false } ],
+            "carrier_imposed": [
+              {
+                "code": "YQ",
+                "amount_cents": 1940,
+                "refundable_on_cancel": false
+              }
+            ],
             "agency_fees": []
           },
           "entitlements": {
@@ -242,90 +477,202 @@
             "earns_redeemable_miles": true,
             "boarding_group": null
           },
-          "checked_bag_fee_tiers": [ { "piece": 1, "amount_cents": 9500, "note": "Second bag overall. TAP's cheaper 'Discount' tier includes none - the name 'Basic' is not the allowance." } ],
-          "segment_ids": ["s-tp1", "s-tp2"]
+          "checked_bag_fee_tiers": [
+            {
+              "piece": 1,
+              "amount_cents": 9500,
+              "note": "Second bag overall. TAP's cheaper 'Discount' tier includes none - the name 'Basic' is not the allowance."
+            }
+          ],
+          "segment_ids": [
+            "s-tp1",
+            "s-tp2"
+          ]
         }
       ],
       "segments": [
         {
           "segment_id": "s-tp1",
-          "marketing": { "carrier": "TP", "number": 208 },
-          "operating": { "carrier": "TP", "number": 208 },
-          "origin": { "iata": "JFK", "terminal": "5", "iata_area": 1, "schengen": false },
-          "destination": { "iata": "LIS", "terminal": "1", "iata_area": 2, "schengen": true },
+          "marketing": {
+            "carrier": "TP",
+            "number": 208
+          },
+          "operating": {
+            "carrier": "TP",
+            "number": 208
+          },
+          "origin": {
+            "iata": "JFK",
+            "terminal": "5",
+            "iata_area": 1,
+            "schengen": false
+          },
+          "destination": {
+            "iata": "LIS",
+            "terminal": "1",
+            "iata_area": 2,
+            "schengen": true
+          },
           "departure_local": "2026-06-04T22:05:00-04:00",
           "arrival_local": "2026-06-05T09:50:00+01:00",
-          "tz_hint": { "departure": "America/New_York", "arrival": "Europe/Lisbon" },
+          "tz_hint": {
+            "departure": "America/New_York",
+            "arrival": "Europe/Lisbon"
+          },
           "equipment_code": "339",
           "cabin_marketed": "economy",
           "claims": {
             "subfleet": {
               "value": "A330-900neo",
-              "observed_frequency": 0.83, "sample_size": 60,
+              "observed_frequency": 0.83,
+              "sample_size": 60,
               "observation_window": "last 60 departures of TP208",
-              "source": "self-collected equipment log", "as_of": "2026-03-01"
+              "source": "self-collected equipment log",
+              "as_of": "2026-03-01"
             },
             "connectivity_oceanic": {
               "value": "no oceanic-capable connectivity",
-              "observed_frequency": 0.56, "sample_size": 60,
+              "observed_frequency": 0.56,
+              "sample_size": 60,
               "observation_window": "last 60 departures of TP208",
-              "source": "self-collected equipment log", "as_of": "2026-03-01"
+              "source": "self-collected equipment log",
+              "as_of": "2026-03-01",
+              "outcome": false
             },
             "seat_pitch_inches": 30
           },
-          "reliability": { "coverage": "none", "reason": "TAP is not a BTS reporting carrier.", "policy": "route_median" }
+          "reliability": {
+            "coverage": "none",
+            "reason": "TAP is not a BTS reporting carrier.",
+            "policy": "route_median"
+          }
         },
         {
           "segment_id": "s-tp2",
-          "marketing": { "carrier": "TP", "number": 1022 },
-          "operating": { "carrier": "TP", "number": 1022 },
-          "origin": { "iata": "LIS", "terminal": "1", "iata_area": 2, "schengen": true },
-          "destination": { "iata": "MAD", "terminal": "2", "iata_area": 2, "schengen": true },
+          "marketing": {
+            "carrier": "TP",
+            "number": 1022
+          },
+          "operating": {
+            "carrier": "TP",
+            "number": 1022
+          },
+          "origin": {
+            "iata": "LIS",
+            "terminal": "1",
+            "iata_area": 2,
+            "schengen": true
+          },
+          "destination": {
+            "iata": "MAD",
+            "terminal": "2",
+            "iata_area": 2,
+            "schengen": true
+          },
           "departure_local": "2026-06-05T12:10:00+01:00",
           "arrival_local": "2026-06-05T14:35:00+02:00",
-          "tz_hint": { "departure": "Europe/Lisbon", "arrival": "Europe/Madrid" },
+          "tz_hint": {
+            "departure": "Europe/Lisbon",
+            "arrival": "Europe/Madrid"
+          },
           "equipment_code": "32N",
           "cabin_marketed": "economy",
-          "claims": { "seat_pitch_inches": 30 },
-          "reliability": { "coverage": "none", "reason": "Intra-Europe leg.", "policy": "route_median" }
+          "claims": {
+            "seat_pitch_inches": 30
+          },
+          "reliability": {
+            "coverage": "none",
+            "reason": "Intra-Europe leg.",
+            "policy": "route_median"
+          }
         }
       ],
       "layovers": [
         {
           "layover_id": "lay-lis",
           "airport": "LIS",
-          "arrive_segment_id": "s-tp1", "depart_segment_id": "s-tp2",
+          "arrive_segment_id": "s-tp1",
+          "depart_segment_id": "s-tp2",
           "immigration_required": true,
           "security_reclear_required": false,
           "ees_first_registration": true,
-          "inter_terminal": { "mode": "walk", "minutes": 12, "headway_minutes": 0, "operating_hours_local": "always" },
+          "inter_terminal": {
+            "mode": "walk",
+            "minutes": 12,
+            "headway_minutes": 0,
+            "operating_hours_local": "always"
+          },
           "published_mct_minutes": 60,
           "mct_source": "cited",
           "bags_checked_through": true,
           "airside_holdable_overnight": null,
           "forced_landside": false,
           "leave_airport_viable": false,
-          "services_open": [ { "what": "Terminal 1 retail and food", "hours_local": "05:00-23:00" } ],
-          "note": "2h20m in the morning, one terminal, bags through, Schengen entry here rather than in Madrid."
+          "services_open": [
+            {
+              "what": "Terminal 1 retail and food",
+              "hours_local": "05:00-23:00"
+            }
+          ],
+          "note": "2h20m in the morning, one terminal, bags through, Schengen entry here rather than in Madrid.",
+          "recovery": {
+            "protected": true,
+            "next_departure_minutes": 180,
+            "overnight_implied": false
+          }
         }
       ],
       "ground": {
         "outbound": [
-          { "mode_id": "jfk-airtrain-howard-beach", "mode": "Subway then AirTrain at Howard Beach", "fare_cents": 1175,
-            "door_to_door_minutes": { "p50": 78, "p90": 98 }, "transfers": 1, "feasible": true, "infeasible_reason": null }
+          {
+            "mode_id": "jfk-airtrain-howard-beach",
+            "mode": "Subway then AirTrain at Howard Beach",
+            "fare_cents": 1175,
+            "door_to_door_minutes": {
+              "p50": 78,
+              "p90": 98
+            },
+            "transfers": 1,
+            "feasible": true,
+            "infeasible_reason": null
+          }
         ],
         "arrival": [
-          { "mode_id": "mad-metro", "mode": "Metro line 8 to Nuevos Ministerios", "fare_cents": 500,
-            "door_to_door_minutes": { "p50": 42, "p90": 55 }, "transfers": 1, "feasible": true, "infeasible_reason": null }
+          {
+            "mode_id": "mad-metro",
+            "mode": "Metro line 8 to Nuevos Ministerios",
+            "fare_cents": 500,
+            "door_to_door_minutes": {
+              "p50": 42,
+              "p90": 55
+            },
+            "transfers": 1,
+            "feasible": true,
+            "infeasible_reason": null
+          }
         ]
       },
-      "airport_process_minutes": { "p50": 60, "p90": 95 },
-      "booking": [ { "who": "flytap.com", "price_cents": 46800, "direct": true } ]
+      "airport_process_minutes": {
+        "p50": 60,
+        "p90": 95
+      },
+      "booking": [
+        {
+          "who": "flytap.com",
+          "price_cents": 46800,
+          "direct": true
+        }
+      ]
     },
-
     {
       "option_id": "self-transfer",
       "display_name": "Two tickets, cheapest headline, most expensive trip",
+      "carrier_rating": {
+        "rating": 0.42,
+        "source": "ConcordeGo curated carrier table, human-reviewed",
+        "as_of": "2026-03-01",
+        "note": "Two carriers, neither responsible for the other's leg"
+      },
       "tickets": [
         {
           "ticket_id": "t-st-a",
@@ -333,24 +680,55 @@
           "issue_date": "2026-05-20",
           "fare_brand_name": "Economy Light",
           "price": {
-            "currency": "USD", "base_cents": 23400, "fx_rate_to_usd": 1.0,
+            "currency": "USD",
+            "base_cents": 23400,
+            "fx_rate_to_usd": 1.0,
             "taxes": [
-              { "code": "US", "amount_cents": 2560, "refundable_on_cancel": true },
-              { "code": "XF", "amount_cents": 450, "refundable_on_cancel": true }
+              {
+                "code": "US",
+                "amount_cents": 2560,
+                "refundable_on_cancel": true
+              },
+              {
+                "code": "XF",
+                "amount_cents": 450,
+                "refundable_on_cancel": true
+              }
             ],
-            "carrier_imposed": [ { "code": "YQ", "amount_cents": 390, "refundable_on_cancel": false } ],
+            "carrier_imposed": [
+              {
+                "code": "YQ",
+                "amount_cents": 390,
+                "refundable_on_cancel": false
+              }
+            ],
             "agency_fees": []
           },
           "entitlements": {
-            "checked_included": 0, "cabin_bag_included": true, "personal_item_included": true,
-            "seat_selection": "paid", "changes": "fee", "change_fee_cents": 9000, "refundable": false,
-            "earns_redeemable_miles": false, "boarding_group": null
+            "checked_included": 0,
+            "cabin_bag_included": true,
+            "personal_item_included": true,
+            "seat_selection": "paid",
+            "changes": "fee",
+            "change_fee_cents": 9000,
+            "refundable": false,
+            "earns_redeemable_miles": false,
+            "boarding_group": null
           },
           "checked_bag_fee_tiers": [
-            { "piece": 1, "amount_cents": 7500, "note": "At booking; ~$130 if added at the airport" },
-            { "piece": 2, "amount_cents": 9500 }
+            {
+              "piece": 1,
+              "amount_cents": 7500,
+              "note": "At booking; ~$130 if added at the airport"
+            },
+            {
+              "piece": 2,
+              "amount_cents": 9500
+            }
           ],
-          "segment_ids": ["s-st1"]
+          "segment_ids": [
+            "s-st1"
+          ]
         },
         {
           "ticket_id": "t-st-b",
@@ -358,77 +736,151 @@
           "issue_date": "2026-05-20",
           "fare_brand_name": "Value",
           "price": {
-            "currency": "EUR", "base_cents": 4800, "fx_rate_to_usd": 1.0820,
+            "currency": "EUR",
+            "base_cents": 4800,
+            "fx_rate_to_usd": 1.082,
             "taxes": [],
             "carrier_imposed": [],
             "agency_fees": []
           },
           "entitlements": {
-            "checked_included": 0, "cabin_bag_included": false, "personal_item_included": true,
-            "seat_selection": "paid", "changes": "fee", "change_fee_cents": 6000, "refundable": false,
-            "earns_redeemable_miles": false, "boarding_group": null
+            "checked_included": 0,
+            "cabin_bag_included": false,
+            "personal_item_included": true,
+            "seat_selection": "paid",
+            "changes": "fee",
+            "change_fee_cents": 6000,
+            "refundable": false,
+            "earns_redeemable_miles": false,
+            "boarding_group": null
           },
           "checked_bag_fee_tiers": [
-            { "piece": 1, "amount_cents": 8100, "note": "EUR. Higher than the transatlantic carrier's first bag - the short leg is the expensive one." },
-            { "piece": 2, "amount_cents": 10200, "note": "EUR" }
+            {
+              "piece": 1,
+              "amount_cents": 8100,
+              "note": "EUR. Higher than the transatlantic carrier's first bag - the short leg is the expensive one."
+            },
+            {
+              "piece": 2,
+              "amount_cents": 10200,
+              "note": "EUR"
+            }
           ],
-          "segment_ids": ["s-st2"]
+          "segment_ids": [
+            "s-st2"
+          ]
         }
       ],
       "segments": [
         {
           "segment_id": "s-st1",
-          "marketing": { "carrier": "N0", "number": 774 },
-          "operating": { "carrier": "N0", "number": 774 },
-          "origin": { "iata": "JFK", "terminal": "1", "iata_area": 1, "schengen": false },
-          "destination": { "iata": "CDG", "terminal": "1", "iata_area": 2, "schengen": true },
+          "marketing": {
+            "carrier": "N0",
+            "number": 774
+          },
+          "operating": {
+            "carrier": "N0",
+            "number": 774
+          },
+          "origin": {
+            "iata": "JFK",
+            "terminal": "1",
+            "iata_area": 1,
+            "schengen": false
+          },
+          "destination": {
+            "iata": "CDG",
+            "terminal": "1",
+            "iata_area": 2,
+            "schengen": true
+          },
           "departure_local": "2026-06-04T21:20:00-04:00",
           "arrival_local": "2026-06-05T10:35:00+02:00",
-          "tz_hint": { "departure": "America/New_York", "arrival": "Europe/Paris" },
+          "tz_hint": {
+            "departure": "America/New_York",
+            "arrival": "Europe/Paris"
+          },
           "equipment_code": "789",
           "cabin_marketed": "economy",
           "claims": {
             "subfleet": {
               "value": "787-9, single-class-density cabin",
-              "observed_frequency": 0.94, "sample_size": 60,
+              "observed_frequency": 0.94,
+              "sample_size": 60,
               "observation_window": "last 60 departures",
-              "source": "self-collected equipment log", "as_of": "2026-03-01"
+              "source": "self-collected equipment log",
+              "as_of": "2026-03-01"
             },
             "connectivity_oceanic": {
               "value": "no connectivity fitted",
-              "observed_frequency": 1.0, "sample_size": 60,
+              "observed_frequency": 1.0,
+              "sample_size": 60,
               "observation_window": "last 60 departures",
-              "source": "self-collected equipment log", "as_of": "2026-03-01"
+              "source": "self-collected equipment log",
+              "as_of": "2026-03-01",
+              "outcome": false
             },
             "seat_pitch_inches": 29
           },
-          "reliability": { "coverage": "none", "reason": "Not a BTS reporting carrier.", "policy": "route_median" }
+          "reliability": {
+            "coverage": "none",
+            "reason": "Not a BTS reporting carrier.",
+            "policy": "route_median"
+          }
         },
         {
           "segment_id": "s-st2",
-          "marketing": { "carrier": "FR", "number": 2318 },
-          "operating": { "carrier": "FR", "number": 2318 },
-          "origin": { "iata": "CDG", "terminal": "3", "iata_area": 2, "schengen": true },
-          "destination": { "iata": "MAD", "terminal": "1", "iata_area": 2, "schengen": true },
+          "marketing": {
+            "carrier": "FR",
+            "number": 2318
+          },
+          "operating": {
+            "carrier": "FR",
+            "number": 2318
+          },
+          "origin": {
+            "iata": "CDG",
+            "terminal": "3",
+            "iata_area": 2,
+            "schengen": true
+          },
+          "destination": {
+            "iata": "MAD",
+            "terminal": "1",
+            "iata_area": 2,
+            "schengen": true
+          },
           "departure_local": "2026-06-05T15:25:00+02:00",
           "arrival_local": "2026-06-05T17:35:00+02:00",
-          "tz_hint": { "departure": "Europe/Paris", "arrival": "Europe/Madrid" },
+          "tz_hint": {
+            "departure": "Europe/Paris",
+            "arrival": "Europe/Madrid"
+          },
           "equipment_code": "738",
           "cabin_marketed": "economy",
-          "claims": { "seat_pitch_inches": 28 },
-          "reliability": { "coverage": "none", "reason": "Intra-Europe leg.", "policy": "route_median" }
+          "claims": {
+            "seat_pitch_inches": 28
+          },
+          "reliability": {
+            "coverage": "none",
+            "reason": "Intra-Europe leg.",
+            "policy": "route_median"
+          }
         }
       ],
       "layovers": [
         {
           "layover_id": "lay-cdg-self",
           "airport": "CDG",
-          "arrive_segment_id": "s-st1", "depart_segment_id": "s-st2",
+          "arrive_segment_id": "s-st1",
+          "depart_segment_id": "s-st2",
           "immigration_required": true,
           "security_reclear_required": true,
           "ees_first_registration": true,
           "inter_terminal": {
-            "mode": "landside_train", "minutes": 20, "headway_minutes": 6,
+            "mode": "landside_train",
+            "minutes": 20,
+            "headway_minutes": 6,
             "operating_hours_local": "CDGVAL 04:00-01:00, then a 25-minute-headway bus"
           },
           "published_mct_minutes": null,
@@ -437,72 +889,163 @@
           "airside_holdable_overnight": null,
           "forced_landside": true,
           "leave_airport_viable": false,
-          "services_open": [ { "what": "Terminal 1 and 3 retail", "hours_local": "05:00-22:00" } ],
-          "note": "Bags must be reclaimed and re-checked, landside, between two terminals on a people mover. The passenger does this themselves; nobody is watching the clock for them."
+          "services_open": [
+            {
+              "what": "Terminal 1 and 3 retail",
+              "hours_local": "05:00-22:00"
+            }
+          ],
+          "note": "Bags must be reclaimed and re-checked, landside, between two terminals on a people mover. The passenger does this themselves; nobody is watching the clock for them.",
+          "recovery": {
+            "protected": false,
+            "next_departure_minutes": null,
+            "overnight_implied": true,
+            "walkup_fare_cents": 21000
+          }
         }
       ],
       "ground": {
         "outbound": [
-          { "mode_id": "jfk-airtrain-howard-beach", "mode": "Subway then AirTrain at Howard Beach", "fare_cents": 1175,
-            "door_to_door_minutes": { "p50": 78, "p90": 98 }, "transfers": 1, "feasible": true, "infeasible_reason": null }
+          {
+            "mode_id": "jfk-airtrain-howard-beach",
+            "mode": "Subway then AirTrain at Howard Beach",
+            "fare_cents": 1175,
+            "door_to_door_minutes": {
+              "p50": 78,
+              "p90": 98
+            },
+            "transfers": 1,
+            "feasible": true,
+            "infeasible_reason": null
+          }
         ],
         "arrival": [
-          { "mode_id": "mad-metro", "mode": "Metro line 8 to Nuevos Ministerios", "fare_cents": 500,
-            "door_to_door_minutes": { "p50": 42, "p90": 55 }, "transfers": 1, "feasible": true, "infeasible_reason": null }
+          {
+            "mode_id": "mad-metro",
+            "mode": "Metro line 8 to Nuevos Ministerios",
+            "fare_cents": 500,
+            "door_to_door_minutes": {
+              "p50": 42,
+              "p90": 55
+            },
+            "transfers": 1,
+            "feasible": true,
+            "infeasible_reason": null
+          }
         ]
       },
-      "airport_process_minutes": { "p50": 60, "p90": 95 },
+      "airport_process_minutes": {
+        "p50": 60,
+        "p90": 95
+      },
       "booking": [
-        { "who": "Kiwi.com", "price_cents": 32000, "direct": false, "note": "Self-transfer. Kiwi's own guarantee, not the airlines' - neither carrier owes anything if the first leg is late." }
+        {
+          "who": "Kiwi.com",
+          "price_cents": 32000,
+          "direct": false,
+          "note": "Self-transfer. Kiwi's own guarantee, not the airlines' - neither carrier owes anything if the first leg is late."
+        }
       ]
     }
   ],
-
   "expect": {
     "grades_stable_across_profiles": true,
     "reconciles": true,
     "order": {
-      "reference": ["aa-main", "tap-basic", "aa-basic", "self-transfer"],
-      "cheapest": ["aa-main", "tap-basic", "aa-basic", "self-transfer"]
+      "reference": [
+        "aa-main",
+        "aa-basic",
+        "tap-basic",
+        "self-transfer"
+      ],
+      "cheapest": [
+        "aa-main",
+        "aa-basic",
+        "tap-basic",
+        "self-transfer"
+      ]
     },
     "ledger_must_contain": [
       {
-        "option_id": "aa-basic", "code": "bags", "sign": "cost", "min_cents": 18500, "max_cents": 18500,
-        "evidence_mentions": ["includes 0", "2026-05-18"],
+        "option_id": "aa-basic",
+        "code": "bags",
+        "sign": "cost",
+        "min_cents": 18500,
+        "max_cents": 18500,
+        "evidence_mentions": [
+          "includes 0",
+          "2026-05-18"
+        ],
         "why": "$85 + $100. The fee schedule is the one for tickets issued on or after 2026-05-18, resolved from issue_date rather than from the June travel date."
       },
       {
-        "option_id": "aa-main", "code": "bags", "sign": "cost", "min_cents": 10000, "max_cents": 10000,
+        "option_id": "aa-main",
+        "code": "bags",
+        "sign": "cost",
+        "min_cents": 10000,
+        "max_cents": 10000,
         "why": "One bag included, so only the second is charged, and it is charged at the FIRST tier because tiers index from beyond the allowance."
       },
       {
-        "option_id": "tap-basic", "code": "bags", "sign": "cost", "min_cents": 9500, "max_cents": 9500,
-        "evidence_mentions": ["Basic", "includes 1"],
+        "option_id": "tap-basic",
+        "code": "bags",
+        "sign": "cost",
+        "min_cents": 9500,
+        "max_cents": 9500,
+        "evidence_mentions": [
+          "Basic",
+          "includes 1"
+        ],
         "why": "A fare literally named Basic that includes a checked bag. If the scorer reached this by pattern-matching the brand name it got the right answer for the wrong reason - and would get American's Basic wrong in the same breath."
       },
       {
-        "option_id": "self-transfer", "code": "bags", "sign": "cost", "min_cents": 36000,
-        "evidence_mentions": ["two tickets", "twice"],
+        "option_id": "self-transfer",
+        "code": "bags",
+        "sign": "cost",
+        "min_cents": 36000,
+        "evidence_mentions": [
+          "two tickets",
+          "twice"
+        ],
         "why": "$75 + $95 on the transatlantic ticket, plus EUR 81 + EUR 102 on the intra-Europe one at the pinned rate. The same two bags, paid for twice, and the SHORT leg costs more than the ocean crossing."
       },
       {
-        "option_id": "self-transfer", "code": "risk", "sign": "cost", "min_cents": 15000,
-        "evidence_mentions": ["separate tickets", "no rebooking"],
-        "why": "Downside severity, not probability, is what makes this bad: a missed connection on two tickets means buying a new one at the walk-up fare. Ticketing topology belongs in risk_adjustment, and the brief's formula does not name it as an input."
+        "option_id": "self-transfer",
+        "code": "risk",
+        "sign": "cost",
+        "evidence_mentions": [
+          "separate tickets",
+          "no rebooking duty"
+        ],
+        "why": "Severity, not probability, is what makes a self-transfer dangerous: no rebooking duty, so a miss is a new leg at the walk-up fare plus a hotel. An earlier version of this assertion demanded a large DOLLAR figure and was wrong — with a 4h50m buffer the probability is genuinely near the floor, so the expected cost is small. What this pins is that the severity is modelled from the ticketing topology at all. The corpus still lacks a tight-buffer self-transfer, where this term should dominate; that fixture is owed."
       },
       {
-        "option_id": "aa-basic", "code": "boarding", "sign": "cost", "min_cents": 1,
-        "evidence_mentions": ["Group 8"],
+        "option_id": "aa-basic",
+        "code": "boarding",
+        "sign": "cost",
+        "min_cents": 1,
+        "evidence_mentions": [
+          "Group 8"
+        ],
         "why": "Basic boards last and the bins fill. That is a comfort line about boarding position - NOT a carry-on restriction, which transatlantic Basic does not have."
+      },
+      {
+        "option_id": "self-transfer",
+        "code": "carrier",
+        "sign": "cost",
+        "min_cents": 5000,
+        "why": "Two carriers, neither answerable for the other's leg, rated well below the route baseline."
       }
     ],
     "ledger_must_not_contain": [
       {
-        "option_id": "aa-basic", "code": "cabin_bag_fee",
+        "option_id": "aa-basic",
+        "code": "cabin_bag_fee",
         "why": "There is no transatlantic Basic Economy carry-on fee in 2026. Charging one here would invent about $70 of cost from a rule that was retired years ago."
       },
       {
-        "option_id": "self-transfer", "code": "bags_through_checked",
+        "option_id": "self-transfer",
+        "code": "bags_through_checked",
         "why": "Bags cannot be checked through across two separately issued tickets. A scorer that assumes through-checking would miss both the second fee and the reclaim-and-recheck time."
       }
     ],
