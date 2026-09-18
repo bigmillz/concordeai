@@ -24,7 +24,10 @@ sys.path.insert(0, os.path.join(HERE, ".."))
 import live                                                 # noqa: E402
 
 FAILS, N = [], [0]
-SECRET = "tq_live_9f3ab21c7e5d40b8a6c1"
+# Deliberately not key-shaped. Every assertion below only ever asks whether this
+# string is present or absent, so its shape guards nothing - and a realistic-looking
+# "tq_live_..." here trips GitHub secret scanning on a value that was never a key.
+SECRET = "NOT-A-REAL-KEY-test-fixture-only"
 
 
 def check(label, cond, detail=""):
