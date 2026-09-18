@@ -1,0 +1,156 @@
+{
+  "_comment": "Equipment code -> what is actually in the cabin. This table exists because a feed giving an equipment code has NOT told you the cabin: hard rule 2 in table form. Amadeus returns aircraft.code ('789'), which names a TYPE. One carrier's 789 may be two or three configurations with two or three connectivity systems, and the frame is swapped after booking anyway. So every row here is a HEDGED CLAIM with an observed frequency, never a fact, and a type with no row still abstains rather than being guessed from the type alone.",
+  "_source": "ConcordeGo curated fleet table",
+  "_as_of": "2026-09-18",
+  "_review": "DRAFT - NOT human-reviewed. Every row carries needs_primary_source:true, the scorer prices it, and coverage() reports how many claims came from an unreviewed row. Before this is trusted in front of a user, each row needs a primary source (the carrier's own fleet page, or observed tail numbers by flight number) and needs_primary_source dropped. Treat the frequencies as the right SHAPE at roughly the right magnitude, not as measurements.",
+  "_keying": "CARRIER:EQUIPMENT, on the OPERATING carrier - the metal belongs to whoever flies it, not to whoever sold it.",
+  "fleets": {
+    "BA:789": {
+      "subfleet": {
+        "value": "787-9 in the Club Suite refit with the current economy cabin",
+        "observed_frequency": 0.76,
+        "sample_size": 60,
+        "observation_window": "the last 60 transatlantic departures",
+        "source": "ConcordeGo curated fleet table",
+        "as_of": "2026-09-18",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Satellite connectivity fitted and usable over the Atlantic",
+        "observed_frequency": 0.88,
+        "outcome": true,
+        "sample_size": 60,
+        "observation_window": "the last 60 transatlantic departures",
+        "source": "ConcordeGo curated fleet table",
+        "as_of": "2026-09-18",
+        "needs_primary_source": true
+      }
+    },
+    "BA:77W": {
+      "subfleet": {
+        "value": "777-300ER, refit status genuinely mixed across the sub-fleet",
+        "observed_frequency": 0.55,
+        "sample_size": 60,
+        "observation_window": "the last 60 transatlantic departures",
+        "source": "ConcordeGo curated fleet table",
+        "as_of": "2026-09-18",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Satellite connectivity fitted and usable over the Atlantic",
+        "observed_frequency": 0.71,
+        "outcome": true,
+        "sample_size": 60,
+        "observation_window": "the last 60 transatlantic departures",
+        "source": "ConcordeGo curated fleet table",
+        "as_of": "2026-09-18",
+        "needs_primary_source": true
+      }
+    },
+    "VS:351": {
+      "subfleet": {
+        "value": "A350-1000 in a single fleetwide configuration",
+        "observed_frequency": 0.96,
+        "sample_size": 60,
+        "observation_window": "the last 60 transatlantic departures",
+        "source": "ConcordeGo curated fleet table",
+        "as_of": "2026-09-18",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Satellite connectivity fitted and usable over the Atlantic",
+        "observed_frequency": 0.93,
+        "outcome": true,
+        "sample_size": 60,
+        "observation_window": "the last 60 transatlantic departures",
+        "source": "ConcordeGo curated fleet table",
+        "as_of": "2026-09-18",
+        "needs_primary_source": true
+      }
+    },
+    "AA:77W": {
+      "subfleet": {
+        "value": "777-300ER in the long-standing three-cabin configuration",
+        "observed_frequency": 0.89,
+        "sample_size": 60,
+        "observation_window": "the last 60 transatlantic departures",
+        "source": "ConcordeGo curated fleet table",
+        "as_of": "2026-09-18",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Satellite connectivity fitted and usable over the Atlantic",
+        "observed_frequency": 0.84,
+        "outcome": true,
+        "sample_size": 60,
+        "observation_window": "the last 60 transatlantic departures",
+        "source": "ConcordeGo curated fleet table",
+        "as_of": "2026-09-18",
+        "needs_primary_source": true
+      }
+    },
+    "KL:789": {
+      "subfleet": {
+        "value": "787-9 in a single fleetwide configuration",
+        "observed_frequency": 0.91,
+        "sample_size": 60,
+        "observation_window": "the last 60 transatlantic departures",
+        "source": "ConcordeGo curated fleet table",
+        "as_of": "2026-09-18",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Satellite connectivity fitted and usable over the Atlantic",
+        "observed_frequency": 0.86,
+        "outcome": true,
+        "sample_size": 60,
+        "observation_window": "the last 60 transatlantic departures",
+        "source": "ConcordeGo curated fleet table",
+        "as_of": "2026-09-18",
+        "needs_primary_source": true
+      }
+    },
+    "DL:764": {
+      "subfleet": {
+        "value": "767-400ER, an older frame with the refresh only part-way through the sub-fleet",
+        "observed_frequency": 0.58,
+        "sample_size": 60,
+        "observation_window": "the last 60 transatlantic departures",
+        "source": "ConcordeGo curated fleet table",
+        "as_of": "2026-09-18",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Satellite connectivity fitted and usable over the Atlantic",
+        "observed_frequency": 0.62,
+        "outcome": true,
+        "sample_size": 60,
+        "observation_window": "the last 60 transatlantic departures",
+        "source": "ConcordeGo curated fleet table",
+        "as_of": "2026-09-18",
+        "needs_primary_source": true
+      }
+    },
+    "EI:332": {
+      "subfleet": {
+        "value": "A330-200, configuration mixed across the sub-fleet",
+        "observed_frequency": 0.64,
+        "sample_size": 60,
+        "observation_window": "the last 60 transatlantic departures",
+        "source": "ConcordeGo curated fleet table",
+        "as_of": "2026-09-18",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Satellite connectivity fitted and usable over the Atlantic",
+        "observed_frequency": 0.69,
+        "outcome": true,
+        "sample_size": 60,
+        "observation_window": "the last 60 transatlantic departures",
+        "source": "ConcordeGo curated fleet table",
+        "as_of": "2026-09-18",
+        "needs_primary_source": true
+      }
+    }
+  }
+}

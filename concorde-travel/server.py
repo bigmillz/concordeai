@@ -445,7 +445,12 @@ def live_request(req):
     src = req.get("source") or "sample"
     _LIVE_META = {}
     if src == "sample":
-        path = os.path.join(HERE, "adapter_samples", "kiwi-jfk-lhr.json")
+        # Which recording depends on which provider is configured, so the page
+        # with no key shows the shape of the feed it would actually get.
+        want = req.get("provider") or live.load_config().get("provider") or "amadeus"
+        name = ("amadeus-jfk-lhr.json" if str(want).startswith("amadeus")
+                else "kiwi-jfk-lhr.json")
+        path = os.path.join(HERE, "adapter_samples", name)
         try:
             with open(path, encoding="utf-8") as fh:
                 raw = json.load(fh)
@@ -469,14 +474,18 @@ def live_request(req):
         return {"error": "unknown source %r - this server does not call a flight "
                          "API itself; hand it a payload or use the recording" % src}
 
-    sc = adapter.from_kiwi(raw, origin_key=req.get("origin_key", "bushwick-brooklyn"))
+    # Dispatch on the payload's own shape. A profile pointed at the wrong
+    # provider then fails as a parse error rather than as a plausible-looking
+    # scenario assembled from the wrong keys.
+    sc = adapter.from_feed(raw, origin_key=req.get("origin_key", "bushwick-brooklyn"),
+                           checked_bags=int(req.get("checked_bags", 1)))
     if sc.get("error"):
         return sc
     _LIVE[sc["fixture_id"]] = sc
     out = _score_scenario(sc, req)
     out["coverage"] = adapter.coverage(sc)
     out["live"] = True
-    out["feed"] = {"source": src}
+    out["feed"] = {"source": src, "provider": (sc.get("_feed") or {}).get("provider", "kiwi")}
     if src == "api":
         out["feed"].update({"fetched": _LIVE_META.get("source"),
                             "age_seconds": _LIVE_META.get("age_seconds"),

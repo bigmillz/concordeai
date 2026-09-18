@@ -1,0 +1,69 @@
+{
+  "_comment": "Fare brand -> what a checked bag costs beyond what the brand includes. This is the join that makes the Amadeus feed worth having: it returns brandedFare ('BASIC', 'LIGHT', 'PLUS') and includedCheckedBags.quantity, which is the ALLOWANCE. It does not return the FEE. Without this table the bags-versus-fare comparison - the cheapest real win in the product - cannot run at all, which is exactly where the Kiwi feed left it.",
+  "_source": "ConcordeGo curated fare-brand table",
+  "_as_of": "2026-09-18",
+  "_review": "DRAFT - NOT human-reviewed. These are the right shape at roughly the right magnitude for transatlantic economy, not published fees read off a tariff. Every row needs checking against the carrier's own baggage page before a dollar figure built on it is shown to anyone.",
+  "_keying": "CARRIER:BRAND on the ISSUING carrier, uppercased. Tiers index from the first piece BEYOND the brand's included allowance, matching scorer._bag_lines - piece 1 is the first bag the traveller PAYS for, not their first bag.",
+  "_default_policy": "A brand with no row falls back to _default, which is deliberately set at the PESSIMISTIC end of real transatlantic fees. Unknown must never be cheap: if an undocumented fare got the benefit of the doubt, the least-documented itinerary would accumulate the fewest penalties and win, which is the failure mode the whole abstain discipline exists to prevent. The fallback is flagged per ticket and counted by coverage().",
+  "_default": {
+    "note": "No curated fee schedule for this brand - priced at the pessimistic end of transatlantic economy, which is a placeholder, not a quote",
+    "tiers": [
+      {"piece": 1, "amount_cents": 10000},
+      {"piece": 2, "amount_cents": 12000},
+      {"piece": 3, "amount_cents": 25000}
+    ]
+  },
+  "brands": {
+    "BA:BASIC": {
+      "tiers": [
+        {"piece": 1, "amount_cents": 7500},
+        {"piece": 2, "amount_cents": 10000},
+        {"piece": 3, "amount_cents": 20000}
+      ]
+    },
+    "BA:PLUS": {
+      "tiers": [
+        {"piece": 1, "amount_cents": 10000},
+        {"piece": 2, "amount_cents": 20000}
+      ]
+    },
+    "AA:BASIC": {
+      "tiers": [
+        {"piece": 1, "amount_cents": 7500},
+        {"piece": 2, "amount_cents": 10000},
+        {"piece": 3, "amount_cents": 20000}
+      ]
+    },
+    "DL:MAIN": {
+      "tiers": [
+        {"piece": 1, "amount_cents": 10000},
+        {"piece": 2, "amount_cents": 20000}
+      ]
+    },
+    "VS:CLASSIC": {
+      "tiers": [
+        {"piece": 1, "amount_cents": 10000},
+        {"piece": 2, "amount_cents": 20000}
+      ]
+    },
+    "KL:LIGHT": {
+      "tiers": [
+        {"piece": 1, "amount_cents": 7000},
+        {"piece": 2, "amount_cents": 11000},
+        {"piece": 3, "amount_cents": 20000}
+      ]
+    },
+    "KL:STANDARD": {
+      "tiers": [
+        {"piece": 1, "amount_cents": 11000},
+        {"piece": 2, "amount_cents": 20000}
+      ]
+    },
+    "EI:SAVER": {
+      "tiers": [
+        {"piece": 1, "amount_cents": 8500},
+        {"piece": 2, "amount_cents": 13000}
+      ]
+    }
+  }
+}

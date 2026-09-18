@@ -362,6 +362,7 @@ python3 concorde-travel/tests/test_adapter.py    # live normalisation, replayed 
 python3 concorde-travel/tests/test_live.py       # quota, cache and key handling, offline
 python3 concorde-travel/live.py status           # key, quota and cache state
 python3 concorde-travel/live.py probe            # validate a key with a REAL search
+python3 concorde-travel/live.py provider amadeus # switch provider profile
 python3 concorde-travel/tests/test_faststart.py
 python3 concorde-travel/adapter.py               # normalise the recorded payload, print coverage
 ```
@@ -399,8 +400,12 @@ asserts the scorer and its tests never import the adapter, and the adapter's own
 replay `adapter_samples/kiwi-jfk-lhr.json` — a real response captured once — instead of
 calling anything.
 
-Measured against that real payload, the feed supplies the skeleton and the price and very
-little else:
+**Two providers, and they do not know the same things.** `from_feed()` dispatches on the
+payload's own shape, so a profile pointed at the wrong provider fails as a parse error
+rather than as a plausible scenario built from the wrong keys.
+
+Measured against the real Kiwi payload, that feed supplies the skeleton and the price and
+very little else:
 
 - **No UTC offset on any timestamp.** The scorer's time model requires one, so the adapter
   attaches it from `enrichment/airports.json`. Without that join the feed cannot satisfy the
@@ -413,9 +418,28 @@ little else:
 - **Baggage as a count already priced in**, and no fare brand — so the bags-versus-fare
   arithmetic, the cheapest real win in the product, has nothing to work with.
 
-`adapter.coverage()` reports this per search and the page prints it. **A grade computed over
-mostly-abstained enrichment is not the same object as one over a curated route** — do not
-quietly drop that strip to make the results look more confident.
+**Amadeus closes three of those four** — it names the operating carrier (and its *absence*
+means the marketing carrier flies it, which is information, not a gap), it carries an
+equipment code, and it carries a fare brand with an included-bag count. It cannot see
+self-transfer or virtual interlining at all, which is why both adapters are kept rather
+than one replacing the other. Kiwi also closed self-serve Tequila signup in 2024, so
+Amadeus is the default because it is the key you can actually get.
+
+**An equipment code is not a cabin.** `aircraft.code` names a *type*; one carrier's 789 may
+be several configurations, and the frame is swapped after booking regardless. It is joined
+against `enrichment/fleets.json` into a **hedged claim with an observed frequency**, and a
+type with no curated row **abstains**. Better data is what hard rule 2 is for, not a reason
+to relax it.
+
+**`enrichment/fleets.json` and `enrichment/fares.json` are DRAFTS.** Marked in the files,
+every fleet row carrying `needs_primary_source: true`, counted by `coverage()`, amber in the
+interface. A claim from an unreviewed table is *more* dangerous than an abstain — an abstain
+announces itself in the ledger, a draft row prints a confident dollar figure. They need a
+human pass before any number built on them goes in front of a stranger.
+
+`adapter.coverage()` reports all of this per search and the page prints it. **A grade
+computed over mostly-abstained enrichment is not the same object as one over a curated
+route** — do not quietly drop that strip to make the results look more confident.
 
 `enrichment/` is the curated moat: airports (zones with DST transition dates, MCT, service
 hours, inter-terminal), carriers (reviewed ratings), ground access by origin and hour, and
@@ -428,16 +452,25 @@ which is the scope discipline working, not a bug.
 question — may we call the provider right now, and what came back — and hands the payload
 to the adapter. The scorer never sees it.
 
-**Setting a key**: `export CONCORDEGO_FLIGHT_KEY=...`, or put one in
-`~/.concordego/cloud.json` (written 0600, created empty by `live.py status`). The env var
-wins, so a key need never touch disk. `/api/live` uses the API when a key is configured and
-the recorded sample when it is not — the interface never offers a button that cannot work.
+**Setting a key**: `export CONCORDEGO_FLIGHT_KEY=...` (plus `CONCORDEGO_FLIGHT_SECRET` on
+an OAuth2 provider), or put them in `~/.concordego/cloud.json` (written 0600, created empty
+by `live.py status`). The env vars win, so neither half need touch disk. `/api/live` uses
+the API when credentials are configured and the recorded sample when they are not — the
+interface never offers a button that cannot work.
 
-**The provider's wire format lives in that config, not in code.** The shipped Tequila
-profile is written from documentation and is **unverified against the live service** — every
-Kiwi host was unreachable from the machine this was built on. If the parameter names are
-wrong, fix the profile; you should not have to edit Python to correct someone else's query
-string.
+**The provider's wire format lives in that config, not in code.** Both shipped profiles are
+written from documentation and are **unverified against the live service** — no credential
+for either was available on the machine this was built on. If the parameter names are wrong,
+fix the profile; you should not have to edit Python to correct someone else's query string.
+Protocols are the exception: OAuth2 is a mechanism, not a parameter name, so it lives in
+code.
+
+**OAuth2 costs nothing when it fails.** The token is minted *before* quota is reserved,
+because a mint is not the metered call and a mistyped secret is the likeliest day-one
+mistake. The token is cached with a one-way fingerprint of the credential pair, so a rotated
+key invalidates it; a 401 on the search drops it, since it may be a retired token rather
+than a bad credential. The secret and the bearer token are redacted everywhere the key is,
+and `status()` reports that a token is held and its remaining life, never the token.
 
 Four behaviours that are deliberate, each with a comment in `live.py`:
 
@@ -453,3 +486,7 @@ Four behaviours that are deliberate, each with a comment in `live.py`:
 Counters live in `~/.concordego/quota.json` and roll over by day and month on their own —
 no cron, no cleanup job. Defaults are 100/day and 1000/month with a 2s floor between calls
 and a 30-minute cache TTL; all four are config.
+
+**`adapter_samples/kiwi-jfk-lhr.json` is a real capture. `amadeus-jfk-lhr.json` is not** —
+it is synthesised from the published schema, its own `_provenance` block says so, and a test
+asserts it. Replace it with a real capture on the first successful probe.

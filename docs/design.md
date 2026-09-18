@@ -1003,8 +1003,125 @@ provider -> saw exactly 3 requests; the cache hit never reached it
 The User-Agent guard is proven by that run: the stand-in refuses `Python-urllib` and the
 real call got a 200.
 
+## A second provider, and why it became the default
+
+Kiwi closed self-serve Tequila registration in May 2024. New access is an application
+through the partner portal, and they want to see a live travel product with real
+distribution — which a pre-launch re-ranker does not have. The Tequila profile still
+ships and still works, but it is not a key you can go and get this afternoon.
+
+There is also no Google Flights API to compare it against. Google retired QPX Express on
+10 April 2018 and never replaced it publicly; everything marketed as a "Google Flights
+API" today scrapes the consumer page, which returns **less** structured data than Kiwi,
+not more, and is fragile besides.
+
+So the default provider is now **Amadeus Self-Service**: self-serve signup, a free test
+environment, and roughly 2,000 free production calls a month on Flight Offers Search.
+More to the point, it carries the three fields the scorer has to abstain on with Kiwi.
+
+| What the scorer needs | Kiwi | Amadeus |
+| --- | --- | --- |
+| UTC offset on a timestamp | no | no — the zone join is load-bearing for both |
+| Operating carrier | no — 11 of 13 sample segments were codeshares | yes, and its **absence means the marketing carrier flies it** |
+| Equipment code | no | yes — a *type*, which is not a cabin |
+| Fare brand + included bags | no | yes |
+| Bag fee schedule | no | no — joined from `enrichment/fares.json` |
+| On-time record | no | no — a separate feed entirely |
+| Self-transfer / virtual interlining | **yes** | **no** |
+
+That last row is why both adapters are kept. Amadeus is GDS content on one ticket, so the
+two-ticket itineraries the risk and baggage terms were built to price simply do not appear
+in it. That is a coverage loss, not a simplification.
+
+### An equipment code is not a cabin
+
+This is the part it would be easy to get wrong. Amadeus returns `aircraft.code`, and the
+temptation is to treat that as having solved hard rule 2. It has not: one carrier's 789 can
+be two or three configurations with two or three connectivity systems, and the frame is
+swapped after booking anyway. So the code is joined against `enrichment/fleets.json` and
+becomes a **hedged claim with an observed frequency** — which is exactly what the scorer's
+cabin-uncertainty term is built to price — and a type with no curated row **abstains**
+rather than being talked up from the type alone. Better data is what hard rule 2 is *for*,
+not a reason to relax it.
+
+`fleets.json` and `fares.json` are both marked `_review: DRAFT` and every fleet row carries
+`needs_primary_source: true`. `coverage()` counts them and the page colours the strip amber,
+because a claim from an unreviewed table is **more** dangerous than an abstain: an abstain
+announces itself in the ledger, a draft row prints a confident dollar figure. These two
+files need a human pass before any number built on them is shown to a stranger.
+
+### Unknown is never cheap, in the bag table too
+
+A fare brand with no curated row falls back to `fares._default`, set deliberately at the
+**pessimistic** end of transatlantic fees. Giving an undocumented fare the benefit of the
+doubt would let the least-documented itinerary accumulate the fewest penalties and win,
+which is the failure the whole abstain discipline exists to prevent. The fallback is
+flagged per ticket and counted by `coverage()`.
+
+### The traveller's bag load comes from the request
+
+`from_amadeus(..., checked_bags=n)` takes the load from the caller, never from the fare.
+Reading it off the fare makes every basic-economy ticket score as though the passenger
+travelled hand-baggage-only — which is precisely the comparison this product exists to make.
+
+## OAuth2, and what it changes about the credential
+
+Amadeus does not take a static header key. It takes a client id and a client secret,
+exchanged at `/v1/security/oauth2/token` for a bearer token good for about half an hour.
+Four consequences, each with a comment in `live.py`:
+
+- **The token is minted before quota is reserved.** A token mint is not the metered call, so
+  a mistyped secret — the likeliest day-one mistake — must cost nothing. Reserving first
+  would burn a search on every attempt.
+- **The token is cached, and the cache is fingerprinted.** A SHA-256 of the credential pair
+  is stored beside the token so a rotated key invalidates it. The fingerprint is one-way, so
+  `token.json` never becomes a second place a secret lives.
+- **A 401 or 403 on the search drops the cached token**, because it may be a retired token
+  rather than a bad credential, and the next call should re-mint rather than replay.
+- **The secret and the bearer token are redacted** everywhere the key already was, including
+  out of the provider's own error echo. `status()` reports whether a token is held and how
+  long it has left, never the token.
+
+Credentials come from `CONCORDEGO_FLIGHT_KEY` / `CONCORDEGO_FLIGHT_SECRET` first, so neither
+half need ever touch disk. `live.py provider amadeus|kiwi-tequila` switches profiles, keeps
+any key already set, and drops a token minted for the old provider.
+
+Note that the sandbox (`test.api.amadeus.com`) and production (`api.amadeus.com`) take the
+same credential *shape* but not the same credentials, and the sandbox serves a limited,
+cached slice of content. The profile ships pointed at the sandbox.
+
+## Both feeds, proven end to end without a real key
+
+A stand-in Amadeus on localhost — validating the grant, requiring the bearer header, and
+403ing a bare `Python-urllib` User-Agent the way real provider edges do — walked the whole
+OAuth2 chain:
+
+```
+probe    -> minted a token, ran a REAL search, 7 itineraries, 2 calls left of 3
+call 1   -> api,   day allowance 3 -> 1
+call 2   -> cache, allowance unchanged, age 0s
+scored   -> AA6175 $918 A+ / DL1 $950 A+ / BA112 $972 A+
+            "ground access, carrier quality and fare brands are curated;
+             the aircraft claims are DRAFT and not yet reviewed"
+3 spent  -> fourth refused by name: "daily limit reached: 3 of 3 calls used today"
+bad secret -> HTTP 401 minting a token, and the allowance did not move
+```
+
+The User-Agent guard is proven by that run: the stand-in refuses `Python-urllib` outright,
+and the real call got through.
+
 ## What is still not done
 
 There is no live key in this repo and none can be added from here. The plumbing is complete
-and tested; what remains is a Tequila key in the config and one `live.py probe` to confirm
-the parameter names, which is the one thing that genuinely could not be checked offline.
+and tested for both providers; what remains is a credential in the config and one
+`live.py probe` to confirm the parameter names — the one thing that genuinely could not be
+checked offline.
+
+Two files also want a human before they are trusted: `enrichment/fleets.json` and
+`enrichment/fares.json` are drafts, marked as such in the files, surfaced by `coverage()`
+and coloured amber in the interface. The mechanism is right; the numbers need a source.
+
+`adapter_samples/amadeus-jfk-lhr.json` is **synthesised from the published schema, not
+captured** — its own `_provenance` block says so, and a test asserts it. It proves the
+adapter handles the documented shape; it cannot prove the documented shape is what the
+service returns. Replace it with a real capture on the first successful probe.

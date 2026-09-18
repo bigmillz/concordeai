@@ -1622,15 +1622,20 @@ function paint(){
     h += '</div>';
   }
   if (LAST.coverage){
-    var indicative = /indicative/.test(LAST.coverage.verdict);
+    // A DRAFT verdict gets the same caution colour as a thin one. Claims from an
+    // unreviewed table print a confident dollar figure, which makes them the
+    // more misleading of the two, not the less.
+    var indicative = /indicative|DRAFT/.test(LAST.coverage.verdict);
     var feed = LAST.feed || {};
     var where = feed.fetched === "cache"
         ? "From cache, " + Math.round((feed.age_seconds || 0) / 60) + " min old."
         : feed.fetched === "api"
           ? "Fetched live \u2014 " + (feed.quota ? feed.quota.day_left + " calls left today." : "")
           : "From a recorded search.";
+    var who = feed.provider ? (feed.provider === "amadeus" ? "Amadeus" : "Kiwi.com") : "";
     h += '<div class="coverage' + (indicative ? ' thin' : '') + '">' +
-         '<b>Live inventory.</b> ' + esc(where) + ' ' + esc(LAST.coverage.verdict) + '<ul>' +
+         '<b>Live inventory' + (who ? ' \u00b7 ' + esc(who) : '') + '.</b> ' +
+         esc(where) + ' ' + esc(LAST.coverage.verdict) + '<ul>' +
          LAST.coverage.gaps.map(function(g){ return '<li>' + esc(g) + '</li>'; }).join("") +
          '</ul></div>';
   }

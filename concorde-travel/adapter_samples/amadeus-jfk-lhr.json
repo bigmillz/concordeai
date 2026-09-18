@@ -1,0 +1,500 @@
+{
+  "_provenance": {
+    "what": "A Flight Offers Search v2 response, JFK-LHR, one adult, 2026-11-12.",
+    "captured": false,
+    "how": "SYNTHESISED from Amadeus's published Flight Offers Search v2 schema. Unlike kiwi-jfk-lhr.json, which is a real response recorded off the wire, no Amadeus credential was available on the machine this was written on, so nothing here was observed. The SHAPE is from the documentation; the VALUES are constructed to exercise the adapter.",
+    "therefore": "It proves the adapter handles the documented schema. It does NOT prove the documented schema matches what the service returns. Replace it with a real capture on the first successful `live.py probe` and re-run the adapter tests; a field that moved will show up as a dropped itinerary, not as silence.",
+    "exercises": [
+      "a nonstop with a BASIC brand carrying no checked bag",
+      "the same physical flight on an upsold brand that includes one - the bags-flip pair",
+      "a codeshare where operating.carrierCode differs from carrierCode",
+      "an offer where operating is ABSENT, which in this schema means the marketing carrier flies it",
+      "a two-segment connection on one ticket, so bags are through-checked",
+      "an itinerary through an uncurated airport, which must be dropped rather than guessed"
+    ]
+  },
+  "meta": {
+    "count": 7,
+    "links": {"self": "https://test.api.amadeus.com/v2/shopping/flight-offers"}
+  },
+  "data": [
+    {
+      "type": "flight-offer",
+      "id": "1",
+      "source": "GDS",
+      "instantTicketingRequired": false,
+      "nonHomogeneous": false,
+      "oneWay": true,
+      "lastTicketingDate": "2026-11-10",
+      "numberOfBookableSeats": 9,
+      "itineraries": [
+        {
+          "duration": "PT7H0M",
+          "segments": [
+            {
+              "departure": {"iataCode": "JFK", "terminal": "7", "at": "2026-11-12T20:25:00"},
+              "arrival": {"iataCode": "LHR", "terminal": "5", "at": "2026-11-13T08:25:00"},
+              "carrierCode": "BA",
+              "number": "112",
+              "aircraft": {"code": "789"},
+              "duration": "PT7H0M",
+              "id": "1",
+              "numberOfStops": 0,
+              "blacklistedInEU": false
+            }
+          ]
+        }
+      ],
+      "price": {
+        "currency": "USD",
+        "total": "480.00",
+        "base": "310.00",
+        "grandTotal": "480.00",
+        "fees": [{"amount": "0.00", "type": "SUPPLIER"}, {"amount": "0.00", "type": "TICKETING"}]
+      },
+      "pricingOptions": {"fareType": ["PUBLISHED"], "includedCheckedBagsOnly": false},
+      "validatingAirlineCodes": ["BA"],
+      "travelerPricings": [
+        {
+          "travelerId": "1",
+          "fareOption": "STANDARD",
+          "travelerType": "ADULT",
+          "price": {"currency": "USD", "total": "480.00", "base": "310.00"},
+          "fareDetailsBySegment": [
+            {
+              "segmentId": "1",
+              "cabin": "ECONOMY",
+              "fareBasis": "OLNNMBA",
+              "brandedFare": "BASIC",
+              "brandedFareLabel": "BASIC",
+              "class": "O",
+              "includedCheckedBags": {"quantity": 0},
+              "includedCabinBags": {"quantity": 1},
+              "amenities": [
+                {"description": "CHECKED BAG FIRST", "isChargeable": true, "amenityType": "BAGGAGE"},
+                {"description": "PRE RESERVED SEAT ASSIGNMENT", "isChargeable": true, "amenityType": "PRE_RESERVED_SEAT"},
+                {"description": "CHANGE BEFORE DEPARTURE", "isChargeable": true, "amenityType": "BRANDED_FARES"}
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "flight-offer",
+      "id": "2",
+      "source": "GDS",
+      "instantTicketingRequired": false,
+      "nonHomogeneous": false,
+      "oneWay": true,
+      "lastTicketingDate": "2026-11-10",
+      "numberOfBookableSeats": 9,
+      "itineraries": [
+        {
+          "duration": "PT7H0M",
+          "segments": [
+            {
+              "departure": {"iataCode": "JFK", "terminal": "7", "at": "2026-11-12T20:25:00"},
+              "arrival": {"iataCode": "LHR", "terminal": "5", "at": "2026-11-13T08:25:00"},
+              "carrierCode": "BA",
+              "number": "112",
+              "aircraft": {"code": "789"},
+              "duration": "PT7H0M",
+              "id": "1",
+              "numberOfStops": 0,
+              "blacklistedInEU": false
+            }
+          ]
+        }
+      ],
+      "price": {
+        "currency": "USD",
+        "total": "562.00",
+        "base": "392.00",
+        "grandTotal": "562.00",
+        "fees": [{"amount": "0.00", "type": "SUPPLIER"}, {"amount": "0.00", "type": "TICKETING"}]
+      },
+      "pricingOptions": {"fareType": ["PUBLISHED"], "includedCheckedBagsOnly": false},
+      "validatingAirlineCodes": ["BA"],
+      "travelerPricings": [
+        {
+          "travelerId": "1",
+          "fareOption": "STANDARD",
+          "travelerType": "ADULT",
+          "price": {"currency": "USD", "total": "562.00", "base": "392.00"},
+          "fareDetailsBySegment": [
+            {
+              "segmentId": "1",
+              "cabin": "ECONOMY",
+              "fareBasis": "NLNNMBA",
+              "brandedFare": "PLUS",
+              "brandedFareLabel": "PLUS",
+              "class": "N",
+              "includedCheckedBags": {"quantity": 1},
+              "includedCabinBags": {"quantity": 1},
+              "amenities": [
+                {"description": "CHECKED BAG FIRST", "isChargeable": false, "amenityType": "BAGGAGE"},
+                {"description": "PRE RESERVED SEAT ASSIGNMENT", "isChargeable": false, "amenityType": "PRE_RESERVED_SEAT"}
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "flight-offer",
+      "id": "3",
+      "source": "GDS",
+      "instantTicketingRequired": false,
+      "nonHomogeneous": false,
+      "oneWay": true,
+      "lastTicketingDate": "2026-11-09",
+      "numberOfBookableSeats": 4,
+      "itineraries": [
+        {
+          "duration": "PT7H10M",
+          "segments": [
+            {
+              "departure": {"iataCode": "JFK", "terminal": "4", "at": "2026-11-12T22:00:00"},
+              "arrival": {"iataCode": "LHR", "terminal": "3", "at": "2026-11-13T10:10:00"},
+              "carrierCode": "VS",
+              "number": "4",
+              "aircraft": {"code": "351"},
+              "operating": {"carrierCode": "VS"},
+              "duration": "PT7H10M",
+              "id": "1",
+              "numberOfStops": 0,
+              "blacklistedInEU": false
+            }
+          ]
+        }
+      ],
+      "price": {
+        "currency": "USD",
+        "total": "611.00",
+        "base": "441.00",
+        "grandTotal": "611.00",
+        "fees": [{"amount": "0.00", "type": "SUPPLIER"}]
+      },
+      "pricingOptions": {"fareType": ["PUBLISHED"], "includedCheckedBagsOnly": true},
+      "validatingAirlineCodes": ["VS"],
+      "travelerPricings": [
+        {
+          "travelerId": "1",
+          "fareOption": "STANDARD",
+          "travelerType": "ADULT",
+          "price": {"currency": "USD", "total": "611.00", "base": "441.00"},
+          "fareDetailsBySegment": [
+            {
+              "segmentId": "1",
+              "cabin": "ECONOMY",
+              "fareBasis": "LNNSVS",
+              "brandedFare": "CLASSIC",
+              "brandedFareLabel": "ECONOMY CLASSIC",
+              "class": "L",
+              "includedCheckedBags": {"quantity": 1},
+              "includedCabinBags": {"quantity": 1}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "flight-offer",
+      "id": "4",
+      "source": "GDS",
+      "instantTicketingRequired": false,
+      "nonHomogeneous": false,
+      "oneWay": true,
+      "lastTicketingDate": "2026-11-10",
+      "numberOfBookableSeats": 7,
+      "itineraries": [
+        {
+          "duration": "PT7H5M",
+          "segments": [
+            {
+              "departure": {"iataCode": "JFK", "terminal": "8", "at": "2026-11-12T18:30:00"},
+              "arrival": {"iataCode": "LHR", "terminal": "5", "at": "2026-11-13T06:35:00"},
+              "carrierCode": "AA",
+              "number": "6175",
+              "aircraft": {"code": "77W"},
+              "operating": {"carrierCode": "BA"},
+              "duration": "PT7H5M",
+              "id": "1",
+              "numberOfStops": 0,
+              "blacklistedInEU": false
+            }
+          ]
+        }
+      ],
+      "price": {
+        "currency": "USD",
+        "total": "498.00",
+        "base": "328.00",
+        "grandTotal": "498.00",
+        "fees": [{"amount": "0.00", "type": "SUPPLIER"}]
+      },
+      "pricingOptions": {"fareType": ["PUBLISHED"], "includedCheckedBagsOnly": false},
+      "validatingAirlineCodes": ["AA"],
+      "travelerPricings": [
+        {
+          "travelerId": "1",
+          "fareOption": "STANDARD",
+          "travelerType": "ADULT",
+          "price": {"currency": "USD", "total": "498.00", "base": "328.00"},
+          "fareDetailsBySegment": [
+            {
+              "segmentId": "1",
+              "cabin": "ECONOMY",
+              "fareBasis": "OLNZZAA",
+              "brandedFare": "BASIC",
+              "brandedFareLabel": "BASIC ECONOMY",
+              "class": "O",
+              "includedCheckedBags": {"quantity": 0},
+              "includedCabinBags": {"quantity": 1}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "flight-offer",
+      "id": "5",
+      "source": "GDS",
+      "instantTicketingRequired": false,
+      "nonHomogeneous": false,
+      "oneWay": true,
+      "lastTicketingDate": "2026-11-08",
+      "numberOfBookableSeats": 9,
+      "itineraries": [
+        {
+          "duration": "PT11H30M",
+          "segments": [
+            {
+              "departure": {"iataCode": "JFK", "terminal": "4", "at": "2026-11-12T18:15:00"},
+              "arrival": {"iataCode": "AMS", "at": "2026-11-13T07:35:00"},
+              "carrierCode": "KL",
+              "number": "642",
+              "aircraft": {"code": "789"},
+              "duration": "PT7H20M",
+              "id": "1",
+              "numberOfStops": 0,
+              "blacklistedInEU": false
+            },
+            {
+              "departure": {"iataCode": "AMS", "at": "2026-11-13T10:20:00"},
+              "arrival": {"iataCode": "LHR", "terminal": "4", "at": "2026-11-13T10:45:00"},
+              "carrierCode": "KL",
+              "number": "1009",
+              "aircraft": {"code": "73H"},
+              "duration": "PT1H25M",
+              "id": "2",
+              "numberOfStops": 0,
+              "blacklistedInEU": false
+            }
+          ]
+        }
+      ],
+      "price": {
+        "currency": "USD",
+        "total": "455.00",
+        "base": "285.00",
+        "grandTotal": "455.00",
+        "fees": [{"amount": "0.00", "type": "SUPPLIER"}]
+      },
+      "pricingOptions": {"fareType": ["PUBLISHED"], "includedCheckedBagsOnly": true},
+      "validatingAirlineCodes": ["KL"],
+      "travelerPricings": [
+        {
+          "travelerId": "1",
+          "fareOption": "STANDARD",
+          "travelerType": "ADULT",
+          "price": {"currency": "USD", "total": "455.00", "base": "285.00"},
+          "fareDetailsBySegment": [
+            {
+              "segmentId": "1",
+              "cabin": "ECONOMY",
+              "fareBasis": "NLGHTKL",
+              "brandedFare": "LIGHT",
+              "brandedFareLabel": "ECONOMY LIGHT",
+              "class": "N",
+              "includedCheckedBags": {"quantity": 0},
+              "includedCabinBags": {"quantity": 1}
+            },
+            {
+              "segmentId": "2",
+              "cabin": "ECONOMY",
+              "fareBasis": "NLGHTKL",
+              "brandedFare": "LIGHT",
+              "brandedFareLabel": "ECONOMY LIGHT",
+              "class": "N",
+              "includedCheckedBags": {"quantity": 0},
+              "includedCabinBags": {"quantity": 1}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "flight-offer",
+      "id": "6",
+      "source": "GDS",
+      "instantTicketingRequired": false,
+      "nonHomogeneous": false,
+      "oneWay": true,
+      "lastTicketingDate": "2026-11-10",
+      "numberOfBookableSeats": 5,
+      "itineraries": [
+        {
+          "duration": "PT6H50M",
+          "segments": [
+            {
+              "departure": {"iataCode": "JFK", "terminal": "4", "at": "2026-11-12T21:15:00"},
+              "arrival": {"iataCode": "LHR", "terminal": "3", "at": "2026-11-13T09:05:00"},
+              "carrierCode": "DL",
+              "number": "1",
+              "aircraft": {"code": "764"},
+              "duration": "PT6H50M",
+              "id": "1",
+              "numberOfStops": 0,
+              "blacklistedInEU": false
+            }
+          ]
+        }
+      ],
+      "price": {
+        "currency": "USD",
+        "total": "520.00",
+        "base": "350.00",
+        "grandTotal": "520.00",
+        "fees": [{"amount": "0.00", "type": "SUPPLIER"}]
+      },
+      "pricingOptions": {"fareType": ["PUBLISHED"], "includedCheckedBagsOnly": false},
+      "validatingAirlineCodes": ["DL"],
+      "travelerPricings": [
+        {
+          "travelerId": "1",
+          "fareOption": "STANDARD",
+          "travelerType": "ADULT",
+          "price": {"currency": "USD", "total": "520.00", "base": "350.00"},
+          "fareDetailsBySegment": [
+            {
+              "segmentId": "1",
+              "cabin": "ECONOMY",
+              "fareBasis": "VLNNMDL",
+              "brandedFare": "MAIN",
+              "brandedFareLabel": "MAIN CABIN",
+              "class": "V",
+              "includedCheckedBags": {"quantity": 1},
+              "includedCabinBags": {"quantity": 1}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "flight-offer",
+      "id": "7",
+      "source": "GDS",
+      "instantTicketingRequired": false,
+      "nonHomogeneous": false,
+      "oneWay": true,
+      "lastTicketingDate": "2026-11-07",
+      "numberOfBookableSeats": 9,
+      "itineraries": [
+        {
+          "duration": "PT10H15M",
+          "segments": [
+            {
+              "departure": {"iataCode": "JFK", "terminal": "4", "at": "2026-11-12T19:30:00"},
+              "arrival": {"iataCode": "DUB", "terminal": "2", "at": "2026-11-13T06:45:00"},
+              "carrierCode": "EI",
+              "number": "104",
+              "aircraft": {"code": "332"},
+              "duration": "PT6H15M",
+              "id": "1",
+              "numberOfStops": 0,
+              "blacklistedInEU": false
+            },
+            {
+              "departure": {"iataCode": "DUB", "terminal": "2", "at": "2026-11-13T09:20:00"},
+              "arrival": {"iataCode": "LHR", "terminal": "2", "at": "2026-11-13T10:45:00"},
+              "carrierCode": "EI",
+              "number": "154",
+              "aircraft": {"code": "320"},
+              "duration": "PT1H25M",
+              "id": "2",
+              "numberOfStops": 0,
+              "blacklistedInEU": false
+            }
+          ]
+        }
+      ],
+      "price": {
+        "currency": "USD",
+        "total": "429.00",
+        "base": "259.00",
+        "grandTotal": "429.00",
+        "fees": [{"amount": "0.00", "type": "SUPPLIER"}]
+      },
+      "pricingOptions": {"fareType": ["PUBLISHED"], "includedCheckedBagsOnly": true},
+      "validatingAirlineCodes": ["EI"],
+      "travelerPricings": [
+        {
+          "travelerId": "1",
+          "fareOption": "STANDARD",
+          "travelerType": "ADULT",
+          "price": {"currency": "USD", "total": "429.00", "base": "259.00"},
+          "fareDetailsBySegment": [
+            {
+              "segmentId": "1",
+              "cabin": "ECONOMY",
+              "fareBasis": "QSAVEREI",
+              "brandedFare": "SAVER",
+              "brandedFareLabel": "ECONOMY SAVER",
+              "class": "Q",
+              "includedCheckedBags": {"quantity": 1},
+              "includedCabinBags": {"quantity": 1}
+            },
+            {
+              "segmentId": "2",
+              "cabin": "ECONOMY",
+              "fareBasis": "QSAVEREI",
+              "brandedFare": "SAVER",
+              "brandedFareLabel": "ECONOMY SAVER",
+              "class": "Q",
+              "includedCheckedBags": {"quantity": 1},
+              "includedCabinBags": {"quantity": 1}
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "dictionaries": {
+    "locations": {
+      "JFK": {"cityCode": "NYC", "countryCode": "US"},
+      "LHR": {"cityCode": "LON", "countryCode": "GB"},
+      "AMS": {"cityCode": "AMS", "countryCode": "NL"},
+      "DUB": {"cityCode": "DUB", "countryCode": "IE"}
+    },
+    "aircraft": {
+      "789": "BOEING 787-9",
+      "351": "AIRBUS A350-1000",
+      "77W": "BOEING 777-300ER",
+      "73H": "BOEING 737-800 (WINGLETS)",
+      "764": "BOEING 767-400",
+      "332": "AIRBUS A330-200",
+      "320": "AIRBUS A320"
+    },
+    "currencies": {"USD": "US DOLLAR"},
+    "carriers": {
+      "BA": "BRITISH AIRWAYS",
+      "VS": "VIRGIN ATLANTIC",
+      "AA": "AMERICAN AIRLINES",
+      "KL": "KLM ROYAL DUTCH AIRLINES",
+      "DL": "DELTA AIR LINES",
+      "EI": "AER LINGUS"
+    }
+  }
+}
