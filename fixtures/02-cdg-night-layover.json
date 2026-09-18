@@ -1,0 +1,443 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "cdg-night-layover",
+  "title": "Four hours is not four hours: the same layover length at CDG at 01:40, LHR at midday, and AMS at midday",
+  "pins_down": "Layover cost is keyed by (airport, arrival hall, departure hall, LOCAL CLOCK TIME, onward Schengen status), never by duration. Three options here carry a layover within 10 minutes of the same length; if the scorer prices them similarly, the layover model is a duration scalar wearing a costume and the product has no moat.",
+  "as_of": "2026-03-01",
+  "notes": [
+    "THE BRIEF'S HEADLINE EXAMPLE CANNOT BE BOOKED. 'Four hours at CDG arriving 1:40am' is not a schedulable itinerary: CDG has a night movement ban under the 2003 arretes - arrivals are prohibited on-block 00:30-05:29 local, departures off-block 00:00-04:59. The latest legal SCHEDULED arrival is 00:29. A 01:40 arrival exists only as a delay. Worse, no NYC-CDG nonstop could produce it anyway - eastbound transatlantic is structurally either a redeye landing 06:00-13:30 or a day flight landing 20:00-22:30, so the 00:30-05:30 window is empty of scheduled passenger arrivals by construction.",
+    "So this fixture builds it honestly: a SCHEDULED 00:10 arrival, which is legal with 20 minutes to spare, and an ACTUAL on-block of 01:40 after a 90-minute delay. Ranking runs on the scheduled times; risk_adjustment runs on the delay. One fixture, both, without either lying.",
+    "All flight numbers here are synthetic and flagged as such. Borrowing a real number and giving it invented times produces a fixture that looks authoritative and is wrong - which is worse than one that is obviously made up.",
+    "The CDG option is also sold with a 65-minute connection at LHR against a published 90-minute T3-to-T5 minimum. Booking sites sell these. That is a separate defect from the layover and gets its own ledger line.",
+    "What makes the CDG case punishing is not the hour by itself. It is that a US-to-CDG-to-Schengen passenger clears immigration at CDG, which ejects them from the 2E transit zone at an hour when the 2F security checkpoint is not open and landside Terminal 2 will not re-admit them from outside. Neither properly airside nor able to leave. A 2E-to-2E connection at the same minute stays airside all night and is a completely different object.",
+    "MCT figures here are CITED, not verified - the official IATA table was not reachable. Marked so, because a grade that turns on MCT margin should not rest on a number nobody checked."
+  ],
+
+  "query": {
+    "origin": {
+      "label": "Wyckoff Ave & Myrtle Ave, Bushwick, Brooklyn, NY 11237",
+      "lat": 40.6994, "lon": -73.9119, "postal_code": "11237", "geocode_precision": "street"
+    },
+    "destination": {
+      "label": "Brera, Milan 20121", "lat": 45.4719, "lon": 9.1881,
+      "postal_code": "20121", "geocode_precision": "neighbourhood"
+    },
+    "depart_date": "2026-03-12",
+    "return_date": null,
+    "party": [
+      {
+        "passenger_id": "p1", "type": "adult",
+        "bags": [ { "kind": "checked", "weight_kg": 20 }, { "kind": "cabin", "weight_kg": 8 }, { "kind": "personal_item" } ]
+      }
+    ],
+    "budget": { "maximum_cents": 140000, "target_cents": 85000, "incidental_allowance_cents": 20000 },
+    "profiles": {
+      "reference": { "label": "neutral reference", "hourly_value_cents": 3500, "comfort_weight": 1.0, "risk_weight": 1.0 },
+      "cheapest":  { "label": "Cheapest",         "hourly_value_cents": 1200, "comfort_weight": 0.45, "risk_weight": 1.0 },
+      "comfort":   { "label": "Most comfortable", "hourly_value_cents": 5500, "comfort_weight": 2.0, "risk_weight": 1.0 }
+    }
+  },
+
+  "options": [
+    {
+      "option_id": "cdg-night",
+      "display_name": "Via Paris, overnight on the wrong side of the glass",
+      "tickets": [
+        {
+          "ticket_id": "t-cdg",
+          "issuing_carrier": "XX",
+          "fare_brand_name": "Economy Light",
+          "price": {
+            "currency": "EUR", "base_cents": 33000, "fx_rate_to_usd": 1.0820,
+            "taxes": [ { "code": "FR", "amount_cents": 2100, "label": "French civil aviation tax", "refundable_on_cancel": true } ],
+            "carrier_imposed": [ { "code": "YQ", "amount_cents": 4600, "refundable_on_cancel": false } ],
+            "agency_fees": []
+          },
+          "entitlements": {
+            "checked_included": 0, "cabin_bag_included": true, "personal_item_included": true,
+            "seat_selection": "paid", "changes": "not_permitted", "refundable": false,
+            "earns_redeemable_miles": false, "boarding_group": null
+          },
+          "checked_bag_fee_tiers": [ { "piece": 1, "amount_cents": 6000, "note": "Prepaid online; $80 at the airport" } ],
+          "segment_ids": ["s-c1", "s-c2", "s-c3"]
+        }
+      ],
+      "segments": [
+        {
+          "segment_id": "s-c1",
+          "marketing": { "carrier": "XX", "number": 9001, "synthetic": true },
+          "operating": { "carrier": "XX", "number": 9001, "synthetic": true },
+          "origin": { "iata": "JFK", "terminal": "7", "iata_area": 1, "schengen": false },
+          "destination": { "iata": "LHR", "terminal": "3", "iata_area": 2, "schengen": false },
+          "departure_local": "2026-03-12T09:30:00-04:00",
+          "arrival_local": "2026-03-12T20:45:00+00:00",
+          "tz_hint": { "departure": "America/New_York", "arrival": "Europe/London" },
+          "equipment_code": "77W",
+          "cabin_marketed": "economy",
+          "claims": {
+            "subfleet": {
+              "value": "777-300ER, cabin generation varies across the subfleet",
+              "observed_frequency": 0.55, "sample_size": 60,
+              "observation_window": "last 60 departures",
+              "source": "self-collected equipment log", "as_of": "2026-03-01"
+            },
+            "connectivity_oceanic": {
+              "value": "oceanic-capable connectivity fitted",
+              "observed_frequency": 0.61, "sample_size": 60,
+              "observation_window": "last 60 departures",
+              "source": "self-collected equipment log", "as_of": "2026-03-01"
+            },
+            "seat_pitch_inches": 31
+          },
+          "reliability": {
+            "coverage": "none",
+            "reason": "Synthetic carrier standing in for a European operator. BTS covers US reporting carriers only, so no free per-flight-number record exists for this segment.",
+            "policy": "route_median"
+          }
+        },
+        {
+          "segment_id": "s-c2",
+          "marketing": { "carrier": "XX", "number": 9002, "synthetic": true },
+          "operating": { "carrier": "XX", "number": 9002, "synthetic": true },
+          "origin": { "iata": "LHR", "terminal": "5", "iata_area": 2, "schengen": false },
+          "destination": { "iata": "CDG", "terminal": "2E", "hall": "L", "iata_area": 2, "schengen": true },
+          "departure_local": "2026-03-12T21:50:00+00:00",
+          "arrival_local": "2026-03-13T00:10:00+01:00",
+          "actual_arrival_local": "2026-03-13T01:40:00+01:00",
+          "tz_hint": { "departure": "Europe/London", "arrival": "Europe/Paris" },
+          "equipment_code": "32N",
+          "cabin_marketed": "economy",
+          "claims": { "seat_pitch_inches": 30 },
+          "reliability": {
+            "coverage": "none",
+            "reason": "Intra-Europe leg. No BTS coverage of any kind.",
+            "policy": "route_median"
+          }
+        },
+        {
+          "segment_id": "s-c3",
+          "marketing": { "carrier": "XX", "number": 9003, "synthetic": true },
+          "operating": { "carrier": "XX", "number": 9003, "synthetic": true },
+          "origin": { "iata": "CDG", "terminal": "2F", "iata_area": 2, "schengen": true },
+          "destination": { "iata": "MXP", "terminal": "1", "iata_area": 2, "schengen": true },
+          "departure_local": "2026-03-13T06:45:00+01:00",
+          "arrival_local": "2026-03-13T08:15:00+01:00",
+          "tz_hint": { "departure": "Europe/Paris", "arrival": "Europe/Rome" },
+          "equipment_code": "32N",
+          "cabin_marketed": "economy",
+          "claims": { "seat_pitch_inches": 30 },
+          "reliability": { "coverage": "none", "reason": "Intra-Europe leg.", "policy": "route_median" }
+        }
+      ],
+      "layovers": [
+        {
+          "layover_id": "lay-lhr-tight",
+          "airport": "LHR",
+          "arrive_segment_id": "s-c1", "depart_segment_id": "s-c2",
+          "immigration_required": false,
+          "security_reclear_required": true,
+          "ees_first_registration": false,
+          "inter_terminal": {
+            "mode": "airside_bus", "minutes": 25, "headway_minutes": 8,
+            "operating_hours_local": "05:00-23:00"
+          },
+          "published_mct_minutes": 90,
+          "mct_source": "cited, single ticket T3 to T5 - NOT verified against the IATA table",
+          "bags_checked_through": true,
+          "airside_holdable_overnight": null,
+          "forced_landside": false,
+          "leave_airport_viable": false,
+          "note": "Scheduled at 65 minutes against a published 90-minute minimum. This is sold, and it is the reason the CDG arrival is late."
+        },
+        {
+          "layover_id": "lay-cdg-night",
+          "airport": "CDG",
+          "arrive_segment_id": "s-c2", "depart_segment_id": "s-c3",
+          "immigration_required": true,
+          "security_reclear_required": true,
+          "ees_first_registration": true,
+          "inter_terminal": {
+            "mode": "walk", "minutes": 35, "headway_minutes": 0,
+            "operating_hours_local": "connecting gallery 2E to 2F; CDGVAL 04:00-01:00 then a 25-minute-headway bus; the 2E airside LISA shuttle stops at 23:30"
+          },
+          "published_mct_minutes": 60,
+          "mct_source": "cited, 2E to 2F - NOT verified against the IATA table",
+          "bags_checked_through": true,
+          "airside_holdable_overnight": false,
+          "forced_landside": true,
+          "leave_airport_viable": false,
+          "services_open": [
+            { "what": "Air France lounge, 2E hall L", "hours_local": "05:30-23:30", "eligibility": "not held on this fare", "source": "lounge listing" },
+            { "what": "Food and retail, Terminal 2", "hours_local": "closes by 23:30", "source": "traveller guides, not ADP policy" },
+            { "what": "Landside admission to Terminal 2", "hours_local": "closed roughly 22:30-04:00", "source": "traveller guides, not ADP policy" },
+            { "what": "YOTELAIR transit hotel, 2E satellite L", "hours_local": "24h", "eligibility": "non-Schengen onward departures only - this passenger clears immigration and loses eligibility", "source": "YOTELAIR access rules" }
+          ],
+          "note": "Scheduled layover 6h35m, actual 5h05m, effectively all of it inside the 23:30-05:30 dead window. The passenger clears Schengen immigration out of 2E into a 2F that does not open until the morning, and cannot re-enter landside Terminal 2 from outside. Stranded roughly 02:00-04:30."
+        }
+      ],
+      "ground": {
+        "outbound": [
+          { "mode_id": "jfk-airtrain-howard-beach", "mode": "Subway then AirTrain at Howard Beach", "fare_cents": 1175,
+            "door_to_door_minutes": { "p50": 78, "p90": 98 }, "transfers": 1, "feasible": true, "infeasible_reason": null }
+        ],
+        "arrival": [
+          { "mode_id": "mxp-malpensa-express", "mode": "Malpensa Express to Cadorna", "fare_cents": 1450,
+            "door_to_door_minutes": { "p50": 62, "p90": 80 }, "transfers": 1, "feasible": true, "infeasible_reason": null,
+            "service_window": { "first_local": "05:26", "last_local": "23:26", "headway_minutes": { "day": 30 } } }
+        ]
+      },
+      "airport_process_minutes": { "p50": 55, "p90": 85 },
+      "booking": [ { "who": "Carrier direct", "price_cents": 42800, "direct": true } ]
+    },
+
+    {
+      "option_id": "lhr-midday",
+      "display_name": "Via London, the middle of the day",
+      "tickets": [
+        {
+          "ticket_id": "t-lhr",
+          "issuing_carrier": "XX",
+          "fare_brand_name": "Economy Standard",
+          "price": {
+            "currency": "USD", "base_cents": 52400, "fx_rate_to_usd": 1.0,
+            "taxes": [ { "code": "GB", "amount_cents": 3300, "label": "UK Air Passenger Duty", "refundable_on_cancel": true } ],
+            "carrier_imposed": [ { "code": "YQ", "amount_cents": 7400, "refundable_on_cancel": false } ],
+            "agency_fees": []
+          },
+          "entitlements": {
+            "checked_included": 1, "cabin_bag_included": true, "personal_item_included": true,
+            "seat_selection": "paid", "changes": "fee", "change_fee_cents": 0, "refundable": false,
+            "earns_redeemable_miles": true, "boarding_group": null
+          },
+          "checked_bag_fee_tiers": [ { "piece": 1, "amount_cents": 10000, "note": "Second bag overall" } ],
+          "segment_ids": ["s-l1", "s-l2"]
+        }
+      ],
+      "segments": [
+        {
+          "segment_id": "s-l1",
+          "marketing": { "carrier": "XX", "number": 9010, "synthetic": true },
+          "operating": { "carrier": "XX", "number": 9010, "synthetic": true },
+          "origin": { "iata": "JFK", "terminal": "7", "iata_area": 1, "schengen": false },
+          "destination": { "iata": "LHR", "terminal": "3", "iata_area": 2, "schengen": false },
+          "departure_local": "2026-03-12T22:00:00-04:00",
+          "arrival_local": "2026-03-13T09:15:00+00:00",
+          "tz_hint": { "departure": "America/New_York", "arrival": "Europe/London" },
+          "equipment_code": "789",
+          "cabin_marketed": "economy",
+          "claims": {
+            "subfleet": {
+              "value": "787-9 with the current cabin",
+              "observed_frequency": 0.89, "sample_size": 60,
+              "observation_window": "last 60 departures",
+              "source": "self-collected equipment log", "as_of": "2026-03-01"
+            },
+            "connectivity_oceanic": {
+              "value": "oceanic-capable connectivity fitted",
+              "observed_frequency": 0.84, "sample_size": 60,
+              "observation_window": "last 60 departures",
+              "source": "self-collected equipment log", "as_of": "2026-03-01"
+            },
+            "seat_pitch_inches": 31
+          },
+          "reliability": { "coverage": "none", "reason": "Synthetic European operator; no BTS coverage.", "policy": "route_median" }
+        },
+        {
+          "segment_id": "s-l2",
+          "marketing": { "carrier": "XX", "number": 9011, "synthetic": true },
+          "operating": { "carrier": "XX", "number": 9011, "synthetic": true },
+          "origin": { "iata": "LHR", "terminal": "5", "iata_area": 2, "schengen": false },
+          "destination": { "iata": "MXP", "terminal": "1", "iata_area": 2, "schengen": true },
+          "departure_local": "2026-03-13T13:25:00+00:00",
+          "arrival_local": "2026-03-13T16:30:00+01:00",
+          "tz_hint": { "departure": "Europe/London", "arrival": "Europe/Rome" },
+          "equipment_code": "32N",
+          "cabin_marketed": "economy",
+          "claims": { "seat_pitch_inches": 30 },
+          "reliability": { "coverage": "none", "reason": "Intra-Europe leg.", "policy": "route_median" }
+        }
+      ],
+      "layovers": [
+        {
+          "layover_id": "lay-lhr-midday",
+          "airport": "LHR",
+          "arrive_segment_id": "s-l1", "depart_segment_id": "s-l2",
+          "immigration_required": false,
+          "security_reclear_required": true,
+          "ees_first_registration": false,
+          "inter_terminal": {
+            "mode": "airside_bus", "minutes": 25, "headway_minutes": 8,
+            "operating_hours_local": "05:00-23:00"
+          },
+          "published_mct_minutes": 90,
+          "mct_source": "cited, single ticket T3 to T5 - NOT verified against the IATA table",
+          "bags_checked_through": true,
+          "airside_holdable_overnight": null,
+          "forced_landside": false,
+          "leave_airport_viable": false,
+          "services_open": [
+            { "what": "Terminal 5 retail and food", "hours_local": "05:00-22:00" },
+            { "what": "Pay-in lounge", "hours_local": "05:30-21:30", "eligibility": "day pass, within the incidental allowance" }
+          ],
+          "note": "250 minutes. A change of building with a bus and a second screening - real work, maybe 60-75 minutes of it, with the rest usable and everything open."
+        }
+      ],
+      "ground": {
+        "outbound": [
+          { "mode_id": "jfk-airtrain-howard-beach", "mode": "Subway then AirTrain at Howard Beach", "fare_cents": 1175,
+            "door_to_door_minutes": { "p50": 78, "p90": 98 }, "transfers": 1, "feasible": true, "infeasible_reason": null }
+        ],
+        "arrival": [
+          { "mode_id": "mxp-malpensa-express", "mode": "Malpensa Express to Cadorna", "fare_cents": 1450,
+            "door_to_door_minutes": { "p50": 62, "p90": 80 }, "transfers": 1, "feasible": true, "infeasible_reason": null }
+        ]
+      },
+      "airport_process_minutes": { "p50": 55, "p90": 85 },
+      "booking": [ { "who": "Carrier direct", "price_cents": 63100, "direct": true } ]
+    },
+
+    {
+      "option_id": "ams-midday",
+      "display_name": "Via Amsterdam, one building, long enough to go into town",
+      "tickets": [
+        {
+          "ticket_id": "t-ams",
+          "issuing_carrier": "XX",
+          "fare_brand_name": "Economy Standard",
+          "price": {
+            "currency": "EUR", "base_cents": 44900, "fx_rate_to_usd": 1.0820,
+            "taxes": [ { "code": "NL", "amount_cents": 2980, "label": "Dutch departure tax", "refundable_on_cancel": true } ],
+            "carrier_imposed": [ { "code": "YQ", "amount_cents": 5100, "refundable_on_cancel": false } ],
+            "agency_fees": []
+          },
+          "entitlements": {
+            "checked_included": 1, "cabin_bag_included": true, "personal_item_included": true,
+            "seat_selection": "paid", "changes": "fee", "change_fee_cents": 0, "refundable": false,
+            "earns_redeemable_miles": true, "boarding_group": null
+          },
+          "checked_bag_fee_tiers": [ { "piece": 1, "amount_cents": 9500, "note": "Second bag overall" } ],
+          "segment_ids": ["s-a1", "s-a2"]
+        }
+      ],
+      "segments": [
+        {
+          "segment_id": "s-a1",
+          "marketing": { "carrier": "XX", "number": 9020, "synthetic": true },
+          "operating": { "carrier": "XX", "number": 9020, "synthetic": true },
+          "origin": { "iata": "JFK", "terminal": "4", "iata_area": 1, "schengen": false },
+          "destination": { "iata": "AMS", "terminal": "1", "iata_area": 2, "schengen": true },
+          "departure_local": "2026-03-12T22:15:00-04:00",
+          "arrival_local": "2026-03-13T10:35:00+01:00",
+          "tz_hint": { "departure": "America/New_York", "arrival": "Europe/Amsterdam" },
+          "equipment_code": "789",
+          "cabin_marketed": "economy",
+          "claims": {
+            "subfleet": {
+              "value": "787-9 with the current cabin",
+              "observed_frequency": 0.92, "sample_size": 60,
+              "observation_window": "last 60 departures",
+              "source": "self-collected equipment log", "as_of": "2026-03-01"
+            },
+            "connectivity_oceanic": {
+              "value": "oceanic-capable connectivity fitted",
+              "observed_frequency": 0.90, "sample_size": 60,
+              "observation_window": "last 60 departures",
+              "source": "self-collected equipment log", "as_of": "2026-03-01"
+            },
+            "seat_pitch_inches": 31
+          },
+          "reliability": { "coverage": "none", "reason": "Synthetic European operator; no BTS coverage.", "policy": "route_median" }
+        },
+        {
+          "segment_id": "s-a2",
+          "marketing": { "carrier": "XX", "number": 9021, "synthetic": true },
+          "operating": { "carrier": "XX", "number": 9021, "synthetic": true },
+          "origin": { "iata": "AMS", "terminal": "1", "iata_area": 2, "schengen": true },
+          "destination": { "iata": "MXP", "terminal": "1", "iata_area": 2, "schengen": true },
+          "departure_local": "2026-03-13T14:45:00+01:00",
+          "arrival_local": "2026-03-13T16:25:00+01:00",
+          "tz_hint": { "departure": "Europe/Amsterdam", "arrival": "Europe/Rome" },
+          "equipment_code": "E95",
+          "cabin_marketed": "economy",
+          "claims": { "seat_pitch_inches": 30 },
+          "reliability": { "coverage": "none", "reason": "Intra-Europe leg.", "policy": "route_median" }
+        }
+      ],
+      "layovers": [
+        {
+          "layover_id": "lay-ams-midday",
+          "airport": "AMS",
+          "arrive_segment_id": "s-a1", "depart_segment_id": "s-a2",
+          "immigration_required": true,
+          "security_reclear_required": false,
+          "ees_first_registration": true,
+          "inter_terminal": { "mode": "walk", "minutes": 15, "headway_minutes": 0, "operating_hours_local": "always" },
+          "published_mct_minutes": 50,
+          "mct_source": "cited, non-Schengen to Schengen",
+          "bags_checked_through": true,
+          "airside_holdable_overnight": null,
+          "forced_landside": false,
+          "leave_airport_viable": true,
+          "services_open": [
+            { "what": "Schiphol retail, food and the Rijksmuseum annex", "hours_local": "06:00-22:00" },
+            { "what": "Train to Amsterdam Centraal", "hours_local": "05:50-00:30", "eligibility": "17 minutes each way from the station beneath the terminal" }
+          ],
+          "note": "250 minutes, the same as the other two. One building, no shuttle, no second screening - immigration is still a real barrier because this is Schengen entry, but the saving is the building change, not the border. Long enough and civil enough to go into the city."
+        }
+      ],
+      "ground": {
+        "outbound": [
+          { "mode_id": "jfk-airtrain-howard-beach", "mode": "Subway then AirTrain at Howard Beach", "fare_cents": 1175,
+            "door_to_door_minutes": { "p50": 78, "p90": 98 }, "transfers": 1, "feasible": true, "infeasible_reason": null }
+        ],
+        "arrival": [
+          { "mode_id": "mxp-malpensa-express", "mode": "Malpensa Express to Cadorna", "fare_cents": 1450,
+            "door_to_door_minutes": { "p50": 62, "p90": 80 }, "transfers": 1, "feasible": true, "infeasible_reason": null }
+        ]
+      },
+      "airport_process_minutes": { "p50": 55, "p90": 85 },
+      "booking": [ { "who": "Carrier direct", "price_cents": 56400, "direct": true } ]
+    }
+  ],
+
+  "expect": {
+    "grades_stable_across_profiles": true,
+    "reconciles": true,
+    "order": {
+      "reference": ["ams-midday", "lhr-midday", "cdg-night"],
+      "comfort": ["ams-midday", "lhr-midday", "cdg-night"]
+    },
+    "ledger_must_contain": [
+      {
+        "option_id": "cdg-night", "code": "layover", "sign": "cost", "min_cents": 15000,
+        "evidence_mentions": ["01:40", "immigration", "2F"],
+        "why": "The dominant cost, and the evidence must name the local clock time and the immigration ejection - not just the duration."
+      },
+      {
+        "option_id": "cdg-night", "code": "mct_margin", "sign": "cost", "min_cents": 4000,
+        "evidence_mentions": ["65", "90"],
+        "why": "A 65-minute connection against a published 90-minute minimum is a separate defect from the layover and earns its own line."
+      },
+      {
+        "option_id": "lhr-midday", "code": "layover", "sign": "cost", "min_cents": 2000, "max_cents": 12000,
+        "why": "Real work - a bus between buildings and a second screening - but bounded, in daylight, with everything open."
+      },
+      {
+        "option_id": "ams-midday", "code": "layover", "sign": "credit",
+        "evidence_mentions": ["leave", "Centraal"],
+        "why": "Same 250 minutes. One building, no shuttle, no re-screen, and long enough to go into the city. If this is not a CREDIT the model cannot express 'a layover can be a feature'."
+      },
+      {
+        "option_id": "cdg-night", "code": "lounge", "sign": "credit", "min_cents": 0, "max_cents": 0,
+        "why": "The incidental allowance would cover a lounge, but nothing at CDG is open at 01:40. A services credit must evaluate to zero outside its hours instead of crediting a lounge nobody can enter."
+      }
+    ],
+    "ledger_must_not_contain": [
+      {
+        "option_id": "cdg-night", "code": "hotel",
+        "why": "Not because an overnight never costs a hotel - it does, and the formula has no term for that cash, which is a real gap. Here the passenger is stranded INSIDE the airport perimeter with no way back landside, so there is no hotel to buy. The absence has to come from the services and access data, not from the model forgetting."
+      }
+    ],
+    "infeasible": []
+  }
+}

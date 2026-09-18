@@ -458,3 +458,124 @@ server. Cached clips live in `~/.concordego/sky`, last six kept, LRU by last-pla
   observed frequency and sample size.
 
 Everything in it is fixture data. There is no flight API anywhere in this repo.
+
+---
+
+# Corrections and gaps
+
+Research done while building the fixture corpus contradicted several things in the brief.
+The brief above is left as written — it is the product direction and it is right about the
+product. These are the factual corrections, kept separately so neither overwrites the
+other.
+
+## Corrections
+
+**The subway is $3.00, not $2.90.** It changed on 2026-01-04. Every fixture now carries an
+`effective_date` beside each fare, because the MTA moved it twice inside this corpus's
+likely lifetime.
+
+**"Bushwick to JFK is $2.90" understates the realistic path by about 4×.** $3.00 buys only
+the Lefferts Blvd route — the JFK AirTrain is free everywhere *except* Jamaica and Howard
+Beach — and that route is three transfers, one of them a bus, roughly 90 minutes. The
+default one-transfer path is **$11.75** ($3.00 + $8.75 AirTrain) at about 78 minutes, and a
+car is $62 at about 37. All three are carried in the fixture, because which one wins is
+exactly the judgment the scorer exists to make.
+
+**"Transit doesn't run at that hour" is wrong, and the wrong reason is more dangerous than
+a wrong number.** The NYC subway runs 24 hours; the L runs all night at ~12-minute
+headways; PATH is 24/7. What actually breaks a 6:10am Newark departure is the **New Jersey
+end** — NJ Transit's Newark Liberty Airport rail stop is served roughly 05:00–01:00, and
+that departure needs you at the terminal by about 04:30. Infeasibility is computed from the
+weakest link and the ledger names that link. A blanket "no transit" is precisely the
+confidently-wrong static rule the brief warns against two lines later.
+
+**The ~$90 car is right for that hour and wrong as a constant.** The published all-hours
+route average for Bushwick→EWR is $116. The 4:15am pickup a 6:10 departure actually
+requires has no surge, which is what puts it in the $80–95 band.
+
+**Outbound tolls to New Jersey are $0.** Every Port Authority Hudson and Staten Island
+crossing is tolled NY-bound only. A symmetric toll model overcharges this trip by about $15
+and would wrongly demote every EWR itinerary in the corpus. Only the Verrazzano is
+bidirectional.
+
+**LGA cannot be a transatlantic origin.** The perimeter rule bars nonstops beyond 1,500
+miles, so LGA has zero European nonstop service and cannot have any. It is worth keeping as
+a ground-access case — the free 24-hour Q70 makes it the only NYC airport with a $3.00
+all-hours path — but not as an origin in this scope.
+
+**The 1:40am CDG arrival in the worked ledger cannot be scheduled.** CDG has a night
+movement ban: arrivals prohibited on-block 00:30–05:29 local, departures 00:00–04:59. The
+latest legal scheduled arrival is 00:29. Worse, no NYC–CDG nonstop could produce it anyway
+— eastbound transatlantic is structurally either a redeye landing 06:00–13:30 or a day
+flight landing 20:00–22:30, so that window is empty of scheduled arrivals by construction.
+The example is real as a **delay**, which is how the fixture builds it: a legal scheduled
+00:10, an actual on-block of 01:40. The validator rejects any scheduled arrival inside a
+curfew.
+
+**What makes that layover punishing is not the hour.** It is that a US→CDG→Schengen
+passenger clears immigration at CDG, which ejects them from the 2E transit zone at an hour
+when 2F security is not open and landside Terminal 2 will not re-admit them. Neither
+airside nor able to leave. A 2E→2E connection at the same minute stays airside all night
+and is a completely different object — so a layover is keyed by (airport, arrival hall,
+departure hall, local clock, onward Schengen status), never by duration.
+
+**"Many transatlantic Basic fares include a checked bag" is no longer true.** Of thirteen
+carriers in scope, exactly one — TAP — bundles a bag into the fare it calls Basic. The rest
+are bag-free at their cheapest tier; the industry closed that gap in 2024–2026. The brief's
+bags conclusion still holds, but not for the stated reason, and anything built on pre-2024
+intuition will be wrong.
+
+**United's transatlantic Basic does not bar the overhead bin.** True at launch, not the
+2026 rule — transatlantic Basic carries a full-size carry-on. What survives is real but
+different: it boards last, so bin space is often gone. That is a comfort line about
+boarding group, not a baggage exclusion, and conflating them invents a fee that does not
+exist.
+
+**American's bag fee is keyed to ticket ISSUE date, not travel date** ($75 before
+2026-05-17, $85 on or after 2026-05-18). A fixture carrying only a travel date cannot
+resolve the right fee.
+
+**The worked ledger does not reconcile.** It shows a ground-access line only on the option
+being demoted. If ground access is an absolute term rather than a delta, every option shows
+its ground line or the numbers do not add up to the stated total.
+
+## Gaps in the model
+
+Real, not fatal, listed so they are decisions rather than oversights.
+
+**The formula is silently single-passenger.** Tickets and bags scale per person; a car to
+EWR does not scale at all; three subway fares do; and a party of four does not value one
+elapsed hour at 4×. There is no party-size policy anywhere in the model.
+
+**The formula is one-directional and the product sells round trips.**
+`ground_access_cost(origin, airport, local departure time)` is written singular. A round
+trip has four ground legs at four different local hours, and arriving at JFK at 11:20pm is
+a different ground problem from leaving it at 6am.
+
+**`ticket_price` is not a scalar.** It is a priced offer: a party, one or more tickets, a
+source currency with a pinned FX rate, a validity window. Collapsing it early is the root
+of most price-side bugs — and with a non-USD fare, "one currency" is a lie at the boundary
+unless the rate is pinned in the fixture.
+
+**Risk cannot be computed from the inputs the formula names.** Severity is dominated by
+*ticketing topology*, which appears nowhere: a protected misconnect is a rebooking, a
+self-transfer misconnect is a whole new ticket at the walk-up fare.
+
+**An overnight that forces a hotel is cash, not discomfort.** It currently lives inside
+`comfort_penalties` and belongs beside `baggage_cost`.
+
+**EU261 and US DOT compensation are a real dollar offset to severity** and the model has no
+term for them.
+
+**Refundability and change fees are option value**, not a price term and not a comfort
+term — a contingent outflow whose size depends on a user-supplied probability, exactly like
+`user_hourly_value` is a user-supplied rate.
+
+**Loyalty earning is a real dollar term and is missing.** Basic Economy commonly earns zero
+redeemable miles and zero status credit, which for a status-chasing traveller can exceed
+the fare gap the re-ranker is agonising over. Its absence biases systematically toward
+Basic.
+
+**Award availability is not in cash inventory.** No cash flight API knows whether a saver
+seat exists, so the points path can only ever say *"if a saver seat is open, this costs
+100k + $12"* — and the interface must say "if".

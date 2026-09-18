@@ -586,13 +586,23 @@ var ROUTE_PAR = 1075;
 var HOME = "Bushwick, Brooklyn";
 var DEST = "Shoreditch, London";
 
+/* Corrected against research — see docs/design.md, "Corrections and gaps".
+   The subway is $3.00 (changed 2026-01-04), not $2.90. Bushwick to JFK is
+   $11.75 the sensible way, not $2.90: the AirTrain is free everywhere
+   EXCEPT Jamaica and Howard Beach, so the $3.00 route means three
+   transfers and ~92 minutes. And the 6am Newark problem is NOT "transit
+   doesn't run" — the subway runs all night. NJ Transit's airport rail
+   stop is what doesn't open until ~05:00. */
 var GROUND = {
-  jfk_train:  {mode:"L + A train, then AirTrain", cost:11.40, mins:64, note:"Subway runs 24h; AirTrain $8.50", viable:true},
-  jfk_car:    {mode:"Rideshare", cost:63, mins:42, note:"Off-peak estimate", viable:true},
-  ewr_car_am: {mode:"Rideshare", cost:78, mins:47, note:"5:00am pickup, no surge, tolls included", viable:true},
-  ewr_train:  {mode:"Subway to Penn, NJ Transit, AirTrain", cost:19.65, mins:96, note:"Chain not viable before ~5:30am", viable:false},
+  jfk_train:  {mode:"L to A, then AirTrain at Howard Beach", cost:11.75, mins:78,
+               note:"Subway $3.00 + AirTrain $8.75; the all-free Lefferts Blvd route is 3 transfers and ~92 min", viable:true},
+  jfk_car:    {mode:"Rideshare", cost:62, mins:37, note:"Route average, no evening surge premium", viable:true},
+  ewr_car_am: {mode:"Rideshare", cost:92, mins:47,
+               note:"04:15 pickup, no surge; $0 in tolls — Port Authority crossings charge NY-bound only", viable:true},
+  ewr_train:  {mode:"Subway to Penn, NJ Transit, AirTrain", cost:20.25, mins:115,
+               note:"Not viable: NJ Transit's airport rail stop runs ~05:00–01:00 and you need the terminal by 04:30", viable:false},
   lhr_eliz:   {mode:"Elizabeth line to Liverpool St", cost:17, mins:44, note:"To Shoreditch", viable:true},
-  lhr_night:  {mode:"Black cab (Elizabeth line closed)", cost:92, mins:52, note:"Arrival after last train", viable:true}
+  lhr_night:  {mode:"Black cab (Elizabeth line closed)", cost:92, mins:52, note:"Arrival after the last train", viable:true}
 };
 
 var ITINS = [

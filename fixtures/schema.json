@@ -1,0 +1,1283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://concordego.local/fixtures/schema.json",
+  "title": "ConcordeGo fixture scenario",
+  "description": "One scenario = one traveller + one query + N competing itineraries + the assertions they must satisfy. A fixture carries INPUTS ONLY. Anything the scorer computes is forbidden here — a fixture that stores its own answer tests nothing.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "fixture_id",
+    "title",
+    "pins_down",
+    "as_of",
+    "query",
+    "options",
+    "expect"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "fixture_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "title": {
+      "type": "string"
+    },
+    "pins_down": {
+      "type": "string",
+      "description": "The one scorer behaviour this fixture exists to hold still. If you cannot write it in a sentence, the fixture is doing too much."
+    },
+    "as_of": {
+      "type": "string",
+      "format": "date",
+      "description": "When the enrichment values in this file were believed true. Fares move; a fixture without this rots silently."
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "query": {
+      "type": "object",
+      "required": [
+        "origin",
+        "destination",
+        "depart_date",
+        "party",
+        "profiles"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "origin": {
+          "$ref": "#/$defs/place"
+        },
+        "destination": {
+          "$ref": "#/$defs/place"
+        },
+        "depart_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "return_date": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "party": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Per-traveller, because bags and fare tiers assess per person while a car to the airport does not.",
+          "items": {
+            "type": "object",
+            "required": [
+              "passenger_id",
+              "type",
+              "bags"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "passenger_id": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "adult",
+                  "child",
+                  "infant"
+                ]
+              },
+              "bags": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "kind"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "checked",
+                        "cabin",
+                        "personal_item",
+                        "stroller",
+                        "medical"
+                      ]
+                    },
+                    "weight_kg": {
+                      "type": "number"
+                    },
+                    "linear_cm": {
+                      "type": "number"
+                    }
+                  }
+                }
+              },
+              "loyalty": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "programme",
+                    "tier"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "programme": {
+                      "type": "string"
+                    },
+                    "tier": {
+                      "type": "string"
+                    },
+                    "free_checked_pieces": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "points_balances": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "programme",
+              "balance",
+              "valuation_cents_per_point"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "programme": {
+                "type": "string"
+              },
+              "balance": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "valuation_cents_per_point": {
+                "type": "number",
+                "description": "How points become dollars. Hard rule 3: ranking happens in dollars, display may be dual."
+              },
+              "transfers_to": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "programme",
+                    "ratio_from",
+                    "ratio_to",
+                    "latency_days"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "programme": {
+                      "type": "string"
+                    },
+                    "ratio_from": {
+                      "type": "integer"
+                    },
+                    "ratio_to": {
+                      "type": "integer"
+                    },
+                    "minimum_increment": {
+                      "type": "integer"
+                    },
+                    "latency_days": {
+                      "type": "number",
+                      "description": "Points that take three days to move are not available for a flight tomorrow."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maximum_cents": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "target_cents": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "incidental_allowance_cents": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          }
+        },
+        "profiles": {
+          "type": "object",
+          "description": "The SAME options are scored under each of these. Cheapest/fastest/comfort are not separate rankings — they are this one model at different weights (hard rule 3). 'reference' is the grade's fixed yardstick and must be present.",
+          "required": [
+            "reference"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/profile"
+          }
+        }
+      }
+    },
+    "options": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/option"
+      }
+    },
+    "expect": {
+      "type": "object",
+      "description": "Assertions. Never a stored effective_cost — that is the number under test.",
+      "additionalProperties": false,
+      "properties": {
+        "order": {
+          "type": "object",
+          "description": "Per profile name, the option_ids in the order the scorer must produce.",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "grades_stable_across_profiles": {
+          "type": "boolean",
+          "description": "The grade is scored at the reference profile, so switching target must not move a letter."
+        },
+        "ledger_must_contain": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "option_id",
+              "code"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "option_id": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              },
+              "sign": {
+                "enum": [
+                  "cost",
+                  "credit"
+                ]
+              },
+              "min_cents": {
+                "type": "integer"
+              },
+              "max_cents": {
+                "type": "integer"
+              },
+              "evidence_mentions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "why": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "ledger_must_not_contain": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "option_id",
+              "code",
+              "why"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "option_id": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              },
+              "why": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "infeasible": {
+          "type": "array",
+          "description": "Options or ground modes the scorer must reject outright rather than merely penalise.",
+          "items": {
+            "type": "object",
+            "required": [
+              "ref",
+              "why"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "ref": {
+                "type": "string"
+              },
+              "why": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "reconciles": {
+          "type": "boolean",
+          "description": "Ledger lines must sum to the reported effective cost, exactly, in integer cents."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "money": {
+      "type": "integer",
+      "description": "INTEGER MINOR UNITS (cents). Never a float: 'same data = same order every time' does not survive float accumulation — two itineraries that should tie exactly would differ in the last bits and sort by rounding noise instead of by the documented tie-break."
+    },
+    "place": {
+      "type": "object",
+      "required": [
+        "label",
+        "lat",
+        "lon"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "lat": {
+          "type": "number"
+        },
+        "lon": {
+          "type": "number"
+        },
+        "postal_code": {
+          "type": "string"
+        },
+        "geocode_precision": {
+          "enum": [
+            "rooftop",
+            "street",
+            "neighbourhood",
+            "postal",
+            "city"
+          ],
+          "description": "City-level precision is the thing the product exists to beat. Carry it so the scorer can say how much it is guessing."
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "required": [
+        "hourly_value_cents",
+        "comfort_weight"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "hourly_value_cents": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "comfort_weight": {
+          "type": "number",
+          "minimum": 0
+        },
+        "risk_weight": {
+          "type": "number",
+          "minimum": 0
+        },
+        "weights": {
+          "type": "object",
+          "description": "A CLOSED set of bounded weights. This is the only thing the intent parser may emit — a hallucinated key must not be able to change the order (hard rule 1).",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 5
+          }
+        },
+        "hard_filters": {
+          "type": "array",
+          "description": "Exclusions. Per hard rule 4 an excluded option is still disclosed with its reason and a way back, so the scorer must return it flagged rather than drop it.",
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "value"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "enum": [
+                  "carrier",
+                  "max_price",
+                  "requires_cabin_bag",
+                  "no_self_transfer"
+                ]
+              },
+              "value": {}
+            }
+          }
+        }
+      }
+    },
+    "hedged_claim": {
+      "type": "object",
+      "description": "Hard rule 2 made structural. Any statement about equipment, cabin, connectivity or punctuality is a claim with an observation behind it, never a fact. A scorer may only turn this into an expected value; a narrator may only render it hedged.",
+      "required": [
+        "value",
+        "observed_frequency",
+        "sample_size",
+        "observation_window",
+        "source",
+        "as_of"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "string"
+        },
+        "observed_frequency": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "sample_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "observation_window": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "as_of": {
+          "type": "string",
+          "format": "date"
+        },
+        "needs_primary_source": {
+          "type": "boolean"
+        }
+      }
+    },
+    "abstain": {
+      "type": "object",
+      "description": "The explicit 'we do not know'. Unknown must NOT score as zero, or the least-described itinerary accumulates the fewest penalties and wins — the ranking would reward missing data.",
+      "required": [
+        "coverage",
+        "reason",
+        "policy"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "coverage": {
+          "const": "none"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "policy": {
+          "enum": [
+            "route_median",
+            "carrier_median",
+            "worst_case",
+            "exclude_term"
+          ]
+        }
+      }
+    },
+    "ground_mode": {
+      "type": "object",
+      "required": [
+        "mode_id",
+        "mode",
+        "fare_cents",
+        "door_to_door_minutes",
+        "feasible"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "mode_id": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "fare_cents": {
+          "$ref": "#/$defs/money"
+        },
+        "fare_components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "what",
+              "amount_cents",
+              "effective_date"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "what": {
+                "type": "string"
+              },
+              "amount_cents": {
+                "$ref": "#/$defs/money"
+              },
+              "effective_date": {
+                "type": "string",
+                "format": "date"
+              },
+              "source": {
+                "type": "string"
+              },
+              "needs_primary_source": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "door_to_door_minutes": {
+          "type": "object",
+          "required": [
+            "p50"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "p50": {
+              "type": "integer"
+            },
+            "p90": {
+              "type": "integer"
+            }
+          }
+        },
+        "transfers": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Scored separately from duration: a $3.00 three-transfer route and an $11.75 one-transfer route are different products at the same p50."
+        },
+        "tolls_cents": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "DIRECTIONAL. Every Port Authority Hudson and Staten Island crossing is tolled NY-bound only, so a Brooklyn-to-EWR car pays $0 outbound. A symmetric toll model overcharges by ~$15 and wrongly demotes every EWR itinerary.",
+          "properties": {
+            "outbound": {
+              "$ref": "#/$defs/money"
+            },
+            "inbound": {
+              "$ref": "#/$defs/money"
+            }
+          }
+        },
+        "service_window": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "first_local": {
+              "type": "string"
+            },
+            "last_local": {
+              "type": "string"
+            },
+            "headway_minutes": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "feasible": {
+          "type": "boolean"
+        },
+        "infeasible_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "weakest_link": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "WHICH leg breaks the chain. The ledger names this link; it never makes a blanket 'no transit' claim."
+        },
+        "disruptions": {
+          "type": "array",
+          "description": "Dated overlays, kept separate from base service data so the fixture does not silently rot when they expire.",
+          "items": {
+            "type": "object",
+            "required": [
+              "what",
+              "starts",
+              "added_minutes"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "what": {
+                "type": "string"
+              },
+              "starts": {
+                "type": "string",
+                "format": "date"
+              },
+              "ends": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date"
+              },
+              "weekdays_only": {
+                "type": "boolean"
+              },
+              "window_local": {
+                "type": "string"
+              },
+              "added_minutes": {
+                "type": "integer"
+              },
+              "source": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "source": {
+          "type": "string"
+        }
+      }
+    },
+    "segment": {
+      "type": "object",
+      "required": [
+        "segment_id",
+        "marketing",
+        "operating",
+        "origin",
+        "destination",
+        "departure_local",
+        "arrival_local",
+        "equipment_code"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "segment_id": {
+          "type": "string"
+        },
+        "marketing": {
+          "$ref": "#/$defs/flight_designator"
+        },
+        "operating": {
+          "$ref": "#/$defs/flight_designator"
+        },
+        "origin": {
+          "$ref": "#/$defs/endpoint"
+        },
+        "destination": {
+          "$ref": "#/$defs/endpoint"
+        },
+        "departure_local": {
+          "type": "string",
+          "description": "RFC3339 with an EXPLICIT numeric offset, e.g. 2026-03-12T06:10:00-05:00. Local wall clock is needed by layover quality and ground access; the offset is needed to get an instant without a tz database at scoring time (which would be I/O, and a tzdata update would silently move golden numbers). Offset rather than zone name because 01:30 on 2026-11-01 at JFK happens twice and a zone name cannot say which.",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}[+-]\\d{2}:\\d{2}$"
+        },
+        "arrival_local": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}[+-]\\d{2}:\\d{2}$"
+        },
+        "actual_arrival_local": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Only for fixtures that model a delay. Ranking runs on scheduled times; risk_adjustment runs on the delay draw. Both come from one fixture."
+        },
+        "tz_hint": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "IANA names, NON-AUTHORITATIVE. For prose only. The offset above is the truth."
+        },
+        "equipment_code": {
+          "type": "string",
+          "description": "A TYPE, not a subfleet. Never sufficient for a cabin claim on its own."
+        },
+        "cabin_marketed": {
+          "type": "string"
+        },
+        "claims": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "subfleet": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/hedged_claim"
+                },
+                {
+                  "$ref": "#/$defs/abstain"
+                }
+              ]
+            },
+            "connectivity_oceanic": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/hedged_claim"
+                },
+                {
+                  "$ref": "#/$defs/abstain"
+                }
+              ]
+            },
+            "seat_pitch_inches": {
+              "type": "number"
+            },
+            "power": {
+              "type": "string"
+            }
+          }
+        },
+        "reliability": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "on_time_fraction",
+                "sample_size",
+                "observation_window",
+                "source"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "on_time_fraction": {
+                  "type": "number"
+                },
+                "delay_minutes_p50": {
+                  "type": "integer"
+                },
+                "delay_minutes_p90": {
+                  "type": "integer"
+                },
+                "sample_size": {
+                  "type": "integer"
+                },
+                "observation_window": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                }
+              }
+            },
+            {
+              "$ref": "#/$defs/abstain"
+            }
+          ],
+          "description": "BTS covers US carriers. BA, VS, LH, AF, KL, IB, AY, SK on JFK/EWR-Europe are NOT in it, and neither is any intra-Europe leg. Those segments abstain rather than score as perfect."
+        }
+      }
+    },
+    "flight_designator": {
+      "type": "object",
+      "required": [
+        "carrier",
+        "number"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "carrier": {
+          "type": "string"
+        },
+        "number": {
+          "type": "integer"
+        },
+        "synthetic": {
+          "type": "boolean",
+          "description": "true = invented for the fixture. Never borrow a real flight number and give it invented times."
+        }
+      }
+    },
+    "endpoint": {
+      "type": "object",
+      "required": [
+        "iata"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "iata": {
+          "type": "string"
+        },
+        "terminal": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hall": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "iata_area": {
+          "type": "integer",
+          "description": "Input to the most-significant-carrier determination for baggage. Store the input; derive the answer."
+        },
+        "schengen": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "layover": {
+      "type": "object",
+      "required": [
+        "layover_id",
+        "airport",
+        "arrive_segment_id",
+        "depart_segment_id"
+      ],
+      "additionalProperties": false,
+      "description": "Keyed by (airport, arrival hall, departure hall, local clock time) — never by duration alone. 250 minutes at AMS midday, at LHR T3-to-T5 midday, and at CDG at 01:40 are three different objects.",
+      "properties": {
+        "layover_id": {
+          "type": "string"
+        },
+        "airport": {
+          "type": "string"
+        },
+        "arrive_segment_id": {
+          "type": "string"
+        },
+        "depart_segment_id": {
+          "type": "string"
+        },
+        "immigration_required": {
+          "type": "boolean"
+        },
+        "security_reclear_required": {
+          "type": "boolean"
+        },
+        "ees_first_registration": {
+          "type": "boolean",
+          "description": "EU Entry/Exit System. First registration is ~15 min at quiet times and was recorded at up to 28 min per family under load."
+        },
+        "inter_terminal": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "enum": [
+                "walk",
+                "airside_shuttle",
+                "airside_bus",
+                "landside_train",
+                "landside_bus",
+                "none"
+              ]
+            },
+            "minutes": {
+              "type": "integer"
+            },
+            "headway_minutes": {
+              "type": "integer"
+            },
+            "operating_hours_local": {
+              "type": "string",
+              "description": "Not just a duration. CDGVAL runs 04:00-01:00 then a 25-minute-headway bus; the 2F-2G airside shuttle runs 05:30-23:00, which makes some connections INFEASIBLE rather than merely expensive."
+            }
+          }
+        },
+        "published_mct_minutes": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "mct_source": {
+          "type": "string"
+        },
+        "bags_checked_through": {
+          "type": "boolean"
+        },
+        "airside_holdable_overnight": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "forced_landside": {
+          "type": "boolean",
+          "description": "At CDG a 2E-to-2F connection ejects you through immigration into a zone that does not reopen until ~04:00. Same airport, same hour, a different object from 2E-to-2E."
+        },
+        "services_open": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "what",
+              "hours_local"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "what": {
+                "type": "string"
+              },
+              "hours_local": {
+                "type": "string"
+              },
+              "eligibility": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              }
+            }
+          },
+          "description": "Open-windows, never booleans. A lounge credit must evaluate to $0 when the layover falls outside its hours."
+        },
+        "leave_airport_viable": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "option": {
+      "type": "object",
+      "required": [
+        "option_id",
+        "tickets",
+        "segments",
+        "ground"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "option_id": {
+          "type": "string"
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "tickets": {
+          "type": "array",
+          "minItems": 1,
+          "description": "One entry per TICKETING BOUNDARY. A self-transfer carries two, which is why its bags are paid twice and its misconnect costs a whole new ticket.",
+          "items": {
+            "type": "object",
+            "required": [
+              "ticket_id",
+              "issuing_carrier",
+              "fare_brand_name",
+              "price",
+              "entitlements",
+              "segment_ids"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "ticket_id": {
+                "type": "string"
+              },
+              "issuing_carrier": {
+                "type": "string"
+              },
+              "issue_date": {
+                "type": "string",
+                "format": "date",
+                "description": "The date the ticket is ISSUED, which is not the travel date. American's transatlantic Basic first-bag fee is keyed to issue date (it rose from $75 to $85 for tickets issued on or after 2026-05-18), so a fixture carrying only a travel date cannot resolve the correct fee."
+              },
+              "fare_brand_name": {
+                "type": "string",
+                "description": "Carried VERBATIM for prose and as an enrichment key. No arithmetic may key off this string or off a normalised tier enum — carriers disagree about what 'Basic' includes. The entitlements block is what the scorer reads."
+              },
+              "price": {
+                "type": "object",
+                "required": [
+                  "currency",
+                  "base_cents",
+                  "fx_rate_to_usd"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "currency": {
+                    "type": "string"
+                  },
+                  "base_cents": {
+                    "$ref": "#/$defs/money"
+                  },
+                  "taxes": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/charge"
+                    }
+                  },
+                  "carrier_imposed": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/charge"
+                    },
+                    "description": "YQ/YR. Generally NOT refundable, unlike government taxes — which is why they are a separate bucket."
+                  },
+                  "agency_fees": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/charge"
+                    },
+                    "description": "Structurally separate. Showing a reseller's margin as a government tax is the same sin rule 4 exists to prevent."
+                  },
+                  "fx_rate_to_usd": {
+                    "type": "number",
+                    "description": "PINNED. Without it the scorer either makes a network call or the conversion is baked in and never tested."
+                  }
+                }
+              },
+              "entitlements": {
+                "type": "object",
+                "required": [
+                  "checked_included",
+                  "cabin_bag_included",
+                  "personal_item_included"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "checked_included": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "cabin_bag_included": {
+                    "type": "boolean"
+                  },
+                  "personal_item_included": {
+                    "type": "boolean"
+                  },
+                  "seat_selection": {
+                    "enum": [
+                      "included",
+                      "paid",
+                      "not_permitted"
+                    ]
+                  },
+                  "changes": {
+                    "enum": [
+                      "free",
+                      "fee",
+                      "not_permitted"
+                    ]
+                  },
+                  "change_fee_cents": {
+                    "$ref": "#/$defs/money"
+                  },
+                  "refundable": {
+                    "type": "boolean"
+                  },
+                  "earns_redeemable_miles": {
+                    "type": "boolean"
+                  },
+                  "boarding_group": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Not a baggage rule. United's transatlantic Basic DOES allow a full-size carry-on; boarding in the last group is a comfort penalty about bin space, which is a different line."
+                  }
+                }
+              },
+              "checked_bag_fee_tiers": {
+                "type": "array",
+                "description": "Fee by piece index BEYOND the included allowance, per passenger, per ticket. Tiers reset per passenger, not per party.",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "piece",
+                    "amount_cents"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "piece": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "amount_cents": {
+                      "$ref": "#/$defs/money"
+                    },
+                    "note": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "award": {
+                "type": "object",
+                "required": [
+                  "programme",
+                  "points",
+                  "cash_taxes_cents",
+                  "availability"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "programme": {
+                    "type": "string"
+                  },
+                  "points": {
+                    "type": "integer"
+                  },
+                  "cash_taxes_cents": {
+                    "$ref": "#/$defs/money"
+                  },
+                  "availability": {
+                    "enum": [
+                      "confirmed",
+                      "unknown"
+                    ],
+                    "description": "No cash-inventory API knows whether a saver seat exists. Until an award feed exists this is 'unknown', and the UI must say 'if', not 'is'."
+                  }
+                }
+              },
+              "segment_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "segments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/segment"
+          }
+        },
+        "layovers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/layover"
+          }
+        },
+        "ground": {
+          "type": "object",
+          "required": [
+            "outbound"
+          ],
+          "additionalProperties": false,
+          "description": "A LIST of modes per end, not a scalar. Bushwick-to-JFK has three defensible answers that only separate once hourly value is applied; one number here is exactly the confidently-wrong static matrix the brief warns against.",
+          "properties": {
+            "outbound": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/ground_mode"
+              }
+            },
+            "arrival": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ground_mode"
+              }
+            }
+          }
+        },
+        "airport_process_minutes": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Check-in, security and the walk to the gate at THIS airport at THIS hour. Part of door-to-door, and the bar renders it as its own segment.",
+          "properties": {
+            "p50": {
+              "type": "integer"
+            },
+            "p90": {
+              "type": "integer"
+            },
+            "source": {
+              "type": "string"
+            }
+          }
+        },
+        "booking": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "who",
+              "price_cents",
+              "direct"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "who": {
+                "type": "string"
+              },
+              "price_cents": {
+                "$ref": "#/$defs/money"
+              },
+              "direct": {
+                "type": "boolean"
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "charge": {
+      "type": "object",
+      "required": [
+        "code",
+        "amount_cents"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "amount_cents": {
+          "$ref": "#/$defs/money"
+        },
+        "label": {
+          "type": "string"
+        },
+        "refundable_on_cancel": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
