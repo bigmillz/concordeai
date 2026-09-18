@@ -362,7 +362,8 @@ python3 concorde-travel/tests/test_adapter.py    # live normalisation, replayed 
 python3 concorde-travel/tests/test_live.py       # quota, cache and key handling, offline
 python3 concorde-travel/live.py status           # key, quota and cache state
 python3 concorde-travel/live.py probe            # validate a key with a REAL search
-python3 concorde-travel/live.py provider amadeus # switch provider profile
+python3 concorde-travel/live.py provider duffel  # switch provider profile
+python3 concorde-travel/tests/mutate_adapter.py  # break the adapters on purpose, 13 faults
 python3 concorde-travel/tests/test_faststart.py
 python3 concorde-travel/adapter.py               # normalise the recorded payload, print coverage
 ```
@@ -377,9 +378,10 @@ never zero** (otherwise the least-documented itinerary accumulates the fewest pe
 wins). Every constant lives in `scorer.Tuning`, never in a fixture — a fixture carrying the
 curve it is meant to be testing is a fixture that tests nothing.
 
-**The test suites are mutation-tested.** Before changing either, know that `test_scorer.py`
-catches 12 of 12 seeded faults and `validate.py` 10 of 10. If a change makes a suite pass
-that should not, the suite has lost a guard.
+**The test suites are mutation-tested.** `test_scorer.py` catches 12 of 12 seeded faults and
+`validate.py` 10 of 10; `tests/mutate_adapter.py` is an executable runner for the adapters
+and must stay at 13/13 with **zero skips** — a skipped mutant never ran and is not a pass.
+If a change makes a suite pass that should not, the suite has lost a guard.
 
 **The narrator is the only non-deterministic surface, and it is fenced.** `narrator.brief()`
 precomputes every number the prose may contain — the model picks words, never arithmetic —
@@ -400,7 +402,7 @@ asserts the scorer and its tests never import the adapter, and the adapter's own
 replay `adapter_samples/kiwi-jfk-lhr.json` — a real response captured once — instead of
 calling anything.
 
-**Two providers, and they do not know the same things.** `from_feed()` dispatches on the
+**Three providers, and they do not know the same things.** `from_feed()` dispatches on the
 payload's own shape, so a profile pointed at the wrong provider fails as a parse error
 rather than as a plausible scenario built from the wrong keys.
 
@@ -424,14 +426,33 @@ equipment code, and it carries a fare brand with an included-bag count. It canno
 self-transfer or virtual interlining at all, which is why both adapters are kept rather
 than one replacing the other.
 
-**Neither shipped profile is self-serve any more.** Amadeus decommissioned its
-Self-Service portal on 2026-07-17 and disabled those keys; Kiwi closed Tequila signups in
-2024. Amadeus is the default for its *schema* — Enterprise still speaks it, and it is the
-reference for what a rich feed looks like — not because you can get a key. **The self-serve
-option today is Duffel** (`app.duffel.com/join`, instant free sandbox), whose Offer schema
-carries the same operating carrier / aircraft / fare brand / baggage fields. There is no
-`from_duffel` yet. Do not re-recommend Amadeus Self-Service or Google Flights; see the
-table in `docs/design.md`.
+**Duffel is the default, and the only one you can still sign up for**
+(`app.duffel.com/join`, instant free sandbox). Amadeus decommissioned its Self-Service
+portal on 2026-07-17 and disabled those keys; Kiwi closed Tequila signups in 2024. Both
+profiles are kept for their schemas — Amadeus Enterprise still speaks Flight Offers Search
+v2, and Kiwi is the only feed here that sees self-transfer at all. **Do not re-recommend
+Amadeus Self-Service or Google Flights**; see the table in `docs/design.md`.
+
+**Duffel is the only feed that quotes a bag price.** `available_services` lists an extra
+checked bag as a bookable service with a real amount, so for those options the bags
+arithmetic is not an estimate — `coverage()` reports that as a *strength*, the one place a
+feed beats the curated moat. Two catches, both handled: it prices per unit up to a
+`maximum_quantity` with nothing beyond, and an empty list means *unknown*, not free.
+
+**Two Duffel-specific traps, each with a comment in `adapter.py`:**
+- **`fare_brand_name` is prose, not a code** ("Basic Economy", "Economy Light") where
+  Amadeus returns `BASIC`. `_brand_key()` matches a curated token as a **whole word** —
+  substring matching makes "Economy Light" hit an `ECONOMY` row, and `SURPLUS` contains
+  `PLUS`.
+- **A `duffel_test_` token returns the fictional carrier Duffel Airways (ZZ)** with
+  invented prices. The adapter handles it — an uncurated carrier keeps its option and loses
+  its rating — and adds a scenario note, but a grade over test inventory means nothing.
+
+**`scorer._bag_cost` raises on an unpriced piece, and the traveller's bag load is
+unbounded.** A published schedule stops at two or three pieces, so a four-bag party used to
+take the whole search down on both feeds. `_extend_tiers()` pads the ladder by repeating
+the **dearest** published tier — extrapolating downwards would make heavy loads look cheap
+on exactly the fares that publish no fourth-bag price.
 
 **An equipment code is not a cabin.** `aircraft.code` names a *type*; one carrier's 789 may
 be several configurations, and the frame is swapped after booking regardless. It is joined
@@ -495,6 +516,8 @@ Counters live in `~/.concordego/quota.json` and roll over by day and month on th
 no cron, no cleanup job. Defaults are 100/day and 1000/month with a 2s floor between calls
 and a 30-minute cache TTL; all four are config.
 
-**`adapter_samples/kiwi-jfk-lhr.json` is a real capture. `amadeus-jfk-lhr.json` is not** —
-it is synthesised from the published schema, its own `_provenance` block says so, and a test
-asserts it. Replace it with a real capture on the first successful probe.
+**`adapter_samples/kiwi-jfk-lhr.json` is a real capture. The other two are not** —
+`amadeus-jfk-lhr.json` is synthesised from the published schema and `duffel-jfk-lhr.json`
+from duffel-api's own model definitions (the authoritative parser, rather than a reading of
+prose docs). Each says so in its `_provenance` block and a test asserts it. Replace them
+with real captures on the first successful probe.

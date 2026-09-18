@@ -104,6 +104,38 @@ PROFILES = {
                   "from the published docs and UNVERIFIED against the live service. "
                   "For a self-serve key today, see docs/design.md."),
     },
+    "duffel": {
+        "provider": "duffel",
+        "base": "https://api.duffel.com",
+        "path": "/air/offer_requests",
+        # Duffel searches with a POST body, not a query string. The METHOD and
+        # the body's SHAPE are protocol; the field names inside it are still
+        # config, so a renamed key is fixed here rather than in Python.
+        "method": "POST",
+        "auth": {"mode": "header_key", "header": "Authorization", "scheme": "Bearer"},
+        "extra_headers": {"Duffel-Version": "v2"},
+        "params": {},
+        "static_params": {"return_offers": "true", "supplier_timeout": "20000"},
+        "date_format": "%Y-%m-%d",
+        "body_template": {
+            "data": {
+                "slices": [{"origin": "$origin", "destination": "$destination",
+                            "departure_date": "$date"}],
+                "passengers": ["$passengers"],
+                "cabin_class": "economy",
+            }
+        },
+        "passenger_template": {"type": "adult"},
+        "quota": dict(_QUOTA_DEFAULT),
+        "_note": ("Wire format from duffel-api's own model definitions, and UNVERIFIED "
+                  "against the live service - no Duffel credential was available on the "
+                  "machine this was written on. THIS IS THE ONE YOU CAN SIGN UP FOR: "
+                  "app.duffel.com/join gives a test token (duffel_test_...) in about a "
+                  "minute. Note that a TEST token returns the fictional carrier Duffel "
+                  "Airways with invented prices - the adapter handles it and says so, "
+                  "but a grade over test inventory means nothing. Live prices need "
+                  "account verification."),
+    },
     "kiwi-tequila": {
         "provider": "kiwi-tequila",
         "base": "https://tequila-api.kiwi.com",
@@ -126,14 +158,13 @@ PROFILES = {
     },
 }
 
-# Amadeus is the default for its SCHEMA, not its availability: it carries the
-# operating carrier, the equipment code and the fare brand - the three fields the
-# scorer has to abstain on with the Kiwi feed - and Amadeus Enterprise still
-# speaks it. Neither shipped profile is self-serve any more: Amadeus retired
-# Self-Service on 2026-07-17 and Kiwi closed Tequila signups in 2024. The
-# self-serve option today is Duffel, which has no adapter yet.
-# Switch with `live.py provider kiwi-tequila`.
-DEFAULTS = json.loads(json.dumps(PROFILES["amadeus"]))
+# Duffel is the default because it is the only one of the three you can still
+# sign up for: Amadeus retired Self-Service on 2026-07-17 and Kiwi closed Tequila
+# signups in 2024. It also happens to carry the most - operating carrier,
+# aircraft, fare brand, per-segment baggage, AND a real quoted price for an extra
+# checked bag, which no other feed here gives at all.
+# Switch with `live.py provider amadeus|kiwi-tequila`.
+DEFAULTS = json.loads(json.dumps(PROFILES["duffel"]))
 
 
 # --------------------------------------------------------------- redaction
@@ -437,8 +468,13 @@ def cache_stats():
 # ------------------------------------------------------------------ search
 
 def _url(cfg, query):
-    p = cfg["params"]
+    p = cfg.get("params") or {}
     args = dict(cfg.get("static_params") or {})
+    if not p:
+        # A POST provider carries its query in the body; the URL may still take
+        # static switches (Duffel's return_offers).
+        qs = urllib.parse.urlencode(args)
+        return cfg["base"].rstrip("/") + cfg["path"] + ("?" + qs if qs else "")
     args[p["origin"]] = query["origin"]
     args[p["destination"]] = query["destination"]
     d = time.strftime(cfg["date_format"], time.strptime(query["date"], "%Y-%m-%d"))
@@ -457,6 +493,38 @@ def _url(cfg, query):
         if name:
             args[name] = query.get(qkey, default)
     return cfg["base"].rstrip("/") + cfg["path"] + "?" + urllib.parse.urlencode(args)
+
+
+def _render_body(cfg, query):
+    """Fill a profile's body template from the query.
+
+    Declarative on purpose: a scalar "$name" is substituted, and a list holding
+    exactly ["$passengers"] expands to one passenger object per adult. That is
+    enough for a search body and keeps someone else's field names out of Python,
+    which is the same reason the query-string providers keep theirs in `params`."""
+    vals = {
+        "$origin": query["origin"],
+        "$destination": query["destination"],
+        "$date": time.strftime(cfg["date_format"], time.strptime(query["date"], "%Y-%m-%d")),
+        "$currency": query.get("currency", "USD"),
+        "$adults": query.get("adults", 1),
+        "$limit": query.get("limit", 20),
+    }
+
+    def walk(node):
+        if isinstance(node, dict):
+            return {k: walk(v) for k, v in node.items()}
+        if isinstance(node, list):
+            if node == ["$passengers"]:
+                pax = cfg.get("passenger_template") or {"type": "adult"}
+                return [json.loads(json.dumps(pax))
+                        for _ in range(max(1, int(query.get("adults", 1))))]
+            return [walk(v) for v in node]
+        if isinstance(node, str) and node in vals:
+            return vals[node]
+        return node
+
+    return walk(cfg["body_template"])
 
 
 def _auth_headers(cfg):
@@ -512,8 +580,14 @@ def search(query, cfg=None, allow_call=True):
 
     secrets = (key, cfg.get("secret", "")) + tuple(headers.values())
     url = _url(cfg, query)
-    req = urllib.request.Request(url, headers=dict(
-        headers, **{"Accept": "application/json", "User-Agent": UA}))
+    hdrs = dict(headers)
+    hdrs.update(cfg.get("extra_headers") or {})
+    hdrs.update({"Accept": "application/json", "User-Agent": UA})
+    data = None
+    if str(cfg.get("method", "GET")).upper() == "POST":
+        data = json.dumps(_render_body(cfg, query)).encode()
+        hdrs["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=data, headers=hdrs)
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             body = r.read().decode("utf-8", "replace")
@@ -548,6 +622,22 @@ def search(query, cfg=None, allow_call=True):
     return payload, {"source": "api", "quota": quota_state(cfg)}
 
 
+def _count_results(payload):
+    """How many itineraries came back, across three unrelated response shapes.
+
+    Deliberately not a call into `adapter`: this module must stay the only one
+    that touches a credential, and the adapter must stay callable with no
+    network layer present at all."""
+    if not isinstance(payload, dict):
+        return 0
+    data = payload.get("data")
+    if isinstance(data, dict):                      # duffel offer request
+        return len(data.get("offers") or [])
+    if isinstance(data, list):                      # amadeus, or duffel offers
+        return len(data)
+    return len(payload.get("itineraries") or [])
+
+
 def probe(cfg=None):
     """Validate a key with a REAL search.
 
@@ -562,7 +652,7 @@ def probe(cfg=None):
     if payload is None:
         return {"ok": False, "why": meta.get("error"), "hint": meta.get("hint"),
                 "quota": meta.get("quota")}
-    n = len(payload.get("data") or payload.get("itineraries") or [])
+    n = _count_results(payload)
     return {"ok": True, "source": meta["source"], "itineraries": n,
             "quota": meta.get("quota"),
             "provider": cfg.get("provider"),

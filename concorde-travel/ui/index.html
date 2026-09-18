@@ -431,6 +431,7 @@ body.novideo .glass{background:var(--panel);-webkit-backdrop-filter:none;backdro
 .coverage b{color:var(--text);font-weight:500}
 .coverage ul{margin:7px 0 0;padding-left:17px}
 .coverage li{margin:2px 0;color:var(--faint)}
+.coverage li.good{color:var(--dim)}
 
 .understood{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding-top:3px}
 .uchip{font-size:11.5px;font-family:var(--mono);border-radius:999px;padding:3px 10px;
@@ -1632,10 +1633,12 @@ function paint(){
         : feed.fetched === "api"
           ? "Fetched live \u2014 " + (feed.quota ? feed.quota.day_left + " calls left today." : "")
           : "From a recorded search.";
-    var who = feed.provider ? (feed.provider === "amadeus" ? "Amadeus" : "Kiwi.com") : "";
+    var who = {duffel: "Duffel", amadeus: "Amadeus", kiwi: "Kiwi.com"}[feed.provider] || "";
     h += '<div class="coverage' + (indicative ? ' thin' : '') + '">' +
          '<b>Live inventory' + (who ? ' \u00b7 ' + esc(who) : '') + '.</b> ' +
          esc(where) + ' ' + esc(LAST.coverage.verdict) + '<ul>' +
+         (LAST.coverage.strengths || []).map(function(s){
+             return '<li class="good">' + esc(s) + '</li>'; }).join("") +
          LAST.coverage.gaps.map(function(g){ return '<li>' + esc(g) + '</li>'; }).join("") +
          '</ul></div>';
   }

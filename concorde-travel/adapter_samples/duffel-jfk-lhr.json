@@ -1,0 +1,683 @@
+{
+  "_provenance": {
+    "what": "A POST /air/offer_requests response, JFK-LHR, one adult, 2026-11-12.",
+    "captured": false,
+    "how": "SYNTHESISED, but not guessed: the field names and nesting are taken from Duffel's own Python SDK (duffel-api 0.6.2, duffel_api/models/offer.py), which is the authoritative parser for this payload. No Duffel credential was available on the machine this was written on, so no value here was observed.",
+    "therefore": "It proves the adapter reads the schema the SDK parses. Replace it with a real capture from a duffel_test_ token and re-run the adapter tests; a field that moved shows up as a dropped itinerary, not as silence.",
+    "note_on_test_mode": "A real duffel_test_ token returns the fictional carrier Duffel Airways (ZZ) with invented prices, NOT the carriers below. Offer off_zz_testmode is included so the adapter's behaviour on an uncurated carrier is exercised, because that is the first thing a new token actually shows you.",
+    "exercises": [
+      "operating_carrier equal to marketing_carrier, which Duffel always states rather than omitting",
+      "a codeshare where they differ",
+      "a fare_brand_name with no checked bag, and the same flight on a brand that includes one",
+      "available_services carrying a REAL price for an extra checked bag",
+      "a segment with aircraft: null, which must abstain",
+      "a two-segment connection on one offer, so bags are through-checked",
+      "an uncurated carrier (ZZ), which keeps the option but drops the carrier rating",
+      "an itinerary through an uncurated airport, which must be dropped rather than guessed",
+      "an airport whose feed time_zone disagrees with the curated zone table"
+    ]
+  },
+  "data": {
+    "id": "orq_0000AaBbCcDdEeFfGgHh",
+    "live_mode": false,
+    "created_at": "2026-09-18T10:00:00.000000Z",
+    "cabin_class": "economy",
+    "passengers": [{"id": "pas_0000AaBbCc", "type": "adult", "age": 34}],
+    "slices": [
+      {
+        "origin": {"iata_code": "JFK", "type": "airport"},
+        "destination": {"iata_code": "LHR", "type": "airport"},
+        "departure_date": "2026-11-12"
+      }
+    ],
+    "offers": [
+      {
+        "id": "off_0000BaBasic",
+        "live_mode": false,
+        "total_amount": "480.00",
+        "total_currency": "USD",
+        "base_amount": "310.00",
+        "base_currency": "USD",
+        "tax_amount": "170.00",
+        "tax_currency": "USD",
+        "total_emissions_kg": "612",
+        "expires_at": "2026-09-18T11:00:00.000000Z",
+        "created_at": "2026-09-18T10:00:00.000000Z",
+        "updated_at": "2026-09-18T10:00:00.000000Z",
+        "partial": false,
+        "passenger_identity_documents_required": false,
+        "allowed_passenger_identity_document_types": ["passport"],
+        "owner": {"id": "arl_ba", "iata_code": "BA", "name": "British Airways"},
+        "payment_requirements": {"requires_instant_payment": true,
+                                 "payment_required_by": null,
+                                 "price_guarantee_expires_at": null},
+        "conditions": {
+          "change_before_departure": {"allowed": false, "penalty_amount": null,
+                                      "penalty_currency": null},
+          "refund_before_departure": {"allowed": false, "penalty_amount": null,
+                                      "penalty_currency": null}
+        },
+        "available_services": [
+          {
+            "id": "ase_0000BaBag1",
+            "type": "baggage",
+            "maximum_quantity": 2,
+            "total_amount": "75.00",
+            "total_currency": "USD",
+            "passenger_ids": ["pas_0000AaBbCc"],
+            "segment_ids": ["seg_0000Ba112"],
+            "metadata": {"type": "checked", "maximum_weight_kg": 23,
+                         "maximum_height_cm": 75, "maximum_length_cm": 90,
+                         "maximum_depth_cm": 43}
+          }
+        ],
+        "passengers": [{"id": "pas_0000AaBbCc", "type": "adult", "age": 34,
+                        "given_name": null, "family_name": null,
+                        "loyalty_programme_accounts": []}],
+        "slices": [
+          {
+            "id": "sli_0000BaBasic",
+            "duration": "PT7H0M",
+            "fare_brand_name": "Basic",
+            "origin_terminal": "7",
+            "destination_terminal": "5",
+            "origin": {"id": "arp_jfk", "type": "airport", "iata_code": "JFK",
+                       "name": "John F. Kennedy International Airport",
+                       "iata_country_code": "US", "time_zone": "America/New_York",
+                       "latitude": 40.64, "longitude": -73.78},
+            "destination": {"id": "arp_lhr", "type": "airport", "iata_code": "LHR",
+                            "name": "Heathrow Airport", "iata_country_code": "GB",
+                            "time_zone": "Europe/London",
+                            "latitude": 51.47, "longitude": -0.45},
+            "conditions": {"change_before_departure": {"allowed": false,
+                                                       "penalty_amount": null,
+                                                       "penalty_currency": null}},
+            "segments": [
+              {
+                "id": "seg_0000Ba112",
+                "departing_at": "2026-11-12T20:25:00",
+                "arriving_at": "2026-11-13T08:25:00",
+                "duration": "PT7H0M",
+                "distance": "5540.23",
+                "origin_terminal": "7",
+                "destination_terminal": "5",
+                "origin": {"id": "arp_jfk", "type": "airport", "iata_code": "JFK",
+                           "name": "John F. Kennedy International Airport",
+                           "iata_country_code": "US", "time_zone": "America/New_York",
+                           "latitude": 40.64, "longitude": -73.78},
+                "destination": {"id": "arp_lhr", "type": "airport", "iata_code": "LHR",
+                                "name": "Heathrow Airport", "iata_country_code": "GB",
+                                "time_zone": "Europe/London",
+                                "latitude": 51.47, "longitude": -0.45},
+                "aircraft": {"id": "arc_789", "iata_code": "789", "name": "Boeing 787-9"},
+                "marketing_carrier": {"id": "arl_ba", "iata_code": "BA",
+                                      "name": "British Airways"},
+                "marketing_carrier_flight_number": "112",
+                "operating_carrier": {"id": "arl_ba", "iata_code": "BA",
+                                      "name": "British Airways"},
+                "operating_carrier_flight_number": "112",
+                "stops": [],
+                "passengers": [
+                  {
+                    "passenger_id": "pas_0000AaBbCc",
+                    "cabin_class": "economy",
+                    "cabin_class_marketing_name": "Basic",
+                    "fare_basis_code": "OLNNMBA",
+                    "baggages": [
+                      {"type": "checked", "quantity": 0},
+                      {"type": "carry_on", "quantity": 1}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "off_0000BaPlus",
+        "live_mode": false,
+        "total_amount": "562.00",
+        "total_currency": "USD",
+        "base_amount": "392.00",
+        "base_currency": "USD",
+        "tax_amount": "170.00",
+        "tax_currency": "USD",
+        "total_emissions_kg": "612",
+        "expires_at": "2026-09-18T11:00:00.000000Z",
+        "created_at": "2026-09-18T10:00:00.000000Z",
+        "updated_at": "2026-09-18T10:00:00.000000Z",
+        "partial": false,
+        "passenger_identity_documents_required": false,
+        "allowed_passenger_identity_document_types": ["passport"],
+        "owner": {"id": "arl_ba", "iata_code": "BA", "name": "British Airways"},
+        "payment_requirements": {"requires_instant_payment": true,
+                                 "payment_required_by": null,
+                                 "price_guarantee_expires_at": null},
+        "conditions": {
+          "change_before_departure": {"allowed": true, "penalty_amount": "150.00",
+                                      "penalty_currency": "USD"},
+          "refund_before_departure": {"allowed": false, "penalty_amount": null,
+                                      "penalty_currency": null}
+        },
+        "available_services": [
+          {
+            "id": "ase_0000BaBag2",
+            "type": "baggage",
+            "maximum_quantity": 1,
+            "total_amount": "100.00",
+            "total_currency": "USD",
+            "passenger_ids": ["pas_0000AaBbCc"],
+            "segment_ids": ["seg_0000Ba112p"],
+            "metadata": {"type": "checked", "maximum_weight_kg": 23,
+                         "maximum_height_cm": 75, "maximum_length_cm": 90,
+                         "maximum_depth_cm": 43}
+          }
+        ],
+        "passengers": [{"id": "pas_0000AaBbCc", "type": "adult", "age": 34,
+                        "given_name": null, "family_name": null,
+                        "loyalty_programme_accounts": []}],
+        "slices": [
+          {
+            "id": "sli_0000BaPlus",
+            "duration": "PT7H0M",
+            "fare_brand_name": "Plus",
+            "origin_terminal": "7",
+            "destination_terminal": "5",
+            "origin": {"id": "arp_jfk", "type": "airport", "iata_code": "JFK",
+                       "name": "John F. Kennedy International Airport",
+                       "iata_country_code": "US", "time_zone": "America/New_York",
+                       "latitude": 40.64, "longitude": -73.78},
+            "destination": {"id": "arp_lhr", "type": "airport", "iata_code": "LHR",
+                            "name": "Heathrow Airport", "iata_country_code": "GB",
+                            "time_zone": "Europe/London",
+                            "latitude": 51.47, "longitude": -0.45},
+            "conditions": {"change_before_departure": {"allowed": true,
+                                                       "penalty_amount": "150.00",
+                                                       "penalty_currency": "USD"}},
+            "segments": [
+              {
+                "id": "seg_0000Ba112p",
+                "departing_at": "2026-11-12T20:25:00",
+                "arriving_at": "2026-11-13T08:25:00",
+                "duration": "PT7H0M",
+                "distance": "5540.23",
+                "origin_terminal": "7",
+                "destination_terminal": "5",
+                "origin": {"id": "arp_jfk", "type": "airport", "iata_code": "JFK",
+                           "name": "John F. Kennedy International Airport",
+                           "iata_country_code": "US", "time_zone": "America/New_York",
+                           "latitude": 40.64, "longitude": -73.78},
+                "destination": {"id": "arp_lhr", "type": "airport", "iata_code": "LHR",
+                                "name": "Heathrow Airport", "iata_country_code": "GB",
+                                "time_zone": "Europe/London",
+                                "latitude": 51.47, "longitude": -0.45},
+                "aircraft": {"id": "arc_789", "iata_code": "789", "name": "Boeing 787-9"},
+                "marketing_carrier": {"id": "arl_ba", "iata_code": "BA",
+                                      "name": "British Airways"},
+                "marketing_carrier_flight_number": "112",
+                "operating_carrier": {"id": "arl_ba", "iata_code": "BA",
+                                      "name": "British Airways"},
+                "operating_carrier_flight_number": "112",
+                "stops": [],
+                "passengers": [
+                  {
+                    "passenger_id": "pas_0000AaBbCc",
+                    "cabin_class": "economy",
+                    "cabin_class_marketing_name": "Plus",
+                    "fare_basis_code": "NLNNMBA",
+                    "baggages": [
+                      {"type": "checked", "quantity": 1},
+                      {"type": "carry_on", "quantity": 1}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "off_0000AaShare",
+        "live_mode": false,
+        "total_amount": "498.00",
+        "total_currency": "USD",
+        "base_amount": "328.00",
+        "base_currency": "USD",
+        "tax_amount": "170.00",
+        "tax_currency": "USD",
+        "total_emissions_kg": "640",
+        "expires_at": "2026-09-18T11:00:00.000000Z",
+        "created_at": "2026-09-18T10:00:00.000000Z",
+        "updated_at": "2026-09-18T10:00:00.000000Z",
+        "partial": false,
+        "passenger_identity_documents_required": false,
+        "allowed_passenger_identity_document_types": ["passport"],
+        "owner": {"id": "arl_aa", "iata_code": "AA", "name": "American Airlines"},
+        "payment_requirements": {"requires_instant_payment": true,
+                                 "payment_required_by": null,
+                                 "price_guarantee_expires_at": null},
+        "conditions": {
+          "change_before_departure": {"allowed": false, "penalty_amount": null,
+                                      "penalty_currency": null},
+          "refund_before_departure": {"allowed": false, "penalty_amount": null,
+                                      "penalty_currency": null}
+        },
+        "available_services": [],
+        "passengers": [{"id": "pas_0000AaBbCc", "type": "adult", "age": 34,
+                        "given_name": null, "family_name": null,
+                        "loyalty_programme_accounts": []}],
+        "slices": [
+          {
+            "id": "sli_0000AaShare",
+            "duration": "PT7H5M",
+            "fare_brand_name": "Basic Economy",
+            "origin_terminal": "8",
+            "destination_terminal": "5",
+            "origin": {"id": "arp_jfk", "type": "airport", "iata_code": "JFK",
+                       "name": "John F. Kennedy International Airport",
+                       "iata_country_code": "US", "time_zone": "America/New_York",
+                       "latitude": 40.64, "longitude": -73.78},
+            "destination": {"id": "arp_lhr", "type": "airport", "iata_code": "LHR",
+                            "name": "Heathrow Airport", "iata_country_code": "GB",
+                            "time_zone": "Europe/London",
+                            "latitude": 51.47, "longitude": -0.45},
+            "conditions": {"change_before_departure": {"allowed": false,
+                                                       "penalty_amount": null,
+                                                       "penalty_currency": null}},
+            "segments": [
+              {
+                "id": "seg_0000Aa6175",
+                "departing_at": "2026-11-12T18:30:00",
+                "arriving_at": "2026-11-13T06:35:00",
+                "duration": "PT7H5M",
+                "distance": "5540.23",
+                "origin_terminal": "8",
+                "destination_terminal": "5",
+                "origin": {"id": "arp_jfk", "type": "airport", "iata_code": "JFK",
+                           "name": "John F. Kennedy International Airport",
+                           "iata_country_code": "US", "time_zone": "America/New_York",
+                           "latitude": 40.64, "longitude": -73.78},
+                "destination": {"id": "arp_lhr", "type": "airport", "iata_code": "LHR",
+                                "name": "Heathrow Airport", "iata_country_code": "GB",
+                                "time_zone": "Europe/London",
+                                "latitude": 51.47, "longitude": -0.45},
+                "aircraft": {"id": "arc_77w", "iata_code": "77W",
+                             "name": "Boeing 777-300ER"},
+                "marketing_carrier": {"id": "arl_aa", "iata_code": "AA",
+                                      "name": "American Airlines"},
+                "marketing_carrier_flight_number": "6175",
+                "operating_carrier": {"id": "arl_ba", "iata_code": "BA",
+                                      "name": "British Airways"},
+                "operating_carrier_flight_number": "178",
+                "stops": [],
+                "passengers": [
+                  {
+                    "passenger_id": "pas_0000AaBbCc",
+                    "cabin_class": "economy",
+                    "cabin_class_marketing_name": "Basic Economy",
+                    "fare_basis_code": "OLNZZAA",
+                    "baggages": [
+                      {"type": "checked", "quantity": 0},
+                      {"type": "carry_on", "quantity": 1}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "off_0000KlConnect",
+        "live_mode": false,
+        "total_amount": "455.00",
+        "total_currency": "USD",
+        "base_amount": "285.00",
+        "base_currency": "USD",
+        "tax_amount": "170.00",
+        "tax_currency": "USD",
+        "total_emissions_kg": "702",
+        "expires_at": "2026-09-18T11:00:00.000000Z",
+        "created_at": "2026-09-18T10:00:00.000000Z",
+        "updated_at": "2026-09-18T10:00:00.000000Z",
+        "partial": false,
+        "passenger_identity_documents_required": false,
+        "allowed_passenger_identity_document_types": ["passport"],
+        "owner": {"id": "arl_kl", "iata_code": "KL", "name": "KLM"},
+        "payment_requirements": {"requires_instant_payment": true,
+                                 "payment_required_by": null,
+                                 "price_guarantee_expires_at": null},
+        "conditions": {
+          "change_before_departure": {"allowed": true, "penalty_amount": "90.00",
+                                      "penalty_currency": "USD"},
+          "refund_before_departure": {"allowed": false, "penalty_amount": null,
+                                      "penalty_currency": null}
+        },
+        "available_services": [
+          {
+            "id": "ase_0000KlBag1",
+            "type": "baggage",
+            "maximum_quantity": 3,
+            "total_amount": "70.00",
+            "total_currency": "USD",
+            "passenger_ids": ["pas_0000AaBbCc"],
+            "segment_ids": ["seg_0000Kl642", "seg_0000Kl1009"],
+            "metadata": {"type": "checked", "maximum_weight_kg": 23,
+                         "maximum_height_cm": 75, "maximum_length_cm": 90,
+                         "maximum_depth_cm": 43}
+          }
+        ],
+        "passengers": [{"id": "pas_0000AaBbCc", "type": "adult", "age": 34,
+                        "given_name": null, "family_name": null,
+                        "loyalty_programme_accounts": []}],
+        "slices": [
+          {
+            "id": "sli_0000KlConnect",
+            "duration": "PT11H30M",
+            "fare_brand_name": "Economy Light",
+            "origin_terminal": "4",
+            "destination_terminal": "4",
+            "origin": {"id": "arp_jfk", "type": "airport", "iata_code": "JFK",
+                       "name": "John F. Kennedy International Airport",
+                       "iata_country_code": "US", "time_zone": "America/New_York",
+                       "latitude": 40.64, "longitude": -73.78},
+            "destination": {"id": "arp_lhr", "type": "airport", "iata_code": "LHR",
+                            "name": "Heathrow Airport", "iata_country_code": "GB",
+                            "time_zone": "Europe/London",
+                            "latitude": 51.47, "longitude": -0.45},
+            "conditions": {"change_before_departure": {"allowed": true,
+                                                       "penalty_amount": "90.00",
+                                                       "penalty_currency": "USD"}},
+            "segments": [
+              {
+                "id": "seg_0000Kl642",
+                "departing_at": "2026-11-12T18:15:00",
+                "arriving_at": "2026-11-13T07:35:00",
+                "duration": "PT7H20M",
+                "distance": "5860.11",
+                "origin_terminal": "4",
+                "destination_terminal": null,
+                "origin": {"id": "arp_jfk", "type": "airport", "iata_code": "JFK",
+                           "name": "John F. Kennedy International Airport",
+                           "iata_country_code": "US", "time_zone": "America/New_York",
+                           "latitude": 40.64, "longitude": -73.78},
+                "destination": {"id": "arp_ams", "type": "airport", "iata_code": "AMS",
+                                "name": "Amsterdam Airport Schiphol",
+                                "iata_country_code": "NL",
+                                "time_zone": "Europe/Amsterdam",
+                                "latitude": 52.31, "longitude": 4.76},
+                "aircraft": {"id": "arc_789", "iata_code": "789", "name": "Boeing 787-9"},
+                "marketing_carrier": {"id": "arl_kl", "iata_code": "KL", "name": "KLM"},
+                "marketing_carrier_flight_number": "642",
+                "operating_carrier": {"id": "arl_kl", "iata_code": "KL", "name": "KLM"},
+                "operating_carrier_flight_number": "642",
+                "stops": [],
+                "passengers": [
+                  {
+                    "passenger_id": "pas_0000AaBbCc",
+                    "cabin_class": "economy",
+                    "cabin_class_marketing_name": "Economy Light",
+                    "fare_basis_code": "NLGHTKL",
+                    "baggages": [
+                      {"type": "checked", "quantity": 0},
+                      {"type": "carry_on", "quantity": 1}
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "seg_0000Kl1009",
+                "departing_at": "2026-11-13T10:20:00",
+                "arriving_at": "2026-11-13T10:45:00",
+                "duration": "PT1H25M",
+                "distance": "370.44",
+                "origin_terminal": null,
+                "destination_terminal": "4",
+                "origin": {"id": "arp_ams", "type": "airport", "iata_code": "AMS",
+                           "name": "Amsterdam Airport Schiphol",
+                           "iata_country_code": "NL", "time_zone": "Europe/Amsterdam",
+                           "latitude": 52.31, "longitude": 4.76},
+                "destination": {"id": "arp_lhr", "type": "airport", "iata_code": "LHR",
+                                "name": "Heathrow Airport", "iata_country_code": "GB",
+                                "time_zone": "Europe/London",
+                                "latitude": 51.47, "longitude": -0.45},
+                "aircraft": {"id": "arc_73h", "iata_code": "73H",
+                             "name": "Boeing 737-800"},
+                "marketing_carrier": {"id": "arl_kl", "iata_code": "KL", "name": "KLM"},
+                "marketing_carrier_flight_number": "1009",
+                "operating_carrier": {"id": "arl_kl", "iata_code": "KL", "name": "KLM"},
+                "operating_carrier_flight_number": "1009",
+                "stops": [],
+                "passengers": [
+                  {
+                    "passenger_id": "pas_0000AaBbCc",
+                    "cabin_class": "economy",
+                    "cabin_class_marketing_name": "Economy Light",
+                    "fare_basis_code": "NLGHTKL",
+                    "baggages": [
+                      {"type": "checked", "quantity": 0},
+                      {"type": "carry_on", "quantity": 1}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "off_zz_testmode",
+        "live_mode": false,
+        "total_amount": "512.34",
+        "total_currency": "USD",
+        "base_amount": "402.34",
+        "base_currency": "USD",
+        "tax_amount": "110.00",
+        "tax_currency": "USD",
+        "total_emissions_kg": "600",
+        "expires_at": "2026-09-18T11:00:00.000000Z",
+        "created_at": "2026-09-18T10:00:00.000000Z",
+        "updated_at": "2026-09-18T10:00:00.000000Z",
+        "partial": false,
+        "passenger_identity_documents_required": false,
+        "allowed_passenger_identity_document_types": ["passport"],
+        "owner": {"id": "arl_zz", "iata_code": "ZZ", "name": "Duffel Airways"},
+        "payment_requirements": {"requires_instant_payment": true,
+                                 "payment_required_by": null,
+                                 "price_guarantee_expires_at": null},
+        "conditions": {
+          "change_before_departure": null,
+          "refund_before_departure": null
+        },
+        "available_services": [],
+        "passengers": [{"id": "pas_0000AaBbCc", "type": "adult", "age": 34,
+                        "given_name": null, "family_name": null,
+                        "loyalty_programme_accounts": []}],
+        "slices": [
+          {
+            "id": "sli_zz_testmode",
+            "duration": "PT7H15M",
+            "fare_brand_name": null,
+            "origin_terminal": null,
+            "destination_terminal": null,
+            "origin": {"id": "arp_jfk", "type": "airport", "iata_code": "JFK",
+                       "name": "John F. Kennedy International Airport",
+                       "iata_country_code": "US", "time_zone": "America/New_York",
+                       "latitude": 40.64, "longitude": -73.78},
+            "destination": {"id": "arp_lhr", "type": "airport", "iata_code": "LHR",
+                            "name": "Heathrow Airport", "iata_country_code": "GB",
+                            "time_zone": "Europe/London",
+                            "latitude": 51.47, "longitude": -0.45},
+            "conditions": {"change_before_departure": null},
+            "segments": [
+              {
+                "id": "seg_zz_testmode",
+                "departing_at": "2026-11-12T19:00:00",
+                "arriving_at": "2026-11-13T07:15:00",
+                "duration": "PT7H15M",
+                "distance": null,
+                "origin_terminal": null,
+                "destination_terminal": null,
+                "origin": {"id": "arp_jfk", "type": "airport", "iata_code": "JFK",
+                           "name": "John F. Kennedy International Airport",
+                           "iata_country_code": "US", "time_zone": "America/New_York",
+                           "latitude": 40.64, "longitude": -73.78},
+                "destination": {"id": "arp_lhr", "type": "airport", "iata_code": "LHR",
+                                "name": "Heathrow Airport", "iata_country_code": "GB",
+                                "time_zone": "Europe/London",
+                                "latitude": 51.47, "longitude": -0.45},
+                "aircraft": null,
+                "marketing_carrier": {"id": "arl_zz", "iata_code": "ZZ",
+                                      "name": "Duffel Airways"},
+                "marketing_carrier_flight_number": "8055",
+                "operating_carrier": {"id": "arl_zz", "iata_code": "ZZ",
+                                      "name": "Duffel Airways"},
+                "operating_carrier_flight_number": "8055",
+                "stops": [],
+                "passengers": [
+                  {
+                    "passenger_id": "pas_0000AaBbCc",
+                    "cabin_class": "economy",
+                    "cabin_class_marketing_name": "Economy",
+                    "fare_basis_code": null,
+                    "baggages": [{"type": "carry_on", "quantity": 1}]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "off_0000EiViaDub",
+        "live_mode": false,
+        "total_amount": "429.00",
+        "total_currency": "USD",
+        "base_amount": "259.00",
+        "base_currency": "USD",
+        "tax_amount": "170.00",
+        "tax_currency": "USD",
+        "total_emissions_kg": "680",
+        "expires_at": "2026-09-18T11:00:00.000000Z",
+        "created_at": "2026-09-18T10:00:00.000000Z",
+        "updated_at": "2026-09-18T10:00:00.000000Z",
+        "partial": false,
+        "passenger_identity_documents_required": false,
+        "allowed_passenger_identity_document_types": ["passport"],
+        "owner": {"id": "arl_ei", "iata_code": "EI", "name": "Aer Lingus"},
+        "payment_requirements": {"requires_instant_payment": true,
+                                 "payment_required_by": null,
+                                 "price_guarantee_expires_at": null},
+        "conditions": {
+          "change_before_departure": {"allowed": false, "penalty_amount": null,
+                                      "penalty_currency": null},
+          "refund_before_departure": {"allowed": false, "penalty_amount": null,
+                                      "penalty_currency": null}
+        },
+        "available_services": [],
+        "passengers": [{"id": "pas_0000AaBbCc", "type": "adult", "age": 34,
+                        "given_name": null, "family_name": null,
+                        "loyalty_programme_accounts": []}],
+        "slices": [
+          {
+            "id": "sli_0000EiViaDub",
+            "duration": "PT10H15M",
+            "fare_brand_name": "Economy Saver",
+            "origin_terminal": "4",
+            "destination_terminal": "2",
+            "origin": {"id": "arp_jfk", "type": "airport", "iata_code": "JFK",
+                       "name": "John F. Kennedy International Airport",
+                       "iata_country_code": "US", "time_zone": "America/New_York",
+                       "latitude": 40.64, "longitude": -73.78},
+            "destination": {"id": "arp_lhr", "type": "airport", "iata_code": "LHR",
+                            "name": "Heathrow Airport", "iata_country_code": "GB",
+                            "time_zone": "Europe/London",
+                            "latitude": 51.47, "longitude": -0.45},
+            "conditions": {"change_before_departure": {"allowed": false,
+                                                       "penalty_amount": null,
+                                                       "penalty_currency": null}},
+            "segments": [
+              {
+                "id": "seg_0000Ei104",
+                "departing_at": "2026-11-12T19:30:00",
+                "arriving_at": "2026-11-13T06:45:00",
+                "duration": "PT6H15M",
+                "distance": "5100.00",
+                "origin_terminal": "4",
+                "destination_terminal": "2",
+                "origin": {"id": "arp_jfk", "type": "airport", "iata_code": "JFK",
+                           "name": "John F. Kennedy International Airport",
+                           "iata_country_code": "US", "time_zone": "America/New_York",
+                           "latitude": 40.64, "longitude": -73.78},
+                "destination": {"id": "arp_dub", "type": "airport", "iata_code": "DUB",
+                                "name": "Dublin Airport", "iata_country_code": "IE",
+                                "time_zone": "Europe/Dublin",
+                                "latitude": 53.42, "longitude": -6.27},
+                "aircraft": {"id": "arc_332", "iata_code": "332",
+                             "name": "Airbus A330-200"},
+                "marketing_carrier": {"id": "arl_ei", "iata_code": "EI",
+                                      "name": "Aer Lingus"},
+                "marketing_carrier_flight_number": "104",
+                "operating_carrier": {"id": "arl_ei", "iata_code": "EI",
+                                      "name": "Aer Lingus"},
+                "operating_carrier_flight_number": "104",
+                "stops": [],
+                "passengers": [
+                  {
+                    "passenger_id": "pas_0000AaBbCc",
+                    "cabin_class": "economy",
+                    "cabin_class_marketing_name": "Economy Saver",
+                    "fare_basis_code": "QSAVEREI",
+                    "baggages": [
+                      {"type": "checked", "quantity": 1},
+                      {"type": "carry_on", "quantity": 1}
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "seg_0000Ei154",
+                "departing_at": "2026-11-13T09:20:00",
+                "arriving_at": "2026-11-13T10:45:00",
+                "duration": "PT1H25M",
+                "distance": "449.00",
+                "origin_terminal": "2",
+                "destination_terminal": "2",
+                "origin": {"id": "arp_dub", "type": "airport", "iata_code": "DUB",
+                           "name": "Dublin Airport", "iata_country_code": "IE",
+                           "time_zone": "Europe/Dublin",
+                           "latitude": 53.42, "longitude": -6.27},
+                "destination": {"id": "arp_lhr", "type": "airport", "iata_code": "LHR",
+                                "name": "Heathrow Airport", "iata_country_code": "GB",
+                                "time_zone": "Europe/London",
+                                "latitude": 51.47, "longitude": -0.45},
+                "aircraft": {"id": "arc_320", "iata_code": "320",
+                             "name": "Airbus A320"},
+                "marketing_carrier": {"id": "arl_ei", "iata_code": "EI",
+                                      "name": "Aer Lingus"},
+                "marketing_carrier_flight_number": "154",
+                "operating_carrier": {"id": "arl_ei", "iata_code": "EI",
+                                      "name": "Aer Lingus"},
+                "operating_carrier_flight_number": "154",
+                "stops": [],
+                "passengers": [
+                  {
+                    "passenger_id": "pas_0000AaBbCc",
+                    "cabin_class": "economy",
+                    "cabin_class_marketing_name": "Economy Saver",
+                    "fare_basis_code": "QSAVEREI",
+                    "baggages": [
+                      {"type": "checked", "quantity": 1},
+                      {"type": "carry_on", "quantity": 1}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

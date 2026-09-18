@@ -373,8 +373,8 @@ def from_kiwi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
 
 # ----------------------------------------------------------------- amadeus
 
-def _amadeus_cents(v) -> int:
-    """Amadeus prices are decimal STRINGS ("480.00"). Parsing to float and
+def _decimal_cents(v) -> int:
+    """Amadeus and Duffel both price in decimal STRINGS ("480.00"). Parsing to float and
     multiplying is how you get 47999 out of 480.00 on some values, so the
     decimal is split textually and money stays integral from the first read."""
     s = str(v or "0").strip()
@@ -408,11 +408,36 @@ def _included_checked(detail: Dict[str, Any]) -> int:
     return 0
 
 
+def _brand_key(fares: Dict[str, Any], carrier: str, brand: str) -> Optional[str]:
+    """Find the curated row for a fare brand across two feeds that name brands
+    differently.
+
+    Amadeus returns a CODE ("BASIC"); Duffel returns free text ("Basic Economy",
+    "Economy Light"). An exact uppercase match handles the first and misses the
+    second entirely, which silently sends every Duffel option to the pessimistic
+    default and makes the curated table dead weight. So: exact match first, then
+    match a curated token appearing as a WORD in the brand name - "Basic
+    Economy" is a BASIC fare, "Economy Light" is a LIGHT one. Matching on
+    substring rather than whole words would make "Economy Light" match a curated
+    "ECONOMY" row, which is why this walks words."""
+    brands = fares.get("brands") or {}
+    up = (brand or "").upper()
+    if "%s:%s" % (carrier, up) in brands:
+        return "%s:%s" % (carrier, up)
+    words = set(re.findall(r"[A-Z]+", up))
+    for key in brands:
+        c, _, token = key.partition(":")
+        if c == carrier and token in words:
+            return key
+    return None
+
+
 def _bag_tiers(enr: Dict[str, Any], carrier: str, brand: str
                ) -> Tuple[List[Dict[str, Any]], bool]:
     """(tiers, used_the_pessimistic_default)."""
     fares = enr.get("fares") or {}
-    row = (fares.get("brands") or {}).get("%s:%s" % (carrier, (brand or "").upper()))
+    key = _brand_key(fares, carrier, brand)
+    row = (fares.get("brands") or {}).get(key) if key else None
     if row:
         return [dict(t) for t in row["tiers"]], False
     dft = fares.get("_default") or {"tiers": [], "note": ""}
@@ -420,6 +445,28 @@ def _bag_tiers(enr: Dict[str, Any], carrier: str, brand: str
     if tiers and dft.get("note"):
         tiers[0]["note"] = dft["note"]
     return tiers, True
+
+
+def _extend_tiers(tiers: List[Dict[str, Any]], need: int) -> List[Dict[str, Any]]:
+    """Pad a fee ladder so every bag the traveller is actually carrying has a price.
+
+    `scorer._bag_cost` RAISES on a piece it cannot price - deliberately, because
+    a fixture that forgets to price a bag is a broken fixture. But a live
+    traveller's bag load comes from the request and is unbounded, while a
+    published fee schedule stops after two or three pieces, so a party with four
+    bags would take the whole search down. Padding repeats the HIGHEST published
+    tier, which is the pessimistic reading and the only safe one: extrapolating
+    downwards would make a heavy load look cheap on exactly the fares that do not
+    publish a fourth-bag price."""
+    if need <= 0 or not tiers:
+        return tiers
+    out = [dict(t) for t in tiers]
+    top = max(out, key=lambda t: t["piece"])
+    for piece in range(top["piece"] + 1, need + 1):
+        out.append({"piece": piece, "amount_cents": top["amount_cents"],
+                    "note": "beyond the published schedule - priced at the highest "
+                            "published tier"})
+    return out
 
 
 def _fleet_claims(enr: Dict[str, Any], operating: str, equipment: str,
@@ -548,12 +595,13 @@ def from_amadeus(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
         included = min([_included_checked(details.get(str(s.get("id")), {}))
                         for s in segs_in] or [0])
         tiers, used_default = _bag_tiers(enr, issuing, brand)
+        tiers = _extend_tiers(tiers, max(0, int(checked_bags) - included))
         if used_default:
             default_used += 1
 
         price = offer.get("price") or {}
-        total_cents = _amadeus_cents(price.get("grandTotal") or price.get("total"))
-        base_cents = _amadeus_cents(price.get("base"))
+        total_cents = _decimal_cents(price.get("grandTotal") or price.get("total"))
+        base_cents = _decimal_cents(price.get("base"))
         if base_cents > total_cents:
             base_cents = total_cents
         amens = {a.get("description", ""): a for a in (first_det.get("amenities") or [])}
@@ -715,6 +763,376 @@ def from_amadeus(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
     return scenario
 
 
+# -------------------------------------------------------------------- duffel
+
+def _duffel_offers(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Two shapes carry offers: the offer-request response nests them under
+    `data.offers`, the offers-list endpoint returns them as `data` directly."""
+    data = raw.get("data")
+    if isinstance(data, dict):
+        return list(data.get("offers") or [])
+    if isinstance(data, list):
+        return [o for o in data if isinstance(o, dict) and "slices" in o]
+    return []
+
+
+def _duffel_bags(seg: Dict[str, Any], kind: str) -> int:
+    """The per-segment, per-passenger allowance. Duffel states it as a list of
+    {type, quantity}; an absent entry is genuinely zero of that type, which is
+    different from Amadeus's absent-key-means-look-elsewhere."""
+    pax = (seg.get("passengers") or [{}])[0]
+    for b in pax.get("baggages") or []:
+        if b.get("type") == kind:
+            return int(b.get("quantity") or 0)
+    return 0
+
+
+def _duffel_bag_tiers(offer: Dict[str, Any], enr: Dict[str, Any],
+                      carrier: str, brand: str) -> Tuple[List[Dict[str, Any]], str]:
+    """(tiers, where_they_came_from).
+
+    Duffel is the only one of the three feeds that prices an extra checked bag:
+    `available_services` lists it as a bookable service with a real amount. That
+    is the actual number the traveller would pay, so it outranks the curated
+    table - this is the one place the feed knows better than the moat.
+
+    Two things it does NOT give. It prices per unit with a `maximum_quantity`,
+    so there is no escalating ladder and nothing at all beyond that cap; pieces
+    past the cap are topped up from the curated table, because the scorer must
+    be able to price every bag the traveller is actually carrying. And the
+    service list is only populated on the single-offer endpoint for the airlines
+    Duffel supports it for - an empty list means unknown, not free."""
+    svcs = [s for s in (offer.get("available_services") or [])
+            if s.get("type") == "baggage"
+            and (s.get("metadata") or {}).get("type") == "checked"]
+    fallback, used_default = _bag_tiers(enr, carrier, brand)
+    if not svcs:
+        return fallback, ("curated" if not used_default else "default")
+
+    best = min(svcs, key=lambda s: _decimal_cents(s.get("total_amount")))
+    per = _decimal_cents(best.get("total_amount"))
+    cap = max(0, int(best.get("maximum_quantity") or 0))
+    tiers = [{"piece": i, "amount_cents": per} for i in range(1, cap + 1)]
+    if tiers:
+        tiers[0]["note"] = ("quoted by the airline through Duffel, not a curated estimate"
+                            + ("" if cap >= 3 else
+                               "; bags past %d are not quoted and fall back to the table"
+                               % cap))
+    # Top up past the cap so a heavier bag load cannot make the scorer raise.
+    for t in fallback:
+        if t["piece"] > cap:
+            tiers.append({"piece": t["piece"], "amount_cents": t["amount_cents"],
+                          "note": "beyond the quoted allowance - estimate"})
+    return tiers, "feed"
+
+
+def _duffel_conditions(offer: Dict[str, Any]) -> Tuple[str, bool]:
+    """(changes, refundable). A null condition is "the airline did not say",
+    which is not the same as "no" - but it cannot be sold as a yes either."""
+    cond = offer.get("conditions") or {}
+    chg = cond.get("change_before_departure")
+    ref = cond.get("refund_before_departure")
+    if chg is None:
+        changes = "unknown"
+    elif not chg.get("allowed"):
+        changes = "not_permitted"
+    else:
+        changes = "fee" if chg.get("penalty_amount") else "free"
+    return changes, bool(ref and ref.get("allowed"))
+
+
+def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
+                enr: Optional[Dict[str, Any]] = None,
+                checked_bags: int = 1) -> Dict[str, Any]:
+    """A Duffel offer-request or offers response -> a scenario dict.
+
+    Field names follow duffel-api's own model definitions, which is the
+    authoritative parser for this payload rather than a reading of prose docs.
+
+    Note that a `duffel_test_` token returns the fictional carrier Duffel Airways
+    with invented prices. The adapter handles it - an uncurated carrier keeps its
+    option and loses its rating - but a grade computed over test-mode inventory
+    means nothing, and `coverage()` says so."""
+    enr = enr or load_enrichment()
+    notes: List[str] = []
+    options: List[Dict[str, Any]] = []
+    dropped: List[Dict[str, str]] = []
+    default_used = 0
+    unreviewed = 0
+    feed_priced_bags = 0
+
+    for offer in _duffel_offers(raw):
+        slices = offer.get("slices") or []
+        if not slices:
+            continue
+        sl = slices[0]                       # one-way; a return is two slices
+        if len(slices) > 1 and "return trips are not modelled yet" not in notes:
+            notes.append("return trips are not modelled yet - only the outbound "
+                         "slice of each offer was scored")
+        segs_in = sl.get("segments") or []
+        if not segs_in:
+            continue
+        fail = None
+        segments, seg_ids = [], []
+
+        for i, s in enumerate(segs_in):
+            o_ap = (s.get("origin") or {}).get("iata_code")
+            d_ap = (s.get("destination") or {}).get("iata_code")
+            dep, e1 = stamp(s.get("departing_at", ""), o_ap, enr)
+            arr, e2 = stamp(s.get("arriving_at", ""), d_ap, enr)
+            if e1 or e2:
+                fail = e1 or e2
+                break
+            ap_from = enr["airports"]["airports"].get(o_ap, {})
+            ap_to = enr["airports"]["airports"].get(d_ap, {})
+            # Duffel names the airport's IANA zone. It is NOT used to compute an
+            # offset - the scorer must never consult a timezone database - but a
+            # disagreement with the curated table means one of them is wrong, and
+            # silently preferring ours would hide it.
+            for ap_json, curated, code in ((s.get("origin") or {}), ap_from, o_ap), \
+                                          ((s.get("destination") or {}), ap_to, d_ap):
+                feed_zone = ap_json.get("time_zone")
+                if feed_zone and curated.get("zone") and feed_zone != curated["zone"]:
+                    msg = ("%s: the feed says %s, the curated table says %s - one is wrong"
+                           % (code, feed_zone, curated["zone"]))
+                    if msg not in notes:
+                        notes.append(msg)
+            sid = "s%d" % (i + 1)
+            seg_ids.append(sid)
+            mkt = ((s.get("marketing_carrier") or {}).get("iata_code") or "")
+            op = ((s.get("operating_carrier") or {}).get("iata_code") or mkt)
+            codeshare = op != mkt
+            ac = s.get("aircraft") or {}
+            equip = (ac.get("iata_code") or "").strip()
+            pax = (s.get("passengers") or [{}])[0]
+            note = ((", and %s%s is sold by %s but flown by %s"
+                     % (mkt, s.get("marketing_carrier_flight_number", ""), mkt, op))
+                    if codeshare else "")
+            claims = _fleet_claims(enr, op, equip, note) if equip else {
+                "subfleet": {"coverage": "none", "policy": "route_median",
+                             "reason": "this offer carries no aircraft" + note},
+                "connectivity_oceanic": {"coverage": "none", "policy": "route_median",
+                                         "reason": "no aircraft named, so no connectivity "
+                                                   "fit can be looked up"},
+            }
+            for c in claims.values():
+                if c.get("needs_primary_source"):
+                    unreviewed += 1
+            num = re.sub(r"\D", "", s.get("marketing_carrier_flight_number", "") or "")
+            segments.append({
+                "segment_id": sid,
+                "marketing": {"carrier": mkt, "number": int(num or 0)},
+                "operating": {"carrier": op,
+                              "number": int(re.sub(r"\D", "",
+                                                   s.get("operating_carrier_flight_number")
+                                                   or num or "0") or 0)},
+                "origin": {"iata": o_ap, "iata_area": ap_from.get("iata_area", 1),
+                           "schengen": ap_from.get("schengen")},
+                "destination": {"iata": d_ap, "iata_area": ap_to.get("iata_area", 2),
+                                "schengen": ap_to.get("schengen")},
+                "departure_local": dep, "arrival_local": arr,
+                "tz_hint": {"departure": ap_from.get("zone", ""),
+                            "arrival": ap_to.get("zone", "")},
+                "equipment_code": equip or "UNKNOWN",
+                "equipment_name": ac.get("name", ""),
+                "cabin_marketed": (pax.get("cabin_class") or "economy").lower(),
+                "claims": claims,
+                "reliability": {"coverage": "none", "policy": "route_median",
+                                "reason": "no on-time record joined for %s%s"
+                                          % (mkt, s.get("marketing_carrier_flight_number",
+                                                        "?"))},
+            })
+        if fail:
+            dropped.append({"id": offer.get("id", "?"), "why": fail})
+            continue
+
+        issuing = ((offer.get("owner") or {}).get("iata_code")
+                   or segments[0]["marketing"]["carrier"])
+        brand = (sl.get("fare_brand_name")
+                 or ((segs_in[0].get("passengers") or [{}])[0]
+                     .get("cabin_class_marketing_name"))
+                 or "Economy")
+        included = min([_duffel_bags(s, "checked") for s in segs_in] or [0])
+        tiers, tier_src = _duffel_bag_tiers(offer, enr, issuing, brand)
+        tiers = _extend_tiers(tiers, max(0, int(checked_bags) - included))
+        if tier_src == "feed":
+            feed_priced_bags += 1
+        elif tier_src == "default":
+            default_used += 1
+            msg = ("no curated bag fees for %s %s and the offer quoted none - "
+                   "priced at the pessimistic default" % (issuing, brand))
+            if msg not in notes:
+                notes.append(msg)
+
+        total_cents = _decimal_cents(offer.get("total_amount"))
+        base_cents = _decimal_cents(offer.get("base_amount"))
+        if base_cents > total_cents:
+            base_cents = total_cents
+        tax_cents = _decimal_cents(offer.get("tax_amount"))
+        if tax_cents != total_cents - base_cents:
+            # The offer's own three numbers disagree. Trust the total - it is
+            # what gets charged - and derive the rest so the ledger reconciles.
+            tax_cents = total_cents - base_cents
+        changes, refundable = _duffel_conditions(offer)
+        ticket = {
+            "ticket_id": "t1",
+            "issuing_carrier": issuing,
+            "fare_brand_name": brand,
+            "price": {
+                "currency": offer.get("total_currency", "USD"),
+                "base_cents": base_cents,
+                "fx_rate_to_usd": 1.0,
+                "taxes": ([{"code": "TOT", "amount_cents": tax_cents,
+                            "label": "Taxes and carrier-imposed charges (the feed gives "
+                                     "one total, not a breakdown)",
+                            "refundable_on_cancel": False}] if tax_cents > 0 else []),
+                "carrier_imposed": [], "agency_fees": []},
+            "entitlements": {
+                "checked_included": included,
+                "cabin_bag_included": bool(min([_duffel_bags(s, "carry_on")
+                                                for s in segs_in] or [0])),
+                "personal_item_included": True,
+                "seat_selection": "paid",
+                "changes": changes, "refundable": refundable,
+                "earns_redeemable_miles": "basic" not in brand.lower()
+                                          and "light" not in brand.lower()
+                                          and "saver" not in brand.lower(),
+                "boarding_group": None},
+            "checked_bag_fee_tiers": tiers,
+            "segment_ids": list(seg_ids),
+        }
+
+        layovers = []
+        for i in range(len(segments) - 1):
+            a_to = segments[i]["destination"]["iata"]
+            ap = enr["airports"]["airports"].get(a_to, {})
+            mct = (ap.get("mct_minutes") or {}).get("default")
+            # One offer is one PNR with one airline: bags go through, the carrier
+            # owes the reconnection, and nobody is put landside.
+            layovers.append({
+                "layover_id": "lay%d" % (i + 1),
+                "airport": a_to,
+                "arrive_segment_id": seg_ids[i], "depart_segment_id": seg_ids[i + 1],
+                "immigration_required": bool(ap.get("schengen")) and not bool(
+                    segments[i]["origin"].get("schengen")),
+                "security_reclear_required": False,
+                "ees_first_registration": False,
+                "inter_terminal": ap.get("inter_terminal") or {"mode": "walk",
+                                                               "minutes": 20},
+                "published_mct_minutes": mct,
+                "mct_source": "curated airport table" if mct else "not curated",
+                "bags_checked_through": True,
+                "forced_landside": False,
+                "leave_airport_viable": bool(ap.get("leave_airport_viable")),
+                "services_open": ap.get("services") or [],
+                "recovery": {"protected": True, "next_departure_minutes": 180,
+                             "overnight_implied": False, "walkup_fare_cents": 0},
+                "note": "Single airline on one ticket: the carrier owes the "
+                        "reconnection and the bags are checked through.",
+            })
+
+        dep_clock = _hhmm(segments[0]["departure_local"][11:16])
+        arr_clock = _hhmm(segments[-1]["arrival_local"][11:16])
+        out_modes, gerr = ground_for(origin_key, segments[0]["origin"]["iata"],
+                                     dep_clock, enr)
+        in_modes, aerr = arrival_ground_for(segments[-1]["destination"]["iata"],
+                                            arr_clock, enr)
+        if gerr:
+            dropped.append({"id": offer.get("id", "?"), "why": gerr})
+            continue
+        if aerr and aerr not in notes:
+            notes.append(aerr)
+
+        oid = re.sub(r"[^a-z0-9]+", "-",
+                     ("%s%s-%s" % (segments[0]["marketing"]["carrier"],
+                                   segments[0]["marketing"]["number"],
+                                   (offer.get("id") or "x")[-10:])).lower())[:40]
+        opt = {
+            "option_id": oid,
+            "display_name": "%s %s%d · %s" % (
+                (offer.get("owner") or {}).get("name", issuing),
+                segments[0]["marketing"]["carrier"], segments[0]["marketing"]["number"],
+                brand),
+            "tickets": [ticket],
+            "segments": segments,
+            "layovers": layovers,
+            "ground": {"outbound": out_modes, "arrival": in_modes},
+            "airport_process_minutes": (enr["airports"]["airports"]
+                                        .get(segments[0]["origin"]["iata"], {})
+                                        .get("process_minutes") or {"p50": 60}),
+            "booking": [{"who": (offer.get("owner") or {}).get("name", issuing),
+                         "price_cents": total_cents, "direct": True,
+                         "note": "Airline inventory - bookable direct with %s" % issuing}],
+        }
+        rating = (enr["carriers"]["ratings"] or {}).get(segments[0]["operating"]["carrier"])
+        if rating:
+            opt["carrier_rating"] = {"rating": rating["rating"], "note": rating["note"],
+                                     "source": enr["carriers"]["_source"],
+                                     "as_of": enr["carriers"]["_as_of"]}
+        options.append(opt)
+
+    if not options:
+        return {"error": "nothing could be normalised", "dropped": dropped}
+
+    first = options[0]
+    o_iata = first["segments"][0]["origin"]["iata"]
+    d_iata = first["segments"][-1]["destination"]["iata"]
+    par = ((enr["ground"].get("routes") or {}).get("%s-%s" % (o_iata, d_iata))
+           or {}).get("par_cents")
+    if not par:
+        par = 105000
+        notes.append("no curated par for %s-%s; grades on this route are indicative only"
+                     % (o_iata, d_iata))
+    if unreviewed:
+        notes.append("%d aircraft claims come from the DRAFT fleet table, which has not "
+                     "been human-reviewed" % unreviewed)
+    # A test token returns a fictional airline. Grading that is meaningless, and
+    # the page must not present it as a real answer.
+    if any(s["marketing"]["carrier"] == "ZZ" for o in options for s in o["segments"]):
+        notes.append("this response contains Duffel Airways (ZZ), the test-mode "
+                     "fiction - prices and schedules in it are invented")
+
+    org = enr["ground"]["origins"].get(origin_key, {})
+    bags = [{"kind": "checked", "weight_kg": 20} for _ in range(max(0, int(checked_bags)))]
+    return {
+        "schema_version": "0.1.0",
+        "fixture_id": "live-duffel-%s-%s" % (o_iata.lower(), d_iata.lower()),
+        "title": "Live inventory (Duffel): %s to %s" % (o_iata, d_iata),
+        "pins_down": "Nothing. This is a live search, not a fixture - it pins no "
+                     "behaviour and must never be committed to fixtures/.",
+        "as_of": first["segments"][0]["departure_local"][:10],
+        "notes": notes,
+        "query": {
+            "origin": {"label": org.get("label", origin_key),
+                       "lat": org.get("lat", 0.0), "lon": org.get("lon", 0.0),
+                       "geocode_precision": "neighbourhood"},
+            "destination": {"label": d_iata, "lat": 0.0, "lon": 0.0,
+                            "geocode_precision": "city"},
+            "depart_date": first["segments"][0]["departure_local"][:10],
+            "return_date": None,
+            "route_par_cents": par,
+            "party": [{"passenger_id": "p1", "type": "adult",
+                       "bags": bags + [{"kind": "cabin"}, {"kind": "personal_item"}]}],
+            "profiles": {
+                "reference": {"label": "neutral reference", "hourly_value_cents": 3500,
+                              "comfort_weight": 1.0, "risk_weight": 1.0},
+                "cheapest": {"label": "Cheapest", "hourly_value_cents": 1200,
+                             "comfort_weight": 0.45, "risk_weight": 1.0},
+                "fastest": {"label": "Fastest", "hourly_value_cents": 9500,
+                            "comfort_weight": 0.85, "risk_weight": 1.0},
+                "comfort": {"label": "Most comfortable", "hourly_value_cents": 5500,
+                            "comfort_weight": 2.0, "risk_weight": 1.0},
+            },
+        },
+        "options": options,
+        "expect": {"reconciles": True},
+        "_dropped": dropped,
+        "_feed": {"provider": "duffel", "default_bag_fees_used": default_used,
+                  "unreviewed_claims": unreviewed,
+                  "feed_priced_bags": feed_priced_bags},
+    }
+
+
 # ----------------------------------------------------------------- coverage
 
 def coverage(scenario: Dict[str, Any]) -> Dict[str, Any]:
@@ -728,7 +1146,8 @@ def coverage(scenario: Dict[str, Any]) -> Dict[str, Any]:
            "codeshare_segments": 0, "options": 0, "rated_carriers": 0,
            "options_with_ground": 0, "options_with_bag_schedule": 0,
            "equipment_known": 0, "operator_known": 0, "unreviewed_claims": 0,
-           "default_bag_fees": int(feed.get("default_bag_fees_used") or 0)}
+           "default_bag_fees": int(feed.get("default_bag_fees_used") or 0),
+           "feed_priced_bags": int(feed.get("feed_priced_bags") or 0)}
     for o in scenario.get("options", []):
         tot["options"] += 1
         if o.get("carrier_rating"):
@@ -771,9 +1190,15 @@ def coverage(scenario: Dict[str, Any]) -> Dict[str, Any]:
     if tot["abstained_claims"]:
         no_code = sum(1 for o in scenario.get("options", []) for s in o["segments"]
                       if s.get("equipment_code") in (None, "", "UNKNOWN"))
-        if no_code:
+        if no_code == tot["segments"]:
             gaps.append("no aircraft, cabin or connectivity claim can be made: the feed "
                         "carries no equipment code")
+        elif no_code:
+            # Some segments named an aircraft and some did not. Saying the feed
+            # carries no code would be false, and would send someone to the
+            # wrong fix.
+            gaps.append("%d of %d segments name no aircraft, so their cabin and "
+                        "connectivity claims abstain" % (no_code, tot["segments"]))
         else:
             # A different gap with a different fix: the feed did its job and the
             # curated table has not caught up. Saying "no equipment code" here
@@ -794,6 +1219,14 @@ def coverage(scenario: Dict[str, Any]) -> Dict[str, Any]:
     if tot["rated_carriers"] < tot["options"]:
         gaps.append("%d of %d options fly a carrier with no curated rating"
                     % (tot["options"] - tot["rated_carriers"], tot["options"]))
+    # Not a gap - the opposite. Duffel quotes a real bag price in
+    # available_services, which is the one field where a feed beats the moat.
+    strengths = []
+    if tot["feed_priced_bags"]:
+        strengths.append("%d of %d options carry an airline-quoted checked-bag price, so "
+                         "their bag arithmetic is not an estimate"
+                         % (tot["feed_priced_bags"], tot["options"]))
+
     enrichment_gaps = len(gaps)
     for d in scenario.get("_dropped", []):
         gaps.append("dropped an itinerary: %s" % d["why"])
@@ -808,21 +1241,27 @@ def coverage(scenario: Dict[str, Any]) -> Dict[str, Any]:
         verdict = "every layer this product prices is curated for these options"
     else:
         verdict = "ground access and carrier quality are curated; aircraft claims are not"
-    return {"counts": tot, "gaps": gaps, "verdict": verdict}
+    return {"counts": tot, "gaps": gaps, "strengths": strengths, "verdict": verdict}
 
 
 def from_feed(raw: Dict[str, Any], **kw) -> Dict[str, Any]:
     """Dispatch on the payload's own shape rather than on a caller-supplied
     name, so a profile pointed at the wrong provider fails as a parse error
-    here instead of as a plausible-looking scenario built from the wrong keys."""
+    here instead of as a plausible-looking scenario built from the wrong keys.
+
+    Duffel is checked before Amadeus because both use a top-level `data`, and a
+    Duffel offer is recognised by `slices` where an Amadeus one carries
+    `type: "flight-offer"` - neither key appears in the other's payload."""
+    if _duffel_offers(raw):
+        return from_duffel(raw, **kw)
     if isinstance(raw.get("data"), list) and any(
             r.get("type") == "flight-offer" for r in raw["data"][:3] if isinstance(r, dict)):
         return from_amadeus(raw, **kw)
     if isinstance(raw.get("itineraries"), list):
         kw.pop("checked_bags", None)      # from_kiwi takes the load from the feed
         return from_kiwi(raw, **kw)
-    return {"error": "unrecognised payload: no Amadeus `data[].type=flight-offer` and "
-                     "no Kiwi `itineraries`", "dropped": []}
+    return {"error": "unrecognised payload: no Duffel `slices`, no Amadeus "
+                     "`data[].type=flight-offer`, no Kiwi `itineraries`", "dropped": []}
 
 
 if __name__ == "__main__":
@@ -840,5 +1279,7 @@ if __name__ == "__main__":
           % (os.path.basename(path), len(sc.get("options", [])),
              (sc.get("_feed") or {}).get("provider", "kiwi")))
     print("\ncoverage: %s" % cov["verdict"])
+    for s in cov.get("strengths", []):
+        print("  + " + s)
     for g in cov["gaps"]:
         print("  - " + g)

@@ -48,6 +48,12 @@ def sandbox(tmp):
     live.CACHE_DIR = os.path.join(tmp, "cache")
 
 
+def req_method_is_post(seen):
+    """urllib picks POST purely from `data` being set, so the body's presence
+    IS the method - assert on what actually goes on the wire."""
+    return seen["body"] is not None
+
+
 def cfg_with(profile="kiwi-tequila", **over):
     """Quota, cache and redaction are provider-independent, so they are exercised
     on the simpler header-key profile. The OAuth2 path gets its own section."""
@@ -289,6 +295,62 @@ def main():
           not os.path.exists(live.TOKEN_FILE))
     ok, _ = live.set_provider("nope")
     check("an unknown provider is refused rather than written", not ok)
+
+    # ---------------------------------------------------------------- duffel
+    # A POST provider with a JSON body and a static bearer key: a third auth and
+    # transport shape, and the only one you can currently sign up for.
+    seen = {"n": 0, "body": None, "hdrs": None, "url": None}
+
+    def duffel_open(req, *a, **k):
+        seen["n"] += 1
+        seen["url"] = req.full_url
+        seen["hdrs"] = dict(req.headers)
+        seen["body"] = json.loads(req.data.decode()) if req.data else None
+        return FakeResp(json.dumps({"data": {"id": "orq_x", "offers": [
+            {"id": "off_1", "slices": []}, {"id": "off_2", "slices": []}]}}))
+
+    df = cfg_with("duffel", quota={"per_day": 9, "per_month": 9,
+                                   "min_seconds_between_calls": 0,
+                                   "cache_ttl_seconds": 600})
+    live.urllib.request.urlopen = duffel_open
+    try:
+        payload, meta = live.search(dict(Q, date="2027-01-05", adults=2), df)
+        watch(meta, "duffel search")
+        check("a duffel search is issued as a POST with a JSON body",
+              seen["body"] is not None and req_method_is_post(seen))
+        check("the query travels in the body, not the query string",
+              seen["body"]["data"]["slices"][0]["origin"] == "JFK"
+              and seen["body"]["data"]["slices"][0]["departure_date"] == "2027-01-05",
+              json.dumps(seen["body"])[:120])
+        check("one passenger object per adult is built from the template",
+              seen["body"]["data"]["passengers"] == [{"type": "adult"}, {"type": "adult"}],
+              json.dumps(seen["body"]["data"]["passengers"]))
+        check("the static switches still ride on the URL",
+              "return_offers=true" in seen["url"], seen["url"])
+        check("a static key is presented with its scheme",
+              seen["hdrs"].get("Authorization") == "Bearer " + SECRET,
+              str(seen["hdrs"].get("Authorization"))[:30])
+        check("the provider's required version header is sent",
+              seen["hdrs"].get("Duffel-version") == "v2"
+              or seen["hdrs"].get("Duffel-Version") == "v2", json.dumps(seen["hdrs"]))
+        check("and our own User-Agent, because a bare urllib one gets 403'd",
+              "ConcordeGo" in str(seen["hdrs"].get("User-agent")
+                                  or seen["hdrs"].get("User-Agent")))
+        check("a nested duffel payload counts its offers, not its keys",
+              live._count_results(payload) == 2, str(live._count_results(payload)))
+        # No OAuth2 here, so nothing should have been minted or stored.
+        check("a static-key provider mints no token", live._token_load(df) is None)
+    finally:
+        live.urllib.request.urlopen = real_open
+
+    check("counting handles all three response shapes",
+          live._count_results({"data": [1, 2, 3]}) == 3
+          and live._count_results({"itineraries": [1]}) == 1
+          and live._count_results({}) == 0 and live._count_results(None) == 0)
+    check("the shipped default is the provider you can actually sign up for",
+          live.DEFAULTS["provider"] == "duffel", live.DEFAULTS["provider"])
+    check("and its note says a test token returns invented inventory",
+          "invented" in live.PROFILES["duffel"]["_note"])
 
     check("the key never appears in anything returned", not leaks, ", ".join(leaks))
     check("redact() shortens a secret rather than echoing it",

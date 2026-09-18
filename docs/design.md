@@ -1014,18 +1014,72 @@ real call got a 200.
 | Google Flights | **Never existed** | QPX Express retired 2018-04-10. Everything sold as one scrapes the consumer page and returns *less* structured data than Kiwi. |
 | Travelpayouts | Yes, free | But the free tier is **cached price data** — no aircraft, no fare brand, no operating carrier. The real-time search API needs 50,000 MAU. |
 | Sabre / Travelport | No | Account-rep activation. |
-| **Duffel** | **Yes** | ~1 minute at `app.duffel.com/join`, instant sandbox, permanently free test mode. Live prices need identity verification. |
+| **Duffel** | **Yes — the default** | ~1 minute at `app.duffel.com/join`, instant sandbox, permanently free test mode. Live prices need identity verification. |
 
 The Amadeus profile is kept for its **schema**, not its availability: Amadeus Enterprise
 still speaks Flight Offers Search v2, so `from_amadeus` applies to anyone with that access,
 and it remains the reference for what a rich feed looks like. It is not a key you can go
 and get.
 
-**Duffel is the self-serve path**, and its Offer schema carries the same three fields —
-`operating_carrier` and `marketing_carrier` per segment, `aircraft`, `fare_brand_name`, and
-per-passenger `baggages`. Its test mode is a fictional carrier with fake prices, so the
-curated joins will not light up against it, but the *shape* is real, which is enough to
-build and verify an adapter. There is no `from_duffel` yet.
+**Duffel is the self-serve path and is now the default provider.** `from_duffel` is built.
+Its Offer schema carries `operating_carrier` and `marketing_carrier` per segment,
+`aircraft`, `fare_brand_name`, per-passenger `baggages`, and fare `conditions` — plus one
+thing neither other feed has, below. Its test mode is a fictional carrier with fake prices,
+so the curated joins will not light up against it, but the *shape* is real.
+
+### The one field where a feed beats the moat
+
+Duffel's `available_services` lists an extra checked bag as a **bookable service with a real
+price**. That is the actual number the traveller would pay, so it outranks the curated
+`fares.json` table — the only place in this product where the feed knows better. For those
+options the bags arithmetic stops being an estimate, and `coverage()` reports it as a
+**strength** rather than a gap, which is a category the coverage strip did not previously
+have.
+
+Two catches, both handled and both commented:
+
+- It prices **per unit up to a `maximum_quantity`** and says nothing beyond, so pieces past
+  the cap are topped up from the curated table and marked as estimates.
+- An **empty list means unknown, not free.** Reading it as free is the mistake that loses
+  money, and it is the same failure as treating an abstain as zero.
+
+### Two things Duffel does differently, and one crash they exposed
+
+**`fare_brand_name` is prose, not a code.** Duffel returns "Basic Economy" and "Economy
+Light" where Amadeus returns `BASIC` and `LIGHT`. An exact uppercase match handles Amadeus
+and misses Duffel entirely, which silently sends every option to the pessimistic default and
+makes the curated table dead weight. `_brand_key()` matches a curated token as a **whole
+word** — "Basic Economy" is a BASIC fare, "Economy Light" is a LIGHT one. Whole words
+because a substring match makes "Economy Light" hit an `ECONOMY` row, and `SURPLUS`
+contains `PLUS`.
+
+**A `duffel_test_` token returns Duffel Airways (ZZ)** with invented prices and schedules.
+The adapter handles it — an uncurated carrier keeps its option and loses its rating, a null
+`aircraft` abstains — and adds a scenario note saying the inventory is fiction. A grade over
+test-mode inventory means nothing and the page should not imply otherwise.
+
+**The crash.** `scorer._bag_cost` raises on a piece it cannot price, deliberately: a fixture
+that forgets to price a bag is a broken fixture. But a live traveller's bag load comes from
+the request and is unbounded, while a published fee schedule stops after two or three
+pieces — so a four-bag party took the entire search down, on the Amadeus path as well, which
+had shipped that way. `_extend_tiers()` pads the ladder by repeating the **dearest**
+published tier. Pessimistic on purpose: extrapolating downwards would make a heavy load look
+cheap on exactly the fares that decline to publish a fourth-bag price. A test now walks
+loads 0–9 on every feed.
+
+### Mutation testing became executable
+
+CLAUDE.md has claimed a mutation-testing standard since the scorer was written, but the runs
+were ad hoc and nothing let the next person check it. `tests/mutate_adapter.py` now applies
+13 real faults — reading a bag load off the fare, extrapolating a ladder from the cheapest
+tier, guessing an offset for an uncurated airport, turning a hedged cabin claim into a
+certainty — and fails if `test_adapter.py` misses any.
+
+Each mutant is scoped to **one named function**, which turned out to matter: three adapters
+share near-identical lines, so a whole-file anchor matches several places, and a runner that
+silently skips an ambiguous anchor reports a better score than it earned. That is exactly
+what happened while building this — an Amadeus run read 7/10 when the three "failures" were
+skips. The runner now prints skips loudly and exits non-zero on any.
 
 The Amadeus profile carries the three fields the scorer has to abstain on with Kiwi:
 
@@ -1120,12 +1174,48 @@ bad secret -> HTTP 401 minting a token, and the allowance did not move
 The User-Agent guard is proven by that run: the stand-in refuses `Python-urllib` outright,
 and the real call got through.
 
+## A third transport: POST with a JSON body
+
+Kiwi and Amadeus search over a query string. Duffel POSTs a JSON body, which is a third
+shape after the static header key and OAuth2. The split stays where it was: the **method and
+the body's structure** are protocol and live in code; the **field names inside it** stay in
+the profile as a `body_template`, so a renamed key is still fixed in config rather than in
+Python. A list holding exactly `["$passengers"]` expands to one passenger object per adult —
+enough for a search body without inventing a template language.
+
+Duffel also needs a `Duffel-Version: v2` header, which the profile carries as
+`extra_headers`, and `return_offers=true` as a static query switch. A stand-in that rejects
+a request missing any of those proved all three actually go on the wire.
+
+## Proven end to end without a real key, twice
+
+A stand-in Duffel on localhost — requiring the bearer token, the version header, a
+well-formed POST body, and a non-default User-Agent, with each guard verified to actually
+reject — walked the chain:
+
+```
+probe    -> 6 offers, 2 calls left of 3
+call 1/2 -> api, then cache with the allowance untouched
+scored   -> AA6175 $918 A+ · BA112 Basic $972 A+ · BA112 Plus $979 A+ · KL642 $1,119 A-
+            "+ 3 of 5 options carry an airline-quoted checked-bag price,
+               so their bag arithmetic is not an estimate"
+3 spent  -> fourth refused by name
+bad token-> HTTP 401, counted (the provider answered), token redacted from the error
+provider -> saw exactly 3 searches and 1 denial; the cache hit never reached it
+```
+
+The same was done for the Amadeus OAuth2 chain, recorded above.
+
 ## What is still not done
 
 There is no live key in this repo and none can be added from here. The plumbing is complete
-and tested for both providers; what remains is a credential in the config and one
+and tested for all three providers; what remains is a credential in the config and one
 `live.py probe` to confirm the parameter names — the one thing that genuinely could not be
 checked offline.
+
+Duffel is the one to try first: `app.duffel.com/join`, then
+`export CONCORDEGO_FLIGHT_KEY=duffel_test_...` and `live.py probe`. Expect Duffel Airways
+and invented prices — that is test mode working, not the adapter failing.
 
 Two files also want a human before they are trusted: `enrichment/fleets.json` and
 `enrichment/fares.json` are drafts, marked as such in the files, surfaced by `coverage()`

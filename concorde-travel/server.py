@@ -447,9 +447,10 @@ def live_request(req):
     if src == "sample":
         # Which recording depends on which provider is configured, so the page
         # with no key shows the shape of the feed it would actually get.
-        want = req.get("provider") or live.load_config().get("provider") or "amadeus"
-        name = ("amadeus-jfk-lhr.json" if str(want).startswith("amadeus")
-                else "kiwi-jfk-lhr.json")
+        want = str(req.get("provider") or live.load_config().get("provider") or "duffel")
+        name = {"duffel": "duffel-jfk-lhr.json",
+                "amadeus": "amadeus-jfk-lhr.json",
+                "kiwi-tequila": "kiwi-jfk-lhr.json"}.get(want, "duffel-jfk-lhr.json")
         path = os.path.join(HERE, "adapter_samples", name)
         try:
             with open(path, encoding="utf-8") as fh:
@@ -485,7 +486,8 @@ def live_request(req):
     out = _score_scenario(sc, req)
     out["coverage"] = adapter.coverage(sc)
     out["live"] = True
-    out["feed"] = {"source": src, "provider": (sc.get("_feed") or {}).get("provider", "kiwi")}
+    out["feed"] = {"source": src,
+                   "provider": (sc.get("_feed") or {}).get("provider", "kiwi")}
     if src == "api":
         out["feed"].update({"fetched": _LIVE_META.get("source"),
                             "age_seconds": _LIVE_META.get("age_seconds"),
