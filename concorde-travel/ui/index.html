@@ -1,0 +1,1639 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- ARTIFACT-BODY-START -->
+<title>ConcordeGo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Michroma&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ===================================================================
+   ConcordeGo — draft interface.
+
+   Same skin as ConcordeAI, deliberately: identical tokens lifted from
+   millenai.py's :root, the same three faces (Space Grotesk / Michroma /
+   IBM Plex Mono), the same frosted glass over a night backdrop, the
+   same 10px radius, and white-as-the-accent.
+
+   One thing this page needs that the AI app does not: a green-to-red
+   ramp, because a red layover segment is the whole point of the bar.
+   It is tuned to land on the app's existing --red (#e26d5a) at the
+   bad end, so the ramp reads as part of the family rather than bolted
+   on, and the flight segments stay STEEL — colour is reserved for
+   inconvenience, never for the productive part of the trip.
+
+   Single theme on purpose. The app is dark-only; so is this.
+   =================================================================== */
+
+:root{
+  /* --- lifted verbatim from millenai.py --- */
+  --bg:#101013;
+  --panel:#0a0a0c;
+  --panel2:#191a1e;
+  --line:#26272c;
+  --line-soft:#1e1f23;
+  --text:#ececec;
+  --dim:#b4b4b4;
+  --faint:#8e8e8e;
+  --accent:#ececec;
+  --accent-hot:#fff;
+  --accent-dim:rgba(255,255,255,.10);
+  --teal:#c8c8c8;
+  --red:#e26d5a;
+  --radius:10px;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --sans:'Space Grotesk',system-ui,sans-serif;
+  --helv:'Helvetica Neue',Helvetica,Arial,sans-serif;
+  --disp:'Michroma','Space Grotesk',system-ui,sans-serif;
+
+  /* --- new here: the inconvenience ramp --- */
+  --q-good:#5fb98a;
+  --q-fair:#d9b45c;
+  --q-poor:#e08d5a;
+  --q-bad:#e26d5a;
+  --q-fly:#474b55;
+  --q-fly2:#3a3e47;
+  --glass:rgba(6,7,10,.34);
+  --glass-2:rgba(6,7,10,.52);
+  --hair:rgba(255,255,255,.07);
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+/* CLAUDE.md, the hard way: `hidden` is only the UA stylesheet's
+   display:none, so ANY author rule that sets display outranks it. Both
+   .guidepane and .results declare display, and both rendered while
+   "hidden". One global rule instead of remembering per element. */
+[hidden]{display:none !important}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:var(--sans);font-size:15px;line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--accent-dim);color:var(--accent-hot)}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.3)}
+::-webkit-scrollbar-track{background:transparent}
+h1,h2,h3,h4{margin:0;font-weight:600;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:1px solid rgba(255,255,255,.55);outline-offset:2px;border-radius:4px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.eyebrow{
+  font-family:var(--mono);text-transform:uppercase;letter-spacing:.17em;
+  font-size:10.5px;color:var(--faint);
+}
+
+/* ---------------------------------------------------------- backdrop */
+/* The AI app runs an Apple ATV aerial of New York behind frosted glass.
+   Those clips can't be played straight from the CDN (sylvan puts the
+   moov atom after 370MB of mdat — millenai.py remuxes and caches them
+   server-side), so this page paints its own night skyline on a canvas
+   in the same mood. Point SKY_SRC at any servable loop and the video
+   takes over; the canvas stays as the always-there fallback. */
+#skyline{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;
+  animation:skyFadeIn .8s ease both}
+@keyframes skyFadeIn{from{opacity:0}to{opacity:1}}
+#skyline video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  filter:brightness(.5) saturate(1.15)}
+#skyline video[hidden]{display:none}
+#skycanvas{position:absolute;inset:0;width:100%;height:100%}
+#skyline::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(16,16,19,.30) 0%,rgba(16,16,19,.10) 34%,rgba(16,16,19,.72) 100%);
+}
+#skyline{transition:filter .6s ease}
+body.gen #skyline{filter:brightness(.7)}
+@media (prefers-reduced-motion: reduce){ *{animation:none !important;transition:none !important} }
+
+/* macOS-style bar while the server warms a clip. The app treats this as
+   part of the show rather than something to hide, and it is right: the
+   download is 300-400MB and pretending otherwise reads as a hang. */
+#skyload{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:4;
+  width:min(420px,58vw);text-align:center;pointer-events:none}
+#skyload[hidden]{display:none}
+#skyload .track{height:3px;overflow:hidden;background:rgba(255,255,255,.10)}
+#skyload .fill{height:100%;width:0;background:#ecedf2;
+  transition:width .5s cubic-bezier(.4,0,.2,1)}
+#skyload .lbl{margin-top:11px;font-size:11px;letter-spacing:.24em;text-transform:uppercase;
+  color:#dfe3ee;font-family:var(--mono);text-shadow:0 2px 14px rgba(0,0,0,.7)}
+
+/* ----------------------------------------------------------- toolbar */
+/* Same material as the AI app's sidebar: ~34% panel carried by a heavy
+   blur, one hairline, no hard tint. Wordmark dead centre. */
+#tb{
+  position:fixed;top:0;left:0;right:0;z-index:20;
+  display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;
+  padding:9px 16px;padding-top:calc(9px + env(safe-area-inset-top, 0px));
+  background:var(--glass-2);
+  -webkit-backdrop-filter:blur(26px) saturate(1.45);
+          backdrop-filter:blur(26px) saturate(1.45);
+  border-bottom:1px solid var(--hair);
+}
+body.novideo #tb{background:var(--panel);-webkit-backdrop-filter:none;backdrop-filter:none}
+#tb .tb-l{justify-self:start;display:flex;align-items:center;gap:8px;min-width:0}
+#tb .tb-r{justify-self:end;display:flex;align-items:center;gap:6px}
+/* the wordmark lockup — the AI app's .vghost, second word bolded the
+   same way (Michroma ships one weight, so it's regular + a .12em
+   stroke, which genuinely fattens the outline instead of faking it) */
+.vghost{
+  font-family:var(--disp);text-transform:uppercase;
+  font-size:14px;letter-spacing:.15em;
+  color:#fff;opacity:.72;user-select:none;
+  display:inline-flex;align-items:center;line-height:1.2;white-space:nowrap;
+}
+.vghost b{font-weight:400}
+.vghost b b{font-weight:400;-webkit-text-stroke:.12em currentColor;
+  font-size:.865em;vertical-align:.06em}
+#vmark{width:13.9px;height:11.6px;margin-right:5px;vertical-align:-.8px;flex:none}
+.vsub{font-style:normal;font-family:var(--mono);font-size:11px;
+  letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.53);margin-left:7px}
+.tbtn{
+  width:28px;height:28px;flex:none;display:grid;place-items:center;
+  background:none;border:1px solid var(--line);border-radius:8px;
+  color:var(--accent-hot);font-size:13px;
+}
+.tbtn:hover{border-color:var(--accent-hot);background:var(--accent-dim)}
+.tb-note{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--faint);white-space:nowrap}
+
+/* -------------------------------------------------------------- page */
+.wrap{
+  position:relative;z-index:1;max-width:1140px;margin:0 auto;
+  padding-inline:16px;padding-block:0 72px;
+}
+.spacer{height:74px}
+
+/* ------------------------------------------------------------- panel */
+.glass{
+  background:var(--glass);
+  -webkit-backdrop-filter:blur(26px) saturate(1.45);
+          backdrop-filter:blur(26px) saturate(1.45);
+  border:1px solid var(--hair);border-radius:var(--radius);
+  box-shadow:0 18px 50px -24px rgba(0,0,0,.85);
+}
+body.novideo .glass{background:var(--panel);-webkit-backdrop-filter:none;backdrop-filter:none;border-color:var(--line)}
+
+.hero{padding:30px 4px 18px;display:flex;flex-direction:column;gap:9px;align-items:center;text-align:center}
+.hero h1{
+  font-family:var(--helv);font-size:clamp(25px,3.6vw,38px);font-weight:400;
+  letter-spacing:-.01em;color:var(--text);
+}
+.hero p{color:var(--dim);font-family:var(--helv);font-size:15.5px;max-width:60ch}
+
+.tabs{display:flex;gap:3px;flex-wrap:wrap;padding:7px 8px 0}
+.tab{
+  border:0;background:transparent;padding:9px 15px;border-radius:9px 9px 0 0;
+  color:var(--faint);font-size:13.5px;display:flex;align-items:center;gap:7px;
+  border-bottom:1px solid transparent;
+}
+.tab:hover{background:rgba(255,255,255,.05);color:var(--text)}
+.tab[aria-selected="true"]{color:#fff;border-bottom-color:var(--accent-hot);background:rgba(255,255,255,.05)}
+.tab .star{font-size:12px;opacity:.9}
+
+.panelbody{padding:15px;display:flex;flex-direction:column;gap:15px}
+.fset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+.fs-head{display:flex;align-items:center;gap:11px}
+.fs-head .rule{flex:1;height:1px;background:var(--line)}
+
+.row{display:flex;gap:9px;flex-wrap:wrap}
+.field{
+  flex:1 1 230px;min-width:0;display:flex;flex-direction:column;gap:3px;
+  background:rgba(255,255,255,.04);border:1px solid var(--line);
+  border-radius:9px;padding:8px 12px 9px;transition:border-color .13s,background .13s;
+}
+.field:focus-within{border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.07)}
+.field label{font-family:var(--mono);text-transform:uppercase;letter-spacing:.15em;
+  font-size:9.5px;color:var(--faint)}
+.field input,.field select{border:0;background:transparent;padding:0;width:100%;
+  font-size:14.5px;min-width:0;color:var(--text)}
+.field select{cursor:pointer}
+.field select option{background:var(--panel2);color:var(--text)}
+.field input::placeholder{color:var(--faint)}
+.field.narrow{flex:0 1 158px}
+.field.money input{font-family:var(--mono)}
+.hint{font-size:12.5px;color:var(--faint);line-height:1.5}
+.hint b{color:var(--dim);font-weight:500}
+.swap{align-self:center;border:1px solid var(--line);background:rgba(255,255,255,.04);
+  width:32px;height:32px;border-radius:50%;display:grid;place-items:center;
+  color:var(--dim);flex:0 0 auto;font-size:14px}
+.swap:hover{border-color:rgba(255,255,255,.4);color:#fff;background:var(--accent-dim)}
+
+.points{display:flex;flex-direction:column;gap:7px}
+.ptrow{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.ptrow select{flex:1 1 220px;background:rgba(255,255,255,.04);border:1px solid var(--line);
+  border-radius:9px;padding:9px 11px;color:var(--text);cursor:pointer}
+.ptrow select option{background:var(--panel2)}
+.ptrow input{flex:0 1 150px;background:rgba(255,255,255,.04);border:1px solid var(--line);
+  border-radius:9px;padding:9px 11px;font-family:var(--mono);color:var(--text)}
+.ptrow .kill{border:1px solid var(--line);background:transparent;border-radius:9px;
+  width:34px;height:34px;color:var(--faint)}
+.ptrow .kill:hover{color:var(--red);border-color:var(--red)}
+.ptrow .worth{font-family:var(--mono);font-size:11.5px;color:var(--faint);white-space:nowrap}
+.addpt{align-self:flex-start;border:1px dashed var(--line);background:transparent;
+  border-radius:9px;padding:8px 13px;font-size:12.5px;color:var(--faint)}
+.addpt:hover{border-color:rgba(255,255,255,.4);color:var(--text)}
+
+/* option chips — the AI app's .qopt, same geometry */
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{
+  display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:9px;
+  font-size:12.5px;color:var(--dim);background:rgba(255,255,255,.04);
+  border:1px solid var(--line);transition:all .13s;user-select:none;
+}
+.chip:hover{background:rgba(255,255,255,.08);color:var(--text)}
+.chip[aria-pressed="true"]{background:var(--accent-dim);border-color:rgba(255,255,255,.4);color:#fff}
+.chip .qbox{width:13px;height:13px;border-radius:4px;flex:none;
+  border:1.5px solid rgba(255,255,255,.35);position:relative}
+.chip[aria-pressed="true"] .qbox{background:#ececec;border-color:#ececec}
+.chip[aria-pressed="true"] .qbox::after{content:"";position:absolute;inset:2.5px;
+  border-radius:inherit;background:#15161a}
+
+.targetbar{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;justify-content:space-between}
+.seg{display:inline-flex;background:rgba(255,255,255,.04);border:1px solid var(--line);
+  border-radius:10px;padding:3px;gap:3px}
+.seg button{border:0;background:transparent;border-radius:8px;padding:9px 19px;
+  font-size:13.5px;color:var(--dim);display:flex;align-items:center;gap:7px}
+.seg button:hover{color:var(--text);background:rgba(255,255,255,.06)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#1a1a1a;font-weight:600}
+.go{border:0;background:var(--accent);color:#1a1a1a;border-radius:10px;
+  padding:12px 30px;font-size:14.5px;font-weight:600}
+.go:hover{background:var(--accent-hot)}
+
+.guidepane{padding:26px 18px;display:flex;flex-direction:column;gap:13px;align-items:flex-start}
+.guidepane p{color:var(--dim);max-width:64ch;font-size:14.5px}
+.guidesteps{display:flex;flex-wrap:wrap;gap:7px;margin:0;padding:0;list-style:none}
+.guidesteps li{font-size:12.5px;color:var(--dim);background:rgba(255,255,255,.04);
+  border:1px solid var(--line);border-radius:9px;padding:6px 12px}
+.guidesteps li b{font-family:var(--mono);color:var(--text);font-size:11px;margin-right:6px}
+
+/* ----------------------------------------------------------- results */
+.results{display:flex;flex-direction:column;gap:13px;margin-top:24px}
+.narrator{padding:16px 18px;display:flex;flex-direction:column;gap:9px;
+  border-left:2px solid rgba(255,255,255,.28)}
+.narrator .lead{font-size:16px;line-height:1.55;max-width:74ch;font-family:var(--helv)}
+.narrator .sub{font-size:14px;color:var(--dim);max-width:76ch;font-family:var(--helv)}
+.narrator .src{font-size:11px;color:var(--faint);font-family:var(--mono);letter-spacing:.04em}
+.understood{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding-top:3px}
+.uchip{font-size:11.5px;font-family:var(--mono);border-radius:999px;padding:3px 10px;
+  border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--dim)}
+.uchip.filter{border-color:var(--red);color:var(--red)}
+.uchip.weight{border-color:rgba(255,255,255,.4);color:#fff}
+
+.sectionhead{display:flex;align-items:center;gap:11px;margin-top:8px}
+.sectionhead .rule{flex:1;height:1px;background:var(--line)}
+
+.opt{overflow:hidden;transition:border-color .13s}
+.opt:hover{border-color:rgba(255,255,255,.16)}
+.opt.filtered{opacity:.55}
+.opthead{display:grid;grid-template-columns:auto 1fr auto;gap:14px;padding:14px 16px 10px;align-items:center}
+.logo{width:40px;height:40px;border-radius:9px;display:grid;place-items:center;flex:none;
+  font-family:var(--disp);font-size:11px;letter-spacing:.02em;color:#fff;
+  border:1px solid rgba(255,255,255,.14)}
+.optmain{min-width:0;display:flex;flex-direction:column;gap:3px}
+.optline1{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.optline1 .route{font-family:var(--mono);font-size:16px;font-weight:500;letter-spacing:.02em;color:#fff}
+.optline1 .carrier{color:var(--dim);font-size:13.5px}
+.optline1 .rank{font-family:var(--mono);font-size:10px;color:var(--faint);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+.optline2{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap;font-size:12.5px;color:var(--faint)}
+.optline2 .m{font-family:var(--mono)}
+.optline2 .sep{opacity:.4}
+
+.priceblk{text-align:right;display:flex;flex-direction:column;gap:2px;align-items:flex-end}
+.price{font-family:var(--mono);font-size:19px;font-weight:500;color:#fff}
+.price.award{font-size:13px;color:var(--text);line-height:1.25;text-align:right}
+.price.award b{display:block;font-size:17px;font-weight:500}
+.price.award i{font-style:normal;color:var(--faint);font-size:11px}
+.eff{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+.eff b{color:var(--dim);font-weight:500}
+.bookvia{font-size:11px;color:var(--faint)}
+
+.barwrap{display:grid;grid-template-columns:1fr auto;gap:15px;align-items:center;padding:0 16px 12px}
+.bar{display:flex;height:24px;border-radius:6px;overflow:hidden;
+  background:rgba(255,255,255,.05);border:1px solid var(--line)}
+.seg-b{position:relative;min-width:2px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.seg-b + .seg-b{border-left:1px solid rgba(0,0,0,.35)}
+.seg-b span{font-family:var(--mono);font-size:10px;color:rgba(0,0,0,.72);white-space:nowrap;
+  padding:0 5px;font-weight:500}
+.seg-b.dark span{color:rgba(255,255,255,.8)}
+.seg-b.q-good{background:var(--q-good)} .seg-b.q-fair{background:var(--q-fair)}
+.seg-b.q-poor{background:var(--q-poor)} .seg-b.q-bad{background:var(--q-bad)}
+.seg-b.q-fly{background:var(--q-fly)} .seg-b.q-fly2{background:var(--q-fly2)}
+.barscale{display:flex;justify-content:space-between;font-family:var(--mono);
+  font-size:10px;color:var(--faint);padding-top:4px;letter-spacing:.04em}
+
+.grade{width:54px;height:54px;border-radius:10px;display:grid;place-items:center;flex:none;
+  font-family:var(--disp);font-size:17px;line-height:1;border:1px solid currentColor;
+  background:rgba(255,255,255,.04)}
+.grade small{display:block;font-family:var(--mono);font-size:8px;letter-spacing:.14em;
+  text-transform:uppercase;opacity:.7;margin-top:4px}
+.g-good{color:var(--q-good)} .g-fair{color:var(--q-fair)}
+.g-poor{color:var(--q-poor)} .g-bad{color:var(--q-bad)}
+
+.optfoot{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:0 16px 13px;flex-wrap:wrap}
+.flip{border:1px solid var(--line);background:rgba(255,255,255,.04);border-radius:9px;
+  padding:7px 13px;font-size:12.5px;color:var(--dim);display:inline-flex;align-items:center;gap:8px}
+.flip:hover{border-color:rgba(255,255,255,.4);color:#fff}
+.flip .arrow{transition:transform .18s ease;display:inline-block;font-size:9px}
+.flip[aria-expanded="true"] .arrow{transform:rotate(180deg)}
+.book{border:0;background:var(--accent);color:#1a1a1a;border-radius:9px;
+  padding:8px 20px;font-weight:600;font-size:13px}
+.book:hover{background:var(--accent-hot)}
+
+.details{border-top:1px solid var(--line);background:rgba(0,0,0,.24);padding:17px 16px;
+  display:grid;grid-template-columns:1.15fr .85fr;gap:22px}
+.details h4{margin:0 0 10px;font-family:var(--mono);text-transform:uppercase;
+  letter-spacing:.15em;font-size:9.5px;color:var(--faint);font-weight:400}
+
+.ledger{display:flex;flex-direction:column;font-family:var(--mono);font-size:12.5px}
+.lrow{display:grid;grid-template-columns:74px 1fr;gap:12px;padding:6px 0;border-bottom:1px solid var(--line-soft)}
+.lrow:last-child{border-bottom:0}
+.amt{text-align:right;font-variant-numeric:tabular-nums}
+.amt.cost{color:var(--red)} .amt.credit{color:var(--q-good)} .amt.base{color:var(--dim)}
+.why{font-family:var(--sans);font-size:13px;color:var(--text);line-height:1.4}
+.why em{font-style:normal;color:var(--faint);font-size:11.5px;display:block;margin-top:1px;line-height:1.45}
+.ovr{background:transparent;border:0;padding:0;font-size:11px;color:var(--dim);
+  font-family:var(--sans);text-decoration:underline;text-underline-offset:2px;margin-top:3px}
+.ovr:hover{color:#fff}
+.ltotal{display:grid;grid-template-columns:74px 1fr;gap:12px;padding-top:10px;margin-top:5px;
+  border-top:1px solid var(--line);font-family:var(--mono);font-size:13px}
+.ltotal .amt{color:#fff}
+.ltotal .why{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
+
+.gb{display:flex;flex-direction:column;gap:16px}
+.gblist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+.gblist li{display:grid;grid-template-columns:14px 1fr;gap:9px;font-size:13px;line-height:1.4;color:var(--text)}
+.gblist li i{font-style:normal;font-family:var(--mono);font-size:12px}
+.gblist.good li i{color:var(--q-good)} .gblist.bad li i{color:var(--red)}
+.gblist li em{font-style:normal;color:var(--faint);font-size:11.5px;display:block;margin-top:1px}
+
+.legs{margin-top:16px;grid-column:1 / -1;border-top:1px solid var(--line);padding-top:14px}
+.tblscroll{overflow-x:auto}
+.legtable{width:100%;border-collapse:collapse;font-size:12.5px;min-width:520px}
+.legtable th{text-align:left;font-family:var(--mono);text-transform:uppercase;letter-spacing:.14em;
+  font-size:9.5px;color:var(--faint);font-weight:400;padding:0 12px 7px 0;white-space:nowrap}
+.legtable td{padding:7px 12px 7px 0;border-top:1px solid var(--line-soft);vertical-align:top;color:var(--text)}
+.legtable td.m{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.legtable .note{color:var(--faint);font-size:11.5px}
+.hedge{display:inline-block;font-size:10.5px;font-family:var(--mono);color:var(--faint);
+  border:1px solid var(--line);border-radius:4px;padding:0 5px;margin-left:5px;white-space:nowrap}
+
+.hidden-row{display:flex;align-items:center;gap:11px;flex-wrap:wrap;padding:12px 16px;
+  font-size:12.5px;color:var(--dim);border-style:dashed}
+.hidden-row button{background:transparent;border:0;color:#fff;text-decoration:underline;
+  text-underline-offset:3px;font-size:12.5px}
+.filtbadge{font-family:var(--mono);font-size:10px;color:var(--red);border:1px solid var(--red);
+  border-radius:999px;padding:1px 9px;letter-spacing:.06em}
+
+/* ------------------------------------------------------------- modal */
+.scrim{position:fixed;inset:0;background:rgba(4,5,8,.66);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  display:grid;place-items:center;padding:16px;z-index:60}
+.modal{background:var(--panel2);border:1px solid var(--line);border-radius:14px;
+  box-shadow:0 30px 80px -20px rgba(0,0,0,.9);
+  width:min(580px,100%);max-height:86vh;overflow:auto;padding:24px;
+  display:flex;flex-direction:column;gap:15px}
+.modal h3{font-family:var(--helv);font-size:22px;font-weight:400}
+.modal p{color:var(--dim);font-size:14px;max-width:60ch}
+.modal textarea{width:100%;min-height:118px;resize:vertical;background:rgba(255,255,255,.04);
+  border:1px solid var(--line);border-radius:10px;padding:12px 13px;font-size:14.5px;
+  line-height:1.5;color:var(--text);font-family:var(--sans)}
+.modal textarea:focus{border-color:rgba(255,255,255,.4);outline:none}
+.dictate{display:inline-flex;align-items:center;gap:9px;border:1px solid var(--line);
+  background:rgba(255,255,255,.04);border-radius:999px;padding:9px 18px;font-size:13px;
+  color:var(--dim);align-self:flex-start}
+.dictate:hover{border-color:rgba(255,255,255,.4);color:#fff}
+.dictate[data-on="1"]{border-color:var(--red);color:var(--red)}
+.dictate .dot{width:8px;height:8px;border-radius:50%;background:currentColor}
+.dictate[data-on="1"] .dot{animation:pulse 1.1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
+.examples{font-size:12.5px;color:var(--faint);font-style:italic;
+  border-left:1px solid var(--line);padding-left:12px;line-height:1.6}
+.acts{display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap}
+.btn-ghost{background:transparent;border:1px solid var(--line);border-radius:9px;
+  padding:10px 18px;color:var(--dim);font-size:13.5px}
+.btn-ghost:hover{color:#fff;border-color:rgba(255,255,255,.4)}
+.bookrow{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 0;border-bottom:1px solid var(--line-soft)}
+.bookrow:last-of-type{border-bottom:0}
+.bookrow .who{display:flex;flex-direction:column;gap:2px;min-width:0}
+.bookrow .who b{font-weight:500;color:var(--text)}
+.bookrow .who span{font-size:11.5px;color:var(--faint)}
+.bookrow .direct{font-family:var(--mono);font-size:9.5px;color:var(--q-good);
+  border:1px solid var(--q-good);border-radius:999px;padding:1px 7px;margin-left:8px;letter-spacing:.08em}
+.bookrow .amt{font-family:var(--mono);font-size:15px;color:#fff;white-space:nowrap}
+
+footer.note{margin-top:34px;padding-top:18px;border-top:1px solid var(--line);
+  font-size:12.5px;color:var(--faint);display:flex;flex-direction:column;gap:8px;line-height:1.6}
+footer.note b{color:var(--dim);font-weight:500}
+footer.note code{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+
+@media (max-width:900px){
+  .details{grid-template-columns:1fr}
+  .opthead{grid-template-columns:auto 1fr;row-gap:11px}
+  .priceblk{grid-column:1 / -1;flex-direction:row;align-items:baseline;justify-content:flex-start;
+    gap:13px;text-align:left}
+}
+@media (max-width:640px){
+  .barwrap{grid-template-columns:1fr;gap:11px}
+  .grade{justify-self:start}
+  .seg-b span{display:none}
+  .seg-b.wide span{display:inline}
+  #tb{grid-template-columns:auto 1fr auto}
+  #tb .tb-note{display:none}
+}
+</style>
+</head>
+<body>
+
+<div id="skyline"><canvas id="skycanvas"></canvas><video id="skyv" muted loop playsinline hidden></video></div>
+<div id="skyload" hidden><div class="track"><div class="fill"></div></div><div class="lbl">Loading</div></div>
+
+<nav id="tb">
+  <div class="tb-l">
+    <button class="tbtn" id="tb-menu" title="Menu" aria-label="Menu">☰</button>
+    <span class="tb-note">Draft · fixture data</span>
+  </div>
+  <span class="vghost" title="ConcordeGo"><svg id="vmark" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="vmg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#vmg)" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>Concorde<b>Go</b></b></span>
+  <div class="tb-r">
+    <button class="tbtn" id="tb-sky" title="Toggle backdrop" aria-label="Toggle backdrop">◐</button>
+    <button class="tbtn" id="tb-set" title="Settings" aria-label="Settings">⚙</button>
+  </div>
+</nav>
+
+<div class="spacer"></div>
+
+<div class="wrap">
+
+  <header class="hero">
+    <h1>Flights, ranked by what they actually cost you.</h1>
+    <p>Not the ticket — the ticket plus the car to Newark at 6am, plus the bags the fare left out, plus the four hours at an airport where nothing is open.</p>
+  </header>
+
+  <section class="glass" aria-label="Search">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="false" data-tab="guide"><span class="star">★</span> Guide me</button>
+      <button class="tab" role="tab" aria-selected="true" data-tab="round">Round trip</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="one">One way</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="multi">Multi-city</button>
+    </div>
+
+    <div class="guidepane" id="pane-guide" hidden>
+      <span class="eyebrow">Wizard — not built yet</span>
+      <p><b>Guide me</b> asks the questions that actually change the answer, one at a time, and ends on the same ranked list. It is not a second search — it fills in the same profile the form builds, so both paths score identically.</p>
+      <ol class="guidesteps">
+        <li><b>1</b> Where are you leaving from, exactly?</li>
+        <li><b>2</b> What's waiting for you when you land?</li>
+        <li><b>3</b> How many bags, really?</li>
+        <li><b>4</b> What's an hour of your time worth today?</li>
+        <li><b>5</b> Any points you'd like to burn?</li>
+        <li><b>6</b> What would ruin this trip?</li>
+      </ol>
+    </div>
+
+    <div class="panelbody" id="pane-form">
+      <div class="row">
+        <div class="field">
+          <label for="f-origin">Leaving from</label>
+          <input id="f-origin" value="Wyckoff Ave &amp; Myrtle Ave, Bushwick, Brooklyn 11237"
+                 placeholder="City, airport code — or better, a street address or postal code">
+        </div>
+        <button class="swap" id="f-swap" title="Swap" aria-label="Swap origin and destination">⇄</button>
+        <div class="field">
+          <label for="f-dest">Going to</label>
+          <input id="f-dest" value="Shoreditch, London EC2A"
+                 placeholder="City, airport code — or better, a street address or postal code">
+        </div>
+      </div>
+      <p class="hint">The more exact you are, the better we rank. <b>Bushwick to JFK is a subway ride; Bushwick to EWR at 6am is a car.</b> We price that difference. Nobody else does.</p>
+
+      <div class="row">
+        <div class="field narrow"><label for="f-out">Depart</label><input id="f-out" type="date" value="2026-03-12"></div>
+        <div class="field narrow"><label for="f-back">Return</label><input id="f-back" type="date" value="2026-03-19"></div>
+        <div class="field narrow"><label for="f-pax">Travellers</label>
+          <select id="f-pax"><option>1 adult</option><option>2 adults</option><option>3 adults</option><option>2 adults, 1 child</option></select></div>
+        <div class="field narrow"><label for="f-bags">Checked bags each</label>
+          <select id="f-bags"><option value="0">None</option><option value="1">1 bag</option><option value="2" selected>2 bags</option></select></div>
+      </div>
+
+      <fieldset class="fset">
+        <div class="fs-head"><span class="eyebrow">Budget &amp; points</span><span class="rule"></span></div>
+        <div class="row">
+          <div class="field money narrow"><label for="f-max">Maximum</label><input id="f-max" value="$1,150" inputmode="numeric"></div>
+          <div class="field money narrow"><label for="f-target">Target</label><input id="f-target" value="$700" inputmode="numeric"></div>
+          <div class="field money"><label for="f-incid">Incidentals I'd happily spend</label><input id="f-incid" value="$180" inputmode="numeric" placeholder="Lounge pass, change fee, extra bag, seat"></div>
+        </div>
+        <p class="hint">Incidentals is padding for things <b>worth buying</b> — a lounge day pass on a long layover, a change fee on a cheap carrier, a seat with legroom. Give us the ceiling and we'll propose them instead of pretending you're flying bare.</p>
+        <div class="points" id="f-points"></div>
+        <button class="addpt" id="f-addpt" type="button">+ Add a points balance</button>
+      </fieldset>
+
+      <fieldset class="fset">
+        <div class="fs-head"><span class="eyebrow">What you'll put up with</span><span class="rule"></span></div>
+        <div class="chips" id="f-opts"></div>
+        <p class="hint">Deliberately not "depart between 8 and 10am". Those pickers make you strangle the search before you've seen anything.</p>
+      </fieldset>
+
+      <div class="targetbar">
+        <div>
+          <div class="eyebrow" style="margin-bottom:7px">Rank these for</div>
+          <div class="seg" id="f-target-seg" role="group" aria-label="Ranking target">
+            <button data-t="fastest" aria-pressed="false">Fastest</button>
+            <button data-t="cheapest" aria-pressed="false">Cheapest</button>
+            <button data-t="comfort" aria-pressed="true">Most comfortable</button>
+          </div>
+        </div>
+        <button class="go" id="f-go">Search flights</button>
+      </div>
+      <p class="hint">This changes the <b>order</b>, never the <b>grade</b> — the grade measures every flight against the same neutral yardstick, so a bargain can sit at the top of your list and still show a D.</p>
+    </div>
+  </section>
+
+  <div class="results" id="results" hidden></div>
+
+  <footer class="note">
+    <div><b>Draft interface.</b> Every itinerary here is hand-written fixture data — no live flight API, per hard rule 5. The scorer in this file is a stand-in that emits the same ledger shape the real one will, so the bar, the grade, the good/bad lists and the recommendation are four projections of <b>one</b> computed object rather than four independent guesses.</div>
+    <div>Ranking is deterministic arithmetic: <code>effective_cost = ticket + bags + ground + time×rate + comfort ± risk</code>. The only things a model does on this page are parse dictated wishes into bounded weights on the way in, and write the prose on the way out.</div>
+  </footer>
+</div>
+
+<div id="modal-root"></div>
+<script>
+/* ===================================================================
+   FIXTURE DATA — hand-written, hard rule 5. No live API anywhere here.
+   This is a UI-facing view model: a flattened projection of the real
+   fixture schema. When the scorer lands, this array gets replaced by
+   fixtures/*.json and nothing above this line changes.
+
+   Every number below is a fixture value chosen to be plausible, not a
+   quote. Anything probabilistic carries its sample and window so the
+   narrator can hedge it (hard rule 2).
+   =================================================================== */
+
+// Curated par for this route + date: the all-in effective cost a CLEAN
+// option achieves — a nonstop, bags sorted, sane ground at both ends.
+// The GRADE is this itinerary measured against that par, which is why it
+// does not move when the user switches target. One yardstick, everybody.
+// It is a property of the route and date, not of any one itinerary.
+var ROUTE_PAR = 1075;
+
+var HOME = "Bushwick, Brooklyn";
+var DEST = "Shoreditch, London";
+
+var GROUND = {
+  jfk_train:  {mode:"L + A train, then AirTrain", cost:11.40, mins:64, note:"Subway runs 24h; AirTrain $8.50", viable:true},
+  jfk_car:    {mode:"Rideshare", cost:63, mins:42, note:"Off-peak estimate", viable:true},
+  ewr_car_am: {mode:"Rideshare", cost:78, mins:47, note:"5:00am pickup, no surge, tolls included", viable:true},
+  ewr_train:  {mode:"Subway to Penn, NJ Transit, AirTrain", cost:19.65, mins:96, note:"Chain not viable before ~5:30am", viable:false},
+  lhr_eliz:   {mode:"Elizabeth line to Liverpool St", cost:17, mins:44, note:"To Shoreditch", viable:true},
+  lhr_night:  {mode:"Black cab (Elizabeth line closed)", cost:92, mins:52, note:"Arrival after last train", viable:true}
+};
+
+var ITINS = [
+  {
+    id:"ba178", carrier:{code:"BA", name:"British Airways", color:"#1d4e89", quality:0.78},
+    route:"JFK → LHR", nonstop:true, fare:"Economy Standard", cabin:"Economy",
+    ticket:612, taxes:0, par:ROUTE_PAR,
+    depLocal:"19:25", arrLocal:"07:35 +1", redeye:true,
+    ground:{out:GROUND.jfk_train, in:GROUND.lhr_eliz},
+    airportWait:55, flyMins:425, layovers:[],
+    bags:{included:1, first:100, second:200, carryOn:true},
+    legs:[{fl:"BA 178", from:"JFK T7", to:"LHR T5", dep:"19:25", arr:"07:35 +1", equip:"A350-1000", mins:425,
+           note:"Club-generation cabin, Panasonic Ku"}],
+    equipClaim:{text:"A350-1000 with the current cabin", freq:0.91, sample:60},
+    wifi:{oceanic:true, freq:0.88, sample:60},
+    reliability:{onTime:0.81, sample:60, source:"BTS, JFK departures"},
+    risk:{misconnectP:0, severityCost:0, severityNote:"Nonstop — no misconnect exposure"},
+    seatPitch:31,
+    bookings:[{who:"britishairways.com", price:612, direct:true},
+              {who:"Expedia", price:618, direct:false},
+              {who:"Kiwi.com", price:604, direct:false, note:"Self-transfer protection not applicable"}]
+  },
+  {
+    id:"ua934", carrier:{code:"UA", name:"United", color:"#1b3a6b", quality:0.66},
+    route:"EWR → LHR", nonstop:true, fare:"Basic Economy", cabin:"Economy",
+    ticket:455, taxes:0, par:ROUTE_PAR,
+    depLocal:"06:10", arrLocal:"18:05", redeye:false,
+    ground:{out:GROUND.ewr_car_am, in:GROUND.lhr_eliz},
+    airportWait:70, flyMins:415, layovers:[],
+    bags:{included:0, first:85,  second:110, carryOn:true},
+    legs:[{fl:"UA 934", from:"EWR TB", to:"LHR T2", dep:"06:10", arr:"18:05", equip:"767-300ER", mins:415,
+           note:"Pre-refresh cabin on most departures"}],
+    equipClaim:{text:"767-300ER, older cabin", freq:0.79, sample:60},
+    wifi:{oceanic:false, freq:0.73, sample:60},
+    reliability:{onTime:0.74, sample:60, source:"BTS, EWR departures"},
+    risk:{misconnectP:0, severityCost:0, severityNote:"Nonstop — no misconnect exposure"},
+    seatPitch:31,
+    bookings:[{who:"united.com", price:455, direct:true},
+              {who:"Priceline", price:449, direct:false},
+              {who:"Expedia", price:462, direct:false}]
+  },
+  {
+    id:"dl4", carrier:{code:"DL", name:"Delta", color:"#153b6e", quality:0.82},
+    route:"JFK → LHR", nonstop:true, fare:"Main Cabin", cabin:"Economy",
+    ticket:780, taxes:0, par:ROUTE_PAR,
+    depLocal:"22:05", arrLocal:"10:15 +1", redeye:true,
+    ground:{out:GROUND.jfk_train, in:GROUND.lhr_eliz},
+    airportWait:55, flyMins:420, layovers:[],
+    bags:{included:1, first:100, second:200, carryOn:true},
+    award:{program:"Virgin Atlantic Flying Club", points:60000, cashTaxes:86,
+           from:"Chase Ultimate Rewards", ratio:"1:1", latencyDays:1, availability:"saver seat not confirmed"},
+    legs:[{fl:"DL 4", from:"JFK T4", to:"LHR T3", dep:"22:05", arr:"10:15 +1", equip:"A330-900neo", mins:420,
+           note:"Delta One cabin forward; economy 31in"}],
+    equipClaim:{text:"A330-900neo", freq:0.94, sample:60},
+    wifi:{oceanic:true, freq:0.92, sample:60},
+    reliability:{onTime:0.86, sample:60, source:"BTS, JFK departures"},
+    risk:{misconnectP:0, severityCost:0, severityNote:"Nonstop — no misconnect exposure"},
+    seatPitch:31,
+    bookings:[{who:"delta.com", price:780, direct:true},
+              {who:"Expedia", price:789, direct:false}]
+  },
+  {
+    id:"af1234", carrier:{code:"AF", name:"Air France", color:"#0a2f6b", quality:0.74},
+    route:"JFK → CDG → LHR", nonstop:false, fare:"Economy Light", cabin:"Economy",
+    ticket:398, taxes:0, par:ROUTE_PAR,
+    depLocal:"19:45", arrLocal:"08:55 +1", redeye:true,
+    ground:{out:GROUND.jfk_train, in:GROUND.lhr_eliz},
+    airportWait:55, flyMins:475,
+    layovers:[{airport:"CDG", mins:250, arrLocal:"01:40", terminal:"2E → 2F", terminalChange:true,
+               reclearImmigration:true, reclearSecurity:true, mct:90, deadHours:true,
+               leaveAirport:false, note:"Schengen entry at 1:40am, minimal desks; 2F landside closed, CDGVAL reduced"}],
+    bags:{included:0, first:75,  second:100, carryOn:true},
+    legs:[{fl:"AF 023", from:"JFK T1", to:"CDG 2E", dep:"19:45", arr:"01:40 +1", equip:"777-300ER", mins:415, note:"Mixed cabin generations"},
+          {fl:"AF 1680", from:"CDG 2F", to:"LHR T4", dep:"05:50", arr:"06:05", equip:"A220-300", mins:75, note:""}],
+    equipClaim:{text:"777-300ER, cabin generation varies", freq:0.55, sample:60},
+    wifi:{oceanic:true, freq:0.61, sample:60},
+    reliability:{onTime:0.69, sample:60, source:"fixture — no BTS coverage for the intra-Europe leg"},
+    risk:{misconnectP:0.11, severityCost:190, severityNote:"First bank of the morning; a miss is a 4h wait, not a hotel"},
+    seatPitch:31,
+    bookings:[{who:"airfrance.com", price:398, direct:true},
+              {who:"Kiwi.com", price:381, direct:false, note:"Separate tickets — no rebooking duty"}]
+  },
+  {
+    id:"kl642", carrier:{code:"KL", name:"KLM", color:"#00a1de", quality:0.80},
+    route:"JFK → AMS → LHR", nonstop:false, fare:"Economy Standard", cabin:"Economy",
+    ticket:486, taxes:0, par:ROUTE_PAR,
+    depLocal:"18:20", arrLocal:"09:40 +1", redeye:true,
+    ground:{out:GROUND.jfk_train, in:GROUND.lhr_eliz},
+    airportWait:55, flyMins:480,
+    layovers:[{airport:"AMS", mins:95, arrLocal:"07:35", terminal:"single terminal", terminalChange:false,
+               reclearImmigration:true, reclearSecurity:false, mct:50, deadHours:false,
+               leaveAirport:false, note:"Schengen entry, one terminal, everything open"}],
+    bags:{included:1, first:95,  second:190, carryOn:true},
+    legs:[{fl:"KL 642", from:"JFK T4", to:"AMS", dep:"18:20", arr:"07:35 +1", equip:"787-9", mins:435, note:"Current cabin"},
+          {fl:"KL 1017", from:"AMS", to:"LHR T4", dep:"09:10", arr:"09:40", equip:"E195-E2", mins:80, note:""}],
+    equipClaim:{text:"787-9", freq:0.89, sample:60},
+    wifi:{oceanic:true, freq:0.84, sample:60},
+    reliability:{onTime:0.78, sample:60, source:"fixture — foreign carrier, no BTS flight-number coverage"},
+    risk:{misconnectP:0.14, severityCost:150, severityNote:"Hourly AMS–LHR service; a miss costs about 2 hours"},
+    seatPitch:31,
+    bookings:[{who:"klm.com", price:486, direct:true},
+              {who:"Expedia", price:491, direct:false}]
+  },
+  {
+    id:"tp204", carrier:{code:"TP", name:"TAP Air Portugal", color:"#008a3e", quality:0.61},
+    route:"EWR → LIS → LHR", nonstop:false, fare:"Economy Discount", cabin:"Economy",
+    ticket:342, taxes:0, par:ROUTE_PAR,
+    depLocal:"21:35", arrLocal:"21:05 +1", redeye:true,
+    ground:{out:{mode:"Rideshare", cost:62, mins:52, note:"9:00pm pickup", viable:true}, in:GROUND.lhr_eliz},
+    airportWait:65, flyMins:455,
+    layovers:[{airport:"LIS", mins:545, arrLocal:"10:15", terminal:"T1", terminalChange:false,
+               reclearImmigration:true, reclearSecurity:true, mct:60, deadHours:false,
+               leaveAirport:true, note:"9h05m in daylight, 20min metro to the city, bags checked through"}],
+    bags:{included:0, first:70,  second:95,  carryOn:true},
+    legs:[{fl:"TP 204", from:"EWR TB", to:"LIS", dep:"21:35", arr:"10:15 +1", equip:"A330-900neo", mins:400, note:""},
+          {fl:"TP 1366", from:"LIS", to:"LHR T2", dep:"19:20", arr:"21:05", equip:"A320neo", mins:165, note:""}],
+    equipClaim:{text:"A330-900neo", freq:0.83, sample:60},
+    wifi:{oceanic:false, freq:0.44, sample:60},
+    reliability:{onTime:0.63, sample:60, source:"fixture — foreign carrier, no BTS flight-number coverage"},
+    risk:{misconnectP:0.04, severityCost:120, severityNote:"9h margin absorbs almost any inbound delay"},
+    seatPitch:30,
+    bookings:[{who:"flytap.com", price:342, direct:true},
+              {who:"Kiwi.com", price:335, direct:false}]
+  },
+  {
+    id:"play", carrier:{code:"PP", name:"PLAY", color:"#c8102e", quality:0.38},
+    route:"EWR → KEF → LHR", nonstop:false, fare:"Basic", cabin:"Economy",
+    ticket:228, taxes:0, par:ROUTE_PAR,
+    depLocal:"20:50", arrLocal:"12:40 +1", redeye:true,
+    ground:{out:{mode:"Rideshare", cost:62, mins:52, note:"8:15pm pickup", viable:true}, in:GROUND.lhr_eliz},
+    airportWait:70, flyMins:390,
+    layovers:[{airport:"KEF", mins:235, arrLocal:"05:30", terminal:"single terminal", terminalChange:false,
+               reclearImmigration:false, reclearSecurity:true, mct:60, deadHours:true,
+               leaveAirport:false, note:"05:30 arrival, most concessions shut until 07:00"}],
+    bags:{included:0, first:75,  second:95,  carryOn:false},
+    legs:[{fl:"OG 112", from:"EWR TB", to:"KEF", dep:"20:50", arr:"05:30 +1", equip:"A321neo", mins:330, note:"No seatback IFE, no wifi"},
+          {fl:"OG 440", from:"KEF", to:"LHR T2", dep:"09:25", arr:"12:40", equip:"A320neo", mins:195, note:""}],
+    equipClaim:{text:"A321neo", freq:0.96, sample:60},
+    wifi:{oceanic:false, freq:0.0, sample:60},
+    reliability:{onTime:0.58, sample:60, source:"fixture — foreign carrier, no BTS flight-number coverage"},
+    risk:{misconnectP:0.19, severityCost:340, severityNote:"Separate tickets — a miss means buying a new one, and KEF–LHR is twice daily"},
+    seatPitch:29,
+    bookings:[{who:"flyplay.com", price:228, direct:true, note:"Changes $90 + fare difference"}]
+  },
+  {
+    id:"n0880", carrier:{code:"N0", name:"Norse Atlantic", color:"#1c2b4a", quality:0.48},
+    route:"JFK → OSL → LHR", nonstop:false, fare:"Light (separate tickets)", cabin:"Economy",
+    ticket:264, taxes:0, par:ROUTE_PAR,
+    depLocal:"17:40", arrLocal:"22:15 +1", redeye:true,
+    ground:{out:GROUND.jfk_train, in:GROUND.lhr_night},
+    airportWait:70, flyMins:465,
+    layovers:[{airport:"OSL", mins:1265, arrLocal:"06:15", terminal:"single terminal", terminalChange:false,
+               reclearImmigration:true, reclearSecurity:true, mct:45, deadHours:true,
+               leaveAirport:false, note:"21h05m — the onward seat is the next day's flight, and the terminal shuts overnight"}],
+    bags:{included:0, first:85, second:110, carryOn:true},
+    legs:[{fl:"N0 880", from:"JFK T1", to:"OSL", dep:"17:40", arr:"06:15 +1", equip:"787-9", mins:395, note:"No included meal, no seatback IFE"},
+          {fl:"WF 402", from:"OSL", to:"LHR T2", dep:"03:20", arr:"22:15", equip:"737-800", mins:130, note:"Separate ticket — not protected against the inbound"}],
+    equipClaim:{text:"787-9", freq:0.86, sample:60},
+    wifi:{oceanic:false, freq:0.0, sample:60},
+    reliability:{onTime:0.61, sample:60, source:"fixture — foreign carrier, no BTS flight-number coverage"},
+    risk:{misconnectP:0.06, severityCost:520, severityNote:"Separate tickets and one onward flight a day — a miss is a new ticket and a hotel night"},
+    seatPitch:29,
+    bookings:[{who:"flynorse.com", price:264, direct:true, note:"Onward OSL–LHR sold separately"},
+              {who:"Kiwi.com", price:281, direct:false, note:"Self-transfer — Kiwi's own guarantee, not the airline's"}]
+  },
+  {
+    id:"aa100", carrier:{code:"AA", name:"American Airlines", color:"#9da6ab", quality:0.63},
+    route:"JFK → LHR", nonstop:true, fare:"Main Cabin", cabin:"Economy",
+    ticket:538, taxes:0, par:ROUTE_PAR,
+    depLocal:"18:30", arrLocal:"06:35 +1", redeye:true,
+    ground:{out:GROUND.jfk_train, in:GROUND.lhr_eliz},
+    airportWait:55, flyMins:420, layovers:[],
+    bags:{included:0, first:75,  second:100, carryOn:true},
+    legs:[{fl:"AA 100", from:"JFK T8", to:"LHR T3", dep:"18:30", arr:"06:35 +1", equip:"777-200ER", mins:420,
+           note:"Three cabin configs in this subfleet"}],
+    equipClaim:{text:"777-200ER, pre-refresh cabin", freq:0.71, sample:60},
+    wifi:{oceanic:false, freq:0.73, sample:60},
+    reliability:{onTime:0.76, sample:60, source:"BTS, JFK departures"},
+    risk:{misconnectP:0, severityCost:0, severityNote:"Nonstop — no misconnect exposure"},
+    seatPitch:31,
+    bookings:[{who:"aa.com", price:538, direct:true},
+              {who:"Expedia", price:544, direct:false}]
+  }
+];
+
+var POINT_PROGRAMS = [
+  {id:"chase",  name:"Chase Ultimate Rewards", cpp:0.016},
+  {id:"amex",   name:"Amex Membership Rewards", cpp:0.015},
+  {id:"cap1",   name:"Capital One Miles", cpp:0.015},
+  {id:"delta",  name:"Delta SkyMiles", cpp:0.012},
+  {id:"united", name:"United MileagePlus", cpp:0.013},
+  {id:"aa",     name:"AAdvantage", cpp:0.014},
+  {id:"vs",     name:"Virgin Atlantic Flying Club", cpp:0.013},
+  {id:"fb",     name:"Air France/KLM Flying Blue", cpp:0.012}
+];
+
+/* ===================================================================
+   THE SCORER — stand-in for the real one, same ledger shape.
+   Pure: (itinerary, profile, prefs) -> ledger. No clock, no network.
+   Everything on screen reads this object and only this object.
+   =================================================================== */
+
+var PROFILES = {
+  // The grade's yardstick. Same for every user, which is the point.
+  reference: {hourly:35, comfort:1.00, label:"neutral reference"},
+  fastest:   {hourly:95, comfort:0.85, label:"Fastest"},
+  cheapest:  {hourly:12, comfort:0.45, label:"Cheapest"},
+  comfort:   {hourly:55, comfort:2.00, label:"Most comfortable"}
+};
+
+function money(n){
+  var s = Math.abs(Math.round(n)).toLocaleString("en-US");
+  return "$" + s;
+}
+function hm(mins){
+  var h = Math.floor(mins/60), m = mins%60;
+  return h + "h" + (m<10?"0":"") + m + "m";
+}
+
+function doorToDoor(it){
+  var lay = 0;
+  for (var i=0;i<it.layovers.length;i++) lay += it.layovers[i].mins;
+  return it.ground.out.mins + it.airportWait + it.flyMins + lay + it.ground.in.mins;
+}
+
+function bagCost(it, bags){
+  if (bags <= it.bags.included) return 0;
+  var c = 0;
+  if (bags >= it.bags.included + 1) c += it.bags.first;
+  if (bags >= it.bags.included + 2) c += it.bags.second;
+  return c;
+}
+
+function layoverPenalty(l, p){
+  var h = l.mins/60, pen = 0, why = [];
+  var excess = Math.max(0, h - 1.5);
+  if (excess > 0){ pen += excess * p.hourly * 0.55; why.push(hm(l.mins) + " on the ground at " + l.airport); }
+  if (l.deadHours){ pen += 85; why.push("lands " + l.arrLocal + " local, nothing open"); }
+  if (l.reclearImmigration){ pen += 25; why.push("re-clear immigration"); }
+  if (l.reclearSecurity){ pen += 20; why.push("re-clear security"); }
+  if (l.terminalChange){ pen += 15; why.push("terminal change " + l.terminal); }
+  if (l.mins - l.mct < 30){ pen += 60; why.push("only " + (l.mins - l.mct) + " min over the " + l.mct + " min minimum"); }
+  if (l.leaveAirport && h >= 6 && !l.deadHours){ pen -= 90; why.push("long enough and civilised enough to leave the airport"); }
+  return {amount: pen, why: why.join(", ")};
+}
+
+function score(it, profile, prefs){
+  var p = PROFILES[profile], lines = [];
+  var bags = prefs.bags;
+
+  lines.push({kind:"base", amount: it.ticket + it.taxes, label:"Ticket",
+              evidence: it.fare + ", " + it.cabin, code:"ticket"});
+
+  var bc = bagCost(it, bags);
+  if (bc > 0) lines.push({kind:"cost", amount: bc, code:"bags", overridable:true,
+      label: (bags - it.bags.included) + " checked bag" + ((bags-it.bags.included)>1?"s":"") + " not included",
+      evidence: it.fare + " includes " + (it.bags.included || "none") + "; you said " + bags});
+  else if (it.bags.included >= bags && bags > 0)
+    lines.push({kind:"credit", amount: -25, code:"bags_inc", overridable:true,
+      label: "Checked bag included", evidence: it.fare + " covers " + it.bags.included});
+
+  var go = it.ground.out;
+  lines.push({kind:"cost", amount: go.cost, code:"ground_out", overridable:true,
+      label: HOME + " to " + it.route.split(" ")[0] + " at " + it.depLocal + ": " + go.mode,
+      evidence: go.note + (go.viable ? "" : "") + " · " + hm(go.mins)});
+  var gi = it.ground.in;
+  lines.push({kind:"cost", amount: gi.cost, code:"ground_in", overridable:true,
+      label: "Arrival airport to " + DEST + ": " + gi.mode,
+      evidence: gi.note + " · " + hm(gi.mins)});
+
+  var d2d = doorToDoor(it);
+  lines.push({kind:"cost", amount: (d2d/60) * p.hourly, code:"time", overridable:false,
+      label: hm(d2d) + " door to door at " + money(p.hourly) + "/hour",
+      evidence: "Ground " + hm(go.mins + gi.mins) + " + airport " + hm(it.airportWait) + " + air " + hm(it.flyMins) +
+                (it.layovers.length ? " + layover " + hm(d2d - go.mins - gi.mins - it.airportWait - it.flyMins) : "")});
+
+  for (var i=0;i<it.layovers.length;i++){
+    var lp = layoverPenalty(it.layovers[i], p);
+    if (Math.abs(lp.amount) >= 1)
+      lines.push({kind: lp.amount >= 0 ? "cost" : "credit", amount: lp.amount * p.comfort, code:"layover", overridable:true,
+        label: (lp.amount >= 0 ? "Layover at " : "Layover at ") + it.layovers[i].airport + " — " + hm(it.layovers[i].mins),
+        evidence: lp.why});
+  }
+
+  if (!it.wifi.oceanic)
+    lines.push({kind:"cost", amount: 60 * p.comfort * (prefs.wifiMatters ? 1.8 : 1), code:"wifi", overridable:true,
+      label:"Connectivity unusable over the Atlantic",
+      evidence:"Equipment without oceanic-capable wifi on " + Math.round(it.wifi.freq*100) + "% of the last " + it.wifi.sample + " departures"});
+
+  if (it.equipClaim.freq < 0.75)
+    lines.push({kind:"cost", amount: 30 * p.comfort, code:"equip_uncertain", overridable:true,
+      label:"Cabin is a coin-flip",
+      evidence: it.equipClaim.text + " on only " + Math.round(it.equipClaim.freq*100) + "% of the last " + it.equipClaim.sample + " departures"});
+
+  if (it.seatPitch <= 30)
+    lines.push({kind:"cost", amount: (31 - it.seatPitch) * 28 * p.comfort, code:"pitch", overridable:true,
+      label: it.seatPitch + " inches of pitch", evidence:"Below the 31in transatlantic norm"});
+
+  var cq = (0.72 - it.carrier.quality);
+  if (Math.abs(cq) > 0.05)
+    lines.push({kind: cq > 0 ? "cost" : "credit", amount: cq * 260 * p.comfort, code:"carrier", overridable:true,
+      label: it.carrier.name + (cq > 0 ? " sits below the route average" : " rates above the route average"),
+      evidence:"Curated carrier rating " + it.carrier.quality.toFixed(2) + " — a reviewed table, not a live opinion"});
+
+  if (it.nonstop)
+    lines.push({kind:"credit", amount:-80, code:"nonstop", overridable:false,
+      label:"Nonstop, no misconnect exposure", evidence:"Nothing to miss"});
+
+  if (it.risk.misconnectP > 0){
+    var ra = it.risk.misconnectP * it.risk.severityCost * (prefs.tightArrival ? 1.6 : 1);
+    lines.push({kind:"cost", amount: ra, code:"risk", overridable:false,
+      label:"Misconnect risk " + Math.round(it.risk.misconnectP*100) + "% × " + money(it.risk.severityCost) + " downside",
+      evidence: it.risk.severityNote + " · on-time " + Math.round(it.reliability.onTime*100) + "% over " + it.reliability.sample + " departures (" + it.reliability.source + ")"});
+  }
+
+  if (it.redeye)
+    lines.push({kind:"cost", amount: prefs.redeyeOK ? 20 : 95, code:"redeye", overridable:true,
+      label:"Overnight flight", evidence: prefs.redeyeOK ? "You said red-eyes are fine — priced as a light cost, not a veto" : "Arrival-day productivity is mostly gone"});
+
+  var eff = 0;
+  for (var j=0;j<lines.length;j++) eff += lines[j].amount;
+
+  var awardEff = null;
+  if (it.award && prefs.balances[it.award.from] >= it.award.points){
+    var cpp = 0;
+    for (var k=0;k<POINT_PROGRAMS.length;k++) if (POINT_PROGRAMS[k].name === it.award.from) cpp = POINT_PROGRAMS[k].cpp;
+    awardEff = eff - (it.ticket + it.taxes) + it.award.cashTaxes + it.award.points * cpp;
+  }
+
+  return {it:it, lines:lines, effective:eff, awardEffective:awardEff, d2d:d2d, profile:p};
+}
+
+function gradeFor(it, prefs){
+  var ref = score(it, "reference", prefs);
+  var idx = ref.effective / it.par;
+  // Bands are set from the fixture corpus' actual spread (1.00 to 2.32 of
+  // par), not pulled out of the air: at par is an A, a bad-hour layover is
+  // a C, and the 32-hour self-transfer is the F it deserves.
+  var table = [[0.94,"A+"],[1.02,"A"],[1.08,"A−"],[1.15,"B+"],[1.22,"B"],[1.30,"B−"],
+               [1.42,"C+"],[1.55,"C"],[1.70,"C−"],[1.90,"D"],[99,"F"]];
+  var letter = "F";
+  for (var i=0;i<table.length;i++) if (idx <= table[i][0]){ letter = table[i][1]; break; }
+  var cls = idx <= 1.08 ? "g-good" : idx <= 1.30 ? "g-fair" : idx <= 1.70 ? "g-poor" : "g-bad";
+  return {letter:letter, cls:cls, index:idx, refEffective:ref.effective};
+}
+</script>
+
+<script>
+/* ===================================================================
+   BACKDROP — the AI app runs an Apple ATV aerial of New York behind
+   frosted glass. Those files can't be played from the CDN directly
+   (millenai.py remuxes and caches them server-side), so this page
+   paints the same mood on a canvas: a cold night sky, a slow star
+   drift, and a city skyline whose windows breathe.
+
+   Set SKY_SRC to any servable loop (the app's /sky/<n>.mov, a local
+   mp4) and the video takes over; the canvas is the always-there floor.
+   =================================================================== */
+(function sky(){
+  /* Served by concorde-travel/server.py, which ports the AI app's
+     pipeline: download once, rewrite the file so `moov` precedes `mdat`
+     (the raw CDN copies are unplayable in a browser without it), cache,
+     and stream same-origin with Range support. Open the page as a plain
+     file:// and none of this exists — the canvas carries it. */
+  var cv = document.getElementById("skycanvas");
+  var vid = document.getElementById("skyv");
+  var load = document.getElementById("skyload");
+  var fill = load.querySelector(".fill"), lbl = load.querySelector(".lbl");
+  if (location.protocol === "file:" || !vid) return;
+
+  function play(i){
+    vid.src = "/sky/" + i + ".mov";
+    vid.addEventListener("canplay", function(){
+      vid.hidden = false; load.hidden = true;
+      cv.style.transition = "opacity .9s ease"; cv.style.opacity = "0";
+    }, {once:true});
+    vid.addEventListener("error", function(){ vid.hidden = true; load.hidden = true; }, {once:true});
+    vid.play().catch(function(){});
+  }
+
+  function warm(i){
+    load.hidden = false;
+    fetch("/api/sky/status?i=" + i + "&warm=1").then(function(){
+      var poll = setInterval(function(){
+        fetch("/api/sky/status?i=" + i).then(function(r){ return r.json(); }).then(function(st){
+          fill.style.width = (st.pct || 0) + "%";
+          lbl.textContent = st.status === "remuxing" ? "Preparing" : "Loading";
+          if (st.status === "ready"){ clearInterval(poll); play(i); }
+          if (st.status === "error"){ clearInterval(poll); load.hidden = true; }
+        }).catch(function(){ clearInterval(poll); load.hidden = true; });
+      }, 700);
+    }).catch(function(){ load.hidden = true; });
+  }
+
+  fetch("/api/sky/cached").then(function(r){ return r.json(); }).then(function(c){
+    var cached = c.cached || [], total = c.total || 0;
+    if (!total) return;
+    if (cached.length){
+      /* rotate, so a relaunch is not always the same skyline */
+      var n = 0;
+      try { n = parseInt(sessionStorage.getItem("cgo.sky") || "0", 10) || 0; } catch(e){}
+      var pick = cached[n % cached.length];
+      try { sessionStorage.setItem("cgo.sky", String(n + 1)); } catch(e){}
+      play(pick);
+    } else {
+      warm(Math.floor(((Date.now() / 1000) | 0) % total));
+    }
+  }).catch(function(){ /* no server — the canvas is the backdrop */ });
+})();
+
+(function backdrop(){
+  var cv = document.getElementById("skycanvas");
+  if (!cv || !cv.getContext) { document.body.classList.add("novideo"); return; }
+  var ctx = cv.getContext("2d"), W = 0, H = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
+  var stars = [], towers = [], t0 = 0, raf = 0;
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function rnd(seed){ /* deterministic PRNG so the skyline is the same every load */
+    var s = seed; return function(){ s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; };
+  }
+
+  function build(){
+    var r = rnd(20260312);
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = Math.floor(W * dpr); cv.height = Math.floor(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    stars = [];
+    var n = Math.floor(W * H / 5200);
+    for (var i = 0; i < n; i++)
+      stars.push({x: r() * W, y: r() * H * 0.72, r: r() * 1.05 + 0.25, a: r() * 0.55 + 0.12, tw: r() * 6.28});
+
+    towers = [];
+    var x = -30, base = H;
+    while (x < W + 40){
+      var w = 22 + r() * 62;
+      var h = (0.10 + Math.pow(r(), 1.7) * 0.30) * H;
+      var lights = [];
+      var cols = Math.max(1, Math.floor(w / 11)), rows = Math.max(1, Math.floor(h / 15));
+      for (var cx = 0; cx < cols; cx++)
+        for (var cy = 0; cy < rows; cy++)
+          if (r() < 0.36) lights.push({x: x + 6 + cx * 11, y: base - h + 10 + cy * 15, a: 0.25 + r() * 0.6, tw: r() * 6.28});
+      towers.push({x: x, w: w, h: h, lights: lights});
+      x += w + 3 + r() * 9;
+    }
+  }
+
+  function paint(ts){
+    var t = (ts || 0) / 1000;
+    ctx.clearRect(0, 0, W, H);
+
+    var sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, "#06070b");
+    sky.addColorStop(0.55, "#0b0d14");
+    sky.addColorStop(0.82, "#171a24");
+    sky.addColorStop(1, "#23202a");
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+
+    for (var i = 0; i < stars.length; i++){
+      var s = stars[i];
+      var a = s.a * (reduce ? 1 : (0.72 + 0.28 * Math.sin(t * 0.7 + s.tw)));
+      ctx.globalAlpha = a; ctx.fillStyle = "#cfd6e6";
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.2832); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    /* the sodium haze the city throws up */
+    var haze = ctx.createRadialGradient(W * 0.5, H * 1.02, 10, W * 0.5, H * 1.02, H * 0.72);
+    haze.addColorStop(0, "rgba(206,150,96,.26)");
+    haze.addColorStop(1, "rgba(206,150,96,0)");
+    ctx.fillStyle = haze; ctx.fillRect(0, 0, W, H);
+
+    for (var j = 0; j < towers.length; j++){
+      var tw = towers[j];
+      ctx.fillStyle = "#05060a";
+      ctx.fillRect(tw.x, H - tw.h, tw.w, tw.h);
+      for (var k = 0; k < tw.lights.length; k++){
+        var L = tw.lights[k];
+        if (L.y > H - 4) continue;
+        var la = L.a * (reduce ? 1 : (0.82 + 0.18 * Math.sin(t * 0.35 + L.tw)));
+        ctx.globalAlpha = la * 0.85;
+        ctx.fillStyle = k % 7 === 0 ? "#cfe0ff" : "#f0c98a";
+        ctx.fillRect(L.x, L.y, 3, 5);
+      }
+      ctx.globalAlpha = 1;
+    }
+    if (!reduce) raf = requestAnimationFrame(paint);
+  }
+
+  function boot(){ build(); cancelAnimationFrame(raf); raf = requestAnimationFrame(paint); }
+  boot();
+  var rt; window.addEventListener("resize", function(){ clearTimeout(rt); rt = setTimeout(boot, 160); });
+})();
+
+/* ===================================================================
+   STATE + the form
+   =================================================================== */
+var STATE = {
+  target:"comfort", bags:2, redeyeOK:false, wifiMatters:false, tightArrival:false,
+  needBin:false, longLayoverOK:true, selfTransferOK:true,
+  balances:{}, filters:[], understood:[], overrides:{}, expanded:{},
+  showFiltered:false, searched:false, firstPaint:true
+};
+
+var OPTIONS = [
+  {k:"redeyeOK",       label:"Red-eyes are fine"},
+  {k:"longLayoverOK",  label:"Long layovers welcome if I can leave the airport"},
+  {k:"needBin",        label:"I need an overhead bin"},
+  {k:"wifiMatters",    label:"Working wifi matters"},
+  {k:"tightArrival",   label:"I have something the morning I land"},
+  {k:"selfTransferOK", label:"Separate tickets are OK"}
+];
+
+function el(tag, cls, html){
+  var n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (html != null) n.innerHTML = html;
+  return n;
+}
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+/* ---- points rows ---- */
+var ptRows = [{prog:"Chase Ultimate Rewards", pts:500000}, {prog:"Delta SkyMiles", pts:42000}];
+function renderPoints(){
+  var host = document.getElementById("f-points");
+  host.innerHTML = "";
+  ptRows.forEach(function(r, i){
+    var row = el("div","ptrow");
+    var sel = el("select");
+    POINT_PROGRAMS.forEach(function(p){
+      var o = el("option", null, esc(p.name)); o.value = p.name;
+      if (p.name === r.prog) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.setAttribute("aria-label","Points programme");
+    sel.onchange = function(){ r.prog = sel.value; sync(); };
+    var inp = el("input"); inp.value = r.pts.toLocaleString("en-US");
+    inp.setAttribute("aria-label","Balance"); inp.inputMode = "numeric";
+    inp.oninput = function(){ r.pts = parseInt(inp.value.replace(/[^0-9]/g,""),10) || 0; sync(); };
+    var worth = el("span","worth");
+    var cpp = 0; POINT_PROGRAMS.forEach(function(p){ if (p.name === r.prog) cpp = p.cpp; });
+    worth.textContent = "≈ " + money(r.pts * cpp) + " at " + (cpp*100).toFixed(1) + "¢";
+    var kill = el("button","kill","✕"); kill.type = "button";
+    kill.setAttribute("aria-label","Remove");
+    kill.onclick = function(){ ptRows.splice(i,1); renderPoints(); sync(); };
+    row.appendChild(sel); row.appendChild(inp); row.appendChild(worth); row.appendChild(kill);
+    host.appendChild(row);
+  });
+}
+function sync(){
+  STATE.balances = {};
+  ptRows.forEach(function(r){ STATE.balances[r.prog] = (STATE.balances[r.prog]||0) + r.pts; });
+  renderPoints();
+  if (STATE.searched) render();
+}
+document.getElementById("f-addpt").onclick = function(){
+  ptRows.push({prog:"Amex Membership Rewards", pts:0}); renderPoints(); sync();
+};
+
+/* ---- option chips ---- */
+(function(){
+  var host = document.getElementById("f-opts");
+  OPTIONS.forEach(function(o){
+    var b = el("button","chip",'<span class="qbox"></span>' + esc(o.label));
+    b.type = "button";
+    b.setAttribute("aria-pressed", STATE[o.k] ? "true" : "false");
+    b.onclick = function(){
+      STATE[o.k] = !STATE[o.k];
+      b.setAttribute("aria-pressed", STATE[o.k] ? "true" : "false");
+      if (STATE.searched) render();
+    };
+    host.appendChild(b);
+  });
+})();
+
+/* ---- tabs ---- */
+Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(t){
+  t.onclick = function(){
+    Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(x){ x.setAttribute("aria-selected","false"); });
+    t.setAttribute("aria-selected","true");
+    var guide = t.dataset.tab === "guide";
+    document.getElementById("pane-guide").hidden = !guide;
+    document.getElementById("pane-form").hidden = guide;
+  };
+});
+
+/* ---- target ---- */
+Array.prototype.forEach.call(document.querySelectorAll("#f-target-seg button"), function(b){
+  b.onclick = function(){
+    Array.prototype.forEach.call(document.querySelectorAll("#f-target-seg button"), function(x){ x.setAttribute("aria-pressed","false"); });
+    b.setAttribute("aria-pressed","true");
+    STATE.target = b.dataset.t;
+    if (STATE.searched) render();
+  };
+});
+
+document.getElementById("f-swap").onclick = function(){
+  var a = document.getElementById("f-origin"), b = document.getElementById("f-dest");
+  var tmp = a.value; a.value = b.value; b.value = tmp;
+};
+document.getElementById("f-bags").onchange = function(e){
+  STATE.bags = parseInt(e.target.value,10); if (STATE.searched) render();
+};
+document.getElementById("tb-sky").onclick = function(){
+  document.body.classList.toggle("novideo");
+  document.getElementById("skyline").hidden = document.body.classList.contains("novideo");
+};
+
+/* ===================================================================
+   THE DREAM-TRIP PROMPT
+   In the shipped product this text goes to a model, which returns a
+   bounded weight vector and a filter list — nothing else, and it never
+   touches the ordering. Here it is a local pattern match so the demo
+   stays deterministic and offline. Either way the user sees exactly
+   what was understood before it is applied.
+   =================================================================== */
+var CARRIER_WORDS = [
+  {name:"American Airlines", pats:["american","aa"]},
+  {name:"United", pats:["united"]},
+  {name:"Delta", pats:["delta"]},
+  {name:"British Airways", pats:["british airways","ba"]},
+  {name:"Air France", pats:["air france"]},
+  {name:"KLM", pats:["klm"]},
+  {name:"TAP Air Portugal", pats:["tap","portugal"]},
+  {name:"PLAY", pats:["play"]}
+];
+function parseDream(text){
+  var t = (" " + text.toLowerCase() + " ").replace(/[^\w\s']/g," ");
+  var filters = [], understood = [];
+  var NEG = /(don'?t|do not|never|avoid|rather not|no more|not)\s+(?:want\s+to\s+)?(?:ever\s+)?(?:fly\s+)?(?:on\s+)?(?:with\s+)?/;
+
+  CARRIER_WORDS.forEach(function(c){
+    for (var i = 0; i < c.pats.length; i++){
+      var idx = t.indexOf(" " + c.pats[i] + " ");
+      if (idx < 0) continue;
+      var before = t.slice(Math.max(0, idx - 42), idx);
+      if (NEG.test(before)){
+        filters.push({kind:"carrier", value:c.name, why:"you excluded " + c.name});
+        understood.push({cls:"filter", text:"exclude " + c.name});
+        return;
+      }
+    }
+  });
+
+  var likes = [
+    {re:/bulkhead/,            w:"bulkhead seat", key:"seat"},
+    {re:/aisle/,               w:"aisle seat", key:"seat"},
+    {re:/787|789|dreamliner/,  w:"prefers the 787", key:"equip"},
+    {re:/a350|350/,            w:"prefers the A350", key:"equip"},
+    {re:/non.?stop|direct/,    w:"nonstop weighted up", key:"nonstop"},
+    {re:/wi.?fi|internet/,     w:"connectivity weighted up", key:"wifi"},
+    {re:/lounge/,              w:"lounge access weighted up", key:"lounge"},
+    {re:/legroom|pitch|space/, w:"legroom weighted up", key:"pitch"}
+  ];
+  likes.forEach(function(L){ if (L.re.test(t)) understood.push({cls:"weight", text:L.w}); });
+  if (/wi.?fi|internet/.test(t)) STATE.wifiMatters = true;
+
+  return {filters:filters, understood:understood};
+}
+
+function openDream(){
+  var root = document.getElementById("modal-root");
+  root.innerHTML = "";
+  var scrim = el("div","scrim");
+  var m = el("div","modal");
+  m.innerHTML =
+    '<h3>Anything that would make this your ideal flight?</h3>' +
+    '<p>Say it the way you\'d say it to a person. We turn it into filters and weights — and show you exactly what we understood before we apply it.</p>' +
+    '<textarea id="dream-txt" placeholder="Speak or type…"></textarea>' +
+    '<div class="examples">"I\'d really like a bulkhead seat, I\'d like to fly a 787 if possible, and I really don\'t want to fly American."</div>';
+  var dict = el("button","dictate",'<span class="dot"></span> Dictate');
+  dict.type = "button";
+  var acts = el("div","acts");
+  var skip = el("button","btn-ghost","Skip"); skip.type = "button";
+  var apply = el("button","go","Apply and search"); apply.type = "button";
+  acts.appendChild(skip); acts.appendChild(apply);
+  m.appendChild(dict); m.appendChild(acts);
+  scrim.appendChild(m); root.appendChild(scrim);
+
+  var ta = m.querySelector("#dream-txt");
+  ta.focus();
+
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition, rec = null, on = false;
+  dict.onclick = function(){
+    if (!SR){
+      dict.innerHTML = '<span class="dot"></span> Dictation needs Chrome or Safari — type instead';
+      dict.disabled = true; return;
+    }
+    if (on){ rec && rec.stop(); return; }
+    rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = "en-US";
+    var settled = ta.value;
+    rec.onresult = function(e){
+      var interim = "";
+      for (var i = e.resultIndex; i < e.results.length; i++){
+        if (e.results[i].isFinal) settled += e.results[i][0].transcript;
+        else interim += e.results[i][0].transcript;
+      }
+      ta.value = (settled + interim).replace(/\s+/g," ").trim();
+    };
+    rec.onend = function(){ on = false; dict.dataset.on = "0"; dict.innerHTML = '<span class="dot"></span> Dictate'; };
+    rec.onerror = rec.onend;
+    rec.start(); on = true; dict.dataset.on = "1";
+    dict.innerHTML = '<span class="dot"></span> Listening — tap to stop';
+  };
+
+  function close(){ try{ rec && rec.stop(); }catch(e){} root.innerHTML = ""; }
+  skip.onclick = function(){ close(); STATE.filters = []; STATE.understood = []; runSearch(); };
+  apply.onclick = function(){
+    var parsed = parseDream(ta.value);
+    STATE.filters = parsed.filters; STATE.understood = parsed.understood;
+    close(); runSearch(true);
+  };
+  scrim.onclick = function(e){ if (e.target === scrim) { close(); STATE.filters=[]; STATE.understood=[]; runSearch(true); } };
+}
+document.getElementById("f-go").onclick = openDream;
+
+/* ===================================================================
+   RENDER
+   =================================================================== */
+function prefs(){
+  return {bags:STATE.bags, redeyeOK:STATE.redeyeOK, balances:STATE.balances,
+          wifiMatters:STATE.wifiMatters, tightArrival:STATE.tightArrival};
+}
+
+function applyOverrides(led, id){
+  var kept = [], eff = 0;
+  led.lines.forEach(function(l){
+    var off = STATE.overrides[id + ":" + l.code];
+    l.off = !!off;
+    kept.push(l);
+    if (!off) eff += l.amount;
+  });
+  led.lines = kept; led.effective = eff;
+  return led;
+}
+
+function filteredReason(it){
+  for (var i = 0; i < STATE.filters.length; i++)
+    if (STATE.filters[i].kind === "carrier" && STATE.filters[i].value === it.carrier.name)
+      return STATE.filters[i].why;
+  if (STATE.needBin && it.bags.carryOn === false) return "no overhead bin on this fare";
+  var max = parseInt((document.getElementById("f-max").value||"").replace(/[^0-9]/g,""),10);
+  if (max && it.ticket > max) return "over your " + money(max) + " maximum";
+  return null;
+}
+
+function qGround(m){ return m <= 45 ? "q-good" : m <= 70 ? "q-fair" : m <= 100 ? "q-poor" : "q-bad"; }
+function qWait(m){ return m <= 50 ? "q-good" : m <= 75 ? "q-fair" : m <= 100 ? "q-poor" : "q-bad"; }
+function qLay(l){
+  var h = l.mins / 60;
+  if (l.leaveAirport && !l.deadHours && h >= 6) return "q-good";
+  if (l.deadHours) return h >= 3 ? "q-bad" : "q-poor";
+  return h <= 2 ? "q-good" : h <= 4 ? "q-fair" : h <= 7 ? "q-poor" : "q-bad";
+}
+
+function barSegs(it){
+  var out = [];
+  var depAp = it.route.split(" ")[0];
+  out.push({mins:it.ground.out.mins, q:qGround(it.ground.out.mins), label:"→ " + depAp, title:HOME + " to " + depAp + " · " + it.ground.out.mode + " · " + hm(it.ground.out.mins)});
+  out.push({mins:it.airportWait, q:qWait(it.airportWait), label:"wait", title:"Check-in, security and the walk to the gate at " + depAp + " · " + hm(it.airportWait)});
+  for (var i = 0; i < it.legs.length; i++){
+    var g = it.legs[i];
+    out.push({mins:g.mins, q:i % 2 ? "q-fly2" : "q-fly", dark:true, label:g.fl, title:g.fl + " " + g.from + "→" + g.to + " · " + hm(g.mins) + (g.equip ? " · " + g.equip : "")});
+    if (it.layovers[i]) {
+      var l = it.layovers[i];
+      out.push({mins:l.mins, q:qLay(l), label:l.airport + " " + hm(l.mins), title:l.airport + " · " + hm(l.mins) + " · lands " + l.arrLocal + " local · " + l.note});
+    }
+  }
+  out.push({mins:it.ground.in.mins, q:qGround(it.ground.in.mins), label:"→ " + DEST.split(",")[0], title:"Arrival airport to " + DEST + " · " + it.ground.in.mode + " · " + hm(it.ground.in.mins)});
+  return out;
+}
+
+function ledgerHTML(led, it){
+  var h = '<div class="ledger">';
+  led.lines.forEach(function(l){
+    var amt, cls;
+    if (l.kind === "base"){ amt = money(l.amount); cls = "base"; }
+    else if (l.amount >= 0){ amt = "− " + money(l.amount); cls = "cost"; }
+    else { amt = "+ " + money(-l.amount); cls = "credit"; }
+    h += '<div class="lrow"><div class="amt ' + cls + '"' + (l.off ? ' style="opacity:.32;text-decoration:line-through"' : '') + '>' + amt + '</div>' +
+         '<div class="why"' + (l.off ? ' style="opacity:.42"' : '') + '>' + esc(l.label) +
+         (l.evidence ? '<em>' + esc(l.evidence) + '</em>' : '') +
+         (l.overridable ? '<button class="ovr" data-ovr="' + it.id + ':' + l.code + '">' + (l.off ? "Count this again" : "Don't count this") + '</button>' : '') +
+         '</div></div>';
+  });
+  h += '<div class="ltotal"><div class="amt">' + money(led.effective) + '</div><div class="why">effective cost · ticket ' + money(it.ticket) + '</div></div>';
+  return h + '</div>';
+}
+
+function goodBadHTML(led, it){
+  /* Not a second copy of the ledger — the ledger already says what every
+     dollar was for. This is the "at a glance" pass: only the lines big
+     enough to matter, plus the facts that carry no dollar value of their
+     own (on-time record, fleet consistency, no overhead bin). A $11
+     subway fare is not news either way. */
+  var NOISE = {ticket:1, time:1, bags_inc:1};
+  var good = [], bad = [];
+
+  led.lines.forEach(function(l){
+    if (l.off || l.kind === "base" || NOISE[l.code]) return;
+    if (l.amount < 0){
+      good.push({t:l.label, e:l.evidence, m:"+ " + money(-l.amount)});
+    } else if (l.amount >= 40){
+      bad.push({t:l.label, e:l.evidence, m:"− " + money(l.amount)});
+    }
+  });
+
+  var ot = Math.round(it.reliability.onTime * 100);
+  if (it.reliability.onTime >= 0.80)
+    good.push({t:"On time " + ot + "% of the last " + it.reliability.sample + " departures", e:it.reliability.source});
+  else if (it.reliability.onTime < 0.68)
+    bad.push({t:"On time only " + ot + "% of the last " + it.reliability.sample + " departures", e:it.reliability.source});
+
+  if (it.equipClaim.freq >= 0.85)
+    good.push({t:"Consistent fleet — " + it.equipClaim.text + " on " + Math.round(it.equipClaim.freq*100) + "% of departures",
+               e:"Equipment still gets swapped after booking; this one rarely is"});
+
+  if (it.bags.carryOn === false)
+    bad.push({t:"No overhead bin on this fare", e:"A personal item only — a cabin bag has to be checked and paid for"});
+
+  if (/[Ss]eparate tickets/.test(it.risk.severityNote))
+    bad.push({t:"Sold as separate tickets", e:"Miss the connection and no airline owes you a rebooking — you buy again"});
+
+  function list(rows, cls, sign, empty){
+    if (!rows.length) return '<ul class="gblist ' + cls + '"><li><i>·</i><span style="color:var(--faint)">' + empty + '</span></li></ul>';
+    return '<ul class="gblist ' + cls + '">' + rows.slice(0,5).map(function(r){
+      return '<li><i>' + sign + '</i><span>' + esc(r.t) + (r.m ? ' <span style="color:var(--faint);font-family:var(--mono);font-size:11.5px">' + r.m + '</span>' : '') +
+             (r.e ? '<em>' + esc(r.e) + '</em>' : '') + '</span></li>';
+    }).join("") + '</ul>';
+  }
+
+  return '<div class="gb">' +
+    '<div><h4>The good</h4>' + list(good, "good", "+", "Nothing stands out in its favour.") + '</div>' +
+    '<div><h4>The bad</h4>'  + list(bad,  "bad",  "−", "Nothing worth flagging.") + '</div></div>';
+}
+
+function legsHTML(it){
+  var h = '<div class="legs"><h4>Flights</h4><div class="tblscroll"><table class="legtable"><thead><tr>' +
+          '<th>Flight</th><th>From</th><th>To</th><th>Depart</th><th>Arrive</th><th>Aircraft</th></tr></thead><tbody>';
+  it.legs.forEach(function(g){
+    h += '<tr><td class="m">' + esc(g.fl) + '</td><td>' + esc(g.from) + '</td><td>' + esc(g.to) + '</td>' +
+         '<td class="m">' + esc(g.dep) + '</td><td class="m">' + esc(g.arr) + '</td>' +
+         '<td>' + esc(g.equip) + (g.note ? '<div class="note">' + esc(g.note) + '</div>' : '') + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  h += '<p class="hint" style="margin-top:11px">Scheduled equipment is a type, not a subfleet, and it gets swapped. ' +
+       'This one has flown as <b>' + esc(it.equipClaim.text) + '</b> on ' + Math.round(it.equipClaim.freq*100) +
+       '% of the last ' + it.equipClaim.sample + ' departures<span class="hedge">observed, not promised</span>' +
+       '<br>Connectivity usable over the Atlantic on ' + Math.round((it.wifi.oceanic ? it.wifi.freq : 1 - it.wifi.freq)*100) +
+       '% of those<span class="hedge">n=' + it.wifi.sample + '</span>' +
+       '<br>On time ' + Math.round(it.reliability.onTime*100) + '% · ' + esc(it.reliability.source) + '</p>';
+  return h + '</div>';
+}
+
+function optionHTML(res, rank, filtered){
+  var it = res.it, led = res.led, g = res.grade;
+  var segs = barSegs(it), total = 0;
+  segs.forEach(function(s){ total += s.mins; });
+
+  var bar = '<div class="bar" role="img" aria-label="Door to door ' + hm(total) + '">';
+  segs.forEach(function(s){
+    var pct = (s.mins / total) * 100;
+    bar += '<div class="seg-b ' + s.q + (s.dark ? ' dark' : '') + (pct > 11 ? ' wide' : '') +
+           '" style="width:' + pct.toFixed(2) + '%" title="' + esc(s.title) + '">' +
+           (pct > 7 ? '<span>' + esc(s.label) + '</span>' : '') + '</div>';
+  });
+  bar += '</div>';
+
+  var best = it.bookings[0];
+  it.bookings.forEach(function(b){ if (b.direct) best = b; });
+  var cheapest = it.bookings.slice().sort(function(a,b){ return a.price - b.price; })[0];
+
+  var priceHTML;
+  if (res.award != null){
+    var cpp = 0; POINT_PROGRAMS.forEach(function(p){ if (p.name === it.award.from) cpp = p.cpp; });
+    priceHTML = '<div class="price award"><b>' + money(it.award.cashTaxes) + ' + ' + it.award.points.toLocaleString("en-US") + '</b>' +
+                esc(it.award.from.replace(" Ultimate Rewards","")) + ' points <i>if a saver seat is open</i></div>' +
+                '<div class="eff">cash <b>' + money(it.ticket) + '</b> · effective <b>' + money(res.award) + '</b></div>';
+  } else {
+    priceHTML = '<div class="price">' + money(it.ticket) + '</div>' +
+                '<div class="eff">effective <b>' + money(led.effective) + '</b></div>' +
+                '<div class="bookvia">' + esc(best.who) + (best.direct ? ' · direct' : '') + '</div>';
+  }
+
+  var open = !!STATE.expanded[it.id];
+  var h = '<article class="opt glass' + (filtered ? ' filtered' : '') + '" data-id="' + it.id + '">';
+  h += '<div class="opthead">';
+  h += '<div class="logo" style="background:' + it.carrier.color + '">' + esc(it.carrier.code) + '</div>';
+  h += '<div class="optmain"><div class="optline1">' +
+       (rank ? '<span class="rank">#' + rank + '</span>' : '') +
+       '<span class="route">' + esc(it.route) + '</span>' +
+       '<span class="carrier">' + esc(it.carrier.name) + ' · ' + esc(it.fare) + '</span>' +
+       (filtered ? '<span class="filtbadge">hidden</span>' : '') + '</div>' +
+       '<div class="optline2"><span class="m">' + esc(it.depLocal) + ' → ' + esc(it.arrLocal) + '</span>' +
+       '<span class="sep">·</span><span class="m">' + hm(total) + ' door to door</span>' +
+       '<span class="sep">·</span><span>' + (it.nonstop ? "Nonstop" : it.layovers.length + " stop, " + it.layovers[0].airport) + '</span>' +
+       '<span class="sep">·</span><span>' + (it.bags.included ? it.bags.included + " bag included" : "no bag included") + '</span></div></div>';
+  h += '<div class="priceblk">' + priceHTML + '</div>';
+  h += '</div>';
+
+  h += '<div class="barwrap"><div><div>' + bar + '</div><div class="barscale"><span>door</span><span>' +
+       hm(total) + '</span><span>door</span></div></div>' +
+       '<div class="grade ' + g.cls + '" title="Measured against the same neutral yardstick for every user">' +
+       g.letter + '<small>grade</small></div></div>';
+
+  h += '<div class="optfoot">' +
+       '<button class="flip" data-flip="' + it.id + '" aria-expanded="' + (open ? "true" : "false") + '">' +
+       '<span class="arrow">▼</span> ' + (open ? "Hide the ledger" : "Why this score") + '</button>' +
+       '<button class="book" data-book="' + it.id + '">Book · from ' + money(cheapest.price) + '</button></div>';
+
+  if (open)
+    h += '<div class="details">' + ledgerHTML(led, it) + goodBadHTML(led, it) + legsHTML(it) + '</div>';
+
+  return h + '</article>';
+}
+
+function narrate(kept){
+  if (!kept.length) return "";
+  var top = kept[0];
+  var cheapTicket = kept.slice().sort(function(a,b){ return a.it.ticket - b.it.ticket; })[0];
+  var lead, sub;
+
+  if (cheapTicket.it.id === top.it.id){
+    lead = "The cheapest ticket here is also the one that actually costs you least — that is rarer than it sounds.";
+  } else {
+    var save = Math.round((1 - cheapTicket.it.ticket / top.it.ticket) * 100);
+    var gap = cheapTicket.led.effective - top.led.effective;
+    var worst = null;
+    cheapTicket.led.lines.forEach(function(l){ if (l.kind !== "base" && l.code !== "time" && (!worst || l.amount > worst.amount)) worst = l; });
+    lead = "You can save " + save + "% on the ticket by taking " + cheapTicket.it.carrier.name + " at " +
+           money(cheapTicket.it.ticket) + " — but it lands " + money(gap) + " worse once everything is counted" +
+           (worst ? ", mostly " + worst.label.charAt(0).toLowerCase() + worst.label.slice(1) : "") + ".";
+  }
+  sub = "Top pick is " + top.it.carrier.name + " " + top.it.route + " at " + money(top.it.ticket) +
+        " ticket, " + money(top.led.effective) + " effective — " + hm(top.led.d2d) + " door to door from " +
+        HOME + ", grade " + top.grade.letter + ". Ranked for " + PROFILES[STATE.target].label.toLowerCase() + ".";
+  return '<div class="lead">' + esc(lead) + '</div><div class="sub">' + esc(sub) + '</div>';
+}
+
+function render(){
+  var host = document.getElementById("results");
+  host.hidden = false;
+
+  var kept = [], hidden = [];
+  ITINS.forEach(function(it){
+    var led = applyOverrides(score(it, STATE.target, prefs()), it.id);
+    var res = {it:it, led:led, grade:gradeFor(it, prefs()), award:led.awardEffective};
+    var why = filteredReason(it);
+    if (why){ res.why = why; hidden.push(res); } else kept.push(res);
+  });
+
+  kept.sort(function(a,b){
+    var av = a.award != null ? Math.min(a.award, a.led.effective) : a.led.effective;
+    var bv = b.award != null ? Math.min(b.award, b.led.effective) : b.led.effective;
+    if (av !== bv) return av - bv;
+    return a.it.id < b.it.id ? -1 : 1;     /* stable, deterministic tie-break */
+  });
+
+  /* The ledger IS the product — the top pick opens with it showing
+     rather than hidden behind a click. After that the user is in charge. */
+  if (STATE.firstPaint && kept.length){ STATE.expanded[kept[0].it.id] = true; STATE.firstPaint = false; }
+
+  var h = '<div class="narrator glass">' + narrate(kept);
+  if (STATE.understood.length){
+    h += '<div class="understood"><span class="eyebrow" style="margin-right:4px">Understood</span>';
+    STATE.understood.forEach(function(u){ h += '<span class="uchip ' + u.cls + '">' + esc(u.text) + '</span>'; });
+    h += '</div>';
+  }
+  h += '<div class="src">Written from the ledger below. It states nothing the arithmetic did not produce.</div></div>';
+
+  h += '<div class="sectionhead"><span class="eyebrow">Top three</span><span class="rule"></span></div>';
+  kept.slice(0,3).forEach(function(r,i){ h += optionHTML(r, i+1, false); });
+
+  if (kept.length > 3){
+    h += '<div class="sectionhead"><span class="eyebrow">' + (kept.length - 3) + ' more</span><span class="rule"></span></div>';
+    kept.slice(3).forEach(function(r,i){ h += optionHTML(r, i+4, false); });
+  }
+
+  if (hidden.length){
+    var bits = hidden.map(function(r){ return r.it.carrier.name + " (" + r.why + ")"; });
+    h += '<div class="hidden-row glass">' + hidden.length + ' option' + (hidden.length>1?"s":"") +
+         ' hidden — ' + esc(bits.join(", ")) + ' <button id="showhid">' +
+         (STATE.showFiltered ? "Hide again" : "Show them anyway") + '</button></div>';
+    if (STATE.showFiltered) hidden.forEach(function(r){ h += optionHTML(r, null, true); });
+  }
+
+  host.innerHTML = h;
+
+  Array.prototype.forEach.call(host.querySelectorAll("[data-flip]"), function(b){
+    b.onclick = function(){ var id = b.dataset.flip; STATE.expanded[id] = !STATE.expanded[id]; render(); };
+  });
+  Array.prototype.forEach.call(host.querySelectorAll("[data-ovr]"), function(b){
+    b.onclick = function(){ var k = b.dataset.ovr; STATE.overrides[k] = !STATE.overrides[k]; render(); };
+  });
+  Array.prototype.forEach.call(host.querySelectorAll("[data-book]"), function(b){
+    b.onclick = function(){ openBook(b.dataset.book); };
+  });
+  var sh = host.querySelector("#showhid");
+  if (sh) sh.onclick = function(){ STATE.showFiltered = !STATE.showFiltered; render(); };
+}
+
+function runSearch(scroll){
+  STATE.searched = true;
+  render();
+  if (scroll) document.getElementById("results").scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+function openBook(id){
+  var it = null; ITINS.forEach(function(x){ if (x.id === id) it = x; });
+  if (!it) return;
+  var rows = it.bookings.slice().sort(function(a,b){
+    if (a.direct !== b.direct) return a.direct ? -1 : 1;   /* direct first, per the brief */
+    return a.price - b.price;
+  });
+  var root = document.getElementById("modal-root");
+  var scrim = el("div","scrim"), m = el("div","modal");
+  var h = '<h3>Book ' + esc(it.carrier.name) + ' · ' + esc(it.route) + '</h3>' +
+          '<p>Direct with the airline first — it is where changes, irregular operations and status actually work. Prices are fixture values, not live quotes.</p>';
+  rows.forEach(function(b){
+    h += '<div class="bookrow"><div class="who"><b>' + esc(b.who) + (b.direct ? '<span class="direct">direct</span>' : '') + '</b>' +
+         (b.note ? '<span>' + esc(b.note) + '</span>' : '') + '</div><div class="amt">' + money(b.price) + '</div></div>';
+  });
+  if (it.award){
+    h += '<div class="bookrow"><div class="who"><b>' + esc(it.award.program) + '</b><span>Transfer ' +
+         esc(it.award.ratio) + ' from ' + esc(it.award.from) + ' · about ' + it.award.latencyDays +
+         ' day' + (it.award.latencyDays>1?"s":"") + ' to move · ' + esc(it.award.availability) + '</span></div>' +
+         '<div class="amt">' + it.award.points.toLocaleString("en-US") + ' + ' + money(it.award.cashTaxes) + '</div></div>';
+  }
+  m.innerHTML = h;
+  var acts = el("div","acts");
+  var close = el("button","btn-ghost","Close"); close.type = "button";
+  acts.appendChild(close); m.appendChild(acts);
+  scrim.appendChild(m); root.appendChild(scrim);
+  close.onclick = function(){ root.innerHTML = ""; };
+  scrim.onclick = function(e){ if (e.target === scrim) root.innerHTML = ""; };
+}
+
+/* open in a working state — an empty shell shows nothing */
+renderPoints();
+sync();
+runSearch(false);
+</script>
+</body>
+</html>
