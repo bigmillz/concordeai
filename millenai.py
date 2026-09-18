@@ -3235,6 +3235,343 @@ def tier_fit(mem_gb: float) -> str:
     return "red"
 
 
+
+# ------------------------------------------------------- studio settings
+# THE GEAR (6b303, per Patrick: "a gear icon into the corner of each that
+# opens a pop-up giving options like resolution, frame rate, effort …
+# then also allow in the query the user to say things to describe the
+# sort of quality they want … while still leaving their default settings
+# the same").
+#
+# Three layers, innermost wins: the RUNG's defaults, then the user's saved
+# settings for that studio, then a ONE-SHOT override parsed out of the
+# message. Only the last is forgotten afterwards.
+#
+# Two controls are deliberately absent because the engines ignore them,
+# which I confirmed by running them rather than by reading docs:
+#   --negative-prompt  mflux warns "ignored; FLUX.1 uses distilled
+#                      guidance and has no negative branch" (real on video)
+#   --lora-style       parsed by mflux-generate and never read; it is
+#                      wired only into the in-context entry point
+# A control that does nothing is worse than no control.
+_prefs_lock = threading.Lock()
+
+STUDIO_RANGE = {
+    "image": {"w": (256, 2048), "h": (256, 2048), "steps": (1, 50),
+              "guidance": (1.0, 10.0)},
+    "video": {"w": (256, 1280), "h": (256, 1280), "steps": (12, 40),
+              "frames": (5, 97), "guidance": (1.0, 10.0)},
+}
+STUDIO_FORMATS = {"image": ("png", "jpg", "webp"),
+                  "video": ("mp4", "gif", "webm")}
+# read off the model's own config.json rather than hardcoded: Wan aligns
+# to patch_size[1] * vae_stride[1] = 32 and caps area at 901,120 px
+_ENGINE_CFG = {"image": {"align": 16, "max_area": 0, "fps": 0},
+               "video": {"align": 32, "max_area": 901120, "fps": 24}}
+
+
+def engine_cfg(key: str) -> dict:
+    out = dict(_ENGINE_CFG.get(key) or {})
+    try:
+        snap = _snap_dir(studio_tier(key)["repo"])
+        with open(os.path.join(snap, "config.json")) as f:
+            c = json.load(f)
+        ps, vs = c.get("patch_size") or [], c.get("vae_stride") or []
+        if len(ps) > 1 and len(vs) > 1:
+            out["align"] = int(ps[1]) * int(vs[1])
+        if c.get("max_area"):
+            out["max_area"] = int(c["max_area"])
+        if c.get("sample_fps"):
+            out["fps"] = int(c["sample_fps"])
+    except Exception:
+        pass
+    return out
+
+
+def _fit_area(w: int, h: int, max_area: int, align: int) -> tuple:
+    """Shrink onto the grid until w*h fits, keeping the shape — the way
+    the engine does it. It tries width-first AND height-first and keeps
+    whichever preserves the aspect ratio better; doing only one branch
+    disagrees with the engine on most inputs. Never GROWS a dimension:
+    the result is clamped back to what was asked for, so a memory or
+    time estimate taken from it can never under-read the real render."""
+    w, h = max(align, int(w)), max(align, int(h))
+    if not max_area or w * h <= max_area:
+        return (w // align) * align or align, (h // align) * align or align
+    ratio = w / float(h)
+    ow1 = max(align, int(round((max_area * ratio) ** 0.5 / align)) * align)
+    oh1 = max(align, int(round((max_area / ratio) ** 0.5 / align)) * align)
+    oh2 = max(align, int(round((max_area / ratio) ** 0.5 / align)) * align)
+    ow2 = max(align, int(round(oh2 * ratio / align)) * align)
+    def err(a, b):
+        r = a / float(b)
+        return max(r / ratio, ratio / r)
+    ow, oh = ((ow1, oh1) if err(ow1, oh1) <= err(ow2, oh2) else (ow2, oh2))
+    ow, oh = min(ow, w), min(oh, h)
+    # rounding to the nearest grid step can land ABOVE the cap, and the
+    # engine would then rewrite it behind our back — step down until the
+    # number we report is the number it renders
+    while ow * oh > max_area and (ow > align or oh > align):
+        if ow >= oh:
+            ow = max(align, ow - align)
+        else:
+            oh = max(align, oh - align)
+    return ow, oh
+
+
+def _snap_frames(n: int) -> int:
+    """Wan asserts num_frames == 4n+1 — an assert, not a clamp, so an
+    unsnapped value is a crash rather than a rounded render."""
+    n = max(5, int(n))
+    return ((n - 1) // 4) * 4 + 1
+
+
+def _num(v, fallback):
+    try:
+        f = float(v)
+        if f != f or f in (float("inf"), float("-inf")):
+            return fallback
+        return f
+    except (TypeError, ValueError):
+        return fallback
+
+
+def studio_prefs(key: str) -> dict:
+    d = load_prefs(None).get("studio_opts") or {}
+    return dict(d.get(key) or {}) if isinstance(d, dict) else {}
+
+
+def studio_opts(key: str, over: dict = None) -> dict:
+    """The settings one render will actually use. Never raises: every
+    value is coerced and clamped, because the override layer comes from
+    free text and the saved layer comes from a JSON file a user can edit."""
+    t = studio_tier(key)
+    cfg = engine_cfg(key)
+    out = {"w": t.get("w", 1024), "h": t.get("h", 1024),
+           "steps": t.get("steps", 4), "guidance": 3.5,
+           "fmt": STUDIO_FORMATS[key][0], "seed": 0, "neg": ""}
+    if key == "video":
+        out.update(frames=t.get("frames", 33), fps=cfg.get("fps") or 24)
+    base = dict(out)          # the rung's own numbers, to fall back on
+    for layer in (studio_prefs(key), over or {}):
+        for k, v in (layer or {}).items():
+            if k in out and v not in (None, ""):
+                out[k] = v
+    rng = STUDIO_RANGE.get(key) or {}
+    for field, (lo, hi) in rng.items():
+        if field not in out:
+            continue
+        # an unreadable value falls back to the RUNG's default, not to
+        # the floor: "abc" steps should render normally, not at 1 step
+        val = _num(out[field], _num(base.get(field), lo))
+        out[field] = min(max(val, lo), hi)
+    out["steps"] = int(out["steps"])
+    out["w"], out["h"] = int(out["w"]), int(out["h"])
+    out["w"], out["h"] = _fit_area(out["w"], out["h"],
+                                   cfg.get("max_area", 0),
+                                   cfg.get("align", 16))
+    if key == "video":
+        out["frames"] = _snap_frames(out["frames"])
+        out["fps"] = int(min(max(_num(out.get("fps"), 24), 8), 60))
+    if out.get("fmt") not in STUDIO_FORMATS[key]:
+        out["fmt"] = STUDIO_FORMATS[key][0]
+    out["seed"] = int(_num(out.get("seed"), 0))
+    out["neg"] = str(out.get("neg") or "")[:300]
+    return out
+
+
+def studio_save_opts(key: str, patch: dict) -> dict:
+    """Merge one change into the saved settings, under the prefs lock —
+    generations now write prefs too (the time calibration), so an
+    unlocked read-modify-write here would lose whichever landed first."""
+    with _prefs_lock:
+        pr = load_prefs(None)
+        allopt = dict(pr.get("studio_opts") or {})
+        cur = dict(allopt.get(key) or {})
+        if patch.get("_reset"):
+            cur = {}
+        else:
+            for k, v in (patch or {}).items():
+                if k.startswith("_"):
+                    continue
+                if v in (None, ""):
+                    cur.pop(k, None)
+                else:
+                    cur[k] = v
+        allopt[key] = cur
+        pr["studio_opts"] = allopt
+        store_prefs(pr)
+    return studio_opts(key)
+
+
+# ------------------------------------------------- one-shot overrides
+# Deterministic on purpose. An override is a NUMBER handed to a renderer:
+# a model that reads "double it" as 4096 costs twenty minutes and a
+# swapped machine. Detection has to be trustworthy, so it is regex; the
+# PROMPT rewrite stays with the model, which is what it is good at.
+#
+# loose=1 rules only fire on a FOLLOW-UP. "4k", "1080p", "portrait",
+# "faster", "sharper", "gif" are all ordinary subject words — "a 4k
+# webcam", "draw a portrait of a woman", "a faster car" — and stripping
+# them out of a fresh commission would eat the subject.
+_OV_RULES = [
+    # (regex, loose, handler-key)
+    (r"\b(?:double|2\s*x|twice)\s+(?:the\s+)?(?:resolution|res|size)\b", 0, "x2"),
+    (r"\b(?:half|halve)\s+(?:the\s+)?(?:resolution|res|size)\b", 0, "x05"),
+    (r"\b(?:at|in|to|into)\s+(4k|8k|1080p?|720p?|480p?|hd|full\s*hd|uhd)\b", 0, "res"),
+    (r"\b(4k|8k|1080p|720p|480p)\b", 1, "res"),
+    (r"\b(\d{3,4})\s*(?:x|by|×)\s*(\d{3,4})\b", 0, "wh"),
+    (r"\b(?:make\s+it\s+|in\s+|as\s+|to\s+|switch\s+to\s+|crop\s+to\s+)"
+     r"(square|portrait|landscape|widescreen|vertical|horizontal|wide|tall)\b", 0, "ar"),
+    (r"^\s*(square|portrait|landscape|widescreen|vertical|horizontal)\s*$", 0, "ar"),
+    (r"\b(?:higher|better|best|more)\s+(?:quality|detail|detailed)\b", 0, "up"),
+    (r"\b(?:highest|maximum|max)\s+(?:quality|detail|effort)\b", 0, "up2"),
+    (r"\bmore\s+steps\b", 0, "up"),
+    (r"\b(?:quick\s+and\s+dirty|lower\s+quality|just\s+a\s+draft|"
+     r"speed\s+it\s+up|less\s+detail|fewer\s+steps)\b", 0, "down"),
+    (r"\b(?:sharper|crisper|cleaner|more\s+detailed)\b", 1, "up"),
+    (r"\b(?:faster|quicker|quickly|rougher)\b", 1, "down"),
+    (r"\b(?:bigger|larger)\b", 1, "x15"),
+    (r"\b(?:smaller|tinier)\b", 1, "x075"),
+    (r"\b(\d{1,2}(?:\.\d)?)\s*(?:s|sec|secs|second|seconds)\s*(?:long)?\b", 0, "secs"),
+    (r"\b(\d{1,3})\s*frames\b", 0, "frames"),
+    (r"\b(?:longer|make\s+it\s+longer)\b", 1, "longer"),
+    (r"\b(?:shorter)\b", 1, "shorter"),
+    (r"\b(\d{1,3})\s*fps\b", 0, "fps"),
+    (r"\b(?:as|in|to|into|make\s+it)\s+(?:an?\s+)?"
+     r"(gif|webm|mp4|jpe?g|png|webp)\b", 0, "fmt"),
+]
+_OV_RES = {"8k": (7680, 4320), "4k": (3840, 2160), "uhd": (3840, 2160),
+           "1080p": (1920, 1080), "1080": (1920, 1080),
+           "full hd": (1920, 1080), "fullhd": (1920, 1080),
+           "hd": (1280, 720), "720p": (1280, 720), "720": (1280, 720),
+           "480p": (854, 480), "480": (854, 480)}
+_OV_AR = {"square": 1.0, "portrait": 0.75, "vertical": 0.5625, "tall": 0.75,
+          "landscape": 1.3333, "horizontal": 1.3333, "widescreen": 1.7778,
+          "wide": 1.7778}
+_OV_COMPILED = [(re.compile(rx, re.I), loose, kind) for rx, loose, kind in _OV_RULES]
+
+
+def gen_overrides(text: str, key: str, loose: bool, prev: dict = None):
+    """(overrides, cleaned_text). The matched phrases are REMOVED from the
+    text so the prompt rewrite never sees "at 4K" and paints it into the
+    picture. Relative asks resolve against the previous render when there
+    is one; absolute ones never need it."""
+    t = " " + re.sub(r"\s+", " ", (text or "").strip()) + " "
+    base = dict(prev or {})
+    ov, notes = {}, []
+    bw = _num(base.get("w"), 0) or 0
+    bh = _num(base.get("h"), 0) or 0
+    for rx, lo, kind in _OV_COMPILED:
+        if lo and not loose:
+            continue
+        m = rx.search(t)
+        if not m:
+            continue
+        g = [x for x in (m.groups() or ()) if x]
+        if kind in ("x2", "x05", "x15", "x075"):
+            f = {"x2": 2.0, "x05": 0.5, "x15": 1.5, "x075": 0.75}[kind]
+            if bw and bh:
+                ov["w"], ov["h"] = int(bw * f), int(bh * f)
+            else:
+                ov["_scale"] = f
+        elif kind == "res":
+            r = _OV_RES.get(g[0].lower().replace(" ", ""))
+            if not r:
+                r = _OV_RES.get(g[0].lower())
+            if r:
+                ov["w"], ov["h"] = r
+        elif kind == "wh" and len(g) >= 2:
+            ov["w"], ov["h"] = int(g[0]), int(g[1])
+        elif kind == "ar":
+            a = _OV_AR.get(g[0].lower())
+            if a:
+                ov["_ar"] = a
+        elif kind in ("up", "up2", "down"):
+            ov["_effort"] = {"up": 1, "up2": 2, "down": -1}[kind]
+        elif kind == "secs":
+            ov["frames"] = _snap_frames(round(_num(g[0], 2) * 24))
+        elif kind == "frames":
+            ov["frames"] = _snap_frames(int(g[0]))
+        elif kind == "longer":
+            ov["_len"] = 1.5
+        elif kind == "shorter":
+            ov["_len"] = 0.6
+        elif kind == "fps":
+            ov["fps"] = int(g[0])
+        elif kind == "fmt":
+            f = g[0].lower().replace("jpeg", "jpg")
+            if f in STUDIO_FORMATS.get(key, ()):
+                ov["fmt"] = f
+            else:
+                notes.append("%s isn't a %s format" % (f.upper(), key))
+        t = t[:m.start()] + " " + t[m.end():]
+    cleaned = re.sub(r"\s+", " ", t).strip()
+    # a matched clause leaves conjunctions and punctuation behind: "make
+    # the piano white and double the resolution" -> "make the piano white
+    # and". Left in, that dangling "and" reaches the prompt.
+    cleaned = re.sub(r"^(?:and|but|then|so|also|plus|with|,|;)\s+", "",
+                     cleaned, flags=re.I)
+    # a removed clause also leaves its governing preposition and any
+    # pronoun behind — "do that again at 1920x1080" -> "do that again at",
+    # "make it bigger" -> "make it". Both would reach the prompt.
+    for _ in range(3):
+        cleaned = re.sub(
+            r"[\s,;]*\b(?:and|but|then|so|also|plus|with|at|to|in|into|as|"
+            r"it|this|that|them)\s*$", "", cleaned, flags=re.I).strip(" ,;.")
+    return ov, cleaned, notes
+
+
+def resolve_overrides(key: str, ov: dict, prev: dict = None) -> tuple:
+    """Fold the relative parts of an override against the settings that
+    are actually in force, and say plainly when a number had to move."""
+    if not ov:
+        return {}, []
+    cur = studio_opts(key)
+    base = dict(cur)
+    base.update({k: v for k, v in (prev or {}).items() if k in cur})
+    out = {k: v for k, v in ov.items() if not k.startswith("_")}
+    notes = []
+    if ov.get("_scale"):
+        out["w"] = int(base["w"] * ov["_scale"])
+        out["h"] = int(base["h"] * ov["_scale"])
+    if ov.get("_ar"):
+        area = (out.get("w", base["w"])) * (out.get("h", base["h"]))
+        a = ov["_ar"]
+        out["w"] = int((area * a) ** 0.5)
+        out["h"] = int((area / a) ** 0.5)
+    if ov.get("_len"):
+        out["frames"] = _snap_frames(base.get("frames", 33) * ov["_len"])
+    eff = ov.get("_effort")
+    if eff:
+        if key == "video":
+            # steps below 20 come out washed out (measured), so effort on
+            # video buys its time from frames and size instead
+            if eff < 0:
+                out["frames"] = _snap_frames(base.get("frames", 33) * 0.85)
+                out["w"] = int(base["w"] * 0.8)
+                out["h"] = int(base["h"] * 0.8)
+                notes.append("smaller and shorter, to be quicker")
+            else:
+                out["steps"] = min(40, base["steps"] + (8 * eff))
+        elif studio_tier("image").get("base") == "schnell" and eff > 0:
+            # schnell is a 4-step distillation: more steps buy nothing,
+            # so quality comes from pixels
+            out["w"] = int(base["w"] * (1.4 if eff == 1 else 1.75))
+            out["h"] = int(base["h"] * (1.4 if eff == 1 else 1.75))
+            notes.append("larger, which is where detail comes from here")
+        else:
+            out["steps"] = max(1, min(50, base["steps"]
+                                      + (6 * eff if eff > 0 else -6)))
+    want = dict(out)
+    final = studio_opts(key, out)
+    for f in ("w", "h", "frames"):
+        if f in want and int(_num(want[f], 0)) != final.get(f):
+            notes.append("%s came out at %s, the most this engine takes"
+                         % ({"w": "width", "h": "height",
+                             "frames": "length"}[f], final.get(f)))
+    return out, notes
+
 def _studio_engine_ok(key: str) -> bool:
     st = STUDIOS[key]
     if st.get("probe"):
@@ -3383,6 +3720,10 @@ def studio_status(key: str) -> dict:
         "on_disk_gb": round(studio_bytes(key) / 1e9, 1) if ready else 0,
         "status": "ready" if ready else job.get("status", "missing"),
         "note": job.get("note", ""),
+        "opts": studio_opts(key), "saved": studio_prefs(key),
+        "ranges": STUDIO_RANGE.get(key) or {},
+        "formats": list(STUDIO_FORMATS.get(key) or ()),
+        "native_fps": engine_cfg(key).get("fps") or 0,
         "tiers": [{"id": t["id"], "name": t["name"], "gb": t["gb"],
                    "mem_gb": t["mem_gb"], "note": t["note"],
                    "fit": tier_fit(t["mem_gb"]),
@@ -3659,7 +4000,80 @@ def _write_image_bytes(data: bytes) -> str:
     return out
 
 
-def generate_image(prompt: str) -> tuple:
+def _render_note(path: str, opts: dict, secs: float = 0.0):
+    """What this file was actually rendered with, beside the file. The
+    transcript keeps the filename, so "double the resolution" can resolve
+    against the real numbers days later — an in-memory dict would forget
+    overnight. The serve routes reject .render.json, so it is invisible."""
+    try:
+        d = dict(opts or {})
+        d["secs"] = round(secs, 1)
+        with open(os.path.splitext(path)[0] + ".render.json", "w") as f:
+            json.dump(d, f)
+    except OSError:
+        pass
+
+
+def render_note(key: str, fname: str) -> dict:
+    """The settings a previous render used, or {}."""
+    base = IMAGE_DIR if key == "image" else VIDEO_DIR
+    try:
+        with open(os.path.join(base,
+                               os.path.splitext(fname)[0] + ".render.json")) as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+def _ffmpeg_convert(src: str, fmt: str, fps: int) -> str:
+    """mp4 -> gif / webm, or a plain rate change. ffmpeg only; when it is
+    missing or fails the original file stands, because a clip in the
+    wrong container beats no clip."""
+    if fmt == "mp4" and not fps:
+        return src
+    out = os.path.splitext(src)[0] + "." + fmt
+    try:
+        if fmt == "gif":
+            pal = os.path.splitext(src)[0] + ".png"
+            subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", src,
+                            "-vf", "fps=%d,palettegen" % (fps or 24), pal],
+                           capture_output=True, timeout=180)
+            subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", src,
+                            "-i", pal, "-lavfi",
+                            "fps=%d [x]; [x][1:v] paletteuse" % (fps or 24),
+                            out], capture_output=True, timeout=300)
+            try:
+                os.remove(pal)
+            except OSError:
+                pass
+        elif fmt == "webm":
+            subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", src,
+                            "-c:v", "libvpx-vp9", "-crf", "32", "-b:v", "0"]
+                           + (["-r", str(fps)] if fps else []) + [out],
+                           capture_output=True, timeout=600)
+        else:
+            subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", src,
+                            "-r", str(fps), out],
+                           capture_output=True, timeout=300)
+        if os.path.exists(out) and os.path.getsize(out) > 2000:
+            if out != src:
+                try:
+                    os.rename(os.path.splitext(src)[0] + ".render.json",
+                              os.path.splitext(out)[0] + ".render.json")
+                except OSError:
+                    pass
+                try:
+                    os.remove(src)
+                except OSError:
+                    pass
+            return out
+    except Exception:
+        pass
+    return src
+
+
+def generate_image(prompt: str, over: dict = None) -> tuple:
     """(png path, source) — local FLUX first, a Gemini key second, the
     community cloud last. Raises when none of them could paint."""
     errs = []
@@ -3670,15 +4084,21 @@ def generate_image(prompt: str) -> tuple:
         # mflux 0.19: a local/third-party model is --model <dir> with
         # --base-model naming the architecture (the old --path is gone)
         _t = studio_tier("image")
+        o = studio_opts("image", over)
+        out = os.path.join(IMAGE_DIR, iid + "." + o["fmt"])
         cmd = [os.path.join(STUDIOS["image"]["venv"], "bin", "mflux-generate"),
                "--model", _snap_dir(_t["repo"]),
                "--base-model", _t.get("base", "schnell"),
-               "--prompt", prompt, "--steps", str(_t.get("steps", 4)),
-               "--seed", str(secrets.randbelow(10 ** 6)),
-               "--width", "1024", "--height", "1024", "--output", out]
+               "--prompt", prompt, "--steps", str(o["steps"]),
+               "--guidance", str(o["guidance"]),
+               "--seed", str(o["seed"] or secrets.randbelow(10 ** 6)),
+               "--width", str(o["w"]), "--height", str(o["h"]),
+               "--output", out]
         try:
+            _t0 = time.time()
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
             if r.returncode == 0 and os.path.exists(out):
+                _render_note(out, o, time.time() - _t0)
                 return out, "local"
             errs.append("local: " + (r.stderr or r.stdout or "")[-200:].strip())
         except Exception as exc:
@@ -4837,7 +5257,7 @@ def _veo_video(prompt: str) -> str:
     raise RuntimeError(last or "the cloud could not make that video")
 
 
-def generate_video(prompt: str) -> tuple:
+def generate_video(prompt: str, over: dict = None) -> tuple:
     """(mp4 path, source). Local first, then a cloud key. Video has no
     keyless tier — nobody gives it away — so when neither is there the
     caller says so plainly rather than pretending."""
@@ -4847,20 +5267,30 @@ def generate_video(prompt: str) -> tuple:
         out = os.path.join(VIDEO_DIR, "%d-%s.mp4" % (
             int(time.time()), secrets.token_hex(3)))
         t = studio_tier("video")
+        o = studio_opts("video", over)
         cmd = [os.path.join(STUDIOS["video"]["venv"], "bin", "python3"),
                "-m", STUDIOS["video"]["module"],
                "--model-dir", _snap_dir(t["repo"]), "--prompt", prompt,
-               "--num-frames", str(t.get("frames", 33)),
-               "--width", str(t.get("w", 640)),
-               "--height", str(t.get("h", 384)),
-               "--steps", str(t.get("steps", 15)),
-               "--seed", str(secrets.randbelow(10 ** 6)),
+               "--num-frames", str(o["frames"]),
+               "--width", str(o["w"]), "--height", str(o["h"]),
+               "--steps", str(o["steps"]),
+               "--guide-scale", str(o["guidance"]),
+               "--seed", str(o["seed"] or secrets.randbelow(10 ** 6)),
                "--output-path", out]
+        if o.get("neg"):
+            cmd += ["--negative-prompt", o["neg"]]
         try:
+            _vt0 = time.time()
             r = subprocess.run(cmd, capture_output=True, text=True,
                                timeout=3600)
             if r.returncode == 0 and os.path.exists(out):
-                return out, "local"
+                cfg = engine_cfg("video")
+                native = cfg.get("fps") or 24
+                _render_note(out, o, time.time() - _vt0)
+                return _ffmpeg_convert(
+                    out, o["fmt"],
+                    0 if (o["fmt"] == "mp4" and o["fps"] == native)
+                    else o["fps"]), "local"
             errs.append("local: " + (r.stderr or r.stdout or "")[-200:].strip())
         except Exception as exc:
             errs.append("local: %s" % str(exc)[:160])
@@ -9845,6 +10275,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                    "/api/model/download", "/api/model/remove",
                    "/api/image/install", "/api/image/remove",
                    "/api/studio/install", "/api/studio/remove",
+                   "/api/studio/opts",
                    "/api/export/reveal",
                    "/api/model/cleanup",
                    "/api/update/install",
@@ -10340,10 +10771,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "private, max-age=3600")
             self.end_headers()
             self.wfile.write(data)
-        elif self.path.startswith("/api/video/") and self.path.endswith(".mp4"):
+        elif self.path.startswith("/api/video/") and self.path.endswith(
+                (".mp4", ".gif", ".webm")):
             vid = self.path[len("/api/video/"):]
             pth = os.path.join(VIDEO_DIR, vid)
-            if not re.fullmatch(r"[\w-]+\.mp4", vid) or not os.path.exists(pth):
+            if not re.fullmatch(r"[\w-]+\.(mp4|gif|webm)", vid) \
+                    or not os.path.exists(pth):
                 self.send_error(404)
                 return
             # Range matters here: a WKWebView <video> asks for one
@@ -10360,7 +10793,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 f.seek(a)
                 data = f.read(b - a + 1)
             self.send_response(206 if partial else 200)
-            self.send_header("Content-Type", "video/mp4")
+            self.send_header("Content-Type", {
+                "mp4": "video/mp4", "webm": "video/webm",
+                "gif": "image/gif"}[vid.rsplit(".", 1)[1]])
             self.send_header("Accept-Ranges", "bytes")
             if partial:
                 self.send_header("Content-Range",
@@ -11473,6 +11908,20 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 and reveal_in_finder(pth)
             self._send_json({"ok": ok})
             return
+        if self.path == "/api/studio/opts":
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                d = json.loads(self.rfile.read(n)) if n else {}
+            except (ValueError, json.JSONDecodeError):
+                d = {}
+            k = str(d.get("key") or "")
+            if k not in STUDIOS:
+                self._send_json({"ok": False})
+                return
+            self._send_json({"ok": True,
+                             "opts": studio_save_opts(k, d.get("set") or {}),
+                             "saved": studio_prefs(k)})
+            return
         if self.path in ("/api/studio/install", "/api/studio/remove",
                          "/api/image/install", "/api/image/remove"):
             n = int(self.headers.get("Content-Length", 0) or 0)
@@ -11620,26 +12069,49 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             export_req = None
         # the picture just made, if there was one — its alt text is the
         # subject, which is what a refinement refines
-        _prev_img = ""
+        _prev_img = _prev_imgf = _prev_vid = _prev_vidf = ""
         for _m in reversed(messages[:-1]):
-            if _m.get("role") == "assistant":
-                _am = re.search(r"!\[([^\]]*)\]\(/api/image/",
-                                str(_m.get("content") or ""))
-                if _am:
-                    _prev_img = _am.group(1)
-                break
-        vid_subject = video_intent(prompt) if not images else None
-        img_subject = (image_intent(prompt)
+            if _m.get("role") != "assistant":
+                continue
+            _c = str(_m.get("content") or "")
+            _am = re.search(r"!\[([^\]]*)\]\(/api/image/"
+                            r"([\w-]+\.(?:png|jpg|webp))\)", _c)
+            if _am:
+                _prev_img, _prev_imgf = _am.group(1), _am.group(2)
+            _vm = re.search(r"\[\[vid:\{[^}]*\"id\":\"([\w.-]+)\"[^}]*"
+                            r"\"t\":\"([^\"]*)\"", _c)
+            if _vm:
+                _prev_vidf, _prev_vid = _vm.group(1), _vm.group(2)
+            break
+        # ONE-SHOT OVERRIDES (6b303). Parsed BEFORE any intent runs, and
+        # the matched phrases are REMOVED, so "at 4K" never reaches the
+        # painter as content and the refinement path sees clean text.
+        _skey = "video" if (_prev_vid and not _prev_img) else "image"
+        _loose = bool(_prev_img or _prev_vid)
+        _pnote = render_note(_skey, _prev_vidf if _skey == "video"
+                             else _prev_imgf)
+        _ovr, _pclean, _onotes = gen_overrides(prompt, _skey, _loose, _pnote)
+        _ptext = _pclean if _ovr else prompt
+        vid_subject = video_intent(_ptext) if not images else None
+        img_subject = (image_intent(_ptext)
                        if not images and not vid_subject else None)
         # a picture that already exists is a search, not a commission
         if img_subject and image_wants_fetch(prompt):
             img_subject = None
-        # and a short follow-up after a picture renders it again
-        if not img_subject and not vid_subject and _prev_img \
-                and not images:
-            _fu = image_followup(prompt, _prev_img)
-            if _fu:
-                img_subject = _fu
+        # a short follow-up after a picture renders it again; an override
+        # on its own ("double the resolution") IS the whole instruction,
+        # so the same subject stands
+        if not img_subject and not vid_subject and not images:
+            if _prev_img:
+                _fu = image_followup(_pclean or _prev_img, _prev_img) \
+                    or (_prev_img if _ovr else None)
+                if _fu:
+                    img_subject = _fu
+            elif _prev_vid:
+                _fv = image_followup(_pclean or _prev_vid, _prev_vid) \
+                    or (_prev_vid if _ovr else None)
+                if _fv:
+                    vid_subject = _fv
         if export_req and img_subject and export_req["score"] < 5 \
                 and export_req["ext"] in ("png", "svg", ""):
             export_req = None            # the painter wins a weak tie
@@ -12521,15 +12993,19 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             step("video", "Making the video", "run", where)
             status("filming \u00b7 " + where)
             try:
-                vpath, vsrc = generate_video(vid_subject)
+                _use, _cnotes = resolve_overrides("video", _ovr, _pnote)
+                vpath, vsrc = generate_video(vid_subject, _use)
                 vmade = "made on this Mac" if vsrc == "local" \
                     else "made in the cloud"
                 step("video", "Made the video", "done", vmade)
-                emit("[[vid:%s]]\n\n*%s \u2014 %s*"
+                _note = ("" if not (_cnotes + _onotes) else
+                         " \u00b7 " + "; ".join(_cnotes + _onotes))
+                emit("[[vid:%s]]\n\n*%s \u2014 %s%s*"
                      % (json.dumps({"id": os.path.basename(vpath),
                                     "t": vid_subject[:80]},
                                    separators=(",", ":")),
-                        vid_subject[:1].upper() + vid_subject[1:], vmade))
+                        vid_subject[:1].upper() + vid_subject[1:], vmade,
+                        _note))
             except Exception as exc:
                 step("video", "Couldn\u2019t make the video", "done",
                      str(exc)[:70])
@@ -12554,13 +13030,17 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             step("image", "Generating the image", "run", where)
             status("painting \u00b7 " + where)
             try:
-                path, src = generate_image(img_subject)
+                _use, _cnotes = resolve_overrides("image", _ovr, _pnote)
+                path, src = generate_image(img_subject, _use)
                 made = "made on this Mac" if src == "local" \
                     else "made in the cloud"
                 step("image", "Generated the image", "done", made)
-                emit("![%s](/api/image/%s)\n\n*%s \u2014 %s*"
+                _note = ("" if not (_cnotes + _onotes) else
+                         " \u00b7 " + "; ".join(_cnotes + _onotes))
+                emit("![%s](/api/image/%s)\n\n*%s \u2014 %s%s*"
                      % (img_subject.replace("]", ""), os.path.basename(path),
-                        img_subject[:1].upper() + img_subject[1:], made))
+                        img_subject[:1].upper() + img_subject[1:], made,
+                        _note))
             except Exception as exc:
                 step("image", "Couldn\u2019t generate the image", "done",
                      str(exc)[:70])
@@ -14949,6 +15429,45 @@ body.gen #chip-model{color:var(--accent)}
 #studio-row{display:flex;flex-direction:column;gap:8px;margin-top:8px}
 .studio{cursor:default}
 .studio .sthead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.studio .stgear{margin-left:auto;width:24px;height:24px;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;background:none;
+  border:1px solid var(--line);border-radius:7px;color:var(--faint);
+  cursor:pointer;padding:0;align-self:center;
+  transition:color .15s,border-color .15s}
+.studio .stgear:hover{color:var(--text);border-color:var(--dim)}
+.studio .stgear svg{width:13px;height:13px}
+#gear-veil{position:fixed;inset:0;z-index:64;display:flex;
+  align-items:center;justify-content:center;background:rgba(6,7,10,.72);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#gear-veil[hidden]{display:none}
+#gear-card{width:min(440px,calc(100vw - 48px));padding:22px 24px 16px;
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--radius);max-height:min(82vh,680px);
+  overflow:hidden auto;animation:doorPop .4s cubic-bezier(.16,1,.3,1) both}
+#gear-card .set-h{margin-bottom:4px}
+#gear-card .tdesc{margin-bottom:12px}
+.gearrow{display:flex;align-items:center;gap:12px;padding:8px 0;
+  border-top:1px solid var(--line)}
+.gearrow:first-child{border-top:none}
+.gearrow .gl{flex:1;min-width:0;font-size:12.5px;color:var(--text)}
+.gearrow .gl i{display:block;font-style:normal;font-size:10px;
+  color:var(--faint);margin-top:2px;line-height:1.35}
+.gearrow .gc{flex:0 0 auto;display:flex;align-items:center;gap:8px}
+.gearrow select,.gearrow input[type=text],.gearrow input[type=number]{
+  font:inherit;font-size:12px;color:var(--text);background:var(--bg);
+  border:1px solid var(--line);border-radius:8px;padding:4px 8px}
+.gearrow input[type=text]{width:130px}
+.gearrow input[type=number]{width:74px}
+.gearrow input[type=range]{width:118px;accent-color:var(--accent)}
+.gearrow .gv{font-family:var(--mono);font-size:10.5px;color:var(--dim);
+  min-width:40px;text-align:right}
+#gear-card .sh-foot{display:flex;gap:8px;justify-content:flex-end;
+  margin-top:14px}
+#gear-card .ghost{background:none;border:1px solid var(--line);
+  color:var(--faint)}
+#gear-card .ghost:hover{color:var(--text);border-color:var(--dim)}
+@media (max-width:520px){.gearrow{flex-wrap:wrap}
+  .gearrow input[type=range]{width:100px}}
 .studio .sthead em{font-style:italic;font-size:10.5px;color:var(--faint);
   font-family:-apple-system,'Helvetica Neue',sans-serif}
 .studio.on .sthead em{color:var(--dim)}
@@ -16176,6 +16695,22 @@ __CODE_ROWS__
      swallowed every veil below it as a CHILD of the hidden modal — the
      setup panel "opened" at 0x0. Keep the tag count honest here. -->
 
+<!-- 6b303, per Patrick: a gear per studio opening the render settings.
+     Only controls the engines actually honour are here; two flags that
+     look useful are silently ignored by the image engine, confirmed by
+     running it, so neither has a row. -->
+<div id="gear-veil" hidden>
+  <div id="gear-card">
+    <div class="set-h" id="gear-title">Settings</div>
+    <p class="tdesc" id="gear-sub"></p>
+    <div id="gear-rows"></div>
+    <div class="sh-foot">
+      <button id="gear-reset" class="about-btn slim ghost">Reset to defaults</button>
+      <button id="gear-ok" class="about-btn slim">Done</button>
+    </div>
+  </div>
+</div>
+
 <div id="updated-veil" hidden>
   <div id="updated-card">
     <div class="sh-icon">&#10024;</div>
@@ -17329,8 +17864,13 @@ function renderMD(raw){
   s=s.replace(/\u0000DL(\d+)\u0000/g,(_,i)=>dlBox(dls[+i]));
   s=s.replace(/\u0000VD(\d+)\u0000/g,(_,i)=>{
     const v=vds[+i];
-    return v&&v.id?'<video class="genvid" controls playsinline preload="metadata"'
-      +' src="/api/video/'+encodeURIComponent(v.id)+'"></video>':"";});
+    if(!v||!v.id)return "";
+    const u="/api/video/"+encodeURIComponent(v.id);
+    // a GIF or animated WebP in a <video> decodes to nothing in WebKit
+    return /\.(gif|webp)$/i.test(v.id)
+      ? '<img class="genvid" src="'+u+'" alt="'+esc(v.t||"")+'" loading="lazy">'
+      : '<video class="genvid" controls playsinline preload="metadata" src="'
+        +u+'"></video>';});
   s=s.replace(/\u0000THINKOPEN(\d+)\u0000/g,(_,i)=>
     '<details open><summary>◈ reasoning…</summary><div class="think-body">'+esc(thinks[+i]).replace(/\n/g,"<br>")+"</div></details>");
   s=s.replace(/\u0000THINK(\d+)\u0000/g,(_,i)=>
@@ -21073,7 +21613,21 @@ function studioHTML(key,st){
     +(st.ready?("installed \u2713"+(st.on_disk_gb?" \u00b7 "+st.on_disk_gb+" GB":""))
       :busy?esc((st.note||"downloading"))+" \u00b7 "+st.pct+"%"
       :st.status==="error"?("failed \u2014 "+esc(st.note||"try again")):"")
-    +'</em></div>';
+    +'</em>'
+    +'<button class="stgear" title="Settings for '+esc(meta.title)
+    +'" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" '
+    +'stroke="currentColor" stroke-width="1.9" stroke-linecap="round" '
+    +'stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/>'
+    +'<path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83'
+    +'l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0'
+    +'v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1'
+    +'-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3'
+    +'a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06'
+    +'a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3'
+    +'a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06'
+    +'a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21'
+    +'a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg></button>'
+    +'</div>';
   if(!st.ready&&!busy){
     h+='<span class="stdesc">'+esc(meta.desc)+'</span>'
       +'<div class="stslider"><div class="sttrack">'
@@ -21108,6 +21662,100 @@ function studioHTML(key,st){
     +(st.status==="error"?"Retry":"Add")+' \u00b7 '+(cur.gb||0)+' GB</button>';
   return h+'</div></div>';
 }
+// the sizes a person actually wants, not a spinner they can put 4096 in
+const GEAR_SIZES={image:[["512x512","Small · 512"],["768x768","Medium · 768"],
+    ["1024x1024","Large · 1024"],["1440x1440","Extra large · 1440"],
+    ["1024x576","Wide · 1024x576"],["576x1024","Tall · 576x1024"]],
+  video:[["512x320","Small · 512x320"],["640x384","Medium · 640x384"],
+    ["704x480","Large · 704x480"],["832x480","Wide · 832x480"],
+    ["384x640","Tall · 384x640"]]};
+let gearKey="";
+function gearRow(label,hint,ctrl){
+  return '<div class="gearrow"><div class="gl">'+esc(label)
+    +(hint?'<i>'+esc(hint)+'</i>':"")+'</div><div class="gc">'+ctrl+'</div></div>';
+}
+function openGear(key){
+  const st=((lastSetup||{}).studios||{})[key];if(!st)return;
+  gearKey=key;
+  const o=st.opts||{},saved=st.saved||{},rng=st.ranges||{};
+  $("#gear-title").textContent=(STUDIO_META[key]||{}).title||"Settings";
+  $("#gear-sub").textContent=st.ready
+    ?"These apply to every render until you change them. In chat you can say \u201cdouble the resolution\u201d or \u201chigher quality\u201d for one picture without touching them."
+    :"Set these now; they apply once it is installed.";
+  const cur=o.w+"x"+o.h;
+  const sizes=GEAR_SIZES[key]||[];
+  const known=sizes.some(p=>p[0]===cur);
+  let h=gearRow("Size","pixels",
+    '<select data-f="size">'+sizes.map(p=>'<option value="'+p[0]+'"'
+      +(p[0]===cur?" selected":"")+'>'+esc(p[1])+'</option>').join("")
+    +(known?"":'<option value="'+cur+'" selected>Custom \u00b7 '+cur+'</option>')
+    +'</select>');
+  const smin=(rng.steps||[1,50])[0],smax=(rng.steps||[1,50])[1];
+  h+=gearRow("Effort","more steps, slower",
+    '<input type="range" data-f="steps" min="'+smin+'" max="'+smax
+    +'" value="'+o.steps+'"><b class="gv">'+o.steps+'</b>');
+  h+=gearRow("Guidance","how literally it follows the words",
+    '<input type="range" data-f="guidance" min="1" max="10" step="0.5" value="'
+    +o.guidance+'"><b class="gv">'+o.guidance+'</b>');
+  if(key==="video"){
+    const fps=st.native_fps||24;
+    const secs=Math.round((o.frames/fps)*10)/10;
+    h+=gearRow("Length","seconds \u00b7 renders at "+fps+" fps",
+      '<input type="range" data-f="frames" min="5" max="97" step="4" value="'
+      +o.frames+'"><b class="gv">'+secs+'s</b>');
+    h+=gearRow("Playback rate","re-times the finished clip",
+      '<input type="range" data-f="fps" min="8" max="60" value="'+o.fps
+      +'"><b class="gv">'+o.fps+' fps</b>');
+    h+=gearRow("Avoid","things to keep out of it",
+      '<input type="text" data-f="neg" maxlength="300" placeholder="optional" value="'
+      +esc(o.neg||"")+'">');
+  }
+  h+=gearRow("Format","",'<select data-f="fmt">'
+    +(st.formats||[]).map(f=>'<option value="'+f+'"'+(f===o.fmt?" selected":"")
+      +'>'+f.toUpperCase()+'</option>').join("")+'</select>');
+  h+=gearRow("Seed","0 is a new one each time",
+    '<input type="number" data-f="seed" min="0" max="999999" value="'+(o.seed||0)+'">');
+  $("#gear-rows").innerHTML=h;
+  $("#gear-rows").classList.toggle("dirty",Object.keys(saved).length>0);
+  $("#gear-veil").hidden=false;
+}
+async function gearSave(patch){
+  try{
+    const r=await(await fetch("/api/studio/opts",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({key:gearKey,set:patch})})).json();
+    if(r&&r.opts&&lastSetup&&lastSetup.studios&&lastSetup.studios[gearKey]){
+      lastSetup.studios[gearKey].opts=r.opts;
+      lastSetup.studios[gearKey].saved=r.saved||{};
+    }
+  }catch(e){}
+}
+$("#gear-rows").addEventListener("input",e=>{
+  const el=e.target.closest("[data-f]");if(!el)return;
+  const f=el.dataset.f;
+  const lab=el.parentElement.querySelector(".gv");
+  if(lab){
+    const st=((lastSetup||{}).studios||{})[gearKey]||{};
+    lab.textContent=f==="frames"
+      ?(Math.round((+el.value/(st.native_fps||24))*10)/10)+"s"
+      :f==="fps"?el.value+" fps":el.value;
+  }
+});
+$("#gear-rows").addEventListener("change",async e=>{
+  const el=e.target.closest("[data-f]");if(!el)return;
+  const f=el.dataset.f;
+  let patch={};
+  if(f==="size"){const p=el.value.split("x");patch={w:+p[0],h:+p[1]};}
+  else patch[f]=(el.type==="number"||el.type==="range")?+el.value:el.value;
+  await gearSave(patch);
+  $("#gear-rows").classList.add("dirty");
+});
+$("#gear-reset").addEventListener("click",async()=>{
+  await gearSave({_reset:true});openGear(gearKey);
+});
+$("#gear-ok").addEventListener("click",()=>{$("#gear-veil").hidden=true;paintStudios();});
+$("#gear-veil").addEventListener("click",e=>{
+  if(e.target===$("#gear-veil")){$("#gear-veil").hidden=true;paintStudios();}});
 function paintStudios(){
   const row=$("#studio-row");if(!row||!lastSetup)return;
   const ss=lastSetup.studios||{};
@@ -21117,6 +21765,7 @@ function paintStudios(){
 $("#studio-row").addEventListener("click",async e=>{
   const box=e.target.closest(".studio");if(!box)return;
   const key=box.dataset.k;
+  if(e.target.closest(".stgear")){openGear(key);return;}
   const notch=e.target.closest(".stnotch");
   if(notch){
     if(notch.classList.contains("off"))return;   // red refuses the click

@@ -297,6 +297,67 @@ try:
     _ist = json.loads(req("/api/setup", cookie=K)[2]).get("image") or {}
 except Exception:
     _ist = {}
+# 6b303, per Patrick: a gear per studio for defaults, and one-shot
+# quality overrides in chat that never touch those defaults.
+_GNS = {"re": re, "os": os, "sys": sys, "time": time, "json": json,
+        "html": __import__("html"), "glob": __import__("glob"),
+        "shutil": __import__("shutil"), "secrets": __import__("secrets"),
+        "threading": __import__("threading"),
+        "subprocess": __import__("subprocess")}
+_GNS.update(
+    studio_tier=lambda k, t="": {
+        "image": {"w": 1024, "h": 1024, "steps": 4, "base": "schnell"},
+        "video": {"w": 640, "h": 384, "steps": 20, "frames": 33}}[k],
+    _snap_dir=lambda r: "/nonexistent",
+    load_prefs=lambda b=None: {}, store_prefs=lambda d, b=None: None)
+try:
+    # ONE dict for globals and locals: split them and the module's own
+    # helpers resolve against the wrong namespace
+    exec(_MILLENAI_SRC[_MILLENAI_SRC.index("_prefs_lock = threading.Lock()"):
+                       _MILLENAI_SRC.index("def _studio_engine_ok")], _GNS)
+except Exception:
+    pass
+_go = _GNS.get("gen_overrides")
+_prevr = {"w": 1024, "h": 1024, "steps": 4, "frames": 33}
+def _ovr(t, key="image", loose=True):
+    return _go(t, key, loose, _prevr) if _go else ({}, t, [])
+check("chat overrides: parsed, stripped, and relative to the last render",
+      _ovr("regenerate this, but double the resolution")[0] == {"w": 2048, "h": 2048}
+      and _ovr("make the piano white and double the resolution")[1]
+          == "make the piano white"
+      and _ovr("same but at 4K")[0] == {"w": 3840, "h": 2160}
+      and _ovr("do that again at 1920x1080")[0] == {"w": 1920, "h": 1080}
+      and _ovr("higher quality")[0] == {"_effort": 1}
+      and _ovr("as a gif", "video")[0] == {"fmt": "gif"}
+      # a fresh commission must keep its subject words
+      and _ovr("draw a portrait of a woman", "image", False)[0] == {}
+      and _ovr("a 4k webcam on a desk", "image", False)[0] == {}
+      and _ovr("make a faster car", "image", False)[0] == {}
+      and "def gen_overrides" in _MILLENAI_SRC)
+_so = _GNS.get("studio_opts")
+check("studio settings are clamped, snapped and never raise",
+      _so and _so("image", {"w": 99999, "h": 99999})["w"] == 2048
+      and _so("image", {"steps": "abc"})["steps"] == 4
+      and _so("video", {"frames": 500})["frames"] == 97
+      and (_so("video", {"frames": 30})["frames"] - 1) % 4 == 0
+      and _so("video", {"w": 4096, "h": 4096})["w"] * 
+          _so("video", {"w": 4096, "h": 4096})["h"] <= 901120
+      and "def _snap_frames" in _MILLENAI_SRC
+      and "def _fit_area" in _MILLENAI_SRC)
+try:
+    _gs = json.loads(req("/api/setup", cookie=K)[2])["studios"]["image"]
+except Exception:
+    _gs = {}
+check("the gear dialog exists and offers only live controls",
+      'class="stgear"' in page and 'id="gear-veil"' in page
+      and "function openGear" in page and 'id="gear-reset"' in page
+      and set(_gs.get("formats") or []) == {"png", "jpg", "webp"}
+      and "opts" in _gs and "ranges" in _gs
+      # both confirmed dead by running the engine: mflux warns that
+      # --negative-prompt is ignored, and never reads --lora-style
+      and "lora-style" not in page and "lora_style" not in _MILLENAI_SRC
+      and '"--negative-prompt", o["neg"]' in _MILLENAI_SRC
+      and _MILLENAI_SRC.count('"--negative-prompt"') == 1)
 # 6b299/6b300/6b301, per Patrick: video alongside image, a colour-coded
 # size ladder, both removable, and intent that understands "make the
 # piano white" without being told the word "generate".
@@ -1118,7 +1179,11 @@ check("seamless dark title bar",
 # exception — the version right under the title says it better than a
 # sentence would — so five descriptions across six panes.
 check("settings: descriptions + Account pane + scoped forget",
-      page.count('class="tdesc"') == 5
+      # scoped to the settings panel: counting the whole page broke the
+      # moment another dialog grew a description (6b303)
+      (page.split('id="about-veil"')[1].split('id="gear-veil"')[0]
+       if 'id="gear-veil"' in page
+       else page.split('id="about-veil"')[1]).count('class="tdesc"') == 5
       and 'data-pane="p-account"' in page
       and '"/api/me"' in _MILLENAI_SRC
       and '"/api/logout"' in _MILLENAI_SRC

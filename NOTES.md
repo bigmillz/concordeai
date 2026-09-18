@@ -4848,3 +4848,47 @@ Steps stay at 20 or above everywhere.
 Also fixed: two rungs share a repo (they differ only in frames and
 size), and studio_bytes counted it twice — Remove was promising 40.2 GB
 of a 19.2 GB install. Repos are deduped in both the size and the sweep.
+
+## 6b303 — a gear per studio, and one-shot quality in chat (uncut)
+
+Per Patrick ("a gear icon into the corner of each that opens a pop-up
+giving options like resolution, frame rate, effort … then also allow in
+the query the user to say things to describe the sort of quality they
+want … while still leaving their default settings the same").
+
+THREE LAYERS, innermost wins: the rung's defaults, the user's saved
+settings, then a one-shot override parsed from the message. Only the
+last is forgotten afterwards.
+
+TWO CONTROLS ARE ABSENT ON PURPOSE, both confirmed by running the
+engine rather than reading docs: mflux warns at runtime that
+`--negative-prompt` is "ignored; FLUX.1 uses distilled guidance and has
+no negative branch", and it parses `--lora-style` without ever reading
+it (that flag belongs to a different entry point). A control that does
+nothing is worse than no control. Video keeps its negative prompt,
+where it is real.
+
+ENGINE FACTS, read from the model's own config.json rather than
+hardcoded: Wan aligns to patch_size[1] x vae_stride[1] = 32 (not 16,
+which is the image figure), caps area at 901,120 px, renders at 24 fps
+natively, and ASSERTS num_frames == 4n+1 — an unsnapped value is a
+crash, not a rounded render. `_fit_area` mirrors both of the engine's
+branches and then steps DOWN the grid, because rounding to the nearest
+step can land above the cap and the engine would rewrite it behind us.
+
+OVERRIDES are deterministic, never a model: an override is a number
+handed to a renderer, and a model reading "double it" as 4096 costs
+twenty minutes. Matched phrases are REMOVED from the text before the
+prompt rewrite sees them, so "make the piano white and double the
+resolution" splits cleanly. Bare "4k", "1080p", "portrait", "faster",
+"gif" only count on a FOLLOW-UP — they are ordinary subject words, and
+stripping them from a fresh commission would eat the subject.
+
+Each render writes a sidecar beside its file recording what it actually
+used, so "double the resolution" resolves against real numbers days
+later. Verified: a 512x512 jpg, then "double the resolution" produced
+exactly 1024x1024.
+
+Also: /api/video widened to gif and webm, and the renderer emits <img>
+rather than <video> for them, since a GIF in a video tag decodes to
+nothing. Prefs writes now take a lock — generations write prefs too.
