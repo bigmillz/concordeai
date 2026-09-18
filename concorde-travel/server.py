@@ -36,6 +36,7 @@ import time
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import adapter                                           # noqa: E402
 import narrator                                          # noqa: E402
 import scorer                                            # noqa: E402
 
@@ -395,6 +396,12 @@ def score_request(req):
     if not path:
         return {"error": "no such fixture: %s" % fid}
     sc = json.load(open(path, encoding="utf-8"))
+    return _score_scenario(sc, req)
+
+
+def _score_scenario(sc, req):
+    """One path for fixtures and live inventory alike. If these ever diverge,
+    a live search is being judged by different rules than the corpus."""
     profile = req.get("profile") or "reference"
     if profile not in sc["query"]["profiles"]:
         profile = "reference"
@@ -423,6 +430,39 @@ def score_request(req):
         "hidden": hidden,
         "narration": narrator.narrate(b, allow_model=False),
     }
+
+
+# Live scenarios are held in memory only. They are never written to fixtures/ -
+# a fixture is a hand-authored assertion about behaviour, and a search result is
+# neither hand-authored nor an assertion.
+_LIVE = {}
+
+
+def live_request(req):
+    """Normalise a recorded or live payload into a scenario, then score it with
+    exactly the same code path the fixtures use."""
+    src = req.get("source") or "sample"
+    if src == "sample":
+        path = os.path.join(HERE, "adapter_samples", "kiwi-jfk-lhr.json")
+        try:
+            with open(path, encoding="utf-8") as fh:
+                raw = json.load(fh)
+        except OSError as exc:
+            return {"error": "no recorded sample: %s" % exc}
+    elif src == "inline":
+        raw = req.get("payload") or {}
+    else:
+        return {"error": "unknown source %r - this server does not call a flight "
+                         "API itself; hand it a payload or use the recording" % src}
+
+    sc = adapter.from_kiwi(raw, origin_key=req.get("origin_key", "bushwick-brooklyn"))
+    if sc.get("error"):
+        return sc
+    _LIVE[sc["fixture_id"]] = sc
+    out = _score_scenario(sc, req)
+    out["coverage"] = adapter.coverage(sc)
+    out["live"] = True
+    return out
 
 
 def narrate_request(req):
@@ -474,7 +514,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
     # --------------------------------------------------------------- POST
     def do_POST(self):
         path = self.path.split("?")[0]
-        if path not in ("/api/score", "/api/narrate"):
+        if path not in ("/api/score", "/api/narrate", "/api/live"):
             return self.send_error(404)
         try:
             n = int(self.headers.get("Content-Length") or 0)
@@ -482,7 +522,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except Exception as exc:
             return self._json({"error": "bad request: %s" % exc})
         try:
-            fn = score_request if path == "/api/score" else narrate_request
+            fn = {"/api/score": score_request, "/api/narrate": narrate_request,
+                  "/api/live": live_request}[path]
             return self._json(fn(req))
         except Exception as exc:
             # a broken fixture should say so on the page, not 500 silently

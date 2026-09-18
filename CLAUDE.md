@@ -344,7 +344,7 @@ the moat.
 ## Build order
 
 fixtures → scorer → enrichment DB → intent parser → ledger narrator → live inventory
-adapter. **Fixtures, scorer and narrator are done.** Stack is Python, stdlib only —
+adapter. **All six are done.** Stack is Python, stdlib only —
 chosen in `docs/design.md`, and the reasoning there is worth reading before proposing
 otherwise. The one exception is the narrator, which uses the official `anthropic` SDK,
 imported lazily and entirely optional: with no key and no package the deterministic
@@ -358,7 +358,9 @@ python3 concorde-travel/scorer.py             # print every fixture's ledger, ev
 python3 fixtures/validate.py                  # fixture schema + semantics
 python3 concorde-travel/tests/test_scorer.py  # the fixtures' own assertions, executed
 python3 concorde-travel/tests/test_narrator.py   # the narrator's guard rails (no key needed)
+python3 concorde-travel/tests/test_adapter.py    # live normalisation, replayed offline
 python3 concorde-travel/tests/test_faststart.py
+python3 concorde-travel/adapter.py               # normalise the recorded payload, print coverage
 ```
 
 **Ports 8884–8930 are the model engines' — never bind there.** ConcordeGo uses 9897.
@@ -382,3 +384,37 @@ airport the brief did not supply, plus a list of unhedged certainty phrases (har
 Anything rejected falls back to the deterministic template. Do not relax the verifier to
 make nicer copy: it is the entire reason a model is allowed near this product. Note there
 is no `temperature` to reach for — it is removed on Claude Opus 5 and returns a 400.
+
+## The live adapter, and what a feed does not give you
+
+`concorde-travel/adapter.py` turns a third-party search into a scenario the scorer already
+reads — a live search and a hand-written fixture arrive at `score()` in the same shape, and
+`server.py` runs both through one `_score_scenario()`.
+
+**Hard rule 5 still holds, and is now enforced rather than trusted**: `test_adapter.py`
+asserts the scorer and its tests never import the adapter, and the adapter's own tests
+replay `adapter_samples/kiwi-jfk-lhr.json` — a real response captured once — instead of
+calling anything.
+
+Measured against that real payload, the feed supplies the skeleton and the price and very
+little else:
+
+- **No UTC offset on any timestamp.** The scorer's time model requires one, so the adapter
+  attaches it from `enrichment/airports.json`. Without that join the feed cannot satisfy the
+  schema at all.
+- **Marketing carrier only.** `KL6101` on JFK–LHR is a codeshare; KLM does not fly it. A
+  four-digit number under a two-letter code is the signature — 11 of 13 segments in the
+  sample.
+- **No equipment code anywhere**, so every aircraft, cabin and connectivity claim abstains.
+  Hard rule 2 is not a preference here: the data needed to break it does not exist.
+- **Baggage as a count already priced in**, and no fare brand — so the bags-versus-fare
+  arithmetic, the cheapest real win in the product, has nothing to work with.
+
+`adapter.coverage()` reports this per search and the page prints it. **A grade computed over
+mostly-abstained enrichment is not the same object as one over a curated route** — do not
+quietly drop that strip to make the results look more confident.
+
+`enrichment/` is the curated moat: airports (zones with DST transition dates, MCT, service
+hours, inter-terminal), carriers (reviewed ratings), ground access by origin and hour, and
+route par. **An airport that is not curated drops the itinerary rather than being guessed**,
+which is the scope discipline working, not a bug.

@@ -1,0 +1,22 @@
+{
+  "_comment": "The curated carrier table. A model may AUTHOR this file; only the arithmetic reads it. A rating decided at query time would make the same search return a different order tomorrow, which is hard rule 1 gone. Every row is reviewed and dated.",
+  "_as_of": "2026-03-01",
+  "_source": "ConcordeGo curated carrier table, human-reviewed",
+  "baseline": 0.72,
+  "ratings": {
+    "BA": {"rating": 0.78, "note": "Full service, current cabin, through bags, real irregular-ops desk"},
+    "VS": {"rating": 0.79, "note": "Strong transatlantic hard product"},
+    "DL": {"rating": 0.80, "note": "Consistent transatlantic operation"},
+    "UA": {"rating": 0.66, "note": "Full service, ageing cabin on several transatlantic routes"},
+    "AA": {"rating": 0.63, "note": "Pre-refresh widebody cabins on much of the Atlantic"},
+    "KL": {"rating": 0.80, "note": "Current cabin, strong hub, single-terminal transfer"},
+    "AF": {"rating": 0.74, "note": "Mixed cabin generations across the widebody fleet"},
+    "LH": {"rating": 0.75, "note": "Consistent, punctual, dated seat on older frames"},
+    "IB": {"rating": 0.68, "note": "Adequate hard product, slower recovery when it goes wrong"},
+    "TP": {"rating": 0.61, "note": "Adequate hard product, weaker punctuality record"},
+    "EI": {"rating": 0.67, "note": "Narrowbody transatlantic, US preclearance at DUB"},
+    "VY": {"rating": 0.44, "note": "Low cost, no interline, thin recovery"},
+    "EW": {"rating": 0.46, "note": "Low cost, no interline"},
+    "FR": {"rating": 0.40, "note": "Low cost, no interline, separate ticket by construction"}
+  }
+}

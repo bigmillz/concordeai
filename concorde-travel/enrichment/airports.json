@@ -1,0 +1,308 @@
+{
+  "_comment": "Curated airport facts. The scorer needs an explicit UTC offset per timestamp and no feed supplies one, so the offset rules live here: the transition dates are the curated part, and deriving an offset from them needs no timezone database at scoring time. Only airports in scope are listed; anything else abstains, which is the point.",
+  "_as_of": "2026-03-01",
+  "zones": {
+    "America/New_York": {
+      "standard": "-05:00",
+      "daylight": "-04:00",
+      "dst": {
+        "2026": [
+          "2026-03-08",
+          "2026-11-01"
+        ],
+        "2027": [
+          "2027-03-14",
+          "2027-11-07"
+        ]
+      }
+    },
+    "Europe/London": {
+      "standard": "+00:00",
+      "daylight": "+01:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
+    },
+    "Europe/Paris": {
+      "standard": "+01:00",
+      "daylight": "+02:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
+    },
+    "Europe/Amsterdam": {
+      "standard": "+01:00",
+      "daylight": "+02:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
+    },
+    "Europe/Madrid": {
+      "standard": "+01:00",
+      "daylight": "+02:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
+    },
+    "Europe/Rome": {
+      "standard": "+01:00",
+      "daylight": "+02:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
+    },
+    "Europe/Lisbon": {
+      "standard": "+00:00",
+      "daylight": "+01:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
+    }
+  },
+  "airports": {
+    "JFK": {
+      "zone": "America/New_York",
+      "iata_area": 1,
+      "schengen": false,
+      "process_minutes": {
+        "p50": 55,
+        "p90": 85
+      }
+    },
+    "EWR": {
+      "zone": "America/New_York",
+      "iata_area": 1,
+      "schengen": false,
+      "process_minutes": {
+        "p50": 70,
+        "p90": 105
+      }
+    },
+    "LHR": {
+      "zone": "Europe/London",
+      "iata_area": 2,
+      "schengen": false,
+      "process_minutes": {
+        "p50": 60,
+        "p90": 95
+      },
+      "mct_minutes": {
+        "default": 75,
+        "T3-T5": 90
+      },
+      "services": [
+        {
+          "what": "Terminal retail and food",
+          "hours_local": "05:00-22:00"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "airside_bus",
+        "minutes": 25,
+        "headway_minutes": 8,
+        "operating_hours_local": "05:00-23:00"
+      }
+    },
+    "CDG": {
+      "zone": "Europe/Paris",
+      "iata_area": 2,
+      "schengen": true,
+      "process_minutes": {
+        "p50": 60,
+        "p90": 100
+      },
+      "mct_minutes": {
+        "default": 90,
+        "2E-2F": 60
+      },
+      "night_curfew": {
+        "arrivals": [
+          "00:30",
+          "05:29"
+        ],
+        "departures": [
+          "00:00",
+          "04:59"
+        ],
+        "source": "arretes of 6 Nov 2003"
+      },
+      "services": [
+        {
+          "what": "Terminal 2 retail",
+          "hours_local": "05:00-23:30"
+        },
+        {
+          "what": "Landside admission to Terminal 2",
+          "hours_local": "04:00-22:30"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "walk",
+        "minutes": 35,
+        "headway_minutes": 0,
+        "operating_hours_local": "CDGVAL 04:00-01:00, then a 25-minute-headway bus"
+      }
+    },
+    "AMS": {
+      "zone": "Europe/Amsterdam",
+      "iata_area": 2,
+      "schengen": true,
+      "process_minutes": {
+        "p50": 55,
+        "p90": 85
+      },
+      "mct_minutes": {
+        "default": 50
+      },
+      "services": [
+        {
+          "what": "Schiphol retail and food",
+          "hours_local": "06:00-22:00"
+        },
+        {
+          "what": "Train to Amsterdam Centraal",
+          "hours_local": "05:50-00:30"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "walk",
+        "minutes": 15,
+        "headway_minutes": 0,
+        "operating_hours_local": "always"
+      },
+      "leave_airport_viable": true
+    },
+    "MAD": {
+      "zone": "Europe/Madrid",
+      "iata_area": 2,
+      "schengen": true,
+      "process_minutes": {
+        "p50": 60,
+        "p90": 95
+      },
+      "mct_minutes": {
+        "default": 60
+      },
+      "services": [
+        {
+          "what": "Terminal retail and food",
+          "hours_local": "05:00-23:00"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "airside_bus",
+        "minutes": 20,
+        "headway_minutes": 10,
+        "operating_hours_local": "05:00-23:30"
+      }
+    },
+    "LIS": {
+      "zone": "Europe/Lisbon",
+      "iata_area": 2,
+      "schengen": true,
+      "process_minutes": {
+        "p50": 55,
+        "p90": 90
+      },
+      "mct_minutes": {
+        "default": 60
+      },
+      "services": [
+        {
+          "what": "Terminal 1 retail and food",
+          "hours_local": "05:00-23:00"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "walk",
+        "minutes": 12,
+        "headway_minutes": 0,
+        "operating_hours_local": "always"
+      }
+    },
+    "MXP": {
+      "zone": "Europe/Rome",
+      "iata_area": 2,
+      "schengen": true,
+      "process_minutes": {
+        "p50": 55,
+        "p90": 85
+      },
+      "mct_minutes": {
+        "default": 60
+      },
+      "services": [
+        {
+          "what": "Terminal retail",
+          "hours_local": "05:30-22:30"
+        }
+      ]
+    },
+    "BCN": {
+      "zone": "Europe/Madrid",
+      "iata_area": 2,
+      "schengen": true,
+      "process_minutes": {
+        "p50": 55,
+        "p90": 90
+      },
+      "mct_minutes": {
+        "default": 45
+      },
+      "services": [
+        {
+          "what": "Terminal 1 retail and food",
+          "hours_local": "05:00-23:00"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "landside_bus",
+        "minutes": 18,
+        "headway_minutes": 10,
+        "operating_hours_local": "05:00-23:30"
+      }
+    }
+  }
+}

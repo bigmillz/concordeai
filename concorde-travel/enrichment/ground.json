@@ -1,0 +1,335 @@
+{
+  "_comment": "Ground access by (origin key, airport, hour band). The origin key stands in for a geocode until a geocoder exists; an origin we have not curated abstains rather than guessing, because a confidently wrong ground estimate is the failure mode this product exists to avoid. Fares carry effective dates: three of these moved inside one year.",
+  "_as_of": "2026-03-01",
+  "origins": {
+    "bushwick-brooklyn": {
+      "label": "Bushwick, Brooklyn, NY",
+      "lat": 40.6994,
+      "lon": -73.9119,
+      "airports": {
+        "JFK": [
+          {
+            "mode_id": "jfk-lefferts-free-airtrain",
+            "mode": "Subway, bus, then AirTrain from Lefferts Blvd",
+            "mode_kind": "transit",
+            "fare_cents": 300,
+            "door_to_door_minutes": {
+              "p50": 92,
+              "p90": 125
+            },
+            "transfers": 3,
+            "hours": "any",
+            "feasible": true,
+            "infeasible_reason": null
+          },
+          {
+            "mode_id": "jfk-airtrain-howard-beach",
+            "mode": "Subway then AirTrain at Howard Beach",
+            "mode_kind": "transit",
+            "fare_cents": 1175,
+            "door_to_door_minutes": {
+              "p50": 78,
+              "p90": 98
+            },
+            "transfers": 1,
+            "hours": "any",
+            "feasible": true,
+            "infeasible_reason": null
+          },
+          {
+            "mode_id": "jfk-rideshare",
+            "mode": "Rideshare",
+            "mode_kind": "rideshare",
+            "fare_cents": 6200,
+            "door_to_door_minutes": {
+              "p50": 37,
+              "p90": 62
+            },
+            "transfers": 0,
+            "tolls_cents": {
+              "outbound": 0,
+              "inbound": 0
+            },
+            "hours": "any",
+            "feasible": true,
+            "infeasible_reason": null
+          }
+        ],
+        "EWR": [
+          {
+            "mode_id": "ewr-njt-rail",
+            "mode": "Subway to Penn, NJ Transit, AirTrain Newark",
+            "mode_kind": "transit",
+            "fare_cents": 2025,
+            "door_to_door_minutes": {
+              "p50": 115,
+              "p90": 150
+            },
+            "transfers": 3,
+            "hours": "05:30-23:00",
+            "feasible": true,
+            "infeasible_reason": "NJ Transit's Newark Liberty Airport rail stop is served roughly 05:00-01:00, so an early departure cannot use it.",
+            "weakest_link": "njt-ewr-airport-rail"
+          },
+          {
+            "mode_id": "ewr-rideshare",
+            "mode": "Rideshare",
+            "mode_kind": "rideshare",
+            "fare_cents": 9200,
+            "door_to_door_minutes": {
+              "p50": 47,
+              "p90": 68
+            },
+            "transfers": 0,
+            "tolls_cents": {
+              "outbound": 0,
+              "inbound": 1679
+            },
+            "hours": "any",
+            "feasible": true,
+            "infeasible_reason": null
+          }
+        ]
+      }
+    }
+  },
+  "arrivals": {
+    "LHR": [
+      {
+        "mode_id": "lhr-elizabeth",
+        "mode": "Elizabeth line",
+        "mode_kind": "transit",
+        "fare_cents": 1700,
+        "door_to_door_minutes": {
+          "p50": 44,
+          "p90": 58
+        },
+        "transfers": 1,
+        "hours": "05:30-23:40",
+        "feasible": true,
+        "infeasible_reason": "The Elizabeth line does not run overnight."
+      },
+      {
+        "mode_id": "lhr-cab",
+        "mode": "Black cab",
+        "mode_kind": "rideshare",
+        "fare_cents": 9200,
+        "door_to_door_minutes": {
+          "p50": 52,
+          "p90": 95
+        },
+        "transfers": 0,
+        "hours": "any",
+        "feasible": true,
+        "infeasible_reason": null
+      }
+    ],
+    "CDG": [
+      {
+        "mode_id": "cdg-rer",
+        "mode": "RER B",
+        "mode_kind": "transit",
+        "fare_cents": 1300,
+        "door_to_door_minutes": {
+          "p50": 55,
+          "p90": 80
+        },
+        "transfers": 1,
+        "hours": "04:50-23:50",
+        "feasible": true,
+        "infeasible_reason": "RER B does not run overnight."
+      },
+      {
+        "mode_id": "cdg-rideshare",
+        "mode": "Rideshare",
+        "mode_kind": "rideshare",
+        "fare_cents": 6500,
+        "door_to_door_minutes": {
+          "p50": 50,
+          "p90": 90
+        },
+        "transfers": 0,
+        "hours": "any",
+        "feasible": true,
+        "infeasible_reason": null
+      }
+    ],
+    "AMS": [
+      {
+        "mode_id": "ams-train",
+        "mode": "Train to Amsterdam Centraal",
+        "mode_kind": "transit",
+        "fare_cents": 600,
+        "door_to_door_minutes": {
+          "p50": 26,
+          "p90": 40
+        },
+        "transfers": 0,
+        "hours": "05:50-00:30",
+        "feasible": true,
+        "infeasible_reason": "The airport train does not run overnight."
+      },
+      {
+        "mode_id": "ams-rideshare",
+        "mode": "Rideshare",
+        "mode_kind": "rideshare",
+        "fare_cents": 5200,
+        "door_to_door_minutes": {
+          "p50": 28,
+          "p90": 45
+        },
+        "transfers": 0,
+        "hours": "any",
+        "feasible": true,
+        "infeasible_reason": null
+      }
+    ],
+    "MAD": [
+      {
+        "mode_id": "mad-metro",
+        "mode": "Metro line 8",
+        "mode_kind": "transit",
+        "fare_cents": 500,
+        "door_to_door_minutes": {
+          "p50": 42,
+          "p90": 55
+        },
+        "transfers": 1,
+        "hours": "06:05-01:30",
+        "feasible": true,
+        "infeasible_reason": "The metro does not run overnight."
+      },
+      {
+        "mode_id": "mad-rideshare",
+        "mode": "Rideshare",
+        "mode_kind": "rideshare",
+        "fare_cents": 3800,
+        "door_to_door_minutes": {
+          "p50": 28,
+          "p90": 45
+        },
+        "transfers": 0,
+        "hours": "any",
+        "feasible": true,
+        "infeasible_reason": null
+      }
+    ],
+    "MXP": [
+      {
+        "mode_id": "mxp-malpensa-express",
+        "mode": "Malpensa Express",
+        "mode_kind": "transit",
+        "fare_cents": 1450,
+        "door_to_door_minutes": {
+          "p50": 62,
+          "p90": 80
+        },
+        "transfers": 1,
+        "hours": "05:26-23:26",
+        "feasible": true,
+        "infeasible_reason": "The Malpensa Express does not run overnight."
+      },
+      {
+        "mode_id": "mxp-rideshare",
+        "mode": "Rideshare",
+        "mode_kind": "rideshare",
+        "fare_cents": 11500,
+        "door_to_door_minutes": {
+          "p50": 52,
+          "p90": 85
+        },
+        "transfers": 0,
+        "hours": "any",
+        "feasible": true,
+        "infeasible_reason": null
+      }
+    ],
+    "LIS": [
+      {
+        "mode_id": "lis-metro",
+        "mode": "Metro red line",
+        "mode_kind": "transit",
+        "fare_cents": 190,
+        "door_to_door_minutes": {
+          "p50": 35,
+          "p90": 50
+        },
+        "transfers": 1,
+        "hours": "06:30-01:00",
+        "feasible": true,
+        "infeasible_reason": "The metro does not run overnight."
+      },
+      {
+        "mode_id": "lis-rideshare",
+        "mode": "Rideshare",
+        "mode_kind": "rideshare",
+        "fare_cents": 1800,
+        "door_to_door_minutes": {
+          "p50": 22,
+          "p90": 40
+        },
+        "transfers": 0,
+        "hours": "any",
+        "feasible": true,
+        "infeasible_reason": null
+      }
+    ],
+    "BCN": [
+      {
+        "mode_id": "bcn-aerobus",
+        "mode": "Aerobus to Placa Catalunya",
+        "mode_kind": "transit",
+        "fare_cents": 760,
+        "door_to_door_minutes": {
+          "p50": 40,
+          "p90": 60
+        },
+        "transfers": 1,
+        "hours": "05:00-01:00",
+        "feasible": true,
+        "infeasible_reason": "The Aerobus does not run 01:00-05:00."
+      },
+      {
+        "mode_id": "bcn-rideshare",
+        "mode": "Rideshare",
+        "mode_kind": "rideshare",
+        "fare_cents": 3400,
+        "door_to_door_minutes": {
+          "p50": 28,
+          "p90": 48
+        },
+        "transfers": 0,
+        "hours": "any",
+        "feasible": true,
+        "infeasible_reason": null
+      }
+    ]
+  },
+  "routes": {
+    "_comment": "Par is the all-in effective cost a CLEAN option achieves on this route. The grade is measured against it, so it is curated per route and date band rather than derived from whatever the search returned.",
+    "JFK-LHR": {
+      "par_cents": 105000
+    },
+    "EWR-LHR": {
+      "par_cents": 105000
+    },
+    "JFK-CDG": {
+      "par_cents": 108000
+    },
+    "JFK-AMS": {
+      "par_cents": 110000
+    },
+    "JFK-MAD": {
+      "par_cents": 100000
+    },
+    "JFK-MXP": {
+      "par_cents": 115000
+    },
+    "JFK-LIS": {
+      "par_cents": 98000
+    },
+    "JFK-BCN": {
+      "par_cents": 102000
+    }
+  }
+}

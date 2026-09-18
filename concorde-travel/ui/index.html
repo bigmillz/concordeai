@@ -421,6 +421,17 @@ body.novideo .glass{background:var(--panel);-webkit-backdrop-filter:none;backdro
 .narrator .lead{font-size:16px;line-height:1.55;max-width:74ch;font-family:var(--helv)}
 .narrator .sub{font-size:14px;color:var(--dim);max-width:76ch;font-family:var(--helv)}
 .narrator .src{font-size:11px;color:var(--faint);font-family:var(--mono);letter-spacing:.04em}
+/* A grade computed over mostly-abstained enrichment is not the same object as
+   one computed over a curated route, and the page should not present them
+   identically. */
+.coverage{margin-top:4px;padding:11px 13px;border-radius:9px;font-size:12.5px;
+  line-height:1.5;color:var(--dim);background:rgba(255,255,255,.04);
+  border:1px solid var(--line)}
+.coverage.thin{border-color:var(--fair);background:var(--fair-soft, rgba(217,180,92,.08))}
+.coverage b{color:var(--text);font-weight:500}
+.coverage ul{margin:7px 0 0;padding-left:17px}
+.coverage li{margin:2px 0;color:var(--faint)}
+
 .understood{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding-top:3px}
 .uchip{font-size:11.5px;font-family:var(--mono);border-radius:999px;padding:3px 10px;
   border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--dim)}
@@ -879,7 +890,7 @@ var STATE = {
   target:"comfort", bags:2,
   nonstop:false, oneticket:false, redeyeOK:false, shortlay:false, excursion:false,
   wifi:false, legroom:false, lieflat:false, lounge:false, bagsinc:false,
-  wishWeights:{}, groundMode:null,
+  wishWeights:{}, groundMode:null, live:false,
   balances:{}, filters:[], understood:[], overrides:{}, expanded:{},
   showFiltered:false, searched:false, firstPaint:true, fixture:"ground-access-swing"
 };
@@ -1199,9 +1210,13 @@ fetch("/api/fixtures").then(function(r){ return r.json(); }).then(function(list)
     if (f.fixture_id === STATE.fixture) o.selected = true;
     sel.appendChild(o);
   });
+  var lv = el("option", null, "Live \u00b7 JFK \u2192 LHR (recorded)");
+  lv.value = "__live__";
+  sel.appendChild(lv);
   document.getElementById("f-fixture-wrap").hidden = false;
   sel.onchange = function(){
     STATE.fixture = sel.value;
+    STATE.live = (sel.value === "__live__");
     STATE.expanded = {}; STATE.overrides = {}; STATE.firstPaint = true; LAST = null;
     var f = list.filter(function(x){ return x.fixture_id === sel.value; })[0];
     if (f){
@@ -1590,6 +1605,13 @@ function paint(){
     STATE.understood.forEach(function(u){ h += '<span class="uchip ' + u.cls + '">' + esc(u.text) + '</span>'; });
     h += '</div>';
   }
+  if (LAST.coverage){
+    var indicative = /indicative/.test(LAST.coverage.verdict);
+    h += '<div class="coverage' + (indicative ? ' thin' : '') + '">' +
+         '<b>Live inventory.</b> ' + esc(LAST.coverage.verdict) + '<ul>' +
+         LAST.coverage.gaps.map(function(g){ return '<li>' + esc(g) + '</li>'; }).join("") +
+         '</ul></div>';
+  }
   h += '<div class="src">' +
        (n.source === "model"
           ? 'Written by a model from the ledger, and checked against it \u2014 every figure here was computed, not phrased.'
@@ -1659,8 +1681,9 @@ function render(scroll){
   host.hidden = false;
   if (!LAST) host.innerHTML = '<div class="narrator glass"><div class="sub">Scoring…</div></div>';
   var body = requestBody();
-  fetch("/api/score", {method:"POST", headers:{"Content-Type":"application/json"},
-                       body: JSON.stringify(body)})
+  fetch(STATE.live ? "/api/live" : "/api/score",
+        {method:"POST", headers:{"Content-Type":"application/json"},
+         body: JSON.stringify(body)})
     .then(function(r){ return r.json(); })
     .then(function(d){
       LAST = d; paint();

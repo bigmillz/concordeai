@@ -866,3 +866,85 @@ It also tests the **false-positive** direction, which caught a real bug: the mon
 swallowed a trailing sentence comma, so `"at $455, $933 effective"` read as an invented
 `$455,` and the verifier rejected its own template. Every narration would have silently
 degraded to the fallback — and nobody would have noticed, because the fallback is fine.
+
+
+---
+
+# The live inventory adapter
+
+Build step six, done — the last one. `concorde-travel/adapter.py`.
+
+A third-party search goes in, a scenario the scorer already reads comes out. Everything
+downstream is untouched: `server.py` runs fixtures and live inventory through one
+`_score_scenario()`, so a live search cannot be judged by different rules than the corpus.
+
+## Hard rule 5, enforced rather than trusted
+
+The scorer and its tests never import the adapter, and `test_adapter.py` asserts exactly
+that. The adapter's own tests replay `adapter_samples/kiwi-jfk-lhr.json` — a real Kiwi.com
+response captured once — so the dependency is recorded, not live.
+
+## What a real feed actually gives you
+
+This was measured against that payload rather than guessed at, and it reshaped the module:
+
+| The feed has | The scorer needs |
+|---|---|
+| `"2026-11-12T20:00:00"` | an explicit UTC offset — 01:30 on 1 Nov at JFK happens twice |
+| `carrier: "KL"`, `flightNumber: "KL6101"` | the **operating** carrier; that route is a codeshare and KLM does not fly it |
+| nothing | an equipment code, for any cabin or connectivity claim |
+| `baggage: {checkedBag: 2}` | a fee schedule and a fare brand |
+
+So the feed supplies the skeleton and the price. **Everything that makes this product
+different is the join against `enrichment/`**, and where that join misses the adapter
+abstains loudly rather than filling in.
+
+Eleven of thirteen segments in the sample are codeshares. Every aircraft claim abstains —
+hard rule 2 is not a stylistic preference at this point, the data required to break it does
+not exist.
+
+## Coverage is part of the answer
+
+`coverage()` reports what was known and what was guessed, and the page prints it above the
+results:
+
+> **Live inventory.** Grades are indicative only — most enrichment is missing.
+> · no aircraft, cabin or connectivity claim can be made: the feed carries no equipment code
+> · 11 of 13 segments are codeshares, so even the operating carrier is unknown
+> · no on-time record joined for any segment
+> · no baggage fee schedule: the feed prices bags inline
+
+A grade computed over mostly-abstained enrichment is not the same object as one over a
+curated route. Presenting both with equal confidence would be the same dishonesty hard rule
+4 exists to prevent, one layer up.
+
+## Ticket topology, recovered
+
+Kiwi encodes ticket boundaries in its itinerary id: chunks sharing a prefix are one
+e-ticket, a new prefix is a new one. That is the self-transfer signal the baggage and risk
+terms need and it is otherwise invisible. A three-segment two-ticket itinerary correctly
+gets **both** kinds of layover — one inside a ticket that keeps its through-check, one
+crossing the boundary that loses it. My first test demanded every layover on a self-transfer
+be unprotected; the test was wrong, not the adapter.
+
+## The enrichment store
+
+`enrichment/` is build step three, extracted from where the fixtures had inlined it:
+airports (zones with curated DST transition dates, MCT, service hours, inter-terminal
+moves), carriers (reviewed ratings with a source and date), ground access by origin and
+hour, route par.
+
+The DST dates are curated rather than read from a timezone database on purpose — the scorer
+must run with no I/O and no versioned external state, and a tzdata update that silently
+moved a golden number would be very hard to notice.
+
+**An uncurated airport drops the itinerary rather than being guessed.** That is the scope
+discipline from the brief, working. When BCN turned up in a real search it was curated
+properly; the guard that catches this now tests the mechanism with a stripped enrichment
+rather than relying on some airport happening to be missing.
+
+## Not wired to a live API
+
+`/api/live` normalises a recorded sample or a payload handed to it. The server does not call
+a flight API itself — that belongs behind a key, a quota and a caching layer, and none of
+those are decisions to make inside an afternoon's adapter.
