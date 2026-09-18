@@ -24,7 +24,8 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
-from scorer import score, score_all, grade, load_scenario, DEFAULT, Line  # noqa: E402
+from scorer import (score, score_all, grade, timeline, load_scenario,  # noqa: E402
+                    DEFAULT, Line)
 
 FAILS = []
 CHECKS = [0]
@@ -176,6 +177,19 @@ def run(path):
     for oid, led in ledgers.items():
         neg = [l for l in led.lines if l.kind == "base" and l.amount_cents <= 0]
         check("[%s] %s has a positive ticket line" % (name, oid), not neg)
+
+    # The bar must be a RENDERING of the ledger, not a second opinion about the
+    # same trip. If these two ever disagree the page is lying in one of them.
+    for prof in sc["query"]["profiles"]:
+        for oid, o in opts.items():
+            led = score(sc, o, prof)
+            if led.infeasible_reason:
+                continue
+            tl = timeline(sc, o, prof)
+            check("[%s] %s's bar totals its door-to-door time (%s)" % (name, oid, prof),
+                  sum(l.minutes for l in tl) == led.door_to_door_minutes,
+                  "bar sums to %d, ledger says %d"
+                  % (sum(l.minutes for l in tl), led.door_to_door_minutes))
 
     # A credit for going into the city, given at an hour when there is no city to
     # go into, is the single most embarrassing thing this model could do. The

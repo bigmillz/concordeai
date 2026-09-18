@@ -122,6 +122,28 @@ body.gen #skyline{filter:brightness(.7)}
 #skyload .lbl{margin-top:11px;font-size:11px;letter-spacing:.24em;text-transform:uppercase;
   color:#dfe3ee;font-family:var(--mono);text-shadow:0 2px 14px rgba(0,0,0,.7)}
 
+/* A label should be a label. Anything that needs a sentence gets one of
+   these instead of a paragraph under the field. */
+.tip{
+  display:inline-grid;place-items:center;width:13px;height:13px;flex:none;
+  border:1px solid var(--line);border-radius:50%;color:var(--faint);
+  font-family:var(--mono);font-size:9px;line-height:1;cursor:help;
+  margin-left:6px;position:relative;vertical-align:1px;
+  text-transform:none;letter-spacing:0;font-weight:500;
+}
+.tip:hover,.tip:focus-visible{border-color:var(--accent-hot);color:#fff}
+.tip::after{
+  content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);left:50%;
+  transform:translateX(-50%);width:max-content;max-width:250px;
+  background:var(--panel2);border:1px solid var(--line-2);border-radius:8px;
+  padding:8px 11px;font-family:var(--sans);font-size:12px;line-height:1.45;
+  color:var(--text);text-transform:none;letter-spacing:0;text-align:left;
+  box-shadow:0 12px 30px -10px rgba(0,0,0,.8);opacity:0;pointer-events:none;
+  transition:opacity .12s;z-index:40;
+}
+.tip:hover::after,.tip:focus-visible::after{opacity:1}
+@media (max-width:620px){ .tip::after{left:auto;right:-8px;transform:none} }
+
 /* ----------------------------------------------------------- toolbar */
 /* Same material as the AI app's sidebar: ~34% panel carried by a heavy
    blur, one hairline, no hard tint. Wordmark dead centre. */
@@ -183,7 +205,7 @@ body.novideo .glass{background:var(--panel);-webkit-backdrop-filter:none;backdro
   font-family:var(--helv);font-size:clamp(25px,3.6vw,38px);font-weight:400;
   letter-spacing:-.01em;color:var(--text);
 }
-.hero p{color:var(--dim);font-family:var(--helv);font-size:15.5px;max-width:60ch}
+.hero p{color:var(--dim);font-family:var(--helv);font-size:15.5px;max-width:64ch;text-wrap:balance}
 
 .tabs{display:flex;gap:3px;flex-wrap:wrap;padding:7px 8px 0}
 .tab{
@@ -473,7 +495,7 @@ footer.note code{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
 
   <header class="hero">
     <h1>Flights, ranked by what they actually cost you.</h1>
-    <p>Not the ticket — the ticket plus the car to Newark at 6am, plus the bags the fare left out, plus the four hours at an airport where nothing is open.</p>
+    <p>The ticket, plus the car, the bags, the layover and the risk — as one number.</p>
   </header>
 
   <section class="glass" aria-label="Search">
@@ -486,7 +508,7 @@ footer.note code{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
 
     <div class="guidepane" id="pane-guide" hidden>
       <span class="eyebrow">Wizard — not built yet</span>
-      <p><b>Guide me</b> asks the questions that actually change the answer, one at a time, and ends on the same ranked list. It is not a second search — it fills in the same profile the form builds, so both paths score identically.</p>
+      <p>The questions that change the answer, one at a time. Same profile, same scorer, same list — just asked rather than filled in.</p>
       <ol class="guidesteps">
         <li><b>1</b> Where are you leaving from, exactly?</li>
         <li><b>2</b> What's waiting for you when you land?</li>
@@ -500,7 +522,7 @@ footer.note code{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
     <div class="panelbody" id="pane-form">
       <div class="row">
         <div class="field">
-          <label for="f-origin">Leaving from</label>
+          <label for="f-origin">Leaving from<span class="tip" tabindex="0" role="note" data-tip="A street address or postal code beats a city. Bushwick to JFK is a train; to Newark at 6am it is a $92 car. We price that gap.">i</span></label>
           <input id="f-origin" value="Wyckoff Ave &amp; Myrtle Ave, Bushwick, Brooklyn 11237"
                  placeholder="City, airport code — or better, a street address or postal code">
         </div>
@@ -511,38 +533,37 @@ footer.note code{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
                  placeholder="City, airport code — or better, a street address or postal code">
         </div>
       </div>
-      <p class="hint">The more exact you are, the better we rank. <b>Bushwick to JFK is a subway ride; Bushwick to EWR at 6am is a car.</b> We price that difference. Nobody else does.</p>
 
       <div class="row">
         <div class="field narrow"><label for="f-out">Depart</label><input id="f-out" type="date" value="2026-03-12"></div>
         <div class="field narrow"><label for="f-back">Return</label><input id="f-back" type="date" value="2026-03-19"></div>
         <div class="field narrow"><label for="f-pax">Travellers</label>
           <select id="f-pax"><option>1 adult</option><option>2 adults</option><option>3 adults</option><option>2 adults, 1 child</option></select></div>
-        <div class="field narrow"><label for="f-bags">Checked bags each</label>
+        <div class="field narrow" id="f-fixture-wrap" hidden><label for="f-fixture">Scenario</label>
+          <select id="f-fixture"></select></div>
+        <div class="field narrow"><label for="f-bags">Checked bags<span class="tip" tabindex="0" role="note" data-tip="Per traveller. This is where the cheapest fare usually stops being the cheapest.">i</span></label>
           <select id="f-bags"><option value="0">None</option><option value="1">1 bag</option><option value="2" selected>2 bags</option></select></div>
       </div>
 
       <fieldset class="fset">
-        <div class="fs-head"><span class="eyebrow">Budget &amp; points</span><span class="rule"></span></div>
+        <div class="fs-head"><span class="eyebrow">Budget &amp; points</span><span class="tip" tabindex="0" role="note" data-tip="Maximum is a hard ceiling. Target is a nudge, not a filter.">i</span><span class="rule"></span></div>
         <div class="row">
           <div class="field money narrow"><label for="f-max">Maximum</label><input id="f-max" value="$1,150" inputmode="numeric"></div>
           <div class="field money narrow"><label for="f-target">Target</label><input id="f-target" value="$700" inputmode="numeric"></div>
-          <div class="field money"><label for="f-incid">Incidentals I'd happily spend</label><input id="f-incid" value="$180" inputmode="numeric" placeholder="Lounge pass, change fee, extra bag, seat"></div>
+          <div class="field money"><label for="f-incid">Incidentals<span class="tip" tabindex="0" role="note" data-tip="Padding for extras worth buying — a lounge pass, a change fee, a seat with legroom.">i</span></label><input id="f-incid" value="$180" inputmode="numeric" placeholder="Lounge pass, change fee, extra bag, seat"></div>
         </div>
-        <p class="hint">Incidentals is padding for things <b>worth buying</b> — a lounge day pass on a long layover, a change fee on a cheap carrier, a seat with legroom. Give us the ceiling and we'll propose them instead of pretending you're flying bare.</p>
         <div class="points" id="f-points"></div>
         <button class="addpt" id="f-addpt" type="button">+ Add a points balance</button>
       </fieldset>
 
       <fieldset class="fset">
-        <div class="fs-head"><span class="eyebrow">What you'll put up with</span><span class="rule"></span></div>
+        <div class="fs-head"><span class="eyebrow">What you'll put up with</span><span class="tip" tabindex="0" role="note" data-tip="Practical trade-offs, not departure-time pickers — those narrow the search before you have seen anything.">i</span><span class="rule"></span></div>
         <div class="chips" id="f-opts"></div>
-        <p class="hint">Deliberately not "depart between 8 and 10am". Those pickers make you strangle the search before you've seen anything.</p>
       </fieldset>
 
       <div class="targetbar">
         <div>
-          <div class="eyebrow" style="margin-bottom:7px">Rank these for</div>
+          <div class="eyebrow" style="margin-bottom:7px">Rank these for<span class="tip" tabindex="0" role="note" data-tip="Changes the order, never the grade. The grade measures every flight against one neutral yardstick, so a bargain can lead your list and still show a D.">i</span></div>
           <div class="seg" id="f-target-seg" role="group" aria-label="Ranking target">
             <button data-t="fastest" aria-pressed="false">Fastest</button>
             <button data-t="cheapest" aria-pressed="false">Cheapest</button>
@@ -551,404 +572,22 @@ footer.note code{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
         </div>
         <button class="go" id="f-go">Search flights</button>
       </div>
-      <p class="hint">This changes the <b>order</b>, never the <b>grade</b> — the grade measures every flight against the same neutral yardstick, so a bargain can sit at the top of your list and still show a D.</p>
     </div>
   </section>
 
   <div class="results" id="results" hidden></div>
 
   <footer class="note">
-    <div><b>Draft interface.</b> Every itinerary here is hand-written fixture data — no live flight API, per hard rule 5. The scorer in this file is a stand-in that emits the same ledger shape the real one will, so the bar, the grade, the good/bad lists and the recommendation are four projections of <b>one</b> computed object rather than four independent guesses.</div>
-    <div>Ranking is deterministic arithmetic: <code>effective_cost = ticket + bags + ground + time×rate + comfort ± risk</code>. The only things a model does on this page are parse dictated wishes into bounded weights on the way in, and write the prose on the way out.</div>
+    <div><b>Draft interface.</b> Hand-written fixtures, no live flight API. Scored by <code>concorde-travel/scorer.py</code> over HTTP — the bar, the grade, the ledger and the prose are four renderings of one computed object.</div>
+    <div><code>effective_cost = ticket + bags + ground + time×rate + comfort ± risk</code>. Deterministic. A model turns your words into weights on the way in and writes prose on the way out; it never touches the order.</div>
   </footer>
 </div>
 
 <div id="modal-root"></div>
-<script>
-/* ===================================================================
-   FIXTURE DATA — hand-written, hard rule 5. No live API anywhere here.
-   This is a UI-facing view model: a flattened projection of the real
-   fixture schema. When the scorer lands, this array gets replaced by
-   fixtures/*.json and nothing above this line changes.
-
-   Every number below is a fixture value chosen to be plausible, not a
-   quote. Anything probabilistic carries its sample and window so the
-   narrator can hedge it (hard rule 2).
-   =================================================================== */
-
-// Curated par for this route + date: the all-in effective cost a CLEAN
-// option achieves — a nonstop, bags sorted, sane ground at both ends.
-// The GRADE is this itinerary measured against that par, which is why it
-// does not move when the user switches target. One yardstick, everybody.
-// It is a property of the route and date, not of any one itinerary.
-var ROUTE_PAR = 1075;
-
-var HOME = "Bushwick, Brooklyn";
-var DEST = "Shoreditch, London";
-
-/* Corrected against research — see docs/design.md, "Corrections and gaps".
-   The subway is $3.00 (changed 2026-01-04), not $2.90. Bushwick to JFK is
-   $11.75 the sensible way, not $2.90: the AirTrain is free everywhere
-   EXCEPT Jamaica and Howard Beach, so the $3.00 route means three
-   transfers and ~92 minutes. And the 6am Newark problem is NOT "transit
-   doesn't run" — the subway runs all night. NJ Transit's airport rail
-   stop is what doesn't open until ~05:00. */
-var GROUND = {
-  jfk_train:  {mode:"L to A, then AirTrain at Howard Beach", cost:11.75, mins:78,
-               note:"Subway $3.00 + AirTrain $8.75; the all-free Lefferts Blvd route is 3 transfers and ~92 min", viable:true},
-  jfk_car:    {mode:"Rideshare", cost:62, mins:37, note:"Route average, no evening surge premium", viable:true},
-  ewr_car_am: {mode:"Rideshare", cost:92, mins:47,
-               note:"04:15 pickup, no surge; $0 in tolls — Port Authority crossings charge NY-bound only", viable:true},
-  ewr_train:  {mode:"Subway to Penn, NJ Transit, AirTrain", cost:20.25, mins:115,
-               note:"Not viable: NJ Transit's airport rail stop runs ~05:00–01:00 and you need the terminal by 04:30", viable:false},
-  lhr_eliz:   {mode:"Elizabeth line to Liverpool St", cost:17, mins:44, note:"To Shoreditch", viable:true},
-  lhr_night:  {mode:"Black cab (Elizabeth line closed)", cost:92, mins:52, note:"Arrival after the last train", viable:true}
-};
-
-var ITINS = [
-  {
-    id:"ba178", carrier:{code:"BA", name:"British Airways", color:"#1d4e89", quality:0.78},
-    route:"JFK → LHR", nonstop:true, fare:"Economy Standard", cabin:"Economy",
-    ticket:612, taxes:0, par:ROUTE_PAR,
-    depLocal:"19:25", arrLocal:"07:35 +1", redeye:true,
-    ground:{out:GROUND.jfk_train, in:GROUND.lhr_eliz},
-    airportWait:55, flyMins:425, layovers:[],
-    bags:{included:1, first:100, second:200, carryOn:true},
-    legs:[{fl:"BA 178", from:"JFK T7", to:"LHR T5", dep:"19:25", arr:"07:35 +1", equip:"A350-1000", mins:425,
-           note:"Club-generation cabin, Panasonic Ku"}],
-    equipClaim:{text:"A350-1000 with the current cabin", freq:0.91, sample:60},
-    wifi:{oceanic:true, freq:0.88, sample:60},
-    reliability:{onTime:0.81, sample:60, source:"BTS, JFK departures"},
-    risk:{misconnectP:0, severityCost:0, severityNote:"Nonstop — no misconnect exposure"},
-    seatPitch:31,
-    bookings:[{who:"britishairways.com", price:612, direct:true},
-              {who:"Expedia", price:618, direct:false},
-              {who:"Kiwi.com", price:604, direct:false, note:"Self-transfer protection not applicable"}]
-  },
-  {
-    id:"ua934", carrier:{code:"UA", name:"United", color:"#1b3a6b", quality:0.66},
-    route:"EWR → LHR", nonstop:true, fare:"Basic Economy", cabin:"Economy",
-    ticket:455, taxes:0, par:ROUTE_PAR,
-    depLocal:"06:10", arrLocal:"18:05", redeye:false,
-    ground:{out:GROUND.ewr_car_am, in:GROUND.lhr_eliz},
-    airportWait:70, flyMins:415, layovers:[],
-    bags:{included:0, first:85,  second:110, carryOn:true},
-    legs:[{fl:"UA 934", from:"EWR TB", to:"LHR T2", dep:"06:10", arr:"18:05", equip:"767-300ER", mins:415,
-           note:"Pre-refresh cabin on most departures"}],
-    equipClaim:{text:"767-300ER, older cabin", freq:0.79, sample:60},
-    wifi:{oceanic:false, freq:0.73, sample:60},
-    reliability:{onTime:0.74, sample:60, source:"BTS, EWR departures"},
-    risk:{misconnectP:0, severityCost:0, severityNote:"Nonstop — no misconnect exposure"},
-    seatPitch:31,
-    bookings:[{who:"united.com", price:455, direct:true},
-              {who:"Priceline", price:449, direct:false},
-              {who:"Expedia", price:462, direct:false}]
-  },
-  {
-    id:"dl4", carrier:{code:"DL", name:"Delta", color:"#153b6e", quality:0.82},
-    route:"JFK → LHR", nonstop:true, fare:"Main Cabin", cabin:"Economy",
-    ticket:780, taxes:0, par:ROUTE_PAR,
-    depLocal:"22:05", arrLocal:"10:15 +1", redeye:true,
-    ground:{out:GROUND.jfk_train, in:GROUND.lhr_eliz},
-    airportWait:55, flyMins:420, layovers:[],
-    bags:{included:1, first:100, second:200, carryOn:true},
-    award:{program:"Virgin Atlantic Flying Club", points:60000, cashTaxes:86,
-           from:"Chase Ultimate Rewards", ratio:"1:1", latencyDays:1, availability:"saver seat not confirmed"},
-    legs:[{fl:"DL 4", from:"JFK T4", to:"LHR T3", dep:"22:05", arr:"10:15 +1", equip:"A330-900neo", mins:420,
-           note:"Delta One cabin forward; economy 31in"}],
-    equipClaim:{text:"A330-900neo", freq:0.94, sample:60},
-    wifi:{oceanic:true, freq:0.92, sample:60},
-    reliability:{onTime:0.86, sample:60, source:"BTS, JFK departures"},
-    risk:{misconnectP:0, severityCost:0, severityNote:"Nonstop — no misconnect exposure"},
-    seatPitch:31,
-    bookings:[{who:"delta.com", price:780, direct:true},
-              {who:"Expedia", price:789, direct:false}]
-  },
-  {
-    id:"af1234", carrier:{code:"AF", name:"Air France", color:"#0a2f6b", quality:0.74},
-    route:"JFK → CDG → LHR", nonstop:false, fare:"Economy Light", cabin:"Economy",
-    ticket:398, taxes:0, par:ROUTE_PAR,
-    depLocal:"19:45", arrLocal:"08:55 +1", redeye:true,
-    ground:{out:GROUND.jfk_train, in:GROUND.lhr_eliz},
-    airportWait:55, flyMins:475,
-    layovers:[{airport:"CDG", mins:250, arrLocal:"01:40", terminal:"2E → 2F", terminalChange:true,
-               reclearImmigration:true, reclearSecurity:true, mct:90, deadHours:true,
-               leaveAirport:false, note:"Schengen entry at 1:40am, minimal desks; 2F landside closed, CDGVAL reduced"}],
-    bags:{included:0, first:75,  second:100, carryOn:true},
-    legs:[{fl:"AF 023", from:"JFK T1", to:"CDG 2E", dep:"19:45", arr:"01:40 +1", equip:"777-300ER", mins:415, note:"Mixed cabin generations"},
-          {fl:"AF 1680", from:"CDG 2F", to:"LHR T4", dep:"05:50", arr:"06:05", equip:"A220-300", mins:75, note:""}],
-    equipClaim:{text:"777-300ER, cabin generation varies", freq:0.55, sample:60},
-    wifi:{oceanic:true, freq:0.61, sample:60},
-    reliability:{onTime:0.69, sample:60, source:"fixture — no BTS coverage for the intra-Europe leg"},
-    risk:{misconnectP:0.11, severityCost:190, severityNote:"First bank of the morning; a miss is a 4h wait, not a hotel"},
-    seatPitch:31,
-    bookings:[{who:"airfrance.com", price:398, direct:true},
-              {who:"Kiwi.com", price:381, direct:false, note:"Separate tickets — no rebooking duty"}]
-  },
-  {
-    id:"kl642", carrier:{code:"KL", name:"KLM", color:"#00a1de", quality:0.80},
-    route:"JFK → AMS → LHR", nonstop:false, fare:"Economy Standard", cabin:"Economy",
-    ticket:486, taxes:0, par:ROUTE_PAR,
-    depLocal:"18:20", arrLocal:"09:40 +1", redeye:true,
-    ground:{out:GROUND.jfk_train, in:GROUND.lhr_eliz},
-    airportWait:55, flyMins:480,
-    layovers:[{airport:"AMS", mins:95, arrLocal:"07:35", terminal:"single terminal", terminalChange:false,
-               reclearImmigration:true, reclearSecurity:false, mct:50, deadHours:false,
-               leaveAirport:false, note:"Schengen entry, one terminal, everything open"}],
-    bags:{included:1, first:95,  second:190, carryOn:true},
-    legs:[{fl:"KL 642", from:"JFK T4", to:"AMS", dep:"18:20", arr:"07:35 +1", equip:"787-9", mins:435, note:"Current cabin"},
-          {fl:"KL 1017", from:"AMS", to:"LHR T4", dep:"09:10", arr:"09:40", equip:"E195-E2", mins:80, note:""}],
-    equipClaim:{text:"787-9", freq:0.89, sample:60},
-    wifi:{oceanic:true, freq:0.84, sample:60},
-    reliability:{onTime:0.78, sample:60, source:"fixture — foreign carrier, no BTS flight-number coverage"},
-    risk:{misconnectP:0.14, severityCost:150, severityNote:"Hourly AMS–LHR service; a miss costs about 2 hours"},
-    seatPitch:31,
-    bookings:[{who:"klm.com", price:486, direct:true},
-              {who:"Expedia", price:491, direct:false}]
-  },
-  {
-    id:"tp204", carrier:{code:"TP", name:"TAP Air Portugal", color:"#008a3e", quality:0.61},
-    route:"EWR → LIS → LHR", nonstop:false, fare:"Economy Discount", cabin:"Economy",
-    ticket:342, taxes:0, par:ROUTE_PAR,
-    depLocal:"21:35", arrLocal:"21:05 +1", redeye:true,
-    ground:{out:{mode:"Rideshare", cost:62, mins:52, note:"9:00pm pickup", viable:true}, in:GROUND.lhr_eliz},
-    airportWait:65, flyMins:455,
-    layovers:[{airport:"LIS", mins:545, arrLocal:"10:15", terminal:"T1", terminalChange:false,
-               reclearImmigration:true, reclearSecurity:true, mct:60, deadHours:false,
-               leaveAirport:true, note:"9h05m in daylight, 20min metro to the city, bags checked through"}],
-    bags:{included:0, first:70,  second:95,  carryOn:true},
-    legs:[{fl:"TP 204", from:"EWR TB", to:"LIS", dep:"21:35", arr:"10:15 +1", equip:"A330-900neo", mins:400, note:""},
-          {fl:"TP 1366", from:"LIS", to:"LHR T2", dep:"19:20", arr:"21:05", equip:"A320neo", mins:165, note:""}],
-    equipClaim:{text:"A330-900neo", freq:0.83, sample:60},
-    wifi:{oceanic:false, freq:0.44, sample:60},
-    reliability:{onTime:0.63, sample:60, source:"fixture — foreign carrier, no BTS flight-number coverage"},
-    risk:{misconnectP:0.04, severityCost:120, severityNote:"9h margin absorbs almost any inbound delay"},
-    seatPitch:30,
-    bookings:[{who:"flytap.com", price:342, direct:true},
-              {who:"Kiwi.com", price:335, direct:false}]
-  },
-  {
-    id:"play", carrier:{code:"PP", name:"PLAY", color:"#c8102e", quality:0.38},
-    route:"EWR → KEF → LHR", nonstop:false, fare:"Basic", cabin:"Economy",
-    ticket:228, taxes:0, par:ROUTE_PAR,
-    depLocal:"20:50", arrLocal:"12:40 +1", redeye:true,
-    ground:{out:{mode:"Rideshare", cost:62, mins:52, note:"8:15pm pickup", viable:true}, in:GROUND.lhr_eliz},
-    airportWait:70, flyMins:390,
-    layovers:[{airport:"KEF", mins:235, arrLocal:"05:30", terminal:"single terminal", terminalChange:false,
-               reclearImmigration:false, reclearSecurity:true, mct:60, deadHours:true,
-               leaveAirport:false, note:"05:30 arrival, most concessions shut until 07:00"}],
-    bags:{included:0, first:75,  second:95,  carryOn:false},
-    legs:[{fl:"OG 112", from:"EWR TB", to:"KEF", dep:"20:50", arr:"05:30 +1", equip:"A321neo", mins:330, note:"No seatback IFE, no wifi"},
-          {fl:"OG 440", from:"KEF", to:"LHR T2", dep:"09:25", arr:"12:40", equip:"A320neo", mins:195, note:""}],
-    equipClaim:{text:"A321neo", freq:0.96, sample:60},
-    wifi:{oceanic:false, freq:0.0, sample:60},
-    reliability:{onTime:0.58, sample:60, source:"fixture — foreign carrier, no BTS flight-number coverage"},
-    risk:{misconnectP:0.19, severityCost:340, severityNote:"Separate tickets — a miss means buying a new one, and KEF–LHR is twice daily"},
-    seatPitch:29,
-    bookings:[{who:"flyplay.com", price:228, direct:true, note:"Changes $90 + fare difference"}]
-  },
-  {
-    id:"n0880", carrier:{code:"N0", name:"Norse Atlantic", color:"#1c2b4a", quality:0.48},
-    route:"JFK → OSL → LHR", nonstop:false, fare:"Light (separate tickets)", cabin:"Economy",
-    ticket:264, taxes:0, par:ROUTE_PAR,
-    depLocal:"17:40", arrLocal:"22:15 +1", redeye:true,
-    ground:{out:GROUND.jfk_train, in:GROUND.lhr_night},
-    airportWait:70, flyMins:465,
-    layovers:[{airport:"OSL", mins:1265, arrLocal:"06:15", terminal:"single terminal", terminalChange:false,
-               reclearImmigration:true, reclearSecurity:true, mct:45, deadHours:true,
-               leaveAirport:false, note:"21h05m — the onward seat is the next day's flight, and the terminal shuts overnight"}],
-    bags:{included:0, first:85, second:110, carryOn:true},
-    legs:[{fl:"N0 880", from:"JFK T1", to:"OSL", dep:"17:40", arr:"06:15 +1", equip:"787-9", mins:395, note:"No included meal, no seatback IFE"},
-          {fl:"WF 402", from:"OSL", to:"LHR T2", dep:"03:20", arr:"22:15", equip:"737-800", mins:130, note:"Separate ticket — not protected against the inbound"}],
-    equipClaim:{text:"787-9", freq:0.86, sample:60},
-    wifi:{oceanic:false, freq:0.0, sample:60},
-    reliability:{onTime:0.61, sample:60, source:"fixture — foreign carrier, no BTS flight-number coverage"},
-    risk:{misconnectP:0.06, severityCost:520, severityNote:"Separate tickets and one onward flight a day — a miss is a new ticket and a hotel night"},
-    seatPitch:29,
-    bookings:[{who:"flynorse.com", price:264, direct:true, note:"Onward OSL–LHR sold separately"},
-              {who:"Kiwi.com", price:281, direct:false, note:"Self-transfer — Kiwi's own guarantee, not the airline's"}]
-  },
-  {
-    id:"aa100", carrier:{code:"AA", name:"American Airlines", color:"#9da6ab", quality:0.63},
-    route:"JFK → LHR", nonstop:true, fare:"Main Cabin", cabin:"Economy",
-    ticket:538, taxes:0, par:ROUTE_PAR,
-    depLocal:"18:30", arrLocal:"06:35 +1", redeye:true,
-    ground:{out:GROUND.jfk_train, in:GROUND.lhr_eliz},
-    airportWait:55, flyMins:420, layovers:[],
-    bags:{included:0, first:75,  second:100, carryOn:true},
-    legs:[{fl:"AA 100", from:"JFK T8", to:"LHR T3", dep:"18:30", arr:"06:35 +1", equip:"777-200ER", mins:420,
-           note:"Three cabin configs in this subfleet"}],
-    equipClaim:{text:"777-200ER, pre-refresh cabin", freq:0.71, sample:60},
-    wifi:{oceanic:false, freq:0.73, sample:60},
-    reliability:{onTime:0.76, sample:60, source:"BTS, JFK departures"},
-    risk:{misconnectP:0, severityCost:0, severityNote:"Nonstop — no misconnect exposure"},
-    seatPitch:31,
-    bookings:[{who:"aa.com", price:538, direct:true},
-              {who:"Expedia", price:544, direct:false}]
-  }
-];
-
-var POINT_PROGRAMS = [
-  {id:"chase",  name:"Chase Ultimate Rewards", cpp:0.016},
-  {id:"amex",   name:"Amex Membership Rewards", cpp:0.015},
-  {id:"cap1",   name:"Capital One Miles", cpp:0.015},
-  {id:"delta",  name:"Delta SkyMiles", cpp:0.012},
-  {id:"united", name:"United MileagePlus", cpp:0.013},
-  {id:"aa",     name:"AAdvantage", cpp:0.014},
-  {id:"vs",     name:"Virgin Atlantic Flying Club", cpp:0.013},
-  {id:"fb",     name:"Air France/KLM Flying Blue", cpp:0.012}
-];
-
-/* ===================================================================
-   THE SCORER — stand-in for the real one, same ledger shape.
-   Pure: (itinerary, profile, prefs) -> ledger. No clock, no network.
-   Everything on screen reads this object and only this object.
-   =================================================================== */
-
-var PROFILES = {
-  // The grade's yardstick. Same for every user, which is the point.
-  reference: {hourly:35, comfort:1.00, label:"neutral reference"},
-  fastest:   {hourly:95, comfort:0.85, label:"Fastest"},
-  cheapest:  {hourly:12, comfort:0.45, label:"Cheapest"},
-  comfort:   {hourly:55, comfort:2.00, label:"Most comfortable"}
-};
-
-function money(n){
-  var s = Math.abs(Math.round(n)).toLocaleString("en-US");
-  return "$" + s;
-}
-function hm(mins){
-  var h = Math.floor(mins/60), m = mins%60;
-  return h + "h" + (m<10?"0":"") + m + "m";
-}
-
-function doorToDoor(it){
-  var lay = 0;
-  for (var i=0;i<it.layovers.length;i++) lay += it.layovers[i].mins;
-  return it.ground.out.mins + it.airportWait + it.flyMins + lay + it.ground.in.mins;
-}
-
-function bagCost(it, bags){
-  if (bags <= it.bags.included) return 0;
-  var c = 0;
-  if (bags >= it.bags.included + 1) c += it.bags.first;
-  if (bags >= it.bags.included + 2) c += it.bags.second;
-  return c;
-}
-
-function layoverPenalty(l, p){
-  var h = l.mins/60, pen = 0, why = [];
-  var excess = Math.max(0, h - 1.5);
-  if (excess > 0){ pen += excess * p.hourly * 0.55; why.push(hm(l.mins) + " on the ground at " + l.airport); }
-  if (l.deadHours){ pen += 85; why.push("lands " + l.arrLocal + " local, nothing open"); }
-  if (l.reclearImmigration){ pen += 25; why.push("re-clear immigration"); }
-  if (l.reclearSecurity){ pen += 20; why.push("re-clear security"); }
-  if (l.terminalChange){ pen += 15; why.push("terminal change " + l.terminal); }
-  if (l.mins - l.mct < 30){ pen += 60; why.push("only " + (l.mins - l.mct) + " min over the " + l.mct + " min minimum"); }
-  if (l.leaveAirport && h >= 6 && !l.deadHours){ pen -= 90; why.push("long enough and civilised enough to leave the airport"); }
-  return {amount: pen, why: why.join(", ")};
-}
-
-function score(it, profile, prefs){
-  var p = PROFILES[profile], lines = [];
-  var bags = prefs.bags;
-
-  lines.push({kind:"base", amount: it.ticket + it.taxes, label:"Ticket",
-              evidence: it.fare + ", " + it.cabin, code:"ticket"});
-
-  var bc = bagCost(it, bags);
-  if (bc > 0) lines.push({kind:"cost", amount: bc, code:"bags", overridable:true,
-      label: (bags - it.bags.included) + " checked bag" + ((bags-it.bags.included)>1?"s":"") + " not included",
-      evidence: it.fare + " includes " + (it.bags.included || "none") + "; you said " + bags});
-  else if (it.bags.included >= bags && bags > 0)
-    lines.push({kind:"credit", amount: -25, code:"bags_inc", overridable:true,
-      label: "Checked bag included", evidence: it.fare + " covers " + it.bags.included});
-
-  var go = it.ground.out;
-  lines.push({kind:"cost", amount: go.cost, code:"ground_out", overridable:true,
-      label: HOME + " to " + it.route.split(" ")[0] + " at " + it.depLocal + ": " + go.mode,
-      evidence: go.note + (go.viable ? "" : "") + " · " + hm(go.mins)});
-  var gi = it.ground.in;
-  lines.push({kind:"cost", amount: gi.cost, code:"ground_in", overridable:true,
-      label: "Arrival airport to " + DEST + ": " + gi.mode,
-      evidence: gi.note + " · " + hm(gi.mins)});
-
-  var d2d = doorToDoor(it);
-  lines.push({kind:"cost", amount: (d2d/60) * p.hourly, code:"time", overridable:false,
-      label: hm(d2d) + " door to door at " + money(p.hourly) + "/hour",
-      evidence: "Ground " + hm(go.mins + gi.mins) + " + airport " + hm(it.airportWait) + " + air " + hm(it.flyMins) +
-                (it.layovers.length ? " + layover " + hm(d2d - go.mins - gi.mins - it.airportWait - it.flyMins) : "")});
-
-  for (var i=0;i<it.layovers.length;i++){
-    var lp = layoverPenalty(it.layovers[i], p);
-    if (Math.abs(lp.amount) >= 1)
-      lines.push({kind: lp.amount >= 0 ? "cost" : "credit", amount: lp.amount * p.comfort, code:"layover", overridable:true,
-        label: (lp.amount >= 0 ? "Layover at " : "Layover at ") + it.layovers[i].airport + " — " + hm(it.layovers[i].mins),
-        evidence: lp.why});
-  }
-
-  if (!it.wifi.oceanic)
-    lines.push({kind:"cost", amount: 60 * p.comfort * (prefs.wifiMatters ? 1.8 : 1), code:"wifi", overridable:true,
-      label:"Connectivity unusable over the Atlantic",
-      evidence:"Equipment without oceanic-capable wifi on " + Math.round(it.wifi.freq*100) + "% of the last " + it.wifi.sample + " departures"});
-
-  if (it.equipClaim.freq < 0.75)
-    lines.push({kind:"cost", amount: 30 * p.comfort, code:"equip_uncertain", overridable:true,
-      label:"Cabin is a coin-flip",
-      evidence: it.equipClaim.text + " on only " + Math.round(it.equipClaim.freq*100) + "% of the last " + it.equipClaim.sample + " departures"});
-
-  if (it.seatPitch <= 30)
-    lines.push({kind:"cost", amount: (31 - it.seatPitch) * 28 * p.comfort, code:"pitch", overridable:true,
-      label: it.seatPitch + " inches of pitch", evidence:"Below the 31in transatlantic norm"});
-
-  var cq = (0.72 - it.carrier.quality);
-  if (Math.abs(cq) > 0.05)
-    lines.push({kind: cq > 0 ? "cost" : "credit", amount: cq * 260 * p.comfort, code:"carrier", overridable:true,
-      label: it.carrier.name + (cq > 0 ? " sits below the route average" : " rates above the route average"),
-      evidence:"Curated carrier rating " + it.carrier.quality.toFixed(2) + " — a reviewed table, not a live opinion"});
-
-  if (it.nonstop)
-    lines.push({kind:"credit", amount:-80, code:"nonstop", overridable:false,
-      label:"Nonstop, no misconnect exposure", evidence:"Nothing to miss"});
-
-  if (it.risk.misconnectP > 0){
-    var ra = it.risk.misconnectP * it.risk.severityCost * (prefs.tightArrival ? 1.6 : 1);
-    lines.push({kind:"cost", amount: ra, code:"risk", overridable:false,
-      label:"Misconnect risk " + Math.round(it.risk.misconnectP*100) + "% × " + money(it.risk.severityCost) + " downside",
-      evidence: it.risk.severityNote + " · on-time " + Math.round(it.reliability.onTime*100) + "% over " + it.reliability.sample + " departures (" + it.reliability.source + ")"});
-  }
-
-  if (it.redeye)
-    lines.push({kind:"cost", amount: prefs.redeyeOK ? 20 : 95, code:"redeye", overridable:true,
-      label:"Overnight flight", evidence: prefs.redeyeOK ? "You said red-eyes are fine — priced as a light cost, not a veto" : "Arrival-day productivity is mostly gone"});
-
-  var eff = 0;
-  for (var j=0;j<lines.length;j++) eff += lines[j].amount;
-
-  var awardEff = null;
-  if (it.award && prefs.balances[it.award.from] >= it.award.points){
-    var cpp = 0;
-    for (var k=0;k<POINT_PROGRAMS.length;k++) if (POINT_PROGRAMS[k].name === it.award.from) cpp = POINT_PROGRAMS[k].cpp;
-    awardEff = eff - (it.ticket + it.taxes) + it.award.cashTaxes + it.award.points * cpp;
-  }
-
-  return {it:it, lines:lines, effective:eff, awardEffective:awardEff, d2d:d2d, profile:p};
-}
-
-function gradeFor(it, prefs){
-  var ref = score(it, "reference", prefs);
-  var idx = ref.effective / it.par;
-  // Bands are set from the fixture corpus' actual spread (1.00 to 2.32 of
-  // par), not pulled out of the air: at par is an A, a bad-hour layover is
-  // a C, and the 32-hour self-transfer is the F it deserves.
-  var table = [[0.94,"A+"],[1.02,"A"],[1.08,"A−"],[1.15,"B+"],[1.22,"B"],[1.30,"B−"],
-               [1.42,"C+"],[1.55,"C"],[1.70,"C−"],[1.90,"D"],[99,"F"]];
-  var letter = "F";
-  for (var i=0;i<table.length;i++) if (idx <= table[i][0]){ letter = table[i][1]; break; }
-  var cls = idx <= 1.08 ? "g-good" : idx <= 1.30 ? "g-fair" : idx <= 1.70 ? "g-poor" : "g-bad";
-  return {letter:letter, cls:cls, index:idx, refEffective:ref.effective};
-}
-</script>
+<!-- The model used to live here: about 350 lines of fixture data and a
+     JavaScript scorer. Both are gone. The page asks concorde-travel/scorer.py
+     for a ledger and draws what comes back, because two implementations of one
+     model is two models, and they drift. -->
 
 <script>
 /* ===================================================================
@@ -1104,7 +743,7 @@ var STATE = {
   target:"comfort", bags:2, redeyeOK:false, wifiMatters:false, tightArrival:false,
   needBin:false, longLayoverOK:true, selfTransferOK:true,
   balances:{}, filters:[], understood:[], overrides:{}, expanded:{},
-  showFiltered:false, searched:false, firstPaint:true
+  showFiltered:false, searched:false, firstPaint:true, fixture:"ground-access-swing"
 };
 
 var OPTIONS = [
@@ -1144,7 +783,7 @@ function renderPoints(){
     inp.oninput = function(){ r.pts = parseInt(inp.value.replace(/[^0-9]/g,""),10) || 0; sync(); };
     var worth = el("span","worth");
     var cpp = 0; POINT_PROGRAMS.forEach(function(p){ if (p.name === r.prog) cpp = p.cpp; });
-    worth.textContent = "≈ " + money(r.pts * cpp) + " at " + (cpp*100).toFixed(1) + "¢";
+    worth.textContent = "≈ " + money(Math.round(r.pts * cpp * 100)) + " at " + (cpp*100).toFixed(1) + "¢";
     var kill = el("button","kill","✕"); kill.type = "button";
     kill.setAttribute("aria-label","Remove");
     kill.onclick = function(){ ptRows.splice(i,1); renderPoints(); sync(); };
@@ -1206,6 +845,36 @@ document.getElementById("f-swap").onclick = function(){
 document.getElementById("f-bags").onchange = function(e){
   STATE.bags = parseInt(e.target.value,10); if (STATE.searched) render();
 };
+["f-max","f-incid"].forEach(function(id){
+  var e = document.getElementById(id);
+  if (e) e.onchange = function(){ if (STATE.searched) render(false); };
+});
+
+/* Three scenarios in the corpus; the page should be able to show any of
+   them rather than hard-coding one. */
+fetch("/api/fixtures").then(function(r){ return r.json(); }).then(function(list){
+  if (!list.length) return;
+  var sel = document.getElementById("f-fixture");
+  list.forEach(function(f){
+    var o = el("option", null, esc(f.title.split(":")[0]));
+    o.value = f.fixture_id;
+    if (f.fixture_id === STATE.fixture) o.selected = true;
+    sel.appendChild(o);
+  });
+  document.getElementById("f-fixture-wrap").hidden = false;
+  sel.onchange = function(){
+    STATE.fixture = sel.value;
+    STATE.expanded = {}; STATE.overrides = {}; STATE.firstPaint = true; LAST = null;
+    var f = list.filter(function(x){ return x.fixture_id === sel.value; })[0];
+    if (f){
+      document.getElementById("f-origin").value = f.origin;
+      document.getElementById("f-dest").value = f.destination;
+      document.getElementById("f-out").value = f.depart_date;
+    }
+    render(false);
+  };
+}).catch(function(){});
+
 document.getElementById("tb-sky").onclick = function(){
   document.body.classList.toggle("novideo");
   document.getElementById("skyline").hidden = document.body.classList.contains("novideo");
@@ -1270,7 +939,7 @@ function openDream(){
   var m = el("div","modal");
   m.innerHTML =
     '<h3>Anything that would make this your ideal flight?</h3>' +
-    '<p>Say it the way you\'d say it to a person. We turn it into filters and weights — and show you exactly what we understood before we apply it.</p>' +
+    '<p>Say it how you would to a person. We show you what we understood before applying it.</p>' +
     '<textarea id="dream-txt" placeholder="Speak or type…"></textarea>' +
     '<div class="examples">"I\'d really like a bulkhead seat, I\'d like to fly a 787 if possible, and I really don\'t want to fly American."</div>';
   var dict = el("button","dictate",'<span class="dot"></span> Dictate');
@@ -1320,327 +989,319 @@ function openDream(){
 document.getElementById("f-go").onclick = openDream;
 
 /* ===================================================================
-   RENDER
+   RENDER — the page owns none of the model. It posts the form to
+   /api/score, gets back a ledger and a bar per option, and draws them.
+   Nothing below computes a penalty, a grade, or a duration.
    =================================================================== */
-function prefs(){
-  return {bags:STATE.bags, redeyeOK:STATE.redeyeOK, balances:STATE.balances,
-          wifiMatters:STATE.wifiMatters, tightArrival:STATE.tightArrival};
+
+var POINT_PROGRAMS = [
+  {name:"Chase Ultimate Rewards", cpp:0.016}, {name:"Amex Membership Rewards", cpp:0.015},
+  {name:"Capital One Miles", cpp:0.015},      {name:"Delta SkyMiles", cpp:0.012},
+  {name:"United MileagePlus", cpp:0.013},     {name:"AAdvantage", cpp:0.014},
+  {name:"Virgin Atlantic Flying Club", cpp:0.013}, {name:"Air France/KLM Flying Blue", cpp:0.012}
+];
+
+var CARRIER_TINT = {BA:"#1d4e89", UA:"#1b3a6b", DL:"#153b6e", AF:"#0a2f6b", KL:"#00a1de",
+                    TP:"#008a3e", AA:"#8b9298", N0:"#1c2b4a", FR:"#1a3a7a", ZZ:"#5a4b8a",
+                    XX:"#3f4a5e", OG:"#c8102e"};
+
+function money(c){ return "$" + Math.abs(Math.round(c/100)).toLocaleString("en-US"); }
+function hm(m){ return Math.floor(m/60) + "h" + (m%60 < 10 ? "0" : "") + (m%60) + "m"; }
+function tint(code){ return CARRIER_TINT[code] || "#3f4a5e"; }
+function gradeClass(g){
+  return g.charAt(0) === "A" ? "g-good" : g.charAt(0) === "B" ? "g-fair"
+       : g.charAt(0) === "C" ? "g-poor" : "g-bad";
 }
 
-function applyOverrides(led, id){
-  var kept = [], eff = 0;
-  led.lines.forEach(function(l){
-    var off = STATE.overrides[id + ":" + l.code];
-    l.off = !!off;
-    kept.push(l);
-    if (!off) eff += l.amount;
+var LAST = null;     /* the most recent server answer */
+
+function requestBody(){
+  return {
+    fixture: STATE.fixture,
+    profile: STATE.target,
+    bags: STATE.bags,
+    prefs: {redeye_ok: STATE.redeyeOK},
+    weights: (function(){
+      var w = {};
+      if (STATE.wifiMatters) w.wifi = 1.8;
+      return w;
+    })(),
+    filters: STATE.filters.map(function(f){ return {kind:"carrier", value:f.value}; })
+      .concat(STATE.needBin ? [{kind:"requires_cabin_bag", value:true}] : []),
+    incidental_cents: dollars("f-incid"),
+    max_cents: dollars("f-max")
+  };
+}
+function dollars(id){
+  var el = document.getElementById(id);
+  if (!el) return null;
+  var n = parseInt((el.value || "").replace(/[^0-9]/g, ""), 10);
+  return isNaN(n) ? null : n * 100;
+}
+
+/* a line the user switched off is dropped and the total re-adds — the
+   override is presentation, so it never round-trips to the scorer */
+function keyOf(oid, ln){ return oid + ":" + ln.code + ":" + (ln.ref || ""); }
+function liveTotal(o){
+  var t = 0;
+  o.lines.forEach(function(ln){ if (!STATE.overrides[keyOf(o.option_id, ln)]) t += ln.amount_cents; });
+  return t;
+}
+
+function barHTML(o){
+  var total = 0;
+  o.bar.forEach(function(b){ total += b.minutes; });
+  var h = '<div class="bar" role="img" aria-label="' + hm(total) + ' door to door">';
+  o.bar.forEach(function(b){
+    var pct = (b.minutes / total) * 100;
+    var cls = b.kind === "flight" ? "q-fly dark" : "q-" + b.quality;
+    h += '<div class="seg-b ' + cls + (pct > 11 ? " wide" : "") +
+         '" style="width:' + pct.toFixed(2) + '%" title="' + esc(b.detail) + '">' +
+         (pct > 7 ? '<span>' + esc(b.label) + '</span>' : '') + '</div>';
   });
-  led.lines = kept; led.effective = eff;
-  return led;
-}
-
-function filteredReason(it){
-  for (var i = 0; i < STATE.filters.length; i++)
-    if (STATE.filters[i].kind === "carrier" && STATE.filters[i].value === it.carrier.name)
-      return STATE.filters[i].why;
-  if (STATE.needBin && it.bags.carryOn === false) return "no overhead bin on this fare";
-  var max = parseInt((document.getElementById("f-max").value||"").replace(/[^0-9]/g,""),10);
-  if (max && it.ticket > max) return "over your " + money(max) + " maximum";
-  return null;
-}
-
-function qGround(m){ return m <= 45 ? "q-good" : m <= 70 ? "q-fair" : m <= 100 ? "q-poor" : "q-bad"; }
-function qWait(m){ return m <= 50 ? "q-good" : m <= 75 ? "q-fair" : m <= 100 ? "q-poor" : "q-bad"; }
-function qLay(l){
-  var h = l.mins / 60;
-  if (l.leaveAirport && !l.deadHours && h >= 6) return "q-good";
-  if (l.deadHours) return h >= 3 ? "q-bad" : "q-poor";
-  return h <= 2 ? "q-good" : h <= 4 ? "q-fair" : h <= 7 ? "q-poor" : "q-bad";
-}
-
-function barSegs(it){
-  var out = [];
-  var depAp = it.route.split(" ")[0];
-  out.push({mins:it.ground.out.mins, q:qGround(it.ground.out.mins), label:"→ " + depAp, title:HOME + " to " + depAp + " · " + it.ground.out.mode + " · " + hm(it.ground.out.mins)});
-  out.push({mins:it.airportWait, q:qWait(it.airportWait), label:"wait", title:"Check-in, security and the walk to the gate at " + depAp + " · " + hm(it.airportWait)});
-  for (var i = 0; i < it.legs.length; i++){
-    var g = it.legs[i];
-    out.push({mins:g.mins, q:i % 2 ? "q-fly2" : "q-fly", dark:true, label:g.fl, title:g.fl + " " + g.from + "→" + g.to + " · " + hm(g.mins) + (g.equip ? " · " + g.equip : "")});
-    if (it.layovers[i]) {
-      var l = it.layovers[i];
-      out.push({mins:l.mins, q:qLay(l), label:l.airport + " " + hm(l.mins), title:l.airport + " · " + hm(l.mins) + " · lands " + l.arrLocal + " local · " + l.note});
-    }
-  }
-  out.push({mins:it.ground.in.mins, q:qGround(it.ground.in.mins), label:"→ " + DEST.split(",")[0], title:"Arrival airport to " + DEST + " · " + it.ground.in.mode + " · " + hm(it.ground.in.mins)});
-  return out;
-}
-
-function ledgerHTML(led, it){
-  var h = '<div class="ledger">';
-  led.lines.forEach(function(l){
-    var amt, cls;
-    if (l.kind === "base"){ amt = money(l.amount); cls = "base"; }
-    else if (l.amount >= 0){ amt = "− " + money(l.amount); cls = "cost"; }
-    else { amt = "+ " + money(-l.amount); cls = "credit"; }
-    h += '<div class="lrow"><div class="amt ' + cls + '"' + (l.off ? ' style="opacity:.32;text-decoration:line-through"' : '') + '>' + amt + '</div>' +
-         '<div class="why"' + (l.off ? ' style="opacity:.42"' : '') + '>' + esc(l.label) +
-         (l.evidence ? '<em>' + esc(l.evidence) + '</em>' : '') +
-         (l.overridable ? '<button class="ovr" data-ovr="' + it.id + ':' + l.code + '">' + (l.off ? "Count this again" : "Don't count this") + '</button>' : '') +
-         '</div></div>';
-  });
-  h += '<div class="ltotal"><div class="amt">' + money(led.effective) + '</div><div class="why">effective cost · ticket ' + money(it.ticket) + '</div></div>';
   return h + '</div>';
 }
 
-function goodBadHTML(led, it){
-  /* Not a second copy of the ledger — the ledger already says what every
-     dollar was for. This is the "at a glance" pass: only the lines big
-     enough to matter, plus the facts that carry no dollar value of their
-     own (on-time record, fleet consistency, no overhead bin). A $11
-     subway fare is not news either way. */
-  var NOISE = {ticket:1, time:1, bags_inc:1};
-  var good = [], bad = [];
-
-  led.lines.forEach(function(l){
-    if (l.off || l.kind === "base" || NOISE[l.code]) return;
-    if (l.amount < 0){
-      good.push({t:l.label, e:l.evidence, m:"+ " + money(-l.amount)});
-    } else if (l.amount >= 40){
-      bad.push({t:l.label, e:l.evidence, m:"− " + money(l.amount)});
-    }
+function ledgerHTML(o){
+  var h = '<div class="ledger">';
+  o.lines.forEach(function(ln){
+    if (ln.kind !== "base" && ln.amount_cents === 0) return;
+    var off = !!STATE.overrides[keyOf(o.option_id, ln)];
+    var amt, cls;
+    if (ln.kind === "base"){ amt = money(ln.amount_cents); cls = "base"; }
+    else if (ln.amount_cents >= 0){ amt = "− " + money(ln.amount_cents); cls = "cost"; }
+    else { amt = "+ " + money(-ln.amount_cents); cls = "credit"; }
+    h += '<div class="lrow"><div class="amt ' + cls + '"' +
+         (off ? ' style="opacity:.32;text-decoration:line-through"' : '') + '>' + amt + '</div>' +
+         '<div class="why"' + (off ? ' style="opacity:.42"' : '') + '>' + esc(ln.label) +
+         (ln.evidence ? '<em>' + esc(ln.evidence) + '</em>' : '') +
+         (ln.overridable ? '<button class="ovr" data-ovr="' + esc(keyOf(o.option_id, ln)) + '">' +
+            (off ? "Count this again" : "Don't count this") + '</button>' : '') +
+         '</div></div>';
   });
+  return h + '<div class="ltotal"><div class="amt">' + money(liveTotal(o)) +
+         '</div><div class="why">effective cost · ticket ' + money(o.ticket_cents) +
+         '</div></div></div>';
+}
 
-  var ot = Math.round(it.reliability.onTime * 100);
-  if (it.reliability.onTime >= 0.80)
-    good.push({t:"On time " + ot + "% of the last " + it.reliability.sample + " departures", e:it.reliability.source});
-  else if (it.reliability.onTime < 0.68)
-    bad.push({t:"On time only " + ot + "% of the last " + it.reliability.sample + " departures", e:it.reliability.source});
-
-  if (it.equipClaim.freq >= 0.85)
-    good.push({t:"Consistent fleet — " + it.equipClaim.text + " on " + Math.round(it.equipClaim.freq*100) + "% of departures",
-               e:"Equipment still gets swapped after booking; this one rarely is"});
-
-  if (it.bags.carryOn === false)
-    bad.push({t:"No overhead bin on this fare", e:"A personal item only — a cabin bag has to be checked and paid for"});
-
-  if (/[Ss]eparate tickets/.test(it.risk.severityNote))
-    bad.push({t:"Sold as separate tickets", e:"Miss the connection and no airline owes you a rebooking — you buy again"});
+/* Not a second copy of the ledger. Only the lines big enough to matter,
+   plus the facts that carry no dollar value of their own. */
+function goodBadHTML(o){
+  var NOISE = {ticket:1, time:1};
+  var good = [], bad = [];
+  o.lines.forEach(function(ln){
+    if (ln.kind === "base" || NOISE[ln.code]) return;
+    if (STATE.overrides[keyOf(o.option_id, ln)]) return;
+    if (ln.amount_cents < 0) good.push({t:ln.label, e:ln.evidence, m:"+ " + money(ln.amount_cents)});
+    else if (ln.amount_cents >= 4000) bad.push({t:ln.label, e:ln.evidence, m:"− " + money(ln.amount_cents)});
+  });
+  o.segments.forEach(function(sg){
+    var r = sg.reliability || {};
+    if (r.on_time_fraction >= 0.80)
+      good.push({t:"On time " + Math.round(r.on_time_fraction*100) + "% of the last " + r.sample_size, e:r.source});
+    var sub = (sg.claims || {}).subfleet;
+    if (sub && sub.observed_frequency >= 0.85)
+      good.push({t:"Consistent fleet — " + sub.value + " on " + Math.round(sub.observed_frequency*100) + "%",
+                 e:"Equipment still gets swapped after booking; this one rarely is"});
+  });
+  if (o.separate_tickets)
+    bad.push({t:"Sold as separate tickets", e:"Miss the connection and no airline owes you a rebooking"});
 
   function list(rows, cls, sign, empty){
     if (!rows.length) return '<ul class="gblist ' + cls + '"><li><i>·</i><span style="color:var(--faint)">' + empty + '</span></li></ul>';
     return '<ul class="gblist ' + cls + '">' + rows.slice(0,5).map(function(r){
-      return '<li><i>' + sign + '</i><span>' + esc(r.t) + (r.m ? ' <span style="color:var(--faint);font-family:var(--mono);font-size:11.5px">' + r.m + '</span>' : '') +
-             (r.e ? '<em>' + esc(r.e) + '</em>' : '') + '</span></li>';
+      return '<li><i>' + sign + '</i><span>' + esc(r.t) +
+        (r.m ? ' <span style="color:var(--faint);font-family:var(--mono);font-size:11.5px">' + r.m + '</span>' : '') +
+        (r.e ? '<em>' + esc(r.e) + '</em>' : '') + '</span></li>';
     }).join("") + '</ul>';
   }
-
-  return '<div class="gb">' +
-    '<div><h4>The good</h4>' + list(good, "good", "+", "Nothing stands out in its favour.") + '</div>' +
-    '<div><h4>The bad</h4>'  + list(bad,  "bad",  "−", "Nothing worth flagging.") + '</div></div>';
+  return '<div class="gb"><div><h4>The good</h4>' + list(good,"good","+","Nothing stands out.") +
+         '</div><div><h4>The bad</h4>' + list(bad,"bad","−","Nothing to flag.") + '</div></div>';
 }
 
-function legsHTML(it){
+function legsHTML(o){
   var h = '<div class="legs"><h4>Flights</h4><div class="tblscroll"><table class="legtable"><thead><tr>' +
           '<th>Flight</th><th>From</th><th>To</th><th>Depart</th><th>Arrive</th><th>Aircraft</th></tr></thead><tbody>';
-  it.legs.forEach(function(g){
-    h += '<tr><td class="m">' + esc(g.fl) + '</td><td>' + esc(g.from) + '</td><td>' + esc(g.to) + '</td>' +
-         '<td class="m">' + esc(g.dep) + '</td><td class="m">' + esc(g.arr) + '</td>' +
-         '<td>' + esc(g.equip) + (g.note ? '<div class="note">' + esc(g.note) + '</div>' : '') + '</td></tr>';
+  o.segments.forEach(function(g){
+    var c = g.claims || {};
+    h += '<tr><td class="m">' + esc(g.flight) + '</td><td>' + esc(g.from) + '</td><td>' + esc(g.to) + '</td>' +
+         '<td class="m">' + esc(g.dep) + '</td><td class="m">' + esc(g.arr) +
+         (g.actual_arr && g.actual_arr !== g.arr ? ' <span class="hedge">landed ' + esc(g.actual_arr) + '</span>' : '') +
+         '</td><td>' + esc(g.equipment) +
+         (c.subfleet && c.subfleet.value ? '<div class="note">' + esc(c.subfleet.value) +
+            ' — ' + Math.round(c.subfleet.observed_frequency*100) + '% of ' + c.subfleet.sample_size +
+            '<span class="hedge">observed</span></div>' : '') +
+         '</td></tr>';
   });
-  h += '</tbody></table></div>';
-  h += '<p class="hint" style="margin-top:11px">Scheduled equipment is a type, not a subfleet, and it gets swapped. ' +
-       'This one has flown as <b>' + esc(it.equipClaim.text) + '</b> on ' + Math.round(it.equipClaim.freq*100) +
-       '% of the last ' + it.equipClaim.sample + ' departures<span class="hedge">observed, not promised</span>' +
-       '<br>Connectivity usable over the Atlantic on ' + Math.round((it.wifi.oceanic ? it.wifi.freq : 1 - it.wifi.freq)*100) +
-       '% of those<span class="hedge">n=' + it.wifi.sample + '</span>' +
-       '<br>On time ' + Math.round(it.reliability.onTime*100) + '% · ' + esc(it.reliability.source) + '</p>';
-  return h + '</div>';
+  return h + '</tbody></table></div></div>';
 }
 
-function optionHTML(res, rank, filtered){
-  var it = res.it, led = res.led, g = res.grade;
-  var segs = barSegs(it), total = 0;
-  segs.forEach(function(s){ total += s.mins; });
+function optionHTML(o, rank, hidden){
+  var total = 0; o.bar.forEach(function(b){ total += b.minutes; });
+  var best = o.booking && o.booking[0];
+  var cheapest = (o.booking || []).slice().sort(function(a,b){ return a.price_cents - b.price_cents; })[0];
 
-  var bar = '<div class="bar" role="img" aria-label="Door to door ' + hm(total) + '">';
-  segs.forEach(function(s){
-    var pct = (s.mins / total) * 100;
-    bar += '<div class="seg-b ' + s.q + (s.dark ? ' dark' : '') + (pct > 11 ? ' wide' : '') +
-           '" style="width:' + pct.toFixed(2) + '%" title="' + esc(s.title) + '">' +
-           (pct > 7 ? '<span>' + esc(s.label) + '</span>' : '') + '</div>';
-  });
-  bar += '</div>';
-
-  var best = it.bookings[0];
-  it.bookings.forEach(function(b){ if (b.direct) best = b; });
-  var cheapest = it.bookings.slice().sort(function(a,b){ return a.price - b.price; })[0];
-
-  var priceHTML;
-  if (res.award != null){
-    var cpp = 0; POINT_PROGRAMS.forEach(function(p){ if (p.name === it.award.from) cpp = p.cpp; });
-    priceHTML = '<div class="price award"><b>' + money(it.award.cashTaxes) + ' + ' + it.award.points.toLocaleString("en-US") + '</b>' +
-                esc(it.award.from.replace(" Ultimate Rewards","")) + ' points <i>if a saver seat is open</i></div>' +
-                '<div class="eff">cash <b>' + money(it.ticket) + '</b> · effective <b>' + money(res.award) + '</b></div>';
+  var price;
+  if (o.award){
+    price = '<div class="price award"><b>' + money(o.award.cash_taxes_cents) + ' + ' +
+            o.award.points.toLocaleString("en-US") + '</b>' + esc(o.award.programme) +
+            ' <i>if a saver seat is open</i></div>';
   } else {
-    priceHTML = '<div class="price">' + money(it.ticket) + '</div>' +
-                '<div class="eff">effective <b>' + money(led.effective) + '</b></div>' +
-                '<div class="bookvia">' + esc(best.who) + (best.direct ? ' · direct' : '') + '</div>';
+    price = '<div class="price">' + money(o.ticket_cents) + '</div>' +
+            '<div class="eff">effective <b>' + money(liveTotal(o)) + '</b></div>' +
+            (best ? '<div class="bookvia">' + esc(best.who) + (best.direct ? ' · direct' : '') + '</div>' : '');
   }
 
-  var open = !!STATE.expanded[it.id];
-  var h = '<article class="opt glass' + (filtered ? ' filtered' : '') + '" data-id="' + it.id + '">';
-  h += '<div class="opthead">';
-  h += '<div class="logo" style="background:' + it.carrier.color + '">' + esc(it.carrier.code) + '</div>';
+  var open = !!STATE.expanded[o.option_id];
+  var h = '<article class="opt glass' + (hidden ? ' filtered' : '') + '">';
+  h += '<div class="opthead"><div class="logo" style="background:' + tint(o.carrier) + '">' + esc(o.carrier) + '</div>';
   h += '<div class="optmain"><div class="optline1">' +
        (rank ? '<span class="rank">#' + rank + '</span>' : '') +
-       '<span class="route">' + esc(it.route) + '</span>' +
-       '<span class="carrier">' + esc(it.carrier.name) + ' · ' + esc(it.fare) + '</span>' +
-       (filtered ? '<span class="filtbadge">hidden</span>' : '') + '</div>' +
-       '<div class="optline2"><span class="m">' + esc(it.depLocal) + ' → ' + esc(it.arrLocal) + '</span>' +
-       '<span class="sep">·</span><span class="m">' + hm(total) + ' door to door</span>' +
-       '<span class="sep">·</span><span>' + (it.nonstop ? "Nonstop" : it.layovers.length + " stop, " + it.layovers[0].airport) + '</span>' +
-       '<span class="sep">·</span><span>' + (it.bags.included ? it.bags.included + " bag included" : "no bag included") + '</span></div></div>';
-  h += '<div class="priceblk">' + priceHTML + '</div>';
-  h += '</div>';
+       '<span class="route">' + esc(o.route.replace(/ - /g, " → ")) + '</span>' +
+       '<span class="carrier">' + esc(o.fare_brand) + '</span>' +
+       (hidden ? '<span class="filtbadge">hidden</span>' : '') + '</div>' +
+       '<div class="optline2"><span class="m">' + esc(o.depart_local) + ' → ' + esc(o.arrive_local) +
+       (o.day_offset ? ' +1' : '') + '</span><span class="sep">·</span>' +
+       '<span class="m">' + hm(total) + ' door to door</span><span class="sep">·</span>' +
+       '<span>' + (o.stops ? o.stops + " stop" : "Nonstop") + '</span><span class="sep">·</span>' +
+       '<span>' + (o.bag_included ? o.bag_included + " bag included" : "no bag included") + '</span></div></div>';
+  h += '<div class="priceblk">' + price + '</div></div>';
 
-  h += '<div class="barwrap"><div><div>' + bar + '</div><div class="barscale"><span>door</span><span>' +
-       hm(total) + '</span><span>door</span></div></div>' +
-       '<div class="grade ' + g.cls + '" title="Measured against the same neutral yardstick for every user">' +
-       g.letter + '<small>grade</small></div></div>';
+  h += '<div class="barwrap"><div><div>' + barHTML(o) + '</div><div class="barscale">' +
+       '<span>door</span><span>' + hm(total) + '</span><span>door</span></div></div>' +
+       '<div class="grade ' + gradeClass(o.grade) + '" title="Scored at the neutral reference profile, the same for every search">' +
+       esc(o.grade) + '<small>grade</small></div></div>';
 
-  h += '<div class="optfoot">' +
-       '<button class="flip" data-flip="' + it.id + '" aria-expanded="' + (open ? "true" : "false") + '">' +
-       '<span class="arrow">▼</span> ' + (open ? "Hide the ledger" : "Why this score") + '</button>' +
-       '<button class="book" data-book="' + it.id + '">Book · from ' + money(cheapest.price) + '</button></div>';
+  h += '<div class="optfoot"><button class="flip" data-flip="' + esc(o.option_id) +
+       '" aria-expanded="' + (open ? "true" : "false") + '"><span class="arrow">▼</span> ' +
+       (open ? "Hide the ledger" : "Why this score") + '</button>' +
+       (cheapest ? '<button class="book" data-book="' + esc(o.option_id) + '">Book · from ' +
+          money(cheapest.price_cents) + '</button>' : '') + '</div>';
 
-  if (open)
-    h += '<div class="details">' + ledgerHTML(led, it) + goodBadHTML(led, it) + legsHTML(it) + '</div>';
-
+  if (open) h += '<div class="details">' + ledgerHTML(o) + goodBadHTML(o) + legsHTML(o) + '</div>';
   return h + '</article>';
 }
 
-function narrate(kept){
-  if (!kept.length) return "";
-  var top = kept[0];
-  var cheapTicket = kept.slice().sort(function(a,b){ return a.it.ticket - b.it.ticket; })[0];
-  var lead, sub;
-
-  if (cheapTicket.it.id === top.it.id){
-    lead = "The cheapest ticket here is also the one that actually costs you least — that is rarer than it sounds.";
+function narrate(opts){
+  if (!opts.length) return "";
+  var top = opts[0];
+  var cheap = opts.slice().sort(function(a,b){ return a.ticket_cents - b.ticket_cents; })[0];
+  var lead;
+  if (cheap.option_id === top.option_id){
+    lead = "The cheapest ticket here is also the one that costs you least. That is rarer than it sounds.";
   } else {
-    var save = Math.round((1 - cheapTicket.it.ticket / top.it.ticket) * 100);
-    var gap = cheapTicket.led.effective - top.led.effective;
+    var save = Math.round((1 - cheap.ticket_cents / top.ticket_cents) * 100);
+    var gap = liveTotal(cheap) - liveTotal(top);
     var worst = null;
-    cheapTicket.led.lines.forEach(function(l){ if (l.kind !== "base" && l.code !== "time" && (!worst || l.amount > worst.amount)) worst = l; });
-    lead = "You can save " + save + "% on the ticket by taking " + cheapTicket.it.carrier.name + " at " +
-           money(cheapTicket.it.ticket) + " — but it lands " + money(gap) + " worse once everything is counted" +
-           (worst ? ", mostly " + worst.label.charAt(0).toLowerCase() + worst.label.slice(1) : "") + ".";
+    cheap.lines.forEach(function(l){
+      if (l.kind !== "base" && l.code !== "time" && (!worst || l.amount_cents > worst.amount_cents)) worst = l;
+    });
+    lead = "You can save " + save + "% on the ticket at " + money(cheap.ticket_cents) +
+           " — it lands " + money(gap) + " worse once everything is counted" +
+           (worst ? ", mostly " + (/^\d/.test(worst.label) ? "its " : "") +
+                    worst.label.charAt(0).toLowerCase() + worst.label.slice(1) : "") + ".";
   }
-  sub = "Top pick is " + top.it.carrier.name + " " + top.it.route + " at " + money(top.it.ticket) +
-        " ticket, " + money(top.led.effective) + " effective — " + hm(top.led.d2d) + " door to door from " +
-        HOME + ", grade " + top.grade.letter + ". Ranked for " + PROFILES[STATE.target].label.toLowerCase() + ".";
+  var sub = "Top pick " + top.route.replace(/ - /g, "→") + " at " + money(top.ticket_cents) +
+            ", " + money(liveTotal(top)) + " effective, " + hm(top.door_to_door_minutes) +
+            " door to door. Grade " + top.grade + ".";
   return '<div class="lead">' + esc(lead) + '</div><div class="sub">' + esc(sub) + '</div>';
 }
 
-function render(){
+function paint(){
   var host = document.getElementById("results");
   host.hidden = false;
+  if (!LAST) return;
+  if (LAST.error){
+    host.innerHTML = '<div class="narrator glass"><div class="lead">The scorer refused this request.</div>' +
+                     '<div class="sub">' + esc(LAST.error) + '</div></div>';
+    return;
+  }
+  var opts = LAST.options, hidden = LAST.hidden;
+  if (STATE.firstPaint && opts.length){ STATE.expanded[opts[0].option_id] = true; STATE.firstPaint = false; }
 
-  var kept = [], hidden = [];
-  ITINS.forEach(function(it){
-    var led = applyOverrides(score(it, STATE.target, prefs()), it.id);
-    var res = {it:it, led:led, grade:gradeFor(it, prefs()), award:led.awardEffective};
-    var why = filteredReason(it);
-    if (why){ res.why = why; hidden.push(res); } else kept.push(res);
-  });
-
-  kept.sort(function(a,b){
-    var av = a.award != null ? Math.min(a.award, a.led.effective) : a.led.effective;
-    var bv = b.award != null ? Math.min(b.award, b.led.effective) : b.led.effective;
-    if (av !== bv) return av - bv;
-    return a.it.id < b.it.id ? -1 : 1;     /* stable, deterministic tie-break */
-  });
-
-  /* The ledger IS the product — the top pick opens with it showing
-     rather than hidden behind a click. After that the user is in charge. */
-  if (STATE.firstPaint && kept.length){ STATE.expanded[kept[0].it.id] = true; STATE.firstPaint = false; }
-
-  var h = '<div class="narrator glass">' + narrate(kept);
+  var h = '<div class="narrator glass">' + narrate(opts);
   if (STATE.understood.length){
     h += '<div class="understood"><span class="eyebrow" style="margin-right:4px">Understood</span>';
     STATE.understood.forEach(function(u){ h += '<span class="uchip ' + u.cls + '">' + esc(u.text) + '</span>'; });
     h += '</div>';
   }
-  h += '<div class="src">Written from the ledger below. It states nothing the arithmetic did not produce.</div></div>';
+  h += '<div class="src">Written from the ledger. It states nothing the arithmetic did not produce.</div></div>';
 
   h += '<div class="sectionhead"><span class="eyebrow">Top three</span><span class="rule"></span></div>';
-  kept.slice(0,3).forEach(function(r,i){ h += optionHTML(r, i+1, false); });
-
-  if (kept.length > 3){
-    h += '<div class="sectionhead"><span class="eyebrow">' + (kept.length - 3) + ' more</span><span class="rule"></span></div>';
-    kept.slice(3).forEach(function(r,i){ h += optionHTML(r, i+4, false); });
+  opts.slice(0,3).forEach(function(o,i){ h += optionHTML(o, i+1, false); });
+  if (opts.length > 3){
+    h += '<div class="sectionhead"><span class="eyebrow">' + (opts.length-3) + ' more</span><span class="rule"></span></div>';
+    opts.slice(3).forEach(function(o,i){ h += optionHTML(o, i+4, false); });
   }
-
   if (hidden.length){
-    var bits = hidden.map(function(r){ return r.it.carrier.name + " (" + r.why + ")"; });
+    var bits = hidden.map(function(o){ return o.display_name + " (" + (o.filtered_reason || o.infeasible_reason) + ")"; });
     h += '<div class="hidden-row glass">' + hidden.length + ' option' + (hidden.length>1?"s":"") +
          ' hidden — ' + esc(bits.join(", ")) + ' <button id="showhid">' +
          (STATE.showFiltered ? "Hide again" : "Show them anyway") + '</button></div>';
-    if (STATE.showFiltered) hidden.forEach(function(r){ h += optionHTML(r, null, true); });
+    if (STATE.showFiltered) hidden.forEach(function(o){ h += optionHTML(o, null, true); });
   }
-
   host.innerHTML = h;
 
   Array.prototype.forEach.call(host.querySelectorAll("[data-flip]"), function(b){
-    b.onclick = function(){ var id = b.dataset.flip; STATE.expanded[id] = !STATE.expanded[id]; render(); };
+    b.onclick = function(){ STATE.expanded[b.dataset.flip] = !STATE.expanded[b.dataset.flip]; paint(); };
   });
   Array.prototype.forEach.call(host.querySelectorAll("[data-ovr]"), function(b){
-    b.onclick = function(){ var k = b.dataset.ovr; STATE.overrides[k] = !STATE.overrides[k]; render(); };
+    b.onclick = function(){ STATE.overrides[b.dataset.ovr] = !STATE.overrides[b.dataset.ovr]; paint(); };
   });
   Array.prototype.forEach.call(host.querySelectorAll("[data-book]"), function(b){
     b.onclick = function(){ openBook(b.dataset.book); };
   });
   var sh = host.querySelector("#showhid");
-  if (sh) sh.onclick = function(){ STATE.showFiltered = !STATE.showFiltered; render(); };
+  if (sh) sh.onclick = function(){ STATE.showFiltered = !STATE.showFiltered; paint(); };
 }
 
-function runSearch(scroll){
+function render(scroll){
   STATE.searched = true;
-  render();
-  if (scroll) document.getElementById("results").scrollIntoView({behavior:"smooth", block:"start"});
+  var host = document.getElementById("results");
+  host.hidden = false;
+  if (!LAST) host.innerHTML = '<div class="narrator glass"><div class="sub">Scoring…</div></div>';
+  fetch("/api/score", {method:"POST", headers:{"Content-Type":"application/json"},
+                       body: JSON.stringify(requestBody())})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      LAST = d; paint();
+      if (scroll) host.scrollIntoView({behavior:"smooth", block:"start"});
+    })
+    .catch(function(e){
+      LAST = {error:"Could not reach the scorer. Start it with: python3 concorde-travel/server.py"};
+      paint();
+    });
 }
+function runSearch(scroll){ render(scroll); }
 
 function openBook(id){
-  var it = null; ITINS.forEach(function(x){ if (x.id === id) it = x; });
-  if (!it) return;
-  var rows = it.bookings.slice().sort(function(a,b){
-    if (a.direct !== b.direct) return a.direct ? -1 : 1;   /* direct first, per the brief */
-    return a.price - b.price;
-  });
+  var o = null;
+  (LAST.options || []).concat(LAST.hidden || []).forEach(function(x){ if (x.option_id === id) o = x; });
+  if (!o) return;
   var root = document.getElementById("modal-root");
   var scrim = el("div","scrim"), m = el("div","modal");
-  var h = '<h3>Book ' + esc(it.carrier.name) + ' · ' + esc(it.route) + '</h3>' +
-          '<p>Direct with the airline first — it is where changes, irregular operations and status actually work. Prices are fixture values, not live quotes.</p>';
-  rows.forEach(function(b){
-    h += '<div class="bookrow"><div class="who"><b>' + esc(b.who) + (b.direct ? '<span class="direct">direct</span>' : '') + '</b>' +
-         (b.note ? '<span>' + esc(b.note) + '</span>' : '') + '</div><div class="amt">' + money(b.price) + '</div></div>';
+  var h = '<h3>Book ' + esc(o.route.replace(/ - /g, " → ")) + '</h3>' +
+          '<p>Direct with the airline first — it is where changes and irregular operations actually work. Fixture prices, not live quotes.</p>';
+  (o.booking || []).forEach(function(b){
+    h += '<div class="bookrow"><div class="who"><b>' + esc(b.who) +
+         (b.direct ? '<span class="direct">direct</span>' : '') + '</b>' +
+         (b.note ? '<span>' + esc(b.note) + '</span>' : '') + '</div>' +
+         '<div class="amt">' + money(b.price_cents) + '</div></div>';
   });
-  if (it.award){
-    h += '<div class="bookrow"><div class="who"><b>' + esc(it.award.program) + '</b><span>Transfer ' +
-         esc(it.award.ratio) + ' from ' + esc(it.award.from) + ' · about ' + it.award.latencyDays +
-         ' day' + (it.award.latencyDays>1?"s":"") + ' to move · ' + esc(it.award.availability) + '</span></div>' +
-         '<div class="amt">' + it.award.points.toLocaleString("en-US") + ' + ' + money(it.award.cashTaxes) + '</div></div>';
+  if (o.award){
+    h += '<div class="bookrow"><div class="who"><b>' + esc(o.award.programme) + '</b>' +
+         '<span>Award seat availability is not in cash inventory — this is an "if", not a price</span></div>' +
+         '<div class="amt">' + o.award.points.toLocaleString("en-US") + ' + ' +
+         money(o.award.cash_taxes_cents) + '</div></div>';
   }
   m.innerHTML = h;
-  var acts = el("div","acts");
-  var close = el("button","btn-ghost","Close"); close.type = "button";
-  acts.appendChild(close); m.appendChild(acts);
+  var acts = el("div","acts"), close = el("button","btn-ghost","Close");
+  close.type = "button"; acts.appendChild(close); m.appendChild(acts);
   scrim.appendChild(m); root.appendChild(scrim);
   close.onclick = function(){ root.innerHTML = ""; };
   scrim.onclick = function(e){ if (e.target === scrim) root.innerHTML = ""; };
 }
 
-/* open in a working state — an empty shell shows nothing */
 renderPoints();
 sync();
 runSearch(false);

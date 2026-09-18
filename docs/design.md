@@ -665,6 +665,41 @@ grade-stability check was asking the same broken function the same question twic
   fixture that would make it dominate is owed.
 - Round trips, parties larger than one, and arrival-time-of-day value remain unmodelled —
   see *Corrections and gaps* above.
-- **The draft interface still runs its own JavaScript stand-in**, not this scorer. Wiring
-  the page to a `/api/score` endpoint is the next obvious step and would delete about 200
-  lines of duplicated model from `ui/index.html`.
+- ~~The draft interface still runs its own JavaScript stand-in.~~ Done — see below.
+
+
+---
+
+# The interface, wired
+
+The page owns no model. It posts the form to `/api/score` and draws what comes back.
+About 380 lines of JavaScript fixture data and a duplicate scorer were deleted from
+`ui/index.html`; two implementations of one model is two models, and they drift.
+
+```
+GET  /api/fixtures   the corpus, for the scenario picker
+POST /api/score      {fixture, profile, bags, filters, weights, prefs, incidental_cents}
+                  -> {options: [...], hidden: [...]}
+```
+
+`server.py` reshapes a `Ledger` and a `timeline()` into what the interface draws and
+computes nothing of its own. The moment it starts deciding what a layover is worth, there
+are two scorers again.
+
+**`timeline()` lives in the scorer, not the page.** It returns the door-to-door bar as
+blocks of time derived from the same numbers the ledger used — including the *same* ground
+mode, via one `chosen_ground()` both call. A test asserts the bar's minutes sum to the
+ledger's door-to-door figure under every profile, which is the property that stops the bar
+becoming a second opinion about the same trip.
+
+Overrides stay client-side: switching a line off removes it and re-adds the total, and
+never round-trips to the scorer. A demotion the user has dismissed is a presentation
+decision, not a different model.
+
+## Copy
+
+Labels are labels. Anything that needed a sentence became a hover note on a small `i`
+rather than a paragraph under the field — "Incidentals" with *"padding for extras worth
+buying: a lounge pass, a change fee, a seat with legroom"* on hover, instead of forty words
+of explanation the user reads once and never again. Five explanatory paragraphs became six
+tooltips.

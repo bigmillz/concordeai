@@ -44,8 +44,8 @@ from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-__all__ = ["Line", "Ledger", "Tuning", "DEFAULT", "score", "score_all",
-           "grade", "load_scenario"]
+__all__ = ["Line", "Ledger", "Leg", "Tuning", "DEFAULT", "score", "score_all",
+           "grade", "timeline", "chosen_ground", "load_scenario"]
 
 
 # ---------------------------------------------------------------- primitives
@@ -175,6 +175,15 @@ class Tuning:
     lounge_day_pass_cents: int = 6500
     lounge_worth_after_minutes: int = 150
 
+    # --- the bar ---
+    # Thresholds in minutes for green / amber / orange / red, per segment KIND.
+    # Deliberately per kind: two hours of flying is not the same news as two
+    # hours of layover, and one global scale would say it was.
+    band_ground: Tuple[int, int, int] = (45, 70, 100)
+    band_process: Tuple[int, int, int] = (50, 75, 110)
+    band_flight: Tuple[int, int, int] = (480, 660, 900)
+    band_layover: Tuple[int, int, int] = (120, 240, 420)
+
     # --- grade bands, as a multiple of the route's par ---
     grade_bands: Tuple[Tuple[float, str], ...] = (
         (0.94, "A+"), (1.02, "A"), (1.08, "A-"), (1.15, "B+"), (1.22, "B"),
@@ -292,6 +301,89 @@ def _pick_ground(modes: Sequence[Dict[str, Any]], hourly: int):
         fare = m["fare_cents"] + (m.get("tolls_cents") or {}).get("outbound", 0)
         return fare + m["door_to_door_minutes"]["p50"] * hourly // 60
     return min(feasible, key=lambda m: (cost(m), m["mode_id"])), None
+
+
+def chosen_ground(option: Dict[str, Any], prof: Dict[str, Any], which: str = "outbound"):
+    """The mode the ledger charged for. The bar reads this too - if the two
+    picked independently they would eventually disagree, and the page would be
+    lying in one of two places."""
+    modes = option["ground"].get(which) or []
+    if not modes:
+        return None, None
+    return _pick_ground(modes, prof["hourly_value_cents"])
+
+
+@dataclass(frozen=True)
+class Leg:
+    """One block of the door-to-door bar. Derived from the same numbers the
+    ledger used, never measured separately."""
+    kind: str            # ground | process | flight | layover
+    label: str
+    minutes: int
+    quality: str         # good | fair | poor | bad | flight
+    detail: str = ""
+
+
+def _band(minutes: int, band: Tuple[int, int, int]) -> str:
+    lo, mid, hi = band
+    return ("good" if minutes <= lo else "fair" if minutes <= mid
+            else "poor" if minutes <= hi else "bad")
+
+
+def timeline(scenario: Dict[str, Any], option: Dict[str, Any],
+             profile_name: str, tuning: Tuning = DEFAULT) -> Tuple[Leg, ...]:
+    """The trip as blocks of time. Its total is the ledger's door-to-door
+    figure by construction, which is the property that stops the bar becoming
+    a second model with its own opinions."""
+    prof = scenario["query"]["profiles"][profile_name]
+    segs = {s["segment_id"]: s for s in option["segments"]}
+    legs: List[Leg] = []
+
+    out, _ = chosen_ground(option, prof, "outbound")
+    if out:
+        m = out["door_to_door_minutes"]["p50"]
+        legs.append(Leg("ground", "to " + option["segments"][0]["origin"]["iata"], m,
+                        _band(m, tuning.band_ground),
+                        "%s - %s" % (out["mode"], _hm(m))))
+
+    proc = (option.get("airport_process_minutes") or {}).get("p50", 0)
+    if proc:
+        legs.append(Leg("process", "airport", proc, _band(proc, tuning.band_process),
+                        "Check-in, security and the walk to the gate at %s"
+                        % option["segments"][0]["origin"]["iata"]))
+
+    for i, seg in enumerate(option["segments"]):
+        m = minutes_between(seg["departure_local"], seg["arrival_local"])
+        fl = "%s %d" % (seg["marketing"]["carrier"], seg["marketing"]["number"])
+        legs.append(Leg("flight", fl, m, "flight",
+                        "%s %s to %s - %s on a %s"
+                        % (fl, seg["origin"]["iata"], seg["destination"]["iata"],
+                           _hm(m), seg.get("equipment_code", "?"))))
+        lay = next((l for l in option.get("layovers", [])
+                    if l["arrive_segment_id"] == seg["segment_id"]), None)
+        if lay:
+            d = segs[lay["depart_segment_id"]]
+            m = minutes_between(seg["arrival_local"], d["departure_local"])
+            landed = seg.get("actual_arrival_local") or seg["arrival_local"]
+            clock = local_minutes(landed)
+            q = _band(m, tuning.band_layover)
+            services = lay.get("services_open") or []
+            if services and not [x for x in services
+                                 if x.get("eligible", True)
+                                 and window_covers(x["hours_local"], clock)]:
+                q = "bad"                      # nothing open outranks the clock
+            legs.append(Leg("layover", "%s %s" % (lay["airport"], _hm(m)), m, q,
+                            "%s - %s, landing %02d:%02d local. %s"
+                            % (lay["airport"], _hm(m), clock // 60, clock % 60,
+                               lay.get("note", ""))))
+
+    inb, _ = chosen_ground(option, prof, "arrival")
+    if inb:
+        m = inb["door_to_door_minutes"]["p50"]
+        legs.append(Leg("ground", "to " + scenario["query"]["destination"]["label"].split(",")[0],
+                        m, _band(m, tuning.band_ground),
+                        "%s - %s" % (inb["mode"], _hm(m))))
+    return tuple(legs)
 
 
 def _layover_lines(option, scenario, prof, tuning) -> List[Line]:
@@ -510,9 +602,9 @@ def _comfort_lines(option, scenario, prof, tuning) -> List[Line]:
                         code="connectivity",
                         label="Connectivity unusable over the ocean",
                         amount_cents=amount,
-                        evidence="%s on %d%% of the last %d departures (%s)"
+                        evidence="%s on %d%% of %s"
                                  % (conn["value"], round(conn["observed_frequency"] * 100),
-                                    conn["sample_size"], conn["observation_window"]),
+                                    conn["observation_window"]),
                         overridable=True))
 
     sub = claims.get("subfleet")
@@ -524,8 +616,8 @@ def _comfort_lines(option, scenario, prof, tuning) -> List[Line]:
                 code="cabin_uncertain",
                 label="The cabin is close to a coin flip",
                 amount_cents=int(tuning.cabin_uncertainty_cents * short * comfort),
-                evidence="%s on only %d%% of the last %d departures, and equipment is "
-                         "swapped after booking" % (sub["value"], round(f * 100), sub["sample_size"]),
+                evidence="%s on only %d%% of %s, and equipment is swapped after booking"
+                         % (sub["value"], round(f * 100), sub["observation_window"]),
                 overridable=True))
 
     pitch = claims.get("seat_pitch_inches")

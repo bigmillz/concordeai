@@ -35,8 +35,12 @@ import threading
 import time
 import urllib.request
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import scorer                                            # noqa: E402
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 UI = os.path.join(HERE, "ui")
+FIXTURES = os.path.join(HERE, "..", "fixtures")
 PORT = int(os.environ.get("CONCORDEGO_PORT", "9897"))
 
 # Apple's ATV aerials, the NIGHT subset — the ones millenai.py flags as
@@ -254,6 +258,144 @@ def _cached():
     return out
 
 
+# ------------------------------------------------------------------ scoring
+# The page does not own a model. It asks for one, and renders what comes back.
+# Everything below is presentation: it reshapes a Ledger and a timeline into
+# what the interface draws, and computes nothing of its own. The moment this
+# file starts deciding what a layover is worth, there are two scorers.
+
+
+def _fixture_files():
+    return sorted(f for f in glob.glob(os.path.join(FIXTURES, "*.json"))
+                  if not f.endswith("schema.json"))
+
+
+def _fixture_path(fid):
+    for f in _fixture_files():
+        if json.load(open(f, encoding="utf-8"))["fixture_id"] == fid:
+            return f
+    return None
+
+
+def list_fixtures():
+    out = []
+    for f in _fixture_files():
+        d = json.load(open(f, encoding="utf-8"))
+        out.append({"fixture_id": d["fixture_id"], "title": d["title"],
+                    "pins_down": d["pins_down"],
+                    "origin": d["query"]["origin"]["label"],
+                    "destination": d["query"]["destination"]["label"],
+                    "depart_date": d["query"]["depart_date"],
+                    "profiles": list(d["query"]["profiles"])})
+    return out
+
+
+def _apply_overrides(sc, req):
+    """The scenario is the inventory; the query side belongs to the user. Bags,
+    target, filters and the incidental ceiling all come off the form."""
+    bags = req.get("bags")
+    if bags is not None:
+        for p in sc["query"]["party"]:
+            keep = [b for b in p["bags"] if b["kind"] != "checked"]
+            p["bags"] = [{"kind": "checked", "weight_kg": 20} for _ in range(int(bags))] + keep
+    inc = req.get("incidental_cents")
+    if inc is not None:
+        sc["query"].setdefault("budget", {})["incidental_allowance_cents"] = int(inc)
+    mx = req.get("max_cents")
+    if mx is not None:
+        sc["query"].setdefault("budget", {})["maximum_cents"] = int(mx) or None
+    sc["query"]["preferences"] = req.get("prefs") or {}
+    filters = req.get("filters") or []
+    weights = req.get("weights") or {}
+    for prof in sc["query"]["profiles"].values():
+        prof["hard_filters"] = list(filters)
+        if weights:
+            prof["weights"] = dict(weights)
+    return sc
+
+
+def _view(sc, opt, profile):
+    """One option, shaped for the page. Two renderings of one computed object:
+    the ledger lines and the bar. Nothing here recalculates either."""
+    led = scorer.score(sc, opt, profile)
+    letter, ref_cents = scorer.grade(sc, opt)
+    tl = scorer.timeline(sc, opt, profile)
+    first, last = opt["segments"][0], opt["segments"][-1]
+    tickets = opt["tickets"]
+    award = next((t["award"] for t in tickets if t.get("award")), None)
+
+    return {
+        "option_id": opt["option_id"],
+        "display_name": opt.get("display_name", opt["option_id"]),
+        "carrier": first["marketing"]["carrier"],
+        "carrier_name": opt.get("carrier_rating", {}).get("note", "") and
+                        first["marketing"]["carrier"] or first["marketing"]["carrier"],
+        "fare_brand": ", ".join(t["fare_brand_name"] for t in tickets),
+        "route": " - ".join([first["origin"]["iata"]]
+                            + [s["destination"]["iata"] for s in opt["segments"]]),
+        "depart_local": first["departure_local"][11:16],
+        "arrive_local": last["arrival_local"][11:16],
+        "day_offset": (last["arrival_local"][:10] != first["departure_local"][:10]),
+        "stops": len(opt["segments"]) - 1,
+        "bag_included": max(t["entitlements"]["checked_included"] for t in tickets),
+        "separate_tickets": len(tickets) > 1,
+        "ticket_cents": led.lines[0].amount_cents,
+        "effective_cents": led.effective_cents,
+        "reference_cents": ref_cents,
+        "door_to_door_minutes": led.door_to_door_minutes,
+        "grade": letter,
+        "filtered_reason": led.filtered_reason,
+        "infeasible_reason": led.infeasible_reason,
+        "award": award,
+        "carrier_rating": opt.get("carrier_rating"),
+        "lines": [{"code": l.code, "ref": l.ref, "label": l.label,
+                   "amount_cents": l.amount_cents, "evidence": l.evidence,
+                   "kind": l.kind, "overridable": l.overridable} for l in led.lines],
+        "bar": [{"kind": l.kind, "label": l.label, "minutes": l.minutes,
+                 "quality": l.quality, "detail": l.detail} for l in tl],
+        "segments": [{
+            "flight": "%s %d" % (s["marketing"]["carrier"], s["marketing"]["number"]),
+            "from": s["origin"]["iata"] + (("/" + s["origin"]["terminal"]) if s["origin"].get("terminal") else ""),
+            "to": s["destination"]["iata"] + (("/" + s["destination"]["terminal"]) if s["destination"].get("terminal") else ""),
+            "dep": s["departure_local"][11:16], "arr": s["arrival_local"][11:16],
+            "actual_arr": (s.get("actual_arrival_local") or "")[11:16],
+            "equipment": s.get("equipment_code", ""),
+            "claims": s.get("claims", {}), "reliability": s.get("reliability", {}),
+        } for s in opt["segments"]],
+        "booking": sorted(opt.get("booking", []),
+                          key=lambda b: (not b["direct"], b["price_cents"])),
+    }
+
+
+def score_request(req):
+    fid = req.get("fixture") or "ground-access-swing"
+    path = _fixture_path(fid)
+    if not path:
+        return {"error": "no such fixture: %s" % fid}
+    sc = json.load(open(path, encoding="utf-8"))
+    profile = req.get("profile") or "reference"
+    if profile not in sc["query"]["profiles"]:
+        profile = "reference"
+    _apply_overrides(sc, req)
+
+    views = [_view(sc, o, profile) for o in sc["options"]]
+    kept = [v for v in views if not v["filtered_reason"] and not v["infeasible_reason"]]
+    hidden = [v for v in views if v["filtered_reason"] or v["infeasible_reason"]]
+    kept.sort(key=lambda v: (v["effective_cents"], v["option_id"]))
+
+    return {
+        "fixture": {"fixture_id": sc["fixture_id"], "title": sc["title"],
+                    "origin": sc["query"]["origin"]["label"],
+                    "destination": sc["query"]["destination"]["label"],
+                    "depart_date": sc["query"]["depart_date"],
+                    "route_par_cents": sc["query"]["route_par_cents"],
+                    "profiles": list(sc["query"]["profiles"])},
+        "profile": profile,
+        "options": kept,
+        "hidden": hidden,
+    }
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     server_version = "ConcordeGo"
     protocol_version = "HTTP/1.1"
@@ -268,6 +410,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path == "/" or path == "/index.html":
             return self._send_file(os.path.join(UI, "index.html"), "text/html; charset=utf-8")
+        if path == "/api/fixtures":
+            return self._json(list_fixtures())
         if path == "/api/sky/cached":
             return self._json({"cached": _cached(), "total": len(SKY_SOURCES)})
         if path.startswith("/api/sky/status"):
@@ -287,6 +431,23 @@ class Handler(http.server.BaseHTTPRequestHandler):
             typ = mimetypes.guess_type(cand)[0] or "application/octet-stream"
             return self._send_file(cand, typ)
         self.send_error(404)
+
+    # --------------------------------------------------------------- POST
+    def do_POST(self):
+        if self.path.split("?")[0] != "/api/score":
+            return self.send_error(404)
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+            req = json.loads(self.rfile.read(n) or b"{}")
+        except Exception as exc:
+            return self._json({"error": "bad request: %s" % exc})
+        try:
+            return self._json(score_request(req))
+        except Exception as exc:
+            # a broken fixture should say so on the page, not 500 silently
+            import traceback
+            traceback.print_exc()
+            return self._json({"error": "%s: %s" % (type(exc).__name__, exc)})
 
     # ------------------------------------------------------------ helpers
     def _json(self, obj):
