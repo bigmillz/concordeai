@@ -37,6 +37,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import adapter                                           # noqa: E402
+import live                                              # noqa: E402
 import narrator                                          # noqa: E402
 import scorer                                            # noqa: E402
 
@@ -442,6 +443,7 @@ def live_request(req):
     """Normalise a recorded or live payload into a scenario, then score it with
     exactly the same code path the fixtures use."""
     src = req.get("source") or "sample"
+    _LIVE_META = {}
     if src == "sample":
         path = os.path.join(HERE, "adapter_samples", "kiwi-jfk-lhr.json")
         try:
@@ -451,6 +453,18 @@ def live_request(req):
             return {"error": "no recorded sample: %s" % exc}
     elif src == "inline":
         raw = req.get("payload") or {}
+    elif src == "api":
+        q = {"origin": req.get("origin", "JFK"), "destination": req.get("destination", "LHR"),
+             "date": req.get("date") or "2026-11-12",
+             "adults": int(req.get("adults", 1)), "currency": "USD", "limit": 20}
+        raw, meta = live.search(q)
+        if raw is None:
+            # The failure IS the answer here - a quota wall or a missing key
+            # should read as a sentence, not a spinner that never resolves.
+            return {"error": meta.get("error", "live search unavailable"),
+                    "hint": meta.get("hint") or meta.get("how"),
+                    "quota": meta.get("quota"), "live": True}
+        _LIVE_META = meta
     else:
         return {"error": "unknown source %r - this server does not call a flight "
                          "API itself; hand it a payload or use the recording" % src}
@@ -462,6 +476,11 @@ def live_request(req):
     out = _score_scenario(sc, req)
     out["coverage"] = adapter.coverage(sc)
     out["live"] = True
+    out["feed"] = {"source": src}
+    if src == "api":
+        out["feed"].update({"fetched": _LIVE_META.get("source"),
+                            "age_seconds": _LIVE_META.get("age_seconds"),
+                            "quota": _LIVE_META.get("quota")})
     return out
 
 
@@ -489,6 +508,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path == "/" or path == "/index.html":
             return self._send_file(os.path.join(UI, "index.html"), "text/html; charset=utf-8")
+        if path == "/api/live/status":
+            # Safe to serve: live.status() reports whether a key exists and
+            # where it came from, never the key.
+            return self._json(live.status())
         if path == "/api/fixtures":
             return self._json(list_fixtures())
         if path == "/api/sky/cached":

@@ -943,8 +943,68 @@ discipline from the brief, working. When BCN turned up in a real search it was c
 properly; the guard that catches this now tests the mechanism with a stripped enrichment
 rather than relying on some airport happening to be missing.
 
-## Not wired to a live API
+## Wired to a live API
 
-`/api/live` normalises a recorded sample or a payload handed to it. The server does not call
-a flight API itself — that belongs behind a key, a quota and a caching layer, and none of
-those are decisions to make inside an afternoon's adapter.
+`concorde-travel/live.py` holds the credential, the quota and the cache. `/api/live` calls
+the provider when a key is configured and replays the recorded sample when it is not.
+
+
+---
+
+# Key, quota and cache
+
+One module holds a credential — `concorde-travel/live.py` — and it decides one thing: may we
+call the provider right now. The scorer never imports it.
+
+## Setting a key
+
+`export CONCORDEGO_FLIGHT_KEY=...`, or `~/.concordego/cloud.json` (0600, created empty by
+`live.py status`). The environment wins, so a key need never touch disk. With no key the
+live option stays on the recorded search rather than offering a control that cannot work.
+
+**The provider's wire format is config, not code.** The shipped Tequila profile comes from
+published documentation and is **unverified against the live service**: every Kiwi host was
+unreachable from where this was built, so the honest thing was to make the query string
+editable rather than pretend it had been tested. Correcting a parameter name should not mean
+editing Python.
+
+## Four decisions with consequences
+
+**The probe uses the runtime payload.** `probe()` runs a real `search()` rather than some
+cheaper validation call. A probe shaped differently from the real request will validate a key
+that then fails on every actual search — the exact trap recorded in CLAUDE.md, and the test
+suite asserts `probe()` contains no `urlopen` of its own.
+
+**Cache before quota.** A cached answer costs nothing, so it must not spend a call. Getting
+this the wrong way round is how a cache stops being a cache.
+
+**Quota is reserved before the call, not counted after.** A request that times out mid-flight
+has already consumed the provider's allowance; counting afterwards undercounts exactly when
+it matters. Only a connection that never reached them is refunded, and the tests check both
+directions — a 403 counts, a DNS failure does not.
+
+**The key never leaves the module.** `redact()` runs over every string that escapes,
+including the provider's own error body, which is where a key most plausibly comes back at
+you. A test asserts the secret appears in nothing returned from the no-key, HTTP-error,
+network-error and status paths.
+
+## Proven end to end without a real key
+
+A stand-in provider on localhost — checking the auth header, and 403ing a bare
+`Python-urllib` User-Agent the way real provider edges do — was used to walk the whole chain:
+
+```
+call 1   -> reached the provider, 7 options scored, top JFK-LHR $530 / $958 effective, A+
+call 2   -> served from cache, day allowance unchanged
+3 fresh  -> allowance spent, fourth refused: "daily limit reached: 3 of 3 calls used today"
+provider -> saw exactly 3 requests; the cache hit never reached it
+```
+
+The User-Agent guard is proven by that run: the stand-in refuses `Python-urllib` and the
+real call got a 200.
+
+## What is still not done
+
+There is no live key in this repo and none can be added from here. The plumbing is complete
+and tested; what remains is a Tequila key in the config and one `live.py probe` to confirm
+the parameter names, which is the one thing that genuinely could not be checked offline.

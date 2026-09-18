@@ -997,6 +997,7 @@ document.getElementById("f-addpt").onclick = function(){
    diverge, one of the two paths is quietly scoring something else.
    =================================================================== */
 var FIXTURE_LIST = [];
+var LIVE_STATUS = null;
 var WIZ_STEP = 0;
 var WIZ_ANS = {};
 
@@ -1213,6 +1214,15 @@ fetch("/api/fixtures").then(function(r){ return r.json(); }).then(function(list)
   var lv = el("option", null, "Live \u00b7 JFK \u2192 LHR (recorded)");
   lv.value = "__live__";
   sel.appendChild(lv);
+  /* A configured key turns the live entry into a real search. Without one it
+     stays on the recording rather than offering a button that cannot work. */
+  fetch("/api/live/status").then(function(r){ return r.json(); }).then(function(st){
+    LIVE_STATUS = st;
+    if (st.key_configured){
+      lv.textContent = "Live \u00b7 search the API";
+      lv.title = st.quota.day_left + " calls left today";
+    }
+  }).catch(function(){});
   document.getElementById("f-fixture-wrap").hidden = false;
   sel.onchange = function(){
     STATE.fixture = sel.value;
@@ -1425,6 +1435,7 @@ function requestBody(){
   STATE.filters.forEach(function(f){ filters.push({kind:"carrier", value:f.value}); });
   Object.keys(STATE.wishWeights || {}).forEach(function(k){ weights[k] = STATE.wishWeights[k]; });
   return {
+    source: (LIVE_STATUS && LIVE_STATUS.key_configured) ? "api" : "sample",
     fixture: STATE.fixture, profile: STATE.target, bags: STATE.bags,
     prefs: prefs, weights: weights, filters: filters,
     max_cents: dollars("f-max")
@@ -1589,8 +1600,13 @@ function paint(){
   host.hidden = false;
   if (!LAST) return;
   if (LAST.error){
-    host.innerHTML = '<div class="narrator glass"><div class="lead">The scorer refused this request.</div>' +
-                     '<div class="sub">' + esc(LAST.error) + '</div></div>';
+    host.innerHTML = '<div class="narrator glass"><div class="lead">' +
+      esc(LAST.live ? "No live results." : "The scorer refused this request.") + '</div>' +
+      '<div class="sub">' + esc(LAST.error) + '</div>' +
+      (LAST.hint ? '<div class="src">' + esc(LAST.hint) + '</div>' : '') +
+      (LAST.quota ? '<div class="src">' + LAST.quota.day_left + ' of ' + LAST.quota.day_limit +
+                    ' calls left today, ' + LAST.quota.month_left + ' this month.</div>' : '') +
+      '</div>';
     return;
   }
   var opts = LAST.options, hidden = LAST.hidden;
@@ -1607,8 +1623,14 @@ function paint(){
   }
   if (LAST.coverage){
     var indicative = /indicative/.test(LAST.coverage.verdict);
+    var feed = LAST.feed || {};
+    var where = feed.fetched === "cache"
+        ? "From cache, " + Math.round((feed.age_seconds || 0) / 60) + " min old."
+        : feed.fetched === "api"
+          ? "Fetched live \u2014 " + (feed.quota ? feed.quota.day_left + " calls left today." : "")
+          : "From a recorded search.";
     h += '<div class="coverage' + (indicative ? ' thin' : '') + '">' +
-         '<b>Live inventory.</b> ' + esc(LAST.coverage.verdict) + '<ul>' +
+         '<b>Live inventory.</b> ' + esc(where) + ' ' + esc(LAST.coverage.verdict) + '<ul>' +
          LAST.coverage.gaps.map(function(g){ return '<li>' + esc(g) + '</li>'; }).join("") +
          '</ul></div>';
   }

@@ -359,6 +359,9 @@ python3 fixtures/validate.py                  # fixture schema + semantics
 python3 concorde-travel/tests/test_scorer.py  # the fixtures' own assertions, executed
 python3 concorde-travel/tests/test_narrator.py   # the narrator's guard rails (no key needed)
 python3 concorde-travel/tests/test_adapter.py    # live normalisation, replayed offline
+python3 concorde-travel/tests/test_live.py       # quota, cache and key handling, offline
+python3 concorde-travel/live.py status           # key, quota and cache state
+python3 concorde-travel/live.py probe            # validate a key with a REAL search
 python3 concorde-travel/tests/test_faststart.py
 python3 concorde-travel/adapter.py               # normalise the recorded payload, print coverage
 ```
@@ -418,3 +421,35 @@ quietly drop that strip to make the results look more confident.
 hours, inter-terminal), carriers (reviewed ratings), ground access by origin and hour, and
 route par. **An airport that is not curated drops the itinerary rather than being guessed**,
 which is the scope discipline working, not a bug.
+
+## The live API: key, quota, cache
+
+`concorde-travel/live.py` is the only module that holds a credential. It answers one
+question — may we call the provider right now, and what came back — and hands the payload
+to the adapter. The scorer never sees it.
+
+**Setting a key**: `export CONCORDEGO_FLIGHT_KEY=...`, or put one in
+`~/.concordego/cloud.json` (written 0600, created empty by `live.py status`). The env var
+wins, so a key need never touch disk. `/api/live` uses the API when a key is configured and
+the recorded sample when it is not — the interface never offers a button that cannot work.
+
+**The provider's wire format lives in that config, not in code.** The shipped Tequila
+profile is written from documentation and is **unverified against the live service** — every
+Kiwi host was unreachable from the machine this was built on. If the parameter names are
+wrong, fix the profile; you should not have to edit Python to correct someone else's query
+string.
+
+Four behaviours that are deliberate, each with a comment in `live.py`:
+
+- **The probe uses the runtime payload.** `probe()` runs a real `search()`. A validation
+  call shaped differently from the real one blesses keys that then fail on every request —
+  this repo has paid for that once already.
+- **Cache before quota.** A cached answer costs nothing, so it must not spend a call.
+- **Quota is reserved before the call, not counted after.** A request that dies mid-flight
+  has already cost you. Only a connection that never reached the provider is refunded.
+- **The key never leaves the module.** Not into a log, an error, the page, or git.
+  `redact()` runs over everything that escapes, including the provider's own error echo.
+
+Counters live in `~/.concordego/quota.json` and roll over by day and month on their own —
+no cron, no cleanup job. Defaults are 100/day and 1000/month with a 2s floor between calls
+and a 30-minute cache TTL; all four are config.
