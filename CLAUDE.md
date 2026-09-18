@@ -24,6 +24,12 @@ Two things make this repo unlike most:
 The repo lives in Google Drive, which has silently rolled `.git` back before. **Always
 `git fetch` and compare against origin before releasing.**
 
+**This repo also hosts a second, unrelated product: ConcordeGo**, the flight re-ranker
+(directory/config name `concorde-travel`). It shares nothing with the desktop app — not
+the process, not `millenai.py`, not the gauntlet. Its brief is
+[`docs/design.md`](docs/design.md) and its working rules are at the bottom of this file.
+Everything between here and there is about the desktop app only.
+
 ## Commands
 
 Everything runs on the app's own venv. A bare/Homebrew Python is missing `psutil` and
@@ -243,3 +249,96 @@ were untracked in the ConcordeAI rename. Edit `millenai.py` at the repo root —
 any `.app` copy of it is a build output, never the source. The repo is
 `bigmillz/concordeai`; GitHub 301-redirects the old `concorde` and `MillenAI`
 URLs, which is what keeps pre-rename installs updating.
+
+---
+
+# ConcordeGo (`concorde-travel`) — flight re-ranker
+
+A second product in this repo, unrelated to the desktop app above. **Full brief:
+[`docs/design.md`](docs/design.md) — read it before touching anything under
+`concorde-travel/` or `fixtures/`.** What follows is the short form: the parts that, if
+forgotten mid-session, cause work that has to be thrown away.
+
+**Product name is ConcordeGo, frozen spelling.** Not "Concorde Go", not "ConcordeGO". The
+directory and config name is `concorde-travel`. Part of the Concorde family (consumer
+assistant, Concorde AI, Concorde VPN).
+
+## What it is
+
+Not a search engine — a **re-ranker**. Inventory comes from a third-party API; the product
+is the enrichment and scoring layer on top. Every platform exposes the same filters over
+the same inventory. They differ in interface, not judgment. We sell the judgment.
+
+## The model — one number per itinerary, in dollars
+
+```
+effective_cost =
+    ticket_price
+  + baggage_cost(actual bag load, fare family)
+  + ground_access_cost(user's geocoded origin, airport, local departure time)
+  + (door_to_door_hours * user_hourly_value)
+  + comfort_penalties - comfort_credits
+  + risk_adjustment(misconnect probability, downside severity)
+```
+
+Cheapest / fastest / most comfortable are **not separate rankings** — they are this same
+model at different `user_hourly_value` and comfort weightings.
+
+## Hard rules — do not relitigate
+
+1. **The LLM narrates, it does not rank.** Scoring is deterministic arithmetic over
+   structured data. The model parses intent into weights on the way in and writes the
+   ledger on the way out. Same query + same data = same order, every time.
+2. **No unhedged aircraft claims.** Feeds give an equipment code, not a subfleet; one
+   carrier's 777-200 may have three cabin configs and three connectivity systems, and
+   equipment gets swapped after booking. "Flown as a 789 with the refreshed cabin on 84%
+   of the last 60 departures" — never "you will have wifi."
+3. **One currency.** Everything resolves to dollars. If you are writing a second ranking
+   function, stop.
+4. **Show the demotions.** Anything pushed down gets an itemized reason with dollar values
+   and a one-click override. Hidden ranking logic feels like a kickback.
+5. **Fixtures before APIs.** No live flight API dependency in the scorer or its tests.
+
+## The output format is the product
+
+An itemized ledger per option — a dollar figure, a cause, and the evidence where the claim
+is probabilistic:
+
+```
+AA 100 · JFK→LHR · $480 ticket · $710 effective
+  − $95  EWR at 6:10am: no viable transit, car fare
+  − $85  4h10m at CDG arriving 1:40am, terminal closed
+  − $60  Older cabin, connectivity unusable over the Atlantic (73% of last 60)
+  − $70  Two checked bags not included
+  + $80  Nonstop, no misconnect exposure
+```
+
+If a number cannot be explained in one line of that form, it does not belong in the model.
+
+## Enrichment layers, easiest first
+
+1. **Ground access** — geocode the *actual* origin, not the city, and model time of day.
+   Bushwick→EWR at 6am is a ~$90 car (transit doesn't run); Bushwick→JFK is $2.90.
+2. **Baggage / fare families** — basic economy plus two bags often loses to the main cabin
+   fare it undercut. Pure arithmetic.
+3. **Layover quality** — a situation, not a number: airport, terminal, **local clock
+   time**, re-clearing immigration/security, terminal changes, margin over MCT, what is
+   open at that hour. Four hours at SIN is a feature; four hours at CDG arriving 1:40am is
+   a punishment.
+4. **Reliability** — US DOT/BTS on-time data is free, by flight number. Model **downside
+   severity separately from probability**: misconnecting the last flight of the day is a
+   hotel night, not a delay.
+5. **Aircraft / cabin / connectivity** — hardest, biggest differentiator.
+
+## Scope
+
+NYC origin, transatlantic long-haul only: JFK/EWR/LGA, ~12 European arrival airports, ~40
+aircraft configs. **Do not generalize the enrichment data until the scorer works end to
+end** — that curated data is the moat.
+
+## Build order
+
+fixtures → scorer → enrichment DB → intent parser → ledger narrator → live inventory
+adapter. Stack is chosen in `docs/design.md`; the only hard constraint is that the scorer
+must be **trivially testable in isolation** — pure function, structured data in, ledger
+out, no network, no clock, no I/O.
