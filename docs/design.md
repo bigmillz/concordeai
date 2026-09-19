@@ -1096,10 +1096,52 @@ par  $800   A+:12  A:5   A-:16  B+:7   B:14  B-:6   C+:10 C:5   C-:6  D:3   F:12
 par  $750   A:14   A-:3  B+:16  B:6    B-:15 C+:10  C:7   C-:6  D:5   F:14
 ```
 
-**$800 is the recommendation** — the best options still earn an A+, the median lands at B,
-and the long tail spreads properly. But where exactly to put it *is* the definition of what
-an A means, which is a product decision rather than a arithmetic one, so it has not been
-changed. One number in `enrichment/ground.json`.
+**That table was the wrong way to choose par, and the recommendation it produced is
+withdrawn.** Every one of those numbers was read off the distribution of a single search.
+Calibrate an absolute yardstick from a relative distribution and you get a relative
+yardstick with extra steps: run the same method on a different date, against different
+demand, and par moves — so the same flight earns a B in one search and a D in another. That
+is precisely the property the grade must not have.
+
+### Par is a specification
+
+Par should be the effective cost of a **defined reference itinerary** on the route: nonstop,
+main cabin with one checked bag, a carrier at the curated baseline rating, the 31-inch
+transatlantic pitch norm, the overnight departure that is simply what this route is. It is
+computable, auditable, explainable to a user in one sentence, and it moves only when the
+route's structure moves or the specification is deliberately changed — never because the
+market had a cheap Tuesday.
+
+Scored against the real capture, that reference produces:
+
+```
+reference at a $350 ticket  ->  par $790 effective
+reference at a $400 ticket  ->  par $840
+reference at a $450 ticket  ->  par $890
+reference at a $500 ticket  ->  par $940
+
+the $450 reference, itemised - this is what par MEANS:
+   Ticket                                    $450
+   11h17m door to door at $35 an hour        $395
+   LHR to London                             $92
+   Nonstop, no misconnect exposure          −$80
+   No on-time record for any segment         $30
+   Bushwick to JFK at 13:09                   $3
+   EFFECTIVE                                 $890
+```
+
+So `route_par_cents` should carry its basis beside it — the reference ticket price and the
+date it was set — rather than being a bare number with no story. Choosing the reference
+ticket price is still a product decision, but it is now a decision about *what a normal
+fare on this route is*, which is answerable, rather than about where to put a letter.
+
+### The absolute-grade property is now guarded
+
+`test_scorer.py` re-grades every option against four different result sets (alone, with the
+dearest half, with the cheapest half, reversed) and fails if any letter moves. A seeded
+fault that computes par from the 25th percentile of the results is caught by it. Nothing
+computes par from the result set today; the test exists so that nobody improves it into
+doing so.
 
 ### The one field where a feed beats the moat
 

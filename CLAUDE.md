@@ -269,6 +269,27 @@ Not a search engine — a **re-ranker**. Inventory comes from a third-party API;
 is the enrichment and scoring layer on top. Every platform exposes the same filters over
 the same inventory. They differ in interface, not judgment. We sell the judgment.
 
+## Grade and order are two calls to one function — do not conflate them
+
+- **The grade is ABSOLUTE.** It is `effective_cost` at the fixed reference profile against a
+  curated route par. The same flight earns the same letter whatever else the search
+  returned, on any date, under any target. A whole search legitimately coming back C− is the
+  system working. `test_scorer.py` guards this by re-grading every option against subsets of
+  the result set; a mutant that derives par from a percentile of the results is caught.
+- **The grade is NOT the price.** It is the whole effective cost — carrier quality, cabin,
+  pitch, layovers, misconnect risk, ground access, time. A dearer ticket routinely grades
+  better: in the real capture Alaska at a $404 ticket takes an A+ while Virgin at $325 takes
+  an A, because the cheaper one connects through AMS with a misconnect exposure and no bag.
+- **The ORDER is the same function at the user's target** (cheapest / fastest / comfort).
+  A C can and should outrank an A+ when the user asked for cheapest. Switching target
+  re-orders the list and never moves a letter.
+
+**Par is a specification, not a percentile.** Set it from a defined reference itinerary for
+the route — nonstop, main cabin with a bag, a carrier at the baseline rating, the 31-inch
+norm — and record the basis alongside it. Calibrating par off the distribution of a search's
+results is the obvious-looking change that quietly makes every grade relative, which is the
+one thing the grade must never be.
+
 ## The model — one number per itinerary, in dollars
 
 ```

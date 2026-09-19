@@ -866,6 +866,23 @@ def _duffel_conditions(offer: Dict[str, Any]) -> Tuple[str, bool]:
     return changes, bool(ref and ref.get("allowed"))
 
 
+def _place_label(node: Dict[str, Any], iata: str) -> str:
+    """"LHR to LHR" is not a ledger line anybody can read.
+
+    The destination label is what the arrival-ground line renders against, so a
+    bare IATA code there produces "LHR to LHR - $92", which fails the output
+    rule the whole product is built on: a dollar figure, a cause, in one line.
+    Duffel names the city on every place it returns, so use it - bare, because
+    the ledger renders "<arrival iata> to <label>" and already carries the code.
+    The fixtures put an address here ("Shoreditch, London EC2A") and the scorer
+    takes the part before the first comma; a live search only knows the city, so
+    the city is what goes in."""
+    city = (node.get("city_name")
+            or ((node.get("city") or {}).get("name") if isinstance(node.get("city"), dict)
+                else None))
+    return city if city and city != iata else iata
+
+
 def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                 enr: Optional[Dict[str, Any]] = None,
                 checked_bags: int = 1) -> Dict[str, Any]:
@@ -1119,6 +1136,14 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
     first = options[0]
     o_iata = first["segments"][0]["origin"]["iata"]
     d_iata = first["segments"][-1]["destination"]["iata"]
+    dest_label = d_iata
+    for off in _duffel_offers(raw):
+        for sl in off.get("slices") or []:
+            for sg in sl.get("segments") or []:
+                node = sg.get("destination") or {}
+                if node.get("iata_code") == d_iata:
+                    dest_label = _place_label(node, d_iata)
+                    break
     par = ((enr["ground"].get("routes") or {}).get("%s-%s" % (o_iata, d_iata))
            or {}).get("par_cents")
     if not par:
@@ -1148,7 +1173,7 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
             "origin": {"label": org.get("label", origin_key),
                        "lat": org.get("lat", 0.0), "lon": org.get("lon", 0.0),
                        "geocode_precision": "neighbourhood"},
-            "destination": {"label": d_iata, "lat": 0.0, "lon": 0.0,
+            "destination": {"label": dest_label, "lat": 0.0, "lon": 0.0,
                             "geocode_precision": "city"},
             "depart_date": first["segments"][0]["departure_local"][:10],
             "return_date": None,

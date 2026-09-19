@@ -167,6 +167,34 @@ def run(path):
                  for p, m in letters.items() for oid, g in m.items() if g != first[oid]]
         check("[%s] grades hold across every profile" % name, not moved, ", ".join(moved))
 
+        # THE GRADE IS ABSOLUTE, NOT A RANKING. The same flight must earn the
+        # same letter whatever else the search happened to return - otherwise a
+        # flight is a B on Tuesday and a D on Wednesday because the competition
+        # changed, and the letter stops meaning anything a person can carry
+        # between searches. A whole search legitimately coming back C- is the
+        # system working.
+        #
+        # Nothing computes par from the result set today. This exists so that
+        # nobody "improves" it into doing so: deriving par from a percentile of
+        # what came back is the obvious-looking change that quietly makes every
+        # grade relative.
+        import copy as _copy
+        drifted = []
+        for oid, o in opts.items():
+            want = grade(sc, o)[0]
+            others = [x for x in sc["options"] if x["option_id"] != oid]
+            for label, subset in (("alone", [o]),
+                                  ("with the dearest half", others[len(others) // 2:] + [o]),
+                                  ("with the cheapest half", others[:len(others) // 2] + [o]),
+                                  ("reversed", list(reversed(sc["options"])))):
+                sub = _copy.deepcopy(sc)
+                sub["options"] = [x for x in subset]
+                got = grade(sub, o)[0]
+                if got != want:
+                    drifted.append("%s: %s %s, %s alone" % (oid, got, label, want))
+        check("[%s] a flight's grade does not depend on what else was returned" % name,
+              not drifted, "; ".join(drifted[:4]))
+
     if exp.get("target_reorders"):
         orders = {p: [l.option_id for l in score_all(sc, p)] for p in sc["query"]["profiles"]}
         distinct = {tuple(v) for v in orders.values()}
