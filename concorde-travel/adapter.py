@@ -826,6 +826,31 @@ def _duffel_bag_tiers(offer: Dict[str, Any], enr: Dict[str, Any],
     return tiers, "feed"
 
 
+def _duffel_amenities(seg: Dict[str, Any]) -> Dict[str, Any]:
+    """The published cabin attributes Duffel returns per segment.
+
+    A real JFK-LHR capture carried these on 269 of 272 segments, which makes it
+    the only feed here that says anything about the cabin without a curated
+    join. What comes back is {wifi:{available,cost}, seat:{type,legroom,pitch},
+    power:{available}}.
+
+    WHAT IS TAKEN AND WHAT IS NOT. Seat pitch is a plain number in the schema,
+    not a hedged claim, because a fare's pitch is a cabin-layout fact the airline
+    publishes rather than an observation of what turned up - and the scorer
+    already prices it against a 31-inch norm, which the real data's own mode
+    confirms. Power is carried as a published attribute for the same reason.
+
+    Wifi is deliberately NOT mapped onto `connectivity_oceanic`. That field is an
+    OBSERVED claim - value, frequency, sample size, window - and an airline
+    saying "wifi: available" is a marketing attribute with no source and no as-of
+    date. Converting it into an observed frequency would mean inventing the
+    sample that hard rule 2 exists to demand. It is kept raw for the narrator and
+    the interface, and the connectivity term goes on abstaining until either the
+    fleet table covers the frame or a real observation feed does."""
+    pax = (seg.get("passengers") or [{}])[0]
+    return ((pax.get("cabin") or {}).get("amenities") or {})
+
+
 def _duffel_conditions(offer: Dict[str, Any]) -> Tuple[str, bool]:
     """(changes, refundable). A null condition is "the airline did not say",
     which is not the same as "no" - but it cannot be sold as a yes either."""
@@ -860,6 +885,8 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
     default_used = 0
     unreviewed = 0
     feed_priced_bags = 0
+    amenity_segments = 0
+    wifi_published = []
 
     for offer in _duffel_offers(raw):
         slices = offer.get("slices") or []
@@ -916,8 +943,23 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                                                    "fit can be looked up"},
             }
             for c in claims.values():
-                if c.get("needs_primary_source"):
+                if isinstance(c, dict) and c.get("needs_primary_source"):
                     unreviewed += 1
+            amen = _duffel_amenities(s)
+            seat = amen.get("seat") or {}
+            pitch = str(seat.get("pitch") or "").strip()
+            if pitch.isdigit():
+                claims["seat_pitch_inches"] = int(pitch)
+                amenity_segments += 1
+            wifi = amen.get("wifi") or {}
+            if wifi:
+                wifi_published.append({"segment": sid, "available": wifi.get("available"),
+                                       "cost": wifi.get("cost")})
+            pw = amen.get("power") or {}
+            if pw.get("available") is not None:
+                claims["power"] = ("Power at the seat, per the airline"
+                                   if pw.get("available") else
+                                   "No power at the seat, per the airline")
             num = re.sub(r"\D", "", s.get("marketing_carrier_flight_number", "") or "")
             segments.append({
                 "segment_id": sid,
@@ -1129,7 +1171,9 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
         "_dropped": dropped,
         "_feed": {"provider": "duffel", "default_bag_fees_used": default_used,
                   "unreviewed_claims": unreviewed,
-                  "feed_priced_bags": feed_priced_bags},
+                  "feed_priced_bags": feed_priced_bags,
+                  "amenity_segments": amenity_segments,
+                  "wifi_published": wifi_published},
     }
 
 

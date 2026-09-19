@@ -363,7 +363,7 @@ python3 concorde-travel/tests/test_live.py       # quota, cache and key handling
 python3 concorde-travel/live.py status           # key, quota and cache state
 python3 concorde-travel/live.py probe            # validate a key with a REAL search
 python3 concorde-travel/live.py provider duffel  # switch provider profile
-python3 concorde-travel/tests/mutate_adapter.py  # break the adapters on purpose, 13 faults
+python3 concorde-travel/tests/mutate_adapter.py  # break the adapters on purpose, 16 faults
 python3 concorde-travel/capture.py JFK LHR 2026-11-12  # real search -> scrubbed sample + report
 python3 concorde-travel/tests/test_faststart.py
 python3 concorde-travel/adapter.py               # normalise the recorded payload, print coverage
@@ -381,7 +381,7 @@ curve it is meant to be testing is a fixture that tests nothing.
 
 **The test suites are mutation-tested.** `test_scorer.py` catches 12 of 12 seeded faults and
 `validate.py` 10 of 10; `tests/mutate_adapter.py` is an executable runner for the adapters
-and must stay at 13/13 with **zero skips** — a skipped mutant never ran and is not a pass.
+and must stay at 16/16 with **zero skips** — a skipped mutant never ran and is not a pass.
 If a change makes a suite pass that should not, the suite has lost a guard.
 
 **The narrator is the only non-deterministic surface, and it is fenced.** `narrator.brief()`
@@ -434,11 +434,29 @@ profiles are kept for their schemas — Amadeus Enterprise still speaks Flight O
 v2, and Kiwi is the only feed here that sees self-transfer at all. **Do not re-recommend
 Amadeus Self-Service or Google Flights**; see the table in `docs/design.md`.
 
-**Duffel is the only feed that quotes a bag price.** `available_services` lists an extra
-checked bag as a bookable service with a real amount, so for those options the bags
-arithmetic is not an estimate — `coverage()` reports that as a *strength*, the one place a
-feed beats the curated moat. Two catches, both handled: it prices per unit up to a
-`maximum_quantity` with nothing beyond, and an empty list means *unknown*, not free.
+**Duffel CAN quote a bag price, but never on the search response.** `available_services` was
+empty on all 172 offers of the real capture — it is populated only by
+`GET /air/offers/{id}`, a second call per offer. The code path is built and tested (a quote
+beats the curated table, `coverage()` reports it as a *strength*), but on `/api/live` today
+every bag is priced from `fares.json` or the pessimistic default. **An empty list means
+unknown, not free.** Fetching details for the top N offers is the obvious next step and is
+not built.
+
+**Duffel carries per-segment cabin amenities, and no other feed here does** —
+`segment.passengers[].cabin.amenities` gave `wifi{available,cost}`, `seat{type,legroom,pitch}`
+and `power{available}` on **269 of 272** segments of the real capture. This is enrichment
+layer 5, the "hardest, biggest differentiator", arriving without a curated join.
+
+**What is taken from it, and what is deliberately not.** `seat.pitch` becomes
+`claims.seat_pitch_inches` — a plain number in the schema, not a hedged claim, because a
+fare's pitch is a published cabin-layout fact and the scorer already prices it against a
+31-inch norm (which the real data's own mode confirms). `power` is carried the same way.
+**Wifi is NOT mapped onto `connectivity_oceanic`**: that field is an *observed* claim with a
+frequency, sample size and window, and an airline saying "wifi: available" is a marketing
+attribute with no source and no as-of date. Manufacturing a frequency for it is precisely
+what hard rule 2 exists to stop, so it is kept raw under `_feed.wifi_published` for the
+narrator and the page, and the connectivity term goes on abstaining. A mutant that turns a
+published amenity into an observed certainty is in `mutate_adapter.py`.
 
 **Two Duffel-specific traps, each with a comment in `adapter.py`:**
 - **`fare_brand_name` is prose, not a code** ("Basic Economy", "Economy Light") where
@@ -526,8 +544,11 @@ scrubs the payload for credentials **before** writing it, saves it to `adapter_s
 and prints a pasteable report. A failed call is a useful result — the report is written for
 that case too, because the likeliest first outcome is a 4xx from a wrong parameter name.
 
-**`adapter_samples/kiwi-jfk-lhr.json` is a real capture. The other two are not** —
-`amadeus-jfk-lhr.json` is synthesised from the published schema and `duffel-jfk-lhr.json`
-from duffel-api's own model definitions (the authoritative parser, rather than a reading of
-prose docs). Each says so in its `_provenance` block and a test asserts it. Replace them
-with real captures on the first successful probe.
+**`kiwi-jfk-lhr.json` and `duffel-jfk-lhr.json` are real captures; `amadeus-jfk-lhr.json` is
+not** — it is synthesised from the published schema, says so in its `_provenance`, and a test
+asserts it. The Duffel capture is a real JFK–LHR search **trimmed from 172 offers to 23**
+covering the distinct shapes; its `_provenance.selection` names why each was kept.
+
+**The Duffel profile is VERIFIED** — a real `duffel_test_` key returned 172 offers on the
+first call, so its parameter names, POST body, `Duffel-Version` header and static switches
+are correct against the live service. Amadeus and Kiwi remain unverified.

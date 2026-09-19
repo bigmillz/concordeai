@@ -35,6 +35,14 @@ def check(label, cond, detail=""):
     print(("  ok   " if cond else "  FAIL ") + label + (("\n         " + detail) if detail and not cond else ""))
 
 
+def dofs_by_id(offers, opt):
+    """Find the raw offer an option came from, by the id suffix the adapter keeps."""
+    for o in offers:
+        if (o["id"] or "")[-10:].lower().replace("_", "-") in opt["option_id"]:
+            return o
+    return {}
+
+
 def main():
     sample = os.path.join(HERE, "..", "adapter_samples", "kiwi-jfk-lhr.json")
     raw = json.load(open(sample, encoding="utf-8"))
@@ -389,154 +397,179 @@ def main():
           json.dumps(ncov["gaps"]))
 
     # -------------------------------------------------------------- duffel
-    print("\nduffel: the third feed")
+    # This sample is a REAL capture, trimmed. Everything below is therefore an
+    # assertion about what the live service actually returns, not about a shape
+    # I guessed at - which is the whole reason it replaced the synthesised one.
+    print("\nduffel: a real capture")
     dpath = os.path.join(HERE, "..", "adapter_samples", "duffel-jfk-lhr.json")
     draw = json.load(open(dpath, encoding="utf-8"))
     dsc = adapter.from_duffel(draw, checked_bags=1)
-    check("the duffel sample normalises", bool(dsc.get("options")), dsc.get("error", ""))
-    check("its provenance says SYNTHESISED, and names the SDK it was built from",
-          draw["_provenance"]["captured"] is False
-          and "duffel_api/models/offer.py" in draw["_provenance"]["how"])
-    check("an itinerary through an uncurated airport is dropped",
-          any("DUB" in d["why"] for d in dsc["_dropped"]), json.dumps(dsc["_dropped"]))
+    check("the captured payload normalises", bool(dsc.get("options")), dsc.get("error", ""))
+    check("and its provenance says CAPTURED, not synthesised",
+          draw["_provenance"]["captured"] is True)
+    check("the capture is trimmed, and says so",
+          "TRIMMED" in draw["_provenance"]["how"])
+
+    dofs = draw["data"]["offers"]
+    dsegs = [sg for o in dofs for sl in o["slices"] for sg in sl["segments"]]
 
     # Duffel nests offers under data.offers on the search call and returns them
     # as a bare data[] on the offers endpoint. Both are the same offers.
-    flat = {"data": draw["data"]["offers"]}
+    flat = {"data": dofs}
     fsc = adapter.from_duffel(flat, checked_bags=1)
     check("both duffel payload shapes produce the same options",
           [o["option_id"] for o in fsc["options"]] == [o["option_id"] for o in dsc["options"]])
 
-    print("\nduffel: carrier, aircraft, and what it refuses to say")
-    share = next(o for o in dsc["options"] if o["option_id"].startswith("aa6175"))
-    sseg = share["segments"][0]
-    check("a codeshare is detected from the two carrier objects",
-          sseg["marketing"]["carrier"] == "AA" and sseg["operating"]["carrier"] == "BA")
-    check("and the operating carrier's own flight number is kept, not the seller's",
-          sseg["operating"]["number"] == 178 and sseg["marketing"]["number"] == 6175,
-          "%s / %s" % (sseg["operating"]["number"], sseg["marketing"]["number"]))
-    check("the cabin claim is looked up on the operator, not the seller",
-          "777-300ER" in str(sseg["claims"]["subfleet"].get("value", "")))
-    ba = next(o for o in dsc["options"] if "Basic" == o["tickets"][0]["fare_brand_name"])
-    check("carrier rating follows the OPERATING carrier",
-          share.get("carrier_rating", {}).get("rating")
-          == ba.get("carrier_rating", {}).get("rating"),
-          "AA-marketed BA metal should rate as BA")
+    print("\nduffel: carrier and aircraft, as the live service gives them")
+    share = next((o for o in dsc["options"] for s in o["segments"]
+                  if s["operating"]["carrier"] != s["marketing"]["carrier"]), None)
+    check("a real codeshare is present and its operator is kept", share is not None)
+    if share:
+        sseg = next(s for s in share["segments"]
+                    if s["operating"]["carrier"] != s["marketing"]["carrier"])
+        check("the operating carrier differs from the seller, and both survive",
+              sseg["operating"]["carrier"] and sseg["marketing"]["carrier"]
+              and sseg["operating"]["carrier"] != sseg["marketing"]["carrier"],
+              "%s / %s" % (sseg["marketing"]["carrier"], sseg["operating"]["carrier"]))
+        check("the carrier rating follows the OPERATING carrier",
+              (share.get("carrier_rating") or {}).get("rating")
+              == ((adapter.load_enrichment()["carriers"]["ratings"]
+                   .get(sseg["operating"]["carrier"]) or {}).get("rating")))
+    noac = [s for o in dsc["options"] for s in o["segments"]
+            if s["equipment_code"] == "UNKNOWN"]
+    check("segments the feed gave no aircraft for are present in a real capture",
+          bool(noac), "the live feed does omit it sometimes")
+    check("and every one of them abstains rather than guessing",
+          all(s["claims"]["subfleet"].get("coverage") == "none" for s in noac))
 
-    zz = next(o for o in dsc["options"] if o["segments"][0]["marketing"]["carrier"] == "ZZ")
-    check("a segment with aircraft: null abstains rather than guessing",
-          zz["segments"][0]["claims"]["subfleet"].get("coverage") == "none")
-    check("an uncurated carrier keeps its option but loses its rating",
-          "carrier_rating" not in zz)
-    check("and test-mode fiction is called out in the scenario notes",
-          any("Duffel Airways" in n and "invented" in n for n in dsc["notes"]),
-          json.dumps(dsc["notes"])[:120])
+    print("\nduffel: the cabin amenities, which no other feed here carries")
+    # 269 of 272 segments in the untrimmed capture carried this block. It is the
+    # aircraft/cabin/connectivity layer arriving without a curated join.
+    amen = [((sg.get("passengers") or [{}])[0].get("cabin") or {}).get("amenities")
+            for sg in dsegs]
+    check("the capture really does carry per-segment cabin amenities",
+          sum(1 for a in amen if a) >= len(dsegs) - 4,
+          "%d of %d" % (sum(1 for a in amen if a), len(dsegs)))
+    pitched = [s for o in dsc["options"] for s in o["segments"]
+               if "seat_pitch_inches" in (s.get("claims") or {})]
+    check("seat pitch is carried through as a number the scorer can price",
+          bool(pitched) and all(20 < s["claims"]["seat_pitch_inches"] < 60
+                                for s in pitched),
+          str(sorted({s["claims"]["seat_pitch_inches"] for s in pitched})))
+    rows = {r.option_id: r for r in scorer.score_all(dsc, "reference")}
+    tight = [o for o in dsc["options"]
+             if any((s.get("claims") or {}).get("seat_pitch_inches", 99) < 31
+                    for s in o["segments"])]
+    check("a sub-31-inch pitch produces a priced ledger line", bool(tight))
+    if tight:
+        line = next((l for l in rows[tight[0]["option_id"]].lines if l.code == "pitch"), None)
+        check("and that line names the inches and costs real money",
+              line is not None and line.amount_cents > 0 and "inches" in line.label,
+              str(line.label if line else None))
 
-    print("\nduffel: it is the only feed that quotes a bag price")
-    bat = ba["tickets"][0]
-    check("an airline-quoted bag price is used", bat["checked_bag_fee_tiers"][0]["amount_cents"] == 7500)
-    check("and is labelled as quoted, not estimated",
-          "not a curated estimate" in (bat["checked_bag_fee_tiers"][0].get("note") or ""),
-          str(bat["checked_bag_fee_tiers"][0].get("note"))[:70])
-    check("coverage reports that as a STRENGTH, not a gap",
-          any("airline-quoted" in s for s in adapter.coverage(dsc).get("strengths", [])),
+    # Wifi is NOT mapped onto connectivity_oceanic. That field is an OBSERVED
+    # claim; an airline saying "wifi: available" is a marketing attribute with
+    # no source and no as-of. Inventing a frequency for it is the exact thing
+    # hard rule 2 exists to stop.
+    wifi = dsc["_feed"]["wifi_published"]
+    check("published wifi is recorded for the narrator and the page", bool(wifi))
+    check("and it keeps the airline's own words rather than a score",
+          all(set(w) == {"segment", "available", "cost"} for w in wifi),
+          json.dumps(wifi[:1]))
+    conn = [(s.get("claims") or {}).get("connectivity_oceanic") for o in dsc["options"]
+            for s in o["segments"]]
+    check("no connectivity claim was manufactured from a published amenity",
+          all(c is None or c.get("coverage") == "none" or "needs_primary_source" in c
+              for c in conn))
+    powered = [s for o in dsc["options"] for s in o["segments"]
+               if (s.get("claims") or {}).get("power")]
+    check("published power is carried through", bool(powered),
+          "%d of %d segments" % (len(powered),
+                                 sum(len(o["segments"]) for o in dsc["options"])))
+    check("as a plain published attribute, not a hedged claim",
+          all(isinstance(s["claims"]["power"], str) and "airline" in s["claims"]["power"]
+              for s in powered))
+
+    print("\nduffel: bags, and what the SEARCH response does not carry")
+    # Measured: available_services was empty on all 172 offers of the real
+    # capture. It is populated only by the single-offer endpoint, so on this
+    # path the bag price is always a fallback - the opposite of what the first
+    # Duffel commit claimed.
+    check("the real search response quotes no bag prices at all",
+          all(not o.get("available_services") for o in dofs))
+    check("so coverage claims no airline-quoted bags on a search payload",
+          not adapter.coverage(dsc).get("strengths"),
           json.dumps(adapter.coverage(dsc).get("strengths")))
+    check("and every ticket still has a priced ladder rather than a free bag",
+          all(t["checked_bag_fee_tiers"] and t["checked_bag_fee_tiers"][0]["amount_cents"] > 0
+              for o in dsc["options"] for t in o["tickets"]))
 
-    # The quote covers maximum_quantity pieces and nothing beyond it. The scorer
-    # RAISES on an unpriced piece, so a heavy bag load must not fall off the end.
-    heavy = adapter.from_duffel(draw, checked_bags=5)
-    hb = next(o for o in heavy["options"]
-              if o["tickets"][0]["fare_brand_name"] == "Basic")["tickets"][0]
-    pieces = [t["piece"] for t in hb["checked_bag_fee_tiers"]]
-    check("pieces beyond the airline's quoted cap are still priced",
-          pieces == sorted(set(pieces)) and max(pieces) >= 3, str(pieces))
-    check("and those are marked as estimates rather than quotes",
-          any("estimate" in (t.get("note") or "") for t in hb["checked_bag_fee_tiers"]))
-    # scorer._bag_cost RAISES on an unpriced piece. The traveller's bag load
-    # comes from the request and is unbounded, so a ladder that stops at three
-    # takes the whole search down on a four-bag party - which it did, on both
-    # feeds, until _extend_tiers.
-    for feed, raw_payload in (("amadeus", araw), ("duffel", draw)):
-        ok_loads = True
-        for load in range(0, 10):
-            s = adapter.from_feed(raw_payload, checked_bags=load)
-            try:
-                scorer.score_all(s, "reference")
-            except ValueError as exc:
-                ok_loads = False
-                detail = "%s at %d bags: %s" % (feed, load, exc)
+    # The capability is real, just on GET /air/offers/{id}. Constructed here
+    # rather than shipped as a sample, because a sample carrying it would be a
+    # sample of a response this code path never sees.
+    quoted = json.loads(json.dumps(draw))
+    target = quoted["data"]["offers"][0]
+    target["available_services"] = [{
+        "id": "ase_x", "type": "baggage", "maximum_quantity": 2,
+        "total_amount": "65.00", "total_currency": "USD",
+        "passenger_ids": ["p"], "segment_ids": ["s"],
+        "metadata": {"type": "checked", "maximum_weight_kg": 23}}]
+    qsc = adapter.from_duffel(quoted, checked_bags=1)
+    qt = qsc["options"][0]["tickets"][0]
+    check("when the single-offer endpoint DOES quote a bag, the quote wins",
+          qt["checked_bag_fee_tiers"][0]["amount_cents"] == 6500,
+          str(qt["checked_bag_fee_tiers"][:1]))
+    check("and it is labelled a quote rather than an estimate",
+          "not a curated estimate" in (qt["checked_bag_fee_tiers"][0].get("note") or ""))
+    check("coverage then reports it as a strength",
+          any("airline-quoted" in s for s in adapter.coverage(qsc).get("strengths", [])))
+
+    # The invariant is not "the ladder reaches N" - a fare including a bag needs
+    # one fewer priced piece. It is that the scorer never raises, at any load.
+    for load in range(0, 10):
+        h = adapter.from_duffel(draw, checked_bags=load)
+        for o in h["options"]:
+            t = o["tickets"][0]
+            need = max(0, load - t["entitlements"]["checked_included"])
+            pieces = sorted(x["piece"] for x in t["checked_bag_fee_tiers"])
+            if pieces != list(range(1, len(pieces) + 1)) or len(pieces) < need:
+                check("every ticket prices the pieces it needs", False,
+                      "%s at %d bags: %s for need %d" % (o["option_id"], load, pieces, need))
                 break
-        check("%s prices every bag load from 0 to 9" % feed, ok_loads,
-              "" if ok_loads else detail)
-    check("padding repeats the DEAREST published tier, never a cheaper one",
-          all(t["amount_cents"] >= max(x["amount_cents"]
-                                       for x in hb["checked_bag_fee_tiers"]
-                                       if x["piece"] < t["piece"])
-              for t in hb["checked_bag_fee_tiers"] if t["piece"] > 1))
+        else:
+            scorer.score_all(h, "reference")
+            continue
+        break
+    else:
+        check("every ticket prices the pieces it needs, loads 0 to 9", True)
 
-    # An empty available_services means Duffel has no quote for that airline. It
-    # does NOT mean the bag is free, which is the reading that loses money.
-    noserv = json.loads(json.dumps(draw))
-    for o in noserv["data"]["offers"]:
-        o["available_services"] = []
-    nsc = adapter.from_duffel(noserv, checked_bags=1)
-    nbt = next(o for o in nsc["options"]
-               if o["tickets"][0]["fare_brand_name"] == "Basic")["tickets"][0]
-    check("no quoted service falls back to the curated table, never to free",
-          bool(nbt["checked_bag_fee_tiers"])
-          and nbt["checked_bag_fee_tiers"][0]["amount_cents"] > 0,
-          str(nbt["checked_bag_fee_tiers"][:1]))
-
-    # A ticket has one allowance. Where the feed's segments disagree, the
-    # smaller is what survives the first bag drop; the larger invents an
-    # allowance on the leg that does not have it.
-    mixd = json.loads(json.dumps(draw))
-    klo = next(o for o in mixd["data"]["offers"] if o["id"] == "off_0000KlConnect")
-    klo["slices"][0]["segments"][0]["passengers"][0]["baggages"] = [
-        {"type": "checked", "quantity": 2}, {"type": "carry_on", "quantity": 1}]
-    klo["slices"][0]["segments"][1]["passengers"][0]["baggages"] = [
-        {"type": "checked", "quantity": 0}, {"type": "carry_on", "quantity": 1}]
-    mdsc = adapter.from_duffel(mixd, checked_bags=1)
-    mdt = next(o for o in mdsc["options"]
-               if o["segments"][0]["marketing"]["carrier"] == "KL")["tickets"][0]
-    check("segments disagreeing on the allowance resolve to the SMALLER one",
-          mdt["entitlements"]["checked_included"] == 0,
-          str(mdt["entitlements"]["checked_included"]))
-    check("and the traveller is therefore charged for their bag",
-          sum(l.amount_cents for l in
-              {r.option_id: r for r in scorer.score_all(mdsc, "reference")}[
-                  next(o["option_id"] for o in mdsc["options"]
-                       if o["segments"][0]["marketing"]["carrier"] == "KL")].lines
-              if l.code == "bags") > 0)
-
-    print("\nduffel: brands are prose here, not codes")
+    print("\nduffel: brands as the live service writes them")
     fares = adapter.load_enrichment()["fares"]
-    check("an exact code still matches", adapter._brand_key(fares, "BA", "BASIC") == "BA:BASIC")
+    live_brands = sorted({sl.get("fare_brand_name") for o in dofs for sl in o["slices"]},
+                         key=lambda x: (x is None, x))
+    check("the real feed writes brands as prose, and some are null",
+          any(b is None for b in live_brands)
+          and any(b and " " in b for b in live_brands if b), str(live_brands[:6]))
+    check("a null brand does not crash and falls back to a cabin name",
+          all(o["tickets"][0]["fare_brand_name"] for o in dsc["options"]))
     check("'Basic Economy' resolves to the BASIC row",
           adapter._brand_key(fares, "AA", "Basic Economy") == "AA:BASIC")
     check("'Economy Light' resolves to LIGHT, not to some ECONOMY row",
           adapter._brand_key(fares, "KL", "Economy Light") == "KL:LIGHT")
-    # Whole words, not substrings: SURPLUS contains PLUS.
     check("a token inside another word does NOT match",
-          adapter._brand_key(fares, "BA", "Surplus Saver") is None,
-          str(adapter._brand_key(fares, "BA", "Surplus Saver")))
+          adapter._brand_key(fares, "BA", "Surplus Saver") is None)
     check("an unknown brand returns nothing so the default applies",
           adapter._brand_key(fares, "BA", "Wibble") is None)
-    aat = next(o for o in dsc["options"]
-               if o["option_id"].startswith("aa6175"))["tickets"][0]
-    check("so a prose brand reaches its curated fees end to end",
-          aat["checked_bag_fee_tiers"][0]["amount_cents"] == 7500,
-          str(aat["checked_bag_fee_tiers"][:1]))
 
-    print("\nduffel: time, conditions, and the ledger")
+    print("\nduffel: time, conditions, topology")
     check("departing_at arrives local-naive and gains an offset",
           all(re.search(r"[+-]\d{2}:\d{2}$", s[k])
               for o in dsc["options"] for s in o["segments"]
               for k in ("departure_local", "arrival_local")))
     check("November in New York is standard time",
-          dsc["options"][0]["segments"][0]["departure_local"].endswith("-05:00"))
-    # Duffel names each airport's IANA zone. It is never used to compute an
-    # offset, but a disagreement means one of the two tables is wrong.
+          all(s["departure_local"].endswith("-05:00")
+              for o in dsc["options"] for s in o["segments"]
+              if s["origin"]["iata"] == "JFK" and s["departure_local"][5:7] == "11"))
     badzone = json.loads(json.dumps(draw))
     badzone["data"]["offers"][0]["slices"][0]["segments"][0]["origin"]["time_zone"] = "Europe/Paris"
     bsc = adapter.from_duffel(badzone, checked_bags=1)
@@ -546,36 +579,37 @@ def main():
           bsc["options"][0]["segments"][0]["departure_local"]
           == dsc["options"][0]["segments"][0]["departure_local"])
 
-    plus = next(o for o in dsc["options"]
-                if o["tickets"][0]["fare_brand_name"] == "Plus")["tickets"][0]
-    check("a change penalty reads as a fee", plus["entitlements"]["changes"] == "fee")
-    check("a disallowed change reads as not permitted",
-          bat["entitlements"]["changes"] == "not_permitted")
-    check("a null condition reads as unknown, not as a no",
-          zz["tickets"][0]["entitlements"]["changes"] == "unknown")
-    check("nothing non-refundable is sold as refundable",
-          not any(o["tickets"][0]["entitlements"]["refundable"] for o in dsc["options"]))
-
-    check("base plus tax reconciles to the offer total",
+    changes = {o["tickets"][0]["entitlements"]["changes"] for o in dsc["options"]}
+    check("real conditions map to the three states and no others",
+          changes <= {"fee", "free", "not_permitted", "unknown"}, str(changes))
+    check("nothing is sold as refundable that the feed did not allow",
+          all(o["tickets"][0]["entitlements"]["refundable"] is (
+              (dofs_by_id(dofs, o).get("conditions", {}).get("refund_before_departure") or {})
+              .get("allowed", False) is True)
+              for o in dsc["options"] if dofs_by_id(dofs, o)))
+    check("base plus tax reconciles to the offer total on every option",
           all(t["price"]["base_cents"] + sum(x["amount_cents"] for x in t["price"]["taxes"])
               == o["booking"][0]["price_cents"]
               for o in dsc["options"] for t in o["tickets"]))
-    # If the feed's own three numbers disagree, the total is what gets charged.
-    skew = json.loads(json.dumps(draw))
-    skew["data"]["offers"][0]["tax_amount"] = "5.00"
-    ssc = adapter.from_duffel(skew, checked_bags=1)
-    st = ssc["options"][0]["tickets"][0]
-    check("a self-contradicting price still reconciles against the total",
-          st["price"]["base_cents"] + sum(x["amount_cents"] for x in st["price"]["taxes"])
-          == 48000,
-          str(st["price"]))
-
-    print("\nduffel: topology and scope")
     check("one offer is one ticket - no self-transfer in this feed",
           all(len(o["tickets"]) == 1 for o in dsc["options"]))
     check("so a connection's bags are checked through",
           all(l["bags_checked_through"] and not l["forced_landside"]
               for o in dsc["options"] for l in o["layovers"]))
+
+    print("\nduffel: scope discipline against real inventory")
+    # A JFK-LHR search really does return connections through Boston, Reykjavik,
+    # Frankfurt and Bogota. Everything outside the curated set must drop.
+    cur = set(adapter.load_enrichment()["airports"]["airports"])
+    check("the capture routes through airports outside the curated set",
+          any(sg[k]["iata_code"] not in cur for sg in dsegs
+              for k in ("origin", "destination")))
+    check("and each of those is dropped by name", bool(dsc["_dropped"]))
+    check("no surviving option touches an uncurated airport",
+          all(s[k]["iata"] in cur for o in dsc["options"] for s in o["segments"]
+              for k in ("origin", "destination")),
+          str(sorted({s[k]["iata"] for o in dsc["options"] for s in o["segments"]
+                      for k in ("origin", "destination")})))
     for n in (0, 3):
         s2 = adapter.from_duffel(draw, checked_bags=n)
         got = sum(1 for b in s2["query"]["party"][0]["bags"] if b["kind"] == "checked")
@@ -585,8 +619,7 @@ def main():
         json.loads(json.dumps(ret["data"]["offers"][0]["slices"][0])))
     rsc = adapter.from_duffel(ret, checked_bags=1)
     check("a return trip says it only scored the outbound rather than pretending",
-          any("return trips are not modelled" in n for n in rsc["notes"]),
-          json.dumps(rsc["notes"])[:120])
+          any("return trips are not modelled" in n for n in rsc["notes"]))
 
     print("\ndispatch, three feeds")
     check("from_feed routes a duffel offer-request payload",

@@ -89,6 +89,23 @@ MUTANTS = [
   'duffel: no quoted service means the bag is free'),
  (AD, "coverage", 'if s.get("equipment_code") not in (None, "", "UNKNOWN"):',
   'if True:', 'coverage: count equipment as known when it is not'),
+ (AD, "from_duffel", """            if pitch.isdigit():
+                claims["seat_pitch_inches"] = int(pitch)""",
+  """            if False:
+                claims["seat_pitch_inches"] = int(pitch)""",
+  'amenities: drop the published seat pitch'),
+ (AD, "from_duffel", """            wifi = amen.get("wifi") or {}""",
+  """            wifi = amen.get("wifi") or {}
+            if wifi.get("available"):
+                claims["connectivity_oceanic"] = {
+                    "value": "Wifi fitted", "observed_frequency": 1.0,
+                    "outcome": True, "sample_size": 1,
+                    "observation_window": "the airline says so",
+                    "source": "duffel amenity", "as_of": "2026-09-19"}""",
+  'hard rule 2: publish a wifi amenity as an observed certainty'),
+ (AD, "from_duffel", """            pw = amen.get("power") or {}""",
+  """            pw = {}""",
+  'amenities: drop the published power attribute'),
  (FA, None, '{"piece": 1, "amount_cents": 10000},\n      {"piece": 2, "amount_cents": 12000},',
   '{"piece": 1, "amount_cents": 1000},\n      {"piece": 2, "amount_cents": 1200},',
   'unknown-is-never-zero: make the fallback bag fee cheap'),

@@ -1027,6 +1027,80 @@ Its Offer schema carries `operating_carrier` and `marketing_carrier` per segment
 thing neither other feed has, below. Its test mode is a fictional carrier with fake prices,
 so the curated joins will not light up against it, but the *shape* is real.
 
+### What the live service actually returned
+
+A real `duffel_test_` key, JFK–LHR, 172 offers in 3.4s, first call. **The profile was
+correct as written** — parameter names, POST body, `Duffel-Version`, static switches, all of
+it — which is the first time any of the three has been verified against a live service.
+
+Three findings from that capture, one of them a correction to the section below.
+
+**`available_services` was empty on all 172 offers.** The bag-quote capability is real but
+lives on `GET /air/offers/{id}`, a second call per offer, not on the search response. The
+code path is built and tested; on `/api/live` today every bag is priced from `fares.json` or
+the pessimistic default. Fetching details for the top N offers is the obvious next step.
+
+**`segment.passengers[].cabin.amenities` on 269 of 272 segments.** Wifi
+(`available` + `cost`), seat (`type`, `legroom`, `pitch`) and `power`. This is enrichment
+layer 5 — the one the brief calls "hardest, biggest differentiator" — arriving in the feed
+without a curated join, and it is the layer I had said was an ATPCO enterprise deal.
+
+Observed values: pitch 28–32 inches (mode 31, which is exactly `Tuning.pitch_norm_inches`),
+legroom `less` on 64 segments, wifi `paid` 151 / `free` 66 / `n/a` 52.
+
+**`ngs_shelf` 1–3 on every slice** — IATA's standardised fare shelf, a better signal than
+parsing prose brand names. Not yet used.
+
+### Taking the amenities without breaking hard rule 2
+
+`seat.pitch` is taken **directly** as `claims.seat_pitch_inches`. That field is a plain
+number in the schema rather than a hedged claim, and deliberately so: a fare's pitch is a
+published cabin-layout fact, not an observation of what turned up, and the scorer already
+prices it linearly against a 31-inch norm. `power` is carried the same way. Both slots
+already existed in the schema — it anticipated exactly this distinction.
+
+**Wifi is not taken.** Mapping `wifi.available: true` onto `connectivity_oceanic` would be
+the single easiest way to break hard rule 2 in this entire codebase, because it looks like
+an upgrade. That field is an *observed* claim — value, observed frequency, sample size,
+window, source, as-of — and an airline publishing "wifi: available" supplies none of those.
+It is a statement about the product sold, not the metal that shows up, and equipment is
+swapped after booking regardless. Manufacturing a frequency to fit the shape is exactly the
+bookkeeping the rule exists to forbid.
+
+So wifi is kept raw under `_feed.wifi_published` for the narrator and the interface, the
+connectivity term goes on abstaining, and `mutate_adapter.py` carries a fault that turns a
+published amenity into an observed certainty — if that ever stops being caught, the guard
+is gone.
+
+### The grade is saturated, and par is the reason
+
+Scoring all 96 normalisable options at the reference profile:
+
+```
+effective cost   min $710   p25 $839   median $956   p75 $1185   p90 $3626
+route par        $1050  (curated with no data behind it)
+grades           A+:55  A:9  A-:6  B+:4  B:5  B-:2  C+:2  C:2  F:11
+```
+
+**57% of a real market gets the top grade.** A grade that half the inventory earns is not
+telling anyone anything, and the grade is the headline element of the interface.
+
+Par is meant to be "the all-in effective cost a CLEAN option achieves on this route". The
+cheapest clean option here is $710 and the p25 is $839, so $1050 is roughly 30% too generous.
+Candidate redistributions:
+
+```
+par $1050   A+:55  A:9   A-:6   B+:4   B:5   B-:2   C+:2  C:2   F:11
+par  $900   A+:30  A:10  A-:13  B+:6   B:10  B-:3   C+:5  C:4   C-:3  D:1   F:11
+par  $800   A+:12  A:5   A-:16  B+:7   B:14  B-:6   C+:10 C:5   C-:6  D:3   F:12
+par  $750   A:14   A-:3  B+:16  B:6    B-:15 C+:10  C:7   C-:6  D:5   F:14
+```
+
+**$800 is the recommendation** — the best options still earn an A+, the median lands at B,
+and the long tail spreads properly. But where exactly to put it *is* the definition of what
+an A means, which is a product decision rather than a arithmetic one, so it has not been
+changed. One number in `enrichment/ground.json`.
+
 ### The one field where a feed beats the moat
 
 Duffel's `available_services` lists an extra checked bag as a **bookable service with a real
