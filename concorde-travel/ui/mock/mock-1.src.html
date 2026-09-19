@@ -1,0 +1,153 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ConcordeGo · Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Space+Grotesk:wght@300;400;500&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#0d0d0f;--paper:#f2efe9;--rule:#c9c4ba;--dim:#6f6a62;--faint:#96918a;
+      --debit:#a8412c;--credit:#2f6b4f;--hair:.5px solid var(--rule)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font:300 15px/1.55 "Space Grotesk",Helvetica,sans-serif;
+     -webkit-font-smoothing:antialiased;padding:0 0 120px}
+.num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:400}
+.wrap{max-width:940px;margin:0 auto;padding:0 28px}
+
+header{padding:46px 0 26px;border-bottom:1.5px solid var(--ink);margin-bottom:2px}
+.mark{font-family:Michroma,sans-serif;font-size:15px;letter-spacing:.24em;text-transform:uppercase}
+.mark b{font-weight:400}
+.slug{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;margin-top:30px;flex-wrap:wrap}
+.route{font-size:40px;font-weight:300;letter-spacing:-.02em;line-height:1}
+.route em{font-style:normal;color:var(--faint)}
+.meta{text-align:right;font-size:12px;color:var(--dim);letter-spacing:.04em}
+.rule2{border-bottom:4px double var(--ink);margin-bottom:34px}
+
+.targets{display:flex;gap:0;margin:26px 0 8px;border-top:var(--hair);border-bottom:var(--hair)}
+.targets button{flex:1;background:none;border:0;border-right:var(--hair);padding:13px 8px;
+  font:400 10.5px/1 "Space Grotesk",sans-serif;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--dim);cursor:pointer;transition:background .15s,color .15s}
+.targets button:last-child{border-right:0}
+.targets button[aria-pressed=true]{background:var(--ink);color:var(--paper)}
+.targets button:hover:not([aria-pressed=true]){background:rgba(13,13,15,.05);color:var(--ink)}
+.sorted{font-size:11px;color:var(--faint);letter-spacing:.03em;margin:0 0 30px}
+
+article{padding:26px 0;border-bottom:var(--hair);cursor:pointer}
+article:hover .hdl{text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:.5px}
+.top{display:grid;grid-template-columns:1fr auto auto;gap:22px;align-items:baseline}
+.hdl{font-size:22px;font-weight:400;letter-spacing:-.01em}
+.hdl small{font-size:12px;color:var(--faint);letter-spacing:.06em;margin-left:9px;font-weight:300}
+.sub{font-size:12.5px;color:var(--dim);margin-top:6px;letter-spacing:.01em}
+.sub i{font-style:normal;color:var(--faint)}
+.eff{font-size:30px;letter-spacing:-.02em;text-align:right;white-space:nowrap}
+.eff u{display:block;font:300 10px/1 "Space Grotesk",sans-serif;letter-spacing:.18em;
+       text-transform:uppercase;color:var(--faint);text-decoration:none;margin-top:5px}
+.gr{font-family:Michroma,sans-serif;font-size:19px;letter-spacing:.02em;min-width:58px;text-align:right}
+.gr.bad{color:var(--debit)}
+
+.ledger{margin-top:20px;padding-top:2px;display:none}
+article.open .ledger{display:block}
+.row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:baseline;padding:4.5px 0}
+.row .lbl{font-size:13.5px}
+.row .dots{border-bottom:1px dotted var(--rule);transform:translateY(-4px)}
+.row .amt{font-size:13.5px;white-space:nowrap}
+.row.debit .amt{color:var(--debit)}
+.row.credit .amt{color:var(--credit)}
+.row .ev{grid-column:1/-1;font-size:11.5px;color:var(--faint);margin:-1px 0 5px;max-width:74ch;line-height:1.45}
+.tot{display:grid;grid-template-columns:auto 1fr auto;gap:10px;margin-top:12px;padding-top:11px;
+     border-top:1.5px solid var(--ink);font-size:15px}
+.tot .amt{font-weight:500}
+.foot{margin-top:15px;font-size:11px;color:var(--faint);letter-spacing:.02em}
+.foot b{font-weight:400;color:var(--dim)}
+
+.coverage{margin-top:44px;padding:20px 0 0;border-top:1.5px solid var(--ink);font-size:11.5px;color:var(--dim)}
+.coverage h4{font:400 10px/1 "Space Grotesk",sans-serif;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--ink);margin-bottom:11px}
+.coverage li{list-style:none;padding-left:16px;position:relative;margin:4px 0;line-height:1.5}
+.coverage li:before{content:"—";position:absolute;left:0;color:var(--rule)}
+@media(max-width:680px){.top{grid-template-columns:1fr auto}.gr{grid-column:2;text-align:right}
+ .eff{grid-column:1/-1;text-align:left;margin-top:8px}.route{font-size:30px}}
+</style></head><body>
+<div class="wrap">
+<header>
+  <div class="mark">Concorde<b>Go</b></div>
+  <div class="slug">
+    <div class="route" id="route"></div>
+    <div class="meta" id="meta"></div>
+  </div>
+</header>
+<div class="rule2"></div>
+<nav class="targets" id="targets"></nav>
+<p class="sorted" id="sorted"></p>
+<main id="list"></main>
+<div class="coverage"><h4>What this is measured on</h4><ul id="gaps"></ul></div>
+</div>
+<script id="d" type="application/json">__DATA__</script>
+<script>
+const D = JSON.parse(document.getElementById("d").textContent);
+const money = c => (c<0?"−":"") + "$" + Math.abs(Math.round(c/100)).toLocaleString();
+const hm = m => (m/60|0) + "h " + String(m%60).padStart(2,"0") + "m";
+const clock = s => s.slice(11,16);
+const day = s => new Date(s.slice(0,10)+"T12:00:00").toLocaleDateString("en",{weekday:"short",day:"numeric",month:"short"});
+const TARGETS = [["cheapest","Cheapest"],["fastest","Fastest"],["comfort","Most comfortable"],["spread","Every grade"]];
+let target = "cheapest";
+
+document.getElementById("route").innerHTML =
+  D.query.origin.split(",")[0] + " <em>to</em> " + D.query.destination;
+document.getElementById("meta").innerHTML =
+  day(D.query.date) + "<br>" + D.query.total_found + " itineraries · one adult, one bag";
+document.getElementById("gaps").innerHTML =
+  "<li>" + D.verdict + "</li>" + D.gaps.map(g => "<li>" + g + "</li>").join("");
+
+document.getElementById("targets").innerHTML = TARGETS.map(([k,l]) =>
+  `<button data-t="${k}" aria-pressed="${k===target}">${l}</button>`).join("");
+
+function render(){
+  const rows = D.results[target] || [];
+  document.getElementById("sorted").textContent =
+    target === "spread"
+      ? "One of every grade this search produced. The letter is the flight, not its rank."
+      : "Ordered by " + TARGETS.find(t=>t[0]===target)[1].toLowerCase() +
+        ". The grade does not move when you change this.";
+  document.getElementById("list").innerHTML = rows.map((r,i) => {
+    const dep = clock(r.depart), arr = clock(r.arrive);
+    const over = new Date(r.arrive.slice(0,10)) > new Date(r.depart.slice(0,10)) ? "<i>+1</i>" : "";
+    const stops = r.stops ? r.route.slice(1,-1).join(", ") + " stop" : "nonstop";
+    const debits = r.lines.filter(l => l.code !== "ticket");
+    return `<article data-i="${i}">
+      <div class="top">
+        <div>
+          <div class="hdl">${r.name.split(" · ")[0]}<small>${r.brand.toUpperCase()}</small></div>
+          <div class="sub"><span class="num">${dep}</span> — <span class="num">${arr}</span>${over}
+            &nbsp;·&nbsp; ${hm(r.door_minutes)} door to door &nbsp;·&nbsp; ${stops}
+            &nbsp;·&nbsp; ${r.bags_included ? "bag included" : "no bag"}</div>
+        </div>
+        <div class="gr ${"CDF".includes(r.grade[0])?"bad":""}">${r.grade}</div>
+        <div class="eff num">${money(r.effective_cents)}<u>effective</u></div>
+      </div>
+      <div class="ledger">
+        <div class="row"><span class="lbl">Ticket</span><span class="dots"></span>
+          <span class="amt num">${money(r.ticket_cents)}</span></div>
+        ${debits.map(l => `
+          <div class="row ${l.cents<0?"credit":"debit"}">
+            <span class="lbl">${l.label}</span><span class="dots"></span>
+            <span class="amt num">${l.cents<0?"+":"−"}${money(Math.abs(l.cents))}</span>
+            ${l.evidence?`<span class="ev">${l.evidence}</span>`:""}
+          </div>`).join("")}
+        <div class="tot"><span>What it actually costs you</span><span class="dots"></span>
+          <span class="amt num">${money(r.effective_cents)}</span></div>
+        <div class="foot">Graded <b>${r.grade}</b> against a clean ${r.route[0]}–${r.route[r.route.length-1]}
+          at ${money(D.query.par_cents)}. ${r.rating?`Carrier quality ${r.rating.toFixed(2)}.`:"Carrier not rated."}
+          ${r.pitch[0]?`${r.pitch[0]}in pitch on the long leg.`:""}</div>
+      </div>
+    </article>`;
+  }).join("");
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-t]");
+  if (b){ target = b.dataset.t;
+    document.querySelectorAll("[data-t]").forEach(x => x.setAttribute("aria-pressed", x.dataset.t===target));
+    render(); return; }
+  const a = e.target.closest("article");
+  if (a) a.classList.toggle("open");
+});
+render();
+</script></body></html>

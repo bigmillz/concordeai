@@ -1,0 +1,148 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ConcordeGo · Deck</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Space+Grotesk:wght@200;300;400;500&family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0c;--text:#f4f4f2;--dim:#8f8f98;--faint:#5d5d66;--line:#1c1d22;
+ --a:#3ddc97;--b:#f5c451;--c:#ff7a59;--f:#ff4d4d}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font:300 16px/1.5 "Space Grotesk",Helvetica,sans-serif;
+ -webkit-font-smoothing:antialiased;overflow:hidden}
+.num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+
+.stage{position:relative;height:100%;display:flex;flex-direction:column}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:16px;
+ padding:20px 32px;flex-wrap:wrap}
+.mark{font-family:Michroma,sans-serif;font-size:12px;letter-spacing:.26em;text-transform:uppercase}
+.q{font-size:12px;color:var(--faint);letter-spacing:.03em}
+.targets{display:flex;gap:6px}
+.targets button{background:none;border:1px solid var(--line);color:var(--faint);padding:7px 14px;
+ border-radius:999px;font:400 10px/1 "Space Grotesk",sans-serif;letter-spacing:.14em;
+ text-transform:uppercase;cursor:pointer;transition:.18s}
+.targets button[aria-pressed=true]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.targets button:hover:not([aria-pressed=true]){color:var(--text);border-color:#33353d}
+
+.card{flex:1;position:relative;overflow:hidden;display:flex;align-items:center;
+ padding:0 clamp(24px,7vw,110px)}
+.ghost{position:absolute;right:-.06em;top:50%;transform:translateY(-50%);
+ font-family:Michroma,sans-serif;font-size:min(58vh,44vw);line-height:.78;
+ opacity:.085;letter-spacing:-.04em;pointer-events:none;user-select:none;transition:color .4s}
+.inner{position:relative;max-width:760px;animation:rise .42s cubic-bezier(.16,1,.3,1)}
+@keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+.eyebrow{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--faint);margin-bottom:16px}
+h1{font-size:clamp(32px,5.4vw,62px);font-weight:200;letter-spacing:-.035em;line-height:1.02}
+h1 b{font-weight:400}
+.brand{display:inline-block;margin-top:14px;font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+ color:var(--faint);border:1px solid var(--line);border-radius:999px;padding:5px 13px}
+.big{display:flex;align-items:flex-end;gap:clamp(20px,4vw,52px);margin:34px 0 26px;flex-wrap:wrap}
+.big .n{font-size:clamp(44px,7.2vw,86px);font-weight:200;letter-spacing:-.045em;line-height:.9}
+.big .n u{display:block;text-decoration:none;font:300 10.5px/1 "Space Grotesk",sans-serif;
+ letter-spacing:.22em;text-transform:uppercase;color:var(--faint);margin-top:13px}
+.big .n.sub{font-size:clamp(22px,3vw,34px);color:var(--dim)}
+.facts{display:flex;gap:clamp(18px,3.4vw,46px);flex-wrap:wrap;padding-top:22px;border-top:1px solid var(--line)}
+.fact .k{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+.fact .v{font-size:17px;font-weight:300}
+.why{margin-top:26px;display:flex;flex-direction:column;gap:7px;max-width:640px}
+.why div{display:flex;justify-content:space-between;gap:18px;font-size:13.5px;color:var(--dim);
+ padding-bottom:6px;border-bottom:1px solid rgba(28,29,34,.8)}
+.why span:last-child{white-space:nowrap}
+.why .neg span:last-child{color:var(--c)}
+.why .pos span:last-child{color:var(--a)}
+
+.rail{padding:16px 32px 26px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.dots{display:flex;gap:5px;flex:1;min-width:180px}
+.dot{flex:1;height:3px;border-radius:2px;background:#22242a;cursor:pointer;transition:.2s;position:relative}
+.dot:hover{transform:scaleY(2.6)}
+.dot[data-on=true]{background:var(--text)}
+.nav{display:flex;gap:8px}
+.nav button{width:38px;height:38px;border-radius:50%;background:none;border:1px solid var(--line);
+ color:var(--dim);cursor:pointer;font-size:15px;transition:.18s}
+.nav button:hover{border-color:var(--text);color:var(--text)}
+.pos{font-size:11px;color:var(--faint);letter-spacing:.14em;min-width:64px;text-align:right}
+.kb{font-size:10.5px;color:var(--faint);letter-spacing:.08em}
+@media(max-width:700px){.card{padding:0 24px}.ghost{font-size:44vh;opacity:.06}}
+</style></head><body>
+<div class="stage">
+  <div class="bar">
+    <div class="mark">Concorde<b style="font-weight:400">Go</b></div>
+    <div class="targets" id="targets"></div>
+    <div class="q" id="q"></div>
+  </div>
+  <div class="card"><div class="ghost" id="ghost"></div><div class="inner" id="inner"></div></div>
+  <div class="rail">
+    <div class="nav"><button id="prev">←</button><button id="next">→</button></div>
+    <div class="dots" id="dots"></div>
+    <div class="pos" id="pos"></div>
+    <div class="kb">← → or scroll</div>
+  </div>
+</div>
+<script id="d" type="application/json">__DATA__</script>
+<script>
+const D = JSON.parse(document.getElementById("d").textContent);
+const money = c => "$" + Math.abs(Math.round(c/100)).toLocaleString();
+const hm = m => (m/60|0) + "h " + String(m%60).padStart(2,"0") + "m";
+const TARGETS=[["cheapest","Cheapest"],["fastest","Fastest"],["comfort","Comfort"],["spread","Every grade"]];
+let target="cheapest", i=0;
+const tone = g => "F".includes(g[0]) ? "var(--f)" : "CD".includes(g[0]) ? "var(--c)"
+               : g[0]==="B" ? "var(--b)" : "var(--a)";
+
+document.getElementById("q").textContent =
+  D.query.origin.split(",")[0] + " → " + D.query.destination + " · " + D.query.date;
+document.getElementById("targets").innerHTML = TARGETS.map(([k,l]) =>
+  `<button data-t="${k}" aria-pressed="${k===target}">${l}</button>`).join("");
+
+function rows(){ return D.results[target] || []; }
+function draw(){
+  const R = rows(), r = R[i]; if (!r) return;
+  const col = tone(r.grade);
+  const gh = document.getElementById("ghost");
+  gh.textContent = r.grade; gh.style.color = col;
+  const debits = r.lines.filter(l => l.code!=="ticket" && l.cents>0)
+                        .sort((a,b)=>b.cents-a.cents).slice(0,3);
+  const credits = r.lines.filter(l => l.cents<0).slice(0,2);
+  const stops = r.stops ? `${r.stops} stop via ${r.route.slice(1,-1).join(", ")}` : "Nonstop";
+  document.getElementById("inner").innerHTML = `
+    <div class="eyebrow">${r.flight} &nbsp;·&nbsp; ${r.route.join(" → ")}
+      ${r.operator!==r.carrier ? " &nbsp;·&nbsp; flown by " + r.operator : ""}</div>
+    <h1>${r.name.split(" · ")[0].replace(/ (\S+)$/,' <b>$1</b>')}</h1>
+    <div class="brand">${r.brand}</div>
+    <div class="big">
+      <div class="n num" style="color:${col}">${r.grade}<u>grade</u></div>
+      <div class="n num">${money(r.effective_cents)}<u>what it really costs</u></div>
+      <div class="n sub num">${money(r.ticket_cents)}<u>ticket</u></div>
+    </div>
+    <div class="facts">
+      <div class="fact"><div class="k">Door to door</div><div class="v">${hm(r.door_minutes)}</div></div>
+      <div class="fact"><div class="k">Stops</div><div class="v">${stops}</div></div>
+      <div class="fact"><div class="k">Departs</div><div class="v">${r.depart.slice(11,16)}</div></div>
+      <div class="fact"><div class="k">Arrives</div><div class="v">${r.arrive.slice(11,16)}</div></div>
+      <div class="fact"><div class="k">Checked bag</div><div class="v">${r.bags_included?"Included":"Not included"}</div></div>
+      ${r.pitch[0]?`<div class="fact"><div class="k">Seat pitch</div><div class="v">${r.pitch[0]} in</div></div>`:""}
+    </div>
+    <div class="why">
+      ${debits.map(l=>`<div class="neg"><span>${l.label}</span><span class="num">−${money(l.cents)}</span></div>`).join("")}
+      ${credits.map(l=>`<div class="pos"><span>${l.label}</span><span class="num">+${money(-l.cents)}</span></div>`).join("")}
+    </div>`;
+  document.getElementById("dots").innerHTML = R.map((x,n)=>
+    `<div class="dot" data-n="${n}" data-on="${n===i}" title="${x.flight} · ${x.grade}"
+      style="${n===i?'background:'+tone(x.grade):''}"></div>`).join("");
+  document.getElementById("pos").textContent = (i+1) + " / " + R.length;
+}
+function go(d){ const R=rows(); i=(i+d+R.length)%R.length; draw(); }
+document.getElementById("prev").onclick=()=>go(-1);
+document.getElementById("next").onclick=()=>go(1);
+addEventListener("keydown", e=>{ if(e.key==="ArrowRight")go(1); if(e.key==="ArrowLeft")go(-1); });
+let lock=0;
+addEventListener("wheel", e=>{ const t=Date.now(); if(t-lock<420)return;
+  if(Math.abs(e.deltaY)>18){ lock=t; go(e.deltaY>0?1:-1);} }, {passive:true});
+document.addEventListener("click", e=>{
+  const b=e.target.closest("[data-t]");
+  if(b){ target=b.dataset.t; i=0;
+    document.querySelectorAll("[data-t]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.t===target));
+    draw(); return; }
+  const d=e.target.closest("[data-n]"); if(d){ i=+d.dataset.n; draw(); }
+});
+draw();
+</script></body></html>

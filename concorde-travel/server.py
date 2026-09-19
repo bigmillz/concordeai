@@ -519,6 +519,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path == "/" or path == "/index.html":
             return self._send_file(os.path.join(UI, "index.html"), "text/html; charset=utf-8")
+        # The interface mockups. Standalone files by design, served here too so
+        # they can be flipped between side by side with the real thing.
+        if path == "/mock" or path == "/mock/":
+            return self._send_file(os.path.join(UI, "mock", "index.html"),
+                                   "text/html; charset=utf-8")
+        if path.startswith("/mock/"):
+            name = os.path.basename(path)
+            if not re.match(r"^(index|mock-[1-9])\.html$", name):
+                return self.send_error(404)
+            return self._send_file(os.path.join(UI, "mock", name),
+                                   "text/html; charset=utf-8")
         if path == "/api/live/status":
             # Safe to serve: live.status() reports whether a key exists and
             # where it came from, never the key.

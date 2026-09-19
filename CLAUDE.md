@@ -594,3 +594,23 @@ covering the distinct shapes; its `_provenance.selection` names why each was kep
 **The Duffel profile is VERIFIED** — a real `duffel_test_` key returned 172 offers on the
 first call, so its parameter names, POST body, `Duffel-Version` header and static switches
 are correct against the live service. Amadeus and Kiwi remain unverified.
+
+## Interface mockups
+
+`concorde-travel/ui/mock/` holds four directions for the interface, at
+`http://127.0.0.1:9897/mock` or by opening the files directly.
+
+Each `mock-N.src.html` carries a `__DATA__` token; `build.py` inlines
+`slim.json` and writes `mock-N.html`. **Edit the `.src.html`, never the built
+file** — and rebuild after. They are standalone on purpose: a mockup you have to
+start a server to look at is a mockup nobody looks at.
+
+The data is a real JFK–LHR Duffel search scored by the real scorer — no
+placeholders. Two things in it are honest artefacts, not bugs: almost everything
+grades **A+** because route par is still the un-calibrated $1,050, and some
+inventory is **synthetic** because the capture came from a test token (the
+fictional carrier ZZ is filtered out of the mock data; a cluster of four
+carriers sharing one departure time is the test feed, not the adapter).
+
+Verify a change with a headless render rather than by eye — Chromium is
+pre-installed, and a page that throws still screenshots fine.

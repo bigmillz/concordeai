@@ -1,0 +1,73 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ConcordeGo · four directions</title>
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Space+Grotesk:wght@200;300;400&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#08080a;--text:#efeff0;--dim:#93939c;--faint:#5f5f68;--line:#1e2026;--accent:#7c6cff}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font:300 16px/1.6 "Space Grotesk",Helvetica,sans-serif;
+ -webkit-font-smoothing:antialiased;padding:0 0 100px}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;
+ background:radial-gradient(800px 500px at 80% -10%,rgba(124,108,255,.14),transparent 60%)}
+.w{position:relative;max-width:1080px;margin:0 auto;padding:0 28px}
+header{padding:60px 0 40px;border-bottom:1px solid var(--line)}
+.mark{font-family:Michroma,sans-serif;font-size:13px;letter-spacing:.26em;text-transform:uppercase}
+.mark b{font-weight:400;color:var(--accent)}
+h1{font-size:clamp(30px,5vw,50px);font-weight:200;letter-spacing:-.03em;margin-top:26px;line-height:1.08}
+.lede{color:var(--dim);max-width:62ch;margin-top:18px;font-size:16.5px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:1px;
+ background:var(--line);margin-top:44px;border:1px solid var(--line)}
+a.card{background:var(--bg);padding:30px 28px 26px;text-decoration:none;color:inherit;
+ display:flex;flex-direction:column;gap:11px;transition:background .2s}
+a.card:hover{background:#0d0e12}
+.n{font-family:Michroma,sans-serif;font-size:11px;color:var(--accent);letter-spacing:.2em}
+.t{font-size:24px;font-weight:300;letter-spacing:-.02em}
+.d{color:var(--dim);font-size:14.5px;line-height:1.55}
+.k{margin-top:6px;font-size:12px;color:var(--faint);letter-spacing:.02em}
+.note{margin-top:46px;padding-top:24px;border-top:1px solid var(--line);color:var(--faint);
+ font-size:13.5px;max-width:74ch;line-height:1.7}
+.note b{color:var(--dim);font-weight:400}
+</style></head><body><div class="w">
+<header>
+  <div class="mark">Concorde<b>Go</b></div>
+  <h1>Four directions for the interface.</h1>
+  <p class="lede">All four run on the same real search — JFK to London, 18 November, 145 itineraries
+  off the live Duffel feed, scored by the real scorer. Nothing here is a placeholder: every dollar
+  figure, grade and ledger line was computed.</p>
+</header>
+<div class="grid">
+  <a class="card" href="mock-1.html">
+    <div class="n">01</div><div class="t">Ledger</div>
+    <div class="d">No cards, no boxes, no rounded corners. Pure typography, like a financial
+    statement or a Swiss timetable. The itemised receipt <i>is</i> the interface.</div>
+    <div class="k">Light · editorial · click a row to open the ledger</div>
+  </a>
+  <a class="card" href="mock-2.html">
+    <div class="n">02</div><div class="t">Ribbon</div>
+    <div class="d">Results positioned on a shared clock, so a later departure really is further
+    right. Each ribbon is the whole door-to-door trip, segmented by what you are actually doing.</div>
+    <div class="k">Dark · spatial · hover a segment, click a row</div>
+  </a>
+  <a class="card" href="mock-3.html">
+    <div class="n">03</div><div class="t">Deck</div>
+    <div class="d">One flight at a time, at magazine scale, with the grade as a huge graphic
+    element. Nothing to scan — you look at one thing and move on.</div>
+    <div class="k">Dark · singular · arrow keys or scroll</div>
+  </a>
+  <a class="card" href="mock-4.html">
+    <div class="n">04</div><div class="t">Field</div>
+    <div class="d">The trade-off surface itself. Time against cost, every itinerary a point,
+    coloured by grade. Drag the target and the sweep line moves — the grades do not.</div>
+    <div class="k">Dark · instrument · drag the slider, click a dot</div>
+  </a>
+</div>
+<p class="note">Two things you will notice and should not read as bugs.
+<b>Almost everything grades A+</b> — route par is still the un-calibrated $1,050, so a genuinely
+cheap route saturates the top of the scale. That is the open decision from last night, and these
+mockups make the case for settling it better than the histogram did. The <i>Every grade</i> tab
+shows the real range.
+<b>Some inventory is synthetic</b> — this came from a Duffel <i>test</i> token, so a few
+itineraries are invented, and one cluster shares an identical departure time across four carriers
+that each claim to operate themselves. The fictional carrier has been filtered out here; the
+codeshare oddity is the test feed, not the adapter.</p>
+</div></body></html>

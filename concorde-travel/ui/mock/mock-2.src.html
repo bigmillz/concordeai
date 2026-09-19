@@ -1,0 +1,195 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ConcordeGo · Ribbon</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Space+Grotesk:wght@300;400;500&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#08080a;--panel:#0e0f12;--line:#1e2026;--text:#ececec;--dim:#9a9aa2;--faint:#6b6b73;
+ --air:#4da3ff;--air2:#2b6fd4;--ground:#4a4d56;--proc:#33363d;
+ --good:#38b48b;--fair:#d9b45c;--poor:#e26d5a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font:300 15px/1.5 "Space Grotesk",Helvetica,sans-serif;
+ -webkit-font-smoothing:antialiased;overflow-x:hidden}
+body:before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+ background:radial-gradient(900px 520px at 78% -8%,rgba(77,163,255,.13),transparent 60%),
+            radial-gradient(700px 460px at 8% 108%,rgba(226,109,90,.08),transparent 62%)}
+.num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+.wrap{position:relative;z-index:1;max-width:1240px;margin:0 auto;padding:0 26px 110px}
+
+header{display:flex;align-items:center;justify-content:space-between;gap:20px;
+ padding:22px 0 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.mark{font-family:Michroma,sans-serif;font-size:13px;letter-spacing:.26em;text-transform:uppercase}
+.mark b{font-weight:400;color:var(--air)}
+.q{font-size:13px;color:var(--dim)}
+.q b{color:var(--text);font-weight:400}
+
+.targets{display:flex;gap:7px;margin:24px 0 6px;flex-wrap:wrap}
+.targets button{background:rgba(255,255,255,.03);border:1px solid var(--line);color:var(--dim);
+ padding:8px 16px;border-radius:999px;font:400 11px/1 "Space Grotesk",sans-serif;
+ letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:.18s}
+.targets button:hover{border-color:#3a3d46;color:var(--text)}
+.targets button[aria-pressed=true]{background:var(--text);color:#08080a;border-color:var(--text)}
+.hint{font-size:12px;color:var(--faint);margin:14px 0 20px;letter-spacing:.01em}
+
+.axis{position:relative;height:26px;margin-left:238px;margin-right:104px;border-bottom:1px solid var(--line)}
+.axis span{position:absolute;top:4px;transform:translateX(-50%);font-size:10px;color:var(--faint);
+ letter-spacing:.1em}
+.axis span:after{content:"";position:absolute;left:50%;top:16px;width:1px;height:7px;background:var(--line)}
+
+.row{display:grid;grid-template-columns:238px 1fr 104px;align-items:center;gap:0;
+ padding:11px 0;border-bottom:1px solid rgba(30,32,38,.6);cursor:pointer;transition:background .16s}
+.row:hover{background:rgba(255,255,255,.022)}
+.row.open{background:rgba(255,255,255,.03)}
+.who{padding-right:18px}
+.who .f{font-size:14.5px;letter-spacing:.01em}
+.who .b{font-size:10.5px;color:var(--faint);letter-spacing:.13em;text-transform:uppercase;margin-top:3px}
+.track{position:relative;height:30px}
+.rib{position:absolute;top:8px;height:14px;display:flex;border-radius:7px;overflow:hidden;
+ box-shadow:0 1px 0 rgba(255,255,255,.05) inset;transition:transform .16s,box-shadow .16s}
+.row:hover .rib{transform:scaleY(1.28);box-shadow:0 0 0 1px rgba(255,255,255,.14),0 6px 22px rgba(0,0,0,.5)}
+.seg{height:100%;position:relative}
+.seg.ground{background:var(--ground)}
+.seg.process{background:var(--proc)}
+.seg.flight{background:linear-gradient(90deg,var(--air2),var(--air))}
+.seg.good{background:var(--good)}.seg.fair{background:var(--fair)}.seg.poor{background:var(--poor)}
+.ends{position:absolute;top:-3px;font-size:10px;color:var(--faint);letter-spacing:.06em}
+.right{text-align:right;padding-left:14px}
+.right .e{font-size:17px;letter-spacing:-.01em}
+.gbadge{display:inline-block;margin-top:5px;font-family:Michroma,sans-serif;font-size:10px;
+ letter-spacing:.04em;padding:3px 8px;border-radius:5px;border:1px solid}
+.g-a{color:var(--good);border-color:rgba(56,180,139,.4);background:rgba(56,180,139,.1)}
+.g-b{color:var(--fair);border-color:rgba(217,180,92,.38);background:rgba(217,180,92,.09)}
+.g-c{color:var(--poor);border-color:rgba(226,109,90,.4);background:rgba(226,109,90,.1)}
+
+.detail{display:none;grid-column:1/-1;padding:16px 0 8px}
+.row.open .detail{display:block}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.legend i{font-style:normal;font-size:11px;color:var(--dim);display:flex;align-items:center;gap:6px}
+.legend u{width:16px;height:7px;border-radius:3px;display:inline-block;text-decoration:none}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+@media(max-width:860px){.cols{grid-template-columns:1fr}.row{grid-template-columns:150px 1fr 84px}
+ .axis{margin-left:150px;margin-right:84px}}
+.cols h5{font:400 10px/1 "Space Grotesk",sans-serif;letter-spacing:.2em;text-transform:uppercase;
+ color:var(--faint);margin-bottom:9px}
+.li{display:flex;justify-content:space-between;gap:14px;padding:4px 0;font-size:13px;
+ border-bottom:1px solid rgba(30,32,38,.5)}
+.li.cr span:last-child{color:var(--good)}
+.li.db span:last-child{color:var(--poor)}
+.li em{display:block;font-style:normal;font-size:11px;color:var(--faint);margin-top:2px;line-height:1.45}
+.tip{position:fixed;z-index:9;pointer-events:none;background:#15161a;border:1px solid #2a2c33;
+ border-radius:7px;padding:7px 11px;font-size:11.5px;color:var(--text);opacity:0;transition:opacity .12s;
+ box-shadow:0 10px 30px rgba(0,0,0,.6);white-space:nowrap}
+.foot{margin-top:34px;padding-top:18px;border-top:1px solid var(--line);font-size:11.5px;color:var(--faint)}
+</style></head><body>
+<div class="wrap">
+<header>
+  <div class="mark">Concorde<b>Go</b></div>
+  <div class="q" id="q"></div>
+</header>
+<div class="targets" id="targets"></div>
+<p class="hint" id="hint"></p>
+<div class="axis" id="axis"></div>
+<div id="list"></div>
+<div class="foot" id="foot"></div>
+</div>
+<div class="tip" id="tip"></div>
+<script id="d" type="application/json">__DATA__</script>
+<script>
+const D = JSON.parse(document.getElementById("d").textContent);
+const money = c => "$" + Math.abs(Math.round(c/100)).toLocaleString();
+const hm = m => (m/60|0) + "h" + (m%60 ? String(m%60).padStart(2,"0") : "");
+const TARGETS=[["cheapest","Cheapest"],["fastest","Fastest"],["comfort","Comfort"],["spread","Every grade"]];
+let target="cheapest";
+const gclass = g => "CDF".includes(g[0]) ? "g-c" : g[0]==="B" ? "g-b" : "g-a";
+const abs = s => Date.parse(s.replace(/([+-]\d\d:\d\d)$/,"$1"));
+
+document.getElementById("q").innerHTML =
+  `<b>${D.query.origin.split(",")[0]}</b> → <b>${D.query.destination}</b> · ${D.query.date}
+   · ${D.query.total_found} itineraries`;
+document.getElementById("foot").textContent = D.verdict;
+document.getElementById("targets").innerHTML = TARGETS.map(([k,l]) =>
+  `<button data-t="${k}" aria-pressed="${k===target}">${l}</button>`).join("");
+
+function render(){
+  const rows = D.results[target] || [];
+  document.getElementById("hint").textContent = target === "spread"
+    ? "One of every grade. Ribbon length is real elapsed time — the whole door-to-door trip, not just the flight."
+    : "Ribbons sit on a shared clock, so a later departure really is further right. Length is door-to-door time.";
+  // one shared window across every ribbon, so positions are comparable
+  const t0 = Math.min(...rows.map(r => abs(r.depart) - 90*60000));
+  const t1 = Math.max(...rows.map(r => abs(r.arrive) + 60*60000));
+  const pct = t => ((t - t0) / (t1 - t0)) * 100;
+
+  const ax = document.getElementById("axis"); ax.innerHTML = "";
+  for (let t = Math.ceil(t0/(6*3600000))*6*3600000; t < t1; t += 6*3600000){
+    const s = document.createElement("span");
+    s.style.left = pct(t) + "%";
+    s.textContent = new Date(t).toUTCString().slice(17,22) + "z";
+    ax.appendChild(s);
+  }
+
+  document.getElementById("list").innerHTML = rows.map((r,i) => {
+    const start = abs(r.depart) - (r.legs.filter(l=>l.kind!=="flight")[0]?.minutes||0)*60000;
+    const total = r.door_minutes;
+    const left = pct(start), width = pct(start + total*60000) - left;
+    const segs = r.legs.map(l => {
+      // Quality colour belongs to LAYOVERS only. Ground and airport time are
+      // neutral: a $3 subway ride drawn in alarm-red reads as a bad trip when
+      // it is the cheapest part of the whole journey.
+      const cls = l.kind === "flight" ? "flight"
+                : l.kind === "layover" ? (l.quality || "fair")
+                : l.kind === "process" ? "process" : "ground";
+      return `<div class="seg ${cls}" style="flex:${l.minutes}"
+        data-tip="${(l.tip||l.label).replace(/"/g,"&quot;")}"></div>`;
+    }).join("");
+    const debits = r.lines.filter(l => l.code !== "ticket" && l.cents > 0).slice(0,5);
+    const credits = r.lines.filter(l => l.cents < 0);
+    return `<div class="row" data-i="${i}">
+      <div class="who"><div class="f">${r.flight} · ${r.route.join("–")}</div>
+        <div class="b">${r.brand} ${r.operator!==r.carrier?"· flown by "+r.operator:""}</div></div>
+      <div class="track">
+        <div class="ends" style="left:${left}%">${r.depart.slice(11,16)}</div>
+        <div class="rib" style="left:${left}%;width:${width}%">${segs}</div>
+      </div>
+      <div class="right"><div class="e num">${money(r.effective_cents)}</div>
+        <div class="gbadge ${gclass(r.grade)}">${r.grade}</div></div>
+      <div class="detail">
+        <div class="legend">
+          <i><u style="background:var(--ground)"></u>getting there</i>
+          <i><u style="background:var(--proc)"></u>airport time</i>
+          <i><u style="background:linear-gradient(90deg,var(--air2),var(--air))"></u>in the air</i>
+          <i><u style="background:var(--good)"></u>easy layover</i>
+          <i><u style="background:var(--fair)"></u>awkward</i>
+          <i><u style="background:var(--poor)"></u>punishing</i>
+        </div>
+        <div class="cols">
+          <div><h5>What it adds</h5>${debits.map(l=>`<div class="li db"><span>${l.label}
+            ${l.evidence?`<em>${l.evidence}</em>`:""}</span><span class="num">−${money(l.cents)}</span></div>`).join("")}</div>
+          <div><h5>What it gives back</h5>${credits.length?credits.map(l=>`<div class="li cr"><span>${l.label}
+            ${l.evidence?`<em>${l.evidence}</em>`:""}</span><span class="num">+${money(l.cents)}</span></div>`).join("")
+            :`<div class="li"><span style="color:var(--faint)">Nothing on this one.</span><span></span></div>`}
+            <div class="li"><span>Ticket</span><span class="num">${money(r.ticket_cents)}</span></div>
+            <div class="li"><span><b>Effective</b></span><span class="num"><b>${money(r.effective_cents)}</b></span></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
+const tip = document.getElementById("tip");
+document.addEventListener("mousemove", e => {
+  const s = e.target.closest("[data-tip]");
+  if (!s){ tip.style.opacity = 0; return; }
+  tip.textContent = s.dataset.tip; tip.style.opacity = 1;
+  tip.style.left = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 12) + "px";
+  tip.style.top = (e.clientY - 40) + "px";
+});
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-t]");
+  if (b){ target = b.dataset.t;
+    document.querySelectorAll("[data-t]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.t===target));
+    render(); return; }
+  const r = e.target.closest(".row"); if (r) r.classList.toggle("open");
+});
+render();
+</script></body></html>
