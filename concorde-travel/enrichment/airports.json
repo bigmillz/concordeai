@@ -1,6 +1,6 @@
 {
   "_comment": "Curated airport facts. The scorer needs an explicit UTC offset per timestamp and no feed supplies one, so the offset rules live here: the transition dates are the curated part, and deriving an offset from them needs no timezone database at scoring time. Only airports in scope are listed; anything else abstains, which is the point.",
-  "_as_of": "2026-03-01",
+  "_as_of": "2026-09-19",
   "zones": {
     "America/New_York": {
       "standard": "-05:00",
@@ -99,6 +99,86 @@
           "2027-10-31"
         ]
       }
+    },
+    "Europe/Berlin": {
+      "standard": "+01:00",
+      "daylight": "+02:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
+    },
+    "Europe/Zurich": {
+      "standard": "+01:00",
+      "daylight": "+02:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
+    },
+    "Europe/Warsaw": {
+      "standard": "+01:00",
+      "daylight": "+02:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
+    },
+    "Europe/Copenhagen": {
+      "standard": "+01:00",
+      "daylight": "+02:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
+    },
+    "Europe/Dublin": {
+      "standard": "+00:00",
+      "daylight": "+01:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
+    },
+    "Atlantic/Reykjavik": {
+      "standard": "+00:00",
+      "observes_dst": false,
+      "why": "Iceland has never observed summer time"
+    },
+    "Europe/Istanbul": {
+      "standard": "+03:00",
+      "observes_dst": false,
+      "why": "Turkey abolished summer time in 2016 and sits on permanent UTC+3"
     }
   },
   "airports": {
@@ -109,7 +189,8 @@
       "process_minutes": {
         "p50": 55,
         "p90": 85
-      }
+      },
+      "border": "us"
     },
     "EWR": {
       "zone": "America/New_York",
@@ -118,7 +199,8 @@
       "process_minutes": {
         "p50": 70,
         "p90": 105
-      }
+      },
+      "border": "us"
     },
     "LHR": {
       "zone": "Europe/London",
@@ -143,7 +225,8 @@
         "minutes": 25,
         "headway_minutes": 8,
         "operating_hours_local": "05:00-23:00"
-      }
+      },
+      "border": "uk"
     },
     "CDG": {
       "zone": "Europe/Paris",
@@ -183,7 +266,8 @@
         "minutes": 35,
         "headway_minutes": 0,
         "operating_hours_local": "CDGVAL 04:00-01:00, then a 25-minute-headway bus"
-      }
+      },
+      "border": "schengen"
     },
     "AMS": {
       "zone": "Europe/Amsterdam",
@@ -212,7 +296,8 @@
         "headway_minutes": 0,
         "operating_hours_local": "always"
       },
-      "leave_airport_viable": true
+      "leave_airport_viable": true,
+      "border": "schengen"
     },
     "MAD": {
       "zone": "Europe/Madrid",
@@ -236,7 +321,8 @@
         "minutes": 20,
         "headway_minutes": 10,
         "operating_hours_local": "05:00-23:30"
-      }
+      },
+      "border": "schengen"
     },
     "LIS": {
       "zone": "Europe/Lisbon",
@@ -260,7 +346,8 @@
         "minutes": 12,
         "headway_minutes": 0,
         "operating_hours_local": "always"
-      }
+      },
+      "border": "schengen"
     },
     "MXP": {
       "zone": "Europe/Rome",
@@ -278,7 +365,8 @@
           "what": "Terminal retail",
           "hours_local": "05:30-22:30"
         }
-      ]
+      ],
+      "border": "schengen"
     },
     "BCN": {
       "zone": "Europe/Madrid",
@@ -302,7 +390,412 @@
         "minutes": 18,
         "headway_minutes": 10,
         "operating_hours_local": "05:00-23:30"
-      }
+      },
+      "border": "schengen"
+    },
+    "FRA": {
+      "zone": "Europe/Berlin",
+      "iata_area": 2,
+      "schengen": true,
+      "border": "schengen",
+      "process_minutes": {
+        "p50": 60,
+        "p90": 100
+      },
+      "mct_minutes": {
+        "default": 45,
+        "T1-T2": 60
+      },
+      "night_curfew": {
+        "arrivals": [
+          "23:00",
+          "04:59"
+        ],
+        "departures": [
+          "23:00",
+          "04:59"
+        ],
+        "source": "Hessischer VGH 2011 night-flight ban; a shoulder quota runs 22:00-23:00"
+      },
+      "services": [
+        {
+          "what": "Terminal 1 and 2 retail",
+          "hours_local": "06:00-21:00"
+        },
+        {
+          "what": "Long-distance rail at Fernbahnhof",
+          "hours_local": "05:00-00:30"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "airside_train",
+        "minutes": 12,
+        "headway_minutes": 4,
+        "operating_hours_local": "Sky Line 04:00-00:30, then a bus"
+      },
+      "leave_airport_viable": true,
+      "needs_primary_source": true
+    },
+    "MUC": {
+      "zone": "Europe/Berlin",
+      "iata_area": 2,
+      "schengen": true,
+      "border": "schengen",
+      "process_minutes": {
+        "p50": 50,
+        "p90": 85
+      },
+      "mct_minutes": {
+        "default": 35,
+        "T1-T2": 50
+      },
+      "night_curfew": {
+        "arrivals": [
+          "00:00",
+          "04:59"
+        ],
+        "departures": [
+          "00:00",
+          "04:59"
+        ],
+        "source": "Munich night-flight restriction"
+      },
+      "services": [
+        {
+          "what": "Terminal 2 retail and the Munich Airport Center",
+          "hours_local": "06:00-22:00"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "airside_walk",
+        "minutes": 15,
+        "headway_minutes": 0,
+        "operating_hours_local": "T2 satellite by APM, 04:30-01:00"
+      },
+      "leave_airport_viable": true,
+      "needs_primary_source": true
+    },
+    "ZRH": {
+      "zone": "Europe/Zurich",
+      "iata_area": 2,
+      "schengen": true,
+      "border": "schengen",
+      "process_minutes": {
+        "p50": 45,
+        "p90": 75
+      },
+      "mct_minutes": {
+        "default": 40
+      },
+      "night_curfew": {
+        "arrivals": [
+          "23:30",
+          "05:59"
+        ],
+        "departures": [
+          "23:30",
+          "05:59"
+        ],
+        "source": "Swiss night-flight ban"
+      },
+      "services": [
+        {
+          "what": "Airside retail and food",
+          "hours_local": "06:00-21:30"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "airside_train",
+        "minutes": 10,
+        "headway_minutes": 4,
+        "operating_hours_local": "Skymetro to the E dock, always"
+      },
+      "leave_airport_viable": true,
+      "needs_primary_source": true
+    },
+    "GVA": {
+      "zone": "Europe/Zurich",
+      "iata_area": 2,
+      "schengen": true,
+      "border": "schengen",
+      "process_minutes": {
+        "p50": 40,
+        "p90": 70
+      },
+      "mct_minutes": {
+        "default": 45
+      },
+      "night_curfew": {
+        "arrivals": [
+          "00:00",
+          "05:59"
+        ],
+        "departures": [
+          "00:00",
+          "05:59"
+        ],
+        "source": "Geneva night-flight ban"
+      },
+      "services": [
+        {
+          "what": "Single-terminal retail",
+          "hours_local": "06:00-21:00"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "walk",
+        "minutes": 10,
+        "headway_minutes": 0,
+        "operating_hours_local": "one terminal"
+      },
+      "leave_airport_viable": true,
+      "needs_primary_source": true
+    },
+    "FCO": {
+      "zone": "Europe/Rome",
+      "iata_area": 2,
+      "schengen": true,
+      "border": "schengen",
+      "process_minutes": {
+        "p50": 55,
+        "p90": 95
+      },
+      "mct_minutes": {
+        "default": 50,
+        "T1-T3": 90
+      },
+      "services": [
+        {
+          "what": "Terminal 1 and 3 retail",
+          "hours_local": "05:30-22:30"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "airside_bus",
+        "minutes": 25,
+        "headway_minutes": 10,
+        "operating_hours_local": "inter-terminal bus 05:00-23:00"
+      },
+      "leave_airport_viable": false,
+      "needs_primary_source": true
+    },
+    "WAW": {
+      "zone": "Europe/Warsaw",
+      "iata_area": 2,
+      "schengen": true,
+      "border": "schengen",
+      "process_minutes": {
+        "p50": 45,
+        "p90": 75
+      },
+      "mct_minutes": {
+        "default": 40
+      },
+      "night_curfew": {
+        "arrivals": [
+          "23:30",
+          "05:29"
+        ],
+        "departures": [
+          "23:30",
+          "05:29"
+        ],
+        "source": "Chopin night-operations limit"
+      },
+      "services": [
+        {
+          "what": "Single-terminal retail",
+          "hours_local": "05:00-22:00"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "walk",
+        "minutes": 10,
+        "headway_minutes": 0,
+        "operating_hours_local": "one terminal"
+      },
+      "leave_airport_viable": true,
+      "needs_primary_source": true
+    },
+    "CPH": {
+      "zone": "Europe/Copenhagen",
+      "iata_area": 2,
+      "schengen": true,
+      "border": "schengen",
+      "process_minutes": {
+        "p50": 45,
+        "p90": 75
+      },
+      "mct_minutes": {
+        "default": 45
+      },
+      "services": [
+        {
+          "what": "Terminal 2 and 3 retail",
+          "hours_local": "05:00-22:00"
+        },
+        {
+          "what": "Metro to Kobenhavn H",
+          "hours_local": "05:00-00:30",
+          "note": "a 20-minute night headway runs outside this window"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "airside_walk",
+        "minutes": 12,
+        "headway_minutes": 0,
+        "operating_hours_local": "T2 and T3 connect airside"
+      },
+      "leave_airport_viable": true,
+      "needs_primary_source": true
+    },
+    "DUS": {
+      "zone": "Europe/Berlin",
+      "iata_area": 2,
+      "schengen": true,
+      "border": "schengen",
+      "process_minutes": {
+        "p50": 45,
+        "p90": 80
+      },
+      "mct_minutes": {
+        "default": 45
+      },
+      "night_curfew": {
+        "arrivals": [
+          "23:00",
+          "05:59"
+        ],
+        "departures": [
+          "23:00",
+          "05:59"
+        ],
+        "source": "Dusseldorf night-flight ban"
+      },
+      "services": [
+        {
+          "what": "Concourse retail",
+          "hours_local": "06:00-21:00"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "walk",
+        "minutes": 12,
+        "headway_minutes": 0,
+        "operating_hours_local": "one terminal, three concourses"
+      },
+      "leave_airport_viable": true,
+      "needs_primary_source": true
+    },
+    "KEF": {
+      "zone": "Atlantic/Reykjavik",
+      "iata_area": 2,
+      "schengen": true,
+      "border": "schengen",
+      "process_minutes": {
+        "p50": 45,
+        "p90": 75
+      },
+      "mct_minutes": {
+        "default": 45
+      },
+      "services": [
+        {
+          "what": "Leifsstod retail, aligned to the connection banks",
+          "hours_local": "04:30-00:30"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "airside_walk",
+        "minutes": 12,
+        "headway_minutes": 0,
+        "operating_hours_local": "one terminal, Schengen and non-Schengen piers"
+      },
+      "leave_airport_viable": false,
+      "needs_primary_source": true
+    },
+    "DUB": {
+      "zone": "Europe/Dublin",
+      "iata_area": 2,
+      "schengen": false,
+      "border": "ie",
+      "process_minutes": {
+        "p50": 50,
+        "p90": 85
+      },
+      "mct_minutes": {
+        "default": 60,
+        "T1-T2": 90
+      },
+      "services": [
+        {
+          "what": "Terminal 1 and 2 retail",
+          "hours_local": "05:00-22:00"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "landside_walk",
+        "minutes": 15,
+        "headway_minutes": 0,
+        "operating_hours_local": "T1 and T2 connect LANDSIDE only - a transfer re-clears security"
+      },
+      "leave_airport_viable": true,
+      "needs_primary_source": true
+    },
+    "SNN": {
+      "zone": "Europe/Dublin",
+      "iata_area": 2,
+      "schengen": false,
+      "border": "ie",
+      "process_minutes": {
+        "p50": 35,
+        "p90": 60
+      },
+      "mct_minutes": {
+        "default": 45
+      },
+      "services": [
+        {
+          "what": "Single-terminal retail",
+          "hours_local": "05:30-20:00"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "walk",
+        "minutes": 8,
+        "headway_minutes": 0,
+        "operating_hours_local": "one terminal"
+      },
+      "leave_airport_viable": false,
+      "needs_primary_source": true
+    },
+    "IST": {
+      "zone": "Europe/Istanbul",
+      "iata_area": 2,
+      "schengen": false,
+      "border": "tr",
+      "process_minutes": {
+        "p50": 60,
+        "p90": 105
+      },
+      "mct_minutes": {
+        "default": 60
+      },
+      "services": [
+        {
+          "what": "Airside retail and food",
+          "hours_local": "24h"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "airside_walk",
+        "minutes": 25,
+        "headway_minutes": 0,
+        "operating_hours_local": "one terminal, but gate-to-gate walks reach 25 minutes"
+      },
+      "leave_airport_viable": false,
+      "needs_primary_source": true
     }
-  }
+  },
+  "_review": "The rows flagged needs_primary_source were added to cover the European connection points a real JFK-LHR search actually returns. MCT, curfew and inter-terminal figures are curated from published airport and carrier data and are the right shape at roughly the right magnitude; each still wants checking against the airport's own published minimum connection time before a dollar figure built on it is shown to a stranger. AMS, BCN, CDG, EWR, JFK, LHR, LIS, MAD and MXP predate this and carry no flag. Deliberately NOT added: BOS, IAD, ATL, BOG, CMN, TLV and AUH - a JFK-LHR search returns connections through all of them and every one is outside the transatlantic scope, so they go on dropping."
 }

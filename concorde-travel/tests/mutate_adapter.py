@@ -106,6 +106,32 @@ MUTANTS = [
  (AD, "from_duffel", """            pw = amen.get("power") or {}""",
   """            pw = {}""",
   'amenities: drop the published power attribute'),
+ (AD, "offset_for", """    if zone.get("observes_dst") is False:
+        return zone["standard"]""",
+  """    if False:
+        return zone["standard"]""",
+  'no-DST zones: treat Iceland/Turkey as an uncurated year'),
+ (AD, "offset_for", """    if zone.get("observes_dst") is False:
+        return zone["standard"]
+    year = date_str[:4]
+    window = (zone.get("dst") or {}).get(year)
+    if not window:
+        return None""",
+  """    if zone.get("observes_dst") is False:
+        return zone["standard"]
+    year = date_str[:4]
+    window = (zone.get("dst") or {}).get(year)
+    if not window:
+        return zone["standard"]""",
+  'an uncurated DST year silently scores at standard time'),
+ (AD, "crosses_border", """    return ba != bb""", """    return False""",
+  'immigration: never charge for a border crossing'),
+ (AD, "crosses_border", """    if not ba or not bb:
+        # Fall back to the older, narrower test rather than guessing "no".
+        return bool(b.get("schengen")) and not bool(a.get("schengen"))""",
+  """    if not ba or not bb:
+        return False""",
+  'immigration: an uncurated airport means no border'),
  (FA, None, '{"piece": 1, "amount_cents": 10000},\n      {"piece": 2, "amount_cents": 12000},',
   '{"piece": 1, "amount_cents": 1000},\n      {"piece": 2, "amount_cents": 1200},',
   'unknown-is-never-zero: make the fallback bag fee cheap'),

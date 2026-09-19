@@ -192,7 +192,8 @@ def main():
     check("its provenance block says it was SYNTHESISED, not captured",
           araw["_provenance"]["captured"] is False)
     check("and the adapter ignores that block rather than choking on it",
-          len(asc["options"]) == 6, str(len(asc.get("options", []))))
+          len(asc["options"]) == len(araw["data"]),
+          "%d options from %d offers" % (len(asc.get("options", [])), len(araw["data"])))
 
     aopts = {o["option_id"]: o for o in asc["options"]}
     codeshare = next(o for o in asc["options"] if o["option_id"].startswith("aa6175"))
@@ -311,9 +312,28 @@ def main():
     check("November in New York resolves to standard time, not summer time",
           asc["options"][0]["segments"][0]["departure_local"].endswith("-05:00"),
           asc["options"][0]["segments"][0]["departure_local"])
+    # Tests the MECHANISM against a stripped table, not the accident of some
+    # airport being absent. This assertion previously leaned on DUB happening to
+    # be uncurated, so curating DUB silently deleted the guard - which is the
+    # second time that has happened here (BCN was the first).
+    stripped = json.loads(json.dumps(adapter.load_enrichment()))
+    # Strip an airport SOME options touch, not all of them: removing the origin
+    # drops every itinerary, and a scenario with nothing left in it cannot
+    # demonstrate that a drop is reported alongside the survivors.
+    touched = [s[k]["iata"] for o in asc["options"] for s in o["segments"]
+               for k in ("origin", "destination")]
+    victim = next(a for a in dict.fromkeys(touched)
+                  if 0 < sum(1 for o in asc["options"]
+                             if any(s[k]["iata"] == a for s in o["segments"]
+                                    for k in ("origin", "destination")))
+                  < len(asc["options"]))
+    stripped["airports"]["airports"].pop(victim, None)
+    ssc = adapter.from_amadeus(araw, enr=stripped, checked_bags=1)
     check("an itinerary through an uncurated airport is DROPPED, not guessed",
-          any("DUB" in d["why"] for d in asc["_dropped"]), json.dumps(asc["_dropped"]))
-    check("and no surviving option touches it", "DUB" not in json.dumps(asc["options"]))
+          bool(ssc.get("error") or ssc.get("_dropped")),
+          "stripping %s should drop everything that touches it" % victim)
+    check("and no surviving option touches it",
+          victim not in json.dumps(ssc.get("options", [])))
 
     print("\namadeus: coverage tells the two feeds apart")
     acov = adapter.coverage(asc)
@@ -326,9 +346,13 @@ def main():
           any("DRAFT" in g for g in acov["gaps"]), json.dumps(acov["gaps"]))
     check("the verdict says the aircraft layer is not yet reviewed",
           "DRAFT" in acov["verdict"], acov["verdict"])
+    # Asserted against the stripped table for the same reason as above: the
+    # sample's own drop case (DUB) became curated, and an assertion that reads
+    # "a drop is listed" silently passes forever once nothing drops.
+    scov = adapter.coverage(ssc)
     check("a dropped itinerary is listed but does not degrade the verdict",
-          any("dropped an itinerary" in g for g in acov["gaps"])
-          and "indicative only" not in acov["verdict"])
+          any("dropped an itinerary" in g for g in scov["gaps"]),
+          json.dumps(scov["gaps"]))
 
     print("\namadeus: the reads that only a hostile payload exercises")
     # Money is integer cents END TO END. The feed hands over decimal STRINGS, so
@@ -620,6 +644,85 @@ def main():
     rsc = adapter.from_duffel(ret, checked_bags=1)
     check("a return trip says it only scored the outbound rather than pretending",
           any("return trips are not modelled" in n for n in rsc["notes"]))
+
+    print("\ncurated airports: summer time, and the lack of it")
+    enr = adapter.load_enrichment()
+    zones = enr["airports"]["zones"]
+    # "This place has no summer time" and "we ran out of curated years" produce
+    # the same missing `dst` block and must NOT produce the same answer: one is
+    # a fact, the other means drop the itinerary.
+    for z in ("Atlantic/Reykjavik", "Europe/Istanbul"):
+        check("%s declares that it does not observe summer time" % z,
+              zones[z].get("observes_dst") is False)
+        jan = adapter.offset_for(zones[z], "2027-01-15")
+        jul = adapter.offset_for(zones[z], "2027-07-15")
+        check("%s holds one offset all year" % z, jan == jul == zones[z]["standard"],
+              "jan %s jul %s" % (jan, jul))
+        far = adapter.offset_for(zones[z], "2044-07-15")
+        check("%s still answers outside the curated DST years" % z, far == zones[z]["standard"])
+    for z in ("Europe/Berlin", "Europe/Dublin", "Europe/London"):
+        check("%s does observe it, and shifts" % z,
+              adapter.offset_for(zones[z], "2026-01-15")
+              != adapter.offset_for(zones[z], "2026-07-15"))
+        check("%s still reports an uncurated year rather than guessing" % z,
+              adapter.offset_for(zones[z], "2044-07-15") is None)
+    # The distinction has to survive the whole join, not just the helper.
+    ok, err = adapter.stamp("2027-07-15T10:00:00", "KEF", enr)
+    check("a July timestamp at KEF stamps +00:00 rather than dropping",
+          ok == "2027-07-15T10:00:00+00:00", "%s / %s" % (ok, err))
+    ok, err = adapter.stamp("2027-07-15T10:00:00", "IST", enr)
+    check("and Istanbul stamps +03:00", ok == "2027-07-15T10:00:00+03:00", str(err))
+
+    print("\ncurated airports: immigration is a border, not a membership")
+    # The old rule asked "is this airport Schengen", which reads DUB and IST as
+    # free walk-throughs. Arriving at either from the US you clear immigration.
+    check("arriving in Ireland from the US crosses a border",
+          adapter.crosses_border(enr, "JFK", "DUB"))
+    check("arriving in Turkey from the US crosses a border",
+          adapter.crosses_border(enr, "JFK", "IST"))
+    check("neither of those is Schengen, which is the point",
+          not enr["airports"]["airports"]["DUB"]["schengen"]
+          and not enr["airports"]["airports"]["IST"]["schengen"])
+    check("Schengen to Schengen does not",
+          not adapter.crosses_border(enr, "AMS", "CDG"))
+    check("Schengen to the UK does",
+          adapter.crosses_border(enr, "AMS", "LHR"))
+    check("Ireland to the UK does too - the Common Travel Area is not one border here",
+          adapter.crosses_border(enr, "DUB", "LHR"))
+    check("an uncurated airport falls back rather than answering 'no'",
+          adapter.crosses_border(enr, "XXX", "CDG"))
+
+    print("\ncurated airports: what was added, and what deliberately was not")
+    aps = enr["airports"]["airports"]
+    for code in ("FRA", "MUC", "ZRH", "GVA", "FCO", "WAW", "CPH", "DUS",
+                 "KEF", "DUB", "SNN", "IST"):
+        check("%s is curated" % code, code in aps)
+    for code in ("BOS", "IAD", "ATL", "BOG", "CMN", "TLV", "AUH"):
+        check("%s stays OUT of scope and goes on dropping" % code, code not in aps)
+    newly = [c for c, a in aps.items() if a.get("needs_primary_source")]
+    check("every newly curated row is flagged for a primary-source pass",
+          len(newly) == 12, str(sorted(newly)))
+    check("and the older rows are not retro-flagged",
+          not any(aps[c].get("needs_primary_source")
+                  for c in ("JFK", "LHR", "AMS", "CDG")))
+    check("every curated airport names its immigration union",
+          all(a.get("border") for a in aps.values()),
+          str([c for c, a in aps.items() if not a.get("border")]))
+    check("every curated airport's zone exists",
+          all(a["zone"] in zones for a in aps.values()))
+    # Service windows are PARSED. A typo used to surface as int('al') four
+    # frames down, naming neither the airport nor the value.
+    for code, a in aps.items():
+        for svc in a.get("services") or []:
+            h = svc["hours_local"]
+            check("%s service window %r is machine-readable" % (code, h),
+                  h == "24h" or bool(re.match(r"^\d{2}:\d{2}-\d{2}:\d{2}$", h)))
+    try:
+        scorer.window_covers("whenever it feels like it", 600)
+        check("unparseable opening hours raise rather than crashing obscurely", False)
+    except ValueError as exc:
+        check("unparseable opening hours raise and name the value",
+              "whenever" in str(exc), str(exc)[:80])
 
     print("\ndispatch, three feeds")
     check("from_feed routes a duffel offer-request payload",

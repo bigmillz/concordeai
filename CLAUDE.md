@@ -384,7 +384,7 @@ python3 concorde-travel/tests/test_live.py       # quota, cache and key handling
 python3 concorde-travel/live.py status           # key, quota and cache state
 python3 concorde-travel/live.py probe            # validate a key with a REAL search
 python3 concorde-travel/live.py provider duffel  # switch provider profile
-python3 concorde-travel/tests/mutate_adapter.py  # break the adapters on purpose, 16 faults
+python3 concorde-travel/tests/mutate_adapter.py  # break the adapters on purpose, 20 faults
 python3 concorde-travel/capture.py JFK LHR 2026-11-12  # real search -> scrubbed sample + report
 python3 concorde-travel/tests/test_faststart.py
 python3 concorde-travel/adapter.py               # normalise the recorded payload, print coverage
@@ -402,7 +402,7 @@ curve it is meant to be testing is a fixture that tests nothing.
 
 **The test suites are mutation-tested.** `test_scorer.py` catches 12 of 12 seeded faults and
 `validate.py` 10 of 10; `tests/mutate_adapter.py` is an executable runner for the adapters
-and must stay at 16/16 with **zero skips** — a skipped mutant never ran and is not a pass.
+and must stay at 20/20 with **zero skips** — a skipped mutant never ran and is not a pass.
 If a change makes a suite pass that should not, the suite has lost a guard.
 
 **The narrator is the only non-deterministic surface, and it is fenced.** `narrator.brief()`
@@ -514,6 +514,27 @@ route** — do not quietly drop that strip to make the results look more confide
 hours, inter-terminal), carriers (reviewed ratings), ground access by origin and hour, and
 route par. **An airport that is not curated drops the itinerary rather than being guessed**,
 which is the scope discipline working, not a bug.
+
+**21 airports are curated.** The 12 European connection points a real JFK–LHR search returns
+were added on 2026-09-19 (FRA MUC ZRH GVA FCO WAW CPH DUS KEF DUB SNN IST), taking the real
+capture from 96 to **146 of 172** offers scored. **BOS, IAD, ATL, BOG, CMN, TLV and AUH are
+deliberately still uncurated** — a JFK–LHR search returns connections through all of them and
+every one is outside the transatlantic scope. Newly added rows carry
+`needs_primary_source: true`; the nine older ones do not.
+
+Three things about that table that are load-bearing:
+
+- **"No summer time" is not "not curated yet."** Iceland has never observed it and Turkey
+  abolished it in 2016, so those zones carry `observes_dst: false` and `offset_for()` returns
+  standard time for any date. A zone that merely runs out of curated years still returns
+  `None` and drops the itinerary. Conflating them either deletes every Icelandic connection
+  or silently scores an uncurated year an hour out for half of it.
+- **Immigration is a BORDER crossing, not a Schengen membership test.** Every airport names
+  its union (`schengen`/`uk`/`ie`/`tr`/`us`) and `crosses_border()` compares them. The old
+  Schengen-only rule scored a US→Dublin or US→Istanbul layover as a free walk-through.
+- **`services[].hours_local` is PARSED**, so it is `HH:MM-HH:MM` or `24h` — never prose. Put
+  prose in a `note` key beside it. A typo there used to surface as `int('al')` four frames
+  down, naming neither the airport nor the value; `window_covers()` now raises with both.
 
 ## The live API: key, quota, cache
 

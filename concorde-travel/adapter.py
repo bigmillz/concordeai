@@ -85,7 +85,17 @@ def offset_for(zone: Dict[str, Any], date_str: str) -> Optional[str]:
 
     Deliberately not a timezone database: the scorer must run with no I/O and
     no versioned external state, and a tzdata update that silently moved a
-    golden number would be very hard to notice."""
+    golden number would be very hard to notice.
+
+    "THIS PLACE HAS NO SUMMER TIME" IS NOT "WE HAVE NOT CURATED IT". Iceland has
+    never observed it and Turkey abolished it in 2016, so a missing `dst` block
+    for Atlantic/Reykjavik or Europe/Istanbul is a fact about the place, while a
+    missing one for Europe/Berlin means the table has run out of years. Conflate
+    them and either every Icelandic connection silently drops, or an uncurated
+    year silently scores at standard time and every timestamp in it is an hour
+    out for half the year. A zone must therefore SAY which it is."""
+    if zone.get("observes_dst") is False:
+        return zone["standard"]
     year = date_str[:4]
     window = (zone.get("dst") or {}).get(year)
     if not window:
@@ -651,8 +661,8 @@ def from_amadeus(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                 "layover_id": "lay%d" % (i + 1),
                 "airport": a_to,
                 "arrive_segment_id": seg_ids[i], "depart_segment_id": seg_ids[i + 1],
-                "immigration_required": bool(ap.get("schengen")) and not bool(
-                    segments[i]["origin"].get("schengen")),
+                "immigration_required": crosses_border(
+                    enr, segments[i]["origin"]["iata"], a_to),
                 "security_reclear_required": False,
                 "ees_first_registration": False,
                 "inter_terminal": ap.get("inter_terminal") or {"mode": "walk", "minutes": 20},
@@ -866,6 +876,26 @@ def _duffel_conditions(offer: Dict[str, Any]) -> Tuple[str, bool]:
     return changes, bool(ref and ref.get("allowed"))
 
 
+def crosses_border(enr: Dict[str, Any], from_iata: str, to_iata: str) -> bool:
+    """Does arriving at `to_iata` from `from_iata` mean clearing immigration?
+
+    NOT a Schengen test. `schengen` answers "is this airport inside that one
+    union", which gets Frankfurt right and Dublin and Istanbul wrong: arriving
+    at DUB from JFK you clear Irish immigration whatever Schengen says, and the
+    old rule scored that layover as if you walked straight through. Each curated
+    airport names the immigration union it sits in - schengen, uk, ie, tr, us -
+    and a crossing is simply two different names. An uncurated airport is
+    unknown rather than false, because a missed border is minutes of a layover
+    that were never counted."""
+    aps = enr["airports"]["airports"]
+    a, b = aps.get(from_iata) or {}, aps.get(to_iata) or {}
+    ba, bb = a.get("border"), b.get("border")
+    if not ba or not bb:
+        # Fall back to the older, narrower test rather than guessing "no".
+        return bool(b.get("schengen")) and not bool(a.get("schengen"))
+    return ba != bb
+
+
 def _place_label(node: Dict[str, Any], iata: str) -> str:
     """"LHR to LHR" is not a ledger line anybody can read.
 
@@ -1072,8 +1102,8 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                 "layover_id": "lay%d" % (i + 1),
                 "airport": a_to,
                 "arrive_segment_id": seg_ids[i], "depart_segment_id": seg_ids[i + 1],
-                "immigration_required": bool(ap.get("schengen")) and not bool(
-                    segments[i]["origin"].get("schengen")),
+                "immigration_required": crosses_border(
+                    enr, segments[i]["origin"]["iata"], a_to),
                 "security_reclear_required": False,
                 "ees_first_registration": False,
                 "inter_terminal": ap.get("inter_terminal") or {"mode": "walk",

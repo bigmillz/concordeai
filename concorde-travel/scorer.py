@@ -84,7 +84,14 @@ def window_covers(hours_local: str, clock_minutes: int) -> bool:
     midnight are handled; prose is not, by design - the schema forbids it."""
     if hours_local == "24h":
         return True
-    lo, hi = _hhmm(hours_local[:5]), _hhmm(hours_local[6:11])
+    try:
+        lo, hi = _hhmm(hours_local[:5]), _hhmm(hours_local[6:11])
+    except (ValueError, IndexError):
+        # A typo in the curated table used to surface as int('al') from four
+        # frames down, which tells you nothing about which airport to go and fix.
+        raise ValueError(
+            "opening hours %r are not HH:MM-HH:MM or '24h'. Service windows are "
+            "parsed, not read: prose belongs in a note field, not here." % hours_local)
     if lo <= hi:
         return lo <= clock_minutes <= hi
     return clock_minutes >= lo or clock_minutes <= hi      # wraps midnight
