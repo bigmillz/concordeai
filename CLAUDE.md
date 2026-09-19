@@ -364,6 +364,7 @@ python3 concorde-travel/live.py status           # key, quota and cache state
 python3 concorde-travel/live.py probe            # validate a key with a REAL search
 python3 concorde-travel/live.py provider duffel  # switch provider profile
 python3 concorde-travel/tests/mutate_adapter.py  # break the adapters on purpose, 13 faults
+python3 concorde-travel/capture.py JFK LHR 2026-11-12  # real search -> scrubbed sample + report
 python3 concorde-travel/tests/test_faststart.py
 python3 concorde-travel/adapter.py               # normalise the recorded payload, print coverage
 ```
@@ -515,6 +516,15 @@ Four behaviours that are deliberate, each with a comment in `live.py`:
 Counters live in `~/.concordego/quota.json` and roll over by day and month on their own —
 no cron, no cleanup job. Defaults are 100/day and 1000/month with a 2s floor between calls
 and a 30-minute cache TTL; all four are config.
+
+**No flight API is reachable from the sandbox these adapters were written in** — the agent
+proxy answers 403 to CONNECT for `api.duffel.com` and every other provider host, which is
+why all three profiles are `UNVERIFIED` and why a key pasted into a session here would be
+useless rather than merely risky. `concorde-travel/capture.py` is the way across that gap:
+run on a machine that *can* reach the provider, it exercises the real `live.search()` path,
+scrubs the payload for credentials **before** writing it, saves it to `adapter_samples/`,
+and prints a pasteable report. A failed call is a useful result — the report is written for
+that case too, because the likeliest first outcome is a 4xx from a wrong parameter name.
 
 **`adapter_samples/kiwi-jfk-lhr.json` is a real capture. The other two are not** —
 `amadeus-jfk-lhr.json` is synthesised from the published schema and `duffel-jfk-lhr.json`
