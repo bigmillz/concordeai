@@ -1588,8 +1588,9 @@ function ledgerHTML(o){
     var off = !!STATE.overrides[keyOf(o.option_id, ln)];
     var amt, cls;
     if (ln.kind === "base"){ amt = money(ln.amount_cents); cls = "base"; }
-    else if (ln.amount_cents >= 0){ amt = "− " + money(ln.amount_cents); cls = "cost"; }
-    else { amt = "+ " + money(-ln.amount_cents); cls = "credit"; }
+    // Added costs are "+": a "−" in front of a cost reads as a discount (per Patrick, 2026-09-20).
+    else if (ln.amount_cents >= 0){ amt = "+ " + money(ln.amount_cents); cls = "cost"; }
+    else { amt = "− " + money(-ln.amount_cents) + '<small class="tag">credit</small>'; cls = "credit"; }
     h += '<div class="lrow"><div class="amt ' + cls + '"' +
          (off ? ' style="opacity:.32;text-decoration:line-through"' : '') + '>' + amt + '</div>' +
          '<div class="why"' + (off ? ' style="opacity:.42"' : '') + '>' + esc(ln.label) +
@@ -1611,8 +1612,8 @@ function goodBadHTML(o){
   o.lines.forEach(function(ln){
     if (ln.kind === "base" || NOISE[ln.code]) return;
     if (STATE.overrides[keyOf(o.option_id, ln)]) return;
-    if (ln.amount_cents < 0) good.push({t:ln.label, e:ln.evidence, m:"+ " + money(ln.amount_cents)});
-    else if (ln.amount_cents >= 4000) bad.push({t:ln.label, e:ln.evidence, m:"− " + money(ln.amount_cents)});
+    if (ln.amount_cents < 0) good.push({t:ln.label, e:ln.evidence, m:"− " + money(ln.amount_cents) + " credit"});
+    else if (ln.amount_cents >= 4000) bad.push({t:ln.label, e:ln.evidence, m:"+ " + money(ln.amount_cents)});
   });
   o.segments.forEach(function(sg){
     var r = sg.reliability || {};

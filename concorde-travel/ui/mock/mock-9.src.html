@@ -225,15 +225,44 @@ details[open] summary:after{content:"–"}
 .chev{color:var(--faint);font-size:20px;line-height:1;transition:transform .2s}
 .row[aria-expanded=true] .chev{transform:rotate(90deg)}
 .detail{padding:4px 18px 22px 100px;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px}
+/* the bill: six groups, a subtotal each, editable lines */
+.bill{display:flex;flex-direction:column;gap:14px}
+.grp header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.grp h4{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:500}
+.grp header b{font-family:var(--mono);font-weight:500;font-size:14px}
+.grp header b.cr{color:var(--green)}
 .lines{list-style:none}
-.lines li{display:grid;grid-template-columns:1fr auto;gap:14px;padding:8px 0;border-top:1px dotted var(--line);align-items:baseline}
+.lines li{display:grid;grid-template-columns:1fr auto auto;gap:12px;padding:8px 0;border-top:1px dotted var(--line-soft);align-items:baseline}
 .lines li:first-child{border-top:0}
+.lines li.off{opacity:.45}
 .lines .lab{font-weight:500;font-size:13.5px}
 .lines .ev{color:var(--faint);font-size:12px;line-height:1.45;margin-top:2px}
-.lines .amt2{font-family:var(--mono);font-weight:500;color:var(--red);white-space:nowrap}
-.lines .amt2.cr{color:var(--green)}.lines .amt2.zero{color:var(--faint)}.lines .amt2.want{color:var(--price)}
-.lines li.total{border-top:2px solid var(--text);margin-top:6px;padding-top:12px}
-.lines li.total .amt2{font-size:20px;color:var(--text)}
+.lines .amt2{font-family:var(--mono);font-weight:500;white-space:nowrap}
+.lines .amt2.cr{color:var(--green)}.lines .amt2.zero{color:var(--faint);font-family:var(--sans);font-size:12.5px}.lines .amt2.want{color:var(--price)}
+.lines .amt2 small{font-family:var(--sans);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;margin-left:5px;color:var(--green)}
+.rmv{width:22px;height:22px;border-radius:50%;border:1px solid var(--line);color:var(--faint);font-size:14px;line-height:1;display:grid;place-items:center}
+.rmv:hover{border-color:var(--red);color:var(--red)}
+.lines li .nox{width:22px}
+.empty{color:var(--faint);font-size:12.5px;padding:8px 0}
+.restore{display:flex;flex-wrap:wrap;gap:6px;padding-top:8px}
+.restore span{border:1px dashed var(--line);border-radius:999px;padding:4px 10px;font-size:12px;color:var(--faint)}
+.restore button{color:var(--speed);font-weight:500;margin-left:6px}
+.addbtn{margin-top:8px;color:var(--speed);font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:6px}
+.addbtn:hover{text-decoration:underline}
+.addmenu{margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--panel);display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px}
+.addmenu button.ad{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12.5px;text-align:left;color:var(--dim);display:flex;justify-content:space-between;gap:8px}
+.addmenu button.ad:hover{border-color:var(--dim);color:var(--text)}
+.addmenu button.ad[disabled]{opacity:.4;cursor:default}
+.addmenu button.ad i{font-style:normal;font-family:var(--mono);color:var(--faint)}
+.addmenu .bagrow{grid-column:1/-1;display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--dim);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+.addmenu .bagrow button{width:26px;height:26px;border:1px solid var(--line);border-radius:50%;color:var(--text)}
+.addmenu .bagrow b{font-family:var(--mono);color:var(--text);min-width:52px;text-align:center}
+.addmenu form{grid-column:1/-1;display:grid;grid-template-columns:1fr 90px auto;gap:6px}
+.addmenu input{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;min-width:0}
+.addmenu form button{border:1px solid var(--line);border-radius:8px;padding:0 12px;font-size:12.5px;color:var(--text)}
+.btotal{display:flex;justify-content:space-between;align-items:baseline;border-top:2px solid var(--text);padding-top:12px;margin-top:2px}
+.btotal span{font-weight:500}.btotal b{font-family:var(--mono);font-size:22px;font-weight:500}
+.btotal small{display:block;color:var(--faint);font-size:12px;font-weight:300}
 .book{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;align-self:start}
 .book h4{font-size:15px;font-weight:500}
 .book p{color:var(--dim);font-size:12.5px;line-height:1.5}
@@ -318,7 +347,7 @@ details[open] summary:after{content:"–"}
 
     <div class="wants">
       <h2>Wants and needs</h2>
-      <p class="sub">What you want, not what you will tolerate. Each one changes the arithmetic: a flight that lacks it is charged for it and sinks, with the reason shown. The number is how many of these flights have it.</p>
+      <p class="sub">What you want, not what you will tolerate. Each one changes the arithmetic: where it can be bought, the price goes on the bill; where it cannot, the flight is charged for lacking it and sinks, with the reason shown. The number is how many of these flights already have it.</p>
       <div class="chips" id="chips"></div>
       <p class="chipnote hidden" id="chipnote"></p>
 
@@ -392,7 +421,7 @@ const money = c => '$' + Math.abs(Math.round(c/100)).toLocaleString('en-US');
 const signed = c => (c < 0 ? '−' : '+') + money(c);
 const hm = iso => iso.slice(11,16);
 const hour = iso => +iso.slice(11,13) + (+iso.slice(14,16))/60;
-const dur = m => Math.floor(m/60) + 'h' + (m%60 ? String(m%60).padStart(2,'0') : '');
+const dur = m => m < 60 ? m + 'm' : Math.floor(m/60) + 'h' + (m%60 ? String(m%60).padStart(2,'0') : '');
 const gcls = g => ({A:'a',B:'b',C:'c'}[g[0]] || 'd');
 const stopsText = e => e.stops === 0 ? 'nonstop' : e.stops === 1 ? 'via ' + e.route[1] : e.stops + ' stops';
 const niceDate = d => new Date(d + 'T12:00:00Z').toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short', timeZone:'UTC'});
@@ -415,7 +444,8 @@ const ALLIANCE = {oneworld:['BA','AA','IB','AY','AS','QR','CX','JL','QF','RJ','M
 const AIRNAME = {american:'AA',aa:'AA','british airways':'BA',ba:'BA',british:'BA',virgin:'VS','virgin atlantic':'VS',delta:'DL',united:'UA',lufthansa:'LH',alaska:'AS',iberia:'IB',finnair:'AY',swiss:'LX',turkish:'TK',ita:'AZ',alitalia:'AZ',jetblue:'B6','aer lingus':'EI',tap:'TP',icelandair:'FI',lot:'LO',klm:'KL','air france':'AF',avianca:'AV',etihad:'EY',sas:'SK'};
 
 // ---- state
-const S = {trip:'round', a:1, b:0, c:0, preset:'1,0,0', asap:false, wants:new Set(), rules:[], adv:{dep0:0, dep1:24, arr0:0, arr1:24, cabin:'economy', stops:2, alli:new Set(), out:new Set()},
+const S = {trip:'round', a:1, b:0, c:0, preset:'1,0,0', asap:false, wants:new Set(), rules:[], ride:'either', off:new Set(), menu:false, open:new Set(),
+  extra:{bag:0, wifi:false, seat:false, legroom:false, lounge:false, priority:false, insurance:false, hotel:false, custom:[]}, adv:{dep0:0, dep1:24, arr0:0, arr1:24, cabin:'economy', stops:2, alli:new Set(), out:new Set()},
   pts:{amex:120000, chase:80000, capone:0, citi:0, bilt:0, avios:0, virgin:0, aa:0, delta:0}, shown:12, T:'mine',
   legs:[{from:'Wyckoff Ave & Myrtle Ave, Bushwick', to:'London', date:'Wed 18 Nov'}], back:'Wed 25 Nov', pax:'one adult', bags:'one checked bag'};
 
@@ -519,16 +549,105 @@ function excluded(e){
   }
   return null;
 }
-function priced(e, prof){
-  // the scorer's number at these weights, plus the charges for missing wants
-  const idx = gridIndex(S.a, S.b), base = prof ? e.by[prof].effective_cents : e.grid[idx];
-  const dem = [];
-  for (const id of S.wants){ const w = WANTS.find(x => x.id === id); if (w.count && !w.ok(e)) dem.push({label:'You wanted ' + w.label.toLowerCase(), cents:w.cents, want:true}); }
-  return {total: base + dem.reduce((s, d) => s + d.cents, 0), base, dem};
+// ---- the bill. Six groups, each line placed by the scorer's own code, and
+// the total is the SUM OF THE LINES: what the card says and what the bill says
+// never disagree. The scorer's ledger at the nearest named target is the
+// starting point; the pieces that move with the dial (the ride, your time,
+// the comfort lines) are re-priced at the dial exactly the way the scorer
+// prices them, and rounding is folded into the time line.
+const RIDES = {either:'whichever is sensible', rideshare:'rideshare', transit:'public transport'};
+const COMFORT = new Set(['connectivity','cabin_uncertain','pitch','redeye','boarding','carrier','mct_margin','lounge']);
+const ADDONS = {
+  wifi:{label:'Wifi pass', cents:1900, sells:e => e.wifi_cost === 'paid', has:e => e.wifi_cost === 'free', want:'wifi', why:'you asked for wifi that works, and this fare sells it'},
+  lounge:{label:'Lounge day pass', cents:6500, sells:() => true, has:e => WANTS.find(w => w.id === 'lounge').ok(e), want:'lounge', why:'you asked for lounge access; none comes with this fare'},
+  legroom:{label:'Extra-legroom seat', cents:7900, sells:() => true, has:e => WANTS.find(w => w.id === 'legroom').ok(e), want:'legroom', why:'you asked for extra legroom; this cabin seats you at 30–31 inches'},
+  seat:{label:'Pick your seat', cents:3000, sells:e => e.seat_selection === 'paid', has:e => e.seat_selection !== 'paid', why:'seat selection is paid on this fare'},
+  priority:{label:'Priority boarding', cents:2500, sells:() => true, has:() => false, why:'added by you'},
+  insurance:{label:'Travel insurance', cents:3800, sells:() => true, has:() => false, why:'added by you'},
+  hotel:{label:'Hotel night at the other end', cents:18000, sells:() => true, has:() => false, why:'added by you', group:'stay'},
+};
+const hourlyAt = () => Math.round(S.a*PR.cheapest.hourly_value_cents + S.b*PR.fastest.hourly_value_cents + S.c*PR.comfort.hourly_value_cents);
+const cwAt = () => S.a*PR.cheapest.comfort_weight + S.b*PR.fastest.comfort_weight + S.c*PR.comfort.comfort_weight;
+const nearestProf = () => S.a >= S.b && S.a >= S.c ? 'cheapest' : S.b >= S.c ? 'fastest' : 'comfort';
+const partyBags = () => ({'no checked bag':0, 'one checked bag':1, 'two checked bags':2}[S.bags] ?? 1);
+function pickGround(modes, hourly, prefer){
+  // the scorer's own rule: cheapest by fare plus minutes at the hour's value; a
+  // preferred class narrows the field and, if nothing of it runs, says so
+  let f = modes.filter(m => m.feasible && m.cents != null && m.minutes != null), note = null;
+  if (prefer){ const w = f.filter(m => m.kind === prefer); if (w.length) f = w; else note = 'no ' + RIDES[prefer] + ' at this hour'; }
+  if (!f.length) return {mode:null, note};
+  f = f.slice().sort((x, y) => (x.cents + Math.floor(x.minutes*hourly/60)) - (y.cents + Math.floor(y.minutes*hourly/60)));
+  return {mode:f[0], note};
 }
+function bagCost(e, pieces){
+  // this fare's own ladder, extended past its last tier by repeating the dearest
+  const t = e.bag_tiers.slice().sort((x, y) => x.piece - y.piece).map(x => x.amount_cents), dear = t.length ? Math.max(...t) : 10000;
+  let c = 0; for (let i = 0; i < pieces; i++) c += i < t.length ? t[i] : dear; return c;
+}
+function overnight(e){
+  // a layover that runs through the small hours: lands late, leaves in the morning
+  let k = 0; for (const l of e.by.cheapest.legs){ if (l.kind !== 'layover') continue; const seg = e.segments[k]; k++;
+    const h = +seg.arr.slice(0,2); if (l.minutes >= 300 && (h >= 21 || h < 3)) return {airport:seg.to, lands:seg.arr, next:(e.segments[k] || {}).dep, minutes:l.minutes}; }
+  return null;
+}
+function linesAt(e, idx){
+  // the scorer's own ledger at this weighting: amounts from the grid, words from the nearest target
+  const G = e.gridlines, ref = e.by[nearestProf()].lines, seen = {};
+  const codes = G.codes || G.pairs[idx].map(p => p[0]), cents = G.codes ? G.cents[idx] : G.pairs[idx].map(p => p[1]);
+  return codes.map((code, i) => { const n = seen[code] = (seen[code] || 0) + 1; const src = ref.filter(l => l.code === code)[n-1] || {label:code, evidence:''}; return {code, cents:cents[i], label:src.label, evidence:src.evidence}; });
+}
+function bill(e, opts){
+  const o = opts || {}, idx = gridIndex(S.a, S.b), L = linesAt(e, idx), G = e.gridlines, hourly = hourlyAt();
+  const find = c => L.find(l => l.code === c), g = {ticket:[], transport:[], stay:[], addons:[], time:[], quality:[]};
+  const line = (grp, x) => { g[grp].push(x); return x; };
+  const T = find('ticket'); line('ticket', {key:'ticket', label:'Ticket', evidence:T.evidence, cents:T.cents});
+  // the ride at each end: the scorer's own pick at this weighting, or the class you asked for
+  const prefer = S.ride === 'either' ? null : S.ride;
+  let dmin = 0, gm = 0;
+  [['out','ground_out'], ['in','ground_in']].forEach(([end, code]) => {
+    const ref = find(code), modes = e.ground[end] || [], cur = modes[G[end][idx]] || null, off = S.off.has(code);
+    let mode = cur, note = null;
+    if (prefer){ const pk = pickGround(modes, hourly, prefer); if (pk.mode) mode = pk.mode; note = pk.note; }
+    const curMin = cur ? cur.minutes : 0, mins = mode ? mode.minutes : curMin, cents = off ? 0 : (mode ? mode.cents : (ref ? ref.cents : 0));
+    dmin += mins - curMin; gm += mins;
+    line('transport', {key:code, label: ref ? ref.label : (end === 'out' ? 'To the airport' : 'From the airport'), cents, removable:true, off,
+      evidence: off ? 'Someone is driving you: the fare is gone, the ' + dur(mins) + ' still counts' : (mode ? mode.mode + ' · ' + dur(mins) + (mode.estimated ? ' · estimated' : '') + (note ? ' · ' + note : '') : (ref ? ref.evidence : ''))});
+  });
+  // your time: the scorer's line, moved by the minutes the ride choice changed
+  const tl = find('time'), d2d = G.d2d[idx] + dmin;
+  line('time', {key:'time', label: dur(d2d) + ' door to door at ' + money(hourly) + ' an hour', evidence: tl ? 'ground ' + dur(gm) + tl.evidence.slice(Math.max(0, tl.evidence.indexOf(' +'))) : '', cents: (tl ? tl.cents : 0) + Math.round(dmin*hourly/60)});
+  for (const l of L){
+    if (['ticket','ground_out','ground_in','time','bags'].includes(l.code)) continue;
+    line('quality', {key:l.code, label:l.label, evidence:l.evidence, cents:l.cents, credit:l.cents < 0});
+  }
+  // add-ons: bags from the sentence and the ladder, then what your choices imply, then what you added
+  const bagsIn = e.bags_included, total = partyBags() + S.extra.bag, paid = Math.max(0, total - bagsIn);
+  const B = find('bags');
+  if (total === 1 && B) line('addons', {key:'bags', label:B.label, evidence:B.evidence, cents:B.cents});
+  else if (paid > 0) line('addons', {key:'bags', label: paid + ' checked bag' + (paid > 1 ? 's' : '') + ' not included', cents:bagCost(e, paid),
+      evidence: total + ' checked, ' + bagsIn + ' included with ' + e.brand + ' · this fare\'s ladder: ' + (e.bag_tiers.length ? e.bag_tiers.map(t => money(t.amount_cents)).join(', ') + ', then ' + money(Math.max(...e.bag_tiers.map(t => t.amount_cents))) + ' each' : 'unpublished, priced at the pessimistic default') + (S.extra.bag ? ' · ' + S.extra.bag + ' added by you' : ''), removable: S.extra.bag > 0});
+  else if (total > 0) line('addons', {key:'bags', label: total + ' checked bag' + (total > 1 ? 's' : '') + ' included', cents:0, included:true, evidence:e.brand + ' includes ' + bagsIn});
+  {
+    for (const [k, a] of Object.entries(ADDONS)){
+      const wanted = (a.want && S.wants.has(a.want)) || S.extra[k]; if (!wanted || S.off.has(k)) continue;
+      if (a.has(e)) line(a.group || 'addons', {key:k, label:a.label.replace('pass', '').replace('Pick your seat', 'Seat choice').trim() + ' included', cents:0, included:true, evidence:'comes with this fare', removable:true});
+      else if (a.sells(e)) line(a.group || 'addons', {key:k, label:a.label, cents:a.cents, evidence:a.why, removable:true});
+    }
+    const on = overnight(e);
+    if (on && !S.off.has('hotel-auto')) line('stay', {key:'hotel-auto', label:'Hotel near ' + on.airport, cents:18000, removable:true, evidence:'lands ' + on.lands + ', next flight ' + on.next + ' · ' + dur(on.minutes) + ' overnight, and the terminal is no place to sleep'});
+    S.extra.custom.forEach((c, i) => line('addons', {key:'custom-' + i, label:c.label, cents:c.cents, evidence:'added by you', removable:true}));
+    // wants with nothing to buy: charged, and shown as the charge
+    for (const id of S.wants){ const w = WANTS.find(x => x.id === id); if (!w.count || w.ok(e)) continue; if (ADDONS[id] && !S.off.has(id) && (ADDONS[id].sells(e) || ADDONS[id].has(e))) continue;
+      line('quality', {key:'want-' + id, label:'You wanted ' + w.label.toLowerCase(), cents:w.cents, want:true, evidence:'a want, not a filter: this flight lacks it, so it is charged and stays visible'}); }
+  }
+  const sum = grp => grp.reduce((s, x) => s + x.cents, 0), totalC = Object.values(g).reduce((s, grp) => s + sum(grp), 0);
+  return {g, total:totalC, sub:Object.fromEntries(Object.entries(g).map(([k, v]) => [k, sum(v)])),
+          dem:g.quality.filter(x => x.want), adds:g.addons.filter(x => x.key !== 'bags' && x.cents > 0).concat(g.stay), base:e.grid[idx]};
+}
+function priced(e){ return bill(e); }
 function ranked(){
   const rows = [], hidden = [];
-  for (const e of ALL){ const why = excluded(e); if (why) hidden.push({e, why}); else rows.push({e, ...priced(e)}); }
+  for (const e of ALL){ const why = excluded(e); if (why) hidden.push({e, why}); else rows.push({e, ...bill(e)}); }
   rows.sort((x, y) => S.asap ? (Date.parse(x.e.arrive) - Date.parse(y.e.arrive)) : (x.total - y.total) || (x.e.id < y.e.id ? -1 : 1));
   return {rows, hidden};
 }
@@ -540,12 +659,12 @@ function skyBand(e){ const d = hour(e.depart), a = hour(e.arrive), span = (Date.
   for (let k = 0; k <= 6; k++){ const t = k/6; st.push(sky(d + span*t + (a - d - span)*t) + ' ' + Math.round(t*100) + '%'); } return 'linear-gradient(90deg,' + st.join(',') + ')'; }
 
 // ---- doors
-function whyLines(e, r, prof){
-  const lines = (prof ? e.by[prof].lines : e.by[S.a >= S.b && S.a >= S.c ? 'cheapest' : S.b >= S.c ? 'fastest' : 'comfort'].lines).filter(l => l.code !== 'ticket').map(l => ({label:l.label, cents:l.cents}));
-  return r.dem.concat(lines).sort((x, y) => Math.abs(y.cents) - Math.abs(x.cents)).slice(0, 3);
+function whyLines(e, r){
+  return Object.values(r.g).flat().filter(l => l.key !== 'ticket' && l.cents !== 0 && !l.off).sort((x, y) => Math.abs(y.cents) - Math.abs(x.cents)).slice(0, 3);
 }
+const amtHTML = l => l.cents === 0 ? (l.included ? 'included' : '—') : l.cents < 0 ? '−' + money(l.cents) + '<small>credit</small>' : '+' + money(l.cents);
 function door(kind, e, r, prof, title){
-  const eff = prof ? r.total - r.base + e.by[prof].effective_cents : r.total;
+  const eff = r.total;
   return `<article class="door ${kind}" data-id="${esc(e.id)}">
     <div class="sky" style="background:${skyBand(e)}"><div class="path"></div>
       <svg class="plane" viewBox="0 0 16 16" style="left:${e.stops ? 46 : 50}%" aria-hidden="true"><path d="M15 8l-4.2-1.4L7 1.5H5.4l1.9 5.1H3.6L2.5 4.9H1.2l.9 3.1-.9 3.1h1.3l1.1-1.7h3.7L5.4 14.5H7l3.8-5.1z"/></svg>
@@ -557,7 +676,7 @@ function door(kind, e, r, prof, title){
       <p class="meta">${stopsText(e)} · ${dur(e.door_minutes)} door to door · ${e.route.join(' → ')}${S.asap ? ' · <b style="color:var(--red);font-weight:500">lands ' + hm(e.arrive) + (e.day_offset ? ' tomorrow' : ' today') + '</b>' : ''}</p>
       <div class="price"><b class="num">${money(eff)}</b><span>all in</span><em>${money(e.ticket_cents)} ticket</em></div>
       ${ptLine(e)}
-      <ul class="why">${whyLines(e, r, prof).map(l => `<li class="${l.want ? 'want' : ''}"><b class="${l.cents < 0 ? 'cr' : ''}">${signed(l.cents)}</b><span>${esc(l.label)}</span></li>`).join('')}</ul>
+      <ul class="why">${whyLines(e, r).map(l => `<li class="${l.want ? 'want' : ''}"><b class="${l.cents < 0 ? 'cr' : ''}">${l.cents < 0 ? '−' + money(l.cents) : '+' + money(l.cents)}</b><span>${esc(l.label)}${l.cents < 0 ? ' · credit' : ''}</span></li>`).join('')}</ul>
       <div class="cta"><button class="choose" data-open="${esc(e.id)}">Choose this flight</button><button class="ledger" data-open="${esc(e.id)}">Full ledger</button></div>
     </div></article>`;
 }
@@ -566,9 +685,12 @@ function paintDoors(rows){
   const byId = Object.fromEntries(rows.map(r => [r.e.id, r]));
   const mine = rows[0], picks = [{kind:S.asap ? 'asap' : 'mine', r:mine, prof:null, title:S.asap ? 'Earliest there' : 'Your pick, at your dial'}];
   // the best under each target that is not already a door, so there are always three
+  // the other doors: best under that target, with this bill's add-ons carried along
   const best = prof => rows.slice().sort((x, y) => (x.e.by[prof].effective_cents + x.total - x.base) - (y.e.by[prof].effective_cents + y.total - y.base)).find(r => !picks.some(p => p.r.e.id === r.e.id));
+  // on a corner of the dial, "your pick" already is that target, so the other two doors are the other targets
+  const corner = S.asap ? 'fastest' : S.a === 1 ? 'cheapest' : S.b === 1 ? 'fastest' : S.c === 1 ? 'comfort' : null;
   for (const [kind, prof, title] of [['cheap','cheapest','Cheapest all-in'],['fast','fastest','Fastest door to door'],['comfy','comfort','Most comfortable']]){
-    if (picks.length === 3) break; const r = best(prof); if (r) picks.push({kind, r, prof, title});
+    if (picks.length === 3 || prof === corner) continue; const r = best(prof); if (r) picks.push({kind, r, prof, title});
   }
   $('#doors').innerHTML = picks.map(p => door(p.kind, p.r.e, p.r, p.prof, p.title)).join('');
   $('#lede').textContent = D.query.total_found + ' flights came back. ' + (S.asap ? 'The first gets you there soonest; the other two are the sensible alternatives.' : 'The first is the best at your dial; the other two answer the questions people ask next.');
@@ -581,7 +703,7 @@ function rowHTML(r, i){
     <button class="rowbtn" data-row="${esc(e.id)}">
       ${logo(e.carrier, true)}<span class="seal s ${gcls(e.grade)}">${e.grade}</span>
       <span class="rw"><b>${esc(e.carrier_name)}</b><span>${esc(e.flight)} · ${esc(e.brand)}</span><small>${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} · ${stopsText(e)} · ${dur(e.door_minutes)}</small>
-        ${r.dem.map(d => `<span class="dem">${signed(d.cents)} ${esc(d.label.toLowerCase())}</span>`).join('')}${a && a.good ? `<span class="pt">or ${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)} · ${a.value.toFixed(1)}¢/pt</span>` : ''}</span>
+        ${r.adds.length ? `<span class="dem" style="color:var(--dim)">+${money(r.adds.reduce((s, x) => s + x.cents, 0))} ${esc(r.adds.map(x => x.label.toLowerCase()).join(', '))}</span>` : ''}${r.dem.map(d => `<span class="dem">+${money(d.cents)} ${esc(d.label.toLowerCase())}</span>`).join('')}${a && a.good ? `<span class="pt">or ${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)} · ${a.value.toFixed(1)}¢/pt</span>` : ''}</span>
       <span class="when">${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''}<i>${stopsText(e)} · ${dur(e.door_minutes)}</i></span>
       <span class="amt"><b>${money(r.total)}</b><i>${money(e.ticket_cents)} ticket</i></span><span class="chev">›</span>
     </button><div class="detail" hidden></div></li>`;
@@ -591,6 +713,7 @@ function paintList(rows, hidden, animate){
   const rest = rows.filter(r => !doorIds.has(r.e.id));
   const before = {}; if (animate) document.querySelectorAll('.row').forEach(li => before[li.dataset.id] = li.getBoundingClientRect().top);
   $('#list').innerHTML = rest.slice(0, S.shown).map(rowHTML).join('');
+  document.querySelectorAll('.row').forEach(li => { if (S.open.has(li.dataset.id)){ li.setAttribute('aria-expanded', 'true'); const det = li.querySelector('.detail'); det.innerHTML = ledgerHTML(ALL.find(x => x.id === li.dataset.id)); det.hidden = false; } });
   const left = rest.length - S.shown; $('#morebtn').hidden = left <= 0; $('#morebtn').textContent = left > 0 ? 'Show the other ' + left : '';
   $('#listnote').textContent = rest.length + ' more, ranked ' + (S.asap ? 'by arrival time' : 'at your dial') + (S.wants.size ? ', charged for the wants they miss' : '') + '.';
   $('#hiddenrows').innerHTML = hidden.length ? '<b style="color:var(--dim);font-weight:500">' + hidden.length + ' hidden</b> by your rules: ' + hidden.slice(0, 6).map(h => esc(h.e.carrier_name + ' ' + h.e.flight) + ' (' + esc(h.why) + ')').join(', ') + (hidden.length > 6 ? ', …' : '') + '. Rules hide; wants only charge.' : '';
@@ -603,11 +726,30 @@ function paint(animate){
 }
 
 // ---- ledger sheet
+const GROUPS = [['ticket','Ticket'],['transport','Getting there and back'],['stay','Staying over'],['addons','Add-ons'],['time','Your time'],['quality','Comfort and risk']];
+const RESTORE = {wifi:'Wifi pass', lounge:'Lounge day pass', legroom:'Extra-legroom seat', seat:'Seat choice', 'hotel-auto':'The hotel', ground_out:'The ride to the airport', ground_in:'The ride from the airport'};
+function lineHTML(l){
+  return `<li class="${l.off ? 'off' : ''}"><div><div class="lab">${esc(l.label)}</div>${l.evidence ? `<div class="ev">${esc(l.evidence)}</div>` : ''}</div>
+    <div class="amt2 ${l.cents < 0 ? 'cr' : l.cents === 0 ? 'zero' : l.want ? 'want' : ''}">${amtHTML(l)}</div>
+    ${l.removable && !l.off ? `<button class="rmv" data-off="${esc(l.key)}" title="Take this off every flight" aria-label="Remove ${esc(l.label)}">×</button>` : '<span class="nox"></span>'}</li>`;
+}
+function addMenuHTML(e){
+  const bagsIn = e.bags_included, next = partyBags() + S.extra.bag + 1, nextCost = next > bagsIn ? bagCost(e, next - bagsIn) - bagCost(e, Math.max(0, next - 1 - bagsIn)) : 0;
+  return `<div class="addmenu">
+    <div class="bagrow"><span>Extra checked bags</span><button data-add="bag-" aria-label="One fewer bag">−</button><b>${S.extra.bag} extra</b><button data-add="bag+" aria-label="One more bag">+</button><span>next one ${nextCost ? money(nextCost) : 'included'} on this fare</span></div>
+    ${Object.entries(ADDONS).map(([k, a]) => { const on = (a.want && S.wants.has(a.want) || S.extra[k]) && !S.off.has(k); return `<button class="ad" data-add="${k}" ${on ? 'disabled' : ''}>${esc(a.label)}<i>${a.has(e) ? 'included' : money(a.cents)}</i></button>`; }).join('')}
+    <form data-custom onsubmit="return false"><input name="label" placeholder="Something else, e.g. airport parking" aria-label="What"><input name="amt" inputmode="numeric" placeholder="$" aria-label="Amount"><button data-addcustom>Add</button></form></div>`;
+}
 function ledgerHTML(e){
-  const r = priced(e), prof = S.a >= S.b && S.a >= S.c ? 'cheapest' : S.b >= S.c ? 'fastest' : 'comfort', lines = e.by[prof].lines, b = e.booking[0], aw = awardsFor(e);
-  return `<ul class="lines">${lines.map(l => `<li><div><div class="lab">${esc(l.label)}</div><div class="ev">${esc(l.evidence)}</div></div><div class="amt2 ${l.cents < 0 ? 'cr' : l.cents === 0 ? 'zero' : ''}">${l.cents === 0 ? '—' : signed(l.cents)}</div></li>`).join('')}
-    ${r.dem.map(d => `<li><div><div class="lab">${esc(d.label)}</div><div class="ev">A want, not a filter: this flight lacks it, so it is charged and shown</div></div><div class="amt2 want">${signed(d.cents)}</div></li>`).join('')}
-    <li class="total"><div class="lab">All in at your dial</div><div class="amt2">${money(r.total)}</div></li></ul>
+  const r = bill(e), b = e.booking[0], aw = awardsFor(e);
+  const restore = [...S.off].filter(k => RESTORE[k] && (k !== 'hotel-auto' || overnight(e)));
+  const grp = (k, title) => { const lines = r.g[k]; if (!lines.length && k !== 'addons' && k !== 'stay') return ''; if (!lines.length && k === 'stay' && !restore.includes('hotel-auto')) return '';
+    return `<section class="grp"><header><h4>${title}</h4><b class="${r.sub[k] < 0 ? 'cr' : ''}">${r.sub[k] < 0 ? '−' : ''}${money(r.sub[k])}</b></header><ul class="lines">${lines.map(lineHTML).join('')}</ul>${!lines.length ? '<div class="empty">Nothing yet.</div>' : ''}
+      ${k === 'addons' ? `<div class="restore">${restore.filter(x => x !== 'hotel-auto' && !x.startsWith('ground')).map(x => `<span>${esc(RESTORE[x])} removed from every flight<button data-restore="${x}">add back</button></span>`).join('')}</div><button class="addbtn" data-addmenu>+ Add an expense</button>${S.menu ? addMenuHTML(e) : ''}` : ''}
+      ${k === 'transport' ? `<div class="restore">${restore.filter(x => x.startsWith('ground')).map(x => `<span>${esc(RESTORE[x])}: someone is driving<button data-restore="${x}">count the fare again</button></span>`).join('')}</div>` : ''}
+      ${k === 'stay' && restore.includes('hotel-auto') ? `<div class="restore"><span>Hotel removed: sleeping in the terminal<button data-restore="hotel-auto">add it back</button></span></div>` : ''}</section>`; };
+  return `<div class="bill">${GROUPS.map(([k, t]) => grp(k, t)).join('')}
+    <div class="btotal"><span>All in at your dial<small>${S.asap ? 'ranked by arrival' : 'the sum of every line above'}</small></span><b>${money(r.total)}</b></div></div>
     <div class="book"><h4>${esc(e.carrier_name)} ${esc(e.flight)}</h4><p>${esc(e.route.join(' → '))} · ${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} · ${stopsText(e)}<br>${b ? esc(b.note) : ''}</p>
       <button class="choose">${b ? 'Book with ' + esc(b.who) + ' · ' + money(b.price_cents) : 'Book'}</button>
       ${aw.length ? '<h4 style="margin-top:6px">With points</h4><ul class="awards">' + aw.map(a => `<li class="${a.good ? 'good' : ''}"><b>${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)}</b> · ${a.value <= 0 ? 'the fees alone exceed this fare' : '<span class="v">' + a.value.toFixed(1) + '¢ per point</span> against a fair ' + a.prog.fair + '¢'}<br>${a.path ? esc(a.path[0].toUpperCase() + a.path.slice(1)) : 'You hold nothing that reaches ' + esc(a.prog.name)} · ${esc(a.why)}<br>${a.good ? 'Worth it: saves ' + money(a.saves) + ' of cash.' : a.value <= 0 ? 'Cash wins outright.' : a.path ? 'Not worth it: keep the points for a better redemption.' : ''}</li>`).join('') + '</ul>' : ''}
@@ -615,7 +757,7 @@ function ledgerHTML(e){
 }
 function openSheet(id){
   const e = ALL.find(x => x.id === id);
-  $('#sheetroot').innerHTML = `<div class="sheetwrap" id="sheetwrap"><div class="sheet" role="dialog" aria-modal="true" aria-label="Ledger"><div class="hd"><h3>${esc(e.carrier_name)} ${esc(e.flight)}<span>${esc(e.brand)} · itemised at your dial</span></h3><button class="x" id="x" aria-label="Close">×</button></div><div class="detail">${ledgerHTML(e)}</div></div></div>`;
+  $('#sheetroot').innerHTML = `<div class="sheetwrap" id="sheetwrap" data-id="${esc(e.id)}"><div class="sheet" role="dialog" aria-modal="true" aria-label="Ledger"><div class="hd"><h3>${esc(e.carrier_name)} ${esc(e.flight)}<span>${esc(e.brand)} · itemised at your dial</span></h3><button class="x" id="x" aria-label="Close">×</button></div><div class="detail">${ledgerHTML(e)}</div></div></div>`;
   $('#x').focus();
 }
 
@@ -627,7 +769,8 @@ function sentenceHTML(){
   let h = 'I&rsquo;m leaving from ' + f('q-from-0', L[0].from, 'Where you start') + ' for ' + f('q-to-0', L[0].to, 'Destination') + ' on ' + f('q-date-0', L[0].date, 'Date');
   if (S.trip === 'round') h += ', back on ' + f('q-back', S.back, 'Return date');
   if (S.trip === 'multi') L.slice(1).forEach((l, i) => { h += `<span class="leg">then from ${f('q-from-' + (i+1), l.from, 'From')} to ${f('q-to-' + (i+1), l.to, 'To')} on ${f('q-date-' + (i+1), l.date, 'Date')}<button class="rm" data-rm="${i+1}" aria-label="Remove this flight">×</button></span>`; });
-  h += (S.trip === 'multi' ? '<span class="leg">' : ', ') + sel('q-pax', S.pax, ['one adult','two adults','a family of four'], 'Travellers') + ' with ' + sel('q-bags', S.bags, ['one checked bag','no checked bag','two checked bags'], 'Checked bags') + '.' + (S.trip === 'multi' ? '</span>' : '');
+  h += (S.trip === 'multi' ? '<span class="leg">' : ', ') + sel('q-pax', S.pax, ['one adult','two adults','a family of four'], 'Travellers') + ' with ' + sel('q-bags', S.bags, ['one checked bag','no checked bag','two checked bags'], 'Checked bags') +
+       ', getting to the airport by ' + sel('q-ride', RIDES[S.ride], Object.values(RIDES), 'How you get to the airport') + '.' + (S.trip === 'multi' ? '</span>' : '');
   $('#sentence').innerHTML = h; $('#addleg').classList.toggle('hidden', S.trip !== 'multi');
   const ruler = document.getElementById('ruler') || Object.assign(document.body.appendChild(document.createElement('span')), {id:'ruler'});
   ruler.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;left:-9999px';
@@ -704,7 +847,7 @@ $('#trip').addEventListener('click', ev => { const b = ev.target.closest('button
 $('#addleg').addEventListener('click', () => { const last = S.legs[S.legs.length-1]; S.legs.push({from:last.to, to:'', date:''}); sentenceHTML(); const i = $('#q-to-' + (S.legs.length-1)); if (i) i.focus(); });
 $('#sentence').addEventListener('click', ev => { const b = ev.target.closest('[data-rm]'); if (b){ S.legs.splice(+b.dataset.rm, 1); sentenceHTML(); } });
 $('#sentence').addEventListener('input', ev => { const i = ev.target, m = /^q-(from|to|date)-(\d+)$/.exec(i.id); if (m) S.legs[+m[2]][m[1]] = i.value; else if (i.id === 'q-back') S.back = i.value; });
-$('#sentence').addEventListener('change', ev => { if (ev.target.id === 'q-pax') S.pax = ev.target.value; if (ev.target.id === 'q-bags') S.bags = ev.target.value; });
+$('#sentence').addEventListener('change', ev => { if (ev.target.id === 'q-pax') S.pax = ev.target.value; if (ev.target.id === 'q-bags'){ S.bags = ev.target.value; paint(true); } if (ev.target.id === 'q-ride'){ S.ride = Object.keys(RIDES).find(k => RIDES[k] === ev.target.value); paint(true); } });
 
 let dragging = false;
 const onPoint = ev => { const r = tri.getBoundingClientRect(); const [a, b, c] = toBary(ev.clientX - r.left, ev.clientY - r.top); setWeights(a, b, c, null); };
@@ -743,8 +886,21 @@ $('#stops').addEventListener('change', ev => { S.adv.stops = +ev.target.value; p
 $('#alli').addEventListener('change', ev => { ev.target.checked ? S.adv.alli.add(ev.target.value) : S.adv.alli.delete(ev.target.value); paint(true); });
 $('#carriers').addEventListener('click', ev => { const b = ev.target.closest('[data-c]'); if (!b) return; const c = b.dataset.c; S.adv.out.has(c) ? S.adv.out.delete(c) : S.adv.out.add(c); b.setAttribute('aria-pressed', String(S.adv.out.has(c))); paint(true); });
 $('#pts').addEventListener('input', ev => { const m = /^pt-(\w+)$/.exec(ev.target.id); if (!m) return; S.pts[m[1]] = +String(ev.target.value).replace(/[^\d]/g, '') || 0; paint(false); });
-$('#list').addEventListener('click', ev => { const b = ev.target.closest('[data-row]'); if (!b) return; const li = b.closest('.row'), open = li.getAttribute('aria-expanded') === 'true', det = li.querySelector('.detail'); li.setAttribute('aria-expanded', String(!open)); if (!open) det.innerHTML = ledgerHTML(ALL.find(x => x.id === li.dataset.id)); det.hidden = open; });
+$('#list').addEventListener('click', ev => { const b = ev.target.closest('[data-row]'); if (!b) return; const li = b.closest('.row'), open = li.getAttribute('aria-expanded') === 'true', det = li.querySelector('.detail'); li.setAttribute('aria-expanded', String(!open)); if (!open){ det.innerHTML = ledgerHTML(ALL.find(x => x.id === li.dataset.id)); S.open.add(li.dataset.id); } else S.open.delete(li.dataset.id); det.hidden = open; });
 $('#morebtn').addEventListener('click', () => { S.shown += 12; paint(false); });
+// the bill's controls, wherever a bill is open (a row or the sheet); every change is global
+function rerenderBills(){ paint(true); const sw = $('#sheetwrap'); if (sw){ const id = sw.dataset.id; sw.querySelector('.detail').innerHTML = ledgerHTML(ALL.find(x => x.id === id)); } }
+document.addEventListener('click', ev => {
+  const off = ev.target.closest('[data-off]'); if (off){ const k = off.dataset.off;
+    if (k === 'bags'){ S.extra.bag = 0; } else if (k.startsWith('custom-')){ S.extra.custom.splice(+k.slice(7), 1); }
+    else if (ADDONS[k] && S.extra[k] && !(ADDONS[k].want && S.wants.has(ADDONS[k].want))){ S.extra[k] = false; }
+    else { S.off.add(k); if (ADDONS[k] && ADDONS[k].want){ S.wants.delete(ADDONS[k].want); paintChips(); } if (ADDONS[k]) S.extra[k] = false; }
+    rerenderBills(); return; }
+  const rs = ev.target.closest('[data-restore]'); if (rs){ const k = rs.dataset.restore; S.off.delete(k); if (ADDONS[k]){ S.extra[k] = true; } rerenderBills(); return; }
+  if (ev.target.closest('[data-addmenu]')){ S.menu = !S.menu; rerenderBills(); return; }
+  const ad = ev.target.closest('[data-add]'); if (ad){ const k = ad.dataset.add; if (k === 'bag+') S.extra.bag++; else if (k === 'bag-') S.extra.bag = Math.max(0, S.extra.bag - 1); else { S.extra[k] = true; S.off.delete(k); } rerenderBills(); return; }
+  const ac = ev.target.closest('[data-addcustom]'); if (ac){ const f = ac.closest('form'), label = f.label.value.trim(), amt = Math.round(+String(f.amt.value).replace(/[^\d.]/g, '') * 100); if (label && amt > 0){ S.extra.custom.push({label, cents:amt}); rerenderBills(); } else f.label.focus(); return; }
+});
 $('#doors').addEventListener('click', ev => { const b = ev.target.closest('[data-open]'); if (b) openSheet(b.dataset.open); });
 document.addEventListener('click', ev => { if (ev.target.id === 'x' || ev.target.id === 'sheetwrap') $('#sheetroot').innerHTML = ''; });
 $('#go').addEventListener('click', () => { paint(true); $('#stepper').scrollIntoView({behavior:'smooth', block:'start'}); });

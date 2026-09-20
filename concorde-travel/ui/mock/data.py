@@ -119,12 +119,17 @@ def main(path):
                 airlines.setdefault(who["iata_code"], {"name": who.get("name"), "logo": who.get("logo_symbol_url"),
                                                         "lockup": who.get("logo_lockup_url")})
         wifi = power = False
+        wifi_cost = None
         for sl in off.get("slices", []):
             for sg in sl.get("segments", []):
                 am = ((sg.get("passengers") or [{}])[0].get("cabin") or {}).get("amenities") or {}
-                wifi = wifi or bool((am.get("wifi") or {}).get("available"))
+                w = am.get("wifi") or {}
+                wifi = wifi or bool(w.get("available"))
+                if w.get("available") and w.get("cost") in ("free", "paid"):
+                    # the long leg decides; a paid pass anywhere on the trip is a paid trip
+                    wifi_cost = "paid" if (wifi_cost == "paid" or w["cost"] == "paid") else "free"
                 power = power or bool((am.get("power") or {}).get("available"))
-        amenities[(off["id"] or "")[-10:].lower().replace("_", "-")] = {"wifi": wifi, "power": power}
+        amenities[(off["id"] or "")[-10:].lower().replace("_", "-")] = {"wifi": wifi, "power": power, "wifi_cost": wifi_cost}
 
     entries = {}
     for o in pool:
@@ -178,8 +183,44 @@ def main(path):
         e["refundable"] = bool(o["tickets"][0]["entitlements"].get("refundable"))
         am = next((v for k, v in amenities.items() if k in e["id"]), {})
         e["wifi_published"] = bool(am.get("wifi")); e["power_published"] = bool(am.get("power"))
+        e["wifi_cost"] = am.get("wifi_cost")
         e["layover_minutes"] = [l["minutes"] for l in e["legs"] if l["kind"] == "layover"]
-        e["grid"] = [scorer.score(sc, o, "dial-%d" % k).effective_cents for k in range(len(pts))]
+        # What the bill needs to be rebuilt as choices change: the fare's own bag
+        # ladder and seat terms, and every ground mode at each end with its fare
+        # and minutes, so a rideshare/transit choice is a swap, not a re-score.
+        t0 = o["tickets"][0]
+        e["bag_tiers"] = t0.get("checked_bag_fee_tiers") or []
+        e["seat_selection"] = t0["entitlements"].get("seat_selection")
+        e["ground"] = {end: [{"mode": m["mode"], "kind": m.get("mode_kind"), "cents": m.get("fare_cents"),
+                              "minutes": (m.get("door_to_door_minutes") or {}).get("p50"),
+                              "estimated": bool(m.get("estimated")), "feasible": m.get("feasible", True)}
+                             for m in (o.get("ground") or {}).get(src) or []]
+                       for end, src in (("out", "outbound"), ("in", "arrival"))}
+        # The scorer's ledger at every weighting, not only its total: the bill on the
+        # page is then the scorer's own lines at the dial, to the cent, rather than a
+        # rescaling of the nearest named target (which was $150 out in the middle).
+        # Labels and evidence do not change with the weights, so only the amounts are
+        # stored, aligned to one code sequence when the sequence is the same at every
+        # point (it is, unless a rounding-to-zero drops a line somewhere).
+        modes = {end: [m["mode"] for m in ((o.get("ground") or {}).get(src) or [])]
+                 for end, src in (("out", "outbound"), ("in", "arrival"))}
+        def which(led, code, end):
+            ln = next((l for l in led.lines if l.code == code), None)
+            if not ln:
+                return -1
+            return next((i for i, m in enumerate(modes[end]) if ln.evidence.startswith(m)), -1)
+        leds = [scorer.score(sc, o, "dial-%d" % k) for k in range(len(pts))]
+        e["grid"] = [led.effective_cents for led in leds]
+        seqs = [[l.code for l in led.lines] for led in leds]
+        gl = {"out": [which(led, "ground_out", "out") for led in leds],
+              "in": [which(led, "ground_in", "in") for led in leds],
+              "d2d": [led.door_to_door_minutes for led in leds]}
+        if all(sq == seqs[0] for sq in seqs):
+            gl["codes"] = seqs[0]
+            gl["cents"] = [[l.amount_cents for l in led.lines] for led in leds]
+        else:
+            gl["pairs"] = [[[l.code, l.amount_cents] for l in led.lines] for led in leds]
+        e["gridlines"] = gl
         entries[e["id"]] = e
 
     results = collections.OrderedDict()

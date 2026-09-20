@@ -1480,3 +1480,39 @@ The decisions in it worth keeping whatever the visual treatment becomes:
 - **Logos come from the feed.** Duffel supplies an SVG per carrier; the page draws a
   brand-coloured monogram and lays the logo over it when it loads.
 
+### The bill (2026-09-20)
+
+Patrick, on the breakdown: group the ticket and the other expenses — transportation
+(rideshare if selected, otherwise public transport), accommodation (overnight layovers),
+add-ons (wifi, extra bags…); make added costs a "+" number, since "−$100 makes it look
+like a discount"; insert the relevant added expenses automatically from what the user has
+already selected; give them an × to remove any that don't apply (not buying wifi); and a
+link at the bottom of each list to add more, like five extra bags.
+
+So the ledger is now presented as a bill, and the rules of the bill are:
+
+- **Six groups, each with a subtotal**: Ticket · Getting there and back · Staying over ·
+  Add-ons · Your time · Comfort and risk. The scorer's lines are placed by their code;
+  nothing about the arithmetic changed, only where a line sits and how it is signed.
+- **Costs are "+", credits are "−" and say "credit".** The original brief signed costs
+  with a minus, the way a statement does; a traveller reads a minus as money off.
+- **Auto-inserted add-ons come from the user's own choices.** Wifi that works → a wifi
+  pass on fares that charge for it (the feed says which; two of thirty-six here are free);
+  lounge access → a day pass where none is included; extra legroom → an extra-legroom seat
+  on fares below 32 inches; an overnight layover → a hotel by that airport; the bag count
+  in the sentence → the fare's own bag fees; the transport choice → the rideshare or the
+  transit fare at each end, with the time line re-priced for the minutes it changes. A want
+  with something to buy is priced as the purchase, not as a penalty, so it says what it
+  costs to get what you asked for.
+- **× is global.** Removing the wifi pass removes it from every flight (nobody buys wifi
+  on one flight and not another) and switches the matching want off, and a chip stays
+  behind to put it back. "Someone's driving me" is the × on a ride: the fare goes, the
+  minutes stay.
+- **"Add an expense" adds to every flight.** Extra bags are priced off *this fare's* own
+  ladder, extended past its last published tier by repeating the dearest, so five bags on
+  a Basic fare cost what five bags on a Basic fare cost; wifi, a seat, legroom, a lounge
+  pass, priority boarding, insurance, a hotel night, or a line of your own.
+- **The all-in is the sum of the bill**, and the order is by that sum. The scorer's own
+  ground choice at the dial is replicated (cheapest of fare plus minutes at the hour's
+  value) so the bill and the ranking agree to the cent.
+

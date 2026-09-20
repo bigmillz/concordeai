@@ -342,15 +342,29 @@ An itemized ledger per option — a dollar figure, a cause, and the evidence whe
 is probabilistic:
 
 ```
-AA 100 · JFK→LHR · $480 ticket · $710 effective
-  − $95  EWR at 6:10am: no viable transit, car fare
-  − $85  4h10m at CDG arriving 1:40am, terminal closed
-  − $60  Older cabin, connectivity unusable over the Atlantic (73% of last 60)
-  − $70  Two checked bags not included
-  + $80  Nonstop, no misconnect exposure
+AA 100 · JFK→LHR · $480 ticket · $710 all in
+  Getting there and back
+    + $95  EWR at 6:10am: no viable transit, car fare
+  Add-ons
+    + $70  Two checked bags not included
+  Comfort and risk
+    + $85  4h10m at CDG arriving 1:40am, terminal closed
+    + $60  Older cabin, connectivity unusable over the Atlantic (73% of last 60)
+    − $80  Nonstop, no misconnect exposure · credit
 ```
 
 If a number cannot be explained in one line of that form, it does not belong in the model.
+
+**Added costs are "+"; only a credit is "−", and it says "credit"** (per Patrick,
+2026-09-20: a minus in front of a cost reads as a discount). **The bill is grouped**
+by what the money is for — ticket, getting there and back, staying over, add-ons,
+your time, comfort and risk — with a subtotal per group, and it is **editable**: the
+add-ons the user's own choices imply are put in automatically (a wifi pass when they
+asked for wifi and this fare charges for it, a hotel when a layover runs overnight, a
+car when they said rideshare), every one of them has an × that takes it off every
+flight, and "add an expense" at the bottom adds more, from five extra bags priced off
+this fare's own ladder to a lounge pass to a line of their own. Nothing is charged
+silently and nothing is removed silently: a removed line leaves a chip to put it back.
 
 ## Enrichment layers, easiest first
 
