@@ -61,6 +61,8 @@ from __future__ import annotations
 import json
 import os
 import re
+
+import ground as _ground
 from typing import Any, Dict, List, Optional, Tuple
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -104,18 +106,48 @@ def offset_for(zone: Dict[str, Any], date_str: str) -> Optional[str]:
     return zone["daylight"] if start <= date_str < end else zone["standard"]
 
 
-def stamp(local_naive: str, iata: str, enr: Dict[str, Any]) -> Tuple[Optional[str], Optional[str]]:
+def _offset_from_tzdb(iana: str, local_naive: str) -> Optional[str]:
+    """Last resort for an airport nobody has curated: resolve the feed's own
+    IANA zone name with the stdlib.
+
+    The curated table exists so that FIXTURES are hermetic - a tzdata update
+    must never silently move a golden number in a test. That reason does not
+    apply to a live search of Reykjavik, where there is no golden number and the
+    alternative is refusing to show the flight at all. So curated wins where it
+    exists, this fills the rest, and either way the SCORER still receives an
+    explicit offset and never consults a timezone database itself."""
+    try:
+        from zoneinfo import ZoneInfo
+        import datetime as _dt
+        dt = _dt.datetime.fromisoformat(local_naive[:19]).replace(tzinfo=ZoneInfo(iana))
+        off = dt.utcoffset()
+        if off is None:
+            return None
+        total = int(off.total_seconds())
+        sign = "+" if total >= 0 else "-"
+        total = abs(total)
+        return "%s%02d:%02d" % (sign, total // 3600, (total % 3600) // 60)
+    except Exception:
+        return None
+
+
+def stamp(local_naive: str, iata: str, enr: Dict[str, Any],
+          feed_zone: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
     """'2026-11-12T20:00:00' + JFK -> '2026-11-12T20:00:00-05:00'."""
     ap = enr["airports"]["airports"].get(iata)
+    if ap:
+        zone = enr["airports"]["zones"].get(ap["zone"])
+        if zone:
+            off = offset_for(zone, local_naive[:10])
+            if off:
+                return local_naive[:19] + off, None
+    if feed_zone:
+        off = _offset_from_tzdb(feed_zone, local_naive)
+        if off:
+            return local_naive[:19] + off, None
     if not ap:
-        return None, "no curated timezone for %s" % iata
-    zone = enr["airports"]["zones"].get(ap["zone"])
-    if not zone:
-        return None, "no zone rules for %s" % ap["zone"]
-    off = offset_for(zone, local_naive[:10])
-    if not off:
-        return None, "no daylight-saving rules curated for %s" % local_naive[:4]
-    return local_naive[:19] + off, None
+        return None, "no timezone for %s, curated or from the feed" % iata
+    return None, "no daylight-saving rules curated for %s and the feed named no zone" % local_naive[:4]
 
 
 def _hhmm(s: str) -> int:
@@ -270,7 +302,7 @@ def from_kiwi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
 
         layovers = []
         for i in range(len(segments) - 1):
-            a, b = segs_in[i], segs_in[i + 1]
+            a = segs_in[i]
             ap = enr["airports"]["airports"].get(a["to"], {})
             through = any(i in g and (i + 1) in g for g in groups)
             mct = (ap.get("mct_minutes") or {}).get("default")
@@ -876,22 +908,55 @@ def _duffel_conditions(offer: Dict[str, Any]) -> Tuple[str, bool]:
     return changes, bool(ref and ref.get("allowed"))
 
 
-def crosses_border(enr: Dict[str, Any], from_iata: str, to_iata: str) -> bool:
+# Immigration unions worth knowing globally. Everything NOT listed here is its
+# own border, which is simply true: two different countries means a queue. That
+# default is what makes this work for airports nobody has curated - Bogota needs
+# no row to be correctly understood as a border from New York.
+UNIONS = {}
+for _members, _union in (
+        ("AT BE CZ DK EE FI FR DE GR HU IS IT LV LI LT LU MT NL NO PL PT SK SI "
+         "ES SE CH HR BG RO", "schengen"),
+        # The Common Travel Area is NOT folded into one union here. Routine
+        # passport checks between IE and GB are lighter than a full border but
+        # not absent, and counting a queue that turns out to be quick costs a
+        # few modelled minutes, while missing one costs a connection.
+        ("GB", "uk"), ("IE", "ie"),
+        ("AE QA BH KW OM SA", "gcc")):
+    for _c in _members.split():
+        UNIONS[_c] = _union
+
+
+def border_of(iata: str, enr: Dict[str, Any],
+              geo: Optional[Dict[str, Any]] = None) -> Optional[str]:
+    """The immigration union an airport sits in: curated, then the feed's own
+    country code, then nothing."""
+    ap = (enr["airports"]["airports"].get(iata) or {})
+    if ap.get("border"):
+        return ap["border"]
+    cc = (ap.get("country") or ((geo or {}).get(iata) or {}).get("country") or "").upper()
+    if not cc:
+        return None
+    return UNIONS.get(cc, cc.lower())
+
+
+def crosses_border(enr: Dict[str, Any], from_iata: str, to_iata: str,
+                   geo: Optional[Dict[str, Any]] = None) -> bool:
     """Does arriving at `to_iata` from `from_iata` mean clearing immigration?
 
     NOT a Schengen test. `schengen` answers "is this airport inside that one
     union", which gets Frankfurt right and Dublin and Istanbul wrong: arriving
-    at DUB from JFK you clear Irish immigration whatever Schengen says, and the
-    old rule scored that layover as if you walked straight through. Each curated
-    airport names the immigration union it sits in - schengen, uk, ie, tr, us -
-    and a crossing is simply two different names. An uncurated airport is
-    unknown rather than false, because a missed border is minutes of a layover
-    that were never counted."""
-    aps = enr["airports"]["airports"]
-    a, b = aps.get(from_iata) or {}, aps.get(to_iata) or {}
-    ba, bb = a.get("border"), b.get("border")
+    at DUB from JFK you clear Irish immigration whatever Schengen says.
+
+    Nor is it a CURATED test any more. Going global meant uncurated airports
+    stopped being dropped, and the old fallback then read a Bogota layover as a
+    free walk-through - a real scoring error, silently introduced the moment the
+    gate came off. Two different countries is a border unless a union says
+    otherwise, which needs no curation to be right."""
+    ba, bb = border_of(from_iata, enr, geo), border_of(to_iata, enr, geo)
     if not ba or not bb:
-        # Fall back to the older, narrower test rather than guessing "no".
+        aps = enr["airports"]["airports"]
+        b = aps.get(to_iata) or {}
+        a = aps.get(from_iata) or {}
         return bool(b.get("schengen")) and not bool(a.get("schengen"))
     return ba != bb
 
@@ -935,6 +1000,29 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
     amenity_segments = 0
     wifi_published = []
 
+    # Duffel names every airport's coordinates, country and IANA zone on every
+    # search. That is most of what the curated table was carrying, and it is
+    # what lets an uncurated airport be stamped and an uncurated origin be
+    # estimated instead of dropped.
+    geo: Dict[str, Dict[str, Any]] = {}
+    for off in _duffel_offers(raw):
+        for sl in off.get("slices") or []:
+            for sg in sl.get("segments") or []:
+                for k in ("origin", "destination"):
+                    n = sg.get(k) or {}
+                    if n.get("iata_code"):
+                        geo[n["iata_code"]] = {
+                            "iata": n["iata_code"], "lat": n.get("latitude"),
+                            "lon": n.get("longitude"),
+                            "country": n.get("iata_country_code"),
+                            "city": n.get("city_name") or (n.get("city") or {}).get("name"),
+                            "tz": n.get("time_zone")}
+
+    origin_place, origin_how = _ground.resolve_origin(
+        origin_key, enr,
+        geo.get(next(iter(geo)), None) if geo else None)
+    ground_support = {"seen": set(), "message": None}
+
     for offer in _duffel_offers(raw):
         slices = offer.get("slices") or []
         if not slices:
@@ -952,8 +1040,10 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
         for i, s in enumerate(segs_in):
             o_ap = (s.get("origin") or {}).get("iata_code")
             d_ap = (s.get("destination") or {}).get("iata_code")
-            dep, e1 = stamp(s.get("departing_at", ""), o_ap, enr)
-            arr, e2 = stamp(s.get("arriving_at", ""), d_ap, enr)
+            dep, e1 = stamp(s.get("departing_at", ""), o_ap, enr,
+                            (geo.get(o_ap) or {}).get("tz"))
+            arr, e2 = stamp(s.get("arriving_at", ""), d_ap, enr,
+                            (geo.get(d_ap) or {}).get("tz"))
             if e1 or e2:
                 fail = e1 or e2
                 break
@@ -1103,7 +1193,7 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                 "airport": a_to,
                 "arrive_segment_id": seg_ids[i], "depart_segment_id": seg_ids[i + 1],
                 "immigration_required": crosses_border(
-                    enr, segments[i]["origin"]["iata"], a_to),
+                    enr, segments[i]["origin"]["iata"], a_to, geo),
                 "security_reclear_required": False,
                 "ees_first_registration": False,
                 "inter_terminal": ap.get("inter_terminal") or {"mode": "walk",
@@ -1122,13 +1212,30 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
 
         dep_clock = _hhmm(segments[0]["departure_local"][11:16])
         arr_clock = _hhmm(segments[-1]["arrival_local"][11:16])
-        out_modes, gerr = ground_for(origin_key, segments[0]["origin"]["iata"],
-                                     dep_clock, enr)
-        in_modes, aerr = arrival_ground_for(segments[-1]["destination"]["iata"],
-                                            arr_clock, enr)
-        if gerr:
-            dropped.append({"id": offer.get("id", "?"), "why": gerr})
-            continue
+        dep_ap = segments[0]["origin"]["iata"]
+        arr_ap = segments[-1]["destination"]["iata"]
+
+        # An uncurated AIRPORT drops the itinerary, because we cannot price a
+        # layover we know nothing about. An uncurated ORIGIN must not: we can
+        # always say "roughly an hour, call it $60" and mark it an estimate, and
+        # refusing to show the flight at all is the worse answer.
+        place = origin_place
+        if place.get("lat") is None and geo.get(dep_ap):
+            place, _ = _ground.resolve_origin(origin_key, enr, geo[dep_ap])
+        out_modes, gsrc = _ground.modes_for(place, geo.get(dep_ap, {"iata": dep_ap}),
+                                            dep_clock, enr)
+        ground_support["seen"].add(gsrc)
+        if not ground_support["message"]:
+            ground_support["message"] = _ground.support_message(out_modes)
+        in_modes, aerr = arrival_ground_for(arr_ap, arr_clock, enr)
+        if not in_modes and geo.get(arr_ap, {}).get("lat") is not None:
+            # Same logic at the far end: estimate the ride into town.
+            city = dict(geo[arr_ap])
+            city["lat"] = city["lat"] + 0.11
+            city["lon"] = city["lon"] + 0.11
+            in_modes = _ground.estimate_modes(
+                {"lat": city["lat"], "lon": city["lon"]}, geo[arr_ap], arr_clock)
+            aerr = None
         if aerr and aerr not in notes:
             notes.append(aerr)
 
@@ -1224,6 +1331,11 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
         "options": options,
         "expect": {"reconciles": True},
         "_dropped": dropped,
+        "_ground": {"origin": origin_place.get("label"),
+                    "precision": origin_place.get("precision"),
+                    "resolved_by": origin_how,
+                    "sources": sorted(ground_support["seen"]),
+                    "message": ground_support["message"]},
         "_feed": {"provider": "duffel", "default_bag_fees_used": default_used,
                   "unreviewed_claims": unreviewed,
                   "feed_priced_bags": feed_priced_bags,
@@ -1325,6 +1437,27 @@ def coverage(scenario: Dict[str, Any]) -> Dict[str, Any]:
         strengths.append("%d of %d options carry an airline-quoted checked-bag price, so "
                          "their bag arithmetic is not an estimate"
                          % (tot["feed_priced_bags"], tot["options"]))
+
+    # Going global replaced "drop the itinerary" with "keep it and estimate".
+    # That is only honest if the estimating is SAID OUT LOUD - an uncurated
+    # layover airport has no minimum connection time, no service hours and no
+    # terminal geography, and a grade built on that is not the same object as
+    # one built on a curated route.
+    blind = {}
+    for o in scenario.get("options", []):
+        for l in o.get("layovers") or []:
+            if l.get("mct_source") == "not curated":
+                blind[l["airport"]] = blind.get(l["airport"], 0) + 1
+    if blind:
+        gaps.append("%d layover%s at %s, which %s no curated connection time, "
+                    "terminal layout or opening hours - those stops are modelled "
+                    "on defaults"
+                    % (sum(blind.values()), "" if sum(blind.values()) == 1 else "s",
+                       ", ".join(sorted(blind)),
+                       "has" if len(blind) == 1 else "have"))
+    g = scenario.get("_ground") or {}
+    if g.get("message"):
+        gaps.append(g["message"])
 
     enrichment_gaps = len(gaps)
     for d in scenario.get("_dropped", []):

@@ -126,12 +126,19 @@ MUTANTS = [
   'an uncurated DST year silently scores at standard time'),
  (AD, "crosses_border", """    return ba != bb""", """    return False""",
   'immigration: never charge for a border crossing'),
- (AD, "crosses_border", """    if not ba or not bb:
-        # Fall back to the older, narrower test rather than guessing "no".
-        return bool(b.get("schengen")) and not bool(a.get("schengen"))""",
-  """    if not ba or not bb:
-        return False""",
-  'immigration: an uncurated airport means no border'),
+ (AD, "crosses_border", """    ba, bb = border_of(from_iata, enr, geo), border_of(to_iata, enr, geo)""",
+  """    ba, bb = None, None""",
+  'global borders: fall back to the Schengen-only test everywhere'),
+ (AD, "border_of", """    return UNIONS.get(cc, cc.lower())""",
+  """    return UNIONS.get(cc)""",
+  'global borders: an uncurated country has no border at all'),
+ (AD, "stamp", """    if feed_zone:
+        off = _offset_from_tzdb(feed_zone, local_naive)
+        if off:
+            return local_naive[:19] + off, None""",
+  """    if False:
+        pass""",
+  'global time: refuse to stamp an airport the table never curated'),
  (FA, None, '{"piece": 1, "amount_cents": 10000},\n      {"piece": 2, "amount_cents": 12000},',
   '{"piece": 1, "amount_cents": 1000},\n      {"piece": 2, "amount_cents": 1200},',
   'unknown-is-never-zero: make the fallback bag fee cheap'),

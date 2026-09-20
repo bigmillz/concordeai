@@ -384,10 +384,11 @@ python3 concorde-travel/tests/test_live.py       # quota, cache and key handling
 python3 concorde-travel/live.py status           # key, quota and cache state
 python3 concorde-travel/live.py probe            # validate a key with a REAL search
 python3 concorde-travel/live.py provider duffel  # switch provider profile
-python3 concorde-travel/tests/mutate_adapter.py  # break the adapters on purpose, 20 faults
+python3 concorde-travel/tests/mutate_adapter.py  # break the adapters on purpose, 22 faults
 python3 concorde-travel/capture.py JFK LHR 2026-11-12  # real search -> scrubbed sample + report
 python3 concorde-travel/tests/test_faststart.py
 python3 concorde-travel/adapter.py               # normalise the recorded payload, print coverage
+python3 concorde-travel/ground.py "Shoreditch" LHR 09:00   # ground estimate for anywhere
 ```
 
 **Ports 8884–8930 are the model engines' — never bind there.** ConcordeGo uses 9897.
@@ -402,7 +403,7 @@ curve it is meant to be testing is a fixture that tests nothing.
 
 **The test suites are mutation-tested.** `test_scorer.py` catches 12 of 12 seeded faults and
 `validate.py` 10 of 10; `tests/mutate_adapter.py` is an executable runner for the adapters
-and must stay at 20/20 with **zero skips** — a skipped mutant never ran and is not a pass.
+and must stay at 22/22 with **zero skips** — a skipped mutant never ran and is not a pass.
 If a change makes a suite pass that should not, the suite has lost a guard.
 
 **The narrator is the only non-deterministic surface, and it is fenced.** `narrator.brief()`
@@ -512,8 +513,36 @@ route** — do not quietly drop that strip to make the results look more confide
 
 `enrichment/` is the curated moat: airports (zones with DST transition dates, MCT, service
 hours, inter-terminal), carriers (reviewed ratings), ground access by origin and hour, and
-route par. **An airport that is not curated drops the itinerary rather than being guessed**,
-which is the scope discipline working, not a bug.
+route par.
+
+**The curated tables are an OVERRIDE LAYER, not a gate** (changed 2026-09-20, when the
+brief went global). Uncurated no longer means dropped; it means estimated, and *said out
+loud*. Removing the gate without adding the reporting is how a Bogotá layover briefly
+scored as a free walk-through, so the two always ship together:
+
+- **Origin** — never drops. `ground.py` estimates from coordinates, the curated table wins
+  wherever it exists, and every mode carries `support`: `curated` / `modelled` (we have fare
+  rates for that country) / `assumed` (we do not, and the user is told so in a sentence).
+- **Timezone** — `stamp()` falls back to the feed's own IANA zone via stdlib `zoneinfo`. The
+  curated DST table stays authoritative so FIXTURES stay hermetic; that was always its real
+  job. With no curated zone *and* no feed zone, it still drops — assuming UTC would shift a
+  whole itinerary in exactly the places we know least about.
+- **Borders** — `border_of()` is curated union, then the feed's country code, then nothing.
+  Two different countries is a border unless a union says otherwise, which needs no curation
+  to be right anywhere on Earth.
+- **Layover facts** — an uncurated airport has no MCT, no service hours, no terminal
+  geography. It is kept and modelled on defaults, and `coverage()` **names the airports**.
+
+**Ground estimates lean high on purpose.** The job is stopping the $100 surprise, and an
+estimate that comes in under the real fare manufactures the surprise it exists to prevent.
+Same principle as "unknown is never cheap". Calibrated against real fares in 8 cities across
+5 countries; 6 of 8 land inside the real range. Known weak: Stockholm reads high (fixed-price
+airport taxis), Narita transit reads low (the N'EX is a premium train).
+
+**Rideshare fares cannot be bought at any price** — Uber's estimate endpoints are
+partner-gated, same story as Kiwi and Amadeus. **Transit fares CAN** — GTFS-Fares v2 is a
+real standard and Navitia serves US and EU. If one half of this gets replaced with real
+data, it is the transit half, and it is the only half that can be.
 
 **21 airports are curated.** The 12 European connection points a real JFK–LHR search returns
 were added on 2026-09-19 (FRA MUC ZRH GVA FCO WAW CPH DUS KEF DUB SNN IST), taking the real

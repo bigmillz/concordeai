@@ -585,6 +585,28 @@ def main():
     check("an unknown brand returns nothing so the default applies",
           adapter._brand_key(fares, "BA", "Wibble") is None)
 
+    # zoneinfo made an uncurated airport survivable, but ONLY because the feed
+    # names its zone. Strip both and there is nothing left to resolve - and
+    # assuming UTC there would silently shift a whole itinerary by hours in
+    # exactly the places we know least about.
+    nozone = json.loads(json.dumps(draw))
+    hit = 0
+    for off in nozone["data"]["offers"]:
+        for sl in off.get("slices") or []:
+            for sg in sl.get("segments") or []:
+                for k in ("origin", "destination"):
+                    if sg[k]["iata_code"] not in adapter.load_enrichment()["airports"]["airports"]:
+                        sg[k].pop("time_zone", None); hit += 1
+    check("the capture has uncurated airports to strip", hit > 0, str(hit))
+    nz = adapter.from_duffel(nozone, checked_bags=1)
+    check("an airport with no curated zone AND no feed zone is dropped, not assumed UTC",
+          any("timezone" in d["why"] for d in nz.get("_dropped", [])),
+          json.dumps(nz.get("_dropped", []))[:140])
+    check("and nothing that survived got a fabricated offset",
+          all(s[k].endswith(("-05:00", "+00:00", "+01:00", "+02:00", "-04:00"))
+              for o in nz.get("options", []) for s in o["segments"]
+              for k in ("departure_local", "arrival_local")))
+
     print("\nduffel: time, conditions, topology")
     check("departing_at arrives local-naive and gains an offset",
           all(re.search(r"[+-]\d{2}:\d{2}$", s[k])
@@ -624,16 +646,51 @@ def main():
     print("\nduffel: scope discipline against real inventory")
     # A JFK-LHR search really does return connections through Boston, Reykjavik,
     # Frankfurt and Bogota. Everything outside the curated set must drop.
+    # THE CONTRACT CHANGED. Uncurated airports used to drop the itinerary. Going
+    # global replaced that with keep-and-estimate, which is only honest if the
+    # estimating is announced - so these now assert the announcement rather than
+    # the drop.
     cur = set(adapter.load_enrichment()["airports"]["airports"])
-    check("the capture routes through airports outside the curated set",
-          any(sg[k]["iata_code"] not in cur for sg in dsegs
-              for k in ("origin", "destination")))
-    check("and each of those is dropped by name", bool(dsc["_dropped"]))
-    check("no surviving option touches an uncurated airport",
-          all(s[k]["iata"] in cur for o in dsc["options"] for s in o["segments"]
-              for k in ("origin", "destination")),
-          str(sorted({s[k]["iata"] for o in dsc["options"] for s in o["segments"]
-                      for k in ("origin", "destination")})))
+    uncur = {sg[k]["iata_code"] for sg in dsegs for k in ("origin", "destination")
+             if sg[k]["iata_code"] not in cur}
+    check("the capture routes through airports outside the curated set", bool(uncur),
+          str(sorted(uncur)))
+    kept = {s[k]["iata"] for o in dsc["options"] for s in o["segments"]
+            for k in ("origin", "destination")}
+    check("an uncurated airport is KEPT, not dropped", bool(uncur & kept),
+          "global coverage means showing the flight and saying what we don't know")
+    check("its timestamps still carry an explicit offset",
+          all(re.search(r"[+-]\d{2}:\d{2}$", s[k])
+              for o in dsc["options"] for s in o["segments"]
+              for k in ("departure_local", "arrival_local")))
+    blindlay = [l for o in dsc["options"] for l in o["layovers"]
+                if l["airport"] not in cur]
+    check("a layover there is flagged as having no curated connection time",
+          all(l["mct_source"] == "not curated" and l["published_mct_minutes"] is None
+              for l in blindlay), "%d such layovers" % len(blindlay))
+    check("and coverage names those airports rather than staying quiet",
+          all(a in " ".join(adapter.coverage(dsc)["gaps"]) for a in
+              {l["airport"] for l in blindlay}),
+          json.dumps(adapter.coverage(dsc)["gaps"]))
+    # The one thing that must NOT be silently lost with the gate: a border.
+    # border_of needs the FEED's country codes for an airport nobody curated -
+    # without them it returns None and every uncurated stop looks foreign, which
+    # is how this assertion was wrong before the adapter was.
+    feedgeo = {}
+    for sg in dsegs:
+        for k in ("origin", "destination"):
+            n = sg[k]
+            feedgeo[n["iata_code"]] = {"country": n.get("iata_country_code")}
+    e = adapter.load_enrichment()
+    home = adapter.border_of("JFK", e, feedgeo)
+    cross = {l["airport"] for l in blindlay if l["immigration_required"]}
+    foreign = {l["airport"] for l in blindlay
+               if adapter.border_of(l["airport"], e, feedgeo) != home}
+    check("an uncurated layover abroad still charges for immigration",
+          cross == foreign, "flagged %s, actually abroad %s"
+          % (sorted(cross), sorted(foreign)))
+    check("and a domestic one does not",
+          not (cross - foreign), "flagged as a border but in the same country")
     for n in (0, 3):
         s2 = adapter.from_duffel(draw, checked_bags=n)
         got = sum(1 for b in s2["query"]["party"][0]["bags"] if b["kind"] == "checked")
