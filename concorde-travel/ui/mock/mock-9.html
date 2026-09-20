@@ -458,7 +458,7 @@ function awardsFor(e){
 }
 function ptLine(e){
   const a = awardsFor(e)[0]; if (!a) return '';
-  if (a.value <= 0) return `<div class="ptline"><b>Pay cash.</b> The ${money(a.fees)} in fees on a ${esc(a.prog.name)} award already exceeds this fare.</div>`;
+  if (a.value <= 0) return `<div class="ptline"><b>Pay cash.</b> The ${money(a.fees)} in fees on ${/^[AEIOU]/.test(a.prog.name) ? 'an' : 'a'} ${esc(a.prog.name)} award already exceeds this fare.</div>`;
   if (a.good) return `<div class="ptline good"><b>Use points:</b> ${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)} · <span class="v">${a.value.toFixed(1)}¢/pt</span> · ${esc(a.path)}</div>`;
   if (!a.path) return `<div class="ptline">Points would need ${a.pts.toLocaleString()} ${esc(a.prog.name)}; nothing you hold transfers there.</div>`;
   return `<div class="ptline"><b>Pay cash.</b> ${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)} is only <span class="v">${a.value.toFixed(1)}¢/pt</span>; keep them.</div>`;
