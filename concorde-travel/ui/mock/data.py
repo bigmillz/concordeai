@@ -107,6 +107,25 @@ def main(path):
     for k, (a, b, c) in enumerate(pts):
         profiles["dial-%d" % k] = blend(a, b, c, profiles)
 
+    # Straight off the feed, for the page: the airline's own logo (Duffel
+    # serves an SVG per carrier), and the published cabin amenities, which the
+    # scorer deliberately does not price (hard rule 2) but a "wants" chip may
+    # show. Keyed by the offer id suffix the adapter keeps in option_id.
+    airlines, amenities = {}, {}
+    for off in raw.get("data", {}).get("offers", []):
+        for who in [off.get("owner")] + [s.get(k) for sl in off.get("slices", []) for s in sl.get("segments", [])
+                                          for k in ("marketing_carrier", "operating_carrier")]:
+            if who and who.get("iata_code"):
+                airlines.setdefault(who["iata_code"], {"name": who.get("name"), "logo": who.get("logo_symbol_url"),
+                                                        "lockup": who.get("logo_lockup_url")})
+        wifi = power = False
+        for sl in off.get("slices", []):
+            for sg in sl.get("segments", []):
+                am = ((sg.get("passengers") or [{}])[0].get("cabin") or {}).get("amenities") or {}
+                wifi = wifi or bool((am.get("wifi") or {}).get("available"))
+                power = power or bool((am.get("power") or {}).get("available"))
+        amenities[(off["id"] or "")[-10:].lower().replace("_", "-")] = {"wifi": wifi, "power": power}
+
     entries = {}
     for o in pool:
         v = server._view(sc, o, "reference")
@@ -156,6 +175,10 @@ def main(path):
         e["legs"] = [{"kind": l["kind"], "label": l["label"], "minutes": l["minutes"],
                       "quality": l["quality"], "tip": l["tip"]} for l in v["bar"]]
         e["changes"] = o["tickets"][0]["entitlements"].get("changes", "unknown")
+        e["refundable"] = bool(o["tickets"][0]["entitlements"].get("refundable"))
+        am = next((v for k, v in amenities.items() if k in e["id"]), {})
+        e["wifi_published"] = bool(am.get("wifi")); e["power_published"] = bool(am.get("power"))
+        e["layover_minutes"] = [l["minutes"] for l in e["legs"] if l["kind"] == "layover"]
         e["grid"] = [scorer.score(sc, o, "dial-%d" % k).effective_cents for k in range(len(pts))]
         entries[e["id"]] = e
 
@@ -185,6 +208,7 @@ def main(path):
                   ("source", "par_cents", "fare_cents", "miles", "market", "month",
                    "season_factor", "reads_as", "reference", "ledger")}
     out["profiles"] = {k: profiles[k] for k in ("reference", "cheapest", "fastest", "comfort")}
+    out["airlines"] = {k: airlines[k] for k in sorted(airlines) if k != "ZZ"}
     out["grid_points"] = [[round(a, 2), round(b, 2), round(c, 2)] for a, b, c in pts]
     out["verdict"] = cov.get("verdict")
     out["gaps"] = cov.get("gaps", [])

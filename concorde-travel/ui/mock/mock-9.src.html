@@ -1,0 +1,753 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ConcordeGo · Concourse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Michroma&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* The Concorde family palette: the desktop app's own tokens, plus its neon set
+   for the three targets (amber for price, blue for speed, purple for comfort). */
+:root{
+  --bg:#101013;--panel:#0a0a0c;--panel2:#191a1e;--panel3:#202127;--line:#26272c;--line-soft:#1e1f23;
+  --text:#ececec;--dim:#b4b4b4;--faint:#8e8e8e;--accent:#ececec;--accent-hot:#fff;--red:#e26d5a;
+  --price:#ffb020;--speed:#4da3ff;--comfy:#a47bff;--green:#35e08a;--lime:#c6ff4f;
+  --gA:#35e08a;--gB:#c6ff4f;--gC:#ffb020;--gD:#e26d5a;
+  --sans:"Space Grotesk","Helvetica Neue",Arial,sans-serif;--disp:"Michroma","Space Grotesk",sans-serif;--mono:"IBM Plex Mono","SFMono-Regular",Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{color-scheme:dark}
+body{background:var(--bg);color:var(--text);font:300 15px/1.5 var(--sans);-webkit-font-smoothing:antialiased;padding-block:0 100px;overflow-x:hidden}
+body:before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(900px 520px at 80% -10%,rgba(77,163,255,.12),transparent 60%),radial-gradient(700px 460px at 6% 110%,rgba(226,109,90,.07),transparent 62%)}
+.wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding-inline:clamp(16px,3.5vw,32px)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--speed);outline-offset:2px;border-radius:3px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:500}
+.eyebrow{font-family:var(--disp);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--faint)}
+h1,h2,h3{font-weight:400;letter-spacing:-.02em;text-wrap:balance}
+.hidden{display:none!important}
+
+/* ---------- header */
+.top{display:flex;justify-content:space-between;align-items:center;padding-block:22px 18px;border-bottom:1px solid var(--line)}
+.mark{font-family:var(--disp);font-size:13px;letter-spacing:.26em;text-transform:uppercase}
+.mark b{font-weight:400;color:var(--speed)}
+.top nav{display:flex;gap:22px;font-size:13px;color:var(--dim)}
+.top nav a{color:inherit;text-decoration:none}.top nav a:hover{color:var(--text)}
+
+/* ---------- search */
+.search{margin-top:26px;background:var(--panel2);border:1px solid var(--line);border-radius:16px;padding:22px 24px 24px}
+.tripseg{display:inline-flex;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px}
+.tripseg button{padding:7px 14px;border-radius:999px;font-size:12.5px;font-weight:500;color:var(--dim);letter-spacing:.02em;transition:.15s}
+.tripseg button[aria-pressed=true]{background:var(--text);color:var(--bg)}
+.tripseg button:hover:not([aria-pressed=true]){color:var(--text)}
+.sentence{font-size:clamp(21px,3vw,31px);line-height:1.45;font-weight:300;margin-top:18px;max-width:30em;letter-spacing:-.01em}
+.sentence .f{display:inline-block;white-space:nowrap;max-width:100%}
+.sentence input,.sentence select{background:none;border:0;border-bottom:2px solid var(--speed);color:var(--text);font-weight:500;padding:0 2px 1px;min-width:2ch;max-width:100%;
+  text-overflow:ellipsis;border-radius:0;-webkit-appearance:none;appearance:none}
+.sentence select{padding-right:.9em;cursor:pointer;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%234da3ff' stroke-width='1.6'/></svg>") no-repeat right .1em center}
+.sentence select option{background:var(--panel2);color:var(--text)}
+.sentence input:hover,.sentence select:hover{background-color:rgba(77,163,255,.08)}
+.sentence .leg{display:block}
+.sentence .leg .rm{color:var(--faint);font-size:16px;margin-left:8px;vertical-align:middle}
+.addleg{margin-top:8px;color:var(--speed);font-size:13.5px;font-weight:500}
+.addleg:hover{text-decoration:underline}
+
+/* ---------- what matters */
+.matters{display:grid;grid-template-columns:330px minmax(0,1fr);gap:26px;margin-top:26px;padding-top:22px;border-top:1px solid var(--line)}
+.dial h2{font-size:17px;font-weight:500;margin-bottom:4px}
+.dial p{color:var(--dim);font-size:13px;line-height:1.5}
+.tri{position:relative;width:100%;aspect-ratio:1/.88;margin:38px 0 36px;touch-action:none;user-select:none;cursor:crosshair}
+.tri canvas{position:absolute;inset:0;width:100%;height:100%}
+.corner{position:absolute;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;pointer-events:none;line-height:1.2}
+.corner small{display:block;font-size:11px;font-weight:400;color:var(--faint);text-transform:none;letter-spacing:0}
+.corner.c{left:50%;top:-34px;transform:translateX(-50%);text-align:center;color:var(--comfy)}
+.corner.a{left:0;bottom:-32px;color:var(--price)}
+.corner.b{right:0;bottom:-32px;text-align:right;color:var(--speed)}
+.handle{position:absolute;width:24px;height:24px;border-radius:50%;background:var(--bg);border:3px solid var(--text);transform:translate(-50%,-50%);box-shadow:0 2px 10px rgba(0,0,0,.6);pointer-events:none}
+.handle:after{content:"";position:absolute;inset:5px;border-radius:50%;background:var(--text)}
+.readout{display:flex;gap:6px;margin-top:4px}
+.readout div{flex:1;background:var(--panel);border:1px solid var(--line-soft);border-radius:8px;padding:8px 10px}
+.readout b{display:block;font-family:var(--mono);font-size:17px;font-weight:500}
+.readout span{font-size:10px;color:var(--faint);letter-spacing:.1em;text-transform:uppercase}
+.readout .a b{color:var(--price)}.readout .b b{color:var(--speed)}.readout .c b{color:var(--comfy)}
+.means{color:var(--dim);font-size:12.5px;margin-top:10px;line-height:1.5}
+.means b{color:var(--text);font-weight:500}
+.presets{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+.presets button{border:1px solid var(--line);border-radius:999px;padding:7px 12px;font-size:12.5px;font-weight:500;color:var(--dim);transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.presets button:hover{border-color:var(--dim);color:var(--text)}
+.presets button[aria-pressed=true]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.presets button.asap{border-color:rgba(226,109,90,.6);color:var(--red)}
+.presets button.asap[aria-pressed=true]{background:var(--red);color:#fff;border-color:var(--red)}
+.asapnote{margin-top:10px;font-size:12.5px;color:var(--red);line-height:1.5}
+
+.wants h2{font-size:17px;font-weight:500;margin-bottom:4px}
+.wants p.sub{color:var(--dim);font-size:13px;line-height:1.5}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{border:1px solid var(--line);border-radius:999px;padding:8px 12px 8px 12px;font-size:13px;font-weight:500;color:var(--dim);display:inline-flex;align-items:center;gap:8px;transition:.15s;background:var(--panel)}
+.chip:hover{border-color:var(--dim);color:var(--text)}
+.chip[aria-pressed=true]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.chip .n{font-family:var(--mono);font-size:11.5px;color:var(--faint);background:rgba(255,255,255,.06);border-radius:999px;padding:2px 7px}
+.chip[aria-pressed=true] .n{color:var(--bg);background:rgba(0,0,0,.12)}
+.chip.zero{opacity:.55}
+.chipnote{margin-top:10px;font-size:12.5px;color:var(--price);line-height:1.5}
+
+.wish{margin-top:22px;border-top:1px solid var(--line);padding-top:18px}
+.wish h3{font-size:15px;font-weight:500;display:flex;align-items:center;gap:8px}
+.wish h3 svg{width:16px;height:16px;fill:var(--price)}
+.wishrow{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-top:10px;align-items:stretch}
+.wish textarea{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 13px;min-height:52px;resize:vertical;font-size:14px;line-height:1.45;width:100%}
+.wish textarea:focus{border-color:var(--speed);outline:none}
+.wish textarea::placeholder{color:var(--faint)}
+.mic,.wishgo{border:1px solid var(--line);border-radius:10px;padding:0 14px;font-size:13.5px;font-weight:500;display:inline-flex;align-items:center;gap:8px;color:var(--dim)}
+.mic:hover{border-color:var(--dim);color:var(--text)}
+.wishgo:hover{background:var(--accent-hot);color:var(--bg)}
+.mic[data-on="1"]{border-color:var(--red);color:var(--red)}
+.mic svg{width:16px;height:16px;fill:currentColor}
+.wishgo{background:var(--text);color:var(--bg);border-color:var(--text)}
+.understood{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center}
+.understood .lab{font-size:11px;color:var(--faint);letter-spacing:.12em;text-transform:uppercase;margin-right:2px}
+.u{border-radius:8px;padding:6px 10px;font-size:12.5px;display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line);background:var(--panel)}
+.u i{font-style:normal;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.u.rule{border-color:rgba(226,109,90,.5)}.u.want{border-color:rgba(164,123,255,.5)}.u.tilt{border-color:rgba(77,163,255,.5)}
+.u button{color:var(--faint);font-size:14px;line-height:1}
+.wishhint{margin-top:8px;font-size:12px;color:var(--faint);line-height:1.5}
+
+/* ---------- advanced + points */
+.more{margin-top:20px;border-top:1px solid var(--line)}
+details{border-bottom:1px solid var(--line)}
+summary{list-style:none;cursor:pointer;padding:14px 0;display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:500}
+summary::-webkit-details-marker{display:none}
+summary span.k{color:var(--faint);font-size:12.5px;font-weight:400}
+summary:after{content:"+";color:var(--faint);font-size:18px;margin-left:12px}
+details[open] summary:after{content:"–"}
+.adv{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px 26px;padding:4px 0 22px}
+.adv h4{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:500;margin-bottom:8px}
+.win{display:flex;flex-direction:column;gap:6px}
+.win .v{font-family:var(--mono);font-size:13px;color:var(--text)}
+.win input[type=range]{width:100%;accent-color:var(--speed)}
+.adv select{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;font-size:13.5px;-webkit-appearance:none;appearance:none}
+.adv select option{background:var(--panel2)}
+.alli{display:flex;flex-direction:column;gap:6px;font-size:13.5px}
+.alli label{display:flex;gap:8px;align-items:center;cursor:pointer}
+.alli input{accent-color:var(--speed)}
+.carriers{display:flex;flex-wrap:wrap;gap:6px}
+.cbtn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:8px;padding:4px 8px 4px 4px;font-size:12.5px;color:var(--dim);background:var(--panel)}
+.cbtn[aria-pressed=true]{opacity:.4;text-decoration:line-through}
+.cbtn:hover{border-color:var(--dim);color:var(--text)}
+.logo{position:relative;width:26px;height:26px;border-radius:6px;background:var(--brand,#333);display:inline-grid;place-items:center;overflow:hidden;flex:0 0 auto}
+.logo b{font-family:var(--mono);font-size:10.5px;font-weight:600;color:#fff;letter-spacing:.02em}
+.logo.lum b{color:#101013}
+.logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:3px;background:#fff;display:none}
+.logo.on img{display:block}
+.logo.on b{visibility:hidden}
+.logo.big{width:40px;height:40px;border-radius:9px}.logo.big b{font-size:14px}
+.pts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 18px;padding:4px 0 8px}
+.pt{display:flex;flex-direction:column;gap:5px}
+.pt label{font-size:12px;color:var(--dim)}
+.pt input{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:var(--mono);font-size:14px;width:100%}
+.pt input:focus{border-color:var(--speed);outline:none}
+.ptnote{grid-column:1/-1;color:var(--faint);font-size:12.5px;line-height:1.55;padding-bottom:14px}
+.ptnote b{color:var(--dim);font-weight:500}
+.gorow{display:flex;gap:18px;align-items:center;margin-top:22px;flex-wrap:wrap}
+.go{background:var(--text);color:var(--bg);padding:14px 24px;border-radius:999px;font-weight:600;font-size:15px;display:inline-flex;align-items:center;gap:10px;transition:.15s}
+.go:hover{background:var(--accent-hot);transform:translateY(-1px)}
+.go svg{width:16px;height:16px}
+.gohint{color:var(--dim);font-size:13px;max-width:56ch;line-height:1.5}
+.gohint b{color:var(--text);font-weight:500}
+
+/* ---------- results */
+.stepper{display:flex;gap:0;margin-top:40px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.step{flex:1;padding:12px 16px;display:flex;gap:10px;align-items:center;font-size:13px;color:var(--faint);border-right:1px solid var(--line);background:var(--panel)}
+.step:last-child{border-right:0}
+.step i{font-style:normal;font-family:var(--mono);font-size:11px;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center}
+.step.on{color:var(--text);background:var(--panel2)}
+.step.on i{background:var(--speed);color:var(--bg);border-color:var(--speed)}
+.step b{font-weight:500}.step small{display:block;font-size:11.5px;color:var(--faint)}
+.sechead{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;padding-block:30px 16px}
+.sechead h2{font-size:24px}
+.sechead p{color:var(--dim);font-size:13.5px;max-width:60ch}
+
+.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.door{background:var(--panel2);border:1px solid var(--line);border-radius:14px;overflow:hidden;position:relative;display:flex;flex-direction:column;transition:transform .2s,border-color .2s}
+.door:hover{transform:translateY(-2px);border-color:#3a3d46}
+.door.mine{border-color:rgba(77,163,255,.6);box-shadow:0 0 0 1px rgba(77,163,255,.25)}
+.sky{height:76px;position:relative;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+.sky .t{position:absolute;bottom:10px;font:500 12.5px/1 var(--mono);letter-spacing:.02em}
+.sky .t.l{left:16px}.sky .t.r{right:70px}
+.sky .t small{font-size:10px;opacity:.85;margin-left:2px}
+.sky .path{position:absolute;left:16px;right:16px;top:32px;height:1px;background:repeating-linear-gradient(90deg,rgba(255,255,255,.8) 0 4px,transparent 4px 9px)}
+.sky .plane{position:absolute;top:25px;width:14px;height:14px;fill:#fff;filter:drop-shadow(0 1px 1px rgba(0,0,0,.4))}
+.seal{position:absolute;right:16px;top:54px;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-family:var(--mono);font-size:19px;font-weight:600;color:var(--bg);box-shadow:0 0 0 4px var(--panel2)}
+.seal.a{background:var(--gA)}.seal.b{background:var(--gB)}.seal.c{background:var(--gC)}.seal.d{background:var(--gD)}
+.door .body{padding:18px 18px 18px;display:flex;flex-direction:column;gap:10px;flex:1}
+.door .eyebrow{color:var(--speed)}
+.door.mine .eyebrow{color:var(--speed)}.door.cheap .eyebrow{color:var(--price)}.door.fast .eyebrow{color:var(--speed)}.door.comfy .eyebrow{color:var(--comfy)}.door.asap .eyebrow{color:var(--red)}
+.who{display:flex;gap:10px;align-items:center;padding-right:44px}
+.who h3{font-size:18px;line-height:1.15;font-weight:500}
+.who h3 span{display:block;font-size:12.5px;color:var(--dim);margin-top:2px;font-weight:300}
+.meta{color:var(--dim);font-size:13px}
+.price{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.price b{font-family:var(--mono);font-size:32px;font-weight:500;letter-spacing:-.02em;line-height:1}
+.price span{color:var(--dim);font-size:12.5px}
+.price em{font-style:normal;color:var(--faint);font-size:12.5px;margin-left:auto;font-family:var(--mono)}
+.ptline{font-size:12.5px;color:var(--dim);border-top:1px solid var(--line-soft);padding-top:9px;line-height:1.45}
+.ptline b{font-weight:500;color:var(--text)}.ptline.good b{color:var(--green)}.ptline .v{font-family:var(--mono)}
+.why{list-style:none;display:flex;flex-direction:column;gap:6px;padding-top:9px;border-top:1px solid var(--line-soft);font-size:13px;line-height:1.35}
+.why li{display:grid;grid-template-columns:56px 1fr;gap:8px;align-items:baseline}
+.why b{font-family:var(--mono);font-weight:500;color:var(--red)}
+.why b.cr{color:var(--green)}
+.why span{color:var(--dim)}
+.why li.want b{color:var(--price)}
+.cta{display:flex;gap:10px;margin-top:auto;padding-top:12px}
+.choose{background:var(--text);color:var(--bg);padding:11px 16px;border-radius:999px;font-weight:600;font-size:13.5px;flex:1;transition:.15s}
+.choose:hover{background:var(--speed)}
+.ledger{color:var(--dim);font-size:13.5px;padding:11px 6px}
+.ledger:hover{color:var(--text)}
+
+.seg{display:inline-flex;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px;gap:2px}
+.seg button{padding:7px 13px;border-radius:999px;font-size:12.5px;font-weight:500;color:var(--dim)}
+.seg button[aria-pressed=true]{background:var(--text);color:var(--bg)}
+.list{list-style:none;background:var(--panel2);border:1px solid var(--line);border-radius:14px;overflow:hidden;position:relative}
+.row+.row{border-top:1px solid var(--line-soft)}
+.row.moving{transition:transform .45s cubic-bezier(.2,.8,.2,1)}
+.rowbtn{width:100%;display:grid;grid-template-columns:40px 32px minmax(0,1fr) auto auto 18px;gap:14px;align-items:center;padding:13px 18px;text-align:left;transition:background .12s}
+.rowbtn:hover{background:var(--panel3)}
+.seal.s{position:static;width:32px;height:32px;font-size:14px;box-shadow:none}
+.rw b{font-weight:500}.rw span{color:var(--dim);font-size:12.5px;margin-left:6px}
+.rw small{display:block;color:var(--faint);font-size:12.5px;margin-top:2px}
+.rw .dem{display:block;color:var(--price);font-size:12px;margin-top:3px}
+.rw .pt{display:block;color:var(--green);font-size:12px;margin-top:3px}
+.when{color:var(--dim);font-size:13px;white-space:nowrap;font-family:var(--mono);text-align:right}
+.when i{font-style:normal;color:var(--faint);display:block;font-family:var(--sans);font-size:12px}
+.amt{text-align:right;min-width:96px}
+.amt b{font-family:var(--mono);font-size:20px;font-weight:500;display:block;line-height:1.05}
+.amt i{font-style:normal;color:var(--faint);font-size:11.5px;font-family:var(--mono)}
+.chev{color:var(--faint);font-size:20px;line-height:1;transition:transform .2s}
+.row[aria-expanded=true] .chev{transform:rotate(90deg)}
+.detail{padding:4px 18px 22px 100px;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px}
+.lines{list-style:none}
+.lines li{display:grid;grid-template-columns:1fr auto;gap:14px;padding:8px 0;border-top:1px dotted var(--line);align-items:baseline}
+.lines li:first-child{border-top:0}
+.lines .lab{font-weight:500;font-size:13.5px}
+.lines .ev{color:var(--faint);font-size:12px;line-height:1.45;margin-top:2px}
+.lines .amt2{font-family:var(--mono);font-weight:500;color:var(--red);white-space:nowrap}
+.lines .amt2.cr{color:var(--green)}.lines .amt2.zero{color:var(--faint)}.lines .amt2.want{color:var(--price)}
+.lines li.total{border-top:2px solid var(--text);margin-top:6px;padding-top:12px}
+.lines li.total .amt2{font-size:20px;color:var(--text)}
+.book{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;align-self:start}
+.book h4{font-size:15px;font-weight:500}
+.book p{color:var(--dim);font-size:12.5px;line-height:1.5}
+.book .choose{flex:0 0 auto}
+.awards{list-style:none;display:flex;flex-direction:column;gap:8px}
+.awards li{border:1px solid var(--line-soft);border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.45;color:var(--dim)}
+.awards li b{color:var(--text);font-weight:500}
+.awards li.good{border-color:rgba(53,224,138,.5)}.awards li.good b{color:var(--green)}
+.awards .v{font-family:var(--mono)}
+.morebtn{display:block;margin:16px auto 0;color:var(--dim);font-size:13.5px;border-bottom:1px solid var(--line);padding:4px 2px}
+.morebtn:hover{color:var(--text)}
+.hiddenrows{margin-top:12px;color:var(--faint);font-size:12.5px;line-height:1.55}
+
+.how{margin-top:50px;padding-top:26px;border-top:1px solid var(--line);display:grid;grid-template-columns:1.2fr 1fr;gap:34px;color:var(--dim);font-size:14px;line-height:1.65}
+.how h2{font-size:18px;color:var(--text);margin-bottom:8px}
+.how b{color:var(--text);font-weight:500}
+.how ul{list-style:none;border-top:1px solid var(--line)}
+.how li{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line-soft);font-size:13px}
+.how li.t{color:var(--price);font-weight:500}
+.cov{margin-top:22px;border-left:3px solid var(--price);padding:4px 14px;color:var(--dim);font-size:12.5px;line-height:1.55}
+.cov b{color:var(--price);font-weight:500}
+
+/* ---------- sheet */
+.sheetwrap{position:fixed;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:end center;padding:16px;z-index:9}
+.sheet{background:var(--panel2);border:1px solid var(--line);border-radius:18px;max-width:760px;width:100%;max-height:min(88vh,900px);overflow:auto;padding:24px}
+.sheet .hd{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:10px}
+.sheet h3{font-size:20px;font-weight:500}.sheet h3 span{display:block;font-size:12.5px;color:var(--dim);margin-top:3px;font-weight:300}
+.x{width:34px;height:34px;border-radius:50%;background:var(--panel);border:1px solid var(--line);font-size:18px;color:var(--dim)}
+.sheet .detail{padding:0;grid-template-columns:1fr;gap:16px}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (max-width:980px){
+  .matters{grid-template-columns:1fr}
+  .three{grid-template-columns:1fr}
+  .detail{grid-template-columns:1fr;padding-left:18px}
+  .how{grid-template-columns:1fr}
+}
+@media (max-width:640px){
+  .rowbtn{grid-template-columns:34px 30px minmax(0,1fr) auto 14px;gap:10px;padding:12px 12px}
+  .when{display:none}
+  .wishrow{grid-template-columns:1fr auto}.wishgo{grid-column:1/-1;padding:10px}
+  .stepper{flex-direction:column}.step{border-right:0;border-bottom:1px solid var(--line)}
+  .detail{padding-inline:12px}
+  .top nav{display:none}
+}
+</style></head><body>
+<div class="wrap">
+
+<header class="top">
+  <div class="mark">Concorde<b>Go</b></div>
+  <nav><a href="#how">How the grade works</a><a href="#">Sign in</a></nav>
+</header>
+
+<section class="search" aria-label="Your trip">
+  <div class="tripseg" id="trip" role="group" aria-label="Trip type">
+    <button data-trip="round" aria-pressed="true">Round trip</button>
+    <button data-trip="one" aria-pressed="false">One way</button>
+    <button data-trip="multi" aria-pressed="false">Multi-city</button>
+  </div>
+  <div class="sentence" id="sentence"></div>
+  <button class="addleg hidden" id="addleg">+ add another flight</button>
+
+  <div class="matters">
+    <div class="dial">
+      <h2>What matters to you?</h2>
+      <p>Drag the dot. Everything below re-ranks as you move, and the price on each flight becomes what it costs <b>you</b>.</p>
+      <div class="tri" id="tri">
+        <canvas id="cv" aria-hidden="true"></canvas>
+        <div class="corner c">Comfort<small>a better seat, fewer risks</small></div>
+        <div class="corner a">Price<small>my money</small></div>
+        <div class="corner b">Speed<small>my time</small></div>
+        <div class="handle" id="handle" role="slider" aria-label="Weighting" tabindex="0"></div>
+      </div>
+      <div class="readout"><div class="a"><b id="ra">100%</b><span>Price</span></div><div class="b"><b id="rb">0%</b><span>Speed</span></div><div class="c"><b id="rc">0%</b><span>Comfort</span></div></div>
+      <p class="means" id="means"></p>
+      <div class="presets" id="presets">
+        <button data-p="1,0,0">Just cheap</button><button data-p="0,1,0">Just fast</button><button data-p="0,0,1">Just comfy</button><button data-p=".34,.33,.33">Balanced</button>
+        <button class="asap" data-p="asap"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1l1.6 3.4L11 5l-2.5 2.4.6 3.6L6 9.3 2.9 11l.6-3.6L1 5l3.4-.6z" fill="currentColor"/></svg>Get me there now</button>
+      </div>
+      <p class="asapnote hidden" id="asapnote">Earliest arrival, whatever it costs. For when someone is in hospital and you need to be there. We rank by when you walk in the door, not by price.</p>
+    </div>
+
+    <div class="wants">
+      <h2>Wants and needs</h2>
+      <p class="sub">What you want, not what you will tolerate. Each one changes the arithmetic: a flight that lacks it is charged for it and sinks, with the reason shown. The number is how many of these flights have it.</p>
+      <div class="chips" id="chips"></div>
+      <p class="chipnote hidden" id="chipnote"></p>
+
+      <div class="wish">
+        <h3><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l1.7 4.2L14 6.4l-3.3 3 .9 4.5L8 11.6l-3.6 2.3.9-4.5-3.3-3 4.3-1.2z"/></svg>Make a wish</h3>
+        <div class="wishrow">
+          <textarea id="wish" placeholder="Say it the way you'd say it to a friend. &ldquo;I really don't want to fly American, but I'd take it for a lie-flat seat. Nothing before 9am.&rdquo;"></textarea>
+          <button class="mic" id="mic" data-on="0" title="Speak instead"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10a3 3 0 0 0 3-3V4a3 3 0 0 0-6 0v3a3 3 0 0 0 3 3zm5-3h-1.2a3.8 3.8 0 0 1-7.6 0H3a5 5 0 0 0 4.3 4.9V14h1.4v-2.1A5 5 0 0 0 13 7z"/></svg>Speak</button>
+          <button class="wishgo" id="wishgo">Apply</button>
+        </div>
+        <div class="understood" id="understood"></div>
+        <p class="wishhint">A model turns your words into rules and weights you can see here and remove one by one. It never ranks: the order is still arithmetic.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="more">
+    <details>
+      <summary>Advanced <span class="k">times, cabin, stops, airlines and alliances</span></summary>
+      <div class="adv">
+        <div class="win"><h4>Depart between</h4><span class="v" id="depv">any time</span><input type="range" min="0" max="24" value="0" id="dep0" aria-label="Earliest departure"><input type="range" min="0" max="24" value="24" id="dep1" aria-label="Latest departure"></div>
+        <div class="win"><h4>Arrive between</h4><span class="v" id="arrv">any time</span><input type="range" min="0" max="24" value="0" id="arr0" aria-label="Earliest arrival"><input type="range" min="0" max="24" value="24" id="arr1" aria-label="Latest arrival"></div>
+        <div><h4>Cabin</h4><select id="cabin"><option value="economy">Economy</option><option value="premium">Premium economy</option><option value="business">Business</option><option value="first">First</option></select>
+          <h4 style="margin-top:14px">Stops</h4><select id="stops"><option value="2">Up to 2 stops</option><option value="1">Up to 1 stop</option><option value="0">Nonstop only</option></select></div>
+        <div><h4>Alliances</h4><div class="alli" id="alli">
+          <label><input type="checkbox" value="oneworld">oneworld <span style="color:var(--faint)">BA, AA, Iberia, Finnair, Alaska</span></label>
+          <label><input type="checkbox" value="skyteam">SkyTeam <span style="color:var(--faint)">Delta, Virgin, Air France, KLM, ITA</span></label>
+          <label><input type="checkbox" value="star">Star Alliance <span style="color:var(--faint)">Lufthansa, SWISS, Turkish, LOT, United</span></label></div></div>
+        <div style="grid-column:1/-1"><h4>Airlines <span style="color:var(--faint);letter-spacing:0;text-transform:none;font-weight:400">· tap to leave one out</span></h4><div class="carriers" id="carriers"></div></div>
+      </div>
+    </details>
+    <details>
+      <summary>Points and miles <span class="k">tell us what you have; we&rsquo;ll show where they beat cash</span></summary>
+      <div class="pts" id="pts"></div>
+    </details>
+  </div>
+
+  <div class="gorow">
+    <button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <p class="gohint" id="gohint"></p>
+  </div>
+</section>
+
+<div class="stepper" id="stepper"></div>
+
+<section aria-label="Your shortlist">
+  <div class="sechead"><h2>Your shortlist</h2><p id="lede"></p></div>
+  <div class="three" id="doors"></div>
+</section>
+
+<section aria-label="Everything else">
+  <div class="sechead"><h2>Everything else, in your order</h2><p id="listnote"></p></div>
+  <ol class="list" id="list"></ol>
+  <button class="morebtn" id="morebtn"></button>
+  <p class="hiddenrows" id="hiddenrows"></p>
+</section>
+
+<section class="how" id="how">
+  <div><h2>How the grade works</h2><p id="how1"></p><p style="margin-top:8px">Every flight is priced the same way: the ticket, the bag you carry, the ride from <b>your</b> door and to theirs at that hour, your time at a rate, and small charges for what makes a trip worse. One number, in dollars, with every line shown. <b>The letter never moves. The order is yours.</b></p></div>
+  <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
+</section>
+<div class="cov" id="cov"></div>
+</div>
+<div id="sheetroot"></div>
+
+<script>
+const D = __DATA__;
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const money = c => '$' + Math.abs(Math.round(c/100)).toLocaleString('en-US');
+const signed = c => (c < 0 ? '−' : '+') + money(c);
+const hm = iso => iso.slice(11,16);
+const hour = iso => +iso.slice(11,13) + (+iso.slice(14,16))/60;
+const dur = m => Math.floor(m/60) + 'h' + (m%60 ? String(m%60).padStart(2,'0') : '');
+const gcls = g => ({A:'a',B:'b',C:'c'}[g[0]] || 'd');
+const stopsText = e => e.stops === 0 ? 'nonstop' : e.stops === 1 ? 'via ' + e.route[1] : e.stops + ' stops';
+const niceDate = d => new Date(d + 'T12:00:00Z').toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short', timeZone:'UTC'});
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const ALL = D.results.reference.slice();
+const PR = D.profiles;
+const AIR = D.airlines || {};
+const NAMES = {cheapest:'cheapest all-in', fastest:'fastest door to door', comfort:'most comfortable'};
+
+// Brand colours for the monogram that stands in when the airline's own logo
+// (Duffel's logo_symbol_url, drawn on top when it loads) cannot be fetched.
+const BRAND = {BA:'#1E4A8B',VS:'#D3082A',AA:'#0F62B4',DL:'#C81E2B',LH:'#F5B400',AY:'#0B1B5C',LX:'#D6001C',TK:'#C00A1A',IB:'#C8102E',AZ:'#0A2A5A',KL:'#00A1DE',AF:'#0A2A6E',EI:'#00A65A',TP:'#00A164',FI:'#12325B',AS:'#0A4A78',SK:'#0B2A5B',LO:'#0C2F6E',UA:'#0A2A6E',B6:'#0033A0',AV:'#D71920',AT:'#B8102E',EY:'#8B6B2E',EW:'#8B1A5C',LY:'#0A3A8C',VL:'#4A4A4A'};
+const LUM = new Set(['LH']);
+function logo(code, big){
+  const a = AIR[code] || {};
+  return `<span class="logo${big ? ' big' : ''}${LUM.has(code) ? ' lum' : ''}" style="--brand:${BRAND[code] || '#3a3d46'}" title="${esc(a.name || code)}">` +
+    (a.logo ? `<img alt="" src="${esc(a.logo)}" onload="this.parentNode.classList.add('on')">` : '') + `<b>${esc(code)}</b></span>`;
+}
+const ALLIANCE = {oneworld:['BA','AA','IB','AY','AS','QR','CX','JL','QF','RJ','MH','AT','UL','WY'], skyteam:['DL','VS','AF','KL','AZ','KE','AM','SV','MU','GA','VN','CI','UX','OK','RO','ME','KQ'], star:['LH','LX','TK','LO','UA','AC','OS','SN','SK','TP','SQ','NH','TG','ET','MS','SA','A3','AI','BR','CA','CM','NZ','OU','OZ','ZH']};
+const AIRNAME = {american:'AA',aa:'AA','british airways':'BA',ba:'BA',british:'BA',virgin:'VS','virgin atlantic':'VS',delta:'DL',united:'UA',lufthansa:'LH',alaska:'AS',iberia:'IB',finnair:'AY',swiss:'LX',turkish:'TK',ita:'AZ',alitalia:'AZ',jetblue:'B6','aer lingus':'EI',tap:'TP',icelandair:'FI',lot:'LO',klm:'KL','air france':'AF',avianca:'AV',etihad:'EY',sas:'SK'};
+
+// ---- state
+const S = {trip:'round', a:1, b:0, c:0, preset:'1,0,0', asap:false, wants:new Set(), rules:[], adv:{dep0:0, dep1:24, arr0:0, arr1:24, cabin:'economy', stops:2, alli:new Set(), out:new Set()},
+  pts:{amex:120000, chase:80000, capone:0, citi:0, bilt:0, avios:0, virgin:0, aa:0, delta:0}, shown:12, T:'mine',
+  legs:[{from:'Wyckoff Ave & Myrtle Ave, Bushwick', to:'London', date:'Wed 18 Nov'}], back:'Wed 25 Nov', pax:'one adult', bags:'one checked bag'};
+
+// ---- wants: a predicate, a charge when it is missing, and a hint when nothing has it
+const NEWGEN = /^(78[1789]|359|351|339|338|32N|32Q|223|7M[89])$/;
+const WANTS = [
+  {id:'nonstop', label:'Nonstop', cents:15000, ok:e => e.stops === 0},
+  {id:'short', label:'Short layovers', cents:8000, ok:e => e.stops === 0 || e.layover_minutes.every(m => m <= 150)},
+  {id:'long', label:'Long layover, see the city', cents:6000, ok:e => e.layover_minutes.some(m => m >= 300)},
+  {id:'lieflat', label:'Lie-flat seat', cents:40000, ok:e => false, hint:'No lie-flat seat flies this route in economy. Switch the cabin to Business under Advanced to see them.'},
+  {id:'newgen', label:'787 / A350 / neo', cents:4000, ok:e => e.equipment.some(x => NEWGEN.test(x))},
+  {id:'wifi', label:'Wifi that works', cents:3000, ok:e => e.wifi_published},
+  {id:'legroom', label:'Extra legroom', cents:3000, ok:e => e.pitch.some(p => (p || 0) >= 32), hint:'Nothing in economy on this route seats you at 32 inches or more. Premium economy does.'},
+  {id:'lounge', label:'Lounge access', cents:6500, ok:e => e.brand.toLowerCase().includes('flex') || e.refundable},
+  {id:'flex', label:'Flexible ticket', cents:9000, ok:e => e.refundable || e.changes === 'fee' || e.changes === 'free'},
+  {id:'day', label:'Daytime flight', cents:5000, ok:e => { const h = hour(e.depart); return h >= 6 && h < 15; }},
+];
+WANTS.forEach(w => w.count = ALL.filter(w.ok).length);
+
+// ---- points: a demo award chart for this route and the transfer partners that reach it.
+// Curated for the mockup, 2026-09; not live availability.
+const PROG = {avios:{name:'Avios', fair:1.3, via:['amex','chase','capone','citi','bilt']}, virgin:{name:'Virgin Points', fair:1.4, via:['amex','chase','capone','citi','bilt']},
+  aa:{name:'AAdvantage', fair:1.5, via:['bilt']}, delta:{name:'SkyMiles', fair:1.2, via:['amex']}, mm:{name:'Miles & More', fair:1.4, via:['capone']}, ms:{name:'Miles&Smiles', fair:1.6, via:['capone','citi','bilt']}};
+const BANK = {amex:'Amex Membership Rewards', chase:'Chase Ultimate Rewards', capone:'Capital One miles', citi:'Citi ThankYou', bilt:'Bilt', avios:'British Airways Avios', virgin:'Virgin Points', aa:'American AAdvantage', delta:'Delta SkyMiles'};
+const AWARD = {BA:[{p:'avios', pts:13000, fees:35000, why:'off-peak economy; BA adds a carrier surcharge'}], VS:[{p:'virgin', pts:10000, fees:22000, why:'Flying Club economy'}],
+  AA:[{p:'aa', pts:30000, fees:600, why:'AAdvantage saver'}], DL:[{p:'delta', pts:32000, fees:600, why:'SkyMiles main'}], AY:[{p:'avios', pts:15000, fees:12000, why:'Finnair Plus, Avios'}],
+  LH:[{p:'mm', pts:30000, fees:15000, why:'Miles & More economy'}], LX:[{p:'mm', pts:30000, fees:15000, why:'Miles & More economy'}], TK:[{p:'ms', pts:30000, fees:10000, why:'Miles&Smiles economy'}],
+  EI:[{p:'avios', pts:13000, fees:8000, why:'Aer Lingus, low fees'}], IB:[{p:'avios', pts:13000, fees:35000, why:'on BA metal, BA surcharge'}], AS:[{p:'avios', pts:13000, fees:35000, why:'flown by BA; book with Avios'}]};
+function awardsFor(e){
+  const out = [];
+  for (const a of (AWARD[e.operator] || AWARD[e.carrier] || [])){
+    const prog = PROG[a.p], have = S.pts[a.p] || 0, value = (e.ticket_cents - a.fees) / a.pts;
+    let path = null, short = a.pts - have;
+    if (short <= 0) path = 'from your ' + prog.name;
+    else { const src = prog.via.filter(k => (S.pts[k] || 0) >= short).sort((x, y) => S.pts[y] - S.pts[x])[0];
+      if (src) path = 'transfer ' + short.toLocaleString() + ' from ' + BANK[src].split(' ')[0] + (have ? ' to top up' : '') + ' (1:1)'; }
+    out.push({...a, prog, value, path, short, good: value >= prog.fair && !!path, saves: e.ticket_cents - a.fees});
+  }
+  return out.sort((x, y) => (y.good - x.good) || (y.value - x.value));
+}
+function ptLine(e){
+  const a = awardsFor(e)[0]; if (!a) return '';
+  if (a.value <= 0) return `<div class="ptline"><b>Pay cash.</b> The ${money(a.fees)} in fees on a ${esc(a.prog.name)} award already exceeds this fare.</div>`;
+  if (a.good) return `<div class="ptline good"><b>Use points:</b> ${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)} · <span class="v">${a.value.toFixed(1)}¢/pt</span> · ${esc(a.path)}</div>`;
+  if (!a.path) return `<div class="ptline">Points would need ${a.pts.toLocaleString()} ${esc(a.prog.name)}; nothing you hold transfers there.</div>`;
+  return `<div class="ptline"><b>Pay cash.</b> ${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)} is only <span class="v">${a.value.toFixed(1)}¢/pt</span>; keep them.</div>`;
+}
+
+// ---- the triangle
+const GRID = {}; D.grid_points.forEach((p, i) => { GRID[Math.round(p[0]*10) + '-' + Math.round(p[1]*10)] = i; });
+function gridIndex(a, b){ let i = Math.round(a*10), j = Math.round(b*10); if (i + j > 10){ if (i >= j) i = 10 - j; else j = 10 - i; } return GRID[i + '-' + j]; }
+const tri = $('#tri'), cv = $('#cv'), handle = $('#handle');
+function corners(){ const w = tri.clientWidth, h = tri.clientHeight, pad = 14; return {Cx:w/2, Cy:pad, Ax:pad, Ay:h-pad, Bx:w-pad, By:h-pad}; }
+function toXY(a, b, c){ const k = corners(); return [a*k.Ax + b*k.Bx + c*k.Cx, a*k.Ay + b*k.By + c*k.Cy]; }
+function toBary(x, y){ const k = corners(), det = (k.By - k.Cy)*(k.Ax - k.Cx) + (k.Cx - k.Bx)*(k.Ay - k.Cy);
+  let a = ((k.By - k.Cy)*(x - k.Cx) + (k.Cx - k.Bx)*(y - k.Cy)) / det, b = ((k.Cy - k.Ay)*(x - k.Cx) + (k.Ax - k.Cx)*(y - k.Cy)) / det, c = 1 - a - b;
+  a = Math.max(0, a); b = Math.max(0, b); c = Math.max(0, c); const s = a + b + c || 1; return [a/s, b/s, c/s]; }
+function paintTri(){
+  const dpr = devicePixelRatio || 1, w = tri.clientWidth, h = tri.clientHeight; if (!w) return;
+  cv.width = w*dpr; cv.height = h*dpr;
+  const ctx = cv.getContext('2d'), img = ctx.createImageData(w*dpr, h*dpr), d = img.data, k = corners();
+  const col = {a:[255,176,32], b:[77,163,255], c:[164,123,255]}, det = (k.By - k.Cy)*(k.Ax - k.Cx) + (k.Cx - k.Bx)*(k.Ay - k.Cy);
+  for (let py = 0; py < h*dpr; py++) for (let px = 0; px < w*dpr; px++){
+    const x = px/dpr, y = py/dpr, a = ((k.By - k.Cy)*(x - k.Cx) + (k.Cx - k.Bx)*(y - k.Cy)) / det, b = ((k.Cy - k.Ay)*(x - k.Cx) + (k.Ax - k.Cx)*(y - k.Cy)) / det, c = 1 - a - b, o = (py*w*dpr + px)*4;
+    if (a < -0.012 || b < -0.012 || c < -0.012){ d[o+3] = 0; continue; }
+    const soft = Math.min(1, (Math.min(a, b, c) + 0.012)/0.024), aa = Math.max(a,0), bb = Math.max(b,0), cc = Math.max(c,0), s = aa+bb+cc;
+    // toward the dark ground, so the handle and the type read on top
+    d[o] = (col.a[0]*aa + col.b[0]*bb + col.c[0]*cc)/s * .62 + 16*.38; d[o+1] = (col.a[1]*aa + col.b[1]*bb + col.c[1]*cc)/s * .62 + 16*.38; d[o+2] = (col.a[2]*aa + col.b[2]*bb + col.c[2]*cc)/s * .62 + 19*.38; d[o+3] = 255*soft;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+function setWeights(a, b, c, preset){
+  S.a = a; S.b = b; S.c = c; S.preset = preset == null ? null : preset; S.asap = preset === 'asap';
+  const [x, y] = toXY(a, b, c); handle.style.left = x + 'px'; handle.style.top = y + 'px';
+  $('#ra').textContent = Math.round(a*100) + '%'; $('#rb').textContent = Math.round(b*100) + '%'; $('#rc').textContent = Math.round(c*100) + '%';
+  const hourly = a*PR.cheapest.hourly_value_cents + b*PR.fastest.hourly_value_cents + c*PR.comfort.hourly_value_cents;
+  const cw = a*PR.cheapest.comfort_weight + b*PR.fastest.comfort_weight + c*PR.comfort.comfort_weight;
+  $('#means').innerHTML = S.asap ? 'Ranked by <b>when you arrive</b>. Price still shown, never hidden.' :
+    'An hour of your time is worth <b>' + money(hourly) + '</b>; a worse cabin, a tight connection or a red-eye counts <b>' + cw.toFixed(1).replace(/\.0$/, '') + '×</b> the usual.';
+  document.querySelectorAll('#presets button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.p === S.preset)));
+  $('#asapnote').classList.toggle('hidden', !S.asap);
+  handle.setAttribute('aria-valuetext', Math.round(a*100) + '% price, ' + Math.round(b*100) + '% speed, ' + Math.round(c*100) + '% comfort');
+  paint(true);
+}
+
+// ---- constraints from Advanced and the wish rules
+function excluded(e){
+  const A = S.adv, dh = hour(e.depart), ah = hour(e.arrive);
+  if (e.stops > A.stops) return 'more stops than you allowed';
+  if (!(A.dep0 === 0 && A.dep1 === 24) && (dh < A.dep0 || dh > A.dep1)) return 'departs outside ' + String(A.dep0).padStart(2,'0') + ':00–' + String(A.dep1).padStart(2,'0') + ':00';
+  if (!(A.arr0 === 0 && A.arr1 === 24) && (ah < A.arr0 || ah > A.arr1)) return 'arrives outside your window';
+  if (A.alli.size && ![...A.alli].some(k => ALLIANCE[k].includes(e.carrier) || ALLIANCE[k].includes(e.operator))) return 'not in your alliances';
+  if (A.out.has(e.carrier) || A.out.has(e.operator)) return (AIR[e.carrier] || {}).name + ' left out';
+  for (const r of S.rules){
+    if (r.kind === 'avoid' && (e.carrier === r.code || e.operator === r.code)){
+      if (r.unless && WANTS.find(w => w.id === r.unless).ok(e)) continue;
+      return (AIR[r.code] || {}).name + ' ruled out' + (r.unless ? ' (no ' + WANTS.find(w => w.id === r.unless).label.toLowerCase() + ' on it)' : '');
+    }
+    if (r.kind === 'after' && dh < r.h) return 'departs before ' + r.h + ':00, which you ruled out';
+    if (r.kind === 'before' && ah > r.h) return 'arrives after ' + r.h + ':00, which you ruled out';
+  }
+  return null;
+}
+function priced(e, prof){
+  // the scorer's number at these weights, plus the charges for missing wants
+  const idx = gridIndex(S.a, S.b), base = prof ? e.by[prof].effective_cents : e.grid[idx];
+  const dem = [];
+  for (const id of S.wants){ const w = WANTS.find(x => x.id === id); if (w.count && !w.ok(e)) dem.push({label:'You wanted ' + w.label.toLowerCase(), cents:w.cents, want:true}); }
+  return {total: base + dem.reduce((s, d) => s + d.cents, 0), base, dem};
+}
+function ranked(){
+  const rows = [], hidden = [];
+  for (const e of ALL){ const why = excluded(e); if (why) hidden.push({e, why}); else rows.push({e, ...priced(e)}); }
+  rows.sort((x, y) => S.asap ? (Date.parse(x.e.arrive) - Date.parse(y.e.arrive)) : (x.total - y.total) || (x.e.id < y.e.id ? -1 : 1));
+  return {rows, hidden};
+}
+
+// ---- the sky from departure to arrival, in local hours
+const SKY = [[0,'#0f1633'],[4,'#161e48'],[5.5,'#7a5a87'],[6.5,'#e9a37a'],[7.5,'#f5d3ad'],[9,'#a6c9f0'],[12,'#8dbfee'],[16,'#9ec4ea'],[17.5,'#f0b48a'],[18.8,'#b26a83'],[20,'#3a3572'],[21.5,'#1a2150'],[24,'#0f1633']];
+function sky(h){ h = ((h%24)+24)%24; for (let i=1;i<SKY.length;i++){ if (h <= SKY[i][0]){ const [h0,c0]=SKY[i-1],[h1,c1]=SKY[i],t=(h-h0)/(h1-h0),a=[1,3,5].map(k=>parseInt(c0.slice(k,k+2),16)),b=[1,3,5].map(k=>parseInt(c1.slice(k,k+2),16)); return 'rgb('+a.map((v,k)=>Math.round(v+(b[k]-v)*t)).join(',')+')'; } } return SKY[0][1]; }
+function skyBand(e){ const d = hour(e.depart), a = hour(e.arrive), span = (Date.parse(e.arrive) - Date.parse(e.depart))/36e5, st = [];
+  for (let k = 0; k <= 6; k++){ const t = k/6; st.push(sky(d + span*t + (a - d - span)*t) + ' ' + Math.round(t*100) + '%'); } return 'linear-gradient(90deg,' + st.join(',') + ')'; }
+
+// ---- doors
+function whyLines(e, r, prof){
+  const lines = (prof ? e.by[prof].lines : e.by[S.a >= S.b && S.a >= S.c ? 'cheapest' : S.b >= S.c ? 'fastest' : 'comfort'].lines).filter(l => l.code !== 'ticket').map(l => ({label:l.label, cents:l.cents}));
+  return r.dem.concat(lines).sort((x, y) => Math.abs(y.cents) - Math.abs(x.cents)).slice(0, 3);
+}
+function door(kind, e, r, prof, title){
+  const eff = prof ? r.total - r.base + e.by[prof].effective_cents : r.total;
+  return `<article class="door ${kind}" data-id="${esc(e.id)}">
+    <div class="sky" style="background:${skyBand(e)}"><div class="path"></div>
+      <svg class="plane" viewBox="0 0 16 16" style="left:${e.stops ? 46 : 50}%" aria-hidden="true"><path d="M15 8l-4.2-1.4L7 1.5H5.4l1.9 5.1H3.6L2.5 4.9H1.2l.9 3.1-.9 3.1h1.3l1.1-1.7h3.7L5.4 14.5H7l3.8-5.1z"/></svg>
+      <span class="t l">${hm(e.depart)}</span><span class="t r">${hm(e.arrive)}${e.day_offset ? '<small>+1</small>' : ''}</span></div>
+    <div class="seal ${gcls(e.grade)}" title="Grade ${e.grade}">${e.grade}</div>
+    <div class="body">
+      <div class="eyebrow">${title}</div>
+      <div class="who">${logo(e.carrier, true)}<h3>${esc(e.carrier_name)}<span>${esc(e.flight)} · ${esc(e.brand)}${e.operator !== e.carrier ? ' · flown by ' + esc((AIR[e.operator] || {}).name || e.operator) : ''}</span></h3></div>
+      <p class="meta">${stopsText(e)} · ${dur(e.door_minutes)} door to door · ${e.route.join(' → ')}${S.asap ? ' · <b style="color:var(--red);font-weight:500">lands ' + hm(e.arrive) + (e.day_offset ? ' tomorrow' : ' today') + '</b>' : ''}</p>
+      <div class="price"><b class="num">${money(eff)}</b><span>all in</span><em>${money(e.ticket_cents)} ticket</em></div>
+      ${ptLine(e)}
+      <ul class="why">${whyLines(e, r, prof).map(l => `<li class="${l.want ? 'want' : ''}"><b class="${l.cents < 0 ? 'cr' : ''}">${signed(l.cents)}</b><span>${esc(l.label)}</span></li>`).join('')}</ul>
+      <div class="cta"><button class="choose" data-open="${esc(e.id)}">Choose this flight</button><button class="ledger" data-open="${esc(e.id)}">Full ledger</button></div>
+    </div></article>`;
+}
+function paintDoors(rows){
+  if (!rows.length){ $('#doors').innerHTML = '<p style="color:var(--dim)">Nothing matches every rule. Loosen one above.</p>'; return; }
+  const byId = Object.fromEntries(rows.map(r => [r.e.id, r]));
+  const mine = rows[0], picks = [{kind:S.asap ? 'asap' : 'mine', r:mine, prof:null, title:S.asap ? 'Earliest there' : 'Your pick, at your dial'}];
+  // the best under each target that is not already a door, so there are always three
+  const best = prof => rows.slice().sort((x, y) => (x.e.by[prof].effective_cents + x.total - x.base) - (y.e.by[prof].effective_cents + y.total - y.base)).find(r => !picks.some(p => p.r.e.id === r.e.id));
+  for (const [kind, prof, title] of [['cheap','cheapest','Cheapest all-in'],['fast','fastest','Fastest door to door'],['comfy','comfort','Most comfortable']]){
+    if (picks.length === 3) break; const r = best(prof); if (r) picks.push({kind, r, prof, title});
+  }
+  $('#doors').innerHTML = picks.map(p => door(p.kind, p.r.e, p.r, p.prof, p.title)).join('');
+  $('#lede').textContent = D.query.total_found + ' flights came back. ' + (S.asap ? 'The first gets you there soonest; the other two are the sensible alternatives.' : 'The first is the best at your dial; the other two answer the questions people ask next.');
+}
+
+// ---- the list
+function rowHTML(r, i){
+  const e = r.e, a = awardsFor(e)[0];
+  return `<li class="row" data-id="${esc(e.id)}" aria-expanded="false">
+    <button class="rowbtn" data-row="${esc(e.id)}">
+      ${logo(e.carrier, true)}<span class="seal s ${gcls(e.grade)}">${e.grade}</span>
+      <span class="rw"><b>${esc(e.carrier_name)}</b><span>${esc(e.flight)} · ${esc(e.brand)}</span><small>${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} · ${stopsText(e)} · ${dur(e.door_minutes)}</small>
+        ${r.dem.map(d => `<span class="dem">${signed(d.cents)} ${esc(d.label.toLowerCase())}</span>`).join('')}${a && a.good ? `<span class="pt">or ${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)} · ${a.value.toFixed(1)}¢/pt</span>` : ''}</span>
+      <span class="when">${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''}<i>${stopsText(e)} · ${dur(e.door_minutes)}</i></span>
+      <span class="amt"><b>${money(r.total)}</b><i>${money(e.ticket_cents)} ticket</i></span><span class="chev">›</span>
+    </button><div class="detail" hidden></div></li>`;
+}
+function paintList(rows, hidden, animate){
+  const doorIds = new Set([...document.querySelectorAll('.door')].map(d => d.dataset.id));
+  const rest = rows.filter(r => !doorIds.has(r.e.id));
+  const before = {}; if (animate) document.querySelectorAll('.row').forEach(li => before[li.dataset.id] = li.getBoundingClientRect().top);
+  $('#list').innerHTML = rest.slice(0, S.shown).map(rowHTML).join('');
+  const left = rest.length - S.shown; $('#morebtn').hidden = left <= 0; $('#morebtn').textContent = left > 0 ? 'Show the other ' + left : '';
+  $('#listnote').textContent = rest.length + ' more, ranked ' + (S.asap ? 'by arrival time' : 'at your dial') + (S.wants.size ? ', charged for the wants they miss' : '') + '.';
+  $('#hiddenrows').innerHTML = hidden.length ? '<b style="color:var(--dim);font-weight:500">' + hidden.length + ' hidden</b> by your rules: ' + hidden.slice(0, 6).map(h => esc(h.e.carrier_name + ' ' + h.e.flight) + ' (' + esc(h.why) + ')').join(', ') + (hidden.length > 6 ? ', …' : '') + '. Rules hide; wants only charge.' : '';
+  if (animate && !REDUCED) document.querySelectorAll('.row').forEach(li => { const b = before[li.dataset.id]; if (b == null) return; const d = b - li.getBoundingClientRect().top; if (!d) return;
+    li.style.transform = 'translateY(' + d + 'px)'; requestAnimationFrame(() => { li.classList.add('moving'); li.style.transform = ''; }); li.addEventListener('transitionend', () => li.classList.remove('moving'), {once:true}); });
+}
+function paint(animate){
+  const {rows, hidden} = ranked();
+  paintDoors(rows); paintList(rows, hidden, animate);
+}
+
+// ---- ledger sheet
+function ledgerHTML(e){
+  const r = priced(e), prof = S.a >= S.b && S.a >= S.c ? 'cheapest' : S.b >= S.c ? 'fastest' : 'comfort', lines = e.by[prof].lines, b = e.booking[0], aw = awardsFor(e);
+  return `<ul class="lines">${lines.map(l => `<li><div><div class="lab">${esc(l.label)}</div><div class="ev">${esc(l.evidence)}</div></div><div class="amt2 ${l.cents < 0 ? 'cr' : l.cents === 0 ? 'zero' : ''}">${l.cents === 0 ? '—' : signed(l.cents)}</div></li>`).join('')}
+    ${r.dem.map(d => `<li><div><div class="lab">${esc(d.label)}</div><div class="ev">A want, not a filter: this flight lacks it, so it is charged and shown</div></div><div class="amt2 want">${signed(d.cents)}</div></li>`).join('')}
+    <li class="total"><div class="lab">All in at your dial</div><div class="amt2">${money(r.total)}</div></li></ul>
+    <div class="book"><h4>${esc(e.carrier_name)} ${esc(e.flight)}</h4><p>${esc(e.route.join(' → '))} · ${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} · ${stopsText(e)}<br>${b ? esc(b.note) : ''}</p>
+      <button class="choose">${b ? 'Book with ' + esc(b.who) + ' · ' + money(b.price_cents) : 'Book'}</button>
+      ${aw.length ? '<h4 style="margin-top:6px">With points</h4><ul class="awards">' + aw.map(a => `<li class="${a.good ? 'good' : ''}"><b>${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)}</b> · ${a.value <= 0 ? 'the fees alone exceed this fare' : '<span class="v">' + a.value.toFixed(1) + '¢ per point</span> against a fair ' + a.prog.fair + '¢'}<br>${a.path ? esc(a.path[0].toUpperCase() + a.path.slice(1)) : 'You hold nothing that reaches ' + esc(a.prog.name)} · ${esc(a.why)}<br>${a.good ? 'Worth it: saves ' + money(a.saves) + ' of cash.' : a.value <= 0 ? 'Cash wins outright.' : a.path ? 'Not worth it: keep the points for a better redemption.' : ''}</li>`).join('') + '</ul>' : ''}
+      <p>Grade <b>${e.grade}</b>: ${money(e.effective_cents)} all in for a neutral traveller, against par ${money(D.query.par_cents)}.</p></div>`;
+}
+function openSheet(id){
+  const e = ALL.find(x => x.id === id);
+  $('#sheetroot').innerHTML = `<div class="sheetwrap" id="sheetwrap"><div class="sheet" role="dialog" aria-modal="true" aria-label="Ledger"><div class="hd"><h3>${esc(e.carrier_name)} ${esc(e.flight)}<span>${esc(e.brand)} · itemised at your dial</span></h3><button class="x" id="x" aria-label="Close">×</button></div><div class="detail">${ledgerHTML(e)}</div></div></div>`;
+  $('#x').focus();
+}
+
+// ---- the sentence
+function sentenceHTML(){
+  const f = (id, v, w) => `<span class="f"><input id="${id}" value="${esc(v)}" aria-label="${w}"></span>`;
+  const sel = (id, v, opts, w) => `<span class="f"><select id="${id}" aria-label="${w}">${opts.map(o => `<option${o === v ? ' selected' : ''}>${o}</option>`).join('')}</select></span>`;
+  const L = S.legs;
+  let h = 'I&rsquo;m leaving from ' + f('q-from-0', L[0].from, 'Where you start') + ' for ' + f('q-to-0', L[0].to, 'Destination') + ' on ' + f('q-date-0', L[0].date, 'Date');
+  if (S.trip === 'round') h += ', back on ' + f('q-back', S.back, 'Return date');
+  if (S.trip === 'multi') L.slice(1).forEach((l, i) => { h += `<span class="leg">then from ${f('q-from-' + (i+1), l.from, 'From')} to ${f('q-to-' + (i+1), l.to, 'To')} on ${f('q-date-' + (i+1), l.date, 'Date')}<button class="rm" data-rm="${i+1}" aria-label="Remove this flight">×</button></span>`; });
+  h += (S.trip === 'multi' ? '<span class="leg">' : ', ') + sel('q-pax', S.pax, ['one adult','two adults','a family of four'], 'Travellers') + ' with ' + sel('q-bags', S.bags, ['one checked bag','no checked bag','two checked bags'], 'Checked bags') + '.' + (S.trip === 'multi' ? '</span>' : '');
+  $('#sentence').innerHTML = h; $('#addleg').classList.toggle('hidden', S.trip !== 'multi');
+  const ruler = document.getElementById('ruler') || Object.assign(document.body.appendChild(document.createElement('span')), {id:'ruler'});
+  ruler.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;left:-9999px';
+  document.querySelectorAll('.sentence input').forEach(i => { const fit = () => { const cs = getComputedStyle(i); ['fontFamily','fontSize','fontStyle','fontWeight','letterSpacing'].forEach(k => ruler.style[k] = cs[k]); ruler.textContent = i.value || ' '; i.style.width = Math.min(ruler.offsetWidth + 10, innerWidth - 40) + 'px'; }; fit(); i.addEventListener('input', fit); document.fonts && document.fonts.ready.then(fit); });
+  paintStepper();
+}
+function paintStepper(){
+  const steps = S.trip === 'one' ? [['Your flight', S.legs[0].date], ['Book', '']] : S.trip === 'round' ? [['Outbound', S.legs[0].date], ['Return', S.back], ['Book', '']] : S.legs.map((l, i) => ['Flight ' + (i+1), l.date]).concat([['Book', '']]);
+  $('#stepper').innerHTML = steps.map((s, i) => `<div class="step${i === 0 ? ' on' : ''}"><i>${i+1}</i><div><b>${esc(s[0])}</b>${s[1] ? '<small>' + esc(s[1]) + '</small>' : ''}</div></div>`).join('');
+}
+
+// ---- the wish
+function parseWish(text){
+  const t = ' ' + text.toLowerCase().replace(/[’']/g, "'") + ' ', out = [];
+  const code = s => { s = s.trim().replace(/\bairlines?\b|\bairways\b/g, '').trim(); for (const k of Object.keys(AIRNAME).sort((a, b) => b.length - a.length)) if (s.startsWith(k) || s.includes(' ' + k)) return AIRNAME[k]; return AIRNAME[s.split(' ')[0]]; };
+  let m;
+  const avoidRx = /(?:don'?t|do not|never|won'?t|not) (?:want(?:ing)? to |wanna )?fly(?:ing)? (?:on |with )?([a-z ]+?)(?=,|\.| but | unless | if | and |$)/g;
+  while ((m = avoidRx.exec(t))){ const c = code(m[1]); if (c) out.push({kind:'avoid', code:c, label:'Avoid ' + (AIR[c] || {name:c}).name}); }
+  const unlessRx = /(?:willing to|would|i'?d) (?:fly|take) (?:on |with )?([a-z ]+?) (?:if|for|when) (?:it means |it'?s |it is |i get |a |the )?(?:a )?(lie[- ]?flat|nonstop|direct)/g;
+  while ((m = unlessRx.exec(t))){ const c = code(m[1]), w = /lie/.test(m[2]) ? 'lieflat' : 'nonstop'; const r = out.find(x => x.kind === 'avoid' && x.code === c); if (r){ r.unless = w; r.label += ' unless ' + WANTS.find(x => x.id === w).label.toLowerCase(); } }
+  if (/lie[- ]?flat|flat bed|business class/.test(t)) out.push({kind:'want', id:'lieflat', label:'Lie-flat seat matters' + (/really|very|important|must/.test(t) ? ' a lot' : '')});
+  if (/nonstop|non-stop|direct flight|no (?:connections?|layovers?|stops?)/.test(t)) out.push({kind:'want', id:'nonstop', label:'Nonstop'});
+  if (/short layover|quick connection/.test(t)) out.push({kind:'want', id:'short', label:'Short layovers'});
+  if (/long layover|stopover|see the city/.test(t)) out.push({kind:'want', id:'long', label:'A long layover'});
+  if (/wifi|wi-fi|internet/.test(t)) out.push({kind:'want', id:'wifi', label:'Wifi'});
+  if (/legroom|leg room|tall/.test(t)) out.push({kind:'want', id:'legroom', label:'Extra legroom'});
+  if (/lounge/.test(t)) out.push({kind:'want', id:'lounge', label:'Lounge access'});
+  if (/flexib|refund|might change|may change/.test(t)) out.push({kind:'want', id:'flex', label:'Flexible ticket'});
+  if (/no red[- ]?eye|not overnight|daytime|during the day|no overnight/.test(t)) out.push({kind:'want', id:'day', label:'Daytime flight'});
+  if ((m = /(?:nothing|not|no flights?|don'?t (?:want|wanna) (?:to )?leave) (?:before|earlier than) (\d{1,2})\s?(am|pm)?/.exec(t))){ let h = +m[1]; if (m[2] === 'pm' && h < 12) h += 12; out.push({kind:'after', h, label:'Nothing before ' + String(h).padStart(2,'0') + ':00'}); }
+  if ((m = /(?:arrive|be there|land) (?:by|before) (\d{1,2})\s?(am|pm)?/.exec(t))){ let h = +m[1]; if (m[2] === 'pm' && h < 12) h += 12; out.push({kind:'before', h, label:'Arrive by ' + String(h).padStart(2,'0') + ':00'}); }
+  if (/as soon as possible|asap|emergency|hospital|right away|immediately/.test(t)) out.push({kind:'tilt', p:'asap', label:'Get there as soon as possible'});
+  else if (/cheap|budget|save money|lowest/.test(t)) out.push({kind:'tilt', p:'1,0,0', label:'Lean toward price'});
+  else if (/fast|quick|shortest/.test(t)) out.push({kind:'tilt', p:'0,1,0', label:'Lean toward speed'});
+  else if (/comfort|comfy|relax|rest/.test(t)) out.push({kind:'tilt', p:'0,0,1', label:'Lean toward comfort'});
+  if ((m = /(window|aisle) seat/.exec(t))) out.push({kind:'note', label:m[1][0].toUpperCase() + m[1].slice(1) + ' seat, noted for seat selection'});
+  return out;
+}
+function applyWish(){
+  const items = parseWish($('#wish').value); if (!items.length){ $('#understood').innerHTML = '<span class="lab">Understood</span><span class="u">Nothing I could turn into a rule yet — try naming an airline, a seat, a time, or what you care about most.</span>'; return; }
+  S.rules = items.filter(x => x.kind === 'avoid' || x.kind === 'after' || x.kind === 'before');
+  items.filter(x => x.kind === 'want').forEach(x => S.wants.add(x.id));
+  const tilt = items.find(x => x.kind === 'tilt'); if (tilt){ if (tilt.p === 'asap') setWeights(0, 1, 0, 'asap'); else { const [a, b, c] = tilt.p.split(',').map(Number); setWeights(a, b, c, tilt.p); } }
+  $('#understood').innerHTML = '<span class="lab">Understood</span>' + items.map((x, i) => `<span class="u ${x.kind === 'avoid' || x.kind === 'after' || x.kind === 'before' ? 'rule' : x.kind === 'tilt' ? 'tilt' : 'want'}"><i>${x.kind === 'avoid' || x.kind === 'after' || x.kind === 'before' ? 'rule' : x.kind === 'tilt' ? 'weights' : x.kind === 'want' ? 'want' : 'note'}</i>${esc(x.label)}<button data-ux="${i}" aria-label="Remove">×</button></span>`).join('');
+  $('#understood').dataset.items = JSON.stringify(items);
+  paintChips(); paint(true);
+}
+
+// ---- chips, carriers, points
+function paintChips(){
+  $('#chips').innerHTML = WANTS.map(w => `<button class="chip${w.count ? '' : ' zero'}" data-w="${w.id}" aria-pressed="${S.wants.has(w.id)}">${esc(w.label)}<span class="n">${w.count}</span></button>`).join('');
+  const z = [...S.wants].map(id => WANTS.find(w => w.id === id)).filter(w => !w.count && w.hint);
+  $('#chipnote').classList.toggle('hidden', !z.length); $('#chipnote').textContent = z.map(w => w.hint).join(' ');
+}
+function paintCarriers(){
+  const codes = [...new Set(ALL.flatMap(e => [e.carrier, e.operator]))].sort();
+  $('#carriers').innerHTML = codes.map(c => `<button class="cbtn" data-c="${c}" aria-pressed="${S.adv.out.has(c)}">${logo(c)}${esc((AIR[c] || {}).name || c)}</button>`).join('');
+}
+function paintPts(){
+  $('#pts').innerHTML = Object.keys(BANK).map(k => `<div class="pt"><label for="pt-${k}">${esc(BANK[k])}</label><input id="pt-${k}" inputmode="numeric" value="${S.pts[k] ? S.pts[k].toLocaleString() : ''}" placeholder="0"></div>`).join('') +
+    '<p class="ptnote"><b>How this works.</b> For each flight we look up the award price in every programme that can book it, the fees on top, and which of your balances reaches it directly or by a 1:1 transfer. Then we say plainly whether the points beat cash at that flight&rsquo;s price, in cents per point against a fair value for that currency. Demo award chart, not live availability.</p>';
+}
+
+// ---- boot
+const P = D.par;
+$('#gohint').innerHTML = 'The ride to the airport is priced <b>from your actual address</b> at the hour you leave — from Wyckoff Ave that is the subway, bus and AirTrain, about ' + dur(ALL[0].legs[0].minutes) + ' — not from &ldquo;New York&rdquo;.';
+$('#how1').innerHTML = 'Par for this route is <b>' + money(D.query.par_cents) + '</b>: what a nonstop in main cabin with a bag costs all in, leaving ' + esc(P.reference.departs_local) + ', ' + dur(P.reference.door_to_door_minutes) + ' door to door, at ' + (P.season_factor < .95 ? 'an off-season' : P.season_factor > 1.05 ? 'a peak' : 'a shoulder') + ' fare for ' + P.miles.toLocaleString() + ' miles. About par is an A; every letter below is a step further from it.';
+$('#parledger').innerHTML = P.ledger.map(l => `<li><span>${esc(l.label)}</span><span class="num">${signed(l.cents)}</span></li>`).join('') + `<li class="t"><span>Par</span><span class="num">${money(P.par_cents)}</span></li>`;
+$('#cov').innerHTML = '<b>Draft data.</b> ' + esc(D.gaps[0] || '') + '. ' + esc(D.verdict || '') + '. A real Duffel search on a test token; some fares and times are invented. Airline logos load from the feed where the page can reach it and fall back to a monogram where it cannot.';
+sentenceHTML(); paintChips(); paintCarriers(); paintPts(); paintTri(); setWeights(1, 0, 0, '1,0,0');
+
+// events
+$('#trip').addEventListener('click', ev => { const b = ev.target.closest('button[data-trip]'); if (!b) return; S.trip = b.dataset.trip; if (S.trip === 'multi' && S.legs.length === 1) S.legs.push({from:'London', to:'Paris', date:'Sat 21 Nov'}); $('#trip').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); sentenceHTML(); });
+$('#addleg').addEventListener('click', () => { const last = S.legs[S.legs.length-1]; S.legs.push({from:last.to, to:'', date:''}); sentenceHTML(); const i = $('#q-to-' + (S.legs.length-1)); if (i) i.focus(); });
+$('#sentence').addEventListener('click', ev => { const b = ev.target.closest('[data-rm]'); if (b){ S.legs.splice(+b.dataset.rm, 1); sentenceHTML(); } });
+$('#sentence').addEventListener('input', ev => { const i = ev.target, m = /^q-(from|to|date)-(\d+)$/.exec(i.id); if (m) S.legs[+m[2]][m[1]] = i.value; else if (i.id === 'q-back') S.back = i.value; });
+$('#sentence').addEventListener('change', ev => { if (ev.target.id === 'q-pax') S.pax = ev.target.value; if (ev.target.id === 'q-bags') S.bags = ev.target.value; });
+
+let dragging = false;
+const onPoint = ev => { const r = tri.getBoundingClientRect(); const [a, b, c] = toBary(ev.clientX - r.left, ev.clientY - r.top); setWeights(a, b, c, null); };
+tri.addEventListener('pointerdown', ev => { dragging = true; tri.setPointerCapture(ev.pointerId); onPoint(ev); });
+tri.addEventListener('pointermove', ev => { if (dragging) onPoint(ev); });
+tri.addEventListener('pointerup', () => dragging = false); tri.addEventListener('pointercancel', () => dragging = false);
+$('#presets').addEventListener('click', ev => { const b = ev.target.closest('button[data-p]'); if (!b) return; if (b.dataset.p === 'asap'){ setWeights(0, 1, 0, 'asap'); return; } const [a, bb, c] = b.dataset.p.split(',').map(Number); setWeights(a, bb, c, b.dataset.p); });
+document.addEventListener('keydown', ev => {
+  if (ev.key === 'Escape') $('#sheetroot').innerHTML = '';
+  if (document.activeElement === handle){ const s = .05; let a = S.a, b = S.b, c = S.c;
+    if (ev.key === 'ArrowLeft'){ a += s; b -= s; } else if (ev.key === 'ArrowRight'){ b += s; a -= s; } else if (ev.key === 'ArrowUp'){ c += s; a -= s/2; b -= s/2; } else if (ev.key === 'ArrowDown'){ c -= s; a += s/2; b += s/2; } else return;
+    a = Math.max(0,a); b = Math.max(0,b); c = Math.max(0,c); const t = a+b+c; setWeights(a/t, b/t, c/t, null); ev.preventDefault(); }
+});
+$('#chips').addEventListener('click', ev => { const b = ev.target.closest('[data-w]'); if (!b) return; const id = b.dataset.w; S.wants.has(id) ? S.wants.delete(id) : S.wants.add(id); paintChips(); paint(true); });
+$('#wishgo').addEventListener('click', applyWish);
+$('#wish').addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); applyWish(); } });
+$('#understood').addEventListener('click', ev => { const b = ev.target.closest('[data-ux]'); if (!b) return; const items = JSON.parse($('#understood').dataset.items || '[]'); const x = items[+b.dataset.ux];
+  if (x.kind === 'want') S.wants.delete(x.id); S.rules = S.rules.filter(r => r.label !== x.label); items.splice(+b.dataset.ux, 1); $('#understood').dataset.items = JSON.stringify(items);
+  $('#understood').innerHTML = items.length ? '<span class="lab">Understood</span>' + items.map((y, i) => `<span class="u ${y.kind === 'avoid' || y.kind === 'after' || y.kind === 'before' ? 'rule' : y.kind === 'tilt' ? 'tilt' : 'want'}"><i>${y.kind === 'avoid' || y.kind === 'after' || y.kind === 'before' ? 'rule' : y.kind === 'tilt' ? 'weights' : y.kind === 'want' ? 'want' : 'note'}</i>${esc(y.label)}<button data-ux="${i}" aria-label="Remove">×</button></span>`).join('') : '';
+  paintChips(); paint(true); });
+// voice: the browser's own recognition where it exists; the box is still typeable everywhere
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+$('#mic').addEventListener('click', () => {
+  if (!SR){ $('#wish').placeholder = 'Voice needs Chrome, Edge or Safari; type it here instead.'; $('#wish').focus(); return; }
+  const mic = $('#mic'); if (mic.dataset.on === '1'){ mic.dataset.on = '0'; if (mic._r) mic._r.stop(); return; }
+  const r = new SR(); r.lang = 'en-US'; r.interimResults = true; mic._r = r; mic.dataset.on = '1';
+  r.onresult = ev => { $('#wish').value = [...ev.results].map(x => x[0].transcript).join(' '); };
+  r.onend = () => { mic.dataset.on = '0'; if ($('#wish').value.trim()) applyWish(); };
+  r.onerror = () => { mic.dataset.on = '0'; };
+  r.start();
+});
+const winv = () => { const A = S.adv; $('#depv').textContent = A.dep0 === 0 && A.dep1 === 24 ? 'any time' : String(A.dep0).padStart(2,'0') + ':00 – ' + String(A.dep1).padStart(2,'0') + ':00'; $('#arrv').textContent = A.arr0 === 0 && A.arr1 === 24 ? 'any time' : String(A.arr0).padStart(2,'0') + ':00 – ' + String(A.arr1).padStart(2,'0') + ':00'; };
+['dep0','dep1','arr0','arr1'].forEach(k => $('#' + k).addEventListener('input', ev => { S.adv[k] = +ev.target.value; if (S.adv.dep0 > S.adv.dep1) S.adv[k === 'dep0' ? 'dep1' : 'dep0'] = S.adv[k]; if (S.adv.arr0 > S.adv.arr1) S.adv[k === 'arr0' ? 'arr1' : 'arr0'] = S.adv[k]; winv(); paint(true); }));
+$('#cabin').addEventListener('change', ev => { S.adv.cabin = ev.target.value; WANTS.find(w => w.id === 'lieflat').hint = ev.target.value === 'economy' ? 'No lie-flat seat flies this route in economy. Switch the cabin to Business under Advanced to see them.' : 'This demo carries economy inventory only; a Business search would show lie-flat seats here.'; paintChips(); });
+$('#stops').addEventListener('change', ev => { S.adv.stops = +ev.target.value; paint(true); });
+$('#alli').addEventListener('change', ev => { ev.target.checked ? S.adv.alli.add(ev.target.value) : S.adv.alli.delete(ev.target.value); paint(true); });
+$('#carriers').addEventListener('click', ev => { const b = ev.target.closest('[data-c]'); if (!b) return; const c = b.dataset.c; S.adv.out.has(c) ? S.adv.out.delete(c) : S.adv.out.add(c); b.setAttribute('aria-pressed', String(S.adv.out.has(c))); paint(true); });
+$('#pts').addEventListener('input', ev => { const m = /^pt-(\w+)$/.exec(ev.target.id); if (!m) return; S.pts[m[1]] = +String(ev.target.value).replace(/[^\d]/g, '') || 0; paint(false); });
+$('#list').addEventListener('click', ev => { const b = ev.target.closest('[data-row]'); if (!b) return; const li = b.closest('.row'), open = li.getAttribute('aria-expanded') === 'true', det = li.querySelector('.detail'); li.setAttribute('aria-expanded', String(!open)); if (!open) det.innerHTML = ledgerHTML(ALL.find(x => x.id === li.dataset.id)); det.hidden = open; });
+$('#morebtn').addEventListener('click', () => { S.shown += 12; paint(false); });
+$('#doors').addEventListener('click', ev => { const b = ev.target.closest('[data-open]'); if (b) openSheet(b.dataset.open); });
+document.addEventListener('click', ev => { if (ev.target.id === 'x' || ev.target.id === 'sheetwrap') $('#sheetroot').innerHTML = ''; });
+$('#go').addEventListener('click', () => { paint(true); $('#stepper').scrollIntoView({behavior:'smooth', block:'start'}); });
+addEventListener('resize', () => { paintTri(); const [x, y] = toXY(S.a, S.b, S.c); handle.style.left = x + 'px'; handle.style.top = y + 'px'; });
+</script>
+</body></html>

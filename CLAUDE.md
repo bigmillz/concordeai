@@ -722,13 +722,30 @@ start one, same as the desktop app's gauntlet.
 
 ## Interface mockups
 
-`concorde-travel/ui/mock/` holds eight directions for the interface in two
-rounds, at `http://127.0.0.1:9897/mock` or by opening the files directly.
-Round two (05–08, 2026-09-20) is the one to look at first: **Shortlist** (a
-sentence-form search and three answer cards), **Board** (a split-flap departures
-board with a paper receipt), **Lines** (a transit map, every journey a line on
-one clock) and **Dial** (a price/speed/comfort triangle that re-ranks live).
-Round one (01–04) is kept for the record.
+`concorde-travel/ui/mock/` holds nine directions for the interface, at
+`http://127.0.0.1:9897/mock` or by opening the files directly. **09 Concourse
+is the converged direction** (2026-09-20, after Patrick picked Shortlist and the
+Dial from round two): the sentence-form search with round trip / one way /
+multi-city, the price–speed–comfort triangle with a "get me there now" preset
+(earliest arrival, price shown but not ranked), ten **wants that charge rather
+than filter** (a flight lacking one is priced for it and sinks, reason shown;
+a want nothing can meet says so instead of sinking everything), a **wish box**
+typed or spoken (the browser's own speech recognition) that becomes visible,
+removable rules and weights, advanced windows / cabin / stops / alliances /
+airlines-to-leave-out (these hide, and say what they hid), and **points
+balances** with a demo award chart and 1:1 transfer partners that say whether
+points beat cash in cents per point. It wears the Concorde family's own
+tokens (`--bg #101013`, Michroma / Space Grotesk / Plex Mono, the app's amber,
+blue and purple for the three targets). Round two (05–08: Shortlist, Board,
+Lines, Dial) and round one (01–04) are kept for the record.
+
+**Airline logos come from the feed.** Duffel's airline objects carry
+`logo_symbol_url` and `logo_lockup_url` (an SVG per carrier on
+`assets.duffel.com`); `data.py` collects them into `airlines`. The page draws a
+brand-coloured monogram and lays the real logo over it when it loads, so a
+viewer that cannot reach the host (a claude.ai artifact, the sandbox) sees the
+monogram and nobody sees a broken image. The live page should use the same
+URLs straight from the offer.
 
 Each `mock-N.src.html` carries a `__DATA__` token; `build.py` inlines
 `slim.json` and writes `mock-N.html`. **Edit the `.src.html`, never the built

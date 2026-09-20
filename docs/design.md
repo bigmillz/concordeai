@@ -1436,3 +1436,47 @@ ranking logic); the ground leg is named as coming from the typed address, becaus
 promise is the moat; and the coverage caveat stays amber on all four. `data.py` is the
 generator so the next round does not start by reverse-engineering the data.
 
+### 09 Concourse — the converged page (2026-09-20)
+
+Patrick's read of round two: "I love the shortlist concept", "the triangle to pick
+priorities is awesome", keep the colours and fonts of the other Concorde apps if possible,
+and then eight things the page has to carry: round trip / one way / multi-city; a preset
+for getting there as fast as possible ("a family member is hospitalized and you need to be
+there asap"); eight to ten common wants (787/A350, lie-flat, short layovers, long layovers,
+nonstop…); advanced options (departure and arrival windows, airline or alliance); fields for
+points and miles that work out a better deal, ideally the way point.me finds transfers;
+airline logos, not names; and "make a wish" — type or speak what you're looking for and the
+model takes it into account.
+
+Concourse is the Shortlist page and the Dial page folded into one, in the family palette.
+The decisions in it worth keeping whatever the visual treatment becomes:
+
+- **Wants charge; rules hide.** A want is what you would like; a rule is what you will not
+  accept. The ten chips are wants: a flight that lacks one is charged a stated dollar figure
+  in its ledger ("+$150 you wanted nonstop") and sinks, but stays visible. Advanced windows,
+  stops, alliances and airlines-left-out are rules: those flights are hidden, and the page
+  lists what it hid and why. That keeps hard rule 4 intact under both: nothing disappears
+  without a reason and nothing is demoted without a number.
+- **A want nothing can meet does not sink everything.** Lie-flat and extra legroom match
+  zero flights in this economy capture; the chip shows 0, and switching it on says which
+  cabin has it instead of charging every row the same amount, which would change nothing
+  and explain nothing.
+- **"Get me there now" changes the objective, not the weights.** It ranks by the moment
+  you walk in the door, shows the price and does not hide it. The dial's other presets
+  move the weights.
+- **The wish is turned into things you can see and remove.** Whatever the model extracts —
+  "avoid American unless lie-flat", "nothing before 9am", "lean toward comfort" — lands as
+  a chip under the box with its kind labelled (rule / want / weights / note) and an ×. In
+  the mock a small pattern parser stands in for the model; the contract is the same: the
+  model produces rules and weights, and the arithmetic ranks. Speech uses the browser's own
+  recognition where it exists and the box stays typeable everywhere.
+- **Points are answered in one sentence per flight.** For each flight, the award price in
+  every programme that can book it, the fees, and which balance reaches it directly or by a
+  1:1 transfer; then a plain verdict in cents per point against a fair value for that
+  currency: "Use points: 13,000 Avios + $350, 1.4¢/pt, transfer from Amex" or "Pay cash,
+  keep them." The award chart and transfer table are a curated demo for this route, not
+  live availability; the live version needs an award source, which is a separate piece of
+  work and not a small one.
+- **Logos come from the feed.** Duffel supplies an SVG per carrier; the page draws a
+  brand-coloured monogram and lays the logo over it when it loads.
+
