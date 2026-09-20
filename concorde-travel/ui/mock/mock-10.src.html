@@ -332,6 +332,42 @@ details[open] summary:after{content:"–"}
 .nav .hintr{color:var(--faint);font-size:12.5px}
 #blk-points .pts{padding-top:0}#blk-advanced .adv{padding-top:0}
 
+/* ---------- the trip, as fields */
+.fields{display:grid;gap:12px;margin-top:18px}
+.frow{display:grid;gap:12px}
+.frow.route{grid-template-columns:minmax(0,1.5fr) 56px minmax(0,1fr);align-items:stretch}
+.frow.dates{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.frow.legrow{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,.8fr) 40px;align-items:center}
+.fld{position:relative;background:var(--panel3);border:1px solid var(--line);border-radius:12px;padding:12px 14px 12px 44px;min-width:0;transition:border-color .15s,background .15s}
+.fld:hover{border-color:#3a3d46}
+.fld:focus-within{border-color:var(--speed);background:#23252c}
+.fld label{display:block;font-family:var(--disp);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin-bottom:5px}
+.fld input,.fld select{width:100%;background:none;border:0;font:500 18px/1.25 var(--sans);color:var(--text);min-width:0;text-overflow:ellipsis;-webkit-appearance:none;appearance:none;padding:0;border-radius:0}
+.fld input::placeholder{color:var(--faint)}
+.fld input:focus,.fld select:focus{outline:none}
+.fld select{cursor:pointer;padding-right:20px;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='7' viewBox='0 0 12 7'><path d='M1 1l5 5 5-5' fill='none' stroke='%238e8e8e' stroke-width='1.8'/></svg>") no-repeat right 2px center}
+.fld select option{background:var(--panel2);color:var(--text)}
+.fld .ico{position:absolute;left:14px;top:15px;width:18px;height:18px;stroke:var(--faint);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.fld:focus-within .ico{stroke:var(--speed)}
+.fld .help{color:var(--faint);font-size:12px;margin-top:7px;line-height:1.45}
+.fld .help b{color:var(--dim);font-weight:500}
+.link{display:grid;place-items:center;color:var(--faint);position:relative}
+.link:before{content:"";position:absolute;left:4px;right:4px;top:50%;height:0;border-top:1px dashed var(--line)}
+.link svg{position:relative;width:26px;height:26px;fill:var(--speed);background:var(--panel2);padding:3px;border-radius:50%}
+.rm2{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);color:var(--faint);font-size:16px;display:grid;place-items:center}
+.rm2:hover{border-color:var(--red);color:var(--red)}
+.ridegrp{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:2px}
+.ridegrp .lbl{font-size:13px;color:var(--dim)}
+.pills{display:inline-flex;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px}
+.pills button{padding:7px 13px;border-radius:999px;font-size:12.5px;font-weight:500;color:var(--dim);transition:.15s}
+.pills button[aria-pressed=true]{background:var(--text);color:var(--bg)}
+.pills button:hover:not([aria-pressed=true]){color:var(--text)}
+.edbody .fld input,.edbody .fld select{font-size:16px}
+@media (max-width:720px){
+  .frow.route{grid-template-columns:1fr}.link{height:18px}.link:before{display:none}.link svg{transform:rotate(90deg)}
+  .frow.legrow{grid-template-columns:1fr 1fr;} .frow.legrow .rm2{justify-self:end}
+}
+
 /* ---------- the bar */
 .bar{position:sticky;top:0;z-index:6;background:rgba(16,16,19,.9);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
 .barin{max-width:1180px;margin:0 auto;padding:10px clamp(16px,3.5vw,32px);display:flex;align-items:center;gap:16px;flex-wrap:wrap}
@@ -384,9 +420,8 @@ details[open] summary:after{content:"–"}
     <p class="lead">Just the trip. Everything else comes one screen at a time, and you can change any of it later without starting over.</p>
     <div class="panel"><div class="slot"><div id="blk-where">
       <div class="tripseg" id="trip" role="group" aria-label="Trip type"><button data-trip="round" aria-pressed="true">Round trip</button><button data-trip="one" aria-pressed="false">One way</button><button data-trip="multi" aria-pressed="false">Multi-city</button></div>
-      <div class="sentence" id="sentence"></div>
+      <div class="fields" id="sentence"></div>
       <button class="addleg hidden" id="addleg">+ add another flight</button>
-      <p class="gohint" id="gohint" style="margin-top:14px"></p>
     </div></div>
     <div class="nav"><button class="go" data-next="2">Continue <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v11M3 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">or press Enter</span></div></div>
   </div></section>
@@ -516,7 +551,7 @@ const AIRNAME = {american:'AA',aa:'AA','british airways':'BA',ba:'BA',british:'B
 const S = {trip:'round', a:1, b:0, c:0, preset:'1,0,0', asap:false, wants:new Set(), rules:[], ride:'either', off:new Set(), menu:false, open:new Set(),
   extra:{bag:0, wifi:false, seat:false, legroom:false, lounge:false, priority:false, insurance:false, hotel:false, custom:[]}, adv:{dep0:0, dep1:24, arr0:0, arr1:24, cabin:'economy', stops:2, alli:new Set(), out:new Set()},
   pts:{amex:120000, chase:80000, capone:0, citi:0, bilt:0, avios:0, virgin:0, aa:0, delta:0}, shown:12, T:'mine',
-  legs:[{from:'Wyckoff Ave & Myrtle Ave, Bushwick', to:'London', date:'Wed 18 Nov'}], back:'Wed 25 Nov', pax:'one adult', bags:'one checked bag'};
+  legs:[{from:'Wyckoff Ave & Myrtle Ave, Bushwick', to:'London', date:'Wed 18 Nov'}], back:'Wed 25 Nov', pax:'1 adult', bags:'1 checked bag'};
 
 // ---- wants: a predicate, a charge when it is missing, and a hint when nothing has it
 const NEWGEN = /^(78[1789]|359|351|339|338|32N|32Q|223|7M[89])$/;
@@ -638,7 +673,7 @@ const ADDONS = {
 const hourlyAt = () => Math.round(S.a*PR.cheapest.hourly_value_cents + S.b*PR.fastest.hourly_value_cents + S.c*PR.comfort.hourly_value_cents);
 const cwAt = () => S.a*PR.cheapest.comfort_weight + S.b*PR.fastest.comfort_weight + S.c*PR.comfort.comfort_weight;
 const nearestProf = () => S.a >= S.b && S.a >= S.c ? 'cheapest' : S.b >= S.c ? 'fastest' : 'comfort';
-const partyBags = () => ({'no checked bag':0, 'one checked bag':1, 'two checked bags':2}[S.bags] ?? 1);
+const partyBags = () => ({'No checked bag':0, '1 checked bag':1, '2 checked bags':2}[S.bags] ?? 1);
 function pickGround(modes, hourly, prefer){
   // the scorer's own rule: cheapest by fare plus minutes at the hour's value; a
   // preferred class narrows the field and, if nothing of it runs, says so
@@ -832,19 +867,24 @@ function openSheet(id){
 }
 
 // ---- the sentence
+const ICON = {
+  pin:'<svg class="ico" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.8-6.5-11a6.5 6.5 0 0 1 13 0c0 5.2-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>',
+  flag:'<svg class="ico" viewBox="0 0 24 24"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>',
+  cal:'<svg class="ico" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
+  who:'<svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg>',
+  bag:'<svg class="ico" viewBox="0 0 24 24"><rect x="4" y="7.5" width="16" height="13" rx="2.5"/><path d="M9 7.5V5.5a3 3 0 0 1 6 0v2M9 11.5v6M15 11.5v6"/></svg>',
+};
 function sentenceHTML(){
-  const f = (id, v, w) => `<span class="f"><input id="${id}" value="${esc(v)}" aria-label="${w}"></span>`;
-  const sel = (id, v, opts, w) => `<span class="f"><select id="${id}" aria-label="${w}">${opts.map(o => `<option${o === v ? ' selected' : ''}>${o}</option>`).join('')}</select></span>`;
-  const L = S.legs;
-  let h = 'I&rsquo;m leaving from ' + f('q-from-0', L[0].from, 'Where you start') + ' for ' + f('q-to-0', L[0].to, 'Destination') + ' on ' + f('q-date-0', L[0].date, 'Date');
-  if (S.trip === 'round') h += ', back on ' + f('q-back', S.back, 'Return date');
-  if (S.trip === 'multi') L.slice(1).forEach((l, i) => { h += `<span class="leg">then from ${f('q-from-' + (i+1), l.from, 'From')} to ${f('q-to-' + (i+1), l.to, 'To')} on ${f('q-date-' + (i+1), l.date, 'Date')}<button class="rm" data-rm="${i+1}" aria-label="Remove this flight">×</button></span>`; });
-  h += (S.trip === 'multi' ? '<span class="leg">' : ', ') + sel('q-pax', S.pax, ['one adult','two adults','a family of four'], 'Travellers') + ' with ' + sel('q-bags', S.bags, ['one checked bag','no checked bag','two checked bags'], 'Checked bags') +
-       ', getting to the airport by ' + sel('q-ride', RIDES[S.ride], Object.values(RIDES), 'How you get to the airport') + '.' + (S.trip === 'multi' ? '</span>' : '');
+  const L = S.legs, g0 = ALL[0].legs[0];
+  const fld = (id, label, val, icon, help, ph) => `<div class="fld">${ICON[icon]}<label for="${id}">${label}</label><input id="${id}" value="${esc(val)}" placeholder="${esc(ph || '')}" autocomplete="off">${help ? `<div class="help">${help}</div>` : ''}</div>`;
+  const sel = (id, label, val, opts, icon) => `<div class="fld">${ICON[icon]}<label for="${id}">${label}</label><select id="${id}">${opts.map(o => `<option${o === val ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select></div>`;
+  const plane = '<div class="link" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M15 8l-4.2-1.4L7 1.5H5.4l1.9 5.1H3.6L2.5 4.9H1.2l.9 3.1-.9 3.1h1.3l1.1-1.7h3.7L5.4 14.5H7l3.8-5.1z"/></svg></div>';
+  let h = `<div class="frow route">${fld('q-from-0', 'From your door', L[0].from, 'pin',
+      'An address, a neighbourhood or a city. <b>The ride to the airport is priced from here</b>, at the hour you leave: from Wyckoff Ave that is ' + esc(g0.tip.split(' · ').slice(2).join(', ')) + ', about ' + dur(g0.minutes) + '.', 'Where you start')}${plane}${fld('q-to-0', 'To', L[0].to, 'flag', 'A city searches every airport it has: London means Heathrow, Gatwick, Stansted, Luton and City, weighed against each other.', 'City or airport')}</div>`;
+  h += `<div class="frow dates">${fld('q-date-0', 'Leaving', L[0].date, 'cal', '', 'Date')}${S.trip === 'round' ? fld('q-back', 'Returning', S.back, 'cal', '', 'Date') : ''}${sel('q-pax', 'Travellers', S.pax, ['1 adult', '2 adults', 'Family of 4'], 'who')}${sel('q-bags', 'Checked bags', S.bags, ['1 checked bag', 'No checked bag', '2 checked bags'], 'bag')}</div>`;
+  if (S.trip === 'multi') L.slice(1).forEach((l, i) => { h += `<div class="frow legrow">${fld('q-from-' + (i+1), 'Then from', l.from, 'pin', '', 'City or airport')}${fld('q-to-' + (i+1), 'To', l.to, 'flag', '', 'City or airport')}${fld('q-date-' + (i+1), 'On', l.date, 'cal', '', 'Date')}<button class="rm2" data-rm="${i+1}" aria-label="Remove this flight">×</button></div>`; });
+  h += `<div class="ridegrp"><span class="lbl">Getting to the airport by</span><div class="pills" id="ridepills" role="group" aria-label="How you get to the airport">${Object.entries(RIDES).map(([k, v]) => `<button data-ride="${k}" aria-pressed="${S.ride === k}">${esc(v[0].toUpperCase() + v.slice(1))}</button>`).join('')}</div></div>`;
   $('#sentence').innerHTML = h; $('#addleg').classList.toggle('hidden', S.trip !== 'multi');
-  const ruler = document.getElementById('ruler') || Object.assign(document.body.appendChild(document.createElement('span')), {id:'ruler'});
-  ruler.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;left:-9999px';
-  document.querySelectorAll('.sentence input').forEach(i => { const fit = () => { const cs = getComputedStyle(i); ['fontFamily','fontSize','fontStyle','fontWeight','letterSpacing'].forEach(k => ruler.style[k] = cs[k]); ruler.textContent = i.value || ' '; i.style.width = Math.min(ruler.offsetWidth + 10, innerWidth - 40) + 'px'; }; fit(); i.addEventListener('input', fit); document.fonts && document.fonts.ready.then(fit); });
   paintStepper();
 }
 function paintStepper(){
@@ -906,7 +946,6 @@ function paintPts(){
 
 // ---- boot
 const P = D.par;
-$('#gohint').innerHTML = 'The ride to the airport is priced <b>from your actual address</b> at the hour you leave — from Wyckoff Ave that is the subway, bus and AirTrain, about ' + dur(ALL[0].legs[0].minutes) + ' — not from &ldquo;New York&rdquo;.';
 $('#how1').innerHTML = 'Par for this route is <b>' + money(D.query.par_cents) + '</b>: what a nonstop in main cabin with a bag costs all in, leaving ' + esc(P.reference.departs_local) + ', ' + dur(P.reference.door_to_door_minutes) + ' door to door, at ' + (P.season_factor < .95 ? 'an off-season' : P.season_factor > 1.05 ? 'a peak' : 'a shoulder') + ' fare for ' + P.miles.toLocaleString() + ' miles. About par is an A; every letter below is a step further from it.';
 $('#parledger').innerHTML = P.ledger.map(l => `<li><span>${esc(l.label)}</span><span class="num">${signed(l.cents)}</span></li>`).join('') + `<li class="t"><span>Par</span><span class="num">${money(P.par_cents)}</span></li>`;
 $('#cov').innerHTML = '<b>Draft data.</b> ' + esc(D.gaps[0] || '') + '. ' + esc(D.verdict || '') + '. A real Duffel search on a test token; some fares and times are invented. Airline logos load from the feed where the page can reach it and fall back to a monogram where it cannot.';
@@ -915,9 +954,9 @@ sentenceHTML(); paintChips(); paintCarriers(); paintPts(); paintTri(); setWeight
 // events
 $('#trip').addEventListener('click', ev => { const b = ev.target.closest('button[data-trip]'); if (!b) return; S.trip = b.dataset.trip; if (S.trip === 'multi' && S.legs.length === 1) S.legs.push({from:'London', to:'Paris', date:'Sat 21 Nov'}); $('#trip').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); sentenceHTML(); });
 $('#addleg').addEventListener('click', () => { const last = S.legs[S.legs.length-1]; S.legs.push({from:last.to, to:'', date:''}); sentenceHTML(); const i = $('#q-to-' + (S.legs.length-1)); if (i) i.focus(); });
-$('#sentence').addEventListener('click', ev => { const b = ev.target.closest('[data-rm]'); if (b){ S.legs.splice(+b.dataset.rm, 1); sentenceHTML(); } });
+$('#sentence').addEventListener('click', ev => { const b = ev.target.closest('[data-rm]'); if (b){ S.legs.splice(+b.dataset.rm, 1); sentenceHTML(); return; } const r = ev.target.closest('[data-ride]'); if (r){ S.ride = r.dataset.ride; $('#ridepills').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === r)); paint(true); } });
 $('#sentence').addEventListener('input', ev => { const i = ev.target, m = /^q-(from|to|date)-(\d+)$/.exec(i.id); if (m) S.legs[+m[2]][m[1]] = i.value; else if (i.id === 'q-back') S.back = i.value; });
-$('#sentence').addEventListener('change', ev => { if (ev.target.id === 'q-pax') S.pax = ev.target.value; if (ev.target.id === 'q-bags'){ S.bags = ev.target.value; paint(true); } if (ev.target.id === 'q-ride'){ S.ride = Object.keys(RIDES).find(k => RIDES[k] === ev.target.value); paint(true); } });
+$('#sentence').addEventListener('change', ev => { if (ev.target.id === 'q-pax') S.pax = ev.target.value; if (ev.target.id === 'q-bags'){ S.bags = ev.target.value; paint(true); } });
 
 let dragging = false;
 const onPoint = ev => { const r = tri.getBoundingClientRect(); const [a, b, c] = toBary(ev.clientX - r.left, ev.clientY - r.top); setWeights(a, b, c, null); };
@@ -995,7 +1034,7 @@ document.addEventListener('click', ev => {
   if (ev.target.closest('#startover')){ startOver(); return; }
   if (ev.target.closest('#jump')){ enterResults(); return; }
 });
-document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && W.mode === 'wizard' && ev.target.matches('#sentence input')){ ev.preventDefault(); goStep(W.step + 1); } });
+document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && W.mode === 'wizard' && ev.target.matches('#sentence input, #sentence select')){ ev.preventDefault(); goStep(W.step + 1); } });
 const io = new IntersectionObserver(es => { es.forEach(x => { if (x.isIntersecting){ W.step = +x.target.dataset.step; document.querySelectorAll('.rail .st').forEach(r => r.classList.toggle('on', +r.dataset.s === W.step)); } }); }, {rootMargin:'-45% 0px -50% 0px'});
 document.querySelectorAll('.screen').forEach(s => io.observe(s));
 
@@ -1003,7 +1042,7 @@ const short = s => s.split(',')[0].replace(/ & .*$/, '').trim();
 function summary(){
   const L = S.legs[0], when = S.trip === 'round' ? L.date + ' – ' + S.back : S.trip === 'multi' ? S.legs.map(l => l.date).join(' · ') : L.date;
   const route = S.trip === 'multi' ? S.legs.map(l => short(l.from)).concat([short(S.legs[S.legs.length-1].to)]).join(' → ') : short(L.from) + ' → ' + short(L.to);
-  $('#sumline').textContent = route + ' · ' + when + ' · ' + S.pax + ' · ' + S.bags.replace(' checked', '') + ' · ' + $('#cabin').selectedOptions[0].textContent;
+  $('#sumline').textContent = route + ' · ' + when + ' · ' + S.pax + ' · ' + S.bags.replace(' checked', '').toLowerCase() + ' · ' + $('#cabin').selectedOptions[0].textContent;
   const chips = [];
   chips.push(S.asap ? 'Get me there now' : S.preset ? ({'1,0,0':'Just cheap','0,1,0':'Just fast','0,0,1':'Just comfy','.34,.33,.33':'Balanced'}[S.preset] || 'Custom dial') : Math.round(S.a*100) + '% price · ' + Math.round(S.b*100) + '% speed · ' + Math.round(S.c*100) + '% comfort');
   S.wants.forEach(id => chips.push(WANTS.find(w => w.id === id).label));
