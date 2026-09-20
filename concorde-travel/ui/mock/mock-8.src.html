@@ -1,0 +1,294 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ConcordeGo · Dial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#EDEFF4;--panel:#FFFFFF;--ink:#191B27;--dim:#5E6375;--faint:#9CA1B0;--rule:#DFE2EA;--rule2:#EEF0F4;
+  --cheap:#E0A32E;--fast:#2E67E8;--comfy:#A94BA6;
+  --gA:#1E7F5C;--gB:#6E7C22;--gC:#C77A1A;--gD:#B8412A;
+  --display:"Sora","Helvetica Neue",Arial,sans-serif;--sans:"Figtree","Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{color-scheme:light}
+body{background:var(--ground);color:var(--ink);font:15px/1.45 var(--sans);-webkit-font-smoothing:antialiased;padding-block:0 80px}
+.wrap{max-width:1200px;margin:0 auto;padding-inline:clamp(16px,3.5vw,32px)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--fast);outline-offset:2px;border-radius:4px}
+.num{font-variant-numeric:tabular-nums}
+h1,h2,h3{font-family:var(--display);letter-spacing:-.02em;text-wrap:balance}
+
+/* ---------- top */
+.top{display:flex;align-items:center;gap:18px;padding-block:18px;flex-wrap:wrap}
+.mark{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:-.03em}
+.mark span{background:linear-gradient(90deg,var(--cheap),var(--fast) 50%,var(--comfy));-webkit-background-clip:text;background-clip:text;color:transparent}
+.bar{flex:1 1 640px;display:grid;grid-template-columns:2fr 1fr .9fr .8fr .8fr auto;background:var(--panel);border-radius:14px;padding:6px;gap:4px;box-shadow:0 1px 0 rgba(25,27,39,.05),0 8px 24px -16px rgba(25,27,39,.25)}
+.bar label{display:flex;flex-direction:column;gap:2px;padding:8px 12px;border-radius:10px;min-width:0}
+.bar label:hover{background:var(--rule2)}
+.bar label span{font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+.bar input,.bar select{font:500 14.5px/1.3 var(--sans);color:var(--ink);background:none;border:0;min-width:0;width:100%;-webkit-appearance:none;appearance:none;text-overflow:ellipsis}
+.bar .go{background:var(--ink);color:#fff;font-weight:600;border-radius:10px;padding:0 20px;font-size:14.5px;white-space:nowrap;transition:background .15s}
+.bar .go:hover{background:var(--fast)}
+
+/* ---------- layout */
+.main{display:grid;grid-template-columns:380px minmax(0,1fr);gap:22px;align-items:start;margin-top:14px}
+.dial{position:sticky;top:14px;background:var(--panel);border-radius:18px;padding:22px 22px 18px;box-shadow:0 1px 0 rgba(25,27,39,.05),0 8px 24px -16px rgba(25,27,39,.25)}
+.dial h1{font-size:22px;font-weight:600;line-height:1.2}
+.dial .sub{color:var(--dim);font-size:13.5px;margin-top:6px;line-height:1.5}
+.tri{position:relative;width:100%;aspect-ratio:1/0.9;margin:44px 0 40px;touch-action:none;user-select:none;cursor:crosshair}
+.tri canvas{position:absolute;inset:0;width:100%;height:100%;border-radius:8px}
+.corner{position:absolute;font-family:var(--display);font-weight:600;font-size:12.5px;letter-spacing:.02em;pointer-events:none;line-height:1.15}
+.corner small{display:block;font-family:var(--sans);font-weight:500;color:var(--dim);font-size:11px}
+.corner.c{left:50%;top:-38px;transform:translateX(-50%);text-align:center;color:var(--comfy)}
+.corner.a{left:0;bottom:-34px;color:#9A6C0F}
+.corner.b{right:0;bottom:-34px;text-align:right;color:var(--fast)}
+.handle{position:absolute;width:26px;height:26px;border-radius:50%;background:#fff;border:3px solid var(--ink);transform:translate(-50%,-50%);box-shadow:0 2px 8px rgba(0,0,0,.25);pointer-events:none;transition:transform .1s}
+.handle:after{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--ink)}
+.tri[data-drag="1"] .handle{transform:translate(-50%,-50%) scale(1.15)}
+.readout{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:14px}
+.readout div{background:var(--ground);border-radius:10px;padding:10px 12px}
+.readout b{display:block;font-family:var(--display);font-size:20px;font-weight:600;letter-spacing:-.02em}
+.readout span{font-size:11px;color:var(--dim);font-weight:500;letter-spacing:.04em;text-transform:uppercase}
+.readout .a b{color:#9A6C0F}.readout .b b{color:var(--fast)}.readout .c b{color:var(--comfy)}
+.means{color:var(--dim);font-size:13px;margin-top:12px;line-height:1.5}
+.means b{color:var(--ink);font-weight:600}
+.presets{display:flex;gap:6px;margin-top:14px;flex-wrap:wrap}
+.presets button{border:1.5px solid var(--rule);border-radius:999px;padding:7px 12px;font-size:12.5px;font-weight:600;color:var(--dim);transition:.15s}
+.presets button:hover{border-color:var(--ink);color:var(--ink)}
+.never{margin-top:16px;padding-top:14px;border-top:1px solid var(--rule);font-size:12.5px;color:var(--dim);line-height:1.5}
+.never b{color:var(--ink);font-weight:600}
+
+/* ---------- tiles */
+.listhead{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:6px 6px 10px;flex-wrap:wrap}
+.listhead h2{font-size:17px;font-weight:600}
+.listhead p{color:var(--dim);font-size:13px}
+.tiles{list-style:none;display:flex;flex-direction:column;gap:8px;position:relative}
+.tile{background:var(--panel);border-radius:14px;display:grid;grid-template-columns:44px minmax(0,1fr) auto auto;gap:14px;align-items:center;padding:14px 16px 14px 12px;
+  box-shadow:0 1px 0 rgba(25,27,39,.05);cursor:pointer;transition:box-shadow .15s;position:relative}
+.tile:hover{box-shadow:0 1px 0 rgba(25,27,39,.05),0 10px 24px -14px rgba(25,27,39,.35)}
+.tile.moving{transition:transform .5s cubic-bezier(.2,.8,.2,1),box-shadow .15s}
+.rank{font-family:var(--display);font-weight:700;font-size:22px;color:var(--faint);text-align:center;letter-spacing:-.04em}
+.tile:nth-child(-n+3) .rank{color:var(--ink)}
+.who b{display:block;font-weight:600;font-size:15.5px}
+.who span{display:block;color:var(--dim);font-size:13px;margin-top:2px}
+.who small{display:block;color:var(--faint);font-size:12.5px;margin-top:3px}
+.chip{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:15px;color:#fff;letter-spacing:-.04em}
+.chip.a{background:var(--gA)}.chip.b{background:var(--gB)}.chip.c{background:var(--gC)}.chip.d{background:var(--gD)}
+.cost{text-align:right;min-width:104px}
+.cost b{display:block;font-family:var(--display);font-weight:600;font-size:20px;letter-spacing:-.03em;line-height:1.1}
+.cost b.up{color:var(--gD)}.cost b.down{color:var(--gA)}
+.cost small{color:var(--faint);font-size:12px}
+.spark{position:absolute;left:12px;right:12px;bottom:0;height:3px;border-radius:3px 3px 0 0;background:linear-gradient(90deg,var(--cheap) var(--pa),var(--fast) var(--pa) var(--pb),var(--comfy) var(--pb));opacity:.0}
+
+/* ---------- drawer */
+.dwrap{position:fixed;inset:0;z-index:9;background:rgba(25,27,39,.45);display:grid;place-items:center;padding:16px}
+.drawer{background:var(--panel);border-radius:18px;width:100%;max-width:640px;max-height:min(88vh,840px);overflow:auto;padding:24px}
+.drawer .hd{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:6px}
+.drawer h3{font-size:20px;font-weight:600}.drawer h3 span{display:block;font-family:var(--sans);font-weight:400;color:var(--dim);font-size:13px;margin-top:3px;letter-spacing:0}
+.x{width:34px;height:34px;border-radius:50%;background:var(--ground);font-size:20px;color:var(--dim)}
+.lines{list-style:none;margin-top:10px}
+.lines li{display:grid;grid-template-columns:1fr auto;gap:12px;padding:9px 0;border-top:1px solid var(--rule2);align-items:baseline}
+.lines .lab{font-weight:600;font-size:14px}.lines .ev{color:var(--faint);font-size:12.5px;line-height:1.4;margin-top:1px}
+.lines em{font-style:normal;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
+.lines em.cr{color:var(--gA)}.lines em.z{color:var(--faint);font-weight:500}
+.lines li.t{border-top:2px solid var(--ink);margin-top:6px;padding-top:12px}
+.lines li.t .lab{font-family:var(--display)}.lines li.t em{font-family:var(--display);font-size:20px}
+.dnote{color:var(--dim);font-size:12.5px;line-height:1.5;margin-top:12px}
+.book{margin-top:14px;background:var(--ink);color:#fff;font-weight:600;padding:14px 18px;border-radius:12px;width:100%;font-size:15px}
+.book:hover{background:var(--fast)}
+
+.foot{margin-top:26px;color:var(--dim);font-size:13px;line-height:1.55;display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.foot b{color:var(--ink);font-weight:600}
+.cov{border-left:3px solid var(--cheap);padding-left:12px}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (max-width:980px){
+  .main{grid-template-columns:1fr}
+  .dial{position:static}
+  .bar{grid-template-columns:1fr 1fr}.bar label:first-child{grid-column:1/-1}.bar .go{grid-column:1/-1;padding:12px}
+  .foot{grid-template-columns:1fr}
+}
+@media (max-width:600px){
+  .tile{grid-template-columns:32px minmax(0,1fr) auto;gap:10px;padding:12px}
+  .tile .chip{grid-column:3;grid-row:1}
+  .tile .cost{grid-column:2/4;text-align:left;display:flex;gap:10px;align-items:baseline}
+  .rank{font-size:18px}
+}
+</style></head><body>
+<div class="wrap">
+
+<header class="top">
+  <div class="mark">Concorde<span>Go</span></div>
+  <form class="bar" onsubmit="return false" aria-label="Your trip">
+    <label><span>From</span><input id="s-from" value="Wyckoff Ave &amp; Myrtle Ave, Bushwick"></label>
+    <label><span>To</span><input id="s-to" value="London"></label>
+    <label><span>Date</span><input id="s-date" value="Wed 18 Nov"></label>
+    <label><span>Who</span><select id="s-pax"><option>1 adult</option><option>2 adults</option><option>Family of 4</option></select></label>
+    <label><span>Bags</span><select id="s-bags"><option>1 checked</option><option>None</option><option>2 checked</option></select></label>
+    <button class="go" type="button" id="go">Search</button>
+  </form>
+</header>
+
+<div class="main">
+  <aside class="dial">
+    <h1>What matters to you?</h1>
+    <p class="sub">Drag the dot. The list re-ranks as you move, from the same 36 flights, and the price shown is what each one really costs <b>you</b>.</p>
+    <div class="tri" id="tri" data-drag="0">
+      <canvas id="cv" aria-hidden="true"></canvas>
+      <div class="corner c">Comfort<small>a better seat, fewer risks</small></div>
+      <div class="corner a">Price<small>my money</small></div>
+      <div class="corner b">Speed<small>my time</small></div>
+      <div class="handle" id="handle" role="slider" aria-label="Weighting" aria-valuetext=""></div>
+    </div>
+    <div class="readout">
+      <div class="a"><b id="ra">100%</b><span>Price</span></div>
+      <div class="b"><b id="rb">0%</b><span>Speed</span></div>
+      <div class="c"><b id="rc">0%</b><span>Comfort</span></div>
+    </div>
+    <p class="means" id="means"></p>
+    <div class="presets" id="presets">
+      <button data-p="1,0,0">Just cheap</button><button data-p="0,1,0">Just fast</button><button data-p="0,0,1">Just comfy</button><button data-p=".34,.33,.33">Balanced</button><button data-p=".5,.5,0">Cheap &amp; quick</button>
+    </div>
+    <p class="never"><b>The letter never moves.</b> It is the flight&rsquo;s own grade against par for this route, <span id="parn"></span>. Only the order is yours.</p>
+  </aside>
+
+  <section>
+    <div class="listhead"><h2 id="lh"></h2><p id="lp"></p></div>
+    <ol class="tiles" id="tiles"></ol>
+  </section>
+</div>
+
+<div class="foot">
+  <p id="par1"></p>
+  <p class="cov" id="cov"></p>
+</div>
+</div>
+<div id="droot"></div>
+
+<script>
+const D = __DATA__;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const money = c => '$' + Math.abs(Math.round(c/100)).toLocaleString('en-US');
+const signed = c => (c < 0 ? '−' : '+') + money(c);
+const hm = iso => iso.slice(11,16);
+const niceDate = d => new Date(d + 'T12:00:00Z').toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long', timeZone:'UTC'});
+const dur = m => Math.floor(m/60) + 'h' + (m%60 ? String(m%60).padStart(2,'0') : '');
+const gcls = g => ({A:'a',B:'b',C:'c'}[g[0]] || 'd');
+const stopsText = e => e.stops === 0 ? 'nonstop' : e.stops === 1 ? 'via ' + e.route[1] : e.stops + ' stops';
+const ALL = D.results.reference.slice();
+const PR = D.profiles;
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---- the triangle. Barycentric weights (a=price, b=speed, c=comfort), a+b+c=1.
+// Every position maps to one of 66 weightings the real scorer already ran;
+// nothing here re-does the arithmetic.
+const GRID = {}; D.grid_points.forEach((p, i) => { GRID[Math.round(p[0]*10) + '-' + Math.round(p[1]*10)] = i; });
+function gridIndex(a, b){ let i = Math.round(a*10), j = Math.round(b*10); if (i + j > 10){ if (i >= j) i = 10 - j; else j = 10 - i; } return GRID[i + '-' + j]; }
+const tri = $('#tri'), cv = $('#cv'), handle = $('#handle');
+let A = 1, B = 0, C = 0, lastIdx = -1;
+function corners(){ const w = tri.clientWidth, h = tri.clientHeight, pad = 16; return {Cx:w/2, Cy:pad, Ax:pad, Ay:h-pad, Bx:w-pad, By:h-pad}; }
+function toXY(a, b, c){ const k = corners(); return [a*k.Ax + b*k.Bx + c*k.Cx, a*k.Ay + b*k.By + c*k.Cy]; }
+function toBary(x, y){
+  const k = corners(), det = (k.By - k.Cy)*(k.Ax - k.Cx) + (k.Cx - k.Bx)*(k.Ay - k.Cy);
+  let a = ((k.By - k.Cy)*(x - k.Cx) + (k.Cx - k.Bx)*(y - k.Cy)) / det;
+  let b = ((k.Cy - k.Ay)*(x - k.Cx) + (k.Ax - k.Cx)*(y - k.Cy)) / det;
+  let c = 1 - a - b;
+  a = Math.max(0, a); b = Math.max(0, b); c = Math.max(0, c); const s = a + b + c || 1;
+  return [a/s, b/s, c/s];
+}
+function paintTri(){
+  const dpr = devicePixelRatio || 1, w = tri.clientWidth, h = tri.clientHeight;
+  cv.width = w*dpr; cv.height = h*dpr;
+  const ctx = cv.getContext('2d'), img = ctx.createImageData(w*dpr, h*dpr), d = img.data, k = corners();
+  const col = {a:[224,163,46], b:[46,103,232], c:[169,75,166]};
+  const det = (k.By - k.Cy)*(k.Ax - k.Cx) + (k.Cx - k.Bx)*(k.Ay - k.Cy);
+  for (let py = 0; py < h*dpr; py++) for (let px = 0; px < w*dpr; px++){
+    const x = px/dpr, y = py/dpr;
+    const a = ((k.By - k.Cy)*(x - k.Cx) + (k.Cx - k.Bx)*(y - k.Cy)) / det, b = ((k.Cy - k.Ay)*(x - k.Cx) + (k.Ax - k.Cx)*(y - k.Cy)) / det, c = 1 - a - b;
+    const o = (py*w*dpr + px)*4;
+    if (a < -0.012 || b < -0.012 || c < -0.012){ d[o+3] = 0; continue; }
+    const edge = Math.min(a, b, c), soft = Math.min(1, (edge + 0.012)/0.024);
+    const aa = Math.max(a,0), bb = Math.max(b,0), cc = Math.max(c,0), s = aa+bb+cc;
+    // pastel blend: mix toward white so the handle and labels stay readable
+    d[o] = 255 - (255 - (col.a[0]*aa + col.b[0]*bb + col.c[0]*cc)/s) * .55;
+    d[o+1] = 255 - (255 - (col.a[1]*aa + col.b[1]*bb + col.c[1]*cc)/s) * .55;
+    d[o+2] = 255 - (255 - (col.a[2]*aa + col.b[2]*bb + col.c[2]*cc)/s) * .55;
+    d[o+3] = 255 * soft;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+function setWeights(a, b, c, animate){
+  A = a; B = b; C = c;
+  const [x, y] = toXY(a, b, c); handle.style.left = x + 'px'; handle.style.top = y + 'px';
+  $('#ra').textContent = Math.round(a*100) + '%'; $('#rb').textContent = Math.round(b*100) + '%'; $('#rc').textContent = Math.round(c*100) + '%';
+  const hourly = a*PR.cheapest.hourly_value_cents + b*PR.fastest.hourly_value_cents + c*PR.comfort.hourly_value_cents;
+  const cw = a*PR.cheapest.comfort_weight + b*PR.fastest.comfort_weight + c*PR.comfort.comfort_weight;
+  $('#means').innerHTML = 'Right now an hour of your time is worth <b>' + money(hourly) + '</b> and a worse cabin, a tight connection or a red-eye counts <b>' + cw.toFixed(1).replace(/\.0$/, '') + '&times;</b> the usual.';
+  handle.setAttribute('aria-valuetext', Math.round(a*100) + '% price, ' + Math.round(b*100) + '% speed, ' + Math.round(c*100) + '% comfort');
+  const idx = gridIndex(a, b);
+  if (idx !== lastIdx){ lastIdx = idx; paintTiles(idx, animate); }
+}
+let prevEff = {};
+function tileHTML(e, i, idx){
+  const eff = e.grid[idx], was = prevEff[e.id], dir = was == null || was === eff ? '' : eff > was ? 'up' : 'down';
+  return `<li class="tile" data-id="${esc(e.id)}"><div class="rank num">${i+1}</div>
+    <div class="who"><b>${esc(e.carrier_name)} <span style="display:inline;color:var(--dim);font-weight:500">${esc(e.flight)}</span></b><span>${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} &middot; ${stopsText(e)} &middot; ${dur(e.door_minutes)} door to door</span><small>${esc(e.brand)}${e.bags_included ? ' · bag included' : ' · bag extra'}</small></div>
+    <div class="chip ${gcls(e.grade)}" title="Grade ${e.grade}">${e.grade}</div>
+    <div class="cost"><b class="num ${dir}">${money(eff)}</b><small class="num">${money(e.ticket_cents)} ticket</small></div></li>`;
+}
+function paintTiles(idx, animate){
+  const list = ALL.slice().sort((x, y) => (x.grid[idx] - y.grid[idx]) || (x.id < y.id ? -1 : 1));
+  const before = {};
+  if (animate) document.querySelectorAll('.tile').forEach(t => before[t.dataset.id] = t.getBoundingClientRect().top);
+  $('#tiles').innerHTML = list.map((e, i) => tileHTML(e, i, idx)).join('');
+  prevEff = {}; list.forEach(e => prevEff[e.id] = e.grid[idx]);
+  $('#lh').textContent = 'Your order';
+  $('#lp').textContent = D.query.total_found + ' flights found for ' + D.query.origin + ' to ' + D.query.destination + ', ' + niceDate(D.query.date) + ' · the best ' + list.length + ' shown';
+  if (animate && !REDUCED) document.querySelectorAll('.tile').forEach(t => {
+    const b = before[t.dataset.id]; if (b == null) return; const d = b - t.getBoundingClientRect().top; if (!d) return;
+    t.style.transform = 'translateY(' + d + 'px)';
+    requestAnimationFrame(() => { t.classList.add('moving'); t.style.transform = ''; });
+    t.addEventListener('transitionend', () => t.classList.remove('moving'), {once:true});
+  });
+}
+function nearestNamed(){ return A >= B && A >= C ? 'cheapest' : B >= C ? 'fastest' : 'comfort'; }
+function openDrawer(id){
+  const e = ALL.find(x => x.id === id), t = nearestNamed(), by = e.by[t], idx = gridIndex(A, B), b = e.booking[0];
+  const NAMES = {cheapest:'price', fastest:'speed', comfort:'comfort'};
+  $('#droot').innerHTML = `<div class="dwrap" id="dwrap"><div class="drawer" role="dialog" aria-modal="true" aria-label="Ledger">
+    <div class="hd"><h3>${esc(e.carrier_name)} ${esc(e.flight)}<span>${esc(e.brand)} &middot; ${e.route.join(' → ')} &middot; ${hm(e.depart)}–${hm(e.arrive)}${e.day_offset ? ' +1' : ''}</span></h3><button class="x" id="dx" aria-label="Close">&times;</button></div>
+    <ul class="lines">${by.lines.map(l => `<li><div><div class="lab">${esc(l.label)}</div><div class="ev">${esc(l.evidence)}</div></div><em class="${l.cents < 0 ? 'cr' : l.cents === 0 ? 'z' : ''}">${l.cents === 0 ? '—' : signed(l.cents)}</em></li>`).join('')}
+    <li class="t"><div class="lab">All in at your dial</div><em>${money(e.grid[idx])}</em></li></ul>
+    <p class="dnote">Itemised at the &ldquo;${NAMES[t]}&rdquo; corner of the dial, which is nearest to where you are; the total above is at your exact position. Grade ${e.grade}: ${money(e.effective_cents)} all in for a neutral traveller, against par ${money(D.query.par_cents)}.</p>
+    <button class="book">${b ? 'Book with ' + esc(b.who) + ' · ' + money(b.price_cents) : 'Book'}</button></div></div>`;
+  $('#dx').focus();
+}
+// ---- boot
+paintTri(); setWeights(1, 0, 0, false);
+$('#parn').textContent = money(D.query.par_cents) + ' for a nonstop in main cabin with a bag';
+const P = D.par;
+$('#par1').innerHTML = '<b>How the price is made.</b> Ticket, the bag you carry, the ride from your address and to their door at that hour, your time at the rate on the dial, and small charges for what makes a trip worse. Par for this route is ' + money(D.query.par_cents) + ' &mdash; ' + esc(P.reads_as) + ', all in. About par is an A.';
+$('#cov').innerHTML = '<b>Draft data.</b> ' + esc(D.gaps[0] || '') + '. ' + esc(D.verdict || '') + '. A real Duffel search on a test token; some fares and times are invented.';
+
+let dragging = false;
+function onPoint(ev){ const r = tri.getBoundingClientRect(); const [a, b, c] = toBary(ev.clientX - r.left, ev.clientY - r.top); setWeights(a, b, c, true); }
+tri.addEventListener('pointerdown', ev => { dragging = true; tri.dataset.drag = '1'; tri.setPointerCapture(ev.pointerId); onPoint(ev); });
+tri.addEventListener('pointermove', ev => { if (dragging) onPoint(ev); });
+tri.addEventListener('pointerup', () => { dragging = false; tri.dataset.drag = '0'; });
+tri.addEventListener('pointercancel', () => { dragging = false; tri.dataset.drag = '0'; });
+$('#presets').addEventListener('click', ev => { const b = ev.target.closest('button[data-p]'); if (!b) return; const [a, bb, c] = b.dataset.p.split(',').map(Number); setWeights(a, bb, c, true); });
+$('#tiles').addEventListener('click', ev => { const t = ev.target.closest('.tile'); if (t) openDrawer(t.dataset.id); });
+document.addEventListener('click', ev => { if (ev.target.id === 'dx' || ev.target.id === 'dwrap') $('#droot').innerHTML = ''; });
+document.addEventListener('keydown', ev => {
+  if (ev.key === 'Escape') $('#droot').innerHTML = '';
+  if (document.activeElement === handle){ const s = .05; let a = A, b = B, c = C;
+    if (ev.key === 'ArrowLeft'){ a += s; b -= s; } else if (ev.key === 'ArrowRight'){ b += s; a -= s; } else if (ev.key === 'ArrowUp'){ c += s; a -= s/2; b -= s/2; } else if (ev.key === 'ArrowDown'){ c -= s; a += s/2; b += s/2; } else return;
+    a = Math.max(0,a); b = Math.max(0,b); c = Math.max(0,c); const t = a+b+c; setWeights(a/t, b/t, c/t, true); ev.preventDefault(); }
+});
+handle.tabIndex = 0;
+addEventListener('resize', () => { paintTri(); setWeights(A, B, C, false); });
+$('#go').addEventListener('click', () => $('#tiles').scrollIntoView({behavior:'smooth', block:'start'}));
+</script>
+</body></html>

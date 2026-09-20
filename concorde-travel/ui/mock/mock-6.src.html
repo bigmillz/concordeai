@@ -1,0 +1,286 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ConcordeGo · Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --board:#0E1114;--flap:#1A1F24;--flap2:#20262C;--edge:#06080A;--letter:#EEE7D6;--amber:#F0B441;--dim:#7E8791;--line:#262D34;
+  --gA:#5CC993;--gB:#B4CF5E;--gC:#F0B441;--gD:#E4584B;
+  --paper:#F5F1E6;--pink:#1C1A16;--pdim:#7A7466;--prule:#CFC7B4;--pred:#B4342A;
+  --cond:"Barlow Condensed","Arial Narrow",Impact,sans-serif;--sans:"Barlow","Helvetica Neue",Arial,sans-serif;--mono:"Courier Prime","Courier New",monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{color-scheme:dark}
+body{background:var(--board);color:var(--letter);font:15px/1.45 var(--sans);-webkit-font-smoothing:antialiased;padding-block:0 80px;overflow-x:hidden}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:clamp(14px,3vw,28px)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+.cond{font-family:var(--cond);text-transform:uppercase;letter-spacing:.06em}
+
+/* ---------- top strip */
+.strip{display:flex;justify-content:space-between;align-items:center;padding-block:18px 14px;border-bottom:1px solid var(--line)}
+.mark{font-family:var(--cond);font-size:22px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.mark b{color:var(--amber);font-weight:700}
+.clock{font-family:var(--cond);font-size:16px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase}
+.clock b{color:var(--letter);font-weight:600}
+
+/* ---------- request line */
+.req{display:grid;grid-template-columns:2.4fr 1fr 1fr .85fr .75fr auto;gap:8px;padding-block:18px;border-bottom:1px solid var(--line);align-items:end}
+.req label{display:flex;flex-direction:column;gap:5px;min-width:0}
+.req label span{font-family:var(--cond);font-size:12px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;white-space:nowrap}
+.req input,.req select{width:100%;background:linear-gradient(var(--flap) 0 49%,var(--edge) 49% 51%,var(--flap2) 51%);border:1px solid var(--edge);color:var(--amber);
+  font:600 19px/1 var(--cond);text-transform:uppercase;letter-spacing:.05em;padding:11px 10px;border-radius:3px;min-width:0;-webkit-appearance:none;appearance:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+.req select{background-image:linear-gradient(var(--flap) 0 49%,var(--edge) 49% 51%,var(--flap2) 51%)}
+.req input:hover,.req select:hover{border-color:#3A424B}
+.req .go{background:var(--amber);color:var(--board);font:700 18px/1 var(--cond);letter-spacing:.14em;text-transform:uppercase;padding:14px 22px;border-radius:3px;
+  transition:filter .15s;white-space:nowrap}
+.req .go:hover{filter:brightness(1.08)}
+
+/* ---------- board head */
+.bhead{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-block:22px 12px;flex-wrap:wrap}
+.title{font-family:var(--cond);font-size:clamp(28px,4vw,44px);font-weight:700;letter-spacing:.08em;text-transform:uppercase;line-height:1}
+.title span{color:var(--dim);font-weight:500;margin-left:14px;font-size:.55em;letter-spacing:.14em;vertical-align:middle}
+.tabs{display:flex;gap:2px;background:var(--edge);padding:2px;border-radius:4px}
+.tabs button{font:600 14px/1 var(--cond);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);padding:11px 16px;border-radius:3px;transition:.15s}
+.tabs button[aria-pressed=true]{background:var(--amber);color:var(--board)}
+.tabs button:hover:not([aria-pressed=true]){color:var(--letter)}
+.legend{font-family:var(--cond);font-size:12px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;width:100%}
+.legend b{color:var(--letter);font-weight:600}
+
+/* ---------- board */
+.board{border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#0B0E11}
+.cols,.rowb{display:grid;grid-template-columns:82px 112px minmax(0,1fr) 118px 96px 112px 116px 72px;gap:6px;align-items:center;padding:0 10px}
+.cols span{white-space:nowrap}
+.cols{padding-block:10px;background:#0B0E11;border-bottom:1px solid var(--line)}
+.cols span{font-family:var(--cond);font-size:12px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
+.cols .r,.rowb .r{text-align:right}
+.rowb{width:100%;text-align:left;padding-block:5px;border-bottom:1px solid var(--edge);transition:background .12s}
+.rowb:hover{background:#12161A}
+.rowb[aria-selected=true]{background:#171C21}
+.cell{display:block;background:linear-gradient(var(--flap) 0 49%,var(--edge) 49% 51%,var(--flap2) 51%);border-radius:3px;padding:9px 9px 8px;
+  font:600 20px/1 var(--cond);letter-spacing:.06em;text-transform:uppercase;color:var(--letter);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+.cell.dep{color:var(--amber)}
+.cell.air{font-size:17px;letter-spacing:.05em}
+.cell.air small{display:block;font-size:11px;letter-spacing:.14em;color:var(--dim);margin-top:3px;font-weight:600}
+.cell.dim{color:var(--dim)}
+.cell.via{font-size:16px;letter-spacing:.05em}
+.ph{display:none}
+.cell.g{text-align:center;font-weight:700;font-size:22px}
+.gA{color:var(--gA)}.gB{color:var(--gB)}.gC{color:var(--gC)}.gD{color:var(--gD)}
+.cell.flip{animation:flap .28s steps(2) 1}
+@keyframes flap{0%{transform:scaleY(.15);filter:brightness(1.6)}100%{transform:none}}
+.foot{display:flex;justify-content:space-between;gap:16px;padding:14px 12px;font-family:var(--cond);font-size:13px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;flex-wrap:wrap}
+.foot b{color:var(--letter);font-weight:600}
+
+/* ---------- par & coverage */
+.par{margin-top:26px;display:grid;grid-template-columns:1.2fr 1fr;gap:26px;color:var(--dim);font-size:14.5px;line-height:1.6}
+.par h2{font-family:var(--cond);font-size:16px;letter-spacing:.16em;text-transform:uppercase;color:var(--letter);margin-bottom:8px;font-weight:600}
+.par b{color:var(--letter);font-weight:500}
+.par ul{list-style:none;border-top:1px solid var(--line)}
+.par li{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line);font-family:var(--cond);font-size:15px;letter-spacing:.06em;text-transform:uppercase}
+.par li.t{color:var(--amber)}
+.cov{margin-top:22px;border-left:3px solid var(--amber);padding:4px 14px;color:var(--dim);font-size:13.5px;line-height:1.55}
+.cov b{color:var(--amber);font-weight:600}
+
+/* ---------- receipt */
+.rwrap{position:fixed;inset:0;z-index:9;pointer-events:none}
+.rwrap[data-on="1"]{pointer-events:auto}
+.shade{position:absolute;inset:0;background:rgba(0,0,0,.45);opacity:0;transition:opacity .25s}
+.rwrap[data-on="1"] .shade{opacity:1}
+.receipt{position:absolute;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--paper);color:var(--pink);font-family:var(--mono);
+  padding:28px 28px 40px;overflow:auto;transform:translateX(104%);transition:transform .32s cubic-bezier(.2,.8,.2,1);box-shadow:-20px 0 60px rgba(0,0,0,.5)}
+.rwrap[data-on="1"] .receipt{transform:none}
+.receipt:before{content:"";position:absolute;left:0;right:0;top:0;height:8px;
+  background:linear-gradient(135deg,transparent 4px,var(--paper) 4px) 0 0/8px 8px,linear-gradient(45deg,transparent 4px,var(--paper) 4px) 0 0/8px 8px;display:none}
+.rx{position:absolute;top:14px;right:16px;font-size:26px;line-height:1;color:var(--pdim);width:36px;height:36px}
+.rx:hover{color:var(--pink)}
+.rhead{text-align:center;letter-spacing:.12em;font-size:13px;color:var(--pdim);text-transform:uppercase;padding-bottom:14px;border-bottom:1px dashed var(--prule)}
+.rhead b{display:block;color:var(--pink);font-size:18px;letter-spacing:.2em;margin-bottom:6px}
+.rflight{padding:16px 0 12px;border-bottom:1px dashed var(--prule)}
+.rflight b{display:block;font-size:20px;font-weight:700}
+.rflight span{display:block;color:var(--pdim);font-size:13px;margin-top:4px}
+.rl{list-style:none;padding:8px 0}
+.rl li{display:flex;align-items:baseline;gap:6px;padding:6px 0;font-size:13.5px}
+.rl li .lab{flex:1 1 auto;min-width:0}
+.rl li .lead{flex:1 0 12px;border-bottom:1px dotted var(--pdim);transform:translateY(-4px);min-width:12px}
+.rl li .amt{flex:0 0 auto;font-weight:700}
+.rl li .amt.cr{color:#1F6B4E}
+.rl li .ev{display:block;color:var(--pdim);font-size:11.5px;line-height:1.4;margin-top:2px;padding-right:8px}
+.rtot{display:flex;justify-content:space-between;align-items:baseline;border-top:2px solid var(--pink);border-bottom:1px dashed var(--prule);padding:12px 0;font-weight:700}
+.rtot b{font-size:26px}
+.rstamp{margin:22px auto 8px;width:max-content;border:3px double var(--pred);color:var(--pred);padding:8px 16px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+  transform:rotate(-6deg);font-size:14px;text-align:center;line-height:1.35;opacity:.9}
+.rstamp b{display:block;font-size:34px;letter-spacing:.04em;line-height:1}
+.rbook{margin-top:22px;width:100%;background:var(--pink);color:var(--paper);font:700 15px/1 var(--mono);letter-spacing:.08em;padding:16px;text-transform:uppercase;border-radius:2px}
+.rbook:hover{background:#000}
+.rnote{margin-top:14px;font-size:11.5px;color:var(--pdim);line-height:1.5;text-align:center}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media (max-width:1000px){
+  .req{grid-template-columns:1fr 1fr;} .req label:first-child{grid-column:1/-1} .req .go{grid-column:1/-1}
+  .par{grid-template-columns:1fr}
+}
+@media (max-width:760px){
+  .cols,.rowb{grid-template-columns:72px minmax(0,1fr) 84px 46px;gap:5px;padding-inline:6px}
+  .cols span{overflow:hidden;text-overflow:ellipsis;letter-spacing:.08em;font-size:11px}
+  .via,.arr,.d2d,.fl{display:none}
+  .ph{display:inline}
+  .tabs{width:100%}.tabs button{flex:1;padding:11px 6px;font-size:12.5px;letter-spacing:.1em;text-align:center}
+  .cell{font-size:16px;letter-spacing:.03em;padding:8px 6px 7px}
+  .cell.air{font-size:14.5px}
+  .cell.g{font-size:19px}
+  .receipt{top:auto;height:min(88vh,760px);width:100%;transform:translateY(104%);border-radius:14px 14px 0 0}
+  .strip .clock{display:none}
+}
+</style></head><body>
+<div class="wrap">
+
+<header class="strip">
+  <div class="mark">Concorde<b>Go</b></div>
+  <div class="clock">Wed 18 Nov &middot; <b>New York</b> local</div>
+</header>
+
+<form class="req" onsubmit="return false" aria-label="Your trip">
+  <label><span>From</span><input id="r-from" value="Wyckoff Ave &amp; Myrtle Ave, Bushwick"></label>
+  <label><span>To</span><input id="r-to" value="London"></label>
+  <label><span>Date</span><input id="r-date" value="18 Nov 2026"></label>
+  <label><span>Travellers</span><select id="r-pax"><option>1 adult</option><option>2 adults</option><option>4 people</option></select></label>
+  <label><span>Bags</span><select id="r-bags"><option>1 bag</option><option>No bags</option><option>2 bags</option></select></label>
+  <button class="go" type="button" id="go">Search</button>
+</form>
+
+<div class="bhead">
+  <h1 class="title">Departures<span id="found"></span></h1>
+  <div class="tabs" id="tabs" role="group" aria-label="Rank by">
+    <button data-t="cheapest" aria-pressed="true">Cheapest</button>
+    <button data-t="fastest" aria-pressed="false">Fastest</button>
+    <button data-t="comfort" aria-pressed="false">Most comfortable</button>
+  </div>
+  <div class="legend">Ranked for <b id="rankedfor">cheapest, all in</b>. The order changes with the tab. The letters never do.</div>
+</div>
+
+<div class="board" role="table" aria-label="Flights">
+  <div class="cols" role="row">
+    <span>Departs</span><span class="fl">Flight</span><span>Airline</span><span class="via">Via</span><span class="arr">Arrives</span><span class="d2d r">Door to door</span><span class="r">All in</span><span style="text-align:center">Grade</span>
+  </div>
+  <div id="rows"></div>
+  <div class="foot"><span>All in = ticket + bag + the ride from <b>your door</b> + your time + the small print &middot; tap a row for the receipt</span><span id="parfoot"></span></div>
+</div>
+
+<section class="par">
+  <div>
+    <h2>What the grade is</h2>
+    <p id="par1"></p>
+    <p style="margin-top:8px">The letter is a report card for the flight itself, not for its place in the list. Sort any way you like, search on any day: <b>BA 117 keeps its letter.</b></p>
+  </div>
+  <div>
+    <h2>The reference trip, itemised</h2>
+    <ul id="parledger"></ul>
+  </div>
+</section>
+<div class="cov" id="cov"></div>
+</div>
+
+<div class="rwrap" id="rwrap" data-on="0">
+  <div class="shade" id="shade"></div>
+  <aside class="receipt" id="receipt" role="dialog" aria-modal="true" aria-label="Receipt"></aside>
+</div>
+
+<script>
+const D = __DATA__;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const money = c => '$' + Math.abs(Math.round(c/100)).toLocaleString('en-US');
+const signed = c => (c < 0 ? '−' : '+') + money(c);
+const hm = iso => iso.slice(11,16);
+const dur = m => Math.floor(m/60) + 'h' + String(m%60).padStart(2,'0');
+const gcls = g => 'g' + ({A:'A',B:'B',C:'C'}[g[0]] || 'D');
+const via = e => e.stops === 0 ? 'Nonstop' : e.route.slice(1,-1).join(' ');
+const NAMES = {cheapest:'cheapest, all in', fastest:'fastest door to door', comfort:'most comfortable'};
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const GLYPHS = '0123456789ABCDEFGHJKLMNPRSTUVWXYZ';
+let T = 'cheapest', SEL = null;
+
+function rowHTML(e){
+  const eff = e.by[T].effective_cents;
+  return `<button class="rowb" role="row" data-id="${esc(e.id)}" aria-selected="${SEL === e.id}">
+    <span class="cell dep num" data-flip>${hm(e.depart)}</span>
+    <span class="cell num fl" data-flip>${esc(e.flight.replace(/^([A-Z0-9]{2})(\d)/, '$1 $2'))}</span>
+    <span class="cell air">${esc(e.carrier_name)}<small><span class="ph">${esc(e.flight)} · </span>${esc(e.brand)}${e.operator !== e.carrier ? ' · flown by ' + esc(e.operator) : ''}</small></span>
+    <span class="cell via dim">${esc(via(e))}</span>
+    <span class="cell arr num">${hm(e.arrive)}${e.day_offset ? '<small style="font-size:11px;color:var(--dim);margin-left:3px">+1</small>' : ''}</span>
+    <span class="cell d2d dim num r">${dur(e.door_minutes)}</span>
+    <span class="cell num r" data-flip>${money(eff)}</span>
+    <span class="cell g ${gcls(e.grade)}">${e.grade}</span>
+  </button>`;
+}
+function flapTo(el, text, delay){
+  if (REDUCED){ el.textContent = text; return; }
+  const target = text, n = 5;
+  let k = 0;
+  setTimeout(() => {
+    el.classList.remove('flip'); void el.offsetWidth; el.classList.add('flip');
+    const iv = setInterval(() => {
+      k++;
+      if (k >= n){ clearInterval(iv); el.textContent = target; return; }
+      el.textContent = target.replace(/[0-9A-Z]/g, ch => Math.random() < .6 ? GLYPHS[Math.floor(Math.random()*GLYPHS.length)] : ch);
+    }, 42);
+  }, delay);
+}
+function paint(animate){
+  const list = D.results[T];
+  const prev = {};
+  if (animate) document.querySelectorAll('.rowb').forEach(r => { prev[r.dataset.id] = r.querySelectorAll('[data-flip]'); });
+  $('#rows').innerHTML = list.map(rowHTML).join('');
+  $('#rankedfor').textContent = NAMES[T];
+  if (animate){
+    document.querySelectorAll('.rowb').forEach((r, i) => {
+      r.querySelectorAll('[data-flip]').forEach(c => flapTo(c, c.textContent, i * 14));
+    });
+  }
+}
+function receiptHTML(e){
+  const lines = e.by[T].lines, eff = e.by[T].effective_cents, b = e.booking[0];
+  return `<button class="rx" id="rx" aria-label="Close">&times;</button>
+  <div class="rhead"><b>ConcordeGo</b>Itemised &middot; not a booking</div>
+  <div class="rflight"><b>${esc(e.carrier_name)} ${esc(e.flight)}</b><span>${esc(e.brand)} &middot; ${e.route.join(' → ')} &middot; ${hm(e.depart)}–${hm(e.arrive)}${e.day_offset ? ' +1' : ''} &middot; ${dur(e.door_minutes)} door to door</span></div>
+  <ul class="rl">${lines.map(l => `<li><span class="lab">${esc(l.label)}<span class="ev">${esc(l.evidence)}</span></span><span class="lead"></span><span class="amt ${l.cents < 0 ? 'cr' : ''}">${l.cents === 0 ? '—' : signed(l.cents)}</span></li>`).join('')}</ul>
+  <div class="rtot"><span>All in, ${NAMES[T]}</span><b>${money(eff)}</b></div>
+  <div class="rstamp">Grade<b>${e.grade}</b>par ${money(D.query.par_cents)}</div>
+  <button class="rbook">${b ? 'Book with ' + esc(b.who) + ' · ' + money(b.price_cents) : 'Book'}</button>
+  <div class="rnote">${b ? esc(b.note) : ''}<br>Grade from the neutral ledger: ${money(e.effective_cents)} all in.</div>`;
+}
+function open(id){
+  const e = D.results[T].find(x => x.id === id); SEL = id;
+  document.querySelectorAll('.rowb').forEach(r => r.setAttribute('aria-selected', r.dataset.id === id));
+  $('#receipt').innerHTML = receiptHTML(e);
+  $('#rwrap').dataset.on = '1'; $('#receipt').scrollTop = 0; $('#rx').focus();
+}
+function close(){ $('#rwrap').dataset.on = '0'; SEL = null; document.querySelectorAll('.rowb').forEach(r => r.setAttribute('aria-selected','false')); }
+
+// ---- boot
+$('#found').textContent = D.query.total_found + ' flights · ' + D.results.cheapest.length + ' shown';
+const P = D.par;
+$('#parfoot').textContent = 'graded against par ' + money(D.query.par_cents);
+$('#par1').innerHTML = 'Every flight is turned into one number: the ticket, the bag you carry, the ride from your address at that hour, your time at a rate, and small charges for the things that make a trip worse. That number against <b>par</b> &mdash; ' +
+  money(D.query.par_cents) + ', what a nonstop in main cabin with a bag costs all in on this route in ' + ['','January','February','March','April','May','June','July','August','September','October','November','December'][P.month] + ' &mdash; is the letter. About par is an A.';
+$('#parledger').innerHTML = P.ledger.map(l => `<li><span>${esc(l.label)}</span><span class="num">${signed(l.cents)}</span></li>`).join('') + `<li class="t"><span>Par</span><span class="num">${money(P.par_cents)}</span></li>`;
+$('#cov').innerHTML = '<b>Draft data.</b> ' + esc(D.gaps[0] || '') + '. ' + esc(D.verdict || '') + '. A real Duffel search on a test token, so some fares and times are invented.';
+paint(false);
+
+$('#tabs').addEventListener('click', ev => {
+  const b = ev.target.closest('button[data-t]'); if (!b || b.dataset.t === T) return;
+  T = b.dataset.t;
+  $('#tabs').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  close(); paint(true);
+});
+$('#rows').addEventListener('click', ev => { const r = ev.target.closest('.rowb'); if (r) open(r.dataset.id); });
+document.addEventListener('click', ev => { if (ev.target.id === 'rx' || ev.target.id === 'shade') close(); });
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') close(); });
+$('#go').addEventListener('click', () => { paint(true); $('.board').scrollIntoView({behavior:'smooth', block:'start'}); });
+</script>
+</body></html>

@@ -1,0 +1,207 @@
+#!/usr/bin/env python3
+"""Score a real capture and write slim.json, the data every mockup inlines.
+
+    python3 concorde-travel/ui/mock/data.py                      # the trimmed 23-offer sample
+    python3 concorde-travel/ui/mock/data.py path/to/capture.json # a fuller capture
+    python3 concorde-travel/ui/mock/build.py                     # then inline it
+
+Nothing in the mockups is a placeholder: every dollar figure, grade, ledger line
+and leg length here came out of scorer.py over a real Duffel response, at the
+modelled par. The old slim.json was built by hand from a script that never made
+it into the repo, against the retired $1,050 guess - which is why its grades
+were almost all A+ and why the second design round could not simply reuse it.
+
+Two additions over what the page itself gets from /api/live:
+
+- `grid`: the effective cost of every option at 66 weightings spanning the
+  triangle between the three named targets. The Dial mockup re-ranks live as
+  the handle moves, and rather than approximate the scorer in JavaScript (two
+  models drift) each point is the real scorer at that exact profile. Hard rule
+  1 in the browser: same weights, same order, every time.
+- `results`: the pool sorted under each named target, so a mockup can flip
+  between them without sorting anything itself.
+"""
+import collections
+import json
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
+sys.path.insert(0, os.path.join(ROOT, "concorde-travel"))
+import adapter    # noqa: E402
+import scorer     # noqa: E402
+import server     # noqa: E402
+
+POOL = 36          # options carried; a real page shows about this many before "more"
+STEPS = 10         # triangle resolution: (STEPS+1)(STEPS+2)/2 = 66 weightings
+NAMED = {"cheapest": (1, 0, 0), "fastest": (0, 1, 0), "comfort": (0, 0, 1)}
+
+
+def blend(a, b, c, profiles):
+    """A profile on the triangle: a, b, c weight the three named targets."""
+    p = [profiles["cheapest"], profiles["fastest"], profiles["comfort"]]
+    return {
+        "label": "dial",
+        "hourly_value_cents": int(round(a * p[0]["hourly_value_cents"] + b * p[1]["hourly_value_cents"]
+                                        + c * p[2]["hourly_value_cents"])),
+        "comfort_weight": a * p[0]["comfort_weight"] + b * p[1]["comfort_weight"] + c * p[2]["comfort_weight"],
+        "risk_weight": a * p[0]["risk_weight"] + b * p[1]["risk_weight"] + c * p[2]["risk_weight"],
+    }
+
+
+def grid_points():
+    pts = []
+    for i in range(STEPS + 1):
+        for j in range(STEPS + 1 - i):
+            pts.append((i / STEPS, j / STEPS, (STEPS - i - j) / STEPS))
+    return pts
+
+
+def carrier_name(display, code):
+    head = display.split(" · ")[0].strip()
+    parts = head.split()
+    if parts and parts[-1].upper().startswith(code) and any(ch.isdigit() for ch in parts[-1]):
+        parts = parts[:-1]
+    return " ".join(parts) or code
+
+
+def main(path):
+    raw = json.load(open(path, encoding="utf-8"))
+    sc = adapter.from_feed(raw, origin_key="Bushwick, Brooklyn", checked_bags=1)
+    if "error" in sc:
+        sys.exit("adapter: %s" % sc["error"])
+    cov = adapter.coverage(sc)
+    profiles = sc["query"]["profiles"]
+
+    # The fictional test carrier is filtered here, not in the adapter: a real
+    # search never returns it, and a mockup should look like a real search.
+    opts = [o for o in sc["options"]
+            if not any(s["marketing"]["carrier"] == "ZZ" for s in o["segments"])]
+
+    # Pool: the best under each target, then filled by the reference order.
+    ref = {o["option_id"]: scorer.score(sc, o, "reference") for o in opts}
+    feasible = [o for o in opts if not ref[o["option_id"]].infeasible_reason
+                and not ref[o["option_id"]].filtered_reason]
+    # Pool: the best ten under each target, then the rest of the ranking sampled
+    # evenly so the page carries the connections and the C-to-F grades a real
+    # search returns. A pool of only the best looks like a brochure.
+    pool_ids = []
+    for prof in NAMED:
+        ranked = sorted(feasible, key=lambda o: (scorer.score(sc, o, prof).effective_cents, o["option_id"]))
+        for o in ranked[:10]:
+            if o["option_id"] not in pool_ids:
+                pool_ids.append(o["option_id"])
+    rest = [o for o in sorted(feasible, key=lambda o: (ref[o["option_id"]].effective_cents, o["option_id"]))
+            if o["option_id"] not in pool_ids]
+    need = max(0, POOL - len(pool_ids))
+    if rest and need:
+        step = len(rest) / float(need)
+        for k in range(need):
+            o = rest[min(len(rest) - 1, int(k * step))]
+            if o["option_id"] not in pool_ids:
+                pool_ids.append(o["option_id"])
+    pool = [o for o in feasible if o["option_id"] in pool_ids]
+
+    pts = grid_points()
+    for k, (a, b, c) in enumerate(pts):
+        profiles["dial-%d" % k] = blend(a, b, c, profiles)
+
+    entries = {}
+    for o in pool:
+        v = server._view(sc, o, "reference")
+        code = v["carrier"]
+        e = collections.OrderedDict()
+        e["id"] = v["option_id"]
+        e["name"] = v["display_name"]
+        e["carrier"] = code
+        e["carrier_name"] = carrier_name(v["display_name"], code)
+        e["flight"] = v["segments"][0]["flight"].replace(" ", "")
+        e["operator"] = o["segments"][0]["operating"]["carrier"]
+        e["brand"] = v["fare_brand"]
+        e["route"] = v["route"].split(" - ")
+        e["depart"] = v["depart_iso"]
+        e["arrive"] = v["arrive_iso"]
+        e["day_offset"] = v["day_offset"]
+        e["stops"] = v["stops"]
+        e["grade"] = v["grade"]
+        e["reference_cents"] = v["reference_cents"]
+        e["ticket_cents"] = v["ticket_cents"]
+        e["door_minutes"] = v["door_to_door_minutes"]
+        e["bags_included"] = v["bag_included"]
+        e["rating"] = (v["carrier_rating"] or {}).get("rating")
+        e["equipment"] = [s["equipment"] for s in v["segments"]]
+        e["pitch"] = [(s["claims"] or {}).get("seat_pitch_inches") for s in v["segments"]]
+        e["segments"] = [{"flight": s["flight"], "from": s["from"], "to": s["to"],
+                          "dep": s["dep"], "arr": s["arr"], "equipment": s["equipment"]}
+                         for s in v["segments"]]
+        e["booking"] = v["booking"]
+        # Per-target: effective, the ledger and the legs (the ground choice can
+        # differ by target, so the legs are per target too).
+        e["by"] = {}
+        for prof in NAMED:
+            pv = server._view(sc, o, prof)
+            e["by"][prof] = {
+                "effective_cents": pv["effective_cents"],
+                "lines": [{"code": l["code"], "label": l["label"], "cents": l["amount_cents"],
+                           "evidence": l["evidence"], "kind": l["kind"]} for l in pv["lines"]],
+                "legs": [{"kind": l["kind"], "label": l["label"], "minutes": l["minutes"],
+                          "quality": l["quality"], "tip": l["tip"]} for l in pv["bar"]],
+            }
+        # The reference profile lives at the top level (the first round's
+        # mockups read it there) and is the ledger the GRADE is made of.
+        e["effective_cents"] = v["effective_cents"]
+        e["lines"] = [{"code": l["code"], "label": l["label"], "cents": l["amount_cents"],
+                       "evidence": l["evidence"], "kind": l["kind"]} for l in v["lines"]]
+        e["legs"] = [{"kind": l["kind"], "label": l["label"], "minutes": l["minutes"],
+                      "quality": l["quality"], "tip": l["tip"]} for l in v["bar"]]
+        e["changes"] = o["tickets"][0]["entitlements"].get("changes", "unknown")
+        e["grid"] = [scorer.score(sc, o, "dial-%d" % k).effective_cents for k in range(len(pts))]
+        entries[e["id"]] = e
+
+    results = collections.OrderedDict()
+    for prof in ("cheapest", "fastest", "comfort", "reference"):
+        eff = lambda i: (entries[i]["by"][prof]["effective_cents"] if prof in NAMED
+                         else entries[i]["effective_cents"])
+        results[prof] = [entries[i] for i in sorted(entries, key=lambda i: (eff(i), i))]
+
+    out = collections.OrderedDict()
+    out["_provenance"] = {
+        "built_from": os.path.basename(path),
+        "note": "Real Duffel search, scored by scorer.py at the modelled par. A duffel_test_ "
+                "token invents some prices and schedules; the fictional carrier ZZ is filtered.",
+        "options_in_capture": len(sc["options"]), "pool": len(pool),
+    }
+    out["query"] = {
+        "origin": sc["query"]["origin"]["label"],
+        "origin_full": "Wyckoff Ave & Myrtle Ave, Bushwick, Brooklyn 11237",
+        "destination": sc["query"]["destination"]["label"],
+        "date": sc["query"]["depart_date"],
+        "adults": 1, "bags": 1,
+        "par_cents": sc["query"]["route_par_cents"],
+        "total_found": len(sc["options"]), "dropped": len(sc.get("_dropped") or []),
+    }
+    out["par"] = {k: sc["_par"].get(k) for k in
+                  ("source", "par_cents", "fare_cents", "miles", "market", "month",
+                   "season_factor", "reads_as", "reference", "ledger")}
+    out["profiles"] = {k: profiles[k] for k in ("reference", "cheapest", "fastest", "comfort")}
+    out["grid_points"] = [[round(a, 2), round(b, 2), round(c, 2)] for a, b, c in pts]
+    out["verdict"] = cov.get("verdict")
+    out["gaps"] = cov.get("gaps", [])
+    out["strengths"] = cov.get("strengths", [])
+    out["results"] = results
+
+    dest = os.path.join(HERE, "slim.json")
+    json.dump(out, open(dest, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+    grades = collections.Counter(e["grade"] for e in entries.values())
+    print("%s: %d options in capture, %d in pool, %.0f KB" % (
+        dest, len(sc["options"]), len(pool), os.path.getsize(dest) / 1024))
+    print("grades in pool:", dict(sorted(grades.items())))
+    for prof in NAMED:
+        top = results[prof][0]
+        print("  %-8s %-34s $%d" % (prof, top["name"][:34], top["by"][prof]["effective_cents"] // 100))
+
+
+if __name__ == "__main__":
+    main(sys.argv[1] if len(sys.argv) > 1
+         else os.path.join(ROOT, "concorde-travel", "adapter_samples", "duffel-jfk-lhr.json"))

@@ -1,0 +1,381 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ConcordeGo · Shortlist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#F1F3EE;--paper:#FFFFFF;--ink:#14201B;--dim:#5B6963;--faint:#98A39D;--rule:#D8DED7;--rule2:#E9ECE6;
+  --accent:#1E6F5C;--accent-ink:#F1F3EE;--accent-soft:#DFEDE7;
+  --gA:#1E6F5C;--gB:#6F7F20;--gC:#B8791F;--gD:#B14A31;
+  --credit:#1E6F5C;--debit:#A5442E;
+  --serif:"Fraunces",Georgia,"Times New Roman",serif;--sans:"Instrument Sans","Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{color-scheme:light}
+body{background:var(--ground);color:var(--ink);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased;
+     padding-block:0 96px}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:clamp(16px,4vw,36px)}
+h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;text-wrap:balance}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
+.num{font-variant-numeric:tabular-nums}
+.eyebrow{font:600 11px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+
+/* ---------- header */
+.top{display:flex;justify-content:space-between;align-items:baseline;padding-block:26px 10px}
+.wordmark{font-family:var(--serif);font-size:22px;font-weight:500;letter-spacing:-.02em}
+.wordmark i{font-style:italic;font-weight:300;color:var(--accent)}
+.top nav a{color:var(--dim);text-decoration:none;font-size:14px;border-bottom:1px solid var(--rule)}
+.top nav a:hover{color:var(--ink);border-color:var(--ink)}
+
+/* ---------- the sentence */
+.ask{padding-block:44px 30px;border-bottom:1px solid var(--rule)}
+.sentence{font-family:var(--serif);font-size:clamp(24px,3.6vw,38px);line-height:1.35;font-weight:300;max-width:22em;
+  font-variation-settings:"opsz" 96}
+.sentence .f{display:inline-block;white-space:nowrap;max-width:100%;vertical-align:baseline}
+.sentence input,.sentence select{font:inherit;color:var(--ink);background:none;border:0;border-bottom:2px solid var(--accent);
+  padding:0 2px 1px;font-weight:500;font-style:italic;min-width:2ch;max-width:100%;text-overflow:ellipsis;border-radius:0;
+  -webkit-appearance:none;appearance:none}
+.sentence select{padding-right:.9em;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%231E6F5C' stroke-width='1.6'/></svg>") no-repeat right .1em center;cursor:pointer}
+.sentence input:hover,.sentence select:hover{background-color:var(--accent-soft)}
+.askrow{display:flex;gap:26px;align-items:flex-start;margin-top:26px;flex-wrap:wrap}
+.go{background:var(--accent);color:var(--accent-ink);padding:14px 22px;border-radius:999px;font-weight:600;font-size:15px;
+  display:inline-flex;align-items:center;gap:10px;transition:transform .15s,background .15s;white-space:nowrap}
+.go:hover{background:#185c4c;transform:translateY(-1px)}
+.go svg{width:16px;height:16px}
+.hint{color:var(--dim);max-width:52ch;font-size:14px;line-height:1.55;padding-top:9px}
+.hint b{color:var(--ink);font-weight:500}
+
+/* ---------- section heads */
+.sechead{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;padding-block:38px 18px}
+.sechead h2{font-size:28px}
+.sechead p{color:var(--dim);max-width:54ch;font-size:14.5px}
+
+/* ---------- the three doors */
+.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.door{background:var(--paper);border-radius:14px;overflow:hidden;position:relative;display:flex;flex-direction:column;
+  box-shadow:0 1px 0 rgba(20,32,27,.06),0 10px 30px -18px rgba(20,32,27,.25);transition:transform .2s,box-shadow .2s}
+.door:hover{transform:translateY(-2px);box-shadow:0 1px 0 rgba(20,32,27,.06),0 18px 40px -18px rgba(20,32,27,.32)}
+.sky{height:84px;position:relative;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+.sky .t{position:absolute;bottom:12px;font:500 13px/1 var(--sans);letter-spacing:.02em}
+.sky .t.l{left:18px}.sky .t.r{right:76px;text-align:right}
+.sky .t small{font-size:10px;opacity:.85;margin-left:2px}
+.sky .path{position:absolute;left:18px;right:18px;top:36px;height:1px;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.75) 0 4px,transparent 4px 9px)}
+.sky .plane{position:absolute;top:29px;width:14px;height:14px;fill:#fff;filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))}
+.seal{position:absolute;right:18px;top:62px;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;
+  font-family:var(--serif);font-size:22px;font-weight:500;color:#fff;box-shadow:0 0 0 4px var(--paper);letter-spacing:-.04em}
+.seal.a{background:var(--gA)}.seal.b{background:var(--gB)}.seal.c{background:var(--gC)}.seal.d{background:var(--gD)}
+.door .body{padding:22px 20px 20px;display:flex;flex-direction:column;gap:12px;flex:1}
+.door .eyebrow{color:var(--accent)}
+.door h3{font-size:22px;line-height:1.15;padding-right:56px}
+.door h3 span{display:block;font-family:var(--sans);font-size:13px;color:var(--dim);margin-top:4px;letter-spacing:0}
+.meta{color:var(--dim);font-size:13.5px}
+.price{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:2px}
+.price b{font-family:var(--serif);font-size:40px;font-weight:400;letter-spacing:-.03em;line-height:1}
+.price span{color:var(--dim);font-size:13px}
+.price em{font-style:normal;color:var(--faint);font-size:13px;margin-left:auto}
+.why{list-style:none;display:flex;flex-direction:column;gap:7px;padding-top:10px;border-top:1px solid var(--rule2);font-size:13.5px;line-height:1.35}
+.why li{display:grid;grid-template-columns:58px 1fr;gap:8px;align-items:baseline}
+.why b{font-weight:600;font-variant-numeric:tabular-nums;color:var(--debit)}
+.why b.cr{color:var(--credit)}
+.why span{color:var(--dim)}
+.cta{display:flex;gap:10px;margin-top:auto;padding-top:14px}
+.choose{background:var(--ink);color:var(--paper);padding:12px 16px;border-radius:999px;font-weight:600;font-size:14px;flex:1;transition:background .15s}
+.choose:hover{background:var(--accent)}
+.ledger{color:var(--dim);font-size:14px;padding:12px 6px;border-bottom:1px solid transparent}
+.ledger:hover{color:var(--ink);border-color:var(--ink)}
+
+.explain{margin-top:22px;color:var(--dim);font-size:14px;max-width:70ch;line-height:1.6}
+.explain b{color:var(--ink);font-weight:500}
+
+/* ---------- everything else */
+.seg{display:inline-flex;background:var(--paper);border:1px solid var(--rule);border-radius:999px;padding:3px;gap:2px}
+.seg button{padding:8px 14px;border-radius:999px;font-size:13.5px;color:var(--dim);transition:.15s}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--paper)}
+.seg button:hover:not([aria-pressed=true]){color:var(--ink)}
+.list{list-style:none;background:var(--paper);border-radius:14px;overflow:hidden;box-shadow:0 1px 0 rgba(20,32,27,.06)}
+.row+.row{border-top:1px solid var(--rule2)}
+.rowbtn{width:100%;display:grid;grid-template-columns:34px 1fr auto auto auto 18px;gap:16px;align-items:center;
+  padding:14px 20px;text-align:left;transition:background .12s}
+.rowbtn:hover{background:#FAFBF9}
+.seal.s{position:static;width:34px;height:34px;font-size:16px;box-shadow:none}
+.who b{font-weight:600}.who span{color:var(--dim);font-size:13px;margin-left:6px}
+.when{color:var(--dim);font-size:14px;white-space:nowrap}
+.when i{font-style:normal;color:var(--faint);margin-left:8px}
+.len{color:var(--dim);font-size:14px;white-space:nowrap;min-width:56px;text-align:right}
+.amt{text-align:right;min-width:98px}
+.amt b{font-family:var(--serif);font-size:22px;font-weight:400;letter-spacing:-.02em;display:block;line-height:1.05}
+.amt i{font-style:normal;color:var(--faint);font-size:12px}
+.chev{color:var(--faint);transition:transform .2s;font-size:20px;line-height:1}
+.row[aria-expanded=true] .chev{transform:rotate(90deg)}
+.detail{padding:6px 20px 22px 70px;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px}
+.lines{list-style:none;display:flex;flex-direction:column}
+.lines li{display:grid;grid-template-columns:1fr auto;gap:14px;padding:9px 0;border-top:1px dotted var(--rule);align-items:baseline}
+.lines li:first-child{border-top:0}
+.lines .lab{font-weight:500;font-size:14px}
+.lines .ev{color:var(--faint);font-size:12.5px;line-height:1.45;margin-top:2px}
+.lines .amt2{font-variant-numeric:tabular-nums;font-weight:600;color:var(--debit);white-space:nowrap}
+.lines .amt2.cr{color:var(--credit)}
+.lines .amt2.zero{color:var(--faint);font-weight:500}
+.lines li.total{border-top:2px solid var(--ink);margin-top:6px;padding-top:12px}
+.lines li.total .lab{font-family:var(--serif);font-size:17px}
+.lines li.total .amt2{font-family:var(--serif);font-size:22px;color:var(--ink);font-weight:500}
+.book{background:var(--ground);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px;align-self:start}
+.book h4{font-family:var(--serif);font-weight:500;font-size:18px}
+.book p{color:var(--dim);font-size:13px;line-height:1.5}
+.book .choose{flex:0 0 auto}
+.more{display:block;margin:18px auto 0;color:var(--dim);border-bottom:1px solid var(--rule);padding:6px 2px;font-size:14px}
+.more:hover{color:var(--ink);border-color:var(--ink)}
+
+/* ---------- how */
+.how{margin-top:56px;padding-top:30px;border-top:1px solid var(--rule);display:grid;grid-template-columns:1fr 1fr;gap:40px}
+.how h2{font-size:24px;margin-bottom:12px}
+.how p{color:var(--dim);font-size:14.5px;line-height:1.65;max-width:58ch}
+.how p+p{margin-top:10px}
+.how b{color:var(--ink);font-weight:500}
+.parledger{list-style:none;background:var(--paper);border-radius:12px;padding:14px 18px;font-size:13.5px}
+.parledger li{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-top:1px dotted var(--rule)}
+.parledger li:first-child{border-top:0}
+.parledger li.t{border-top:2px solid var(--ink);font-weight:600;margin-top:4px;padding-top:9px}
+.parledger span:last-child{font-variant-numeric:tabular-nums}
+.cov{margin-top:34px;padding:14px 18px;border-radius:12px;background:#F6EEDC;color:#6B4E12;font-size:13px;line-height:1.55;display:flex;gap:12px}
+.cov:before{content:"";flex:0 0 8px;border-radius:99px;background:#C99A2E;margin-top:3px;height:20px}
+.cov b{font-weight:600}
+
+/* ---------- ledger sheet */
+.sheetwrap{position:fixed;inset:0;background:rgba(20,32,27,.42);display:grid;place-items:end center;padding:16px;z-index:9}
+.sheet{background:var(--paper);border-radius:18px;max-width:720px;width:100%;max-height:min(86vh,860px);overflow:auto;padding:26px 26px 22px;
+  box-shadow:0 30px 60px -20px rgba(0,0,0,.4)}
+.sheet .hd{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:12px}
+.sheet h3{font-size:24px}.sheet h3 span{display:block;font-family:var(--sans);font-size:13px;color:var(--dim);margin-top:4px}
+.x{width:36px;height:36px;border-radius:50%;background:var(--ground);font-size:20px;line-height:1;color:var(--dim)}
+.x:hover{color:var(--ink)}
+.sheet .detail{padding:0;grid-template-columns:1fr;gap:18px}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (max-width:900px){
+  .three{grid-template-columns:1fr}
+  .detail{grid-template-columns:1fr;padding-left:20px}
+  .how{grid-template-columns:1fr}
+}
+@media (max-width:640px){
+  .rowbtn{grid-template-columns:34px 1fr auto 18px;gap:12px;padding:14px 14px}
+  .when,.len{display:none}
+  .who span{display:block;margin:2px 0 0}
+  .who small{display:block;color:var(--faint);font-size:12px;margin-top:2px}
+  .detail{padding-inline:14px}
+  .sechead h2{font-size:24px}
+}
+@media (min-width:641px){.who small{display:none}}
+</style></head><body>
+<div class="wrap">
+
+<header class="top">
+  <div class="wordmark">Concorde<i>Go</i></div>
+  <nav><a href="#how">How the grade works</a></nav>
+</header>
+
+<section class="ask" aria-label="Your trip">
+  <p class="sentence">I&rsquo;m leaving from <span class="f"><input id="q-origin" value="Wyckoff Ave &amp; Myrtle Ave, Bushwick" aria-label="Where you start"></span>
+  for <span class="f"><input id="q-dest" value="London" aria-label="Destination"></span>
+  on <span class="f"><input id="q-date" value="Wed 18 Nov" aria-label="Date"></span>,
+  <span class="f"><select id="q-pax" aria-label="Travellers"><option>one adult</option><option>two adults</option><option>a family of four</option></select></span>
+  with <span class="f"><select id="q-bags" aria-label="Checked bags"><option>one checked bag</option><option>no checked bag</option><option>two checked bags</option></select></span>.</p>
+  <div class="askrow">
+    <button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <p class="hint" id="hint"></p>
+  </div>
+</section>
+
+<section aria-label="Your shortlist">
+  <div class="sechead">
+    <h2>Your shortlist</h2>
+    <p id="lede"></p>
+  </div>
+  <div class="three" id="doors"></div>
+  <p class="explain">Same flights, three questions. <b>The letter is the flight&rsquo;s own report card</b> against what a clean nonstop costs on this route, all in; it never changes. <b>The order is yours</b>: it changes with what you told us matters.</p>
+</section>
+
+<section aria-label="Everything else">
+  <div class="sechead">
+    <h2>Everything else, in your order</h2>
+    <div class="seg" id="seg" role="group" aria-label="Rank by">
+      <button data-t="cheapest" aria-pressed="true">Cheapest all-in</button>
+      <button data-t="fastest" aria-pressed="false">Fastest door to door</button>
+      <button data-t="comfort" aria-pressed="false">Most comfortable</button>
+    </div>
+  </div>
+  <ol class="list" id="list"></ol>
+  <button class="more" id="more"></button>
+</section>
+
+<section class="how" id="how">
+  <div>
+    <h2>How the grade works</h2>
+    <p id="how1"></p>
+    <p>Every flight is priced the same way: the ticket, the bag you actually carry, the ride from <b>your</b> door and to theirs at that hour, your time at a rate, and small charges for the things that make a trip worse &mdash; a tight connection, an unknown cabin, a red-eye. One number, in dollars. <b>Nothing is hidden and every charge has a reason you can read.</b></p>
+  </div>
+  <div>
+    <div class="eyebrow" style="margin-bottom:10px">The reference trip this route is graded against</div>
+    <ul class="parledger" id="parledger"></ul>
+  </div>
+</section>
+
+<div class="cov" id="cov"></div>
+</div>
+
+<div id="sheetroot"></div>
+
+<script>
+const D = __DATA__;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const money = c => '$' + Math.abs(Math.round(c/100)).toLocaleString('en-US');
+const signed = c => (c < 0 ? '−' : '+') + money(c);
+const hm = iso => iso.slice(11,16);
+const niceDate = d => new Date(d + 'T12:00:00Z').toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long', timeZone:'UTC'});
+const hour = iso => +iso.slice(11,13) + (+iso.slice(14,16))/60;
+const dur = m => Math.floor(m/60) + 'h' + (m%60 ? String(m%60).padStart(2,'0') : '');
+const gcls = g => ({A:'a',B:'b',C:'c'}[g[0]] || 'd');
+const stopsText = e => e.stops === 0 ? 'nonstop' : e.stops === 1 ? 'via ' + e.route[1] : e.stops + ' stops';
+const TARGETS = {cheapest:'Cheapest all-in', fastest:'Fastest door to door', comfort:'Most comfortable'};
+
+// The sky at a local hour. A night flight east reads dusk → night → dawn,
+// which is the one thing about an overnight a person actually remembers.
+const SKY = [[0,'#0f1633'],[4,'#161e48'],[5.5,'#7a5a87'],[6.5,'#e9a37a'],[7.5,'#f5d3ad'],[9,'#a6c9f0'],
+             [12,'#8dbfee'],[16,'#9ec4ea'],[17.5,'#f0b48a'],[18.8,'#b26a83'],[20,'#3a3572'],[21.5,'#1a2150'],[24,'#0f1633']];
+function lerp(a,b,t){ return a + (b-a)*t; }
+function hex(h){ return [1,3,5].map(i => parseInt(h.slice(i,i+2),16)); }
+function sky(h){
+  h = ((h % 24) + 24) % 24;
+  for (let i = 1; i < SKY.length; i++){
+    if (h <= SKY[i][0]){
+      const [h0,c0] = SKY[i-1], [h1,c1] = SKY[i], t = (h-h0)/(h1-h0), a = hex(c0), b = hex(c1);
+      return 'rgb(' + a.map((v,k) => Math.round(lerp(v,b[k],t))).join(',') + ')';
+    }
+  }
+  return SKY[0][1];
+}
+function skyBand(e){
+  const d = hour(e.depart), a = hour(e.arrive);
+  const span = (Date.parse(e.arrive) - Date.parse(e.depart)) / 36e5;    // real elapsed hours
+  const stops = [];
+  for (let k = 0; k <= 6; k++){
+    const t = k/6, hh = d + span*t + (a - d - span)*t;                     // drift toward arrival clock
+    stops.push(sky(hh) + ' ' + Math.round(t*100) + '%');
+  }
+  return 'linear-gradient(90deg,' + stops.join(',') + ')';
+}
+function whyLines(e, t){
+  return e.by[t].lines.filter(l => l.code !== 'ticket').sort((a,b) => Math.abs(b.cents) - Math.abs(a.cents)).slice(0,3);
+}
+function door(t, e){
+  const eff = e.by[t].effective_cents;
+  return `<article class="door" data-id="${esc(e.id)}" data-t="${t}">
+    <div class="sky" style="background:${skyBand(e)}">
+      <div class="path"></div>
+      <svg class="plane" viewBox="0 0 16 16" style="left:${e.stops ? 46 : 50}%" aria-hidden="true"><path d="M15 8l-4.2-1.4L7 1.5H5.4l1.9 5.1H3.6L2.5 4.9H1.2l.9 3.1-.9 3.1h1.3l1.1-1.7h3.7L5.4 14.5H7l3.8-5.1z"/></svg>
+      <span class="t l">${hm(e.depart)}</span>
+      <span class="t r">${hm(e.arrive)}${e.day_offset ? '<small>+1</small>' : ''}</span>
+    </div>
+    <div class="seal ${gcls(e.grade)}" title="Grade ${e.grade}">${e.grade}</div>
+    <div class="body">
+      <div class="eyebrow">${TARGETS[t]}</div>
+      <h3>${esc(e.carrier_name)}<span>${esc(e.flight)} &middot; ${esc(e.brand)}</span></h3>
+      <p class="meta">${stopsText(e)} &middot; ${dur(e.door_minutes)} door to door &middot; ${e.route.join(' → ')}</p>
+      <div class="price"><b class="num">${money(eff)}</b><span>all in</span><em class="num">${money(e.ticket_cents)} ticket</em></div>
+      <ul class="why">${whyLines(e,t).map(l => `<li><b class="${l.cents < 0 ? 'cr' : ''}">${signed(l.cents)}</b><span>${esc(l.label)}</span></li>`).join('')}</ul>
+      <div class="cta"><button class="choose" data-open="${esc(e.id)}" data-t="${t}">Choose this flight</button><button class="ledger" data-open="${esc(e.id)}" data-t="${t}">Full ledger</button></div>
+    </div>
+  </article>`;
+}
+function ledgerHTML(e, t){
+  const lines = e.by[t].lines, eff = e.by[t].effective_cents, b = e.booking[0];
+  return `<ul class="lines">${lines.map(l => `<li><div><div class="lab">${esc(l.label)}</div><div class="ev">${esc(l.evidence)}</div></div>
+      <div class="amt2 num ${l.cents < 0 ? 'cr' : l.cents === 0 ? 'zero' : ''}">${l.cents === 0 ? '—' : signed(l.cents)}</div></li>`).join('')}
+    <li class="total"><div class="lab">All in, ranked for ${TARGETS[t].toLowerCase()}</div><div class="amt2 num">${money(eff)}</div></li></ul>
+    <div class="book"><h4>${esc(e.carrier_name)} ${esc(e.flight)}</h4>
+      <p>${esc(e.route.join(' → '))} &middot; ${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} &middot; ${stopsText(e)}<br>${b ? esc(b.note) : ''}</p>
+      <button class="choose">${b ? 'Book with ' + esc(b.who) + ' &middot; ' + money(b.price_cents) : 'Book'}</button>
+      <p>Grade <b>${e.grade}</b>: ${money(e.effective_cents)} all in at a neutral traveller against par of ${money(D.query.par_cents)}.</p></div>`;
+}
+let T = 'cheapest', shown = 12;
+function row(e){
+  const eff = e.by[T].effective_cents;
+  return `<li class="row" data-id="${esc(e.id)}" aria-expanded="false">
+    <button class="rowbtn" data-row="${esc(e.id)}">
+      <span class="seal s ${gcls(e.grade)}">${e.grade}</span>
+      <span class="who"><b>${esc(e.carrier_name)}</b><span>${esc(e.flight)} &middot; ${esc(e.brand)}</span><small>${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} &middot; ${stopsText(e)} &middot; ${dur(e.door_minutes)}</small></span>
+      <span class="when num">${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''}<i>${stopsText(e)}</i></span>
+      <span class="len num">${dur(e.door_minutes)}</span>
+      <span class="amt"><b class="num">${money(eff)}</b><i class="num">${money(e.ticket_cents)} ticket</i></span>
+      <span class="chev">›</span>
+    </button>
+    <div class="detail" hidden></div>
+  </li>`;
+}
+function paintList(){
+  const all = D.results[T];
+  const top = new Set(Object.keys(TARGETS).map(t => D.results[t][0].id));
+  const rest = all.filter(e => !top.has(e.id));
+  $('#list').innerHTML = rest.slice(0, shown).map(row).join('');
+  const left = rest.length - shown;
+  $('#more').hidden = left <= 0;
+  $('#more').textContent = left > 0 ? 'Show the other ' + left : '';
+}
+function paint(){
+  $('#doors').innerHTML = Object.keys(TARGETS).map(t => door(t, D.results[t][0])).join('');
+  paintList();
+}
+// ---- boot
+const q = D.query, g0 = D.results.cheapest[0].legs[0];
+$('#hint').innerHTML = 'The ride to the airport is priced from <b>your actual address</b>, at the hour you leave &mdash; from Wyckoff Ave that is ' +
+  esc(g0.tip.split(' · ').slice(2).join(', ')) + ', about ' + dur(g0.minutes) + ' &mdash; not from &ldquo;New York&rdquo;.';
+$('#lede').textContent = q.total_found + ' flights came back for ' + q.origin + ' to ' + q.destination + ' on ' + niceDate(q.date) + '. Three of them answer the question most people are really asking.';
+const P = D.par;
+$('#how1').innerHTML = 'Par for this route is <b>' + money(q.par_cents) + '</b>: what a nonstop in main cabin with a bag costs all in, leaving ' + esc(P.reference.departs_local) +
+  ' and taking ' + dur(P.reference.door_to_door_minutes) + ' door to door, at a ' + (P.season_factor < .95 ? 'off-season' : P.season_factor > 1.05 ? 'peak' : 'shoulder') +
+  ' fare for ' + P.miles.toLocaleString() + ' miles. A flight that costs about par all in gets an A; every letter below is a step further from that.';
+$('#parledger').innerHTML = P.ledger.map(l => `<li><span>${esc(l.label)}</span><span>${signed(l.cents)}</span></li>`).join('') +
+  `<li class="t"><span>Par</span><span>${money(P.par_cents)}</span></li>`;
+$('#cov').innerHTML = '<div><b>Draft data.</b> ' + esc(D.gaps[0] || '') + '. ' + esc(D.verdict || '') + '. Real Duffel search; some inventory is invented by the test token.</div>';
+// Size each field to its own text, measured in its own font: a 'ch' is the
+// width of a zero, and italic serif text is a good deal narrower than that.
+const ruler = document.createElement('span'); ruler.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;left:-9999px';
+document.body.appendChild(ruler);
+document.querySelectorAll('.sentence input').forEach(i => {
+  const fit = () => { const cs = getComputedStyle(i); ['fontFamily','fontSize','fontStyle','fontWeight','letterSpacing','fontVariationSettings'].forEach(k => ruler.style[k] = cs[k]);
+    ruler.textContent = i.value || ' '; i.style.width = Math.min(ruler.offsetWidth + 10, innerWidth - 40) + 'px'; };
+  fit(); i.addEventListener('input', fit); document.fonts && document.fonts.ready.then(fit);
+});
+paint();
+
+$('#seg').addEventListener('click', ev => {
+  const b = ev.target.closest('button[data-t]'); if (!b) return;
+  T = b.dataset.t; shown = 12;
+  $('#seg').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  paintList();
+});
+$('#more').addEventListener('click', () => { shown += 12; paintList(); });
+$('#list').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-row]'); if (!b) return;
+  const li = b.closest('.row'), open = li.getAttribute('aria-expanded') === 'true', det = li.querySelector('.detail');
+  li.setAttribute('aria-expanded', String(!open));
+  if (!open && !det.innerHTML){ const e = D.results[T].find(x => x.id === li.dataset.id); det.innerHTML = ledgerHTML(e, T); }
+  det.hidden = open;
+});
+$('#doors').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-open]'); if (!b) return;
+  const e = D.results[b.dataset.t].find(x => x.id === b.dataset.open);
+  $('#sheetroot').innerHTML = `<div class="sheetwrap" id="sheetwrap"><div class="sheet" role="dialog" aria-modal="true" aria-label="Ledger">
+    <div class="hd"><h3>${esc(e.carrier_name)} ${esc(e.flight)}<span>${esc(e.brand)} &middot; ${TARGETS[b.dataset.t]}</span></h3><button class="x" id="x" aria-label="Close">&times;</button></div>
+    <div class="detail">${ledgerHTML(e, b.dataset.t)}</div></div></div>`;
+  $('#x').focus();
+});
+document.addEventListener('click', ev => { if (ev.target.id === 'x' || ev.target.id === 'sheetwrap') $('#sheetroot').innerHTML = ''; });
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') $('#sheetroot').innerHTML = ''; });
+$('#go').addEventListener('click', () => { $('#doors').scrollIntoView({behavior:'smooth', block:'start'}); });
+</script>
+</body></html>

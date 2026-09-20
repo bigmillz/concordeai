@@ -1,0 +1,321 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ConcordeGo · Lines</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#FFFFFF;--panel:#F4F5F7;--ink:#1E2433;--dim:#5C6372;--faint:#9AA0AC;--rule:#E4E7EC;--rule2:#F0F2F5;
+  --navy:#0F2C6B;--flight:#1449B8;--flight2:#3A6BE0;--transit:#008C42;--car:#7C8391;--proc:#CBD0D8;--lay:#FFFFFF;
+  --gA:#00794F;--gB:#6E7F0E;--gC:#C9800F;--gD:#C6321D;
+  --sans:"Hanken Grotesk","Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{color-scheme:light}
+body{background:var(--ground);color:var(--ink);font:15px/1.45 var(--sans);-webkit-font-smoothing:antialiased;padding-block:0 90px}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:clamp(16px,3.5vw,32px)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--flight);outline-offset:2px;border-radius:3px}
+.num{font-variant-numeric:tabular-nums}
+h1,h2{font-weight:700;letter-spacing:-.02em;text-wrap:balance}
+
+/* ---------- header sign */
+.sign{background:var(--navy);color:#fff;margin-inline:calc(-1*clamp(16px,3.5vw,32px));padding:20px clamp(16px,3.5vw,32px);
+  display:flex;justify-content:space-between;align-items:center;gap:16px}
+.mark{font-weight:800;font-size:20px;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+.mark i{display:inline-block;width:26px;height:26px;border-radius:50%;border:5px solid #fff;box-shadow:inset 0 0 0 3px var(--navy);background:#E8462E}
+.mark em{font-style:normal;font-weight:500;opacity:.85}
+.sign nav{display:flex;gap:22px;font-weight:500;font-size:14px;opacity:.9}
+
+/* ---------- journey planner */
+.planner{border:1px solid var(--rule);border-top:6px solid var(--navy);margin-top:26px;padding:22px 24px 24px;display:grid;grid-template-columns:1fr auto;gap:22px;align-items:end}
+.planner h1{font-size:22px;margin-bottom:14px;grid-column:1/-1}
+.fields{display:grid;grid-template-columns:2fr 1.2fr 1fr 1fr 1fr;gap:14px}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field label{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.field input,.field select{font:500 16px/1.2 var(--sans);color:var(--ink);background:var(--ground);border:0;border-bottom:2px solid var(--ink);padding:8px 2px;min-width:0;
+  -webkit-appearance:none;appearance:none;border-radius:0}
+.field select{background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='7' viewBox='0 0 12 7'><path d='M1 1l5 5 5-5' fill='none' stroke='%231E2433' stroke-width='1.8'/></svg>") no-repeat right 4px center;padding-right:20px}
+.field input:focus,.field select:focus{border-color:var(--flight);outline:none}
+.plan{background:var(--flight);color:#fff;font-weight:700;padding:14px 22px;border-radius:6px;font-size:15px;white-space:nowrap;transition:background .15s}
+.plan:hover{background:var(--navy)}
+.planner .note{grid-column:1/-1;color:var(--dim);font-size:13.5px;line-height:1.5;max-width:80ch}
+.planner .note b{color:var(--ink);font-weight:600}
+
+/* ---------- map head */
+.maphead{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap;padding-block:34px 14px}
+.maphead h2{font-size:26px}
+.maphead p{color:var(--dim);font-size:14px;margin-top:4px}
+.lines-ctl{display:flex;gap:8px;flex-wrap:wrap}
+.lines-ctl button{display:inline-flex;align-items:center;gap:9px;padding:9px 14px 9px 10px;border:1.5px solid var(--rule);border-radius:6px;font-weight:600;font-size:14px;color:var(--dim);transition:.15s}
+.lines-ctl button i{width:18px;height:8px;border-radius:2px;background:var(--faint)}
+.lines-ctl button[data-t=cheapest] i{background:#C9931A}.lines-ctl button[data-t=fastest] i{background:var(--flight)}.lines-ctl button[data-t=comfort] i{background:#8E3E9E}
+.lines-ctl button[aria-pressed=true]{border-color:var(--ink);color:var(--ink);background:var(--panel)}
+.lines-ctl button:hover:not([aria-pressed=true]){border-color:var(--dim)}
+
+/* ---------- the map */
+.map{border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+.axis{display:grid;grid-template-columns:var(--cols);align-items:end;background:var(--panel);border-bottom:1px solid var(--rule);padding:10px 0 0}
+.axis .lbl{font-size:11px;font-weight:600;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;padding:0 14px 8px}
+.axis .lbl.r{text-align:right}
+.ticks{position:relative;height:34px}
+.ticks span{position:absolute;bottom:12px;transform:translateX(-50%);font-size:11px;font-weight:600;color:var(--dim)}
+.ticks span:after{content:"";position:absolute;left:50%;top:15px;width:1px;height:8px;background:var(--faint)}
+.skyband{position:absolute;left:0;right:0;bottom:0;height:5px;opacity:.9}
+.line{display:grid;grid-template-columns:var(--cols);align-items:center;border-top:1px solid var(--rule2);min-height:82px;cursor:pointer;transition:background .12s;position:relative;background:var(--ground)}
+.line:hover{background:#FAFBFC}
+.line[aria-expanded=true]{background:#F7F9FC}
+.line.moving{transition:transform .45s cubic-bezier(.2,.8,.2,1)}
+.name{padding:12px 14px;min-width:0}
+.name b{display:block;font-size:17px;font-weight:700;letter-spacing:-.01em}
+.name span{display:block;font-size:12.5px;color:var(--dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.track{position:relative;height:70px}
+.seg{position:absolute;top:33px;height:6px;border-radius:3px;background:var(--proc)}
+.seg.transit{background:var(--transit)}.seg.car{background:var(--car)}
+.seg.flight{top:31px;height:10px;border-radius:5px;background:var(--flight)}
+.seg.layover{top:31px;height:10px;border-radius:5px;background:var(--lay);border:2px dashed var(--faint)}
+.st{position:absolute;top:36px;width:0;height:0}
+.st i{position:absolute;left:-5px;top:-5px;width:10px;height:10px;border-radius:50%;background:#fff;border:2.5px solid var(--flight)}
+.st.door i{border-radius:2px;border-color:var(--ink);left:-4px;top:-4px;width:8px;height:8px}
+.st.x i{left:-7px;top:-7px;width:14px;height:14px;border:3px solid var(--ink)}
+.st b{position:absolute;top:13px;left:0;transform:translateX(-50%);font-size:11px;font-weight:700;white-space:nowrap;letter-spacing:.02em}
+.st.door b{top:auto;bottom:13px;color:var(--dim);font-weight:600}
+.st b small{font-weight:500;color:var(--dim);margin-left:3px;font-size:10.5px}
+.st.x b{top:auto;bottom:12px}
+.st.end b{transform:translateX(-100%)}
+.st.first b{transform:none}
+.roundel{padding:8px 14px;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:center;justify-items:end}
+.ring{grid-row:1/3;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:19px;letter-spacing:-.04em;background:#fff;border:5px solid currentColor}
+.ring.a{color:var(--gA)}.ring.b{color:var(--gB)}.ring.c{color:var(--gC)}.ring.d{color:var(--gD)}
+.roundel b{font-size:19px;font-weight:700;letter-spacing:-.02em}
+.roundel small{color:var(--faint);font-size:12px}
+.tip{position:fixed;z-index:9;background:var(--ink);color:#fff;font-size:12.5px;padding:8px 10px;border-radius:5px;pointer-events:none;max-width:260px;line-height:1.4;opacity:0;transition:opacity .1s}
+.tip[data-on="1"]{opacity:1}
+
+/* ---------- in-car diagram (expanded) */
+.detail{grid-column:1/-1;padding:6px 14px 24px;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:28px;cursor:default}
+.diagram{list-style:none;position:relative;padding-left:26px;margin-top:6px}
+.diagram:before{content:"";position:absolute;left:9px;top:10px;bottom:14px;width:6px;background:var(--flight);border-radius:3px}
+.stn{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:baseline;padding:8px 0;position:relative}
+.stn:before{content:"";position:absolute;left:-22px;top:13px;width:10px;height:10px;border-radius:50%;background:#fff;border:2.5px solid var(--flight);box-sizing:content-box;box-shadow:0 0 0 2px #fff}
+.stn.door:before{border-radius:2px;border-color:var(--ink)}
+.stn.x:before{left:-24px;top:11px;width:12px;height:12px;border:3px solid var(--ink)}
+.stn b{display:block;font-weight:700}
+.stn span{display:block;color:var(--dim);font-size:13px;margin-top:1px;line-height:1.4}
+.stn em{font-style:normal;font-weight:700;white-space:nowrap}
+.stn em.cr{color:var(--gA)}
+.stn em.z{color:var(--faint);font-weight:500}
+.notes h4{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:12px 0 4px}
+.notes ul{list-style:none}
+.notes li{display:grid;grid-template-columns:1fr auto;gap:12px;padding:7px 0;border-top:1px dotted var(--rule);align-items:baseline;font-size:13.5px}
+.notes li span{display:block;color:var(--faint);font-size:12px;margin-top:1px;line-height:1.4}
+.notes li em{font-style:normal;font-weight:700;white-space:nowrap}
+.notes li em.cr{color:var(--gA)}.notes li em.z{color:var(--faint);font-weight:500}
+.total{display:flex;justify-content:space-between;align-items:baseline;border-top:2px solid var(--ink);margin-top:10px;padding-top:10px;font-weight:700}
+.total b{font-size:22px}
+.book{margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.book .plan{padding:12px 18px}
+.book p{color:var(--dim);font-size:12.5px;flex:1 1 200px}
+
+/* ---------- key & par */
+.key{display:flex;gap:18px;flex-wrap:wrap;padding:14px 4px;font-size:12.5px;color:var(--dim)}
+.key span{display:inline-flex;align-items:center;gap:7px}
+.key i{width:22px;height:6px;border-radius:3px;background:var(--proc)}
+.key i.t{background:var(--transit)}.key i.c{background:var(--car)}.key i.f{background:var(--flight);height:9px}.key i.l{background:#fff;border:2px dashed var(--faint);height:9px}
+.par{margin-top:36px;padding-top:26px;border-top:1px solid var(--rule);display:grid;grid-template-columns:1.2fr 1fr;gap:32px;color:var(--dim);font-size:14.5px;line-height:1.6}
+.par h2{font-size:18px;color:var(--ink);margin-bottom:8px}
+.par b{color:var(--ink);font-weight:600}
+.par ul{list-style:none;border-top:1px solid var(--rule)}
+.par li{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--rule);font-size:13.5px}
+.par li.t{font-weight:700;color:var(--ink)}
+.cov{margin-top:24px;background:#FFF6E3;border:1px solid #F1DEB0;color:#6B4E12;padding:12px 16px;border-radius:6px;font-size:13px;line-height:1.55}
+.cov b{font-weight:700}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (max-width:980px){
+  .fields{grid-template-columns:1fr 1fr}.fields .field:first-child{grid-column:1/-1}
+  .planner{grid-template-columns:1fr}
+  .par{grid-template-columns:1fr}
+}
+@media (max-width:720px){
+  .axis,.line{grid-template-columns:1fr}
+  .axis .lbl{display:none}
+  .name{padding:12px 14px 0}
+  .track{margin:0 14px}
+  .st b small{display:none}
+  .roundel{grid-template-columns:auto auto 1fr;justify-items:start;padding-top:0}
+  .ring{grid-row:auto;width:34px;height:34px;font-size:15px;border-width:4px}
+  .detail{grid-template-columns:1fr}
+  .sign nav{display:none}
+}
+</style></head><body>
+<div class="wrap">
+
+<header class="sign">
+  <div class="mark"><i aria-hidden="true"></i>ConcordeGo <em>Journey planner</em></div>
+  <nav><span>Flights</span><span>How the grade works</span><span>Sign in</span></nav>
+</header>
+
+<form class="planner" onsubmit="return false" aria-label="Plan your journey">
+  <h1>Plan your journey, door to door</h1>
+  <div class="fields">
+    <div class="field"><label for="j-from">From your door</label><input id="j-from" value="Wyckoff Ave &amp; Myrtle Ave, Bushwick, Brooklyn"></div>
+    <div class="field"><label for="j-to">To</label><input id="j-to" value="London"></div>
+    <div class="field"><label for="j-date">Leaving</label><input id="j-date" value="Wed 18 Nov"></div>
+    <div class="field"><label for="j-pax">Who</label><select id="j-pax"><option>1 adult</option><option>2 adults</option><option>Family of 4</option></select></div>
+    <div class="field"><label for="j-bags">Bags</label><select id="j-bags"><option>1 checked</option><option>None</option><option>2 checked</option></select></div>
+  </div>
+  <button class="plan" type="button" id="go">Plan journey</button>
+  <p class="note" id="note"></p>
+</form>
+
+<div class="maphead">
+  <div><h2>Every way to London, on one clock</h2><p id="lede"></p></div>
+  <div class="lines-ctl" id="ctl" role="group" aria-label="Rank by">
+    <button data-t="cheapest" aria-pressed="true"><i></i>Cheapest all-in</button>
+    <button data-t="fastest" aria-pressed="false"><i></i>Fastest</button>
+    <button data-t="comfort" aria-pressed="false"><i></i>Most comfortable</button>
+  </div>
+</div>
+
+<div class="map" id="map" style="--cols:200px minmax(0,1fr) 172px">
+  <div class="axis" id="axis"></div>
+  <ol id="lines" style="list-style:none"></ol>
+</div>
+<div class="key">
+  <span><i class="t"></i>Public transport</span><span><i class="c"></i>Car</span><span><i></i>At the airport</span><span><i class="f"></i>In the air</span><span><i class="l"></i>Layover</span>
+  <span style="margin-left:auto">Times are yours, New York local &middot; hover any part of a line</span>
+</div>
+
+<section class="par">
+  <div><h2>How the letter is decided</h2><p id="par1"></p><p style="margin-top:8px">Sort by any of the three, search on any day: <b>the letter on a flight does not move</b>. Only its place in the list does.</p></div>
+  <div><h2>The reference journey</h2><ul id="parledger"></ul></div>
+</section>
+<div class="cov" id="cov"></div>
+</div>
+<div class="tip" id="tip" data-on="0"></div>
+
+<script>
+const D = __DATA__;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const money = c => '$' + Math.abs(Math.round(c/100)).toLocaleString('en-US');
+const signed = c => (c < 0 ? '−' : '+') + money(c);
+const hm = iso => iso.slice(11,16);
+const niceDate = d => new Date(d + 'T12:00:00Z').toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long', timeZone:'UTC'});
+const dur = m => Math.floor(m/60) + 'h' + (m%60 ? String(m%60).padStart(2,'0') : '');
+const gcls = g => ({A:'a',B:'b',C:'c'}[g[0]] || 'd');
+const isCar = leg => /cab|car|uber|lyft|ride|taxi/i.test(leg.tip);
+const NAMES = {cheapest:'cheapest all-in', fastest:'fastest door to door', comfort:'most comfortable'};
+let T = 'cheapest', W = null;
+
+// ---- the shared clock, in the traveller's local time
+function offsetMs(iso){ const m = /([+-])(\d\d):(\d\d)$/.exec(iso); return (m[1] === '-' ? -1 : 1) * (+m[2]*60 + +m[3]) * 6e4; }
+function startOf(e){ const legs = e.by[T].legs; let lead = 0; for (const l of legs){ if (l.kind === 'flight') break; lead += l.minutes; } return Date.parse(e.depart) - lead*6e4; }
+function computeWindow(list){
+  let s = Infinity, en = -Infinity;
+  for (const e of list){ const a = startOf(e); s = Math.min(s, a); en = Math.max(en, a + e.door_minutes*6e4); }
+  const off = offsetMs(list[0].depart);
+  const h = 3600e3, local0 = Math.floor((s + off) / h) * h - off;
+  return {start: local0, end: Math.ceil((en + off) / h) * h - off, off};
+}
+const pct = t => (t - W.start) / (W.end - W.start) * 100;
+const SKY = [[0,'#1a2150'],[4,'#232a5e'],[5.5,'#8a6a97'],[6.5,'#f0b28a'],[7.5,'#f8dcb8'],[9,'#bcd6f2'],[12,'#a9cdf2'],[16,'#b3cfec'],[17.5,'#f3bd93'],[18.8,'#b67b90'],[20,'#4a4482'],[21.5,'#262e62'],[24,'#1a2150']];
+function sky(h){ h = ((h%24)+24)%24; for (let i=1;i<SKY.length;i++){ if (h <= SKY[i][0]){ const [h0,c0]=SKY[i-1],[h1,c1]=SKY[i],t=(h-h0)/(h1-h0); const a=[1,3,5].map(k=>parseInt(c0.slice(k,k+2),16)),b=[1,3,5].map(k=>parseInt(c1.slice(k,k+2),16)); return 'rgb('+a.map((v,k)=>Math.round(v+(b[k]-v)*t)).join(',')+')'; } } return SKY[0][1]; }
+function axisHTML(){
+  const ticks = [], hours = (W.end - W.start)/36e5, step = hours > 30 ? 6 : 3;
+  const stops = [];
+  for (let t = W.start; t <= W.end; t += 36e5){
+    const lh = new Date(t + W.off).getUTCHours();
+    stops.push(sky(lh) + ' ' + pct(t).toFixed(1) + '%');
+    if (lh % step === 0) ticks.push(`<span style="left:${pct(t).toFixed(2)}%">${String(lh).padStart(2,'0')}:00</span>`);
+  }
+  return `<div class="lbl">Line</div><div class="ticks">${ticks.join('')}<div class="skyband" style="background:linear-gradient(90deg,${stops.join(',')})"></div></div><div class="lbl r">Grade &middot; all in</div>`;
+}
+function trackHTML(e){
+  const legs = e.by[T].legs; let t = startOf(e); const segs = [], sts = [];
+  sts.push(`<span class="st door first" style="left:${pct(t).toFixed(2)}%"><i></i><b>Your door<small>${hm(new Date(t + W.off).toISOString())}</small></b></span>`);
+  legs.forEach((l, i) => {
+    const w = l.minutes*6e4, cls = l.kind === 'ground' ? (isCar(l) ? 'ground car' : 'ground transit') : l.kind;
+    segs.push(`<span class="seg ${cls}" style="left:${pct(t).toFixed(2)}%;width:${(w/(W.end-W.start)*100).toFixed(2)}%" data-tip="${esc(l.tip)}"></span>`);
+    if (l.kind === 'flight'){
+      const seg = e.segments[legs.slice(0, i).filter(x => x.kind === 'flight').length] || {};
+      if (!legs.slice(0, i).some(x => x.kind === 'flight'))
+        sts.push(`<span class="st" style="left:${pct(t).toFixed(2)}%"><i></i><b>${esc(seg.from || e.route[0])}<small>${esc(seg.dep || hm(e.depart))}</small></b></span>`);
+      const isLast = !legs.slice(i+1).some(x => x.kind === 'flight');
+      if (isLast) sts.push(`<span class="st ${legs.slice(i+1).length ? '' : 'end'}" style="left:${pct(t + w).toFixed(2)}%"><i></i><b>${esc(seg.to || e.route[e.route.length-1])}<small>${esc(seg.arr || hm(e.arrive))}${e.day_offset ? ' +1' : ''}</small></b></span>`);
+    }
+    if (l.kind === 'layover') sts.push(`<span class="st x" style="left:${pct(t + w/2).toFixed(2)}%"><i></i><b>${esc(l.label)}</b></span>`);
+    t += w;
+  });
+  sts.push(`<span class="st door end" style="left:${pct(t).toFixed(2)}%"><i></i><b>${esc(D.query.destination)}</b></span>`);
+  return segs.join('') + sts.join('');
+}
+function lineHTML(e){
+  const eff = e.by[T].effective_cents;
+  return `<li class="line" data-id="${esc(e.id)}" aria-expanded="false">
+    <div class="name"><b>${esc(e.flight.replace(/^([A-Z0-9]{2})(\d)/, '$1 $2'))}${e.stops ? ' <span style="display:inline;color:var(--faint);font-weight:500">+' + e.stops + '</span>' : ''}</b><span>${esc(e.carrier_name)} &middot; ${esc(e.brand)}</span></div>
+    <div class="track">${trackHTML(e)}</div>
+    <div class="roundel"><span class="ring ${gcls(e.grade)}" title="Grade ${e.grade}">${e.grade}</span><b class="num">${money(eff)}</b><small class="num">${money(e.ticket_cents)} ticket &middot; ${dur(e.door_minutes)}</small></div>
+    <div class="detail" hidden></div></li>`;
+}
+function detailHTML(e){
+  const by = e.by[T], lines = by.lines, legs = by.legs, L = code => lines.find(l => l.code === code);
+  const amt = l => l ? `<em class="${l.cents < 0 ? 'cr' : l.cents === 0 ? 'z' : ''}">${l.cents === 0 ? '—' : signed(l.cents)}</em>` : '<em class="z">—</em>';
+  const st = []; let fl = 0, lay = 0;
+  legs.forEach(l => {
+    if (l.kind === 'ground' && !fl) st.push(`<li class="stn door"><div><b>${esc(D.query.origin_full)}</b><span>${esc(l.tip.split(' · ').slice(2).join(' · '))} &middot; ${dur(l.minutes)}</span></div>${amt(L('ground_out'))}</li>`);
+    else if (l.kind === 'process') st.push(`<li class="stn"><div><b>${esc(e.route[0])}</b><span>At the airport ${dur(l.minutes)} &middot; departs ${hm(e.depart)}</span></div><em class="z">—</em></li>`);
+    else if (l.kind === 'flight'){ const s = e.segments[fl]; st.push(`<li class="stn"><div><b>${esc(s.flight)} to ${esc(s.to)}</b><span>${dur(l.minutes)} in the air${s.equipment && s.equipment !== 'UNKNOWN' ? ' · ' + esc(s.equipment) : ''}${fl === 0 ? ' · ticket, ' + esc(e.brand) : ''}</span></div>${fl === 0 ? amt(L('ticket')) : '<em class="z">—</em>'}</li>`); fl++; }
+    else if (l.kind === 'layover'){ const ll = lines.filter(x => x.code === 'layover' || x.code === 'risk' || x.code === 'mct_margin')[lay]; st.push(`<li class="stn x"><div><b>${esc(l.label.split(' ')[0])} &middot; change planes</b><span>${esc(l.tip.split(' · ').slice(2).join(' · '))}${ll ? ' · ' + esc(ll.label) : ''}</span></div>${amt(ll)}</li>`); lay++; }
+    else if (l.kind === 'ground') st.push(`<li class="stn door"><div><b>${esc(D.query.destination)}</b><span>${esc(l.tip.split(' · ').slice(2).join(' · '))} &middot; ${dur(l.minutes)} &middot; arrives ${hm(e.arrive)}${e.day_offset ? ' +1' : ''}</span></div>${amt(L('ground_in'))}</li>`);
+  });
+  const used = new Set(['ground_out','ground_in','ticket']); let layN = 0;
+  const notes = lines.filter(l => { if (used.has(l.code)) return false; if (l.code === 'layover' || l.code === 'risk' || l.code === 'mct_margin'){ return layN++ >= lay; } return true; });
+  const b = e.booking[0];
+  return `<ol class="diagram">${st.join('')}</ol>
+    <div class="notes"><h4>Also on the ticket</h4><ul>${notes.map(l => `<li><div>${esc(l.label)}<span>${esc(l.evidence)}</span></div>${amt(l)}</li>`).join('')}</ul>
+    <div class="total"><span>All in, ${NAMES[T]}</span><b class="num">${money(by.effective_cents)}</b></div>
+    <div class="book"><button class="plan">${b ? 'Book with ' + esc(b.who) + ' · ' + money(b.price_cents) : 'Book'}</button><p>Grade ${e.grade}: ${money(e.effective_cents)} all in for a neutral traveller, against par ${money(D.query.par_cents)}.</p></div></div>`;
+}
+function paint(animate){
+  const list = D.results[T]; W = computeWindow(list);
+  const before = {};
+  if (animate) document.querySelectorAll('.line').forEach(li => { before[li.dataset.id] = li.getBoundingClientRect().top; });
+  $('#axis').innerHTML = axisHTML();
+  $('#lines').innerHTML = list.map(lineHTML).join('');
+  if (animate && !matchMedia('(prefers-reduced-motion: reduce)').matches){
+    document.querySelectorAll('.line').forEach(li => {
+      const b = before[li.dataset.id]; if (b == null) return;
+      const d = b - li.getBoundingClientRect().top; if (!d) return;
+      li.style.transform = 'translateY(' + d + 'px)';
+      requestAnimationFrame(() => { li.classList.add('moving'); li.style.transform = ''; });
+      li.addEventListener('transitionend', () => li.classList.remove('moving'), {once:true});
+    });
+  }
+}
+// ---- boot
+const q = D.query, P = D.par, g0 = D.results.cheapest[0].by.cheapest.legs[0];
+$('#note').innerHTML = 'The first leg is priced <b>from your address at the hour you leave</b>, not from the city: ' + esc(g0.tip.split(' · ').slice(2).join(', ')) + ', ' + dur(g0.minutes) + '. Change the address and the whole map moves.';
+$('#lede').textContent = niceDate(q.date) + ' · ' + q.total_found + ' journeys found, ' + D.results.cheapest.length + ' drawn. Further right is later. Longer is longer.';
+$('#par1').innerHTML = 'Each journey is one number, in dollars: ticket, bag, both rides at that hour, your time at a rate, and the small print. Against <b>par ' + money(q.par_cents) + '</b> &mdash; what a nonstop in main cabin with a bag costs all in on this route this month &mdash; that number is the letter. About par is an A.';
+$('#parledger').innerHTML = P.ledger.map(l => `<li><span>${esc(l.label)}</span><span class="num">${signed(l.cents)}</span></li>`).join('') + `<li class="t"><span>Par</span><span class="num">${money(P.par_cents)}</span></li>`;
+$('#cov').innerHTML = '<b>Draft data.</b> ' + esc(D.gaps[0] || '') + '. ' + esc(D.verdict || '') + '. A real Duffel search on a test token; some fares and times are invented.';
+paint(false);
+
+$('#ctl').addEventListener('click', ev => { const b = ev.target.closest('button[data-t]'); if (!b || b.dataset.t === T) return; T = b.dataset.t; $('#ctl').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); paint(true); });
+$('#lines').addEventListener('click', ev => {
+  if (ev.target.closest('.detail')) return;
+  const li = ev.target.closest('.line'); if (!li) return;
+  const open = li.getAttribute('aria-expanded') === 'true', det = li.querySelector('.detail');
+  li.setAttribute('aria-expanded', String(!open));
+  if (!open && !det.innerHTML) det.innerHTML = detailHTML(D.results[T].find(x => x.id === li.dataset.id));
+  det.hidden = open;
+});
+const tip = $('#tip');
+$('#lines').addEventListener('mousemove', ev => { const s = ev.target.closest('[data-tip]'); if (!s){ tip.dataset.on = '0'; return; } tip.textContent = s.dataset.tip; tip.dataset.on = '1'; tip.style.left = Math.min(ev.clientX + 12, innerWidth - 280) + 'px'; tip.style.top = (ev.clientY + 14) + 'px'; });
+$('#lines').addEventListener('mouseleave', () => tip.dataset.on = '0');
+addEventListener('resize', () => paint(false));
+$('#go').addEventListener('click', () => $('#map').scrollIntoView({behavior:'smooth', block:'start'}));
+</script>
+</body></html>

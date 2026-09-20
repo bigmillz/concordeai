@@ -406,6 +406,8 @@ python3 concorde-travel/capture.py JFK LHR 2026-11-12  # real search -> scrubbed
 python3 concorde-travel/tests/test_faststart.py
 python3 concorde-travel/tests/test_timeline.py   # needs a running server; skips without one
 python3 concorde-travel/adapter.py               # normalise the recorded payload, print coverage
+python3 concorde-travel/ui/mock/data.py [capture]  # score a capture into the mockups' slim.json
+python3 concorde-travel/ui/mock/build.py         # inline it into mock-N.html
 python3 concorde-travel/ground.py "Shoreditch" LHR 09:00   # ground estimate for anywhere
 python3 concorde-travel/places.py "Shoreditch, London EC2A"  # what a typed place resolves to
 ```
@@ -720,19 +722,32 @@ start one, same as the desktop app's gauntlet.
 
 ## Interface mockups
 
-`concorde-travel/ui/mock/` holds four directions for the interface, at
-`http://127.0.0.1:9897/mock` or by opening the files directly.
+`concorde-travel/ui/mock/` holds eight directions for the interface in two
+rounds, at `http://127.0.0.1:9897/mock` or by opening the files directly.
+Round two (05–08, 2026-09-20) is the one to look at first: **Shortlist** (a
+sentence-form search and three answer cards), **Board** (a split-flap departures
+board with a paper receipt), **Lines** (a transit map, every journey a line on
+one clock) and **Dial** (a price/speed/comfort triangle that re-ranks live).
+Round one (01–04) is kept for the record.
 
 Each `mock-N.src.html` carries a `__DATA__` token; `build.py` inlines
 `slim.json` and writes `mock-N.html`. **Edit the `.src.html`, never the built
 file** — and rebuild after. They are standalone on purpose: a mockup you have to
 start a server to look at is a mockup nobody looks at.
 
-The data is a real JFK–LHR Duffel search scored by the real scorer — no
-placeholders. Two things in it are honest artefacts, not bugs: almost everything
-grades **A+** because `slim.json` was built before par was modelled, against the
-retired $1,050 guess (the live page is the reference for grades now), and some
-inventory is **synthetic** because the capture came from a test token (the
+**`slim.json` is made by `data.py`**, not by hand: it runs a capture through the
+adapter and the real scorer at the modelled par and writes every number the
+pages use, plus two things the live page does not have — the pool sorted under
+each target, and `grid`, the effective cost of every option at **66 weightings**
+across the triangle between the three targets, so the Dial can re-rank live
+with the scorer's own numbers rather than a JavaScript imitation of them (hard
+rule 1 in the browser). The pool is the best ten under each target plus an even
+sample of the rest, so the page carries the connections and the C-to-F grades a
+real search returns. The checked-in file was built from the untrimmed 172-offer
+capture, which is not in the repo; rebuilding from the trimmed sample gives 23
+options and says so in `_provenance`.
+
+Some inventory is **synthetic** because the capture came from a test token (the
 fictional carrier ZZ is filtered out of the mock data; a cluster of four
 carriers sharing one departure time is the test feed, not the adapter).
 

@@ -1386,3 +1386,53 @@ its source before its flag comes off.
 captured** — its own `_provenance` block says so, and a test asserts it. It proves the
 adapter handles the documented shape; it cannot prove the documented shape is what the
 service returns. Replace it with a real capture on the first successful probe.
+
+## The second design round (2026-09-20)
+
+Patrick's brief: four new mockups, "creative, different than most everything out there,
+as far as like Google Flights, Expedia … aesthetically pleasing without being overwhelming,
+but also highly intuitive. I want somebody to go on there, be excited about booking their
+flight, be excited through the process, and move quickly through it so that they can
+easily find the best flight for them." Each is a whole page — the search, the results and
+the pick — on the same real JFK–LHR capture, scored at the modelled par, and each takes
+one idea about how a person finds a flight and builds the page around it.
+
+**05 Shortlist — answer first.** The search is a sentence you edit in place ("I'm leaving
+from *Wyckoff Ave & Myrtle Ave, Bushwick* for *London* on *Wed 18 Nov*, *one adult* with
+*one checked bag*."), and the result is three doors: cheapest all-in, fastest door to
+door, most comfortable — each with its grade as a seal, its all-in price, and its three
+biggest reasons in dollars. That is the product's thesis in one screen: the same 172
+flights, three questions, three answers. Everything else waits below in a ranked list.
+The sky band on each card is the local sky from departure to arrival, so an overnight
+reads dusk → night → dawn without a word. Fraunces and Instrument Sans on a cool bone
+ground with a viridian accent.
+
+**06 Board — the departures board.** Amber on black, split-flap cells, one row per flight.
+The three tabs re-sort and the cells flap over; a row opens a paper receipt — Courier,
+dotted leaders, a rotated grade stamp — which is the one moment of warm paper on a dark
+screen. It is the most evocative of the four and the least like a booking site, and the
+board vernacular (Barlow Condensed, letter-spaced caps) is the subject's own. The risk is
+novelty wearing off; the flap runs once, on sort, and is off under reduced motion.
+
+**07 Lines — a transit map.** Mock-2's insight carried into a metaphor everyone already
+reads: every journey is a line on one clock, green for the train, grey for the car, blue
+in the air, a dashed hollow where you wait, a ring where you change planes, and the grade
+as a roundel at the end. Station labels are the airport codes and local times; the axis
+carries a thin sky strip so 02:00 looks like 02:00. A line opens into the in-car strip
+diagram with the ledger amount at each station. The journey-planner form at the top is
+where the ground leg's "from your door" promise lives.
+
+**08 Dial — what matters to you.** A triangle between price, speed and comfort; drag the
+dot and the list re-ranks live. This is the model's one function made tangible, and it is
+honest: every position on the dial maps to one of 66 weightings the real scorer already
+ran (`grid` in `slim.json`), so the numbers are the scorer's, not a JavaScript
+approximation, and the readout says what the position means in the model's own terms
+("an hour of your time is worth $23, a worse cabin counts 1.2×"). The letters do not move
+as you drag, and the panel says so.
+
+Three things they share, on purpose: the grade is explained in one sentence on every page
+with the reference ledger beside it (a letter against a number nobody can see is hidden
+ranking logic); the ground leg is named as coming from the typed address, because that
+promise is the moat; and the coverage caveat stays amber on all four. `data.py` is the
+generator so the next round does not start by reverse-engineering the data.
+
