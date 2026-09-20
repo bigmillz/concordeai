@@ -368,6 +368,30 @@ details[open] summary:after{content:"–"}
   .frow.legrow{grid-template-columns:1fr 1fr;} .frow.legrow .rm2{justify-self:end}
 }
 
+/* ---------- motion */
+@keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes drop{from{opacity:0;transform:translateY(-100%)}to{opacity:1;transform:none}}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+@keyframes pan{from{transform:translateX(0)}to{transform:translateX(-18%)}}
+.rise{animation:rise .6s cubic-bezier(.2,.8,.2,1) both}
+.bar.drop{animation:drop .55s cubic-bezier(.2,.8,.2,1) both}
+#results.fade{animation:fadein .5s ease both}
+/* the shortlist window: one picture of the origin city across all three cards,
+   each card a pane of it; it drifts, and every few seconds it changes, pane by pane */
+.sky{height:126px;overflow:hidden}
+.sky .pano{position:absolute;top:0;bottom:0;left:0;width:100%;animation:pan 44s ease-in-out infinite alternate;will-change:transform}
+.sky .pano img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 62%;opacity:0;transition:opacity 1.1s ease}
+.sky .pano img.on{opacity:1}
+.sky .pano img.top{z-index:1}
+.sky .scrim{position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(10,10,12,.12) 0%,rgba(10,10,12,.02) 35%,rgba(10,10,12,.6) 100%);pointer-events:none}
+.sky .cap{position:absolute;left:16px;top:10px;z-index:2;font-family:var(--disp);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.78);text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.sky .t,.sky .path,.sky .plane{z-index:2}
+.sky .path{top:auto;bottom:38px}
+.sky .plane{top:auto;bottom:31px}
+.seal{top:104px}
+@media (max-width:980px){.sky{height:108px}.seal{top:86px}}
+@media (prefers-reduced-motion:reduce){.sky .pano{animation:none}.rise,.bar.drop,#results.fade{animation:none}}
+
 /* ---------- the bar */
 .bar{position:sticky;top:0;z-index:6;background:rgba(16,16,19,.9);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
 .barin{max-width:1180px;margin:0 auto;padding:10px clamp(16px,3.5vw,32px);display:flex;align-items:center;gap:16px;flex-wrap:wrap}
@@ -519,6 +543,9 @@ details[open] summary:after{content:"–"}
 
 <script>
 const D = __DATA__;
+// the pictures on the shortlist cards; declared first because the cards are drawn at boot
+var PHOTOS = __PHOTOS__;
+const PH = {idx:0, t0:performance.now(), timer:null, city:(D.query.origin || 'Brooklyn').split(',').pop().trim()};
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const money = c => '$' + Math.abs(Math.round(c/100)).toLocaleString('en-US');
@@ -770,7 +797,7 @@ const amtHTML = l => l.cents === 0 ? (l.included ? 'included' : '—') : l.cents
 function door(kind, e, r, prof, title){
   const eff = r.total;
   return `<article class="door ${kind}" data-id="${esc(e.id)}">
-    <div class="sky" style="background:${skyBand(e)}"><div class="path"></div>
+    <div class="sky" style="background:${skyBand(e)}">${PHOTOS.length ? `<div class="pano"><img class="ph a on" alt="" src="${PHOTOS[PH.idx].src}"><img class="ph b" alt=""></div><div class="scrim"></div><span class="cap">${esc(PH.city)} · ${esc(PHOTOS[PH.idx].credit)}</span>` : ''}<div class="path"></div>
       <svg class="plane" viewBox="0 0 16 16" style="left:${e.stops ? 46 : 50}%" aria-hidden="true"><path d="M15 8l-4.2-1.4L7 1.5H5.4l1.9 5.1H3.6L2.5 4.9H1.2l.9 3.1-.9 3.1h1.3l1.1-1.7h3.7L5.4 14.5H7l3.8-5.1z"/></svg>
       <span class="t l">${hm(e.depart)}</span><span class="t r">${hm(e.arrive)}${e.day_offset ? '<small>+1</small>' : ''}</span></div>
     <div class="seal ${gcls(e.grade)}" title="Grade ${e.grade}">${e.grade}</div>
@@ -797,6 +824,8 @@ function paintDoors(rows){
     if (picks.length === 3 || prof === corner) continue; const r = best(prof); if (r) picks.push({kind, r, prof, title});
   }
   $('#doors').innerHTML = picks.map(p => door(p.kind, p.r.e, p.r, p.prof, p.title)).join('');
+  if (S.entrance) document.querySelectorAll('#doors .door').forEach((d, k) => { d.classList.add('rise'); d.style.animationDelay = (120 + k*110) + 'ms'; });
+  mountPhotos();
   $('#lede').textContent = D.query.total_found + ' flights came back. ' + (S.asap ? 'The first gets you there soonest; the other two are the sensible alternatives.' : 'The first is the best at your dial; the other two answer the questions people ask next.');
 }
 
@@ -817,6 +846,7 @@ function paintList(rows, hidden, animate){
   const rest = rows.filter(r => !doorIds.has(r.e.id));
   const before = {}; if (animate) document.querySelectorAll('.row').forEach(li => before[li.dataset.id] = li.getBoundingClientRect().top);
   $('#list').innerHTML = rest.slice(0, S.shown).map(rowHTML).join('');
+  if (S.entrance){ document.querySelectorAll('.row').forEach((li, k) => { if (k < 14){ li.classList.add('rise'); li.style.animationDelay = (420 + k*45) + 'ms'; } }); S.entrance = false; }
   document.querySelectorAll('.row').forEach(li => { if (S.open.has(li.dataset.id)){ li.setAttribute('aria-expanded', 'true'); const det = li.querySelector('.detail'); det.innerHTML = ledgerHTML(ALL.find(x => x.id === li.dataset.id)); det.hidden = false; } });
   const left = rest.length - S.shown; $('#morebtn').hidden = left <= 0; $('#morebtn').textContent = left > 0 ? 'Show the other ' + left : '';
   $('#listnote').textContent = rest.length + ' more, ranked ' + (S.asap ? 'by arrival time' : 'at your dial') + (S.wants.size ? ', charged for the wants they miss' : '') + '.';
@@ -1015,6 +1045,79 @@ document.addEventListener('click', ev => { if (ev.target.id === 'x' || ev.target
 $('#go').addEventListener('click', enterResults);
 addEventListener('resize', () => { paintTri(); const [x, y] = toXY(S.a, S.b, S.c); handle.style.left = x + 'px'; handle.style.top = y + 'px'; });
 
+// ================= the pictures =================
+// One picture of the origin city across the three shortlist cards. Each card
+// shows the slice of it that sits under that card, so together they are one
+// window (the gaps between the cards are the frame). The whole thing drifts
+// slowly, and every few seconds it changes to the next picture, each card a
+// beat behind the last, the way a row of screens in a subway does.
+function mountPhotos(){
+  const grid = $('#doors'), doors = [...grid.querySelectorAll('.door')]; if (!PHOTOS.length || !doors.length) return;
+  const gl = grid.getBoundingClientRect(), gw = grid.clientWidth; if (gw < 10) return;
+  const phase = -(((performance.now() - PH.t0) / 1000) % 88) + 's';
+  doors.forEach(d => { const pano = d.querySelector('.pano'); if (!pano) return;
+    pano.style.width = Math.round(gw * 1.22) + 'px'; pano.style.left = Math.round(gl.left - d.getBoundingClientRect().left) + 'px'; pano.style.animationDelay = phase; });
+  if (!PH.timer && !REDUCED) PH.timer = setInterval(cycle, 6500);
+}
+function cycle(){
+  if (W.mode !== 'results' || PHOTOS.length < 2) return;
+  PH.idx = (PH.idx + 1) % PHOTOS.length; const next = PHOTOS[PH.idx];
+  document.querySelectorAll('#doors .door').forEach((d, k) => setTimeout(() => {
+    const pano = d.querySelector('.pano'); if (!pano) return;
+    const cur = pano.querySelector('img.on'), nxt = pano.querySelector('img:not(.on)'); if (!cur || !nxt) return;
+    nxt.src = next.src; nxt.classList.add('top'); cur.classList.remove('top');
+    // the new picture fades in over the old one, which stays put until the fade is done - two fades at once let the ground show through
+    requestAnimationFrame(() => requestAnimationFrame(() => { nxt.classList.add('on');
+      setTimeout(() => { cur.style.transition = 'none'; cur.classList.remove('on'); requestAnimationFrame(() => { cur.style.transition = ''; }); }, 1200); }));
+    const cap = d.querySelector('.cap'); if (cap) cap.textContent = PH.city + ' · ' + next.credit;
+  }, k * 480));
+}
+addEventListener('resize', mountPhotos);
+
+// Until photos.py has been run on a machine that can reach an image host,
+// the pictures are drawn here: the same skyline at four times of day, wide
+// enough to be a strip across three cards. A stand-in for the stock photo,
+// and it says so on the card.
+function makeArt(hour, variant){
+  const W = 3600, H = 640, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+  const mk = seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const geo = mk(1234567), fx = mk(97 + variant * 1013);
+  const night = hour >= 20 || hour < 5.5, dusk = !night && (hour >= 17.5 || hour < 7.5), horizon = H * .60, deck = H * .70;
+  const g = x.createLinearGradient(0, 0, 0, horizon); g.addColorStop(0, sky(hour - 1.4)); g.addColorStop(1, sky(hour + .9)); x.fillStyle = g; x.fillRect(0, 0, W, H);
+  if (dusk){ const r = x.createRadialGradient(W*.64, horizon - 20, 10, W*.64, horizon - 20, W*.42); r.addColorStop(0, 'rgba(255,168,92,.6)'); r.addColorStop(1, 'rgba(255,168,92,0)'); x.fillStyle = r; x.fillRect(0, 0, W, H); }
+  if (night){ for (let i = 0; i < 320; i++){ x.globalAlpha = .25 + fx() * .65; x.fillStyle = '#fff'; x.beginPath(); x.arc(fx() * W, fx() * horizon * .7, .3 + fx() * 1.3, 0, 7); x.fill(); } x.globalAlpha = 1; x.fillStyle = '#f3eed6'; x.beginPath(); x.arc(W*.78, H*.17, 24, 0, 7); x.fill(); }
+  else if (!dusk){ x.fillStyle = 'rgba(255,250,232,.92)'; x.beginPath(); x.arc(W*.28, H*.15, 30, 0, 7); x.fill(); const hl = x.createRadialGradient(W*.28, H*.15, 30, W*.28, H*.15, 420); hl.addColorStop(0, 'rgba(255,255,240,.35)'); hl.addColorStop(1, 'rgba(255,255,240,0)'); x.fillStyle = hl; x.fillRect(0, 0, W, H); }
+  // the skyline across the water
+  const far = night ? '#171d33' : dusk ? '#33304d' : '#55668a', tops = []; x.fillStyle = far;
+  for (let px = 0; px < W;){ const bw = 38 + geo() * 92, near = Math.abs(px - W*.55) < W*.2, bh = 50 + Math.pow(geo(), 2.2) * (near ? 330 : 190); x.fillRect(px, horizon - bh, bw, bh); tops.push([px, bw, bh]);
+    if (geo() < .11) x.fillRect(px + bw/2 - 3, horizon - bh - 60 - geo() * 110, 6, 170); px += bw + 5 + geo() * 20; }
+  if (night || dusk){ x.fillStyle = night ? 'rgba(255,214,140,.85)' : 'rgba(255,225,170,.5)'; for (const [bx, bw, bh] of tops) for (let wy = horizon - bh + 10; wy < horizon - 8; wy += 13) for (let wx = bx + 5; wx < bx + bw - 6; wx += 11) if (fx() < (night ? .42 : .2)) x.fillRect(wx, wy, 4, 6); }
+  const hz = x.createLinearGradient(0, horizon - 140, 0, horizon); hz.addColorStop(0, 'rgba(255,255,255,0)'); hz.addColorStop(1, night ? 'rgba(20,24,45,.35)' : 'rgba(255,255,255,.16)'); x.fillStyle = hz; x.fillRect(0, horizon - 140, W, 140);
+  const wg = x.createLinearGradient(0, horizon, 0, H); wg.addColorStop(0, night ? '#0e1530' : dusk ? '#46395c' : '#2f4d78'); wg.addColorStop(1, night ? '#04060e' : dusk ? '#17121f' : '#12223d'); x.fillStyle = wg; x.fillRect(0, horizon, W, H - horizon);
+  x.save(); x.globalAlpha = .2; x.translate(0, horizon * 2); x.scale(1, -1); x.drawImage(c, 0, horizon - 300, W, 300, 0, horizon - 300, W, 300); x.restore();
+  for (let i = 0; i < 160; i++){ x.fillStyle = 'rgba(255,255,255,' + (fx() * .07) + ')'; x.fillRect(fx() * W, horizon + fx() * (H - horizon), 60 + fx() * 280, 1.5); }
+  // the bridge
+  const t1 = W*.40, t2 = W*.60, tw = 86, th = 300, stone = night ? '#0f1019' : dusk ? '#211c2b' : '#2a2e3c', open = night ? '#1a2140' : dusk ? '#55466a' : '#8ea3c2';
+  for (const tx of [t1, t2]){ x.fillStyle = stone; x.fillRect(tx - tw/2, deck - th, tw, th + 80);
+    x.fillStyle = open; for (const ax of [tx - 28, tx + 8]){ x.beginPath(); x.moveTo(ax, deck - 30); x.lineTo(ax, deck - 175); x.lineTo(ax + 10, deck - 212); x.lineTo(ax + 20, deck - 175); x.lineTo(ax + 20, deck - 30); x.closePath(); x.fill(); } }
+  x.fillStyle = stone; x.fillRect(0, deck - 6, W, 14);
+  x.strokeStyle = night ? 'rgba(210,220,245,.55)' : 'rgba(18,20,28,.85)';
+  const segs = [[0, deck - 12, t1*.5, deck - 40, t1, deck - th], [t1, deck - th, (t1+t2)/2, deck + 60, t2, deck - th], [t2, deck - th, t2 + (W-t2)*.5, deck - 40, W, deck - 12]];
+  const at = (sg, t) => [(1-t)*(1-t)*sg[0] + 2*(1-t)*t*sg[2] + t*t*sg[4], (1-t)*(1-t)*sg[1] + 2*(1-t)*t*sg[3] + t*t*sg[5]];
+  for (const sg of segs){ x.lineWidth = 5; x.beginPath(); x.moveTo(sg[0], sg[1]); x.quadraticCurveTo(sg[2], sg[3], sg[4], sg[5]); x.stroke();
+    x.lineWidth = 1.1; for (let t = .03; t < .98; t += .028){ const [px, py] = at(sg, t); if (py < deck - 8){ x.beginPath(); x.moveTo(px, py); x.lineTo(px, deck - 6); x.stroke(); } } }
+  x.lineWidth = .9; for (const tx of [t1, t2]) for (let k = 1; k <= 14; k++) for (const dir of [-1, 1]){ x.beginPath(); x.moveTo(tx, deck - th + 30 + k*4); x.lineTo(tx + dir * k * 62, deck - 6); x.stroke(); }
+  if (night || dusk){ x.fillStyle = night ? 'rgba(255,220,150,.9)' : 'rgba(255,230,170,.6)'; for (let px = 30; px < W; px += 120) x.fillRect(px, deck - 22, 3, 3); }
+  const vg = x.createLinearGradient(0, H - 120, 0, H); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.55)'); x.fillStyle = vg; x.fillRect(0, H - 120, W, 120);
+  return c.toDataURL('image/jpeg', .82);
+}
+if (!PHOTOS.length){
+  const paintArt = () => { PHOTOS = [[6.6, 'dawn'], [12.5, 'midday'], [18.3, 'dusk'], [22.4, 'night']].map(([h, l], i) => ({src: makeArt(h, i), credit: 'stand-in artwork, ' + l}));
+    if (W.mode === 'results') paint(false); };
+  (window.requestIdleCallback || (f => setTimeout(f, 60)))(paintArt);
+}
+document.addEventListener('animationend', ev => { if (ev.target.classList && ev.target.classList.contains('rise')) ev.target.classList.remove('rise'); });
+
 // ================= the steps, the bar, the editor =================
 var W = {mode:'wizard', step:1};
 const BLOCKS = ['where','matters','points','advanced'];
@@ -1058,14 +1161,16 @@ function summary(){
   $('#sumchips').innerHTML = chips.map(c => `<i>${esc(c)}</i>`).join('');
 }
 function enterResults(){
-  W.mode = 'results';
+  W.mode = 'results'; S.entrance = true;
+  $('#bar').classList.add('drop'); $('#results').classList.add('fade');
+  document.querySelectorAll('#results .stepper, #results .sechead').forEach((el, k) => { el.classList.add('rise'); el.style.animationDelay = (k*80) + 'ms'; });
   BLOCKS.forEach(k => $('#ed-' + k).appendChild($('#blk-' + k)));
   $('#wizard').classList.add('hidden'); $('#rail').classList.add('hidden');
   $('#bar').classList.remove('hidden'); $('#results').classList.remove('hidden');
   paint(true); summary(); scrollTo({top:0, behavior:'auto'});
 }
 function startOver(){
-  closeEditor(); W.mode = 'wizard';
+  closeEditor(); W.mode = 'wizard'; $('#bar').classList.remove('drop'); $('#results').classList.remove('fade');
   BLOCKS.forEach(k => $('#s' + (BLOCKS.indexOf(k) + 1) + ' .stepin .slot').appendChild($('#blk-' + k)));
   $('#bar').classList.add('hidden'); $('#results').classList.add('hidden');
   $('#wizard').classList.remove('hidden'); $('#rail').classList.remove('hidden');

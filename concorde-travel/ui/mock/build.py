@@ -18,6 +18,10 @@ for src in sorted(glob.glob(os.path.join(HERE, "mock-*.src.html"))):
     n = int(os.path.basename(src)[5:-9])
     html = open(src, encoding="utf-8").read()
     assert "__DATA__" in html, "mock-%d has no __DATA__ token" % n
+    # Photos are optional and only some mocks carry the token: photos.json is
+    # written by photos.py on a machine that can reach an image host.
+    photos = os.path.join(HERE, "photos.json")
+    ph = open(photos, encoding="utf-8").read() if os.path.exists(photos) else "[]"
     out = os.path.join(HERE, "mock-%d.html" % n)
-    open(out, "w", encoding="utf-8").write(html.replace("__DATA__", data))
+    open(out, "w", encoding="utf-8").write(html.replace("__DATA__", data).replace("__PHOTOS__", ph))
     print("mock-%d.html  %6.0f KB" % (n, os.path.getsize(out) / 1024))
