@@ -37,6 +37,15 @@ h1,h2,h3{font-weight:400;letter-spacing:-.02em;text-wrap:balance}
 /* ---------- search */
 .search{margin-top:26px;background:var(--panel2);border:1px solid var(--line);border-radius:16px;padding:22px 24px 24px}
 .tripseg{display:inline-flex;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px}
+/* cash or points: two words, a star on the better one */
+.paywith{display:inline-flex;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:2px;margin-bottom:8px}
+.paywith button{padding:5px 11px;border-radius:999px;font-size:12px;font-weight:500;color:var(--dim);display:inline-flex;align-items:center;gap:5px}
+.paywith button[aria-pressed=true]{background:var(--text);color:var(--bg)}
+.paywith button.best:before{content:"★";font-size:10px;color:var(--price)}
+.paywith button[aria-pressed=true].best:before{color:#b07a10}
+.ptwhy{font-size:12px;color:var(--faint);line-height:1.45;margin-top:-2px}
+.ptwhy b{color:var(--dim);font-weight:500}
+.price .unit{color:var(--dim);font-size:12.5px}
 .tripseg button{padding:7px 14px;border-radius:999px;font-size:12.5px;font-weight:500;color:var(--dim);letter-spacing:.02em;transition:.15s}
 .tripseg button[aria-pressed=true]{background:var(--text);color:var(--bg)}
 .tripseg button:hover:not([aria-pressed=true]){color:var(--text)}
@@ -368,6 +377,31 @@ details[open] summary:after{content:"–"}
   .frow.legrow{grid-template-columns:1fr 1fr;} .frow.legrow .rm2{justify-self:end}
 }
 
+/* ---------- the family mark: the delta wing, CONCORDE in Michroma, GO heavier
+   (Michroma ships one weight, so heavier is a text-stroke, as in the other apps) */
+.brand{display:inline-flex;align-items:center;gap:11px;text-decoration:none;color:#fff;opacity:.86;transition:opacity .15s}
+.brand:hover{opacity:1}
+.wing{display:block;overflow:visible;width:26px}
+.wing line{stroke:url(#wgrad);stroke-width:2.4;stroke-linecap:round;fill:none}
+.lockup{font-family:var(--disp);text-transform:uppercase;letter-spacing:.15em;font-size:12.5px;font-weight:400;white-space:nowrap;color:#fff;display:inline-flex;align-items:center}
+.lockup .tld{font-weight:800;-webkit-text-stroke:.7px currentColor}
+.brand:hover .wing line{filter:drop-shadow(0 0 4px rgba(244,245,248,.55))}
+/* HDR nameplate: on an HDR display the lockup swaps to a looping sheen that
+   flares past SDR white, the way the site's and the app's marks do. The text
+   stays in the DOM for SDR, accessibility and no-JS. Loaded only where
+   (dynamic-range: high) is true and the asset exists beside the page. */
+.mark-hdr{display:none;height:22px;width:auto}
+html.hdrmarks .mark-txt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+html.hdrmarks .mark-hdr{display:block}
+/* white edges that glow: wide-gamut white where the display has it */
+@supports (color: color(display-p3 1 1 1)){
+  .seal.a{box-shadow:0 0 0 4px var(--panel2),0 0 18px color(display-p3 .2 .9 .55 / .45)}
+  .go{box-shadow:0 0 22px color(display-p3 1 1 1 / .12)}
+  .go:hover{box-shadow:0 0 30px color(display-p3 1 1 1 / .22)}
+  .door.mine{box-shadow:0 0 0 1px color(display-p3 .3 .65 1 / .35),0 0 28px color(display-p3 .3 .65 1 / .18)}
+  .handle{box-shadow:0 0 0 2px color(display-p3 1 1 1 / .18),0 2px 12px rgba(0,0,0,.6)}
+}
+
 /* ---------- motion */
 @keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
 @keyframes drop{from{opacity:0;transform:translateY(-100%)}to{opacity:1;transform:none}}
@@ -430,8 +464,9 @@ details[open] summary:after{content:"–"}
 }
 </style></head><body>
 
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><linearGradient id="wgrad" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs></svg>
 <div class="rail" id="rail"><div class="railin">
-  <div class="mark">Concorde<b>Go</b></div>
+  <a class="brand" href="#top" aria-label="ConcordeGo"><svg class="wing" viewBox="2 2.3 19.6 16.4" aria-hidden="true" focusable="false"><g><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><span class="lockup"><span class="mark-txt">Concorde<span class="tld">Go</span></span><video class="mark-hdr" data-mark="go" muted playsinline loop preload="none" aria-hidden="true"></video></span></a>
   <div class="steps">
     <button class="st on" data-s="1"><i>1</i>Where and when</button><button class="st" data-s="2"><i>2</i>What matters</button><button class="st" data-s="3"><i>3</i>Points and miles</button><button class="st" data-s="4"><i>4</i>Anything else</button>
   </div>
@@ -484,7 +519,7 @@ details[open] summary:after{content:"–"}
 
   <section class="screen" id="s3" data-step="3"><div class="stepin">
     <div class="eyebrow">Step 3 of 4 · optional</div><h1>Points and miles</h1>
-    <p class="lead">Tell us what you hold and we&rsquo;ll say, flight by flight, whether points beat cash and which transfer gets you there. Skip it if you&rsquo;d rather pay cash.</p>
+    <p class="lead">What you hold. Each flight then shows cash or points, whichever is the better deal.</p>
     <div class="panel"><div class="slot"><div id="blk-points"><div class="pts" id="pts"></div></div></div>
     <div class="nav"><button class="back" data-back="2">Back</button><button class="go" data-next="4">Continue <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v11M3 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button class="skip" data-next="4">Skip, I&rsquo;ll pay cash</button></div></div>
   </div></section>
@@ -508,7 +543,7 @@ details[open] summary:after{content:"–"}
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
-  <div class="mark">Concorde<b>Go</b></div>
+  <a class="brand" href="#top" aria-label="ConcordeGo"><svg class="wing" viewBox="2 2.3 19.6 16.4" aria-hidden="true" focusable="false"><g><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><span class="lockup"><span class="mark-txt">Concorde<span class="tld">Go</span></span><video class="mark-hdr" data-mark="go" muted playsinline loop preload="none" aria-hidden="true"></video></span></a>
   <button class="sum" id="sum" data-tab="where" title="Edit your search"><b id="sumline"></b><span id="sumchips"></span></button>
   <div class="barbtns"><button data-tab="where">Edit search</button><button data-tab="matters">Filters</button><button data-tab="advanced">Advanced</button><button class="dimbtn" id="startover">Start over</button></div>
 </div></div>
@@ -601,28 +636,47 @@ WANTS.forEach(w => w.count = ALL.filter(w.ok).length);
 const PROG = {avios:{name:'Avios', fair:1.3, via:['amex','chase','capone','citi','bilt']}, virgin:{name:'Virgin Points', fair:1.4, via:['amex','chase','capone','citi','bilt']},
   aa:{name:'AAdvantage', fair:1.5, via:['bilt']}, delta:{name:'SkyMiles', fair:1.2, via:['amex']}, mm:{name:'Miles & More', fair:1.4, via:['capone']}, ms:{name:'Miles&Smiles', fair:1.6, via:['capone','citi','bilt']}};
 const BANK = {amex:'Amex Membership Rewards', chase:'Chase Ultimate Rewards', capone:'Capital One miles', citi:'Citi ThankYou', bilt:'Bilt', avios:'British Airways Avios', virgin:'Virgin Points', aa:'American AAdvantage', delta:'Delta SkyMiles'};
-const AWARD = {BA:[{p:'avios', pts:13000, fees:35000, why:'off-peak economy; BA adds a carrier surcharge'}], VS:[{p:'virgin', pts:10000, fees:22000, why:'Flying Club economy'}],
+// A live transfer bonus, the kind that flips a verdict: in the product this is looked up, not typed.
+const BONUS = {virgin:{from:'chase', ratio:1.3, until:'30 Sep'}};
+const AWARD = {BA:[{p:'avios', pts:13000, fees:35000, why:'off-peak economy; BA adds a carrier surcharge'}], VS:[{p:'virgin', pts:10000, fees:15000, why:'Flying Club economy'}],
   AA:[{p:'aa', pts:30000, fees:600, why:'AAdvantage saver'}], DL:[{p:'delta', pts:32000, fees:600, why:'SkyMiles main'}], AY:[{p:'avios', pts:15000, fees:12000, why:'Finnair Plus, Avios'}],
   LH:[{p:'mm', pts:30000, fees:15000, why:'Miles & More economy'}], LX:[{p:'mm', pts:30000, fees:15000, why:'Miles & More economy'}], TK:[{p:'ms', pts:30000, fees:10000, why:'Miles&Smiles economy'}],
   EI:[{p:'avios', pts:13000, fees:8000, why:'Aer Lingus, low fees'}], IB:[{p:'avios', pts:13000, fees:35000, why:'on BA metal, BA surcharge'}], AS:[{p:'avios', pts:13000, fees:35000, why:'flown by BA; book with Avios'}]};
 function awardsFor(e){
   const out = [];
   for (const a of (AWARD[e.operator] || AWARD[e.carrier] || [])){
-    const prog = PROG[a.p], have = S.pts[a.p] || 0, value = (e.ticket_cents - a.fees) / a.pts;
-    let path = null, short = a.pts - have;
-    if (short <= 0) path = 'from your ' + prog.name;
-    else { const src = prog.via.filter(k => (S.pts[k] || 0) >= short).sort((x, y) => S.pts[y] - S.pts[x])[0];
-      if (src) path = 'transfer ' + short.toLocaleString() + ' from ' + BANK[src].split(' ')[0] + (have ? ' to top up' : '') + ' (1:1)'; }
-    out.push({...a, prog, value, path, short, good: value >= prog.fair && !!path, saves: e.ticket_cents - a.fees});
+    const prog = PROG[a.p], have = S.pts[a.p] || 0, bonus = BONUS[a.p];
+    let path = null, short = a.pts - have, spend = a.pts, ratio = 1, via = null;
+    if (short <= 0) path = 'your ' + prog.name;
+    else {
+      // a bonus from a bank you hold counts first: fewer of your points buy the same award
+      const srcs = prog.via.map(k => ({k, r: bonus && bonus.from === k ? bonus.ratio : 1})).filter(x => (S.pts[x.k] || 0) * x.r >= short).sort((x, y) => (y.r - x.r) || (S.pts[y.k] - S.pts[x.k]));
+      if (srcs.length){ via = srcs[0].k; ratio = srcs[0].r; spend = have + Math.ceil(short / ratio); path = BANK[via].split(' ')[0] + ' → ' + prog.name + ' ' + (ratio > 1 ? '1:' + ratio : '1:1'); }
+    }
+    const value = (e.ticket_cents - a.fees) / spend;
+    out.push({...a, prog, value, path, short, spend, ratio, via, bonus: ratio > 1 ? bonus : null, good: value >= prog.fair && !!path, saves: e.ticket_cents - a.fees});
   }
   return out.sort((x, y) => (y.good - x.good) || (y.value - x.value));
 }
-function ptLine(e){
-  const a = awardsFor(e)[0]; if (!a) return '';
-  if (a.value <= 0) return `<div class="ptline"><b>Pay cash.</b> The ${money(a.fees)} in fees on ${/^[AEIOU]/.test(a.prog.name) ? 'an' : 'a'} ${esc(a.prog.name)} award already exceeds this fare.</div>`;
-  if (a.good) return `<div class="ptline good"><b>Use points:</b> ${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)} · <span class="v">${a.value.toFixed(1)}¢/pt</span> · ${esc(a.path)}</div>`;
-  if (!a.path) return `<div class="ptline">Points would need ${a.pts.toLocaleString()} ${esc(a.prog.name)}; nothing you hold transfers there.</div>`;
-  return `<div class="ptline"><b>Pay cash.</b> ${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)} is only <span class="v">${a.value.toFixed(1)}¢/pt</span>; keep them.</div>`;
+// The one line under the price. Short on purpose: the numbers are the reason,
+// the sentence just points at them. In the product the narrator writes this
+// line from the same precomputed figures, current to the query (a transfer
+// bonus, a peak date), and the verifier holds it to those figures.
+const PAY = {};   // per flight: 'cash' | 'points', when the user has chosen
+function ptWhy(e, a, mode){
+  const c = a.value.toFixed(1) + '¢', fair = a.prog.fair + '¢';
+  if (!a.path) return `Nothing you hold reaches ${esc(a.prog.name)}.`;
+  if (a.value <= 0) return `Award fees alone (${money(a.fees)}) exceed this fare.`;
+  if (a.good) return mode === 'points' ? `<b>${c} a point</b>${a.bonus ? ' with the ' + esc(BANK[a.via].split(' ')[0]) + ' 1:' + a.bonus.ratio + ' bonus, until ' + esc(a.bonus.until) : ''}. Above ${fair}, points win.`
+                                       : `Points beat cash here: <b>${c} a point</b>${a.bonus ? ' via the ' + esc(BANK[a.via].split(' ')[0]) + ' bonus' : ''}.`;
+  return mode === 'points' ? `Only <b>${c} a point</b>; keep them for ${fair} or better.` : `Points here return ${c} each, under the ${fair} they are worth.`;
+}
+function ptBlock(e, total){
+  const a = awardsFor(e)[0]; if (!a) return {toggle:'', price:null, why:''};
+  const best = a.good ? 'points' : 'cash', mode = PAY[e.id] || best;
+  const toggle = `<div class="paywith" role="group" aria-label="Pay with"><button data-pay="cash" data-id="${esc(e.id)}" class="${best === 'cash' ? 'best' : ''}" aria-pressed="${mode === 'cash'}">Cash</button><button data-pay="points" data-id="${esc(e.id)}" class="${best === 'points' ? 'best' : ''}" aria-pressed="${mode === 'points'}">Points</button></div>`;
+  const price = mode === 'points' && a.path ? `<b class="num">${a.spend.toLocaleString()}</b><span class="unit">${esc(BANK[a.via || a.p].split(' ')[0])} pts</span><em>+ ${money(total - e.ticket_cents + a.fees)} all in</em>` : null;
+  return {toggle, price, why:`<div class="ptwhy">${ptWhy(e, a, mode)}</div>`};
 }
 
 // ---- the triangle
@@ -795,7 +849,7 @@ function whyLines(e, r){
 }
 const amtHTML = l => l.cents === 0 ? (l.included ? 'included' : '—') : l.cents < 0 ? '−' + money(l.cents) + '<small>credit</small>' : '+' + money(l.cents);
 function door(kind, e, r, prof, title){
-  const eff = r.total;
+  const eff = r.total, pb = ptBlock(e, eff);
   return `<article class="door ${kind}" data-id="${esc(e.id)}">
     <div class="sky" style="background:${skyBand(e)}">${PHOTOS.length ? `<div class="pano"><img class="ph a on" alt="" src="${PHOTOS[PH.idx].src}"><img class="ph b" alt=""></div><div class="scrim"></div><span class="cap">${esc(PH.city)} · ${esc(PHOTOS[PH.idx].credit)}</span>` : ''}<div class="path"></div>
       <svg class="plane" viewBox="0 0 16 16" style="left:${e.stops ? 46 : 50}%" aria-hidden="true"><path d="M15 8l-4.2-1.4L7 1.5H5.4l1.9 5.1H3.6L2.5 4.9H1.2l.9 3.1-.9 3.1h1.3l1.1-1.7h3.7L5.4 14.5H7l3.8-5.1z"/></svg>
@@ -805,8 +859,9 @@ function door(kind, e, r, prof, title){
       <div class="eyebrow">${title}</div>
       <div class="who">${logo(e.carrier, true)}<h3>${esc(e.carrier_name)}<span>${esc(e.flight)} · ${esc(e.brand)}${e.operator !== e.carrier ? ' · flown by ' + esc((AIR[e.operator] || {}).name || e.operator) : ''}</span></h3></div>
       <p class="meta">${stopsText(e)} · ${dur(e.door_minutes)} door to door · ${e.route.join(' → ')}${S.asap ? ' · <b style="color:var(--red);font-weight:500">lands ' + hm(e.arrive) + (e.day_offset ? ' tomorrow' : ' today') + '</b>' : ''}</p>
-      <div class="price"><b class="num">${money(eff)}</b><span>all in</span><em>${money(e.ticket_cents)} ticket</em></div>
-      ${ptLine(e)}
+      ${pb.toggle}
+      <div class="price">${pb.price || `<b class="num">${money(eff)}</b><span>all in</span><em>${money(e.ticket_cents)} ticket</em>`}</div>
+      ${pb.why}
       <ul class="why">${whyLines(e, r).map(l => `<li class="${l.want ? 'want' : ''}"><b class="${l.cents < 0 ? 'cr' : ''}">${l.cents < 0 ? '−' + money(l.cents) : '+' + money(l.cents)}</b><span>${esc(l.label)}${l.cents < 0 ? ' · credit' : ''}</span></li>`).join('')}</ul>
       <div class="cta"><button class="choose" data-open="${esc(e.id)}">Choose this flight</button><button class="ledger" data-open="${esc(e.id)}">Full ledger</button></div>
     </div></article>`;
@@ -836,7 +891,7 @@ function rowHTML(r, i){
     <button class="rowbtn" data-row="${esc(e.id)}">
       ${logo(e.carrier, true)}<span class="seal s ${gcls(e.grade)}">${e.grade}</span>
       <span class="rw"><b>${esc(e.carrier_name)}</b><span>${esc(e.flight)} · ${esc(e.brand)}</span><small>${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} · ${stopsText(e)} · ${dur(e.door_minutes)}</small>
-        ${r.adds.length ? `<span class="dem" style="color:var(--dim)">+${money(r.adds.reduce((s, x) => s + x.cents, 0))} ${esc(r.adds.map(x => x.label.toLowerCase()).join(', '))}</span>` : ''}${r.dem.map(d => `<span class="dem">+${money(d.cents)} ${esc(d.label.toLowerCase())}</span>`).join('')}${a && a.good ? `<span class="pt">or ${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)} · ${a.value.toFixed(1)}¢/pt</span>` : ''}</span>
+        ${r.adds.length ? `<span class="dem" style="color:var(--dim)">+${money(r.adds.reduce((s, x) => s + x.cents, 0))} ${esc(r.adds.map(x => x.label.toLowerCase()).join(', '))}</span>` : ''}${r.dem.map(d => `<span class="dem">+${money(d.cents)} ${esc(d.label.toLowerCase())}</span>`).join('')}${a && a.good ? `<span class="pt">★ points: ${a.spend.toLocaleString()} ${esc(BANK[a.via || a.p].split(' ')[0])} · ${a.value.toFixed(1)}¢</span>` : ''}</span>
       <span class="when">${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''}<i>${stopsText(e)} · ${dur(e.door_minutes)}</i></span>
       <span class="amt"><b>${money(r.total)}</b><i>${money(e.ticket_cents)} ticket</i></span><span class="chev">›</span>
     </button><div class="detail" hidden></div></li>`;
@@ -887,7 +942,7 @@ function ledgerHTML(e){
     <div class="btotal"><span>All in at your dial<small>${S.asap ? 'ranked by arrival' : 'the sum of every line above'}</small></span><b>${money(r.total)}</b></div></div>
     <div class="book"><h4>${esc(e.carrier_name)} ${esc(e.flight)}</h4><p>${esc(e.route.join(' → '))} · ${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} · ${stopsText(e)}<br>${b ? esc(b.note) : ''}</p>
       <button class="choose">${b ? 'Book with ' + esc(b.who) + ' · ' + money(b.price_cents) : 'Book'}</button>
-      ${aw.length ? '<h4 style="margin-top:6px">With points</h4><ul class="awards">' + aw.map(a => `<li class="${a.good ? 'good' : ''}"><b>${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)}</b> · ${a.value <= 0 ? 'the fees alone exceed this fare' : '<span class="v">' + a.value.toFixed(1) + '¢ per point</span> against a fair ' + a.prog.fair + '¢'}<br>${a.path ? esc(a.path[0].toUpperCase() + a.path.slice(1)) : 'You hold nothing that reaches ' + esc(a.prog.name)} · ${esc(a.why)}<br>${a.good ? 'Worth it: saves ' + money(a.saves) + ' of cash.' : a.value <= 0 ? 'Cash wins outright.' : a.path ? 'Not worth it: keep the points for a better redemption.' : ''}</li>`).join('') + '</ul>' : ''}
+      ${aw.length ? '<h4 style="margin-top:6px">With points</h4><ul class="awards">' + aw.map(a => `<li class="${a.good ? 'good' : ''}"><b>${a.good ? '★ ' : ''}${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)}</b> · <span class="v">${a.value <= 0 ? 'fees exceed the fare' : a.value.toFixed(1) + '¢/pt'}</span>${a.path ? ' · ' + esc(a.path) : ' · no route from your balances'}${a.bonus ? ' until ' + esc(a.bonus.until) : ''}</li>`).join('') + '</ul>' : ''}
       <p>Grade <b>${e.grade}</b>: ${money(e.effective_cents)} all in for a neutral traveller, against par ${money(D.query.par_cents)}.</p></div>`;
 }
 function openSheet(id){
@@ -971,7 +1026,7 @@ function paintCarriers(){
 }
 function paintPts(){
   $('#pts').innerHTML = Object.keys(BANK).map(k => `<div class="pt"><label for="pt-${k}">${esc(BANK[k])}</label><input id="pt-${k}" inputmode="numeric" value="${S.pts[k] ? S.pts[k].toLocaleString() : ''}" placeholder="0"></div>`).join('') +
-    '<p class="ptnote"><b>How this works.</b> For each flight we look up the award price in every programme that can book it, the fees on top, and which of your balances reaches it directly or by a 1:1 transfer. Then we say plainly whether the points beat cash at that flight&rsquo;s price, in cents per point against a fair value for that currency. Demo award chart, not live availability.</p>';
+    '<p class="ptnote">Every flight is priced in every programme that can book it, transfers and bonuses included, and the better of cash or points is starred. Demo award chart.</p>';
 }
 
 // ---- boot
@@ -1040,7 +1095,7 @@ document.addEventListener('click', ev => {
   const ad = ev.target.closest('[data-add]'); if (ad){ const k = ad.dataset.add; if (k === 'bag+') S.extra.bag++; else if (k === 'bag-') S.extra.bag = Math.max(0, S.extra.bag - 1); else { S.extra[k] = true; S.off.delete(k); } rerenderBills(); return; }
   const ac = ev.target.closest('[data-addcustom]'); if (ac){ const f = ac.closest('form'), label = f.label.value.trim(), amt = Math.round(+String(f.amt.value).replace(/[^\d.]/g, '') * 100); if (label && amt > 0){ S.extra.custom.push({label, cents:amt}); rerenderBills(); } else f.label.focus(); return; }
 });
-$('#doors').addEventListener('click', ev => { const b = ev.target.closest('[data-open]'); if (b) openSheet(b.dataset.open); });
+$('#doors').addEventListener('click', ev => { const pw = ev.target.closest('[data-pay]'); if (pw){ PAY[pw.dataset.id] = pw.dataset.pay; paint(false); return; } const b = ev.target.closest('[data-open]'); if (b) openSheet(b.dataset.open); });
 document.addEventListener('click', ev => { if (ev.target.id === 'x' || ev.target.id === 'sheetwrap') $('#sheetroot').innerHTML = ''; });
 $('#go').addEventListener('click', enterResults);
 addEventListener('resize', () => { paintTri(); const [x, y] = toXY(S.a, S.b, S.c); handle.style.left = x + 'px'; handle.style.top = y + 'px'; });
@@ -1116,6 +1171,17 @@ if (!PHOTOS.length){
     if (W.mode === 'results') paint(false); };
   (window.requestIdleCallback || (f => setTimeout(f, 60)))(paintArt);
 }
+(function(){
+  if (!matchMedia('(dynamic-range: high)').matches || REDUCED) return;
+  const marks = document.querySelectorAll('video.mark-hdr'); if (!marks.length) return;
+  let armed = 0;
+  marks.forEach(v => { const k = v.dataset.mark;
+    const sq = document.createElement('source'); sq.src = 'assets/mark-' + k + '-pq.mp4'; sq.type = 'video/mp4; codecs="hvc1"';
+    const sh = document.createElement('source'); sh.src = 'assets/mark-' + k + '-hlg.webm'; sh.type = 'video/webm; codecs="vp09.02.10.10"';
+    v.appendChild(sq); v.appendChild(sh);
+    v.addEventListener('loadeddata', () => { if (!armed++) document.documentElement.classList.add('hdrmarks'); const pr = v.play(); if (pr && pr.catch) pr.catch(() => {}); }, {once:true});
+    v.load(); });
+})();
 document.addEventListener('animationend', ev => { if (ev.target.classList && ev.target.classList.contains('rise')) ev.target.classList.remove('rise'); });
 
 // ================= the steps, the bar, the editor =================

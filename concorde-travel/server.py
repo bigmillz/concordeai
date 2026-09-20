@@ -580,7 +580,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                    "text/html; charset=utf-8")
         if path.startswith("/mock/"):
             name = os.path.basename(path)
-            if not re.match(r"^(index|mock-[1-9])\.html$", name):
+            if path.startswith("/mock/assets/") and re.match(r"^mark-[a-z0-9]+-(pq\.mp4|hlg\.webm)$", name):
+                # the HDR nameplates, same as the site's: tiny tagged loops
+                return self._send_file(os.path.join(UI, "mock", "assets", name),
+                                       "video/mp4" if name.endswith(".mp4") else "video/webm")
+            if not re.match(r"^(index|mock-[0-9]+)\.html$", name):
                 return self.send_error(404)
             return self._send_file(os.path.join(UI, "mock", name),
                                    "text/html; charset=utf-8")
