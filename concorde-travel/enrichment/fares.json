@@ -1,68 +1,1328 @@
 {
-  "_comment": "Fare brand -> what a checked bag costs beyond what the brand includes. This is the join that makes the Amadeus feed worth having: it returns brandedFare ('BASIC', 'LIGHT', 'PLUS') and includedCheckedBags.quantity, which is the ALLOWANCE. It does not return the FEE. Without this table the bags-versus-fare comparison - the cheapest real win in the product - cannot run at all, which is exactly where the Kiwi feed left it.",
-  "_source": "ConcordeGo curated fare-brand table",
-  "_as_of": "2026-09-18",
-  "_review": "DRAFT - NOT human-reviewed. These are the right shape at roughly the right magnitude for transatlantic economy, not published fees read off a tariff. Every row needs checking against the carrier's own baggage page before a dollar figure built on it is shown to anyone.",
-  "_keying": "CARRIER:BRAND on the ISSUING carrier, uppercased. Tiers index from the first piece BEYOND the brand's included allowance, matching scorer._bag_lines - piece 1 is the first bag the traveller PAYS for, not their first bag.",
+  "_comment": "Fare brand -> what a checked bag costs beyond what the brand includes. Both Duffel and Amadeus return the brand and the included-bag ALLOWANCE; neither returns the FEE. Without this table the bags-versus-fare comparison - the cheapest real win in the product - cannot run at all.",
+  "_source": "ConcordeGo curated fare-brand table (carrier baggage pages, transatlantic economy, mid-2026)",
+  "_as_of": "2026-09-20",
+  "_review": "DRAFT - populated 2026-09-20 from the carriers' published transatlantic baggage fees as known in mid-2026, not re-read off each tariff on that date. Fees are one-way, per piece, and lean to the airport price where prepaid is cheaper: a fee that comes in under what the traveller pays manufactures the $100 surprise this product exists to prevent. Before a row is trusted in front of a user, check it against the carrier's own baggage page and drop the note. Fees change roughly yearly.",
+  "_keying": "CARRIER:BRAND on the ISSUING carrier, uppercased. BRAND is a single word that appears as a WHOLE WORD in the feed's brand name (Duffel says 'Economy Light', Amadeus says 'LIGHT'; both hit KL:LIGHT) - see adapter._brand_key. Never key a carrier on a word its other brands share ('ECONOMY', 'BLUE', 'GO', 'PARTNER'): the first row to match wins and the others go dark. Tiers index from the first piece BEYOND the brand's included allowance, matching scorer._bag_lines - piece 1 is the first bag the traveller PAYS for, not their first bag. A brand's tier count therefore says how many bags it includes: three tiers is a no-bag brand, two includes one, one includes two.",
   "_default_policy": "A brand with no row falls back to _default, which is deliberately set at the PESSIMISTIC end of real transatlantic fees. Unknown must never be cheap: if an undocumented fare got the benefit of the doubt, the least-documented itinerary would accumulate the fewest penalties and win, which is the failure mode the whole abstain discipline exists to prevent. The fallback is flagged per ticket and counted by coverage().",
   "_default": {
     "note": "No curated fee schedule for this brand - priced at the pessimistic end of transatlantic economy, which is a placeholder, not a quote",
     "tiers": [
-      {"piece": 1, "amount_cents": 10000},
-      {"piece": 2, "amount_cents": 12000},
-      {"piece": 3, "amount_cents": 25000}
+      {
+        "piece": 1,
+        "amount_cents": 10000
+      },
+      {
+        "piece": 2,
+        "amount_cents": 12000
+      },
+      {
+        "piece": 3,
+        "amount_cents": 25000
+      }
     ]
   },
   "brands": {
     "BA:BASIC": {
+      "feed_name": "Basic",
+      "includes_checked": 0,
+      "note": "BA Basic: no checked bag; next pieces $85 / $100 / $200 one-way, published fee, mid-2026",
       "tiers": [
-        {"piece": 1, "amount_cents": 7500},
-        {"piece": 2, "amount_cents": 10000},
-        {"piece": 3, "amount_cents": 20000}
+        {
+          "piece": 1,
+          "amount_cents": 8500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
       ]
     },
     "BA:PLUS": {
+      "feed_name": "Plus",
+      "includes_checked": 1,
+      "note": "BA Plus: 1 checked included; next pieces $85 / $100 / $200 one-way, published fee, mid-2026",
       "tiers": [
-        {"piece": 1, "amount_cents": 10000},
-        {"piece": 2, "amount_cents": 20000}
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
       ]
     },
-    "AA:BASIC": {
+    "BA:STANDARD": {
+      "feed_name": "Standard",
+      "includes_checked": 1,
+      "note": "BA Standard: 1 checked included; next pieces $85 / $100 / $200 one-way, published fee, mid-2026",
       "tiers": [
-        {"piece": 1, "amount_cents": 7500},
-        {"piece": 2, "amount_cents": 10000},
-        {"piece": 3, "amount_cents": 20000}
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
       ]
     },
-    "DL:MAIN": {
+    "BA:FLEX": {
+      "feed_name": "Plus Flex",
+      "includes_checked": 1,
+      "note": "BA Plus Flex: 1 checked included; next pieces $85 / $100 / $200 one-way, published fee, mid-2026",
       "tiers": [
-        {"piece": 1, "amount_cents": 10000},
-        {"piece": 2, "amount_cents": 20000}
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "VS:LIGHT": {
+      "feed_name": "Economy Light",
+      "includes_checked": 0,
+      "note": "VS Economy Light: no checked bag; next pieces $90 / $100 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 9000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
       ]
     },
     "VS:CLASSIC": {
+      "feed_name": "Economy Classic",
+      "includes_checked": 1,
+      "note": "VS Economy Classic: 1 checked included; next pieces $90 / $100 / $200 one-way, published fee, mid-2026",
       "tiers": [
-        {"piece": 1, "amount_cents": 10000},
-        {"piece": 2, "amount_cents": 20000}
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "VS:DELIGHT": {
+      "feed_name": "Economy Delight",
+      "includes_checked": 1,
+      "note": "VS Economy Delight: 1 checked included; next pieces $90 / $100 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "VS:FLEX": {
+      "feed_name": "Economy Flex",
+      "includes_checked": 2,
+      "note": "VS Economy Flex: 2 checked included; next pieces $90 / $100 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "AA:BASIC": {
+      "feed_name": "Basic Economy",
+      "includes_checked": 0,
+      "note": "AA Basic Economy: no checked bag; next pieces $75 / $100 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 7500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "AA:MAIN": {
+      "feed_name": "Main Cabin",
+      "includes_checked": 1,
+      "note": "AA Main Cabin: 1 checked included; next pieces $75 / $100 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "AA:FLEXIBLE": {
+      "feed_name": "Main Cabin Flexible",
+      "includes_checked": 1,
+      "note": "AA Main Cabin Flexible: 1 checked included; next pieces $75 / $100 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "DL:BASIC": {
+      "feed_name": "Basic Economy",
+      "includes_checked": 0,
+      "note": "DL Basic Economy: no checked bag; next pieces $75 / $100 / $285 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 7500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 28500
+        }
+      ]
+    },
+    "DL:MAIN": {
+      "feed_name": "Main Cabin / Main Classic",
+      "includes_checked": 1,
+      "note": "DL Main Cabin / Main Classic: 1 checked included; next pieces $75 / $100 / $285 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 28500
+        }
+      ]
+    },
+    "DL:EXTRA": {
+      "feed_name": "Main Extra",
+      "includes_checked": 1,
+      "note": "DL Main Extra: 1 checked included; next pieces $75 / $100 / $285 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 28500
+        }
+      ]
+    },
+    "DL:COMFORT": {
+      "feed_name": "Comfort+",
+      "includes_checked": 1,
+      "note": "DL Comfort+: 1 checked included; next pieces $75 / $100 / $285 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 28500
+        }
+      ]
+    },
+    "UA:BASIC": {
+      "feed_name": "Basic Economy",
+      "includes_checked": 0,
+      "note": "UA Basic Economy: no checked bag; next pieces $75 / $100 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 7500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "UA:ECONOMY": {
+      "feed_name": "Economy",
+      "includes_checked": 1,
+      "note": "UA Economy: 1 checked included; next pieces $75 / $100 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "UA:PLUS": {
+      "feed_name": "Economy Plus",
+      "includes_checked": 1,
+      "note": "UA Economy Plus: 1 checked included; next pieces $75 / $100 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "AS:SAVER": {
+      "feed_name": "Saver / Partner Saver",
+      "includes_checked": 0,
+      "note": "AS Saver / Partner Saver: no checked bag; next pieces $85 / $100 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 8500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "AS:MAIN": {
+      "feed_name": "Main / Partner Main / Partner Refundable Main",
+      "includes_checked": 1,
+      "note": "AS Main / Partner Main / Partner Refundable Main: 1 checked included; next pieces $85 / $100 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "B6:BASIC": {
+      "feed_name": "Blue Basic",
+      "includes_checked": 0,
+      "note": "B6 Blue Basic: no checked bag; next pieces $75 / $100 / $150 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 7500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 15000
+        }
+      ]
+    },
+    "B6:EXTRA": {
+      "feed_name": "Blue Extra",
+      "includes_checked": 1,
+      "note": "B6 Blue Extra: 1 checked included; next pieces $75 / $100 / $150 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 15000
+        }
+      ]
+    },
+    "B6:PLUS": {
+      "feed_name": "Blue Plus",
+      "includes_checked": 1,
+      "note": "B6 Blue Plus: 1 checked included; next pieces $75 / $100 / $150 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 15000
+        }
       ]
     },
     "KL:LIGHT": {
+      "feed_name": "Economy Light",
+      "includes_checked": 0,
+      "note": "KL Economy Light: no checked bag; next pieces $95 / $110 / $210 one-way, published fee, mid-2026",
       "tiers": [
-        {"piece": 1, "amount_cents": 7000},
-        {"piece": 2, "amount_cents": 11000},
-        {"piece": 3, "amount_cents": 20000}
+        {
+          "piece": 1,
+          "amount_cents": 9500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 21000
+        }
       ]
     },
     "KL:STANDARD": {
+      "feed_name": "Economy Standard",
+      "includes_checked": 1,
+      "note": "KL Economy Standard: 1 checked included; next pieces $95 / $110 / $210 one-way, published fee, mid-2026",
       "tiers": [
-        {"piece": 1, "amount_cents": 11000},
-        {"piece": 2, "amount_cents": 20000}
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 21000
+        }
+      ]
+    },
+    "KL:FLEX": {
+      "feed_name": "Economy Flex",
+      "includes_checked": 1,
+      "note": "KL Economy Flex: 1 checked included; next pieces $95 / $110 / $210 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 21000
+        }
+      ]
+    },
+    "AF:LIGHT": {
+      "feed_name": "Economy Light",
+      "includes_checked": 0,
+      "note": "AF Economy Light: no checked bag; next pieces $95 / $110 / $210 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 9500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 21000
+        }
+      ]
+    },
+    "AF:STANDARD": {
+      "feed_name": "Economy Standard",
+      "includes_checked": 1,
+      "note": "AF Economy Standard: 1 checked included; next pieces $95 / $110 / $210 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 21000
+        }
+      ]
+    },
+    "AF:FLEX": {
+      "feed_name": "Economy Flex",
+      "includes_checked": 1,
+      "note": "AF Economy Flex: 1 checked included; next pieces $95 / $110 / $210 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 21000
+        }
+      ]
+    },
+    "LH:LIGHT": {
+      "feed_name": "Economy Light",
+      "includes_checked": 0,
+      "note": "LH Economy Light: no checked bag; next pieces $90 / $110 / $250 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 9000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 25000
+        }
+      ]
+    },
+    "LH:CLASSIC": {
+      "feed_name": "Economy Classic",
+      "includes_checked": 1,
+      "note": "LH Economy Classic: 1 checked included; next pieces $90 / $110 / $250 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 25000
+        }
+      ]
+    },
+    "LH:FLEX": {
+      "feed_name": "Economy Flex",
+      "includes_checked": 1,
+      "note": "LH Economy Flex: 1 checked included; next pieces $90 / $110 / $250 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 25000
+        }
+      ]
+    },
+    "LH:COMFORT": {
+      "feed_name": "Economy Comfort",
+      "includes_checked": 1,
+      "note": "LH Economy Comfort: 1 checked included; next pieces $90 / $110 / $250 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 25000
+        }
+      ]
+    },
+    "LX:LIGHT": {
+      "feed_name": "Economy Light",
+      "includes_checked": 0,
+      "note": "LX Economy Light: no checked bag; next pieces $90 / $110 / $250 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 9000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 25000
+        }
+      ]
+    },
+    "LX:CLASSIC": {
+      "feed_name": "Economy Classic",
+      "includes_checked": 1,
+      "note": "LX Economy Classic: 1 checked included; next pieces $90 / $110 / $250 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 25000
+        }
+      ]
+    },
+    "LX:FLEX": {
+      "feed_name": "Economy Flex",
+      "includes_checked": 1,
+      "note": "LX Economy Flex: 1 checked included; next pieces $90 / $110 / $250 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 25000
+        }
+      ]
+    },
+    "OS:LIGHT": {
+      "feed_name": "Economy Light",
+      "includes_checked": 0,
+      "note": "OS Economy Light: no checked bag; next pieces $90 / $110 / $250 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 9000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 25000
+        }
+      ]
+    },
+    "OS:CLASSIC": {
+      "feed_name": "Economy Classic",
+      "includes_checked": 1,
+      "note": "OS Economy Classic: 1 checked included; next pieces $90 / $110 / $250 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 25000
+        }
+      ]
+    },
+    "OS:FLEX": {
+      "feed_name": "Economy Flex",
+      "includes_checked": 1,
+      "note": "OS Economy Flex: 1 checked included; next pieces $90 / $110 / $250 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 25000
+        }
+      ]
+    },
+    "SN:LIGHT": {
+      "feed_name": "Economy Light",
+      "includes_checked": 0,
+      "note": "SN Economy Light: no checked bag; next pieces $90 / $110 / $250 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 9000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 25000
+        }
+      ]
+    },
+    "SN:CLASSIC": {
+      "feed_name": "Economy Classic",
+      "includes_checked": 1,
+      "note": "SN Economy Classic: 1 checked included; next pieces $90 / $110 / $250 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 25000
+        }
+      ]
+    },
+    "SN:FLEX": {
+      "feed_name": "Economy Flex",
+      "includes_checked": 1,
+      "note": "SN Economy Flex: 1 checked included; next pieces $90 / $110 / $250 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 25000
+        }
+      ]
+    },
+    "4Y:LIGHT": {
+      "feed_name": "Economy Light",
+      "includes_checked": 0,
+      "note": "4Y Economy Light: no checked bag; next pieces $90 / $110 / $250 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 9000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 25000
+        }
+      ]
+    },
+    "4Y:CLASSIC": {
+      "feed_name": "Economy Classic",
+      "includes_checked": 1,
+      "note": "4Y Economy Classic: 1 checked included; next pieces $90 / $110 / $250 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 25000
+        }
+      ]
+    },
+    "4Y:FLEX": {
+      "feed_name": "Economy Flex",
+      "includes_checked": 1,
+      "note": "4Y Economy Flex: 1 checked included; next pieces $90 / $110 / $250 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 25000
+        }
+      ]
+    },
+    "TP:DISCOUNT": {
+      "feed_name": "Discount",
+      "includes_checked": 0,
+      "note": "TP Discount: no checked bag; next pieces $85 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 8500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "TP:BASIC": {
+      "feed_name": "Basic",
+      "includes_checked": 1,
+      "note": "TP Basic: 1 checked included; next pieces $85 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "TP:CLASSIC": {
+      "feed_name": "Classic",
+      "includes_checked": 1,
+      "note": "TP Classic: 1 checked included; next pieces $85 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "TP:PLUS": {
+      "feed_name": "Plus",
+      "includes_checked": 2,
+      "note": "TP Plus: 2 checked included; next pieces $85 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "FI:LIGHT": {
+      "feed_name": "Economy Light",
+      "includes_checked": 0,
+      "note": "FI Economy Light: no checked bag; next pieces $90 / $120 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 9000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 12000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "FI:STANDARD": {
+      "feed_name": "Economy Standard",
+      "includes_checked": 1,
+      "note": "FI Economy Standard: 1 checked included; next pieces $90 / $120 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 12000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "FI:FLEX": {
+      "feed_name": "Economy Flex",
+      "includes_checked": 2,
+      "note": "FI Economy Flex: 2 checked included; next pieces $90 / $120 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 20000
+        }
       ]
     },
     "EI:SAVER": {
+      "feed_name": "Saver",
+      "includes_checked": 0,
+      "note": "EI Saver: no checked bag; next pieces $80 / $100 / $200 one-way, published fee, mid-2026",
       "tiers": [
-        {"piece": 1, "amount_cents": 8500},
-        {"piece": 2, "amount_cents": 13000}
+        {
+          "piece": 1,
+          "amount_cents": 8000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "EI:SMART": {
+      "feed_name": "Smart",
+      "includes_checked": 1,
+      "note": "EI Smart: 1 checked included; next pieces $80 / $100 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "EI:FLEX": {
+      "feed_name": "Flex",
+      "includes_checked": 1,
+      "note": "EI Flex: 1 checked included; next pieces $80 / $100 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "AY:LIGHT": {
+      "feed_name": "Economy Light",
+      "includes_checked": 0,
+      "note": "AY Economy Light: no checked bag; next pieces $90 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 9000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "AY:CLASSIC": {
+      "feed_name": "Economy Classic",
+      "includes_checked": 1,
+      "note": "AY Economy Classic: 1 checked included; next pieces $90 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "AY:FLEX": {
+      "feed_name": "Economy Flex",
+      "includes_checked": 2,
+      "note": "AY Economy Flex: 2 checked included; next pieces $90 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "IB:BASIC": {
+      "feed_name": "Basic",
+      "includes_checked": 0,
+      "note": "IB Basic: no checked bag; next pieces $85 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 8500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "IB:OPTIMA": {
+      "feed_name": "Optima",
+      "includes_checked": 1,
+      "note": "IB Optima: 1 checked included; next pieces $85 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "IB:COMFORT": {
+      "feed_name": "Comfort",
+      "includes_checked": 1,
+      "note": "IB Comfort: 1 checked included; next pieces $85 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "IB:FLEXIBLE": {
+      "feed_name": "Flexible",
+      "includes_checked": 2,
+      "note": "IB Flexible: 2 checked included; next pieces $85 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "LO:SAVER": {
+      "feed_name": "Economy Saver",
+      "includes_checked": 0,
+      "note": "LO Economy Saver: no checked bag; next pieces $85 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 8500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "LO:STANDARD": {
+      "feed_name": "Economy Standard",
+      "includes_checked": 1,
+      "note": "LO Economy Standard: 1 checked included; next pieces $85 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "LO:FLEX": {
+      "feed_name": "Economy Flex",
+      "includes_checked": 1,
+      "note": "LO Economy Flex: 1 checked included; next pieces $85 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "SK:LIGHT": {
+      "feed_name": "Go Light",
+      "includes_checked": 0,
+      "note": "SK Go Light: no checked bag; next pieces $85 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 8500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "SK:SMART": {
+      "feed_name": "Go Smart",
+      "includes_checked": 1,
+      "note": "SK Go Smart: 1 checked included; next pieces $85 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "SK:FLEX": {
+      "feed_name": "Go Flex",
+      "includes_checked": 2,
+      "note": "SK Go Flex: 2 checked included; next pieces $85 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "AZ:LIGHT": {
+      "feed_name": "Economy Light",
+      "includes_checked": 0,
+      "note": "AZ Economy Light: no checked bag; next pieces $90 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 9000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "AZ:CLASSIC": {
+      "feed_name": "Economy Classic",
+      "includes_checked": 1,
+      "note": "AZ Economy Classic: 1 checked included; next pieces $90 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "AZ:FLEX": {
+      "feed_name": "Economy Flex",
+      "includes_checked": 1,
+      "note": "AZ Economy Flex: 1 checked included; next pieces $90 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "DE:LIGHT": {
+      "feed_name": "Economy Light",
+      "includes_checked": 0,
+      "note": "DE Economy Light: no checked bag; next pieces $85 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 8500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "DE:CLASSIC": {
+      "feed_name": "Economy Classic",
+      "includes_checked": 1,
+      "note": "DE Economy Classic: 1 checked included; next pieces $85 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "DE:FLEX": {
+      "feed_name": "Economy Flex",
+      "includes_checked": 1,
+      "note": "DE Economy Flex: 1 checked included; next pieces $85 / $110 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 11000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "AC:BASIC": {
+      "feed_name": "Basic",
+      "includes_checked": 0,
+      "note": "AC Basic: no checked bag; next pieces $75 / $100 / $225 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 7500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 22500
+        }
+      ]
+    },
+    "AC:STANDARD": {
+      "feed_name": "Standard",
+      "includes_checked": 1,
+      "note": "AC Standard: 1 checked included; next pieces $75 / $100 / $225 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 22500
+        }
+      ]
+    },
+    "AC:FLEX": {
+      "feed_name": "Flex",
+      "includes_checked": 1,
+      "note": "AC Flex: 1 checked included; next pieces $75 / $100 / $225 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 22500
+        }
+      ]
+    },
+    "AC:COMFORT": {
+      "feed_name": "Comfort",
+      "includes_checked": 1,
+      "note": "AC Comfort: 1 checked included; next pieces $75 / $100 / $225 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 22500
+        }
+      ]
+    },
+    "AC:LATITUDE": {
+      "feed_name": "Latitude",
+      "includes_checked": 2,
+      "note": "AC Latitude: 2 checked included; next pieces $75 / $100 / $225 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 22500
+        }
+      ]
+    },
+    "WS:BASIC": {
+      "feed_name": "Basic",
+      "includes_checked": 0,
+      "note": "WS Basic: no checked bag; next pieces $80 / $100 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 8000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "WS:ECONO": {
+      "feed_name": "Econo",
+      "includes_checked": 1,
+      "note": "WS Econo: 1 checked included; next pieces $80 / $100 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
+      ]
+    },
+    "WS:ECONOFLEX": {
+      "feed_name": "EconoFlex",
+      "includes_checked": 1,
+      "note": "WS EconoFlex: 1 checked included; next pieces $80 / $100 / $200 one-way, published fee, mid-2026",
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        }
       ]
     }
   }

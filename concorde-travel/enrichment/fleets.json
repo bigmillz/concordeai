@@ -1,154 +1,1955 @@
 {
-  "_comment": "Equipment code -> what is actually in the cabin. This table exists because a feed giving an equipment code has NOT told you the cabin: hard rule 2 in table form. Amadeus returns aircraft.code ('789'), which names a TYPE. One carrier's 789 may be two or three configurations with two or three connectivity systems, and the frame is swapped after booking anyway. So every row here is a HEDGED CLAIM with an observed frequency, never a fact, and a type with no row still abstains rather than being guessed from the type alone.",
-  "_source": "ConcordeGo curated fleet table",
-  "_as_of": "2026-09-18",
-  "_review": "DRAFT - NOT human-reviewed. Every row carries needs_primary_source:true, the scorer prices it, and coverage() reports how many claims came from an unreviewed row. Before this is trusted in front of a user, each row needs a primary source (the carrier's own fleet page, or observed tail numbers by flight number) and needs_primary_source dropped. Treat the frequencies as the right SHAPE at roughly the right magnitude, not as measurements.",
+  "_comment": "Equipment code -> what is actually in the cabin. This table exists because a feed giving an equipment code has NOT told you the cabin: hard rule 2 in table form. Duffel and Amadeus return aircraft.code ('789'), which names a TYPE. One carrier's 789 may be two or three configurations with two or three connectivity systems, and the frame is swapped after booking anyway. So every row here is a HEDGED CLAIM with a frequency, never a fact, and a type with no row still abstains rather than being guessed from the type alone.",
+  "_source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+  "_as_of": "2026-09-20",
+  "_what_the_frequency_is": "The SHARE OF THE CARRIER'S FRAMES of that type that carry the described (better) configuration, with sample_size the number of frames. That is a stated belief about fleet composition, which is the honest quantity available without tail-number observations - a tail is assigned close to departure, so the share of frames is close to the probability any one departure gets the good cabin. It is NOT a count of departures, and the observation_window says so. The earlier draft claimed 'the last 60 transatlantic departures' for numbers nobody had counted, which was precisely the kind of manufactured observation hard rule 2 forbids.",
+  "_review": "DRAFT - populated 2026-09-20 from public fleet and cabin-configuration knowledge as of mid-2026, not from primary sources. Every row carries needs_primary_source:true, the scorer prices it, and coverage() reports how many claims came from an unreviewed row. To clear a row: check the carrier's own fleet page or a tail-number history for the type, correct the share, set as_of, drop the flag. Values are conservative: where a refit is under way the share on the new cabin is put below the halfway point unless it is known to be further along.",
   "_keying": "CARRIER:EQUIPMENT, on the OPERATING carrier - the metal belongs to whoever flies it, not to whoever sold it.",
+  "_scope": "Transatlantic long-haul types for the carriers a real JFK-LHR search returns, plus the narrowbodies that feed their European hubs. A short-haul row exists so a feeder segment is not abstain-priced; the connectivity term is only charged on the longest segment of an itinerary.",
   "fleets": {
-    "BA:789": {
+    "BA:77W": {
+      "note": "Four-class and high-density layouts both fly the Atlantic; refit essentially complete",
       "subfleet": {
-        "value": "787-9 in the Club Suite refit with the current economy cabin",
-        "observed_frequency": 0.76,
-        "sample_size": 60,
-        "observation_window": "the last 60 transatlantic departures",
-        "source": "ConcordeGo curated fleet table",
-        "as_of": "2026-09-18",
+        "value": "777-300ER with the Club Suite refit and the current economy cabin",
+        "observed_frequency": 0.8,
+        "sample_size": 16,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
         "needs_primary_source": true
       },
       "connectivity_oceanic": {
-        "value": "Satellite connectivity fitted and usable over the Atlantic",
-        "observed_frequency": 0.88,
+        "value": "Satellite connectivity fitted fleetwide; usable over the Atlantic",
+        "observed_frequency": 0.9,
         "outcome": true,
-        "sample_size": 60,
-        "observation_window": "the last 60 transatlantic departures",
-        "source": "ConcordeGo curated fleet table",
-        "as_of": "2026-09-18",
+        "sample_size": 16,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
         "needs_primary_source": true
       }
     },
-    "BA:77W": {
+    "BA:772": {
+      "note": "The most mixed sub-fleet BA has - three-class, four-class, refit and not",
       "subfleet": {
-        "value": "777-300ER, refit status genuinely mixed across the sub-fleet",
+        "value": "777-200ER in one of four layouts; Club Suite on the refitted frames",
         "observed_frequency": 0.55,
-        "sample_size": 60,
-        "observation_window": "the last 60 transatlantic departures",
-        "source": "ConcordeGo curated fleet table",
-        "as_of": "2026-09-18",
+        "sample_size": 43,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
         "needs_primary_source": true
       },
       "connectivity_oceanic": {
-        "value": "Satellite connectivity fitted and usable over the Atlantic",
-        "observed_frequency": 0.71,
+        "value": "Satellite connectivity fitted fleetwide; usable over the Atlantic",
+        "observed_frequency": 0.88,
         "outcome": true,
-        "sample_size": 60,
-        "observation_window": "the last 60 transatlantic departures",
-        "source": "ConcordeGo curated fleet table",
-        "as_of": "2026-09-18",
+        "sample_size": 43,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "BA:789": {
+      "subfleet": {
+        "value": "787-9 with Club Suite and the current economy cabin",
+        "observed_frequency": 0.9,
+        "sample_size": 18,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Satellite connectivity fitted fleetwide; usable over the Atlantic",
+        "observed_frequency": 0.9,
+        "outcome": true,
+        "sample_size": 18,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "BA:781": {
+      "subfleet": {
+        "value": "787-10, delivered with Club Suite, single configuration",
+        "observed_frequency": 0.97,
+        "sample_size": 8,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Satellite connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.9,
+        "outcome": true,
+        "sample_size": 8,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "BA:788": {
+      "subfleet": {
+        "value": "787-8 in the Club Suite refit (the rest still fly the old Club World)",
+        "observed_frequency": 0.5,
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Satellite connectivity fitted fleetwide; usable over the Atlantic",
+        "observed_frequency": 0.88,
+        "outcome": true,
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "BA:388": {
+      "subfleet": {
+        "value": "A380 with the Club Suite refit",
+        "observed_frequency": 0.8,
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Satellite connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.88,
+        "outcome": true,
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "VS:333": {
+      "note": "Refit in progress; the un-refitted frames carry the 2011 cabin",
+      "subfleet": {
+        "value": "A330-300 refitted with the A330neo-generation cabin",
+        "observed_frequency": 0.4,
+        "sample_size": 10,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted fleetwide; usable over the Atlantic",
+        "observed_frequency": 0.88,
+        "outcome": true,
+        "sample_size": 10,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "VS:339": {
+      "subfleet": {
+        "value": "A330-900neo, single configuration",
+        "observed_frequency": 0.97,
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.9,
+        "outcome": true,
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
         "needs_primary_source": true
       }
     },
     "VS:351": {
       "subfleet": {
-        "value": "A350-1000 in a single fleetwide configuration",
-        "observed_frequency": 0.96,
-        "sample_size": 60,
-        "observation_window": "the last 60 transatlantic departures",
-        "source": "ConcordeGo curated fleet table",
-        "as_of": "2026-09-18",
+        "value": "A350-1000 in the business layout (the leisure layout carries fewer Upper Class seats)",
+        "observed_frequency": 0.7,
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
         "needs_primary_source": true
       },
       "connectivity_oceanic": {
-        "value": "Satellite connectivity fitted and usable over the Atlantic",
-        "observed_frequency": 0.93,
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.9,
         "outcome": true,
-        "sample_size": 60,
-        "observation_window": "the last 60 transatlantic departures",
-        "source": "ConcordeGo curated fleet table",
-        "as_of": "2026-09-18",
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
         "needs_primary_source": true
       }
     },
-    "AA:77W": {
+    "VS:789": {
+      "note": "The 787-9 connectivity system has been the least reliable in the fleet",
       "subfleet": {
-        "value": "777-300ER in the long-standing three-cabin configuration",
-        "observed_frequency": 0.89,
-        "sample_size": 60,
-        "observation_window": "the last 60 transatlantic departures",
-        "source": "ConcordeGo curated fleet table",
-        "as_of": "2026-09-18",
+        "value": "787-9, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 17,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
         "needs_primary_source": true
       },
       "connectivity_oceanic": {
-        "value": "Satellite connectivity fitted and usable over the Atlantic",
-        "observed_frequency": 0.84,
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
         "outcome": true,
-        "sample_size": 60,
-        "observation_window": "the last 60 transatlantic departures",
-        "source": "ConcordeGo curated fleet table",
-        "as_of": "2026-09-18",
+        "sample_size": 17,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
         "needs_primary_source": true
       }
     },
-    "KL:789": {
+    "FI:7M8": {
       "subfleet": {
-        "value": "787-9 in a single fleetwide configuration",
-        "observed_frequency": 0.91,
-        "sample_size": 60,
-        "observation_window": "the last 60 transatlantic departures",
-        "source": "ConcordeGo curated fleet table",
-        "as_of": "2026-09-18",
+        "value": "737 MAX 8, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
         "needs_primary_source": true
       },
       "connectivity_oceanic": {
-        "value": "Satellite connectivity fitted and usable over the Atlantic",
-        "observed_frequency": 0.86,
+        "value": "Connectivity fitted; usable over the North Atlantic",
+        "observed_frequency": 0.65,
         "outcome": true,
-        "sample_size": 60,
-        "observation_window": "the last 60 transatlantic departures",
-        "source": "ConcordeGo curated fleet table",
-        "as_of": "2026-09-18",
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
         "needs_primary_source": true
       }
     },
-    "DL:764": {
+    "FI:7M9": {
       "subfleet": {
-        "value": "767-400ER, an older frame with the refresh only part-way through the sub-fleet",
-        "observed_frequency": 0.58,
-        "sample_size": 60,
-        "observation_window": "the last 60 transatlantic departures",
-        "source": "ConcordeGo curated fleet table",
-        "as_of": "2026-09-18",
+        "value": "737 MAX 9, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 4,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
         "needs_primary_source": true
       },
       "connectivity_oceanic": {
-        "value": "Satellite connectivity fitted and usable over the Atlantic",
-        "observed_frequency": 0.62,
+        "value": "Connectivity fitted; usable over the North Atlantic",
+        "observed_frequency": 0.65,
         "outcome": true,
-        "sample_size": 60,
-        "observation_window": "the last 60 transatlantic departures",
-        "source": "ConcordeGo curated fleet table",
-        "as_of": "2026-09-18",
+        "sample_size": 4,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "FI:75W": {
+      "subfleet": {
+        "value": "757-200 with the older cabin, single configuration",
+        "observed_frequency": 0.92,
+        "sample_size": 15,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Older Ku-band connectivity; usable over the North Atlantic",
+        "observed_frequency": 0.7,
+        "outcome": true,
+        "sample_size": 15,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "FI:76W": {
+      "subfleet": {
+        "value": "767-300ER with the older cabin, single configuration",
+        "observed_frequency": 0.92,
+        "sample_size": 4,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Older Ku-band connectivity; usable over the North Atlantic",
+        "observed_frequency": 0.7,
+        "outcome": true,
+        "sample_size": 4,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
         "needs_primary_source": true
       }
     },
     "EI:332": {
       "subfleet": {
-        "value": "A330-200, configuration mixed across the sub-fleet",
-        "observed_frequency": 0.64,
-        "sample_size": 60,
-        "observation_window": "the last 60 transatlantic departures",
-        "source": "ConcordeGo curated fleet table",
-        "as_of": "2026-09-18",
+        "value": "A330-200, single configuration",
+        "observed_frequency": 0.92,
+        "sample_size": 4,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
         "needs_primary_source": true
       },
       "connectivity_oceanic": {
-        "value": "Satellite connectivity fitted and usable over the Atlantic",
-        "observed_frequency": 0.69,
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 4,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "EI:333": {
+      "note": "Two business-cabin generations still flying",
+      "subfleet": {
+        "value": "A330-300 with the current business cabin",
+        "observed_frequency": 0.6,
+        "sample_size": 9,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 9,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "EI:32Q": {
+      "subfleet": {
+        "value": "A321LR/XLR with lie-flat business, single configuration",
+        "observed_frequency": 0.9,
+        "sample_size": 14,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 14,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "TP:32Q": {
+      "note": "The same equipment code covers two very different aeroplanes at TAP",
+      "subfleet": {
+        "value": "A321LR with the lie-flat business cabin (the A321neo carries a recliner Eurobusiness cabin under the same code)",
+        "observed_frequency": 0.5,
+        "sample_size": 23,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.8,
+        "outcome": true,
+        "sample_size": 23,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "TP:339": {
+      "subfleet": {
+        "value": "A330-900neo, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 19,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 19,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "TP:332": {
+      "subfleet": {
+        "value": "A330-200 with the older cabin, being retired",
+        "observed_frequency": 0.9,
+        "sample_size": 6,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted on part of the sub-fleet",
+        "observed_frequency": 0.5,
+        "outcome": true,
+        "sample_size": 6,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "TP:32N": {
+      "subfleet": {
+        "value": "A320neo, short-haul configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted",
+        "observed_frequency": 0.75,
+        "outcome": true,
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AF:359": {
+      "note": "Two business-cabin generations across the deliveries",
+      "subfleet": {
+        "value": "A350-900 with the current business cabin",
+        "observed_frequency": 0.65,
+        "sample_size": 34,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted fleetwide; usable over the Atlantic",
+        "observed_frequency": 0.9,
+        "outcome": true,
+        "sample_size": 34,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AF:77W": {
+      "note": "Three layouts; the leisure one is a markedly worse economy cabin",
+      "subfleet": {
+        "value": "777-300ER in the 'Best' layout (two other layouts fly, one leisure-dense)",
+        "observed_frequency": 0.35,
+        "sample_size": 43,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted fleetwide; usable over the Atlantic",
+        "observed_frequency": 0.9,
+        "outcome": true,
+        "sample_size": 43,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AF:772": {
+      "subfleet": {
+        "value": "777-200ER in the refitted layout",
+        "observed_frequency": 0.6,
+        "sample_size": 18,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted fleetwide; usable over the Atlantic",
+        "observed_frequency": 0.88,
+        "outcome": true,
+        "sample_size": 18,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AF:223": {
+      "subfleet": {
+        "value": "A220-300, short-haul configuration",
+        "observed_frequency": 0.97,
+        "sample_size": 40,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 40,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "B6:32Q": {
+      "subfleet": {
+        "value": "A321LR/XLR with Mint, single configuration",
+        "observed_frequency": 0.92,
+        "sample_size": 20,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Free connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.88,
+        "outcome": true,
+        "sample_size": 20,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "B6:223": {
+      "subfleet": {
+        "value": "A220-300, single configuration",
+        "observed_frequency": 0.97,
+        "sample_size": 40,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Free connectivity fitted",
+        "observed_frequency": 0.88,
+        "outcome": true,
+        "sample_size": 40,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AV:788": {
+      "subfleet": {
+        "value": "787-8, single configuration",
+        "observed_frequency": 0.92,
+        "sample_size": 14,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted on a minority of the sub-fleet",
+        "observed_frequency": 0.35,
+        "outcome": true,
+        "sample_size": 14,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AV:32N": {
+      "subfleet": {
+        "value": "A320neo, dense single-class configuration",
+        "observed_frequency": 0.9,
+        "sample_size": 40,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted on part of the fleet",
+        "observed_frequency": 0.45,
+        "outcome": true,
+        "sample_size": 40,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "DL:764": {
+      "subfleet": {
+        "value": "767-400ER with Delta One suites, refit complete",
+        "observed_frequency": 0.95,
+        "sample_size": 21,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 21,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "DL:76W": {
+      "note": "The oldest widebody cabin Delta flies across the Atlantic",
+      "subfleet": {
+        "value": "767-300ER with the older cabin",
+        "observed_frequency": 0.88,
+        "sample_size": 44,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.8,
+        "outcome": true,
+        "sample_size": 44,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "DL:339": {
+      "subfleet": {
+        "value": "A330-900neo, single configuration",
+        "observed_frequency": 0.97,
+        "sample_size": 33,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.9,
+        "outcome": true,
+        "sample_size": 33,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "DL:359": {
+      "subfleet": {
+        "value": "A350-900 in Delta's own layout (the ex-LATAM frames differ)",
+        "observed_frequency": 0.7,
+        "sample_size": 30,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.9,
+        "outcome": true,
+        "sample_size": 30,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "DL:333": {
+      "subfleet": {
+        "value": "A330-300 in the refitted layout",
+        "observed_frequency": 0.9,
+        "sample_size": 31,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.88,
+        "outcome": true,
+        "sample_size": 31,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "DL:E75": {
+      "subfleet": {
+        "value": "Embraer 175, regional single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 60,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted",
+        "observed_frequency": 0.8,
         "outcome": true,
         "sample_size": 60,
-        "observation_window": "the last 60 transatlantic departures",
-        "source": "ConcordeGo curated fleet table",
-        "as_of": "2026-09-18",
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "LX:333": {
+      "subfleet": {
+        "value": "A330-300, single configuration",
+        "observed_frequency": 0.92,
+        "sample_size": 14,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 14,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "LX:343": {
+      "subfleet": {
+        "value": "A340-300 with the older cabin",
+        "observed_frequency": 0.9,
+        "sample_size": 5,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.8,
+        "outcome": true,
+        "sample_size": 5,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "LX:77W": {
+      "note": "Refit under way; the rest fly the 2016 cabin",
+      "subfleet": {
+        "value": "777-300ER with the Swiss Senses refit",
+        "observed_frequency": 0.4,
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "LX:32Q": {
+      "subfleet": {
+        "value": "A321neo, short-haul configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 10,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted",
+        "observed_frequency": 0.75,
+        "outcome": true,
+        "sample_size": 10,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "LH:359": {
+      "note": "Allegris on roughly half; the rest carry the 2012-generation business cabin",
+      "subfleet": {
+        "value": "A350-900 with Allegris",
+        "observed_frequency": 0.45,
+        "sample_size": 30,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted fleetwide; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 30,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "LH:748": {
+      "subfleet": {
+        "value": "747-8 with the Allegris refit",
+        "observed_frequency": 0.35,
+        "sample_size": 19,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 19,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "LH:744": {
+      "subfleet": {
+        "value": "747-400 with the older cabin, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 8,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.8,
+        "outcome": true,
+        "sample_size": 8,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "LH:346": {
+      "subfleet": {
+        "value": "A340-600 with the older cabin",
+        "observed_frequency": 0.92,
+        "sample_size": 17,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.8,
+        "outcome": true,
+        "sample_size": 17,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "LH:388": {
+      "subfleet": {
+        "value": "A380 with the older cabin, single configuration",
+        "observed_frequency": 0.92,
+        "sample_size": 8,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.8,
+        "outcome": true,
+        "sample_size": 8,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "LH:789": {
+      "subfleet": {
+        "value": "787-9 with Allegris (the first deliveries carry the older business cabin)",
+        "observed_frequency": 0.5,
+        "sample_size": 10,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 10,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "KL:789": {
+      "subfleet": {
+        "value": "787-9, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 13,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 13,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "KL:781": {
+      "subfleet": {
+        "value": "787-10, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 8,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 8,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "KL:77W": {
+      "subfleet": {
+        "value": "777-300ER with the World Business Class refit",
+        "observed_frequency": 0.9,
+        "sample_size": 14,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 14,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "KL:772": {
+      "subfleet": {
+        "value": "777-200ER with the World Business Class refit",
+        "observed_frequency": 0.85,
+        "sample_size": 15,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 15,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "KL:332": {
+      "subfleet": {
+        "value": "A330-200 with the older cabin",
+        "observed_frequency": 0.9,
+        "sample_size": 6,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted on part of the sub-fleet",
+        "observed_frequency": 0.65,
+        "outcome": true,
+        "sample_size": 6,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AA:77W": {
+      "subfleet": {
+        "value": "777-300ER with Flagship Business, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 20,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.88,
+        "outcome": true,
+        "sample_size": 20,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AA:772": {
+      "subfleet": {
+        "value": "777-200ER in the refitted layout (Flagship Suite refit under way)",
+        "observed_frequency": 0.55,
+        "sample_size": 47,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.88,
+        "outcome": true,
+        "sample_size": 47,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AA:788": {
+      "note": "Two layouts, one with a markedly denser economy",
+      "subfleet": {
+        "value": "787-8 in the refitted layout",
+        "observed_frequency": 0.5,
+        "sample_size": 37,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.88,
+        "outcome": true,
+        "sample_size": 37,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AA:789": {
+      "subfleet": {
+        "value": "787-9 with Flagship Suite (the original layout still flies)",
+        "observed_frequency": 0.55,
+        "sample_size": 30,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.88,
+        "outcome": true,
+        "sample_size": 30,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "UA:77W": {
+      "note": "Connectivity system changeover in progress across the fleet",
+      "subfleet": {
+        "value": "777-300ER with Polaris, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 22,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 22,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "UA:772": {
+      "subfleet": {
+        "value": "777-200ER in the international Polaris layout (the domestic high-density layout also flies)",
+        "observed_frequency": 0.65,
+        "sample_size": 55,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 55,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "UA:764": {
+      "subfleet": {
+        "value": "767-400ER with Polaris, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 16,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 16,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "UA:763": {
+      "subfleet": {
+        "value": "767-300ER with Polaris (high-J and standard layouts)",
+        "observed_frequency": 0.8,
+        "sample_size": 37,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 37,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "UA:789": {
+      "subfleet": {
+        "value": "787-9 with Polaris, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 45,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 45,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "UA:788": {
+      "subfleet": {
+        "value": "787-8 with Polaris",
+        "observed_frequency": 0.9,
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "IB:332": {
+      "subfleet": {
+        "value": "A330-200 with the current business cabin",
+        "observed_frequency": 0.9,
+        "sample_size": 15,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 15,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "IB:333": {
+      "subfleet": {
+        "value": "A330-300 with the older business cabin",
+        "observed_frequency": 0.9,
+        "sample_size": 8,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 8,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "IB:359": {
+      "subfleet": {
+        "value": "A350-900, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 20,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.88,
+        "outcome": true,
+        "sample_size": 20,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AY:359": {
+      "subfleet": {
+        "value": "A350-900 with the AirLounge business cabin",
+        "observed_frequency": 0.85,
+        "sample_size": 17,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 17,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AY:333": {
+      "subfleet": {
+        "value": "A330-300 with the AirLounge refit",
+        "observed_frequency": 0.8,
+        "sample_size": 8,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 8,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "LO:788": {
+      "subfleet": {
+        "value": "787-8, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 8,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.8,
+        "outcome": true,
+        "sample_size": 8,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "LO:789": {
+      "subfleet": {
+        "value": "787-9, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 7,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.8,
+        "outcome": true,
+        "sample_size": 7,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "TK:77W": {
+      "subfleet": {
+        "value": "777-300ER, single configuration",
+        "observed_frequency": 0.92,
+        "sample_size": 33,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 33,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "TK:359": {
+      "subfleet": {
+        "value": "A350-900, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 30,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.88,
+        "outcome": true,
+        "sample_size": 30,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "TK:333": {
+      "note": "Two business-cabin generations",
+      "subfleet": {
+        "value": "A330-300 with the current business cabin",
+        "observed_frequency": 0.6,
+        "sample_size": 37,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 37,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "TK:789": {
+      "subfleet": {
+        "value": "787-9, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 25,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.88,
+        "outcome": true,
+        "sample_size": 25,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "SK:333": {
+      "subfleet": {
+        "value": "A330-300 in the refitted layout",
+        "observed_frequency": 0.9,
+        "sample_size": 8,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 8,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "SK:359": {
+      "subfleet": {
+        "value": "A350-900, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 4,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.88,
+        "outcome": true,
+        "sample_size": 4,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AZ:359": {
+      "subfleet": {
+        "value": "A350-900, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 6,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 6,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AZ:339": {
+      "subfleet": {
+        "value": "A330-900neo, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 11,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 11,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AZ:333": {
+      "subfleet": {
+        "value": "A330-300 with the older cabin",
+        "observed_frequency": 0.9,
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.8,
+        "outcome": true,
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "OS:763": {
+      "subfleet": {
+        "value": "767-300ER with the older cabin",
+        "observed_frequency": 0.92,
+        "sample_size": 3,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.8,
+        "outcome": true,
+        "sample_size": 3,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "OS:77W": {
+      "subfleet": {
+        "value": "777-300ER with the refitted cabin",
+        "observed_frequency": 0.5,
+        "sample_size": 6,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 6,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "SN:333": {
+      "subfleet": {
+        "value": "A330-300, single configuration",
+        "observed_frequency": 0.92,
+        "sample_size": 10,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted on part of the sub-fleet",
+        "observed_frequency": 0.6,
+        "outcome": true,
+        "sample_size": 10,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "DE:339": {
+      "subfleet": {
+        "value": "A330-900neo, single configuration",
+        "observed_frequency": 0.97,
+        "sample_size": 18,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 18,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "4Y:333": {
+      "subfleet": {
+        "value": "A330-300, single configuration",
+        "observed_frequency": 0.92,
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.8,
+        "outcome": true,
+        "sample_size": 12,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AC:77W": {
+      "subfleet": {
+        "value": "777-300ER in the standard layout (a 450-seat high-density layout also flies)",
+        "observed_frequency": 0.55,
+        "sample_size": 19,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 19,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AC:789": {
+      "subfleet": {
+        "value": "787-9, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 29,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 29,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AC:788": {
+      "subfleet": {
+        "value": "787-8, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 8,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 8,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AC:333": {
+      "subfleet": {
+        "value": "A330-300 in the refitted layout",
+        "observed_frequency": 0.85,
+        "sample_size": 16,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 16,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "WS:789": {
+      "subfleet": {
+        "value": "787-9, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 7,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 7,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "WS:7M8": {
+      "subfleet": {
+        "value": "737 MAX 8, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 50,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted",
+        "observed_frequency": 0.8,
+        "outcome": true,
+        "sample_size": 50,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AT:788": {
+      "subfleet": {
+        "value": "787-8, single configuration",
+        "observed_frequency": 0.92,
+        "sample_size": 9,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted on part of the sub-fleet",
+        "observed_frequency": 0.55,
+        "outcome": true,
+        "sample_size": 9,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "AT:789": {
+      "subfleet": {
+        "value": "787-9, single configuration",
+        "observed_frequency": 0.92,
+        "sample_size": 5,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the Atlantic",
+        "observed_frequency": 0.7,
+        "outcome": true,
+        "sample_size": 5,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "EY:789": {
+      "subfleet": {
+        "value": "787-9, single configuration",
+        "observed_frequency": 0.92,
+        "sample_size": 40,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the ocean",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 40,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "EY:388": {
+      "subfleet": {
+        "value": "A380, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 10,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the ocean",
+        "observed_frequency": 0.85,
+        "outcome": true,
+        "sample_size": 10,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      }
+    },
+    "EY:359": {
+      "subfleet": {
+        "value": "A350-1000, single configuration",
+        "observed_frequency": 0.95,
+        "sample_size": 10,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
+        "needs_primary_source": true
+      },
+      "connectivity_oceanic": {
+        "value": "Connectivity fitted; usable over the ocean",
+        "observed_frequency": 0.88,
+        "outcome": true,
+        "sample_size": 10,
+        "observation_window": "share of the carrier's frames of this type, fleet composition as of 2026-09",
+        "source": "ConcordeGo curated fleet table (public fleet and cabin-configuration knowledge, not counted departures)",
+        "as_of": "2026-09-20",
         "needs_primary_source": true
       }
     }

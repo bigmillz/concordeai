@@ -1105,35 +1105,75 @@ is precisely the property the grade must not have.
 
 ### Par is a specification
 
-Par should be the effective cost of a **defined reference itinerary** on the route: nonstop,
-main cabin with one checked bag, a carrier at the curated baseline rating, the 31-inch
-transatlantic pitch norm, the overnight departure that is simply what this route is. It is
-computable, auditable, explainable to a user in one sentence, and it moves only when the
-route's structure moves or the specification is deliberately changed — never because the
-market had a cheap Tuesday.
+Par is the effective cost of a **defined reference itinerary** on the route: nonstop, main
+cabin with one checked bag, a carrier at the curated baseline rating, the 31-inch
+transatlantic pitch norm, leaving when the market flies. It is computable, auditable,
+explainable to a user in one sentence, and it moves only when the route's structure moves,
+the season moves, or the specification is deliberately changed — never because the market
+had a cheap Tuesday.
 
-Scored against the real capture, that reference produces:
+**Since 2026-09-20 it is modelled, for any route, by `concorde-travel/par.py`.** Patrick's
+brief was "calculate par based on much more factors … use historical data and come up with
+a reasonable price. I don't have all the answers for every flight out there, so that's your
+job." What the model does, and why each piece is there:
+
+- **The reference fare is route economics, not a lookup.** Fare = base + marginal per-mile
+  yields over three distance bands (the first 600 mi, the next 1,400, everything beyond),
+  because yield per mile falls with stage length in every carrier's own accounts. The bands
+  differ by **market class** — the competitive market the route sits in, from the two
+  countries' regions: `transatlantic`, `transpacific`, `intra-eu` (an LCC price war),
+  `domestic-na`, `intra-af` (not a price war), 26 in all. A **month multiplier** per market
+  (transatlantic July 1.45, January 0.82; southern-hemisphere markets flipped six months)
+  moves it from the shoulder. The yields were set against what these markets charge for a
+  one-way main-cabin fare with a bag about six weeks out, and `test_adapter.py` pins four
+  routes with known prices: JFK–LHR $400–560, JFK–LAX $250–400, LHR–BCN $70–140, LAX–NRT
+  $550–900.
+- **The departure time is the route's structure.** Eastbound over 2,500 mi is an overnight
+  at 19:30, because that is how the market flies and a daytime reference would set a bar no
+  real flight could reach; everything else leaves at 10:00, the cleanest a day can be.
+- **The ground legs are the city centre**, estimated by `ground.py` from coordinates 0.11°
+  off the airport — the same estimator every real option gets.
+- **The reference has a SPECIFIED on-time record** (78%, the long-run US system average),
+  not an abstain: the scorer's "unknown is never free" is right for a real flight nobody
+  has data on, but a definition that says "and we do not know how punctual it is" adds $30
+  to every par on Earth for no reason.
+- **Beyond ~8,800 mi the reference allows one clean connection** (the layover time at the
+  reference hourly value plus the nonstop credit given back), because nothing flies that
+  far without stopping and a nonstop reference would grade the whole route D.
+- **It never sees the search.** `par_for(origin, destination, date, …)` has no parameter
+  through which an option could arrive. A curated row in `enrichment/ground.json` `routes`
+  overrides it — that table is now empty, its eight guesses retired.
 
 ```
-reference at a $350 ticket  ->  par $790 effective
-reference at a $400 ticket  ->  par $840
-reference at a $450 ticket  ->  par $890
-reference at a $500 ticket  ->  par $940
-
-the $450 reference, itemised - this is what par MEANS:
-   Ticket                                    $450
-   11h17m door to door at $35 an hour        $395
-   LHR to London                             $92
-   Nonstop, no misconnect exposure          −$80
-   No on-time record for any segment         $30
-   Bushwick to JFK at 13:09                   $3
-   EFFECTIVE                                 $890
+JFK-LHR, 18 November 2026:
+   fare   : 3442 mi, transatlantic market, x0.88 for month 11 -> $452 main cabin with a bag
+   leaves : 19:30 local, 7h22m block, lands 07:52
+   Ticket                                               $452
+   city centre to JFK at 19:30                          $12
+   LHR to London                                        $9
+   9h59m door to door at $35 an hour                    $349
+   Nonstop, no misconnect exposure                      -$80
+   PAR                                                  $743
 ```
 
-So `route_par_cents` should carry its basis beside it — the reference ticket price and the
-date it was set — rather than being a bare number with no story. Choosing the reference
-ticket price is still a product decision, but it is now a decision about *what a normal
-fare on this route is*, which is answerable, rather than about where to put a letter.
+Against the full 172-offer real capture (test-token inventory, so some prices are invented):
+
+```
+par $743 (modelled)   A:13  A-:5  B+:15  B:7  B-:14  C+:19  C:16  C-:16  D:20  F:47
+effective             min $704   p25 $929   median $1,129   p75 $1,454
+```
+
+No A+ at all, which is right: the cheapest clean nonstop *is* the reference, and it earns
+an A. The 47 Fs are two-stop 15-hour itineraries for a 7-hour route, an $827 economy fare
+via Amsterdam, and a $10,003 Etihad fare via Abu Dhabi — every one has a ledger that says
+so. Whether the letter bands themselves sit in the right places is tuning for later; what
+matters is that the yardstick now has a story a user can be told in one sentence, and the
+page tells it.
+
+**Par is seasonal on purpose.** A $500 ticket in July is a better deal than the same ticket
+in November, and the letter says so. That is still an absolute grade: the same route on the
+same date has one par, whatever the inventory, and `mutate_adapter.py` seeds a par derived
+from the median of the results to prove the suite notices.
 
 ### The absolute-grade property is now guarded
 
@@ -1335,7 +1375,12 @@ and invented prices — that is test mode working, not the adapter failing.
 
 Two files also want a human before they are trusted: `enrichment/fleets.json` and
 `enrichment/fares.json` are drafts, marked as such in the files, surfaced by `coverage()`
-and coloured amber in the interface. The mechanism is right; the numbers need a source.
+and coloured amber in the interface. On 2026-09-20 both were populated in earnest — 92 fleet
+rows and 82 fare-brand rows, every carrier a real JFK–LHR search returns — from public fleet
+and published-fee knowledge rather than primary sources, and a fleet row's frequency is now
+honestly the share of frames in the described configuration, not a count of departures
+nobody made. The mechanism is right and the numbers are now plausible; each row still needs
+its source before its flag comes off.
 
 `adapter_samples/amadeus-jfk-lhr.json` is **synthesised from the published schema, not
 captured** — its own `_provenance` block says so, and a test asserts it. It proves the

@@ -1709,6 +1709,28 @@ function optionHTML(o, rank, hidden){
    ledger, one implementation - and /api/narrate upgrades it when a model is
    reachable. */
 
+// The yardstick, in one sentence. Every letter on the page is measured
+// against this number, so the page says what it is and where it came from.
+function parLine(fx){
+  if (!fx || !fx.route_par_cents) return '';
+  var p = fx.par || {}, src = p.source || 'fixture';
+  var s = 'Grades measure each option against par of ' + money(fx.route_par_cents);
+  if (src === 'modelled' && p.reference){
+    var r = p.reference;
+    s += ': a nonstop in main cabin with a bag, leaving ' + esc(r.departs_local || '') +
+         ', ' + Math.round((r.door_to_door_minutes || 0) / 60) + 'h door to door, at ' +
+         (p.season_factor > 1.05 ? 'a peak' : p.season_factor < 0.95 ? 'an off-season' : 'a shoulder') +
+         ' fare of ' + money(p.fare_cents) + ' for ' + (p.miles || 0).toLocaleString() + ' miles.';
+  } else if (src === 'default'){
+    s += ', a placeholder - this route could not be modelled, so the letters are indicative only.';
+  } else if (src === 'curated'){
+    s += ', a curated figure for this route.';
+  } else {
+    s += ', the figure this fixture pins.';
+  }
+  return '<div class="coverage thin" style="margin-top:4px">' + s + '</div>';
+}
+
 function paint(){
   var host = document.getElementById("results");
   host.hidden = false;
@@ -1740,6 +1762,7 @@ function paint(){
     h += '<div class="coverage thin" style="margin-top:4px"><b>Not a live search.</b> ' +
          esc(LAST.sample_notice) + '</div>';
   }
+  h += parLine(LAST.fixture);
   if (LAST.coverage){
     // A DRAFT verdict gets the same caution colour as a thin one. Claims from an
     // unreviewed table print a confident dollar figure, which makes them the

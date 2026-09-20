@@ -63,6 +63,7 @@ import os
 import re
 
 import ground as _ground
+import par as _par
 from typing import Any, Dict, List, Optional, Tuple
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -371,11 +372,8 @@ def from_kiwi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
             if sg.get("to") == d_iata and sg.get("toCity"):
                 dest_city = sg["toCity"]
                 break
-    par = ((enr["ground"].get("routes") or {}).get("%s-%s" % (o_iata, d_iata)) or {}).get("par_cents")
-    if not par:
-        par = 105000
-        notes.append("no curated par for %s-%s; grades on this route are indicative only"
-                     % (o_iata, d_iata))
+    par, par_basis = route_par(o_iata, d_iata, first["segments"][0]["departure_local"][:10],
+                               enr, notes)
 
     org = enr["ground"]["origins"].get(origin_key, {})
     scenario = {
@@ -410,6 +408,7 @@ def from_kiwi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
         "expect": {"reconciles": True},
         "_dropped": dropped,
         "_ground": ground_info,
+        "_par": par_basis,
     }
     return scenario
 
@@ -464,9 +463,21 @@ def _brand_key(fares: Dict[str, Any], carrier: str, brand: str) -> Optional[str]
     substring rather than whole words would make "Economy Light" match a curated
     "ECONOMY" row, which is why this walks words."""
     brands = fares.get("brands") or {}
-    up = (brand or "").upper()
+    up = (brand or "").upper().strip()
+    if not up:
+        return None
     if "%s:%s" % (carrier, up) in brands:
         return "%s:%s" % (carrier, up)
+    # A row may name the feed's exact wording ("Basic Economy", "Partner Main");
+    # that beats the word walk, which is what keeps UA:BASIC and UA:ECONOMY
+    # from depending on which row happens to come first in the file.
+    for key, row in brands.items():
+        c, _, _ = key.partition(":")
+        if c != carrier:
+            continue
+        names = [n.strip().upper() for n in str(row.get("feed_name") or "").split("/")]
+        if up in names:
+            return key
     words = set(re.findall(r"[A-Z]+", up))
     for key in brands:
         c, _, token = key.partition(":")
@@ -756,11 +767,8 @@ def from_amadeus(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
     first = options[0]
     o_iata = first["segments"][0]["origin"]["iata"]
     d_iata = first["segments"][-1]["destination"]["iata"]
-    par = ((enr["ground"].get("routes") or {}).get("%s-%s" % (o_iata, d_iata)) or {}).get("par_cents")
-    if not par:
-        par = 105000
-        notes.append("no curated par for %s-%s; grades on this route are indicative only"
-                     % (o_iata, d_iata))
+    par, par_basis = route_par(o_iata, d_iata, first["segments"][0]["departure_local"][:10],
+                               enr, notes)
     if unreviewed:
         notes.append("%d aircraft claims come from the DRAFT fleet table, which has not "
                      "been human-reviewed" % unreviewed)
@@ -801,6 +809,7 @@ def from_amadeus(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
         "expect": {"reconciles": True},
         "_dropped": dropped,
         "_ground": ground_info,
+        "_par": par_basis,
         "_feed": {"provider": "amadeus", "default_bag_fees_used": default_used,
                   "unreviewed_claims": unreviewed},
     }
@@ -961,6 +970,56 @@ def crosses_border(enr: Dict[str, Any], from_iata: str, to_iata: str,
         a = aps.get(from_iata) or {}
         return bool(b.get("schengen")) and not bool(a.get("schengen"))
     return ba != bb
+
+
+# ------------------------------------------------------------------- par
+
+def route_par(o_iata: str, d_iata: str, date: str, enr: Dict[str, Any],
+              notes: List[str], geo: Optional[Dict[str, Any]] = None,
+              scorer_mod=None) -> Tuple[int, Dict[str, Any]]:
+    """(par_cents, basis) for a route. NEVER reads the options.
+
+    A curated row in enrichment/ground.json wins - that is a human's number for
+    a route somebody has studied. Everywhere else, par.py builds the reference
+    itinerary from the two airports' coordinates and scores it through the real
+    scorer. With no coordinates at all (a feed that carries none, an airport
+    nobody curated) there is nothing to model, so the transatlantic default
+    stands and the note says so - a grade over that number is indicative only.
+
+    The one input that varies between searches on the same route is the DATE,
+    because the reference fare is seasonal: a $500 ticket in July is a better
+    deal than the same ticket in November, and the letter should say so. The
+    par is still the same for every option in the search, and for every search
+    on that route and date, whatever the inventory came back as."""
+    curated = ((enr["ground"].get("routes") or {}).get("%s-%s" % (o_iata, d_iata)) or {})
+    if curated.get("par_cents"):
+        return int(curated["par_cents"]), {"source": "curated", "par_cents": int(curated["par_cents"]),
+                                            "basis": curated.get("basis")}
+    geo = geo or {}
+    aps = enr["airports"]["airports"]
+
+    def place_of(iata):
+        node = dict(geo.get(iata) or {})
+        ap = aps.get(iata) or {}
+        node.setdefault("iata", iata)
+        for k in ("lat", "lon", "country", "city"):
+            if node.get(k) is None and ap.get(k) is not None:
+                node[k] = ap[k]
+        return node
+
+    o, d = place_of(o_iata), place_of(d_iata)
+    if o.get("lat") is None or d.get("lat") is None or not o.get("country") or not d.get("country"):
+        missing = [i for i, n in ((o_iata, o), (d_iata, d)) if n.get("lat") is None or not n.get("country")]
+        notes.append("no coordinates for %s, so par cannot be modelled; grades on this "
+                     "route are indicative only" % " and ".join(missing))
+        return 105000, {"source": "default", "par_cents": 105000,
+                        "reads_as": "no coordinates for %s" % " and ".join(missing)}
+    if scorer_mod is None:
+        import scorer as scorer_mod                     # the adapter may import the scorer; never the reverse
+    par, basis = _par.par_for(o, d, date, enr, scorer_mod, _ground)
+    notes.append("par for %s-%s is modelled, not curated: %s, $%d all in"
+                 % (o_iata, d_iata, basis["reads_as"], par // 100))
+    return par, basis
 
 
 def ground_both_ends(origin_text: str, dep_ap: str, arr_ap: str,
@@ -1299,12 +1358,8 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                 if node.get("iata_code") == d_iata:
                     dest_label = _place_label(node, d_iata)
                     break
-    par = ((enr["ground"].get("routes") or {}).get("%s-%s" % (o_iata, d_iata))
-           or {}).get("par_cents")
-    if not par:
-        par = 105000
-        notes.append("no curated par for %s-%s; grades on this route are indicative only"
-                     % (o_iata, d_iata))
+    par, par_basis = route_par(o_iata, d_iata, first["segments"][0]["departure_local"][:10],
+                               enr, notes, geo)
     if unreviewed:
         notes.append("%d aircraft claims come from the DRAFT fleet table, which has not "
                      "been human-reviewed" % unreviewed)
@@ -1350,6 +1405,7 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
         "expect": {"reconciles": True},
         "_dropped": dropped,
         "_ground": ground_info,
+        "_par": par_basis,
         "_feed": {"provider": "duffel", "default_bag_fees_used": default_used,
                   "unreviewed_claims": unreviewed,
                   "feed_priced_bags": feed_priced_bags,

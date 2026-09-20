@@ -306,30 +306,12 @@
     ]
   },
   "routes": {
-    "_comment": "Par is the all-in effective cost a CLEAN option achieves on this route. The grade is measured against it, so it is curated per route and date band rather than derived from whatever the search returned.",
-    "JFK-LHR": {
-      "par_cents": 105000
-    },
-    "EWR-LHR": {
-      "par_cents": 105000
-    },
-    "JFK-CDG": {
-      "par_cents": 108000
-    },
-    "JFK-AMS": {
-      "par_cents": 110000
-    },
-    "JFK-MAD": {
-      "par_cents": 100000
-    },
-    "JFK-MXP": {
-      "par_cents": 115000
-    },
-    "JFK-LIS": {
-      "par_cents": 98000
-    },
-    "JFK-BCN": {
-      "par_cents": 102000
+    "_comment": "OVERRIDE LAYER, empty on purpose. Par is the all-in effective cost of a defined reference itinerary (nonstop, main cabin with a bag, baseline carrier, 31-inch pitch, from the city centre, at the time of day the market flies), and concorde-travel/par.py models it for any route on Earth from the two airports' coordinates, the market the route sits in, and the month. A row here wins over the model: put one in ONLY with a basis a human can defend - the eight rows that used to live here ($1,050 for JFK-LHR and the like) were guesses with nothing behind them, put 57% of a real search at A+, and were retired on 2026-09-20 when the model replaced them.",
+    "_format": {
+      "ROUTE": {
+        "par_cents": 0,
+        "basis": "how the number was arrived at, and when"
+      }
     }
   }
 }

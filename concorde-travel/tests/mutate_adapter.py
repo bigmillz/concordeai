@@ -31,6 +31,7 @@ AD = "concorde-travel/adapter.py"
 GR = "concorde-travel/ground.py"
 PL = "concorde-travel/places.py"
 FA = "concorde-travel/enrichment/fares.json"
+PA = "concorde-travel/par.py"
 
 
 def slice_fn(src, name):
@@ -157,9 +158,36 @@ MUTANTS = [
  (PL, "covers", '''    return code == iata or iata in METRO.get(code, set())''',
   '''    return True''',
   'places: call every airport a match for every metro'),
- (FA, None, '{"piece": 1, "amount_cents": 10000},\n      {"piece": 2, "amount_cents": 12000},',
-  '{"piece": 1, "amount_cents": 1000},\n      {"piece": 2, "amount_cents": 1200},',
+ (FA, None, '"piece": 1,\n        "amount_cents": 10000\n      },\n      {\n        "piece": 2,\n        "amount_cents": 12000',
+  '"piece": 1,\n        "amount_cents": 1000\n      },\n      {\n        "piece": 2,\n        "amount_cents": 1200',
   'unknown-is-never-zero: make the fallback bag fee cheap'),
+ (AD, "route_par", 'par, basis = _par.par_for(o, d, date, enr, scorer_mod, _ground)',
+  'par, basis = _par.par_for(o, d, date, enr, scorer_mod, _ground)\n'
+  '    import inspect as _i\n'
+  '    _opts = _i.currentframe().f_back.f_locals.get("options") or []\n'
+  '    if _opts:\n'
+  '        _p = sorted(x["booking"][0]["price_cents"] for x in _opts)\n'
+  '        par = int(_p[len(_p) // 2] * 1.6)',
+  'par: derive it from the median of the results (the grade goes relative)'),
+ (AD, "route_par", '    if curated.get("par_cents"):', '    if False and curated.get("par_cents"):',
+  'par: ignore the curated override'),
+ (AD, "route_par", '        return 105000, {"source": "default", "par_cents": 105000,',
+  '        return 105000, {"source": "modelled", "par_cents": 105000,',
+  'par: dress the default up as a modelled number'),
+ (PA, "season_factor", '    return row[m]', '    return 1.0',
+  'par: flatten the season'),
+ (PA, "reference_fare_cents", '    b3 = max(miles - 2000.0, 0.0)', '    b3 = 0.0',
+  'par: drop the long-haul band from the fare'),
+ (PA, "market_class", '    if oc and oc == dc:', '    if False:',
+  'par: price a domestic route as an intercontinental one'),
+ (PA, "reference_departure_minutes", '    return 19 * 60 + 30 if long_haul_east else 10 * 60',
+  '    return 10 * 60',
+  'par: a daytime reference on an overnight market'),
+ (PA, "par_for", '            "reliability": {"on_time_fraction": 0.78, "delay_minutes_p50": 10,',
+  '            "reliability": {"coverage": "none", "policy": "route_median", "reason": "x", "_": {"on_time_fraction": 0.78, "delay_minutes_p50": 10,',
+  'par: charge the reference for an unknown on-time record'),
+ (PA, "par_for", '    if miles > NONSTOP_RANGE_MILES:', '    if False:',
+  'par: measure a route with no nonstop against a nonstop'),
 ]
 
 caught = skipped = 0

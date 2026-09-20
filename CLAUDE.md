@@ -271,9 +271,9 @@ the same inventory. They differ in interface, not judgment. We sell the judgment
 
 ## Grade and order are two calls to one function — do not conflate them
 
-- **The grade is ABSOLUTE.** It is `effective_cost` at the fixed reference profile against a
-  curated route par. The same flight earns the same letter whatever else the search
-  returned, on any date, under any target. A whole search legitimately coming back C− is the
+- **The grade is ABSOLUTE.** It is `effective_cost` at the fixed reference profile against the
+  route's par. The same flight earns the same letter whatever else the search returned,
+  whenever you search, under any target. A whole search legitimately coming back C− is the
   system working. `test_scorer.py` guards this by re-grading every option against subsets of
   the result set; a mutant that derives par from a percentile of the results is caught.
 - **The grade is NOT the price.** It is the whole effective cost — carrier quality, cabin,
@@ -284,11 +284,27 @@ the same inventory. They differ in interface, not judgment. We sell the judgment
   A C can and should outrank an A+ when the user asked for cheapest. Switching target
   re-orders the list and never moves a letter.
 
-**Par is a specification, not a percentile.** Set it from a defined reference itinerary for
-the route — nonstop, main cabin with a bag, a carrier at the baseline rating, the 31-inch
-norm — and record the basis alongside it. Calibrating par off the distribution of a search's
+**Par is a specification, not a percentile — and it is MODELLED for any route on Earth**
+(since 2026-09-20). `concorde-travel/par.py` builds the route's reference itinerary — nonstop,
+main cabin with one bag, a carrier at the baseline rating, 31-inch pitch, from the city
+centre, leaving when that market actually flies (an overnight eastbound across an ocean,
+mid-morning otherwise) — and scores it through the real scorer at the reference profile. The
+only modelled input is the reference **fare**: distance through marginal per-mile yields that
+fall with stage length, the competitive market the route sits in (transatlantic, intra-EU,
+domestic-NA, … 26 classes), and the month. `par_for()` takes an origin, a destination and a
+date and **nothing else**. Beyond nonstop range (~8,800 mi) the reference allows one
+connection, or no real flight could reach it.
+
+Two consequences that look wrong and are not: **par is seasonal** — a $500 ticket in July is
+a better deal than the same ticket in November and the letter says so; it is still absolute,
+because the same route on the same date has one par whatever the inventory. And **the
+curated `routes` table in `enrichment/ground.json` is empty on purpose** — a row there
+overrides the model, and the eight numbers it used to hold were guesses that put 57% of a
+real search at A+. The basis ships with every search (`_par` in the scenario, `fixture.par`
+on the wire, one sentence on the page). Calibrating par off the distribution of a search's
 results is the obvious-looking change that quietly makes every grade relative, which is the
-one thing the grade must never be.
+one thing the grade must never be; `mutate_adapter.py` seeds exactly that fault and the
+adapter suite catches it.
 
 ## The model — one number per itinerary, in dollars
 
@@ -376,6 +392,7 @@ template ships and nothing else changes.
 ```bash
 python3 concorde-travel/server.py             # the draft UI, http://127.0.0.1:9897
 python3 concorde-travel/scorer.py             # print every fixture's ledger, every profile
+python3 concorde-travel/par.py JFK LHR 2026-11-18   # the reference itinerary and its ledger, any route
 python3 fixtures/validate.py                  # fixture schema + semantics
 python3 concorde-travel/tests/test_scorer.py  # the fixtures' own assertions, executed
 python3 concorde-travel/tests/test_narrator.py   # the narrator's guard rails (no key needed)
@@ -503,19 +520,34 @@ against `enrichment/fleets.json` into a **hedged claim with an observed frequenc
 type with no curated row **abstains**. Better data is what hard rule 2 is for, not a reason
 to relax it.
 
-**`enrichment/fleets.json` and `enrichment/fares.json` are DRAFTS.** Marked in the files,
-every fleet row carrying `needs_primary_source: true`, counted by `coverage()`, amber in the
-interface. A claim from an unreviewed table is *more* dangerous than an abstain — an abstain
-announces itself in the ledger, a draft row prints a confident dollar figure. They need a
-human pass before any number built on them goes in front of a stranger.
+**`enrichment/fleets.json` and `enrichment/fares.json` are populated DRAFTS** (92 fleet rows
+and 82 brand rows as of 2026-09-20, covering every carrier a real JFK–LHR search returns and
+the narrowbodies that feed their hubs). Marked in the files, every fleet row carrying
+`needs_primary_source: true`, counted by `coverage()`, amber in the interface. A claim from
+an unreviewed table is *more* dangerous than an abstain — an abstain announces itself in the
+ledger, a draft row prints a confident dollar figure. They need a human pass before any
+number built on them goes in front of a stranger. Two things about their content:
+
+- **A fleet row's frequency is the share of the carrier's FRAMES of that type in the
+  described configuration**, with `sample_size` the frame count and the window saying so.
+  That is the honest quantity available without tail-number observations; the earlier draft
+  claimed "the last 60 transatlantic departures" for numbers nobody had counted, which is
+  the manufactured observation hard rule 2 forbids. Where a refit is under way the share is
+  put below the halfway point unless known to be further along.
+- **A fare row carries `feed_name`** — the wording the feed uses ("Basic Economy", "Partner
+  Main", alternatives separated by `/`) — and `_brand_key()` matches that exactly before it
+  walks words, so `UA:BASIC` and `UA:ECONOMY` no longer depend on which row comes first. Never
+  key a carrier on a word its other brands share. A row's tier count says how many bags the
+  brand includes (three tiers is a no-bag brand, two includes one, one includes two), and the
+  fees lean to the airport price where prepaid is cheaper.
 
 `adapter.coverage()` reports all of this per search and the page prints it. **A grade
 computed over mostly-abstained enrichment is not the same object as one over a curated
 route** — do not quietly drop that strip to make the results look more confident.
 
 `enrichment/` is the curated moat: airports (zones with DST transition dates, MCT, service
-hours, inter-terminal), carriers (reviewed ratings), ground access by origin and hour, and
-route par.
+hours, inter-terminal), carriers (reviewed ratings), ground access by origin and hour, fleets
+and fare brands, and an (empty) route-par override table.
 
 **The curated tables are an OVERRIDE LAYER, not a gate** (changed 2026-09-20, when the
 brief went global). Uncurated no longer means dropped; it means estimated, and *said out
@@ -698,7 +730,8 @@ start a server to look at is a mockup nobody looks at.
 
 The data is a real JFK–LHR Duffel search scored by the real scorer — no
 placeholders. Two things in it are honest artefacts, not bugs: almost everything
-grades **A+** because route par is still the un-calibrated $1,050, and some
+grades **A+** because `slim.json` was built before par was modelled, against the
+retired $1,050 guess (the live page is the reference for grades now), and some
 inventory is **synthetic** because the capture came from a test token (the
 fictional carrier ZZ is filtered out of the mock data; a cluster of four
 carriers sharing one departure time is the test feed, not the adapter).

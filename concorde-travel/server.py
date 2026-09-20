@@ -424,6 +424,9 @@ def _score_scenario(sc, req):
                     "destination": sc["query"]["destination"]["label"],
                     "depart_date": sc["query"]["depart_date"],
                     "route_par_cents": sc["query"]["route_par_cents"],
+                    # Hard rule 4 applies to the yardstick too: a letter against
+                    # a number nobody can see is hidden ranking logic.
+                    "par": sc.get("_par"),
                     "profiles": list(sc["query"]["profiles"])}
 
     # The deterministic narration rides along with the scores - it costs

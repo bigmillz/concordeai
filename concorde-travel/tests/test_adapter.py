@@ -247,8 +247,10 @@ def main():
     check("the included allowance comes off the feed too, and they differ",
           basic["entitlements"]["checked_included"] == 0
           and plus["entitlements"]["checked_included"] == 1)
+    ba_basic_first = adapter.load_enrichment()["fares"]["brands"]["BA:BASIC"]["tiers"][0]["amount_cents"]
     check("a curated brand gets its curated fee schedule",
-          [t["amount_cents"] for t in basic["checked_bag_fee_tiers"]][:1] == [7500],
+          [t["amount_cents"] for t in basic["checked_bag_fee_tiers"]][:1] == [ba_basic_first]
+          and ba_basic_first != 10000,
           str(basic["checked_bag_fee_tiers"][:1]))
     check("prices parsed from a decimal STRING land as integer cents",
           basic["price"]["base_cents"] == 31000
@@ -271,7 +273,7 @@ def main():
     rows = {r.option_id: r for r in scorer.score_all(one, "reference")}
     bag_cost = lambda oid: sum(l.amount_cents for l in rows[oid].lines if l.code == "bags")
     check("a fare including no bag is charged for the traveller's bag",
-          bag_cost("ba112-basic-1") == 7500, str(bag_cost("ba112-basic-1")))
+          bag_cost("ba112-basic-1") == ba_basic_first, str(bag_cost("ba112-basic-1")))
     check("and the fare that includes one is not",
           bag_cost("ba112-plus-2") == 0, str(bag_cost("ba112-plus-2")))
 
@@ -872,6 +874,84 @@ def main():
           "unrecognised" in adapter.from_feed({"hello": "world"}).get("error", ""))
     check("a scenario built from either feed scores without special-casing",
           len(scorer.score_all(asc, "reference")) == len(asc["options"]))
+
+    # ------------------------------------------------------------ par
+    # Par is a SPECIFICATION scored through the real scorer, never a reading
+    # of the results. Every property below is one a plausible shortcut breaks.
+    import copy
+    import par as parmod
+    enr = adapter.load_enrichment()
+    full = adapter.from_duffel(draw, checked_bags=1)
+    offers = adapter._duffel_offers(draw)
+    few = copy.deepcopy(draw); few["data"]["offers"] = offers[:3]
+    dear = copy.deepcopy(draw)
+    dear["data"]["offers"] = sorted(offers, key=lambda o: -float(o["total_amount"]))[:6]
+    p_full, p_few, p_dear = (adapter.from_duffel(r, checked_bags=1)["query"]["route_par_cents"]
+                             for r in (draw, few, dear))
+    check("par is the same whatever the search returned",
+          p_full == p_few == p_dear, "%s / %s / %s" % (p_full, p_few, p_dear))
+    check("par is modelled and says so",
+          full["_par"].get("source") == "modelled"
+          and any("modelled, not curated" in n for n in full["notes"]))
+    check("a modelled par carries its whole basis",
+          all(k in full["_par"] for k in ("miles", "market", "season_factor", "ledger", "reference")))
+    check("par ledger reconciles to the par",
+          sum(l["cents"] for l in full["_par"]["ledger"]) == full["_par"]["par_cents"])
+    check("the reference itinerary carries a specified on-time record, not an abstain",
+          not any("on-time" in l["label"].lower() and "no " in l["label"].lower()
+                  for l in full["_par"]["ledger"]))
+    # A curated row wins, and says it is curated.
+    cur = copy.deepcopy(enr)
+    cur["ground"]["routes"] = {"JFK-LHR": {"par_cents": 99999, "basis": "test"}}
+    csc = adapter.from_duffel(draw, checked_bags=1, enr=cur)
+    check("a curated route par overrides the model",
+          csc["query"]["route_par_cents"] == 99999 and csc["_par"]["source"] == "curated")
+
+    # The fare model against routes with a known price.
+    jfk = dict(enr["airports"]["airports"]["JFK"], iata="JFK")
+    lhr = dict(enr["airports"]["airports"]["LHR"], iata="LHR")
+    bcn = dict(enr["airports"]["airports"]["BCN"], iata="BCN")
+    lax = {"iata": "LAX", "lat": 33.9425, "lon": -118.4081, "country": "US"}
+    nrt = {"iata": "NRT", "lat": 35.772, "lon": 140.3929, "country": "JP"}
+    def fare(o, d, date): return parmod.reference_fare_cents(o, d, date)[0]
+    check("JFK-LHR shoulder fare is a real main-cabin-with-bag price",
+          40000 <= fare(jfk, lhr, "2026-11-18") <= 56000, str(fare(jfk, lhr, "2026-11-18")))
+    check("JFK-LAX is priced as a domestic route, not a transatlantic one",
+          25000 <= fare(jfk, lax, "2026-11-18") <= 40000, str(fare(jfk, lax, "2026-11-18")))
+    check("LHR-BCN is priced as an LCC market",
+          7000 <= fare(lhr, bcn, "2026-11-18") <= 14000, str(fare(lhr, bcn, "2026-11-18")))
+    check("LAX-NRT is priced as transpacific",
+          55000 <= fare(lax, nrt, "2026-11-18") <= 90000, str(fare(lax, nrt, "2026-11-18")))
+    check("July costs more than November across the Atlantic",
+          fare(jfk, lhr, "2026-07-12") > fare(jfk, lhr, "2026-11-18") * 1.3)
+    check("the fare rises with distance",
+          fare(lhr, bcn, "2026-05-01") < fare(jfk, lhr, "2026-05-01") < fare(lax, nrt, "2026-05-01"))
+    check("market class is a real partition",
+          parmod.market_class("US", "GB") == "transatlantic"
+          and parmod.market_class("GB", "ES") == "intra-eu"
+          and parmod.market_class("US", "US") == "domestic-na"
+          and parmod.market_class("US", "JP") == "transpacific")
+    mi = parmod.haversine_mi(jfk["lat"], jfk["lon"], lhr["lat"], lhr["lon"])
+    check("an eastbound long-haul reference is an overnight",
+          parmod.reference_departure_minutes(jfk, lhr, mi) == 19 * 60 + 30)
+    check("a westbound long-haul reference leaves in the morning",
+          parmod.reference_departure_minutes(lhr, jfk, mi) == 10 * 60)
+    import ground as groundmod
+    p1, b1 = parmod.par_for(jfk, lhr, "2026-11-18", enr, scorer, groundmod)
+    p2, _ = parmod.par_for(jfk, lhr, "2026-11-18", enr, scorer, groundmod)
+    check("par_for is pure", p1 == p2)
+    check("par is the reference ledger, all in - more than the fare, less than double it",
+          b1["fare_cents"] < p1 < 2 * b1["fare_cents"], str((b1["fare_cents"], p1)))
+    syd = {"iata": "SYD", "lat": -33.9399, "lon": 151.1753, "country": "AU"}
+    _, bs = parmod.par_for(jfk, syd, "2026-11-18", enr, scorer, groundmod)
+    check("beyond nonstop range the reference allows a connection",
+          any("connection" in l["label"] for l in bs["ledger"]))
+    nn = []
+    dp, db = adapter.route_par("JFK", "QQQ", "2026-11-18", enr, nn)
+    check("an airport with no coordinates gets the default par AND a note",
+          dp == 105000 and any("cannot be modelled" in x for x in nn))
+    check("and that default is labelled a default, never a modelled number",
+          db.get("source") == "default")
 
     src = open(os.path.join(HERE, "..", "scorer.py"), encoding="utf-8").read()
     check("the scorer does not import the adapter",
