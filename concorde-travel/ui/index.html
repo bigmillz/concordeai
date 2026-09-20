@@ -468,15 +468,14 @@ body.novideo .glass{background:var(--panel);-webkit-backdrop-filter:none;backdro
 .eff b{color:var(--dim);font-weight:500}
 .bookvia{font-size:11px;color:var(--faint)}
 
-.barwrap{display:grid;grid-template-columns:1fr auto;gap:15px;align-items:center;padding:0 16px 12px}
-.bar{display:flex;height:24px;border-radius:6px;overflow:hidden;
+.bar-legacy{display:flex;height:24px;border-radius:6px;overflow:hidden;
   background:rgba(255,255,255,.05);border:1px solid var(--line)}
 /* No labels inside the segments. They clipped on every narrow block and
    read as noise on the wide ones; hovering says it properly instead. */
 .seg-b{position:relative;min-width:3px;cursor:default;transition:filter .12s}
 .seg-b + .seg-b{border-left:1px solid rgba(0,0,0,.35)}
 .seg-b:hover{filter:brightness(1.25)}
-.bar:hover .seg-b:not(:hover){filter:brightness(.68)}
+.rib:hover .seg-b:not(:hover){filter:brightness(.66)}
 .seg-b::after{
   content:"";position:absolute;inset:0;border:1.5px solid #fff;border-radius:2px;
   opacity:0;transition:opacity .12s;pointer-events:none;
@@ -491,17 +490,39 @@ body.novideo .glass{background:var(--panel);-webkit-backdrop-filter:none;backdro
   transform:translate(-50%,-100%);
 }
 #bartip[data-on="1"]{opacity:1}
+/* Quality colour is for LAYOVERS only. Ground and airport time are neutral:
+   a $3 subway ride drawn in alarm-red reads as a bad trip when it is the
+   cheapest part of the whole journey. */
 .seg-b.q-good{background:var(--q-good)} .seg-b.q-fair{background:var(--q-fair)}
 .seg-b.q-poor{background:var(--q-poor)} .seg-b.q-bad{background:var(--q-bad)}
-.seg-b.q-fly{background:var(--q-fly)} .seg-b.q-fly2{background:var(--q-fly2)}
-.barscale{display:flex;justify-content:space-between;font-family:var(--mono);
-  font-size:10px;color:var(--faint);padding-top:4px;letter-spacing:.04em}
+.seg-b.q-fly{background:linear-gradient(90deg,var(--q-fly2),var(--q-fly))}
+.seg-b.q-ground{background:#4a4d56}
+.seg-b.q-proc{background:#32353d}
 
-.grade{width:54px;height:54px;border-radius:10px;display:grid;place-items:center;flex:none;
-  font-family:var(--disp);font-size:17px;line-height:1;border:1px solid currentColor;
-  background:rgba(255,255,255,.04)}
-.grade small{display:block;font-family:var(--mono);font-size:8px;letter-spacing:.14em;
-  text-transform:uppercase;opacity:.7;margin-top:4px}
+/* THE SHARED CLOCK. The axis and every track use the same left/right gutters,
+   so a tick at 18:00 sits exactly above the ribbon that departs at 18:00. If
+   these two ever disagree the whole thing lies, so they are one number. */
+.axis{position:relative;height:20px;margin:2px 108px 8px 16px;border-bottom:1px solid var(--line)}
+.axis span{position:absolute;top:2px;transform:translateX(-50%);font-family:var(--mono);
+  font-size:10px;color:var(--faint);letter-spacing:.06em}
+.axis span:after{content:"";position:absolute;left:50%;top:13px;width:1px;height:6px;background:var(--line)}
+.axishint{font-size:10.5px;color:var(--faint);letter-spacing:.04em;white-space:nowrap}
+
+.barwrap{display:grid;grid-template-columns:1fr 84px;gap:8px;align-items:center;padding:2px 16px 12px}
+.track{position:relative;height:26px}
+.bar{display:none}
+.rib{position:absolute;top:6px;height:15px;display:flex;border-radius:8px;overflow:hidden;
+  box-shadow:0 1px 0 rgba(255,255,255,.06) inset;transition:transform .15s,box-shadow .15s}
+.opt:hover .rib{transform:scaleY(1.22);box-shadow:0 0 0 1px rgba(255,255,255,.16),0 6px 20px rgba(0,0,0,.5)}
+
+/* The figures live BESIDE the track, never on it - numbers blending into the
+   bars was the one thing Patrick asked to be fixed about this design. */
+.barend{display:flex;align-items:center;justify-content:flex-end;gap:9px}
+.barend .dur{font-family:var(--mono);font-size:11px;color:var(--faint);white-space:nowrap}
+.grade{min-width:36px;height:26px;border-radius:7px;display:grid;place-items:center;flex:none;
+  font-family:var(--disp);font-size:12.5px;line-height:1;border:1px solid currentColor;
+  background:rgba(255,255,255,.05);padding:0 7px}
+.grade small{display:none}
 .g-good{color:var(--q-good)} .g-fair{color:var(--q-fair)}
 .g-poor{color:var(--q-poor)} .g-bad{color:var(--q-bad)}
 
@@ -1475,17 +1496,89 @@ function liveTotal(o){
   return t;
 }
 
+/* ONE CLOCK FOR EVERY OPTION.
+
+   A bar that always fills its row tells you how a trip is divided but not when
+   it happens, so two flights look identical when one leaves at eight and the
+   other at midnight. Positioning every ribbon on a shared window is the whole
+   reason to draw this instead of printing numbers: you can look down the column
+   and see that leaving around noon costs you four more hours than leaving at
+   eight, without reading a single figure.
+
+   WINDOW is recomputed per render over whatever is on screen. */
+var WINDOW = {t0: 0, t1: 1, offsetMin: 0};
+
+function absMs(iso){ return Date.parse(iso); }
+
+/* Everything before wheels-up: the ride to the airport AND the time inside it.
+   depart_iso is the FLIGHT's departure, so the ribbon has to start that much
+   earlier or the coloured block will not sit under its own tick. */
+function leadMinutes(o){
+  var lead = 0;
+  for (var i = 0; i < o.bar.length; i++){
+    if (o.bar[i].kind === "flight") break;
+    lead += o.bar[i].minutes;
+  }
+  return lead;
+}
+
+function computeWindow(opts){
+  var lo = Infinity, hi = -Infinity;
+  opts.forEach(function(o){
+    if (!o.depart_iso) return;
+    var start = absMs(o.depart_iso) - leadMinutes(o) * 60000;
+    var end = start + (o.door_to_door_minutes || 0) * 60000;
+    if (start < lo) lo = start;
+    if (end > hi) hi = end;
+  });
+  if (!isFinite(lo)){ WINDOW = {t0: 0, t1: 1, offsetMin: 0}; return; }
+  var pad = Math.max((hi - lo) * 0.04, 20 * 60000);
+  // Every option leaves the same city, so the first one's offset is the
+  // traveller's clock. Read it off the stamp rather than trusting the browser,
+  // which is in whatever timezone the person happens to be sitting in.
+  var off = 0, m = (opts[0] && opts[0].depart_iso || "").match(/([+-])(\d\d):(\d\d)$/);
+  if (m) off = (m[1] === "-" ? -1 : 1) * (parseInt(m[2],10) * 60 + parseInt(m[3],10));
+  WINDOW = {t0: lo - pad, t1: hi + pad, offsetMin: off};
+}
+
+function pct(ms){ return ((ms - WINDOW.t0) / (WINDOW.t1 - WINDOW.t0)) * 100; }
+
+function axisHTML(){
+  var span = WINDOW.t1 - WINDOW.t0, h = "";
+  // A tick every 3, 6 or 12 hours depending on how wide the day is.
+  var step = span > 30*3600000 ? 12*3600000 : span > 14*3600000 ? 6*3600000 : 3*3600000;
+  var t = Math.ceil(WINDOW.t0 / step) * step;
+  for (; t < WINDOW.t1; t += step){
+    var p = pct(t);
+    if (p < 2 || p > 98) continue;
+    var d = new Date(t + WINDOW.offsetMin * 60000);
+    h += '<span style="left:' + p.toFixed(2) + '%">' +
+         String(d.getUTCHours()).padStart(2,"0") + ':' +
+         String(d.getUTCMinutes()).padStart(2,"0") + '</span>';
+  }
+  return '<div class="axis">' + h + '</div>';
+}
+
 function barHTML(o){
   var total = 0;
   o.bar.forEach(function(b){ total += b.minutes; });
-  var h = '<div class="bar" role="img" aria-label="' + hm(total) + ' door to door">';
-  o.bar.forEach(function(b, i){
-    var pct = (b.minutes / total) * 100;
-    var cls = b.kind === "flight" ? (i % 2 ? "q-fly2" : "q-fly") : "q-" + b.quality;
-    h += '<div class="seg-b ' + cls + '" style="width:' + pct.toFixed(2) +
-         '%" data-tip="' + esc(b.tip || b.label) + '"></div>';
+  if (!o.depart_iso) return '<div class="track"><div class="rib" style="left:0;width:100%"></div></div>';
+  var start = absMs(o.depart_iso) - leadMinutes(o) * 60000;
+  var left = pct(start), width = pct(start + total * 60000) - left;
+
+  var h = '<div class="track"><div class="rib" style="left:' + left.toFixed(2) +
+          '%;width:' + Math.max(width, 1).toFixed(2) + '%" role="img" aria-label="' +
+          hm(total) + ' door to door">';
+  o.bar.forEach(function(b){
+    // Quality colour belongs to LAYOVERS. A $3 subway ride drawn in alarm-red
+    // says the trip is bad when it is the cheapest part of it.
+    var cls = b.kind === "flight" ? "q-fly"
+            : b.kind === "layover" ? ("q-" + (b.quality || "fair"))
+            : b.kind === "process" ? "q-proc" : "q-ground";
+    h += '<div class="seg-b ' + cls + '" style="flex:' + b.minutes +
+         '" data-tip="' + esc(b.tip || b.label) + '"></div>';
   });
-  return h + '</div>';
+  return h + '</div></div>';
 }
 
 function ledgerHTML(o){
@@ -1593,10 +1686,14 @@ function optionHTML(o, rank, hidden){
        '<span>' + (o.bag_included ? o.bag_included + " bag included" : "no bag included") + '</span></div></div>';
   h += '<div class="priceblk">' + price + '</div></div>';
 
-  h += '<div class="barwrap"><div><div>' + barHTML(o) + '</div><div class="barscale">' +
-       '<span>door</span><span>' + hm(total) + '</span><span>door</span></div></div>' +
-       '<div class="grade ' + gradeClass(o.grade) + '" title="Scored at the neutral reference profile, the same for every search">' +
-       esc(o.grade) + '<small>grade</small></div></div>';
+  // The bar gets a lane of its own. Patrick's note was that numbers blended
+  // into the bars - they did, because the price sat in the same box. The
+  // figures live left and right of the track now and never on top of it.
+  h += '<div class="barwrap">' + barHTML(o) +
+       '<div class="barend"><span class="dur">' + hm(total) + '</span>' +
+       '<span class="grade ' + gradeClass(o.grade) +
+       '" title="Scored at the neutral reference profile, the same for every search">' +
+       esc(o.grade) + '</span></div></div>';
 
   h += '<div class="optfoot"><button class="flip" data-flip="' + esc(o.option_id) +
        '" aria-expanded="' + (open ? "true" : "false") + '"><span class="arrow">▼</span> ' +
@@ -1627,7 +1724,8 @@ function paint(){
     return;
   }
   var opts = LAST.options, hidden = LAST.hidden;
-  if (STATE.firstPaint && opts.length){ STATE.expanded[opts[0].option_id] = true; STATE.firstPaint = false; }
+  computeWindow(opts.concat(STATE.showFiltered ? hidden : []));
+  if (STATE.firstPaint) STATE.firstPaint = false;
 
   var n = LAST.narration || {lead:"", sub:"", source:"template"};
   var h = '<div class="narrator glass">' +
@@ -1671,7 +1769,9 @@ function paint(){
          '<button id="clearfilters">Clear them</button></div>';
   } else
   h += '<div class="sectionhead"><span class="eyebrow">Top ' + (opts.length < 3 ? opts.length : "three") +
-       '</span><span class="rule"></span></div>';
+       '</span><span class="rule"></span>' +
+       '<span class="axishint">one clock, your local time \u00b7 length is door to door</span></div>' +
+       axisHTML();
   opts.slice(0,3).forEach(function(o,i){ h += optionHTML(o, i+1, false); });
   if (opts.length > 3){
     h += '<div class="sectionhead"><span class="eyebrow">' + (opts.length-3) + ' more</span><span class="rule"></span></div>';

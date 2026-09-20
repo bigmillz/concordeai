@@ -359,6 +359,11 @@ def _view(sc, opt, profile):
         "route": " - ".join([first["origin"]["iata"]]
                             + [s["destination"]["iata"] for s in opt["segments"]]),
         "depart_local": first["departure_local"][11:16],
+        # The full stamps, because the results list puts every option on ONE
+        # clock - a later departure has to actually sit further right, which is
+        # the whole point of the timeline and is impossible from "13:09".
+        "depart_iso": first["departure_local"],
+        "arrive_iso": last["arrival_local"],
         "arrive_local": last["arrival_local"][11:16],
         "day_offset": (last["arrival_local"][:10] != first["departure_local"][:10]),
         "stops": len(opt["segments"]) - 1,

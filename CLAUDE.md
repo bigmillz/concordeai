@@ -387,6 +387,7 @@ python3 concorde-travel/live.py provider duffel  # switch provider profile
 python3 concorde-travel/tests/mutate_adapter.py  # break the adapters on purpose, 26 faults
 python3 concorde-travel/capture.py JFK LHR 2026-11-12  # real search -> scrubbed sample + report
 python3 concorde-travel/tests/test_faststart.py
+python3 concorde-travel/tests/test_timeline.py   # needs a running server; skips without one
 python3 concorde-travel/adapter.py               # normalise the recorded payload, print coverage
 python3 concorde-travel/ground.py "Shoreditch" LHR 09:00   # ground estimate for anywhere
 python3 concorde-travel/places.py "Shoreditch, London EC2A"  # what a typed place resolves to
@@ -653,6 +654,37 @@ covering the distinct shapes; its `_provenance.selection` names why each was kep
 **The Duffel profile is VERIFIED** — a real `duffel_test_` key returned 172 offers on the
 first call, so its parameter names, POST body, `Duffel-Version` header and static switches
 are correct against the live service. Amadeus and Kiwi remain unverified.
+
+## The results timeline
+
+The results section is mock-2 from the design round: **every option on ONE
+clock.** A bar that always fills its row tells you how a trip is divided but not
+when it happens, so two flights look identical when one leaves at eight and the
+other at midnight. Positioning each ribbon on a shared window is the entire
+reason to draw this rather than print numbers — you look down the column and see
+that leaving around noon costs four more hours than leaving at eight, without
+reading a figure.
+
+Four things about it that are load-bearing:
+
+- **The axis and every track share one set of gutters.** If they disagree the
+  picture lies. `.axis` margin and `.barwrap` padding + column widths are the
+  same number, and `test_timeline.py` measures it.
+- **The axis is in the TRAVELLER'S local time**, read off `depart_iso`'s offset —
+  not UTC, and not the browser's zone. "I want to leave around noon" means noon
+  where they are standing, and labelling it UTC makes the one question the
+  timeline exists to answer unanswerable.
+- **The ribbon starts at departure minus ALL pre-flight time** — the ride *and*
+  the airport hour. Counting only the first block put every ribbon up to an hour
+  adrift of its own tick while still looking plausible in a screenshot.
+- **Figures sit beside the track, never on it.** Numbers blending into the bars
+  was the one thing Patrick asked to be fixed about this design.
+
+`tests/test_timeline.py` measures all of that in a real browser and **skips
+rather than fails** when playwright or a server is absent — the product is
+stdlib-only and this is the single test that is not, so it must never be the
+reason a clean checkout cannot run its suite. Start a server first; it does not
+start one, same as the desktop app's gauntlet.
 
 ## Interface mockups
 
