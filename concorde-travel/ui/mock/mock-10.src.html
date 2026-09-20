@@ -179,7 +179,7 @@ details[open] summary:after{content:"–"}
 .three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 .door{background:var(--panel2);border:1px solid var(--line);border-radius:14px;overflow:hidden;position:relative;display:flex;flex-direction:column;transition:transform .2s,border-color .2s}
 .door:hover{transform:translateY(-2px);border-color:#3a3d46}
-.door.mine{border-color:rgba(77,163,255,.6);box-shadow:0 0 0 1px rgba(77,163,255,.25)}
+.door.p1{border-color:rgba(77,163,255,.6);box-shadow:0 0 0 1px rgba(77,163,255,.25)}
 .sky{height:76px;position:relative;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.4)}
 .sky .t{position:absolute;bottom:10px;font:500 12.5px/1 var(--mono);letter-spacing:.02em}
 .sky .t.l{left:16px}.sky .t.r{right:70px}
@@ -190,7 +190,15 @@ details[open] summary:after{content:"–"}
 .seal.a{background:var(--gA)}.seal.b{background:var(--gB)}.seal.c{background:var(--gC)}.seal.d{background:var(--gD)}
 .door .body{padding:18px 18px 18px;display:flex;flex-direction:column;gap:10px;flex:1}
 .door .eyebrow{color:var(--speed)}
-.door.mine .eyebrow{color:var(--speed)}.door.cheap .eyebrow{color:var(--price)}.door.fast .eyebrow{color:var(--speed)}.door.comfy .eyebrow{color:var(--comfy)}.door.asap .eyebrow{color:var(--red)}
+.door.p1 .eyebrow{color:var(--speed)}.door.p2 .eyebrow{color:#aeb4c2}.door.p3 .eyebrow{color:#b8875e}
+.door .eyebrow{display:flex;align-items:center;gap:8px}
+.door .eyebrow small{font-size:9px;letter-spacing:.1em;color:var(--faint);text-transform:none;font-family:var(--sans);font-weight:300}
+/* one line of pros, one of cons: single words, the ledger has the rest */
+.pc{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12.5px;line-height:1.35;margin-top:-4px}
+.pc i{font:500 10px/1.6 var(--mono);letter-spacing:.14em;text-transform:uppercase}
+.pc .pro i{color:var(--green)}.pc .con i{color:var(--red)}
+.pc span{color:var(--text)}.pc span.none{color:var(--faint)}
+.pc b{font-weight:400;white-space:nowrap}.pc b+b::before{content:'·';color:var(--faint);margin:0 6px}
 .who{display:flex;gap:10px;align-items:center;padding-right:44px}
 .who h3{font-size:18px;line-height:1.15;font-weight:500}
 .who h3 span{display:block;font-size:12.5px;color:var(--dim);margin-top:2px;font-weight:300}
@@ -201,12 +209,6 @@ details[open] summary:after{content:"–"}
 .price em{font-style:normal;color:var(--faint);font-size:12.5px;margin-left:auto;font-family:var(--mono)}
 .ptline{font-size:12.5px;color:var(--dim);border-top:1px solid var(--line-soft);padding-top:9px;line-height:1.45}
 .ptline b{font-weight:500;color:var(--text)}.ptline.good b{color:var(--green)}.ptline .v{font-family:var(--mono)}
-.why{list-style:none;display:flex;flex-direction:column;gap:6px;padding-top:9px;border-top:1px solid var(--line-soft);font-size:13px;line-height:1.35}
-.why li{display:grid;grid-template-columns:56px 1fr;gap:8px;align-items:baseline}
-.why b{font-family:var(--mono);font-weight:500;color:var(--red)}
-.why b.cr{color:var(--green)}
-.why span{color:var(--dim)}
-.why li.want b{color:var(--price)}
 .cta{display:flex;gap:10px;margin-top:auto;padding-top:12px}
 .choose{background:var(--text);color:var(--bg);padding:11px 16px;border-radius:999px;font-weight:600;font-size:13.5px;flex:1;transition:.15s}
 .choose:hover{background:var(--speed)}
@@ -398,7 +400,7 @@ html.hdrmarks .mark-hdr{display:block}
   .seal.a{box-shadow:0 0 0 4px var(--panel2),0 0 18px color(display-p3 .2 .9 .55 / .45)}
   .go{box-shadow:0 0 22px color(display-p3 1 1 1 / .12)}
   .go:hover{box-shadow:0 0 30px color(display-p3 1 1 1 / .22)}
-  .door.mine{box-shadow:0 0 0 1px color(display-p3 .3 .65 1 / .35),0 0 28px color(display-p3 .3 .65 1 / .18)}
+  .door.p1{box-shadow:0 0 0 1px color(display-p3 .3 .65 1 / .35),0 0 28px color(display-p3 .3 .65 1 / .18)}
   .handle{box-shadow:0 0 0 2px color(display-p3 1 1 1 / .18),0 2px 12px rgba(0,0,0,.6)}
 }
 
@@ -878,13 +880,39 @@ function sky(h){ h = ((h%24)+24)%24; for (let i=1;i<SKY.length;i++){ if (h <= SK
 function skyBand(e){ const d = hour(e.depart), a = hour(e.arrive), span = (Date.parse(e.arrive) - Date.parse(e.depart))/36e5, st = [];
   for (let k = 0; k <= 6; k++){ const t = k/6; st.push(sky(d + span*t + (a - d - span)*t) + ' ' + Math.round(t*100) + '%'); } return 'linear-gradient(90deg,' + st.join(',') + ')'; }
 
-// ---- doors
-function whyLines(e, r){
-  return Object.values(r.g).flat().filter(l => l.key !== 'ticket' && l.cents !== 0 && !l.off).sort((x, y) => Math.abs(y.cents) - Math.abs(x.cents)).slice(0, 3);
+// ---- doors: the top three of the ranking, whatever the ranking is.
+// Under each place, one line of pros and one of cons, a word or two each, read
+// off the bill and the itinerary. They are a glance, not the argument: every
+// item here is a line with a dollar figure in the full ledger.
+const WANT_CON = {nonstop:'Not nonstop', short:'Long layover', long:'Short layover', lieflat:'No lie-flat', newgen:'Older jet', wifi:'No wifi', legroom:'Tight seat', lounge:'No lounge', flex:'No changes', day:'Not daytime'};
+function prosCons(e, r, ctx){
+  const L = Object.values(r.g).flat(), has = (k, test) => L.some(l => l.key === k && !l.off && (test ? test(l) : l.cents > 0));
+  const pro = [], con = [], P = w => { if (pro.length < 3 && !pro.includes(w)) pro.push(w); }, C = w => { if (con.length < 3 && !con.includes(w)) con.push(w); };
+  if (e.stops === 0) P('Nonstop');
+  if (e.door_minutes === ctx.minDoor) P('Fastest'); else if (e.door_minutes <= ctx.minDoor + 30) P('Fast');
+  if (r.total === ctx.minTotal) P('Cheapest'); else if (r.total <= ctx.minTotal * 1.1) P('Cheap');
+  if (has('bags', l => l.included)) P('Bag included');
+  if (e.wifi_cost === 'free') P('Free wifi');
+  if (e.pitch.some(p => (p || 0) >= 32)) P('Legroom');
+  if (has('carrier', l => l.cents < 0)) P('Top-rated');
+  if (e.day_offset === false && e.stops === 0 && hour(e.depart) >= 6 && hour(e.depart) < 15) P('Daytime');
+  // cons, strongest first: the wants they miss, then what the bill charges for
+  for (const d of r.dem){ const id = d.key.replace('want-', ''); if (WANT_CON[id]) C(WANT_CON[id]); }
+  if (has('redeye')) C('Red-eye');
+  if (e.stops > 0){ const on = overnight(e); C(on ? 'Overnight stop' : e.stops > 1 ? e.stops + ' stops' : has('layover', l => l.cents >= 5000) ? 'Rough layover' : 'Layover'); }
+  if (has('mct_margin') || has('risk', l => l.cents >= 3000)) C('Tight connection');
+  if (e.door_minutes >= ctx.minDoor * 1.5) C('Long day'); else if (e.door_minutes >= ctx.minDoor + 120) C('Slower');
+  if (r.total >= ctx.minTotal * 1.5) C('Pricey');
+  if (has('bags')) C('Bag fee');
+  if (has('pitch')) C('Tight seat');
+  if (has('connectivity', l => l.cents >= 3000)) C('Patchy wifi');
+  if (has('carrier', l => l.cents > 0)) C('Low-rated');
+  if (has('hotel-auto')) C('Hotel night');
+  return {pro, con};
 }
 const amtHTML = l => l.cents === 0 ? (l.included ? 'included' : '—') : l.cents < 0 ? '−' + money(l.cents) + '<small>credit</small>' : '+' + money(l.cents);
-function door(kind, e, r, prof, title){
-  const eff = r.total, pb = ptBlock(e, eff);
+function door(kind, e, r, title, ctx){
+  const eff = r.total, pb = ptBlock(e, eff), pc = prosCons(e, r, ctx);
   return `<article class="door ${kind}" data-id="${esc(e.id)}">
     <div class="sky" style="background:${skyBand(e)}">${PHOTOS.length ? `<div class="pano"><img class="ph a on" alt="" src="${PHOTOS[PH.idx].src}"><img class="ph b" alt=""></div><div class="scrim"></div><span class="cap">${esc(PH.city)} · ${esc(PHOTOS[PH.idx].credit)}</span>` : ''}<div class="path"></div>
       <svg class="plane" viewBox="0 0 16 16" style="left:${e.stops ? 46 : 50}%" aria-hidden="true"><path d="M15 8l-4.2-1.4L7 1.5H5.4l1.9 5.1H3.6L2.5 4.9H1.2l.9 3.1-.9 3.1h1.3l1.1-1.7h3.7L5.4 14.5H7l3.8-5.1z"/></svg>
@@ -892,31 +920,26 @@ function door(kind, e, r, prof, title){
     <div class="seal ${gcls(e.grade)}" title="Grade ${e.grade}">${e.grade}</div>
     <div class="body">
       <div class="eyebrow">${title}</div>
+      <div class="pc"><span class="pro"><i>Pro</i></span><span class="${pc.pro.length ? '' : 'none'}">${pc.pro.length ? pc.pro.map(w => '<b>' + esc(w) + '</b>').join('') : '—'}</span><span class="con"><i>Con</i></span><span class="${pc.con.length ? '' : 'none'}">${pc.con.length ? pc.con.map(w => '<b>' + esc(w) + '</b>').join('') : 'none'}</span></div>
       <div class="who">${logo(e.carrier, true)}<h3>${esc(e.carrier_name)}<span>${esc(e.flight)} · ${esc(e.brand)}${e.operator !== e.carrier ? ' · flown by ' + esc((AIR[e.operator] || {}).name || e.operator) : ''}</span></h3></div>
       <p class="meta">${stopsText(e)} · ${dur(e.door_minutes)} door to door · ${e.route.join(' → ')}${S.asap ? ' · <b style="color:var(--red);font-weight:500">lands ' + hm(e.arrive) + (e.day_offset ? ' tomorrow' : ' today') + '</b>' : ''}</p>
       ${pb.toggle}
       <div class="price">${pb.price || `<b class="num">${money(eff)}</b><span>all in</span><em>${money(e.ticket_cents)} ticket</em>`}</div>
       ${pb.why}
-      <ul class="why">${whyLines(e, r).map(l => `<li class="${l.want ? 'want' : ''}"><b class="${l.cents < 0 ? 'cr' : ''}">${l.cents < 0 ? '−' + money(l.cents) : '+' + money(l.cents)}</b><span>${esc(l.label)}${l.cents < 0 ? ' · credit' : ''}</span></li>`).join('')}</ul>
       <div class="cta"><button class="choose" data-open="${esc(e.id)}">Choose this flight</button><button class="ledger" data-open="${esc(e.id)}">Full ledger</button></div>
     </div></article>`;
 }
 function paintDoors(rows){
   if (!rows.length){ $('#doors').innerHTML = '<p style="color:var(--dim)">Nothing matches every rule. Loosen one above.</p>'; return; }
-  const byId = Object.fromEntries(rows.map(r => [r.e.id, r]));
-  const mine = rows[0], picks = [{kind:S.asap ? 'asap' : 'mine', r:mine, prof:null, title:S.asap ? 'Earliest there' : 'Your pick, at your dial'}];
-  // the best under each target that is not already a door, so there are always three
-  // the other doors: best under that target, with this bill's add-ons carried along
-  const best = prof => rows.slice().sort((x, y) => (x.e.by[prof].effective_cents + x.total - x.base) - (y.e.by[prof].effective_cents + y.total - y.base)).find(r => !picks.some(p => p.r.e.id === r.e.id));
-  // on a corner of the dial, "your pick" already is that target, so the other two doors are the other targets
-  const corner = S.asap ? 'fastest' : S.a === 1 ? 'cheapest' : S.b === 1 ? 'fastest' : S.c === 1 ? 'comfort' : null;
-  for (const [kind, prof, title] of [['cheap','cheapest','Cheapest all-in'],['fast','fastest','Fastest door to door'],['comfy','comfort','Most comfortable']]){
-    if (picks.length === 3 || prof === corner) continue; const r = best(prof); if (r) picks.push({kind, r, prof, title});
-  }
-  $('#doors').innerHTML = picks.map(p => door(p.kind, p.r.e, p.r, p.prof, p.title)).join('');
+  // first, second, third: the top of the ranking as it stands, so the places
+  // change when the sort does (all-in at the dial, or earliest arrival on ASAP)
+  const ctx = {minDoor:Math.min(...rows.map(r => r.e.door_minutes)), minTotal:Math.min(...rows.map(r => r.total))};
+  const basis = S.asap ? 'earliest there' : S.a === 1 ? 'cheapest all in' : S.b === 1 ? 'fastest door to door' : S.c === 1 ? 'most comfortable' : 'at your dial';
+  const picks = rows.slice(0, 3).map((r, k) => ({kind:'p' + (k + 1), r, title:['First place', 'Second place', 'Third place'][k] + (k === 0 ? ' <small>' + esc(basis) + '</small>' : '')}));
+  $('#doors').innerHTML = picks.map(p => door(p.kind, p.r.e, p.r, p.title, ctx)).join('');
   if (S.entrance) document.querySelectorAll('#doors .door').forEach((d, k) => { d.classList.add('rise'); d.style.animationDelay = (120 + k*110) + 'ms'; });
   mountPhotos();
-  $('#lede').textContent = D.query.total_found + ' flights came back. ' + (S.asap ? 'The first gets you there soonest; the other two are the sensible alternatives.' : 'The first is the best at your dial; the other two answer the questions people ask next.');
+  $('#lede').textContent = D.query.total_found + ' flights came back, ranked ' + (S.asap ? 'by arrival time: the first gets you there soonest.' : basis === 'at your dial' ? 'all in at your dial, wants charged, wishes applied.' : basis + '.') + ' Pros and cons are the short form; the ledger has the figures.';
 }
 
 // ---- the list
