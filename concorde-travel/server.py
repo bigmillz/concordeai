@@ -37,6 +37,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import adapter                                           # noqa: E402
+import places                                           # noqa: E402
 import live                                              # noqa: E402
 import narrator                                          # noqa: E402
 import scorer                                            # noqa: E402
@@ -444,6 +445,24 @@ def live_request(req):
     exactly the same code path the fixtures use."""
     src = req.get("source") or "sample"
     _LIVE_META = {}
+
+    # Resolve what the user typed BEFORE anything is spent. A search that burns
+    # a metered API call and then discovers the destination was a typo is a
+    # search that cost money to fail.
+    where = {}
+    if src == "api":
+        for field, default in (("origin", "NYC"), ("destination", "")):
+            code, how, problem = places.resolve(req.get(field) or default)
+            if problem:
+                return {"error": problem, "field": field, "live": True,
+                        "suggest": places.suggest(req.get(field) or "")}
+            where[field] = {"code": code, "how": how, "typed": req.get(field) or default,
+                            "label": places.label_for(code)}
+        d = (req.get("date") or "").strip()
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", d):
+            return {"error": "That date did not look like a date. Use YYYY-MM-DD.",
+                    "field": "date", "live": True}
+        where["date"] = d
     if src == "sample":
         # Which recording depends on which provider is configured, so the page
         # with no key shows the shape of the feed it would actually get.
@@ -460,9 +479,9 @@ def live_request(req):
     elif src == "inline":
         raw = req.get("payload") or {}
     elif src == "api":
-        q = {"origin": req.get("origin", "JFK"), "destination": req.get("destination", "LHR"),
-             "date": req.get("date") or "2026-11-12",
-             "adults": int(req.get("adults", 1)), "currency": "USD", "limit": 20}
+        q = {"origin": where["origin"]["code"], "destination": where["destination"]["code"],
+             "date": where["date"],
+             "adults": int(req.get("adults", 1)), "currency": "USD", "limit": 50}
         raw, meta = live.search(q)
         if raw is None:
             # The failure IS the answer here - a quota wall or a missing key
@@ -478,7 +497,13 @@ def live_request(req):
     # Dispatch on the payload's own shape. A profile pointed at the wrong
     # provider then fails as a parse error rather than as a plausible-looking
     # scenario assembled from the wrong keys.
-    sc = adapter.from_feed(raw, origin_key=req.get("origin_key", "bushwick-brooklyn"),
+    # The ORIGIN ADDRESS is a different thing from the origin airport: "Bushwick"
+    # is where they are, "NYC" is where they fly from, and ground access needs
+    # the first one. Falling back to the airport text is better than assuming a
+    # neighbourhood in Brooklyn for somebody in Lisbon.
+    origin_text = (req.get("origin_address") or req.get("origin_key")
+                   or req.get("origin") or "bushwick-brooklyn")
+    sc = adapter.from_feed(raw, origin_key=origin_text,
                            checked_bags=int(req.get("checked_bags", 1)))
     if sc.get("error"):
         return sc
@@ -488,6 +513,8 @@ def live_request(req):
     out["live"] = True
     out["feed"] = {"source": src,
                    "provider": (sc.get("_feed") or {}).get("provider", "kiwi")}
+    out["where"] = where or None
+    out["ground"] = sc.get("_ground")
     if src == "api":
         out["feed"].update({"fetched": _LIVE_META.get("source"),
                             "age_seconds": _LIVE_META.get("age_seconds"),

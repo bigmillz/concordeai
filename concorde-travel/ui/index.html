@@ -1435,12 +1435,28 @@ function requestBody(){
   if (STATE.groundMode) prefs.ground_mode = STATE.groundMode;
   STATE.filters.forEach(function(f){ filters.push({kind:"carrier", value:f.value}); });
   Object.keys(STATE.wishWeights || {}).forEach(function(k){ weights[k] = STATE.wishWeights[k]; });
+  // The origin field holds an ADDRESS and does two different jobs: it is where
+  // the ground leg starts, and the city inside it is which airports to search.
+  // Sending only one of those is why the form used to be decorative - every
+  // search was a hardcoded JFK to LHR no matter what anybody typed.
+  var origin = val("f-origin"), dest = val("f-dest");
   return {
     source: (LIVE_STATUS && LIVE_STATUS.key_configured) ? "api" : "sample",
     fixture: STATE.fixture, profile: STATE.target, bags: STATE.bags,
+    origin: origin, origin_address: origin, destination: dest,
+    date: val("f-out"), adults: paxCount(),
+    checked_bags: STATE.bags,
     prefs: prefs, weights: weights, filters: filters,
     max_cents: dollars("f-max")
   };
+}
+
+function val(id){ var el = document.getElementById(id); return el ? (el.value || "").trim() : ""; }
+
+function paxCount(){
+  var el = document.getElementById("f-pax");
+  var n = parseInt((el && el.value || "1").replace(/[^0-9]/, ""), 10);
+  return isNaN(n) ? 1 : Math.max(1, Math.min(9, n));
 }
 
 function dollars(id){
@@ -1717,8 +1733,13 @@ function render(scroll){
     .then(function(r){ return r.json(); })
     .then(function(d){
       LAST = d; paint();
+      if (d && d.field){
+        var f = document.getElementById(d.field === "destination" ? "f-dest"
+                : d.field === "date" ? "f-out" : "f-origin");
+        if (f){ f.focus(); f.select && f.select(); }
+      }
       if (scroll) host.scrollIntoView({behavior:"smooth", block:"start"});
-      upgradeNarration(body);
+      if (!d || !d.error) upgradeNarration(body);
     })
     .catch(function(e){
       LAST = {error:"Could not reach the scorer. Start it with: python3 concorde-travel/server.py"};

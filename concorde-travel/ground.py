@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -226,9 +227,19 @@ def resolve_origin(text: str, enr: Dict[str, Any],
         return ({"key": q, "label": o.get("label", q), "lat": o["lat"], "lon": o["lon"],
                  "precision": "curated"}, "curated")
 
+    # Match in BOTH directions. Someone types a full address - "Wyckoff Ave &
+    # Myrtle Ave, Bushwick, Brooklyn 11237" - and the curated row is called
+    # "Bushwick, Brooklyn, NY". Checking only whether the typed text sits inside
+    # the label misses that completely, which meant the one neighbourhood we
+    # have real numbers for silently fell through to an estimate.
     for key, o in origins.items():
         label = (o.get("label") or "").lower()
-        if q and (q in label or label.split(",")[0] == q):
+        hood = label.split(",")[0].strip()
+        if not q:
+            break
+        if (q in label or label == q or hood == q
+                or (hood and re.search(r"\b%s\b" % re.escape(hood), q))
+                or re.search(r"\b%s\b" % re.escape(key.replace("-", " ")), q)):
             return ({"key": key, "label": o.get("label", key), "lat": o["lat"],
                      "lon": o["lon"], "precision": "curated"}, "curated")
 

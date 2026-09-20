@@ -190,7 +190,11 @@
         "p50": 55,
         "p90": 85
       },
-      "border": "us"
+      "border": "us",
+      "lat": 40.6413,
+      "lon": -73.7781,
+      "country": "US",
+      "city": "New York"
     },
     "EWR": {
       "zone": "America/New_York",
@@ -200,7 +204,11 @@
         "p50": 70,
         "p90": 105
       },
-      "border": "us"
+      "border": "us",
+      "lat": 40.6895,
+      "lon": -74.1745,
+      "country": "US",
+      "city": "Newark"
     },
     "LHR": {
       "zone": "Europe/London",
@@ -226,7 +234,11 @@
         "headway_minutes": 8,
         "operating_hours_local": "05:00-23:00"
       },
-      "border": "uk"
+      "border": "uk",
+      "lat": 51.47,
+      "lon": -0.4543,
+      "country": "GB",
+      "city": "London"
     },
     "CDG": {
       "zone": "Europe/Paris",
@@ -267,7 +279,11 @@
         "headway_minutes": 0,
         "operating_hours_local": "CDGVAL 04:00-01:00, then a 25-minute-headway bus"
       },
-      "border": "schengen"
+      "border": "schengen",
+      "lat": 49.0097,
+      "lon": 2.5479,
+      "country": "FR",
+      "city": "Paris"
     },
     "AMS": {
       "zone": "Europe/Amsterdam",
@@ -297,7 +313,11 @@
         "operating_hours_local": "always"
       },
       "leave_airport_viable": true,
-      "border": "schengen"
+      "border": "schengen",
+      "lat": 52.3105,
+      "lon": 4.7683,
+      "country": "NL",
+      "city": "Amsterdam"
     },
     "MAD": {
       "zone": "Europe/Madrid",
@@ -322,7 +342,11 @@
         "headway_minutes": 10,
         "operating_hours_local": "05:00-23:30"
       },
-      "border": "schengen"
+      "border": "schengen",
+      "lat": 40.4839,
+      "lon": -3.568,
+      "country": "ES",
+      "city": "Madrid"
     },
     "LIS": {
       "zone": "Europe/Lisbon",
@@ -347,7 +371,11 @@
         "headway_minutes": 0,
         "operating_hours_local": "always"
       },
-      "border": "schengen"
+      "border": "schengen",
+      "lat": 38.7742,
+      "lon": -9.1342,
+      "country": "PT",
+      "city": "Lisbon"
     },
     "MXP": {
       "zone": "Europe/Rome",
@@ -366,7 +394,11 @@
           "hours_local": "05:30-22:30"
         }
       ],
-      "border": "schengen"
+      "border": "schengen",
+      "lat": 45.6301,
+      "lon": 8.7255,
+      "country": "IT",
+      "city": "Milan"
     },
     "BCN": {
       "zone": "Europe/Madrid",
@@ -391,7 +423,11 @@
         "headway_minutes": 10,
         "operating_hours_local": "05:00-23:30"
       },
-      "border": "schengen"
+      "border": "schengen",
+      "lat": 41.2974,
+      "lon": 2.0833,
+      "country": "ES",
+      "city": "Barcelona"
     },
     "FRA": {
       "zone": "Europe/Berlin",
@@ -434,7 +470,11 @@
         "operating_hours_local": "Sky Line 04:00-00:30, then a bus"
       },
       "leave_airport_viable": true,
-      "needs_primary_source": true
+      "needs_primary_source": true,
+      "lat": 50.0379,
+      "lon": 8.5622,
+      "country": "DE",
+      "city": "Frankfurt"
     },
     "MUC": {
       "zone": "Europe/Berlin",
@@ -473,7 +513,11 @@
         "operating_hours_local": "T2 satellite by APM, 04:30-01:00"
       },
       "leave_airport_viable": true,
-      "needs_primary_source": true
+      "needs_primary_source": true,
+      "lat": 48.3537,
+      "lon": 11.775,
+      "country": "DE",
+      "city": "Munich"
     },
     "ZRH": {
       "zone": "Europe/Zurich",
@@ -511,7 +555,11 @@
         "operating_hours_local": "Skymetro to the E dock, always"
       },
       "leave_airport_viable": true,
-      "needs_primary_source": true
+      "needs_primary_source": true,
+      "lat": 47.4647,
+      "lon": 8.5492,
+      "country": "CH",
+      "city": "Zurich"
     },
     "GVA": {
       "zone": "Europe/Zurich",
@@ -549,7 +597,11 @@
         "operating_hours_local": "one terminal"
       },
       "leave_airport_viable": true,
-      "needs_primary_source": true
+      "needs_primary_source": true,
+      "lat": 46.2381,
+      "lon": 6.1089,
+      "country": "CH",
+      "city": "Geneva"
     },
     "FCO": {
       "zone": "Europe/Rome",
@@ -577,7 +629,11 @@
         "operating_hours_local": "inter-terminal bus 05:00-23:00"
       },
       "leave_airport_viable": false,
-      "needs_primary_source": true
+      "needs_primary_source": true,
+      "lat": 41.8003,
+      "lon": 12.2389,
+      "country": "IT",
+      "city": "Rome"
     },
     "WAW": {
       "zone": "Europe/Warsaw",
@@ -615,7 +671,11 @@
         "operating_hours_local": "one terminal"
       },
       "leave_airport_viable": true,
-      "needs_primary_source": true
+      "needs_primary_source": true,
+      "lat": 52.1657,
+      "lon": 20.9671,
+      "country": "PL",
+      "city": "Warsaw"
     },
     "CPH": {
       "zone": "Europe/Copenhagen",
@@ -647,7 +707,11 @@
         "operating_hours_local": "T2 and T3 connect airside"
       },
       "leave_airport_viable": true,
-      "needs_primary_source": true
+      "needs_primary_source": true,
+      "lat": 55.618,
+      "lon": 12.6508,
+      "country": "DK",
+      "city": "Copenhagen"
     },
     "DUS": {
       "zone": "Europe/Berlin",
@@ -685,7 +749,11 @@
         "operating_hours_local": "one terminal, three concourses"
       },
       "leave_airport_viable": true,
-      "needs_primary_source": true
+      "needs_primary_source": true,
+      "lat": 51.2895,
+      "lon": 6.7668,
+      "country": "DE",
+      "city": "Dusseldorf"
     },
     "KEF": {
       "zone": "Atlantic/Reykjavik",
@@ -712,7 +780,11 @@
         "operating_hours_local": "one terminal, Schengen and non-Schengen piers"
       },
       "leave_airport_viable": false,
-      "needs_primary_source": true
+      "needs_primary_source": true,
+      "lat": 63.985,
+      "lon": -22.6056,
+      "country": "IS",
+      "city": "Reykjavik"
     },
     "DUB": {
       "zone": "Europe/Dublin",
@@ -740,7 +812,11 @@
         "operating_hours_local": "T1 and T2 connect LANDSIDE only - a transfer re-clears security"
       },
       "leave_airport_viable": true,
-      "needs_primary_source": true
+      "needs_primary_source": true,
+      "lat": 53.4213,
+      "lon": -6.2701,
+      "country": "IE",
+      "city": "Dublin"
     },
     "SNN": {
       "zone": "Europe/Dublin",
@@ -767,7 +843,11 @@
         "operating_hours_local": "one terminal"
       },
       "leave_airport_viable": false,
-      "needs_primary_source": true
+      "needs_primary_source": true,
+      "lat": 52.7019,
+      "lon": -8.9248,
+      "country": "IE",
+      "city": "Shannon"
     },
     "IST": {
       "zone": "Europe/Istanbul",
@@ -794,7 +874,11 @@
         "operating_hours_local": "one terminal, but gate-to-gate walks reach 25 minutes"
       },
       "leave_airport_viable": false,
-      "needs_primary_source": true
+      "needs_primary_source": true,
+      "lat": 41.2753,
+      "lon": 28.7519,
+      "country": "TR",
+      "city": "Istanbul"
     }
   },
   "_review": "The rows flagged needs_primary_source were added to cover the European connection points a real JFK-LHR search actually returns. MCT, curfew and inter-terminal figures are curated from published airport and carrier data and are the right shape at roughly the right magnitude; each still wants checking against the airport's own published minimum connection time before a dollar figure built on it is shown to a stranger. AMS, BCN, CDG, EWR, JFK, LHR, LIS, MAD and MXP predate this and carry no flag. Deliberately NOT added: BOS, IAD, ATL, BOG, CMN, TLV and AUH - a JFK-LHR search returns connections through all of them and every one is outside the transatlantic scope, so they go on dropping."

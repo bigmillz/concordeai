@@ -28,6 +28,8 @@ fault that breaks it.
 import subprocess, shutil, sys, re
 
 AD = "concorde-travel/adapter.py"
+GR = "concorde-travel/ground.py"
+PL = "concorde-travel/places.py"
 FA = "concorde-travel/enrichment/fares.json"
 
 
@@ -139,6 +141,19 @@ MUTANTS = [
   """    if False:
         pass""",
   'global time: refuse to stamp an airport the table never curated'),
+ (GR, "resolve_origin", '''                or (hood and re.search(r"\\b%s\\b" % re.escape(hood), q))''',
+  '''                or False''',
+  'ground: stop finding a curated neighbourhood inside a full address'),
+ (GR, "estimate_modes", '''    fare = int(base + per_mile * miles + per_min * drive_min + airport_fee)''',
+  '''    fare = int(base + per_mile * miles * 0.4)''',
+  'ground: make the car estimate cheap, recreating the surprise it prevents'),
+ (GR, "region_support", '''    return "modelled" if (country or "").upper() in _BAND_BY_COUNTRY else "assumed"''',
+  '''    return "modelled"''',
+  'ground: call an unpriced region modelled'),
+ (PL, "resolve", '''    near = suggest(raw)''',
+  '''    return "NYC", "city", None
+    near = suggest(raw)''',
+  'places: guess New York for anything unrecognised'),
  (FA, None, '{"piece": 1, "amount_cents": 10000},\n      {"piece": 2, "amount_cents": 12000},',
   '{"piece": 1, "amount_cents": 1000},\n      {"piece": 2, "amount_cents": 1200},',
   'unknown-is-never-zero: make the fallback bag fee cheap'),

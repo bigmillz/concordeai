@@ -224,6 +224,7 @@ def from_kiwi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
     notes: List[str] = []
     options: List[Dict[str, Any]] = []
     dropped: List[Dict[str, str]] = []
+    ground_info: Dict[str, Any] = {}
 
     for it in raw.get("itineraries", []):
         leg = it.get("outbound") or {}
@@ -330,13 +331,12 @@ def from_kiwi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
 
         dep_clock = _hhmm(segments[0]["departure_local"][11:16])
         arr_clock = _hhmm(segments[-1]["arrival_local"][11:16])
-        out_modes, gerr = ground_for(origin_key, segments[0]["origin"]["iata"], dep_clock, enr)
-        in_modes, aerr = arrival_ground_for(segments[-1]["destination"]["iata"], arr_clock, enr)
-        if gerr:
-            dropped.append({"id": it.get("id", "?"), "why": gerr})
-            continue
-        if aerr and aerr not in notes:
-            notes.append(aerr)
+        out_modes, in_modes, ginfo = ground_both_ends(
+            origin_key, segments[0]["origin"]["iata"],
+            segments[-1]["destination"]["iata"], dep_clock, arr_clock, enr)
+        ground_info = ginfo
+        if ginfo.get("arrival_note") and ginfo["arrival_note"] not in notes:
+            notes.append(ginfo["arrival_note"])
 
         rating = (enr["carriers"]["ratings"] or {}).get(segs_in[0]["carrier"])
         opt = {
@@ -409,6 +409,7 @@ def from_kiwi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
         "options": options,
         "expect": {"reconciles": True},
         "_dropped": dropped,
+        "_ground": ground_info,
     }
     return scenario
 
@@ -556,6 +557,7 @@ def from_amadeus(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
     carrier_names = dicts.get("carriers") or {}
     default_used = 0
     unreviewed = 0
+    ground_info = {}
 
     for offer in raw.get("data", []):
         itins = offer.get("itineraries") or []
@@ -712,13 +714,12 @@ def from_amadeus(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
 
         dep_clock = _hhmm(segments[0]["departure_local"][11:16])
         arr_clock = _hhmm(segments[-1]["arrival_local"][11:16])
-        out_modes, gerr = ground_for(origin_key, segments[0]["origin"]["iata"], dep_clock, enr)
-        in_modes, aerr = arrival_ground_for(segments[-1]["destination"]["iata"], arr_clock, enr)
-        if gerr:
-            dropped.append({"id": "offer %s" % offer.get("id", "?"), "why": gerr})
-            continue
-        if aerr and aerr not in notes:
-            notes.append(aerr)
+        out_modes, in_modes, ginfo = ground_both_ends(
+            origin_key, segments[0]["origin"]["iata"],
+            segments[-1]["destination"]["iata"], dep_clock, arr_clock, enr)
+        ground_info = ginfo
+        if ginfo.get("arrival_note") and ginfo["arrival_note"] not in notes:
+            notes.append(ginfo["arrival_note"])
 
         oid = re.sub(r"[^a-z0-9]+", "-",
                      ("%s%s-%s-%s" % (segs_in[0].get("carrierCode", ""),
@@ -799,6 +800,7 @@ def from_amadeus(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
         "options": options,
         "expect": {"reconciles": True},
         "_dropped": dropped,
+        "_ground": ground_info,
         "_feed": {"provider": "amadeus", "default_bag_fees_used": default_used,
                   "unreviewed_claims": unreviewed},
     }
@@ -961,6 +963,42 @@ def crosses_border(enr: Dict[str, Any], from_iata: str, to_iata: str,
     return ba != bb
 
 
+def ground_both_ends(origin_text: str, dep_ap: str, arr_ap: str,
+                     dep_clock: int, arr_clock: int, enr: Dict[str, Any],
+                     geo: Optional[Dict[str, Any]] = None):
+    """(out_modes, in_modes, ground_info). Shared by all three adapters.
+
+    An uncurated ORIGIN must never drop an itinerary - that was the whole point
+    of going global - and it would be a silly kind of bug for that to be true of
+    the newest feed only because that is where it happened to be written."""
+    geo = geo or {}
+    aps = enr["airports"]["airports"]
+
+    def place_of(iata):
+        node = dict(geo.get(iata) or {})
+        ap = aps.get(iata) or {}
+        node.setdefault("iata", iata)
+        for k in ("lat", "lon", "country", "city"):
+            if node.get(k) is None and ap.get(k) is not None:
+                node[k] = ap[k]
+        return node
+
+    dep, arr = place_of(dep_ap), place_of(arr_ap)
+    origin, how = _ground.resolve_origin(origin_text, enr, dep)
+    out_modes, src = _ground.modes_for(origin, dep, dep_clock, enr)
+
+    in_modes, aerr = arrival_ground_for(arr_ap, arr_clock, enr)
+    if not in_modes and arr.get("lat") is not None:
+        in_modes = _ground.estimate_modes(
+            {"lat": arr["lat"] + 0.11, "lon": arr["lon"] + 0.11}, arr, arr_clock)
+        aerr = None
+    info = {"origin": origin.get("label"), "precision": origin.get("precision"),
+            "resolved_by": how, "source": src,
+            "message": _ground.support_message(out_modes),
+            "arrival_note": aerr}
+    return out_modes, in_modes, info
+
+
 def _place_label(node: Dict[str, Any], iata: str) -> str:
     """"LHR to LHR" is not a ledger line anybody can read.
 
@@ -1018,10 +1056,7 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                             "city": n.get("city_name") or (n.get("city") or {}).get("name"),
                             "tz": n.get("time_zone")}
 
-    origin_place, origin_how = _ground.resolve_origin(
-        origin_key, enr,
-        geo.get(next(iter(geo)), None) if geo else None)
-    ground_support = {"seen": set(), "message": None}
+    ground_info: Dict[str, Any] = {}
 
     for offer in _duffel_offers(raw):
         slices = offer.get("slices") or []
@@ -1212,32 +1247,15 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
 
         dep_clock = _hhmm(segments[0]["departure_local"][11:16])
         arr_clock = _hhmm(segments[-1]["arrival_local"][11:16])
-        dep_ap = segments[0]["origin"]["iata"]
-        arr_ap = segments[-1]["destination"]["iata"]
-
-        # An uncurated AIRPORT drops the itinerary, because we cannot price a
-        # layover we know nothing about. An uncurated ORIGIN must not: we can
-        # always say "roughly an hour, call it $60" and mark it an estimate, and
-        # refusing to show the flight at all is the worse answer.
-        place = origin_place
-        if place.get("lat") is None and geo.get(dep_ap):
-            place, _ = _ground.resolve_origin(origin_key, enr, geo[dep_ap])
-        out_modes, gsrc = _ground.modes_for(place, geo.get(dep_ap, {"iata": dep_ap}),
-                                            dep_clock, enr)
-        ground_support["seen"].add(gsrc)
-        if not ground_support["message"]:
-            ground_support["message"] = _ground.support_message(out_modes)
-        in_modes, aerr = arrival_ground_for(arr_ap, arr_clock, enr)
-        if not in_modes and geo.get(arr_ap, {}).get("lat") is not None:
-            # Same logic at the far end: estimate the ride into town.
-            city = dict(geo[arr_ap])
-            city["lat"] = city["lat"] + 0.11
-            city["lon"] = city["lon"] + 0.11
-            in_modes = _ground.estimate_modes(
-                {"lat": city["lat"], "lon": city["lon"]}, geo[arr_ap], arr_clock)
-            aerr = None
-        if aerr and aerr not in notes:
-            notes.append(aerr)
+        # One ground path for all three feeds. Duffel supplies airport
+        # coordinates the other two do not, so it hands them over as `geo` and
+        # the helper falls back to the curated table for the rest.
+        out_modes, in_modes, ginfo = ground_both_ends(
+            origin_key, segments[0]["origin"]["iata"],
+            segments[-1]["destination"]["iata"], dep_clock, arr_clock, enr, geo)
+        ground_info = ginfo
+        if ginfo.get("arrival_note") and ginfo["arrival_note"] not in notes:
+            notes.append(ginfo["arrival_note"])
 
         oid = re.sub(r"[^a-z0-9]+", "-",
                      ("%s%s-%s" % (segments[0]["marketing"]["carrier"],
@@ -1331,11 +1349,7 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
         "options": options,
         "expect": {"reconciles": True},
         "_dropped": dropped,
-        "_ground": {"origin": origin_place.get("label"),
-                    "precision": origin_place.get("precision"),
-                    "resolved_by": origin_how,
-                    "sources": sorted(ground_support["seen"]),
-                    "message": ground_support["message"]},
+        "_ground": ground_info,
         "_feed": {"provider": "duffel", "default_bag_fees_used": default_used,
                   "unreviewed_claims": unreviewed,
                   "feed_priced_bags": feed_priced_bags,

@@ -781,6 +781,66 @@ def main():
         check("unparseable opening hours raise and name the value",
               "whenever" in str(exc), str(exc)[:80])
 
+    print("\nground access, anywhere")
+    import ground as _g, places as _p
+    e = adapter.load_enrichment()
+    jfk = {"iata": "JFK", "lat": 40.6413, "lon": -73.7781, "country": "US"}
+    # The curated row must survive being buried in a real address, which is what
+    # people actually type. Matching only exact labels meant the one
+    # neighbourhood with real numbers quietly fell through to an estimate.
+    for typed in ("bushwick-brooklyn", "Bushwick", "BUSHWICK, BROOKLYN",
+                  "Wyckoff Ave & Myrtle Ave, Bushwick, Brooklyn 11237"):
+        o, how = _g.resolve_origin(typed, e, jfk)
+        check("a curated origin is found in %r" % typed[:28], how == "curated", how)
+    o, how = _g.resolve_origin("1 Bushwicky Lane, Nowhere", e, jfk)
+    check("but a word that merely CONTAINS it does not match", how != "curated", how)
+    check("an unplaceable origin still resolves to something",
+          _g.resolve_origin("qqq", e, jfk)[0]["lat"] is not None)
+
+    for feed, fn in (("kiwi", adapter.from_kiwi), ("amadeus", adapter.from_amadeus),
+                     ("duffel", adapter.from_duffel)):
+        payload = {"kiwi": raw, "amadeus": araw, "duffel": draw}[feed]
+        base = len(fn(payload, origin_key="bushwick-brooklyn").get("options", []))
+        for where in ("Upper East Side", "Accra", "qqq"):
+            sc2 = fn(payload, origin_key=where)
+            check("%s keeps every option from an uncurated origin (%s)" % (feed, where),
+                  len(sc2.get("options", [])) == base and base > 0,
+                  "%d vs %d" % (len(sc2.get("options", [])), base))
+        cur = fn(payload, origin_key="bushwick-brooklyn")
+        check("%s uses the curated table when it can" % feed,
+              (cur.get("_ground") or {}).get("source") == "curated",
+              str((cur.get("_ground") or {}).get("source")))
+        check("%s says so when it could not" % feed,
+              bool((fn(payload, origin_key="Accra").get("_ground") or {}).get("message")))
+
+    check("an estimated mode is marked estimated",
+          all(m.get("estimated") for m in _g.estimate_modes(
+              {"lat": 40.77, "lon": -73.96}, jfk, 540)))
+    check("and a curated one is not",
+          not any(m.get("estimated") for m in
+                  _g.modes_for({"key": "bushwick-brooklyn"}, jfk, 540, e)[0]))
+    check("an unpriced region is called assumed, not modelled",
+          _g.region_support("GH") == "assumed" and _g.region_support("US") == "modelled")
+    check("and the assumed message warns rather than quoting",
+          "placeholder" in (_g.SUPPORT_NOTE["assumed"] or ""))
+    # Leaning high is the entire point - an estimate that comes in under the
+    # real fare manufactures the surprise it exists to prevent.
+    est = _g.estimate_modes({"lat": 40.7736, "lon": -73.9566}, jfk, 540)[0]
+    check("a Manhattan-to-JFK car estimate is not cheap", est["fare_cents"] >= 6500,
+          "$%.0f - under about $65 and it stops being a warning" % (est["fare_cents"] / 100))
+
+    print("\nplaces")
+    for typed, want in (("london", "LON"), ("LHR", "LHR"), ("Paris, France", "PAR"),
+                        ("Shoreditch, London EC2A", "LON"),
+                        ("Wyckoff Ave, Bushwick, Brooklyn 11237", "NYC"),
+                        ("10 Downing St, London SW1A 2AA", "LON")):
+        got, how, problem = _p.resolve(typed)
+        check("%r resolves to %s" % (typed[:34], want), got == want, "%s (%s)" % (got, problem))
+    code, how, problem = _p.resolve("Narnia")
+    check("an unknown place is refused, not guessed", code is None and bool(problem))
+    check("and the refusal tells the user what to type instead",
+          "airport code" in problem)
+
     print("\ndispatch, three feeds")
     check("from_feed routes a duffel offer-request payload",
           (adapter.from_feed(draw).get("_feed") or {}).get("provider") == "duffel")

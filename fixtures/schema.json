@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://concordego.local/fixtures/schema.json",
   "title": "ConcordeGo fixture scenario",
-  "description": "One scenario = one traveller + one query + N competing itineraries + the assertions they must satisfy. A fixture carries INPUTS ONLY. Anything the scorer computes is forbidden here — a fixture that stores its own answer tests nothing.",
+  "description": "One scenario = one traveller + one query + N competing itineraries + the assertions they must satisfy. A fixture carries INPUTS ONLY. Anything the scorer computes is forbidden here \u2014 a fixture that stores its own answer tests nothing.",
   "type": "object",
   "required": [
     "schema_version",
@@ -232,7 +232,7 @@
         },
         "profiles": {
           "type": "object",
-          "description": "The SAME options are scored under each of these. Cheapest/fastest/comfort are not separate rankings — they are this one model at different weights (hard rule 3). 'reference' is the grade's fixed yardstick and must be present.",
+          "description": "The SAME options are scored under each of these. Cheapest/fastest/comfort are not separate rankings \u2014 they are this one model at different weights (hard rule 3). 'reference' is the grade's fixed yardstick and must be present.",
           "required": [
             "reference"
           ],
@@ -251,7 +251,7 @@
     },
     "expect": {
       "type": "object",
-      "description": "Assertions. Never a stored effective_cost — that is the number under test.",
+      "description": "Assertions. Never a stored effective_cost \u2014 that is the number under test.",
       "additionalProperties": false,
       "properties": {
         "order": {
@@ -439,7 +439,7 @@
   "$defs": {
     "money": {
       "type": "integer",
-      "description": "INTEGER MINOR UNITS (cents). Never a float: 'same data = same order every time' does not survive float accumulation — two itineraries that should tie exactly would differ in the last bits and sort by rounding noise instead of by the documented tie-break."
+      "description": "INTEGER MINOR UNITS (cents). Never a float: 'same data = same order every time' does not survive float accumulation \u2014 two itineraries that should tie exactly would differ in the last bits and sort by rounding noise instead of by the documented tie-break."
     },
     "place": {
       "type": "object",
@@ -499,7 +499,7 @@
         },
         "weights": {
           "type": "object",
-          "description": "A CLOSED set of bounded weights. This is the only thing the intent parser may emit — a hallucinated key must not be able to change the order (hard rule 1).",
+          "description": "A CLOSED set of bounded weights. This is the only thing the intent parser may emit \u2014 a hallucinated key must not be able to change the order (hard rule 1).",
           "additionalProperties": {
             "type": "number",
             "minimum": 0,
@@ -579,7 +579,7 @@
     },
     "abstain": {
       "type": "object",
-      "description": "The explicit 'we do not know'. Unknown must NOT score as zero, or the least-described itinerary accumulates the fewest penalties and wins — the ranking would reward missing data.",
+      "description": "The explicit 'we do not know'. Unknown must NOT score as zero, or the least-described itinerary accumulates the fewest penalties and wins \u2014 the ranking would reward missing data.",
       "required": [
         "coverage",
         "reason",
@@ -773,6 +773,22 @@
         },
         "source": {
           "type": "string"
+        },
+        "estimated": {
+          "type": "boolean",
+          "description": "True when this mode was computed by ground.py from coordinates rather than curated by a human. A curated mode knows things no formula recovers - that NJ Transit's airport rail stop dies at 01:00, which is why Bushwick to EWR is a $92 car and not a $20 train. An estimated one does not, and must say so."
+        },
+        "support": {
+          "enum": [
+            "curated",
+            "modelled",
+            "assumed"
+          ],
+          "description": "How well this region is actually known. 'curated' a human wrote it; 'modelled' we hold fare rates for that country; 'assumed' we do not and fell back to a middle band, which is a guess about an entire economy and gets said to the user in a sentence."
+        },
+        "basis": {
+          "type": "string",
+          "description": "One line on where an estimated number came from, for the ledger."
         }
       }
     },
@@ -970,7 +986,7 @@
         "depart_segment_id"
       ],
       "additionalProperties": false,
-      "description": "Keyed by (airport, arrival hall, departure hall, local clock time) — never by duration alone. 250 minutes at AMS midday, at LHR T3-to-T5 midday, and at CDG at 01:40 are three different objects.",
+      "description": "Keyed by (airport, arrival hall, departure hall, local clock time) \u2014 never by duration alone. 250 minutes at AMS midday, at LHR T3-to-T5 midday, and at CDG at 01:40 are three different objects.",
       "properties": {
         "layover_id": {
           "type": "string"
@@ -1183,7 +1199,7 @@
               },
               "fare_brand_name": {
                 "type": "string",
-                "description": "Carried VERBATIM for prose and as an enrichment key. No arithmetic may key off this string or off a normalised tier enum — carriers disagree about what 'Basic' includes. The entitlements block is what the scorer reads."
+                "description": "Carried VERBATIM for prose and as an enrichment key. No arithmetic may key off this string or off a normalised tier enum \u2014 carriers disagree about what 'Basic' includes. The entitlements block is what the scorer reads."
               },
               "price": {
                 "type": "object",
@@ -1211,7 +1227,7 @@
                     "items": {
                       "$ref": "#/$defs/charge"
                     },
-                    "description": "YQ/YR. Generally NOT refundable, unlike government taxes — which is why they are a separate bucket."
+                    "description": "YQ/YR. Generally NOT refundable, unlike government taxes \u2014 which is why they are a separate bucket."
                   },
                   "agency_fees": {
                     "type": "array",

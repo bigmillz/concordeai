@@ -384,11 +384,12 @@ python3 concorde-travel/tests/test_live.py       # quota, cache and key handling
 python3 concorde-travel/live.py status           # key, quota and cache state
 python3 concorde-travel/live.py probe            # validate a key with a REAL search
 python3 concorde-travel/live.py provider duffel  # switch provider profile
-python3 concorde-travel/tests/mutate_adapter.py  # break the adapters on purpose, 22 faults
+python3 concorde-travel/tests/mutate_adapter.py  # break the adapters on purpose, 26 faults
 python3 concorde-travel/capture.py JFK LHR 2026-11-12  # real search -> scrubbed sample + report
 python3 concorde-travel/tests/test_faststart.py
 python3 concorde-travel/adapter.py               # normalise the recorded payload, print coverage
 python3 concorde-travel/ground.py "Shoreditch" LHR 09:00   # ground estimate for anywhere
+python3 concorde-travel/places.py "Shoreditch, London EC2A"  # what a typed place resolves to
 ```
 
 **Ports 8884–8930 are the model engines' — never bind there.** ConcordeGo uses 9897.
@@ -403,7 +404,7 @@ curve it is meant to be testing is a fixture that tests nothing.
 
 **The test suites are mutation-tested.** `test_scorer.py` catches 12 of 12 seeded faults and
 `validate.py` 10 of 10; `tests/mutate_adapter.py` is an executable runner for the adapters
-and must stay at 22/22 with **zero skips** — a skipped mutant never ran and is not a pass.
+and must stay at 26/26 with **zero skips** — a skipped mutant never ran and is not a pass.
 If a change makes a suite pass that should not, the suite has lost a guard.
 
 **The narrator is the only non-deterministic surface, and it is fenced.** `narrator.brief()`
@@ -564,6 +565,35 @@ Three things about that table that are load-bearing:
 - **`services[].hours_local` is PARSED**, so it is `HH:MM-HH:MM` or `24h` — never prose. Put
   prose in a `note` key beside it. A typo there used to surface as `int('al')` four frames
   down, naming neither the airport nor the value; `window_covers()` now raises with both.
+
+## Searching anywhere: places, and the form that used to be decorative
+
+`concorde-travel/places.py` turns what somebody typed into a code a flight API
+accepts. **It resolves offline, from a table of ~180 spellings.** Duffel has a
+Places endpoint that should be wired in eventually, but resolving a destination
+must not depend on the network: a search that fails because an autocomplete call
+timed out is a worse failure than one saying "try an airport code".
+
+- **City codes beat airport codes** for a destination. Someone flying to London
+  wants all five airports weighed against each other — that is the whole product
+  — so a bare city name resolves to the metro code (`LON`, not `LHR`).
+- **Addresses are parsed from the END.** Real input is
+  `"Wyckoff Ave & Myrtle Ave, Bushwick, Brooklyn 11237"`, and the city is the
+  last part, not the first. Postcodes are stripped: a token carrying a digit is
+  never a city, and `"london ec2a"` matching nothing is how the most normal input
+  in the world used to fail.
+- **Nothing is ever guessed.** An unrecognised place comes back as a sentence for
+  the user, because searching the wrong continent is worse than being asked to
+  type three letters. A mutant that guesses `NYC` is caught.
+
+**The origin field does two different jobs** and both are sent: `origin_address`
+is where the ground leg starts, and the city inside it decides which airports to
+search. Sending only one is why every search used to be a hardcoded JFK–LHR no
+matter what anybody typed.
+
+**Unresolvable input is refused BEFORE a metered call is spent.** A search that
+burns quota and then discovers the destination was a typo is a search that cost
+money to fail.
 
 ## The live API: key, quota, cache
 
