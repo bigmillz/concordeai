@@ -426,6 +426,29 @@ html.hdrmarks .mark-hdr{display:block}
 @media (max-width:980px){.sky{height:108px}.seal{top:86px}}
 @media (prefers-reduced-motion:reduce){.sky .pano{animation:none}.rise,.bar.drop,#results.fade{animation:none}}
 
+/* ---------- the dock: the wish goes on under the results, like a chat */
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:7;padding:0 clamp(12px,3vw,28px) calc(12px + env(safe-area-inset-bottom,0px));pointer-events:none}
+.dockin{max-width:760px;margin:0 auto;background:rgba(16,16,19,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.6);pointer-events:auto;overflow:hidden}
+.dock .thead{display:flex;align-items:center;gap:10px;padding:10px 16px 0;font-size:12px;color:var(--faint)}
+.dock .thead button{margin-left:auto;color:var(--faint);font-size:12px}.dock .thead button:hover{color:var(--text)}
+.thread{max-height:34vh;overflow:auto;padding:8px 16px 4px;display:flex;flex-direction:column;gap:12px}
+.msg .you{font-size:13.5px;color:var(--text);border-left:2px solid var(--speed);padding-left:10px;line-height:1.45}
+.msg .got{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.msg .reply{margin-top:6px;font-size:12.5px;color:var(--dim);line-height:1.45}
+.composer{padding:10px 12px 12px}
+.clabel{font-size:11.5px;color:var(--faint);padding:0 4px 8px;letter-spacing:.01em}
+.crow{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:end}
+.crow textarea{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 13px;font-size:14px;line-height:1.4;resize:none;min-height:42px;max-height:120px;width:100%;transition:border-color .15s,box-shadow .15s}
+.crow textarea:focus{outline:none;border-color:var(--speed);box-shadow:0 0 0 3px rgba(77,163,255,.18)}
+.crow textarea::placeholder{color:var(--faint)}
+.crow .mic{height:42px;padding:0 12px;border-radius:12px}
+.crow .send{height:42px;width:46px;border-radius:12px;background:var(--text);color:var(--bg);display:grid;place-items:center;transition:background .15s}
+.crow .send:hover{background:var(--speed)}.crow .send svg{width:16px;height:16px}
+#results.dockpad{padding-bottom:180px}
+@keyframes cue{0%,100%{box-shadow:0 0 0 0 rgba(77,163,255,0)}40%{box-shadow:0 0 0 4px rgba(77,163,255,.35)}}
+.dock.cue .crow textarea{animation:cue 1.6s ease 2}
+@media (prefers-reduced-motion:reduce){.dock.cue .crow textarea{animation:none}}
+
 /* ---------- the bar */
 .bar{position:sticky;top:0;z-index:6;background:rgba(16,16,19,.9);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
 .barin{max-width:1180px;margin:0 auto;padding:10px clamp(16px,3.5vw,32px);display:flex;align-items:center;gap:16px;flex-wrap:wrap}
@@ -510,7 +533,7 @@ html.hdrmarks .mark-hdr{display:block}
             <button class="mic" id="mic" data-on="0" title="Speak instead"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10a3 3 0 0 0 3-3V4a3 3 0 0 0-6 0v3a3 3 0 0 0 3 3zm5-3h-1.2a3.8 3.8 0 0 1-7.6 0H3a5 5 0 0 0 4.3 4.9V14h1.4v-2.1A5 5 0 0 0 13 7z"/></svg>Speak</button>
             <button class="wishgo" id="wishgo">Apply</button></div>
           <div class="understood" id="understood"></div>
-          <p class="wishhint">A model turns your words into rules and weights you can see here and remove one by one. It never ranks: the order is still arithmetic.</p>
+          <p class="wishhint">Your words become rules and weights you can see and remove. You can keep adding to it after the results, in the box at the bottom of the page.</p>
         </div>
       </div>
     </div></div></div></div>
@@ -557,6 +580,17 @@ html.hdrmarks .mark-hdr{display:block}
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
+</div></div>
+
+<div class="dock hidden" id="dock"><div class="dockin">
+  <div class="thead hidden"><span class="eyebrow">Your wish</span><span id="tcount"></span><button id="tchev">Hide</button></div>
+  <div class="thread" id="thread" hidden></div>
+  <div class="composer">
+    <div class="clabel">Narrow it down in your own words. Each thing you say adds to the last.</div>
+    <div class="crow"><textarea id="dwish" rows="1" placeholder="Say more, in your own words… 'not Iberia'"></textarea>
+      <button class="mic" id="dmic" data-on="0" aria-label="Speak"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10a3 3 0 0 0 3-3V4a3 3 0 0 0-6 0v3a3 3 0 0 0 3 3zm5-3h-1.2a3.8 3.8 0 0 1-7.6 0H3a5 5 0 0 0 4.3 4.9V14h1.4v-2.1A5 5 0 0 0 13 7z"/></svg></button>
+      <button class="send" id="dsend" aria-label="Apply"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+  </div>
 </div></div>
 
 <div id="editor" class="editor hidden" role="dialog" aria-modal="true" aria-label="Edit your search">
@@ -729,6 +763,7 @@ function excluded(e){
       if (r.unless && WANTS.find(w => w.id === r.unless).ok(e)) continue;
       return (AIR[r.code] || {}).name + ' ruled out' + (r.unless ? ' (no ' + WANTS.find(w => w.id === r.unless).label.toLowerCase() + ' on it)' : '');
     }
+    if (r.kind === 'max' && bill(e).total > r.cents) return 'over your ' + money(r.cents) + ' cap all in';
     if (r.kind === 'after' && dh < r.h) return 'departs before ' + r.h + ':00, which you ruled out';
     if (r.kind === 'before' && ah > r.h) return 'arrives after ' + r.h + ':00, which you ruled out';
   }
@@ -982,8 +1017,11 @@ function parseWish(text){
   const t = ' ' + text.toLowerCase().replace(/[’']/g, "'") + ' ', out = [];
   const code = s => { s = s.trim().replace(/\bairlines?\b|\bairways\b/g, '').trim(); for (const k of Object.keys(AIRNAME).sort((a, b) => b.length - a.length)) if (s.startsWith(k) || s.includes(' ' + k)) return AIRNAME[k]; return AIRNAME[s.split(' ')[0]]; };
   let m;
-  const avoidRx = /(?:don'?t|do not|never|won'?t|not) (?:want(?:ing)? to |wanna )?fly(?:ing)? (?:on |with )?([a-z ]+?)(?=,|\.| but | unless | if | and |$)/g;
-  while ((m = avoidRx.exec(t))){ const c = code(m[1]); if (c) out.push({kind:'avoid', code:c, label:'Avoid ' + (AIR[c] || {name:c}).name}); }
+  const avoidRx = /(?:don'?t|do not|never|won'?t|not|no) (?:want(?:ing)? to |wanna |really )?(?:fly(?:ing)?|like|trust|use|book) (?:on |with )?([a-z ]+?)(?=,|\.| but | unless | if | and |$)/g;
+  while ((m = avoidRx.exec(t))){ const c = code(m[1]); if (c && !out.some(x => x.kind === 'avoid' && x.code === c)) out.push({kind:'avoid', code:c, label:'Avoid ' + (AIR[c] || {name:c}).name}); }
+  const bareRx = /(?:^|[ ,.;])(?:no|not|skip|avoid|anything but|never|without|minus|forget) ([a-z ]{2,30}?)(?=,|\.|;|$| and | or | but | unless | please)/g;
+  while ((m = bareRx.exec(t))){ const c = code(m[1]); if (c && !out.some(x => x.kind === 'avoid' && x.code === c)) out.push({kind:'avoid', code:c, label:'Avoid ' + (AIR[c] || {name:c}).name}); }
+  if ((m = /(?:nothing|not|no more than|under|below|max(?:imum)?|cap(?:ped)? at|less than) (?:over |above |than )?\$\s?(\d[\d,]*)/.exec(t))){ const cents = +m[1].replace(/,/g, '') * 100; if (cents > 0) out.push({kind:'max', cents, label:'Nothing over ' + money(cents)}); }
   const unlessRx = /(?:willing to|would|i'?d) (?:fly|take) (?:on |with )?([a-z ]+?) (?:if|for|when) (?:it means |it'?s |it is |i get |a |the )?(?:a )?(lie[- ]?flat|nonstop|direct)/g;
   while ((m = unlessRx.exec(t))){ const c = code(m[1]), w = /lie/.test(m[2]) ? 'lieflat' : 'nonstop'; const r = out.find(x => x.kind === 'avoid' && x.code === c); if (r){ r.unless = w; r.label += ' unless ' + WANTS.find(x => x.id === w).label.toLowerCase(); } }
   if (/lie[- ]?flat|flat bed|business class/.test(t)) out.push({kind:'want', id:'lieflat', label:'Lie-flat seat matters' + (/really|very|important|must/.test(t) ? ' a lot' : '')});
@@ -1004,16 +1042,60 @@ function parseWish(text){
   if ((m = /(window|aisle) seat/.exec(t))) out.push({kind:'note', label:m[1][0].toUpperCase() + m[1].slice(1) + ' seat, noted for seat selection'});
   return out;
 }
-function applyWish(){
-  const items = parseWish($('#wish').value); if (!items.length){ $('#understood').innerHTML = '<span class="lab">Understood</span><span class="u">Nothing I could turn into a rule yet — try naming an airline, a seat, a time, or what you care about most.</span>'; return; }
-  S.rules = items.filter(x => x.kind === 'avoid' || x.kind === 'after' || x.kind === 'before');
-  items.filter(x => x.kind === 'want').forEach(x => S.wants.add(x.id));
-  const tilt = items.find(x => x.kind === 'tilt'); if (tilt){ if (tilt.p === 'asap') setWeights(0, 1, 0, 'asap'); else { const [a, b, c] = tilt.p.split(',').map(Number); setWeights(a, b, c, tilt.p); } }
-  $('#understood').innerHTML = '<span class="lab">Understood</span>' + items.map((x, i) => `<span class="u ${x.kind === 'avoid' || x.kind === 'after' || x.kind === 'before' ? 'rule' : x.kind === 'tilt' ? 'tilt' : 'want'}"><i>${x.kind === 'avoid' || x.kind === 'after' || x.kind === 'before' ? 'rule' : x.kind === 'tilt' ? 'weights' : x.kind === 'want' ? 'want' : 'note'}</i>${esc(x.label)}<button data-ux="${i}" aria-label="Remove">×</button></span>`).join('');
-  $('#understood').dataset.items = JSON.stringify(items);
-  paintChips(); paint(true);
+// The wish is a conversation. Each message ADDS to what came before (a new
+// rule, a new want, a nudge of the dial), lands in the thread with what was
+// understood as removable chips, and gets one line back. The thread lives in
+// the dock under the results, and its chips also show in the step and the
+// sheet, so the same state is visible wherever the box is.
+S.thread = [];
+const KINDS = {avoid:'rule', after:'rule', before:'rule', max:'rule', tilt:'weights', want:'want', note:'note'};
+function replyFor(items){
+  if (!items.length) return "Didn't catch that. Try an airline, a time, a seat, or what matters most.";
+  const bits = [];
+  for (const x of items){
+    if (x.kind === 'avoid'){ const n = ALL.filter(e => e.carrier === x.code || e.operator === x.code).length; bits.push((AIR[x.code] || {name:x.code}).name + ' out' + (n ? ' (' + n + ')' : '') + (x.unless ? ', unless ' + WANTS.find(w => w.id === x.unless).label.toLowerCase() : '')); }
+    else if (x.kind === 'want'){ const w = WANTS.find(v => v.id === x.id); bits.push(w.count ? w.label + (ADDONS[x.id] ? ' on the bill' : ' counted') : w.label + ': none in economy'); }
+    else if (x.kind === 'tilt') bits.push(x.p === 'asap' ? 'Ranked for the soonest arrival' : x.label.replace('Lean toward', 'Leaning toward'));
+    else if (x.kind === 'max') bits.push('Nothing over ' + money(x.cents));
+    else bits.push(x.label);
+  }
+  return bits.join(' · ') + '.';
 }
-
+function applyWish(text, box){
+  text = (text || '').trim(); if (!text) return;
+  const items = parseWish(text);
+  for (const x of items){
+    if (x.kind === 'want') S.wants.add(x.id);
+    else if (x.kind === 'avoid' || x.kind === 'after' || x.kind === 'before' || x.kind === 'max'){ if (!S.rules.some(r => r.label === x.label)) S.rules.push(x); }
+    else if (x.kind === 'tilt'){ if (x.p === 'asap') setWeights(0, 1, 0, 'asap'); else { const [a, b, c] = x.p.split(',').map(Number); setWeights(a, b, c, x.p); } }
+  }
+  S.thread.push({text, items, reply: replyFor(items)});
+  if (box) box.value = '';
+  renderThread(); paintChips(); paint(true);
+}
+function chipsHTML(){
+  const out = [];
+  S.thread.forEach((m, mi) => m.items.forEach((x, ii) => out.push(`<span class="u ${KINDS[x.kind] === 'rule' ? 'rule' : KINDS[x.kind] === 'weights' ? 'tilt' : 'want'}"><i>${KINDS[x.kind]}</i>${esc(x.label)}<button data-ux="${mi}-${ii}" aria-label="Remove">×</button></span>`)));
+  return out.length ? '<span class="lab">Understood</span>' + out.join('') : '';
+}
+function renderThread(){
+  $('#understood').innerHTML = chipsHTML();
+  const th = $('#thread'); if (!th) return;
+  th.hidden = !S.thread.length || S.threadClosed;
+  th.innerHTML = S.thread.map((m, mi) => `<div class="msg"><div class="you">${esc(m.text)}</div><div class="got">${m.items.map((x, ii) => `<span class="u ${KINDS[x.kind] === 'rule' ? 'rule' : KINDS[x.kind] === 'weights' ? 'tilt' : 'want'}"><i>${KINDS[x.kind]}</i>${esc(x.label)}<button data-ux="${mi}-${ii}" aria-label="Remove">×</button></span>`).join('')}</div><div class="reply">${esc(m.reply)}</div></div>`).join('');
+  th.scrollTop = th.scrollHeight;
+  const n = S.thread.reduce((k, m) => k + m.items.length, 0);
+  $('#tcount').textContent = S.thread.length ? (n + (n === 1 ? ' thing' : ' things') + ' understood') : '';
+  $('#tcount').closest('.thead').classList.toggle('hidden', !S.thread.length);
+  $('#tchev').textContent = S.threadClosed ? 'Show' : 'Hide';
+}
+function removeItem(key){
+  const [mi, ii] = key.split('-').map(Number), m = S.thread[mi]; if (!m) return;
+  const x = m.items[ii]; if (!x) return;
+  if (x.kind === 'want') S.wants.delete(x.id); else S.rules = S.rules.filter(r => r.label !== x.label);
+  m.items.splice(ii, 1); m.reply = m.items.length ? replyFor(m.items) : 'Removed.';
+  renderThread(); paintChips(); paint(true);
+}
 // ---- chips, carriers, points
 function paintChips(){
   $('#chips').innerHTML = WANTS.map(w => `<button class="chip${w.count ? '' : ' zero'}" data-w="${w.id}" aria-pressed="${S.wants.has(w.id)}">${esc(w.label)}<span class="n">${w.count}</span></button>`).join('');
@@ -1056,23 +1138,28 @@ document.addEventListener('keydown', ev => {
     a = Math.max(0,a); b = Math.max(0,b); c = Math.max(0,c); const t = a+b+c; setWeights(a/t, b/t, c/t, null); ev.preventDefault(); }
 });
 $('#chips').addEventListener('click', ev => { const b = ev.target.closest('[data-w]'); if (!b) return; const id = b.dataset.w; S.wants.has(id) ? S.wants.delete(id) : S.wants.add(id); paintChips(); paint(true); });
-$('#wishgo').addEventListener('click', applyWish);
-$('#wish').addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); applyWish(); } });
-$('#understood').addEventListener('click', ev => { const b = ev.target.closest('[data-ux]'); if (!b) return; const items = JSON.parse($('#understood').dataset.items || '[]'); const x = items[+b.dataset.ux];
-  if (x.kind === 'want') S.wants.delete(x.id); S.rules = S.rules.filter(r => r.label !== x.label); items.splice(+b.dataset.ux, 1); $('#understood').dataset.items = JSON.stringify(items);
-  $('#understood').innerHTML = items.length ? '<span class="lab">Understood</span>' + items.map((y, i) => `<span class="u ${y.kind === 'avoid' || y.kind === 'after' || y.kind === 'before' ? 'rule' : y.kind === 'tilt' ? 'tilt' : 'want'}"><i>${y.kind === 'avoid' || y.kind === 'after' || y.kind === 'before' ? 'rule' : y.kind === 'tilt' ? 'weights' : y.kind === 'want' ? 'want' : 'note'}</i>${esc(y.label)}<button data-ux="${i}" aria-label="Remove">×</button></span>`).join('') : '';
-  paintChips(); paint(true); });
+$('#wishgo').addEventListener('click', () => applyWish($('#wish').value, $('#wish')));
+$('#wish').addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); applyWish($('#wish').value, $('#wish')); } });
+$('#dsend').addEventListener('click', () => applyWish($('#dwish').value, $('#dwish')));
+$('#dwish').addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); applyWish($('#dwish').value, $('#dwish')); } });
+$('#dwish').addEventListener('input', ev => { ev.target.style.height = 'auto'; ev.target.style.height = Math.min(ev.target.scrollHeight, 120) + 'px'; });
+document.addEventListener('click', ev => { const b = ev.target.closest('[data-ux]'); if (b) removeItem(b.dataset.ux); if (ev.target.closest('#tchev')){ S.threadClosed = !S.threadClosed; renderThread(); } });
 // voice: the browser's own recognition where it exists; the box is still typeable everywhere
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-$('#mic').addEventListener('click', () => {
-  if (!SR){ $('#wish').placeholder = 'Voice needs Chrome, Edge or Safari; type it here instead.'; $('#wish').focus(); return; }
-  const mic = $('#mic'); if (mic.dataset.on === '1'){ mic.dataset.on = '0'; if (mic._r) mic._r.stop(); return; }
+function listen(mic, box){
+  if (!SR){ box.placeholder = 'Voice needs Chrome, Edge or Safari; type it here instead.'; box.focus(); return; }
+  if (mic.dataset.on === '1'){ mic.dataset.on = '0'; if (mic._r) mic._r.stop(); return; }
   const r = new SR(); r.lang = 'en-US'; r.interimResults = true; mic._r = r; mic.dataset.on = '1';
-  r.onresult = ev => { $('#wish').value = [...ev.results].map(x => x[0].transcript).join(' '); };
-  r.onend = () => { mic.dataset.on = '0'; if ($('#wish').value.trim()) applyWish(); };
+  r.onresult = ev => { box.value = [...ev.results].map(x => x[0].transcript).join(' '); };
+  r.onend = () => { mic.dataset.on = '0'; if (box.value.trim()) applyWish(box.value, box); };
   r.onerror = () => { mic.dataset.on = '0'; };
   r.start();
-});
+}
+$('#mic').addEventListener('click', () => listen($('#mic'), $('#wish')));
+$('#dmic').addEventListener('click', () => listen($('#dmic'), $('#dwish')));
+// the composer suggests what it can take, one example at a time
+const HINTS = ["Say more, in your own words… 'not Iberia'", "'land before 9am'", "'I'd pay more for a lie-flat seat'", "'nothing over $600'", "'get me there as soon as possible'", "'no red-eyes'"];
+let hintN = 0; setInterval(() => { const box = $('#dwish'); if (!box || document.activeElement === box || box.value) return; hintN = (hintN + 1) % HINTS.length; box.placeholder = HINTS[hintN]; }, 4200);
 const winv = () => { const A = S.adv; $('#depv').textContent = A.dep0 === 0 && A.dep1 === 24 ? 'any time' : String(A.dep0).padStart(2,'0') + ':00 – ' + String(A.dep1).padStart(2,'0') + ':00'; $('#arrv').textContent = A.arr0 === 0 && A.arr1 === 24 ? 'any time' : String(A.arr0).padStart(2,'0') + ':00 – ' + String(A.arr1).padStart(2,'0') + ':00'; };
 ['dep0','dep1','arr0','arr1'].forEach(k => $('#' + k).addEventListener('input', ev => { S.adv[k] = +ev.target.value; if (S.adv.dep0 > S.adv.dep1) S.adv[k === 'dep0' ? 'dep1' : 'dep0'] = S.adv[k]; if (S.adv.arr0 > S.adv.arr1) S.adv[k === 'arr0' ? 'arr1' : 'arr0'] = S.adv[k]; winv(); paint(true); }));
 $('#cabin').addEventListener('change', ev => { S.adv.cabin = ev.target.value; if (W.mode === 'results') summary(); WANTS.find(w => w.id === 'lieflat').hint = ev.target.value === 'economy' ? 'No lie-flat seat flies this route in economy. Switch the cabin to Business under Advanced to see them.' : 'This demo carries economy inventory only; a Business search would show lie-flat seats here.'; paintChips(); });
@@ -1232,13 +1319,15 @@ function enterResults(){
   document.querySelectorAll('#results .stepper, #results .sechead').forEach((el, k) => { el.classList.add('rise'); el.style.animationDelay = (k*80) + 'ms'; });
   BLOCKS.forEach(k => $('#ed-' + k).appendChild($('#blk-' + k)));
   $('#wizard').classList.add('hidden'); $('#rail').classList.add('hidden');
-  $('#bar').classList.remove('hidden'); $('#results').classList.remove('hidden');
+  $('#bar').classList.remove('hidden'); $('#results').classList.remove('hidden'); $('#results').classList.add('dockpad');
+  $('#dock').classList.remove('hidden'); $('#dock').classList.add('cue'); setTimeout(() => $('#dock').classList.remove('cue'), 3600);
+  S.threadClosed = false; renderThread();
   paint(true); summary(); scrollTo({top:0, behavior:'auto'});
 }
 function startOver(){
   closeEditor(); W.mode = 'wizard'; $('#bar').classList.remove('drop'); $('#results').classList.remove('fade');
   BLOCKS.forEach(k => $('#s' + (BLOCKS.indexOf(k) + 1) + ' .stepin .slot').appendChild($('#blk-' + k)));
-  $('#bar').classList.add('hidden'); $('#results').classList.add('hidden');
+  $('#bar').classList.add('hidden'); $('#results').classList.add('hidden'); $('#dock').classList.add('hidden');
   $('#wizard').classList.remove('hidden'); $('#rail').classList.remove('hidden');
   scrollTo({top:0, behavior:'auto'}); goStep(1); setTimeout(layoutDial, 50);
 }
