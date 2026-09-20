@@ -836,6 +836,15 @@ def main():
                         ("10 Downing St, London SW1A 2AA", "LON")):
         got, how, problem = _p.resolve(typed)
         check("%r resolves to %s" % (typed[:34], want), got == want, "%s (%s)" % (got, problem))
+    # A metro code and its airports are the same request. A prefix test saying
+    # otherwise ("does LHR start with LO") is the kind of near-miss that tells
+    # somebody their London search was not a London search.
+    for c, i, want in (("LON", "LHR", True), ("LON", "LGW", True), ("LON", "JFK", False),
+                       ("NYC", "EWR", True), ("TYO", "NRT", True), ("LHR", "LHR", True),
+                       ("PAR", "LHR", False), ("", "LHR", False), ("LON", "", False)):
+        check("%s covers %s is %s" % (c or "''", i or "''", want),
+              _p.covers(c, i) is want)
+
     code, how, problem = _p.resolve("Narnia")
     check("an unknown place is refused, not guessed", code is None and bool(problem))
     check("and the refusal tells the user what to type instead",

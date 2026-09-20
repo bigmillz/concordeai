@@ -520,6 +520,25 @@ def live_request(req):
                    "provider": (sc.get("_feed") or {}).get("provider", "kiwi")}
     out["where"] = where or None
     out["ground"] = sc.get("_ground")
+
+    # With no key the inventory is a RECORDING of one route, so someone asking
+    # for Paris to Tokyo gets JFK to London and no hint that they did. Only the
+    # ground leg actually responded to what they typed. Say so, rather than
+    # letting a confident-looking page answer a question nobody asked.
+    if src == "sample" and (req.get("destination") or req.get("origin")):
+        first = (sc.get("options") or [{}])[0]
+        segs = first.get("segments") or []
+        if segs:
+            actual = "%s-%s" % (segs[0]["origin"]["iata"], segs[-1]["destination"]["iata"])
+            asked_o, _, _ = places.resolve(req.get("origin") or "")
+            asked_d, _, _ = places.resolve(req.get("destination") or "")
+            codes = {segs[0]["origin"]["iata"], segs[-1]["destination"]["iata"]}
+            mismatch = bool(asked_d) and not any(places.covers(asked_d, c) for c in codes)
+            out["sample_notice"] = (
+                "These are real recorded %s results, not a live search. Add a Duffel "
+                "key to search the route you typed." % actual
+                if mismatch else
+                "Recorded %s inventory - add a Duffel key for live results." % actual)
     if src == "api":
         out["feed"].update({"fetched": _LIVE_META.get("source"),
                             "age_seconds": _LIVE_META.get("age_seconds"),

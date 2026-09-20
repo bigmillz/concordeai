@@ -94,6 +94,43 @@ _add("SAO", "sao paulo"); _add("GRU", "guarulhos", "gru"); _add("RIO", "rio de j
 _add("BUE", "buenos aires"); _add("SCL", "santiago"); _add("LIM", "lima")
 _add("BOG", "bogota"); _add("UIO", "quito"); _add("MVD", "montevideo")
 
+# Which airports a metro code actually covers. Needed to answer "did we search
+# what they asked for?" - LON and LHR are the same request, and a prefix test
+# saying otherwise ("does LHR start with LO") is the kind of near-miss heuristic
+# that looks fine until it tells somebody their London search was not a London
+# search. Only the metros this module emits need a row.
+METRO: Dict[str, set] = {
+    "NYC": {"JFK", "EWR", "LGA"},
+    "LON": {"LHR", "LGW", "STN", "LTN", "LCY", "SEN"},
+    "PAR": {"CDG", "ORY", "BVA"},
+    "MIL": {"MXP", "LIN", "BGY"},
+    "ROM": {"FCO", "CIA"},
+    "TYO": {"NRT", "HND"},
+    "OSA": {"KIX", "ITM"},
+    "SEL": {"ICN", "GMP"},
+    "CHI": {"ORD", "MDW"},
+    "WAS": {"IAD", "DCA", "BWI"},
+    "SAO": {"GRU", "CGH", "VCP"},
+    "RIO": {"GIG", "SDU"},
+    "BUE": {"EZE", "AEP"},
+    "STO": {"ARN", "BMA", "NYO"},
+    "BJS": {"PEK", "PKX"},
+    "SHA": {"PVG", "SHA"},
+    "YTO": {"YYZ", "YTZ"},
+    "YMQ": {"YUL"},
+    "BER": {"BER"},
+    "MOW": {"SVO", "DME", "VKO"},
+}
+
+
+def covers(code: str, iata: str) -> bool:
+    """Is `iata` the place `code` asked for? A metro covers its airports."""
+    code, iata = (code or "").upper(), (iata or "").upper()
+    if not code or not iata:
+        return False
+    return code == iata or iata in METRO.get(code, set())
+
+
 CODE_RE = re.compile(r"^[A-Z]{3}$")
 
 

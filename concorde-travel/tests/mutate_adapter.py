@@ -154,6 +154,9 @@ MUTANTS = [
   '''    return "NYC", "city", None
     near = suggest(raw)''',
   'places: guess New York for anything unrecognised'),
+ (PL, "covers", '''    return code == iata or iata in METRO.get(code, set())''',
+  '''    return True''',
+  'places: call every airport a match for every metro'),
  (FA, None, '{"piece": 1, "amount_cents": 10000},\n      {"piece": 2, "amount_cents": 12000},',
   '{"piece": 1, "amount_cents": 1000},\n      {"piece": 2, "amount_cents": 1200},',
   'unknown-is-never-zero: make the fallback bag fee cheap'),

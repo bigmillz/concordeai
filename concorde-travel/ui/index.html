@@ -1736,6 +1736,10 @@ function paint(){
     STATE.understood.forEach(function(u){ h += '<span class="uchip ' + u.cls + '">' + esc(u.text) + '</span>'; });
     h += '</div>';
   }
+  if (LAST.sample_notice){
+    h += '<div class="coverage thin" style="margin-top:4px"><b>Not a live search.</b> ' +
+         esc(LAST.sample_notice) + '</div>';
+  }
   if (LAST.coverage){
     // A DRAFT verdict gets the same caution colour as a thin one. Claims from an
     // unreviewed table print a confident dollar figure, which makes them the
