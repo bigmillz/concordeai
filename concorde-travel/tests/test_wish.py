@@ -54,7 +54,7 @@ fake = with_client({"items": [
     {"kind": "max", "code": None, "unless": None, "id": None, "p": None, "cents": 50000, "h": None, "note": None},
     {"kind": "after", "code": None, "unless": None, "id": None, "p": None, "cents": None, "h": 9, "note": None},
     {"kind": "tilt", "code": None, "unless": None, "id": None, "p": "asap", "cents": None, "h": None, "note": None},
-], "ask": ""})
+], "ask": "", "offtopic": False})
 r = wish.parse("not iberia unless nonstop, lie-flat, nothing over $500, not before 9, asap", AIR)
 labels = [i["label"] for i in r["items"]]
 check("model items kept", r["source"] == "model" and len(r["items"]) == 5, json.dumps(r))
@@ -73,7 +73,7 @@ with_client({"items": [
     {"kind": "note", "code": None, "unless": None, "id": None, "p": None, "cents": None, "h": None, "note": "seat 14A costs $30"},
     {"kind": "rank", "code": None, "unless": None, "id": None, "p": None, "cents": None, "h": None, "note": None},
     {"kind": "avoid", "code": "BA", "unless": "teleport", "id": None, "p": None, "cents": None, "h": None, "note": None},
-], "ask": "Did you mean Iberia? It is about $40 more."})
+], "ask": "Did you mean Iberia? It is about $40 more.", "offtopic": False})
 r = wish.parse("anything", AIR)
 check("everything outside the vocabulary is dropped", [i["kind"] for i in r["items"]] == ["avoid"] and r["items"][0]["code"] == "BA" and "unless" not in r["items"][0], json.dumps(r))
 check("an ask carrying a figure is suppressed", r["ask"] == "", r["ask"])
@@ -82,9 +82,15 @@ check("an ask carrying a figure is suppressed", r["ask"] == "", r["ask"])
 with_client({"items": [
     {"kind": "want", "code": None, "unless": None, "id": "wifi", "p": None, "cents": None, "h": None, "note": None},
     {"kind": "want", "code": None, "unless": None, "id": "wifi", "p": None, "cents": None, "h": None, "note": None},
-], "ask": "  Which airline do you mean by  'the red one'?  "})
+], "ask": "  Which airline do you mean by  'the red one'?  ", "offtopic": False})
 r = wish.parse("wifi wifi", AIR)
 check("duplicates collapse and the ask is tidied", len(r["items"]) == 1 and r["ask"] == "Which airline do you mean by 'the red one'?", json.dumps(r))
+
+# 4b. off topic: nothing comes through, whatever the model wrote beside the flag
+with_client({"items": [{"kind": "want", "code": None, "unless": None, "id": "wifi", "p": None, "cents": None, "h": None, "note": None}], "ask": "The answer to your equation is x = 4.", "offtopic": True})
+r = wish.parse("solve 2x + 3 = 11", AIR)
+check("off topic yields no items and no ask", r["offtopic"] is True and r["items"] == [] and r["ask"] == "", json.dumps(r))
+check("the schema requires the flag", "offtopic" in wish.SCHEMA["required"] and "off topic" in wish.SYSTEM)
 
 # 5. a failed call steps aside rather than raising
 class Boom(FakeClient):

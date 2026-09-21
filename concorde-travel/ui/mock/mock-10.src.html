@@ -1577,6 +1577,7 @@ async function askModel(text){
       body: JSON.stringify({text, airlines: Object.entries(AIR).map(([code, a]) => ({code, name: a.name})), prior: S.thread.map(t => t.text).slice(-6)})});
     const d = await r.json();
     // not signed in, or out of wishes for the day: the page's own parser costs nothing, so use it
+    if (d.source === 'model' && d.offtopic) return {offtopic:true};
     return d.source === 'model' ? d : null;
   } catch (e) { return null; }
 }
@@ -1585,6 +1586,8 @@ async function applyWish(text, box){
   if (box) box.disabled = true;
   const m = await askModel(text);
   if (box) box.disabled = false;
+  // off topic: the model returned nothing and the page says so in its own words
+  if (m && m.offtopic){ S.thread.push({text, items:[], reply:"That one's outside this trip. I can help with airlines, times, seats, layovers, points, and what matters most."}); if (box) box.value = ''; renderThread(); return; }
   const items = m ? m.items : parseWish(text);
   if (m && !items.length && m.ask){ S.thread.push({text, items:[], reply:m.ask}); if (box) box.value = ''; renderThread(); return; }
   if (!items.length && isQuestion(text)){ S.thread.push({text, items:[], reply:answerFor(text)}); if (box) box.value = ''; renderThread(); return; }
