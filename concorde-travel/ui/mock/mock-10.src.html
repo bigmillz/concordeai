@@ -11,7 +11,7 @@
   --text:#ececec;--dim:#b4b4b4;--faint:#8e8e8e;--accent:#ececec;--accent-hot:#fff;--red:#e26d5a;
   --price:#ffb020;--speed:#4da3ff;--comfy:#a47bff;--green:#35e08a;--lime:#c6ff4f;
   --gA:#35e08a;--gB:#c6ff4f;--gC:#ffb020;--gD:#e26d5a;
-  --sans:"Space Grotesk","Helvetica Neue",Arial,sans-serif;--disp:"Michroma","Space Grotesk",sans-serif;--mono:"IBM Plex Mono","SFMono-Regular",Menlo,monospace;
+  --sans:"Space Grotesk","Helvetica Neue",Arial,sans-serif;--disp:"Michroma","Space Grotesk",sans-serif;--fig:"UD Shin Go NT","UD Shin Go","A-OTF UD Shin Go Pr6N","UDShinGoPr6N","Michroma","Space Grotesk",sans-serif;--mono:"IBM Plex Mono","SFMono-Regular",Menlo,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{color-scheme:dark}
@@ -46,8 +46,12 @@ h1,h2,h3{font-weight:400;letter-spacing:-.02em;text-wrap:balance}
 .pay .ph{font-family:var(--disp);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:6px;min-height:14px}
 .pay.best .ph{color:var(--price)}
 .pay .ph .star{font-style:normal;font-size:11px;line-height:1}
-.fig{font-family:var(--disp);font-weight:400;font-variant-numeric:tabular-nums;letter-spacing:0}
+/* the large figures: UD Shin Go where the machine has it (Morisawa's face, not
+   fetchable from the web), else Michroma, the wordmark's. Michroma runs about a
+   third wider, so the sizes step up when the first choice is what resolved. */
+.fig{font-family:var(--fig);font-weight:400;font-variant-numeric:tabular-nums;letter-spacing:0}
 .pay .num{font-size:21px;line-height:1.1;margin-top:4px;white-space:nowrap}
+html.udsg .fig{font-weight:500}html.udsg .pay .num{font-size:26px;letter-spacing:-.01em}html.udsg .amt b{font-size:21px;font-weight:500}html.udsg .btotal b{font-size:24px;font-weight:500}
 .pay.dim .num{color:var(--faint)}
 .pay .unit{color:var(--dim);font-size:12px}
 .pay .unit.dim{color:var(--faint)}
@@ -262,7 +266,7 @@ details[open] summary:after{content:"–"}
 .when{color:var(--dim);font-size:13px;white-space:nowrap;font-family:var(--mono);text-align:right}
 .when i{font-style:normal;color:var(--faint);display:block;font-family:var(--sans);font-size:12px}
 .amt{text-align:right;min-width:96px}
-.amt b{font-family:var(--disp);font-size:17px;font-weight:400;display:block;line-height:1.1;font-variant-numeric:tabular-nums}
+.amt b{font-family:var(--fig);font-size:17px;font-weight:400;display:block;line-height:1.1;font-variant-numeric:tabular-nums}
 .amt i{font-style:normal;color:var(--faint);font-size:11.5px;font-family:var(--mono)}
 .chev{color:var(--faint);font-size:20px;line-height:1;transition:transform .2s}
 .row[aria-expanded=true] .chev{transform:rotate(90deg)}
@@ -303,7 +307,7 @@ details[open] summary:after{content:"–"}
 .addmenu input{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;min-width:0}
 .addmenu form button{border:1px solid var(--line);border-radius:8px;padding:0 12px;font-size:12.5px;color:var(--text)}
 .btotal{display:flex;justify-content:space-between;align-items:baseline;border-top:2px solid var(--text);padding-top:12px;margin-top:2px}
-.btotal span{font-weight:500}.btotal b{font-family:var(--disp);font-size:19px;font-weight:400;font-variant-numeric:tabular-nums}
+.btotal span{font-weight:500}.btotal b{font-family:var(--fig);font-size:19px;font-weight:400;font-variant-numeric:tabular-nums}
 .btotal small{display:block;color:var(--faint);font-size:12px;font-weight:300}
 .book{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;align-self:start}
 .book h4{font-size:15px;font-weight:500}
@@ -671,6 +675,9 @@ const gcls = g => ({A:'a',B:'b',C:'c'}[g[0]] || 'd');
 const stopsText = e => e.stops === 0 ? 'nonstop' : e.stops === 1 ? 'via ' + e.route[1] : e.stops + ' stops';
 const niceDate = d => new Date(d + 'T12:00:00Z').toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short', timeZone:'UTC'});
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+(function(){ const c = document.createElement('canvas').getContext('2d'), probe = '$1,834 13,000', w = f => { c.font = '40px ' + f; return c.measureText(probe).width; };
+  const detect = () => { const base = w('monospace'); if (['UD Shin Go NT', 'UD Shin Go', 'A-OTF UD Shin Go Pr6N', 'UDShinGoPr6N'].some(n => Math.abs(w('"' + n + '", monospace') - base) > .5)) document.documentElement.classList.add('udsg'); };
+  detect(); if (document.fonts){ document.fonts.ready.then(detect); document.fonts.addEventListener('loadingdone', detect); } })();
 const ALL = D.results.reference.slice();
 const PR = D.profiles;
 const AIR = D.airlines || {};
