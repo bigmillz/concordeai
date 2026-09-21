@@ -233,9 +233,15 @@ details[open] summary:after{content:"–"}
    how good that stretch is, green down to red. Figures sit beside, not on. */
 .journey{display:flex;flex-direction:column;gap:6px}
 .jbar{display:flex;gap:2px;height:12px;border-radius:6px;overflow:hidden;background:rgba(255,255,255,.05)}
-.jmini{display:block;max-width:460px;margin-top:7px}
+.jmini{display:block;max-width:460px;margin:7px 0 0}
+/* .rw span carries a 6px left margin for the flight number; the bar and its
+   segments are spans too, so they must give it back or the whole bar drifts
+   right and the track shows as a grey stub at the left edge */
+.rw .jmini,.rw .jmini span{margin-left:0;font-size:0}
 .jmini .jbar{height:7px;border-radius:4px;gap:1px}
 .jmini .jseg{min-width:2px}
+.jbar .jseg:first-child{border-radius:6px 0 0 6px}.jbar .jseg:last-child{border-radius:0 6px 6px 0}
+.jmini .jseg:first-child{border-radius:4px 0 0 4px}.jmini .jseg:last-child{border-radius:0 4px 4px 0}
 .jseg{position:relative;height:100%;min-width:3px;background:var(--sc,rgba(255,255,255,.16));transform-origin:left center;transition:filter .2s}
 .jseg.neutral{background:rgba(255,255,255,.16)}
 .jseg:hover{filter:brightness(1.15)}
