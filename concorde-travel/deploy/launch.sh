@@ -90,6 +90,7 @@ say "keys -> /etc/concordego.env on the droplet"
 { [ -n "${CONCORDEGO_FLIGHT_KEY:-}" ] && printf 'CONCORDEGO_FLIGHT_KEY=%s\n' "$CONCORDEGO_FLIGHT_KEY"
   [ -n "${ANTHROPIC_API_KEY:-}" ] && printf 'ANTHROPIC_API_KEY=%s\n' "$ANTHROPIC_API_KEY"
   [ -n "${CONCORDEGO_PEXELS_KEY:-}" ] && printf 'CONCORDEGO_PEXELS_KEY=%s\n' "$CONCORDEGO_PEXELS_KEY"
+  [ -n "${CONCORDEGO_SERPAPI_KEY:-}" ] && printf 'CONCORDEGO_SERPAPI_KEY=%s\n' "$CONCORDEGO_SERPAPI_KEY"
   [ -n "$ACCESS_TEAM" ] && printf 'CONCORDEGO_ACCESS_TEAM=%s\n' "$ACCESS_TEAM"
   printf 'CONCORDEGO_OWNERS=%s\n' "$OWNERS"; printf 'CONCORDEGO_PUBLIC=1\n'; } | "${SSH[@]}" 'umask 077; cat > /root/.concordego-keys.tmp; python3 - <<"PY"
 import sys, re, os
