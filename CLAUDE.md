@@ -588,6 +588,40 @@ other signed-in emails unlimited without admin access. Signed-in people get a Lo
 trips as chips under the form (`recent` in `users.json`, five deep, survives the day's
 rollover).
 
+**Three things a signed-in person carries** (2026-09-21, per Patrick). **Status is a
+credit in the order**: a held tier (own programme, or an alliance tier the operator belongs
+to) gives a flight that keeps it earning a credit at what the traveller says keeping it is
+worth (`S.statusWorth`, a select beside the status chips, $60 by default), named on the row
+("Keeps your SkyTeam Elite Plus") and in the ledger, never on the money bill and never in
+the grade. **The flying personality** is eight chip questions (`QUIZ`) that become a persona:
+a point on the dial plus its own priced terms (`personaLines`: a nervous flyer's
+connections, red-eyes and low-rated carriers; a foodie's long daytime layover in a food
+city as a credit; lounge, wifi and power; "never" red-eyes or connections), offered as a
+"Me" preset beside cheapest, fastest and comfort. It ranks by the same arithmetic, every
+term named on the row, and the grade never sees it. Saved to the person's profile on the
+server (`/api/profile`, `users.json[email].profile`, sent back by `/whoami`) or this
+browser's storage without an account, and sent up on sign-in. **The profile** is behind
+the avatar (the account button becomes the person's initial): who you are, the allowance,
+the personality, Log out. **A first-launch tour** (`TOUR`, once per browser, when the splash
+lifts) says the premise in a breath, how it works in three lines, and hands off to the quiz.
+
+**The delayed-or-cancelled helper** (`rescue.py`, `/rescue` outside the door on the free
+allowance, `/api/rescue` inside it; the sheet behind "Flight delayed or cancelled? Make the
+call" on the first screen). The situation comes in as chips and clocks: delayed or cancelled,
+the scheduled and new times, whether rebooking was offered and when it lands, the fare, a
+checked bag, what was paid, what an hour is worth. Clocks are read in the AIRPORT's zone,
+taken from the results, never the browser's. One live search for the day (and tomorrow after
+17:00) runs through the ordinary pipeline, and the arithmetic makes the call: each
+alternative costs its ticket less the refund the rules say you may expect (US DOT 2024: a
+cancellation, or a delay of three hours at home and six abroad; elsewhere, cancelled yes,
+delayed ask), less the hours it saves at your rate, plus a hotel night when the only way on
+leaves tomorrow morning. Switch when an alternative comes out $25 or more ahead, stay
+otherwise, wait when nothing leaves in time. The rights list is what the rules say you MAY
+ask for (refund, rebooking, EU261 by distance, care, the bag) and the advice is the model
+behind the narrator's guard rails plus its own: no figure the brief did not give, no airport
+it did not name, and no promise about rights ("you are owed" is rejected), the template
+otherwise. `tests/test_rescue.py` fences all of it offline, on the checked-in sample.
+
 **The wish box's model is Claude Opus 5** (`concorde-travel/wish.py`, `/api/wish`), the same
 model as the narrator: one call at low effort with a strict JSON schema over the page's own
 vocabulary (avoid / want / tilt / max / after / before / note), the vocabulary cached as the

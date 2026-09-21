@@ -764,6 +764,14 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 .qz .q{margin:12px 0 0}.qz .q p{margin:0 0 6px;font-size:14px}.qz .chips{display:flex;flex-wrap:wrap;gap:6px}
 .qz .pchip{cursor:pointer}.qz .pchip.on{border-color:var(--speed);color:var(--text);background:rgba(120,160,255,.08)}
 .prof .row2{margin-top:16px;align-items:center}
+.rsc .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:6px 0 4px}
+.rsc .fld{padding:10px 12px}.rsc .fld input{font-size:15px}
+.rsc .chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}.rsc .pchip{cursor:pointer}.rsc .pchip.on{border-color:var(--speed);color:var(--text);background:rgba(120,160,255,.08)}
+.rsc h4{font-family:var(--disp);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin:14px 0 6px}
+.rsc .verdict{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--panel3);margin:6px 0 12px}.rsc .verdict b{display:block;font-size:18px;margin-bottom:6px}
+.rsc .alt{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:10px 0;border-top:1px solid var(--line)}.rsc .alt small{color:var(--faint);display:block}.rsc .alt .net{font-family:var(--mono);text-align:right}
+.rsc ul{padding-left:18px;margin:0}.rsc li{margin:5px 0;font-size:13.5px;color:var(--dim)}.rsc li b{color:var(--text);font-weight:500}
+.rsc .advice{font-size:15px;line-height:1.55;margin:6px 0 0}
 .prof.tour p,.prof.tour li{font-size:15px;line-height:1.5;color:var(--text)}.prof.tour ul{padding-left:18px;margin:0}.prof.tour li{margin:6px 0}
 .rail .rail-acct{order:9;margin-left:auto}
 /* what needs an account, while there is none: greyed, and a tap opens the pop-up */
@@ -834,6 +842,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
       <div class="fields" id="sentence"></div>
       <button class="addleg hidden" id="addleg">+ add another flight</button>
       <p class="searcherr" id="searcherr" role="alert"></p>
+      <p class="ptnote"><button type="button" class="ledger" id="rescuego">Flight delayed or cancelled? Make the call</button></p>
     </div></div>
     <div class="nav"><button class="go" data-next="2">Continue <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v11M3 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">or press Enter</span></div></div>
   </div></section>
@@ -2639,6 +2648,54 @@ function openAccount(why){
   $('#acct').classList.remove('hidden'); ($('#acctgo') || $('#acctno')).focus();
 }
 function closeAccount(){ $('#acct').classList.add('hidden'); }
+// ---- the delayed-or-cancelled helper (per Patrick, 2026-09-21): the situation in chips, one search, the call in dollars
+const RS = {kind:'delayed', rebook:'no', fare:'main', bags:'no'};
+function localISO(d){ const p = n => String(n).padStart(2, '0'), off = -d.getTimezoneOffset(), sg = off >= 0 ? '+' : '-'; return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:00${sg}${p(Math.floor(Math.abs(off)/60))}:${p(Math.abs(off)%60)}`; }
+function openRescue(){
+  const today = localISO(new Date()).slice(0, 10);
+  const chips = (k, opts) => `<div class="chips" data-rs="${k}">${opts.map(([v, l]) => `<button type="button" class="pchip${RS[k] === v ? ' on' : ''}" data-v="${v}">${l}</button>`).join('')}</div>`;
+  const fld = (id, label, ph, val) => `<div class="fld"><label for="${id}">${label}</label><input id="${id}" placeholder="${ph}" value="${esc(val || '')}" autocomplete="off"></div>`;
+  $('#accth').textContent = 'Delayed or cancelled';
+  $('#acctbody').innerHTML = `<div class="rsc">
+    <div class="grid">${fld('rs-from', 'From', 'JFK', RS.from)}${fld('rs-to', 'To', 'LHR', RS.to)}${fld('rs-flight', 'Flight', 'DL 1', RS.flight)}${fld('rs-date', 'Date', today, RS.date || today)}</div>
+    <h4>What happened</h4>${chips('kind', [['delayed', 'Delayed'], ['cancelled', 'Cancelled']])}
+    <div class="grid" id="rs-when">${fld('rs-sched', 'Scheduled departure', '18:30', RS.sched)}${fld('rs-new', 'New departure, if delayed', '21:40', RS.newdep)}${fld('rs-newarr', 'New arrival', '09:50 +1', RS.newarr)}</div>
+    <h4>Rebooking offered?</h4>${chips('rebook', [['no', 'No'], ['notyet', 'Not yet'], ['yes', 'Yes']])}
+    <div class="grid">${fld('rs-rbarr', 'Its arrival, if offered', '13:10 +1', RS.rbarr)}</div>
+    <h4>Your ticket</h4>${chips('fare', [['basic', 'Basic'], ['main', 'Main cabin'], ['flex', 'Flexible']])}${chips('bags', [['no', 'Carry-on only'], ['yes', 'A bag is checked']])}
+    <div class="grid">${fld('rs-paid', 'What you paid ($)', '400', RS.paid)}${fld('rs-hour', 'Your hour is worth ($)', '35', RS.hour || 35)}</div>
+    <p class="searcherr" id="rs-err" role="alert"></p>
+    <div class="row2"><button class="choose" id="rs-go" style="flex:0 0 auto">Make the call</button><button class="ledger" id="acctno">Cancel</button></div></div>`;
+  $('#acct').classList.remove('hidden'); $('#rs-from').focus();
+}
+function rsTime(dateStr, hhmm){ const m = /^(\d{1,2}):(\d{2})\s*(\+1)?$/.exec((hhmm || '').trim()); if (!m) return null; const d = new Date(dateStr + 'T00:00:00'); if (m[3]) d.setDate(d.getDate() + 1); d.setHours(+m[1], +m[2]); return localISO(d); }
+async function runRescue(){
+  const v = id => ($(id) ? $(id).value.trim() : ''); RS.from = v('#rs-from').toUpperCase(); RS.to = v('#rs-to').toUpperCase(); RS.flight = v('#rs-flight'); RS.date = v('#rs-date'); RS.sched = v('#rs-sched'); RS.newdep = v('#rs-new'); RS.newarr = v('#rs-newarr'); RS.rbarr = v('#rs-rbarr'); RS.paid = v('#rs-paid'); RS.hour = v('#rs-hour');
+  const err = $('#rs-err'); err.textContent = '';
+  if (!RS.from || !RS.to){ err.textContent = 'From and to, as airport codes.'; return; }
+  const now = new Date(), sit = {kind:RS.kind, origin:RS.from, destination:RS.to, flight:RS.flight, date:RS.date, bags_checked:RS.bags === 'yes', fare:RS.fare,
+    paid_cents: Math.round((parseFloat(RS.paid) || 0) * 100), hourly_value_cents: Math.round((parseFloat(RS.hour) || 35) * 100)};
+  // clocks go up as typed; the server reads them in the airport's own zone, which the browser does not know
+  if (RS.kind === 'delayed'){ sit.sched_clock = RS.sched; sit.new_dep_clock = RS.newdep; sit.new_arr_clock = RS.newarr;
+    if (!RS.newdep && !RS.newarr){ err.textContent = 'The new departure or arrival time the airline gave you.'; return; } }
+  if (RS.rebook === 'yes') sit.rebook_arr_clock = RS.rbarr;
+  $('#rs-go').disabled = true; $('#rs-go').textContent = 'Searching…';
+  let res; try { const r = await fetch('/rescue', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({situation:sit, now:localISO(now), source:'api'})}); res = await r.json(); } catch (e){ res = {error:'The search did not come back. Try again.'}; }
+  if (res.error){ $('#rs-go').disabled = false; $('#rs-go').textContent = 'Make the call'; err.textContent = res.error; if (res.sign_in){ closeAccount(); openAccount(res); } return; }
+  paintRescue(res);
+}
+function paintRescue(res){
+  const a = res.assessment, V = a.verdict, hm = iso => iso ? iso.slice(11, 16) : '';
+  const alt = r => `<div class="alt"><div><b>${esc(r.carrier)} ${esc(r.flight)}</b> · ${esc((r.route || []).join(' → '))} · ${hm(r.depart)} → ${hm(r.arrive)}${r.stops ? ' · ' + r.stops + ' stop' : ' · nonstop'}<small>${r.lines.map(l => esc(l.label) + ' ' + (l.cents < 0 ? '−' : '') + money(Math.abs(l.cents))).join(' · ')}</small></div><div class="net">${V.option && V.option.id === r.id ? '★ ' : ''}${r.net_cents < 0 ? '−' : ''}${money(Math.abs(r.net_cents))}<small>net</small></div></div>`;
+  const head = V.action === 'switch' && V.option ? 'Switch to ' + V.option.carrier + ' ' + V.option.flight + (V.ahead_cents ? ', ' + money(V.ahead_cents) + ' ahead' : '') : V.action === 'stay' ? 'Stay with what the airline offered' : 'Wait it out';
+  $('#accth').textContent = 'The call';
+  $('#acctbody').innerHTML = `<div class="rsc"><div class="verdict"><b>${esc(head)}</b><p class="advice">${esc(res.advice.advice)}</p>${res.advice.source === 'template' ? '<p class="fine">Written from the figures without the model' + (res.advice.note ? ' (' + esc(res.advice.note) + ')' : '') + '.</p>' : ''}</div>
+    <h4>Your options today${res.searched.length > 1 ? ' and tomorrow' : ''} · ${res.found} found</h4>${a.options.slice(0, 4).map(alt).join('') || '<p>Nothing leaves in time.</p>'}
+    ${a.hotel_tonight ? `<h4>Tonight</h4><p><a class="ledger" target="_blank" rel="noopener" href="https://www.google.com/maps/search/hotels+near+${encodeURIComponent(RS.from)}+airport">Hotels near ${esc(RS.from)}</a> · ask the desk whether the airline covers it.</p>` : ''}
+    <h4>What you can ask for</h4><ul>${a.rights.map(r => `<li><b>${esc(r.what)}</b> · ${esc(r.detail)}</li>`).join('')}</ul>
+    <p class="fine">Refund: ${esc(a.refund.why)}.</p>
+    <div class="row2"><button class="ledger" id="rescuego">Change the details</button><button class="choose" id="acctno" style="flex:0 0 auto">Done</button></div></div>`;
+}
 // the first-launch tour (per Patrick, 2026-09-21): the premise in a breath, how it works in three lines, then the
 // quiz. Once per browser; the profile can always reopen the quiz.
 const TOUR = [
@@ -2674,6 +2731,9 @@ function openProfile(quiz){
 document.addEventListener('click', ev => {
   if (ev.target.closest('#account, #account2')){ const u = S.user; if (u && (u.email || u.owner)){ openProfile(); return; } openAccount(); return; }
   if (ev.target.closest('#quizgo')){ openProfile(true); return; }
+  if (ev.target.closest('#rescuego')){ openRescue(); return; }
+  if (ev.target.closest('#rs-go')){ runRescue(); return; }
+  const rc = ev.target.closest('.rsc [data-rs] .pchip'); if (rc){ const g = rc.closest('[data-rs]'); RS[g.dataset.rs] = rc.dataset.v; g.querySelectorAll('.pchip').forEach(x => x.classList.toggle('on', x === rc)); return; }
   const tn = ev.target.closest('#tournext'); if (tn){ openTour(+tn.dataset.i); return; }
   if (ev.target.closest('#tourdone')){ closeAccount(); return; }
   if (ev.target.closest('#quizsave')){ const ans = {}; document.querySelectorAll('.qz .q').forEach(q => { const on = q.querySelector('.pchip.on'); if (on) ans[q.dataset.q] = +on.dataset.i; }); if (Object.keys(ans).length < QUIZ.length){ $('#quizerr').textContent = 'Answer every one; it takes a minute.'; return; } savePersona(personaFrom(ans)); if (W.mode === 'results'){ setWeights(S.persona.a, S.persona.b, S.persona.c, 'mine'); paint(false); } openProfile(); return; }

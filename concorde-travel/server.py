@@ -33,6 +33,7 @@ import struct
 import sys
 import threading
 import time
+import datetime
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -41,6 +42,7 @@ import places                                           # noqa: E402
 import live                                              # noqa: E402
 import narrator                                          # noqa: E402
 import wish                                              # noqa: E402
+import rescue                                            # noqa: E402
 import scorer                                            # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -746,6 +748,72 @@ def _supplement(q):
                                 adults=q.get("adults", 1), cfg=scfg)
     except Exception as exc:                          # a supplement must never take the search down
         return None, {"source": "none", "error": "supplement failed: %s" % exc}
+
+
+def rescue_request(req):
+    """The delayed-or-cancelled helper: the situation in, the call out. One
+    live search today (and tomorrow when the evening is gone), the arithmetic
+    in rescue.py, and the advice from the model behind the guard rails."""
+    sit = dict(req.get("situation") or {})
+    o, d = str(sit.get("origin") or "").strip(), str(sit.get("destination") or "").strip()
+    if not (o and d):
+        return {"error": "Where were you flying from and to? Airport codes are fine."}
+    date = str(sit.get("date") or "")[:10]
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+        return {"error": "The date of the flight, please."}
+    now = None
+    try:
+        now = datetime.datetime.fromisoformat(str(req.get("now") or ""))
+    except ValueError:
+        pass
+    dates = [date]
+    if now is not None and now.hour >= 17:
+        dates.append((now + datetime.timedelta(days=1)).strftime("%Y-%m-%d"))
+    found, errors, feed = [], [], None
+    for dt in dates:
+        r = search_request({"source": "api", "origin": o, "origin_address": o, "destination": d, "date": dt,
+                            "adults": 1, "checked_bags": 1 if sit.get("bags_checked") else 0, "_served": req.get("_served")})
+        if r.get("error"):
+            errors.append(r["error"])
+            continue
+        feed = r.get("feed")
+        found.extend(r["results"]["reference"])
+    if not found:
+        return {"error": errors[0] if errors else "Nothing found for that day."}
+    # the countries the rules turn on, from the curated airports where we know them
+    enr = adapter.load_enrichment()
+    aps = enr["airports"]["airports"]
+    o_ap, d_ap = aps.get(places.airports_for(o)[0], {}), aps.get(places.airports_for(d)[0], {})
+    sit.setdefault("us", (o_ap.get("border") == "us") or (d_ap.get("border") == "us"))
+    sit.setdefault("eu", o_ap.get("border") in ("schengen", "ie"))
+    sit.setdefault("international", bool(o_ap.get("border") and d_ap.get("border") and o_ap.get("border") != d_ap.get("border")))
+    # the clocks the traveller typed are read in the airport's own zone, taken from the results, never the browser's
+    dep_off, arr_off = found[0]["depart"][-6:], found[0]["arrive"][-6:]
+    def clock(txt, off):
+        m = re.match(r"^\s*(\d{1,2}):(\d{2})\s*(\+1)?\s*$", str(txt or ""))
+        if not m:
+            return None
+        day = datetime.date.fromisoformat(date) + datetime.timedelta(days=1 if m.group(3) else 0)
+        return "%sT%02d:%02d:00%s" % (day.isoformat(), int(m.group(1)), int(m.group(2)), off)
+    sched, newdep = clock(sit.get("sched_clock"), dep_off), clock(sit.get("new_dep_clock"), dep_off)
+    if newdep:
+        sit["new_depart"] = newdep
+    if sched and newdep:
+        sit["delay_minutes"] = max(0, int((datetime.datetime.fromisoformat(newdep) - datetime.datetime.fromisoformat(sched)).total_seconds() // 60))
+    newarr, rbarr = clock(sit.get("new_arr_clock"), arr_off), clock(sit.get("rebook_arr_clock"), arr_off)
+    if newarr:
+        sit["new_arrive"] = newarr
+    if rbarr:
+        sit["rebook_arrive"] = rbarr
+    if o_ap.get("lat") is not None and d_ap.get("lat") is not None:
+        import ground as _g
+        sit.setdefault("distance_km", int(_g.haversine_km(o_ap["lat"], o_ap["lon"], d_ap["lat"], d_ap["lon"])))
+    sit["route"] = "%s to %s" % (o, d)
+    sit["now_clock"] = now.strftime("%H:%M") if now else None
+    a = rescue.assess(sit, found, now=now)
+    b = rescue.brief(sit, a)
+    prose = rescue.narrate(b, allow_model=bool(os.environ.get("ANTHROPIC_API_KEY")))
+    return {"assessment": a, "advice": prose, "searched": dates, "feed": feed, "found": len(found), "notes": errors}
 
 
 def search_request(req):
@@ -1556,6 +1624,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._json({"error": "%s: %s" % (type(exc).__name__, exc)})
         if path == "/search":
             path = "/api/search"; anon_ok = True
+        elif path == "/rescue":
+            path = "/api/rescue"; anon_ok = True          # the delayed-flight helper: a search and a brief, on the free allowance
         else:
             anon_ok = False
         if path == "/api/profile":
@@ -1574,7 +1644,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._json({"ok": False, "error": "that profile is too large"})
             _users_profile_set(who, profile)
             return self._json({"ok": True, "profile": profile})
-        if path not in ("/api/score", "/api/narrate", "/api/live", "/api/wish", "/api/search"):
+        if path not in ("/api/score", "/api/narrate", "/api/live", "/api/wish", "/api/search", "/api/rescue"):
             return self.send_error(404)
         try:
             n = int(self.headers.get("Content-Length") or 0)
@@ -1585,7 +1655,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         # spends freely; a signed-in visitor spends from a daily allowance;
         # nobody anonymous spends at all.
         # a live search only spends when this machine holds a key; without one the recording stands in
-        spends = path == "/api/narrate" or path == "/api/wish" or (path in ("/api/live", "/api/search") and (req.get("source") or "sample") != "sample" and bool(live.load_config().get("key")))
+        spends = path == "/api/narrate" or path == "/api/wish" or (path in ("/api/live", "/api/search", "/api/rescue") and (req.get("source") or "sample") != "sample" and bool(live.load_config().get("key")))
         if spends and self._remote():
             who = self._who()
             if not who and anon_ok:
@@ -1601,7 +1671,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._json({"error": "Sign in to use this. A few searches a day are free; the wish box, the price check and more searches come with a free account.",
                                    "remote": True, "sign_in": True})
         if spends and self._remote() and who:
-            kind, limit = ("searches", USER_SEARCHES) if path in ("/api/live", "/api/search") else ("wishes", USER_WISHES)
+            kind, limit = ("searches", USER_SEARCHES) if path in ("/api/live", "/api/search", "/api/rescue") else ("wishes", USER_WISHES)
             if kind == "wishes":
                 okall, _ = _users_take("_everyone", "wishes", WISHES_TOTAL)
                 if not okall:
@@ -1619,7 +1689,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 if who_r and "@" in who_r and isinstance(trip, dict) and not trip.get("leg"):
                     _users_recent_add(who_r, {"from": str(req.get("origin") or "")[:120], "to": str(req.get("destination") or "")[:120], "date": str(req.get("date") or "")[:10],
                                               "kind": str(trip.get("kind") or "round")[:8], "back": str(trip.get("back") or "")[:40], "pax": str(trip.get("pax") or "")[:20], "bags": str(trip.get("bags") or "")[:20]})
-            fn = {"/api/score": score_request, "/api/narrate": narrate_request,
+            fn = {"/api/score": score_request, "/api/narrate": narrate_request, "/api/rescue": rescue_request,
                   "/api/live": live_request, "/api/wish": wish_request, "/api/search": search_request}[path]
             return self._json(fn(req))
         except Exception as exc:
