@@ -516,7 +516,7 @@ details[open] summary:after{content:"–"}
    takes a while, such as the price check below the list. */
 .loading{position:fixed;inset:0;z-index:20;background:var(--bg);display:grid;place-items:center}
 /* the title card, once a session: one point of light comes at you and opens
-   into the wing, the nameplate lands, and a bar warms what the page needs */
+   into the wing, the wordmark lands, and a bar warms what the page needs */
 /* the sky sits under everything, on the page's own background; the title card is a
    clear layer over it, and the page underneath is held at opacity 0 until it lifts.
    The html class is set in the markup so nothing flashes before the script runs;
@@ -541,11 +541,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 .splash .wing.once line:nth-child(4){stroke-dasharray:5.6;stroke-dashoffset:5.6;animation-delay:.41s}
 .splash .wing.once line:nth-child(5){stroke-dasharray:1.5;stroke-dashoffset:1.5;animation-delay:.53s}
 @keyframes draw{to{stroke-dashoffset:0}}
-.splashmark{transform:scale(1.9);transform-origin:center;margin:6px 0 10px;--silver:linear-gradient(90deg,#f5f6f8,#c8ccd5,#9aa0ac,#e2e5ea,#8f95a1,#d5d8df,#f5f6f8)}
-/* the site's wordmark sheen: brushed silver sweeping into place over 2.4s */
-.splashmark .mark-txt{background:var(--silver);background-size:220% 100%;background-position:50% 0;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;animation:sheen 2.4s cubic-bezier(.2,.7,.2,1) .35s both}
-.splashmark .tld{-webkit-text-stroke:0}
-@keyframes sheen{from{background-position:118% 0}to{background-position:50% 0}}
+.splashmark{transform:scale(1.9);transform-origin:center;margin:6px 0 10px}
 .splash .pbar{opacity:0;animation:fadein .4s 1.9s ease forwards}
 @media (prefers-reduced-motion:reduce){.splashin{animation:none;opacity:1}.splash .wing.once line{animation:none;stroke-dashoffset:0;opacity:1}.splash .pbar{animation:none;opacity:1}}
 .loadin{width:min(340px,78vw);display:flex;flex-direction:column;align-items:center;gap:26px}
@@ -559,15 +555,9 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 @media (prefers-reduced-motion:reduce){.wing.big line{animation:none;opacity:1;stroke-dashoffset:0}}
 .wing line{stroke:url(#wgrad);stroke-width:2.4;stroke-linecap:round;fill:none}
 .lockup{font-family:var(--disp);text-transform:uppercase;letter-spacing:.15em;font-size:12.5px;font-weight:400;white-space:nowrap;color:#fff;display:inline-flex;align-items:center}
-.lockup .tld{font-weight:800;-webkit-text-stroke:.7px currentColor}
+/* GO: extra extra bold, as the app sets AI (6b258): a fattening stroke, a touch smaller, raised to sit on the same line */
+.lockup .tld{font-weight:400;-webkit-text-stroke:.12em currentColor;font-size:.865em;vertical-align:.06em}
 .brand:hover .wing line{filter:drop-shadow(0 0 4px rgba(244,245,248,.55))}
-/* HDR nameplate: on an HDR display the lockup swaps to a looping sheen that
-   flares past SDR white, the way the site's and the app's marks do. The text
-   stays in the DOM for SDR, accessibility and no-JS. Loaded only where
-   (dynamic-range: high) is true and the asset exists beside the page. */
-.mark-hdr{display:none;height:22px;width:auto}
-html.hdrmarks .mark-txt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-html.hdrmarks .mark-hdr{display:block}
 /* white edges that glow: wide-gamut white where the display has it */
 @supports (color: color(display-p3 1 1 1)){
   .seal .g{filter:drop-shadow(0 0 4px color-mix(in oklab, var(--gc) 55%, transparent))}
@@ -710,11 +700,11 @@ html.hdrmarks .mark-hdr{display:block}
 <div class="splash" id="splash" aria-label="Loading ConcordeGo">
   <div class="splashin">
     <svg class="wing big once" viewBox="2 2.3 19.6 16.4" aria-hidden="true" focusable="false"><g><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg>
-    <span class="lockup splashmark"><span class="mark-txt">Concorde<span class="tld">Go</span></span><video class="mark-hdr" data-mark="go" muted playsinline loop preload="none" aria-hidden="true"></video></span>
+    <span class="lockup splashmark">Concorde<span class="tld">Go</span></span>
     <div class="pbar"><i class="pfill"></i></div><div class="pstage"></div>
   </div></div>
 <div class="rail" id="rail"><div class="railin">
-  <a class="brand" href="#top" aria-label="ConcordeGo"><svg class="wing" viewBox="2 2.3 19.6 16.4" aria-hidden="true" focusable="false"><g><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><span class="lockup"><span class="mark-txt">Concorde<span class="tld">Go</span></span><video class="mark-hdr" data-mark="go" muted playsinline loop preload="none" aria-hidden="true"></video></span></a>
+  <a class="brand" href="#top" aria-label="ConcordeGo"><svg class="wing" viewBox="2 2.3 19.6 16.4" aria-hidden="true" focusable="false"><g><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><span class="lockup">Concorde<span class="tld">Go</span></span></a>
   <button class="acctbtn rail-acct" id="account2">Sign in</button>
   <div class="rsteps">
     <button class="st on" data-s="1"><i><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.4 6.4l2.5 2.5 4.8-5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>Where and when</span></button><button class="st" data-s="2"><i><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.4 6.4l2.5 2.5 4.8-5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>What matters</span></button><button class="st" data-s="3"><i><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.4 6.4l2.5 2.5 4.8-5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>Points and miles</span></button><button class="st" data-s="4"><i><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.4 6.4l2.5 2.5 4.8-5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>Anything else</span></button>
@@ -793,7 +783,7 @@ html.hdrmarks .mark-hdr{display:block}
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
-  <a class="brand" href="#top" aria-label="ConcordeGo"><svg class="wing" viewBox="2 2.3 19.6 16.4" aria-hidden="true" focusable="false"><g><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><span class="lockup"><span class="mark-txt">Concorde<span class="tld">Go</span></span><video class="mark-hdr" data-mark="go" muted playsinline loop preload="none" aria-hidden="true"></video></span></a>
+  <a class="brand" href="#top" aria-label="ConcordeGo"><svg class="wing" viewBox="2 2.3 19.6 16.4" aria-hidden="true" focusable="false"><g><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><span class="lockup">Concorde<span class="tld">Go</span></span></a>
   <button class="sum" id="sum" data-tab="where" title="Edit your search"><b id="sumline"></b><span id="sumchips"></span></button>
   <div class="barbtns"><button data-tab="where">Edit search</button><button data-tab="matters">Filters</button><button data-tab="advanced">Advanced</button><button class="dimbtn" id="startover">Start over</button><button class="acctbtn" id="account">Sign in</button></div>
 </div></div>
@@ -2026,8 +2016,8 @@ const STARFIELD = (function stars(){
 })();
 
 // ---- the title card. Once a session, over the sky above: the wing draws
-// itself, the nameplate takes the sheen, and the bar warms what the page
-// needs first - the fonts, the nameplate, the airlines' logos for the flights
+// itself under the wordmark, and the bar warms what the page needs first -
+// the fonts, the airlines' logos for the flights
 // on the page. Nothing else is fetched. It lifts when the warp begins its
 // glide (2.6s), never later than 5s, and the page underneath fades up.
 (function splash(){
@@ -2038,7 +2028,6 @@ const STARFIELD = (function stars(){
   const fill = el.querySelector('.pfill'), stage = el.querySelector('.pstage'), jobs = [];
   const job = (label, pr) => jobs.push({label, pr: Promise.resolve(pr).catch(() => null)});
   job('Type', document.fonts ? document.fonts.ready : null);
-  if (matchMedia('(dynamic-range: high)').matches) for (const f of ['assets/mark-go-hlg.webm', 'assets/mark-go-pq.mp4']) job('Nameplate', fetch(f, {cache:'force-cache'}).then(r => r.blob()));
   const logos = Object.values(AIR).map(a => a.logo).filter(u => u && /^https?:/.test(u)).slice(0, 40);
   for (const u of logos) job('Airline marks', new Promise(res => { const im = new Image(); im.onload = im.onerror = () => res(); im.src = u; setTimeout(res, 2500); }));
   let done = 0; const total = jobs.length || 1, started = performance.now(), MIN = REDUCED ? 300 : 2600, MAX = 5000;
@@ -2275,17 +2264,6 @@ if (!PHOTOS.length){
     if (W.mode === 'results') paint(false); };
   (window.requestIdleCallback || (f => setTimeout(f, 60)))(paintArt);
 }
-(function(){
-  if (!matchMedia('(dynamic-range: high)').matches || REDUCED) return;
-  const marks = document.querySelectorAll('video.mark-hdr'); if (!marks.length) return;
-  let armed = 0;
-  marks.forEach(v => { const k = v.dataset.mark;
-    const sq = document.createElement('source'); sq.src = 'assets/mark-' + k + '-pq.mp4'; sq.type = 'video/mp4; codecs="hvc1"';
-    const sh = document.createElement('source'); sh.src = 'assets/mark-' + k + '-hlg.webm'; sh.type = 'video/webm; codecs="vp09.02.10.10"';
-    v.appendChild(sq); v.appendChild(sh);
-    v.addEventListener('loadeddata', () => { if (!armed++) document.documentElement.classList.add('hdrmarks'); const pr = v.play(); if (pr && pr.catch) pr.catch(() => {}); }, {once:true});
-    v.load(); });
-})();
 document.addEventListener('animationend', ev => { if (ev.target.classList && ev.target.classList.contains('rise')) ev.target.classList.remove('rise'); });
 
 // ================= the steps, the bar, the editor =================
