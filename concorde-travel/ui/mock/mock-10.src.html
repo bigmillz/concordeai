@@ -314,9 +314,8 @@ details[open] summary:after{content:"–"}
 .jtip li.bad::before{background:var(--red)}.jtip li.good::before{background:var(--green)}
 .jtip .arrow{position:absolute;left:var(--ax,50%);bottom:-5px;width:8px;height:8px;background:rgba(16,16,19,.97);border-right:1px solid var(--line);border-bottom:1px solid var(--line);transform:translateX(-50%) rotate(45deg)}
 .jtip.below .arrow{bottom:auto;top:-5px;transform:translateX(-50%) rotate(-135deg)}
-.jtip .gf li{display:grid;grid-template-columns:30px 88px 56px minmax(0,1fr);gap:0 8px;align-items:baseline;padding-left:0}
-.jtip .gf .pull{font-family:var(--mono);font-size:11.5px;font-style:normal;color:var(--text);white-space:nowrap;text-align:right}
-.jtip .gf .pull.credit{color:var(--good, #6fcf97)}
+.jtip .gf li{display:grid;grid-template-columns:30px 112px minmax(0,1fr);gap:0 8px;align-items:baseline;padding-left:0}
+.jtip .gf span i{font-style:normal;font-family:var(--mono);font-size:10px;color:var(--faint);margin-left:6px}
 .jtip .gf li::before{display:none}
 .jtip .gf b{font-family:var(--disp);font-size:13px;font-weight:400}
 .jtip .gf span{color:var(--text)}
@@ -672,16 +671,19 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
    rounding or device pixel ratio can leave the ground showing (per Patrick, 2026-09-21: a black bar top and bottom).
    Two layers crossfade. A layer drifts on its own, or, in a panorama, all three move as one strip. */
 .sky .photo{position:absolute;inset:0;overflow:hidden;background:#0a0a0c}
-.sky .pic{position:absolute;inset:-16px;background-size:cover;background-position:50% 45%;background-repeat:no-repeat;opacity:0;transition:opacity .4s ease;animation:drift 9s ease-in-out infinite alternate;will-change:transform,opacity;--z:1.2;--z0:1;--z1:1.2;--sx:3%;--sy:-2%}
-/* the flash: a wash of white over the tile that peaks as the new picture lands and is gone half a second later */
-.sky .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:2}
-.sky .flash.go{animation:flash .6s ease-out}
-@keyframes flash{0%{opacity:0}18%{opacity:.85}100%{opacity:0}}
+/* a picture drifts for as long as it is up: one slow zoom with a slide, one direction only, 20s long though a
+   picture lives about 6.5s, so what shows is the calm first third and never a reversal. The end points are set per
+   picture in setPic (a zoom in or out, a slide toward a random corner), kept inside the 16px of slack so the ground
+   never shows: a zoom-in may slide 4.5% of its width, a zoom-out 2.5%. */
+.sky .pic{position:absolute;inset:-16px;background-size:cover;background-position:50% 45%;background-repeat:no-repeat;opacity:0;transition:opacity .35s ease;animation:drift 20s linear forwards;will-change:transform,opacity;--z0:1;--z1:1.16;--x0:0%;--y0:0%;--x1:2.5%;--y1:-1.5%}
 .sky .pic.on{opacity:1}
 .sky .pic.top{z-index:1}
-.sky .pic.wide{animation:pan 12s ease-in-out infinite alternate}
-@keyframes drift{from{transform:scale(var(--z0)) translate(calc(var(--sx) * -1), calc(var(--sy) * -1))}to{transform:scale(var(--z1)) translate(var(--sx), var(--sy))}}
-@keyframes pan{from{transform:translateX(1.5%) scale(1.04)}to{transform:translateX(-3%) scale(1.1)}}
+@keyframes drift{from{transform:scale(var(--z0)) translate(var(--x0),var(--y0))}to{transform:scale(var(--z1)) translate(var(--x1),var(--y1))}}
+/* the flash: the WHOLE frame goes white and comes back (per Patrick, 2026-09-21: "no oval flash, flash the entire
+   frame"); it sits above the scrim and the caption, not under them, and the picture changes at its peak */
+.sky .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:3}
+.sky .flash.go{animation:flash .7s ease-out}
+@keyframes flash{0%{opacity:0}16%{opacity:1}34%{opacity:.8}100%{opacity:0}}
 
 .sky .scrim{position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(10,10,12,.12) 0%,rgba(10,10,12,.02) 35%,rgba(10,10,12,.6) 100%);pointer-events:none}
 .sky .cap{position:absolute;left:16px;right:16px;top:10px;z-index:2;font-family:var(--disp);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.78);text-shadow:0 1px 2px rgba(0,0,0,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1364,50 +1366,9 @@ const PLACES = ['First place', 'Second place', 'Third place'];
 const GSCORE = {'A+':1, 'A':.93, 'A-':.86, 'B+':.78, 'B':.7, 'B-':.62, 'C+':.54, 'C':.46, 'C-':.38, 'D+':.3, 'D':.22, 'D-':.14, 'F':0};
 const scaleColor = (q, c) => `oklch(${(.7 + .14*q).toFixed(3)} ${c || .2} ${Math.round(22 + q*125)})`;
 const gradeColor = g => scaleColor(GSCORE[g] ?? 0);
-// The grade's parts. The grade is the whole effective cost at the reference
-// profile against par (scorer.grade). Each factor below is the scorer's own
-// lines for that part, against par's same part, read on the same bands the
-// grade uses, amplified so one part's pull shows as letter steps: a part that
-// moves the whole index by 5% reads about a grade and a half away from A.
-// The parts add up to the whole exactly; the letters are each part's pull.
-const BANDS = [[.94,'A+'],[1.02,'A'],[1.08,'A-'],[1.15,'B+'],[1.22,'B'],[1.30,'B-'],[1.42,'C+'],[1.55,'C'],[1.70,'C-'],[1.90,'D']];
-const letterFor = idx => { for (const [t, l] of BANDS) if (idx <= t) return l; return 'F'; };
-const FACTORS = [
-  ['price', 'Price', ['ticket', 'bags'], p => p.fare_cents],
-  ['speed', 'Speed', ['time'], p => (p.ledger.find(l => /door to door/.test(l.label)) || {}).cents || 0],
-  ['ground', 'Getting there', ['ground_out', 'ground_in'], p => p.ledger.filter(l => /to JFK|to EWR|to London|LHR to|city centre/.test(l.label) && !/door to door/.test(l.label)).reduce((s, l) => s + l.cents, 0)],
-  ['comfort', 'Comfort', ['connectivity', 'cabin_uncertain', 'pitch', 'carrier', 'boarding', 'lounge', 'redeye'], () => 0],
-  ['routing', 'Routing', ['nonstop', 'layover', 'risk', 'mct_margin'], p => (p.ledger.find(l => /Nonstop/.test(l.label)) || {}).cents || 0],
-  ['reliability', 'Reliability', ['reliability'], () => 0],
-];
-// Each category's letter is its own gap from par's same part, scaled so that the six categories' gaps AVERAGE to the
-// whole's gap: the mean of the parts' indices is the overall index, and a GPA over the six letters lands on the
-// overall letter (per Patrick, 2026-09-21: the parts used to read a grade better than the whole).
-const PULL = 6;   // = FACTORS.length; asserted below
-if (PULL !== FACTORS.length) console.error('PULL must equal the number of factors');
-// A part's letter sits on the overall's own scale, read linearly through the grade bands (about 3.4 points of GPA per
-// unit of index, A at par), so the mean of the six parts' points is the overall's points and a GPA over the six
-// letters lands on the overall letter. The one thing letters cannot say is 'far better than A+': a part that deep
-// under par is clamped, and the card says it is carrying the rest.
-const GPA_PTS = [['A+', 4.3], ['A', 4], ['A-', 3.7], ['B+', 3.3], ['B', 3], ['B-', 2.7], ['C+', 2.3], ['C', 2], ['C-', 1.7], ['D', 1], ['F', 0]];
-function partLetter(idx){ const pts = Math.max(0, Math.min(4.3, 4 - 3.4 * (idx - 1.02))); return GPA_PTS.reduce((best, [l, p]) => Math.abs(p - pts) < Math.abs(best[1] - pts) ? [l, p] : best, ['F', -9])[0]; }
-function factors(e){
-  const par = D.par, parTotal = D.query.par_cents, sum = codes => e.lines.filter(l => codes.includes(l.code)).reduce((s, l) => s + l.cents, 0);
-  return FACTORS.map(([id, name, codes, parOf]) => { const mine = sum(codes), theirs = parOf(par), idx = 1 + PULL * (mine - theirs) / parTotal;
-    return {id, name, idx, pull: mine - theirs, letter: partLetter(idx), carries: idx < 0.93, why: factorWhy(id, e, mine, theirs)}; });
-}
-function factorWhy(id, e, mine, theirs){
-  const L = code => e.lines.find(l => l.code === code), fl = e.by.cheapest.legs.filter(l => l.kind === 'flight'); let li = 0; fl.forEach((l, i) => { if (l.minutes > fl[li].minutes) li = i; });
-  switch (id){
-    case 'price': { const d = mine - theirs; return money(e.ticket_cents) + ' ticket' + (L('bags') && L('bags').cents > 0 ? ' + ' + money(L('bags').cents) + ' bag' : '') + (Math.abs(d) >= 1000 ? ', ' + money(Math.abs(d)) + (d < 0 ? ' under par' : ' over par') : ', at par'); }
-    case 'speed': return dur(e.door_minutes) + ' door to door, par ' + dur(D.par.reference.door_to_door_minutes);
-    case 'ground': { const o = L('ground_out'), i = L('ground_in'); return [o && o.evidence.split(' - ')[0], i && i.evidence.split(' - ')[0]].filter(Boolean).join(' · ') || '—'; }
-    case 'comfort': { const b = []; const pm = Math.max(0, ...e.pitch.map(x => x || 0)); if (pm) b.push(pm + '-inch pitch'); if (e.wifi_cost === 'free') b.push('free wifi'); else if (e.wifi_published) b.push('paid wifi'); else b.push('no wifi'); if (e.rating != null) b.push('rated ' + e.rating.toFixed(2)); else b.push('unrated'); if (L('cabin_uncertain')) b.push('cabin uncertain'); if (L('redeye')) b.push('red-eye'); const eq = (e.segments[li] || {}).equipment; if (eq && JET[eq]) b.push(JET[eq]); return b.join(', '); }
-    case 'routing': { if (e.stops === 0) return 'nonstop'; const lay = L('layover'), risk = L('risk'); return e.layover_minutes.map((m, i) => dur(m) + ' at ' + (e.segments[i] || {}).to).join(', ') + (risk && risk.cents >= 2500 ? ', misconnect risk' : '') + (lay && lay.cents >= 5000 ? ', a rough layover' : ''); }
-    case 'reliability': { const r = L('reliability'); if (!r) return 'no record'; return r.cents >= 3000 ? 'no on-time record for this flight' : r.cents < 0 ? 'good on-time record' : 'a weak on-time record'; }
-  }
-  return '';
-}
+// The grade's parts come from the scorer's report card (scorer.report_card): six categories, each on its own
+// absolute rubric, and the letter is their weighted average. Nothing is graded here; the page only shows it.
+function factors(e){ const c = e.card; return c && c.parts ? c.parts : []; }
 // A capital's ink does not sit at the centre of its em box, and the mono face's A sits low and to the right of it,
 // so the letter is measured on a canvas in the seal's own font and shifted by the difference. Re-measured once the
 // web fonts land, since the fallback face measures differently.
@@ -1427,7 +1388,7 @@ if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { IN
 function sealHTML(e, small){
   const g = e.grade, m = g.match(/^([A-F])([+-]?)$/) || [g, g, ''];
   const [dx, dy] = small ? inkOffset(m[1], '600 23px ' + getComputedStyle(document.body).getPropertyValue('--sans')) : inkOffset(m[1], '600 26px ' + getComputedStyle(document.body).getPropertyValue('--mono'), .75);
-  const tip = `<div class="jh"><i></i><b>Grade ${esc(g)}</b><em>against par</em></div><ul class="gf">${factors(e).map(f => `<li><b style="color:${gradeColor(f.letter)}">${f.letter}</b><span>${f.name}</span><em class="pull${f.pull < 0 ? ' credit' : ''}">${Math.abs(f.pull) < 100 ? 'at par' : (f.pull < 0 ? '−' : '+') + money(Math.abs(f.pull))}</em><small>${esc(f.why)}${f.carries ? ' · far enough under par to carry the rest' : ''}</small></li>`).join('')}</ul><p class="gnote">${money(e.effective_cents)} all in for a neutral traveller against this route's par of ${money(D.query.par_cents)}, ${e.effective_cents >= D.query.par_cents ? money(e.effective_cents - D.query.par_cents) + ' over' : money(D.query.par_cents - e.effective_cents) + ' under'}. The dollars are each part against par's same part, and they add up to that gap: the letters are not equal weights, the money is.</p>`;
+  const tip = `<div class="jh"><i></i><b>Grade ${esc(g)}</b><em>report card</em></div><ul class="gf">${factors(e).map(f => `<li><b style="color:${gradeColor(f.letter)}">${f.letter}</b><span>${f.name}<i>${Math.round(f.weight * 100)}%</i></span><small>${esc(f.why)}</small></li>`).join('')}</ul><p class="gnote">Six categories, each on its own scale: price against this route's fair fare, speed against the nonstop, the rest on what the flight is. The letter is their weighted average${e.card && e.card.points != null ? ', ' + e.card.points.toFixed(1) + ' of 4.3' : ''}. The order of the list is separate: what the trip costs you at your dial.</p>`;
   return `<span class="seal${small ? ' s' : ''}" style="--gc:${gradeColor(g)}" data-tip="${esc(tip)}" aria-label="Grade ${esc(g)}"${small ? '' : ' tabindex="0"'}><svg viewBox="0 0 48 48" aria-hidden="true"><circle class="ring" cx="24" cy="24" r="22.5" pathLength="100"/><text class="g" x="${(m[2] ? 22.5 : 24) + dx}" y="${24 + dy}">${m[1]}</text>${m[2] ? `<text class="sg" x="36" y="15.5">${m[2] === '-' ? '−' : '+'}</text>` : ''}</svg><span class="sr">Grade ${esc(g)}</span></span>`;
 }
 
@@ -1610,7 +1571,7 @@ function door(kind, e, r, title, ctx){
   const eff = r.total, pc = prosCons(e, r, ctx);
   const chips = (arr, none) => arr.length ? arr.map(w => '<b>' + esc(w) + '</b>').join('') : '<b class="none">' + none + '</b>';
   return `<article class="door ${kind}" data-id="${esc(e.id)}">
-    <div class="sky" style="background:${skyBand(e)}">${PHOTOS.length ? `<div class="photo"><div class="pic a"></div><div class="pic b"></div><div class="flash"></div></div><div class="scrim"></div>` : ''}</div>
+    <div class="sky" style="background:${skyBand(e)}">${PHOTOS.length ? `<div class="photo"><div class="pic a"></div><div class="pic b"></div></div><div class="scrim"></div><div class="flash"></div>` : ''}</div>
     ${sealHTML(e)}
     <div class="body">
       <div class="eyebrow">${title}</div>
@@ -1738,7 +1699,7 @@ function ledgerHTML(e){
       <p>${S.trip === 'round' ? (S.legIdx === 0 ? 'Then pick the return, and one link books both legs together.' : 'Then one link books both legs together.') : 'Then one link takes you to the airline with the flight filled in.'}</p>
       ${aw.length ? `<button class="ledger" data-play="${esc(e.id)}" style="text-align:left;padding:4px 0">${aw[0].good ? '★ ' : ''}Book with points, step by step →</button>` : ''}
       ${aw.length ? '<h4 style="margin-top:6px">With points</h4><ul class="awards">' + aw.map(a => `<li class="${a.good ? 'good' : ''}"><b>${a.good ? '★ ' : ''}${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)}</b> · <span class="v">${a.value <= 0 ? 'fees exceed the fare' : moneyPt(a.value) + '/pt · ≈ ' + money(r.total - a.margin) + ' all in'}</span>${a.path ? ' · ' + esc(a.path) : ' · no route from your balances'}${a.bonus ? ' until ' + esc(a.bonus.until) : ''}</li>`).join('') + '</ul>' : ''}
-      <p>Grade <b>${e.grade}</b>: ${money(e.effective_cents)} all in for a neutral traveller, against par ${money(D.query.par_cents)}.</p></div>`;
+      <p>Grade <b>${e.grade}</b> on the report card${e.card && e.card.points != null ? ' (' + e.card.points.toFixed(1) + ' of 4.3)' : ''}. ${money(e.effective_cents)} all in for a neutral traveller, against par ${money(D.query.par_cents)}.</p></div>`;
 }
 function openSheet(id){
   const e = ALL.find(x => x.id === id);
@@ -2611,11 +2572,17 @@ addEventListener('resize', () => { paintTri(); const [x, y] = toXY(S.a, S.b, S.c
 // or one picture is laid across the whole row as a strip, held for a beat, and broken back into three. Nothing
 // repeats in order, and no two tiles ever show the same picture except in a panorama.
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-// A DECK, not a lottery (per Patrick, 2026-09-21: "the same ones over and over"): the pool is shuffled once and
-// dealt in order, so every picture is shown before any comes round again; the deck is reshuffled when it runs out.
+// THE SHOW on the three frames (per Patrick, 2026-09-21, third pass: "go right to left and update ... make the panning
+// smoother, like a drift ... a single image that spans all 3 frames, randomly"). A beat every 6.5 seconds. On the beat
+// the frames update RIGHT TO LEFT, 420ms apart, each behind a white flash over its whole frame, the picture changing at
+// the flash's peak so the cut itself is never seen. Most beats deal three new pictures, home and away alternating along
+// the row; about one beat in three, at random and never twice running, one picture is laid across all three frames as
+// a single strip. Pictures come off a shuffled DECK, so nothing repeats until every one has shown. Each picture drifts
+// for as long as it is up, and a re-paint of the cards picks the drift up where it was rather than restarting it.
+const BEAT = 6500, GAP = 420, PANO_ODDS = 1 / 3;
 function freshPhoto(k, wantPlace){
   if (!PH.deck || !PH.deck.length){ PH.deck = shuffle(PHOTOS.map((p, i) => i)); }
-  const onScreen = new Set((PH.slots || []).filter((x, i) => i !== k));
+  const onScreen = new Set((PH.slots || []).filter((x, i) => i !== k).concat(PH.wide != null ? [PH.wide] : []));
   let at = PH.deck.findIndex(i => !onScreen.has(i) && (!wantPlace || PHOTOS[i].place === wantPlace));
   if (at < 0) at = PH.deck.findIndex(i => !onScreen.has(i));
   if (at < 0) return Math.floor(Math.random() * PHOTOS.length);
@@ -2623,55 +2590,65 @@ function freshPhoto(k, wantPlace){
 }
 function seatPhotos(){
   const places = [...new Set(PHOTOS.map(p => p.place))], start = Math.floor(Math.random() * places.length);
-  PH.slots = [-1, -1, -1]; PH.deck = null;
+  PH.slots = [-1, -1, -1]; PH.deck = null; PH.drift = [null, null, null]; PH.wide = null; PH.driftWide = null;
   // seated one at a time, so each pick sees the ones already seated and never repeats them
   for (let k = 0; k < 3; k++) PH.slots[k] = freshPhoto(k, places.length > 1 ? places[(start + k) % places.length] : null);
-  PH.wide = null; PH.beat = 0;
+}
+const pick = (a, b) => a + Math.random() * (b - a), sign = () => Math.random() < .5 ? -1 : 1;
+// the drift for a picture in a frame: made once when it lands, reused on a re-paint so the motion never jumps
+function driftFor(k, idx, wide){
+  if (wide){ if (!PH.driftWide || PH.driftWide.pic !== idx) PH.driftWide = {pic:idx, dir:sign(), t0:performance.now()}; return PH.driftWide; }
+  PH.drift = PH.drift || [null, null, null];
+  const d = PH.drift[k];
+  if (d && d.pic === idx) return d;
+  const zin = Math.random() < .5, z = +pick(1.14, 1.2).toFixed(3);
+  return (PH.drift[k] = {pic:idx, z0: zin ? 1 : z, z1: zin ? z : 1, x1: +(sign() * pick(zin ? 2.5 : 1.5, zin ? 4.5 : 2.5)).toFixed(1), y1: +(sign() * pick(1, 2)).toFixed(1), t0:performance.now()});
 }
 function setPic(el, p, k, wide){
-  el.style.backgroundImage = 'url("' + p.src + '")';
-  // each picture gets its own move: a zoom of 12–28% with a slide, from a random corner toward the opposite one
-  const z = (1.12 + Math.random() * .16).toFixed(3), sx = (Math.random() < .5 ? -1 : 1) * (2 + Math.random() * 4), sy = (Math.random() < .5 ? -1 : 1) * (1 + Math.random() * 3);
-  el.style.setProperty('--z', z); el.style.setProperty('--sx', sx.toFixed(1) + '%'); el.style.setProperty('--sy', sy.toFixed(1) + '%');
-  el.style.setProperty('--z0', Math.random() < .5 ? '1' : z); el.style.setProperty('--z1', el.style.getPropertyValue('--z0') === '1' ? z : '1');
-  if (wide){ const doors = [...document.querySelectorAll('#doors .door')], first = doors[0].getBoundingClientRect(), last = doors[doors.length - 1].getBoundingClientRect(), gw = Math.max(300, last.right - first.left), dl = el.closest('.door').getBoundingClientRect().left - first.left;
-    el.classList.add('wide'); el.style.backgroundSize = Math.round(gw * 1.06) + 'px auto'; el.style.backgroundPosition = (-Math.round(dl) - 16) + 'px 45%'; el.style.animationDelay = '0s'; }
-  else { el.classList.remove('wide'); el.style.backgroundSize = ''; el.style.backgroundPosition = ''; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; }
+  const S = el.style, idx = PHOTOS.indexOf(p), d = driftFor(k, idx, wide);
+  S.backgroundImage = 'url("' + p.src + '")';
+  if (wide){
+    // one strip across the three frames, measured from the FRAMES themselves and never rounded: the picture is as
+    // wide as the row plus the 16px overhang at each end, each frame shows the slice under it, and every frame
+    // scales about the SAME point on the page (the middle of the strip) and slides the same pixels at the same
+    // moment, so the three slices stay one picture to the sub-pixel (a door-based, rounded version was 2px out)
+    const frames = [...document.querySelectorAll('#doors .door .photo')].map(ph => ph.getBoundingClientRect()), F0 = frames[0], FN = frames[frames.length - 1];
+    const W = Math.max(300, FN.right - F0.left + 32), off = el.closest('.photo').getBoundingClientRect().left - F0.left;
+    el.classList.add('wide'); S.backgroundSize = W.toFixed(2) + 'px auto'; S.backgroundPosition = (-off).toFixed(2) + 'px 45%';
+    S.transformOrigin = (W / 2 - off).toFixed(2) + 'px 50%';
+    S.setProperty('--z0', '1'); S.setProperty('--z1', '1.04'); S.setProperty('--x0', (d.dir * .5) + '%'); S.setProperty('--x1', (d.dir * -.6) + '%'); S.setProperty('--y0', '0%'); S.setProperty('--y1', '0%');
+  } else {
+    el.classList.remove('wide'); S.backgroundSize = ''; S.backgroundPosition = ''; S.transformOrigin = '';
+    S.setProperty('--z0', d.z0); S.setProperty('--z1', d.z1); S.setProperty('--x0', '0%'); S.setProperty('--y0', '0%'); S.setProperty('--x1', d.x1 + '%'); S.setProperty('--y1', d.y1 + '%');
+  }
+  S.animation = 'none'; void el.offsetWidth; S.animation = ''; S.animationDelay = (-(performance.now() - d.t0) / 1000).toFixed(2) + 's';
 }
 function swapTile(d, k, p, wide){
   const ph = d.querySelector('.photo'); if (!ph) return;
   const cur = ph.querySelector('.pic.on'), nxt = ph.querySelector('.pic:not(.on)'); if (!cur || !nxt) return;
-  setPic(nxt, p, k, wide); nxt.classList.add('top'); cur.classList.remove('top');
-  const fl = ph.querySelector('.flash'); if (fl){ fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go'); }
-  // timers, not requestAnimationFrame: rAF never fires in a hidden document, and a swap that waits on it looks dead
-  setTimeout(() => { nxt.classList.add('on');
-    setTimeout(() => { cur.style.transition = 'none'; cur.classList.remove('on'); setTimeout(() => { cur.style.transition = ''; }, 40); }, 500); }, 30);
+  const fl = d.querySelector('.sky .flash'); if (fl){ fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go'); }
+  // the picture changes under the white, at the flash's peak; timers, not requestAnimationFrame, which never fires
+  // in a hidden document
+  setTimeout(() => { setPic(nxt, p, k, wide); nxt.classList.add('top'); cur.classList.remove('top');
+    nxt.style.transition = 'none'; nxt.classList.add('on'); cur.classList.remove('on'); setTimeout(() => { nxt.style.transition = ''; }, 40); }, 110);
 }
 function mountPhotos(){
   const doors = [...document.querySelectorAll('#doors .door')]; if (!PHOTOS.length || !doors.length) return;
   if (!PH.slots || PH.slots.length !== 3) seatPhotos();
   doors.forEach((d, k) => { const ph = d.querySelector('.photo'); if (!ph) return; const a = ph.querySelector('.pic.a'), p = PH.wide != null ? PHOTOS[PH.wide] : PHOTOS[PH.slots[k]];
-    if (!a.classList.contains('on') && !ph.querySelector('.pic.on')){ setPic(a, p, k, PH.wide != null); a.classList.add('on'); }
+    if (!ph.querySelector('.pic.on')){ setPic(a, p, k, PH.wide != null); a.style.transition = 'none'; a.classList.add('on'); setTimeout(() => { a.style.transition = ''; }, 40); }
     else if (PH.wide != null) setPic(ph.querySelector('.pic.on'), p, k, true); });
-  if (!PH.timer) PH.timer = setInterval(cycle, 5000);
+  if (!PH.timer) PH.timer = setInterval(cycle, BEAT);
 }
 function cycle(){
   if (W.mode !== 'results' || PHOTOS.length < 2 || document.hidden) return;
-  const doors = [...document.querySelectorAll('#doors .door')]; if (doors.length < 3) return;
-  const places = [...new Set(PHOTOS.map(p => p.place))], GAP = 380;
-  PH.beat = (PH.beat || 0) + 1;
-  if (PH.wide == null && PH.beat % 3 !== 0){        // most beats: one tile changes, to a picture of the other place
-    const k = Math.floor(Math.random() * 3), cur = PHOTOS[PH.slots[k]], other = places.find(pl => pl !== (cur || {}).place) || null;
-    PH.slots[k] = freshPhoto(k, other); swapTile(doors[k], k, PHOTOS[PH.slots[k]], false); return;
-  }
-  if (PH.wide == null){                              // three pictures -> one across the row
-    PH.wide = freshPhoto(-1, null);
-    doors.forEach((d, k) => setTimeout(() => swapTile(d, k, PHOTOS[PH.wide], true), k * GAP));
-  } else {                                           // one across the row -> three new pictures, home and away
-    PH.wide = null; const start = Math.floor(Math.random() * places.length);
-    for (let k = 0; k < 3; k++) PH.slots[k] = freshPhoto(k, places.length > 1 ? places[(start + k) % places.length] : null);
-    doors.forEach((d, k) => setTimeout(() => swapTile(d, k, PHOTOS[PH.slots[k]], false), k * GAP));
-  }
+  if (document.querySelectorAll('#doors .door').length < 3) return;
+  const places = [...new Set(PHOTOS.map(p => p.place))];
+  const pano = PH.wide == null && Math.random() < PANO_ODDS;
+  if (pano){ PH.wide = freshPhoto(-1, null); PH.driftWide = null; driftFor(-1, PH.wide, true); }
+  else { PH.wide = null; const start = Math.floor(Math.random() * places.length); for (let k = 0; k < 3; k++) PH.slots[k] = freshPhoto(k, places.length > 1 ? places[(start + k) % places.length] : null); }
+  // right to left: the last frame first, then the middle, then the first
+  [2, 1, 0].forEach((k, i) => setTimeout(() => { const d = document.querySelectorAll('#doors .door')[k]; if (d) swapTile(d, k, PHOTOS[pano ? PH.wide : PH.slots[k]], pano); }, i * GAP));
 }
 addEventListener('resize', mountPhotos);
 

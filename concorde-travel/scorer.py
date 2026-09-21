@@ -45,7 +45,8 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 __all__ = ["Line", "Ledger", "Leg", "Tuning", "DEFAULT", "score", "score_all",
-           "grade", "timeline", "chosen_ground", "load_scenario"]
+           "grade", "report_card", "card_letter", "CARD_WEIGHTS", "CARD_POINTS",
+           "timeline", "chosen_ground", "load_scenario"]
 
 
 # ---------------------------------------------------------------- primitives
@@ -892,6 +893,247 @@ def grade(scenario: Dict[str, Any], option: Dict[str, Any],
         if idx <= threshold:
             return letter, led.effective_cents
     return "F", led.effective_cents
+
+
+# --------------------------------------------------------------- report card
+#
+# The letter on the page (per Patrick, 2026-09-21: "every plate shows up as an F
+# when they're definitely not ... grades that each flight gets objectively in
+# each category and not just price"). Six categories, each graded on its OWN
+# absolute rubric - price against the route's fair fare, speed against the
+# nonstop reference, the ground legs on what they cost and take, comfort on what
+# the cabin is, routing on what the connection is, reliability on the record -
+# and the whole is their weighted grade-point average. Price is the heaviest
+# weight and still only three tenths of the letter, so a flight that is fine in
+# every other way is not an F for one dear ticket, and a cheap seat with 28
+# inches through a dead layover is not an A.
+#
+# It is still ABSOLUTE: nothing here looks at the other results, so the same
+# flight earns the same card in every search, and test_scorer holds it to that.
+# It is deterministic, so the same flight earns the same card twice. And it is
+# not the ORDER: the list is ranked by effective cost at the traveller's dial,
+# the same as ever; the card says what the flight is, the dial says what it
+# costs you. grade() above stays as the model's own value grade (effective cost
+# against par), which the ledger tests and the fixtures are written against.
+
+CARD_WEIGHTS: Tuple[Tuple[str, str, float], ...] = (
+    ("price", "Price", 0.30), ("speed", "Speed", 0.15), ("ground", "Getting there", 0.10),
+    ("comfort", "Comfort", 0.20), ("routing", "Routing", 0.15), ("reliability", "Reliability", 0.10))
+CARD_POINTS: Tuple[Tuple[str, float], ...] = (
+    ("A+", 4.3), ("A", 4.0), ("A-", 3.7), ("B+", 3.3), ("B", 3.0), ("B-", 2.7),
+    ("C+", 2.3), ("C", 2.0), ("C-", 1.7), ("D", 1.0), ("F", 0.0))
+# points -> letter, each letter from midway to the next
+_LETTER_AT: Tuple[Tuple[float, str], ...] = (
+    (4.15, "A+"), (3.85, "A"), (3.5, "A-"), (3.15, "B+"), (2.85, "B"), (2.5, "B-"),
+    (2.15, "C+"), (1.85, "C"), (1.5, "C-"), (0.7, "D"))
+# a ratio to the reference -> points: the ticket to the fair fare, ...
+_PRICE_BANDS: Tuple[Tuple[float, float], ...] = (
+    (0.75, 4.3), (0.90, 4.0), (1.00, 3.7), (1.10, 3.3), (1.20, 3.0), (1.30, 2.7),
+    (1.45, 2.3), (1.60, 2.0), (1.75, 1.7), (2.00, 1.0))
+# ... and the door-to-door time to the nonstop reference's
+_SPEED_BANDS: Tuple[Tuple[float, float], ...] = (
+    (1.00, 4.3), (1.05, 4.0), (1.10, 3.7), (1.20, 3.3), (1.30, 3.0), (1.45, 2.7),
+    (1.60, 2.3), (1.80, 2.0), (2.00, 1.7), (2.40, 1.0))
+# a way to or from the airport, on its fare (cents) and, under $15, its time
+_GROUND_BANDS: Tuple[Tuple[int, float], ...] = (
+    (1500, 4.0), (4000, 3.0), (7000, 2.5), (10000, 2.0), (15000, 1.0))
+# the seat: pitch on the long leg, inches -> points; unknown is never the best seat
+_PITCH_POINTS: Tuple[Tuple[int, float], ...] = ((34, 4.3), (32, 4.0), (31, 3.5), (30, 3.0), (29, 2.3))
+_PITCH_UNKNOWN, _PITCH_FLOOR = 2.7, 1.3
+# the on-time record of the worst leg -> points; no record reads as a B: not a
+# demerit (BTS covers US carriers only, so most of the world has none) and not
+# a merit, and a card can still reach A+ past it only with everything else top
+_ONTIME_BANDS: Tuple[Tuple[float, float], ...] = (
+    (0.85, 4.3), (0.80, 4.0), (0.75, 3.3), (0.70, 2.7), (0.60, 2.0))
+_ONTIME_UNKNOWN, _ONTIME_FLOOR = 3.0, 1.0
+# with no modelled par basis (a hand-written fixture), the fair fare is the
+# share of par the reference fare takes on the modelled routes
+_FARE_SHARE_OF_PAR = 0.6
+
+
+def card_letter(points: float) -> str:
+    for at, letter in _LETTER_AT:
+        if points >= at:
+            return letter
+    return "F"
+
+
+def _card_band(value: float, bands: Sequence[Tuple[float, float]], below: float = 0.0) -> float:
+    for top, pts in bands:
+        if value <= top:
+            return pts
+    return below
+
+
+def _usd(cents: int) -> str:
+    return "$%s" % format(int(round(cents / 100.0)), ",d")
+
+
+def report_card(scenario: Dict[str, Any], option: Dict[str, Any],
+                tuning: Tuning = DEFAULT) -> Dict[str, Any]:
+    """The six letters and the whole, with a sentence for each. Absolute and
+    deterministic: only this option, the route's reference and the rubrics."""
+    led = score(scenario, option, "reference", tuning)
+    q = scenario["query"]
+    prof = q["profiles"]["reference"]
+    basis = scenario.get("_par") or {}
+    par = int(q["route_par_cents"])
+    segments = option["segments"]
+    parts: List[Dict[str, Any]] = []
+
+    def part(pid: str, pts: float, why: str) -> None:
+        name, weight = next((n, w) for i, n, w in CARD_WEIGHTS if i == pid)
+        pts = max(0.0, min(4.3, pts))
+        parts.append({"id": pid, "name": name, "letter": card_letter(pts),
+                      "points": round(pts, 2), "weight": weight, "why": why})
+
+    # price: the ticket and the party's bags against the fair fare - the modelled
+    # reference fare, which already carries the season and the holiday week
+    ticket = led.lines[0].amount_cents
+    bags = sum(l.amount_cents for l in led.all_by_code("bags"))
+    fair = int(basis.get("fare_cents") or par * _FARE_SHARE_OF_PAR)
+    ratio = (ticket + max(bags, 0)) / max(fair, 1)
+    if ratio < 0.95:
+        vs = "%d%% under the fair fare of %s" % (round((1 - ratio) * 100), _usd(fair))
+    elif ratio <= 1.05:
+        vs = "at the fair fare of %s" % _usd(fair)
+    else:
+        vs = "%d%% over the fair fare of %s" % (round((ratio - 1) * 100), _usd(fair))
+    part("price", _card_band(ratio, _PRICE_BANDS),
+         "%s ticket%s, %s" % (_usd(ticket), (" + %s bags" % _usd(bags)) if bags > 0 else "", vs))
+
+    # speed: door to door against the reference itinerary's (nonstop, from the
+    # centre); with no basis, the flying time plus the airport hour and a ride each end
+    ref_d2d = int((basis.get("reference") or {}).get("door_to_door_minutes") or 0)
+    if not ref_d2d:
+        ref_d2d = sum(minutes_between(s["departure_local"], s["arrival_local"]) for s in segments) + 150
+    d2d = led.door_to_door_minutes
+    part("speed", _card_band(d2d / max(ref_d2d, 1), _SPEED_BANDS),
+         "%s door to door, the nonstop reference %s" % (_hm(d2d), _hm(ref_d2d)))
+
+    # getting there: each end's chosen way in, on what it costs and how long it takes
+    def ground_points(mode: Optional[Dict[str, Any]], key: str) -> Tuple[float, str]:
+        if not mode:
+            return 1.0, "no way in we could price"
+        fare = int(mode.get("fare_cents", 0)) + int((mode.get("tolls_cents") or {}).get(key, 0) or 0)
+        mins = int(mode["door_to_door_minutes"]["p50"])
+        pts = _card_band(fare, _GROUND_BANDS)
+        if fare <= 1500 and mins <= 75:
+            pts = 4.3
+        if mode.get("support") == "assumed":          # a number we could not model, said so
+            pts = min(pts, 3.0)
+        return pts, "%s %s, %s" % (_usd(fare), str(mode.get("mode", "")).lower(), _hm(mins))
+    pref = _ground_pref(scenario)
+    ends: List[Tuple[float, str]] = []
+    out_mode, _ = chosen_ground(option, prof, "outbound", pref)
+    ends.append(ground_points(out_mode, "outbound"))
+    if option["ground"].get("arrival"):
+        in_mode, _ = chosen_ground(option, prof, "arrival", pref)
+        ends.append(ground_points(in_mode, "inbound"))
+    part("ground", sum(p for p, _ in ends) / len(ends), " · ".join(w for _, w in ends))
+
+    # comfort: the seat on the long leg, the cabin, wifi and power as the airline
+    # publishes them, the carrier's reviewed rating, and a red-eye
+    long_leg = max(segments, key=lambda s: minutes_between(s["departure_local"], s["arrival_local"]))
+    claims = long_leg.get("claims") or {}
+    pitch = claims.get("seat_pitch_inches")
+    why: List[str] = []
+    if pitch:
+        pts = _PITCH_FLOOR
+        for at, p in _PITCH_POINTS:
+            if pitch >= at:
+                pts = p
+                break
+        why.append("%g-inch pitch" % pitch)
+    else:
+        pts = _PITCH_UNKNOWN
+        why.append("pitch unknown")
+    cabin = next((str(x.get("cabin_marketed")) for x in list(option.get("tickets", [])) + list(segments)
+                  if x.get("cabin_marketed")), "economy").lower()
+    if cabin in ("business", "first"):
+        pts = max(pts, 4.3); why.append(cabin)
+    elif cabin.startswith("premium"):
+        pts = max(pts, 3.7); why.append("premium economy")
+    sids = {s.get("segment_id") for s in segments}
+    wifi = [w for w in ((scenario.get("_feed") or {}).get("wifi_published") or []) if w.get("segment") in sids]
+    if any(w.get("available") and w.get("cost") == "free" for w in wifi):
+        pts += 0.3; why.append("free wifi")
+    elif any(w.get("available") for w in wifi):
+        pts += 0.1; why.append("paid wifi" if any(w.get("cost") == "paid" for w in wifi) else "wifi")
+    elif wifi:
+        pts -= 0.2; why.append("no wifi")
+    power = str(claims.get("power") or "")
+    if power.startswith("Power"):
+        pts += 0.2; why.append("power at the seat")
+    elif power.startswith("No power"):
+        pts -= 0.2; why.append("no power")
+    cr = option.get("carrier_rating") or {}
+    rating = cr.get("rating")
+    if rating is None:
+        pts -= 0.2; why.append("unrated carrier")
+    else:
+        rating = float(rating)
+        pts += 0.4 if rating >= 0.85 else 0.1 if rating >= tuning.carrier_baseline else -0.2 if rating >= 0.6 else -0.5
+        why.append("carrier rated %.2f" % rating)
+    if led.by_code("redeye"):
+        pts -= 0.6; why.append("red-eye")
+    if led.by_code("cabin_uncertain"):
+        pts -= 0.2; why.append("cabin uncertain")
+    part("comfort", pts, ", ".join(why))
+
+    # routing: nonstop, or what the connection is - its hours, its margin, what
+    # a miss costs, whether it is one ticket
+    stops = len(segments) - 1
+    if stops == 0:
+        part("routing", 4.3, "nonstop")
+    else:
+        pts = 3.3 if stops == 1 else 2.3
+        why = []
+        segs = {s["segment_id"]: s for s in segments}
+        for lay in option.get("layovers", []):
+            arr, dep = segs[lay["arrive_segment_id"]], segs[lay["depart_segment_id"]]
+            why.append("%s at %s" % (_hm(minutes_between(arr["arrival_local"], dep["departure_local"])),
+                                     arr["destination"]["iata"]))
+        lay_pen = sum(l.amount_cents for l in led.all_by_code("layover"))
+        risk = sum(l.amount_cents for l in led.all_by_code("risk"))
+        if lay_pen >= 8000:
+            pts -= 1.2; why.append("dead hours")
+        elif lay_pen >= 4000:
+            pts -= 0.6; why.append("a rough layover")
+        elif lay_pen >= 1500:
+            pts -= 0.3
+        if risk >= 4000:
+            pts -= 1.0; why.append("a real misconnect exposure")
+        elif risk >= 2000:
+            pts -= 0.5; why.append("some misconnect exposure")
+        elif risk >= 800:
+            pts -= 0.2
+        if led.by_code("mct_margin"):
+            pts -= 0.5; why.append("tight against the minimum connection")
+        if len(option.get("tickets", [])) > 1:
+            pts -= 1.0; why.append("separate tickets")
+        part("routing", pts, ", ".join(why))
+
+    # reliability: the on-time record of the worst leg; a chain is as good as its weakest
+    records = [s["reliability"] for s in segments
+               if isinstance(s.get("reliability"), dict) and not is_abstain(s["reliability"])
+               and s["reliability"].get("on_time_fraction") is not None]
+    if records:
+        worst = min(records, key=lambda r: float(r["on_time_fraction"]))
+        f = float(worst["on_time_fraction"])
+        pts = _ONTIME_FLOOR
+        for at, p in _ONTIME_BANDS:
+            if f >= at:
+                pts = p
+                break
+        part("reliability", pts, "on time %d%% over %s departures%s" % (
+            round(f * 100), format(int(worst.get("sample_size") or 0), ",d"),
+            " on the weakest leg" if len(records) > 1 else ""))
+    else:
+        part("reliability", _ONTIME_UNKNOWN, "no on-time record for this flight")
+
+    points = sum(p["points"] * p["weight"] for p in parts)
+    return {"grade": card_letter(points), "points": round(points, 2), "parts": parts}
 
 
 def score_all(scenario: Dict[str, Any], profile_name: str,

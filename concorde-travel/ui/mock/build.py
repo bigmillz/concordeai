@@ -34,3 +34,17 @@ for src in sorted(glob.glob(os.path.join(HERE, "mock-*.src.html"))):
     open(out, "w", encoding="utf-8").write(html.replace("__DATA__", data).replace("__PHOTOS__", ph)
                                            .replace("__BUILD__", BUILD).replace("__UPDATED__", UPDATED))
     print("mock-%d.html  %6.0f KB" % (n, os.path.getsize(out) / 1024))
+    # One bad line kills the whole client silently (a duplicate const did, 2026-09-21), so every built page's
+    # scripts are syntax-checked with node when it is on the machine. Skipped, and said so, without it.
+    import re, shutil, tempfile, sys
+    if shutil.which("node"):
+        built = open(out, encoding="utf-8").read()
+        for i, js in enumerate(re.findall(r"<script(?![^>]*\bsrc=)(?![^>]*type=\"application)[^>]*>(.*?)</script>", built, re.S)):
+            with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as fh:
+                fh.write(js)
+            r = subprocess.run(["node", "--check", fh.name], capture_output=True, text=True)
+            os.unlink(fh.name)
+            if r.returncode:
+                sys.exit("mock-%d.html script %d does not parse; the page would be dead:\n%s" % (n, i, r.stderr.strip()[-600:]))
+    elif n == 10:
+        print("  (no node on this machine: the scripts were not syntax-checked)")

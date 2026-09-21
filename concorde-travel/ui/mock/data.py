@@ -217,6 +217,8 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
         e["day_offset"] = v["day_offset"]
         e["stops"] = v["stops"]
         e["grade"] = v["grade"]
+        e["card"] = v["card"]
+        e["value_grade"] = v["value_grade"]
         e["reference_cents"] = v["reference_cents"]
         e["ticket_cents"] = v["ticket_cents"]
         e["door_minutes"] = v["door_to_door_minutes"]

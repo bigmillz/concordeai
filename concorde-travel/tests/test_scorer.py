@@ -24,7 +24,8 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
-from scorer import (score, score_all, grade, timeline, chosen_ground,  # noqa: E402
+from scorer import (score, score_all, grade, report_card, card_letter, CARD_WEIGHTS, CARD_POINTS,  # noqa: E402
+                    timeline, chosen_ground,  # noqa: E402
                     load_scenario, DEFAULT, Line)
 
 FAILS = []
@@ -195,6 +196,40 @@ def run(path):
         check("[%s] a flight's grade does not depend on what else was returned" % name,
               not drifted, "; ".join(drifted[:4]))
 
+    # THE REPORT CARD, the letter on the page: six rubrics, weighted. Checked
+    # here with an independent oracle - the weighted average is recomputed
+    # from the parts - and held to the same absoluteness as the value grade.
+    import copy as _copy2
+    letters = {l for l, _ in CARD_POINTS}
+    cards = {oid: report_card(sc, o) for oid, o in opts.items()}
+    check("[%s] every card letter is a grade" % name,
+          all(c["grade"] in letters and all(p["letter"] in letters for p in c["parts"]) for c in cards.values()))
+    check("[%s] the card is its parts' weighted average" % name,
+          all(abs(sum(p["points"] * p["weight"] for p in c["parts"]) - c["points"]) < 0.02
+              and card_letter(sum(p["points"] * p["weight"] for p in c["parts"])) == c["grade"]
+              and [p["id"] for p in c["parts"]] == [i for i, _, _ in CARD_WEIGHTS]
+              for c in cards.values()))
+    check("[%s] the card is the same card twice" % name,
+          all(report_card(sc, o) == cards[oid] for oid, o in opts.items()))
+    drifted = []
+    for oid, o in opts.items():
+        for label, subset in (("alone", [o]), ("reversed", list(reversed(sc["options"])))):
+            sub = _copy2.deepcopy(sc)
+            sub["options"] = list(subset)
+            if report_card(sub, o) != cards[oid]:
+                drifted.append("%s %s" % (oid, label))
+    check("[%s] a flight's card does not depend on what else was returned" % name,
+          not drifted, "; ".join(drifted[:4]))
+    # a dearer ticket never earns a better price letter than a cheaper one
+    by_price = sorted(opts.values(), key=lambda o: sum(l.amount_cents for l in score(sc, o, "reference").lines
+                                                        if l.code in ("ticket", "bags")))
+    pp = [next(p["points"] for p in cards[o["option_id"]]["parts"] if p["id"] == "price") for o in by_price]
+    check("[%s] the price letter falls as the ticket rises" % name,
+          all(pp[i] >= pp[i + 1] for i in range(len(pp) - 1)), str(pp))
+    check("[%s] a nonstop is an A+ for routing" % name,
+          all(next(p["letter"] for p in cards[oid]["parts"] if p["id"] == "routing") == "A+"
+              for oid, o in opts.items() if len(o["segments"]) == 1))
+
     if exp.get("target_reorders"):
         orders = {p: [l.option_id for l in score_all(sc, p)] for p in sc["query"]["profiles"]}
         distinct = {tuple(v) for v in orders.values()}
@@ -280,6 +315,18 @@ def invariants():
           t.abstain_reliability_cents > 0 and t.abstain_claim_cents > 0)
     check("accepting red-eyes makes them cheaper, not free",
           0 < t.redeye_accepted_cents < t.redeye_cents)
+    # the report card's weights: what Patrick asked for, as arithmetic
+    ws = [w for _, _, w in CARD_WEIGHTS]
+    check("the card's weights add up to one", abs(sum(ws) - 1.0) < 1e-9)
+    check("price is the heaviest weight on the card and still under a third",
+          max(ws) == dict((i, w) for i, _, w in CARD_WEIGHTS)["price"] and max(ws) < 1 / 3)
+    check("one F among six categories with the rest at B is not an F overall",
+          all(sum(w for j, w in enumerate(ws) if j != i) * 3.0 >= 1.5 for i in range(len(ws))))
+    check("one A+ cannot carry five Fs above a D",
+          max(ws) * 4.3 < 1.5)
+    check("card letters descend with their points",
+          all(CARD_POINTS[i][1] > CARD_POINTS[i + 1][1] for i in range(len(CARD_POINTS) - 1))
+          and [card_letter(p) for _, p in CARD_POINTS] == [l for l, _ in CARD_POINTS])
 
 
 def main():

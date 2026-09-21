@@ -269,20 +269,35 @@ Not a search engine — a **re-ranker**. Inventory comes from a third-party API;
 is the enrichment and scoring layer on top. Every platform exposes the same filters over
 the same inventory. They differ in interface, not judgment. We sell the judgment.
 
-## Grade and order are two calls to one function — do not conflate them
+## The grade is a report card; the order is the dial — do not conflate them
 
-- **The grade is ABSOLUTE.** It is `effective_cost` at the fixed reference profile against the
-  route's par. The same flight earns the same letter whatever else the search returned,
-  whenever you search, under any target. A whole search legitimately coming back C− is the
-  system working. `test_scorer.py` guards this by re-grading every option against subsets of
-  the result set; a mutant that derives par from a percentile of the results is caught.
-- **The grade is NOT the price.** It is the whole effective cost — carrier quality, cabin,
-  pitch, layovers, misconnect risk, ground access, time. A dearer ticket routinely grades
-  better: in the real capture Alaska at a $404 ticket takes an A+ while Virgin at $325 takes
-  an A, because the cheaper one connects through AMS with a misconnect exposure and no bag.
-- **The ORDER is the same function at the user's target** (cheapest / fastest / comfort).
-  A C can and should outrank an A+ when the user asked for cheapest. Switching target
-  re-orders the list and never moves a letter.
+**The letter on the page is `scorer.report_card()`** (2026-09-21, per Patrick, after a
+Thanksgiving-eve search came back all F on the value grade: "every plate shows up as an F
+when they're definitely not ... grades that each flight gets objectively in each category
+and not just price"). Six categories, each on its OWN absolute rubric, and the letter is
+their weighted grade-point average: price 30% (ticket and the party's bags against the
+route's fair fare, the modelled reference fare with its season and holiday), speed 15%
+(door to door against the nonstop reference), getting there 10% (each end's chosen way in,
+on its fare and time), comfort 20% (pitch on the long leg, the cabin, wifi and power as
+published, the reviewed carrier rating, a red-eye), routing 15% (nonstop, or the
+connection's hours, margin, misconnect exposure and whether it is one ticket), reliability
+10% (the on-time record of the worst leg; no record reads as a B). The hover card shows
+the six letters, their weights and one sentence each. Price is the heaviest weight and
+still under a third, so one dear ticket is not an F and one bargain is not an A;
+`test_scorer.py` asserts both from the weights, and that a nonstop is an A+ for routing.
+
+- **It is still ABSOLUTE.** Nothing in the card looks at the other results, so the same
+  flight earns the same card whatever else the search returned; `test_scorer.py` re-cards
+  every option against subsets of the result set. Deriving anything from a percentile of
+  what came back is the obvious-looking change that quietly makes every grade relative.
+- **The value grade still exists.** `scorer.grade()` is effective cost at the reference
+  profile against par, on `Tuning.grade_bands`; the ledger tests and the fixtures'
+  expectations are written against it, and `_view` ships it as `value_grade`. It is not
+  shown. Do not relitigate which is "right": the card is what Patrick asked to see, and the
+  value model is what ranks.
+- **The ORDER is effective cost at the user's target** (cheapest / fastest / comfort).
+  A C can and should outrank an A when the user asked for cheapest. Switching target
+  re-orders the list and never moves a letter. The card never ranks anything.
 
 **Par is a specification, not a percentile — and it is MODELLED for any route on Earth**
 (since 2026-09-20). `concorde-travel/par.py` builds the route's reference itinerary — nonstop,
@@ -768,11 +783,19 @@ cached a week under `~/.concordego/suggest/` and capped per day. What a pick put
 field always resolves: a name with its code in brackets ("Honolulu (HNL)", which
 `places.resolve` reads), or an address.
 
-**The shortlist tiles' show** (2026-09-21): a shuffled pool of every photo of both places;
-each tile seated on its own picture, home and away alternating, drifting; every seven
-seconds the row flips between three pictures and one laid across the whole row, the three
-tiles changing 380ms apart with a white flash on each. The picture is a background layer
-16px past every edge, so no transform can show the ground.
+**The shortlist tiles' show** (2026-09-21, third pass, per Patrick: "go right to left and
+update ... make the panning smoother, like a drift ... a single image that spans all 3
+frames, randomly"): a beat every 6.5s; on the beat the frames update RIGHT TO LEFT, 420ms
+apart, each behind a white flash over its whole frame (above the scrim and the caption),
+the picture changing at the flash's peak; most beats deal three new pictures, home and away
+alternating; about one beat in three, at random, one picture is laid across all three frames
+as a strip, every frame scaling about the same point on the page so the slices stay one
+picture. Pictures come off a shuffled DECK, so nothing repeats until every one has shown.
+Each picture drifts for as long as it is up: one slow zoom with a slide, 20s long and linear
+though a picture lives 6.5s, the end points chosen per picture inside the 16px of slack, and
+a re-paint picks the drift up where it was. The swaps run on timers, never
+`requestAnimationFrame`, which a hidden tab never fires; and `build.py` syntax-checks every
+built page with node, because one duplicate `const` killed the whole client silently.
 
 **The destination field takes an address too** (2026-09-21, per Patrick: "so the person can get
 to a hotel or wherever they're staying"). `server.geo_place()` geocodes anything with a digit

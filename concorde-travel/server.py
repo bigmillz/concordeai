@@ -528,6 +528,7 @@ def _view(sc, opt, profile):
     the ledger lines and the bar. Nothing here recalculates either."""
     led = scorer.score(sc, opt, profile)
     letter, ref_cents = scorer.grade(sc, opt)
+    card = scorer.report_card(sc, opt)                 # the letter on the page (see scorer.report_card)
     tl = scorer.timeline(sc, opt, profile)
     first, last = opt["segments"][0], opt["segments"][-1]
     tickets = opt["tickets"]
@@ -557,7 +558,9 @@ def _view(sc, opt, profile):
         "effective_cents": led.effective_cents,
         "reference_cents": ref_cents,
         "door_to_door_minutes": led.door_to_door_minutes,
-        "grade": letter,
+        "grade": card["grade"],
+        "card": card,
+        "value_grade": letter,
         "filtered_reason": led.filtered_reason,
         "infeasible_reason": led.infeasible_reason,
         "award": award,
