@@ -207,6 +207,7 @@ details[open] summary:after{content:"–"}
 .pt input{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:var(--mono);font-size:14px;width:100%}
 .pt input:focus{border-color:var(--speed);outline:none}
 .ptnote{color:var(--faint);font-size:12.5px;line-height:1.55;margin:-4px 0 0}
+.ptnote.stworth select{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:3px 8px;color:var(--text);font-size:12.5px;margin:0 4px}
 .sth{grid-column:1/-1;margin:6px 0 0;font-size:15px;font-weight:500}
 .pt select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:9px 12px;font-size:14px}
 .ptnote b{color:var(--dim);font-weight:500}
@@ -880,7 +881,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">Advanced options are optional; leave them and go.</span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="86b57c4">86b57c4</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="3a93315">3a93315</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -907,7 +908,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="86b57c4">86b57c4</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="3a93315">3a93315</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1006,7 +1007,7 @@ const AIRNAME = {american:'AA',aa:'AA','british airways':'BA',ba:'BA',british:'B
 // ---- state
 const S = {trip:'round', a:1, b:0, c:0, preset:'1,0,0', asap:false, wants:new Set(), rules:[], ride:'either', off:new Set(), menu:false, open:new Set(),
   extra:{bag:0, wifi:false, seat:false, legroom:false, lounge:false, priority:false, insurance:false, hotel:false, custom:[]}, adv:{dep0:0, dep1:24, arr0:0, arr1:24, cabin:'economy', stops:2, alli:new Set(), out:new Set()},
-  pts:{amex:0, chase:0, capone:0, citi:0, bilt:0, marriott:0, avios:0, virgin:0, aa:0, delta:0, mm:0, ms:0, fb:0, ac:0, ua:0}, ptOpen:new Set(), stOpen:new Set(), more:{banks:false, progs:false, status:false}, pay:{}, legIdx:0, legPick:{}, stage:'legs', status:{}, shown:12, T:'mine',
+  pts:{amex:0, chase:0, capone:0, citi:0, bilt:0, marriott:0, avios:0, virgin:0, aa:0, delta:0, mm:0, ms:0, fb:0, ac:0, ua:0}, ptOpen:new Set(), stOpen:new Set(), statusWorth:6000, more:{banks:false, progs:false, status:false}, pay:{}, legIdx:0, legPick:{}, stage:'legs', status:{}, shown:12, T:'mine',
   legs:[{from:'', to:'', date:'Wed 18 Nov'}], back:'Wed 25 Nov', pax:'1 adult', bags:'1 checked bag'};
 
 // ---- wants: a predicate, a charge when it is missing, and a hint when nothing has it
@@ -1347,12 +1348,31 @@ function bill(e, opts){
       const wc = w.cost ? w.cost(e) : w.cents; if (!wc) continue;
       q.push({key:'want-' + id, label:'You wanted ' + w.label.toLowerCase(), cents:wc, want:true, evidence:w.why ? w.why(e) : 'a want, not a filter: this flight lacks it, so it sinks and stays visible'}); }
   }
+  // status (per Patrick, 2026-09-21): two flights otherwise alike, and one keeps your status earning. A CREDIT in
+  // the order, at what you say keeping it is worth, named on the row and in the ledger; never a filter, never on
+  // the money bill, never in the grade
+  const sh = statusHeld(e);
+  if (sh && S.statusWorth) q.push({key:'status', label:'Keeps your ' + sh.name, cents:-S.statusWorth, credit:true,
+      evidence:(sh.via === 'own' ? 'flying the programme\'s own airline' : 'flying a ' + sh.alliance + ' partner') + ' keeps the status earning · credit, at what you said it is worth'});
   const sum = grp => grp.reduce((s, x) => s + x.cents, 0), cash = Object.values(g).reduce((s, grp) => s + sum(grp), 0);
   // total: what you pay. rank: the scorer's whole effective cost at the dial, which orders the list.
   return {g, q, total:cash, rank:cash + sum(q) + timeCents, sub:Object.fromEntries(Object.entries(g).map(([k, v]) => [k, sum(v)])), ground:rides,
           dem:q.filter(x => x.want), adds:g.addons.filter(x => x.key !== 'bags' && x.cents > 0).concat(g.stay), base:e.grid[idx]};
 }
 function priced(e){ return bill(e); }
+// the status this flight keeps earning, if the traveller holds one: the operator's own programme, a programme
+// whose codes include the operator, or an alliance tier the operator belongs to
+function statusHeld(e){
+  const op = e.operator || e.carrier;
+  for (const [code, st] of Object.entries(STATUS)){
+    if (!S.status[code]) continue;
+    if (st.alliance){ if ((ALLI[st.alliance] || []).includes(op)) return {name:st.name + ' ' + S.status[code], via:'alliance', alliance:st.alliance}; continue; }
+    const codes = st.codes || [code];
+    if (codes.includes(op)) return {name:st.name + ' ' + S.status[code], via:'own'};
+    for (const [al, members] of Object.entries(ALLI)) if (members.includes(op) && codes.some(c => members.includes(c))) return {name:st.name + ' ' + S.status[code], via:'alliance', alliance:al};
+  }
+  return null;
+}
 function ranked(){
   const rows = [], hidden = [];
   for (const e of ALL){ const why = excluded(e); if (why) hidden.push({e, why}); else rows.push({e, ...bill(e)}); }
@@ -1505,6 +1525,7 @@ function rawTerms(e, r, ctx){
   // time, against the field
   if (ctx.spreadDoor >= 60){ const d = ctx.medDoor - e.door_minutes; if (d >= 45) pro('quicker', dur(rnd15(d)) + ' quicker', d*H/60 + 2000); else if (-d >= 60) con('slower', dur(rnd15(-d)) + ' slower', -d*H/60 + 2000); }
   const air = ctx.air(e); if (ctx.refAir && air/ctx.refAir >= 1.25) con('longway', 'Goes the long way', (air - ctx.refAir)*H/60 + 3000);
+  if (cents('status') < 0) pro('status', 'Keeps your status', -cents('status') + 2000, true);
   if (e.stops === 0) pro('nonstop', 'Nonstop', 8000);
   else { e.by.cheapest.legs.filter(l => l.kind === 'layover').forEach((l, i) => { const sg = e.segments[i], apt = sg ? sg.to : '', h = sg ? +sg.arr.slice(0, 2) : 12, m = l.minutes;
       if (m >= 300 && (h >= 21 || h < 3)) con('overnight', 'Overnight at ' + apt, 9000);
@@ -2064,9 +2085,10 @@ function paintPts(){
     chipRow('banks', 'Points you hold', POPULAR.banks, ptOn, balance, addPt, 4) +
     chipRow('progs', 'Airline programmes', progs, ptOn, balance, addPt, 4) +
     chipRow('status', 'Status', own.concat(alli), stOn, tier, addSt, 3, alli) +
+    (Object.values(S.status).some(Boolean) ? `<p class="ptnote stworth">Keeping it is worth <select id="stworth" aria-label="What keeping status is worth, a flight">${[0, 3000, 6000, 12000, 25000].map(c => `<option value="${c}"${S.statusWorth === c ? ' selected' : ''}>${c ? money(c) : 'nothing'}</option>`).join('')}</select> a flight: a flight that keeps it earning gets that credit in the order.</p>` : '') +
     '<p class="ptnote">Tap what you hold. Every flight is then priced in every programme that can book it, transfers included, and the better of cash or points is starred; status sets the odds of an upgrade. Only programmes these flights can use are offered. Demo award chart; upgrade odds from policy, never a flight\'s load.</p>';
 }
-document.addEventListener('change', ev => { const sel = ev.target.closest('[data-status]'); if (sel){ S.status[sel.dataset.status] = sel.value; paint(false); } });
+document.addEventListener('change', ev => { const w = ev.target.closest('#stworth'); if (w){ S.statusWorth = +w.value; paint(false); return; } const sel = ev.target.closest('[data-status]'); if (sel){ S.status[sel.dataset.status] = sel.value; paint(false); } });
 
 // ---- the sky. The site's own (concorde-site, index.html), ported as it is:
 // a starfield on three parallax depths with glinting hero stars, streaming
