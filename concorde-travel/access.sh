@@ -36,8 +36,6 @@ else
   AUTH=(-H "Authorization: Bearer $CF_API_TOKEN"); AUTH_KIND=token
 fi
 HOST="${HOST:-go.flyconcordefly.com}"; SESSION="${SESSION:-24h}"; TEAM="${TEAM:-}"; HOST_OK=""
-# /admin is for the person who runs it: ADMINS (default: the first email in ALLOW), matched again by the server's CONCORDEGO_OWNERS
-ADMINS="${ADMINS:-${ALLOW%%,*}}"
 TUNNEL="${TUNNEL:-concordego}"
 
 # The account that owns the zone is the one the tunnel was made in: cloudflared
@@ -192,10 +190,15 @@ echo "== applications"
 # not sign in, and Access never lets an anonymous request reach /api at all.
 ensure_app "ConcordeGo" "$HOST" "$EVERYONE"
 HOST_OK=1
-ensure_app "ConcordeGo sign-in" "$HOST/signin" "$FRIENDS"
+# ONE protected application. The sign-in (/api/signin) and the admin page (/api/admin) live inside it, so the
+# page and every call it makes share one sign-in: a browser fetch cannot complete a second application's login
+# redirect, which is what broke the admin page and the wish box when they were separate (2026-09-21). The
+# admin page is further limited to CONCORDEGO_OWNERS by the server itself.
 ensure_app "ConcordeGo API" "$HOST/api" "$FRIENDS"
-ADMIN_INCLUDE=$(python3 -c "import json,sys; print(json.dumps([{'email':{'email':e.strip().lower()}} for e in '$ADMINS'.split(',') if e.strip()]))")
-ensure_app "ConcordeGo admin" "$HOST/admin" "{\"name\":\"Friends\",\"decision\":\"allow\",\"include\":$ADMIN_INCLUDE,\"precedence\":1}"
+for OLD in "$HOST/signin" "$HOST/admin"; do
+  OID=$(cf GET "/apps" | jq_ "print(next((a['id'] for a in d.get('result') or [] if a.get('domain')=='$OLD'), ''))")
+  [ -n "$OID" ] && cf DELETE "/apps/$OID" >/dev/null && echo "  removed the separate application for $OLD"
+done
 echo
-echo "Done. https://$HOST is open to browse (a few searches a day free, via /search); /api and /signin ask for a sign-in, and the server sees the email in Cf-Access-Authenticated-User-Email"
+echo "Done. https://$HOST is open to browse (a few searches a day free, via /search); /api, with the sign-in and the admin page inside it, asks for a sign-in, and the server sees the email in Cf-Access-Authenticated-User-Email"
 echo "and gives each person a daily allowance (CONCORDEGO_USER_SEARCHES, default 20; CONCORDEGO_USER_WISHES, default 200)."

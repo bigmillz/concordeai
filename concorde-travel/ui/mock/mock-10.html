@@ -561,6 +561,9 @@ details[open] summary:after{content:"–"}
 .link svg{position:relative;width:26px;height:26px;fill:var(--speed);background:var(--panel2);padding:3px;border-radius:50%}
 .rm2{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);color:var(--faint);font-size:16px;display:grid;place-items:center}
 .rm2:hover{border-color:var(--red);color:var(--red)}
+/* a signed-in person's last three trips, under the form */
+.recent{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.recent.hidden{display:none}.recent .lbl{font-size:13px;color:var(--dim)}
+.rchip{border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--text);background:var(--panel);display:inline-flex;align-items:baseline;gap:8px}.rchip small{color:var(--faint);font-family:var(--mono);font-size:11px}.rchip:hover{border-color:var(--dim)}
 .ridegrp{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:2px}
 .ridegrp .lbl{font-size:13px;color:var(--dim)}
 .pills{display:inline-flex;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px}
@@ -860,7 +863,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">Advanced options are optional; leave them and go.</span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="04a740d">04a740d</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="5877378">5877378</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -887,7 +890,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="04a740d">04a740d</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="5877378">5877378</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -930,6 +933,9 @@ var PHOTOS = [];
 const cityOf = q => ((q.origin_full || q.origin || 'Brooklyn').split(',').pop().replace(/\d+/g, '').trim() || 'Brooklyn');
 const PH = {idx:0, t0:performance.now(), timer:null, city:cityOf(D.query)};
 const $ = s => document.querySelector(s);
+// test mode: a key pasted on the admin page lives in this browser's storage and rides on every request
+(() => { let k = ''; try { k = localStorage.getItem('concordego.testkey') || ''; } catch (e) {} if (!k) return; const f = window.fetch;
+  window.fetch = (url, opts) => { opts = opts || {}; if (typeof url === 'string' && url.startsWith('/')){ const h = new Headers(opts.headers || {}); h.set('X-Concordego-Test', k); opts = {...opts, headers:h}; } return f(url, opts); }; })();
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // One currency inside the model (hard rule 3): every figure is scored in US
 // cents and stays so. The display converts at the edge, and the footer says
@@ -1755,8 +1761,9 @@ function sentenceHTML(){
       'An address, a neighbourhood or a city. <b>The ride to the airport is priced from here</b>, at the hour you leave' + (L[0].from && D.query.origin_full && L[0].from === D.query.origin_full ? ': from ' + esc(short(L[0].from)) + ' that is ' + esc(g0.tip.split(' · ').slice(2).join(', ')) + ', about ' + dur(g0.minutes) : '') + '.<span class="locerr" id="locerr"></span>', 'Your address, or a neighbourhood')}${plane}${fld('q-to-0', 'To', L[0].to, 'flag', 'A city searches every airport it has: London means Heathrow, Gatwick, Stansted, Luton and City, weighed against each other.', 'City or airport')}</div>`;
   h += `<div class="frow dates">${fld('q-date-0', 'Leaving', L[0].date, 'cal', '', 'Date')}${S.trip === 'round' ? fld('q-back', 'Returning', S.back, 'cal', '', 'Date') : ''}${sel('q-pax', 'Travellers', S.pax, ['1 adult', '2 adults', 'Family of 4'], 'who')}${sel('q-cabin', 'Cabin', CABIN_NAMES[S.adv.cabin], Object.values(CABIN_NAMES), 'seat')}${sel('q-bags', 'Checked bags', S.bags, ['1 checked bag', 'No checked bag', '2 checked bags'], 'bag')}</div>`;
   if (S.trip === 'multi') L.slice(1).forEach((l, i) => { h += `<div class="frow legrow">${fld('q-from-' + (i+1), 'Then from', l.from, 'pin', '', 'City or airport')}${fld('q-to-' + (i+1), 'To', l.to, 'flag', '', 'City or airport')}${fld('q-date-' + (i+1), 'On', l.date, 'cal', '', 'Date')}<button class="rm2" data-rm="${i+1}" aria-label="Remove this flight">×</button></div>`; });
+  h += `<div class="recent" id="recent"></div>`;
   h += `<div class="ridegrp"><span class="lbl">Getting to the airport by</span><div class="pills" id="ridepills" role="group" aria-label="How you get to the airport">${Object.entries(RIDES).map(([k, v]) => `<button data-ride="${k}" aria-pressed="${S.ride === k}">${esc(v[0].toUpperCase() + v.slice(1))}</button>`).join('')}</div></div>`;
-  $('#sentence').innerHTML = h; $('#addleg').classList.toggle('hidden', S.trip !== 'multi');
+  $('#sentence').innerHTML = h; $('#addleg').classList.toggle('hidden', S.trip !== 'multi'); paintRecent();
   paintStepper();
 }
 function legNames(){ return S.trip === 'one' ? [['Your flight', S.legs[0].date]] : S.trip === 'round' ? [['Outbound', S.legs[0].date], ['Return', S.back]] : S.legs.map((l, i) => ['Flight ' + (i+1), l.date]); }
@@ -1796,7 +1803,7 @@ async function fetchLeg(i){
   if (!(SERVED && date)){ S.notice = (S.trip === 'round' ? 'Return leg, stand-in' : 'Flight ' + (i+1) + ', stand-in') + ': the outbound recording mirrored (this page is a file, not the live service).'; return null; }
   const box = $('#loading'); box.classList.remove('hidden'); runProgress(box, SEARCH_STAGES, 9000, () => {});
   let res;
-  try { const r = await fetch('/search', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'api', origin:from, origin_address:from, destination:to, date, adults:paxCount(), checked_bags:partyBags()})}); res = await r.json(); }
+  try { const r = await fetch('/search', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'api', origin:from, origin_address:from, destination:to, date, adults:paxCount(), checked_bags:partyBags(), trip:{leg:1}})}); res = await r.json(); }
   catch (x){ res = {error:'The search did not come back: ' + x.message}; }
   box.classList.add('hidden');
   if (res.error){ if (res.sign_in){ openAccount(res); return undefined; } S.notice = 'The return search failed (' + res.error + '), so this is the outbound recording mirrored.'; return null; }
@@ -2521,17 +2528,31 @@ $('#go').addEventListener('click', enterResults);
 // The server counts each person's day; the page greys the doors until then.
 S.user = null;
 const LOCKS = [['#wishbox', 'the wish box'], ['#dock .composer', 'the wish box'], ['#rbox', 'the price check']];
+function paintRecent(){
+  const el = $('#recent'); if (!el) return; const R = (S.recent || []).slice(0, 3);
+  el.innerHTML = R.length ? '<span class="lbl">Recent</span>' + R.map((r, i) => `<button type="button" class="rchip" data-recent="${i}">${esc(short(r.from) || r.from)} → ${esc(short(r.to) || r.to)}<small>${esc(r.date)}${r.kind === 'round' && r.back ? ' – ' + esc(r.back) : r.kind === 'one' ? ' · one way' : ''}</small></button>`).join('') : '';
+  el.classList.toggle('hidden', !R.length);
+}
+function runRecent(i){
+  const r = (S.recent || [])[i]; if (!r) return;
+  S.trip = r.kind === 'one' ? 'one' : 'round'; document.querySelectorAll('[data-trip]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.trip === S.trip)));
+  S.legs[0].from = r.from; S.legs[0].to = r.to; if (r.date) S.legs[0].date = isoToLabel(r.date); if (r.back) S.back = r.back; if (r.pax) S.pax = r.pax; if (r.bags) S.bags = r.bags;
+  sentenceHTML(); finishAllSteps(); enterResults();
+}
+function isoToLabel(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); if (!m) return iso; const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])); return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()]; }
+document.addEventListener('click', ev => { const b = ev.target.closest('[data-recent]'); if (b) runRecent(+b.dataset.recent); });
 function paintAccount(){
-  const u = S.user, label = !u ? 'Sign in' : u.owner ? 'This machine' : (u.email || 'Signed in').replace(/@.*/, '') + (u.demo ? ' (demo)' : '');
-  for (const id of ['#account', '#account2']){ const b = $(id); if (!b) continue; b.textContent = label; b.classList.toggle('in', !!u); b.title = u && u.left ? u.left.searches + ' live searches and ' + u.left.wishes + ' wishes left today' : u ? '' : 'Free: email or Google'; }
+  const u = S.user, label = !u ? 'Sign in' : u.test ? 'Test mode' : (u.viaAccess || (u.email && !u.demo && SERVED)) ? 'Log out' : u.owner ? 'This machine' : (u.email || 'Signed in') + (u.demo ? ' (demo)' : '');
+  for (const id of ['#account', '#account2']){ const b = $(id); if (!b) continue; b.textContent = label; b.classList.toggle('in', !!u); b.title = u && u.left ? (u.email || '') + ' · ' + u.left.searches + ' live searches and ' + u.left.wishes + ' wishes left today' : u && u.email ? u.email : u ? '' : 'Free: email or Google'; }
+  paintRecent();
   for (const [sel, what] of LOCKS){ const el = document.querySelector(sel); if (!el) continue; el.classList.toggle('locked', !u);
     if (!u){ el.dataset.tip = '<div class="jh"><i></i><b>Sign in to unlock ' + what + '</b></div><ul><li>Free. Your email or Google; no password.</li></ul>'; el.setAttribute('aria-label', 'Sign in to unlock ' + what); } else { delete el.dataset.tip; el.removeAttribute('aria-label'); } }
   const h4 = document.querySelector('#s4 .hintr'); if (h4) h4.textContent = u && !u.demo ? 'Advanced options are optional; leave them and go.' : 'Without a sign-in these are recorded results. Sign in above to search live.';
 }
 function openAccount(why){
   const u = S.user, capped = why && why.sign_in && why.free != null;
-  $('#accth').textContent = u ? (u.owner ? 'This machine' : 'Your account') : capped ? 'Today\'s free searches are used up' : 'A free account unlocks the rest';
-  $('#acctbody').innerHTML = u ? `<p>${u.owner ? 'This machine has no limits.' : 'Signed in as <b>' + esc(u.email || '') + '</b>.' + (u.left ? ' Today: <b>' + u.left.searches + '</b> live searches and <b>' + u.left.wishes + '</b> wishes left.' : '')}</p>
+  $('#accth').textContent = u ? (u.test ? 'Test mode' : u.owner ? 'This machine' : 'Your account') : capped ? 'Today\'s free searches are used up' : 'A free account unlocks the rest';
+  $('#acctbody').innerHTML = u ? `<p>${u.test ? 'This browser holds the test key: no limits. Turn it off on the admin page.' : u.owner ? 'This machine has no limits.' : 'Signed in as <b>' + esc(u.email || '') + '</b>.' + (u.left ? ' Today: <b>' + u.left.searches + '</b> live searches and <b>' + u.left.wishes + '</b> wishes left.' : '')}</p>
       <div class="row2">${!u.owner && !u.demo && SERVED ? '<a class="ledger" href="/cdn-cgi/access/logout">Sign out</a>' : ''}${u.demo ? '<button class="ledger" id="acctout">Leave the demo account</button>' : ''}<button class="choose" id="acctno" style="flex:0 0 auto">Done</button></div>`
     : `<p>${capped ? esc(why.error) + ' Your email or Google, no password.' : (S.freeMax ? S.freeMax + ' searches a day are free without an account' + (S.free != null ? ' (' + S.free + ' left today)' : '') + '. ' : '') + 'A free account unlocks the rest: ' + (S.freeMax ? '' : 'live searches on your own dates and places, ') + 'the wish box, the price check from other countries, and a watchlist. Your email or Google, no password.'}</p>
       <ul><li>Live searches on your own dates and places <small>· 20 a day</small></li><li>The wish box, read by Claude <small>· 200 a day</small></li><li>The price check from other countries <small>· 2 a day</small></li><li>Saved searches and a watchlist of routes, with price history <small>· up to 5 routes, coming</small></li></ul>
@@ -2541,14 +2562,14 @@ function openAccount(why){
 }
 function closeAccount(){ $('#acct').classList.add('hidden'); }
 document.addEventListener('click', ev => {
-  if (ev.target.closest('#account, #account2')){ openAccount(); return; }
+  if (ev.target.closest('#account, #account2')){ const u = S.user; if (u && (u.viaAccess || (u.email && !u.demo && SERVED))){ location.href = '/cdn-cgi/access/logout'; return; } openAccount(); return; }
   if (ev.target.closest('#acctx, #acctno') || ev.target.id === 'acct'){ closeAccount(); return; }
-  if (ev.target.closest('#acctgo')){ if (SERVED) location.href = '/signin?next=' + encodeURIComponent(location.pathname); else { S.user = {email:'you@example.com', demo:true}; paintAccount(); closeAccount(); } return; }
+  if (ev.target.closest('#acctgo')){ if (SERVED) location.href = '/api/signin?next=' + encodeURIComponent(location.pathname); else { S.user = {email:'you@example.com', demo:true}; paintAccount(); closeAccount(); } return; }
   if (ev.target.closest('#acctout')){ S.user = null; paintAccount(); closeAccount(); return; }
   const lock = ev.target.closest('.locked'); if (lock){ ev.preventDefault(); ev.stopPropagation(); openAccount(); }
 }, true);
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('#acct').classList.contains('hidden')) closeAccount(); });
-if (SERVED) fetch('/whoami').then(r => r.json()).then(w => { S.user = w.owner ? {owner:true} : w.email ? {email:w.email, left:w.left} : null; S.free = w.free_left; S.freeMax = (w.allowances || {}).free; paintAccount(); }).catch(() => paintAccount()); else paintAccount();
+if (SERVED) fetch('/whoami').then(r => r.json()).then(w => { S.user = w.owner ? {owner:true, email:w.email || '', viaAccess: w.remote && !!w.email} : w.test ? {owner:true, test:true} : w.email ? {email:w.email, left:w.left, viaAccess:true} : null; S.recent = w.recent || []; S.free = w.free_left; S.freeMax = (w.allowances || {}).free; paintAccount(); }).catch(() => paintAccount()); else paintAccount();
 // the hover card: one element, filled from the segment under the pointer
 const JT = document.createElement('div'); JT.className = 'jtip'; JT.setAttribute('role', 'tooltip'); JT.hidden = true; document.body.appendChild(JT);
 let jtFor = null;
@@ -2785,7 +2806,7 @@ async function enterResults(){
   if (SERVED){
     runProgress(box, SEARCH_STAGES, 9000, () => {});
     let res;
-    try { const r = await fetch('/search', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'api', origin:L.from, origin_address:L.from, destination:L.to, date, adults:paxCount(), checked_bags:partyBags()})}); res = await r.json(); }
+    try { const r = await fetch('/search', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'api', origin:L.from, origin_address:L.from, destination:L.to, date, adults:paxCount(), checked_bags:partyBags(), trip:{kind:S.trip, back:S.trip === 'round' ? S.back : '', pax:S.pax, bags:S.bags}})}); res = await r.json(); }
     catch (e){ res = {error:'The search did not come back: ' + e.message}; }
     if (res.error){ box.classList.add('hidden'); $('#wizard').classList.remove('hidden'); $('#rail').classList.remove('hidden'); goStep(1);
       if (res.sign_in){ openAccount(res); return; }

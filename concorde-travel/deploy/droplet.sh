@@ -10,7 +10,7 @@
 #   - /opt/concordego/venv     python3 + the anthropic SDK (the one non-stdlib package)
 #   - concordego.service       server.py on 127.0.0.1:9897, serving mock-10 at /
 #   - concordego-update.timer  hourly: fetch BRANCH, and if HEAD moved, reset to it and restart the service
-#   - /admin on the served site the same by hand: which commit is live, what GitHub has, update now, the logs;
+#   - /api/admin on the served site the same by hand: which commit is live, what GitHub has, update now, the logs;
 #                              for the emails in CONCORDEGO_OWNERS (put them behind Access too: access.sh does)
 #   - cloudflared              a Cloudflare tunnel made in the Zero Trust dashboard, run from its token;
 #                              the dashboard owns the public hostname and its DNS record, so nothing here
@@ -65,6 +65,7 @@ HOME=/var/lib/concordego
 # CONCORDEGO_OWNERS=pat@millertechnology.net
 # CONCORDEGO_PEXELS_KEY=...          photos of the origin and destination on the shortlist tiles (pexels.com/api, free)
 # CONCORDEGO_ACCESS_TEAM=yourteam    the Zero Trust team name (the part before .cloudflareaccess.com): the server verifies the sign-in cookie against it
+# CONCORDEGO_TEST_KEY=...            test mode: 64 random characters; a browser that pastes it on /api/admin is not metered
 # CONCORDEGO_USER_SEARCHES=20
 # CONCORDEGO_USER_WISHES=200
 ENV

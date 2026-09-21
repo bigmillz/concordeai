@@ -105,7 +105,7 @@ systemctl restart concordego && sleep 1 && systemctl is-active concordego'
 
 # ------------------------------------------------------------------ door
 say "access"
-ALLOW="$ALLOW" ADMINS="${ADMINS:-$OWNERS}" HOST="$HOST" TEAM="${TEAM:-}" bash "$TRAVEL/access.sh" 2>&1 | sed 's/^/  /'
+ALLOW="$ALLOW" HOST="$HOST" TEAM="${TEAM:-}" bash "$TRAVEL/access.sh" 2>&1 | sed 's/^/  /'
 
 # ---------------------------------------------------------------- verify
 say "verify"
@@ -113,5 +113,5 @@ for _ in $(seq 1 12); do dig +short "$HOST" @1.1.1.1 2>/dev/null | grep -q . && 
 echo "  dns: $(dig +short "$HOST" @1.1.1.1 | head -1)"
 for _ in $(seq 1 12); do CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "https://$HOST/" || true); [ "$CODE" = 200 ] && break; sleep 5; done
 echo "  https://$HOST/ -> $CODE"
-echo "  https://$HOST/admin (sign in as $OWNERS)"
+echo "  https://$HOST/api/admin (sign in as $OWNERS)"
 echo "  droplet: ssh root@$IP   logs: journalctl -u concordego -f   update now: concordego-update"

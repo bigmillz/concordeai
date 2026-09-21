@@ -64,6 +64,9 @@ WISHES_TOTAL = int(os.environ.get("CONCORDEGO_WISHES_TOTAL", "1500"))
 ANON_SEARCHES = int(os.environ.get("CONCORDEGO_ANON_SEARCHES", "4"))
 # The Zero Trust team, e.g. millerworldindustries: the issuer of the sign-in cookie the server verifies below.
 ACCESS_TEAM = os.environ.get("CONCORDEGO_ACCESS_TEAM", "").strip().lower()
+# Test mode: a browser that sends this key (pasted once on the admin page, kept in its own storage) is not
+# metered, signed in or not. 64 random characters, generated on the box, never in the repo.
+TEST_KEY = os.environ.get("CONCORDEGO_TEST_KEY", "").strip()
 # Photos of the origin and the destination for the shortlist tiles: Pexels (free, 200 an hour, a credit line
 # asked). Cached per place for a month, so a place costs one call ever; and at most PHOTO_CALLS uncached
 # lookups a day site-wide, so nobody can spend the hour walking the atlas. No key: the stand-in artwork stays.
@@ -93,7 +96,7 @@ def _users_take(email, kind, limit):
             users = {}
         u = users.get(email) or {}
         if u.get("day") != today:
-            u = {"day": today, "searches": 0, "wishes": 0}
+            u = {"day": today, "searches": 0, "wishes": 0, "recent": u.get("recent") or []}
         if u.get(kind, 0) >= limit:
             users[email] = u
             return False, 0
@@ -171,6 +174,31 @@ def access_email(token):
         return email or None
     except Exception:
         return None
+
+
+def _users_recent_add(email, item):
+    """Remember a signed-in person's search (the trip, not the results), newest
+    first, five deep, one entry per distinct trip."""
+    key = json.dumps(item, sort_keys=True)
+    with _USERS_LOCK:
+        try:
+            with open(USERS_FILE, encoding="utf-8") as fh:
+                users = json.load(fh)
+        except (OSError, ValueError):
+            users = {}
+        u = users.get(email) or {}
+        recent = [r for r in (u.get("recent") or []) if json.dumps(r, sort_keys=True) != key]
+        u["recent"] = ([item] + recent)[:5]
+        users[email] = u
+        live._atomic_write(USERS_FILE, users)
+
+
+def _users_recent(email):
+    try:
+        with open(USERS_FILE, encoding="utf-8") as fh:
+            return ((json.load(fh)).get(email) or {}).get("recent") or []
+    except (OSError, ValueError):
+        return []
 
 
 def _hours_to_midnight():
@@ -834,6 +862,7 @@ def admin_status(fetch=False):
     out["narrator"] = bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
     out["users_today"] = _users_today()
     out["allowances"] = {"searches": USER_SEARCHES, "wishes": USER_WISHES}
+    out["test_key"] = TEST_KEY   # the owner's own page; Access and OWNERS stand in front of it
     import shutil
     out["log_source"] = "journal" if shutil.which("journalctl") else (LOG_FILE or None)
     return out
@@ -1069,6 +1098,9 @@ table{border-collapse:collapse;font-size:13px;width:100%}td,th{text-align:left;p
 <div class="grid" id="cards"></div>
 <div class="row"><button id="check">Check GitHub</button><button id="update" disabled>Update now</button><button class="ghost" id="refresh">Refresh</button><span class="note" id="msg"></span></div>
 <div id="incoming"></div>
+<div class="card" style="margin-bottom:18px"><div class="k">Test mode</div><div class="v">Paste the key to use the site without limits in this browser</div>
+<div class="row" style="margin:10px 0 0"><input id="tkey" placeholder="64 characters" style="flex:1;min-width:260px;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);font:13px 'IBM Plex Mono',monospace;padding:9px 12px"><button id="tkeyon">Turn on</button><button class="ghost" id="tkeyoff">Turn off</button><span class="note" id="tkeymsg"></span></div>
+<div class="s" id="tkeyhint"></div></div>
 <div class="tabs"><button id="t-server" aria-pressed="true">Server log</button><button id="t-update" aria-pressed="false">Update log</button><button class="ghost" id="t-reload">Reload log</button></div>
 <pre id="log">…</pre>
 </div><script>
@@ -1076,7 +1108,7 @@ const $ = s => document.querySelector(s); let ST = null, UNIT = 'server';
 const ago = s => s < 90 ? s + 's' : s < 5400 ? Math.round(s/60) + ' min' : s < 172800 ? (s/3600).toFixed(1) + ' h' : Math.round(s/86400) + ' d';
 const when = iso => iso ? new Date(iso).toLocaleString() : '—';
 async function j(url, opts){ const r = await fetch(url, opts); if (!r.ok) throw new Error(r.status + ' ' + r.statusText); return r.json(); }
-function paint(st){ ST = st; const h = st.head || {}, behind = st.behind;
+function paint(st){ ST = st; const h = st.head || {}, behind = st.behind; paintKey(st);
   const cards = [
     ['Running', `<b>${h.short || '?'}</b> on ${st.branch || '?'}`, (h.subject || '') + (h.date ? ' · ' + when(h.date) : '')],
     ['GitHub', behind == null ? '<span class="warn">not checked</span>' : behind ? `<span class="warn">${behind} commit${behind > 1 ? 's' : ''} ahead</span>` : '<span class="ok">up to date</span>', st.last_check ? 'last checked ' + when(st.last_check) : 'never checked'],
@@ -1103,6 +1135,11 @@ $('#refresh').onclick = () => { load(); logs(); };
 $('#t-server').onclick = () => { UNIT = 'server'; $('#t-server').setAttribute('aria-pressed', 'true'); $('#t-update').setAttribute('aria-pressed', 'false'); logs(); };
 $('#t-update').onclick = () => { UNIT = 'update'; $('#t-update').setAttribute('aria-pressed', 'true'); $('#t-server').setAttribute('aria-pressed', 'false'); logs(); };
 $('#t-reload').onclick = logs;
+const tkState = () => { let k = ''; try { k = localStorage.getItem('concordego.testkey') || ''; } catch (e) {} $('#tkeymsg').textContent = k ? 'On in this browser.' : 'Off.'; };
+$('#tkeyon').onclick = () => { const k = $('#tkey').value.trim(); if (k.length < 32){ $('#tkeymsg').textContent = 'That is not the key.'; return; } try { localStorage.setItem('concordego.testkey', k); } catch (e) {} $('#tkey').value = ''; tkState(); };
+$('#tkeyoff').onclick = () => { try { localStorage.removeItem('concordego.testkey'); } catch (e) {} tkState(); };
+const paintKey = st => { $('#tkeyhint').innerHTML = st.test_key ? 'This server\'s key: <code style="user-select:all;color:var(--dim)">' + st.test_key + '</code> (only you see this page)' : '<span class="warn">No CONCORDEGO_TEST_KEY set on this server.</span>'; };
+tkState();
 load(); logs();
 </script></body></html>
 """
@@ -1135,6 +1172,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def _who(self):
         if not self._remote():
             return "owner"
+        import hmac
+        tk = (self.headers.get("X-Concordego-Test") or "").strip()
+        if TEST_KEY and tk and hmac.compare_digest(tk, TEST_KEY):
+            return "test"
         email = (self.headers.get("Cf-Access-Authenticated-User-Email") or "").strip().lower()
         if email:
             return email
@@ -1152,6 +1193,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def _is_owner(self):
         who = self._who()
         return who == "owner" or (who is not None and who in OWNERS)
+
+    def _unmetered(self, who):
+        return who == "owner" or who == "test" or (who is not None and who in OWNERS)
 
     def _html(self, text, code=200):
         body = text.encode("utf-8")
@@ -1172,19 +1216,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
             owner = who == "owner" or (who is not None and who in OWNERS)
             ip = (self.headers.get("Cf-Connecting-Ip") or self.headers.get("X-Forwarded-For") or "?").split(",")[0].strip()
             free = None if who else max(0, ANON_SEARCHES - (_users_left("ip:" + ip) or {}).get("searches_used", 0))
-            return self._json({"remote": self._remote(), "email": None if who in (None, "owner") else who,
-                               "owner": owner, "left": None if (owner or who is None) else _users_left(who),
+            return self._json({"remote": self._remote(), "email": None if who in (None, "owner", "test") else who,
+                               "owner": owner, "test": who == "test", "left": None if (owner or who in (None, "test")) else _users_left(who),
+                               "recent": _users_recent(who)[:3] if (who and "@" in who) else [],
                                "allowances": {"searches": USER_SEARCHES, "wishes": USER_WISHES, "free": ANON_SEARCHES},
                                "free_left": free, "hours": _hours_to_midnight()})
         if path in ("/locate", "/photos", "/suggest"):
             from urllib.parse import parse_qs
             q = parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
             return self._json({"/locate": locate_request, "/photos": photos_request, "/suggest": suggest_request}[path](q))
-        if path == "/admin" or path.startswith("/api/admin/"):
+        if path == "/api/admin" or path.startswith("/api/admin/"):
             if not self._is_owner():
                 return self._html("<!doctype html><meta charset=utf-8><body style='background:#101013;color:#ececec;font:15px sans-serif;padding:40px'>"
                                   "<p>This page is for the person who runs ConcordeGo. Sign in with an email listed in CONCORDEGO_OWNERS.</p>", 403)
-            if path == "/admin":
+            if path == "/api/admin":
                 return self._html(ADMIN_HTML)
             from urllib.parse import parse_qs
             q = parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
@@ -1223,7 +1268,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self.send_error(404)
             return self._send_file(os.path.join(UI, "mock", name),
                                    "text/html; charset=utf-8")
-        if path == "/signin":
+        if path in ("/signin", "/admin"):
+            # the old paths: into the one protected application, /api, so the page and its calls share one sign-in
+            q = ("?" + self.path.split("?", 1)[1]) if "?" in self.path else ""
+            self.send_response(302); self.send_header("Location", "/api" + path + q); self.send_header("Content-Length", "0"); self.end_headers(); return
+        if path == "/api/signin":
             # Cloudflare Access protects this path; by the time a request lands
             # here the person has signed in, and the cookie now covers /api/*
             q = self.path.split("?", 1)[1] if "?" in self.path else ""
@@ -1308,13 +1357,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 if not okall:
                     return self._json({"error": "The wish box has had its day (%d wishes site-wide). It is back at midnight." % WISHES_TOTAL,
                                        "remote": True, "allowance": True})
-            ok, left = (True, None) if who in OWNERS else _users_take(who, kind, limit)
+            ok, left = (True, None) if self._unmetered(who) else _users_take(who, kind, limit)
             if not ok:
                 return self._json({"error": "That is today's allowance of %d %s for %s. It resets at midnight." % (limit, kind, who),
                                    "remote": True, "allowance": True})
         try:
             if anon_ok and self._remote():
                 req = dict(req, _served=True)
+                who_r = self._who()
+                trip = req.get("trip") or {}
+                if who_r and "@" in who_r and isinstance(trip, dict) and not trip.get("leg"):
+                    _users_recent_add(who_r, {"from": str(req.get("origin") or "")[:120], "to": str(req.get("destination") or "")[:120], "date": str(req.get("date") or "")[:10],
+                                              "kind": str(trip.get("kind") or "round")[:8], "back": str(trip.get("back") or "")[:40], "pax": str(trip.get("pax") or "")[:20], "bags": str(trip.get("bags") or "")[:20]})
             fn = {"/api/score": score_request, "/api/narrate": narrate_request,
                   "/api/live": live_request, "/api/wish": wish_request, "/api/search": search_request}[path]
             return self._json(fn(req))

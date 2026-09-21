@@ -532,7 +532,16 @@ in again (2026-09-21). The server therefore reads Access's own cookie, `CF_Autho
 JWT signed with the team's key, and verifies it in the stdlib (RS256 against the team's
 published keys at `<team>.cloudflareaccess.com/cdn-cgi/access/certs`, cached an hour; the
 issuer; the expiry) before trusting its email. `CONCORDEGO_ACCESS_TEAM` names the team;
-`launch.sh` reads it from the account and writes it to the droplet's env.
+`launch.sh` reads it from the account and writes it to the droplet's env. **There is ONE
+protected Access application, `/api`**, with the sign-in (`/api/signin`) and the admin page
+(`/api/admin`) inside it: a browser fetch cannot complete a second application's login
+redirect, which is what broke the admin page when it was its own application. `/signin` and
+`/admin` redirect into it. **Test mode**: `CONCORDEGO_TEST_KEY` (64 random characters,
+generated on the box); a browser that pastes it on the admin page keeps it in its own storage
+and sends it as `X-Concordego-Test` on every request, and the server meters nothing for it.
+Signed-in people get a Log out button (Access's own logout) and their three most recent
+trips as chips under the form (`recent` in `users.json`, five deep, survives the day's
+rollover).
 
 **The wish box's model is Claude Opus 5** (`concorde-travel/wish.py`, `/api/wish`), the same
 model as the narrator: one call at low effort with a strict JSON schema over the page's own
