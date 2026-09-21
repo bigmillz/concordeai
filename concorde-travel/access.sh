@@ -39,8 +39,9 @@ echo "== account"
 # Reading /accounts/{id} itself needs "Account Settings: Read", which this token
 # is not asked to carry, so the account is checked through Access instead: the
 # list of Access applications needs only the permission the script needs anyway.
-cf GET /apps | jq_ 'if not d.get("success"): sys.exit("  The token cannot reach Access on this account: " + json.dumps(d.get("errors")) + "\n  One of three things:\n   - CF_ACCOUNT_ID is wrong. The sure way to read it: open dash.cloudflare.com, click the account, and copy the 32 characters in the address bar right after dash.cloudflare.com/ (a Zone ID looks identical and is the usual mix-up).\n   - The token was made with Account Resources set to a different account, or to none.\n   - The token lacks \"Access: Apps and Policies: Edit\".\n  My Profile > API Tokens > the token shows its permissions and which account it covers.")
-print("  reachable, " + str(len(d.get("result") or [])) + " Access application(s) so far")'
+cf GET /apps | jq_ 'r=d.get("result") or []
+if not d.get("success"): sys.exit("  The token cannot reach Access on this account: " + json.dumps(d.get("errors")) + "\n  One of three things:\n   - CF_ACCOUNT_ID is wrong. The sure way to read it: open dash.cloudflare.com, click the account, and copy the 32 characters in the address bar right after dash.cloudflare.com/ (a Zone ID looks identical and is the usual mix-up).\n   - The token was made with Account Resources set to a different account, or to none.\n   - The token lacks \"Access: Apps and Policies: Edit\".\n  My Profile > API Tokens > the token shows its permissions and which account it covers.")
+print("  reachable, " + str(len(r)) + " Access application(s) so far")'
 
 echo "== organisation"
 ORG=$(cf GET /organizations)
