@@ -164,7 +164,12 @@ details[open] summary:after{content:"–"}
 .alli{display:flex;flex-direction:column;gap:6px;font-size:13.5px}
 .alli label{display:flex;gap:8px;align-items:center;cursor:pointer}
 .alli input{accent-color:var(--speed)}
-.carriers{display:flex;flex-wrap:wrap;gap:6px}
+/* an even grid, so the names line up in columns rather than ragged chips (per Patrick, 2026-09-21) */
+.carriers{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:6px}
+.carriers .cbtn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.cbtn.more{border-style:dashed;color:var(--faint);justify-content:center}.cbtn.more:hover{color:var(--text)}
+.airsheet h4{font:400 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin:18px 0 8px}
+.airsheet .airq{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);font:500 15px var(--sans);padding:10px 14px;margin-top:6px}.airsheet .airq:focus{outline:none;border-color:var(--speed)}
 .cbtn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:8px;padding:4px 8px 4px 4px;font-size:12.5px;color:var(--dim);background:var(--panel)}
 .cbtn[aria-pressed=true]{opacity:.4;text-decoration:line-through}
 .cbtn:hover{border-color:var(--dim);color:var(--text)}
@@ -521,7 +526,7 @@ details[open] summary:after{content:"–"}
 .fields{display:grid;gap:12px;margin-top:18px}
 .frow{display:grid;gap:12px}
 .frow.route{grid-template-columns:minmax(0,1.5fr) 56px minmax(0,1fr);align-items:stretch}
-.frow.dates{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.frow.dates{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
 .frow.legrow{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,.8fr) 40px;align-items:center}
 .fld{position:relative;background:var(--panel3);border:1px solid var(--line);border-radius:12px;padding:12px 14px 12px 44px;min-width:0;transition:border-color .15s,background .15s}
 .fld:hover{border-color:#3a3d46}
@@ -646,17 +651,20 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 /* the shortlist window: one picture of the origin city across all three cards,
    each card a pane of it; it drifts, and every few seconds it changes, pane by pane */
 .sky{height:126px;overflow:hidden}
-.sky .pano{position:absolute;top:0;bottom:0;left:0;width:100%;animation:pan 44s ease-in-out infinite alternate;will-change:transform}
-.sky .pano img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 62%;opacity:0;transition:opacity 1.1s ease}
-.sky .pano img.on{opacity:1}
-.sky .pano img.top{z-index:1}
+/* each door holds its own full-frame photo (per Patrick, 2026-09-21: the strip across three cards read as
+   crops); the row is offset so it goes home, there, home, and every 6.5s the whole row walks one along */
+.sky .photo{position:absolute;inset:0;overflow:hidden}
+.sky .photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 45%;opacity:0;transition:opacity 1.1s ease;animation:drift 24s ease-in-out infinite alternate;will-change:transform}
+.sky .photo img.on{opacity:1}
+.sky .photo img.top{z-index:1}
+@keyframes drift{from{transform:scale(1.04) translate(-1%, 0)}to{transform:scale(1.12) translate(1%, -2%)}}
 .sky .scrim{position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(10,10,12,.12) 0%,rgba(10,10,12,.02) 35%,rgba(10,10,12,.6) 100%);pointer-events:none}
 .sky .cap{position:absolute;left:16px;right:16px;top:10px;z-index:2;font-family:var(--disp);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.78);text-shadow:0 1px 2px rgba(0,0,0,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sky .t{z-index:2}
 .seal{top:140px}
 .door .body .eyebrow,.door .body .pc{padding-right:60px}
 @media (max-width:980px){.sky{height:108px}.seal{top:122px}}
-@media (prefers-reduced-motion:reduce){.sky .pano{animation:none}.rise,.bar.drop,#results.fade,.door.swap,.rise .seal .ring,.swap .seal .ring,.rise .seal .g,.swap .seal .g,.rise .seal .sg,.swap .seal .sg,.rise .jseg,.swap .jseg,.door.p1 .seal svg{animation:none;opacity:1;stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){.sky .photo img{animation:none}.rise,.bar.drop,#results.fade,.door.swap,.rise .seal .ring,.swap .seal .ring,.rise .seal .g,.swap .seal .g,.rise .seal .sg,.swap .seal .sg,.rise .jseg,.swap .jseg,.door.p1 .seal svg{animation:none;opacity:1;stroke-dashoffset:0}}
 
 /* ---------- the dock: the wish goes on under the results, like a chat */
 .dock{position:fixed;left:0;right:0;bottom:0;z-index:7;padding:0 clamp(12px,3vw,28px) calc(12px + env(safe-area-inset-bottom,0px));pointer-events:none}
@@ -934,11 +942,27 @@ const NAMES = {cheapest:'cheapest all-in', fastest:'fastest door to door', comfo
 const BRAND = {BA:'#1E4A8B',VS:'#D3082A',AA:'#0F62B4',DL:'#C81E2B',LH:'#F5B400',AY:'#0B1B5C',LX:'#D6001C',TK:'#C00A1A',IB:'#C8102E',AZ:'#0A2A5A',KL:'#00A1DE',AF:'#0A2A6E',EI:'#00A65A',TP:'#00A164',FI:'#12325B',AS:'#0A4A78',SK:'#0B2A5B',LO:'#0C2F6E',UA:'#0A2A6E',B6:'#0033A0',AV:'#D71920',AT:'#B8102E',EY:'#8B6B2E',EW:'#8B1A5C',LY:'#0A3A8C',VL:'#4A4A4A'};
 const LUM = new Set(['LH']);
 function logo(code, big){
-  const a = AIR[code] || {};
-  return `<span class="logo${big ? ' big' : ''}${LUM.has(code) ? ' lum' : ''}" style="--brand:${BRAND[code] || '#3a3d46'}" title="${esc(a.name || code)}">` +
-    (a.logo ? `<img alt="" src="${esc(a.logo)}" onload="this.parentNode.classList.add('on')">` : '') + `<b>${esc(code)}</b></span>`;
+  const a = AIR[code] || {}, src = a.logo || (DUFFEL[code] ? 'https://assets.duffel.com/img/airlines/for-light-background/full-color-logo/' + code + '.svg' : '');
+  return `<span class="logo${big ? ' big' : ''}${LUM.has(code) ? ' lum' : ''}" style="--brand:${BRAND[code] || '#3a3d46'}" title="${esc(a.name || airName(code))}">` +
+    (src ? `<img alt="" src="${esc(src)}" onload="this.parentNode.classList.add('on')">` : '') + `<b>${esc(code)}</b></span>`;
 }
 const ALLIANCE = {oneworld:['BA','AA','IB','AY','AS','QR','CX','JL','QF','RJ','MH','AT','UL','WY'], skyteam:['DL','VS','AF','KL','AZ','KE','AM','SV','MU','GA','VN','CI','UX','OK','RO','ME','KQ'], star:['LH','LX','TK','LO','UA','AC','OS','SN','SK','TP','SQ','NH','TG','ET','MS','SA','A3','AI','BR','CA','CM','NZ','OU','OZ','ZH']};
+
+// ---- every airline Duffel can sell (its own list, 2026-09: 29 direct, 112 through Travelport), by region. The
+// chips show the majors; "More airlines" opens the rest. A code not in the search still gets a name and a logo from
+// Duffel's asset host. Delta and ITA are kept although Duffel's page does not list them: ITA came back in the real
+// capture, Delta is the one most people look for first, and a leave-out chip for an airline that never returns costs nothing.
+const REGIONS = ['North America', 'Latin America', 'Europe', 'Middle East', 'Africa', 'Asia', 'Oceania'];
+const DUFFEL = {
+  AA:['American Airlines',0], DL:['Delta',0], UA:['United',0], B6:['JetBlue',0], AS:['Alaska Airlines',0], HA:['Hawaiian Airlines',0], F9:['Frontier',0], WS:['WestJet',0], AC:['Air Canada',0], PD:['Porter',0], TS:['Air Transat',0], LF:['Contour',0], UP:['Bahamasair',0], BW:['Caribbean Airlines',0], KX:['Cayman Airways',0], WM:['Winair',0], Y4:['Volaris',0],
+  CM:['Copa Airlines',1], LA:['LATAM',1], AV:['Avianca',1], AR:['Aerolíneas Argentinas',1], AD:['Azul',1], G3:['GOL',1], OB:['BoA',1], PY:['Surinam Airways',1],
+  BA:['British Airways',2], VS:['Virgin Atlantic',2], LH:['Lufthansa',2], LX:['SWISS',2], OS:['Austrian',2], SN:['Brussels Airlines',2], AF:['Air France',2], KL:['KLM',2], IB:['Iberia',2], I2:['Iberia Express',2], LV:['LEVEL',2], VY:['Vueling',2], AY:['Finnair',2], EI:['Aer Lingus',2], AZ:['ITA Airways',2], TP:['TAP Air Portugal',2], SK:['SAS',2], FI:['Icelandair',2], DY:['Norwegian',2], UX:['Air Europa',2], LO:['LOT Polish',2], BT:['airBaltic',2], DE:['Condor',2], SS:['Corsair',2], EW:['Eurowings',2], '4Y':['Eurowings Discover',2], U2:['easyJet',2], HV:['Transavia',2], A3:['Aegean',2], OA:['Olympic Air',2], OU:['Croatia Airlines',2], JU:['Air Serbia',2], FB:['Bulgaria Air',2], RO:['Tarom',2], LG:['Luxair',2], V7:['Volotea',2], GQ:['SKY express',2], S4:['Azores Airlines',2], RC:['Atlantic Airways',2], TK:['Turkish Airlines',2], PC:['Pegasus',2], XQ:['SunExpress',2],
+  EK:['Emirates',3], QR:['Qatar Airways',3], EY:['Etihad',3], FZ:['flydubai',3], WY:['Oman Air',3], SV:['Saudia',3], KU:['Kuwait Airways',3], RJ:['Royal Jordanian',3], ME:['Middle East Airlines',3], LY:['EL AL',3],
+  ET:['Ethiopian',4], MS:['EgyptAir',4], NP:['Nile Air',4], AT:['Royal Air Maroc',4], AH:['Air Algérie',4], TU:['Tunisair',4], KQ:['Kenya Airways',4], WB:['RwandAir',4], UR:['Uganda Airlines',4], TC:['Air Tanzania',4], PW:['Precision Air',4], SA:['South African Airways',4], '4Z':['Airlink',4], BP:['Air Botswana',4], TM:['LAM Mozambique',4], DT:['TAAG Angola',4], MK:['Air Mauritius',4], HM:['Air Seychelles',4], MD:['Air Madagascar',4], UU:['Air Austral',4],
+  SQ:['Singapore Airlines',5], CX:['Cathay Pacific',5], NH:['ANA',5], JL:['Japan Airlines',5], KE:['Korean Air',5], OZ:['Asiana',5], BR:['EVA Air',5], CI:['China Airlines',5], CA:['Air China',5], MU:['China Eastern',5], CZ:['China Southern',5], HU:['Hainan Airlines',5], ZH:['Shenzhen Airlines',5], '3U':['Sichuan Airlines',5], MF:['XiamenAir',5], HX:['Hong Kong Airlines',5], NX:['Air Macau',5], TG:['Thai Airways',5], PG:['Bangkok Airways',5], VN:['Vietnam Airlines',5], MH:['Malaysia Airlines',5], GA:['Garuda Indonesia',5], PR:['Philippine Airlines',5], BG:['Biman Bangladesh',5], RA:['Nepal Airlines',5], PK:['PIA',5], OM:['MIAT Mongolian',5], J2:['Azerbaijan Airlines',5], KC:['Air Astana / FlyArystan',5], TR:['Scoot',5],
+  QF:['Qantas',6], JQ:['Jetstar',6], VA:['Virgin Australia',6], NZ:['Air New Zealand',6], FJ:['Fiji Airways',6], PX:['Air Niugini',6], TN:['Air Tahiti Nui',6], NF:['Air Vanuatu',6], IE:['Solomon Airlines',6]};
+const MAJORS = ['AA','DL','UA','B6','AS','AC','BA','VS','LH','AF','KL','IB','LX','AY','TK','EI','EK','QR','SQ','CX'];
+const airName = c => (AIR[c] || {}).name || (DUFFEL[c] || [c])[0];
 const AIRNAME = {american:'AA',aa:'AA','british airways':'BA',ba:'BA',british:'BA',virgin:'VS','virgin atlantic':'VS',delta:'DL',united:'UA',lufthansa:'LH',alaska:'AS',iberia:'IB',finnair:'AY',swiss:'LX',turkish:'TK',ita:'AZ',alitalia:'AZ',jetblue:'B6','aer lingus':'EI',tap:'TP',icelandair:'FI',lot:'LO',klm:'KL','air france':'AF',avianca:'AV',etihad:'EY',sas:'SK'};
 
 // ---- state
@@ -1183,7 +1207,7 @@ function excluded(e){
   for (const r of S.rules){
     if (r.kind === 'avoid' && (e.carrier === r.code || e.operator === r.code)){
       if (r.unless && WANTS.find(w => w.id === r.unless).ok(e)) continue;
-      return (AIR[r.code] || {}).name + ' ruled out' + (r.unless ? ' (no ' + WANTS.find(w => w.id === r.unless).label.toLowerCase() + ' on it)' : '');
+      return airName(r.code) + ' ruled out' + (r.unless ? ' (no ' + WANTS.find(w => w.id === r.unless).label.toLowerCase() + ' on it)' : '');
     }
     if (r.kind === 'max' && bill(e).total > r.cents) return 'over your ' + money(r.cents) + ' cap all in';
     if (r.kind === 'after' && dh < r.h) return 'departs before ' + r.h + ':00, which you ruled out';
@@ -1549,8 +1573,7 @@ function door(kind, e, r, title, ctx){
   const eff = r.total, pc = prosCons(e, r, ctx);
   const chips = (arr, none) => arr.length ? arr.map(w => '<b>' + esc(w) + '</b>').join('') : '<b class="none">' + none + '</b>';
   return `<article class="door ${kind}" data-id="${esc(e.id)}">
-    <div class="sky" style="background:${skyBand(e)}">${PHOTOS.length ? `<div class="pano"><img class="ph a on" alt="" src="${PHOTOS[PH.idx].src}"><img class="ph b" alt=""></div><div class="scrim"></div><span class="cap">${esc(PHOTOS[PH.idx].place || PH.city)} · ${esc(PHOTOS[PH.idx].credit)}</span>` : ''}
-      <span class="t l">${hm(e.depart)}</span><span class="t r">${hm(e.arrive)}${e.day_offset ? '<small>+1</small>' : ''}</span></div>
+    <div class="sky" style="background:${skyBand(e)}">${PHOTOS.length ? `<div class="photo"><img class="ph a" alt=""><img class="ph b" alt=""></div><div class="scrim"></div><span class="cap"></span>` : ''}</div>
     ${sealHTML(e)}
     <div class="body">
       <div class="eyebrow">${title}</div>
@@ -1691,6 +1714,7 @@ const ICON = {
   flag:'<svg class="ico" viewBox="0 0 24 24"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>',
   cal:'<svg class="ico" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
   who:'<svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg>',
+  seat:'<svg class="ico" viewBox="0 0 24 24"><path d="M6 4.5v9.5h9.5l3 5.5M6 14l-2 5.5M9 14v-4.5a2 2 0 0 1 2-2h3"/></svg>',
   bag:'<svg class="ico" viewBox="0 0 24 24"><rect x="4" y="7.5" width="16" height="13" rx="2.5"/><path d="M9 7.5V5.5a3 3 0 0 1 6 0v2M9 11.5v6M15 11.5v6"/></svg>',
 };
 function sentenceHTML(){
@@ -1701,7 +1725,7 @@ function sentenceHTML(){
   const plane = '<div class="link" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M15 8l-4.2-1.4L7 1.5H5.4l1.9 5.1H3.6L2.5 4.9H1.2l.9 3.1-.9 3.1h1.3l1.1-1.7h3.7L5.4 14.5H7l3.8-5.1z"/></svg></div>';
   let h = `<div class="frow route">${fld('q-from-0', 'From your door', L[0].from, 'pin',
       'An address, a neighbourhood or a city. <b>The ride to the airport is priced from here</b>, at the hour you leave' + (L[0].from && D.query.origin_full && L[0].from === D.query.origin_full ? ': from ' + esc(short(L[0].from)) + ' that is ' + esc(g0.tip.split(' · ').slice(2).join(', ')) + ', about ' + dur(g0.minutes) : '') + '.<span class="locerr" id="locerr"></span>', 'Your address, or a neighbourhood')}${plane}${fld('q-to-0', 'To', L[0].to, 'flag', 'A city searches every airport it has: London means Heathrow, Gatwick, Stansted, Luton and City, weighed against each other.', 'City or airport')}</div>`;
-  h += `<div class="frow dates">${fld('q-date-0', 'Leaving', L[0].date, 'cal', '', 'Date')}${S.trip === 'round' ? fld('q-back', 'Returning', S.back, 'cal', '', 'Date') : ''}${sel('q-pax', 'Travellers', S.pax, ['1 adult', '2 adults', 'Family of 4'], 'who')}${sel('q-bags', 'Checked bags', S.bags, ['1 checked bag', 'No checked bag', '2 checked bags'], 'bag')}</div>`;
+  h += `<div class="frow dates">${fld('q-date-0', 'Leaving', L[0].date, 'cal', '', 'Date')}${S.trip === 'round' ? fld('q-back', 'Returning', S.back, 'cal', '', 'Date') : ''}${sel('q-pax', 'Travellers', S.pax, ['1 adult', '2 adults', 'Family of 4'], 'who')}${sel('q-cabin', 'Cabin', CABIN_NAMES[S.adv.cabin], Object.values(CABIN_NAMES), 'seat')}${sel('q-bags', 'Checked bags', S.bags, ['1 checked bag', 'No checked bag', '2 checked bags'], 'bag')}</div>`;
   if (S.trip === 'multi') L.slice(1).forEach((l, i) => { h += `<div class="frow legrow">${fld('q-from-' + (i+1), 'Then from', l.from, 'pin', '', 'City or airport')}${fld('q-to-' + (i+1), 'To', l.to, 'flag', '', 'City or airport')}${fld('q-date-' + (i+1), 'On', l.date, 'cal', '', 'Date')}<button class="rm2" data-rm="${i+1}" aria-label="Remove this flight">×</button></div>`; });
   h += `<div class="ridegrp"><span class="lbl">Getting to the airport by</span><div class="pills" id="ridepills" role="group" aria-label="How you get to the airport">${Object.entries(RIDES).map(([k, v]) => `<button data-ride="${k}" aria-pressed="${S.ride === k}">${esc(v[0].toUpperCase() + v.slice(1))}</button>`).join('')}</div></div>`;
   $('#sentence').innerHTML = h; $('#addleg').classList.toggle('hidden', S.trip !== 'multi');
@@ -1845,7 +1869,7 @@ function replyFor(items){
   if (!items.length) return "Didn't catch that. Try an airline, a time, a seat, or what matters most.";
   const bits = [];
   for (const x of items){
-    if (x.kind === 'avoid'){ const n = ALL.filter(e => e.carrier === x.code || e.operator === x.code).length; bits.push((AIR[x.code] || {name:x.code}).name + ' out' + (n ? ' (' + n + ')' : '') + (x.unless ? ', unless ' + WANTS.find(w => w.id === x.unless).label.toLowerCase() : '')); }
+    if (x.kind === 'avoid'){ const n = ALL.filter(e => e.carrier === x.code || e.operator === x.code).length; bits.push(airName(x.code) + ' out' + (n ? ' (' + n + ')' : '') + (x.unless ? ', unless ' + WANTS.find(w => w.id === x.unless).label.toLowerCase() : '')); }
     else if (x.kind === 'want'){ const w = WANTS.find(v => v.id === x.id); bits.push(w.count ? w.label + (ADDONS[x.id] ? ' on the bill' : ' counted') : w.label + ': none in economy'); }
     else if (x.kind === 'tilt') bits.push(x.p === 'asap' ? 'Ranked for the soonest arrival' : x.label.replace('Lean toward', 'Leaning toward'));
     else if (x.kind === 'max') bits.push('Nothing over ' + money(x.cents));
@@ -1940,9 +1964,20 @@ function paintChips(){
   const z = [...S.wants].map(id => WANTS.find(w => w.id === id)).filter(w => !w.count && w.hint);
   $('#chipnote').classList.toggle('hidden', !z.length); $('#chipnote').textContent = z.map(w => w.hint).join(' ');
 }
+function carrierChip(c){ return `<button class="cbtn" data-c="${c}" aria-pressed="${S.adv.out.has(c)}">${logo(c)}<span>${esc(airName(c))}</span></button>`; }
 function paintCarriers(){
-  const codes = [...new Set(ALL.flatMap(e => [e.carrier, e.operator]))].sort();
-  $('#carriers').innerHTML = codes.map(c => `<button class="cbtn" data-c="${c}" aria-pressed="${S.adv.out.has(c)}">${logo(c)}${esc((AIR[c] || {}).name || c)}</button>`).join('');
+  const inSearch = new Set(ALL.flatMap(e => [e.carrier, e.operator]).filter(Boolean));
+  const shown = [...new Set(MAJORS.concat([...inSearch].sort()))].filter(c => DUFFEL[c] || inSearch.has(c));
+  const rest = Object.keys(DUFFEL).filter(c => !shown.includes(c)).length + [...S.adv.out].filter(c => !shown.includes(c)).length;
+  $('#carriers').innerHTML = shown.map(carrierChip).join('') +
+    `<button class="cbtn more" id="moreair" type="button"><span>More airlines · ${rest} more${[...S.adv.out].some(c => !shown.includes(c)) ? ' · ' + [...S.adv.out].filter(c => !shown.includes(c)).length + ' out' : ''}</span></button>`;
+}
+function airlinesSheet(){
+  const q = (S.airq || '').trim().toLowerCase();
+  const groups = REGIONS.map((r, gi) => { const codes = Object.keys(DUFFEL).filter(c => DUFFEL[c][1] === gi && (!q || DUFFEL[c][0].toLowerCase().includes(q) || c.toLowerCase() === q)); return codes.length ? `<h4>${esc(r)}</h4><div class="carriers all">${codes.sort((a, b) => DUFFEL[a][0].localeCompare(DUFFEL[b][0])).map(carrierChip).join('')}</div>` : ''; }).join('');
+  $('#sheetroot').innerHTML = `<div class="sheetwrap" id="sheetwrap"><div class="sheet airsheet" role="dialog" aria-modal="true" aria-label="All airlines"><div class="hd"><h3>Every airline this search can sell<span>${Object.keys(DUFFEL).length} of them. Tap one to leave it out; tap again to let it back.</span></h3><button class="x" id="x" aria-label="Close">×</button></div>
+    <input class="airq" id="airq" placeholder="Find an airline" value="${esc(S.airq || '')}" autocomplete="off"><div id="airgroups">${groups || '<p class="bnote">Nothing by that name.</p>'}</div></div></div>`;
+  ($('#airq')).focus();
 }
 // Elite status, for the odds of an upgrade. What is curated per airline is
 // its published policy on a transatlantic economy fare (which cabin, if any,
@@ -1963,6 +1998,9 @@ const statusCodes = ([k, st]) => st.alliance ? ALLI[st.alliance] : (st.codes || 
 function statusInPlay(){ return Object.entries(STATUS).filter(x => statusCodes(x).some(c => LOY.has(c)) && (x[1].alliance || statusCodes(x).some(c => OPS.has(c)))); }
 function progsInPlay(){ const ps = new Set(); ALL.forEach(e => (AWARD[e.operator] || AWARD[e.carrier] || []).forEach(a => ps.add(a.p))); return Object.keys(PROG).filter(k => ps.has(k)); }
 const ALLI = {skyteam:['DL','VS','AF','KL','AZ','KE','AM','SV','MU','GA','VN','CI','UX','OK','RO','ME','KQ'], oneworld:['AA','BA','IB','AY','AS','QR','CX','JL','QF','RJ','MH','AT','UL','WY'], star:['UA','LH','LX','TK','LO','AC','OS','SN','SK','TP','SQ','NH','TG','ET','MS','SA','A3','AI','BR','CA','CM','NZ','OU','OZ','ZH']};
+const CABIN_NAMES = {economy:'Economy', premium:'Premium economy', business:'Business', first:'First'};
+function setCabin(v){ S.adv.cabin = v; $('#cabin').value = v; const q = $('#q-cabin'); if (q) q.value = CABIN_NAMES[v]; if (W.mode === 'results') summary();
+  WANTS.find(w => w.id === 'lieflat').hint = v === 'economy' ? 'No lie-flat seat flies this route in economy. Switch the cabin to Business to see them.' : 'This demo carries economy inventory only; a Business search would show lie-flat seats here.'; paintChips(); }
 const CABINS = {DL:['Comfort+', 'Premium Select', 'Delta One'], UA:['Premium Plus', 'Polaris'], AA:['Premium Economy', 'Business'], BA:['World Traveller Plus', 'Club World'], VS:['Premium', 'Upper Class'], LH:['Premium Economy', 'Business', 'First'], LX:['Business', 'First'],
   AF:['Premium Economy', 'Business'], KL:['Premium Comfort', 'Business'], TK:['Business'], AC:['Premium Economy', 'Business'], AY:['Premium Economy', 'Business'], IB:['Premium Economy', 'Business'], default:['Premium economy', 'Business']};
 // complimentary status upgrades on a transatlantic economy fare: which cabin, and roughly how often they clear, by tier
@@ -2388,9 +2426,13 @@ const HINTS = ["Say more, in your own words… 'not Iberia'", "'land before 9am'
 let hintN = 0; setInterval(() => { const box = $('#dwish'); if (!box || document.activeElement === box || box.value || $('#dock').classList.contains('mini')) return; hintN = (hintN + 1) % HINTS.length; box.placeholder = HINTS[hintN]; }, 4200);
 const winv = () => { const A = S.adv; $('#depv').textContent = A.dep0 === 0 && A.dep1 === 24 ? 'any time' : String(A.dep0).padStart(2,'0') + ':00 – ' + String(A.dep1).padStart(2,'0') + ':00'; $('#arrv').textContent = A.arr0 === 0 && A.arr1 === 24 ? 'any time' : String(A.arr0).padStart(2,'0') + ':00 – ' + String(A.arr1).padStart(2,'0') + ':00'; };
 ['dep0','dep1','arr0','arr1'].forEach(k => $('#' + k).addEventListener('input', ev => { S.adv[k] = +ev.target.value; if (S.adv.dep0 > S.adv.dep1) S.adv[k === 'dep0' ? 'dep1' : 'dep0'] = S.adv[k]; if (S.adv.arr0 > S.adv.arr1) S.adv[k === 'arr0' ? 'arr1' : 'arr0'] = S.adv[k]; winv(); paint(true); }));
-$('#cabin').addEventListener('change', ev => { S.adv.cabin = ev.target.value; if (W.mode === 'results') summary(); WANTS.find(w => w.id === 'lieflat').hint = ev.target.value === 'economy' ? 'No lie-flat seat flies this route in economy. Switch the cabin to Business under Advanced to see them.' : 'This demo carries economy inventory only; a Business search would show lie-flat seats here.'; paintChips(); });
+$('#cabin').addEventListener('change', ev => setCabin(ev.target.value));
+document.addEventListener('change', ev => { if (ev.target.id === 'q-cabin') setCabin(Object.keys(CABIN_NAMES).find(k => CABIN_NAMES[k] === ev.target.value) || 'economy'); });
 $('#stops').addEventListener('change', ev => { S.adv.stops = +ev.target.value; paint(true); });
 $('#alli').addEventListener('change', ev => { ev.target.checked ? S.adv.alli.add(ev.target.value) : S.adv.alli.delete(ev.target.value); paint(true); });
+document.addEventListener('input', ev => { if (ev.target.id === 'airq'){ S.airq = ev.target.value; const pos = ev.target.selectionStart; airlinesSheet(); const f = $('#airq'); f.setSelectionRange(pos, pos); } });
+document.addEventListener('click', ev => { if (ev.target.closest('#moreair')){ S.airq = ''; airlinesSheet(); return; }
+  const b = ev.target.closest('#airgroups [data-c]'); if (!b) return; const c = b.dataset.c; S.adv.out.has(c) ? S.adv.out.delete(c) : S.adv.out.add(c); b.setAttribute('aria-pressed', String(S.adv.out.has(c))); paintCarriers(); if (W.mode === 'results'){ paint(false); summary(); } });
 $('#carriers').addEventListener('click', ev => { const b = ev.target.closest('[data-c]'); if (!b) return; const c = b.dataset.c; S.adv.out.has(c) ? S.adv.out.delete(c) : S.adv.out.add(c); b.setAttribute('aria-pressed', String(S.adv.out.has(c))); paint(true); });
 $('#pts').addEventListener('input', ev => { const m = /^pt-(\w+)$/.exec(ev.target.id); if (!m) return; S.pts[m[1]] = +String(ev.target.value).replace(/[^\d]/g, '') || 0; paint(false); });
 $('#list').addEventListener('click', ev => { const b = ev.target.closest('[data-row]'); if (!b) return; const li = b.closest('.row'), open = li.getAttribute('aria-expanded') === 'true', det = li.querySelector('.detail'); li.setAttribute('aria-expanded', String(!open)); if (!open){ det.innerHTML = ledgerHTML(ALL.find(x => x.id === li.dataset.id)); S.open.add(li.dataset.id); } else S.open.delete(li.dataset.id); det.hidden = open; });
@@ -2482,22 +2524,23 @@ addEventListener('resize', () => { paintTri(); const [x, y] = toXY(S.a, S.b, S.c
 // window (the gaps between the cards are the frame). The whole thing drifts
 // slowly, and every few seconds it changes to the next picture, each card a
 // beat behind the last, the way a row of screens in a subway does.
+function photoFor(k){ return PHOTOS[(PH.idx + k) % PHOTOS.length]; }
 function mountPhotos(){
-  const grid = $('#doors'), doors = [...grid.querySelectorAll('.door')]; if (!PHOTOS.length || !doors.length) return;
-  const gl = grid.getBoundingClientRect(), gw = grid.clientWidth; if (gw < 10) return;
-  const phase = -(((performance.now() - PH.t0) / 1000) % 88) + 's';
-  doors.forEach(d => { const pano = d.querySelector('.pano'); if (!pano) return;
-    pano.style.width = Math.round(gw * 1.22) + 'px'; pano.style.left = Math.round(gl.left - d.getBoundingClientRect().left) + 'px'; pano.style.animationDelay = phase; });
+  const doors = [...document.querySelectorAll('#doors .door')]; if (!PHOTOS.length || !doors.length) return;
+  doors.forEach((d, k) => { const ph = d.querySelector('.photo'); if (!ph) return; const p = photoFor(k), a = ph.querySelector('img.a');
+    if (a.getAttribute('src') !== p.src){ a.src = p.src; a.classList.add('on'); ph.querySelector('img.b').classList.remove('on'); }
+    a.style.animationDelay = (-k * 7) + 's';
+    const cap = d.querySelector('.cap'); if (cap) cap.textContent = (p.place || PH.city) + ' · ' + p.credit; });
   if (!PH.timer && !REDUCED) PH.timer = setInterval(cycle, 6500);
 }
 function cycle(){
   if (W.mode !== 'results' || PHOTOS.length < 2) return;
-  PH.idx = (PH.idx + 1) % PHOTOS.length; const next = PHOTOS[PH.idx];
+  PH.idx = (PH.idx + 1) % PHOTOS.length;
   document.querySelectorAll('#doors .door').forEach((d, k) => setTimeout(() => {
-    const pano = d.querySelector('.pano'); if (!pano) return;
-    const cur = pano.querySelector('img.on'), nxt = pano.querySelector('img:not(.on)'); if (!cur || !nxt) return;
+    const ph = d.querySelector('.photo'); if (!ph) return; const next = photoFor(k);
+    const cur = ph.querySelector('img.on'), nxt = ph.querySelector('img:not(.on)'); if (!cur || !nxt) return;
     nxt.src = next.src; nxt.classList.add('top'); cur.classList.remove('top');
-    // the new picture fades in over the old one, which stays put until the fade is done - two fades at once let the ground show through
+    // the new picture fades in over the old one, which stays put until the fade is done
     requestAnimationFrame(() => requestAnimationFrame(() => { nxt.classList.add('on');
       setTimeout(() => { cur.style.transition = 'none'; cur.classList.remove('on'); requestAnimationFrame(() => { cur.style.transition = ''; }); }, 1200); }));
     const cap = d.querySelector('.cap'); if (cap) cap.textContent = (next.place || PH.city) + ' · ' + next.credit;
