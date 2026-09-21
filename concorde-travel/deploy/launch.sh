@@ -48,6 +48,18 @@ if [ -z "$IP" ]; then
   KEY="${SSH_KEY:-$(doctl compute ssh-key list --format ID --no-header | head -1)}"
   [ -n "$KEY" ] || { echo "  no ssh key on the DigitalOcean account. Add one:  doctl compute ssh-key import laptop --public-key-file ~/.ssh/id_ed25519.pub"; exit 1; }
   IP=$(doctl compute droplet create "$NAME" --region "$REGION" --size "$SIZE" --image ubuntu-24-04-x64 --ssh-keys "$KEY" --wait --format PublicIPv4 --no-header)
+  # a DigitalOcean cloud firewall in front of the box: ssh in, everything out; the site is served through the
+  # tunnel, which dials out, so no web port is ever open (per Patrick, 2026-09-21)
+  DID=$(doctl compute droplet list --format ID,Name --no-header | awk -v n="$NAME" '$2==n{print $1}')
+  FW=$(doctl compute firewall list --format ID,Name --no-header | awk '$2=="concordego"{print $1}')
+  if [ -z "$FW" ]; then
+    doctl compute firewall create --name concordego \
+      --inbound-rules "protocol:tcp,ports:22,address:0.0.0.0/0,address:::/0" \
+      --outbound-rules "protocol:tcp,ports:all,address:0.0.0.0/0,address:::/0 protocol:udp,ports:all,address:0.0.0.0/0,address:::/0 protocol:icmp,address:0.0.0.0/0,address:::/0" \
+      --droplet-ids "$DID" >/dev/null && echo "   cloud firewall: ssh in, all out"
+  else
+    doctl compute firewall add-droplets "$FW" --droplet-ids "$DID" >/dev/null 2>&1 || true
+  fi
   echo "  created, $IP"
 else echo "  exists, $IP"; fi
 SSH=(ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=8 -o BatchMode=yes "root@$IP")

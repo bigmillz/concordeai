@@ -149,6 +149,29 @@ echo "  every hour; by hand:  concordego-update"
 
 say "firewall"
 ufw allow OpenSSH >/dev/null; ufw --force enable >/dev/null; echo "  ssh only; the server listens on 127.0.0.1 and the tunnel dials out"
+# ssh by key only, root included; and security updates on their own, with a reboot at a quiet hour
+# (09:30 UTC, 05:30 New York) only when a kernel asks for one (per Patrick, 2026-09-21)
+mkdir -p /etc/ssh/sshd_config.d
+printf 'PermitRootLogin prohibit-password\nPasswordAuthentication no\nKbdInteractiveAuthentication no\n' > /etc/ssh/sshd_config.d/50-concordego.conf
+sshd -t && (systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true)
+apt-get install -y -qq unattended-upgrades >/dev/null
+cat > /etc/apt/apt.conf.d/20auto-upgrades <<'APT'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Download-Upgradeable-Packages "1";
+APT::Periodic::AutocleanInterval "7";
+APT::Periodic::Unattended-Upgrade "1";
+APT
+cat > /etc/apt/apt.conf.d/52concordego-unattended <<'APT'
+// ConcordeGo: security updates on their own, reboot at a quiet hour when a kernel asks for it
+Unattended-Upgrade::Allowed-Origins { "${distro_id}:${distro_codename}-security"; "${distro_id}ESMApps:${distro_codename}-apps-security"; "${distro_id}ESM:${distro_codename}-infra-security"; };
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "09:30";
+Unattended-Upgrade::SyslogEnable "true";
+APT
+systemctl enable --now apt-daily.timer apt-daily-upgrade.timer unattended-upgrades >/dev/null 2>&1 || true
+echo "  security updates unattended; reboots at 09:30 UTC only when required"
 
 say "cloudflared"
 if ! command -v cloudflared >/dev/null; then
