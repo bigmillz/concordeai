@@ -174,6 +174,8 @@ details[open] summary:after{content:"–"}
 .pt input{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:var(--mono);font-size:14px;width:100%}
 .pt input:focus{border-color:var(--speed);outline:none}
 .ptnote{grid-column:1/-1;color:var(--faint);font-size:12.5px;line-height:1.55;padding-bottom:14px}
+.sth{grid-column:1/-1;margin:6px 0 0;font-size:15px;font-weight:500}
+.pt select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:9px 12px;font-size:14px}
 .ptnote b{color:var(--dim);font-weight:500}
 .gorow{display:flex;gap:18px;align-items:center;margin-top:22px;flex-wrap:wrap}
 .go{background:var(--text);color:var(--bg);padding:14px 24px;border-radius:999px;font-weight:600;font-size:15px;display:inline-flex;align-items:center;gap:10px;transition:.15s}
@@ -502,6 +504,19 @@ details[open] summary:after{content:"–"}
    over a bar that is thin, white and quiet. Both are reused for any job that
    takes a while, such as the price check below the list. */
 .loading{position:fixed;inset:0;z-index:20;background:var(--bg);display:grid;place-items:center}
+/* the title card, once a session: one point of light comes at you and opens
+   into the wing, the nameplate lands, and a bar warms what the page needs */
+.splash{position:fixed;inset:0;z-index:40;background:#000;display:grid;place-items:center;transition:opacity .7s ease}
+.splash.out{opacity:0;pointer-events:none}
+.splash canvas{position:absolute;inset:0;width:100%;height:100%}
+.splashin{position:relative;display:flex;flex-direction:column;align-items:center;gap:26px;width:min(340px,78vw);opacity:0;animation:fadein .5s 1.15s ease forwards}
+.splash .wing.big{width:74px}
+.splash .wing.once line{animation:wingonce .7s cubic-bezier(.2,.8,.2,1) forwards}
+.splash .wing.once line:nth-child(2){animation-delay:.12s}.splash .wing.once line:nth-child(3){animation-delay:.24s}.splash .wing.once line:nth-child(4){animation-delay:.36s}.splash .wing.once line:nth-child(5){animation-delay:.48s}
+@keyframes wingonce{from{stroke-dashoffset:30;opacity:0}to{stroke-dashoffset:0;opacity:1}}
+.splashmark{transform:scale(1.9);transform-origin:center;margin:6px 0 10px}
+.splash .pbar{opacity:0;animation:fadein .4s 1.9s ease forwards}
+@media (prefers-reduced-motion:reduce){.splashin{animation:none;opacity:1}.splash .wing.once line{animation:none;stroke-dashoffset:0;opacity:1}.splash .pbar{animation:none;opacity:1}}
 .loadin{width:min(340px,78vw);display:flex;flex-direction:column;align-items:center;gap:26px}
 .wing.big{width:66px}
 .wing.big line{stroke-width:2.2;stroke-dasharray:30;stroke-dashoffset:30;opacity:0;animation:wingline 2.6s cubic-bezier(.4,0,.2,1) infinite}
@@ -587,6 +602,19 @@ html.hdrmarks .mark-hdr{display:block}
 .crow .send{height:42px;width:46px;border-radius:12px;background:var(--text);color:var(--bg);display:grid;place-items:center;transition:background .15s}
 .crow .send:hover{background:var(--speed)}.crow .send svg{width:16px;height:16px}
 #results.dockpad{padding-bottom:180px}
+#wizard{padding-bottom:120px}
+/* before there are results, the box is a single oval at the foot of the page,
+   the way a phone keeps its search bar in reach: always there, one tap away */
+.dock.mini .dockin{max-width:560px;border-radius:999px;box-shadow:0 18px 50px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.04)}
+.dock.mini .thead,.dock.mini .thread,.dock.mini .clabel{display:none}
+.dock.mini .composer{padding:6px 6px 6px 8px}
+.dock.mini .crow textarea{border-radius:999px;min-height:44px;max-height:44px;padding:12px 18px;border-color:transparent;background:transparent}
+.dock.mini .crow textarea:focus{border-color:transparent;box-shadow:none}
+.dock.mini .crow .mic,.dock.mini .crow .send{border-radius:999px;height:40px}
+.dock.mini .crow .send{width:40px}
+.dock .toast{position:absolute;left:50%;bottom:calc(100% + 10px);transform:translateX(-50%);max-width:min(560px,90vw);background:rgba(16,16,19,.96);border:1px solid var(--line);border-radius:14px;padding:9px 14px;font-size:13px;color:var(--text);line-height:1.45;box-shadow:0 12px 30px rgba(0,0,0,.5);opacity:0;transition:opacity .2s;pointer-events:none}
+.dock .toast.on{opacity:1}
+@supports (color: color(display-p3 1 1 1)){.dock.mini .dockin{box-shadow:0 18px 50px rgba(0,0,0,.55),0 0 0 1px color(display-p3 1 1 1 / .06),0 0 24px color(display-p3 .3 .65 1 / .10)}}
 @keyframes cue{0%,100%{box-shadow:0 0 0 0 rgba(77,163,255,0)}40%{box-shadow:0 0 0 4px rgba(77,163,255,.35)}}
 .dock.cue .crow textarea{animation:cue 1.6s ease 2}
 @media (prefers-reduced-motion:reduce){.dock.cue .crow textarea{animation:none}}
@@ -645,6 +673,12 @@ html.hdrmarks .mark-hdr{display:block}
 </style></head><body>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><linearGradient id="wgrad" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs></svg>
+<div class="splash" id="splash" aria-label="Loading ConcordeGo"><canvas id="warp" aria-hidden="true"></canvas>
+  <div class="splashin">
+    <svg class="wing big once" viewBox="2 2.3 19.6 16.4" aria-hidden="true" focusable="false"><g><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg>
+    <span class="lockup splashmark"><span class="mark-txt">Concorde<span class="tld">Go</span></span><video class="mark-hdr" data-mark="go" muted playsinline loop preload="none" aria-hidden="true"></video></span>
+    <div class="pbar"><i class="pfill"></i></div><div class="pstage"></div>
+  </div></div>
 <div class="rail" id="rail"><div class="railin">
   <a class="brand" href="#top" aria-label="ConcordeGo"><svg class="wing" viewBox="2 2.3 19.6 16.4" aria-hidden="true" focusable="false"><g><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><span class="lockup"><span class="mark-txt">Concorde<span class="tld">Go</span></span><video class="mark-hdr" data-mark="go" muted playsinline loop preload="none" aria-hidden="true"></video></span></a>
   <button class="acctbtn rail-acct" id="account2">Sign in</button>
@@ -750,12 +784,13 @@ html.hdrmarks .mark-hdr{display:block}
   <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page.</span></footer>
 </div></div>
 
-<div class="dock hidden" id="dock"><div class="dockin">
+<div class="dock mini" id="dock"><div class="dockin">
   <div class="thead hidden"><span class="eyebrow">Your wish</span><span id="tcount"></span><button id="tchev">Hide</button></div>
   <div class="thread" id="thread" hidden></div>
+  <div class="toast" id="dtoast"></div>
   <div class="composer">
     <div class="clabel">Ask about these flights or change anything, any time. Each thing you say builds on the last.</div>
-    <div class="crow"><textarea id="dwish" rows="1" placeholder="'Not Iberia' · 'Why is Virgin first?' · 'I'd pay more for a lie-flat seat'"></textarea>
+    <div class="crow"><textarea id="dwish" rows="1" placeholder="Ask or wish for anything about your trip…"></textarea>
       <button class="mic" id="dmic" data-on="0" aria-label="Speak"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10a3 3 0 0 0 3-3V4a3 3 0 0 0-6 0v3a3 3 0 0 0 3 3zm5-3h-1.2a3.8 3.8 0 0 1-7.6 0H3a5 5 0 0 0 4.3 4.9V14h1.4v-2.1A5 5 0 0 0 13 7z"/></svg></button>
       <button class="send" id="dsend" aria-label="Apply"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
   </div>
@@ -829,7 +864,7 @@ const AIRNAME = {american:'AA',aa:'AA','british airways':'BA',ba:'BA',british:'B
 // ---- state
 const S = {trip:'round', a:1, b:0, c:0, preset:'1,0,0', asap:false, wants:new Set(), rules:[], ride:'either', off:new Set(), menu:false, open:new Set(),
   extra:{bag:0, wifi:false, seat:false, legroom:false, lounge:false, priority:false, insurance:false, hotel:false, custom:[]}, adv:{dep0:0, dep1:24, arr0:0, arr1:24, cabin:'economy', stops:2, alli:new Set(), out:new Set()},
-  pts:{amex:120000, chase:80000, capone:0, citi:0, bilt:0, avios:0, virgin:0, aa:0, delta:0}, shown:12, T:'mine',
+  pts:{amex:120000, chase:80000, capone:0, citi:0, bilt:0, avios:0, virgin:0, aa:0, delta:0}, status:{DL:'', AA:'', UA:'', BA:'', VS:'', LH:''}, shown:12, T:'mine',
   legs:[{from:'Wyckoff Ave & Myrtle Ave, Bushwick, Brooklyn', to:'London', date:'Wed 18 Nov'}], back:'Wed 25 Nov', pax:'1 adult', bags:'1 checked bag'};
 
 // ---- wants: a predicate, a charge when it is missing, and a hint when nothing has it
@@ -1330,6 +1365,7 @@ function rawTerms(e, r, ctx){
   if (find('hotel-auto')) con('hotel', 'Hotel night ' + money(cents('hotel-auto')), 18000, true);
   for (const d of r.dem){ const id = d.key.replace('want-', ''); if (WANT_CON[id]) con('want-' + id, WANT_CON[id], d.cents, true); }
   const a = awardsFor(e)[0]; if (a && a.good) pro('points', 'Points ' + money(a.margin) + ' under cash', Math.max(2000, a.margin));
+  const up = upgradeOdds(e); if (up && up.rows[0].p >= .25) pro('upgrade', pct(up.rows[0].p) + ' upgrade to ' + up.rows[0].cabin, 3000, true);
   const rel = cents('reliability'); if (rel < 0) pro('ontime', 'Good on-time record', 1000 - rel); else if (rel > 0 && rel < 3000) con('delays', 'Weak on-time record', rel); else if (rel >= 3000) con('norecord', 'No on-time data', 1000);
   return T;
 }
@@ -1475,6 +1511,8 @@ function factsHTML(e){
   F.push(row('Airline', esc(e.carrier_name) + (e.rating != null ? ` · rated ${e.rating.toFixed(2)}` : '') + (d.carriage_url ? ` · <a href="${esc(d.carriage_url)}" target="_blank" rel="noopener">conditions of carriage</a>` : ''), true));
   if (d.loyalty && d.loyalty.length) F.push(row('Miles', d.loyalty.slice(0, 6).map(c => ((AIR[c] || {}).name || c).replace(' Airlines', '').replace(' Airways', '')).join(', ') + (d.loyalty.length > 6 ? ' +' + (d.loyalty.length - 6) : '')));
   if (d.id_docs_required) F.push(row('Documents', 'passport needed to book'));
+  const up = upgradeOdds(e);
+  F.push(row('Upgrade odds', up ? up.rows.map(r => pct(r.p) + ' to ' + r.cabin + ' (' + r.how + ')').join(' · ') + (up.note ? ' · ' + up.note : '') : '—'));
   return `<section class="facts">${legs}<div class="fact"><h5>Fare</h5><dl>${F.join('')}</dl></div><p class="fnote">As published by the airline. Aircraft as scheduled.</p></section>`;
 }
 function ledgerHTML(e){
@@ -1610,10 +1648,10 @@ async function applyWish(text, box){
   const m = await askModel(text);
   if (box) box.disabled = false;
   // off topic: the model returned nothing and the page says so in its own words
-  if (m && m.offtopic){ S.thread.push({text, items:[], reply:"That one's outside this trip. I can help with airlines, times, seats, layovers, points, and what matters most."}); if (box) box.value = ''; renderThread(); return; }
+  if (m && m.offtopic){ const reply = "That one's outside this trip. I can help with airlines, times, seats, layovers, points, and what matters most."; S.thread.push({text, items:[], reply}); if (box) box.value = ''; renderThread(); toast(reply); return; }
   const items = m ? m.items : parseWish(text);
-  if (m && !items.length && m.ask){ S.thread.push({text, items:[], reply:m.ask}); if (box) box.value = ''; renderThread(); return; }
-  if (!items.length && isQuestion(text)){ S.thread.push({text, items:[], reply:answerFor(text)}); if (box) box.value = ''; renderThread(); return; }
+  if (m && !items.length && m.ask){ S.thread.push({text, items:[], reply:m.ask}); if (box) box.value = ''; renderThread(); toast(m.ask); return; }
+  if (!items.length && isQuestion(text)){ const reply = answerFor(text); S.thread.push({text, items:[], reply}); if (box) box.value = ''; renderThread(); toast(reply); return; }
   for (const x of items){
     if (x.kind === 'want') S.wants.add(x.id);
     else if (x.kind === 'avoid' || x.kind === 'after' || x.kind === 'before' || x.kind === 'max'){ if (!S.rules.some(r => r.label === x.label)) S.rules.push(x); }
@@ -1622,7 +1660,11 @@ async function applyWish(text, box){
   S.thread.push({text, items, reply: replyFor(items) + (m && m.ask ? ' ' + m.ask : '')});
   if (box) box.value = '';
   renderThread(); paintChips(); paint(true);
+  toast(replyFor(items));
 }
+// before there are results the thread is folded away, so the answer floats up over the pill for a moment
+let toastT = null;
+function toast(text){ if (!$('#dock').classList.contains('mini')) return; const t = $('#dtoast'); t.textContent = text; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 4200); }
 function chipsHTML(){
   const out = [];
   S.thread.forEach((m, mi) => m.items.forEach((x, ii) => out.push(`<span class="u ${KINDS[x.kind] === 'rule' ? 'rule' : KINDS[x.kind] === 'weights' ? 'tilt' : 'want'}"><i>${KINDS[x.kind]}</i>${esc(x.label)}<button data-ux="${mi}-${ii}" aria-label="Remove">×</button></span>`)));
@@ -1656,11 +1698,98 @@ function paintCarriers(){
   const codes = [...new Set(ALL.flatMap(e => [e.carrier, e.operator]))].sort();
   $('#carriers').innerHTML = codes.map(c => `<button class="cbtn" data-c="${c}" aria-pressed="${S.adv.out.has(c)}">${logo(c)}${esc((AIR[c] || {}).name || c)}</button>`).join('');
 }
+// Elite status, for the odds of an upgrade. What is curated per airline is
+// its published policy on a transatlantic economy fare (which cabin, if any,
+// a status upgrade can reach without paying, and who is excluded), plus a
+// modest rate for the operational upgrade nobody can plan for, weighted by
+// status. These are estimates from policy and typical rates, never this
+// flight's load, and the page says so. No higher cabin means a dash.
+const STATUS = {DL:{name:'Delta Medallion', tiers:['Silver','Gold','Platinum','Diamond']}, AA:{name:'AAdvantage', tiers:['Gold','Platinum','Platinum Pro','Executive Platinum']},
+  UA:{name:'United Premier', tiers:['Silver','Gold','Platinum','1K']}, BA:{name:'BA Executive Club', tiers:['Bronze','Silver','Gold']}, VS:{name:'Virgin Flying Club', tiers:['Silver','Gold']}, LH:{name:'Miles & More', tiers:['Frequent Traveller','Senator','HON Circle']}};
+const ALLI = {skyteam:['DL','VS','AF','KL','AZ','KE','AM','SV','MU','GA','VN','CI','UX','OK','RO','ME','KQ'], oneworld:['AA','BA','IB','AY','AS','QR','CX','JL','QF','RJ','MH','AT','UL','WY'], star:['UA','LH','LX','TK','LO','AC','OS','SN','SK','TP','SQ','NH','TG','ET','MS','SA','A3','AI','BR','CA','CM','NZ','OU','OZ','ZH']};
+const CABINS = {DL:['Comfort+', 'Premium Select', 'Delta One'], UA:['Premium Plus', 'Polaris'], AA:['Premium Economy', 'Business'], BA:['World Traveller Plus', 'Club World'], VS:['Premium', 'Upper Class'], LH:['Premium Economy', 'Business', 'First'], LX:['Business', 'First'], default:['Premium economy', 'Business']};
+// complimentary status upgrades on a transatlantic economy fare: which cabin, and roughly how often they clear, by tier
+const COMP = {DL:{cabin:'Comfort+', rate:{Silver:.25, Gold:.5, Platinum:.7, Diamond:.85}}};
+// the operational upgrade when economy is oversold: rare, and status goes first
+const OPUP = {own:{0:.005, 1:.012, 2:.02, 3:.03, 4:.035}, alliance:{0:.005, 1:.008, 2:.01, 3:.012, 4:.014}};
+function upgradeOdds(e){
+  const op = e.operator || e.carrier, cab = ((e.details && e.details.segments[0] && e.details.segments[0].cabin) || 'Economy').toLowerCase();
+  const ladder = CABINS[op] || CABINS.default;
+  if (/first/.test(cab)) return null;
+  if (/business|upper|club|polaris|delta one/.test(cab)){ const top = ladder[ladder.length - 1]; if (!/first/i.test(top)) return null; }
+  const idx = /premium/.test(cab) ? 1 : 0, above = ladder.slice(idx); if (!above.length) return null;
+  const basic = /basic|light|restricted/i.test(e.brand || '');
+  const tierOf = code => { const st = STATUS[code]; if (!st || !S.status[code]) return 0; return st.tiers.indexOf(S.status[code]) + 1; };
+  let tier = tierOf(op), via = 'own', held = S.status[op] ? STATUS[op].name + ' ' + S.status[op] : '';
+  if (!tier){ for (const [al, members] of Object.entries(ALLI)){ if (!members.includes(op)) continue; for (const code of Object.keys(STATUS)){ if (members.includes(code) && tierOf(code) > tier){ tier = tierOf(code); via = 'alliance'; held = STATUS[code].name + ' ' + S.status[code] + ' (' + al + ')'; } } } }
+  const out = {held, basis:'from published upgrade policy and typical operational-upgrade rates, not this flight\'s load', rows:[]};
+  const next = above[0], top = above[above.length - 1];
+  const comp = COMP[op] && via === 'own' && tier && COMP[op].cabin === next && !basic ? COMP[op].rate[S.status[op]] : 0;
+  const opup = OPUP[via][Math.min(4, tier)] * (basic ? .5 : 1);
+  out.rows.push({cabin:next, p: comp || opup, how: comp ? 'complimentary for ' + held : (tier ? 'operational upgrades only; ' + held + ' goes ahead of the queue' : 'operational upgrades only, no status')});
+  if (top !== next) out.rows.push({cabin:top, p: opup * (above.length > 2 ? .4 : .6), how: tier ? 'operational only, even with status' : 'operational only'});
+  if (basic) out.note = 'this fare is excluded from complimentary upgrades';
+  return out;
+}
+const pct = p => p < .005 ? 'under 1%' : '~' + Math.round(p*100) + '%';
 function paintPts(){
   $('#pts').innerHTML = Object.keys(BANK).map(k => `<div class="pt"><label for="pt-${k}">${esc(BANK[k])}</label><input id="pt-${k}" inputmode="numeric" value="${S.pts[k] ? S.pts[k].toLocaleString() : ''}" placeholder="0"></div>`).join('') +
-    '<p class="ptnote">Every flight is priced in every programme that can book it, transfers and bonuses included, and the better of cash or points is starred. Demo award chart.</p>';
+    '<p class="ptnote">Every flight is priced in every programme that can book it, transfers and bonuses included, and the better of cash or points is starred. Demo award chart.</p>' +
+    '<h4 class="sth">Your status</h4>' + Object.entries(STATUS).map(([k, st]) => `<div class="pt"><label for="st-${k}">${esc(st.name)}</label><select id="st-${k}" data-status="${k}"><option value="">None</option>${st.tiers.map(t => `<option${S.status[k] === t ? ' selected' : ''}>${t}</option>`).join('')}</select></div>`).join('') +
+    '<p class="ptnote">Status sets the odds of an upgrade on each flight, shown when you open one: what a status upgrade can reach on that airline and fare, and the rare operational upgrade. Estimates from policy, never this flight\'s load.</p>';
 }
+document.addEventListener('change', ev => { const sel = ev.target.closest('[data-status]'); if (sel){ S.status[sel.dataset.status] = sel.value; paint(false); } });
 
+// ---- the title card. Once a session. The star is drawn, not fetched: one
+// point of light with streaks pulled out toward you on a canvas (wide-gamut
+// white where the display has it, so it reads as light, not paint), and no
+// field of dots: the family's rule is no white specks. While it plays, the
+// bar warms what the page needs first: the fonts, the nameplate, the
+// airlines' logos for the flights on the page. Nothing else is fetched.
+(function splash(){
+  const el = $('#splash'); if (!el) return;
+  let seen = false; try { seen = sessionStorage.getItem('concordego.splashed') === '1'; } catch (e) {}
+  if (seen){ el.remove(); return; }
+  const cv = $('#warp'), ctx = cv.getContext('2d', {colorSpace:'display-p3'}) || cv.getContext('2d'), white = (() => { try { ctx.fillStyle = 'color(display-p3 1 1 1)'; return ctx.fillStyle && /display-p3/.test(String(ctx.fillStyle)) ? 'color(display-p3 1 1 1)' : '#fff'; } catch (e) { return '#fff'; } })();
+  const dpr = Math.min(2, devicePixelRatio || 1); let W, H, t0 = performance.now(), raf = 0;
+  const size = () => { W = cv.width = innerWidth*dpr; H = cv.height = innerHeight*dpr; }; size(); addEventListener('resize', size);
+  const STREAKS = Array.from({length:42}, (_, i) => ({a: (i/42)*Math.PI*2 + (i%2 ? .05 : 0), r: .18 + ((i*7919) % 100)/100*.55, w: .6 + ((i*104729) % 10)/10*1.2}));
+  function frame(now){
+    const t = (now - t0)/1000, cx = W/2, cy = H*.46, R = Math.min(W, H);
+    ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = 'rgba(0,0,0,.34)'; ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+    const zoom = REDUCED ? 1 : Math.min(1, t/1.5), ease = 1 - Math.pow(1 - zoom, 3);
+    // the star: a core that grows, then settles behind the wing
+    const settle = Math.max(0, Math.min(1, (t - 1.1)/.6)), core = R*(.003 + .024*ease*(1 - .85*settle));
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(1, core*5)); g.addColorStop(0, white); g.addColorStop(.15, 'rgba(255,255,255,.85)'); g.addColorStop(.4, 'rgba(180,200,255,.18)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = 1 - .75*settle; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, Math.max(1, core*5), 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1;
+    // the streaks: pulled out from the centre, fastest as the star arrives, gone once it has
+    const pull = ease*(1 - Math.max(0, Math.min(1, (t - 1.35)/.7)));
+    if (pull > 0){ ctx.strokeStyle = white; ctx.lineCap = 'round';
+      for (const s of STREAKS){ const len = R*s.r*pull*pull, r0 = R*.02 + len*.15; ctx.globalAlpha = .55*pull; ctx.lineWidth = s.w*dpr*pull;
+        ctx.beginPath(); ctx.moveTo(cx + Math.cos(s.a)*r0, cy + Math.sin(s.a)*r0); ctx.lineTo(cx + Math.cos(s.a)*(r0 + len), cy + Math.sin(s.a)*(r0 + len)); ctx.stroke(); }
+      ctx.globalAlpha = 1; }
+    if (t < 6 && !el.classList.contains('out')) raf = requestAnimationFrame(frame);
+  }
+  raf = requestAnimationFrame(frame);
+  // the cache warmer
+  const fill = el.querySelector('.pfill'), stage = el.querySelector('.pstage'), jobs = [];
+  const job = (label, pr) => jobs.push({label, pr: Promise.resolve(pr).catch(() => null)});
+  job('Type', document.fonts ? document.fonts.ready : null);
+  if (matchMedia('(dynamic-range: high)').matches) for (const f of ['assets/mark-go-hlg.webm', 'assets/mark-go-pq.mp4']) job('Nameplate', fetch(f, {cache:'force-cache'}).then(r => r.blob()));
+  const logos = Object.values(AIR).map(a => a.logo).filter(u => u && /^https?:/.test(u)).slice(0, 40);
+  for (const u of logos) job('Airline marks', new Promise(res => { const im = new Image(); im.onload = im.onerror = () => res(); im.src = u; setTimeout(res, 2500); }));
+  let done = 0; const total = jobs.length || 1, started = performance.now(), MIN = REDUCED ? 300 : 2600, MAX = 5000;
+  // the bar never runs ahead of the clock: it sweeps the card's own length when the cache is quick, and waits on the cache when it is slow
+  const tick = () => { const p = Math.min(done/total, (performance.now() - started)/MIN); fill.style.width = Math.round(4 + 96*Math.min(1, p)) + '%'; };
+  const sweep = setInterval(() => { tick(); if (el.classList.contains('out')) clearInterval(sweep); }, 80);
+  jobs.forEach(j => j.pr.then(() => { done++; stage.textContent = j.label; tick(); }));
+  stage.textContent = 'Getting ready'; tick();
+  const finish = () => { if (el.classList.contains('out')) return; fill.style.width = '100%'; el.classList.add('out'); try { sessionStorage.setItem('concordego.splashed', '1'); } catch (e) {} setTimeout(() => { cancelAnimationFrame(raf); el.remove(); }, 750); };
+  Promise.all(jobs.map(j => j.pr)).then(() => setTimeout(finish, Math.max(0, MIN - (performance.now() - started))));
+  setTimeout(finish, MAX + 400);
+  el.addEventListener('click', finish);
+})();
 // ---- boot
 let P = D.par;
 // A live search replaces everything the page reads. Every derived table is
@@ -1724,7 +1853,7 @@ $('#mic').addEventListener('click', () => listen($('#mic'), $('#wish')));
 $('#dmic').addEventListener('click', () => listen($('#dmic'), $('#dwish')));
 // the composer suggests what it can take, one example at a time
 const HINTS = ["Say more, in your own words… 'not Iberia'", "'land before 9am'", "'I'd pay more for a lie-flat seat'", "'nothing over $600'", "'get me there as soon as possible'", "'no red-eyes'"];
-let hintN = 0; setInterval(() => { const box = $('#dwish'); if (!box || document.activeElement === box || box.value) return; hintN = (hintN + 1) % HINTS.length; box.placeholder = HINTS[hintN]; }, 4200);
+let hintN = 0; setInterval(() => { const box = $('#dwish'); if (!box || document.activeElement === box || box.value || $('#dock').classList.contains('mini')) return; hintN = (hintN + 1) % HINTS.length; box.placeholder = HINTS[hintN]; }, 4200);
 const winv = () => { const A = S.adv; $('#depv').textContent = A.dep0 === 0 && A.dep1 === 24 ? 'any time' : String(A.dep0).padStart(2,'0') + ':00 – ' + String(A.dep1).padStart(2,'0') + ':00'; $('#arrv').textContent = A.arr0 === 0 && A.arr1 === 24 ? 'any time' : String(A.arr0).padStart(2,'0') + ':00 – ' + String(A.arr1).padStart(2,'0') + ':00'; };
 ['dep0','dep1','arr0','arr1'].forEach(k => $('#' + k).addEventListener('input', ev => { S.adv[k] = +ev.target.value; if (S.adv.dep0 > S.adv.dep1) S.adv[k === 'dep0' ? 'dep1' : 'dep0'] = S.adv[k]; if (S.adv.arr0 > S.adv.arr1) S.adv[k === 'arr0' ? 'arr1' : 'arr0'] = S.adv[k]; winv(); paint(true); }));
 $('#cabin').addEventListener('change', ev => { S.adv.cabin = ev.target.value; if (W.mode === 'results') summary(); WANTS.find(w => w.id === 'lieflat').hint = ev.target.value === 'economy' ? 'No lie-flat seat flies this route in economy. Switch the cabin to Business under Advanced to see them.' : 'This demo carries economy inventory only; a Business search would show lie-flat seats here.'; paintChips(); });
@@ -1985,7 +2114,7 @@ function showResults(){
   BLOCKS.forEach(k => $('#ed-' + k).appendChild($('#blk-' + k)));
   $('#wizard').classList.add('hidden'); $('#rail').classList.add('hidden');
   $('#bar').classList.remove('hidden'); $('#results').classList.remove('hidden'); $('#results').classList.add('dockpad');
-  $('#dock').classList.remove('hidden'); $('#dock').classList.add('cue'); setTimeout(() => $('#dock').classList.remove('cue'), 3600);
+  $('#dock').classList.remove('mini'); $('#dwish').placeholder = "'Not Iberia' · 'Why is Virgin first?' · 'I'd pay more for a lie-flat seat'"; $('#dock').classList.add('cue'); setTimeout(() => $('#dock').classList.remove('cue'), 3600);
   S.threadClosed = false; renderThread();
   paint(true); summary(); scrollTo({top:0, behavior:'auto'});
 }
@@ -2030,7 +2159,7 @@ document.addEventListener('click', ev => { if (!ev.target.closest('#rgo')) retur
 function startOver(){
   closeEditor(); W.mode = 'wizard'; $('#bar').classList.remove('drop'); $('#results').classList.remove('fade');
   BLOCKS.forEach(k => $('#s' + (BLOCKS.indexOf(k) + 1) + ' .stepin .slot').appendChild($('#blk-' + k)));
-  $('#bar').classList.add('hidden'); $('#results').classList.add('hidden'); $('#dock').classList.add('hidden');
+  $('#bar').classList.add('hidden'); $('#results').classList.add('hidden'); $('#dock').classList.add('mini'); $('#dwish').placeholder = 'Ask or wish for anything about your trip…';
   $('#wizard').classList.remove('hidden'); $('#rail').classList.remove('hidden');
   scrollTo({top:0, behavior:'auto'}); goStep(1); setTimeout(layoutDial, 50);
 }
