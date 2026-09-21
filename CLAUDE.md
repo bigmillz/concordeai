@@ -428,6 +428,14 @@ python3 concorde-travel/places.py "Shoreditch, London EC2A"  # what a typed plac
 
 **Ports 8884–8930 are the model engines' — never bind there.** ConcordeGo uses 9897.
 
+**Public address, from a laptop:** `concorde-travel/go-live.sh` installs a LaunchAgent for
+`server.py` (with `CONCORDEGO_ROOT=mock-10`, so `/` serves the current interface mockup)
+and a Cloudflare named tunnel `concordego` at **go.flyconcordfly.com**, with its own config
+file and agent so it never touches the AI app's tunnel. A request that arrives through the
+tunnel carries `Cf-Connecting-Ip`, and `server.py` refuses it anything metered — a live
+flight search, the narrator, a sky download — so a visitor cannot spend the Duffel quota
+or the Anthropic key; recorded results still serve. It works while that Mac is awake.
+
 Three things about the scorer that look like fussiness and are not, each with a comment in
 `scorer.py` saying why: money is **integer cents end to end** (float accumulation makes
 ties sort by rounding noise); timestamps carry an **explicit UTC offset** and no timezone

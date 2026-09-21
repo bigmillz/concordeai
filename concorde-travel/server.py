@@ -46,6 +46,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 UI = os.path.join(HERE, "ui")
 FIXTURES = os.path.join(HERE, "..", "fixtures")
 PORT = int(os.environ.get("CONCORDEGO_PORT", "9897"))
+# CONCORDEGO_ROOT=mock-10 serves that mockup at / (the public address does this
+# while the mockup is the interface); unset, / is the draft page in ui/.
+ROOT = (os.environ.get("CONCORDEGO_ROOT") or "").strip()
+if ROOT and not re.match(r"^mock-[0-9]+$", ROOT):
+    sys.exit("CONCORDEGO_ROOT must name a mockup, e.g. mock-10 (got %r)" % ROOT)
 
 # Apple's ATV aerials, the NIGHT subset — the ones millenai.py flags as
 # dark, because this interface is dark and the city reads as light and
@@ -569,10 +574,26 @@ class Handler(http.server.BaseHTTPRequestHandler):
         sys.stderr.write("  %s\n" % (fmt % args))
 
     # ---------------------------------------------------------------- GET
+    # A request that came through the tunnel carries Cloudflare's headers; a
+    # local one never does (the same test millenai.py uses). The public
+    # address may read anything but may not SPEND: no metered flight search,
+    # no narrator call, no 250 MB sky download on its say-so.
+    def _remote(self):
+        return bool(self.headers.get("Cf-Connecting-Ip") or self.headers.get("X-Forwarded-For"))
+
     def do_GET(self):
         path = self.path.split("?")[0]
         if path == "/" or path == "/index.html":
+            if ROOT:
+                return self._send_file(os.path.join(UI, "mock", ROOT + ".html"), "text/html; charset=utf-8")
             return self._send_file(os.path.join(UI, "index.html"), "text/html; charset=utf-8")
+        if ROOT and path.startswith("/assets/"):
+            # the mockup at / asks for its nameplates relative to itself
+            name = os.path.basename(path)
+            if re.match(r"^mark-[a-z0-9]+-(pq\.mp4|hlg\.webm)$", name):
+                return self._send_file(os.path.join(UI, "mock", "assets", name),
+                                       "video/mp4" if name.endswith(".mp4") else "video/webm")
+            return self.send_error(404)
         # The interface mockups. Standalone files by design, served here too so
         # they can be flipped between side by side with the real thing.
         if path == "/mock" or path == "/mock/":
@@ -603,7 +624,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 i = int(args.get("i", "0"))
             except ValueError:
                 i = 0
-            return self._json(sky_status(i, args.get("warm") == "1"))
+            return self._json(sky_status(i, args.get("warm") == "1" and not self._remote()))
         if re.match(r"^/sky/\d+\.mov$", path):
             return self._send_sky(path)
         # anything else under ui/ (future css, js, images)
@@ -624,6 +645,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             req = json.loads(self.rfile.read(n) or b"{}")
         except Exception as exc:
             return self._json({"error": "bad request: %s" % exc})
+        if self._remote() and (path == "/api/narrate" or (path == "/api/live" and (req.get("source") or "sample") != "sample")):
+            return self._json({"error": "The public address serves recorded results only. Live searches and "
+                                        "the narrator run from the machine itself, so nobody else can spend its quota.",
+                               "remote": True})
         try:
             fn = {"/api/score": score_request, "/api/narrate": narrate_request,
                   "/api/live": live_request}[path]
@@ -716,7 +741,7 @@ class Server(socketserver.ThreadingTCPServer):
 
 def main():
     ready = _cached()
-    print("ConcordeGo  http://127.0.0.1:%d" % PORT)
+    print("ConcordeGo  http://127.0.0.1:%d%s" % (PORT, ("  (/ is %s)" % ROOT) if ROOT else ""))
     print("  %d night clips available, %d already cached in %s"
           % (len(SKY_SOURCES), len(ready), _sky_dir()))
     if not ready:
