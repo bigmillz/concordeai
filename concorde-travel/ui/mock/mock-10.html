@@ -233,6 +233,9 @@ details[open] summary:after{content:"–"}
    how good that stretch is, green down to red. Figures sit beside, not on. */
 .journey{display:flex;flex-direction:column;gap:6px}
 .jbar{display:flex;gap:2px;height:12px;border-radius:6px;overflow:hidden;background:rgba(255,255,255,.05)}
+.jmini{display:block;max-width:460px;margin-top:7px}
+.jmini .jbar{height:7px;border-radius:4px;gap:1px}
+.jmini .jseg{min-width:2px}
 .jseg{position:relative;height:100%;min-width:3px;background:var(--sc,rgba(255,255,255,.16));transform-origin:left center;transition:filter .2s}
 .jseg.neutral{background:rgba(255,255,255,.16)}
 .jseg:hover{filter:brightness(1.15)}
@@ -318,6 +321,10 @@ details[open] summary:after{content:"–"}
 .awards li b{color:var(--text);font-weight:500}
 .awards li.good{border-color:rgba(53,224,138,.5)}.awards li.good b{color:var(--green)}
 .awards .v{font-family:var(--mono)}
+.foot{border-top:1px solid var(--line);margin-top:36px;padding:18px 0 6px;font-size:12.5px;color:var(--dim);display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center}
+.foot label{display:inline-flex;align-items:center;gap:8px;color:var(--text)}
+.foot select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:5px 26px 5px 9px;font-size:12.5px;appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);background-position:calc(100% - 13px) 13px,calc(100% - 9px) 13px;background-size:4px 4px;background-repeat:no-repeat}
+.foot .dimmer{color:var(--faint);flex-basis:100%}
 .morebtn{display:block;margin:16px auto 0;color:var(--dim);font-size:13.5px;border-bottom:1px solid var(--line);padding:4px 2px}
 .morebtn:hover{color:var(--text)}
 .hiddenrows{margin-top:12px;color:var(--faint);font-size:12.5px;line-height:1.55}
@@ -629,6 +636,7 @@ html.hdrmarks .mark-hdr{display:block}
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page.</span></footer>
 </div></div>
 
 <div class="dock hidden" id="dock"><div class="dockin">
@@ -666,7 +674,16 @@ var PHOTOS = [];
 const PH = {idx:0, t0:performance.now(), timer:null, city:(D.query.origin || 'Brooklyn').split(',').pop().trim()};
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const money = c => '$' + Math.abs(Math.round(c/100)).toLocaleString('en-US');
+// One currency inside the model (hard rule 3): every figure is scored in US
+// cents and stays so. The display converts at the edge, and the footer says
+// which rate it used. Rates here are a demo table; the product looks them up.
+const CURRENCIES = {USD:{sym:'$', minor:'¢', rate:1, name:'US dollar'}, EUR:{sym:'€', minor:'c', rate:.92, name:'Euro'}, GBP:{sym:'£', minor:'p', rate:.78, name:'British pound'},
+  CAD:{sym:'CA$', minor:'¢', rate:1.36, name:'Canadian dollar'}, AUD:{sym:'A$', minor:'¢', rate:1.5, name:'Australian dollar'}, CHF:{sym:'CHF ', minor:'Rp.', rate:.88, name:'Swiss franc'},
+  JPY:{sym:'¥', minor:null, rate:149, name:'Japanese yen'}, MXN:{sym:'MX$', minor:'¢', rate:18.2, name:'Mexican peso'}, INR:{sym:'₹', minor:'p', rate:84, name:'Indian rupee'}};
+const RATES_ASOF = 'demo rates, 21 Sep 2026';
+let CUR = 'USD'; try { CUR = localStorage.getItem('concordego.currency') || 'USD'; if (!CURRENCIES[CUR]) CUR = 'USD'; } catch (e) {}
+const money = c => { const k = CURRENCIES[CUR]; return k.sym + Math.abs(Math.round(c*k.rate/100)).toLocaleString('en-US'); };
+const moneyPt = c => { const k = CURRENCIES[CUR], v = c*k.rate; return k.minor ? v.toFixed(1) + k.minor : k.sym + v.toFixed(1); };   // US cents per point, shown in the chosen currency's minor unit
 const signed = c => (c < 0 ? '−' : '+') + money(c);
 const hm = iso => iso.slice(11,16);
 const hour = iso => +iso.slice(11,13) + (+iso.slice(14,16))/60;
@@ -739,8 +756,11 @@ function awardsFor(e){
       const srcs = prog.via.map(k => ({k, r: bonus && bonus.from === k ? bonus.ratio : 1})).filter(x => (S.pts[x.k] || 0) * x.r >= short).sort((x, y) => (y.r - x.r) || (S.pts[y.k] - S.pts[x.k]));
       if (srcs.length){ via = srcs[0].k; ratio = srcs[0].r; spend = have + Math.ceil(short / ratio); path = BANK[via].split(' ')[0] + ' → ' + prog.name + ' ' + (ratio > 1 ? '1:' + ratio : '1:1'); }
     }
-    const value = (e.ticket_cents - a.fees) / spend;
-    out.push({...a, prog, value, path, short, spend, ratio, via, bonus: ratio > 1 ? bonus : null, good: value >= prog.fair && !!path, saves: e.ticket_cents - a.fees});
+    // the test is in dollars: the points, valued at what the programme usually
+    // returns, plus the fees, against the fare they replace. Cents a point is the
+    // same comparison per point; the margin is what the user actually keeps.
+    const value = (e.ticket_cents - a.fees) / spend, worth = Math.round(spend * prog.fair), margin = e.ticket_cents - a.fees - worth;
+    out.push({...a, prog, value, path, short, spend, ratio, via, bonus: ratio > 1 ? bonus : null, worth, margin, good: !!path && margin > 0, saves: e.ticket_cents - a.fees});
   }
   return out.sort((x, y) => (y.good - x.good) || (y.value - x.value));
 }
@@ -748,13 +768,15 @@ function awardsFor(e){
 // reason sits behind the (i), two short lines from precomputed figures. In the
 // product the narrator writes those lines, current to the query (a transfer
 // bonus, a peak date), and the verifier holds them to the figures.
-function ptTip(e, a){
-  const c = a.value.toFixed(1) + '¢', fair = a.prog.fair + '¢', award = a.pts.toLocaleString() + ' ' + esc(a.prog.name) + ' + ' + money(a.fees) + ' fees';
+function ptTip(e, a, total){
+  const c = moneyPt(a.value), fair = moneyPt(a.prog.fair), award = a.pts.toLocaleString() + ' ' + esc(a.prog.name) + ' + ' + money(a.fees) + ' fees';
   if (!a.path) return `Nothing you hold transfers to ${esc(a.prog.name)}.<small>Award: ${award}.</small>`;
-  if (a.value <= 0) return `Award fees alone (${money(a.fees)}) exceed this fare, so points cannot win here.<small>Award: ${award}.</small>`;
+  if (a.value <= 0) return `Award fees alone (${money(a.fees)}) exceed the ${money(e.ticket_cents)} fare, so points cannot win here.<small>Award: ${award}.</small>`;
   const path = a.via ? esc(BANK[a.via].split(' ')[0]) + ' → ' + esc(a.prog.name) + (a.ratio > 1 ? ' at 1:' + a.ratio + (a.bonus ? ', a bonus until ' + esc(a.bonus.until) : '') : ' 1:1') : 'from your ' + esc(a.prog.name);
-  if (a.good) return `<b>${c} a point</b>, above the ${fair} ${esc(a.prog.name)} are usually worth, so points win.<small>${path}. Award: ${award}. You keep ${money(a.saves)} of cash.</small>`;
-  return `Only <b>${c} a point</b>, under the ${fair} ${esc(a.prog.name)} are worth. Pay cash and keep them.<small>${path}. Award: ${award}.</small>`;
+  const bank = a.via ? esc(BANK[a.via].split(' ')[0]) : esc(a.prog.name), rest = total - e.ticket_cents + a.fees, eq = total - a.margin;
+  const sum = `${a.spend.toLocaleString()} ${bank} points at ${fair} each are worth ${money(a.worth)}. With the ${money(rest)} you still pay, that is <b>${money(eq)} all in</b>`;
+  if (a.good) return `${sum}, ${money(a.margin)} under the ${money(total)} in cash. That is ${c} a point, above the ${fair} ${esc(a.prog.name)} usually return.<small>${path}. Award: ${award}.</small>`;
+  return `${sum}, ${money(-a.margin)} over the ${money(total)} in cash. Only ${c} a point; keep them for ${fair} or better.<small>${path}. Award: ${award}.</small>`;
 }
 function payHTML(e, total){
   const a = awardsFor(e)[0], ptsWin = !!(a && a.good), col = (cls, head, body) => `<div class="pay ${cls}">${head}${body}</div>`;
@@ -762,10 +784,10 @@ function payHTML(e, total){
   const cash = col('cash' + (ptsWin ? '' : ' best'), head('Cash', !ptsWin), `<b class="num fig">${money(total)}</b><span class="unit">all in</span><em>${money(e.ticket_cents)} ticket</em><div class="v">+ ${money(total - e.ticket_cents)} beyond the fare</div>`);
   let pts;
   if (!a) pts = col('points dim', head('Points', false), `<b class="num fig">—</b><span class="unit dim">no award chart</span><em>for this airline yet</em>`);
-  else { const usable = a.path && a.value > 0, rest = total - e.ticket_cents + a.fees, tip = `<button class="info" type="button" aria-expanded="false" aria-label="Why">i</button><span class="tip" role="tooltip">${ptTip(e, a)}</span>`;
+  else { const usable = a.path && a.value > 0, rest = total - e.ticket_cents + a.fees, tip = `<button class="info" type="button" aria-expanded="false" aria-label="Why">i</button><span class="tip" role="tooltip">${ptTip(e, a, total)}</span>`;
     pts = col('points' + (ptsWin ? ' best' : '') + (usable ? '' : ' dim'), head('Points', ptsWin),
       `<b class="num fig">${a.spend.toLocaleString()}</b><span class="unit${usable ? '' : ' dim'}">${a.via ? esc(BANK[a.via].split(' ')[0]) + ' pts' : esc(a.prog.name)}</span><em>+ ${money(rest)} cash</em>` +
-      `<div class="v">${!a.path ? 'no route' : a.value <= 0 ? 'fees exceed fare' : '<b class="num">' + a.value.toFixed(1) + '¢</b> a point'}${tip}</div>`); }
+      `<div class="v">${!a.path ? 'no route' : a.value <= 0 ? 'fees exceed fare' : '<b class="num">≈ ' + money(total - a.margin) + '</b> all in'}${tip}</div>`); }
   return `<div class="paycols">${cash}${pts}</div>`;
 }
 
@@ -970,11 +992,14 @@ function journey(e, r, ctx){
   }
   return out;
 }
-function journeyHTML(e, r, ctx){
+function journeyHTML(e, r, ctx, compact){
   const segs = journey(e, r, ctx), total = segs.reduce((a, x) => a + x.minutes, 0) || 1;
-  let w = segs.map(x => Math.max(3.2, 100*x.minutes/total)); const sum = w.reduce((a, x) => a + x, 0); w = w.map(x => 100*x/sum);
+  let w = segs.map(x => Math.max(compact ? 1.6 : 3.2, 100*x.minutes/total)); const sum = w.reduce((a, x) => a + x, 0); w = w.map(x => 100*x/sum);
+  const bar = `<span class="jbar"${compact ? ` style="width:${(100*Math.min(1, total/Math.max(ctx.maxDoor || 0, total))).toFixed(1)}%"` : ''}>${segs.map((x, i) => `<span class="jseg ${x.kind}${x.q == null ? ' neutral' : ''}" style="width:${w[i].toFixed(2)}%;--i:${i}${x.q == null ? '' : ';--sc:' + scaleColor(x.q, .19)}" title="${esc(x.tip)}">${!compact && w[i] >= 9 ? '<i>' + esc(w[i] >= 22 && x.long ? x.long : x.label) + '</i>' : ''}</span>`).join('')}</span>`;
+  // in a row: the bar alone, its length the trip's length against the longest in the results, so a long day reads long
+  if (compact) return `<span class="jmini" title="${dur(total)} door to door">${bar}</span>`;
   const fi = Math.max(0, segs.findIndex(x => x.kind === 'flight')), pre = segs.slice(0, fi).reduce((a, x) => a + x.minutes, 0), last = segs[segs.length - 1], post = last && last.kind === 'ground' ? last.minutes : 0;
-  return `<div class="journey"><div class="jbar">${segs.map((x, i) => `<span class="jseg ${x.kind}${x.q == null ? ' neutral' : ''}" style="width:${w[i].toFixed(2)}%;--i:${i}${x.q == null ? '' : ';--sc:' + scaleColor(x.q, .19)}" title="${esc(x.tip)}">${w[i] >= 9 ? '<i>' + esc(w[i] >= 22 && x.long ? x.long : x.label) + '</i>' : ''}</span>`).join('')}</div>
+  return `<div class="journey">${bar}
     <div class="jlab"><span><b>${clockAdd(e.depart, -pre)}</b> out the door</span><span><b>${clockAdd(e.arrive, post)}</b>${e.day_offset ? ' +1' : ''} in ${esc(D.query.destination)}</span></div></div>`;
 }
 
@@ -1037,7 +1062,7 @@ function rawTerms(e, r, ctx){
   if (gi){ if (gi.cents >= 5000) con('ridein', money(gi.cents) + ' ride from ' + aptN, gi.cents + gi.minutes*H/60); else if (gi.minutes >= ctx.medGroundIn + 30) con('farin', dur(gi.minutes) + ' from ' + aptN, (gi.minutes - ctx.medGroundIn)*H/60 + 1500); }
   if (find('hotel-auto')) con('hotel', 'Hotel night ' + money(cents('hotel-auto')), 18000, true);
   for (const d of r.dem){ const id = d.key.replace('want-', ''); if (WANT_CON[id]) con('want-' + id, WANT_CON[id], d.cents, true); }
-  const a = awardsFor(e)[0]; if (a && a.good) pro('points', 'Points win ' + a.value.toFixed(1) + '¢', 3000);
+  const a = awardsFor(e)[0]; if (a && a.good) pro('points', 'Points ' + money(a.margin) + ' under cash', Math.max(2000, a.margin));
   const rel = cents('reliability'); if (rel < 0) pro('ontime', 'Good on-time record', 1000 - rel); else if (rel > 0 && rel < 3000) con('delays', 'Weak on-time record', rel); else if (rel >= 3000) con('norecord', 'No on-time data', 1000);
   return T;
 }
@@ -1051,7 +1076,7 @@ function statsFor(rows){
   const totals = rows.map(r => r.total), doors = rows.map(r => r.e.door_minutes), tickets = rows.map(r => r.e.ticket_cents);
   const air = e => e.by.cheapest.legs.filter(l => l.kind === 'flight').reduce((a, l) => a + l.minutes, 0);
   const ns = rows.filter(r => r.e.stops === 0).map(r => air(r.e)), ratings = rows.map(r => r.e.rating).filter(x => x != null);
-  const ctx = {air, totals, tickets, medTotal:med(totals), spreadTotal:med(totals) ? (pct(totals, .9) - pct(totals, .1))/med(totals) : 0, medDoor:med(doors), spreadDoor:pct(doors, .9) - pct(doors, .1),
+  const ctx = {air, totals, tickets, maxDoor:Math.max(0, ...doors), medTotal:med(totals), spreadTotal:med(totals) ? (pct(totals, .9) - pct(totals, .1))/med(totals) : 0, medDoor:med(doors), spreadDoor:pct(doors, .9) - pct(doors, .1),
     refAir: ns.length ? Math.min(...ns) : ((D.par && D.par.reference && D.par.reference.block_minutes) || 0), medRating: ratings.length ? med(ratings) : .72,
     medGroundOut: med(rows.map(r => r.ground.out ? r.ground.out.minutes : 0)), medGroundIn: med(rows.map(r => r.ground.in ? r.ground.in.minutes : 0)), hourly: hourlyAt(),
     rank: (arr, v) => arr.filter(x => x < v).length / (arr.length || 1), share: () => 0};
@@ -1078,11 +1103,11 @@ function door(kind, e, r, title, ctx){
     </div></article>`;
 }
 let DOOR_IDS = [];
-function paintDoors(rows){
+function paintDoors(rows, ctx){
   if (!rows.length){ $('#doors').innerHTML = '<p style="color:var(--dim)">Nothing matches every rule. Loosen one above.</p>'; DOOR_IDS = []; return; }
   // first, second, third: the top of the ranking as it stands, so the places
   // change when the sort does (all-in at the dial, or earliest arrival on ASAP)
-  const ctx = statsFor(rows), picks = rows.slice(0, 3).map((r, k) => ({kind:'p' + (k + 1), r, title:PLACES[k]}));
+  const picks = rows.slice(0, 3).map((r, k) => ({kind:'p' + (k + 1), r, title:PLACES[k]}));
   $('#doors').innerHTML = picks.map(p => door(p.kind, p.r.e, p.r, p.title, ctx)).join('');
   const doors = [...document.querySelectorAll('#doors .door')];
   if (S.entrance) doors.forEach((d, k) => { d.classList.add('rise'); d.style.animationDelay = (120 + k*110) + 'ms'; });
@@ -1094,22 +1119,23 @@ function paintDoors(rows){
 }
 
 // ---- the list
-function rowHTML(r, i){
+function rowHTML(r, ctx){
   const e = r.e, a = awardsFor(e)[0];
   return `<li class="row" data-id="${esc(e.id)}" aria-expanded="false">
     <button class="rowbtn" data-row="${esc(e.id)}">
       ${logo(e.carrier, true)}${sealHTML(e.grade, true)}
       <span class="rw"><b>${esc(e.carrier_name)}</b><span>${esc(e.flight)} · ${esc(e.brand)}</span><small>${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} · ${stopsText(e)} · ${dur(e.door_minutes)}</small>
-        ${r.adds.length ? `<span class="dem" style="color:var(--dim)">+${money(r.adds.reduce((s, x) => s + x.cents, 0))} ${esc(r.adds.map(x => x.label.toLowerCase()).join(', '))}</span>` : ''}${r.dem.map(d => `<span class="dem">+${money(d.cents)} ${esc(d.label.toLowerCase())}</span>`).join('')}${a && a.good ? `<span class="pt">★ points: ${a.spend.toLocaleString()} ${esc(BANK[a.via || a.p].split(' ')[0])} · ${a.value.toFixed(1)}¢</span>` : ''}</span>
+        ${journeyHTML(e, r, ctx, true)}
+        ${r.adds.length ? `<span class="dem" style="color:var(--dim)">+${money(r.adds.reduce((s, x) => s + x.cents, 0))} ${esc(r.adds.map(x => x.label.toLowerCase()).join(', '))}</span>` : ''}${r.dem.map(d => `<span class="dem">+${money(d.cents)} ${esc(d.label.toLowerCase())}</span>`).join('')}${a && a.good ? `<span class="pt">★ points: ${a.spend.toLocaleString()} ${esc((BANK[a.via] || a.prog.name).split(' ')[0])} ≈ ${money(r.total - a.margin)} all in, ${money(a.margin)} under cash</span>` : ''}</span>
       <span class="when">${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''}<i>${stopsText(e)} · ${dur(e.door_minutes)}</i></span>
       <span class="amt"><b>${money(r.total)}</b><i>${money(e.ticket_cents)} ticket</i></span><span class="chev">›</span>
     </button><div class="detail" hidden></div></li>`;
 }
-function paintList(rows, hidden, animate){
+function paintList(rows, hidden, animate, ctx){
   const doorIds = new Set([...document.querySelectorAll('.door')].map(d => d.dataset.id));
   const rest = rows.filter(r => !doorIds.has(r.e.id));
   const before = {}; if (animate) document.querySelectorAll('.row').forEach(li => before[li.dataset.id] = li.getBoundingClientRect().top);
-  $('#list').innerHTML = rest.slice(0, S.shown).map(rowHTML).join('');
+  $('#list').innerHTML = rest.slice(0, S.shown).map(r => rowHTML(r, ctx)).join('');
   if (S.entrance){ document.querySelectorAll('.row').forEach((li, k) => { if (k < 14){ li.classList.add('rise'); li.style.animationDelay = (420 + k*45) + 'ms'; } }); S.entrance = false; }
   document.querySelectorAll('.row').forEach(li => { if (S.open.has(li.dataset.id)){ li.setAttribute('aria-expanded', 'true'); const det = li.querySelector('.detail'); det.innerHTML = ledgerHTML(ALL.find(x => x.id === li.dataset.id)); det.hidden = false; } });
   const left = rest.length - S.shown; $('#morebtn').hidden = left <= 0; $('#morebtn').textContent = left > 0 ? 'Show the other ' + left : '';
@@ -1119,8 +1145,8 @@ function paintList(rows, hidden, animate){
     li.style.transform = 'translateY(' + d + 'px)'; requestAnimationFrame(() => { li.classList.add('moving'); li.style.transform = ''; }); li.addEventListener('transitionend', () => li.classList.remove('moving'), {once:true}); });
 }
 function paint(animate){
-  const {rows, hidden} = ranked();
-  paintDoors(rows); paintList(rows, hidden, animate);
+  const {rows, hidden} = ranked(), ctx = rows.length ? statsFor(rows) : null;
+  paintDoors(rows, ctx); paintList(rows, hidden, animate, ctx);
   if (W && W.mode === 'results') summary();
 }
 
@@ -1151,7 +1177,7 @@ function ledgerHTML(e){
     <div class="btotal"><span>All in at your dial<small>${S.asap ? 'ranked by arrival' : 'the sum of every line above'}</small></span><b>${money(r.total)}</b></div></div>
     <div class="book"><h4>${esc(e.carrier_name)} ${esc(e.flight)}</h4><p>${esc(e.route.join(' → '))} · ${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} · ${stopsText(e)}<br>${b ? esc(b.note) : ''}</p>
       <button class="choose">${b ? 'Book with ' + esc(b.who) + ' · ' + money(b.price_cents) : 'Book'}</button>
-      ${aw.length ? '<h4 style="margin-top:6px">With points</h4><ul class="awards">' + aw.map(a => `<li class="${a.good ? 'good' : ''}"><b>${a.good ? '★ ' : ''}${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)}</b> · <span class="v">${a.value <= 0 ? 'fees exceed the fare' : a.value.toFixed(1) + '¢/pt'}</span>${a.path ? ' · ' + esc(a.path) : ' · no route from your balances'}${a.bonus ? ' until ' + esc(a.bonus.until) : ''}</li>`).join('') + '</ul>' : ''}
+      ${aw.length ? '<h4 style="margin-top:6px">With points</h4><ul class="awards">' + aw.map(a => `<li class="${a.good ? 'good' : ''}"><b>${a.good ? '★ ' : ''}${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)}</b> · <span class="v">${a.value <= 0 ? 'fees exceed the fare' : moneyPt(a.value) + '/pt · ≈ ' + money(r.total - a.margin) + ' all in'}</span>${a.path ? ' · ' + esc(a.path) : ' · no route from your balances'}${a.bonus ? ' until ' + esc(a.bonus.until) : ''}</li>`).join('') + '</ul>' : ''}
       <p>Grade <b>${e.grade}</b>: ${money(e.effective_cents)} all in for a neutral traveller, against par ${money(D.query.par_cents)}.</p></div>`;
 }
 function openSheet(id){
@@ -1300,8 +1326,11 @@ function paintPts(){
 
 // ---- boot
 const P = D.par;
+function paintPar(){
 $('#how1').innerHTML = 'Par for this route is <b>' + money(D.query.par_cents) + '</b>: what a nonstop in main cabin with a bag costs all in, leaving ' + esc(P.reference.departs_local) + ', ' + dur(P.reference.door_to_door_minutes) + ' door to door, at ' + (P.season_factor < .95 ? 'an off-season' : P.season_factor > 1.05 ? 'a peak' : 'a shoulder') + ' fare for ' + P.miles.toLocaleString() + ' miles. About par is an A; every letter below is a step further from it.';
 $('#parledger').innerHTML = P.ledger.map(l => `<li><span>${esc(l.label)}</span><span class="num">${signed(l.cents)}</span></li>`).join('') + `<li class="t"><span>Par</span><span class="num">${money(P.par_cents)}</span></li>`;
+}
+paintPar();
 $('#cov').innerHTML = '<b>Draft data.</b> ' + esc(D.gaps[0] || '') + '. ' + esc(D.verdict || '') + '. A real Duffel search on a test token; some fares and times are invented. Airline logos load from the feed where the page can reach it and fall back to a monogram where it cannot.';
 sentenceHTML(); paintChips(); paintCarriers(); paintPts(); paintTri(); setWeights(1, 0, 0, '1,0,0');
 
@@ -1373,6 +1402,10 @@ $('#doors').addEventListener('click', ev => { const b = ev.target.closest('[data
 document.addEventListener('click', ev => { const i = ev.target.closest('.info'); document.querySelectorAll('.info[aria-expanded=true]').forEach(x => { if (x !== i) x.setAttribute('aria-expanded', 'false'); }); if (i) i.setAttribute('aria-expanded', i.getAttribute('aria-expanded') === 'true' ? 'false' : 'true'); });
 document.addEventListener('click', ev => { if (ev.target.id === 'x' || ev.target.id === 'sheetwrap') $('#sheetroot').innerHTML = ''; });
 $('#go').addEventListener('click', enterResults);
+$('#cur').innerHTML = Object.entries(CURRENCIES).map(([k, v]) => `<option value="${k}"${k === CUR ? ' selected' : ''}>${k} · ${esc(v.name)}</option>`).join('');
+function curNote(){ const k = CURRENCIES[CUR]; $('#curnote').textContent = CUR === 'USD' ? 'Figures in US dollars.' : '1 USD = ' + k.rate + ' ' + CUR + ' · ' + RATES_ASOF + '.'; }
+curNote();
+$('#cur').addEventListener('change', ev => { CUR = ev.target.value; try { localStorage.setItem('concordego.currency', CUR); } catch (e) {} curNote(); paintPar(); rerenderBills(); if (S.thread.length) renderThread(); });
 addEventListener('resize', () => { paintTri(); const [x, y] = toXY(S.a, S.b, S.c); handle.style.left = x + 'px'; handle.style.top = y + 'px'; });
 
 // ================= the pictures =================
