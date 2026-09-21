@@ -543,6 +543,10 @@ details[open] summary:after{content:"–"}
 .fld label{display:block;font-family:var(--disp);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin-bottom:5px}
 .fld input,.fld select{width:100%;background:none;border:0;font:500 18px/1.25 var(--sans);color:var(--text);min-width:0;text-overflow:ellipsis;-webkit-appearance:none;appearance:none;padding:0;border-radius:0}
 .fld input::placeholder{color:var(--faint)}
+/* the date fields are the browser's own, in the dark scheme, with its calendar (per Patrick, 2026-09-21: "no calendar pop outs") */
+.fld input[type=date]{color-scheme:dark;padding-left:0;cursor:pointer}
+.fld input[type=date]::-webkit-calendar-picker-indicator{opacity:.55;cursor:pointer;filter:invert(1)}
+.fld:has(input[type=date]){padding-left:14px}
 .fld input:focus,.fld select:focus{outline:none}
 .fld select{cursor:pointer;padding-right:20px;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='7' viewBox='0 0 12 7'><path d='M1 1l5 5 5-5' fill='none' stroke='%238e8e8e' stroke-width='1.8'/></svg>") no-repeat right 2px center}
 .fld select option{background:var(--panel2);color:var(--text)}
@@ -901,7 +905,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">Advanced options are optional; leave them and go.</span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="10e615c">10e615c</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="02873ea">02873ea</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -928,7 +932,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="10e615c">10e615c</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="02873ea">02873ea</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -985,6 +989,8 @@ const moneyPt = c => { const k = CURRENCIES[CUR], v = c*k.rate; return k.minor ?
 const signed = c => (c < 0 ? '−' : '+') + money(c);
 const hm = iso => iso.slice(11,16);
 const hour = iso => +iso.slice(11,13) + (+iso.slice(14,16))/60;
+// declared here, above the first render: the sentence's date fields parse dates at boot (a TDZ once killed the page)
+const MON = {jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, sept:8, oct:9, nov:10, dec:11};
 const dur = m => m < 60 ? m + 'm' : Math.floor(m/60) + 'h' + (m%60 ? String(m%60).padStart(2,'0') : '');
 const gcls = g => ({A:'a',B:'b',C:'c'}[g[0]] || 'd');
 const stopsText = e => e.stops === 0 ? 'nonstop' : e.stops === 1 ? 'via ' + e.route[1] : e.stops + ' stops';
@@ -1835,7 +1841,10 @@ const ICON = {
 function sentenceHTML(){
   const L = S.legs, g0 = ALL[0].legs[0], gIn = ALL[0].legs.slice().reverse().find(l => l.kind === 'ground' && l !== g0);
   const LOCATE = '<button type="button" class="locate" id="locate" title="Use my location" aria-label="Use my location"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>';
-  const fld = (id, label, val, icon, help, ph) => `<div class="fld${id === 'q-from-0' ? ' hasloc' : ''}">${ICON[icon]}<label for="${id}">${label}</label><input id="${id}" value="${esc(val)}" placeholder="${esc(ph || '')}" autocomplete="off">${id === 'q-from-0' ? LOCATE : ''}${help ? `<div class="help">${help}</div>` : ''}</div>`;
+  const today = localISO(new Date()).slice(0, 10);
+  const fld = (id, label, val, icon, help, ph) => icon === 'cal'
+    ? `<div class="fld"><label for="${id}">${label}</label><input id="${id}" type="date" value="${esc(toISODate(val) || '')}" min="${today}" aria-label="${esc(label)}">${help ? `<div class="help">${help}</div>` : ''}</div>`
+    : `<div class="fld${id === 'q-from-0' ? ' hasloc' : ''}">${ICON[icon]}<label for="${id}">${label}</label><input id="${id}" value="${esc(val)}" placeholder="${esc(ph || '')}" autocomplete="off">${id === 'q-from-0' ? LOCATE : ''}${help ? `<div class="help">${help}</div>` : ''}</div>`;
   const sel = (id, label, val, opts, icon) => `<div class="fld">${ICON[icon]}<label for="${id}">${label}</label><select id="${id}">${opts.map(o => `<option${o === val ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select></div>`;
   const plane = '<div class="link" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M15 8l-4.2-1.4L7 1.5H5.4l1.9 5.1H3.6L2.5 4.9H1.2l.9 3.1-.9 3.1h1.3l1.1-1.7h3.7L5.4 14.5H7l3.8-5.1z"/></svg></div>';
   let h = `<div class="frow route">${fld('q-from-0', 'From your door', L[0].from, 'pin',
@@ -2525,8 +2534,11 @@ async function askSugg(input){
   if (SERVED){ try { const r = await fetch('/suggest?q=' + encodeURIComponent(q) + '&kind=' + kind + (cc ? '&cc=' + cc : '')); rows = (await r.json()).rows || []; } catch (e){ rows = []; } }
   if (seq !== SG.seq) return; SG.rows = rows.slice(0, 9); SG.sel = -1; paintSugg();
 }
-function pickSugg(i){ const r = SG.rows[i], input = SG.input; if (!r || !input) return; input.value = r.value; closeSugg(); input.dispatchEvent(new Event('input', {bubbles:true})); }
-document.addEventListener('input', ev => { const i = ev.target; if (!(i.matches && (i.id === 'q-from-0' || i.id === 'q-to-0' || /^q-(from|to)-\d+$/.test(i.id)))) return; if (SG.input !== i) closeSugg(); clearTimeout(SG.timer); SG.timer = setTimeout(() => askSugg(i), 220); });
+function pickSugg(i){ const r = SG.rows[i], input = SG.input; if (!r || !input) return; input.value = r.value; closeSugg(); SG.picked = r.value; input.dispatchEvent(new Event('input', {bubbles:true})); }
+document.addEventListener('input', ev => { const i = ev.target; if (!(i.matches && (i.id === 'q-from-0' || i.id === 'q-to-0' || /^q-(from|to)-\d+$/.test(i.id)))) return;
+  // the input event a pick fires is for the state, not a new lookup: the box would come straight back for the value just chosen
+  if (SG.picked && i.value === SG.picked){ SG.picked = null; clearTimeout(SG.timer); closeSugg(); return; }
+  if (SG.input !== i) closeSugg(); clearTimeout(SG.timer); SG.timer = setTimeout(() => askSugg(i), 220); });
 document.addEventListener('keydown', ev => { if (!SG.input || ev.target !== SG.input || !SG.rows.length) return;
   if (ev.key === 'ArrowDown'){ ev.preventDefault(); SG.sel = (SG.sel + 1) % SG.rows.length; paintSugg(); }
   else if (ev.key === 'ArrowUp'){ ev.preventDefault(); SG.sel = (SG.sel - 1 + SG.rows.length) % SG.rows.length; paintSugg(); }
@@ -2964,7 +2976,8 @@ document.querySelectorAll('.screen').forEach(s => io.observe(s));
 
 const short = s => (s || '').split(',')[0].replace(/ & .*$/, '').trim() || '…';
 function summary(){
-  const L = S.legs[0], when = S.trip === 'round' ? L.date + ' – ' + S.back : S.trip === 'multi' ? S.legs.map(l => l.date).join(' · ') : L.date;
+  const nice = d => { const iso = toISODate(d); return iso ? isoToLabel(iso) : (d || ''); };
+  const L = S.legs[0], when = S.trip === 'round' ? nice(L.date) + ' – ' + nice(S.back) : S.trip === 'multi' ? S.legs.map(l => nice(l.date)).join(' · ') : nice(L.date);
   // nothing typed yet and the recording on screen: name the recording's own ends rather than printing dots
   const q = D.query || {}, fromName = L.from ? short(L.from) : short(q.origin_full || q.origin || ''), toName = L.to ? short(L.to) : short(q.destination || '');
   const route = S.trip === 'multi' ? S.legs.map(l => short(l.from)).concat([short(S.legs[S.legs.length-1].to)]).join(' → ') : fromName + ' → ' + toName;
@@ -2992,7 +3005,6 @@ function runProgress(box, stages, ms, done){
 }
 const SEARCH_STAGES = [['Asking the airlines', 22], ['Pricing the ride from your door', 44], ['Timing every layover', 62], ['Grading against par', 84], ['Ranking at your dial', 100]];
 // 'Wed 18 Nov' or '18 Nov' or '2026-11-18' -> an ISO date; the next such day from today
-const MON = {jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, sept:8, oct:9, nov:10, dec:11};
 function toISODate(str){
   const t = (str || '').trim(); if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
   const m = /(\d{1,2})\s+([A-Za-z]{3,4})\.?(?:\s+(\d{4}))?/.exec(t) || /([A-Za-z]{3,4})\.?\s+(\d{1,2})(?:,?\s+(\d{4}))?/.exec(t); if (!m) return null;
