@@ -17,7 +17,9 @@
 # SSH_KEY (a DigitalOcean ssh-key id or name; default: the first one listed).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; TRAVEL="$(dirname "$HERE")"
-: "${DIGITALOCEAN_ACCESS_TOKEN:?set DIGITALOCEAN_ACCESS_TOKEN}"
+# doctl may already hold its token (doctl auth init); the env var is only needed when it does not
+command -v doctl >/dev/null || { echo "doctl is missing:  brew install doctl"; exit 1; }
+doctl account get >/dev/null 2>&1 || : "${DIGITALOCEAN_ACCESS_TOKEN:?doctl is not authorised: run  doctl auth init  , or set DIGITALOCEAN_ACCESS_TOKEN}"
 : "${ALLOW:?set ALLOW to a comma-separated list of emails}"
 [ -n "${CF_GLOBAL_KEY:-}" ] && : "${CF_EMAIL:?set CF_EMAIL beside CF_GLOBAL_KEY}"
 [ -n "${CF_GLOBAL_KEY:-}" ] || : "${CF_API_TOKEN:?set CF_API_TOKEN, or CF_EMAIL and CF_GLOBAL_KEY}"
@@ -25,7 +27,6 @@ HOST="${HOST:-go.flyconcordefly.com}"; NAME="${NAME:-concordego}"; REGION="${REG
 BRANCH="${BRANCH:-$(git -C "$TRAVEL" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
 PORT=9897; APEX=$(echo "$HOST" | awk -F. '{print $(NF-1)"."$NF}'); SUB="${HOST%.$APEX}"
 OWNERS="${OWNERS:-${ALLOW%%,*}}"
-command -v doctl >/dev/null || { echo "doctl is missing:  brew install doctl"; exit 1; }
 say(){ printf '\n\033[1m%s\033[0m\n' "$*"; }
 jq_(){ python3 -c "import sys,json; d=json.load(sys.stdin); $1"; }
 ROOT="https://api.cloudflare.com/client/v4"
