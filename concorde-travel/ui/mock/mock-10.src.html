@@ -212,7 +212,10 @@ details[open] summary:after{content:"–"}
 .seal .sg{fill:var(--gc);stroke:none;font:600 12px/1 var(--mono);text-anchor:middle;dominant-baseline:central}
 .seal .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .seal.s{position:static;width:32px;height:32px;flex:none}
-.seal.s .g{stroke-width:1.7}.seal.s .sg{font-size:13px}
+/* in a row, the ghost tag: a hairline in the grade colour over a 14% tint, the letter filled */
+.seal.s .ring{fill:color-mix(in oklab,var(--gc) 14%,transparent);stroke:color-mix(in oklab,var(--gc) 60%,transparent);stroke-width:1}
+.seal.s .g{fill:var(--gc);stroke:none;font:600 23px/1 var(--sans);letter-spacing:0}
+.seal.s .sg{font:600 12px/1 var(--sans)}
 .door .body{padding:18px 18px 18px;display:flex;flex-direction:column;gap:10px;flex:1}
 .door .eyebrow{color:var(--speed)}
 .door.p1 .eyebrow{color:var(--speed)}.door.p2 .eyebrow{color:#aeb4c2}.door.p3 .eyebrow{color:#b8875e}
@@ -1603,7 +1606,6 @@ function showResults(){
 const POS = [['ZA', '🇿🇦', 'South Africa', .12, 'Some airlines want a South African card; a cancelled ticket is the downside'], ['IN', '🇮🇳', 'India', .14, 'A local card or address is often required at ticketing'],
   ['TR', '🇹🇷', 'Türkiye', .05, 'Priced in lira; the rate moves week to week'], ['MX', '🇲🇽', 'Mexico', .04, 'Usually fine with a foreign card'],
   ['BR', '🇧🇷', 'Brazil', .03, 'Instalment pricing hides the real total; read the last screen'], ['GB', '🇬🇧', 'United Kingdom', .02, 'Straightforward; APD applies on the way back'], ['AU', '🇦🇺', 'Australia', .01, 'Rarely cheaper for a transatlantic fare']];
-const CARD_FEE = .03;
 const RBOX = `<div class="rstart"><button class="go" id="rgo">Check ${POS.length} other points of sale</button><span class="hintr">About a minute. It runs in the background and the results land here.</span></div>`;
 const seeded = str => { let h = 2166136261; for (const ch of str){ h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return (h % 10000) / 10000; };
 function researchRows(){
@@ -1611,19 +1613,19 @@ function researchRows(){
   return rows.slice(0, 3).map(r => {
     const e = r.e, tries = POS.map(([code, flag, name, lean, catchNote]) => { const u = seeded(e.id + code); const delta = Math.round(e.ticket_cents * (lean * 2 * (u - .35) - lean)); return {code, flag, name, price: e.ticket_cents + delta, delta, catchNote}; })
       .sort((x, y) => x.price - y.price);
-    const best = tries[0], gross = e.ticket_cents - best.price, net = gross - Math.round(best.price * CARD_FEE);
-    return {e, r, best, gross, net, worth: net >= 2500};
+    const best = tries[0], net = e.ticket_cents - best.price;
+    return {e, r, best, net, worth: net >= 2500};
   });
 }
 function researchHTML(){
   const rs = researchRows();
-  return `<table class="rtab"><thead><tr><th>Flight</th><th>Cheapest point of sale</th><th>Their fare</th><th>Ours</th><th>After a ${Math.round(CARD_FEE*100)}% card fee</th><th>The catch</th></tr></thead><tbody>${rs.map(x => `<tr>
+  return `<table class="rtab"><thead><tr><th>Flight</th><th>Cheapest point of sale</th><th>Their fare*</th><th>Ours</th><th>Saving</th><th>The catch</th></tr></thead><tbody>${rs.map(x => `<tr>
     <td><b>${esc(x.e.carrier_name)}</b> ${esc(x.e.flight)}<br><span style="color:var(--dim);font-size:12.5px">${esc(x.e.brand)}</span></td>
     <td><span class="flag">${x.best.flag}</span>${esc(x.best.name)}</td>
     <td><b class="fig">${money(x.best.price)}</b></td><td><b class="fig">${money(x.e.ticket_cents)}</b></td>
     <td class="${x.worth ? 'save' : 'nosave'}">${x.net > 0 ? money(x.net) + ' less' : 'No saving'}</td>
-    <td class="catch">${x.worth ? esc(x.best.catchNote) : x.net > 0 ? 'Too small to be worth a foreign card and the risk' : 'Home fare is already the low one'}</td></tr>`).join('')}</tbody></table>
-    <p class="rnote"><b>How to read it.</b> The saving is on the ticket alone; the rest of the bill does not move. Points are unaffected. <b>What is real:</b> the fare rules, and the catches. <b>What is not, yet:</b> the figures, which are demo, seeded from each flight, because our feed prices at one point of sale. The real feature needs a connection that takes a country of sale per request.</p>`;
+    <td class="catch">${x.worth ? esc(x.best.catchNote) : x.net > 0 ? 'Too small to be worth the risk' : 'Home fare is already the low one'}</td></tr>`).join('')}</tbody></table>
+    <p class="rnote">* Foreign transaction fees may apply, typically 0–3% depending on your card. <b>How to read it.</b> The saving is on the ticket alone; the rest of the bill does not move. Points are unaffected. <b>What is real:</b> the fare rules, and the catches. <b>What is not, yet:</b> the figures, which are demo, seeded from each flight, because our feed prices at one point of sale. The real feature needs a connection that takes a country of sale per request.</p>`;
 }
 const RESEARCH_STAGES = POS.map(([code, flag, name], i) => ['Pricing from ' + name, Math.round(100 * (i + 1) / POS.length)]);
 document.addEventListener('click', ev => { if (!ev.target.closest('#rgo')) return; const box = $('#rbox');
