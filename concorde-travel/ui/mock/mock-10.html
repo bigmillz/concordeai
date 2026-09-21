@@ -781,6 +781,8 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 @media (max-width:980px){.rsc.fixer .frow.four{grid-template-columns:repeat(2,minmax(0,1fr))}.rsc.fixer .frow.three{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:640px){.rsc.fixer .frow.two,.rsc.fixer .frow.three,.rsc.fixer .frow.four{grid-template-columns:1fr}}
 .rsc.fixer .nav{margin-top:18px}
+/* in Flight Fixer mode the other steps do not apply, so they are not shown (per Patrick, 2026-09-21) */
+.fixmode .rail .st:not(:first-child),.fixmode .rail .jump{display:none}.fixmode .rail .st:first-child{margin-right:auto}
 .rsc .odds{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 10px}.rsc .odds b{font-family:var(--mono);font-size:26px}.rsc .odds small{color:var(--faint)}
 .rsc .odds button{color:var(--dim);font-size:12.5px;border-bottom:1px solid var(--line)}
 .rsc .chart{margin:6px 0 12px}.rsc .chart svg{width:100%;height:130px;display:block}.rsc .chart text{fill:var(--faint);font:10px var(--mono)}.rsc .chart .l{fill:none;stroke:var(--speed);stroke-width:2}.rsc .chart .g{stroke:var(--line)}
@@ -920,7 +922,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">Advanced options are optional; leave them and go.</span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="6fe8fe9">6fe8fe9</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="fab44ac">fab44ac</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -947,7 +949,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="6fe8fe9">6fe8fe9</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="fab44ac">fab44ac</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1887,6 +1889,8 @@ const ICON = {
 };
 function sentenceHTML(){
   const fix = S.trip === 'fix';
+  document.documentElement.classList.toggle('fixmode', fix);
+  $('#s1 .eyebrow').textContent = fix ? 'Flight Fixer' : 'Step 1 of 4';
   $('#s1 h1').textContent = fix ? 'What happened to your flight?' : 'Where are you going?';
   $('#s1 .lead').textContent = fix ? 'Tell it what you know. From, to and what happened are enough; every detail after that makes the call faster and surer.' : 'Just the trip. Everything else comes one screen at a time, and you can change any of it later without starting over.';
   { const nav = document.querySelector('#s1 .panel > .nav'); if (nav) nav.classList.toggle('hidden', fix); }
@@ -2750,7 +2754,7 @@ async function runRescue(){
   let res; try { const r = await fetch('/rescue', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({situation:sit, now:localISO(now), source:'api'})}); res = await r.json(); } catch (e){ res = {error:'The search did not come back. Try again.'}; }
   if (res.error){ $('#rs-go').disabled = false; $('#rs-go').textContent = '🪄 Make the call'; err.textContent = res.error; if (res.sign_in){ closeAccount(); openAccount(res); } return; }
   $('#rs-go').disabled = false; $('#rs-go').textContent = '🪄 Make the call';
-  paintRescue(res);
+  try { paintRescue(res); } catch (e){ err.textContent = 'The call came back but could not be drawn: ' + (e && e.message ? e.message : e) + '. Try again, and tell us if it persists.'; console.error(e); }
 }
 function paintRescue(res){
   const a = res.assessment, V = a.verdict, hm = iso => iso ? iso.slice(11, 16) : '';
@@ -2764,6 +2768,8 @@ function paintRescue(res){
     <h4>What you can ask for</h4><ul>${a.rights.map(r => `<li><b>${esc(r.what)}</b> · ${esc(r.detail)}</li>`).join('')}</ul>
     <p class="fine">Refund: ${esc(a.refund.why)}.</p>
     <div class="row2"><button class="ledger" id="rescuego">Change the details</button><button class="choose" id="acctno" style="flex:0 0 auto">Done</button></div></div>`;
+  // the form lives on the page now, so the sheet must be OPENED, not just filled (2026-09-21: the call came back into a hidden sheet)
+  $('#acct').classList.remove('hidden'); const sh = $('#acct .sheet'); if (sh) sh.scrollTop = 0; ($('#oddsmore') || $('#acctno')).focus();
 }
 // the chance of being off the ground by each hour left in the day, as one line; the basis under it in a sentence
 function oddsChart(od){
