@@ -4,8 +4,12 @@
 # nothing reaches the server until someone has signed in. Idempotent.
 #
 #   export CF_API_TOKEN=...        # a token with:  Access: Apps and Policies : Edit
-#   export CF_ACCOUNT_ID=...       #                Access: Organizations, Identity Providers, and Groups : Edit
+#                                  #               Access: Organizations, Identity Providers, and Groups : Edit
 #   ALLOW="pat@millertechnology.net,friend@example.com" ./concorde-travel/access.sh
+#
+# The Account ID is read from the tunnel's credentials in ~/.cloudflared (the
+# account go-live.sh made the tunnel in owns the zone, and Access needs that
+# one); CF_ACCOUNT_ID=... overrides it and is refused if it disagrees.
 #
 # Optional: HOST (default go.flyconcordfly.com), TEAM (the Zero Trust team name,
 # needed only the first time an account uses Access; it becomes
@@ -16,8 +20,38 @@
 # paste an OAuth client id and secret from Google Cloud, then re-run this script
 # and the app picks it up beside the one-time PIN.
 set -euo pipefail
-: "${CF_API_TOKEN:?set CF_API_TOKEN}"; : "${CF_ACCOUNT_ID:?set CF_ACCOUNT_ID}"; : "${ALLOW:?set ALLOW to a comma-separated list of emails}"
+: "${CF_API_TOKEN:?set CF_API_TOKEN}"; : "${ALLOW:?set ALLOW to a comma-separated list of emails}"
 HOST="${HOST:-go.flyconcordfly.com}"; SESSION="${SESSION:-24h}"; TEAM="${TEAM:-}"
+TUNNEL="${TUNNEL:-concordego}"
+
+# The account that owns the zone is the one the tunnel was made in: cloudflared
+# logged into it, and wrote its AccountTag into the tunnel's credentials file.
+# Access can only guard a hostname whose zone is in the same account, so that
+# tag is the Account ID this script must use. It is read here so nobody has to
+# find it in the dashboard, and a CF_ACCOUNT_ID that disagrees is refused before
+# a team or an application is created in the wrong account.
+TUN_ACCT=$(python3 - "$TUNNEL" <<'PY'
+import glob, json, os, sys
+want = sys.argv[1]; found = []
+for f in sorted(glob.glob(os.path.expanduser("~/.cloudflared/*.json"))):
+    try: d = json.load(open(f))
+    except Exception: continue
+    if d.get("AccountTag") and d.get("TunnelID"): found.append((d.get("TunnelName") == want, d["AccountTag"]))
+found.sort(key=lambda x: not x[0])
+print(found[0][1] if found and (found[0][0] or len(found) == 1) else "")
+PY
+)
+if [ -z "${CF_ACCOUNT_ID:-}" ]; then
+  [ -n "$TUN_ACCT" ] || { echo "set CF_ACCOUNT_ID (no tunnel credentials in ~/.cloudflared to read it from; run go-live.sh first, or pass it)"; exit 1; }
+  CF_ACCOUNT_ID="$TUN_ACCT"; echo "== account id\n  $CF_ACCOUNT_ID, from the tunnel's credentials in ~/.cloudflared" | sed 's/\\n/\n/'
+elif [ -n "$TUN_ACCT" ] && [ "$TUN_ACCT" != "$CF_ACCOUNT_ID" ]; then
+  echo "== account id"
+  echo "  CF_ACCOUNT_ID is $CF_ACCOUNT_ID, but the tunnel that serves $HOST was made in account $TUN_ACCT"
+  echo "  (its credentials file in ~/.cloudflared says so), and that is the account that owns the zone."
+  echo "  Access can only guard the hostname from there. Re-run with CF_ACCOUNT_ID=$TUN_ACCT and a token"
+  echo "  whose Account Resources cover that account; or leave CF_ACCOUNT_ID out and it is used automatically."
+  exit 1
+fi
 API="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/access"
 
 cf(){ # method path [json]

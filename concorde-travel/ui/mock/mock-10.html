@@ -555,9 +555,8 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 @media (prefers-reduced-motion:reduce){.wing.big line{animation:none;opacity:1;stroke-dashoffset:0}}
 .wing line{stroke:url(#wgrad);stroke-width:2.4;stroke-linecap:round;fill:none}
 .lockup{font-family:var(--disp);text-transform:uppercase;letter-spacing:.15em;font-size:12.5px;font-weight:400;white-space:nowrap;color:#fff;display:inline-flex;align-items:center}
-/* GO: extra extra bold, as the app sets AI (6b258): a fattening stroke, a touch smaller, raised to sit on the same line */
-.lockup .tld{font-weight:400;-webkit-text-stroke:.12em currentColor;font-size:.865em;vertical-align:.06em}
-.brand:hover .wing line{filter:drop-shadow(0 0 4px rgba(244,245,248,.55))}
+/* GO: exactly the site's card lockups (ConcordeAI, ConcordeVPN), nothing more */
+.lockup .tld{font-weight:800;-webkit-text-stroke:.55px currentColor}
 /* white edges that glow: wide-gamut white where the display has it */
 @supports (color: color(display-p3 1 1 1)){
   .seal .g{filter:drop-shadow(0 0 4px color-mix(in oklab, var(--gc) 55%, transparent))}
