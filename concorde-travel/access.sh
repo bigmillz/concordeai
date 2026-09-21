@@ -24,13 +24,33 @@ cf(){ # method path [json]
   curl -sS -X "$1" "$API$2" -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" ${3:+--data "$3"}
 }
 jq_(){ python3 -c "import sys,json; d=json.load(sys.stdin); $1"; }
+ROOT="https://api.cloudflare.com/client/v4"
+cfroot(){ curl -sS "$ROOT$1" -H "Authorization: Bearer $CF_API_TOKEN"; }
+
+# A request that fails is not the same as a team that does not exist, and the
+# first version of this script conflated them: an unauthorised GET read as "no
+# team yet" and sent people off to pick a name. So the token and the account
+# are checked first, each with the reason spelled out.
+echo "== token"
+cfroot /user/tokens/verify | jq_ 'r=d.get("result") or {}
+if not d.get("success") or r.get("status") != "active": sys.exit("  Cloudflare does not accept this token: " + json.dumps(d.get("errors")) + "\n  Make one at dash.cloudflare.com > My Profile > API Tokens > Create Token > Custom token.")
+print("  active")'
+echo "== account"
+cfroot "/accounts/$CF_ACCOUNT_ID" | jq_ 'r=d.get("result") or {}
+if not d.get("success"): sys.exit("  The token cannot see this account: " + json.dumps(d.get("errors")) + "\n  Either CF_ACCOUNT_ID is wrong (it is on the right of the Overview page of the flyconcordfly.com zone, under API), or the token was made with Account Resources set to another account.")
+print("  " + (r.get("name") or ""))'
 
 echo "== organisation"
-if ! cf GET /organizations | jq_ 'sys.exit(0 if d.get("success") and d.get("result") and d["result"].get("auth_domain") else 1)'; then
-  [ -n "$TEAM" ] || { echo "This account has no Zero Trust team yet. Re-run with TEAM=<name> (it becomes <name>.cloudflareaccess.com)."; exit 1; }
-  cf POST /organizations "{\"name\":\"$TEAM\",\"auth_domain\":\"$TEAM.cloudflareaccess.com\"}" | jq_ 'print("  created", d["result"]["auth_domain"]) if d.get("success") else sys.exit("  " + json.dumps(d.get("errors")))'
+ORG=$(cf GET /organizations)
+if echo "$ORG" | jq_ 'sys.exit(0 if d.get("success") else 1)'; then
+  if echo "$ORG" | jq_ 'sys.exit(0 if (d.get("result") or {}).get("auth_domain") else 1)'; then
+    echo "$ORG" | jq_ 'print("  ", d["result"]["auth_domain"])'
+  else
+    [ -n "$TEAM" ] || { echo "This account has no Zero Trust team yet. Re-run with TEAM=<name> (it becomes <name>.cloudflareaccess.com)."; exit 1; }
+    cf POST /organizations "{\"name\":\"$TEAM\",\"auth_domain\":\"$TEAM.cloudflareaccess.com\"}" | jq_ 'print("  created", d["result"]["auth_domain"]) if d.get("success") else sys.exit("  " + json.dumps(d.get("errors")) + "\n  Creating the team needs the permission \"Access: Organizations, Identity Providers, and Groups: Edit\" on the token.\n  Or create it once by hand at one.dash.cloudflare.com (pick the team name, the Free plan) and re-run without TEAM.")'
+  fi
 else
-  cf GET /organizations | jq_ 'print("  ", d["result"]["auth_domain"])'
+  echo "$ORG" | jq_ 'sys.exit("  Access refused the request: " + json.dumps(d.get("errors")) + "\n  The token needs BOTH permissions, on this account: \"Access: Apps and Policies: Edit\" and \"Access: Organizations, Identity Providers, and Groups: Edit\".\n  If the account has never opened Zero Trust, open one.dash.cloudflare.com once, pick a team name and the Free plan, then re-run.")'
 fi
 
 echo "== identity providers"
