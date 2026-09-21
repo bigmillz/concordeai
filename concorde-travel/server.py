@@ -62,6 +62,8 @@ WISHES_TOTAL = int(os.environ.get("CONCORDEGO_WISHES_TOTAL", "1500"))
 # Anyone may run a few real searches a day before signing in (per Patrick, 2026-09-21: never made-up results;
 # a few free ones, then the account pop-up or the wait). Counted per address; a round trip is two searches.
 ANON_SEARCHES = int(os.environ.get("CONCORDEGO_ANON_SEARCHES", "4"))
+# The Zero Trust team, e.g. millerworldindustries: the issuer of the sign-in cookie the server verifies below.
+ACCESS_TEAM = os.environ.get("CONCORDEGO_ACCESS_TEAM", "").strip().lower()
 # Photos of the origin and the destination for the shortlist tiles: Pexels (free, 200 an hour, a credit line
 # asked). Cached per place for a month, so a place costs one call ever; and at most PHOTO_CALLS uncached
 # lookups a day site-wide, so nobody can spend the hour walking the atlas. No key: the stand-in artwork stays.
@@ -99,6 +101,76 @@ def _users_take(email, kind, limit):
         users[email] = u
         live._atomic_write(USERS_FILE, users)
         return True, limit - u[kind]
+
+
+# ----------------------------------------------------------- who is this
+# Cloudflare Access only writes Cf-Access-Authenticated-User-Email on requests
+# to an application that demanded a sign-in. The free searches, the photos
+# and the identity check live on the open part of the site, which Access
+# passes through unstamped, so a signed-in person looked anonymous there and
+# was sent round to sign in again (2026-09-21). The browser sends Access's own
+# cookie, CF_Authorization, on every request to the host: a JWT signed with
+# the team's key. It is verified here in the stdlib - RS256 is one modular
+# exponentiation and a fixed padding - against the team's published keys,
+# cached an hour. Issuer, expiry and signature all have to hold.
+_JWKS = {"at": 0.0, "keys": {}}
+
+
+def _b64u(s):
+    import base64
+    s = s + "=" * (-len(s) % 4)
+    return base64.urlsafe_b64decode(s.encode("ascii"))
+
+
+def _access_keys():
+    if not ACCESS_TEAM:
+        return {}
+    if time.time() - _JWKS["at"] > 3600 or not _JWKS["keys"]:
+        try:
+            req = urllib.request.Request("https://%s.cloudflareaccess.com/cdn-cgi/access/certs" % ACCESS_TEAM,
+                                         headers={"User-Agent": "ConcordeGo/1.0 (go.flyconcordefly.com)"})
+            with urllib.request.urlopen(req, timeout=6) as r:
+                d = json.loads(r.read().decode("utf-8"))
+            keys = {}
+            for k in d.get("keys") or []:
+                if k.get("kty") == "RSA" and k.get("kid"):
+                    keys[k["kid"]] = (int.from_bytes(_b64u(k["n"]), "big"), int.from_bytes(_b64u(k["e"]), "big"))
+            if keys:
+                _JWKS["keys"] = keys
+            _JWKS["at"] = time.time()
+        except Exception:
+            _JWKS["at"] = time.time() - 3300     # try again in five minutes, keep what we had
+    return _JWKS["keys"]
+
+
+_SHA256_PREFIX = bytes.fromhex("3031300d060960864801650304020105000420")
+
+
+def access_email(token):
+    """The signed-in email in an Access JWT, or None. Verifies RS256 against
+    the team's keys, the issuer and the expiry; nothing else is trusted."""
+    try:
+        h64, p64, s64 = token.split(".")
+        header = json.loads(_b64u(h64)); payload = json.loads(_b64u(p64)); sig = int.from_bytes(_b64u(s64), "big")
+        if header.get("alg") != "RS256":
+            return None
+        n, e = _access_keys().get(header.get("kid"), (None, None))
+        if not n:
+            return None
+        klen = (n.bit_length() + 7) // 8
+        m = pow(sig, e, n).to_bytes(klen, "big")
+        digest = hashlib.sha256((h64 + "." + p64).encode("ascii")).digest()
+        expect = b"\x00\x01" + b"\xff" * (klen - 3 - len(_SHA256_PREFIX) - len(digest)) + b"\x00" + _SHA256_PREFIX + digest
+        if m != expect:
+            return None
+        if payload.get("iss") != "https://%s.cloudflareaccess.com" % ACCESS_TEAM:
+            return None
+        if float(payload.get("exp") or 0) < time.time():
+            return None
+        email = (payload.get("email") or "").strip().lower()
+        return email or None
+    except Exception:
+        return None
 
 
 def _hours_to_midnight():
@@ -1064,7 +1136,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not self._remote():
             return "owner"
         email = (self.headers.get("Cf-Access-Authenticated-User-Email") or "").strip().lower()
-        return email or None
+        if email:
+            return email
+        # the open part of the site: read Access's own cookie, verified
+        token = self.headers.get("Cf-Access-Jwt-Assertion") or ""
+        if not token:
+            from http.cookies import SimpleCookie
+            try:
+                c = SimpleCookie(); c.load(self.headers.get("Cookie") or "")
+                token = c["CF_Authorization"].value if "CF_Authorization" in c else ""
+            except Exception:
+                token = ""
+        return access_email(token) if token else None
 
     def _is_owner(self):
         who = self._who()
