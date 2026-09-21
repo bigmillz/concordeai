@@ -46,7 +46,8 @@ h1,h2,h3{font-weight:400;letter-spacing:-.02em;text-wrap:balance}
 .pay .ph{font-family:var(--disp);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:6px;min-height:14px}
 .pay.best .ph{color:var(--price)}
 .pay .ph .star{font-style:normal;font-size:11px;line-height:1}
-.pay .num{font-size:25px;line-height:1.05;letter-spacing:-.02em;margin-top:3px;white-space:nowrap}
+.fig{font-family:var(--disp);font-weight:400;font-variant-numeric:tabular-nums;letter-spacing:0}
+.pay .num{font-size:21px;line-height:1.1;margin-top:4px;white-space:nowrap}
 .pay.dim .num{color:var(--faint)}
 .pay .unit{color:var(--dim);font-size:12px}
 .pay .unit.dim{color:var(--faint)}
@@ -261,7 +262,7 @@ details[open] summary:after{content:"–"}
 .when{color:var(--dim);font-size:13px;white-space:nowrap;font-family:var(--mono);text-align:right}
 .when i{font-style:normal;color:var(--faint);display:block;font-family:var(--sans);font-size:12px}
 .amt{text-align:right;min-width:96px}
-.amt b{font-family:var(--mono);font-size:20px;font-weight:500;display:block;line-height:1.05}
+.amt b{font-family:var(--disp);font-size:17px;font-weight:400;display:block;line-height:1.1;font-variant-numeric:tabular-nums}
 .amt i{font-style:normal;color:var(--faint);font-size:11.5px;font-family:var(--mono)}
 .chev{color:var(--faint);font-size:20px;line-height:1;transition:transform .2s}
 .row[aria-expanded=true] .chev{transform:rotate(90deg)}
@@ -302,7 +303,7 @@ details[open] summary:after{content:"–"}
 .addmenu input{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;min-width:0}
 .addmenu form button{border:1px solid var(--line);border-radius:8px;padding:0 12px;font-size:12.5px;color:var(--text)}
 .btotal{display:flex;justify-content:space-between;align-items:baseline;border-top:2px solid var(--text);padding-top:12px;margin-top:2px}
-.btotal span{font-weight:500}.btotal b{font-family:var(--mono);font-size:22px;font-weight:500}
+.btotal span{font-weight:500}.btotal b{font-family:var(--disp);font-size:19px;font-weight:400;font-variant-numeric:tabular-nums}
 .btotal small{display:block;color:var(--faint);font-size:12px;font-weight:300}
 .book{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;align-self:start}
 .book h4{font-size:15px;font-weight:500}
@@ -751,12 +752,12 @@ function ptTip(e, a){
 function payHTML(e, total){
   const a = awardsFor(e)[0], ptsWin = !!(a && a.good), col = (cls, head, body) => `<div class="pay ${cls}">${head}${body}</div>`;
   const head = (label, win) => `<div class="ph">${label}${win ? '<i class="star" title="Better value">★</i>' : ''}</div>`;
-  const cash = col('cash' + (ptsWin ? '' : ' best'), head('Cash', !ptsWin), `<b class="num">${money(total)}</b><span class="unit">all in</span><em>${money(e.ticket_cents)} ticket</em><div class="v">+ ${money(total - e.ticket_cents)} beyond the fare</div>`);
+  const cash = col('cash' + (ptsWin ? '' : ' best'), head('Cash', !ptsWin), `<b class="num fig">${money(total)}</b><span class="unit">all in</span><em>${money(e.ticket_cents)} ticket</em><div class="v">+ ${money(total - e.ticket_cents)} beyond the fare</div>`);
   let pts;
-  if (!a) pts = col('points dim', head('Points', false), `<b class="num">—</b><span class="unit dim">no award chart</span><em>for this airline yet</em>`);
+  if (!a) pts = col('points dim', head('Points', false), `<b class="num fig">—</b><span class="unit dim">no award chart</span><em>for this airline yet</em>`);
   else { const usable = a.path && a.value > 0, rest = total - e.ticket_cents + a.fees, tip = `<button class="info" type="button" aria-expanded="false" aria-label="Why">i</button><span class="tip" role="tooltip">${ptTip(e, a)}</span>`;
     pts = col('points' + (ptsWin ? ' best' : '') + (usable ? '' : ' dim'), head('Points', ptsWin),
-      `<b class="num">${a.spend.toLocaleString()}</b><span class="unit${usable ? '' : ' dim'}">${a.via ? esc(BANK[a.via].split(' ')[0]) + ' pts' : esc(a.prog.name)}</span><em>+ ${money(rest)} cash</em>` +
+      `<b class="num fig">${a.spend.toLocaleString()}</b><span class="unit${usable ? '' : ' dim'}">${a.via ? esc(BANK[a.via].split(' ')[0]) + ' pts' : esc(a.prog.name)}</span><em>+ ${money(rest)} cash</em>` +
       `<div class="v">${!a.path ? 'no route' : a.value <= 0 ? 'fees exceed fare' : '<b class="num">' + a.value.toFixed(1) + '¢</b> a point'}${tip}</div>`); }
   return `<div class="paycols">${cash}${pts}</div>`;
 }
