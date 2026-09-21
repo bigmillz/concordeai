@@ -441,7 +441,7 @@ python3 concorde-travel/places.py "Shoreditch, London EC2A"  # what a typed plac
 **Public address:** `concorde-travel/go-live.sh` (a Mac, LaunchAgents) or
 `concorde-travel/deploy/droplet.sh` (an Ubuntu droplet, systemd, a venv for the `anthropic`
 SDK) runs `server.py` with `CONCORDEGO_ROOT=mock-10`, so `/` serves the current interface
-mockup, behind a Cloudflare named tunnel `concordego` at **go.flyconcordfly.com**, with its
+mockup, behind a Cloudflare named tunnel `concordego` at **go.flyconcordefly.com**, with its
 own config and service so it never touches the AI app's tunnel. **Keys never go in the
 LaunchAgent plist** (world-readable): the agent sources `~/.concordego/env` (0600, written
 empty by `go-live.sh`) before starting, so `ANTHROPIC_API_KEY` and the Duffel token go

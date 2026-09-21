@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ConcordeGo at https://go.flyconcordfly.com, served from this Mac.
+# ConcordeGo at https://go.flyconcordefly.com, served from this Mac.
 #
 # One idempotent script, the sibling of the repo root's go-live.sh (the AI
 # app at ai.millertechnology.net). It installs:
@@ -8,10 +8,10 @@
 #   * a Cloudflare named tunnel, "concordego", with its OWN config file and
 #     its own LaunchAgent, so the AI app's tunnel and this one never touch
 #     each other's config
-#   * the DNS route go.flyconcordfly.com -> the tunnel
+#   * the DNS route go.flyconcordefly.com -> the tunnel
 #
 # The one human step: if cloudflared has never been authorised on this Mac,
-# a browser opens; click the flyconcordfly.com row, then Authorize. Re-run
+# a browser opens; click the flyconcordefly.com row, then Authorize. Re-run
 # the script afterwards and it finishes. Until a proper host exists, the
 # address works while this laptop is awake and online.
 #
@@ -21,12 +21,12 @@
 # world-readable): the agent sources ~/.concordego/env (created here, 0600)
 # before it starts the server, so put ANTHROPIC_API_KEY there, and put the
 # Duffel token there as CONCORDEGO_FLIGHT_KEY or in ~/.concordego/cloud.json.
-# After editing that file:  launchctl kickstart -k gui/$(id -u)/com.flyconcordfly.go
+# After editing that file:  launchctl kickstart -k gui/$(id -u)/com.flyconcordefly.go
 set -euo pipefail
 
-HOST="go.flyconcordfly.com"
+HOST="go.flyconcordefly.com"
 TUNNEL="concordego"
-LABEL="com.flyconcordfly.go"
+LABEL="com.flyconcordefly.go"
 SERVE_PORT=9897
 ROOT_MOCK="mock-10"
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -65,7 +65,7 @@ load_agent(){
 if [ ! -f "$KEYS" ]; then
   mkdir -p "$(dirname "$KEYS")"; (umask 077; cat > "$KEYS" <<'ENV'
 # Sourced by the ConcordeGo LaunchAgent before server.py starts. Mode 0600.
-# Uncomment and fill in; then: launchctl kickstart -k gui/$(id -u)/com.flyconcordfly.go
+# Uncomment and fill in; then: launchctl kickstart -k gui/$(id -u)/com.flyconcordefly.go
 #export ANTHROPIC_API_KEY=sk-ant-...        # the wish box and the narrator (Claude Opus 5)
 #export CONCORDEGO_FLIGHT_KEY=duffel_live_... # or put it in ~/.concordego/cloud.json instead
 ENV
@@ -130,7 +130,7 @@ fi
 
 if [ ! -f "$HOME/.cloudflared/cert.pem" ]; then
   say "tunnel not authorised yet - your browser is opening Cloudflare now."
-  echo "  Click the flyconcordfly.com row, then Authorize. Waiting up to 5 minutes..."
+  echo "  Click the flyconcordefly.com row, then Authorize. Waiting up to 5 minutes..."
   cloudflared tunnel login &
   LOGIN_PID=$!
   for _ in $(seq 1 60); do
@@ -187,7 +187,7 @@ YML
 
 if ! cloudflared tunnel route dns "$TUNNEL" "$HOST" 2>/dev/null; then
   echo "  DNS route not added by cloudflared (already there, or the zone is not on this account)."
-  echo "  If $HOST does not resolve, add a proxied CNAME in the flyconcordfly.com zone:"
+  echo "  If $HOST does not resolve, add a proxied CNAME in the flyconcordefly.com zone:"
   echo "    go  ->  $TID.cfargotunnel.com"
 fi
 

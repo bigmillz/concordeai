@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Put Cloudflare Access in front of go.flyconcordfly.com: an email allowlist,
+# Put Cloudflare Access in front of go.flyconcordefly.com: an email allowlist,
 # one-time-PIN sign-in (and Google, once that identity provider exists), and
 # nothing reaches the server until someone has signed in. Idempotent.
 #
@@ -13,7 +13,7 @@
 # account go-live.sh made the tunnel in owns the zone, and Access needs that
 # one); CF_ACCOUNT_ID=... overrides it and is refused if it disagrees.
 #
-# Optional: HOST (default go.flyconcordfly.com), TEAM (the Zero Trust team name,
+# Optional: HOST (default go.flyconcordefly.com), TEAM (the Zero Trust team name,
 # needed only the first time an account uses Access; it becomes
 # <TEAM>.cloudflareaccess.com), SESSION (default 24h).
 #
@@ -35,7 +35,7 @@ else
   : "${CF_API_TOKEN:?set CF_API_TOKEN, or CF_EMAIL and CF_GLOBAL_KEY}"
   AUTH=(-H "Authorization: Bearer $CF_API_TOKEN"); AUTH_KIND=token
 fi
-HOST="${HOST:-go.flyconcordfly.com}"; SESSION="${SESSION:-24h}"; TEAM="${TEAM:-}"; HOST_OK=""
+HOST="${HOST:-go.flyconcordefly.com}"; SESSION="${SESSION:-24h}"; TEAM="${TEAM:-}"; HOST_OK=""
 TUNNEL="${TUNNEL:-concordego}"
 
 # The account that owns the zone is the one the tunnel was made in: cloudflared

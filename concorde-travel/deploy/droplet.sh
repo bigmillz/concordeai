@@ -2,7 +2,7 @@
 # ConcordeGo on a small Ubuntu droplet: the server as a systemd service, the
 # anthropic SDK in a venv (the one non-stdlib dependency, for the narrator and
 # the wish box on Claude Opus 5), and a Cloudflare tunnel carrying
-# go.flyconcordfly.com to it. Cloudflare Access (access.sh) is the door.
+# go.flyconcordefly.com to it. Cloudflare Access (access.sh) is the door.
 #
 #   ssh root@<droplet>
 #   curl -fsSL https://raw.githubusercontent.com/bigmillz/concordeai/main/concorde-travel/deploy/droplet.sh | bash
@@ -12,11 +12,11 @@
 #   CONCORDEGO_FLIGHT_KEY=duffel_live_...      the Duffel key
 #   ANTHROPIC_API_KEY=sk-ant-...               for the narrator and the wish box
 # The one human step is `cloudflared tunnel login` the first time (a URL is
-# printed; open it, pick flyconcordfly.com, Authorize). Re-run after that.
+# printed; open it, pick flyconcordefly.com, Authorize). Re-run after that.
 set -euo pipefail
 REPO="${REPO:-https://github.com/bigmillz/concordeai.git}"
 BRANCH="${BRANCH:-main}"
-HOST="${HOST:-go.flyconcordfly.com}"
+HOST="${HOST:-go.flyconcordefly.com}"
 TUNNEL="${TUNNEL:-concordego}"
 APP=/opt/concordego
 ENVF=/etc/concordego.env
@@ -88,7 +88,7 @@ if ! command -v cloudflared >/dev/null; then
   apt-get update -qq && apt-get install -y -qq cloudflared >/dev/null
 fi
 if [ ! -f /root/.cloudflared/cert.pem ]; then
-  say "tunnel not authorised: run  cloudflared tunnel login  , open the URL it prints, pick flyconcordfly.com, then re-run this script."
+  say "tunnel not authorised: run  cloudflared tunnel login  , open the URL it prints, pick flyconcordefly.com, then re-run this script."
   exit 0
 fi
 cloudflared tunnel list 2>/dev/null | grep -q " $TUNNEL " || cloudflared tunnel create "$TUNNEL"
