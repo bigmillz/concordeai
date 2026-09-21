@@ -215,7 +215,7 @@ def search(text: str, limit: int = 6) -> List[dict]:
             proper = label_for(c).rsplit(" (", 1)[0]
             is_airport = any(a == c.lower() for a, cc in CITIES.items() if cc == c) and c not in METROS
             out.append({"value": "%s (%s)" % (proper, c), "label": proper, "code": c, "kind": "airport" if is_airport else "city",
-                        "sub": " · ".join(x for x in ((n.title() if n.title() != proper else ""), c) if x)})
+                        "sub": " · ".join(x for x in ((n.title() if n.title() != proper and n != c.lower() else ""), c) if x)})
             if len(out) >= limit:
                 return out
     return out

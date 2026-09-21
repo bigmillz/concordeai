@@ -2417,7 +2417,8 @@ async function askSugg(input){
   const q = input.value.trim(), kind = input.id === 'q-to-0' ? 'to' : 'from', seq = ++SG.seq; SG.input = input;
   if (q.length < 2){ closeSugg(); return; }
   let rows = [];
-  if (SERVED){ try { const r = await fetch('/suggest?q=' + encodeURIComponent(q) + '&kind=' + kind); rows = (await r.json()).rows || []; } catch (e){ rows = []; } }
+  const cc = ((navigator.language || '').split('-')[1] || '').toLowerCase();
+  if (SERVED){ try { const r = await fetch('/suggest?q=' + encodeURIComponent(q) + '&kind=' + kind + (cc ? '&cc=' + cc : '')); rows = (await r.json()).rows || []; } catch (e){ rows = []; } }
   if (seq !== SG.seq) return; SG.rows = rows.slice(0, 9); SG.sel = -1; paintSugg();
 }
 function pickSugg(i){ const r = SG.rows[i], input = SG.input; if (!r || !input) return; input.value = r.value; closeSugg(); input.dispatchEvent(new Event('input', {bubbles:true})); }

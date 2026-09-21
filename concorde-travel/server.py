@@ -844,6 +844,7 @@ def suggest_request(q):
     goes in the field, and always resolves: 'Honolulu (HNL)', or an address."""
     text = (q.get("q") or [""])[0].strip()[:80]
     kind = (q.get("kind") or ["to"])[0]
+    cc = re.sub(r"[^a-z]", "", (q.get("cc") or [""])[0].lower())[:2]   # the visitor's country, from the browser's locale
     if len(text) < 2:
         return {"rows": []}
     rows = places.search(text, 5)
@@ -877,7 +878,10 @@ def suggest_request(q):
     if looks_address:
         def fetch_addr():
             from urllib.parse import quote
-            req = urllib.request.Request("https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=5&q=" + quote(text),
+            digits0 = text.replace(" ", "")
+            # a bare postal code is searched in the visitor's own country first: 11237 is Bushwick, and also a town in Lithuania
+            extra = ("&countrycodes=" + cc) if (cc and digits0.isdigit()) else ""
+            req = urllib.request.Request("https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=5" + extra + "&q=" + quote(text),
                                          headers={"User-Agent": "ConcordeGo/1.0 (go.flyconcordefly.com)", "Accept": "application/json"})
             try:
                 with urllib.request.urlopen(req, timeout=6) as r:
@@ -895,7 +899,7 @@ def suggest_request(q):
                     seen_txt.add(t)
                     out.append({"value": t, "label": t, "sub": (hit.get("address") or {}).get("country") or "", "kind": "address"})
             return out
-        rows = rows + _lookup_cached("addr", text, 7 * 86400, fetch_addr)
+        rows = rows + _lookup_cached("addr", text + ("|" + cc if cc else ""), 7 * 86400, fetch_addr)
     return {"rows": rows[:9]}
 
 
