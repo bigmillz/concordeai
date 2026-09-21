@@ -40,7 +40,24 @@ say(){ printf '\n\033[1m%s\033[0m\n' "$*"; }
 
 load_agent(){
   launchctl bootout "gui/$UID_N/$1" 2>/dev/null || true
-  launchctl bootstrap "gui/$UID_N" "$AGENTS/$1.plist"
+  # bootout returns before the old instance is gone, and cloudflared drains
+  # its connections for a few seconds on the way out. A bootstrap while the
+  # old one lingers fails with "Bootstrap failed: 5: Input/output error", so
+  # wait until launchd has forgotten it, then load, retrying for a while.
+  for _ in $(seq 1 60); do
+    launchctl print "gui/$UID_N/$1" >/dev/null 2>&1 || break
+    sleep 0.5
+  done
+  local n=0
+  until launchctl bootstrap "gui/$UID_N" "$AGENTS/$1.plist" 2>/dev/null; do
+    n=$((n+1))
+    if [ "$n" -ge 30 ]; then
+      echo "  launchctl would not load $1. Try by hand:"
+      echo "    launchctl bootout gui/$UID_N/$1; sleep 10; launchctl bootstrap gui/$UID_N $AGENTS/$1.plist"
+      return 1
+    fi
+    sleep 1
+  done
   launchctl kickstart -k "gui/$UID_N/$1" 2>/dev/null || true
 }
 
@@ -174,6 +191,7 @@ if ! cloudflared tunnel route dns "$TUNNEL" "$HOST" 2>/dev/null; then
   echo "    go  ->  $TID.cfargotunnel.com"
 fi
 
+say "tunnel: $TUNNEL -> https://$HOST"
 cat > "$AGENTS/$LABEL-tunnel.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
