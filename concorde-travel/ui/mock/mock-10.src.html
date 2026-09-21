@@ -2587,8 +2587,10 @@ function cycle(){
   } else if (r < .32){                               // all three, in sequence
     const start = Math.floor(Math.random() * places.length);
     doors.forEach((d, k) => { const want = places.length > 1 ? places[(start + k) % places.length] : null; PH.slots[k] = freshPhoto(k, want); setTimeout(() => swapTile(d, k, PHOTOS[PH.slots[k]], false), k * 420); });
-  } else {                                           // one tile, to the other place
-    const k = Math.floor(Math.random() * 3), here = PHOTOS[PH.slots[k]].place, other = places.filter(p => p !== here);
+  } else {                                           // one tile, to the other place: taken from whichever place has the row's majority, so the row stays mixed
+    const count = {}; PH.slots.forEach(i => { const pl = PHOTOS[i].place; count[pl] = (count[pl] || 0) + 1; });
+    const major = Object.keys(count).sort((x, y) => count[y] - count[x])[0], cands = [0, 1, 2].filter(k => PHOTOS[PH.slots[k]].place === major);
+    const k = cands[Math.floor(Math.random() * cands.length)], here = PHOTOS[PH.slots[k]].place, other = places.filter(p => p !== here);
     PH.slots[k] = freshPhoto(k, other.length ? other[Math.floor(Math.random() * other.length)] : null);
     swapTile(doors[k], k, PHOTOS[PH.slots[k]], false);
   }
