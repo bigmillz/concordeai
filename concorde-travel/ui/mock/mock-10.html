@@ -42,9 +42,11 @@ h1,h2,h3{font-weight:400;letter-spacing:-.02em;text-wrap:balance}
    behind the (i): hover, focus or tap. Nothing else is written under it. */
 .paycols{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .pay{position:relative;border:1px solid var(--line);border-radius:12px;padding:9px 11px 8px;display:flex;flex-direction:column;gap:2px;background:rgba(255,255,255,.02);min-width:0;transition:border-color .2s,background .2s}
-.pay.best{border-color:rgba(255,176,32,.5);background:rgba(255,176,32,.06)}
-.pay .ph{font-family:var(--disp);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:6px;min-height:14px}
+/* the star marks the better value; the outline marks the PICK, which is the better value until tapped otherwise */
+.pay[data-pick]{cursor:pointer}.pay[data-pick]:hover{border-color:var(--dim)}
+.pay.pick{border-color:rgba(255,176,32,.55);background:rgba(255,176,32,.06)}
 .pay.best .ph{color:var(--price)}
+.pay .ph{font-family:var(--disp);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:6px;min-height:14px}
 .pay .ph .star{font-style:normal;font-size:11px;line-height:1}
 /* the large figures wear the wordmark's face */
 .fig{font-family:var(--fig);font-weight:400;font-variant-numeric:tabular-nums;letter-spacing:0}
@@ -54,7 +56,7 @@ h1,h2,h3{font-weight:400;letter-spacing:-.02em;text-wrap:balance}
 .pay .unit.dim{color:var(--faint)}
 .pay em{font-style:normal;color:var(--faint);font-size:11.5px;font-family:var(--mono);margin-top:1px}
 .pay .v{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--dim);margin-top:3px;min-height:16px}
-.pay.best .v{color:var(--text)}
+.pay.pick .v{color:var(--text)}
 .pay .v .num{font-size:11.5px;margin:0}
 .info{width:16px;height:16px;border-radius:50%;border:1px solid var(--faint);color:var(--faint);font:600 10px/1 var(--mono);display:inline-grid;place-items:center;flex:none;transition:border-color .15s,color .15s;margin-left:auto}
 .info:hover,.info:focus-visible,.info[aria-expanded=true]{border-color:var(--text);color:var(--text)}
@@ -220,7 +222,10 @@ details[open] summary:after{content:"–"}
 .three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 .door{background:var(--panel2);border:1px solid var(--line);border-radius:14px;overflow:hidden;position:relative;display:flex;flex-direction:column;transition:transform .2s,border-color .2s}
 .door:hover{transform:translateY(-2px);border-color:#3a3d46}
-.door.p1{border-color:rgba(77,163,255,.6);box-shadow:0 0 0 1px rgba(77,163,255,.25)}
+/* the podium: gold, silver, bronze, first glowing a little more than the other two (per Patrick, 2026-09-21) */
+.door.p1{border-color:rgba(255,196,64,.8);box-shadow:0 0 0 1px rgba(255,196,64,.35),0 0 36px rgba(255,196,64,.26)}
+.door.p2{border-color:rgba(200,204,213,.6);box-shadow:0 0 0 1px rgba(200,204,213,.2),0 0 18px rgba(200,204,213,.12)}
+.door.p3{border-color:rgba(205,127,50,.65);box-shadow:0 0 0 1px rgba(205,127,50,.22),0 0 18px rgba(205,127,50,.12)}
 .sky{height:76px;position:relative;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.4)}
 .sky .t{position:absolute;bottom:10px;font:500 12.5px/1 var(--mono);letter-spacing:.02em}
 .sky .t.l{left:16px}.sky .t.r{right:70px}
@@ -231,7 +236,7 @@ details[open] summary:after{content:"–"}
 .seal{position:absolute;right:16px;top:54px;width:46px;height:46px;--gc:var(--gA);cursor:default}
 .seal svg{display:block;width:100%;height:100%;overflow:visible}
 .seal .ring{fill:rgba(0,0,0,.2);stroke:rgba(255,255,255,.3);stroke-width:1;vector-effect:non-scaling-stroke}
-.seal .g{fill:none;stroke:var(--gc);stroke-width:1.35;font:600 26px/1 var(--mono);text-anchor:middle;dominant-baseline:central;letter-spacing:-.02em;transform-box:fill-box;transform-origin:center}
+.seal .g{fill:none;stroke:var(--gc);stroke-width:1.35;font:600 26px/1 var(--mono);text-anchor:middle;dominant-baseline:auto;letter-spacing:-.02em;transform-box:fill-box;transform-origin:center}
 .seal .sg{fill:var(--gc);stroke:none;font:600 12px/1 var(--mono);text-anchor:middle;dominant-baseline:central}
 .seal .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .seal.s{position:static;width:32px;height:32px;flex:none}
@@ -241,7 +246,7 @@ details[open] summary:after{content:"–"}
 .seal.s .sg{font:600 12px/1 var(--sans)}
 .door .body{padding:18px 18px 18px;display:flex;flex-direction:column;gap:10px;flex:1}
 .door .eyebrow{color:var(--speed)}
-.door.p1 .eyebrow{color:var(--speed)}.door.p2 .eyebrow{color:#aeb4c2}.door.p3 .eyebrow{color:#b8875e}
+.door.p1 .eyebrow{color:#ffc440}.door.p2 .eyebrow{color:#c8ccd5}.door.p3 .eyebrow{color:#cd7f32}
 .door .eyebrow{display:flex;align-items:center;gap:8px}
 .door .eyebrow small{font-size:9px;letter-spacing:.1em;color:var(--faint);text-transform:none;font-family:var(--sans);font-weight:300}
 /* one line of pros, one of cons: single words, the ledger has the rest */
@@ -432,8 +437,6 @@ details[open] summary:after{content:"–"}
 .play .sum b{display:block;font-size:20px;line-height:1.1;margin-top:2px}
 .play .sum span{font-size:11.5px;color:var(--faint)}
 .play .pnote{font-size:11.5px;color:var(--faint);line-height:1.5;margin:10px 0 0}
-.pay .how{margin-top:4px;font-size:11.5px;color:var(--speed);text-align:left;padding:0}
-.pay .how:hover{text-decoration:underline}
 @media (max-width:600px){.play .sum{grid-template-columns:1fr}}
 .sheet{background:var(--panel2);border:1px solid var(--line);border-radius:18px;max-width:760px;width:100%;max-height:min(88vh,900px);overflow:auto;padding:24px}
 .sheet .hd{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:10px}
@@ -581,11 +584,11 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
   .seal .g{filter:drop-shadow(0 0 4px color-mix(in oklab, var(--gc) 55%, transparent))}
   .door.p1 .seal svg{animation:breathe 4.5s ease-in-out infinite alternate}
   .jseg{box-shadow:inset 0 1px 0 rgba(255,255,255,.28)}
-  .pay.best{box-shadow:0 0 0 1px color(display-p3 1 .72 .2 / .18),0 0 22px color(display-p3 1 .72 .2 / .12)}
+  .pay.pick{box-shadow:0 0 0 1px color(display-p3 1 .72 .2 / .18),0 0 22px color(display-p3 1 .72 .2 / .12)}
   .crow textarea:focus{box-shadow:0 0 0 3px color(display-p3 .3 .65 1 / .22),0 0 26px color(display-p3 .3 .65 1 / .14)}
   .go{box-shadow:0 0 22px color(display-p3 1 1 1 / .12)}
   .go:hover{box-shadow:0 0 30px color(display-p3 1 1 1 / .22)}
-  .door.p1{box-shadow:0 0 0 1px color(display-p3 .3 .65 1 / .35),0 0 28px color(display-p3 .3 .65 1 / .18)}
+  .door.p1{box-shadow:0 0 0 1px color(display-p3 1 .78 .3 / .45),0 0 36px color(display-p3 1 .78 .3 / .32)}
   .handle{box-shadow:0 0 0 2px color(display-p3 1 1 1 / .18),0 2px 12px rgba(0,0,0,.6)}
   .pbar .pfill{box-shadow:0 0 12px color(display-p3 1 1 1 / .45)}
 }
@@ -618,8 +621,9 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 .sky .scrim{position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(10,10,12,.12) 0%,rgba(10,10,12,.02) 35%,rgba(10,10,12,.6) 100%);pointer-events:none}
 .sky .cap{position:absolute;left:16px;top:10px;z-index:2;font-family:var(--disp);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.78);text-shadow:0 1px 2px rgba(0,0,0,.6)}
 .sky .t{z-index:2}
-.seal{top:104px}
-@media (max-width:980px){.sky{height:108px}.seal{top:86px}}
+.seal{top:140px}
+.door .body .eyebrow,.door .body .pc{padding-right:60px}
+@media (max-width:980px){.sky{height:108px}.seal{top:122px}}
 @media (prefers-reduced-motion:reduce){.sky .pano{animation:none}.rise,.bar.drop,#results.fade,.door.swap,.rise .seal .ring,.swap .seal .ring,.rise .seal .g,.swap .seal .g,.rise .seal .sg,.swap .seal .sg,.rise .jseg,.swap .jseg,.door.p1 .seal svg{animation:none;opacity:1;stroke-dashoffset:0}}
 
 /* ---------- the dock: the wish goes on under the results, like a chat */
@@ -760,7 +764,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
       </div>
       <div class="wants">
         <h2>Wants and needs</h2>
-        <p class="sub">What you want, not what you will tolerate. Where it can be bought, the price goes on the bill; where it cannot, the flight is charged for lacking it and sinks, with the reason shown. The number is how many of these flights already have it.</p>
+        <p class="sub">What you want, not what you will tolerate. Where it can be bought, the price goes on the bill; where it cannot, the flight is charged for lacking it and sinks, with the reason shown. The number is how many of these flights have it, together with everything else you have picked; a zero means no flight has that combination.</p>
         <div class="chips" id="chips"></div><p class="chipnote hidden" id="chipnote"></p>
         <div class="wish">
           <h3><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l1.7 4.2L14 6.4l-3.3 3 .9 4.5L8 11.6l-3.6 2.3.9-4.5-3.3-3 4.3-1.2z"/></svg>Make a wish</h3>
@@ -906,7 +910,7 @@ const AIRNAME = {american:'AA',aa:'AA','british airways':'BA',ba:'BA',british:'B
 // ---- state
 const S = {trip:'round', a:1, b:0, c:0, preset:'1,0,0', asap:false, wants:new Set(), rules:[], ride:'either', off:new Set(), menu:false, open:new Set(),
   extra:{bag:0, wifi:false, seat:false, legroom:false, lounge:false, priority:false, insurance:false, hotel:false, custom:[]}, adv:{dep0:0, dep1:24, arr0:0, arr1:24, cabin:'economy', stops:2, alli:new Set(), out:new Set()},
-  pts:{amex:120000, chase:80000, capone:0, citi:0, bilt:0, marriott:0, avios:0, virgin:0, aa:0, delta:0, mm:0, ms:0, fb:0, ac:0, ua:0}, ptOpen:new Set(), stOpen:new Set(), more:{banks:false, progs:false, status:false}, status:{}, shown:12, T:'mine',
+  pts:{amex:120000, chase:80000, capone:0, citi:0, bilt:0, marriott:0, avios:0, virgin:0, aa:0, delta:0, mm:0, ms:0, fb:0, ac:0, ua:0}, ptOpen:new Set(), stOpen:new Set(), more:{banks:false, progs:false, status:false}, pay:{}, status:{}, shown:12, T:'mine',
   legs:[{from:'Wyckoff Ave & Myrtle Ave, Bushwick, Brooklyn', to:'London', date:'Wed 18 Nov'}], back:'Wed 25 Nov', pax:'1 adult', bags:'1 checked bag'};
 
 // ---- wants: a predicate, a charge when it is missing, and a hint when nothing has it
@@ -1082,16 +1086,18 @@ function openPlaybook(id){
   $('#sheetroot').innerHTML = `<div class="sheetwrap" id="sheetwrap" data-id="${esc(e.id)}"><div class="sheet" role="dialog" aria-modal="true" aria-label="Booking with points"><div class="hd"><h3>Booking ${esc(e.carrier_name)} ${esc(e.flight)} with points<span>${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)} · step by step</span></h3><button class="x" id="x" aria-label="Close">×</button></div><div class="detail">${playbookHTML(e, r)}</div></div></div>`;
   $('#x').focus();
 }
+// which way this flight is being bought: the person's pick, else whichever is the better value
+function payPick(e, a){ const a2 = a === undefined ? awardsFor(e)[0] : a; return S.pay[e.id] || (a2 && a2.good ? 'points' : 'cash'); }
 function payHTML(e, total){
-  const a = awardsFor(e)[0], ptsWin = !!(a && a.good), col = (cls, head, body) => `<div class="pay ${cls}">${head}${body}</div>`;
+  const a = awardsFor(e)[0], ptsWin = !!(a && a.good), pick = payPick(e, a), col = (cls, head, body, kind) => `<div class="pay ${cls}${kind && pick === kind ? ' pick' : ''}"${kind ? ` data-pick="${kind}" role="button" tabindex="0" aria-pressed="${pick === kind}"` : ''}>${head}${body}</div>`;
   const head = (label, win) => `<div class="ph">${label}${win ? '<i class="star" title="Better value">★</i>' : ''}</div>`;
-  const cash = col('cash' + (ptsWin ? '' : ' best'), head('Cash', !ptsWin), `<b class="num fig">${money(total)}</b><span class="unit">all in</span><em>${money(e.ticket_cents)} ticket</em><div class="v">+ ${money(total - e.ticket_cents)} beyond the fare</div>`);
+  const cash = col('cash' + (ptsWin ? '' : ' best'), head('Cash', !ptsWin), `<b class="num fig">${money(total)}</b><span class="unit">all in</span><em>${money(e.ticket_cents)} ticket</em><div class="v">+ ${money(total - e.ticket_cents)} beyond the fare</div>`, 'cash');
   let pts;
   if (!a) pts = col('points dim', head('Points', false), `<b class="num fig">—</b><span class="unit dim">no award chart</span><em>for this airline yet</em>`);
   else { const usable = a.path && a.value > 0, rest = total - e.ticket_cents + a.fees, tip = `<button class="info" type="button" aria-expanded="false" aria-label="Why">i</button><span class="tip" role="tooltip">${ptTip(e, a, total)}</span>`;
     pts = col('points' + (ptsWin ? ' best' : '') + (usable ? '' : ' dim'), head('Points', ptsWin),
       `<b class="num fig">${a.spend.toLocaleString()}</b><span class="unit${usable ? '' : ' dim'}">${a.via ? esc(SHORT[a.via]) + ' pts' : esc(a.prog.name)}</span><em>+ ${money(rest)} cash</em>` +
-      `<div class="v">${!a.path ? 'no route' : a.value <= 0 ? 'fees exceed fare' : '<b class="num">≈ ' + money(total - a.margin) + '</b> all in'}${tip}</div><button class="how" type="button" data-play="${esc(e.id)}">How to book with points →</button>`); }
+      `<div class="v">${!a.path ? 'no route' : a.value <= 0 ? 'fees exceed fare' : '<b class="num">≈ ' + money(total - a.margin) + '</b> all in'}${tip}</div>`, 'points'); }
   return `<div class="paycols">${cash}${pts}</div>`;
 }
 
@@ -1307,10 +1313,27 @@ function factorWhy(id, e, mine, theirs){
   }
   return '';
 }
+// A capital's ink does not sit at the centre of its em box, and the mono face's A sits low and to the right of it,
+// so the letter is measured on a canvas in the seal's own font and shifted by the difference. Re-measured once the
+// web fonts land, since the fallback face measures differently.
+const INK = new Map();
+function inkOffset(ch, font, trim){
+  const key = ch + '|' + font + '|' + (trim || 0); if (INK.has(key)) return INK.get(key);
+  let o = [0, 0];
+  // measured against the alphabetic baseline, the one place canvas and SVG agree on: the ink of a capital sits
+  // above it, so the baseline goes below the ring's centre by half the ink height, and the anchor slides by the
+  // ink's own asymmetry about it
+  try { const c = document.createElement('canvas').getContext('2d'); c.font = font; c.textAlign = 'center'; c.textBaseline = 'alphabetic'; const m = c.measureText(ch);
+    // the stroke and its glow read a hair heavier below the letter's crossbar than above it; measured on screen at 2x, the last pixel is this
+    o = [-(m.actualBoundingBoxRight - m.actualBoundingBoxLeft)/2, (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent)/2 - (trim || 0)]; } catch (e) {}
+  INK.set(key, o); return o;
+}
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { INK.clear(); if (W.mode === 'results') paint(false); });
 function sealHTML(e, small){
   const g = e.grade, m = g.match(/^([A-F])([+-]?)$/) || [g, g, ''];
+  const [dx, dy] = small ? inkOffset(m[1], '600 23px ' + getComputedStyle(document.body).getPropertyValue('--sans')) : inkOffset(m[1], '600 26px ' + getComputedStyle(document.body).getPropertyValue('--mono'), .75);
   const tip = `<div class="jh"><i></i><b>Grade ${esc(g)}</b><em>against par</em></div><ul class="gf">${factors(e).map(f => `<li><b style="color:${gradeColor(f.letter)}">${f.letter}</b><span>${f.name}</span><small>${esc(f.why)}</small></li>`).join('')}</ul><p class="gnote">The whole trip priced for a neutral traveller against this route's par, ${money(D.query.par_cents)}. Each line is that part's pull on the letter.</p>`;
-  return `<span class="seal${small ? ' s' : ''}" style="--gc:${gradeColor(g)}" data-tip="${esc(tip)}" aria-label="Grade ${esc(g)}"${small ? '' : ' tabindex="0"'}><svg viewBox="0 0 48 48" aria-hidden="true"><circle class="ring" cx="24" cy="24" r="22.5" pathLength="100"/><text class="g" x="${m[2] ? 22.5 : 24}" y="25">${m[1]}</text>${m[2] ? `<text class="sg" x="36" y="15.5">${m[2] === '-' ? '−' : '+'}</text>` : ''}</svg><span class="sr">Grade ${esc(g)}</span></span>`;
+  return `<span class="seal${small ? ' s' : ''}" style="--gc:${gradeColor(g)}" data-tip="${esc(tip)}" aria-label="Grade ${esc(g)}"${small ? '' : ' tabindex="0"'}><svg viewBox="0 0 48 48" aria-hidden="true"><circle class="ring" cx="24" cy="24" r="22.5" pathLength="100"/><text class="g" x="${(m[2] ? 22.5 : 24) + dx}" y="${24 + dy}">${m[1]}</text>${m[2] ? `<text class="sg" x="36" y="15.5">${m[2] === '-' ? '−' : '+'}</text>` : ''}</svg><span class="sr">Grade ${esc(g)}</span></span>`;
 }
 
 // The journey bar: the same legs the scorer timed, coloured by how good each
@@ -1502,7 +1525,7 @@ function door(kind, e, r, title, ctx){
       <p class="meta">${stopsText(e)} · ${dur(e.door_minutes)} door to door · ${e.route.join(' → ')}${S.asap ? ' · <b style="color:var(--red);font-weight:500">lands ' + hm(e.arrive) + (e.day_offset ? ' tomorrow' : ' today') + '</b>' : ''}${perHour(r, ctx)}</p>
       ${journeyHTML(e, r, ctx)}
       ${payHTML(e, eff)}
-      <div class="cta"><button class="choose" data-open="${esc(e.id)}">Choose this flight</button><button class="ledger" data-open="${esc(e.id)}">Full ledger</button></div>
+      <div class="cta"><button class="choose" data-choose="${esc(e.id)}">${payPick(e) === 'points' ? 'Book with points' : 'Choose this flight'}</button><button class="ledger" data-open="${esc(e.id)}">Full details</button></div>
     </div></article>`;
 }
 let DOOR_IDS = [];
@@ -1780,7 +1803,12 @@ function removeItem(key){
 }
 // ---- chips, carriers, points
 function paintChips(){
-  $('#chips').innerHTML = WANTS.map(w => `<button class="chip${w.count ? '' : ' zero'}" data-w="${w.id}" aria-pressed="${S.wants.has(w.id)}">${esc(w.label)}<span class="n">${w.count}</span></button>`).join('');
+  // w.count stays the absolute figure the engine uses (a want nothing has is never charged); the chip shows what is
+  // left among flights that already meet every other pick, so a combination nobody flies reads 0 and goes grey
+  const picked = [...S.wants].map(id => WANTS.find(w => w.id === id)).filter(Boolean);
+  const meets = (e, skip) => picked.every(w => w === skip || w.ok(e));
+  WANTS.forEach(w => { w.now = ALL.filter(e => w.ok(e) && meets(e, w)).length; });
+  $('#chips').innerHTML = WANTS.map(w => `<button class="chip${w.now ? '' : ' zero'}" data-w="${w.id}" aria-pressed="${S.wants.has(w.id)}" title="${w.now === w.count ? '' : esc(w.count + ' have it; ' + w.now + ' together with what you have picked')}">${esc(w.label)}<span class="n">${w.now}</span></button>`).join('');
   const z = [...S.wants].map(id => WANTS.find(w => w.id === id)).filter(w => !w.count && w.hint);
   $('#chipnote').classList.toggle('hidden', !z.length); $('#chipnote').textContent = z.map(w => w.hint).join(' ');
 }
@@ -2227,7 +2255,13 @@ document.addEventListener('click', ev => {
   const ad = ev.target.closest('[data-add]'); if (ad){ const k = ad.dataset.add; if (k === 'bag+') S.extra.bag++; else if (k === 'bag-') S.extra.bag = Math.max(0, S.extra.bag - 1); else { S.extra[k] = true; S.off.delete(k); } rerenderBills(); return; }
   const ac = ev.target.closest('[data-addcustom]'); if (ac){ const f = ac.closest('form'), label = f.label.value.trim(), amt = Math.round(+String(f.amt.value).replace(/[^\d.]/g, '') * 100); if (label && amt > 0){ S.extra.custom.push({label, cents:amt}); rerenderBills(); } else f.label.focus(); return; }
 });
-$('#doors').addEventListener('click', ev => { const b = ev.target.closest('[data-open]'); if (b) openSheet(b.dataset.open); });
+$('#doors').addEventListener('click', ev => {
+  const c = ev.target.closest('[data-choose]'); if (c){ const e = ALL.find(x => x.id === c.dataset.choose); if (e && payPick(e) === 'points') openPlaybook(e.id); else openSheet(c.dataset.choose); return; }
+  const b = ev.target.closest('[data-open]'); if (b){ openSheet(b.dataset.open); return; }
+  if (ev.target.closest('.info, .tip')) return;
+  const pk = ev.target.closest('.pay[data-pick]'); if (pk){ const art = pk.closest('[data-id]'); if (art){ S.pay[art.dataset.id] = pk.dataset.pick; paint(false); } }
+});
+$('#doors').addEventListener('keydown', ev => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches('.pay[data-pick]')){ ev.preventDefault(); ev.target.click(); } });
 document.addEventListener('click', ev => { const b = ev.target.closest('[data-play]'); if (b){ ev.stopPropagation(); openPlaybook(b.dataset.play); } }, true);
 document.addEventListener('click', ev => { const i = ev.target.closest('.info'); document.querySelectorAll('.info[aria-expanded=true]').forEach(x => { if (x !== i) x.setAttribute('aria-expanded', 'false'); }); if (i) i.setAttribute('aria-expanded', i.getAttribute('aria-expanded') === 'true' ? 'false' : 'true'); });
 document.addEventListener('click', ev => { if (ev.target.id === 'x' || ev.target.id === 'sheetwrap') $('#sheetroot').innerHTML = ''; });

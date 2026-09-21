@@ -5,6 +5,8 @@
 #
 #   export CF_API_TOKEN=...        # a token with:  Access: Apps and Policies : Edit
 #                                  #               Access: Organizations, Identity Providers, and Groups : Edit
+#                                  #               Zone : Zone : Read, Zone Resources: All zones
+#   (or CF_EMAIL=... CF_GLOBAL_KEY=...  the Global API Key, for one run, never stored)
 #   ALLOW="pat@millertechnology.net,friend@example.com" ./concorde-travel/access.sh
 #
 # The Account ID is read from the tunnel's credentials in ~/.cloudflared (the
@@ -20,7 +22,19 @@
 # paste an OAuth client id and secret from Google Cloud, then re-run this script
 # and the app picks it up beside the one-time PIN.
 set -euo pipefail
-: "${CF_API_TOKEN:?set CF_API_TOKEN}"; : "${ALLOW:?set ALLOW to a comma-separated list of emails}"
+: "${ALLOW:?set ALLOW to a comma-separated list of emails}"
+# Two ways in. A scoped API token is the right one; Access resolves a hostname
+# through the zones the token can see, so it needs Zone: Read on the zone as
+# well as the two Access rows. The Global API Key (My Profile > API Tokens >
+# Global API Key > View) sees everything and cannot be mis-scoped; it is read
+# from the environment for this one run and written nowhere.
+if [ -n "${CF_GLOBAL_KEY:-}" ]; then
+  : "${CF_EMAIL:?set CF_EMAIL (the Cloudflare login email) beside CF_GLOBAL_KEY}"
+  AUTH=(-H "X-Auth-Email: $CF_EMAIL" -H "X-Auth-Key: $CF_GLOBAL_KEY"); AUTH_KIND=globalkey
+else
+  : "${CF_API_TOKEN:?set CF_API_TOKEN, or CF_EMAIL and CF_GLOBAL_KEY}"
+  AUTH=(-H "Authorization: Bearer $CF_API_TOKEN"); AUTH_KIND=token
+fi
 HOST="${HOST:-go.flyconcordfly.com}"; SESSION="${SESSION:-24h}"; TEAM="${TEAM:-}"; HOST_OK=""
 TUNNEL="${TUNNEL:-concordego}"
 
@@ -71,20 +85,26 @@ fi
 API="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/access"
 
 cf(){ # method path [json]
-  curl -sS -X "$1" "$API$2" -H "Authorization: Bearer $CF_API_TOKEN" -H "Content-Type: application/json" ${3:+--data "$3"}
+  curl -sS -X "$1" "$API$2" "${AUTH[@]}" -H "Content-Type: application/json" ${3:+--data "$3"}
 }
 jq_(){ python3 -c "import sys,json; d=json.load(sys.stdin); $1"; }
 ROOT="https://api.cloudflare.com/client/v4"
-cfroot(){ curl -sS "$ROOT$1" -H "Authorization: Bearer $CF_API_TOKEN"; }
+cfroot(){ curl -sS "$ROOT$1" "${AUTH[@]}"; }
 
 # A request that fails is not the same as a team that does not exist, and the
 # first version of this script conflated them: an unauthorised GET read as "no
 # team yet" and sent people off to pick a name. So the token and the account
 # are checked first, each with the reason spelled out.
-echo "== token"
-cfroot /user/tokens/verify | jq_ 'r=d.get("result") or {}
+echo "== credentials"
+if [ "$AUTH_KIND" = token ]; then
+  cfroot /user/tokens/verify | jq_ 'r=d.get("result") or {}
 if not d.get("success") or r.get("status") != "active": sys.exit("  Cloudflare does not accept this token: " + json.dumps(d.get("errors")) + "\n  Make one at dash.cloudflare.com > My Profile > API Tokens > Create Token > Custom token.")
-print("  active")'
+print("  token active")'
+else
+  cfroot /user | jq_ 'r=d.get("result") or {}
+if not d.get("success"): sys.exit("  Cloudflare does not accept this Global API Key and email: " + json.dumps(d.get("errors")))
+print("  global key for " + str(r.get("email") or ""))'
+fi
 echo "== account"
 # Reading /accounts/{id} itself needs "Account Settings: Read", which this token
 # is not asked to carry, so the account is checked through Access instead: the
@@ -101,7 +121,15 @@ ZONE_SEEN=$(cfroot "/zones?name=$APEX" | jq_ 'r = d.get("result") or []
 print("1" if (d.get("success") and r) else "")')
 echo "== zone"
 if [ -n "$ZONE_SEEN" ]; then echo "  $APEX is visible to this token"
-else echo "  $APEX is NOT visible to this token: its zone list is empty (a token with no zone permission lists nothing rather than refusing). Access resolves a hostname through the zones the token can see, so this usually ends in \"domain does not belong to zone\" below."; fi
+else
+  echo "  $APEX is NOT visible with these credentials: the zone list is empty (a token with no zone permission lists nothing rather than refusing)."
+  echo "  Access resolves a hostname through the zones the caller can see, so the applications would be refused with \"domain does not belong to zone\". Nothing is created. Two ways through:"
+  echo "   a. Edit the token (dash.cloudflare.com > My Profile > API Tokens > the token > Edit): add the permission  Zone : Zone : Read,"
+  echo "      and under Zone Resources choose  Include > All zones  (or All zones from an account > the account that owns $APEX). Save, re-run."
+  echo "   b. Or run once with the Global API Key, which sees every zone (My Profile > API Tokens > Global API Key > View):"
+  echo "        CF_EMAIL=you@example.com CF_GLOBAL_KEY=paste-here ALLOW=\"...\" ./concorde-travel/access.sh"
+  exit 1
+fi
 
 echo "== organisation"
 ORG=$(cf GET /organizations)
