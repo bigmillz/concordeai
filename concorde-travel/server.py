@@ -68,6 +68,11 @@ ANON_SEARCHES = int(os.environ.get("CONCORDEGO_ANON_SEARCHES", "4"))
 PEXELS_KEY = os.environ.get("CONCORDEGO_PEXELS_KEY", "")
 PHOTO_CALLS = int(os.environ.get("CONCORDEGO_PHOTO_CALLS", "150"))
 PHOTO_DIR = os.path.join(live.HOME, "photos")
+# Autocomplete for the origin and destination: the offline table first (instant), then Duffel's places (airports
+# and cities the feed can actually sell, with the key), then addresses from Nominatim for the origin. External
+# answers are cached per query for a week and capped per day site-wide.
+SUGGEST_CALLS = int(os.environ.get("CONCORDEGO_SUGGEST_CALLS", "1500"))
+SUGGEST_DIR = os.path.join(live.HOME, "suggest")
 USER_WISHES = int(os.environ.get("CONCORDEGO_USER_WISHES", "200"))        # model calls a day (cents each)
 USERS_FILE = os.path.join(live.HOME, "users.json")
 _USERS_LOCK = threading.Lock()
@@ -800,6 +805,100 @@ def photos_request(q):
     return out
 
 
+def _address_text(a):
+    road = " ".join(x for x in (a.get("house_number"), a.get("road")) if x) or a.get("pedestrian") or a.get("footway") or ""
+    hood = a.get("neighbourhood") or a.get("suburb") or a.get("quarter") or a.get("city_district") or a.get("borough") or ""
+    city = a.get("city") or a.get("town") or a.get("village") or a.get("municipality") or a.get("county") or ""
+    parts = []
+    for x in (road, hood, city):
+        if x and x not in parts:
+            parts.append(x)
+    return ", ".join(parts)
+
+
+def _lookup_cached(kind, key, ttl, fetch):
+    """A small JSON cache on disk for the lookups above; the day's cap counts only the misses."""
+    os.makedirs(SUGGEST_DIR, exist_ok=True)
+    slug = re.sub(r"[^a-z0-9]+", "-", key.lower()).strip("-")[:80]
+    path = os.path.join(SUGGEST_DIR, "%s-%s.json" % (kind, slug))
+    try:
+        if time.time() - os.path.getmtime(path) < ttl:
+            with open(path) as f:
+                return json.load(f)
+    except OSError:
+        pass
+    ok, _ = _users_take("_suggest", "suggest", SUGGEST_CALLS)
+    if not ok:
+        return []
+    out = fetch()
+    try:
+        with open(path, "w") as f:
+            json.dump(out, f)
+    except OSError:
+        pass
+    return out
+
+
+def suggest_request(q):
+    """q, kind=from|to -> rows of {value, label, sub, kind}. The value is what
+    goes in the field, and always resolves: 'Honolulu (HNL)', or an address."""
+    text = (q.get("q") or [""])[0].strip()[:80]
+    kind = (q.get("kind") or ["to"])[0]
+    if len(text) < 2:
+        return {"rows": []}
+    rows = places.search(text, 5)
+    seen = {r["code"] for r in rows}
+    cfg = live.load_config()
+    if cfg.get("key") and cfg.get("provider") == "duffel" and len(text) >= 2:
+        def fetch():
+            from urllib.parse import quote
+            req = urllib.request.Request("https://api.duffel.com/places/suggestions?query=" + quote(text),
+                                         headers={"Authorization": "Bearer " + cfg["key"], "Duffel-Version": "v2", "Accept": "application/json",
+                                                  "User-Agent": "ConcordeGo/1.0 (go.flyconcordefly.com)"})
+            try:
+                with urllib.request.urlopen(req, timeout=6) as r:
+                    d = json.loads(r.read().decode("utf-8"))
+            except Exception:
+                return []
+            out = []
+            for pl in d.get("data") or []:
+                code = pl.get("iata_code") or ""
+                if not code:
+                    continue
+                name = pl.get("name") or code
+                sub = pl.get("type") == "airport" and (pl.get("city_name") or "") or ""
+                out.append({"value": "%s (%s)" % (name, code), "label": name, "sub": " · ".join(x for x in (sub, pl.get("iata_country_code") or "") if x),
+                            "code": code, "kind": pl.get("type") or "airport"})
+            return out[:8]
+        for r in _lookup_cached("duffel", text, 7 * 86400, fetch):
+            if r["code"] not in seen:
+                seen.add(r["code"]); rows.append(r)
+    looks_address = kind == "from" and len(text) >= 5 and (re.search(r"\d", text) or " " in text)
+    if looks_address:
+        def fetch_addr():
+            from urllib.parse import quote
+            req = urllib.request.Request("https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=5&q=" + quote(text),
+                                         headers={"User-Agent": "ConcordeGo/1.0 (go.flyconcordefly.com)", "Accept": "application/json"})
+            try:
+                with urllib.request.urlopen(req, timeout=6) as r:
+                    d = json.loads(r.read().decode("utf-8"))
+            except Exception:
+                return []
+            out, seen_txt = [], set()
+            digits = text.replace(" ", "")
+            for hit in d:
+                # a bare postal code: only places that actually carry it, not every 11237 on Earth
+                if digits.isdigit() and not str((hit.get("address") or {}).get("postcode") or "").replace(" ", "").startswith(digits):
+                    continue
+                t = _address_text(hit.get("address") or {})
+                if t and t not in seen_txt:
+                    seen_txt.add(t)
+                    out.append({"value": t, "label": t, "sub": (hit.get("address") or {}).get("country") or "", "kind": "address"})
+            return out
+        rows = rows + _lookup_cached("addr", text, 7 * 86400, fetch_addr)
+    return {"rows": rows[:9]}
+
+
 def locate_request(q):
     """lat, lon -> a street address in the shape places.py reads from the end.
     OpenStreetMap's Nominatim, one identified User-Agent, nothing stored."""
@@ -816,14 +915,7 @@ def locate_request(q):
     except Exception as exc:
         return {"error": "the map service did not answer: %s" % type(exc).__name__}
     a = d.get("address") or {}
-    road = " ".join(x for x in (a.get("house_number"), a.get("road")) if x) or a.get("pedestrian") or a.get("footway") or ""
-    hood = a.get("neighbourhood") or a.get("suburb") or a.get("quarter") or a.get("city_district") or a.get("borough") or ""
-    city = a.get("city") or a.get("town") or a.get("village") or a.get("municipality") or a.get("county") or ""
-    parts = []
-    for x in (road, hood, city):
-        if x and x not in parts:
-            parts.append(x)
-    return {"address_text": ", ".join(parts), "address": a}
+    return {"address_text": _address_text(a), "address": a}
 
 
 def admin_update():
@@ -976,10 +1068,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                "owner": owner, "left": None if (owner or who is None) else _users_left(who),
                                "allowances": {"searches": USER_SEARCHES, "wishes": USER_WISHES, "free": ANON_SEARCHES},
                                "free_left": free, "hours": _hours_to_midnight()})
-        if path in ("/locate", "/photos"):
+        if path in ("/locate", "/photos", "/suggest"):
             from urllib.parse import parse_qs
             q = parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
-            return self._json(locate_request(q) if path == "/locate" else photos_request(q))
+            return self._json({"/locate": locate_request, "/photos": photos_request, "/suggest": suggest_request}[path](q))
         if path == "/admin" or path.startswith("/api/admin/"):
             if not self._is_owner():
                 return self._html("<!doctype html><meta charset=utf-8><body style='background:#101013;color:#ececec;font:15px sans-serif;padding:40px'>"

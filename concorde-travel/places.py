@@ -155,6 +155,10 @@ def resolve(text: str) -> Tuple[Optional[str], str, Optional[str]]:
         return None, "unknown", "Nowhere to fly to - type a city or an airport code."
     if CODE_RE.match(raw.upper()) and len(raw) == 3:
         return raw.upper(), "code", None
+    # "Honolulu (HNL)": what the autocomplete puts in the field, the code carried in brackets
+    m = re.search(r"\(([A-Za-z]{3})\)\s*$", raw)
+    if m:
+        return m.group(1).upper(), "code", None
 
     key = raw.lower()
     if key in CITIES:
@@ -189,13 +193,45 @@ def suggest(text: str, limit: int = 3) -> List[str]:
     return sorted({n.title() for n in CITIES if q in n})[:limit]
 
 
+def search(text: str, limit: int = 6) -> List[dict]:
+    """Autocomplete over the table: names starting with what was typed first,
+    then names containing it, one row per code, the proper name first and the
+    matched spelling shown when it differs. Offline, instant."""
+    q = (text or "").strip().lower()
+    if len(q) < 2:
+        return []
+    seen, out = set(), []
+    proper_of = {}
+    for n, c in CITIES.items():
+        proper_of.setdefault(c, n if n != c.lower() else None)
+        if proper_of[c] is None and n != c.lower():
+            proper_of[c] = n
+    # the proper name starting with it, then a spelling or neighbourhood starting with it, then anything containing it
+    for pick in (lambda n, c: n == proper_of.get(c) and n.startswith(q), lambda n, c: n.startswith(q), lambda n, c: q in n):
+        for n, c in CITIES.items():
+            if c in seen or not pick(n, c):
+                continue
+            seen.add(c)
+            proper = label_for(c).rsplit(" (", 1)[0]
+            is_airport = any(a == c.lower() for a, cc in CITIES.items() if cc == c) and c not in METROS
+            out.append({"value": "%s (%s)" % (proper, c), "label": proper, "code": c, "kind": "airport" if is_airport else "city",
+                        "sub": " · ".join(x for x in ((n.title() if n.title() != proper else ""), c) if x)})
+            if len(out) >= limit:
+                return out
+    return out
+
+
+METROS = {"NYC", "LON", "PAR", "CHI", "WAS", "YTO", "YMQ", "MIL", "ROM", "TYO", "OSA", "SAO", "RIO", "BUE", "MOW", "STO", "BER"}
+
+
 def label_for(code: str) -> str:
     """A human name for a code, for echoing a search back at someone."""
     code = (code or "").upper()
-    names = [n for n, c in CITIES.items() if c == code]
+    # the first name added for a code is its proper name; the rest are spellings and neighbourhoods
+    names = [n for n, c in CITIES.items() if c == code and n != code.lower()]
     if not names:
         return code
-    return "%s (%s)" % (max(names, key=len).title(), code)
+    return "%s (%s)" % (names[0].title(), code)
 
 
 if __name__ == "__main__":

@@ -732,6 +732,21 @@ timed out is a worse failure than one saying "try an airport code".
   the user, because searching the wrong continent is worse than being asked to
   type three letters. A mutant that guesses `NYC` is caught.
 
+**The place fields autocomplete** (2026-09-21): `/suggest?q=&kind=from|to` (outside the
+door) answers from the offline table first (`places.search`, proper name first, the matched
+spelling shown beside it), then Duffel's places endpoint (airports and cities the feed can
+sell, with the key), then, for the origin, Nominatim addresses (only when what was typed
+looks like one; a bare postal code keeps only hits that carry it). External answers are
+cached a week under `~/.concordego/suggest/` and capped per day. What a pick puts in the
+field always resolves: a name with its code in brackets ("Honolulu (HNL)", which
+`places.resolve` reads), or an address.
+
+**The shortlist tiles' show** (2026-09-21): a shuffled pool of every photo of both places;
+each tile seated on its own picture, home and away alternating, drifting; every seven
+seconds the row flips between three pictures and one laid across the whole row, the three
+tiles changing 380ms apart with a white flash on each. The picture is a background layer
+16px past every edge, so no transform can show the ground.
+
 **The origin field does two different jobs** and both are sent: `origin_address`
 is where the ground leg starts, and the city inside it decides which airports to
 search. Sending only one is why every search used to be a hardcoded JFK–LHR no
