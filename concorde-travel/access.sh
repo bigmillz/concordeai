@@ -97,8 +97,11 @@ print("  reachable, " + str(len(r)) + " Access application(s) so far" + ((": " +
 # confirms the zone that owns $HOST is on this account. Without it the list is
 # simply EMPTY (not refused), which proves nothing, so it never stops the run.
 APEX=$(echo "$HOST" | awk -F. '{print $(NF-1)"."$NF}')
-cfroot "/zones?name=$APEX" | jq_ 'r = d.get("result") or []
-print("== zone\n  " + ("'$APEX' is on this account" if (d.get("success") and r) else "not checked: the zone list came back empty for this token (a token without Zone: Read lists nothing rather than refusing), so Access itself decides below"))'
+ZONE_SEEN=$(cfroot "/zones?name=$APEX" | jq_ 'r = d.get("result") or []
+print("1" if (d.get("success") and r) else "")')
+echo "== zone"
+if [ -n "$ZONE_SEEN" ]; then echo "  $APEX is visible to this token"
+else echo "  $APEX is NOT visible to this token: its zone list is empty (a token with no zone permission lists nothing rather than refusing). Access resolves a hostname through the zones the token can see, so this usually ends in \"domain does not belong to zone\" below."; fi
 
 echo "== organisation"
 ORG=$(cf GET /organizations)
@@ -131,7 +134,8 @@ ensure_app(){ # name domain policy_json
   if [ -z "$APP" ]; then APP=$(cf POST /apps "$BODY" | jq_ 'errs = json.dumps(d.get("errors"))
 if d.get("success"): print(d["result"]["id"])
 elif "does not belong to zone" in errs and "'${HOST_OK:-}'": sys.exit("  " + errs + "\n  The bare hostname was accepted a moment ago, so the zone is fine and Access is refusing the PATH form ('$DOM').")
-elif "does not belong to zone" in errs: sys.exit("  " + errs + "\n  Access says the zone that owns '$DOM' is not in account '$CF_ACCOUNT_ID'. Two things to check in the dashboard:\n   1. Open the zone (the apex of '$DOM'), Overview: the Account ID on the right must be '$CF_ACCOUNT_ID'. If it is another account, use that one: CF_ACCOUNT_ID=<it>, a token whose Account Resources cover it, and TEAM= with a new name if it has no team yet.\n   2. If it IS this account, the zone must be Active with DNS fully on Cloudflare (not pending, not a partial CNAME setup); Access cannot guard a hostname on a zone in either of those states.")
+elif "does not belong to zone" in errs and not "'${ZONE_SEEN:-}'": sys.exit("  " + errs + "\n  The token cannot see the zone that owns '$DOM' (its zone list is empty), and Access resolves the hostname through the zones the token can see.\n  Fix the token, not the zone: dash.cloudflare.com > My Profile > API Tokens > this token > Edit:\n    - Permissions: add  Zone : Zone : Read  (keep the two Access rows)\n    - Zone Resources: Include > All zones from an account > the account that owns the zone\n  Save, then re-run. The zone step above will then say the zone is visible, and the applications go through.")
+elif "does not belong to zone" in errs: sys.exit("  " + errs + "\n  The token can see the zone, yet Access refuses the hostname. Check the zone in the dashboard: it must be Active with DNS fully on Cloudflare (not pending, not a partial CNAME setup), and the Account ID on its Overview page must be '$CF_ACCOUNT_ID'.")
 else: sys.exit("  " + errs)'); echo "  created $NAME ($DOM)"
   else cf PUT "/apps/$APP" "$BODY" >/dev/null; echo "  updated $NAME ($DOM)"; fi
   local POL; POL=$(cf GET "/apps/$APP/policies" | jq_ 'print(next((p["id"] for p in d.get("result") or [] if p.get("name") in ("Friends","Everyone")), ""))')
