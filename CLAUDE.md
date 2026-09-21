@@ -440,7 +440,15 @@ python3 concorde-travel/places.py "Shoreditch, London EC2A"  # what a typed plac
 
 **Public address:** the domain is **flyconcordefly.com, with the e** (a day was lost to
 `flyconcordfly.com`, a zone that does not exist; Cloudflare's answers were all correct).
-`concorde-travel/deploy/droplet.sh BRANCH TUNNEL_TOKEN` is the intended home (an Ubuntu
+`concorde-travel/deploy/launch.sh` does the whole thing from a laptop in one command (doctl
+makes or finds the droplet; Cloudflare's API makes or finds a remotely-managed tunnel,
+sets its ingress, reads its token and writes the proxied CNAME; the installer runs over
+ssh; the keys go over the ssh channel into `/etc/concordego.env`, never a command line;
+`access.sh` adds the door; then DNS and HTTPS are checked). It needs
+`DIGITALOCEAN_ACCESS_TOKEN`, Cloudflare credentials that can see the zone, and `ALLOW`. The
+sandbox this was written in reaches neither cloud and holds no such keys, so its first real
+run is on Patrick's laptop; it was dry-run against stubbed doctl, ssh and Cloudflare.
+`concorde-travel/deploy/droplet.sh BRANCH TUNNEL_TOKEN` is what it runs on the box (an Ubuntu
 droplet: systemd, a venv for the `anthropic` SDK, an hourly `concordego-update.timer` that
 resets the checkout to `origin/BRANCH` and restarts the service when HEAD moved, ufw with
 ssh only, and cloudflared run from a tunnel token made in the Zero Trust dashboard, whose
