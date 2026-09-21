@@ -203,6 +203,29 @@ def _users_recent_add(email, item):
         live._atomic_write(USERS_FILE, users)
 
 
+def _users_profile(email):
+    try:
+        with open(USERS_FILE, encoding="utf-8") as fh:
+            return ((json.load(fh)).get(email) or {}).get("profile") or None
+    except (OSError, ValueError):
+        return None
+
+
+def _users_profile_set(email, profile):
+    """The signed-in person's profile: today the flying personality (the quiz's
+    answers and the persona they make), kept small and only ever theirs."""
+    with _USERS_LOCK:
+        try:
+            with open(USERS_FILE, encoding="utf-8") as fh:
+                users = json.load(fh)
+        except (OSError, ValueError):
+            users = {}
+        u = users.get(email) or {}
+        u["profile"] = profile
+        users[email] = u
+        live._atomic_write(USERS_FILE, users)
+
+
 def _users_recent(email):
     try:
         with open(USERS_FILE, encoding="utf-8") as fh:
@@ -1414,6 +1437,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             free = None if who else max(0, ANON_SEARCHES - (_users_left("ip:" + ip) or {}).get("searches_used", 0))
             return self._json({"remote": self._remote(), "email": None if who in (None, "owner") else who,
                                "owner": owner, "unlimited": bool(who and "@" in who and who in _unlimited()),
+                               "profile": _users_profile(who) if (who and "@" in who) else None,
                                "left": None if (owner or who is None or who in _unlimited()) else _users_left(who),
                                "recent": _users_recent(who)[:3] if (who and "@" in who) else [],
                                "allowances": {"searches": USER_SEARCHES, "wishes": USER_WISHES, "free": ANON_SEARCHES},
@@ -1483,6 +1507,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             owner = who == "owner" or (who is not None and who in OWNERS)
             return self._json({"remote": self._remote(), "email": None if who in (None, "owner") else who,
                                "owner": owner, "left": None if (owner or who is None) else _users_left(who),
+                               "profile": _users_profile(who) if (who and "@" in who) else None,
                                "allowances": {"searches": USER_SEARCHES, "wishes": USER_WISHES}})
         if path == "/api/live/status":
             # Safe to serve: live.status() reports whether a key exists and
@@ -1533,6 +1558,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
             path = "/api/search"; anon_ok = True
         else:
             anon_ok = False
+        if path == "/api/profile":
+            # the flying personality: saved for a signed-in person, never metered, never for a stranger
+            who = self._who()
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(n) or b"{}")
+            except Exception as exc:
+                return self._json({"error": "bad request: %s" % exc})
+            if not who or "@" not in who:
+                return self._json({"ok": False, "local": who == "owner", "error": None if who == "owner" else "sign in to save a profile"})
+            persona = body.get("persona") if isinstance(body.get("persona"), dict) else None
+            profile = {"persona": persona} if persona else {}
+            if len(json.dumps(profile)) > 4000:
+                return self._json({"ok": False, "error": "that profile is too large"})
+            _users_profile_set(who, profile)
+            return self._json({"ok": True, "profile": profile})
         if path not in ("/api/score", "/api/narrate", "/api/live", "/api/wish", "/api/search"):
             return self.send_error(404)
         try:

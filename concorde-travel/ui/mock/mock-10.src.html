@@ -753,6 +753,18 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 .adminlink{text-decoration:none}.adminlink.hidden{display:none}
 .acctbtn{border:1px solid var(--line);border-radius:999px;padding:8px 13px;font-size:13px;font-weight:500;color:var(--text);background:rgba(255,255,255,.04)}
 .acctbtn.in{color:var(--dim);font-weight:400}
+/* signed in, the button is the person: a round mark with their initial, which opens the profile */
+.acctbtn.avatar{width:34px;height:34px;padding:0;border-radius:50%;display:inline-grid;place-items:center;font-family:var(--disp);font-size:13px;font-weight:600;color:#0b0c10;background:var(--speed);border:0}
+.acctbtn.avatar.me{background:var(--speed)}
+.prof .who{display:flex;align-items:center;gap:12px;margin:4px 0 14px}.prof .who .avatar{width:44px;height:44px;font-size:17px}
+.prof .who small{display:block;color:var(--faint);font-size:12.5px;margin-top:3px}
+.prof h4{font-family:var(--disp);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin:18px 0 8px}
+.prof .persona{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--panel3)}
+.prof .persona b{display:block;font-size:16px;margin-bottom:4px}.prof .persona p{color:var(--dim);font-size:13.5px;margin:0}
+.qz .q{margin:12px 0 0}.qz .q p{margin:0 0 6px;font-size:14px}.qz .chips{display:flex;flex-wrap:wrap;gap:6px}
+.qz .pchip{cursor:pointer}.qz .pchip.on{border-color:var(--speed);color:var(--text);background:rgba(120,160,255,.08)}
+.prof .row2{margin-top:16px;align-items:center}
+.prof.tour p,.prof.tour li{font-size:15px;line-height:1.5;color:var(--text)}.prof.tour ul{padding-left:18px;margin:0}.prof.tour li{margin:6px 0}
 .rail .rail-acct{order:9;margin-left:auto}
 /* what needs an account, while there is none: greyed, and a tap opens the pop-up */
 .locked{opacity:.5;cursor:not-allowed;position:relative}
@@ -1227,7 +1239,7 @@ function setWeights(a, b, c, preset){
   $('#ra').textContent = Math.round(a*100) + '%'; $('#rb').textContent = Math.round(b*100) + '%'; $('#rc').textContent = Math.round(c*100) + '%';
   const hourly = a*PR.cheapest.hourly_value_cents + b*PR.fastest.hourly_value_cents + c*PR.comfort.hourly_value_cents;
   const cw = a*PR.cheapest.comfort_weight + b*PR.fastest.comfort_weight + c*PR.comfort.comfort_weight;
-  $('#means').innerHTML = S.asap ? 'Ranked by <b>when you arrive</b>. Price still shown, never hidden.' :
+  $('#means').innerHTML = S.asap ? 'Ranked by <b>when you arrive</b>. Price still shown, never hidden.' : S.preset === 'mine' && S.persona ? 'Ranked <b>your way</b>: ' + esc(S.persona.blurb) :
     'An hour of your time is worth <b>' + money(hourly) + '</b>; a worse cabin, a tight connection or a red-eye counts <b>' + cw.toFixed(1).replace(/\.0$/, '') + '×</b> the usual.';
   document.querySelectorAll('#presets button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.p === S.preset)));
   $('#asapnote').classList.toggle('hidden', !S.asap);
@@ -1351,6 +1363,7 @@ function bill(e, opts){
   // status (per Patrick, 2026-09-21): two flights otherwise alike, and one keeps your status earning. A CREDIT in
   // the order, at what you say keeping it is worth, named on the row and in the ledger; never a filter, never on
   // the money bill, never in the grade
+  personaLines(e).forEach(x => q.push(x));
   const sh = statusHeld(e);
   if (sh && S.statusWorth) q.push({key:'status', label:'Keeps your ' + sh.name, cents:-S.statusWorth, credit:true,
       evidence:(sh.via === 'own' ? 'flying the programme\'s own airline' : 'flying a ' + sh.alliance + ' partner') + ' keeps the status earning · credit, at what you said it is worth'});
@@ -1360,6 +1373,67 @@ function bill(e, opts){
           dem:q.filter(x => x.want), adds:g.addons.filter(x => x.key !== 'bags' && x.cents > 0).concat(g.stay), base:e.grid[idx]};
 }
 function priced(e){ return bill(e); }
+// ---- the flying personality (per Patrick, 2026-09-21): a short quiz becomes a persona: a point on the dial and a
+// few priced terms of its own, offered as a target of its own beside cheapest, fastest and comfort. It ranks by the
+// same arithmetic as everything else; nothing here is a filter, and the grade never sees it.
+const QUIZ = [
+  {id:'hours', q:'A flight costs $80 more and saves two hours. You…', a:[['Pay for the hours', {speed:2}], ['Keep the money', {price:2}], ['Depends on the day', {}]]},
+  {id:'layover', q:'A four-hour layover is…', a:[['Wasted time', {speed:1}], ['A chance to eat in a new city', {foodie:2}], ['Fine with a good lounge', {lounge:2}]]},
+  {id:'cabin', q:'In the air, what matters most?', a:[['Space and a quiet cabin', {comfort:2}], ['Wifi and power', {tech:2}], ['The price of the seat', {price:2}]]},
+  {id:'nerves', q:'Flying makes you…', a:[['Calm', {}], ['A little tense', {nervous:1}], ['Genuinely anxious', {nervous:2, comfort:1}]]},
+  {id:'redeye', q:'Red-eyes are…', a:[['Fine, I sleep anywhere', {redeye_ok:1}], ['A last resort', {}], ['Never', {noredeye:1}]]},
+  {id:'stops', q:'Connections are…', a:[['Fine if they save money', {price:1}], ['Only when nonstop is silly money', {}], ['Never', {nonstop:1, speed:1}]]},
+  {id:'crew', q:'The airline\'s reputation for service…', a:[['Matters a lot', {crew:2}], ['A bit', {crew:1}], ['Not at all', {price:1}]]},
+  {id:'lounge', q:'A lounge before the flight is…', a:[['Essential', {lounge:2}], ['Nice', {lounge:1}], ['Not my thing', {}]]},
+];
+const FOOD_CITY = ['CDG','AMS','LIS','MAD','BCN','FCO','IST','SIN','HKG','NRT','HND','ICN','BKK','MEX','CPH','TLV','DXB','MUC'];
+function personaFrom(answers){
+  const t = {price:1, speed:1, comfort:1, nervous:0, foodie:0, lounge:0, tech:0, crew:0, redeye_ok:0, noredeye:0, nonstop:0};
+  QUIZ.forEach(q => { const k = answers[q.id]; if (k == null || !q.a[k]) return; for (const [tr, v] of Object.entries(q.a[k][1])) t[tr] = (t[tr] || 0) + v; });
+  if (t.nervous >= 2) t.comfort += 1;
+  const sum = t.price + t.speed + t.comfort, a = t.price/sum, b = t.speed/sum, c = t.comfort/sum;
+  const lead = [['price', 'Careful spender'], ['speed', 'Time is money'], ['comfort', 'Comfort first']].sort((x, y) => t[y[0]] - t[x[0]])[0][1];
+  const tag = t.nervous >= 2 ? 'Nervous flyer' : t.foodie >= 2 ? 'Layover foodie' : t.lounge >= 2 ? 'Lounge regular' : t.tech >= 2 ? 'Working in the air' : t.nervous === 1 ? 'Slightly tense' : '';
+  const name = tag ? tag + ', ' + lead.toLowerCase() : lead;
+  const bits = [];
+  if (t.nervous) bits.push(t.nervous >= 2 ? 'short legs, no connections if it can be helped, daytime flights and well-rated airlines' : 'fewer connections and a better-rated airline where it is close');
+  if (t.foodie >= 2) bits.push('a long daytime layover in a good food city counts in a flight\'s favour');
+  if (t.lounge) bits.push(t.lounge >= 2 ? 'a fare with lounge access is worth real money' : 'lounge access counts a little');
+  if (t.tech >= 2) bits.push('wifi and power at the seat count');
+  if (t.noredeye) bits.push('red-eyes sink');
+  if (t.nonstop) bits.push('nonstops first');
+  if (t.crew >= 2 && !t.nervous) bits.push('the airline\'s reputation weighs');
+  return {name, a:+a.toFixed(2), b:+b.toFixed(2), c:+c.toFixed(2), t, blurb:(bits.length ? bits.join('; ') : 'a balanced dial, nothing extra charged') + '.', answers};
+}
+// the persona's own terms, priced like wants: charges for what it dislikes, credits for what it loves, each named
+function personaLines(e){
+  const P = S.persona; if (!P || S.preset !== 'mine') return [];
+  const t = P.t, L = [], add = (key, label, cents, evidence) => L.push({key:'me-' + key, label:'Your style: ' + label, cents, credit:cents < 0, evidence});
+  const rating = e.rating, lay = e.layover_minutes || [], h = hour(e.depart), ah = hour(e.arrive), redeye = h >= 21 || (e.day_offset && ah <= 6);
+  if (t.nervous){ const k = t.nervous;
+    if (e.stops > 0) add('stops', e.stops + ' connection' + (e.stops > 1 ? 's' : ''), 6000 * k * e.stops, 'you said flying makes you ' + (k >= 2 ? 'anxious' : 'tense') + '; each connection is charged');
+    if (redeye) add('redeye', 'a night flight', 4000 * k, 'a red-eye when you would rather not');
+    if (rating == null || rating < .72) add('crew', rating == null ? 'an unrated airline' : 'a lower-rated airline', 4000 * k, 'a well-rated airline is worth more to you than most'); }
+  else if (t.crew >= 2 && (rating == null || rating < .72)) add('crew', rating == null ? 'an unrated airline' : 'a lower-rated airline', 3000, 'you said the airline\'s reputation matters a lot');
+  if (t.foodie >= 2){ const segs = e.segments || []; lay.forEach((m, i) => { const apt = (segs[i] || {}).to, lh = segs[i] ? +segs[i].arr.slice(0, 2) : 12; if (m >= 180 && m <= 600 && FOOD_CITY.includes(apt) && lh >= 8 && lh <= 19) add('food', dur(m) + ' in ' + apt, -5000, 'a long daytime layover in a food city, which you said you would enjoy · credit'); }); }
+  if (t.lounge && !(e.brand.toLowerCase().includes('flex') || e.refundable)) add('lounge', 'no lounge access', 2500 * t.lounge, 'this fare carries no lounge access');
+  if (t.tech >= 2){ if (!e.wifi_published) add('wifi', 'no wifi', 3000, 'you work in the air'); if (!e.power_published) add('power', 'no power at the seat', 2000, 'you work in the air'); }
+  if (t.noredeye && redeye) add('noredeye', 'a red-eye', 6000, 'you said never');
+  if (t.nonstop && e.stops > 0) add('nonstop', 'not nonstop', 9000, 'you said connections never');
+  return L;
+}
+function savePersona(P){
+  S.persona = P; try { localStorage.setItem('concordego.persona', JSON.stringify(P)); } catch (e) {}
+  if (SERVED && S.user && S.user.email) fetch('/api/profile', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({persona:P})}).catch(() => {});
+  paintPresets();
+}
+function loadLocalPersona(){ try { return JSON.parse(localStorage.getItem('concordego.persona') || 'null'); } catch (e) { return null; } }
+function paintPresets(){
+  const box = $('#presets'); if (!box) return; let b = box.querySelector('button[data-p="mine"]');
+  if (!S.persona){ if (b) b.remove(); return; }
+  if (!b){ b = document.createElement('button'); b.dataset.p = 'mine'; b.className = 'mine'; box.insertBefore(b, box.querySelector('.asap')); }
+  b.textContent = 'Me: ' + S.persona.name; b.title = S.persona.blurb;
+}
 // the status this flight keeps earning, if the traveller holds one: the operator's own programme, a programme
 // whose codes include the operator, or an alliance tier the operator belongs to
 function statusHeld(e){
@@ -1930,6 +2004,8 @@ const isQuestion = t => /\?\s*$/.test(t) || /^(why|what|which|how|is|are|does|do
 // as it applies its own. Opened as a file, or if the model steps aside, the
 // pattern parser below does the job. Either way the model never ranks.
 const SERVED = location.protocol.startsWith('http');
+// opened as a file there is no account: the persona lives in this browser
+if (!SERVED){ S.persona = loadLocalPersona(); paintPresets(); }
 async function askModel(text){
   if (!SERVED) return null;
   try {
@@ -2349,7 +2425,7 @@ const STARFIELD = (function stars(){
 (function splash(){
   const el = $('#splash'), root = document.documentElement; if (!el) return;
   let seen = false; try { seen = sessionStorage.getItem('concordego.splashed') === '1'; } catch (e) {}
-  if (seen){ el.remove(); root.classList.remove('splashing'); return; }
+  if (seen){ el.remove(); root.classList.remove('splashing'); maybeTour(); return; }
   // the cache warmer
   const fill = el.querySelector('.pfill'), stage = el.querySelector('.pstage'), jobs = [];
   const job = (label, pr) => jobs.push({label, pr: Promise.resolve(pr).catch(() => null)});
@@ -2366,7 +2442,7 @@ const STARFIELD = (function stars(){
   const sweep = setInterval(() => { tick(); if (el.classList.contains('out')) clearInterval(sweep); }, 80);
   jobs.forEach(j => j.pr.then(() => { done++; stage.textContent = j.label; tick(); }));
   stage.textContent = 'Getting ready'; tick();
-  const finish = () => { if (el.classList.contains('out')) return; fill.style.width = '100%'; el.classList.add('out'); root.classList.add('splashlift'); root.classList.remove('splashing'); try { sessionStorage.setItem('concordego.splashed', '1'); } catch (e) {} setTimeout(() => { el.remove(); root.classList.remove('splashlift'); }, 1000); };
+  const finish = () => { if (el.classList.contains('out')) return; maybeTour(); fill.style.width = '100%'; el.classList.add('out'); root.classList.add('splashlift'); root.classList.remove('splashing'); try { sessionStorage.setItem('concordego.splashed', '1'); } catch (e) {} setTimeout(() => { el.remove(); root.classList.remove('splashlift'); }, 1000); };
   Promise.all(jobs.map(j => j.pr)).then(function wait(){ clock() >= 1 ? finish() : setTimeout(wait, 40); });
   setTimeout(finish, MAX + 400);
   el.addEventListener('click', finish);
@@ -2456,7 +2532,7 @@ const onPoint = ev => { const r = tri.getBoundingClientRect(); const [a, b, c] =
 tri.addEventListener('pointerdown', ev => { dragging = true; tri.setPointerCapture(ev.pointerId); onPoint(ev); });
 tri.addEventListener('pointermove', ev => { if (dragging) onPoint(ev); });
 tri.addEventListener('pointerup', () => dragging = false); tri.addEventListener('pointercancel', () => dragging = false);
-$('#presets').addEventListener('click', ev => { const b = ev.target.closest('button[data-p]'); if (!b) return; if (b.dataset.p === 'asap'){ setWeights(0, 1, 0, 'asap'); return; } const [a, bb, c] = b.dataset.p.split(',').map(Number); setWeights(a, bb, c, b.dataset.p); });
+$('#presets').addEventListener('click', ev => { const b = ev.target.closest('button[data-p]'); if (!b) return; if (b.dataset.p === 'asap'){ setWeights(0, 1, 0, 'asap'); return; } if (b.dataset.p === 'mine'){ const P = S.persona; if (P) setWeights(P.a, P.b, P.c, 'mine'); return; } const [a, bb, c] = b.dataset.p.split(',').map(Number); setWeights(a, bb, c, b.dataset.p); });
 document.addEventListener('keydown', ev => {
   if (ev.key === 'Escape') $('#sheetroot').innerHTML = '';
   if (document.activeElement === handle){ const s = .05; let a = S.a, b = S.b, c = S.c;
@@ -2543,8 +2619,8 @@ function runRecent(i){
 function isoToLabel(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); if (!m) return iso; const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])); return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()]; }
 document.addEventListener('click', ev => { const b = ev.target.closest('[data-recent]'); if (b) runRecent(+b.dataset.recent); });
 function paintAccount(){
-  const u = S.user, label = !u ? 'Sign in' : (u.viaAccess || (u.email && !u.demo && SERVED)) ? 'Log out' : u.owner ? 'This machine' : (u.email || 'Signed in') + (u.demo ? ' (demo)' : '');
-  for (const id of ['#account', '#account2']){ const b = $(id); if (!b) continue; b.textContent = label; b.classList.toggle('in', !!u); b.title = u && u.left ? (u.email || '') + ' · ' + u.left.searches + ' live searches and ' + u.left.wishes + ' wishes left today' : u && u.email ? u.email : u ? '' : 'Free: email or Google'; }
+  const u = S.user, who = u && (u.email || (u.owner ? 'you' : '')), label = !u ? 'Sign in' : who ? who[0].toUpperCase() : 'This machine';
+  for (const id of ['#account', '#account2']){ const b = $(id); if (!b) continue; b.textContent = label; b.classList.toggle('in', !!u); b.classList.toggle('avatar', !!(u && who)); b.setAttribute('aria-label', u && who ? 'Your profile' : label); b.title = u && u.left ? (u.email || '') + ' · ' + u.left.searches + ' live searches and ' + u.left.wishes + ' wishes left today' : u && u.email ? u.email + ' · your profile' : u ? 'Your profile' : 'Free: email or Google'; }
   paintRecent();
   document.querySelectorAll('.adminlink').forEach(a => a.classList.toggle('hidden', !(u && u.owner && u.viaAccess)));
   for (const [sel, what] of LOCKS){ const el = document.querySelector(sel); if (!el) continue; el.classList.toggle('locked', !u);
@@ -2563,15 +2639,53 @@ function openAccount(why){
   $('#acct').classList.remove('hidden'); ($('#acctgo') || $('#acctno')).focus();
 }
 function closeAccount(){ $('#acct').classList.add('hidden'); }
+// the first-launch tour (per Patrick, 2026-09-21): the premise in a breath, how it works in three lines, then the
+// quiz. Once per browser; the profile can always reopen the quiz.
+const TOUR = [
+  ['Flying, made simple', '<p>Every site shows the same seats. ConcordeGo tells you which one is actually worth it: the ticket plus the ride, the bags, the layover and the risk, all in dollars, and grades each flight on its own merits.</p>'],
+  ['How it works', '<ul><li>One dial: cheap, fast or comfortable, or your own mix.</li><li>Every card shows the bill and the grade, with each dollar explained.</li><li>Ask for anything in plain words. It becomes a rule you can see and remove.</li></ul>'],
+  ['Your style', '<p>Eight quick questions, and flights rank your way, beside cheapest, fastest and comfort.</p>'],
+];
+function openTour(i){
+  i = i || 0; const last = i === TOUR.length - 1;
+  $('#accth').textContent = TOUR[i][0];
+  $('#acctbody').innerHTML = `<div class="prof tour">${TOUR[i][1]}<div class="row2">${last ? '<button class="choose" id="quizgo" style="flex:0 0 auto">Take the quiz</button><button class="ledger" id="tourdone">Later</button>' : `<button class="choose" id="tournext" data-i="${i + 1}" style="flex:0 0 auto">Next</button><button class="ledger" id="tourdone">Skip</button>`}<span class="hintr" style="margin-left:auto">${i + 1} of ${TOUR.length}</span></div></div>`;
+  $('#acct').classList.remove('hidden'); ($('#tournext') || $('#quizgo')).focus();
+}
+function maybeTour(){
+  let seen = false; try { seen = !!localStorage.getItem('concordego.toured'); } catch (e) {}
+  if (seen || S.persona) return;
+  try { localStorage.setItem('concordego.toured', '1'); } catch (e) {}
+  setTimeout(() => { if ($('#acct').classList.contains('hidden')) openTour(0); }, 900);
+}
+// the profile: who you are here, the flying personality, the recent trips, and the way out
+function openProfile(quiz){
+  const u = S.user || {}, who = u.email || (u.owner ? 'This machine' : 'Not signed in'), P = S.persona;
+  $('#accth').textContent = 'Your profile';
+  const quizHTML = `<div class="qz">${QUIZ.map(q => `<div class="q" data-q="${q.id}"><p>${esc(q.q)}</p><div class="chips">${q.a.map((a, i) => `<button type="button" class="pchip${P && P.answers && P.answers[q.id] === i ? ' on' : ''}" data-i="${i}">${esc(a[0])}</button>`).join('')}</div></div>`).join('')}
+    <p class="searcherr" id="quizerr" role="alert"></p><div class="row2"><button class="choose" id="quizsave" style="flex:0 0 auto">Save my style</button><button class="ledger" id="acctno">Cancel</button></div></div>`;
+  $('#acctbody').innerHTML = `<div class="prof"><div class="who"><span class="acctbtn avatar" aria-hidden="true">${esc((u.email || 'y')[0].toUpperCase())}</span><div><b>${esc(who)}</b><small>${u.unlimited ? 'No daily cap.' : u.owner ? 'An owner: no limits.' : u.left ? u.left.searches + ' live searches and ' + u.left.wishes + ' wishes left today.' : ''}</small></div></div>
+    <h4>Flying personality</h4>
+    ${quiz ? quizHTML : P ? `<div class="persona"><b>${esc(P.name)}</b><p>${esc(P.blurb.charAt(0).toUpperCase() + P.blurb.slice(1))}</p></div><div class="row2"><button class="ledger" id="quizgo">Retake the quiz</button><button class="ledger" id="quizdrop">Forget it</button></div>`
+      : `<div class="persona"><b>Not set yet</b><p>Eight quick questions. Then "Me" appears beside cheapest, fastest and comfort, and ranks flights your way.</p></div><div class="row2"><button class="choose" id="quizgo" style="flex:0 0 auto">Take the quiz</button></div>`}
+    ${quiz ? '' : `<div class="row2">${u.viaAccess || (u.email && !u.demo && SERVED) ? '<a class="choose" style="flex:0 0 auto" href="/cdn-cgi/access/logout">Log out</a>' : ''}${u.demo ? '<button class="ledger" id="acctout">Leave the demo account</button>' : ''}<button class="ledger" id="acctno">Done</button></div>`}</div>`;
+  $('#acct').classList.remove('hidden'); ($('#quizsave') || $('#quizgo') || $('#acctno')).focus();
+}
 document.addEventListener('click', ev => {
-  if (ev.target.closest('#account, #account2')){ const u = S.user; if (u && (u.viaAccess || (u.email && !u.demo && SERVED))){ location.href = '/cdn-cgi/access/logout'; return; } openAccount(); return; }
+  if (ev.target.closest('#account, #account2')){ const u = S.user; if (u && (u.email || u.owner)){ openProfile(); return; } openAccount(); return; }
+  if (ev.target.closest('#quizgo')){ openProfile(true); return; }
+  const tn = ev.target.closest('#tournext'); if (tn){ openTour(+tn.dataset.i); return; }
+  if (ev.target.closest('#tourdone')){ closeAccount(); return; }
+  if (ev.target.closest('#quizsave')){ const ans = {}; document.querySelectorAll('.qz .q').forEach(q => { const on = q.querySelector('.pchip.on'); if (on) ans[q.dataset.q] = +on.dataset.i; }); if (Object.keys(ans).length < QUIZ.length){ $('#quizerr').textContent = 'Answer every one; it takes a minute.'; return; } savePersona(personaFrom(ans)); if (W.mode === 'results'){ setWeights(S.persona.a, S.persona.b, S.persona.c, 'mine'); paint(false); } openProfile(); return; }
+  if (ev.target.closest('#quizdrop')){ S.persona = null; try { localStorage.removeItem('concordego.persona'); } catch (e) {} if (SERVED && S.user && S.user.email) fetch('/api/profile', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'}).catch(() => {}); if (S.preset === 'mine') setWeights(.34, .33, .33, '.34,.33,.33'); paintPresets(); openProfile(); return; }
+  const qc = ev.target.closest('.qz .pchip'); if (qc){ qc.parentElement.querySelectorAll('.pchip').forEach(x => x.classList.toggle('on', x === qc)); return; }
   if (ev.target.closest('#acctx, #acctno') || ev.target.id === 'acct'){ closeAccount(); return; }
   if (ev.target.closest('#acctgo')){ if (SERVED) location.href = '/api/signin?next=' + encodeURIComponent(location.pathname); else { S.user = {email:'you@example.com', demo:true}; paintAccount(); closeAccount(); } return; }
   if (ev.target.closest('#acctout')){ S.user = null; paintAccount(); closeAccount(); return; }
   const lock = ev.target.closest('.locked'); if (lock){ ev.preventDefault(); ev.stopPropagation(); openAccount(); }
 }, true);
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('#acct').classList.contains('hidden')) closeAccount(); });
-if (SERVED) fetch('/whoami').then(r => r.json()).then(w => { S.user = w.owner ? {owner:true, email:w.email || '', viaAccess: w.remote && !!w.email} : w.email ? {email:w.email, left:w.left, viaAccess:true, unlimited:!!w.unlimited} : null; S.recent = w.recent || []; S.free = w.free_left; S.freeMax = (w.allowances || {}).free; paintAccount(); }).catch(() => paintAccount()); else paintAccount();
+if (SERVED) fetch('/whoami').then(r => r.json()).then(w => { S.user = w.owner ? {owner:true, email:w.email || '', viaAccess: w.remote && !!w.email} : w.email ? {email:w.email, left:w.left, viaAccess:true, unlimited:!!w.unlimited} : null; S.recent = w.recent || []; S.free = w.free_left; S.freeMax = (w.allowances || {}).free; S.persona = (w.profile && w.profile.persona) || loadLocalPersona(); if (S.persona && !(w.profile && w.profile.persona) && S.user && S.user.email) savePersona(S.persona); paintPresets(); paintAccount(); }).catch(() => paintAccount()); else paintAccount();
 // the hover card: one element, filled from the segment under the pointer
 const JT = document.createElement('div'); JT.className = 'jtip'; JT.setAttribute('role', 'tooltip'); JT.hidden = true; document.body.appendChild(JT);
 let jtFor = null;
