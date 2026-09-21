@@ -243,9 +243,4 @@ def verify(text: str, b: Dict[str, Any]) -> Tuple[bool, str]:
     for p in PROMISES:
         if p in low:
             return False, "a promise about rights: %r" % p
-    if len(text) > 900:
-        return False, "too long (%d chars)" % len(text)
-    ok, why = narrator.verify(text[:400], b)
-    if not ok:
-        return ok, why
-    return narrator.verify(text[400:], b) if len(text) > 400 else (True, "")
+    return narrator.verify(text, b, max_len=900)

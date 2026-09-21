@@ -168,8 +168,7 @@ details[open] summary:after{content:"–"}
 .carriers{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:6px}
 .carriers .cbtn{height:36px;box-sizing:border-box;display:flex}
 .carriers .cbtn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
-.cbtn.more{border-style:dashed;color:var(--faint);justify-content:center;padding:4px 10px}.cbtn.more:hover{color:var(--text);border-color:var(--dim)}
-.cbtn.more span{text-align:center}
+.carriers .moreair{grid-column:1 / -1;margin:4px 0 0}
 .airsheet h4{font:400 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin:18px 0 8px}
 .airsheet .airq{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);font:500 15px var(--sans);padding:10px 14px;margin-top:6px}.airsheet .airq:focus{outline:none;border-color:var(--speed)}
 .cbtn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:8px;padding:4px 8px 4px 4px;font-size:12.5px;color:var(--dim);background:var(--panel)}
@@ -2090,7 +2089,7 @@ function paintCarriers(){
   const shown = [...new Set(MAJORS.concat([...inSearch].sort()))].filter(c => DUFFEL[c] || inSearch.has(c));
   const rest = Object.keys(DUFFEL).filter(c => !shown.includes(c)).length + [...S.adv.out].filter(c => !shown.includes(c)).length;
   $('#carriers').innerHTML = shown.map(carrierChip).join('') +
-    `<button class="cbtn more" id="moreair" type="button"><span>+${rest} more airlines${[...S.adv.out].some(c => !shown.includes(c)) ? ' · ' + [...S.adv.out].filter(c => !shown.includes(c)).length + ' out' : ''}</span></button>`;
+    `<p class="ptnote moreair"><button class="ledger" id="moreair" type="button">All ${Object.keys(DUFFEL).length} airlines</button>${[...S.adv.out].some(c => !shown.includes(c)) ? ' · ' + [...S.adv.out].filter(c => !shown.includes(c)).length + ' left out from the full list' : ''}</p>`;
 }
 function airlinesSheet(){
   const q = (S.airq || '').trim().toLowerCase();
@@ -2115,8 +2114,10 @@ const STATUS = {DL:{name:'Delta Medallion', tiers:['Silver','Gold','Platinum','D
 Object.keys(STATUS).forEach(k => { if (!(k in S.status)) S.status[k] = ''; });
 const statusKey = op => Object.keys(STATUS).find(k => !STATUS[k].alliance && (k === op || (STATUS[k].codes || []).includes(op)));
 const statusCodes = ([k, st]) => st.alliance ? ALLI[st.alliance] : (st.codes || [k]);
-function statusInPlay(){ return Object.entries(STATUS).filter(x => statusCodes(x).some(c => LOY.has(c)) && (x[1].alliance || statusCodes(x).some(c => OPS.has(c)))); }
-function progsInPlay(){ const ps = new Set(); ALL.forEach(e => (AWARD[e.operator] || AWARD[e.carrier] || []).forEach(a => ps.add(a.p))); return Object.keys(PROG).filter(k => ps.has(k)); }
+// every programme and every status, always: what a person holds does not change with the search (per Patrick,
+// 2026-09-21: chips that vanished "for no apparent reason"); a programme with no award on these flights says so on the card
+function statusInPlay(){ return Object.entries(STATUS); }
+function progsInPlay(){ return Object.keys(PROG); }
 const ALLI = {skyteam:['DL','VS','AF','KL','AZ','KE','AM','SV','MU','GA','VN','CI','UX','OK','RO','ME','KQ'], oneworld:['AA','BA','IB','AY','AS','QR','CX','JL','QF','RJ','MH','AT','UL','WY'], star:['UA','LH','LX','TK','LO','AC','OS','SN','SK','TP','SQ','NH','TG','ET','MS','SA','A3','AI','BR','CA','CM','NZ','OU','OZ','ZH']};
 const CABIN_NAMES = {economy:'Economy', premium:'Premium economy', business:'Business', first:'First'};
 function setCabin(v){ S.adv.cabin = v; $('#cabin').value = v; const q = $('#q-cabin'); if (q) q.value = CABIN_NAMES[v]; if (W.mode === 'results') summary();
@@ -3009,6 +3010,7 @@ async function enterResults(){
   finishAllSteps();
   const box = $('#loading'); box.classList.remove('hidden'); $('#wizard').classList.add('hidden'); $('#rail').classList.add('hidden'); $('#searcherr').textContent = '';
   const L = S.legs[0], date = toISODate(L.date); S.notice = '';
+  { const iso = toISODate(L.date), today = localISO(new Date()).slice(0, 10); if (iso && iso < today){ $('#searcherr').textContent = 'That date has passed. Flights can be searched from today.'; ($('#q-date-0') || {focus(){}}).focus(); return; } }
   if (SERVED && !(L.from.trim() && L.to.trim())){
     box.classList.add('hidden'); $('#wizard').classList.remove('hidden'); $('#rail').classList.remove('hidden'); goStep(1);
     $('#searcherr').textContent = L.from.trim() ? 'Where are you going? A city, an airport, or the address where you will stay.' : 'Where does the trip start? An address, a neighbourhood or a city.'; ($('#q-' + (L.from.trim() ? 'to' : 'from') + '-0') || {focus(){}}).focus(); return; }

@@ -694,6 +694,10 @@ def _fetch_raw(req):
         if not re.match(r"^\d{4}-\d{2}-\d{2}$", d):
             return ({"error": "That date did not look like a date. Use YYYY-MM-DD.",
                      "field": "date", "live": True},)
+        if d < time.strftime("%Y-%m-%d", time.gmtime(time.time() - 12 * 3600)):
+            # the provider refuses a past date with a 422; say it in a sentence and spend nothing
+            return ({"error": "That date has passed. Flights can be searched from today.",
+                     "field": "date", "live": True},)
         where["date"] = d
         if not live.load_config().get("key"):
             if req.get("_served"):

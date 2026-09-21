@@ -1029,11 +1029,9 @@ as seen; under 980px it is one column in rank order again. **Step 3 is rows of c
 Patrick, 2026-09-21: "not welcome to the world of data entry"): a source, a
 programme or a status is a chip until it is tapped, and only then a field, with
 the most popular few showing and the rest behind a dashed "+N more" chip.
-**Programmes and status are gated by the
-search**: a programme balance is offered only when it has an award on a flight
-the search returned, and a
-status programme only when the feed's `supported_loyalty_programmes` on this
-search's offers take it AND that airline flies in the search; one tier per
+**Every programme and every status is offered, always** (2026-09-21, per Patrick: gated
+chips "kept disappearing"; what a person holds does not change with the search); a
+programme with no award on these flights says "no route" on the card. One tier per
 alliance (Star, oneworld, SkyTeam) stands in for every partner. Marriott Bonvoy
 is a source at 3:1 valued at its own 0.7¢, so a 3:1 move is never priced as 1:1. It wears the Concorde family's own
 tokens (`--bg #101013`, Michroma / Space Grotesk / Plex Mono, the app's amber,

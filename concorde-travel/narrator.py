@@ -189,8 +189,10 @@ def template(b: Dict[str, Any]) -> Dict[str, str]:
     return {"lead": lead, "sub": sub, "source": "template"}
 
 
-def verify(text: str, b: Dict[str, Any]) -> Tuple[bool, str]:
-    """Is every checkable claim in this sentence one the arithmetic produced?"""
+def verify(text: str, b: Dict[str, Any], max_len: int = 400) -> Tuple[bool, str]:
+    """Is every checkable claim in this sentence one the arithmetic produced?
+    `max_len` is the narrator's two sentences by default; the delayed-flight
+    helper's advice is allowed more."""
     allowed = b.get("allowed", {})
     low = text.lower()
 
@@ -211,7 +213,7 @@ def verify(text: str, b: Dict[str, Any]) -> Tuple[bool, str]:
         if code not in allowed.get("codes", []):
             return False, "airport or carrier not in the brief: %s" % code
 
-    if len(text) > 400:
+    if len(text) > max_len:
         return False, "too long (%d chars)" % len(text)
     return True, ""
 
