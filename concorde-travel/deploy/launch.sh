@@ -84,9 +84,11 @@ say "keys -> /etc/concordego.env on the droplet"
 # sent over the ssh channel, never on a command line
 { [ -n "${CONCORDEGO_FLIGHT_KEY:-}" ] && printf 'CONCORDEGO_FLIGHT_KEY=%s\n' "$CONCORDEGO_FLIGHT_KEY"
   [ -n "${ANTHROPIC_API_KEY:-}" ] && printf 'ANTHROPIC_API_KEY=%s\n' "$ANTHROPIC_API_KEY"
-  printf 'CONCORDEGO_OWNERS=%s\n' "$OWNERS"; } | "${SSH[@]}" 'python3 - <<"PY"
-import sys, re
-new = dict(l.rstrip("\n").split("=", 1) for l in sys.stdin if "=" in l)
+  printf 'CONCORDEGO_OWNERS=%s\n' "$OWNERS"; } | "${SSH[@]}" 'umask 077; cat > /root/.concordego-keys.tmp; python3 - <<"PY"
+import sys, re, os
+# the lines arrive on stdin; they are read into a file first because the heredoc below takes stdin over
+new = dict(l.rstrip("\n").split("=", 1) for l in open("/root/.concordego-keys.tmp") if "=" in l)
+os.remove("/root/.concordego-keys.tmp")
 path = "/etc/concordego.env"; lines = open(path).read().splitlines()
 out = [l for l in lines if not any(re.match(r"#?\s*" + k + "=", l) for k in new)] + [k + "=" + v for k, v in new.items()]
 open(path, "w").write("\n".join(out) + "\n")
