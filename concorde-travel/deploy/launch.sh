@@ -8,7 +8,7 @@
 #   brew install doctl jq            # doctl once; jq is optional (python3 stands in)
 #   export DIGITALOCEAN_ACCESS_TOKEN=dop_v1_...     # DigitalOcean > API > Generate (read + write)
 #   export CF_EMAIL=you@example.com CF_GLOBAL_KEY=...   # or CF_API_TOKEN with Tunnel, DNS, Zone and Access edit
-#   export CONCORDEGO_FLIGHT_KEY=duffel_live_...  ANTHROPIC_API_KEY=sk-ant-...
+#   export CONCORDEGO_FLIGHT_KEY=duffel_live_...  ANTHROPIC_API_KEY=sk-ant-...  CONCORDEGO_PEXELS_KEY=...  (Pexels optional: tile photos)
 #   ALLOW="you@example.com,friend@example.com" ./concorde-travel/deploy/launch.sh
 #
 # Optional: BRANCH (default: the branch this checkout is on), REGION (nyc3),
@@ -84,6 +84,7 @@ say "keys -> /etc/concordego.env on the droplet"
 # sent over the ssh channel, never on a command line
 { [ -n "${CONCORDEGO_FLIGHT_KEY:-}" ] && printf 'CONCORDEGO_FLIGHT_KEY=%s\n' "$CONCORDEGO_FLIGHT_KEY"
   [ -n "${ANTHROPIC_API_KEY:-}" ] && printf 'ANTHROPIC_API_KEY=%s\n' "$ANTHROPIC_API_KEY"
+  [ -n "${CONCORDEGO_PEXELS_KEY:-}" ] && printf 'CONCORDEGO_PEXELS_KEY=%s\n' "$CONCORDEGO_PEXELS_KEY"
   printf 'CONCORDEGO_OWNERS=%s\n' "$OWNERS"; } | "${SSH[@]}" 'umask 077; cat > /root/.concordego-keys.tmp; python3 - <<"PY"
 import sys, re, os
 # the lines arrive on stdin; they are read into a file first because the heredoc below takes stdin over

@@ -265,7 +265,9 @@ details[open] summary:after{content:"–"}
 .door .eyebrow{display:flex;align-items:center;gap:8px}
 .door .eyebrow small{font-size:9px;letter-spacing:.1em;color:var(--faint);text-transform:none;font-family:var(--sans);font-weight:300}
 /* one line of pros, one of cons: single words, the ledger has the rest */
-.pc{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12.5px;line-height:1.35;margin-top:-4px}
+/* the same height on every door, whatever each one has to say, so the airline, the bar and the prices line up across
+   the three (per Patrick, 2026-09-21): room for four lines, and a fifth is clipped rather than pushing the rest down */
+.pc{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12.5px;line-height:1.35;margin-top:-4px;height:calc(4 * 1.35em + 9px);overflow:hidden;align-content:start}
 .pc i{font:500 10px/1.6 var(--mono);letter-spacing:.14em;text-transform:uppercase}
 .pc .pro i{color:var(--green)}.pc .con i{color:var(--red)}
 .pc span{color:var(--text);display:flex;flex-wrap:wrap;row-gap:2px;min-width:0}.pc span.none{color:var(--faint)}
@@ -1547,7 +1549,7 @@ function door(kind, e, r, title, ctx){
   const eff = r.total, pc = prosCons(e, r, ctx);
   const chips = (arr, none) => arr.length ? arr.map(w => '<b>' + esc(w) + '</b>').join('') : '<b class="none">' + none + '</b>';
   return `<article class="door ${kind}" data-id="${esc(e.id)}">
-    <div class="sky" style="background:${skyBand(e)}">${PHOTOS.length ? `<div class="pano"><img class="ph a on" alt="" src="${PHOTOS[PH.idx].src}"><img class="ph b" alt=""></div><div class="scrim"></div><span class="cap">${esc(PH.city)} · ${esc(PHOTOS[PH.idx].credit)}</span>` : ''}
+    <div class="sky" style="background:${skyBand(e)}">${PHOTOS.length ? `<div class="pano"><img class="ph a on" alt="" src="${PHOTOS[PH.idx].src}"><img class="ph b" alt=""></div><div class="scrim"></div><span class="cap">${esc(PHOTOS[PH.idx].place || PH.city)} · ${esc(PHOTOS[PH.idx].credit)}</span>` : ''}
       <span class="t l">${hm(e.depart)}</span><span class="t r">${hm(e.arrive)}${e.day_offset ? '<small>+1</small>' : ''}</span></div>
     ${sealHTML(e)}
     <div class="body">
@@ -2305,7 +2307,7 @@ function loadData(d){
   D = d; ALL = D.results.reference.slice(); PR = D.profiles; AIR = D.airlines || {}; AP = D.airports || {}; P = D.par;
   GRID = {}; D.grid_points.forEach((p, i) => { GRID[Math.round(p[0]*10) + '-' + Math.round(p[1]*10)] = i; });
   prepWants(); paintPts();
-  PH.city = cityOf(D.query); DOOR_IDS = []; S.open = new Set();
+  PH.city = cityOf(D.query); DOOR_IDS = []; S.open = new Set(); fetchPhotos();
   paintPar(); paintCov();
 }
 function paintPar(){
@@ -2498,7 +2500,7 @@ function cycle(){
     // the new picture fades in over the old one, which stays put until the fade is done - two fades at once let the ground show through
     requestAnimationFrame(() => requestAnimationFrame(() => { nxt.classList.add('on');
       setTimeout(() => { cur.style.transition = 'none'; cur.classList.remove('on'); requestAnimationFrame(() => { cur.style.transition = ''; }); }, 1200); }));
-    const cap = d.querySelector('.cap'); if (cap) cap.textContent = PH.city + ' · ' + next.credit;
+    const cap = d.querySelector('.cap'); if (cap) cap.textContent = (next.place || PH.city) + ' · ' + next.credit;
   }, k * 480));
 }
 addEventListener('resize', mountPhotos);
@@ -2544,6 +2546,20 @@ if (!PHOTOS.length){
   const paintArt = () => { PHOTOS = [[6.6, 'dawn'], [12.5, 'midday'], [18.3, 'dusk'], [22.4, 'night']].map(([h, l], i) => ({src: makeArt(h, i), credit: 'stand-in artwork, ' + l}));
     if (W.mode === 'results') paint(false); };
   (window.requestIdleCallback || (f => setTimeout(f, 60)))(paintArt);
+}
+// Real photos of both ends of the trip, served: the origin's neighbourhood and the destination city, alternating
+// across the tiles so the strip walks from home to there and back. Stand-in artwork until they arrive, or if none come.
+async function fetchPhotos(){
+  if (!SERVED) return;
+  const q = D.query || {}, parts = String(q.origin_full || q.origin || '').split(',').map(x => x.replace(/\d+/g, '').trim()).filter(Boolean);
+  const here = parts.length >= 2 ? parts.slice(-2).join(', ') : (parts[0] || ''), there = String(q.destination || '').trim();
+  const key = here + '|' + there; if (PH.key === key) return; PH.key = key;
+  const get = async place => { if (!place) return []; try { const r = await fetch('/api/photos?place=' + encodeURIComponent(place)); const d = await r.json(); return (d.photos || []).map(p => ({...p, place: d.place || place})); } catch (e){ return []; } };
+  const [a, b] = await Promise.all([get(here), get(there)]); if (PH.key !== key) return;
+  const mixed = []; for (let i = 0; i < Math.max(a.length, b.length) && mixed.length < 8; i++){ if (a[i]) mixed.push(a[i]); if (b[i]) mixed.push(b[i]); }
+  if (mixed.length < 2) return;
+  mixed.forEach(p => { const im = new Image(); im.src = p.src; });
+  PHOTOS = mixed; PH.idx = 0; if (W.mode === 'results') paint(false);
 }
 document.addEventListener('animationend', ev => { if (ev.target.classList && ev.target.classList.contains('rise')) ev.target.classList.remove('rise'); });
 
@@ -2652,7 +2668,7 @@ async function enterResults(){
   runProgress(box, SEARCH_STAGES, REDUCED ? 500 : 2400, () => { box.classList.add('hidden'); showResults(); });
 }
 function showResults(){
-  W.mode = 'results'; S.entrance = true; $('#rbox').innerHTML = RBOX;
+  W.mode = 'results'; fetchPhotos(); S.entrance = true; $('#rbox').innerHTML = RBOX;
   $('#bar').classList.add('drop'); $('#results').classList.add('fade');
   document.querySelectorAll('#results .stepper, #results .sechead').forEach((el, k) => { el.classList.add('rise'); el.style.animationDelay = (k*80) + 'ms'; });
   BLOCKS.forEach(k => $('#ed-' + k).appendChild($('#blk-' + k)));

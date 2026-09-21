@@ -59,6 +59,12 @@ OWNERS = {e.strip().lower() for e in os.environ.get("CONCORDEGO_OWNERS", "").spl
 # swarm of them. Wishes are the only metered thing that costs money per call (Duffel bills per booking, not per
 # search; live.py caps searches on its own), so a day of wishes is at most this many Opus calls.
 WISHES_TOTAL = int(os.environ.get("CONCORDEGO_WISHES_TOTAL", "1500"))
+# Photos of the origin and the destination for the shortlist tiles: Pexels (free, 200 an hour, a credit line
+# asked). Cached per place for a month, so a place costs one call ever; and at most PHOTO_CALLS uncached
+# lookups a day site-wide, so nobody can spend the hour walking the atlas. No key: the stand-in artwork stays.
+PEXELS_KEY = os.environ.get("CONCORDEGO_PEXELS_KEY", "")
+PHOTO_CALLS = int(os.environ.get("CONCORDEGO_PHOTO_CALLS", "150"))
+PHOTO_DIR = os.path.join(live.HOME, "photos")
 USER_WISHES = int(os.environ.get("CONCORDEGO_USER_WISHES", "200"))        # model calls a day (cents each)
 USERS_FILE = os.path.join(live.HOME, "users.json")
 _USERS_LOCK = threading.Lock()
@@ -744,6 +750,44 @@ def admin_status(fetch=False):
     return out
 
 
+def photos_request(q):
+    """place -> a handful of landscape photos with credits, from Pexels, cached."""
+    place = re.sub(r"[^A-Za-z0-9 ,'\-]", "", (q.get("place") or [""])[0]).strip()[:60]
+    if not place:
+        return {"photos": [], "reason": "no place"}
+    if not PEXELS_KEY:
+        return {"photos": [], "reason": "no key"}
+    slug = re.sub(r"[^a-z0-9]+", "-", place.lower()).strip("-")
+    os.makedirs(PHOTO_DIR, exist_ok=True)
+    path = os.path.join(PHOTO_DIR, slug + ".json")
+    try:
+        if time.time() - os.path.getmtime(path) < 30 * 86400:
+            with open(path) as f:
+                return json.load(f)
+    except OSError:
+        pass
+    ok, _ = _users_take("_photos", "photos", PHOTO_CALLS)
+    if not ok:
+        return {"photos": [], "reason": "today's photo lookups are spent"}
+    from urllib.parse import quote
+    url = "https://api.pexels.com/v1/search?query=%s&orientation=landscape&per_page=10" % quote(place)
+    req = urllib.request.Request(url, headers={"Authorization": PEXELS_KEY, "User-Agent": "ConcordeGo/1.0 (go.flyconcordefly.com)"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            d = json.loads(r.read().decode("utf-8"))
+    except Exception as exc:
+        return {"photos": [], "reason": "Pexels did not answer: %s" % live.redact(str(exc), PEXELS_KEY)}
+    out = {"place": place, "photos": [{"src": p["src"].get("large2x") or p["src"].get("large"),
+                                       "credit": "Photo: %s on Pexels" % p.get("photographer", ""), "url": p.get("url", ""),
+                                       "avg_color": p.get("avg_color")} for p in (d.get("photos") or []) if p.get("src")]}
+    try:
+        with open(path, "w") as f:
+            json.dump(out, f)
+    except OSError:
+        pass
+    return out
+
+
 def locate_request(q):
     """lat, lon -> a street address in the shape places.py reads from the end.
     OpenStreetMap's Nominatim, one identified User-Agent, nothing stored."""
@@ -908,10 +952,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split("?")[0]
-        if path == "/api/locate":
+        if path in ("/api/locate", "/api/photos"):
             from urllib.parse import parse_qs
             q = parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
-            return self._json(locate_request(q))
+            return self._json(locate_request(q) if path == "/api/locate" else photos_request(q))
         if path == "/admin" or path.startswith("/api/admin/"):
             if not self._is_owner():
                 return self._html("<!doctype html><meta charset=utf-8><body style='background:#101013;color:#ececec;font:15px sans-serif;padding:40px'>"

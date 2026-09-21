@@ -63,6 +63,7 @@ HOME=/var/lib/concordego
 # CONCORDEGO_FLIGHT_KEY=duffel_live_...
 # ANTHROPIC_API_KEY=sk-ant-...
 # CONCORDEGO_OWNERS=pat@millertechnology.net
+# CONCORDEGO_PEXELS_KEY=...          photos of the origin and destination on the shortlist tiles (pexels.com/api, free)
 # CONCORDEGO_USER_SEARCHES=20
 # CONCORDEGO_USER_WISHES=200
 ENV
