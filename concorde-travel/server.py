@@ -874,7 +874,10 @@ def suggest_request(q):
         for r in _lookup_cached("duffel", text, 7 * 86400, fetch):
             if r["code"] not in seen:
                 seen.add(r["code"]); rows.append(r)
-    looks_address = kind == "from" and len(text) >= 5 and (re.search(r"\d", text) or " " in text)
+    # a digit means an address or a postal code (EC2A, 11237, 361 Harman), which no airport name carries;
+    # those go to the address service, and come back ahead of the places
+    has_digit = bool(re.search(r"\d", text))
+    looks_address = kind == "from" and ((has_digit and len(text) >= 3) or (len(text) >= 5 and " " in text))
     if looks_address:
         def fetch_addr():
             from urllib.parse import quote
@@ -899,7 +902,8 @@ def suggest_request(q):
                     seen_txt.add(t)
                     out.append({"value": t, "label": t, "sub": (hit.get("address") or {}).get("country") or "", "kind": "address"})
             return out
-        rows = rows + _lookup_cached("addr", text + ("|" + cc if cc else ""), 7 * 86400, fetch_addr)
+        addr = _lookup_cached("addr", text + ("|" + cc if cc else ""), 7 * 86400, fetch_addr)
+        rows = (addr + rows) if has_digit else (rows + addr)
     return {"rows": rows[:9]}
 
 
