@@ -933,7 +933,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">Advanced options are optional; leave them and go.</span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="1ce50c6">1ce50c6</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="7f50b6d">7f50b6d</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -960,7 +960,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="1ce50c6">1ce50c6</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="7f50b6d">7f50b6d</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1441,7 +1441,7 @@ function fixerHTML(){
     <div class="frow two">${Sel('rs-rebook', 'Rebooking offered', RS.rebook, 'swap', [['no', 'No'], ['notyet', 'Not yet'], ['yes', 'Yes, on another flight']], 'What the airline has put you on, if anything.')}${T('rs-rbarr', 'That flight lands at', K('rbarr'), 'Only if one was offered. Add +1 for tomorrow.')}</div>
     <div class="frow four">${Sel('rs-fare', 'Your fare', RS.fare, 'seat', [['basic', 'Basic economy'], ['main', 'Main cabin'], ['flex', 'Economy, flexible'], ['premium', 'Premium economy'], ['business', 'Business'], ['first', 'First']], 'Sets the refund rules and which cabin to search.')}${Sel('rs-bags', 'Bags', RS.bags, 'bag', [['no', 'Carry-on only'], ['yes', 'A bag is checked']], 'A checked bag does not follow you to another airline.')}${F('rs-paid', 'What you paid', K('paid'), 'dollar', 'Helps the refund maths.', '—')}${F('rs-hour', 'An hour of yours is worth', keep ? (RS.hour || '35') : '35', 'who', 'Prices the time an alternative saves.', '35')}</div>
     <p class="searcherr" id="rs-err" role="alert"></p>
-    <div class="nav"><button class="go" id="rs-go">🪄 Make the call</button><span class="hintr">From, to, what happened and the scheduled time are required. The more you add, the faster and surer the call.</span></div></div>`;
+    <div class="nav"><button class="go" id="rs-go">☎️ Make the call</button><span class="hintr">From, to, what happened and the scheduled time are required. The more you add, the faster and surer the call.</span></div></div>`;
 }
 // the other fares of the same flight, in a breath: "· also Main Plus $681, Flexible $888 all in"
 function fareAlts(e){ const f = e.fares || []; return f.length ? ' · also ' + f.map(x => esc(x.brand.replace(/^Main Cabin /, '')) + ' ' + money(x.total)).join(', ') + ' all in' : ''; }
@@ -2776,8 +2776,8 @@ async function runRescue(){
   if (RS.rebook === 'yes') sit.rebook_arr_clock = RS.rbarr;
   $('#rs-go').disabled = true; $('#rs-go').textContent = 'Searching today\'s flights…';
   let res; try { const r = await fetch('/rescue', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({situation:sit, now:localISO(now), source:'api'})}); res = await r.json(); } catch (e){ res = {error:'The search did not come back. Try again.'}; }
-  if (res.error){ $('#rs-go').disabled = false; $('#rs-go').textContent = '🪄 Make the call'; err.textContent = res.error; if (res.sign_in){ closeAccount(); openAccount(res); } return; }
-  $('#rs-go').disabled = false; $('#rs-go').textContent = '🪄 Make the call';
+  if (res.error){ $('#rs-go').disabled = false; $('#rs-go').textContent = '☎️ Make the call'; err.textContent = res.error; if (res.sign_in){ closeAccount(); openAccount(res); } return; }
+  $('#rs-go').disabled = false; $('#rs-go').textContent = '☎️ Make the call';
   try { paintRescue(res); } catch (e){ err.textContent = 'The call came back but could not be drawn: ' + (e && e.message ? e.message : e) + '. Try again, and tell us if it persists.'; console.error(e); }
 }
 function paintRescue(res){
@@ -2790,7 +2790,7 @@ function paintRescue(res){
     ${od.planned && od.flight && od.flight.p != null ? `<div class="odds"><b>${pct(od.flight.p)}</b><span>chance of making the updated flight, the ${c12(od.planned)}</span><small>modelled</small></div>${oddsChart(od.flight.curve, 'If it slips to this hour, the chance it still goes today.')}` : ''}
     <div class="odds"><b>${pct(od.today.p)}</b><span>chance you fly today, one way or another</span><small>modelled</small></div>${oddsChart(od.today.curve, 'Standing at the gate at this hour: this flight, or an alternative still leaving 75 minutes on.')}
     <p class="fine">${esc(od.basis || '')}</p>`;
-  $('#accth').textContent = 'The call';
+  $('#accth').textContent = '☎️ The Call';
   $('#acctbody').innerHTML = `<div class="rsc">${oddsHTML}<div class="verdict"><b>${esc(head)}</b><p class="advice">${esc(res.advice.advice)}</p>${res.advice.source === 'template' ? '<p class="fine">Written from the figures without the model' + (res.advice.note ? ' (' + esc(res.advice.note) + ')' : '') + '.</p>' : ''}</div>
     <h4>Your options today${res.searched.length > 1 ? ' and tomorrow' : ''} · ${res.found} found</h4>${a.options.slice(0, 4).map(alt).join('') || '<p>Nothing leaves in time.</p>'}
     ${RS.search ? '<div class="seeall"><button class="acctbtn" id="seealt">See all alternative flights</button></div>' : ''}
