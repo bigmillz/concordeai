@@ -702,7 +702,7 @@ html.hdrmarks .mark-hdr{display:block}
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page.</span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page.</span></footer>
 </div></div>
 
 <div class="dock hidden" id="dock"><div class="dockin">
@@ -1291,8 +1291,8 @@ function factsHTML(e){
     const mk = sg.marketing || {}, op = sg.operating || {}, ac = sg.aircraft || {}, seat = sg.seat || {}, L = [];
     L.push(row('Flight', `${mk.code} ${n(mk.number)}` + (op.code && op.code !== mk.code ? ` · flown by ${op.name}` + (op.number ? ` as ${op.code} ${n(op.number)}` : '') : '')));
     L.push(row('Route', `${sg.from.code}${sg.from.terminal ? ' T' + sg.from.terminal : ''} → ${sg.to.code}${sg.to.terminal ? ' T' + sg.to.terminal : ''}` + (sg.minutes ? ' · ' + dur(sg.minutes) : '') + (sg.km ? ` · ${sg.km.toLocaleString()} km` : '')));
-    L.push(row('Aircraft', ac.name || ac.code || 'not published'));
-    L.push(row('Cabin', [sg.cabin, sg.fare_brand && sg.fare_brand !== sg.cabin ? sg.fare_brand : null, sg.fare_basis ? 'fare basis ' + sg.fare_basis : null].filter(Boolean).join(' · ')));
+    L.push(row('Aircraft', ac.name || ac.code || '—'));
+    L.push(row('Cabin', [sg.cabin, sg.fare_brand && sg.fare_brand !== sg.cabin ? sg.fare_brand : null, sg.fare_basis ? 'fare basis ' + sg.fare_basis : null].filter(Boolean).join(' · ') || '—'));
     const bits = []; if (seat.pitch) bits.push(seat.pitch + '-inch pitch'); if (seat.legroom && seat.legroom !== 'n/a' && seat.legroom !== 'standard') bits.push(seat.legroom + ' legroom'); if (seat.type && seat.type !== 'standard') bits.push(seat.type + ' seat');
     if (sg.wifi) bits.push(sg.wifi.available ? (sg.wifi.cost === 'free' ? 'free wifi' : sg.wifi.cost === 'paid' ? 'paid wifi' : 'wifi') : 'no wifi');
     if (sg.power) bits.push(sg.power.available ? 'power' : 'no power');
@@ -1301,14 +1301,14 @@ function factsHTML(e){
     return `<div class="fact"><h5>${d.segments.length === 1 ? 'Flight' : 'Leg ' + (i + 1) + ' of ' + d.segments.length}</h5><dl>${L.join('')}</dl></div>`;
   }).join('');
   const F = [];
-  F.push(row('Changes', d.change.allowed == null ? 'not stated' : d.change.allowed ? (d.change.penalty_cents ? money(d.change.penalty_cents) + ' penalty' : 'allowed') : 'not allowed'));
-  F.push(row('Refunds', d.refund.allowed == null ? 'not stated' : d.refund.allowed ? (d.refund.penalty_cents ? money(d.refund.penalty_cents) + ' penalty' : 'allowed') : 'not refundable'));
-  F.push(row('Seat choice', e.seat_selection === 'paid' ? 'paid' : e.seat_selection === 'free' ? 'included' : 'not stated'));
+  F.push(row('Changes', d.change.allowed == null ? '—' : d.change.allowed ? (d.change.penalty_cents ? money(d.change.penalty_cents) + ' penalty' : 'allowed') : 'not allowed'));
+  F.push(row('Refunds', d.refund.allowed == null ? '—' : d.refund.allowed ? (d.refund.penalty_cents ? money(d.refund.penalty_cents) + ' penalty' : 'allowed') : 'not refundable'));
+  F.push(row('Seat choice', e.seat_selection === 'paid' ? 'paid' : e.seat_selection === 'free' ? 'included' : '—'));
   // the split is shown only when it is a real one: the test feed invents a $1 base under real taxes
   if (d.base_cents != null && d.base_cents >= .25 * (d.base_cents + (d.tax_cents || 0))) F.push(row('Fare', `${money(d.base_cents)} base + ${money(d.tax_cents || 0)} taxes`));
   if (d.price_guarantee_until) F.push(row('Price held', 'until ' + when(d.price_guarantee_until))); else if (d.pay_by) F.push(row('Pay by', when(d.pay_by)));
   if (d.emissions_kg) F.push(row('Emissions', `${(+d.emissions_kg).toLocaleString()} kg CO₂`));
-  F.push(row('Airline', esc(e.carrier_name) + (e.rating != null ? ` · rated ${e.rating.toFixed(2)}` : ' · unrated') + (d.carriage_url ? ` · <a href="${esc(d.carriage_url)}" target="_blank" rel="noopener">conditions of carriage</a>` : ''), true));
+  F.push(row('Airline', esc(e.carrier_name) + (e.rating != null ? ` · rated ${e.rating.toFixed(2)}` : '') + (d.carriage_url ? ` · <a href="${esc(d.carriage_url)}" target="_blank" rel="noopener">conditions of carriage</a>` : ''), true));
   if (d.loyalty && d.loyalty.length) F.push(row('Miles', d.loyalty.slice(0, 6).map(c => ((AIR[c] || {}).name || c).replace(' Airlines', '').replace(' Airways', '')).join(', ') + (d.loyalty.length > 6 ? ' +' + (d.loyalty.length - 6) : '')));
   if (d.id_docs_required) F.push(row('Documents', 'passport needed to book'));
   return `<section class="facts">${legs}<div class="fact"><h5>Fare</h5><dl>${F.join('')}</dl></div><p class="fnote">As published by the airline. Aircraft as scheduled.</p></section>`;
@@ -1421,16 +1421,36 @@ function answerFor(text){
   return r.e.carrier_name + ' ' + r.e.flight + ' is ' + ordinal(pos) + ' at ' + money(r.total) + ' all in, ' + money(r.e.ticket_cents) + ' of it the ticket. For it: ' + (pc.pro.join(', ').toLowerCase() || 'nothing that stands out') + '. Against: ' + (pc.con.join(', ').toLowerCase() || 'nothing much') + '. The biggest lines on top of the fare: ' + big.map(l => '+' + money(l.cents) + ' ' + l.label.toLowerCase()).join(', ') + '. Its ledger has every line.';
 }
 const isQuestion = t => /\?\s*$/.test(t) || /^(why|what|which|how|is|are|does|do|can|should|who|where)\b/i.test(t);
-function applyWish(text, box){
+// Served from the server, the sentence goes to /api/wish: Claude Opus 5 picks
+// rules from the same vocabulary this page's parser knows, the server
+// re-validates them and builds the labels, and this page applies them exactly
+// as it applies its own. Opened as a file, or if the model steps aside, the
+// pattern parser below does the job. Either way the model never ranks.
+const SERVED = location.protocol.startsWith('http');
+async function askModel(text){
+  if (!SERVED) return null;
+  try {
+    const r = await fetch('/api/wish', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text, airlines: Object.entries(AIR).map(([code, a]) => ({code, name: a.name})), prior: S.thread.map(t => t.text).slice(-6)})});
+    const d = await r.json();
+    // not signed in, or out of wishes for the day: the page's own parser costs nothing, so use it
+    return d.source === 'model' ? d : null;
+  } catch (e) { return null; }
+}
+async function applyWish(text, box){
   text = (text || '').trim(); if (!text) return;
-  const items = parseWish(text);
+  if (box) box.disabled = true;
+  const m = await askModel(text);
+  if (box) box.disabled = false;
+  const items = m ? m.items : parseWish(text);
+  if (m && !items.length && m.ask){ S.thread.push({text, items:[], reply:m.ask}); if (box) box.value = ''; renderThread(); return; }
   if (!items.length && isQuestion(text)){ S.thread.push({text, items:[], reply:answerFor(text)}); if (box) box.value = ''; renderThread(); return; }
   for (const x of items){
     if (x.kind === 'want') S.wants.add(x.id);
     else if (x.kind === 'avoid' || x.kind === 'after' || x.kind === 'before' || x.kind === 'max'){ if (!S.rules.some(r => r.label === x.label)) S.rules.push(x); }
     else if (x.kind === 'tilt'){ if (x.p === 'asap') setWeights(0, 1, 0, 'asap'); else { const [a, b, c] = x.p.split(',').map(Number); setWeights(a, b, c, x.p); } }
   }
-  S.thread.push({text, items, reply: replyFor(items)});
+  S.thread.push({text, items, reply: replyFor(items) + (m && m.ask ? ' ' + m.ask : '')});
   if (box) box.value = '';
   renderThread(); paintChips(); paint(true);
 }
@@ -1570,6 +1590,7 @@ document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && jtFor) h
 $('#cur').innerHTML = Object.entries(CURRENCIES).map(([k, v]) => `<option value="${k}"${k === CUR ? ' selected' : ''}>${k} · ${esc(v.name)}</option>`).join('');
 function curNote(){ const k = CURRENCIES[CUR]; $('#curnote').textContent = CUR === 'USD' ? 'Figures in US dollars.' : '1 USD = ' + k.rate + ' ' + CUR + ' · ' + RATES_ASOF + '.'; }
 curNote();
+if (SERVED) fetch('/api/whoami').then(r => r.json()).then(w => { $('#whoami').textContent = w.owner ? 'This machine: no allowance applies.' : w.email ? `Signed in as ${w.email} · ${w.left.searches} live searches and ${w.left.wishes} wishes left today.` : 'Not signed in: recorded results only.'; }).catch(() => {});
 $('#cur').addEventListener('change', ev => { CUR = ev.target.value; try { localStorage.setItem('concordego.currency', CUR); } catch (e) {} curNote(); paintPar(); rerenderBills(); if (S.thread.length) renderThread(); });
 addEventListener('resize', () => { paintTri(); const [x, y] = toXY(S.a, S.b, S.c); handle.style.left = x + 'px'; handle.style.top = y + 'px'; });
 

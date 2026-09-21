@@ -428,13 +428,29 @@ python3 concorde-travel/places.py "Shoreditch, London EC2A"  # what a typed plac
 
 **Ports 8884–8930 are the model engines' — never bind there.** ConcordeGo uses 9897.
 
-**Public address, from a laptop:** `concorde-travel/go-live.sh` installs a LaunchAgent for
-`server.py` (with `CONCORDEGO_ROOT=mock-10`, so `/` serves the current interface mockup)
-and a Cloudflare named tunnel `concordego` at **go.flyconcordfly.com**, with its own config
-file and agent so it never touches the AI app's tunnel. A request that arrives through the
-tunnel carries `Cf-Connecting-Ip`, and `server.py` refuses it anything metered — a live
-flight search, the narrator, a sky download — so a visitor cannot spend the Duffel quota
-or the Anthropic key; recorded results still serve. It works while that Mac is awake.
+**Public address:** `concorde-travel/go-live.sh` (a Mac, LaunchAgents) or
+`concorde-travel/deploy/droplet.sh` (an Ubuntu droplet, systemd, a venv for the `anthropic`
+SDK) runs `server.py` with `CONCORDEGO_ROOT=mock-10`, so `/` serves the current interface
+mockup, behind a Cloudflare named tunnel `concordego` at **go.flyconcordfly.com**, with its
+own config and service so it never touches the AI app's tunnel. **The door is Cloudflare
+Access**: `concorde-travel/access.sh` creates the app, a one-time-PIN sign-in (Google too
+once that provider exists) and an email allowlist through the Cloudflare API. A request
+that arrives through the tunnel carries `Cf-Connecting-Ip`, and Access adds
+`Cf-Access-Authenticated-User-Email` for whoever signed in; the origin listens on loopback
+only, so that header cannot be forged from outside. `server.py` spends nothing for an
+anonymous visitor (a live flight search, the narrator, the wish box, a sky download), gives
+a signed-in person a daily allowance (`CONCORDEGO_USER_SEARCHES` 20, `CONCORDEGO_USER_WISHES`
+200, counted in `~/.concordego/users.json`), and lets the machine's owner spend freely.
+Recorded results serve to anyone. `/api/whoami` tells the page who it is talking to.
+
+**The wish box's model is Claude Opus 5** (`concorde-travel/wish.py`, `/api/wish`), the same
+model as the narrator: one call at low effort with a strict JSON schema over the page's own
+vocabulary (avoid / want / tilt / max / after / before / note), the vocabulary cached as the
+system prompt. The model picks WHICH rules; the server drops anything outside the
+vocabulary or naming an airline the search did not return, builds every label itself, and
+suppresses an `ask` that carries a figure (hard rule 1: it never ranks, never prices). With
+no key, no package or a failed call it answers `fallback` and the page's own pattern parser
+takes over, so the box never goes dead. `tests/test_wish.py` fences this offline.
 
 Three things about the scorer that look like fussiness and are not, each with a comment in
 `scorer.py` saying why: money is **integer cents end to end** (float accumulation makes

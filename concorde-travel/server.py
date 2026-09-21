@@ -40,6 +40,7 @@ import adapter                                           # noqa: E402
 import places                                           # noqa: E402
 import live                                              # noqa: E402
 import narrator                                          # noqa: E402
+import wish                                              # noqa: E402
 import scorer                                            # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -49,6 +50,48 @@ PORT = int(os.environ.get("CONCORDEGO_PORT", "9897"))
 # CONCORDEGO_ROOT=mock-10 serves that mockup at / (the public address does this
 # while the mockup is the interface); unset, / is the draft page in ui/.
 ROOT = (os.environ.get("CONCORDEGO_ROOT") or "").strip()
+# Per-person allowances for anyone who reached us through Cloudflare Access.
+# Access puts the signed-in email in a header; nobody without one may spend.
+USER_SEARCHES = int(os.environ.get("CONCORDEGO_USER_SEARCHES", "20"))     # metered flight searches a day
+USER_WISHES = int(os.environ.get("CONCORDEGO_USER_WISHES", "200"))        # model calls a day (cents each)
+USERS_FILE = os.path.join(live.HOME, "users.json")
+_USERS_LOCK = threading.Lock()
+
+
+def _users_take(email, kind, limit):
+    """Count one call of `kind` against `email` for today. Returns (allowed, left).
+    Counters roll over by day on their own, like the global quota."""
+    import datetime
+    today = datetime.date.today().isoformat()
+    with _USERS_LOCK:
+        try:
+            with open(USERS_FILE, encoding="utf-8") as fh:
+                users = json.load(fh)
+        except (OSError, ValueError):
+            users = {}
+        u = users.get(email) or {}
+        if u.get("day") != today:
+            u = {"day": today, "searches": 0, "wishes": 0}
+        if u.get(kind, 0) >= limit:
+            users[email] = u
+            return False, 0
+        u[kind] = u.get(kind, 0) + 1
+        users[email] = u
+        live._atomic_write(USERS_FILE, users)
+        return True, limit - u[kind]
+
+
+def _users_left(email):
+    import datetime
+    today = datetime.date.today().isoformat()
+    try:
+        with open(USERS_FILE, encoding="utf-8") as fh:
+            u = (json.load(fh)).get(email) or {}
+    except (OSError, ValueError):
+        u = {}
+    if u.get("day") != today:
+        u = {}
+    return {"searches": max(0, USER_SEARCHES - u.get("searches", 0)), "wishes": max(0, USER_WISHES - u.get("wishes", 0))}
 if ROOT and not re.match(r"^mock-[0-9]+$", ROOT):
     sys.exit("CONCORDEGO_ROOT must name a mockup, e.g. mock-10 (got %r)" % ROOT)
 
@@ -554,6 +597,16 @@ def live_request(req):
     return out
 
 
+def wish_request(req):
+    """One sentence from the wish box -> rules from the page's vocabulary,
+    chosen by the model and re-validated here. The page keeps its own pattern
+    parser for when this answers 'fallback'."""
+    airlines = [{"code": str(a.get("code", ""))[:3].upper(), "name": str(a.get("name", ""))[:60]}
+                for a in (req.get("airlines") or [])[:80] if isinstance(a, dict)]
+    prior = [str(t)[:200] for t in (req.get("prior") or [])[:8]]
+    return wish.parse(str(req.get("text") or "")[:500], airlines, prior)
+
+
 def narrate_request(req):
     """Prose over an already-computed ledger. Never re-ranks - it scores the
     same request and narrates the order it was given."""
@@ -580,6 +633,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
     # no narrator call, no 250 MB sky download on its say-so.
     def _remote(self):
         return bool(self.headers.get("Cf-Connecting-Ip") or self.headers.get("X-Forwarded-For"))
+
+    # Who is asking. Local is the owner. Through the tunnel, Cloudflare Access
+    # sets the signed-in email on every request it lets past; the origin only
+    # listens on loopback, so that header can only arrive via Cloudflare and
+    # nobody else can write it. (A JWT check against the team's public keys
+    # would be belt and braces; the stdlib has no RSA, so the loopback bind
+    # is the guarantee, and it is documented in go-live.sh.)
+    def _who(self):
+        if not self._remote():
+            return "owner"
+        email = (self.headers.get("Cf-Access-Authenticated-User-Email") or "").strip().lower()
+        return email or None
 
     def do_GET(self):
         path = self.path.split("?")[0]
@@ -609,6 +674,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self.send_error(404)
             return self._send_file(os.path.join(UI, "mock", name),
                                    "text/html; charset=utf-8")
+        if path == "/api/whoami":
+            who = self._who()
+            return self._json({"remote": self._remote(), "email": None if who in (None, "owner") else who,
+                               "owner": who == "owner", "left": None if who in (None, "owner") else _users_left(who),
+                               "allowances": {"searches": USER_SEARCHES, "wishes": USER_WISHES}})
         if path == "/api/live/status":
             # Safe to serve: live.status() reports whether a key exists and
             # where it came from, never the key.
@@ -638,20 +708,31 @@ class Handler(http.server.BaseHTTPRequestHandler):
     # --------------------------------------------------------------- POST
     def do_POST(self):
         path = self.path.split("?")[0]
-        if path not in ("/api/score", "/api/narrate", "/api/live"):
+        if path not in ("/api/score", "/api/narrate", "/api/live", "/api/wish"):
             return self.send_error(404)
         try:
             n = int(self.headers.get("Content-Length") or 0)
             req = json.loads(self.rfile.read(n) or b"{}")
         except Exception as exc:
             return self._json({"error": "bad request: %s" % exc})
-        if self._remote() and (path == "/api/narrate" or (path == "/api/live" and (req.get("source") or "sample") != "sample")):
-            return self._json({"error": "The public address serves recorded results only. Live searches and "
-                                        "the narrator run from the machine itself, so nobody else can spend its quota.",
-                               "remote": True})
+        # Spending: a live search, the narrator and the wish model. The owner
+        # spends freely; a signed-in visitor spends from a daily allowance;
+        # nobody anonymous spends at all.
+        spends = path == "/api/narrate" or path == "/api/wish" or (path == "/api/live" and (req.get("source") or "sample") != "sample")
+        if spends and self._remote():
+            who = self._who()
+            if not who:
+                return self._json({"error": "Sign in to run a live search. The public address serves recorded results to anyone; "
+                                            "live searches, the narrator and the wish box are for signed-in people, so nobody can spend the quota anonymously.",
+                                   "remote": True, "sign_in": True})
+            kind, limit = ("searches", USER_SEARCHES) if path == "/api/live" else ("wishes", USER_WISHES)
+            ok, left = _users_take(who, kind, limit)
+            if not ok:
+                return self._json({"error": "That is today's allowance of %d %s for %s. It resets at midnight." % (limit, kind, who),
+                                   "remote": True, "allowance": True})
         try:
             fn = {"/api/score": score_request, "/api/narrate": narrate_request,
-                  "/api/live": live_request}[path]
+                  "/api/live": live_request, "/api/wish": wish_request}[path]
             return self._json(fn(req))
         except Exception as exc:
             # a broken fixture should say so on the page, not 500 silently
