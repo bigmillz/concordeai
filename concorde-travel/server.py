@@ -786,17 +786,33 @@ def photos_request(q):
     ok, _ = _users_take("_photos", "photos", PHOTO_CALLS)
     if not ok:
         return {"photos": [], "reason": "today's photo lookups are spent"}
+    # The place, not its people (per Patrick, 2026-09-21: a doll's face and somebody's baby came back for
+    # Bushwick). Pexels has no subject filter, so the query names the subject and the photo's own alt text
+    # is read: anything describing a person, a face, a costume or a pet is left out.
     from urllib.parse import quote
-    url = "https://api.pexels.com/v1/search?query=%s&orientation=landscape&per_page=10" % quote(place)
-    req = urllib.request.Request(url, headers={"Authorization": PEXELS_KEY, "User-Agent": "ConcordeGo/1.0 (go.flyconcordefly.com)"})
-    try:
-        with urllib.request.urlopen(req, timeout=10) as r:
-            d = json.loads(r.read().decode("utf-8"))
-    except Exception as exc:
-        return {"photos": [], "reason": "Pexels did not answer: %s" % live.redact(str(exc), PEXELS_KEY)}
-    out = {"place": place, "photos": [{"src": p["src"].get("large2x") or p["src"].get("large"),
-                                       "credit": "%s / Pexels" % p.get("photographer", ""), "url": p.get("url", ""),
-                                       "avg_color": p.get("avg_color")} for p in (d.get("photos") or []) if p.get("src")]}
+    PEOPLE = re.compile(r"\b(man|men|woman|women|girl|boy|child|children|kid|kids|baby|infant|toddler|people|person|couple|"
+                        r"family|portrait|face|faces|selfie|model|bride|groom|wedding|doll|mask|costume|halloween|makeup|"
+                        r"dog|cat|puppy|kitten|pet|smil\w*|posing|crowd|fashion|dress|hair|tattoo)\b", re.I)
+    seen, photos = set(), []
+    for subject in ("skyline", "street", "architecture", "landmark"):
+        url = "https://api.pexels.com/v1/search?query=%s&orientation=landscape&per_page=8" % quote("%s %s" % (place, subject))
+        req = urllib.request.Request(url, headers={"Authorization": PEXELS_KEY, "User-Agent": "ConcordeGo/1.0 (go.flyconcordefly.com)"})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as r:
+                d = json.loads(r.read().decode("utf-8"))
+        except Exception as exc:
+            if not photos:
+                return {"photos": [], "reason": "Pexels did not answer: %s" % live.redact(str(exc), PEXELS_KEY)}
+            break
+        for p in d.get("photos") or []:
+            if not p.get("src") or p.get("id") in seen or PEOPLE.search(p.get("alt") or ""):
+                continue
+            seen.add(p.get("id"))
+            photos.append({"src": p["src"].get("large2x") or p["src"].get("large"), "credit": "%s / Pexels" % p.get("photographer", ""),
+                           "url": p.get("url", ""), "avg_color": p.get("avg_color"), "alt": (p.get("alt") or "")[:120]})
+        if len(photos) >= 16:
+            break
+    out = {"place": place, "photos": photos[:16]}
     try:
         with open(path, "w") as f:
             json.dump(out, f)

@@ -149,6 +149,55 @@ def season_factor(market: str, month: int, southern: bool = False) -> float:
     return row[m]
 
 
+# Holiday weeks. A month multiplier cannot know that the Wednesday before
+# Thanksgiving is the dearest domestic day of the year, so a whole search on
+# it came back F against a par built for an ordinary November (2026-09-21).
+# Par is a specification of a fair fare ON THAT DATE, and a fair fare in a
+# holiday week is higher; so the factor belongs in par, not in the grade.
+# Windows are inclusive; the factor is the largest window that covers the day.
+def _easter(year: int):
+    a = year % 19; b = year // 100; c = year % 100; d = b // 4; e = b % 4
+    f = (b + 8) // 25; g = (b - f + 1) // 3; h = (19 * a + b - d - g + 15) % 30
+    i = c // 4; k = c % 4; l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    month = (h + l - 7 * m + 114) // 31; day = ((h + l - 7 * m + 114) % 31) + 1
+    import datetime
+    return datetime.date(year, month, day)
+
+
+def holiday_factor(market: str, date: str, countries=()) -> Tuple[float, Optional[str]]:
+    """(factor, why). US holidays touch any market with a US end; Christmas
+    and New Year touch every market; Easter the European ones."""
+    import datetime
+    try:
+        d = datetime.date(int(date[0:4]), int(date[5:7]), int(date[8:10]))
+    except (TypeError, ValueError):
+        return 1.0, None
+    cs = {(c or "").upper() for c in countries}
+    us = "US" in cs or market in ("domestic-na", "intra-na")
+    eu = market in ("intra-eu", "domestic-eu") or bool(cs & {"GB", "IE", "FR", "DE", "ES", "IT", "NL", "BE", "PT", "AT", "CH", "PL", "SE", "DK", "NO", "FI"})
+    best = (1.0, None)
+    def window(start, end, factor, why):
+        nonlocal best
+        if start <= d <= end and factor > best[0]:
+            best = (factor, why)
+    y = d.year
+    # Christmas and New Year, everywhere
+    window(datetime.date(y, 12, 18), datetime.date(y, 12, 31), 1.35, "Christmas week")
+    window(datetime.date(y, 1, 1), datetime.date(y, 1, 4), 1.25, "New Year")
+    if us:
+        nov1 = datetime.date(y, 11, 1); thanks = nov1 + datetime.timedelta(days=(3 - nov1.weekday()) % 7 + 21)
+        window(thanks - datetime.timedelta(days=2), thanks + datetime.timedelta(days=4), 1.55, "Thanksgiving week")
+        window(thanks - datetime.timedelta(days=1), thanks - datetime.timedelta(days=1), 1.75, "the day before Thanksgiving")
+        window(thanks + datetime.timedelta(days=3), thanks + datetime.timedelta(days=3), 1.75, "the Sunday after Thanksgiving")
+        j4 = datetime.date(y, 7, 4); window(j4 - datetime.timedelta(days=3), j4 + datetime.timedelta(days=2), 1.2, "the Fourth of July")
+        may31 = datetime.date(y, 5, 31); mem = may31 - datetime.timedelta(days=may31.weekday()); window(mem - datetime.timedelta(days=3), mem, 1.2, "Memorial Day weekend")
+        sep1 = datetime.date(y, 9, 1); lab = sep1 + datetime.timedelta(days=(0 - sep1.weekday()) % 7); window(lab - datetime.timedelta(days=3), lab, 1.2, "Labor Day weekend")
+    if eu:
+        e = _easter(y); window(e - datetime.timedelta(days=3), e + datetime.timedelta(days=1), 1.25, "Easter weekend")
+    return best
+
+
 def haversine_mi(a_lat, a_lon, b_lat, b_lon) -> float:
     r = 3958.8
     p1, p2 = math.radians(a_lat), math.radians(b_lat)
@@ -173,7 +222,8 @@ def reference_fare_cents(o: Dict[str, Any], d: Dict[str, Any], date: str
         month = 4
     southern = market in _SOUTHERN or (o["lat"] < 0 and d["lat"] < 0)
     sf = season_factor(market, month, southern)
-    fare = int(round(shoulder * sf))
+    hf, holiday = holiday_factor(market, date, (o.get("country"), d.get("country")))
+    fare = int(round(shoulder * sf * hf))
     return fare, {
         "miles": round(miles), "market": market, "month": month,
         "base_cents": base,
@@ -182,9 +232,10 @@ def reference_fare_cents(o: Dict[str, Any], d: Dict[str, Any], date: str
                   {"miles": round(b3), "cents_per_mile": y3}],
         "shoulder_cents": int(round(shoulder)),
         "season_factor": sf, "southern_hemisphere": southern,
+        "holiday_factor": hf, "holiday": holiday,
         "fare_cents": fare,
-        "reads_as": "%d mi, %s market, x%.2f for month %d -> $%d main cabin with a bag"
-                    % (round(miles), market, sf, month, fare // 100),
+        "reads_as": "%d mi, %s market, x%.2f for month %d%s -> $%d main cabin with a bag"
+                    % (round(miles), market, sf, month, (", x%.2f for %s" % (hf, holiday)) if holiday else "", fare // 100),
     }
 
 

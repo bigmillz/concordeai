@@ -315,7 +315,7 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
     }
     out["par"] = {k: sc["_par"].get(k) for k in
                   ("source", "par_cents", "fare_cents", "miles", "market", "month",
-                   "season_factor", "reads_as", "reference", "ledger")}
+                   "season_factor", "holiday_factor", "holiday", "reads_as", "reference", "ledger")}
     out["profiles"] = {k: profiles[k] for k in ("reference", "cheapest", "fastest", "comfort")}
     out["airlines"] = {k: airlines[k] for k in sorted(airlines) if k != "ZZ"}
     # The curated airport facts the page's hover cards need: which union a

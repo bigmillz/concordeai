@@ -2367,7 +2367,7 @@ function loadData(d){
   paintPar(); paintCov();
 }
 function paintPar(){
-$('#how1').innerHTML = 'Par for this route is <b>' + money(D.query.par_cents) + '</b>: what a nonstop in main cabin with a bag costs all in, leaving ' + esc(P.reference.departs_local) + ', ' + dur(P.reference.door_to_door_minutes) + ' door to door, at ' + (P.season_factor < .95 ? 'an off-season' : P.season_factor > 1.05 ? 'a peak' : 'a shoulder') + ' fare for ' + P.miles.toLocaleString() + ' miles. About par is an A; every letter below is a step further from it.';
+$('#how1').innerHTML = 'Par for this route is <b>' + money(D.query.par_cents) + '</b>: what a nonstop in main cabin with a bag costs all in, leaving ' + esc(P.reference.departs_local) + ', ' + dur(P.reference.door_to_door_minutes) + ' door to door, at ' + (P.holiday ? 'a ' + esc(P.holiday) + ' fare (x' + P.holiday_factor.toFixed(2) + ' on the season)' : (P.season_factor < .95 ? 'an off-season' : P.season_factor > 1.05 ? 'a peak' : 'a shoulder') + ' fare') + ' for ' + P.miles.toLocaleString() + ' miles. About par is an A; every letter below is a step further from it.';
 $('#parledger').innerHTML = P.ledger.map(l => `<li><span>${esc(l.label)}</span><span class="num">${signed(l.cents)}</span></li>`).join('') + `<li class="t"><span>Par</span><span class="num">${money(P.par_cents)}</span></li>`;
 }
 paintPar();

@@ -860,7 +860,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">Advanced options are optional; leave them and go.</span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="fcb4f2b">fcb4f2b</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="8f529b3">8f529b3</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -887,7 +887,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="fcb4f2b">fcb4f2b</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="8f529b3">8f529b3</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -2367,7 +2367,7 @@ function loadData(d){
   paintPar(); paintCov();
 }
 function paintPar(){
-$('#how1').innerHTML = 'Par for this route is <b>' + money(D.query.par_cents) + '</b>: what a nonstop in main cabin with a bag costs all in, leaving ' + esc(P.reference.departs_local) + ', ' + dur(P.reference.door_to_door_minutes) + ' door to door, at ' + (P.season_factor < .95 ? 'an off-season' : P.season_factor > 1.05 ? 'a peak' : 'a shoulder') + ' fare for ' + P.miles.toLocaleString() + ' miles. About par is an A; every letter below is a step further from it.';
+$('#how1').innerHTML = 'Par for this route is <b>' + money(D.query.par_cents) + '</b>: what a nonstop in main cabin with a bag costs all in, leaving ' + esc(P.reference.departs_local) + ', ' + dur(P.reference.door_to_door_minutes) + ' door to door, at ' + (P.holiday ? 'a ' + esc(P.holiday) + ' fare (x' + P.holiday_factor.toFixed(2) + ' on the season)' : (P.season_factor < .95 ? 'an off-season' : P.season_factor > 1.05 ? 'a peak' : 'a shoulder') + ' fare') + ' for ' + P.miles.toLocaleString() + ' miles. About par is an A; every letter below is a step further from it.';
 $('#parledger').innerHTML = P.ledger.map(l => `<li><span>${esc(l.label)}</span><span class="num">${signed(l.cents)}</span></li>`).join('') + `<li class="t"><span>Par</span><span class="num">${money(P.par_cents)}</span></li>`;
 }
 paintPar();

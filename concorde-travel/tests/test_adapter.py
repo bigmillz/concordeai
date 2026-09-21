@@ -940,6 +940,14 @@ def main():
     p1, b1 = parmod.par_for(jfk, lhr, "2026-11-18", enr, scorer, groundmod)
     p2, _ = parmod.par_for(jfk, lhr, "2026-11-18", enr, scorer, groundmod)
     check("par_for is pure", p1 == p2)
+    # a holiday week is dearer by specification: the day before Thanksgiving on a US route, not on a European one
+    hf_us, why_us = parmod.holiday_factor("domestic-na", "2026-11-25", ("US", "US"))
+    hf_eu, _ = parmod.holiday_factor("intra-eu", "2026-11-25", ("GB", "FR"))
+    check("par knows the day before Thanksgiving on a US route", hf_us > 1.5 and "Thanksgiving" in (why_us or ""), (hf_us, why_us))
+    check("and not on a European one", hf_eu == 1.0, hf_eu)
+    check("an ordinary November day carries no holiday factor", parmod.holiday_factor("domestic-na", "2026-11-18", ("US", "US"))[0] == 1.0)
+    p3, b3 = parmod.par_for(jfk, lhr, "2026-12-24", enr, scorer, groundmod)
+    check("Christmas week raises par and the basis says so", p3 > p1 and b3.get("holiday") == "Christmas week", (p3, p1, b3.get("holiday")))
     check("par is the reference ledger, all in - more than the fare, less than double it",
           b1["fare_cents"] < p1 < 2 * b1["fare_cents"], str((b1["fare_cents"], p1)))
     syd = {"iata": "SYD", "lat": -33.9399, "lon": 151.1753, "country": "AU"}
