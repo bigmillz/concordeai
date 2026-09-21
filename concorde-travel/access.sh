@@ -43,6 +43,13 @@ cf GET /apps | jq_ 'r=d.get("result") or []
 if not d.get("success"): sys.exit("  The token cannot reach Access on this account: " + json.dumps(d.get("errors")) + "\n  One of three things:\n   - CF_ACCOUNT_ID is wrong. The sure way to read it: open dash.cloudflare.com, click the account, and copy the 32 characters in the address bar right after dash.cloudflare.com/ (a Zone ID looks identical and is the usual mix-up).\n   - The token was made with Account Resources set to a different account, or to none.\n   - The token lacks \"Access: Apps and Policies: Edit\".\n  My Profile > API Tokens > the token shows its permissions and which account it covers.")
 print("  reachable, " + str(len(r)) + " Access application(s) so far")'
 
+# Best effort, before anything is created: if the token can list zones, make sure
+# the zone that owns $HOST is on this account. Without Zone: Read the lookup is
+# refused and skipped; the applications step reports the same thing later.
+APEX=$(echo "$HOST" | awk -F. '{print $(NF-1)"."$NF}')
+cfroot "/zones?name=$APEX" | jq_ 'if d.get("success") and not (d.get("result") or []): sys.exit("== zone\n  The token can list zones and '$APEX' is not among this account'"'"'s. The zone lives in another account of yours: its Overview page shows that Account ID on the right. Use that, with a token covering that account.")
+print("== zone\n  " + ("'$APEX' is on this account" if d.get("success") else "not checked (the token has no Zone: Read, which is fine)"))'
+
 echo "== organisation"
 ORG=$(cf GET /organizations)
 if echo "$ORG" | jq_ 'sys.exit(0 if d.get("success") else 1)'; then
@@ -71,7 +78,10 @@ ensure_app(){ # name domain policy_json
   local NAME="$1" DOM="$2" POLICY="$3" APP
   APP=$(cf GET "/apps" | jq_ "print(next((a['id'] for a in d.get('result') or [] if a.get('domain')=='$DOM'), ''))")
   local BODY="{\"name\":\"$NAME\",\"type\":\"self_hosted\",\"domain\":\"$DOM\",\"session_duration\":\"$SESSION\",\"allowed_idps\":[$IDP_LIST],\"auto_redirect_to_identity\":false,\"app_launcher_visible\":false}"
-  if [ -z "$APP" ]; then APP=$(cf POST /apps "$BODY" | jq_ 'print(d["result"]["id"]) if d.get("success") else sys.exit("  " + json.dumps(d.get("errors")))'); echo "  created $NAME ($DOM)"
+  if [ -z "$APP" ]; then APP=$(cf POST /apps "$BODY" | jq_ 'errs = json.dumps(d.get("errors"))
+if d.get("success"): print(d["result"]["id"])
+elif "does not belong to zone" in errs: sys.exit("  " + errs + "\n  Access can only guard a hostname whose zone is in THIS account, and the zone that owns '$DOM' is not.\n  The zone lives in another Cloudflare account of yours: open that zone in the dashboard, and its Overview page shows the Account ID on the right. Use that one,\n  make sure the token covers that account (My Profile > API Tokens > the token > Account Resources), and re-run. If that account has no team yet, pass TEAM= with a NEW name: the one just used is now taken by this account.")
+else: sys.exit("  " + errs)'); echo "  created $NAME ($DOM)"
   else cf PUT "/apps/$APP" "$BODY" >/dev/null; echo "  updated $NAME ($DOM)"; fi
   local POL; POL=$(cf GET "/apps/$APP/policies" | jq_ 'print(next((p["id"] for p in d.get("result") or [] if p.get("name") in ("Friends","Everyone")), ""))')
   if [ -z "$POL" ]; then cf POST "/apps/$APP/policies" "$POLICY" | jq_ 'print("    policy", d["result"]["id"]) if d.get("success") else sys.exit("  " + json.dumps(d.get("errors")))'
