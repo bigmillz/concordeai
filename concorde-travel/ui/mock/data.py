@@ -250,6 +250,24 @@ def main(path):
                    "season_factor", "reads_as", "reference", "ledger")}
     out["profiles"] = {k: profiles[k] for k in ("reference", "cheapest", "fastest", "comfort")}
     out["airlines"] = {k: airlines[k] for k in sorted(airlines) if k != "ZZ"}
+    # The curated airport facts the page's hover cards need: which union a
+    # border check is against, the minimum connection, and the hours the
+    # terminal's shops and food keep (so a layover that lands after they close
+    # can be called out). An airport the table does not know is listed as
+    # uncurated, so the page says so rather than guessing.
+    apts = json.load(open(os.path.join(HERE, "..", "..", "enrichment", "airports.json"), encoding="utf-8"))
+    apts = apts.get("airports") or apts
+    codes = sorted({c for e in entries.values() for c in e["route"]})
+    out["airports"] = {}
+    for c in codes:
+        a = apts.get(c)
+        if not a:
+            out["airports"][c] = {"curated": False}
+            continue
+        out["airports"][c] = {"curated": True, "city": a.get("city"), "border": a.get("border"),
+                              "mct": (a.get("mct_minutes") or {}).get("default"),
+                              "services": [{"what": s.get("what"), "hours": s.get("hours_local"), "note": s.get("note")}
+                                           for s in (a.get("services") or [])]}
     out["grid_points"] = [[round(a, 2), round(b, 2), round(c, 2)] for a, b, c in pts]
     out["verdict"] = cov.get("verdict")
     out["gaps"] = cov.get("gaps", [])

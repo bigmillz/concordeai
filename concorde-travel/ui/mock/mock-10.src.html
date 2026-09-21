@@ -248,6 +248,20 @@ details[open] summary:after{content:"–"}
 .jseg i{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:500 9px/1 var(--mono);letter-spacing:.01em;color:rgba(0,0,0,.74);white-space:nowrap;overflow:hidden;font-style:normal;padding:0 3px}
 .jseg.neutral i{color:rgba(255,255,255,.8)}
 .jlab{display:flex;justify-content:space-between;gap:8px;font:400 11px/1.2 var(--mono);color:var(--faint)}
+/* the hover card for a segment: what it is, the verdict, and why it got its colour */
+.jseg{cursor:default}
+.jtip{position:absolute;z-index:30;width:min(280px,86vw);background:rgba(16,16,19,.97);border:1px solid var(--line);border-radius:12px;padding:11px 13px 10px;box-shadow:0 14px 36px rgba(0,0,0,.6);font-size:12.5px;line-height:1.45;color:var(--dim);pointer-events:none;opacity:0;transform:translateY(4px);transition:opacity .14s,transform .14s}
+.jtip.on{opacity:1;transform:none}
+.jtip .jh{display:flex;align-items:center;gap:8px;color:var(--text);margin-bottom:6px}
+.jtip .jh b{font-weight:500;flex:1;min-width:0}
+.jtip .jh i{width:9px;height:9px;border-radius:50%;background:var(--sc,rgba(255,255,255,.3));flex:none;box-shadow:0 0 8px var(--sc,transparent)}
+.jtip .jh em{font-style:normal;font-family:var(--disp);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--sc,var(--faint))}
+.jtip ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:3px}
+.jtip li{padding-left:12px;position:relative}
+.jtip li::before{content:'';position:absolute;left:0;top:8px;width:4px;height:4px;border-radius:50%;background:var(--faint)}
+.jtip li.bad::before{background:var(--red)}.jtip li.good::before{background:var(--green)}
+.jtip .arrow{position:absolute;left:var(--ax,50%);bottom:-5px;width:8px;height:8px;background:rgba(16,16,19,.97);border-right:1px solid var(--line);border-bottom:1px solid var(--line);transform:translateX(-50%) rotate(45deg)}
+.jtip.below .arrow{bottom:auto;top:-5px;transform:translateX(-50%) rotate(-135deg)}
 .jlab b{font-weight:500;color:var(--dim)}
 .who{display:flex;gap:10px;align-items:center;padding-right:44px}
 .who h3{font-size:18px;line-height:1.15;font-weight:500}
@@ -1018,26 +1032,75 @@ function sealHTML(g, small){
 // against the shortest nonstop in the results, and on the airline's rating.
 // The airport hour is the same for everyone, so it stays neutral.
 const clamp01 = x => Math.max(0, Math.min(1, x));
+const AP = D.airports || {};
 const groundQ = (m, cents) => clamp01(1 - Math.max(0, m - 40)/170 - (cents >= 6000 ? .25 : cents >= 3000 ? .1 : 0));
-function layoverQ(m, s){ const h = s ? +s.arr.slice(0, 2) : 12; if (m >= 300 && (h >= 21 || h < 3)) return .04; if (m < 45) return .1; if (m < 60) return .35; if (m < 75) return .6; if (m <= 180) return 1; if (m <= 300) return 1 - (m - 180)/240; return Math.max(0, .5 - (m - 300)/360); }
-function flightQ(e, ctx){ const det = ctx.refAir ? ctx.air(e)/ctx.refAir : 1, qd = clamp01(1 - (det - 1.08)/.9), qr = e.rating == null ? .5 : clamp01((e.rating - .55)/.3); return clamp01(.65*qd + .35*qr); }
+// minutes of a layover that fall outside the terminal's shop-and-food hours,
+// from the curated table; null when the airport is not curated
+const hm2m = t => { const [h, m] = t.split(':').map(Number); return h*60 + m; };
+function closedMinutes(apt, lands, minutes){
+  const a = AP[apt]; if (!a || !a.curated) return null; const svc = (a.services || []).find(x => x.hours); if (!svc) return null; if (svc.hours === '24h') return 0;
+  const [o, c] = svc.hours.split('-').map(hm2m), t0 = hm2m(lands); let closed = 0;
+  for (let t = t0; t < t0 + minutes; t++){ const tt = t % 1440; if (!(o <= tt && tt < c)) closed++; } return closed;
+}
+function layoverQ(m, s, apt){
+  const h = s ? +s.arr.slice(0, 2) : 12; let q;
+  if (m >= 300 && (h >= 21 || h < 3)) q = .04; else if (m < 45) q = .1; else if (m < 60) q = .35; else if (m < 75) q = .6; else if (m <= 180) q = 1; else if (m <= 300) q = 1 - (m - 180)/240; else q = Math.max(0, .5 - (m - 300)/360);
+  // shut terminal: two hours or more with nothing open is red whatever the length
+  const closed = s ? closedMinutes(apt, s.arr, m) : null; if (closed != null){ if (closed >= 120) q = Math.min(q, .06); else if (closed >= 45) q = Math.min(q, .35); }
+  return q;
+}
+function flightQ(e, ctx){ const det = e.stops && ctx.refAir ? ctx.air(e)/ctx.refAir : 1, qd = clamp01(1 - (det - 1.08)/.9), qr = e.rating == null ? .5 : clamp01((e.rating - .55)/.3); return clamp01(.65*qd + .35*qr); }
+const verdictOf = q => q == null ? 'Neutral' : q >= .75 ? 'Good' : q >= .5 ? 'Fine' : q >= .3 ? 'Rough' : 'Bad';
+const UNION = {us:'the US', uk:'the UK', ie:'Ireland', schengen:'Schengen', tr:'Türkiye'};
 const clockAdd = (iso, mins) => { const t = ((+iso.slice(11, 13)*60 + +iso.slice(14, 16) + mins) % 1440 + 1440) % 1440; return String(Math.floor(t/60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'); };
 function journey(e, r, ctx){
   const legs = e.by[nearestProf()].legs, out = []; let k = 0, grounds = 0;
+  const fl = legs.filter(l => l.kind === 'flight'); let li = 0; fl.forEach((l, i) => { if (l.minutes > fl[li].minutes) li = i; });
   for (const l of legs){
-    if (l.kind === 'ground'){ const end = grounds++ ? 'in' : 'out', m = r.ground[end], apt = end === 'out' ? e.route[0] : e.route[e.route.length - 1], mins = m ? m.minutes : l.minutes, cents = m ? m.cents : 0;
-      out.push({kind:'ground', minutes:mins, q:groundQ(mins, cents), label:dur(mins), tip:(end === 'out' ? 'To ' : 'From ') + apt + ' · ' + dur(mins) + (m ? ' · ' + m.mode + ' · ' + money(cents) : '')}); }
-    else if (l.kind === 'process') out.push({kind:'process', minutes:l.minutes, q:null, label:'airport', tip:'At the airport · ' + dur(l.minutes)});
-    else if (l.kind === 'flight'){ const sg = e.segments[k++]; out.push({kind:'flight', minutes:l.minutes, q:flightQ(e, ctx), label:dur(l.minutes), long:(sg ? sg.flight.replace(' ', '') + ' · ' : '') + dur(l.minutes),
-      tip:'Flight · ' + (sg ? sg.flight + ' ' + sg.from + '→' + sg.to + ' · ' : '') + dur(l.minutes) + (e.rating != null ? ' · airline rated ' + e.rating.toFixed(2) : ' · airline unrated')}); }
-    else if (l.kind === 'layover'){ const sg = e.segments[k - 1]; out.push({kind:'layover', minutes:l.minutes, q:layoverQ(l.minutes, sg), label:(sg ? sg.to + ' ' : '') + dur(l.minutes), tip:l.tip}); }
+    if (l.kind === 'ground'){
+      const end = grounds++ ? 'in' : 'out', m = r.ground[end], apt = end === 'out' ? e.route[0] : e.route[e.route.length - 1], mins = m ? m.minutes : l.minutes, cents = m ? m.cents : 0, why = [];
+      const modes = e.ground[end] || [], transitDead = m && m.kind !== 'transit' && modes.some(x => x.kind === 'transit' && !x.feasible);
+      if (m) why.push({t: m.mode + (m.estimated ? ', estimated' : '')});
+      if (cents >= 6000) why.push({t: money(cents) + ' by car' + (transitDead ? ': transit does not run at this hour' : ''), bad:true});
+      if (mins >= 90) why.push({t: 'Long ride: ' + dur(mins), bad:true});
+      if (mins <= 45 && cents <= 1500) why.push({t: 'Quick and cheap', good:true});
+      if (!why.length) why.push({t: 'An ordinary ride'});
+      out.push({kind:'ground', minutes:mins, q:groundQ(mins, cents), label:dur(mins), title:(end === 'out' ? 'To ' : 'From ') + apt + ' · ' + dur(mins) + (m ? ' · ' + money(cents) : ''), why});
+    }
+    else if (l.kind === 'process') out.push({kind:'process', minutes:l.minutes, q:null, label:'airport', title:'At the airport · ' + dur(l.minutes), why:[{t:'Check-in, security and the walk to the gate'}, {t:'The same for every flight, so it is not judged'}]});
+    else if (l.kind === 'flight'){
+      const sg = e.segments[k++], i = k - 1, why = [], det = ctx.refAir ? ctx.air(e)/ctx.refAir : 1;
+      if (e.rating == null) why.push({t:'Unrated airline: priced as unknown, never as free', bad:true});
+      else why.push({t:e.carrier_name + ', rated ' + e.rating.toFixed(2) + (e.rating >= .76 ? ': well above the route baseline' : e.rating >= .7 ? ': about the route baseline' : ': below the route baseline'), good:e.rating >= .76, bad:e.rating < .7});
+      if (e.stops && det >= 1.15) why.push({t:'Goes the long way: ' + dur(ctx.air(e)) + ' in the air against ' + dur(ctx.refAir) + ' nonstop', bad:true});
+      const dh = sg ? +sg.dep.slice(0, 2) : 12; if (l.minutes >= 300 && dh >= 20) why.push({t:'Overnight flight'});
+      if (i === li && sg && sg.equipment && sg.equipment !== 'UNKNOWN') why.push({t:'Scheduled ' + (JET[sg.equipment] || sg.equipment) + '; the aircraft can change'});
+      if (e.operator !== e.carrier && i === li) why.push({t:'Flown by ' + ((AIR[e.operator] || {}).name || e.operator)});
+      out.push({kind:'flight', minutes:l.minutes, q:flightQ(e, ctx), label:dur(l.minutes), long:(sg ? sg.flight.replace(' ', '') + ' · ' : '') + dur(l.minutes), title:(sg ? sg.flight + ' · ' + sg.from + ' → ' + sg.to + ' · ' : 'Flight · ') + dur(l.minutes), why});
+    }
+    else if (l.kind === 'layover'){
+      const sg = e.segments[k - 1], nx = e.segments[k], apt = sg ? sg.to : '', m = l.minutes, a = AP[apt] || {}, why = [], h = sg ? +sg.arr.slice(0, 2) : 12;
+      const closed = sg ? closedMinutes(apt, sg.arr, m) : null, svc = a.curated ? (a.services || []).find(x => x.hours) : null;
+      if (closed != null && closed >= 45) why.push({t:'Lands ' + sg.arr + (nx ? ', next flight ' + nx.dep : '') + ': ' + (svc.what || 'the terminal') + ' keeps ' + svc.hours + ', so ' + dur(closed) + ' with nothing open', bad:true});
+      else if (m >= 300 && (h >= 21 || h < 3)) why.push({t:'Overnight in the terminal: lands ' + sg.arr + (nx ? ', leaves ' + nx.dep : ''), bad:true});
+      if (a.curated && a.mct && m < a.mct + 15) why.push({t:'Tight: ' + dur(m) + ' against a ' + a.mct + 'm minimum connection here', bad:true});
+      else if (m < 55) why.push({t:'Tight: ' + dur(m) + ' to make the connection', bad:true});
+      if (m >= 300 && !(closed >= 45)) why.push({t:dur(m) + ' in the terminal', bad:true});
+      const from = AP[e.route[0]] || {}, to = AP[e.route[e.route.length - 1]] || {};
+      if (a.border && from.border && a.border !== from.border) why.push({t:'Passport control on arrival: ' + (UNION[from.border] || from.border) + ' into ' + (UNION[a.border] || a.border) + (to.border && to.border !== a.border ? ', and again at ' + e.route[e.route.length - 1] : '')});
+      if (!a.curated) why.push({t:'No curated facts for ' + apt + ': modelled on defaults'});
+      if (svc && svc.hours === '24h') why.push({t:(svc.what || 'The terminal') + ' is open around the clock', good:true});
+      if (!why.some(x => x.bad) && m >= 60 && m <= 180) why.push({t:'Enough time, not too much' + (svc && closed === 0 ? ', with everything open' : ''), good:true});
+      out.push({kind:'layover', minutes:m, q:layoverQ(m, sg, apt), label:apt + ' ' + dur(m), title:'Layover · ' + apt + (a.city ? ', ' + a.city : '') + ' · ' + dur(m) + (sg ? ' · lands ' + sg.arr : ''), why});
+    }
   }
   return out;
 }
 function journeyHTML(e, r, ctx, compact){
   const segs = journey(e, r, ctx), total = segs.reduce((a, x) => a + x.minutes, 0) || 1;
   let w = segs.map(x => Math.max(compact ? 1.6 : 3.2, 100*x.minutes/total)); const sum = w.reduce((a, x) => a + x, 0); w = w.map(x => 100*x/sum);
-  const bar = `<span class="jbar"${compact ? ` style="width:${(100*Math.min(1, total/Math.max(ctx.maxDoor || 0, total))).toFixed(1)}%"` : ''}>${segs.map((x, i) => `<span class="jseg ${x.kind}${x.q == null ? ' neutral' : ''}" style="width:${w[i].toFixed(2)}%;--i:${i}${x.q == null ? '' : ';--sc:' + scaleColor(x.q, .19)}" title="${esc(x.tip)}">${!compact && w[i] >= 9 ? '<i>' + esc(w[i] >= 22 && x.long ? x.long : x.label) + '</i>' : ''}</span>`).join('')}</span>`;
+  const card = x => `<div class="jh"><i></i><b>${esc(x.title)}</b><em>${verdictOf(x.q)}</em></div><ul>${x.why.map(w => `<li class="${w.bad ? 'bad' : w.good ? 'good' : ''}">${esc(w.t)}</li>`).join('')}</ul>`;
+  const bar = `<span class="jbar"${compact ? ` style="width:${(100*Math.min(1, total/Math.max(ctx.maxDoor || 0, total))).toFixed(1)}%"` : ''}>${segs.map((x, i) => `<span class="jseg ${x.kind}${x.q == null ? ' neutral' : ''}" style="width:${w[i].toFixed(2)}%;--i:${i}${x.q == null ? '' : ';--sc:' + scaleColor(x.q, .19)}" data-tip="${esc(card(x))}" aria-label="${esc(x.title + ': ' + verdictOf(x.q) + '. ' + x.why.map(w => w.t).join('. '))}"${compact ? '' : ' tabindex="0"'}>${!compact && w[i] >= 9 ? '<i>' + esc(w[i] >= 22 && x.long ? x.long : x.label) + '</i>' : ''}</span>`).join('')}</span>`;
   // in a row: the bar alone, its length the trip's length against the longest in the results, so a long day reads long
   if (compact) return `<span class="jmini" title="${dur(total)} door to door">${bar}</span>`;
   const fi = Math.max(0, segs.findIndex(x => x.kind === 'flight')), pre = segs.slice(0, fi).reduce((a, x) => a + x.minutes, 0), last = segs[segs.length - 1], post = last && last.kind === 'ground' ? last.minutes : 0;
@@ -1444,6 +1507,23 @@ $('#doors').addEventListener('click', ev => { const b = ev.target.closest('[data
 document.addEventListener('click', ev => { const i = ev.target.closest('.info'); document.querySelectorAll('.info[aria-expanded=true]').forEach(x => { if (x !== i) x.setAttribute('aria-expanded', 'false'); }); if (i) i.setAttribute('aria-expanded', i.getAttribute('aria-expanded') === 'true' ? 'false' : 'true'); });
 document.addEventListener('click', ev => { if (ev.target.id === 'x' || ev.target.id === 'sheetwrap') $('#sheetroot').innerHTML = ''; });
 $('#go').addEventListener('click', enterResults);
+// the hover card: one element, filled from the segment under the pointer
+const JT = document.createElement('div'); JT.className = 'jtip'; JT.setAttribute('role', 'tooltip'); JT.hidden = true; document.body.appendChild(JT);
+let jtFor = null;
+function showTip(seg){
+  if (!seg || seg === jtFor) return; jtFor = seg; JT.innerHTML = seg.dataset.tip + '<span class="arrow"></span>'; JT.style.setProperty('--sc', seg.style.getPropertyValue('--sc') || 'rgba(255,255,255,.3)');
+  JT.hidden = false; JT.classList.remove('below'); const r = seg.getBoundingClientRect(), w = JT.offsetWidth, h = JT.offsetHeight;
+  let left = r.left + r.width/2 - w/2; left = Math.max(8, Math.min(innerWidth - w - 8, left));
+  let top = r.top - h - 10; if (top < 8){ top = r.bottom + 10; JT.classList.add('below'); }
+  JT.style.left = (left + scrollX) + 'px'; JT.style.top = (top + scrollY) + 'px'; JT.style.setProperty('--ax', (r.left + r.width/2 - left) + 'px');
+  requestAnimationFrame(() => JT.classList.add('on'));
+}
+function hideTip(){ jtFor = null; JT.classList.remove('on'); setTimeout(() => { if (!jtFor) JT.hidden = true; }, 150); }
+document.addEventListener('mouseover', ev => { const seg = ev.target.closest('.jseg'); if (seg) showTip(seg); else if (jtFor && !ev.target.closest('.jtip')) hideTip(); });
+document.addEventListener('focusin', ev => { const seg = ev.target.closest('.jseg'); if (seg) showTip(seg); });
+document.addEventListener('focusout', ev => { if (ev.target.closest && ev.target.closest('.jseg')) hideTip(); });
+document.addEventListener('scroll', () => { if (jtFor) hideTip(); }, {passive:true});
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && jtFor) hideTip(); });
 $('#cur').innerHTML = Object.entries(CURRENCIES).map(([k, v]) => `<option value="${k}"${k === CUR ? ' selected' : ''}>${k} · ${esc(v.name)}</option>`).join('');
 function curNote(){ const k = CURRENCIES[CUR]; $('#curnote').textContent = CUR === 'USD' ? 'Figures in US dollars.' : '1 USD = ' + k.rate + ' ' + CUR + ' · ' + RATES_ASOF + '.'; }
 curNote();
