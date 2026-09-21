@@ -768,6 +768,14 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 .qz .pchip{cursor:pointer}.qz .pchip.on{border-color:var(--speed);color:var(--text);background:rgba(120,160,255,.08)}
 .prof .row2{margin-top:16px;align-items:center}
 .rsc .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:6px 0 4px}
+.fixer .fld{padding:12px 14px 12px 44px}   /* the sheet's tighter .rsc .fld padding must not swallow the icon gutter */
+.fixer .frow{margin-top:12px}.fixer .frow.dates{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.fixer .fld .req{font-style:normal;letter-spacing:.06em;font-size:8.5px;color:var(--speed);margin-left:6px;text-transform:uppercase}
+.fixer .chipfld{padding-left:14px}.fixer .chipfld .chips{margin:2px 0 0}
+.fixer .nav{margin-top:16px}
+.rsc .odds{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 10px}.rsc .odds b{font-family:var(--mono);font-size:26px}.rsc .odds small{color:var(--faint)}
+.rsc .odds button{color:var(--dim);font-size:12.5px;border-bottom:1px solid var(--line)}
+.rsc .chart{margin:6px 0 12px}.rsc .chart svg{width:100%;height:130px;display:block}.rsc .chart text{fill:var(--faint);font:10px var(--mono)}.rsc .chart .l{fill:none;stroke:var(--speed);stroke-width:2}.rsc .chart .g{stroke:var(--line)}
 .rsc .fld{padding:10px 12px}.rsc .fld input{font-size:15px}
 .rsc .chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}.rsc .pchip{cursor:pointer}.rsc .pchip.on{border-color:var(--speed);color:var(--text);background:rgba(120,160,255,.08)}
 .rsc h4{font-family:var(--disp);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin:14px 0 6px}
@@ -841,11 +849,10 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div class="eyebrow">Step 1 of 4</div><h1>Where are you going?</h1>
     <p class="lead">Just the trip. Everything else comes one screen at a time, and you can change any of it later without starting over.</p>
     <div class="panel"><div class="slot"><div id="blk-where">
-      <div class="tripseg" id="trip" role="group" aria-label="Trip type"><button data-trip="round" aria-pressed="true">Round trip</button><button data-trip="one" aria-pressed="false">One way</button><button data-trip="multi" aria-pressed="false">Multi-city</button></div>
+      <div class="tripseg" id="trip" role="group" aria-label="Trip type"><button data-trip="round" aria-pressed="true">Round trip</button><button data-trip="one" aria-pressed="false">One way</button><button data-trip="multi" aria-pressed="false">Multi-city</button><button data-trip="fix" aria-pressed="false">🪄 Flight Fixer</button></div>
       <div class="fields" id="sentence"></div>
       <button class="addleg hidden" id="addleg">+ add another flight</button>
       <p class="searcherr" id="searcherr" role="alert"></p>
-      <p class="ptnote"><button type="button" class="ledger" id="rescuego">Flight delayed or cancelled? Make the call</button></p>
     </div></div>
     <div class="nav"><button class="go" data-next="2">Continue <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v11M3 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">or press Enter</span></div></div>
   </div></section>
@@ -905,7 +912,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">Advanced options are optional; leave them and go.</span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="5f41b4d">5f41b4d</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="9677cc5">9677cc5</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -932,7 +939,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="5f41b4d">5f41b4d</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="9677cc5">9677cc5</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1387,6 +1394,21 @@ function bill(e, opts){
           dem:q.filter(x => x.want), adds:g.addons.filter(x => x.key !== 'bags' && x.cents > 0).concat(g.stay), base:e.grid[idx]};
 }
 function priced(e){ return bill(e); }
+// ---- the Flight Fixer's form: the search's own fields and labels, what is required marked, the rest optional
+function fixerHTML(){
+  const today = localISO(new Date()).slice(0, 10);
+  const F = (id, label, val, icon, help, ph, req) => `<div class="fld"><svg class="ico" viewBox="0 0 24 24">${ICON[icon] ? ICON[icon].replace(/^<svg[^>]*>|<\/svg>$/g, '') : ''}</svg><label for="${id}">${label}${req ? ' <em class="req">required</em>' : ''}</label><input id="${id}" value="${esc(val || '')}" placeholder="${esc(ph || '')}" autocomplete="off">${help ? `<div class="help">${help}</div>` : ''}</div>`;
+  const D = (id, label, val) => `<div class="fld"><label for="${id}">${label}</label><input id="${id}" type="date" value="${esc(val || today)}" max="${today}"></div>`;
+  const chips = (k, opts, req) => `<div class="fld chipfld"><label>${opts.label}${req ? ' <em class="req">required</em>' : ''}</label><div class="chips" data-rs="${k}">${opts.items.map(([v, l]) => `<button type="button" class="pchip${RS[k] === v ? ' on' : ''}" data-v="${v}">${l}</button>`).join('')}</div></div>`;
+  return `<div class="rsc fixer">
+    <div class="frow route">${F('q-from-0', 'From', RS.from, 'pin', 'The airport, or the city.', 'LGA', true)}<div class="link" aria-hidden="true"></div>${F('q-to-0', 'To', RS.to, 'flag', 'The airport, the city, or the address where you are staying.', 'CLT', true)}</div>
+    <div class="frow dates">${F('rs-flight', 'Flight', RS.flight, 'seat', 'Helps: the number on your boarding pass.', 'DL 5048')}${D('rs-date', 'Date', RS.date)}${chips('kind', {label:'What happened', items:[['delayed', 'Delayed'], ['cancelled', 'Cancelled']]}, true)}</div>
+    <div class="frow dates" id="rs-when">${F('rs-sched', 'Scheduled departure', RS.sched, 'cal', 'As printed on the ticket.', '18:30', true)}${F('rs-new', 'New departure', RS.newdep, 'cal', 'What the board or the app says now. Blank if there is none yet.', '21:40')}${F('rs-newarr', 'New arrival', RS.newarr, 'cal', 'Add +1 if it lands tomorrow.', '09:50 +1')}</div>
+    <div class="frow dates">${chips('rebook', {label:'Rebooking offered', items:[['no', 'No'], ['notyet', 'Not yet'], ['yes', 'Yes']]})}${F('rs-rbarr', 'Its arrival, if offered', RS.rbarr, 'cal', 'The flight the airline put you on.', '13:10 +1')}</div>
+    <div class="frow dates">${chips('fare', {label:'Your fare', items:[['basic', 'Basic'], ['main', 'Main cabin'], ['flex', 'Flexible']]})}${chips('bags', {label:'Bags', items:[['no', 'Carry-on only'], ['yes', 'A bag is checked']]})}${F('rs-paid', 'What you paid', RS.paid, 'bag', 'Helps the refund maths.', '$600')}${F('rs-hour', 'An hour of yours is worth', RS.hour || '35', 'who', 'Prices the time an alternative saves.', '$35')}</div>
+    <p class="searcherr" id="rs-err" role="alert"></p>
+    <div class="nav"><button class="go" id="rs-go">🪄 Make the call</button><span class="hintr">From, to and what happened are required. The more you add, the faster and surer the call.</span></div></div>`;
+}
 // the other fares of the same flight, in a breath: "· also Main Plus $681, Flexible $888 all in"
 function fareAlts(e){ const f = e.fares || []; return f.length ? ' · also ' + f.map(x => esc(x.brand.replace(/^Main Cabin /, '')) + ' ' + money(x.total)).join(', ') + ' all in' : ''; }
 // ---- the flying personality (per Patrick, 2026-09-21): a short quiz becomes a persona: a point on the dial and a
@@ -1849,6 +1871,11 @@ const ICON = {
   bag:'<svg class="ico" viewBox="0 0 24 24"><rect x="4" y="7.5" width="16" height="13" rx="2.5"/><path d="M9 7.5V5.5a3 3 0 0 1 6 0v2M9 11.5v6M15 11.5v6"/></svg>',
 };
 function sentenceHTML(){
+  const fix = S.trip === 'fix';
+  $('#s1 h1').textContent = fix ? 'What happened to your flight?' : 'Where are you going?';
+  $('#s1 .lead').textContent = fix ? 'Tell it what you know. From, to and what happened are enough; every detail after that makes the call faster and surer.' : 'Just the trip. Everything else comes one screen at a time, and you can change any of it later without starting over.';
+  { const nav = document.querySelector('#s1 .panel > .nav'); if (nav) nav.classList.toggle('hidden', fix); }
+  if (fix){ $('#sentence').innerHTML = fixerHTML(); $('#addleg').classList.add('hidden'); paintRecent(); return; }
   const L = S.legs, g0 = ALL[0].legs[0], gIn = ALL[0].legs.slice().reverse().find(l => l.kind === 'ground' && l !== g0);
   const LOCATE = '<button type="button" class="locate" id="locate" title="Use my location" aria-label="Use my location"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>';
   const today = localISO(new Date()).slice(0, 10);
@@ -2693,31 +2720,44 @@ function openRescue(){
 }
 function rsTime(dateStr, hhmm){ const m = /^(\d{1,2}):(\d{2})\s*(\+1)?$/.exec((hhmm || '').trim()); if (!m) return null; const d = new Date(dateStr + 'T00:00:00'); if (m[3]) d.setDate(d.getDate() + 1); d.setHours(+m[1], +m[2]); return localISO(d); }
 async function runRescue(){
-  const v = id => ($(id) ? $(id).value.trim() : ''); RS.from = v('#rs-from').toUpperCase(); RS.to = v('#rs-to').toUpperCase(); RS.flight = v('#rs-flight'); RS.date = v('#rs-date'); RS.sched = v('#rs-sched'); RS.newdep = v('#rs-new'); RS.newarr = v('#rs-newarr'); RS.rbarr = v('#rs-rbarr'); RS.paid = v('#rs-paid'); RS.hour = v('#rs-hour');
+  const v = id => ($(id) ? $(id).value.trim() : ''); RS.from = (v('#q-from-0') || v('#rs-from')); RS.to = (v('#q-to-0') || v('#rs-to')); RS.flight = v('#rs-flight'); RS.date = v('#rs-date'); RS.sched = v('#rs-sched'); RS.newdep = v('#rs-new'); RS.newarr = v('#rs-newarr'); RS.rbarr = v('#rs-rbarr'); RS.paid = v('#rs-paid'); RS.hour = v('#rs-hour');
   const err = $('#rs-err'); err.textContent = '';
-  if (!RS.from || !RS.to){ err.textContent = 'From and to, as airport codes.'; return; }
+  if (!RS.from || !RS.to){ err.textContent = 'Where from, and where to.'; return; }
+  if (RS.kind === 'delayed' && !RS.sched){ err.textContent = 'The scheduled departure, as printed on the ticket.'; return; }
+  RS.paid = RS.paid.replace(/[^\d.]/g, ''); RS.hour = RS.hour.replace(/[^\d.]/g, '');
   const now = new Date(), sit = {kind:RS.kind, origin:RS.from, destination:RS.to, flight:RS.flight, date:RS.date, bags_checked:RS.bags === 'yes', fare:RS.fare,
     paid_cents: Math.round((parseFloat(RS.paid) || 0) * 100), hourly_value_cents: Math.round((parseFloat(RS.hour) || 35) * 100)};
   // clocks go up as typed; the server reads them in the airport's own zone, which the browser does not know
   if (RS.kind === 'delayed'){ sit.sched_clock = RS.sched; sit.new_dep_clock = RS.newdep; sit.new_arr_clock = RS.newarr;
     if (!RS.newdep && !RS.newarr){ err.textContent = 'The new departure or arrival time the airline gave you.'; return; } }
   if (RS.rebook === 'yes') sit.rebook_arr_clock = RS.rbarr;
-  $('#rs-go').disabled = true; $('#rs-go').textContent = 'Searching…';
+  $('#rs-go').disabled = true; $('#rs-go').textContent = 'Searching today\'s flights…';
   let res; try { const r = await fetch('/rescue', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({situation:sit, now:localISO(now), source:'api'})}); res = await r.json(); } catch (e){ res = {error:'The search did not come back. Try again.'}; }
-  if (res.error){ $('#rs-go').disabled = false; $('#rs-go').textContent = 'Make the call'; err.textContent = res.error; if (res.sign_in){ closeAccount(); openAccount(res); } return; }
+  if (res.error){ $('#rs-go').disabled = false; $('#rs-go').textContent = '🪄 Make the call'; err.textContent = res.error; if (res.sign_in){ closeAccount(); openAccount(res); } return; }
+  $('#rs-go').disabled = false; $('#rs-go').textContent = '🪄 Make the call';
   paintRescue(res);
 }
 function paintRescue(res){
   const a = res.assessment, V = a.verdict, hm = iso => iso ? iso.slice(11, 16) : '';
   const alt = r => `<div class="alt"><div><b>${esc(r.carrier)} ${esc(r.flight)}</b> · ${esc((r.route || []).join(' → '))} · ${hm(r.depart)} → ${hm(r.arrive)}${r.stops ? ' · ' + r.stops + ' stop' : ' · nonstop'}<small>${r.lines.map(l => esc(l.label) + ' ' + (l.cents < 0 ? '−' : '') + money(Math.abs(l.cents))).join(' · ')}</small></div><div class="net">${V.option && V.option.id === r.id ? '★ ' : ''}${r.net_cents < 0 ? '−' : ''}${money(Math.abs(r.net_cents))}<small>net</small></div></div>`;
   const head = V.action === 'switch' && V.option ? 'Switch to ' + V.option.carrier + ' ' + V.option.flight + (V.ahead_cents ? ', ' + money(V.ahead_cents) + ' ahead' : '') : V.action === 'stay' ? 'Stay with what the airline offered' : 'Wait it out';
+  const od = a.odds || {}, oddsHTML = od.p_today == null ? '' : `<div class="odds"><b>${Math.round(od.p_today * 100)}%</b><span>chance you fly today${od.planned ? ' on the ' + hm(od.planned) : ''}</span><small>modelled</small>${od.curve && od.curve.length ? '<button type="button" id="oddsmore">Details</button>' : ''}</div>${oddsChart(od)}`;
   $('#accth').textContent = 'The call';
-  $('#acctbody').innerHTML = `<div class="rsc"><div class="verdict"><b>${esc(head)}</b><p class="advice">${esc(res.advice.advice)}</p>${res.advice.source === 'template' ? '<p class="fine">Written from the figures without the model' + (res.advice.note ? ' (' + esc(res.advice.note) + ')' : '') + '.</p>' : ''}</div>
+  $('#acctbody').innerHTML = `<div class="rsc">${oddsHTML}<div class="verdict"><b>${esc(head)}</b><p class="advice">${esc(res.advice.advice)}</p>${res.advice.source === 'template' ? '<p class="fine">Written from the figures without the model' + (res.advice.note ? ' (' + esc(res.advice.note) + ')' : '') + '.</p>' : ''}</div>
     <h4>Your options today${res.searched.length > 1 ? ' and tomorrow' : ''} · ${res.found} found</h4>${a.options.slice(0, 4).map(alt).join('') || '<p>Nothing leaves in time.</p>'}
     ${a.hotel_tonight ? `<h4>Tonight</h4><p><a class="ledger" target="_blank" rel="noopener" href="https://www.google.com/maps/search/hotels+near+${encodeURIComponent(RS.from)}+airport">Hotels near ${esc(RS.from)}</a> · ask the desk whether the airline covers it.</p>` : ''}
     <h4>What you can ask for</h4><ul>${a.rights.map(r => `<li><b>${esc(r.what)}</b> · ${esc(r.detail)}</li>`).join('')}</ul>
     <p class="fine">Refund: ${esc(a.refund.why)}.</p>
     <div class="row2"><button class="ledger" id="rescuego">Change the details</button><button class="choose" id="acctno" style="flex:0 0 auto">Done</button></div></div>`;
+}
+// the chance of being off the ground by each hour left in the day, as one line; the basis under it in a sentence
+function oddsChart(od){
+  const c = od.curve || []; if (!c.length) return '';
+  const W = 560, H = 130, L = 34, R = 10, T = 10, B = 26, x = h => L + (h - c[0].hour) / Math.max(1, c[c.length - 1].hour - c[0].hour) * (W - L - R), y = p => T + (1 - p) * (H - T - B);
+  const pts = c.map(k => x(k.hour).toFixed(1) + ',' + y(k.p).toFixed(1)).join(' ');
+  const grid = [0, .5, 1].map(p => `<line class="g" x1="${L}" x2="${W - R}" y1="${y(p)}" y2="${y(p)}"/><text x="2" y="${y(p) + 3}">${Math.round(p * 100)}%</text>`).join('');
+  const ticks = c.filter((k, i) => i % Math.max(1, Math.floor(c.length / 6)) === 0 || i === c.length - 1).map(k => `<text x="${x(k.hour)}" y="${H - 8}" text-anchor="middle">${String(k.hour % 24).padStart(2, '0')}:00</text>`).join('');
+  return `<div class="chart hidden" id="oddschart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}<polyline class="l" points="${pts}"/>${ticks}</svg><p class="fine">Chance you are off the ground by each hour left today. ${esc(od.basis || '')}.</p></div>`;
 }
 // the first-launch tour (per Patrick, 2026-09-21): the premise in a breath, how it works in three lines, then the
 // quiz. Once per browser; the profile can always reopen the quiz.
@@ -2754,7 +2794,8 @@ function openProfile(quiz){
 document.addEventListener('click', ev => {
   if (ev.target.closest('#account, #account2')){ const u = S.user; if (u && (u.email || u.owner)){ openProfile(); return; } openAccount(); return; }
   if (ev.target.closest('#quizgo')){ openProfile(true); return; }
-  if (ev.target.closest('#rescuego')){ openRescue(); return; }
+  if (ev.target.closest('#rescuego')){ closeAccount(); S.trip = 'fix'; $('#trip').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.trip === 'fix')); goStep(1); sentenceHTML(); return; }
+  if (ev.target.closest('#oddsmore')){ const c = $('#oddschart'); if (c) c.classList.toggle('hidden'); return; }
   if (ev.target.closest('#rs-go')){ runRescue(); return; }
   const rc = ev.target.closest('.rsc [data-rs] .pchip'); if (rc){ const g = rc.closest('[data-rs]'); RS[g.dataset.rs] = rc.dataset.v; g.querySelectorAll('.pchip').forEach(x => x.classList.toggle('on', x === rc)); return; }
   const tn = ev.target.closest('#tournext'); if (tn){ openTour(+tn.dataset.i); return; }
@@ -3036,10 +3077,11 @@ const paxCount = () => ({'1 adult':1, '2 adults':2, 'Family of 4':4}[S.pax] || 1
 // and the lede says so. Opened as a file there is no server, so the recording
 // is all there is.
 async function enterResults(){
+  if (S.trip === 'fix'){ runRescue(); return; }
+  { const iso = toISODate(S.legs[0].date), today = localISO(new Date()).slice(0, 10); if (iso && iso < today){ $('#searcherr').textContent = 'That date has passed. Flights can be searched from today.'; ($('#q-date-0') || {focus(){}}).focus(); return; } }
   finishAllSteps();
   const box = $('#loading'); box.classList.remove('hidden'); $('#wizard').classList.add('hidden'); $('#rail').classList.add('hidden'); $('#searcherr').textContent = '';
   const L = S.legs[0], date = toISODate(L.date); S.notice = '';
-  { const iso = toISODate(L.date), today = localISO(new Date()).slice(0, 10); if (iso && iso < today){ $('#searcherr').textContent = 'That date has passed. Flights can be searched from today.'; ($('#q-date-0') || {focus(){}}).focus(); return; } }
   if (SERVED && !(L.from.trim() && L.to.trim())){
     box.classList.add('hidden'); $('#wizard').classList.remove('hidden'); $('#rail').classList.remove('hidden'); goStep(1);
     $('#searcherr').textContent = L.from.trim() ? 'Where are you going? A city, an airport, or the address where you will stay.' : 'Where does the trip start? An address, a neighbourhood or a city.'; ($('#q-' + (L.from.trim() ? 'to' : 'from') + '-0') || {focus(){}}).focus(); return; }

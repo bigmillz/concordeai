@@ -605,9 +605,17 @@ the avatar (the account button becomes the person's initial): who you are, the a
 the personality, Log out. **A first-launch tour** (`TOUR`, once per browser, when the splash
 lifts) says the premise in a breath, how it works in three lines, and hands off to the quiz.
 
-**The delayed-or-cancelled helper** (`rescue.py`, `/rescue` outside the door on the free
-allowance, `/api/rescue` inside it; the sheet behind "Flight delayed or cancelled? Make the
-call" on the first screen). The situation comes in as chips and clocks: delayed or cancelled,
+**The Flight Fixer** (`rescue.py`, `/rescue` outside the door on the free allowance,
+`/api/rescue` inside it; the fourth trip type beside round trip, one way and multi-city,
+whose form is the search's own fields with the required ones marked and a line saying the
+more you add the surer the call). It also puts a number on **the chance you fly today**
+(`rescue.odds()`): MODELLED, and labelled so on the page, from the delay so far, the hour
+the new departure is planned for and how delays compound (a delayed flight leaves when the
+airline says 55% of the time, the rest slipping by the hour; the cancellation risk grows with
+the delay and jumps after 21:00 and 23:00; anything past midnight is lost), with a Details
+line chart of the chance of being off the ground by each hour left in the day. A tracking
+feed for the flight number would replace those priors with the flight's own day and is the
+obvious next key. The helper's model text: The situation comes in as chips and clocks: delayed or cancelled,
 the scheduled and new times, whether rebooking was offered and when it lands, the fare, a
 checked bag, what was paid, what an hour is worth. Clocks are read in the AIRPORT's zone,
 taken from the results, never the browser's. One live search for the day (and tomorrow after

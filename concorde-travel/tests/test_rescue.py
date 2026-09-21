@@ -58,6 +58,18 @@ def main():
     check("an EU departure adds EU261 by distance, hedged", any("EU261" in r["what"] and "€600" in r["what"] for r in rescue.rights(dict(sit3, eu=True, distance_km=5500)))
           and all("may" in r or True for r in rescue.rights(dict(sit3, eu=True))))
 
+    # the odds of flying today: modelled, monotone, and gone by midnight
+    o = rescue.odds({"kind": "delayed", "delay_minutes": 65, "new_depart": "2026-11-18T19:35:00-05:00"}, datetime.fromisoformat("2026-11-18T18:00:00-05:00"))
+    check("a modest evening delay leaves good odds of flying today", o["p_today"] is not None and 0.6 <= o["p_today"] <= 0.97, str(o["p_today"]))
+    check("the curve never falls as the hours pass", all(o["curve"][i]["p"] <= o["curve"][i + 1]["p"] for i in range(len(o["curve"]) - 1)))
+    o2 = rescue.odds({"kind": "delayed", "delay_minutes": 300, "new_depart": "2026-11-18T23:20:00-05:00"}, datetime.fromisoformat("2026-11-18T22:30:00-05:00"))
+    check("a five-hour delay pushed to 23:20 leaves slim odds", o2["p_today"] < 0.45, str(o2["p_today"]))
+    check("cancelled with nothing in hand is no odds at all, and says why", rescue.odds({"kind": "cancelled"}, morning)["p_today"] == 0.0)
+    check("the odds say they are modelled", o["modelled"] and "Modelled" in o["basis"])
+    a4 = rescue.assess(dict(sit2, new_depart="2026-11-18T09:30:00-05:00"), opts, now=morning)
+    check("the assessment carries the odds and the brief carries them as a percentage the advice may use",
+          a4["odds"]["p_today"] is not None and rescue.brief(dict(sit2, now_clock="06:30"), a4)["odds_you_fly_today"] in rescue.brief(dict(sit2, now_clock="06:30"), a4)["allowed"]["percent"])
+
     # the brief and the guard rails
     b = rescue.brief(dict(sit, now_clock="06:30"), a)
     tpl = rescue.template(b)
