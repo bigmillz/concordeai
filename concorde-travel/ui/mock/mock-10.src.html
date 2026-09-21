@@ -11,7 +11,7 @@
   --text:#ececec;--dim:#b4b4b4;--faint:#8e8e8e;--accent:#ececec;--accent-hot:#fff;--red:#e26d5a;
   --price:#ffb020;--speed:#4da3ff;--comfy:#a47bff;--green:#35e08a;--lime:#c6ff4f;
   --gA:#35e08a;--gB:#c6ff4f;--gC:#ffb020;--gD:#e26d5a;
-  --sans:"Space Grotesk","Helvetica Neue",Arial,sans-serif;--disp:"Michroma","Space Grotesk",sans-serif;--fig:"UD Shin Go NT","UD Shin Go","A-OTF UD Shin Go Pr6N","UDShinGoPr6N","Michroma","Space Grotesk",sans-serif;--mono:"IBM Plex Mono","SFMono-Regular",Menlo,monospace;
+  --sans:"Space Grotesk","Helvetica Neue",Arial,sans-serif;--disp:"Michroma","Space Grotesk",sans-serif;--fig:"Michroma","Space Grotesk",sans-serif;--mono:"IBM Plex Mono","SFMono-Regular",Menlo,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{color-scheme:dark}
@@ -46,12 +46,9 @@ h1,h2,h3{font-weight:400;letter-spacing:-.02em;text-wrap:balance}
 .pay .ph{font-family:var(--disp);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:6px;min-height:14px}
 .pay.best .ph{color:var(--price)}
 .pay .ph .star{font-style:normal;font-size:11px;line-height:1}
-/* the large figures: UD Shin Go where the machine has it (Morisawa's face, not
-   fetchable from the web), else Michroma, the wordmark's. Michroma runs about a
-   third wider, so the sizes step up when the first choice is what resolved. */
+/* the large figures wear the wordmark's face */
 .fig{font-family:var(--fig);font-weight:400;font-variant-numeric:tabular-nums;letter-spacing:0}
 .pay .num{font-size:21px;line-height:1.1;margin-top:4px;white-space:nowrap}
-html.udsg .fig{font-weight:500}html.udsg .pay .num{font-size:26px;letter-spacing:-.01em}html.udsg .amt b{font-size:21px;font-weight:500}html.udsg .btotal b{font-size:24px;font-weight:500}
 .pay.dim .num{color:var(--faint)}
 .pay .unit{color:var(--dim);font-size:12px}
 .pay .unit.dim{color:var(--faint)}
@@ -321,6 +318,22 @@ details[open] summary:after{content:"–"}
 .awards li b{color:var(--text);font-weight:500}
 .awards li.good{border-color:rgba(53,224,138,.5)}.awards li.good b{color:var(--green)}
 .awards .v{font-family:var(--mono)}
+.research{margin-top:34px}
+.rbox{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.rbox .rstart{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.rbox .hintr{color:var(--faint);font-size:12.5px}
+.rbox .pbar{max-width:420px;margin:6px 0 10px}
+.rtab{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:4px}
+.rtab th{text-align:left;font-family:var(--disp);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);font-weight:400;padding:6px 10px 8px;border-bottom:1px solid var(--line-soft)}
+.rtab td{padding:11px 10px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+.rtab tr:last-child td{border-bottom:0}
+.rtab .fig{font-size:15px}
+.rtab .save{color:var(--green)}.rtab .nosave{color:var(--faint)}
+.rtab .catch{color:var(--dim);font-size:12.5px;line-height:1.4;max-width:34ch}
+.rtab .flag{font-size:16px;margin-right:6px;vertical-align:-1px}
+.rnote{margin-top:12px;font-size:12.5px;color:var(--faint);line-height:1.5}
+.rnote b{color:var(--dim);font-weight:500}
+@media (max-width:760px){.rtab th:nth-child(4),.rtab td:nth-child(4){display:none}}
 .foot{border-top:1px solid var(--line);margin-top:36px;padding:18px 0 6px;font-size:12.5px;color:var(--dim);display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center}
 .foot label{display:inline-flex;align-items:center;gap:8px;color:var(--text)}
 .foot select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:5px 26px 5px 9px;font-size:12.5px;appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);background-position:calc(100% - 13px) 13px,calc(100% - 9px) 13px;background-size:4px 4px;background-repeat:no-repeat}
@@ -426,6 +439,19 @@ details[open] summary:after{content:"–"}
 .brand{display:inline-flex;align-items:center;gap:11px;text-decoration:none;color:#fff;opacity:.86;transition:opacity .15s}
 .brand:hover{opacity:1}
 .wing{display:block;overflow:visible;width:26px}
+/* the loading screen: the wing draws in line by line, as the VPN app's does,
+   over a bar that is thin, white and quiet. Both are reused for any job that
+   takes a while, such as the price check below the list. */
+.loading{position:fixed;inset:0;z-index:20;background:var(--bg);display:grid;place-items:center}
+.loadin{width:min(340px,78vw);display:flex;flex-direction:column;align-items:center;gap:26px}
+.wing.big{width:66px}
+.wing.big line{stroke-width:2.2;stroke-dasharray:30;stroke-dashoffset:30;opacity:0;animation:wingline 2.6s cubic-bezier(.4,0,.2,1) infinite}
+.wing.big line:nth-child(2){animation-delay:.13s}.wing.big line:nth-child(3){animation-delay:.26s}.wing.big line:nth-child(4){animation-delay:.39s}.wing.big line:nth-child(5){animation-delay:.52s}
+@keyframes wingline{0%{stroke-dashoffset:30;opacity:0}6%{opacity:1}28%{stroke-dashoffset:0;opacity:1}72%{stroke-dashoffset:0;opacity:1}88%{opacity:0;stroke-dashoffset:0}100%{opacity:0;stroke-dashoffset:30}}
+.pbar{width:100%;height:3px;border-radius:2px;background:rgba(255,255,255,.1);overflow:hidden}
+.pbar .pfill{display:block;height:100%;width:0;border-radius:2px;background:var(--text);transition:width .55s cubic-bezier(.2,.8,.2,1);box-shadow:0 0 10px rgba(255,255,255,.35)}
+.pstage{font-size:13px;color:var(--dim);min-height:18px;letter-spacing:.01em}
+@media (prefers-reduced-motion:reduce){.wing.big line{animation:none;opacity:1;stroke-dashoffset:0}}
 .wing line{stroke:url(#wgrad);stroke-width:2.4;stroke-linecap:round;fill:none}
 .lockup{font-family:var(--disp);text-transform:uppercase;letter-spacing:.15em;font-size:12.5px;font-weight:400;white-space:nowrap;color:#fff;display:inline-flex;align-items:center}
 .lockup .tld{font-weight:800;-webkit-text-stroke:.7px currentColor}
@@ -448,6 +474,7 @@ html.hdrmarks .mark-hdr{display:block}
   .go:hover{box-shadow:0 0 30px color(display-p3 1 1 1 / .22)}
   .door.p1{box-shadow:0 0 0 1px color(display-p3 .3 .65 1 / .35),0 0 28px color(display-p3 .3 .65 1 / .18)}
   .handle{box-shadow:0 0 0 2px color(display-p3 1 1 1 / .18),0 2px 12px rgba(0,0,0,.6)}
+  .pbar .pfill{box-shadow:0 0 12px color(display-p3 1 1 1 / .45)}
 }
 
 /* ---------- motion */
@@ -627,10 +654,18 @@ html.hdrmarks .mark-hdr{display:block}
   <div class="barbtns"><button data-tab="where">Edit search</button><button data-tab="matters">Filters</button><button data-tab="advanced">Advanced</button><button class="dimbtn" id="startover">Start over</button></div>
 </div></div>
 
+<div class="loading hidden" id="loading" role="status" aria-live="polite"><div class="loadin">
+  <svg class="wing big" viewBox="2 2.3 19.6 16.4" aria-hidden="true" focusable="false"><g><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg>
+  <div class="pbar"><i class="pfill"></i></div><div class="pstage"></div>
+</div></div>
 <div id="results" class="hidden"><div class="wrapin">
   <div class="stepper" id="stepper"></div>
   <section aria-label="Your shortlist"><div class="sechead"><h2>Your shortlist</h2><p id="lede"></p></div><div class="three" id="doors"></div></section>
   <section aria-label="Everything else"><div class="sechead"><h2>Everything else, in your order</h2><p id="listnote"></p></div><ol class="list" id="list"></ol><button class="morebtn" id="morebtn"></button><p class="hiddenrows" id="hiddenrows"></p></section>
+  <section class="research" id="research" aria-label="Price check from other countries">
+    <div class="sechead"><h2>Is it cheaper from somewhere else?</h2><p>The same seat is often filed at a different fare depending on the country the ticket is sold in. Ask, and the search re-runs under other points of sale, no VPN, and says what the difference is worth after the catches.</p></div>
+    <div class="rbox" id="rbox"></div>
+  </section>
   <section class="how" id="how">
     <div><h2>How the grade works</h2><p id="how1"></p><p style="margin-top:8px">Every flight is priced the same way: the ticket, the bag you carry, the ride from <b>your</b> door and to theirs at that hour, your time at a rate, and small charges for what makes a trip worse. One number, in dollars, with every line shown. <b>The letter never moves. The order is yours.</b></p></div>
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
@@ -692,9 +727,7 @@ const gcls = g => ({A:'a',B:'b',C:'c'}[g[0]] || 'd');
 const stopsText = e => e.stops === 0 ? 'nonstop' : e.stops === 1 ? 'via ' + e.route[1] : e.stops + ' stops';
 const niceDate = d => new Date(d + 'T12:00:00Z').toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short', timeZone:'UTC'});
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
-(function(){ const c = document.createElement('canvas').getContext('2d'), probe = '$1,834 13,000', w = f => { c.font = '40px ' + f; return c.measureText(probe).width; };
-  const detect = () => { const base = w('monospace'); if (['UD Shin Go NT', 'UD Shin Go', 'A-OTF UD Shin Go Pr6N', 'UDShinGoPr6N'].some(n => Math.abs(w('"' + n + '", monospace') - base) > .5)) document.documentElement.classList.add('udsg'); };
-  detect(); if (document.fonts){ document.fonts.ready.then(detect); document.fonts.addEventListener('loadingdone', detect); } })();
+
 const ALL = D.results.reference.slice();
 const PR = D.profiles;
 const AIR = D.airlines || {};
@@ -1534,8 +1567,20 @@ function summary(){
   const extra = Object.entries(S.extra).filter(([k, v]) => k !== 'custom' && k !== 'bag' && v).map(([k]) => ADDONS[k].label.toLowerCase()); if (S.extra.bag) extra.unshift(S.extra.bag + ' extra bag' + (S.extra.bag > 1 ? 's' : '')); if (extra.length) chips.push(extra.join(', '));
   $('#sumchips').innerHTML = chips.map(c => `<i>${esc(c)}</i>`).join('');
 }
+// A slim bar that walks through named stages. In the product the stages are
+// real: the feed answering, the ground model, the layover clock, the grade.
+function runProgress(box, stages, ms, done){
+  const fill = box.querySelector('.pfill'), stage = box.querySelector('.pstage'); let k = 0; fill.style.width = '3%';
+  const step = () => { if (k >= stages.length){ setTimeout(done, 260); return; } stage.textContent = stages[k][0]; fill.style.width = stages[k][1] + '%'; k++; setTimeout(step, ms / stages.length); };
+  setTimeout(step, 60);
+}
+const SEARCH_STAGES = [['Asking the airlines', 22], ['Pricing the ride from your door', 44], ['Timing every layover', 62], ['Grading against par', 84], ['Ranking at your dial', 100]];
 function enterResults(){
-  W.mode = 'results'; S.entrance = true;
+  const box = $('#loading'); box.classList.remove('hidden'); $('#wizard').classList.add('hidden'); $('#rail').classList.add('hidden');
+  runProgress(box, SEARCH_STAGES, REDUCED ? 500 : 2400, () => { box.classList.add('hidden'); showResults(); });
+}
+function showResults(){
+  W.mode = 'results'; S.entrance = true; $('#rbox').innerHTML = RBOX;
   $('#bar').classList.add('drop'); $('#results').classList.add('fade');
   document.querySelectorAll('#results .stepper, #results .sechead').forEach((el, k) => { el.classList.add('rise'); el.style.animationDelay = (k*80) + 'ms'; });
   BLOCKS.forEach(k => $('#ed-' + k).appendChild($('#blk-' + k)));
@@ -1545,6 +1590,45 @@ function enterResults(){
   S.threadClosed = false; renderThread();
   paint(true); summary(); scrollTo({top:0, behavior:'auto'});
 }
+// ---- the price check. Point of sale is a real dimension of an airfare: the
+// same seat is filed at a different price for a ticket sold in South Africa
+// than one sold in New York, and people with a VPN go looking for it. The
+// product asks the question for them, under several countries at once, and
+// reports the difference AFTER the catches: the card's foreign-transaction
+// fee, and the airlines that require a card or address from the country of
+// sale and will cancel otherwise. Our feed today (Duffel) prices at one point
+// of sale; running this for real needs a GDS or NDC connection that takes a
+// country of sale per request, so the figures below are demo, seeded from
+// the flight, and say so.
+const POS = [['ZA', '🇿🇦', 'South Africa', .12, 'Some airlines want a South African card; a cancelled ticket is the downside'], ['IN', '🇮🇳', 'India', .14, 'A local card or address is often required at ticketing'],
+  ['TR', '🇹🇷', 'Türkiye', .05, 'Priced in lira; the rate moves week to week'], ['MX', '🇲🇽', 'Mexico', .04, 'Usually fine with a foreign card'],
+  ['BR', '🇧🇷', 'Brazil', .03, 'Instalment pricing hides the real total; read the last screen'], ['GB', '🇬🇧', 'United Kingdom', .02, 'Straightforward; APD applies on the way back'], ['AU', '🇦🇺', 'Australia', .01, 'Rarely cheaper for a transatlantic fare']];
+const CARD_FEE = .03;
+const RBOX = `<div class="rstart"><button class="go" id="rgo">Check ${POS.length} other points of sale</button><span class="hintr">About a minute. It runs in the background and the results land here.</span></div>`;
+const seeded = str => { let h = 2166136261; for (const ch of str){ h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return (h % 10000) / 10000; };
+function researchRows(){
+  const {rows} = ranked();
+  return rows.slice(0, 3).map(r => {
+    const e = r.e, tries = POS.map(([code, flag, name, lean, catchNote]) => { const u = seeded(e.id + code); const delta = Math.round(e.ticket_cents * (lean * 2 * (u - .35) - lean)); return {code, flag, name, price: e.ticket_cents + delta, delta, catchNote}; })
+      .sort((x, y) => x.price - y.price);
+    const best = tries[0], gross = e.ticket_cents - best.price, net = gross - Math.round(best.price * CARD_FEE);
+    return {e, r, best, gross, net, worth: net >= 2500};
+  });
+}
+function researchHTML(){
+  const rs = researchRows();
+  return `<table class="rtab"><thead><tr><th>Flight</th><th>Cheapest point of sale</th><th>Their fare</th><th>Ours</th><th>After a ${Math.round(CARD_FEE*100)}% card fee</th><th>The catch</th></tr></thead><tbody>${rs.map(x => `<tr>
+    <td><b>${esc(x.e.carrier_name)}</b> ${esc(x.e.flight)}<br><span style="color:var(--dim);font-size:12.5px">${esc(x.e.brand)}</span></td>
+    <td><span class="flag">${x.best.flag}</span>${esc(x.best.name)}</td>
+    <td><b class="fig">${money(x.best.price)}</b></td><td><b class="fig">${money(x.e.ticket_cents)}</b></td>
+    <td class="${x.worth ? 'save' : 'nosave'}">${x.net > 0 ? money(x.net) + ' less' : 'No saving'}</td>
+    <td class="catch">${x.worth ? esc(x.best.catchNote) : x.net > 0 ? 'Too small to be worth a foreign card and the risk' : 'Home fare is already the low one'}</td></tr>`).join('')}</tbody></table>
+    <p class="rnote"><b>How to read it.</b> The saving is on the ticket alone; the rest of the bill does not move. Points are unaffected. <b>What is real:</b> the fare rules, and the catches. <b>What is not, yet:</b> the figures, which are demo, seeded from each flight, because our feed prices at one point of sale. The real feature needs a connection that takes a country of sale per request.</p>`;
+}
+const RESEARCH_STAGES = POS.map(([code, flag, name], i) => ['Pricing from ' + name, Math.round(100 * (i + 1) / POS.length)]);
+document.addEventListener('click', ev => { if (!ev.target.closest('#rgo')) return; const box = $('#rbox');
+  box.innerHTML = '<div class="pbar"><i class="pfill"></i></div><div class="pstage"></div>';
+  runProgress(box, RESEARCH_STAGES, REDUCED ? 500 : 3600, () => { box.innerHTML = researchHTML(); box.classList.add('rise'); }); });
 function startOver(){
   closeEditor(); W.mode = 'wizard'; $('#bar').classList.remove('drop'); $('#results').classList.remove('fade');
   BLOCKS.forEach(k => $('#s' + (BLOCKS.indexOf(k) + 1) + ' .stepin .slot').appendChild($('#blk-' + k)));
