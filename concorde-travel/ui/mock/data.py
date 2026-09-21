@@ -125,9 +125,10 @@ def feed_details(offer):
     }
 
 
-def main(path):
-    raw = json.load(open(path, encoding="utf-8"))
-    sc = adapter.from_feed(raw, origin_key="Bushwick, Brooklyn", checked_bags=1)
+def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full=None, source_note=None, built_from="a live search"):
+    """A feed payload -> everything mock 10 reads. server.py calls this for a
+    live search; main() below calls it for the checked-in sample."""
+    sc = adapter.from_feed(raw, origin_key=origin_key, checked_bags=checked_bags)
     # The raw offers, keyed the way the adapter names its options (the last ten
     # characters of the offer id), so the page can show everything the feed
     # said about a flight, not only what the scorer priced.
@@ -136,7 +137,7 @@ def main(path):
         offers = offers.get("offers") or []
     by_tail = {re.sub(r"[^a-z0-9]+", "-", (o.get("id") or "x")[-10:].lower()): o for o in (offers or [])}
     if "error" in sc:
-        sys.exit("adapter: %s" % sc["error"])
+        raise ValueError("adapter: %s" % sc["error"])
     cov = adapter.coverage(sc)
     profiles = sc["query"]["profiles"]
 
@@ -298,14 +299,14 @@ def main(path):
 
     out = collections.OrderedDict()
     out["_provenance"] = {
-        "built_from": os.path.basename(path),
+        "built_from": built_from,
         "note": "Real Duffel search, scored by scorer.py at the modelled par. A duffel_test_ "
                 "token invents some prices and schedules; the fictional carrier ZZ is filtered.",
         "options_in_capture": len(sc["options"]), "pool": len(pool),
     }
     out["query"] = {
         "origin": sc["query"]["origin"]["label"],
-        "origin_full": "Wyckoff Ave & Myrtle Ave, Bushwick, Brooklyn 11237",
+        "origin_full": origin_full or "Wyckoff Ave & Myrtle Ave, Bushwick, Brooklyn 11237",
         "destination": sc["query"]["destination"]["label"],
         "date": sc["query"]["depart_date"],
         "adults": 1, "bags": 1,
@@ -341,14 +342,28 @@ def main(path):
     out["strengths"] = cov.get("strengths", [])
     out["results"] = results
 
+    out["query"]["adults"] = int(sc["query"].get("adults") or 1) if isinstance(sc.get("query"), dict) else 1
+    out["query"]["bags"] = checked_bags
+    if source_note:
+        out["source_note"] = source_note
+    return out
+
+
+def main(path):
+    raw = json.load(open(path, encoding="utf-8"))
+    try:
+        out = build_slim(raw, built_from=os.path.basename(path))
+    except ValueError as exc:
+        sys.exit(str(exc))
     dest = os.path.join(HERE, "slim.json")
     json.dump(out, open(dest, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
-    grades = collections.Counter(e["grade"] for e in entries.values())
+    pool = out["results"]["reference"]
+    grades = collections.Counter(e["grade"] for e in pool)
     print("%s: %d options in capture, %d in pool, %.0f KB" % (
-        dest, len(sc["options"]), len(pool), os.path.getsize(dest) / 1024))
+        dest, out["_provenance"]["options_in_capture"], len(pool), os.path.getsize(dest) / 1024))
     print("grades in pool:", dict(sorted(grades.items())))
     for prof in NAMED:
-        top = results[prof][0]
+        top = out["results"][prof][0]
         print("  %-8s %-34s $%d" % (prof, top["name"][:34], top["by"][prof]["effective_cents"] // 100))
 
 

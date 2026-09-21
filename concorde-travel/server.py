@@ -496,32 +496,33 @@ def _score_scenario(sc, req):
 _LIVE = {}
 
 
-def live_request(req):
-    """Normalise a recorded or live payload into a scenario, then score it with
-    exactly the same code path the fixtures use."""
+def _fetch_raw(req):
+    """Resolve what was typed, then fetch: the recording, an inline payload,
+    or the provider. Returns (raw, meta, where, src) or ({"error": ...},).
+    Shared by /api/live (the draft page) and /api/search (mock 10)."""
     src = req.get("source") or "sample"
-    _LIVE_META = {}
-
-    # Resolve what the user typed BEFORE anything is spent. A search that burns
-    # a metered API call and then discovers the destination was a typo is a
-    # search that cost money to fail.
     where = {}
     if src == "api":
+        # what was typed is checked first, whether or not a call will be spent:
+        # a typo is a typo, and the recording standing in should not hide it
         for field, default in (("origin", "NYC"), ("destination", "")):
             code, how, problem = places.resolve(req.get(field) or default)
             if problem:
-                return {"error": problem, "field": field, "live": True,
-                        "suggest": places.suggest(req.get(field) or "")}
+                return ({"error": problem, "field": field, "live": True,
+                         "suggest": places.suggest(req.get(field) or "")},)
             where[field] = {"code": code, "how": how, "typed": req.get(field) or default,
                             "label": places.label_for(code)}
         d = (req.get("date") or "").strip()
         if not re.match(r"^\d{4}-\d{2}-\d{2}$", d):
-            return {"error": "That date did not look like a date. Use YYYY-MM-DD.",
-                    "field": "date", "live": True}
+            return ({"error": "That date did not look like a date. Use YYYY-MM-DD.",
+                     "field": "date", "live": True},)
         where["date"] = d
+        if not live.load_config().get("key"):
+            # no key on this machine: the recording stands in, and says so
+            src = "sample"
+            req = dict(req, _fell_back=True)
+    meta = {}
     if src == "sample":
-        # Which recording depends on which provider is configured, so the page
-        # with no key shows the shape of the feed it would actually get.
         want = str(req.get("provider") or live.load_config().get("provider") or "duffel")
         name = {"duffel": "duffel-jfk-lhr.json",
                 "amadeus": "amadeus-jfk-lhr.json",
@@ -531,7 +532,9 @@ def live_request(req):
             with open(path, encoding="utf-8") as fh:
                 raw = json.load(fh)
         except OSError as exc:
-            return {"error": "no recorded sample: %s" % exc}
+            return ({"error": "no recorded sample: %s" % exc},)
+        if req.get("_fell_back"):
+            meta["fell_back"] = "no flight API key on this machine"
     elif src == "inline":
         raw = req.get("payload") or {}
     elif src == "api":
@@ -540,23 +543,51 @@ def live_request(req):
              "adults": int(req.get("adults", 1)), "currency": "USD", "limit": 50}
         raw, meta = live.search(q)
         if raw is None:
-            # The failure IS the answer here - a quota wall or a missing key
-            # should read as a sentence, not a spinner that never resolves.
-            return {"error": meta.get("error", "live search unavailable"),
-                    "hint": meta.get("hint") or meta.get("how"),
-                    "quota": meta.get("quota"), "live": True}
-        _LIVE_META = meta
+            return ({"error": meta.get("error", "live search unavailable"),
+                     "hint": meta.get("hint") or meta.get("how"),
+                     "quota": meta.get("quota"), "live": True},)
     else:
-        return {"error": "unknown source %r - this server does not call a flight "
-                         "API itself; hand it a payload or use the recording" % src}
+        return ({"error": "unknown source %r - this server does not call a flight "
+                          "API itself; hand it a payload or use the recording" % src},)
+    return raw, meta, where, src
 
-    # Dispatch on the payload's own shape. A profile pointed at the wrong
-    # provider then fails as a parse error rather than as a plausible-looking
-    # scenario assembled from the wrong keys.
-    # The ORIGIN ADDRESS is a different thing from the origin airport: "Bushwick"
-    # is where they are, "NYC" is where they fly from, and ground access needs
-    # the first one. Falling back to the airport text is better than assuming a
-    # neighbourhood in Brooklyn for somebody in Lisbon.
+
+def search_request(req):
+    """Mock 10's search: the same fetch as /api/live, then everything the page
+    reads (data.build_slim: the pool, the ledgers per target, the 66-point
+    grid, the feed's own facts). One-way today: the outbound date only."""
+    got = _fetch_raw(req)
+    if len(got) == 1:
+        return got[0]
+    raw, meta, where, src = got
+    sys.path.insert(0, os.path.join(UI, "mock"))
+    import data as mockdata                                   # noqa: E402  (imports server, so it is loaded here, not at the top)
+    origin_text = (req.get("origin_address") or req.get("origin") or "bushwick-brooklyn")
+    try:
+        out = mockdata.build_slim(raw, origin_key=origin_text, checked_bags=int(req.get("checked_bags", 1)),
+                                  origin_full=req.get("origin_address") or None)
+    except ValueError as exc:
+        return {"error": str(exc)}
+    out["feed"] = {"source": src, "fetched": meta.get("source"), "age_seconds": meta.get("age_seconds"),
+                   "quota": meta.get("quota"), "fell_back": meta.get("fell_back")}
+    out["where"] = where or None
+    if src == "sample":
+        out["source_note"] = ("Recorded JFK–LHR results, not a live search" +
+                              (": " + meta["fell_back"] if meta.get("fell_back") else "") + ".")
+    if not out.get("_provenance"):
+        out["_provenance"] = {}
+    out["_provenance"]["live"] = src == "api"
+    return out
+
+
+def live_request(req):
+    """Normalise a recorded or live payload into a scenario, then score it with
+    exactly the same code path the fixtures use."""
+    got = _fetch_raw(req)
+    if len(got) == 1:
+        return got[0]
+    raw, _LIVE_META, where, src = got
+
     origin_text = (req.get("origin_address") or req.get("origin_key")
                    or req.get("origin") or "bushwick-brooklyn")
     sc = adapter.from_feed(raw, origin_key=origin_text,
@@ -674,6 +705,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self.send_error(404)
             return self._send_file(os.path.join(UI, "mock", name),
                                    "text/html; charset=utf-8")
+        if path == "/signin":
+            # Cloudflare Access protects this path; by the time a request lands
+            # here the person has signed in, and the cookie now covers /api/*
+            q = self.path.split("?", 1)[1] if "?" in self.path else ""
+            nxt = dict(kv.split("=", 1) for kv in q.split("&") if "=" in kv).get("next", "/")
+            self.send_response(302); self.send_header("Location", nxt if nxt.startswith("/") else "/"); self.send_header("Content-Length", "0"); self.end_headers(); return
         if path == "/api/whoami":
             who = self._who()
             return self._json({"remote": self._remote(), "email": None if who in (None, "owner") else who,
@@ -708,7 +745,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
     # --------------------------------------------------------------- POST
     def do_POST(self):
         path = self.path.split("?")[0]
-        if path not in ("/api/score", "/api/narrate", "/api/live", "/api/wish"):
+        if path not in ("/api/score", "/api/narrate", "/api/live", "/api/wish", "/api/search"):
             return self.send_error(404)
         try:
             n = int(self.headers.get("Content-Length") or 0)
@@ -718,21 +755,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
         # Spending: a live search, the narrator and the wish model. The owner
         # spends freely; a signed-in visitor spends from a daily allowance;
         # nobody anonymous spends at all.
-        spends = path == "/api/narrate" or path == "/api/wish" or (path == "/api/live" and (req.get("source") or "sample") != "sample")
+        # a live search only spends when this machine holds a key; without one the recording stands in
+        spends = path == "/api/narrate" or path == "/api/wish" or (path in ("/api/live", "/api/search") and (req.get("source") or "sample") != "sample" and bool(live.load_config().get("key")))
         if spends and self._remote():
             who = self._who()
             if not who:
                 return self._json({"error": "Sign in to run a live search. The public address serves recorded results to anyone; "
                                             "live searches, the narrator and the wish box are for signed-in people, so nobody can spend the quota anonymously.",
                                    "remote": True, "sign_in": True})
-            kind, limit = ("searches", USER_SEARCHES) if path == "/api/live" else ("wishes", USER_WISHES)
+            kind, limit = ("searches", USER_SEARCHES) if path in ("/api/live", "/api/search") else ("wishes", USER_WISHES)
             ok, left = _users_take(who, kind, limit)
             if not ok:
                 return self._json({"error": "That is today's allowance of %d %s for %s. It resets at midnight." % (limit, kind, who),
                                    "remote": True, "allowance": True})
         try:
             fn = {"/api/score": score_request, "/api/narrate": narrate_request,
-                  "/api/live": live_request, "/api/wish": wish_request}[path]
+                  "/api/live": live_request, "/api/wish": wish_request, "/api/search": search_request}[path]
             return self._json(fn(req))
         except Exception as exc:
             # a broken fixture should say so on the page, not 500 silently

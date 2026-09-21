@@ -44,25 +44,29 @@ GOOGLE=$(echo "$IDPS" | jq_ 'print(next((i["id"] for i in d.get("result") or [] 
 echo "  one-time PIN: $OTP${GOOGLE:+   google: $GOOGLE}"
 IDP_LIST="\"$OTP\"${GOOGLE:+,\"$GOOGLE\"}"
 
-echo "== application $HOST"
-APP=$(cf GET "/apps" | jq_ "print(next((a['id'] for a in d.get('result') or [] if a.get('domain')=='$HOST'), ''))")
-BODY="{\"name\":\"ConcordeGo\",\"type\":\"self_hosted\",\"domain\":\"$HOST\",\"session_duration\":\"$SESSION\",\"allowed_idps\":[$IDP_LIST],\"auto_redirect_to_identity\":false,\"app_launcher_visible\":true}"
-if [ -z "$APP" ]; then
-  APP=$(cf POST /apps "$BODY" | jq_ 'print(d["result"]["id"]) if d.get("success") else sys.exit("  " + json.dumps(d.get("errors")))')
-  echo "  created $APP"
-else
-  cf PUT "/apps/$APP" "$BODY" >/dev/null; echo "  updated $APP"
-fi
-
-echo "== policy: allow these people"
+ensure_app(){ # name domain policy_json
+  local NAME="$1" DOM="$2" POLICY="$3" APP
+  APP=$(cf GET "/apps" | jq_ "print(next((a['id'] for a in d.get('result') or [] if a.get('domain')=='$DOM'), ''))")
+  local BODY="{\"name\":\"$NAME\",\"type\":\"self_hosted\",\"domain\":\"$DOM\",\"session_duration\":\"$SESSION\",\"allowed_idps\":[$IDP_LIST],\"auto_redirect_to_identity\":false,\"app_launcher_visible\":false}"
+  if [ -z "$APP" ]; then APP=$(cf POST /apps "$BODY" | jq_ 'print(d["result"]["id"]) if d.get("success") else sys.exit("  " + json.dumps(d.get("errors")))'); echo "  created $NAME ($DOM)"
+  else cf PUT "/apps/$APP" "$BODY" >/dev/null; echo "  updated $NAME ($DOM)"; fi
+  local POL; POL=$(cf GET "/apps/$APP/policies" | jq_ 'print(next((p["id"] for p in d.get("result") or [] if p.get("name") in ("Friends","Everyone")), ""))')
+  if [ -z "$POL" ]; then cf POST "/apps/$APP/policies" "$POLICY" | jq_ 'print("    policy", d["result"]["id"]) if d.get("success") else sys.exit("  " + json.dumps(d.get("errors")))'
+  else cf PUT "/apps/$APP/policies/$POL" "$POLICY" | jq_ 'print("    policy", d["result"]["id"]) if d.get("success") else sys.exit("  " + json.dumps(d.get("errors")))'; fi
+}
 INCLUDE=$(python3 -c "import json,sys; print(json.dumps([{'email':{'email':e.strip().lower()}} for e in '$ALLOW'.split(',') if e.strip()]))")
-POL=$(cf GET "/apps/$APP/policies" | jq_ 'print(next((p["id"] for p in d.get("result") or [] if p.get("name")=="Friends"), ""))')
-PBODY="{\"name\":\"Friends\",\"decision\":\"allow\",\"include\":$INCLUDE,\"precedence\":1}"
-if [ -z "$POL" ]; then
-  cf POST "/apps/$APP/policies" "$PBODY" | jq_ 'print("  created", d["result"]["id"]) if d.get("success") else sys.exit("  " + json.dumps(d.get("errors")))'
-else
-  cf PUT "/apps/$APP/policies/$POL" "$PBODY" | jq_ 'print("  updated", d["result"]["id"]) if d.get("success") else sys.exit("  " + json.dumps(d.get("errors")))'
-fi
+FRIENDS="{\"name\":\"Friends\",\"decision\":\"allow\",\"include\":$INCLUDE,\"precedence\":1}"
+EVERYONE='{"name":"Everyone","decision":"bypass","include":[{"everyone":{}}],"precedence":1}'
+
+echo "== applications"
+# Two doors need a sign-in: everything under /api (a live search, the wish box,
+# the price check) and /signin, the page the site sends people to. The page
+# itself and its assets stay open to everyone, so anyone can browse and read
+# the recorded results; the server spends nothing for a visitor Access did
+# not sign in, and Access never lets an anonymous request reach /api at all.
+ensure_app "ConcordeGo API" "$HOST/api" "$FRIENDS"
+ensure_app "ConcordeGo sign-in" "$HOST/signin" "$FRIENDS"
+ensure_app "ConcordeGo" "$HOST" "$EVERYONE"
 echo
-echo "Done. https://$HOST now asks for a sign-in; the server sees the email in Cf-Access-Authenticated-User-Email"
+echo "Done. https://$HOST is open to browse; /api and /signin ask for a sign-in, and the server sees the email in Cf-Access-Authenticated-User-Email"
 echo "and gives each person a daily allowance (CONCORDEGO_USER_SEARCHES, default 20; CONCORDEGO_USER_WISHES, default 200)."

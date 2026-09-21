@@ -601,6 +601,21 @@ html.hdrmarks .mark-hdr{display:block}
 .sum i{font-style:normal;font-size:11.5px;color:var(--dim);border:1px solid var(--line);border-radius:999px;padding:2px 8px;white-space:nowrap}
 .barbtns{display:flex;gap:6px;flex-wrap:wrap}
 .barbtns button{border:1px solid var(--line);border-radius:999px;padding:8px 13px;font-size:13px;font-weight:500;color:var(--dim);transition:.15s}
+.acctbtn{border:1px solid var(--line);border-radius:999px;padding:8px 13px;font-size:13px;font-weight:500;color:var(--text);background:rgba(255,255,255,.04)}
+.acctbtn.in{color:var(--dim);font-weight:400}
+.rail .rail-acct{order:9;margin-left:auto}
+/* what needs an account, while there is none: greyed, and a tap opens the pop-up */
+.locked{opacity:.5;cursor:not-allowed;position:relative}
+.locked *{pointer-events:none}
+.searcherr{color:var(--red);font-size:13px;margin:8px 0 0;min-height:0}
+.searcherr:empty{display:none}
+.acctsheet{max-width:560px;place-self:center}
+.acctbody p{color:var(--dim);font-size:13.5px;line-height:1.55;margin:0 0 12px}
+.acctbody ul{margin:0 0 16px;padding-left:18px;color:var(--text);font-size:13.5px;line-height:1.7}
+.acctbody ul small{color:var(--faint)}
+.acctbody .row2{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.acctbody .row2 .ledger{padding:11px 6px}
+.acctbody .fine{font-size:11.5px;color:var(--faint);margin:14px 0 0}
 .barbtns button:hover{border-color:var(--dim);color:var(--text)}
 .barbtns .dimbtn{border-color:transparent;color:var(--faint)}
 #results>.wrapin{max-width:1180px;margin:0 auto;padding-inline:clamp(16px,3.5vw,32px)}
@@ -632,6 +647,7 @@ html.hdrmarks .mark-hdr{display:block}
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><linearGradient id="wgrad" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs></svg>
 <div class="rail" id="rail"><div class="railin">
   <a class="brand" href="#top" aria-label="ConcordeGo"><svg class="wing" viewBox="2 2.3 19.6 16.4" aria-hidden="true" focusable="false"><g><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><span class="lockup"><span class="mark-txt">Concorde<span class="tld">Go</span></span><video class="mark-hdr" data-mark="go" muted playsinline loop preload="none" aria-hidden="true"></video></span></a>
+  <button class="acctbtn rail-acct" id="account2">Sign in</button>
   <div class="steps">
     <button class="st on" data-s="1"><i>1</i>Where and when</button><button class="st" data-s="2"><i>2</i>What matters</button><button class="st" data-s="3"><i>3</i>Points and miles</button><button class="st" data-s="4"><i>4</i>Anything else</button>
   </div>
@@ -646,6 +662,7 @@ html.hdrmarks .mark-hdr{display:block}
       <div class="tripseg" id="trip" role="group" aria-label="Trip type"><button data-trip="round" aria-pressed="true">Round trip</button><button data-trip="one" aria-pressed="false">One way</button><button data-trip="multi" aria-pressed="false">Multi-city</button></div>
       <div class="fields" id="sentence"></div>
       <button class="addleg hidden" id="addleg">+ add another flight</button>
+      <p class="searcherr" id="searcherr" role="alert"></p>
     </div></div>
     <div class="nav"><button class="go" data-next="2">Continue <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v11M3 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">or press Enter</span></div></div>
   </div></section>
@@ -671,7 +688,7 @@ html.hdrmarks .mark-hdr{display:block}
         <div class="chips" id="chips"></div><p class="chipnote hidden" id="chipnote"></p>
         <div class="wish">
           <h3><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l1.7 4.2L14 6.4l-3.3 3 .9 4.5L8 11.6l-3.6 2.3.9-4.5-3.3-3 4.3-1.2z"/></svg>Make a wish</h3>
-          <div class="wishrow"><textarea id="wish" placeholder="Say it the way you'd say it to a friend. &ldquo;I really don't want to fly American, but I'd take it for a lie-flat seat. Nothing before 9am.&rdquo;"></textarea>
+          <div class="wishrow" id="wishbox"><textarea id="wish" placeholder="Say it the way you'd say it to a friend. &ldquo;I really don't want to fly American, but I'd take it for a lie-flat seat. Nothing before 9am.&rdquo;"></textarea>
             <button class="mic" id="mic" data-on="0" title="Speak instead"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 10a3 3 0 0 0 3-3V4a3 3 0 0 0-6 0v3a3 3 0 0 0 3 3zm5-3h-1.2a3.8 3.8 0 0 1-7.6 0H3a5 5 0 0 0 4.3 4.9V14h1.4v-2.1A5 5 0 0 0 13 7z"/></svg>Speak</button>
             <button class="wishgo" id="wishgo">Apply</button></div>
           <div class="understood" id="understood"></div>
@@ -710,7 +727,7 @@ html.hdrmarks .mark-hdr{display:block}
 <div class="bar hidden" id="bar"><div class="barin">
   <a class="brand" href="#top" aria-label="ConcordeGo"><svg class="wing" viewBox="2 2.3 19.6 16.4" aria-hidden="true" focusable="false"><g><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><span class="lockup"><span class="mark-txt">Concorde<span class="tld">Go</span></span><video class="mark-hdr" data-mark="go" muted playsinline loop preload="none" aria-hidden="true"></video></span></a>
   <button class="sum" id="sum" data-tab="where" title="Edit your search"><b id="sumline"></b><span id="sumchips"></span></button>
-  <div class="barbtns"><button data-tab="where">Edit search</button><button data-tab="matters">Filters</button><button data-tab="advanced">Advanced</button><button class="dimbtn" id="startover">Start over</button></div>
+  <div class="barbtns"><button data-tab="where">Edit search</button><button data-tab="matters">Filters</button><button data-tab="advanced">Advanced</button><button class="dimbtn" id="startover">Start over</button><button class="acctbtn" id="account">Sign in</button></div>
 </div></div>
 
 <div class="loading hidden" id="loading" role="status" aria-live="polite"><div class="loadin">
@@ -760,12 +777,17 @@ html.hdrmarks .mark-hdr{display:block}
   </div>
 </div>
 <div id="sheetroot"></div>
+<div class="sheetwrap hidden" id="acct"><div class="sheet acctsheet" role="dialog" aria-modal="true" aria-label="Account">
+  <div class="hd"><h3 id="accth">An account is free, and it opens the doors that cost something</h3><button class="x" id="acctx" aria-label="Close">×</button></div>
+  <div class="acctbody" id="acctbody"></div>
+</div></div>
 
 <script>
-const D = __DATA__;
+let D = __DATA__;
 // the pictures on the shortlist cards; declared first because the cards are drawn at boot
 var PHOTOS = __PHOTOS__;
-const PH = {idx:0, t0:performance.now(), timer:null, city:(D.query.origin || 'Brooklyn').split(',').pop().trim()};
+const cityOf = q => ((q.origin_full || q.origin || 'Brooklyn').split(',').pop().replace(/\d+/g, '').trim() || 'Brooklyn');
+const PH = {idx:0, t0:performance.now(), timer:null, city:cityOf(D.query)};
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // One currency inside the model (hard rule 3): every figure is scored in US
@@ -787,9 +809,9 @@ const stopsText = e => e.stops === 0 ? 'nonstop' : e.stops === 1 ? 'via ' + e.ro
 const niceDate = d => new Date(d + 'T12:00:00Z').toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short', timeZone:'UTC'});
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const ALL = D.results.reference.slice();
-const PR = D.profiles;
-const AIR = D.airlines || {};
+let ALL = D.results.reference.slice();
+let PR = D.profiles;
+let AIR = D.airlines || {};
 const NAMES = {cheapest:'cheapest all-in', fastest:'fastest door to door', comfort:'most comfortable'};
 
 // Brand colours for the monogram that stands in when the airline's own logo
@@ -808,7 +830,7 @@ const AIRNAME = {american:'AA',aa:'AA','british airways':'BA',ba:'BA',british:'B
 const S = {trip:'round', a:1, b:0, c:0, preset:'1,0,0', asap:false, wants:new Set(), rules:[], ride:'either', off:new Set(), menu:false, open:new Set(),
   extra:{bag:0, wifi:false, seat:false, legroom:false, lounge:false, priority:false, insurance:false, hotel:false, custom:[]}, adv:{dep0:0, dep1:24, arr0:0, arr1:24, cabin:'economy', stops:2, alli:new Set(), out:new Set()},
   pts:{amex:120000, chase:80000, capone:0, citi:0, bilt:0, avios:0, virgin:0, aa:0, delta:0}, shown:12, T:'mine',
-  legs:[{from:'Wyckoff Ave & Myrtle Ave, Bushwick', to:'London', date:'Wed 18 Nov'}], back:'Wed 25 Nov', pax:'1 adult', bags:'1 checked bag'};
+  legs:[{from:'Wyckoff Ave & Myrtle Ave, Bushwick, Brooklyn', to:'London', date:'Wed 18 Nov'}], back:'Wed 25 Nov', pax:'1 adult', bags:'1 checked bag'};
 
 // ---- wants: a predicate, a charge when it is missing, and a hint when nothing has it
 const NEWGEN = /^(78[1789]|359|351|339|338|32N|32Q|223|7M[89])$/;
@@ -950,7 +972,7 @@ function payHTML(e, total){
 }
 
 // ---- the triangle
-const GRID = {}; D.grid_points.forEach((p, i) => { GRID[Math.round(p[0]*10) + '-' + Math.round(p[1]*10)] = i; });
+let GRID = {}; D.grid_points.forEach((p, i) => { GRID[Math.round(p[0]*10) + '-' + Math.round(p[1]*10)] = i; });
 function gridIndex(a, b){ let i = Math.round(a*10), j = Math.round(b*10); if (i + j > 10){ if (i >= j) i = 10 - j; else j = 10 - i; } return GRID[i + '-' + j]; }
 const tri = $('#tri'), cv = $('#cv'), handle = $('#handle');
 function corners(){ const w = tri.clientWidth, h = tri.clientHeight, pad = 14; return {Cx:w/2, Cy:pad, Ax:pad, Ay:h-pad, Bx:w-pad, By:h-pad}; }
@@ -1172,7 +1194,7 @@ function sealHTML(e, small){
 // against the shortest nonstop in the results, and on the airline's rating.
 // The airport hour is the same for everyone, so it stays neutral.
 const clamp01 = x => Math.max(0, Math.min(1, x));
-const AP = D.airports || {};
+let AP = D.airports || {};
 const groundQ = (m, cents) => clamp01(1 - Math.max(0, m - 40)/170 - (cents >= 6000 ? .25 : cents >= 3000 ? .1 : 0));
 // minutes of a layover that fall outside the terminal's shop-and-food hours,
 // from the curated table; null when the airport is not curated
@@ -1370,7 +1392,7 @@ function paintDoors(rows, ctx){
   DOOR_IDS = doors.map(d => d.dataset.id);
   mountPhotos();
   const basis = S.asap ? 'by arrival time: the first gets you there soonest.' : S.a === 1 ? 'cheapest all in.' : S.b === 1 ? 'fastest door to door.' : S.c === 1 ? 'most comfortable first.' : 'all in at your dial, wants charged, wishes applied.';
-  $('#lede').textContent = D.query.total_found + ' flights came back, ranked ' + basis + ' Pros and cons are against the rest of the field; the ledger has every figure.';
+  $('#lede').textContent = (S.notice ? S.notice + ' ' : '') + D.query.total_found + ' flights came back, ranked ' + basis + ' Pros and cons are against the rest of the field; the ledger has every figure.';
 }
 
 // ---- the list
@@ -1583,6 +1605,7 @@ async function askModel(text){
 }
 async function applyWish(text, box){
   text = (text || '').trim(); if (!text) return;
+  if (!S.user){ openAccount(); return; }
   if (box) box.disabled = true;
   const m = await askModel(text);
   if (box) box.disabled = false;
@@ -1639,13 +1662,25 @@ function paintPts(){
 }
 
 // ---- boot
-const P = D.par;
+let P = D.par;
+// A live search replaces everything the page reads. Every derived table is
+// rebuilt here, so a second search is a clean slate and not a mix of two.
+function loadData(d){
+  D = d; ALL = D.results.reference.slice(); PR = D.profiles; AIR = D.airlines || {}; AP = D.airports || {}; P = D.par;
+  GRID = {}; D.grid_points.forEach((p, i) => { GRID[Math.round(p[0]*10) + '-' + Math.round(p[1]*10)] = i; });
+  WANTS.forEach(w => w.count = ALL.filter(w.ok).length);
+  PH.city = cityOf(D.query); DOOR_IDS = []; S.open = new Set();
+  paintPar(); paintCov();
+}
 function paintPar(){
 $('#how1').innerHTML = 'Par for this route is <b>' + money(D.query.par_cents) + '</b>: what a nonstop in main cabin with a bag costs all in, leaving ' + esc(P.reference.departs_local) + ', ' + dur(P.reference.door_to_door_minutes) + ' door to door, at ' + (P.season_factor < .95 ? 'an off-season' : P.season_factor > 1.05 ? 'a peak' : 'a shoulder') + ' fare for ' + P.miles.toLocaleString() + ' miles. About par is an A; every letter below is a step further from it.';
 $('#parledger').innerHTML = P.ledger.map(l => `<li><span>${esc(l.label)}</span><span class="num">${signed(l.cents)}</span></li>`).join('') + `<li class="t"><span>Par</span><span class="num">${money(P.par_cents)}</span></li>`;
 }
 paintPar();
-$('#cov').innerHTML = '<b>Draft data.</b> ' + esc(D.gaps[0] || '') + '. ' + esc(D.verdict || '') + '. A real Duffel search on a test token; some fares and times are invented. Airline logos load from the feed where the page can reach it and fall back to a monogram where it cannot.';
+function paintCov(){
+  $('#cov').innerHTML = (D.source_note ? '<b>' + esc(D.source_note) + '</b> ' : (D._provenance && D._provenance.live ? '<b>Live search.</b> ' : '<b>Draft data.</b> ')) + esc(D.gaps[0] || '') + '. ' + esc(D.verdict || '') + (D._provenance && D._provenance.live ? '' : '. A real Duffel search on a test token; some fares and times are invented') + '. Airline logos load from the feed where the page can reach it and fall back to a monogram where it cannot.';
+}
+paintCov();
 sentenceHTML(); paintChips(); paintCarriers(); paintPts(); paintTri(); setWeights(1, 0, 0, '1,0,0');
 
 // events
@@ -1717,6 +1752,40 @@ document.addEventListener('click', ev => { const b = ev.target.closest('[data-pl
 document.addEventListener('click', ev => { const i = ev.target.closest('.info'); document.querySelectorAll('.info[aria-expanded=true]').forEach(x => { if (x !== i) x.setAttribute('aria-expanded', 'false'); }); if (i) i.setAttribute('aria-expanded', i.getAttribute('aria-expanded') === 'true' ? 'false' : 'true'); });
 document.addEventListener('click', ev => { if (ev.target.id === 'x' || ev.target.id === 'sheetwrap') $('#sheetroot').innerHTML = ''; });
 $('#go').addEventListener('click', enterResults);
+// ---- the account. Anyone can browse and read recorded results. Live
+// searches, the wish box and the price check spend money, so they need a
+// sign-in (Cloudflare Access: email code or Google; no password to keep).
+// The server counts each person's day; the page greys the doors until then.
+S.user = null;
+const LOCKS = [['#wishbox', 'the wish box'], ['#dock .composer', 'the wish box'], ['#rbox', 'the price check']];
+function paintAccount(){
+  const u = S.user, label = !u ? 'Sign in' : u.owner ? 'This machine' : (u.email || 'Signed in').replace(/@.*/, '') + (u.demo ? ' (demo)' : '');
+  for (const id of ['#account', '#account2']){ const b = $(id); if (!b) continue; b.textContent = label; b.classList.toggle('in', !!u); b.title = u && u.left ? u.left.searches + ' live searches and ' + u.left.wishes + ' wishes left today' : u ? '' : 'Free: email or Google'; }
+  for (const [sel, what] of LOCKS){ const el = document.querySelector(sel); if (!el) continue; el.classList.toggle('locked', !u);
+    if (!u){ el.dataset.tip = '<div class="jh"><i></i><b>Sign in to use ' + what + '</b></div><ul><li>Free. Your email or Google; no password.</li></ul>'; el.setAttribute('aria-label', 'Sign in to use ' + what); } else { delete el.dataset.tip; el.removeAttribute('aria-label'); } }
+  const h4 = document.querySelector('#s4 .hintr'); if (h4) h4.textContent = u && !u.demo ? 'Advanced options are optional; leave them and go.' : 'Without a sign-in these are recorded results. Sign in above to search live.';
+}
+function openAccount(){
+  const u = S.user;
+  $('#accth').textContent = u ? (u.owner ? 'This machine' : 'Your account') : 'An account is free, and it opens the doors that cost something';
+  $('#acctbody').innerHTML = u ? `<p>${u.owner ? 'Searches from this machine spend freely; no allowance applies.' : 'Signed in as <b>' + esc(u.email || '') + '</b>.' + (u.left ? ' Today: <b>' + u.left.searches + '</b> live searches and <b>' + u.left.wishes + '</b> wishes left.' : '')}</p>
+      <div class="row2">${!u.owner && !u.demo && SERVED ? '<a class="ledger" href="/cdn-cgi/access/logout">Sign out</a>' : ''}${u.demo ? '<button class="ledger" id="acctout">Leave the demo account</button>' : ''}<button class="choose" id="acctno" style="flex:0 0 auto">Done</button></div>`
+    : `<p>Browsing and the recorded results are open to everyone. The parts that cost real money each time need a sign-in, so that nobody anonymous can run them up. Signing in is your email or Google, no password.</p>
+      <ul><li>Live searches on your own dates and places <small>· 20 a day</small></li><li>The wish box, read by Claude <small>· 200 a day</small></li><li>The price check from other countries <small>· 2 a day</small></li><li>Saved searches and a watchlist of routes, with price history <small>· up to 5 routes, coming</small></li></ul>
+      <div class="row2"><button class="choose" id="acctgo" style="flex:0 0 auto">${SERVED ? 'Sign in or sign up' : 'Sign in (demo)'}</button><button class="ledger" id="acctno">Not now</button></div>
+      <p class="fine">${SERVED ? 'You will be sent to the sign-in page and brought straight back.' : 'Opened as a file there is no sign-in page; this unlocks the demo.'}</p>`;
+  $('#acct').classList.remove('hidden'); ($('#acctgo') || $('#acctno')).focus();
+}
+function closeAccount(){ $('#acct').classList.add('hidden'); }
+document.addEventListener('click', ev => {
+  if (ev.target.closest('#account, #account2')){ openAccount(); return; }
+  if (ev.target.closest('#acctx, #acctno') || ev.target.id === 'acct'){ closeAccount(); return; }
+  if (ev.target.closest('#acctgo')){ if (SERVED) location.href = '/signin?next=' + encodeURIComponent(location.pathname); else { S.user = {email:'you@example.com', demo:true}; paintAccount(); closeAccount(); } return; }
+  if (ev.target.closest('#acctout')){ S.user = null; paintAccount(); closeAccount(); return; }
+  const lock = ev.target.closest('.locked'); if (lock){ ev.preventDefault(); ev.stopPropagation(); openAccount(); }
+}, true);
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('#acct').classList.contains('hidden')) closeAccount(); });
+if (SERVED) fetch('/api/whoami').then(r => r.json()).then(w => { S.user = w.owner ? {owner:true} : w.email ? {email:w.email, left:w.left} : null; paintAccount(); }).catch(() => paintAccount()); else paintAccount();
 // the hover card: one element, filled from the segment under the pointer
 const JT = document.createElement('div'); JT.className = 'jtip'; JT.setAttribute('role', 'tooltip'); JT.hidden = true; document.body.appendChild(JT);
 let jtFor = null;
@@ -1729,7 +1798,7 @@ function showTip(seg){
   requestAnimationFrame(() => JT.classList.add('on'));
 }
 function hideTip(){ jtFor = null; JT.classList.remove('on'); setTimeout(() => { if (!jtFor) JT.hidden = true; }, 150); }
-document.addEventListener('mouseover', ev => { const seg = ev.target.closest('.jseg, .seal[data-tip]'); if (seg) showTip(seg); else if (jtFor && !ev.target.closest('.jtip')) hideTip(); });
+document.addEventListener('mouseover', ev => { const seg = ev.target.closest('.jseg, .seal[data-tip], .locked[data-tip]'); if (seg) showTip(seg); else if (jtFor && !ev.target.closest('.jtip')) hideTip(); });
 document.addEventListener('focusin', ev => { const seg = ev.target.closest('.jseg, .seal[data-tip]'); if (seg) showTip(seg); });
 document.addEventListener('focusout', ev => { if (ev.target.closest && ev.target.closest('.jseg, .seal[data-tip]')) hideTip(); });
 document.addEventListener('scroll', () => { if (jtFor) hideTip(); }, {passive:true});
@@ -1737,7 +1806,6 @@ document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && jtFor) h
 $('#cur').innerHTML = Object.entries(CURRENCIES).map(([k, v]) => `<option value="${k}"${k === CUR ? ' selected' : ''}>${k} · ${esc(v.name)}</option>`).join('');
 function curNote(){ const k = CURRENCIES[CUR]; $('#curnote').textContent = CUR === 'USD' ? 'Figures in US dollars.' : '1 USD = ' + k.rate + ' ' + CUR + ' · ' + RATES_ASOF + '.'; }
 curNote();
-if (SERVED) fetch('/api/whoami').then(r => r.json()).then(w => { $('#whoami').textContent = w.owner ? 'This machine: no allowance applies.' : w.email ? `Signed in as ${w.email} · ${w.left.searches} live searches and ${w.left.wishes} wishes left today.` : 'Not signed in: recorded results only.'; }).catch(() => {});
 $('#cur').addEventListener('change', ev => { CUR = ev.target.value; try { localStorage.setItem('concordego.currency', CUR); } catch (e) {} curNote(); paintPar(); rerenderBills(); if (S.thread.length) renderThread(); });
 addEventListener('resize', () => { paintTri(); const [x, y] = toXY(S.a, S.b, S.c); handle.style.left = x + 'px'; handle.style.top = y + 'px'; });
 
@@ -1875,8 +1943,39 @@ function runProgress(box, stages, ms, done){
   setTimeout(step, 60);
 }
 const SEARCH_STAGES = [['Asking the airlines', 22], ['Pricing the ride from your door', 44], ['Timing every layover', 62], ['Grading against par', 84], ['Ranking at your dial', 100]];
-function enterResults(){
-  const box = $('#loading'); box.classList.remove('hidden'); $('#wizard').classList.add('hidden'); $('#rail').classList.add('hidden');
+// 'Wed 18 Nov' or '18 Nov' or '2026-11-18' -> an ISO date; the next such day from today
+const MON = {jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, sept:8, oct:9, nov:10, dec:11};
+function toISODate(str){
+  const t = (str || '').trim(); if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  const m = /(\d{1,2})\s+([A-Za-z]{3,4})\.?(?:\s+(\d{4}))?/.exec(t) || /([A-Za-z]{3,4})\.?\s+(\d{1,2})(?:,?\s+(\d{4}))?/.exec(t); if (!m) return null;
+  const day = +(m[1].length <= 2 && /^\d/.test(m[1]) ? m[1] : m[2]), mon = MON[(/^\d/.test(m[1]) ? m[2] : m[1]).toLowerCase()]; if (mon == null || !day) return null;
+  const now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let y = m[3] ? +m[3] : now.getFullYear(); let d = new Date(y, mon, day); if (!m[3] && d < today) d = new Date(y + 1, mon, day);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+const paxCount = () => ({'1 adult':1, '2 adults':2, 'Family of 4':4}[S.pax] || 1);
+// Served and signed in, the search is real: what was typed goes to /api/search
+// and the page is rebuilt from what comes back. Anyone else sees the recording,
+// and the lede says so. Opened as a file there is no server, so the recording
+// is all there is.
+async function enterResults(){
+  const box = $('#loading'); box.classList.remove('hidden'); $('#wizard').classList.add('hidden'); $('#rail').classList.add('hidden'); $('#searcherr').textContent = '';
+  const L = S.legs[0], date = toISODate(L.date); S.notice = '';
+  if (SERVED && S.user && !S.user.demo && date){
+    runProgress(box, SEARCH_STAGES, 9000, () => {});
+    let res;
+    try { const r = await fetch('/api/search', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'api', origin:L.from, origin_address:L.from, destination:L.to, date, adults:paxCount(), checked_bags:partyBags()})}); res = await r.json(); }
+    catch (e){ res = {error:'The search did not come back: ' + e.message}; }
+    if (res.error){ box.classList.add('hidden'); $('#wizard').classList.remove('hidden'); $('#rail').classList.remove('hidden'); goStep(1);
+      $('#searcherr').textContent = res.error + (res.suggest && res.suggest.length ? ' Did you mean ' + res.suggest.slice(0, 3).join(', ') + '?' : ''); return; }
+    loadData(res);
+    S.notice = res.source_note || (res.feed && res.feed.fetched === 'cache' ? 'Live results, from a search a few minutes ago.' : 'Live results.');
+    if (S.trip === 'round') S.notice += ' Outbound leg only for now.';
+    box.querySelector('.pfill').style.width = '100%'; setTimeout(() => { box.classList.add('hidden'); showResults(); }, 350); return;
+  }
+  if (SERVED && !S.user) S.notice = 'Recorded results. Sign in to search live.';
+  else if (S.user && S.user.demo) S.notice = 'Recorded results: this is the demo.';
+  else if (L.date && !date) S.notice = 'Could not read the date, so these are recorded results.';
   runProgress(box, SEARCH_STAGES, REDUCED ? 500 : 2400, () => { box.classList.add('hidden'); showResults(); });
 }
 function showResults(){
@@ -1925,7 +2024,7 @@ function researchHTML(){
     <p class="rnote">* Foreign transaction fees may apply, typically 0–3% depending on your card. <b>How to read it.</b> The saving is on the ticket alone; the rest of the bill does not move. Points are unaffected. <b>What is real:</b> the fare rules, and the catches. <b>What is not, yet:</b> the figures, which are demo, seeded from each flight, because our feed prices at one point of sale. The real feature needs a connection that takes a country of sale per request.</p>`;
 }
 const RESEARCH_STAGES = POS.map(([code, flag, name], i) => ['Pricing from ' + name, Math.round(100 * (i + 1) / POS.length)]);
-document.addEventListener('click', ev => { if (!ev.target.closest('#rgo')) return; const box = $('#rbox');
+document.addEventListener('click', ev => { if (!ev.target.closest('#rgo')) return; if (!S.user){ openAccount(); return; } const box = $('#rbox');
   box.innerHTML = '<div class="pbar"><i class="pfill"></i></div><div class="pstage"></div>';
   runProgress(box, RESEARCH_STAGES, REDUCED ? 500 : 3600, () => { box.innerHTML = researchHTML(); box.classList.add('rise'); }); });
 function startOver(){

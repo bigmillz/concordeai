@@ -37,7 +37,11 @@ def _add(code: str, *names: str) -> None:
 
 
 # North America
-_add("NYC", "new york", "new york city", "nyc", "manhattan", "brooklyn", "queens")
+_add("NYC", "new york", "new york city", "nyc", "manhattan", "brooklyn", "queens", "the bronx", "bronx", "staten island",
+     # neighbourhoods people actually type as the last part of an address; still a table, not a guess
+     "bushwick", "williamsburg", "greenpoint", "park slope", "bed-stuy", "bedford-stuyvesant", "crown heights", "flatbush",
+     "astoria", "long island city", "flushing", "jackson heights", "harlem", "upper west side", "upper east side",
+     "lower east side", "east village", "west village", "chelsea", "tribeca", "soho", "midtown", "financial district")
 _add("JFK", "jfk", "kennedy"); _add("EWR", "newark", "ewr"); _add("LGA", "laguardia", "lga")
 _add("LAX", "los angeles", "la", "lax"); _add("SFO", "san francisco", "sfo")
 _add("CHI", "chicago"); _add("ORD", "o'hare", "ohare", "ord")

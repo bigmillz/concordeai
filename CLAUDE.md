@@ -453,6 +453,23 @@ a signed-in person a daily allowance (`CONCORDEGO_USER_SEARCHES` 20, `CONCORDEGO
 200, counted in `~/.concordego/users.json`), and lets the machine's owner spend freely.
 Recorded results serve to anyone. `/api/whoami` tells the page who it is talking to.
 
+**Mock 10 runs real searches when served** (`/api/search`): what the wizard holds (the
+address, the destination, the date, travellers, bags) goes to the server, which resolves
+the places, fetches (the provider with a key, the recording without one, and the lede says
+which), and returns everything the page reads via `data.build_slim()` — the same builder
+that writes `slim.json`, so a live search and the checked-in sample are one shape. The page
+rebuilds every derived table from the response (`loadData`); a typo comes back to the form
+with the sentence from `places.py`. One-way today: the outbound date only. Opened as a
+file, or by anyone Access did not sign in, the inlined recording is all there is.
+
+**An account is the deterrent.** Browsing and recorded results are open to everyone. A
+live search, the wish box and the price check need a sign-in: the page greys them and a
+tap opens the pop-up that says what an account gives (live searches 20 a day, wishes 200,
+price checks 2, a watchlist of 5 routes, coming) and sends the person to `/signin`, which
+Cloudflare Access protects; `access.sh` makes three applications — `/api/*` and `/signin`
+behind the email allowlist, the page itself open with a bypass policy — so an anonymous
+request never reaches `/api` at all, and the server counts each signed-in person's day.
+
 **The wish box's model is Claude Opus 5** (`concorde-travel/wish.py`, `/api/wish`), the same
 model as the narrator: one call at low effort with a strict JSON schema over the page's own
 vocabulary (avoid / want / tilt / max / after / before / note), the vocabulary cached as the
