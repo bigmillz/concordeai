@@ -31,14 +31,30 @@ TUNNEL="${TUNNEL:-concordego}"
 # find it in the dashboard, and a CF_ACCOUNT_ID that disagrees is refused before
 # a team or an application is created in the wrong account.
 TUN_ACCT=$(python3 - "$TUNNEL" <<'PY'
-import glob, json, os, sys
-want = sys.argv[1]; found = []
-for f in sorted(glob.glob(os.path.expanduser("~/.cloudflared/*.json"))):
-    try: d = json.load(open(f))
-    except Exception: continue
-    if d.get("AccountTag") and d.get("TunnelID"): found.append((d.get("TunnelName") == want, d["AccountTag"]))
-found.sort(key=lambda x: not x[0])
-print(found[0][1] if found and (found[0][0] or len(found) == 1) else "")
+import glob, json, os, re, sys
+want = sys.argv[1]; home = os.path.expanduser("~/.cloudflared")
+def tag(path):
+    try: d = json.load(open(path)); return d.get("AccountTag") or ""
+    except Exception: return ""
+# 1. the config go-live.sh wrote names the credentials file outright
+cfg = os.path.join(home, want + ".yml")
+if os.path.exists(cfg):
+    for line in open(cfg):
+        m = re.match(r"\s*credentials-file:\s*(.+?)\s*$", line)
+        if m and tag(m.group(1)): print(tag(m.group(1))); sys.exit()
+# 2. the tunnel id from cloudflared itself, then its credentials file
+try:
+    import subprocess
+    out = subprocess.run(["cloudflared", "tunnel", "list", "--name", want, "--output", "json"], capture_output=True, text=True, timeout=20).stdout
+    for t in json.loads(out or "[]"):
+        if t.get("name") == want and tag(os.path.join(home, t["id"] + ".json")): print(tag(os.path.join(home, t["id"] + ".json"))); sys.exit()
+except Exception: pass
+# 3. a credentials file that names the tunnel, or the only one there is
+files = [f for f in sorted(glob.glob(os.path.join(home, "*.json"))) if tag(f)]
+named = [f for f in files if (json.load(open(f)).get("TunnelName") == want)]
+if named: print(tag(named[0]))
+elif len(files) == 1: print(tag(files[0]))
+else: print("")
 PY
 )
 if [ -z "${CF_ACCOUNT_ID:-}" ]; then
