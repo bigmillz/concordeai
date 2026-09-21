@@ -653,11 +653,17 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 .sky{height:126px;overflow:hidden}
 /* each door holds its own full-frame photo (per Patrick, 2026-09-21: the strip across three cards read as
    crops); the row is offset so it goes home, there, home, and every 6.5s the whole row walks one along */
+/* the picture is a background layer 16px past every edge of the tile, not an <img> box, so no transform,
+   rounding or device pixel ratio can leave the ground showing (per Patrick, 2026-09-21: a black bar top and bottom).
+   Two layers crossfade. A layer drifts on its own, or, in a panorama, all three move as one strip. */
 .sky .photo{position:absolute;inset:0;overflow:hidden;background:#0a0a0c}
-.sky .photo img{position:absolute;top:-10%;left:-10%;width:120%;height:120%;object-fit:cover;object-position:50% 45%;opacity:0;transition:opacity 1.1s ease;animation:drift 26s ease-in-out infinite alternate;will-change:transform}
-.sky .photo img.on{opacity:1}
-.sky .photo img.top{z-index:1}
-@keyframes drift{from{transform:scale(1.02) translate(-2.5%, 1%)}to{transform:scale(1.12) translate(2.5%, -2%)}}
+.sky .pic{position:absolute;inset:-16px;background-size:cover;background-position:50% 45%;background-repeat:no-repeat;opacity:0;transition:opacity 1.3s ease;animation:drift 28s ease-in-out infinite alternate;will-change:transform,opacity}
+.sky .pic.on{opacity:1}
+.sky .pic.top{z-index:1}
+.sky .pic.wide{animation:pan 36s ease-in-out infinite alternate}
+@keyframes drift{from{transform:scale(1.02) translate(-1.5%, .8%)}to{transform:scale(1.12) translate(1.5%, -1.2%)}}
+@keyframes pan{from{transform:translateX(0)}to{transform:translateX(-3%)}}
+
 .sky .scrim{position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(10,10,12,.12) 0%,rgba(10,10,12,.02) 35%,rgba(10,10,12,.6) 100%);pointer-events:none}
 .sky .cap{position:absolute;left:16px;right:16px;top:10px;z-index:2;font-family:var(--disp);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.78);text-shadow:0 1px 2px rgba(0,0,0,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sky .t{z-index:2}
@@ -842,7 +848,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">Advanced options are optional; leave them and go.</span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="8851fd8">8851fd8</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="a73dd15">a73dd15</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -869,7 +875,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="8851fd8">8851fd8</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="a73dd15">a73dd15</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1573,7 +1579,7 @@ function door(kind, e, r, title, ctx){
   const eff = r.total, pc = prosCons(e, r, ctx);
   const chips = (arr, none) => arr.length ? arr.map(w => '<b>' + esc(w) + '</b>').join('') : '<b class="none">' + none + '</b>';
   return `<article class="door ${kind}" data-id="${esc(e.id)}">
-    <div class="sky" style="background:${skyBand(e)}">${PHOTOS.length ? `<div class="photo"><img class="ph a" alt=""><img class="ph b" alt=""></div><div class="scrim"></div>` : ''}</div>
+    <div class="sky" style="background:${skyBand(e)}">${PHOTOS.length ? `<div class="photo"><div class="pic a"></div><div class="pic b"></div></div><div class="scrim"></div>` : ''}</div>
     ${sealHTML(e)}
     <div class="body">
       <div class="eyebrow">${title}</div>
@@ -1759,19 +1765,19 @@ function showLegSections(on){
 }
 async function goLeg(i){
   S.stage = 'legs'; S.legIdx = i;
-  if (!LEGDATA[i]){ const d = await fetchLeg(i); LEGDATA[i] = d || mirrorData(LEGDATA[0], i); }
+  if (!LEGDATA[i]){ const d = await fetchLeg(i); if (d === undefined){ S.legIdx = 0; delete S.legPick[0]; paintStepper(); return; } LEGDATA[i] = d || mirrorData(LEGDATA[0], i); }
   loadData(LEGDATA[i]); showLegSections(true); paintStepper(); paint(true); summary(); scrollTo({top:0, behavior:REDUCED ? 'auto' : 'smooth'});
 }
 // the return (or the next leg of a multi-city) is its own search the other way round, the same shape as the outbound
 async function fetchLeg(i){
   const L0 = S.legs[0], from = S.trip === 'round' ? L0.to : S.legs[i].from, to = S.trip === 'round' ? L0.from : S.legs[i].to, dateStr = S.trip === 'round' ? S.back : S.legs[i].date, date = toISODate(dateStr);
-  if (!(SERVED && S.user && !S.user.demo && date)){ S.notice = (S.trip === 'round' ? 'Return leg, stand-in' : 'Flight ' + (i+1) + ', stand-in') + ': the outbound recording mirrored, until a live search runs for it.'; return null; }
+  if (!(SERVED && date)){ S.notice = (S.trip === 'round' ? 'Return leg, stand-in' : 'Flight ' + (i+1) + ', stand-in') + ': the outbound recording mirrored (this page is a file, not the live service).'; return null; }
   const box = $('#loading'); box.classList.remove('hidden'); runProgress(box, SEARCH_STAGES, 9000, () => {});
   let res;
-  try { const r = await fetch('/api/search', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'api', origin:from, origin_address:from, destination:to, date, adults:paxCount(), checked_bags:partyBags()})}); res = await r.json(); }
+  try { const r = await fetch('/search', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'api', origin:from, origin_address:from, destination:to, date, adults:paxCount(), checked_bags:partyBags()})}); res = await r.json(); }
   catch (x){ res = {error:'The search did not come back: ' + x.message}; }
   box.classList.add('hidden');
-  if (res.error){ S.notice = 'The return search failed (' + res.error + '), so this is the outbound recording mirrored.'; return null; }
+  if (res.error){ if (res.sign_in){ openAccount(res); return undefined; } S.notice = 'The return search failed (' + res.error + '), so this is the outbound recording mirrored.'; return null; }
   S.notice = (S.trip === 'round' ? 'Return leg. ' : 'Flight ' + (i+1) + '. ') + (res.source_note || 'Live results.'); return res;
 }
 // a stand-in for a leg nobody has searched yet: the outbound, the other way round, on that leg's date. Said so in the lede.
@@ -2345,7 +2351,7 @@ function loadData(d){
   D = d; ALL = D.results.reference.slice(); PR = D.profiles; AIR = D.airlines || {}; AP = D.airports || {}; P = D.par;
   GRID = {}; D.grid_points.forEach((p, i) => { GRID[Math.round(p[0]*10) + '-' + Math.round(p[1]*10)] = i; });
   prepWants(); paintPts();
-  PH.city = cityOf(D.query); DOOR_IDS = []; S.open = new Set(); fetchPhotos();
+  PH.city = cityOf(D.query); DOOR_IDS = []; S.open = new Set(); PH.slots = null; PH.wide = null; fetchPhotos();
   paintPar(); paintCov();
 }
 function paintPar(){
@@ -2474,12 +2480,12 @@ function paintAccount(){
     if (!u){ el.dataset.tip = '<div class="jh"><i></i><b>Sign in to unlock ' + what + '</b></div><ul><li>Free. Your email or Google; no password.</li></ul>'; el.setAttribute('aria-label', 'Sign in to unlock ' + what); } else { delete el.dataset.tip; el.removeAttribute('aria-label'); } }
   const h4 = document.querySelector('#s4 .hintr'); if (h4) h4.textContent = u && !u.demo ? 'Advanced options are optional; leave them and go.' : 'Without a sign-in these are recorded results. Sign in above to search live.';
 }
-function openAccount(){
-  const u = S.user;
-  $('#accth').textContent = u ? (u.owner ? 'This machine' : 'Your account') : 'A free account unlocks the rest';
+function openAccount(why){
+  const u = S.user, capped = why && why.sign_in && why.free != null;
+  $('#accth').textContent = u ? (u.owner ? 'This machine' : 'Your account') : capped ? 'Today\'s free searches are used up' : 'A free account unlocks the rest';
   $('#acctbody').innerHTML = u ? `<p>${u.owner ? 'This machine has no limits.' : 'Signed in as <b>' + esc(u.email || '') + '</b>.' + (u.left ? ' Today: <b>' + u.left.searches + '</b> live searches and <b>' + u.left.wishes + '</b> wishes left.' : '')}</p>
       <div class="row2">${!u.owner && !u.demo && SERVED ? '<a class="ledger" href="/cdn-cgi/access/logout">Sign out</a>' : ''}${u.demo ? '<button class="ledger" id="acctout">Leave the demo account</button>' : ''}<button class="choose" id="acctno" style="flex:0 0 auto">Done</button></div>`
-    : `<p>Browsing and the recorded results are open to everyone. Sign in to unlock the rest: live searches on your own dates and places, the wish box, the price check from other countries, and a watchlist. Your email or Google, no password.</p>
+    : `<p>${capped ? esc(why.error) + ' Your email or Google, no password.' : (S.freeMax ? S.freeMax + ' searches a day are free without an account' + (S.free != null ? ' (' + S.free + ' left today)' : '') + '. ' : '') + 'A free account unlocks the rest: ' + (S.freeMax ? '' : 'live searches on your own dates and places, ') + 'the wish box, the price check from other countries, and a watchlist. Your email or Google, no password.'}</p>
       <ul><li>Live searches on your own dates and places <small>· 20 a day</small></li><li>The wish box, read by Claude <small>· 200 a day</small></li><li>The price check from other countries <small>· 2 a day</small></li><li>Saved searches and a watchlist of routes, with price history <small>· up to 5 routes, coming</small></li></ul>
       <div class="row2"><button class="choose" id="acctgo" style="flex:0 0 auto">${SERVED ? 'Sign in or sign up' : 'Sign in (demo)'}</button><button class="ledger" id="acctno">Not now</button></div>
       <p class="fine">${SERVED ? 'You will be sent to the sign-in page and brought straight back.' : 'Opened as a file there is no sign-in page; this unlocks the demo.'}</p>`;
@@ -2494,7 +2500,7 @@ document.addEventListener('click', ev => {
   const lock = ev.target.closest('.locked'); if (lock){ ev.preventDefault(); ev.stopPropagation(); openAccount(); }
 }, true);
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('#acct').classList.contains('hidden')) closeAccount(); });
-if (SERVED) fetch('/api/whoami').then(r => r.json()).then(w => { S.user = w.owner ? {owner:true} : w.email ? {email:w.email, left:w.left} : null; paintAccount(); }).catch(() => paintAccount()); else paintAccount();
+if (SERVED) fetch('/whoami').then(r => r.json()).then(w => { S.user = w.owner ? {owner:true} : w.email ? {email:w.email, left:w.left} : null; S.free = w.free_left; S.freeMax = (w.allowances || {}).free; paintAccount(); }).catch(() => paintAccount()); else paintAccount();
 // the hover card: one element, filled from the segment under the pointer
 const JT = document.createElement('div'); JT.className = 'jtip'; JT.setAttribute('role', 'tooltip'); JT.hidden = true; document.body.appendChild(JT);
 let jtFor = null;
@@ -2524,26 +2530,68 @@ addEventListener('resize', () => { paintTri(); const [x, y] = toXY(S.a, S.b, S.c
 // window (the gaps between the cards are the frame). The whole thing drifts
 // slowly, and every few seconds it changes to the next picture, each card a
 // beat behind the last, the way a row of screens in a subway does.
-function photoFor(k){ return PHOTOS[(PH.idx + k) % PHOTOS.length]; }
+// The show on the three tiles. Every photo of both places is in the pool, shuffled; each tile starts on its own
+// picture, home and away alternating along the row. Then, every few seconds, one of three things: one tile changes
+// (most of the time, to a picture nobody is showing, from the other place); all three change, one after another;
+// or one picture is laid across the whole row as a strip, held for a beat, and broken back into three. Nothing
+// repeats in order, and no two tiles ever show the same picture except in a panorama.
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+function freshPhoto(k, wantPlace){
+  const taken = new Set((PH.slots || []).filter((x, i) => i !== k)), pool = PHOTOS.map((p, i) => i).filter(i => !taken.has(i) && i !== (PH.slots || [])[k]);
+  const pref = wantPlace ? pool.filter(i => PHOTOS[i].place === wantPlace) : [];
+  const from = pref.length ? pref : pool.length ? pool : PHOTOS.map((p, i) => i);
+  return from[Math.floor(Math.random() * from.length)];
+}
+function seatPhotos(){
+  const places = [...new Set(PHOTOS.map(p => p.place))], start = Math.floor(Math.random() * places.length);
+  PH.slots = [-1, -1, -1];
+  // seated one at a time, so each pick sees the ones already seated and never repeats them
+  for (let k = 0; k < 3; k++) PH.slots[k] = freshPhoto(k, places.length > 1 ? places[(start + k) % places.length] : null);
+  PH.wide = null; PH.beat = 0;
+}
+function setPic(el, p, k, wide){
+  el.style.backgroundImage = 'url("' + p.src + '")';
+  if (wide){ const doors = [...document.querySelectorAll('#doors .door')], first = doors[0].getBoundingClientRect(), last = doors[doors.length - 1].getBoundingClientRect(), gw = Math.max(300, last.right - first.left), dl = el.closest('.door').getBoundingClientRect().left - first.left;
+    el.classList.add('wide'); el.style.backgroundSize = Math.round(gw * 1.06) + 'px auto'; el.style.backgroundPosition = (-Math.round(dl) - 16) + 'px 45%'; el.style.animationDelay = '0s'; }
+  else { el.classList.remove('wide'); el.style.backgroundSize = ''; el.style.backgroundPosition = ''; el.style.animationDelay = (-(k * 9 + Math.floor(Math.random() * 6))) + 's'; }
+}
+function swapTile(d, k, p, wide){
+  const ph = d.querySelector('.photo'); if (!ph) return;
+  const cur = ph.querySelector('.pic.on'), nxt = ph.querySelector('.pic:not(.on)'); if (!cur || !nxt) return;
+  setPic(nxt, p, k, wide); nxt.classList.add('top'); cur.classList.remove('top');
+  requestAnimationFrame(() => requestAnimationFrame(() => { nxt.classList.add('on');
+    setTimeout(() => { cur.style.transition = 'none'; cur.classList.remove('on'); requestAnimationFrame(() => { cur.style.transition = ''; }); }, 1400); }));
+}
 function mountPhotos(){
   const doors = [...document.querySelectorAll('#doors .door')]; if (!PHOTOS.length || !doors.length) return;
-  doors.forEach((d, k) => { const ph = d.querySelector('.photo'); if (!ph) return; const p = photoFor(k), a = ph.querySelector('img.a');
-    if (a.getAttribute('src') !== p.src){ a.src = p.src; a.classList.add('on'); ph.querySelector('img.b').classList.remove('on'); }
-    a.style.animationDelay = (-k * 7) + 's';
-  });
-  if (!PH.timer && !REDUCED) PH.timer = setInterval(cycle, 6500);
+  if (!PH.slots || PH.slots.length !== 3) seatPhotos();
+  doors.forEach((d, k) => { const ph = d.querySelector('.photo'); if (!ph) return; const a = ph.querySelector('.pic.a'), p = PH.wide != null ? PHOTOS[PH.wide] : PHOTOS[PH.slots[k]];
+    if (!a.classList.contains('on') && !ph.querySelector('.pic.on')){ setPic(a, p, k, PH.wide != null); a.classList.add('on'); }
+    else if (PH.wide != null) setPic(ph.querySelector('.pic.on'), p, k, true); });
+  if (!PH.timer) PH.timer = setInterval(cycle, 5200);
 }
 function cycle(){
-  if (W.mode !== 'results' || PHOTOS.length < 2) return;
-  PH.idx = (PH.idx + 1) % PHOTOS.length;
-  document.querySelectorAll('#doors .door').forEach((d, k) => setTimeout(() => {
-    const ph = d.querySelector('.photo'); if (!ph) return; const next = photoFor(k);
-    const cur = ph.querySelector('img.on'), nxt = ph.querySelector('img:not(.on)'); if (!cur || !nxt) return;
-    nxt.src = next.src; nxt.classList.add('top'); cur.classList.remove('top');
-    // the new picture fades in over the old one, which stays put until the fade is done
-    requestAnimationFrame(() => requestAnimationFrame(() => { nxt.classList.add('on');
-      setTimeout(() => { cur.style.transition = 'none'; cur.classList.remove('on'); requestAnimationFrame(() => { cur.style.transition = ''; }); }, 1200); }));
-  }, k * 480));
+  if (W.mode !== 'results' || PHOTOS.length < 2 || document.hidden) return;
+  const doors = [...document.querySelectorAll('#doors .door')]; if (doors.length < 3) return;
+  const places = [...new Set(PHOTOS.map(p => p.place))];
+  if (PH.wide != null){                              // out of a panorama: back to three, one after another
+    if (++PH.beat < 2) return;                       // hold the strip a beat
+    PH.wide = null; const start = Math.floor(Math.random() * places.length);
+    doors.forEach((d, k) => { const want = places.length > 1 ? places[(start + k) % places.length] : null; PH.slots[k] = freshPhoto(k, want); setTimeout(() => swapTile(d, k, PHOTOS[PH.slots[k]], false), k * 420); });
+    return;
+  }
+  const r = Math.random();
+  if (r < .14){                 // a panorama: one picture across the row
+    PH.wide = freshPhoto(-1, null); PH.beat = 0;
+    doors.forEach((d, k) => setTimeout(() => swapTile(d, k, PHOTOS[PH.wide], true), k * 260));
+  } else if (r < .32){                               // all three, in sequence
+    const start = Math.floor(Math.random() * places.length);
+    doors.forEach((d, k) => { const want = places.length > 1 ? places[(start + k) % places.length] : null; PH.slots[k] = freshPhoto(k, want); setTimeout(() => swapTile(d, k, PHOTOS[PH.slots[k]], false), k * 420); });
+  } else {                                           // one tile, to the other place
+    const k = Math.floor(Math.random() * 3), here = PHOTOS[PH.slots[k]].place, other = places.filter(p => p !== here);
+    PH.slots[k] = freshPhoto(k, other.length ? other[Math.floor(Math.random() * other.length)] : null);
+    swapTile(doors[k], k, PHOTOS[PH.slots[k]], false);
+  }
 }
 addEventListener('resize', mountPhotos);
 
@@ -2598,10 +2646,9 @@ async function fetchPhotos(){
   const key = here + '|' + there; if (PH.key === key) return; PH.key = key;
   const get = async place => { if (!place) return []; try { const r = await fetch('/photos?place=' + encodeURIComponent(place)); const d = await r.json(); return (d.photos || []).map(p => ({...p, place: d.place || place})); } catch (e){ return []; } };
   const [a, b] = await Promise.all([get(here), get(there)]); if (PH.key !== key) return;
-  const mixed = []; for (let i = 0; i < Math.max(a.length, b.length) && mixed.length < 8; i++){ if (a[i]) mixed.push(a[i]); if (b[i]) mixed.push(b[i]); }
-  if (mixed.length < 2) return;
+  const mixed = shuffle(a.concat(b)); if (mixed.length < 2) return;
   mixed.forEach(p => { const im = new Image(); im.src = p.src; });
-  PHOTOS = mixed; PH.idx = 0; if (W.mode === 'results') paint(false);
+  PHOTOS = mixed; PH.slots = null; PH.wide = null; if (W.mode === 'results') paint(false);
 }
 document.addEventListener('animationend', ev => { if (ev.target.classList && ev.target.classList.contains('rise')) ev.target.classList.remove('rise'); });
 
@@ -2690,15 +2737,19 @@ async function enterResults(){
   finishAllSteps();
   const box = $('#loading'); box.classList.remove('hidden'); $('#wizard').classList.add('hidden'); $('#rail').classList.add('hidden'); $('#searcherr').textContent = '';
   const L = S.legs[0], date = toISODate(L.date); S.notice = '';
-  if (SERVED && S.user && !S.user.demo && date && !(L.from.trim() && L.to.trim())){
+  if (SERVED && !(L.from.trim() && L.to.trim())){
     box.classList.add('hidden'); $('#wizard').classList.remove('hidden'); $('#rail').classList.remove('hidden'); goStep(1);
     $('#searcherr').textContent = L.from.trim() ? 'Where are you going?' : 'Where does the trip start? An address, a neighbourhood or a city.'; ($('#q-' + (L.from.trim() ? 'to' : 'from') + '-0') || {focus(){}}).focus(); return; }
-  if (SERVED && S.user && !S.user.demo && date){
+  if (SERVED && !date){
+    box.classList.add('hidden'); $('#wizard').classList.remove('hidden'); $('#rail').classList.remove('hidden'); goStep(1);
+    $('#searcherr').textContent = 'Could not read the leaving date. Something like Wed 18 Nov, or 2026-11-18.'; return; }
+  if (SERVED){
     runProgress(box, SEARCH_STAGES, 9000, () => {});
     let res;
-    try { const r = await fetch('/api/search', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'api', origin:L.from, origin_address:L.from, destination:L.to, date, adults:paxCount(), checked_bags:partyBags()})}); res = await r.json(); }
+    try { const r = await fetch('/search', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'api', origin:L.from, origin_address:L.from, destination:L.to, date, adults:paxCount(), checked_bags:partyBags()})}); res = await r.json(); }
     catch (e){ res = {error:'The search did not come back: ' + e.message}; }
     if (res.error){ box.classList.add('hidden'); $('#wizard').classList.remove('hidden'); $('#rail').classList.remove('hidden'); goStep(1);
+      if (res.sign_in){ openAccount(res); return; }
       $('#searcherr').textContent = res.error + (res.suggest && res.suggest.length ? ' Did you mean ' + res.suggest.slice(0, 3).join(', ') + '?' : ''); return; }
     loadData(res);
     S.notice = res.source_note || (res.feed && res.feed.fetched === 'cache' ? 'Live results, from a search a few minutes ago.' : 'Live results.');
@@ -2706,9 +2757,7 @@ async function enterResults(){
     LEGDATA[0] = res; LEGDATA[1] = null; S.legPick = {}; S.legIdx = 0; S.stage = 'legs';
     box.querySelector('.pfill').style.width = '100%'; setTimeout(() => { box.classList.add('hidden'); showResults(); }, 350); return;
   }
-  if (SERVED && !S.user) S.notice = 'Recorded results. Sign in to search live.';
-  else if (S.user && S.user.demo) S.notice = 'Recorded results: this is the demo.';
-  else if (L.date && !date) S.notice = 'Could not read the date, so these are recorded results.';
+  S.notice = 'Recorded results: this page is a file, not the live service.';
   runProgress(box, SEARCH_STAGES, REDUCED ? 500 : 2400, () => { box.classList.add('hidden'); showResults(); });
 }
 function showResults(){

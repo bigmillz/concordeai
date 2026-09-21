@@ -197,5 +197,5 @@ ensure_app "ConcordeGo API" "$HOST/api" "$FRIENDS"
 ADMIN_INCLUDE=$(python3 -c "import json,sys; print(json.dumps([{'email':{'email':e.strip().lower()}} for e in '$ADMINS'.split(',') if e.strip()]))")
 ensure_app "ConcordeGo admin" "$HOST/admin" "{\"name\":\"Friends\",\"decision\":\"allow\",\"include\":$ADMIN_INCLUDE,\"precedence\":1}"
 echo
-echo "Done. https://$HOST is open to browse; /api and /signin ask for a sign-in, and the server sees the email in Cf-Access-Authenticated-User-Email"
+echo "Done. https://$HOST is open to browse (a few searches a day free, via /search); /api and /signin ask for a sign-in, and the server sees the email in Cf-Access-Authenticated-User-Email"
 echo "and gives each person a daily allowance (CONCORDEGO_USER_SEARCHES, default 20; CONCORDEGO_USER_WISHES, default 200)."

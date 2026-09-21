@@ -59,6 +59,9 @@ OWNERS = {e.strip().lower() for e in os.environ.get("CONCORDEGO_OWNERS", "").spl
 # swarm of them. Wishes are the only metered thing that costs money per call (Duffel bills per booking, not per
 # search; live.py caps searches on its own), so a day of wishes is at most this many Opus calls.
 WISHES_TOTAL = int(os.environ.get("CONCORDEGO_WISHES_TOTAL", "1500"))
+# Anyone may run a few real searches a day before signing in (per Patrick, 2026-09-21: never made-up results;
+# a few free ones, then the account pop-up or the wait). Counted per address; a round trip is two searches.
+ANON_SEARCHES = int(os.environ.get("CONCORDEGO_ANON_SEARCHES", "4"))
 # Photos of the origin and the destination for the shortlist tiles: Pexels (free, 200 an hour, a credit line
 # asked). Cached per place for a month, so a place costs one call ever; and at most PHOTO_CALLS uncached
 # lookups a day site-wide, so nobody can spend the hour walking the atlas. No key: the stand-in artwork stays.
@@ -93,6 +96,12 @@ def _users_take(email, kind, limit):
         return True, limit - u[kind]
 
 
+def _hours_to_midnight():
+    import datetime
+    now = datetime.datetime.now()
+    return max(1, round((datetime.datetime.combine(now.date() + datetime.timedelta(days=1), datetime.time()) - now).total_seconds() / 3600))
+
+
 def _users_left(email):
     import datetime
     today = datetime.date.today().isoformat()
@@ -103,7 +112,8 @@ def _users_left(email):
         u = {}
     if u.get("day") != today:
         u = {}
-    return {"searches": max(0, USER_SEARCHES - u.get("searches", 0)), "wishes": max(0, USER_WISHES - u.get("wishes", 0))}
+    return {"searches": max(0, USER_SEARCHES - u.get("searches", 0)), "wishes": max(0, USER_WISHES - u.get("wishes", 0)),
+            "searches_used": u.get("searches", 0)}
 if ROOT and not re.match(r"^mock-[0-9]+$", ROOT):
     sys.exit("CONCORDEGO_ROOT must name a mockup, e.g. mock-10 (got %r)" % ROOT)
 
@@ -530,7 +540,9 @@ def _fetch_raw(req):
                      "field": "date", "live": True},)
         where["date"] = d
         if not live.load_config().get("key"):
-            # no key on this machine: the recording stands in, and says so
+            if req.get("_served"):
+                return ({"error": "Live search is not set up on this server yet (no flight API key). Nothing to show you that would not be made up.", "live": True},)
+            # a developer's machine with no key: the recording stands in, and says so
             src = "sample"
             req = dict(req, _fell_back=True)
     meta = {}
@@ -954,6 +966,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         # Outside /api on purpose: Access fronts /api with the sign-in, and these two are free, cached and
         # wanted before anyone signs in (the tiles' photos, the locate button while typing an origin).
+        if path == "/whoami":
+            # outside /api: the page asks this before anyone signs in
+            who = self._who()
+            owner = who == "owner" or (who is not None and who in OWNERS)
+            ip = (self.headers.get("Cf-Connecting-Ip") or self.headers.get("X-Forwarded-For") or "?").split(",")[0].strip()
+            free = None if who else max(0, ANON_SEARCHES - (_users_left("ip:" + ip) or {}).get("searches_used", 0))
+            return self._json({"remote": self._remote(), "email": None if who in (None, "owner") else who,
+                               "owner": owner, "left": None if (owner or who is None) else _users_left(who),
+                               "allowances": {"searches": USER_SEARCHES, "wishes": USER_WISHES, "free": ANON_SEARCHES},
+                               "free_left": free, "hours": _hours_to_midnight()})
         if path in ("/locate", "/photos"):
             from urllib.parse import parse_qs
             q = parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
@@ -1049,6 +1071,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._json(admin_status(True) if path.endswith("/check") else admin_update())
             except Exception as exc:
                 return self._json({"error": "%s: %s" % (type(exc).__name__, exc)})
+        if path == "/search":
+            path = "/api/search"; anon_ok = True
+        else:
+            anon_ok = False
         if path not in ("/api/score", "/api/narrate", "/api/live", "/api/wish", "/api/search"):
             return self.send_error(404)
         try:
@@ -1063,10 +1089,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
         spends = path == "/api/narrate" or path == "/api/wish" or (path in ("/api/live", "/api/search") and (req.get("source") or "sample") != "sample" and bool(live.load_config().get("key")))
         if spends and self._remote():
             who = self._who()
-            if not who:
-                return self._json({"error": "Sign in to run a live search. The public address serves recorded results to anyone; "
-                                            "live searches, the narrator and the wish box are unlocked by signing in.",
+            if not who and anon_ok:
+                # the free searches: a few a day per address, then the account or the wait
+                ip = (self.headers.get("Cf-Connecting-Ip") or self.headers.get("X-Forwarded-For") or "?").split(",")[0].strip()
+                ok, left = _users_take("ip:" + ip, "searches", ANON_SEARCHES)
+                if not ok:
+                    return self._json({"error": "That is today's %d free searches. A free account gives you %d a day, or come back in about %d hours."
+                                                % (ANON_SEARCHES, USER_SEARCHES, _hours_to_midnight()),
+                                       "remote": True, "sign_in": True, "free": ANON_SEARCHES, "hours": _hours_to_midnight()})
+                who = None
+            elif not who:
+                return self._json({"error": "Sign in to use this. A few searches a day are free; the wish box, the price check and more searches come with a free account.",
                                    "remote": True, "sign_in": True})
+        if spends and self._remote() and who:
             kind, limit = ("searches", USER_SEARCHES) if path in ("/api/live", "/api/search") else ("wishes", USER_WISHES)
             if kind == "wishes":
                 okall, _ = _users_take("_everyone", "wishes", WISHES_TOTAL)
@@ -1078,6 +1113,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._json({"error": "That is today's allowance of %d %s for %s. It resets at midnight." % (limit, kind, who),
                                    "remote": True, "allowance": True})
         try:
+            if anon_ok and self._remote():
+                req = dict(req, _served=True)
             fn = {"/api/score": score_request, "/api/narrate": narrate_request,
                   "/api/live": live_request, "/api/wish": wish_request, "/api/search": search_request}[path]
             return self._json(fn(req))

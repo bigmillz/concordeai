@@ -503,13 +503,18 @@ airlines get two links and a sentence saying two tickets is normal; a points leg
 transfer walkthrough. The airline's own domain comes from the feed's conditions-of-carriage
 URL, falling back to `SITES`.
 
-**An account is the deterrent.** Browsing and recorded results are open to everyone. A
-live search, the wish box and the price check need a sign-in: the page greys them and a
-tap opens the pop-up that says what an account gives (live searches 20 a day, wishes 200,
-price checks 2, a watchlist of 5 routes, coming) and sends the person to `/signin`, which
-Cloudflare Access protects; `access.sh` makes three applications — `/api/*` and `/signin`
-behind the email allowlist, the page itself open with a bypass policy — so an anonymous
-request never reaches `/api` at all, and the server counts each signed-in person's day.
+**A served page never shows made-up results** (per Patrick, 2026-09-21). Anyone gets
+`CONCORDEGO_ANON_SEARCHES` (4) real searches a day, counted per address at `/search`, which
+lives outside `/api` so Access lets it through; past that the page opens the account pop-up
+with the wait in hours ("today's free searches are used up"). The recording stands in only
+when the page is opened as a file, or on a developer's machine with no key; a served
+request with no key is refused with a sentence rather than faked. The wish box, the price
+check and the fuller allowance need a sign-in: the page greys them and a tap opens the
+pop-up that says what an account gives (searches 20 a day, wishes 200, price checks 2, a
+watchlist of 5 routes, coming) and sends the person to `/signin`, which Cloudflare Access
+protects; `access.sh` makes the applications — `/api/*`, `/signin` and `/admin` behind the
+email allowlist, the page itself open with a bypass policy — and the server counts each
+signed-in person's day. `/whoami`, `/locate` and `/photos` sit outside the door too.
 
 **The wish box's model is Claude Opus 5** (`concorde-travel/wish.py`, `/api/wish`), the same
 model as the narrator: one call at low effort with a strict JSON schema over the page's own
