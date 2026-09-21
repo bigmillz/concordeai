@@ -670,7 +670,9 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 #results.fade{animation:fadein .5s ease both}
 /* the shortlist window: one picture of the origin city across all three cards,
    each card a pane of it; it drifts, and every few seconds it changes, pane by pane */
-.sky{height:126px;overflow:hidden}
+/* the picture sits proud of the card: a shadow under it, painted over the body, so the rest reads as tucked
+   under the image (per Patrick, 2026-09-21) */
+.sky{height:126px;overflow:hidden;z-index:2;box-shadow:0 10px 26px rgba(0,0,0,.6),0 2px 6px rgba(0,0,0,.55)}
 /* each door holds its own full-frame photo (per Patrick, 2026-09-21: the strip across three cards read as
    crops); the row is offset so it goes home, there, home, and every 6.5s the whole row walks one along */
 /* the picture is a background layer 16px past every edge of the tile, not an <img> box, so no transform,
