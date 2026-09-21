@@ -864,7 +864,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">Advanced options are optional; leave them and go.</span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="d5ebfff">d5ebfff</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="a769ca9">a769ca9</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -891,7 +891,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="d5ebfff">d5ebfff</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="a769ca9">a769ca9</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -934,9 +934,6 @@ var PHOTOS = [];
 const cityOf = q => ((q.origin_full || q.origin || 'Brooklyn').split(',').pop().replace(/\d+/g, '').trim() || 'Brooklyn');
 const PH = {idx:0, t0:performance.now(), timer:null, city:cityOf(D.query)};
 const $ = s => document.querySelector(s);
-// test mode: a key pasted on the admin page lives in this browser's storage and rides on every request
-(() => { let k = ''; try { k = localStorage.getItem('concordego.testkey') || ''; } catch (e) {} if (!k) return; const f = window.fetch;
-  window.fetch = (url, opts) => { opts = opts || {}; if (typeof url === 'string' && url.startsWith('/')){ const h = new Headers(opts.headers || {}); h.set('X-Concordego-Test', k); opts = {...opts, headers:h}; } return f(url, opts); }; })();
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // One currency inside the model (hard rule 3): every figure is scored in US
 // cents and stays so. The display converts at the edge, and the footer says
@@ -2543,7 +2540,7 @@ function runRecent(i){
 function isoToLabel(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); if (!m) return iso; const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])); return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()]; }
 document.addEventListener('click', ev => { const b = ev.target.closest('[data-recent]'); if (b) runRecent(+b.dataset.recent); });
 function paintAccount(){
-  const u = S.user, label = !u ? 'Sign in' : u.test ? 'Test mode' : (u.viaAccess || (u.email && !u.demo && SERVED)) ? 'Log out' : u.owner ? 'This machine' : (u.email || 'Signed in') + (u.demo ? ' (demo)' : '');
+  const u = S.user, label = !u ? 'Sign in' : (u.viaAccess || (u.email && !u.demo && SERVED)) ? 'Log out' : u.owner ? 'This machine' : (u.email || 'Signed in') + (u.demo ? ' (demo)' : '');
   for (const id of ['#account', '#account2']){ const b = $(id); if (!b) continue; b.textContent = label; b.classList.toggle('in', !!u); b.title = u && u.left ? (u.email || '') + ' · ' + u.left.searches + ' live searches and ' + u.left.wishes + ' wishes left today' : u && u.email ? u.email : u ? '' : 'Free: email or Google'; }
   paintRecent();
   document.querySelectorAll('.adminlink').forEach(a => a.classList.toggle('hidden', !(u && u.owner && u.viaAccess)));
@@ -2553,8 +2550,8 @@ function paintAccount(){
 }
 function openAccount(why){
   const u = S.user, capped = why && why.sign_in && why.free != null;
-  $('#accth').textContent = u ? (u.test ? 'Test mode' : u.owner ? 'This machine' : 'Your account') : capped ? 'Today\'s free searches are used up' : 'A free account unlocks the rest';
-  $('#acctbody').innerHTML = u ? `<p>${u.test ? 'This browser holds the test key: no limits. Turn it off on the admin page.' : u.unlimited ? 'Signed in as <b>' + esc(u.email || '') + '</b>, with no daily cap.' : u.owner ? (u.email ? 'Signed in as <b>' + esc(u.email) + '</b>, an owner: no limits.' : 'This machine has no limits.') : 'Signed in as <b>' + esc(u.email || '') + '</b>.' + (u.left ? ' Today: <b>' + u.left.searches + '</b> live searches and <b>' + u.left.wishes + '</b> wishes left.' : '')}</p>
+  $('#accth').textContent = u ? (u.owner ? 'This machine' : 'Your account') : capped ? 'Today\'s free searches are used up' : 'A free account unlocks the rest';
+  $('#acctbody').innerHTML = u ? `<p>${u.unlimited ? 'Signed in as <b>' + esc(u.email || '') + '</b>, with no daily cap.' : u.owner ? (u.email ? 'Signed in as <b>' + esc(u.email) + '</b>, an owner: no limits.' : 'This machine has no limits.') : 'Signed in as <b>' + esc(u.email || '') + '</b>.' + (u.left ? ' Today: <b>' + u.left.searches + '</b> live searches and <b>' + u.left.wishes + '</b> wishes left.' : '')}</p>
       <div class="row2">${!u.owner && !u.demo && SERVED ? '<a class="ledger" href="/cdn-cgi/access/logout">Sign out</a>' : ''}${u.demo ? '<button class="ledger" id="acctout">Leave the demo account</button>' : ''}<button class="choose" id="acctno" style="flex:0 0 auto">Done</button></div>`
     : `<p>${capped ? esc(why.error) + ' Your email or Google, no password.' : (S.freeMax ? S.freeMax + ' searches a day are free without an account' + (S.free != null ? ' (' + S.free + ' left today)' : '') + '. ' : '') + 'A free account unlocks the rest: ' + (S.freeMax ? '' : 'live searches on your own dates and places, ') + 'the wish box, the price check from other countries, and a watchlist. Your email or Google, no password.'}</p>
       <ul><li>Live searches on your own dates and places <small>· 20 a day</small></li><li>The wish box, read by Claude <small>· 200 a day</small></li><li>The price check from other countries <small>· 2 a day</small></li><li>Saved searches and a watchlist of routes, with price history <small>· up to 5 routes, coming</small></li></ul>
@@ -2571,7 +2568,7 @@ document.addEventListener('click', ev => {
   const lock = ev.target.closest('.locked'); if (lock){ ev.preventDefault(); ev.stopPropagation(); openAccount(); }
 }, true);
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('#acct').classList.contains('hidden')) closeAccount(); });
-if (SERVED) fetch('/whoami').then(r => r.json()).then(w => { S.user = w.owner ? {owner:true, email:w.email || '', viaAccess: w.remote && !!w.email} : w.test ? {owner:true, test:true} : w.email ? {email:w.email, left:w.left, viaAccess:true, unlimited:!!w.unlimited} : null; S.recent = w.recent || []; S.free = w.free_left; S.freeMax = (w.allowances || {}).free; paintAccount(); }).catch(() => paintAccount()); else paintAccount();
+if (SERVED) fetch('/whoami').then(r => r.json()).then(w => { S.user = w.owner ? {owner:true, email:w.email || '', viaAccess: w.remote && !!w.email} : w.email ? {email:w.email, left:w.left, viaAccess:true, unlimited:!!w.unlimited} : null; S.recent = w.recent || []; S.free = w.free_left; S.freeMax = (w.allowances || {}).free; paintAccount(); }).catch(() => paintAccount()); else paintAccount();
 // the hover card: one element, filled from the segment under the pointer
 const JT = document.createElement('div'); JT.className = 'jtip'; JT.setAttribute('role', 'tooltip'); JT.hidden = true; document.body.appendChild(JT);
 let jtFor = null;

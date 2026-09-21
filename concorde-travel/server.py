@@ -64,9 +64,6 @@ WISHES_TOTAL = int(os.environ.get("CONCORDEGO_WISHES_TOTAL", "1500"))
 ANON_SEARCHES = int(os.environ.get("CONCORDEGO_ANON_SEARCHES", "4"))
 # The Zero Trust team, e.g. millerworldindustries: the issuer of the sign-in cookie the server verifies below.
 ACCESS_TEAM = os.environ.get("CONCORDEGO_ACCESS_TEAM", "").strip().lower()
-# Test mode: a browser that sends this key (pasted once on the admin page, kept in its own storage) is not
-# metered, signed in or not. 64 random characters, generated on the box, never in the repo.
-TEST_KEY = os.environ.get("CONCORDEGO_TEST_KEY", "").strip()
 # Emails the admin page marks unlimited: signed in, they are not metered. Kept beside users.json.
 UNLIMITED_FILE = os.path.join(live.HOME, "unlimited.json")
 
@@ -874,7 +871,6 @@ def admin_status(fetch=False):
     out["narrator"] = bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
     out["users_today"] = _users_today()
     out["allowances"] = {"searches": USER_SEARCHES, "wishes": USER_WISHES}
-    out["test_key"] = TEST_KEY   # the owner's own page; Access and OWNERS stand in front of it
     out["unlimited"] = _unlimited()
     import shutil
     out["log_source"] = "journal" if shutil.which("journalctl") else (LOG_FILE or None)
@@ -1114,9 +1110,6 @@ table{border-collapse:collapse;font-size:13px;width:100%}td,th{text-align:left;p
 <div class="card" style="margin-bottom:18px"><div class="k">Unlimited people</div><div class="v">Signed-in emails with no daily cap</div>
 <div id="unl" style="margin:8px 0 6px"></div>
 <div class="row" style="margin:0"><input id="unladd" placeholder="email" style="flex:1;min-width:220px;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);font:13px 'Space Grotesk',sans-serif;padding:9px 12px"><button id="unlgo">Add</button></div></div>
-<div class="card" style="margin-bottom:18px"><div class="k">Test mode</div><div class="v">Paste the key to use the site without limits in this browser</div>
-<div class="row" style="margin:10px 0 0"><input id="tkey" placeholder="64 characters" style="flex:1;min-width:260px;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);font:13px 'IBM Plex Mono',monospace;padding:9px 12px"><button id="tkeyon">Turn on</button><button class="ghost" id="tkeyoff">Turn off</button><span class="note" id="tkeymsg"></span></div>
-<div class="s" id="tkeyhint"></div></div>
 <div class="tabs"><button id="t-server" aria-pressed="true">Server log</button><button id="t-update" aria-pressed="false">Update log</button><button class="ghost" id="t-reload">Reload log</button></div>
 <pre id="log">…</pre>
 </div><script>
@@ -1151,13 +1144,10 @@ $('#refresh').onclick = () => { load(); logs(); };
 $('#t-server').onclick = () => { UNIT = 'server'; $('#t-server').setAttribute('aria-pressed', 'true'); $('#t-update').setAttribute('aria-pressed', 'false'); logs(); };
 $('#t-update').onclick = () => { UNIT = 'update'; $('#t-update').setAttribute('aria-pressed', 'true'); $('#t-server').setAttribute('aria-pressed', 'false'); logs(); };
 $('#t-reload').onclick = logs;
-const tkState = () => { let k = ''; try { k = localStorage.getItem('concordego.testkey') || ''; } catch (e) {} $('#tkeymsg').textContent = k ? 'On in this browser.' : 'Off.'; };
-$('#tkeyon').onclick = () => { const k = $('#tkey').value.trim(); if (k.length < 32){ $('#tkeymsg').textContent = 'That is not the key.'; return; } try { localStorage.setItem('concordego.testkey', k); } catch (e) {} $('#tkey').value = ''; tkState(); };
-$('#tkeyoff').onclick = () => { try { localStorage.removeItem('concordego.testkey'); } catch (e) {} tkState(); };
 const paintUnl = list => { $('#unl').innerHTML = (list || []).length ? list.map(e => `<span style="display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:5px 6px 5px 12px;margin:0 6px 6px 0;font-size:13px">${e}<button class="ghost" data-unl="${e}" style="padding:2px 8px;font-size:12px" title="Remove">×</button></span>`).join('') : '<span class="note">Nobody yet. Owners are already unlimited.</span>'; };
 document.addEventListener('click', async ev => { const b = ev.target.closest('[data-unl]'); if (!b) return; const r = await j('/api/admin/unlimited', {method:'POST', body: JSON.stringify({remove: b.dataset.unl})}); paintUnl(r.unlimited); });
 $('#unlgo').onclick = async () => { const e = $('#unladd').value.trim(); if (!e.includes('@')) return; const r = await j('/api/admin/unlimited', {method:'POST', body: JSON.stringify({add: e})}); $('#unladd').value = ''; paintUnl(r.unlimited); };
-const paintKey = st => { paintUnl(st.unlimited); $('#tkeyhint').innerHTML = st.test_key ? 'This server\'s key: <code style="user-select:all;color:var(--dim)">' + st.test_key + '</code> (only you see this page)' : '<span class="warn">No CONCORDEGO_TEST_KEY set on this server.</span>'; };
+const paintKey = st => { paintUnl(st.unlimited); };
 tkState();
 load(); logs();
 </script></body></html>
@@ -1191,10 +1181,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def _who(self):
         if not self._remote():
             return "owner"
-        import hmac
-        tk = (self.headers.get("X-Concordego-Test") or "").strip()
-        if TEST_KEY and tk and hmac.compare_digest(tk, TEST_KEY):
-            return "test"
         email = (self.headers.get("Cf-Access-Authenticated-User-Email") or "").strip().lower()
         if email:
             return email
@@ -1214,7 +1200,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return who == "owner" or (who is not None and who in OWNERS)
 
     def _unmetered(self, who):
-        return who == "owner" or who == "test" or (who is not None and (who in OWNERS or who in _unlimited()))
+        return who == "owner" or (who is not None and (who in OWNERS or who in _unlimited()))
 
     def _html(self, text, code=200):
         body = text.encode("utf-8")
@@ -1235,9 +1221,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             owner = who == "owner" or (who is not None and who in OWNERS)
             ip = (self.headers.get("Cf-Connecting-Ip") or self.headers.get("X-Forwarded-For") or "?").split(",")[0].strip()
             free = None if who else max(0, ANON_SEARCHES - (_users_left("ip:" + ip) or {}).get("searches_used", 0))
-            return self._json({"remote": self._remote(), "email": None if who in (None, "owner", "test") else who,
-                               "owner": owner, "test": who == "test", "unlimited": bool(who and "@" in who and who in _unlimited()),
-                               "left": None if (owner or who in (None, "test") or who in _unlimited()) else _users_left(who),
+            return self._json({"remote": self._remote(), "email": None if who in (None, "owner") else who,
+                               "owner": owner, "unlimited": bool(who and "@" in who and who in _unlimited()),
+                               "left": None if (owner or who is None or who in _unlimited()) else _users_left(who),
                                "recent": _users_recent(who)[:3] if (who and "@" in who) else [],
                                "allowances": {"searches": USER_SEARCHES, "wishes": USER_WISHES, "free": ANON_SEARCHES},
                                "free_left": free, "hours": _hours_to_midnight()})

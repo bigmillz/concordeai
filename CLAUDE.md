@@ -536,10 +536,10 @@ issuer; the expiry) before trusting its email. `CONCORDEGO_ACCESS_TEAM` names th
 protected Access application, `/api`**, with the sign-in (`/api/signin`) and the admin page
 (`/api/admin`) inside it: a browser fetch cannot complete a second application's login
 redirect, which is what broke the admin page when it was its own application. `/signin` and
-`/admin` redirect into it. **Test mode**: `CONCORDEGO_TEST_KEY` (64 random characters,
-generated on the box); a browser that pastes it on the admin page keeps it in its own storage
-and sends it as `X-Concordego-Test` on every request, and the server meters nothing for it.
-Signed-in people get a Log out button (Access's own logout) and their three most recent
+`/admin` redirect into it. Unlimited use is bound to an email, never a key (a test key
+existed for an hour and was removed as a second way in): `CONCORDEGO_OWNERS` are unlimited and
+may open the admin page; the admin page's own list (`~/.concordego/unlimited.json`) makes
+other signed-in emails unlimited without admin access. Signed-in people get a Log out button (Access's own logout) and their three most recent
 trips as chips under the form (`recent` in `users.json`, five deep, survives the day's
 rollover).
 

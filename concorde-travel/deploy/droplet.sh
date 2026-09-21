@@ -65,7 +65,6 @@ HOME=/var/lib/concordego
 # CONCORDEGO_OWNERS=pat@millertechnology.net
 # CONCORDEGO_PEXELS_KEY=...          photos of the origin and destination on the shortlist tiles (pexels.com/api, free)
 # CONCORDEGO_ACCESS_TEAM=yourteam    the Zero Trust team name (the part before .cloudflareaccess.com): the server verifies the sign-in cookie against it
-# CONCORDEGO_TEST_KEY=...            test mode: 64 random characters; a browser that pastes it on /api/admin is not metered
 # CONCORDEGO_USER_SEARCHES=20
 # CONCORDEGO_USER_WISHES=200
 ENV
