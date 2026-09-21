@@ -390,6 +390,28 @@ details[open] summary:after{content:"–"}
 
 /* ---------- sheet */
 .sheetwrap{position:fixed;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:end center;padding:16px;z-index:9}
+/* booking with points, step by step */
+.play .lede{color:var(--dim);font-size:13.5px;line-height:1.5;margin:0 0 14px}
+.play .lede b{color:var(--text);font-weight:500}
+.play .warn{border:1px solid rgba(255,176,32,.45);background:rgba(255,176,32,.07);border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.5;color:var(--text);margin-bottom:16px}
+.play .warn b{color:var(--price);font-weight:500}
+.steps{list-style:none;margin:0;padding:0;counter-reset:step;display:flex;flex-direction:column;gap:14px}
+.steps li{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start}
+.steps li::before{counter-increment:step;content:counter(step);width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.04);display:grid;place-items:center;font:400 12px var(--disp);color:var(--dim);margin-top:1px}
+.steps h4,.steps p{grid-column:2}
+.steps h4{margin:0 0 4px;font-size:14.5px;font-weight:500}
+.steps p{margin:0;color:var(--dim);font-size:13px;line-height:1.55}
+.steps p b{color:var(--text);font-weight:500}
+.steps p a{color:var(--speed);text-decoration:none}.steps p a:hover{text-decoration:underline}
+.steps .path{display:inline-block;font:400 11.5px var(--mono);color:var(--dim);background:var(--panel);border:1px solid var(--line-soft);border-radius:6px;padding:2px 7px;margin-top:5px}
+.play .sum{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0 12px}
+.play .sum div{background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;padding:10px 12px}
+.play .sum b{display:block;font-size:20px;line-height:1.1;margin-top:2px}
+.play .sum span{font-size:11.5px;color:var(--faint)}
+.play .pnote{font-size:11.5px;color:var(--faint);line-height:1.5;margin:10px 0 0}
+.pay .how{margin-top:4px;font-size:11.5px;color:var(--speed);text-align:left;padding:0}
+.pay .how:hover{text-decoration:underline}
+@media (max-width:600px){.play .sum{grid-template-columns:1fr}}
 .sheet{background:var(--panel2);border:1px solid var(--line);border-radius:18px;max-width:760px;width:100%;max-height:min(88vh,900px);overflow:auto;padding:24px}
 .sheet .hd{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:10px}
 .sheet h3{font-size:20px;font-weight:500}.sheet h3 span{display:block;font-size:12.5px;color:var(--dim);margin-top:3px;font-weight:300}
@@ -848,6 +870,72 @@ function ptTip(e, a, total){
   if (a.good) return `${sum}, ${money(a.margin)} under the ${money(total)} in cash. That is ${c} a point, above the ${fair} ${esc(a.prog.name)} usually return.<small>${path}. Award: ${award}.</small>`;
   return `${sum}, ${money(-a.margin)} over the ${money(total)} in cash. Only ${c} a point; keep them for ${fair} or better.<small>${path}. Award: ${award}.</small>`;
 }
+// ---- booking with points, step by step. What a friend who does this for a
+// living would tell you: check space BEFORE you transfer, which site sells
+// this seat for these points, how the bank moves them and how fast, what the
+// fees are and which card to pay them with, and the cheaper way round when
+// one exists. Every figure comes from awardsFor(); the words around them come
+// from this curated table (as of 2026-09, and these change: the page says
+// so). In the product the narrator writes the prose from the same brief and
+// the verifier holds it to these numbers.
+const PLAY = {
+  virgin: {site:'virginatlantic.com', search:'Sign in to Flying Club, search the date with "Pay with points" on, and look for a Standard economy reward on this flight.',
+    fees:'Virgin adds a carrier surcharge on its own flights; the fees quoted here are for economy.', cancel:'A points booking can be cancelled for a fee and the points come back, so it is a safe one to make early.',
+    tips:['Virgin Points also book Delta-operated flights with much lower fees. If a Delta flight on this route works for you, check space on delta.com first, then book it through virginatlantic.com.']},
+  avios: {site:'ba.com', search:'Sign in to the Executive Club, search with "Book with Avios", and check the Reward Flight Saver price for this flight on this date.',
+    fees:'BA-operated transatlantic flights carry a heavy carrier surcharge, which is most of the fee here.', cancel:'Avios bookings can be cancelled for a fee, with the Avios and most of the taxes returned.',
+    tips:['Avios move 1:1 between British Airways, Iberia and Aer Lingus accounts. An Iberia-operated flight booked in Iberia Plus, or an Aer Lingus one in AerClub, carries far lower surcharges than a BA-operated one; if either flies your route, price it there before booking this.']},
+  aa: {site:'aa.com', search:'Sign in to AAdvantage, search with "Redeem miles", and look for the Web Special or MileSAAver price on this flight.',
+    fees:'American keeps its own fees low; the taxes on this one are mostly government charges.', cancel:'American returns miles on cancelled awards without a fee.',
+    tips:['Bilt is the only transferable currency that reaches AAdvantage, so if you do not hold Bilt points, this award can only come from miles already in the account.']},
+  delta: {site:'delta.com', search:'Sign in to SkyMiles, search with "Shop with miles", and compare the miles price with the cash price: Delta prices awards dynamically.',
+    fees:'Delta charges little beyond taxes on its own flights.', cancel:'Main cabin awards can be cancelled and the miles redeposited for free on most fares.',
+    tips:['Only American Express transfers to SkyMiles. The same Delta seat is often cheaper with Virgin Points (a Chase, Amex, Capital One, Citi or Bilt transfer), booked on virginatlantic.com.']},
+  mm: {site:'miles-and-more.com', search:'Sign in to Miles & More and search the award calendar for this flight.',
+    fees:'Lufthansa Group awards carry a surcharge, which is most of the fee here.', cancel:'Awards can be refunded for a fee.',
+    tips:['Miles & More is not a partner of the big US banks; this award usually comes from miles already in the account.']},
+  ms: {site:'turkishairlines.com', search:'Sign in to Miles&Smiles and search the award on the airline\'s own site; partner sites do not show it.',
+    fees:'Turkish keeps its surcharges moderate.', cancel:'Awards can be cancelled for a fee.',
+    tips:['Capital One, Citi and Bilt transfer to Miles&Smiles 1:1; transfers can take up to a day, so start early.']},
+};
+const BANKPATH = {amex:'americanexpress.com → Rewards → Transfer points', chase:'chase.com → Ultimate Rewards → Transfer to travel partners', capone:'capitalone.com → Rewards → Transfer miles', citi:'citi.com → ThankYou Rewards → Points transfer', bilt:'Bilt app → Points → Transfer'};
+const SPEED = {'chase>virgin':'usually within minutes', 'amex>virgin':'usually within minutes', 'chase>avios':'usually within minutes', 'amex>avios':'usually within minutes, occasionally a day or two', 'amex>delta':'usually within minutes', 'bilt>aa':'usually within minutes', 'capone>ms':'up to a day', 'citi>ms':'up to a day', 'bilt>ms':'up to a day'};
+function playbookHTML(e, r){
+  const aw = awardsFor(e), a = aw[0]; if (!a) return '';
+  const P = PLAY[a.p] || {}, prog = a.prog.name, have = S.pts[a.p] || 0, total = r.total, rest = total - e.ticket_cents + a.fees, eq = total - a.margin;
+  const S1 = [], step = (h, t, path) => S1.push(`<li><h4>${h}</h4><p>${t}${path ? `<br><span class="path">${esc(path)}</span>` : ''}</p></li>`);
+  // 1. space first
+  step('Check the seat is there before you move anything', `${esc(P.search || 'Search the award on the programme\'s site.')} You are looking for <b>${esc(e.flight)} on ${esc(niceDate(D.query.date))}</b>, ${esc(e.route.join(' → '))}, at <b>${a.pts.toLocaleString()} ${esc(prog)} + ${money(a.fees)}</b>. If the price shown is higher, it is a peak date or a different fare: stop here and compare with cash. <b>Transfers cannot be reversed</b>, so nothing moves until the seat is on the screen.`, P.site);
+  // 2. the transfer
+  if (!a.path){
+    const banks = a.prog.via.map(k => BANK[k].split(' ')[0]).join(', ');
+    step('Get the points there', `Nothing you hold transfers to ${esc(prog)}. It takes ${esc(banks)} points, which move 1:1${a.prog.via.length > 1 ? '' : ''}. You would need <b>${a.pts.toLocaleString()}</b> in ${esc(prog)}; you have ${have.toLocaleString()}. Paying cash is the way to book this one today.`);
+  } else if (a.short <= 0){
+    step('No transfer needed', `You already hold <b>${have.toLocaleString()} ${esc(prog)}</b>, more than the ${a.pts.toLocaleString()} this needs. Skip to the booking.`);
+  } else {
+    const bank = BANK[a.via].split(' ')[0], inc = 1000, need = Math.ceil(a.short / a.ratio), move = Math.ceil(need / inc) * inc, arrive = Math.floor(move * a.ratio);
+    step(`Move ${move.toLocaleString()} ${bank} points to ${prog}`, `You need ${a.short.toLocaleString()} more ${esc(prog)}. ${bank} transfers in ${inc.toLocaleString()}-point blocks at ${a.ratio > 1 ? '1:' + a.ratio + ' (a bonus until ' + esc(a.bonus.until) + ')' : '1:1'}, so send <b>${move.toLocaleString()}</b> and <b>${arrive.toLocaleString()}</b> arrive${arrive - a.short > 0 ? ', leaving ' + (arrive - a.short).toLocaleString() + ' spare in the account' : ''}. Link the ${esc(prog)} account to ${bank} first; the names on both must match exactly. ${esc((x => x[0].toUpperCase() + x.slice(1))(SPEED[a.via + '>' + a.p] || 'transfers to this programme can take a day or more'))}. Do this only after step 1.`, BANKPATH[a.via]);
+  }
+  // 3. book
+  if (a.path) step('Book it, and pay the fees on the right card', `Back on <b>${esc(P.site || 'the programme\'s site')}</b>, search the same flight again with points, pick it, and pay the <b>${money(a.fees)}</b> in taxes and fees. ${esc(P.fees || '')} Pay with a card that has no foreign transaction fee: the fees are often charged in the airline\'s home currency.`);
+  // 4. the cheaper way round, if the table knows one
+  for (const t of (P.tips || [])) step('Worth checking first', esc(t));
+  // 5. after
+  if (a.path) step('After booking', `Screenshot the confirmation, add the booking to the airline app, and pick a seat: on this fare seat choice is <b>${e.seat_selection === 'paid' ? 'paid' : 'included'}</b>. ${esc(P.cancel || '')}`);
+  const verdict = !a.path ? `Points cannot do this one from where you stand.` : a.good ? `<b>Points win by ${money(a.margin)}.</b> ${a.spend.toLocaleString()} ${esc(BANK[a.via || a.p].split(' ')[0])} points at ${moneyPt(a.prog.fair)} each are worth ${money(a.worth)}; with the ${money(rest)} you still pay, that is ${money(eq)} all in against ${money(total)} in cash, and you get ${moneyPt(a.value)} a point.`
+    : `<b>Cash wins by ${money(-a.margin)}.</b> At ${moneyPt(a.value)} a point this award returns less than the ${moneyPt(a.prog.fair)} ${esc(prog)} usually give; keep the points for a better one.`;
+  return `<div class="play"><p class="lede">${verdict}</p>
+    ${a.path ? `<div class="warn"><b>The one rule:</b> confirm the award seat on ${esc(P.site || 'the site')} before any transfer. Points that have moved do not come back.</div>` : ''}
+    <ol class="steps">${S1.join('')}</ol>
+    <div class="sum"><div><span>Points to move</span><b class="fig">${a.path && a.short > 0 ? (Math.ceil(Math.ceil(a.short / a.ratio) / 1000) * 1000).toLocaleString() : a.path ? '0' : '—'}</b><span>${a.path && a.short > 0 ? 'from ' + esc(BANK[a.via].split(' ')[0]) : a.path ? 'already in ' + esc(prog) : 'no route'}</span></div>
+      <div><span>Cash still due</span><b class="fig">${money(rest)}</b><span>${money(a.fees)} award fees + ${money(total - e.ticket_cents)} beyond the fare</span></div></div>
+    <p class="pnote">Programme rules, transfer partners, ratios and speeds are curated as of September 2026 and change without notice; confirm on the bank's transfer page before moving points. In the product these steps are written by the narrator from the same figures, current to the day.</p></div>`;
+}
+function openPlaybook(id){
+  const e = ALL.find(x => x.id === id), r = bill(e), a = awardsFor(e)[0]; if (!a) return;
+  $('#sheetroot').innerHTML = `<div class="sheetwrap" id="sheetwrap" data-id="${esc(e.id)}"><div class="sheet" role="dialog" aria-modal="true" aria-label="Booking with points"><div class="hd"><h3>Booking ${esc(e.carrier_name)} ${esc(e.flight)} with points<span>${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)} · step by step</span></h3><button class="x" id="x" aria-label="Close">×</button></div><div class="detail">${playbookHTML(e, r)}</div></div></div>`;
+  $('#x').focus();
+}
 function payHTML(e, total){
   const a = awardsFor(e)[0], ptsWin = !!(a && a.good), col = (cls, head, body) => `<div class="pay ${cls}">${head}${body}</div>`;
   const head = (label, win) => `<div class="ph">${label}${win ? '<i class="star" title="Better value">★</i>' : ''}</div>`;
@@ -857,7 +945,7 @@ function payHTML(e, total){
   else { const usable = a.path && a.value > 0, rest = total - e.ticket_cents + a.fees, tip = `<button class="info" type="button" aria-expanded="false" aria-label="Why">i</button><span class="tip" role="tooltip">${ptTip(e, a, total)}</span>`;
     pts = col('points' + (ptsWin ? ' best' : '') + (usable ? '' : ' dim'), head('Points', ptsWin),
       `<b class="num fig">${a.spend.toLocaleString()}</b><span class="unit${usable ? '' : ' dim'}">${a.via ? esc(BANK[a.via].split(' ')[0]) + ' pts' : esc(a.prog.name)}</span><em>+ ${money(rest)} cash</em>` +
-      `<div class="v">${!a.path ? 'no route' : a.value <= 0 ? 'fees exceed fare' : '<b class="num">≈ ' + money(total - a.margin) + '</b> all in'}${tip}</div>`); }
+      `<div class="v">${!a.path ? 'no route' : a.value <= 0 ? 'fees exceed fare' : '<b class="num">≈ ' + money(total - a.margin) + '</b> all in'}${tip}</div><button class="how" type="button" data-play="${esc(e.id)}">How to book with points →</button>`); }
   return `<div class="paycols">${cash}${pts}</div>`;
 }
 
@@ -1379,6 +1467,7 @@ function ledgerHTML(e){
     <div class="btotal"><span>All in<small>what you pay: the lines above. Time, comfort and risk weigh the order and make the grade, not the bill.</small></span><b>${money(r.total)}</b></div></div>
     <div class="book"><h4>${esc(e.carrier_name)} ${esc(e.flight)}</h4><p>${esc(e.route.join(' → '))} · ${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} · ${stopsText(e)}<br>${b ? esc(b.note) : ''}</p>
       <button class="choose">${b ? 'Book with ' + esc(b.who) + ' · ' + money(b.price_cents) : 'Book'}</button>
+      ${aw.length ? `<button class="ledger" data-play="${esc(e.id)}" style="text-align:left;padding:4px 0">${aw[0].good ? '★ ' : ''}Book with points, step by step →</button>` : ''}
       ${aw.length ? '<h4 style="margin-top:6px">With points</h4><ul class="awards">' + aw.map(a => `<li class="${a.good ? 'good' : ''}"><b>${a.good ? '★ ' : ''}${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)}</b> · <span class="v">${a.value <= 0 ? 'fees exceed the fare' : moneyPt(a.value) + '/pt · ≈ ' + money(r.total - a.margin) + ' all in'}</span>${a.path ? ' · ' + esc(a.path) : ' · no route from your balances'}${a.bonus ? ' until ' + esc(a.bonus.until) : ''}</li>`).join('') + '</ul>' : ''}
       <p>Grade <b>${e.grade}</b>: ${money(e.effective_cents)} all in for a neutral traveller, against par ${money(D.query.par_cents)}.</p></div>`;
 }
@@ -1621,6 +1710,7 @@ document.addEventListener('click', ev => {
   const ac = ev.target.closest('[data-addcustom]'); if (ac){ const f = ac.closest('form'), label = f.label.value.trim(), amt = Math.round(+String(f.amt.value).replace(/[^\d.]/g, '') * 100); if (label && amt > 0){ S.extra.custom.push({label, cents:amt}); rerenderBills(); } else f.label.focus(); return; }
 });
 $('#doors').addEventListener('click', ev => { const b = ev.target.closest('[data-open]'); if (b) openSheet(b.dataset.open); });
+document.addEventListener('click', ev => { const b = ev.target.closest('[data-play]'); if (b){ ev.stopPropagation(); openPlaybook(b.dataset.play); } }, true);
 document.addEventListener('click', ev => { const i = ev.target.closest('.info'); document.querySelectorAll('.info[aria-expanded=true]').forEach(x => { if (x !== i) x.setAttribute('aria-expanded', 'false'); }); if (i) i.setAttribute('aria-expanded', i.getAttribute('aria-expanded') === 'true' ? 'false' : 'true'); });
 document.addEventListener('click', ev => { if (ev.target.id === 'x' || ev.target.id === 'sheetwrap') $('#sheetroot').innerHTML = ''; });
 $('#go').addEventListener('click', enterResults);
