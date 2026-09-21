@@ -34,6 +34,10 @@ def main():
     check("alternatives that leave within the buffer are not offered",
           all(datetime.fromisoformat(r["depart"]) > morning for r in a["options"]))
     check("the best alternative is the lowest net", a["options"][0]["net_cents"] == min(r["net_cents"] for r in a["options"]))
+    import copy as _c
+    twin = _c.deepcopy(opts[0]); twin["id"] = "twin-fare"; twin["ticket_cents"] += 9000
+    a_tw = rescue.assess(sit, opts + [twin], now=morning)
+    check("two fares of one flight make one row, the cheaper", sum(1 for r in a_tw["options"] if r["flight"] == opts[0]["flight"] and r["depart"] == opts[0]["depart"]) <= 1)
 
     # delayed two hours, domestic: no refund, and the rebook lands earlier than anything else -> stay
     sit2 = {"kind": "delayed", "us": True, "international": False, "delay_minutes": 120, "paid_cents": 30000,
@@ -51,12 +55,24 @@ def main():
     nxt = copy.deepcopy(opts[0]); nxt["id"] = "next-morning"; nxt["depart"] = nxt["depart"].replace("2026-11-18", "2026-11-19"); nxt["arrive"] = nxt["arrive"].replace("2026-11-18", "2026-11-19")
     a3 = rescue.assess(sit3, opts + [nxt], now=late)
     check("a six-hour international delay: the refund is expected", a3["refund"]["expected"])
-    check("late at night, an option that leaves tomorrow morning carries the hotel", any(r["hotel_cents"] == rescue.HOTEL_CENTS for r in a3["options"]) and a3["hotel_tonight"] is not None)
+    check("late at night, an option that leaves tomorrow morning carries a night's room", any(r["hotel_cents"] > 0 for r in a3["options"]) and a3["hotel_tonight"] is not None)
     check("the rights list names the refund, rebooking and the bag when one was checked",
           [r["what"] for r in rescue.rights(dict(sit3, bags_checked=True))][:2] == ["A refund of the unused ticket", "Rebooking at no charge"]
           and any("bag" in r["what"].lower() for r in rescue.rights(dict(sit3, bags_checked=True))))
     check("an EU departure adds EU261 by distance, hedged", any("EU261" in r["what"] and "€600" in r["what"] for r in rescue.rights(dict(sit3, eu=True, distance_km=5500)))
           and all("may" in r or True for r in rescue.rights(dict(sit3, eu=True))))
+
+    # the night before a flight tomorrow: a typical room from the table, the rides from the ground model
+    n = rescue.night_near({"iata": "JFK", "lat": 40.6413, "lon": -73.7781, "country": "US"}, late, datetime.fromisoformat("2026-11-19T08:00:00-05:00"))
+    check("a night near JFK is priced from the table and says it is not a live price", n["hotel_cents"] == 19000 and "not a live price" in n["hotel_basis"])
+    check("the rides there and back are estimated at the airport's own rates", len(n["rides"]) == 2 and n["rides_cents"] > 0 and "estimated" in n["rides_basis"])
+    n2 = rescue.night_near({"iata": "XXX", "lat": 51.5, "lon": -0.1, "country": "GB"}, late, None)
+    check("an airport not in the table takes its country's rate and says so", n2["hotel_cents"] == 15000 and "not in the table" in n2["hotel_basis"])
+    n3 = rescue.night_near({"iata": "ZZZ"}, late, None)
+    check("with no coordinates there is no ride estimate, and the room is the default", n3["rides_cents"] == 0 and n3["hotel_cents"] == 16000)
+    a5 = rescue.assess(sit3, opts + [nxt], now=late, airports={"JFK": {"iata": "JFK", "lat": 40.6413, "lon": -73.7781, "country": "US"}})
+    tm = next(r for r in a5["options"] if r["id"] == "next-morning")
+    check("a next-morning option carries the night near JFK and the rides, itemised", tm["hotel_cents"] == 19000 and tm["rides_cents"] > 0 and any("Rides" in l["label"] for l in tm["lines"]) and tm["night"]["km"] == 4.0)
 
     # the fare's own rules
     ok, why = rescue.refund_rights({"kind": "delayed", "us": True, "delay_minutes": 30, "fare": "flex"})
@@ -96,7 +112,7 @@ def main():
     check("with no key, narrate ships the template and says why",
           rescue.narrate(b, allow_model=False)["source"] == "template")
     src = open(os.path.join(HERE, "..", "rescue.py"), encoding="utf-8").read()
-    check("the helper never imports the scorer, the adapter or the live module",
+    check("the helper never imports the scorer, the adapter or the live module (the ground model is allowed)",
           not any(("import %s" % m) in src or ("from %s" % m) in src for m in ("scorer", "adapter", "live")))
 
     print("\n%d checks, %d failed" % (N[0], len(FAILS)))

@@ -827,7 +827,17 @@ def rescue_request(req):
         sit.setdefault("distance_km", int(_g.haversine_km(o_ap["lat"], o_ap["lon"], d_ap["lat"], d_ap["lon"])))
     sit["route"] = "%s to %s" % (o, d)
     sit["now_clock"] = now.strftime("%H:%M") if now else None
-    a = rescue.assess(sit, found, now=now)
+    # the airports' coordinates for the night's rides: the curated table, then whatever the feed named
+    airports = {k: {"iata": k, "lat": v.get("lat"), "lon": v.get("lon"), "country": v.get("country")} for k, v in aps.items() if v.get("lat") is not None}
+    try:
+        got = _fetch_raw({"source": "api", "origin": o, "destination": d, "date": date, "adults": 1, "_served": req.get("_served")})
+        if len(got) == 4:
+            for k, g in adapter.duffel_geo(got[0]).items():
+                if g.get("lat") is not None:
+                    airports.setdefault(k, {"iata": k, "lat": g["lat"], "lon": g["lon"], "country": g.get("country")})
+    except Exception:
+        pass
+    a = rescue.assess(sit, found, now=now, airports=airports, hotels=rescue.load_hotels())
     b = rescue.brief(sit, a)
     prose = rescue.narrate(b, allow_model=bool(os.environ.get("ANTHROPIC_API_KEY")))
     return {"assessment": a, "advice": prose, "searched": dates, "feed": feed, "found": len(found), "notes": errors,

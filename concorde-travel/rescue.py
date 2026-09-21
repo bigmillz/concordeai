@@ -19,6 +19,12 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 import narrator                                                  # noqa: E402  (the guard rails; never the scorer, never the adapter)
+import ground                                                    # noqa: E402  (the ride model, for the night's rides)
+import json
+import os
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+HOTEL_KM = 4.0               # an airport hotel sits a few kilometres out; the ride is priced at that
 
 HOTEL_CENTS = 18000          # a night near the airport, the page's own figure
 BUFFER_MINUTES = 75          # you cannot make a flight that leaves sooner than this
@@ -57,6 +63,58 @@ def _minutes(a: Optional[datetime], b: Optional[datetime]) -> Optional[int]:
     if a is None or b is None:
         return None
     return int(round((b - a).total_seconds() / 60))
+
+
+def load_hotels() -> Dict[str, Any]:
+    try:
+        with open(os.path.join(HERE, "enrichment", "hotels.json"), encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return {"airports": {}, "country_default_cents": {}, "_default_cents": HOTEL_CENTS}
+
+
+def night_near(airport: Optional[Dict[str, Any]], now: Optional[datetime], dep: Optional[datetime],
+               hotels: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """What a night near the airport costs before a flight tomorrow: a typical
+    room rate from the curated table (never a live price, and it says so),
+    and the ground model's own rideshare estimate for a hotel a few
+    kilometres out, there at this hour and back two hours before the flight."""
+    hotels = hotels or load_hotels()
+    iata = (airport or {}).get("iata") or ""
+    country = (airport or {}).get("country") or ""
+    rate = (hotels.get("airports") or {}).get(iata)
+    if rate:
+        hotel_basis = "a typical airport-area rate near %s, not a live price" % iata
+    elif (hotels.get("country_default_cents") or {}).get(country):
+        rate = hotels["country_default_cents"][country]
+        hotel_basis = "a typical airport-area rate in %s, not a live price; %s itself is not in the table" % (country, iata or "the airport")
+    else:
+        rate = int(hotels.get("_default_cents") or HOTEL_CENTS)
+        hotel_basis = "a default rate: no table row for %s or its country" % (iata or "the airport")
+    out = {"hotel_cents": int(rate), "hotel_basis": hotel_basis, "rides_cents": 0, "rides": [], "rides_basis": "",
+           "km": HOTEL_KM}
+    if airport and airport.get("lat") is not None and airport.get("lon") is not None:
+        hotel_pt = {"lat": float(airport["lat"]) + HOTEL_KM / 111.0, "lon": float(airport["lon"])}
+        ap = {"lat": float(airport["lat"]), "lon": float(airport["lon"]), "country": country, "iata": iata}
+        legs = []
+        if now is not None:
+            legs.append(("to a hotel tonight", now.hour * 60 + now.minute))
+        if dep is not None:
+            back = dep - timedelta(hours=2)
+            legs.append(("back for the flight", back.hour * 60 + back.minute))
+        for label, clock in legs:
+            try:
+                modes = ground.estimate_modes(hotel_pt, ap, clock)
+            except Exception:
+                modes = []
+            ride = next((m for m in modes if "ride" in str(m.get("mode", "")).lower() or "taxi" in str(m.get("mode", "")).lower()), None)
+            if ride:
+                out["rides"].append({"label": label, "cents": int(ride["fare_cents"]), "mode": ride["mode"],
+                                     "minutes": int(ride["door_to_door_minutes"]["p50"])})
+        out["rides_cents"] = sum(r["cents"] for r in out["rides"])
+        out["rides_basis"] = ("rideshare to a hotel about %d km out and back, at %s's own rates, estimated" % (HOTEL_KM, iata)
+                              if out["rides"] else "no ride estimate for %s" % iata)
+    return out
 
 
 def refund_rights(sit: Dict[str, Any]) -> Tuple[bool, str]:
@@ -107,9 +165,12 @@ def rights(sit: Dict[str, Any]) -> List[Dict[str, str]]:
     return out
 
 
-def assess(sit: Dict[str, Any], options: List[Dict[str, Any]], now: Optional[datetime] = None) -> Dict[str, Any]:
+def assess(sit: Dict[str, Any], options: List[Dict[str, Any]], now: Optional[datetime] = None,
+           airports: Optional[Dict[str, Dict[str, Any]]] = None, hotels: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """The decision. `options` are the page's result entries (ticket_cents,
-    depart, arrive with offsets, stops, carrier, flight, route, grade)."""
+    depart, arrive with offsets, stops, carrier, flight, route, grade);
+    `airports` maps IATA to lat, lon and country for the night's rides."""
+    nights: Dict[str, Dict[str, Any]] = {}
     hourly = int(sit.get("hourly_value_cents") or 3500)
     paid = int(sit.get("paid_cents") or 0)
     ok, why = refund_rights(sit)
@@ -127,21 +188,41 @@ def assess(sit: Dict[str, Any], options: List[Dict[str, Any]], now: Optional[dat
         oop = int(o.get("ticket_cents", 0)) - refund
         sooner = _minutes(arr, base_arrive) if base_arrive else None      # positive: this one lands earlier
         time_value = int(round(sooner / 60.0 * hourly)) if sooner is not None else 0
-        # a flight tomorrow means a night somewhere tonight, whatever the clock says now
-        hotel = HOTEL_CENTS if (now is not None and dep.date() > now.date()) else 0
-        net = oop - time_value + hotel
+        # a flight tomorrow means a night somewhere tonight, whatever the clock says now: a typical
+        # room near the airport it leaves from, and the rides there and back
+        night = None
+        hotel = rides = 0
+        if now is not None and dep.date() > now.date():
+            ap = (o.get("route") or [None])[0] or ""
+            if ap not in nights:
+                nights[ap] = night_near((airports or {}).get(ap) or ({"iata": ap} if ap else None), now, dep, hotels)
+            night = nights[ap]
+            hotel, rides = night["hotel_cents"], night["rides_cents"]
+        net = oop - time_value + hotel + rides
         lines = [{"label": "Ticket", "cents": int(o.get("ticket_cents", 0))}]
         if refund:
             lines.append({"label": "Less the refund you may expect", "cents": -refund})
         if sooner is not None and sooner != 0:
             lines.append({"label": ("Lands %s sooner" if sooner > 0 else "Lands %s later") % narrator._hm(abs(sooner)) + " at your rate", "cents": -time_value})
         if hotel:
-            lines.append({"label": "A hotel tonight, it leaves tomorrow", "cents": hotel})
+            lines.append({"label": "A night near %s, it leaves tomorrow" % ((o.get("route") or ["the airport"])[0]), "cents": hotel})
+        if rides:
+            lines.append({"label": "Rides to the hotel and back", "cents": rides})
         rows.append({"id": o.get("id"), "carrier": o.get("carrier"), "flight": o.get("flight"), "route": o.get("route"),
                      "depart": o.get("depart"), "arrive": o.get("arrive"), "stops": o.get("stops", 0), "grade": o.get("grade"),
                      "ticket_cents": int(o.get("ticket_cents", 0)), "out_of_pocket_cents": oop, "sooner_minutes": sooner,
-                     "time_value_cents": time_value, "hotel_cents": hotel, "net_cents": net, "lines": lines})
+                     "time_value_cents": time_value, "hotel_cents": hotel, "rides_cents": rides, "night": night,
+                     "net_cents": net, "lines": lines})
     rows.sort(key=lambda r: (r["net_cents"], r["arrive"]))
+    # one row per FLIGHT: the feed sells each fare family as its own offer; the best-priced fare stands for it
+    seen, uniq = set(), []
+    for r in rows:
+        key = (r.get("flight"), r.get("depart"))
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append(r)
+    rows = uniq
     best = rows[0] if rows else None
     if best is None:
         action, reason = "wait", "nothing else we can find leaves in time; stay with the airline and hold it to its plan"

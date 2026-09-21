@@ -620,7 +620,12 @@ each given an even chance of taking you, capped at 97% because a seat on sale is
 in hand). Times on the form are 12-hour with an AM/PM toggle; a 24-hour entry picks its half
 by itself. The alternatives on the result open the details sheet, with a warning to ask the
 airline's staff first, and "See all alternative flights" shows the day's results as an
-ordinary search narrowed by a visible "leaves after" rule. A tracking
+ordinary search narrowed by a visible "leaves after" rule. **A next-day option carries the
+night**: a typical room rate near the airport it leaves from (`enrichment/hotels.json`, 65
+airports and country defaults, DRAFTED from general knowledge on 2026-09-21, never a live
+price, and the row says so) and the ground model's own rideshare estimate for a hotel 4 km
+out, there at this hour and back two hours before the flight, both itemised and both under
+"more" on the row. One row per flight, the cheapest fare standing for it. A tracking
 feed for the flight number would replace those priors with the flight's own day and is the
 obvious next key. The helper's model text: The situation comes in as chips and clocks: delayed or cancelled,
 the scheduled and new times, whether rebooking was offered and when it lands, the fare, a
