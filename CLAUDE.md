@@ -467,8 +467,22 @@ the places, fetches (the provider with a key, the recording without one, and the
 which), and returns everything the page reads via `data.build_slim()` — the same builder
 that writes `slim.json`, so a live search and the checked-in sample are one shape. The page
 rebuilds every derived table from the response (`loadData`); a typo comes back to the form
-with the sentence from `places.py`. One-way today: the outbound date only. Opened as a
-file, or by anyone Access did not sign in, the inlined recording is all there is.
+with the sentence from `places.py`. Opened as a file, or by anyone Access did not sign in,
+the inlined recording is all there is.
+
+**A round trip is three steps, and the last is one link** (per Patrick, 2026-09-21: the old
+sheet dead-ended on one leg). The details sheet's button selects the leg ("Select this
+outbound"), the stepper advances, and the return is its own search the other way round
+(`fetchLeg`: the destination city as origin, the origin address as destination, the return
+date) landing in `LEGDATA[1]`; with no live search possible the outbound recording is
+mirrored (`mirrorData`) and the lede says so. Picks are snapshots (`S.legPick`), so going
+back to a leg and choosing again is cheap. The book step (`bookHTML`) shows both legs and
+their picks, cash or points, and the link: one airline for the whole trip gets one link to
+its own site (`DEEP` fills the airports and dates in for the few whose search pages take
+them in the address; the rest open the site with the itinerary to enter, copyable); two
+airlines get two links and a sentence saying two tickets is normal; a points leg gets the
+transfer walkthrough. The airline's own domain comes from the feed's conditions-of-carriage
+URL, falling back to `SITES`.
 
 **An account is the deterrent.** Browsing and recorded results are open to everyone. A
 live search, the wish box and the price check need a sign-in: the page greys them and a

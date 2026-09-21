@@ -214,6 +214,17 @@ details[open] summary:after{content:"–"}
 .step i{font-style:normal;font-family:var(--mono);font-size:11px;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center}
 .step.on{color:var(--text);background:var(--panel2)}
 .step.on i{background:var(--speed);color:var(--bg);border-color:var(--speed)}
+.step[data-leg],.step[data-book]{cursor:pointer}.step[data-leg]:hover,.step[data-book]:hover{color:var(--text)}
+.step.done i{background:var(--green);border-color:var(--green);color:var(--bg)}.step.wait{opacity:.55}
+/* the book step: both legs, one link */
+.bookcard{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:6px 18px 18px;display:flex;flex-direction:column;gap:0;max-width:820px}
+.bleg{display:grid;grid-template-columns:40px 1fr auto auto;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line-soft)}
+.bleg .binfo{display:flex;flex-direction:column;gap:3px;min-width:0}.bleg .binfo b{font-weight:500}.bleg .binfo span{color:var(--dim);font-size:13px}
+.bleg .bpay{text-align:right;display:flex;flex-direction:column;gap:2px}.bleg .bpay .fig{font-size:20px;line-height:1.1}.bleg .bpay span{color:var(--dim);font-size:12px}
+.blinks{display:flex;flex-direction:column;gap:10px;padding:18px 0 6px}.blink{text-decoration:none;text-align:center;display:block}
+.bnote{color:var(--dim);font-size:12.5px;line-height:1.5;margin:0}
+.bfoot{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;padding-top:8px}.itin{font:12px/1.6 var(--mono);color:var(--dim);white-space:pre-wrap;margin:0;flex:1;min-width:240px}
+@media (max-width:640px){.bleg{grid-template-columns:40px 1fr;grid-auto-rows:auto}.bleg .bpay{text-align:left;grid-column:2}}
 .step b{font-weight:500}.step small{display:block;font-size:11.5px;color:var(--faint)}
 .sechead{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;padding-block:30px 16px}
 .sechead h2{font-size:24px}
@@ -816,6 +827,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 </div></div>
 <div id="results" class="hidden"><div class="wrapin">
   <div class="stepper" id="stepper"></div>
+  <section id="bookstep" class="hidden" aria-label="Book the trip"></section>
   <section aria-label="Your shortlist"><div class="sechead"><h2>Your shortlist</h2><p id="lede"></p></div><div class="three" id="doors"></div></section>
   <section aria-label="Everything else"><div class="sechead"><h2>Everything else, in your order</h2><p id="listnote"></p></div><ol class="list" id="list"></ol><button class="morebtn" id="morebtn"></button><p class="hiddenrows" id="hiddenrows"></p></section>
   <section class="research" id="research" aria-label="Price check from other countries">
@@ -910,7 +922,7 @@ const AIRNAME = {american:'AA',aa:'AA','british airways':'BA',ba:'BA',british:'B
 // ---- state
 const S = {trip:'round', a:1, b:0, c:0, preset:'1,0,0', asap:false, wants:new Set(), rules:[], ride:'either', off:new Set(), menu:false, open:new Set(),
   extra:{bag:0, wifi:false, seat:false, legroom:false, lounge:false, priority:false, insurance:false, hotel:false, custom:[]}, adv:{dep0:0, dep1:24, arr0:0, arr1:24, cabin:'economy', stops:2, alli:new Set(), out:new Set()},
-  pts:{amex:120000, chase:80000, capone:0, citi:0, bilt:0, marriott:0, avios:0, virgin:0, aa:0, delta:0, mm:0, ms:0, fb:0, ac:0, ua:0}, ptOpen:new Set(), stOpen:new Set(), more:{banks:false, progs:false, status:false}, pay:{}, status:{}, shown:12, T:'mine',
+  pts:{amex:120000, chase:80000, capone:0, citi:0, bilt:0, marriott:0, avios:0, virgin:0, aa:0, delta:0, mm:0, ms:0, fb:0, ac:0, ua:0}, ptOpen:new Set(), stOpen:new Set(), more:{banks:false, progs:false, status:false}, pay:{}, legIdx:0, legPick:{}, stage:'legs', status:{}, shown:12, T:'mine',
   legs:[{from:'Wyckoff Ave & Myrtle Ave, Bushwick, Brooklyn', to:'London', date:'Wed 18 Nov'}], back:'Wed 25 Nov', pax:'1 adult', bags:'1 checked bag'};
 
 // ---- wants: a predicate, a charge when it is missing, and a hint when nothing has it
@@ -1639,7 +1651,8 @@ function ledgerHTML(e){
   return `${factsHTML(e)}<div class="bill">${GROUPS.map(([k, t]) => grp(k, t)).join('')}
     <div class="btotal"><span>All in<small>what you pay: the lines above. Time, comfort and risk weigh the order and make the grade, not the bill.</small></span><b>${money(r.total)}</b></div></div>
     <div class="book"><h4>${esc(e.carrier_name)} ${esc(e.flight)}</h4><p>${esc(e.route.join(' → '))} · ${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} · ${stopsText(e)}<br>${b ? esc(b.note) : ''}</p>
-      <button class="choose">${b ? 'Book with ' + esc(b.who) + ' · ' + money(b.price_cents) : 'Book'}</button>
+      <button class="choose" data-select="${esc(e.id)}">${selectLabel()}${b ? ' · ' + money(b.price_cents) : ''}</button>
+      <p>${S.trip === 'round' ? (S.legIdx === 0 ? 'Then pick the return, and one link books both legs together.' : 'Then one link books both legs together.') : 'Then one link takes you to the airline with the flight filled in.'}</p>
       ${aw.length ? `<button class="ledger" data-play="${esc(e.id)}" style="text-align:left;padding:4px 0">${aw[0].good ? '★ ' : ''}Book with points, step by step →</button>` : ''}
       ${aw.length ? '<h4 style="margin-top:6px">With points</h4><ul class="awards">' + aw.map(a => `<li class="${a.good ? 'good' : ''}"><b>${a.good ? '★ ' : ''}${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)}</b> · <span class="v">${a.value <= 0 ? 'fees exceed the fare' : moneyPt(a.value) + '/pt · ≈ ' + money(r.total - a.margin) + ' all in'}</span>${a.path ? ' · ' + esc(a.path) : ' · no route from your balances'}${a.bonus ? ' until ' + esc(a.bonus.until) : ''}</li>`).join('') + '</ul>' : ''}
       <p>Grade <b>${e.grade}</b>: ${money(e.effective_cents)} all in for a neutral traveller, against par ${money(D.query.par_cents)}.</p></div>`;
@@ -1671,9 +1684,98 @@ function sentenceHTML(){
   $('#sentence').innerHTML = h; $('#addleg').classList.toggle('hidden', S.trip !== 'multi');
   paintStepper();
 }
+function legNames(){ return S.trip === 'one' ? [['Your flight', S.legs[0].date]] : S.trip === 'round' ? [['Outbound', S.legs[0].date], ['Return', S.back]] : S.legs.map((l, i) => ['Flight ' + (i+1), l.date]); }
+function selectLabel(){ const n = legNames(); return S.trip === 'round' ? (S.legIdx === 0 ? 'Select this outbound' : 'Select this return') : S.trip === 'multi' ? 'Select this for flight ' + (S.legIdx + 1) : 'Select this flight'; }
 function paintStepper(){
-  const steps = S.trip === 'one' ? [['Your flight', S.legs[0].date], ['Book', '']] : S.trip === 'round' ? [['Outbound', S.legs[0].date], ['Return', S.back], ['Book', '']] : S.legs.map((l, i) => ['Flight ' + (i+1), l.date]).concat([['Book', '']]);
-  $('#stepper').innerHTML = steps.map((s, i) => `<div class="step${i === 0 ? ' on' : ''}"><i>${i+1}</i><div><b>${esc(s[0])}</b>${s[1] ? '<small>' + esc(s[1]) + '</small>' : ''}</div></div>`).join('');
+  const names = legNames(), picks = S.legPick, allPicked = names.every((_, i) => picks[i]);
+  const legs = names.map((s, i) => { const pk = picks[i]; return `<div class="step${S.stage === 'legs' && i === S.legIdx ? ' on' : ''}${pk ? ' done' : ''}" data-leg="${i}" role="button" tabindex="0"><i>${pk ? '✓' : i+1}</i><div><b>${esc(s[0])}</b><small>${pk ? esc(pk.snap.carrier + ' ' + pk.snap.flight + ' · ' + s[1]) : esc(s[1] || '')}</small></div></div>`; });
+  legs.push(`<div class="step${S.stage === 'book' ? ' on' : ''}${allPicked ? '' : ' wait'}"${allPicked ? ' data-book role="button" tabindex="0"' : ''}><i>${names.length + 1}</i><div><b>Book</b><small>${allPicked ? 'one link, both legs' : 'after you pick'}</small></div></div>`);
+  $('#stepper').innerHTML = legs.join('');
+}
+// ---- the flow: pick a leg, get the next one, then one booking card for the whole trip
+function closeSheet(){ $('#sheetroot').innerHTML = ''; }
+function snapshot(e){
+  const b = e.booking && e.booking[0], aw = awardsFor(e)[0], host = (() => { try { return new URL((e.details || {}).carriage_url || '').host; } catch (x) { return ''; } })();
+  return {id:e.id, carrier:e.carrier, carrier_name:e.carrier_name, flight:e.flight, route:e.route.slice(), depart:e.depart, arrive:e.arrive, day_offset:e.day_offset, brand:e.brand, ticket_cents:e.ticket_cents, total_cents:bill(e).total,
+    pay:payPick(e, aw), award:aw ? {p:aw.p, name:aw.prog.name, pts:aw.pts, fees:aw.fees, spend:aw.spend, via:aw.via, good:aw.good} : null, site:host || (SITES[e.carrier] || ''), who:b ? b.who : e.carrier_name};
+}
+async function selectLeg(id){
+  const e = ALL.find(x => x.id === id); if (!e) return;
+  S.legPick[S.legIdx] = {id, snap:snapshot(e)}; closeSheet();
+  const n = legNames().length, next = [...Array(n).keys()].find(i => i > S.legIdx && !S.legPick[i]) ?? [...Array(n).keys()].find(i => !S.legPick[i]);
+  if (next !== undefined) await goLeg(next); else goBook();
+}
+function showLegSections(on){
+  ['#results section[aria-label="Your shortlist"]', '#results section[aria-label="Everything else"]', '#research', '#how', '#cov'].forEach(sel => { const el = document.querySelector(sel); if (el) el.classList.toggle('hidden', !on); });
+  $('#bookstep').classList.toggle('hidden', on);
+}
+async function goLeg(i){
+  S.stage = 'legs'; S.legIdx = i;
+  if (!LEGDATA[i]){ const d = await fetchLeg(i); LEGDATA[i] = d || mirrorData(LEGDATA[0], i); }
+  loadData(LEGDATA[i]); showLegSections(true); paintStepper(); paint(true); summary(); scrollTo({top:0, behavior:REDUCED ? 'auto' : 'smooth'});
+}
+// the return (or the next leg of a multi-city) is its own search the other way round, the same shape as the outbound
+async function fetchLeg(i){
+  const L0 = S.legs[0], from = S.trip === 'round' ? L0.to : S.legs[i].from, to = S.trip === 'round' ? L0.from : S.legs[i].to, dateStr = S.trip === 'round' ? S.back : S.legs[i].date, date = toISODate(dateStr);
+  if (!(SERVED && S.user && !S.user.demo && date)){ S.notice = (S.trip === 'round' ? 'Return leg, stand-in' : 'Flight ' + (i+1) + ', stand-in') + ': the outbound recording mirrored, until a live search runs for it.'; return null; }
+  const box = $('#loading'); box.classList.remove('hidden'); runProgress(box, SEARCH_STAGES, 9000, () => {});
+  let res;
+  try { const r = await fetch('/api/search', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'api', origin:from, origin_address:from, destination:to, date, adults:paxCount(), checked_bags:partyBags()})}); res = await r.json(); }
+  catch (x){ res = {error:'The search did not come back: ' + x.message}; }
+  box.classList.add('hidden');
+  if (res.error){ S.notice = 'The return search failed (' + res.error + '), so this is the outbound recording mirrored.'; return null; }
+  S.notice = (S.trip === 'round' ? 'Return leg. ' : 'Flight ' + (i+1) + '. ') + (res.source_note || 'Live results.'); return res;
+}
+// a stand-in for a leg nobody has searched yet: the outbound, the other way round, on that leg's date. Said so in the lede.
+function mirrorData(d0, i){
+  const d = JSON.parse(JSON.stringify(d0)), dateStr = S.trip === 'round' ? S.back : (S.legs[i] || {}).date, iso = toISODate(dateStr) || d.query.date;
+  const onDate = (stamp, plus) => { const m = /^(\d{4}-\d{2}-\d{2})(.*)$/.exec(stamp || ''); if (!m) return stamp; const t = new Date(iso + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + (plus || 0)); return t.toISOString().slice(0, 10) + m[2]; };
+  const flip = str => String(str || '').replace(/^to (\S+)/, 'from $1').replace(/^from (\S+)/, (m, a) => m.startsWith('from') && !/^to /.test(str) ? 'to ' + a : m).replace(/^To (\S+)/, 'From $1').replace(/^From (\S+)/, (m, a) => 'To ' + a);
+  d.results.reference.forEach(e => {
+    e.id = e.id + '-r'; e.route = e.route.slice().reverse(); e.depart = onDate(e.depart, 0); e.arrive = onDate(e.arrive, e.day_offset || 0);
+    if (Array.isArray(e.legs)) e.legs = e.legs.slice().reverse().map(l => ({...l, label: l.kind === 'ground' ? flip(l.label) : l.label, tip: l.kind === 'ground' ? flip(l.tip) : l.tip}));
+    if (e.details && Array.isArray(e.details.segments)) e.details.segments = e.details.segments.slice().reverse().map(sg => { const t = {...sg}; ['from', 'to'].every(k => k in t) && ([t.from, t.to] = [sg.to, sg.from]); ['origin', 'destination'].every(k => k in t) && ([t.origin, t.destination] = [sg.destination, sg.origin]); return t; });
+  });
+  Object.keys(d.by || {}).forEach(k => { d.by[k] = d.by[k].map(id => id + '-r'); });
+  d.query = {...d.query, origin: d.query.destination, origin_full: d.query.destination, destination: d.query.origin, date: iso};
+  d._provenance = {...(d._provenance || {}), built_from: 'the outbound recording, mirrored: a stand-in for a leg nobody has searched yet'};
+  return d;
+}
+function goBook(){ S.stage = 'book'; paintStepper(); showLegSections(false); $('#bookstep').innerHTML = bookHTML(); scrollTo({top:0, behavior:REDUCED ? 'auto' : 'smooth'}); }
+// where the airline sells its own seats, and the few whose search pages take the trip in the address
+const SITES = {BA:'www.britishairways.com', VS:'www.virginatlantic.com', AA:'www.aa.com', DL:'www.delta.com', UA:'www.united.com', LH:'www.lufthansa.com', LX:'www.swiss.com', OS:'www.austrian.com', SN:'www.brusselsairlines.com', IB:'www.iberia.com', AY:'www.finnair.com', EI:'www.aerlingus.com', TK:'www.turkishairlines.com', KL:'www.klm.com', AF:'www.airfrance.com', AZ:'www.ita-airways.com', TP:'www.flytap.com', SK:'www.flysas.com', LO:'www.lot.com', FI:'www.icelandair.com', AS:'www.alaskaair.com', AC:'www.aircanada.com', EY:'www.etihad.com', AV:'www.avianca.com', LY:'www.elal.com', AT:'www.royalairmaroc.com', QR:'www.qatarairways.com', SQ:'www.singaporeair.com'};
+const usDate = iso => iso.slice(5, 7) + '/' + iso.slice(8, 10) + '/' + iso.slice(0, 4);
+const DEEP = {
+  UA: (o, d, dep, ret, pax) => `https://www.united.com/en/us/fsr/choose-flights?f=${o}&t=${d}&d=${dep}${ret ? '&r=' + ret + '&tt=1' : '&tt=0'}&px=${pax}&sc=7&at=1&taxng=1&idx=1`,
+  DL: (o, d, dep, ret, pax) => `https://www.delta.com/flight-search/book-a-flight?tripType=${ret ? 'RT' : 'OW'}&originCity=${o}&destinationCity=${d}&departureDate=${usDate(dep)}${ret ? '&returnDate=' + usDate(ret) : ''}&paxCount=${pax}`,
+  AA: (o, d, dep, ret, pax) => `https://www.aa.com/booking/search?locale=en_US&pax=${pax}&adult=${pax}&type=${ret ? 'RoundTrip' : 'OneWay'}&searchType=Revenue&cabin=&carriers=ALL&slices=${encodeURIComponent(JSON.stringify([{orig:o, origNearby:false, dest:d, destNearby:false, date:dep}].concat(ret ? [{orig:d, origNearby:false, dest:o, destNearby:false, date:ret}] : [])))}`,
+  EI: (o, d, dep, ret, pax) => `https://www.aerlingus.com/html/flightSearchResult.html#/fareType=${ret ? 'ROUNDTRIP' : 'ONEWAY'}&fareCategory=ECONOMY&numAdults=${pax}&numChildren=0&numInfants=0&sourceAirportCode_0=${o}&destinationAirportCode_0=${d}&departureDate_0=${dep}${ret ? '&sourceAirportCode_1=' + d + '&destinationAirportCode_1=' + o + '&departureDate_1=' + ret : ''}`,
+};
+function airlineLink(carrier, site, legs){
+  const o = legs[0].route[0], d = legs[0].route[legs[0].route.length - 1], dep = legs[0].depart.slice(0, 10), ret = legs[1] ? legs[1].depart.slice(0, 10) : null, pax = paxCount();
+  const deep = DEEP[carrier]; return {href: deep ? deep(o, d, dep, ret, pax) : (site ? 'https://' + site + '/' : '#'), filled: !!deep, host: (site || carrier).replace(/^www\./, '')};
+}
+function itinText(){ return Object.keys(S.legPick).sort().map(i => { const p = S.legPick[i].snap, n = legNames()[i]; return `${n[0]}: ${p.route.join(' → ')} ${n[1]}, ${p.carrier_name} ${p.flight} (${p.brand}), ${hm(p.depart)} → ${hm(p.arrive)}${p.day_offset ? ' +1' : ''}`; }).join('\n'); }
+function bookHTML(){
+  const names = legNames(), picks = names.map((_, i) => S.legPick[i]).filter(Boolean); if (picks.length < names.length) return '<div class="sechead"><h2>Pick every leg first</h2></div>';
+  const snaps = picks.map(p => p.snap), same = snaps.every(x => x.carrier === snaps[0].carrier), cash = snaps.filter(x => x.pay !== 'points'), pts = snaps.filter(x => x.pay === 'points');
+  const legRow = (p, i) => `<div class="bleg"><div class="blogo">${logo(p.carrier, true)}</div><div class="binfo"><b>${esc(names[i][0])} · ${esc(names[i][1] || '')}</b><span>${esc(p.carrier_name)} ${esc(p.flight)} · ${esc(p.route.join(' → '))} · ${hm(p.depart)} → ${hm(p.arrive)}${p.day_offset ? ' +1' : ''} · ${esc(p.brand)}</span></div>
+      <div class="bpay">${p.pay === 'points' && p.award ? `<b class="fig">${p.award.spend.toLocaleString()}</b><span>${esc(p.award.via ? SHORT[p.award.via] + ' pts' : p.award.name)} + ${money(p.award.fees)}</span>` : `<b class="fig">${money(p.total_cents)}</b><span>all in</span>`}</div>
+      <button class="ledger" data-changeleg="${i}">Change</button></div>`;
+  const total = cash.reduce((t, x) => t + x.total_cents, 0);
+  let links = '';
+  if (cash.length){
+    if (same && cash.length === snaps.length){ const l = airlineLink(snaps[0].carrier, snaps[0].site, snaps);
+      links += `<a class="choose blink" href="${esc(l.href)}" target="_blank" rel="noopener">Book ${snaps.length > 1 ? 'both legs' : 'it'} on ${esc(l.host)} →</a><p class="bnote">${l.filled ? 'Opens the airline\'s search with the airports and dates filled in; pick these flights there.' : 'Opens the airline\'s site; put in these flights.'}</p>`; }
+    else { cash.forEach(p => { const i = snaps.indexOf(p), l = airlineLink(p.carrier, p.site, [p]);
+        links += `<a class="choose blink" href="${esc(l.href)}" target="_blank" rel="noopener">Book the ${esc(names[i][0].toLowerCase())} on ${esc(l.host)} →</a>`; });
+      if (!same) links += '<p class="bnote">Two tickets: the airlines differ, so each leg books on its own site. That is normal, and often what made it cheaper.</p>'; }
+  }
+  pts.forEach(p => { const i = snaps.indexOf(p); links += `<button class="choose blink" data-playleg="${i}">Book the ${esc(names[i][0].toLowerCase())} with ${esc(p.award.name)}, step by step →</button>`; });
+  return `<div class="sechead"><h2>Book it</h2><p>${same ? 'One airline for the whole trip.' : 'Two airlines, two tickets.'} ${cash.length ? 'Cash legs come to <b>' + money(total) + '</b>' + (pts.length ? '; the points leg has its own walkthrough.' : '.') : 'Booked with points, with a walkthrough for each leg.'}</p></div>
+    <div class="bookcard">${snaps.map(legRow).join('')}
+    <div class="blinks">${links}</div>
+    <div class="bfoot"><pre class="itin" id="itin">${esc(itinText())}</pre><button class="ledger" id="copyitin">Copy the itinerary</button></div></div>`;
 }
 
 // ---- the wish
@@ -2171,6 +2273,8 @@ const STARFIELD = (function stars(){
 })();
 // ---- boot
 let P = D.par;
+// one dataset per leg of the trip: 0 is the outbound the page opened with; the return arrives when it is asked for
+const LEGDATA = {0: D};
 // A live search replaces everything the page reads. Every derived table is
 // rebuilt here, so a second search is a clean slate and not a mix of two.
 function loadData(d){
@@ -2418,6 +2522,11 @@ document.addEventListener('click', ev => {
   if (ev.target.closest('#eddone, #eddone2, #edshade')){ closeEditor(); return; }
   if (ev.target.closest('#startover')){ startOver(); return; }
   if (ev.target.closest('#jump')){ finishAllSteps(); setTimeout(enterResults, REDUCED ? 0 : 380); return; }
+  const sl = ev.target.closest('[data-select]'); if (sl){ selectLeg(sl.dataset.select); return; }
+  const lg = ev.target.closest('#stepper [data-leg], [data-changeleg]'); if (lg){ goLeg(+(lg.dataset.leg !== undefined ? lg.dataset.leg : lg.dataset.changeleg)); return; }
+  if (ev.target.closest('#stepper [data-book]')){ goBook(); return; }
+  const pl = ev.target.closest('[data-playleg]'); if (pl){ const i = +pl.dataset.playleg, pk = S.legPick[i]; if (pk && LEGDATA[i]){ loadData(LEGDATA[i]); openPlaybook(pk.id); } return; }
+  if (ev.target.closest('#copyitin')){ const t = $('#itin').textContent; (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('Copied.'), () => toast('Select the text and copy it.')); return; }
   const pm = ev.target.closest('[data-more]'); if (pm){ S.more[pm.dataset.more] = !S.more[pm.dataset.more]; paintPts(); return; }
   const pa = ev.target.closest('[data-add]'); if (pa){ S.ptOpen.add(pa.dataset.add); paintPts(); const f = $('#pt-' + pa.dataset.add); if (f) f.focus(); return; }
   const pd = ev.target.closest('[data-drop]'); if (pd){ S.ptOpen.delete(pd.dataset.drop); S.pts[pd.dataset.drop] = 0; paintPts(); paint(false); return; }
@@ -2483,7 +2592,8 @@ async function enterResults(){
       $('#searcherr').textContent = res.error + (res.suggest && res.suggest.length ? ' Did you mean ' + res.suggest.slice(0, 3).join(', ') + '?' : ''); return; }
     loadData(res);
     S.notice = res.source_note || (res.feed && res.feed.fetched === 'cache' ? 'Live results, from a search a few minutes ago.' : 'Live results.');
-    if (S.trip === 'round') S.notice += ' Outbound leg only for now.';
+    if (S.trip === 'round') S.notice += ' Outbound leg; the return comes once you pick.';
+    LEGDATA[0] = res; LEGDATA[1] = null; S.legPick = {}; S.legIdx = 0; S.stage = 'legs';
     box.querySelector('.pfill').style.width = '100%'; setTimeout(() => { box.classList.add('hidden'); showResults(); }, 350); return;
   }
   if (SERVED && !S.user) S.notice = 'Recorded results. Sign in to search live.';
@@ -2545,7 +2655,8 @@ function startOver(){
   BLOCKS.forEach(k => $('#s' + (BLOCKS.indexOf(k) + 1) + ' .stepin .slot').appendChild($('#blk-' + k)));
   $('#bar').classList.add('hidden'); $('#results').classList.add('hidden'); $('#dock').classList.add('mini'); $('#dwish').placeholder = 'Ask or wish for anything about your trip…';
   $('#wizard').classList.remove('hidden'); $('#rail').classList.remove('hidden');
-  W.done.clear(); scrollTo({top:0, behavior:'auto'}); goStep(1); setTimeout(layoutDial, 50);
+  W.done.clear(); S.legPick = {}; S.legIdx = 0; S.stage = 'legs'; if (LEGDATA[0] && D !== LEGDATA[0]) loadData(LEGDATA[0]); showLegSections(true);
+  scrollTo({top:0, behavior:'auto'}); goStep(1); setTimeout(layoutDial, 50);
 }
 function openEditor(tab){
   $('#editor').classList.remove('hidden'); document.body.style.overflow = 'hidden';
