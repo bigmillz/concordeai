@@ -813,9 +813,13 @@ typed or spoken (the browser's own speech recognition) that becomes visible,
 removable rules and weights, advanced windows / cabin / stops / alliances /
 airlines-to-leave-out (these hide, and say what they hid), and **points
 balances** with a demo award chart and 1:1 transfer partners that say whether
-points beat cash in cents per point. **Programmes and status are gated by the
+points beat cash in cents per point. **Step 3 is rows of chips, not a form** (per
+Patrick, 2026-09-21: "not welcome to the world of data entry"): a source, a
+programme or a status is a chip until it is tapped, and only then a field, with
+the most popular few showing and the rest behind a dashed "+N more" chip.
+**Programmes and status are gated by the
 search**: a programme balance is offered only when it has an award on a flight
-the search returned (first four shown, the rest behind "More programmes"), and a
+the search returned, and a
 status programme only when the feed's `supported_loyalty_programmes` on this
 search's offers take it AND that airline flies in the search; one tier per
 alliance (Star, oneworld, SkyTeam) stands in for every partner. Marriott Bonvoy

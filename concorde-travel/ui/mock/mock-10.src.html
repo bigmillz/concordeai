@@ -170,14 +170,31 @@ details[open] summary:after{content:"–"}
 .logo.on img{display:block}
 .logo.on b{visibility:hidden}
 .logo.big{width:40px;height:40px;border-radius:9px}.logo.big b{font-size:14px}
-.pts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 18px;padding:4px 0 8px}
+/* step 3 is rows of chips, not a form: a source, programme or status is a chip until it is tapped, and only
+   then a field. The most popular few show; the rest wait behind a dashed chip (per Patrick, 2026-09-21). */
+.pts{display:flex;flex-direction:column;gap:16px;padding:2px 0 4px}
+.prow{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.prow .lab{width:100%;font:400 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:-2px}
+.pchip{border:1px solid var(--line);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:500;color:var(--dim);display:inline-flex;align-items:center;gap:6px;background:var(--panel);transition:.15s}
+.pchip:hover{border-color:var(--dim);color:var(--text)}
+.pchip i{font-style:normal;color:var(--faint);font-weight:400}
+.pchip.rest{border-style:dashed;color:var(--faint)}
+.pchip.on{background:var(--panel2);border-color:var(--dim);color:var(--text);padding:3px 4px 3px 12px;cursor:default}
+.pchip.on:hover{border-color:var(--dim)}
+.pchip.on b{font-weight:500}
+.pchip.on input{width:9ch;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--text);font:500 13px var(--mono);text-align:right;padding:2px 2px;outline:none}
+.pchip.on input:focus{border-bottom-color:var(--speed)}
+.pchip.on select{background:transparent;border:0;color:var(--text);font:500 13px var(--sans);padding:2px 0;outline:none;max-width:16ch}
+.pchip.on select option{background:var(--panel2);color:var(--text)}
+.pchip.on .x{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:var(--faint);font-size:16px;line-height:1}
+.pchip.on .x:hover{background:rgba(255,255,255,.08);color:var(--text)}
 .pt{display:flex;flex-direction:column;gap:5px}
 .pt.more{justify-content:flex-end;align-items:flex-start}
 .pt.more .ledger{padding:9px 12px}
 .pt label{font-size:12px;color:var(--dim)}
 .pt input{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:var(--mono);font-size:14px;width:100%}
 .pt input:focus{border-color:var(--speed);outline:none}
-.ptnote{grid-column:1/-1;color:var(--faint);font-size:12.5px;line-height:1.55;padding-bottom:14px}
+.ptnote{color:var(--faint);font-size:12.5px;line-height:1.55;margin:-4px 0 0}
 .sth{grid-column:1/-1;margin:6px 0 0;font-size:15px;font-weight:500}
 .pt select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:9px 12px;font-size:14px}
 .ptnote b{color:var(--dim);font-weight:500}
@@ -889,7 +906,7 @@ const AIRNAME = {american:'AA',aa:'AA','british airways':'BA',ba:'BA',british:'B
 // ---- state
 const S = {trip:'round', a:1, b:0, c:0, preset:'1,0,0', asap:false, wants:new Set(), rules:[], ride:'either', off:new Set(), menu:false, open:new Set(),
   extra:{bag:0, wifi:false, seat:false, legroom:false, lounge:false, priority:false, insurance:false, hotel:false, custom:[]}, adv:{dep0:0, dep1:24, arr0:0, arr1:24, cabin:'economy', stops:2, alli:new Set(), out:new Set()},
-  pts:{amex:120000, chase:80000, capone:0, citi:0, bilt:0, marriott:0, avios:0, virgin:0, aa:0, delta:0, mm:0, ms:0, fb:0, ac:0, ua:0}, morePts:false, status:{}, shown:12, T:'mine',
+  pts:{amex:120000, chase:80000, capone:0, citi:0, bilt:0, marriott:0, avios:0, virgin:0, aa:0, delta:0, mm:0, ms:0, fb:0, ac:0, ua:0}, ptOpen:new Set(), stOpen:new Set(), more:{banks:false, progs:false, status:false}, status:{}, shown:12, T:'mine',
   legs:[{from:'Wyckoff Ave & Myrtle Ave, Bushwick, Brooklyn', to:'London', date:'Wed 18 Nov'}], back:'Wed 25 Nov', pax:'1 adult', bags:'1 checked bag'};
 
 // ---- wants: a predicate, a charge when it is missing, and a hint when nothing has it
@@ -1818,14 +1835,28 @@ function upgradeOdds(e){
   return out;
 }
 const pct = p => p < .005 ? 'under 1%' : '~' + Math.round(p*100) + '%';
+// the order people actually hold them in; a row shows the held ones plus the first few of the rest
+const POPULAR = {banks:['amex','chase','capone','bilt','citi','marriott'], progs:['avios','virgin','aa','delta','ua','fb','ac','mm','ms'], status:['DL','AA','UA','BA','VS','LH','AF','TK','AS','AC']};
+const ALLIANCE_TIERS = ['star','oneworld','skyteam'];
+function chipRow(kind, label, keys, isOn, onChip, offChip, limit, pinned = []){
+  const on = keys.filter(isOn), rest = keys.filter(k => !isOn(k) && !pinned.includes(k)), pin = keys.filter(k => !isOn(k) && pinned.includes(k));
+  const shown = S.more[kind] ? rest : rest.slice(0, limit), hidden = rest.length - shown.length;
+  const more = rest.length > limit ? `<button type="button" class="pchip rest" data-more="${kind}">${S.more[kind] ? 'fewer' : '+' + hidden + ' more'}</button>` : '';
+  return `<div class="prow"><span class="lab">${label}</span>${on.map(onChip).join('')}${shown.map(offChip).join('')}${pin.map(offChip).join('')}${more}</div>`;
+}
 function paintPts(){
-  const field = k => `<div class="pt"><label for="pt-${k}">${esc(BANK[k])}</label><input id="pt-${k}" inputmode="numeric" value="${S.pts[k] ? S.pts[k].toLocaleString() : ''}" placeholder="0"></div>`;
-  const progs = progsInPlay(), main = progs.slice(0, 4), more = progs.slice(4), sts = statusInPlay();
-  $('#pts').innerHTML = BANKS.map(field).join('') + main.map(field).join('') + (S.morePts ? more.map(field).join('') : '') +
-    (more.length ? `<div class="pt more"><button type="button" class="ledger" id="morepts">${S.morePts ? 'Fewer programmes' : 'More programmes (' + more.length + ')'}</button></div>` : '') +
-    '<p class="ptnote">Every flight is priced in every programme that can book it, transfers and bonuses included, and the better of cash or points is starred. Only programmes with an award on a flight in this search are listed. Demo award chart.</p>' +
-    '<h4 class="sth">Your status</h4>' + sts.map(([k, st]) => `<div class="pt"><label for="st-${k}">${esc(st.name)}</label><select id="st-${k}" data-status="${k}"><option value="">None</option>${st.tiers.map(t => `<option${S.status[k] === t ? ' selected' : ''}>${t}</option>`).join('')}</select></div>`).join('') +
-    '<p class="ptnote">Status sets the odds of an upgrade on each flight, shown when you open one. Only programmes these airlines take are listed; an alliance tier covers every partner in it. Estimates from policy, never this flight\'s load.</p>';
+  const ptOn = k => S.ptOpen.has(k) || (S.pts[k] || 0) > 0, stOn = k => S.stOpen.has(k) || !!S.status[k];
+  const balance = k => `<span class="pchip on" data-k="${k}"><b>${esc(SHORT[k])}</b><input id="pt-${k}" inputmode="numeric" aria-label="${esc(BANK[k])} balance" value="${S.pts[k] ? S.pts[k].toLocaleString() : ''}" placeholder="0"><button type="button" class="x" data-drop="${k}" aria-label="Remove ${esc(SHORT[k])}">×</button></span>`;
+  const addPt = k => `<button type="button" class="pchip" data-add="${k}" title="${esc(BANK[k])}"><i>+</i>${esc(SHORT[k])}</button>`;
+  const tier = k => { const st = STATUS[k]; return `<span class="pchip on" data-k="${k}"><b>${esc(st.name)}</b><select id="st-${k}" data-status="${k}" aria-label="${esc(st.name)} tier"><option value=""${S.status[k] ? '' : ' selected'}>tier…</option>${st.tiers.map(t => `<option${S.status[k] === t ? ' selected' : ''}>${t}</option>`).join('')}</select><button type="button" class="x" data-dropst="${k}" aria-label="Remove ${esc(st.name)}">×</button></span>`; };
+  const addSt = k => `<button type="button" class="pchip" data-addst="${k}"><i>+</i>${esc(STATUS[k].name)}</button>`;
+  const inPlay = progsInPlay(), progs = POPULAR.progs.filter(k => inPlay.includes(k)).concat(inPlay.filter(k => !POPULAR.progs.includes(k)));
+  const stKeys = statusInPlay().map(x => x[0]), own = POPULAR.status.filter(k => stKeys.includes(k)).concat(stKeys.filter(k => !POPULAR.status.includes(k) && !ALLIANCE_TIERS.includes(k))), alli = ALLIANCE_TIERS.filter(k => stKeys.includes(k));
+  $('#pts').innerHTML =
+    chipRow('banks', 'Points you hold', POPULAR.banks, ptOn, balance, addPt, 4) +
+    chipRow('progs', 'Airline programmes', progs, ptOn, balance, addPt, 4) +
+    chipRow('status', 'Status', own.concat(alli), stOn, tier, addSt, 3, alli) +
+    '<p class="ptnote">Tap what you hold. Every flight is then priced in every programme that can book it, transfers included, and the better of cash or points is starred; status sets the odds of an upgrade. Only programmes these flights can use are offered. Demo award chart; upgrade odds from policy, never a flight\'s load.</p>';
 }
 document.addEventListener('change', ev => { const sel = ev.target.closest('[data-status]'); if (sel){ S.status[sel.dataset.status] = sel.value; paint(false); } });
 
@@ -2353,7 +2384,11 @@ document.addEventListener('click', ev => {
   if (ev.target.closest('#eddone, #eddone2, #edshade')){ closeEditor(); return; }
   if (ev.target.closest('#startover')){ startOver(); return; }
   if (ev.target.closest('#jump')){ finishAllSteps(); setTimeout(enterResults, REDUCED ? 0 : 380); return; }
-  if (ev.target.closest('#morepts')){ S.morePts = !S.morePts; paintPts(); return; }
+  const pm = ev.target.closest('[data-more]'); if (pm){ S.more[pm.dataset.more] = !S.more[pm.dataset.more]; paintPts(); return; }
+  const pa = ev.target.closest('[data-add]'); if (pa){ S.ptOpen.add(pa.dataset.add); paintPts(); const f = $('#pt-' + pa.dataset.add); if (f) f.focus(); return; }
+  const pd = ev.target.closest('[data-drop]'); if (pd){ S.ptOpen.delete(pd.dataset.drop); S.pts[pd.dataset.drop] = 0; paintPts(); paint(false); return; }
+  const sa = ev.target.closest('[data-addst]'); if (sa){ S.stOpen.add(sa.dataset.addst); paintPts(); const f = $('#st-' + sa.dataset.addst); if (f) f.focus(); return; }
+  const sd = ev.target.closest('[data-dropst]'); if (sd){ S.stOpen.delete(sd.dataset.dropst); S.status[sd.dataset.dropst] = ''; paintPts(); paint(false); return; }
 });
 document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && W.mode === 'wizard' && ev.target.matches('#sentence input, #sentence select')){ ev.preventDefault(); finishStep(W.step); goStep(W.step + 1); } });
 const io = new IntersectionObserver(es => { es.forEach(x => { if (x.isIntersecting){ W.step = +x.target.dataset.step; paintSteps(); } }); }, {rootMargin:'-45% 0px -50% 0px'});

@@ -21,7 +21,7 @@
 # and the app picks it up beside the one-time PIN.
 set -euo pipefail
 : "${CF_API_TOKEN:?set CF_API_TOKEN}"; : "${ALLOW:?set ALLOW to a comma-separated list of emails}"
-HOST="${HOST:-go.flyconcordfly.com}"; SESSION="${SESSION:-24h}"; TEAM="${TEAM:-}"
+HOST="${HOST:-go.flyconcordfly.com}"; SESSION="${SESSION:-24h}"; TEAM="${TEAM:-}"; HOST_OK=""
 TUNNEL="${TUNNEL:-concordego}"
 
 # The account that owns the zone is the one the tunnel was made in: cloudflared
@@ -91,15 +91,14 @@ echo "== account"
 # list of Access applications needs only the permission the script needs anyway.
 cf GET /apps | jq_ 'r=d.get("result") or []
 if not d.get("success"): sys.exit("  The token cannot reach Access on this account: " + json.dumps(d.get("errors")) + "\n  One of three things:\n   - CF_ACCOUNT_ID is wrong. The sure way to read it: open dash.cloudflare.com, click the account, and copy the 32 characters in the address bar right after dash.cloudflare.com/ (a Zone ID looks identical and is the usual mix-up).\n   - The token was made with Account Resources set to a different account, or to none.\n   - The token lacks \"Access: Apps and Policies: Edit\".\n  My Profile > API Tokens > the token shows its permissions and which account it covers.")
-print("  reachable, " + str(len(r)) + " Access application(s) so far")'
+print("  reachable, " + str(len(r)) + " Access application(s) so far" + ((": " + ", ".join(str(a.get("domain") or "?") for a in r[:8])) if r else ""))'
 
-# Best effort, before anything is created: if the token can list zones, make sure
-# the zone that owns $HOST is on this account. Without Zone: Read the lookup is
-# refused and skipped; the applications step reports the same thing later.
+# Best effort, before anything is created: with Zone: Read on the token this
+# confirms the zone that owns $HOST is on this account. Without it the list is
+# simply EMPTY (not refused), which proves nothing, so it never stops the run.
 APEX=$(echo "$HOST" | awk -F. '{print $(NF-1)"."$NF}')
 cfroot "/zones?name=$APEX" | jq_ 'r = d.get("result") or []
-if d.get("success") and not r: sys.exit("== zone\n  The token can list zones and '$APEX' is not among this account'"'"'s. The zone lives in another account of yours: its Overview page shows that Account ID on the right. Use that, with a token covering that account.")
-print("== zone\n  " + ("'$APEX' is on this account" if d.get("success") else "not checked (the token has no Zone: Read, which is fine)"))'
+print("== zone\n  " + ("'$APEX' is on this account" if (d.get("success") and r) else "not checked: the zone list came back empty for this token (a token without Zone: Read lists nothing rather than refusing), so Access itself decides below"))'
 
 echo "== organisation"
 ORG=$(cf GET /organizations)
@@ -131,7 +130,8 @@ ensure_app(){ # name domain policy_json
   local BODY="{\"name\":\"$NAME\",\"type\":\"self_hosted\",\"domain\":\"$DOM\",\"session_duration\":\"$SESSION\",\"allowed_idps\":[$IDP_LIST],\"auto_redirect_to_identity\":false,\"app_launcher_visible\":false}"
   if [ -z "$APP" ]; then APP=$(cf POST /apps "$BODY" | jq_ 'errs = json.dumps(d.get("errors"))
 if d.get("success"): print(d["result"]["id"])
-elif "does not belong to zone" in errs: sys.exit("  " + errs + "\n  Access can only guard a hostname whose zone is in THIS account, and the zone that owns '$DOM' is not.\n  The zone lives in another Cloudflare account of yours: open that zone in the dashboard, and its Overview page shows the Account ID on the right. Use that one,\n  make sure the token covers that account (My Profile > API Tokens > the token > Account Resources), and re-run. If that account has no team yet, pass TEAM= with a NEW name: the one just used is now taken by this account.")
+elif "does not belong to zone" in errs and "'${HOST_OK:-}'": sys.exit("  " + errs + "\n  The bare hostname was accepted a moment ago, so the zone is fine and Access is refusing the PATH form ('$DOM').")
+elif "does not belong to zone" in errs: sys.exit("  " + errs + "\n  Access says the zone that owns '$DOM' is not in account '$CF_ACCOUNT_ID'. Two things to check in the dashboard:\n   1. Open the zone (the apex of '$DOM'), Overview: the Account ID on the right must be '$CF_ACCOUNT_ID'. If it is another account, use that one: CF_ACCOUNT_ID=<it>, a token whose Account Resources cover it, and TEAM= with a new name if it has no team yet.\n   2. If it IS this account, the zone must be Active with DNS fully on Cloudflare (not pending, not a partial CNAME setup); Access cannot guard a hostname on a zone in either of those states.")
 else: sys.exit("  " + errs)'); echo "  created $NAME ($DOM)"
   else cf PUT "/apps/$APP" "$BODY" >/dev/null; echo "  updated $NAME ($DOM)"; fi
   local POL; POL=$(cf GET "/apps/$APP/policies" | jq_ 'print(next((p["id"] for p in d.get("result") or [] if p.get("name") in ("Friends","Everyone")), ""))')
@@ -148,9 +148,10 @@ echo "== applications"
 # itself and its assets stay open to everyone, so anyone can browse and read
 # the recorded results; the server spends nothing for a visitor Access did
 # not sign in, and Access never lets an anonymous request reach /api at all.
-ensure_app "ConcordeGo API" "$HOST/api" "$FRIENDS"
-ensure_app "ConcordeGo sign-in" "$HOST/signin" "$FRIENDS"
 ensure_app "ConcordeGo" "$HOST" "$EVERYONE"
+HOST_OK=1
+ensure_app "ConcordeGo sign-in" "$HOST/signin" "$FRIENDS"
+ensure_app "ConcordeGo API" "$HOST/api" "$FRIENDS"
 echo
 echo "Done. https://$HOST is open to browse; /api and /signin ask for a sign-in, and the server sees the email in Cf-Access-Authenticated-User-Email"
 echo "and gives each person a daily allowance (CONCORDEGO_USER_SEARCHES, default 20; CONCORDEGO_USER_WISHES, default 200)."
