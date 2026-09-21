@@ -25,7 +25,7 @@ cabin claim into a certainty. If you add a behaviour worth protecting, add the
 fault that breaks it.
 """
 
-import subprocess, shutil, sys, re
+import subprocess, shutil, sys, re, os
 
 AD = "concorde-travel/adapter.py"
 GR = "concorde-travel/ground.py"
@@ -43,6 +43,14 @@ def slice_fn(src, name):
     end = m.end() + nxt.start() if nxt else len(src)
     return start, end
 
+
+
+def _uncache():
+    """Drop compiled bytecode after every write. A mutant the same size as the
+    original ("all" -> "any"), restored inside the same second, otherwise leaves
+    its .pyc looking fresh, and the NEXT import runs the mutant (2026-09-21)."""
+    for d in ("concorde-travel", "concorde-travel/tests", "concorde-travel/ui/mock"):
+        shutil.rmtree(os.path.join(d, "__pycache__"), ignore_errors=True)
 
 MUTANTS = [
  (AD, "from_amadeus", 'op = ((s.get("operating") or {}).get("carrierCode") or mkt)',
@@ -188,6 +196,19 @@ MUTANTS = [
   'par: charge the reference for an unknown on-time record'),
  (PA, "par_for", '    if miles > NONSTOP_RANGE_MILES:', '    if False:',
   'par: measure a route with no nonstop against a nonstop'),
+ (AD, "from_serpapi", '''            if e1 or e2:
+                fail = e1 or e2
+                break''',
+  '''            if e1 or e2:
+                dep = dep or dep_naive + "+00:00"
+                arr = arr or arr_naive + "+00:00"''',
+  'serpapi: guess an offset instead of dropping an uncurated airport'),
+ (AD, "from_serpapi", 'total_cents = int(round(float(it.get("price")) * 100))',
+  'total_cents = int(round(float(it.get("price"))))',
+  'serpapi: take the whole-dollar price as cents'),
+ (AD, "from_serpapi", 'if want and not all(c in want for c in codes):',
+  'if want and not any(c in want for c in codes):',
+  'serpapi: keep an itinerary with one Delta leg among other carriers'),
 ]
 
 caught = skipped = 0
@@ -208,7 +229,11 @@ for path, fn, old, new, why in MUTANTS:
             print("  SKIP  (%d matches) %s" % (src.count(old), why)); shutil.move(path+".bak", path); skipped += 1; continue
         src = src.replace(old, new)
     open(path, "w", encoding="utf-8").write(src)
-    r = subprocess.run([sys.executable, "concorde-travel/tests/test_adapter.py"],
+    _uncache()      # a same-size mutant restored within the second would otherwise leave its .pyc looking fresh
+    # -B and PYTHONDONTWRITEBYTECODE: a mutant must never leave compiled bytecode behind; a same-size mutant
+    # restored within the second looks fresh to the cache and the NEXT import runs the mutant (2026-09-21)
+    r = subprocess.run([sys.executable, "-B", "concorde-travel/tests/test_adapter.py"],
+                       env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"),
                        capture_output=True, text=True)
     shutil.move(path + ".bak", path)
     ok = r.returncode != 0

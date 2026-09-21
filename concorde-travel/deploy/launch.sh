@@ -91,7 +91,7 @@ say "keys -> /etc/concordego.env on the droplet"
   [ -n "${ANTHROPIC_API_KEY:-}" ] && printf 'ANTHROPIC_API_KEY=%s\n' "$ANTHROPIC_API_KEY"
   [ -n "${CONCORDEGO_PEXELS_KEY:-}" ] && printf 'CONCORDEGO_PEXELS_KEY=%s\n' "$CONCORDEGO_PEXELS_KEY"
   [ -n "$ACCESS_TEAM" ] && printf 'CONCORDEGO_ACCESS_TEAM=%s\n' "$ACCESS_TEAM"
-  printf 'CONCORDEGO_OWNERS=%s\n' "$OWNERS"; } | "${SSH[@]}" 'umask 077; cat > /root/.concordego-keys.tmp; python3 - <<"PY"
+  printf 'CONCORDEGO_OWNERS=%s\n' "$OWNERS"; printf 'CONCORDEGO_PUBLIC=1\n'; } | "${SSH[@]}" 'umask 077; cat > /root/.concordego-keys.tmp; python3 - <<"PY"
 import sys, re, os
 # the lines arrive on stdin; they are read into a file first because the heredoc below takes stdin over
 new = dict(l.rstrip("\n").split("=", 1) for l in open("/root/.concordego-keys.tmp") if "=" in l)

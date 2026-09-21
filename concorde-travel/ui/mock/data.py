@@ -79,6 +79,41 @@ def _iso_minutes(d):
     return (int(m.group(1) or 0) * 60 + int(m.group(2) or 0)) if m else None
 
 
+def google_details(g):
+    """What Google Flights said about an itinerary, in the shape the page reads
+    feed details in: the legs by name, the cabin, the published amenities, the
+    CO2 estimate. Absent fields stay absent; the page says so."""
+    if not g:
+        return None
+    segs = []
+    for leg in g.get("legs") or []:
+        code = str(leg.get("flight") or "").split(" ")[0]
+        num = "".join(ch for ch in str(leg.get("flight") or "") if ch.isdigit())
+        ext = [str(x) for x in (leg.get("extensions") or [])]
+        wifi = next((x for x in ext if "wi-fi" in x.lower() or "wifi" in x.lower()), None)
+        pitch = "".join(ch for ch in str(leg.get("legroom") or "") if ch.isdigit())
+        segs.append({
+            "marketing": {"code": code, "name": leg.get("airline"), "number": num},
+            "operating": {"code": code, "name": leg.get("airline"), "number": num},
+            "aircraft": {"code": None, "name": leg.get("airplane")} if leg.get("airplane") else None,
+            "from": {"code": (leg.get("from") or {}).get("code"), "name": (leg.get("from") or {}).get("name"), "terminal": None},
+            "to": {"code": (leg.get("to") or {}).get("code"), "name": (leg.get("to") or {}).get("name"), "terminal": None},
+            "minutes": leg.get("minutes"), "km": None,
+            "cabin": leg.get("travel_class"), "fare_basis": None, "bags": [],
+            "wifi": ({"available": "no wi-fi" not in wifi.lower(),
+                      "cost": "free" if "free" in wifi.lower() else "paid" if "fee" in wifi.lower() else None}
+                     if wifi else None),
+            "seat": {"pitch": pitch} if pitch else None,
+            "power": {"available": True} if any("power" in x.lower() or "usb" in x.lower() for x in ext) else None,
+            "fare_brand": None, "extensions": ext, "often_delayed": bool(leg.get("often_delayed")),
+        })
+    return {"source": g.get("source") or "Google Flights via SerpApi", "segments": segs,
+            "emissions_kg": g.get("emissions_kg"), "typical_kg": g.get("typical_kg"),
+            "total_minutes": g.get("total_duration"),
+            "note": "The lowest fare Google shows, with no fare brand or bag allowance named; "
+                    "priced here as the airline's no-bag fare. Book on the airline's own site."}
+
+
 def feed_details(offer):
     """Everything Duffel says about an offer that the scorer does not price:
     the aircraft by name, terminals, distance, cabin and fare basis, the
@@ -126,10 +161,17 @@ def feed_details(offer):
 
 
 def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full=None, source_note=None, built_from="a live search",
-               dest_point=None, destination_full=None):
+               dest_point=None, destination_full=None, supplement=None):
     """A feed payload -> everything mock 10 reads. server.py calls this for a
     live search; main() below calls it for the checked-in sample."""
     sc = adapter.from_feed(raw, origin_key=origin_key, checked_bags=checked_bags, dest_point=dest_point)
+    if supplement and "error" not in sc:
+        # Google Flights through SerpApi, for the carriers the feed cannot sell: normalised by its own
+        # adapter with the feed's zones borrowed for airports the table does not know, then merged
+        # under the feed's par and profiles, so a Delta row is graded and ranked like every other
+        sc = adapter.merge_scenarios(sc, adapter.from_serpapi(
+            supplement, origin_key=origin_key, checked_bags=checked_bags,
+            geo=adapter.duffel_geo(raw), dest_point=dest_point), "Google Flights (Delta)")
     # The raw offers, keyed the way the adapter names its options (the last ten
     # characters of the offer id), so the page can show everything the feed
     # said about a flight, not only what the scorer priced.
@@ -199,6 +241,12 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
                 power = power or bool((am.get("power") or {}).get("available"))
         amenities[(off["id"] or "")[-10:].lower().replace("_", "-")] = {"wifi": wifi, "power": power, "wifi_cost": wifi_cost}
 
+    for o in sc["options"]:                          # the supplement's airlines, with Google's logo
+        g = o.get("_google")
+        if g:
+            code = o["segments"][0]["marketing"]["carrier"]
+            airlines.setdefault(code, {"name": (g.get("legs") or [{}])[0].get("airline") or code,
+                                       "logo": g.get("airline_logo"), "lockup": None})
     entries = {}
     for o in pool:
         v = server._view(sc, o, "reference")
@@ -255,7 +303,10 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
         e["wifi_published"] = bool(am.get("wifi")); e["power_published"] = bool(am.get("power"))
         e["wifi_cost"] = am.get("wifi_cost")
         e["layover_minutes"] = [l["minutes"] for l in e["legs"] if l["kind"] == "layover"]
-        e["details"] = feed_details(by_tail.get(e["id"].rsplit("-", 1)[-1]))
+        g = o.get("_google")
+        e["details"] = google_details(g) if g else feed_details(by_tail.get(e["id"].rsplit("-", 1)[-1]))
+        if g:
+            e["source"] = "google"
         # What the bill needs to be rebuilt as choices change: the fare's own bag
         # ladder and seat terms, and every ground mode at each end with its fare
         # and minutes, so a rideshare/transit choice is a swap, not a re-score.

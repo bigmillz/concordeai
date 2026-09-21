@@ -65,7 +65,10 @@ HOME=/var/lib/concordego
 # CONCORDEGO_FLIGHT_KEY=duffel_live_...
 # ANTHROPIC_API_KEY=sk-ant-...
 # CONCORDEGO_OWNERS=pat@millertechnology.net
+# CONCORDEGO_PUBLIC=1                 always set on a served box: nothing is local here, so a request without the
+#                                     proxy's headers is a stranger, never the owner (server.py _remote)
 # CONCORDEGO_PEXELS_KEY=...          photos of the origin and destination on the shortlist tiles (pexels.com/api, free)
+# CONCORDEGO_SERPAPI_KEY=...          the Delta supplement: Google Flights through SerpApi (serpapi.com), its own key and counters
 # CONCORDEGO_ACCESS_TEAM=yourteam    the Zero Trust team name (the part before .cloudflareaccess.com): the server verifies the sign-in cookie against it
 # CONCORDEGO_USER_SEARCHES=20
 # CONCORDEGO_USER_WISHES=200

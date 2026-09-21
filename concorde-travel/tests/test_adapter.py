@@ -961,6 +961,67 @@ def main():
     check("and that default is labelled a default, never a modelled number",
           db.get("source") == "default")
 
+    # ---- the Delta supplement: Google Flights through SerpApi, replayed offline
+    print("\nserpapi supplement (synthesized sample)")
+    with open(os.path.join(HERE, "..", "adapter_samples", "serpapi-jfk-lhr.json"), encoding="utf-8") as fh:
+        serp = json.load(fh)
+    check("the SerpApi sample says it was synthesized, not captured",
+          bool((serp.get("_provenance") or {}).get("synthesized")))
+    ss = adapter.from_serpapi(serp, carriers=("DL",))
+    check("from_feed dispatches a Google Flights payload to the supplement adapter",
+          adapter.from_feed(serp)["fixture_id"] == ss["fixture_id"])
+    ids = [o["option_id"] for o in ss["options"]]
+    check("only Delta survives: the Virgin nonstop and the Delta+Air France pair are dropped, and say why",
+          len(ids) == 1 and ids[0].startswith("google-dl1")
+          and sum("not one of the carriers" in d["why"] for d in ss["_dropped"]) == 2, str(ids))
+    check("the connection through BOS, an uncurated airport with no zone from the feed, DROPS and names it",
+          any("BOS" in d["why"] for d in ss["_dropped"]))
+    with_geo = adapter.from_serpapi(serp, carriers=("DL",), geo={"BOS": {"tz": "America/New_York", "lat": 42.36, "lon": -71.0, "country": "US", "city": "Boston"}})
+    check("with the zone borrowed from the feed, the BOS connection is kept, with its layover at BOS",
+          len(with_geo["options"]) == 2 and any(o["layovers"] and o["layovers"][0]["airport"] == "BOS" for o in with_geo["options"]))
+    dl1 = ss["options"][0]
+    check("every timestamp carries an explicit offset: JFK in November is -05:00, Heathrow +00:00",
+          dl1["segments"][0]["departure_local"] == "2026-11-18T21:15:00-05:00"
+          and dl1["segments"][0]["arrival_local"] == "2026-11-19T09:20:00+00:00"
+          and all(re.search(r"[+-]\d\d:\d\d$", s[k]) for o in with_geo["options"] for s in o["segments"] for k in ("departure_local", "arrival_local")))
+    check("the whole-dollar price becomes cents", dl1["tickets"][0]["price"]["base_cents"] == 51200)
+    check("legroom becomes pitch, the power sentence a claim, the wifi sentence a published amenity (paid)",
+          dl1["segments"][0]["claims"].get("seat_pitch_inches") == 31
+          and str(dl1["segments"][0]["claims"].get("power", "")).startswith("Power")
+          and any(w["segment"] == "s1" and w["available"] and w["cost"] == "paid" for w in ss["_feed"]["wifi_published"]))
+    check("the aircraft is a name, not a code, so the equipment code abstains",
+          dl1["segments"][0]["equipment_code"] == "UNKNOWN" and "A330" in dl1["segments"][0]["equipment_name"])
+    check("the fare is priced as Delta's no-bag brand and the note says so",
+          dl1["tickets"][0]["fare_brand_name"] == "Basic Economy" and dl1["tickets"][0]["entitlements"]["checked_included"] == 0
+          and len(dl1["tickets"][0]["checked_bag_fee_tiers"]) >= 1 and any("unknown is never cheap" in n for n in ss["notes"]))
+    led = scorer.score(ss, dl1, "reference")
+    check("the scorer reads a Google itinerary like any other: it reconciles, and the ticket line is the price",
+          led.reconciles() and led.lines[0].amount_cents == 51200)
+    card = scorer.report_card(ss, dl1)
+    check("and the report card grades it, nonstop routing A+", card["grade"] in {l for l, _ in scorer.CARD_POINTS}
+          and next(p["letter"] for p in card["parts"] if p["id"] == "routing") == "A+")
+    check("the booking goes to the airline, not to Google",
+          "delta" in dl1["booking"][0]["who"].lower() and "own site" in dl1["booking"][0]["note"])
+    check("the CO2 estimate rides along in kilograms for the page", dl1["_google"]["emissions_kg"] == 512)
+    # merging into the main feed's scenario
+    with open(os.path.join(HERE, "..", "adapter_samples", "duffel-jfk-lhr.json"), encoding="utf-8") as fh:
+        duff = json.load(fh)
+    main_sc = adapter.from_feed(duff)
+    n0 = len(main_sc["options"])
+    extra = adapter.from_serpapi(serp, carriers=("DL",), geo=adapter.duffel_geo(duff))
+    n1 = len(extra["options"])
+    check("with the feed's own zones, the BOS connection is kept too", n1 == 2, str([o["option_id"] for o in extra["options"]]))
+    merged = adapter.merge_scenarios(main_sc, extra, "Delta via Google Flights")
+    check("the supplement's options join the feed's, ids unique, par and profiles the feed's",
+          len(merged["options"]) == n0 + n1 and len({o["option_id"] for o in merged["options"]}) == n0 + n1
+          and merged["_feed"]["supplements"][0]["options"] == n1
+          and all(o["segments"][0]["marketing"]["carrier"] == "DL" for o in merged["options"][n0:]))
+    check("the merged scenario still scores end to end",
+          all(scorer.score(merged, o, "reference").reconciles() for o in merged["options"]))
+    ad_src = open(os.path.join(HERE, "..", "adapter.py"), encoding="utf-8").read()
+    check("the adapter never imports the live module (the key stays where it is)",
+          not re.search(r"^\s*(import live\b|from live\b)", ad_src, re.M))
+
     src = open(os.path.join(HERE, "..", "scorer.py"), encoding="utf-8").read()
     check("the scorer does not import the adapter",
           "import adapter" not in src and "from adapter" not in src)

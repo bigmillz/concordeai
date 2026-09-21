@@ -270,9 +270,9 @@ def _month():
     return time.strftime("%Y-%m", time.gmtime())
 
 
-def load_quota():
+def load_quota(path=None):
     try:
-        with open(QUOTA_FILE, encoding="utf-8") as fh:
+        with open(path or QUOTA_FILE, encoding="utf-8") as fh:
             q = json.load(fh)
     except (OSError, ValueError):
         q = {}
@@ -288,10 +288,10 @@ def load_quota():
     return q
 
 
-def quota_state(cfg=None):
+def quota_state(cfg=None, path=None):
     cfg = cfg or load_config()
     lim = cfg["quota"]
-    q = load_quota()
+    q = load_quota(path)
     return {
         "day": q["day"], "month": q["month"],
         "day_calls": q["day_calls"], "day_limit": lim["per_day"],
@@ -304,11 +304,13 @@ def quota_state(cfg=None):
     }
 
 
-def _reserve(cfg):
+def _reserve(cfg, path=None):
     """Spend a call up front. Counting afterwards undercounts precisely when a
-    request dies mid-flight, which is when the provider has charged you anyway."""
+    request dies mid-flight, which is when the provider has charged you anyway.
+    `path` names the counter file: the feed's, or a second source's own."""
+    path = path or QUOTA_FILE
     lim = cfg["quota"]
-    q = load_quota()
+    q = load_quota(path)
     if q["day_calls"] >= lim["per_day"]:
         return False, ("daily limit reached: %d of %d calls used today"
                        % (q["day_calls"], lim["per_day"]))
@@ -322,17 +324,18 @@ def _reserve(cfg):
     q["month_calls"] += 1
     q["total_calls"] += 1
     q["last_call_at"] = time.time()
-    _atomic_write(QUOTA_FILE, q)
+    _atomic_write(path, q)
     return True, ""
 
 
-def _refund():
+def _refund(path=None):
     """Only for a request that never reached the provider."""
-    q = load_quota()
+    path = path or QUOTA_FILE
+    q = load_quota(path)
     q["day_calls"] = max(0, q["day_calls"] - 1)
     q["month_calls"] = max(0, q["month_calls"] - 1)
     q["total_calls"] = max(0, q["total_calls"] - 1)
-    _atomic_write(QUOTA_FILE, q)
+    _atomic_write(path, q)
 
 
 # ------------------------------------------------------------------- token
@@ -623,6 +626,114 @@ def search(query, cfg=None, allow_call=True):
     return payload, {"source": "api", "quota": quota_state(cfg)}
 
 
+# ------------------------------------------------------------ serpapi (delta)
+#
+# A second, narrower source: Google Flights' results, scraped by proxy through
+# SerpApi, asked ONLY for the carriers the main feed cannot sell - Delta today,
+# which does not distribute through Duffel (docs/design.md). Same discipline as
+# the feed above: cache before quota, quota reserved before the call, a miss
+# never cached, the key never leaving this module. Its own counters, because
+# its allowance is its own (250 searches a month on SerpApi's free plan). It
+# books nothing: what comes back is times, a price in whole dollars, and the
+# airline's own site to buy it on.
+
+SERP_URL = "https://serpapi.com/search.json"
+_SERP_QUOTA_DEFAULT = {"per_day": 40, "per_month": 240,
+                       "min_seconds_between_calls": 1.0, "cache_ttl_seconds": 1800}
+
+
+def serp_config():
+    """The SerpApi key and allowance: CONCORDEGO_SERPAPI_KEY, else `serpapi_key`
+    in cloud.json, with `serpapi_quota` and `serpapi_carriers` beside it."""
+    cfg = load_config()
+    env = os.environ.get("CONCORDEGO_SERPAPI_KEY")
+    key = env or cfg.get("serpapi_key") or ""
+    quota = dict(_SERP_QUOTA_DEFAULT)
+    quota.update(cfg.get("serpapi_quota") or {})
+    carriers = [str(c).upper() for c in (cfg.get("serpapi_carriers") or ["DL"]) if c]
+    return {"key": key, "quota": quota, "carriers": carriers,
+            "_key_source": ("CONCORDEGO_SERPAPI_KEY" if env
+                            else CONFIG_FILE if cfg.get("serpapi_key") else "none")}
+
+
+def _serp_quota_file():
+    return os.path.join(os.path.dirname(QUOTA_FILE), "quota-serpapi.json")
+
+
+def serp_status():
+    cfg = serp_config()
+    return {"key_configured": bool(cfg["key"]), "key_source": cfg["_key_source"],
+            "carriers": cfg["carriers"], "quota": quota_state(cfg, _serp_quota_file())}
+
+
+def serp_search(origin, destination, date, adults=1, carriers=None, cfg=None, allow_call=True):
+    """(payload, meta): Google Flights through SerpApi for the named carriers
+    only, one way, in dollars. Cache, then quota, then the wire."""
+    cfg = cfg or serp_config()
+    carriers = sorted({str(c).upper() for c in (carriers or cfg["carriers"]) if c})
+    query = {"engine": "google_flights", "origin": origin, "destination": destination,
+             "date": date, "adults": int(adults), "carriers": carriers}
+    qf = _serp_quota_file()
+    hit = cache_get(query, cfg["quota"]["cache_ttl_seconds"])
+    if hit:                                   # a cached answer costs nothing, so it must not spend a call
+        return hit["payload"], {"source": "cache", "age_seconds": hit["_age_seconds"],
+                                "quota": quota_state(cfg, qf)}
+    if not cfg.get("key"):
+        return None, {"source": "none", "error": "no SerpApi key",
+                      "how": "set CONCORDEGO_SERPAPI_KEY, or serpapi_key in " + CONFIG_FILE,
+                      "quota": quota_state(cfg, qf)}
+    if not carriers:
+        return None, {"source": "none", "error": "no carriers to ask for",
+                      "quota": quota_state(cfg, qf)}
+    if not allow_call:
+        return None, {"source": "none", "error": "live calls are disabled for this request",
+                      "quota": quota_state(cfg, qf)}
+    ok, why = _reserve(cfg, qf)
+    if not ok:
+        return None, {"source": "none", "error": why, "quota": quota_state(cfg, qf)}
+    from urllib.parse import urlencode
+    params = {"engine": "google_flights", "departure_id": origin, "arrival_id": destination,
+              "outbound_date": date, "type": 2, "currency": "USD", "hl": "en", "gl": "us",
+              "adults": int(adults), "include_airlines": ",".join(carriers), "api_key": cfg["key"]}
+    req = urllib.request.Request(SERP_URL + "?" + urlencode(params),
+                                 headers={"Accept": "application/json", "User-Agent": UA})
+    secrets = (cfg["key"],)
+    try:
+        with urllib.request.urlopen(req, timeout=40) as r:
+            body = r.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as exc:
+        detail = ""
+        try:
+            detail = exc.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            pass
+        # SerpApi answered, so the call counted. No refund.
+        return None, {"source": "none", "quota": quota_state(cfg, qf),
+                      "error": redact("HTTP %s from SerpApi: %s" % (exc.code, detail), *secrets),
+                      "hint": ("check the SerpApi key" if exc.code in (401, 403) else
+                               "SerpApi is rate limiting or the plan is used up" if exc.code == 429 else
+                               "the query may not match SerpApi's parameters")}
+    except (urllib.error.URLError, OSError) as exc:
+        _refund(qf)                           # never reached them; that one genuinely cost nothing
+        return None, {"source": "none", "quota": quota_state(cfg, qf),
+                      "error": redact("could not reach SerpApi: %s" % exc, *secrets),
+                      "refunded": True}
+    try:
+        payload = json.loads(body)
+    except ValueError:
+        return None, {"source": "none", "quota": quota_state(cfg, qf),
+                      "error": "SerpApi did not return JSON",
+                      "first_bytes": redact(body[:200], *secrets)}
+    if not isinstance(payload, dict) or payload.get("error"):
+        # SerpApi reports some failures as a 200 with an `error` sentence. The
+        # call counted, and an answer that is not an answer is never cached.
+        return None, {"source": "none", "quota": quota_state(cfg, qf),
+                      "error": redact("SerpApi: %s" % (payload.get("error") if isinstance(payload, dict)
+                                                       else "unexpected response"), *secrets)}
+    cache_put(query, payload)
+    return payload, {"source": "api", "quota": quota_state(cfg, qf)}
+
+
 def _count_results(payload):
     """How many itineraries came back, across three unrelated response shapes.
 
@@ -695,6 +806,7 @@ def status():
         "quota": quota_state(cfg),
         "cache": cache_stats(),
         "note": cfg.get("_note", ""),
+        "serpapi": serp_status(),
     }
 
 
@@ -736,6 +848,13 @@ if __name__ == "__main__":
             ok, msg = set_provider(sys.argv[2])
             print(msg)
             raise SystemExit(0 if ok else 1)
+    elif cmd == "serp" and len(sys.argv) >= 5:
+        # the Delta supplement, live: a REAL SerpApi search, which spends one of its calls
+        payload, meta = serp_search(sys.argv[2], sys.argv[3], sys.argv[4])
+        print(json.dumps(meta, indent=2))
+        if payload:
+            print("best_flights: %d, other_flights: %d"
+                  % (len(payload.get("best_flights") or []), len(payload.get("other_flights") or [])))
     elif cmd == "search" and len(sys.argv) >= 5:
         payload, meta = search({"origin": sys.argv[2], "destination": sys.argv[3],
                                 "date": sys.argv[4], "adults": 1, "currency": "USD"})

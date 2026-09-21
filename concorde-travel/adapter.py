@@ -1565,6 +1565,342 @@ def coverage(scenario: Dict[str, Any]) -> Dict[str, Any]:
     return {"counts": tot, "gaps": gaps, "strengths": strengths, "verdict": verdict}
 
 
+# ---------------------------------------------------------------- serpapi
+#
+# Google Flights' results, scraped by proxy through SerpApi, for the carriers
+# the main feed cannot sell - Delta today, which does not distribute through
+# Duffel (docs/design.md; live.serp_search holds the key). What Google gives:
+# the segments with local clock times and NO offset, the airline and flight
+# number, an aircraft NAME rather than a code, the cabin, the legroom in
+# inches, a few published amenities as sentences ("Wi-Fi for a fee", "In-seat
+# power & USB outlets"), the layovers, one price in whole dollars for the
+# party, a CO2 estimate, and a booking token only Google can redeem. What it
+# does not give: a fare brand, a bag allowance, an operating carrier, base and
+# tax. So the offset comes from the curated airports or the zones the main
+# feed named (an airport with neither DROPS, as everywhere else), the fare is
+# priced as the carrier's no-bag brand because unknown is never cheap and the
+# note says so, the aircraft claim abstains, and the booking is the airline's
+# own site. An itinerary with a leg on another carrier is not that carrier's.
+
+_SERP_TIME = re.compile(r"^(\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2})$")
+
+
+def _serp_code(flight_number: Any) -> str:
+    """'DL 1' -> 'DL'. Google prints the marketing carrier's number."""
+    return str(flight_number or "").strip().split(" ")[0].upper()[:2]
+
+
+def _serp_naive(t: Any) -> Optional[str]:
+    m = _SERP_TIME.match(str(t or "").strip())
+    return "%sT%s:%s:00" % (m.group(1), m.group(2), m.group(3)) if m else None
+
+
+def _serp_brand(enr: Dict[str, Any], carrier: str) -> str:
+    """The carrier's no-bag brand by name: the fare row with the most tiers,
+    which is how fares.json says 'no checked bag included'."""
+    rows = {k: v for k, v in ((enr.get("fares") or {}).get("brands") or {}).items()
+            if k.startswith(carrier + ":")}
+    if not rows:
+        return "Basic Economy"
+    k, row = max(rows.items(), key=lambda kv: len(kv[1].get("tiers") or []))
+    return (row.get("feed_name") or k.split(":", 1)[1].title()).split("/")[0].strip()
+
+
+def duffel_geo(raw: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """The places a Duffel payload names, keyed by IATA, with the zone, the
+    coordinates and the city: what the supplement borrows for airports the
+    curated table does not know."""
+    geo: Dict[str, Dict[str, Any]] = {}
+    for off in _duffel_offers(raw):
+        for sl in off.get("slices") or []:
+            for sg in sl.get("segments") or []:
+                for k in ("origin", "destination"):
+                    n = sg.get(k) or {}
+                    if n.get("iata_code"):
+                        geo[n["iata_code"]] = {
+                            "iata": n["iata_code"], "lat": n.get("latitude"), "lon": n.get("longitude"),
+                            "country": n.get("iata_country_code"),
+                            "city": n.get("city_name") or (n.get("city") or {}).get("name"),
+                            "tz": n.get("time_zone")}
+    return geo
+
+
+def from_serpapi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
+                 enr: Optional[Dict[str, Any]] = None, checked_bags: int = 1,
+                 carriers: Sequence[str] = ("DL",), geo: Optional[Dict[str, Any]] = None,
+                 dest_point: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """A SerpApi Google Flights response -> a scenario dict the scorer reads,
+    holding only the carriers asked for."""
+    enr = enr or load_enrichment()
+    geo = geo or {}
+    want = {str(c).upper() for c in carriers if c}
+    notes: List[str] = []
+    options: List[Dict[str, Any]] = []
+    dropped: List[Dict[str, str]] = []
+    wifi_published: List[Dict[str, Any]] = []
+    seen_ids: set = set()
+    default_used = amenity_segments = 0
+    ground_info: Dict[str, Any] = {}
+    bag_brands: Dict[str, str] = {}
+
+    itins = list(raw.get("best_flights") or []) + list(raw.get("other_flights") or [])
+    for n, it in enumerate(itins):
+        flights = it.get("flights") or []
+        if not flights:
+            continue
+        codes = [_serp_code(f.get("flight_number")) for f in flights]
+        if want and not all(c in want for c in codes):
+            dropped.append({"id": "google-%d" % n,
+                            "why": "not one of the carriers asked for (%s)" % "/".join(codes)})
+            continue
+        segments: List[Dict[str, Any]] = []
+        seg_ids: List[str] = []
+        fail = None
+        for i, f in enumerate(flights):
+            sid = "s%d" % (i + 1)
+            o_ap = str((f.get("departure_airport") or {}).get("id") or "").upper()
+            d_ap = str((f.get("arrival_airport") or {}).get("id") or "").upper()
+            dep_naive = _serp_naive((f.get("departure_airport") or {}).get("time"))
+            arr_naive = _serp_naive((f.get("arrival_airport") or {}).get("time"))
+            if not (o_ap and d_ap and dep_naive and arr_naive):
+                fail = "a segment without airports or times"
+                break
+            dep, e1 = stamp(dep_naive, o_ap, enr, (geo.get(o_ap) or {}).get("tz"))
+            arr, e2 = stamp(arr_naive, d_ap, enr, (geo.get(d_ap) or {}).get("tz"))
+            if e1 or e2:
+                fail = e1 or e2
+                break
+            ap_from = enr["airports"]["airports"].get(o_ap, {})
+            ap_to = enr["airports"]["airports"].get(d_ap, {})
+            mkt = codes[i]
+            num = re.sub(r"\D", "", str(f.get("flight_number") or ""))
+            claims: Dict[str, Any] = {}
+            legroom = re.search(r"(\d+)\s*in", str(f.get("legroom") or ""))
+            if legroom:
+                claims["seat_pitch_inches"] = int(legroom.group(1))
+                amenity_segments += 1
+            ext = [str(x) for x in (f.get("extensions") or [])]
+            if any(("power" in x.lower() or "usb" in x.lower()) for x in ext):
+                claims["power"] = "Power at the seat, per Google Flights"
+            wifi = next((x for x in ext if "wi-fi" in x.lower() or "wifi" in x.lower()), None)
+            if wifi:
+                wifi_published.append({"segment": sid, "available": "no wi-fi" not in wifi.lower(),
+                                       "cost": ("free" if "free" in wifi.lower()
+                                                else "paid" if "fee" in wifi.lower() else None)})
+            segments.append({
+                "segment_id": sid,
+                "marketing": {"carrier": mkt, "number": int(num or 0)},
+                # Google names one carrier per leg; it is taken as the operator
+                # too, which is what it means when the number is the carrier's own
+                "operating": {"carrier": mkt, "number": int(num or 0)},
+                "origin": {"iata": o_ap, "iata_area": ap_from.get("iata_area", 1),
+                           "schengen": ap_from.get("schengen")},
+                "destination": {"iata": d_ap, "iata_area": ap_to.get("iata_area", 2),
+                                "schengen": ap_to.get("schengen")},
+                "departure_local": dep, "arrival_local": arr,
+                "tz_hint": {"departure": ap_from.get("zone", ""), "arrival": ap_to.get("zone", "")},
+                "equipment_code": "UNKNOWN",     # a NAME ("Boeing 767"), not a code: the cabin claim abstains
+                "equipment_name": str(f.get("airplane") or ""),
+                "cabin_marketed": str(f.get("travel_class") or "economy").lower().replace(" ", "_"),
+                "claims": claims,
+                "reliability": {"coverage": "none", "policy": "route_median",
+                                "reason": "no on-time record joined for %s%s" % (mkt, num)},
+                "often_delayed": bool(f.get("often_delayed_by_over_30_min")),
+            })
+            seg_ids.append(sid)
+        if fail:
+            dropped.append({"id": "google-%d" % n, "why": fail})
+            continue
+
+        issuing = segments[0]["marketing"]["carrier"]
+        brand = _serp_brand(enr, issuing)
+        tiers, dft = _bag_tiers(enr, issuing, brand)
+        included = 0 if dft else max(0, 3 - len(tiers))
+        tiers = _extend_tiers(tiers, max(0, int(checked_bags) - included))
+        if dft:
+            default_used += 1
+        bag_brands[issuing] = brand
+        try:
+            total_cents = int(round(float(it.get("price")) * 100))
+        except (TypeError, ValueError):
+            dropped.append({"id": "google-%d" % n, "why": "no price"})
+            continue
+        airline_name = str(flights[0].get("airline") or issuing)
+        ticket = {
+            "ticket_id": "t1",
+            "issuing_carrier": issuing,
+            "fare_brand_name": brand,
+            "price": {"currency": "USD", "base_cents": total_cents, "fx_rate_to_usd": 1.0,
+                      "taxes": [], "carrier_imposed": [], "agency_fees": []},
+            "entitlements": {
+                "checked_included": included, "cabin_bag_included": True,
+                "personal_item_included": True, "seat_selection": "paid",
+                "changes": "unknown", "refundable": False,
+                "earns_redeemable_miles": False, "boarding_group": None},
+            "checked_bag_fee_tiers": tiers,
+            "segment_ids": list(seg_ids),
+        }
+        layovers = []
+        for i in range(len(segments) - 1):
+            a_to = segments[i]["destination"]["iata"]
+            ap = enr["airports"]["airports"].get(a_to, {})
+            mct = (ap.get("mct_minutes") or {}).get("default")
+            layovers.append({
+                "layover_id": "lay%d" % (i + 1), "airport": a_to,
+                "arrive_segment_id": seg_ids[i], "depart_segment_id": seg_ids[i + 1],
+                "immigration_required": crosses_border(enr, segments[i]["origin"]["iata"], a_to, geo),
+                "security_reclear_required": False, "ees_first_registration": False,
+                "inter_terminal": ap.get("inter_terminal") or {"mode": "walk", "minutes": 20},
+                "published_mct_minutes": mct,
+                "mct_source": "curated airport table" if mct else "not curated",
+                "bags_checked_through": True, "forced_landside": False,
+                "leave_airport_viable": bool(ap.get("leave_airport_viable")),
+                "services_open": ap.get("services") or [],
+                "recovery": {"protected": True, "next_departure_minutes": 180,
+                             "overnight_implied": False, "walkup_fare_cents": 0},
+                "note": "One airline on one ticket, as Google Flights lists it: the carrier "
+                        "owes the reconnection and the bags are checked through.",
+            })
+        dep_clock = _hhmm(segments[0]["departure_local"][11:16])
+        arr_clock = _hhmm(segments[-1]["arrival_local"][11:16])
+        out_modes, in_modes, ginfo = ground_both_ends(
+            origin_key, segments[0]["origin"]["iata"], segments[-1]["destination"]["iata"],
+            dep_clock, arr_clock, enr, geo, dest_point=dest_point)
+        ground_info = ginfo
+        if ginfo.get("arrival_note") and ginfo["arrival_note"] not in notes:
+            notes.append(ginfo["arrival_note"])
+        oid = "google-%s%s-%s" % (issuing.lower(), segments[0]["marketing"]["number"],
+                                  segments[0]["departure_local"][11:16].replace(":", ""))
+        k = 2
+        while oid in seen_ids:
+            oid = "%s-%d" % (oid.rsplit("-", 1)[0] if k > 2 else oid, k)
+            k += 1
+        seen_ids.add(oid)
+        ce = it.get("carbon_emissions") or {}
+        opt = {
+            "option_id": oid,
+            "display_name": "%s %s" % (airline_name, flights[0].get("flight_number") or issuing),
+            "segments": segments,
+            "layovers": layovers,
+            "tickets": [ticket],
+            "ground": {"outbound": out_modes, "arrival": in_modes},
+            "airport_process_minutes": (enr["airports"]["airports"]
+                                        .get(segments[0]["origin"]["iata"], {})
+                                        .get("process_minutes") or {"p50": 60}),
+            "booking": [{"who": airline_name, "price_cents": total_cents, "direct": True,
+                         "note": "Google Flights' price for the lowest fare; book on %s's own site"
+                                 % airline_name}],
+            "_google": {"source": "Google Flights via SerpApi", "airline_logo": it.get("airline_logo"),
+                        "total_duration": it.get("total_duration"),
+                        "emissions_kg": (int(ce["this_flight"]) // 1000) if ce.get("this_flight") else None,
+                        "typical_kg": (int(ce["typical_for_this_route"]) // 1000)
+                                      if ce.get("typical_for_this_route") else None,
+                        "booking_token": it.get("booking_token"),
+                        "legs": [{"flight": f.get("flight_number"), "airline": f.get("airline"),
+                                  "airplane": f.get("airplane"), "travel_class": f.get("travel_class"),
+                                  "legroom": f.get("legroom"), "extensions": list(f.get("extensions") or []),
+                                  "minutes": f.get("duration"),
+                                  "from": {"code": (f.get("departure_airport") or {}).get("id"),
+                                           "name": (f.get("departure_airport") or {}).get("name")},
+                                  "to": {"code": (f.get("arrival_airport") or {}).get("id"),
+                                         "name": (f.get("arrival_airport") or {}).get("name")},
+                                  "often_delayed": bool(f.get("often_delayed_by_over_30_min"))}
+                                 for f in flights]},
+        }
+        rating = (enr["carriers"]["ratings"] or {}).get(issuing)
+        if rating:
+            opt["carrier_rating"] = {"rating": rating["rating"], "note": rating["note"],
+                                     "source": enr["carriers"]["_source"],
+                                     "as_of": enr["carriers"]["_as_of"]}
+        options.append(opt)
+
+    if not options:
+        return {"error": "nothing could be normalised from Google Flights", "dropped": dropped,
+                "notes": notes}
+
+    for c, b in sorted(bag_brands.items()):
+        notes.append("%s comes from Google Flights through SerpApi, not from the airline's own "
+                     "inventory: the lowest fare is shown with no brand, so it is priced as %s "
+                     "with no bag (unknown is never cheap); no operating carrier is named; the "
+                     "aircraft is a name, not a code, so cabin claims abstain; booking is on the "
+                     "airline's site" % (c, b))
+    first = options[0]
+    o_iata = first["segments"][0]["origin"]["iata"]
+    d_iata = first["segments"][-1]["destination"]["iata"]
+    dest_label = (geo.get(d_iata) or {}).get("city") or d_iata
+    par, par_basis = route_par(o_iata, d_iata, first["segments"][0]["departure_local"][:10],
+                               enr, notes, geo)
+    org = enr["ground"]["origins"].get(origin_key, {})
+    bags = [{"kind": "checked", "weight_kg": 20} for _ in range(max(0, int(checked_bags)))]
+    return {
+        "schema_version": "0.1.0",
+        "fixture_id": "live-google-%s-%s" % (o_iata.lower(), d_iata.lower()),
+        "title": "Google Flights via SerpApi (%s): %s to %s" % ("/".join(sorted(want)) or "all", o_iata, d_iata),
+        "pins_down": "Nothing. This is a live search, not a fixture - it pins no "
+                     "behaviour and must never be committed to fixtures/.",
+        "as_of": first["segments"][0]["departure_local"][:10],
+        "notes": notes,
+        "query": {
+            "origin": {"label": org.get("label", origin_key), "lat": org.get("lat", 0.0),
+                       "lon": org.get("lon", 0.0), "geocode_precision": "neighbourhood"},
+            "destination": ({"label": dest_point["label"], "lat": dest_point["lat"], "lon": dest_point["lon"],
+                             "geocode_precision": "address"} if dest_point and dest_point.get("lat") is not None
+                            else {"label": dest_label, "lat": 0.0, "lon": 0.0, "geocode_precision": "city"}),
+            "depart_date": first["segments"][0]["departure_local"][:10],
+            "return_date": None,
+            "route_par_cents": par,
+            "party": [{"passenger_id": "p1", "type": "adult",
+                       "bags": bags + [{"kind": "cabin"}, {"kind": "personal_item"}]}],
+            "profiles": {
+                "reference": {"label": "neutral reference", "hourly_value_cents": 3500,
+                              "comfort_weight": 1.0, "risk_weight": 1.0},
+                "cheapest": {"label": "Cheapest", "hourly_value_cents": 1200,
+                             "comfort_weight": 0.45, "risk_weight": 1.0},
+                "fastest": {"label": "Fastest", "hourly_value_cents": 9500,
+                            "comfort_weight": 0.85, "risk_weight": 1.0},
+                "comfort": {"label": "Most comfortable", "hourly_value_cents": 5500,
+                            "comfort_weight": 2.0, "risk_weight": 1.0},
+            },
+        },
+        "options": options,
+        "expect": {"reconciles": True},
+        "_dropped": dropped,
+        "_ground": ground_info,
+        "_par": par_basis,
+        "_feed": {"provider": "serpapi", "carriers": sorted(want), "default_bag_fees_used": default_used,
+                  "unreviewed_claims": 0, "feed_priced_bags": 0,
+                  "amenity_segments": amenity_segments, "wifi_published": wifi_published},
+    }
+
+
+def merge_scenarios(main: Dict[str, Any], extra: Dict[str, Any], label: str) -> Dict[str, Any]:
+    """Add a supplement's options to the main scenario: the main one's query,
+    par and profiles stand (one par per route, whatever the source), ids that
+    collide are suffixed, and the supplement's notes, drops and published
+    amenities ride along under its own name."""
+    if not extra or extra.get("error") or not extra.get("options"):
+        return main
+    ids = {o["option_id"] for o in main["options"]}
+    for o in extra["options"]:
+        oid = o["option_id"]
+        while oid in ids:
+            oid += "-x"
+        o["option_id"] = oid
+        ids.add(oid)
+        main["options"].append(o)
+    main["notes"] = list(main.get("notes") or []) + [n for n in (extra.get("notes") or [])
+                                                     if n not in (main.get("notes") or [])]
+    main["_dropped"] = list(main.get("_dropped") or []) + list(extra.get("_dropped") or [])
+    feed = main.setdefault("_feed", {})
+    feed["wifi_published"] = list(feed.get("wifi_published") or []) + list(
+        (extra.get("_feed") or {}).get("wifi_published") or [])
+    feed.setdefault("supplements", []).append({
+        "label": label, "provider": (extra.get("_feed") or {}).get("provider"),
+        "carriers": (extra.get("_feed") or {}).get("carriers"), "options": len(extra["options"]),
+        "dropped": len(extra.get("_dropped") or [])})
+    return main
+
+
 def from_feed(raw: Dict[str, Any], **kw) -> Dict[str, Any]:
     """Dispatch on the payload's own shape rather than on a caller-supplied
     name, so a profile pointed at the wrong provider fails as a parse error
@@ -1573,6 +1909,8 @@ def from_feed(raw: Dict[str, Any], **kw) -> Dict[str, Any]:
     Duffel is checked before Amadeus because both use a top-level `data`, and a
     Duffel offer is recognised by `slices` where an Amadeus one carries
     `type: "flight-offer"` - neither key appears in the other's payload."""
+    if isinstance(raw.get("best_flights"), list) or isinstance(raw.get("other_flights"), list):
+        return from_serpapi(raw, **kw)               # Google Flights through SerpApi: the supplement
     if _duffel_offers(raw):
         return from_duffel(raw, **kw)
     if isinstance(raw.get("data"), list) and any(

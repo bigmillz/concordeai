@@ -241,7 +241,13 @@ details[open] summary:after{content:"–"}
 .sechead h2{font-size:24px}
 .sechead p{color:var(--dim);font-size:13.5px;max-width:60ch}
 
-.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+/* the podium (per Patrick, 2026-09-21: "left to right, 2nd, 1st, 3rd, with 1st being a little larger ... the podium
+   in auto racing"): first place in the middle, wider and standing taller, the three cards on one baseline */
+.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:center}
+/* first place is TALLER, not wider (per Patrick, 2026-09-21: "extend the top and bottom to add height, keep the
+   width the same"): a taller picture up top and more room under the buttons, the three cards centred on one line
+   so the middle one stands out both ways */
+.door.p1 .sky{height:172px}.door.p1 .seal{top:186px}.door.p1 .body{padding-bottom:40px}
 .door{background:var(--panel2);border:1px solid var(--line);border-radius:14px;overflow:hidden;position:relative;display:flex;flex-direction:column;transition:transform .2s,border-color .2s}
 .door:hover{transform:translateY(-2px);border-color:#3a3d46}
 /* the podium: gold, silver, bronze, first glowing a little more than the other two (per Patrick, 2026-09-21) */
@@ -681,8 +687,8 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 @keyframes drift{from{transform:scale(var(--z0)) translate(var(--x0),var(--y0))}to{transform:scale(var(--z1)) translate(var(--x1),var(--y1))}}
 /* the flash: the WHOLE frame goes white and comes back (per Patrick, 2026-09-21: "no oval flash, flash the entire
    frame"); it sits above the scrim and the caption, not under them, and the picture changes at its peak */
-.sky .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:3}
-.sky .flash.go{animation:flash .7s ease-out}
+.sky .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:3;border-radius:0;padding:0;margin:0;transform:none}
+.sky .flash.lit{animation:flash .7s ease-out}
 @keyframes flash{0%{opacity:0}16%{opacity:1}34%{opacity:.8}100%{opacity:0}}
 
 .sky .scrim{position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(10,10,12,.12) 0%,rgba(10,10,12,.02) 35%,rgba(10,10,12,.6) 100%);pointer-events:none}
@@ -690,7 +696,8 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 .sky .t{z-index:2}
 .seal{top:140px}
 .door .body .eyebrow,.door .body .pc{padding-right:60px}
-@media (max-width:980px){.sky{height:108px}.seal{top:122px}}
+@media (max-width:980px){.sky{height:108px}.seal{top:122px}.door.p1 .sky{height:150px}.door.p1 .seal{top:164px}}
+@media (max-width:980px){.three .door.p1{order:-1}}   /* one column: back to first, second, third */
 @media (prefers-reduced-motion:reduce){.rise,.bar.drop,#results.fade,.door.swap,.rise .seal .ring,.swap .seal .ring,.rise .seal .g,.swap .seal .g,.rise .seal .sg,.swap .seal .sg,.rise .jseg,.swap .jseg,.door.p1 .seal svg{animation:none;opacity:1;stroke-dashoffset:0}}
 
 /* ---------- the dock: the wish goes on under the results, like a chat */
@@ -871,7 +878,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">Advanced options are optional; leave them and go.</span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="96d8090">96d8090</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="d5c8d57">d5c8d57</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -898,7 +905,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="96d8090">96d8090</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="d5c8d57">d5c8d57</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1589,7 +1596,10 @@ function paintDoors(rows, ctx){
   // first, second, third: the top of the ranking as it stands, so the places
   // change when the sort does (all-in at the dial, or earliest arrival on ASAP)
   const picks = rows.slice(0, 3).map((r, k) => ({kind:'p' + (k + 1), r, title:PLACES[k]}));
-  $('#doors').innerHTML = picks.map(p => door(p.kind, p.r.e, p.r, p.title, ctx)).join('');
+  // the podium: second on the left, first in the middle, third on the right (the DOM is the visual order, so the
+  // tiles' right-to-left show and the strip across them read the row as it is seen)
+  const shown = picks.length === 3 ? [picks[1], picks[0], picks[2]] : picks;
+  $('#doors').innerHTML = shown.map(p => door(p.kind, p.r.e, p.r, p.title, ctx)).join('');
   const doors = [...document.querySelectorAll('#doors .door')];
   if (S.entrance) doors.forEach((d, k) => { d.classList.add('rise'); d.style.animationDelay = (120 + k*110) + 'ms'; });
   else if (!REDUCED) doors.forEach((d, k) => { if (DOOR_IDS[k] !== d.dataset.id){ d.classList.add('swap'); d.style.animationDelay = (k*60) + 'ms'; } });
@@ -1677,6 +1687,7 @@ function factsHTML(e){
   if (d.base_cents != null && d.base_cents >= .25 * (d.base_cents + (d.tax_cents || 0))) F.push(row('Fare', `${money(d.base_cents)} base + ${money(d.tax_cents || 0)} taxes`));
   if (d.price_guarantee_until) F.push(row('Price held', 'until ' + when(d.price_guarantee_until))); else if (d.pay_by) F.push(row('Pay by', when(d.pay_by)));
   if (d.emissions_kg) F.push(row('Emissions', `${(+d.emissions_kg).toLocaleString()} kg CO₂`));
+  if (d.source) F.push(row('Source', d.source + (d.note ? ' · ' + d.note : '')));
   F.push(row('Airline', esc(e.carrier_name) + (e.rating != null ? ` · rated ${e.rating.toFixed(2)}` : '') + (d.carriage_url ? ` · <a href="${esc(d.carriage_url)}" target="_blank" rel="noopener">conditions of carriage</a>` : ''), true));
   if (d.loyalty && d.loyalty.length) F.push(row('Miles', d.loyalty.slice(0, 6).map(c => ((AIR[c] || {}).name || c).replace(' Airlines', '').replace(' Airways', '')).join(', ') + (d.loyalty.length > 6 ? ' +' + (d.loyalty.length - 6) : '')));
   if (d.id_docs_required) F.push(row('Documents', 'passport needed to book'));
@@ -2518,7 +2529,7 @@ function paintAccount(){
 }
 function openAccount(why){
   const u = S.user, capped = why && why.sign_in && why.free != null;
-  $('#accth').textContent = u ? (u.owner ? 'This machine' : 'Your account') : capped ? 'Today\'s free searches are used up' : 'A free account unlocks the rest';
+  $('#accth').textContent = u ? (u.owner && !u.email ? 'This machine' : 'Your account') : capped ? 'Today\'s free searches are used up' : 'A free account unlocks the rest';
   $('#acctbody').innerHTML = u ? `<p>${u.unlimited ? 'Signed in as <b>' + esc(u.email || '') + '</b>, with no daily cap.' : u.owner ? (u.email ? 'Signed in as <b>' + esc(u.email) + '</b>, an owner: no limits.' : 'This machine has no limits.') : 'Signed in as <b>' + esc(u.email || '') + '</b>.' + (u.left ? ' Today: <b>' + u.left.searches + '</b> live searches and <b>' + u.left.wishes + '</b> wishes left.' : '')}</p>
       <div class="row2">${!u.owner && !u.demo && SERVED ? '<a class="ledger" href="/cdn-cgi/access/logout">Sign out</a>' : ''}${u.demo ? '<button class="ledger" id="acctout">Leave the demo account</button>' : ''}<button class="choose" id="acctno" style="flex:0 0 auto">Done</button></div>`
     : `<p>${capped ? esc(why.error) + ' Your email or Google, no password.' : (S.freeMax ? S.freeMax + ' searches a day are free without an account' + (S.free != null ? ' (' + S.free + ' left today)' : '') + '. ' : '') + 'A free account unlocks the rest: ' + (S.freeMax ? '' : 'live searches on your own dates and places, ') + 'the wish box, the price check from other countries, and a watchlist. Your email or Google, no password.'}</p>
@@ -2613,9 +2624,14 @@ function setPic(el, p, k, wide){
     // scales about the SAME point on the page (the middle of the strip) and slides the same pixels at the same
     // moment, so the three slices stay one picture to the sub-pixel (a door-based, rounded version was 2px out)
     const frames = [...document.querySelectorAll('#doors .door .photo')].map(ph => ph.getBoundingClientRect()), F0 = frames[0], FN = frames[frames.length - 1];
-    const W = Math.max(300, FN.right - F0.left + 32), off = el.closest('.photo').getBoundingClientRect().left - F0.left;
-    el.classList.add('wide'); S.backgroundSize = W.toFixed(2) + 'px auto'; S.backgroundPosition = (-off).toFixed(2) + 'px 45%';
-    S.transformOrigin = (W / 2 - off).toFixed(2) + 'px 50%';
+    const mine = el.closest('.photo').getBoundingClientRect(), off = mine.left - F0.left;
+    // the frames are not all one height (first place stands taller), so the strip is placed in one vertical band,
+    // 16px past the tallest frame's top and bottom, and each frame shows the part of it that sits behind that frame
+    const bandTop = Math.min(...frames.map(f => f.top)) - 16, bandBot = Math.max(...frames.map(f => f.bottom)) + 16, H = bandBot - bandTop;
+    const W = Math.max(300, FN.right - F0.left + 32), ih = p.w && p.h ? W * p.h / p.w : H, dy = (mine.top - 16) - bandTop;
+    el.classList.add('wide'); S.backgroundSize = W.toFixed(2) + 'px auto';
+    S.backgroundPosition = (-off).toFixed(2) + 'px ' + ((H - ih) * .45 - dy).toFixed(2) + 'px';
+    S.transformOrigin = (W / 2 - off).toFixed(2) + 'px ' + (H / 2 - dy).toFixed(2) + 'px';
     S.setProperty('--z0', '1'); S.setProperty('--z1', '1.04'); S.setProperty('--x0', (d.dir * .5) + '%'); S.setProperty('--x1', (d.dir * -.6) + '%'); S.setProperty('--y0', '0%'); S.setProperty('--y1', '0%');
   } else {
     el.classList.remove('wide'); S.backgroundSize = ''; S.backgroundPosition = ''; S.transformOrigin = '';
@@ -2626,7 +2642,8 @@ function setPic(el, p, k, wide){
 function swapTile(d, k, p, wide){
   const ph = d.querySelector('.photo'); if (!ph) return;
   const cur = ph.querySelector('.pic.on'), nxt = ph.querySelector('.pic:not(.on)'); if (!cur || !nxt) return;
-  const fl = d.querySelector('.sky .flash'); if (fl){ fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go'); }
+  // `lit`, not `go`: .go is the search button, and its pill radius once turned the flash into an oval
+  const fl = d.querySelector('.sky .flash'); if (fl){ fl.classList.remove('lit'); void fl.offsetWidth; fl.classList.add('lit'); }
   // the picture changes under the white, at the flash's peak; timers, not requestAnimationFrame, which never fires
   // in a hidden document
   setTimeout(() => { setPic(nxt, p, k, wide); nxt.classList.add('top'); cur.classList.remove('top');
@@ -2704,7 +2721,7 @@ async function fetchPhotos(){
   const get = async place => { if (!place) return []; try { const r = await fetch('/photos?place=' + encodeURIComponent(place)); const d = await r.json(); return (d.photos || []).map(p => ({...p, place: d.place || place})); } catch (e){ return []; } };
   const [a, b] = await Promise.all([get(here), get(there)]); if (PH.key !== key) return;
   const mixed = shuffle(a.concat(b)); if (mixed.length < 2) return;
-  mixed.forEach(p => { const im = new Image(); im.src = p.src; });
+  mixed.forEach(p => { const im = new Image(); im.onload = () => { p.w = im.naturalWidth; p.h = im.naturalHeight; }; im.src = p.src; });
   PHOTOS = mixed; PH.slots = null; PH.wide = null; if (W.mode === 'results') paint(false);
 }
 document.addEventListener('animationend', ev => { if (ev.target.classList && ev.target.classList.contains('rise')) ev.target.classList.remove('rise'); });

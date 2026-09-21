@@ -482,8 +482,12 @@ public hostname owns the DNS record so no script here touches DNS). `concorde-tr
 (a Mac, LaunchAgents) is the laptop fallback. Either runs `server.py` with
 `CONCORDEGO_ROOT=mock-10`, so `/` serves the current interface mockup, at
 **go.flyconcordefly.com**, on its own tunnel so it never touches the AI app's. **`/admin`** on
-the served site (owners only: the local machine, or an email in `CONCORDEGO_OWNERS`, which
-Access fronts as its own application for `ADMINS`) shows the live commit, asks GitHub what is
+the served site (owners only: an email in `CONCORDEGO_OWNERS`, or the local machine on a
+developer's box; on the public box `CONCORDEGO_PUBLIC=1`, written by the installer, makes
+every request remote, so a request that somehow arrives without the proxy's headers is a
+stranger, never the owner. The Access application for `/api` allows exactly the owners'
+emails; an incognito window that opens it has an Access session of its own, or the WARP
+client signed in for the team, and the admin page now prints who it takes you for) shows the live commit, asks GitHub what is
 new, updates now (`git reset --hard origin/<branch>` in the running checkout, then exit: the
 supervisor restarts it, so the service unit lists the checkout in `ReadWritePaths`) and
 tails the journal (`concordego` user is in `systemd-journal`) or `CONCORDEGO_LOG`. Owners
@@ -628,7 +632,33 @@ than one replacing the other.
 portal on 2026-07-17 and disabled those keys; Kiwi closed Tequila signups in 2024. Both
 profiles are kept for their schemas — Amadeus Enterprise still speaks Flight Offers Search
 v2, and Kiwi is the only feed here that sees self-transfer at all. **Do not re-recommend
-Amadeus Self-Service or Google Flights**; see the table in `docs/design.md`.
+Amadeus Self-Service, or Google Flights as a primary source**; see the table in
+`docs/design.md`. Google Flights has one job here, below.
+
+**Delta comes through Google Flights, scraped by proxy through SerpApi** (2026-09-21, per
+Patrick: "to bandaid the delta problem"). Duffel lists 141 airlines and Delta is not one
+of them, so `live.serp_search()` asks SerpApi's `google_flights` engine for the route, one
+way, in dollars, with `include_airlines` set to the carriers the feed cannot sell
+(`serpapi_carriers` in `cloud.json`, `["DL"]` by default), on its own key
+(`CONCORDEGO_SERPAPI_KEY`, or `serpapi_key` in `cloud.json`) and its own counters
+(`quota-serpapi.json`, 40 a day and 240 a month by default: the free plan is 250), with the
+same discipline as the feed: cache before quota, quota reserved before the call, a miss
+never cached, the key redacted from everything that escapes, and SerpApi's 200-with-an-
+`error`-sentence treated as the failure it is. `adapter.from_serpapi()` turns the response
+into the scorer's shape: Google gives local clock times with NO offset (attached from the
+curated airports, or the zones the Duffel payload named through `adapter.duffel_geo()`; an
+airport with neither DROPS), an aircraft NAME not a code (the cabin claim abstains), legroom
+in inches (pitch), amenity sentences ("Wi-Fi for a fee" is a published amenity, never an
+observed one), one whole-dollar price (cents ×100), no fare brand and no bag allowance (priced
+as the carrier's no-bag brand from `fares.json`, and the scenario note says so: unknown is
+never cheap), no operating carrier, and a booking token only Google can redeem (the booking
+line goes to the airline's own site). An itinerary with a leg on another carrier is not
+Delta's and is dropped. `adapter.merge_scenarios()` adds the options under the feed's par
+and profiles, so a Delta row is graded and ranked like every other; `_feed.supplements`
+says how many came from where. `adapter_samples/serpapi-jfk-lhr.json` is SYNTHESIZED from
+the published schema (no key was on the machine) and says so; `live.py serp JFK LHR DATE`
+makes a real one. Three mutants in `mutate_adapter.py` cover it (39 now). It is a bandaid:
+scraping by proxy can break without notice, and it cannot book.
 
 **Duffel CAN quote a bag price, but never on the search response.** `available_services` was
 empty on all 172 offers of the real capture — it is populated only by
@@ -930,7 +960,12 @@ typed or spoken (the browser's own speech recognition) that becomes visible,
 removable rules and weights, advanced windows / cabin / stops / alliances /
 airlines-to-leave-out (these hide, and say what they hid), and **points
 balances** with a demo award chart and 1:1 transfer partners that say whether
-points beat cash in cents per point. **Step 3 is rows of chips, not a form** (per
+points beat cash in cents per point. **The three cards are a podium** (2026-09-21, per Patrick: "2nd, 1st, 3rd, with 1st being a
+little larger ... the podium in auto racing", then "taller rather than wider"): second on the
+left, first in the middle, third on the right, all one width, first place taller at both
+ends (a taller picture, more room under the buttons), the three centred on one line. The DOM
+is the visual order, so the tiles' right-to-left show and the strip across them read the row
+as seen; under 980px it is one column in rank order again. **Step 3 is rows of chips, not a form** (per
 Patrick, 2026-09-21: "not welcome to the world of data entry"): a source, a
 programme or a status is a chip until it is tapped, and only then a field, with
 the most popular few showing and the rest behind a dashed "+N more" chip.

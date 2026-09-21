@@ -55,6 +55,7 @@ ROOT = (os.environ.get("CONCORDEGO_ROOT") or "").strip()
 USER_SEARCHES = int(os.environ.get("CONCORDEGO_USER_SEARCHES", "20"))     # metered flight searches a day
 # Signed-in people who are not metered and may open /admin: the machine's owner reaching it through the tunnel.
 OWNERS = {e.strip().lower() for e in os.environ.get("CONCORDEGO_OWNERS", "").split(",") if e.strip()}
+PUBLIC = (os.environ.get("CONCORDEGO_PUBLIC") or "").strip().lower() in ("1", "true", "yes")
 # A ceiling on the whole site's day, whoever asks: the per-person allowance bounds one account, this bounds a
 # swarm of them. Wishes are the only metered thing that costs money per call (Duffel bills per booking, not per
 # search; live.py caps searches on its own), so a day of wishes is at most this many Opus calls.
@@ -700,10 +701,26 @@ def _fetch_raw(req):
             return ({"error": meta.get("error", "live search unavailable"),
                      "hint": meta.get("hint") or meta.get("how"),
                      "quota": meta.get("quota"), "live": True},)
+        # the supplement: Google Flights through SerpApi, for the carriers the
+        # feed cannot sell (Delta). Its absence or failure never fails the search.
+        meta = dict(meta)
+        meta["supplement_payload"], meta["supplement"] = _supplement(q)
     else:
         return ({"error": "unknown source %r - this server does not call a flight "
                           "API itself; hand it a payload or use the recording" % src},)
     return raw, meta, where, src
+
+
+def _supplement(q):
+    """(payload, meta) from live.serp_search for the route, or (None, why)."""
+    try:
+        scfg = live.serp_config()
+        if not scfg.get("key"):
+            return None, {"source": "none", "skipped": "no SerpApi key"}
+        return live.serp_search(q["origin"], q["destination"], q["date"],
+                                adults=q.get("adults", 1), cfg=scfg)
+    except Exception as exc:                          # a supplement must never take the search down
+        return None, {"source": "none", "error": "supplement failed: %s" % exc}
 
 
 def search_request(req):
@@ -722,11 +739,14 @@ def search_request(req):
         out = mockdata.build_slim(raw, origin_key=origin_text, checked_bags=int(req.get("checked_bags", 1)),
                                   origin_full=req.get("origin_address") or None,
                                   dest_point=dest_point,
-                                  destination_full=(req.get("destination") if dest_point else None))
+                                  destination_full=(req.get("destination") if dest_point else None),
+                                  supplement=meta.get("supplement_payload"))
     except ValueError as exc:
         return {"error": str(exc)}
     out["feed"] = {"source": src, "fetched": meta.get("source"), "age_seconds": meta.get("age_seconds"),
-                   "quota": meta.get("quota"), "fell_back": meta.get("fell_back")}
+                   "quota": meta.get("quota"), "fell_back": meta.get("fell_back"),
+                   "supplement": {k: v for k, v in (meta.get("supplement") or {}).items()
+                                  if k in ("source", "error", "skipped", "age_seconds", "hint")}}
     out["where"] = where or None
     if src == "sample":
         out["source_note"] = ("Recorded JFK–LHR results, not a live search" +
@@ -752,6 +772,11 @@ def live_request(req):
                            dest_point=(where.get("destination") or {}).get("point") if src == "api" else None)
     if sc.get("error"):
         return sc
+    if _LIVE_META.get("supplement_payload"):
+        sc = adapter.merge_scenarios(sc, adapter.from_serpapi(
+            _LIVE_META["supplement_payload"], origin_key=origin_text,
+            checked_bags=int(req.get("checked_bags", 1)), geo=adapter.duffel_geo(raw),
+            dest_point=(where.get("destination") or {}).get("point")), "Google Flights (Delta)")
     _LIVE[sc["fixture_id"]] = sc
     out = _score_scenario(sc, req)
     out["coverage"] = adapter.coverage(sc)
@@ -1279,7 +1304,7 @@ function paint(st){ ST = st; const h = st.head || {}, behind = st.behind; paintK
   const cards = [
     ['Running', `<b>${h.short || '?'}</b> on ${st.branch || '?'}`, (h.subject || '') + (h.date ? ' · ' + when(h.date) : '')],
     ['GitHub', behind == null ? '<span class="warn">not checked</span>' : behind ? `<span class="warn">${behind} commit${behind > 1 ? 's' : ''} ahead</span>` : '<span class="ok">up to date</span>', st.last_check ? 'last checked ' + when(st.last_check) : 'never checked'],
-    ['Process', `up ${ago(st.uptime_s)}`, 'pid ' + st.pid + ' · python ' + st.python + ' · ' + (st.owners.length ? 'owners: ' + st.owners.join(', ') : '<span class="warn">no CONCORDEGO_OWNERS set</span>')],
+    ['Process', `up ${ago(st.uptime_s)}`, 'pid ' + st.pid + ' · python ' + st.python + ' · ' + (st.owners.length ? 'owners: ' + st.owners.join(', ') : '<span class="warn">no CONCORDEGO_OWNERS set</span>') + ' · you: ' + (st.you === 'owner' ? 'this machine' : (st.you || 'nobody')) + (st.public ? ' · public box' : ' · <span class="warn">not marked public</span>')],
     ['Flight API', st.live && st.live.key_configured ? `<span class="ok">${st.live.provider} key on</span>` : '<span class="warn">no key: recorded results</span>', st.live && st.live.quota ? `today ${st.live.quota.day_calls}/${st.live.quota.day_limit} · month ${st.live.quota.month_calls}/${st.live.quota.month_limit}` : ''],
     ['Claude', st.narrator ? '<span class="ok">key on</span>' : '<span class="warn">no key: template only</span>', 'narrator and wish box'],
     ['People today', st.users_today.length ? st.users_today.length + ' signed in' : 'nobody yet', st.users_today.slice(0, 4).map(u => `${u.email} ${u.searches}/${st.allowances.searches} · ${u.wishes}/${st.allowances.wishes}`).join('<br>')],
@@ -1328,6 +1353,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
     # address may read anything but may not SPEND: no metered flight search,
     # no narrator call, no 250 MB sky download on its say-so.
     def _remote(self):
+        # On the public box NOTHING is local: every request comes through the
+        # tunnel, so a request that somehow arrives without the proxy's headers
+        # is a stranger, never the owner (CONCORDEGO_PUBLIC=1, set by the
+        # installer). Locality grants owner only on a developer's own machine.
+        if PUBLIC:
+            return True
         return bool(self.headers.get("Cf-Connecting-Ip") or self.headers.get("X-Forwarded-For"))
 
     # Who is asking. Local is the owner. Through the tunnel, Cloudflare Access
@@ -1398,7 +1429,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             from urllib.parse import parse_qs
             q = parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
             if path == "/api/admin/status":
-                return self._json(admin_status(False))
+                st = admin_status(False)
+                st["you"] = self._who()
+                st["public"] = PUBLIC
+                return self._json(st)
             if path == "/api/admin/logs":
                 try:
                     n = int((q.get("n") or ["300"])[0])

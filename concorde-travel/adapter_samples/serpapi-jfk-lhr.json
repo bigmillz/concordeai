@@ -1,0 +1,283 @@
+{
+ "_provenance": {
+  "synthesized": true,
+  "written": "2026-09-21",
+  "note": "Written from SerpApi's published Google Flights schema (serpapi.com/google-flights-api); no key was available on the machine this was built on. Replace with a real capture (python3 concorde-travel/live.py serp JFK LHR 2026-11-18) before trusting a field name. The itineraries are plausible, not observed.",
+  "selection": [
+   "a Delta nonstop, the case the supplement exists for",
+   "a Delta connection through BOS, which is uncurated and so drops unless the feed named a zone",
+   "a Virgin nonstop, to prove the carrier filter",
+   "a Delta+Air France pair, to prove a mixed itinerary is not Delta"
+  ]
+ },
+ "search_metadata": {
+  "status": "Success",
+  "created_at": "2026-09-21 18:00:00 UTC"
+ },
+ "search_parameters": {
+  "engine": "google_flights",
+  "departure_id": "JFK",
+  "arrival_id": "LHR",
+  "outbound_date": "2026-11-18",
+  "type": "2",
+  "currency": "USD",
+  "hl": "en",
+  "gl": "us",
+  "adults": 1,
+  "include_airlines": "DL"
+ },
+ "best_flights": [
+  {
+   "flights": [
+    {
+     "departure_airport": {
+      "name": "John F. Kennedy International Airport",
+      "id": "JFK",
+      "time": "2026-11-18 21:15"
+     },
+     "arrival_airport": {
+      "name": "Heathrow Airport",
+      "id": "LHR",
+      "time": "2026-11-19 09:20"
+     },
+     "duration": 425,
+     "airplane": "Airbus A330-900neo",
+     "airline": "Delta",
+     "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+     "travel_class": "Economy",
+     "flight_number": "DL 1",
+     "legroom": "31 in",
+     "extensions": [
+      "Average legroom (31 in)",
+      "Wi-Fi for a fee",
+      "In-seat power & USB outlets",
+      "On-demand video",
+      "Carbon emissions estimate: 512 kg"
+     ]
+    }
+   ],
+   "total_duration": 425,
+   "carbon_emissions": {
+    "this_flight": 512000,
+    "typical_for_this_route": 498000,
+    "difference_percent": 3
+   },
+   "price": 512,
+   "type": "One way",
+   "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+   "booking_token": "WyJDalJJU1hKcldrMVNRVnBtZDNkQlJqQlRTRUZDUnkwdExTMHRMUzB0TFMxaGJXOTBjM0pCUVVGQlIyaHBRbWhKZEVSRFFXOUJFZ1JFVERFcGFHVUVCU0lBIiwiSkZLIiwiTEhSIl1d"
+  },
+  {
+   "flights": [
+    {
+     "departure_airport": {
+      "name": "John F. Kennedy International Airport",
+      "id": "JFK",
+      "time": "2026-11-18 16:05"
+     },
+     "arrival_airport": {
+      "name": "Boston Logan International Airport",
+      "id": "BOS",
+      "time": "2026-11-18 17:25"
+     },
+     "duration": 80,
+     "airplane": "Embraer 175",
+     "airline": "Delta",
+     "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+     "travel_class": "Economy",
+     "flight_number": "DL 5624",
+     "legroom": "31 in",
+     "extensions": [
+      "Average legroom (31 in)",
+      "Wi-Fi for a fee",
+      "In-seat USB outlet"
+     ]
+    },
+    {
+     "departure_airport": {
+      "name": "Boston Logan International Airport",
+      "id": "BOS",
+      "time": "2026-11-18 19:00"
+     },
+     "arrival_airport": {
+      "name": "Heathrow Airport",
+      "id": "LHR",
+      "time": "2026-11-19 06:35"
+     },
+     "duration": 395,
+     "airplane": "Boeing 767",
+     "airline": "Delta",
+     "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+     "travel_class": "Economy",
+     "flight_number": "DL 58",
+     "legroom": "31 in",
+     "extensions": [
+      "Average legroom (31 in)",
+      "Wi-Fi for a fee",
+      "In-seat power & USB outlets"
+     ],
+     "often_delayed_by_over_30_min": true
+    }
+   ],
+   "layovers": [
+    {
+     "duration": 95,
+     "name": "Boston Logan International Airport",
+     "id": "BOS",
+     "overnight": false
+    }
+   ],
+   "total_duration": 570,
+   "carbon_emissions": {
+    "this_flight": 604000,
+    "typical_for_this_route": 498000,
+    "difference_percent": 21
+   },
+   "price": 438,
+   "type": "One way",
+   "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+   "booking_token": "WyJDalJJU1hKcldrMVNRVnBtZDNkQlJqQlRTRUZDUnkwdExTMHRMUzB0TFMxaGJXOTBjM0pCUVVGQlIyaHBRbWhKZEVSRFFXOUJFZ3hFVERVMk1qUjhSRXcxT0JvSkNBQVNCQUFBQUFBUUFCb0FBQUFBIiwiSkZLIiwiTEhSIl1d"
+  }
+ ],
+ "other_flights": [
+  {
+   "flights": [
+    {
+     "departure_airport": {
+      "name": "John F. Kennedy International Airport",
+      "id": "JFK",
+      "time": "2026-11-18 18:30"
+     },
+     "arrival_airport": {
+      "name": "Heathrow Airport",
+      "id": "LHR",
+      "time": "2026-11-19 06:30"
+     },
+     "duration": 420,
+     "airplane": "Airbus A350",
+     "airline": "Virgin Atlantic",
+     "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/VS.png",
+     "travel_class": "Economy",
+     "flight_number": "VS 3",
+     "legroom": "31 in",
+     "extensions": [
+      "Average legroom (31 in)",
+      "Wi-Fi for a fee",
+      "In-seat power & USB outlets"
+     ]
+    }
+   ],
+   "total_duration": 420,
+   "carbon_emissions": {
+    "this_flight": 470000,
+    "typical_for_this_route": 498000,
+    "difference_percent": -6
+   },
+   "price": 395,
+   "type": "One way",
+   "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/VS.png",
+   "booking_token": "WyJWUzMiLCJKRksiLCJMSFIiXQ=="
+  },
+  {
+   "flights": [
+    {
+     "departure_airport": {
+      "name": "John F. Kennedy International Airport",
+      "id": "JFK",
+      "time": "2026-11-18 19:10"
+     },
+     "arrival_airport": {
+      "name": "Paris Charles de Gaulle Airport",
+      "id": "CDG",
+      "time": "2026-11-19 08:25"
+     },
+     "duration": 435,
+     "airplane": "Boeing 767",
+     "airline": "Delta",
+     "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/DL.png",
+     "travel_class": "Economy",
+     "flight_number": "DL 264",
+     "legroom": "31 in",
+     "extensions": [
+      "Average legroom (31 in)",
+      "Wi-Fi for a fee"
+     ]
+    },
+    {
+     "departure_airport": {
+      "name": "Paris Charles de Gaulle Airport",
+      "id": "CDG",
+      "time": "2026-11-19 10:15"
+     },
+     "arrival_airport": {
+      "name": "Heathrow Airport",
+      "id": "LHR",
+      "time": "2026-11-19 10:35"
+     },
+     "duration": 80,
+     "airplane": "Airbus A320",
+     "airline": "Air France",
+     "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/AF.png",
+     "travel_class": "Economy",
+     "flight_number": "AF 1680",
+     "legroom": "29 in",
+     "extensions": [
+      "Below average legroom (29 in)"
+     ]
+    }
+   ],
+   "layovers": [
+    {
+     "duration": 110,
+     "name": "Paris Charles de Gaulle Airport",
+     "id": "CDG",
+     "overnight": false
+    }
+   ],
+   "total_duration": 625,
+   "carbon_emissions": {
+    "this_flight": 655000,
+    "typical_for_this_route": 498000,
+    "difference_percent": 32
+   },
+   "price": 402,
+   "type": "One way",
+   "airline_logo": "https://www.gstatic.com/flights/airline_logos/70px/multi.png",
+   "booking_token": "WyJETDI2NHxBRjE2ODAiLCJKRksiLCJMSFIiXQ=="
+  }
+ ],
+ "price_insights": {
+  "lowest_price": 395,
+  "price_level": "typical",
+  "typical_price_range": [
+   380,
+   620
+  ]
+ },
+ "airports": [
+  {
+   "departure": [
+    {
+     "airport": {
+      "id": "JFK",
+      "name": "John F. Kennedy International Airport"
+     },
+     "city": "New York",
+     "country": "United States",
+     "country_code": "US"
+    }
+   ],
+   "arrival": [
+    {
+     "airport": {
+      "id": "LHR",
+      "name": "Heathrow Airport"
+     },
+     "city": "London",
+     "country": "United Kingdom",
+     "country_code": "GB"
+    }
+   ]
+  }
+ ]
+}

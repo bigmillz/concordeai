@@ -66,6 +66,94 @@ def cfg_with(profile="kiwi-tequila", **over):
     return c
 
 
+
+class _Body:
+    def __init__(self, b):
+        self.b = b
+
+    def read(self):
+        return self.b
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def serp_checks():
+    """SerpApi, the Delta supplement: its own key and counters, the same discipline."""
+    import io
+    import tempfile
+    here = os.path.dirname(os.path.abspath(__file__))
+    print("\nserpapi supplement")
+    tmp = tempfile.mkdtemp()
+    sandbox(tmp)
+    os.environ.pop("CONCORDEGO_SERPAPI_KEY", None)
+    p, m = live.serp_search("JFK", "LHR", "2026-11-18")
+    check("with no SerpApi key nothing is called, and the reason names the variable",
+          p is None and "CONCORDEGO_SERPAPI_KEY" in (m.get("how") or ""))
+    check("and no call was spent", m["quota"]["day_calls"] == 0)
+    os.environ["CONCORDEGO_SERPAPI_KEY"] = SECRET
+    real = live.urllib.request.urlopen
+    scfg = live.serp_config()
+    scfg["quota"]["min_seconds_between_calls"] = 0          # the floor is a real limit; the test is about the rest
+    try:
+        with open(os.path.join(here, "..", "adapter_samples", "serpapi-jfk-lhr.json"), encoding="utf-8") as fh:
+            sample = json.load(fh)
+        seen = {"n": 0, "url": ""}
+
+        def fake_open(req, timeout=0):
+            seen["n"] += 1
+            seen["url"] = req.full_url
+            return _Body(json.dumps(sample).encode())
+        live.urllib.request.urlopen = fake_open
+        p, m = live.serp_search("JFK", "LHR", "2026-11-18", cfg=scfg)
+        check("a search with a key reaches SerpApi once and comes back as api",
+              p is not None and m["source"] == "api" and seen["n"] == 1)
+        check("the request asks Google Flights for Delta only, one way, in dollars",
+              all(x in seen["url"] for x in ("engine=google_flights", "include_airlines=DL", "type=2",
+                                              "currency=USD", "departure_id=JFK", "arrival_id=LHR",
+                                              "outbound_date=2026-11-18")), seen["url"].replace(SECRET, "[key]"))
+        check("one call was spent, on SerpApi's OWN counter, not the feed's",
+              m["quota"]["day_calls"] == 1 and live.quota_state()["day_calls"] == 0)
+        p2, m2 = live.serp_search("JFK", "LHR", "2026-11-18", cfg=scfg)
+        check("the same search again is served from cache and spends nothing",
+              m2["source"] == "cache" and seen["n"] == 1 and m2["quota"]["day_calls"] == 1)
+
+        def http_error(req, timeout=0):
+            raise live.urllib.error.HTTPError(req.full_url, 401, "Unauthorized", {},
+                                              io.BytesIO(("bad key " + SECRET).encode()))
+        live.urllib.request.urlopen = http_error
+        p3, m3 = live.serp_search("JFK", "CDG", "2026-11-18", cfg=scfg)
+        check("a refused key is reported without the key in it",
+              p3 is None and SECRET not in json.dumps(m3) and "401" in m3["error"])
+        check("and the refused call still counted", m3["quota"]["day_calls"] == 2)
+
+        def net_error(req, timeout=0):
+            raise live.urllib.error.URLError("no route")
+        live.urllib.request.urlopen = net_error
+        p4, m4 = live.serp_search("JFK", "AMS", "2026-11-18", cfg=scfg)
+        check("a call that never reached SerpApi is refunded",
+              bool(m4.get("refunded")) and m4["quota"]["day_calls"] == 2)
+
+        def soft_error(req, timeout=0):
+            return _Body(json.dumps({"error": "Google hasn't returned any results for this query."}).encode())
+        live.urllib.request.urlopen = soft_error
+        p5, m5 = live.serp_search("JFK", "FRA", "2026-11-18", cfg=scfg)
+        check("a 200 carrying an error sentence is a failure, not a payload",
+              p5 is None and "Google" in m5["error"])
+        p6, m6 = live.serp_search("JFK", "FRA", "2026-11-18", cfg=scfg)
+        check("and it was not cached", m6["source"] != "cache")
+        st = live.status()
+        check("status reports the SerpApi key as configured, from the environment, and never prints it",
+              st["serpapi"]["key_configured"] and "CONCORDEGO_SERPAPI_KEY" in st["serpapi"]["key_source"]
+              and SECRET not in json.dumps(st))
+    finally:
+        live.urllib.request.urlopen = real
+        os.environ.pop("CONCORDEGO_SERPAPI_KEY", None)
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="cgo-live-")
     sandbox(tmp)
@@ -391,6 +479,7 @@ def main():
     check("the shipped default says its wire format was verified against the live service",
           "VERIFIED against the live service" in live.DEFAULTS["_note"] and "UNVERIFIED" not in live.DEFAULTS["_note"])
 
+    serp_checks()
     print("\n%d checks, %d failed" % (N[0], len(FAILS)))
     if FAILS:
         print()
