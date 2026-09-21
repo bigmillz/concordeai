@@ -877,7 +877,8 @@ def suggest_request(q):
     # a digit means an address or a postal code (EC2A, 11237, 361 Harman), which no airport name carries;
     # those go to the address service, and come back ahead of the places
     has_digit = bool(re.search(r"\d", text))
-    looks_address = kind == "from" and ((has_digit and len(text) >= 3) or (len(text) >= 5 and " " in text))
+    looks_address = kind == "from" and ((has_digit and len(text) >= 3) or (len(text) >= 5 and " " in text)
+                                       or (len(text) >= 4 and not rows))   # a neighbourhood nobody else knows
     if looks_address:
         def fetch_addr():
             from urllib.parse import quote
