@@ -117,17 +117,25 @@ print("  reachable, " + str(len(r)) + " Access application(s) so far" + ((": " +
 # confirms the zone that owns $HOST is on this account. Without it the list is
 # simply EMPTY (not refused), which proves nothing, so it never stops the run.
 APEX=$(echo "$HOST" | awk -F. '{print $(NF-1)"."$NF}')
-ZONE_SEEN=$(cfroot "/zones?name=$APEX" | jq_ 'r = d.get("result") or []
+ZJ=$(cfroot "/zones?name=$APEX")
+ZONE_SEEN=$(echo "$ZJ" | jq_ 'r = d.get("result") or []
 print("1" if (d.get("success") and r) else "")')
 echo "== zone"
-if [ -n "$ZONE_SEEN" ]; then echo "  $APEX is visible to this token"
+if [ -n "$ZONE_SEEN" ]; then echo "  $APEX is visible to these credentials"
 else
-  echo "  $APEX is NOT visible with these credentials: the zone list is empty (a token with no zone permission lists nothing rather than refusing)."
-  echo "  Access resolves a hostname through the zones the caller can see, so the applications would be refused with \"domain does not belong to zone\". Nothing is created. Two ways through:"
-  echo "   a. Edit the token (dash.cloudflare.com > My Profile > API Tokens > the token > Edit): add the permission  Zone : Zone : Read,"
-  echo "      and under Zone Resources choose  Include > All zones  (or All zones from an account > the account that owns $APEX). Save, re-run."
-  echo "   b. Or run once with the Global API Key, which sees every zone (My Profile > API Tokens > Global API Key > View):"
-  echo "        CF_EMAIL=you@example.com CF_GLOBAL_KEY=paste-here ALLOW=\"...\" ./concorde-travel/access.sh"
+  echo "  $APEX is NOT visible to these credentials. What Cloudflare said, and who these credentials are:"
+  echo "$ZJ" | jq_ 'print("   zones?name=: success=" + str(d.get("success")) + " result=" + json.dumps(d.get("result")) + " errors=" + json.dumps(d.get("errors")))'
+  cfroot "/zones?per_page=50" | jq_ 'r = d.get("result") or []
+print("   zones they can see: " + (", ".join(z.get("name","?") + " (" + (z.get("account") or {}).get("id","?")[:8] + ")" for z in r) if r else "none") + ("" if d.get("success") else "  errors=" + json.dumps(d.get("errors"))))'
+  cfroot "/memberships" | jq_ 'r = d.get("result") or []
+print("   account memberships: " + ("; ".join((m.get("account") or {}).get("name","?") + " " + (m.get("account") or {}).get("id","?")[:8] + " as " + ", ".join(m.get("roles") or []) for m in r) if r else "none") + ("" if d.get("success") else "  errors=" + json.dumps(d.get("errors"))))'
+  echo "  Access resolves a hostname through the zones the caller can see, so the applications would be refused. Nothing is created."
+  echo "  Read the lines above:"
+  echo "   - If the zone is missing even with the Global API Key, the login these credentials belong to does not own the zone: it is a MEMBER"
+  echo "     of the account with a role that covers Access but not DNS. The owner login (the one that shows the zone in its dashboard) must"
+  echo "     either run this script with ITS Global API Key, or make this login a Super Administrator of the account."
+  echo "   - If this is a scoped token and the Global API Key does see the zone, edit the token: add  Zone : Zone : Read  with Zone Resources"
+  echo "     Include > All zones, save, and re-run."
   exit 1
 fi
 
