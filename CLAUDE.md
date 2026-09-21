@@ -801,14 +801,25 @@ start one, same as the desktop app's gauntlet.
 is the converged direction** (2026-09-20, after Patrick picked Shortlist and the
 Dial from round two): the sentence-form search with round trip / one way /
 multi-city, the price–speed–comfort triangle with a "get me there now" preset
-(earliest arrival, price shown but not ranked), ten **wants that charge rather
+(earliest arrival, price shown but not ranked), thirteen **wants that charge rather
 than filter** (a flight lacking one is priced for it and sinks, reason shown;
-a want nothing can meet says so instead of sinking everything), a **wish box**
+a want nothing can meet says so instead of sinking everything; the three added
+on 2026-09-21 are the ones the feed reports outright, the refund term, power at
+the seat and CO₂ per offer, the last charged as the gap to the cleanest option at
+$60 a tonne, unknown never counted as clean; carry-on, airport changes, seat
+maps, meals, on-time and the rest were left out because the feed does not carry
+them or every offer on the route passes), a **wish box**
 typed or spoken (the browser's own speech recognition) that becomes visible,
 removable rules and weights, advanced windows / cabin / stops / alliances /
 airlines-to-leave-out (these hide, and say what they hid), and **points
 balances** with a demo award chart and 1:1 transfer partners that say whether
-points beat cash in cents per point. It wears the Concorde family's own
+points beat cash in cents per point. **Programmes and status are gated by the
+search**: a programme balance is offered only when it has an award on a flight
+the search returned (first four shown, the rest behind "More programmes"), and a
+status programme only when the feed's `supported_loyalty_programmes` on this
+search's offers take it AND that airline flies in the search; one tier per
+alliance (Star, oneworld, SkyTeam) stands in for every partner. Marriott Bonvoy
+is a source at 3:1 valued at its own 0.7¢, so a 3:1 move is never priced as 1:1. It wears the Concorde family's own
 tokens (`--bg #101013`, Michroma / Space Grotesk / Plex Mono, the app's amber,
 blue and purple for the three targets). Round two (05–08: Shortlist, Board,
 Lines, Dial) and round one (01–04) are kept for the record.

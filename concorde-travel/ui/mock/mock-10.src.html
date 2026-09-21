@@ -172,6 +172,8 @@ details[open] summary:after{content:"–"}
 .logo.big{width:40px;height:40px;border-radius:9px}.logo.big b{font-size:14px}
 .pts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 18px;padding:4px 0 8px}
 .pt{display:flex;flex-direction:column;gap:5px}
+.pt.more{justify-content:flex-end;align-items:flex-start}
+.pt.more .ledger{padding:9px 12px}
 .pt label{font-size:12px;color:var(--dim)}
 .pt input{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:var(--mono);font-size:14px;width:100%}
 .pt input:focus{border-color:var(--speed);outline:none}
@@ -887,11 +889,14 @@ const AIRNAME = {american:'AA',aa:'AA','british airways':'BA',ba:'BA',british:'B
 // ---- state
 const S = {trip:'round', a:1, b:0, c:0, preset:'1,0,0', asap:false, wants:new Set(), rules:[], ride:'either', off:new Set(), menu:false, open:new Set(),
   extra:{bag:0, wifi:false, seat:false, legroom:false, lounge:false, priority:false, insurance:false, hotel:false, custom:[]}, adv:{dep0:0, dep1:24, arr0:0, arr1:24, cabin:'economy', stops:2, alli:new Set(), out:new Set()},
-  pts:{amex:120000, chase:80000, capone:0, citi:0, bilt:0, avios:0, virgin:0, aa:0, delta:0}, status:{DL:'', AA:'', UA:'', BA:'', VS:'', LH:''}, shown:12, T:'mine',
+  pts:{amex:120000, chase:80000, capone:0, citi:0, bilt:0, marriott:0, avios:0, virgin:0, aa:0, delta:0, mm:0, ms:0, fb:0, ac:0, ua:0}, morePts:false, status:{}, shown:12, T:'mine',
   legs:[{from:'Wyckoff Ave & Myrtle Ave, Bushwick, Brooklyn', to:'London', date:'Wed 18 Nov'}], back:'Wed 25 Nov', pax:'1 adult', bags:'1 checked bag'};
 
 // ---- wants: a predicate, a charge when it is missing, and a hint when nothing has it
 const NEWGEN = /^(78[1789]|359|351|339|338|32N|32Q|223|7M[89])$/;
+// what the search's offers support: loyalty programmes (the feed lists them per offer) and the airlines that actually fly it
+let LOY = new Set(), OPS = new Set(), CO2MIN = null, CO2MED = null;
+const kgOf = e => +((e.details || {}).emissions_kg) || 0;
 const WANTS = [
   {id:'nonstop', label:'Nonstop', cents:15000, ok:e => e.stops === 0},
   {id:'short', label:'Short layovers', cents:8000, ok:e => e.stops === 0 || e.layover_minutes.every(m => m <= 150)},
@@ -903,20 +908,50 @@ const WANTS = [
   {id:'lounge', label:'Lounge access', cents:6500, ok:e => e.brand.toLowerCase().includes('flex') || e.refundable},
   {id:'flex', label:'Flexible ticket', cents:9000, ok:e => e.refundable || e.changes === 'fee' || e.changes === 'free'},
   {id:'day', label:'Daytime flight', cents:5000, ok:e => { const h = hour(e.depart); return h >= 6 && h < 15; }},
+  // three more the feed reports outright (2026-09-21): the fare's refund term, power at the seat, and CO2 per offer
+  {id:'refund', label:'Refundable', cents:12000, ok:e => e.refundable === true, hint:'No refundable fare on this route in economy. Flexible ticket covers changes.'},
+  {id:'power', label:'Power at the seat', cents:2500, ok:e => e.power_published === true},
+  // the cleaner half of the search has it; the dirtier half is charged the gap to the cleanest option at $60 a tonne, and an unreported figure is never counted as clean
+  {id:'co2', label:'Lower emissions', cents:4000, prep:() => { const ks = ALL.map(kgOf).filter(Boolean).sort((a, b) => a - b); CO2MIN = ks.length ? ks[0] : null; CO2MED = ks.length ? ks[Math.floor((ks.length - 1)/2)] : null; },
+    ok:e => { const k = kgOf(e); return !!(CO2MED && k && k <= CO2MED); },
+    cost:e => { const k = kgOf(e); return (!k || !CO2MIN) ? 4000 : Math.round(6 * Math.max(0, k - CO2MIN)); },
+    why:e => { const k = kgOf(e); return (!k || !CO2MIN) ? 'the airline did not report emissions for this fare, and unknown is never counted as clean' : ((k - CO2MIN)/1000).toFixed(2) + ' t more CO₂ than the cleanest option in this search, at $60 a tonne'; },
+    hint:'The airlines did not report emissions for these fares.'},
 ];
-WANTS.forEach(w => w.count = ALL.filter(w.ok).length);
+function prepWants(){
+  LOY = new Set(); OPS = new Set();
+  ALL.forEach(e => { (((e.details || {}).loyalty) || []).forEach(c => LOY.add(c)); [e.carrier, e.operator].forEach(c => { if (c) OPS.add(c); }); });
+  WANTS.forEach(w => { if (w.prep) w.prep(); w.count = ALL.filter(w.ok).length; });
+}
+prepWants();
 
 // ---- points: a demo award chart for this route and the transfer partners that reach it.
 // Curated for the mockup, 2026-09; not live availability.
-const PROG = {avios:{name:'Avios', fair:1.3, via:['amex','chase','capone','citi','bilt']}, virgin:{name:'Virgin Points', fair:1.4, via:['amex','chase','capone','citi','bilt']},
-  aa:{name:'AAdvantage', fair:1.5, via:['bilt']}, delta:{name:'SkyMiles', fair:1.2, via:['amex']}, mm:{name:'Miles & More', fair:1.4, via:['capone']}, ms:{name:'Miles&Smiles', fair:1.6, via:['capone','citi','bilt']}};
-const BANK = {amex:'Amex Membership Rewards', chase:'Chase Ultimate Rewards', capone:'Capital One miles', citi:'Citi ThankYou', bilt:'Bilt', avios:'British Airways Avios', virgin:'Virgin Points', aa:'American AAdvantage', delta:'Delta SkyMiles'};
+// Programmes that can book a flight this feed returns, and the sources that reach them. Only the ones with an
+// award on a flight in the current search are offered; the rest stay out of the way (2026-09-21).
+const PROG = {avios:{name:'Avios', fair:1.3, via:['amex','chase','capone','citi','bilt','marriott']}, virgin:{name:'Virgin Points', fair:1.4, via:['amex','chase','capone','citi','bilt','marriott']},
+  aa:{name:'AAdvantage', fair:1.5, via:['bilt','marriott']}, delta:{name:'SkyMiles', fair:1.2, via:['amex','marriott']}, mm:{name:'Miles & More', fair:1.4, via:['capone','marriott']}, ms:{name:'Miles&Smiles', fair:1.6, via:['capone','citi','bilt','marriott']},
+  fb:{name:'Flying Blue', fair:1.2, via:['amex','chase','capone','citi','bilt','marriott']}, ac:{name:'Aeroplan', fair:1.4, via:['amex','chase','capone','bilt','marriott']}, ua:{name:'MileagePlus', fair:1.2, via:['chase','bilt','marriott']}};
+// the banks move 1:1; Marriott Bonvoy moves 3:1 and a Bonvoy point is worth about 0.7c on its own (the 5,000-mile bonus per 60,000 moved is in the playbook, not the arithmetic)
+const SOURCE = {amex:{r:1}, chase:{r:1}, capone:{r:1}, citi:{r:1}, bilt:{r:1}, marriott:{r:1/3, fair:.7}};
+const BANKS = ['amex','chase','capone','citi','bilt','marriott'];
+const BANK = {amex:'Amex Membership Rewards', chase:'Chase Ultimate Rewards', capone:'Capital One miles', citi:'Citi ThankYou', bilt:'Bilt', marriott:'Marriott Bonvoy',
+  avios:'British Airways Avios', virgin:'Virgin Points', aa:'American AAdvantage', delta:'Delta SkyMiles', mm:'Lufthansa Miles & More', ms:'Turkish Miles&Smiles', fb:'Air France-KLM Flying Blue', ac:'Air Canada Aeroplan', ua:'United MileagePlus'};
+const SHORT = {amex:'Amex', chase:'Chase', capone:'Capital One', citi:'Citi', bilt:'Bilt', marriott:'Marriott', avios:'Avios', virgin:'Virgin', aa:'AAdvantage', delta:'SkyMiles', mm:'Miles & More', ms:'Miles&Smiles', fb:'Flying Blue', ac:'Aeroplan', ua:'MileagePlus'};
+const rlabel = r => r > 1 ? '1:' + r : r < 1 ? Math.round(1/r) + ':1' : '1:1';
 // A live transfer bonus, the kind that flips a verdict: in the product this is looked up, not typed.
 const BONUS = {virgin:{from:'chase', ratio:1.3, until:'30 Sep'}};
-const AWARD = {BA:[{p:'avios', pts:13000, fees:35000, why:'off-peak economy; BA adds a carrier surcharge'}], VS:[{p:'virgin', pts:10000, fees:15000, why:'Flying Club economy'}],
-  AA:[{p:'aa', pts:30000, fees:600, why:'AAdvantage saver'}], DL:[{p:'delta', pts:32000, fees:600, why:'SkyMiles main'}], AY:[{p:'avios', pts:15000, fees:12000, why:'Finnair Plus, Avios'}],
-  LH:[{p:'mm', pts:30000, fees:15000, why:'Miles & More economy'}], LX:[{p:'mm', pts:30000, fees:15000, why:'Miles & More economy'}], TK:[{p:'ms', pts:30000, fees:10000, why:'Miles&Smiles economy'}],
-  EI:[{p:'avios', pts:13000, fees:8000, why:'Aer Lingus, low fees'}], IB:[{p:'avios', pts:13000, fees:35000, why:'on BA metal, BA surcharge'}], AS:[{p:'avios', pts:13000, fees:35000, why:'flown by BA; book with Avios'}]};
+// the demo award chart for this route, economy one way. STAR is what Aeroplan and MileagePlus charge for any Star
+// Alliance partner on it, FB what Flying Blue charges across SkyTeam; both are gated by the operator being in the search.
+const STAR = [{p:'ac', pts:35000, fees:9000, why:'Aeroplan partner award: no fuel surcharge, a partner booking fee'}, {p:'ua', pts:35000, fees:600, why:'MileagePlus partner saver'}];
+const MM = {p:'mm', pts:30000, fees:15000, why:'Miles & More economy'};
+const AWARD = {BA:[{p:'avios', pts:13000, fees:35000, why:'off-peak economy; BA adds a carrier surcharge'}],
+  VS:[{p:'virgin', pts:10000, fees:15000, why:'Flying Club economy'}, {p:'fb', pts:30000, fees:20000, why:'Flying Blue partner award; Virgin\'s surcharge applies'}],
+  AA:[{p:'aa', pts:30000, fees:600, why:'AAdvantage saver'}], DL:[{p:'delta', pts:32000, fees:600, why:'SkyMiles main'}, {p:'fb', pts:30000, fees:6000, why:'Flying Blue partner award on Delta, mostly taxes'}],
+  AY:[{p:'avios', pts:15000, fees:12000, why:'Finnair Plus, Avios'}], EI:[{p:'avios', pts:13000, fees:8000, why:'Aer Lingus, low fees'}], IB:[{p:'avios', pts:13000, fees:35000, why:'on BA metal, BA surcharge'}], AS:[{p:'avios', pts:13000, fees:35000, why:'flown by BA; book with Avios'}],
+  LH:[MM, ...STAR], LX:[MM, ...STAR], OS:[MM, ...STAR], SN:[MM, ...STAR], TK:[{p:'ms', pts:30000, fees:10000, why:'Miles&Smiles economy'}, ...STAR], SK:STAR, TP:STAR, LO:STAR,
+  UA:[{p:'ua', pts:33000, fees:600, why:'MileagePlus saver on United, priced dynamically'}, STAR[0]], AC:[{p:'ac', pts:35000, fees:9000, why:'Aeroplan on Air Canada'}, STAR[1]],
+  AF:[{p:'fb', pts:30000, fees:15000, why:'Flying Blue economy; a surcharge on Air France metal'}], KL:[{p:'fb', pts:30000, fees:15000, why:'Flying Blue economy; a surcharge on KLM metal'}], AZ:[{p:'fb', pts:30000, fees:15000, why:'Flying Blue partner award on ITA'}]};
 function awardsFor(e){
   const out = [];
   for (const a of (AWARD[e.operator] || AWARD[e.carrier] || [])){
@@ -925,14 +960,16 @@ function awardsFor(e){
     if (short <= 0) path = 'your ' + prog.name;
     else {
       // a bonus from a bank you hold counts first: fewer of your points buy the same award
-      const srcs = prog.via.map(k => ({k, r: bonus && bonus.from === k ? bonus.ratio : 1})).filter(x => (S.pts[x.k] || 0) * x.r >= short).sort((x, y) => (y.r - x.r) || (S.pts[y.k] - S.pts[x.k]));
-      if (srcs.length){ via = srcs[0].k; ratio = srcs[0].r; spend = have + Math.ceil(short / ratio); path = BANK[via].split(' ')[0] + ' → ' + prog.name + ' ' + (ratio > 1 ? '1:' + ratio : '1:1'); }
+      const srcs = prog.via.map(k => ({k, r: bonus && bonus.from === k ? bonus.ratio : (SOURCE[k] || {r:1}).r})).filter(x => (S.pts[x.k] || 0) * x.r >= short).sort((x, y) => (y.r - x.r) || (S.pts[y.k] - S.pts[x.k]));
+      if (srcs.length){ via = srcs[0].k; ratio = srcs[0].r; spend = have + Math.ceil(short / ratio); path = SHORT[via] + ' → ' + prog.name + ' ' + rlabel(ratio); }
     }
     // the test is in dollars: the points, valued at what the programme usually
     // returns, plus the fees, against the fare they replace. Cents a point is the
     // same comparison per point; the margin is what the user actually keeps.
-    const value = (e.ticket_cents - a.fees) / spend, worth = Math.round(spend * prog.fair), margin = e.ticket_cents - a.fees - worth;
-    out.push({...a, prog, value, path, short, spend, ratio, via, bonus: ratio > 1 ? bonus : null, worth, margin, good: !!path && margin > 0, saves: e.ticket_cents - a.fees});
+    // what the points used are worth: the programme's own at its fair value, plus whatever is moved in at the source's
+    const moved = via ? Math.ceil(short / ratio) : 0, fairPt = via ? ((SOURCE[via] || {}).fair || prog.fair) : prog.fair;
+    const value = (e.ticket_cents - a.fees) / spend, worth = Math.round(Math.min(have, a.pts) * prog.fair + moved * fairPt), margin = e.ticket_cents - a.fees - worth;
+    out.push({...a, prog, value, path, short, spend, ratio, via, bonus: ratio > 1 ? bonus : null, worth, margin, fairPt, good: !!path && margin > 0, saves: e.ticket_cents - a.fees});
   }
   return out.sort((x, y) => (y.good - x.good) || (y.value - x.value));
 }
@@ -941,11 +978,11 @@ function awardsFor(e){
 // product the narrator writes those lines, current to the query (a transfer
 // bonus, a peak date), and the verifier holds them to the figures.
 function ptTip(e, a, total){
-  const c = moneyPt(a.value), fair = moneyPt(a.prog.fair), award = a.pts.toLocaleString() + ' ' + esc(a.prog.name) + ' + ' + money(a.fees) + ' fees';
+  const c = moneyPt(a.value), fair = moneyPt(a.fairPt), award = a.pts.toLocaleString() + ' ' + esc(a.prog.name) + ' + ' + money(a.fees) + ' fees';
   if (!a.path) return `Nothing you hold transfers to ${esc(a.prog.name)}.<small>Award: ${award}.</small>`;
   if (a.value <= 0) return `Award fees alone (${money(a.fees)}) exceed the ${money(e.ticket_cents)} fare, so points cannot win here.<small>Award: ${award}.</small>`;
-  const path = a.via ? esc(BANK[a.via].split(' ')[0]) + ' → ' + esc(a.prog.name) + (a.ratio > 1 ? ' at 1:' + a.ratio + (a.bonus ? ', a bonus until ' + esc(a.bonus.until) : '') : ' 1:1') : 'from your ' + esc(a.prog.name);
-  const bank = a.via ? esc(BANK[a.via].split(' ')[0]) : esc(a.prog.name), rest = total - e.ticket_cents + a.fees, eq = total - a.margin;
+  const path = a.via ? esc(SHORT[a.via]) + ' → ' + esc(a.prog.name) + ' at ' + rlabel(a.ratio) + (a.bonus ? ', a bonus until ' + esc(a.bonus.until) : '') : 'from your ' + esc(a.prog.name);
+  const bank = a.via ? esc(SHORT[a.via]) : esc(a.prog.name), rest = total - e.ticket_cents + a.fees, eq = total - a.margin;
   const sum = `${a.spend.toLocaleString()} ${bank} points at ${fair} each are worth ${money(a.worth)}. With the ${money(rest)} you still pay, that is <b>${money(eq)} all in</b>`;
   if (a.good) return `${sum}, ${money(a.margin)} under the ${money(total)} in cash. That is ${c} a point, above the ${fair} ${esc(a.prog.name)} usually return.<small>${path}. Award: ${award}.</small>`;
   return `${sum}, ${money(-a.margin)} over the ${money(total)} in cash. Only ${c} a point; keep them for ${fair} or better.<small>${path}. Award: ${award}.</small>`;
@@ -977,9 +1014,21 @@ const PLAY = {
   ms: {site:'turkishairlines.com', search:'Sign in to Miles&Smiles and search the award on the airline\'s own site; partner sites do not show it.',
     fees:'Turkish keeps its surcharges moderate.', cancel:'Awards can be cancelled for a fee.',
     tips:['Capital One, Citi and Bilt transfer to Miles&Smiles 1:1; transfers can take up to a day, so start early.']},
+  fb: {site:'airfrance.com or klm.com', search:'Sign in to Flying Blue, search with "Pay with Miles" on airfrance.com or klm.com, and look for the Economy award on this date; Flying Blue prices dynamically.',
+    fees:'Air France and KLM add a surcharge on their own flights; on a Delta-operated flight it is mostly taxes.', cancel:'Award tickets can be refunded for a fee up to departure.',
+    tips:['Every big US bank transfers to Flying Blue 1:1 (Amex, Chase, Capital One, Citi, Bilt), usually within minutes. Wait for the seat to show before you move anything.', 'Flying Blue publishes Promo Rewards monthly, 25% or more off some routes; check the current list before paying the standard price.']},
+  ac: {site:'aircanada.com', search:'Sign in to Aeroplan, search with "Book with points" on aircanada.com, and look for the partner award on this Star Alliance flight.',
+    fees:'Aeroplan adds no fuel surcharge on partners; the fee here is its partner booking charge plus taxes.', cancel:'Award tickets can be cancelled for a fee, with the points returned.',
+    tips:['Amex, Chase, Capital One and Bilt transfer 1:1, usually within minutes; Marriott Bonvoy moves 3:1 with 5,000 bonus miles per 60,000.', 'Aeroplan prices by distance and partner, so a Lufthansa, SWISS, TAP or Turkish flight on this route costs the same points: pick the one with the better fee and time.']},
+  ua: {site:'united.com', search:'Sign in to MileagePlus, search with "Book with miles" on united.com, and look for the Saver award on this flight; United prices dynamically.',
+    fees:'United adds no surcharge; the fee is taxes.', cancel:'United awards can be cancelled and the miles redeposited without a fee.',
+    tips:['Only Chase and Bilt transfer to MileagePlus, 1:1 and usually within minutes. The same Star Alliance seat often costs fewer points through Aeroplan, so check both.']},
 };
-const BANKPATH = {amex:'americanexpress.com → Rewards → Transfer points', chase:'chase.com → Ultimate Rewards → Transfer to travel partners', capone:'capitalone.com → Rewards → Transfer miles', citi:'citi.com → ThankYou Rewards → Points transfer', bilt:'Bilt app → Points → Transfer'};
-const SPEED = {'chase>virgin':'usually within minutes', 'amex>virgin':'usually within minutes', 'chase>avios':'usually within minutes', 'amex>avios':'usually within minutes, occasionally a day or two', 'amex>delta':'usually within minutes', 'bilt>aa':'usually within minutes', 'capone>ms':'up to a day', 'citi>ms':'up to a day', 'bilt>ms':'up to a day'};
+const BANKPATH = {amex:'americanexpress.com → Rewards → Transfer points', chase:'chase.com → Ultimate Rewards → Transfer to travel partners', capone:'capitalone.com → Rewards → Transfer miles', citi:'citi.com → ThankYou Rewards → Points transfer', bilt:'Bilt app → Points → Transfer', marriott:'marriott.com → Bonvoy → Points → Transfer to airline miles'};
+const SPEED = {'chase>virgin':'usually within minutes', 'amex>virgin':'usually within minutes', 'chase>avios':'usually within minutes', 'amex>avios':'usually within minutes, occasionally a day or two', 'amex>delta':'usually within minutes', 'bilt>aa':'usually within minutes', 'capone>ms':'up to a day', 'citi>ms':'up to a day', 'bilt>ms':'up to a day',
+  'amex>fb':'usually within minutes', 'chase>fb':'usually within minutes', 'capone>fb':'usually within minutes', 'citi>fb':'usually within minutes', 'bilt>fb':'usually within minutes',
+  'amex>ac':'usually within minutes', 'chase>ac':'usually within minutes', 'capone>ac':'usually within minutes', 'bilt>ac':'usually within minutes', 'chase>ua':'usually within minutes', 'bilt>ua':'usually within minutes',
+  'marriott>avios':'a few days, up to a week', 'marriott>virgin':'a few days, up to a week', 'marriott>aa':'a few days, up to a week', 'marriott>delta':'a few days, up to a week', 'marriott>mm':'a few days, up to a week', 'marriott>ms':'a few days, up to a week', 'marriott>fb':'a few days, up to a week', 'marriott>ac':'a few days, up to a week', 'marriott>ua':'a few days, up to a week'};
 function playbookHTML(e, r){
   const aw = awardsFor(e), a = aw[0]; if (!a) return '';
   const P = PLAY[a.p] || {}, prog = a.prog.name, have = S.pts[a.p] || 0, total = r.total, rest = total - e.ticket_cents + a.fees, eq = total - a.margin;
@@ -988,13 +1037,13 @@ function playbookHTML(e, r){
   step('Check the seat is there before you move anything', `${esc(P.search || 'Search the award on the programme\'s site.')} You are looking for <b>${esc(e.flight)} on ${esc(niceDate(D.query.date))}</b>, ${esc(e.route.join(' → '))}, at <b>${a.pts.toLocaleString()} ${esc(prog)} + ${money(a.fees)}</b>. If the price shown is higher, it is a peak date or a different fare: stop here and compare with cash. <b>Transfers cannot be reversed</b>, so nothing moves until the seat is on the screen.`, P.site);
   // 2. the transfer
   if (!a.path){
-    const banks = a.prog.via.map(k => BANK[k].split(' ')[0]).join(', ');
+    const banks = a.prog.via.map(k => SHORT[k]).join(', ');
     step('Get the points there', `Nothing you hold transfers to ${esc(prog)}. It takes ${esc(banks)} points, which move 1:1${a.prog.via.length > 1 ? '' : ''}. You would need <b>${a.pts.toLocaleString()}</b> in ${esc(prog)}; you have ${have.toLocaleString()}. Paying cash is the way to book this one today.`);
   } else if (a.short <= 0){
     step('No transfer needed', `You already hold <b>${have.toLocaleString()} ${esc(prog)}</b>, more than the ${a.pts.toLocaleString()} this needs. Skip to the booking.`);
   } else {
-    const bank = BANK[a.via].split(' ')[0], inc = 1000, need = Math.ceil(a.short / a.ratio), move = Math.ceil(need / inc) * inc, arrive = Math.floor(move * a.ratio);
-    step(`Move ${move.toLocaleString()} ${bank} points to ${prog}`, `You need ${a.short.toLocaleString()} more ${esc(prog)}. ${bank} transfers in ${inc.toLocaleString()}-point blocks at ${a.ratio > 1 ? '1:' + a.ratio + ' (a bonus until ' + esc(a.bonus.until) + ')' : '1:1'}, so send <b>${move.toLocaleString()}</b> and <b>${arrive.toLocaleString()}</b> arrive${arrive - a.short > 0 ? ', leaving ' + (arrive - a.short).toLocaleString() + ' spare in the account' : ''}. Link the ${esc(prog)} account to ${bank} first; the names on both must match exactly. ${esc((x => x[0].toUpperCase() + x.slice(1))(SPEED[a.via + '>' + a.p] || 'transfers to this programme can take a day or more'))}. Do this only after step 1.`, BANKPATH[a.via]);
+    const bank = SHORT[a.via], inc = a.via === 'marriott' ? 3000 : 1000, need = Math.ceil(a.short / a.ratio), move = Math.ceil(need / inc) * inc, arrive = Math.floor(move * a.ratio);
+    step(`Move ${move.toLocaleString()} ${bank} points to ${prog}`, `You need ${a.short.toLocaleString()} more ${esc(prog)}. ${bank} transfers in ${inc.toLocaleString()}-point blocks at ${rlabel(a.ratio)}${a.bonus ? ' (a bonus until ' + esc(a.bonus.until) + ')' : ''}, so send <b>${move.toLocaleString()}</b> and <b>${arrive.toLocaleString()}</b> arrive${arrive - a.short > 0 ? ', leaving ' + (arrive - a.short).toLocaleString() + ' spare in the account' : ''}. Link the ${esc(prog)} account to ${bank} first; the names on both must match exactly. ${esc((x => x[0].toUpperCase() + x.slice(1))(SPEED[a.via + '>' + a.p] || 'transfers to this programme can take a day or more'))}. Do this only after step 1.`, BANKPATH[a.via]);
   }
   // 3. book
   if (a.path) step('Book it, and pay the fees on the right card', `Back on <b>${esc(P.site || 'the programme\'s site')}</b>, search the same flight again with points, pick it, and pay the <b>${money(a.fees)}</b> in taxes and fees. ${esc(P.fees || '')} Pay with a card that has no foreign transaction fee: the fees are often charged in the airline\'s home currency.`);
@@ -1002,12 +1051,12 @@ function playbookHTML(e, r){
   for (const t of (P.tips || [])) step('Worth checking first', esc(t));
   // 5. after
   if (a.path) step('After booking', `Screenshot the confirmation, add the booking to the airline app, and pick a seat: on this fare seat choice is <b>${e.seat_selection === 'paid' ? 'paid' : 'included'}</b>. ${esc(P.cancel || '')}`);
-  const verdict = !a.path ? `Points cannot do this one from where you stand.` : a.good ? `<b>Points win by ${money(a.margin)}.</b> ${a.spend.toLocaleString()} ${esc(BANK[a.via || a.p].split(' ')[0])} points at ${moneyPt(a.prog.fair)} each are worth ${money(a.worth)}; with the ${money(rest)} you still pay, that is ${money(eq)} all in against ${money(total)} in cash, and you get ${moneyPt(a.value)} a point.`
-    : `<b>Cash wins by ${money(-a.margin)}.</b> At ${moneyPt(a.value)} a point this award returns less than the ${moneyPt(a.prog.fair)} ${esc(prog)} usually give; keep the points for a better one.`;
+  const verdict = !a.path ? `Points cannot do this one from where you stand.` : a.good ? `<b>Points win by ${money(a.margin)}.</b> ${a.spend.toLocaleString()} ${esc(SHORT[a.via || a.p])} points at ${moneyPt(a.prog.fair)} each are worth ${money(a.worth)}; with the ${money(rest)} you still pay, that is ${money(eq)} all in against ${money(total)} in cash, and you get ${moneyPt(a.value)} a point.`
+    : `<b>Cash wins by ${money(-a.margin)}.</b> At ${moneyPt(a.value)} a point this award returns less than the ${moneyPt(a.fairPt)} ${esc(prog)} usually give; keep the points for a better one.`;
   return `<div class="play"><p class="lede">${verdict}</p>
     ${a.path ? `<div class="warn"><b>The one rule:</b> confirm the award seat on ${esc(P.site || 'the site')} before any transfer. Points that have moved do not come back.</div>` : ''}
     <ol class="steps">${S1.join('')}</ol>
-    <div class="sum"><div><span>Points to move</span><b class="fig">${a.path && a.short > 0 ? (Math.ceil(Math.ceil(a.short / a.ratio) / 1000) * 1000).toLocaleString() : a.path ? '0' : '—'}</b><span>${a.path && a.short > 0 ? 'from ' + esc(BANK[a.via].split(' ')[0]) : a.path ? 'already in ' + esc(prog) : 'no route'}</span></div>
+    <div class="sum"><div><span>Points to move</span><b class="fig">${a.path && a.short > 0 ? (Math.ceil(Math.ceil(a.short / a.ratio) / 1000) * 1000).toLocaleString() : a.path ? '0' : '—'}</b><span>${a.path && a.short > 0 ? 'from ' + esc(SHORT[a.via]) : a.path ? 'already in ' + esc(prog) : 'no route'}</span></div>
       <div><span>Cash still due</span><b class="fig">${money(rest)}</b><span>${money(a.fees)} award fees + ${money(total - e.ticket_cents)} beyond the fare</span></div></div>
     <p class="pnote">Programme rules, transfer partners, ratios and speeds are curated as of September 2026 and change without notice; confirm on the bank's transfer page before moving points. In the product these steps are written by the narrator from the same figures, current to the day.</p></div>`;
 }
@@ -1024,7 +1073,7 @@ function payHTML(e, total){
   if (!a) pts = col('points dim', head('Points', false), `<b class="num fig">—</b><span class="unit dim">no award chart</span><em>for this airline yet</em>`);
   else { const usable = a.path && a.value > 0, rest = total - e.ticket_cents + a.fees, tip = `<button class="info" type="button" aria-expanded="false" aria-label="Why">i</button><span class="tip" role="tooltip">${ptTip(e, a, total)}</span>`;
     pts = col('points' + (ptsWin ? ' best' : '') + (usable ? '' : ' dim'), head('Points', ptsWin),
-      `<b class="num fig">${a.spend.toLocaleString()}</b><span class="unit${usable ? '' : ' dim'}">${a.via ? esc(BANK[a.via].split(' ')[0]) + ' pts' : esc(a.prog.name)}</span><em>+ ${money(rest)} cash</em>` +
+      `<b class="num fig">${a.spend.toLocaleString()}</b><span class="unit${usable ? '' : ' dim'}">${a.via ? esc(SHORT[a.via]) + ' pts' : esc(a.prog.name)}</span><em>+ ${money(rest)} cash</em>` +
       `<div class="v">${!a.path ? 'no route' : a.value <= 0 ? 'fees exceed fare' : '<b class="num">≈ ' + money(total - a.margin) + '</b> all in'}${tip}</div><button class="how" type="button" data-play="${esc(e.id)}">How to book with points →</button>`); }
   return `<div class="paycols">${cash}${pts}</div>`;
 }
@@ -1176,7 +1225,8 @@ function bill(e, opts){
     S.extra.custom.forEach((c, i) => line('addons', {key:'custom-' + i, label:c.label, cents:c.cents, evidence:'added by you', removable:true}));
     // wants with nothing to buy: weighed in the order, named on the row, never billed
     for (const id of S.wants){ const w = WANTS.find(x => x.id === id); if (!w.count || w.ok(e)) continue; if (ADDONS[id] && !S.off.has(id) && (ADDONS[id].sells(e) || ADDONS[id].has(e))) continue;
-      q.push({key:'want-' + id, label:'You wanted ' + w.label.toLowerCase(), cents:w.cents, want:true, evidence:'a want, not a filter: this flight lacks it, so it sinks and stays visible'}); }
+      const wc = w.cost ? w.cost(e) : w.cents; if (!wc) continue;
+      q.push({key:'want-' + id, label:'You wanted ' + w.label.toLowerCase(), cents:wc, want:true, evidence:w.why ? w.why(e) : 'a want, not a filter: this flight lacks it, so it sinks and stays visible'}); }
   }
   const sum = grp => grp.reduce((s, x) => s + x.cents, 0), cash = Object.values(g).reduce((s, grp) => s + sum(grp), 0);
   // total: what you pay. rank: the scorer's whole effective cost at the dial, which orders the list.
@@ -1727,10 +1777,21 @@ function paintCarriers(){
 // modest rate for the operational upgrade nobody can plan for, weighted by
 // status. These are estimates from policy and typical rates, never this
 // flight's load, and the page says so. No higher cabin means a dash.
+// Own programmes are listed only when the feed says its offers take that programme AND the airline flies in this search;
+// an alliance tier is one field that partners recognise across every member, so it stands in for the rest (2026-09-21).
 const STATUS = {DL:{name:'Delta Medallion', tiers:['Silver','Gold','Platinum','Diamond']}, AA:{name:'AAdvantage', tiers:['Gold','Platinum','Platinum Pro','Executive Platinum']},
-  UA:{name:'United Premier', tiers:['Silver','Gold','Platinum','1K']}, BA:{name:'BA Executive Club', tiers:['Bronze','Silver','Gold']}, VS:{name:'Virgin Flying Club', tiers:['Silver','Gold']}, LH:{name:'Miles & More', tiers:['Frequent Traveller','Senator','HON Circle']}};
+  UA:{name:'United Premier', tiers:['Silver','Gold','Platinum','1K']}, BA:{name:'BA Executive Club', tiers:['Bronze','Silver','Gold']}, VS:{name:'Virgin Flying Club', tiers:['Silver','Gold']},
+  LH:{name:'Miles & More', tiers:['Frequent Traveller','Senator','HON Circle'], codes:['LH','LX','OS','SN']}, AF:{name:'Flying Blue', tiers:['Silver','Gold','Platinum'], codes:['AF','KL']},
+  AS:{name:'Atmos Rewards', tiers:['Silver','Gold','Platinum','Titanium']}, TK:{name:'Miles&Smiles', tiers:['Classic Plus','Elite','Elite Plus']}, AC:{name:'Aeroplan Elite', tiers:['25K','35K','50K','75K','Super Elite']},
+  star:{name:'Star Alliance status', tiers:['Silver','Gold'], alliance:'star'}, oneworld:{name:'oneworld status', tiers:['Ruby','Sapphire','Emerald'], alliance:'oneworld'}, skyteam:{name:'SkyTeam status', tiers:['Elite','Elite Plus'], alliance:'skyteam'}};
+Object.keys(STATUS).forEach(k => { if (!(k in S.status)) S.status[k] = ''; });
+const statusKey = op => Object.keys(STATUS).find(k => !STATUS[k].alliance && (k === op || (STATUS[k].codes || []).includes(op)));
+const statusCodes = ([k, st]) => st.alliance ? ALLI[st.alliance] : (st.codes || [k]);
+function statusInPlay(){ return Object.entries(STATUS).filter(x => statusCodes(x).some(c => LOY.has(c)) && (x[1].alliance || statusCodes(x).some(c => OPS.has(c)))); }
+function progsInPlay(){ const ps = new Set(); ALL.forEach(e => (AWARD[e.operator] || AWARD[e.carrier] || []).forEach(a => ps.add(a.p))); return Object.keys(PROG).filter(k => ps.has(k)); }
 const ALLI = {skyteam:['DL','VS','AF','KL','AZ','KE','AM','SV','MU','GA','VN','CI','UX','OK','RO','ME','KQ'], oneworld:['AA','BA','IB','AY','AS','QR','CX','JL','QF','RJ','MH','AT','UL','WY'], star:['UA','LH','LX','TK','LO','AC','OS','SN','SK','TP','SQ','NH','TG','ET','MS','SA','A3','AI','BR','CA','CM','NZ','OU','OZ','ZH']};
-const CABINS = {DL:['Comfort+', 'Premium Select', 'Delta One'], UA:['Premium Plus', 'Polaris'], AA:['Premium Economy', 'Business'], BA:['World Traveller Plus', 'Club World'], VS:['Premium', 'Upper Class'], LH:['Premium Economy', 'Business', 'First'], LX:['Business', 'First'], default:['Premium economy', 'Business']};
+const CABINS = {DL:['Comfort+', 'Premium Select', 'Delta One'], UA:['Premium Plus', 'Polaris'], AA:['Premium Economy', 'Business'], BA:['World Traveller Plus', 'Club World'], VS:['Premium', 'Upper Class'], LH:['Premium Economy', 'Business', 'First'], LX:['Business', 'First'],
+  AF:['Premium Economy', 'Business'], KL:['Premium Comfort', 'Business'], TK:['Business'], AC:['Premium Economy', 'Business'], AY:['Premium Economy', 'Business'], IB:['Premium Economy', 'Business'], default:['Premium economy', 'Business']};
 // complimentary status upgrades on a transatlantic economy fare: which cabin, and roughly how often they clear, by tier
 const COMP = {DL:{cabin:'Comfort+', rate:{Silver:.25, Gold:.5, Platinum:.7, Diamond:.85}}};
 // the operational upgrade when economy is oversold: rare, and status goes first
@@ -1743,8 +1804,10 @@ function upgradeOdds(e){
   const idx = /premium/.test(cab) ? 1 : 0, above = ladder.slice(idx); if (!above.length) return null;
   const basic = /basic|light|restricted/i.test(e.brand || '');
   const tierOf = code => { const st = STATUS[code]; if (!st || !S.status[code]) return 0; return st.tiers.indexOf(S.status[code]) + 1; };
-  let tier = tierOf(op), via = 'own', held = S.status[op] ? STATUS[op].name + ' ' + S.status[op] : '';
-  if (!tier){ for (const [al, members] of Object.entries(ALLI)){ if (!members.includes(op)) continue; for (const code of Object.keys(STATUS)){ if (members.includes(code) && tierOf(code) > tier){ tier = tierOf(code); via = 'alliance'; held = STATUS[code].name + ' ' + S.status[code] + ' (' + al + ')'; } } } }
+  const own = statusKey(op); let tier = own ? tierOf(own) : 0, via = 'own', held = own && S.status[own] ? STATUS[own].name + ' ' + S.status[own] : '';
+  if (!tier){ for (const [al, members] of Object.entries(ALLI)){ if (!members.includes(op)) continue;
+    for (const code of Object.keys(STATUS)){ const st = STATUS[code], applies = st.alliance ? st.alliance === al : statusCodes([code, st]).some(c => members.includes(c));
+      if (applies && tierOf(code) > tier){ tier = tierOf(code); via = 'alliance'; held = st.name + ' ' + S.status[code] + (st.alliance ? '' : ' (' + al + ')'); } } } }
   const out = {held, basis:'from published upgrade policy and typical operational-upgrade rates, not this flight\'s load', rows:[]};
   const next = above[0], top = above[above.length - 1];
   const comp = COMP[op] && via === 'own' && tier && COMP[op].cabin === next && !basic ? COMP[op].rate[S.status[op]] : 0;
@@ -1756,10 +1819,13 @@ function upgradeOdds(e){
 }
 const pct = p => p < .005 ? 'under 1%' : '~' + Math.round(p*100) + '%';
 function paintPts(){
-  $('#pts').innerHTML = Object.keys(BANK).map(k => `<div class="pt"><label for="pt-${k}">${esc(BANK[k])}</label><input id="pt-${k}" inputmode="numeric" value="${S.pts[k] ? S.pts[k].toLocaleString() : ''}" placeholder="0"></div>`).join('') +
-    '<p class="ptnote">Every flight is priced in every programme that can book it, transfers and bonuses included, and the better of cash or points is starred. Demo award chart.</p>' +
-    '<h4 class="sth">Your status</h4>' + Object.entries(STATUS).map(([k, st]) => `<div class="pt"><label for="st-${k}">${esc(st.name)}</label><select id="st-${k}" data-status="${k}"><option value="">None</option>${st.tiers.map(t => `<option${S.status[k] === t ? ' selected' : ''}>${t}</option>`).join('')}</select></div>`).join('') +
-    '<p class="ptnote">Status sets the odds of an upgrade on each flight, shown when you open one: what a status upgrade can reach on that airline and fare, and the rare operational upgrade. Estimates from policy, never this flight\'s load.</p>';
+  const field = k => `<div class="pt"><label for="pt-${k}">${esc(BANK[k])}</label><input id="pt-${k}" inputmode="numeric" value="${S.pts[k] ? S.pts[k].toLocaleString() : ''}" placeholder="0"></div>`;
+  const progs = progsInPlay(), main = progs.slice(0, 4), more = progs.slice(4), sts = statusInPlay();
+  $('#pts').innerHTML = BANKS.map(field).join('') + main.map(field).join('') + (S.morePts ? more.map(field).join('') : '') +
+    (more.length ? `<div class="pt more"><button type="button" class="ledger" id="morepts">${S.morePts ? 'Fewer programmes' : 'More programmes (' + more.length + ')'}</button></div>` : '') +
+    '<p class="ptnote">Every flight is priced in every programme that can book it, transfers and bonuses included, and the better of cash or points is starred. Only programmes with an award on a flight in this search are listed. Demo award chart.</p>' +
+    '<h4 class="sth">Your status</h4>' + sts.map(([k, st]) => `<div class="pt"><label for="st-${k}">${esc(st.name)}</label><select id="st-${k}" data-status="${k}"><option value="">None</option>${st.tiers.map(t => `<option${S.status[k] === t ? ' selected' : ''}>${t}</option>`).join('')}</select></div>`).join('') +
+    '<p class="ptnote">Status sets the odds of an upgrade on each flight, shown when you open one. Only programmes these airlines take are listed; an alliance tier covers every partner in it. Estimates from policy, never this flight\'s load.</p>';
 }
 document.addEventListener('change', ev => { const sel = ev.target.closest('[data-status]'); if (sel){ S.status[sel.dataset.status] = sel.value; paint(false); } });
 
@@ -2051,7 +2117,7 @@ let P = D.par;
 function loadData(d){
   D = d; ALL = D.results.reference.slice(); PR = D.profiles; AIR = D.airlines || {}; AP = D.airports || {}; P = D.par;
   GRID = {}; D.grid_points.forEach((p, i) => { GRID[Math.round(p[0]*10) + '-' + Math.round(p[1]*10)] = i; });
-  WANTS.forEach(w => w.count = ALL.filter(w.ok).length);
+  prepWants(); paintPts();
   PH.city = cityOf(D.query); DOOR_IDS = []; S.open = new Set();
   paintPar(); paintCov();
 }
@@ -2287,6 +2353,7 @@ document.addEventListener('click', ev => {
   if (ev.target.closest('#eddone, #eddone2, #edshade')){ closeEditor(); return; }
   if (ev.target.closest('#startover')){ startOver(); return; }
   if (ev.target.closest('#jump')){ finishAllSteps(); setTimeout(enterResults, REDUCED ? 0 : 380); return; }
+  if (ev.target.closest('#morepts')){ S.morePts = !S.morePts; paintPts(); return; }
 });
 document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && W.mode === 'wizard' && ev.target.matches('#sentence input, #sentence select')){ ev.preventDefault(); finishStep(W.step); goStep(W.step + 1); } });
 const io = new IntersectionObserver(es => { es.forEach(x => { if (x.isIntersecting){ W.step = +x.target.dataset.step; paintSteps(); } }); }, {rootMargin:'-45% 0px -50% 0px'});
@@ -2307,7 +2374,7 @@ function summary(){
   if (!(A.arr0 === 0 && A.arr1 === 24)) chips.push('arrive ' + String(A.arr0).padStart(2,'0') + '–' + String(A.arr1).padStart(2,'0'));
   if (A.alli.size) chips.push([...A.alli].join(', '));
   if (A.out.size) chips.push(A.out.size + ' airline' + (A.out.size > 1 ? 's' : '') + ' left out');
-  const pts = Object.entries(S.pts).filter(([k, v]) => v > 0).map(([k, v]) => BANK[k].split(' ')[0] + ' ' + Math.round(v/1000) + 'k'); if (pts.length) chips.push(pts.join(', '));
+  const pts = Object.entries(S.pts).filter(([k, v]) => v > 0).map(([k, v]) => SHORT[k] + ' ' + Math.round(v/1000) + 'k'); if (pts.length) chips.push(pts.join(', '));
   const extra = Object.entries(S.extra).filter(([k, v]) => k !== 'custom' && k !== 'bag' && v).map(([k]) => ADDONS[k].label.toLowerCase()); if (S.extra.bag) extra.unshift(S.extra.bag + ' extra bag' + (S.extra.bag > 1 ? 's' : '')); if (extra.length) chips.push(extra.join(', '));
   $('#sumchips').innerHTML = chips.map(c => `<i>${esc(c)}</i>`).join('');
 }
