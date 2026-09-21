@@ -185,10 +185,23 @@ ingress:
   - service: http_status:404
 YML
 
-if ! cloudflared tunnel route dns "$TUNNEL" "$HOST" 2>/dev/null; then
-  echo "  DNS route not added by cloudflared (already there, or the zone is not on this account)."
-  echo "  If $HOST does not resolve, add a proxied CNAME in the flyconcordefly.com zone:"
-  echo "    go  ->  $TID.cfargotunnel.com"
+# The DNS route is what makes the name exist. cloudflared's own words are shown
+# (a silent failure here once hid a misspelt zone for a day), and the record is
+# then checked at a public resolver, so "LIVE" below is never printed for a name
+# that does not resolve.
+say "dns: $HOST -> $TID.cfargotunnel.com"
+ROUTE_OUT=$(cloudflared tunnel route dns "$TUNNEL" "$HOST" 2>&1) || true
+echo "  cloudflared: $(echo "$ROUTE_OUT" | tail -1)"
+DNS_OK=""
+for _ in $(seq 1 12); do
+  if dig +short "$HOST" @1.1.1.1 2>/dev/null | grep -q .; then DNS_OK=1; break; fi
+  sleep 5
+done
+if [ -n "$DNS_OK" ]; then echo "  resolves: $(dig +short "$HOST" @1.1.1.1 | head -1)"
+else
+  echo "  $HOST does not resolve yet at 1.1.1.1. If cloudflared reported an error above, fix that; otherwise add the record by hand:"
+  echo "    zone flyconcordefly.com, DNS, add record: type CNAME, name go, target $TID.cfargotunnel.com, proxied ON"
+  echo "  Your Mac may also be holding an old 'no such name' answer:  sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder"
 fi
 
 say "tunnel: $TUNNEL -> https://$HOST"
