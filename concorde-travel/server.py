@@ -686,7 +686,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if ROOT and path.startswith("/assets/"):
             # the mockup at / asks for its nameplates relative to itself
             name = os.path.basename(path)
-            if re.match(r"^mark-[a-z0-9]+-(pq\.mp4|hlg\.webm)$", name):
+            if re.match(r"^(mark-[a-z0-9]+|boom)-(pq\.mp4|hlg\.webm)$", name):
                 return self._send_file(os.path.join(UI, "mock", "assets", name),
                                        "video/mp4" if name.endswith(".mp4") else "video/webm")
             return self.send_error(404)
@@ -697,8 +697,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                    "text/html; charset=utf-8")
         if path.startswith("/mock/"):
             name = os.path.basename(path)
-            if path.startswith("/mock/assets/") and re.match(r"^mark-[a-z0-9]+-(pq\.mp4|hlg\.webm)$", name):
-                # the HDR nameplates, same as the site's: tiny tagged loops
+            if path.startswith("/mock/assets/") and re.match(r"^(mark-[a-z0-9]+|boom)-(pq\.mp4|hlg\.webm)$", name):
+                # the HDR nameplates and the site's warp flare: tagged loops
                 return self._send_file(os.path.join(UI, "mock", "assets", name),
                                        "video/mp4" if name.endswith(".mp4") else "video/webm")
             if not re.match(r"^(index|mock-[0-9]+)\.html$", name):

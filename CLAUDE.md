@@ -818,6 +818,20 @@ URLs straight from the offer. For a mockup that must show the logos where that
 host is unreachable, `logos.py` bakes each SVG into `slim.json` as a data URI
 (run it on a machine with internet, then `build.py`).
 
+**The sky behind mock 10 is the website's own** (`bigmillz/concorde-site`, `index.html`,
+ported line for line on 2026-09-21 after Patrick said the site's zoom was "a thousand times
+better" than the drawn star it replaced): a starfield on three parallax depths with glinting
+hero stars, cirrus, a satellite and meteors, and for the first seven seconds the warp, a
+cubic spool-up to full power at 1.6s, held to 2.6s, then a long glide out, with the camera
+zoom and the debris burst. On an HDR display the site's tagged flare loops
+(`ui/mock/assets/boom-*`, served by `server.py` beside the nameplates) fade in with it. The
+title card sits over the sky as a clear layer, holds the page at opacity 0, and lifts on the
+**warp's own clock** (the end of full power), not the wall's, so on a slow machine the page
+still arrives as the glide begins; the html `splashing` class is set in the markup so nothing
+flashes before the script runs, with an inline 8s watchdog. Seen once this session, the sky
+starts in its ambient drift. The desktop app's "no white dots" rule is the app's; the site
+has stars, and this is the site's.
+
 Each `mock-N.src.html` carries a `__DATA__` token; `build.py` inlines
 `slim.json` and writes `mock-N.html`. **Edit the `.src.html`, never the built
 file** — and rebuild after. They are standalone on purpose: a mockup you have to

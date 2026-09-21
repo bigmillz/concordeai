@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8">
+<!doctype html><html lang="en" class="splashing"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>ConcordeGo · Steps</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -506,15 +506,35 @@ details[open] summary:after{content:"–"}
 .loading{position:fixed;inset:0;z-index:20;background:var(--bg);display:grid;place-items:center}
 /* the title card, once a session: one point of light comes at you and opens
    into the wing, the nameplate lands, and a bar warms what the page needs */
-.splash{position:fixed;inset:0;z-index:40;background:#000;display:grid;place-items:center;transition:opacity .7s ease}
+/* the sky sits under everything, on the page's own background; the title card is a
+   clear layer over it, and the page underneath is held at opacity 0 until it lifts.
+   The html class is set in the markup so nothing flashes before the script runs;
+   an inline watchdog at the top of the body clears it after 8s no matter what. */
+.stars{position:fixed;inset:0;z-index:-1;pointer-events:none}
+/* the site's HDR flare: a PQ/HLG-tagged streak field only HDR displays load, faded in
+   with the warp. No filters and no blend modes here: either forces SDR compositing and
+   cancels the overbright path. Opacity alone is compositor-safe. */
+.hdr-boost{position:fixed;inset:0;z-index:-1;width:100%;height:100%;object-fit:cover;object-position:50% 42%;opacity:0;pointer-events:none}
+html.splashing body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(script){opacity:0}
+html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(script){transition:opacity .9s ease}
+.splash{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding-bottom:16vh;transition:opacity .7s ease}
 .splash.out{opacity:0;pointer-events:none}
-.splash canvas{position:absolute;inset:0;width:100%;height:100%}
-.splashin{position:relative;display:flex;flex-direction:column;align-items:center;gap:26px;width:min(340px,78vw);opacity:0;animation:fadein .5s 1.15s ease forwards}
-.splash .wing.big{width:74px}
-.splash .wing.once line{animation:wingonce .7s cubic-bezier(.2,.8,.2,1) forwards}
-.splash .wing.once line:nth-child(2){animation-delay:.12s}.splash .wing.once line:nth-child(3){animation-delay:.24s}.splash .wing.once line:nth-child(4){animation-delay:.36s}.splash .wing.once line:nth-child(5){animation-delay:.48s}
-@keyframes wingonce{from{stroke-dashoffset:30;opacity:0}to{stroke-dashoffset:0;opacity:1}}
-.splashmark{transform:scale(1.9);transform-origin:center;margin:6px 0 10px}
+.splashin{position:relative;display:flex;flex-direction:column;align-items:center;gap:26px;width:min(340px,78vw);opacity:0;animation:fadein .5s .2s ease forwards}
+/* the wing draws itself the way the site's hero wing does: each line its own length, 1.5s, staggered */
+.splash .wing.big{width:104px}
+.splash .wing.big line{stroke-width:1.6}
+.splash .wing.once line{opacity:1;animation:draw 1.5s cubic-bezier(.3,.75,.25,1) both}
+.splash .wing.once line:nth-child(1){stroke-dasharray:22.3;stroke-dashoffset:22.3;animation-delay:.05s}
+.splash .wing.once line:nth-child(2){stroke-dasharray:16.7;stroke-dashoffset:16.7;animation-delay:.17s}
+.splash .wing.once line:nth-child(3){stroke-dasharray:11.2;stroke-dashoffset:11.2;animation-delay:.29s}
+.splash .wing.once line:nth-child(4){stroke-dasharray:5.6;stroke-dashoffset:5.6;animation-delay:.41s}
+.splash .wing.once line:nth-child(5){stroke-dasharray:1.5;stroke-dashoffset:1.5;animation-delay:.53s}
+@keyframes draw{to{stroke-dashoffset:0}}
+.splashmark{transform:scale(1.9);transform-origin:center;margin:6px 0 10px;--silver:linear-gradient(90deg,#f5f6f8,#c8ccd5,#9aa0ac,#e2e5ea,#8f95a1,#d5d8df,#f5f6f8)}
+/* the site's wordmark sheen: brushed silver sweeping into place over 2.4s */
+.splashmark .mark-txt{background:var(--silver);background-size:220% 100%;background-position:50% 0;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;animation:sheen 2.4s cubic-bezier(.2,.7,.2,1) .35s both}
+.splashmark .tld{-webkit-text-stroke:0}
+@keyframes sheen{from{background-position:118% 0}to{background-position:50% 0}}
 .splash .pbar{opacity:0;animation:fadein .4s 1.9s ease forwards}
 @media (prefers-reduced-motion:reduce){.splashin{animation:none;opacity:1}.splash .wing.once line{animation:none;stroke-dashoffset:0;opacity:1}.splash .pbar{animation:none;opacity:1}}
 .loadin{width:min(340px,78vw);display:flex;flex-direction:column;align-items:center;gap:26px}
@@ -671,9 +691,12 @@ html.hdrmarks .mark-hdr{display:block}
   .edbody .matters{grid-template-columns:1fr}
 }
 </style></head><body>
+<script>setTimeout(function(){ document.documentElement.classList.remove('splashing'); }, 8000);</script>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><linearGradient id="wgrad" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs></svg>
-<div class="splash" id="splash" aria-label="Loading ConcordeGo"><canvas id="warp" aria-hidden="true"></canvas>
+<canvas class="stars" id="starfield" aria-hidden="true"></canvas>
+<video class="hdr-boost" id="hdrboost" muted playsinline loop preload="none" aria-hidden="true"></video>
+<div class="splash" id="splash" aria-label="Loading ConcordeGo">
   <div class="splashin">
     <svg class="wing big once" viewBox="2 2.3 19.6 16.4" aria-hidden="true" focusable="false"><g><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg>
     <span class="lockup splashmark"><span class="mark-txt">Concorde<span class="tld">Go</span></span><video class="mark-hdr" data-mark="go" muted playsinline loop preload="none" aria-hidden="true"></video></span>
@@ -1740,38 +1763,266 @@ function paintPts(){
 }
 document.addEventListener('change', ev => { const sel = ev.target.closest('[data-status]'); if (sel){ S.status[sel.dataset.status] = sel.value; paint(false); } });
 
-// ---- the title card. Once a session. The star is drawn, not fetched: one
-// point of light with streaks pulled out toward you on a canvas (wide-gamut
-// white where the display has it, so it reads as light, not paint), and no
-// field of dots: the family's rule is no white specks. While it plays, the
-// bar warms what the page needs first: the fonts, the nameplate, the
-// airlines' logos for the flights on the page. Nothing else is fetched.
-(function splash(){
-  const el = $('#splash'); if (!el) return;
+// ---- the sky. The site's own (concorde-site, index.html), ported as it is:
+// a starfield on three parallax depths with glinting hero stars, streaming
+// cirrus, a satellite and meteor traffic - and for the first seven seconds
+// the warp, the view from the jump seat: a cubic spool-up to full power at
+// 1.6s, held to 2.6s, then a long glide out, with a camera zoom that relaxes
+// as you decelerate and one burst of debris at detonation. On an HDR display
+// the site's tagged flare video fades in over it with the warp. The title
+// card lifts as the glide begins, so the page arrives while the sky is still
+// slowing down; once seen this session the sky starts in its ambient drift.
+const STARFIELD = (function stars(){
+  const cv = $('#starfield'); if (!cv) return null;
+  const ctx = cv.getContext('2d');
+  const reduce = REDUCED;
+  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+  const TONES = ['245,246,248','200,204,213','154,160,172'];
+  const LEN = Math.hypot(17.2, 14);
+  const UX = 17.2/LEN, UY = -14/LEN;            // wing direction (right, up)
+  let W, H, stars = [], wisps = [], meteors = [], sat = null;
   let seen = false; try { seen = sessionStorage.getItem('concordego.splashed') === '1'; } catch (e) {}
-  if (seen){ el.remove(); return; }
-  const cv = $('#warp'), ctx = cv.getContext('2d', {colorSpace:'display-p3'}) || cv.getContext('2d'), white = (() => { try { ctx.fillStyle = 'color(display-p3 1 1 1)'; return ctx.fillStyle && /display-p3/.test(String(ctx.fillStyle)) ? 'color(display-p3 1 1 1)' : '#fff'; } catch (e) { return '#fff'; } })();
-  const dpr = Math.min(2, devicePixelRatio || 1); let W, H, t0 = performance.now(), raf = 0;
-  const size = () => { W = cv.width = innerWidth*dpr; H = cv.height = innerHeight*dpr; }; size(); addEventListener('resize', size);
-  const STREAKS = Array.from({length:42}, (_, i) => ({a: (i/42)*Math.PI*2 + (i%2 ? .05 : 0), r: .18 + ((i*7919) % 100)/100*.55, w: .6 + ((i*104729) % 10)/10*1.2}));
-  function frame(now){
-    const t = (now - t0)/1000, cx = W/2, cy = H*.46, R = Math.min(W, H);
-    ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = 'rgba(0,0,0,.34)'; ctx.fillRect(0, 0, W, H);
-    ctx.globalCompositeOperation = 'lighter';
-    const zoom = REDUCED ? 1 : Math.min(1, t/1.5), ease = 1 - Math.pow(1 - zoom, 3);
-    // the star: a core that grows, then settles behind the wing
-    const settle = Math.max(0, Math.min(1, (t - 1.1)/.6)), core = R*(.003 + .024*ease*(1 - .85*settle));
-    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(1, core*5)); g.addColorStop(0, white); g.addColorStop(.15, 'rgba(255,255,255,.85)'); g.addColorStop(.4, 'rgba(180,200,255,.18)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.globalAlpha = 1 - .75*settle; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, Math.max(1, core*5), 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1;
-    // the streaks: pulled out from the centre, fastest as the star arrives, gone once it has
-    const pull = ease*(1 - Math.max(0, Math.min(1, (t - 1.35)/.7)));
-    if (pull > 0){ ctx.strokeStyle = white; ctx.lineCap = 'round';
-      for (const s of STREAKS){ const len = R*s.r*pull*pull, r0 = R*.02 + len*.15; ctx.globalAlpha = .55*pull; ctx.lineWidth = s.w*dpr*pull;
-        ctx.beginPath(); ctx.moveTo(cx + Math.cos(s.a)*r0, cy + Math.sin(s.a)*r0); ctx.lineTo(cx + Math.cos(s.a)*(r0 + len), cy + Math.sin(s.a)*(r0 + len)); ctx.stroke(); }
-      ctx.globalAlpha = 1; }
-    if (t < 6 && !el.classList.contains('out')) raf = requestAnimationFrame(frame);
+  const INTRO = 7.0, RISE = 1.6, HOLD = 2.6;     // warp: spool 1.6s, full power to 2.6s, glide out to 7s
+  // The HDR layer loads only where it can actually exceed SDR white.
+  const hdr = $('#hdrboost'); let hdrOn = false, hdrDone = false;
+  if (hdr && !reduce && !seen && matchMedia('(dynamic-range: high)').matches){
+    const sq = document.createElement('source'); sq.src = 'assets/boom-pq.mp4'; sq.type = 'video/mp4; codecs="hvc1"';
+    const sh = document.createElement('source'); sh.src = 'assets/boom-hlg.webm'; sh.type = 'video/webm; codecs="vp09.02.10.10"';
+    hdr.appendChild(sq); hdr.appendChild(sh); hdr.load();
+    hdrOn = true;
   }
-  raf = requestAnimationFrame(frame);
+  let debris = null;                           // one-shot spark burst at detonation
+  let nextMeteor = 7.8, nextShower = 30, nextSat = 9;
+  let raf = 0, on = false, last = 0, t = seen ? INTRO : 0;
+
+  function seed(){
+    stars = []; wisps = [];
+    const n = Math.round(W*H/2600);
+    for (let i = 0; i < n; i++){
+      const z = Math.random();
+      const far = z < .52, mid = z < .86;
+      stars.push({
+        x: Math.random()*W, y: Math.random()*H,
+        r: far ? .55+Math.random()*.5 : mid ? .75+Math.random()*.6 : 1.05+Math.random()*.65,
+        v: far ? 3.5 : mid ? 7 : 12,           // px/s - real motion
+        tone: TONES[(Math.random()*TONES.length)|0],
+        a: far ? .18+Math.random()*.24 : mid ? .28+Math.random()*.3 : .38+Math.random()*.34,
+        tw: .7+Math.random()*2.8,
+        ph: Math.random()*6.283,
+        glint: !far && Math.random() < .045    // rare hero stars with spikes
+      });
+    }
+    for (let j = 0; j < 7; j++){
+      wisps.push({
+        x: Math.random()*W, y: Math.random()*H,
+        rx: 220+Math.random()*260, ry: 60+Math.random()*80,
+        v: 12+Math.random()*7,
+        a: .028+Math.random()*.026,
+        tw: 7+Math.random()*7, ph: Math.random()*6.283
+      });
+    }
+  }
+  function size(){
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = W*DPR; cv.height = H*DPR;
+    cv.style.width = W+'px'; cv.style.height = H+'px';
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    seed();
+  }
+  function spawnMeteor(delay){
+    meteors.push({
+      x: W*(-.05+Math.random()*.5), y: H*(.2+Math.random()*.65),
+      life: -(delay||0), dur: .55+Math.random()*.5,
+      run: 460+Math.random()*320, tail: 110+Math.random()*70,
+      w: .9+Math.random()*.9, peak: .5+Math.random()*.3
+    });
+  }
+  function frame(dt){
+    ctx.clearRect(0,0,W,H);
+
+    // cirrus, streaming aft
+    for (let k = 0; k < wisps.length; k++){
+      const wp = wisps[k];
+      wp.x -= UX*wp.v*dt; wp.y -= UY*wp.v*dt;
+      if (wp.x < -wp.rx) wp.x += W+wp.rx*2; if (wp.x > W+wp.rx) wp.x -= W+wp.rx*2;
+      if (wp.y < -wp.ry) wp.y += H+wp.ry*2; if (wp.y > H+wp.ry) wp.y -= H+wp.ry*2;
+      const wa = wp.a*(.7+.3*Math.sin(t/wp.tw*6.283+wp.ph));
+      ctx.save();
+      ctx.translate(wp.x, wp.y); ctx.scale(1, wp.ry/wp.rx);
+      const wg = ctx.createRadialGradient(0,0,0, 0,0,wp.rx);
+      wg.addColorStop(0,'rgba(200,204,213,'+wa.toFixed(4)+')');
+      wg.addColorStop(1,'rgba(200,204,213,0)');
+      ctx.fillStyle = wg;
+      ctx.beginPath(); ctx.arc(0,0,wp.rx,0,6.283); ctx.fill();
+      ctx.restore();
+    }
+
+    // stars - for the first seconds they streak outward from behind the
+    // wordmark (the view from the jump seat), decelerating into the ambient
+    // drift; after that, the normal field
+    if (!reduce && t < INTRO){
+      // Three acts: cubic spool-up, a full-power plateau, a long glide out.
+      // The zoom is real: perspective speeds (edge whips, center crawls) plus
+      // a camera scale on the star layer that relaxes as you decelerate, and
+      // a single shockwave ring the moment the warp reaches full power.
+      const e = t < RISE ? Math.pow(t/RISE, 3)
+            : t < HOLD ? 1
+            : (function(){ const k = 1-(t-HOLD)/(INTRO-HOLD); return k*k; })();
+      const warp = e*1750;
+      if (hdrOn){
+        hdr.style.opacity = (e*e*.68).toFixed(3);
+        if (hdr.paused){ const pp = hdr.play(); if (pp && pp.catch) pp.catch(() => {}); }
+      }
+      const cx = W/2, cy = H*.42;
+      const maxD = Math.hypot(Math.max(cx, W-cx), Math.max(cy, H-cy));
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const zoom = 1 + .07*e;                  // the camera eases back to 1:1
+      ctx.translate(cx, cy); ctx.scale(zoom, zoom); ctx.translate(-cx, -cy);
+      for (let i = 0; i < stars.length; i++){
+        const st = stars[i];
+        let dx = st.x-cx, dy = st.y-cy, dist = Math.hypot(dx,dy) || 1;
+        const sp = warp*(.06 + Math.pow(dist/maxD, 1.6)*1.15);
+        st.x += dx/dist*sp*dt; st.y += dy/dist*sp*dt;
+        if (st.x < -8 || st.x > W+8 || st.y < -8 || st.y > H+8){
+          const ang = Math.random()*6.283, rr = Math.random()*maxD*.22;
+          st.x = cx + Math.cos(ang)*rr; st.y = cy + Math.sin(ang)*rr;
+          dx = st.x-cx; dy = st.y-cy; dist = Math.hypot(dx,dy) || 1;
+        }
+        const trail = Math.min(150, sp*.07) + st.r;
+        const wa2 = Math.min(.96, st.a*(.6+1.9*e))*(.42+.58*dist/maxD);
+        ctx.strokeStyle = 'rgba('+st.tone+','+wa2.toFixed(3)+')';
+        ctx.lineWidth = st.r*(1+.85*e); ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(st.x - dx/dist*trail, st.y - dy/dist*trail);
+        ctx.lineTo(st.x, st.y);
+        ctx.stroke();
+      }
+      // detonation debris: one burst of sparks thrown from the core
+      if (!debris && t >= RISE){
+        debris = [];
+        for (let db = 0; db < 52; db++){
+          const da = Math.random()*6.283, dv = 260 + Math.random()*680;
+          debris.push({ x: cx, y: cy, vx: Math.cos(da)*dv, vy: Math.sin(da)*dv,
+                        life: -Math.random()*.25, dur: .9+Math.random()*.8,
+                        r: .8+Math.random()*1.4 });
+        }
+      }
+      if (debris){
+        for (let dq = 0; dq < debris.length; dq++){
+          const dd = debris[dq];
+          dd.life += dt;
+          if (dd.life < 0 || dd.life > dd.dur) continue;
+          dd.x += dd.vx*dt; dd.y += dd.vy*dt;
+          dd.vx *= (1-1.1*dt); dd.vy *= (1-1.1*dt);
+          const dp = dd.life/dd.dur, dfade = Math.pow(1-dp, 1.5)*.8;
+          ctx.beginPath(); ctx.arc(dd.x, dd.y, dd.r*(1-dp*.5), 0, 6.283);
+          ctx.fillStyle = 'rgba(245,246,248,'+dfade.toFixed(3)+')'; ctx.fill();
+        }
+      }
+      ctx.restore();
+      ctx.globalCompositeOperation = 'source-over';
+      return;                                  // no glints/traffic mid-warp
+    }
+    if (hdrOn && !hdrDone){
+      hdrDone = true;
+      hdr.style.opacity = 0; hdr.pause(); hdr.style.display = 'none';
+    }
+    for (let i = 0; i < stars.length; i++){
+      const st = stars[i];
+      st.x -= UX*st.v*dt; st.y -= UY*st.v*dt;
+      if (st.x < -6) st.x += W+12; if (st.x > W+6) st.x -= W+12;
+      if (st.y < -6) st.y += H+12; if (st.y > H+6) st.y -= H+12;
+      const a = st.a*(.62+.38*Math.sin(t/st.tw*6.283 + st.ph));
+      ctx.beginPath();
+      ctx.arc(st.x, st.y, st.r, 0, 6.283);
+      ctx.fillStyle = 'rgba('+st.tone+','+a.toFixed(3)+')';
+      ctx.fill();
+      if (st.glint){
+        // 4-point diffraction spike, breathing with the star
+        const g = a*.8, L = st.r*7*(0.8+.2*Math.sin(t/st.tw*6.283+st.ph));
+        ctx.strokeStyle = 'rgba('+st.tone+','+(g*.5).toFixed(3)+')';
+        ctx.lineWidth = .7; ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(st.x-L, st.y); ctx.lineTo(st.x+L, st.y);
+        ctx.moveTo(st.x, st.y-L); ctx.lineTo(st.x, st.y+L);
+        ctx.stroke();
+      }
+    }
+
+    if (reduce) return;
+
+    // satellite
+    if (!sat && t > nextSat){
+      const fromLeft = Math.random() < .5;
+      sat = { x: fromLeft ? -8 : W+8, y: H*(.1+Math.random()*.55),
+              vx: (fromLeft ? 1 : -1)*(26+Math.random()*14),
+              vy: (Math.random()-.5)*9, life: 0, dur: (W+16)/32 };
+    }
+    if (sat){
+      sat.life += dt; sat.x += sat.vx*dt; sat.y += sat.vy*dt;
+      const sp = sat.life/sat.dur;
+      if (sp >= 1 || sat.x < -12 || sat.x > W+12){ sat = null; nextSat = t + 10 + Math.random()*12; }
+      else {
+        const sf = Math.min(1, Math.min(sp, 1-sp)*6) * .4;
+        ctx.beginPath(); ctx.arc(sat.x, sat.y, .9, 0, 6.283);
+        ctx.fillStyle = 'rgba(228,231,236,'+sf.toFixed(3)+')'; ctx.fill();
+      }
+    }
+
+    // meteor traffic: singles every few seconds, a volley every minute or so
+    if (t > nextMeteor){ spawnMeteor(0); nextMeteor = t + 3.5 + Math.random()*4.5; }
+    if (t > nextShower){
+      const count = 3 + (Math.random()*3|0);
+      for (let m = 0; m < count; m++) spawnMeteor(m*(.28+Math.random()*.22));
+      nextShower = t + 50 + Math.random()*40;
+    }
+    for (let q = meteors.length-1; q >= 0; q--){
+      const mt = meteors[q];
+      mt.life += dt;
+      if (mt.life < 0) continue;               // staggered volley member
+      const p = mt.life/mt.dur;
+      if (p >= 1){ meteors.splice(q,1); continue; }
+      const d = mt.run*p, hx = mt.x + UX*d, hy = mt.y + UY*d;
+      const fade = p < .4 ? p/.4 : (1-p)/.6;
+      const g = ctx.createLinearGradient(hx, hy, hx-UX*mt.tail, hy-UY*mt.tail);
+      g.addColorStop(0, 'rgba(235,238,243,'+(mt.peak*fade).toFixed(3)+')');
+      g.addColorStop(1, 'rgba(235,238,243,0)');
+      ctx.strokeStyle = g; ctx.lineWidth = mt.w; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx-UX*mt.tail, hy-UY*mt.tail); ctx.stroke();
+      // glowing head
+      ctx.beginPath(); ctx.arc(hx, hy, mt.w*1.15, 0, 6.283);
+      ctx.fillStyle = 'rgba(245,246,248,'+(mt.peak*fade*.9).toFixed(3)+')'; ctx.fill();
+    }
+  }
+  function loop(now){
+    if (!on) return;
+    const dt = Math.min((now-last)/1000, .05); last = now; t += dt;
+    frame(dt);
+    raf = requestAnimationFrame(loop);
+  }
+  function start(){ if (on || reduce) return; on = true; last = performance.now(); raf = requestAnimationFrame(loop); }
+  function stop(){ on = false; cancelAnimationFrame(raf); }
+
+  size();
+  if (reduce){ frame(0); }
+  else {
+    start();
+    document.addEventListener('visibilitychange', () => { document.hidden ? stop() : start(); });
+  }
+  let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { size(); if (reduce) frame(0); }, 150); });
+  return { renderFrame(dt){ t += dt || 0; frame(dt || 0); }, get t(){ return t; } };  // static capture / testing hook
+})();
+
+// ---- the title card. Once a session, over the sky above: the wing draws
+// itself, the nameplate takes the sheen, and the bar warms what the page
+// needs first - the fonts, the nameplate, the airlines' logos for the flights
+// on the page. Nothing else is fetched. It lifts when the warp begins its
+// glide (2.6s), never later than 5s, and the page underneath fades up.
+(function splash(){
+  const el = $('#splash'), root = document.documentElement; if (!el) return;
+  let seen = false; try { seen = sessionStorage.getItem('concordego.splashed') === '1'; } catch (e) {}
+  if (seen){ el.remove(); root.classList.remove('splashing'); return; }
   // the cache warmer
   const fill = el.querySelector('.pfill'), stage = el.querySelector('.pstage'), jobs = [];
   const job = (label, pr) => jobs.push({label, pr: Promise.resolve(pr).catch(() => null)});
@@ -1780,13 +2031,17 @@ document.addEventListener('change', ev => { const sel = ev.target.closest('[data
   const logos = Object.values(AIR).map(a => a.logo).filter(u => u && /^https?:/.test(u)).slice(0, 40);
   for (const u of logos) job('Airline marks', new Promise(res => { const im = new Image(); im.onload = im.onerror = () => res(); im.src = u; setTimeout(res, 2500); }));
   let done = 0; const total = jobs.length || 1, started = performance.now(), MIN = REDUCED ? 300 : 2600, MAX = 5000;
+  // The card runs on the sky's own clock, not the wall's: it lifts when the warp reaches the end of full
+  // power (2.6s of frames), so on a slow machine the page still arrives as the glide begins and never
+  // mid-warp. Reduced motion has no warp and uses the wall clock. MAX below is always the wall clock.
+  const clock = () => (REDUCED || !STARFIELD) ? (performance.now() - started)/MIN : STARFIELD.t/2.6;
   // the bar never runs ahead of the clock: it sweeps the card's own length when the cache is quick, and waits on the cache when it is slow
-  const tick = () => { const p = Math.min(done/total, (performance.now() - started)/MIN); fill.style.width = Math.round(4 + 96*Math.min(1, p)) + '%'; };
+  const tick = () => { const p = Math.min(done/total, clock()); fill.style.width = Math.round(4 + 96*Math.min(1, p)) + '%'; };
   const sweep = setInterval(() => { tick(); if (el.classList.contains('out')) clearInterval(sweep); }, 80);
   jobs.forEach(j => j.pr.then(() => { done++; stage.textContent = j.label; tick(); }));
   stage.textContent = 'Getting ready'; tick();
-  const finish = () => { if (el.classList.contains('out')) return; fill.style.width = '100%'; el.classList.add('out'); try { sessionStorage.setItem('concordego.splashed', '1'); } catch (e) {} setTimeout(() => { cancelAnimationFrame(raf); el.remove(); }, 750); };
-  Promise.all(jobs.map(j => j.pr)).then(() => setTimeout(finish, Math.max(0, MIN - (performance.now() - started))));
+  const finish = () => { if (el.classList.contains('out')) return; fill.style.width = '100%'; el.classList.add('out'); root.classList.add('splashlift'); root.classList.remove('splashing'); try { sessionStorage.setItem('concordego.splashed', '1'); } catch (e) {} setTimeout(() => { el.remove(); root.classList.remove('splashlift'); }, 1000); };
+  Promise.all(jobs.map(j => j.pr)).then(function wait(){ clock() >= 1 ? finish() : setTimeout(wait, 40); });
   setTimeout(finish, MAX + 400);
   el.addEventListener('click', finish);
 })();
