@@ -478,7 +478,33 @@ run is on Patrick's laptop; it was dry-run against stubbed doctl, ssh and Cloudf
 droplet: systemd, a venv for the `anthropic` SDK, an hourly `concordego-update.timer` that
 resets the checkout to `origin/BRANCH` and restarts the service when HEAD moved, ufw with
 ssh only, and cloudflared run from a tunnel token made in the Zero Trust dashboard, whose
-public hostname owns the DNS record so no script here touches DNS). `concorde-travel/go-live.sh`
+public hostname owns the DNS record so no script here touches DNS). **The box is locked
+down three ways** (2026-09-21): a DigitalOcean cloud firewall named `concordego` in front
+of it (inbound TCP 22 only, everything outbound; the site needs no open web port because
+the tunnel dials out; `launch.sh` creates it with doctl, or attaches a new droplet to the
+existing one), ufw on the box with ssh only, and sshd by key only, root included
+(`/etc/ssh/sshd_config.d/50-concordego.conf`). Security updates are unattended
+(`/etc/apt/apt.conf.d/52concordego-unattended`: the security channels only, unused kernels
+and dependencies removed, an automatic reboot at 09:30 UTC, 05:30 New York, only when a
+kernel asks); `droplet.sh` writes all of that on a fresh box.
+
+**Every key lives in `/etc/concordego.env` on the droplet** (0600, read by systemd, never in
+the repo, the plist, a command line or chat): `CONCORDEGO_FLIGHT_KEY` (Duffel),
+`ANTHROPIC_API_KEY` (narrator and wish box), `CONCORDEGO_PEXELS_KEY` (tile photos),
+`CONCORDEGO_SERPAPI_KEY` (the Delta supplement), plus `CONCORDEGO_OWNERS`,
+`CONCORDEGO_ACCESS_TEAM` and `CONCORDEGO_PUBLIC=1`. To add or change one, edit the file ON
+THE SERVER and restart, from a laptop Terminal:
+
+```bash
+ssh root@67.207.85.212 "echo 'CONCORDEGO_SERPAPI_KEY=...' >> /etc/concordego.env && systemctl restart concordego"
+```
+
+No spaces around the `=`, no quotes round the value. Editing a copy on the laptop changes
+nothing (2026-09-21: an hour went on a key that was never on the box). A key pasted into a
+chat is a key to roll. `launch.sh` carries the same variables from the laptop's environment
+to a new box over the ssh channel; `live.py status` on the box says which keys it sees
+(`serpapi.key_configured`, never the value), and `live.py serp JFK LHR 2026-11-18` spends
+one SerpApi call to prove the key works. `concorde-travel/go-live.sh`
 (a Mac, LaunchAgents) is the laptop fallback. Either runs `server.py` with
 `CONCORDEGO_ROOT=mock-10`, so `/` serves the current interface mockup, at
 **go.flyconcordefly.com**, on its own tunnel so it never touches the AI app's. **`/admin`** on
