@@ -446,7 +446,11 @@ own config and service so it never touches the AI app's tunnel. **Keys never go 
 LaunchAgent plist** (world-readable): the agent sources `~/.concordego/env` (0600, written
 empty by `go-live.sh`) before starting, so `ANTHROPIC_API_KEY` and the Duffel token go
 there (or the token in `~/.concordego/cloud.json`); the droplet's equivalent is
-`/etc/concordego.env`. **The door is Cloudflare
+`/etc/concordego.env`. The Mac script runs `server.py` on its own venv at
+`~/.concordego/venv` with the `anthropic` SDK installed into it, because Homebrew's python
+refuses `pip install` (PEP 668); the tunnel is looked up by exact name from cloudflared's
+JSON, since grepping its table once missed an existing tunnel and the create that followed
+failed. **The door is Cloudflare
 Access**: `concorde-travel/access.sh` creates the app, a one-time-PIN sign-in (Google too
 once that provider exists) and an email allowlist through the Cloudflare API. A request
 that arrives through the tunnel carries `Cf-Connecting-Ip`, and Access adds

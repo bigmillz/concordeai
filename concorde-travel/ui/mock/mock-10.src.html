@@ -99,8 +99,10 @@ h1,h2,h3{font-weight:400;letter-spacing:-.02em;text-wrap:balance}
 .readout .a b{color:var(--price)}.readout .b b{color:var(--speed)}.readout .c b{color:var(--comfy)}
 .means{color:var(--dim);font-size:12.5px;margin-top:10px;line-height:1.5}
 .means b{color:var(--text);font-weight:500}
-.presets{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
-.presets button{border:1px solid var(--line);border-radius:999px;padding:7px 12px;font-size:12.5px;font-weight:500;color:var(--dim);transition:.15s;display:inline-flex;align-items:center;gap:6px}
+/* two columns, every chip the same width and centred; the one that stands apart spans the row */
+.presets{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.presets button{border:1px solid var(--line);border-radius:999px;padding:8px 12px;font-size:12.5px;font-weight:500;color:var(--dim);transition:.15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:0}
+.presets button.asap{grid-column:1/-1}
 .presets button:hover{border-color:var(--dim);color:var(--text)}
 .presets button[aria-pressed=true]{background:var(--text);color:var(--bg);border-color:var(--text)}
 .presets button.asap{border-color:rgba(226,109,90,.6);color:var(--red)}
@@ -439,11 +441,20 @@ details[open] summary:after{content:"–"}
 /* ---------- steps */
 .rail{position:sticky;top:0;z-index:6;background:rgba(16,16,19,.86);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
 .railin{max-width:1180px;margin:0 auto;padding:12px clamp(16px,3.5vw,32px);display:flex;align-items:center;gap:18px;flex-wrap:wrap}
-.rail .steps{display:flex;gap:4px;flex:1;min-width:0;overflow:auto}
-.rail .st{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;font-size:12.5px;color:var(--faint);white-space:nowrap}
-.rail .st i{font-style:normal;font-family:var(--mono);font-size:11px;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center}
+/* the steps, in a row (`.rsteps`: `.steps` is the playbook's list, and sharing the name stacked these).
+   Each carries a check: grey until the step is done, green once it is (Continue, Enter, or Skip). */
+.rail .rsteps{display:flex;gap:4px;flex:1;min-width:0;overflow:auto}
+.rail .st:first-child{margin-left:auto}.rail .st:last-child{margin-right:auto}
+.rail .st{display:inline-flex;align-items:center;gap:8px;padding:6px 12px 6px 8px;border-radius:999px;font-size:12.5px;color:var(--faint);white-space:nowrap;transition:color .2s,background .2s}
+.rail .st i{font-style:normal;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;color:var(--faint);transition:background .25s,border-color .25s,color .25s}
+.rail .st i svg{width:11px;height:11px}
 .rail .st.on{color:var(--text);background:var(--panel2)}
-.rail .st.on i{background:var(--speed);color:var(--bg);border-color:var(--speed)}
+.rail .st.on i{border-color:var(--dim);color:var(--text)}
+.rail .st.done i{background:var(--green);border-color:var(--green);color:var(--bg)}
+/* narrow: the checks take a row of their own under the brand, and only the current step keeps its name */
+/* narrow: two rows. The brand and the skip link, then the four checks and the sign-in. The step's name
+   is dropped here: the screen's own heading a line below says it. */
+@media (max-width:720px){.rail .jump{order:1;margin-left:auto}.rail .rsteps{order:10;flex:0 1 auto;gap:2px}.rail .st span{display:none}.rail .st{padding:6px 8px}.rail .st:first-child{margin-left:0}.rail .st:last-child{margin-right:0}.rail .railin .rail-acct{order:11;margin-left:auto}}
 .rail .jump{font-size:12px;color:var(--faint);border-bottom:1px solid var(--line);padding:2px 0}
 .rail .jump:hover{color:var(--text)}
 #wizard{scroll-snap-type:y proximity}
@@ -705,8 +716,8 @@ html.hdrmarks .mark-hdr{display:block}
 <div class="rail" id="rail"><div class="railin">
   <a class="brand" href="#top" aria-label="ConcordeGo"><svg class="wing" viewBox="2 2.3 19.6 16.4" aria-hidden="true" focusable="false"><g><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><span class="lockup"><span class="mark-txt">Concorde<span class="tld">Go</span></span><video class="mark-hdr" data-mark="go" muted playsinline loop preload="none" aria-hidden="true"></video></span></a>
   <button class="acctbtn rail-acct" id="account2">Sign in</button>
-  <div class="steps">
-    <button class="st on" data-s="1"><i>1</i>Where and when</button><button class="st" data-s="2"><i>2</i>What matters</button><button class="st" data-s="3"><i>3</i>Points and miles</button><button class="st" data-s="4"><i>4</i>Anything else</button>
+  <div class="rsteps">
+    <button class="st on" data-s="1"><i><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.4 6.4l2.5 2.5 4.8-5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>Where and when</span></button><button class="st" data-s="2"><i><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.4 6.4l2.5 2.5 4.8-5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>What matters</span></button><button class="st" data-s="3"><i><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.4 6.4l2.5 2.5 4.8-5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>Points and miles</span></button><button class="st" data-s="4"><i><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.4 6.4l2.5 2.5 4.8-5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>Anything else</span></button>
   </div>
   <button class="jump" id="jump">Skip to results</button>
 </div></div>
@@ -836,7 +847,7 @@ html.hdrmarks .mark-hdr{display:block}
 </div>
 <div id="sheetroot"></div>
 <div class="sheetwrap hidden" id="acct"><div class="sheet acctsheet" role="dialog" aria-modal="true" aria-label="Account">
-  <div class="hd"><h3 id="accth">An account is free, and it opens the doors that cost something</h3><button class="x" id="acctx" aria-label="Close">×</button></div>
+  <div class="hd"><h3 id="accth">A free account unlocks the rest</h3><button class="x" id="acctx" aria-label="Close">×</button></div>
   <div class="acctbody" id="acctbody"></div>
 </div></div>
 
@@ -2146,15 +2157,15 @@ function paintAccount(){
   const u = S.user, label = !u ? 'Sign in' : u.owner ? 'This machine' : (u.email || 'Signed in').replace(/@.*/, '') + (u.demo ? ' (demo)' : '');
   for (const id of ['#account', '#account2']){ const b = $(id); if (!b) continue; b.textContent = label; b.classList.toggle('in', !!u); b.title = u && u.left ? u.left.searches + ' live searches and ' + u.left.wishes + ' wishes left today' : u ? '' : 'Free: email or Google'; }
   for (const [sel, what] of LOCKS){ const el = document.querySelector(sel); if (!el) continue; el.classList.toggle('locked', !u);
-    if (!u){ el.dataset.tip = '<div class="jh"><i></i><b>Sign in to use ' + what + '</b></div><ul><li>Free. Your email or Google; no password.</li></ul>'; el.setAttribute('aria-label', 'Sign in to use ' + what); } else { delete el.dataset.tip; el.removeAttribute('aria-label'); } }
+    if (!u){ el.dataset.tip = '<div class="jh"><i></i><b>Sign in to unlock ' + what + '</b></div><ul><li>Free. Your email or Google; no password.</li></ul>'; el.setAttribute('aria-label', 'Sign in to unlock ' + what); } else { delete el.dataset.tip; el.removeAttribute('aria-label'); } }
   const h4 = document.querySelector('#s4 .hintr'); if (h4) h4.textContent = u && !u.demo ? 'Advanced options are optional; leave them and go.' : 'Without a sign-in these are recorded results. Sign in above to search live.';
 }
 function openAccount(){
   const u = S.user;
-  $('#accth').textContent = u ? (u.owner ? 'This machine' : 'Your account') : 'An account is free, and it opens the doors that cost something';
-  $('#acctbody').innerHTML = u ? `<p>${u.owner ? 'Searches from this machine spend freely; no allowance applies.' : 'Signed in as <b>' + esc(u.email || '') + '</b>.' + (u.left ? ' Today: <b>' + u.left.searches + '</b> live searches and <b>' + u.left.wishes + '</b> wishes left.' : '')}</p>
+  $('#accth').textContent = u ? (u.owner ? 'This machine' : 'Your account') : 'A free account unlocks the rest';
+  $('#acctbody').innerHTML = u ? `<p>${u.owner ? 'This machine has no limits.' : 'Signed in as <b>' + esc(u.email || '') + '</b>.' + (u.left ? ' Today: <b>' + u.left.searches + '</b> live searches and <b>' + u.left.wishes + '</b> wishes left.' : '')}</p>
       <div class="row2">${!u.owner && !u.demo && SERVED ? '<a class="ledger" href="/cdn-cgi/access/logout">Sign out</a>' : ''}${u.demo ? '<button class="ledger" id="acctout">Leave the demo account</button>' : ''}<button class="choose" id="acctno" style="flex:0 0 auto">Done</button></div>`
-    : `<p>Browsing and the recorded results are open to everyone. The parts that cost real money each time need a sign-in, so that nobody anonymous can run them up. Signing in is your email or Google, no password.</p>
+    : `<p>Browsing and the recorded results are open to everyone. Sign in to unlock the rest: live searches on your own dates and places, the wish box, the price check from other countries, and a watchlist. Your email or Google, no password.</p>
       <ul><li>Live searches on your own dates and places <small>· 20 a day</small></li><li>The wish box, read by Claude <small>· 200 a day</small></li><li>The price check from other countries <small>· 2 a day</small></li><li>Saved searches and a watchlist of routes, with price history <small>· up to 5 routes, coming</small></li></ul>
       <div class="row2"><button class="choose" id="acctgo" style="flex:0 0 auto">${SERVED ? 'Sign in or sign up' : 'Sign in (demo)'}</button><button class="ledger" id="acctno">Not now</button></div>
       <p class="fine">${SERVED ? 'You will be sent to the sign-in page and brought straight back.' : 'Opened as a file there is no sign-in page; this unlocks the demo.'}</p>`;
@@ -2278,26 +2289,30 @@ if (!PHOTOS.length){
 document.addEventListener('animationend', ev => { if (ev.target.classList && ev.target.classList.contains('rise')) ev.target.classList.remove('rise'); });
 
 // ================= the steps, the bar, the editor =================
-var W = {mode:'wizard', step:1};
+var W = {mode:'wizard', step:1, done:new Set()};
+// a step is done once the person moves on from it (Continue or Enter); skipping ahead, or reaching the results, finishes every step
+function paintSteps(){ document.querySelectorAll('.rail .st').forEach(x => { const n = +x.dataset.s; x.classList.toggle('on', n === W.step); x.classList.toggle('done', W.done.has(n)); }); }
+function finishStep(n){ W.done.add(n); paintSteps(); }
+function finishAllSteps(){ [1, 2, 3, 4].forEach(n => W.done.add(n)); paintSteps(); }
 const BLOCKS = ['where','matters','points','advanced'];
 function layoutDial(){ paintTri(); const [x, y] = toXY(S.a, S.b, S.c); handle.style.left = x + 'px'; handle.style.top = y + 'px'; }
 function goStep(n){
   W.step = n; const s = $('#s' + n); if (!s) return;
   s.scrollIntoView({behavior: REDUCED ? 'auto' : 'smooth', block:'start'});
-  document.querySelectorAll('.rail .st').forEach(x => x.classList.toggle('on', +x.dataset.s === n));
+  paintSteps();
   if (n === 2) setTimeout(layoutDial, 350);
 }
 document.addEventListener('click', ev => {
-  const nx = ev.target.closest('[data-next]'); if (nx){ goStep(+nx.dataset.next); return; }
+  const nx = ev.target.closest('[data-next]'); if (nx){ finishStep(+nx.dataset.next - 1); goStep(+nx.dataset.next); return; }
   const bk = ev.target.closest('[data-back]'); if (bk){ goStep(+bk.dataset.back); return; }
   const rs = ev.target.closest('.rail .st'); if (rs){ goStep(+rs.dataset.s); return; }
   const tb = ev.target.closest('[data-tab]'); if (tb){ openEditor(tb.dataset.tab); return; }
   if (ev.target.closest('#eddone, #eddone2, #edshade')){ closeEditor(); return; }
   if (ev.target.closest('#startover')){ startOver(); return; }
-  if (ev.target.closest('#jump')){ enterResults(); return; }
+  if (ev.target.closest('#jump')){ finishAllSteps(); setTimeout(enterResults, REDUCED ? 0 : 380); return; }
 });
-document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && W.mode === 'wizard' && ev.target.matches('#sentence input, #sentence select')){ ev.preventDefault(); goStep(W.step + 1); } });
-const io = new IntersectionObserver(es => { es.forEach(x => { if (x.isIntersecting){ W.step = +x.target.dataset.step; document.querySelectorAll('.rail .st').forEach(r => r.classList.toggle('on', +r.dataset.s === W.step)); } }); }, {rootMargin:'-45% 0px -50% 0px'});
+document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && W.mode === 'wizard' && ev.target.matches('#sentence input, #sentence select')){ ev.preventDefault(); finishStep(W.step); goStep(W.step + 1); } });
+const io = new IntersectionObserver(es => { es.forEach(x => { if (x.isIntersecting){ W.step = +x.target.dataset.step; paintSteps(); } }); }, {rootMargin:'-45% 0px -50% 0px'});
 document.querySelectorAll('.screen').forEach(s => io.observe(s));
 
 const short = s => s.split(',')[0].replace(/ & .*$/, '').trim();
@@ -2343,6 +2358,7 @@ const paxCount = () => ({'1 adult':1, '2 adults':2, 'Family of 4':4}[S.pax] || 1
 // and the lede says so. Opened as a file there is no server, so the recording
 // is all there is.
 async function enterResults(){
+  finishAllSteps();
   const box = $('#loading'); box.classList.remove('hidden'); $('#wizard').classList.add('hidden'); $('#rail').classList.add('hidden'); $('#searcherr').textContent = '';
   const L = S.legs[0], date = toISODate(L.date); S.notice = '';
   if (SERVED && S.user && !S.user.demo && date){
@@ -2416,7 +2432,7 @@ function startOver(){
   BLOCKS.forEach(k => $('#s' + (BLOCKS.indexOf(k) + 1) + ' .stepin .slot').appendChild($('#blk-' + k)));
   $('#bar').classList.add('hidden'); $('#results').classList.add('hidden'); $('#dock').classList.add('mini'); $('#dwish').placeholder = 'Ask or wish for anything about your trip…';
   $('#wizard').classList.remove('hidden'); $('#rail').classList.remove('hidden');
-  scrollTo({top:0, behavior:'auto'}); goStep(1); setTimeout(layoutDial, 50);
+  W.done.clear(); scrollTo({top:0, behavior:'auto'}); goStep(1); setTimeout(layoutDial, 50);
 }
 function openEditor(tab){
   $('#editor').classList.remove('hidden'); document.body.style.overflow = 'hidden';

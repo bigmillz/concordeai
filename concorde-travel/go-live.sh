@@ -33,7 +33,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 LOGS="$HOME/Library/Logs/ConcordeGo"; mkdir -p "$LOGS"
 AGENTS="$HOME/Library/LaunchAgents"; mkdir -p "$AGENTS"
 UID_N="$(id -u)"
-PY="$(command -v python3)"
+SYS_PY="$(command -v python3)"
 KEYS="$HOME/.concordego/env"
 
 say(){ printf '\n\033[1m%s\033[0m\n' "$*"; }
@@ -55,9 +55,23 @@ ENV
   ); echo "  wrote $KEYS (empty template, 0600)"
 fi
 chmod 600 "$KEYS"
+
+# ---------------------------------------------------------------- python
+# Homebrew's python3 refuses pip installs (PEP 668, "externally managed"), so
+# the server runs on its own venv holding the one non-stdlib package, the
+# anthropic SDK. server.py is stdlib and runs there unchanged. With no network
+# the install is skipped and the wish box and narrator fall back to the
+# template until the script is run again.
+VENV="$HOME/.concordego/venv"
+if [ ! -x "$VENV/bin/python3" ]; then
+  say "python: making a venv at $VENV"
+  "$SYS_PY" -m venv "$VENV"
+fi
+PY="$VENV/bin/python3"
 if ! "$PY" -c "import anthropic" 2>/dev/null; then
-  echo "  note: $PY cannot import anthropic; the wish box and narrator fall back to the template."
-  echo "        fix:  $PY -m pip install anthropic"
+  say "python: installing the anthropic SDK into the venv"
+  "$PY" -m pip install -q --upgrade pip anthropic \
+    || echo "  could not install anthropic (offline?): the wish box and narrator use the template until you re-run this"
 fi
 
 # ---------------------------------------------------------------- server
@@ -115,15 +129,39 @@ if [ ! -f "$HOME/.cloudflared/cert.pem" ]; then
   exit 0
 fi
 
-if ! cloudflared tunnel list 2>/dev/null | grep -q " $TUNNEL "; then
-  cloudflared tunnel create "$TUNNEL"
+# The tunnel is looked up by exact name from cloudflared's own JSON, not by
+# grepping its table: the table grep once missed an existing tunnel and the
+# create that followed failed with "tunnel with name already exists".
+tunnel_id(){
+  cloudflared tunnel list --name "$TUNNEL" --output json 2>/dev/null | "$PY" -c '
+import json, sys
+try: ts = json.load(sys.stdin)
+except Exception: ts = []
+ts = [t for t in ts if t.get("name") == sys.argv[1] and not str(t.get("deleted_at") or "").startswith("2")]
+print(ts[0]["id"] if ts else "")' "$TUNNEL"
+}
+TID=$(tunnel_id)
+if [ -z "$TID" ]; then
+  cloudflared tunnel create "$TUNNEL" || true      # "already exists" is fine: it is looked up again below
+  TID=$(tunnel_id)
 fi
-TID=$(cloudflared tunnel list 2>/dev/null | awk -v t="$TUNNEL" '$2==t{print $1}')
-[ -n "$TID" ] || { echo "could not find the tunnel id for $TUNNEL"; exit 1; }
+if [ -z "$TID" ]; then
+  echo "could not find or create the tunnel $TUNNEL. What cloudflared sees:"
+  cloudflared tunnel list --name "$TUNNEL" || true
+  echo "  An outdated cloudflared can be the cause:  brew upgrade cloudflared"
+  exit 1
+fi
+CRED="$HOME/.cloudflared/$TID.json"
+if [ ! -f "$CRED" ]; then
+  say "the tunnel $TUNNEL exists but its credentials file is not on this Mac."
+  echo "  It was created on another machine. Make a fresh one here, then re-run:"
+  echo "    cloudflared tunnel delete -f $TUNNEL"
+  exit 1
+fi
 CFG="$HOME/.cloudflared/$TUNNEL.yml"
 cat > "$CFG" <<YML
 tunnel: $TID
-credentials-file: $HOME/.cloudflared/$TID.json
+credentials-file: $CRED
 ingress:
   - hostname: $HOST
     service: http://localhost:$SERVE_PORT

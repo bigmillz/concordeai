@@ -761,7 +761,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             who = self._who()
             if not who:
                 return self._json({"error": "Sign in to run a live search. The public address serves recorded results to anyone; "
-                                            "live searches, the narrator and the wish box are for signed-in people, so nobody can spend the quota anonymously.",
+                                            "live searches, the narrator and the wish box are unlocked by signing in.",
                                    "remote": True, "sign_in": True})
             kind, limit = ("searches", USER_SEARCHES) if path in ("/api/live", "/api/search") else ("wishes", USER_WISHES)
             ok, left = _users_take(who, kind, limit)
