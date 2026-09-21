@@ -525,7 +525,14 @@ pop-up that says what an account gives (searches 20 a day, wishes 200, price che
 watchlist of 5 routes, coming) and sends the person to `/signin`, which Cloudflare Access
 protects; `access.sh` makes the applications — `/api/*`, `/signin` and `/admin` behind the
 email allowlist, the page itself open with a bypass policy — and the server counts each
-signed-in person's day. `/whoami`, `/locate` and `/photos` sit outside the door too.
+signed-in person's day. `/whoami`, `/locate` and `/photos` sit outside the door too. **Access stamps the email only on
+requests to an application that demanded a sign-in**, and passes the open part of the site
+through unstamped, so a signed-in person looked anonymous there and was sent round to sign
+in again (2026-09-21). The server therefore reads Access's own cookie, `CF_Authorization`, a
+JWT signed with the team's key, and verifies it in the stdlib (RS256 against the team's
+published keys at `<team>.cloudflareaccess.com/cdn-cgi/access/certs`, cached an hour; the
+issuer; the expiry) before trusting its email. `CONCORDEGO_ACCESS_TEAM` names the team;
+`launch.sh` reads it from the account and writes it to the droplet's env.
 
 **The wish box's model is Claude Opus 5** (`concorde-travel/wish.py`, `/api/wish`), the same
 model as the narrator: one call at low effort with a strict JSON schema over the page's own

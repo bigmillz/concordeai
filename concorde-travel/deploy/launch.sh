@@ -76,6 +76,11 @@ BODY="{\"type\":\"CNAME\",\"name\":\"$SUB\",\"content\":\"$TUN.cfargotunnel.com\
 if [ -z "$REC" ]; then cf POST "/zones/$ZONE_ID/dns_records" "$BODY" | jq_ 'print("  created CNAME -> " + d["result"]["content"]) if d.get("success") else sys.exit("  could not add the record: " + json.dumps(d.get("errors")))'
 else cf PUT "/zones/$ZONE_ID/dns_records/$REC" "$BODY" | jq_ 'print("  updated CNAME -> " + d["result"]["content"]) if d.get("success") else sys.exit("  could not update the record: " + json.dumps(d.get("errors")))'; fi
 
+# the Zero Trust team: the server verifies Access's sign-in cookie against its keys, so it must know the name
+ACCESS_TEAM=$(cf GET "/accounts/$CF_ACCOUNT_ID/access/organizations" | jq_ 'r = d.get("result") or {}
+print((r.get("auth_domain") or "").split(".")[0])')
+[ -n "$ACCESS_TEAM" ] && echo "  Zero Trust team: $ACCESS_TEAM" || echo "  no Zero Trust team yet: access.sh (below) makes one; re-run this afterwards so the server learns its name"
+
 # --------------------------------------------------------------- install
 say "install on the droplet ($BRANCH)"
 "${SSH[@]}" "curl -fsSL https://raw.githubusercontent.com/bigmillz/concordeai/$BRANCH/concorde-travel/deploy/droplet.sh | bash -s -- '$BRANCH' '$TOKEN'" 2>&1 | sed 's/^/  /'
@@ -85,6 +90,7 @@ say "keys -> /etc/concordego.env on the droplet"
 { [ -n "${CONCORDEGO_FLIGHT_KEY:-}" ] && printf 'CONCORDEGO_FLIGHT_KEY=%s\n' "$CONCORDEGO_FLIGHT_KEY"
   [ -n "${ANTHROPIC_API_KEY:-}" ] && printf 'ANTHROPIC_API_KEY=%s\n' "$ANTHROPIC_API_KEY"
   [ -n "${CONCORDEGO_PEXELS_KEY:-}" ] && printf 'CONCORDEGO_PEXELS_KEY=%s\n' "$CONCORDEGO_PEXELS_KEY"
+  [ -n "$ACCESS_TEAM" ] && printf 'CONCORDEGO_ACCESS_TEAM=%s\n' "$ACCESS_TEAM"
   printf 'CONCORDEGO_OWNERS=%s\n' "$OWNERS"; } | "${SSH[@]}" 'umask 077; cat > /root/.concordego-keys.tmp; python3 - <<"PY"
 import sys, re, os
 # the lines arrive on stdin; they are read into a file first because the heredoc below takes stdin over
