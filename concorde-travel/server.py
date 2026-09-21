@@ -783,7 +783,7 @@ def rescue_request(req):
     dates = [date]
     if now is not None and now.hour >= 17:
         dates.append((now + datetime.timedelta(days=1)).strftime("%Y-%m-%d"))
-    found, errors, feed = [], [], None
+    found, errors, feed, search = [], [], None, None
     for dt in dates:
         r = search_request({"source": "api", "origin": o, "origin_address": o, "destination": d, "date": dt,
                             "adults": 1, "checked_bags": 1 if sit.get("bags_checked") else 0, "_served": req.get("_served"),
@@ -792,6 +792,8 @@ def rescue_request(req):
             errors.append(r["error"])
             continue
         feed = r.get("feed")
+        if search is None:
+            search = r                                # the day's full results, so the page can show them as a search
         found.extend(r["results"]["reference"])
     if not found:
         return {"error": errors[0] if errors else "Nothing found for that day."}
@@ -828,7 +830,8 @@ def rescue_request(req):
     a = rescue.assess(sit, found, now=now)
     b = rescue.brief(sit, a)
     prose = rescue.narrate(b, allow_model=bool(os.environ.get("ANTHROPIC_API_KEY")))
-    return {"assessment": a, "advice": prose, "searched": dates, "feed": feed, "found": len(found), "notes": errors}
+    return {"assessment": a, "advice": prose, "searched": dates, "feed": feed, "found": len(found), "notes": errors,
+            "search": search}
 
 
 def search_request(req):

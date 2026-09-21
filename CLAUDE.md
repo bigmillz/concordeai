@@ -608,12 +608,19 @@ lifts) says the premise in a breath, how it works in three lines, and hands off 
 **The Flight Fixer** (`rescue.py`, `/rescue` outside the door on the free allowance,
 `/api/rescue` inside it; the fourth trip type beside round trip, one way and multi-city,
 whose form is the search's own fields with the required ones marked and a line saying the
-more you add the surer the call). It also puts a number on **the chance you fly today**
-(`rescue.odds()`): MODELLED, and labelled so on the page, from the delay so far, the hour
-the new departure is planned for and how delays compound (a delayed flight leaves when the
-airline says 55% of the time, the rest slipping by the hour; the cancellation risk grows with
-the delay and jumps after 21:00 and 23:00; anything past midnight is lost), with a Details
-line chart of the chance of being off the ground by each hour left in the day. A tracking
+more you add the surer the call). It also puts two numbers on the day (`rescue.odds()`), MODELLED and
+labelled so, each with its own line chart open on the result and both FALLING through the
+day (per Patrick, 2026-09-21: at nine there is a day of chances, at ten to midnight there
+are not): **the chance of making the updated flight** (if it slips to hour h, the chance it
+still goes today: a delayed flight leaves when the airline says 55% of the time, the rest
+slipping by the hour; the cancellation risk grows with the delay and jumps after 21:00 and
+23:00; anything past midnight is lost) and **the chance you fly today at all** (at hour h,
+the flight's own chance or one of the day's own alternatives still leaving 75 minutes on,
+each given an even chance of taking you, capped at 97% because a seat on sale is not a seat
+in hand). Times on the form are 12-hour with an AM/PM toggle; a 24-hour entry picks its half
+by itself. The alternatives on the result open the details sheet, with a warning to ask the
+airline's staff first, and "See all alternative flights" shows the day's results as an
+ordinary search narrowed by a visible "leaves after" rule. A tracking
 feed for the flight number would replace those priors with the flight's own day and is the
 obvious next key. The helper's model text: The situation comes in as chips and clocks: delayed or cancelled,
 the scheduled and new times, whether rebooking was offered and when it lands, the fare, a

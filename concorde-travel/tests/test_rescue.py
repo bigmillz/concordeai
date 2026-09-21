@@ -64,17 +64,26 @@ def main():
     ok2, why2 = rescue.refund_rights({"kind": "delayed", "us": True, "delay_minutes": 30, "fare": "business"})
     check("business is 'often refundable' and not counted until checked", not ok2 and "often refundable" in why2)
 
-    # the odds of flying today: modelled, monotone, and gone by midnight
-    o = rescue.odds({"kind": "delayed", "delay_minutes": 65, "new_depart": "2026-11-18T19:35:00-05:00"}, datetime.fromisoformat("2026-11-18T18:00:00-05:00"))
-    check("a modest evening delay leaves good odds of flying today", o["p_today"] is not None and 0.6 <= o["p_today"] <= 0.97, str(o["p_today"]))
-    check("the curve never falls as the hours pass", all(o["curve"][i]["p"] <= o["curve"][i + 1]["p"] for i in range(len(o["curve"]) - 1)))
-    o2 = rescue.odds({"kind": "delayed", "delay_minutes": 300, "new_depart": "2026-11-18T23:20:00-05:00"}, datetime.fromisoformat("2026-11-18T22:30:00-05:00"))
-    check("a five-hour delay pushed to 23:20 leaves slim odds", o2["p_today"] < 0.45, str(o2["p_today"]))
-    check("cancelled with nothing in hand is no odds at all, and says why", rescue.odds({"kind": "cancelled"}, morning)["p_today"] == 0.0)
+    # the odds: two lines, both modelled, both falling through the day
+    nine = datetime.fromisoformat("2026-11-18T09:00:00-05:00"); late2 = datetime.fromisoformat("2026-11-18T23:20:00-05:00")
+    o = rescue.odds({"kind": "delayed", "delay_minutes": 65, "new_depart": "2026-11-18T19:35:00-05:00"}, datetime.fromisoformat("2026-11-18T18:00:00-05:00"), opts)
+    check("a modest evening delay leaves good odds of the updated flight going", 0.6 <= o["flight"]["p"] <= 0.97, str(o["flight"]["p"]))
+    fc = [k["p"] for k in o["flight"]["curve"]]
+    check("the updated flight's line never rises as the hour it slips to gets later", all(fc[i] >= fc[i + 1] for i in range(len(fc) - 1)), str(fc))
+    tc = [k["p"] for k in o["today"]["curve"]]
+    check("the flying-today line never rises as the day runs out", all(tc[i] >= tc[i + 1] for i in range(len(tc) - 1)), str(tc))
+    check("flying today is never less likely than the flight alone", all(k["p"] >= f["p"] for k, f in zip(o["today"]["curve"], o["flight"]["curve"])))
+    o9 = rescue.odds({"kind": "cancelled"}, nine, opts)
+    check("cancelled at nine in the morning, with a day of alternatives, flying today is very likely", o9["today"]["p"] >= 0.9, str(o9["today"]["p"]))
+    o23 = rescue.odds({"kind": "cancelled"}, late2, opts)
+    check("cancelled at twenty past eleven at night, with nothing left to leave, flying today is nil", o23["today"]["p"] == 0.0, str(o23["today"]["p"]))
+    o2 = rescue.odds({"kind": "delayed", "delay_minutes": 300, "new_depart": "2026-11-18T23:20:00-05:00"}, datetime.fromisoformat("2026-11-18T22:30:00-05:00"), [])
+    check("a five-hour delay pushed to 23:20 leaves slim odds for the flight", o2["flight"]["p"] < 0.45, str(o2["flight"]["p"]))
     check("the odds say they are modelled", o["modelled"] and "Modelled" in o["basis"])
     a4 = rescue.assess(dict(sit2, new_depart="2026-11-18T09:30:00-05:00"), opts, now=morning)
-    check("the assessment carries the odds and the brief carries them as a percentage the advice may use",
-          a4["odds"]["p_today"] is not None and rescue.brief(dict(sit2, now_clock="06:30"), a4)["odds_you_fly_today"] in rescue.brief(dict(sit2, now_clock="06:30"), a4)["allowed"]["percent"])
+    b4 = rescue.brief(dict(sit2, now_clock="06:30"), a4)
+    check("the assessment carries both odds and the brief carries them as percentages the advice may use",
+          a4["odds"]["today"]["p"] is not None and b4["odds_you_fly_today"] in b4["allowed"]["percent"] and b4["odds_the_updated_flight_goes"] in b4["allowed"]["percent"])
 
     # the brief and the guard rails
     b = rescue.brief(dict(sit, now_clock="06:30"), a)

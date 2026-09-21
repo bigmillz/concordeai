@@ -768,10 +768,12 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 .qz .pchip{cursor:pointer}.qz .pchip.on{border-color:var(--speed);color:var(--text);background:rgba(120,160,255,.08)}
 .prof .row2{margin-top:16px;align-items:center}
 .rsc .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:6px 0 4px}
-.rsc.fixer .fld{padding:12px 14px 12px 44px;display:flex;flex-direction:column;min-height:104px}
+.rsc.fixer .frow{align-items:stretch}
+.rsc.fixer .fld{padding:12px 14px 12px 44px;display:flex;flex-direction:column;min-height:104px;height:100%;box-sizing:border-box}
+.rsc.fixer .fld .ico{stroke:#8a8d97}
 .rsc.fixer .fld .help{margin-top:auto;padding-top:7px}
 .rsc.fixer .fld input[type=time],.rsc.fixer .fld input[type=date]{padding-left:0;color-scheme:dark;cursor:pointer}
-.rsc.fixer .fld input[type=time]::-webkit-calendar-picker-indicator,.rsc.fixer .fld input[type=date]::-webkit-calendar-picker-indicator{opacity:.55;filter:invert(1);cursor:pointer}
+.rsc.fixer .fld input[type=time]::-webkit-calendar-picker-indicator,.rsc.fixer .fld input[type=date]::-webkit-calendar-picker-indicator{opacity:.7;filter:none;cursor:pointer}
 .rsc.fixer .fld .req{font-style:normal;letter-spacing:.14em;font-size:8.5px;color:var(--speed);margin-left:8px;text-transform:uppercase;vertical-align:1px}
 .rsc.fixer .chipfld .seg{display:inline-flex;gap:2px;padding:3px;margin:-1px 0 0;background:var(--panel);border:1px solid var(--line);border-radius:999px;align-self:flex-start}
 .rsc.fixer .chipfld .pchip{border:0;background:none;padding:5px 12px;font-size:13px;border-radius:999px;color:var(--dim)}
@@ -781,6 +783,10 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 @media (max-width:980px){.rsc.fixer .frow.four{grid-template-columns:repeat(2,minmax(0,1fr))}.rsc.fixer .frow.three{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:640px){.rsc.fixer .frow.two,.rsc.fixer .frow.three,.rsc.fixer .frow.four{grid-template-columns:1fr}}
 .rsc.fixer .nav{margin-top:18px}
+.rsc.fixer .tm{display:flex;align-items:center;gap:8px}.rsc.fixer .tm input{flex:1;min-width:0}
+.rsc.fixer .tm .ampm{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line);border-radius:999px;background:var(--panel);flex:none}
+.rsc.fixer .tm .ampm .pchip{border:0;background:none;padding:3px 9px;font-size:11px;letter-spacing:.04em;border-radius:999px;color:var(--faint)}
+.rsc.fixer .tm .ampm .pchip.on{background:var(--text);color:var(--bg)}
 /* in Flight Fixer mode the other steps do not apply, so they are not shown (per Patrick, 2026-09-21) */
 .fixmode .rail .st:not(:first-child),.fixmode .rail .jump{display:none}.fixmode .rail .st:first-child{margin-right:auto}
 .rsc .odds{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 10px}.rsc .odds b{font-family:var(--mono);font-size:26px}.rsc .odds small{color:var(--faint)}
@@ -793,6 +799,11 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 .rsc .alt{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:10px 0;border-top:1px solid var(--line)}.rsc .alt small{color:var(--faint);display:block}.rsc .alt .net{font-family:var(--mono);text-align:right}
 .rsc ul{padding-left:18px;margin:0}.rsc li{margin:5px 0;font-size:13.5px;color:var(--dim)}.rsc li b{color:var(--text);font-weight:500}
 .rsc .advice{font-size:15px;line-height:1.55;margin:6px 0 0}
+.rsc .row2.end{justify-content:flex-end;margin-top:20px;padding-top:14px;border-top:1px solid var(--line)}
+.rsc .alt[data-alt]{cursor:pointer;border-radius:8px;margin:0 -8px;padding:10px 8px}.rsc .alt[data-alt]:hover{background:rgba(255,255,255,.04)}
+.rsc .alt .tmrw{color:var(--faint);font-family:var(--mono);font-size:11px;margin-left:6px}
+.rsc .seeall{display:flex;justify-content:flex-end;margin:10px 0 2px}
+.fixwarn{margin:0 0 14px;padding:10px 14px;border:1px solid rgba(255,196,64,.5);border-radius:10px;background:rgba(255,196,64,.06);font-size:13.5px;line-height:1.5;color:var(--text)}
 .prof.tour p,.prof.tour li{font-size:15px;line-height:1.5;color:var(--text)}.prof.tour ul{padding-left:18px;margin:0}.prof.tour li{margin:6px 0}
 .rail .rail-acct{order:9;margin-left:auto}
 /* what needs an account, while there is none: greyed, and a tap opens the pop-up */
@@ -1405,19 +1416,30 @@ function bill(e, opts){
 }
 function priced(e){ return bill(e); }
 // ---- the Flight Fixer's form: the search's own fields and labels, what is required marked, the rest optional
+// 12-hour clocks for people (per Patrick, 2026-09-21): typed as 6:30 with AM or PM, or as 18:30, which picks PM by itself
+function split12(v){ const m = /^\s*(\d{1,2}):(\d{2})\s*(\+1)?\s*$/.exec(v || ''); if (!m) return {h12:'', ampm:''}; let h = +m[1]; const ampm = h >= 12 ? 'pm' : 'am'; h = h % 12 || 12; return {h12: h + ':' + m[2] + (m[3] ? ' +1' : ''), ampm}; }
+function guessAmPm(h){ return (h >= 5 && h <= 11) ? 'am' : 'pm'; }     // airlines fly from five in the morning; 1 to 4 reads as afternoon
+function read24(id){ const i = $('#' + id); if (!i) return ''; const m = /^\s*(\d{1,2}):(\d{2})\s*(\+1)?\s*$/.exec(i.value || ''); if (!m) return ''; let h = +m[1]; const seg = document.querySelector('[data-ampm="' + id + '"] .pchip.on'), ampm = seg ? seg.dataset.v : (h > 12 ? 'pm' : guessAmPm(h)); if (h <= 12){ h = h % 12 + (ampm === 'pm' ? 12 : 0); } return String(h).padStart(2, '0') + ':' + m[2] + (m[3] ? ' +1' : ''); }
+document.addEventListener('input', ev => { const i = ev.target; if (!(i.matches && i.matches('input[data-time]'))) return;
+  const m = /^\s*(\d{1,2}):(\d{2})(\s*\+1)?\s*$/.exec(i.value); if (!m) return; const h = +m[1], seg = document.querySelector('[data-ampm="' + i.id + '"]'); if (!seg) return;
+  let pick = null; if (h >= 13){ i.value = (h - 12) + ':' + m[2] + (m[3] ? ' +1' : ''); pick = 'pm'; } else if (h === 0){ i.value = '12:' + m[2] + (m[3] ? ' +1' : ''); pick = 'am'; } else if (h === 12) pick = 'pm'; else if (!seg.querySelector('.pchip.on')) pick = guessAmPm(h);
+  if (pick) seg.querySelectorAll('.pchip').forEach(x => x.classList.toggle('on', x.dataset.v === pick)); });
+document.addEventListener('click', ev => { const b = ev.target.closest('.rsc [data-ampm] .pchip'); if (!b) return; b.parentElement.querySelectorAll('.pchip').forEach(x => x.classList.toggle('on', x === b)); });
 function fixerHTML(){
-  const today = localISO(new Date()).slice(0, 10);
+  const today = localISO(new Date()).slice(0, 10), keep = !!RS.keep; RS.keep = false;
+  const K = k => keep ? (RS[k] || '') : '';
+  const T = (id, label, val, help, req) => { const t = split12(val); return `<div class="fld"><svg class="ico" viewBox="0 0 24 24">${ICON.clock.replace(/^<svg[^>]*>|<\/svg>$/g, '')}</svg><label for="${id}">${label}${tag(req)}</label><div class="tm"><input id="${id}" value="${esc(t.h12)}" placeholder="—" autocomplete="off" inputmode="numeric" data-time><div class="ampm" data-ampm="${id}" role="group" aria-label="AM or PM"><button type="button" class="pchip${t.ampm === 'am' ? ' on' : ''}" data-v="am">AM</button><button type="button" class="pchip${t.ampm === 'pm' ? ' on' : ''}" data-v="pm">PM</button></div></div>${help ? `<div class="help">${help}</div>` : ''}</div>`; };
   const tag = req => req ? ' <em class="req">required</em>' : '';
   const F = (id, label, val, icon, help, ph, req, type) => `<div class="fld"><svg class="ico" viewBox="0 0 24 24">${ICON[icon].replace(/^<svg[^>]*>|<\/svg>$/g, '')}</svg><label for="${id}">${label}${tag(req)}</label><input id="${id}" type="${type || 'text'}" value="${esc(val || '')}" placeholder="${esc(ph || '')}" autocomplete="off"${type === 'time' ? ' step="300"' : ''}>${help ? `<div class="help">${help}</div>` : ''}</div>`;
   const D = (id, label, val) => `<div class="fld"><svg class="ico" viewBox="0 0 24 24">${ICON.cal.replace(/^<svg[^>]*>|<\/svg>$/g, '')}</svg><label for="${id}">${label}</label><input id="${id}" type="date" value="${esc(val || today)}" max="${today}"><div class="help">The day of the flight.</div></div>`;
   const Sel = (id, label, val, icon, opts, help) => `<div class="fld"><svg class="ico" viewBox="0 0 24 24">${ICON[icon].replace(/^<svg[^>]*>|<\/svg>$/g, '')}</svg><label for="${id}">${label}</label><select id="${id}">${opts.map(([v, l]) => `<option value="${v}"${val === v ? ' selected' : ''}>${l}</option>`).join('')}</select>${help ? `<div class="help">${help}</div>` : ''}</div>`;
   const Seg = (k, label, icon, opts, req) => `<div class="fld chipfld"><svg class="ico" viewBox="0 0 24 24">${ICON[icon].replace(/^<svg[^>]*>|<\/svg>$/g, '')}</svg><label>${label}${tag(req)}</label><div class="seg" data-rs="${k}" role="group" aria-label="${esc(label)}">${opts.map(([v, l]) => `<button type="button" class="pchip${RS[k] === v ? ' on' : ''}" data-v="${v}" aria-pressed="${RS[k] === v}">${l}</button>`).join('')}</div><div class="help">${k === 'kind' ? 'Delayed keeps the flight in the running; cancelled looks only at the way on.' : ''}</div></div>`;
   return `<div class="rsc fixer">
-    <div class="frow route">${F('q-from-0', 'From', RS.from, 'pin', 'The airport, or the city.', 'LGA', true)}<div class="link" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M15 8l-4.2-1.4L7 1.5H5.4l1.9 5.1H3.6L2.5 4.9H1.2l.9 3.1-.9 3.1h1.3l1.1-1.7h3.7L5.4 14.5H7l3.8-5.1z"/></svg></div>${F('q-to-0', 'To', RS.to, 'flag', 'The airport, the city, or the address where you are staying.', 'CLT', true)}</div>
-    <div class="frow three">${F('rs-flight', 'Flight', RS.flight, 'plane', 'The number on your boarding pass.', 'DL 5048')}${D('rs-date', 'Date', RS.date)}${Seg('kind', 'What happened', 'alert', [['delayed', 'Delayed'], ['cancelled', 'Cancelled']], true)}</div>
-    <div class="frow three" id="rs-when">${F('rs-sched', 'Scheduled departure', RS.sched, 'clock', 'As printed on the ticket.', '18:30', true, 'time')}${F('rs-new', 'New departure', RS.newdep, 'clock', 'What the board says now. Blank if nothing yet.', '21:40', false, 'time')}${F('rs-newarr', 'New arrival', RS.newarr, 'clock', 'Add +1 if it lands tomorrow.', '09:50 +1')}</div>
-    <div class="frow two">${Sel('rs-rebook', 'Rebooking offered', RS.rebook, 'swap', [['no', 'No'], ['notyet', 'Not yet'], ['yes', 'Yes, on another flight']], 'What the airline has put you on, if anything.')}${F('rs-rbarr', 'That flight lands at', RS.rbarr, 'flag', 'Only if one was offered. Add +1 for tomorrow.', '13:10 +1')}</div>
-    <div class="frow four">${Sel('rs-fare', 'Your fare', RS.fare, 'seat', [['basic', 'Basic economy'], ['main', 'Main cabin'], ['flex', 'Economy, flexible'], ['premium', 'Premium economy'], ['business', 'Business'], ['first', 'First']], 'Sets the refund rules and which cabin to search.')}${Sel('rs-bags', 'Bags', RS.bags, 'bag', [['no', 'Carry-on only'], ['yes', 'A bag is checked']], 'A checked bag does not follow you to another airline.')}${F('rs-paid', 'What you paid', RS.paid, 'dollar', 'Helps the refund maths.', '600')}${F('rs-hour', 'An hour of yours is worth', RS.hour || '35', 'who', 'Prices the time an alternative saves.', '35')}</div>
+    <div class="frow route">${F('q-from-0', 'From', K('from'), 'pin', 'The airport, or the city.', '—', true)}<div class="link" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M15 8l-4.2-1.4L7 1.5H5.4l1.9 5.1H3.6L2.5 4.9H1.2l.9 3.1-.9 3.1h1.3l1.1-1.7h3.7L5.4 14.5H7l3.8-5.1z"/></svg></div>${F('q-to-0', 'To', K('to'), 'flag', 'The airport, the city, or the address where you are staying.', '—', true)}</div>
+    <div class="frow three">${F('rs-flight', 'Flight', K('flight'), 'plane', 'The number on your boarding pass.', '—')}${D('rs-date', 'Date', keep ? RS.date : '')}${Seg('kind', 'What happened', 'alert', [['delayed', 'Delayed'], ['cancelled', 'Cancelled']], true)}</div>
+    <div class="frow three" id="rs-when">${T('rs-sched', 'Scheduled departure', K('sched'), 'As printed on the ticket.', true)}${T('rs-new', 'New departure', K('newdep'), 'What the board says now. Blank if nothing yet.')}${T('rs-newarr', 'New arrival', K('newarr'), 'Add +1 if it lands tomorrow.')}</div>
+    <div class="frow two">${Sel('rs-rebook', 'Rebooking offered', RS.rebook, 'swap', [['no', 'No'], ['notyet', 'Not yet'], ['yes', 'Yes, on another flight']], 'What the airline has put you on, if anything.')}${T('rs-rbarr', 'That flight lands at', K('rbarr'), 'Only if one was offered. Add +1 for tomorrow.')}</div>
+    <div class="frow four">${Sel('rs-fare', 'Your fare', RS.fare, 'seat', [['basic', 'Basic economy'], ['main', 'Main cabin'], ['flex', 'Economy, flexible'], ['premium', 'Premium economy'], ['business', 'Business'], ['first', 'First']], 'Sets the refund rules and which cabin to search.')}${Sel('rs-bags', 'Bags', RS.bags, 'bag', [['no', 'Carry-on only'], ['yes', 'A bag is checked']], 'A checked bag does not follow you to another airline.')}${F('rs-paid', 'What you paid', K('paid'), 'dollar', 'Helps the refund maths.', '—')}${F('rs-hour', 'An hour of yours is worth', keep ? (RS.hour || '35') : '35', 'who', 'Prices the time an alternative saves.', '35')}</div>
     <p class="searcherr" id="rs-err" role="alert"></p>
     <div class="nav"><button class="go" id="rs-go">🪄 Make the call</button><span class="hintr">From, to, what happened and the scheduled time are required. The more you add, the faster and surer the call.</span></div></div>`;
 }
@@ -1835,8 +1857,9 @@ function factsHTML(e){
     return `<div class="fact"><h5>${d.segments.length === 1 ? 'Flight' : 'Leg ' + (i + 1) + ' of ' + d.segments.length}</h5><dl>${L.join('')}</dl></div>`;
   }).join('');
   const F = [];
-  F.push(row('Changes', d.change.allowed == null ? '—' : d.change.allowed ? (d.change.penalty_cents ? money(d.change.penalty_cents) + ' penalty' : 'allowed') : 'not allowed'));
-  F.push(row('Refunds', d.refund.allowed == null ? '—' : d.refund.allowed ? (d.refund.penalty_cents ? money(d.refund.penalty_cents) + ' penalty' : 'allowed') : 'not refundable'));
+  { const ch = d.change || {}, rf = d.refund || {};
+  F.push(row('Changes', ch.allowed == null ? '—' : ch.allowed ? (ch.penalty_cents ? money(ch.penalty_cents) + ' penalty' : 'allowed') : 'not allowed'));
+  F.push(row('Refunds', rf.allowed == null ? '—' : rf.allowed ? (rf.penalty_cents ? money(rf.penalty_cents) + ' penalty' : 'allowed') : 'not refundable')); }
   F.push(row('Seat choice', e.seat_selection === 'paid' ? 'paid' : e.seat_selection === 'free' ? 'included' : '—'));
   // the split is shown only when it is a real one: the test feed invents a $1 base under real taxes
   if (d.base_cents != null && d.base_cents >= .25 * (d.base_cents + (d.tax_cents || 0))) F.push(row('Fare', `${money(d.base_cents)} base + ${money(d.tax_cents || 0)} taxes`));
@@ -1870,6 +1893,7 @@ function ledgerHTML(e){
 function openSheet(id){
   const e = ALL.find(x => x.id === id);
   $('#sheetroot').innerHTML = `<div class="sheetwrap" id="sheetwrap" data-id="${esc(e.id)}"><div class="sheet" role="dialog" aria-modal="true" aria-label="Ledger"><div class="hd"><h3>${esc(e.carrier_name)} ${esc(e.flight)}<span>${esc(e.brand)} · itemised at your dial</span></h3><button class="x" id="x" aria-label="Close">×</button></div><div class="detail">${ledgerHTML(e)}</div></div></div>`;
+  if (S.fixerWarn){ const hd = document.querySelector('#sheetwrap .sheet .hd'); if (hd) hd.insertAdjacentHTML('afterend', '<p class="fixwarn">Booking this yourself works, but ask the airline\'s staff to move you first, especially onto one of its own flights: a second ticket can mean paying twice, and a checked bag does not follow you to another airline.</p>'); }
   $('#x').focus();
 }
 
@@ -2739,7 +2763,7 @@ function openRescue(){
 }
 function rsTime(dateStr, hhmm){ const m = /^(\d{1,2}):(\d{2})\s*(\+1)?$/.exec((hhmm || '').trim()); if (!m) return null; const d = new Date(dateStr + 'T00:00:00'); if (m[3]) d.setDate(d.getDate() + 1); d.setHours(+m[1], +m[2]); return localISO(d); }
 async function runRescue(){
-  const v = id => ($(id) ? $(id).value.trim() : ''); RS.from = (v('#q-from-0') || v('#rs-from')); RS.to = (v('#q-to-0') || v('#rs-to')); RS.flight = v('#rs-flight'); if ($('#rs-fare')) RS.fare = v('#rs-fare'); if ($('#rs-bags')) RS.bags = v('#rs-bags'); if ($('#rs-rebook')) RS.rebook = v('#rs-rebook'); RS.date = v('#rs-date'); RS.sched = v('#rs-sched'); RS.newdep = v('#rs-new'); RS.newarr = v('#rs-newarr'); RS.rbarr = v('#rs-rbarr'); RS.paid = v('#rs-paid'); RS.hour = v('#rs-hour');
+  const v = id => ($(id) ? $(id).value.trim() : ''); RS.from = (v('#q-from-0') || v('#rs-from')); RS.to = (v('#q-to-0') || v('#rs-to')); RS.flight = v('#rs-flight').toUpperCase().replace(/^([A-Z0-9]{2})\s*(\d+)$/, '$1 $2'); if ($('#rs-fare')) RS.fare = v('#rs-fare'); if ($('#rs-bags')) RS.bags = v('#rs-bags'); if ($('#rs-rebook')) RS.rebook = v('#rs-rebook'); RS.date = v('#rs-date'); RS.sched = read24('rs-sched'); RS.newdep = read24('rs-new'); RS.newarr = read24('rs-newarr'); RS.rbarr = read24('rs-rbarr'); RS.paid = v('#rs-paid'); RS.hour = v('#rs-hour');
   const err = $('#rs-err'); err.textContent = '';
   if (!RS.from || !RS.to){ err.textContent = 'Where from, and where to.'; return; }
   if (RS.kind === 'delayed' && !RS.sched){ err.textContent = 'The scheduled departure, as printed on the ticket.'; return; }
@@ -2758,27 +2782,47 @@ async function runRescue(){
 }
 function paintRescue(res){
   const a = res.assessment, V = a.verdict, hm = iso => iso ? iso.slice(11, 16) : '';
-  const alt = r => `<div class="alt"><div><b>${esc(r.carrier)} ${esc(r.flight)}</b> · ${esc((r.route || []).join(' → '))} · ${hm(r.depart)} → ${hm(r.arrive)}${r.stops ? ' · ' + r.stops + ' stop' : ' · nonstop'}<small>${r.lines.map(l => esc(l.label) + ' ' + (l.cents < 0 ? '−' : '') + money(Math.abs(l.cents))).join(' · ')}</small></div><div class="net">${V.option && V.option.id === r.id ? '★ ' : ''}${r.net_cents < 0 ? '−' : ''}${money(Math.abs(r.net_cents))}<small>net</small></div></div>`;
+  RS.search = res.search || null; RS.loaded = false; const known = new Set(((RS.search || {}).results || {}).reference ? RS.search.results.reference.map(e => e.id) : []);
+  const alt = r => `<div class="alt"${known.has(r.id) ? ` data-alt="${esc(r.id)}" role="button" tabindex="0"` : ''}><div><b>${esc(r.carrier)} ${esc(r.flight)}</b>${known.has(r.id) ? '' : '<span class="tmrw">tomorrow</span>'} · ${esc((r.route || []).join(' → '))} · ${hm(r.depart)} → ${hm(r.arrive)}${r.stops ? ' · ' + r.stops + ' stop' : ' · nonstop'}<small>${r.lines.map(l => esc(l.label) + ' ' + (l.cents < 0 ? '−' : '') + money(Math.abs(l.cents))).join(' · ')}</small></div><div class="net">${V.option && V.option.id === r.id ? '★ ' : ''}${r.net_cents < 0 ? '−' : ''}${money(Math.abs(r.net_cents))}<small>net</small></div></div>`;
   const head = V.action === 'switch' && V.option ? 'Switch to ' + V.option.carrier + ' ' + V.option.flight + (V.ahead_cents ? ', ' + money(V.ahead_cents) + ' ahead' : '') : V.action === 'stay' ? 'Stay with what the airline offered' : 'Wait it out';
-  const od = a.odds || {}, oddsHTML = od.p_today == null ? '' : `<div class="odds"><b>${Math.round(od.p_today * 100)}%</b><span>chance you fly today${od.planned ? ' on the ' + hm(od.planned) : ''}</span><small>modelled</small>${od.curve && od.curve.length ? '<button type="button" id="oddsmore">Details</button>' : ''}</div>${oddsChart(od)}`;
+  const od = a.odds || {}, pct = x => Math.round(x * 100) + '%', c12 = iso => { const t = split12(hm(iso)); return t.h12 + ' ' + t.ampm.toUpperCase(); };
+  const oddsHTML = !(od.today && od.today.p != null) ? '' : `
+    ${od.planned && od.flight && od.flight.p != null ? `<div class="odds"><b>${pct(od.flight.p)}</b><span>chance of making the updated flight, the ${c12(od.planned)}</span><small>modelled</small></div>${oddsChart(od.flight.curve, 'If it slips to this hour, the chance it still goes today.')}` : ''}
+    <div class="odds"><b>${pct(od.today.p)}</b><span>chance you fly today, one way or another</span><small>modelled</small></div>${oddsChart(od.today.curve, 'Standing at the gate at this hour: this flight, or an alternative still leaving 75 minutes on.')}
+    <p class="fine">${esc(od.basis || '')}</p>`;
   $('#accth').textContent = 'The call';
   $('#acctbody').innerHTML = `<div class="rsc">${oddsHTML}<div class="verdict"><b>${esc(head)}</b><p class="advice">${esc(res.advice.advice)}</p>${res.advice.source === 'template' ? '<p class="fine">Written from the figures without the model' + (res.advice.note ? ' (' + esc(res.advice.note) + ')' : '') + '.</p>' : ''}</div>
     <h4>Your options today${res.searched.length > 1 ? ' and tomorrow' : ''} · ${res.found} found</h4>${a.options.slice(0, 4).map(alt).join('') || '<p>Nothing leaves in time.</p>'}
+    ${RS.search ? '<div class="seeall"><button class="acctbtn" id="seealt">See all alternative flights</button></div>' : ''}
     ${a.hotel_tonight ? `<h4>Tonight</h4><p><a class="ledger" target="_blank" rel="noopener" href="https://www.google.com/maps/search/hotels+near+${encodeURIComponent(RS.from)}+airport">Hotels near ${esc(RS.from)}</a> · ask the desk whether the airline covers it.</p>` : ''}
     <h4>What you can ask for</h4><ul>${a.rights.map(r => `<li><b>${esc(r.what)}</b> · ${esc(r.detail)}</li>`).join('')}</ul>
     <p class="fine">Refund: ${esc(a.refund.why)}.</p>
-    <div class="row2"><button class="ledger" id="rescuego">Change the details</button><button class="choose" id="acctno" style="flex:0 0 auto">Done</button></div></div>`;
+    <div class="row2 end"><button class="acctbtn" id="rescuego">Change the details</button><button class="choose" id="acctno" style="flex:0 0 auto">Done</button></div></div>`;
   // the form lives on the page now, so the sheet must be OPENED, not just filled (2026-09-21: the call came back into a hidden sheet)
   $('#acct').classList.remove('hidden'); const sh = $('#acct .sheet'); if (sh) sh.scrollTop = 0; ($('#oddsmore') || $('#acctno')).focus();
 }
+// the day's search, shown as a search: one way, narrowed to what still leaves in time, the rule on a chip anyone can remove
+function showAlternatives(openId){
+  if (!RS.search) return;
+  closeAccount();
+  if (!RS.loaded){ loadData(RS.search); RS.loaded = true; }
+  S.trip = 'one'; document.querySelectorAll('[data-trip]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.trip === 'one')));
+  S.legs[0].from = RS.from; S.legs[0].to = RS.to; S.legs[0].date = RS.date || localISO(new Date()).slice(0, 10);
+  const soonest = new Date(Date.now() + 75 * 60000), h = Math.min(23, soonest.getHours() + (soonest.getMinutes() ? 1 : 0)), label = 'Leaves after ' + String(h).padStart(2, '0') + ':00, the earliest you can make';
+  S.rules = S.rules.filter(r => r.kind !== 'after'); S.rules.push({kind:'after', h, label});
+  S.fixerWarn = true; S.notice = 'Live results for today, the alternatives to your flight.';
+  document.documentElement.classList.remove('fixmode'); finishAllSteps(); $('#wizard').classList.add('hidden'); $('#rail').classList.add('hidden'); $('#loading').classList.add('hidden');
+  showResults(); paint(false);
+  if (openId) setTimeout(() => openSheet(openId), 250);
+}
 // the chance of being off the ground by each hour left in the day, as one line; the basis under it in a sentence
-function oddsChart(od){
-  const c = od.curve || []; if (!c.length) return '';
+function oddsChart(c, caption){
+  c = c || []; if (!c.length) return '';
   const W = 560, H = 130, L = 34, R = 10, T = 10, B = 26, x = h => L + (h - c[0].hour) / Math.max(1, c[c.length - 1].hour - c[0].hour) * (W - L - R), y = p => T + (1 - p) * (H - T - B);
   const pts = c.map(k => x(k.hour).toFixed(1) + ',' + y(k.p).toFixed(1)).join(' ');
   const grid = [0, .5, 1].map(p => `<line class="g" x1="${L}" x2="${W - R}" y1="${y(p)}" y2="${y(p)}"/><text x="2" y="${y(p) + 3}">${Math.round(p * 100)}%</text>`).join('');
   const ticks = c.filter((k, i) => i % Math.max(1, Math.floor(c.length / 6)) === 0 || i === c.length - 1).map(k => `<text x="${x(k.hour)}" y="${H - 8}" text-anchor="middle">${String(k.hour % 24).padStart(2, '0')}:00</text>`).join('');
-  return `<div class="chart hidden" id="oddschart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}<polyline class="l" points="${pts}"/>${ticks}</svg><p class="fine">Chance you are off the ground by each hour left today. ${esc(od.basis || '')}.</p></div>`;
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}<polyline class="l" points="${pts}"/>${ticks}</svg><p class="fine">${esc(caption || '')}</p></div>`;
 }
 // the first-launch tour (per Patrick, 2026-09-21): the premise in a breath, how it works in three lines, then the
 // quiz. Once per browser; the profile can always reopen the quiz.
@@ -2815,7 +2859,9 @@ function openProfile(quiz){
 document.addEventListener('click', ev => {
   if (ev.target.closest('#account, #account2')){ const u = S.user; if (u && (u.email || u.owner)){ openProfile(); return; } openAccount(); return; }
   if (ev.target.closest('#quizgo')){ openProfile(true); return; }
-  if (ev.target.closest('#rescuego')){ closeAccount(); S.trip = 'fix'; $('#trip').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.trip === 'fix')); goStep(1); sentenceHTML(); return; }
+  const altRow = ev.target.closest('.rsc .alt[data-alt]'); if (altRow){ showAlternatives(altRow.dataset.alt); return; }
+  if (ev.target.closest('#seealt')){ showAlternatives(); return; }
+  if (ev.target.closest('#rescuego')){ RS.keep = true; closeAccount(); S.trip = 'fix'; $('#trip').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.trip === 'fix')); goStep(1); sentenceHTML(); return; }
   if (ev.target.closest('#oddsmore')){ const c = $('#oddschart'); if (c) c.classList.toggle('hidden'); return; }
   if (ev.target.closest('#rs-go')){ runRescue(); return; }
   const rc = ev.target.closest('.rsc [data-rs] .pchip'); if (rc){ const g = rc.closest('[data-rs]'); RS[g.dataset.rs] = rc.dataset.v; g.querySelectorAll('.pchip').forEach(x => { x.classList.toggle('on', x === rc); x.setAttribute('aria-pressed', x === rc); }); return; }

@@ -108,6 +108,7 @@ def google_details(g):
             "fare_brand": None, "extensions": ext, "often_delayed": bool(leg.get("often_delayed")),
         })
     return {"source": g.get("source") or "Google Flights via SerpApi", "segments": segs,
+            "change": {"allowed": None}, "refund": {"allowed": None},   # Google names no fare terms; the sheet prints a dash
             "emissions_kg": g.get("emissions_kg"), "typical_kg": g.get("typical_kg"),
             "total_minutes": g.get("total_duration"),
             "note": "The lowest fare Google shows, with no fare brand or bag allowance named; "

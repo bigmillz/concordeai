@@ -127,7 +127,8 @@ def assess(sit: Dict[str, Any], options: List[Dict[str, Any]], now: Optional[dat
         oop = int(o.get("ticket_cents", 0)) - refund
         sooner = _minutes(arr, base_arrive) if base_arrive else None      # positive: this one lands earlier
         time_value = int(round(sooner / 60.0 * hourly)) if sooner is not None else 0
-        hotel = HOTEL_CENTS if (now is not None and dep.date() > now.date() and (dep - now) >= timedelta(hours=7) and now.hour >= 19) else 0
+        # a flight tomorrow means a night somewhere tonight, whatever the clock says now
+        hotel = HOTEL_CENTS if (now is not None and dep.date() > now.date()) else 0
         net = oop - time_value + hotel
         lines = [{"label": "Ticket", "cents": int(o.get("ticket_cents", 0))}]
         if refund:
@@ -151,7 +152,7 @@ def assess(sit: Dict[str, Any], options: List[Dict[str, Any]], now: Optional[dat
     else:
         action, reason = "stay", "no alternative beats %s once its ticket, the refund you may expect and the hours are counted" % base_label
     return {"kind": sit.get("kind"), "baseline": {"label": base_label, "arrive": base_arrive.isoformat() if base_arrive else None},
-            "odds": odds(sit, now),
+            "odds": odds(sit, now, options),
             "refund": {"expected": ok, "cents": refund, "why": why, "paid_cents": paid},
             "rights": rights(sit), "options": rows[:5],
             "verdict": {"action": action, "reason": reason, "option": best if action == "switch" else None,
@@ -161,14 +162,27 @@ def assess(sit: Dict[str, Any], options: List[Dict[str, Any]], now: Optional[dat
 
 # ------------------------------------------------------------------ the odds
 #
-# P(you are in the air today). MODELLED, not observed, and it says so: a delay
-# that has already happened, the hour of the day, and the two things everybody
-# who has sat at a gate knows - a delay grows more often than it shrinks, and
-# the later it gets the likelier the cancellation, because crews time out and
-# the day runs out. A tracking feed for the flight number (a key the box can
-# hold later) would replace these priors with the flight's own day.
+# Two lines, both MODELLED and labelled so, both read against the hour of the
+# day and both falling as it goes (per Patrick, 2026-09-21: at nine in the
+# morning there is a whole day of chances; at ten to midnight there are not):
+#
+#   the updated flight: if it is still planned for hour h (it may slip there),
+#   the chance it goes at all today. A delay grows more often than it shrinks,
+#   and the later it gets the likelier the cancellation, because crews time
+#   out and the day runs out.
+#
+#   flying today at all: at hour h, the flight's own chance or one of the
+#   alternatives still leaving after it, from the DAY'S OWN RESULTS: every
+#   alternative on sale that leaves at least 75 minutes after h is one more
+#   way out, and each is given an even chance of taking you. Inventory
+#   dwindles through the evening, so the line falls to what the flight alone
+#   is worth, and to nothing after the last departure.
+#
+# A tracking feed for the flight number (a key the box can hold later) would
+# replace the priors with the flight's own day.
 
 _SLIP = ((0, 0.55), (60, 0.25), (120, 0.12), (180, 0.08))     # how much further a delayed flight slips, minutes -> share
+_ALT_TAKES_YOU = 0.5                                            # each alternative on sale: an even chance it takes you
 
 
 def _cancel_risk(delay_minutes: int, planned_hour: float) -> float:
@@ -180,37 +194,67 @@ def _cancel_risk(delay_minutes: int, planned_hour: float) -> float:
     return min(0.70, r)
 
 
-def odds(sit: Dict[str, Any], now: Optional[datetime]) -> Dict[str, Any]:
-    """{p_today, curve:[{hour, p}], basis, planned}. The curve is P(off the
-    ground by that hour) for each hour left in the day, on this flight or the
-    rebooking the airline offered."""
+def _flight_goes_today(planned: datetime, delay: int) -> float:
+    """The updated flight, planned for `planned` with `delay` behind it: the
+    chance it leaves at all today, its slips counted and midnight the end."""
+    midnight = planned.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    got = 0.0
+    for slip, share in _SLIP:
+        at = planned + timedelta(minutes=slip)
+        if at < midnight:
+            got += share * (1.0 - _cancel_risk(delay + slip, at.hour + at.minute / 60.0))
+    return round(got, 3)
+
+
+def odds(sit: Dict[str, Any], now: Optional[datetime], options: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    """{flight:{p, curve}, today:{p, curve}, modelled, planned, basis}. Each
+    curve is [{hour, p}] for the hours left in the day."""
     planned = _parse(sit.get("rebook_depart")) or _parse(sit.get("new_depart"))
-    if sit.get("kind") == "cancelled" and not planned:
-        return {"p_today": 0.0, "curve": [], "modelled": True, "planned": None,
-                "basis": "the flight is cancelled and no rebooking is in hand; the odds are the alternatives'"}
-    if planned is None or now is None:
-        return {"p_today": None, "curve": [], "modelled": True, "planned": None,
-                "basis": "no new departure time yet; the odds need one"}
+    cancelled = sit.get("kind") == "cancelled" and not planned
+    if now is None:
+        return {"flight": {"p": None, "curve": []}, "today": {"p": None, "curve": []}, "modelled": True, "planned": None,
+                "basis": "no local time came with the request, so the hours cannot be drawn"}
     delay = int(sit.get("delay_minutes") or 0)
-    ph = planned.hour + planned.minute / 60.0
-    cancel = _cancel_risk(delay, ph)
     start = now.hour + (1 if now.minute else 0)
-    curve = []
-    for h in range(max(start, 0), 25):
-        edge = planned.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=h)
-        got = 0.0
-        for slip, share in _SLIP:
-            if planned + timedelta(minutes=slip) <= edge:
-                got += share
-        curve.append({"hour": h, "p": round((1.0 - cancel) * got, 3)})
-    p_today = curve[-1]["p"] if curve else 0.0
-    return {"p_today": round(p_today, 2), "curve": curve, "modelled": True,
-            "planned": planned.isoformat(), "cancel_risk": round(cancel, 2),
-            "basis": ("a %s delay so far and a departure planned for %02d:%02d: the cancellation risk is put at %d%%, "
-                      "and a delayed flight is given a %d%% chance of leaving when the airline says, the rest slipping "
-                      "by the hour; anything past midnight is lost. Modelled from the hour and the delay, not from the "
-                      "airline's operation"
-                      % (narrator._hm(delay) if delay else "no", planned.hour, planned.minute, round(cancel * 100), round(_SLIP[0][1] * 100)))}
+    day0 = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    hours = list(range(max(start, 0), 25))
+    # the updated flight, by the hour it is planned for
+    fcurve = []
+    if planned is not None and not cancelled:
+        ph = planned.hour + planned.minute / 60.0
+        for h in hours:
+            at = planned if h <= ph else planned.replace(hour=min(h, 23), minute=planned.minute if h < 24 else 59)
+            slip = 0 if h <= ph else int((h - ph) * 60)
+            p = 0.0 if h >= 24 else _flight_goes_today(at, delay + slip)
+            fcurve.append({"hour": h, "p": p})
+        p_flight = _flight_goes_today(planned, delay)
+    else:
+        p_flight = 0.0
+    # flying today at all, by the hour you are standing there
+    deps = []
+    for o in options or []:
+        d = _parse(o.get("depart"))
+        if d is not None and d.date() == now.date():
+            deps.append(d)
+    tcurve = []
+    for h in hours:
+        edge = day0 + timedelta(hours=h, minutes=BUFFER_MINUTES)
+        n = sum(1 for d in deps if d >= edge)
+        p_alt = 1.0 - (1.0 - _ALT_TAKES_YOU) ** n if n else 0.0
+        pf = next((k["p"] for k in fcurve if k["hour"] == h), 0.0)
+        # never certain: a seat on sale is not a seat in hand, so the line tops out at 97%
+        tcurve.append({"hour": h, "p": round(min(0.97, 1.0 - (1.0 - pf) * (1.0 - p_alt)), 3), "alternatives_left": n})
+    p_today = next((k["p"] for k in tcurve if k["hour"] >= now.hour + now.minute / 60.0), tcurve[0]["p"] if tcurve else 0.0)
+    cancel = _cancel_risk(delay, planned.hour + planned.minute / 60.0) if (planned is not None and not cancelled) else None
+    basis = ("Modelled from the hour and the delay, not from the airline's operation. "
+             + ("The updated flight: a %s delay so far and a departure planned for %02d:%02d, a cancellation risk put at %d%%, "
+                "and a %d%% chance of leaving when the airline says with the rest slipping by the hour; anything past midnight is lost. "
+                % (narrator._hm(delay) if delay else "no", planned.hour, planned.minute, round(cancel * 100), round(_SLIP[0][1] * 100))
+                if cancel is not None else ("The flight is cancelled" + (" with no rebooking in hand" if sit.get("kind") == "cancelled" else "") + ", so only the alternatives count. "))
+             + "Flying today at all: every alternative on sale that still leaves 75 minutes after the hour is one more way out, "
+               "each given an even chance of taking you; %d leave today after now." % sum(1 for d in deps if d >= now + timedelta(minutes=BUFFER_MINUTES)))
+    return {"flight": {"p": round(p_flight, 2), "curve": fcurve}, "today": {"p": round(p_today, 2), "curve": tcurve},
+            "modelled": True, "planned": planned.isoformat() if planned else None, "cancel_risk": cancel, "basis": basis}
 
 
 def _clock(iso: Optional[str]) -> str:
@@ -235,7 +279,8 @@ def brief(sit: Dict[str, Any], a: Dict[str, Any]) -> Dict[str, Any]:
                          for r in a["options"][:3]],
         "rights": [{"what": r["what"], "detail": r["detail"]} for r in a["rights"]],
         "hotel_tonight": a["hotel_tonight"],
-        "odds_you_fly_today": ("%d%%" % round(a["odds"]["p_today"] * 100)) if a.get("odds", {}).get("p_today") is not None else None,
+        "odds_you_fly_today": ("%d%%" % round(a["odds"]["today"]["p"] * 100)) if (a.get("odds", {}).get("today") or {}).get("p") is not None else None,
+        "odds_the_updated_flight_goes": ("%d%%" % round(a["odds"]["flight"]["p"] * 100)) if (a.get("odds", {}).get("flight") or {}).get("p") is not None and a["odds"]["planned"] else None,
         "odds_are_modelled_not_observed": True,
     }
     blob = narrator._walk(b)
