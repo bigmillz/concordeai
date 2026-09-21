@@ -53,6 +53,8 @@ ROOT = (os.environ.get("CONCORDEGO_ROOT") or "").strip()
 # Per-person allowances for anyone who reached us through Cloudflare Access.
 # Access puts the signed-in email in a header; nobody without one may spend.
 USER_SEARCHES = int(os.environ.get("CONCORDEGO_USER_SEARCHES", "20"))     # metered flight searches a day
+# Signed-in people who are not metered and may open /admin: the machine's owner reaching it through the tunnel.
+OWNERS = {e.strip().lower() for e in os.environ.get("CONCORDEGO_OWNERS", "").split(",") if e.strip()}
 USER_WISHES = int(os.environ.get("CONCORDEGO_USER_WISHES", "200"))        # model calls a day (cents each)
 USERS_FILE = os.path.join(live.HOME, "users.json")
 _USERS_LOCK = threading.Lock()
@@ -648,6 +650,171 @@ def narrate_request(req):
     return narrator.narrate(b, allow_model=True)
 
 
+
+# ----------------------------------------------------------------- admin
+# One page for the person who runs this: which commit is live, whether GitHub
+# has moved, a button to update now, and the logs. Update means `git reset
+# --hard origin/<branch>` in the checkout the server runs from, then exiting:
+# the supervisor (systemd's Restart=always on the droplet, launchd's KeepAlive
+# on a Mac) brings the new code up. Gated to the local owner and to the emails
+# in CONCORDEGO_OWNERS; through the tunnel Access fronts /admin as well.
+REPO_DIR = os.path.dirname(HERE)
+STARTED = time.time()
+LOG_FILE = os.environ.get("CONCORDEGO_LOG", "")
+
+
+def _git(*args, timeout=40):
+    import subprocess
+    try:
+        r = subprocess.run(["git", "-C", REPO_DIR] + list(args), capture_output=True, text=True, timeout=timeout)
+        return r.returncode, (r.stdout or "").strip(), (r.stderr or "").strip()
+    except Exception as exc:
+        return 1, "", "%s: %s" % (type(exc).__name__, exc)
+
+
+def _users_today():
+    today = time.strftime("%Y-%m-%d")
+    try:
+        with open(USERS_FILE) as f:
+            data = json.load(f)
+    except Exception:
+        return []
+    out = []
+    for email, u in (data or {}).items():
+        if isinstance(u, dict) and u.get("day") == today:
+            out.append({"email": email, "searches": u.get("searches", 0), "wishes": u.get("wishes", 0)})
+    return sorted(out, key=lambda x: -(x["searches"] + x["wishes"]))
+
+
+def admin_status(fetch=False):
+    out = {"repo": REPO_DIR, "uptime_s": int(time.time() - STARTED), "pid": os.getpid(), "python": sys.version.split()[0],
+           "owners": sorted(OWNERS), "log_source": None, "now": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
+    rc, branch, err = _git("rev-parse", "--abbrev-ref", "HEAD")
+    out["branch"] = branch if rc == 0 else None
+    if rc != 0:
+        out["git_error"] = err
+    rc, head, _ = _git("log", "-1", "--format=%h%x09%cI%x09%s")
+    if rc == 0 and head:
+        h, d, sub = (head.split("\t") + ["", ""])[:3]
+        out["head"] = {"short": h, "date": d, "subject": sub}
+    if fetch and out["branch"]:
+        rc, _, err = _git("fetch", "-q", "origin", out["branch"], timeout=90)
+        out["fetched"] = rc == 0
+        out["fetch_error"] = None if rc == 0 else live.redact(err)
+    if out["branch"]:
+        rc, n, _ = _git("rev-list", "--count", "HEAD..origin/%s" % out["branch"])
+        out["behind"] = int(n) if rc == 0 and n.isdigit() else None
+        rc, log, _ = _git("log", "--format=%h%x09%cI%x09%s", "HEAD..origin/%s" % out["branch"])
+        out["incoming"] = [dict(zip(("short", "date", "subject"), (l.split("\t") + ["", ""])[:3])) for l in log.splitlines() if l] if rc == 0 else []
+    fh = os.path.join(REPO_DIR, ".git", "FETCH_HEAD")
+    out["last_check"] = time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(os.path.getmtime(fh))) if os.path.exists(fh) else None
+    try:
+        st = live.status()
+        out["live"] = {"provider": st.get("provider"), "key_configured": st.get("key_configured"), "ready": st.get("ready"), "quota": st.get("quota")}
+    except Exception as exc:
+        out["live"] = {"error": str(exc)}
+    out["narrator"] = bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
+    out["users_today"] = _users_today()
+    out["allowances"] = {"searches": USER_SEARCHES, "wishes": USER_WISHES}
+    import shutil
+    out["log_source"] = "journal" if shutil.which("journalctl") else (LOG_FILE or None)
+    return out
+
+
+def admin_update():
+    st = admin_status(fetch=True)
+    if not st.get("branch"):
+        return {"error": "This is not a git checkout, so there is nothing to update from."}
+    if st.get("fetched") is False:
+        return {"error": "Could not fetch from GitHub: " + (st.get("fetch_error") or "unknown")}
+    rc, _, err = _git("reset", "--hard", "origin/%s" % st["branch"])
+    if rc:
+        return {"error": "The update could not be applied: " + live.redact(err)}
+    rc, head, _ = _git("rev-parse", "--short", "HEAD")
+    # exit after the reply has gone out; the supervisor restarts the service on the new code
+    threading.Timer(1.0, lambda: os._exit(0)).start()
+    return {"ok": True, "head": head, "was": (st.get("head") or {}).get("short"), "restarting": True}
+
+
+def admin_logs(unit, n):
+    import subprocess, shutil
+    n = max(20, min(2000, n))
+    if shutil.which("journalctl"):
+        svc = {"server": "concordego", "update": "concordego-update"}.get(unit, "concordego")
+        try:
+            r = subprocess.run(["journalctl", "-u", svc, "-n", str(n), "--no-pager", "-o", "short-iso"], capture_output=True, text=True, timeout=20)
+            text = r.stdout.strip()
+            # "-- No entries --" means the unit is not here (a Mac, a dev shell): fall through to the file
+            if r.returncode == 0 and text and not text.startswith("-- No entries"):
+                return {"source": "journal: " + svc, "text": live.redact(r.stdout)}
+        except Exception:
+            pass
+    if LOG_FILE and os.path.exists(LOG_FILE):
+        with open(LOG_FILE, "rb") as f:
+            f.seek(0, 2); size = f.tell(); f.seek(max(0, size - 400000)); data = f.read().decode("utf-8", "replace")
+        return {"source": LOG_FILE, "text": live.redact("\n".join(data.splitlines()[-n:]))}
+    return {"source": None, "text": "No log source here: the journal is not readable and CONCORDEGO_LOG is not set."}
+
+
+ADMIN_HTML = r"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ConcordeGo admin</title>
+<style>
+:root{--bg:#101013;--panel:#0a0a0c;--panel2:#191a1e;--line:#26272c;--text:#ececec;--dim:#b4b4b4;--faint:#8e8e8e;--green:#35e08a;--speed:#4da3ff;--red:#e26d5a;--price:#ffb020}
+html{color-scheme:dark}body{margin:0;background:var(--bg);color:var(--text);font:300 15px/1.5 "Space Grotesk","Helvetica Neue",Arial,sans-serif;padding:28px 16px 60px}
+.wrap{max-width:960px;margin:0 auto}h1{font:400 14px "Michroma","Space Grotesk",sans-serif;letter-spacing:.15em;text-transform:uppercase;margin:0 0 22px}h1 b{font-weight:800}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:18px}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px 16px}.card .k{font:400 10.5px "IBM Plex Mono",monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+.card .v{font-size:15px}.card .v b{font-weight:500}.card .s{color:var(--dim);font-size:12.5px;margin-top:4px}.ok{color:var(--green)}.warn{color:var(--price)}.bad{color:var(--red)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0 18px}
+button{background:var(--text);color:var(--bg);border:0;border-radius:999px;padding:10px 16px;font:600 13.5px "Space Grotesk",sans-serif;cursor:pointer}button.ghost{background:transparent;color:var(--dim);border:1px solid var(--line)}button:disabled{opacity:.45;cursor:default}
+.note{color:var(--dim);font-size:13px}ul.in{margin:8px 0 0;padding-left:18px;color:var(--dim);font-size:13px}ul.in code{color:var(--text);font-family:"IBM Plex Mono",monospace;font-size:12px}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;font:12px/1.55 "IBM Plex Mono",monospace;color:var(--dim);white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow:auto;margin:0}
+.tabs{display:flex;gap:6px;margin:14px 0 8px}.tabs button{padding:6px 12px;font-size:12.5px}.tabs button[aria-pressed=true]{background:var(--text);color:var(--bg)}
+table{border-collapse:collapse;font-size:13px;width:100%}td,th{text-align:left;padding:4px 8px 4px 0;color:var(--dim)}th{color:var(--faint);font-weight:400;font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+</style></head><body><div class="wrap">
+<h1>Concorde<b>Go</b> · admin</h1>
+<div class="grid" id="cards"></div>
+<div class="row"><button id="check">Check GitHub</button><button id="update" disabled>Update now</button><button class="ghost" id="refresh">Refresh</button><span class="note" id="msg"></span></div>
+<div id="incoming"></div>
+<div class="tabs"><button id="t-server" aria-pressed="true">Server log</button><button id="t-update" aria-pressed="false">Update log</button><button class="ghost" id="t-reload">Reload log</button></div>
+<pre id="log">…</pre>
+</div><script>
+const $ = s => document.querySelector(s); let ST = null, UNIT = 'server';
+const ago = s => s < 90 ? s + 's' : s < 5400 ? Math.round(s/60) + ' min' : s < 172800 ? (s/3600).toFixed(1) + ' h' : Math.round(s/86400) + ' d';
+const when = iso => iso ? new Date(iso).toLocaleString() : '—';
+async function j(url, opts){ const r = await fetch(url, opts); if (!r.ok) throw new Error(r.status + ' ' + r.statusText); return r.json(); }
+function paint(st){ ST = st; const h = st.head || {}, behind = st.behind;
+  const cards = [
+    ['Running', `<b>${h.short || '?'}</b> on ${st.branch || '?'}`, (h.subject || '') + (h.date ? ' · ' + when(h.date) : '')],
+    ['GitHub', behind == null ? '<span class="warn">not checked</span>' : behind ? `<span class="warn">${behind} commit${behind > 1 ? 's' : ''} ahead</span>` : '<span class="ok">up to date</span>', st.last_check ? 'last checked ' + when(st.last_check) : 'never checked'],
+    ['Process', `up ${ago(st.uptime_s)}`, 'pid ' + st.pid + ' · python ' + st.python + ' · ' + (st.owners.length ? 'owners: ' + st.owners.join(', ') : '<span class="warn">no CONCORDEGO_OWNERS set</span>')],
+    ['Flight API', st.live && st.live.key_configured ? `<span class="ok">${st.live.provider} key on</span>` : '<span class="warn">no key: recorded results</span>', st.live && st.live.quota ? `today ${st.live.quota.day_calls}/${st.live.quota.day_limit} · month ${st.live.quota.month_calls}/${st.live.quota.month_limit}` : ''],
+    ['Claude', st.narrator ? '<span class="ok">key on</span>' : '<span class="warn">no key: template only</span>', 'narrator and wish box'],
+    ['People today', st.users_today.length ? st.users_today.length + ' signed in' : 'nobody yet', st.users_today.slice(0, 4).map(u => `${u.email} ${u.searches}/${st.allowances.searches} · ${u.wishes}/${st.allowances.wishes}`).join('<br>')],
+  ];
+  $('#cards').innerHTML = cards.map(c => `<div class="card"><div class="k">${c[0]}</div><div class="v">${c[1]}</div><div class="s">${c[2]}</div></div>`).join('');
+  $('#update').disabled = !behind; $('#update').textContent = behind ? `Update now (${behind})` : 'Update now';
+  $('#incoming').innerHTML = (st.incoming || []).length ? '<ul class="in">' + st.incoming.map(c => `<li><code>${c.short}</code> ${c.subject} <span style="color:var(--faint)">· ${when(c.date)}</span></li>`).join('') + '</ul>' : '';
+  if (st.fetch_error) $('#msg').textContent = 'Fetch failed: ' + st.fetch_error;
+}
+async function load(){ try { paint(await j('/api/admin/status')); } catch (e){ $('#msg').textContent = e.message; } }
+async function logs(){ $('#log').textContent = '…'; try { const r = await j('/api/admin/logs?unit=' + UNIT + '&n=300'); $('#log').textContent = (r.source ? '[' + r.source + ']\n' : '') + r.text; $('#log').scrollTop = 1e9; } catch (e){ $('#log').textContent = e.message; } }
+$('#check').onclick = async () => { $('#msg').textContent = 'Asking GitHub…'; $('#check').disabled = true; try { paint(await j('/api/admin/check', {method:'POST'})); $('#msg').textContent = ST.behind ? '' : 'Nothing new.'; } catch (e){ $('#msg').textContent = e.message; } $('#check').disabled = false; };
+$('#update').onclick = async () => { if (!confirm('Update to the newest commit and restart the service?')) return; $('#msg').textContent = 'Updating…'; $('#update').disabled = true;
+  try { const r = await j('/api/admin/update', {method:'POST'}); if (r.error){ $('#msg').textContent = r.error; $('#update').disabled = false; return; }
+    $('#msg').textContent = `Now at ${r.head}; the service is restarting…`; const t0 = Date.now();
+    const poll = async () => { try { const st = await j('/api/admin/status'); if (st.uptime_s < 30 || Date.now() - t0 > 20000){ paint(st); $('#msg').textContent = `Back up on ${st.head.short}.`; logs(); return; } } catch (e) {} if (Date.now() - t0 < 60000) setTimeout(poll, 1500); else $('#msg').textContent = 'The service has not come back yet; check the log.'; };
+    setTimeout(poll, 2500);
+  } catch (e){ $('#msg').textContent = e.message; $('#update').disabled = false; } };
+$('#refresh').onclick = () => { load(); logs(); };
+$('#t-server').onclick = () => { UNIT = 'server'; $('#t-server').setAttribute('aria-pressed', 'true'); $('#t-update').setAttribute('aria-pressed', 'false'); logs(); };
+$('#t-update').onclick = () => { UNIT = 'update'; $('#t-update').setAttribute('aria-pressed', 'true'); $('#t-server').setAttribute('aria-pressed', 'false'); logs(); };
+$('#t-reload').onclick = logs;
+load(); logs();
+</script></body></html>
+"""
+
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     server_version = "ConcordeGo"
     protocol_version = "HTTP/1.1"
@@ -677,8 +844,38 @@ class Handler(http.server.BaseHTTPRequestHandler):
         email = (self.headers.get("Cf-Access-Authenticated-User-Email") or "").strip().lower()
         return email or None
 
+    def _is_owner(self):
+        who = self._who()
+        return who == "owner" or (who is not None and who in OWNERS)
+
+    def _html(self, text, code=200):
+        body = text.encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
         path = self.path.split("?")[0]
+        if path == "/admin" or path.startswith("/api/admin/"):
+            if not self._is_owner():
+                return self._html("<!doctype html><meta charset=utf-8><body style='background:#101013;color:#ececec;font:15px sans-serif;padding:40px'>"
+                                  "<p>This page is for the person who runs ConcordeGo. Sign in with an email listed in CONCORDEGO_OWNERS.</p>", 403)
+            if path == "/admin":
+                return self._html(ADMIN_HTML)
+            from urllib.parse import parse_qs
+            q = parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
+            if path == "/api/admin/status":
+                return self._json(admin_status(False))
+            if path == "/api/admin/logs":
+                try:
+                    n = int((q.get("n") or ["300"])[0])
+                except ValueError:
+                    n = 300
+                return self._json(admin_logs((q.get("unit") or ["server"])[0], n))
+            return self.send_error(404)
         if path == "/" or path == "/index.html":
             if ROOT:
                 return self._send_file(os.path.join(UI, "mock", ROOT + ".html"), "text/html; charset=utf-8")
@@ -713,8 +910,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_response(302); self.send_header("Location", nxt if nxt.startswith("/") else "/"); self.send_header("Content-Length", "0"); self.end_headers(); return
         if path == "/api/whoami":
             who = self._who()
+            owner = who == "owner" or (who is not None and who in OWNERS)
             return self._json({"remote": self._remote(), "email": None if who in (None, "owner") else who,
-                               "owner": who == "owner", "left": None if who in (None, "owner") else _users_left(who),
+                               "owner": owner, "left": None if (owner or who is None) else _users_left(who),
                                "allowances": {"searches": USER_SEARCHES, "wishes": USER_WISHES}})
         if path == "/api/live/status":
             # Safe to serve: live.status() reports whether a key exists and
@@ -745,6 +943,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
     # --------------------------------------------------------------- POST
     def do_POST(self):
         path = self.path.split("?")[0]
+        if path in ("/api/admin/check", "/api/admin/update"):
+            if not self._is_owner():
+                return self._json({"error": "owners only"})
+            try:
+                return self._json(admin_status(True) if path.endswith("/check") else admin_update())
+            except Exception as exc:
+                return self._json({"error": "%s: %s" % (type(exc).__name__, exc)})
         if path not in ("/api/score", "/api/narrate", "/api/live", "/api/wish", "/api/search"):
             return self.send_error(404)
         try:
@@ -764,7 +969,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                             "live searches, the narrator and the wish box are unlocked by signing in.",
                                    "remote": True, "sign_in": True})
             kind, limit = ("searches", USER_SEARCHES) if path in ("/api/live", "/api/search") else ("wishes", USER_WISHES)
-            ok, left = _users_take(who, kind, limit)
+            ok, left = (True, None) if who in OWNERS else _users_take(who, kind, limit)
             if not ok:
                 return self._json({"error": "That is today's allowance of %d %s for %s. It resets at midnight." % (limit, kind, who),
                                    "remote": True, "allowance": True})

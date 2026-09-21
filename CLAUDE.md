@@ -438,11 +438,22 @@ python3 concorde-travel/places.py "Shoreditch, London EC2A"  # what a typed plac
 
 **Ports 8884–8930 are the model engines' — never bind there.** ConcordeGo uses 9897.
 
-**Public address:** `concorde-travel/go-live.sh` (a Mac, LaunchAgents) or
-`concorde-travel/deploy/droplet.sh` (an Ubuntu droplet, systemd, a venv for the `anthropic`
-SDK) runs `server.py` with `CONCORDEGO_ROOT=mock-10`, so `/` serves the current interface
-mockup, behind a Cloudflare named tunnel `concordego` at **go.flyconcordefly.com**, with its
-own config and service so it never touches the AI app's tunnel. **Keys never go in the
+**Public address:** the domain is **flyconcordefly.com, with the e** (a day was lost to
+`flyconcordfly.com`, a zone that does not exist; Cloudflare's answers were all correct).
+`concorde-travel/deploy/droplet.sh BRANCH TUNNEL_TOKEN` is the intended home (an Ubuntu
+droplet: systemd, a venv for the `anthropic` SDK, an hourly `concordego-update.timer` that
+resets the checkout to `origin/BRANCH` and restarts the service when HEAD moved, ufw with
+ssh only, and cloudflared run from a tunnel token made in the Zero Trust dashboard, whose
+public hostname owns the DNS record so no script here touches DNS). `concorde-travel/go-live.sh`
+(a Mac, LaunchAgents) is the laptop fallback. Either runs `server.py` with
+`CONCORDEGO_ROOT=mock-10`, so `/` serves the current interface mockup, at
+**go.flyconcordefly.com**, on its own tunnel so it never touches the AI app's. **`/admin`** on
+the served site (owners only: the local machine, or an email in `CONCORDEGO_OWNERS`, which
+Access fronts as its own application for `ADMINS`) shows the live commit, asks GitHub what is
+new, updates now (`git reset --hard origin/<branch>` in the running checkout, then exit: the
+supervisor restarts it, so the service unit lists the checkout in `ReadWritePaths`) and
+tails the journal (`concordego` user is in `systemd-journal`) or `CONCORDEGO_LOG`. Owners
+are not metered. **Keys never go in the
 LaunchAgent plist** (world-readable): the agent sources `~/.concordego/env` (0600, written
 empty by `go-live.sh`) before starting, so `ANTHROPIC_API_KEY` and the Duffel token go
 there (or the token in `~/.concordego/cloud.json`); the droplet's equivalent is

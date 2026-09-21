@@ -36,6 +36,8 @@ else
   AUTH=(-H "Authorization: Bearer $CF_API_TOKEN"); AUTH_KIND=token
 fi
 HOST="${HOST:-go.flyconcordefly.com}"; SESSION="${SESSION:-24h}"; TEAM="${TEAM:-}"; HOST_OK=""
+# /admin is for the person who runs it: ADMINS (default: the first email in ALLOW), matched again by the server's CONCORDEGO_OWNERS
+ADMINS="${ADMINS:-${ALLOW%%,*}}"
 TUNNEL="${TUNNEL:-concordego}"
 
 # The account that owns the zone is the one the tunnel was made in: cloudflared
@@ -192,6 +194,8 @@ ensure_app "ConcordeGo" "$HOST" "$EVERYONE"
 HOST_OK=1
 ensure_app "ConcordeGo sign-in" "$HOST/signin" "$FRIENDS"
 ensure_app "ConcordeGo API" "$HOST/api" "$FRIENDS"
+ADMIN_INCLUDE=$(python3 -c "import json,sys; print(json.dumps([{'email':{'email':e.strip().lower()}} for e in '$ADMINS'.split(',') if e.strip()]))")
+ensure_app "ConcordeGo admin" "$HOST/admin" "{\"name\":\"Friends\",\"decision\":\"allow\",\"include\":$ADMIN_INCLUDE,\"precedence\":1}"
 echo
 echo "Done. https://$HOST is open to browse; /api and /signin ask for a sign-in, and the server sees the email in Cf-Access-Authenticated-User-Email"
 echo "and gives each person a daily allowance (CONCORDEGO_USER_SEARCHES, default 20; CONCORDEGO_USER_WISHES, default 200)."

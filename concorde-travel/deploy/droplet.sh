@@ -1,23 +1,31 @@
 #!/usr/bin/env bash
-# ConcordeGo on a small Ubuntu droplet: the server as a systemd service, the
-# anthropic SDK in a venv (the one non-stdlib dependency, for the narrator and
-# the wish box on Claude Opus 5), and a Cloudflare tunnel carrying
-# go.flyconcordefly.com to it. Cloudflare Access (access.sh) is the door.
+# ConcordeGo on a small Ubuntu droplet, updating itself from GitHub every hour.
 #
 #   ssh root@<droplet>
-#   curl -fsSL https://raw.githubusercontent.com/bigmillz/concordeai/main/concorde-travel/deploy/droplet.sh | bash
-#   # or: git clone ... && bash concordeai/concorde-travel/deploy/droplet.sh
+#   curl -fsSL https://raw.githubusercontent.com/bigmillz/concordeai/BRANCH/concorde-travel/deploy/droplet.sh \
+#     | bash -s -- BRANCH CLOUDFLARE_TUNNEL_TOKEN
 #
-# Secrets go in /etc/concordego.env (0600), never in the repo:
+# What it sets up, all idempotent (re-run any time):
+#   - /opt/concordego          the repo, on BRANCH, owned by a system user
+#   - /opt/concordego/venv     python3 + the anthropic SDK (the one non-stdlib package)
+#   - concordego.service       server.py on 127.0.0.1:9897, serving mock-10 at /
+#   - concordego-update.timer  hourly: fetch BRANCH, and if HEAD moved, reset to it and restart the service
+#   - /admin on the served site the same by hand: which commit is live, what GitHub has, update now, the logs;
+#                              for the emails in CONCORDEGO_OWNERS (put them behind Access too: access.sh does)
+#   - cloudflared              a Cloudflare tunnel made in the Zero Trust dashboard, run from its token;
+#                              the dashboard owns the public hostname and its DNS record, so nothing here
+#                              touches DNS (the laptop route step that kept failing is gone)
+#   - /etc/concordego.env      the keys, 0600, read by systemd, never in the repo
+#
+# Secrets go in /etc/concordego.env after the first run:
 #   CONCORDEGO_FLIGHT_KEY=duffel_live_...      the Duffel key
 #   ANTHROPIC_API_KEY=sk-ant-...               for the narrator and the wish box
-# The one human step is `cloudflared tunnel login` the first time (a URL is
-# printed; open it, pick flyconcordefly.com, Authorize). Re-run after that.
+#   CONCORDEGO_OWNERS=pat@millertechnology.net signed-in people who are not metered
+# then: systemctl restart concordego
 set -euo pipefail
+BRANCH="${1:-${BRANCH:-main}}"
+TUNNEL_TOKEN="${2:-${CLOUDFLARE_TUNNEL_TOKEN:-}}"
 REPO="${REPO:-https://github.com/bigmillz/concordeai.git}"
-BRANCH="${BRANCH:-main}"
-HOST="${HOST:-go.flyconcordefly.com}"
-TUNNEL="${TUNNEL:-concordego}"
 APP=/opt/concordego
 ENVF=/etc/concordego.env
 SVC=concordego
@@ -29,25 +37,32 @@ say(){ printf '\n\033[1m%s\033[0m\n' "$*"; }
 
 say "packages"
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq && apt-get install -y -qq git python3 python3-venv curl >/dev/null
+apt-get update -qq && apt-get install -y -qq git python3 python3-venv curl ufw >/dev/null
 
-say "user and code"
+say "code: $REPO on $BRANCH -> $APP"
 id -u concordego >/dev/null 2>&1 || useradd --system --home "$APP" --shell /usr/sbin/nologin concordego
-if [ -d "$APP/.git" ]; then git -C "$APP" fetch -q origin "$BRANCH" && git -C "$APP" checkout -q "$BRANCH" && git -C "$APP" pull -q --ff-only origin "$BRANCH"
-else git clone -q --branch "$BRANCH" --depth 50 "$REPO" "$APP"; fi
+usermod -aG systemd-journal concordego   # /admin shows the service journal
+if [ -d "$APP/.git" ]; then
+  git -C "$APP" fetch -q origin "$BRANCH" && git -C "$APP" checkout -q -B "$BRANCH" "origin/$BRANCH"
+else
+  git clone -q --branch "$BRANCH" --depth 50 "$REPO" "$APP"
+fi
+git config --global --add safe.directory "$APP" >/dev/null 2>&1 || true
 [ -d "$APP/venv" ] || python3 -m venv "$APP/venv"
 "$APP/venv/bin/pip" install -q --upgrade pip anthropic >/dev/null
 mkdir -p /var/lib/concordego && chown -R concordego:concordego "$APP" /var/lib/concordego
+echo "  at $(git -C "$APP" rev-parse --short HEAD): $(git -C "$APP" log -1 --format=%s | cut -c1-70)"
 
 say "environment file $ENVF"
 if [ ! -f "$ENVF" ]; then
   cat > "$ENVF" <<ENV
-# ConcordeGo. Read by systemd; keys never leave this file.
+# ConcordeGo. Read by systemd; the keys never leave this file.
 CONCORDEGO_PORT=$PORT
 CONCORDEGO_ROOT=$ROOT_MOCK
 HOME=/var/lib/concordego
 # CONCORDEGO_FLIGHT_KEY=duffel_live_...
 # ANTHROPIC_API_KEY=sk-ant-...
+# CONCORDEGO_OWNERS=pat@millertechnology.net
 # CONCORDEGO_USER_SEARCHES=20
 # CONCORDEGO_USER_WISHES=200
 ENV
@@ -71,14 +86,62 @@ Restart=always
 RestartSec=3
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths=/var/lib/concordego
+ReadWritePaths=/var/lib/concordego $APP
 PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload && systemctl enable -q "$SVC" && systemctl restart "$SVC"
-sleep 1.5; curl -sf -o /dev/null "http://127.0.0.1:$PORT/" && echo "  up on 127.0.0.1:$PORT" || { journalctl -u "$SVC" -n 20 --no-pager; exit 1; }
+for _ in $(seq 1 20); do curl -sf -o /dev/null "http://127.0.0.1:$PORT/" && break; sleep 0.5; done
+curl -sf -o /dev/null "http://127.0.0.1:$PORT/" && echo "  up on 127.0.0.1:$PORT" || { journalctl -u "$SVC" -n 20 --no-pager; exit 1; }
+
+say "hourly update from GitHub"
+cat > /usr/local/bin/concordego-update <<'UPD'
+#!/usr/bin/env bash
+# Pull the branch the droplet tracks; restart the service only when HEAD moved.
+set -euo pipefail
+APP=/opt/concordego
+cd "$APP"
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+before=$(git rev-parse HEAD)
+git fetch -q origin "$BRANCH"
+after=$(git rev-parse "origin/$BRANCH")
+if [ "$before" = "$after" ]; then echo "up to date at ${before:0:7} on $BRANCH"; exit 0; fi
+git reset -q --hard "origin/$BRANCH"
+chown -R concordego:concordego "$APP"
+"$APP/venv/bin/pip" install -q --upgrade anthropic >/dev/null 2>&1 || true
+systemctl restart concordego
+echo "updated ${before:0:7} -> ${after:0:7} on $BRANCH: $(git log -1 --format=%s | cut -c1-70)"
+UPD
+chmod 755 /usr/local/bin/concordego-update
+cat > /etc/systemd/system/concordego-update.service <<UNIT
+[Unit]
+Description=ConcordeGo: update from GitHub
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/concordego-update
+UNIT
+cat > /etc/systemd/system/concordego-update.timer <<UNIT
+[Unit]
+Description=ConcordeGo: check GitHub every hour
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=1h
+RandomizedDelaySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+systemctl daemon-reload && systemctl enable -q --now concordego-update.timer
+echo "  every hour; by hand:  concordego-update"
+
+say "firewall"
+ufw allow OpenSSH >/dev/null; ufw --force enable >/dev/null; echo "  ssh only; the server listens on 127.0.0.1 and the tunnel dials out"
 
 say "cloudflared"
 if ! command -v cloudflared >/dev/null; then
@@ -87,22 +150,15 @@ if ! command -v cloudflared >/dev/null; then
   echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main" > /etc/apt/sources.list.d/cloudflared.list
   apt-get update -qq && apt-get install -y -qq cloudflared >/dev/null
 fi
-if [ ! -f /root/.cloudflared/cert.pem ]; then
-  say "tunnel not authorised: run  cloudflared tunnel login  , open the URL it prints, pick flyconcordefly.com, then re-run this script."
-  exit 0
+if [ -n "$TUNNEL_TOKEN" ]; then
+  # a dashboard-made tunnel: the token carries everything, the dashboard owns the hostname and its DNS
+  if systemctl is-enabled cloudflared >/dev/null 2>&1; then cloudflared service uninstall >/dev/null 2>&1 || true; fi
+  cloudflared service install "$TUNNEL_TOKEN" >/dev/null
+  systemctl restart cloudflared; sleep 3
+  systemctl is-active -q cloudflared && echo "  tunnel running from the dashboard token" || { journalctl -u cloudflared -n 20 --no-pager; exit 1; }
+  say "LIVE once the dashboard's public hostname points at http://localhost:$PORT. Then the door: concorde-travel/access.sh (from any machine)."
+else
+  say "no tunnel token given. Make the tunnel in the dashboard (one.dash.cloudflare.com > Networks > Tunnels > Create a tunnel > Cloudflared),"
+  echo "  name it, copy the token from the install command it shows, add a Public hostname (go . flyconcordefly.com -> HTTP localhost:$PORT),"
+  echo "  then:  cloudflared service install <token>   or re-run this script with the token as its second argument."
 fi
-cloudflared tunnel list 2>/dev/null | grep -q " $TUNNEL " || cloudflared tunnel create "$TUNNEL"
-TID=$(cloudflared tunnel list 2>/dev/null | awk -v t="$TUNNEL" '$2==t{print $1}')
-mkdir -p /etc/cloudflared
-cat > /etc/cloudflared/config.yml <<YML
-tunnel: $TID
-credentials-file: /root/.cloudflared/$TID.json
-ingress:
-  - hostname: $HOST
-    service: http://localhost:$PORT
-  - service: http_status:404
-YML
-cloudflared tunnel route dns "$TUNNEL" "$HOST" 2>/dev/null || echo "  DNS route exists or the zone is elsewhere: CNAME go -> $TID.cfargotunnel.com"
-systemctl is-enabled cloudflared >/dev/null 2>&1 || cloudflared service install
-systemctl restart cloudflared
-say "LIVE: https://$HOST   (put Access in front of it: concorde-travel/access.sh)"

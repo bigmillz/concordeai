@@ -107,6 +107,7 @@ cat > "$AGENTS/$LABEL.plist" <<PLIST
   <key>EnvironmentVariables</key><dict>
     <key>CONCORDEGO_PORT</key><string>$SERVE_PORT</string>
     <key>CONCORDEGO_ROOT</key><string>$ROOT_MOCK</string>
+    <key>CONCORDEGO_LOG</key><string>$LOGS/server.log</string>
   </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
