@@ -388,8 +388,8 @@ def main():
     check("with an empty key", written.get("key") == "")
     mode = os.stat(path).st_mode & 0o777
     check("and 0600 permissions", mode == 0o600, "got %o" % mode)
-    check("the shipped default warns that the wire format is unverified",
-          "UNVERIFIED" in live.DEFAULTS["_note"])
+    check("the shipped default says its wire format was verified against the live service",
+          "VERIFIED against the live service" in live.DEFAULTS["_note"] and "UNVERIFIED" not in live.DEFAULTS["_note"])
 
     print("\n%d checks, %d failed" % (N[0], len(FAILS)))
     if FAILS:

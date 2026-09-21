@@ -715,9 +715,10 @@ by `live.py status`). The env vars win, so neither half need touch disk. `/api/l
 the API when credentials are configured and the recorded sample when they are not — the
 interface never offers a button that cannot work.
 
-**The provider's wire format lives in that config, not in code.** Both shipped profiles are
-written from documentation and are **unverified against the live service** — no credential
-for either was available on the machine this was built on. If the parameter names are wrong,
+**The provider's wire format lives in that config, not in code.** The Amadeus and Kiwi
+profiles are written from documentation and are **unverified against the live service** — no
+credential for either was available on the machine this was built on; Duffel's is verified
+(below), and `live.py status` prints each profile's note. If the parameter names are wrong,
 fix the profile; you should not have to edit Python to correct someone else's query string.
 Protocols are the exception: OAuth2 is a mechanism, not a parameter name, so it lives in
 code.

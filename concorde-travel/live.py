@@ -127,13 +127,14 @@ PROFILES = {
         },
         "passenger_template": {"type": "adult"},
         "quota": dict(_QUOTA_DEFAULT),
-        "_note": ("Wire format from duffel-api's own model definitions, and UNVERIFIED "
-                  "against the live service - no Duffel credential was available on the "
-                  "machine this was written on. THIS IS THE ONE YOU CAN SIGN UP FOR: "
-                  "app.duffel.com/join gives a test token (duffel_test_...) in about a "
-                  "minute. Note that a TEST token returns the fictional carrier Duffel "
-                  "Airways with invented prices - the adapter handles it and says so, "
-                  "but a grade over test inventory means nothing. Live prices need "
+        "_note": ("Wire format VERIFIED against the live service on 2026-09-20: a real "
+                  "duffel_test_ token returned 172 offers on the first call, so the "
+                  "parameter names, POST body, Duffel-Version header and switches are "
+                  "right. THIS IS THE ONE YOU CAN SIGN UP FOR: app.duffel.com/join gives "
+                  "a test token (duffel_test_...) in about a minute. A TEST token returns "
+                  "the fictional carrier Duffel Airways with invented prices - the adapter "
+                  "handles it and says so, but a grade over test inventory means nothing. "
+                  "Real inventory needs a duffel_live_ token, which Duffel issues after "
                   "account verification."),
     },
     "kiwi-tequila": {
@@ -693,7 +694,7 @@ def status():
         "config_error": cfg.get("_config_error"),
         "quota": quota_state(cfg),
         "cache": cache_stats(),
-        "unverified": cfg.get("_note", ""),
+        "note": cfg.get("_note", ""),
     }
 
 
