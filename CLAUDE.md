@@ -355,6 +355,16 @@ AA 100 · JFK→LHR · $480 ticket · $710 all in
 
 If a number cannot be explained in one line of that form, it does not belong in the model.
 
+**The bill on the page is MONEY ONLY** (per Patrick, 2026-09-21: "we can't tack on money
+because of the pitch of the seat", and "the person knows how long it is already"). The
+scorer still prices time, comfort and risk in dollars — that is the model, and it still
+decides the ORDER at the dial and makes the GRADE — but those lines never appear as
+charges on the bill. Mock 10 keeps them off-bill (`r.q`, and the time term inside
+`r.rank`) and shows them two other ways: the pros and cons, and the grade's hover card,
+which gives each part (price, speed, getting there, comfort, routing, reliability) its own
+letter, read on the grade's own bands from that part's pull against par's same part. The
+ledger format below is the scorer's, which the draft page still prints in full.
+
 **Added costs are "+"; only a credit is "−", and it says "credit"** (per Patrick,
 2026-09-20: a minus in front of a cost reads as a discount). **The bill is grouped**
 by what the money is for — ticket, getting there and back, staying over, add-ons,
