@@ -67,6 +67,18 @@ ACCESS_TEAM = os.environ.get("CONCORDEGO_ACCESS_TEAM", "").strip().lower()
 # Test mode: a browser that sends this key (pasted once on the admin page, kept in its own storage) is not
 # metered, signed in or not. 64 random characters, generated on the box, never in the repo.
 TEST_KEY = os.environ.get("CONCORDEGO_TEST_KEY", "").strip()
+# Emails the admin page marks unlimited: signed in, they are not metered. Kept beside users.json.
+UNLIMITED_FILE = os.path.join(live.HOME, "unlimited.json")
+
+def _unlimited():
+    try:
+        with open(UNLIMITED_FILE, encoding="utf-8") as fh:
+            return sorted({str(e).strip().lower() for e in json.load(fh) if str(e).strip()})
+    except (OSError, ValueError):
+        return []
+
+def _unlimited_set(emails):
+    live._atomic_write(UNLIMITED_FILE, sorted({e.strip().lower() for e in emails if e.strip()}))
 # Photos of the origin and the destination for the shortlist tiles: Pexels (free, 200 an hour, a credit line
 # asked). Cached per place for a month, so a place costs one call ever; and at most PHOTO_CALLS uncached
 # lookups a day site-wide, so nobody can spend the hour walking the atlas. No key: the stand-in artwork stays.
@@ -863,6 +875,7 @@ def admin_status(fetch=False):
     out["users_today"] = _users_today()
     out["allowances"] = {"searches": USER_SEARCHES, "wishes": USER_WISHES}
     out["test_key"] = TEST_KEY   # the owner's own page; Access and OWNERS stand in front of it
+    out["unlimited"] = _unlimited()
     import shutil
     out["log_source"] = "journal" if shutil.which("journalctl") else (LOG_FILE or None)
     return out
@@ -1098,6 +1111,9 @@ table{border-collapse:collapse;font-size:13px;width:100%}td,th{text-align:left;p
 <div class="grid" id="cards"></div>
 <div class="row"><button id="check">Check GitHub</button><button id="update" disabled>Update now</button><button class="ghost" id="refresh">Refresh</button><span class="note" id="msg"></span></div>
 <div id="incoming"></div>
+<div class="card" style="margin-bottom:18px"><div class="k">Unlimited people</div><div class="v">Signed-in emails with no daily cap</div>
+<div id="unl" style="margin:8px 0 6px"></div>
+<div class="row" style="margin:0"><input id="unladd" placeholder="email" style="flex:1;min-width:220px;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);font:13px 'Space Grotesk',sans-serif;padding:9px 12px"><button id="unlgo">Add</button></div></div>
 <div class="card" style="margin-bottom:18px"><div class="k">Test mode</div><div class="v">Paste the key to use the site without limits in this browser</div>
 <div class="row" style="margin:10px 0 0"><input id="tkey" placeholder="64 characters" style="flex:1;min-width:260px;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);font:13px 'IBM Plex Mono',monospace;padding:9px 12px"><button id="tkeyon">Turn on</button><button class="ghost" id="tkeyoff">Turn off</button><span class="note" id="tkeymsg"></span></div>
 <div class="s" id="tkeyhint"></div></div>
@@ -1138,7 +1154,10 @@ $('#t-reload').onclick = logs;
 const tkState = () => { let k = ''; try { k = localStorage.getItem('concordego.testkey') || ''; } catch (e) {} $('#tkeymsg').textContent = k ? 'On in this browser.' : 'Off.'; };
 $('#tkeyon').onclick = () => { const k = $('#tkey').value.trim(); if (k.length < 32){ $('#tkeymsg').textContent = 'That is not the key.'; return; } try { localStorage.setItem('concordego.testkey', k); } catch (e) {} $('#tkey').value = ''; tkState(); };
 $('#tkeyoff').onclick = () => { try { localStorage.removeItem('concordego.testkey'); } catch (e) {} tkState(); };
-const paintKey = st => { $('#tkeyhint').innerHTML = st.test_key ? 'This server\'s key: <code style="user-select:all;color:var(--dim)">' + st.test_key + '</code> (only you see this page)' : '<span class="warn">No CONCORDEGO_TEST_KEY set on this server.</span>'; };
+const paintUnl = list => { $('#unl').innerHTML = (list || []).length ? list.map(e => `<span style="display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:5px 6px 5px 12px;margin:0 6px 6px 0;font-size:13px">${e}<button class="ghost" data-unl="${e}" style="padding:2px 8px;font-size:12px" title="Remove">×</button></span>`).join('') : '<span class="note">Nobody yet. Owners are already unlimited.</span>'; };
+document.addEventListener('click', async ev => { const b = ev.target.closest('[data-unl]'); if (!b) return; const r = await j('/api/admin/unlimited', {method:'POST', body: JSON.stringify({remove: b.dataset.unl})}); paintUnl(r.unlimited); });
+$('#unlgo').onclick = async () => { const e = $('#unladd').value.trim(); if (!e.includes('@')) return; const r = await j('/api/admin/unlimited', {method:'POST', body: JSON.stringify({add: e})}); $('#unladd').value = ''; paintUnl(r.unlimited); };
+const paintKey = st => { paintUnl(st.unlimited); $('#tkeyhint').innerHTML = st.test_key ? 'This server\'s key: <code style="user-select:all;color:var(--dim)">' + st.test_key + '</code> (only you see this page)' : '<span class="warn">No CONCORDEGO_TEST_KEY set on this server.</span>'; };
 tkState();
 load(); logs();
 </script></body></html>
@@ -1195,7 +1214,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return who == "owner" or (who is not None and who in OWNERS)
 
     def _unmetered(self, who):
-        return who == "owner" or who == "test" or (who is not None and who in OWNERS)
+        return who == "owner" or who == "test" or (who is not None and (who in OWNERS or who in _unlimited()))
 
     def _html(self, text, code=200):
         body = text.encode("utf-8")
@@ -1217,7 +1236,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             ip = (self.headers.get("Cf-Connecting-Ip") or self.headers.get("X-Forwarded-For") or "?").split(",")[0].strip()
             free = None if who else max(0, ANON_SEARCHES - (_users_left("ip:" + ip) or {}).get("searches_used", 0))
             return self._json({"remote": self._remote(), "email": None if who in (None, "owner", "test") else who,
-                               "owner": owner, "test": who == "test", "left": None if (owner or who in (None, "test")) else _users_left(who),
+                               "owner": owner, "test": who == "test", "unlimited": bool(who and "@" in who and who in _unlimited()),
+                               "left": None if (owner or who in (None, "test") or who in _unlimited()) else _users_left(who),
                                "recent": _users_recent(who)[:3] if (who and "@" in who) else [],
                                "allowances": {"searches": USER_SEARCHES, "wishes": USER_WISHES, "free": ANON_SEARCHES},
                                "free_left": free, "hours": _hours_to_midnight()})
@@ -1313,10 +1333,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
     # --------------------------------------------------------------- POST
     def do_POST(self):
         path = self.path.split("?")[0]
-        if path in ("/api/admin/check", "/api/admin/update"):
+        if path in ("/api/admin/check", "/api/admin/update", "/api/admin/unlimited"):
             if not self._is_owner():
                 return self._json({"error": "owners only"})
             try:
+                if path.endswith("/unlimited"):
+                    n = int(self.headers.get("Content-Length") or 0)
+                    body = json.loads(self.rfile.read(n) or b"{}")
+                    cur = set(_unlimited())
+                    add = str(body.get("add") or "").strip().lower(); rm = str(body.get("remove") or "").strip().lower()
+                    if add and "@" in add: cur.add(add)
+                    cur.discard(rm)
+                    _unlimited_set(cur)
+                    return self._json({"unlimited": _unlimited()})
                 return self._json(admin_status(True) if path.endswith("/check") else admin_update())
             except Exception as exc:
                 return self._json({"error": "%s: %s" % (type(exc).__name__, exc)})
