@@ -768,11 +768,19 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 .qz .pchip{cursor:pointer}.qz .pchip.on{border-color:var(--speed);color:var(--text);background:rgba(120,160,255,.08)}
 .prof .row2{margin-top:16px;align-items:center}
 .rsc .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:6px 0 4px}
-.fixer .fld{padding:12px 14px 12px 44px}   /* the sheet's tighter .rsc .fld padding must not swallow the icon gutter */
-.fixer .frow{margin-top:12px}.fixer .frow.dates{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
-.fixer .fld .req{font-style:normal;letter-spacing:.06em;font-size:8.5px;color:var(--speed);margin-left:6px;text-transform:uppercase}
-.fixer .chipfld{padding-left:14px}.fixer .chipfld .chips{margin:2px 0 0}
-.fixer .nav{margin-top:16px}
+.rsc.fixer .fld{padding:12px 14px 12px 44px;display:flex;flex-direction:column;min-height:104px}
+.rsc.fixer .fld .help{margin-top:auto;padding-top:7px}
+.rsc.fixer .fld input[type=time],.rsc.fixer .fld input[type=date]{padding-left:0;color-scheme:dark;cursor:pointer}
+.rsc.fixer .fld input[type=time]::-webkit-calendar-picker-indicator,.rsc.fixer .fld input[type=date]::-webkit-calendar-picker-indicator{opacity:.55;filter:invert(1);cursor:pointer}
+.rsc.fixer .fld .req{font-style:normal;letter-spacing:.14em;font-size:8.5px;color:var(--speed);margin-left:8px;text-transform:uppercase;vertical-align:1px}
+.rsc.fixer .chipfld .seg{display:inline-flex;gap:2px;padding:3px;margin:-1px 0 0;background:var(--panel);border:1px solid var(--line);border-radius:999px;align-self:flex-start}
+.rsc.fixer .chipfld .pchip{border:0;background:none;padding:5px 12px;font-size:13px;border-radius:999px;color:var(--dim)}
+.rsc.fixer .chipfld .pchip.on{background:var(--text);color:var(--bg)}
+.rsc.fixer .frow{margin-top:12px}.rsc.fixer .frow.route{margin-top:0}
+.rsc.fixer .frow.two{grid-template-columns:repeat(2,minmax(0,1fr))}.rsc.fixer .frow.three{grid-template-columns:repeat(3,minmax(0,1fr))}.rsc.fixer .frow.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:980px){.rsc.fixer .frow.four{grid-template-columns:repeat(2,minmax(0,1fr))}.rsc.fixer .frow.three{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.rsc.fixer .frow.two,.rsc.fixer .frow.three,.rsc.fixer .frow.four{grid-template-columns:1fr}}
+.rsc.fixer .nav{margin-top:18px}
 .rsc .odds{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 10px}.rsc .odds b{font-family:var(--mono);font-size:26px}.rsc .odds small{color:var(--faint)}
 .rsc .odds button{color:var(--dim);font-size:12.5px;border-bottom:1px solid var(--line)}
 .rsc .chart{margin:6px 0 12px}.rsc .chart svg{width:100%;height:130px;display:block}.rsc .chart text{fill:var(--faint);font:10px var(--mono)}.rsc .chart .l{fill:none;stroke:var(--speed);stroke-width:2}.rsc .chart .g{stroke:var(--line)}
@@ -912,7 +920,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">Advanced options are optional; leave them and go.</span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="9677cc5">9677cc5</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="16a43a8">16a43a8</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -939,7 +947,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="9677cc5">9677cc5</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="16a43a8">16a43a8</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1397,17 +1405,19 @@ function priced(e){ return bill(e); }
 // ---- the Flight Fixer's form: the search's own fields and labels, what is required marked, the rest optional
 function fixerHTML(){
   const today = localISO(new Date()).slice(0, 10);
-  const F = (id, label, val, icon, help, ph, req) => `<div class="fld"><svg class="ico" viewBox="0 0 24 24">${ICON[icon] ? ICON[icon].replace(/^<svg[^>]*>|<\/svg>$/g, '') : ''}</svg><label for="${id}">${label}${req ? ' <em class="req">required</em>' : ''}</label><input id="${id}" value="${esc(val || '')}" placeholder="${esc(ph || '')}" autocomplete="off">${help ? `<div class="help">${help}</div>` : ''}</div>`;
-  const D = (id, label, val) => `<div class="fld"><label for="${id}">${label}</label><input id="${id}" type="date" value="${esc(val || today)}" max="${today}"></div>`;
-  const chips = (k, opts, req) => `<div class="fld chipfld"><label>${opts.label}${req ? ' <em class="req">required</em>' : ''}</label><div class="chips" data-rs="${k}">${opts.items.map(([v, l]) => `<button type="button" class="pchip${RS[k] === v ? ' on' : ''}" data-v="${v}">${l}</button>`).join('')}</div></div>`;
+  const tag = req => req ? ' <em class="req">required</em>' : '';
+  const F = (id, label, val, icon, help, ph, req, type) => `<div class="fld"><svg class="ico" viewBox="0 0 24 24">${ICON[icon].replace(/^<svg[^>]*>|<\/svg>$/g, '')}</svg><label for="${id}">${label}${tag(req)}</label><input id="${id}" type="${type || 'text'}" value="${esc(val || '')}" placeholder="${esc(ph || '')}" autocomplete="off"${type === 'time' ? ' step="300"' : ''}>${help ? `<div class="help">${help}</div>` : ''}</div>`;
+  const D = (id, label, val) => `<div class="fld"><svg class="ico" viewBox="0 0 24 24">${ICON.cal.replace(/^<svg[^>]*>|<\/svg>$/g, '')}</svg><label for="${id}">${label}</label><input id="${id}" type="date" value="${esc(val || today)}" max="${today}"><div class="help">The day of the flight.</div></div>`;
+  const Sel = (id, label, val, icon, opts, help) => `<div class="fld"><svg class="ico" viewBox="0 0 24 24">${ICON[icon].replace(/^<svg[^>]*>|<\/svg>$/g, '')}</svg><label for="${id}">${label}</label><select id="${id}">${opts.map(([v, l]) => `<option value="${v}"${val === v ? ' selected' : ''}>${l}</option>`).join('')}</select>${help ? `<div class="help">${help}</div>` : ''}</div>`;
+  const Seg = (k, label, icon, opts, req) => `<div class="fld chipfld"><svg class="ico" viewBox="0 0 24 24">${ICON[icon].replace(/^<svg[^>]*>|<\/svg>$/g, '')}</svg><label>${label}${tag(req)}</label><div class="seg" data-rs="${k}" role="group" aria-label="${esc(label)}">${opts.map(([v, l]) => `<button type="button" class="pchip${RS[k] === v ? ' on' : ''}" data-v="${v}" aria-pressed="${RS[k] === v}">${l}</button>`).join('')}</div><div class="help">${k === 'kind' ? 'Delayed keeps the flight in the running; cancelled looks only at the way on.' : ''}</div></div>`;
   return `<div class="rsc fixer">
-    <div class="frow route">${F('q-from-0', 'From', RS.from, 'pin', 'The airport, or the city.', 'LGA', true)}<div class="link" aria-hidden="true"></div>${F('q-to-0', 'To', RS.to, 'flag', 'The airport, the city, or the address where you are staying.', 'CLT', true)}</div>
-    <div class="frow dates">${F('rs-flight', 'Flight', RS.flight, 'seat', 'Helps: the number on your boarding pass.', 'DL 5048')}${D('rs-date', 'Date', RS.date)}${chips('kind', {label:'What happened', items:[['delayed', 'Delayed'], ['cancelled', 'Cancelled']]}, true)}</div>
-    <div class="frow dates" id="rs-when">${F('rs-sched', 'Scheduled departure', RS.sched, 'cal', 'As printed on the ticket.', '18:30', true)}${F('rs-new', 'New departure', RS.newdep, 'cal', 'What the board or the app says now. Blank if there is none yet.', '21:40')}${F('rs-newarr', 'New arrival', RS.newarr, 'cal', 'Add +1 if it lands tomorrow.', '09:50 +1')}</div>
-    <div class="frow dates">${chips('rebook', {label:'Rebooking offered', items:[['no', 'No'], ['notyet', 'Not yet'], ['yes', 'Yes']]})}${F('rs-rbarr', 'Its arrival, if offered', RS.rbarr, 'cal', 'The flight the airline put you on.', '13:10 +1')}</div>
-    <div class="frow dates">${chips('fare', {label:'Your fare', items:[['basic', 'Basic'], ['main', 'Main cabin'], ['flex', 'Flexible']]})}${chips('bags', {label:'Bags', items:[['no', 'Carry-on only'], ['yes', 'A bag is checked']]})}${F('rs-paid', 'What you paid', RS.paid, 'bag', 'Helps the refund maths.', '$600')}${F('rs-hour', 'An hour of yours is worth', RS.hour || '35', 'who', 'Prices the time an alternative saves.', '$35')}</div>
+    <div class="frow route">${F('q-from-0', 'From', RS.from, 'pin', 'The airport, or the city.', 'LGA', true)}<div class="link" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M15 8l-4.2-1.4L7 1.5H5.4l1.9 5.1H3.6L2.5 4.9H1.2l.9 3.1-.9 3.1h1.3l1.1-1.7h3.7L5.4 14.5H7l3.8-5.1z"/></svg></div>${F('q-to-0', 'To', RS.to, 'flag', 'The airport, the city, or the address where you are staying.', 'CLT', true)}</div>
+    <div class="frow three">${F('rs-flight', 'Flight', RS.flight, 'plane', 'The number on your boarding pass.', 'DL 5048')}${D('rs-date', 'Date', RS.date)}${Seg('kind', 'What happened', 'alert', [['delayed', 'Delayed'], ['cancelled', 'Cancelled']], true)}</div>
+    <div class="frow three" id="rs-when">${F('rs-sched', 'Scheduled departure', RS.sched, 'clock', 'As printed on the ticket.', '18:30', true, 'time')}${F('rs-new', 'New departure', RS.newdep, 'clock', 'What the board says now. Blank if nothing yet.', '21:40', false, 'time')}${F('rs-newarr', 'New arrival', RS.newarr, 'clock', 'Add +1 if it lands tomorrow.', '09:50 +1')}</div>
+    <div class="frow two">${Sel('rs-rebook', 'Rebooking offered', RS.rebook, 'swap', [['no', 'No'], ['notyet', 'Not yet'], ['yes', 'Yes, on another flight']], 'What the airline has put you on, if anything.')}${F('rs-rbarr', 'That flight lands at', RS.rbarr, 'flag', 'Only if one was offered. Add +1 for tomorrow.', '13:10 +1')}</div>
+    <div class="frow four">${Sel('rs-fare', 'Your fare', RS.fare, 'seat', [['basic', 'Basic economy'], ['main', 'Main cabin'], ['flex', 'Flexible']], 'Sets what a change or refund costs.')}${Sel('rs-bags', 'Bags', RS.bags, 'bag', [['no', 'Carry-on only'], ['yes', 'A bag is checked']], 'A checked bag does not follow you to another airline.')}${F('rs-paid', 'What you paid', RS.paid, 'dollar', 'Helps the refund maths.', '600')}${F('rs-hour', 'An hour of yours is worth', RS.hour || '35', 'who', 'Prices the time an alternative saves.', '35')}</div>
     <p class="searcherr" id="rs-err" role="alert"></p>
-    <div class="nav"><button class="go" id="rs-go">🪄 Make the call</button><span class="hintr">From, to and what happened are required. The more you add, the faster and surer the call.</span></div></div>`;
+    <div class="nav"><button class="go" id="rs-go">🪄 Make the call</button><span class="hintr">From, to, what happened and the scheduled time are required. The more you add, the faster and surer the call.</span></div></div>`;
 }
 // the other fares of the same flight, in a breath: "· also Main Plus $681, Flexible $888 all in"
 function fareAlts(e){ const f = e.fares || []; return f.length ? ' · also ' + f.map(x => esc(x.brand.replace(/^Main Cabin /, '')) + ' ' + money(x.total)).join(', ') + ' all in' : ''; }
@@ -1869,6 +1879,11 @@ const ICON = {
   who:'<svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg>',
   seat:'<svg class="ico" viewBox="0 0 24 24"><path d="M6 4.5v9.5h9.5l3 5.5M6 14l-2 5.5M9 14v-4.5a2 2 0 0 1 2-2h3"/></svg>',
   bag:'<svg class="ico" viewBox="0 0 24 24"><rect x="4" y="7.5" width="16" height="13" rx="2.5"/><path d="M9 7.5V5.5a3 3 0 0 1 6 0v2M9 11.5v6M15 11.5v6"/></svg>',
+  plane:'<svg class="ico" viewBox="0 0 24 24"><path d="M21 12l-6.3-2.1L9.5 3H7.3l2.9 7.6H5.4L3.7 8.2H2l1.4 3.8L2 15.8h1.7l1.7-2.4h4.8L7.3 21h2.2l5.2-6.9z"/></svg>',
+  clock:'<svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
+  alert:'<svg class="ico" viewBox="0 0 24 24"><path d="M12 3.5l9 16H3z"/><path d="M12 10v4M12 16.5v.5"/></svg>',
+  swap:'<svg class="ico" viewBox="0 0 24 24"><path d="M4 9h13l-3-3M20 15H7l3 3"/></svg>',
+  dollar:'<svg class="ico" viewBox="0 0 24 24"><path d="M12 3v18M16.5 7.5c0-1.7-2-3-4.5-3S7.5 5.8 7.5 7.5s2 3 4.5 3 4.5 1.3 4.5 3-2 3-4.5 3-4.5-1.3-4.5-3"/></svg>',
 };
 function sentenceHTML(){
   const fix = S.trip === 'fix';
@@ -2720,7 +2735,7 @@ function openRescue(){
 }
 function rsTime(dateStr, hhmm){ const m = /^(\d{1,2}):(\d{2})\s*(\+1)?$/.exec((hhmm || '').trim()); if (!m) return null; const d = new Date(dateStr + 'T00:00:00'); if (m[3]) d.setDate(d.getDate() + 1); d.setHours(+m[1], +m[2]); return localISO(d); }
 async function runRescue(){
-  const v = id => ($(id) ? $(id).value.trim() : ''); RS.from = (v('#q-from-0') || v('#rs-from')); RS.to = (v('#q-to-0') || v('#rs-to')); RS.flight = v('#rs-flight'); RS.date = v('#rs-date'); RS.sched = v('#rs-sched'); RS.newdep = v('#rs-new'); RS.newarr = v('#rs-newarr'); RS.rbarr = v('#rs-rbarr'); RS.paid = v('#rs-paid'); RS.hour = v('#rs-hour');
+  const v = id => ($(id) ? $(id).value.trim() : ''); RS.from = (v('#q-from-0') || v('#rs-from')); RS.to = (v('#q-to-0') || v('#rs-to')); RS.flight = v('#rs-flight'); if ($('#rs-fare')) RS.fare = v('#rs-fare'); if ($('#rs-bags')) RS.bags = v('#rs-bags'); if ($('#rs-rebook')) RS.rebook = v('#rs-rebook'); RS.date = v('#rs-date'); RS.sched = v('#rs-sched'); RS.newdep = v('#rs-new'); RS.newarr = v('#rs-newarr'); RS.rbarr = v('#rs-rbarr'); RS.paid = v('#rs-paid'); RS.hour = v('#rs-hour');
   const err = $('#rs-err'); err.textContent = '';
   if (!RS.from || !RS.to){ err.textContent = 'Where from, and where to.'; return; }
   if (RS.kind === 'delayed' && !RS.sched){ err.textContent = 'The scheduled departure, as printed on the ticket.'; return; }
@@ -2797,7 +2812,7 @@ document.addEventListener('click', ev => {
   if (ev.target.closest('#rescuego')){ closeAccount(); S.trip = 'fix'; $('#trip').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.trip === 'fix')); goStep(1); sentenceHTML(); return; }
   if (ev.target.closest('#oddsmore')){ const c = $('#oddschart'); if (c) c.classList.toggle('hidden'); return; }
   if (ev.target.closest('#rs-go')){ runRescue(); return; }
-  const rc = ev.target.closest('.rsc [data-rs] .pchip'); if (rc){ const g = rc.closest('[data-rs]'); RS[g.dataset.rs] = rc.dataset.v; g.querySelectorAll('.pchip').forEach(x => x.classList.toggle('on', x === rc)); return; }
+  const rc = ev.target.closest('.rsc [data-rs] .pchip'); if (rc){ const g = rc.closest('[data-rs]'); RS[g.dataset.rs] = rc.dataset.v; g.querySelectorAll('.pchip').forEach(x => { x.classList.toggle('on', x === rc); x.setAttribute('aria-pressed', x === rc); }); return; }
   const tn = ev.target.closest('#tournext'); if (tn){ openTour(+tn.dataset.i); return; }
   if (ev.target.closest('#tourdone')){ closeAccount(); return; }
   if (ev.target.closest('#quizsave')){ const ans = {}; document.querySelectorAll('.qz .q').forEach(q => { const on = q.querySelector('.pchip.on'); if (on) ans[q.dataset.q] = +on.dataset.i; }); if (Object.keys(ans).length < QUIZ.length){ $('#quizerr').textContent = 'Answer every one; it takes a minute.'; return; } savePersona(personaFrom(ans)); if (W.mode === 'results'){ setWeights(S.persona.a, S.persona.b, S.persona.c, 'mine'); paint(false); } openProfile(); return; }
