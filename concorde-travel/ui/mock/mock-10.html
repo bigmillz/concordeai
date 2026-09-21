@@ -653,18 +653,18 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 .sky{height:126px;overflow:hidden}
 /* each door holds its own full-frame photo (per Patrick, 2026-09-21: the strip across three cards read as
    crops); the row is offset so it goes home, there, home, and every 6.5s the whole row walks one along */
-.sky .photo{position:absolute;inset:0;overflow:hidden}
-.sky .photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 45%;opacity:0;transition:opacity 1.1s ease;animation:drift 24s ease-in-out infinite alternate;will-change:transform}
+.sky .photo{position:absolute;inset:0;overflow:hidden;background:#0a0a0c}
+.sky .photo img{position:absolute;top:-10%;left:-10%;width:120%;height:120%;object-fit:cover;object-position:50% 45%;opacity:0;transition:opacity 1.1s ease;animation:drift 26s ease-in-out infinite alternate;will-change:transform}
 .sky .photo img.on{opacity:1}
 .sky .photo img.top{z-index:1}
-@keyframes drift{from{transform:scale(1.04) translate(-1%, 0)}to{transform:scale(1.12) translate(1%, -2%)}}
+@keyframes drift{from{transform:scale(1) translate(0, 0)}to{transform:scale(1.08) translate(1.5%, -1.5%)}}
 .sky .scrim{position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(10,10,12,.12) 0%,rgba(10,10,12,.02) 35%,rgba(10,10,12,.6) 100%);pointer-events:none}
 .sky .cap{position:absolute;left:16px;right:16px;top:10px;z-index:2;font-family:var(--disp);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.78);text-shadow:0 1px 2px rgba(0,0,0,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sky .t{z-index:2}
 .seal{top:140px}
 .door .body .eyebrow,.door .body .pc{padding-right:60px}
 @media (max-width:980px){.sky{height:108px}.seal{top:122px}}
-@media (prefers-reduced-motion:reduce){.sky .photo img{animation:none}.rise,.bar.drop,#results.fade,.door.swap,.rise .seal .ring,.swap .seal .ring,.rise .seal .g,.swap .seal .g,.rise .seal .sg,.swap .seal .sg,.rise .jseg,.swap .jseg,.door.p1 .seal svg{animation:none;opacity:1;stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){.rise,.bar.drop,#results.fade,.door.swap,.rise .seal .ring,.swap .seal .ring,.rise .seal .g,.swap .seal .g,.rise .seal .sg,.swap .seal .sg,.rise .jseg,.swap .jseg,.door.p1 .seal svg{animation:none;opacity:1;stroke-dashoffset:0}}
 
 /* ---------- the dock: the wish goes on under the results, like a chat */
 .dock{position:fixed;left:0;right:0;bottom:0;z-index:7;padding:0 clamp(12px,3vw,28px) calc(12px + env(safe-area-inset-bottom,0px));pointer-events:none}
@@ -842,7 +842,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">Advanced options are optional; leave them and go.</span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="c5ccdf3">c5ccdf3</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="1579039">1579039</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -869,7 +869,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="c5ccdf3">c5ccdf3</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="1579039">1579039</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1573,7 +1573,7 @@ function door(kind, e, r, title, ctx){
   const eff = r.total, pc = prosCons(e, r, ctx);
   const chips = (arr, none) => arr.length ? arr.map(w => '<b>' + esc(w) + '</b>').join('') : '<b class="none">' + none + '</b>';
   return `<article class="door ${kind}" data-id="${esc(e.id)}">
-    <div class="sky" style="background:${skyBand(e)}">${PHOTOS.length ? `<div class="photo"><img class="ph a" alt=""><img class="ph b" alt=""></div><div class="scrim"></div><span class="cap"></span>` : ''}</div>
+    <div class="sky" style="background:${skyBand(e)}">${PHOTOS.length ? `<div class="photo"><img class="ph a" alt=""><img class="ph b" alt=""></div><div class="scrim"></div>` : ''}</div>
     ${sealHTML(e)}
     <div class="body">
       <div class="eyebrow">${title}</div>
@@ -2530,7 +2530,7 @@ function mountPhotos(){
   doors.forEach((d, k) => { const ph = d.querySelector('.photo'); if (!ph) return; const p = photoFor(k), a = ph.querySelector('img.a');
     if (a.getAttribute('src') !== p.src){ a.src = p.src; a.classList.add('on'); ph.querySelector('img.b').classList.remove('on'); }
     a.style.animationDelay = (-k * 7) + 's';
-    const cap = d.querySelector('.cap'); if (cap) cap.textContent = (p.place || PH.city) + ' · ' + p.credit; });
+  });
   if (!PH.timer && !REDUCED) PH.timer = setInterval(cycle, 6500);
 }
 function cycle(){
@@ -2543,7 +2543,6 @@ function cycle(){
     // the new picture fades in over the old one, which stays put until the fade is done
     requestAnimationFrame(() => requestAnimationFrame(() => { nxt.classList.add('on');
       setTimeout(() => { cur.style.transition = 'none'; cur.classList.remove('on'); requestAnimationFrame(() => { cur.style.transition = ''; }); }, 1200); }));
-    const cap = d.querySelector('.cap'); if (cap) cap.textContent = (next.place || PH.city) + ' · ' + next.credit;
   }, k * 480));
 }
 addEventListener('resize', mountPhotos);
