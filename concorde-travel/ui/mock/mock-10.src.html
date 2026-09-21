@@ -682,7 +682,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 /* the picture is a background layer 16px past every edge of the tile, not an <img> box, so no transform,
    rounding or device pixel ratio can leave the ground showing (per Patrick, 2026-09-21: a black bar top and bottom).
    Two layers crossfade. A layer drifts on its own, or, in a panorama, all three move as one strip. */
-.sky .photo{position:absolute;inset:0;overflow:hidden;background:#0a0a0c}
+.sky .photo{position:absolute;inset:0;overflow:hidden;background:transparent}   /* the sky's gradient shows until a picture has loaded */
 /* a picture drifts for as long as it is up: one slow zoom with a slide, one direction only, 20s long though a
    picture lives about 6.5s, so what shows is the calm first third and never a reversal. The end points are set per
    picture in setPic (a zoom in or out, a slide toward a random corner), kept inside the 16px of slack so the ground
@@ -1387,6 +1387,8 @@ function bill(e, opts){
           dem:q.filter(x => x.want), adds:g.addons.filter(x => x.key !== 'bags' && x.cents > 0).concat(g.stay), base:e.grid[idx]};
 }
 function priced(e){ return bill(e); }
+// the other fares of the same flight, in a breath: "· also Main Plus $681, Flexible $888 all in"
+function fareAlts(e){ const f = e.fares || []; return f.length ? ' · also ' + f.map(x => esc(x.brand.replace(/^Main Cabin /, '')) + ' ' + money(x.total)).join(', ') + ' all in' : ''; }
 // ---- the flying personality (per Patrick, 2026-09-21): a short quiz becomes a persona: a point on the dial and a
 // few priced terms of its own, offered as a target of its own beside cheapest, fastest and comfort. It ranks by the
 // same arithmetic as everything else; nothing here is a filter, and the grade never sees it.
@@ -1465,7 +1467,15 @@ function ranked(){
   const rows = [], hidden = [];
   for (const e of ALL){ const why = excluded(e); if (why) hidden.push({e, why}); else rows.push({e, ...bill(e)}); }
   rows.sort((x, y) => S.asap ? (Date.parse(x.e.arrive) - Date.parse(y.e.arrive)) : (x.rank - y.rank) || (x.e.id < y.e.id ? -1 : 1));
-  return {rows, hidden};
+  // one card per FLIGHT (per Patrick, 2026-09-21: "the same flight just different prices, in multiple places"): the feed
+  // sells each fare family as its own offer, so the same segments came back three times. The best-ranked fare stands
+  // for the flight and the others are named on it, so a dearer fare is a choice on the card, not a rival in the list.
+  const seen = new Map(), out = [];
+  for (const r of rows){ const key = (r.e.segments || []).map(sg => sg.flight + '@' + sg.dep).join('|') + '|' + r.e.depart; r.e.fares = [];
+    const first = seen.get(key); if (first){ first.e.fares.push({id:r.e.id, brand:r.e.brand, total:r.total, ticket:r.e.ticket_cents}); continue; }
+    seen.set(key, r); out.push(r); }
+  out.forEach(r => r.e.fares.sort((a, b) => a.total - b.total));
+  return {rows: out, hidden};
 }
 
 // ---- the sky from departure to arrival, in local hours
@@ -1694,7 +1704,7 @@ function door(kind, e, r, title, ctx){
     <div class="body">
       <div class="eyebrow">${title}</div>
       <div class="pc"><span class="pro"><i>Pro</i></span><span>${chips(pc.pro, '—')}</span><span class="con"><i>Con</i></span><span>${chips(pc.con, 'none')}</span></div>
-      <div class="who">${logo(e.carrier, true)}<h3>${esc(e.carrier_name)}<span>${esc(e.flight)} · ${esc(e.brand)}${e.operator !== e.carrier ? ' · flown by ' + esc((AIR[e.operator] || {}).name || e.operator) : ''}</span></h3></div>
+      <div class="who">${logo(e.carrier, true)}<h3>${esc(e.carrier_name)}<span>${esc(e.flight)} · ${esc(e.brand)}${fareAlts(e)}${e.operator !== e.carrier ? ' · flown by ' + esc((AIR[e.operator] || {}).name || e.operator) : ''}</span></h3></div>
       <p class="meta">${stopsText(e)} · ${dur(e.door_minutes)} door to door · ${e.route.join(' → ')}${S.asap ? ' · <b style="color:var(--red);font-weight:500">lands ' + hm(e.arrive) + (e.day_offset ? ' tomorrow' : ' today') + '</b>' : ''}${perHour(r, ctx)}</p>
       ${journeyHTML(e, r, ctx)}
       ${payHTML(e, eff)}
@@ -1727,7 +1737,7 @@ function rowHTML(r, ctx){
   return `<li class="row" data-id="${esc(e.id)}" aria-expanded="false">
     <button class="rowbtn" data-row="${esc(e.id)}">
       ${logo(e.carrier, true)}${sealHTML(e, true)}
-      <span class="rw"><b>${esc(e.carrier_name)}</b><span>${esc(e.flight)} · ${esc(e.brand)}</span><small>${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} · ${stopsText(e)} · ${dur(e.door_minutes)}</small>
+      <span class="rw"><b>${esc(e.carrier_name)}</b><span>${esc(e.flight)} · ${esc(e.brand)}${fareAlts(e)}</span><small>${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} · ${stopsText(e)} · ${dur(e.door_minutes)}</small>
         ${journeyHTML(e, r, ctx, true)}
         ${r.adds.length ? `<span class="dem" style="color:var(--dim)">+${money(r.adds.reduce((s, x) => s + x.cents, 0))} ${esc(r.adds.map(x => x.label.toLowerCase()).join(', '))}</span>` : ''}${r.dem.map(d => `<span class="dem">${esc(d.label.toLowerCase())}</span>`).join('')}${a && a.good ? `<span class="pt">★ points: ${a.spend.toLocaleString()} ${esc((BANK[a.via] || a.prog.name).split(' ')[0])} ≈ ${money(r.total - a.margin)} all in, ${money(a.margin)} under cash</span>` : ''}</span>
       <span class="when">${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''}<i>${stopsText(e)} · ${dur(e.door_minutes)}</i></span>
@@ -2803,13 +2813,15 @@ const shuffle = a => { for (let i = a.length - 1; i > 0; i--){ const j = Math.fl
 // for as long as it is up, and a re-paint of the cards picks the drift up where it was rather than restarting it.
 const BEAT = 6500, GAP = 420, PANO_ODDS = 1 / 3;
 function freshPhoto(k, wantPlace){
-  if (!PH.deck || !PH.deck.length){ PH.deck = shuffle(PHOTOS.map((p, i) => i)); }
+  if (!PH.deck || !PH.deck.length){ PH.deck = shuffle(PHOTOS.map((p, i) => i).filter(i => !PHOTOS[i].bad)); }
   const onScreen = new Set((PH.slots || []).filter((x, i) => i !== k).concat(PH.wide != null ? [PH.wide] : []));
-  let at = PH.deck.findIndex(i => !onScreen.has(i) && (!wantPlace || PHOTOS[i].place === wantPlace));
-  if (at < 0) at = PH.deck.findIndex(i => !onScreen.has(i));
-  if (at < 0) return Math.floor(Math.random() * PHOTOS.length);
+  const usable = i => !onScreen.has(i) && PHOTOS[i].ok && !PHOTOS[i].bad;
+  let at = PH.deck.findIndex(i => usable(i) && (!wantPlace || PHOTOS[i].place === wantPlace));
+  if (at < 0) at = PH.deck.findIndex(usable);
+  if (at < 0){ const ok = PHOTOS.map((p, i) => i).filter(i => PHOTOS[i].ok && !onScreen.has(i)); return ok.length ? ok[Math.floor(Math.random() * ok.length)] : -1; }
   return PH.deck.splice(at, 1)[0];
 }
+const photosReady = () => PHOTOS.filter(p => p.ok).length >= 3 || (PHOTOS.length && PHOTOS.every(p => p.ok || p.bad) && PHOTOS.some(p => p.ok));
 function seatPhotos(){
   const places = [...new Set(PHOTOS.map(p => p.place))], start = Math.floor(Math.random() * places.length);
   PH.slots = [-1, -1, -1]; PH.deck = null; PH.drift = [null, null, null]; PH.wide = null; PH.driftWide = null;
@@ -2862,8 +2874,10 @@ function swapTile(d, k, p, wide){
 }
 function mountPhotos(){
   const doors = [...document.querySelectorAll('#doors .door')]; if (!PHOTOS.length || !doors.length) return;
-  if (!PH.slots || PH.slots.length !== 3) seatPhotos();
-  doors.forEach((d, k) => { const ph = d.querySelector('.photo'); if (!ph) return; const a = ph.querySelector('.pic.a'), p = PH.wide != null ? PHOTOS[PH.wide] : PHOTOS[PH.slots[k]];
+  // not until the pictures are really here: the frame keeps the sky's own gradient, never a black box
+  if (!photosReady()){ clearTimeout(PH.wait); PH.wait = setTimeout(mountPhotos, 300); return; }
+  if (!PH.slots || PH.slots.length !== 3 || PH.slots.some(i => i < 0 || !PHOTOS[i] || !PHOTOS[i].ok)) seatPhotos();
+  doors.forEach((d, k) => { const ph = d.querySelector('.photo'); if (!ph) return; const a = ph.querySelector('.pic.a'), p = PH.wide != null ? PHOTOS[PH.wide] : PHOTOS[PH.slots[k]]; if (!p || !p.ok) return;
     if (!ph.querySelector('.pic.on')){ setPic(a, p, k, PH.wide != null); a.style.transition = 'none'; a.classList.add('on'); setTimeout(() => { a.style.transition = ''; }, 40); }
     else if (PH.wide != null) setPic(ph.querySelector('.pic.on'), p, k, true); });
   if (!PH.timer) PH.timer = setInterval(cycle, BEAT);
@@ -2872,9 +2886,10 @@ function cycle(){
   if (W.mode !== 'results' || PHOTOS.length < 2 || document.hidden) return;
   if (document.querySelectorAll('#doors .door').length < 3) return;
   const places = [...new Set(PHOTOS.map(p => p.place))];
+  if (!photosReady()) return;
   const pano = PH.wide == null && Math.random() < PANO_ODDS;
-  if (pano){ PH.wide = freshPhoto(-1, null); PH.driftWide = null; driftFor(-1, PH.wide, true); }
-  else { PH.wide = null; const start = Math.floor(Math.random() * places.length); for (let k = 0; k < 3; k++) PH.slots[k] = freshPhoto(k, places.length > 1 ? places[(start + k) % places.length] : null); }
+  if (pano){ PH.wide = freshPhoto(-1, null); if (PH.wide < 0){ PH.wide = null; return; } PH.driftWide = null; driftFor(-1, PH.wide, true); }
+  else { PH.wide = null; const start = Math.floor(Math.random() * places.length); for (let k = 0; k < 3; k++){ const n = freshPhoto(k, places.length > 1 ? places[(start + k) % places.length] : null); if (n >= 0) PH.slots[k] = n; } }
   // right to left: the last frame first, then the middle, then the first
   [2, 1, 0].forEach((k, i) => setTimeout(() => { const d = document.querySelectorAll('#doors .door')[k]; if (d) swapTile(d, k, PHOTOS[pano ? PH.wide : PH.slots[k]], pano); }, i * GAP));
 }
@@ -2932,7 +2947,9 @@ async function fetchPhotos(){
   const get = async place => { if (!place) return []; try { const r = await fetch('/photos?place=' + encodeURIComponent(place)); const d = await r.json(); return (d.photos || []).map(p => ({...p, place: d.place || place})); } catch (e){ return []; } };
   const [a, b] = await Promise.all([get(here), get(there)]); if (PH.key !== key) return;
   const mixed = shuffle(a.concat(b)); if (mixed.length < 2) return;
-  mixed.forEach(p => { const im = new Image(); im.onload = () => { p.w = im.naturalWidth; p.h = im.naturalHeight; }; im.src = p.src; });
+  // a picture is used only once its image has loaded; one that fails is never used (per Patrick, 2026-09-21:
+  // black frames every second refresh, when the image host was slow or refused a load)
+  mixed.forEach(p => { const im = new Image(); im.onload = () => { p.w = im.naturalWidth; p.h = im.naturalHeight; p.ok = true; }; im.onerror = () => { p.bad = true; }; im.src = p.src; });
   PHOTOS = mixed; PH.slots = null; PH.wide = null; if (W.mode === 'results') paint(false);
 }
 document.addEventListener('animationend', ev => { if (ev.target.classList && ev.target.classList.contains('rise')) ev.target.classList.remove('rise'); });
