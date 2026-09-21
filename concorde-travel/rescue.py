@@ -65,6 +65,9 @@ def refund_rights(sit: Dict[str, Any]) -> Tuple[bool, str]:
     and six abroad, and you choose not to travel. Elsewhere: cancelled, yes;
     delayed, ask."""
     kind = sit.get("kind")
+    fare = str(sit.get("fare") or "")
+    if fare == "flex":
+        return True, "a flexible fare is refundable by its own terms, whatever the delay"
     if kind == "cancelled":
         return True, "the flight was cancelled and you choose not to take the airline's alternative, so the unused ticket may be refunded in full"
     delay = sit.get("delay_minutes")
@@ -73,6 +76,9 @@ def refund_rights(sit: Dict[str, Any]) -> Tuple[bool, str]:
     if sit.get("us") and delay is not None and delay >= need:
         return True, ("a delay of %s on a US %s flight is 'significant' under the DOT rule, so the unused ticket may be refunded if you choose not to travel"
                       % (narrator._hm(delay), "international" if intl else "domestic"))
+    if fare in ("business", "first"):
+        return False, ("a %s fare is often refundable by its own rules, which the arithmetic does not count until you check; a delay under %s is not 'significant' under the US rule"
+                       % (fare, narrator._hm(need)))
     return False, ("a delay under %s is not 'significant' under the US rule; buying another ticket means paying twice unless the airline agrees to refund"
                    % narrator._hm(need) if sit.get("us") else "outside the US rules, a refund for a delay is the airline's call; ask before you buy")
 

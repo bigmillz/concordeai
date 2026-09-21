@@ -920,7 +920,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">Advanced options are optional; leave them and go.</span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="16a43a8">16a43a8</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="6fe8fe9">6fe8fe9</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -947,7 +947,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="16a43a8">16a43a8</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="6fe8fe9">6fe8fe9</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1415,7 +1415,7 @@ function fixerHTML(){
     <div class="frow three">${F('rs-flight', 'Flight', RS.flight, 'plane', 'The number on your boarding pass.', 'DL 5048')}${D('rs-date', 'Date', RS.date)}${Seg('kind', 'What happened', 'alert', [['delayed', 'Delayed'], ['cancelled', 'Cancelled']], true)}</div>
     <div class="frow three" id="rs-when">${F('rs-sched', 'Scheduled departure', RS.sched, 'clock', 'As printed on the ticket.', '18:30', true, 'time')}${F('rs-new', 'New departure', RS.newdep, 'clock', 'What the board says now. Blank if nothing yet.', '21:40', false, 'time')}${F('rs-newarr', 'New arrival', RS.newarr, 'clock', 'Add +1 if it lands tomorrow.', '09:50 +1')}</div>
     <div class="frow two">${Sel('rs-rebook', 'Rebooking offered', RS.rebook, 'swap', [['no', 'No'], ['notyet', 'Not yet'], ['yes', 'Yes, on another flight']], 'What the airline has put you on, if anything.')}${F('rs-rbarr', 'That flight lands at', RS.rbarr, 'flag', 'Only if one was offered. Add +1 for tomorrow.', '13:10 +1')}</div>
-    <div class="frow four">${Sel('rs-fare', 'Your fare', RS.fare, 'seat', [['basic', 'Basic economy'], ['main', 'Main cabin'], ['flex', 'Flexible']], 'Sets what a change or refund costs.')}${Sel('rs-bags', 'Bags', RS.bags, 'bag', [['no', 'Carry-on only'], ['yes', 'A bag is checked']], 'A checked bag does not follow you to another airline.')}${F('rs-paid', 'What you paid', RS.paid, 'dollar', 'Helps the refund maths.', '600')}${F('rs-hour', 'An hour of yours is worth', RS.hour || '35', 'who', 'Prices the time an alternative saves.', '35')}</div>
+    <div class="frow four">${Sel('rs-fare', 'Your fare', RS.fare, 'seat', [['basic', 'Basic economy'], ['main', 'Main cabin'], ['flex', 'Economy, flexible'], ['premium', 'Premium economy'], ['business', 'Business'], ['first', 'First']], 'Sets the refund rules and which cabin to search.')}${Sel('rs-bags', 'Bags', RS.bags, 'bag', [['no', 'Carry-on only'], ['yes', 'A bag is checked']], 'A checked bag does not follow you to another airline.')}${F('rs-paid', 'What you paid', RS.paid, 'dollar', 'Helps the refund maths.', '600')}${F('rs-hour', 'An hour of yours is worth', RS.hour || '35', 'who', 'Prices the time an alternative saves.', '35')}</div>
     <p class="searcherr" id="rs-err" role="alert"></p>
     <div class="nav"><button class="go" id="rs-go">🪄 Make the call</button><span class="hintr">From, to, what happened and the scheduled time are required. The more you add, the faster and surer the call.</span></div></div>`;
 }
@@ -1946,7 +1946,7 @@ async function fetchLeg(i){
   if (!(SERVED && date)){ S.notice = (S.trip === 'round' ? 'Return leg, stand-in' : 'Flight ' + (i+1) + ', stand-in') + ': the outbound recording mirrored (this page is a file, not the live service).'; return null; }
   const box = $('#loading'); box.classList.remove('hidden'); runProgress(box, SEARCH_STAGES, 9000, () => {});
   let res;
-  try { const r = await fetch('/search', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'api', origin:from, origin_address:from, destination:to, date, adults:paxCount(), checked_bags:partyBags(), trip:{leg:1}})}); res = await r.json(); }
+  try { const r = await fetch('/search', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'api', origin:from, origin_address:from, destination:to, date, adults:paxCount(), checked_bags:partyBags(), cabin:S.adv.cabin, trip:{leg:1}})}); res = await r.json(); }
   catch (x){ res = {error:'The search did not come back: ' + x.message}; }
   box.classList.add('hidden');
   if (res.error){ if (res.sign_in){ openAccount(res); return undefined; } S.notice = 'The return search failed (' + res.error + '), so this is the outbound recording mirrored.'; return null; }
@@ -3106,7 +3106,7 @@ async function enterResults(){
   if (SERVED){
     runProgress(box, SEARCH_STAGES, 9000, () => {});
     let res;
-    try { const r = await fetch('/search', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'api', origin:L.from, origin_address:L.from, destination:L.to, date, adults:paxCount(), checked_bags:partyBags(), trip:{kind:S.trip, back:S.trip === 'round' ? S.back : '', pax:S.pax, bags:S.bags}})}); res = await r.json(); }
+    try { const r = await fetch('/search', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'api', origin:L.from, origin_address:L.from, destination:L.to, date, adults:paxCount(), checked_bags:partyBags(), cabin:S.adv.cabin, trip:{kind:S.trip, back:S.trip === 'round' ? S.back : '', pax:S.pax, bags:S.bags}})}); res = await r.json(); }
     catch (e){ res = {error:'The search did not come back: ' + e.message}; }
     if (res.error){ box.classList.add('hidden'); $('#wizard').classList.remove('hidden'); $('#rail').classList.remove('hidden'); goStep(1);
       if (res.sign_in){ openAccount(res); return; }

@@ -154,6 +154,17 @@ def serp_checks():
         os.environ.pop("CONCORDEGO_SERPAPI_KEY", None)
 
 
+
+def cabin_checks():
+    """The cabin the page asked for reaches the provider's body; nothing asked for is economy."""
+    print("\ncabin")
+    d = json.loads(json.dumps(live.PROFILES["duffel"]))
+    body = live._render_body(d, {"origin": "JFK", "destination": "LHR", "date": "2026-11-18", "adults": 1, "cabin": "business"})
+    check("a business search asks Duffel for business", body["data"]["cabin_class"] == "business")
+    body2 = live._render_body(d, {"origin": "JFK", "destination": "LHR", "date": "2026-11-18", "adults": 1})
+    check("no cabin asked for is economy", body2["data"]["cabin_class"] == "economy")
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="cgo-live-")
     sandbox(tmp)
@@ -479,6 +490,7 @@ def main():
     check("the shipped default says its wire format was verified against the live service",
           "VERIFIED against the live service" in live.DEFAULTS["_note"] and "UNVERIFIED" not in live.DEFAULTS["_note"])
 
+    cabin_checks()
     serp_checks()
     print("\n%d checks, %d failed" % (N[0], len(FAILS)))
     if FAILS:

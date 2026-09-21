@@ -58,6 +58,12 @@ def main():
     check("an EU departure adds EU261 by distance, hedged", any("EU261" in r["what"] and "€600" in r["what"] for r in rescue.rights(dict(sit3, eu=True, distance_km=5500)))
           and all("may" in r or True for r in rescue.rights(dict(sit3, eu=True))))
 
+    # the fare's own rules
+    ok, why = rescue.refund_rights({"kind": "delayed", "us": True, "delay_minutes": 30, "fare": "flex"})
+    check("a flexible fare is refundable whatever the delay", ok and "flexible" in why)
+    ok2, why2 = rescue.refund_rights({"kind": "delayed", "us": True, "delay_minutes": 30, "fare": "business"})
+    check("business is 'often refundable' and not counted until checked", not ok2 and "often refundable" in why2)
+
     # the odds of flying today: modelled, monotone, and gone by midnight
     o = rescue.odds({"kind": "delayed", "delay_minutes": 65, "new_depart": "2026-11-18T19:35:00-05:00"}, datetime.fromisoformat("2026-11-18T18:00:00-05:00"))
     check("a modest evening delay leaves good odds of flying today", o["p_today"] is not None and 0.6 <= o["p_today"] <= 0.97, str(o["p_today"]))

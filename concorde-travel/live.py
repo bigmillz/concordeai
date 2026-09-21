@@ -122,7 +122,7 @@ PROFILES = {
                 "slices": [{"origin": "$origin", "destination": "$destination",
                             "departure_date": "$date"}],
                 "passengers": ["$passengers"],
-                "cabin_class": "economy",
+                "cabin_class": "$cabin",
             }
         },
         "passenger_template": {"type": "adult"},
@@ -513,6 +513,7 @@ def _render_body(cfg, query):
         "$currency": query.get("currency", "USD"),
         "$adults": query.get("adults", 1),
         "$limit": query.get("limit", 20),
+        "$cabin": query.get("cabin") or "economy",     # economy | premium_economy | business | first
     }
 
     def walk(node):
@@ -666,13 +667,16 @@ def serp_status():
             "carriers": cfg["carriers"], "quota": quota_state(cfg, _serp_quota_file())}
 
 
-def serp_search(origin, destination, date, adults=1, carriers=None, cfg=None, allow_call=True):
+_SERP_CLASS = {"economy": 1, "premium_economy": 2, "business": 3, "first": 4}
+
+
+def serp_search(origin, destination, date, adults=1, carriers=None, cfg=None, allow_call=True, cabin=None):
     """(payload, meta): Google Flights through SerpApi for the named carriers
     only, one way, in dollars. Cache, then quota, then the wire."""
     cfg = cfg or serp_config()
     carriers = sorted({str(c).upper() for c in (carriers or cfg["carriers"]) if c})
     query = {"engine": "google_flights", "origin": origin, "destination": destination,
-             "date": date, "adults": int(adults), "carriers": carriers}
+             "date": date, "adults": int(adults), "carriers": carriers, "cabin": cabin or "economy"}
     qf = _serp_quota_file()
     hit = cache_get(query, cfg["quota"]["cache_ttl_seconds"])
     if hit:                                   # a cached answer costs nothing, so it must not spend a call
@@ -694,7 +698,8 @@ def serp_search(origin, destination, date, adults=1, carriers=None, cfg=None, al
     from urllib.parse import urlencode
     params = {"engine": "google_flights", "departure_id": origin, "arrival_id": destination,
               "outbound_date": date, "type": 2, "currency": "USD", "hl": "en", "gl": "us",
-              "adults": int(adults), "include_airlines": ",".join(carriers), "api_key": cfg["key"]}
+              "adults": int(adults), "include_airlines": ",".join(carriers), "api_key": cfg["key"],
+              "travel_class": _SERP_CLASS.get(cabin or "economy", 1)}
     req = urllib.request.Request(SERP_URL + "?" + urlencode(params),
                                  headers={"Accept": "application/json", "User-Agent": UA})
     secrets = (cfg["key"],)

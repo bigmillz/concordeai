@@ -724,7 +724,8 @@ def _fetch_raw(req):
     elif src == "api":
         q = {"origin": where["origin"]["code"], "destination": where["destination"]["code"],
              "date": where["date"],
-             "adults": int(req.get("adults", 1)), "currency": "USD", "limit": 50}
+             "adults": int(req.get("adults", 1)), "currency": "USD", "limit": 50,
+             "cabin": _cabin(req.get("cabin"))}
         raw, meta = live.search(q)
         if raw is None:
             return ({"error": meta.get("error", "live search unavailable"),
@@ -740,6 +741,15 @@ def _fetch_raw(req):
     return raw, meta, where, src
 
 
+_CABINS = {"economy": "economy", "premium": "premium_economy", "premium_economy": "premium_economy",
+           "business": "business", "first": "first"}
+
+
+def _cabin(word):
+    """The page's cabin word -> the provider's. Unknown words are economy, never an error."""
+    return _CABINS.get(str(word or "").strip().lower(), "economy")
+
+
 def _supplement(q):
     """(payload, meta) from live.serp_search for the route, or (None, why)."""
     try:
@@ -749,7 +759,7 @@ def _supplement(q):
         # Google has no metro codes: NYC comes back empty, JFK,EWR,LGA comes back full
         return live.serp_search(",".join(places.airports_for(q["origin"])),
                                 ",".join(places.airports_for(q["destination"])), q["date"],
-                                adults=q.get("adults", 1), cfg=scfg)
+                                adults=q.get("adults", 1), cfg=scfg, cabin=q.get("cabin"))
     except Exception as exc:                          # a supplement must never take the search down
         return None, {"source": "none", "error": "supplement failed: %s" % exc}
 
@@ -776,7 +786,8 @@ def rescue_request(req):
     found, errors, feed = [], [], None
     for dt in dates:
         r = search_request({"source": "api", "origin": o, "origin_address": o, "destination": d, "date": dt,
-                            "adults": 1, "checked_bags": 1 if sit.get("bags_checked") else 0, "_served": req.get("_served")})
+                            "adults": 1, "checked_bags": 1 if sit.get("bags_checked") else 0, "_served": req.get("_served"),
+                            "cabin": {"premium": "premium", "business": "business", "first": "first"}.get(str(sit.get("fare") or ""), "economy")})
         if r.get("error"):
             errors.append(r["error"])
             continue
