@@ -55,6 +55,10 @@ ROOT = (os.environ.get("CONCORDEGO_ROOT") or "").strip()
 USER_SEARCHES = int(os.environ.get("CONCORDEGO_USER_SEARCHES", "20"))     # metered flight searches a day
 # Signed-in people who are not metered and may open /admin: the machine's owner reaching it through the tunnel.
 OWNERS = {e.strip().lower() for e in os.environ.get("CONCORDEGO_OWNERS", "").split(",") if e.strip()}
+# A ceiling on the whole site's day, whoever asks: the per-person allowance bounds one account, this bounds a
+# swarm of them. Wishes are the only metered thing that costs money per call (Duffel bills per booking, not per
+# search; live.py caps searches on its own), so a day of wishes is at most this many Opus calls.
+WISHES_TOTAL = int(os.environ.get("CONCORDEGO_WISHES_TOTAL", "1500"))
 USER_WISHES = int(os.environ.get("CONCORDEGO_USER_WISHES", "200"))        # model calls a day (cents each)
 USERS_FILE = os.path.join(live.HOME, "users.json")
 _USERS_LOCK = threading.Lock()
@@ -686,6 +690,25 @@ def _users_today():
     return sorted(out, key=lambda x: -(x["searches"] + x["wishes"]))
 
 
+_STAMP = {"at": 0.0, "build": "", "updated": ""}
+
+
+def _stamp(body):
+    """The footer's build and date, from git HEAD, so a served page says what is
+    running. Cached a minute: the updater changes it, nothing else does."""
+    if time.time() - _STAMP["at"] > 60:
+        rc, head, _ = _git("log", "-1", "--format=%h%x09%cs")
+        if rc == 0 and "\t" in head:
+            _STAMP["build"], _STAMP["updated"] = head.split("\t", 1)
+        _STAMP["at"] = time.time()
+    if not _STAMP["build"]:
+        return body
+    b, u = _STAMP["build"].encode(), _STAMP["updated"].encode()
+    body = re.sub(rb'data-build="[^"]*">[^<]*</code>', b'data-build="' + b + b'">' + b + b'</code>', body)
+    body = re.sub(rb'data-updated="[^"]*">[^<]*</time>', b'data-updated="' + u + b'">' + u + b'</time>', body)
+    return body
+
+
 def admin_status(fetch=False):
     out = {"repo": REPO_DIR, "uptime_s": int(time.time() - STARTED), "pid": os.getpid(), "python": sys.version.split()[0],
            "owners": sorted(OWNERS), "log_source": None, "now": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
@@ -719,6 +742,32 @@ def admin_status(fetch=False):
     import shutil
     out["log_source"] = "journal" if shutil.which("journalctl") else (LOG_FILE or None)
     return out
+
+
+def locate_request(q):
+    """lat, lon -> a street address in the shape places.py reads from the end.
+    OpenStreetMap's Nominatim, one identified User-Agent, nothing stored."""
+    try:
+        lat, lon = float(q["lat"][0]), float(q["lon"][0])
+        assert -90 <= lat <= 90 and -180 <= lon <= 180
+    except Exception:
+        return {"error": "lat and lon, please"}
+    url = "https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&lat=%.6f&lon=%.6f" % (lat, lon)
+    req = urllib.request.Request(url, headers={"User-Agent": "ConcordeGo/1.0 (go.flyconcordefly.com)", "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=8) as r:
+            d = json.loads(r.read().decode("utf-8"))
+    except Exception as exc:
+        return {"error": "the map service did not answer: %s" % type(exc).__name__}
+    a = d.get("address") or {}
+    road = " ".join(x for x in (a.get("house_number"), a.get("road")) if x) or a.get("pedestrian") or a.get("footway") or ""
+    hood = a.get("neighbourhood") or a.get("suburb") or a.get("quarter") or a.get("city_district") or a.get("borough") or ""
+    city = a.get("city") or a.get("town") or a.get("village") or a.get("municipality") or a.get("county") or ""
+    parts = []
+    for x in (road, hood, city):
+        if x and x not in parts:
+            parts.append(x)
+    return {"address_text": ", ".join(parts), "address": a}
 
 
 def admin_update():
@@ -859,6 +908,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split("?")[0]
+        if path == "/api/locate":
+            from urllib.parse import parse_qs
+            q = parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
+            return self._json(locate_request(q))
         if path == "/admin" or path.startswith("/api/admin/"):
             if not self._is_owner():
                 return self._html("<!doctype html><meta charset=utf-8><body style='background:#101013;color:#ececec;font:15px sans-serif;padding:40px'>"
@@ -878,7 +931,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self.send_error(404)
         if path == "/" or path == "/index.html":
             if ROOT:
-                return self._send_file(os.path.join(UI, "mock", ROOT + ".html"), "text/html; charset=utf-8")
+                return self._send_file(os.path.join(UI, "mock", ROOT + ".html"), "text/html; charset=utf-8", stamp=True)
             return self._send_file(os.path.join(UI, "index.html"), "text/html; charset=utf-8")
         if ROOT and path.startswith("/assets/"):
             # the mockup at / asks for its nameplates relative to itself
@@ -969,6 +1022,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                             "live searches, the narrator and the wish box are unlocked by signing in.",
                                    "remote": True, "sign_in": True})
             kind, limit = ("searches", USER_SEARCHES) if path in ("/api/live", "/api/search") else ("wishes", USER_WISHES)
+            if kind == "wishes":
+                okall, _ = _users_take("_everyone", "wishes", WISHES_TOTAL)
+                if not okall:
+                    return self._json({"error": "The wish box has had its day (%d wishes site-wide). It is back at midnight." % WISHES_TOTAL,
+                                       "remote": True, "allowance": True})
             ok, left = (True, None) if who in OWNERS else _users_take(who, kind, limit)
             if not ok:
                 return self._json({"error": "That is today's allowance of %d %s for %s. It resets at midnight." % (limit, kind, who),
@@ -993,12 +1051,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _send_file(self, path, ctype):
+    def _send_file(self, path, ctype, stamp=False):
         try:
             with open(path, "rb") as fh:
                 body = fh.read()
         except OSError:
             return self.send_error(404)
+        if stamp:
+            body = _stamp(body)
         self.send_response(200)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))

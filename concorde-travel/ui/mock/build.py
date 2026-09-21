@@ -14,6 +14,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 data = open(os.path.join(HERE, "slim.json"), encoding="utf-8").read()
 
 import glob
+import subprocess, datetime
+# The stamp in the page footers: the checkout's HEAD and its date. server.py rewrites both from git at serve time,
+# so a served page always shows what is running; this is what a page opened as a file shows.
+def _git(*args):
+    try: return subprocess.run(["git"] + list(args), cwd=HERE, capture_output=True, text=True, timeout=10).stdout.strip()
+    except Exception: return ""
+BUILD = _git("rev-parse", "--short", "HEAD") or "dev"
+UPDATED = (_git("log", "-1", "--format=%cs") or datetime.date.today().isoformat())
 for src in sorted(glob.glob(os.path.join(HERE, "mock-*.src.html"))):
     n = int(os.path.basename(src)[5:-9])
     html = open(src, encoding="utf-8").read()
@@ -23,5 +31,6 @@ for src in sorted(glob.glob(os.path.join(HERE, "mock-*.src.html"))):
     photos = os.path.join(HERE, "photos.json")
     ph = open(photos, encoding="utf-8").read() if os.path.exists(photos) else "[]"
     out = os.path.join(HERE, "mock-%d.html" % n)
-    open(out, "w", encoding="utf-8").write(html.replace("__DATA__", data).replace("__PHOTOS__", ph))
+    open(out, "w", encoding="utf-8").write(html.replace("__DATA__", data).replace("__PHOTOS__", ph)
+                                           .replace("__BUILD__", BUILD).replace("__UPDATED__", UPDATED))
     print("mock-%d.html  %6.0f KB" % (n, os.path.getsize(out) / 1024))

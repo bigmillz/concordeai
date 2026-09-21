@@ -1,4 +1,4 @@
-<!doctype html><html lang="en" class="splashing"><head><meta charset="utf-8">
+<!doctype html><html lang="en" class="splashing"><head><meta charset="utf-8"><link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMxMDEwMTMiLz48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMSIgeDI9IjEiIHkyPSIwIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM4Zjk1YTEiLz48c3RvcCBvZmZzZXQ9Ii41NSIgc3RvcC1jb2xvcj0iI2UyZTVlYSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iI2Y1ZjZmOCIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxnIHN0cm9rZT0idXJsKCNnKSIgc3Ryb2tlLXdpZHRoPSI1LjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNiA4KSBzY2FsZSgyLjYpIj48bGluZSB4MT0iMS4yIiB5MT0iMTUuMiIgeDI9IjE4LjQiIHkyPSIxLjIiLz48bGluZSB4MT0iNS41IiB5MT0iMTUuMiIgeDI9IjE4LjQiIHkyPSI0LjciLz48bGluZSB4MT0iOS44IiB5MT0iMTUuMiIgeDI9IjE4LjQiIHkyPSI4LjIiLz48bGluZSB4MT0iMTQuMSIgeTE9IjE1LjIiIHgyPSIxOC40IiB5Mj0iMTEuNyIvPjxsaW5lIHgxPSIxNy4zIiB5MT0iMTUuMiIgeDI9IjE4LjQiIHkyPSIxNC4zIi8+PC9nPjwvc3ZnPg==">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>ConcordeGo · Steps</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -45,13 +45,16 @@ h1,h2,h3{font-weight:400;letter-spacing:-.02em;text-wrap:balance}
 /* the star marks the better value; the outline marks the PICK, which is the better value until tapped otherwise */
 .pay[data-pick]{cursor:pointer}.pay[data-pick]:hover{border-color:var(--dim)}
 .pay.pick{border-color:rgba(255,176,32,.55);background:rgba(255,176,32,.06)}
-.pay.best .ph{color:var(--price)}
 .pay .ph{font-family:var(--disp);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:6px;min-height:14px}
 .pay .ph .star{font-style:normal;font-size:11px;line-height:1}
 /* the large figures wear the wordmark's face */
 .fig{font-family:var(--fig);font-weight:400;font-variant-numeric:tabular-nums;letter-spacing:0}
-.pay .num{font-size:21px;line-height:1.1;margin-top:4px;white-space:nowrap}
+.pay .num{font-size:21px;line-height:1.1;margin-top:4px;white-space:nowrap;color:var(--dim);transition:color .2s}
+.pay.pick .num{color:var(--text)}
+.pay.pick .ph{color:var(--text)}.pay.pick.best .ph{color:var(--price)}
+.pay:not(.pick) .v,.pay:not(.pick) .unit{color:var(--faint)}
 .pay.dim .num{color:var(--faint)}
+.pay.pick .num,.pay.pick.dim .num{color:var(--text)}
 .pay .unit{color:var(--dim);font-size:12px}
 .pay .unit.dim{color:var(--faint)}
 .pay em{font-style:normal;color:var(--faint);font-size:11.5px;font-family:var(--mono);margin-top:1px}
@@ -223,6 +226,7 @@ details[open] summary:after{content:"–"}
 .bleg .bpay{text-align:right;display:flex;flex-direction:column;gap:2px}.bleg .bpay .fig{font-size:20px;line-height:1.1}.bleg .bpay span{color:var(--dim);font-size:12px}
 .blinks{display:flex;flex-direction:column;gap:10px;padding:18px 0 6px}.blink{text-decoration:none;text-align:center;display:block}
 .bnote{color:var(--dim);font-size:12.5px;line-height:1.5;margin:0}
+.bwalk{border-top:1px solid var(--line-soft);padding-top:16px;margin-top:8px}.bwalk h3{font-size:15px;font-weight:500;margin:0 0 10px}.bwalk .play{margin:0}
 .bfoot{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;padding-top:8px}.itin{font:12px/1.6 var(--mono);color:var(--dim);white-space:pre-wrap;margin:0;flex:1;min-width:240px}
 @media (max-width:640px){.bleg{grid-template-columns:40px 1fr;grid-auto-rows:auto}.bleg .bpay{text-align:left;grid-column:2}}
 .step b{font-weight:500}.step small{display:block;font-size:11.5px;color:var(--faint)}
@@ -410,10 +414,16 @@ details[open] summary:after{content:"–"}
 .rnote{margin-top:12px;font-size:12.5px;color:var(--faint);line-height:1.5}
 .rnote b{color:var(--dim);font-weight:500}
 @media (max-width:760px){.rtab th:nth-child(4),.rtab td:nth-child(4){display:none}}
-.foot{border-top:1px solid var(--line);margin-top:36px;padding:18px 0 6px;font-size:12.5px;color:var(--dim);display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center}
+.foot{border-top:1px solid var(--line);margin-top:36px;padding:22px 0 10px;font-size:12.5px;color:var(--dim);display:flex;flex-wrap:wrap;gap:10px 22px;align-items:center;justify-content:center;text-align:center}
+/* the stamp: the mark, the date of the last change and the build. Both are written in by build.py, and rewritten
+   from git HEAD by server.py at serve time, so the droplet shows what is actually running. */
+.foot .stamp{flex-basis:100%;display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:6px}
+.foot .stamp .brand{opacity:.9}.foot .stamp .lockup{font-size:11px}
+.foot .built{font:400 11px var(--mono);letter-spacing:.06em;color:var(--faint)}.foot .built code{font:inherit;color:var(--dim)}
+.wfoot{max-width:1180px;margin:0 auto;padding-inline:clamp(16px,3.5vw,32px)}
 .foot label{display:inline-flex;align-items:center;gap:8px;color:var(--text)}
 .foot select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:5px 26px 5px 9px;font-size:12.5px;appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);background-position:calc(100% - 13px) 13px,calc(100% - 9px) 13px;background-size:4px 4px;background-repeat:no-repeat}
-.foot .dimmer{color:var(--faint);flex-basis:100%}
+.foot .dimmer{color:var(--faint);flex-basis:100%;max-width:70ch;margin:0 auto}
 .morebtn{display:block;margin:16px auto 0;color:var(--dim);font-size:13.5px;border-bottom:1px solid var(--line);padding:4px 2px}
 .morebtn:hover{color:var(--text)}
 .hiddenrows{margin-top:12px;color:var(--faint);font-size:12.5px;line-height:1.55}
@@ -428,7 +438,7 @@ details[open] summary:after{content:"–"}
 .cov b{color:var(--price);font-weight:500}
 
 /* ---------- sheet */
-.sheetwrap{position:fixed;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:end center;padding:16px;z-index:9}
+.sheetwrap{position:fixed;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:center;padding:16px;z-index:9}
 /* booking with points, step by step */
 .play .lede{color:var(--dim);font-size:13.5px;line-height:1.5;margin:0 0 14px}
 .play .lede b{color:var(--text);font-weight:500}
@@ -491,7 +501,9 @@ details[open] summary:after{content:"–"}
 .rail .jump{font-size:12px;color:var(--faint);border-bottom:1px solid var(--line);padding:2px 0}
 .rail .jump:hover{color:var(--text)}
 #wizard{scroll-snap-type:y proximity}
-.screen{min-height:100svh;display:grid;align-items:center;scroll-snap-align:start;scroll-margin-top:0;padding-block:64px 48px}
+/* a screen is the viewport minus the sticky rail above it, and its content sits centred between the rail and the
+   wish pill below (the bottom padding is the pill's room), so the card reads as centred, not low (per Patrick, 2026-09-21) */
+.screen{min-height:calc(100svh - 63px);display:grid;align-items:center;scroll-snap-align:start;scroll-margin-top:0;padding-block:32px 104px}
 .stepin{width:100%;max-width:1180px;margin:0 auto;padding-inline:clamp(16px,3.5vw,32px)}
 .stepin h1{font-size:clamp(26px,3.6vw,40px);font-weight:300;letter-spacing:-.02em;margin:8px 0 6px}
 .stepin .lead{color:var(--dim);font-size:15px;max-width:60ch;line-height:1.55}
@@ -521,6 +533,13 @@ details[open] summary:after{content:"–"}
 .fld .ico{position:absolute;left:14px;top:15px;width:18px;height:18px;stroke:var(--faint);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .fld:focus-within .ico{stroke:var(--speed)}
 .fld .help{color:var(--faint);font-size:12px;margin-top:7px;line-height:1.45}
+/* the target: the browser's own position, reverse-geocoded into the address (per Patrick, 2026-09-21) */
+.fld.hasloc input{padding-right:40px}
+.fld .locate{position:absolute;right:12px;top:30px;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:var(--dim);border:1px solid transparent;transition:.15s}
+.fld .locate svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round}
+.fld .locate:hover{color:var(--speed);border-color:var(--line)}.fld .locate.busy svg{animation:spin 1s linear infinite}.fld .locate.on{color:var(--green)}
+.fld .locerr{display:block;color:var(--red);margin-top:4px}.fld .locerr:empty{display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
 .fld .help b{color:var(--dim);font-weight:500}
 .link{display:grid;place-items:center;color:var(--faint);position:relative}
 .link:before{content:"";position:absolute;left:4px;right:4px;top:50%;height:0;border-top:1px dashed var(--line)}
@@ -813,6 +832,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">Advanced options are optional; leave them and go.</span></div></div>
   </div></section>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="656afec">656afec</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -839,7 +859,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page.</span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="656afec">656afec</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -857,7 +877,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 <div id="editor" class="editor hidden" role="dialog" aria-modal="true" aria-label="Edit your search">
   <div class="edshade" id="edshade"></div>
   <div class="edwrap">
-    <aside class="edtabs"><div class="ttl">Everything, at once</div>
+    <aside class="edtabs">
       <button data-etab="where" class="on">Search</button><button data-etab="matters">What matters</button><button data-etab="points">Points and miles</button><button data-etab="advanced">Advanced</button>
       <button class="done" id="eddone">Done</button></aside>
     <div class="edbody" id="edbody">
@@ -923,7 +943,7 @@ const AIRNAME = {american:'AA',aa:'AA','british airways':'BA',ba:'BA',british:'B
 const S = {trip:'round', a:1, b:0, c:0, preset:'1,0,0', asap:false, wants:new Set(), rules:[], ride:'either', off:new Set(), menu:false, open:new Set(),
   extra:{bag:0, wifi:false, seat:false, legroom:false, lounge:false, priority:false, insurance:false, hotel:false, custom:[]}, adv:{dep0:0, dep1:24, arr0:0, arr1:24, cabin:'economy', stops:2, alli:new Set(), out:new Set()},
   pts:{amex:120000, chase:80000, capone:0, citi:0, bilt:0, marriott:0, avios:0, virgin:0, aa:0, delta:0, mm:0, ms:0, fb:0, ac:0, ua:0}, ptOpen:new Set(), stOpen:new Set(), more:{banks:false, progs:false, status:false}, pay:{}, legIdx:0, legPick:{}, stage:'legs', status:{}, shown:12, T:'mine',
-  legs:[{from:'Wyckoff Ave & Myrtle Ave, Bushwick, Brooklyn', to:'London', date:'Wed 18 Nov'}], back:'Wed 25 Nov', pax:'1 adult', bags:'1 checked bag'};
+  legs:[{from:'', to:'', date:'Wed 18 Nov'}], back:'Wed 25 Nov', pax:'1 adult', bags:'1 checked bag'};
 
 // ---- wants: a predicate, a charge when it is missing, and a hint when nothing has it
 const NEWGEN = /^(78[1789]|359|351|339|338|32N|32Q|223|7M[89])$/;
@@ -1537,7 +1557,7 @@ function door(kind, e, r, title, ctx){
       <p class="meta">${stopsText(e)} · ${dur(e.door_minutes)} door to door · ${e.route.join(' → ')}${S.asap ? ' · <b style="color:var(--red);font-weight:500">lands ' + hm(e.arrive) + (e.day_offset ? ' tomorrow' : ' today') + '</b>' : ''}${perHour(r, ctx)}</p>
       ${journeyHTML(e, r, ctx)}
       ${payHTML(e, eff)}
-      <div class="cta"><button class="choose" data-choose="${esc(e.id)}">${payPick(e) === 'points' ? 'Book with points' : 'Choose this flight'}</button><button class="ledger" data-open="${esc(e.id)}">Full details</button></div>
+      <div class="cta"><button class="choose" data-choose="${esc(e.id)}">${payPick(e) === 'points' ? (S.trip === 'one' ? 'Book with points' : legNames()[S.legIdx][0] + ' with points') : selectLabel()}</button><button class="ledger" data-open="${esc(e.id)}">Full details</button></div>
     </div></article>`;
 }
 let DOOR_IDS = [];
@@ -1673,11 +1693,12 @@ const ICON = {
 };
 function sentenceHTML(){
   const L = S.legs, g0 = ALL[0].legs[0];
-  const fld = (id, label, val, icon, help, ph) => `<div class="fld">${ICON[icon]}<label for="${id}">${label}</label><input id="${id}" value="${esc(val)}" placeholder="${esc(ph || '')}" autocomplete="off">${help ? `<div class="help">${help}</div>` : ''}</div>`;
+  const LOCATE = '<button type="button" class="locate" id="locate" title="Use my location" aria-label="Use my location"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>';
+  const fld = (id, label, val, icon, help, ph) => `<div class="fld${id === 'q-from-0' ? ' hasloc' : ''}">${ICON[icon]}<label for="${id}">${label}</label><input id="${id}" value="${esc(val)}" placeholder="${esc(ph || '')}" autocomplete="off">${id === 'q-from-0' ? LOCATE : ''}${help ? `<div class="help">${help}</div>` : ''}</div>`;
   const sel = (id, label, val, opts, icon) => `<div class="fld">${ICON[icon]}<label for="${id}">${label}</label><select id="${id}">${opts.map(o => `<option${o === val ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select></div>`;
   const plane = '<div class="link" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M15 8l-4.2-1.4L7 1.5H5.4l1.9 5.1H3.6L2.5 4.9H1.2l.9 3.1-.9 3.1h1.3l1.1-1.7h3.7L5.4 14.5H7l3.8-5.1z"/></svg></div>';
   let h = `<div class="frow route">${fld('q-from-0', 'From your door', L[0].from, 'pin',
-      'An address, a neighbourhood or a city. <b>The ride to the airport is priced from here</b>, at the hour you leave: from Wyckoff Ave that is ' + esc(g0.tip.split(' · ').slice(2).join(', ')) + ', about ' + dur(g0.minutes) + '.', 'Where you start')}${plane}${fld('q-to-0', 'To', L[0].to, 'flag', 'A city searches every airport it has: London means Heathrow, Gatwick, Stansted, Luton and City, weighed against each other.', 'City or airport')}</div>`;
+      'An address, a neighbourhood or a city. <b>The ride to the airport is priced from here</b>, at the hour you leave' + (L[0].from && D.query.origin_full && L[0].from === D.query.origin_full ? ': from ' + esc(short(L[0].from)) + ' that is ' + esc(g0.tip.split(' · ').slice(2).join(', ')) + ', about ' + dur(g0.minutes) : '') + '.<span class="locerr" id="locerr"></span>', 'Your address, or a neighbourhood')}${plane}${fld('q-to-0', 'To', L[0].to, 'flag', 'A city searches every airport it has: London means Heathrow, Gatwick, Stansted, Luton and City, weighed against each other.', 'City or airport')}</div>`;
   h += `<div class="frow dates">${fld('q-date-0', 'Leaving', L[0].date, 'cal', '', 'Date')}${S.trip === 'round' ? fld('q-back', 'Returning', S.back, 'cal', '', 'Date') : ''}${sel('q-pax', 'Travellers', S.pax, ['1 adult', '2 adults', 'Family of 4'], 'who')}${sel('q-bags', 'Checked bags', S.bags, ['1 checked bag', 'No checked bag', '2 checked bags'], 'bag')}</div>`;
   if (S.trip === 'multi') L.slice(1).forEach((l, i) => { h += `<div class="frow legrow">${fld('q-from-' + (i+1), 'Then from', l.from, 'pin', '', 'City or airport')}${fld('q-to-' + (i+1), 'To', l.to, 'flag', '', 'City or airport')}${fld('q-date-' + (i+1), 'On', l.date, 'cal', '', 'Date')}<button class="rm2" data-rm="${i+1}" aria-label="Remove this flight">×</button></div>`; });
   h += `<div class="ridegrp"><span class="lbl">Getting to the airport by</span><div class="pills" id="ridepills" role="group" aria-label="How you get to the airport">${Object.entries(RIDES).map(([k, v]) => `<button data-ride="${k}" aria-pressed="${S.ride === k}">${esc(v[0].toUpperCase() + v.slice(1))}</button>`).join('')}</div></div>`;
@@ -1697,7 +1718,8 @@ function closeSheet(){ $('#sheetroot').innerHTML = ''; }
 function snapshot(e){
   const b = e.booking && e.booking[0], aw = awardsFor(e)[0], host = (() => { try { return new URL((e.details || {}).carriage_url || '').host; } catch (x) { return ''; } })();
   return {id:e.id, carrier:e.carrier, carrier_name:e.carrier_name, flight:e.flight, route:e.route.slice(), depart:e.depart, arrive:e.arrive, day_offset:e.day_offset, brand:e.brand, ticket_cents:e.ticket_cents, total_cents:bill(e).total,
-    pay:payPick(e, aw), award:aw ? {p:aw.p, name:aw.prog.name, pts:aw.pts, fees:aw.fees, spend:aw.spend, via:aw.via, good:aw.good} : null, site:host || (SITES[e.carrier] || ''), who:b ? b.who : e.carrier_name};
+    pay:payPick(e, aw), award:aw ? {p:aw.p, name:aw.prog.name, pts:aw.pts, fees:aw.fees, spend:aw.spend, via:aw.via, good:aw.good} : null, site:host || (SITES[e.carrier] || ''), who:b ? b.who : e.carrier_name,
+    play: payPick(e, aw) === 'points' && aw ? playbookHTML(e, bill(e)) : ''};
 }
 async function selectLeg(id){
   const e = ALL.find(x => x.id === id); if (!e) return;
@@ -1771,10 +1793,12 @@ function bookHTML(){
         links += `<a class="choose blink" href="${esc(l.href)}" target="_blank" rel="noopener">Book the ${esc(names[i][0].toLowerCase())} on ${esc(l.host)} →</a>`; });
       if (!same) links += '<p class="bnote">Two tickets: the airlines differ, so each leg books on its own site. That is normal, and often what made it cheaper.</p>'; }
   }
-  pts.forEach(p => { const i = snaps.indexOf(p); links += `<button class="choose blink" data-playleg="${i}">Book the ${esc(names[i][0].toLowerCase())} with ${esc(p.award.name)}, step by step →</button>`; });
+  const walks = pts.map(p => { const i = snaps.indexOf(p); return `<section class="bwalk"><h3>${esc(names[i][0])} with ${esc(p.award.name)}: ${p.award.spend.toLocaleString()} ${esc(p.award.via ? SHORT[p.award.via] + ' points' : p.award.name)} + ${money(p.award.fees)}</h3>${p.play || '<p class="bnote">No walkthrough for this award.</p>'}</section>`; }).join('');
+  const sameProg = pts.length > 1 && pts.every(p => p.award.p === pts[0].award.p && (p.award.via || '') === (pts[0].award.via || ''));
+  const ptsHead = pts.length ? `<p class="bnote">${pts.length > 1 ? (sameProg ? 'Both legs book with ' + esc(pts[0].award.name) + ': move <b>' + pts.reduce((t, p) => t + p.award.spend, 0).toLocaleString() + '</b> ' + esc(pts[0].award.via ? SHORT[pts[0].award.via] : pts[0].award.name) + ' points once, then book each leg as below. Check both award seats before moving anything.' : 'Two programmes, two transfers: check both award seats before moving anything.') : ''}</p>` : '';
   return `<div class="sechead"><h2>Book it</h2><p>${same ? 'One airline for the whole trip.' : 'Two airlines, two tickets.'} ${cash.length ? 'Cash legs come to <b>' + money(total) + '</b>' + (pts.length ? '; the points leg has its own walkthrough.' : '.') : 'Booked with points, with a walkthrough for each leg.'}</p></div>
     <div class="bookcard">${snaps.map(legRow).join('')}
-    <div class="blinks">${links}</div>
+    <div class="blinks">${links}</div>${ptsHead}${walks}
     <div class="bfoot"><pre class="itin" id="itin">${esc(itinText())}</pre><button class="ledger" id="copyitin">Copy the itinerary</button></div></div>`;
 }
 
@@ -2299,6 +2323,29 @@ sentenceHTML(); paintChips(); paintCarriers(); paintPts(); paintTri(); setWeight
 $('#trip').addEventListener('click', ev => { const b = ev.target.closest('button[data-trip]'); if (!b) return; S.trip = b.dataset.trip; if (S.trip === 'multi' && S.legs.length === 1) S.legs.push({from:'London', to:'Paris', date:'Sat 21 Nov'}); $('#trip').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); sentenceHTML(); });
 $('#addleg').addEventListener('click', () => { const last = S.legs[S.legs.length-1]; S.legs.push({from:last.to, to:'', date:''}); sentenceHTML(); const i = $('#q-to-' + (S.legs.length-1)); if (i) i.focus(); });
 $('#sentence').addEventListener('click', ev => { const b = ev.target.closest('[data-rm]'); if (b){ S.legs.splice(+b.dataset.rm, 1); sentenceHTML(); return; } const r = ev.target.closest('[data-ride]'); if (r){ S.ride = r.dataset.ride; $('#ridepills').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === r)); paint(true); } });
+// The target button: the browser asks for the position, and it is turned into a street address. Served, the server does
+// the reverse geocoding (one User-Agent, one place); opened as a file the page asks OpenStreetMap's Nominatim itself.
+async function locateMe(){
+  const btn = $('#locate'), err = $('#locerr'), inp = $('#q-from-0'); if (!btn || !navigator.geolocation){ if (err) err.textContent = 'This browser cannot share a location.'; return; }
+  btn.classList.add('busy'); btn.classList.remove('on'); err.textContent = '';
+  try {
+    const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, {enableHighAccuracy:true, timeout:12000, maximumAge:60000}));
+    const {latitude:lat, longitude:lon} = pos.coords;
+    const url = SERVED ? `/api/locate?lat=${lat}&lon=${lon}` : `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
+    const r = await fetch(url, {headers:{'Accept':'application/json'}}); const d = await r.json();
+    const text = d.address_text || addressText(d.address || {}); if (!text) throw new Error('no address for that spot');
+    inp.value = text; S.legs[0].from = text; btn.classList.add('on'); inp.dispatchEvent(new Event('input', {bubbles:true}));
+  } catch (e){ err.textContent = e.code === 1 ? 'Location is off for this site; allow it in the browser, or type the address.' : 'Could not read a location (' + (e.message || 'timed out') + '); type the address.'; }
+  btn.classList.remove('busy');
+}
+// street and number, the neighbourhood, the city: the shape places.py reads from the end
+function addressText(a){
+  const road = [a.house_number, a.road].filter(Boolean).join(' ') || a.pedestrian || a.footway || '';
+  const hood = a.neighbourhood || a.suburb || a.quarter || a.city_district || a.borough || '';
+  const city = a.city || a.town || a.village || a.municipality || a.county || '';
+  return [road, hood, city].filter((x, i, arr) => x && arr.indexOf(x) === i).join(', ');
+}
+document.addEventListener('click', ev => { if (ev.target.closest('#locate')) locateMe(); });
 $('#sentence').addEventListener('input', ev => { const i = ev.target, m = /^q-(from|to|date)-(\d+)$/.exec(i.id); if (m) S.legs[+m[2]][m[1]] = i.value; else if (i.id === 'q-back') S.back = i.value; });
 $('#sentence').addEventListener('change', ev => { if (ev.target.id === 'q-pax') S.pax = ev.target.value; if (ev.target.id === 'q-bags'){ S.bags = ev.target.value; paint(true); } });
 
@@ -2360,7 +2407,7 @@ document.addEventListener('click', ev => {
   const ac = ev.target.closest('[data-addcustom]'); if (ac){ const f = ac.closest('form'), label = f.label.value.trim(), amt = Math.round(+String(f.amt.value).replace(/[^\d.]/g, '') * 100); if (label && amt > 0){ S.extra.custom.push({label, cents:amt}); rerenderBills(); } else f.label.focus(); return; }
 });
 $('#doors').addEventListener('click', ev => {
-  const c = ev.target.closest('[data-choose]'); if (c){ const e = ALL.find(x => x.id === c.dataset.choose); if (e && payPick(e) === 'points') openPlaybook(e.id); else openSheet(c.dataset.choose); return; }
+  const c = ev.target.closest('[data-choose]'); if (c){ selectLeg(c.dataset.choose); return; }
   const b = ev.target.closest('[data-open]'); if (b){ openSheet(b.dataset.open); return; }
   if (ev.target.closest('.info, .tip')) return;
   const pk = ev.target.closest('.pay[data-pick]'); if (pk){ const art = pk.closest('[data-id]'); if (art){ S.pay[art.dataset.id] = pk.dataset.pick; paint(false); } }
@@ -2521,11 +2568,11 @@ document.addEventListener('click', ev => {
   const tb = ev.target.closest('[data-tab]'); if (tb){ openEditor(tb.dataset.tab); return; }
   if (ev.target.closest('#eddone, #eddone2, #edshade')){ closeEditor(); return; }
   if (ev.target.closest('#startover')){ startOver(); return; }
+  const br = ev.target.closest('a.brand'); if (br){ ev.preventDefault(); if (W.mode === 'results') startOver(); else { scrollTo({top:0, behavior:REDUCED ? 'auto' : 'smooth'}); goStep(1); } return; }
   if (ev.target.closest('#jump')){ finishAllSteps(); setTimeout(enterResults, REDUCED ? 0 : 380); return; }
   const sl = ev.target.closest('[data-select]'); if (sl){ selectLeg(sl.dataset.select); return; }
   const lg = ev.target.closest('#stepper [data-leg], [data-changeleg]'); if (lg){ goLeg(+(lg.dataset.leg !== undefined ? lg.dataset.leg : lg.dataset.changeleg)); return; }
   if (ev.target.closest('#stepper [data-book]')){ goBook(); return; }
-  const pl = ev.target.closest('[data-playleg]'); if (pl){ const i = +pl.dataset.playleg, pk = S.legPick[i]; if (pk && LEGDATA[i]){ loadData(LEGDATA[i]); openPlaybook(pk.id); } return; }
   if (ev.target.closest('#copyitin')){ const t = $('#itin').textContent; (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('Copied.'), () => toast('Select the text and copy it.')); return; }
   const pm = ev.target.closest('[data-more]'); if (pm){ S.more[pm.dataset.more] = !S.more[pm.dataset.more]; paintPts(); return; }
   const pa = ev.target.closest('[data-add]'); if (pa){ S.ptOpen.add(pa.dataset.add); paintPts(); const f = $('#pt-' + pa.dataset.add); if (f) f.focus(); return; }
@@ -2537,7 +2584,7 @@ document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && W.mode ==
 const io = new IntersectionObserver(es => { es.forEach(x => { if (x.isIntersecting){ W.step = +x.target.dataset.step; paintSteps(); } }); }, {rootMargin:'-45% 0px -50% 0px'});
 document.querySelectorAll('.screen').forEach(s => io.observe(s));
 
-const short = s => s.split(',')[0].replace(/ & .*$/, '').trim();
+const short = s => (s || '').split(',')[0].replace(/ & .*$/, '').trim() || '…';
 function summary(){
   const L = S.legs[0], when = S.trip === 'round' ? L.date + ' – ' + S.back : S.trip === 'multi' ? S.legs.map(l => l.date).join(' · ') : L.date;
   const route = S.trip === 'multi' ? S.legs.map(l => short(l.from)).concat([short(S.legs[S.legs.length-1].to)]).join(' → ') : short(L.from) + ' → ' + short(L.to);
@@ -2583,6 +2630,9 @@ async function enterResults(){
   finishAllSteps();
   const box = $('#loading'); box.classList.remove('hidden'); $('#wizard').classList.add('hidden'); $('#rail').classList.add('hidden'); $('#searcherr').textContent = '';
   const L = S.legs[0], date = toISODate(L.date); S.notice = '';
+  if (SERVED && S.user && !S.user.demo && date && !(L.from.trim() && L.to.trim())){
+    box.classList.add('hidden'); $('#wizard').classList.remove('hidden'); $('#rail').classList.remove('hidden'); goStep(1);
+    $('#searcherr').textContent = L.from.trim() ? 'Where are you going?' : 'Where does the trip start? An address, a neighbourhood or a city.'; ($('#q-' + (L.from.trim() ? 'to' : 'from') + '-0') || {focus(){}}).focus(); return; }
   if (SERVED && S.user && !S.user.demo && date){
     runProgress(box, SEARCH_STAGES, 9000, () => {});
     let res;
