@@ -778,7 +778,7 @@ def photos_request(q):
     except Exception as exc:
         return {"photos": [], "reason": "Pexels did not answer: %s" % live.redact(str(exc), PEXELS_KEY)}
     out = {"place": place, "photos": [{"src": p["src"].get("large2x") or p["src"].get("large"),
-                                       "credit": "Photo: %s on Pexels" % p.get("photographer", ""), "url": p.get("url", ""),
+                                       "credit": "%s / Pexels" % p.get("photographer", ""), "url": p.get("url", ""),
                                        "avg_color": p.get("avg_color")} for p in (d.get("photos") or []) if p.get("src")]}
     try:
         with open(path, "w") as f:
