@@ -860,7 +860,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">Advanced options are optional; leave them and go.</span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="8f529b3">8f529b3</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="eee53b9">eee53b9</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -887,7 +887,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="8f529b3">8f529b3</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="eee53b9">eee53b9</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1371,7 +1371,11 @@ const FACTORS = [
   ['routing', 'Routing', ['nonstop', 'layover', 'risk', 'mct_margin'], p => (p.ledger.find(l => /Nonstop/.test(l.label)) || {}).cents || 0],
   ['reliability', 'Reliability', ['reliability'], () => 0],
 ];
-const PULL = 4;
+// Each category's letter is its own gap from par's same part, scaled so that the six categories' gaps AVERAGE to the
+// whole's gap: the mean of the parts' indices is the overall index, and a GPA over the six letters lands on the
+// overall letter (per Patrick, 2026-09-21: the parts used to read a grade better than the whole).
+const PULL = 6;   // = FACTORS.length; asserted below
+if (PULL !== FACTORS.length) console.error('PULL must equal the number of factors');
 function factors(e){
   const par = D.par, parTotal = D.query.par_cents, sum = codes => e.lines.filter(l => codes.includes(l.code)).reduce((s, l) => s + l.cents, 0);
   return FACTORS.map(([id, name, codes, parOf]) => { const mine = sum(codes), theirs = parOf(par), idx = 1 + PULL * (mine - theirs) / parTotal;

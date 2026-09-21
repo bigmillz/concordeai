@@ -295,6 +295,17 @@ domestic-NA, … 26 classes), and the month. `par_for()` takes an origin, a dest
 date and **nothing else**. Beyond nonstop range (~8,800 mi) the reference allows one
 connection, or no real flight could reach it.
 
+**Par knows holiday weeks** (2026-09-21, after a Thanksgiving-eve search came back all F against
+a par built for an ordinary November): `par.holiday_factor()` multiplies the reference fare
+for Thanksgiving week (×1.55, the Wednesday before and the Sunday after ×1.75) on any route
+with a US end, Christmas week ×1.35 and New Year ×1.25 everywhere, Easter weekend ×1.25 on
+European routes, and the US summer holiday weekends ×1.2. The basis names the holiday and the
+page's par sentence says so. A fair fare on the day before Thanksgiving IS higher; that is a
+property of the date, so it belongs in par, never in the grade bands. **The hover card's six
+category letters average to the overall** by construction (`PULL` equals the number of
+factors, so the mean of the parts' indices is the whole's index); before, the parts read a
+grade better than the whole.
+
 Two consequences that look wrong and are not: **par is seasonal** — a $500 ticket in July is
 a better deal than the same ticket in November and the letter says so; it is still absolute,
 because the same route on the same date has one par whatever the inventory. And **the
@@ -884,7 +895,10 @@ Lines, Dial) and round one (01–04) are kept for the record.
 **The shortlist tiles show photos of both ends of the trip when served** (2026-09-21):
 `/photos?place=` asks Pexels (free, 200 an hour, a credit line) with
 `CONCORDEGO_PEXELS_KEY`, caches each place for a month under `~/.concordego/photos/`, and
-allows `CONCORDEGO_PHOTO_CALLS` (150) uncached lookups a day site-wide. The page asks for
+allows `CONCORDEGO_PHOTO_CALLS` (150) uncached lookups a day site-wide. Pexels has no
+subject filter, so each place is searched four ways (skyline, street, architecture,
+landmark) and any photo whose own alt text describes a person, a face, a costume or a pet
+is dropped: the place and its culture, never somebody's family album (per Patrick). The page asks for
 the origin's neighbourhood and city and for the destination, alternates them across the
 tiles, and keeps the stand-in artwork until they arrive or when there is no key. Every
 photo carries its place and credit in the tile's caption.

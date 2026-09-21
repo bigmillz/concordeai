@@ -1371,7 +1371,11 @@ const FACTORS = [
   ['routing', 'Routing', ['nonstop', 'layover', 'risk', 'mct_margin'], p => (p.ledger.find(l => /Nonstop/.test(l.label)) || {}).cents || 0],
   ['reliability', 'Reliability', ['reliability'], () => 0],
 ];
-const PULL = 4;
+// Each category's letter is its own gap from par's same part, scaled so that the six categories' gaps AVERAGE to the
+// whole's gap: the mean of the parts' indices is the overall index, and a GPA over the six letters lands on the
+// overall letter (per Patrick, 2026-09-21: the parts used to read a grade better than the whole).
+const PULL = 6;   // = FACTORS.length; asserted below
+if (PULL !== FACTORS.length) console.error('PULL must equal the number of factors');
 function factors(e){
   const par = D.par, parTotal = D.query.par_cents, sum = codes => e.lines.filter(l => codes.includes(l.code)).reduce((s, l) => s + l.cents, 0);
   return FACTORS.map(([id, name, codes, parOf]) => { const mine = sum(codes), theirs = parOf(par), idx = 1 + PULL * (mine - theirs) / parTotal;
