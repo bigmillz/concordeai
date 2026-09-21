@@ -442,7 +442,11 @@ python3 concorde-travel/places.py "Shoreditch, London EC2A"  # what a typed plac
 `concorde-travel/deploy/droplet.sh` (an Ubuntu droplet, systemd, a venv for the `anthropic`
 SDK) runs `server.py` with `CONCORDEGO_ROOT=mock-10`, so `/` serves the current interface
 mockup, behind a Cloudflare named tunnel `concordego` at **go.flyconcordfly.com**, with its
-own config and service so it never touches the AI app's tunnel. **The door is Cloudflare
+own config and service so it never touches the AI app's tunnel. **Keys never go in the
+LaunchAgent plist** (world-readable): the agent sources `~/.concordego/env` (0600, written
+empty by `go-live.sh`) before starting, so `ANTHROPIC_API_KEY` and the Duffel token go
+there (or the token in `~/.concordego/cloud.json`); the droplet's equivalent is
+`/etc/concordego.env`. **The door is Cloudflare
 Access**: `concorde-travel/access.sh` creates the app, a one-time-PIN sign-in (Google too
 once that provider exists) and an email allowlist through the Cloudflare API. A request
 that arrives through the tunnel carries `Cf-Connecting-Ip`, and Access adds

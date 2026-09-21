@@ -15,11 +15,13 @@
 # the script afterwards and it finishes. Until a proper host exists, the
 # address works while this laptop is awake and online.
 #
-# Nothing metered is reachable from the public address: server.py refuses a
-# live flight search or a narrator call that arrives through the tunnel, so
-# a visitor cannot spend the Duffel quota or the Anthropic key. Set
-# CONCORDEGO_FLIGHT_KEY in your own shell for local live searches; it is
-# NOT written into the LaunchAgent.
+# A visitor through the tunnel spends nothing until they sign in (Cloudflare
+# Access, set up by access.sh); a signed-in friend gets the per-user allowance
+# in server.py. The keys are never written into the LaunchAgent plist (it is
+# world-readable): the agent sources ~/.concordego/env (created here, 0600)
+# before it starts the server, so put ANTHROPIC_API_KEY there, and put the
+# Duffel token there as CONCORDEGO_FLIGHT_KEY or in ~/.concordego/cloud.json.
+# After editing that file:  launchctl kickstart -k gui/$(id -u)/com.flyconcordfly.go
 set -euo pipefail
 
 HOST="go.flyconcordfly.com"
@@ -32,6 +34,7 @@ LOGS="$HOME/Library/Logs/ConcordeGo"; mkdir -p "$LOGS"
 AGENTS="$HOME/Library/LaunchAgents"; mkdir -p "$AGENTS"
 UID_N="$(id -u)"
 PY="$(command -v python3)"
+KEYS="$HOME/.concordego/env"
 
 say(){ printf '\n\033[1m%s\033[0m\n' "$*"; }
 
@@ -40,6 +43,22 @@ load_agent(){
   launchctl bootstrap "gui/$UID_N" "$AGENTS/$1.plist"
   launchctl kickstart -k "gui/$UID_N/$1" 2>/dev/null || true
 }
+
+# ---------------------------------------------------------------- keys
+if [ ! -f "$KEYS" ]; then
+  mkdir -p "$(dirname "$KEYS")"; (umask 077; cat > "$KEYS" <<'ENV'
+# Sourced by the ConcordeGo LaunchAgent before server.py starts. Mode 0600.
+# Uncomment and fill in; then: launchctl kickstart -k gui/$(id -u)/com.flyconcordfly.go
+#export ANTHROPIC_API_KEY=sk-ant-...        # the wish box and the narrator (Claude Opus 5)
+#export CONCORDEGO_FLIGHT_KEY=duffel_live_... # or put it in ~/.concordego/cloud.json instead
+ENV
+  ); echo "  wrote $KEYS (empty template, 0600)"
+fi
+chmod 600 "$KEYS"
+if ! "$PY" -c "import anthropic" 2>/dev/null; then
+  echo "  note: $PY cannot import anthropic; the wish box and narrator fall back to the template."
+  echo "        fix:  $PY -m pip install anthropic"
+fi
 
 # ---------------------------------------------------------------- server
 say "server: $HERE/server.py on :$SERVE_PORT, / = $ROOT_MOCK"
@@ -50,7 +69,9 @@ cat > "$AGENTS/$LABEL.plist" <<PLIST
 <plist version="1.0"><dict>
   <key>Label</key><string>$LABEL</string>
   <key>ProgramArguments</key>
-  <array><string>$PY</string><string>$HERE/server.py</string></array>
+  <array><string>/bin/sh</string><string>-c</string>
+  <string>[ -f "$KEYS" ] &amp;&amp; . "$KEYS"; exec "\$0" "\$1"</string>
+  <string>$PY</string><string>$HERE/server.py</string></array>
   <key>WorkingDirectory</key><string>$HERE</string>
   <key>EnvironmentVariables</key><dict>
     <key>CONCORDEGO_PORT</key><string>$SERVE_PORT</string>
@@ -135,4 +156,5 @@ load_agent "$LABEL-tunnel"
 
 say "LIVE: https://$HOST"
 echo "  while this Mac is awake and online. Logs: $LOGS"
+echo "  Keys:     $KEYS  (then: launchctl kickstart -k gui/$UID_N/$LABEL)"
 echo "  To stop:  launchctl bootout gui/$UID_N/$LABEL-tunnel; launchctl bootout gui/$UID_N/$LABEL"
