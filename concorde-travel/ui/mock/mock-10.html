@@ -834,7 +834,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">Advanced options are optional; leave them and go.</span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="ae983f9">ae983f9</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="f5d0c76">f5d0c76</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -861,7 +861,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="ae983f9">ae983f9</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="f5d0c76">f5d0c76</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -2333,7 +2333,7 @@ async function locateMe(){
   try {
     const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, {enableHighAccuracy:true, timeout:12000, maximumAge:60000}));
     const {latitude:lat, longitude:lon} = pos.coords;
-    const url = SERVED ? `/api/locate?lat=${lat}&lon=${lon}` : `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
+    const url = SERVED ? `/locate?lat=${lat}&lon=${lon}` : `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
     const r = await fetch(url, {headers:{'Accept':'application/json'}}); const d = await r.json();
     const text = d.address_text || addressText(d.address || {}); if (!text) throw new Error('no address for that spot');
     inp.value = text; S.legs[0].from = text; btn.classList.add('on'); inp.dispatchEvent(new Event('input', {bubbles:true}));
@@ -2554,7 +2554,7 @@ async function fetchPhotos(){
   const q = D.query || {}, parts = String(q.origin_full || q.origin || '').split(',').map(x => x.replace(/\d+/g, '').trim()).filter(Boolean);
   const here = parts.length >= 2 ? parts.slice(-2).join(', ') : (parts[0] || ''), there = String(q.destination || '').trim();
   const key = here + '|' + there; if (PH.key === key) return; PH.key = key;
-  const get = async place => { if (!place) return []; try { const r = await fetch('/api/photos?place=' + encodeURIComponent(place)); const d = await r.json(); return (d.photos || []).map(p => ({...p, place: d.place || place})); } catch (e){ return []; } };
+  const get = async place => { if (!place) return []; try { const r = await fetch('/photos?place=' + encodeURIComponent(place)); const d = await r.json(); return (d.photos || []).map(p => ({...p, place: d.place || place})); } catch (e){ return []; } };
   const [a, b] = await Promise.all([get(here), get(there)]); if (PH.key !== key) return;
   const mixed = []; for (let i = 0; i < Math.max(a.length, b.length) && mixed.length < 8; i++){ if (a[i]) mixed.push(a[i]); if (b[i]) mixed.push(b[i]); }
   if (mixed.length < 2) return;

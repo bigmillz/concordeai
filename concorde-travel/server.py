@@ -952,10 +952,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split("?")[0]
-        if path in ("/api/locate", "/api/photos"):
+        # Outside /api on purpose: Access fronts /api with the sign-in, and these two are free, cached and
+        # wanted before anyone signs in (the tiles' photos, the locate button while typing an origin).
+        if path in ("/locate", "/photos"):
             from urllib.parse import parse_qs
             q = parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
-            return self._json(locate_request(q) if path == "/api/locate" else photos_request(q))
+            return self._json(locate_request(q) if path == "/locate" else photos_request(q))
         if path == "/admin" or path.startswith("/api/admin/"):
             if not self._is_owner():
                 return self._html("<!doctype html><meta charset=utf-8><body style='background:#101013;color:#ececec;font:15px sans-serif;padding:40px'>"

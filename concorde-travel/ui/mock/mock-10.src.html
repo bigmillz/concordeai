@@ -2333,7 +2333,7 @@ async function locateMe(){
   try {
     const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, {enableHighAccuracy:true, timeout:12000, maximumAge:60000}));
     const {latitude:lat, longitude:lon} = pos.coords;
-    const url = SERVED ? `/api/locate?lat=${lat}&lon=${lon}` : `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
+    const url = SERVED ? `/locate?lat=${lat}&lon=${lon}` : `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
     const r = await fetch(url, {headers:{'Accept':'application/json'}}); const d = await r.json();
     const text = d.address_text || addressText(d.address || {}); if (!text) throw new Error('no address for that spot');
     inp.value = text; S.legs[0].from = text; btn.classList.add('on'); inp.dispatchEvent(new Event('input', {bubbles:true}));
@@ -2554,7 +2554,7 @@ async function fetchPhotos(){
   const q = D.query || {}, parts = String(q.origin_full || q.origin || '').split(',').map(x => x.replace(/\d+/g, '').trim()).filter(Boolean);
   const here = parts.length >= 2 ? parts.slice(-2).join(', ') : (parts[0] || ''), there = String(q.destination || '').trim();
   const key = here + '|' + there; if (PH.key === key) return; PH.key = key;
-  const get = async place => { if (!place) return []; try { const r = await fetch('/api/photos?place=' + encodeURIComponent(place)); const d = await r.json(); return (d.photos || []).map(p => ({...p, place: d.place || place})); } catch (e){ return []; } };
+  const get = async place => { if (!place) return []; try { const r = await fetch('/photos?place=' + encodeURIComponent(place)); const d = await r.json(); return (d.photos || []).map(p => ({...p, place: d.place || place})); } catch (e){ return []; } };
   const [a, b] = await Promise.all([get(here), get(there)]); if (PH.key !== key) return;
   const mixed = []; for (let i = 0; i < Math.max(a.length, b.length) && mixed.length < 8; i++){ if (a[i]) mixed.push(a[i]); if (b[i]) mixed.push(b[i]); }
   if (mixed.length < 2) return;

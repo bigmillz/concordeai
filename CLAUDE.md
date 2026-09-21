@@ -862,7 +862,7 @@ blue and purple for the three targets). Round two (05–08: Shortlist, Board,
 Lines, Dial) and round one (01–04) are kept for the record.
 
 **The shortlist tiles show photos of both ends of the trip when served** (2026-09-21):
-`/api/photos?place=` asks Pexels (free, 200 an hour, a credit line) with
+`/photos?place=` asks Pexels (free, 200 an hour, a credit line) with
 `CONCORDEGO_PEXELS_KEY`, caches each place for a month under `~/.concordego/photos/`, and
 allows `CONCORDEGO_PHOTO_CALLS` (150) uncached lookups a day site-wide. The page asks for
 the origin's neighbourhood and city and for the destination, alternates them across the
