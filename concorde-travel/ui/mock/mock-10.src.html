@@ -341,6 +341,14 @@ details[open] summary:after{content:"–"}
 .awards li b{color:var(--text);font-weight:500}
 .awards li.good{border-color:rgba(53,224,138,.5)}.awards li.good b{color:var(--green)}
 .awards .v{font-family:var(--mono)}
+/* the facts above the bill: what the airline's own offer says about the flight */
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:16px}
+.facts .seg{background:rgba(255,255,255,.03);border:1px solid var(--line-soft);border-radius:12px;padding:12px 14px;min-width:0}
+.facts h5{margin:0 0 8px;font:400 9.5px var(--disp);letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
+.facts dl{margin:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;font-size:12.5px;line-height:1.45}
+.facts dt{color:var(--faint);white-space:nowrap}.facts dd{margin:0;color:var(--text);overflow-wrap:anywhere}
+.facts dd a{color:var(--speed);text-decoration:none}.facts dd a:hover{text-decoration:underline}
+.facts .fnote{grid-column:1/-1;margin:0;font-size:11.5px;color:var(--faint);line-height:1.45}
 .research{margin-top:34px}
 .rbox{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
 .rbox .rstart{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
@@ -1270,6 +1278,40 @@ function addMenuHTML(e){
     ${Object.entries(ADDONS).map(([k, a]) => { const on = (a.want && S.wants.has(a.want) || S.extra[k]) && !S.off.has(k); return `<button class="ad" data-add="${k}" ${on ? 'disabled' : ''}>${esc(a.label)}<i>${a.has(e) ? 'included' : money(a.cents)}</i></button>`; }).join('')}
     <form data-custom onsubmit="return false"><input name="label" placeholder="Something else, e.g. airport parking" aria-label="What"><input name="amt" inputmode="numeric" placeholder="$" aria-label="Amount"><button data-addcustom>Add</button></form></div>`;
 }
+// What the airline's own offer says about the flight, above the bill: the
+// legs by flight number and operator, the aircraft BY NAME as scheduled (and
+// that it can be swapped: hard rule 2), terminals, distance, cabin and fare
+// basis, the published amenities, the fare's change and refund terms with
+// their penalties, the price hold, emissions, and the programmes it credits.
+function factsHTML(e){
+  const d = e.details; if (!d) return '';
+  const when = iso => iso ? iso.replace('T', ' ').slice(0, 16) + ' UTC' : null, row = (k, v, raw) => `<dt>${esc(k)}</dt><dd>${raw ? v : esc(v)}</dd>`;
+  const legs = d.segments.map((sg, i) => {
+    const mk = sg.marketing || {}, op = sg.operating || {}, ac = sg.aircraft || {}, seat = sg.seat || {}, L = [];
+    L.push(row('Flight', `${mk.code} ${String(mk.number || '').replace(/^0+/, '')}` + (op.code && op.code !== mk.code ? ` · flown by ${op.name}` + (op.number ? ` as ${op.code} ${String(op.number).replace(/^0+/, '')}` : '') : ` · ${mk.name || ''}`)));
+    L.push(row('Route', `${sg.from.code}${sg.from.terminal ? ' T' + sg.from.terminal : ''} → ${sg.to.code}${sg.to.terminal ? ' T' + sg.to.terminal : ''}` + (sg.minutes ? ' · ' + dur(sg.minutes) : '') + (sg.km ? ` · ${sg.km.toLocaleString()} km` : '')));
+    L.push(row('Aircraft', ac.name ? `Scheduled ${ac.name}; the airline can swap it` : 'Not published by the airline'));
+    L.push(row('Cabin', `${sg.cabin || 'not stated'}${sg.fare_brand ? ' · ' + sg.fare_brand : ''}${sg.fare_basis ? ' · fare basis ' + sg.fare_basis : ''}`));
+    const bits = []; if (seat.pitch) bits.push(seat.pitch + '-inch pitch'); if (seat.legroom && seat.legroom !== 'n/a' && seat.legroom !== 'standard') bits.push(seat.legroom + ' legroom'); if (seat.type && seat.type !== 'standard') bits.push(seat.type + ' seat');
+    bits.push(sg.wifi ? (sg.wifi.available ? 'wifi ' + (sg.wifi.cost === 'free' ? 'free' : sg.wifi.cost === 'paid' ? 'sold on board' : 'published') : 'no wifi published') : 'wifi not published');
+    if (sg.power) bits.push(sg.power.available ? 'power at the seat' : 'no seat power');
+    L.push(row('On board', bits.join(' · ')));
+    const bags = (sg.bags || []).map(x => `${x.quantity} ${String(x.type).replace('_', '-')}`).join(', '); if (bags) L.push(row('Bags', bags + ' included'));
+    return `<div class="seg"><h5>${d.segments.length === 1 ? 'The flight' : 'Leg ' + (i + 1) + ' of ' + d.segments.length}</h5><dl>${L.join('')}</dl></div>`;
+  }).join('');
+  const F = [];
+  F.push(row('Changes', d.change.allowed == null ? 'not stated by the fare' : d.change.allowed ? (d.change.penalty_cents ? money(d.change.penalty_cents) + ' penalty' : 'allowed, no penalty stated') : 'not allowed'));
+  F.push(row('Refunds', d.refund.allowed == null ? 'not stated by the fare' : d.refund.allowed ? (d.refund.penalty_cents ? money(d.refund.penalty_cents) + ' penalty' : 'allowed') : 'not refundable'));
+  F.push(row('Seat choice', e.seat_selection === 'paid' ? 'paid' : e.seat_selection === 'free' ? 'included' : 'not stated'));
+  // the split is shown only when it is a real one: the test feed invents a $1 base under real taxes
+  if (d.base_cents != null && d.base_cents >= .25 * (d.base_cents + (d.tax_cents || 0))) F.push(row('Fare', `${money(d.base_cents)} base + ${money(d.tax_cents || 0)} taxes and fees`));
+  if (d.price_guarantee_until) F.push(row('Price held', 'until ' + when(d.price_guarantee_until))); else if (d.pay_by) F.push(row('Pay by', when(d.pay_by)));
+  if (d.emissions_kg) F.push(row('Emissions', `${(+d.emissions_kg).toLocaleString()} kg CO₂ a passenger, the feed's figure`));
+  F.push(row('Airline', esc(e.carrier_name) + (e.rating != null ? `, rated ${e.rating.toFixed(2)} on the curated table` : ', not on the curated table') + (d.carriage_url ? ` · <a href="${esc(d.carriage_url)}" target="_blank" rel="noopener">conditions of carriage</a>` : ''), true));
+  if (d.loyalty && d.loyalty.length) F.push(row('Earn miles with', d.loyalty.slice(0, 7).map(c => (AIR[c] || {}).name || c).join(', ') + (d.loyalty.length > 7 ? ' and ' + (d.loyalty.length - 7) + ' more' : '')));
+  if (d.id_docs_required) F.push(row('Documents', 'passport details needed to book'));
+  return `<section class="facts">${legs}<div class="seg"><h5>The fare</h5><dl>${F.join('')}</dl></div><p class="fnote">From the airline's own offer through the feed, as of the search. Amenities are as published, never observed; the aircraft is what is scheduled, and airlines swap them.</p></section>`;
+}
 function ledgerHTML(e){
   const r = bill(e), b = e.booking[0], aw = awardsFor(e);
   const restore = [...S.off].filter(k => RESTORE[k] && (k !== 'hotel-auto' || overnight(e)));
@@ -1278,7 +1320,7 @@ function ledgerHTML(e){
       ${k === 'addons' ? `<div class="restore">${restore.filter(x => x !== 'hotel-auto' && !x.startsWith('ground')).map(x => `<span>${esc(RESTORE[x])} removed from every flight<button data-restore="${x}">add back</button></span>`).join('')}</div><button class="addbtn" data-addmenu>+ Add an expense</button>${S.menu ? addMenuHTML(e) : ''}` : ''}
       ${k === 'transport' ? `<div class="restore">${restore.filter(x => x.startsWith('ground')).map(x => `<span>${esc(RESTORE[x])}: someone is driving<button data-restore="${x}">count the fare again</button></span>`).join('')}</div>` : ''}
       ${k === 'stay' && restore.includes('hotel-auto') ? `<div class="restore"><span>Hotel removed: sleeping in the terminal<button data-restore="hotel-auto">add it back</button></span></div>` : ''}</section>`; };
-  return `<div class="bill">${GROUPS.map(([k, t]) => grp(k, t)).join('')}
+  return `${factsHTML(e)}<div class="bill">${GROUPS.map(([k, t]) => grp(k, t)).join('')}
     <div class="btotal"><span>All in at your dial<small>${S.asap ? 'ranked by arrival' : 'the sum of every line above'}</small></span><b>${money(r.total)}</b></div></div>
     <div class="book"><h4>${esc(e.carrier_name)} ${esc(e.flight)}</h4><p>${esc(e.route.join(' → '))} · ${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} · ${stopsText(e)}<br>${b ? esc(b.note) : ''}</p>
       <button class="choose">${b ? 'Book with ' + esc(b.who) + ' · ' + money(b.price_cents) : 'Book'}</button>

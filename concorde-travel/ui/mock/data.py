@@ -24,6 +24,7 @@ Two additions over what the page itself gets from /api/live:
 import collections
 import json
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -66,9 +67,74 @@ def carrier_name(display, code):
     return " ".join(parts) or code
 
 
+def _cents(x):
+    try:
+        return int(round(float(x) * 100)) if x is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _iso_minutes(d):
+    m = re.match(r"^PT(?:(\d+)H)?(?:(\d+)M)?", d or "")
+    return (int(m.group(1) or 0) * 60 + int(m.group(2) or 0)) if m else None
+
+
+def feed_details(offer):
+    """Everything Duffel says about an offer that the scorer does not price:
+    the aircraft by name, terminals, distance, cabin and fare basis, the
+    published amenities, the fare's change and refund terms with their
+    penalties, price-hold and payment deadlines, emissions, the loyalty
+    programmes it credits. Absent fields stay absent; the page says so."""
+    if not offer:
+        return None
+    c = offer.get("conditions") or {}
+    ch, rf = c.get("change_before_departure") or {}, c.get("refund_before_departure") or {}
+    pay = offer.get("payment_requirements") or {}
+    segs = []
+    for sl in offer.get("slices") or []:
+        for sg in sl.get("segments") or []:
+            px = (sg.get("passengers") or [{}])[0]
+            am = ((px.get("cabin") or {}).get("amenities") or {})
+            mk, op, ac = sg.get("marketing_carrier") or {}, sg.get("operating_carrier") or {}, sg.get("aircraft") or {}
+            segs.append({
+                "marketing": {"code": mk.get("iata_code"), "name": mk.get("name"), "number": sg.get("marketing_carrier_flight_number")},
+                "operating": {"code": op.get("iata_code"), "name": op.get("name"), "number": sg.get("operating_carrier_flight_number")},
+                "aircraft": {"code": ac.get("iata_code"), "name": ac.get("name")} if ac else None,
+                "from": {"code": (sg.get("origin") or {}).get("iata_code"), "name": (sg.get("origin") or {}).get("name"), "terminal": sg.get("origin_terminal")},
+                "to": {"code": (sg.get("destination") or {}).get("iata_code"), "name": (sg.get("destination") or {}).get("name"), "terminal": sg.get("destination_terminal")},
+                "minutes": _iso_minutes(sg.get("duration")),
+                "km": int(round(float(sg["distance"]))) if sg.get("distance") else None,
+                "cabin": px.get("cabin_class_marketing_name") or px.get("cabin_class"),
+                "fare_basis": px.get("fare_basis_code"),
+                "bags": [{"type": b.get("type"), "quantity": b.get("quantity")} for b in (px.get("baggages") or [])],
+                "wifi": am.get("wifi"), "seat": am.get("seat"), "power": am.get("power"),
+                "fare_brand": sl.get("fare_brand_name"),
+            })
+    return {
+        "base_cents": _cents(offer.get("base_amount")), "tax_cents": _cents(offer.get("tax_amount")),
+        "emissions_kg": offer.get("total_emissions_kg"),
+        "expires_at": offer.get("expires_at"), "price_guarantee_until": pay.get("price_guarantee_expires_at"),
+        "pay_by": pay.get("payment_required_by"), "instant_payment": pay.get("requires_instant_payment"),
+        "change": {"allowed": ch.get("allowed"), "penalty_cents": _cents(ch.get("penalty_amount"))},
+        "refund": {"allowed": rf.get("allowed"), "penalty_cents": _cents(rf.get("penalty_amount"))},
+        "owner": (offer.get("owner") or {}).get("name"),
+        "carriage_url": (offer.get("owner") or {}).get("conditions_of_carriage_url"),
+        "loyalty": offer.get("supported_loyalty_programmes") or [],
+        "id_docs_required": offer.get("passenger_identity_documents_required"),
+        "segments": segs,
+    }
+
+
 def main(path):
     raw = json.load(open(path, encoding="utf-8"))
     sc = adapter.from_feed(raw, origin_key="Bushwick, Brooklyn", checked_bags=1)
+    # The raw offers, keyed the way the adapter names its options (the last ten
+    # characters of the offer id), so the page can show everything the feed
+    # said about a flight, not only what the scorer priced.
+    offers = raw.get("data") if isinstance(raw, dict) else raw
+    if isinstance(offers, dict):
+        offers = offers.get("offers") or []
+    by_tail = {re.sub(r"[^a-z0-9]+", "-", (o.get("id") or "x")[-10:].lower()): o for o in (offers or [])}
     if "error" in sc:
         sys.exit("adapter: %s" % sc["error"])
     cov = adapter.coverage(sc)
@@ -185,6 +251,7 @@ def main(path):
         e["wifi_published"] = bool(am.get("wifi")); e["power_published"] = bool(am.get("power"))
         e["wifi_cost"] = am.get("wifi_cost")
         e["layover_minutes"] = [l["minutes"] for l in e["legs"] if l["kind"] == "layover"]
+        e["details"] = feed_details(by_tail.get(e["id"].rsplit("-", 1)[-1]))
         # What the bill needs to be rebuilt as choices change: the fare's own bag
         # ladder and seat terms, and every ground mode at each end with its fare
         # and minutes, so a rideshare/transit choice is a swap, not a re-score.
