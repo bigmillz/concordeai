@@ -38,14 +38,30 @@ h1,h2,h3{font-weight:400;letter-spacing:-.02em;text-wrap:balance}
 .search{margin-top:26px;background:var(--panel2);border:1px solid var(--line);border-radius:16px;padding:22px 24px 24px}
 .tripseg{display:inline-flex;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px}
 /* cash or points: two words, a star on the better one */
-.paywith{display:grid;grid-template-columns:1fr 1fr;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:2px;margin-bottom:8px}
-.paywith button{padding:5px 11px;border-radius:999px;font-size:12px;font-weight:500;color:var(--dim);display:inline-flex;align-items:center;justify-content:center;gap:5px;transition:background .18s,color .18s}
-.paywith button[aria-pressed=true]{background:var(--text);color:var(--bg)}
-.paywith button.best:before{content:"★";font-size:10px;color:var(--price)}
-.paywith button[aria-pressed=true].best:before{color:#b07a10}
-.ptwhy{font-size:12px;color:var(--faint);line-height:1.45;margin-top:-2px}
-.ptwhy b{color:var(--dim);font-weight:500}
-.price .unit{color:var(--dim);font-size:12.5px}
+/* cash beside points, both in full, the winner starred. The reason lives
+   behind the (i): hover, focus or tap. Nothing else is written under it. */
+.paycols{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pay{position:relative;border:1px solid var(--line);border-radius:12px;padding:9px 11px 8px;display:flex;flex-direction:column;gap:2px;background:rgba(255,255,255,.02);min-width:0;transition:border-color .2s,background .2s}
+.pay.best{border-color:rgba(255,176,32,.5);background:rgba(255,176,32,.06)}
+.pay .ph{font-family:var(--disp);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:6px;min-height:14px}
+.pay.best .ph{color:var(--price)}
+.pay .ph .star{font-style:normal;font-size:11px;line-height:1}
+.pay .num{font-size:25px;line-height:1.05;letter-spacing:-.02em;margin-top:3px;white-space:nowrap}
+.pay.dim .num{color:var(--faint)}
+.pay .unit{color:var(--dim);font-size:12px}
+.pay .unit.dim{color:var(--faint)}
+.pay em{font-style:normal;color:var(--faint);font-size:11.5px;font-family:var(--mono);margin-top:1px}
+.pay .v{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--dim);margin-top:3px;min-height:16px}
+.pay.best .v{color:var(--text)}
+.pay .v .num{font-size:11.5px;margin:0}
+.info{width:16px;height:16px;border-radius:50%;border:1px solid var(--faint);color:var(--faint);font:600 10px/1 var(--mono);display:inline-grid;place-items:center;flex:none;transition:border-color .15s,color .15s;margin-left:auto}
+.info:hover,.info:focus-visible,.info[aria-expanded=true]{border-color:var(--text);color:var(--text)}
+.tip{position:absolute;right:-1px;bottom:calc(100% + 8px);width:min(272px,84vw);background:rgba(16,16,19,.97);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.45;color:var(--dim);box-shadow:0 12px 32px rgba(0,0,0,.55);z-index:5;opacity:0;transform:translateY(4px);pointer-events:none;transition:opacity .18s,transform .18s;text-align:left;font-family:var(--sans);letter-spacing:0}
+.tip b{color:var(--text);font-weight:500}
+.tip .num{font-size:12px}
+.tip small{display:block;margin-top:6px;color:var(--faint);font-size:11px}
+.info:hover ~ .tip,.info:focus-visible ~ .tip,.info[aria-expanded=true] ~ .tip{opacity:1;transform:none;pointer-events:auto}
+.door.p1 .pay:first-child .tip,.pay.cash .tip{right:auto;left:-1px}
 .tripseg button{padding:7px 14px;border-radius:999px;font-size:12.5px;font-weight:500;color:var(--dim);letter-spacing:.02em;transition:.15s}
 .tripseg button[aria-pressed=true]{background:var(--text);color:var(--bg)}
 .tripseg button:hover:not([aria-pressed=true]){color:var(--text)}
@@ -224,11 +240,6 @@ details[open] summary:after{content:"–"}
 .who h3 span{display:block;font-size:12.5px;color:var(--dim);margin-top:2px;font-weight:300}
 .meta{color:var(--dim);font-size:13px}
 .price{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
-.price b{font-family:var(--mono);font-size:32px;font-weight:500;letter-spacing:-.02em;line-height:1}
-.price span{color:var(--dim);font-size:12.5px}
-.price em{font-style:normal;color:var(--faint);font-size:12.5px;margin-left:auto;font-family:var(--mono)}
-.ptline{font-size:12.5px;color:var(--dim);border-top:1px solid var(--line-soft);padding-top:9px;line-height:1.45}
-.ptline b{font-weight:500;color:var(--text)}.ptline.good b{color:var(--green)}.ptline .v{font-family:var(--mono)}
 .cta{display:flex;gap:10px;margin-top:auto;padding-top:12px}
 .choose{background:var(--text);color:var(--bg);padding:11px 16px;border-radius:999px;font-weight:600;font-size:13.5px;flex:1;transition:.15s}
 .choose:hover{background:var(--speed)}
@@ -419,6 +430,7 @@ html.hdrmarks .mark-hdr{display:block}
   .seal .g{filter:drop-shadow(0 0 4px color-mix(in oklab, var(--gc) 55%, transparent))}
   .door.p1 .seal svg{animation:breathe 4.5s ease-in-out infinite alternate}
   .jseg{box-shadow:inset 0 1px 0 rgba(255,255,255,.28)}
+  .pay.best{box-shadow:0 0 0 1px color(display-p3 1 .72 .2 / .18),0 0 22px color(display-p3 1 .72 .2 / .12)}
   .crow textarea:focus{box-shadow:0 0 0 3px color(display-p3 .3 .65 1 / .22),0 0 26px color(display-p3 .3 .65 1 / .14)}
   .go{box-shadow:0 0 22px color(display-p3 1 1 1 / .12)}
   .go:hover{box-shadow:0 0 30px color(display-p3 1 1 1 / .22)}
@@ -724,25 +736,29 @@ function awardsFor(e){
   }
   return out.sort((x, y) => (y.good - x.good) || (y.value - x.value));
 }
-// The one line under the price. Short on purpose: the numbers are the reason,
-// the sentence just points at them. In the product the narrator writes this
-// line from the same precomputed figures, current to the query (a transfer
-// bonus, a peak date), and the verifier holds it to those figures.
-const PAY = {};   // per flight: 'cash' | 'points', when the user has chosen
-function ptWhy(e, a, mode){
-  const c = a.value.toFixed(1) + '¢', fair = a.prog.fair + '¢';
-  if (!a.path) return `Nothing you hold reaches ${esc(a.prog.name)}.`;
-  if (a.value <= 0) return `Award fees alone (${money(a.fees)}) exceed this fare.`;
-  if (a.good) return mode === 'points' ? `<b>${c} a point</b>${a.bonus ? ' with the ' + esc(BANK[a.via].split(' ')[0]) + ' 1:' + a.bonus.ratio + ' bonus, until ' + esc(a.bonus.until) : ''}. Above ${fair}, points win.`
-                                       : `Points beat cash here: <b>${c} a point</b>${a.bonus ? ' via the ' + esc(BANK[a.via].split(' ')[0]) + ' bonus' : ''}.`;
-  return mode === 'points' ? `Only <b>${c} a point</b>; keep them for ${fair} or better.` : `Points here return ${c} each, under the ${fair} they are worth.`;
+// Cash beside points, both in full. The star goes to the better value; the
+// reason sits behind the (i), two short lines from precomputed figures. In the
+// product the narrator writes those lines, current to the query (a transfer
+// bonus, a peak date), and the verifier holds them to the figures.
+function ptTip(e, a){
+  const c = a.value.toFixed(1) + '¢', fair = a.prog.fair + '¢', award = a.pts.toLocaleString() + ' ' + esc(a.prog.name) + ' + ' + money(a.fees) + ' fees';
+  if (!a.path) return `Nothing you hold transfers to ${esc(a.prog.name)}.<small>Award: ${award}.</small>`;
+  if (a.value <= 0) return `Award fees alone (${money(a.fees)}) exceed this fare, so points cannot win here.<small>Award: ${award}.</small>`;
+  const path = a.via ? esc(BANK[a.via].split(' ')[0]) + ' → ' + esc(a.prog.name) + (a.ratio > 1 ? ' at 1:' + a.ratio + (a.bonus ? ', a bonus until ' + esc(a.bonus.until) : '') : ' 1:1') : 'from your ' + esc(a.prog.name);
+  if (a.good) return `<b>${c} a point</b>, above the ${fair} ${esc(a.prog.name)} are usually worth, so points win.<small>${path}. Award: ${award}. You keep ${money(a.saves)} of cash.</small>`;
+  return `Only <b>${c} a point</b>, under the ${fair} ${esc(a.prog.name)} are worth. Pay cash and keep them.<small>${path}. Award: ${award}.</small>`;
 }
-function ptBlock(e, total){
-  const a = awardsFor(e)[0]; if (!a) return {toggle:'', price:null, why:''};
-  const best = a.good ? 'points' : 'cash', mode = PAY[e.id] || best;
-  const toggle = `<div class="paywith" role="group" aria-label="Pay with"><button data-pay="cash" data-id="${esc(e.id)}" class="${best === 'cash' ? 'best' : ''}" aria-pressed="${mode === 'cash'}">Cash</button><button data-pay="points" data-id="${esc(e.id)}" class="${best === 'points' ? 'best' : ''}" aria-pressed="${mode === 'points'}">Points</button></div>`;
-  const price = mode === 'points' && a.path ? `<b class="num">${a.spend.toLocaleString()}</b><span class="unit">${esc(BANK[a.via || a.p].split(' ')[0])} pts</span><em>+ ${money(total - e.ticket_cents + a.fees)} all in</em>` : null;
-  return {toggle, price, why:`<div class="ptwhy">${ptWhy(e, a, mode)}</div>`};
+function payHTML(e, total){
+  const a = awardsFor(e)[0], ptsWin = !!(a && a.good), col = (cls, head, body) => `<div class="pay ${cls}">${head}${body}</div>`;
+  const head = (label, win) => `<div class="ph">${label}${win ? '<i class="star" title="Better value">★</i>' : ''}</div>`;
+  const cash = col('cash' + (ptsWin ? '' : ' best'), head('Cash', !ptsWin), `<b class="num">${money(total)}</b><span class="unit">all in</span><em>${money(e.ticket_cents)} ticket</em><div class="v">+ ${money(total - e.ticket_cents)} beyond the fare</div>`);
+  let pts;
+  if (!a) pts = col('points dim', head('Points', false), `<b class="num">—</b><span class="unit dim">no award chart</span><em>for this airline yet</em>`);
+  else { const usable = a.path && a.value > 0, rest = total - e.ticket_cents + a.fees, tip = `<button class="info" type="button" aria-expanded="false" aria-label="Why">i</button><span class="tip" role="tooltip">${ptTip(e, a)}</span>`;
+    pts = col('points' + (ptsWin ? ' best' : '') + (usable ? '' : ' dim'), head('Points', ptsWin),
+      `<b class="num">${a.spend.toLocaleString()}</b><span class="unit${usable ? '' : ' dim'}">${a.via ? esc(BANK[a.via].split(' ')[0]) + ' pts' : esc(a.prog.name)}</span><em>+ ${money(rest)} cash</em>` +
+      `<div class="v">${!a.path ? 'no route' : a.value <= 0 ? 'fees exceed fare' : '<b class="num">' + a.value.toFixed(1) + '¢</b> a point'}${tip}</div>`); }
+  return `<div class="paycols">${cash}${pts}</div>`;
 }
 
 // ---- the triangle
@@ -1037,7 +1053,7 @@ function statsFor(rows){
 }
 const amtHTML = l => l.cents === 0 ? (l.included ? 'included' : '—') : l.cents < 0 ? '−' + money(l.cents) + '<small>credit</small>' : '+' + money(l.cents);
 function door(kind, e, r, title, ctx){
-  const eff = r.total, pb = ptBlock(e, eff), pc = prosCons(e, r, ctx);
+  const eff = r.total, pc = prosCons(e, r, ctx);
   const chips = (arr, none) => arr.length ? arr.map(w => '<b>' + esc(w) + '</b>').join('') : '<b class="none">' + none + '</b>';
   return `<article class="door ${kind}" data-id="${esc(e.id)}">
     <div class="sky" style="background:${skyBand(e)}">${PHOTOS.length ? `<div class="pano"><img class="ph a on" alt="" src="${PHOTOS[PH.idx].src}"><img class="ph b" alt=""></div><div class="scrim"></div><span class="cap">${esc(PH.city)} · ${esc(PHOTOS[PH.idx].credit)}</span>` : ''}
@@ -1049,9 +1065,7 @@ function door(kind, e, r, title, ctx){
       <div class="who">${logo(e.carrier, true)}<h3>${esc(e.carrier_name)}<span>${esc(e.flight)} · ${esc(e.brand)}${e.operator !== e.carrier ? ' · flown by ' + esc((AIR[e.operator] || {}).name || e.operator) : ''}</span></h3></div>
       <p class="meta">${stopsText(e)} · ${dur(e.door_minutes)} door to door · ${e.route.join(' → ')}${S.asap ? ' · <b style="color:var(--red);font-weight:500">lands ' + hm(e.arrive) + (e.day_offset ? ' tomorrow' : ' today') + '</b>' : ''}</p>
       ${journeyHTML(e, r, ctx)}
-      ${pb.toggle}
-      <div class="price">${pb.price || `<b class="num">${money(eff)}</b><span>all in</span><em>${money(e.ticket_cents)} ticket</em>`}</div>
-      ${pb.why}
+      ${payHTML(e, eff)}
       <div class="cta"><button class="choose" data-open="${esc(e.id)}">Choose this flight</button><button class="ledger" data-open="${esc(e.id)}">Full ledger</button></div>
     </div></article>`;
 }
@@ -1347,7 +1361,8 @@ document.addEventListener('click', ev => {
   const ad = ev.target.closest('[data-add]'); if (ad){ const k = ad.dataset.add; if (k === 'bag+') S.extra.bag++; else if (k === 'bag-') S.extra.bag = Math.max(0, S.extra.bag - 1); else { S.extra[k] = true; S.off.delete(k); } rerenderBills(); return; }
   const ac = ev.target.closest('[data-addcustom]'); if (ac){ const f = ac.closest('form'), label = f.label.value.trim(), amt = Math.round(+String(f.amt.value).replace(/[^\d.]/g, '') * 100); if (label && amt > 0){ S.extra.custom.push({label, cents:amt}); rerenderBills(); } else f.label.focus(); return; }
 });
-$('#doors').addEventListener('click', ev => { const pw = ev.target.closest('[data-pay]'); if (pw){ PAY[pw.dataset.id] = pw.dataset.pay; paint(false); return; } const b = ev.target.closest('[data-open]'); if (b) openSheet(b.dataset.open); });
+$('#doors').addEventListener('click', ev => { const b = ev.target.closest('[data-open]'); if (b) openSheet(b.dataset.open); });
+document.addEventListener('click', ev => { const i = ev.target.closest('.info'); document.querySelectorAll('.info[aria-expanded=true]').forEach(x => { if (x !== i) x.setAttribute('aria-expanded', 'false'); }); if (i) i.setAttribute('aria-expanded', i.getAttribute('aria-expanded') === 'true' ? 'false' : 'true'); });
 document.addEventListener('click', ev => { if (ev.target.id === 'x' || ev.target.id === 'sheetwrap') $('#sheetroot').innerHTML = ''; });
 $('#go').addEventListener('click', enterResults);
 addEventListener('resize', () => { paintTri(); const [x, y] = toXY(S.a, S.b, S.c); handle.style.left = x + 'px'; handle.style.top = y + 'px'; });
