@@ -47,7 +47,9 @@ if [ -d "$APP/.git" ]; then
 else
   git clone -q --branch "$BRANCH" --depth 50 "$REPO" "$APP"
 fi
-git config --global --add safe.directory "$APP" >/dev/null 2>&1 || true
+# --system, not --global: the updater runs from systemd with no HOME, so root's
+# ~/.gitconfig is never read there and every hourly pull died on "dubious ownership"
+git config --system --add safe.directory "$APP" >/dev/null 2>&1 || true
 [ -d "$APP/venv" ] || python3 -m venv "$APP/venv"
 "$APP/venv/bin/pip" install -q --upgrade pip anthropic >/dev/null
 mkdir -p /var/lib/concordego && chown -R concordego:concordego "$APP" /var/lib/concordego
