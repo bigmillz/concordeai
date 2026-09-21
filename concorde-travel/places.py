@@ -127,6 +127,14 @@ METRO: Dict[str, set] = {
 }
 
 
+def airports_for(code: str) -> List[str]:
+    """A metro code as the airports it stands for, sorted; an airport as itself.
+    Google Flights (through SerpApi) has no metro codes: NYC gets no results,
+    JFK,EWR,LGA does (2026-09-21)."""
+    code = (code or "").upper()
+    return sorted(METRO.get(code) or [code]) if code else []
+
+
 def covers(code: str, iata: str) -> bool:
     """Is `iata` the place `code` asked for? A metro covers its airports."""
     code, iata = (code or "").upper(), (iata or "").upper()

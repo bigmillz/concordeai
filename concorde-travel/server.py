@@ -717,7 +717,9 @@ def _supplement(q):
         scfg = live.serp_config()
         if not scfg.get("key"):
             return None, {"source": "none", "skipped": "no SerpApi key"}
-        return live.serp_search(q["origin"], q["destination"], q["date"],
+        # Google has no metro codes: NYC comes back empty, JFK,EWR,LGA comes back full
+        return live.serp_search(",".join(places.airports_for(q["origin"])),
+                                ",".join(places.airports_for(q["destination"])), q["date"],
                                 adults=q.get("adults", 1), cfg=scfg)
     except Exception as exc:                          # a supplement must never take the search down
         return None, {"source": "none", "error": "supplement failed: %s" % exc}
