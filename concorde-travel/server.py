@@ -642,12 +642,25 @@ def _fetch_raw(req):
         # what was typed is checked first, whether or not a call will be spent:
         # a typo is a typo, and the recording standing in should not hide it
         for field, default in (("origin", "NYC"), ("destination", "")):
-            code, how, problem = places.resolve(req.get(field) or default)
+            typed = req.get(field) or default
+            code, how, problem = places.resolve(typed)
+            point = None
+            # An address on either side ("3820 Planters Watch, Loganville GA", "The
+            # Savoy, Strand, London") is geocoded: the point prices the ride at that
+            # end, and when the city in it is one the table does not know, the
+            # nearest airport or metro to the point is where the flights go.
+            if problem or _looks_like_address(typed):
+                point = geo_place(typed)
+                if problem and point:
+                    code, how = place_near(point)
+                    problem = None if code else problem
             if problem:
                 return ({"error": problem, "field": field, "live": True,
-                         "suggest": places.suggest(req.get(field) or "")},)
-            where[field] = {"code": code, "how": how, "typed": req.get(field) or default,
-                            "label": places.label_for(code)}
+                         "suggest": places.suggest(typed)},)
+            if point and code:
+                point["city"] = places.label_for(code).split(" (")[0]   # the metro the page names: London, not City of Westminster
+            where[field] = {"code": code, "how": how, "typed": typed,
+                            "label": places.label_for(code), "point": point}
         d = (req.get("date") or "").strip()
         if not re.match(r"^\d{4}-\d{2}-\d{2}$", d):
             return ({"error": "That date did not look like a date. Use YYYY-MM-DD.",
@@ -701,9 +714,12 @@ def search_request(req):
     sys.path.insert(0, os.path.join(UI, "mock"))
     import data as mockdata                                   # noqa: E402  (imports server, so it is loaded here, not at the top)
     origin_text = (req.get("origin_address") or req.get("origin") or "bushwick-brooklyn")
+    dest_point = (where.get("destination") or {}).get("point") if src == "api" else None
     try:
         out = mockdata.build_slim(raw, origin_key=origin_text, checked_bags=int(req.get("checked_bags", 1)),
-                                  origin_full=req.get("origin_address") or None)
+                                  origin_full=req.get("origin_address") or None,
+                                  dest_point=dest_point,
+                                  destination_full=(req.get("destination") if dest_point else None))
     except ValueError as exc:
         return {"error": str(exc)}
     out["feed"] = {"source": src, "fetched": meta.get("source"), "age_seconds": meta.get("age_seconds"),
@@ -729,7 +745,8 @@ def live_request(req):
     origin_text = (req.get("origin_address") or req.get("origin_key")
                    or req.get("origin") or "bushwick-brooklyn")
     sc = adapter.from_feed(raw, origin_key=origin_text,
-                           checked_bags=int(req.get("checked_bags", 1)))
+                           checked_bags=int(req.get("checked_bags", 1)),
+                           dest_point=(where.get("destination") or {}).get("point") if src == "api" else None)
     if sc.get("error"):
         return sc
     _LIVE[sc["fixture_id"]] = sc
@@ -931,6 +948,131 @@ def photos_request(q):
     return out
 
 
+def _looks_like_address(text):
+    """A digit, or three parts, says street address rather than a city name:
+    '842 Bushwick Ave', 'The Savoy, Strand, London'. 'Paris, France' is not one."""
+    t = (text or "").strip()
+    return bool(re.search(r"\d", t)) or t.count(",") >= 2
+
+
+def _geo_tries(t):
+    """Nominatim misses a house it does not hold ("3820 Planters Watch,
+    Loganville, GA" -> nothing), so a search is repeated from the end of the
+    address inward: the street without its number, then the town. A town-level
+    point still prices the ride to within a few dollars. (parts, queries)."""
+    parts = [x.strip() for x in t.split(",") if x.strip()] or [t]
+    tries = [t]
+    words = parts[0].split(" ")
+    if len(parts) > 1 and len(words) > 1 and words[0].isdigit():
+        tries.append(", ".join([" ".join(words[1:])] + parts[1:]))
+    if len(parts) > 1:
+        tries.append(", ".join(parts[1:]))
+    if len(parts) > 2:
+        tries.append(", ".join(parts[2:]))
+    out, seen = [], set()
+    for q in tries:
+        if q.lower() not in seen:
+            seen.add(q.lower()); out.append(q)
+    return parts, out
+
+
+def geo_place(text):
+    """What was typed -> {lat, lon, label, city, cc} through Nominatim, cached
+    a month, or None. The label is the short address the ledger prints
+    ('3820 Planters Watch, Loganville'); the city is what the page names."""
+    t = re.sub(r"\s+", " ", (text or "").strip())
+    if len(t) < 3:
+        return None
+
+    def ask(q):
+        from urllib.parse import quote
+        req = urllib.request.Request("https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=1&q=" + quote(q),
+                                     headers={"User-Agent": "ConcordeGo/1.0 (go.flyconcordefly.com)", "Accept": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=8) as r:
+                d = json.loads(r.read().decode("utf-8"))
+        except Exception:
+            return []
+        out = []
+        for hit in d or []:
+            a = hit.get("address") or {}
+            try:
+                lat, lon = float(hit["lat"]), float(hit["lon"])
+            except (KeyError, ValueError, TypeError):
+                continue
+            city = a.get("city") or a.get("town") or a.get("village") or a.get("municipality") or a.get("county") or ""
+            out.append({"lat": lat, "lon": lon, "label": _address_text(a) or q, "city": city,
+                        "cc": (a.get("country_code") or "").upper(), "precision": "address"})
+        return out
+
+    def fetch():
+        parts, tries = _geo_tries(t)
+        for i, q in enumerate(tries):
+            rows = ask(q)
+            if rows:
+                if i:
+                    rows[0]["precision"] = "street" if i == 1 and len(tries) > 2 else "town"
+                    rows[0]["label"] = parts[0] + ", " + rows[0]["label"] if rows[0]["label"] != q else t
+                return rows
+            time.sleep(1.05)                         # Nominatim's one-a-second rule
+        return []
+    rows = _lookup_cached("geo", t, 30 * 86400, fetch)
+    return rows[0] if rows else None
+
+
+def place_near(point):
+    """(code, how) for the airport or metro a geocoded point flies through:
+    the city named in the address when the table knows it, else what the
+    provider lists within 150 km of the point (a city entry first, so every
+    airport there is weighed), else the nearest curated airport. (None, 'unknown')
+    when nothing is close enough, and the caller keeps its sentence."""
+    if not point:
+        return None, "unknown"
+    code, how, problem = places.resolve(point.get("city") or "")
+    if code and not problem:
+        return code, "address"
+    cfg = live.load_config()
+    if cfg.get("key") and cfg.get("provider") == "duffel":
+        key = "%.2f,%.2f" % (point["lat"], point["lon"])
+
+        def fetch():
+            req = urllib.request.Request("https://api.duffel.com/places/suggestions?lat=%.4f&lng=%.4f&rad=150000" % (point["lat"], point["lon"]),
+                                         headers={"Authorization": "Bearer " + cfg["key"], "Duffel-Version": "v2", "Accept": "application/json",
+                                                  "User-Agent": "ConcordeGo/1.0 (go.flyconcordefly.com)"})
+            try:
+                with urllib.request.urlopen(req, timeout=6) as r:
+                    d = json.loads(r.read().decode("utf-8"))
+            except Exception:
+                return []
+            out = []
+            for pl in d.get("data") or []:
+                if pl.get("iata_code") and pl.get("latitude") is not None:
+                    city = pl.get("city") if isinstance(pl.get("city"), dict) else {}
+                    out.append({"code": pl["iata_code"], "kind": pl.get("type") or "airport",
+                                "city_code": (city or {}).get("iata_code") or pl.get("iata_city_code") or "",
+                                "lat": pl["latitude"], "lon": pl["longitude"]})
+            return out
+        import ground as _g
+        near = _lookup_cached("near", key, 30 * 86400, fetch)
+        near.sort(key=lambda p: _g.haversine_km(point["lat"], point["lon"], p["lat"], p["lon"]))
+        cities = [p for p in near if p["kind"] == "city"]
+        if cities:
+            return cities[0]["code"], "near"
+        if near:
+            # the nearest airport's METRO code when it has one: an address near
+            # City airport is a London search, every airport weighed, not an LCY one
+            return (near[0].get("city_code") or near[0]["code"]), "near"
+    import ground as _g
+    best, dist = None, 150.0
+    for iata, ap in (adapter.load_enrichment()["airports"]["airports"] or {}).items():
+        if ap.get("lat") is None:
+            continue
+        km = _g.haversine_km(point["lat"], point["lon"], ap["lat"], ap["lon"])
+        if km < dist:
+            best, dist = iata, km
+    return (best, "near") if best else (None, "unknown")
+
+
 def _address_text(a):
     road = " ".join(x for x in (a.get("house_number"), a.get("road")) if x) or a.get("pedestrian") or a.get("footway") or ""
     hood = a.get("neighbourhood") or a.get("suburb") or a.get("quarter") or a.get("city_district") or a.get("borough") or ""
@@ -957,6 +1099,8 @@ def _lookup_cached(kind, key, ttl, fetch):
     if not ok:
         return []
     out = fetch()
+    if not out:
+        return out                                    # a miss (or an outage) is not worth remembering for a month
     try:
         with open(path, "w") as f:
             json.dump(out, f)
@@ -1003,20 +1147,29 @@ def suggest_request(q):
     # a digit means an address or a postal code (EC2A, 11237, 361 Harman), which no airport name carries;
     # those go to the address service, and come back ahead of the places
     has_digit = bool(re.search(r"\d", text))
-    looks_address = kind == "from" and ((has_digit and len(text) >= 3) or (len(text) >= 5 and " " in text)
-                                       or (len(text) >= 4 and not rows))   # a neighbourhood nobody else knows
+    # both sides: the destination takes the hotel's address too, and the ride from the airport is priced to it
+    looks_address = ((has_digit and len(text) >= 3) or (len(text) >= 5 and " " in text)
+                     or (len(text) >= 4 and not rows))   # a neighbourhood nobody else knows
     if looks_address:
         def fetch_addr():
             from urllib.parse import quote
             digits0 = text.replace(" ", "")
             # a bare postal code is searched in the visitor's own country first: 11237 is Bushwick, and also a town in Lithuania
             extra = ("&countrycodes=" + cc) if (cc and digits0.isdigit()) else ""
-            req = urllib.request.Request("https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=5" + extra + "&q=" + quote(text),
-                                         headers={"User-Agent": "ConcordeGo/1.0 (go.flyconcordefly.com)", "Accept": "application/json"})
-            try:
-                with urllib.request.urlopen(req, timeout=6) as r:
-                    d = json.loads(r.read().decode("utf-8"))
-            except Exception:
+            parts, tries = _geo_tries(text)
+            d, used = [], 0
+            for used, q0 in enumerate(tries):
+                req = urllib.request.Request("https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=5" + extra + "&q=" + quote(q0),
+                                             headers={"User-Agent": "ConcordeGo/1.0 (go.flyconcordefly.com)", "Accept": "application/json"})
+                try:
+                    with urllib.request.urlopen(req, timeout=6) as r:
+                        d = json.loads(r.read().decode("utf-8"))
+                except Exception:
+                    d = []
+                if d or used == len(tries) - 1:
+                    break
+                time.sleep(1.05)
+            if not d:
                 return []
             out, seen_txt = [], set()
             digits = text.replace(" ", "")
@@ -1025,6 +1178,8 @@ def suggest_request(q):
                 if digits.isdigit() and not str((hit.get("address") or {}).get("postcode") or "").replace(" ", "").startswith(digits):
                     continue
                 t = _address_text(hit.get("address") or {})
+                if used and t:
+                    t = parts[0] + ", " + t                  # the house or the name as typed, then what the map knows
                 if t and t not in seen_txt:
                     seen_txt.add(t)
                     out.append({"value": t, "label": t, "sub": (hit.get("address") or {}).get("country") or "", "kind": "address"})

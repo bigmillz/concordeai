@@ -219,7 +219,8 @@ def _tickets_from_id(itin_id: str, n_segments: int) -> List[List[int]]:
 
 
 def from_kiwi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
-              enr: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+              enr: Optional[Dict[str, Any]] = None,
+              dest_point: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """A Kiwi search response -> a scenario dict the scorer can read."""
     enr = enr or load_enrichment()
     notes: List[str] = []
@@ -334,7 +335,8 @@ def from_kiwi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
         arr_clock = _hhmm(segments[-1]["arrival_local"][11:16])
         out_modes, in_modes, ginfo = ground_both_ends(
             origin_key, segments[0]["origin"]["iata"],
-            segments[-1]["destination"]["iata"], dep_clock, arr_clock, enr)
+            segments[-1]["destination"]["iata"], dep_clock, arr_clock, enr,
+            dest_point=dest_point)
         ground_info = ginfo
         if ginfo.get("arrival_note") and ginfo["arrival_note"] not in notes:
             notes.append(ginfo["arrival_note"])
@@ -551,7 +553,8 @@ def _fleet_claims(enr: Dict[str, Any], operating: str, equipment: str,
 
 def from_amadeus(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                  enr: Optional[Dict[str, Any]] = None,
-                 checked_bags: int = 1) -> Dict[str, Any]:
+                 checked_bags: int = 1,
+                 dest_point: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """An Amadeus Flight Offers Search v2 response -> a scenario dict.
 
     `checked_bags` is what the TRAVELLER is carrying, and it deliberately comes
@@ -727,7 +730,8 @@ def from_amadeus(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
         arr_clock = _hhmm(segments[-1]["arrival_local"][11:16])
         out_modes, in_modes, ginfo = ground_both_ends(
             origin_key, segments[0]["origin"]["iata"],
-            segments[-1]["destination"]["iata"], dep_clock, arr_clock, enr)
+            segments[-1]["destination"]["iata"], dep_clock, arr_clock, enr,
+            dest_point=dest_point)
         ground_info = ginfo
         if ginfo.get("arrival_note") and ginfo["arrival_note"] not in notes:
             notes.append(ginfo["arrival_note"])
@@ -1024,8 +1028,15 @@ def route_par(o_iata: str, d_iata: str, date: str, enr: Dict[str, Any],
 
 def ground_both_ends(origin_text: str, dep_ap: str, arr_ap: str,
                      dep_clock: int, arr_clock: int, enr: Dict[str, Any],
-                     geo: Optional[Dict[str, Any]] = None):
+                     geo: Optional[Dict[str, Any]] = None,
+                     dest_point: Optional[Dict[str, Any]] = None):
     """(out_modes, in_modes, ground_info). Shared by all three adapters.
+
+    `dest_point` is where the trip ENDS when the traveller typed an address on
+    the destination side (a hotel, a friend's flat): a dict with lat, lon and a
+    label, geocoded by the server. With it, the arrival ride is priced from the
+    airport to that door through the same model as the outbound ride, instead
+    of to a point near the airport standing in for "the city".
 
     An uncurated ORIGIN must never drop an itinerary - that was the whole point
     of going global - and it would be a silly kind of bug for that to be true of
@@ -1046,7 +1057,11 @@ def ground_both_ends(origin_text: str, dep_ap: str, arr_ap: str,
     origin, how = _ground.resolve_origin(origin_text, enr, dep)
     out_modes, src = _ground.modes_for(origin, dep, dep_clock, enr)
 
-    in_modes, aerr = arrival_ground_for(arr_ap, arr_clock, enr)
+    if dest_point and dest_point.get("lat") is not None and arr.get("lat") is not None:
+        in_modes, _isrc = _ground.modes_for(dict(dest_point, key=dest_point.get("key")), arr, arr_clock, enr)
+        aerr = None
+    else:
+        in_modes, aerr = arrival_ground_for(arr_ap, arr_clock, enr)
     if not in_modes and arr.get("lat") is not None:
         in_modes = _ground.estimate_modes(
             {"lat": arr["lat"] + 0.11, "lon": arr["lon"] + 0.11}, arr, arr_clock)
@@ -1054,6 +1069,7 @@ def ground_both_ends(origin_text: str, dep_ap: str, arr_ap: str,
     info = {"origin": origin.get("label"), "precision": origin.get("precision"),
             "resolved_by": how, "source": src,
             "message": _ground.support_message(out_modes),
+            "destination": (dest_point or {}).get("label"),
             "arrival_note": aerr}
     return out_modes, in_modes, info
 
@@ -1077,7 +1093,8 @@ def _place_label(node: Dict[str, Any], iata: str) -> str:
 
 def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                 enr: Optional[Dict[str, Any]] = None,
-                checked_bags: int = 1) -> Dict[str, Any]:
+                checked_bags: int = 1,
+                dest_point: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """A Duffel offer-request or offers response -> a scenario dict.
 
     Field names follow duffel-api's own model definitions, which is the
@@ -1311,7 +1328,8 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
         # the helper falls back to the curated table for the rest.
         out_modes, in_modes, ginfo = ground_both_ends(
             origin_key, segments[0]["origin"]["iata"],
-            segments[-1]["destination"]["iata"], dep_clock, arr_clock, enr, geo)
+            segments[-1]["destination"]["iata"], dep_clock, arr_clock, enr, geo,
+            dest_point=dest_point)
         ground_info = ginfo
         if ginfo.get("arrival_note") and ginfo["arrival_note"] not in notes:
             notes.append(ginfo["arrival_note"])
@@ -1383,8 +1401,9 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
             "origin": {"label": org.get("label", origin_key),
                        "lat": org.get("lat", 0.0), "lon": org.get("lon", 0.0),
                        "geocode_precision": "neighbourhood"},
-            "destination": {"label": dest_label, "lat": 0.0, "lon": 0.0,
-                            "geocode_precision": "city"},
+            "destination": ({"label": dest_point["label"], "lat": dest_point["lat"], "lon": dest_point["lon"],
+                             "geocode_precision": "address"} if dest_point and dest_point.get("lat") is not None
+                            else {"label": dest_label, "lat": 0.0, "lon": 0.0, "geocode_precision": "city"}),
             "depart_date": first["segments"][0]["departure_local"][:10],
             "return_date": None,
             "route_par_cents": par,

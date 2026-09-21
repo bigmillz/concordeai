@@ -774,6 +774,20 @@ seconds the row flips between three pictures and one laid across the whole row, 
 tiles changing 380ms apart with a white flash on each. The picture is a background layer
 16px past every edge, so no transform can show the ground.
 
+**The destination field takes an address too** (2026-09-21, per Patrick: "so the person can get
+to a hotel or wherever they're staying"). `server.geo_place()` geocodes anything with a digit
+or three comma parts through Nominatim, walking inward when the full line misses (the street
+without its number, then the town), and never caches a miss; `place_near()` picks the airport
+the flights go to when the city in the address is not in the table: the provider's places
+within 150 km, the nearest airport's METRO code first (an address by City airport is a London
+search), else the nearest curated airport. The point rides through `dest_point` into
+`adapter.ground_both_ends()`, so the arrival ride is priced from the airport to that door by
+the same model as the outbound ride, and the page names the metro (`query.destination`) with
+the address beside it (`query.destination_full`). Autocomplete offers address rows on both
+sides. The wish thread's `.thread` rule sets `display`, so it needs its own `[hidden]` rule
+(the CLAUDE.md trap, met again); and the shortlist's picture swap runs on timers, never
+`requestAnimationFrame`, which a hidden tab never fires.
+
 **The origin field does two different jobs** and both are sent: `origin_address`
 is where the ground leg starts, and the city inside it decides which airports to
 search. Sending only one is why every search used to be a hardcoded JFK–LHR no

@@ -125,10 +125,11 @@ def feed_details(offer):
     }
 
 
-def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full=None, source_note=None, built_from="a live search"):
+def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full=None, source_note=None, built_from="a live search",
+               dest_point=None, destination_full=None):
     """A feed payload -> everything mock 10 reads. server.py calls this for a
     live search; main() below calls it for the checked-in sample."""
-    sc = adapter.from_feed(raw, origin_key=origin_key, checked_bags=checked_bags)
+    sc = adapter.from_feed(raw, origin_key=origin_key, checked_bags=checked_bags, dest_point=dest_point)
     # The raw offers, keyed the way the adapter names its options (the last ten
     # characters of the offer id), so the page can show everything the feed
     # said about a flight, not only what the scorer priced.
@@ -307,7 +308,8 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
     out["query"] = {
         "origin": sc["query"]["origin"]["label"],
         "origin_full": origin_full or "Wyckoff Ave & Myrtle Ave, Bushwick, Brooklyn 11237",
-        "destination": sc["query"]["destination"]["label"],
+        "destination": (dest_point or {}).get("city") or sc["query"]["destination"]["label"],
+        "destination_full": destination_full or None,
         "date": sc["query"]["depart_date"],
         "adults": 1, "bags": 1,
         "par_cents": sc["query"]["route_par_cents"],

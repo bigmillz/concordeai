@@ -166,8 +166,10 @@ details[open] summary:after{content:"–"}
 .alli input{accent-color:var(--speed)}
 /* an even grid, so the names line up in columns rather than ragged chips (per Patrick, 2026-09-21) */
 .carriers{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:6px}
+.carriers .cbtn{height:36px;box-sizing:border-box;display:flex}
 .carriers .cbtn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
-.cbtn.more{border-style:dashed;color:var(--faint);justify-content:center}.cbtn.more:hover{color:var(--text)}
+.cbtn.more{border-style:dashed;color:var(--faint);justify-content:center;padding:4px 10px}.cbtn.more:hover{color:var(--text);border-color:var(--dim)}
+.cbtn.more span{text-align:center}
 .airsheet h4{font:400 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin:18px 0 8px}
 .airsheet .airq{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);font:500 15px var(--sans);padding:10px 14px;margin-top:6px}.airsheet .airq:focus{outline:none;border-color:var(--speed)}
 .cbtn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:8px;padding:4px 8px 4px 4px;font-size:12.5px;color:var(--dim);background:var(--panel)}
@@ -312,7 +314,9 @@ details[open] summary:after{content:"–"}
 .jtip li.bad::before{background:var(--red)}.jtip li.good::before{background:var(--green)}
 .jtip .arrow{position:absolute;left:var(--ax,50%);bottom:-5px;width:8px;height:8px;background:rgba(16,16,19,.97);border-right:1px solid var(--line);border-bottom:1px solid var(--line);transform:translateX(-50%) rotate(45deg)}
 .jtip.below .arrow{bottom:auto;top:-5px;transform:translateX(-50%) rotate(-135deg)}
-.jtip .gf li{display:grid;grid-template-columns:30px 88px minmax(0,1fr);gap:0 8px;align-items:baseline;padding-left:0}
+.jtip .gf li{display:grid;grid-template-columns:30px 88px 56px minmax(0,1fr);gap:0 8px;align-items:baseline;padding-left:0}
+.jtip .gf .pull{font-family:var(--mono);font-size:11.5px;font-style:normal;color:var(--text);white-space:nowrap;text-align:right}
+.jtip .gf .pull.credit{color:var(--good, #6fcf97)}
 .jtip .gf li::before{display:none}
 .jtip .gf b{font-family:var(--disp);font-size:13px;font-weight:400}
 .jtip .gf span{color:var(--text)}
@@ -525,7 +529,7 @@ details[open] summary:after{content:"–"}
 /* ---------- the trip, as fields */
 .fields{display:grid;gap:12px;margin-top:18px}
 .frow{display:grid;gap:12px}
-.frow.route{grid-template-columns:minmax(0,1.5fr) 56px minmax(0,1fr);align-items:stretch}
+.frow.route{grid-template-columns:minmax(0,1fr) 56px minmax(0,1fr);align-items:stretch}
 .frow.dates{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
 .frow.legrow{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,.8fr) 40px;align-items:center}
 .fld{position:relative;background:var(--panel3);border:1px solid var(--line);border-radius:12px;padding:12px 14px 12px 44px;min-width:0;transition:border-color .15s,background .15s}
@@ -668,16 +672,16 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
    rounding or device pixel ratio can leave the ground showing (per Patrick, 2026-09-21: a black bar top and bottom).
    Two layers crossfade. A layer drifts on its own, or, in a panorama, all three move as one strip. */
 .sky .photo{position:absolute;inset:0;overflow:hidden;background:#0a0a0c}
-.sky .pic{position:absolute;inset:-16px;background-size:cover;background-position:50% 45%;background-repeat:no-repeat;opacity:0;transition:opacity .4s ease;animation:drift 28s ease-in-out infinite alternate;will-change:transform,opacity}
+.sky .pic{position:absolute;inset:-16px;background-size:cover;background-position:50% 45%;background-repeat:no-repeat;opacity:0;transition:opacity .4s ease;animation:drift 9s ease-in-out infinite alternate;will-change:transform,opacity;--z:1.2;--z0:1;--z1:1.2;--sx:3%;--sy:-2%}
 /* the flash: a wash of white over the tile that peaks as the new picture lands and is gone half a second later */
 .sky .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:2}
 .sky .flash.go{animation:flash .6s ease-out}
 @keyframes flash{0%{opacity:0}18%{opacity:.85}100%{opacity:0}}
 .sky .pic.on{opacity:1}
 .sky .pic.top{z-index:1}
-.sky .pic.wide{animation:pan 36s ease-in-out infinite alternate}
-@keyframes drift{from{transform:scale(1.02) translate(-1.5%, .8%)}to{transform:scale(1.12) translate(1.5%, -1.2%)}}
-@keyframes pan{from{transform:translateX(0)}to{transform:translateX(-3%)}}
+.sky .pic.wide{animation:pan 12s ease-in-out infinite alternate}
+@keyframes drift{from{transform:scale(var(--z0)) translate(calc(var(--sx) * -1), calc(var(--sy) * -1))}to{transform:scale(var(--z1)) translate(var(--sx), var(--sy))}}
+@keyframes pan{from{transform:translateX(1.5%) scale(1.04)}to{transform:translateX(-3%) scale(1.1)}}
 
 .sky .scrim{position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(10,10,12,.12) 0%,rgba(10,10,12,.02) 35%,rgba(10,10,12,.6) 100%);pointer-events:none}
 .sky .cap{position:absolute;left:16px;right:16px;top:10px;z-index:2;font-family:var(--disp);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.78);text-shadow:0 1px 2px rgba(0,0,0,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -693,6 +697,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 .dock .thead{display:flex;align-items:center;gap:10px;padding:10px 16px 0;font-size:12px;color:var(--faint)}
 .dock .thead button{margin-left:auto;color:var(--faint);font-size:12px}.dock .thead button:hover{color:var(--text)}
 .thread{max-height:34vh;overflow:auto;padding:8px 16px 4px;display:flex;flex-direction:column;gap:12px}
+.thread[hidden]{display:none}
 .msg .you{font-size:13.5px;color:var(--text);border-left:2px solid var(--speed);padding-left:10px;line-height:1.45}
 .msg .got{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
 .msg .reply{margin-top:6px;font-size:12.5px;color:var(--dim);line-height:1.45}
@@ -880,7 +885,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 <div id="results" class="hidden"><div class="wrapin">
   <div class="stepper" id="stepper"></div>
   <section id="bookstep" class="hidden" aria-label="Book the trip"></section>
-  <section aria-label="Your shortlist"><div class="sechead"><h2>Your shortlist</h2><p id="lede"></p></div><div class="three" id="doors"></div></section>
+  <section aria-label="Top recommendations"><div class="sechead"><h2>Top recommendations</h2><p id="lede" hidden></p></div><div class="three" id="doors"></div></section>
   <section aria-label="Everything else"><div class="sechead"><h2>Everything else, in your order</h2><p id="listnote"></p></div><ol class="list" id="list"></ol><button class="morebtn" id="morebtn"></button><p class="hiddenrows" id="hiddenrows"></p></section>
   <section class="research" id="research" aria-label="Price check from other countries">
     <div class="sechead"><h2>Is it cheaper from somewhere else?</h2><p>The same seat is often filed at a different fare depending on the country the ticket is sold in. Ask, and the search re-runs under other points of sale, no VPN, and says what the difference is worth after the catches.</p></div>
@@ -990,7 +995,7 @@ const AIRNAME = {american:'AA',aa:'AA','british airways':'BA',ba:'BA',british:'B
 // ---- state
 const S = {trip:'round', a:1, b:0, c:0, preset:'1,0,0', asap:false, wants:new Set(), rules:[], ride:'either', off:new Set(), menu:false, open:new Set(),
   extra:{bag:0, wifi:false, seat:false, legroom:false, lounge:false, priority:false, insurance:false, hotel:false, custom:[]}, adv:{dep0:0, dep1:24, arr0:0, arr1:24, cabin:'economy', stops:2, alli:new Set(), out:new Set()},
-  pts:{amex:120000, chase:80000, capone:0, citi:0, bilt:0, marriott:0, avios:0, virgin:0, aa:0, delta:0, mm:0, ms:0, fb:0, ac:0, ua:0}, ptOpen:new Set(), stOpen:new Set(), more:{banks:false, progs:false, status:false}, pay:{}, legIdx:0, legPick:{}, stage:'legs', status:{}, shown:12, T:'mine',
+  pts:{amex:0, chase:0, capone:0, citi:0, bilt:0, marriott:0, avios:0, virgin:0, aa:0, delta:0, mm:0, ms:0, fb:0, ac:0, ua:0}, ptOpen:new Set(), stOpen:new Set(), more:{banks:false, progs:false, status:false}, pay:{}, legIdx:0, legPick:{}, stage:'legs', status:{}, shown:12, T:'mine',
   legs:[{from:'', to:'', date:'Wed 18 Nov'}], back:'Wed 25 Nov', pax:'1 adult', bags:'1 checked bag'};
 
 // ---- wants: a predicate, a charge when it is missing, and a hint when nothing has it
@@ -1389,7 +1394,7 @@ function partLetter(idx){ const pts = Math.max(0, Math.min(4.3, 4 - 3.4 * (idx -
 function factors(e){
   const par = D.par, parTotal = D.query.par_cents, sum = codes => e.lines.filter(l => codes.includes(l.code)).reduce((s, l) => s + l.cents, 0);
   return FACTORS.map(([id, name, codes, parOf]) => { const mine = sum(codes), theirs = parOf(par), idx = 1 + PULL * (mine - theirs) / parTotal;
-    return {id, name, idx, letter: partLetter(idx), carries: idx < 0.93, why: factorWhy(id, e, mine, theirs)}; });
+    return {id, name, idx, pull: mine - theirs, letter: partLetter(idx), carries: idx < 0.93, why: factorWhy(id, e, mine, theirs)}; });
 }
 function factorWhy(id, e, mine, theirs){
   const L = code => e.lines.find(l => l.code === code), fl = e.by.cheapest.legs.filter(l => l.kind === 'flight'); let li = 0; fl.forEach((l, i) => { if (l.minutes > fl[li].minutes) li = i; });
@@ -1422,7 +1427,7 @@ if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { IN
 function sealHTML(e, small){
   const g = e.grade, m = g.match(/^([A-F])([+-]?)$/) || [g, g, ''];
   const [dx, dy] = small ? inkOffset(m[1], '600 23px ' + getComputedStyle(document.body).getPropertyValue('--sans')) : inkOffset(m[1], '600 26px ' + getComputedStyle(document.body).getPropertyValue('--mono'), .75);
-  const tip = `<div class="jh"><i></i><b>Grade ${esc(g)}</b><em>against par</em></div><ul class="gf">${factors(e).map(f => `<li><b style="color:${gradeColor(f.letter)}">${f.letter}</b><span>${f.name}</span><small>${esc(f.why)}${f.carries ? ' · far enough under par to carry the rest' : ''}</small></li>`).join('')}</ul><p class="gnote">The whole trip priced for a neutral traveller against this route's par, ${money(D.query.par_cents)}. Each line is that part's pull on the letter.</p>`;
+  const tip = `<div class="jh"><i></i><b>Grade ${esc(g)}</b><em>against par</em></div><ul class="gf">${factors(e).map(f => `<li><b style="color:${gradeColor(f.letter)}">${f.letter}</b><span>${f.name}</span><em class="pull${f.pull < 0 ? ' credit' : ''}">${Math.abs(f.pull) < 100 ? 'at par' : (f.pull < 0 ? '−' : '+') + money(Math.abs(f.pull))}</em><small>${esc(f.why)}${f.carries ? ' · far enough under par to carry the rest' : ''}</small></li>`).join('')}</ul><p class="gnote">${money(e.effective_cents)} all in for a neutral traveller against this route's par of ${money(D.query.par_cents)}, ${e.effective_cents >= D.query.par_cents ? money(e.effective_cents - D.query.par_cents) + ' over' : money(D.query.par_cents - e.effective_cents) + ' under'}. The dollars are each part against par's same part, and they add up to that gap: the letters are not equal weights, the money is.</p>`;
   return `<span class="seal${small ? ' s' : ''}" style="--gc:${gradeColor(g)}" data-tip="${esc(tip)}" aria-label="Grade ${esc(g)}"${small ? '' : ' tabindex="0"'}><svg viewBox="0 0 48 48" aria-hidden="true"><circle class="ring" cx="24" cy="24" r="22.5" pathLength="100"/><text class="g" x="${(m[2] ? 22.5 : 24) + dx}" y="${24 + dy}">${m[1]}</text>${m[2] ? `<text class="sg" x="36" y="15.5">${m[2] === '-' ? '−' : '+'}</text>` : ''}</svg><span class="sr">Grade ${esc(g)}</span></span>`;
 }
 
@@ -1630,7 +1635,8 @@ function paintDoors(rows, ctx){
   DOOR_IDS = doors.map(d => d.dataset.id);
   mountPhotos();
   const basis = S.asap ? 'by arrival time: the first gets you there soonest.' : S.a === 1 ? 'cheapest all in.' : S.b === 1 ? 'fastest door to door.' : S.c === 1 ? 'most comfortable first.' : 'all in at your dial, wants charged, wishes applied.';
-  $('#lede').textContent = (S.notice ? S.notice + ' ' : '') + D.query.total_found + ' flights came back, ranked ' + basis + ' Pros and cons are against the rest of the field; the ledger has every figure.';
+  // only a recording gets a sentence here; a live search says nothing (per Patrick, 2026-09-21: "can this useless text")
+  { const rec = S.notice && !/^Live results/.test(S.notice) ? S.notice.replace(/^(Return leg\. |Flight \d+\. )/, '') : ''; $('#lede').textContent = rec; $('#lede').hidden = !rec; }
 }
 
 // ---- the list
@@ -1750,13 +1756,14 @@ const ICON = {
   bag:'<svg class="ico" viewBox="0 0 24 24"><rect x="4" y="7.5" width="16" height="13" rx="2.5"/><path d="M9 7.5V5.5a3 3 0 0 1 6 0v2M9 11.5v6M15 11.5v6"/></svg>',
 };
 function sentenceHTML(){
-  const L = S.legs, g0 = ALL[0].legs[0];
+  const L = S.legs, g0 = ALL[0].legs[0], gIn = ALL[0].legs.slice().reverse().find(l => l.kind === 'ground' && l !== g0);
   const LOCATE = '<button type="button" class="locate" id="locate" title="Use my location" aria-label="Use my location"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>';
   const fld = (id, label, val, icon, help, ph) => `<div class="fld${id === 'q-from-0' ? ' hasloc' : ''}">${ICON[icon]}<label for="${id}">${label}</label><input id="${id}" value="${esc(val)}" placeholder="${esc(ph || '')}" autocomplete="off">${id === 'q-from-0' ? LOCATE : ''}${help ? `<div class="help">${help}</div>` : ''}</div>`;
   const sel = (id, label, val, opts, icon) => `<div class="fld">${ICON[icon]}<label for="${id}">${label}</label><select id="${id}">${opts.map(o => `<option${o === val ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select></div>`;
   const plane = '<div class="link" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M15 8l-4.2-1.4L7 1.5H5.4l1.9 5.1H3.6L2.5 4.9H1.2l.9 3.1-.9 3.1h1.3l1.1-1.7h3.7L5.4 14.5H7l3.8-5.1z"/></svg></div>';
   let h = `<div class="frow route">${fld('q-from-0', 'From your door', L[0].from, 'pin',
-      'An address, a neighbourhood or a city. <b>The ride to the airport is priced from here</b>, at the hour you leave' + (L[0].from && D.query.origin_full && L[0].from === D.query.origin_full ? ': from ' + esc(short(L[0].from)) + ' that is ' + esc(g0.tip.split(' · ').slice(2).join(', ')) + ', about ' + dur(g0.minutes) : '') + '.<span class="locerr" id="locerr"></span>', 'Your address, or a neighbourhood')}${plane}${fld('q-to-0', 'To', L[0].to, 'flag', 'A city searches every airport it has: London means Heathrow, Gatwick, Stansted, Luton and City, weighed against each other.', 'City or airport')}</div>`;
+      'An address, a neighbourhood or a city. <b>The ride to the airport is priced from here</b>, at the hour you leave' + (L[0].from && D.query.origin_full && L[0].from === D.query.origin_full ? ': from ' + esc(short(L[0].from)) + ' that is ' + esc(g0.tip.split(' · ').slice(2).join(', ')) + ', about ' + dur(g0.minutes) : '') + '.<span class="locerr" id="locerr"></span>', 'Your address, or a neighbourhood')}${plane}${fld('q-to-0', 'To your door', L[0].to, 'flag',
+      'A city, an airport, or the address where you are staying. A city weighs every airport it has; <b>an address prices the ride from the airport too</b>' + (L[0].to && D.query.destination_full && L[0].to === D.query.destination_full && gIn ? ': to ' + esc(short(L[0].to)) + ' that is ' + esc(gIn.tip.split(' · ').slice(2).join(', ')) + ', about ' + dur(gIn.minutes) : '') + '.', 'City, airport, or your hotel\'s address')}</div>`;
   h += `<div class="frow dates">${fld('q-date-0', 'Leaving', L[0].date, 'cal', '', 'Date')}${S.trip === 'round' ? fld('q-back', 'Returning', S.back, 'cal', '', 'Date') : ''}${sel('q-pax', 'Travellers', S.pax, ['1 adult', '2 adults', 'Family of 4'], 'who')}${sel('q-cabin', 'Cabin', CABIN_NAMES[S.adv.cabin], Object.values(CABIN_NAMES), 'seat')}${sel('q-bags', 'Checked bags', S.bags, ['1 checked bag', 'No checked bag', '2 checked bags'], 'bag')}</div>`;
   if (S.trip === 'multi') L.slice(1).forEach((l, i) => { h += `<div class="frow legrow">${fld('q-from-' + (i+1), 'Then from', l.from, 'pin', '', 'City or airport')}${fld('q-to-' + (i+1), 'To', l.to, 'flag', '', 'City or airport')}${fld('q-date-' + (i+1), 'On', l.date, 'cal', '', 'Date')}<button class="rm2" data-rm="${i+1}" aria-label="Remove this flight">×</button></div>`; });
   h += `<div class="recent" id="recent"></div>`;
@@ -1787,7 +1794,7 @@ async function selectLeg(id){
   if (next !== undefined) await goLeg(next); else goBook();
 }
 function showLegSections(on){
-  ['#results section[aria-label="Your shortlist"]', '#results section[aria-label="Everything else"]', '#research', '#how', '#cov'].forEach(sel => { const el = document.querySelector(sel); if (el) el.classList.toggle('hidden', !on); });
+  ['#results section[aria-label="Top recommendations"]', '#results section[aria-label="Everything else"]', '#research', '#how', '#cov'].forEach(sel => { const el = document.querySelector(sel); if (el) el.classList.toggle('hidden', !on); });
   $('#bookstep').classList.toggle('hidden', on);
 }
 async function goLeg(i){
@@ -1818,7 +1825,7 @@ function mirrorData(d0, i){
     if (e.details && Array.isArray(e.details.segments)) e.details.segments = e.details.segments.slice().reverse().map(sg => { const t = {...sg}; ['from', 'to'].every(k => k in t) && ([t.from, t.to] = [sg.to, sg.from]); ['origin', 'destination'].every(k => k in t) && ([t.origin, t.destination] = [sg.destination, sg.origin]); return t; });
   });
   Object.keys(d.by || {}).forEach(k => { d.by[k] = d.by[k].map(id => id + '-r'); });
-  d.query = {...d.query, origin: d.query.destination, origin_full: d.query.destination, destination: d.query.origin, date: iso};
+  d.query = {...d.query, origin: d.query.destination, origin_full: d.query.destination_full || d.query.destination, destination: d.query.origin, destination_full: d.query.origin_full || null, date: iso};
   d._provenance = {...(d._provenance || {}), built_from: 'the outbound recording, mirrored: a stand-in for a leg nobody has searched yet'};
   return d;
 }
@@ -2003,7 +2010,7 @@ function paintCarriers(){
   const shown = [...new Set(MAJORS.concat([...inSearch].sort()))].filter(c => DUFFEL[c] || inSearch.has(c));
   const rest = Object.keys(DUFFEL).filter(c => !shown.includes(c)).length + [...S.adv.out].filter(c => !shown.includes(c)).length;
   $('#carriers').innerHTML = shown.map(carrierChip).join('') +
-    `<button class="cbtn more" id="moreair" type="button"><span>More airlines · ${rest} more${[...S.adv.out].some(c => !shown.includes(c)) ? ' · ' + [...S.adv.out].filter(c => !shown.includes(c)).length + ' out' : ''}</span></button>`;
+    `<button class="cbtn more" id="moreair" type="button"><span>+${rest} more airlines${[...S.adv.out].some(c => !shown.includes(c)) ? ' · ' + [...S.adv.out].filter(c => !shown.includes(c)).length + ' out' : ''}</span></button>`;
 }
 function airlinesSheet(){
   const q = (S.airq || '').trim().toLowerCase();
@@ -2604,32 +2611,41 @@ addEventListener('resize', () => { paintTri(); const [x, y] = toXY(S.a, S.b, S.c
 // or one picture is laid across the whole row as a strip, held for a beat, and broken back into three. Nothing
 // repeats in order, and no two tiles ever show the same picture except in a panorama.
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+// A DECK, not a lottery (per Patrick, 2026-09-21: "the same ones over and over"): the pool is shuffled once and
+// dealt in order, so every picture is shown before any comes round again; the deck is reshuffled when it runs out.
 function freshPhoto(k, wantPlace){
-  const taken = new Set((PH.slots || []).filter((x, i) => i !== k)), pool = PHOTOS.map((p, i) => i).filter(i => !taken.has(i) && i !== (PH.slots || [])[k]);
-  const pref = wantPlace ? pool.filter(i => PHOTOS[i].place === wantPlace) : [];
-  const from = pref.length ? pref : pool.length ? pool : PHOTOS.map((p, i) => i);
-  return from[Math.floor(Math.random() * from.length)];
+  if (!PH.deck || !PH.deck.length){ PH.deck = shuffle(PHOTOS.map((p, i) => i)); }
+  const onScreen = new Set((PH.slots || []).filter((x, i) => i !== k));
+  let at = PH.deck.findIndex(i => !onScreen.has(i) && (!wantPlace || PHOTOS[i].place === wantPlace));
+  if (at < 0) at = PH.deck.findIndex(i => !onScreen.has(i));
+  if (at < 0) return Math.floor(Math.random() * PHOTOS.length);
+  return PH.deck.splice(at, 1)[0];
 }
 function seatPhotos(){
   const places = [...new Set(PHOTOS.map(p => p.place))], start = Math.floor(Math.random() * places.length);
-  PH.slots = [-1, -1, -1];
+  PH.slots = [-1, -1, -1]; PH.deck = null;
   // seated one at a time, so each pick sees the ones already seated and never repeats them
   for (let k = 0; k < 3; k++) PH.slots[k] = freshPhoto(k, places.length > 1 ? places[(start + k) % places.length] : null);
   PH.wide = null; PH.beat = 0;
 }
 function setPic(el, p, k, wide){
   el.style.backgroundImage = 'url("' + p.src + '")';
+  // each picture gets its own move: a zoom of 12–28% with a slide, from a random corner toward the opposite one
+  const z = (1.12 + Math.random() * .16).toFixed(3), sx = (Math.random() < .5 ? -1 : 1) * (2 + Math.random() * 4), sy = (Math.random() < .5 ? -1 : 1) * (1 + Math.random() * 3);
+  el.style.setProperty('--z', z); el.style.setProperty('--sx', sx.toFixed(1) + '%'); el.style.setProperty('--sy', sy.toFixed(1) + '%');
+  el.style.setProperty('--z0', Math.random() < .5 ? '1' : z); el.style.setProperty('--z1', el.style.getPropertyValue('--z0') === '1' ? z : '1');
   if (wide){ const doors = [...document.querySelectorAll('#doors .door')], first = doors[0].getBoundingClientRect(), last = doors[doors.length - 1].getBoundingClientRect(), gw = Math.max(300, last.right - first.left), dl = el.closest('.door').getBoundingClientRect().left - first.left;
     el.classList.add('wide'); el.style.backgroundSize = Math.round(gw * 1.06) + 'px auto'; el.style.backgroundPosition = (-Math.round(dl) - 16) + 'px 45%'; el.style.animationDelay = '0s'; }
-  else { el.classList.remove('wide'); el.style.backgroundSize = ''; el.style.backgroundPosition = ''; el.style.animationDelay = (-(k * 9 + Math.floor(Math.random() * 6))) + 's'; }
+  else { el.classList.remove('wide'); el.style.backgroundSize = ''; el.style.backgroundPosition = ''; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; }
 }
 function swapTile(d, k, p, wide){
   const ph = d.querySelector('.photo'); if (!ph) return;
   const cur = ph.querySelector('.pic.on'), nxt = ph.querySelector('.pic:not(.on)'); if (!cur || !nxt) return;
   setPic(nxt, p, k, wide); nxt.classList.add('top'); cur.classList.remove('top');
   const fl = ph.querySelector('.flash'); if (fl){ fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go'); }
-  requestAnimationFrame(() => requestAnimationFrame(() => { nxt.classList.add('on');
-    setTimeout(() => { cur.style.transition = 'none'; cur.classList.remove('on'); requestAnimationFrame(() => { cur.style.transition = ''; }); }, 500); }));
+  // timers, not requestAnimationFrame: rAF never fires in a hidden document, and a swap that waits on it looks dead
+  setTimeout(() => { nxt.classList.add('on');
+    setTimeout(() => { cur.style.transition = 'none'; cur.classList.remove('on'); setTimeout(() => { cur.style.transition = ''; }, 40); }, 500); }, 30);
 }
 function mountPhotos(){
   const doors = [...document.querySelectorAll('#doors .door')]; if (!PHOTOS.length || !doors.length) return;
@@ -2637,12 +2653,17 @@ function mountPhotos(){
   doors.forEach((d, k) => { const ph = d.querySelector('.photo'); if (!ph) return; const a = ph.querySelector('.pic.a'), p = PH.wide != null ? PHOTOS[PH.wide] : PHOTOS[PH.slots[k]];
     if (!a.classList.contains('on') && !ph.querySelector('.pic.on')){ setPic(a, p, k, PH.wide != null); a.classList.add('on'); }
     else if (PH.wide != null) setPic(ph.querySelector('.pic.on'), p, k, true); });
-  if (!PH.timer) PH.timer = setInterval(cycle, 7000);
+  if (!PH.timer) PH.timer = setInterval(cycle, 5000);
 }
 function cycle(){
   if (W.mode !== 'results' || PHOTOS.length < 2 || document.hidden) return;
   const doors = [...document.querySelectorAll('#doors .door')]; if (doors.length < 3) return;
   const places = [...new Set(PHOTOS.map(p => p.place))], GAP = 380;
+  PH.beat = (PH.beat || 0) + 1;
+  if (PH.wide == null && PH.beat % 3 !== 0){        // most beats: one tile changes, to a picture of the other place
+    const k = Math.floor(Math.random() * 3), cur = PHOTOS[PH.slots[k]], other = places.find(pl => pl !== (cur || {}).place) || null;
+    PH.slots[k] = freshPhoto(k, other); swapTile(doors[k], k, PHOTOS[PH.slots[k]], false); return;
+  }
   if (PH.wide == null){                              // three pictures -> one across the row
     PH.wide = freshPhoto(-1, null);
     doors.forEach((d, k) => setTimeout(() => swapTile(d, k, PHOTOS[PH.wide], true), k * GAP));
@@ -2798,7 +2819,7 @@ async function enterResults(){
   const L = S.legs[0], date = toISODate(L.date); S.notice = '';
   if (SERVED && !(L.from.trim() && L.to.trim())){
     box.classList.add('hidden'); $('#wizard').classList.remove('hidden'); $('#rail').classList.remove('hidden'); goStep(1);
-    $('#searcherr').textContent = L.from.trim() ? 'Where are you going?' : 'Where does the trip start? An address, a neighbourhood or a city.'; ($('#q-' + (L.from.trim() ? 'to' : 'from') + '-0') || {focus(){}}).focus(); return; }
+    $('#searcherr').textContent = L.from.trim() ? 'Where are you going? A city, an airport, or the address where you will stay.' : 'Where does the trip start? An address, a neighbourhood or a city.'; ($('#q-' + (L.from.trim() ? 'to' : 'from') + '-0') || {focus(){}}).focus(); return; }
   if (SERVED && !date){
     box.classList.add('hidden'); $('#wizard').classList.remove('hidden'); $('#rail').classList.remove('hidden'); goStep(1);
     $('#searcherr').textContent = 'Could not read the leaving date. Something like Wed 18 Nov, or 2026-11-18.'; return; }
