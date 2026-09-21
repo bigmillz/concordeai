@@ -759,7 +759,9 @@ Lines, Dial) and round one (01–04) are kept for the record.
 brand-coloured monogram and lays the real logo over it when it loads, so a
 viewer that cannot reach the host (a claude.ai artifact, the sandbox) sees the
 monogram and nobody sees a broken image. The live page should use the same
-URLs straight from the offer.
+URLs straight from the offer. For a mockup that must show the logos where that
+host is unreachable, `logos.py` bakes each SVG into `slim.json` as a data URI
+(run it on a machine with internet, then `build.py`).
 
 Each `mock-N.src.html` carries a `__DATA__` token; `build.py` inlines
 `slim.json` and writes `mock-N.html`. **Edit the `.src.html`, never the built
