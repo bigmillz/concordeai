@@ -47,7 +47,8 @@ print("  reachable, " + str(len(r)) + " Access application(s) so far")'
 # the zone that owns $HOST is on this account. Without Zone: Read the lookup is
 # refused and skipped; the applications step reports the same thing later.
 APEX=$(echo "$HOST" | awk -F. '{print $(NF-1)"."$NF}')
-cfroot "/zones?name=$APEX" | jq_ 'if d.get("success") and not (d.get("result") or []): sys.exit("== zone\n  The token can list zones and '$APEX' is not among this account'"'"'s. The zone lives in another account of yours: its Overview page shows that Account ID on the right. Use that, with a token covering that account.")
+cfroot "/zones?name=$APEX" | jq_ 'r = d.get("result") or []
+if d.get("success") and not r: sys.exit("== zone\n  The token can list zones and '$APEX' is not among this account'"'"'s. The zone lives in another account of yours: its Overview page shows that Account ID on the right. Use that, with a token covering that account.")
 print("== zone\n  " + ("'$APEX' is on this account" if d.get("success") else "not checked (the token has no Zone: Read, which is fine)"))'
 
 echo "== organisation"
