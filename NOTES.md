@@ -4928,3 +4928,48 @@ videos; Veo abandons a paid render on one transient error; run_model
 retries can orphan an engine handle; the janitor can stop an engine
 mid-answer; a few client polls that never stop after an error;
 /api/video suffix ranges; /api/stats shells out three times per poll.
+
+## 6b305 — the catalog brought up to September 2026 (uncut)
+
+Per Patrick ("are they currently optimal for what's current and
+deprecating any that are outdated or superseded?"). Seven research
+agents, one per slot, each proposal attacked by an independent
+verifier that fetched the repo, confirmed its size, and matched every
+weight key against the INSTALLED mlx-lm 0.31.3 — so a newer model that
+the app's engine cannot load was never an upgrade. Five proposals were
+vetoed and are not here.
+
+ADDED: Ministral 3 14B, Qwen 3.5 9B, Hermes 4 14B, Qwen 3.8 27B,
+DeepSeek R1 8B (the 0528 Qwen3-8B distill), Qwen 3.5 Vision 9B (via
+Ollama qwen3.5:9b), GLM 5.3, DeepSeek V3.2 671B.
+
+REMOVED (moved to RETIRED_MODELS with their vetted identities, so
+auto-clean can delete their weights): Mistral Nemo 12B, Phi-4 14B,
+Qwen 2.5 Coder 7B and 14B, Qwen 3.6 27B, DeepSeek R1 7B, DeepSeek R1
+671B, LLaVA Vision 7B, Llama 3.3 70B, Llama 4 Scout, Qwen 3 235B MoE,
+GLM-5.2.
+
+KEPT: Llama 3.2 1B and 3B (the verifier vetoed both small swaps —
+Qwen 3.5 2B scores lower on instruction following, the job those rows
+exist for, and LFM 2.5 has no Ollama tag and a revenue-capped licence),
+Hermes 3 8B (Intel still needs an Ollama Hermes), Gemma 4 12B and 26B,
+GPT-OSS 20B and 120B, Qwen 3.6 35B MoE.
+
+The two dedicated coders go: two Qwen generations later, the general
+models beat them at code (Qwen 3.8 27B on 24 GB+, Qwen 3.5 9B below
+that), so the Code-lane picks point there. Every tier and agent pick
+list was remapped by name and re-checked: no pick names a row that does
+not exist. Vision still routes through Ollama — the MLX vision path was
+vetoed because mlx-vlm is not installed.
+
+NOT DONE, and why:
+- Qwen 4 was announced on 2026-09-22 at Apsara, four tiers, still in
+  training; no weights exist. Qwen 3.8 Flash Next (Aug 24), billed as
+  the Qwen 4 architecture preview, uses model_type qwen4_exp, which
+  mlx-lm 0.31.3 cannot load, and is 111 GB at 4-bit.
+- The image ladder (FLUX.2 klein 4B, Z-Image Turbo q4/q8) is verified to
+  resolve on the installed mflux, but each uses a different generator
+  command than FLUX.1, and shipping it unrendered is how the mflux flag
+  change bit us before. Deferred until a real render.
+- FastWan2.2 (3-step video) loads but does not sample correctly on the
+  installed mlx-video. Vetoed.

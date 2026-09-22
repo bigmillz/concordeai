@@ -388,28 +388,24 @@ CATALOG = [
     # label,               icon, size, group, mlx repo, ollama tag, port, mem_gb, gb, star
     ("Llama 3.2 1B",       "🪶", "1B",  "core", "mlx-community/Llama-3.2-1B-Instruct-4bit",        "llama3.2:1b",       8884,  1.2,  0.8, True),
     ("Llama 3.2 3B",       "⚡️", "3B",  "core", "mlx-community/Llama-3.2-3B-Instruct-4bit",        "llama3.2:3b",       8888,  2.5,  1.8, True),
-    ("Mistral Nemo 12B",   "🌪️", "12B", "core", "mlx-community/Mistral-Nemo-Instruct-2407-4bit",   "mistral-nemo:12b",  8892,  7.8,  6.9, True),
+    ("Ministral 3 14B",    "🌪️", "14B", "core", "mlx-community/Ministral-3-14B-Instruct-2512-4bit", "ministral-3:14b", 8932, 9.6, 8.5, True),
     # tuned for tool use and structured output — the Research agent's first pick
     ("Hermes 3 8B",        "🪽", "8B",  "core", "mlx-community/Hermes-3-Llama-3.1-8B-4bit",        "hermes3:8b",        8912,  5.5,  4.6, False),
-    ("Qwen 2.5 Coder 7B",  "💻", "7B",  "code", "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit",    "qwen2.5-coder:7b",  8898,  5.0,  4.3, False),
-    ("Qwen 2.5 Coder 14B", "🛠️", "14B", "code", "mlx-community/Qwen2.5-Coder-14B-Instruct-4bit",   "qwen2.5-coder:14b", 8900,  9.5,  8.1, False),
+    ("Hermes 4 14B",       "🪽", "14B", "core", "mlx-community/Hermes-4-14B-4bit",                 None,                8936,  9.3,  8.3, False),
     ("Gemma 4 12B",        "💠", "12B", "core", "mlx-community/gemma-4-12B-it-4bit",               "gemma4:12b",        8908,  8.2,  6.8, True),
     ("Gemma 4 26B",        "🔷", "26B", "core", "mlx-community/gemma-4-26b-a4b-it-4bit",           "gemma4:26b",        8910, 17.0, 15.4, False),
-    ("Phi-4 14B",          "🔬", "14B", "core", "mlx-community/phi-4-4bit",                        "phi4:14b",          8902,  9.5,  8.2, False),
-    ("DeepSeek R1 7B",     "🧠", "7B",  "core", "mlx-community/DeepSeek-R1-Distill-Qwen-7B-4bit",  "deepseek-r1:7b",    8904,  5.0,  4.3, False),
-    ("LLaVA Vision 7B",    "👁️", "7B",  "code", None,                                              "llava:7b",          None,  5.0,  4.7, False),
+    ("Qwen 3.5 9B",        "🔬", "9B",  "core", "mlx-community/Qwen3.5-9B-4bit",                   "qwen3.5:9b",        8934,  6.9,  6.0, False),
+    ("DeepSeek R1 8B",     "🧠", "8B",  "core", "mlx-community/DeepSeek-R1-0528-Qwen3-8B-4bit",    "deepseek-r1:8b",    8940,  5.4,  4.6, False),
+    ("Qwen 3.5 Vision 9B", "👁️", "9B",  "code", None,                                              "qwen3.5:9b",        None,  7.4,  6.6, False),
     # ---- the 2026 ladder: every repo/tag verified against HF + the Ollama
     # registry on 2026-08-01. Strongest model per hardware class; anything
     # that can't fit the machine is filtered out of the UI entirely.
     ("GPT-OSS 20B",        "🌀", "20B",  "core", "mlx-community/gpt-oss-20b-MXFP4-Q4",             "gpt-oss:20b",       8914, 13.0, 12.0, False),
-    ("Qwen 3.6 27B",       "🐉", "27B",  "big",  "mlx-community/Qwen3.6-27B-4bit",                 None,                8916, 16.5, 15.0, False),
+    ("Qwen 3.8 27B",       "🐉", "27B",  "big",  "mlx-community/Qwen3.8-27B-4bit",                 "qwen3.8:27b",       8938, 17.6, 16.1, False),
     ("Qwen 3.6 35B MoE",   "🚀", "35B",  "big",  "mlx-community/Qwen3.6-35B-A3B-4bit",             "qwen3.6:35b",       8918, 20.0, 18.5, True),
-    ("Llama 3.3 70B",      "🐋", "70B",  "big",  "mlx-community/Llama-3.3-70B-Instruct-4bit",      "llama3.3:70b",      8920, 42.0, 40.0, False),
-    ("Llama 4 Scout",      "🦅", "109B", "big",  "mlx-community/Llama-4-Scout-17B-16E-Instruct-4bit","llama4:scout",    8922, 58.0, 55.0, False),
     ("GPT-OSS 120B",       "🌌", "120B", "big",  "mlx-community/gpt-oss-120b-MXFP4-Q4",            "gpt-oss:120b",      8924, 64.0, 61.0, False),
-    ("Qwen 3 235B MoE",    "🐲", "235B", "big",  "mlx-community/Qwen3-235B-A22B-4bit",             "qwen3:235b",        8926, 125.0, 118.0, False),
-    ("GLM-5.2",            "👑", "744B", "big",  "mlx-community/GLM-5.2-4bit",                     None,                8928, 375.0, 360.0, False),
-    ("DeepSeek R1 671B",   "🌊", "671B", "big",  "mlx-community/DeepSeek-R1-0528-4bit",            None,                8930, 380.0, 360.0, False),
+    ("GLM 5.3",            "👑", "744B", "big",  "mlx-community/GLM-5.3-4bit",                     None,                8944, 430.0, 418.3, False),
+    ("DeepSeek V3.2 671B", "🌊", "671B", "big",  "mlx-community/DeepSeek-V3.2-4bit",               None,                8942, 390.0, 378.1, False),
 ]
 
 # PRUNED, NOT FORGOTTEN (6b269, per Patrick: "what models can we prune
@@ -434,6 +430,33 @@ RETIRED_MODELS = {
     "DeepSeek R1":       (None, "deepseek-r1", None, 4.7),
     "Mistral Small 24B": ("mlx-community/Mistral-Small-24B-Instruct-2501-4bit",
                           "mistral-small:24b", 8906, 13.0),
+    # 6b305, per Patrick ("are they currently optimal … deprecating any
+    # that are outdated or superseded?"). Each checked against its
+    # replacement by a research agent and an independent verifier, which
+    # confirmed the repo, its size, and that the architecture loads on
+    # the installed mlx-lm 0.31.3 by matching every weight key.
+    "Mistral Nemo 12B":  ("mlx-community/Mistral-Nemo-Instruct-2407-4bit",
+                          "mistral-nemo:12b", 8892, 6.9),
+    "Qwen 2.5 Coder 7B": ("mlx-community/Qwen2.5-Coder-7B-Instruct-4bit",
+                          "qwen2.5-coder:7b", 8898, 4.3),
+    "Qwen 2.5 Coder 14B": ("mlx-community/Qwen2.5-Coder-14B-Instruct-4bit",
+                           "qwen2.5-coder:14b", 8900, 8.3),
+    "Phi-4 14B":         ("mlx-community/phi-4-4bit", "phi4:14b", 8902, 8.2),
+    "DeepSeek R1 7B":    ("mlx-community/DeepSeek-R1-Distill-Qwen-7B-4bit",
+                          "deepseek-r1:7b", 8904, 4.3),
+    # bare tag on purpose: the default pull lands as llava:latest, and
+    # the cleanup resolves a bare retired tag to whatever is pulled
+    "LLaVA Vision 7B":   (None, "llava", None, 4.7),
+    "Qwen 3.6 27B":      ("mlx-community/Qwen3.6-27B-4bit", None, 8916, 16.1),
+    "Llama 3.3 70B":     ("mlx-community/Llama-3.3-70B-Instruct-4bit",
+                          "llama3.3:70b", 8920, 39.7),
+    "Llama 4 Scout":     ("mlx-community/Llama-4-Scout-17B-16E-Instruct-4bit",
+                          "llama4:scout", 8922, 61.1),
+    "Qwen 3 235B MoE":   ("mlx-community/Qwen3-235B-A22B-4bit",
+                          "qwen3:235b", 8926, 132.3),
+    "GLM-5.2":           ("mlx-community/GLM-5.2-4bit", None, 8928, 418.3),
+    "DeepSeek R1 671B":  ("mlx-community/DeepSeek-R1-0528-4bit", None, 8930,
+                          377.6),
 }
 
 GROUP_TITLES = {"core": "General Models", "code": "Coding & Vision",
@@ -1804,11 +1827,10 @@ TIERS = {
         # questions, but Gemma never collapsed, never slop-looped, and
         # held 1-6s while Qwen's hidden thinking mode stalled it for
         # 15-19s on random turns. Same brains, steadier hand.
-        "picks": ["Qwen 3 235B MoE", "GPT-OSS 120B", "Llama 4 Scout",
-                  "Llama 3.3 70B", "Gemma 4 26B", "Qwen 3.6 27B",
-                  "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Gemma 4 12B",
-                  "Phi-4 14B", "Mistral Nemo 12B",
-                  "Llama 3.2 3B", "Llama 3.2 1B"],
+        "picks": ["GPT-OSS 120B", "Gemma 4 26B", "Qwen 3.8 27B",
+          "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Gemma 4 12B",
+          "Qwen 3.5 9B", "Ministral 3 14B", "Llama 3.2 3B",
+          "Llama 3.2 1B"],
         "count": 1,
     },
     # "Best" is gone (5.3, per Patrick: "same as fast") — without a
@@ -1825,10 +1847,9 @@ TIERS = {
         # R1" ollama row — same brain, different label — so the
         # REASONING model couldn't seat in the REASONING tier and a
         # plain Nemo blended in instead (seen on this very machine).
-        "picks": ["Qwen 3 235B MoE", "GPT-OSS 120B", "Llama 4 Scout",
-                  "Llama 3.3 70B", "Gemma 4 26B", "Qwen 3.6 35B MoE",
-                  "GPT-OSS 20B", "Phi-4 14B", "DeepSeek R1 7B",
-                  "Qwen 2.5 Coder 14B", "Gemma 4 12B"],
+        "picks": ["GPT-OSS 120B", "Gemma 4 26B", "Qwen 3.8 27B",
+                  "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Qwen 3.5 9B",
+                  "DeepSeek R1 8B", "Gemma 4 12B"],
         "count": 3,
     },
     # Pro absorbed Power (5.3, per Patrick): every model that fits takes
@@ -1889,9 +1910,9 @@ AGENTS = {
         # Claude-Code-shaped, honestly scoped: it READS the folder you
         # point it at and answers about YOUR code. No writes, no shell.
         "icon": "\U0001f5c2\ufe0f", "desc": "answers about your own code",
-        "picks": ["Qwen 2.5 Coder 14B", "Gemma 4 26B",
-                  "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Qwen 2.5 Coder 7B",
-                  "Gemma 4 12B"],
+        "picks": ["Qwen 3.8 27B", "Gemma 4 26B",
+          "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Qwen 3.5 9B",
+          "Gemma 4 12B"],
         "workspace": True,
         "system": (
             "You are a senior engineer reading the user's actual "
@@ -1912,15 +1933,15 @@ AGENTS = {
         # run_remote_agent picks the strongest available driver (cloud
         # when keyed). Lives in the Code tab beside Coding/Workspace.
         "icon": "🛰️", "desc": "runs commands on your server over SSH",
-        "picks": ["Qwen 2.5 Coder 14B", "Qwen 3.6 35B MoE", "GPT-OSS 20B",
-                  "Gemma 4 26B", "Qwen 2.5 Coder 7B", "Gemma 4 12B"],
+        "picks": ["Qwen 3.8 27B", "Qwen 3.6 35B MoE",
+          "GPT-OSS 20B", "Gemma 4 26B", "Qwen 3.5 9B", "Gemma 4 12B"],
         "remote": True,
         "system": "",       # the loop supplies REMOTE_SYSTEM itself
     },
     "Coding": {
         "icon": "💻", "desc": "working code, tight explanations",
-        "picks": ["Qwen 2.5 Coder 14B", "Qwen 2.5 Coder 7B",
-                  "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Gemma 4 12B"],
+        "picks": ["Qwen 3.8 27B", "Qwen 3.5 9B",
+          "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Gemma 4 12B"],
         "system": (
             "You are a senior software engineer. Give WORKING code first, "
             "in fenced blocks with the language tag, then a tight "
@@ -1935,7 +1956,8 @@ AGENTS = {
         # system prompt sets TONE, not permissions: it still refuses
         # what must be refused, it just skips the sermon.
         "icon": "\U0001fabd", "desc": "the infamous one — direct, no varnish",
-        "picks": ["Hermes 3 8B", "Mistral Nemo 12B", "Llama 3.2 3B"],
+        "picks": ["Hermes 4 14B", "Hermes 3 8B", "Ministral 3 14B",
+                  "Llama 3.2 3B"],
         "system": (
             "You are Hermes — direct, sharp, personality-forward. "
             "Answer exactly what was asked. Take real positions when "
@@ -1948,8 +1970,8 @@ AGENTS = {
     },
     "Resumes": {
         "icon": "📄", "desc": "bullets that get interviews",
-        "picks": ["Hermes 3 8B", "Qwen 3.6 35B MoE", "Gemma 4 12B",
-                  "Mistral Nemo 12B"],
+        "picks": ["Hermes 3 8B", "Qwen 3.6 35B MoE",
+          "Gemma 4 12B", "Ministral 3 14B"],
         "system": (
             "You are an expert resume writer and hiring manager. Turn "
             "experience into crisp, quantified bullet points: strong verb "
@@ -1961,8 +1983,8 @@ AGENTS = {
     },
     "Writing": {
         "icon": "✍️", "desc": "emails, essays, anything with a reader",
-        "picks": ["Qwen 3.6 35B MoE", "Gemma 4 26B", "Gemma 4 12B",
-                  "Mistral Nemo 12B", "Hermes 3 8B"],
+        "picks": ["Qwen 3.6 35B MoE", "Gemma 4 26B",
+          "Gemma 4 12B", "Ministral 3 14B", "Hermes 3 8B"],
         "system": (
             "You are a sharp professional writer and editor. Match the "
             "asked-for tone exactly, lead with the point, cut every "
@@ -1974,8 +1996,8 @@ AGENTS = {
     },
     "Mnemosyne": {
         "icon": "\U0001f9e0", "desc": "total recall — and how to remember",
-        "picks": ["Qwen 3.6 35B MoE", "Gemma 4 26B", "Hermes 3 8B",
-                  "Mistral Nemo 12B"],
+        "picks": ["Qwen 3.6 35B MoE", "Gemma 4 26B",
+          "Hermes 3 8B", "Ministral 3 14B"],
         "system": (
             "You are Mnemosyne, the memory specialist. Two jobs.\n"
             "1) RECALL: when asked what you know or remember about the "
@@ -1995,8 +2017,8 @@ AGENTS = {
     },
     "Math & Logic": {
         "icon": "🧮", "desc": "careful step-by-step reasoning",
-        "picks": ["Phi-4 14B", "DeepSeek R1 7B", "Gemma 4 26B",
-                  "Qwen 3.6 35B MoE", "Gemma 4 12B"],
+        "picks": ["Qwen 3.5 9B", "DeepSeek R1 8B", "Gemma 4 26B",
+          "Qwen 3.6 35B MoE", "Gemma 4 12B"],
         "system": (
             "You are a meticulous mathematician. Work step by step, "
             "define variables before using them, and CHECK the result "
@@ -2007,8 +2029,8 @@ AGENTS = {
     },
     "Research": {
         "icon": "🔎", "desc": "searches the web, writes a cited brief",
-        "picks": ["Hermes 3 8B", "Qwen 3.6 35B MoE", "Gemma 4 12B",
-                  "Mistral Nemo 12B"],
+        "picks": ["Hermes 3 8B", "Qwen 3.6 35B MoE",
+          "Gemma 4 12B", "Ministral 3 14B"],
         "research": True,
         "system": "",
     },
@@ -2068,7 +2090,7 @@ def build_code_rows() -> str:
 
 # Auto-blending skips these: a vision model answers text poorly, and 1B-class
 # models degrade into repetition (observed looping "address address address").
-BLEND_EXCLUDE = {"LLaVA Vision 7B"}
+BLEND_EXCLUDE = {"Qwen 3.5 Vision 9B"}
 BLEND_MIN_MEM = 2.4e9
 
 THINK_HINT = ("Work through this carefully and step by step before giving "
@@ -2158,7 +2180,7 @@ def _starter_labels() -> list:
               and "Vision" not in l), None))                   # everyday
     add("Llama 3.2 3B")
     add("Llama 3.2 1B")
-    add("LLaVA Vision 7B")
+    add("Qwen 3.5 Vision 9B")
     return picks
 
 
@@ -9232,9 +9254,7 @@ def remote_driver():
     if ladder:
         return ("cloud", ladder[0])
     pulled = ollama_pulled_tags() or set()
-    for l in ("Qwen 2.5 Coder 14B", "Qwen 3.6 35B MoE", "GPT-OSS 20B",
-              "Gemma 4 26B", "Qwen 2.5 Coder 7B", "Gemma 4 12B",
-              "Llama 3.2 3B"):
+    for l in ("Qwen 3.8 27B", "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Gemma 4 26B", "Qwen 3.5 9B", "Gemma 4 12B", "Llama 3.2 3B"):
         if l in MODEL_ROUTES and model_cached(l, pulled) \
                 and model_fits_memory(l):
             return ("local", l)
@@ -12525,8 +12545,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 vm["content"] = "Describe this image in useful detail."
             vm["images"] = b64s
             messages = messages[:-1] + [vm] if messages else [vm]
-            council = ["LLaVA Vision 7B"]
-            model_name = "LLaVA Vision 7B"
+            council = ["Qwen 3.5 Vision 9B"]
+            model_name = "Qwen 3.5 Vision 9B"
             prompt = vm["content"]
 
         # the model routing is settled by here — resolve it NOW, before
@@ -13490,11 +13510,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         kind, target = route
         # first image before the vision engine exists: kick the download
         # and say so, instead of a cryptic connection error
-        if images and not model_cached("LLaVA Vision 7B",
+        if images and not model_cached("Qwen 3.5 Vision 9B",
                                        ollama_pulled_tags() or set()):
             try:
-                start_model_downloads(["LLaVA Vision 7B"])
-                emit("Getting the vision engine ready (LLaVA, ~4.7 GB) — "
+                start_model_downloads(["Qwen 3.5 Vision 9B"])
+                emit("Getting the vision engine ready (about 6.6 GB) — "
                      "the download just started. Progress is under "
                      "**Settings › Download models…**; paste the image again once it "
                      "shows the check mark.")
@@ -17480,20 +17500,16 @@ const ADV_USE={
   "Llama 3.2 1B":"instant drafts, the simplest questions",
   "Llama 3.2 3B":"quick everyday answers",
   "Hermes 3 8B":"creative writing and roleplay",
-  "Qwen 2.5 Coder 7B":"code completion and review",
-  "Qwen 2.5 Coder 14B":"stronger code work",
-  "Mistral Nemo 12B":"long context, natural prose",
+  "Hermes 4 14B":"creative writing, roleplay and tool use",
+  "Ministral 3 14B":"long context, natural prose",
+  "Qwen 3.5 9B":"reasoning, code and STEM",
   "Gemma 4 12B":"strong generalist, good merge writer",
   "Gemma 4 26B":"the house heavyweight — best local compositor",
-  "Phi-4 14B":"reasoning and STEM",
-  "DeepSeek R1 7B":"step-by-step reasoning",
+  "DeepSeek R1 8B":"step-by-step reasoning",
   "GPT-OSS 20B":"strong open reasoning",
-  "Qwen 3.6 27B":"heavyweight generalist",
+  "Qwen 3.8 27B":"heavyweight generalist and coder",
   "Qwen 3.6 35B MoE":"heavyweight generalist, fast for its size",
-  "Llama 3.3 70B":"big-iron generalist",
-  "Llama 4 Scout":"frontier-class, huge context",
   "GPT-OSS 120B":"frontier-class open reasoning",
-  "Qwen 3 235B MoE":"the biggest local brain",
 };
 const ADV_CLOUD={
   gemini:["Gemini","fast frontier drafts · free tier"],
