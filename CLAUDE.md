@@ -491,7 +491,8 @@ kernel asks); `droplet.sh` writes all of that on a fresh box.
 **Every key lives in `/etc/concordego.env` on the droplet** (0600, read by systemd, never in
 the repo, the plist, a command line or chat): `CONCORDEGO_FLIGHT_KEY` (Duffel),
 `ANTHROPIC_API_KEY` (narrator and wish box), `CONCORDEGO_PEXELS_KEY` (tile photos),
-`CONCORDEGO_SERPAPI_KEY` (the Delta supplement), plus `CONCORDEGO_OWNERS`,
+`CONCORDEGO_SERPAPI_KEY` (the Delta supplement), `CONCORDEGO_AERODATABOX_KEY` (the Flight
+Fixer's tracking feed), plus `CONCORDEGO_OWNERS`,
 `CONCORDEGO_ACCESS_TEAM` and `CONCORDEGO_PUBLIC=1`. To add or change one, edit the file ON
 THE SERVER and restart, from a laptop Terminal:
 
@@ -625,9 +626,24 @@ night**: a typical room rate near the airport it leaves from (`enrichment/hotels
 airports and country defaults, DRAFTED from general knowledge on 2026-09-21, never a live
 price, and the row says so) and the ground model's own rideshare estimate for a hotel 4 km
 out, there at this hour and back two hours before the flight, both itemised and both under
-"more" on the row. One row per flight, the cheapest fare standing for it. A tracking
-feed for the flight number would replace those priors with the flight's own day and is the
-obvious next key. The helper's model text: The situation comes in as chips and clocks: delayed or cancelled,
+"more" on the row. One row per flight, the cheapest fare standing for it. **The tracking
+feed is AeroDataBox** (2026-09-21, through RapidAPI; `live.flight_status(number, date)` on its
+own key `CONCORDEGO_AERODATABOX_KEY`, or `aerodatabox_key` in `cloud.json`, its own counters
+in `quota-aerodatabox.json`, 40 a day and 300 a month by default, a five-minute cache so a
+refresh costs one call, the key in the RapidAPI header and redacted from everything that
+escapes; no flight known that day is an empty list, an answer, not an error). `GET /flight?
+number=&date=&origin=&destination=` sits outside the door on a dozen lookups a day per
+address; "Look it up" beside the Flight field fills the scheduled and revised clocks,
+flips Delayed or Cancelled, and prints what the airline posted (`#rs-tracked`), marked
+observed; the call reads the feed itself when a flight number is given
+(`rescue.from_tracking()`, `apply_tracking()`), and the odds' basis opens with the airline's
+own status and says the rest is still modelled. The shape was VERIFIED with a real call on
+2026-09-21 (DL 5048, LGA to CLT, Expected, 3h32 behind); `adapter_samples/aerodatabox-dl5048.json`
+is synthesized and says so. AeroDataBox's status word "Expected" with a revised time later
+than the schedule reads as delayed (a quarter hour or more); "Canceled" and
+"CanceledUncertain" as cancelled; "Departed"/"EnRoute"/"Arrived"/"Diverted" as flown. A
+FlightAware AeroAPI adapter behind the same `from_tracking()` is the swap if lag or coverage
+ever bites. The helper's model text: The situation comes in as chips and clocks: delayed or cancelled,
 the scheduled and new times, whether rebooking was offered and when it lands, the fare, a
 checked bag, what was paid, what an hour is worth. Clocks are read in the AIRPORT's zone,
 taken from the results, never the browser's. One live search for the day (and tomorrow after
