@@ -1018,6 +1018,17 @@ def main():
           and all(o["segments"][0]["marketing"]["carrier"] == "DL" for o in merged["options"][n0:]))
     check("the merged scenario still scores end to end",
           all(scorer.score(merged, o, "reference").reconciles() for o in merged["options"]))
+    # the price signal: Google's context, our cheapest, one deterministic call
+    sig = adapter.price_signal(serp, 29500)
+    check("a fare under the typical range says book, with the range in the reason",
+          sig and sig["verdict"] == "book" and "$380 to $620" in sig["reason"] and sig["low_cents"] == 38000)
+    check("a fare above the range says wait", adapter.price_signal(serp, 70000)["verdict"] == "wait")
+    check("a fare inside the range is typical", adapter.price_signal(serp, 45000)["verdict"] == "typical")
+    check("the history is carried in cents, oldest first, at most sixty points",
+          len(sig["history"]) == 60 and sig["history"][0][1] == 28500 and sig["history"][0][0] < sig["history"][-1][0])
+    no_range = json.loads(json.dumps(serp)); no_range["price_insights"].pop("typical_price_range")
+    check("with no range, the recent median decides", adapter.price_signal(no_range, 20000)["verdict"] == "book" and "median" in adapter.price_signal(no_range, 20000)["reason"])
+    check("no insights at all is no signal, never a made-up one", adapter.price_signal({}, 29500) is None and adapter.price_signal(None, 29500) is None)
     ad_src = open(os.path.join(HERE, "..", "adapter.py"), encoding="utf-8").read()
     check("the adapter never imports the live module (the key stays where it is)",
           not re.search(r"^\s*(import live\b|from live\b)", ad_src, re.M))

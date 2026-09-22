@@ -786,6 +786,46 @@ def flight_request(q, remote, headers):
     return {"tracking": tr, "fetched": meta.get("source"), "age_seconds": meta.get("age_seconds")}
 
 
+FLEX_PER_DAY = int(os.environ.get("CONCORDEGO_FLEX_PER_DAY") or 40)
+
+
+def flex_request(req):
+    """Nearby days (per Patrick, 2026-09-22: "nearby airports and dates, priced
+    from your door"): the same search on the three days either side, each
+    through the ordinary pipeline so every day is priced all in from the
+    traveller's door, and each day's best under each target. Up to six extra
+    provider calls, each cached half an hour; capped site-wide by
+    CONCORDEGO_FLEX_PER_DAY sweeps a day."""
+    date = str(req.get("date") or "")[:10]
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+        return {"error": "The date of the trip, please."}
+    span = max(1, min(3, int(req.get("days") or 3)))
+    ok, _ = _users_take("_flex", "flex", FLEX_PER_DAY)
+    if not ok:
+        return {"error": "The nearby-days sweep has had its day (%d sweeps site-wide). It is back at midnight." % FLEX_PER_DAY}
+    centre = datetime.date.fromisoformat(date)
+    today = datetime.date.today()
+    days = []
+    for k in range(-span, span + 1):
+        d = centre + datetime.timedelta(days=k)
+        if d < today:
+            continue
+        r = search_request(dict(req, date=d.isoformat(), source="api", trip={"leg": 1}))
+        row = {"date": d.isoformat(), "offset": k, "found": 0}
+        if r.get("error"):
+            row["error"] = r["error"]
+        else:
+            row["found"] = r["query"]["total_found"]
+            for prof in ("cheapest", "fastest", "comfort", "reference"):
+                lst = (r.get("results") or {}).get(prof) or []
+                if lst:
+                    e = lst[0]
+                    row[prof] = {"effective_cents": e["by"][prof]["effective_cents"] if prof in e.get("by", {}) else e["effective_cents"],
+                                 "ticket_cents": e["ticket_cents"], "carrier": e["carrier"], "flight": e["flight"], "grade": e["grade"]}
+        days.append(row)
+    return {"days": days, "centre": date, "note": "Every day is priced all in from your door, the ride and the bags included, not the fare alone."}
+
+
 def rescue_request(req):
     """The delayed-or-cancelled helper: the situation in, the call out. One
     live search today (and tomorrow when the evening is gone), the arithmetic
@@ -897,6 +937,11 @@ def search_request(req):
                    "supplement": {k: v for k, v in (meta.get("supplement") or {}).items()
                                   if k in ("source", "error", "skipped", "age_seconds", "hint")}}
     out["where"] = where or None
+    try:
+        cheapest = min((e["ticket_cents"] for e in out["results"]["reference"]), default=None)
+        out["signal"] = adapter.price_signal(meta.get("supplement_payload"), cheapest) if src == "api" else None
+    except Exception:
+        out["signal"] = None
     if src == "sample":
         out["source_note"] = ("Recorded JFK–LHR results, not a live search" +
                               (": " + meta["fell_back"] if meta.get("fell_back") else "") + ".")
@@ -1686,6 +1731,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             path = "/api/search"; anon_ok = True
         elif path == "/rescue":
             path = "/api/rescue"; anon_ok = True          # the delayed-flight helper: a search and a brief, on the free allowance
+        elif path == "/flex":
+            path = "/api/flex"; anon_ok = True            # nearby days: one allowance unit, the days each cached
         else:
             anon_ok = False
         if path == "/api/profile":
@@ -1704,7 +1751,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._json({"ok": False, "error": "that profile is too large"})
             _users_profile_set(who, profile)
             return self._json({"ok": True, "profile": profile})
-        if path not in ("/api/score", "/api/narrate", "/api/live", "/api/wish", "/api/search", "/api/rescue"):
+        if path not in ("/api/score", "/api/narrate", "/api/live", "/api/wish", "/api/search", "/api/rescue", "/api/flex"):
             return self.send_error(404)
         try:
             n = int(self.headers.get("Content-Length") or 0)
@@ -1715,7 +1762,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         # spends freely; a signed-in visitor spends from a daily allowance;
         # nobody anonymous spends at all.
         # a live search only spends when this machine holds a key; without one the recording stands in
-        spends = path == "/api/narrate" or path == "/api/wish" or (path in ("/api/live", "/api/search", "/api/rescue") and (req.get("source") or "sample") != "sample" and bool(live.load_config().get("key")))
+        spends = path == "/api/narrate" or path == "/api/wish" or (path in ("/api/live", "/api/search", "/api/rescue", "/api/flex") and (req.get("source") or "sample") != "sample" and bool(live.load_config().get("key")))
         if spends and self._remote():
             who = self._who()
             if not who and anon_ok:
@@ -1731,7 +1778,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._json({"error": "Sign in to use this. A few searches a day are free; the wish box, the price check and more searches come with a free account.",
                                    "remote": True, "sign_in": True})
         if spends and self._remote() and who:
-            kind, limit = ("searches", USER_SEARCHES) if path in ("/api/live", "/api/search", "/api/rescue") else ("wishes", USER_WISHES)
+            kind, limit = ("searches", USER_SEARCHES) if path in ("/api/live", "/api/search", "/api/rescue", "/api/flex") else ("wishes", USER_WISHES)
             if kind == "wishes":
                 okall, _ = _users_take("_everyone", "wishes", WISHES_TOTAL)
                 if not okall:
@@ -1749,7 +1796,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 if who_r and "@" in who_r and isinstance(trip, dict) and not trip.get("leg"):
                     _users_recent_add(who_r, {"from": str(req.get("origin") or "")[:120], "to": str(req.get("destination") or "")[:120], "date": str(req.get("date") or "")[:10],
                                               "kind": str(trip.get("kind") or "round")[:8], "back": str(trip.get("back") or "")[:40], "pax": str(trip.get("pax") or "")[:20], "bags": str(trip.get("bags") or "")[:20]})
-            fn = {"/api/score": score_request, "/api/narrate": narrate_request, "/api/rescue": rescue_request,
+            fn = {"/api/score": score_request, "/api/narrate": narrate_request, "/api/rescue": rescue_request, "/api/flex": flex_request,
                   "/api/live": live_request, "/api/wish": wish_request, "/api/search": search_request}[path]
             return self._json(fn(req))
         except Exception as exc:

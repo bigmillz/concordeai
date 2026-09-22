@@ -767,6 +767,31 @@ the published schema (no key was on the machine) and says so; `live.py serp JFK 
 makes a real one. Three mutants in `mutate_adapter.py` cover it (39 now). It is a bandaid:
 scraping by proxy can break without notice, and it cannot book.
 
+**The price signal and the nearby days cost no new key** (2026-09-22, per Patrick: a paid feed
+has to earn its keep every month, not once). **The price signal** is read off the SerpApi
+response the Delta supplement already fetches: Google Flights ships `price_insights` (the
+route's typical range and a 60-point daily low history) with every search, and
+`adapter.price_signal()` turns it into ONE verdict over today's cheapest ticket, `book`
+(at or under the low end of the range, or 10% or more under the recent median when there is
+no range), `wait` (above the range, or 20% over the median) or `typical`, with the reason in a
+line and the history in cents. `search_request` hangs it on the response as `signal` for a
+live search only; a recording, or a search with no SerpApi key (a developer's Mac), carries
+`null` and the page shows nothing, never a made-up verdict. The page prints the word, the
+sentence, and behind "Price history" a sparkline of the sixty lows with a dot for today's
+cheapest here. It never ranks or grades anything (hard rule 1 holds: a signal is a sentence
+about the date, not a term in the model). **Nearby days** (`#flexgo`, POST `/flex`, `/api/flex`
+inside the door) runs the same search for the three days either side, skipping days already
+past, through `search_request` itself, so each day's number is the ordinary pipeline's
+cheapest at the user's dial, ride and bags included, and the strip names the flight, its
+ticket and its grade; the searched day is marked, the cheapest days highlighted, and a tap
+sets the date and searches it. Seven searches a click is real quota: the sweep is metered as
+searches for the person and capped site-wide at `CONCORDEGO_FLEX_PER_DAY` (40 days a day), and
+it runs sequentially on the feed's own 2s floor, so it takes most of a minute; the strip says
+so while it prices. Nearby AIRPORTS need no button: a city resolves to its metro code already,
+so JFK, EWR and LGA (or all five of London's) are weighed in one search, which is the product.
+`test_adapter.py` fences the signal offline on the synthesized SerpApi sample, which now
+carries a `price_insights` block.
+
 **Duffel CAN quote a bag price, but never on the search response.** `available_services` was
 empty on all 172 offers of the real capture — it is populated only by
 `GET /air/offers/{id}`, a second call per offer. The code path is built and tested (a quote

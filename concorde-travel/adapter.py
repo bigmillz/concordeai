@@ -1873,6 +1873,56 @@ def from_serpapi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
     }
 
 
+def price_signal(payload: Optional[Dict[str, Any]], lowest_now_cents: Optional[int]) -> Optional[Dict[str, Any]]:
+    """Google's price context for the route, as SerpApi hands it back beside
+    the flights: the typical range when it has one, and the recent history of
+    the lowest fare. Against today's cheapest ticket from OUR results it makes
+    one deterministic call, book / typical / wait, with the reason in a line.
+    A signal, not a forecast: it says where today sits against the recent past."""
+    ins = (payload or {}).get("price_insights") if isinstance(payload, dict) else None
+    if not isinstance(ins, dict):
+        return None
+    hist = []
+    for row in ins.get("price_history") or []:
+        try:
+            ts, price = int(row[0]), float(row[1])
+        except (TypeError, ValueError, IndexError):
+            continue
+        if price > 0:
+            hist.append([ts, int(round(price * 100))])
+    hist.sort()
+    rng = ins.get("typical_price_range")
+    low = high = None
+    if isinstance(rng, (list, tuple)) and len(rng) == 2:
+        try:
+            low, high = int(round(float(rng[0]) * 100)), int(round(float(rng[1]) * 100))
+        except (TypeError, ValueError):
+            low = high = None
+    vals = sorted(v for _, v in hist)
+    median = vals[len(vals) // 2] if vals else None
+    recent_low = min(v for _, v in hist[-30:]) if hist else None
+    now = int(lowest_now_cents) if lowest_now_cents else None
+    verdict, reason = "typical", "no comparison to make"
+    if now is not None and (low is not None or median is not None):
+        if low is not None and high is not None:
+            if now <= low:
+                verdict, reason = "book", "today's cheapest is at or under the low end of the typical range, $%d to $%d" % (low // 100, high // 100)
+            elif now > high:
+                verdict, reason = "wait", "today's cheapest is above the typical range, $%d to $%d; it has been lower" % (low // 100, high // 100)
+            else:
+                verdict, reason = "typical", "today's cheapest sits inside the typical range, $%d to $%d" % (low // 100, high // 100)
+        elif median is not None:
+            if now <= median * 0.9:
+                verdict, reason = "book", "today's cheapest is %d%% under the recent median of $%d" % (round((1 - now / median) * 100), median // 100)
+            elif now >= median * 1.2:
+                verdict, reason = "wait", "today's cheapest is %d%% over the recent median of $%d" % (round((now / median - 1) * 100), median // 100)
+            else:
+                verdict, reason = "typical", "today's cheapest is near the recent median of $%d" % (median // 100)
+    return {"level": ins.get("price_level"), "low_cents": low, "high_cents": high, "median_cents": median,
+            "recent_low_cents": recent_low, "lowest_now_cents": now, "history": hist[-60:],
+            "verdict": verdict, "reason": reason, "source": "Google Flights price history, via SerpApi"}
+
+
 def merge_scenarios(main: Dict[str, Any], extra: Dict[str, Any], label: str) -> Dict[str, Any]:
     """Add a supplement's options to the main scenario: the main one's query,
     par and profiles stand (one par per route, whatever the source), ids that

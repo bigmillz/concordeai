@@ -792,6 +792,18 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 .rsc.fixer .tm .ampm .pchip.on{background:var(--text);color:var(--bg)}
 /* in Flight Fixer mode the other steps do not apply, so they are not shown (per Patrick, 2026-09-21) */
 .fixmode .rail .st:not(:first-child),.fixmode .rail .jump{display:none}.fixmode .rail .st:first-child{margin-right:auto}
+/* the price signal: one line under the heading, Google's history behind a toggle */
+.signal{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:-6px 0 14px;font-size:13.5px;color:var(--dim)}
+.signal b{font-family:var(--disp);font-size:10px;letter-spacing:.18em;text-transform:uppercase;padding:4px 9px;border-radius:999px;border:1px solid var(--line)}
+.signal b.book{color:#7ee2a8;border-color:rgba(126,226,168,.5)}.signal b.wait{color:#f0b48a;border-color:rgba(240,180,138,.5)}.signal b.typical{color:var(--dim)}
+.signal button{color:var(--dim);font-size:12.5px;border-bottom:1px solid var(--line)}.signal .spark{flex-basis:100%;margin-top:4px}.signal .spark svg{width:100%;max-width:560px;height:70px;display:block}
+.signal .spark .l{fill:none;stroke:var(--speed);stroke-width:1.6}.signal .spark .g{stroke:var(--line)}.signal .spark text{fill:var(--faint);font:10px var(--mono)}.signal .spark .now{fill:var(--speed)}
+/* nearby days: a strip of seven, each all in, the searched day marked */
+.flex{display:flex;gap:8px;flex-wrap:wrap;align-items:stretch;margin:-4px 0 16px}
+.flex .day{border:1px solid var(--line);border-radius:12px;padding:8px 12px;min-width:112px;background:var(--panel3);cursor:pointer;text-align:left}
+.flex .day:hover{border-color:var(--dim)}.flex .day.here{border-color:var(--speed)}.flex .day.best{box-shadow:0 0 0 1px rgba(126,226,168,.5)}
+.flex .day small{display:block;color:var(--faint);font-size:11px;font-family:var(--mono)}.flex .day b{display:block;font-size:17px;margin:2px 0}.flex .day i{font-style:normal;color:var(--dim);font-size:12px}
+.flex .note{flex-basis:100%;color:var(--faint);font-size:12px}
 .rsc .odds{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 10px}.rsc .odds b{font-family:var(--mono);font-size:26px}.rsc .odds small{color:var(--faint)}
 .rsc .odds button{color:var(--dim);font-size:12.5px;border-bottom:1px solid var(--line)}
 .rsc .chart{margin:6px 0 12px}.rsc .chart svg{width:100%;height:130px;display:block}.rsc .chart text{fill:var(--faint);font:10px var(--mono)}.rsc .chart .l{fill:none;stroke:var(--speed);stroke-width:2}.rsc .chart .g{stroke:var(--line)}
@@ -938,13 +950,13 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">Advanced options are optional; leave them and go.</span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="37623af">37623af</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="8ab9cd0">8ab9cd0</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
   <a class="brand" href="#top" aria-label="ConcordeGo"><svg class="wing" viewBox="2 2.3 19.6 16.4" aria-hidden="true" focusable="false"><g><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><span class="lockup">Concorde<span class="tld">Go</span></span></a>
   <button class="sum" id="sum" data-tab="where" title="Edit your search"><b id="sumline"></b><span id="sumchips"></span></button>
-  <div class="barbtns"><button data-tab="where">Edit search</button><button data-tab="matters">Filters</button><button data-tab="advanced">Advanced</button><button class="dimbtn" id="startover">Start over</button><a class="acctbtn adminlink hidden" href="/api/admin">Admin</a><button class="acctbtn" id="account">Sign in</button></div>
+  <div class="barbtns"><button data-tab="where">Edit search</button><button data-tab="matters">Filters</button><button data-tab="advanced">Advanced</button><button id="flexgo" title="The same search on the three days either side, priced from your door">Nearby days</button><button class="dimbtn" id="startover">Start over</button><a class="acctbtn adminlink hidden" href="/api/admin">Admin</a><button class="acctbtn" id="account">Sign in</button></div>
 </div></div>
 
 <div class="loading hidden" id="loading" role="status" aria-live="polite"><div class="loadin">
@@ -954,7 +966,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 <div id="results" class="hidden"><div class="wrapin">
   <div class="stepper" id="stepper"></div>
   <section id="bookstep" class="hidden" aria-label="Book the trip"></section>
-  <section aria-label="Top recommendations"><div class="sechead"><h2>Top recommendations</h2><p id="lede" hidden></p></div><div class="three" id="doors"></div></section>
+  <section aria-label="Top recommendations"><div class="sechead"><h2>Top recommendations</h2><p id="lede" hidden></p></div><div class="signal" id="signal" hidden></div><div class="flex" id="flex" hidden></div><div class="three" id="doors"></div></section>
   <section aria-label="Everything else"><div class="sechead"><h2>Everything else, in your order</h2><p id="listnote"></p></div><ol class="list" id="list"></ol><button class="morebtn" id="morebtn"></button><p class="hiddenrows" id="hiddenrows"></p></section>
   <section class="research" id="research" aria-label="Price check from other countries">
     <div class="sechead"><h2>Search international markets</h2></div>
@@ -965,7 +977,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="37623af">37623af</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="8ab9cd0">8ab9cd0</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -2557,6 +2569,37 @@ let P = D.par;
 const LEGDATA = {0: D};
 // A live search replaces everything the page reads. Every derived table is
 // rebuilt here, so a second search is a clean slate and not a mix of two.
+function paintSignal(){
+  const box = $('#signal'); if (!box) return; const g = D.signal;
+  if (!g || !g.verdict || g.lowest_now_cents == null){ box.hidden = true; box.innerHTML = ''; return; }
+  const word = {book:'Book', wait:'Wait if you can', typical:'Typical'}[g.verdict] || 'Typical';
+  const cap = g.reason ? (g.reason.charAt(0).toUpperCase() + g.reason.slice(1)).replace(/\.\s*$/, '') : '';
+  box.innerHTML = `<b class="${g.verdict}">${word}</b><span>${esc(cap)}.</span>${g.history && g.history.length > 3 ? '<button type="button" id="sigmore">Price history</button>' : ''}${g.history && g.history.length > 3 ? '<div class="spark hidden" id="spark">' + sparkline(g) + '</div>' : ''}`;
+  box.hidden = false;
+}
+function sparkline(g){
+  const h = g.history, W = 560, H = 70, L = 40, R = 8, T = 8, B = 16, vs = h.map(x => x[1]).concat([g.lowest_now_cents]), lo = Math.min(...vs), hi = Math.max(...vs), span = Math.max(1, hi - lo);
+  const x = i => L + i / Math.max(1, h.length) * (W - L - R), y = v => T + (1 - (v - lo) / span) * (H - T - B);
+  const pts = h.map((p, i) => x(i).toFixed(1) + ',' + y(p[1]).toFixed(1)).join(' ');
+  const nowX = W - R, nowY = y(g.lowest_now_cents);
+  const d0 = new Date(h[0][0] * 1000), d1 = new Date(h[h.length - 1][0] * 1000), lab = d => d.toLocaleDateString([], {month:'short', day:'numeric'});
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line class="g" x1="${L}" x2="${W - R}" y1="${y(lo)}" y2="${y(lo)}"/><line class="g" x1="${L}" x2="${W - R}" y1="${y(hi)}" y2="${y(hi)}"/><text x="2" y="${y(hi) + 3}">${money(hi)}</text><text x="2" y="${y(lo) + 3}">${money(lo)}</text><polyline class="l" points="${pts}"/><circle class="now" cx="${nowX}" cy="${nowY}" r="3.5"/><text x="${L}" y="${H - 3}">${lab(d0)}</text><text x="${W - R}" y="${H - 3}" text-anchor="end">${lab(d1)} · today ${money(g.lowest_now_cents)}</text></svg><p class="fine">The lowest fare on this route on each recent day, per ${esc(g.source || 'Google')}; the dot is today's cheapest here.</p>`;
+}
+async function runFlex(){
+  const box = $('#flex'), btn = $('#flexgo'); if (!box) return;
+  const L = S.legs[0], date = toISODate(L.date); if (!date) return;
+  btn.disabled = true; btn.textContent = 'Checking nearby days…'; box.hidden = false; box.innerHTML = '<span class="note">Pricing the three days either side, all in from your door…</span>';
+  let res; try { const r = await fetch('/flex', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'api', origin:L.from, origin_address:L.from, destination:L.to, date, adults:paxCount(), checked_bags:partyBags(), cabin:S.adv.cabin, days:3})}); res = await r.json(); } catch (e){ res = {error:'The sweep did not come back.'}; }
+  btn.disabled = false; btn.textContent = 'Nearby days';
+  if (res.error){ box.innerHTML = '<span class="note">' + esc(res.error) + '</span>'; if (res.sign_in) openAccount(res); return; }
+  const prof = nearestProf(), rows = res.days.filter(d => d[prof]), best = rows.length ? Math.min(...rows.map(d => d[prof].effective_cents)) : null;
+  box.innerHTML = res.days.map(d => { const b = d[prof]; return `<button type="button" class="day${d.offset === 0 ? ' here' : ''}${b && b.effective_cents === best ? ' best' : ''}" data-flexday="${d.date}"><small>${isoToLabel(d.date)}${d.offset === 0 ? ' · this' : ''}</small>${b ? `<b>${money(b.effective_cents)}</b><i>${esc(b.carrier + ' ' + b.flight)} · ${money(b.ticket_cents)} ticket · ${esc(b.grade)}</i>` : `<b>—</b><i>${esc(d.error || 'nothing found')}</i>`}</button>`; }).join('') + `<span class="note">All in at your dial (${prof}), the ride and the bags included. Tap a day to search it.</span>`;
+}
+document.addEventListener('click', ev => {
+  if (ev.target.closest('#sigmore')){ const sp = $('#spark'); if (sp){ sp.classList.toggle('hidden'); $('#sigmore').textContent = sp.classList.contains('hidden') ? 'Price history' : 'Hide history'; } return; }
+  if (ev.target.closest('#flexgo')){ runFlex(); return; }
+  const fd = ev.target.closest('[data-flexday]'); if (fd){ S.legs[0].date = fd.dataset.flexday; sentenceHTML(); enterResults(); return; }
+});
 function loadData(d){
   D = d; ALL = D.results.reference.slice(); PR = D.profiles; AIR = D.airlines || {}; AP = D.airports || {}; P = D.par;
   GRID = {}; D.grid_points.forEach((p, i) => { GRID[Math.round(p[0]*10) + '-' + Math.round(p[1]*10)] = i; });
@@ -3201,7 +3244,7 @@ async function enterResults(){
   runProgress(box, SEARCH_STAGES, REDUCED ? 500 : 2400, () => { box.classList.add('hidden'); showResults(); });
 }
 function showResults(){
-  W.mode = 'results'; fetchPhotos(); S.entrance = true; $('#rbox').innerHTML = RBOX;
+  W.mode = 'results'; fetchPhotos(); S.entrance = true; $('#rbox').innerHTML = RBOX; paintSignal(); { const f = $('#flex'); if (f){ f.hidden = true; f.innerHTML = ''; } }
   $('#bar').classList.add('drop'); $('#results').classList.add('fade');
   document.querySelectorAll('#results .stepper, #results .sechead').forEach((el, k) => { el.classList.add('rise'); el.style.animationDelay = (k*80) + 'ms'; });
   BLOCKS.forEach(k => $('#ed-' + k).appendChild($('#blk-' + k)));
