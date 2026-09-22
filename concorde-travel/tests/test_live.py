@@ -165,6 +165,59 @@ def cabin_checks():
     check("no cabin asked for is economy", body2["data"]["cabin_class"] == "economy")
 
 
+
+def adb_checks():
+    """AeroDataBox, the Flight Fixer's tracking feed: its own key and counters, the same discipline."""
+    import io
+    import tempfile
+    here = os.path.dirname(os.path.abspath(__file__))
+    print("\naerodatabox tracking")
+    tmp = tempfile.mkdtemp()
+    sandbox(tmp)
+    os.environ.pop("CONCORDEGO_AERODATABOX_KEY", None)
+    legs, m = live.flight_status("DL 5048", "2026-09-21")
+    check("with no key nothing is called, and the reason names the variable", legs is None and "CONCORDEGO_AERODATABOX_KEY" in (m.get("how") or ""))
+    check("a string that is not a flight number is refused before anything else", live.flight_status("hello there", "2026-09-21")[0] is None)
+    os.environ["CONCORDEGO_AERODATABOX_KEY"] = SECRET
+    real = live.urllib.request.urlopen
+    cfg = live.adb_config(); cfg["quota"]["min_seconds_between_calls"] = 0
+    try:
+        with open(os.path.join(here, "..", "adapter_samples", "aerodatabox-dl5048.json"), encoding="utf-8") as fh:
+            sample = json.load(fh)
+        seen = {"n": 0, "url": "", "hdr": {}}
+
+        def fake_open(req, timeout=0):
+            seen["n"] += 1; seen["url"] = req.full_url; seen["hdr"] = dict(req.header_items())
+            return _Body(json.dumps(sample).encode())
+        live.urllib.request.urlopen = fake_open
+        legs, m = live.flight_status("DL 5048", "2026-09-21", cfg=cfg)
+        check("a lookup with a key reaches AeroDataBox once, by number and date, and comes back as api",
+              legs is not None and m["source"] == "api" and seen["n"] == 1 and "/flights/number/DL5048/2026-09-21" in seen["url"])
+        check("the key rides in the RapidAPI header, not the address",
+              any(k.lower() == "x-rapidapi-key" and v == SECRET for k, v in seen["hdr"].items()) and SECRET not in seen["url"])
+        check("one call was spent, on the feed's OWN counter", m["quota"]["day_calls"] == 1 and live.quota_state()["day_calls"] == 0)
+        legs2, m2 = live.flight_status("DL5048", "2026-09-21", cfg=cfg)
+        check("the same lookup again, spaces or not, is served from cache", m2["source"] == "cache" and seen["n"] == 1)
+
+        def http_error(req, timeout=0):
+            raise live.urllib.error.HTTPError(req.full_url, 403, "Forbidden", {}, io.BytesIO(("not subscribed " + SECRET).encode()))
+        live.urllib.request.urlopen = http_error
+        l3, m3 = live.flight_status("AA 100", "2026-09-21", cfg=cfg)
+        check("a refused key is reported without the key in it", l3 is None and SECRET not in json.dumps(m3) and "403" in m3["error"])
+
+        def nothing(req, timeout=0):
+            raise live.urllib.error.HTTPError(req.full_url, 404, "Not Found", {}, io.BytesIO(b""))
+        live.urllib.request.urlopen = nothing
+        l4, m4 = live.flight_status("ZZ 1", "2026-09-21", cfg=cfg)
+        check("no flight known that day is an answer (an empty list), not an error", l4 == [] and m4["source"] == "api")
+        st = live.status()
+        check("status reports the tracking key as configured without printing it",
+              st["aerodatabox"]["key_configured"] and SECRET not in json.dumps(st))
+    finally:
+        live.urllib.request.urlopen = real
+        os.environ.pop("CONCORDEGO_AERODATABOX_KEY", None)
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="cgo-live-")
     sandbox(tmp)
@@ -492,6 +545,7 @@ def main():
 
     cabin_checks()
     serp_checks()
+    adb_checks()
     print("\n%d checks, %d failed" % (N[0], len(FAILS)))
     if FAILS:
         print()

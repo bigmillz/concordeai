@@ -101,6 +101,20 @@ def main():
     check("the assessment carries both odds and the brief carries them as percentages the advice may use",
           a4["odds"]["today"]["p"] is not None and b4["odds_you_fly_today"] in b4["allowed"]["percent"] and b4["odds_the_updated_flight_goes"] in b4["allowed"]["percent"])
 
+    # the tracking feed: an observed status fills the clocks and the delay, and says it is observed
+    legs = json.load(open(os.path.join(HERE, "..", "adapter_samples", "aerodatabox-dl5048.json"), encoding="utf-8"))
+    check("the AeroDataBox sample says it was synthesized", bool(legs[0].get("_provenance", {}).get("synthesized")))
+    tr = rescue.from_tracking(legs, "LGA", "CLT")
+    check("the leg is read: delayed, 3h10 behind, clocks in the airport's own zone",
+          tr and tr["kind"] == "delayed" and tr["delay_minutes"] == 190 and tr["sched_depart"] == "2026-09-21T18:30:00-04:00" and tr["new_depart"] == "2026-09-21T21:40:00-04:00" and tr["observed"])
+    check("a leg for another airport is not taken for this one", rescue.from_tracking(legs, "JFK", "CLT") is not None and rescue.from_tracking([], "LGA") is None)
+    sit_t = rescue.apply_tracking({"kind": "delayed", "us": True, "paid_cents": 60000, "hourly_value_cents": 3500}, tr)
+    check("the observed status fills the situation", sit_t["delay_minutes"] == 190 and sit_t["new_depart"] == tr["new_depart"] and sit_t["tracking"]["source"] == "AeroDataBox")
+    ot = rescue.odds(sit_t, datetime.fromisoformat("2026-09-21T17:10:00-04:00"), [])
+    check("the odds say the status is observed and the rest modelled", ot["observed_status"] and "own status" in ot["basis"] and "still modelled" in ot["basis"])
+    canc = json.loads(json.dumps(legs)); canc[1]["status"] = "Canceled"
+    check("a cancelled status is read as cancelled", rescue.from_tracking(canc, "LGA")["kind"] == "cancelled" and rescue.apply_tracking({"kind": "delayed"}, rescue.from_tracking(canc, "LGA"))["kind"] == "cancelled")
+
     # the brief and the guard rails
     b = rescue.brief(dict(sit, now_clock="06:30"), a)
     tpl = rescue.template(b)

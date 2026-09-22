@@ -1,0 +1,88 @@
+[
+ {
+  "_provenance": {
+   "synthesized": true,
+   "written": "2026-09-21",
+   "note": "Written from AeroDataBox's documented v2 shape (flights/number/{number}/{date}); no key was on the machine this was built on. Replace with a real capture (python3 concorde-travel/live.py flight DL5048 2026-09-21) before trusting a field name."
+  }
+ },
+ {
+  "greatCircleDistance": {
+   "meter": 869000,
+   "km": 869,
+   "mile": 540
+  },
+  "departure": {
+   "airport": {
+    "icao": "KLGA",
+    "iata": "LGA",
+    "name": "New York LaGuardia",
+    "shortName": "LaGuardia",
+    "municipalityName": "New York",
+    "location": {
+     "lat": 40.7772,
+     "lon": -73.8726
+    },
+    "countryCode": "US",
+    "timeZone": "America/New_York"
+   },
+   "scheduledTime": {
+    "utc": "2026-09-21 22:30Z",
+    "local": "2026-09-21 18:30-04:00"
+   },
+   "revisedTime": {
+    "utc": "2026-09-22 01:40Z",
+    "local": "2026-09-21 21:40-04:00"
+   },
+   "terminal": "C",
+   "gate": "C24",
+   "quality": [
+    "Basic",
+    "Live"
+   ]
+  },
+  "arrival": {
+   "airport": {
+    "icao": "KCLT",
+    "iata": "CLT",
+    "name": "Charlotte Douglas",
+    "shortName": "Charlotte",
+    "municipalityName": "Charlotte",
+    "location": {
+     "lat": 35.214,
+     "lon": -80.9431
+    },
+    "countryCode": "US",
+    "timeZone": "America/New_York"
+   },
+   "scheduledTime": {
+    "utc": "2026-09-22 00:39Z",
+    "local": "2026-09-21 20:39-04:00"
+   },
+   "revisedTime": {
+    "utc": "2026-09-22 03:49Z",
+    "local": "2026-09-21 23:49-04:00"
+   },
+   "terminal": "A",
+   "quality": [
+    "Basic",
+    "Live"
+   ]
+  },
+  "lastUpdatedUtc": "2026-09-21 21:02Z",
+  "number": "DL 5048",
+  "status": "Delayed",
+  "codeshareStatus": "IsOperator",
+  "isCargo": false,
+  "aircraft": {
+   "reg": "N203JQ",
+   "modeS": "A1B2C3",
+   "model": "Embraer 175"
+  },
+  "airline": {
+   "name": "Delta",
+   "iata": "DL",
+   "icao": "DAL"
+  }
+ }
+]

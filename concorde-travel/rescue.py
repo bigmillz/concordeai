@@ -117,6 +117,87 @@ def night_near(airport: Optional[Dict[str, Any]], now: Optional[datetime], dep: 
     return out
 
 
+def _adb_time(t: Any) -> Optional[str]:
+    """AeroDataBox's 'yyyy-MM-dd HH:mm±hh:mm' (or 'Z') -> ISO with an offset."""
+    if not t:
+        return None
+    m = re.match(r"^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(?::\d{2})?\s*(Z|[+-]\d{2}:?\d{2})?$", str(t).strip())
+    if not m:
+        return None
+    off = m.group(3) or "+00:00"
+    if off == "Z":
+        off = "+00:00"
+    if re.match(r"^[+-]\d{4}$", off):
+        off = off[:3] + ":" + off[3:]
+    return "%sT%s:00%s" % (m.group(1), m.group(2), off)
+
+
+CANCELLED_WORDS = ("canceled", "cancelled", "canceleduncertain")
+FLOWN_WORDS = ("departed", "enroute", "approaching", "arrived", "diverted")
+
+
+def from_tracking(legs: Any, origin: str = "", destination: str = "") -> Optional[Dict[str, Any]]:
+    """The tracking feed's legs for the flight number and day -> what the
+    Fixer's form asks: the scheduled and revised clocks, delayed or
+    cancelled, the delay so far, and where the airline last put the
+    aircraft. OBSERVED, not modelled, and the result says so. Picks the leg
+    leaving `origin` (and reaching `destination`) when several legs share a
+    number; None when nothing matches."""
+    if not isinstance(legs, list):
+        return None
+    o, d = (origin or "").upper()[:3], (destination or "").upper()[:3]
+    cands = [l for l in legs if isinstance(l, dict) and isinstance(l.get("departure"), dict)]
+    if o:
+        cands = [l for l in cands if str((l["departure"].get("airport") or {}).get("iata") or "").upper() == o] or cands
+    if d:
+        cands = [l for l in cands if str(((l.get("arrival") or {}).get("airport") or {}).get("iata") or "").upper() == d] or cands
+    if not cands:
+        return None
+    leg = cands[0]
+    dep, arr = leg.get("departure") or {}, leg.get("arrival") or {}
+    sched_dep = _adb_time((dep.get("scheduledTime") or {}).get("local"))
+    new_dep = _adb_time((dep.get("revisedTime") or {}).get("local"))
+    sched_arr = _adb_time((arr.get("scheduledTime") or {}).get("local"))
+    new_arr = _adb_time((arr.get("revisedTime") or {}).get("local"))
+    word = str(leg.get("status") or "").strip()
+    low = word.lower()
+    if low in CANCELLED_WORDS:
+        kind = "cancelled"
+    elif low in FLOWN_WORDS:
+        kind = "flown"
+    else:
+        kind = "delayed" if (new_dep and sched_dep and _parse(new_dep) and _parse(sched_dep) and _parse(new_dep) > _parse(sched_dep) + timedelta(minutes=14)) else "on_time"
+    delay = None
+    if new_dep and sched_dep and _parse(new_dep) and _parse(sched_dep):
+        delay = max(0, int((_parse(new_dep) - _parse(sched_dep)).total_seconds() // 60))
+    return {"observed": True, "source": "AeroDataBox", "status_word": word or "Unknown", "kind": kind,
+            "number": leg.get("number"), "airline": (leg.get("airline") or {}).get("name"),
+            "origin": (dep.get("airport") or {}).get("iata"), "destination": (arr.get("airport") or {}).get("iata"),
+            "sched_depart": sched_dep, "new_depart": new_dep, "sched_arrive": sched_arr, "new_arrive": new_arr,
+            "delay_minutes": delay, "terminal": dep.get("terminal"), "gate": dep.get("gate"),
+            "aircraft": (leg.get("aircraft") or {}).get("model"), "registration": (leg.get("aircraft") or {}).get("reg"),
+            "last_updated": _adb_time(leg.get("lastUpdatedUtc"))}
+
+
+def apply_tracking(sit: Dict[str, Any], tr: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """The observed status fills what the traveller did not type, and overrides
+    the delay it can measure. What they typed about rebooking and money stays."""
+    if not tr:
+        return sit
+    sit = dict(sit)
+    if tr["kind"] == "cancelled":
+        sit["kind"] = "cancelled"
+    elif tr["kind"] in ("delayed", "on_time") and sit.get("kind") != "cancelled":
+        sit["kind"] = "delayed"
+    for k in ("sched_depart", "new_depart", "new_arrive"):
+        if tr.get(k):
+            sit[k] = tr[k]
+    if tr.get("delay_minutes") is not None:
+        sit["delay_minutes"] = tr["delay_minutes"]
+    sit["tracking"] = tr
+    return sit
+
+
 def refund_rights(sit: Dict[str, Any]) -> Tuple[bool, str]:
     """Can the traveller expect the unused ticket back if they do not fly it?
     US DOT's 2024 rule: a cancelled flight, or a delay of three hours at home
@@ -327,7 +408,11 @@ def odds(sit: Dict[str, Any], now: Optional[datetime], options: Optional[List[Di
         tcurve.append({"hour": h, "p": round(min(0.97, 1.0 - (1.0 - pf) * (1.0 - p_alt)), 3), "alternatives_left": n})
     p_today = next((k["p"] for k in tcurve if k["hour"] >= now.hour + now.minute / 60.0), tcurve[0]["p"] if tcurve else 0.0)
     cancel = _cancel_risk(delay, planned.hour + planned.minute / 60.0) if (planned is not None and not cancelled) else None
-    basis = ("Modelled from the hour and the delay, not from the airline's operation. "
+    tr = sit.get("tracking") or {}
+    basis = (("The flight's own status, %s at %s (%s): %s" % (tr.get("source"), _clock(tr.get("last_updated")) or "an unknown time",
+              tr.get("status_word"), ("delayed %s" % narrator._hm(tr["delay_minutes"])) if tr.get("delay_minutes") else "no delay posted")
+             + ((", aircraft %s" % tr["aircraft"]) if tr.get("aircraft") else "") + ". What follows is still modelled: "
+             if tr.get("observed") else "Modelled from the hour and the delay, not from the airline's operation. ")
              + ("The updated flight: a %s delay so far and a departure planned for %02d:%02d, a cancellation risk put at %d%%, "
                 "and a %d%% chance of leaving when the airline says with the rest slipping by the hour; anything past midnight is lost. "
                 % (narrator._hm(delay) if delay else "no", planned.hour, planned.minute, round(cancel * 100), round(_SLIP[0][1] * 100))
@@ -335,7 +420,8 @@ def odds(sit: Dict[str, Any], now: Optional[datetime], options: Optional[List[Di
              + "Flying today at all: every alternative on sale that still leaves 75 minutes after the hour is one more way out, "
                "each given an even chance of taking you; %d leave today after now." % sum(1 for d in deps if d >= now + timedelta(minutes=BUFFER_MINUTES)))
     return {"flight": {"p": round(p_flight, 2), "curve": fcurve}, "today": {"p": round(p_today, 2), "curve": tcurve},
-            "modelled": True, "planned": planned.isoformat() if planned else None, "cancel_risk": cancel, "basis": basis}
+            "modelled": True, "observed_status": bool(tr.get("observed")), "planned": planned.isoformat() if planned else None,
+            "cancel_risk": cancel, "basis": basis}
 
 
 def _clock(iso: Optional[str]) -> str:
@@ -349,7 +435,8 @@ def brief(sit: Dict[str, Any], a: Dict[str, Any]) -> Dict[str, Any]:
         "situation": {"kind": a["kind"], "flight": sit.get("flight"), "route": sit.get("route"),
                       "delay": narrator._hm(sit["delay_minutes"]) if sit.get("delay_minutes") else None,
                       "airline_offered": a["baseline"]["label"], "offered_arrival": _clock(a["baseline"]["arrive"]),
-                      "local_time_now": sit.get("now_clock"), "bags_checked": bool(sit.get("bags_checked"))},
+                      "local_time_now": sit.get("now_clock"), "bags_checked": bool(sit.get("bags_checked")),
+                      "airline_status": ((sit.get("tracking") or {}).get("status_word") if sit.get("tracking") else None)},
         "decision": {"action": a["verdict"]["action"], "reason": a["verdict"]["reason"],
                      "ahead_by": d(a["verdict"]["ahead_cents"]) if a["verdict"]["ahead_cents"] else None},
         "refund": {"expected": a["refund"]["expected"], "amount": d(a["refund"]["cents"]) if a["refund"]["cents"] else None, "why": a["refund"]["why"]},

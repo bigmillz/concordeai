@@ -739,6 +739,105 @@ def serp_search(origin, destination, date, adults=1, carriers=None, cfg=None, al
     return payload, {"source": "api", "quota": quota_state(cfg, qf)}
 
 
+# ------------------------------------------------------------ flight status
+#
+# The Flight Fixer's tracking feed: AeroDataBox through RapidAPI, one flight
+# number and one date -> that day's legs with scheduled and revised times,
+# the status word, the aircraft. Same discipline as the two feeds above -
+# cache before quota (five minutes, so a person refreshing costs one call),
+# quota reserved before the call, a miss never cached, the key redacted from
+# everything that escapes - on its own counters. Written from the documented
+# v2 shape and UNVERIFIED until the first real call (live.py flight DL5048 DATE).
+
+ADB_HOST = "aerodatabox.p.rapidapi.com"
+_ADB_QUOTA_DEFAULT = {"per_day": 40, "per_month": 300,
+                      "min_seconds_between_calls": 1.0, "cache_ttl_seconds": 300}
+
+
+def adb_config():
+    cfg = load_config()
+    env = os.environ.get("CONCORDEGO_AERODATABOX_KEY")
+    key = env or cfg.get("aerodatabox_key") or ""
+    quota = dict(_ADB_QUOTA_DEFAULT)
+    quota.update(cfg.get("aerodatabox_quota") or {})
+    return {"key": key, "quota": quota,
+            "_key_source": ("CONCORDEGO_AERODATABOX_KEY" if env
+                            else CONFIG_FILE if cfg.get("aerodatabox_key") else "none")}
+
+
+def _adb_quota_file():
+    return os.path.join(os.path.dirname(QUOTA_FILE), "quota-aerodatabox.json")
+
+
+def adb_status():
+    cfg = adb_config()
+    return {"key_configured": bool(cfg["key"]), "key_source": cfg["_key_source"],
+            "quota": quota_state(cfg, _adb_quota_file())}
+
+
+def flight_status(number, date, cfg=None, allow_call=True):
+    """(legs, meta): AeroDataBox's flights for `number` ("DL 5048", "DL5048") on
+    `date` (YYYY-MM-DD, the departure's local date). Cache, then quota, then the wire."""
+    cfg = cfg or adb_config()
+    num = re.sub(r"\s+", "", str(number or "")).upper()
+    if not re.match(r"^[A-Z0-9]{2}\d{1,4}[A-Z]?$", num):
+        return None, {"source": "none", "error": "that does not look like a flight number"}
+    query = {"engine": "aerodatabox", "number": num, "date": date}
+    qf = _adb_quota_file()
+    hit = cache_get(query, cfg["quota"]["cache_ttl_seconds"])
+    if hit:
+        return hit["payload"], {"source": "cache", "age_seconds": hit["_age_seconds"], "quota": quota_state(cfg, qf)}
+    if not cfg.get("key"):
+        return None, {"source": "none", "error": "no AeroDataBox key",
+                      "how": "set CONCORDEGO_AERODATABOX_KEY, or aerodatabox_key in " + CONFIG_FILE,
+                      "quota": quota_state(cfg, qf)}
+    if not allow_call:
+        return None, {"source": "none", "error": "live calls are disabled for this request", "quota": quota_state(cfg, qf)}
+    ok, why = _reserve(cfg, qf)
+    if not ok:
+        return None, {"source": "none", "error": why, "quota": quota_state(cfg, qf)}
+    url = "https://%s/flights/number/%s/%s?withAircraftImage=false&withLocation=false" % (ADB_HOST, num, date)
+    req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": UA,
+                                               "X-RapidAPI-Key": cfg["key"], "X-RapidAPI-Host": ADB_HOST})
+    secrets = (cfg["key"],)
+    try:
+        with urllib.request.urlopen(req, timeout=25) as r:
+            body = r.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as exc:
+        detail = ""
+        try:
+            detail = exc.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            pass
+        if exc.code == 204 or exc.code == 404:
+            # nothing known for that number on that day: an answer, and it counted
+            cache_put(query, [])
+            return [], {"source": "api", "quota": quota_state(cfg, qf), "note": "no flight known by that number that day"}
+        return None, {"source": "none", "quota": quota_state(cfg, qf),
+                      "error": redact("HTTP %s from AeroDataBox: %s" % (exc.code, detail), *secrets),
+                      "hint": ("check the RapidAPI key and the AeroDataBox subscription" if exc.code in (401, 403) else
+                               "AeroDataBox is rate limiting or the plan is used up" if exc.code == 429 else
+                               "the request may not match AeroDataBox's shape")}
+    except (urllib.error.URLError, OSError) as exc:
+        _refund(qf)
+        return None, {"source": "none", "quota": quota_state(cfg, qf),
+                      "error": redact("could not reach AeroDataBox: %s" % exc, *secrets), "refunded": True}
+    if not body.strip():                      # 204-style empty body on a 200
+        cache_put(query, [])
+        return [], {"source": "api", "quota": quota_state(cfg, qf), "note": "no flight known by that number that day"}
+    try:
+        payload = json.loads(body)
+    except ValueError:
+        return None, {"source": "none", "quota": quota_state(cfg, qf),
+                      "error": "AeroDataBox did not return JSON", "first_bytes": redact(body[:200], *secrets)}
+    if isinstance(payload, dict) and payload.get("message"):
+        return None, {"source": "none", "quota": quota_state(cfg, qf), "error": redact("AeroDataBox: %s" % payload["message"], *secrets)}
+    if not isinstance(payload, list):
+        return None, {"source": "none", "quota": quota_state(cfg, qf), "error": "unexpected response shape"}
+    cache_put(query, payload)
+    return payload, {"source": "api", "quota": quota_state(cfg, qf)}
+
+
 def _count_results(payload):
     """How many itineraries came back, across three unrelated response shapes.
 
@@ -812,6 +911,7 @@ def status():
         "cache": cache_stats(),
         "note": cfg.get("_note", ""),
         "serpapi": serp_status(),
+        "aerodatabox": adb_status(),
     }
 
 
@@ -853,6 +953,19 @@ if __name__ == "__main__":
             ok, msg = set_provider(sys.argv[2])
             print(msg)
             raise SystemExit(0 if ok else 1)
+    elif cmd == "flight" and len(sys.argv) >= 4:
+        # the tracking feed, live: a REAL AeroDataBox lookup, which spends one of its calls
+        legs, meta = flight_status(sys.argv[2], sys.argv[3])
+        print(json.dumps(meta, indent=2))
+        if legs is not None:
+            for leg in legs:
+                if not isinstance(leg, dict) or "departure" not in leg:
+                    continue
+                print("%s %s -> %s  %s  sched %s  revised %s" % (
+                    leg.get("number"), (leg.get("departure") or {}).get("airport", {}).get("iata"),
+                    (leg.get("arrival") or {}).get("airport", {}).get("iata"), leg.get("status"),
+                    (leg.get("departure") or {}).get("scheduledTime", {}).get("local"),
+                    (leg.get("departure") or {}).get("revisedTime", {}).get("local")))
     elif cmd == "serp" and len(sys.argv) >= 5:
         # the Delta supplement, live: a REAL SerpApi search, which spends one of its calls
         payload, meta = serp_search(sys.argv[2], sys.argv[3], sys.argv[4])

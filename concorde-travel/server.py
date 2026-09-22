@@ -35,6 +35,7 @@ import threading
 import time
 import datetime
 import urllib.request
+from urllib.parse import urlparse, parse_qs
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import adapter                                           # noqa: E402
@@ -764,6 +765,26 @@ def _supplement(q):
         return None, {"source": "none", "error": "supplement failed: %s" % exc}
 
 
+def flight_request(q, remote, headers):
+    """GET /flight?number=DL5048&date=YYYY-MM-DD[&origin=LGA&destination=CLT] -> the observed status."""
+    number = (q.get("number") or [""])[0]
+    date = (q.get("date") or [""])[0][:10]
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+        return {"error": "the date of the flight, please"}
+    if remote:
+        ip = (headers.get("Cf-Connecting-Ip") or headers.get("X-Forwarded-For") or "?").split(",")[0].strip()
+        ok, _left = _users_take("ip:" + ip, "flights", 12)
+        if not ok:
+            return {"error": "That is today's dozen flight lookups from this address."}
+    legs, meta = live.flight_status(number, date)
+    if legs is None:
+        return {"error": meta.get("error", "no status"), "hint": meta.get("hint") or meta.get("how"), "configured": bool(live.adb_config().get("key"))}
+    tr = rescue.from_tracking(legs, (q.get("origin") or [""])[0], (q.get("destination") or [""])[0])
+    if not tr:
+        return {"error": "Nothing known for %s on %s." % (number.upper(), date) + (" Check the number and the date." if legs == [] else ""), "legs": len(legs)}
+    return {"tracking": tr, "fetched": meta.get("source"), "age_seconds": meta.get("age_seconds")}
+
+
 def rescue_request(req):
     """The delayed-or-cancelled helper: the situation in, the call out. One
     live search today (and tomorrow when the evening is gone), the arithmetic
@@ -827,6 +848,12 @@ def rescue_request(req):
         sit.setdefault("distance_km", int(_g.haversine_km(o_ap["lat"], o_ap["lon"], d_ap["lat"], d_ap["lon"])))
     sit["route"] = "%s to %s" % (o, d)
     sit["now_clock"] = now.strftime("%H:%M") if now else None
+    tr = sit.get("tracking") if isinstance(sit.get("tracking"), dict) and sit["tracking"].get("observed") else None
+    if tr is None and sit.get("flight") and live.adb_config().get("key"):
+        legs, _m = live.flight_status(sit["flight"], date)
+        tr = rescue.from_tracking(legs, o, d) if legs else None
+    if tr:
+        sit = rescue.apply_tracking(sit, tr)
     # the airports' coordinates for the night's rides: the curated table, then whatever the feed named
     airports = {k: {"iata": k, "lat": v.get("lat"), "lon": v.get("lon"), "country": v.get("country")} for k, v in aps.items() if v.get("lat") is not None}
     try:
@@ -1562,6 +1589,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     n = 300
                 return self._json(admin_logs((q.get("unit") or ["server"])[0], n))
             return self.send_error(404)
+        if path == "/flight":
+            # the Flight Fixer's tracking lookup: a flight number and a date -> the observed status
+            return self._json(flight_request(dict(parse_qs(urlparse(self.path).query)), self._remote(), self.headers))
         if path == "/" or path == "/index.html":
             if ROOT:
                 return self._send_file(os.path.join(UI, "mock", ROOT + ".html"), "text/html; charset=utf-8", stamp=True)

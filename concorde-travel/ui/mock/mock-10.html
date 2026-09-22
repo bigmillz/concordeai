@@ -784,6 +784,8 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 @media (max-width:980px){.rsc.fixer .frow.four{grid-template-columns:repeat(2,minmax(0,1fr))}.rsc.fixer .frow.three{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:640px){.rsc.fixer .frow.two,.rsc.fixer .frow.three,.rsc.fixer .frow.four{grid-template-columns:1fr}}
 .rsc.fixer .nav{margin-top:18px}
+.rsc.fixer .linkish{color:var(--speed);border-bottom:1px solid currentColor;font-size:12px;margin-left:4px}.rsc.fixer .linkish:disabled{opacity:.5}
+.rsc.fixer #rs-tracked{display:block;margin-top:4px;color:var(--text)}.rsc.fixer #rs-tracked.bad{color:var(--warn,#e0705a)}
 .rsc.fixer .tm{display:flex;align-items:center;gap:8px}.rsc.fixer .tm input{flex:1;min-width:0}
 .rsc.fixer .tm .ampm{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line);border-radius:999px;background:var(--panel);flex:none}
 .rsc.fixer .tm .ampm .pchip{border:0;background:none;padding:3px 9px;font-size:11px;letter-spacing:.04em;border-radius:999px;color:var(--faint)}
@@ -936,7 +938,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr">Advanced options are optional; leave them and go.</span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="eec35c3">eec35c3</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="f377de6">f377de6</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -963,7 +965,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The reference trip this route is graded against</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="eec35c3">eec35c3</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Every flight is scored in US dollars, one currency inside the model. Your currency is applied at the edge, to every figure on the page. Photos of the places from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-21">2026-09-21</time> · build <code id="build" data-build="f377de6">f377de6</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1439,7 +1441,7 @@ function fixerHTML(){
   const Seg = (k, label, icon, opts, req) => `<div class="fld chipfld"><svg class="ico" viewBox="0 0 24 24">${ICON[icon].replace(/^<svg[^>]*>|<\/svg>$/g, '')}</svg><label>${label}${tag(req)}</label><div class="seg" data-rs="${k}" role="group" aria-label="${esc(label)}">${opts.map(([v, l]) => `<button type="button" class="pchip${RS[k] === v ? ' on' : ''}" data-v="${v}" aria-pressed="${RS[k] === v}">${l}</button>`).join('')}</div><div class="help">${k === 'kind' ? 'Delayed keeps the flight in the running; cancelled looks only at the way on.' : ''}</div></div>`;
   return `<div class="rsc fixer">
     <div class="frow route">${F('q-from-0', 'From', K('from'), 'pin', 'The airport, or the city.', '—', true)}<div class="link" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M15 8l-4.2-1.4L7 1.5H5.4l1.9 5.1H3.6L2.5 4.9H1.2l.9 3.1-.9 3.1h1.3l1.1-1.7h3.7L5.4 14.5H7l3.8-5.1z"/></svg></div>${F('q-to-0', 'To', K('to'), 'flag', 'The airport, the city, or the address where you are staying.', '—', true)}</div>
-    <div class="frow three">${F('rs-flight', 'Flight', K('flight'), 'plane', 'The number on your boarding pass.', '—')}${D('rs-date', 'Date', keep ? RS.date : '')}${Seg('kind', 'What happened', 'alert', [['delayed', 'Delayed'], ['cancelled', 'Cancelled']], true)}</div>
+    <div class="frow three">${F('rs-flight', 'Flight', K('flight'), 'plane', 'The number on your boarding pass. <button type="button" class="linkish" id="rs-lookup">Look it up</button><span id="rs-tracked"></span>', '—')}${D('rs-date', 'Date', keep ? RS.date : '')}${Seg('kind', 'What happened', 'alert', [['delayed', 'Delayed'], ['cancelled', 'Cancelled']], true)}</div>
     <div class="frow three" id="rs-when">${T('rs-sched', 'Scheduled departure', K('sched'), 'As printed on the ticket.', true)}${T('rs-new', 'New departure', K('newdep'), 'What the board says now. Blank if nothing yet.')}${T('rs-newarr', 'New arrival', K('newarr'), 'Add +1 if it lands tomorrow.')}</div>
     <div class="frow two">${Sel('rs-rebook', 'Rebooking offered', RS.rebook, 'swap', [['no', 'No'], ['notyet', 'Not yet'], ['yes', 'Yes, on another flight']], 'What the airline has put you on, if anything.')}${T('rs-rbarr', 'That flight lands at', K('rbarr'), 'Only if one was offered. Add +1 for tomorrow.')}</div>
     <div class="frow four">${Sel('rs-fare', 'Your fare', RS.fare, 'seat', [['basic', 'Basic economy'], ['main', 'Main cabin'], ['flex', 'Economy, flexible'], ['premium', 'Premium economy'], ['business', 'Business'], ['first', 'First']], 'Sets the refund rules and which cabin to search.')}${Sel('rs-bags', 'Bags', RS.bags, 'bag', [['no', 'Carry-on only'], ['yes', 'A bag is checked']], 'A checked bag does not follow you to another airline.')}${F('rs-paid', 'What you paid', K('paid'), 'dollar', 'Helps the refund maths.', '—')}${F('rs-hour', 'An hour of yours is worth', keep ? (RS.hour || '35') : '35', 'who', 'Prices the time an alternative saves.', '35')}</div>
@@ -2766,6 +2768,24 @@ function openRescue(){
     <div class="row2"><button class="choose" id="rs-go" style="flex:0 0 auto">Make the call</button><button class="ledger" id="acctno">Cancel</button></div></div>`;
   $('#acct').classList.remove('hidden'); $('#rs-from').focus();
 }
+// the tracking feed fills the clocks and says what the airline has posted; what it fills is marked observed
+async function lookupFlight(){
+  const v = id => ($('#' + id) ? $('#' + id).value.trim() : ''), out = $('#rs-tracked'), btn = $('#rs-lookup');
+  const number = v('rs-flight').toUpperCase().replace(/\s+/g, ''), date = v('rs-date') || localISO(new Date()).slice(0, 10), from = v('q-from-0'), to = v('q-to-0');
+  if (!/^[A-Z0-9]{2}\d{1,4}[A-Z]?$/.test(number)){ out.className = 'bad'; out.textContent = 'A flight number like DL 5048.'; return; }
+  btn.disabled = true; out.className = ''; out.textContent = 'Asking the tracking feed…';
+  let res; try { const r = await fetch('/flight?number=' + encodeURIComponent(number) + '&date=' + encodeURIComponent(date) + (from ? '&origin=' + encodeURIComponent(from.slice(0, 3)) : '') + (to ? '&destination=' + encodeURIComponent(to.slice(0, 3)) : '')); res = await r.json(); } catch (e){ res = {error:'The feed did not answer.'}; }
+  btn.disabled = false;
+  if (res.error){ out.className = 'bad'; out.textContent = res.error + (res.configured === false ? ' (no tracking key on this server)' : ''); return; }
+  const t = res.tracking; RS.tracking = t;
+  const hm = iso => iso ? iso.slice(11, 16) : '';
+  const put = (id, iso) => { const i = $('#' + id); if (!i || !iso) return; const sp = split12(hm(iso)); i.value = sp.h12; const seg = document.querySelector('[data-ampm="' + id + '"]'); if (seg) seg.querySelectorAll('.pchip').forEach(x => x.classList.toggle('on', x.dataset.v === sp.ampm)); };
+  put('rs-sched', t.sched_depart); if (t.kind === 'delayed'){ put('rs-new', t.new_depart); put('rs-newarr', t.new_arrive); }
+  if (t.origin && !from) $('#q-from-0').value = t.origin; if (t.destination && !to) $('#q-to-0').value = t.destination;
+  const kind = t.kind === 'cancelled' ? 'cancelled' : 'delayed'; RS.kind = kind; document.querySelectorAll('#sentence [data-rs="kind"] .pchip').forEach(x => { x.classList.toggle('on', x.dataset.v === kind); x.setAttribute('aria-pressed', x.dataset.v === kind); });
+  const when = t.last_updated ? new Date(t.last_updated) : null;
+  out.textContent = (t.airline || '') + ' ' + (t.number || number) + ', ' + (t.origin || '') + ' to ' + (t.destination || '') + ': ' + t.status_word.toLowerCase() + (t.delay_minutes ? ', ' + dur(t.delay_minutes) + ' behind' : t.kind === 'on_time' ? ', on time so far' : '') + (t.gate ? ' · gate ' + t.gate : '') + (t.aircraft ? ' · ' + t.aircraft : '') + (when ? ' · posted ' + when.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}) : '') + ' · observed, ' + t.source + '.';
+}
 function rsTime(dateStr, hhmm){ const m = /^(\d{1,2}):(\d{2})\s*(\+1)?$/.exec((hhmm || '').trim()); if (!m) return null; const d = new Date(dateStr + 'T00:00:00'); if (m[3]) d.setDate(d.getDate() + 1); d.setHours(+m[1], +m[2]); return localISO(d); }
 async function runRescue(){
   const v = id => ($(id) ? $(id).value.trim() : ''); RS.from = (v('#q-from-0') || v('#rs-from')); RS.to = (v('#q-to-0') || v('#rs-to')); RS.flight = v('#rs-flight').toUpperCase().replace(/^([A-Z0-9]{2})\s*(\d+)$/, '$1 $2'); if ($('#rs-fare')) RS.fare = v('#rs-fare'); if ($('#rs-bags')) RS.bags = v('#rs-bags'); if ($('#rs-rebook')) RS.rebook = v('#rs-rebook'); RS.date = v('#rs-date'); RS.sched = read24('rs-sched'); RS.newdep = read24('rs-new'); RS.newarr = read24('rs-newarr'); RS.rbarr = read24('rs-rbarr'); RS.paid = v('#rs-paid'); RS.hour = v('#rs-hour');
@@ -2773,7 +2793,7 @@ async function runRescue(){
   if (!RS.from || !RS.to){ err.textContent = 'Where from, and where to.'; return; }
   if (RS.kind === 'delayed' && !RS.sched){ err.textContent = 'The scheduled departure, as printed on the ticket.'; return; }
   RS.paid = RS.paid.replace(/[^\d.]/g, ''); RS.hour = RS.hour.replace(/[^\d.]/g, '');
-  const now = new Date(), sit = {kind:RS.kind, origin:RS.from, destination:RS.to, flight:RS.flight, date:RS.date, bags_checked:RS.bags === 'yes', fare:RS.fare,
+  const now = new Date(), sit = {kind:RS.kind, origin:RS.from, destination:RS.to, flight:RS.flight, date:RS.date, bags_checked:RS.bags === 'yes', fare:RS.fare, tracking:(RS.tracking && RS.tracking.number && RS.tracking.number.replace(/\s+/g, '') === RS.flight.replace(/\s+/g, '')) ? RS.tracking : undefined,
     paid_cents: Math.round((parseFloat(RS.paid) || 0) * 100), hourly_value_cents: Math.round((parseFloat(RS.hour) || 35) * 100)};
   // clocks go up as typed; the server reads them in the airport's own zone, which the browser does not know
   if (RS.kind === 'delayed'){ sit.sched_clock = RS.sched; sit.new_dep_clock = RS.newdep; sit.new_arr_clock = RS.newarr;
@@ -2793,7 +2813,7 @@ function paintRescue(res){
   const head = V.action === 'switch' && V.option ? 'Switch to ' + V.option.carrier + ' ' + V.option.flight + (V.ahead_cents ? ', ' + money(V.ahead_cents) + ' ahead' : '') : V.action === 'stay' ? 'Stay with what the airline offered' : 'Wait it out';
   const od = a.odds || {}, pct = x => Math.round(x * 100) + '%', c12 = iso => { const t = split12(hm(iso)); return t.h12 + ' ' + t.ampm.toUpperCase(); };
   const oddsHTML = !(od.today && od.today.p != null) ? '' : `
-    ${od.planned && od.flight && od.flight.p != null ? `<div class="odds"><b>${pct(od.flight.p)}</b><span>chance of making the updated flight, the ${c12(od.planned)}</span><small>modelled</small></div>${oddsChart(od.flight.curve, 'If it slips to this hour, the chance it still goes today.')}` : ''}
+    ${od.planned && od.flight && od.flight.p != null ? `<div class="odds"><b>${pct(od.flight.p)}</b><span>chance of making the updated flight, the ${c12(od.planned)}</span><small>${od.observed_status ? 'from the airline\'s posted status' : 'modelled'}</small></div>${oddsChart(od.flight.curve, 'If it slips to this hour, the chance it still goes today.')}` : ''}
     <div class="odds"><b>${pct(od.today.p)}</b><span>chance you fly today, one way or another</span><small>modelled</small></div>${oddsChart(od.today.curve, 'Standing at the gate at this hour: this flight, or an alternative still leaving 75 minutes on.')}
     <p class="fine">${esc(od.basis || '')}</p>`;
   $('#accth').textContent = '☎️ The Call';
@@ -2868,6 +2888,7 @@ document.addEventListener('click', ev => {
   const nm = ev.target.closest('.nightmore'); if (nm){ ev.stopPropagation(); const box = document.getElementById('night-' + nm.dataset.night); if (box){ box.classList.toggle('hidden'); nm.textContent = box.classList.contains('hidden') ? 'more' : 'less'; } return; }
   const altRow = ev.target.closest('.rsc .alt[data-alt]'); if (altRow){ showAlternatives(altRow.dataset.alt); return; }
   if (ev.target.closest('#seealt')){ showAlternatives(); return; }
+  if (ev.target.closest('#rs-lookup')){ lookupFlight(); return; }
   if (ev.target.closest('#rescuego')){ RS.keep = true; closeAccount(); S.trip = 'fix'; $('#trip').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.trip === 'fix')); goStep(1); sentenceHTML(); return; }
   if (ev.target.closest('#oddsmore')){ const c = $('#oddschart'); if (c) c.classList.toggle('hidden'); return; }
   if (ev.target.closest('#rs-go')){ runRescue(); return; }
