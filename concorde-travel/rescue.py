@@ -389,9 +389,13 @@ def odds(sit: Dict[str, Any], now: Optional[datetime], options: Optional[List[Di
             slip = 0 if h <= ph else int((h - ph) * 60)
             p = 0.0 if h >= 24 else _flight_goes_today(at, delay + slip)
             fcurve.append({"hour": h, "p": p})
-        p_flight = _flight_goes_today(planned, delay)
+        # a posted departure that has already passed with no departure posted is a flight still slipping:
+        # the headline is the curve's first point, not the odds of a time that is gone
+        passed = planned < now
+        p_flight = fcurve[0]["p"] if (passed and fcurve) else _flight_goes_today(planned, delay)
     else:
         p_flight = 0.0
+        passed = False
     # flying today at all, by the hour you are standing there
     deps = []
     for o in options or []:
@@ -421,6 +425,7 @@ def odds(sit: Dict[str, Any], now: Optional[datetime], options: Optional[List[Di
                "each given an even chance of taking you; %d leave today after now." % sum(1 for d in deps if d >= now + timedelta(minutes=BUFFER_MINUTES)))
     return {"flight": {"p": round(p_flight, 2), "curve": fcurve}, "today": {"p": round(p_today, 2), "curve": tcurve},
             "modelled": True, "observed_status": bool(tr.get("observed")), "planned": planned.isoformat() if planned else None,
+            "planned_passed": passed,
             "cancel_risk": cancel, "basis": basis}
 
 

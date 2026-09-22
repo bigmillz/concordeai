@@ -2813,7 +2813,7 @@ function paintRescue(res){
   const head = V.action === 'switch' && V.option ? 'Switch to ' + V.option.carrier + ' ' + V.option.flight + (V.ahead_cents ? ', ' + money(V.ahead_cents) + ' ahead' : '') : V.action === 'stay' ? 'Stay with what the airline offered' : 'Wait it out';
   const od = a.odds || {}, pct = x => Math.round(x * 100) + '%', c12 = iso => { const t = split12(hm(iso)); return t.h12 + ' ' + t.ampm.toUpperCase(); };
   const oddsHTML = !(od.today && od.today.p != null) ? '' : `
-    ${od.planned && od.flight && od.flight.p != null ? `<div class="odds"><b>${pct(od.flight.p)}</b><span>chance of making the updated flight, the ${c12(od.planned)}</span><small>${od.observed_status ? 'from the airline\'s posted status' : 'modelled'}</small></div>${oddsChart(od.flight.curve, 'If it slips to this hour, the chance it still goes today.')}` : ''}
+    ${od.planned && od.flight && od.flight.p != null ? `<div class="odds"><b>${pct(od.flight.p)}</b><span>chance of making the updated flight, the ${c12(od.planned)}${od.planned_passed ? ', which has passed with no departure posted' : ''}</span><small>${od.observed_status ? 'from the airline\'s posted status' : 'modelled'}</small></div>${oddsChart(od.flight.curve, 'If it slips to this hour, the chance it still goes today.')}` : ''}
     <div class="odds"><b>${pct(od.today.p)}</b><span>chance you fly today, one way or another</span><small>modelled</small></div>${oddsChart(od.today.curve, 'Standing at the gate at this hour: this flight, or an alternative still leaving 75 minutes on.')}
     <p class="fine">${esc(od.basis || '')}</p>`;
   $('#accth').textContent = '☎️ The Call';

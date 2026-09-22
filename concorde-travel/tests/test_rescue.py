@@ -96,6 +96,9 @@ def main():
     o2 = rescue.odds({"kind": "delayed", "delay_minutes": 300, "new_depart": "2026-11-18T23:20:00-05:00"}, datetime.fromisoformat("2026-11-18T22:30:00-05:00"), [])
     check("a five-hour delay pushed to 23:20 leaves slim odds for the flight", o2["flight"]["p"] < 0.45, str(o2["flight"]["p"]))
     check("the odds say they are modelled", o["modelled"] and "Modelled" in o["basis"])
+    op = rescue.odds({"kind": "delayed", "delay_minutes": 212, "new_depart": "2026-11-18T17:45:00-05:00"}, datetime.fromisoformat("2026-11-18T22:28:00-05:00"), [])
+    check("a posted departure that has passed makes the headline the curve's first point, and says it passed",
+          op["planned_passed"] and abs(op["flight"]["p"] - op["flight"]["curve"][0]["p"]) < 0.01 and op["flight"]["p"] < 0.3, str(op["flight"]))
     a4 = rescue.assess(dict(sit2, new_depart="2026-11-18T09:30:00-05:00"), opts, now=morning)
     b4 = rescue.brief(dict(sit2, now_clock="06:30"), a4)
     check("the assessment carries both odds and the brief carries them as percentages the advice may use",
