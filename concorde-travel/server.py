@@ -34,6 +34,7 @@ import sys
 import threading
 import time
 import datetime
+import urllib.parse
 import urllib.request
 from urllib.parse import urlparse, parse_qs
 
@@ -1591,7 +1592,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self.send_error(404)
         if path == "/flight":
             # the Flight Fixer's tracking lookup: a flight number and a date -> the observed status
-            return self._json(flight_request(dict(parse_qs(urlparse(self.path).query)), self._remote(), self.headers))
+            # fully qualified: do_GET imports parse_qs locally further down, which makes the bare name a local here
+            return self._json(flight_request(dict(urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)), self._remote(), self.headers))
         if path == "/" or path == "/index.html":
             if ROOT:
                 return self._send_file(os.path.join(UI, "mock", ROOT + ".html"), "text/html; charset=utf-8", stamp=True)
