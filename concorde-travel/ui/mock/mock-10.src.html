@@ -719,7 +719,8 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 .composer{padding:10px 12px 12px}
 .clabel{font-size:11.5px;color:var(--faint);padding:0 4px 8px;letter-spacing:.01em}
 .crow{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:end}
-.crow textarea{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 13px;font-size:14px;line-height:1.4;resize:none;min-height:42px;max-height:120px;width:100%;transition:border-color .15s,box-shadow .15s}
+/* one line tall, growing with what is typed; no scrollbar until it is genuinely full (a rounding slip once drew one on an empty box) */
+.crow textarea{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 13px;font-size:14px;line-height:1.4;resize:none;min-height:42px;max-height:120px;width:100%;box-sizing:border-box;overflow-y:hidden;transition:border-color .15s,box-shadow .15s}
 .crow textarea:focus{outline:none;border-color:var(--speed);box-shadow:0 0 0 3px rgba(77,163,255,.18)}
 .crow textarea::placeholder{color:var(--faint)}
 .crow .mic{height:42px;padding:0 12px;border-radius:12px}
@@ -732,7 +733,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 .dock.mini .dockin{max-width:560px;border-radius:999px;box-shadow:0 18px 50px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.04)}
 .dock.mini .thead,.dock.mini .thread,.dock.mini .clabel{display:none}
 .dock.mini .composer{padding:6px 6px 6px 8px}
-.dock.mini .crow textarea{border-radius:999px;min-height:44px;max-height:44px;padding:12px 18px;border-color:transparent;background:transparent}
+.dock.mini .crow textarea{border-radius:999px;min-height:44px;max-height:120px;padding:12px 18px;border-color:transparent;background:transparent}   /* one line at rest, growing as you type, the same as the full dock */
 .dock.mini .crow textarea:focus{border-color:transparent;box-shadow:none}
 .dock.mini .crow .mic,.dock.mini .crow .send{border-radius:999px;height:40px}
 .dock.mini .crow .send{width:40px}
@@ -2648,7 +2649,9 @@ $('#wishgo').addEventListener('click', () => applyWish($('#wish').value, $('#wis
 $('#wish').addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); applyWish($('#wish').value, $('#wish')); } });
 $('#dsend').addEventListener('click', () => applyWish($('#dwish').value, $('#dwish')));
 $('#dwish').addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); applyWish($('#dwish').value, $('#dwish')); } });
-$('#dwish').addEventListener('input', ev => { ev.target.style.height = 'auto'; ev.target.style.height = Math.min(ev.target.scrollHeight, 120) + 'px'; });
+function growWish(t){ if (!t.value){ t.style.height = ''; t.style.overflowY = 'hidden'; return; }   // empty: one line, whatever the placeholder would wrap to
+  t.style.height = 'auto'; const h = Math.min(t.scrollHeight, 120); t.style.height = h + 'px'; t.style.overflowY = t.scrollHeight > 120 ? 'auto' : 'hidden'; }
+$('#dwish').addEventListener('input', ev => growWish(ev.target));
 document.addEventListener('click', ev => { const b = ev.target.closest('[data-ux]'); if (b) removeItem(b.dataset.ux); if (ev.target.closest('#tchev')){ S.threadClosed = !S.threadClosed; renderThread(); } });
 // voice: the browser's own recognition where it exists; the box is still typeable everywhere
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
