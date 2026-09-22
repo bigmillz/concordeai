@@ -4892,3 +4892,39 @@ exactly 1024x1024.
 Also: /api/video widened to gif and webm, and the renderer emits <img>
 rather than <video> for them, since a GIF in a video tag decodes to
 nothing. Prefs writes now take a lock — generations write prefs too.
+
+## 6b304 — the leak hunt (uncut)
+
+Per Patrick ("a ~30 min bug hunting and performance leak finding
+pass"). Six lenses in parallel, each attacked by a verifier that
+re-measured: 47 findings reported, all 47 confirmed, about 20 distinct.
+The high-severity ones are fixed; each has a gauntlet regression check.
+
+- THE THIN LIST CRASH: a missing `+` since 6b281 made a string literal
+  get CALLED, so every venue-hours question raised TypeError before the
+  headers. It was the SyntaxWarning flagged at the 6.0.2 cut. The
+  gauntlet now compiles with SyntaxWarning as an error.
+- /api/setup 2.3s -> 0.025s median: no `python -c "import mlx_video"`
+  twice per call, no 58k-file venv walk per call, each studio computed
+  once, a disk-free /api/setup/busy for the idle strip, and in-flight
+  guards on the tickers. RSS 424 -> 108 MB.
+- cloud.json lost API keys under concurrent writers (71/500 rounds
+  reproduced). Now lock + flock + atomic replace, and never persist over
+  an unreadable file: 0/500.
+- Timed .ics exports crashed on the (tz, place) tuple.
+- Routing: settings-only follow-ups, back-references ("make the video
+  longer", "make it a gif") and English words that are format aliases
+  ("a word for tired") all route correctly now.
+- 15 GB of abandoned *.incomplete downloads are swept safely.
+- No pre-warm for chats that never use a text model; the warm-up stamps
+  the idle clock so the janitor can free it.
+- Renders run one at a time in their own process group and stop when
+  the reader hangs up.
+- prefs saves use unique temp files; size keeps its aspect ratio; mp4
+  playback rate actually re-times the clip.
+
+Deferred (lower severity): no retention sweep for generated images and
+videos; Veo abandons a paid render on one transient error; run_model
+retries can orphan an engine handle; the janitor can stop an engine
+mid-answer; a few client polls that never stop after an error;
+/api/video suffix ranges; /api/stats shells out three times per poll.

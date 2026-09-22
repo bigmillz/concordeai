@@ -29,6 +29,7 @@ import plistlib
 import random
 import re
 import shutil
+import select
 import signal
 import socket
 import base64
@@ -39,6 +40,7 @@ import struct
 import subprocess
 import sys
 import tarfile
+import contextlib
 import tempfile
 import threading
 import time
@@ -701,16 +703,87 @@ def _cloud_all() -> dict:
     return {"providers": {}, "active": ""}
 
 
-def _cloud_save_state(which: str, entry: dict, make_active=False):
-    d = _cloud_all()
-    d.setdefault("providers", {})[which] = entry
-    if make_active or not d.get("active"):
-        if entry.get("status") == "ok":
-            d["active"] = which
+# CLOUD.JSON WRITES ARE ATOMIC AND SERIALIZED (6b304). Every writer used
+# to read, mutate, then open(CLOUD_FILE, "w") — which TRUNCATES first —
+# with no lock. Council seats run on their own threads and each rests a
+# provider through cloud_cool, so writers raced: a reader landing mid-write
+# saw an unparseable file, _cloud_all returned {} for it, and the next
+# save persisted that — erasing every other provider's API key. Measured
+# by the leak hunt: 75 of 500 four-thread rounds lost keys, 210 left the
+# file unparseable, and a real cloud.json.corrupt-backup sits in the
+# data dir from August. Now: one re-entrant lock in-process, an flock
+# across processes (the desktop app and the hosted instance share the
+# file), a temp-file + os.replace so no reader ever sees half a file,
+# and a writer that REFUSES to persist over a file it could not parse.
+try:
+    import fcntl as _fcntl
+except ImportError:            # Windows: the in-process lock still holds
+    _fcntl = None
+_cloud_lock = threading.RLock()
+_cloud_depth = [0]
+
+
+@contextlib.contextmanager
+def _cloud_txn():
+    with _cloud_lock:
+        _cloud_depth[0] += 1
+        lf = None
+        try:
+            if _cloud_depth[0] == 1 and _fcntl is not None:
+                try:
+                    lf = open(CLOUD_FILE + ".lock", "a")
+                    _fcntl.flock(lf, _fcntl.LOCK_EX)
+                except OSError:
+                    lf = None
+            yield
+        finally:
+            if lf is not None:
+                try:
+                    _fcntl.flock(lf, _fcntl.LOCK_UN)
+                finally:
+                    lf.close()
+            _cloud_depth[0] -= 1
+
+
+def _cloud_read_strict() -> dict:
+    """Like _cloud_all, but RAISES when the file exists and cannot be
+    parsed, so a writer never mistakes a damaged file for an empty one."""
+    if not os.path.exists(CLOUD_FILE):
+        return {"providers": {}, "active": ""}
+    with open(CLOUD_FILE) as f:
+        json.load(f)            # raises on damage; the value is re-read below
+    return _cloud_all()
+
+
+def _cloud_write(d: dict):
+    """Write the whole state atomically: a sibling temp file, fsynced,
+    then os.replace — readers see the old file or the new one, never half."""
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(CLOUD_FILE) or ".",
+                               prefix=".cloud-", suffix=".tmp")
     try:
-        with open(CLOUD_FILE, "w") as f:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w") as f:
             json.dump(d, f)
-        os.chmod(CLOUD_FILE, 0o600)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, CLOUD_FILE)
+    except Exception:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def _cloud_save_state(which: str, entry: dict, make_active=False):
+    try:
+        with _cloud_txn():
+            d = _cloud_read_strict()
+            d.setdefault("providers", {})[which] = entry
+            if make_active or not d.get("active"):
+                if entry.get("status") == "ok":
+                    d["active"] = which
+            _cloud_write(d)
     except Exception:
         pass
 
@@ -816,13 +889,17 @@ def cloud_cool(pid: str, note: str, secs: float = QUOTA_COOLDOWN):
     """Bench a provider WITHOUT marking it failed: status stays ok, so it
     returns on its own when the window passes."""
     try:
-        cur = dict((_cloud_all().get("providers") or {}).get(pid) or {})
-        if not cur:
-            return
-        cur["status"] = "ok"
-        cur["cool"] = time.time() + secs
-        cur["note"] = note[:120]
-        _cloud_save_state(pid, cur)
+        # the read and the write inside ONE transaction, or two threads
+        # resting two providers each write back the other's stale entry
+        with _cloud_txn():
+            cur = dict((_cloud_read_strict().get("providers") or {})
+                       .get(pid) or {})
+            if not cur:
+                return
+            cur["status"] = "ok"
+            cur["cool"] = time.time() + secs
+            cur["note"] = note[:120]
+            _cloud_save_state(pid, cur)
     except Exception:
         pass
 
@@ -1074,7 +1151,7 @@ def _cloud_refresh_picks():
     that is offline or resting just keeps its pick until next boot."""
     try:
         d = _cloud_all()
-        changed = False
+        updates = {}
         for pid, v in (d.get("providers") or {}).items():
             if not (v.get("status", "ok") == "ok" and v.get("key")
                     and v.get("base")):
@@ -1112,12 +1189,18 @@ def _cloud_refresh_picks():
             inv = chat[:6] if chat else found[:6]
             if pick and (pick != v.get("model")
                          or inv != v.get("models")):
-                v["model"], v["models"] = pick, inv
-                changed = True
-        if changed:
-            with open(CLOUD_FILE, "w") as f:
-                json.dump(d, f)
-            os.chmod(CLOUD_FILE, 0o600)
+                updates[pid] = (v.get("key"), pick, inv)
+        # the network calls above ran OUTSIDE the lock; apply the result
+        # to a FRESH read inside it, and only to a provider whose key is
+        # still the one we asked about (6b304)
+        if updates:
+            with _cloud_txn():
+                d2 = _cloud_read_strict()
+                for pid, (key, pick, inv) in updates.items():
+                    v2 = (d2.get("providers") or {}).get(pid)
+                    if v2 and v2.get("key") == key:
+                        v2["model"], v2["models"] = pick, inv
+                _cloud_write(d2)
     except Exception:
         pass
 
@@ -1140,19 +1223,18 @@ def _cloud_repair():
     # never sit in front of the first answer
     threading.Thread(target=_cloud_refresh_picks, daemon=True).start()
     try:
-        d = _cloud_all()
-        changed = False
-        for v in (d.get("providers") or {}).values():
-            if v.get("status") == "fail" and _QUOTA_RX.search(
-                    v.get("note") or ""):
-                v["status"] = "ok"
-                v["cool"] = time.time() + QUOTA_COOLDOWN
-                v["note"] = "rate limited — resting"
-                changed = True
-        if changed:
-            with open(CLOUD_FILE, "w") as f:
-                json.dump(d, f)
-            os.chmod(CLOUD_FILE, 0o600)
+        with _cloud_txn():
+            d = _cloud_read_strict()
+            changed = False
+            for v in (d.get("providers") or {}).values():
+                if v.get("status") == "fail" and _QUOTA_RX.search(
+                        v.get("note") or ""):
+                    v["status"] = "ok"
+                    v["cool"] = time.time() + QUOTA_COOLDOWN
+                    v["note"] = "rate limited — resting"
+                    changed = True
+            if changed:
+                _cloud_write(d)
     except Exception:
         pass
 
@@ -3254,7 +3336,6 @@ def tier_fit(mem_gb: float) -> str:
 #   --lora-style       parsed by mflux-generate and never read; it is
 #                      wired only into the in-context entry point
 # A control that does nothing is worse than no control.
-_prefs_lock = threading.Lock()
 
 STUDIO_RANGE = {
     "image": {"w": (256, 2048), "h": (256, 2048), "steps": (1, 50),
@@ -3358,6 +3439,15 @@ def studio_opts(key: str, over: dict = None) -> dict:
             if k in out and v not in (None, ""):
                 out[k] = v
     rng = STUDIO_RANGE.get(key) or {}
+    # SIZE KEEPS ITS SHAPE (6b304): clamping width and height separately
+    # turned a 3840x2160 ask into 1280x1280 on video — a square. Scale
+    # both sides by ONE factor to fit the per-axis limits first.
+    _w, _h = _num(out.get("w"), base.get("w", 1024)), _num(out.get("h"),
+                                                            base.get("h", 1024))
+    if _w > 0 and _h > 0 and "w" in rng and "h" in rng:
+        f = min(1.0, rng["w"][1] / _w, rng["h"][1] / _h)
+        f = max(f, rng["w"][0] / _w, rng["h"][0] / _h)
+        out["w"], out["h"] = _w * f, _h * f
     for field, (lo, hi) in rng.items():
         if field not in out:
             continue
@@ -3573,18 +3663,23 @@ def resolve_overrides(key: str, ov: dict, prev: dict = None) -> tuple:
     return out, notes
 
 def _studio_engine_ok(key: str) -> bool:
+    """Is the engine installed? A FILESYSTEM check, deliberately (6b304).
+
+    The video studio used to prove it by running `python -c "import
+    mlx_video"` — a cold Python + MLX start costing ~1.1s wall and ~0.8s
+    CPU. It ran twice per /api/setup, and /api/setup is polled every
+    1.2-4s by four tickers: two-thirds of that endpoint's 2.3s, measured,
+    and a machine held at half a core just to say "yes, still installed".
+    The package's own __init__.py on disk answers the same question in
+    a tenth of a millisecond."""
     st = STUDIOS[key]
     if st.get("probe"):
         return os.path.exists(os.path.join(st["venv"], "bin", st["probe"]))
-    py = os.path.join(st["venv"], "bin", "python3")
-    if not os.path.exists(py):
+    if not os.path.exists(os.path.join(st["venv"], "bin", "python3")):
         return False
-    try:
-        r = subprocess.run([py, "-c", "import %s" % st["module"].rsplit(
-            ".", 1)[0]], capture_output=True, timeout=60)
-        return r.returncode == 0
-    except Exception:
-        return False
+    top = st["module"].split(".", 1)[0]
+    return bool(glob.glob(os.path.join(st["venv"], "lib", "python*",
+                                       "site-packages", top, "__init__.py")))
 
 
 def _snap_dir(repo: str) -> str:
@@ -3609,7 +3704,28 @@ def studio_ready(key: str, tid: str = "") -> bool:
             and _studio_model_ok(key, tid))
 
 
+_studio_bytes_cache = {}        # key -> (ts, bytes); cleared on change
+
+
+def _studio_bytes_forget(key: str):
+    _studio_bytes_cache.pop(key, None)
+
+
 def studio_bytes(key: str) -> int:
+    """Cached for ten minutes, and cleared on install and remove (6b304).
+    Walking both venvs and every rung's weights is ~58k files and ~200k
+    stat calls, and it ran three times per /api/setup, holding the GIL
+    and slowing chat streaming, to report a number that changes only
+    when something is installed or removed."""
+    hit = _studio_bytes_cache.get(key)
+    if hit and time.time() - hit[0] < 3600:
+        return hit[1]
+    val = _studio_bytes_uncached(key)
+    _studio_bytes_cache[key] = (time.time(), val)
+    return val
+
+
+def _studio_bytes_uncached(key: str) -> int:
     """Everything this studio occupies: its venv and EVERY rung of its
     ladder that was ever downloaded, so Remove promises the truth."""
     total = _dir_bytes_real(STUDIOS[key]["venv"])
@@ -3660,6 +3776,8 @@ def _studio_install_worker(key: str, tid: str):
         with _setup_lock:
             _setup_jobs[row] = {"status": "error", "note": str(exc)[:200],
                                 "pct": 0}
+    finally:
+        _studio_bytes_forget(key)
 
 
 def start_studio_install(key: str, tid: str = "") -> bool:
@@ -3668,9 +3786,10 @@ def start_studio_install(key: str, tid: str = "") -> bool:
     tid = tid or studio_tier_id(key)
     if tid not in [t["id"] for t in STUDIOS[key]["tiers"]]:
         return False
-    pr = load_prefs(None)
-    pr["studio_" + key] = tid
-    store_prefs(pr)
+    with _prefs_lock:
+        pr = load_prefs(None)
+        pr["studio_" + key] = tid
+        store_prefs(pr)
     if studio_ready(key, tid):
         return False
     row = STUDIOS[key]["row"]
@@ -3688,7 +3807,8 @@ def studio_remove(key: str) -> dict:
     """Take the whole studio back off the disk — the venv and every rung
     that was downloaded — and clear the job so the box reads as a fresh
     install rather than a finished one."""
-    freed, errs = studio_bytes(key), []
+    freed, errs = _studio_bytes_uncached(key), []
+    _studio_bytes_forget(key)
     targets = [STUDIOS[key]["venv"]] + [
         _hf_model_dir(r) for r in
         dict.fromkeys(t["repo"] for t in STUDIOS[key]["tiers"])]
@@ -3709,13 +3829,14 @@ def studio_status(key: str) -> dict:
         job = dict(_setup_jobs.get(st["row"], {}))
     tid = studio_tier_id(key)
     tier = studio_tier(key, tid)
-    ready = studio_ready(key, tid)
+    engine = _studio_engine_ok(key)
+    ready = studio_supported() and engine and _studio_model_ok(key, tid)
     est = int(tier["gb"] * 1e9)
     pct = 100 if ready else min(99, round(
         _dir_bytes_real(_hf_model_dir(tier["repo"])) / est * 100))
     return {
         "key": key, "supported": studio_supported(), "ready": ready,
-        "engine": _studio_engine_ok(key), "tier": tid,
+        "engine": engine, "tier": tid,
         "gb": tier["gb"], "pct": pct,
         "on_disk_gb": round(studio_bytes(key) / 1e9, 1) if ready else 0,
         "status": "ready" if ready else job.get("status", "missing"),
@@ -3802,6 +3923,8 @@ def image_intent(text: str):
     subj = re.sub(r"^(?:an?|some|the)\s+(?:image|picture|pic|photo(?:graph)?)s?"
                   r"\s+(?:of|showing|depicting)\s+", "", subj, flags=re.I)
     subj = subj.strip().strip(".!?").strip()
+    if _BACKREF.match(subj):
+        return None               # points at what was made: a follow-up
     return subj or "something beautiful"
 
 
@@ -3859,6 +3982,37 @@ _IMG_LEADIN = re.compile(
 def _subject_words(subject: str) -> set:
     return {w for w in re.findall(r"[a-z]{3,}", (subject or "").lower())
             if w not in ("the", "and", "with", "for", "from", "that")}
+
+
+# A BACK-REFERENCE IS NOT A NEW SUBJECT (6b304). Both commission regexes
+# accepted "make the video longer" and "make it a gif" as fresh requests
+# and filmed the literal words "the video" / "it a gif". A subject that
+# opens by pointing at the thing already made belongs to the follow-up
+# path, never to a new render.
+_MEDIUM = (r"(?:image|picture|photo|pic|video|clip|animation|gif|movie|"
+           r"render|one)s?")
+_BACKREF = re.compile(
+    r"^(?:it|them|its)\b"
+    r"|^(?:this|that|these|those)\s+(?:a|an|into|to|as|the)\b"
+    r"|^(?:the|this|that|these|those|my|your)\s+" + _MEDIUM + r"\b", re.I)
+# "make it a gif", "turn this into a video", "animate it" — after a still,
+# that asks for MOTION of the same subject
+_TO_MOTION = re.compile(
+    r"\b(?:make|turn|convert|change)\s+(?:it|this|that)\s+(?:into\s+)?"
+    r"(?:an?\s+)?(?:short\s+)?(?:gif|video|clip|animation|movie)\b"
+    r"|\banimate\s+(?:it|this|that)\b", re.I)
+# what is left of a message once the filler and the medium are gone; if
+# nothing is, the message carried no CONTENT change at all
+_FILLER = re.compile(
+    r"\b(?:same|again|but|please|it|this|that|these|those|now|and|then|"
+    r"the|a|an|do|redo|regenerate|re-?render|re-?draw|re-?make|make|try|"
+    r"one|more|time|just|so|also|with|of|for|at|in|to|as|can|could|you|"
+    r"would|me|us|let's|lets|give|go|another|version|" + _MEDIUM[3:-3] +
+    r")\b", re.I)
+
+
+def _residual(text: str) -> str:
+    return re.sub(r"[\s,.;:!?]+", " ", _FILLER.sub(" ", text or "")).strip()
 
 
 def image_followup(text: str, prev_subject: str):
@@ -4000,6 +4154,69 @@ def _write_image_bytes(data: bytes) -> str:
     return out
 
 
+# ONE RENDER AT A TIME, AND A RENDER THAT CAN BE STOPPED (6b304). Both
+# engines ran under subprocess.run from the chat thread: nothing could
+# stop them, and the server is threaded, so Stop followed by a re-ask ran
+# TWO diffusion jobs side by side in unified memory — one of them
+# rendering for a reader who had already left.
+_render_lock = threading.Lock()
+
+
+class RenderBusy(RuntimeError):
+    """Another local render is running. Not a reason to spend the user's
+    cloud quota on a fallback — the caller says so instead."""
+
+
+def _client_gone(sock) -> bool:
+    """True once the reader has hung up. A closed TCP peer reads as
+    ready-with-zero-bytes; a peek never consumes anything."""
+    if sock is None:
+        return False
+    try:
+        r, _, _ = select.select([sock], [], [], 0)
+        if not r:
+            return False
+        return sock.recv(1, socket.MSG_PEEK) == b""
+    except (OSError, ValueError):
+        return True
+
+
+def _run_render(cmd: list, timeout: float, sock=None) -> tuple:
+    """Run a render in its own process group, polling once a second.
+    Stops it cleanly when the reader leaves or the clock runs out.
+    Output goes to a temp file, not a pipe: Popen with PIPE and a loop of
+    polls deadlocks the moment the child fills the pipe buffer.
+    Returns (returncode, output_tail, cancelled)."""
+    log = tempfile.TemporaryFile(mode="w+")
+    proc = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT,
+                            start_new_session=True)
+    end = time.time() + timeout
+    cancelled = False
+    try:
+        while proc.poll() is None:
+            if _client_gone(sock) or time.time() > end:
+                cancelled = True
+                try:
+                    os.killpg(proc.pid, signal.SIGTERM)
+                except OSError:
+                    pass
+                try:
+                    proc.wait(5)
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except OSError:
+                        pass
+                    proc.wait()
+                break
+            time.sleep(1.0)
+        log.seek(0)
+        tail = log.read()[-400:]
+    finally:
+        log.close()
+    return proc.returncode, tail, cancelled
+
+
 def _render_note(path: str, opts: dict, secs: float = 0.0):
     """What this file was actually rendered with, beside the file. The
     transcript keeps the filename, so "double the resolution" can resolve
@@ -4053,9 +4270,22 @@ def _ffmpeg_convert(src: str, fmt: str, fps: int) -> str:
                            + (["-r", str(fps)] if fps else []) + [out],
                            capture_output=True, timeout=600)
         else:
+            # 6b304: out == src here (mp4 -> mp4), and ffmpeg cannot write
+            # over its own input — the setting silently did nothing. Write
+            # beside it and swap. And "-r" alone keeps the duration and
+            # just drops or duplicates frames; a PLAYBACK RATE re-times
+            # the clip, so the same frames play faster or slower.
+            native = engine_cfg("video").get("fps") or 24
+            out = os.path.splitext(src)[0] + ".rt.mp4"
             subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", src,
-                            "-r", str(fps), out],
+                            "-vf", "setpts=PTS*%s" % (float(native) / fps),
+                            "-r", str(fps), "-an", out],
                            capture_output=True, timeout=300)
+            if os.path.exists(out) and os.path.getsize(out) > 2000:
+                final = os.path.splitext(src)[0] + ".mp4"
+                os.replace(out, final)
+                return final
+            return src
         if os.path.exists(out) and os.path.getsize(out) > 2000:
             if out != src:
                 try:
@@ -4073,7 +4303,7 @@ def _ffmpeg_convert(src: str, fmt: str, fps: int) -> str:
     return src
 
 
-def generate_image(prompt: str, over: dict = None) -> tuple:
+def generate_image(prompt: str, over: dict = None, sock=None) -> tuple:
     """(png path, source) — local FLUX first, a Gemini key second, the
     community cloud last. Raises when none of them could paint."""
     errs = []
@@ -4094,15 +4324,23 @@ def generate_image(prompt: str, over: dict = None) -> tuple:
                "--seed", str(o["seed"] or secrets.randbelow(10 ** 6)),
                "--width", str(o["w"]), "--height", str(o["h"]),
                "--output", out]
+        if not _render_lock.acquire(timeout=5):
+            raise RenderBusy("already making one \u2014 ask again when it lands")
         try:
             _t0 = time.time()
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
-            if r.returncode == 0 and os.path.exists(out):
+            rc, tail, cut = _run_render(cmd, 900, sock)
+            if cut:
+                raise RenderBusy("stopped")
+            if rc == 0 and os.path.exists(out):
                 _render_note(out, o, time.time() - _t0)
                 return out, "local"
-            errs.append("local: " + (r.stderr or r.stdout or "")[-200:].strip())
+            errs.append("local: " + tail[-200:].strip())
+        except RenderBusy:
+            raise
         except Exception as exc:
             errs.append("local: %s" % exc)
+        finally:
+            _render_lock.release()
     gem = (_cloud_all().get("providers") or {}).get("gemini") or {}
     if gem.get("key") and gem.get("status", "ok") == "ok":
         # newest first, as Google lists them today (6b294, probed live)
@@ -4353,6 +4591,20 @@ _SHAPE_FMT = {"table": "xlsx", "code": "txt", "diagram": "mmd",
               "doc": "pdf", "prose": "md"}
 
 
+# ALIASES THAT ARE ALSO ORDINARY WORDS (6b304). "give me a word for
+# tired", "a deck building strategy", "a sheet cake recipe", "a zip line
+# plan", "a migration plan", "a presentation tip", "turn this into a word
+# cloud" all scored 5 and produced a FILE. For these the article+verb
+# frame alone is not enough: the word must be a DESTINATION — nothing
+# after it, or a file noun ("word doc", "zip file") — and even after
+# "as/into" it must not be the first half of a compound noun.
+_X_AMBIG = {"word", "deck", "sheet", "sheets", "bundle", "archive", "zip",
+            "migration", "presentation", "slides", "vector", "readme",
+            "keynote", "sql", "terraform", "markdown"}
+_X_AFTER_OK = {"for", "to", "about", "on", "with", "so", "please", "and",
+               "then", "i", "we", "that", "which", "by", "in", "please."}
+
+
 def export_intent(text: str, has_prior: bool = False):
     """None, or what to export and where the content comes from.
 
@@ -4385,6 +4637,18 @@ def export_intent(text: str, has_prior: bool = False):
         return None
 
     score = 0
+    if hit_at >= 0 and hit_word in _X_AMBIG and not fn_ext:
+        _b = t[:hit_at]
+        _a = t[hit_at + len(hit_word):]
+        _first = (re.findall(r"[A-Za-z']+", _a) or [""])[0].lower()
+        _as = bool(_XF_AS.search(_b))
+        if _XF_NOUN.search(_a):
+            pass                          # "word doc", "zip file": a file
+        elif _as:
+            if _first and _first not in _X_AFTER_OK:
+                return None               # "into a word cloud": a compound
+        elif _first:
+            return None                   # "a word for tired": just a word
     if hit_at >= 0:
         before = t[:hit_at]
         after = t[hit_at + len(hit_word):]
@@ -4824,7 +5088,12 @@ def ex_calendar(text, ext, path, title=""):
     """RFC 5545 from a schedule. All-day events take DTEND as the day AFTER
     the last day, which is what the spec requires and what every calendar
     app expects."""
-    tz = _home_tz() if "_home_tz" in globals() else None
+    # FLOATING local times (6b304): _home_tz() returns a (tz, place)
+    # TUPLE, which this used to concatenate into the string — every timed
+    # event raised TypeError. A bare TZID with no VTIMEZONE block is also
+    # out of spec (RFC 5545 3.2.19) and Outlook can reject it, so timed
+    # events carry no zone at all and read as "this time, where you are".
+    tz = ""
     now = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
     evs = []
     for line in x_strip_md(text).split("\n"):
@@ -5190,6 +5459,8 @@ def video_intent(text: str):
     subj = re.sub(r"^(?:an?|some|the)\s+(?:short\s+)?" + _VID_NOUNS +
                   r"\s+(?:of|showing|depicting)\s+", "", subj, flags=re.I)
     subj = subj.strip().strip(".!?").strip()
+    if _BACKREF.match(subj):
+        return None               # points at what was made: a follow-up
     return subj or "something beautiful"
 
 
@@ -5257,7 +5528,7 @@ def _veo_video(prompt: str) -> str:
     raise RuntimeError(last or "the cloud could not make that video")
 
 
-def generate_video(prompt: str, over: dict = None) -> tuple:
+def generate_video(prompt: str, over: dict = None, sock=None) -> tuple:
     """(mp4 path, source). Local first, then a cloud key. Video has no
     keyless tier — nobody gives it away — so when neither is there the
     caller says so plainly rather than pretending."""
@@ -5279,11 +5550,14 @@ def generate_video(prompt: str, over: dict = None) -> tuple:
                "--output-path", out]
         if o.get("neg"):
             cmd += ["--negative-prompt", o["neg"]]
+        if not _render_lock.acquire(timeout=5):
+            raise RenderBusy("already making one \u2014 ask again when it lands")
         try:
             _vt0 = time.time()
-            r = subprocess.run(cmd, capture_output=True, text=True,
-                               timeout=3600)
-            if r.returncode == 0 and os.path.exists(out):
+            rc, tail, cut = _run_render(cmd, 3600, sock)
+            if cut:
+                raise RenderBusy("stopped")
+            if rc == 0 and os.path.exists(out):
                 cfg = engine_cfg("video")
                 native = cfg.get("fps") or 24
                 _render_note(out, o, time.time() - _vt0)
@@ -5291,9 +5565,13 @@ def generate_video(prompt: str, over: dict = None) -> tuple:
                     out, o["fmt"],
                     0 if (o["fmt"] == "mp4" and o["fps"] == native)
                     else o["fps"]), "local"
-            errs.append("local: " + (r.stderr or r.stdout or "")[-200:].strip())
+            errs.append("local: " + tail[-200:].strip())
+        except RenderBusy:
+            raise
         except Exception as exc:
             errs.append("local: %s" % str(exc)[:160])
+        finally:
+            _render_lock.release()
     try:
         return _veo_video(prompt), "cloud"
     except Exception as exc:
@@ -5653,13 +5931,28 @@ def load_prefs(base=None) -> dict:
         return {}
 
 
+_prefs_lock = threading.RLock()
+
+
 def store_prefs(d: dict, base=None):
+    """Atomic, with a UNIQUE temp file per save (6b304). Every save used to
+    write prefs.json.tmp, so two at once could rename one another's
+    half-written file into place, or raise when the other had already
+    moved it away. Callers that read-modify-write take _prefs_lock."""
     p = _pfile("prefs.json", base)
     os.makedirs(os.path.dirname(p), exist_ok=True)
-    tmp = p + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(d, f)
-    os.replace(tmp, p)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p), prefix=".prefs-",
+                               suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(d, f)
+        os.replace(tmp, p)
+    except Exception:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
 _chats_lock = threading.Lock()
 
 
@@ -6304,6 +6597,26 @@ def _auto_cleanup_pass(manual=False) -> list:
         return []
 
 
+def setup_busy() -> dict:
+    """What the sidebar strip needs, and nothing else (6b304). The strip
+    polled the full /api/setup every 4s for the life of the window, even
+    with nothing downloading — a disk walk each time to learn "no". This
+    answers from the job table alone when idle, and only measures bytes
+    for the batch actually in flight."""
+    with _setup_lock:
+        busy = any(j.get("status") in ("downloading", "queued")
+                   for lbl, j in _setup_jobs.items() if lbl != ENGINE_ROW)
+    if not busy:
+        return {"busy": False}
+    have, want = _downloaded_bytes(ollama_pulled_tags() or set())
+    bps = _dl_speed(have)
+    return {"busy": True,
+            "overall_pct": round(have / want * 100) if want else 100,
+            "speed_mbs": round(bps / 1e6, 1),
+            "eta_min": (min(999, max(1, round((want - have) / bps / 60)))
+                        if bps > 2e5 and want > have else None)}
+
+
 def setup_status() -> dict:
     # WATCHDOG: a download thread that dies mid-write leaves its job in
     # "downloading" forever, and the whole setup panel reads busy for the
@@ -6378,11 +6691,14 @@ def setup_status() -> dict:
                        "note": job.get("note", "")})
 
     # the image engine rides the same strip and pane while it installs
+    # each studio is computed ONCE per call and shared (6b304): the image
+    # studio was computed twice, and a studio mid-install three times
+    _studios = {k: studio_status(k) for k in STUDIOS}
     for _row, _k in _STUDIO_ROWS.items():
         with _setup_lock:
             _j = dict(_setup_jobs.get(_row, {}))
         if _j and _j.get("status") != "done":
-            _s = studio_status(_k)
+            _s = _studios[_k]
             models.append({"label": _row, "est_gb": _s["gb"],
                            "status": _j.get("status", "missing"),
                            "pct": _s["pct"], "star": False, "supported": True,
@@ -6442,8 +6758,8 @@ def setup_status() -> dict:
                    for pl in ("min", "rec", "full", "all")},
         # what the auto-clean sweep would reclaim right now (6b265)
         "cleanup": _cleanup_stat(pulled),
-        "image": image_status(),
-        "studios": {k: studio_status(k) for k in STUDIOS},
+        "image": _studios["image"],
+        "studios": _studios,
         "ready_n": ready_n,
         "mlx_ok": _has_mlx() if IS_ARM else True,
         "ollama": _ollama_bin() is not None,
@@ -10734,6 +11050,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._send_engines()
         elif self.path == "/api/setup":
             self._send_json(setup_status())
+        elif self.path == "/api/setup/busy":
+            self._send_json(setup_busy())
         elif self.path.startswith("/api/update/check"):
             force = urllib.parse.parse_qs(
                 urllib.parse.urlparse(self.path).query
@@ -11747,14 +12065,18 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 d = None
             if isinstance(d, dict):
                 base = self._data_base()
-                cur = load_prefs(base)
-                cur.update(d)
+                # the read, the merge and the write under ONE lock (6b304):
+                # every toggle posts on change, so two quick flips raced
+                # and the second write dropped the first's key
+                with _prefs_lock:
+                    cur = load_prefs(base)
+                    cur.update(d)
+                    store_prefs(cur, base)
                 if base is None and "no_limits" in d:
                     _no_limits["v"] = bool(d.get("no_limits"))
                 if base is None and any(k.startswith("contrib_") for k in d):
                     threading.Thread(target=contrib_apply, args=(cur,),
                                      daemon=True).start()
-                store_prefs(cur, base)
             self._send_json({"ok": isinstance(d, dict)})
             return
         if self.path == "/api/chats":
@@ -12102,16 +12424,33 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # on its own ("double the resolution") IS the whole instruction,
         # so the same subject stands
         if not img_subject and not vid_subject and not images:
-            if _prev_img:
-                _fu = image_followup(_pclean or _prev_img, _prev_img) \
-                    or (_prev_img if _ovr else None)
+            if _prev_img and _TO_MOTION.search(prompt):
+                # a still asked to MOVE: film the same subject, and redo
+                # the overrides for the video studio ("as a gif" is a real
+                # video format; it was rejected as an image one)
+                vid_subject = _prev_img
+                _skey = "video"
+                _ovr, _pclean, _onotes = gen_overrides(prompt, "video",
+                                                       True, {})
+                _pnote = {}
+            elif _prev_img or _prev_vid:
+                _prev = _prev_img or _prev_vid
+                # 6b304: a message that is ONLY settings ("double the
+                # resolution", "make the video longer") carries no content
+                # change, so the subject stands exactly. It used to be
+                # passed to the refinement surgery AS the user's words,
+                # which turned "a dog on a beach" into "a dog on a beach,
+                # on a beach".
+                if _ovr and not _residual(_pclean):
+                    _fu = _prev
+                else:
+                    _fu = (image_followup(_pclean, _prev) if _pclean
+                           else None) or (_prev if _ovr else None)
                 if _fu:
-                    img_subject = _fu
-            elif _prev_vid:
-                _fv = image_followup(_pclean or _prev_vid, _prev_vid) \
-                    or (_prev_vid if _ovr else None)
-                if _fv:
-                    vid_subject = _fv
+                    if _prev_img:
+                        img_subject = _fu
+                    else:
+                        vid_subject = _fu
         if export_req and img_subject and export_req["score"] < 5 \
                 and export_req["ext"] in ("png", "svg", ""):
             export_req = None            # the painter wins a weak tie
@@ -12218,10 +12557,22 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # takes _engine_lock before its own ensure, so if the warm-up
         # is still in flight the first draft simply waits on the lock —
         # the same wait as before, minus everything it used to shadow.
-        if route[0] == "mlx" and route_label:
+        # 6b304: only warm a text model for a chat that will USE one. An
+        # export of the previous answer, a picture, a video, or a cloud-
+        # only tier never calls run_model — so the engine loaded, sat
+        # beside FLUX or Wan in unified memory, and, because run_model is
+        # the only thing that stamps _mlx_last_use, the janitor (which
+        # skips a zero stamp) never released it. The warm-up now stamps
+        # the clock itself, so anything it loads is reclaimable.
+        _no_text_model = (cloud_only or img_subject or vid_subject
+                          or (export_req and export_req.get("lane")
+                              == "retro"))
+        if route[0] == "mlx" and route_label and not _no_text_model:
             def _prewarm(_lbl=route_label):
+                global _mlx_last_use
                 with _engine_lock:
                     ensure_mlx_engine(_lbl)
+                    _mlx_last_use = time.time()
             threading.Thread(target=_prewarm, daemon=True).start()
 
         # "/search …" forces a lookup; otherwise auto-search decides.
@@ -12494,7 +12845,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         "Tuesday' beats a generic hours range.\n"
                         "2. Then at most three options as short bold-name "
                         "lines: **Name** — what it is — tonight's hours.\n"
-                        (("THIN LIST: only %d venue(s) could be checked "
+                        # 6b304: this '+' was missing since 6b281, so the
+                        # literal above was CALLED with the tuple below and
+                        # every venue-hours question raised TypeError before
+                        # headers were sent — the client saw a dropped line
+                        + (("THIN LIST: only %d venue(s) could be checked "
                           "and none is open — say 'of the %d I could "
                           "check' in those words, never 'nothing is "
                           "open', and name the late-night or early "
@@ -12994,7 +13349,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             status("filming \u00b7 " + where)
             try:
                 _use, _cnotes = resolve_overrides("video", _ovr, _pnote)
-                vpath, vsrc = generate_video(vid_subject, _use)
+                vpath, vsrc = generate_video(vid_subject, _use,
+                                             sock=self.connection)
                 vmade = "made on this Mac" if vsrc == "local" \
                     else "made in the cloud"
                 step("video", "Made the video", "done", vmade)
@@ -13006,6 +13362,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                    separators=(",", ":")),
                         vid_subject[:1].upper() + vid_subject[1:], vmade,
                         _note))
+            except RenderBusy as rb:
+                # stopped: the reader left, there is no one to tell.
+                # busy: say so, and do NOT spend cloud quota on a fallback
+                if str(rb) != "stopped":
+                    step("video", "Another render is running", "done", "")
+                    emit("I\u2019m already making one \u2014 ask again when it "
+                         "lands, and I\u2019ll start this straight after.")
             except Exception as exc:
                 step("video", "Couldn\u2019t make the video", "done",
                      str(exc)[:70])
@@ -13031,7 +13394,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             status("painting \u00b7 " + where)
             try:
                 _use, _cnotes = resolve_overrides("image", _ovr, _pnote)
-                path, src = generate_image(img_subject, _use)
+                path, src = generate_image(img_subject, _use,
+                                           sock=self.connection)
                 made = "made on this Mac" if src == "local" \
                     else "made in the cloud"
                 step("image", "Generated the image", "done", made)
@@ -13041,6 +13405,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                      % (img_subject.replace("]", ""), os.path.basename(path),
                         img_subject[:1].upper() + img_subject[1:], made,
                         _note))
+            except RenderBusy as rb:
+                if str(rb) != "stopped":
+                    step("image", "Another render is running", "done", "")
+                    emit("I\u2019m already making one \u2014 ask again when it "
+                         "lands, and I\u2019ll start this straight after.")
             except Exception as exc:
                 step("image", "Couldn\u2019t generate the image", "done",
                      str(exc)[:70])
@@ -20819,7 +21188,13 @@ function celebrateDownloads(){
   },910);
 }
 
+let setupInFlight=false;
 async function setupTick(){
+  // 6b304: a 1.2s setInterval over a request that took 2.4-3s kept two or
+  // three in flight at once, each costing the server a full recompute.
+  // Skip the tick while one is still out.
+  if(setupInFlight)return;
+  setupInFlight=true;
   try{
     const st=await(await fetch("/api/setup")).json();
     renderSetup(st);
@@ -20833,16 +21208,21 @@ async function setupTick(){
       wasDownloading=false;
     }
   }catch(e){}
+  finally{setupInFlight=false;}
 }
 // the header strip: alive whenever models download in the background
 const dlStrip=$("#dlstrip");
+let dlStripBusy=false;          // one request at a time, never a queue
 async function dlStripTick(){
-  if(document.hidden||!dlStrip)return;
+  if(document.hidden||!dlStrip||dlStripBusy)return;
+  dlStripBusy=true;
   try{
-    const st=await(await fetch("/api/setup")).json();
+    // 6b304: the cheap endpoint. The full /api/setup walked the disk every
+    // 4s for the life of the window just to learn nothing was happening.
+    const st=await(await fetch("/api/setup/busy")).json();
     const bg=st.busy&&veil.hidden;
     dlStrip.hidden=!bg;
-    paintModelsFlag(st);            // the same read drives the pill
+    if(st.busy){const f=$("#models-flag");if(f){f.style.background="";f.hidden=true;}}
     if(bg){
       dlStrip.querySelector(".dlfill").style.width=(st.overall_pct||0)+"%";
       dlStrip.querySelector(".dllbl").textContent=
@@ -20851,6 +21231,7 @@ async function dlStripTick(){
         +(st.eta_min?" \u00b7 ~"+st.eta_min+" min":"");
     }
   }catch(e){}
+  finally{dlStripBusy=false;}
 }
 setInterval(dlStripTick,4000);
 document.addEventListener("visibilitychange",()=>{
@@ -22698,6 +23079,61 @@ def _purge_stale_guests():
         pass
 
 
+def _sweep_hf_carcasses(max_age: float = 1800.0) -> int:
+    """Delete abandoned partial downloads (6b304). huggingface_hub names
+    each attempt <blob>.<uuid8>.incomplete and never resumes one, so an
+    interrupted download leaves a carcass that nothing ever completes —
+    15 GB of them sat in this machine's cache, the youngest a week old.
+    Worse, they made mlx_model_cached and _studio_model_ok report the
+    model as NOT installed, and inflated the progress for missing ones.
+
+    Safe by construction: a repo with a live job is skipped entirely, and
+    only files untouched for max_age go — a download in flight keeps
+    writing, so its mtime stays fresh, which also protects a sibling
+    instance downloading the same repo. Returns bytes freed."""
+    with _setup_lock:
+        live = {lbl for lbl, j in _setup_jobs.items()
+                if j.get("status") in ("downloading", "queued")}
+    repos = set()
+    for lbl, repo in MLX_REPOS.items():
+        if lbl not in live and repo:
+            repos.add(repo)
+    for k, st in STUDIOS.items():
+        if st["row"] not in live:
+            repos.update(t["repo"] for t in st["tiers"])
+    try:
+        repos.add(WHISPER_REPO)
+    except NameError:
+        pass
+    freed, cut = 0, time.time() - max_age
+    for repo in repos:
+        for pth in glob.glob(os.path.join(_hf_model_dir(repo), "blobs",
+                                          "*.incomplete")):
+            try:
+                st_ = os.stat(pth)
+                if st_.st_mtime < cut:
+                    os.remove(pth)
+                    freed += st_.st_size
+            except OSError:
+                pass
+    return freed
+
+
+def _warm_studio_cache():
+    """Fill the studio disk-usage cache in the background at startup, so
+    the page's first /api/setup does not pay for the walk (6b304)."""
+    try:
+        _sweep_hf_carcasses()
+    except Exception:
+        pass
+    for k in STUDIOS:
+        try:
+            if studio_ready(k):
+                studio_bytes(k)
+        except Exception:
+            pass
+
+
 def _mlx_janitor():
     """An MLX engine held its full model in RAM FOREVER after last use —
     the always-on instance pinned 17 GB around the clock and the music
@@ -22710,6 +23146,7 @@ def _mlx_janitor():
             swept[0] = time.time()
             _purge_stale_guests()
             sweep_all_exports()
+            _sweep_hf_carcasses()
             _auto_cleanup_pass()   # no-op unless the pref is on
         try:
             if _mlx_procs and _mlx_last_use and \
@@ -22861,6 +23298,7 @@ if __name__ == "__main__":
     reap_orphan_engines()
     maybe_version_splash()
     threading.Thread(target=_mlx_janitor, daemon=True).start()
+    threading.Thread(target=_warm_studio_cache, daemon=True).start()
     contrib_apply()   # resume Contribute mode if it was left on
     start_managed_engines()
     if not HAS_SEARCH:

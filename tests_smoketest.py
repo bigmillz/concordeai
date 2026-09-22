@@ -297,6 +297,78 @@ try:
     _ist = json.loads(req("/api/setup", cookie=K)[2]).get("image") or {}
 except Exception:
     _ist = {}
+# 6b304: the leak hunt. Each check is the regression test for a finding
+# the verifiers confirmed, and runs the real code rather than grepping it.
+_LH = {"re": re, "os": os, "sys": sys, "time": time, "json": json,
+       "html": __import__("html"), "glob": __import__("glob"),
+       "shutil": __import__("shutil"), "secrets": __import__("secrets"),
+       "threading": __import__("threading"), "tempfile": __import__("tempfile"),
+       "contextlib": __import__("contextlib"),
+       "subprocess": __import__("subprocess"), "app_dir": lambda: "/tmp"}
+check("compiles with SyntaxWarning as an error (the THIN LIST crash)",
+      __import__("subprocess").run(
+          [sys.executable, "-W", "error::SyntaxWarning", "-c",
+           "compile(open(%r,encoding='utf-8').read(),'m','exec')"
+           % os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          "millenai.py")],
+          capture_output=True).returncode == 0)
+_t0 = time.time(); req("/api/setup", cookie=K); req("/api/setup", cookie=K)
+_setup_s = (time.time() - _t0) / 2
+_b = json.loads(req("/api/setup/busy", cookie=K)[2])
+check("the hot status endpoint is cheap and the idle strip cheaper",
+      _setup_s < 1.0 and _b == {"busy": False}
+      and 'python", "-c", "import' not in _MILLENAI_SRC
+      and "def _studio_bytes_uncached" in _MILLENAI_SRC
+      and "if(setupInFlight)return;" in page and "dlStripBusy" in page,
+      "%.2fs" % _setup_s)
+# cloud.json: four threads resting four providers at once must never
+# lose a key or leave the file unreadable (it did in 71 of 500 rounds)
+_cd = _LH["tempfile"].mkdtemp(); _cf = os.path.join(_cd, "cloud.json")
+_cns = dict(_LH, CLOUD_FILE=_cf, QUOTA_COOLDOWN=600.0)
+import ast as _ast
+_ctree = _ast.parse(_MILLENAI_SRC)
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("try:\n    import fcntl as _fcntl"):
+                   _MILLENAI_SRC.index("def _cloud_save_state(")], _cns)
+for _n in _ctree.body:
+    if isinstance(_n, _ast.FunctionDef) and _n.name in (
+            "_cloud_all", "_cloud_save_state", "cloud_cool"):
+        exec(_ast.get_source_segment(_MILLENAI_SRC, _n), _cns)
+_bad = 0
+for _r in range(60):
+    json.dump({"providers": {p: {"key": "K" + p, "status": "ok"}
+                             for p in "abcd"}, "active": "a"}, open(_cf, "w"))
+    _bar = _cns["threading"].Barrier(4)
+    def _w(p):
+        _bar.wait(); _cns["cloud_cool"](p, "rest", 60)
+    _ts = [_cns["threading"].Thread(target=_w, args=(p,)) for p in "abcd"]
+    [x.start() for x in _ts]; [x.join() for x in _ts]
+    try:
+        if len([1 for v in json.load(open(_cf))["providers"].values()
+                if v.get("key")]) < 4:
+            _bad += 1
+    except Exception:
+        _bad += 1
+check("cloud.json survives concurrent writers with every key intact",
+      _bad == 0 and "def _cloud_write" in _MILLENAI_SRC
+      and 'with open(CLOUD_FILE, "w")' not in _MILLENAI_SRC, "%d bad rounds" % _bad)
+_xns2 = dict(_LH, _home_tz=lambda: ("America/New_York", "Boston"))
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("_X_FENCE = re.compile("):
+                   _MILLENAI_SRC.index("def ex_cards(")], _xns2)
+_icp = os.path.join(_cd, "t.ics")
+try:
+    _xns2["ex_calendar"]("- 2026-09-22 10:00 Standup\n", "ics", _icp, "")
+    _ics = open(_icp).read()
+except Exception as _e:
+    _ics = "ERR " + str(_e)
+check("a timed calendar export works (the tz tuple crash)",
+      "DTSTART:20260922T100000" in _ics and "TZID" not in _ics, _ics[:60])
+check("renders are serialized and stop when the reader leaves",
+      "_render_lock = threading.Lock()" in _MILLENAI_SRC
+      and "def _run_render" in _MILLENAI_SRC and "os.killpg" in _MILLENAI_SRC
+      and "start_new_session=True" in _MILLENAI_SRC
+      and "sock=self.connection" in _MILLENAI_SRC
+      and "def _sweep_hf_carcasses" in _MILLENAI_SRC
+      and "_no_text_model" in _MILLENAI_SRC)
 # 6b303, per Patrick: a gear per studio for defaults, and one-shot
 # quality overrides in chat that never touch those defaults.
 _GNS = {"re": re, "os": os, "sys": sys, "time": time, "json": json,
@@ -313,7 +385,7 @@ _GNS.update(
 try:
     # ONE dict for globals and locals: split them and the module's own
     # helpers resolve against the wrong namespace
-    exec(_MILLENAI_SRC[_MILLENAI_SRC.index("_prefs_lock = threading.Lock()"):
+    exec(_MILLENAI_SRC[_MILLENAI_SRC.index("STUDIO_RANGE = {"):
                        _MILLENAI_SRC.index("def _studio_engine_ok")], _GNS)
 except Exception:
     pass
@@ -487,7 +559,9 @@ check("one download indicator: the strip alone while busy",
       "DOWNLOADING MODELS" not in page
       and "linear-gradient(90deg,#e26d5a" not in page
       and '"downloading models \\u00b7 "' in page
-      and "paintModelsFlag(st);            // the same read drives the pill" in page)
+      # 6b304: the strip reads the cheap busy endpoint and hides the pill
+      # itself; it no longer re-reads the full status to drive it
+      and 'fetch("/api/setup/busy")' in page)
 # 6b290, per Patrick ("sitting at 100% doing nothing… idiot proof it"):
 # the bar counts the batch in play, MLX runs two at a time and is judged
 # by bytes, the pane reports live, and the preset on disk is marked
