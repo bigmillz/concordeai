@@ -500,8 +500,19 @@ THE SERVER and restart, from a laptop Terminal:
 ssh root@67.207.85.212 "echo 'CONCORDEGO_SERPAPI_KEY=...' >> /etc/concordego.env && systemctl restart concordego"
 ```
 
-No spaces around the `=`, no quotes round the value. Editing a copy on the laptop changes
-nothing (2026-09-21: an hour went on a key that was never on the box). A key pasted into a
+No spaces around the `=`, no quotes round the value, and `export` in lower case if the line
+carries it at all (the laptop's `~/.concordego/env` is sourced by a shell, and one `Export`
+with a capital E silently broke every line after it, 2026-09-21). Editing a copy on the
+laptop changes nothing (2026-09-21: an hour went on a key that was never on the box).
+
+**The AeroDataBox key** (the Flight Fixer's tracking feed) comes from RapidAPI, not from
+AeroDataBox itself: subscribe to AeroDataBox at rapidapi.com (the free tier covers a few
+hundred calls a month, the first paid tier a few thousand), copy the `X-RapidAPI-Key` the
+subscription shows, and set it as `CONCORDEGO_AERODATABOX_KEY` on the droplet with the
+command above. The server sends it as the RapidAPI header, never in an address; `live.py
+status` reports `aerodatabox.key_configured`; and `live.py flight DL5048 2026-09-21` spends
+one call to prove it works (it did, on 2026-09-21). Its allowance is `aerodatabox_quota` in
+`cloud.json`, 40 a day and 300 a month by default, with a five-minute cache. A key pasted into a
 chat is a key to roll. `launch.sh` carries the same variables from the laptop's environment
 to a new box over the ssh channel; `live.py status` on the box says which keys it sees
 (`serpapi.key_configured`, never the value), and `live.py serp JFK LHR 2026-11-18` spends
