@@ -1088,7 +1088,7 @@ at $60 a tonne, unknown never counted as clean. On 2026-09-22, per Patrick, seat
 went (every transatlantic fare has it, so it separated nothing) and four came in: same
 airport on a connection, bag included, free carry-on (the fare's own allowance,
 `carry_on` from `data.build_slim`; a feed that does not say reads as not included) and
-top-rated airline (rating at or above .76, the page's own "well-rated" line). Free
+top-rated airline (rating at or above .76, the page's own "well-rated" line). Wifi became free wifi the same day (`wifi_cost === 'free'`, the long leg deciding as in `data.py`): a fare that sells a pass gets the pass on its bill, one with none ranks lower. Free
 seat choice was considered and left out: Duffel and Google never report seat
 selection on a search, the adapters record "paid", so it would match nothing. The
 sixteen sit in a fixed grid, four across when the panel is at least 690px wide and two

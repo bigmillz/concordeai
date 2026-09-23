@@ -1110,7 +1110,7 @@ const WANTS = [
   {id:'lieflat', label:'Lie-flat seat', cents:40000, ok:e => false, hint:'No lie-flat seats in economy. Switch the cabin to Business.'},
   {id:'legroom', label:'Extra legroom', cents:3000, ok:e => e.pitch.some(p => (p || 0) >= 32), hint:'No economy seat here has 32 inches of legroom. Try premium economy.'},
   {id:'newgen', label:'787 / A350 / neo', cents:4000, ok:e => e.equipment.some(x => NEWGEN.test(x))},
-  {id:'wifi', label:'Wifi', cents:3000, ok:e => e.wifi_published},
+  {id:'wifi', label:'Free wifi', cents:3000, ok:e => e.wifi_cost === 'free', hint:'No fare here lists free wifi.'},   // a fare that sells a pass gets the pass on its bill; one with no wifi ranks lower
   {id:'lounge', label:'Lounge access', cents:6500, ok:e => e.brand.toLowerCase().includes('flex') || e.refundable},
   {id:'toprated', label:'Top-rated airline', cents:4000, ok:e => e.rating != null && e.rating >= .76, hint:'No top-rated airline on this route.'},
   // the cleaner half of the search has it; the dirtier half is charged the gap to the cleanest option at $60 a tonne, and an unreported figure is never counted as clean
@@ -1347,7 +1347,7 @@ function excluded(e){
 const RIDES = {either:'best option', rideshare:'rideshare', transit:'public transit'};
 const COMFORT = new Set(['connectivity','cabin_uncertain','pitch','redeye','boarding','carrier','mct_margin','lounge']);
 const ADDONS = {
-  wifi:{label:'Wifi pass', cents:1900, sells:e => e.wifi_cost === 'paid', has:e => e.wifi_cost === 'free', want:'wifi', why:'you asked for wifi; this fare charges for it'},
+  wifi:{label:'Wifi pass', cents:1900, sells:e => e.wifi_cost === 'paid', has:e => e.wifi_cost === 'free', want:'wifi', why:'you picked free wifi; this fare charges for it'},
   lounge:{label:'Lounge day pass', cents:6500, sells:() => true, has:e => WANTS.find(w => w.id === 'lounge').ok(e), want:'lounge', why:'you asked for lounge access; this fare does not include it'},
   legroom:{label:'Extra-legroom seat', cents:7900, sells:() => true, has:e => WANTS.find(w => w.id === 'legroom').ok(e), want:'legroom', why:'you asked for extra legroom; no seat on this fare is listed at 32 inches or more'},
   seat:{label:'Pick your seat', cents:3000, sells:e => e.seat_selection === 'paid', has:e => e.seat_selection !== 'paid', why:'seat selection is paid on this fare'},
@@ -2081,7 +2081,7 @@ function parseWish(text){
   if (/nonstop|non-stop|direct flight|no (?:connections?|layovers?|stops?)/.test(t)) out.push({kind:'want', id:'nonstop', label:'Nonstop'});
   if (/short layover|quick connection/.test(t)) out.push({kind:'want', id:'short', label:'Short layovers'});
   if (/long layover|stopover|see the city/.test(t)) out.push({kind:'want', id:'long', label:'A long layover'});
-  if (/wifi|wi-fi|internet/.test(t)) out.push({kind:'want', id:'wifi', label:'Wifi'});
+  if (/wifi|wi-fi|internet/.test(t)) out.push({kind:'want', id:'wifi', label:'Free wifi'});
   if (/legroom|leg room|tall/.test(t)) out.push({kind:'want', id:'legroom', label:'Extra legroom'});
   if (/lounge/.test(t)) out.push({kind:'want', id:'lounge', label:'Lounge access'});
   if (/flexib|refund|might change|may change/.test(t)) out.push({kind:'want', id:'flex', label:'Flexible ticket'});
