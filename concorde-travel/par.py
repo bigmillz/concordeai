@@ -345,7 +345,7 @@ def par_for(o: Dict[str, Any], d: Dict[str, Any], date: str,
     }
     scenario = {
         "query": {
-            "origin": {"label": "city centre", "lat": city_o["lat"], "lon": city_o["lon"],
+            "origin": {"label": "city center", "lat": city_o["lat"], "lon": city_o["lon"],
                        "geocode_precision": "city"},
             "destination": {"label": d.get("city") or d_iata, "lat": 0.0, "lon": 0.0,
                             "geocode_precision": "city"},
@@ -370,7 +370,7 @@ def par_for(o: Dict[str, Any], d: Dict[str, Any], date: str,
         # the layover time, and the nonstop credit given back.
         allowance = (CONNECTION_MINUTES * 3500) // 60 + scorer_mod.DEFAULT.nonstop_credit_cents
         par += allowance
-        lines.append({"label": "Beyond nonstop range: one clean connection allowed",
+        lines.append({"label": "One connection allowed: too far for a nonstop",
                       "cents": allowance})
     basis = dict(fbasis)
     basis.update({

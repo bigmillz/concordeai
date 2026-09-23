@@ -111,8 +111,8 @@ def google_details(g):
             "change": {"allowed": None}, "refund": {"allowed": None},   # Google names no fare terms; the sheet prints a dash
             "emissions_kg": g.get("emissions_kg"), "typical_kg": g.get("typical_kg"),
             "total_minutes": g.get("total_duration"),
-            "note": "The lowest fare Google shows, with no fare brand or bag allowance named; "
-                    "priced here as the airline's no-bag fare. Book on the airline's own site."}
+            "note": "Google's lowest fare. Bag allowance not shown, so bags are priced as extra. "
+                    "Book on the airline's site."}
 
 
 def feed_details(offer):
@@ -301,6 +301,11 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
         e["changes"] = o["tickets"][0]["entitlements"].get("changes", "unknown")
         e["refundable"] = bool(o["tickets"][0]["entitlements"].get("refundable"))
         am = next((v for k, v in amenities.items() if k in e["id"]), {})
+        if o.get("_google"):                         # Google's amenity sentences, published like Duffel's
+            ext = [str(x).lower() for leg in (o["_google"].get("legs") or []) for x in (leg.get("extensions") or [])]
+            wx = [x for x in ext if "wi-fi" in x or "wifi" in x]
+            am = {"wifi": any("no wi-fi" not in x for x in wx), "power": any("power" in x or "usb" in x for x in ext),
+                  "wifi_cost": "paid" if any("fee" in x for x in wx) else "free" if any("free" in x for x in wx) else None}
         e["wifi_published"] = bool(am.get("wifi")); e["power_published"] = bool(am.get("power"))
         e["wifi_cost"] = am.get("wifi_cost")
         e["layover_minutes"] = [l["minutes"] for l in e["legs"] if l["kind"] == "layover"]

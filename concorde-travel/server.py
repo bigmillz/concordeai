@@ -110,7 +110,7 @@ def _users_take(email, kind, limit):
             users = {}
         u = users.get(email) or {}
         if u.get("day") != today:
-            u = {"day": today, "searches": 0, "wishes": 0, "recent": u.get("recent") or []}
+            u = {"day": today, "searches": 0, "wishes": 0, "recent": u.get("recent") or [], "profile": u.get("profile")}
         if u.get(kind, 0) >= limit:
             users[email] = u
             return False, 0
@@ -118,6 +118,22 @@ def _users_take(email, kind, limit):
         users[email] = u
         live._atomic_write(USERS_FILE, users)
         return True, limit - u[kind]
+
+
+def _users_give(email, kind):
+    """Hand back one call of `kind` taken today: input refused before any call spends nothing."""
+    today = datetime.date.today().isoformat()
+    with _USERS_LOCK:
+        try:
+            with open(USERS_FILE, encoding="utf-8") as fh:
+                users = json.load(fh)
+        except (OSError, ValueError):
+            return
+        u = users.get(email) or {}
+        if u.get("day") == today and u.get(kind, 0) > 0:
+            u[kind] -= 1
+            users[email] = u
+            live._atomic_write(USERS_FILE, users)
 
 
 # ----------------------------------------------------------- who is this
@@ -690,20 +706,27 @@ def _fetch_raw(req):
                          "suggest": places.suggest(typed)},)
             if point and code:
                 point["city"] = places.label_for(code).split(" (")[0]   # the metro the page names: London, not City of Westminster
+            if point and field == "origin":
+                import ground as _g
+                _g.GEOCODED[typed.strip().lower()] = point   # the ride is priced from this door, not a guess near the airport
             where[field] = {"code": code, "how": how, "typed": typed,
                             "label": places.label_for(code), "point": point}
         d = (req.get("date") or "").strip()
         if not re.match(r"^\d{4}-\d{2}-\d{2}$", d):
-            return ({"error": "That date did not look like a date. Use YYYY-MM-DD.",
+            return ({"error": "Pick a valid date.",
                      "field": "date", "live": True},)
         if d < time.strftime("%Y-%m-%d", time.gmtime(time.time() - 12 * 3600)):
             # the provider refuses a past date with a 422; say it in a sentence and spend nothing
-            return ({"error": "That date has passed. Flights can be searched from today.",
+            return ({"error": "That date has passed. Pick today or later.",
                      "field": "date", "live": True},)
+        try:
+            datetime.date.fromisoformat(d)
+        except ValueError:
+            return ({"error": "Pick a valid date.", "field": "date", "live": True},)
         where["date"] = d
         if not live.load_config().get("key"):
             if req.get("_served"):
-                return ({"error": "Live search is not set up on this server yet (no flight API key). Nothing to show you that would not be made up.", "live": True},)
+                return ({"error": "Live search isn't set up yet, so there's nothing to show.", "live": True},)
             # a developer's machine with no key: the recording stands in, and says so
             src = "sample"
             req = dict(req, _fell_back=True)
@@ -726,11 +749,11 @@ def _fetch_raw(req):
     elif src == "api":
         q = {"origin": where["origin"]["code"], "destination": where["destination"]["code"],
              "date": where["date"],
-             "adults": int(req.get("adults", 1)), "currency": "USD", "limit": 50,
+             "adults": max(1, min(9, int(req.get("adults", 1)))), "currency": "USD", "limit": 50,
              "cabin": _cabin(req.get("cabin"))}
         raw, meta = live.search(q)
         if raw is None:
-            return ({"error": meta.get("error", "live search unavailable"),
+            return ({"error": meta.get("error", "Search isn't working right now. Try again soon."),
                      "hint": meta.get("hint") or meta.get("how"),
                      "quota": meta.get("quota"), "live": True},)
         # the supplement: Google Flights through SerpApi, for the carriers the
@@ -771,18 +794,18 @@ def flight_request(q, remote, headers):
     number = (q.get("number") or [""])[0]
     date = (q.get("date") or [""])[0][:10]
     if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
-        return {"error": "the date of the flight, please"}
+        return {"error": "Pick the flight date."}
     if remote:
         ip = (headers.get("Cf-Connecting-Ip") or headers.get("X-Forwarded-For") or "?").split(",")[0].strip()
         ok, _left = _users_take("ip:" + ip, "flights", 12)
         if not ok:
-            return {"error": "That is today's dozen flight lookups from this address."}
+            return {"error": "You have used today's 12 flight lookups. Try again tomorrow."}
     legs, meta = live.flight_status(number, date)
     if legs is None:
         return {"error": meta.get("error", "no status"), "hint": meta.get("hint") or meta.get("how"), "configured": bool(live.adb_config().get("key"))}
     tr = rescue.from_tracking(legs, (q.get("origin") or [""])[0], (q.get("destination") or [""])[0])
     if not tr:
-        return {"error": "Nothing known for %s on %s." % (number.upper(), date) + (" Check the number and the date." if legs == [] else ""), "legs": len(legs)}
+        return {"error": "No flight %s found on %s." % (number.upper(), date) + (" Check the number and date." if legs == [] else ""), "legs": len(legs)}
     return {"tracking": tr, "fetched": meta.get("source"), "age_seconds": meta.get("age_seconds")}
 
 
@@ -798,12 +821,15 @@ def flex_request(req):
     CONCORDEGO_FLEX_PER_DAY sweeps a day."""
     date = str(req.get("date") or "")[:10]
     if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
-        return {"error": "The date of the trip, please."}
-    span = max(1, min(3, int(req.get("days") or 3)))
-    ok, _ = _users_take("_flex", "flex", FLEX_PER_DAY)
+        return {"error": "Pick a trip date."}
+    try:
+        centre = datetime.date.fromisoformat(date)
+        span = max(1, min(3, int(req.get("days") or 3)))
+    except (TypeError, ValueError):
+        return {"error": "Pick a real trip date."}
+    ok, _ = _users_take("_flex", "searches", FLEX_PER_DAY)
     if not ok:
-        return {"error": "The nearby-days sweep has had its day (%d sweeps site-wide). It is back at midnight." % FLEX_PER_DAY}
-    centre = datetime.date.fromisoformat(date)
+        return {"error": "Nearby days has hit today's limit. Try again after midnight."}
     today = datetime.date.today()
     days = []
     for k in range(-span, span + 1):
@@ -812,6 +838,8 @@ def flex_request(req):
             continue
         r = search_request(dict(req, date=d.isoformat(), source="api", trip={"leg": 1}))
         row = {"date": d.isoformat(), "offset": k, "found": 0}
+        if r.get("error") and r.get("field"):
+            return {"error": r["error"], "field": r["field"]}   # a typo in the form is the same typo on every day
         if r.get("error"):
             row["error"] = r["error"]
         else:
@@ -820,7 +848,7 @@ def flex_request(req):
                 lst = (r.get("results") or {}).get(prof) or []
                 if lst:
                     e = lst[0]
-                    row[prof] = {"effective_cents": e["by"][prof]["effective_cents"] if prof in e.get("by", {}) else e["effective_cents"],
+                    row[prof] = {"effective_cents": e["by"][prof]["effective_cents"] if prof in e.get("by", {}) else e["effective_cents"], "total_cents": sum(l["cents"] for l in (e.get("by", {}).get(prof) or e)["lines"] if l["code"] in ("ticket", "bags", "ground_out", "ground_in")),
                                  "ticket_cents": e["ticket_cents"], "carrier": e["carrier"], "flight": e["flight"], "grade": e["grade"]}
         days.append(row)
     return {"days": days, "centre": date, "note": "Every day is priced all in from your door, the ride and the bags included, not the fare alone."}
@@ -833,10 +861,10 @@ def rescue_request(req):
     sit = dict(req.get("situation") or {})
     o, d = str(sit.get("origin") or "").strip(), str(sit.get("destination") or "").strip()
     if not (o and d):
-        return {"error": "Where were you flying from and to? Airport codes are fine."}
+        return {"error": "Enter where you are flying from and to."}
     date = str(sit.get("date") or "")[:10]
     if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
-        return {"error": "The date of the flight, please."}
+        return {"error": "Pick the flight date."}
     now = None
     try:
         now = datetime.datetime.fromisoformat(str(req.get("now") or ""))
@@ -858,16 +886,20 @@ def rescue_request(req):
             search = r                                # the day's full results, so the page can show them as a search
         found.extend(r["results"]["reference"])
     if not found:
-        return {"error": errors[0] if errors else "Nothing found for that day."}
+        return {"error": errors[0] if errors else "No flights found for that day."}
     # the countries the rules turn on, from the curated airports where we know them
     enr = adapter.load_enrichment()
     aps = enr["airports"]["airports"]
-    o_ap, d_ap = aps.get(places.airports_for(o)[0], {}), aps.get(places.airports_for(d)[0], {})
+    # the typed text is often a city ("New York"): resolve it, then take the first curated airport of the metro
+    pick = lambda typed: next((aps[a] for a in places.airports_for(places.resolve(typed)[0] or typed) if a in aps), {})
+    o_ap, d_ap = pick(o), pick(d)
     sit.setdefault("us", (o_ap.get("border") == "us") or (d_ap.get("border") == "us"))
     sit.setdefault("eu", o_ap.get("border") in ("schengen", "ie"))
     sit.setdefault("international", bool(o_ap.get("border") and d_ap.get("border") and o_ap.get("border") != d_ap.get("border")))
     # the clocks the traveller typed are read in the airport's own zone, taken from the results, never the browser's
     dep_off, arr_off = found[0]["depart"][-6:], found[0]["arrive"][-6:]
+    if now is not None and now.tzinfo is not None:    # the hours on the page are the airport's, never the browser's
+        now = now.astimezone(datetime.datetime.fromisoformat(found[0]["depart"]).tzinfo)
     def clock(txt, off):
         m = re.match(r"^\s*(\d{1,2}):(\d{2})\s*(\+1)?\s*$", str(txt or ""))
         if not m:
@@ -875,6 +907,8 @@ def rescue_request(req):
         day = datetime.date.fromisoformat(date) + datetime.timedelta(days=1 if m.group(3) else 0)
         return "%sT%02d:%02d:00%s" % (day.isoformat(), int(m.group(1)), int(m.group(2)), off)
     sched, newdep = clock(sit.get("sched_clock"), dep_off), clock(sit.get("new_dep_clock"), dep_off)
+    if sched and newdep and datetime.datetime.fromisoformat(newdep) < datetime.datetime.fromisoformat(sched) - datetime.timedelta(hours=6):
+        newdep = (datetime.datetime.fromisoformat(newdep) + datetime.timedelta(days=1)).isoformat()   # 11:30 PM delayed to 1:15 AM leaves tomorrow, +1 or not
     if newdep:
         sit["new_depart"] = newdep
     if sched and newdep:
@@ -898,7 +932,8 @@ def rescue_request(req):
     # the airports' coordinates for the night's rides: the curated table, then whatever the feed named
     airports = {k: {"iata": k, "lat": v.get("lat"), "lon": v.get("lon"), "country": v.get("country")} for k, v in aps.items() if v.get("lat") is not None}
     try:
-        got = _fetch_raw({"source": "api", "origin": o, "destination": d, "date": date, "adults": 1, "_served": req.get("_served")})
+        got = _fetch_raw({"source": "api", "origin": o, "destination": d, "date": date, "adults": 1, "_served": req.get("_served"),
+                         "cabin": {"premium": "premium", "business": "business", "first": "first"}.get(str(sit.get("fare") or ""), "economy")})
         if len(got) == 4:
             for k, g in adapter.duffel_geo(got[0]).items():
                 if g.get("lat") is not None:
@@ -925,13 +960,15 @@ def search_request(req):
     origin_text = (req.get("origin_address") or req.get("origin") or "bushwick-brooklyn")
     dest_point = (where.get("destination") or {}).get("point") if src == "api" else None
     try:
-        out = mockdata.build_slim(raw, origin_key=origin_text, checked_bags=int(req.get("checked_bags", 1)),
+        out = mockdata.build_slim(raw, origin_key=origin_text, checked_bags=max(0, min(9, int(req.get("checked_bags", 1)))),
                                   origin_full=req.get("origin_address") or None,
                                   dest_point=dest_point,
                                   destination_full=(req.get("destination") if dest_point else None),
                                   supplement=meta.get("supplement_payload"))
     except ValueError as exc:
-        return {"error": str(exc)}
+        return {"error": "No flights came back for that day. Try another date.", "detail": str(exc)}
+    if not out["results"]["reference"]:
+        return {"error": "No flights found on that route that day. Try another date or airport."}
     out["feed"] = {"source": src, "fetched": meta.get("source"), "age_seconds": meta.get("age_seconds"),
                    "quota": meta.get("quota"), "fell_back": meta.get("fell_back"),
                    "supplement": {k: v for k, v in (meta.get("supplement") or {}).items()
@@ -994,10 +1031,10 @@ def live_request(req):
             codes = {segs[0]["origin"]["iata"], segs[-1]["destination"]["iata"]}
             mismatch = bool(asked_d) and not any(places.covers(asked_d, c) for c in codes)
             out["sample_notice"] = (
-                "These are real recorded %s results, not a live search. Add a Duffel "
-                "key to search the route you typed." % actual
+                "These are recorded %s results, not your route. Add a Duffel "
+                "key to search it." % actual
                 if mismatch else
-                "Recorded %s inventory - add a Duffel key for live results." % actual)
+                "Recorded %s results. Add a Duffel key for live ones." % actual)
     if src == "api":
         out["feed"].update({"fetched": _LIVE_META.get("source"),
                             "age_seconds": _LIVE_META.get("age_seconds"),
@@ -1056,7 +1093,7 @@ def _users_today():
         return []
     out = []
     for email, u in (data or {}).items():
-        if isinstance(u, dict) and u.get("day") == today:
+        if isinstance(u, dict) and u.get("day") == today and "@" in email:
             out.append({"email": email, "searches": u.get("searches", 0), "wishes": u.get("wishes", 0)})
     return sorted(out, key=lambda x: -(x["searches"] + x["wishes"]))
 
@@ -1309,7 +1346,7 @@ def _address_text(a):
 def _lookup_cached(kind, key, ttl, fetch):
     """A small JSON cache on disk for the lookups above; the day's cap counts only the misses."""
     os.makedirs(SUGGEST_DIR, exist_ok=True)
-    slug = re.sub(r"[^a-z0-9]+", "-", key.lower()).strip("-")[:80]
+    slug = re.sub(r"[^a-z0-9]+", "-", key.lower()).strip("-")[:60] + "-" + hashlib.sha1(key.encode("utf-8")).hexdigest()[:10]
     path = os.path.join(SUGGEST_DIR, "%s-%s.json" % (kind, slug))
     try:
         if time.time() - os.path.getmtime(path) < ttl:
@@ -1525,7 +1562,6 @@ const paintUnl = list => { $('#unl').innerHTML = (list || []).length ? list.map(
 document.addEventListener('click', async ev => { const b = ev.target.closest('[data-unl]'); if (!b) return; const r = await j('/api/admin/unlimited', {method:'POST', body: JSON.stringify({remove: b.dataset.unl})}); paintUnl(r.unlimited); });
 $('#unlgo').onclick = async () => { const e = $('#unladd').value.trim(); if (!e.includes('@')) return; const r = await j('/api/admin/unlimited', {method:'POST', body: JSON.stringify({add: e})}); $('#unladd').value = ''; paintUnl(r.unlimited); };
 const paintKey = st => { paintUnl(st.unlimited); };
-tkState();
 load(); logs();
 </script></body></html>
 """
@@ -1618,7 +1654,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == "/api/admin" or path.startswith("/api/admin/"):
             if not self._is_owner():
                 return self._html("<!doctype html><meta charset=utf-8><body style='background:#101013;color:#ececec;font:15px sans-serif;padding:40px'>"
-                                  "<p>This page is for the person who runs ConcordeGo. Sign in with an email listed in CONCORDEGO_OWNERS.</p>", 403)
+                                  "<p>This page is for site admins. Sign in with an admin email.</p>", 403)
             if path == "/api/admin":
                 return self._html(ADMIN_HTML)
             from urllib.parse import parse_qs
@@ -1673,8 +1709,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             # Cloudflare Access protects this path; by the time a request lands
             # here the person has signed in, and the cookie now covers /api/*
             q = self.path.split("?", 1)[1] if "?" in self.path else ""
-            nxt = dict(kv.split("=", 1) for kv in q.split("&") if "=" in kv).get("next", "/")
-            self.send_response(302); self.send_header("Location", nxt if nxt.startswith("/") else "/"); self.send_header("Content-Length", "0"); self.end_headers(); return
+            nxt = urllib.parse.unquote(dict(kv.split("=", 1) for kv in q.split("&") if "=" in kv).get("next", "/"))
+            # a path on this site only: "//host" is another site, and anything outside printable ASCII breaks the header
+            ok_next = nxt.startswith("/") and not nxt.startswith("//") and all(32 < ord(c) < 127 and c != chr(92) for c in nxt)
+            self.send_response(302); self.send_header("Location", nxt if ok_next else "/"); self.send_header("Content-Length", "0"); self.end_headers(); return
         if path == "/api/whoami":
             who = self._who()
             owner = who == "owner" or (who is not None and who in OWNERS)
@@ -1745,7 +1783,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._json({"error": "bad request: %s" % exc})
             if not who or "@" not in who:
                 return self._json({"ok": False, "local": who == "owner", "error": None if who == "owner" else "sign in to save a profile"})
-            persona = body.get("persona") if isinstance(body.get("persona"), dict) else None
+            persona = body.get("persona") if isinstance(body, dict) and isinstance(body.get("persona"), dict) else None
             profile = {"persona": persona} if persona else {}
             if len(json.dumps(profile)) > 4000:
                 return self._json({"ok": False, "error": "that profile is too large"})
@@ -1756,13 +1794,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
         try:
             n = int(self.headers.get("Content-Length") or 0)
             req = json.loads(self.rfile.read(n) or b"{}")
+            if not isinstance(req, dict):
+                raise ValueError("expected a JSON object")
         except Exception as exc:
             return self._json({"error": "bad request: %s" % exc})
+        if path == "/api/flex" and _users_left("_flex")["searches_used"] >= FLEX_PER_DAY:
+            # the site-wide cap before anyone's allowance is charged, so a refused sweep costs nothing
+            return self._json({"error": "Nearby days has hit today's limit. Try again after midnight."})
         # Spending: a live search, the narrator and the wish model. The owner
         # spends freely; a signed-in visitor spends from a daily allowance;
         # nobody anonymous spends at all.
         # a live search only spends when this machine holds a key; without one the recording stands in
-        spends = path == "/api/narrate" or path == "/api/wish" or (path in ("/api/live", "/api/search", "/api/rescue", "/api/flex") and (req.get("source") or "sample") != "sample" and bool(live.load_config().get("key")))
+        spends = path == "/api/narrate" or path == "/api/wish" or (path in ("/api/live", "/api/search", "/api/rescue", "/api/flex") and (path in ("/api/rescue", "/api/flex") or (req.get("source") or "sample") != "sample") and bool(live.load_config().get("key")))
+        charged = None                                  # (who, kind) taken below, handed back if the input is refused
         if spends and self._remote():
             who = self._who()
             if not who and anon_ok:
@@ -1770,40 +1814,47 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 ip = (self.headers.get("Cf-Connecting-Ip") or self.headers.get("X-Forwarded-For") or "?").split(",")[0].strip()
                 ok, left = _users_take("ip:" + ip, "searches", ANON_SEARCHES)
                 if not ok:
-                    return self._json({"error": "That is today's %d free searches. A free account gives you %d a day, or come back in about %d hours."
+                    return self._json({"error": "You've used today's %d free searches. Sign in for %d a day, or come back in about %d hours."
                                                 % (ANON_SEARCHES, USER_SEARCHES, _hours_to_midnight()),
                                        "remote": True, "sign_in": True, "free": ANON_SEARCHES, "hours": _hours_to_midnight()})
                 who = None
+                charged = ("ip:" + ip, "searches")
             elif not who:
-                return self._json({"error": "Sign in to use this. A few searches a day are free; the wish box, the price check and more searches come with a free account.",
+                return self._json({"error": "Sign in to use this. A free account adds the wish box, price checks and more searches.",
                                    "remote": True, "sign_in": True})
         if spends and self._remote() and who:
             kind, limit = ("searches", USER_SEARCHES) if path in ("/api/live", "/api/search", "/api/rescue", "/api/flex") else ("wishes", USER_WISHES)
             if kind == "wishes":
                 okall, _ = _users_take("_everyone", "wishes", WISHES_TOTAL)
                 if not okall:
-                    return self._json({"error": "The wish box has had its day (%d wishes site-wide). It is back at midnight." % WISHES_TOTAL,
+                    return self._json({"error": "The wish box is used up for today. Try again in about %d hours." % _hours_to_midnight(),
                                        "remote": True, "allowance": True})
             ok, left = (True, None) if self._unmetered(who) else _users_take(who, kind, limit)
+            charged = None if left is None else (who, kind)
             if not ok:
-                return self._json({"error": "That is today's allowance of %d %s for %s. It resets at midnight." % (limit, kind, who),
+                return self._json({"error": "You've used today's %d %s. More in about %d hours." % (limit, kind, _hours_to_midnight()),
                                    "remote": True, "allowance": True})
+            if not self._unmetered(who):
+                charged = (who, kind)
         try:
             if anon_ok and self._remote():
                 req = dict(req, _served=True)
                 who_r = self._who()
                 trip = req.get("trip") or {}
-                if who_r and "@" in who_r and isinstance(trip, dict) and not trip.get("leg"):
+                if who_r and "@" in who_r and path == "/api/search" and isinstance(trip, dict) and not trip.get("leg"):
                     _users_recent_add(who_r, {"from": str(req.get("origin") or "")[:120], "to": str(req.get("destination") or "")[:120], "date": str(req.get("date") or "")[:10],
                                               "kind": str(trip.get("kind") or "round")[:8], "back": str(trip.get("back") or "")[:40], "pax": str(trip.get("pax") or "")[:20], "bags": str(trip.get("bags") or "")[:20]})
             fn = {"/api/score": score_request, "/api/narrate": narrate_request, "/api/rescue": rescue_request, "/api/flex": flex_request,
                   "/api/live": live_request, "/api/wish": wish_request, "/api/search": search_request}[path]
-            return self._json(fn(req))
+            out = fn(req)
+            if charged and isinstance(out, dict) and out.get("field"):
+                _users_give(*charged)                 # refused before any fetch: a typo or a past date costs no search
+            return self._json(out)
         except Exception as exc:
             # a broken fixture should say so on the page, not 500 silently
             import traceback
             traceback.print_exc()
-            return self._json({"error": "%s: %s" % (type(exc).__name__, exc)})
+            return self._json({"error": "Something went wrong. Try again."})
 
     # ------------------------------------------------------------ helpers
     def _json(self, obj):

@@ -312,14 +312,12 @@ def _reserve(cfg, path=None):
     lim = cfg["quota"]
     q = load_quota(path)
     if q["day_calls"] >= lim["per_day"]:
-        return False, ("daily limit reached: %d of %d calls used today"
-                       % (q["day_calls"], lim["per_day"]))
+        return False, "The daily limit is used up. Try again tomorrow."
     if q["month_calls"] >= lim["per_month"]:
-        return False, ("monthly limit reached: %d of %d calls used in %s"
-                       % (q["month_calls"], lim["per_month"], q["month"]))
+        return False, "This month's limit is used up. Try again next month."
     wait = lim["min_seconds_between_calls"] - (time.time() - q["last_call_at"])
     if wait > 0:
-        return False, "rate limited: %.1fs until the next call is allowed" % wait
+        return False, "Busy right now (rate limited). Try again in a few seconds."
     q["day_calls"] += 1
     q["month_calls"] += 1
     q["total_calls"] += 1
@@ -781,14 +779,14 @@ def flight_status(number, date, cfg=None, allow_call=True):
     cfg = cfg or adb_config()
     num = re.sub(r"\s+", "", str(number or "")).upper()
     if not re.match(r"^[A-Z0-9]{2}\d{1,4}[A-Z]?$", num):
-        return None, {"source": "none", "error": "that does not look like a flight number"}
+        return None, {"source": "none", "error": "That doesn't look like a flight number."}
     query = {"engine": "aerodatabox", "number": num, "date": date}
     qf = _adb_quota_file()
     hit = cache_get(query, cfg["quota"]["cache_ttl_seconds"])
     if hit:
         return hit["payload"], {"source": "cache", "age_seconds": hit["_age_seconds"], "quota": quota_state(cfg, qf)}
     if not cfg.get("key"):
-        return None, {"source": "none", "error": "no AeroDataBox key",
+        return None, {"source": "none", "error": "Flight tracking isn't set up yet",
                       "how": "set CONCORDEGO_AERODATABOX_KEY, or aerodatabox_key in " + CONFIG_FILE,
                       "quota": quota_state(cfg, qf)}
     if not allow_call:

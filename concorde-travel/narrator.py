@@ -178,13 +178,13 @@ def template(b: Dict[str, Any]) -> Dict[str, str]:
     top = b["options"][0]
     c = b["cheapest_ticket"]
     if c["is_also_top_pick"]:
-        lead = "The cheapest ticket here is also the one that costs you least, which is rarer than it sounds."
+        lead = "The cheapest ticket is also the cheapest trip all in."
     else:
-        lead = ("You can save %s on the ticket at %s - it lands %s worse once everything is counted%s."
-                % (c["saving_pct"], c["ticket"], c["worse_by"],
+        lead = ("The cheapest ticket, %s, is %s cheaper than the top pick but %s more all in%s."
+                % (c["ticket"], c["saving_pct"], c["worse_by"],
                    ", mostly " + c["mostly_because"][0].lower() + c["mostly_because"][1:]
                    if c["mostly_because"] else ""))
-    sub = ("Top pick %s at %s, %s effective, %s door to door. Grade %s."
+    sub = ("Top pick: %s, %s ticket, %s all in, %s door to door, grade %s."
            % (top["route"], top["ticket"], top["effective"], top["door_to_door"], top["grade"]))
     return {"lead": lead, "sub": sub, "source": "template"}
 

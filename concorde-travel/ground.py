@@ -87,11 +87,9 @@ ROAD_FACTOR = 1.22
 # the half worth replacing with real data first.
 SUPPORT_NOTE = {
     "curated":  None,
-    "modelled": "Ground costs here are estimated, not quoted - expect the real "
-                "fare to land within about a third of this.",
-    "assumed":  "We do not model ground transport in this region yet. The car "
-                "figure is a rough placeholder and could be well out; treat it "
-                "as a reminder to check, not as a price.",
+    "modelled": "Ride prices here are estimates and could be off by up to a third",
+    "assumed":  "We don't have ride prices for this area yet. The car fare is a "
+                "placeholder, so check it",
 }
 
 # Airport rail does not travel at a fraction of road speed - it has its own
@@ -102,6 +100,10 @@ SUPPORT_NOTE = {
 TRANSIT_KMH = 38.0
 TRANSIT_FIXED_MIN = 22      # walk to the line, wait, transfer, walk at the far end
 KM_PER_MILE = 1.60934
+
+# Typed origin text (lower-cased) -> the point the server geocoded for it, so
+# the ride starts at the traveler's door rather than a guess near the airport.
+GEOCODED: Dict[str, Dict[str, Any]] = {}
 
 
 def haversine_km(a_lat: float, a_lon: float, b_lat: float, b_lon: float) -> float:
@@ -243,6 +245,11 @@ def resolve_origin(text: str, enr: Dict[str, Any],
             return ({"key": key, "label": o.get("label", key), "lat": o["lat"],
                      "lon": o["lon"], "precision": "curated"}, "curated")
 
+    pt = GEOCODED.get(q)
+    if pt and pt.get("lat") is not None:
+        return ({"key": None, "label": text, "lat": pt["lat"], "lon": pt["lon"],
+                 "precision": "address"}, "address")
+
     # "40.69,-73.91" straight through
     if "," in q:
         parts = q.split(",")
@@ -299,8 +306,7 @@ def support_message(modes: List[Dict[str, Any]]) -> Optional[str]:
     Worst case wins: if the car number is a placeholder, saying nothing because
     the train number happens to be fine is how somebody ends up stranded."""
     if not modes:
-        return ("We could not work out how you would reach the airport from "
-                "there, so the ground leg is missing from these totals entirely.")
+        return "We couldn't price the ride to the airport, so it isn't in these totals"
     order = {"curated": 0, "modelled": 1, "assumed": 2}
     worst = max((m.get("support", "modelled") for m in modes), key=lambda k: order.get(k, 1))
     return SUPPORT_NOTE.get(worst)

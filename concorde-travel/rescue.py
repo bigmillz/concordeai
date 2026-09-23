@@ -84,13 +84,13 @@ def night_near(airport: Optional[Dict[str, Any]], now: Optional[datetime], dep: 
     country = (airport or {}).get("country") or ""
     rate = (hotels.get("airports") or {}).get(iata)
     if rate:
-        hotel_basis = "a typical airport-area rate near %s, not a live price" % iata
+        hotel_basis = "typical rate near %s, not a live price" % iata
     elif (hotels.get("country_default_cents") or {}).get(country):
         rate = hotels["country_default_cents"][country]
-        hotel_basis = "a typical airport-area rate in %s, not a live price; %s itself is not in the table" % (country, iata or "the airport")
+        hotel_basis = "typical rate in %s, not a live price (%s is not in the table)" % (country, iata or "the airport")
     else:
         rate = int(hotels.get("_default_cents") or HOTEL_CENTS)
-        hotel_basis = "a default rate: no table row for %s or its country" % (iata or "the airport")
+        hotel_basis = "rough estimate for %s, not a live price" % (iata or "the airport")
     out = {"hotel_cents": int(rate), "hotel_basis": hotel_basis, "rides_cents": 0, "rides": [], "rides_basis": "",
            "km": HOTEL_KM}
     if airport and airport.get("lat") is not None and airport.get("lon") is not None:
@@ -112,7 +112,7 @@ def night_near(airport: Optional[Dict[str, Any]], now: Optional[datetime], dep: 
                 out["rides"].append({"label": label, "cents": int(ride["fare_cents"]), "mode": ride["mode"],
                                      "minutes": int(ride["door_to_door_minutes"]["p50"])})
         out["rides_cents"] = sum(r["cents"] for r in out["rides"])
-        out["rides_basis"] = ("rideshare to a hotel about %d km out and back, at %s's own rates, estimated" % (HOTEL_KM, iata)
+        out["rides_basis"] = ("estimated rideshare to a hotel about %d km away and back, at %s prices" % (HOTEL_KM, iata)
                               if out["rides"] else "no ride estimate for %s" % iata)
     return out
 
@@ -206,20 +206,20 @@ def refund_rights(sit: Dict[str, Any]) -> Tuple[bool, str]:
     kind = sit.get("kind")
     fare = str(sit.get("fare") or "")
     if fare == "flex":
-        return True, "a flexible fare is refundable by its own terms, whatever the delay"
+        return True, "a flexible fare can be refunded under its own rules, whatever the delay"
     if kind == "cancelled":
-        return True, "the flight was cancelled and you choose not to take the airline's alternative, so the unused ticket may be refunded in full"
+        return True, "your flight was canceled, so if you skip the airline's new flight you may get a full refund"
     delay = sit.get("delay_minutes")
     intl = bool(sit.get("international"))
     need = US_INTL_REFUND_MINUTES if intl else US_DOMESTIC_REFUND_MINUTES
     if sit.get("us") and delay is not None and delay >= need:
-        return True, ("a delay of %s on a US %s flight is 'significant' under the DOT rule, so the unused ticket may be refunded if you choose not to travel"
+        return True, ("a %s delay on a US %s flight counts as significant under US rules, so you may get a refund if you don't fly"
                       % (narrator._hm(delay), "international" if intl else "domestic"))
     if fare in ("business", "first"):
-        return False, ("a %s fare is often refundable by its own rules, which the arithmetic does not count until you check; a delay under %s is not 'significant' under the US rule"
+        return False, ("a %s fare is often refundable, so check its rules; we have not counted it. A delay under %s is too short for a refund under US rules"
                        % (fare, narrator._hm(need)))
-    return False, ("a delay under %s is not 'significant' under the US rule; buying another ticket means paying twice unless the airline agrees to refund"
-                   % narrator._hm(need) if sit.get("us") else "outside the US rules, a refund for a delay is the airline's call; ask before you buy")
+    return False, ("a delay under %s is too short for a refund under US rules, so a new ticket means paying twice unless the airline refunds you"
+                   % narrator._hm(need) if sit.get("us") else "outside the US, a refund for a delay is up to the airline; ask before you buy")
 
 
 def rights(sit: Dict[str, Any]) -> List[Dict[str, str]]:
@@ -229,20 +229,20 @@ def rights(sit: Dict[str, Any]) -> List[Dict[str, str]]:
     out.append({"what": "A refund of the unused ticket", "may": ok, "detail": why})
     if sit.get("kind") == "cancelled" or (sit.get("delay_minutes") or 0) >= 120:
         out.append({"what": "Rebooking at no charge", "may": True,
-                    "detail": "the airline's own next flight, and on a partner if it has an agreement; ask for the earliest, not the first offered"})
+                    "detail": "on the airline's next flight or a partner's; ask for the earliest"})
     if sit.get("eu"):
         km = int(sit.get("distance_km") or 0)
         comp = "€600" if km > 3500 else "€400" if km > 1500 else "€250" if km else "€250 to €600 by distance"
         out.append({"what": "EU261 compensation of %s" % comp, "may": True,
-                    "detail": "for a cancellation with under two weeks' notice or arriving three hours late or more, unless the cause was extraordinary (weather, air traffic control, strikes outside the airline)"})
+                    "detail": "if canceled within two weeks or 3+ hours late, unless caused by weather, air traffic control or outside strikes"})
         out.append({"what": "Meals, and a hotel if you wait overnight", "may": True,
-                    "detail": "the EU duty of care applies whatever the cause; keep receipts"})
+                    "detail": "EU rules cover this whatever the cause; keep receipts"})
     elif sit.get("us"):
-        out.append({"what": "A meal, and a hotel overnight, if the cause was the airline's", "may": True,
-                    "detail": "most US carriers commit to it in their customer service plan for controllable delays and cancellations; weather is not covered"})
+        out.append({"what": "A meal, and a hotel overnight, if the airline caused it", "may": True,
+                    "detail": "most US airlines offer this when the delay is their fault, not for weather"})
     if sit.get("bags_checked"):
         out.append({"what": "Your checked bag", "may": True,
-                    "detail": "if you switch airlines the bag does not follow; ask the desk to pull it, or expect it delivered later"})
+                    "detail": "it will not follow you to another airline; ask the desk to pull it"})
     return out
 
 
@@ -257,8 +257,13 @@ def assess(sit: Dict[str, Any], options: List[Dict[str, Any]], now: Optional[dat
     ok, why = refund_rights(sit)
     refund = paid if ok else 0
     base_arrive = _parse(sit.get("rebook_arrive")) or (_parse(sit.get("new_arrive")) if sit.get("kind") == "delayed" else None)
-    base_label = ("the rebooking the airline offered" if sit.get("rebook_arrive")
-                  else "the delayed flight's new arrival" if base_arrive else "nothing: the airline has offered no way on yet")
+    if base_arrive is None and sit.get("kind") == "delayed" and _parse(sit.get("new_depart")):
+        # no new arrival given: the delayed flight lands the fastest option's flying time after its new departure
+        spans = [_parse(o.get("arrive")) - _parse(o.get("depart")) for o in options if _parse(o.get("arrive")) and _parse(o.get("depart"))]
+        if spans:
+            base_arrive = _parse(sit.get("new_depart")) + min(spans)
+    base_label = ("the airline's new flight" if sit.get("rebook_arrive")
+                  else "your delayed flight" if base_arrive else "nothing yet")
     rows = []
     for o in options:
         dep, arr = _parse(o.get("depart")), _parse(o.get("arrive"))
@@ -282,11 +287,11 @@ def assess(sit: Dict[str, Any], options: List[Dict[str, Any]], now: Optional[dat
         net = oop - time_value + hotel + rides
         lines = [{"label": "Ticket", "cents": int(o.get("ticket_cents", 0))}]
         if refund:
-            lines.append({"label": "Less the refund you may expect", "cents": -refund})
+            lines.append({"label": "Refund you may get", "cents": -refund})
         if sooner is not None and sooner != 0:
-            lines.append({"label": ("Lands %s sooner" if sooner > 0 else "Lands %s later") % narrator._hm(abs(sooner)) + " at your rate", "cents": -time_value})
+            lines.append({"label": ("Time saved, lands %s sooner" if sooner > 0 else "Time lost, lands %s later") % narrator._hm(abs(sooner)), "cents": -time_value})
         if hotel:
-            lines.append({"label": "A night near %s, it leaves tomorrow" % ((o.get("route") or ["the airport"])[0]), "cents": hotel})
+            lines.append({"label": "Hotel near %s tonight" % ((o.get("route") or ["the airport"])[0]), "cents": hotel})
         if rides:
             lines.append({"label": "Rides to the hotel and back", "cents": rides})
         rows.append({"id": o.get("id"), "carrier": o.get("carrier"), "flight": o.get("flight"), "route": o.get("route"),
@@ -306,13 +311,13 @@ def assess(sit: Dict[str, Any], options: List[Dict[str, Any]], now: Optional[dat
     rows = uniq
     best = rows[0] if rows else None
     if best is None:
-        action, reason = "wait", "nothing else we can find leaves in time; stay with the airline and hold it to its plan"
+        action, reason = "wait", "no other flight leaves in time, so stay with the airline"
     elif base_arrive is None:
-        action, reason = "switch", "the airline has offered no way on; this is the cheapest way there once the refund you may expect is counted"
+        action, reason = "switch", "the airline has not given you a new flight or time yet, and this is the cheapest way there"
     elif best["net_cents"] <= -2500:
-        action, reason = "switch", "counting the refund you may expect and the hours it saves at your rate, switching comes out %s ahead" % narrator._d(-best["net_cents"])
+        action, reason = "switch", "counting any refund and the time saved, switching puts you %s ahead" % narrator._d(-best["net_cents"])
     else:
-        action, reason = "stay", "no alternative beats %s once its ticket, the refund you may expect and the hours are counted" % base_label
+        action, reason = "stay", "no other flight beats %s, counting cost, refund and time" % base_label
     return {"kind": sit.get("kind"), "baseline": {"label": base_label, "arrive": base_arrive.isoformat() if base_arrive else None},
             "odds": odds(sit, now, options),
             "refund": {"expected": ok, "cents": refund, "why": why, "paid_cents": paid},
@@ -383,7 +388,7 @@ def odds(sit: Dict[str, Any], now: Optional[datetime], options: Optional[List[Di
     # the updated flight, by the hour it is planned for
     fcurve = []
     if planned is not None and not cancelled:
-        ph = planned.hour + planned.minute / 60.0
+        ph = (planned - day0).total_seconds() / 3600.0      # hours since today's midnight: 1:15 AM tomorrow is 25.25, not 1.25
         for h in hours:
             at = planned if h <= ph else planned.replace(hour=min(h, 23), minute=planned.minute if h < 24 else 59)
             slip = 0 if h <= ph else int((h - ph) * 60)
@@ -413,16 +418,20 @@ def odds(sit: Dict[str, Any], now: Optional[datetime], options: Optional[List[Di
     p_today = next((k["p"] for k in tcurve if k["hour"] >= now.hour + now.minute / 60.0), tcurve[0]["p"] if tcurve else 0.0)
     cancel = _cancel_risk(delay, planned.hour + planned.minute / 60.0) if (planned is not None and not cancelled) else None
     tr = sit.get("tracking") or {}
-    basis = (("The flight's own status, %s at %s (%s): %s" % (tr.get("source"), _clock(tr.get("last_updated")) or "an unknown time",
-              tr.get("status_word"), ("delayed %s" % narrator._hm(tr["delay_minutes"])) if tr.get("delay_minutes") else "no delay posted")
-             + ((", aircraft %s" % tr["aircraft"]) if tr.get("aircraft") else "") + ". What follows is still modelled: "
-             if tr.get("observed") else "Modelled from the hour and the delay, not from the airline's operation. ")
-             + ("The updated flight: a %s delay so far and a departure planned for %02d:%02d, a cancellation risk put at %d%%, "
-                "and a %d%% chance of leaving when the airline says with the rest slipping by the hour; anything past midnight is lost. "
-                % (narrator._hm(delay) if delay else "no", planned.hour, planned.minute, round(cancel * 100), round(_SLIP[0][1] * 100))
-                if cancel is not None else ("The flight is cancelled" + (" with no rebooking in hand" if sit.get("kind") == "cancelled" else "") + ", so only the alternatives count. "))
-             + "Flying today at all: every alternative on sale that still leaves 75 minutes after the hour is one more way out, "
-               "each given an even chance of taking you; %d leave today after now." % sum(1 for d in deps if d >= now + timedelta(minutes=BUFFER_MINUTES)))
+    hm12 = lambda t: t.strftime("%I:%M %p").lstrip("0")
+    upd = _parse(tr.get("last_updated"))
+    basis = (("The airline's own status%s: %s%s%s. The rest is still modelled. " % (
+                  (" at " + hm12(upd.astimezone(now.tzinfo))) if upd and upd.tzinfo else "", tr.get("status_word"),
+                  (", %s late" % narrator._hm(tr["delay_minutes"])) if tr.get("delay_minutes") else "",
+                  (", aircraft %s" % tr["aircraft"]) if tr.get("aircraft") else "")
+              if tr.get("observed") else "Modelled on the time of day and the delay so far. ")
+             + ("Your flight: %s, leaving at %s. We put the risk of cancellation at %d%%. We put the chance it leaves at the new time at %d%%. %s"
+                % (("%s late" % narrator._hm(delay)) if delay else "no delay yet", hm12(planned), round(cancel * 100), round(_SLIP[0][1] * 100),
+                   "After midnight, we count it as lost. " if planned.date() == now.date() else "")
+                if cancel is not None else "Your flight is canceled, so only other flights count. " if sit.get("kind") == "cancelled"
+                else "No new departure time yet, so only other flights count. ")
+             + "Flying today: each other flight leaving at least 75 minutes later adds an even chance. "
+               "%d still leave today." % sum(1 for d in deps if d >= now + timedelta(minutes=BUFFER_MINUTES)))
     return {"flight": {"p": round(p_flight, 2), "curve": fcurve}, "today": {"p": round(p_today, 2), "curve": tcurve},
             "modelled": True, "observed_status": bool(tr.get("observed")), "planned": planned.isoformat() if planned else None,
             "planned_passed": passed,
@@ -446,7 +455,7 @@ def brief(sit: Dict[str, Any], a: Dict[str, Any]) -> Dict[str, Any]:
                      "ahead_by": d(a["verdict"]["ahead_cents"]) if a["verdict"]["ahead_cents"] else None},
         "refund": {"expected": a["refund"]["expected"], "amount": d(a["refund"]["cents"]) if a["refund"]["cents"] else None, "why": a["refund"]["why"]},
         "alternatives": [{"flight": r["flight"], "route": " to ".join(r["route"] or []), "departs": _clock(r["depart"]), "arrives": _clock(r["arrive"]),
-                          "ticket": d(r["ticket_cents"]), "out_of_pocket": d(r["out_of_pocket_cents"]),
+                          "ticket": d(r["ticket_cents"]), "out_of_pocket": d(r["out_of_pocket_cents"]) if r["out_of_pocket_cents"] > 0 else "nothing",
                           "sooner": (narrator._hm(r["sooner_minutes"]) if r["sooner_minutes"] and r["sooner_minutes"] > 0 else None),
                           "hotel": d(r["hotel_cents"]) if r["hotel_cents"] else None, "net": d(r["net_cents"]), "stops": r["stops"]}
                          for r in a["options"][:3]],
@@ -473,17 +482,17 @@ def template(b: Dict[str, Any]) -> str:
         t = b["alternatives"][0]
         out = "Switch to %s, leaving %s and landing %s: %s out of pocket%s. %s." % (
             t["flight"], t["departs"], t["arrives"], t["out_of_pocket"],
-            " with the refund counted" if b["refund"]["expected"] else "", dec["reason"][0].upper() + dec["reason"][1:])
+            " after the refund" if b["refund"]["expected"] else "", dec["reason"][0].upper() + dec["reason"][1:])
     elif dec["action"] == "stay":
         out = "Stay with %s. %s." % (s["airline_offered"], dec["reason"][0].upper() + dec["reason"][1:])
     else:
         out = "Wait it out. %s." % (dec["reason"][0].upper() + dec["reason"][1:])
     if b.get("odds_you_fly_today") and dec["action"] != "switch":
-        out += " The odds of flying today on it are put at %s, modelled from the delay and the hour." % b["odds_you_fly_today"]
+        out += " Chance you fly today: %s (estimate)." % b["odds_you_fly_today"]
     if b.get("hotel_tonight"):
-        out += " The way on leaves tomorrow morning, so book a hotel near the airport tonight and ask the desk whether the airline covers it."
+        out += " The best option leaves tomorrow. Book a hotel near the airport and ask if the airline will pay."
     if b["rights"]:
-        out += " Ask for: " + "; ".join(r["what"].lower() for r in b["rights"][:3]) + "."
+        out += " You may ask for: " + "; ".join(r["what"] if r["what"][1:2].isupper() else r["what"][0].lower() + r["what"][1:] for r in b["rights"][:3]) + "."
     return out
 
 

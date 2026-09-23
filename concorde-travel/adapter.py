@@ -1353,7 +1353,7 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                                         .get("process_minutes") or {"p50": 60}),
             "booking": [{"who": (offer.get("owner") or {}).get("name", issuing),
                          "price_cents": total_cents, "direct": True,
-                         "note": "Airline inventory - bookable direct with %s" % issuing}],
+                         "note": "Book direct with the airline."}],
         }
         rating = (enr["carriers"]["ratings"] or {}).get(segments[0]["operating"]["carrier"])
         if rating:
@@ -1480,44 +1480,38 @@ def coverage(scenario: Dict[str, Any]) -> Dict[str, Any]:
     # and it is a more dangerous gap than an abstain: an abstain announces
     # itself in the ledger, a draft row prints a confident dollar figure.
     if tot["unreviewed_claims"]:
-        gaps.append("%d aircraft and connectivity claims come from the DRAFT fleet "
-                    "table, which has not been human-reviewed"
-                    % tot["unreviewed_claims"])
+        gaps.append("Aircraft and wifi details are a DRAFT we are still checking")
     if tot["default_bag_fees"]:
-        gaps.append("%d of %d options have no curated bag fees for their fare brand "
-                    "and were priced at the pessimistic default"
+        gaps.append("%d of %d fares have no known bag fees, so we priced bags high"
                     % (tot["default_bag_fees"], tot["options"]))
     if tot["abstained_claims"]:
         no_code = sum(1 for o in scenario.get("options", []) for s in o["segments"]
                       if s.get("equipment_code") in (None, "", "UNKNOWN"))
         if no_code == tot["segments"]:
-            gaps.append("no aircraft, cabin or connectivity claim can be made: the feed "
-                        "carries no equipment code")
+            gaps.append("No aircraft or wifi details: this search carries no equipment code")
         elif no_code:
             # Some segments named an aircraft and some did not. Saying the feed
             # carries no code would be false, and would send someone to the
             # wrong fix.
-            gaps.append("%d of %d segments name no aircraft, so their cabin and "
-                        "connectivity claims abstain" % (no_code, tot["segments"]))
+            gaps.append("%d of %d flights name no aircraft, so we skip their cabin and wifi details"
+                        % (no_code, tot["segments"]))
         else:
             # A different gap with a different fix: the feed did its job and the
             # curated table has not caught up. Saying "no equipment code" here
             # would send someone to change the wrong file.
             n = sum(1 for o in scenario.get("options", []) for s in o["segments"]
                     if ((s.get("claims") or {}).get("subfleet") or {}).get("coverage") == "none")
-            gaps.append("%d segment%s fl%s a type with no curated cabin configuration, so "
-                        "the aircraft claims there abstain"
-                        % (n, "" if n == 1 else "s", "ies" if n == 1 else "y"))
+            gaps.append("%d flight%s use%s a plane we have no cabin details for"
+                        % (n, "" if n == 1 else "s", "s" if n == 1 else ""))
     if tot["codeshare_segments"]:
-        gaps.append("%d of %d segments are codeshares, so even the operating carrier is unknown"
+        gaps.append("%d of %d flights are codeshares, so the airline flying them is unknown"
                     % (tot["codeshare_segments"], tot["segments"]))
     if tot["abstained_reliability"] == tot["segments"] and tot["segments"]:
-        gaps.append("no on-time record joined for any segment")
+        gaps.append("No on-time records for these flights yet")
     if not tot["options_with_bag_schedule"]:
-        gaps.append("no baggage fee schedule: the feed prices bags inline, so the "
-                    "fare-versus-bags comparison cannot run")
+        gaps.append("No bag fees listed, so fares with and without bags can't be compared")
     if tot["rated_carriers"] < tot["options"]:
-        gaps.append("%d of %d options fly a carrier with no curated rating"
+        gaps.append("%d of %d flights are on an airline we haven't rated"
                     % (tot["options"] - tot["rated_carriers"], tot["options"]))
     # Not a gap - the opposite. Duffel quotes a real bag price in
     # available_services, which is the one field where a feed beats the moat.
@@ -1538,15 +1532,14 @@ def coverage(scenario: Dict[str, Any]) -> Dict[str, Any]:
             if l.get("mct_source") == "not curated":
                 blind[l["airport"]] = blind.get(l["airport"], 0) + 1
     if blind:
-        gaps.append("%d layover%s at %s, which %s no curated connection time, "
-                    "terminal layout or opening hours - those stops are modelled "
-                    "on defaults"
+        gaps.append("%d layover%s at %s %s estimated: we lack connection times and opening hours there"
                     % (sum(blind.values()), "" if sum(blind.values()) == 1 else "s",
                        ", ".join(sorted(blind)),
-                       "has" if len(blind) == 1 else "have"))
+                       "is" if sum(blind.values()) == 1 else "are"))
     g = scenario.get("_ground") or {}
     if g.get("message"):
-        gaps.append(g["message"])
+        # a placeholder or missing ride is the gap a traveler must see, and the page shows the first
+        gaps.insert(len(gaps) if g["message"] == _ground.SUPPORT_NOTE["modelled"] else 0, g["message"])
 
     enrichment_gaps = len(gaps)
     for d in scenario.get("_dropped", []):
@@ -1554,14 +1547,13 @@ def coverage(scenario: Dict[str, Any]) -> Dict[str, Any]:
 
     enriched = tot["options_with_ground"] and tot["rated_carriers"]
     if not enriched or enrichment_gaps >= 4:
-        verdict = "grades are indicative only - most enrichment is missing"
+        verdict = "Grades are indicative: many details are estimated"
     elif tot["unreviewed_claims"]:
-        verdict = ("ground access, carrier quality and fare brands are curated; the "
-                   "aircraft claims are DRAFT and not yet reviewed")
+        verdict = "Rides, airline ratings and bag fees are researched; aircraft details are a DRAFT"
     elif tot["equipment_known"] == tot["segments"] and tot["segments"]:
-        verdict = "every layer this product prices is curated for these options"
+        verdict = "Every detail here comes from our own research"
     else:
-        verdict = "ground access and carrier quality are curated; aircraft claims are not"
+        verdict = "Rides and airline ratings are researched; aircraft details are not"
     return {"counts": tot, "gaps": gaps, "strengths": strengths, "verdict": verdict}
 
 
@@ -1788,9 +1780,9 @@ def from_serpapi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                                         .get(segments[0]["origin"]["iata"], {})
                                         .get("process_minutes") or {"p50": 60}),
             "booking": [{"who": airline_name, "price_cents": total_cents, "direct": True,
-                         "note": "Google Flights' price for the lowest fare; book on %s's own site"
+                         "note": "Price from Google Flights. Book on %s's own site."
                                  % airline_name}],
-            "_google": {"source": "Google Flights via SerpApi", "airline_logo": it.get("airline_logo"),
+            "_google": {"source": "Google Flights", "airline_logo": it.get("airline_logo"),
                         "total_duration": it.get("total_duration"),
                         "emissions_kg": (int(ce["this_flight"]) // 1000) if ce.get("this_flight") else None,
                         "typical_kg": (int(ce["typical_for_this_route"]) // 1000)
@@ -1902,15 +1894,15 @@ def price_signal(payload: Optional[Dict[str, Any]], lowest_now_cents: Optional[i
     median = vals[len(vals) // 2] if vals else None
     recent_low = min(v for _, v in hist[-30:]) if hist else None
     now = int(lowest_now_cents) if lowest_now_cents else None
-    verdict, reason = "typical", "no comparison to make"
+    verdict, reason = None, ""                   # no range and no history: no verdict, and the page shows none
     if now is not None and (low is not None or median is not None):
         if low is not None and high is not None:
             if now <= low:
-                verdict, reason = "book", "today's cheapest is at or under the low end of the typical range, $%d to $%d" % (low // 100, high // 100)
+                verdict, reason = "book", "low for this route, which usually runs $%d to $%d" % (low // 100, high // 100)
             elif now > high:
-                verdict, reason = "wait", "today's cheapest is above the typical range, $%d to $%d; it has been lower" % (low // 100, high // 100)
+                verdict, reason = "wait", "high for this route, which usually runs $%d to $%d" % (low // 100, high // 100)
             else:
-                verdict, reason = "typical", "today's cheapest sits inside the typical range, $%d to $%d" % (low // 100, high // 100)
+                verdict, reason = "typical", "normal for this route, which usually runs $%d to $%d" % (low // 100, high // 100)
         elif median is not None:
             if now <= median * 0.9:
                 verdict, reason = "book", "today's cheapest is %d%% under the recent median of $%d" % (round((1 - now / median) * 100), median // 100)
@@ -1920,7 +1912,7 @@ def price_signal(payload: Optional[Dict[str, Any]], lowest_now_cents: Optional[i
                 verdict, reason = "typical", "today's cheapest is near the recent median of $%d" % (median // 100)
     return {"level": ins.get("price_level"), "low_cents": low, "high_cents": high, "median_cents": median,
             "recent_low_cents": recent_low, "lowest_now_cents": now, "history": hist[-60:],
-            "verdict": verdict, "reason": reason, "source": "Google Flights price history, via SerpApi"}
+            "verdict": verdict, "reason": reason, "source": "Google Flights"}
 
 
 def merge_scenarios(main: Dict[str, Any], extra: Dict[str, Any], label: str) -> Dict[str, Any]:
