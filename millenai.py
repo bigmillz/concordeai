@@ -485,8 +485,12 @@ RETIRED_SUCCESSORS = {
     "Llama 3.3 70B":      ("GPT-OSS 120B", "Qwen 3.8 27B"),
     "Llama 4 Scout":      ("GPT-OSS 120B", "Qwen 3.8 27B"),
     "Qwen 3 235B MoE":    ("GPT-OSS 120B", "Qwen 3.8 27B"),
-    "GLM-5.2":            ("GLM 5.3", "DeepSeek V3.2 671B", "GPT-OSS 120B"),
-    "DeepSeek R1 671B":   ("DeepSeek V3.2 671B", "GLM 5.3", "GPT-OSS 120B"),
+    # the giant first only for someone who opted into giants (6b307);
+    # everyone else gets GPT-OSS 120B, or Qwen 3.8 27B below 96 GB
+    "GLM-5.2":            ("GLM 5.3", "DeepSeek V3.2 671B", "GPT-OSS 120B",
+                           "Qwen 3.8 27B"),
+    "DeepSeek R1 671B":   ("DeepSeek V3.2 671B", "GLM 5.3", "GPT-OSS 120B",
+                           "Qwen 3.8 27B"),
 }
 
 GROUP_TITLES = {"core": "General Models", "code": "Coding & Vision",
@@ -495,13 +499,22 @@ GROUP_TITLES = {"core": "General Models", "code": "Coding & Vision",
 # ------------------------------------------------- hardware-class ladder
 # The sidebar groups models by the MACHINE they need, not by family, and a
 # model that cannot fit this machine is not shown at all — a 16 GB Air
-# never sees a 70B, and only the 512 GB Studios ever see GLM-5.2.
+# never sees a 70B. The Titan class holds only the giants (over
+# GIANT_GB), and shows only when someone has opted into them.
 HW_CLASSES = [   # (key, header, resident-GB ceiling for the class)
     ("everyday",    "Everyday · any machine",   10),
     ("performance", "Performance · 32 GB",      20),
-    ("flagship",    "Flagship · 64–96 GB",      64),
-    ("titan",       "Titan · 128 GB+",          1e9),
+    ("flagship",    "Flagship · 64–128 GB",     128),
+    ("titan",       "Titan · 512 GB",           1e9),
 ]
+
+# THE GIANTS (6b307, per Patrick: "anything that requires more than 128
+# gigs of memory to run is probably pointless to have in there"). GLM
+# 5.3 and DeepSeek V3.2 need 390-430 GB, which only a 512 GB Mac Studio
+# has. They stay in the catalog, so auto-clean never deletes a download
+# someone chose, but every list hides them unless BOTH "ignore system
+# limits" and "include 128 GB+ models" are ticked.
+GIANT_GB = 128
 
 
 def hw_class(mem_gb: float) -> str:
@@ -557,14 +570,39 @@ _no_limits = {"v": None}
 
 def no_limits() -> bool:
     if _no_limits["v"] is None:
+        # NEVER CACHE A FAILED READ (6b307, found in review): this runs at
+        # import, before load_prefs exists, and the NameError used to be
+        # cached as False, so "no limits" was off after every restart
+        # while its box still showed ticked
         try:
             _no_limits["v"] = bool(load_prefs(None).get("no_limits"))
         except Exception:
-            _no_limits["v"] = False
+            return False
     return bool(_no_limits["v"])
 
 
+_giants = {"v": None}
+
+
+def giants_on() -> bool:
+    """The second box only counts while the first is ticked."""
+    if not no_limits():
+        return False
+    if _giants["v"] is None:
+        try:
+            _giants["v"] = bool(load_prefs(None).get("include_giants"))
+        except Exception:
+            return False           # see no_limits: a failed read isn't an answer
+    return bool(_giants["v"])
+
+
+def model_is_giant(label: str) -> bool:
+    return MODEL_MEM_BYTES.get(label, 0) > GIANT_GB * 1e9
+
+
 def model_fits_machine(label: str) -> bool:
+    if model_is_giant(label) and not giants_on():
+        return False
     if no_limits():
         # Patrick's "disobey the limits" switch: every supported model is
         # offered. The runtime admission check still referees actual RAM.
@@ -851,8 +889,10 @@ def _cloud_save_state(which: str, entry: dict, make_active=False):
 #             what makes "grey it out when no keys are active" TRUE
 #             rather than "no keys were active the last time one was
 #             typed in".
-#   400/404 — the MODEL is gone, so only that model is retired, and only
-#             for this session; the provider's other models carry on.
+#   400/404 — the MODEL is gone, so only that model is retired; the
+#             provider's other models carry on. Since 6b307 a 400 counts
+#             only when it says the model is gone, and a retirement
+#             lasts a day.
 _dead_models = set()
 _dead_lock = threading.Lock()
 
@@ -884,9 +924,22 @@ def _dead_seed():
         return
     _dead_loaded[0] = True
     try:
+        now = time.time()
         for v in (_cloud_all().get("providers") or {}).values():
+            stamps = v.get("dead_at") or {}
             for m in (v.get("dead") or []):
-                _dead_models.add(m)
+                # AN ENTRY WITHOUT A STAMP GETS ANOTHER CHANCE (6b307).
+                # Every one was written by the old any-400-is-forever
+                # rule: Patrick's Groq pick, openai/gpt-oss-120b, had sat
+                # on this list for a month, so Groq took no council seat
+                # and no Fast answer. A model really gone 404s once more
+                # and is retired again, with a stamp this time.
+                if m not in stamps:
+                    continue
+                when = float(stamps[m])
+                if now - when <= DEAD_TTL:
+                    _dead_models.add(m)
+                    _dead_when[m] = when
     except Exception:
         pass
 
@@ -935,7 +988,17 @@ def cloud_failure_kind(code: int, body: str) -> str:
         return "quota"
     if code in (401, 403):
         return "auth"
+    # Google answers a revoked or expired key with 400, not 401 (6b307):
+    # read as a bad request, it rotated models forever and the provider
+    # never turned red
+    if code == 400 and _BAD_KEY_RX.search(body or ""):
+        return "auth"
     return "other"
+
+
+_BAD_KEY_RX = re.compile(
+    r"api[ _-]?key (not valid|invalid|expired)|API_KEY_INVALID|"
+    r"invalid[ _-]api[ _-]key|invalid x-api-key", re.I)
 
 
 def cloud_cool(pid: str, note: str, secs: float = QUOTA_COOLDOWN):
@@ -961,8 +1024,13 @@ def cloud_glitch(c: dict, why: str):
     """A cloud model that didn't work, for any reason short of a bad key:
     drop it for a couple of minutes so the NEXT question doesn't spend a
     council seat on it, and let it come back by itself. Never raises —
-    this runs on the answer path."""
+    this runs on the answer path. Since 6b307 the MODEL rests and the
+    provider's next ranked model stands in; only a conf with no model
+    benches the whole provider."""
     try:
+        if c.get("model"):
+            cloud_rest_model(c["model"], GLITCH_COOLDOWN)
+            return
         pid = _provider_of(c)
         if pid:
             cloud_cool(pid, why, GLITCH_COOLDOWN)
@@ -970,10 +1038,39 @@ def cloud_glitch(c: dict, why: str):
         pass
 
 
+# An account out of money is not a throttle (6b307, found live: Moonshot
+# answers 429 "suspended due to insufficient balance", which read as a
+# rate limit and was retried every ten minutes forever).
+_NO_CREDIT_RX = re.compile(
+    r"insufficient[ _](balance|credits?|funds)|suspended|recharge|"
+    r"credit balance is too low|payment required", re.I)
+# A 400 that means the model is GONE, not that the request was wrong
+# (6b307): any 400 used to retire a model for good, across restarts,
+# including "prompt is too long" and a rejected parameter.
+_MODEL_GONE_RX = re.compile(
+    r"not[ _]found|no longer (available|supported)|deprecat|"
+    r"decommission|does not exist|unknown model|invalid model|"
+    r"model[^.]{0,40}not (available|supported)", re.I)
+DEAD_TTL = 24 * 3600.0
+
+
+_dead_when = {}          # model -> when it was retired (6b307)
+
+
 def cloud_model_alive(model: str) -> bool:
+    """False for a model the provider withdrew. A retirement lasts a day
+    (6b307): an unlucky 404 during an outage used to bench a model until
+    its key was re-pasted."""
     _dead_seed()
     with _dead_lock:
-        return model not in _dead_models
+        if model not in _dead_models:
+            return True
+        when = _dead_when.get(model)
+        if when and time.time() - when > DEAD_TTL:
+            _dead_models.discard(model)
+            _dead_when.pop(model, None)
+            return True
+        return False
 
 
 def cloud_revive(models: list):
@@ -982,6 +1079,10 @@ def cloud_revive(models: list):
     with _dead_lock:
         for m in models or []:
             _dead_models.discard(m)
+            _dead_when.pop(m, None)
+    with _model_rest_lock:
+        for m in models or []:
+            _model_rest.pop(m, None)
 
 
 def cloud_note_failure(c: dict, exc: Exception):
@@ -990,9 +1091,21 @@ def cloud_note_failure(c: dict, exc: Exception):
     try:
         code = getattr(exc, "code", 0)
         model = c.get("model", "")
-        kind = cloud_failure_kind(code, _http_body(exc))
+        body = _http_body(exc)
+        kind = cloud_failure_kind(code, body)
+        if kind == "quota" and _NO_CREDIT_RX.search(body):
+            pid = _provider_of(c)
+            if pid:
+                cloud_cool(pid, "out of credit \u2014 top up the account",
+                           3600.0)
+            return
         if kind == "quota":
-            # the key WORKS — sit the provider out and let it come back
+            # the key WORKS. When the provider names the model (Groq's
+            # per-model token budgets, Gemini's per-model free quota),
+            # only that model rests (6b307); otherwise the provider does
+            if model and model.lower() in body.lower():
+                cloud_rest_model(model, 300.0)
+                return
             pid = _provider_of(c)
             if pid:
                 cloud_cool(pid, "rate limited — resting")
@@ -1010,9 +1123,14 @@ def cloud_note_failure(c: dict, exc: Exception):
             cur["note"] = "key rejected (HTTP %d)" % code
             cur.pop("cool", None)
             _cloud_save_state(pid, cur)
-        elif kind == "other" and code not in (400, 404):
-            # a 5xx or anything else unexpected: not the key's fault and
-            # not the model's, so rest the provider briefly
+        elif kind == "other" and (code not in (400, 404) or (
+                code == 400 and not _MODEL_GONE_RX.search(body))):
+            # a 5xx ("high demand"), or a 400 about the REQUEST: not the
+            # key's fault, so the model rests briefly and the provider's
+            # next ranked model answers (6b307)
+            if model:
+                cloud_rest_model(model, GLITCH_COOLDOWN)
+                return
             pid = _provider_of(c)
             if pid:
                 cloud_cool(pid, "not answering (HTTP %d)" % code,
@@ -1020,17 +1138,23 @@ def cloud_note_failure(c: dict, exc: Exception):
         elif code in (400, 404) and model:
             with _dead_lock:
                 _dead_models.add(model)
+                _dead_when[model] = time.time()
             pid = _provider_of(c)
             if not pid:
                 return
             cur = dict((_cloud_all().get("providers") or {}).get(pid) or {})
             if not cur:
                 return
-            dead = list(cur.get("dead") or [])
-            if model not in dead:
-                dead.append(model)
-                cur["dead"] = dead[-12:]
-                _cloud_save_state(pid, cur)
+            # stamped EVERY time (6b307): an entry already on the list
+            # but unstamped or expired must be retired again on disk
+            dead = [m for m in (cur.get("dead") or []) if m != model]
+            dead.append(model)
+            cur["dead"] = dead[-12:]
+            stamps = dict(cur.get("dead_at") or {})
+            stamps[model] = time.time()
+            cur["dead_at"] = {m: stamps[m] for m in cur["dead"]
+                              if m in stamps}
+            _cloud_save_state(pid, cur)
     except Exception:
         pass
 
@@ -1062,17 +1186,15 @@ def _anthropic_stream(c: dict, messages: list, emit) -> bool:
                            if m.get("role") == "system")
     turns = [{"role": m["role"], "content": m["content"]}
              for m in messages if m.get("role") in ("user", "assistant")]
-    body = {"model": c["model"], "max_tokens": 4096, "stream": True,
-            "messages": turns}
-    if sys_txt:
-        body["system"] = sys_txt
+    body = _anthropic_body(c, turns, sys_txt, CLOUD_MAX_OUT["claude"],
+                           stream=True)
     req = urllib.request.Request(
         c["base"].rstrip("/") + "/messages", data=json.dumps(body).encode(),
         headers={"Content-Type": "application/json",
                  "x-api-key": c["key"],
                  "anthropic-version": "2023-06-01",
                  "User-Agent": "MillenAI/%s" % APP_VERSION})
-    got = False
+    got, stop = False, ""
     try:
         with urllib.request.urlopen(req, timeout=120) as r:
             for raw in r:
@@ -1084,10 +1206,13 @@ def _anthropic_stream(c: dict, messages: list, emit) -> bool:
                 except Exception:
                     continue
                 if d.get("type") == "content_block_delta":
+                    # thinking_delta blocks carry no "text": skipped
                     tok = (d.get("delta") or {}).get("text") or ""
                     if tok:
                         got = True
                         emit(tok)
+                elif d.get("type") == "message_delta":
+                    stop = (d.get("delta") or {}).get("stop_reason") or stop
     except urllib.error.HTTPError as exc:
         if not got:
             cloud_note_failure(c, exc)
@@ -1096,12 +1221,25 @@ def _anthropic_stream(c: dict, messages: list, emit) -> bool:
         if not got:
             cloud_glitch(c, "not responding")
         return got
-    if not got:
+    # A REFUSAL IS ABOUT THE QUESTION, NOT THE MODEL (6b307): Opus 5.5
+    # runs safety classifiers that can stop a turn, even after text has
+    # gone out. Wipe what was shown and let the next rung answer; resting
+    # a healthy Claude for it would punish the key. `_stop` tells a
+    # caller not to ask the same model again.
+    c["_stop"] = stop
+    if stop == "refusal":
+        if got:
+            try:
+                emit(NUL + "RESET" + NUL)
+            except Exception:
+                pass
+        return False
+    if not got and stop != "max_tokens":
         cloud_glitch(c, "returned nothing")
     return got
 
 
-def cloud_text(c: dict, messages: list, timeout: int = 60,
+def cloud_text(c: dict, messages: list, timeout: int = 120,
                max_tokens: int = 4096) -> str:
     """One buffered completion from a SPECIFIC provider conf — the
     council/merge offload path (6b219). Empty string = didn't work."""
@@ -1109,11 +1247,12 @@ def cloud_text(c: dict, messages: list, timeout: int = 60,
         if "anthropic.com" in c.get("base", ""):
             sys_txt = "\n\n".join(m["content"] for m in messages
                                    if m["role"] == "system")
-            payload = json.dumps({
-                "model": c["model"], "max_tokens": max_tokens,
-                "system": sys_txt,
-                "messages": [m for m in messages
-                             if m["role"] != "system"]}).encode()
+            # the caller's cap is a floor here: a thinking model pays for
+            # its reasoning out of max_tokens, and a short cap returned
+            # nothing at all (6b255, 6b307). Billing is by what's used.
+            payload = json.dumps(_anthropic_body(
+                c, [m for m in messages if m["role"] != "system"], sys_txt,
+                max(max_tokens, 16000), stream=False)).encode()
             req = urllib.request.Request(
                 c["base"].rstrip("/") + "/messages", data=payload,
                 headers={"x-api-key": c["key"],
@@ -1122,6 +1261,8 @@ def cloud_text(c: dict, messages: list, timeout: int = 60,
                          "User-Agent": "MillenAI/%s" % APP_VERSION})
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 d = json.loads(r.read().decode("utf-8", "replace"))
+            if d.get("stop_reason") == "refusal":
+                return ""          # partial text of a refused turn: no draft
             out = "".join(b.get("text", "")
                           for b in d.get("content", []))
             # A THINKING MODEL CAN SPEND THE WHOLE BUDGET THINKING
@@ -1132,22 +1273,17 @@ def cloud_text(c: dict, messages: list, timeout: int = 60,
             # out, not a broken provider: resting the key for it took a
             # healthy Claude off the bench for ten minutes.
             if not out.strip():
-                if d.get("stop_reason") == "max_tokens":
+                if d.get("stop_reason") in ("max_tokens", "refusal"):
                     return ""
                 cloud_glitch(c, "returned nothing")
             if _is_provider_error(out):
                 _cloud_budget_hit(c)
                 return ""
             return out
-        body = {"model": c["model"], "messages": messages,
-                "max_tokens": 4096, "temperature": 0.75}
-        # MOONSHOT PINS EACH MODEL'S LEGAL TEMPERATURE (6b247, found
-        # live: kimi-k2.7-code 400s "only 1 is allowed" on 0.75, so
-        # every council draft died while the save-probe — which sends
-        # no temperature — showed a green ✓). Omit it and take the
-        # server default, which is always legal.
-        if "moonshot" in c.get("base", ""):
-            body.pop("temperature")
+        # per-provider body (6b307): effort by role, Moonshot's pinned
+        # temperature left out, the provider's own output ceiling
+        body = _openai_body(c, messages, max(max_tokens, CLOUD_MAX_OUT.get(
+            _provider_of(c), 4096)), stream=False)
         payload = json.dumps(body).encode()
         req = urllib.request.Request(
             c["base"].rstrip("/") + "/chat/completions", data=payload,
@@ -1184,7 +1320,13 @@ CLOUD_SKIP_IDS = ("embed", "tts", "image", "imagen", "veo", "aqa",
                   # classifiers are not chat models: Groq's inventory
                   # carries llama-prompt-guard, and it once took a
                   # council seat (6b247, seen live)
-                  "guard", "moderation")
+                  "guard", "moderation",
+                  # 6b307: speech-to-text, voices, music, agents and a
+                  # 4K-context legacy model were all counting as chat
+                  "whisper", "orpheus", "allam", "safeguard", "lyria",
+                  "banana", "transcribe", "robotics", "computer-use",
+                  "deep-research", "antigravity", "customtools", "omni",
+                  "-eap")
 CLOUD_PICK_ORDER = {
     "gemini": ["gemini-3-flash", "gemini-3.0-flash", "flash-latest",
                "gemini-2.5-flash", "flash", "pro"],
@@ -1192,6 +1334,226 @@ CLOUD_PICK_ORDER = {
     "claude": ["sonnet", "haiku", "opus"],
     "kimi": ["kimi-k3", "k3", "kimi-latest", "k2"],
 }
+
+
+# RANKED, NOT MATCHED (6b307, per Patrick: "are all our cloud ones using
+# the most capable models?"). The substring lists above each named one
+# generation: "gemini-3-flash" never matched gemini-3.8-flash, and
+# "sonnet" beat opus. Each provider's ids are parsed for their version
+# and ranked, so a newer model is picked the day it shows up in the
+# inventory. CLOUD_PICK_ORDER stays as the tail for ids nobody parses.
+# Fable is left out on purpose: Opus 5.5 beats it on every published
+# benchmark at 40% of the price per task (Patrick chose Opus).
+_CLAUDE_ID = re.compile(
+    r"^claude-(opus|sonnet|haiku)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$")
+_GEM_FLASH = re.compile(r"^gemini-(\d+(?:\.\d+)*)-flash(-lite)?(-preview)?$")
+_QWEN_ID = re.compile(r"^qwen/qwen(\d+(?:\.\d+)*)-(\d+)b$")
+_KIMI_ID = re.compile(r"^kimi-k(\d+(?:\.\d+)*)$")
+
+
+def _vtuple(v: str) -> tuple:
+    return tuple(int(x) for x in v.split("."))
+
+
+def _probe_model(base: str, key: str, model: str):
+    """An 8-token hello to one model; raises HTTPError as the provider
+    answered. The key-save check, shared by every provider."""
+    hdr = {"Content-Type": "application/json",
+           "User-Agent": "MillenAI/%s" % APP_VERSION}
+    if "anthropic" in base:
+        hdr.update({"x-api-key": key, "anthropic-version": "2023-06-01"})
+        url = base + "/messages"
+    else:
+        hdr["Authorization"] = "Bearer " + key
+        url = base + "/chat/completions"
+    tq = urllib.request.Request(url, headers=hdr, data=json.dumps(
+        {"model": model, "max_tokens": 8,
+         "messages": [{"role": "user", "content": "hi"}]}).encode())
+    urllib.request.urlopen(tq, timeout=25).read(400)
+
+
+def cloud_candidates(pid: str, ids, role: str = "seat") -> list:
+    """This provider's models for `role`, best first. role: "seat" (a
+    council draft), "composite" (the final answer) or "fast"."""
+    ids = [i for i in dict.fromkeys(ids or []) if i]
+    out = []
+    if pid == "claude":
+        fams = {}
+        for i in ids:
+            m = _CLAUDE_ID.match(i)
+            if m:
+                fams.setdefault(m.group(1), []).append(
+                    ((int(m.group(2)), int(m.group(3) or 0)), i))
+        order = (("haiku", "sonnet") if role == "fast"
+                 else ("opus", "sonnet", "haiku"))
+        for f in order:
+            out += [i for _v, i in sorted(fams.get(f, []), reverse=True)]
+    elif pid == "gemini":
+        flash, lite = [], []
+        for i in ids:
+            m = _GEM_FLASH.match(i)
+            if m:
+                # newest version first; at a tie the GA id beats -preview
+                key = (_vtuple(m.group(1)), not m.group(3))
+                (lite if m.group(2) else flash).append((key, i))
+        flash = [i for _k, i in sorted(flash, reverse=True)]
+        lite = [i for _k, i in sorted(lite, reverse=True)]
+        # no pro rung: 3.x Pro has no free tier, and its 429 (limit 0)
+        # used to bench the whole provider
+        out = (lite + flash) if role == "fast" else flash
+    elif pid == "groq":
+        qw = []
+        for i in ids:
+            m = _QWEN_ID.match(i)
+            if m:
+                qw.append(((_vtuple(m.group(1)), int(m.group(2))), i))
+        qw = [i for _k, i in sorted(qw, reverse=True)]
+        oss = [i for i in ("openai/gpt-oss-120b", "openai/gpt-oss-20b")
+               if i in ids]
+        # Qwen holds the council SEAT (Patrick's pick). The fast rung and
+        # the final answer stay on gpt-oss: ~500 tok/s with no thinking
+        # wall, and a long merge is exactly what the free tier's ~1,000
+        # output tokens a minute turns away for Qwen (seen live)
+        out = (qw + oss) if role == "seat" else (oss + qw)
+    elif pid == "kimi":
+        ks = []
+        for i in ids:
+            m = _KIMI_ID.match(i)
+            if m:
+                ks.append((_vtuple(m.group(1)), i))
+        out = [i for _k, i in sorted(ks, reverse=True)]
+    for want in CLOUD_PICK_ORDER.get(pid, []):
+        out += [i for i in ids if want in i.lower() and i not in out]
+    return list(dict.fromkeys(out))
+
+
+# ONE MODEL RESTS, NOT THE PROVIDER (6b307). Found live the day these
+# picks moved: Groq's free tier gives qwen3.8-27b about 1,000 output
+# tokens a minute and turns away requests on a rolling estimate, and
+# gemini-3.8-flash answered 503 "high demand" twice while 3.7 answered
+# in 2.7s. Benching the whole provider for that took gpt-oss (the Fast
+# tier's first rung) down with Qwen. Now the model rests and the next
+# ranked model from the same provider takes its place.
+_model_rest = {}          # model id -> unix time it may be asked again
+_model_rest_lock = threading.Lock()
+
+
+def cloud_rest_model(model: str, secs: float):
+    if model:
+        with _model_rest_lock:
+            _model_rest[model] = max(_model_rest.get(model, 0.0),
+                                     time.time() + secs)
+
+
+def cloud_model_resting(model: str) -> bool:
+    with _model_rest_lock:
+        return _model_rest.get(model, 0.0) > time.time()
+
+
+def cloud_rest_left(pid: str, v: dict) -> int:
+    """Seconds until this provider can answer again, 0 if it can now.
+    Counts a provider-wide rest AND the case where every model it would
+    field is resting (6b307: those rests were invisible to Settings and
+    to Cloud Only, which told a user with a working key to add one)."""
+    now = time.time()
+    try:
+        left = float(v.get("cool") or 0) - now
+    except (TypeError, ValueError):
+        left = 0.0
+    if left > 0:
+        return int(left)
+    if not (v.get("key") and v.get("status", "ok") == "ok"):
+        return 0
+    if cloud_role_model(pid, v, "seat"):
+        return 0
+    ids = [v.get("model", "")] + list(v.get("models") or [])
+    with _model_rest_lock:
+        ends = [_model_rest.get(m, 0.0)
+                for m in cloud_candidates(pid, ids, "seat")[:4]]
+    ends = [e for e in ends if e > now]
+    return int(min(ends) - now) if ends else 0
+
+
+def cloud_role_model(pid: str, c: dict, role: str) -> str:
+    """The model this provider fields for `role` right now: the best
+    ranked one that is neither retired nor resting. Only the top few
+    are considered, so a provider never falls back to something far
+    below its pick; '' when all of them are out."""
+    ids = [c.get("model", "")] + list(c.get("models") or [])
+    cands = cloud_candidates(pid, ids, role)[:4] or [c.get("model", "")]
+    for m in cands:
+        if m and cloud_model_alive(m) and not cloud_model_resting(m):
+            return m
+    return ""
+
+
+# EFFORT PER ROLE (6b307). Every one of these models reasons before it
+# answers, and max_tokens pays for the reasoning too: at the old 4096
+# ceiling a hard question could spend it all thinking, come back empty,
+# and bench a healthy provider. Each value below was sent live first.
+_EFFORT = {"fast": "low", "seat": "medium", "composite": "high"}
+CLOUD_MAX_OUT = {"claude": 32000, "gemini": 16000, "groq": 8192,
+                 "kimi": 16000}
+
+
+def _anthropic_body(c: dict, turns: list, sys_txt: str, max_tokens: int,
+                    stream: bool) -> dict:
+    body = {"model": c["model"], "messages": turns,
+            "max_tokens": max_tokens}
+    if stream:
+        body["stream"] = True
+    if sys_txt:
+        body["system"] = sys_txt
+    # EFFORT ONLY WHERE IT WAS SEEN TO WORK (6b307, each sent live):
+    # Opus 4.5 and later, Sonnet 4.6 and later, Fable. Haiku 4.5 and
+    # Sonnet 4.5 400 on it. An id we can't parse gets none. No
+    # temperature: the thinking models own it.
+    if _claude_takes_effort(c["model"]):
+        body["output_config"] = {
+            "effort": _EFFORT.get(c.get("role") or "seat", "medium")}
+    return body
+
+
+def _claude_takes_effort(model: str) -> bool:
+    if model.startswith("claude-fable-"):
+        return True
+    m = _CLAUDE_ID.match(model)
+    if not m:
+        return False
+    ver = (int(m.group(2)), int(m.group(3) or 0))
+    return ((m.group(1) == "opus" and ver >= (4, 5))
+            or (m.group(1) == "sonnet" and ver >= (4, 6)))
+
+
+def _openai_body(c: dict, messages: list, max_tokens: int,
+                 stream: bool) -> dict:
+    base, model = c.get("base", ""), c.get("model", "")
+    role = c.get("role") or "seat"
+    body = {"model": model, "messages": messages, "max_tokens": max_tokens,
+            "temperature": 0.75}
+    if stream:
+        body["stream"] = True
+    if "moonshot" in base:
+        # MOONSHOT PINS EACH MODEL'S LEGAL TEMPERATURE (6b247, found
+        # live: kimi-k2.7-code 400s "only 1 is allowed" on 0.75). Omit it
+        # and take the server default, which is always legal.
+        body.pop("temperature")
+    elif "generativelanguage" in base:
+        # Gemini 3 is tuned at its default temperature; below it the
+        # thinking models can loop. Flash-Lite thinks minimally by
+        # default and is the Fast tier because of it: no effort sent.
+        body.pop("temperature")
+        if "-lite" not in model:
+            # medium even for the composite: "high" took 70s to say one
+            # word and drew 503s under load (both seen live, 6b307)
+            body["reasoning_effort"] = {"fast": "low"}.get(role, "medium")
+    elif "groq" in base:
+        if model.startswith("qwen/"):
+            # Qwen thinks in <think> tags unless told to hide them
+            body["reasoning_format"] = "hidden"
+        elif "gpt-oss" in model:
+            body["reasoning_effort"] = _EFFORT.get(role, "medium")
+    return body
 
 
 def _cloud_refresh_picks():
@@ -1211,10 +1573,14 @@ def _cloud_refresh_picks():
                 continue
             try:
                 if "anthropic" in v["base"]:
+                    # 20 per page by default: past 20 models the oldest,
+                    # Haiku first, fell off the list (6b307)
                     lq = urllib.request.Request(
-                        v["base"].rstrip("/") + "/models",
+                        v["base"].rstrip("/") + "/models?limit=1000",
                         headers={"x-api-key": v["key"],
-                                 "anthropic-version": "2023-06-01"})
+                                 "anthropic-version": "2023-06-01",
+                                 "User-Agent":
+                                     "MillenAI/%s" % APP_VERSION})
                 else:
                     lq = urllib.request.Request(
                         v["base"].rstrip("/") + "/models",
@@ -1231,17 +1597,17 @@ def _cloud_refresh_picks():
                 continue
             chat = [i for i in found
                     if not any(k in i.lower() for k in CLOUD_SKIP_IDS)]
-            pick = ""
-            for want in CLOUD_PICK_ORDER.get(pid, []):
-                pick = next((i for i in chat if want in i.lower()), "")
-                if pick:
-                    break
-            if not pick:
-                pick = (v.get("model") if v.get("model") in chat
-                        else (chat[0] if chat else ""))
-            inv = chat[:6] if chat else found[:6]
+            ranked = [i for i in cloud_candidates(pid, chat, "seat")
+                      if cloud_model_alive(i)]
+            pick = (ranked[0] if ranked
+                    else (v.get("model") if v.get("model") in chat
+                          else (chat[0] if chat else "")))
+            # the WHOLE chat inventory (6b307): six ids hid Haiku (11th
+            # of 12), gemini-3.8-flash and every Gemini 3.x model
+            inv = chat or found[:6]
             if pick and (pick != v.get("model")
-                         or inv != v.get("models")):
+                         or inv != v.get("models")
+                         or v.get("name") == "Groq 120B"):
                 updates[pid] = (v.get("key"), pick, inv)
         # the network calls above ran OUTSIDE the lock; apply the result
         # to a FRESH read inside it, and only to a provider whose key is
@@ -1253,6 +1619,8 @@ def _cloud_refresh_picks():
                     v2 = (d2.get("providers") or {}).get(pid)
                     if v2 and v2.get("key") == key:
                         v2["model"], v2["models"] = pick, inv
+                        if v2.get("name") == "Groq 120B":
+                            v2["name"] = "Groq"
                 _cloud_write(d2)
     except Exception:
         pass
@@ -1323,9 +1691,13 @@ def cloud_bench() -> list:
     bench = []
     for c in cloud_ok_providers():
         # a model the provider has retired 404s on every question — it
-        # burned a whole seat per council until it was skipped (6b233)
-        if not cloud_model_alive(c.get("model", "")):
+        # burned a whole seat per council until it was skipped (6b233);
+        # a resting one gives way to the next ranked model (6b307)
+        pid = _provider_of(c)
+        seat = cloud_role_model(pid, c, "seat")
+        if not seat:
             continue
+        c = dict(c, model=seat, role="seat")
         bench.append((c["name"], c))
         # alternates only on FREE tiers — Anthropic and Moonshot bill
         # per token, and the blind alternate once benched claude-opus-5
@@ -1335,8 +1707,12 @@ def cloud_bench() -> list:
         if ("anthropic" in c.get("base", "")
                 or "moonshot" in c.get("base", "")):
             continue
+        # Gemini fields no second seat (6b307): its "pro" sibling has no
+        # free tier and 429'd the whole provider (limit 0)
+        if pid == "gemini":
+            continue
         alts = [m for m in c.get("models", []) if m != c.get("model")
-                and cloud_model_alive(m)]
+                and cloud_model_alive(m) and not cloud_model_resting(m)]
         # A STRONGER SIBLING OR NONE (6b233). The old fallback took
         # alts[0] — any model at all — and once retired models started
         # being skipped it walked the inventory into things like
@@ -1358,29 +1734,33 @@ def cloud_bench() -> list:
 
 def compositor_ladder() -> list:
     """Confs to try for the COMPOSITE, strongest first (6b220): Claude,
-    then Kimi K3 (6b245 — frontier-class, 1M context), then Gemini
-    (upgraded to its pro model when the inventory has one), then Groq.
+    then Kimi K3 (6b245 — frontier-class, 1M context), then Gemini,
+    then Groq, each fielding its ranked best (6b307: Opus 5.5 for
+    Claude, the newest GA Flash for Gemini).
     Local Gemma 4 stays the no-cloud floor — it was only ever the best
     LOCAL compositor."""
     d = _cloud_all()
     pv = d.get("providers") or {}
     out = []
+    now = time.time()
     for pid in ("claude", "kimi", "gemini", "groq"):
         c = pv.get(pid)
         if not (c and c.get("status", "ok") == "ok" and c.get("key")
                 and c.get("base") and c.get("model")):
             continue
-        c = dict(c)
-        if pid == "gemini":
-            pro = next((m for m in c.get("models", [])
-                        if "pro" in m.lower() and cloud_model_alive(m)), "")
-            if pro:
-                c["model"] = pro
-        # the upgrade above, or the stored pick, may have been retired —
-        # a dead rung wastes a full round trip on every composite
-        if not cloud_model_alive(c.get("model", "")):
+        try:                       # out of credit / quota: it 429s anyway
+            if float(c.get("cool") or 0) > now:
+                continue
+        except (TypeError, ValueError):
+            pass
+        # the ranked best that is alive and not resting (6b307). The old
+        # Gemini "pro" swap landed on gemini-2.5-pro (restricted since
+        # 2026-09-18); a dead or resting rung wastes a full round trip
+        # on every composite
+        m = cloud_role_model(pid, c, "composite")
+        if not m:
             continue
-        out.append(c)
+        out.append(dict(c, model=m, role="composite"))
     return out
 
 
@@ -1408,16 +1788,13 @@ def fast_cloud_ladder() -> list:
                 continue
         except (TypeError, ValueError):
             pass
-        c = dict(c)
-        if pid == "claude":
-            light = next((m for m in c.get("models", [])
-                          if "haiku" in m.lower()
-                          and cloud_model_alive(m)), "")
-            if light:
-                c["model"] = light
-        if not cloud_model_alive(c.get("model", "")):
+        # each provider's own quick model (6b307): Haiku, Flash-Lite,
+        # gpt-oss at low effort. The Haiku downshift never fired before:
+        # the stored inventory stopped six ids short of it
+        m = cloud_role_model(pid, c, "fast")
+        if not m:
             continue
-        out.append(c)
+        out.append(dict(c, model=m, role="fast"))
     return out
 
 
@@ -1465,10 +1842,8 @@ def cloud_stream_conf(c: dict, messages: list, emit) -> bool:
         return False
     if "anthropic.com" in c.get("base", ""):
         return _anthropic_stream(c, messages, emit)
-    body = {"model": c["model"], "messages": messages,
-            "max_tokens": 4096, "temperature": 0.75, "stream": True}
-    if "moonshot" in c.get("base", ""):   # pinned temps — see cloud_text
-        body.pop("temperature")
+    body = _openai_body(c, messages, CLOUD_MAX_OUT.get(
+        _provider_of(c), 4096), stream=True)
     payload = json.dumps(body).encode()
     req = urllib.request.Request(
         c["base"].rstrip("/") + "/chat/completions", data=payload,
@@ -2289,7 +2664,10 @@ def plan_labels(plan: str) -> list:
     if plan == "full":
         return list(fits)
     if plan == "all":
-        return [l for l in MODEL_INFO if SUPPORTED.get(l)]
+        # every model there is, bar the giants unless opted in (6b307):
+        # on a 48 GB Mac "Max" offered 926 GB, 796 of it two models
+        return [l for l in MODEL_INFO if SUPPORTED.get(l)
+                and (giants_on() or not model_is_giant(l))]
     if plan == "basic":
         # the smallest capable brain: ~1 GB, instant town
         small = sorted(fits, key=lambda l: MODEL_INFO[l]["gb"])
@@ -2396,6 +2774,10 @@ def _mem_available():
 
 
 def model_fits_memory(label: str) -> bool:
+    # the giant gate holds at run time too (6b307): tiers, the merger,
+    # the fleet and every fallback ask this before starting a model
+    if model_is_giant(label) and not giants_on():
+        return False
     if no_limits():
         # "disobey the limits": admission stands down entirely — a 70B on
         # a 48GB Mac swaps hard, and that is the explicit ask
@@ -4397,8 +4779,8 @@ def generate_image(prompt: str, over: dict = None, sock=None) -> tuple:
     gem = (_cloud_all().get("providers") or {}).get("gemini") or {}
     if gem.get("key") and gem.get("status", "ok") == "ok":
         # newest first, as Google lists them today (6b294, probed live)
-        for mdl in ("gemini-3.1-flash-lite-image", "gemini-3.1-flash-image",
-                    "gemini-2.5-flash-image"):
+        # gemini-2.5-flash-image shuts down 2026-10-02 (6b307)
+        for mdl in ("gemini-3.1-flash-lite-image", "gemini-3.1-flash-image"):
             try:
                 req = urllib.request.Request(
                     "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -5544,6 +5926,17 @@ def _veo_video(prompt: str) -> str:
             if not name:
                 last = "no operation returned"
                 continue
+        except Exception as exc:
+            # only a SUBMIT that fails (quota, a withdrawn model) hands
+            # over to the next model (6b307)
+            last = str(exc)[:160]
+            continue
+        # A RENDER THAT STARTED IS THE ONLY TRY (6b307). Timing out and
+        # moving on started a second paid render while the first could
+        # still finish and bill, and three models in a row made the
+        # reader wait about twenty minutes. A refusal from one model
+        # is a refusal from the next.
+        try:
             for _ in range(90):               # up to ~7 minutes
                 time.sleep(5)
                 pr = urllib.request.Request(base + name + "?key=" + key,
@@ -5578,6 +5971,7 @@ def _veo_video(prompt: str) -> str:
                 last = "timed out waiting for the render"
         except Exception as exc:
             last = str(exc)[:160]
+        break
     raise RuntimeError(last or "the cloud could not make that video")
 
 
@@ -6941,8 +7335,12 @@ def setup_status() -> dict:
     # fit-filtered like the sidebar: the add-models panel never offers a
     # model this machine cannot hold resident
     stars_now = set(_starter_labels())
+    # an INSTALLED model is listed whatever the limits say (6b307): a
+    # giant downloaded while opted in, or a 70B from "no limits", must
+    # still have a row with a Remove button once the box is unticked
     for label in [l for l in MODEL_INFO
-                  if SUPPORTED.get(l) and model_fits_machine(l)]:
+                  if SUPPORTED.get(l) and (model_fits_machine(l)
+                                           or model_cached(l, pulled))]:
         kind, _target = MODEL_ROUTES[label]
         est = MLX_EST_BYTES.get(label, 5_000_000_000)
         with _setup_lock:
@@ -8601,11 +8999,22 @@ def run_cloud_only(messages: list, emit, status, step) -> None:
         if cloud_stream_conf(c, messages, emit):
             step("draft", "Drafted the answer", "done", lbl)
             return
-        # streaming failed — one non-streaming retry before giving up
-        text = strip_think(cloud_text(c, messages))
+        # streaming failed — one non-streaming retry before giving up,
+        # on whichever model the provider fields NOW (the one that just
+        # failed is resting), and not at all after a refusal (6b307)
+        _m2 = ("" if c.get("_stop") == "refusal"
+               else cloud_role_model(_provider_of(c), c, "seat"))
+        text = strip_think(cloud_text(dict(c, model=_m2), messages)) \
+            if _m2 else ""
         if text:
             emit(text)
             step("draft", "Drafted the answer", "done", lbl)
+            return
+        if c.get("_stop") == "refusal":
+            step("draft", "That provider declined", "done", lbl)
+            emit("☁️ **%s** declined to answer that one. Switch to **Fast**, "
+                 "**Thinking** or **Pro** and this machine will answer it."
+                 % lbl)
             return
         step("draft", "That provider dropped out", "done", lbl)
         emit(_cloud_all_down())
@@ -8622,19 +9031,21 @@ def _cloud_all_down() -> str:
     """What to say when Cloud Only has nothing left to ask. Names which
     providers are resting and for how long, because 'try again later' is
     useless without the later."""
-    resting, broken = [], []
+    resting, broken, keyed = [], [], 0
     for pid, v in (_cloud_all().get("providers") or {}).items():
         if not v.get("key"):
             continue
+        keyed += 1
         if v.get("status") == "fail":
             broken.append("**%s** — %s" % (pid.title(),
                                            v.get("note") or "not working"))
             continue
-        try:
-            left = int(float(v.get("cool") or 0) - time.time())
-        except (TypeError, ValueError):
-            left = 0
-        if left > 0:
+        # a provider rest OR every model it fields resting (6b307)
+        left = cloud_rest_left(pid, v)
+        if left > 0 and _NO_CREDIT_RX.search(v.get("note") or ""):
+            broken.append("**%s** — out of credit, top up the account"
+                          % pid.title())
+        elif left > 0:
             resting.append("**%s** — back in about %d minute%s"
                            % (pid.title(), max(1, left // 60),
                               "" if 60 <= left < 120 else "s"))
@@ -8644,7 +9055,10 @@ def _cloud_all_down() -> str:
     if broken:
         out.append("Needs a new key:\n\n"
                    + "\n".join("- " + b for b in broken))
-    if not resting and not broken:
+    if not resting and not broken and keyed:
+        out.append("Your cloud providers didn't answer this one — try "
+                   "again in a moment.")
+    elif not resting and not broken:
         out.append("Add a key under **Settings › Cloud power** — Gemini "
                    "and Groq both have free tiers.")
     out.append("Switch to **Fast**, **Thinking** or **Pro** and this "
@@ -8760,7 +9174,9 @@ def run_council(labels: list, messages: list, emit, status,
                     pass
                 run_mark(add=lbl)
                 try:
-                    t = strip_think(cloud_text(conf, messages))
+                    # inside the council's 75 s shared deadline (6b307),
+                    # so a stalled seat is rested before the merge
+                    t = strip_think(cloud_text(conf, messages, timeout=70))
                 except Exception:
                     t = ""
                     cloud_glitch(conf, "not responding")
@@ -8935,7 +9351,9 @@ def run_council(labels: list, messages: list, emit, status,
     # feed the merger only the strongest few answers, each truncated:
     # an unbounded merge prompt overflows small models' context and sends
     # them into repetition loops (seen in the wild with 8 full drafts)
-    cloud_names = {lbl for lbl, _c in cloud_bench()}
+    # the bench this council STARTED with (6b307): asking again after a
+    # seat rested relabels the provider and dropped the backup's draft
+    cloud_names = {lbl for lbl, _c in _bench}
     rank = {l: i for i, l in enumerate(MERGE_RANK)}
     good.sort(key=lambda d: -1 if d[0] in cloud_names
               else rank.get(d[0], 99))
@@ -9517,7 +9935,7 @@ def _agent_turn(driver, convo, budget: int = 8000) -> str:
     it on a retry rather than treating an empty turn as a dead key."""
     kind, who = driver
     if kind == "cloud":
-        return strip_think(cloud_text(who, convo, timeout=90,
+        return strip_think(cloud_text(who, convo, timeout=150,
                                       max_tokens=budget))
     parts = []
     try:
@@ -10384,7 +10802,7 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
     if load_prefs(None).get("turbo"):
         for _conf in (compositor_ladder() or
                       ([cloud_conf()] if cloud_conf() else [])):
-            raw = cloud_text(_conf, msgs, timeout=45)
+            raw = cloud_text(_conf, msgs, timeout=120)
             if raw:
                 engine = str(_conf.get("model") or "cloud")
                 break
@@ -10416,7 +10834,7 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
             and load_prefs(None).get("turbo")):
         out = []
         for _conf in compositor_ladder():
-            raw2 = cloud_text(_conf, msgs, timeout=45)
+            raw2 = cloud_text(_conf, msgs, timeout=120)
             m2 = re.search(r"\{[\s\S]*\}", raw2 or "")
             if not m2:
                 continue
@@ -11299,7 +11717,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     return 0
             provs = {k: {"status": v.get("status", ""),
                          "note": (v.get("note") or "")[:80],
-                         "cool": _cool_left(v),
+                         # model rests count too (6b307): a provider
+                         # whose every model is resting isn't "in use"
+                         "cool": max(_cool_left(v), cloud_rest_left(k, v)),
                          # real money where the provider will say (Kimi);
                          # '' where it won't — never invented
                          "balance": (cloud_balance(k, v)
@@ -11753,13 +12173,18 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"ok": True, "off": True})
                 return
             spec = {
+                # defaults only matter when discovery fails (6b307):
+                # gemini-2.5-flash is closed to new users, and the
+                # claude-sonnet-4-5 snapshot retires from 2026-09-29
                 "gemini": ("Gemini",
                            "https://generativelanguage.googleapis.com"
-                           "/v1beta/openai", "gemini-2.5-flash"),
-                "groq": ("Groq 120B", "https://api.groq.com/openai/v1",
+                           "/v1beta/openai", "gemini-3.8-flash"),
+                # the name is the provider, not a model: the seat is
+                # Qwen when Groq lets it, gpt-oss otherwise (6b307)
+                "groq": ("Groq", "https://api.groq.com/openai/v1",
                          "openai/gpt-oss-120b"),
                 "claude": ("Claude", "https://api.anthropic.com/v1",
-                           "claude-sonnet-4-5"),
+                           "claude-opus-5-5"),
                 # Moonshot's Kimi K3 (6b245, per Patrick): 2.8T-param MoE,
                 # open weights but ~64 H100s to self-host — so it joins as
                 # a provider, not a local row. OpenAI-compatible API; the
@@ -11791,15 +12216,19 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # save. The chat probe below then verifies the pick.
             found = []
             try:
+                # a bare Python-urllib UA gets 403'd at Groq's edge, which
+                # silently saved a stale default (6b307)
                 if "anthropic" in base:
                     lq = urllib.request.Request(
-                        base + "/models",
+                        base + "/models?limit=1000",
                         headers={"x-api-key": key,
-                                 "anthropic-version": "2023-06-01"})
+                                 "anthropic-version": "2023-06-01",
+                                 "User-Agent": "MillenAI/%s" % APP_VERSION})
                 else:
                     lq = urllib.request.Request(
                         base + "/models",
-                        headers={"Authorization": "Bearer " + key})
+                        headers={"Authorization": "Bearer " + key,
+                                 "User-Agent": "MillenAI/%s" % APP_VERSION})
                 raw = json.loads(urllib.request.urlopen(
                     lq, timeout=20).read().decode("utf-8", "replace"))
                 found = [str(m.get("id", "")).replace("models/", "")
@@ -11807,46 +12236,49 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          if m.get("id")]
             except Exception:
                 pass                      # discovery is best-effort
+            cands = []
             if found:
-                # chat-capable only, then prefer the fastest current
-                # line — the policy lives in CLOUD_SKIP_IDS/
-                # CLOUD_PICK_ORDER, shared with the boot refresh (6b247)
+                # chat-capable only, then the ranked best — the policy
+                # lives in CLOUD_SKIP_IDS/cloud_candidates, shared with
+                # the boot refresh (6b247, ranked since 6b307)
                 chat = [i for i in found
                         if not any(k in i.lower() for k in CLOUD_SKIP_IDS)]
-                prefs_order = CLOUD_PICK_ORDER.get(which, [])
-                for want in prefs_order:
-                    hit = next((i for i in chat if want in i.lower()), "")
-                    if hit:
-                        model = hit
-                        break
-                else:
-                    if chat:
-                        model = chat[0]
-                found = chat[:6] if chat else found[:6]
+                cands = cloud_candidates(which, chat, "seat")
+                if cands:
+                    model = cands[0]
+                elif chat:
+                    model = chat[0]
+                found = chat or found[:6]
             # live-test before saving: a bad key must fail HERE, not
-            # silently on the user's next question
+            # silently on the user's next question. A pick the provider
+            # says is gone hands over to the next ranked one (6b307).
+            # A BUSY OR THROTTLED PICK IS NOT A BAD KEY (6b307, found in
+            # review): a 503 "high demand" on gemini-3.8-flash, or Qwen's
+            # per-model token cap on Groq, saved a working key as failed
+            # and called it revoked. Those hand over too, and when every
+            # candidate is merely busy the key is saved with a note.
+            _next = [m for m in cands if m != model][:3]
+            _busy = False
             try:
-                if "anthropic" in base:
-                    tq = urllib.request.Request(
-                        base + "/messages",
-                        data=json.dumps({"model": model, "max_tokens": 8,
-                                         "messages": [{"role": "user",
-                                                       "content": "hi"}]}
-                                        ).encode(),
-                        headers={"x-api-key": key,
-                                 "anthropic-version": "2023-06-01",
-                                 "Content-Type": "application/json"})
-                else:
-                    tq = urllib.request.Request(
-                        base + "/chat/completions",
-                        data=json.dumps({"model": model, "max_tokens": 8,
-                                         "messages": [{"role": "user",
-                                                       "content": "hi"}]}
-                                        ).encode(),
-                        headers={"Authorization": "Bearer " + key,
-                                 "Content-Type": "application/json",
-                                 "User-Agent": "MillenAI/%s" % APP_VERSION})
-                urllib.request.urlopen(tq, timeout=25).read(400)
+                while True:
+                    try:
+                        _probe_model(base, key, model)
+                        break
+                    except urllib.error.HTTPError as _pe:
+                        _pb = _http_body(_pe)
+                        _gone = (_pe.code in (400, 404)
+                                 and _MODEL_GONE_RX.search(_pb))
+                        _mbusy = (_pe.code in (500, 502, 503, 504, 529)
+                                  or (_pe.code == 429
+                                      and model.lower() in _pb.lower()
+                                      and not _NO_CREDIT_RX.search(_pb)))
+                        if _next and (_gone or _mbusy):
+                            model = _next.pop(0)
+                            continue
+                        if _mbusy:
+                            _busy = True
+                            break
+                        raise
             except urllib.error.HTTPError as exc:
                 # the provider's OWN words beat "HTTP Error 400": Google
                 # answers 400 "Please pass a valid API key" for a bad key
@@ -11868,22 +12300,32 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # still answered 200 (found live, 6b235). Accept it, rest
                 # it, and say so.
                 if cloud_failure_kind(exc.code, raw or detail) == "quota":
+                    # an account with no money is saved too, but says so
+                    # and sits out an hour, not ten minutes (6b307)
+                    _broke = bool(_NO_CREDIT_RX.search(raw or detail))
                     _cloud_save_state(which, {"name": name, "base": base,
                                               "key": key, "model": model,
                                               "models": found,
                                               "status": "ok",
                                               "cool": time.time()
-                                              + QUOTA_COOLDOWN,
-                                              "note": "rate limited — "
-                                                      "resting"},
+                                              + (3600.0 if _broke
+                                                 else QUOTA_COOLDOWN),
+                                              "note": ("out of credit \u2014 "
+                                                       "top up the account"
+                                                       if _broke else
+                                                       "rate limited — "
+                                                       "resting")},
                                       make_active=True)
                     p = load_prefs(None); p["turbo"] = True; store_prefs(p)
                     self._send_json({
                         "ok": True, "name": name, "model": model,
                         "models": found,
-                        "warn": "key saved — %s is rate limited right now, "
-                                "so it sits out for a few minutes and comes "
-                                "back on its own." % which.title()})
+                        "warn": ("key saved — the %s account is out of "
+                                 "credit, so it sits out until it's topped "
+                                 "up." % which.title()) if _broke else
+                                ("key saved — %s is rate limited right now, "
+                                 "so it sits out for a few minutes and comes "
+                                 "back on its own." % which.title())})
                     return
                 # the provider says "Invalid API Key" for a REVOKED key and
                 # for a MANGLED one alike, so say which this looks like.
@@ -11942,8 +12384,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"ok": False, "err": str(exc)[:80]})
                 return
             p = load_prefs(None); p["turbo"] = True; store_prefs(p)
-            self._send_json({"ok": True, "name": name,
-                             "model": model, "models": found})
+            _ok = {"ok": True, "name": name, "model": model,
+                   "models": found}
+            if _busy:
+                _ok["warn"] = ("key saved — %s is busy right now and joins "
+                               "as soon as it answers." % which.title())
+            self._send_json(_ok)
             return
         if self.path == "/api/guest":
             # one tap, zero questions: a TEMPORARY pass — the cookie lives
@@ -12223,7 +12669,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     for _conf in (compositor_ladder() or
                                   ([cloud_conf()] if cloud_conf()
                                    else [])):
-                        out = cloud_text(_conf, msgs, timeout=45)
+                        out = cloud_text(_conf, msgs, timeout=120)
                         if out:
                             break
                 if not out:
@@ -12297,7 +12743,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          % (goal, reqs or "none", "; ".join(picks), out)}]
                     _fix = ""
                     for _conf in (compositor_ladder() or []):
-                        _fix = cloud_text(_conf, _audit, timeout=45)
+                        _fix = cloud_text(_conf, _audit, timeout=120)
                         if _fix:
                             break
                     _fix = (_fix or "").strip()
@@ -12351,6 +12797,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     store_prefs(cur, base)
                 if base is None and "no_limits" in d:
                     _no_limits["v"] = bool(d.get("no_limits"))
+                if base is None and "include_giants" in d:
+                    _giants["v"] = bool(d.get("include_giants"))
                 if base is None and any(k.startswith("contrib_") for k in d):
                     threading.Thread(target=contrib_apply, args=(cur,),
                                      daemon=True).start()
@@ -16290,21 +16738,23 @@ body.gen #chip-model{color:var(--accent)}
 #turbo-row{display:flex;gap:8px;align-items:flex-start;font-size:11.5px;
   color:var(--dim);margin:12px 2px 2px;cursor:pointer;line-height:1.5;
   text-align:left}
-#turbo-row input,#contrib-row input,#nolimits-row input,#share-row input,#beta-row input{
+#turbo-row input,#contrib-row input,#nolimits-row input,#share-row input,#beta-row input,
+#giants-row input{
   appearance:none;-webkit-appearance:none;
   width:17px;height:17px;flex:none;margin:0;border-radius:5px;
   border:1.5px solid var(--faint);background:rgba(255,255,255,.04);
   cursor:pointer;position:relative;transition:all .15s;
 }
 #turbo-row input:hover,#contrib-row input:hover,#nolimits-row input:hover,
-#share-row input:hover,#beta-row input:hover{
+#share-row input:hover,#beta-row input:hover,#giants-row:not(.off) input:hover{
   border-color:var(--accent-hot)}
 #turbo-row input:checked,#contrib-row input:checked,
-#nolimits-row input:checked,#share-row input:checked,#beta-row input:checked{
+#nolimits-row input:checked,#share-row input:checked,#beta-row input:checked,
+#giants-row input:checked{
   background:var(--accent);border-color:var(--accent)}
 #turbo-row input:checked::after,#contrib-row input:checked::after,
 #nolimits-row input:checked::after,#share-row input:checked::after,
-#beta-row input:checked::after{
+#beta-row input:checked::after,#giants-row input:checked::after{
   content:"";position:absolute;left:5px;top:1.5px;
   width:4px;height:9px;border:solid #14161c;
   border-width:0 2.2px 2.2px 0;transform:rotate(45deg)}
@@ -16667,6 +17117,15 @@ body.gen #chip-model{color:var(--accent)}
 #nolimits-row{display:flex;gap:8px;align-items:flex-start;
   font-size:11px;color:var(--faint);margin:10px 2px 0;cursor:pointer;
   line-height:1.5;text-align:left}
+/* 6b307: the giants box hangs under "no limits", greyed until it's on */
+.giants-row{display:flex;gap:8px;align-items:center;font-size:11px;
+  color:var(--faint);margin:6px 2px 0 24px;cursor:pointer;line-height:1.5;
+  text-align:left;transition:opacity .15s}
+.giants-row input{margin:0}
+.giants-row .hint{margin-left:2px}
+/* greyed, but the i stays readable: it explains why the box is there */
+.giants-row.off{cursor:default}
+.giants-row.off input,.giants-row.off span{opacity:.4;cursor:default}
 #setup-go{background:var(--accent);color:#1a1a1a;border:none}
 #setup-go:hover{background:var(--accent-hot);color:#000}
 #setup-go:disabled{opacity:.55;cursor:default}
@@ -17498,6 +17957,11 @@ __CODE_ROWS__
         Ignore system limits &mdash; offer every model in each list even
         beyond this machine&rsquo;s memory. May swap hard or crash;
         use at your own risk.</label>
+      <!-- 6b307, per Patrick: the giants sit behind a second box that
+           only wakes up once the first is ticked -->
+      <label id="wiz-giants" class="giants-row off"><input type="checkbox"
+        id="wiz-gi" disabled><span>Include 128 GB+ models</span><i
+        class="hint" title="Massive models: each one needs at least 512 GB of memory to run, and downloads about 400 GB.">i</i></label>
     </div>
 
     <div class="wstep" data-w="3" hidden>
@@ -17535,6 +17999,9 @@ __CODE_ROWS__
     <label id="nolimits-row"><input type="checkbox" id="nolimits">
       No limits — offer models beyond this machine&rsquo;s memory
       (can swap hard)</label>
+    <label id="giants-row" class="giants-row off"><input type="checkbox"
+      id="giants" disabled><span>Include 128 GB+ models</span><i
+      class="hint" title="Massive models: each one needs at least 512 GB of memory to run, and downloads about 400 GB.">i</i></label>
     <label id="share-row"><input type="checkbox" id="share-first">
       &#9889; Share GPU power — when idle, your machine helps answer the
       community&rsquo;s questions (off any time in Settings)</label>
@@ -21666,7 +22133,8 @@ function ckBoard(provs,active){
     return '<div class="ckm'+(rest?" rest":st==="ok"?" on"
         :st==="fail"?" bad":"")
       +'">'+mark+label
-      +(rest?' <i>· resting '+Math.ceil(cool/60)+'m · quota</i>'
+      +(rest?(/credit/i.test(note)?' <i>· out of credit · top up the account</i>'
+          :' <i>· resting '+Math.ceil(cool/60)+'m</i>')
         :st==="ok"&&id===active?' <i>· in use</i>':"")
       +(st==="ok"&&bal?' <i>· '+esc(bal)+'</i>':"")
       +(st==="fail"&&note?' <i>· '+esc(note)+'</i>':"")+'</div>';
@@ -21737,14 +22205,39 @@ $("#share-yes").addEventListener("click",()=>shareDone(true));
     });
   }catch(e){}
 })();
+/* the giants box only means something while "no limits" is on: greyed
+   and cleared otherwise, so a dim box never reads as a hidden "yes" */
+function paintGiants(nl,gi){
+  gi.disabled=!nl.checked;
+  if(!nl.checked)gi.checked=false;
+  gi.closest(".giants-row").classList.toggle("off",!nl.checked);
+}
+/* one pair of settings, two screens: whichever was ticked, both show it */
+function syncLimits(nlOn,giOn){
+  [["#nolimits","#giants"],["#wiz-nl","#wiz-gi"]].forEach(([a,b])=>{
+    const nl=$(a),gi=$(b);if(!nl||!gi)return;
+    nl.checked=!!nlOn;gi.checked=!!(nlOn&&giOn);paintGiants(nl,gi);
+  });
+}
 (async()=>{try{
-  $("#nolimits").checked=!!(await(await fetch("/api/prefs")).json()).no_limits;
+  const pr=await(await fetch("/api/prefs")).json();
+  syncLimits(pr.no_limits,pr.include_giants);
 }catch(e){}})();
 $("#nolimits").addEventListener("change",async()=>{
+  const on=$("#nolimits").checked;
+  syncLimits(on,$("#giants").checked);
   await fetch("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({no_limits:$("#nolimits").checked})});
+    body:JSON.stringify(on?{no_limits:true}
+      :{no_limits:false,include_giants:false})});
   setupTick();   // the plans + GB re-price under the new rules
+});
+$("#giants").addEventListener("change",async()=>{
+  syncLimits($("#nolimits").checked,$("#giants").checked);
+  await fetch("/api/prefs",{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({include_giants:$("#giants").checked})});
+  setupTick();
 });
 $("#models-flag").addEventListener("click",()=>{openSetup();});
 
@@ -21804,10 +22297,20 @@ $("#wiz-ac").addEventListener("change",async()=>{
   if(s)s.classList.toggle("on",$("#wiz-ac").checked);
 });
 $("#wiz-nl").addEventListener("change",async()=>{
+  const on=$("#wiz-nl").checked;
+  syncLimits(on,$("#wiz-gi").checked);
   await fetch("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({no_limits:$("#wiz-nl").checked})});
+    body:JSON.stringify(on?{no_limits:true}
+      :{no_limits:false,include_giants:false})});
   wizPaintPlans();          // the GB re-price under the new rules
+});
+$("#wiz-gi").addEventListener("change",async()=>{
+  syncLimits($("#wiz-nl").checked,$("#wiz-gi").checked);
+  await fetch("/api/prefs",{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({include_giants:$("#wiz-gi").checked})});
+  wizPaintPlans();
 });
 async function wizPaintProvs(){
   const box=$("#wiz-provs");

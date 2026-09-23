@@ -526,7 +526,8 @@ check("image generation: intent, engine ladder, settings box, wizard, arrow pill
       and _ii("generate a list of image formats") is None
       and "def generate_image" in _MILLENAI_SRC
       and "mflux-generate" in _MILLENAI_SRC and "image.pollinations.ai" in _MILLENAI_SRC
-      and "gemini-2.5-flash-image" in _MILLENAI_SRC
+      # 6b307: 2.5-flash-image shuts down 2026-10-02
+      and '("gemini-3.1-flash-lite-image", "gemini-3.1-flash-image")' in _MILLENAI_SRC
       and '"/api/image/install",' in _MILLENAI_SRC
       and set(_ist.keys()) >= {"supported", "ready", "gb", "status", "pct"}
       and 'id="studio-row"' in page and 'id="wiz-img"' in page
@@ -795,7 +796,8 @@ check("long-job engine: no double-run, honest exit codes",
       and "( %s ) > %s 2>&1; echo $? > %s" in _MILLENAI_SRC  # subshell, not brace
       and "__DONE__" in _MILLENAI_SRC)       # exit code from a file, not systemd
 check("thinking budget and rate-limit backoff",
-      'stop_reason") == "max_tokens"' in _MILLENAI_SRC
+      # 6b307: a refusal is also our cue to hand over, not to rest
+      'stop_reason") in ("max_tokens", "refusal")' in _MILLENAI_SRC
       and "budget=8000 + 6000 * _try" in _MILLENAI_SRC
       and "(4, 12, 25, 40)[_try]" in _MILLENAI_SRC)
 # 6b248: the Advanced council — menu row behind a divider, the picker
@@ -1149,6 +1151,205 @@ check("post-update sweep, endpoints, and the default wired",
       and 'id="wiz-ac" checked' in page)
 s, h, b = req("/api/model/update", cookie=K)
 check("update status answers", s == 200 and b'"state"' in b, b[:80])
+# 6b307, per Patrick ("are all our cloud ones using the most capable
+# models?"): ranked picks by version, a role per call with the effort
+# each role gets, one model resting instead of the provider, a 400 that
+# retires only a model the provider says is gone, and the giants behind
+# two boxes. Run for real against the inventories his keys returned on
+# 2026-09-22.
+def _exec_names(ns, names):
+    for _n in _ctree.body:
+        nm = getattr(_n, "name", None)
+        if nm is None and isinstance(_n, _ast.Assign):
+            nm = next((getattr(t, "id", None) for t in _n.targets), None)
+        if nm in names:
+            exec(_ast.get_source_segment(_MILLENAI_SRC, _n), ns)
+_cq = dict(_LH, APP_VERSION="t", urllib=__import__("urllib.request"))
+__import__("urllib.error")
+_exec_names(_cq, {"CLOUD_SKIP_IDS", "CLOUD_PICK_ORDER", "_CLAUDE_ID",
+    "_GEM_FLASH", "_QWEN_ID", "_KIMI_ID", "_vtuple", "cloud_candidates",
+    "_model_rest", "_model_rest_lock", "cloud_rest_model",
+    "cloud_model_resting", "cloud_role_model", "_EFFORT", "CLOUD_MAX_OUT",
+    "_anthropic_body", "_openai_body", "_dead_models", "_dead_lock",
+    "_dead_when", "DEAD_TTL", "cloud_model_alive", "_QUOTA_RX",
+    "QUOTA_COOLDOWN", "GLITCH_COOLDOWN", "_http_body", "cloud_failure_kind",
+    "_NO_CREDIT_RX", "_MODEL_GONE_RX", "cloud_note_failure", "cloud_glitch",
+    "_provider_of", "_claude_takes_effort", "_BAD_KEY_RX", "cloud_rest_left"})
+_cooled, _saved = [], []
+_cq.update(_dead_seed=lambda: None,
+           cloud_cool=lambda pid, note, secs=600.0: _cooled.append((pid, note, secs)),
+           _cloud_all=lambda: {"providers": {"groq": {"key": "k"}, "kimi": {"key": "k"},
+                                             "gemini": {"key": "k"}, "claude": {"key": "k"}}},
+           _cloud_save_state=lambda pid, cur: _saved.append((pid, cur)))
+_INV = {
+ "claude": ["claude-opus-5-5", "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
+            "claude-fable-5", "claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-4-6",
+            "claude-opus-4-6", "claude-opus-4-5-20251101", "claude-haiku-4-5-20251001",
+            "claude-sonnet-4-5-20250929"],
+ "gemini": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-pro-latest", "gemini-2.5-flash-lite",
+            "gemini-3-flash-preview", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite-preview",
+            "gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.5-flash-lite",
+            "gemini-omni-1.1-flash", "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.8-flash",
+            "gemini-flash-latest"],
+ "groq": ["qwen/qwen3.8-27b", "openai/gpt-oss-20b", "allam-2-7b", "openai/gpt-oss-120b",
+          "openai/gpt-oss-safeguard-20b", "meta-llama/llama-prompt-guard-2-22m",
+          "whisper-large-v3-turbo", "canopylabs/orpheus-v1-english"],
+ "kimi": ["kimi-k2.7-code", "kimi-k2.6", "kimi-k3", "kimi-k2.7-code-highspeed"]}
+_chat = {p: [i for i in v if not any(k in i.lower() for k in _cq["CLOUD_SKIP_IDS"])]
+         for p, v in _INV.items()}
+_cc = _cq["cloud_candidates"]
+check("ranked picks: the newest model of each line, by role",
+      _cc("claude", _chat["claude"], "seat")[0] == "claude-opus-5-5"
+      and _cc("claude", _chat["claude"], "composite")[0] == "claude-opus-5-5"
+      and _cc("claude", _chat["claude"], "fast")[0] == "claude-haiku-4-5-20251001"
+      and not any("fable" in i for i in _cc("claude", _chat["claude"], "seat")[:6])
+      and _cc("gemini", _chat["gemini"], "seat")[:2] == ["gemini-3.8-flash", "gemini-3.7-flash"]
+      and _cc("gemini", _chat["gemini"], "fast")[0] == "gemini-3.5-flash-lite"
+      and not any("pro" in i for i in _cc("gemini", _chat["gemini"], "seat")[:8])
+      and _cc("groq", _chat["groq"], "seat")[:2] == ["qwen/qwen3.8-27b", "openai/gpt-oss-120b"]
+      and _cc("groq", _chat["groq"], "fast")[0] == "openai/gpt-oss-120b"
+      # long merges stay on gpt-oss: Qwen's free-tier cap turns them away
+      and _cc("groq", _chat["groq"], "composite")[0] == "openai/gpt-oss-120b"
+      and _cc("kimi", _chat["kimi"], "seat")[0] == "kimi-k3",
+      "%r" % {p: _cc(p, _chat[p], "seat")[:2] for p in _chat})
+check("skip list keeps speech, voices and classifiers off the council",
+      _chat["groq"] == ["qwen/qwen3.8-27b", "openai/gpt-oss-20b", "openai/gpt-oss-120b"]
+      and "gemini-omni-1.1-flash" not in _chat["gemini"], "%r" % _chat["groq"])
+# a resting model gives way to the next ranked one from the same provider
+_cq["cloud_rest_model"]("gemini-3.8-flash", 60)
+_rm = _cq["cloud_role_model"]
+check("a resting model steps aside for the provider's next best",
+      _rm("gemini", {"model": "gemini-3.8-flash", "models": _chat["gemini"]}, "seat")
+          == "gemini-3.7-flash"
+      and _rm("groq", {"model": "qwen/qwen3.8-27b", "models": _chat["groq"]}, "fast")
+          == "openai/gpt-oss-120b")
+_ab, _ob = _cq["_anthropic_body"], _cq["_openai_body"]
+_g = "https://generativelanguage.googleapis.com/v1beta/openai"
+_gr, _mo = "https://api.groq.com/openai/v1", "https://api.moonshot.ai/v1"
+check("each role sends the effort that was verified live",
+      _ab({"model": "claude-opus-5-5", "role": "seat"}, [], "", 32000, True)
+          ["output_config"] == {"effort": "medium"}
+      and _ab({"model": "claude-opus-5-5", "role": "composite"}, [], "s", 32000, True)
+          ["output_config"] == {"effort": "high"}
+      and "output_config" not in _ab({"model": "claude-haiku-4-5-20251001",
+                                      "role": "fast"}, [], "", 16000, False)
+      and "temperature" not in _ab({"model": "claude-opus-5-5"}, [], "", 1, False)
+      and "temperature" not in _ob({"model": "gemini-3.8-flash", "base": _g}, [], 1, False)
+      and _ob({"model": "gemini-3.8-flash", "base": _g, "role": "composite"}, [], 1, False)
+          ["reasoning_effort"] == "medium"
+      and "reasoning_effort" not in _ob({"model": "gemini-3.5-flash-lite", "base": _g,
+                                         "role": "fast"}, [], 1, False)
+      and _ob({"model": "qwen/qwen3.8-27b", "base": _gr}, [], 1, False)
+          ["reasoning_format"] == "hidden"
+      and _ob({"model": "openai/gpt-oss-120b", "base": _gr, "role": "fast"}, [], 1, True)
+          ["reasoning_effort"] == "low"
+      and "temperature" not in _ob({"model": "kimi-k3", "base": _mo}, [], 1, False))
+def _herr(code, body):
+    return __import__("urllib.error").error.HTTPError(
+        "u", code, "m", {}, __import__("io").BytesIO(body.encode()))
+_nf = _cq["cloud_note_failure"]
+_cooled.clear()
+_nf({"base": "https://api.anthropic.com/v1", "model": "claude-haiku-4-5-20251001"},
+    _herr(400, '{"message":"This model does not support the effort parameter."}'))
+_n1 = (_cq["cloud_model_alive"]("claude-haiku-4-5-20251001")
+       and _cq["cloud_model_resting"]("claude-haiku-4-5-20251001"))
+_nf({"base": _g, "model": "gemini-2.5-pro"},
+    _herr(404, '{"message":"no longer available to new users"}'))
+_n2 = not _cq["cloud_model_alive"]("gemini-2.5-pro")
+_nf({"base": _gr, "model": "qwen/qwen3.8-27b"},
+    _herr(429, 'Request too large for model `qwen/qwen3.8-27b` on output tokens per minute'))
+_n3 = _cq["cloud_model_resting"]("qwen/qwen3.8-27b") and not _cooled
+_nf({"base": _mo, "model": "kimi-k3"},
+    _herr(429, '{"message":"account is suspended due to insufficient balance"}'))
+_n4 = bool(_cooled) and _cooled[-1][0] == "kimi" and "credit" in _cooled[-1][1] \
+    and _cooled[-1][2] >= 3600
+_cq["_dead_when"]["gemini-2.5-pro"] = time.time() - 25 * 3600
+_n5 = _cq["cloud_model_alive"]("gemini-2.5-pro")
+check("failures: a bad request rests, a gone model retires for a day, "
+      "a throttle rests one model, no credit says so",
+      _n1 and _n2 and _n3 and _n4 and _n5, "%r" % [_n1, _n2, _n3, _n4, _n5])
+# review fixes (6b307): effort only where each model took it live, a
+# 400 bad-key is an auth failure, a provider whose models all rest reads
+# as resting, a retirement is re-stamped every time
+_te = _cq["_claude_takes_effort"]
+_cq["_model_rest"].clear()
+for _m in _cc("groq", _chat["groq"], "seat")[:4]:
+    _cq["cloud_rest_model"](_m, 90)
+_rl = _cq["cloud_rest_left"]("groq", {"key": "k", "status": "ok",
+                                      "model": "qwen/qwen3.8-27b",
+                                      "models": _chat["groq"]})
+_cq["_model_rest"].clear()
+_saved.clear()
+for _i in range(2):
+    _nf({"base": _g, "model": "gemini-9-gone"},
+        _herr(404, '{"message":"model not found"}'))
+check("review fixes: effort by family, bad-key 400, model-level rest shown, re-stamped",
+      _te("claude-opus-5-5") and _te("claude-opus-4-5-20251101")
+      and _te("claude-sonnet-4-6") and _te("claude-fable-5-1")
+      and not _te("claude-sonnet-4-5-20250929")
+      and not _te("claude-haiku-4-5-20251001") and not _te("claude-mystery")
+      and _cq["cloud_failure_kind"](400, "API key not valid. Please pass a valid API key.") == "auth"
+      and _cq["cloud_failure_kind"](400, "prompt is too long") == "other"
+      and 60 <= _rl <= 90
+      and len(_saved) == 2 and all("gemini-9-gone" in (c.get("dead_at") or {})
+                                   for _p, c in _saved),
+      "%r" % [_rl, len(_saved)])
+check("review fixes: refusals wipe and hand over, honest Cloud Only, synced boxes",
+      'c["_stop"] = stop' in _MILLENAI_SRC
+      and 'if d.get("stop_reason") == "refusal":' in _MILLENAI_SRC
+      and "Your cloud providers didn't answer this one" in _MILLENAI_SRC
+      and "cloud_names = {lbl for lbl, _c in _bench}" in _MILLENAI_SRC
+      and "cloud_text(conf, messages, timeout=70)" in _MILLENAI_SRC
+      and "_busy = True" in _MILLENAI_SRC
+      and "if model_is_giant(label) and not giants_on():\n        return False\n    if no_limits():" in _MILLENAI_SRC
+      and _MILLENAI_SRC.count("        except Exception:\n            return False") >= 2
+      and "function syncLimits" in page and "out of credit · top up the account" in page)
+# the giants: hidden unless BOTH boxes are ticked, never in "Max" otherwise
+_gz = dict(_LH)
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("CATALOG = ["):
+                   _MILLENAI_SRC.index("GROUP_TITLES = {")], _gz)
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("MODEL_INFO = {c[0]"):
+                   _MILLENAI_SRC.index("# a model is usable here")], _gz)
+_GP = {"no_limits": False, "include_giants": False}
+_gz.update(MODEL_MEM_BYTES={l: i["mem"] for l, i in _gz["MODEL_INFO"].items()},
+           SUPPORTED={l: True for l in _gz["MODEL_INFO"]},
+           machine_budget_bytes=lambda: 40e9,
+           no_limits=lambda: _GP["no_limits"],
+           load_prefs=lambda base=None: dict(_GP),
+           _starter_labels=lambda: [])
+_exec_names(_gz, {"GIANT_GB", "_giants", "giants_on", "model_is_giant",
+                  "model_fits_machine", "plan_labels", "_family_of", "_gen_of"})
+def _gz_set(nl, gi):
+    _GP.update(no_limits=nl, include_giants=gi); _gz["_giants"]["v"] = None
+_big = [l for l, i in _gz["MODEL_INFO"].items() if i["mem"] > 128e9]
+_gz_set(False, False); _v0 = [_gz["model_fits_machine"](l) for l in _big]
+_max0 = _gz["plan_labels"]("all")
+_gz_set(True, False); _v1 = [_gz["model_fits_machine"](l) for l in _big]
+_gz_set(False, True); _v2 = [_gz["model_fits_machine"](l) for l in _big]
+_gz_set(True, True); _v3 = [_gz["model_fits_machine"](l) for l in _big]
+_max3 = _gz["plan_labels"]("all")
+check("128 GB+ models only with both boxes ticked, and never in Max otherwise",
+      _big and not any(_v0 + _v1 + _v2) and all(_v3)
+      and not set(_big) & set(_max0) and set(_big) <= set(_max3)
+      and _gz["model_fits_machine"]("GPT-OSS 120B") in (True, False),
+      "%r" % [_big, _v0, _v1, _v2, _v3])
+check("cloud wiring: ranked everywhere, no 6-id cap, no 4096 wall, one render try",
+      "chat[:6]" not in _MILLENAI_SRC
+      and '"max_tokens": 4096, "stream": True' not in _MILLENAI_SRC
+      and "_anthropic_body(c, turns, sys_txt, CLOUD_MAX_OUT" in _MILLENAI_SRC
+      and "cloud_role_model(pid, c, \"composite\")" in _MILLENAI_SRC
+      and "cloud_role_model(pid, c, \"fast\")" in _MILLENAI_SRC
+      and "/models?limit=1000" in _MILLENAI_SRC
+      and '"claude-opus-5-5"),' in _MILLENAI_SRC
+      and "A RENDER THAT STARTED IS THE ONLY TRY" in _MILLENAI_SRC
+      and 'if not got and stop != "max_tokens":' in _MILLENAI_SRC
+      # the month-old unstamped entry that kept Groq off every council
+      and "AN ENTRY WITHOUT A STAMP GETS ANOTHER CHANCE" in _MILLENAI_SRC)
+check("giants boxes: greyed until no-limits, with the 512 GB tooltip",
+      'id="giants" disabled' in page and 'id="wiz-gi" disabled' in page
+      and page.count("at least 512 GB of memory") >= 2
+      and "function paintGiants" in page and "include_giants:false" in page
+      and "Titan · 512 GB" in _MILLENAI_SRC)
 # 6b283, per Patrick (twice): the Clean-up button and note were clipped
 # below the settings card — the card is a grid whose row grew to its
 # content; the row is bounded now and the pane scrolls

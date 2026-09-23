@@ -5033,3 +5033,73 @@ would have met both. It now stands down on the update launch, keeping
 its own promise of one card per launch. (3) The Models pane's "Model
 updates…" button opened the installer; it now says "Add models…", and
 the command palette has both.
+
+## 6b307 — the most capable cloud model in every role, and the giants behind two boxes (uncut)
+
+Per Patrick ("for claude api, which model does it use? are all our cloud
+ones using the most capable models?"). A 20-agent workflow (a researcher
+per provider, two adversarial verifiers each, a code audit) and then
+every setting sent to the live APIs with his keys before it went in.
+
+WHAT EACH ROLE USES NOW (his inventories, 2026-09-22):
+- Claude: Opus 5.5 for the council seat (effort medium) and the final
+  answer (effort high); Haiku 4.5 on the Fast tier (no effort: Haiku
+  400s on it, verified). Was Sonnet 5 everywhere. Patrick chose Opus 5.5
+  over Fable 5.1, which trails it on every published benchmark at 2.5x
+  the price.
+- Gemini: 3.8 Flash for seat and final answer (medium effort: "high"
+  took 70s to say one word and drew 503s), 3.5 Flash-Lite on Fast. Was
+  3-flash-preview, and the final answer swapped to gemini-2.5-pro.
+- Groq: Qwen 3.8 27B for the seat, gpt-oss-120b as the second seat, the
+  final-answer rung and the Fast tier (low effort). His free tier gives
+  Qwen ~1,000 output tokens a minute, enforced on a rolling estimate,
+  so on that key gpt-oss does most of the work.
+- Kimi: K3, unchanged. His Moonshot account is suspended for
+  insufficient balance; the app now says "out of credit" and rests it
+  an hour instead of calling it a rate limit every ten minutes.
+
+HOW. Picks are RANKED by parsed version (cloud_candidates), not matched
+by substring, so a newer model is picked the day it appears. The whole
+chat inventory is stored (six ids hid Haiku and every Gemini 3.x), and
+Anthropic's list is read with limit=1000. Each call carries a role;
+_anthropic_body/_openai_body send the effort that role gets, verified
+live per provider, with output ceilings raised from 4096 (thinking
+models spent it all thinking and came back empty).
+
+FAILURES. A throttle, overload or bad request now rests the MODEL and
+the provider's next ranked model stands in (cloud_role_model); only a
+provider-wide quota benches the provider. A model is retired only on a
+404 or a 400 that says it is gone, for a day. Found live: Patrick's
+Groq pick, gpt-oss-120b, had sat on the dead list for a month under the
+old any-400-is-forever rule, so Groq took no council seat and no Fast
+answer. Unstamped entries get another chance.
+
+ALSO. gemini-2.5-flash-image left the image ladder (shuts down
+2026-10-02). Veo tries the next model only when a submit fails; a
+render that started is the only try. Save-time defaults moved off
+retiring ids. Refusals (Opus 5.5 safety classifiers) hand over to the
+next rung without resting Claude.
+
+THE GIANTS, per Patrick ("anything that requires more than 128 gigs of
+memory to run is probably pointless"): GLM 5.3 (430 GB) and DeepSeek
+V3.2 (390 GB) stay in the catalog so auto-clean never deletes a
+download someone chose, but every list hides them unless both "ignore
+system limits" and the new "Include 128 GB+ models" box (greyed until
+the first is ticked, with an i tooltip about 512 GB) are on. "Max" on a
+48 GB Mac drops from 926 GB to 130 GB. The Titan group holds only them.
+
+REVIEWED before it shipped: five reviewers (request bodies, failure
+states, ranking, giants/UI, regressions), every finding put to a
+skeptic; 31 confirmed, 19 distinct, all fixed. The ones that mattered:
+a refusal after text had streamed shipped the partial as the answer
+(now wiped with RESET and handed to the next rung); Cloud Only told a
+user with a working key to "add a key" once model-level rests hid the
+provider (cloud_rest_left now feeds that message and Settings); a busy
+or throttled top pick at key save marked a good key failed; Google's
+400 for a revoked key read as a bad request; "no limits" was silently
+off after EVERY restart (the import-time read failed before load_prefs
+existed and the failure was cached; the giants box inherited it); an
+installed giant still ran in tiers with the gate closed; Groq's final
+answer went to Qwen, which the free tier turns away (gpt-oss now); the
+effort parameter was sent to Sonnet 4.5, which 400s on it (effort now
+only on Opus 4.5+, Sonnet 4.6+ and Fable, each probed live).
