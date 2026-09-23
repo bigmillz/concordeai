@@ -459,6 +459,36 @@ RETIRED_MODELS = {
                           377.6),
 }
 
+# WHAT REPLACES EACH (6b306, per Patrick: "keep users current on their
+# models while also not forcing them to sit there and wait for a 20
+# gigabyte download just because the app auto updated"). Best first.
+# ANY of them installed means the old model does nothing this machine
+# can't already do, so the automatic pass may delete it. With none
+# installed, Update models downloads the first that runs on this
+# machine and deletes the old one only once the new one is complete.
+# Like for like on size where the lineage allows: a 2B was picked for
+# speed, so its replacement is small too.
+RETIRED_SUCCESSORS = {
+    "Gemma 2 2B":         ("Llama 3.2 3B", "Gemma 4 12B"),
+    "Gemma 2 9B IT":      ("Gemma 4 12B", "Qwen 3.5 9B", "Llama 3.2 3B"),
+    "Llama 3.1 8B":       ("Qwen 3.5 9B", "Hermes 3 8B", "Llama 3.2 3B"),
+    "Qwen 2.5 7B":        ("Qwen 3.5 9B", "Llama 3.2 3B"),
+    "DeepSeek R1":        ("DeepSeek R1 8B", "Qwen 3.5 9B"),
+    "Mistral Small 24B":  ("Ministral 3 14B", "Gemma 4 26B", "Qwen 3.5 9B"),
+    "Mistral Nemo 12B":   ("Ministral 3 14B", "Qwen 3.5 9B"),
+    "Qwen 2.5 Coder 7B":  ("Qwen 3.5 9B", "Qwen 3.8 27B"),
+    "Qwen 2.5 Coder 14B": ("Qwen 3.8 27B", "Qwen 3.5 9B"),
+    "Phi-4 14B":          ("Ministral 3 14B", "Qwen 3.5 9B"),
+    "DeepSeek R1 7B":     ("DeepSeek R1 8B", "Qwen 3.5 9B"),
+    "LLaVA Vision 7B":    ("Qwen 3.5 Vision 9B",),
+    "Qwen 3.6 27B":       ("Qwen 3.8 27B", "Qwen 3.5 9B"),
+    "Llama 3.3 70B":      ("GPT-OSS 120B", "Qwen 3.8 27B"),
+    "Llama 4 Scout":      ("GPT-OSS 120B", "Qwen 3.8 27B"),
+    "Qwen 3 235B MoE":    ("GPT-OSS 120B", "Qwen 3.8 27B"),
+    "GLM-5.2":            ("GLM 5.3", "DeepSeek V3.2 671B", "GPT-OSS 120B"),
+    "DeepSeek R1 671B":   ("DeepSeek V3.2 671B", "GLM 5.3", "GPT-OSS 120B"),
+}
+
 GROUP_TITLES = {"core": "General Models", "code": "Coding & Vision",
                 "big": "Large Models"}
 
@@ -3178,6 +3208,7 @@ def _download_model(label: str):
                 pass
         with _setup_lock:
             _setup_jobs[label] = {"status": "done", "note": ""}
+        _ledger_add(label)
         _spawn_mlx_engine(label)
     except Exception as exc:
         with _setup_lock:
@@ -5975,6 +6006,41 @@ def store_prefs(d: dict, base=None):
         except OSError:
             pass
         raise
+
+
+# THE MODELS THIS APP PUT ON DISK (6b306). Auto-clean is on by default
+# now, and an Ollama tag or a Hugging Face cache pulled for some other
+# tool looks exactly like one of ours. The automatic pass deletes only
+# models listed here. An install that predates the list vouches for
+# every model it knows (the app was the only thing offering them); a
+# brand-new install starts empty and records each download as it lands.
+def _ledger() -> set:
+    v = load_prefs(None).get("app_models")
+    return set(v) if isinstance(v, list) else set()
+
+
+def _ledger_add(label: str):
+    try:
+        with _prefs_lock:
+            p = load_prefs(None)
+            have = p.get("app_models")
+            # not seeded yet (a dev instance before the real app's first
+            # run): creating it here would stop that run vouching for
+            # the models already installed
+            if not isinstance(have, list):
+                return
+            if label not in have:
+                p["app_models"] = have + [label]
+                store_prefs(p)
+    except Exception:
+        pass
+
+
+def _ledger_seed(prefs: dict, existing: bool):
+    """Called once, under _prefs_lock, on the first run that has the list."""
+    if "app_models" not in prefs:
+        prefs["app_models"] = ([*MODEL_INFO, *RETIRED_MODELS]
+                               if existing else [])
 _chats_lock = threading.Lock()
 
 
@@ -6326,6 +6392,7 @@ def _ollama_install_worker(labels: list):
             with _setup_lock:
                 _setup_jobs[label] = {"status": "done", "note": "",
                                       "pct": 100}
+            _ledger_add(label)
         except Exception as exc:
             with _setup_lock:
                 _setup_jobs[label] = {"status": "error",
@@ -6385,10 +6452,11 @@ def _batch_labels() -> list:
     return batch or list(STARTER_LABELS)
 
 
-def _downloaded_bytes(pulled) -> tuple:
-    """(bytes on disk, bytes expected) across the batch in play."""
+def _downloaded_bytes(pulled, labels=None) -> tuple:
+    """(bytes on disk, bytes expected) across the batch in play, or
+    across `labels` when given (Update models, 6b306)."""
     have = want = 0
-    for label in _batch_labels():
+    for label in (_batch_labels() if labels is None else labels):
         if label in _STUDIO_ROWS:
             _k = _STUDIO_ROWS[label]
             _t = studio_tier(_k)
@@ -6416,7 +6484,7 @@ def _downloaded_bytes(pulled) -> tuple:
 _dl_hist = []          # (ts, bytes) over the last minute, one per 2s
 
 
-def _dl_speed(have: int) -> float:
+def _dl_speed(have: int, hist=None) -> float:
     """Bytes/sec measured across a ROLLING WINDOW, not between two polls.
 
     The old estimate sampled on every call, and this endpoint is polled by
@@ -6427,18 +6495,19 @@ def _dl_speed(have: int) -> float:
     forever (seen live, 6b299). A window immune to poll frequency fixes
     it: at most one sample every 2s, speed taken end to end across up to
     60s of them."""
+    h = _dl_hist if hist is None else hist
     now = time.time()
-    if not _dl_hist or now - _dl_hist[-1][0] >= 2.0:
-        _dl_hist.append((now, have))
-        while len(_dl_hist) > 2 and now - _dl_hist[0][0] > 60:
-            _dl_hist.pop(0)
+    if not h or now - h[-1][0] >= 2.0:
+        h.append((now, have))
+        while len(h) > 2 and now - h[0][0] > 60:
+            h.pop(0)
     # a batch that restarted (bytes went backwards) invalidates the window
-    if len(_dl_hist) >= 2 and have < _dl_hist[0][1]:
-        del _dl_hist[:-1]
-    if len(_dl_hist) < 2:
+    if len(h) >= 2 and have < h[0][1]:
+        del h[:-1]
+    if len(h) < 2:
         return 0.0
-    dt = _dl_hist[-1][0] - _dl_hist[0][0]
-    db = _dl_hist[-1][1] - _dl_hist[0][1]
+    dt = h[-1][0] - h[0][0]
+    db = h[-1][1] - h[0][1]
     if dt < 4.0 or db <= 0:
         return 0.0            # no honest measurement yet: say nothing
     return db / dt
@@ -6447,32 +6516,78 @@ def _dl_speed(have: int) -> float:
 _job_watch = {}   # label -> (pct, ts of last movement)
 
 
-def superseded_installed(pulled=None) -> list:
-    """Installed models made redundant by an installed NEWER generation
-    of the same family — Gemma 2 9B once a Gemma 4 is on disk (6b265,
-    per Patrick: "remove models that are no longer supported"). Only
-    ever names a model whose replacement is ALREADY complete locally,
-    so a sweep can never leave a family with nothing. Generation ties
-    (unparsable gens read 0) are never named — conservative by design.
-    """
+def _retired_on_disk(label: str, pulled) -> bool:
+    repo, tag, _port, _gb = RETIRED_MODELS[label]
+    if repo and IS_ARM:
+        return mlx_model_cached(repo)
+    return bool(tag and pulled and tag in pulled)
+
+
+def model_updates(pulled=None) -> list:
+    """Every retired model still on disk, and what replaces it here
+    (6b306). `covered`: a listed replacement is already installed, so
+    nothing is lost by deleting the old one. `new`: otherwise, the
+    first replacement this machine can run, or None when none fits."""
     if pulled is None:
-        pulled = ollama_pulled_tags()
-    have = [l for l in SUPPORTED if model_cached(l, pulled)]
-    fams = {}
-    for l in have:
-        fams.setdefault(_family_of(l), []).append(l)
+        pulled = ollama_pulled_tags() or set()
+    have = {l for l in MODEL_INFO
+            if SUPPORTED.get(l) and model_cached(l, pulled)}
+    offers = load_prefs(None).get("model_offers")
+    offers = offers if isinstance(offers, list) else []
     out = []
-    for ls in fams.values():
-        best = max(_gen_of(l) for l in ls)
-        out.extend(l for l in ls if _gen_of(l) < best)
-    # retired rows: still on disk == still deletable (6b269)
-    for l, (repo, tag, _port, _gb) in RETIRED_MODELS.items():
-        if repo and IS_ARM:
-            if mlx_model_cached(repo):
-                out.append(l)
-        elif tag and pulled and (tag in pulled):
-            out.append(l)
+    for old in RETIRED_MODELS:
+        on_disk = _retired_on_disk(old, pulled)
+        if not on_disk and old not in offers:
+            continue
+        cands = RETIRED_SUCCESSORS.get(old, ())
+        covered = any(c in have for c in cands)
+        new = None if covered else next(
+            (c for c in cands
+             if SUPPORTED.get(c) and model_fits_machine(c)), None)
+        if not on_disk and not new:
+            continue      # swept, and nothing left to offer
+        out.append({"old": old, "new": new, "covered": covered,
+                    "gone": not on_disk,
+                    "free_gb": _gb_of(old) if on_disk else 0.0,
+                    "dl_gb": MODEL_INFO[new]["gb"] if new else 0.0})
     return out
+
+
+def _offers_set(add=(), drop=()):
+    """Retired models swept before their replacement was installed
+    (6b306). The weights are gone; the offer to install what replaces
+    them stays until it is taken."""
+    try:
+        with _prefs_lock:
+            p = load_prefs(None)
+            cur = p.get("model_offers")
+            cur = list(cur) if isinstance(cur, list) else []
+            nxt = [l for l in cur if l not in drop]
+            nxt += [l for l in add if l not in nxt]
+            if nxt != cur:
+                p["model_offers"] = nxt
+                store_prefs(p)
+    except Exception:
+        pass
+
+
+def superseded_installed(pulled=None, auto=False) -> list:
+    """Retired models still on disk (6b265, rebuilt 6b306). The catalog
+    is curated: every row in it is current for some machine, so a row
+    is never "superseded" by its name. The old family-generation rule
+    read Qwen 3.8 27B as replacing the Qwen 3.6 35B MoE and Hermes 4 as
+    replacing Hermes 3, and with auto-clean on by default it would have
+    deleted both. A retired model can't be used by the app at all, so
+    it goes whether or not its replacement is here yet (per Patrick:
+    "make sure that any outdated models are cleaned out and not just
+    left in there taking up tons of space"); the offer to install the
+    replacement is remembered. `auto` narrows to models this app
+    downloaded."""
+    ups = [u for u in model_updates(pulled) if not u.get("gone")]
+    if not auto:
+        return [u["old"] for u in ups]
+    mine = _ledger()
+    return [u["old"] for u in ups if u["old"] in mine]
 
 
 def _gb_of(label: str) -> float:
@@ -6482,9 +6597,25 @@ def _gb_of(label: str) -> float:
 
 
 def _cleanup_stat(pulled=None) -> dict:
-    ls = superseded_installed(pulled)
-    return {"labels": ls,
-            "gb": round(sum(_gb_of(l) for l in ls), 1)}
+    """What the Manage pane and the post-update card show (6b306): the
+    retired models on disk, the replacements that would download, and
+    the totals both ways. A replacement shared by two old models is
+    counted once."""
+    ups = model_updates(pulled)
+    news = list(dict.fromkeys(u["new"] for u in ups if u["new"]))
+    return {"labels": [u["old"] for u in ups if not u.get("gone")],
+            "gb": round(sum(u["free_gb"] for u in ups), 1),
+            "updates": ups,
+            "news": news,
+            "dl_gb": round(sum(MODEL_INFO[n]["gb"] for n in news), 1),
+            "auto": auto_cleanup_on(),
+            "running": _modup.get("state") == "running"}
+
+
+def auto_cleanup_on() -> bool:
+    """On unless the user switched it off (6b306, per Patrick: "make
+    sure that's enabled by default")."""
+    return load_prefs(None).get("auto_cleanup") is not False
 
 
 def _remove_models(want: list) -> tuple:
@@ -6579,17 +6710,29 @@ def _remove_models(want: list) -> tuple:
 _CLEANUP_LAST_ERRORS = {}
 
 
+def _resident(label: str) -> bool:
+    """An engine for this model is up, here or in a sibling instance
+    (ports are shared machine-wide)."""
+    if label in MODEL_ROUTES:
+        kind, tgt = MODEL_ROUTES[label]
+    else:
+        _r = RETIRED_MODELS.get(label)
+        kind, tgt = (("mlx", _r[2]) if (_r and _r[2]) else (None, None))
+    return kind == "mlx" and (label in _mlx_procs
+                              or bool(tgt and _port_in_use(tgt)))
+
+
 def _auto_cleanup_pass(manual=False) -> list:
-    """The auto-clean sweep (6b265, per Patrick's checkbox). Runs only
-    when the pref is on; stands down entirely while an app update or
+    """The auto-clean sweep (6b265, per Patrick's checkbox; on by
+    default since 6b306). Stands down entirely while an app update or
     ANY model download is in flight (the process can vanish or a dir
-    can be mid-write); skips a model whose engine is resident — here
-    OR in a sibling instance (ports are shared machine-wide)."""
+    can be mid-write); skips a model whose engine is resident."""
     try:
         # manual == the Clean-now button (6b268, per Patrick): the
         # user is asking RIGHT NOW, so the standing pref doesn't
-        # gate it — every safety guard below still does.
-        if not manual and not load_prefs(None).get("auto_cleanup"):
+        # gate it, and the list they were shown is the whole list.
+        # Every safety guard below still applies.
+        if not manual and not auto_cleanup_on():
             return []
         if _update.get("state") not in (None, "", "idle", "error"):
             return []
@@ -6597,26 +6740,132 @@ def _auto_cleanup_pass(manual=False) -> list:
             if any((j or {}).get("status") in ("downloading", "queued")
                    for j in _setup_jobs.values()):
                 return []
-        targets = []
-        for label in superseded_installed():
-            if label in MODEL_ROUTES:
-                kind, tgt = MODEL_ROUTES[label]
-            else:
-                _r = RETIRED_MODELS.get(label)
-                kind, tgt = (("mlx", _r[2]) if (_r and _r[2])
-                             else (None, None))
-            if kind == "mlx" and (label in _mlx_procs
-                                  or (tgt and _port_in_use(tgt))):
-                continue        # resident somewhere — next pass gets it
-            targets.append(label)
+        plan = {u["old"]: u for u in model_updates()}
+        targets = [l for l in superseded_installed(auto=not manual)
+                   if not _resident(l)]
         if not targets:
             return []
         removed, _errs = _remove_models(targets)
+        _offers_set(add=[l for l in removed
+                         if (plan.get(l) or {}).get("new")])
         _CLEANUP_LAST_ERRORS.clear()
         _CLEANUP_LAST_ERRORS.update(_errs or {})
         return removed
     except Exception:
         return []
+
+
+# UPDATE MODELS (6b306, per Patrick: the post-update card recommends it
+# and runs it with a progress bar). One run at a time. Replacements
+# download through the ordinary installer, so the sidebar strip shows
+# them too when the card is closed; each old model is deleted only once
+# its replacement is complete, and one whose replacement failed stays.
+_modup = {"state": "idle"}
+_modup_lock = threading.Lock()
+_modup_hist = []          # its own speed window: the strip has _dl_hist
+
+
+def start_model_update() -> dict:
+    with _modup_lock:
+        if _modup.get("state") == "running":
+            return dict(_modup)
+        plan = model_updates()
+        news = list(dict.fromkeys(u["new"] for u in plan if u["new"]))
+        _modup.clear()
+        _modup.update(state="running" if plan else "done",
+                      olds=[u["old"] for u in plan], news=news,
+                      removed=[], failed=[], freed_gb=0.0,
+                      dl_gb=round(sum(MODEL_INFO[n]["gb"]
+                                      for n in news), 1))
+        del _modup_hist[:]
+        snap = dict(_modup)
+    if plan:
+        threading.Thread(target=_model_update_worker, args=(plan, news),
+                         daemon=True).start()
+    return snap
+
+
+def _model_update_worker(plan: list, news: list):
+    try:
+        if news:
+            start_model_downloads(news)
+        pending, strikes = list(plan), {}
+        deadline = time.time() + 12 * 3600
+        while pending and time.time() < deadline:
+            pulled = ollama_pulled_tags() or set()
+            ready, wait = [], []
+            for u in pending:
+                n = u["new"]
+                if u["covered"] or not n or model_cached(n, pulled):
+                    ready.append(u)
+                    continue
+                with _setup_lock:
+                    st = (_setup_jobs.get(n) or {}).get("status")
+                if st in ("downloading", "queued"):
+                    wait.append(u)
+                    continue
+                # finished but not complete on disk, or never started:
+                # give the disk a few polls to agree, then give up and
+                # KEEP the old model — it's all this machine has
+                strikes[n] = strikes.get(n, 0) + 1
+                if st == "error" or strikes[n] > 5:
+                    _modup["failed"].append(u["old"])
+                else:
+                    wait.append(u)
+            _offers_set(drop=[u["old"] for u in ready])
+            ready = [u for u in ready if not u.get("gone")]
+            gone = [u["old"] for u in ready if not _resident(u["old"])]
+            wait += [u for u in ready if u["old"] not in gone]
+            if gone:
+                removed, errs = _remove_models(gone)
+                _modup["removed"] += removed
+                _modup["freed_gb"] = round(sum(
+                    _gb_of(l) for l in _modup["removed"]), 1)
+                for l in gone:
+                    if l not in removed:
+                        _modup["failed"].append(l)
+            pending = wait
+            if pending:
+                time.sleep(3)
+        _modup["failed"] += [u["old"] for u in pending]
+        _modup["state"] = "partial" if _modup["failed"] else "done"
+    except Exception:
+        _modup["state"] = "error"
+
+
+def model_update_status() -> dict:
+    """The run's state plus bytes across ITS replacements only."""
+    st = dict(_modup)
+    news = st.get("news") or []
+    if st.get("state") == "running" and news:
+        pulled = ollama_pulled_tags() or set()
+        have, want = _downloaded_bytes(pulled, news)
+        bps = _dl_speed(have, _modup_hist)
+        st.update(
+            pct=min(99, round(have / want * 100)) if want else 99,
+            have_gb=round(have / 1e9, 1), want_gb=round(want / 1e9, 1),
+            speed_mbs=round(bps / 1e6, 1),
+            eta_min=(min(999, max(1, round((want - have) / bps / 60)))
+                     if bps > 2e5 and want > have else None))
+    elif st.get("state") == "running":
+        st["pct"] = 99
+    else:
+        st["pct"] = 100 if st.get("state") in ("done", "partial") else 0
+    return st
+
+
+def _post_update_cleanup():
+    """The first launch after an update sweeps at once (6b306, per
+    Patrick: "every time an update to our app lands and is installed,
+    force the auto clean to run on startup"). Our engines aren't up
+    yet; a sibling instance's are seen by port and skipped. Anything
+    that couldn't go now (Ollama not running yet) goes on the
+    janitor's first tick, a minute in. The post-update card waits for
+    this, so it never offers to free space that's already free."""
+    try:
+        _auto_cleanup_pass()
+    finally:
+        _SWEEP_DONE.set()
 
 
 def setup_busy() -> dict:
@@ -6633,6 +6882,7 @@ def setup_busy() -> dict:
     have, want = _downloaded_bytes(ollama_pulled_tags() or set())
     bps = _dl_speed(have)
     return {"busy": True,
+            "updating": _modup.get("state") == "running",
             "overall_pct": round(have / want * 100) if want else 100,
             "speed_mbs": round(bps / 1e6, 1),
             "eta_min": (min(999, max(1, round((want - have) / bps / 60)))
@@ -10613,7 +10863,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                    "/api/studio/install", "/api/studio/remove",
                    "/api/studio/opts",
                    "/api/export/reveal",
-                   "/api/model/cleanup",
+                   "/api/model/cleanup", "/api/model/update",
                    "/api/update/install",
                    "/api/speak", "/api/voice/prepare",
                    "/api/remote/config", "/api/remote/test",
@@ -11072,6 +11322,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._send_json(setup_status())
         elif self.path == "/api/setup/busy":
             self._send_json(setup_busy())
+        elif self.path.startswith("/api/model/update"):
+            st = model_update_status()
+            if "plan=1" in self.path:
+                # the post-update card: after the startup sweep
+                _SWEEP_DONE.wait(15)
+                st["plan"] = _cleanup_stat()
+            self._send_json(st)
         elif self.path.startswith("/api/update/check"):
             force = urllib.parse.parse_qs(
                 urllib.parse.urlparse(self.path).query
@@ -12289,6 +12546,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             except (ValueError, json.JSONDecodeError):
                 want = []
             self._send_json({"started": start_model_downloads(want)})
+            return
+        if self.path == "/api/model/update":
+            # Update models (6b306): replacements download, each old
+            # model goes once its replacement is complete
+            self._send_json(start_model_update())
             return
         if self.path == "/api/model/cleanup":
             # run the auto-clean sweep NOW — the checkbox's first act
@@ -14147,16 +14409,22 @@ body.resizing{cursor:col-resize;user-select:none}
 /* the library tabs + agent radio rows */
 /* background model download: a whisper of a progress strip in the
    header — visible only while a download runs, click opens details */
-#dlstrip{display:flex;align-items:center;gap:8px;margin:2px 2px 4px;
-  cursor:pointer}
+/* the bar sits ABOVE its label (6b306): side by side, a label with
+   speed and time left outgrew the sidebar and squeezed the bar to 0px */
+#dlstrip{display:flex;flex-direction:column;align-items:stretch;gap:5px;
+  margin:2px 2px 4px;cursor:pointer}
 #dlstrip[hidden]{display:none}
-#dlstrip .dltrack{flex:1;height:2px;border-radius:0;overflow:hidden;
+#dlstrip .dltrack{flex:none;height:2px;border-radius:0;overflow:hidden;
   background:rgba(255,255,255,.07)}
 #dlstrip .dlfill{height:100%;width:0;border-radius:0;background:#ecedf2;
   transition:width .6s cubic-bezier(.4,0,.2,1)}
 #dlstrip .dlfill{animation:barBreathe 2.4s ease-in-out infinite}
-#dlstrip .dllbl{font-family:var(--mono);font-size:9.5px;
+#dlstrip .dllbl{display:flex;justify-content:space-between;gap:8px;
+  font-family:var(--mono);font-size:9.5px;
   letter-spacing:.12em;color:var(--faint);white-space:nowrap}
+#dlstrip .dllbl span:first-child{min-width:0;overflow:hidden;
+  text-overflow:ellipsis}
+#dlstrip .dllbl span:last-child{flex:none}
 #dlstrip:hover .dllbl{color:var(--dim)}
 #mode-tabs{display:flex;gap:0;margin:5px 0 6px;position:relative;
   background:rgba(255,255,255,.05);border-radius:11px;padding:3px;
@@ -15530,18 +15798,47 @@ body.gen #chip-model{color:var(--accent)}
   background:var(--panel);border:1px solid var(--line);
   border-radius:var(--radius);text-align:center;
   animation:doorPop .5s cubic-bezier(.16,1,.3,1) both}
-#clean-card .sh-icon{font-size:30px;margin-bottom:4px}
-#clean-card h2{font-family:var(--disp);font-size:15px;letter-spacing:.06em}
-#clean-card p{font-size:13px;color:var(--dim);line-height:1.55;margin:6px 0 16px}
-#clean-card .sh-foot{display:flex;gap:10px;justify-content:center}
-#clean-card button{font:inherit;font-size:13px;font-weight:600;
-  padding:9px 22px;border-radius:99px;cursor:pointer;border:1px solid transparent}
-#clean-card .primary{background:var(--text);color:var(--panel)}
-#clean-card .primary:hover{filter:brightness(.92)}
-#clean-card .ghost{background:transparent;color:var(--dim);
+#clean-card{width:min(430px,calc(100vw - 48px));box-sizing:border-box}
+#clean-card h2{font-family:var(--disp);font-size:15px;letter-spacing:.06em;
+  margin-bottom:12px}
+#updated-card .sh-foot[hidden]{display:none}
+/* 6b306 — Update models, design C (per Patrick): one line, the names
+   only on request, one quiet bar, and "Continue in background" hands
+   the progress to the strip at the top left. The same section sits in
+   the post-update card and in the card the Manage pane opens. */
+.mu{margin:0;padding-top:14px;border-top:1px solid var(--line);
+  text-align:center}
+.mu.bare{border-top:0;padding-top:0}
+.mu[hidden]{display:none}
+.mu-h{font-size:13px;font-weight:500;color:var(--text);margin-bottom:4px}
+.mu-m{font-family:var(--mono);font-size:11px;color:var(--faint);
+  letter-spacing:.02em}
+.mu-which{display:inline-block;background:none;border:0;padding:0;
+  margin-top:7px;font:inherit;font-size:11.5px;color:var(--faint);
+  text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.mu-which:hover{color:var(--dim)}
+.mu-list{margin:10px auto 0;max-width:340px;text-align:left;
+  border-top:1px solid var(--line);padding-top:7px}
+.mu-list[hidden]{display:none}
+.mu-list div{display:flex;justify-content:space-between;gap:12px;
+  font-family:var(--mono);font-size:11px;color:var(--dim);padding:3px 0}
+.mu-list div span:first-child{min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.mu-list div span:last-child{color:var(--faint);flex:none}
+.mu-bar{height:3px;border-radius:99px;background:rgba(255,255,255,.08);
+  overflow:hidden;margin:12px 0 8px}
+.mu-bar i{display:block;height:100%;width:0;background:#ecedf2;
+  transition:width .6s cubic-bezier(.4,0,.2,1)}
+.mu-foot{display:flex;gap:10px;justify-content:center;margin-top:16px}
+.mu-foot button{font:inherit;font-size:13px;font-weight:600;
+  padding:9px 22px;border-radius:99px;cursor:pointer;
+  border:1px solid transparent}
+.mu-foot .primary{background:var(--text);color:var(--panel)}
+.mu-foot .primary:hover{filter:brightness(.92)}
+.mu-foot .ghost{background:transparent;color:var(--dim);
   border-color:var(--line)}
-#clean-card .ghost:hover{color:var(--text);border-color:rgba(255,255,255,.25)}
-#clean-card .primary[hidden]{display:none}
+.mu-foot .ghost:hover{color:var(--text);border-color:rgba(255,255,255,.25)}
+.mu-foot button:disabled{opacity:.5;cursor:default}
 #dlhelp-veil{position:fixed;inset:0;z-index:61;display:flex;
   align-items:center;justify-content:center;background:rgba(6,7,10,.72);
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
@@ -16088,14 +16385,17 @@ body.gen #chip-model{color:var(--accent)}
 }
 #fleet-box input:not([type=checkbox]):focus{border-color:var(--accent-dim)}
 #autoclean-bar{display:flex;align-items:center;gap:10px;
-  justify-content:space-between;margin-top:10px;flex-wrap:nowrap}
-#autoclean-bar #autoclean-row{flex:1;min-width:0;margin:0}
-#autoclean-bar #autoclean-row span{white-space:nowrap;overflow:hidden;
+  justify-content:space-between;margin-top:12px;flex-wrap:nowrap}
+#autoclean-bar #autoclean-toggle{flex:1;min-width:0;color:var(--text)}
+#autoclean-bar .ac-txt{display:flex;flex-direction:column;min-width:0;
+  gap:1px}
+#autoclean-bar .ac-txt span{white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis}
 #autoclean-bar #clean-now{margin:0;flex:none;white-space:nowrap;
   display:inline-block;width:auto}
-#autoclean-note{font-size:11.5px;color:var(--faint);margin-top:4px}
-#acon-row,#idleon-row,#autoclean-row{display:flex;gap:7px;align-items:center;
+#autoclean-bar #clean-now[hidden]{display:none}
+#autoclean-note{font-size:11.5px;color:var(--faint)}
+#acon-row,#idleon-row{display:flex;gap:7px;align-items:center;
   font-size:12px;color:var(--text);margin:6px 0}
 #acon-row input,#idleon-row input{flex:none;margin:0}
 /* #about-facts carries no rule of its own anymore (6b245): it is a row
@@ -16633,7 +16933,7 @@ body.gen #chip-model{color:var(--accent)}
 
   <div id="dlstrip" hidden title="Models downloading — click for details">
     <div class="dltrack"><div class="dlfill"></div></div>
-    <span class="dllbl">models &middot; 0%</span>
+    <span class="dllbl"><span>models &middot; 0%</span><span></span></span>
   </div>
   <div id="mode-tabs">
     <i id="tab-glide"></i>
@@ -17050,7 +17350,9 @@ __CODE_ROWS__
       <div id="roster"></div>
       <div id="roster-foot">
         <button class="about-btn slim" id="roster-manage">Manage models&hellip;</button>
-        <button class="about-btn slim" id="open-setup">Model updates&hellip;</button>
+        <!-- 6b306: this opens the installer; "updates" now means the
+             Update models card, so the button says what it does -->
+        <button class="about-btn slim" id="open-setup">Add models&hellip;</button>
       </div>
       <div id="manage-box" hidden>
         <dl id="mg-stats">
@@ -17064,11 +17366,16 @@ __CODE_ROWS__
              italic line and a way to take it back off; adding offers a
              ladder of sizes, colour-coded against this Mac's memory. -->
         <div id="studio-row"></div>
-        <div id="autoclean-note"></div>
+        <!-- 6b306, per Patrick (design C): one switch, one line saying
+             where things stand, and a button only when there is
+             something to do -->
         <div id="autoclean-bar">
-          <label id="autoclean-row"><input type="checkbox" id="autoclean">
-            <span>Automatically remove superseded models</span></label>
-          <button class="about-btn slim" id="clean-now">Clean up now&hellip;</button>
+          <div class="toggle-row" id="autoclean-toggle"
+               title="Removes models this version no longer uses, after each update and every few hours. Never downloads anything on its own.">
+            <div class="switch"></div>
+            <span class="ac-txt"><span>Remove outdated models automatically</span>
+              <span id="autoclean-note"></span></span></div>
+          <button class="about-btn slim" id="clean-now" hidden>Update</button>
         </div>
         <div id="manage-note"></div>
       </div>
@@ -17106,6 +17413,7 @@ __CODE_ROWS__
     <h2>Updated to <span id="updated-ver"></span></h2>
     <p id="updated-sub">Here&rsquo;s what changed.</p>
     <div id="updated-notes"></div>
+    <div id="updated-models" class="mu" hidden></div>
     <div class="sh-foot">
       <button id="updated-ok" class="primary">Nice</button>
     </div>
@@ -17114,13 +17422,8 @@ __CODE_ROWS__
 
 <div id="clean-veil" hidden>
   <div id="clean-card">
-    <div class="sh-icon">&#129529;</div>
-    <h2>Free up space</h2>
-    <p id="clean-body"></p>
-    <div class="sh-foot">
-      <button id="clean-go" class="primary">Remove</button>
-      <button id="clean-cancel" class="ghost">Keep everything</button>
-    </div>
+    <h2>Your models</h2>
+    <div id="clean-models" class="mu bare"></div>
   </div>
 </div>
 
@@ -17182,9 +17485,9 @@ __CODE_ROWS__
       several at once on hard questions, and composites their drafts
       into one answer. Pick how much to install:</p>
       <div id="wiz-plans"></div>
-      <label id="wiz-autoclean"><input type="checkbox" id="wiz-ac">
-        Automatically remove superseded models once a newer generation
-        is installed</label>
+      <label id="wiz-autoclean"><input type="checkbox" id="wiz-ac" checked>
+        Remove outdated models automatically when an update replaces
+        them</label>
       <label id="wiz-image"><input type="checkbox" id="wiz-img">
         Also add image generation &mdash; make pictures from a description,
         entirely on this Mac (9.6 GB)</label>
@@ -19347,14 +19650,23 @@ function greeting(){
   if(!prev||!$("#updated-veil"))return;
   $("#updated-ver").textContent="__APP_VER__";
   $("#updated-sub").textContent="You were on "+prev+". Here\u2019s what changed.";
-  let notes="";
+  let notes="",mu=null;
   // THIS build's notes (6b288): a nightly lists its own commits, a
   // numbered release its own body — never the channel's newest, which
-  // may already be a different build
-  try{const r=await(await fetch("/api/update/whatsnew")).json();
-      if(r&&r.notes)notes=r.notes;}catch(e){}
+  // may already be a different build. Alongside them (6b306), what's
+  // newer for the models on this Mac — asked AFTER the startup sweep,
+  // so the card never offers to free space that is already free.
+  await Promise.all([
+    (async()=>{try{const r=await(await fetch("/api/update/whatsnew")).json();
+      if(r&&r.notes)notes=r.notes;}catch(e){}})(),
+    (async()=>{try{mu=await muFetch(true);}catch(e){}})()]);
   $("#updated-notes").innerHTML=notes?notesHTML(notes)
     :"<p>The full notes are in Settings \u2192 About.</p>";
+  if(mu&&(mu.state==="running"||muOffers(muPlan).length||(muPlan&&muPlan.gb))){
+    // the section brings its own buttons: Update models / Later
+    $("#updated-card .sh-foot").hidden=true;
+    muShow($("#updated-models"),mu);
+  }
   $("#updated-veil").hidden=false;
   $("#updated-ok").addEventListener("click",()=>{$("#updated-veil").hidden=true;});
 })();
@@ -20085,7 +20397,8 @@ function palActions(){
   const acts=[
     {k:"new",t:"New chat",run:()=>$("#newchat").click()},
     {k:"go",t:"Settings",run:()=>openAbout()},
-    {k:"go",t:"Model updates\u2026",run:()=>openSetup()},
+    {k:"go",t:"Add models\u2026",run:()=>openSetup()},
+    {k:"go",t:"Update models\u2026",run:()=>openModelUpdates()},
     {k:"set",t:"Toggle visual effects",
      run:()=>$("#fx-toggle").click()},
   ];
@@ -21241,10 +21554,17 @@ async function dlStripTick(){
     if(st.busy){const f=$("#models-flag");if(f){f.style.background="";f.hidden=true;}}
     if(bg){
       dlStrip.querySelector(".dlfill").style.width=(st.overall_pct||0)+"%";
-      dlStrip.querySelector(".dllbl").textContent=
-        "downloading models \u00b7 "+(st.overall_pct||0)+"%"
-        +(st.speed_mbs>0?" \u00b7 "+st.speed_mbs+" MB/s":"")
-        +(st.eta_min?" \u00b7 ~"+st.eta_min+" min":"");
+      dlStrip.dataset.upd=st.updating?"1":"";
+      // what is happening on the left, how fast and how long on the
+      // right: the time left is the part that must never be clipped
+      const lbl=dlStrip.querySelector(".dllbl");
+      lbl.firstChild.textContent=
+        (st.updating?"updating":"downloading")
+        +" \u00b7 "+(st.overall_pct||0)+"%";
+      lbl.lastChild.textContent=[
+        st.speed_mbs>0?(st.speed_mbs>=10?Math.round(st.speed_mbs)
+          :st.speed_mbs)+" MB/s":"",
+        st.eta_min?"~"+st.eta_min+" min":""].filter(Boolean).join(" \u00b7 ");
     }
   }catch(e){}
   finally{dlStripBusy=false;}
@@ -21253,7 +21573,10 @@ setInterval(dlStripTick,4000);
 document.addEventListener("visibilitychange",()=>{
   if(!document.hidden)dlStripTick();   // correct a stale strip instantly
 });
-if(dlStrip)dlStrip.addEventListener("click",()=>{dlStrip.hidden=true;openSetup();});
+if(dlStrip)dlStrip.addEventListener("click",()=>{
+  // an Update models run reopens its own card, not the installer
+  if(dlStrip.dataset.upd){openModelUpdates();return;}
+  dlStrip.hidden=true;openSetup();});
 function openSetup(){
   setupManual=true;
   veil.hidden=false;setupTick();
@@ -21477,7 +21800,8 @@ $("#wiz-ac").addEventListener("change",async()=>{
   await fetch("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({auto_cleanup:$("#wiz-ac").checked})});
-  const s=$("#autoclean");if(s)s.checked=$("#wiz-ac").checked;
+  const s=$("#autoclean-toggle");
+  if(s)s.classList.toggle("on",$("#wiz-ac").checked);
 });
 $("#wiz-nl").addEventListener("change",async()=>{
   await fetch("/api/prefs",{method:"POST",
@@ -21716,7 +22040,7 @@ async function openAbout(){
       $("#contrib").checked=!!pr2.contrib_on;
       if($("#upchan"))$("#upchan").value=pr2.update_channel||(pr2.beta_updates?"beta":"stable");
       $("#autochk-toggle").classList.toggle("on",pr2.auto_update_check!==false);
-      $("#autoclean").checked=!!pr2.auto_cleanup;
+      $("#autoclean-toggle").classList.toggle("on",pr2.auto_cleanup!==false);   // on by default (6b306)
       // unchecked features fold their furniture away (6.0b5)
       $("#fleet-box").hidden=!pr2.contrib_on;
       try{
@@ -21777,6 +22101,9 @@ async function openAbout(){
 const REMIND_GAP=20*60*60*1000;       // "daily", forgiving of launch times
 async function announceModels(){
   if(!IS_LOCAL)return;
+  // the post-update card owns this launch and carries the model
+  // offer itself (6b306): one card per launch, as promised above
+  if(__JUST_UPDATED__)return;
   try{
     const [st,prefs]=await Promise.all([
       (await fetch("/api/setup")).json(),
@@ -22245,70 +22572,165 @@ $("#roster-manage").addEventListener("click",async()=>{
     if(lastSetup&&lastSetup.busy)manageTick();   // a batch is already running
   }
 });
-function paintCleanNote(){
-  const c=(lastSetup&&lastSetup.cleanup)||{labels:[],gb:0};
-  $("#autoclean-note").textContent=c.labels.length
-    ?c.labels.length+" superseded on disk — reclaims "+c.gb+" GB ("
-      +c.labels.join(", ")+")"
-    :"nothing superseded — everything installed is current";
+/* 6b306 — Update models, design C (per Patrick): "keep users current
+   on their models while also not forcing them to sit there and wait
+   for a 20 gigabyte download". One section, two hosts: the post-update
+   card and the card the Manage pane opens. Names only on request. */
+let muPlan=null,muHost=null,muTimer=null;
+function muGB(x){x=+x||0;return (x>=10?Math.round(x):Math.round(x*10)/10)+" GB";}
+function muOffers(p){return ((p&&p.updates)||[]).filter(u=>u.new);}
+function muHas(p){return !!(p&&((p.updates||[]).length));}
+async function muFetch(withPlan){
+  const r=await(await fetch("/api/model/update"+(withPlan?"?plan=1":""))).json();
+  if(r.plan)muPlan=r.plan;
+  return r;
 }
-$("#clean-now").addEventListener("click",async()=>{
-  await ensureSetup();
-  const c=(lastSetup&&lastSetup.cleanup)||{labels:[],gb:0};
-  const body=$("#clean-body"),go=$("#clean-go");
-  if(!c.labels.length){
-    body.textContent="Nothing to clean \u2014 every installed model "
-      +"is the newest of its kind.";
-    go.hidden=true;
+function muPaint(el,st){
+  const p=muPlan||{updates:[],dl_gb:0,gb:0};
+  const offers=muOffers(p),n=offers.length;
+  let h;
+  if(st&&st.state==="running"){
+    const eta=st.eta_min?(st.eta_min>=90?"about "+Math.round(st.eta_min/60)+" hr"
+      :"about "+st.eta_min+" min"):"";
+    h='<div class="mu-h">Updating your models</div>'
+      +'<div class="mu-bar"><i style="width:'+(st.pct||0)+'%"></i></div>'
+      +'<div class="mu-m">'+[(st.pct||0)+"%",
+          st.want_gb?st.have_gb+" of "+st.want_gb+" GB":"",
+          st.speed_mbs>0?st.speed_mbs+" MB/s":"",eta]
+        .filter(Boolean).join(" · ")+'</div>'
+      +'<div class="mu-foot"><button class="ghost" data-mu="bg">'
+      +'Continue in background</button></div>';
+  }else if(st&&el.dataset.ran&&/^(done|partial|error)$/.test(st.state)){
+    const ok=st.state==="done";
+    h='<div class="mu-h">'+(ok?"Your models are up to date"
+        :"Some models couldn’t update")+'</div>'
+      +'<div class="mu-m">'+(ok
+        ?(st.freed_gb?"Freed "+muGB(st.freed_gb)+" of old models":"Everything is current")
+        :"Those were left as they were · try again any time from Settings")
+      +'</div><div class="mu-foot"><button class="primary" data-mu="close">'
+      +'Done</button></div>';
+  }else if(n){
+    const meta=[p.dl_gb?muGB(p.dl_gb)+" to download":"",
+                p.gb?"frees "+muGB(p.gb):""].filter(Boolean).join(" · ");
+    h='<div class="mu-h">'+(n===1?"A newer version of one of your models is"
+        :"Newer versions of "+n+" of your models are")+' ready</div>'
+      +'<div class="mu-m">'+meta+'</div>'
+      +'<button class="mu-which" data-mu="which">Show which</button>'
+      +'<div class="mu-list" hidden>'+(p.updates||[]).map(u=>
+        '<div><span>'+esc(u.new?u.old+" → "+u.new:u.old)+'</span><span>'
+        +(u.new?muGB(u.dl_gb):"remove")+'</span></div>').join("")+'</div>'
+      +'<div class="mu-foot"><button class="primary" data-mu="go">'
+      +'Update models</button><button class="ghost" data-mu="later">'
+      +'Later</button></div>';
+  }else if(p.gb){
+    h='<div class="mu-h">Outdated models are taking '+muGB(p.gb)+'</div>'
+      +'<div class="mu-m">This version doesn’t use them</div>'
+      +'<div class="mu-foot"><button class="primary" data-mu="go">'
+      +'Remove them</button><button class="ghost" data-mu="later">'
+      +'Keep for now</button></div>';
   }else{
-    body.innerHTML="These have newer replacements already installed:"
-      +"<br><b>"+c.labels.join("</b><br><b>")+"</b><br><br>"
-      +"Removing them frees about <b>"+c.gb+" GB</b>. Any of them "
-      +"can be reinstalled from the roster later.";
-    go.hidden=false;go.disabled=false;
-    go.textContent="Remove "+c.labels.length+" \u2014 free "+c.gb+" GB";
+    h='<div class="mu-h">Everything is current</div>'
+      +'<div class="mu-m">Every model you have is the newest of its kind</div>'
+      +'<div class="mu-foot"><button class="primary" data-mu="close">'
+      +'Done</button></div>';
   }
+  el.innerHTML=h;
+}
+async function muTick(){
+  muTimer=null;
+  if(!muHost)return;
+  let st;try{st=await muFetch(false);}catch(e){muTimer=setTimeout(muTick,3000);return;}
+  if(!muHost)return;
+  muPaint(muHost,st);
+  if(st.state==="running")muTimer=setTimeout(muTick,1500);
+  else muSettled();
+}
+async function muSettled(){
+  // the disk changed: the Manage pane and roster read it again
+  lastSetup=null;
+  try{await ensureSetup();paintRoster(lastSetup,lastCloud);paintMgStats();
+      paintCleanNote();}catch(e){}
+}
+function muShow(host,st){
+  muHost=host;host.hidden=false;
+  if(st&&st.state==="running")host.dataset.ran="1";
+  muPaint(host,st);
+  if(st&&st.state==="running"&&!muTimer)muTimer=setTimeout(muTick,1500);
+}
+function muDismiss(){
+  if(!muHost)return;
+  const v=muHost.closest("#updated-veil,#clean-veil");
+  if(v)v.hidden=true;
+  muHost=null;clearTimeout(muTimer);muTimer=null;
+}
+async function openModelUpdates(){
+  let r;try{r=await muFetch(true);}catch(e){return;}
+  const host=$("#clean-models");delete host.dataset.ran;
   $("#clean-veil").hidden=false;
-});
-$("#clean-cancel").addEventListener("click",()=>{
-  $("#clean-veil").hidden=true;});
-$("#clean-go").addEventListener("click",async()=>{
-  const go=$("#clean-go");
-  go.textContent="Cleaning\u2026";go.disabled=true;
-  try{
-    const r=await(await fetch("/api/model/cleanup",{method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({force:true})})).json();
-    const errs=Object.entries(r.errors||{});
-    $("#clean-body").textContent=r.removed.length
-      ?"Removed "+r.removed.length+" \u2014 freed "+r.freed_gb+" GB."
-      :(errs.length
-        ?"Couldn\u2019t remove "+errs.map(([n,e])=>n+" ("+e+")").join(", ")+"."
-        :"Nothing to remove right now.");
-  }catch(e){
-    $("#clean-body").textContent="Cleanup hit a snag \u2014 try again.";
+  muShow(host,r);
+}
+document.addEventListener("click",async e=>{
+  const b=e.target.closest&&e.target.closest("[data-mu]");
+  if(!b||!muHost||!muHost.contains(b))return;
+  const act=b.dataset.mu;
+  if(act==="which"){
+    const l=muHost.querySelector(".mu-list");
+    l.hidden=!l.hidden;b.textContent=l.hidden?"Show which":"Hide";
+  }else if(act==="go"){
+    b.disabled=true;
+    try{
+      const st=await(await fetch("/api/model/update",{method:"POST",
+        headers:{"Content-Type":"application/json"},body:"{}"})).json();
+      muHost.dataset.ran="1";muPaint(muHost,st);
+      if(st.state==="running"){if(!muTimer)muTimer=setTimeout(muTick,800);}
+      else muSettled();
+    }catch(err){b.disabled=false;}
+  }else if(act==="bg"){
+    // the strip at the top left carries it from here
+    muDismiss();dlStripTick();
+  }else{
+    muDismiss();
+    if(act==="close")muSettled();
   }
-  go.hidden=true;
-  lastSetup=null;await ensureSetup();
-  paintRoster(lastSetup,lastCloud);paintMgStats();paintCleanNote();
 });
-$("#autoclean").addEventListener("change",async()=>{
+function paintCleanNote(){
+  const c=(lastSetup&&lastSetup.cleanup)||{updates:[],gb:0};
+  muPlan=c;
+  const note=$("#autoclean-note"),btn=$("#clean-now");
+  const n=muOffers(c).length;
+  // the switch reads the same answer the server acts on (on unless off)
+  if(typeof c.auto==="boolean")
+    $("#autoclean-toggle").classList.toggle("on",c.auto);
+  if(c.running){
+    note.textContent="Updating your models…";btn.textContent="View";btn.hidden=false;
+  }else if(n){
+    note.textContent=n===1?"A newer version of one model is ready"
+      :"Newer versions of "+n+" models are ready";
+    btn.textContent="Update";btn.hidden=false;
+  }else if(c.gb){
+    note.textContent="Outdated models are taking "+muGB(c.gb);
+    btn.textContent="Clean up";btn.hidden=false;
+  }else{
+    note.textContent="Everything is current";btn.hidden=true;
+  }
+}
+$("#clean-now").addEventListener("click",openModelUpdates);
+$("#autoclean-toggle").addEventListener("click",async()=>{
+  const t=$("#autoclean-toggle"),on=!t.classList.contains("on");
+  t.classList.toggle("on",on);
+  if(lastSetup&&lastSetup.cleanup)lastSetup.cleanup.auto=on;
+  const w=$("#wiz-ac");if(w)w.checked=on;
   await fetch("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({auto_cleanup:$("#autoclean").checked})});
-  if(!$("#autoclean").checked)return;
-  $("#autoclean-note").textContent="cleaning up\u2026";
+    body:JSON.stringify({auto_cleanup:on})});
+  if(!on)return;
+  // switching it on is a sweep
+  $("#autoclean-note").textContent="Clearing out old models…";
   try{
-    const r=await(await fetch("/api/model/cleanup",{method:"POST",
-      headers:{"Content-Type":"application/json"},body:"{}"})).json();
-    $("#autoclean-note").textContent=r.removed.length
-      ?"removed "+r.removed.length+" \u2014 freed "+r.freed_gb+" GB"
-      :"nothing to clean right now";
-  }catch(e){
-    $("#autoclean-note").textContent="cleanup hit a snag \u2014 try again";
-  }
-  lastSetup=null;await ensureSetup();
-  paintRoster(lastSetup,lastCloud);paintMgStats();
+    await fetch("/api/model/cleanup",{method:"POST",
+      headers:{"Content-Type":"application/json"},body:"{}"});
+  }catch(e){}
+  muSettled();
 });
 $("#plan-row").addEventListener("click",async e=>{
   const c=e.target.closest(".plan-card");if(!c||!c.dataset.plan)return;
@@ -23250,6 +23672,8 @@ for(let i=0;i<30;i++){
 
 _splash_shown = [False]
 _JUST_UPDATED = [""]          # previous version, set on the first run after an update
+_UPDATE_LANDED = [False]     # the real app's first run after one: sweep now
+_SWEEP_DONE = threading.Event()
 
 
 def maybe_version_splash():
@@ -23259,19 +23683,28 @@ def maybe_version_splash():
     (6b288, per Patrick: "just another 6.0.3 nightly, with an updated
     commit number") and the dialog can say exactly that."""
     try:
-        ident = short_version()
-        prefs = load_prefs()
-        last = prefs.get("last_ident") or prefs.get("last_version")
-        if last == ident:
-            return
         # dev and test instances share this prefs file with the real
         # app: they may show the moment but never move the record
-        if not os.environ.get("MILLENAI_TESTBUILD") and PORT == 8889:
-            prefs["last_ident"] = ident
-            prefs["last_version"] = APP_VERSION
-            store_prefs(prefs)
-        if last is None or not (HAS_WEBVIEW and IS_MAC):
+        real = not os.environ.get("MILLENAI_TESTBUILD") and PORT == 8889
+        ident = short_version()
+        with _prefs_lock:
+            prefs = load_prefs()
+            last = prefs.get("last_ident") or prefs.get("last_version")
+            if real and "app_models" not in prefs:
+                _ledger_seed(prefs, existing=last is not None)
+                store_prefs(prefs)
+            if last == ident:
+                return
+            if real:
+                prefs["last_ident"] = ident
+                prefs["last_version"] = APP_VERSION
+                store_prefs(prefs)
+        if last is None:
             return          # fresh install gets the boot wipe, not this
+        if real:
+            _UPDATE_LANDED[0] = True
+        if not (HAS_WEBVIEW and IS_MAC):
+            return
         _JUST_UPDATED[0] = str(last)
     except Exception:
         pass
@@ -23313,6 +23746,10 @@ if __name__ == "__main__":
     print(f"  running on http://127.0.0.1:{PORT}")
     reap_orphan_engines()
     maybe_version_splash()
+    if _UPDATE_LANDED[0]:
+        threading.Thread(target=_post_update_cleanup, daemon=True).start()
+    else:
+        _SWEEP_DONE.set()
     threading.Thread(target=_mlx_janitor, daemon=True).start()
     threading.Thread(target=_warm_studio_cache, daemon=True).start()
     contrib_apply()   # resume Contribute mode if it was left on

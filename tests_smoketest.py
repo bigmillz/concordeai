@@ -491,7 +491,9 @@ check("both studios expose a colour-coded ladder",
       str({k: [t["fit"] for t in v.get("tiers", [])] for k, v in _ss.items()}))
 check("download estimate uses a rolling window, not two polls",
       "_dl_hist = []" in _MILLENAI_SRC
-      and "now - _dl_hist[-1][0] >= 2.0" in _MILLENAI_SRC
+      # 6b306: the window is a parameter (Update models keeps its own)
+      and "h = _dl_hist if hist is None else hist" in _MILLENAI_SRC
+      and "now - h[-1][0] >= 2.0" in _MILLENAI_SRC
       and "if dt < 4.0 or db <= 0:" in _MILLENAI_SRC
       and "bps > 2e5" in _MILLENAI_SRC)
 check("no brand or model name above an answer",
@@ -558,7 +560,7 @@ check("automatic update checks: switch, daily cadence, server gate",
 check("one download indicator: the strip alone while busy",
       "DOWNLOADING MODELS" not in page
       and "linear-gradient(90deg,#e26d5a" not in page
-      and '"downloading models \\u00b7 "' in page
+      and '(st.updating?"updating":"downloading")' in page
       # 6b304: the strip reads the cheap busy endpoint and hides the pill
       # itself; it no longer re-reads the full status to drive it
       and 'fetch("/api/setup/busy")' in page)
@@ -571,7 +573,8 @@ except Exception:
     _st = {}
 check("model downloads: batch-true progress, live pane, current preset",
       "def _batch_labels" in _MILLENAI_SRC
-      and "for label in _batch_labels():" in _MILLENAI_SRC
+      and "for label in (_batch_labels() if labels is None else labels):"
+          in _MILLENAI_SRC
       and "_MLX_GATE = threading.Semaphore(2)" in _MILLENAI_SRC
       and "with _MLX_GATE:" in _MILLENAI_SRC
       and "// 1_000_000" in _MILLENAI_SRC
@@ -920,7 +923,7 @@ check("auto-cleanup wired end to end",
           _MILLENAI_SRC.split("def _mlx_janitor")[1][:1200]
       and '"/api/model/cleanup"' in _MILLENAI_SRC
       and _MILLENAI_SRC.count('"/api/model/cleanup"') >= 2  # + ADMIN_PATHS
-      and 'id="autoclean"' in page)
+      and 'id="autoclean-toggle"' in page)
 s, h, b = req("/api/setup", cookie=K, timeout=180)
 check("setup reports the reclaimable set", b'"cleanup"' in b)
 # 6b268, per Patrick's RC4 trial: the page AI tucks to the titlebar's
@@ -934,7 +937,8 @@ check("prune: retired registry + ladders scrubbed",
       "RETIRED_MODELS = {" in _MILLENAI_SRC
       and '"Gemma 2 9B IT":     ("mlx-community/gemma-2-9b-it-4bit"' in _MILLENAI_SRC
       and _MILLENAI_SRC.count('("Gemma 2 9B IT",') == 0
-      and _MILLENAI_SRC.count('"Llama 3.1 8B"') == 1     # registry only
+      # the registry and its replacement map only (6b306)
+      and _MILLENAI_SRC.count('"Llama 3.1 8B"') == 2
       and '"Mistral Small 24B":' in _MILLENAI_SRC
       and "def _gb_of" in _MILLENAI_SRC
       and "elif label in RETIRED_MODELS:" in _MILLENAI_SRC)
@@ -956,7 +960,7 @@ check("titlebar lockup centers on the window",
           < _MILLENAI_SRC.find("_lockw = 6 + _ww"))
 check("clean-now flow wired",
       'id="clean-now"' in page and 'id="clean-veil"' in page
-      and 'id="clean-go"' in page
+      and 'id="clean-models"' in page and 'data-mu="go"' in page
       and "font-weight:400;-webkit-text-stroke:.12em currentColor" in page
       and 'id="autoclean-bar"' in page
       and "#roster:not(.managing) .rrm{display:none}" in page
@@ -966,9 +970,185 @@ check("clean-now flow wired",
 # wears the house chrome, reports the real reason a removal failed, and
 # a retired Ollama row deletes the tag that is actually pulled
 check("clean-up dialog: house chrome, honest errors, exact tags",
-      "#clean-card .ghost{" in page and "#clean-card .primary{" in page
+      ".mu-foot .ghost{" in page and ".mu-foot .primary{" in page
       and '"errors": dict(_CLEANUP_LAST_ERRORS)' in _MILLENAI_SRC
       and "resolve the" in _MILLENAI_SRC and "t.split(\":\")[0] == _tag" in _MILLENAI_SRC)
+# 6b306, per Patrick: auto-clean on by default, a sweep on the first
+# launch after every update, and Update models in the post-update card.
+# The rules, run for real against a fake disk: the catalog is never
+# swept by name, the unattended pass takes only what this app installed
+# and what is already replaced, and Update models deletes an old model
+# only after its replacement is complete.
+threading = _LH["threading"]
+_mns = dict(_LH)
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("CATALOG = ["):
+                   _MILLENAI_SRC.index("GROUP_TITLES = {")], _mns)
+exec(_MILLENAI_SRC[_MILLENAI_SRC.index("MODEL_INFO = {c[0]"):
+                   _MILLENAI_SRC.index("# a model is usable here")], _mns)
+_MD = {"disk": set(), "prefs": {}, "fit": 999.0, "removed": [],
+       "jobs_fail": set()}
+_mt = __import__("types").SimpleNamespace(
+    time=time.time, sleep=lambda s: time.sleep(0.01))
+_mns.update(
+    time=_mt, IS_ARM=True, SUPPORTED={l: True for l in _mns["MODEL_INFO"]},
+    MODEL_ROUTES={}, _mlx_procs={}, _port_in_use=lambda p: False,
+    _update={"state": "idle"}, _setup_lock=threading.RLock(),
+    _setup_jobs={}, _CLEANUP_LAST_ERRORS={},
+    _prefs_lock=threading.RLock(),
+    ollama_pulled_tags=lambda: set(),
+    model_cached=lambda l, pulled=None: l in _MD["disk"],
+    mlx_model_cached=lambda repo: repo in _MD["disk"],
+    model_fits_machine=lambda l: _mns["MODEL_INFO"][l]["mem"] / 1e9
+        <= _MD["fit"],
+    load_prefs=lambda base=None: dict(_MD["prefs"]),
+    store_prefs=lambda d, base=None: _MD.update(prefs=dict(d)))
+
+
+def _fake_remove(want):
+    for l in want:
+        _MD["disk"].discard(_mns["RETIRED_MODELS"][l][0] or l)
+    _MD["removed"] += want
+    return list(want), {}
+
+
+def _fake_dl(labels):
+    def _run():
+        for l in labels:
+            with _mns["_setup_lock"]:
+                _mns["_setup_jobs"][l] = {"status": "downloading"}
+            time.sleep(0.05)
+            ok = l not in _MD["jobs_fail"]
+            with _mns["_setup_lock"]:
+                _mns["_setup_jobs"][l] = {"status": "done" if ok
+                                          else "error"}
+            if ok:
+                _MD["disk"].add(l)
+    threading.Thread(target=_run, daemon=True).start()
+    return list(labels)
+
+
+_mns.update(_remove_models=_fake_remove, start_model_downloads=_fake_dl)
+for _n in _ctree.body:
+    if isinstance(_n, (_ast.FunctionDef, _ast.Assign)) and (
+            getattr(_n, "name", "") in (
+                "_retired_on_disk", "model_updates", "superseded_installed",
+                "_gb_of", "_cleanup_stat", "auto_cleanup_on", "_resident",
+                "_auto_cleanup_pass", "start_model_update",
+                "_model_update_worker", "_ledger", "_ledger_add",
+                "_ledger_seed", "_offers_set")
+            or (isinstance(_n, _ast.Assign) and any(
+                getattr(t, "id", "") in ("_modup", "_modup_lock",
+                                         "_modup_hist")
+                for t in _n.targets))):
+        exec(_ast.get_source_segment(_MILLENAI_SRC, _n), _mns)
+_R = _mns["RETIRED_MODELS"]
+_S = _mns["RETIRED_SUCCESSORS"]
+check("every retired model has replacements, each a real catalog row",
+      set(_S) == set(_R) and all(
+          _S[o] and all(c in _mns["MODEL_INFO"] for c in _S[o]) for o in _S))
+# the catalog is never swept by name: three Qwen generations and both
+# Hermes rows installed side by side all stay
+_MD["disk"] = {"Qwen 3.8 27B", "Qwen 3.6 35B MoE", "Qwen 3.5 9B",
+               "Hermes 3 8B", "Hermes 4 14B", "Gemma 4 12B"}
+_MD["prefs"] = {"app_models": list(_mns["MODEL_INFO"]) + list(_R)}
+check("auto-clean never deletes a current catalog model",
+      _mns["superseded_installed"]() == []
+      and _mns["_auto_cleanup_pass"]() == [])
+# on by default; an explicit off is respected
+_MD["prefs"] = {}
+_on_default = _mns["auto_cleanup_on"]()
+_MD["prefs"] = {"auto_cleanup": False}
+check("auto-clean is on unless switched off",
+      _on_default and not _mns["auto_cleanup_on"]())
+# the unattended pass: every outdated model this app installed, whether
+# or not its replacement is here yet (per Patrick: "make sure that any
+# outdated models are cleaned out"), and never one it didn't install
+_nemo = _R["Mistral Nemo 12B"][0]
+_MD["disk"] = {_nemo, "Ministral 3 14B", "LLaVA Vision 7B"}
+_mns["_retired_on_disk"] = (lambda l, pulled:
+    (_R[l][0] or l) in _MD["disk"])
+_MD["prefs"] = {"app_models": ["Mistral Nemo 12B", "LLaVA Vision 7B"]}
+_auto = _mns["superseded_installed"](auto=True)
+_MD["prefs"] = {"app_models": []}
+_auto_theirs = _mns["superseded_installed"](auto=True)
+check("unattended pass: every outdated model this app installed, no other",
+      sorted(_auto) == ["LLaVA Vision 7B", "Mistral Nemo 12B"]
+      and _auto_theirs == []
+      and sorted(_mns["superseded_installed"]()) ==
+          ["LLaVA Vision 7B", "Mistral Nemo 12B"],
+      "%r %r" % (_auto, _auto_theirs))
+# swept before its replacement arrived: the weights go, the offer stays
+_MD.update(disk={"LLaVA Vision 7B"}, removed=[],
+           prefs={"app_models": ["LLaVA Vision 7B"]})
+_swept = _mns["_auto_cleanup_pass"]()
+_left = _mns["model_updates"]()
+check("a swept model's replacement is still offered",
+      _swept == ["LLaVA Vision 7B"] and "LLaVA Vision 7B" not in _MD["disk"]
+      and _MD["prefs"].get("model_offers") == ["LLaVA Vision 7B"]
+      and len(_left) == 1 and _left[0]["gone"]
+      and _left[0]["new"] == "Qwen 3.5 Vision 9B"
+      and _left[0]["free_gb"] == 0.0, "%r %r" % (_swept, _left))
+# a replacement is chosen for THIS machine's memory
+_MD["disk"] = {_R["Qwen 2.5 Coder 14B"][0]}
+_MD["fit"] = 12.0
+_small = _mns["model_updates"]()[0]["new"]
+_MD["fit"] = 64.0
+_big = _mns["model_updates"]()[0]["new"]
+check("replacement fits the machine",
+      _small == "Qwen 3.5 9B" and _big == "Qwen 3.8 27B",
+      "%s / %s" % (_small, _big))
+# Update models: the covered one goes at once, the other only after its
+# replacement lands; a failed replacement keeps the old model
+def _run_update():
+    _MD["removed"] = []
+    _mns["_setup_jobs"].clear()
+    _mns["start_model_update"]()
+    for _ in range(300):
+        if _mns["_modup"]["state"] != "running":
+            break
+        time.sleep(0.02)
+    return dict(_mns["_modup"])
+_MD.update(disk={_nemo, "Ministral 3 14B", "LLaVA Vision 7B"},
+           jobs_fail=set(), fit=999.0,
+           prefs={"model_offers": ["LLaVA Vision 7B"]})
+_u1 = _run_update()
+_offer_cleared = _MD["prefs"].get("model_offers") == []
+_u1_landed = "Qwen 3.5 Vision 9B" in _MD["disk"]
+_MD.update(disk={"LLaVA Vision 7B"}, jobs_fail={"Qwen 3.5 Vision 9B"})
+_u2 = _run_update()
+check("Update models replaces first, then removes; a failure keeps the old",
+      _u1["state"] == "done" and _u1["news"] == ["Qwen 3.5 Vision 9B"]
+      and sorted(_u1["removed"]) == ["LLaVA Vision 7B", "Mistral Nemo 12B"]
+      and _u1_landed and _offer_cleared,
+      "%r" % _u1)
+check("a failed replacement keeps the old model",
+      _u2["state"] == "partial" and _u2["removed"] == []
+      and _u2["failed"] == ["LLaVA Vision 7B"]
+      and "LLaVA Vision 7B" in _MD["disk"], "%r" % _u2)
+# the ledger: an existing install vouches for what it knows, a new one
+# starts empty, and a download is recorded only once it's seeded
+_p1, _p2 = {}, {}
+_mns["_ledger_seed"](_p1, existing=True)
+_mns["_ledger_seed"](_p2, existing=False)
+_MD["prefs"] = {}
+_mns["_ledger_add"]("Qwen 3.5 9B")
+_unseeded = "app_models" not in _MD["prefs"]
+_MD["prefs"] = {"app_models": []}
+_mns["_ledger_add"]("Qwen 3.5 9B")
+check("ledger: seeded per install, downloads recorded",
+      "Mistral Nemo 12B" in _p1["app_models"] and _p2["app_models"] == []
+      and _unseeded and _MD["prefs"]["app_models"] == ["Qwen 3.5 9B"])
+check("post-update sweep, endpoints, and the default wired",
+      "_UPDATE_LANDED[0] = True" in _MILLENAI_SRC
+      and "target=_post_update_cleanup" in _MILLENAI_SRC
+      and '"/api/model/cleanup", "/api/model/update",' in _MILLENAI_SRC
+      and 'self.path == "/api/model/update"' in _MILLENAI_SRC
+      and "_ledger_add(label)" in _MILLENAI_SRC.split(
+          "def _download_model")[1][:1500]
+      and "pr2.auto_cleanup!==false" in page
+      and 'id="wiz-ac" checked' in page)
+s, h, b = req("/api/model/update", cookie=K)
+check("update status answers", s == 200 and b'"state"' in b, b[:80])
 # 6b283, per Patrick (twice): the Clean-up button and note were clipped
 # below the settings card — the card is a grid whose row grew to its
 # content; the row is bounded now and the pane scrolls

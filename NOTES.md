@@ -4973,3 +4973,63 @@ NOT DONE, and why:
   change bit us before. Deferred until a real render.
 - FastWan2.2 (3-step video) loads but does not sample correctly on the
   installed mlx-video. Vetoed.
+
+## 6b306 — Update models, and auto-clean on by default (uncut)
+
+Per Patrick: "make sure that's enabled by default and trigger it so
+that every time an update to our app lands and is installed, that it
+will force the auto clean to run on startup … keep users current on
+their models while also not forcing them to sit there and wait for a 20
+gigabyte download." He picked mockup C of four ("names on demand"),
+plus a Continue in background button that hands the progress to the
+strip, and "make sure that any outdated models are cleaned out and not
+just left in there taking up tons of space."
+
+WHAT RUNS BY ITSELF. Auto-clean is on unless the user switched it off
+(an explicit off is respected). The first launch of the real app after
+an update sweeps at once (`_post_update_cleanup`); the janitor's first
+tick a minute in and every six hours after repeat it. It removes every
+RETIRED model on disk that this app downloaded, and never downloads
+anything. A retired model the app can no longer use goes even when its
+replacement isn't installed yet; the replacement is remembered as an
+offer (`model_offers` in prefs) until it is taken.
+
+WHAT IT NEVER TOUCHES. (1) Current catalog rows. The old rule read a
+newer generation in the same family as a replacement, so Qwen 3.8 27B
+"superseded" the Qwen 3.6 35B MoE and Hermes 4 "superseded" Hermes 3:
+with the switch on by default it would have deleted both. The catalog
+is curated, so only RETIRED_MODELS are ever outdated. (2) Models this
+app didn't download. An Ollama tag or HF cache pulled for another tool
+looks identical on disk, so the unattended pass only deletes labels in
+the `app_models` ledger. An install that predates the ledger vouches
+for every model it knows; a brand-new install starts empty and records
+each download as it lands. Dev instances never seed it.
+
+UPDATE MODELS. RETIRED_SUCCESSORS names each retired model's
+replacements, best first. The first that fits this machine's memory is
+what downloads (Qwen 2.5 Coder 14B gets Qwen 3.8 27B on a big Mac, Qwen
+3.5 9B on a small one). Replacements go through the ordinary installer,
+so the strip shows them; each old model is deleted only once its
+replacement is complete on disk, and one whose replacement failed is
+kept. One run at a time (`_modup`), its own speed window.
+
+THE CARD. The post-update card waits for the startup sweep, then shows
+one line ("Newer versions of 3 of your models are ready · 31 GB to
+download · frees 20 GB"), names behind Show which, and Update models /
+Later. Running: one bar, %, GB, speed, time left, and Continue in
+background. The strip at the top left then reads "updating · 48%" and
+clicking it reopens the card, not the installer. The Manage pane's row
+is a switch ("Remove outdated models automatically") with one status
+line and a button only when there's something to do; that button opens
+the same section in its own card.
+
+FOUND ON THE WAY. (1) The strip's label outgrew the sidebar once it
+carried speed and time left, and squeezed the bar to 0px, so no bar
+showed during downloads. The bar now sits above a two-part label, and
+the time left is never clipped. (2) The "More models available" card
+(its Download installs the whole max plan) fired right after the
+post-update card. The catalog update adds eight models, so every user
+would have met both. It now stands down on the update launch, keeping
+its own promise of one card per launch. (3) The Models pane's "Model
+updates…" button opened the installer; it now says "Add models…", and
+the command palette has both.
