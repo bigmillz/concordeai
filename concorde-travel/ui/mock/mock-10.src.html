@@ -2782,7 +2782,7 @@ function paintAccount(){
   document.querySelectorAll('.adminlink').forEach(a => a.classList.toggle('hidden', !(u && u.owner && u.viaAccess)));
   for (const [sel, what] of LOCKS){ const el = document.querySelector(sel); if (!el) continue; el.classList.toggle('locked', !u);
     if (!u){ el.dataset.tip = '<div class="jh"><i></i><b>Sign in to use ' + what + '</b></div><ul><li>Free with email or Google. No password.</li></ul>'; el.setAttribute('aria-label', 'Sign in to use ' + what); } else { delete el.dataset.tip; el.removeAttribute('aria-label'); } }
-  const h4 = document.querySelector('#s4 .hintr'); if (h4) h4.textContent = u && !u.demo ? '' : 'Without a sign-in these are recorded results. Sign in above to search live.';
+  const h4 = document.querySelector('#s4 .hintr'); if (h4) h4.textContent = SERVED ? '' : 'Opened as a file, so these are sample results.';
 }
 function openAccount(why){
   const u = S.user, capped = why && why.sign_in && why.free != null;
