@@ -160,7 +160,7 @@ def resolve(text: str) -> Tuple[Optional[str], str, Optional[str]]:
     worse outcome than being asked to type three letters."""
     raw = (text or "").strip()
     if not raw:
-        return None, "unknown", "Where to? Type a city or an airport code."
+        return None, "unknown", "Enter a city, an address or an airport code."
     if CODE_RE.match(raw.upper()) and len(raw) == 3:
         return raw.upper(), "code", None
     # "Honolulu (HNL)": what the autocomplete puts in the field, the code carried in brackets
@@ -186,8 +186,8 @@ def resolve(text: str) -> Tuple[Optional[str], str, Optional[str]]:
 
     near = suggest(raw)
     hint = (" Did you mean %s?" % ", ".join(near)) if near else ""
-    return None, "unknown", ("We couldn't find \"%s\". Try a city or a 3-letter "
-                             "airport code, like LHR.%s" % (raw, hint))
+    return None, "unknown", ("No match for \"%s\". Enter a city or a 3-letter "
+                             "airport code, such as LHR.%s" % (raw, hint))
 
 
 def suggest(text: str, limit: int = 3) -> List[str]:

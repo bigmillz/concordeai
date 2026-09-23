@@ -260,6 +260,12 @@ def _hours_to_midnight():
     return max(1, round((datetime.datetime.combine(now.date() + datetime.timedelta(days=1), datetime.time()) - now).total_seconds() / 3600))
 
 
+def _in_hours():
+    """'in 1 hour' or 'in 6 hours', for the limit messages."""
+    h = _hours_to_midnight()
+    return "in %d hour%s" % (h, "" if h == 1 else "s")
+
+
 def _users_left(email):
     import datetime
     today = datetime.date.today().isoformat()
@@ -632,7 +638,7 @@ def score_request(req):
     fid = req.get("fixture") or "ground-access-swing"
     path = _fixture_path(fid)
     if not path:
-        return {"error": "no such fixture: %s" % fid}
+        return {"error": "No such fixture: %s" % fid}
     sc = json.load(open(path, encoding="utf-8"))
     return _score_scenario(sc, req)
 
@@ -726,7 +732,7 @@ def _fetch_raw(req):
         where["date"] = d
         if not live.load_config().get("key"):
             if req.get("_served"):
-                return ({"error": "Live search isn't set up yet, so there's nothing to show.", "live": True},)
+                return ({"error": "Live search is not set up yet.", "live": True},)
             # a developer's machine with no key: the recording stands in, and says so
             src = "sample"
             req = dict(req, _fell_back=True)
@@ -741,9 +747,9 @@ def _fetch_raw(req):
             with open(path, encoding="utf-8") as fh:
                 raw = json.load(fh)
         except OSError as exc:
-            return ({"error": "no recorded sample: %s" % exc},)
+            return ({"error": "Recorded results missing: %s" % exc},)
         if req.get("_fell_back"):
-            meta["fell_back"] = "no flight API key on this machine"
+            meta["fell_back"] = "No flight API key on this machine"
     elif src == "inline":
         raw = req.get("payload") or {}
     elif src == "api":
@@ -753,7 +759,7 @@ def _fetch_raw(req):
              "cabin": _cabin(req.get("cabin"))}
         raw, meta = live.search(q)
         if raw is None:
-            return ({"error": meta.get("error", "Search isn't working right now. Try again soon."),
+            return ({"error": meta.get("error", "Search is unavailable. Try again later."),
                      "hint": meta.get("hint") or meta.get("how"),
                      "quota": meta.get("quota"), "live": True},)
         # the supplement: Google Flights through SerpApi, for the carriers the
@@ -761,8 +767,7 @@ def _fetch_raw(req):
         meta = dict(meta)
         meta["supplement_payload"], meta["supplement"] = _supplement(q)
     else:
-        return ({"error": "unknown source %r - this server does not call a flight "
-                          "API itself; hand it a payload or use the recording" % src},)
+        return ({"error": "Unknown source %r. Use sample, inline or api." % src},)
     return raw, meta, where, src
 
 
@@ -799,10 +804,10 @@ def flight_request(q, remote, headers):
         ip = (headers.get("Cf-Connecting-Ip") or headers.get("X-Forwarded-For") or "?").split(",")[0].strip()
         ok, _left = _users_take("ip:" + ip, "flights", 12)
         if not ok:
-            return {"error": "You have used today's 12 flight lookups. Try again tomorrow."}
+            return {"error": "Daily limit reached: 12 flight lookups. Try again tomorrow."}
     legs, meta = live.flight_status(number, date)
     if legs is None:
-        return {"error": meta.get("error", "no status"), "hint": meta.get("hint") or meta.get("how"), "configured": bool(live.adb_config().get("key"))}
+        return {"error": meta.get("error") or "Flight lookup unavailable. Enter the times by hand.", "hint": meta.get("hint") or meta.get("how"), "configured": bool(live.adb_config().get("key"))}
     tr = rescue.from_tracking(legs, (q.get("origin") or [""])[0], (q.get("destination") or [""])[0])
     if not tr:
         return {"error": "No flight %s found on %s." % (number.upper(), date) + (" Check the number and date." if legs == [] else ""), "legs": len(legs)}
@@ -826,10 +831,10 @@ def flex_request(req):
         centre = datetime.date.fromisoformat(date)
         span = max(1, min(3, int(req.get("days") or 3)))
     except (TypeError, ValueError):
-        return {"error": "Pick a real trip date."}
+        return {"error": "Pick a valid date."}
     ok, _ = _users_take("_flex", "searches", FLEX_PER_DAY)
     if not ok:
-        return {"error": "Nearby days has hit today's limit. Try again after midnight."}
+        return {"error": "Nearby days: daily limit reached. Try again %s." % _in_hours()}
     today = datetime.date.today()
     days = []
     for k in range(-span, span + 1):
@@ -851,7 +856,7 @@ def flex_request(req):
                     row[prof] = {"effective_cents": e["by"][prof]["effective_cents"] if prof in e.get("by", {}) else e["effective_cents"], "total_cents": sum(l["cents"] for l in (e.get("by", {}).get(prof) or e)["lines"] if l["code"] in ("ticket", "bags", "ground_out", "ground_in")),
                                  "ticket_cents": e["ticket_cents"], "carrier": e["carrier"], "flight": e["flight"], "grade": e["grade"]}
         days.append(row)
-    return {"days": days, "centre": date, "note": "Every day is priced all in from your door, the ride and the bags included, not the fare alone."}
+    return {"days": days, "centre": date, "note": "Best flight each day, rides and bags included."}
 
 
 def rescue_request(req):
@@ -886,7 +891,7 @@ def rescue_request(req):
             search = r                                # the day's full results, so the page can show them as a search
         found.extend(r["results"]["reference"])
     if not found:
-        return {"error": errors[0] if errors else "No flights found for that day."}
+        return {"error": errors[0] if errors else "No flights found for this date."}
     # the countries the rules turn on, from the curated airports where we know them
     enr = adapter.load_enrichment()
     aps = enr["airports"]["airports"]
@@ -966,9 +971,9 @@ def search_request(req):
                                   destination_full=(req.get("destination") if dest_point else None),
                                   supplement=meta.get("supplement_payload"))
     except ValueError as exc:
-        return {"error": "No flights came back for that day. Try another date.", "detail": str(exc)}
+        return {"error": "No flights found for this date.", "detail": str(exc)}
     if not out["results"]["reference"]:
-        return {"error": "No flights found on that route that day. Try another date or airport."}
+        return {"error": "No flights found for this route and date. Try another date or airport."}
     out["feed"] = {"source": src, "fetched": meta.get("source"), "age_seconds": meta.get("age_seconds"),
                    "quota": meta.get("quota"), "fell_back": meta.get("fell_back"),
                    "supplement": {k: v for k, v in (meta.get("supplement") or {}).items()
@@ -981,7 +986,7 @@ def search_request(req):
         out["signal"] = None
     if src == "sample":
         out["source_note"] = ("Recorded JFK–LHR results, not a live search" +
-                              (": " + meta["fell_back"] if meta.get("fell_back") else "") + ".")
+                              (". " + meta["fell_back"] if meta.get("fell_back") else "") + ".")
     if not out.get("_provenance"):
         out["_provenance"] = {}
     out["_provenance"]["live"] = src == "api"
@@ -1031,10 +1036,10 @@ def live_request(req):
             codes = {segs[0]["origin"]["iata"], segs[-1]["destination"]["iata"]}
             mismatch = bool(asked_d) and not any(places.covers(asked_d, c) for c in codes)
             out["sample_notice"] = (
-                "These are recorded %s results, not your route. Add a Duffel "
+                "Recorded %s results, not your route. Add a Duffel "
                 "key to search it." % actual
                 if mismatch else
-                "Recorded %s results. Add a Duffel key for live ones." % actual)
+                "Recorded %s results. Add a Duffel key for live results." % actual)
     if src == "api":
         out["feed"].update({"fetched": _LIVE_META.get("source"),
                             "age_seconds": _LIVE_META.get("age_seconds"),
@@ -1171,7 +1176,7 @@ def photos_request(q):
         pass
     ok, _ = _users_take("_photos", "photos", PHOTO_CALLS)
     if not ok:
-        return {"photos": [], "reason": "today's photo lookups are spent"}
+        return {"photos": [], "reason": "Daily photo limit reached."}
     # The place, not its people (per Patrick, 2026-09-21: a doll's face and somebody's baby came back for
     # Bushwick). Pexels has no subject filter, so the query names the subject and the photo's own alt text
     # is read: anything describing a person, a face, a costume or a pet is left out.
@@ -1188,7 +1193,7 @@ def photos_request(q):
                 d = json.loads(r.read().decode("utf-8"))
         except Exception as exc:
             if not photos:
-                return {"photos": [], "reason": "Pexels did not answer: %s" % live.redact(str(exc), PEXELS_KEY)}
+                return {"photos": [], "reason": "Pexels did not respond: %s" % live.redact(str(exc), PEXELS_KEY)}
             break
         for p in d.get("photos") or []:
             if not p.get("src") or p.get("id") in seen or PEOPLE.search(p.get("alt") or ""):
@@ -1455,14 +1460,14 @@ def locate_request(q):
         lat, lon = float(q["lat"][0]), float(q["lon"][0])
         assert -90 <= lat <= 90 and -180 <= lon <= 180
     except Exception:
-        return {"error": "lat and lon, please"}
+        return {"error": "Missing or invalid lat and lon."}
     url = "https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&lat=%.6f&lon=%.6f" % (lat, lon)
     req = urllib.request.Request(url, headers={"User-Agent": "ConcordeGo/1.0 (go.flyconcordefly.com)", "Accept": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=8) as r:
             d = json.loads(r.read().decode("utf-8"))
     except Exception as exc:
-        return {"error": "the map service did not answer: %s" % type(exc).__name__}
+        return {"error": "Map service did not respond: %s" % type(exc).__name__}
     a = d.get("address") or {}
     return {"address_text": _address_text(a), "address": a}
 
@@ -1470,12 +1475,12 @@ def locate_request(q):
 def admin_update():
     st = admin_status(fetch=True)
     if not st.get("branch"):
-        return {"error": "This is not a git checkout, so there is nothing to update from."}
+        return {"error": "Not a git checkout. Nothing to update from."}
     if st.get("fetched") is False:
         return {"error": "Could not fetch from GitHub: " + (st.get("fetch_error") or "unknown")}
     rc, _, err = _git("reset", "--hard", "origin/%s" % st["branch"])
     if rc:
-        return {"error": "The update could not be applied: " + live.redact(err)}
+        return {"error": "Update failed: " + live.redact(err)}
     rc, head, _ = _git("rev-parse", "--short", "HEAD")
     # exit after the reply has gone out; the supervisor restarts the service on the new code
     threading.Timer(1.0, lambda: os._exit(0)).start()
@@ -1499,7 +1504,7 @@ def admin_logs(unit, n):
         with open(LOG_FILE, "rb") as f:
             f.seek(0, 2); size = f.tell(); f.seek(max(0, size - 400000)); data = f.read().decode("utf-8", "replace")
         return {"source": LOG_FILE, "text": live.redact("\n".join(data.splitlines()[-n:]))}
-    return {"source": None, "text": "No log source here: the journal is not readable and CONCORDEGO_LOG is not set."}
+    return {"source": None, "text": "No log source: the journal is not readable and CONCORDEGO_LOG is not set."}
 
 
 ADMIN_HTML = r"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ConcordeGo admin</title>
@@ -1521,7 +1526,7 @@ table{border-collapse:collapse;font-size:13px;width:100%}td,th{text-align:left;p
 <div class="grid" id="cards"></div>
 <div class="row"><button id="check">Check GitHub</button><button id="update" disabled>Update now</button><button class="ghost" id="refresh">Refresh</button><span class="note" id="msg"></span></div>
 <div id="incoming"></div>
-<div class="card" style="margin-bottom:18px"><div class="k">Unlimited people</div><div class="v">Signed-in emails with no daily cap</div>
+<div class="card" style="margin-bottom:18px"><div class="k">Unlimited accounts</div><div class="v">Signed-in emails with no daily limit.</div>
 <div id="unl" style="margin:8px 0 6px"></div>
 <div class="row" style="margin:0"><input id="unladd" placeholder="email" style="flex:1;min-width:220px;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);font:13px 'Space Grotesk',sans-serif;padding:9px 12px"><button id="unlgo">Add</button></div></div>
 <div class="tabs"><button id="t-server" aria-pressed="true">Server log</button><button id="t-update" aria-pressed="false">Update log</button><button class="ghost" id="t-reload">Reload log</button></div>
@@ -1534,11 +1539,11 @@ async function j(url, opts){ const r = await fetch(url, opts); if (!r.ok) throw 
 function paint(st){ ST = st; const h = st.head || {}, behind = st.behind; paintKey(st);
   const cards = [
     ['Running', `<b>${h.short || '?'}</b> on ${st.branch || '?'}`, (h.subject || '') + (h.date ? ' · ' + when(h.date) : '')],
-    ['GitHub', behind == null ? '<span class="warn">not checked</span>' : behind ? `<span class="warn">${behind} commit${behind > 1 ? 's' : ''} ahead</span>` : '<span class="ok">up to date</span>', st.last_check ? 'last checked ' + when(st.last_check) : 'never checked'],
+    ['GitHub', behind == null ? '<span class="warn">not checked</span>' : behind ? `<span class="warn">${behind} new commit${behind > 1 ? 's' : ''}</span>` : '<span class="ok">up to date</span>', st.last_check ? 'last checked ' + when(st.last_check) : 'never checked'],
     ['Process', `up ${ago(st.uptime_s)}`, 'pid ' + st.pid + ' · python ' + st.python + ' · ' + (st.owners.length ? 'owners: ' + st.owners.join(', ') : '<span class="warn">no CONCORDEGO_OWNERS set</span>') + ' · you: ' + (st.you === 'owner' ? 'this machine' : (st.you || 'nobody')) + (st.public ? ' · public box' : ' · <span class="warn">not marked public</span>')],
-    ['Flight API', st.live && st.live.key_configured ? `<span class="ok">${st.live.provider} key on</span>` : '<span class="warn">no key: recorded results</span>', st.live && st.live.quota ? `today ${st.live.quota.day_calls}/${st.live.quota.day_limit} · month ${st.live.quota.month_calls}/${st.live.quota.month_limit}` : ''],
-    ['Claude', st.narrator ? '<span class="ok">key on</span>' : '<span class="warn">no key: template only</span>', 'narrator and wish box'],
-    ['People today', st.users_today.length ? st.users_today.length + ' signed in' : 'nobody yet', st.users_today.slice(0, 4).map(u => `${u.email} ${u.searches}/${st.allowances.searches} · ${u.wishes}/${st.allowances.wishes}`).join('<br>')],
+    ['Flight API', st.live && st.live.key_configured ? `<span class="ok">${st.live.provider} key on</span>` : '<span class="warn">no key: live search off</span>', st.live && st.live.quota ? `today ${st.live.quota.day_calls}/${st.live.quota.day_limit} · month ${st.live.quota.month_calls}/${st.live.quota.month_limit}` : ''],
+    ['Claude', st.narrator ? '<span class="ok">key on</span>' : '<span class="warn">no key: template only</span>', 'narrator, wish box, Flight Fixer advice'],
+    ['People today', st.users_today.length ? st.users_today.length + ' signed in' : 'none', st.users_today.slice(0, 4).map(u => `${u.email} ${u.searches}/${st.allowances.searches} · ${u.wishes}/${st.allowances.wishes}`).join('<br>')],
   ];
   $('#cards').innerHTML = cards.map(c => `<div class="card"><div class="k">${c[0]}</div><div class="v">${c[1]}</div><div class="s">${c[2]}</div></div>`).join('');
   $('#update').disabled = !behind; $('#update').textContent = behind ? `Update now (${behind})` : 'Update now';
@@ -1547,18 +1552,18 @@ function paint(st){ ST = st; const h = st.head || {}, behind = st.behind; paintK
 }
 async function load(){ try { paint(await j('/api/admin/status')); } catch (e){ $('#msg').textContent = e.message; } }
 async function logs(){ $('#log').textContent = '…'; try { const r = await j('/api/admin/logs?unit=' + UNIT + '&n=300'); $('#log').textContent = (r.source ? '[' + r.source + ']\n' : '') + r.text; $('#log').scrollTop = 1e9; } catch (e){ $('#log').textContent = e.message; } }
-$('#check').onclick = async () => { $('#msg').textContent = 'Asking GitHub…'; $('#check').disabled = true; try { paint(await j('/api/admin/check', {method:'POST'})); $('#msg').textContent = ST.behind ? '' : 'Nothing new.'; } catch (e){ $('#msg').textContent = e.message; } $('#check').disabled = false; };
+$('#check').onclick = async () => { $('#msg').textContent = 'Checking GitHub…'; $('#check').disabled = true; try { paint(await j('/api/admin/check', {method:'POST'})); $('#msg').textContent = ST.behind ? '' : 'Nothing new.'; } catch (e){ $('#msg').textContent = e.message; } $('#check').disabled = false; };
 $('#update').onclick = async () => { if (!confirm('Update to the newest commit and restart the service?')) return; $('#msg').textContent = 'Updating…'; $('#update').disabled = true;
   try { const r = await j('/api/admin/update', {method:'POST'}); if (r.error){ $('#msg').textContent = r.error; $('#update').disabled = false; return; }
-    $('#msg').textContent = `Now at ${r.head}; the service is restarting…`; const t0 = Date.now();
-    const poll = async () => { try { const st = await j('/api/admin/status'); if (st.uptime_s < 30 || Date.now() - t0 > 20000){ paint(st); $('#msg').textContent = `Back up on ${st.head.short}.`; logs(); return; } } catch (e) {} if (Date.now() - t0 < 60000) setTimeout(poll, 1500); else $('#msg').textContent = 'The service has not come back yet; check the log.'; };
+    $('#msg').textContent = `Updated to ${r.head}. Restarting…`; const t0 = Date.now();
+    const poll = async () => { try { const st = await j('/api/admin/status'); if (st.uptime_s < 30 || Date.now() - t0 > 20000){ paint(st); $('#msg').textContent = `Running ${st.head.short}.`; logs(); return; } } catch (e) {} if (Date.now() - t0 < 60000) setTimeout(poll, 1500); else $('#msg').textContent = 'Service not responding after 60 seconds. Check the log.'; };
     setTimeout(poll, 2500);
   } catch (e){ $('#msg').textContent = e.message; $('#update').disabled = false; } };
 $('#refresh').onclick = () => { load(); logs(); };
 $('#t-server').onclick = () => { UNIT = 'server'; $('#t-server').setAttribute('aria-pressed', 'true'); $('#t-update').setAttribute('aria-pressed', 'false'); logs(); };
 $('#t-update').onclick = () => { UNIT = 'update'; $('#t-update').setAttribute('aria-pressed', 'true'); $('#t-server').setAttribute('aria-pressed', 'false'); logs(); };
 $('#t-reload').onclick = logs;
-const paintUnl = list => { $('#unl').innerHTML = (list || []).length ? list.map(e => `<span style="display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:5px 6px 5px 12px;margin:0 6px 6px 0;font-size:13px">${e}<button class="ghost" data-unl="${e}" style="padding:2px 8px;font-size:12px" title="Remove">×</button></span>`).join('') : '<span class="note">Nobody yet. Owners are already unlimited.</span>'; };
+const paintUnl = list => { $('#unl').innerHTML = (list || []).length ? list.map(e => `<span style="display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:5px 6px 5px 12px;margin:0 6px 6px 0;font-size:13px">${e}<button class="ghost" data-unl="${e}" style="padding:2px 8px;font-size:12px" title="Remove">×</button></span>`).join('') : '<span class="note">None. Owners are always unlimited.</span>'; };
 document.addEventListener('click', async ev => { const b = ev.target.closest('[data-unl]'); if (!b) return; const r = await j('/api/admin/unlimited', {method:'POST', body: JSON.stringify({remove: b.dataset.unl})}); paintUnl(r.unlimited); });
 $('#unlgo').onclick = async () => { const e = $('#unladd').value.trim(); if (!e.includes('@')) return; const r = await j('/api/admin/unlimited', {method:'POST', body: JSON.stringify({add: e})}); $('#unladd').value = ''; paintUnl(r.unlimited); };
 const paintKey = st => { paintUnl(st.unlimited); };
@@ -1751,7 +1756,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path in ("/api/admin/check", "/api/admin/update", "/api/admin/unlimited"):
             if not self._is_owner():
-                return self._json({"error": "owners only"})
+                return self._json({"error": "Owners only."})
             try:
                 if path.endswith("/unlimited"):
                     n = int(self.headers.get("Content-Length") or 0)
@@ -1780,13 +1785,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 n = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(n) or b"{}")
             except Exception as exc:
-                return self._json({"error": "bad request: %s" % exc})
+                return self._json({"error": "Bad request: %s" % exc})
             if not who or "@" not in who:
-                return self._json({"ok": False, "local": who == "owner", "error": None if who == "owner" else "sign in to save a profile"})
+                return self._json({"ok": False, "local": who == "owner", "error": None if who == "owner" else "Sign in to save your profile."})
             persona = body.get("persona") if isinstance(body, dict) and isinstance(body.get("persona"), dict) else None
             profile = {"persona": persona} if persona else {}
             if len(json.dumps(profile)) > 4000:
-                return self._json({"ok": False, "error": "that profile is too large"})
+                return self._json({"ok": False, "error": "Profile too large."})
             _users_profile_set(who, profile)
             return self._json({"ok": True, "profile": profile})
         if path not in ("/api/score", "/api/narrate", "/api/live", "/api/wish", "/api/search", "/api/rescue", "/api/flex"):
@@ -1797,10 +1802,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if not isinstance(req, dict):
                 raise ValueError("expected a JSON object")
         except Exception as exc:
-            return self._json({"error": "bad request: %s" % exc})
+            return self._json({"error": "Bad request: %s" % exc})
         if path == "/api/flex" and _users_left("_flex")["searches_used"] >= FLEX_PER_DAY:
             # the site-wide cap before anyone's allowance is charged, so a refused sweep costs nothing
-            return self._json({"error": "Nearby days has hit today's limit. Try again after midnight."})
+            return self._json({"error": "Nearby days: daily limit reached. Try again %s." % _in_hours()})
         # Spending: a live search, the narrator and the wish model. The owner
         # spends freely; a signed-in visitor spends from a daily allowance;
         # nobody anonymous spends at all.
@@ -1814,25 +1819,25 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 ip = (self.headers.get("Cf-Connecting-Ip") or self.headers.get("X-Forwarded-For") or "?").split(",")[0].strip()
                 ok, left = _users_take("ip:" + ip, "searches", ANON_SEARCHES)
                 if not ok:
-                    return self._json({"error": "You've used today's %d free searches. Sign in for %d a day, or come back in about %d hours."
-                                                % (ANON_SEARCHES, USER_SEARCHES, _hours_to_midnight()),
+                    return self._json({"error": "Daily limit reached: %d free searches. Sign in for %d a day, or try again %s."
+                                                % (ANON_SEARCHES, USER_SEARCHES, _in_hours()),
                                        "remote": True, "sign_in": True, "free": ANON_SEARCHES, "hours": _hours_to_midnight()})
                 who = None
                 charged = ("ip:" + ip, "searches")
             elif not who:
-                return self._json({"error": "Sign in to use this. A free account adds the wish box, price checks and more searches.",
+                return self._json({"error": "Sign in to use this. A free account adds more searches, the wish box and international markets.",
                                    "remote": True, "sign_in": True})
         if spends and self._remote() and who:
             kind, limit = ("searches", USER_SEARCHES) if path in ("/api/live", "/api/search", "/api/rescue", "/api/flex") else ("wishes", USER_WISHES)
             if kind == "wishes":
                 okall, _ = _users_take("_everyone", "wishes", WISHES_TOTAL)
                 if not okall:
-                    return self._json({"error": "The wish box is used up for today. Try again in about %d hours." % _hours_to_midnight(),
+                    return self._json({"error": "Wish box: daily limit reached. Try again %s." % _in_hours(),
                                        "remote": True, "allowance": True})
             ok, left = (True, None) if self._unmetered(who) else _users_take(who, kind, limit)
             charged = None if left is None else (who, kind)
             if not ok:
-                return self._json({"error": "You've used today's %d %s. More in about %d hours." % (limit, kind, _hours_to_midnight()),
+                return self._json({"error": "Daily limit reached: %d %s. Try again %s." % (limit, kind, _in_hours()),
                                    "remote": True, "allowance": True})
             if not self._unmetered(who):
                 charged = (who, kind)

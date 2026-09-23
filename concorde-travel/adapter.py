@@ -354,7 +354,7 @@ def from_kiwi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                                         .get("process_minutes") or {"p50": 60}),
             "booking": [{"who": "Kiwi.com", "price_cents": total_cents, "direct": False,
                          "note": "Self-transfer protection is Kiwi's own, not the airlines'"
-                                 if len(groups) > 1 else "Resold inventory"}],
+                                 if len(groups) > 1 else "Sold by Kiwi.com, not the airline"}],
         }
         if rating:
             opt["carrier_rating"] = {"rating": rating["rating"], "note": rating["note"],
@@ -756,7 +756,7 @@ def from_amadeus(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                                         .get("process_minutes") or {"p50": 60}),
             "booking": [{"who": carrier_names.get(issuing, issuing).title(),
                          "price_cents": total_cents, "direct": True,
-                         "note": "Airline inventory - bookable direct with %s" % issuing}],
+                         "note": "Book direct with %s." % issuing}],
         }
         rating = (enr["carriers"]["ratings"] or {}).get(segments[0]["operating"]["carrier"])
         if rating:
@@ -1480,9 +1480,9 @@ def coverage(scenario: Dict[str, Any]) -> Dict[str, Any]:
     # and it is a more dangerous gap than an abstain: an abstain announces
     # itself in the ledger, a draft row prints a confident dollar figure.
     if tot["unreviewed_claims"]:
-        gaps.append("Aircraft and wifi details are a DRAFT we are still checking")
+        gaps.append("Aircraft and wifi details are a DRAFT, not yet verified")
     if tot["default_bag_fees"]:
-        gaps.append("%d of %d fares have no known bag fees, so we priced bags high"
+        gaps.append("%d of %d fares list no bag fees, so bags are priced at a high estimate"
                     % (tot["default_bag_fees"], tot["options"]))
     if tot["abstained_claims"]:
         no_code = sum(1 for o in scenario.get("options", []) for s in o["segments"]
@@ -1493,7 +1493,7 @@ def coverage(scenario: Dict[str, Any]) -> Dict[str, Any]:
             # Some segments named an aircraft and some did not. Saying the feed
             # carries no code would be false, and would send someone to the
             # wrong fix.
-            gaps.append("%d of %d flights name no aircraft, so we skip their cabin and wifi details"
+            gaps.append("%d of %d flights name no aircraft, so they have no cabin or wifi details"
                         % (no_code, tot["segments"]))
         else:
             # A different gap with a different fix: the feed did its job and the
@@ -1501,8 +1501,8 @@ def coverage(scenario: Dict[str, Any]) -> Dict[str, Any]:
             # would send someone to change the wrong file.
             n = sum(1 for o in scenario.get("options", []) for s in o["segments"]
                     if ((s.get("claims") or {}).get("subfleet") or {}).get("coverage") == "none")
-            gaps.append("%d flight%s use%s a plane we have no cabin details for"
-                        % (n, "" if n == 1 else "s", "s" if n == 1 else ""))
+            gaps.append("No cabin details for the aircraft on %d flight%s"
+                        % (n, "" if n == 1 else "s"))
     if tot["codeshare_segments"]:
         gaps.append("%d of %d flights are codeshares, so the airline flying them is unknown"
                     % (tot["codeshare_segments"], tot["segments"]))
@@ -1511,7 +1511,7 @@ def coverage(scenario: Dict[str, Any]) -> Dict[str, Any]:
     if not tot["options_with_bag_schedule"]:
         gaps.append("No bag fees listed, so fares with and without bags can't be compared")
     if tot["rated_carriers"] < tot["options"]:
-        gaps.append("%d of %d flights are on an airline we haven't rated"
+        gaps.append("%d of %d flights are on an unrated airline"
                     % (tot["options"] - tot["rated_carriers"], tot["options"]))
     # Not a gap - the opposite. Duffel quotes a real bag price in
     # available_services, which is the one field where a feed beats the moat.
@@ -1532,7 +1532,7 @@ def coverage(scenario: Dict[str, Any]) -> Dict[str, Any]:
             if l.get("mct_source") == "not curated":
                 blind[l["airport"]] = blind.get(l["airport"], 0) + 1
     if blind:
-        gaps.append("%d layover%s at %s %s estimated: we lack connection times and opening hours there"
+        gaps.append("%d layover%s at %s %s estimated: no connection times or opening hours on file"
                     % (sum(blind.values()), "" if sum(blind.values()) == 1 else "s",
                        ", ".join(sorted(blind)),
                        "is" if sum(blind.values()) == 1 else "are"))
@@ -1551,7 +1551,7 @@ def coverage(scenario: Dict[str, Any]) -> Dict[str, Any]:
     elif tot["unreviewed_claims"]:
         verdict = "Rides, airline ratings and bag fees are researched; aircraft details are a DRAFT"
     elif tot["equipment_known"] == tot["segments"] and tot["segments"]:
-        verdict = "Every detail here comes from our own research"
+        verdict = "Every detail here is researched"
     else:
         verdict = "Rides and airline ratings are researched; aircraft details are not"
     return {"counts": tot, "gaps": gaps, "strengths": strengths, "verdict": verdict}

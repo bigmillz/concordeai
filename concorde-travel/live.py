@@ -317,7 +317,8 @@ def _reserve(cfg, path=None):
         return False, "This month's limit is used up. Try again next month."
     wait = lim["min_seconds_between_calls"] - (time.time() - q["last_call_at"])
     if wait > 0:
-        return False, "Busy right now (rate limited). Try again in a few seconds."
+        secs = max(1, int(wait + 0.999))
+        return False, "Too many requests at once (rate limited). Try again in %d second%s." % (secs, "" if secs == 1 else "s")
     q["day_calls"] += 1
     q["month_calls"] += 1
     q["total_calls"] += 1
@@ -604,21 +605,21 @@ def search(query, cfg=None, allow_call=True):
             token_clear()   # may be a retired token rather than a bad credential
         # The provider answered, so the call counted. No refund.
         return None, {"source": "none", "quota": quota_state(cfg),
-                      "error": redact("HTTP %s from the provider: %s" % (exc.code, detail), *secrets),
+                      "error": redact("Flight search failed (HTTP %s): %s" % (exc.code, detail), *secrets),
                       "hint": ("check the key" if exc.code in (401, 403) else
                                "the provider is rate limiting or out of budget" if exc.code == 429 else
                                "the query shape in %s may not match this provider" % CONFIG_FILE)}
     except (urllib.error.URLError, OSError) as exc:
         _refund()   # never reached them; that one genuinely cost nothing
         return None, {"source": "none", "quota": quota_state(cfg),
-                      "error": redact("could not reach the provider: %s" % exc, *secrets),
+                      "error": redact("Could not reach the flight search service (%s). Try again." % exc, *secrets),
                       "refunded": True}
 
     try:
         payload = json.loads(body)
     except ValueError:
         return None, {"source": "none", "quota": quota_state(cfg),
-                      "error": "the provider did not return JSON",
+                      "error": "The flight search service sent an unreadable reply. Try again.",
                       "first_bytes": redact(body[:200], *secrets)}
 
     cache_put(query, payload)
@@ -779,7 +780,7 @@ def flight_status(number, date, cfg=None, allow_call=True):
     cfg = cfg or adb_config()
     num = re.sub(r"\s+", "", str(number or "")).upper()
     if not re.match(r"^[A-Z0-9]{2}\d{1,4}[A-Z]?$", num):
-        return None, {"source": "none", "error": "That doesn't look like a flight number."}
+        return None, {"source": "none", "error": "Not a valid flight number. Enter the airline code and number, such as DL 5048."}
     query = {"engine": "aerodatabox", "number": num, "date": date}
     qf = _adb_quota_file()
     hit = cache_get(query, cfg["quota"]["cache_ttl_seconds"])
@@ -812,14 +813,14 @@ def flight_status(number, date, cfg=None, allow_call=True):
             cache_put(query, [])
             return [], {"source": "api", "quota": quota_state(cfg, qf), "note": "no flight known by that number that day"}
         return None, {"source": "none", "quota": quota_state(cfg, qf),
-                      "error": redact("HTTP %s from AeroDataBox: %s" % (exc.code, detail), *secrets),
+                      "error": redact("Flight lookup failed (HTTP %s): %s" % (exc.code, detail), *secrets),
                       "hint": ("check the RapidAPI key and the AeroDataBox subscription" if exc.code in (401, 403) else
                                "AeroDataBox is rate limiting or the plan is used up" if exc.code == 429 else
                                "the request may not match AeroDataBox's shape")}
     except (urllib.error.URLError, OSError) as exc:
         _refund(qf)
         return None, {"source": "none", "quota": quota_state(cfg, qf),
-                      "error": redact("could not reach AeroDataBox: %s" % exc, *secrets), "refunded": True}
+                      "error": redact("Could not reach the flight tracking service (%s). Try again." % exc, *secrets), "refunded": True}
     if not body.strip():                      # 204-style empty body on a 200
         cache_put(query, [])
         return [], {"source": "api", "quota": quota_state(cfg, qf), "note": "no flight known by that number that day"}
@@ -827,11 +828,11 @@ def flight_status(number, date, cfg=None, allow_call=True):
         payload = json.loads(body)
     except ValueError:
         return None, {"source": "none", "quota": quota_state(cfg, qf),
-                      "error": "AeroDataBox did not return JSON", "first_bytes": redact(body[:200], *secrets)}
+                      "error": "The flight tracking service sent an unreadable reply. Try again.", "first_bytes": redact(body[:200], *secrets)}
     if isinstance(payload, dict) and payload.get("message"):
-        return None, {"source": "none", "quota": quota_state(cfg, qf), "error": redact("AeroDataBox: %s" % payload["message"], *secrets)}
+        return None, {"source": "none", "quota": quota_state(cfg, qf), "error": redact("Flight lookup failed: %s" % payload["message"], *secrets)}
     if not isinstance(payload, list):
-        return None, {"source": "none", "quota": quota_state(cfg, qf), "error": "unexpected response shape"}
+        return None, {"source": "none", "quota": quota_state(cfg, qf), "error": "The flight tracking service sent an unexpected reply. Try again."}
     cache_put(query, payload)
     return payload, {"source": "api", "quota": quota_state(cfg, qf)}
 

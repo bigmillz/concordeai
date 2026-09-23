@@ -188,9 +188,9 @@ def holiday_factor(market: str, date: str, countries=()) -> Tuple[float, Optiona
     if us:
         nov1 = datetime.date(y, 11, 1); thanks = nov1 + datetime.timedelta(days=(3 - nov1.weekday()) % 7 + 21)
         window(thanks - datetime.timedelta(days=2), thanks + datetime.timedelta(days=4), 1.55, "Thanksgiving week")
-        window(thanks - datetime.timedelta(days=1), thanks - datetime.timedelta(days=1), 1.75, "the day before Thanksgiving")
-        window(thanks + datetime.timedelta(days=3), thanks + datetime.timedelta(days=3), 1.75, "the Sunday after Thanksgiving")
-        j4 = datetime.date(y, 7, 4); window(j4 - datetime.timedelta(days=3), j4 + datetime.timedelta(days=2), 1.2, "the Fourth of July")
+        window(thanks - datetime.timedelta(days=1), thanks - datetime.timedelta(days=1), 1.75, "Thanksgiving Eve")
+        window(thanks + datetime.timedelta(days=3), thanks + datetime.timedelta(days=3), 1.75, "Thanksgiving Sunday")
+        j4 = datetime.date(y, 7, 4); window(j4 - datetime.timedelta(days=3), j4 + datetime.timedelta(days=2), 1.2, "Fourth of July")
         may31 = datetime.date(y, 5, 31); mem = may31 - datetime.timedelta(days=may31.weekday()); window(mem - datetime.timedelta(days=3), mem, 1.2, "Memorial Day weekend")
         sep1 = datetime.date(y, 9, 1); lab = sep1 + datetime.timedelta(days=(0 - sep1.weekday()) % 7); window(lab - datetime.timedelta(days=3), lab, 1.2, "Labor Day weekend")
     if eu:
@@ -345,7 +345,7 @@ def par_for(o: Dict[str, Any], d: Dict[str, Any], date: str,
     }
     scenario = {
         "query": {
-            "origin": {"label": "city center", "lat": city_o["lat"], "lon": city_o["lon"],
+            "origin": {"label": "City center", "lat": city_o["lat"], "lon": city_o["lon"],
                        "geocode_precision": "city"},
             "destination": {"label": d.get("city") or d_iata, "lat": 0.0, "lon": 0.0,
                             "geocode_precision": "city"},

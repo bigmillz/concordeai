@@ -41,7 +41,8 @@ Absolute rules:
   "you are owed" or "the airline must".
 - Never promise a seat, a refund, or an outcome. Never name a hotel or a price the brief
   does not give.
-- Plain, calm, specific. No exclamation marks.
+- Direct and specific: lead with what to do. Calm, not chatty. No "we" or "our",
+  no exclamation marks.
 
 Write `advice`: three to five sentences. What to do first, why the arithmetic says so,
 the one practical step (the desk, the app, the phone line, a hotel tonight), and what to
@@ -216,8 +217,8 @@ def refund_rights(sit: Dict[str, Any]) -> Tuple[bool, str]:
         return True, ("a %s delay on a US %s flight counts as significant under US rules, so you may get a refund if you don't fly"
                       % (narrator._hm(delay), "international" if intl else "domestic"))
     if fare in ("business", "first"):
-        return False, ("a %s fare is often refundable, so check its rules; we have not counted it. A delay under %s is too short for a refund under US rules"
-                       % (fare, narrator._hm(need)))
+        return False, ("a %s fare is often refundable; check its rules. It is not counted in the totals%s"
+                       % (fare, (". Under US rules, a delay under %s is too short for a refund" % narrator._hm(need)) if sit.get("us") else ""))
     return False, ("a delay under %s is too short for a refund under US rules, so a new ticket means paying twice unless the airline refunds you"
                    % narrator._hm(need) if sit.get("us") else "outside the US, a refund for a delay is up to the airline; ask before you buy")
 
@@ -287,7 +288,7 @@ def assess(sit: Dict[str, Any], options: List[Dict[str, Any]], now: Optional[dat
         net = oop - time_value + hotel + rides
         lines = [{"label": "Ticket", "cents": int(o.get("ticket_cents", 0))}]
         if refund:
-            lines.append({"label": "Refund you may get", "cents": -refund})
+            lines.append({"label": "Possible refund", "cents": -refund})
         if sooner is not None and sooner != 0:
             lines.append({"label": ("Time saved, lands %s sooner" if sooner > 0 else "Time lost, lands %s later") % narrator._hm(abs(sooner)), "cents": -time_value})
         if hotel:
@@ -425,13 +426,13 @@ def odds(sit: Dict[str, Any], now: Optional[datetime], options: Optional[List[Di
                   (", %s late" % narrator._hm(tr["delay_minutes"])) if tr.get("delay_minutes") else "",
                   (", aircraft %s" % tr["aircraft"]) if tr.get("aircraft") else "")
               if tr.get("observed") else "Modelled on the time of day and the delay so far. ")
-             + ("Your flight: %s, leaving at %s. We put the risk of cancellation at %d%%. We put the chance it leaves at the new time at %d%%. %s"
+             + ("Your flight: %s, leaving at %s. Cancellation risk: %d%%. Chance it leaves at the new time: %d%%. %s"
                 % (("%s late" % narrator._hm(delay)) if delay else "no delay yet", hm12(planned), round(cancel * 100), round(_SLIP[0][1] * 100),
-                   "After midnight, we count it as lost. " if planned.date() == now.date() else "")
+                   "After midnight it counts as lost. " if planned.date() == now.date() else "")
                 if cancel is not None else "Your flight is canceled, so only other flights count. " if sit.get("kind") == "cancelled"
                 else "No new departure time yet, so only other flights count. ")
-             + "Flying today: each other flight leaving at least 75 minutes later adds an even chance. "
-               "%d still leave today." % sum(1 for d in deps if d >= now + timedelta(minutes=BUFFER_MINUTES)))
+             + "Flying today: each other flight leaving 75+ minutes from now counts as a 50%% chance of a seat. "
+               "Flights that qualify: %d." % sum(1 for d in deps if d >= now + timedelta(minutes=BUFFER_MINUTES)))
     return {"flight": {"p": round(p_flight, 2), "curve": fcurve}, "today": {"p": round(p_today, 2), "curve": tcurve},
             "modelled": True, "observed_status": bool(tr.get("observed")), "planned": planned.isoformat() if planned else None,
             "planned_passed": passed,

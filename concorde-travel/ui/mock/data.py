@@ -111,7 +111,7 @@ def google_details(g):
             "change": {"allowed": None}, "refund": {"allowed": None},   # Google names no fare terms; the sheet prints a dash
             "emissions_kg": g.get("emissions_kg"), "typical_kg": g.get("typical_kg"),
             "total_minutes": g.get("total_duration"),
-            "note": "Google's lowest fare. Bag allowance not shown, so bags are priced as extra. "
+            "note": "Lowest fare listed. No bag allowance given, so bags are priced as extra. "
                     "Book on the airline's site."}
 
 

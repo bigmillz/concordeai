@@ -88,7 +88,7 @@ ROAD_FACTOR = 1.22
 SUPPORT_NOTE = {
     "curated":  None,
     "modelled": "Ride prices here are estimates and could be off by up to a third",
-    "assumed":  "We don't have ride prices for this area yet. The car fare is a "
+    "assumed":  "No ride prices for this area yet. The car fare is a "
                 "placeholder, so check it",
 }
 
@@ -306,7 +306,7 @@ def support_message(modes: List[Dict[str, Any]]) -> Optional[str]:
     Worst case wins: if the car number is a placeholder, saying nothing because
     the train number happens to be fine is how somebody ends up stranded."""
     if not modes:
-        return "We couldn't price the ride to the airport, so it isn't in these totals"
+        return "The ride to the airport could not be priced and is not in these totals"
     order = {"curated": 0, "modelled": 1, "assumed": 2}
     worst = max((m.get("support", "modelled") for m in modes), key=lambda k: order.get(k, 1))
     return SUPPORT_NOTE.get(worst)
