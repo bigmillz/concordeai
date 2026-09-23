@@ -123,6 +123,13 @@ h1,h2,h3{font-weight:400;letter-spacing:-.02em;text-wrap:balance}
 .chip .n{font-family:var(--mono);font-size:11.5px;color:var(--faint);background:rgba(255,255,255,.06);border-radius:999px;padding:2px 7px}
 .chip[aria-pressed=true] .n{color:var(--bg);background:rgba(0,0,0,.12)}
 .chip.zero{opacity:.55}
+/* wants as a fixed grid, four across and two on phones, so no row ends with a stray chip (per Patrick, 2026-09-22) */
+#chips{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+#chips .chip{display:flex;justify-content:space-between;min-width:0;padding:8px 10px;gap:6px}
+#chips .chip .l{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wants{container-type:inline-size}
+@container (max-width:690px){#chips{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@container (max-width:420px){#chips .chip{border-radius:14px;align-items:center}#chips .chip .l{white-space:normal;overflow:visible;line-height:1.25}}   /* on a phone a long label wraps to a second line rather than being cut */   /* four across only when the panel has room for the longest label; two otherwise, never three (16 does not divide by three) */
 .chipnote{margin-top:10px;font-size:12.5px;color:var(--price);line-height:1.5}
 
 .wish{margin-top:22px;border-top:1px solid var(--line);padding-top:18px}
@@ -952,7 +959,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr"></span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-22">2026-09-22</time> · build <code id="build" data-build="32b1e28">32b1e28</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-22">2026-09-22</time> · build <code id="build" data-build="f448cb9">f448cb9</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -979,7 +986,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The standard trip for this route</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Prices are calculated in US dollars, then converted. Photos from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-22">2026-09-22</time> · build <code id="build" data-build="32b1e28">32b1e28</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Prices are calculated in US dollars, then converted. Photos from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-22">2026-09-22</time> · build <code id="build" data-build="f448cb9">f448cb9</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1089,19 +1096,23 @@ const NEWGEN = /^(78[1789]|359|351|339|338|32N|32Q|223|7M[89])$/;
 let LOY = new Set(), OPS = new Set(), CO2MIN = null, CO2MED = null;
 const kgOf = e => +((e.details || {}).emissions_kg) || 0;
 const WANTS = [
+  // laid out four to a row (2026-09-22, per Patrick): routing, then schedule and fare, then cabin, then the rest; 16 fill the grid
   {id:'nonstop', label:'Nonstop', cents:15000, ok:e => e.stops === 0},
   {id:'short', label:'Short layovers', cents:8000, ok:e => e.stops === 0 || e.layover_minutes.every(m => m <= 150)},
   {id:'long', label:'Long layover', cents:6000, ok:e => e.layover_minutes.some(m => m >= 300)},
+  {id:'sameapt', label:'Same airport', cents:12000, ok:e => (e.segments || []).every((g, i, a) => i === 0 || a[i-1].to === g.from)},
+  {id:'day', label:'Daytime flight', cents:5000, ok:e => { const h = hour(e.depart); return h >= 6 && h < 15; }},
+  {id:'flex', label:'Flexible ticket', cents:9000, ok:e => e.refundable || e.changes === 'fee' || e.changes === 'free'},
+  {id:'refund', label:'Refundable', cents:12000, ok:e => e.refundable === true, hint:'No refundable economy fares here. Flexible ticket covers changes.'},
+  {id:'bagin', label:'Bag included', cents:3500, ok:e => (e.bags_included || 0) >= 1, hint:'No fare here includes a checked bag.'},
+  // carry_on comes from the fare's own allowance; the checked-in recording predates the field, so absent there reads as included (every fare in it has one)
+  {id:'carryon', label:'Free carry-on', cents:6500, ok:e => e.carry_on !== false, hint:'Every fare here charges for a carry-on.'},
   {id:'lieflat', label:'Lie-flat seat', cents:40000, ok:e => false, hint:'No lie-flat seats in economy. Switch the cabin to Business.'},
+  {id:'legroom', label:'Extra legroom', cents:3000, ok:e => e.pitch.some(p => (p || 0) >= 32), hint:'No economy seat here has 32 inches of legroom. Try premium economy.'},
   {id:'newgen', label:'787 / A350 / neo', cents:4000, ok:e => e.equipment.some(x => NEWGEN.test(x))},
   {id:'wifi', label:'Wifi', cents:3000, ok:e => e.wifi_published},
-  {id:'legroom', label:'Extra legroom', cents:3000, ok:e => e.pitch.some(p => (p || 0) >= 32), hint:'No economy seat here has 32 inches of legroom. Try premium economy.'},
   {id:'lounge', label:'Lounge access', cents:6500, ok:e => e.brand.toLowerCase().includes('flex') || e.refundable},
-  {id:'flex', label:'Flexible ticket', cents:9000, ok:e => e.refundable || e.changes === 'fee' || e.changes === 'free'},
-  {id:'day', label:'Daytime flight', cents:5000, ok:e => { const h = hour(e.depart); return h >= 6 && h < 15; }},
-  // three more the feed reports outright (2026-09-21): the fare's refund term, power at the seat, and CO2 per offer
-  {id:'refund', label:'Refundable', cents:12000, ok:e => e.refundable === true, hint:'No refundable economy fares here. Flexible ticket covers changes.'},
-  {id:'power', label:'Seat power', cents:2500, ok:e => e.power_published === true},
+  {id:'toprated', label:'Top-rated airline', cents:4000, ok:e => e.rating != null && e.rating >= .76, hint:'No top-rated airline on this route.'},
   // the cleaner half of the search has it; the dirtier half is charged the gap to the cleanest option at $60 a tonne, and an unreported figure is never counted as clean
   {id:'co2', label:'Lower emissions', cents:4000, prep:() => { const ks = ALL.map(kgOf).filter(Boolean).sort((a, b) => a - b); CO2MIN = ks.length ? ks[0] : null; CO2MED = ks.length ? ks[Math.floor((ks.length - 1)/2)] : null; },
     ok:e => { const k = kgOf(e); return !!(CO2MED && k && k <= CO2MED); },
@@ -2075,6 +2086,10 @@ function parseWish(text){
   if (/lounge/.test(t)) out.push({kind:'want', id:'lounge', label:'Lounge access'});
   if (/flexib|refund|might change|may change/.test(t)) out.push({kind:'want', id:'flex', label:'Flexible ticket'});
   if (/no red[- ]?eye|not overnight|daytime|during the day|no overnight/.test(t)) out.push({kind:'want', id:'day', label:'Daytime flight'});
+  if (/bag included|free (?:checked )?bag|includes? a (?:checked )?bag/.test(t)) out.push({kind:'want', id:'bagin', label:'Bag included'});
+  if (/carry[- ]?on|cabin bag|overhead bin/.test(t)) out.push({kind:'want', id:'carryon', label:'Free carry-on'});
+  if (/good airline|top[- ]rated|best airline|well[- ]rated|reputable airline/.test(t)) out.push({kind:'want', id:'toprated', label:'Top-rated airline'});
+  if (/same airport|airport change|change airports|switch airports/.test(t)) out.push({kind:'want', id:'sameapt', label:'Same airport'});
   if ((m = /(?:nothing|not|no flights?|don'?t (?:want|wanna) (?:to )?leave) (?:before|earlier than) (\d{1,2})\s?(am|pm)?/.exec(t))){ let h = +m[1]; if (m[2] === 'pm' && h < 12) h += 12; out.push({kind:'after', h, label:'Nothing before ' + String(h).padStart(2,'0') + ':00'}); }
   if ((m = /(?:arrive|be there|land) (?:by|before) (\d{1,2})\s?(am|pm)?/.exec(t))){ let h = +m[1]; if (m[2] === 'pm' && h < 12) h += 12; out.push({kind:'before', h, label:'Arrive by ' + String(h).padStart(2,'0') + ':00'}); }
   if (/as soon as possible|asap|emergency|hospital|right away|immediately/.test(t)) out.push({kind:'tilt', p:'asap', label:'Get there as soon as possible'});
@@ -2189,7 +2204,7 @@ function paintChips(){
   const picked = [...S.wants].map(id => WANTS.find(w => w.id === id)).filter(Boolean);
   const meets = (e, skip) => picked.every(w => w === skip || w.ok(e));
   WANTS.forEach(w => { w.now = ALL.filter(e => w.ok(e) && meets(e, w)).length; });
-  $('#chips').innerHTML = WANTS.map(w => `<button class="chip${w.now ? '' : ' zero'}" data-w="${w.id}" aria-pressed="${S.wants.has(w.id)}" title="${w.now === w.count ? '' : esc(w.count + ' have it, ' + w.now + ' with your other picks')}">${esc(w.label)}<span class="n">${w.now}</span></button>`).join('');
+  $('#chips').innerHTML = WANTS.map(w => `<button class="chip${w.now ? '' : ' zero'}" data-w="${w.id}" aria-pressed="${S.wants.has(w.id)}" title="${w.now === w.count ? '' : esc(w.count + ' have it, ' + w.now + ' with your other picks')}"><span class="l">${esc(w.label)}</span><span class="n">${w.now}</span></button>`).join('');
   const z = [...S.wants].map(id => WANTS.find(w => w.id === id)).filter(w => !w.count && w.hint);
   $('#chipnote').classList.toggle('hidden', !z.length); $('#chipnote').textContent = z.map(w => w.hint).join(' ');
 }

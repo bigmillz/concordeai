@@ -319,6 +319,8 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
         t0 = o["tickets"][0]
         e["bag_tiers"] = t0.get("checked_bag_fee_tiers") or []
         e["seat_selection"] = t0["entitlements"].get("seat_selection")
+        # a carry-on on every ticket of the trip; a feed that does not say reads as not included (unknown is never cheap)
+        e["carry_on"] = all(bool(t["entitlements"].get("cabin_bag_included")) for t in o["tickets"])
         e["ground"] = {end: [{"mode": m["mode"], "kind": m.get("mode_kind"), "cents": m.get("fare_cents"),
                               "minutes": (m.get("door_to_door_minutes") or {}).get("p50"),
                               "estimated": bool(m.get("estimated")), "feasible": m.get("feasible", True)}

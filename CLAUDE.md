@@ -1080,14 +1080,21 @@ start one, same as the desktop app's gauntlet.
 is the converged direction** (2026-09-20, after Patrick picked Shortlist and the
 Dial from round two): the sentence-form search with round trip / one way /
 multi-city, the price–speed–comfort triangle with a "get me there now" preset
-(earliest arrival, price shown but not ranked), thirteen **wants that charge rather
+(earliest arrival, price shown but not ranked), sixteen **wants that charge rather
 than filter** (a flight lacking one is priced for it and sinks, reason shown;
-a want nothing can meet says so instead of sinking everything; the three added
-on 2026-09-21 are the ones the feed reports outright, the refund term, power at
-the seat and CO₂ per offer, the last charged as the gap to the cleanest option at
-$60 a tonne, unknown never counted as clean; carry-on, airport changes, seat
-maps, meals, on-time and the rest were left out because the feed does not carry
-them or every offer on the route passes), a **wish box**
+a want nothing can meet says so instead of sinking everything; the refund term and
+CO₂ per offer came on 2026-09-21, the last charged as the gap to the cleanest option
+at $60 a tonne, unknown never counted as clean. On 2026-09-22, per Patrick, seat power
+went (every transatlantic fare has it, so it separated nothing) and four came in: same
+airport on a connection, bag included, free carry-on (the fare's own allowance,
+`carry_on` from `data.build_slim`; a feed that does not say reads as not included) and
+top-rated airline (rating at or above .76, the page's own "well-rated" line). Free
+seat choice was considered and left out: Duffel and Google never report seat
+selection on a search, the adapters record "paid", so it would match nothing. The
+sixteen sit in a fixed grid, four across when the panel is at least 690px wide and two
+otherwise (a container query on `.wants`; never three, since sixteen does not divide
+by three), and on a phone a long label wraps rather than being cut. The wish box's
+vocabulary in `wish.py` lists every want the grid does), a **wish box**
 typed or spoken (the browser's own speech recognition) that becomes visible,
 removable rules and weights, advanced windows / cabin / stops / alliances /
 airlines-to-leave-out (these hide, and say what they hid), and **points

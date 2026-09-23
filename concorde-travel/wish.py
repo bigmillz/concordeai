@@ -27,7 +27,9 @@ WANTS = {
     "nonstop": "Nonstop", "short": "Short layovers", "long": "A long layover",
     "lieflat": "Lie-flat seat matters", "newgen": "787 / A350 / neo", "wifi": "Wifi",
     "legroom": "Extra legroom", "lounge": "Lounge access", "flex": "Flexible ticket",
-    "day": "Daytime flight",
+    "day": "Daytime flight", "refund": "Refundable", "co2": "Lower emissions",
+    "sameapt": "Same airport", "bagin": "Bag included", "carryon": "Free carry-on",
+    "toprated": "Top-rated airline",
 }
 TILTS = {
     "asap": "Get there as soon as possible", "1,0,0": "Lean toward price",
