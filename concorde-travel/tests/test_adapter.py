@@ -1056,6 +1056,39 @@ def main():
     rt_dear = mockdata.build_slim(dfl, round_trip={"outbound_cents": 30000, "totals": {k0: 30000 + ow0 + 1000}})
     check("a round-trip fare dearer than the two one-ways changes nothing",
           not any(e.get("round_trip") for v in rt_dear["results"].values() if isinstance(v, list) for e in v))
+    # who sells this fare (2026-09-24): each Google flight's booking token reaches the page on the flights' own key
+    with_serp = mockdata.build_slim(dfl, supplement=serp)
+    toks = {e["flight"]: e.get("seller_token") for v in with_serp["results"].values() if isinstance(v, list) for e in v}
+    serp_tokens = {"".join(f["flight_number"].split()): it["booking_token"] for it in (serp.get("best_flights") or []) + (serp.get("other_flights") or []) for f in it["flights"][:1]}
+    check("a Google flight carries its own booking token to the page, and a flight Google did not list carries none",
+          toks.get("DL1") == serp_tokens.get("DL1") and toks.get("DL1") and any(v is None for v in toks.values()), str(list(toks.items())[:3]))
+    import server as srv
+    real_bo = srv.live.serp_booking_options
+    real_cfg = srv.live.serp_config
+    bo = {"booking_options": [
+        {"together": {"book_with": "Gotogate", "airline": None, "price": 286, "marketed_as": ["EI 108", "EI 156"], "booking_request": {"url": "https://www.google.com/travel/clk/f", "post_data": "u=abc"}}},
+        {"together": {"book_with": "Aer Lingus", "airline": True, "price": 293, "marketed_as": ["EI 108", "EI 156"], "booking_request": {"url": "https://www.google.com/travel/clk/f", "post_data": "u=def"}}},
+        {"together": {"book_with": "Booking.com", "airline": None, "price": 274, "marketed_as": ["EI 108", "EI 156"]}},
+        {"together": {"book_with": "British Airways", "airline": True, "price": 413, "marketed_as": ["BA 2070", "BA 5914"]}},
+        {"together": {"book_with": "Evil", "airline": None, "price": 100, "marketed_as": ["EI 108", "EI 156"], "booking_request": {"url": "https://evil.example/", "post_data": "x"}}},
+        {"departing": {"book_with": "Split", "price": 50}}]}
+    try:
+        srv.live.serp_booking_options = lambda q, t, cfg=None: (bo, {"source": "api"})
+        srv.live.serp_config = lambda: {"key": "k", "quota": {}}
+        good = {"token": "A" * 40, "query": {"departure_id": "EWR,JFK,LGA", "arrival_id": "LCY,LGW,LHR", "outbound_date": "2026-11-04", "adults": 1}, "flights": ["EI108", "EI156"]}
+        r = srv.sellers_request(good)
+        names = [x["name"] for x in r.get("sellers") or []]
+        check("sellers: the airline first, then agencies cheapest first; a codeshare under other numbers is marked; "
+              "a split ticket and a booking link that is not Google's are left out",
+              names[:1] == ["Aer Lingus"] and r["airline"]["cents"] == 29300 and r["cheapest_agency"]["name"] == "Evil"
+              and not next(x for x in r["sellers"] if x["name"] == "British Airways")["same_flights"]
+              and "Split" not in names and next(x for x in r["sellers"] if x["name"] == "Evil")["go"] is None
+              and next(x for x in r["sellers"] if x["name"] == "Aer Lingus")["go"]["url"].startswith("https://www.google.com/"), str(names))
+        check("a check the page sent with a bad token or query is refused before any call, and marked for a refund",
+              srv.sellers_request(dict(good, token="bad token!")).get("field") == "sellers"
+              and srv.sellers_request(dict(good, query=dict(good["query"], departure_id="<x>"))).get("field") == "sellers")
+    finally:
+        srv.live.serp_booking_options, srv.live.serp_config = real_bo, real_cfg
     # the server keys Google's round-trip returns the way the adapter keys the same flights
     import server as srv
     calls = {"serp": 0}

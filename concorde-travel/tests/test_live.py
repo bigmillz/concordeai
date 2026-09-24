@@ -205,6 +205,10 @@ def round_trip_checks():
               p2 is None and len(seen) == n and "no round-trip fare" in m2["error"])
         live.serp_round_trip("EWR,JFK", "LGW,LHR", "2026-11-04", "2026-11-11", ["TP212", "TP1328"], cfg=cfg)
         check("the same round trip again is served from the cache", len(seen) == n)
+        n2 = len(seen)
+        live.serp_booking_options({"departure_id": "EWR,JFK", "arrival_id": "LGW,LHR", "outbound_date": "2026-11-04", "adults": 1}, "TOKEN-123", cfg=cfg)
+        check("a seller check repeats the search's own query with the flight's booking token, one call",
+              len(seen) == n2 + 1 and "booking_token=TOKEN-123" in seen[-1] and "type=2" in seen[-1] and "outbound_date=2026-11-04" in seen[-1])
     finally:
         live.urllib.request.urlopen = real
         os.environ.pop("CONCORDEGO_SERPAPI_KEY", None)

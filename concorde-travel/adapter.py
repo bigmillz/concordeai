@@ -1630,6 +1630,14 @@ def _serp_number(flight_number: Any) -> str:
     return re.sub(r"\D", "", tail)
 
 
+def serp_itin_key(it: Dict[str, Any]) -> tuple:
+    """A Google itinerary keyed as _itin_key keys an option: carrier, number and local departure minute per
+    segment ('BA 117' leaving '2026-11-11 09:35' -> ('BA', 117, '2026-11-11T09:35'))."""
+    return tuple((_serp_code(f.get("flight_number")), int(_serp_number(f.get("flight_number")) or 0),
+                  str((f.get("departure_airport") or {}).get("time") or "").replace(" ", "T")[:16])
+                 for f in (it or {}).get("flights") or [])
+
+
 def _serp_naive(t: Any) -> Optional[str]:
     m = _SERP_TIME.match(str(t or "").strip())
     return "%sT%s:%s:00" % (m.group(1), m.group(2), m.group(3)) if m else None

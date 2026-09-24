@@ -175,6 +175,12 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
         sc = adapter.merge_scenarios(sc, adapter.from_serpapi(
             supplement, origin_key=origin_key, checked_bags=checked_bags,
             geo=adapter.duffel_geo(raw), dest_point=dest_point, carriers=server.live.serp_want()), "Google Flights")
+    # Google's booking token for each flight it listed, by the flights' own key: the page's "who sells this
+    # fare" asks Google with it, for a Google row or for the feed's copy of the same flights (2026-09-24)
+    seller_tokens = {}
+    for it in list((supplement or {}).get("best_flights") or []) + list((supplement or {}).get("other_flights") or []):
+        if it.get("booking_token"):
+            seller_tokens.setdefault(adapter.serp_itin_key(it), it["booking_token"])
     # A round trip's return leg (2026-09-24): where the airline sells this return together with the outbound
     # already chosen for less than the two one-way tickets, the return's ticket becomes what the round trip
     # adds to the outbound's price, and the page says it is one round-trip ticket. Scored after the change,
@@ -347,6 +353,7 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
         # a carry-on on every ticket of the trip; a feed that does not say reads as not included (unknown is never cheap)
         e["carry_on"] = all(bool(t["entitlements"].get("cabin_bag_included")) for t in o["tickets"])
         e["round_trip"] = o.get("_round_trip")
+        e["seller_token"] = seller_tokens.get(adapter._itin_key(o))
         e["ground"] = {end: [{"mode": m["mode"], "kind": m.get("mode_kind"), "cents": m.get("fare_cents"),
                               "minutes": (m.get("door_to_door_minutes") or {}).get("p50"),
                               "estimated": bool(m.get("estimated")), "feasible": m.get("feasible", True)}

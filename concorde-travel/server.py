@@ -67,6 +67,9 @@ WISHES_TOTAL = int(os.environ.get("CONCORDEGO_WISHES_TOTAL", "1500"))
 # Anyone may run a few real searches a day before signing in (per Patrick, 2026-09-21: never made-up results;
 # a few free ones, then the account pop-up or the wait). Counted per address; a round trip is two searches.
 ANON_SEARCHES = int(os.environ.get("CONCORDEGO_ANON_SEARCHES", "4"))
+# who sells this fare: one SerpApi call each, counted apart from searches (2026-09-24)
+ANON_SELLERS = int(os.environ.get("CONCORDEGO_ANON_SELLERS", "5"))
+USER_SELLERS = int(os.environ.get("CONCORDEGO_USER_SELLERS", "30"))
 # The Zero Trust team, e.g. millerworldindustries: the issuer of the sign-in cookie the server verifies below.
 ACCESS_TEAM = os.environ.get("CONCORDEGO_ACCESS_TEAM", "").strip().lower()
 # Emails the admin page marks unlimited: signed in, they are not metered. Kept beside users.json.
@@ -985,12 +988,59 @@ def _round_trip_totals(req, where):
             fl = it.get("flights") or []
             if not fl or it.get("price") is None:
                 continue
-            # the key the adapter gives the same flights: carrier, number and local departure minute per segment
-            key = tuple((adapter._serp_code(f.get("flight_number")), int(adapter._serp_number(f.get("flight_number")) or 0),
-                         str((f.get("departure_airport") or {}).get("time") or "").replace(" ", "T")[:16]) for f in fl)
+            key = adapter.serp_itin_key(it)      # the key the adapter gives the same flights
             cents = int(round(float(it["price"]) * 100))
             totals[key] = min(totals.get(key, cents), cents)
     return {"outbound_cents": p_out, "totals": totals, "sources": ["Google Flights"]} if totals else None
+
+
+def sellers_request(req):
+    """Who sells this fare (2026-09-24, per Patrick): Google's booking options for one flight, the airline's own
+    price first and every travel agency after it, flagged as Google flags them. One SerpApi call, cached; the
+    page asks only when someone opens a flight and taps the button. The token and the query come from the page,
+    so each is checked here before anything is spent."""
+    tok = str(req.get("token") or "")
+    q = req.get("query") if isinstance(req.get("query"), dict) else {}
+    fns = [str(x).replace(" ", "").upper() for x in (req.get("flights") or [])][:6]
+    dep, arr = str(q.get("departure_id") or "").upper(), str(q.get("arrival_id") or "").upper()
+    date = str(q.get("outbound_date") or "")[:10]
+    try:
+        adults = max(1, min(9, int(q.get("adults") or 1)))
+    except (TypeError, ValueError):
+        adults = 1
+    if not (re.match(r"^[A-Za-z0-9_\-=+/]{20,4000}$", tok) and re.match(r"^[A-Z]{3}(,[A-Z]{3}){0,7}$", dep)
+            and re.match(r"^[A-Z]{3}(,[A-Z]{3}){0,7}$", arr) and re.match(r"^\d{4}-\d{2}-\d{2}$", date)
+            and fns and all(re.match(r"^[A-Z0-9]{2}\d{1,4}$", f) for f in fns)):
+        return {"error": "This flight cannot be checked.", "field": "sellers"}
+    if not live.serp_config().get("key"):
+        return {"error": "Seller checks are not set up on this machine.", "field": "sellers"}
+    payload, meta = live.serp_booking_options({"departure_id": dep, "arrival_id": arr, "outbound_date": date,
+                                               "adults": adults, "cabin": _cabin(q.get("cabin"))}, tok)
+    if payload is None:
+        return {"error": "Google did not answer. Try again in a minute.", "detail": meta.get("error")}
+    sellers = []
+    for o in payload.get("booking_options") or []:
+        t = o.get("together") if isinstance(o.get("together"), dict) else None
+        if not t or t.get("price") is None:
+            continue                          # sold as separate tickets per direction: not this one-way fare
+        sold = [str(x).replace(" ", "").upper() for x in t.get("marketed_as") or []]
+        req_b = t.get("booking_request") or {}
+        url = str(req_b.get("url") or "")
+        sellers.append({"name": str(t.get("book_with") or "")[:60], "airline": bool(t.get("airline")),
+                        "cents": int(round(float(t["price"]) * 100)),
+                        # the same flights under the same numbers; a codeshare sold under other numbers is noted
+                        "same_flights": not sold or sold == fns,
+                        "go": {"url": url, "post": str(req_b.get("post_data") or "")[:4000]} if url.startswith("https://www.google.com/") else None})
+    if not sellers:
+        return {"error": "Google lists no seller for this flight right now."}
+    same = [x for x in sellers if x["same_flights"]] or sellers
+    air = [x for x in same if x["airline"]]
+    agencies = sorted([x for x in same if not x["airline"]], key=lambda x: x["cents"])
+    sellers.sort(key=lambda x: (not x["airline"], not x["same_flights"], x["cents"]))
+    return {"sellers": sellers,
+            "airline": min(air, key=lambda x: x["cents"]) if air else None,
+            "cheapest_agency": agencies[0] if agencies else None,
+            "fetched": meta.get("source")}
 
 
 def search_request(req):
@@ -1026,6 +1076,12 @@ def search_request(req):
                    "supplement": {k: v for k, v in (meta.get("supplement") or {}).items()
                                   if k in ("source", "error", "skipped", "age_seconds", "hint")}}
     out["where"] = where or None
+    if src == "api" and meta.get("supplement_payload"):
+        # what the seller check must repeat to Google with a flight's booking token: the supplement's own query
+        out["seller_query"] = {"departure_id": ",".join(places.airports_for(where["origin"]["code"])),
+                               "arrival_id": ",".join(places.airports_for(where["destination"]["code"])),
+                               "outbound_date": where["date"], "adults": max(1, min(9, int(req.get("adults", 1) or 1))),
+                               "cabin": _cabin(req.get("cabin"))}
     if rt:
         out["round_trip"] = {"outbound_cents": rt["outbound_cents"], "sources": rt["sources"],
                              "applied": len({e["id"] for v in out["results"].values() if isinstance(v, list) for e in v if e.get("round_trip")})}
@@ -1960,6 +2016,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             path = "/api/rescue"; anon_ok = True          # the delayed-flight helper: a search and a brief, on the free allowance
         elif path == "/flex":
             path = "/api/flex"; anon_ok = True            # nearby days: one allowance unit, the days each cached
+        elif path == "/sellers":
+            path = "/api/sellers"; anon_ok = True         # who sells this fare: one SerpApi call, its own allowance
         else:
             anon_ok = False
         if path == "/api/profile":
@@ -1994,25 +2052,35 @@ class Handler(http.server.BaseHTTPRequestHandler):
         # spends freely; a signed-in visitor spends from a daily allowance;
         # nobody anonymous spends at all.
         # a live search only spends when this machine holds a key; without one the recording stands in
-        spends = path == "/api/narrate" or path == "/api/wish" or (path in ("/api/live", "/api/search", "/api/rescue", "/api/flex") and (path in ("/api/rescue", "/api/flex") or (req.get("source") or "sample") != "sample") and bool(live.load_config().get("key")))
+        spends = path == "/api/narrate" or path == "/api/wish" or path == "/api/sellers" or (path in ("/api/live", "/api/search", "/api/rescue", "/api/flex") and (path in ("/api/rescue", "/api/flex") or (req.get("source") or "sample") != "sample") and bool(live.load_config().get("key")))
         charged = None                                  # (who, kind) taken below, handed back if the input is refused
         if spends and self._remote():
             who = self._who()
             if not who and anon_ok:
                 # the free searches: a few a day per address, then the account or the wait
                 ip = (self.headers.get("Cf-Connecting-Ip") or self.headers.get("X-Forwarded-For") or "?").split(",")[0].strip()
-                ok, left = _users_take("ip:" + ip, "searches", ANON_SEARCHES)
-                if not ok:
-                    return self._json({"error": "Daily limit reached: %d free searches. Sign in for %d a day, or try again %s."
-                                                % (ANON_SEARCHES, USER_SEARCHES, _in_hours()),
-                                       "remote": True, "sign_in": True, "free": ANON_SEARCHES, "hours": _hours_to_midnight()})
-                who = None
-                charged = ("ip:" + ip, "searches")
+                if path == "/api/sellers":
+                    # a seller check has its own few a day, so it never spends one of the free searches
+                    ok, left = _users_take("ip:" + ip, "sellers", ANON_SELLERS)
+                    if not ok:
+                        return self._json({"error": "Daily limit reached: %d seller checks. Sign in for %d a day, or try again %s."
+                                                    % (ANON_SELLERS, USER_SELLERS, _in_hours()), "remote": True, "sign_in": True})
+                    who = None
+                    charged = ("ip:" + ip, "sellers")
+                else:
+                    ok, left = _users_take("ip:" + ip, "searches", ANON_SEARCHES)
+                    if not ok:
+                        return self._json({"error": "Daily limit reached: %d free searches. Sign in for %d a day, or try again %s."
+                                                    % (ANON_SEARCHES, USER_SEARCHES, _in_hours()),
+                                           "remote": True, "sign_in": True, "free": ANON_SEARCHES, "hours": _hours_to_midnight()})
+                    who = None
+                    charged = ("ip:" + ip, "searches")
             elif not who:
-                return self._json({"error": "Sign in to use this. A free account adds more searches, the wish box and international markets.",
+                return self._json({"error": "Sign in to use this. A free account adds more searches and the wish box.",
                                    "remote": True, "sign_in": True})
         if spends and self._remote() and who:
-            kind, limit = ("searches", USER_SEARCHES) if path in ("/api/live", "/api/search", "/api/rescue", "/api/flex") else ("wishes", USER_WISHES)
+            kind, limit = (("searches", USER_SEARCHES) if path in ("/api/live", "/api/search", "/api/rescue", "/api/flex")
+                           else ("sellers", USER_SELLERS) if path == "/api/sellers" else ("wishes", USER_WISHES))
             if kind == "wishes":
                 okall, _ = _users_take("_everyone", "wishes", WISHES_TOTAL)
                 if not okall:
@@ -2034,7 +2102,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     _users_recent_add(who_r, {"from": str(req.get("origin") or "")[:120], "to": str(req.get("destination") or "")[:120], "date": str(req.get("date") or "")[:10],
                                               "kind": str(trip.get("kind") or "round")[:8], "back": str(trip.get("back") or "")[:40], "pax": str(trip.get("pax") or "")[:20], "bags": str(trip.get("bags") or "")[:20]})
             fn = {"/api/score": score_request, "/api/narrate": narrate_request, "/api/rescue": rescue_request, "/api/flex": flex_request,
-                  "/api/live": live_request, "/api/wish": wish_request, "/api/search": search_request}[path]
+                  "/api/live": live_request, "/api/wish": wish_request, "/api/search": search_request,
+                  "/api/sellers": sellers_request}[path]
             out = fn(req)
             if charged and isinstance(out, dict) and out.get("field"):
                 _users_give(*charged)                 # refused before any fetch: a typo or a past date costs no search

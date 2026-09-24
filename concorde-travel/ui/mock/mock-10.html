@@ -449,6 +449,11 @@ details[open] summary:after{content:"–"}
 .rtab .fig{font-size:15px}
 .rtab .save{color:var(--green)}.rtab .nosave{color:var(--faint)}
 .rtab .catch{color:var(--dim);font-size:12.5px;line-height:1.4;max-width:34ch}
+.mchips{display:flex;flex-wrap:wrap;gap:6px}.mchip{border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:12.5px;color:var(--text);text-decoration:none;white-space:nowrap}.mchip:hover{border-color:var(--dim)}
+.mdim{color:var(--dim);font-size:12.5px}
+.sellers{margin:14px 0 4px;padding:12px 0 0;border-top:1px solid var(--line-soft)}.sellers h4{margin:0 0 6px}.sellers .sdim{color:var(--dim);font-size:12.5px;margin:6px 0}
+.slist{list-style:none;margin:0;padding:0}.slist li{display:grid;grid-template-columns:minmax(0,1fr) auto 7.5rem auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line-soft);font-size:13.5px}
+.slist li.air span{font-weight:500}.slist small{color:var(--faint);font-size:11.5px}.slist small.less{color:var(--green)}.slist form{margin:0}.agt{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--dim);margin-top:8px}.agt small{color:var(--faint)}.mcatch{margin:10px 0 0;padding-left:18px;color:var(--dim);font-size:12.5px;line-height:1.5}
 .rtab .flag{font-size:16px;margin-right:6px;vertical-align:-1px}
 .rnote{margin-top:12px;font-size:12.5px;color:var(--faint);line-height:1.5}
 .rnote b{color:var(--dim);font-weight:500}
@@ -974,7 +979,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr"></span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="cd2d2f0">cd2d2f0</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="05e9d1a">05e9d1a</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -1001,7 +1006,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The standard trip for this route</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Prices are calculated in US dollars, then converted. Photos from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="cd2d2f0">cd2d2f0</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Prices are calculated in US dollars, then converted. Photos from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="05e9d1a">05e9d1a</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1405,6 +1410,15 @@ function bill(e, opts){
   const find = c => L.find(l => l.code === c), g = {ticket:[], transport:[], stay:[], addons:[]};
   const line = (grp, x) => { g[grp].push(x); return x; };
   const T = find('ticket'); line('ticket', {key:'ticket', label:'Ticket', evidence:T.evidence, cents:T.cents});
+  // who sells this fare (2026-09-24): once checked, the ticket is what the airline itself charges, or with
+  // travel agencies switched on, the cheapest seller of these same flights, named, with its caveat
+  { const sv = SELLERS[e.id];
+    if (sv && sv.sellers){
+      const pick = AGENCIES && sv.cheapest_agency && (!sv.airline || sv.cheapest_agency.cents < sv.airline.cents) ? sv.cheapest_agency : sv.airline;
+      const d = pick ? pick.cents - T.cents : 0;
+      if (pick && Math.abs(d) >= 100) line('ticket', {key:'seller', cents:d, credit:d < 0,
+        label: pick.airline ? (d > 0 ? "Airline's own price" : "Lower on the airline's own site") : 'Sold for less by ' + pick.name,
+        evidence: pick.airline ? pick.name + ' sells these flights for ' + money(pick.cents) : pick.name + ' is a travel agency. Changes and refunds go through them.'}); } }
   // the ride at each end: the scorer's own pick at this weighting, or the class you asked for
   const prefer = S.ride === 'either' ? null : S.ride;
   let dmin = 0, gm = 0; const rides = {out:null, in:null};
@@ -1929,7 +1943,7 @@ function ledgerHTML(e){
       ${k === 'transport' ? `<div class="restore">${restore.filter(x => x.startsWith('ground')).map(x => `<span>${esc(RESTORE[x])} removed: someone is driving you<button data-restore="${x}">add back</button></span>`).join('')}</div>` : ''}
       ${k === 'stay' && restore.includes('hotel-auto') ? `<div class="restore"><span>Hotel removed: sleeping in the terminal<button data-restore="hotel-auto">add back</button></span></div>` : ''}</section>`; };
   return `${factsHTML(e)}<div class="bill">${GROUPS.map(([k, t]) => grp(k, t)).join('')}
-    <div class="btotal"><span>All in</span><b>${money(r.total)}</b></div></div>
+    <div class="btotal"><span>All in</span><b>${money(r.total)}</b></div></div>${sellersHTML(e)}
     <div class="book"><h4>${esc(e.carrier_name)} ${esc(e.flight)}</h4><p>${esc(e.route.join(' → '))} · ${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} · ${stopsText(e)}<br>${b ? esc(b.note) : ''}</p>
       <button class="choose" data-select="${esc(e.id)}">${selectLabel()}${b ? ' · ' + money(b.price_cents) : ''}</button>
       <p>${S.trip === 'round' ? (S.legIdx === 0 ? 'Then pick your return.' : 'Then book both legs.') : 'Then book with the airline.'}</p>
@@ -1937,6 +1951,36 @@ function ledgerHTML(e){
       ${aw.length ? '<h4 style="margin-top:6px">With points</h4><ul class="awards">' + aw.map(a => `<li class="${a.good ? 'good' : ''}"><b>${a.good ? '★ ' : ''}${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)}</b> · <span class="v">${a.value <= 0 ? 'fees exceed the fare' : moneyPt(a.value) + '/pt · ≈ ' + money(r.total - a.margin) + ' all in'}</span>${a.path ? ' · ' + esc(a.path) : ' · not reachable with your points'}${a.bonus ? ' until ' + esc(a.bonus.until) : ''}</li>`).join('') + '</ul>' : ''}
       <p>Grade <b>${e.grade}</b>${e.card && e.card.points != null ? ' (' + e.card.points.toFixed(1) + ' of 4.3)' : ''}.</p></div>`;
 }
+// ---- who sells this fare (2026-09-24, per Patrick): Google's sellers for one flight, the airline first, every
+// travel agency after it with how much less it asks and what that costs you in help later. One lookup, on request.
+const SELLERS = {};
+let AGENCIES = false; try { AGENCIES = localStorage.getItem('concordego.agencies') === '1'; } catch (x) {}
+function sellersHTML(e){
+  if (!SERVED || !e.seller_token || e.round_trip || !D.seller_query) return '';
+  const sv = SELLERS[e.id], head = '<h4>Who sells this fare</h4>';
+  if (!sv) return `<section class="sellers">${head}<p class="sdim">Compare the airline's own price with travel agencies.</p><button class="ledger" data-sellers="${esc(e.id)}">Check who sells it</button></section>`;
+  if (sv.busy) return `<section class="sellers">${head}<p class="sdim">Checking…</p></section>`;
+  if (sv.error) return `<section class="sellers">${head}<p class="sdim">${esc(sv.error)}</p><button class="ledger" data-sellers="${esc(e.id)}">Try again</button></section>`;
+  const air = sv.airline, same = sv.sellers.filter(x => x.same_flights), codeshare = sv.sellers.filter(x => !x.same_flights);
+  const go = x => { if (!x.go) return ''; const fields = String(x.go.post || '').split('&').filter(Boolean).map(kv => { const i = kv.indexOf('='); const k = i < 0 ? kv : kv.slice(0, i), v = i < 0 ? '' : kv.slice(i + 1); let dk = k, dv = v; try { dk = decodeURIComponent(k.replace(/\+/g, ' ')); dv = decodeURIComponent(v.replace(/\+/g, ' ')); } catch (y) {} return `<input type="hidden" name="${esc(dk)}" value="${esc(dv)}">`; }).join('');
+    return `<form method="post" action="${esc(x.go.url)}" target="_blank">${fields}<button class="ledger">Go</button></form>`; };
+  const li = x => `<li class="${x.airline ? 'air' : ''}"><span>${esc(x.name)}${x.airline ? ' <small>the airline</small>' : ''}</span><b>${money(x.cents)}</b>${!x.airline && air && x.cents < air.cents ? `<small class="less">${money(air.cents - x.cents)} less</small>` : '<small></small>'}${go(x)}</li>`;
+  const agencies = same.filter(x => !x.airline);
+  return `<section class="sellers">${head}<ul class="slist">${same.map(li).join('')}</ul>
+    ${codeshare.length ? `<p class="sdim">Also sold under other flight numbers: ${codeshare.map(x => esc(x.name) + ' ' + money(x.cents)).join(', ')}.</p>` : ''}
+    ${agencies.length ? '<p class="sdim">Travel agencies: changes, refunds and help when a flight is disrupted go through the agency, not the airline.</p>' : ''}
+    <label class="agt"><input type="checkbox" data-agencies ${AGENCIES ? 'checked' : ''}> Include travel agency prices <small>for flights you have checked</small></label></section>`;
+}
+document.addEventListener('click', async ev => {
+  const b = ev.target.closest('[data-sellers]'); if (!b) return;
+  const id = b.dataset.sellers, e = ALL.find(x => x.id === id); if (!e) return;
+  SELLERS[id] = {busy:true}; rerenderBills();
+  let res; try { const r = await fetch('/sellers', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({token:e.seller_token, query:D.seller_query, flights:e.segments.map(g => String(g.flight).replace(/\s+/g, ''))})}); res = await r.json(); }
+  catch (x){ res = {error:'No answer. Try again.'}; }
+  if (res.sign_in){ delete SELLERS[id]; rerenderBills(); openAccount(res); return; }
+  SELLERS[id] = res.error ? {error:res.error} : res; rerenderBills();
+});
+document.addEventListener('change', ev => { const c = ev.target.closest('[data-agencies]'); if (!c) return; AGENCIES = c.checked; try { localStorage.setItem('concordego.agencies', AGENCIES ? '1' : '0'); } catch (x) {} rerenderBills(); });
 function openSheet(id){
   const e = ALL.find(x => x.id === id);
   $('#sheetroot').innerHTML = `<div class="sheetwrap" id="sheetwrap" data-id="${esc(e.id)}"><div class="sheet" role="dialog" aria-modal="true" aria-label="Flight details"><div class="hd"><h3>${esc(e.carrier_name)} ${esc(e.flight)}<span>${esc(e.brand)}</span></h3><button class="x" id="x" aria-label="Close">×</button></div><div class="detail">${ledgerHTML(e)}</div></div></div>`;
@@ -2827,7 +2871,7 @@ $('#go').addEventListener('click', enterResults);
 // sign-in (Cloudflare Access: email code or Google; no password to keep).
 // The server counts each person's day; the page greys the doors until then.
 S.user = null;
-const LOCKS = [['#wishbox', 'use the wish box'], ['#dock .composer', 'use the wish box'], ['#rbox', 'search international markets']];
+const LOCKS = [['#wishbox', 'use the wish box'], ['#dock .composer', 'use the wish box']];
 function paintRecent(){
   const el = $('#recent'); if (!el) return; const R = (S.recent || []).slice(0, 3);
   el.innerHTML = R.length ? '<span class="lbl">Recent</span>' + R.map((r, i) => `<button type="button" class="rchip" data-recent="${i}">${esc(short(r.from) || r.from)} → ${esc(short(r.to) || r.to)}<small>${esc(r.date)}${r.kind === 'round' && r.back ? ' – ' + esc(r.back) : r.kind === 'one' ? ' · one way' : ''}</small></button>`).join('') : '';
@@ -2856,7 +2900,7 @@ function openAccount(why){
   $('#acctbody').innerHTML = u ? `<p>${u.unlimited ? 'Signed in as <b>' + esc(u.email || '') + '</b>. No daily limit.' : u.owner ? (u.email ? 'Signed in as <b>' + esc(u.email) + '</b>. No limits.' : 'This machine has no limits.') : 'Signed in as <b>' + esc(u.email || '') + '</b>.' + (u.left ? ' Left today: <b>' + u.left.searches + '</b> searches, <b>' + u.left.wishes + '</b> wishes.' : '')}</p>
       <div class="row2">${!u.owner && !u.demo && SERVED ? '<a class="ledger" href="/cdn-cgi/access/logout">Log out</a>' : ''}${u.demo ? '<button class="ledger" id="acctout">Leave the demo account</button>' : ''}<button class="choose" id="acctno" style="flex:0 0 auto">Done</button></div>`
     : `<p>${capped ? esc(why.error) + ' Sign in with email or Google. No password.' : (S.freeMax ? 'Without an account: ' + S.freeMax + ' searches a day' + (S.free != null ? ' (' + S.free + ' left today)' : '') + '. ' : '') + 'A free account adds more. Sign in with email or Google. No password.'}</p>
-      <ul><li>More searches <small>· 20 a day</small></li><li>Wish box <small>· 200 a day</small></li><li>International markets <small>· 2 a day</small></li><li>Route watchlist <small>· 5 routes, coming soon</small></li></ul>
+      <ul><li>More searches <small>· 20 a day</small></li><li>Wish box <small>· 200 a day</small></li><li>Route watchlist <small>· 5 routes, coming soon</small></li></ul>
       <div class="row2"><button class="choose" id="acctgo" style="flex:0 0 auto">${SERVED ? 'Sign in or sign up' : 'Sign in (demo)'}</button><button class="ledger" id="acctno">Not now</button></div>
       <p class="fine">${SERVED ? 'Sign-in returns you to this page.' : 'This file has no real sign-in. The button opens a demo account.'}</p>`;
   $('#acct').classList.remove('hidden'); ($('#acctgo') || $('#acctno')).focus();
@@ -3344,34 +3388,32 @@ function showResults(){
 // of sale; running this for real needs a GDS or NDC connection that takes a
 // country of sale per request, so the figures below are demo, seeded from
 // the flight, and say so.
-const POS = [['ZA', '🇿🇦', 'South Africa', .12, 'Some airlines may cancel if you pay without a South African card'], ['IN', '🇮🇳', 'India', .14, 'Often needs an Indian card or address'],
-  ['TR', '🇹🇷', 'Türkiye', .05, 'Priced in lira. The exchange rate shifts week to week.'], ['MX', '🇲🇽', 'Mexico', .04, 'Foreign cards usually work.'],
-  ['BR', '🇧🇷', 'Brazil', .03, 'Installment prices can hide the total. Check the final price.'], ['GB', '🇬🇧', 'United Kingdom', .02, 'UK departure tax applies on the return.'], ['AU', '🇦🇺', 'Australia', .01, 'Rarely cheaper for a transatlantic fare']];
-const RBOX = `<div class="rstart"><button class="go" id="rgo">Check ${POS.length} other countries</button><span class="hintr">Re-run your search in other countries. These may be priced differently, and can work in your favour.<br>Takes approximately 1 minute to run.</span></div>`;
-const seeded = str => { let h = 2166136261; for (const ch of str){ h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return (h % 10000) / 10000; };
-function researchRows(){
-  const {rows} = ranked();
-  return rows.slice(0, 3).map(r => {
-    const e = r.e, tries = POS.map(([code, flag, name, lean, catchNote]) => { const u = seeded(e.id + code); const delta = Math.round(e.ticket_cents * (lean * 2 * (u - .35) - lean)); return {code, flag, name, price: e.ticket_cents + delta, delta, catchNote}; })
-      .sort((x, y) => x.price - y.price);
-    const best = tries[0], net = e.ticket_cents - best.price;
-    return {e, r, best, net, worth: net >= 2500};
-  });
+// Search international markets (per Patrick, 2026-09-24: option 2). The earlier version showed prices from a
+// seeded formula, labelled "examples"; no feed a non-agency can use prices a flight as sold in another country
+// (Google through SerpApi only converts the US fare), so this names where to look, with links, and no numbers.
+const MARKETS = [['GB', '🇬🇧', 'United Kingdom', 'UK departure tax applies on flights leaving the UK.'], ['MX', '🇲🇽', 'Mexico', 'Foreign cards usually work.'],
+  ['BR', '🇧🇷', 'Brazil', 'Installment prices can hide the total. Check the final price.'], ['ZA', '🇿🇦', 'South Africa', 'Some airlines cancel if you pay without a South African card.'],
+  ['IN', '🇮🇳', 'India', 'Often needs an Indian card or address.'], ['TR', '🇹🇷', 'Türkiye', 'Priced in lira. The exchange rate shifts week to week.'], ['AU', '🇦🇺', 'Australia', '']];
+// country pages that opened when checked on 2026-09-24; an airline not here gets its main site and the countries to pick there
+const MARKET_SITES = {BA:['https://www.britishairways.com/en-{cc}/home', 'GB ZA BR TR AU MX IN'], DL:['https://www.delta.com/{cc}/en', 'GB BR MX'],
+  LX:['https://www.swiss.com/{cc}/en/homepage', 'GB ZA BR AU IN'], TP:['https://www.flytap.com/en-{cc}', 'GB ZA BR TR MX'], EI:['https://www.aerlingus.com/en-{cc}/', 'GB TR']};
+const RBOX = `<div class="rstart"><button class="go" id="rgo">Show where to check</button><span class="hintr">Re-run your search in other countries. These may be priced differently, and can work in your favour.</span></div>`;
+function marketsHTML(){
+  const rows = ranked().rows.slice(0, 3), names = MARKETS.map(m => m[2]).slice(0, 5).join(', ');
+  const body = rows.map(({e}) => {
+    const ms = MARKET_SITES[e.carrier], site = SITES[e.carrier];
+    const links = ms ? MARKETS.filter(m => ms[1].split(' ').includes(m[0])).map(([cc, flag, name]) =>
+      `<a class="mchip" href="${esc(ms[0].replace('{cc}', cc.toLowerCase()))}" target="_blank" rel="noopener">${flag} ${esc(name)}</a>`).join('') : '';
+    const other = links ? '' : site
+      ? `Open <a href="https://${esc(site)}/" target="_blank" rel="noopener">${esc(site.replace(/^www\./, ''))}</a>, switch the country (usually at the top or bottom of the page), and search this flight. Worth trying: ${esc(names)}.`
+      : `Search this flight on ${esc(e.carrier_name)}'s own site with another country selected.`;
+    return `<tr><td><b>${esc(e.carrier_name)}</b> ${esc(e.flight)}<br><span class="mdim">${esc(e.brand)} · ${money(e.ticket_cents)} here</span></td><td>${links ? '<div class="mchips">' + links + '</div>' : other}</td></tr>`;
+  }).join('');
+  return `<table class="rtab"><thead><tr><th>Flight</th><th>The airline's own site in</th></tr></thead><tbody>${body}</tbody></table>
+    <ul class="mcatch">${MARKETS.filter(m => m[3]).map(([cc, flag, name, c]) => `<li>${flag} <b>${esc(name)}</b>: ${esc(c)}</li>`).join('')}</ul>
+    <p class="rnote">Search the same flight and date there. Prices may show in local currency, and your card may add a 0–3% foreign transaction fee.</p>`;
 }
-function researchHTML(){
-  const rs = researchRows();
-  return `<table class="rtab"><thead><tr><th>Flight</th><th>Cheapest country</th><th>Price there*</th><th>Your price</th><th>Saving</th><th>The catch</th></tr></thead><tbody>${rs.map(x => `<tr>
-    <td><b>${esc(x.e.carrier_name)}</b> ${esc(x.e.flight)}<br><span style="color:var(--dim);font-size:12.5px">${esc(x.e.brand)}</span></td>
-    <td><span class="flag">${x.best.flag}</span>${esc(x.best.name)}</td>
-    <td><b class="fig">${money(x.best.price)}</b></td><td><b class="fig">${money(x.e.ticket_cents)}</b></td>
-    <td class="${x.worth ? 'save' : 'nosave'}">${x.net > 0 ? money(x.net) + ' less' : 'No saving'}</td>
-    <td class="catch">${x.worth ? esc(x.best.catchNote) : x.net > 0 ? 'Too small to be worth the risk' : 'Your price is already the lowest'}</td></tr>`).join('')}</tbody></table>
-    <p class="rnote">* Your card may add a 0–3% foreign transaction fee. Savings cover the ticket only. <b>Prices are examples, not live quotes.</b> The catches are real.</p>`;
-}
-const RESEARCH_STAGES = POS.map(([code, flag, name], i) => ['Pricing from ' + name, Math.round(100 * (i + 1) / POS.length)]);
-document.addEventListener('click', ev => { if (!ev.target.closest('#rgo')) return; if (!S.user){ openAccount(); return; } const box = $('#rbox');
-  box.innerHTML = '<div class="pbar"><i class="pfill"></i></div><div class="pstage"></div>';
-  runProgress(box, RESEARCH_STAGES, REDUCED ? 500 : 3600, () => { box.innerHTML = researchHTML(); box.classList.add('rise'); }); });
+document.addEventListener('click', ev => { if (!ev.target.closest('#rgo')) return; const box = $('#rbox'); box.innerHTML = marketsHTML(); box.classList.add('rise'); });
 function startOver(){
   closeEditor(); W.mode = 'wizard'; $('#bar').classList.remove('drop'); $('#results').classList.remove('fade');
   BLOCKS.forEach(k => $('#s' + (BLOCKS.indexOf(k) + 1) + ' .stepin .slot').appendChild($('#blk-' + k)));

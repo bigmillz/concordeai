@@ -602,10 +602,27 @@ past the 453 MB droplet's memory and the kernel killed the service. `live.MAX_RE
 is at most about 5 MB) now refuses any reply that size before it is parsed. First live result: with AA100 out,
 BA117 home was $965 one-way and $526 as part of an $819 round trip; the cheapest trip that day was still two one-ways.
 
-**Search international markets is a DEMO** (found 2026-09-24): its prices come from a seeded formula in
-`researchRows`, labelled "examples, not live quotes", and it never searched another country. SerpApi cannot make it
-real: asking Google as India or the UK returns the US fares converted (every flight moved by the same percentage).
-Patrick decides whether it comes down, becomes links to the airlines' other-country sites, or waits for a feed.
+**Other countries' sites are LINKS, never prices** (2026-09-24, per Patrick, "option 2"). The old panel was a demo:
+its prices came from a seeded formula and it never searched another country. SerpApi cannot make it real: asking
+Google as India or the UK returns the US fares converted (every flight moved by the same percentage), and no lawful
+feed we can get sells a point-of-sale choice. "Show where to check" (`#rgo`, `marketsHTML`) now lists the top three
+flights with a chip per country (`MARKETS`: UK, Mexico, Brazil, South Africa, India, Türkiye, Australia) linking the
+airline's own site for that country, only where the address pattern was checked (`MARKET_SITES`, five airlines);
+every other airline gets its main site and "switch the country". Each country carries its catch (the UK's departure
+tax, a foreign card's fee). It shows no price and costs no call. Google already prices at the departure city, so a
+return leg that starts abroad is already that country's fare.
+
+**Who sells this fare** (2026-09-24, per Patrick). Google's cheapest price is sometimes a travel agency's. The details
+sheet has "Check who sells it" (`sellersHTML`) when the flight came through Google (`e.seller_token`, from
+`data.build_slim`) on a live search (`seller_query` on the response) and is not a round-trip fare. It POSTs
+`/sellers` (`/api/sellers` inside the door), one SerpApi booking-options call, cached, on its own allowance
+(`CONCORDEGO_ANON_SELLERS` 5 a day per address, `CONCORDEGO_USER_SELLERS` 30 signed in). `server.sellers_request`
+validates the token, airports, date and flight numbers before spending anything; keeps only sellers of the whole
+one-way fare; marks a seller whose flight numbers differ as a codeshare (listed apart, never used for the price);
+and passes Google's "Go" link on only when it points at https://www.google.com/. The page lists the airline first,
+each agency with how much less it asks, and the agency caveat. Once checked, the bill's ticket group gets a line:
+the airline's own price by default, or, with "Include travel agency prices" ticked (`AGENCIES`, this browser only),
+the cheapest agency as a credit that names it. A difference under a dollar adds no line.
 
 **A served page never shows made-up results** (per Patrick, 2026-09-21). Anyone gets
 `CONCORDEGO_ANON_SEARCHES` (4) real searches a day, counted per address at `/search`, which

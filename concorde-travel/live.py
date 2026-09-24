@@ -827,6 +827,17 @@ def _serp_fns(it):
     return [str(f.get("flight_number") or "").replace(" ", "").upper() for f in (it or {}).get("flights") or []]
 
 
+def serp_booking_options(query, token, cfg=None):
+    """(Google's booking options for one flight, meta): who sells it and for how much, the airline flagged. The
+    token only works with the search it came from, so the query repeats the supplement's own. One call, cached."""
+    cfg = cfg or serp_config()
+    params = {"engine": "google_flights", "departure_id": query["departure_id"], "arrival_id": query["arrival_id"],
+              "outbound_date": query["outbound_date"], "type": 2, "currency": "USD", "hl": "en", "gl": "us",
+              "adults": int(query.get("adults") or 1), "travel_class": _SERP_CLASS.get(query.get("cabin") or "economy", 1),
+              "booking_token": token}
+    return _serp_fetch(cfg, dict(params, _kind="booking"), params)
+
+
 def serp_round_trip(origin, destination, out_date, back_date, outbound_fns, adults=1, cabin=None, cfg=None):
     """(payload of return flights priced as round trips with the chosen outbound, meta). Google prices a round
     trip in two steps: the outbound list, each carrying a departure_token, then the returns for one outbound,

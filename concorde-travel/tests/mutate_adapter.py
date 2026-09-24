@@ -229,9 +229,11 @@ MUTANTS = [
     (AD, "_fare_row", 'elif short and row.get("short_haul"):', 'elif not short and row.get("short_haul"):',
      'bags: charge the short-haul fees on the long-haul trip'),
     (DATA, "build_slim", 'if extra + 100 > ow:', 'if extra + 100 < ow:', 'round trip: apply the round-trip fare when it is dearer'),
-    (SV, "_round_trip_totals", 'str((f.get("departure_airport") or {}).get("time") or "").replace(" ", "T")[:16]',
-     'str((f.get("departure_airport") or {}).get("time") or "")[:16]',
+    (AD, "serp_itin_key", 'str((f.get("departure_airport") or {}).get("time") or "").replace(" ", "T")[:16])',
+     'str((f.get("departure_airport") or {}).get("time") or "")[:16])',
      'round trip: key Google\'s returns by a clock the adapter never writes, so no return ever matches'),
+    (SV, "sellers_request", '"same_flights": not sold or sold == fns,', '"same_flights": True,',
+     'sellers: price a codeshare under other flight numbers as if it were these flights'),
 ]
 
 caught = skipped = 0
