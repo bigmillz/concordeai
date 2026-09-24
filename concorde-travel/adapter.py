@@ -1823,7 +1823,9 @@ def from_serpapi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
         ce = it.get("carbon_emissions") or {}
         opt = {
             "option_id": oid,
-            "display_name": "%s %s" % (airline_name, flights[0].get("flight_number") or issuing),
+            # "Ryanair FR8214", the feed's own shape: data.carrier_name strips the flight off it, which a
+            # spaced "FR 8214" slipped past and the page printed "Ryanair FR 8214 FR8214" (2026-09-24)
+            "display_name": "%s %s%s" % (airline_name, issuing, _serp_number(flights[0].get("flight_number"))),
             "segments": segments,
             "layovers": layovers,
             "tickets": [ticket],

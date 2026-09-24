@@ -974,7 +974,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr"></span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="f422816">f422816</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="cd13b63">cd13b63</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -1001,7 +1001,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The standard trip for this route</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Prices are calculated in US dollars, then converted. Photos from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="f422816">f422816</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Prices are calculated in US dollars, then converted. Photos from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="cd13b63">cd13b63</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -2043,7 +2043,7 @@ function mirrorData(d0, i){ d0 = Object.assign({}, d0, {signal:null});
 }
 function goBook(){ S.stage = 'book'; paintStepper(); showLegSections(false); $('#bookstep').innerHTML = bookHTML(); scrollTo({top:0, behavior:REDUCED ? 'auto' : 'smooth'}); }
 // where the airline sells its own seats, and the few whose search pages take the trip in the address
-const SITES = {BA:'www.britishairways.com', VS:'www.virginatlantic.com', AA:'www.aa.com', DL:'www.delta.com', UA:'www.united.com', LH:'www.lufthansa.com', LX:'www.swiss.com', OS:'www.austrian.com', SN:'www.brusselsairlines.com', IB:'www.iberia.com', AY:'www.finnair.com', EI:'www.aerlingus.com', TK:'www.turkishairlines.com', KL:'www.klm.com', AF:'www.airfrance.com', AZ:'www.ita-airways.com', TP:'www.flytap.com', SK:'www.flysas.com', LO:'www.lot.com', FI:'www.icelandair.com', AS:'www.alaskaair.com', AC:'www.aircanada.com', EY:'www.etihad.com', AV:'www.avianca.com', LY:'www.elal.com', AT:'www.royalairmaroc.com', QR:'www.qatarairways.com', SQ:'www.singaporeair.com'};
+const SITES = {BA:'www.britishairways.com', VS:'www.virginatlantic.com', AA:'www.aa.com', DL:'www.delta.com', UA:'www.united.com', LH:'www.lufthansa.com', LX:'www.swiss.com', OS:'www.austrian.com', SN:'www.brusselsairlines.com', IB:'www.iberia.com', AY:'www.finnair.com', EI:'www.aerlingus.com', TK:'www.turkishairlines.com', KL:'www.klm.com', AF:'www.airfrance.com', AZ:'www.ita-airways.com', TP:'www.flytap.com', SK:'www.flysas.com', LO:'www.lot.com', FI:'www.icelandair.com', AS:'www.alaskaair.com', AC:'www.aircanada.com', EY:'www.etihad.com', AV:'www.avianca.com', LY:'www.elal.com', AT:'www.royalairmaroc.com', QR:'www.qatarairways.com', SQ:'www.singaporeair.com', FR:'www.ryanair.com', U2:'www.easyjet.com', W6:'wizzair.com', W9:'wizzair.com', W4:'wizzair.com', VY:'www.vueling.com', B6:'www.jetblue.com', WN:'www.southwest.com', NK:'www.spirit.com', F9:'www.flyfrontier.com', G4:'www.allegiantair.com', SY:'www.suncountry.com', HA:'www.hawaiianairlines.com', MX:'www.flybreeze.com', LS:'www.jet2.com', DY:'www.norwegian.com', D8:'www.norwegian.com', EW:'www.eurowings.com', V7:'www.volotea.com', HV:'www.transavia.com', TO:'www.transavia.com', PC:'www.flypgs.com', XQ:'www.sunexpress.com', LL:'www.flylevel.com', UX:'www.aireuropa.com', DE:'www.condor.com', WS:'www.westjet.com', PD:'www.flyporter.com', TS:'www.airtransat.com', Y4:'www.volaris.com', VB:'www.vivaaerobus.com', AM:'www.aeromexico.com', CM:'www.copaair.com', LA:'www.latamairlines.com', G3:'www.voegol.com.br', AD:'www.voeazul.com.br', JL:'www.jal.co.jp', NH:'www.ana.co.jp', KE:'www.koreanair.com', OZ:'flyasiana.com', CX:'www.cathaypacific.com', EK:'www.emirates.com', BR:'www.evaair.com', CI:'www.china-airlines.com', PR:'www.philippineairlines.com', YP:'www.airpremia.com', MU:'us.ceair.com', CA:'www.airchina.us', CZ:'www.csair.com', QF:'www.qantas.com', NZ:'www.airnewzealand.com', VA:'www.virginaustralia.com', JQ:'www.jetstar.com', AI:'www.airindia.com', '6E':'www.goindigo.in', HR:'www.hahnair.com', ET:'www.ethiopianairlines.com', MS:'www.egyptair.com', RJ:'www.rj.com', SV:'www.saudia.com', WY:'www.omanair.com', GF:'www.gulfair.com', A3:'en.aegeanair.com', OU:'www.croatiaairlines.com', RO:'www.tarom.ro', BT:'www.airbaltic.com', JU:'www.airserbia.com', KM:'www.airmalta.com', CY:'cyprusairways.com', S4:'www.azoresairlines.pt', NO:'www.neosair.it', BY:'www.tui.co.uk', '4U':'www.eurowings.com'};   // the budget and regional airlines the every-airline Google supplement brings in (2026-09-24)
 const usDate = iso => iso.slice(5, 7) + '/' + iso.slice(8, 10) + '/' + iso.slice(0, 4);
 const DEEP = {
   UA: (o, d, dep, ret, pax) => `https://www.united.com/en/us/fsr/choose-flights?f=${o}&t=${d}&d=${dep}${ret ? '&r=' + ret + '&tt=1' : '&tt=0'}&px=${pax}&sc=7&at=1&taxng=1&idx=1`,
@@ -2053,7 +2053,9 @@ const DEEP = {
 };
 function airlineLink(carrier, site, legs){
   const o = legs[0].route[0], d = legs[0].route[legs[0].route.length - 1], dep = legs[0].depart.slice(0, 10), ret = legs[1] ? legs[1].depart.slice(0, 10) : null, pax = paxCount();
-  const deep = DEEP[carrier] && legs.length < 3 && (!legs[1] || (legs[1].route[0] === d && legs[1].route[legs[1].route.length - 1] === o)) ? DEEP[carrier] : null; return {href: deep ? deep(o, d, dep, ret, pax) : (site ? 'https://' + site + '/' : '#'), filled: !!deep, host: (site || carrier).replace(/^www\./, '')};
+  const deep = DEEP[carrier] && legs.length < 3 && (!legs[1] || (legs[1].route[0] === d && legs[1].route[legs[1].route.length - 1] === o)) ? DEEP[carrier] : null;
+  // no site known for the airline: name it and link nowhere, rather than a button that goes to '#'
+  return {href: deep ? deep(o, d, dep, ret, pax) : (site ? 'https://' + site + '/' : null), filled: !!deep, host: site ? site.replace(/^www\./, '') : (legs[0].carrier_name || carrier)};
 }
 function itinText(){ return Object.keys(S.legPick).sort().map(i => { const p = S.legPick[i].snap, n = legNames()[i]; return `${n[0]}: ${p.route.join(' → ')} ${n[1]}, ${p.carrier_name} ${p.flight} (${p.brand}), ${hm(p.depart)} → ${hm(p.arrive)}${p.day_offset ? ' +1' : ''}`; }).join('\n'); }
 function bookHTML(){
@@ -2066,9 +2068,11 @@ function bookHTML(){
   let links = '';
   if (cash.length){
     if (same && cash.length === snaps.length){ const l = airlineLink(snaps[0].carrier, snaps[0].site, snaps);
-      links += `<a class="choose blink" href="${esc(l.href)}" target="_blank" rel="noopener">Book ${snaps.length > 2 ? 'all ' + snaps.length + ' flights' : snaps.length > 1 ? 'both flights' : 'it'} on ${esc(l.host)} →</a><p class="bnote">${l.filled ? 'Airports and dates are filled in. Pick these flights there.' : 'Search for these flights on the airline\'s site.'}</p>`; }
+      links += l.href ? `<a class="choose blink" href="${esc(l.href)}" target="_blank" rel="noopener">Book ${snaps.length > 2 ? 'all ' + snaps.length + ' flights' : snaps.length > 1 ? 'both flights' : 'it'} on ${esc(l.host)} →</a><p class="bnote">${l.filled ? 'Airports and dates are filled in. Pick these flights there.' : 'Search for these flights on the airline\'s site.'}</p>`
+        : `<p class="bnote">Book directly with ${esc(l.host)} on its own website. Search for these flights there.</p>`; }
     else { cash.forEach(p => { const i = snaps.indexOf(p), l = airlineLink(p.carrier, p.site, [p]);
-        links += `<a class="choose blink" href="${esc(l.href)}" target="_blank" rel="noopener">Book the ${esc(names[i][0].toLowerCase())} on ${esc(l.host)} →</a>`; });
+        links += l.href ? `<a class="choose blink" href="${esc(l.href)}" target="_blank" rel="noopener">Book the ${esc(names[i][0].toLowerCase())} on ${esc(l.host)} →</a>`
+          : `<p class="bnote">Book the ${esc(names[i][0].toLowerCase())} directly with ${esc(l.host)} on its own website.</p>`; });
       if (!same) links += '<p class="bnote">Different airlines mean separate tickets. That is normal and often cheaper.</p>'; }
   }
   const walks = pts.map(p => { const i = snaps.indexOf(p); return `<section class="bwalk"><h3>${esc(names[i][0])} with ${esc(p.award.name)}: ${p.award.spend.toLocaleString()} ${esc(p.award.via ? SHORT[p.award.via] + ' points' : p.award.name)} + ${money(p.award.fees)}</h3>${p.play || '<p class="bnote">No walkthrough for this award.</p>'}</section>`; }).join('');
