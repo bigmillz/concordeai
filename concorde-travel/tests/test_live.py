@@ -255,6 +255,16 @@ def main():
     ok, why = live._reserve(cfg2)
     check("the minimum interval between calls is enforced",
           not ok and "rate limited" in why, why)
+    ok, why = live._reserve_paced(cfg2)
+    check("a paced reservation still refuses when the floor is longer than it will wait",
+          not ok and "rate limited" in why, why)
+    cfg3 = cfg_with(quota={"per_day": 50, "per_month": 50,
+                           "min_seconds_between_calls": 1, "cache_ttl_seconds": 600})
+    live._reserve(cfg3)
+    t0 = time.time()
+    ok, why = live._reserve_paced(cfg3)
+    check("a call inside a one-second floor waits it out and goes, rather than failing (2026-09-24)",
+          ok and 0.5 <= time.time() - t0 < 3, (ok, why, round(time.time() - t0, 2)))
 
     # ---- the cache must not spend quota ------------------------------
     print("\ncache")

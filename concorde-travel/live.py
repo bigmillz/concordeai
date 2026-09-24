@@ -327,6 +327,23 @@ def _reserve(cfg, path=None):
     return True, ""
 
 
+def _reserve_paced(cfg, path=None, max_wait=3.0):
+    """_reserve, but a call that lands inside the floor waits out the rest of it (up to max_wait seconds)
+    and goes, instead of failing. The floor paces calls; it was never meant to turn away the second person
+    to search in the same second, or to drop the Google supplement from a search silently (2026-09-24:
+    four of ten legs in a price check lost their Google fares to "Too many requests at once")."""
+    path = path or QUOTA_FILE
+    for _ in range(3):
+        ok, why = _reserve(cfg, path)
+        if ok or "rate limited" not in why:
+            return ok, why
+        wait = cfg["quota"]["min_seconds_between_calls"] - (time.time() - load_quota(path)["last_call_at"])
+        if wait > max_wait:
+            return ok, why
+        time.sleep(max(0.05, wait + 0.05))
+    return _reserve(cfg, path)
+
+
 def _refund(path=None):
     """Only for a request that never reached the provider."""
     path = path or QUOTA_FILE
@@ -578,7 +595,7 @@ def search(query, cfg=None, allow_call=True):
         return None, {"source": "none", "error": auth_err, "quota": quota_state(cfg),
                       "hint": "check the key and secret; no search was spent"}
 
-    ok, why = _reserve(cfg)
+    ok, why = _reserve_paced(cfg)
     if not ok:
         return None, {"source": "none", "error": why, "quota": quota_state(cfg)}
 
@@ -701,7 +718,7 @@ def serp_search(origin, destination, date, adults=1, carriers=None, cfg=None, al
     if not allow_call:
         return None, {"source": "none", "error": "live calls are disabled for this request",
                       "quota": quota_state(cfg, qf)}
-    ok, why = _reserve(cfg, qf)
+    ok, why = _reserve_paced(cfg, qf)
     if not ok:
         return None, {"source": "none", "error": why, "quota": quota_state(cfg, qf)}
     from urllib.parse import urlencode
@@ -804,7 +821,7 @@ def flight_status(number, date, cfg=None, allow_call=True):
                       "quota": quota_state(cfg, qf)}
     if not allow_call:
         return None, {"source": "none", "error": "live calls are disabled for this request", "quota": quota_state(cfg, qf)}
-    ok, why = _reserve(cfg, qf)
+    ok, why = _reserve_paced(cfg, qf)
     if not ok:
         return None, {"source": "none", "error": why, "quota": quota_state(cfg, qf)}
     url = "https://%s/flights/number/%s/%s?withAircraftImage=false&withLocation=false" % (ADB_HOST, num, date)
