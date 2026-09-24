@@ -974,8 +974,12 @@ keep a price history only from the cabin asked for. The cabin asked for rides in
 weight), off the bill, in the order and the grade; a leg ABOVE it costs nothing (business search, domestic first
 leg). The page always names it first among the cons ("Business on 1 of 3 flights", "Business, not first class") and
 on the flight's hover card. `adapter.cabin_norm` puts every feed's cabin words into one vocabulary: Google's
-"Business Class" used to read as `business_class`, matched nothing, and graded as economy. The grade's comfort part
-now reads the LONG leg's cabin. **Airports no table knows are placed in time from Duffel's places**
+"Business Class" used to read as `business_class`, matched nothing, and graded as economy. **The grade's comfort
+part weighs every flight's seat by its time in the air** (a business long-haul with two economy hops is not a
+business trip) **and takes points off for flights below the cabin asked for** (`_CABIN_SHORT_POINTS` 2.0 at a full
+shortfall, the share blending flights and time, each weighted by how far below: a business search that is economy on
+two of three flights loses most of a letter, business throughout on a first-class search about half a letter, first
+on a business search nothing), per Patrick: such trips mislead, and people book them and are disappointed. **Airports no table knows are placed in time from Duffel's places**
 (`server.airport_geo`, cached a year, twelve a search): a Google-only trip through Charlotte, Houston, Quito and
 Cuenca used to be dropped whole, because Google gives local clocks with no zone and Duffel had returned nothing to
 borrow one from.

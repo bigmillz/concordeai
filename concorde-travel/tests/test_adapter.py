@@ -1227,6 +1227,35 @@ def main():
         go_rows = []
     check("an empty feed reply with Google trips shows Google's trips, not 'no flights found'", len(go_rows) > 0,
           str(len(go_rows)))
+    # the grade's comfort part (2026-09-24, per Patrick): every flight's seat weighted by time, and points off for
+    # flights below the cabin asked for; a business search that is economy on most flights grades clearly lower
+    sc_g = adapter.from_feed(dfl)
+    multi = next(o for o in sc_g["options"] if len(o["segments"]) >= 2)
+    def comfort_pts(cabins, want):
+        o = _cp.deepcopy(multi)
+        for sg_, c in zip(o["segments"], cabins):
+            sg_["cabin_marketed"] = c
+        sc0 = dict(sc_g, query=dict(sc_g["query"], cabin=want))
+        card = _scr.report_card(sc0, o)
+        return next(p["points"] for p in card["parts"] if p["id"] == "comfort"), card
+    n_ = len(multi["segments"])
+    li_ = max(range(n_), key=lambda i: _scr.minutes_between(multi["segments"][i]["departure_local"], multi["segments"][i]["arrival_local"]))
+    long_only = ["economy"] * n_
+    long_only[li_] = "business"
+    t_mix, _ = comfort_pts(long_only, None)
+    t_all, _ = comfort_pts(["business"] * n_, None)
+    check("comfort weighs every flight's seat by its time: business on the long flight and economy on the rest is below "
+          "business throughout, with no cabin asked for", t_mix < t_all, str((t_mix, t_all)))
+    a_all, card_a = comfort_pts(["business"] * n_, "business")
+    b_mix, card_b = comfort_pts(["business"] + ["economy"] * (n_ - 1), "business")
+    c_bus, _ = comfort_pts(["business"] * n_, "first")
+    d_up, _ = comfort_pts(["first"] * n_, "business")
+    f_all, _ = comfort_pts(["first"] * n_, "first")
+    check("comfort: the cabin asked for on every flight is top marks; a business search mostly in economy loses more "
+          "than half a letter and pulls the overall down; business on a first-class search costs a little; first on a "
+          "business search costs nothing",
+          f_all == a_all == d_up and b_mix <= a_all - 0.5 and a_all - 0.8 < c_bus < a_all
+          and card_b["points"] < card_a["points"], str((a_all, b_mix, c_bus, d_up, f_all, card_a["grade"], card_b["grade"])))
     d_sc = adapter.from_feed(dfl)
     procs = sorted({o["airport_process_minutes"]["p50"] for o in d_sc["options"]})
     check("every option of a real New York to London search is timed at an hour and a half at the airport",

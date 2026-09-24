@@ -992,6 +992,8 @@ _GROUND_BANDS: Tuple[Tuple[int, float], ...] = (
 # the seat: pitch on the long leg, inches -> points; unknown is never the best seat
 _PITCH_POINTS: Tuple[Tuple[int, float], ...] = ((34, 4.3), (32, 4.0), (31, 3.5), (30, 3.0), (29, 2.3))
 _PITCH_UNKNOWN, _PITCH_FLOOR = 2.7, 1.3
+# comfort points taken off at a full shortfall: every flight a whole cabin-worth below the one asked for
+_CABIN_SHORT_POINTS = 2.0
 # the on-time record of the worst leg -> points; no record reads as a B: not a
 # demerit (BTS covers US carriers only, so most of the world has none) and not
 # a merit, and a card can still reach A+ past it only with everything else top
@@ -1090,22 +1092,40 @@ def report_card(scenario: Dict[str, Any], option: Dict[str, Any],
     claims = long_leg.get("claims") or {}
     pitch = claims.get("seat_pitch_inches")
     why: List[str] = []
-    if pitch:
-        pts = _PITCH_FLOOR
-        for at, p in _PITCH_POINTS:
-            if pitch >= at:
-                pts = p
-                break
-        why.append("%g-inch pitch" % pitch)
+
+    def seat_points(sg) -> float:
+        p = (sg.get("claims") or {}).get("seat_pitch_inches")
+        v = _PITCH_UNKNOWN
+        if p:
+            v = _PITCH_FLOOR
+            for at, pp in _PITCH_POINTS:
+                if p >= at:
+                    v = pp
+                    break
+        c = str(sg.get("cabin_marketed") or "economy").lower()
+        return max(v, 4.3) if c in ("business", "first") else max(v, 3.7) if c.startswith("premium") else v
+
+    # the seat on EVERY flight, weighted by its time in the air (2026-09-24, per Patrick): a business long-haul
+    # with two economy hops is not a business trip, and grading only the long leg said it was
+    mins = [max(1, minutes_between(sg["departure_local"], sg["arrival_local"])) for sg in segments]
+    pts = sum(seat_points(sg) * m for sg, m in zip(segments, mins)) / sum(mins)
+    why.append("%g-inch pitch" % pitch if pitch else "pitch unknown")
+    cabins = [str(sg.get("cabin_marketed") or "economy").lower() for sg in segments]
+    if len(set(cabins)) == 1:
+        if cabins[0] != "economy":
+            why.append(CABIN_NAMES.get(cabins[0], cabins[0]))
     else:
-        pts = _PITCH_UNKNOWN
-        why.append("pitch unknown")
-    cabin = str(long_leg.get("cabin_marketed") or next((str(x.get("cabin_marketed")) for x in list(option.get("tickets", []))
-                                                        + list(segments) if x.get("cabin_marketed")), "economy")).lower()
-    if cabin in ("business", "first"):
-        pts = max(pts, 4.3); why.append(cabin)
-    elif cabin.startswith("premium"):
-        pts = max(pts, 3.7); why.append("premium economy")
+        why.append(" and ".join(CABIN_NAMES.get(c, c) for c in sorted(set(cabins), key=lambda c: -dict(tuning.cabin_hour_cents).get(c, 0))))
+    # below the cabin asked for: points off by how far below and for how much of the trip, flights and time
+    # blended, so a business search that is economy on two of three flights reads a letter lower (per Patrick)
+    want = str(q.get("cabin") or "")
+    worth = dict(tuning.cabin_hour_cents)
+    if worth.get(want):
+        gaps = [max(0, worth[want] - worth.get(c, 0)) / worth[want] for c in cabins]
+        share = 0.5 * sum(g * m for g, m in zip(gaps, mins)) / sum(mins) + 0.5 * sum(gaps) / len(gaps)
+        if share > 0:
+            pts -= _CABIN_SHORT_POINTS * share
+            why.append("%d of %d flights below %s" % (sum(1 for g in gaps if g > 0), len(gaps), CABIN_NAMES.get(want, want)))
     sids = {s.get("segment_id") for s in segments}
     wifi = [w for w in ((scenario.get("_feed") or {}).get("wifi_published") or []) if w.get("segment") in sids]
     if any(w.get("available") and w.get("cost") == "free" for w in wifi):
