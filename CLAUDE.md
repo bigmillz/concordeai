@@ -610,7 +610,13 @@ flights with a chip per country (`MARKETS`: UK, Mexico, Brazil, South Africa, In
 airline's own site for that country, only where the address pattern was checked (`MARKET_SITES`, five airlines);
 every other airline gets its main site and "switch the country". Each country carries its catch (the UK's departure
 tax, a foreign card's fee). It shows no price and costs no call. Google already prices at the departure city, so a
-return leg that starts abroad is already that country's fare.
+return leg that starts abroad is already that country's fare. **Travelpayouts' `market` parameter was TESTED and does
+not give other-market prices** (2026-09-24, a real token, `CONCORDEGO_TRAVELPAYOUTS_TOKEN` on the droplet, partner ID
+781552): across 22 market codes and eight routes the Aviasales Data API returned the same flights at the same prices;
+`in` and `za` returned exactly what an invented code `xx` returns, even for Delhi to London; the only differences
+were `us` rows seen more recently and `ru` rubles-conversion noise. Its data is also sparse (nine NYC to London fares
+for a whole month) and days old. Skyscanner's Travel API does price by market, but it takes established businesses
+with over 100,000 visitors a month, forbids background sweeps and caching, and is free (they pay commission).
 
 **Who sells this fare** (2026-09-24, per Patrick). Google's cheapest price is sometimes a travel agency's. The details
 sheet has "Check who sells it" (`sellersHTML`) when the flight came through Google (`e.seller_token`, from
