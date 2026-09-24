@@ -874,7 +874,7 @@ type with no curated row **abstains**. Better data is what hard rule 2 is for, n
 to relax it.
 
 **`enrichment/fleets.json` and `enrichment/fares.json` are populated DRAFTS** (92 fleet rows
-and 82 brand rows as of 2026-09-20, covering every carrier a real JFK–LHR search returns and
+and 82 brand rows as of 2026-09-20, 131 since 2026-09-24, covering every carrier a real JFK–LHR search returns and
 the narrowbodies that feed their hubs). Marked in the files, every fleet row carrying
 `needs_primary_source: true`, counted by `coverage()`, amber in the interface. A claim from
 an unreviewed table is *more* dangerous than an abstain — an abstain announces itself in the
@@ -893,6 +893,22 @@ number built on them goes in front of a stranger. Two things about their content
   key a carrier on a word its other brands share. A row's tier count says how many bags the
   brand includes (three tiers is a no-bag brand, two includes one, one includes two), and the
   fees lean to the airport price where prepaid is cheaper.
+
+**Bag fees by route, and the airlines Google brings in** (2026-09-24, per Patrick, after the every-airline
+supplement put Ryanair, Southwest, JetBlue and the Asian carriers on the page at the $100 placeholder). 69 airlines'
+published fees were researched from their own baggage pages and each re-checked against its sources by a second agent;
+the rows carry `sources`, `confidence`, `verdict` and `needs_primary_source` where the check could not confirm them (19).
+Every fee is one way, per piece, the price when the bag is added during booking online at the top of the airline's
+stated range (never the ultra-low-cost airport penalty, never a member price). A row's `short_haul` block replaces its
+tiers, included bags and carry-on when the trip starts and ends in one country or covers at most 3,500 km
+(`adapter._short_haul`; unknown reads long-haul): the table used to hold only transatlantic fees, so JetBlue's domestic
+bag was $75 instead of $49. American, United, Delta, Alaska and JetBlue carry the domestic block on every economy row
+(domestic Main includes no bag); the European and Canadian full-service airlines on their lowest row only.
+`includes_carry_on: false` marks a lowest fare with no full-size cabin bag (the budget airlines, United Basic), which
+the Google adapter now passes on, so the Free carry-on want is honest for Google rows. An unknown short-haul fare takes
+`_default_short_haul` ($76 / $76 / $150), below the long-haul default. Spirit stopped flying on 2026-05-02 and has no
+row; Eurowings, airBaltic and TAP publish only "from" prices and stay on the default. Fees change about yearly; the
+research method is in the commit that added these rows.
 
 `adapter.coverage()` reports all of this per search and the page prints it. **A grade
 computed over mostly-abstained enrichment is not the same object as one over a curated

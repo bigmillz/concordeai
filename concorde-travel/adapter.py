@@ -489,19 +489,51 @@ def _brand_key(fares: Dict[str, Any], carrier: str, brand: str) -> Optional[str]
     return None
 
 
-def _bag_tiers(enr: Dict[str, Any], carrier: str, brand: str
-               ) -> Tuple[List[Dict[str, Any]], bool]:
-    """(tiers, used_the_pessimistic_default)."""
+SHORT_HAUL_KM = 3500
+
+
+def _short_haul(o_iata: str, d_iata: str, enr: Dict[str, Any], geo: Optional[Dict[str, Any]] = None) -> bool:
+    """A trip that starts and ends in one country, or covers at most SHORT_HAUL_KM: the fares where airlines
+    charge their domestic or regional bag fees, not their long-haul ones (2026-09-24: every row was a
+    transatlantic fee, and JetBlue's domestic bag was priced at $75). Unknown reads as long-haul, whose
+    fees are the higher ones: unknown is never cheap."""
+    def place(iata):
+        ap = (enr.get("airports") or {}).get("airports", {}).get(iata) or {}
+        g = (geo or {}).get(iata) or {}
+        return (ap.get("lat", g.get("lat")), ap.get("lon", g.get("lon")), ap.get("country") or g.get("country"))
+    la1, lo1, c1 = place(o_iata)
+    la2, lo2, c2 = place(d_iata)
+    if c1 and c2 and str(c1).upper() == str(c2).upper():
+        return True
+    if None in (la1, lo1, la2, lo2):
+        return False
+    return _ground.haversine_km(float(la1), float(lo1), float(la2), float(lo2)) <= SHORT_HAUL_KM
+
+
+def _fare_row(enr: Dict[str, Any], carrier: str, brand: str, short: bool = False
+              ) -> Tuple[Dict[str, Any], bool]:
+    """(the brand's row, used_the_pessimistic_default). On a short-haul trip a row's `short_haul` block,
+    where it has one, replaces its tiers, included bags and carry-on; the default has its own short-haul
+    version for the same reason."""
     fares = enr.get("fares") or {}
     key = _brand_key(fares, carrier, brand)
     row = (fares.get("brands") or {}).get(key) if key else None
-    if row:
-        return [dict(t) for t in row["tiers"]], False
-    dft = fares.get("_default") or {"tiers": [], "note": ""}
-    tiers = [dict(t) for t in dft["tiers"]]
-    if tiers and dft.get("note"):
-        tiers[0]["note"] = dft["note"]
-    return tiers, True
+    used_default = not row
+    if not row:
+        row = (fares.get("_default_short_haul") if short else None) or fares.get("_default") or {"tiers": [], "note": ""}
+    elif short and row.get("short_haul"):
+        row = dict(row, **row["short_haul"])
+    return row, used_default
+
+
+def _bag_tiers(enr: Dict[str, Any], carrier: str, brand: str, short: bool = False
+               ) -> Tuple[List[Dict[str, Any]], bool]:
+    """(tiers, used_the_pessimistic_default)."""
+    row, used_default = _fare_row(enr, carrier, brand, short)
+    tiers = [dict(t) for t in row.get("tiers") or []]
+    if used_default and tiers and row.get("note"):
+        tiers[0]["note"] = row["note"]
+    return tiers, used_default
 
 
 def _extend_tiers(tiers: List[Dict[str, Any]], need: int) -> List[Dict[str, Any]]:
@@ -863,7 +895,12 @@ def _duffel_bag_tiers(offer: Dict[str, Any], enr: Dict[str, Any],
     svcs = [s for s in (offer.get("available_services") or [])
             if s.get("type") == "baggage"
             and (s.get("metadata") or {}).get("type") == "checked"]
-    fallback, used_default = _bag_tiers(enr, carrier, brand)
+    sl = offer.get("slices") or [{}]
+    ends = [(sl[0].get("origin") or {}), (sl[-1].get("destination") or {})]
+    geo = {e.get("iata_code"): {"lat": e.get("latitude"), "lon": e.get("longitude"), "country": e.get("iata_country_code")}
+           for e in ends if e.get("iata_code")}
+    short = _short_haul(ends[0].get("iata_code", ""), ends[1].get("iata_code", ""), enr, geo)
+    fallback, used_default = _bag_tiers(enr, carrier, brand, short)
     if not svcs:
         return fallback, ("curated" if not used_default else "default")
 
@@ -1758,8 +1795,12 @@ def from_serpapi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
 
         issuing = segments[0]["marketing"]["carrier"]
         brand = _serp_brand(enr, issuing)
-        tiers, dft = _bag_tiers(enr, issuing, brand)
-        included = 0 if dft else max(0, 3 - len(tiers))
+        short = _short_haul(segments[0]["origin"]["iata"], segments[-1]["destination"]["iata"], enr, geo)
+        frow, dft = _fare_row(enr, issuing, brand, short)
+        tiers, _ = _bag_tiers(enr, issuing, brand, short)
+        included = 0 if dft else int(frow.get("includes_checked", max(0, 3 - len(tiers))))
+        # a full-size carry-on: the row says, for the budget airlines whose lowest fare excludes one
+        carry_on = True if dft else bool(frow.get("includes_carry_on", True))
         tiers = _extend_tiers(tiers, max(0, int(checked_bags) - included))
         if dft:
             default_used += 1
@@ -1777,7 +1818,7 @@ def from_serpapi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
             "price": {"currency": "USD", "base_cents": total_cents, "fx_rate_to_usd": 1.0,
                       "taxes": [], "carrier_imposed": [], "agency_fees": []},
             "entitlements": {
-                "checked_included": included, "cabin_bag_included": True,
+                "checked_included": included, "cabin_bag_included": carry_on,
                 "personal_item_included": True, "seat_selection": "paid",
                 "changes": "unknown", "refundable": False,
                 "earns_redeemable_miles": False, "boarding_group": None},

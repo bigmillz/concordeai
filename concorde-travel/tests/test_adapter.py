@@ -1004,6 +1004,28 @@ def main():
     cheaper = json.loads(json.dumps(dup["options"][0])); cheaper["tickets"][0]["price"]["base_cents"] -= 5000
     dearer = json.loads(json.dumps(dup["options"][1])); dearer["tickets"][0]["price"]["base_cents"] += 5000
     merged = adapter.merge_scenarios(json.loads(json.dumps(main)), dict(dup, options=[cheaper, dearer]), "test")
+    # bag fees by route (2026-09-24): a row's short_haul block on a domestic or regional trip, its long-haul tiers otherwise
+    enr0 = adapter.load_enrichment()
+    lax = {"LAX": {"lat": 33.94, "lon": -118.41, "country": "US"}}
+    check("short-haul: JFK-LAX is one country; LHR-FCO is 1,400 km; JFK-LHR is neither; an unknown end reads as long-haul",
+          adapter._short_haul("JFK", "LAX", enr0, lax) and adapter._short_haul("LHR", "FCO", enr0)
+          and not adapter._short_haul("JFK", "LHR", enr0) and not adapter._short_haul("QQA", "QQB", enr0))
+    fake = {"brands": {"XX:BASIC": {"feed_name": "Basic", "includes_checked": 0, "includes_carry_on": True,
+                                     "tiers": [{"piece": 1, "amount_cents": 9000}],
+                                     "short_haul": {"includes_checked": 0, "includes_carry_on": False,
+                                                    "tiers": [{"piece": 1, "amount_cents": 4000}]}}},
+            "_default": {"tiers": [{"piece": 1, "amount_cents": 10000}], "note": "long"},
+            "_default_short_haul": {"tiers": [{"piece": 1, "amount_cents": 7000}], "note": "short"}}
+    fe = dict(enr0, fares=fake)
+    r_long, d_long = adapter._fare_row(fe, "XX", "Basic", False)
+    r_short, d_short = adapter._fare_row(fe, "XX", "Basic", True)
+    check("a row's short-haul block replaces its tiers and carry-on only on a short-haul trip",
+          r_long["tiers"][0]["amount_cents"] == 9000 and r_long["includes_carry_on"] is True
+          and r_short["tiers"][0]["amount_cents"] == 4000 and r_short["includes_carry_on"] is False and not d_long and not d_short)
+    check("an unknown fare takes the short-haul default short-haul and the long-haul default otherwise, flagged either way",
+          adapter._bag_tiers(fe, "ZZ", "Basic", True)[0][0]["amount_cents"] == 7000
+          and adapter._bag_tiers(fe, "ZZ", "Basic", False)[0][0]["amount_cents"] == 10000
+          and adapter._bag_tiers(fe, "ZZ", "Basic", True)[1] is True)
     # the cheapest tickets always reach the page, whatever their rank (2026-09-24, the Google Flights price check)
     sys.path.insert(0, os.path.join(HERE, "..", "ui", "mock"))
     import data as mockdata

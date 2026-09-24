@@ -222,6 +222,11 @@ MUTANTS = [
     (AD, "_serp_number", 'tail = " ".join(parts[1:]) if len(parts) > 1 else str(flight_number or "").strip()[2:]',
      'tail = str(flight_number or "")',
      'serpapi: take every digit of the flight number, the carrier code\'s included'),
+    (AD, "_short_haul", 'return _ground.haversine_km(float(la1), float(lo1), float(la2), float(lo2)) <= SHORT_HAUL_KM',
+     'return _ground.haversine_km(float(la1), float(lo1), float(la2), float(lo2)) >= SHORT_HAUL_KM',
+     'bags: call a long trip short-haul and a short one long-haul'),
+    (AD, "_fare_row", 'elif short and row.get("short_haul"):', 'elif not short and row.get("short_haul"):',
+     'bags: charge the short-haul fees on the long-haul trip'),
 ]
 
 caught = skipped = 0

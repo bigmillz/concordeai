@@ -1,7 +1,7 @@
 {
   "_comment": "Fare brand -> what a checked bag costs beyond what the brand includes. Both Duffel and Amadeus return the brand and the included-bag ALLOWANCE; neither returns the FEE. Without this table the bags-versus-fare comparison - the cheapest real win in the product - cannot run at all.",
   "_source": "ConcordeGo curated fare-brand table (carrier baggage pages, transatlantic economy, mid-2026)",
-  "_as_of": "2026-09-20",
+  "_as_of": "2026-09-24",
   "_review": "DRAFT - populated 2026-09-20 from the carriers' published transatlantic baggage fees as known in mid-2026, not re-read off each tariff on that date. Fees are one-way, per piece, and lean to the airport price where prepaid is cheaper: a fee that comes in under what the traveller pays manufactures the $100 surprise this product exists to prevent. Before a row is trusted in front of a user, check it against the carrier's own baggage page and drop the note. Fees change roughly yearly.",
   "_keying": "CARRIER:BRAND on the ISSUING carrier, uppercased. BRAND is a single word that appears as a WHOLE WORD in the feed's brand name (Duffel says 'Economy Light', Amadeus says 'LIGHT'; both hit KL:LIGHT) - see adapter._brand_key. Never key a carrier on a word its other brands share ('ECONOMY', 'BLUE', 'GO', 'PARTNER'): the first row to match wins and the others go dark. Tiers index from the first piece BEYOND the brand's included allowance, matching scorer._bag_lines - piece 1 is the first bag the traveller PAYS for, not their first bag. A brand's tier count therefore says how many bags it includes: three tiers is a no-bag brand, two includes one, one includes two.",
   "_default_policy": "A brand with no row falls back to _default, which is deliberately set at the PESSIMISTIC end of real transatlantic fees. Unknown must never be cheap: if an undocumented fare got the benefit of the doubt, the least-documented itinerary would accumulate the fewest penalties and win, which is the failure mode the whole abstain discipline exists to prevent. The fallback is flagged per ticket and counted by coverage().",
@@ -40,7 +40,36 @@
           "piece": 3,
           "amount_cents": 20000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 10200
+          },
+          {
+            "piece": 2,
+            "amount_cents": 10200
+          },
+          {
+            "piece": 3,
+            "amount_cents": 17800
+          }
+        ],
+        "note": "BA Economy Basic (short-haul): no checked bag; next pieces $102 / $102 / $178 one-way, BA no longer publishes extra-bag prices (its own FAQ, updated 31 Mar 2025, points to the calculator and Manage My Booking). I took the upper end of the online ranges a secondary tracker reports: 1st bag GBP 35-80, 2nd GBP 65-80, 3rd GBP 80-140. That range is not split by route, so it may overstate short-haul",
+        "sources": [
+          "https://www.britishairways.com/content/information/help/faq/baggage/extra-checked-baggage",
+          "https://www.britishairways.com/content/en/us/information/legal/us-optional-extras",
+          "https://www.mybaggage.com/shipping/airlines/british-airways/",
+          "https://flighttribe.co.uk/british-airways-baggage-allowance/"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "low",
+        "verdict": "unverifiable",
+        "needs_primary_source": true,
+        "includes_carry_on": true
+      }
     },
     "BA:PLUS": {
       "feed_name": "Plus",
@@ -164,7 +193,37 @@
           "piece": 3,
           "amount_cents": 20000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 5000
+          },
+          {
+            "piece": 2,
+            "amount_cents": 6000
+          },
+          {
+            "piece": 3,
+            "amount_cents": 20000
+          }
+        ],
+        "note": "AA Basic Economy (short-haul): no checked bag; next pieces $50 / $60 / $200 one-way, Short haul uses the Basic Economy price when the bag is prepaid on aa.com or the app, for domestic, Canada, Mexico, Caribbean and Central America routes, on tickets bought on or after 2026-05-18. The airport price is $55/$65 and the 3rd bag is $200 either way. Long haul uses the transatlantic Basic Economy price on tickets issued on or after 2026-05-18, and American publishes no online discount there",
+        "sources": [
+          "https://s202.q4cdn.com/986123435/files/doc_news/American-Airlines-updates-bag-fees-and-Basic-Economy-fares-OPS-POL-04-2026.pdf",
+          "https://platinumflyer.com/american-airlines-basic-economy-bag-fee-surcharge/",
+          "https://upgradedpoints.com/news/aa-increases-baggage-fees-changes-basic-economy/",
+          "https://deeparrival.com/airlines/american-airlines/baggage-fees/",
+          "https://thepointsguy.com/news/american-airlines-bag-fees-basic-economy-europe",
+          "https://www.aa.com/i18n/travel-info/baggage/checked-baggage-policy.html?locale=en_PL (403; seen only in search snippets)"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "medium",
+        "verdict": "corrected",
+        "includes_carry_on": true
+      }
     },
     "AA:MAIN": {
       "feed_name": "Main Cabin",
@@ -179,7 +238,36 @@
           "piece": 2,
           "amount_cents": 20000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 5000
+          },
+          {
+            "piece": 2,
+            "amount_cents": 6000
+          },
+          {
+            "piece": 3,
+            "amount_cents": 20000
+          }
+        ],
+        "note": "AA Basic Economy (short-haul): no checked bag; next pieces $50 / $60 / $200 one-way, Short haul uses the Basic Economy price when the bag is prepaid on aa.com or the app, for domestic, Canada, Mexico, Caribbean and Central America routes, on tickets bought on or after 2026-05-18. The airport price is $55/$65 and the 3rd bag is $200 either way. Long haul uses the transatlantic Basic Economy price on tickets issued on or after 2026-05-18, and American publishes no online discount there",
+        "sources": [
+          "https://s202.q4cdn.com/986123435/files/doc_news/American-Airlines-updates-bag-fees-and-Basic-Economy-fares-OPS-POL-04-2026.pdf",
+          "https://platinumflyer.com/american-airlines-basic-economy-bag-fee-surcharge/",
+          "https://upgradedpoints.com/news/aa-increases-baggage-fees-changes-basic-economy/",
+          "https://deeparrival.com/airlines/american-airlines/baggage-fees/",
+          "https://thepointsguy.com/news/american-airlines-bag-fees-basic-economy-europe",
+          "https://www.aa.com/i18n/travel-info/baggage/checked-baggage-policy.html?locale=en_PL (403; seen only in search snippets)"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "medium",
+        "verdict": "corrected"
+      }
     },
     "AA:FLEXIBLE": {
       "feed_name": "Main Cabin Flexible",
@@ -194,7 +282,36 @@
           "piece": 2,
           "amount_cents": 20000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 5000
+          },
+          {
+            "piece": 2,
+            "amount_cents": 6000
+          },
+          {
+            "piece": 3,
+            "amount_cents": 20000
+          }
+        ],
+        "note": "AA Basic Economy (short-haul): no checked bag; next pieces $50 / $60 / $200 one-way, Short haul uses the Basic Economy price when the bag is prepaid on aa.com or the app, for domestic, Canada, Mexico, Caribbean and Central America routes, on tickets bought on or after 2026-05-18. The airport price is $55/$65 and the 3rd bag is $200 either way. Long haul uses the transatlantic Basic Economy price on tickets issued on or after 2026-05-18, and American publishes no online discount there",
+        "sources": [
+          "https://s202.q4cdn.com/986123435/files/doc_news/American-Airlines-updates-bag-fees-and-Basic-Economy-fares-OPS-POL-04-2026.pdf",
+          "https://platinumflyer.com/american-airlines-basic-economy-bag-fee-surcharge/",
+          "https://upgradedpoints.com/news/aa-increases-baggage-fees-changes-basic-economy/",
+          "https://deeparrival.com/airlines/american-airlines/baggage-fees/",
+          "https://thepointsguy.com/news/american-airlines-bag-fees-basic-economy-europe",
+          "https://www.aa.com/i18n/travel-info/baggage/checked-baggage-policy.html?locale=en_PL (403; seen only in search snippets)"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "medium",
+        "verdict": "corrected"
+      }
     },
     "DL:BASIC": {
       "feed_name": "Basic Economy",
@@ -213,7 +330,35 @@
           "piece": 3,
           "amount_cents": 28500
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 4500
+          },
+          {
+            "piece": 2,
+            "amount_cents": 5500
+          },
+          {
+            "piece": 3,
+            "amount_cents": 20000
+          }
+        ],
+        "note": "DL Delta Main Basic (short-haul): no checked bag; next pieces $45 / $55 / $200 one-way, Delta publishes one price for every channel, with no prepay discount. Short haul is the domestic price on tickets booked on or after 2026-04-08. Long haul is the US\u2013Europe Main Basic price",
+        "sources": [
+          "https://www.delta.com/us/en/baggage/overview",
+          "https://upgradedpoints.com/news/delta-raising-checked-bag-fees-2026/",
+          "https://www.delta.com/us/en/onboard/onboard-experience/delta-main-basic",
+          "https://radicalstorage.com/travel/delta-baggage-allowance/ (search snippet)"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "medium",
+        "verdict": "corrected",
+        "includes_carry_on": true
+      }
     },
     "DL:MAIN": {
       "feed_name": "Main Cabin / Main Classic",
@@ -228,7 +373,34 @@
           "piece": 2,
           "amount_cents": 28500
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 4500
+          },
+          {
+            "piece": 2,
+            "amount_cents": 5500
+          },
+          {
+            "piece": 3,
+            "amount_cents": 20000
+          }
+        ],
+        "note": "DL Delta Main Basic (short-haul): no checked bag; next pieces $45 / $55 / $200 one-way, Delta publishes one price for every channel, with no prepay discount. Short haul is the domestic price on tickets booked on or after 2026-04-08. Long haul is the US\u2013Europe Main Basic price",
+        "sources": [
+          "https://www.delta.com/us/en/baggage/overview",
+          "https://upgradedpoints.com/news/delta-raising-checked-bag-fees-2026/",
+          "https://www.delta.com/us/en/onboard/onboard-experience/delta-main-basic",
+          "https://radicalstorage.com/travel/delta-baggage-allowance/ (search snippet)"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "medium",
+        "verdict": "corrected"
+      }
     },
     "DL:EXTRA": {
       "feed_name": "Main Extra",
@@ -243,7 +415,34 @@
           "piece": 2,
           "amount_cents": 28500
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 4500
+          },
+          {
+            "piece": 2,
+            "amount_cents": 5500
+          },
+          {
+            "piece": 3,
+            "amount_cents": 20000
+          }
+        ],
+        "note": "DL Delta Main Basic (short-haul): no checked bag; next pieces $45 / $55 / $200 one-way, Delta publishes one price for every channel, with no prepay discount. Short haul is the domestic price on tickets booked on or after 2026-04-08. Long haul is the US\u2013Europe Main Basic price",
+        "sources": [
+          "https://www.delta.com/us/en/baggage/overview",
+          "https://upgradedpoints.com/news/delta-raising-checked-bag-fees-2026/",
+          "https://www.delta.com/us/en/onboard/onboard-experience/delta-main-basic",
+          "https://radicalstorage.com/travel/delta-baggage-allowance/ (search snippet)"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "medium",
+        "verdict": "corrected"
+      }
     },
     "DL:COMFORT": {
       "feed_name": "Comfort+",
@@ -258,7 +457,34 @@
           "piece": 2,
           "amount_cents": 28500
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 4500
+          },
+          {
+            "piece": 2,
+            "amount_cents": 5500
+          },
+          {
+            "piece": 3,
+            "amount_cents": 20000
+          }
+        ],
+        "note": "DL Delta Main Basic (short-haul): no checked bag; next pieces $45 / $55 / $200 one-way, Delta publishes one price for every channel, with no prepay discount. Short haul is the domestic price on tickets booked on or after 2026-04-08. Long haul is the US\u2013Europe Main Basic price",
+        "sources": [
+          "https://www.delta.com/us/en/baggage/overview",
+          "https://upgradedpoints.com/news/delta-raising-checked-bag-fees-2026/",
+          "https://www.delta.com/us/en/onboard/onboard-experience/delta-main-basic",
+          "https://radicalstorage.com/travel/delta-baggage-allowance/ (search snippet)"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "medium",
+        "verdict": "corrected"
+      }
     },
     "UA:BASIC": {
       "feed_name": "Basic Economy",
@@ -277,7 +503,38 @@
           "piece": 3,
           "amount_cents": 20000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 4500
+          },
+          {
+            "piece": 2,
+            "amount_cents": 5500
+          },
+          {
+            "piece": 3,
+            "amount_cents": 20000
+          }
+        ],
+        "note": "UA Basic Economy (short-haul): no checked bag; next pieces $45 / $55 / $200 one-way, Short haul uses the price when the bag is prepaid more than 24 hours before departure (the booking-time online price) on US, Canada, Mexico and Latin America routes, for tickets bought on or after 2026-04-03. It is $50/$60 within 24 hours or at the airport, and the 3rd bag is $200. For long haul, only the Economy 2nd bag after the 2026-05-12 international increase could be confirmed",
+        "sources": [
+          "https://liveandletsfly.com/united-checked-bag-fees/",
+          "https://abcnews.com/GMA/Travel/united-airlines-raises-checked-bag-fees-travelers/story?id=131687092",
+          "https://deeparrival.com/airlines/united-airlines/baggage-fees/",
+          "https://thepointsguy.com/airline/united-airlines-baggage-fees/",
+          "https://blogs.vcu.edu/procurement/united-airlines-checked-bag-fee-increase-domestic-and-international/",
+          "https://www.united.com/en/us/fly/baggage/checked-bags.html (timed out, not read)",
+          "https://www.united.com/en/us/fly/baggage/fees.html (timed out, not read)"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "medium",
+        "verdict": "corrected",
+        "includes_carry_on": false
+      }
     },
     "UA:ECONOMY": {
       "feed_name": "Economy",
@@ -292,7 +549,37 @@
           "piece": 2,
           "amount_cents": 20000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 4500
+          },
+          {
+            "piece": 2,
+            "amount_cents": 5500
+          },
+          {
+            "piece": 3,
+            "amount_cents": 20000
+          }
+        ],
+        "note": "UA Basic Economy (short-haul): no checked bag; next pieces $45 / $55 / $200 one-way, Short haul uses the price when the bag is prepaid more than 24 hours before departure (the booking-time online price) on US, Canada, Mexico and Latin America routes, for tickets bought on or after 2026-04-03. It is $50/$60 within 24 hours or at the airport, and the 3rd bag is $200. For long haul, only the Economy 2nd bag after the 2026-05-12 international increase could be confirmed",
+        "sources": [
+          "https://liveandletsfly.com/united-checked-bag-fees/",
+          "https://abcnews.com/GMA/Travel/united-airlines-raises-checked-bag-fees-travelers/story?id=131687092",
+          "https://deeparrival.com/airlines/united-airlines/baggage-fees/",
+          "https://thepointsguy.com/airline/united-airlines-baggage-fees/",
+          "https://blogs.vcu.edu/procurement/united-airlines-checked-bag-fee-increase-domestic-and-international/",
+          "https://www.united.com/en/us/fly/baggage/checked-bags.html (timed out, not read)",
+          "https://www.united.com/en/us/fly/baggage/fees.html (timed out, not read)"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "medium",
+        "verdict": "corrected"
+      }
     },
     "UA:PLUS": {
       "feed_name": "Economy Plus",
@@ -307,7 +594,37 @@
           "piece": 2,
           "amount_cents": 20000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 4500
+          },
+          {
+            "piece": 2,
+            "amount_cents": 5500
+          },
+          {
+            "piece": 3,
+            "amount_cents": 20000
+          }
+        ],
+        "note": "UA Basic Economy (short-haul): no checked bag; next pieces $45 / $55 / $200 one-way, Short haul uses the price when the bag is prepaid more than 24 hours before departure (the booking-time online price) on US, Canada, Mexico and Latin America routes, for tickets bought on or after 2026-04-03. It is $50/$60 within 24 hours or at the airport, and the 3rd bag is $200. For long haul, only the Economy 2nd bag after the 2026-05-12 international increase could be confirmed",
+        "sources": [
+          "https://liveandletsfly.com/united-checked-bag-fees/",
+          "https://abcnews.com/GMA/Travel/united-airlines-raises-checked-bag-fees-travelers/story?id=131687092",
+          "https://deeparrival.com/airlines/united-airlines/baggage-fees/",
+          "https://thepointsguy.com/airline/united-airlines-baggage-fees/",
+          "https://blogs.vcu.edu/procurement/united-airlines-checked-bag-fee-increase-domestic-and-international/",
+          "https://www.united.com/en/us/fly/baggage/checked-bags.html (timed out, not read)",
+          "https://www.united.com/en/us/fly/baggage/fees.html (timed out, not read)"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "medium",
+        "verdict": "corrected"
+      }
     },
     "AS:SAVER": {
       "feed_name": "Saver / Partner Saver",
@@ -326,7 +643,34 @@
           "piece": 3,
           "amount_cents": 20000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 4500
+          },
+          {
+            "piece": 2,
+            "amount_cents": 5500
+          },
+          {
+            "piece": 3,
+            "amount_cents": 20000
+          }
+        ],
+        "note": "AS Saver (short-haul): no checked bag; next pieces $45 / $55 / $200 one-way, Alaska publishes one price for every channel, with no prepay discount since the April 2026 change. Short haul is North America on flights ticketed on or after 2026-04-10. Long haul is Europe, where the 1st bag is free even on Saver, so its fee is 0",
+        "sources": [
+          "https://www.alaskaair.com/content/travel-info/baggage/checked-bags",
+          "https://www.alaskaair.com/content/travel-info/flight-experience/saver",
+          "https://www.adn.com/alaska-life/travel/2026/04/09/alaska-airlines-increases-baggage-fees-amid-rising-jet-fuel-prices/"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "high",
+        "verdict": "corrected",
+        "includes_carry_on": true
+      }
     },
     "AS:MAIN": {
       "feed_name": "Main / Partner Main / Partner Refundable Main",
@@ -341,7 +685,33 @@
           "piece": 2,
           "amount_cents": 20000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 4500
+          },
+          {
+            "piece": 2,
+            "amount_cents": 5500
+          },
+          {
+            "piece": 3,
+            "amount_cents": 20000
+          }
+        ],
+        "note": "AS Saver (short-haul): no checked bag; next pieces $45 / $55 / $200 one-way, Alaska publishes one price for every channel, with no prepay discount since the April 2026 change. Short haul is North America on flights ticketed on or after 2026-04-10. Long haul is Europe, where the 1st bag is free even on Saver, so its fee is 0",
+        "sources": [
+          "https://www.alaskaair.com/content/travel-info/baggage/checked-bags",
+          "https://www.alaskaair.com/content/travel-info/flight-experience/saver",
+          "https://www.adn.com/alaska-life/travel/2026/04/09/alaska-airlines-increases-baggage-fees-amid-rising-jet-fuel-prices/"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "high",
+        "verdict": "corrected"
+      }
     },
     "B6:BASIC": {
       "feed_name": "Blue Basic",
@@ -360,7 +730,33 @@
           "piece": 3,
           "amount_cents": 15000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 4900
+          },
+          {
+            "piece": 2,
+            "amount_cents": 6900
+          },
+          {
+            "piece": 3,
+            "amount_cents": 20000
+          }
+        ],
+        "note": "B6 Main Base (short-haul): no checked bag; next pieces $49 / $69 / $200 one-way, All figures are the PEAK-season price when the bag is added online more than 24 hours before departure, the upper end of JetBlue's booking-time price. Off-peak it is $45/$59 domestic and $75/$109 transatlantic. The 3rd and later bags are $200 domestic, and $200 off-peak or $210 peak transatlantic. Within 24 hours it costs more and is treated as the late price",
+        "sources": [
+          "https://www.jetblue.com/legal/fees",
+          "https://www.jetblue.com/flying-with-us/our-fares"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "high",
+        "verdict": "corrected",
+        "includes_carry_on": true
+      }
     },
     "B6:EXTRA": {
       "feed_name": "Blue Extra",
@@ -375,7 +771,32 @@
           "piece": 2,
           "amount_cents": 15000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 4900
+          },
+          {
+            "piece": 2,
+            "amount_cents": 6900
+          },
+          {
+            "piece": 3,
+            "amount_cents": 20000
+          }
+        ],
+        "note": "B6 Main Base (short-haul): no checked bag; next pieces $49 / $69 / $200 one-way, All figures are the PEAK-season price when the bag is added online more than 24 hours before departure, the upper end of JetBlue's booking-time price. Off-peak it is $45/$59 domestic and $75/$109 transatlantic. The 3rd and later bags are $200 domestic, and $200 off-peak or $210 peak transatlantic. Within 24 hours it costs more and is treated as the late price",
+        "sources": [
+          "https://www.jetblue.com/legal/fees",
+          "https://www.jetblue.com/flying-with-us/our-fares"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "high",
+        "verdict": "corrected"
+      }
     },
     "B6:PLUS": {
       "feed_name": "Blue Plus",
@@ -390,7 +811,32 @@
           "piece": 2,
           "amount_cents": 15000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 4900
+          },
+          {
+            "piece": 2,
+            "amount_cents": 6900
+          },
+          {
+            "piece": 3,
+            "amount_cents": 20000
+          }
+        ],
+        "note": "B6 Main Base (short-haul): no checked bag; next pieces $49 / $69 / $200 one-way, All figures are the PEAK-season price when the bag is added online more than 24 hours before departure, the upper end of JetBlue's booking-time price. Off-peak it is $45/$59 domestic and $75/$109 transatlantic. The 3rd and later bags are $200 domestic, and $200 off-peak or $210 peak transatlantic. Within 24 hours it costs more and is treated as the late price",
+        "sources": [
+          "https://www.jetblue.com/legal/fees",
+          "https://www.jetblue.com/flying-with-us/our-fares"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "high",
+        "verdict": "corrected"
+      }
     },
     "KL:LIGHT": {
       "feed_name": "Economy Light",
@@ -409,7 +855,35 @@
           "piece": 3,
           "amount_cents": 21000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 7600
+          },
+          {
+            "piece": 2,
+            "amount_cents": 7600
+          },
+          {
+            "piece": 3,
+            "amount_cents": 7600
+          }
+        ],
+        "note": "KL Basic (short-haul): no checked bag; next pieces $76 / $76 / $76 one-way, klm.nl: extra checked baggage bought at least 24 h ahead costs EUR 20-70 on flights within Europe. I took the top, EUR 70, and applied it to each extra piece because the range is stated per extra bag. Basic cabin bag: from EUR 15, up to about EUR 35 by route (secondary). Long-haul is KLM's US/Canada-Europe table valid from 2026-07-01: USD 75 / 100 / 285",
+        "sources": [
+          "https://www.klm.nl/en/information/baggage/extra-oversized-overweight-baggage",
+          "https://www.klm.nl/en/information/baggage/hand-baggage-allowance",
+          "https://www.klm.com/information/legal/fees-paid-options",
+          "https://travel-dealz.com/news/air-france-klm-new-basic-fare/"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "medium",
+        "verdict": "confirmed",
+        "includes_carry_on": false
+      }
     },
     "KL:STANDARD": {
       "feed_name": "Economy Standard",
@@ -458,7 +932,36 @@
           "piece": 3,
           "amount_cents": 21000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 7600
+          },
+          {
+            "piece": 2,
+            "amount_cents": 7600
+          },
+          {
+            "piece": 3,
+            "amount_cents": 7600
+          }
+        ],
+        "note": "AF Basic (short-haul): no checked bag; next pieces $76 / $76 / $76 one-way, Air France's own pages give no figures, only 'shown at booking'. I used the shared AF-KLM figure from klm.nl: EUR 20-70 per extra checked bag within Europe, bought at least 24 h ahead. I took the top, EUR 70. Basic cabin bag: from EUR 15 up to about EUR 35. Long-haul is the AF-KLM US/Canada-Europe table valid from 2026-07-01: USD 75 / 100 / 285",
+        "sources": [
+          "https://wwws.airfrance.fr/en/information/bagages/bagages-supplementaires-plus-grands-plus-lourds",
+          "https://www.klm.nl/en/information/baggage/extra-oversized-overweight-baggage",
+          "https://www.klm.com/information/legal/fees-paid-options",
+          "https://travel-dealz.com/news/air-france-klm-new-basic-fare/"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "low",
+        "verdict": "confirmed",
+        "needs_primary_source": true,
+        "includes_carry_on": false
+      }
     },
     "AF:STANDARD": {
       "feed_name": "Economy Standard",
@@ -507,7 +1010,36 @@
           "piece": 3,
           "amount_cents": 25000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 7000
+          },
+          {
+            "piece": 2,
+            "amount_cents": 7000
+          },
+          {
+            "piece": 3,
+            "amount_cents": 7000
+          }
+        ],
+        "note": "LH Economy Basic (short-haul): no checked bag; next pieces $70 / $70 / $70 one-way, Short-haul: the group publishes only 'from' prices (EUR30-35 online cross-border, EUR60 at the airport, SWISS's zone table from EUR65 for an extra 23 kg piece online), so EUR65 = USD70 per piece is taken as the high side. Long-haul first bag is the group's fixed Europe-USA/Canada Economy Light fee, USD75. Carry-on is the top of the EUR15-50 secondary range, because the airline states only a EUR20 minimum",
+        "sources": [
+          "http://web.archive.org/web/20251011012209/https://business.lufthansagroup.com/content/dam/b2b/experts/files/LHG_FBAG_EcoLight_EN.pdf",
+          "https://www.swiss.com/us/en/prepare/baggage/excess-baggage",
+          "https://travel-dealz.com/news/lufthansa-reduces-carry-on/",
+          "https://aifly.one/guides/lufthansa-baggage-allowance/"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "low",
+        "verdict": "corrected",
+        "needs_primary_source": true,
+        "includes_carry_on": false
+      }
     },
     "LH:CLASSIC": {
       "feed_name": "Economy Classic",
@@ -571,7 +1103,35 @@
           "piece": 3,
           "amount_cents": 25000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 7000
+          },
+          {
+            "piece": 2,
+            "amount_cents": 7000
+          },
+          {
+            "piece": 3,
+            "amount_cents": 7000
+          }
+        ],
+        "note": "LX Economy Basic (short-haul): no checked bag; next pieces $70 / $70 / $70 one-way, Europe: only 'from' prices are published (first bag from EUR35 online, extra 23 kg piece from EUR65 on swiss.com, EUR65-90 at check-in), so EUR65 = USD70 per piece is taken. Transatlantic: USD75 for the 1st bag (the same online and at check-in), the discounted online 2nd piece at USD100, and the flat USD200 for further additional bags on Light. Carry-on is the top of the EUR15-50 secondary range, because the group states only a EUR20 minimum",
+        "sources": [
+          "https://www.swiss.com/us/en/prepare/baggage/excess-baggage",
+          "https://www.swiss.com/us/en/prepare/baggage/hand-baggage",
+          "https://travel-dealz.com/news/lufthansa-reduces-carry-on/",
+          "https://aifly.one/guides/lufthansa-baggage-allowance/"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "medium",
+        "verdict": "corrected",
+        "includes_carry_on": false
+      }
     },
     "LX:CLASSIC": {
       "feed_name": "Economy Classic",
@@ -620,7 +1180,36 @@
           "piece": 3,
           "amount_cents": 25000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 7000
+          },
+          {
+            "piece": 2,
+            "amount_cents": 7000
+          },
+          {
+            "piece": 3,
+            "amount_cents": 7000
+          }
+        ],
+        "note": "OS Economy Basic (short-haul): no checked bag; next pieces $70 / $70 / $70 one-way, Short-haul: the group publishes only 'from' prices (EUR30-35 online cross-border, EUR60 at the airport), so EUR65 = USD70 per piece is taken as the high side. Long-haul first bag is the group's fixed Europe-USA/Canada Economy Light fee, USD75. Carry-on is the top of the EUR15-50 secondary range, because the group states only a EUR20 minimum",
+        "sources": [
+          "http://web.archive.org/web/20251011012209/https://business.lufthansagroup.com/content/dam/b2b/experts/files/LHG_FBAG_EcoLight_EN.pdf",
+          "https://web.archive.org/web/20260322192339/https://www.austrian.com/us/en/additional-baggage",
+          "https://www.swiss.com/us/en/prepare/baggage/excess-baggage",
+          "https://travel-dealz.com/news/lufthansa-reduces-carry-on/"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "low",
+        "verdict": "corrected",
+        "needs_primary_source": true,
+        "includes_carry_on": false
+      }
     },
     "OS:CLASSIC": {
       "feed_name": "Economy Classic",
@@ -872,7 +1461,34 @@
           "piece": 3,
           "amount_cents": 20000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 6500
+          },
+          {
+            "piece": 2,
+            "amount_cents": 6500
+          },
+          {
+            "piece": 3,
+            "amount_cents": 6500
+          }
+        ],
+        "note": "EI Saver (short-haul): no checked bag; next pieces $65 / $65 / $65 one-way, Within Europe, the Saver 20 kg bag added during booking, Far band: EUR60 per bag (40 kg in 2 bags is EUR120). Transatlantic: the Saver 25 kg bag during booking is USD59.99 for the 1st piece, and later pieces take the USD79.99 25 kg rate charged for a bag beyond an included allowance. That rate is higher than Saver's, so the figure leans high. The airport price (EUR70 Europe, USD100 transatlantic) is not used",
+        "sources": [
+          "https://web.archive.org/web/20260731184417/https://www.aerlingus.com/prepare/bags/checked-baggage/",
+          "https://www.aerlingus.com/localized/en/modals/baggage-information.html",
+          "https://www.irishtimes.com/transport/2026/01/09/hand-luggage-rules-aer-lingus-ryanair/"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "medium",
+        "verdict": "corrected",
+        "includes_carry_on": false
+      }
     },
     "EI:SMART": {
       "feed_name": "Smart",
@@ -921,7 +1537,33 @@
           "piece": 3,
           "amount_cents": 20000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 5900
+          },
+          {
+            "piece": 2,
+            "amount_cents": 7600
+          },
+          {
+            "piece": 3,
+            "amount_cents": 8600
+          }
+        ],
+        "note": "AY Superlight (short-haul): no checked bag; next pieces $59 / $76 / $86 one-way, Finnair's own table, Rest of Europe, prepaid online: 1st EUR 32-55, 2nd EUR 50-70, 3rd+ EUR 65-80. I took the tops. Airport is EUR 70 / 90 / 100. Cabin bag on Superlight/Light is prepaid EUR 12-30; I took EUR 30. Long-haul is the North America prepaid rate in USD: 85 / 100 / 200",
+        "sources": [
+          "https://www.finnair.com/us-en/baggage-on-finnair-flights/extra-baggage-fees",
+          "https://www.finnair.com/us-en/finnair-ticket-types"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "high",
+        "verdict": "confirmed",
+        "includes_carry_on": false
+      }
     },
     "AY:CLASSIC": {
       "feed_name": "Economy Classic",
@@ -966,7 +1608,32 @@
           "piece": 3,
           "amount_cents": 20000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 11100
+          },
+          {
+            "piece": 2,
+            "amount_cents": 11100
+          },
+          {
+            "piece": 3,
+            "amount_cents": 11100
+          }
+        ],
+        "note": "IB Basic (short-haul): no checked bag; next pieces $111 / $111 / $111 one-way, Iberia's own table, Europe/Israel/North Africa zone, 23 kg bag bought online, is EUR 20-95 (USD 22-111). I took the top, USD 111. Online prices are lowest during booking and highest at online check-in. The page says a second bag or more costs the same as the first. Long-haul is the America zone online range: 1st bag up to USD 158, 2nd and later up to USD 269",
+        "sources": [
+          "https://web.archive.org/web/20260812184128/https://www.iberia.com/us/luggage/allowance-in-hold/"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "medium",
+        "verdict": "confirmed",
+        "includes_carry_on": true
+      }
     },
     "IB:OPTIMA": {
       "feed_name": "Optima",
@@ -1026,7 +1693,27 @@
           "piece": 3,
           "amount_cents": 20000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 8100
+          }
+        ],
+        "note": "LO Economy Saver (short-haul): no checked bag; next pieces $81 one-way, LOT publishes no prices; its pages say the price shows at booking. A secondary reports about EUR 45-75 online within Europe; I took EUR 75. LOT's FAQ says a second bag on Saver is charged as an extra piece on other fares, but that price is not published, so the 2nd and 3rd bags are null",
+        "sources": [
+          "https://web.archive.org/web/20260309022016/https://www.lot.com/us/en/help-center/baggage/what-is-the-cost-of-the-additional-baggage",
+          "https://web.archive.org/web/20260915203738/https://www.lot.com/us/en/journey/additional-services/extra-baggage",
+          "https://aifly.one/guides/lot-polish-airlines-baggage-allowance/"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "low",
+        "verdict": "unverifiable",
+        "needs_primary_source": true,
+        "includes_carry_on": true
+      }
     },
     "LO:STANDARD": {
       "feed_name": "Economy Standard",
@@ -1075,7 +1762,36 @@
           "piece": 3,
           "amount_cents": 20000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 6500
+          },
+          {
+            "piece": 2,
+            "amount_cents": 6500
+          },
+          {
+            "piece": 3,
+            "amount_cents": 6500
+          }
+        ],
+        "note": "SK SAS Go Light (short-haul): no checked bag; next pieces $65 / $65 / $65 one-way, flysas.com is behind a bot check. A search snippet from SAS's own site gives EUR 20-105 for a 23 kg bag, which includes airport pricing. A secondary gives EUR 25-60 for adding a bag to Go Light online. SAS charges a fixed fee per bag, one way, so I used about EUR 60 for each piece. Carry-on add-on: EUR 12-20 in advance; I took EUR 20",
+        "sources": [
+          "https://web.archive.org/web/20260329083806/https://www.flysas.com/us-en/legal-info/optional-services-fees",
+          "https://www.scc.lv/en/news/member-news--incentives/sas-go-light",
+          "https://deeparrival.com/airlines/sas-airlines/baggage-fees/",
+          "https://thetraveltinker.com/transport/sas-scandinavian-airlines-baggage-allowance/"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "low",
+        "verdict": "unverifiable",
+        "needs_primary_source": true,
+        "includes_carry_on": false
+      }
     },
     "SK:SMART": {
       "feed_name": "Go Smart",
@@ -1120,7 +1836,32 @@
           "piece": 3,
           "amount_cents": 20000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 8000
+          },
+          {
+            "piece": 2,
+            "amount_cents": 9500
+          },
+          {
+            "piece": 3,
+            "amount_cents": 22000
+          }
+        ],
+        "note": "AZ Economy Light (short-haul): no checked bag; next pieces $80 / $95 / $220 one-way, ITA's own Economy Light table, Europe/Algeria/Tunisia, 'prices from': 1st USD 80, 2nd USD 95, 3rd USD 220. Long-haul is the New York / Boston / Miami / Chicago / Washington / Toronto row: 140 / 200 / 280. The page says the price depends on when the bag is bought",
+        "sources": [
+          "https://web.archive.org/web/20260118132226/https://www.ita-airways.com/en_us/fly-ita/baggage/checked-baggage.html"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "medium",
+        "verdict": "confirmed",
+        "includes_carry_on": true
+      }
     },
     "AZ:CLASSIC": {
       "feed_name": "Economy Classic",
@@ -1218,7 +1959,34 @@
           "piece": 3,
           "amount_cents": 22500
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 4500
+          },
+          {
+            "piece": 2,
+            "amount_cents": 6000
+          },
+          {
+            "piece": 3,
+            "amount_cents": 10000
+          }
+        ],
+        "note": "AC Economy Basic (short-haul): no checked bag; next pieces $45 / $60 / $100 one-way, Air Canada's own fee pages: on tickets bought from 13 Apr 2026, Basic and Standard fares within Canada and Canada-US (plus Mexico, the Caribbean and Central America) pay CA/US$45 for the 1st bag and CA/US$60 for the 2nd, before tax. Canadian tax brings the 1st bag to CA$54 and the 2nd to CA$72. I took the US-dollar price, the upper end once converted (CA$54 is about US$39). The 3rd bag is CA$100 before tax (CA$120 with it), from secondary sources; that it is also US$100 in dollars is my assumption. Long-haul Basic (Europe, Asia, Africa, Middle East, South America) is CA/US$90 and CA/US$120 from 14 May 2026",
+        "sources": [
+          "https://www.aircanada.com/ca/en/aco/home/book/travel-news-and-updates/baggage-fee-changes.html",
+          "https://www.aircanada.com/ca/en/aco/home/legal/products-and-services.html",
+          "https://openjaw.com/newsroom/airline/2026/04/15/air-canada-raises-checked-bag-fees-for-north-america-and-sun/"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "high",
+        "verdict": "confirmed",
+        "includes_carry_on": false
+      }
     },
     "AC:STANDARD": {
       "feed_name": "Standard",
@@ -1293,7 +2061,34 @@
           "piece": 3,
           "amount_cents": 20000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 5500
+          },
+          {
+            "piece": 2,
+            "amount_cents": 7000
+          },
+          {
+            "piece": 3,
+            "amount_cents": 15000
+          }
+        ],
+        "note": "WS UltraBasic (short-haul): no checked bag; next pieces $55 / $70 / $150 one-way, WestJet's own fee table for flights within Canada and the US, at the face price a trip starting in the US pays in USD with no GST: the prepay price during booking for the 1st bag (US$55) and 2nd bag (US$70). A 3rd bag cannot be prepaid, so it uses the lowest channel left, online check-in (US$150)",
+        "sources": [
+          "https://www.westjet.com/en-ca/flights/fees",
+          "https://www.westjet.com/en-us/flights/fees",
+          "https://www.westjet.com/en-us/baggage/carry-on"
+        ],
+        "checked": "2026-09-24",
+        "confidence": "high",
+        "verdict": "corrected",
+        "includes_carry_on": false
+      }
     },
     "WS:ECONO": {
       "feed_name": "Econo",
@@ -1324,6 +2119,1634 @@
           "amount_cents": 20000
         }
       ]
+    },
+    "WN:BASIC": {
+      "feed_name": "Basic",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 4500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 5500
+        },
+        {
+          "piece": 3,
+          "amount_cents": 15000
+        }
+      ],
+      "note": "WN Basic (short-haul): no checked bag; next pieces $45 / $55 / $150 one-way, Flat published fees for tickets booked on or after 2026-04-09 ($45 first, $55 second; third bag stays at $150). The fee is the same online and at the airport, so there is no range to pick from",
+      "sources": [
+        "https://www.nbcdfw.com/news/local/southwest-becomes-the-latest-airline-to-increase-checked-bag-fees/4007913/",
+        "https://upgradedpoints.com/news/southwest-airlines-increasing-checked-bag-fees-2026/",
+        "https://www.thepointsguy.com/news/southwest-hikes-checked-bag-fees/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "confirmed",
+      "includes_carry_on": true
+    },
+    "F9:BASIC": {
+      "feed_name": "Basic",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 6300
+        },
+        {
+          "piece": 2,
+          "amount_cents": 8600
+        },
+        {
+          "piece": 3,
+          "amount_cents": 11000
+        }
+      ],
+      "note": "F9 Basic (short-haul): no checked bag; next pieces $63 / $86 / $110 one-way, Upper end of the 'during booking (web/mobile)' range, route-dependent: carry-on $29-69, 1st bag $29-63, 2nd $59-86, 3rd+ $75-110. Airport and gate prices run $79-116 and are not used",
+      "sources": [
+        "https://www.flyfrontier.com/travel/travel-info/bag-options/",
+        "https://faq.flyfrontier.com/help/bags-seats-general-info-how-much-does-frontier-charge-for-bags",
+        "https://upgradedpoints.com/travel/airlines/frontier-airlines-baggage-fees/",
+        "https://deeparrival.com/airlines/frontier-airlines/baggage-fees/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "confirmed",
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 6900
+    },
+    "G4:BASE": {
+      "feed_name": "Base fare",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 5000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 5000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 5000
+        }
+      ],
+      "note": "G4 Base fare (short-haul): no checked bag; next pieces $50 / $50 / $50 one-way, Upper end of the at-booking range as reported: checked bags 1-4 at $20-50 each, carry-on $15-41, route-dependent and per segment. Pre-departure online is $70 and the airport is $75; neither is used",
+      "sources": [
+        "https://www.allegiantair.com/popup/optional-services-fees",
+        "https://www.allegiantair.com/baggage-1?mg=16476671350&cn=19010",
+        "https://upgradedpoints.com/travel/airlines/allegiant-air-baggage-fees/",
+        "https://deeparrival.com/airlines/allegiant-air/baggage-fees/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "low",
+      "verdict": "confirmed",
+      "needs_primary_source": true,
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 4100
+    },
+    "SY:BASE": {
+      "feed_name": "Base fare",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 4500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 4500
+        },
+        {
+          "piece": 3,
+          "amount_cents": 4500
+        }
+      ],
+      "note": "SY Base fare (short-haul): no checked bag; next pieces $45 / $45 / $45 one-way, Upper end of the at-booking price: carry-on $25-40, 1st bag $30-45, 2nd and 3rd $45. Later online is $50/$60, and the airport is $55/$65 plus a $10 gate handling fee; neither is used",
+      "sources": [
+        "https://thriftytraveler.com/guides/airlines/sun-country-baggage-fees/",
+        "https://deeparrival.com/airlines/sun-country-airlines/baggage-fees/",
+        "https://newsroom.allegiantair.com/press-releases/press-release-details/2026/Allegiant-Completes-Acquisition-of-Sun-Country-Airlines-Creating-the-Leading-Leisure-Focused-U-S--Airline/default.aspx"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "confirmed",
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 4000
+    },
+    "MX:NO": {
+      "feed_name": "No Flex",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 5000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 6000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 6500
+        }
+      ],
+      "note": "MX No Flex (short-haul): no checked bag; next pieces $50 / $60 / $65 one-way, Deep Arrival's per-bag channel table, the highest of the current secondaries. At booking: 1st bag $50 and carry-on $40. For the 2nd and 3rd bags it gives only online prices, $60 and $65 (none at booking). Later-online carry-on ($45-50) and the flat $75 airport or phone price per bag per flight are not used",
+      "sources": [
+        "https://deeparrival.com/airlines/breeze-airways/baggage-fees/",
+        "https://upgradedpoints.com/travel/airlines/breeze-airways-baggage-fees/",
+        "https://baggagepolicies.org/breeze-baggage-policy/",
+        "https://www.flybreeze.com/support?a=No-Flex-Fare---id--xnCPLTmPScGdrbndJz0keg",
+        "https://www.flybreeze.com/bag-pricing"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "low",
+      "verdict": "corrected",
+      "needs_primary_source": true,
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 4000
+    },
+    "HA:CABIN": {
+      "feed_name": "Main Cabin Basic",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 4500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 5500
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ],
+      "note": "HA Main Cabin Basic (short-haul): no checked bag; next pieces $45 / $55 / $200 one-way, Flat published fees on Hawaii-North America routes from 2026-04-10 ($45 / $55 / $200), when Alaska Air Group ended the online prepay discount, so online and airport prices are now the same. Neighbor Island (inter-island) routes are lower at $30 / $40 / $50, but the North America figures are used as the typical route",
+      "sources": [
+        "https://www.hawaiianairlines.com/our-services/baggage/checked-baggage",
+        "https://www.centraloregondaily.com/news/consumer/alaska-hawaiian-airlines-checked-bag-fee-increase-2026/article_fffb735a-d26b-47bc-9844-d3e165f3192f.html",
+        "https://upgradedpoints.com/travel/airlines/hawaiian-airlines-baggage-fees/",
+        "https://deeparrival.com/airlines/hawaiian-airlines/baggage-fees/",
+        "https://www.adn.com/alaska-life/travel/2026/04/09/alaska-airlines-increases-baggage-fees-amid-rising-jet-fuel-prices/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "confirmed",
+      "includes_carry_on": true
+    },
+    "FR:BASIC": {
+      "feed_name": "Basic",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 6500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 6500
+        },
+        {
+          "piece": 3,
+          "amount_cents": 6500
+        }
+      ],
+      "note": "FR Basic (short-haul): no checked bag; next pieces $65 / $65 / $65 one-way, 20kg Check-in Bag bought online at the time of booking, top of Ryanair's stated range EUR/GBP 21.49-59.99 per bag per flight (EUR 59.99 = $65); each additional bag is sold at the same per-item price",
+      "sources": [
+        "https://www.ryanair.com/ie/en/useful-info/help-centre/fees",
+        "https://www.markenkoffer.de/en/blogs/news/ryanair-checked-baggage"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "high",
+      "verdict": "confirmed",
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 3900
+    },
+    "U2:STANDARD": {
+      "feed_name": "Standard",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 6400
+        },
+        {
+          "piece": 2,
+          "amount_cents": 6400
+        },
+        {
+          "piece": 3,
+          "amount_cents": 6400
+        }
+      ],
+      "note": "U2 Standard (short-haul): no checked bag; next pieces $64 / $64 / $64 one-way, 23kg hold bag added online during booking, top of the range secondary trackers quote from easyJet's fees page, \u00a39.49-\u00a350.00 one way per bag (\u00a350 = $64); up to three hold bags each at the same per-bag price",
+      "sources": [
+        "https://www.easyjet.com/en/help-centre/policy-terms-and-conditions/fees-charges",
+        "https://www.sendmybag.com/airlines/easyjet-baggage-allowance/",
+        "https://travellon.com/easyjet-baggage-allowance-guide",
+        "https://stasher.com/blog/easyjet-baggage-allowance",
+        "https://baggagepolicies.com/easyjet-baggage-allowance/",
+        "https://aifly.one/guides/easyjet-baggage-allowance/",
+        "https://airadvisor.com/en/baggage-allowance/easyjet"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "confirmed",
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 4400
+    },
+    "W6:BASIC": {
+      "feed_name": "Basic",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 9300
+        },
+        {
+          "piece": 2,
+          "amount_cents": 9300
+        },
+        {
+          "piece": 3,
+          "amount_cents": 9300
+        }
+      ],
+      "note": "W6 Basic (short-haul): no checked bag; next pieces $93 / $93 / $93 one-way, 20kg checked bag bought online during booking, at the top of the stated online/call-centre range \u20ac13.00-\u20ac86.50 (\u20ac86.50 = $93), not the airport price. Each of the up to three bags bought online is priced per piece",
+      "sources": [
+        "https://www.mybaggage.com/shipping/airlines/wizz-air-baggage-allowance/",
+        "https://www.sendmybag.com/airlines/wizz-air-baggage-allowance/",
+        "https://airadvisor.com/en/baggage-allowance/wizz-air",
+        "https://aifly.one/guides/wizz-air-baggage-allowance/",
+        "https://flighttribe.co.uk/wizz-air-checked-baggage/",
+        "http://web.archive.org/web/20260729145537/https://www.wizzair.com/en-gb/information-and-services/prices-discounts/all-services-fees"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "low",
+      "verdict": "corrected",
+      "needs_primary_source": true,
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 6500
+    },
+    "W9:BASIC": {
+      "feed_name": "Basic",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 9300
+        },
+        {
+          "piece": 2,
+          "amount_cents": 9300
+        },
+        {
+          "piece": 3,
+          "amount_cents": 9300
+        }
+      ],
+      "note": "W9 Basic (short-haul): no checked bag; next pieces $93 / $93 / $93 one-way, The group schedule: 20kg checked bag bought online during booking, at the top of the stated online range \u20ac13.00-\u20ac86.50 (\u20ac86.50 = $93); charged in GBP on UK-origin bookings",
+      "sources": [
+        "https://www.mybaggage.com/shipping/airlines/wizz-air-baggage-allowance/",
+        "https://www.sendmybag.com/airlines/wizz-air-baggage-allowance/",
+        "https://airadvisor.com/en/baggage-allowance/wizz-air",
+        "https://flighttribe.co.uk/wizz-air-checked-baggage/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "low",
+      "verdict": "corrected",
+      "needs_primary_source": true,
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 6500
+    },
+    "5W:BASIC": {
+      "feed_name": "Basic",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 5900
+        },
+        {
+          "piece": 2,
+          "amount_cents": 5900
+        },
+        {
+          "piece": 3,
+          "amount_cents": 5900
+        }
+      ],
+      "note": "5W Basic (short-haul): no checked bag; next pieces $59 / $59 / $59 one-way, Copied from W6 (the group schedule); the carrier no longer operates, so no current fee of its own exists",
+      "sources": [
+        "https://www.businesstraveller.com/business-travel/wizz-air-to-cease-abu-dhabi-operations-from-september-2025/",
+        "https://gulfnews.com/business/aviation/wizz-air-to-exit-abu-dhabi-operations-by-september-1-refocus-on-europe-1.500197356",
+        "https://www.thenationalnews.com/travel/2026/09/09/wizz-air-announces-return-to-abu-dhabi-and-dubai-with-new-routes/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "low",
+      "verdict": "unverifiable",
+      "needs_primary_source": true,
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 6000
+    },
+    "VY:BASIC": {
+      "feed_name": "Basic",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 10700
+        },
+        {
+          "piece": 2,
+          "amount_cents": 10700
+        },
+        {
+          "piece": 3,
+          "amount_cents": 10700
+        }
+      ],
+      "note": "VY Basic (short-haul): no checked bag; next pieces $107 / $107 / $107 one-way, 25kg bag (the tier that fits a 23kg suitcase and the one Vueling includes in its higher fares) bought on the web/app during booking, top of Vueling's own stated range 'From 18 to 99 EUR' (\u20ac99 = $107); the 20kg bag is 'From 14 to 96 EUR' ($104)",
+      "sources": [
+        "https://help.vueling.com/hc/en-gb/articles/19798784049041-Checked-Luggage-Allowance",
+        "https://help.vueling.com/hc/en-gb/articles/19798835176081-Hand-Luggage-Allowance-Cabin-bags-allowance",
+        "https://baggagepolicies.com/vueling-baggage-policy/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "confirmed",
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 6400
+    },
+    "LL:LIGHT": {
+      "feed_name": "Light",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 7600
+        }
+      ],
+      "note": "LL Light (long-haul): no checked bag; next pieces $76 one-way, 1st 23kg bag on 'Web (Booking)' for New York (JFK) to Barcelona, the Season B (peak) price of \u20ac70 ($76); LEVEL's own table runs \u20ac65-\u20ac70 on BCN routes and \u20ac78-\u20ac91 to 'other intercontinental destinations' via BCN (up to $98 from LAX/SFO)",
+      "sources": [
+        "https://lv-contentmanager-webapp-pro.azurewebsites.net/media/d5vh2bbo/us-23kg-checked-baggage-fees.pdf",
+        "http://web.archive.org/web/20260113100913/https://www.flylevel.com/en/why-level/baggage",
+        "https://www.flylevel.com/en/why-level/baggage"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "high",
+      "verdict": "confirmed",
+      "includes_carry_on": true
+    },
+    "DY:LOWFARE": {
+      "feed_name": "LowFare",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 5700
+        },
+        {
+          "piece": 2,
+          "amount_cents": 5800
+        }
+      ],
+      "note": "DY LowFare (short-haul): no checked bag; next pieces $57 / $58 one-way, The top of Norwegian's own online pre-check-in ranges for international flights, per bag per flight: first bag GBP 19-45 (took 45), second bag GBP 28-46 (took 46). Domestic is GBP 20 / 29.90. I did not take the check-in-desk prices (GBP 40 direct, GBP 80 connecting)",
+      "sources": [
+        "https://www.norwegian.com/uk/booking/booking-information/optional-charges/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "high",
+      "verdict": "confirmed",
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 3200
+    },
+    "D8:LOWFARE": {
+      "feed_name": "LowFare",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 5700
+        },
+        {
+          "piece": 2,
+          "amount_cents": 5800
+        }
+      ],
+      "note": "D8 LowFare (short-haul): no checked bag; next pieces $57 / $58 one-way, Same as DY. D8 is Norwegian's Swedish operating certificate and sells under the same norwegian.com fare families and optional-charges page. The top of the online international ranges: first bag GBP 45, second bag GBP 46",
+      "sources": [
+        "https://www.norwegian.com/uk/booking/booking-information/optional-charges/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "high",
+      "verdict": "confirmed",
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 3200
+    },
+    "V7:BASIC": {
+      "feed_name": "Basic",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 4300
+        },
+        {
+          "piece": 2,
+          "amount_cents": 5400
+        },
+        {
+          "piece": 3,
+          "amount_cents": 5400
+        }
+      ],
+      "note": "V7 Basic (short-haul): no checked bag; next pieces $43 / $54 / $54 one-way, Volotea's own price table gives only online floors: 20 kg from EUR 10, 25 kg from EUR 14. It also lists call-centre prices of EUR 35 / 40 and airport prices of EUR 75. I took EUR 40 (the 25 kg call-centre price, matching a secondary's EUR 15-40 online range) as the online upper end. Per Volotea's note, each bag after the first costs EUR 10 more (EUR 50)",
+      "sources": [
+        "https://www.volotea.com/en/service-fees/",
+        "https://www.volotea.com/en/contact/article/7419350406033-how-much-does-it-cost-to-check-a-bag",
+        "https://stasher.com/blog/volotea-baggage-allowance-and-fees"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "confirmed",
+      "includes_carry_on": false
+    },
+    "HV:BASIC": {
+      "feed_name": "Basic",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 7800
+        },
+        {
+          "piece": 2,
+          "amount_cents": 5400
+        }
+      ],
+      "note": "HV Basic (short-haul): no checked bag; next pieces $78 / $54 one-way, Transavia sells hold baggage by total weight, not per piece. HV online one-way: 20 kg EUR 33-61, 25 kg EUR 35-72, 40 kg EUR 64-105, 50 kg EUR 87-122. For a 23 kg-class first bag I took the top of the 25 kg band (EUR 72). The second is the step from 25 kg to 50 kg at the top (EUR 122 - 72 = EUR 50). A third bag of that size is impossible (50 kg total maximum)",
+      "sources": [
+        "https://web.archive.org/web/20260406231030/https://www.transavia.com/help/en-eu/baggage/checked-baggage/fares-checked-baggage",
+        "https://stasher.com/blog/transavia-baggage-allowance",
+        "https://flyrulebook.com/airline/transavia"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "confirmed",
+      "includes_carry_on": false
+    },
+    "TO:BASIC": {
+      "feed_name": "Basic",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 7800
+        },
+        {
+          "piece": 2,
+          "amount_cents": 5400
+        }
+      ],
+      "note": "TO Basic (short-haul): no checked bag; next pieces $78 / $54 one-way, Transavia France (TO) publishes only online floors: 20 kg from EUR 36, 25 kg from EUR 41, 50 kg from EUR 87. Airport prices are EUR 70 / 80 / 100 / 120 / 180. With no TO upper published, I used HV's published upper bands (25 kg EUR 72; step to 50 kg EUR 50) as a proxy. TO's floors are at or above HV's",
+      "sources": [
+        "https://web.archive.org/web/20260406231030/https://www.transavia.com/help/en-eu/baggage/checked-baggage/fares-checked-baggage"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "low",
+      "verdict": "unverifiable",
+      "needs_primary_source": true,
+      "includes_carry_on": false
+    },
+    "LS:FLIGHT": {
+      "feed_name": "Flight-only fare",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 5100
+        },
+        {
+          "piece": 2,
+          "amount_cents": 5100
+        },
+        {
+          "piece": 3,
+          "amount_cents": 5100
+        }
+      ],
+      "note": "LS Flight-only fare (short-haul): no checked bag; next pieces $51 / $51 / $51 one-way, Jet2 publishes no online price list. I took GBP 40, the highest real online price found (SendMyBag's example: about GBP 40 one way for a 22 kg bag, Edinburgh-Alicante in June). It sits just under the GBP 45 per-item price charged at the airport. Up to three 22 kg bags, priced per item",
+      "sources": [
+        "https://web.archive.org/web/20260920214019/https://www.jet2.com/en/baggage",
+        "https://www.sendmybag.com/airlines/jet2-baggage-allowance/",
+        "https://flighttribe.co.uk/jet2-checked-baggage-allowance/",
+        "https://stasher.com/blog/jet2-baggage-allowance"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "low",
+      "verdict": "confirmed",
+      "needs_primary_source": true,
+      "includes_carry_on": true
+    },
+    "PC:LIGHT": {
+      "feed_name": "Light",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 3800
+        }
+      ],
+      "note": "PC Light (short-haul): no checked bag; next pieces $38 one-way, Pegasus prices checked baggage by weight allowance, and online prices are dynamic and unpublished. Its own published international price table (airport, 0-12 hours) gives a 20 kg allowance at EUR 25-35 on European routes (EUR 35 for England, Ireland, Spain, France, Norway, Finland, Russia). That is close to the online level, so I took EUR 35 as the upper end. Cabin bag: the airport table's EUR 25",
+      "sources": [
+        "https://www.flypgs.com/en/travel-services/flight-services/additional-baggage",
+        "https://cdnp.flypgs.com/files/genel_kurallar/Genel-Kurallar-ucret-Tablosu_11.06.2026_EN.pdf"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "confirmed",
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 2700
+    },
+    "UX:LITE": {
+      "feed_name": "Economy Lite",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 13000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 15100
+        }
+      ],
+      "note": "UX Economy Lite (long-haul): no checked bag; next pieces $130 / $151 one-way, Air Europa publishes no fee table; the price appears only during booking. Europe and Canaries: took the stated online advance prices for Lite, EUR 40 first and EUR 50 second (airport EUR 65). Long-haul: took the South America online figures, EUR 120 first and EUR 140 second (airport EUR 140 / 160), as the only itemised long-haul prices. Another guide gives a EUR 100-150 range for long haul",
+      "sources": [
+        "https://www.aireuropa.com/us/en/aea/travel-information/baggage/checked-baggage.html",
+        "https://www.aireuropa.com/us/en/aea/aexperience/our-fares.html",
+        "https://baggagepolicies.com/air-europa-baggage-policy/",
+        "https://aifly.one/guides/air-europa-baggage-allowance/",
+        "https://www.infobae.com/espana/viajes/2025/10/06/este-es-el-precio-del-equipaje-facturado-en-air-europa-en-2025-condiciones-pesos-permitidos-y-tipos-de-vuelo/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "low",
+      "verdict": "unverifiable",
+      "needs_primary_source": true,
+      "includes_carry_on": true,
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 4300
+          },
+          {
+            "piece": 2,
+            "amount_cents": 5400
+          }
+        ],
+        "note": "UX Economy Lite (short-haul): no checked bag; next pieces $43 / $54 one-way, Air Europa publishes no fee table; the price appears only during booking. Europe and Canaries: took the stated online advance prices for Lite, EUR 40 first and EUR 50 second (airport EUR 65). Long-haul: took the South America online figures, EUR 120 first and EUR 140 second (airport EUR 140 / 160), as the only itemised long-haul prices. Another guide gives a EUR 100-150 range for long haul"
+      }
+    },
+    "A3:LIGHT": {
+      "feed_name": "Light",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 6900
+        },
+        {
+          "piece": 2,
+          "amount_cents": 6900
+        },
+        {
+          "piece": 3,
+          "amount_cents": 6900
+        }
+      ],
+      "note": "A3 Light (short-haul): no checked bag; next pieces $69 / $69 / $69 one-way, From Aegean's own published fee table, the top of the prepayment range for an extra bag up to 23 kg on international flights: CAD 30-95 (took 95). Domestic Greece is CAD 14-56. Airport is CAD 45-110 and gate CAD 76-110 (international). Every extra piece is priced on the same scale, so the same figure is used for the second and third",
+      "sources": [
+        "https://en.aegeanair.com/travel-info/additional-flight-services/prices-additional-services-canadian-dollars/",
+        "https://en.aegeanair.com/travel-info/travelling-with-aegean/baggage/add-baggage/",
+        "https://en.aegeanair.com/travel-info/travelling-with-aegean/baggage/baggage-allowance/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "high",
+      "verdict": "confirmed",
+      "includes_carry_on": true
+    },
+    "VL:BASIC": {
+      "feed_name": "Economy Basic",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 7000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 7000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 7000
+        }
+      ],
+      "note": "VL Economy Basic (short-haul): no checked bag; next pieces $70 / $70 / $70 one-way, Lufthansa Group first-bag prices are published only as 'from' figures (EUR30-35 online cross-border, EUR60 at the airport). EUR65 = USD70 per piece is taken as the high side. Carry-on is the top of the EUR15-50 secondary range, because the group states only a EUR20 minimum",
+      "sources": [
+        "http://web.archive.org/web/20251011012209/https://business.lufthansagroup.com/content/dam/b2b/experts/files/LHG_FBAG_EcoLight_EN.pdf",
+        "https://www.swiss.com/us/en/prepare/baggage/excess-baggage",
+        "https://travel-dealz.com/news/lufthansa-reduces-carry-on/",
+        "https://onemileatatime.com/news/lufthansa-economy-basic-fares-carry-on-bag-not-included/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "low",
+      "verdict": "corrected",
+      "needs_primary_source": true,
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 5400
+    },
+    "TK:ECOFLY": {
+      "feed_name": "EcoFly",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 20500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 22500
+        },
+        {
+          "piece": 3,
+          "amount_cents": 22500
+        }
+      ],
+      "note": "TK EcoFly (long-haul): no checked bag; next pieces $205 / $225 / $225 one-way, I took TK's own calculator price for extra pieces on JFK-Istanbul, economy, lowest brand, 18 Nov 2026: 1st $205, 2nd $225, 3rd $225. TK says fees can change up to 8 hours before the flight. Routes beyond Istanbul include 1 piece and charge $220-$250 per extra piece",
+      "sources": [
+        "https://www.turkishairlines.com/en-us/any-questions/checked-baggage/baggage-calculator/ (its API: POST /api/v1/additional-services/baggage/calculate, queried 2026-09-24)",
+        "https://www.turkishairlines.com/en-us/any-questions/checked-baggage/",
+        "https://www.turkishairlines.com/en-us/any-questions/baggage-information/usa-free-baggage-rules/",
+        "https://upgradedpoints.com/travel/airlines/turkish-airlines-baggage-fees/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "corrected",
+      "includes_carry_on": true
+    },
+    "QR:LITE": {
+      "feed_name": "Economy Lite",
+      "includes_checked": 1,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 20000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ],
+      "note": "QR Economy Lite (long-haul): 1 checked included; next pieces $200 / $200 / $200 one-way, I took QR's published 'Preferred' rate, which applies when you buy online more than 6 hours before departure: USD 200 per extra 23 kg piece on piece-concept routes to/from the USA. The $255 'Standard' rate applies only within 6 hours of departure",
+      "sources": [
+        "https://www.qatarairways.com/en-us/optional-services-and-fees.html",
+        "https://www.qatarairways.com/en-us/baggage/excess.html",
+        "https://www.qatarairways.com/en-us/baggage/allowance.html"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "high",
+      "verdict": "corrected",
+      "includes_carry_on": true
+    },
+    "EK:SPECIAL": {
+      "feed_name": "Economy Special",
+      "includes_checked": 1,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 22500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 22500
+        },
+        {
+          "piece": 3,
+          "amount_cents": 22500
+        }
+      ],
+      "note": "EK Economy Special (long-haul): 1 checked included; next pieces $225 / $225 / $225 one-way, EK's check-in rate for tickets issued on/after 2026-09-08, Americas to/from the Middle East: USD 225 per extra piece. The page offers 15% off in advance on select routes (and elsewhere says 50% off the first piece online), but those discounts are conditional, so the list rate is taken as the upper end",
+      "sources": [
+        "https://www.emirates.com/us/english/before-you-fly/baggage/checked-baggage/",
+        "https://www.emirates.com/us/english/before-you-fly/baggage/purchase-additional-baggage-allowance/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "high",
+      "verdict": "confirmed",
+      "includes_carry_on": true
+    },
+    "EY:BASIC": {
+      "feed_name": "Economy Basic",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 26000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 26000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 26000
+        }
+      ],
+      "note": "EY Economy Basic (long-haul): no checked bag; next pieces $260 / $260 / $260 one-way, EY publishes only the airport rate for US/Canada: USD 260 per 23 kg bag for tickets issued on/after 2026-04-23. The online price is shown only in Manage Booking ('save up to 65%'), so the published $260 is taken as the upper end and may overstate the booking-time price",
+      "sources": [
+        "https://www.etihad.com/en-us/help/faq/fares",
+        "https://www.etihad.com/en-us/help/baggage-information",
+        "https://www.etihad.com/en-us/legal/terms-and-conditions-us/optional-service-fees"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "confirmed",
+      "includes_carry_on": true
+    },
+    "SQ:LITE": {
+      "feed_name": "Economy Lite",
+      "includes_checked": 2,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 20000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ],
+      "note": "SQ Economy Lite (long-haul): 2 checked included; next pieces $200 / $200 / $200 one-way, I took the online pre-purchase rate for buying more than 48 hours before departure, per the secondary. US to Band 3 (Asia beyond Singapore) is $200 per extra piece; US-Singapore alone is $160. It is $225 from 48 to 6 hours out and $250 at the airport",
+      "sources": [
+        "https://upgradedpoints.com/travel/airlines/singapore-airlines-baggage-fees/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "corrected",
+      "includes_carry_on": true
+    },
+    "CX:LIGHT": {
+      "feed_name": "Economy Light",
+      "includes_checked": 1,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 21000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 21000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 21000
+        }
+      ],
+      "note": "CX Economy Light (long-haul): 1 checked included; next pieces $210 / $210 / $210 one-way, CX's regular per-piece rate (online 24h-1h before departure, and at the airport), taken for US to Asia beyond Hong Kong (Zone 5 to Zone 1, $210). US-Hong Kong alone is $200. A pre-purchase discount of up to 10% (24h+ out, selected routes only) is not applied. Short-haul is Zone 1 to Zone 1 via Hong Kong ($120), the upper end over Hong Kong-Zone 1 ($100)",
+      "sources": [
+        "https://www.cathaypacific.com/cx/en_US/book-a-trip/book-flights/new-economy-fares.html",
+        "https://www.cathaypacific.com/cx/en_US/baggage/extra-baggage-charges/pay-cash-or-by-credit-card.html"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "high",
+      "verdict": "confirmed",
+      "includes_carry_on": true,
+      "short_haul": {
+        "includes_checked": 1,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 12000
+          },
+          {
+            "piece": 2,
+            "amount_cents": 12000
+          },
+          {
+            "piece": 3,
+            "amount_cents": 12000
+          }
+        ],
+        "note": "CX Economy Light (short-haul): 1 checked included; next pieces $120 / $120 / $120 one-way, CX's regular per-piece rate (online 24h-1h before departure, and at the airport), taken for US to Asia beyond Hong Kong (Zone 5 to Zone 1, $210). US-Hong Kong alone is $200. A pre-purchase discount of up to 10% (24h+ out, selected routes only) is not applied. Short-haul is Zone 1 to Zone 1 via Hong Kong ($120), the upper end over Hong Kong-Zone 1 ($100)"
+      }
+    },
+    "JL:SPECIAL": {
+      "feed_name": "Economy Special Saver",
+      "includes_checked": 2,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 20000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ],
+      "note": "JL Economy Special Saver (long-haul): 2 checked included; next pieces $200 / $200 / $200 one-way, JAL publishes one per-piece rate with no online discount. Additional bag between Japan and the Americas, Europe or other long-haul regions is JPY20,000/USD200. Between Japan and Asia/Guam/Oceania it is JPY10,000/USD100",
+      "sources": [
+        "https://www.jal.co.jp/jp/en/inter/baggage/checked/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "high",
+      "verdict": "confirmed",
+      "includes_carry_on": true,
+      "short_haul": {
+        "includes_checked": 2,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 10000
+          },
+          {
+            "piece": 2,
+            "amount_cents": 10000
+          },
+          {
+            "piece": 3,
+            "amount_cents": 10000
+          }
+        ],
+        "note": "JL Economy Special Saver (short-haul): 2 checked included; next pieces $100 / $100 / $100 one-way, JAL publishes one per-piece rate with no online discount. Additional bag between Japan and the Americas, Europe or other long-haul regions is JPY20,000/USD200. Between Japan and Asia/Guam/Oceania it is JPY10,000/USD100"
+      }
+    },
+    "NH:BASIC": {
+      "feed_name": "Economy Basic",
+      "includes_checked": 1,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 20000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ],
+      "note": "NH Economy Basic (long-haul): 1 checked included; next pieces $200 / $200 / $200 one-way, ANA's per-piece rate for flights between areas (e.g. US-Japan): USD 200. Within one area (e.g. Japan-Asia): USD 100. Online prepayment is not available on itineraries touching the US or Canada, so the published rate is what a US traveller pays",
+      "sources": [
+        "https://www.ana.co.jp/en/us/travel-information/baggage-information/checked-baggage/",
+        "https://www.ana.co.jp/en/us/plan-book/how-to-manage-your-booking/branded-fare/north-america/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "high",
+      "verdict": "confirmed",
+      "includes_carry_on": true,
+      "short_haul": {
+        "includes_checked": 1,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 10000
+          },
+          {
+            "piece": 2,
+            "amount_cents": 10000
+          },
+          {
+            "piece": 3,
+            "amount_cents": 10000
+          }
+        ],
+        "note": "NH Economy Basic (short-haul): 1 checked included; next pieces $100 / $100 / $100 one-way, ANA's per-piece rate for flights between areas (e.g. US-Japan): USD 200. Within one area (e.g. Japan-Asia): USD 100. Online prepayment is not available on itineraries touching the US or Canada, so the published rate is what a US traveller pays"
+      }
+    },
+    "KE:SAVER": {
+      "feed_name": "Economy Saver",
+      "includes_checked": 1,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 20000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ],
+      "note": "KE Economy Saver (long-haul): 1 checked included; next pieces $200 / $200 / $200 one-way, KE's own excess table. For a Saver fare on Americas routes, the first bag is free and each bag from the second on is USD 200. For short-haul, the upper of KE's unlabelled Asia tiers is used (2nd bag $100, 3rd onwards $150). The lowest tier (Korea-Japan/China/Taiwan/HK per a secondary) is $70 / $100",
+      "sources": [
+        "https://www.koreanair.com/contents/plan-your-travel/baggage/checked-baggage/free-baggage",
+        "https://www.koreanair.com/contents/plan-your-travel/baggage/checked-baggage/excess-baggage"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "high",
+      "verdict": "confirmed",
+      "includes_carry_on": true,
+      "short_haul": {
+        "includes_checked": 1,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 10000
+          },
+          {
+            "piece": 2,
+            "amount_cents": 15000
+          },
+          {
+            "piece": 3,
+            "amount_cents": 15000
+          }
+        ],
+        "note": "KE Economy Saver (short-haul): 1 checked included; next pieces $100 / $150 / $150 one-way, KE's own excess table. For a Saver fare on Americas routes, the first bag is free and each bag from the second on is USD 200. For short-haul, the upper of KE's unlabelled Asia tiers is used (2nd bag $100, 3rd onwards $150). The lowest tier (Korea-Japan/China/Taiwan/HK per a secondary) is $70 / $100"
+      }
+    },
+    "OZ:ECONOMY": {
+      "feed_name": "Economy",
+      "includes_checked": 2,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 20000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 20000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ],
+      "note": "OZ Economy (long-haul): 2 checked included; next pieces $200 / $200 / $200 one-way, The secondary source says Asiana sells no prepaid excess baggage, so the airport rate is the only price. Long-haul is US routes, $200 per extra piece. Short-haul is the 'within Asia' tier, the upper of the intra-Asia tiers: 1st extra $110, 2nd $160, 3rd assumed at the 2nd-piece rate",
+      "sources": [
+        "https://upgradedpoints.com/travel/airlines/asiana-airlines-baggage-fees/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "corrected",
+      "includes_carry_on": true,
+      "short_haul": {
+        "includes_checked": 2,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 11000
+          },
+          {
+            "piece": 2,
+            "amount_cents": 16000
+          },
+          {
+            "piece": 3,
+            "amount_cents": 16000
+          }
+        ],
+        "note": "OZ Economy (short-haul): 2 checked included; next pieces $110 / $160 / $160 one-way, The secondary source says Asiana sells no prepaid excess baggage, so the airport rate is the only price. Long-haul is US routes, $200 per extra piece. Short-haul is the 'within Asia' tier, the upper of the intra-Asia tiers: 1st extra $110, 2nd $160, 3rd assumed at the 2nd-piece rate"
+      }
+    },
+    "BR:DISCOUNT": {
+      "feed_name": "Economy Discount",
+      "includes_checked": 1,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 26100
+        },
+        {
+          "piece": 2,
+          "amount_cents": 26100
+        },
+        {
+          "piece": 3,
+          "amount_cents": 26100
+        }
+      ],
+      "note": "BR Economy Discount (long-haul): 1 checked included; next pieces $261 / $261 / $261 one-way, EVA's new chart for travel on or after 2026-09-29, less its fixed 10% prepaid discount (online, from ticketing up to 4h before). Long-haul is North America outside the West Coast (Zone 4) to Asia beyond Taipei: 290 less 10% = $261. Zone 4-Taiwan alone is 270 less 10% = $243. Short-haul is Zone 1 to Zone 1 via TPE: 210 less 10% = $189. Taiwan-Zone 1 is 160 less 10% = $144",
+      "sources": [
+        "https://www.evaair.com/en-us/fly-prepare/baggage/free-baggage/checked-baggage/",
+        "https://www.evaair.com/en-us/fly-prepare/baggage/excess-baggage-and-other-optional-fees/",
+        "https://www.evaair.com/en-us/about-eva-air/news/travel-news/2026-08-31-evaair-will-raise-baggage-fees-from-september-29.html"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "high",
+      "verdict": "confirmed",
+      "includes_carry_on": true,
+      "short_haul": {
+        "includes_checked": 1,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 18900
+          },
+          {
+            "piece": 2,
+            "amount_cents": 18900
+          },
+          {
+            "piece": 3,
+            "amount_cents": 18900
+          }
+        ],
+        "note": "BR Economy Discount (short-haul): 1 checked included; next pieces $189 / $189 / $189 one-way, EVA's new chart for travel on or after 2026-09-29, less its fixed 10% prepaid discount (online, from ticketing up to 4h before). Long-haul is North America outside the West Coast (Zone 4) to Asia beyond Taipei: 290 less 10% = $261. Zone 4-Taiwan alone is 270 less 10% = $243. Short-haul is Zone 1 to Zone 1 via TPE: 210 less 10% = $189. Taiwan-Zone 1 is 160 less 10% = $144"
+      }
+    },
+    "CI:DISCOUNT": {
+      "feed_name": "Economy Discount",
+      "includes_checked": 1,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 21900
+        },
+        {
+          "piece": 2,
+          "amount_cents": 21900
+        },
+        {
+          "piece": 3,
+          "amount_cents": 21900
+        }
+      ],
+      "note": "CI Economy Discount (long-haul): 1 checked included; next pieces $219 / $219 / $219 one-way, CI's per-piece chart less its fixed 5% prepaid discount. Long-haul is Zone 3 (which includes New York, LA, SF, Seattle, Ontario, Phoenix) to Asia beyond Taipei: 230 less 5% = $219. Zone 3-Taiwan alone is 200 less 5% = $190. Short-haul is Zone 1 to Zone 1: 170 less 5% = $162. Taiwan-Zone 1 is 140 less 5% = $133",
+      "sources": [
+        "https://www.china-airlines.com/us/en/fly/prepare-for-the-fly/baggage/baggage-rules",
+        "https://www.china-airlines.com/us/en/fly/prepare-for-the-fly/baggage/excess-baggage"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "high",
+      "verdict": "confirmed",
+      "includes_carry_on": true,
+      "short_haul": {
+        "includes_checked": 1,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 16200
+          },
+          {
+            "piece": 2,
+            "amount_cents": 16200
+          },
+          {
+            "piece": 3,
+            "amount_cents": 16200
+          }
+        ],
+        "note": "CI Economy Discount (short-haul): 1 checked included; next pieces $162 / $162 / $162 one-way, CI's per-piece chart less its fixed 5% prepaid discount. Long-haul is Zone 3 (which includes New York, LA, SF, Seattle, Ontario, Phoenix) to Asia beyond Taipei: 230 less 5% = $219. Zone 3-Taiwan alone is 200 less 5% = $190. Short-haul is Zone 1 to Zone 1: 170 less 5% = $162. Taiwan-Zone 1 is 140 less 5% = $133"
+      }
+    },
+    "PR:SUPERSAVER": {
+      "feed_name": "Economy Supersaver",
+      "includes_checked": 1,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 21000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 21000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 25000
+        }
+      ],
+      "note": "PR Economy Supersaver (long-haul): 1 checked included; next pieces $210 / $210 / $250 one-way, I took PAL's prepaid rate, sold at booking until 4 hours before departure. From the US to Asia beyond Manila it is $210 for each of the first two extra 23 kg pieces; US-Philippines alone is $200. No more than 2 prepaid pieces are sold, so the 3rd extra piece is the standard airport EBC of $250",
+      "sources": [
+        "https://www.philippineairlines.com/us/en/mypal-travel-boost/mypal-baggage-plus/prepaid-baggage.html",
+        "https://www.philippineairlines.com/us/en/before-you-fly/baggage-information/baggage-allowance/baggage-allowance-fees/international-flights/international-excess-baggage.html",
+        "https://aifly.one/guides/philippine-airlines-baggage-allowance/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "corrected",
+      "includes_carry_on": true
+    },
+    "YP:LITE": {
+      "feed_name": "Economy Lite",
+      "includes_checked": 1,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 16000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 16000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ],
+      "note": "YP Economy Lite (long-haul): 1 checked included; next pieces $160 / $160 / $200 one-way, I took Air Premia's prepaid online rate for local-departure fares, bought up to 48 hours before departure: $160 per extra 23 kg piece to the Americas/Europe and $80 to Southeast Asia (Northeast Asia $60). Prepaid purchase is capped at 2 extra pieces, so the 3rd uses the airport rate: $200 long-haul, $100 Southeast Asia",
+      "sources": [
+        "https://www.airpremia.com/a/en/support/ssr/pre-baggage",
+        "https://www.airpremia.com/a/en/inflight/class-service/ey"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "high",
+      "verdict": "corrected",
+      "includes_carry_on": true,
+      "short_haul": {
+        "includes_checked": 1,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 8000
+          },
+          {
+            "piece": 2,
+            "amount_cents": 8000
+          },
+          {
+            "piece": 3,
+            "amount_cents": 10000
+          }
+        ],
+        "note": "YP Economy Lite (short-haul): 1 checked included; next pieces $80 / $80 / $100 one-way, I took Air Premia's prepaid online rate for local-departure fares, bought up to 48 hours before departure: $160 per extra 23 kg piece to the Americas/Europe and $80 to Southeast Asia (Northeast Asia $60). Prepaid purchase is capped at 2 extra pieces, so the 3rd uses the airport rate: $200 long-haul, $100 Southeast Asia"
+      }
+    },
+    "PD:PORTERCLASSIC": {
+      "feed_name": "PorterClassic Basic",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 8600
+        },
+        {
+          "piece": 2,
+          "amount_cents": 12700
+        },
+        {
+          "piece": 3,
+          "amount_cents": 26500
+        }
+      ],
+      "note": "PD PorterClassic Basic (long-haul): no checked bag; next pieces $86 / $127 / $265 one-way, Porter's own at-booking prices on flyporter.com, the new pricing for bookings from 2026-05-07, at the upper end of each stated range including tax: Canada, US and sun routes $63.25 for the 1st bag and $80.50 for the 2nd. For the 3rd bag I took $126.50 ($110 plus 15% HST) as the typical route; the stated range runs up to $258.75. Transatlantic is $86.25, $126.50 and $264.50. The carry-on uses the upper end of the Basic Express range, $103.50, because Porter does not sell it during booking",
+      "sources": [
+        "https://www.flyporter.com/en-ca/book-travel/our-fares-and-fees/optional-services-and-fees",
+        "https://www.flyporter.com/en-us/book-travel/our-fares-and-fees/optional-services-and-fees"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "high",
+      "verdict": "corrected",
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 10400,
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 6300
+          },
+          {
+            "piece": 2,
+            "amount_cents": 8100
+          },
+          {
+            "piece": 3,
+            "amount_cents": 12700
+          }
+        ],
+        "note": "PD PorterClassic Basic (short-haul): no checked bag; next pieces $63 / $81 / $127 one-way, Porter's own at-booking prices on flyporter.com, the new pricing for bookings from 2026-05-07, at the upper end of each stated range including tax: Canada, US and sun routes $63.25 for the 1st bag and $80.50 for the 2nd. For the 3rd bag I took $126.50 ($110 plus 15% HST) as the typical route; the stated range runs up to $258.75. Transatlantic is $86.25, $126.50 and $264.50. The carry-on uses the upper end of the Basic Express range, $103.50, because Porter does not sell it during booking"
+      }
+    },
+    "TS:ECO": {
+      "feed_name": "Eco Budget",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 7300
+        },
+        {
+          "piece": 2,
+          "amount_cents": 10600
+        }
+      ],
+      "note": "TS Eco Budget (long-haul): no checked bag; next pieces $73 / $106 one-way, Air Transat does not publish its booking-time bag prices; its bag calculator is JavaScript. The only official figures are the prices for bags bought within 24 hours of departure, from 1 Jun 2026. Within Canada that is CA$62.50-67.50 for the 1st bag and CA$78.25-84.75 for the 2nd; to and from Europe it is CA$100 and CA$145. I took the upper end of those as a ceiling. The price when adding a bag during booking is lower by an unpublished amount",
+      "sources": [
+        "https://www.airtransat.com/en-CA/news/changes-baggage-fees",
+        "https://www.airtransat.com/en-CA/travel-information/baggage/weight-dimensions",
+        "https://www.lugless.com/airline-baggage-fees/air-transat-baggage-fees/",
+        "https://flyrulebook.com/airline/air-transat",
+        "https://aifly.one/guides/air-transat-baggage-allowance/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "low",
+      "verdict": "confirmed",
+      "needs_primary_source": true,
+      "includes_carry_on": false,
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 4900
+          },
+          {
+            "piece": 2,
+            "amount_cents": 6200
+          }
+        ],
+        "note": "TS Eco Budget (short-haul): no checked bag; next pieces $49 / $62 one-way, Air Transat does not publish its booking-time bag prices; its bag calculator is JavaScript. The only official figures are the prices for bags bought within 24 hours of departure, from 1 Jun 2026. Within Canada that is CA$62.50-67.50 for the 1st bag and CA$78.25-84.75 for the 2nd; to and from Europe it is CA$100 and CA$145. I took the upper end of those as a ceiling. The price when adding a bag during booking is lower by an unpublished amount"
+      }
+    },
+    "F8:BASE": {
+      "feed_name": "Base fare",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 8700
+        },
+        {
+          "piece": 2,
+          "amount_cents": 12000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 12000
+        }
+      ],
+      "note": "F8 Base fare (short-haul): no checked bag; next pieces $87 / $120 / $120 one-way, I took the upper end of the at-booking range from secondary sources: CA$69-119 for the 1st checked bag, CA$69-164 for the 2nd and later bags, and CA$49-109 for the carry-on. I did not use the gate prices (up to CA$164 for the 1st bag and CA$279 for the 2nd), which are penalties",
+      "sources": [
+        "https://www.lugless.com/airline-baggage-fees/flair-baggage-fees/",
+        "https://flyrulebook.com/airline/flair-airlines"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "confirmed",
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 8000
+    },
+    "AM:LIGHT": {
+      "feed_name": "Light",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 6000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 10000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 20000
+        }
+      ],
+      "note": "AM Light (long-haul): no checked bag; next pieces $60 / $100 / $200 one-way, Domestic Mexico from Aeromexico's own excess-baggage table, at the High (peak season) end of the stated Low/High range: MXN 2,025 for the 1st 25 kg bag, 2,405 for the 2nd, 2,785 for the 3rd to 7th. The page presents these as the prices to pay before the flight, but it does not say whether they also apply during booking. Long-haul figures are upgradedpoints' online US$60, $100 and $200 for Basic, a secondary source I could not confirm on Aeromexico's site. The carry-on is the upper of the two Light 10 kg carry-on prices (MXN 905)",
+      "sources": [
+        "https://www.aeromexico.com/en-us/travel-information/fare-types-and-tickets",
+        "https://www.aeromexico.com/en-us/travel-information/baggage/baggage-allowance",
+        "https://www.aeromexico.com/en-us/travel-information/baggage/excess-baggage",
+        "https://upgradedpoints.com/travel/airlines/aeromexico-baggage-fees/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "corrected",
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 5000,
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 11100
+          },
+          {
+            "piece": 2,
+            "amount_cents": 13200
+          },
+          {
+            "piece": 3,
+            "amount_cents": 15300
+          }
+        ],
+        "note": "AM Light (short-haul): no checked bag; next pieces $111 / $132 / $153 one-way, Domestic Mexico from Aeromexico's own excess-baggage table, at the High (peak season) end of the stated Low/High range: MXN 2,025 for the 1st 25 kg bag, 2,405 for the 2nd, 2,785 for the 3rd to 7th. The page presents these as the prices to pay before the flight, but it does not say whether they also apply during booking. Long-haul figures are upgradedpoints' online US$60, $100 and $200 for Basic, a secondary source I could not confirm on Aeromexico's site. The carry-on is the upper of the two Light 10 kg carry-on prices (MXN 905)"
+      }
+    },
+    "CM:BASIC": {
+      "feed_name": "Economy Basic",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 3800
+        },
+        {
+          "piece": 2,
+          "amount_cents": 5300
+        },
+        {
+          "piece": 3,
+          "amount_cents": 18000
+        }
+      ],
+      "note": "CM Economy Basic (short-haul): no checked bag; next pieces $38 / $53 / $180 one-way, International Americas network (which includes the US), taking the higher of two secondary sources for each bag: 1st US$38 (upgradedpoints; deeparrival gives 'from ~$30'), 2nd US$53, 3rd and later US$180 (deeparrival; upgradedpoints gives $150). Copa's page adds that bag fees are subject to taxes in the country of origin, so the price paid can run slightly higher",
+      "sources": [
+        "https://www.copaair.com/en-us/travel-information/baggage-information/checked-baggage/",
+        "https://upgradedpoints.com/travel/airlines/copa-airlines-baggage-fees/",
+        "https://deeparrival.com/airlines/copa-airlines/baggage-fees/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "corrected",
+      "includes_carry_on": true
+    },
+    "LA:BASIC": {
+      "feed_name": "Basic",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 7000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 10000
+        }
+      ],
+      "note": "LA Basic (long-haul): no checked bag; next pieces $70 / $100 one-way, LATAM prices bags dynamically by route; the cheapest time to buy is 48 hours or more before departure. Domestic: I took the upper end of Peru's advance range (US$20-45); Ecuador is US$20-40 and Chile CLP 16,990 and 24,990 (about $18 and $27). Long-haul between South America and the US: US$70 for the 1st bag bought in advance (US$130 at the airport) and US$100 for the 2nd, from secondary sources",
+      "sources": [
+        "https://baggagepolicies.com/latam-airlines-baggage-policy/",
+        "https://camli.com/airlines/latam-airlines/baggage-policy",
+        "https://deeparrival.com/airlines/latam/baggage-fees/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "low",
+      "verdict": "unverifiable",
+      "needs_primary_source": true,
+      "includes_carry_on": false,
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 4500
+          }
+        ],
+        "note": "LA Basic (short-haul): no checked bag; next pieces $45 one-way, LATAM prices bags dynamically by route; the cheapest time to buy is 48 hours or more before departure. Domestic: I took the upper end of Peru's advance range (US$20-45); Ecuador is US$20-40 and Chile CLP 16,990 and 24,990 (about $18 and $27). Long-haul between South America and the US: US$70 for the 1st bag bought in advance (US$130 at the airport) and US$100 for the 2nd, from secondary sources"
+      }
+    },
+    "AV:BASIC": {
+      "feed_name": "Basic",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 8500
+        },
+        {
+          "piece": 2,
+          "amount_cents": 14000
+        },
+        {
+          "piece": 3,
+          "amount_cents": 22500
+        }
+      ],
+      "note": "AV Basic (long-haul): no checked bag; next pieces $85 / $140 / $225 one-way, Avianca's own table of prices for bags bought more than 48 hours before departure, including during booking. Short-haul is domestic Ecuador and Guatemala in USD, the dearer domestic market (Colombia's COP 79,900, 160,000 and 200,000 is about $20, $40 and $50). Long-haul is between North America and South America: US$85, $140 and $225. Avianca publishes only 'from' prices, so these are the floor; the upper end is not published",
+      "sources": [
+        "https://ayuda.avianca.com/hc/en-us/articles/13080382443803-Where-can-I-buy-checked-baggage",
+        "https://ayuda.avianca.com/hc/en-us/articles/13080259544219-What-is-carry-on-baggage-and-how-can-I-purchase-it",
+        "https://www.avianca.com/en/my-booking/prepare-your-trip/baggage"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "corrected",
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 3000,
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 3000
+          },
+          {
+            "piece": 2,
+            "amount_cents": 4000
+          },
+          {
+            "piece": 3,
+            "amount_cents": 6000
+          }
+        ],
+        "note": "AV Basic (short-haul): no checked bag; next pieces $30 / $40 / $60 one-way, Avianca's own table of prices for bags bought more than 48 hours before departure, including during booking. Short-haul is domestic Ecuador and Guatemala in USD, the dearer domestic market (Colombia's COP 79,900, 160,000 and 200,000 is about $20, $40 and $50). Long-haul is between North America and South America: US$85, $140 and $225. Avianca publishes only 'from' prices, so these are the floor; the upper end is not published"
+      }
+    },
+    "Y4:ZERO": {
+      "feed_name": "Zero",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 18000
+        },
+        {
+          "piece": 2,
+          "amount_cents": 14400
+        },
+        {
+          "piece": 3,
+          "amount_cents": 14400
+        }
+      ],
+      "note": "Y4 Zero (short-haul): no checked bag; next pieces $180 / $144 / $144 one-way, Volaris's official fee schedule (2026-09-22), the 'up to' ceiling for bags bought during booking in all channels, on international routes between Mexico and the US: first checked bag US$180, each extra checked bag US$144, carry-on US$102. On domestic Mexico routes the booking ceilings are MXN 1,764, 1,680 and 1,100. I did not use the pre-flight or airport prices, which are penalties",
+      "sources": [
+        "https://cms.volaris.com/globalassets/pdfs/eng/ancillariesandfees.en.pdf"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "high",
+      "verdict": "corrected",
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 10200
+    },
+    "VB:VIVA": {
+      "feed_name": "Viva Zero",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 5600
+        },
+        {
+          "piece": 2,
+          "amount_cents": 5600
+        },
+        {
+          "piece": 3,
+          "amount_cents": 5600
+        }
+      ],
+      "note": "VB Viva Zero (short-haul): no checked bag; next pieces $56 / $56 / $56 one-way, Domestic Mexico, from a Jan 2025 price list: an extra 25 kg bag is MXN 1,010. Adding a checked bag to a Zero fare is carry-on (MXN 406) plus the 25 kg increment (MXN 604), which is also MXN 1,010, so I used 1,010 for every piece. The carry-on is MXN 406",
+      "sources": [
+        "https://www.viveusa.mx/en/destinos/cuanto-cobra-viva-aerobus-por-maletas-documentadas-esta-es-su-lista-de-precios/",
+        "https://upgradedpoints.com/travel/airlines/viva-aerobus-baggage-fees/",
+        "https://www.eluniversal.com.mx/destinos/cuanto-cuesta-documentar-una-maleta-en-vuelos-nacionales/",
+        "https://deeparrival.com/airlines/viva-aerobus/baggage-fees/"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "low",
+      "verdict": "unverifiable",
+      "needs_primary_source": true,
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 2200
+    },
+    "EC:STANDARD": {
+      "feed_name": "Standard",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 6400
+        },
+        {
+          "piece": 2,
+          "amount_cents": 6400
+        },
+        {
+          "piece": 3,
+          "amount_cents": 6400
+        }
+      ],
+      "note": "EC (same policy as U2) Standard (short-haul): no checked bag; next pieces $64 / $64 / $64 one-way, 23kg hold bag added online during booking, top of the range secondary trackers quote from easyJet's fees page, \u00a39.49-\u00a350.00 one way per bag (\u00a350 = $64); up to three hold bags each at the same per-bag price",
+      "sources": [
+        "https://www.easyjet.com/en/help-centre/policy-terms-and-conditions/fees-charges",
+        "https://www.sendmybag.com/airlines/easyjet-baggage-allowance/",
+        "https://travellon.com/easyjet-baggage-allowance-guide",
+        "https://stasher.com/blog/easyjet-baggage-allowance",
+        "https://baggagepolicies.com/easyjet-baggage-allowance/",
+        "https://aifly.one/guides/easyjet-baggage-allowance/",
+        "https://airadvisor.com/en/baggage-allowance/easyjet"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "confirmed",
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 4400
+    },
+    "DS:STANDARD": {
+      "feed_name": "Standard",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 6400
+        },
+        {
+          "piece": 2,
+          "amount_cents": 6400
+        },
+        {
+          "piece": 3,
+          "amount_cents": 6400
+        }
+      ],
+      "note": "DS (same policy as U2) Standard (short-haul): no checked bag; next pieces $64 / $64 / $64 one-way, 23kg hold bag added online during booking, top of the range secondary trackers quote from easyJet's fees page, \u00a39.49-\u00a350.00 one way per bag (\u00a350 = $64); up to three hold bags each at the same per-bag price",
+      "sources": [
+        "https://www.easyjet.com/en/help-centre/policy-terms-and-conditions/fees-charges",
+        "https://www.sendmybag.com/airlines/easyjet-baggage-allowance/",
+        "https://travellon.com/easyjet-baggage-allowance-guide",
+        "https://stasher.com/blog/easyjet-baggage-allowance",
+        "https://baggagepolicies.com/easyjet-baggage-allowance/",
+        "https://aifly.one/guides/easyjet-baggage-allowance/",
+        "https://airadvisor.com/en/baggage-allowance/easyjet"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "medium",
+      "verdict": "confirmed",
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 4400
+    },
+    "W4:BASIC": {
+      "feed_name": "Basic",
+      "includes_checked": 0,
+      "tiers": [
+        {
+          "piece": 1,
+          "amount_cents": 9300
+        },
+        {
+          "piece": 2,
+          "amount_cents": 9300
+        },
+        {
+          "piece": 3,
+          "amount_cents": 9300
+        }
+      ],
+      "note": "W4 (same policy as W6) Basic (short-haul): no checked bag; next pieces $93 / $93 / $93 one-way, 20kg checked bag bought online during booking, at the top of the stated online/call-centre range \u20ac13.00-\u20ac86.50 (\u20ac86.50 = $93), not the airport price. Each of the up to three bags bought online is priced per piece",
+      "sources": [
+        "https://www.mybaggage.com/shipping/airlines/wizz-air-baggage-allowance/",
+        "https://www.sendmybag.com/airlines/wizz-air-baggage-allowance/",
+        "https://airadvisor.com/en/baggage-allowance/wizz-air",
+        "https://aifly.one/guides/wizz-air-baggage-allowance/",
+        "https://flighttribe.co.uk/wizz-air-checked-baggage/",
+        "http://web.archive.org/web/20260729145537/https://www.wizzair.com/en-gb/information-and-services/prices-discounts/all-services-fees"
+      ],
+      "checked": "2026-09-24",
+      "confidence": "low",
+      "verdict": "corrected",
+      "needs_primary_source": true,
+      "includes_carry_on": false,
+      "carry_on_fee_cents": 6500
     }
-  }
+  },
+  "_default_short_haul": {
+    "note": "No curated fee schedule for this fare - priced at the high end of what airlines charge on short-haul and domestic routes, which is a placeholder, not a quote",
+    "tiers": [
+      {
+        "piece": 1,
+        "amount_cents": 7600
+      },
+      {
+        "piece": 2,
+        "amount_cents": 7600
+      },
+      {
+        "piece": 3,
+        "amount_cents": 15000
+      }
+    ]
+  },
+  "_short_haul_policy": "A row's `short_haul` block replaces its tiers, included bags and carry-on when the trip starts and ends in one country or covers at most 3,500 km (adapter._short_haul): airlines charge domestic and regional bag fees there, not their long-haul ones. `includes_carry_on` false means the lowest fare excludes a full-size overhead bag. Rows and blocks added on 2026-09-24 carry the sources read and whether a second check confirmed them; `needs_primary_source` marks the ones it could not."
 }
