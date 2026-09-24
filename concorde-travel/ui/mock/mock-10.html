@@ -979,7 +979,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr"></span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="b73f8d2">b73f8d2</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="7bdf140">7bdf140</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -997,8 +997,8 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
   <section id="bookstep" class="hidden" aria-label="Book the trip"></section>
   <section aria-label="Top recommendations"><div class="sechead"><h2>Top recommendations</h2><p id="lede" hidden></p></div><div class="signal" id="signal" hidden></div><div class="flex" id="flex" hidden></div><div class="three" id="doors"></div></section>
   <section aria-label="Everything else"><div class="sechead"><h2>More flights</h2><p id="listnote"></p></div><ol class="list" id="list"></ol><button class="morebtn" id="morebtn"></button><p class="hiddenrows" id="hiddenrows"></p></section>
-  <section class="research" id="research" aria-label="Search international markets">
-    <div class="sechead"><h2>Search international markets</h2></div>
+  <section class="research" id="research" aria-label="Check other countries">
+    <div class="sechead"><h2>Check other countries</h2></div>
     <div class="rbox" id="rbox"></div>
   </section>
   <section class="how" id="how">
@@ -1006,7 +1006,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The standard trip for this route</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Prices are calculated in US dollars, then converted. Photos from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="b73f8d2">b73f8d2</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Prices are calculated in US dollars, then converted. Photos from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="7bdf140">7bdf140</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -3391,11 +3391,11 @@ function showResults(){
 // fee, and the airlines that require a card or address from the country of
 // sale and will cancel otherwise. Our feed today (Duffel) prices at one point
 // of sale; running this for real needs a GDS or NDC connection that takes a
-// country of sale per request, so the figures below are demo, seeded from
-// the flight, and say so.
-// Search international markets (per Patrick, 2026-09-24: option 2). The earlier version showed prices from a
-// seeded formula, labelled "examples"; no feed a non-agency can use prices a flight as sold in another country
-// (Google through SerpApi only converts the US fare), so this names where to look, with links, and no numbers.
+// country of sale per request.
+// Check other countries (per Patrick, 2026-09-24: option 2). The earlier version showed prices from a formula,
+// labelled "examples", and was removed: a made-up price is worse than none. No feed a non-agency can use prices a
+// flight as sold in another country (Google through SerpApi only converts the US fare; Travelpayouts' market codes
+// were tested and all return one cache), so this names where to look, with links, and no numbers.
 const MARKETS = [['GB', '🇬🇧', 'United Kingdom', 'UK departure tax applies on flights leaving the UK.'], ['MX', '🇲🇽', 'Mexico', 'Foreign cards usually work.'],
   ['BR', '🇧🇷', 'Brazil', 'Installment prices can hide the total. Check the final price.'], ['ZA', '🇿🇦', 'South Africa', 'Some airlines cancel if you pay without a South African card.'],
   ['IN', '🇮🇳', 'India', 'Often needs an Indian card or address.'], ['TR', '🇹🇷', 'Türkiye', 'Priced in lira. The exchange rate shifts week to week.'], ['AU', '🇦🇺', 'Australia', '']];
