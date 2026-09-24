@@ -1716,6 +1716,43 @@ def suggest_request(q):
     return {"rows": rows[:9]}
 
 
+RATES_FILE = os.path.join(live.HOME, "rates.json")
+RATES_WANT = ("EUR", "GBP", "CAD", "AUD", "CHF", "JPY", "MXN", "INR")
+
+
+def rates_request(q=None):
+    """The European Central Bank's daily reference rates against the dollar, through Frankfurter (free, no key),
+    cached six hours (2026-09-24, per Patrick: no sample data; the page's table of made-up rates is gone). A stale
+    copy is served with its own date when the service is down; with none at all, the page stays in dollars."""
+    cur = None
+    try:
+        with open(RATES_FILE) as f:
+            cur = json.load(f)
+        if time.time() - float(cur.get("_fetched", 0)) < 6 * 3600:
+            return {k: cur[k] for k in ("date", "rates", "source")}
+    except (OSError, ValueError, KeyError):
+        cur = None
+    try:
+        req = urllib.request.Request("https://api.frankfurter.dev/v1/latest?base=USD&symbols=" + ",".join(RATES_WANT),
+                                     headers={"User-Agent": "ConcordeGo/1.0 (go.flyconcordefly.com)", "Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=6) as r:
+            d = json.loads(r.read().decode("utf-8"))
+        rates = {k: float(v) for k, v in (d.get("rates") or {}).items() if k in RATES_WANT and float(v) > 0}
+        if rates and re.match(r"^\d{4}-\d{2}-\d{2}$", str(d.get("date") or "")):
+            out = {"date": d["date"], "rates": rates, "source": "European Central Bank reference rates"}
+            try:
+                with open(RATES_FILE, "w") as f:
+                    json.dump(dict(out, _fetched=time.time()), f)
+            except OSError:
+                pass
+            return out
+    except Exception:
+        pass
+    if cur and cur.get("rates"):
+        return {k: cur[k] for k in ("date", "rates", "source")}
+    return {"rates": {}, "error": "Exchange rates are unavailable right now."}
+
+
 def locate_request(q):
     """lat, lon -> a street address in the shape places.py reads from the end.
     OpenStreetMap's Nominatim, one identified User-Agent, nothing stored."""
@@ -1975,10 +2012,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                                "recent": _users_recent(who)[:3] if (who and "@" in who) else [],
                                "allowances": {"searches": USER_SEARCHES, "wishes": USER_WISHES, "free": ANON_SEARCHES},
                                "free_left": free, "hours": _hours_to_midnight()})
-        if path in ("/locate", "/photos", "/suggest"):
+        if path in ("/locate", "/photos", "/suggest", "/rates"):
             from urllib.parse import parse_qs
             q = parse_qs(self.path.split("?", 1)[1]) if "?" in self.path else {}
-            return self._json({"/locate": locate_request, "/photos": photos_request, "/suggest": suggest_request}[path](q))
+            return self._json({"/locate": locate_request, "/photos": photos_request, "/suggest": suggest_request,
+                               "/rates": rates_request}[path](q))
         if path == "/api/admin" or path.startswith("/api/admin/"):
             if not self._is_owner():
                 return self._html("<!doctype html><meta charset=utf-8><body style='background:#101013;color:#ececec;font:15px sans-serif;padding:40px'>"

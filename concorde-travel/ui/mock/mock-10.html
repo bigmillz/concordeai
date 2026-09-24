@@ -996,7 +996,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr"></span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="fnotes"><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="b35de20">b35de20</code></span></span></footer>
+  <footer class="foot wfoot"><span class="fnotes"><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="661c1e5">661c1e5</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -1024,7 +1024,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The standard trip for this route</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="fnotes"><span>Prices are calculated in US dollars, then converted.</span><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="b35de20">b35de20</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="fnotes"><span>Prices are calculated in US dollars, then converted.</span><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="661c1e5">661c1e5</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1070,14 +1070,16 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // One currency inside the model (hard rule 3): every figure is scored in US
 // cents and stays so. The display converts at the edge, and the footer says
-// which rate it used. Rates here are a demo table; the product looks them up.
-const CURRENCIES = {USD:{sym:'$', minor:'¢', rate:1, name:'US dollar'}, EUR:{sym:'€', minor:'c', rate:.92, name:'Euro'}, GBP:{sym:'£', minor:'p', rate:.78, name:'British pound'},
-  CAD:{sym:'CA$', minor:'¢', rate:1.36, name:'Canadian dollar'}, AUD:{sym:'A$', minor:'¢', rate:1.5, name:'Australian dollar'}, CHF:{sym:'CHF ', minor:'Rp.', rate:.88, name:'Swiss franc'},
-  JPY:{sym:'¥', minor:null, rate:149, name:'Japanese yen'}, MXN:{sym:'MX$', minor:'¢', rate:18.2, name:'Mexican peso'}, INR:{sym:'₹', minor:'p', rate:84, name:'Indian rupee'}};
-const RATES_ASOF = 'sample rates, Sep 21, 2026';
-let CUR = 'USD'; try { CUR = localStorage.getItem('concordego.currency') || 'USD'; if (!CURRENCIES[CUR]) CUR = 'USD'; } catch (e) {}
-const money = c => { const k = CURRENCIES[CUR]; return k.sym + Math.abs(Math.round(c*k.rate/100)).toLocaleString('en-US'); };
-const moneyPt = c => { const k = CURRENCIES[CUR], v = c*k.rate; return k.minor ? v.toFixed(1) + k.minor : k.sym + (v/100).toFixed(2); };   // US cents per point, shown in the chosen currency's minor unit
+// which rate it used: the European Central Bank's reference rate of the day, from the server's /rates (2026-09-24:
+// the made-up table that stood here is gone). A currency with no real rate is not offered; the page stays in dollars.
+const CURRENCIES = {USD:{sym:'$', minor:'¢', rate:1, name:'US dollar'}, EUR:{sym:'€', minor:'c', rate:null, name:'Euro'}, GBP:{sym:'£', minor:'p', rate:null, name:'British pound'},
+  CAD:{sym:'CA$', minor:'¢', rate:null, name:'Canadian dollar'}, AUD:{sym:'A$', minor:'¢', rate:null, name:'Australian dollar'}, CHF:{sym:'CHF ', minor:'Rp.', rate:null, name:'Swiss franc'},
+  JPY:{sym:'¥', minor:null, rate:null, name:'Japanese yen'}, MXN:{sym:'MX$', minor:'¢', rate:null, name:'Mexican peso'}, INR:{sym:'₹', minor:'p', rate:null, name:'Indian rupee'}};
+let RATES_ASOF = '';
+let CUR_WANT = 'USD'; try { CUR_WANT = localStorage.getItem('concordego.currency') || 'USD'; if (!CURRENCIES[CUR_WANT]) CUR_WANT = 'USD'; } catch (e) {}
+let CUR = 'USD';      // until the day's rate arrives, dollars
+const money = c => { const k = CURRENCIES[CUR].rate ? CURRENCIES[CUR] : CURRENCIES.USD; return k.sym + Math.abs(Math.round(c*k.rate/100)).toLocaleString('en-US'); };
+const moneyPt = c => { const k = CURRENCIES[CUR].rate ? CURRENCIES[CUR] : CURRENCIES.USD, v = c*k.rate; return k.minor ? v.toFixed(1) + k.minor : k.sym + (v/100).toFixed(2); };   // US cents per point, shown in the chosen currency's minor unit
 const signed = c => (c < 0 ? '−' : '+') + money(c);
 const hm = iso => iso.slice(11,16);
 const hour = iso => +iso.slice(11,13) + (+iso.slice(14,16))/60;
@@ -1179,8 +1181,9 @@ const BANK = {amex:'Amex Membership Rewards', chase:'Chase Ultimate Rewards', ca
   avios:'British Airways Avios', virgin:'Virgin Points', aa:'American AAdvantage', delta:'Delta SkyMiles', mm:'Lufthansa Miles & More', ms:'Turkish Miles&Smiles', fb:'Air France-KLM Flying Blue', ac:'Air Canada Aeroplan', ua:'United MileagePlus'};
 const SHORT = {amex:'Amex', chase:'Chase', capone:'Capital One', citi:'Citi', bilt:'Bilt', marriott:'Marriott', avios:'Avios', virgin:'Virgin', aa:'AAdvantage', delta:'SkyMiles', mm:'Miles & More', ms:'Miles&Smiles', fb:'Flying Blue', ac:'Aeroplan', ua:'MileagePlus'};
 const rlabel = r => r > 1 ? '1:' + r : r < 1 ? Math.round(1/r) + ':1' : '1:1';
-// A live transfer bonus, the kind that flips a verdict: in the product this is looked up, not typed.
-const BONUS = {virgin:{from:'chase', ratio:1.3, until:'30 Sep'}};
+// Transfer bonuses: none. The one that stood here was invented (2026-09-24, per Patrick: no sample data); a bonus
+// shows only when it is read from the bank's own page with its end date.
+const BONUS = {};
 // the demo award chart for this route, economy one way. STAR is what Aeroplan and MileagePlus charge for any Star
 // Alliance partner on it, FB what Flying Blue charges across SkyTeam; both are gated by the operator being in the search.
 const STAR = [{p:'ac', pts:35000, fees:9000, why:'Aeroplan partner award: no fuel surcharge, a partner booking fee'}, {p:'ua', pts:35000, fees:600, why:'MileagePlus partner saver'}];
@@ -1861,7 +1864,6 @@ function rawTerms(e, r, ctx){
   if (find('hotel-auto')) con('hotel', 'Hotel night ' + money(cents('hotel-auto')), 18000, true);
   for (const d of r.dem){ const id = d.key.replace('want-', ''); if (WANT_CON[id]) con('want-' + id, WANT_CON[id], d.cents, true); }
   const a = awardsFor(e)[0]; if (a && a.good) pro('points', 'Points ' + money(a.margin) + ' under cash', Math.max(2000, a.margin));
-  const up = upgradeOdds(e); if (up && up.rows[0].p >= .25) pro('upgrade', 'Upgrade odds: ' + pct(up.rows[0].p) + ' to ' + up.rows[0].cabin, 3000, true);
   const rel = cents('reliability'); if (rel < 0) pro('ontime', 'Good on-time record', 1000 - rel); else if (rel > 0 && rel < 3000) con('delays', 'Weak on-time record', rel); else if (rel >= 3000) con('norecord', 'No on-time data', 1000);
   return T;
 }
@@ -2015,8 +2017,6 @@ function factsHTML(e){
   F.push(row('Airline', esc(e.carrier_name) + (e.rating != null ? ` · rated ${Math.round(e.rating * 100)}/100` + (e.rating_basis ? ` <small class="rbasis">${esc(e.rating_basis)}</small>` : '') : '') + (d.carriage_url ? ` · <a href="${esc(d.carriage_url)}" target="_blank" rel="noopener">conditions of carriage</a>` : ''), true));
   if (d.loyalty && d.loyalty.length) F.push(row('Earns miles', d.loyalty.slice(0, 6).map(c => ((AIR[c] || {}).name || c).replace(' Airlines', '').replace(' Airways', '')).join(', ') + (d.loyalty.length > 6 ? ' +' + (d.loyalty.length - 6) : '')));
   if (d.id_docs_required) F.push(row('Documents', 'passport needed to book'));
-  const up = upgradeOdds(e);
-  F.push(row('Upgrade odds', up ? up.rows.map(r => pct(r.p) + ' to ' + r.cabin + ' (' + r.how + ')').join(' · ') + (up.note ? ' · ' + up.note : '') : '—'));
   return `<section class="facts">${legs}<div class="fact"><h5>Fare</h5><dl>${F.join('')}</dl></div><p class="fnote">As published by the airline. Aircraft as scheduled.</p></section>`;
 }
 function ledgerHTML(e){
@@ -2417,31 +2417,7 @@ function setCabin(v){ S.adv.cabin = v; $('#cabin').value = v; const q = $('#q-ca
   WANTS.find(w => w.id === 'lieflat').hint = v === 'economy' ? 'No lie-flat seats in economy. Search Business to see them.' : 'No lie-flat seats in these results. Try another cabin or date.'; paintChips(); }
 const CABINS = {DL:['Comfort+', 'Premium Select', 'Delta One'], UA:['Premium Plus', 'Polaris'], AA:['Premium Economy', 'Business'], BA:['World Traveller Plus', 'Club World'], VS:['Premium', 'Upper Class'], LH:['Premium Economy', 'Business', 'First'], LX:['Business', 'First'],
   AF:['Premium Economy', 'Business'], KL:['Premium Comfort', 'Business'], TK:['Business'], AC:['Premium Economy', 'Business'], AY:['Premium Economy', 'Business'], IB:['Premium Economy', 'Business'], default:['Premium economy', 'Business']};
-// complimentary status upgrades on a transatlantic economy fare: which cabin, and roughly how often they clear, by tier
-const COMP = {DL:{cabin:'Comfort+', rate:{Silver:.25, Gold:.5, Platinum:.7, Diamond:.85}}};
-// the operational upgrade when economy is oversold: rare, and status goes first
-const OPUP = {own:{0:.005, 1:.012, 2:.02, 3:.03, 4:.035}, alliance:{0:.005, 1:.008, 2:.01, 3:.012, 4:.014}};
-function upgradeOdds(e){
-  const op = e.operator || e.carrier, cab = ((e.details && e.details.segments[0] && e.details.segments[0].cabin) || 'Economy').toLowerCase();
-  const ladder = CABINS[op] || CABINS.default;
-  if (/first/.test(cab)) return null;
-  if (/business|upper|club|polaris|delta one/.test(cab)){ const top = ladder[ladder.length - 1]; if (!/first/i.test(top)) return null; }
-  const idx = /business|upper|club|polaris|delta one/.test(cab) ? ladder.findIndex(c => /first/i.test(c)) : /premium/.test(cab) ? ladder.findIndex(c => /business|upper|club|polaris|delta one|first/i.test(c)) : 0, above = ladder.slice(idx); if (!above.length) return null;
-  const basic = /basic|light|restricted/i.test(e.brand || '');
-  const tierOf = code => { const st = STATUS[code]; if (!st || !S.status[code]) return 0; return st.tiers.indexOf(S.status[code]) + 1; };
-  const own = statusKey(op); let tier = own ? tierOf(own) : 0, via = 'own', held = own && S.status[own] ? STATUS[own].name + ' ' + S.status[own] : '';
-  if (!tier){ for (const [al, members] of Object.entries(ALLI)){ if (!members.includes(op)) continue;
-    for (const code of Object.keys(STATUS)){ const st = STATUS[code], applies = st.alliance ? st.alliance === al : statusCodes([code, st]).some(c => members.includes(c));
-      if (applies && tierOf(code) > tier){ tier = tierOf(code); via = 'alliance'; held = st.name + ' ' + S.status[code] + (st.alliance ? '' : ' (' + al + ')'); } } } }
-  const out = {held, basis:'from published upgrade policy and typical operational-upgrade rates, not this flight\'s load', rows:[]};
-  const next = above[0], top = above[above.length - 1];
-  const comp = COMP[op] && via === 'own' && tier && COMP[op].cabin === next && !basic ? COMP[op].rate[S.status[op]] : 0;
-  const opup = OPUP[via][Math.min(4, tier)] * (basic ? .5 : 1);
-  out.rows.push({cabin:next, p: comp || opup, how: comp ? 'free with ' + held : (tier ? 'only if oversold; ' + held + ' goes first' : 'only if oversold')});
-  if (top !== next) out.rows.push({cabin:top, p: opup * (above.length > 2 ? .4 : .6), how: 'only if oversold'});
-  if (basic) out.note = 'no free upgrades on this fare';
-  return out;
-}
+// Upgrade odds: removed (2026-09-24). Their percentages were invented; no published source gives them.
 const pct = p => p < .005 ? 'under 1%' : '~' + Math.round(p*100) + '%';
 // the order people actually hold them in; a row shows the held ones plus the first few of the rest
 // Step 3 as dropdown rows (per Patrick, 2026-09-23): each section is a list of rows, a program picked from an
@@ -2474,7 +2450,7 @@ function paintPts(){
     return `<div class="psec"><span class="lab">${P.label}</span>${rows.map((k, i) => plineHTML(sec, k, i)).join('')}${full ? '' : `<button type="button" class="addrow" data-padd="${sec}">+ Add another</button>`}</div>`;
   }).join('') +
     (Object.values(S.status).some(Boolean) ? `<p class="ptnote stworth">Prefer airlines where I have status: <select id="stworth" aria-label="Prefer airlines where I have status">${[[0, 'Off'], [3000, 'A little'], [6000, 'Some'], [15000, 'Strongly']].map(([c, t]) => `<option value="${c}"${S.statusWorth === c ? ' selected' : ''}>${t}</option>`).join('')}</select><br>Flights that earn your status rank higher.</p>` : '') +
-    '<p class="ptnote">Each flight shows cash or points, whichever is cheaper. Award prices are samples. Upgrade odds are estimates.</p>';
+    '<p class="ptnote">Each flight shows cash or points, whichever is cheaper. Award prices are samples.</p>';
 }
 const pfocus = (sec, i, cls) => { const f = document.querySelector(`#pts .${cls}[data-psec="${sec}"][data-pi="${i}"]`); if (f) f.focus(); };
 document.addEventListener('change', ev => { const w = ev.target.closest('#stworth'); if (w){ S.statusWorth = +w.value; paint(false); return; }
@@ -3174,10 +3150,19 @@ document.addEventListener('focusin', ev => { const seg = ev.target.closest('.jse
 document.addEventListener('focusout', ev => { if (ev.target.closest && ev.target.closest('.jseg, .seal[data-tip]')) hideTip(); });
 document.addEventListener('scroll', () => { if (jtFor) hideTip(); }, {passive:true});
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && jtFor) hideTip(); });
-$('#cur').innerHTML = Object.entries(CURRENCIES).map(([k, v]) => `<option value="${k}"${k === CUR ? ' selected' : ''}>${k} · ${esc(v.name)}</option>`).join('');
-function curNote(){ const k = CURRENCIES[CUR]; $('#curnote').textContent = CUR === 'USD' ? '' : '1 USD = ' + k.rate + ' ' + CUR + ' (' + RATES_ASOF + ').'; }
+paintCurSelect();
+function curNote(){ const k = CURRENCIES[CUR]; $('#curnote').textContent = CUR === 'USD' || !k.rate ? '' : '1 USD = ' + (+k.rate.toPrecision(4)) + ' ' + CUR + ' (' + RATES_ASOF + ').'; }
+function paintCurSelect(){ $('#cur').innerHTML = Object.entries(CURRENCIES).filter(([k, v]) => v.rate).map(([k, v]) => `<option value="${k}"${k === CUR ? ' selected' : ''}>${k} · ${esc(v.name)}</option>`).join(''); }
+// the day's rates: only then is another currency offered, and the one this browser chose comes back
+if (SERVED) fetch('/rates').then(r => r.json()).then(d => {
+  if (!d || !d.rates) return;
+  for (const [k, v] of Object.entries(d.rates)) if (CURRENCIES[k] && v > 0) CURRENCIES[k].rate = v;
+  RATES_ASOF = 'ECB rate of ' + new Date(d.date + 'T12:00:00Z').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+  if (CUR_WANT !== CUR && CURRENCIES[CUR_WANT].rate){ CUR = CUR_WANT; paintPar(); paintSignal(); rerenderBills(); }
+  paintCurSelect(); curNote();
+}).catch(() => {});
 curNote();
-$('#cur').addEventListener('change', ev => { CUR = ev.target.value; try { localStorage.setItem('concordego.currency', CUR); } catch (e) {} curNote(); paintPar(); paintSignal(); rerenderBills(); if (S.thread.length) renderThread(); });
+$('#cur').addEventListener('change', ev => { CUR = CUR_WANT = ev.target.value; try { localStorage.setItem('concordego.currency', CUR); } catch (e) {} curNote(); paintPar(); paintSignal(); rerenderBills(); if (S.thread.length) renderThread(); });
 addEventListener('resize', () => { paintTri(); const [x, y] = toXY(S.a, S.b, S.c); handle.style.left = x + 'px'; handle.style.top = y + 'px'; });
 
 // ================= the pictures =================
