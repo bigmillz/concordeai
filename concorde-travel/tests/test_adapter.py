@@ -1218,6 +1218,15 @@ def main():
           "without them), carries its cabin, and the query records the cabin asked for",
           asked_geo == [["CLT", "UIO"]] and rows_c and not rows_n and rows_c[0]["segments"][0]["cabin"] == "business"
           and got_c["query"]["cabin"] == "first", str((asked_geo, len(rows_c), len(rows_n))))
+    # the feed may sell nothing where Google does: Google's own scenario is then the search (2026-09-24)
+    empty_feed = {"data": {"offers": [], "slices": []}}
+    try:
+        go_only = mockdata.build_slim(empty_feed, supplement=serp, cabin="economy")
+        go_rows = [e for v in go_only["results"].values() if isinstance(v, list) for e in v]
+    except ValueError as exc:
+        go_rows = []
+    check("an empty feed reply with Google trips shows Google's trips, not 'no flights found'", len(go_rows) > 0,
+          str(len(go_rows)))
     d_sc = adapter.from_feed(dfl)
     procs = sorted({o["airport_process_minutes"]["p50"] for o in d_sc["options"]})
     check("every option of a real New York to London search is timed at an hour and a half at the airport",

@@ -979,6 +979,9 @@ now reads the LONG leg's cabin. **Airports no table knows are placed in time fro
 (`server.airport_geo`, cached a year, twelve a search): a Google-only trip through Charlotte, Houston, Quito and
 Cuenca used to be dropped whole, because Google gives local clocks with no zone and Duffel had returned nothing to
 borrow one from.
+**An empty feed hands the search to Google**: when Duffel sells nothing on a route and Google has trips,
+`data.build_slim` builds the search from Google's own scenario (`from_serpapi`) instead of answering "No flights
+found", which is what that Charlotte to Cuenca search did.
 
 **Airline ratings come from published scores** (2026-09-24, per Patrick, who asked whether AI could give "a general
 consensus for each airline": it can AUTHOR the table once, never answer at search time, which would let the same

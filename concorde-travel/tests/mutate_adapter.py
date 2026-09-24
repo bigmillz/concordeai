@@ -261,6 +261,8 @@ MUTANTS = [
      'cabins: list the same flights twice when both cabin searches return them'),
     (DATA, "build_slim", 'if need:\n            geo.update(server.airport_geo(need))', 'if False:\n            geo.update(server.airport_geo(need))',
      'zones: never ask Duffel where an unknown airport is, so a Google trip through Houston and Quito is dropped'),
+    (DATA, "build_slim", 'google_only = bool(isinstance(d0, dict) and d0.get("offers") == [] and supplement',
+     'google_only = bool(False and supplement', 'feed: an empty feed reply hides every Google trip behind "no flights found"'),
     (AD, "_arrival_international", 'if o_iata in US_PRECLEARANCE and border_of(d_iata, enr, geo) == "us":',
      'if False:', 'arrival: ignore US preclearance, so Dublin to New York queues for passport control twice'),
     (AD, "_arrival_block", 'last = segments[-1]',

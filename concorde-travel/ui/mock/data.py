@@ -167,9 +167,8 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
                dest_point=None, destination_full=None, supplement=None, round_trip=None, cabin=None):
     """A feed payload -> everything mock 10 reads. server.py calls this for a
     live search; main() below calls it for the checked-in sample."""
-    sc = adapter.from_feed(raw, origin_key=origin_key, checked_bags=checked_bags, dest_point=dest_point)
     geo = adapter.duffel_geo(raw)
-    if supplement and "error" not in sc:
+    if supplement:
         # airports Google names that neither the curated table nor the feed's reply can place in time: their zones
         # from Duffel's places, or the itineraries through them would be dropped (2026-09-24)
         aps = adapter.load_enrichment()["airports"]["airports"]
@@ -178,7 +177,17 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
         need = {c for c in named if c and c not in geo and not (aps.get(c) or {}).get("zone")}
         if need:
             geo.update(server.airport_geo(need))
-    if supplement and "error" not in sc:
+    # The feed may sell nothing on a route Google does (2026-09-24: Charlotte to Cuenca, Duffel empty in first and
+    # in business, Google with trips): then Google's own scenario is the search, instead of "no flights found".
+    d0 = (raw or {}).get("data") if isinstance(raw, dict) else None
+    google_only = bool(isinstance(d0, dict) and d0.get("offers") == [] and supplement
+                       and (supplement.get("best_flights") or supplement.get("other_flights")))
+    if google_only:
+        sc = adapter.from_serpapi(supplement, origin_key=origin_key, checked_bags=checked_bags,
+                                  geo=geo, dest_point=dest_point, carriers=server.live.serp_want())
+    else:
+        sc = adapter.from_feed(raw, origin_key=origin_key, checked_bags=checked_bags, dest_point=dest_point)
+    if supplement and "error" not in sc and not google_only:
         # Google Flights through SerpApi, for the carriers the feed cannot sell: normalised by its own
         # adapter with the feed's zones borrowed for airports the table does not know, then merged
         # under the feed's par and profiles, so a Delta row is graded and ranked like every other
