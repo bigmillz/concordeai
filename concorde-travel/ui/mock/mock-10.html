@@ -448,7 +448,20 @@ details[open] summary:after{content:"–"}
 .facts dl{margin:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;font-size:12.5px;line-height:1.45}
 .facts dt{color:var(--faint);white-space:nowrap}.facts dd{margin:0;color:var(--text);overflow-wrap:anywhere}
 .facts dd a{color:var(--speed);text-decoration:none}.facts dd a:hover{text-decoration:underline}
-.facts dd .rbasis{display:block;color:var(--faint);font-size:11.5px;margin-top:2px}
+/* rating stars: "rstars", never "stars", which is the sky's full-screen canvas (a clash shrank the sky to 80x16) */
+.rstars{position:relative;display:inline-block;width:80px;height:16px;vertical-align:-3px;margin-left:6px}
+.rstars svg{position:absolute;left:0;top:0;width:80px;height:16px}.rstars .sbg path{fill:rgba(255,255,255,.16)}.rstars .sfg path{fill:var(--price)}
+.rstars .sfill{position:absolute;left:0;top:0;height:16px;overflow:hidden}.starsnum{margin-left:6px;font-weight:600;color:var(--text)}
+.sjourney{margin:2px 0 18px}.sjourney .journey{gap:8px}.sjourney .jbar{height:16px}
+.pchart{margin:18px 0;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02)}
+.pchart header{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}.pchart h4{margin:0}
+.pchart .ptrend{font-size:12.5px;color:var(--dim)}.pchart .ptrend.down{color:var(--green)}.pchart .ptrend.up{color:var(--red)}
+.pchart .pverdict{margin-left:auto;font-size:12px;padding:2px 9px;border-radius:999px;border:1px solid var(--line)}
+.pchart .pverdict.book{color:var(--green);border-color:currentColor}.pchart .pverdict.wait{color:var(--price);border-color:currentColor}
+.pchart svg{width:100%;height:auto;display:block;overflow:visible}.pchart .line{fill:none;stroke:var(--speed);stroke-width:2;stroke-linejoin:round}
+.pchart .band{fill:rgba(77,163,255,.08)}.pchart .grid{stroke:var(--line);stroke-dasharray:3 4}
+.pchart text{font:500 11px var(--mono);fill:var(--faint)}.pchart .mine{stroke:var(--price);stroke-dasharray:4 4}.pchart circle.mine{fill:var(--price);stroke:none}
+.pchart text.mine{fill:var(--price);stroke:none}.pchart .pnote{margin:8px 0 0;font-size:12px;color:var(--faint)}
 .facts .fnote{grid-column:1/-1;margin:0;font-size:11.5px;color:var(--faint);line-height:1.45}
 .research{margin-top:34px}
 .rbox{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:16px 18px;overflow-x:auto}
@@ -996,7 +1009,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr"></span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="fnotes"><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="661c1e5">661c1e5</code></span></span></footer>
+  <footer class="foot wfoot"><span class="fnotes"><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="87b10d1">87b10d1</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -1024,7 +1037,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The standard trip for this route</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="fnotes"><span>Prices are calculated in US dollars, then converted.</span><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="661c1e5">661c1e5</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="fnotes"><span>Prices are calculated in US dollars, then converted.</span><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="87b10d1">87b10d1</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1748,8 +1761,7 @@ function journey(e, r, ctx){
         if (want in CABIN_RANK && have in CABIN_RANK && CABIN_RANK[have] < CABIN_RANK[want]) why.push({t:CABIN_WORD[have] + ', not ' + CABIN_WORD[want].toLowerCase(), bad:true}); }
       if (e.rating == null) why.push({t:'Airline not rated yet'});
       // bands on the ratings' own scale, which since 2026-09-24 spans low-cost airlines too: the middle sits near .6
-      else { why.push({t:e.carrier_name + (e.rating >= .76 ? ': well-rated airline' : e.rating >= .6 ? ': average rating' : ': below-average rating'), good:e.rating >= .76, bad:e.rating < .6});
-        if (e.rating_basis && i === li) why.push({t:e.rating_basis}); }
+      else why.push({t:e.carrier_name + ': ' + starsOf(e.rating).toFixed(1) + ' of 5 stars', good:e.rating >= .76, bad:e.rating < .6});
       if (e.stops && det >= 1.15) why.push({t:'Long way round: ' + dur(ctx.air(e)) + ' flying vs ' + dur(ctx.refAir) + ' nonstop', bad:true});
       const dh = sg ? +sg.dep.slice(0, 2) : 12; if (l.minutes >= 300 && dh >= 20) why.push({t:'Overnight flight'});
       if (i === li && sg && sg.equipment && sg.equipment !== 'UNKNOWN') why.push({t:'Scheduled ' + (JET[sg.equipment] || sg.equipment) + ' (can change)'});
@@ -2014,10 +2026,52 @@ function factsHTML(e){
   if (e.round_trip) F.push(row('Round trip', `One ticket with your outbound: ${money(e.round_trip.total_cents)} for both flights, ${money(e.round_trip.one_way_cents - e.ticket_cents)} less than two one-way tickets. This flight adds ${money(e.ticket_cents)}.`));
   if (d.emissions_kg) F.push(row('Emissions', `${(+d.emissions_kg).toLocaleString()} kg CO₂`));
   if (d.source) F.push(row('Source', d.source.replace(/ via SerpApi$/, '') + (d.note ? ' · ' + d.note : '')));
-  F.push(row('Airline', esc(e.carrier_name) + (e.rating != null ? ` · rated ${Math.round(e.rating * 100)}/100` + (e.rating_basis ? ` <small class="rbasis">${esc(e.rating_basis)}</small>` : '') : '') + (d.carriage_url ? ` · <a href="${esc(d.carriage_url)}" target="_blank" rel="noopener">conditions of carriage</a>` : ''), true));
+  F.push(row('Airline', esc(e.carrier_name) + (e.rating != null ? ' ' + starsHTML(e.rating) : '') + (d.carriage_url ? ` · <a href="${esc(d.carriage_url)}" target="_blank" rel="noopener">conditions of carriage</a>` : ''), true));
   if (d.loyalty && d.loyalty.length) F.push(row('Earns miles', d.loyalty.slice(0, 6).map(c => ((AIR[c] || {}).name || c).replace(' Airlines', '').replace(' Airways', '')).join(', ') + (d.loyalty.length > 6 ? ' +' + (d.loyalty.length - 6) : '')));
   if (d.id_docs_required) F.push(row('Documents', 'passport needed to book'));
   return `<section class="facts">${legs}<div class="fact"><h5>Fare</h5><dl>${F.join('')}</dl></div><p class="fnote">As published by the airline. Aircraft as scheduled.</p></section>`;
+}
+// Five stars for an airline (per Patrick, 2026-09-24: "an easy to read five star rating", no math shown): the rating
+// times five, one decimal, drawn as five stars filled to that fraction. The star is Material Icons' (Apache 2.0).
+const STAR_D = 'M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z';
+const starsOf = r => Math.round(Math.max(0, Math.min(1, r)) * 50) / 10;
+function starsHTML(r){
+  const v = starsOf(r), row = cls => `<svg class="${cls}" viewBox="0 0 120 24" aria-hidden="true">${[0, 1, 2, 3, 4].map(i => `<path transform="translate(${i * 24} 0)" d="${STAR_D}"/>`).join('')}</svg>`;
+  return `<span class="rstars" role="img" aria-label="${v.toFixed(1)} out of 5 stars">${row('sbg')}<span class="sfill" style="width:${(v / 5 * 100).toFixed(1)}%">${row('sfg')}</span></span><b class="starsnum">${v.toFixed(1)}</b>`;
+}
+// The journey bar across the whole sheet (per Patrick, 2026-09-24): the same blocks as the cards, drawn to this
+// trip's own length rather than the search's longest, so every leg has room.
+function sheetJourney(e, r){
+  const { rows } = ranked(), ctx = rows.length ? statsFor(rows) : null; if (!ctx) return '';
+  return `<section class="sjourney">${journeyHTML(e, r, Object.assign({}, ctx, {maxDoor:0}))}</section>`;
+}
+// Price history (per Patrick, 2026-09-24): Google Flights' lowest fare for this route and date, day by day over
+// the last two months, with this flight's own fare marked. Google keeps it per route and date, not per airline, and
+// the chart says so. Only on a live search that carried it; otherwise nothing.
+function priceChartHTML(e){
+  const g = D.signal; if (!g || !g.history || g.history.length < 4) return '';
+  const h = g.history.map(p => p[1]), W = 640, H = 170, L = 52, R = 14, T = 12, B = 24, mine = e.ticket_cents;
+  const vs = h.concat([mine]).concat(g.low_cents != null && g.high_cents != null ? [g.low_cents, g.high_cents] : []), lo = Math.min(...vs), hi = Math.max(...vs), span = Math.max(1, hi - lo);
+  const x = i => L + i / Math.max(1, h.length - 1) * (W - L - R), y = v => T + (1 - (v - lo) / span) * (H - T - B);
+  // the trend: the least-squares slope of the whole history, as the change it makes over the last 30 days (a week
+  // against the week before called a steady $100 climb "steady")
+  const n = h.length, mx = (n - 1) / 2, my = h.reduce((t, v) => t + v, 0) / n;
+  const slope = h.reduce((t, v, i) => t + (i - mx) * (v - my), 0) / Math.max(1, h.reduce((t, v, i) => t + (i - mx) ** 2, 0));
+  const days = Math.min(30, n - 1), diff = slope * days, trend = Math.abs(diff) < .04 * my ? 'Steady' : diff < 0 ? 'Trending down' : 'Trending up';
+  const tip = trend !== 'Steady' ? ` ${trend === 'Trending down' ? 'Down' : 'Up'} about ${money(Math.abs(diff))} over the last ${days} days.` : '';
+  const word = {book:'Book', wait:'Maybe wait', typical:'Typical'}[g.verdict] || '';
+  const d0 = new Date(g.history[0][0] * 1000), d1 = new Date(g.history[g.history.length - 1][0] * 1000), lab = d => d.toLocaleDateString([], {month:'short', day:'numeric'});
+  const band = g.low_cents != null && g.high_cents != null ? `<rect class="band" x="${L}" width="${W - L - R}" y="${y(g.high_cents).toFixed(1)}" height="${Math.max(1, y(g.low_cents) - y(g.high_cents)).toFixed(1)}"/>` : '';
+  const pts = h.map((v, i) => x(i).toFixed(1) + ',' + y(v).toFixed(1)).join(' ');
+  return `<section class="pchart"><header><h4>Price history</h4><span class="ptrend ${trend === 'Trending down' ? 'down' : trend === 'Trending up' ? 'up' : ''}">${trend}</span>${word ? `<b class="pverdict ${esc(g.verdict)}">${word}</b>` : ''}</header>
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(trend + '. Lowest fare on this route each day from ' + lab(d0) + ' to ' + lab(d1) + '. This flight ' + money(mine) + '.')}">${band}
+      <line class="grid" x1="${L}" x2="${W - R}" y1="${y(hi).toFixed(1)}" y2="${y(hi).toFixed(1)}"/><line class="grid" x1="${L}" x2="${W - R}" y1="${y(lo).toFixed(1)}" y2="${y(lo).toFixed(1)}"/>
+      <text x="4" y="${(y(hi) + 4).toFixed(1)}">${money(hi)}</text><text x="4" y="${(y(lo) + 4).toFixed(1)}">${money(lo)}</text>
+      <polyline class="line" points="${pts}"/>
+      <line class="mine" x1="${L}" x2="${W - R}" y1="${y(mine).toFixed(1)}" y2="${y(mine).toFixed(1)}"/><circle class="mine" cx="${W - R}" cy="${y(mine).toFixed(1)}" r="4.5"/>
+      <text class="mine" x="${W - R - 4}" y="${(y(mine) - 8).toFixed(1)}" text-anchor="end">This flight ${money(mine)}</text>
+      <text x="${L}" y="${H - 6}">${lab(d0)}</text><text x="${W - R}" y="${H - 6}" text-anchor="end">${lab(d1)}</text></svg>
+    <p class="pnote">The lowest fare on this route for your date, any airline, each day for the last ${Math.round((d1 - d0) / 864e5)} days (Google Flights). ${g.low_cents != null && g.high_cents != null ? 'The band is the usual range.' : ''}${tip}</p></section>`;
 }
 function ledgerHTML(e){
   const r = bill(e), b = e.booking[0], aw = awardsFor(e);
@@ -2027,8 +2081,8 @@ function ledgerHTML(e){
       ${k === 'addons' ? `<div class="restore">${restore.filter(x => x !== 'hotel-auto' && !x.startsWith('ground')).map(x => `<span>${esc(RESTORE[x])} removed from every flight<button data-restore="${x}">add back</button></span>`).join('')}</div><button class="addbtn" data-addmenu>+ Add an expense</button>${S.menu ? addMenuHTML(e) : ''}` : ''}
       ${k === 'transport' ? `<div class="restore">${restore.filter(x => x.startsWith('ground')).map(x => `<span>${esc(RESTORE[x])} removed: someone is driving you<button data-restore="${x}">add back</button></span>`).join('')}</div>` : ''}
       ${k === 'stay' && restore.includes('hotel-auto') ? `<div class="restore"><span>Hotel removed: sleeping in the terminal<button data-restore="hotel-auto">add back</button></span></div>` : ''}</section>`; };
-  return `${factsHTML(e)}<div class="bill">${GROUPS.map(([k, t]) => grp(k, t)).join('')}
-    <div class="btotal"><span>All in</span><b>${money(r.total)}</b></div></div>${sellersHTML(e)}
+  return `${sheetJourney(e, r)}${factsHTML(e)}<div class="bill">${GROUPS.map(([k, t]) => grp(k, t)).join('')}
+    <div class="btotal"><span>All in</span><b>${money(r.total)}</b></div></div>${priceChartHTML(e)}${sellersHTML(e)}
     <div class="book"><h4>${esc(e.carrier_name)} ${esc(e.flight)}</h4><p>${esc(e.route.join(' → '))} · ${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} · ${stopsText(e)}<br>${b ? esc(b.note) : ''}</p>
       <button class="choose" data-select="${esc(e.id)}">${selectLabel()}${b ? ' · ' + money(b.price_cents) : ''}</button>
       <p>${S.trip === 'round' ? (S.legIdx === 0 ? 'Then pick your return.' : 'Then book both legs.') : 'Then book with the airline.'}</p>

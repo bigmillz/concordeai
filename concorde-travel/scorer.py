@@ -1146,7 +1146,7 @@ def report_card(scenario: Dict[str, Any], option: Dict[str, Any],
     else:
         rating = float(rating)
         pts += 0.4 if rating >= 0.85 else 0.1 if rating >= tuning.carrier_baseline else -0.2 if rating >= 0.6 else -0.5
-        why.append("carrier rated %.2f" % rating)
+        why.append("airline %.1f of 5 stars" % (round(min(1.0, max(0.0, rating)) * 50) / 10))
     if led.by_code("redeye"):
         pts -= 0.6; why.append("red-eye")
     if led.by_code("cabin_uncertain"):

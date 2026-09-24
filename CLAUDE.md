@@ -1225,6 +1225,13 @@ Aruba, Abu Dhabi). It is the option's `arrival_process_minutes` (schema), counte
 named in its time line, and par's reference traveller, who checks the one bag its fare includes, gets it too; a
 fixture without the field models none. The account and Admin buttons sit at the right end of the top bar
 (`.baracct`), and the search summary gives way first so they keep one row.
+**The details sheet** (2026-09-24, per Patrick) opens with the journey bar drawn across the whole sheet (this trip's
+own length, not the search's longest), carries a **price history chart** above the booking box when a live search
+brought Google's price insights (the lowest fare on the route for that date, any airline, day by day for about 60
+days, the usual range as a band, this flight's fare marked; the trend is the least-squares slope as the change over
+the last 30 days, "steady" under 4%), and shows an **airline as five stars** (the rating times five, one decimal,
+partly filled) with no sources listed: per Patrick, travellers do not care about the math. The class is `rstars`:
+`.stars` is the sky's full-screen canvas, and a clash once shrank the sky to 80 by 16 pixels.
 
 The results section is mock-2 from the design round: **every option on ONE
 clock.** A bar that always fills its row tells you how a trip is divided but not
