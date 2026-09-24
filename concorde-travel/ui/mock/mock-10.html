@@ -461,14 +461,15 @@ details[open] summary:after{content:"–"}
 .foot{border-top:1px solid var(--line);margin-top:36px;padding:22px 0 10px;font-size:12.5px;color:var(--dim);display:flex;flex-wrap:wrap;gap:10px 22px;align-items:center;justify-content:center;text-align:center}
 /* the stamp: the mark, the date of the last change and the build. Both are written in by build.py, and rewritten
    from git HEAD by server.py at serve time, so the droplet shows what is actually running. */
-.foot .stamp{flex-basis:100%;display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:6px}
+.foot .stamp{flex-basis:100%;display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:2px}
 .foot .stamp .brand{opacity:.9}.foot .stamp .lockup{font-size:11px}
 .foot .built{font:400 11px var(--mono);letter-spacing:.06em;color:var(--faint)}.foot .built code{font:inherit;color:var(--dim)}
 .wfoot{max-width:1180px;margin:0 auto;padding-inline:clamp(16px,3.5vw,32px)}
 .foot label{display:inline-flex;align-items:center;gap:8px;color:var(--text)}
 .foot select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:5px 26px 5px 9px;font-size:12.5px;appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);background-position:calc(100% - 13px) 13px,calc(100% - 9px) 13px;background-size:4px 4px;background-repeat:no-repeat}
-.foot .dimmer{color:var(--faint);flex-basis:100%;max-width:70ch;margin:0 auto}
-.foot .credit{font-style:italic;font-size:11.5px;margin-top:-6px}.foot .credit a{color:inherit;text-decoration:underline;text-underline-offset:2px}.foot .credit a:hover{color:var(--dim)}
+.foot .fnotes{flex:0 0 100%;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--faint);text-align:center}
+.foot #curnote:empty,.foot #whoami:empty{display:none}
+.foot .credit{font-style:italic;font-size:11.5px}.foot .credit a{color:inherit;text-decoration:underline;text-underline-offset:2px}.foot .credit a:hover{color:var(--dim)}
 .morebtn{display:block;margin:16px auto 0;color:var(--dim);font-size:13.5px;border-bottom:1px solid var(--line);padding:4px 2px}
 .morebtn:hover{color:var(--text)}
 .hiddenrows{margin-top:12px;color:var(--faint);font-size:12.5px;line-height:1.55}
@@ -980,7 +981,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr"></span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="dimmer credit">Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a>.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="ded6c39">ded6c39</code></span></span></footer>
+  <footer class="foot wfoot"><span class="fnotes"><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="6d85c36">6d85c36</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -1007,7 +1008,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The standard trip for this route</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Prices are calculated in US dollars, then converted. Photos from Pexels.</span><span class="dimmer credit">Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a>.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="ded6c39">ded6c39</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="fnotes"><span>Prices are calculated in US dollars, then converted.</span><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="6d85c36">6d85c36</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -3091,7 +3092,7 @@ document.addEventListener('focusout', ev => { if (ev.target.closest && ev.target
 document.addEventListener('scroll', () => { if (jtFor) hideTip(); }, {passive:true});
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && jtFor) hideTip(); });
 $('#cur').innerHTML = Object.entries(CURRENCIES).map(([k, v]) => `<option value="${k}"${k === CUR ? ' selected' : ''}>${k} · ${esc(v.name)}</option>`).join('');
-function curNote(){ const k = CURRENCIES[CUR]; $('#curnote').textContent = CUR === 'USD' ? 'Prices in US dollars.' : '1 USD = ' + k.rate + ' ' + CUR + ' (' + RATES_ASOF + ').'; }
+function curNote(){ const k = CURRENCIES[CUR]; $('#curnote').textContent = CUR === 'USD' ? '' : '1 USD = ' + k.rate + ' ' + CUR + ' (' + RATES_ASOF + ').'; }
 curNote();
 $('#cur').addEventListener('change', ev => { CUR = ev.target.value; try { localStorage.setItem('concordego.currency', CUR); } catch (e) {} curNote(); paintPar(); paintSignal(); rerenderBills(); if (S.thread.length) renderThread(); });
 addEventListener('resize', () => { paintTri(); const [x, y] = toXY(S.a, S.b, S.c); handle.style.left = x + 'px'; handle.style.top = y + 'px'; });
