@@ -1154,7 +1154,12 @@ one (airlines close bag drop 45 and 60 minutes out), or the curated airport's me
 at a connection that crosses a border red at an hour or less, green from 1h45 to 3 hours, red from 6 hours; amber
 between, and the airport's own minimum connection, an overnight in the terminal and a shut terminal still force
 red. **Flights** are coloured by the detour and the airline's rating; an unrated airline is coloured on the detour
-alone and its card says "Airline not rated yet", never "bad".
+alone and its card says "Airline not rated yet", never "bad". **Inside each block is a glyph, not a word** (per Patrick,
+2026-09-24: "airport" did not fit): a car for a ride (a train when it is public transit), a suitcase for the airport, a
+plane then "· time" for a flight, a chair for a layover (a bed for an overnight one) then the airport code and time.
+`GLYPH` holds them (Material Icons paths, Apache 2.0) in the bar's dark ink; every full-size block is a CSS size
+container, so each piece appears only once the block is wide enough for it (glyph from 16px, the words from 40 to
+72px) and nothing is ever cut mid-word. The mini bars in the rows carry no glyphs.
 
 The results section is mock-2 from the design round: **every option on ONE
 clock.** A bar that always fills its row tells you how a trip is divided but not

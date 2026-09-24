@@ -342,7 +342,7 @@ def from_kiwi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
         if ginfo.get("arrival_note") and ginfo["arrival_note"] not in notes:
             notes.append(ginfo["arrival_note"])
 
-        rating = (enr["carriers"]["ratings"] or {}).get(segs_in[0]["carrier"])
+        rating = _carrier_rating(enr, segs_in[0]["carrier"], segments)
         opt = {
             "option_id": oid,
             "display_name": "%s %s" % (segs_in[0].get("carrierName", ""), leg.get("route", [""])[-1]),
@@ -356,9 +356,7 @@ def from_kiwi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                                  if len(groups) > 1 else "Sold by Kiwi.com, not the airline"}],
         }
         if rating:
-            opt["carrier_rating"] = {"rating": rating["rating"], "note": rating["note"],
-                                     "source": enr["carriers"]["_source"],
-                                     "as_of": enr["carriers"]["_as_of"]}
+            opt["carrier_rating"] = rating
         options.append(opt)
 
     if not options:
@@ -506,6 +504,27 @@ def _short_haul(o_iata: str, d_iata: str, enr: Dict[str, Any], geo: Optional[Dic
     if None in (la1, lo1, la2, lo2):
         return False
     return _ground.haversine_km(float(la1), float(lo1), float(la2), float(lo2)) <= SHORT_HAUL_KM
+
+
+def _carrier_rating(enr: Dict[str, Any], carrier: str, segments: List[Dict[str, Any]],
+                    geo: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    """The airline's curated rating for this trip, or None. A row's `short_haul` block replaces its rating and
+    note on a short-haul trip (the same _short_haul test the bag fees use): several airlines fly a better product
+    on long-haul than at home, and one number for both misstates one of them (2026-09-24, per Patrick). The
+    row's own source and date win over the file's."""
+    cars = enr["carriers"]
+    row = (cars.get("ratings") or {}).get(carrier)
+    if not row:
+        return None
+    use = row
+    if row.get("short_haul") and segments and _short_haul(segments[0]["origin"]["iata"],
+                                                         segments[-1]["destination"]["iata"], enr, geo):
+        use = dict(row, **row["short_haul"])
+    out = {"rating": use["rating"], "note": use.get("note", ""),
+           "source": row.get("source") or cars["_source"], "as_of": row.get("as_of") or cars["_as_of"]}
+    if row.get("basis"):
+        out["basis"] = row["basis"]             # the published scores behind it, for the page's flight card
+    return out
 
 
 def _fare_row(enr: Dict[str, Any], carrier: str, brand: str, short: bool = False
@@ -787,11 +806,9 @@ def from_amadeus(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                          "price_cents": total_cents, "direct": True,
                          "note": "Book direct with %s." % issuing}],
         }
-        rating = (enr["carriers"]["ratings"] or {}).get(segments[0]["operating"]["carrier"])
+        rating = _carrier_rating(enr, segments[0]["operating"]["carrier"], segments)
         if rating:
-            opt["carrier_rating"] = {"rating": rating["rating"], "note": rating["note"],
-                                     "source": enr["carriers"]["_source"],
-                                     "as_of": enr["carriers"]["_as_of"]}
+            opt["carrier_rating"] = rating
         options.append(opt)
 
     if not options:
@@ -1399,11 +1416,9 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                          "price_cents": total_cents, "direct": True,
                          "note": "Book direct with the airline."}],
         }
-        rating = (enr["carriers"]["ratings"] or {}).get(segments[0]["operating"]["carrier"])
+        rating = _carrier_rating(enr, segments[0]["operating"]["carrier"], segments, geo)
         if rating:
-            opt["carrier_rating"] = {"rating": rating["rating"], "note": rating["note"],
-                                     "source": enr["carriers"]["_source"],
-                                     "as_of": enr["carriers"]["_as_of"]}
+            opt["carrier_rating"] = rating
         options.append(opt)
 
     if not options:
@@ -1906,11 +1921,9 @@ def from_serpapi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                                   "often_delayed": bool(f.get("often_delayed_by_over_30_min"))}
                                  for f in flights]},
         }
-        rating = (enr["carriers"]["ratings"] or {}).get(issuing)
+        rating = _carrier_rating(enr, issuing, segments, geo)
         if rating:
-            opt["carrier_rating"] = {"rating": rating["rating"], "note": rating["note"],
-                                     "source": enr["carriers"]["_source"],
-                                     "as_of": enr["carriers"]["_as_of"]}
+            opt["carrier_rating"] = rating
         options.append(opt)
 
     if not options:

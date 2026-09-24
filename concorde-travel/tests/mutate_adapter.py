@@ -250,6 +250,8 @@ MUTANTS = [
      'airport time: judge a trip by its first flight only, so New York to Chicago to London is timed as domestic'),
     (PA, "airport_minutes", 'p50 = max(floor, int(cur.get("p50") or 0))', 'p50 = int(cur.get("p50") or floor)',
      'airport time: let a curated median shorter than the floor win, so JFK to London gets 55 minutes'),
+    (AD, "_carrier_rating", 'use = dict(row, **row["short_haul"])', 'use = row',
+     'ratings: ignore the short-haul rating, so a domestic flight is judged on the airline\'s long-haul product'),
 ]
 
 caught = skipped = 0

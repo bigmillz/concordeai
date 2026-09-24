@@ -1104,6 +1104,18 @@ def main():
           and blk([("CDG", "FRA")]) == 60,
           str([blk([("JFK", "LAX")], geo_na), blk([("JFK", "LHR")]), blk([("JFK", "ORD"), ("ORD", "LHR")], geo_na),
                blk([("EWR", "LAX")], geo_na), blk([("CDG", "FRA")])]))
+    # an airline's short-haul rating on a short trip, its main one otherwise (2026-09-24, per Patrick)
+    import copy as _copy
+    enr_r = _copy.deepcopy(enr0)
+    enr_r["carriers"]["ratings"]["QQ"] = {"rating": 0.8, "note": "long", "short_haul": {"rating": 0.6, "note": "short"},
+                                          "source": "test", "as_of": "2026-09-24"}
+    seg = lambda a, b: [{"origin": {"iata": a}, "destination": {"iata": b}}]
+    geo_r = {"LAX": {"country": "US", "lat": 33.94, "lon": -118.41}, "JFK": {"country": "US", "lat": 40.64, "lon": -73.78}}
+    r_long, r_short = adapter._carrier_rating(enr_r, "QQ", seg("JFK", "LHR")), adapter._carrier_rating(enr_r, "QQ", seg("JFK", "LAX"), geo_r)
+    check("an airline's short-haul rating applies to a trip inside one country, its main rating to a long-haul one, "
+          "and the row's own source and date travel with it",
+          r_long["rating"] == 0.8 and r_short["rating"] == 0.6 and r_short["note"] == "short" and r_long["source"] == "test"
+          and adapter._carrier_rating(enr_r, "NOPE", seg("JFK", "LHR")) is None, str((r_long, r_short)))
     d_sc = adapter.from_feed(dfl)
     procs = sorted({o["airport_process_minutes"]["p50"] for o in d_sc["options"]})
     check("every option of a real New York to London search is timed at an hour and a half at the airport",
