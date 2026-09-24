@@ -5498,3 +5498,14 @@ an upgrade to the next highest preset ... I just want them updated."
   own engine on a free port, answered, and the listener received 0
   bytes. Quitting stopped the moved engine too.
 - Gauntlet 239/239.
+
+## 6b313 — The giants box says "systems", not "Macs"
+Per Patrick: "we have a Windows version. So maybe say models for 512 GB+
+systems."
+- giant_blurb() returns "Include models for 512 GB+ systems" and a
+  tooltip that says "512 GB or more of memory", with no Mac in either.
+- Both giants are MLX-only (no Ollama tag), so on Windows, Linux and
+  Intel Macs the box can't add them. Where SUPPORTED has none of them,
+  the tooltip adds "For now they run only on Apple silicon Macs."
+- The gauntlet runs giant_blurb twice, once as an Apple-silicon Mac and
+  once as Windows (SUPPORTED from the Ollama tags). 239/239.

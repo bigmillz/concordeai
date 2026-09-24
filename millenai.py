@@ -631,28 +631,33 @@ _html_escape = html.escape   # do_GET's page builder names a local `html`
 def giant_blurb() -> tuple:
     """(label, tooltip) for the giants box, from the catalog (6b312, per
     Patrick: "128 GB+" undersold models that download about 400 GB and
-    only run on a 512 GB Mac). Nothing in the catalog sits between
+    only run with 512 GB of memory). Nothing in the catalog sits between
     GPT-OSS 120B's 64 GB and the giants' 390 GB, so the honest line is
-    the Mac they need, and the tooltip names them."""
+    the memory they need, and the tooltip names them. It says "systems",
+    not "Macs", because Windows shows the same box (Patrick, 6b313); the
+    giants are MLX-only today, so there the tooltip says so."""
     g = sorted((l for l in MODEL_INFO if model_is_giant(l)),
                key=lambda l: MODEL_INFO[l]["mem"])
     if not g:
         return ("Include the largest models", "None in this version.")
     need = max(MODEL_INFO[l]["mem"] for l in g) / 1e9
-    mac = next((m for m in (192, 256, 512, 1024) if m >= need),
-               int(need))
+    tier = next((m for m in (192, 256, 512, 1024) if m >= need),
+                int(need))
 
     def span(xs):
         lo, hi = min(xs), max(xs)
         return "%d" % lo if lo == hi else "%d\u2013%d" % (lo, hi)
     names = (" and ".join(g) if len(g) < 3
              else ", ".join(g[:-1]) + " and " + g[-1])
-    return ("Include models for %d GB Macs" % mac,
-            "%s. %s a Mac with %d GB of memory (%s GB in use) and a "
-            "%s GB download." % (
-                names, "Each needs" if len(g) > 1 else "Needs", mac,
-                span([round(MODEL_INFO[l]["mem"] / 1e9) for l in g]),
-                span([round(MODEL_INFO[l]["gb"]) for l in g])))
+    tip = ("%s. %s %d GB or more of memory (%s GB in use) and a "
+           "%s GB download." % (
+               names, "Each needs" if len(g) > 1 else "Needs", tier,
+               span([round(MODEL_INFO[l]["mem"] / 1e9) for l in g]),
+               span([round(MODEL_INFO[l]["gb"]) for l in g])))
+    if not any(SUPPORTED.get(l) for l in g):
+        tip += (" For now %s only on Apple silicon Macs."
+                % ("they run" if len(g) > 1 else "it runs"))
+    return ("Include models for %d GB+ systems" % tier, tip)
 
 
 def model_fits_machine(label: str) -> bool:

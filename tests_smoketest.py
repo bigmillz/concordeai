@@ -1554,11 +1554,18 @@ check("taken port: the window opens the server this app bound",
 # 6b312, per Patrick: the models window "should be an update and clean
 # out, not trying to sell an upgrade"; the giants box must say what the
 # giants really need; and the (i) tips must not take seconds to appear.
-_mw = {}
-exec(_ast0.get_source_segment(_MILLENAI_SRC, [x for x in _ast0.parse(_MILLENAI_SRC).body
-     if getattr(x, "name", "") == "giant_blurb"][0]), dict(
-         MODEL_INFO=_pn["MODEL_INFO"], model_is_giant=lambda l: _pn["MODEL_INFO"][l]["mem"] > 128e9), _mw)
-_gl, _gt = _mw["giant_blurb"]()
+# 6b313, per Patrick: "we have a Windows version", so the box says
+# "systems", and where the giants can't run (they're MLX-only) the tip
+# says so. Run once as an Apple-silicon Mac, once as Windows.
+def _giant_blurb_on(supported):
+    _mw = {}
+    exec(_ast0.get_source_segment(_MILLENAI_SRC, [x for x in _ast0.parse(_MILLENAI_SRC).body
+         if getattr(x, "name", "") == "giant_blurb"][0]), dict(
+             MODEL_INFO=_pn["MODEL_INFO"], SUPPORTED=supported,
+             model_is_giant=lambda l: _pn["MODEL_INFO"][l]["mem"] > 128e9), _mw)
+    return _mw["giant_blurb"]()
+_gl, _gt = _giant_blurb_on({l: True for l in _pn["MODEL_INFO"]})
+_wl, _wt = _giant_blurb_on({l: bool(i["ollama"]) for l, i in _pn["MODEL_INFO"].items()})
 _jsf = lambda nm: _MILLENAI_SRC[_MILLENAI_SRC.index("function %s(" % nm):
                                 _MILLENAI_SRC.index("\n}\n", _MILLENAI_SRC.index(
                                     "function %s(" % nm)) + 3]
@@ -1597,11 +1604,13 @@ check("models window: your set updates, a bigger set adds, no upsell",
       and "if(!mine&&(rem[setupPlan]||0)<=0){" in _MILLENAI_SRC,
       str(_mo))
 check("giants box says what they need, from the catalog",
-      _gl == "Include models for 512 GB Macs"
+      _gl == _wl == "Include models for 512 GB+ systems"
       and "GLM 5.3" in _gt and "DeepSeek V3.2 671B" in _gt
-      and "512 GB of memory" in _gt and "download" in _gt
+      and "512 GB or more of memory" in _gt and "download" in _gt
+      and "Mac" not in _gt and "Mac" not in _gl
+      and _wt == _gt + " For now they run only on Apple silicon Macs."
       and "128 GB+" not in _MILLENAI_SRC.split('HTML_CONTENT = r"""')[1]
-      and _MILLENAI_SRC.count("__GIANT_LABEL__") == 3, "%s | %s" % (_gl, _gt))
+      and _MILLENAI_SRC.count("__GIANT_LABEL__") == 3, "%s | %s | %s" % (_gl, _gt, _wt))
 check("(i) tips show at once, not after the browser's title delay",
       "#tip{position:fixed" in _MILLENAI_SRC and "QUICK TIPS (6b312" in _MILLENAI_SRC
       and "el.dataset.tip=el.title;el.removeAttribute(\"title\")" in _MILLENAI_SRC
@@ -2217,7 +2226,7 @@ check("cloud wiring: ranked everywhere, no 6-id cap, no 4096 wall, one render tr
       and "AN ENTRY WITHOUT A STAMP GETS ANOTHER CHANCE" in _MILLENAI_SRC)
 check("giants boxes: greyed until no-limits, with the 512 GB tooltip",
       'id="giants" disabled' in page and 'id="wiz-gi" disabled' in page
-      and page.count("a Mac with 512 GB of memory") >= 2
+      and page.count("512 GB or more of memory") >= 2
       and "function paintGiants" in page and "include_giants:false" in page
       and "Titan · 512 GB" in _MILLENAI_SRC)
 # 6b283, per Patrick (twice): the Clean-up button and note were clipped
@@ -2523,7 +2532,7 @@ _nav = re.findall(r'data-pane="(p-[a-z]+)"', page)
 _panes = re.findall(r'class="spane[^"]*" id="(p-[a-z]+)"', page)
 _want = ["p-about", "p-account", "p-persona", "p-cloud", "p-models"]
 check("the served page names the giants' real need",
-      "Include models for 512 GB Macs" in page and "128 GB+" not in page
+      "Include models for 512 GB+ systems" in page and "128 GB+" not in page
       and "__GIANT_" not in page and "GLM 5.3" in page)
 check("About leads the rail, Account right under it",
       _nav == _want and _panes == _want
