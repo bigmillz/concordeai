@@ -1684,6 +1684,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if ROOT:
                 return self._send_file(os.path.join(UI, "mock", ROOT + ".html"), "text/html; charset=utf-8", stamp=True)
             return self._send_file(os.path.join(UI, "index.html"), "text/html; charset=utf-8")
+        if path == "/favicon.ico":
+            # the Concorde website's own icon (flyconcordefly.com), for bookmarks and browsers that ask for it by name
+            return self._send_file(os.path.join(UI, "mock", "assets", "favicon.ico"), "image/x-icon")
         if ROOT and path.startswith("/assets/"):
             # the mockup at / asks for its nameplates relative to itself
             name = os.path.basename(path)

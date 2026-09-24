@@ -1104,10 +1104,14 @@ little larger ... the podium in auto racing", then "taller rather than wider"): 
 left, first in the middle, third on the right, all one width, first place taller at both
 ends (a taller picture, more room under the buttons), the three centred on one line. The DOM
 is the visual order, so the tiles' right-to-left show and the strip across them read the row
-as seen; under 980px it is one column in rank order again. **Step 3 is rows of chips, not a form** (per
-Patrick, 2026-09-21: "not welcome to the world of data entry"): a source, a
-programme or a status is a chip until it is tapped, and only then a field, with
-the most popular few showing and the rest behind a dashed "+N more" chip.
+as seen; under 980px it is one column in rank order again. **Step 3 is dropdown rows** (per Patrick, 2026-09-23, replacing the chip rows of
+2026-09-21): three sections, Card points, Airline miles and Status, each a list of rows,
+a program picked from an alphabetical dropdown, a balance beside it (a level dropdown
+for status), an × to remove the row, and "+ Add another" under the list. A program
+already picked in a section is not offered again in it. The rows (`S.prow`) only say
+what is shown; balances and levels stay in `S.pts` and `S.status`, which the points
+pricing, upgrade odds and status credit read. A balance follows its row when the
+program is changed; a level does not, since the tiers differ.
 **Every programme and every status is offered, always** (2026-09-21, per Patrick: gated
 chips "kept disappearing"; what a person holds does not change with the search); a
 programme with no award on these flights says "no route" on the card. One tier per
