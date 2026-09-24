@@ -957,9 +957,10 @@ def _round_trip_totals(req, where):
     (2026-09-24, per Patrick: two one-ways can cost more than the round trip on the same airline). Returns
     {"outbound_cents", "totals": {return itinerary key: round-trip total in cents}, "sources"} or None.
 
-    `req["pair"]` names the chosen outbound and comes from the browser, so every field is checked here. The
-    feed prices both flights in one request (free); Google is asked only when the outbound came from Google
-    (the feed does not sell it) or the feed priced no round trip with it, because Google takes two calls."""
+    Google prices it in two calls: the outbounds, then the returns for the chosen outbound by its token, a
+    reply of a few dozen flights. The feed is NOT asked: a two-slice request returns every outbound-and-return
+    pair at once, and on 2026-09-24 that reply grew past what the 453 MB droplet could hold and the kernel
+    killed the service. `req["pair"]` names the outbound and comes from the browser, so every field is checked."""
     pair = req.get("pair") if isinstance(req.get("pair"), dict) else None
     if not pair:
         return None
@@ -976,45 +977,20 @@ def _round_trip_totals(req, where):
         return None
     back_date, ret_o, ret_d = where["date"], where["origin"]["code"], where["destination"]["code"]
     adults = max(1, min(9, int(req.get("adults", 1) or 1)))
-    totals, sources = {}, []
-    raw, meta = live.search({"origin": o_ap, "destination": d_ap, "date": out_date, "return_date": back_date,
-                             "return_origin": ret_o, "return_destination": ret_d, "adults": adults,
-                             "currency": "USD", "limit": 50, "cabin": _cabin(req.get("cabin"))})
-    offers = ((raw or {}).get("data") or {}).get("offers") if isinstance((raw or {}).get("data"), dict) else (raw or {}).get("offers")
-    for off in offers or []:
-        sl = off.get("slices") or []
-        if len(sl) != 2 or str(off.get("total_currency") or "USD") != "USD":
-            continue
-        s0 = sl[0].get("segments") or []
-        if [((g.get("marketing_carrier") or {}).get("iata_code", "") + str(int(g.get("marketing_carrier_flight_number") or 0))).upper() for g in s0] != fns:
-            continue
-        if not s0 or str(s0[0].get("departing_at") or "")[:16] != dep:
-            continue
-        key = tuple(((g.get("marketing_carrier") or {}).get("iata_code", ""), int(g.get("marketing_carrier_flight_number") or 0),
-                     str(g.get("departing_at") or "")[:16]) for g in sl[1].get("segments") or [])
-        try:
-            cents = int(round(float(off["total_amount"]) * 100))
-        except (KeyError, TypeError, ValueError):
-            continue
-        totals[key] = min(totals.get(key, cents), cents)
-    if totals:
-        sources.append("the airline, through Duffel")
-    if pair.get("source") == "google" or not totals:
-        payload, m = live.serp_round_trip(",".join(places.airports_for(ret_d)), ",".join(places.airports_for(ret_o)),
-                                          out_date, back_date, fns, adults=adults, cabin=_cabin(req.get("cabin")))
-        n0 = len(totals)
-        for grp in ("best_flights", "other_flights"):
-            for it in (payload or {}).get(grp) or []:
-                fl = it.get("flights") or []
-                if not fl or it.get("price") is None:
-                    continue
-                key = tuple((adapter._serp_code(f.get("flight_number")), int(adapter._serp_number(f.get("flight_number")) or 0),
-                             str((f.get("departure_airport") or {}).get("time") or "").replace(" ", "T")[:16]) for f in fl)
-                cents = int(round(float(it["price"]) * 100))
-                totals[key] = min(totals.get(key, cents), cents)
-        if len(totals) > n0:
-            sources.append("Google Flights")
-    return {"outbound_cents": p_out, "totals": totals, "sources": sources} if totals else None
+    payload, meta = live.serp_round_trip(",".join(places.airports_for(ret_d)), ",".join(places.airports_for(ret_o)),
+                                         out_date, back_date, fns, adults=adults, cabin=_cabin(req.get("cabin")))
+    totals = {}
+    for grp in ("best_flights", "other_flights"):
+        for it in (payload or {}).get(grp) or []:
+            fl = it.get("flights") or []
+            if not fl or it.get("price") is None:
+                continue
+            # the key the adapter gives the same flights: carrier, number and local departure minute per segment
+            key = tuple((adapter._serp_code(f.get("flight_number")), int(adapter._serp_number(f.get("flight_number")) or 0),
+                         str((f.get("departure_airport") or {}).get("time") or "").replace(" ", "T")[:16]) for f in fl)
+            cents = int(round(float(it["price"]) * 100))
+            totals[key] = min(totals.get(key, cents), cents)
+    return {"outbound_cents": p_out, "totals": totals, "sources": ["Google Flights"]} if totals else None
 
 
 def search_request(req):

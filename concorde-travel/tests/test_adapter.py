@@ -1056,38 +1056,29 @@ def main():
     rt_dear = mockdata.build_slim(dfl, round_trip={"outbound_cents": 30000, "totals": {k0: 30000 + ow0 + 1000}})
     check("a round-trip fare dearer than the two one-ways changes nothing",
           not any(e.get("round_trip") for v in rt_dear["results"].values() if isinstance(v, list) for e in v))
-    # the server matches the two-flight offers to the EXACT outbound chosen, number and departure minute
-    offs = (dfl.get("data") or {}).get("offers") or dfl.get("offers") or []
-    oa, ob = offs[0], offs[1]
-    sa = oa["slices"][0]["segments"]
-    pair = {"flights": [g["marketing_carrier"]["iata_code"] + str(int(g["marketing_carrier_flight_number"])) for g in sa],
-            "origin": oa["slices"][0]["origin"]["iata_code"], "destination": oa["slices"][0]["destination"]["iata_code"],
-            "date": sa[0]["departing_at"][:10], "depart": sa[0]["departing_at"][:16], "ticket_cents": 40000, "source": "feed"}
-    good = {"slices": [oa["slices"][0], ob["slices"][0]], "total_amount": "500.00", "total_currency": "USD"}
-    moved = json.loads(json.dumps(oa["slices"][0])); moved["segments"][0]["departing_at"] = "2026-12-01T06:00:00"
-    decoy = {"slices": [moved, ob["slices"][0]], "total_amount": "100.00", "total_currency": "USD"}
+    # the server keys Google's round-trip returns the way the adapter keys the same flights
     import server as srv
     calls = {"serp": 0}
-    real_search, real_rt = srv.live.search, srv.live.serp_round_trip
+    real_rt = srv.live.serp_round_trip
+    pair = {"flights": ["TP212", "TP1328"], "origin": "EWR", "destination": "LGW", "date": "2026-11-04",
+            "depart": "2026-11-04T18:10", "ticket_cents": 30000, "source": "feed"}
+    returns = {"other_flights": [{"price": 568, "flights": [{"flight_number": "TP 1329", "departure_airport": {"time": "2026-11-11 09:35"}},
+                                                             {"flight_number": "TP 211", "departure_airport": {"time": "2026-11-11 18:10"}}]}]}
     try:
-        srv.live.search = lambda q: ({"data": {"offers": [decoy, good]}}, {"source": "api"})
         def fake_rt(*a, **k):
             calls["serp"] += 1
-            return None, {"source": "none"}
+            return returns, {"source": "api"}
         srv.live.serp_round_trip = fake_rt
-        where = {"date": "2026-11-25", "origin": {"code": "LON"}, "destination": {"code": "NYC"}}
+        where = {"date": "2026-11-11", "origin": {"code": "LON"}, "destination": {"code": "NYC"}}
         got = srv._round_trip_totals({"pair": pair, "adults": 1}, where)
-        kb = tuple((g["marketing_carrier"]["iata_code"], int(g["marketing_carrier_flight_number"]), g["departing_at"][:16])
-                   for g in ob["slices"][0]["segments"])
-        check("the server prices the return from the offer with the chosen outbound, not a cheaper one with the same "
-              "flight numbers at another time, and asks Google nothing when the feed sold the outbound",
-              got and got["totals"].get(kb) == 50000 and got["outbound_cents"] == 40000 and calls["serp"] == 0, str(got and list(got["totals"].values())))
-        srv._round_trip_totals({"pair": dict(pair, source="google"), "adults": 1}, where)
-        check("an outbound Google sold asks Google too", calls["serp"] == 1)
-        check("a pair the browser sent with a malformed field is ignored",
-              srv._round_trip_totals({"pair": dict(pair, flights=["<script>"]), "adults": 1}, where) is None)
+        check("the server keys Google's round-trip returns as the adapter keys the same flights "
+              "(carrier, number, local departure minute), whichever source sold the outbound",
+              got and got["totals"] == {(("TP", 1329, "2026-11-11T09:35"), ("TP", 211, "2026-11-11T18:10")): 56800}
+              and got["outbound_cents"] == 30000 and calls["serp"] == 1, str(got))
+        check("a pair the browser sent with a malformed field is ignored, and nothing is asked",
+              srv._round_trip_totals({"pair": dict(pair, flights=["<script>"]), "adults": 1}, where) is None and calls["serp"] == 1)
     finally:
-        srv.live.search, srv.live.serp_round_trip = real_search, real_rt
+        srv.live.serp_round_trip = real_rt
     check("merging: a supplement fare for flights the feed already sells at that price or less is left out; a cheaper one stays",
           len(merged["options"]) == len(main["options"]) + 1
           and min(adapter._ticket_cents(o) for o in merged["options"] if adapter._itin_key(o) == adapter._itin_key(cheaper)) == adapter._ticket_cents(cheaper))

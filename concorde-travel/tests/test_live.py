@@ -71,8 +71,8 @@ class _Body:
     def __init__(self, b):
         self.b = b
 
-    def read(self):
-        return self.b
+    def read(self, n=-1):
+        return self.b if n is None or n < 0 else self.b[:n]
 
     def __enter__(self):
         return self
@@ -318,6 +318,20 @@ def main():
     payload, meta = live.search(Q, cfg3)
     after = live.load_quota()["day_calls"]
     check("a cache hit is served", meta["source"] == "cache" and payload is not None)
+    # a reply too big to hold is refused before it is parsed (2026-09-24: an oversized reply cost the service its memory)
+    big_real, big_cap = live.urllib.request.urlopen, live.MAX_RESPONSE_BYTES
+    try:
+        live.MAX_RESPONSE_BYTES = 1000
+        live.urllib.request.urlopen = lambda req, timeout=0: _Body(b'{"data": {"offers": []}, "pad": "' + b"x" * 5000 + b'"}')
+        cfgb = cfg_with(quota={"per_day": 50, "per_month": 50, "min_seconds_between_calls": 0, "cache_ttl_seconds": 600})
+        pb, mb = live.search(dict(Q, date="2026-12-24"), cfgb)
+        check("a reply larger than the limit is refused with a sentence, not parsed and not cached",
+              pb is None and "more than can be read" in mb.get("error", "") and live.cache_get(dict(Q, date="2026-12-24"), 600) is None, mb)
+    finally:
+        live.urllib.request.urlopen, live.MAX_RESPONSE_BYTES = big_real, big_cap
+        for f in os.listdir(tmp):                     # the refused reply was a counted call; later checks count from zero
+            if f.startswith("quota"):
+                os.remove(os.path.join(tmp, f))
     check("and costs no quota", before == after == 0,
           "a cache that spends a call is not a cache")
 
@@ -393,7 +407,7 @@ def main():
     class FakeResp:
         def __init__(self, body):
             self._b = body.encode() if isinstance(body, str) else body
-        def read(self):
+        def read(self, n=-1):
             return self._b
         def __enter__(self):
             return self

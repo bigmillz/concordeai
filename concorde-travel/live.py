@@ -58,6 +58,10 @@ CACHE_DIR = os.path.join(HOME, "cache")
 # A bare Python-urllib User-Agent gets 403'd by provider edges - "works in
 # curl, fails in-app" is usually a UA fingerprint, not logic.
 UA = "ConcordeGo/0.1 (+flight re-ranker; contact: operator)"
+# The most a provider's reply may be. A one-way search replies with up to about 5 MB; on 2026-09-24 a round-trip
+# request (every outbound-and-return pair at once) grew past what a 453 MB droplet could hold, the kernel killed the
+# service, and the site went down until it restarted. Read no more than this, so no reply can do that again.
+MAX_RESPONSE_BYTES = 15 * 1024 * 1024
 
 _QUOTA_DEFAULT = {
     "per_day": 100,
@@ -621,7 +625,12 @@ def search(query, cfg=None, allow_call=True):
     req = urllib.request.Request(url, data=data, headers=hdrs)
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
-            body = r.read().decode("utf-8", "replace")
+            raw_bytes = r.read(MAX_RESPONSE_BYTES + 1)
+        if len(raw_bytes) > MAX_RESPONSE_BYTES:
+            # the provider answered, so the call counted; but a reply this size would take the whole service down
+            return None, {"source": "none", "quota": quota_state(cfg),
+                          "error": "The flight search sent back more than can be read at once. Try a narrower search."}
+        body = raw_bytes.decode("utf-8", "replace")
     except urllib.error.HTTPError as exc:
         detail = ""
         try:
