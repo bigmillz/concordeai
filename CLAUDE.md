@@ -798,9 +798,10 @@ own duration (`_offset_by_duration`: one end's offset known, the other's is arit
 so a connection through such an airport is kept; with neither end known it still drops. And `data.build_slim` always
 puts the five cheapest tickets in the pool (`CHEAPEST_TICKETS`) whatever their rank: the ranking may demote a $159
 Frontier connection below a $201 nonstop, but it must be on the page with its reasons, never absent. Mutants cover all
-three (42 now). The check's harness is `/var/lib/concordego/parity/parity.py` on the droplet, run as the service user
-with `systemd-run --uid=concordego -p EnvironmentFile=/etc/concordego.env --wait --pipe`; it keeps its own HOME, so
-the site's allowances are untouched, and spends about five SerpApi calls a trip.
+three (42 now). The check itself is `concorde-travel/tests/parity_google.py` (not an offline suite: it spends real searches),
+run on the droplet as the service user with `systemd-run --uid=concordego -p EnvironmentFile=/etc/concordego.env
+--wait --pipe`; it keeps its own HOME, so the site's allowances are untouched, and spends two or three SerpApi calls a
+trip (`PARITY_NO_RT=1` skips the round-trip call).
 
 **The price signal and the nearby days cost no new key** (2026-09-22, per Patrick: a paid feed
 has to earn its keep every month, not once). **The price signal** is read off the SerpApi
