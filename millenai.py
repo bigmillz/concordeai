@@ -537,7 +537,8 @@ HW_CLASSES = [   # (key, header, resident-GB ceiling for the class)
 # 5.3 and DeepSeek V3.2 need 390-430 GB, which only a 512 GB Mac Studio
 # has. They stay in the catalog, so auto-clean never deletes a download
 # someone chose, but every list hides them unless BOTH "ignore system
-# limits" and "include 128 GB+ models" are ticked.
+# limits" and the giants box are ticked. The box says what they really
+# need (giant_blurb), not the 128 GB line that hides them.
 GIANT_GB = 128
 
 
@@ -622,6 +623,36 @@ def giants_on() -> bool:
 
 def model_is_giant(label: str) -> bool:
     return MODEL_MEM_BYTES.get(label, 0) > GIANT_GB * 1e9
+
+
+_html_escape = html.escape   # do_GET's page builder names a local `html`
+
+
+def giant_blurb() -> tuple:
+    """(label, tooltip) for the giants box, from the catalog (6b312, per
+    Patrick: "128 GB+" undersold models that download about 400 GB and
+    only run on a 512 GB Mac). Nothing in the catalog sits between
+    GPT-OSS 120B's 64 GB and the giants' 390 GB, so the honest line is
+    the Mac they need, and the tooltip names them."""
+    g = sorted((l for l in MODEL_INFO if model_is_giant(l)),
+               key=lambda l: MODEL_INFO[l]["mem"])
+    if not g:
+        return ("Include the largest models", "None in this version.")
+    need = max(MODEL_INFO[l]["mem"] for l in g) / 1e9
+    mac = next((m for m in (192, 256, 512, 1024) if m >= need),
+               int(need))
+
+    def span(xs):
+        lo, hi = min(xs), max(xs)
+        return "%d" % lo if lo == hi else "%d\u2013%d" % (lo, hi)
+    names = (" and ".join(g) if len(g) < 3
+             else ", ".join(g[:-1]) + " and " + g[-1])
+    return ("Include models for %d GB Macs" % mac,
+            "%s. %s a Mac with %d GB of memory (%s GB in use) and a "
+            "%s GB download." % (
+                names, "Each needs" if len(g) > 1 else "Needs", mac,
+                span([round(MODEL_INFO[l]["mem"] / 1e9) for l in g]),
+                span([round(MODEL_INFO[l]["gb"]) for l in g])))
 
 
 def model_fits_machine(label: str) -> bool:
@@ -11887,6 +11918,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     .replace("__APP_BETA__",
                              'VERSION <b class="vnum">%s</b>' % short_version())
                     .replace("__CHIP__", chip_name())
+                    .replace("__GIANT_LABEL__", _html_escape(giant_blurb()[0]))
+                    .replace("__GIANT_TIP__", _html_escape(giant_blurb()[1]))
                     .replace("__MEM_LABEL__", mem_label())
                     .replace("__WIN_WIPE__",
                              "1" if (HAS_WEBVIEW and IS_MAC) else "0")
@@ -17368,7 +17401,16 @@ body.gen #chip-model{color:var(--accent)}
   font-size:10px;line-height:13px;text-align:center;
   font-family:var(--helv);margin-left:auto;
 }
-.hint:hover{color:var(--text);border-color:var(--dim)}
+.hint:hover,.hint:focus-visible{color:var(--text);border-color:var(--dim);outline:none}
+/* QUICK TIPS (6b312): see the script at the end of the page */
+#tip{position:fixed;z-index:9999;max-width:290px;padding:8px 11px;
+  border-radius:9px;background:#1d2027;color:#eceef3;
+  border:1px solid rgba(255,255,255,.09);font:12.5px/1.45 var(--helv);
+  box-shadow:0 10px 28px -10px rgba(0,0,0,.7);pointer-events:none;
+  opacity:0;transform:translateY(-3px);
+  transition:opacity .08s ease,transform .08s ease}
+#tip.on{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){#tip{transition:none}}
 
 /* response length (6b231): slim rail, full width, and the same
    mono micro-header type as every other label in this window. The
@@ -17675,6 +17717,11 @@ body.gen #chip-model{color:var(--accent)}
 .plan.on{border-color:var(--accent-hot);background:var(--accent-dim)}
 .plan.done{opacity:.45;cursor:default}
 .plan.done:hover{border-color:var(--line)}
+/* 6b312: in the Your models window the installed set is a real choice
+   (picking it updates what you have), so it isn't greyed out there */
+.plans.mine .plan.done{opacity:1;cursor:pointer}
+.plans.mine .plan.done:hover{border-color:var(--accent-hot)}
+.plans.mine .plan.done em{color:var(--accent-hot)}
 #nolimits-row{display:flex;gap:8px;align-items:flex-start;
   font-size:11px;color:var(--faint);margin:10px 2px 0;cursor:pointer;
   line-height:1.5;text-align:left}
@@ -18484,8 +18531,8 @@ __CODE_ROWS__
       <!-- 6b307, per Patrick: the giants sit behind a second box that
            only wakes up once the first is ticked -->
       <label id="wiz-giants" class="giants-row off"><input type="checkbox"
-        id="wiz-gi" disabled><span>Include 128 GB+ models</span><i
-        class="hint" title="Massive models: each one needs at least 512 GB of memory to run, and downloads about 400 GB.">i</i></label>
+        id="wiz-gi" disabled><span>__GIANT_LABEL__</span><i
+        class="hint" title="__GIANT_TIP__">i</i></label>
     </div>
 
     <div class="wstep" data-w="3" hidden>
@@ -18516,16 +18563,16 @@ __CODE_ROWS__
 
 <div id="setup-veil" hidden>
   <div id="setup-card">
-    <h2 id="setup-title">Updates available</h2>
-    <p class="sub" id="setup-sub">New models are ready for this machine.
-      They download in the background while you keep chatting.</p>
+    <h2 id="setup-title">Your models</h2>
+    <p class="sub" id="setup-sub">Pick your set to update it, or a bigger
+      set to add models.</p>
     <div id="setup-list"></div>
     <label id="nolimits-row"><input type="checkbox" id="nolimits">
       No limits — offer models beyond this machine&rsquo;s memory
       (can swap hard)</label>
     <label id="giants-row" class="giants-row off"><input type="checkbox"
-      id="giants" disabled><span>Include 128 GB+ models</span><i
-      class="hint" title="Massive models: each one needs at least 512 GB of memory to run, and downloads about 400 GB.">i</i></label>
+      id="giants" disabled><span>__GIANT_LABEL__</span><i
+      class="hint" title="__GIANT_TIP__">i</i></label>
     <div id="setup-note"></div>
     <div id="setup-foot">
       <button id="setup-later">Later</button>
@@ -22368,42 +22415,67 @@ function renderSetup(st){
       : '<div class="setup-row clickable" data-model="'+esc(m.label)+'">'
         +'<span class="nm">'+esc(m.label)+'</span>'+state(m)
         +'<div class="bar"><i style="width:'+(m.pct||0)+'%"></i></div></div>';
-  // CONSOLIDATED "Update Models" view: recommended picks up front,
-  // everything else counted and folded — never a wall of every model
-  // manual = the same three choices as first run, plus the sentence
-  const missing=st.models.filter(m=>m.status!=="ready");
-  const recs=missing.filter(m=>m.star);
-  if(recs.length){
-    setTitle("Updates available",
-      "New models are ready for this machine \u2014 pick how much you "
-      +"want. They download in the background while you keep chatting.");
-    html+=planCards(st);
-  }else{
-    setTitle("You\u2019re up to date",
-      "Every model this machine can run is installed.");
+  // YOUR MODELS, NOT AN UPSELL (6b312, per Patrick: "why can't they
+  // select the fast preset that they already have installed to update
+  // their library of models without adding more models they may not
+  // want? ... It should be an update and clean out"). This window
+  // called itself "Updates available" whenever ANY model of the biggest
+  // set was missing, greyed out the set you have and preselected the
+  // next one up. Now your set opens selected, picking it updates what
+  // you have and clears out old versions (the Update models run), and
+  // a bigger set is an add that says so. No progress bar until
+  // something actually downloads.
+  if(!setupPlanPicked){
+    const have=currentPlan(st);
+    if(have)setupPlan=have;
+    setupPlanPicked=true;
   }
-  setupList.innerHTML=html;
+  const cu=st.cleanup||{};
+  const upd=(cu.updates||[]).some(u=>u.new)||(cu.gb||0)>0;
+  const all=((st.plans||{}).max||0)<=0;
+  setTitle("Your models",
+    upd?"Newer versions of models you have are ready. Pick your set to "
+        +"update it and clear out the old ones, or a bigger set to add more."
+    :all?"You have every model this machine can run, and they\u2019re up "
+        +"to date."
+    :"Your set is up to date. Pick a bigger set to add more; it downloads "
+        +"in the background while you keep chatting.");
+  setupList.innerHTML=planCards(st,true);
   wirePlans(st);
 
   if(!st.mlx_ok){
-    setupNote.textContent="engine not installed — reopen the app to finish setup";
-    setupGo.disabled=true;
+    setupNote.textContent="engine not installed \u2014 reopen the app to finish setup";
   }else if(stars.some(m=>m.status==="error")){
-    setupNote.textContent="a download failed — check your connection, then retry";
+    setupNote.textContent="a download failed \u2014 check your connection, then retry";
   }else{
     setupNote.textContent="";
   }
-
-  if(anyDl){
-    setupGo.disabled=true;setupGo.textContent="Downloading\u2026";
-  }else if(setupAllReady){
-    setupGo.disabled=false;setupGo.textContent="Let\u2019s run it";
+  paintManualGo(st);
+}
+// the largest set that's fully installed: the one this person has
+function currentPlan(st){
+  const rem=st.plans||{};
+  return ["max","pro","basic"].find(k=>(rem[k]||0)<=0)||"";
+}
+// the Your models window's one button: your own set updates, a bigger
+// set adds, and nothing to do says so
+function paintManualGo(st){
+  const cu=st.cleanup||{},left=(st.plans||{})[setupPlan]||0;
+  const name={basic:"Fast",pro:"Pro",max:"Max"}[setupPlan]||"models";
+  setupGo.disabled=!st.mlx_ok;
+  if(left>0){
+    setupGo.dataset.act="add";
+    setupGo.textContent="Add "+name+" \u00b7 "+Math.max(1,Math.round(left))+" GB";
+  }else if((cu.updates||[]).some(u=>u.new)){
+    setupGo.dataset.act="update";
+    setupGo.textContent="Update models"
+      +(cu.dl_gb?" \u00b7 "+Math.max(1,Math.round(cu.dl_gb))+" GB":"");
+  }else if((cu.gb||0)>0){
+    setupGo.dataset.act="update";
+    setupGo.textContent="Clear out old models \u00b7 "+muGB(cu.gb);
   }else{
-    const left=(st.plans||{})[setupPlan]||0;
-    setupGo.disabled=!st.mlx_ok||left<=0;
-    setupGo.textContent=left<=0?"Up to date \u2713"
-      :(stars.some(m=>m.status==="error")?"Retry":"Update")+
-       " \u00b7 "+planGB(st)+" GB";
+    setupGo.dataset.act="";setupGo.disabled=true;
+    setupGo.textContent="Up to date \u2713";
   }
 }
 // the button quotes the CHOSEN plan, not the whole catalog
@@ -22418,16 +22490,16 @@ function nowLine(st){
   const q=st.queued_n?(st.queued_n+" waiting"):"";
   return [now.join("  \u00b7  "),q].filter(Boolean).join("  \u00b7  ");
 }
-function planCards(st){
+function planCards(st,mine){
   const rem=st.plans||{};
   const meta=[["basic","Fast","Quick answers, tiny download"],
               ["pro","Pro","Great everyday quality"],
               ["max","Max","The best this machine can run"]];
-  if((rem[setupPlan]||0)<=0){
+  if(!mine&&(rem[setupPlan]||0)<=0){
     const next=meta.find(([k])=>rem[k]>0);
     if(next)setupPlan=next[0];
   }
-  return '<div class="plans">'+meta.map(([k,name,desc])=>{
+  return '<div class="plans'+(mine?' mine':'')+'">'+meta.map(([k,name,desc])=>{
     const left=rem[k]||0;
     return '<div class="plan'+(left<=0?' done':'')+'" data-plan="'+k+'">'
       +'<b>'+name+'</b><span>'+desc+'</span>'
@@ -22437,12 +22509,14 @@ function planCards(st){
 function wirePlans(st){
   setupList.querySelectorAll(".plan").forEach(el=>{
     el.classList.toggle("on",el.dataset.plan===setupPlan);
-    if(el.classList.contains("done"))return;
+    // your own set is a choice in the Your models window (6b312)
+    if(el.classList.contains("done")&&!setupManual)return;
     el.addEventListener("click",()=>{
-      setupPlan=el.dataset.plan;
+      setupPlan=el.dataset.plan;setupPlanPicked=true;
       setupList.querySelectorAll(".plan").forEach(x=>
         x.classList.toggle("on",x===el));
-      setupGo.textContent="Update \u00b7 "+planGB(st)+" GB";
+      if(setupManual)paintManualGo(st);
+      else setupGo.textContent="Update \u00b7 "+planGB(st)+" GB";
     });
   });
 }
@@ -22570,7 +22644,7 @@ function rainbowWipe(){
 let wasDownloading=false;
 // true when the panel was opened to add models rather than by first-run setup
 let setupManual=false;
-let setupPlan="pro";
+let setupPlan="pro",setupPlanPicked=false;
 function celebrateDownloads(){
   const card=$("#setup-card"),veil=$("#setup-veil");
   // the card grows and dissolves, then the wipe runs
@@ -22642,14 +22716,18 @@ if(dlStrip)dlStrip.addEventListener("click",()=>{
   if(dlStrip.dataset.upd){openModelUpdates();return;}
   dlStrip.hidden=true;openSetup();});
 function openSetup(){
-  setupManual=true;
+  setupManual=true;setupPlanPicked=false;
   veil.hidden=false;setupTick();
   if(!setupTimer)setupTimer=setInterval(setupTick,1200);
 }
 function closeSetup(){veil.hidden=true;if(setupTimer){clearInterval(setupTimer);setupTimer=null;}input.focus();}
 setupLater.addEventListener("click",closeSetup);
 setupGo.addEventListener("click",async()=>{
-  if(setupAllReady){closeSetup();return;}
+  // your own set picked: update what you have, in the Update models card
+  if(setupManual&&setupGo.dataset.act==="update"){
+    closeSetup();runModelUpdate();return;}
+  if(setupAllReady&&!(setupManual&&setupGo.dataset.act==="add")){
+    closeSetup();return;}
   await fetch("/api/setup/install",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({plan:setupPlan})});
@@ -22791,7 +22869,7 @@ $("#giants").addEventListener("change",async()=>{
     body:JSON.stringify({include_giants:$("#giants").checked})});
   setupTick();
 });
-$("#models-flag").addEventListener("click",()=>{openSetup();});
+$("#models-flag").addEventListener("click",()=>{openModelUpdates();});
 
 /* -------------------------------------------------- first-run wizard */
 // Four steps over the app (6b247, per Patrick). Reuses the machinery
@@ -22950,9 +23028,14 @@ function paintModelsFlag(st){
   if(st.busy){
     f.hidden=true;
   }else{
-    f.textContent="MODELS AVAILABLE";
+    // UPDATES, NOT AN UPSELL (6b312, per Patrick): this lit whenever any
+    // model of the biggest set was missing, forever for anyone on Fast
+    // or Pro, and opened the add-models picker. Now it lights only when
+    // models you HAVE have newer versions or old ones to clear.
+    const c=st.cleanup||{};
+    f.textContent="MODEL UPDATES";
     f.hidden=!(st.mlx_ok&&!st.needs_setup&&
-      st.models.some(m=>m.star&&m.status!=="ready"));
+      ((c.updates||[]).length>0||(c.gb||0)>0));
   }
 }
 // keep the chip honest while downloads run behind a closed panel
@@ -23653,6 +23736,20 @@ function muDismiss(){
   const v=muHost.closest("#updated-veil,#clean-veil");
   if(v)v.hidden=true;
   muHost=null;clearTimeout(muTimer);muTimer=null;
+}
+// update what you have: new versions in, old ones out. The Update models
+// card's button and your own set in the Your models window both land here
+async function runModelUpdate(){
+  const host=$("#clean-models");
+  $("#clean-veil").hidden=false;
+  try{await muFetch(true);}catch(e){}
+  host.dataset.ran="1";
+  let st=null;
+  try{st=await(await fetch("/api/model/update",{method:"POST",
+    headers:{"Content-Type":"application/json"},body:"{}"})).json();}
+  catch(e){}
+  muShow(host,st);
+  if(!st||st.state!=="running")muSettled();
 }
 async function openModelUpdates(){
   let r;try{r=await muFetch(true);}catch(e){return;}
@@ -24468,6 +24565,45 @@ $("#z-ov").addEventListener("click",e=>{
   if(e.target===$("#z-ov"))window.zitoEsc();
 });
 addEventListener("resize",()=>{if(zOn)zLayout();});
+})();
+
+/* QUICK TIPS (6b312, per Patrick: the (i) tooltips took two or three
+   seconds to appear). That delay belongs to the browser's own title
+   tooltip and can't be shortened, so every .hint keeps its text in
+   data-tip instead and this shows it at once, under the icon and
+   inside the window. A title set later (the cloud-power hint is
+   rewritten after the key check) is taken over on the next hover. */
+(function(){
+  const tip=document.createElement("div");
+  tip.id="tip";tip.setAttribute("role","tooltip");
+  document.body.appendChild(tip);
+  let cur=null;
+  const take=el=>{
+    if(el.title){el.dataset.tip=el.title;el.removeAttribute("title");}
+    return el.dataset.tip||"";
+  };
+  function show(el){
+    const text=take(el);if(!text)return;
+    cur=el;tip.textContent=text;tip.classList.add("on");
+    const r=el.getBoundingClientRect(),w=tip.offsetWidth,h=tip.offsetHeight;
+    const x=Math.min(Math.max(8,r.left+r.width/2-w/2),innerWidth-w-8);
+    const y=r.bottom+8+h>innerHeight-8?r.top-h-8:r.bottom+8;
+    tip.style.left=x+"px";tip.style.top=y+"px";
+  }
+  function hide(){cur=null;tip.classList.remove("on");}
+  document.addEventListener("mouseover",e=>{
+    const h=e.target.closest&&e.target.closest(".hint");
+    if(h&&h!==cur)show(h);else if(!h&&cur)hide();
+  });
+  document.addEventListener("focusin",e=>{
+    const h=e.target.closest&&e.target.closest(".hint");
+    if(h)show(h);
+  });
+  document.addEventListener("focusout",hide);
+  addEventListener("scroll",hide,true);
+  document.querySelectorAll(".hint").forEach(h=>{
+    if(!h.hasAttribute("tabindex"))h.tabIndex=0;take(h);
+  });
 })();
 
 input.focus();

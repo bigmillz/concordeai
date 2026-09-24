@@ -1551,6 +1551,62 @@ check("taken port: the window opens the server this app bound",
       "moved=%s named_fails=%s lock=%s calls=%s overlap=%s"
       % (_moved, _named_fails, _si_ok, _si_calls,
          set(_pn["FALLBACK_PORTS"]) & _eng))
+# 6b312, per Patrick: the models window "should be an update and clean
+# out, not trying to sell an upgrade"; the giants box must say what the
+# giants really need; and the (i) tips must not take seconds to appear.
+_mw = {}
+exec(_ast0.get_source_segment(_MILLENAI_SRC, [x for x in _ast0.parse(_MILLENAI_SRC).body
+     if getattr(x, "name", "") == "giant_blurb"][0]), dict(
+         MODEL_INFO=_pn["MODEL_INFO"], model_is_giant=lambda l: _pn["MODEL_INFO"][l]["mem"] > 128e9), _mw)
+_gl, _gt = _mw["giant_blurb"]()
+_jsf = lambda nm: _MILLENAI_SRC[_MILLENAI_SRC.index("function %s(" % nm):
+                                _MILLENAI_SRC.index("\n}\n", _MILLENAI_SRC.index(
+                                    "function %s(" % nm)) + 3]
+_mjs = (_jsf("currentPlan") + _jsf("paintManualGo")
+        + 'function muGB(x){x=+x||0;return (x>=10?Math.round(x):Math.round(x*10)/10)+" GB";}'
+        'const out=[];let setupPlan;const setupGo={dataset:{}};'
+        'const P={basic:0,pro:9.2,max:9.4};'
+        'for(const [plan,cu] of [["basic",{updates:[],gb:0}],'
+        '["basic",{updates:[{old:"A",new:"B"}],dl_gb:2.4,gb:1}],'
+        '["basic",{updates:[{old:"A"}],gb:4.7}],["pro",{updates:[],gb:0}]]){'
+        'setupPlan=plan;paintManualGo({mlx_ok:true,plans:P,cleanup:cu});'
+        'out.push([setupGo.textContent,setupGo.dataset.act,setupGo.disabled]);}'
+        'out.push(currentPlan({plans:P}),currentPlan({plans:{basic:0,pro:0,max:0}}),'
+        'currentPlan({plans:{basic:1,pro:9,max:9}}));'
+        'process.stdout.write(JSON.stringify(out));')
+try:
+    open(os.path.join(_si_dir, "mw.js"), "w").write(_mjs)
+    _mo = json.loads(subprocess.run(["node", os.path.join(_si_dir, "mw.js")],
+                                    capture_output=True, text=True, timeout=30).stdout)
+except Exception as _e:
+    _mo = ["ERR %s" % _e]
+_flag = _MILLENAI_SRC.split("function paintModelsFlag(st){")[1].split("\n}\n")[0]
+check("models window: your set updates, a bigger set adds, no upsell",
+      _mo == [["Up to date ✓", "", True],
+              ["Update models · 2 GB", "update", False],
+              ["Clear out old models · 4.7 GB", "update", False],
+              ["Add Pro · 9 GB", "add", False],
+              "basic", "max", ""]
+      and 'f.textContent="MODEL UPDATES";' in _flag
+      and "c.updates" in _flag and "m.star" not in _flag
+      and '$("#models-flag").addEventListener("click",()=>{openModelUpdates();});' in _MILLENAI_SRC
+      and 'setTitle("Updates available"' not in _MILLENAI_SRC
+      and '<h2 id="setup-title">Updates available' not in _MILLENAI_SRC
+      and "if(setupManual&&setupGo.dataset.act===\"update\"){" in _MILLENAI_SRC
+      and "closeSetup();runModelUpdate();return;}" in _MILLENAI_SRC
+      and "if(!mine&&(rem[setupPlan]||0)<=0){" in _MILLENAI_SRC,
+      str(_mo))
+check("giants box says what they need, from the catalog",
+      _gl == "Include models for 512 GB Macs"
+      and "GLM 5.3" in _gt and "DeepSeek V3.2 671B" in _gt
+      and "512 GB of memory" in _gt and "download" in _gt
+      and "128 GB+" not in _MILLENAI_SRC.split('HTML_CONTENT = r"""')[1]
+      and _MILLENAI_SRC.count("__GIANT_LABEL__") == 3, "%s | %s" % (_gl, _gt))
+check("(i) tips show at once, not after the browser's title delay",
+      "#tip{position:fixed" in _MILLENAI_SRC and "QUICK TIPS (6b312" in _MILLENAI_SRC
+      and "el.dataset.tip=el.title;el.removeAttribute(\"title\")" in _MILLENAI_SRC
+      and 'document.addEventListener("focusin"' in _MILLENAI_SRC
+      and "transition:opacity .08s" in _MILLENAI_SRC)
 # (2) ENGINES ANOTHER ACCOUNT RUNS ARE NOT OURS. A listener counts only
 # when lsof (which shows a user only their own processes) finds it
 # running as us; our Ollama then runs privately on a free port.
@@ -2142,7 +2198,7 @@ _gz_set(True, False); _v1 = [_gz["model_fits_machine"](l) for l in _big]
 _gz_set(False, True); _v2 = [_gz["model_fits_machine"](l) for l in _big]
 _gz_set(True, True); _v3 = [_gz["model_fits_machine"](l) for l in _big]
 _max3 = _gz["plan_labels"]("all")
-check("128 GB+ models only with both boxes ticked, and never in Max otherwise",
+check("giant models only with both boxes ticked, and never in Max otherwise",
       _big and not any(_v0 + _v1 + _v2) and all(_v3)
       and not set(_big) & set(_max0) and set(_big) <= set(_max3)
       and _gz["model_fits_machine"]("GPT-OSS 120B") in (True, False),
@@ -2161,7 +2217,7 @@ check("cloud wiring: ranked everywhere, no 6-id cap, no 4096 wall, one render tr
       and "AN ENTRY WITHOUT A STAMP GETS ANOTHER CHANCE" in _MILLENAI_SRC)
 check("giants boxes: greyed until no-limits, with the 512 GB tooltip",
       'id="giants" disabled' in page and 'id="wiz-gi" disabled' in page
-      and page.count("at least 512 GB of memory") >= 2
+      and page.count("a Mac with 512 GB of memory") >= 2
       and "function paintGiants" in page and "include_giants:false" in page
       and "Titan · 512 GB" in _MILLENAI_SRC)
 # 6b283, per Patrick (twice): the Clean-up button and note were clipped
@@ -2466,6 +2522,9 @@ check("settings: descriptions + Account pane + scoped forget",
 _nav = re.findall(r'data-pane="(p-[a-z]+)"', page)
 _panes = re.findall(r'class="spane[^"]*" id="(p-[a-z]+)"', page)
 _want = ["p-about", "p-account", "p-persona", "p-cloud", "p-models"]
+check("the served page names the giants' real need",
+      "Include models for 512 GB Macs" in page and "128 GB+" not in page
+      and "__GIANT_" not in page and "GLM 5.3" in page)
 check("About leads the rail, Account right under it",
       _nav == _want and _panes == _want
       and '<button class="snav on" data-pane="p-about">About</button>' in page

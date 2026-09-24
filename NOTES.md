@@ -5464,3 +5464,37 @@ without waiting for accounts.
 - Gauntlet: "no reference to an undeclared perf" and "the page script
   uses no undeclared names" (a new browser API goes in _PAGE_HOST);
   mutation-tested by putting each bug back. 235/235.
+
+## 6b312 — Your models: update what you have, no upsell
+Per Patrick: "It should be an update and clean out, not trying to sell
+an upgrade to the next highest preset ... I just want them updated."
+- The header badge read MODELS AVAILABLE whenever any model of the
+  biggest set was missing (forever, for anyone on Fast or Pro) and
+  opened the add-models picker. It now reads MODEL UPDATES, lights only
+  when models you HAVE have newer versions or old ones to clear
+  (st.cleanup), and opens the Update models card.
+- The picker, titled "Updates available", greyed out the set you have
+  and preselected the next one up. It is "Your models" now: your set
+  (currentPlan: the largest fully installed) opens selected and stays
+  clickable; picking it runs the Update models flow (runModelUpdate:
+  new versions in, old ones out), with "Update models · N GB", "Clear
+  out old models · N GB" or "Up to date ✓". A bigger set says "Add Pro
+  · 9 GB". The progress bar shows only while something downloads.
+- The giants box said "Include 128 GB+ models" for two models that use
+  390-430 GB and download 378-418 GB. giant_blurb() builds the label
+  and tooltip from the catalog: "Include models for 512 GB Macs", and
+  the tooltip names them. Nothing in the catalog sits between GPT-OSS
+  120B (64 GB) and the giants.
+- (i) tips appear at once. The native title tooltip has a fixed delay
+  that can't be shortened, so .hint text moves to data-tip and a small
+  script shows it under the icon, inside the window, on hover or focus.
+- Caught by the gauntlet on the first run: the page builder in do_GET
+  names a local `html`, so html.escape inside it raised
+  UnboundLocalError and the page failed to load. _html_escape is bound at
+  module level.
+- Two-user test on the real Mac (a second macOS login, concordetest): it
+  held Llama 3.2 1B's engine port with a logging listener. The new app
+  logged "another account holds Llama 3.2 1B's engine port", ran its
+  own engine on a free port, answered, and the listener received 0
+  bytes. Quitting stopped the moved engine too.
+- Gauntlet 239/239.
