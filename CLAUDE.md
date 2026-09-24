@@ -486,7 +486,11 @@ existing one), ufw on the box with ssh only, and sshd by key only, root included
 (`/etc/ssh/sshd_config.d/50-concordego.conf`). Security updates are unattended
 (`/etc/apt/apt.conf.d/52concordego-unattended`: the security channels only, unused kernels
 and dependencies removed, an automatic reboot at 09:30 UTC, 05:30 New York, only when a
-kernel asks); `droplet.sh` writes all of that on a fresh box.
+kernel asks); `droplet.sh` writes all of that on a fresh box. For a full update beyond the security channels,
+`concorde-travel/deploy/update-system.sh` (2026-09-24, run by hand for now) does update, full-upgrade keeping
+edited config files, autoremove --purge, autoclean and snap refresh, waits for the nightly updater's lock,
+logs to `/var/log/update-system/`, and reboots only with `--reboot`; `--dry-run` changes nothing. It runs from
+a laptop without being copied: `ssh root@67.207.85.212 'bash -s' < concorde-travel/deploy/update-system.sh`.
 
 **Every key lives in `/etc/concordego.env` on the droplet** (0600, read by systemd, never in
 the repo, the plist, a command line or chat): `CONCORDEGO_FLIGHT_KEY` (Duffel),
