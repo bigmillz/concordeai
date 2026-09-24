@@ -489,8 +489,24 @@ and dependencies removed, an automatic reboot at 09:30 UTC, 05:30 New York, only
 kernel asks); `droplet.sh` writes all of that on a fresh box. For a full update beyond the security channels,
 `concorde-travel/deploy/update-system.sh` (2026-09-24, run by hand for now) does update, full-upgrade keeping
 edited config files, autoremove --purge, autoclean and snap refresh, waits for the nightly updater's lock,
-logs to `/var/log/update-system/`, and reboots only with `--reboot`; `--dry-run` changes nothing. It runs from
-a laptop without being copied: `ssh root@67.207.85.212 'bash -s' < concorde-travel/deploy/update-system.sh`.
+logs to `/var/log/update-system/`, and reboots only with `--reboot`; `--dry-run` changes nothing. From a laptop it is
+copied to a temp file and run with stdin closed (piped into `bash -s`, a package's install script can read the
+rest of it off stdin): `ssh root@67.207.85.212 'f=$(mktemp) && cat > "$f" && bash "$f" --reboot < /dev/null; rc=$?;
+rm -f "$f"; exit $rc' < concorde-travel/deploy/update-system.sh`; better, copy it and start it under
+`systemd-run`, as its header says, because an ssh session that drops mid-run takes the run with it (2026-09-24,
+while a 453 MB droplet with no swap built a kernel's boot image; the script now adds a temporary 1 GB swap file
+on a box that small). **System updates from the admin page** (2026-09-24, per Patrick: check nightly, never
+install automatically, two buttons): `deploy/install-sysupdate.sh`, run by `droplet.sh`, installs a root-owned
+copy of the script in `/usr/local/sbin` (the checkout belongs to the web user; re-run the installer to update
+it), `concordego-updates-check.timer` (07:00 UTC and 3 minutes after boot, `--check`: installs nothing, writes
+`/var/lib/concordego-sys/status.json`), and `concordego-sysupdate.path`, which starts the update when the page
+writes the ONE word `update` or `reboot` to `/var/lib/concordego/sysupdate-request`. The web process never runs
+anything as root; root never writes where the web user can. "Pending" counts what an upgrade would install now;
+Ubuntu's phased updates are listed apart as held back. The page shows an orange "Updates pending (N)" button
+opening Update (site stays up) and Update and restart (shown when a kernel or C library is involved or a reboot
+is waiting). Every admin POST must carry `X-ConcordeGo-Admin: 1`, which only the page's own fetch sets, and the
+POST body is read before any refusal (an unread body on a kept-alive connection became the next request line).
+The security-only unattended upgrades of 2026-09-21 are unchanged.
 
 **Every key lives in `/etc/concordego.env` on the droplet** (0600, read by systemd, never in
 the repo, the plist, a command line or chat): `CONCORDEGO_FLIGHT_KEY` (Duffel),

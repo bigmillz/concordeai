@@ -12,6 +12,8 @@
 #   - concordego-update.timer  hourly: fetch BRANCH, and if HEAD moved, reset to it and restart the service
 #   - /api/admin on the served site the same by hand: which commit is live, what GitHub has, update now, the logs;
 #                              for the emails in CONCORDEGO_OWNERS (put them behind Access too: access.sh does)
+#   - system updates           a nightly check (installs nothing) and the admin page's Update / Update and restart
+#                              buttons, through a root .path unit: deploy/install-sysupdate.sh
 #   - cloudflared              a Cloudflare tunnel made in the Zero Trust dashboard, run from its token;
 #                              the dashboard owns the public hostname and its DNS record, so nothing here
 #                              touches DNS (the laptop route step that kept failing is gone)
@@ -172,6 +174,10 @@ Unattended-Upgrade::SyslogEnable "true";
 APT
 systemctl enable --now apt-daily.timer apt-daily-upgrade.timer unattended-upgrades >/dev/null 2>&1 || true
 echo "  security updates unattended; reboots at 09:30 UTC only when required"
+
+say "system updates from the admin page"
+# a nightly check that installs nothing, and the admin page's Update / Update and restart buttons (per Patrick, 2026-09-24)
+bash "$APP/concorde-travel/deploy/install-sysupdate.sh"
 
 say "cloudflared"
 if ! command -v cloudflared >/dev/null; then

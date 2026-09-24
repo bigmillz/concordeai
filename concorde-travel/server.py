@@ -1078,6 +1078,12 @@ def narrate_request(req):
 REPO_DIR = os.path.dirname(HERE)
 STARTED = time.time()
 LOG_FILE = os.environ.get("CONCORDEGO_LOG", "")
+# System updates (per Patrick, 2026-09-24): a root timer checks nightly and writes SYS_STATUS; the admin page
+# asks for an update by writing one word to SYS_REQUEST, which a root .path unit acts on (deploy/install-sysupdate.sh).
+# This process never runs anything as root and never touches apt.
+SYS_STATUS = os.environ.get("CONCORDEGO_SYS_STATUS", "/var/lib/concordego-sys/status.json")
+SYS_REQUEST = os.environ.get("CONCORDEGO_SYS_REQUEST", "/var/lib/concordego/sysupdate-request")
+SYS_LOGS = "/var/log/update-system"
 
 
 def _git(*args, timeout=40):
@@ -1122,6 +1128,49 @@ def _stamp(body):
     return body
 
 
+def sys_status():
+    """What the nightly check found, for the admin page. The file is written by root; a box without the
+    units installed (a Mac, a fresh droplet) reports itself unavailable rather than up to date."""
+    out = {"available": os.path.isdir(os.path.dirname(SYS_REQUEST)) and os.path.exists(SYS_STATUS),
+           "kernel": os.uname().release, "requested": os.path.exists(SYS_REQUEST)}
+    try:
+        with open(SYS_STATUS) as fh:
+            st = json.load(fh)
+    except (OSError, ValueError):
+        return out
+    out.update({k: st.get(k) for k in ("checked_at", "pending", "pending_count", "deferred", "restart_likely", "reboot_waiting", "state", "last_run")})
+    # the file is only rewritten by the next check; after a reboot the flag it copied is gone, so trust the box
+    if not os.path.exists("/var/run/reboot-required"):
+        out["reboot_waiting"] = []
+    # a run that died without finishing (the box went down mid-run) must not lock the buttons forever
+    lr = out.get("last_run") or {}
+    if out.get("state") == "running":
+        try:
+            started = datetime.datetime.strptime(lr.get("started_at") or "", "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
+            if (datetime.datetime.now(datetime.timezone.utc) - started).total_seconds() > 3 * 3600:
+                out["state"] = "stale"
+        except ValueError:
+            out["state"] = "stale"
+    out["restart"] = bool(out.get("reboot_waiting") or out.get("restart_likely"))
+    return out
+
+
+def sys_update(mode):
+    """The admin page's two buttons. Writes one word for the root unit; installs nothing itself."""
+    if mode not in ("update", "reboot"):
+        return {"error": "Unknown update type."}
+    st = sys_status()
+    if not st.get("available"):
+        return {"error": "System updates are not set up on this machine."}
+    if st.get("state") == "running" or st.get("requested"):
+        return {"error": "An update is already running."}
+    tmp = SYS_REQUEST + ".tmp"
+    with open(tmp, "w") as fh:
+        fh.write(mode)
+    os.replace(tmp, SYS_REQUEST)
+    return {"ok": True, "mode": mode}
+
+
 def admin_status(fetch=False):
     out = {"repo": REPO_DIR, "uptime_s": int(time.time() - STARTED), "pid": os.getpid(), "python": sys.version.split()[0],
            "owners": sorted(OWNERS), "log_source": None, "now": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
@@ -1155,6 +1204,7 @@ def admin_status(fetch=False):
     out["unlimited"] = _unlimited()
     import shutil
     out["log_source"] = "journal" if shutil.which("journalctl") else (LOG_FILE or None)
+    out["system"] = sys_status()
     return out
 
 
@@ -1490,6 +1540,16 @@ def admin_update():
 def admin_logs(unit, n):
     import subprocess, shutil
     n = max(20, min(2000, n))
+    if unit == "system":
+        path = ((sys_status().get("last_run") or {}).get("log")) or ""
+        if not (path.startswith(SYS_LOGS + "/") and ".." not in path and os.path.isfile(path)):
+            logs = sorted(f for f in os.listdir(SYS_LOGS) if f.endswith(".log")) if os.path.isdir(SYS_LOGS) else []
+            path = os.path.join(SYS_LOGS, logs[-1]) if logs else ""
+        if not path:
+            return {"source": None, "text": "No system update has run on this machine."}
+        with open(path, "rb") as f:
+            f.seek(0, 2); size = f.tell(); f.seek(max(0, size - 400000)); data = f.read().decode("utf-8", "replace")
+        return {"source": path, "text": "\n".join(data.splitlines()[-n:])}
     if shutil.which("journalctl"):
         svc = {"server": "concordego", "update": "concordego-update"}.get(unit, "concordego")
         try:
@@ -1520,22 +1580,25 @@ button{background:var(--text);color:var(--bg);border:0;border-radius:999px;paddi
 .note{color:var(--dim);font-size:13px}ul.in{margin:8px 0 0;padding-left:18px;color:var(--dim);font-size:13px}ul.in code{color:var(--text);font-family:"IBM Plex Mono",monospace;font-size:12px}
 pre{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;font:12px/1.55 "IBM Plex Mono",monospace;color:var(--dim);white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow:auto;margin:0}
 .tabs{display:flex;gap:6px;margin:14px 0 8px}.tabs button{padding:6px 12px;font-size:12.5px}.tabs button[aria-pressed=true]{background:var(--text);color:var(--bg)}
+button.orange{background:var(--price);color:#1a1204}.sysbox{background:var(--panel2);border:1px solid rgba(255,176,32,.45);border-radius:12px;padding:12px 16px;margin:-6px 0 18px}.sysbox .note{margin:0 0 6px}.sysbox code{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--text)}
 table{border-collapse:collapse;font-size:13px;width:100%}td,th{text-align:left;padding:4px 8px 4px 0;color:var(--dim)}th{color:var(--faint);font-weight:400;font-size:11px;letter-spacing:.1em;text-transform:uppercase}
 </style></head><body><div class="wrap">
 <h1>Concorde<b>Go</b> · admin</h1>
 <div class="grid" id="cards"></div>
-<div class="row"><button id="check">Check GitHub</button><button id="update" disabled>Update now</button><button class="ghost" id="refresh">Refresh</button><span class="note" id="msg"></span></div>
+<div class="row"><button id="check">Check GitHub</button><button id="update" disabled>Update now</button><button class="ghost" id="refresh">Refresh</button><button class="orange" id="syspend" hidden>Updates pending</button><span class="note" id="msg"></span></div>
+<div class="sysbox" id="sysbox" hidden></div>
 <div id="incoming"></div>
 <div class="card" style="margin-bottom:18px"><div class="k">Unlimited accounts</div><div class="v">Signed-in emails with no daily limit.</div>
 <div id="unl" style="margin:8px 0 6px"></div>
 <div class="row" style="margin:0"><input id="unladd" placeholder="email" style="flex:1;min-width:220px;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--text);font:13px 'Space Grotesk',sans-serif;padding:9px 12px"><button id="unlgo">Add</button></div></div>
-<div class="tabs"><button id="t-server" aria-pressed="true">Server log</button><button id="t-update" aria-pressed="false">Update log</button><button class="ghost" id="t-reload">Reload log</button></div>
+<div class="tabs"><button id="t-server" aria-pressed="true">Server log</button><button id="t-update" aria-pressed="false">Update log</button><button id="t-system" aria-pressed="false">System update log</button><button class="ghost" id="t-reload">Reload log</button></div>
 <pre id="log">…</pre>
 </div><script>
 const $ = s => document.querySelector(s); let ST = null, UNIT = 'server';
 const ago = s => s < 90 ? s + 's' : s < 5400 ? Math.round(s/60) + ' min' : s < 172800 ? (s/3600).toFixed(1) + ' h' : Math.round(s/86400) + ' d';
 const when = iso => iso ? new Date(iso).toLocaleString() : '—';
-async function j(url, opts){ const r = await fetch(url, opts); if (!r.ok) throw new Error(r.status + ' ' + r.statusText); return r.json(); }
+const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function j(url, opts){ if (opts && opts.method === 'POST') opts = Object.assign({}, opts, {headers: Object.assign({'Content-Type':'application/json', 'X-ConcordeGo-Admin':'1'}, opts.headers || {})}); const r = await fetch(url, opts); if (!r.ok) throw new Error(r.status + ' ' + r.statusText); return r.json(); }
 function paint(st){ ST = st; const h = st.head || {}, behind = st.behind; paintKey(st);
   const cards = [
     ['Running', `<b>${h.short || '?'}</b> on ${st.branch || '?'}`, (h.subject || '') + (h.date ? ' · ' + when(h.date) : '')],
@@ -1543,9 +1606,11 @@ function paint(st){ ST = st; const h = st.head || {}, behind = st.behind; paintK
     ['Process', `up ${ago(st.uptime_s)}`, 'pid ' + st.pid + ' · python ' + st.python + ' · ' + (st.owners.length ? 'owners: ' + st.owners.join(', ') : '<span class="warn">no CONCORDEGO_OWNERS set</span>') + ' · you: ' + (st.you === 'owner' ? 'this machine' : (st.you || 'nobody')) + (st.public ? ' · public box' : ' · <span class="warn">not marked public</span>')],
     ['Flight API', st.live && st.live.key_configured ? `<span class="ok">${st.live.provider} key on</span>` : '<span class="warn">no key: live search off</span>', st.live && st.live.quota ? `today ${st.live.quota.day_calls}/${st.live.quota.day_limit} · month ${st.live.quota.month_calls}/${st.live.quota.month_limit}` : ''],
     ['Claude', st.narrator ? '<span class="ok">key on</span>' : '<span class="warn">no key: template only</span>', 'narrator, wish box, Flight Fixer advice'],
+    sysCard(st.system || {}),
     ['People today', st.users_today.length ? st.users_today.length + ' signed in' : 'none', st.users_today.slice(0, 4).map(u => `${u.email} ${u.searches}/${st.allowances.searches} · ${u.wishes}/${st.allowances.wishes}`).join('<br>')],
   ];
   $('#cards').innerHTML = cards.map(c => `<div class="card"><div class="k">${c[0]}</div><div class="v">${c[1]}</div><div class="s">${c[2]}</div></div>`).join('');
+  paintSys(st.system || {});
   $('#update').disabled = !behind; $('#update').textContent = behind ? `Update now (${behind})` : 'Update now';
   $('#incoming').innerHTML = (st.incoming || []).length ? '<ul class="in">' + st.incoming.map(c => `<li><code>${c.short}</code> ${c.subject} <span style="color:var(--faint)">· ${when(c.date)}</span></li>`).join('') + '</ul>' : '';
   if (st.fetch_error) $('#msg').textContent = 'Fetch failed: ' + st.fetch_error;
@@ -1560,13 +1625,58 @@ $('#update').onclick = async () => { if (!confirm('Update to the newest commit a
     setTimeout(poll, 2500);
   } catch (e){ $('#msg').textContent = e.message; $('#update').disabled = false; } };
 $('#refresh').onclick = () => { load(); logs(); };
-$('#t-server').onclick = () => { UNIT = 'server'; $('#t-server').setAttribute('aria-pressed', 'true'); $('#t-update').setAttribute('aria-pressed', 'false'); logs(); };
-$('#t-update').onclick = () => { UNIT = 'update'; $('#t-update').setAttribute('aria-pressed', 'true'); $('#t-server').setAttribute('aria-pressed', 'false'); logs(); };
+const tab = u => { UNIT = u; ['server', 'update', 'system'].forEach(k => $('#t-' + k).setAttribute('aria-pressed', String(k === u))); logs(); };
+$('#t-server').onclick = () => tab('server');
+$('#t-update').onclick = () => tab('update');
+$('#t-system').onclick = () => tab('system');
 $('#t-reload').onclick = logs;
 const paintUnl = list => { $('#unl').innerHTML = (list || []).length ? list.map(e => `<span style="display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:5px 6px 5px 12px;margin:0 6px 6px 0;font-size:13px">${e}<button class="ghost" data-unl="${e}" style="padding:2px 8px;font-size:12px" title="Remove">×</button></span>`).join('') : '<span class="note">None. Owners are always unlimited.</span>'; };
 document.addEventListener('click', async ev => { const b = ev.target.closest('[data-unl]'); if (!b) return; const r = await j('/api/admin/unlimited', {method:'POST', body: JSON.stringify({remove: b.dataset.unl})}); paintUnl(r.unlimited); });
 $('#unlgo').onclick = async () => { const e = $('#unladd').value.trim(); if (!e.includes('@')) return; const r = await j('/api/admin/unlimited', {method:'POST', body: JSON.stringify({add: e})}); $('#unladd').value = ''; paintUnl(r.unlimited); };
 const paintKey = st => { paintUnl(st.unlimited); };
+// System updates (per Patrick, 2026-09-24): checked nightly, never installed automatically. An orange
+// "Updates pending" button opens the two choices: Update (the site stays up) and Update and restart.
+let SYSOPEN = false, SYSWAIT = null;
+const sysBusy = sy => sy.state === 'running' || sy.requested;
+function sysCard(sy){
+  const n = sy.pending_count || 0, rb = (sy.reboot_waiting || []).length, lr = sy.last_run || {}, held = (sy.deferred || []).length;
+  const v = !sy.available ? '<span class="warn">not set up on this machine</span>' : sysBusy(sy) ? '<span class="warn">updating</span>'
+    : n ? `<span class="warn">${n} update${n > 1 ? 's' : ''} pending</span>` : rb ? '<span class="warn">restart pending</span>' : '<span class="ok">up to date</span>';
+  const s = [sy.kernel ? 'kernel ' + esc(sy.kernel) : '', sy.checked_at ? 'checked ' + when(sy.checked_at) : 'not checked yet',
+    held ? held + ' held back by Ubuntu for now' : '', lr.finished_at ? 'last update ' + when(lr.finished_at) + (lr.exit === 0 ? '' : ' <span class="bad">failed</span>') : ''].filter(Boolean).join(' · ');
+  return ['System', v, s];
+}
+function paintSys(sy){
+  const btn = $('#syspend'), box = $('#sysbox'), n = sy.pending_count || 0, rb = (sy.reboot_waiting || []).length, busy = sysBusy(sy);
+  const show = !!sy.available && (busy || n > 0 || rb > 0);
+  btn.hidden = !show; box.hidden = !show || !(SYSOPEN || busy);
+  if (!show) return;
+  btn.textContent = busy ? 'Updating…' : n ? `Updates pending (${n})` : 'Restart pending';
+  if (busy){ box.innerHTML = '<p class="note">Updating now. The System update log below shows progress.</p>'; return; }
+  const restart = [...new Set([...(sy.reboot_waiting || []), ...(sy.restart_likely || [])])];
+  box.innerHTML = (n ? `<p class="note">${n} update${n > 1 ? 's' : ''}: ${(sy.pending || []).slice(0, 24).map(p => '<code>' + esc(p) + '</code>').join(', ')}${n > 24 ? ', and ' + (n - 24) + ' more' : ''}</p>` : '')
+    + (restart.length ? `<p class="note">Needs a restart: ${restart.slice(0, 8).map(p => '<code>' + esc(p) + '</code>').join(', ')}</p>` : '')
+    + `<div class="row" style="margin:8px 0 4px">${n ? '<button id="sysupd">Update</button>' : ''}${sy.restart ? '<button class="orange" id="sysrb">Update and restart</button>' : ''}</div>`
+    + `<p class="note">${n ? 'Update keeps the site up. ' : ''}${sy.restart ? 'Update and restart takes it down for about a minute.' : ''}</p>`;
+}
+$('#syspend').onclick = () => { SYSOPEN = !SYSOPEN; paintSys((ST || {}).system || {}); };
+document.addEventListener('click', async ev => {
+  const b = ev.target.closest('#sysupd, #sysrb'); if (!b) return; const reboot = b.id === 'sysrb';
+  if (!confirm(reboot ? 'Install updates and restart the server? The site is down for about a minute.' : 'Install updates now? The site stays up.')) return;
+  b.disabled = true; $('#msg').textContent = 'Starting…';
+  try { const r = await j('/api/admin/sysupdate', {method:'POST', body: JSON.stringify({mode: reboot ? 'reboot' : 'update'})});
+    if (r.error){ $('#msg').textContent = r.error; b.disabled = false; return; }
+    SYSWAIT = {reboot, t0: Date.now(), down: false}; SYSOPEN = true; tab('system'); load(); $('#msg').textContent = reboot ? 'Updating, then restarting…' : 'Updating…'; setTimeout(sysPoll, 3000);
+  } catch (e){ $('#msg').textContent = e.message; b.disabled = false; } });
+async function sysPoll(){
+  const w = SYSWAIT; if (!w) return; let st = null;
+  try { st = await j('/api/admin/status'); } catch (e){ w.down = true; }
+  if (st){ paint(st); if (UNIT === 'system') logs();
+    const sy = st.system || {}, lr = sy.last_run || {}, done = !sysBusy(sy) && Date.parse(lr.finished_at || 0) >= w.t0 - 5000;
+    if (w.reboot && (w.down || st.uptime_s < 120) && Date.parse(lr.started_at || 0) >= w.t0 - 5000 && !sysBusy(sy)){ SYSWAIT = null; $('#msg').textContent = 'Restarted. Kernel ' + (sy.kernel || '?') + '.'; return; }
+    if (done && !(w.reboot && (sy.reboot_waiting || []).length)){ SYSWAIT = null; $('#msg').textContent = lr.exit === 0 ? 'Update finished.' : 'Update failed. See the System update log.'; return; } }
+  else $('#msg').textContent = 'Restarting… the page will reconnect.';
+  if (Date.now() - w.t0 < 45 * 60000) setTimeout(sysPoll, 4000); else { SYSWAIT = null; $('#msg').textContent = 'Still not finished after 45 minutes. Check the System update log.'; } }
 load(); logs();
 </script></body></html>
 """
@@ -1757,13 +1867,24 @@ class Handler(http.server.BaseHTTPRequestHandler):
     # --------------------------------------------------------------- POST
     def do_POST(self):
         path = self.path.split("?")[0]
-        if path in ("/api/admin/check", "/api/admin/update", "/api/admin/unlimited"):
+        if path in ("/api/admin/check", "/api/admin/update", "/api/admin/unlimited", "/api/admin/sysupdate"):
+            # read the body before any refusal: left unread on a kept-alive connection, it becomes the start
+            # of the next request line (seen 2026-09-24 as a 501 for the method '{"mode":"update"}GET')
+            try:
+                raw = self.rfile.read(max(0, min(65536, int(self.headers.get("Content-Length") or 0))))
+            except ValueError:
+                raw = b""
             if not self._is_owner():
                 return self._json({"error": "Owners only."})
+            # the owner's browser carries the sign-in cookie to any site's form; only this page's own fetch sets this header
+            if self.headers.get("X-ConcordeGo-Admin") != "1":
+                return self._json({"error": "Refused: not sent from the admin page."})
             try:
+                if path.endswith("/sysupdate"):
+                    body = json.loads(raw or b"{}")
+                    return self._json(sys_update(str((body if isinstance(body, dict) else {}).get("mode") or "")))
                 if path.endswith("/unlimited"):
-                    n = int(self.headers.get("Content-Length") or 0)
-                    body = json.loads(self.rfile.read(n) or b"{}")
+                    body = json.loads(raw or b"{}")
                     cur = set(_unlimited())
                     add = str(body.get("add") or "").strip().lower(); rm = str(body.get("remove") or "").strip().lower()
                     if add and "@" in add: cur.add(add)
