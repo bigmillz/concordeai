@@ -5441,3 +5441,26 @@ without waiting for accounts.
   `perf` (the old perf mode), throwing every 1.5 s. It's on main too.
 - Gauntlet 233/233; ci_smoke.sh passes; an isolated end-to-end run
   proved the fallback, the 0600 note and a 0-second handoff.
+
+## 6b311 — no undeclared names in the page
+- `perf` threw every 1.5 s. 6b292 folded perf mode into the Visual
+  effects switch (noVideo, which also migrates the old millen.perf key)
+  and missed one reader: the brand chameleon's interval. It now rests
+  while Visual effects are off, as does the parallax the comment above
+  it always promised would ("never in perf mode"), and two stale
+  comments stopped naming a mode that no longer exists.
+- THE SCAN FOUND ONE OF MINE: 6b310's Contribute removal left the Zito
+  board's code-board row reading the deleted `peers`. zBuild's .catch
+  turned that into "board degraded" and a half-built board. Row removed;
+  opened live via the z-i-t-o chord, it builds 8/8 rows.
+- jsscan.py (dev tool; builds copy only millenai.py) lists every name
+  the page script uses but declares nowhere: it tokenises the script
+  (comments, strings, templates with ${}, regex literals) and collects
+  every binding made anywhere. Scope-insensitive on purpose: it can miss
+  a scope bug, never invents one. On ff71fbd it flags exactly `perf`,
+  on 87b71b3 `perf` and `peers`, on this build nothing beyond the host
+  globals the page uses (each confirmed present on window), Leaflet's
+  L, and the server-filled __X__ placeholders.
+- Gauntlet: "no reference to an undeclared perf" and "the page script
+  uses no undeclared names" (a new browser API goes in _PAGE_HOST);
+  mutation-tested by putting each bug back. 235/235.

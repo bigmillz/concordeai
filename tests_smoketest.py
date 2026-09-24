@@ -1425,6 +1425,34 @@ def _exec_names(ns, names):
             nm = next((getattr(t, "id", None) for t in _n.targets), None)
         if nm in names:
             exec(_ast.get_source_segment(_MILLENAI_SRC, _n), ns)
+# NO UNDECLARED NAMES IN THE PAGE (6b311). A name the page script never
+# declares throws only when its line runs: `perf` threw every 1.5 s after
+# perf mode became Visual effects (6b292), and 6b310's Contribute removal
+# left the Zito board reading a deleted `peers`. jsscan (a dev tool in
+# this repo) lists every name used but declared nowhere; anything that
+# isn't a host global the page already relies on is a bug. A NEW browser
+# API the page starts using belongs in _PAGE_HOST (checked: the name must
+# exist on window in WKWebView), everything else gets declared.
+import jsscan as _jsscan
+_PAGE_HOST = set("""AbortController Array ArrayBuffer Blob Boolean CSS DataView Date
+Error Event Float32Array Image JSON Map Math Object Promise Set String
+TextDecoder URL addEventListener cancelAnimationFrame clearInterval
+clearTimeout decodeURIComponent devicePixelRatio document
+encodeURIComponent fetch getComputedStyle innerHeight innerWidth isFinite
+localStorage location matchMedia navigator parseFloat parseInt performance
+requestAnimationFrame setInterval setTimeout window""".split())
+# L is Leaflet, loaded from unpkg before any map mounts; the __X__ names
+# are placeholders the server fills in before the page is sent
+_PAGE_HOST |= {"L", "__JUST_UPDATED__", "__USER_CITY__", "__USER_NICK__"}
+_undecl = _jsscan.undeclared(_jsscan.page_script(_MILLENAI_SRC))
+_brand = _MILLENAI_SRC.split("the brand chameleon runs on its own gentle clock")[1][:600]
+check("the page has no reference to an undeclared perf",
+      "perf" not in _undecl
+      and "if(!noVideo&&!document.hidden)paintBrandFromSky" in _brand,
+      str(_undecl.get("perf")))
+check("the page script uses no undeclared names",
+      not (set(_undecl) - _PAGE_HOST) and len(_undecl) > 20,
+      str(sorted(set(_undecl) - _PAGE_HOST)))
 # 6b310, per Patrick: "we don't need a feature where friends can answer
 # each other's questions." Contribute (and the fleet hub behind it) is
 # gone: no worker, no hub routes, no UI, no invite, and startup scrubs

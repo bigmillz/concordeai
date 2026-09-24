@@ -16641,9 +16641,10 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
      bottom of the backdrop read as a rendering bug (seen live) */
   background:linear-gradient(transparent,rgba(5,6,10,.62) 78%);
 }
-/* 6b243, per Patrick: no hairline. Perf mode drew a 1px rule right
-   across the window under the hero — the backdrop is off in perf mode
-   so nothing needed separating, and it read as a rendering artefact. */
+/* 6b243, per Patrick: no hairline. With the backdrop off (then perf
+   mode, now Visual effects off) a 1px rule ran right across the window
+   under the hero; nothing needed separating, and it read as a
+   rendering artefact. */
 body.novideo #composer-wrap{background:var(--bg);padding-top:14px}
 /* the box sits IN FLOW under the greeting — a pinned percentage
    collided with two-line greetings (seen live) */
@@ -21637,7 +21638,7 @@ async function pollStats(){
 }
 // polling is owned by applyStatsPolling (paused only while hidden)
 // (statsTimer is declared with the rest of the state — re-declaring it here
-//  would orphan the timer setPerf already started at boot)
+//  would orphan a timer an earlier call already started)
 function applyStatsPolling(){
   if(!statsTimer){pollStats();statsTimer=setInterval(pollStats,2000);}
 }
@@ -22123,7 +22124,8 @@ function starTick(){
 }
 starTick();
 // PARALLAX: the city leans a few px toward the cursor — barely there,
-// endlessly alive. Desktop pointers only, and never in perf mode.
+// endlessly alive. Desktop pointers only, and never with Visual effects
+// off (the backdrop isn't moving then, so nothing should).
 if(matchMedia("(pointer:fine)").matches){
   // rAF only WHILE easing — the old loop span at full frame rate
   // forever, even with the mouse still (M4 "gobbling", per Patrick)
@@ -22136,14 +22138,18 @@ if(matchMedia("(pointer:fine)").matches){
     requestAnimationFrame(paraStep);
   }
   document.addEventListener("mousemove",e=>{
+    if(noVideo)return;
     pxT=(e.clientX/innerWidth-.5);pyT=(e.clientY/innerHeight-.5);
     if(!paraOn){paraOn=true;requestAnimationFrame(paraStep);}
   },{passive:true});
 }
 // the brand chameleon runs on its own gentle clock — the warp loop only
-// draws while a query runs, but the wordmark should match the city always
+// draws while a query runs, but the wordmark should match the city always.
+// It samples the backdrop video, so it rests while Visual effects are off
+// (noVideo). This read an undeclared `perf` since 6b292 folded perf mode
+// into that switch, and threw every 1.5 s instead.
 setInterval(()=>{
-  if(!perf&&!document.hidden)paintBrandFromSky(performance.now());
+  if(!noVideo&&!document.hidden)paintBrandFromSky(performance.now());
 },1500);
 
 /* --------------------------------------------- canvas wordmark halo */
@@ -24134,7 +24140,7 @@ async function zBuild(){
   /* code board — real flags, then the three that are the joke */
   const CODE=[["engines up",up.length>0,"--n3"],["cloud keys",keys.length>0,"--n2"],
     ["web retrieval",true,"--n6"],["workspace bound",root!=="none","--n8"],
-    ["resident memory",facts>0,"--n7"],["gpu sharing",peers>0,"--n4"],
+    ["resident memory",facts>0,"--n7"],
     ["vibe normaliser",false,"--n1"],["rival ui audit",false,"--n5"],
     ["humility module",false,"--n8"]];
   $("#z-cbn").textContent=CODE.filter(c=>c[1]).length+"/"+CODE.length;
