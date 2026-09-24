@@ -219,6 +219,9 @@ MUTANTS = [
      'serpapi: run the duration the wrong way when working out an offset'),
     (DATA, "build_slim", '[:CHEAPEST_TICKETS]', '[:0]',
      'pool: leave the cheapest tickets out when the ranking demotes them'),
+    (AD, "_serp_number", 'tail = " ".join(parts[1:]) if len(parts) > 1 else str(flight_number or "").strip()[2:]',
+     'tail = str(flight_number or "")',
+     'serpapi: take every digit of the flight number, the carrier code\'s included'),
 ]
 
 caught = skipped = 0

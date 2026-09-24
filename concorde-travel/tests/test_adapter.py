@@ -980,6 +980,9 @@ def main():
           bos is not None and bos["segments"][0]["arrival_local"].endswith("-05:00")
           and bos["segments"][1]["departure_local"].endswith("-05:00")
           and any("worked out from the flight's own duration" in n for n in ss["notes"]), str(bos and [s["arrival_local"] for s in bos["segments"]]))
+    check("a flight number is the digits after the carrier code, even when the code has a digit: "
+          "B6 1024 is 1024, U2 2323 is 2323, W9 5378 is 5378, DL 1 is 1",
+          [adapter._serp_number(x) for x in ("B6 1024", "U2 2323", "W9 5378", "DL 1", "9W 12")] == ["1024", "2323", "5378", "1", "12"])
     check("the arithmetic itself: 21:15 at -05:00 plus 7h05 lands 09:20 local, which is +00:00; a flight that "
           "would need +16:00 is refused",
           adapter._offset_by_duration("2026-11-18T21:15:00-05:00", "2026-11-19T09:20:00", 425, forward=True) == "+00:00"

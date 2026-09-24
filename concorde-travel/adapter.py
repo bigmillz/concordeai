@@ -1583,6 +1583,16 @@ def _serp_code(flight_number: Any) -> str:
     return str(flight_number or "").strip().split(" ")[0].upper()[:2]
 
 
+def _serp_number(flight_number: Any) -> str:
+    """'B6 1024' -> '1024'. The digits AFTER the carrier code: stripping every non-digit from the whole
+    string kept the 6 of B6 (and the 2 of U2, the 9 of W9) and made JetBlue's 1024 into 61024, so the
+    same flight never matched the feed's copy and the page printed a number that does not exist (2026-09-24;
+    DL has no digit, which is why the Delta-only supplement never showed it)."""
+    parts = str(flight_number or "").strip().split()
+    tail = " ".join(parts[1:]) if len(parts) > 1 else str(flight_number or "").strip()[2:]
+    return re.sub(r"\D", "", tail)
+
+
 def _serp_naive(t: Any) -> Optional[str]:
     m = _SERP_TIME.match(str(t or "").strip())
     return "%sT%s:%s:00" % (m.group(1), m.group(2), m.group(3)) if m else None
@@ -1707,7 +1717,7 @@ def from_serpapi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
             ap_from = enr["airports"]["airports"].get(o_ap, {})
             ap_to = enr["airports"]["airports"].get(d_ap, {})
             mkt = codes[i]
-            num = re.sub(r"\D", "", str(f.get("flight_number") or ""))
+            num = _serp_number(f.get("flight_number"))
             claims: Dict[str, Any] = {}
             legroom = re.search(r"(\d+)\s*in", str(f.get("legroom") or ""))
             if legroom:
