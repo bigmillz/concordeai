@@ -19,7 +19,9 @@ def _uq(s):
 
 BASE = "http://127.0.0.1:9894"
 KEY = "smoketestkey123"
-K = "millen_key=" + KEY
+PORT_ = int(BASE.rsplit(":", 1)[1])
+# 6b310: the launch key rides a cookie named for the port
+K = "millen_key_%d=%s" % (PORT_, KEY)
 
 RESULTS = []
 
@@ -35,8 +37,11 @@ def check(name, ok, detail=""):
 
 def req(path, method="GET", data=None, headers=None, cookie=None, timeout=30):
     h = dict(headers or {})
-    if cookie:
-        h["Cookie"] = cookie
+    # every request carries the launch key (6b310) unless a check is
+    # probing the door itself with cookie=False
+    if cookie is not False:
+        h["Cookie"] = (cookie if cookie and K in cookie
+                       else K + ("; " + cookie if cookie else ""))
     if data is not None and not isinstance(data, bytes):
         data = json.dumps(data).encode()
         h.setdefault("Content-Type", "application/json")
@@ -49,12 +54,52 @@ def req(path, method="GET", data=None, headers=None, cookie=None, timeout=30):
 
 
 print("== access control ==")
-# the key door is retired (1.20): local goes straight to the app, remote
-# strangers land on the account screen
+# 6b310, per Patrick: nobody's chats may reach another user. Only this
+# launch's own window gets in: the right Host AND the launch key.
+s, h, b = req("/", cookie=False)
+check("no launch key -> 403, no page", s == 403 and b"skyline" not in b)
+s, h, b = req("/api/chats", cookie=False)
+check("no launch key -> chats refused", s == 403 and b"messages" not in b)
+s, h, b = req("/api/prefs", "POST", {"length": 3}, cookie=False)
+check("no launch key -> POST refused", s == 403)
+s, h, b = req("/api/chats", headers={"Host": "evil.example:%d" % PORT_})
+check("key but a rebinding Host -> 403", s == 403)
+s, h, b = req("/api/chats", headers={"Host": "127.0.0.1:%d" % (PORT_ + 1)})
+check("key but another port's Host -> 403", s == 403)
+s, h, b = req("/api/chats", cookie=False, headers={
+    "Cookie": "millen_key_%d=%s" % (PORT_ + 1, KEY)})
+check("another port's cookie name -> 403", s == 403)
+s, h, b = req("/?key=wrong", cookie=False)
+check("wrong key link -> 403", s == 403)
+_o = urllib.request.build_opener(type("NoRedir", (
+    urllib.request.HTTPRedirectHandler,), {
+        "redirect_request": lambda *a, **k: None}))
+try:
+    _r = _o.open(BASE + "/?key=" + KEY, timeout=10)
+    _st, _hd = _r.status, dict(_r.headers)
+except urllib.error.HTTPError as e:
+    _st, _hd = e.code, dict(e.headers)
+_sc = _hd.get("Set-Cookie", "")
+check("right key link -> 302 + HttpOnly Strict cookie named for the port",
+      _st == 302 and _hd.get("Location") == "/"
+      and _sc.startswith("millen_key_%d=%s;" % (PORT_, KEY))
+      and "HttpOnly" in _sc and "SameSite=Strict" in _sc)
 s, h, b = req("/")
-check("local bare URL -> app", s == 200 and b"id=\"skyline\"" in b)
-s, h, b = req("/?key=oldlink")
-check("legacy key links still land", s == 200 and b"id=\"skyline\"" in b)
+check("with the key -> app", s == 200 and b"id=\"skyline\"" in b)
+# 6b310 review: a 127.0.0.1 cookie goes to EVERY port on 127.0.0.1, so
+# the page may load only from itself and https — never plain http
+_csp = h.get("Content-Security-Policy", "")
+check("page CSP: self + https only, so no other local port sees the key",
+      "default-src 'self' https: data: blob:" in _csp
+      and "http:" not in _csp.replace("https:", "")
+      and "object-src 'none'" in _csp and "form-action 'self'" in _csp, _csp)
+s, h, b = req("/api/chats", cookie=False, headers={
+    "Cookie": "millen_key_%d=junk; %s" % (PORT_, K)})
+check("a stray same-name cookie can't shadow the key", s == 200)
+s, h, b = req("/api/window/focus", "POST", {})
+s2, h2, b2 = req("/api/window/focus", "POST", {}, cookie=False)
+check("second launch can ask this copy forward; nobody else can",
+      s == 200 and b'"ok": true' in b and s2 == 403)
 s, h, b = req("/", headers={"X-Forwarded-For": "1.2.3.4"})
 check("remote stranger -> account screen", b"continue as guest" in b.lower()
       and b"pinform" in b)
@@ -79,13 +124,26 @@ s, h, b = req("/api/chats", cookie=K + "; millen_user=" + smoke_uid,
 check("fresh profile sees empty chats", b == b'{"chats": []}')
 s, h, b = req("/api/chats", cookie=K)
 check("local owner sees real chats", b"title" in b)
-own_pin = open("/Users/patrickmiller/Library/Application Support/MillenAI/owner_pin").read().strip()
-s, h, b = req("/api/welcome", "POST", {"name": "anyname", "pin": own_pin},
-              cookie=K, headers={"X-Forwarded-For": "1.2.3.4"})
-m2 = re.search(r"millen_user=([0-9a-f]{20})", str(h))
-s, h, b = req("/api/chats", cookie=K + "; millen_user=" + (m2.group(1) if m2 else ""),
-              headers={"X-Forwarded-For": "1.2.3.4"})
-check("owner PIN opens real chats remotely", b"title" in b)
+_opf = os.path.expanduser("~/Library/Application Support/MillenAI/owner_pin")
+if os.path.exists(_opf):
+    own_pin = open(_opf).read().strip()
+    s, h, b = req("/api/welcome", "POST", {"name": "anyname", "pin": own_pin},
+                  cookie=K, headers={"X-Forwarded-For": "1.2.3.4"})
+    m2 = re.search(r"millen_user=([0-9a-f]{20})", str(h))
+    s, h, b = req("/api/chats", cookie=K + "; millen_user=" + (m2.group(1) if m2 else ""),
+                  headers={"X-Forwarded-For": "1.2.3.4"})
+    check("owner PIN opens real chats remotely", b"title" in b)
+else:
+    # 6b310: the web version is retired and its owner_pin file went
+    # with it, so no remote PIN may map onto the owner's files
+    _pin = str(10000000 + int.from_bytes(os.urandom(3), "big"))
+    s, h, b = req("/api/welcome", "POST", {"name": "anyname", "pin": _pin},
+                  cookie=K, headers={"X-Forwarded-For": "1.2.3.4"})
+    m2 = re.search(r"millen_user=([0-9a-f]{20})", str(h))
+    s, h, b = req("/api/chats", cookie=K + "; millen_user=" + (m2.group(1) if m2 else ""),
+                  headers={"X-Forwarded-For": "1.2.3.4"})
+    check("no owner_pin: a remote PIN opens only its own empty profile",
+          b == b'{"chats": []}')
 
 print("== admin lockdown ==")
 for p in ("/api/speak", "/api/model/download", "/api/open-logs",
@@ -314,57 +372,6 @@ _dups = [n for n, c in _col.Counter(
     x.name for x in _ast0.parse(_MILLENAI_SRC).body
     if isinstance(x, (_ast0.FunctionDef, _ast0.AsyncFunctionDef))).items() if c > 1]
 check("no function is defined twice at the top level", not _dups, str(_dups))
-# 6b309, per Patrick: "make sure that if any user is contributing GPU,
-# that they're only contributing their own GPU, not their cloud models
-# that they're paying for." Walk EVERYTHING the Contribute worker can
-# call: no cloud function, no cloud key, no address but this Mac's own
-# engines (the hub is reached only through the url it was given).
-import re as _re0
-_fdefs = {x.name: x for x in _ast0.parse(_MILLENAI_SRC).body
-          if isinstance(x, (_ast0.FunctionDef, _ast0.AsyncFunctionDef))}
-_reach, _todo = set(), ["_contrib_loop"]
-while _todo:
-    _f = _todo.pop()
-    if _f in _reach:
-        continue
-    _reach.add(_f)
-    _todo += [c.func.id for c in _ast0.walk(_fdefs[_f])
-              if isinstance(c, _ast0.Call) and isinstance(c.func, _ast0.Name)
-              and c.func.id in _fdefs]
-_CLOUDY = _re0.compile(r"cloud|anthropic|claude|gemini|groq|openrouter|"
-                       r"together|kimi|pollinations|turbo|api_key", _re0.I)
-_bad_names, _bad_urls = set(), set()
-for _f in _reach:
-    for _n in _ast0.walk(_fdefs[_f]):
-        _id = (_n.id if isinstance(_n, _ast0.Name) else
-               _n.attr if isinstance(_n, _ast0.Attribute) else "")
-        if _CLOUDY.search(_id) or _CLOUDY.search(_f):
-            _bad_names.add(_f + ":" + (_id or _f))
-        _s = (_n.value if isinstance(_n, _ast0.Constant)
-              and isinstance(_n.value, str) else
-              "".join(v.value for v in _n.values
-                      if isinstance(v, _ast0.Constant)
-                      and isinstance(v.value, str))
-              if isinstance(_n, _ast0.JoinedStr) else "")
-        if _re0.match(r"https?://", _s) and not _s.startswith(
-                "http://127.0.0.1:"):
-            _bad_urls.add(_f + ":" + _s)
-_cl = _MILLENAI_SRC.split("def _contrib_loop(")[1].split("\ndef ")[0]
-_cns = {}
-for _x in _ast0.parse(_MILLENAI_SRC).body:
-    if isinstance(_x, _ast0.Assign) and any(
-            getattr(_tg, "id", "") in ("CATALOG", "MODEL_INFO")
-            for _tg in _x.targets):
-        exec(_ast0.get_source_segment(_MILLENAI_SRC, _x), _cns)
-_cloud_tags = [i["ollama"] for i in _cns["MODEL_INFO"].values()
-               if "cloud" in str(i.get("ollama") or "").lower()]
-check("Contribute GPU runs only this Mac's own models, never a cloud",
-      "run_model" in _reach and len(_reach) > 10
-      and not _bad_names and not _bad_urls and not _cloud_tags
-      and -1 < _cl.find("if _lbl not in models:")
-      < _cl.find("run_model(_lbl,")
-      and "l in MODEL_ROUTES and model_cached(l, pulled)" in _cl,
-      "%s %s %s" % (sorted(_bad_names), sorted(_bad_urls), _cloud_tags))
 check("compiles with SyntaxWarning as an error (the THIN LIST crash)",
       __import__("subprocess").run(
           [sys.executable, "-W", "error::SyntaxWarning", "-c",
@@ -585,7 +592,7 @@ check("image generation: intent, engine ladder, settings box, wizard, arrow pill
       and _ii("what is an image sensor") is None
       and _ii("generate a list of image formats") is None
       and "def generate_image" in _MILLENAI_SRC
-      and "mflux-generate" in _MILLENAI_SRC and "image.pollinations.ai" in _MILLENAI_SRC
+      and "mflux-generate" in _MILLENAI_SRC and "pollinations.ai" not in _MILLENAI_SRC
       # 6b307: 2.5-flash-image shuts down 2026-10-02
       and '("gemini-3.1-flash-lite-image", "gemini-3.1-flash-image")' in _MILLENAI_SRC
       and '"/api/image/install",' in _MILLENAI_SRC
@@ -1418,6 +1425,352 @@ def _exec_names(ns, names):
             nm = next((getattr(t, "id", None) for t in _n.targets), None)
         if nm in names:
             exec(_ast.get_source_segment(_MILLENAI_SRC, _n), ns)
+# 6b310, per Patrick: "we don't need a feature where friends can answer
+# each other's questions." Contribute (and the fleet hub behind it) is
+# gone: no worker, no hub routes, no UI, no invite, and startup scrubs
+# its saved credentials. Nothing may lend a GPU or borrow one.
+import re as _re0
+_rc = {"os": os, "load_prefs": None, "store_prefs": None}
+_rc_dir = __import__("tempfile").mkdtemp()
+_rc_prefs = {"contrib_on": True, "contrib_token": "t", "contrib_wid": "w",
+             "fleet_auto": True, "seen_share": True, "length": 3}
+for _fn in ("fleet_key", "fleet_workers.json", "contrib_ledger.json"):
+    open(os.path.join(_rc_dir, _fn), "w").write("x")
+_rc.update(app_dir=lambda: _rc_dir, _prefs_lock=__import__("threading").RLock(),
+           load_prefs=lambda b=None: dict(_rc_prefs),
+           store_prefs=lambda d, b=None: (_rc_prefs.clear(), _rc_prefs.update(d)))
+_exec_names(_rc, {"_retire_contribute"})
+_rc["_retire_contribute"]()
+_GONE = ("_contrib_loop", "contrib_apply", "fleet_run", "fleet_pick",
+         "FLEET_HOME", "fleet_key()", "_fleet_workers", "/api/fleet/",
+         "fleet_auto\", True", "contrib_on", "p-community", "share-veil",
+         "Share GPU power", "Contribute GPU power", "friends' machines",
+         "a friend\\u2019s GPU", "fleet-meter", "COMMUNITY GPU")
+_left = [g for g in _GONE if g in _MILLENAI_SRC.replace(
+    "# CONTRIBUTE IS GONE", "")]
+check("Contribute is gone: no worker, no hub, no UI, and its creds scrubbed",
+      not _left and _rc_prefs == {"length": 3}
+      and not any(os.path.exists(os.path.join(_rc_dir, f)) for f in
+                  ("fleet_key", "fleet_workers.json", "contrib_ledger.json"))
+      and "_retire_contribute()" in _MILLENAI_SRC.split(
+          'if __name__ == "__main__":')[-1],
+      "%s %s" % (_left, _rc_prefs))
+# 6b310, per Patrick: "The absolute most important thing is that we
+# prevent people's questions, answers, and chats from mixing with other
+# users." Four ways they could, in the app as it stood.
+import socket as _sk0, tempfile as _tf0, html.parser as _hp0
+import subprocess
+# (1) THE WINDOW OPENS THE SERVER THIS PROCESS BOUND. A taken 8889 (say,
+# another login's ConcordeAI) moves the desktop app to a fallback; a
+# named port fails instead of silently becoming something else.
+_hold = _sk0.socket(); _hold.bind(("127.0.0.1", 0)); _hold.listen(1)
+_held = _hold.getsockname()[1]
+_fb = []
+for _i in range(2):
+    _s = _sk0.socket(); _s.bind(("127.0.0.1", 0))
+    _fb.append(_s.getsockname()[1]); _s.close()
+_bn = {"socketserver": __import__("socketserver"), "socket": _sk0,
+       "IS_WIN": False, "PORT": _held, "DEFAULT_APP": True,
+       "FALLBACK_PORTS": tuple(_fb),
+       "StudioHandler": __import__("http.server").server.BaseHTTPRequestHandler}
+_exec_names(_bn, {"bind_backend"})
+try:
+    _srv = _bn["bind_backend"]()
+    _moved = _bn["PORT"] in _fb and _srv.server_address[1] == _bn["PORT"]
+    _srv.server_close()
+except OSError:
+    _moved = False
+_bn.update(PORT=_held, DEFAULT_APP=False)
+try:
+    _bn["bind_backend"]()
+    _named_fails = False
+except OSError:
+    _named_fails = True
+_hold.close()
+_si_dir = _tf0.mkdtemp()
+_si_calls = []
+_si = {"os": os, "time": time, "IS_WIN": False, "_INSTANCE_LOCK": [],
+       "app_dir": lambda: _si_dir,
+       "_hand_off": lambda: _si_calls.append("hand") or False,
+       "_already_open_notice": lambda: _si_calls.append("notice")}
+_exec_names(_si, {"single_instance"})
+_si1 = _si["single_instance"](wait=0.2)
+_si2 = _si["single_instance"](wait=0.6)      # busy, no answer: waits, tells
+_si_ok = _si1 is True and _si2 is False and _si_calls == ["hand", "notice"]
+_si["_hand_off"] = lambda: _si_calls.append("hand2") or True
+_t0 = time.time()
+_si3 = _si["single_instance"](wait=5)       # the running copy answered
+_si_ok = _si_ok and _si3 is False and time.time() - _t0 < 2 \
+    and _si_calls[-1] == "hand2"
+# the fallback band must never meet an engine port, today's or retired
+_pn = {}
+for _x in _ast0.parse(_MILLENAI_SRC).body:
+    if isinstance(_x, _ast0.Assign) and any(getattr(_tg, "id", "") in (
+            "CATALOG", "MODEL_INFO", "RETIRED_MODELS", "FALLBACK_PORTS")
+            for _tg in _x.targets):
+        exec(_ast0.get_source_segment(_MILLENAI_SRC, _x), _pn)
+_eng = ({i["port"] for i in _pn["MODEL_INFO"].values() if i["port"]}
+        | {r[2] for r in _pn["RETIRED_MODELS"].values() if r[2]})
+_main = _MILLENAI_SRC.split('if __name__ == "__main__":')[-1]
+check("taken port: the window opens the server this app bound",
+      _moved and _named_fails and _si_ok
+      and not (set(_pn["FALLBACK_PORTS"]) & (_eng | {8889, 9889, 9894, 9897}))
+      and "threading.Thread(target=start_backend, daemon=True)" not in _MILLENAI_SRC
+      and _main.index("single_instance()") < _main.index("bind_backend()")
+      < _main.index("_write_instance_note()") < _main.index("webview.create_window(")
+      and 'url = f"http://127.0.0.1:{PORT}/?key="' in _main
+      and "os.O_WRONLY | os.O_CREAT | os.O_TRUNC,\n                     0o600" in _MILLENAI_SRC,
+      "moved=%s named_fails=%s lock=%s calls=%s overlap=%s"
+      % (_moved, _named_fails, _si_ok, _si_calls,
+         set(_pn["FALLBACK_PORTS"]) & _eng))
+# (2) ENGINES ANOTHER ACCOUNT RUNS ARE NOT OURS. A listener counts only
+# when lsof (which shows a user only their own processes) finds it
+# running as us; our Ollama then runs privately on a free port.
+_LN = {"_my_listen_ports", "_listener_is_mine", "_engine_up",
+       "_win_listener_mine", "_MINE_CACHE", "_SYSTEM_UID_MAX"}
+_lm = {"os": os, "re": re, "time": time, "subprocess": subprocess,
+       "IS_WIN": False, "IS_MAC": True, "HAS_PSUTIL": False,
+       "_port_in_use": lambda p: True}
+_exec_names(_lm, _LN)
+_ls = _sk0.socket(); _ls.bind(("127.0.0.1", 0)); _ls.listen(1)
+_own = _lm["_listener_is_mine"](_ls.getsockname()[1])
+_ls.close()
+
+
+class _FakeRun:
+    """What lsof would say about this user's listeners."""
+    def __init__(self, out="", rc=0, boom=False):
+        self.out, self.rc, self.boom = out, rc, boom
+
+    def run(self, cmd, *a, **k):
+        if self.boom:
+            raise subprocess.TimeoutExpired(cmd, 4)
+        return type("R", (), {"stdout": self.out, "returncode": self.rc})()
+
+
+_cases = [  # (fake lsof, expected answer for port 4242)
+    (_FakeRun("p9\nn127.0.0.1:4242\n"), True),            # ours
+    (_FakeRun("p9\nn*:4242\np8\nn127.0.0.1:9\n"), True),  # ours, wildcard
+    (_FakeRun("p9\nn127.0.0.1:4243\n"), False),           # someone else's
+    (_FakeRun("", rc=1), False),                          # we listen nowhere
+    (_FakeRun(boom=True), None),                          # probe failed
+    (_FakeRun("junk", rc=2), None),                       # lsof error
+]
+_others = []
+for _fk, _want in _cases:
+    _lx = dict(_lm, subprocess=_fk)
+    _exec_names(_lx, _LN)
+    _others.append(_lx["_listener_is_mine"](4242) is _want)
+# acting on the answer: only a definite False moves anything; None
+# refuses that request; True proceeds
+def _ou_ns(mine, spawn_moves_to=None):
+    ns = {"OLLAMA_PORT": [11434], "_port_in_use": lambda p: True,
+          "_listener_is_mine": lambda p: (True if p == spawn_moves_to
+                                          else mine)}
+    ns["_spawn_ollama_serve"] = lambda: ns["OLLAMA_PORT"].__setitem__(
+        0, spawn_moves_to) if spawn_moves_to else None
+    _exec_names(ns, {"ollama_url"})
+    return ns
+
+
+def _raises(f, *a):
+    try:
+        f(*a)
+        return False
+    except RuntimeError:
+        return True
+
+
+_ou_mine = _ou_ns(True)["ollama_url"]("/api/tags")
+_ou_moved = _ou_ns(False, 54321)["ollama_url"]("/api/chat")
+_ou_none = _raises(_ou_ns(None)["ollama_url"], "/api/chat")
+_ou_stuck = _raises(_ou_ns(False)["ollama_url"], "/api/chat")
+_spawned = []
+_so = {"OLLAMA_PORT": [11434], "_port_in_use": lambda p: True,
+       "_listener_is_mine": lambda p: False, "_free_port": lambda: 54321,
+       "_ollama_bin": lambda: "/bin/true", "log_dir": lambda: _si_dir,
+       "app_dir": lambda: _si_dir, "_RELOCATED": set(),
+       "_managed_procs": [], "os": os, "print": lambda *a, **k: None,
+       "subprocess": type("S", (), {"Popen": staticmethod(
+           lambda *a, **k: _spawned.append(k.get("env", {})) or
+           type("P", (), {"pid": 1})())})}
+_exec_names(_so, {"_spawn_ollama_serve"})
+_so["_spawn_ollama_serve"]()
+_so2 = dict(_so, _listener_is_mine=lambda p: None, OLLAMA_PORT=[11434],
+            _managed_procs=[])
+_exec_names(_so2, {"_spawn_ollama_serve"})
+_so2_spawned = _so2["_spawn_ollama_serve"]()
+_eps = []
+for _mine in (True, False, None):
+    _ep = {"MODEL_ROUTES": {"X": ("mlx", 8888)}, "_RELOCATED": set(),
+           "_port_in_use": lambda p: True, "_free_port": lambda: 45678,
+           "_listener_is_mine": (lambda m: lambda p: m)(_mine),
+           "print": lambda *a, **k: None}
+    _exec_names(_ep, {"_own_engine_port"})
+    try:
+        _eps.append((_ep["_own_engine_port"]("X"), _ep["_RELOCATED"]))
+    except RuntimeError:
+        _eps.append("refused")
+_ne = {"ensure_mlx_engine": lambda l, timeout=0: False}
+_exec_names(_ne, {"_need_engine"})
+_code = "\n".join(ln for ln in _MILLENAI_SRC.splitlines()
+                  if not ln.lstrip().startswith("#"))
+_rm = _MILLENAI_SRC.split("def run_model(")[1].split("\ndef ")[0]
+check("another account's Ollama or MLX engine never gets a prompt",
+      _own is True and all(_others)
+      and _ou_mine == "http://127.0.0.1:11434/api/tags"
+      and _ou_moved == "http://127.0.0.1:54321/api/chat"
+      and _ou_none and _ou_stuck
+      and _so["OLLAMA_PORT"] == [54321] and _so["_RELOCATED"] == {54321}
+      and _spawned and _spawned[0].get("OLLAMA_HOST") == "127.0.0.1:54321"
+      and _so2_spawned is False and len(_spawned) == 1
+      and _eps == [(8888, set()), (45678, {45678}), "refused"]
+      and _raises(_ne["_need_engine"], "X")
+      and "http://127.0.0.1:11434" not in _code
+      and 'ollama_url("/api/chat")' in _MILLENAI_SRC
+      and 'ollama_url("/api/delete")' in _MILLENAI_SRC
+      and "OLLAMA_HOST=urllib.parse.urlsplit(" in _MILLENAI_SRC
+      # run_model: stop when the engine didn't start, re-check afresh
+      # right before sending, and retire (not just forget) a stale engine
+      and "ensure_mlx_engine(" not in _rm and _rm.count("_need_engine(") == 3
+      and _rm.count("_retire_engine(label)") == 2
+      and 'if _listener_is_mine(target) is not True:' in _rm
+      and "_retire_engine(label)      # never two copies" in _MILLENAI_SRC
+      and "port = _own_engine_port(label)" in _MILLENAI_SRC
+      and "_listener_is_mine(port) is True:" in _MILLENAI_SRC
+      # "loaded" means loaded HERE, never another account's engine
+      and _MILLENAI_SRC.count("_engine_up(") >= 5
+      # this user's siblings only; moved engines always stop; the
+      # reaper takes only mlx_lm orphans and never this app itself
+      and '["pgrep", "-U", str(os.getuid()), "-f",' in _MILLENAI_SRC
+      and "if _proc_port(p) in {str(x) for x in _RELOCATED}:" in _MILLENAI_SRC
+      and 'if ppid == "1" and "mlx_lm" in cmd:' in _MILLENAI_SRC
+      and "pids.discard(str(os.getpid()))" in _MILLENAI_SRC,
+      "own=%s others=%s ollama=%s/%s/%s/%s spawn=%s engine=%s"
+      % (_own, _others, _ou_mine, _ou_moved, _ou_none, _ou_stuck,
+         _so2_spawned, _eps))
+_lcd = _MILLENAI_SRC.split("async function loadChatsFromDisk(){")[1].split("\n}")[0]
+check("review fixes: chat copy, autonomy, downloads, image label, photos",
+      "pushChatsToDisk" not in _lcd and "chats=server;" in _lcd
+      and 'localStorage.removeItem("millen.chats")' in _lcd
+      and "p.remote_autonomy" in _MILLENAI_SRC
+      and "JSON.stringify({remote_autonomy:autonomy})" in _MILLENAI_SRC
+      and "dlDirect(a)" in _MILLENAI_SRC
+      and 'window.location.href=a.getAttribute("href")' not in _MILLENAI_SRC
+      and '"in the cloud" if _cloud_img else ""' in _MILLENAI_SRC
+      and 'if p.startswith("https://")][:3]' in _MILLENAI_SRC
+      and 'img.startswith("https://")' in _MILLENAI_SRC
+      and "r'(https://[^" in _MILLENAI_SRC and "(https?://[^" not in _MILLENAI_SRC
+      and "A question that needs the web goes, as\n      typed, to a search engine"
+      in _MILLENAI_SRC)
+# (3) NO KEYLESS CLOUD. Pollinations got whole prompts (memory and name
+# included) when cloud power was on without a key, and image
+# descriptions with no opt-in at all, onto a public feed.
+check("Pollinations is gone and the Cloud power copy tells the truth",
+      "pollinations.ai" not in _MILLENAI_SRC
+      and "FREE_CLOUD" not in _MILLENAI_SRC
+      and "free_cloud_stream" not in _MILLENAI_SRC
+      and "_free_cold" not in _MILLENAI_SRC
+      and "community cloud" not in _MILLENAI_SRC.lower()
+      and "leave this machine\n      only while a key is on" not in _MILLENAI_SRC
+      and "Your chats reach a cloud provider\n      only while a key is on"
+      in _MILLENAI_SRC)
+# (4) AN ANSWER CAN'T RUN SCRIPT IN THE PAGE. esc() left quotes alone, so
+# ![x" onerror="...](https://...) closed the alt attribute and ran code
+# that could read every chat. The page's OWN renderer runs in node here.
+import re as _re1
+_jsb = lambda nm: _MILLENAI_SRC[_MILLENAI_SRC.index("function %s(" % nm):
+                                 _MILLENAI_SRC.index("\n}\n", _MILLENAI_SRC.index(
+                                     "function %s(" % nm)) + 3]
+_js = (_re1.search(r"function esc\(s\)\{.*?;\}\n", _MILLENAI_SRC, _re1.S).group(0)
+       + _re1.search(r"const HL_KW=.*?;\n", _MILLENAI_SRC, _re1.S).group(0)
+       + _jsb("hilite") + _jsb("dlBox") + _jsb("flowDiagram")
+       + _jsb("photoRow") + _jsb("mapCard") + _jsb("renderMD")
+       + 'const C=JSON.parse(require("fs").readFileSync(0,"utf8"));'
+       'process.stdout.write(JSON.stringify(C.map(c=>{try{'
+       'return c.fn==="photoRow"?photoRow(c.arg):c.fn==="mapCard"?mapCard(c.arg)'
+       ':renderMD(c)}catch(e){return "ERR "+e}})));')
+_xss = ['![x" onerror="alert(1)](https://nope.invalid/a.png)',
+        "![x' onerror='alert(1)](https://nope.invalid/a.png)",
+        '![x](https://nope.invalid/a.png"onerror="alert(1))',
+        '[click" onmouseover="alert(1)](https://a.example/)',
+        '[x](https://a.example/"onmouseover="alert(1))',
+        '<img src=x onerror=alert(1)>',
+        '`x" onerror="y`', '**b" onclick="y**',
+        '[[dl:{"id":"a\\" onmouseover=\\"x","name":"f\\" onclick=\\"y","size":9}]]',
+        '```\nit\'s 39 "q\n```',
+        'He said "hi" and it\'s fine',
+        # 6b310 review: a remote picture loads with no click, so it is a
+        # link now; our own /api/image/ files still render; no loopback
+        '![q](https://collector.example/p.png?d=secret)',
+        '![made](/api/image/123-abc.png)',
+        '![x](http://127.0.0.1:5555/p.png)',
+        {"fn": "photoRow", "arg": ["http://127.0.0.1:5555/a.jpg",
+                                   "https://a.example/b.jpg"]},
+        {"fn": "mapCard", "arg": {"lat": 1, "lon": '2"></iframe><img src=x onerror=alert(1)>'}},
+        {"fn": "mapCard", "arg": {"lat": 40.7, "lon": -73.9, "name": "Here"}},
+        '```flow\nUser\'s app -> "API" (can\'t fail)\n```']
+try:
+    _jsf = os.path.join(_si_dir, "rmd.js")
+    open(_jsf, "w").write(_js)
+    _outs = json.loads(subprocess.run(["node", _jsf], input=json.dumps(_xss),
+                                      capture_output=True, text=True,
+                                      timeout=30).stdout)
+except Exception as _e:
+    _outs = ["ERR %s" % _e] * len(_xss)
+
+
+_emit_nul = []
+for _m in _re1.finditer(r"\bemit\(", _MILLENAI_SRC):
+    _seg = _MILLENAI_SRC[_m.end():_m.end() + 300]
+    _d, _i = 1, 0
+    while _i < len(_seg) and _d:
+        _d += {"(": 1, ")": -1}.get(_seg[_i], 0)
+        _i += 1
+    if "NUL" in _seg[:_i] and not _seg.lstrip().startswith("Ctl("):
+        _emit_nul.append(_MILLENAI_SRC[:_m.start()].count("\n") + 1)
+check("model text can't open a stream frame; the server's frames are tagged",
+      "class Ctl(str):" in _MILLENAI_SRC and not _emit_nul
+      and "if not isinstance(chunk, Ctl):" in _MILLENAI_SRC
+      and 'chunk = strip_special(chunk).replace(NUL, "")' in _MILLENAI_SRC
+      and 'text = str(text).replace(NUL, "")' in _MILLENAI_SRC,
+      "untagged frames at %s" % _emit_nul)
+
+
+class _Attrs(_hp0.HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.bad = []
+
+    def handle_starttag(self, tag, attrs):
+        for k, v in attrs:
+            # photoRow's own handler is the one on* the page writes
+            if (tag, k, v) == ("img", "onerror", "this.remove()"):
+                continue
+            if k.startswith("on") or "javascript:" in (v or "").lower():
+                self.bad.append((tag, k, v))
+
+
+_bad = []
+for _o in _outs:
+    _pa = _Attrs(); _pa.feed(_o); _bad += _pa.bad
+check("an answer can't break out of an attribute and run script",
+      len(_outs) == len(_xss) and not any(o.startswith("ERR") for o in _outs)
+      and not _bad
+      and "it&#39;s <i class=\"hnum\">39</i> &quot;q" in _outs[9]
+      and "&#<i" not in "".join(_outs)
+      and _outs[10] == "<p>He said &quot;hi&quot; and it&#39;s fine</p>"
+      and "<img" not in _outs[11] and 'href="https://collector.example/' in _outs[11]
+      and '<img class="genimg" src="/api/image/123-abc.png"' in _outs[12]
+      and "<img" not in _outs[13]
+      and "127.0.0.1" not in _outs[14] and 'src="https://a.example/b.jpg"' in _outs[14]
+      and _outs[15] == "" and "<iframe" in _outs[16] and "40.7,-73.9" in _outs[16]
+      # visible text escaped once; the data-n attribute keeps one more
+      # level on purpose (the browser decodes an attribute once)
+      and "<b>User&#39;s app</b>" in _outs[17] and "<b>User&amp;" not in _outs[17]
+      and "<span>can&#39;t fail</span>" in _outs[17]
+      and "data-id=\"'+esc(c.id)+'\"" in _MILLENAI_SRC,
+      "%s | %s" % (_bad[:3], [o[:90] for o in _outs if o.startswith("ERR")][:2]))
 _cq = dict(_LH, APP_VERSION="t", urllib=__import__("urllib.request"))
 __import__("urllib.error")
 _exec_names(_cq, {"CLOUD_SKIP_IDS", "CLOUD_PICK_ORDER", "_CLAUDE_ID",
@@ -2065,13 +2418,14 @@ check("seamless dark title bar",
 # with a one-breath description, /api/me sits behind the Account pane,
 # and Forget Me is scoped + triple-locked. 6b259: About is the
 # exception — the version right under the title says it better than a
-# sentence would — so five descriptions across six panes.
+# sentence would. 6b310 retired the Community pane: four descriptions
+# across five panes.
 check("settings: descriptions + Account pane + scoped forget",
       # scoped to the settings panel: counting the whole page broke the
       # moment another dialog grew a description (6b303)
       (page.split('id="about-veil"')[1].split('id="gear-veil"')[0]
        if 'id="gear-veil"' in page
-       else page.split('id="about-veil"')[1]).count('class="tdesc"') == 5
+       else page.split('id="about-veil"')[1]).count('class="tdesc"') == 4
       and 'data-pane="p-account"' in page
       and '"/api/me"' in _MILLENAI_SRC
       and '"/api/logout"' in _MILLENAI_SRC
@@ -2083,8 +2437,7 @@ check("settings: descriptions + Account pane + scoped forget",
 # is the one that opens.
 _nav = re.findall(r'data-pane="(p-[a-z]+)"', page)
 _panes = re.findall(r'class="spane[^"]*" id="(p-[a-z]+)"', page)
-_want = ["p-about", "p-account", "p-persona", "p-cloud", "p-community",
-         "p-models"]
+_want = ["p-about", "p-account", "p-persona", "p-cloud", "p-models"]
 check("About leads the rail, Account right under it",
       _nav == _want and _panes == _want
       and '<button class="snav on" data-pane="p-about">About</button>' in page
@@ -2092,18 +2445,6 @@ check("About leads the rail, Account right under it",
       and "p-updates" not in page
       # the removed blurb must not creep back
       and "What version you're flying" not in page)
-# 6b257: the Community pane tells the truth — a ledger this Mac
-# measured (its own file: prefs.json rewrites would race the worker
-# thread), a TIME share that rests between jobs (no honest GPU-percent
-# knob exists, so none is offered), and gates that finally make the
-# idle-only tooltip promise real (AC via psutil, HIDIdleTime via
-# ioreg). The politely-lying user-count line must never return.
-check("community: honest ledger + real gates",
-      'id="contrib-stats"' in page and 'id="contrib-seg"' in page
-      and "contrib_ledger.json" in _MILLENAI_SRC
-      and "_on_ac_power" in _MILLENAI_SRC
-      and "HIDIdleTime" in _MILLENAI_SRC
-      and "Contributing to " not in page)
 # 6b257: the Models roster — status/size/purpose per mind from data
 # the resolvers already compute (ADV_USE is the one description dict,
 # so the picker and the roster can never drift); Manage reuses the
@@ -2178,14 +2519,6 @@ check("logout clears the cookie", s == 200
 # a valid-JSON non-object body used to reach .get() and 500 the handler
 s, h, b = req("/api/forget", "POST", [1, 2, 3], cookie=K)
 check("non-dict JSON body survives", s == 200)
-# 6b257: the contribute loop carries a generation token — the stop
-# Event alone could not retire a loop stuck mid-job (contrib_apply
-# gives up after 3s and CLEARS the flag for the new thread, and the
-# old one sails on), so flipping a Settings toggle during a job left
-# two loops polling the hub
-check("contribute loop retires by generation",
-      "_contrib_gen" in _MILLENAI_SRC
-      and "gen == _contrib_gen[0]" in _MILLENAI_SRC)
 # 6b257: erase means erase — a walled profile's .ident marker holds
 # the very PII the pane promises to forget (the Google email), so a
 # full three-scope forget takes the directory with it
@@ -2293,83 +2626,11 @@ t = chat({"model": "", "models": [], "tier": "Fast", "auto_web": True,
 check("weather answer carries real data", ("°F" in t or "degrees" in t or " mph" in t)
       and "⚠️" not in t and len(t) > 60, t[:120])
 
-# FLEET LOOPBACK (6b244): a real worker speaking the real protocol —
-# register (auto-approve + token), long-poll, take the job, submit a
-# sentinel — and the chat answer must BE that sentinel, delivered with
-# the "GPU is on it" status. Proves dispatch end to end with zero
-# engine loads. turbo is parked for the window (cloud outranks fleet
-# in the single-model path) and restored no matter what.
-import threading as _th
-
-_FSENT = ("FLEET-GAUNTLET-7391: the pooled GPU answered this, and this "
-          "sentence is long enough to clear the degenerate-output floor "
-          "standing in for a real model's reply.")
-
-
-# The hub hands a worker its token ONCE (register marks the claim
-# "claimed"); a known wid arriving with no token is an imposter and
-# parks in pending — correct security, but it made a fixed test wid
-# work exactly once. Persist the (wid, token) PAIR across runs; if the
-# cache is gone, a fresh random wid gets auto-approved and re-cached.
-import os as _os
-import secrets as _sec
-import tempfile as _tf
-
-_FCACHE = _os.path.join(_tf.gettempdir(), "millenai-gauntlet-fleet.json")
-
-
-def _fleet_worker(stop):
-    try:
-        c = json.load(open(_FCACHE))
-        wid, tok = c["wid"], c["token"]
-    except Exception:
-        wid, tok = "gauntlet" + _sec.token_hex(6), ""
-    while not stop.is_set():
-        try:
-            s2, h2, b2 = req("/api/fleet/register", "POST",
-                             {"id": wid, "token": tok, "name": "gauntlet-rig",
-                              "models": [json.loads(
-                                  req("/api/tiers", cookie=K)[2])
-                                  ["Fast"]["models"][0]]}, cookie=K)
-            out = json.loads(b2)
-            if out.get("pending"):
-                # claimed wid, lost token — start over as a new worker
-                wid, tok = "gauntlet" + _sec.token_hex(6), ""
-                continue
-            if out.get("token"):
-                tok = out["token"]
-                json.dump({"wid": wid, "token": tok}, open(_FCACHE, "w"))
-            if not tok:
-                time.sleep(1)
-                continue
-            s2, h2, b2 = req("/api/fleet/poll", "POST",
-                             {"id": wid, "token": tok}, cookie=K, timeout=40)
-            job = json.loads(b2)
-            if job.get("job"):
-                req("/api/fleet/submit", "POST",
-                    {"id": wid, "token": tok, "job": job["job"],
-                     "text": _FSENT}, cookie=K)
-                return
-        except Exception:
-            time.sleep(1)
-
-
-_prefs0 = json.loads(req("/api/prefs", cookie=K)[2])
-req("/api/prefs", "POST", {"turbo": False}, cookie=K)
-_fstop = _th.Event()
-_fth = _th.Thread(target=_fleet_worker, args=(_fstop,), daemon=True)
-_fth.start()
-time.sleep(2)
-try:
-    t = chat({"model": "", "models": [], "tier": "Fast", "auto_web": False,
-              "messages": [{"role": "user",
-                            "content": "Say hello in one sentence."}]},
-             timeout=60)
-    check("fleet: worker's answer comes back through chat",
-          "FLEET-GAUNTLET-7391" in t, t[:120])
-finally:
-    _fstop.set()
-    req("/api/prefs", "POST", {"turbo": bool(_prefs0.get("turbo"))}, cookie=K)
+# 6b310: the fleet hub is gone — its routes answer 404 even with the key
+s, h, b = req("/api/fleet/register", "POST",
+              {"id": "gauntlet", "token": "", "name": "x", "models": []})
+s2, h2, b2 = req("/api/fleet/status")
+check("fleet hub routes are gone", s == 404 and s2 == 404, "%s %s" % (s, s2))
 
 # a place no index knows must NOT get a bare "couldn't find any info"
 # shrug (3.3) — the answer says so plainly AND asks a pin-down question

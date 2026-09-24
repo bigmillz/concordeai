@@ -41,8 +41,11 @@ MILLENAI_PORT=9894 MILLENAI_KEY=smoketestkey123 MILLENAI_HEADLESS=1 \
 ```
 
 `MILLENAI_HEADLESS=1` suppresses the window and `webbrowser.open`. Port convention:
-**8889** desktop app, **9889** the always-on hosted instance, **9894** dev. Ports
-**8884–8930 are reserved for model engines** — never bind a server there.
+**8889** desktop app (it moves to **18890–18898** when another login holds 8889),
+**9894** dev; **9897 is ConcordeGo's** and 9889 was the retired hosted instance. Ports
+**8884 and up, by twos, are model engines** (8944 today) — never bind a server there.
+Every request needs the launch key as the cookie `millen_key_<port>` (6b310), so a
+dev instance is started with `MILLENAI_KEY` and curled with `-b 'millen_key_9894=…'`.
 
 The page is assembled at request time but **the process reads `millenai.py` once at
 import**, so *any edit needs a server restart*. Kill by port, never `pkill -f`:
@@ -80,9 +83,9 @@ It asserts against three surfaces, which is why a UI change can fail a test:
 **Running one check:** there is no selector. Assert over the wire instead:
 
 ```bash
-curl -s -b 'millen_key=smoketestkey123' \
+curl -s -b 'millen_key_9894=smoketestkey123' \
   'http://127.0.0.1:9894/api/remote/classify?cmd=rm%20-rf%20/'     # {"risk":"danger"}
-curl -s -b 'millen_key=smoketestkey123' http://127.0.0.1:9894/ | grep -c 'barBreathe'
+curl -s -b 'millen_key_9894=smoketestkey123' http://127.0.0.1:9894/ | grep -c 'barBreathe'
 ```
 
 A test instance is **not isolated** — it shares `prefs.json`, `chats.json` and the 88xx

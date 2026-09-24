@@ -29,7 +29,7 @@ trap 'pkill -9 -P $PID 2>/dev/null || true; kill -9 $PID 2>/dev/null || true; rm
 code=000
 for _ in $(seq 1 90); do
   kill -0 $PID 2>/dev/null || { echo "boot: the app exited"; tail -40 "$LOG"; exit 1; }
-  code=$(curl -s -m 5 -o /dev/null -w "%{http_code}" -H "Cookie: millen_key=$KEY" \
+  code=$(curl -s -m 5 -o /dev/null -w "%{http_code}" -H "Cookie: millen_key_$PORT=$KEY" \
          "http://127.0.0.1:$PORT/" || true)
   [ "$code" = "200" ] && break
   sleep 1
@@ -39,9 +39,9 @@ if grep -q 'Traceback\|Address already in use' "$LOG"; then
 fi
 [ "$code" = "200" ] || { echo "boot: no page after 90s (HTTP $code)"; tail -40 "$LOG"; exit 1; }
 PAGE="$HOME_DIR/page.html"
-curl -sf -m 10 -H "Cookie: millen_key=$KEY" "http://127.0.0.1:$PORT/" >"$PAGE"
+curl -sf -m 10 -H "Cookie: millen_key_$PORT=$KEY" "http://127.0.0.1:$PORT/" >"$PAGE"
 LEFT=$(grep -oE '__[A-Z_]{3,}__' "$PAGE" | grep -v '^__MAIN__$' | sort -u || true)
 [ -z "$LEFT" ] || { echo "page: unreplaced template tokens: $LEFT"; exit 1; }
-curl -sf -m 10 -H "Cookie: millen_key=$KEY" "http://127.0.0.1:$PORT/api/stats" >/dev/null \
+curl -sf -m 10 -H "Cookie: millen_key_$PORT=$KEY" "http://127.0.0.1:$PORT/api/stats" >/dev/null \
   || { echo "api: /api/stats failed"; tail -40 "$LOG"; exit 1; }
 echo "boot: ok (page $(wc -c <"$PAGE" | tr -d ' ') bytes, /api/stats 200)"

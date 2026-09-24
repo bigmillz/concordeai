@@ -31,7 +31,8 @@ import time
 import urllib.request
 
 BASE = "http://127.0.0.1:9894"
-K = "millen_key=smoketestkey123"
+# the launch key's cookie is named for the port (6b310)
+K = "millen_key_%s=smoketestkey123" % BASE.rsplit(":", 1)[1]
 NUL = "\x00"
 
 # ---------------------------------------------------------------- banks

