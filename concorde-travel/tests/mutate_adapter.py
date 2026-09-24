@@ -29,6 +29,7 @@ import subprocess, shutil, sys, re, os
 
 AD = "concorde-travel/adapter.py"
 DATA = "concorde-travel/ui/mock/data.py"
+SV = "concorde-travel/server.py"
 GR = "concorde-travel/ground.py"
 PL = "concorde-travel/places.py"
 FA = "concorde-travel/enrichment/fares.json"
@@ -227,6 +228,9 @@ MUTANTS = [
      'bags: call a long trip short-haul and a short one long-haul'),
     (AD, "_fare_row", 'elif short and row.get("short_haul"):', 'elif not short and row.get("short_haul"):',
      'bags: charge the short-haul fees on the long-haul trip'),
+    (DATA, "build_slim", 'if extra + 100 > ow:', 'if extra + 100 < ow:', 'round trip: apply the round-trip fare when it is dearer'),
+    (SV, "_round_trip_totals", 'if not s0 or str(s0[0].get("departing_at") or "")[:16] != dep:', 'if not s0:',
+     'round trip: match the outbound by flight numbers alone, whatever day it flies'),
 ]
 
 caught = skipped = 0

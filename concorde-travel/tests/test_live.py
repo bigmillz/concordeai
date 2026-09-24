@@ -168,6 +168,46 @@ def cabin_checks():
     check("a business search asks Duffel for business", body["data"]["cabin_class"] == "business")
     body2 = live._render_body(d, {"origin": "JFK", "destination": "LHR", "date": "2026-11-18", "adults": 1})
     check("no cabin asked for is economy", body2["data"]["cabin_class"] == "economy")
+    one = live._render_body(d, {"origin": "NYC", "destination": "LON", "date": "2026-11-04", "adults": 1})
+    both = live._render_body(d, {"origin": "JFK", "destination": "LHR", "date": "2026-11-04", "adults": 1,
+                                 "return_date": "2026-11-11", "return_origin": "LON", "return_destination": "NYC"})
+    check("a round trip asks Duffel for both flights as one request: the way home is a second slice (2026-09-24)",
+          len(one["data"]["slices"]) == 1 and len(both["data"]["slices"]) == 2
+          and both["data"]["slices"][1] == {"origin": "LON", "destination": "NYC", "departure_date": "2026-11-11"}
+          and both["data"]["slices"][0]["origin"] == "JFK")
+
+
+def round_trip_checks():
+    """Google's round trip in two calls: the outbounds, then the returns for the chosen one, by its token."""
+    import tempfile
+    print("\nround trip through SerpApi")
+    sandbox(tempfile.mkdtemp())
+    os.environ["CONCORDEGO_SERPAPI_KEY"] = SECRET
+    real = live.urllib.request.urlopen
+    cfg = live.serp_config(); cfg["quota"]["min_seconds_between_calls"] = 0
+    seen = []
+    outbounds = {"best_flights": [{"price": 600, "departure_token": "TOK-B", "flights": [{"flight_number": "BA 178"}]},
+                                  {"price": 568, "departure_token": "TOK-T", "flights": [{"flight_number": "TP 212"}, {"flight_number": "TP 1328"}]}]}
+    returns = {"other_flights": [{"price": 568, "flights": [{"flight_number": "TP 1329", "departure_airport": {"time": "2026-11-11 09:35"}}]}]}
+
+    def fake(req, timeout=0):
+        seen.append(req.full_url)
+        return _Body(json.dumps(returns if "departure_token=" in req.full_url else outbounds).encode())
+    try:
+        live.urllib.request.urlopen = fake
+        p, m = live.serp_round_trip("EWR,JFK", "LGW,LHR", "2026-11-04", "2026-11-11", ["TP212", "TP1328"], cfg=cfg)
+        check("the returns come back for the chosen outbound, asked for by its own token, in two calls",
+              p == returns and len(seen) == 2 and "departure_token=TOK-T" in seen[1] and "type=1" in seen[0]
+              and "return_date=2026-11-11" in seen[0] and SECRET not in json.dumps(m), [u.replace(SECRET, "[key]")[-80:] for u in seen])
+        n = len(seen)
+        p2, m2 = live.serp_round_trip("EWR,JFK", "LGW,LHR", "2026-11-04", "2026-11-11", ["XX1"], cfg=cfg)
+        check("an outbound Google does not list gets no second call, and says why",
+              p2 is None and len(seen) == n and "no round-trip fare" in m2["error"])
+        live.serp_round_trip("EWR,JFK", "LGW,LHR", "2026-11-04", "2026-11-11", ["TP212", "TP1328"], cfg=cfg)
+        check("the same round trip again is served from the cache", len(seen) == n)
+    finally:
+        live.urllib.request.urlopen = real
+        os.environ.pop("CONCORDEGO_SERPAPI_KEY", None)
 
 
 
@@ -559,6 +599,7 @@ def main():
           "VERIFIED against the live service" in live.DEFAULTS["_note"] and "UNVERIFIED" not in live.DEFAULTS["_note"])
 
     cabin_checks()
+    round_trip_checks()
     serp_checks()
     adb_checks()
     print("\n%d checks, %d failed" % (N[0], len(FAILS)))

@@ -545,7 +545,17 @@ def _render_body(cfg, query):
             return vals[node]
         return node
 
-    return walk(cfg["body_template"])
+    body = walk(cfg["body_template"])
+    # a round trip (2026-09-24): the same body with the flight home as a second slice, so the airline
+    # prices both as one ticket. A template with no slices list (a query-string provider) is left alone.
+    if query.get("return_date"):
+        slices = (body.get("data") or {}).get("slices") if isinstance(body, dict) else None
+        if isinstance(slices, list) and len(slices) == 1 and isinstance(slices[0], dict):
+            back = time.strftime(cfg["date_format"], time.strptime(query["return_date"], "%Y-%m-%d"))
+            slices.append({"origin": query.get("return_origin") or query["destination"],
+                           "destination": query.get("return_destination") or query["origin"],
+                           "departure_date": back})
+    return body
 
 
 def _auth_headers(cfg):
@@ -765,6 +775,67 @@ def serp_search(origin, destination, date, adults=1, carriers=None, cfg=None, al
                                                        else "unexpected response"), *secrets)}
     cache_put(query, payload)
     return payload, {"source": "api", "quota": quota_state(cfg, qf)}
+
+
+def _serp_fetch(cfg, cache_query, params):
+    """One SerpApi call with the supplement's discipline: cache before quota, quota reserved (paced) before
+    the call, a miss never cached, the key redacted from everything that escapes."""
+    qf = _serp_quota_file()
+    hit = cache_get(cache_query, cfg["quota"]["cache_ttl_seconds"])
+    if hit:
+        return hit["payload"], {"source": "cache", "age_seconds": hit["_age_seconds"], "quota": quota_state(cfg, qf)}
+    if not cfg.get("key"):
+        return None, {"source": "none", "error": "no SerpApi key", "quota": quota_state(cfg, qf)}
+    ok, why = _reserve_paced(cfg, qf)
+    if not ok:
+        return None, {"source": "none", "error": why, "quota": quota_state(cfg, qf)}
+    from urllib.parse import urlencode
+    req = urllib.request.Request(SERP_URL + "?" + urlencode(dict(params, api_key=cfg["key"])),
+                                 headers={"Accept": "application/json", "User-Agent": UA})
+    try:
+        with urllib.request.urlopen(req, timeout=40) as r:
+            body = r.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as exc:
+        return None, {"source": "none", "quota": quota_state(cfg, qf),
+                      "error": redact("HTTP %s from SerpApi" % exc.code, cfg["key"])}
+    except (urllib.error.URLError, OSError) as exc:
+        _refund(qf)
+        return None, {"source": "none", "quota": quota_state(cfg, qf), "refunded": True,
+                      "error": redact("could not reach SerpApi: %s" % exc, cfg["key"])}
+    try:
+        payload = json.loads(body)
+    except ValueError:
+        return None, {"source": "none", "quota": quota_state(cfg, qf), "error": "SerpApi did not return JSON"}
+    if not isinstance(payload, dict) or payload.get("error"):
+        return None, {"source": "none", "quota": quota_state(cfg, qf),
+                      "error": redact("SerpApi: %s" % (payload.get("error") if isinstance(payload, dict) else "unexpected response"), cfg["key"])}
+    cache_put(cache_query, payload)
+    return payload, {"source": "api", "quota": quota_state(cfg, qf)}
+
+
+def _serp_fns(it):
+    """A Google itinerary's flight numbers, 'BA 117' -> 'BA117'."""
+    return [str(f.get("flight_number") or "").replace(" ", "").upper() for f in (it or {}).get("flights") or []]
+
+
+def serp_round_trip(origin, destination, out_date, back_date, outbound_fns, adults=1, cabin=None, cfg=None):
+    """(payload of return flights priced as round trips with the chosen outbound, meta). Google prices a round
+    trip in two steps: the outbound list, each carrying a departure_token, then the returns for one outbound,
+    each priced as the whole round trip. Two calls, each cached."""
+    cfg = cfg or serp_config()
+    base = {"engine": "google_flights", "departure_id": origin, "arrival_id": destination, "outbound_date": out_date,
+            "return_date": back_date, "type": 1, "currency": "USD", "hl": "en", "gl": "us", "adults": int(adults),
+            "travel_class": _SERP_CLASS.get(cabin or "economy", 1)}
+    first, m1 = _serp_fetch(cfg, dict(base, _kind="rt-outbound"), base)
+    if first is None:
+        return None, m1
+    want = [str(x).replace(" ", "").upper() for x in outbound_fns or []]
+    tok = next((it.get("departure_token") for grp in ("best_flights", "other_flights") for it in first.get(grp) or []
+                if _serp_fns(it) == want and it.get("departure_token")), None)
+    if not tok:
+        return None, {"source": "none", "error": "Google shows no round-trip fare with this outbound", "quota": m1.get("quota")}
+    second, m2 = _serp_fetch(cfg, dict(base, _kind="rt-returns", outbound="/".join(want)), dict(base, departure_token=tok))
+    return second, m2
 
 
 # ------------------------------------------------------------ flight status

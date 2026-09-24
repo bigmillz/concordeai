@@ -164,7 +164,7 @@ def feed_details(offer):
 
 
 def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full=None, source_note=None, built_from="a live search",
-               dest_point=None, destination_full=None, supplement=None):
+               dest_point=None, destination_full=None, supplement=None, round_trip=None):
     """A feed payload -> everything mock 10 reads. server.py calls this for a
     live search; main() below calls it for the checked-in sample."""
     sc = adapter.from_feed(raw, origin_key=origin_key, checked_bags=checked_bags, dest_point=dest_point)
@@ -175,6 +175,23 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
         sc = adapter.merge_scenarios(sc, adapter.from_serpapi(
             supplement, origin_key=origin_key, checked_bags=checked_bags,
             geo=adapter.duffel_geo(raw), dest_point=dest_point, carriers=server.live.serp_want()), "Google Flights")
+    # A round trip's return leg (2026-09-24): where the airline sells this return together with the outbound
+    # already chosen for less than the two one-way tickets, the return's ticket becomes what the round trip
+    # adds to the outbound's price, and the page says it is one round-trip ticket. Scored after the change,
+    # so the order and the grade see the price the traveller will pay.
+    if round_trip and round_trip.get("totals") and "error" not in sc:
+        p_out = int(round_trip.get("outbound_cents") or 0)
+        for o in sc["options"]:
+            tot = round_trip["totals"].get(adapter._itin_key(o))
+            if tot is None or len(o.get("tickets") or []) != 1:
+                continue
+            ow = adapter._ticket_cents(o)
+            extra = max(0, int(tot) - p_out)
+            if extra + 100 > ow:
+                continue                     # not at least a dollar better than the one-way ticket
+            t = o["tickets"][0]
+            t["price"] = dict(t["price"], base_cents=extra, fx_rate_to_usd=1.0, taxes=[], carrier_imposed=[], agency_fees=[])
+            o["_round_trip"] = {"total_cents": int(tot), "outbound_cents": p_out, "one_way_cents": ow}
     # The raw offers, keyed the way the adapter names its options (the last ten
     # characters of the offer id), so the page can show everything the feed
     # said about a flight, not only what the scorer priced.
@@ -329,6 +346,7 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
         e["seat_selection"] = t0["entitlements"].get("seat_selection")
         # a carry-on on every ticket of the trip; a feed that does not say reads as not included (unknown is never cheap)
         e["carry_on"] = all(bool(t["entitlements"].get("cabin_bag_included")) for t in o["tickets"])
+        e["round_trip"] = o.get("_round_trip")
         e["ground"] = {end: [{"mode": m["mode"], "kind": m.get("mode_kind"), "cents": m.get("fare_cents"),
                               "minutes": (m.get("door_to_door_minutes") or {}).get("p50"),
                               "estimated": bool(m.get("estimated")), "feasible": m.get("feasible", True)}

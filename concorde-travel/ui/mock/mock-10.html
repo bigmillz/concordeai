@@ -974,7 +974,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr"></span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="cd13b63">cd13b63</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="cd2d2f0">cd2d2f0</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -1001,7 +1001,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The standard trip for this route</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Prices are calculated in US dollars, then converted. Photos from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="cd13b63">cd13b63</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Prices are calculated in US dollars, then converted. Photos from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="cd2d2f0">cd2d2f0</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1744,6 +1744,7 @@ function rawTerms(e, r, ctx){
   else if (e.rating <= ctx.medRating - .04) con('lowrated', 'Lower-rated airline', Math.abs(cents('carrier')) + 2500);
   // the fare
   const B = find('bags'); if (B && B.cents > 0) con('bagfee', 'Bag fee ' + money(B.cents), B.cents); else if (B && B.included) pro('bagin', 'Bag included', 4500);
+  if (e.round_trip) pro('roundtrip', 'Round-trip fare saves ' + money(e.round_trip.one_way_cents - e.ticket_cents), e.round_trip.one_way_cents - e.ticket_cents + 5000);
   if (e.seat_selection === 'paid') con('seatfee', 'Paid seat choice', 1500);
   if (e.refundable) pro('refund', 'Refundable', 4000);
   if (e.changes === 'free') pro('freechg', 'Free changes', 3000); else if (e.changes === 'fee') con('chgfee', 'Change fee', 1500); else if (e.changes === 'not_permitted') con('nochg', 'No changes', 2500);
@@ -1909,6 +1910,7 @@ function factsHTML(e){
   // the split is shown only when it is a real one: the test feed invents a $1 base under real taxes
   if (d.base_cents != null && d.base_cents >= .25 * (d.base_cents + (d.tax_cents || 0))) F.push(row('Fare', `${money(d.base_cents)} base + ${money(d.tax_cents || 0)} taxes`));
   if (d.price_guarantee_until) F.push(row('Price held', 'until ' + when(d.price_guarantee_until))); else if (d.pay_by) F.push(row('Pay by', when(d.pay_by)));
+  if (e.round_trip) F.push(row('Round trip', `One ticket with your outbound: ${money(e.round_trip.total_cents)} for both flights, ${money(e.round_trip.one_way_cents - e.ticket_cents)} less than two one-way tickets. This flight adds ${money(e.ticket_cents)}.`));
   if (d.emissions_kg) F.push(row('Emissions', `${(+d.emissions_kg).toLocaleString()} kg CO₂`));
   if (d.source) F.push(row('Source', d.source.replace(/ via SerpApi$/, '') + (d.note ? ' · ' + d.note : '')));
   F.push(row('Airline', esc(e.carrier_name) + (e.rating != null ? ` · rated ${Math.round(e.rating * 100)}/100` : '') + (d.carriage_url ? ` · <a href="${esc(d.carriage_url)}" target="_blank" rel="noopener">conditions of carriage</a>` : ''), true));
@@ -1996,10 +1998,12 @@ function snapshot(e){
   const b = e.booking && e.booking[0], aw = awardsFor(e)[0], host = (() => { try { return new URL((e.details || {}).carriage_url || '').host; } catch (x) { return ''; } })();
   return {id:e.id, carrier:e.carrier, carrier_name:e.carrier_name, flight:e.flight, route:e.route.slice(), depart:e.depart, arrive:e.arrive, day_offset:e.day_offset, brand:e.brand, ticket_cents:e.ticket_cents, total_cents:bill(e).total,
     pay:payPick(e, aw), award:aw ? {p:aw.p, name:aw.prog.name, pts:aw.pts, fees:aw.fees, spend:aw.spend, via:aw.via, good:aw.good} : null, site:(SITES[e.carrier] && host.endsWith(SITES[e.carrier].replace(/^www\./, '')) ? SITES[e.carrier] : host) || SITES[e.carrier] || '', who:b ? b.who : e.carrier_name,
-    play: payPick(e, aw) === 'points' && aw ? playbookHTML(e, bill(e)) : ''};
+    play: payPick(e, aw) === 'points' && aw ? playbookHTML(e, bill(e)) : '', round_trip:e.round_trip || null};
 }
 async function selectLeg(id){
   const e = ALL.find(x => x.id === id); if (!e) return;
+  if (S.trip === 'round' && S.legIdx === 0 && S.legPick[0] && S.legPick[0].id !== id){ LEGDATA[1] = null; delete S.legPick[1]; }   // round-trip fares depend on the outbound
+  if (S.legIdx === 0) ALL0 = ALL.slice();
   S.legPick[S.legIdx] = {id, snap:snapshot(e)}; closeSheet();
   const n = legNames().length, next = [...Array(n).keys()].find(i => i > S.legIdx && !S.legPick[i]) ?? [...Array(n).keys()].find(i => !S.legPick[i]);
   if (next !== undefined) await goLeg(next); else goBook();
@@ -2014,12 +2018,20 @@ async function goLeg(i){
   loadData(LEGDATA[i]); paintSignal(); { const f = $('#flex'); if (f){ f.hidden = true; f.innerHTML = ''; } } showLegSections(true); paintStepper(); paint(true); summary(); scrollTo({top:0, behavior:REDUCED ? 'auto' : 'smooth'});
 }
 // the return (or the next leg of a multi-city) is its own search the other way round, the same shape as the outbound
+// the outbound already chosen, for pricing the return as part of one round-trip ticket (2026-09-24)
+function pairFor(i){
+  if (S.trip !== 'round' || i !== 1 || !S.legPick[0]) return null;
+  const e = ((LEGDATA[0] || {}).results ? Object.values(LEGDATA[0].results).flat() : []).find(x => x && x.id === S.legPick[0].id) || ALL0.find(x => x.id === S.legPick[0].id);
+  if (!e || !e.segments || !e.segments.length) return null;
+  return {flights:e.segments.map(g => String(g.flight).replace(/\s+/g, '')), origin:e.route[0], destination:e.route[e.route.length - 1],
+    date:e.depart.slice(0, 10), depart:e.depart.slice(0, 16), ticket_cents:e.ticket_cents, source:String(e.id).startsWith('google-') ? 'google' : 'feed'};
+}
 async function fetchLeg(i){
   const L0 = S.legs[0], from = S.trip === 'round' ? L0.to : S.legs[i].from, to = S.trip === 'round' ? L0.from : S.legs[i].to, dateStr = S.trip === 'round' ? S.back : S.legs[i].date, date = toISODate(dateStr);
   if (!(SERVED && date)){ S.notice = (S.trip === 'round' ? 'Return' : 'Flight ' + (i+1)) + ': sample results, the outbound flights reversed. Open the website for live results.'; return null; }
   const box = $('#loading'); box.classList.remove('hidden'); runProgress(box, SEARCH_STAGES, 9000, () => {});
   let res;
-  try { const r = await fetch('/search', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'api', origin:from, origin_address:from, destination:to, date, adults:paxCount(), checked_bags:partyBags(), cabin:S.adv.cabin, trip:{leg:1}})}); res = await r.json(); }
+  try { const r = await fetch('/search', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'api', origin:from, origin_address:from, destination:to, date, adults:paxCount(), checked_bags:partyBags(), cabin:S.adv.cabin, trip:{leg:1}, pair:pairFor(i)})}); res = await r.json(); }
   catch (x){ res = {error:'no response'}; }
   box.classList.add('hidden');
   if (res.error){ if (res.sign_in){ openAccount(res); return undefined; } S.notice = (S.trip === 'round' ? 'The return search' : 'This search') + ' failed (' + res.error + '). Showing the outbound flights reversed, as a sample.'; return null; }
@@ -2061,24 +2073,27 @@ function itinText(){ return Object.keys(S.legPick).sort().map(i => { const p = S
 function bookHTML(){
   const names = legNames(), picks = names.map((_, i) => S.legPick[i]).filter(Boolean); if (picks.length < names.length) return '<div class="sechead"><h2>Pick every flight first</h2></div>';
   const snaps = picks.map(p => p.snap), same = snaps.every(x => x.carrier === snaps[0].carrier), cash = snaps.filter(x => x.pay !== 'points'), pts = snaps.filter(x => x.pay === 'points');
+  // one round-trip ticket (2026-09-24): both flights priced together, so they are booked together, on the outbound airline's site
+  const rt = S.trip === 'round' && snaps.length === 2 && cash.length === 2 && snaps[1].round_trip ? snaps[1].round_trip : null;
   const legRow = (p, i) => `<div class="bleg"><div class="blogo">${logo(p.carrier, true)}</div><div class="binfo"><b>${esc(names[i][0])} · ${esc(names[i][1] || '')}</b><span>${esc(p.carrier_name)} ${esc(p.flight)} · ${esc(p.route.join(' → '))} · ${hm(p.depart)} → ${hm(p.arrive)}${p.day_offset ? ' +1' : ''} · ${esc(p.brand)}</span></div>
       <div class="bpay">${p.pay === 'points' && p.award ? `<b class="fig">${p.award.spend.toLocaleString()}</b><span>${esc(p.award.via ? SHORT[p.award.via] + ' pts' : p.award.name)} + ${money(p.award.fees)}</span>` : `<b class="fig">${money(p.total_cents)}</b><span>all in</span>`}</div>
       <button class="ledger" data-changeleg="${i}">Change</button></div>`;
   const k = CURRENCIES[CUR], total = cash.reduce((t, x) => t + Math.round(x.total_cents * k.rate / 100) * 100 / k.rate, 0);   // the sum of the figures shown, so the total never reads a dollar off the legs
   let links = '';
   if (cash.length){
-    if (same && cash.length === snaps.length){ const l = airlineLink(snaps[0].carrier, snaps[0].site, snaps);
+    if ((same || rt) && cash.length === snaps.length){ const l = airlineLink(snaps[0].carrier, snaps[0].site, snaps);
       links += l.href ? `<a class="choose blink" href="${esc(l.href)}" target="_blank" rel="noopener">Book ${snaps.length > 2 ? 'all ' + snaps.length + ' flights' : snaps.length > 1 ? 'both flights' : 'it'} on ${esc(l.host)} →</a><p class="bnote">${l.filled ? 'Airports and dates are filled in. Pick these flights there.' : 'Search for these flights on the airline\'s site.'}</p>`
         : `<p class="bnote">Book directly with ${esc(l.host)} on its own website. Search for these flights there.</p>`; }
     else { cash.forEach(p => { const i = snaps.indexOf(p), l = airlineLink(p.carrier, p.site, [p]);
         links += l.href ? `<a class="choose blink" href="${esc(l.href)}" target="_blank" rel="noopener">Book the ${esc(names[i][0].toLowerCase())} on ${esc(l.host)} →</a>`
           : `<p class="bnote">Book the ${esc(names[i][0].toLowerCase())} directly with ${esc(l.host)} on its own website.</p>`; });
-      if (!same) links += '<p class="bnote">Different airlines mean separate tickets. That is normal and often cheaper.</p>'; }
+      if (!same && !rt) links += '<p class="bnote">Different airlines mean separate tickets. That is normal and often cheaper.</p>'; }
+    if (rt) links += `<p class="bnote">Book both flights together as one round-trip ticket: ${money(rt.total_cents)} for the pair, ${money(rt.one_way_cents - (rt.total_cents - rt.outbound_cents))} less than two one-way tickets. Booked separately, they cost more.</p>`;
   }
   const walks = pts.map(p => { const i = snaps.indexOf(p); return `<section class="bwalk"><h3>${esc(names[i][0])} with ${esc(p.award.name)}: ${p.award.spend.toLocaleString()} ${esc(p.award.via ? SHORT[p.award.via] + ' points' : p.award.name)} + ${money(p.award.fees)}</h3>${p.play || '<p class="bnote">No walkthrough for this award.</p>'}</section>`; }).join('');
   const sameProg = pts.length > 1 && pts.every(p => p.award.p === pts[0].award.p && (p.award.via || '') === (pts[0].award.via || ''));
   const ptsHead = pts.length ? `<p class="bnote">${pts.length > 1 ? (sameProg ? (pts.length === 2 ? 'Both flights' : 'All ' + pts.length + ' flights') + ' book with ' + esc(pts[0].award.name) + '. ' + (pts[0].award.via ? 'Transfer <b>' : 'Use <b>') + pts.reduce((t, p) => t + p.award.spend, 0).toLocaleString() + '</b> ' + esc(pts[0].award.via ? SHORT[pts[0].award.via] : pts[0].award.name) + ' points' + (pts[0].award.via ? ' once' : '') + ', then book each flight below. Check award seats on every flight before you ' + (pts[0].award.via ? 'transfer.' : 'book.') : 'Each flight books separately. Check award seats on every flight before you transfer points.') : ''}</p>` : '';
-  return `<div class="sechead"><h2>Book it</h2><p>${same ? 'One airline for the whole trip.' : 'Different airlines, separate tickets.'} ${cash.length ? 'Cash total: <b>' + money(total) + '</b>' + (pts.length ? '. Points steps are below.' : '.') : 'All on points. Steps for each flight are below.'}</p></div>
+  return `<div class="sechead"><h2>Book it</h2><p>${rt ? 'One round-trip ticket.' : same ? 'One airline for the whole trip.' : 'Different airlines, separate tickets.'} ${cash.length ? 'Cash total: <b>' + money(total) + '</b>' + (pts.length ? '. Points steps are below.' : '.') : 'All on points. Steps for each flight are below.'}</p></div>
     <div class="bookcard">${snaps.map(legRow).join('')}
     <div class="blinks">${links}</div>${ptsHead}${walks}
     <div class="bfoot"><pre class="itin" id="itin">${esc(itinText())}</pre><button class="ledger" id="copyitin">Copy itinerary</button></div></div>`;
@@ -2621,6 +2636,7 @@ const STARFIELD = (function stars(){
 let P = D.par;
 // one dataset per leg of the trip: 0 is the outbound the page opened with; the return arrives when it is asked for
 const LEGDATA = {0: D};
+let ALL0 = [];   // the outbound leg's flights, for naming the chosen outbound when the return is searched
 // A live search replaces everything the page reads. Every derived table is
 // rebuilt here, so a second search is a clean slate and not a mix of two.
 function paintSignal(){

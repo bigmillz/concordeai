@@ -1044,6 +1044,50 @@ def main():
     five = sorted(adapter._ticket_cents(o) for o in feas)[:mockdata.CHEAPEST_TICKETS]
     check("with the pool cut to the single best per target, the five cheapest tickets still reach the page",
           all(t in shown for t in five) and len(five) == 5, str((five, sorted(shown)[:8])))
+
+    # round trips (2026-09-24): a return the airline sells with the chosen outbound for less than two one-ways
+    opts1 = [o for o in scd["options"] if len(o.get("tickets") or []) == 1]
+    o0 = opts1[0]; k0 = adapter._itin_key(o0); ow0 = adapter._ticket_cents(o0)
+    rt_cheap = mockdata.build_slim(dfl, round_trip={"outbound_cents": 30000, "totals": {k0: 30000 + ow0 - 5000}})
+    rts = [e for v in rt_cheap["results"].values() if isinstance(v, list) for e in v if e.get("round_trip")]
+    check("a round-trip fare $50 under the two one-ways makes the return's ticket what the round trip adds, and says so",
+          rts and all(e["ticket_cents"] == ow0 - 5000 and e["round_trip"]["one_way_cents"] == ow0
+                      and e["round_trip"]["total_cents"] == 30000 + ow0 - 5000 for e in rts), str([(e["ticket_cents"], ow0) for e in rts[:2]]))
+    rt_dear = mockdata.build_slim(dfl, round_trip={"outbound_cents": 30000, "totals": {k0: 30000 + ow0 + 1000}})
+    check("a round-trip fare dearer than the two one-ways changes nothing",
+          not any(e.get("round_trip") for v in rt_dear["results"].values() if isinstance(v, list) for e in v))
+    # the server matches the two-flight offers to the EXACT outbound chosen, number and departure minute
+    offs = (dfl.get("data") or {}).get("offers") or dfl.get("offers") or []
+    oa, ob = offs[0], offs[1]
+    sa = oa["slices"][0]["segments"]
+    pair = {"flights": [g["marketing_carrier"]["iata_code"] + str(int(g["marketing_carrier_flight_number"])) for g in sa],
+            "origin": oa["slices"][0]["origin"]["iata_code"], "destination": oa["slices"][0]["destination"]["iata_code"],
+            "date": sa[0]["departing_at"][:10], "depart": sa[0]["departing_at"][:16], "ticket_cents": 40000, "source": "feed"}
+    good = {"slices": [oa["slices"][0], ob["slices"][0]], "total_amount": "500.00", "total_currency": "USD"}
+    moved = json.loads(json.dumps(oa["slices"][0])); moved["segments"][0]["departing_at"] = "2026-12-01T06:00:00"
+    decoy = {"slices": [moved, ob["slices"][0]], "total_amount": "100.00", "total_currency": "USD"}
+    import server as srv
+    calls = {"serp": 0}
+    real_search, real_rt = srv.live.search, srv.live.serp_round_trip
+    try:
+        srv.live.search = lambda q: ({"data": {"offers": [decoy, good]}}, {"source": "api"})
+        def fake_rt(*a, **k):
+            calls["serp"] += 1
+            return None, {"source": "none"}
+        srv.live.serp_round_trip = fake_rt
+        where = {"date": "2026-11-25", "origin": {"code": "LON"}, "destination": {"code": "NYC"}}
+        got = srv._round_trip_totals({"pair": pair, "adults": 1}, where)
+        kb = tuple((g["marketing_carrier"]["iata_code"], int(g["marketing_carrier_flight_number"]), g["departing_at"][:16])
+                   for g in ob["slices"][0]["segments"])
+        check("the server prices the return from the offer with the chosen outbound, not a cheaper one with the same "
+              "flight numbers at another time, and asks Google nothing when the feed sold the outbound",
+              got and got["totals"].get(kb) == 50000 and got["outbound_cents"] == 40000 and calls["serp"] == 0, str(got and list(got["totals"].values())))
+        srv._round_trip_totals({"pair": dict(pair, source="google"), "adults": 1}, where)
+        check("an outbound Google sold asks Google too", calls["serp"] == 1)
+        check("a pair the browser sent with a malformed field is ignored",
+              srv._round_trip_totals({"pair": dict(pair, flights=["<script>"]), "adults": 1}, where) is None)
+    finally:
+        srv.live.search, srv.live.serp_round_trip = real_search, real_rt
     check("merging: a supplement fare for flights the feed already sells at that price or less is left out; a cheaper one stays",
           len(merged["options"]) == len(main["options"]) + 1
           and min(adapter._ticket_cents(o) for o in merged["options"] if adapter._itin_key(o) == adapter._itin_key(cheaper)) == adapter._ticket_cents(cheaper))
