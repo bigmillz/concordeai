@@ -1131,8 +1131,18 @@ def _stamp(body):
 def sys_status():
     """What the nightly check found, for the admin page. The file is written by root; a box without the
     units installed (a Mac, a fresh droplet) reports itself unavailable rather than up to date."""
-    out = {"available": os.path.isdir(os.path.dirname(SYS_REQUEST)) and os.path.exists(SYS_STATUS),
+    # available only when the root side is installed: a request nobody acts on would lock the buttons
+    out = {"available": os.path.isdir(os.path.dirname(SYS_REQUEST)) and os.path.exists(SYS_STATUS)
+                        and os.path.exists("/etc/systemd/system/concordego-sysupdate.path"),
            "kernel": os.uname().release, "requested": os.path.exists(SYS_REQUEST)}
+    # the .path unit picks a request up within a second; one still lying there after ten minutes was never
+    # going to be, so it is cleared rather than holding the buttons as "already running"
+    try:
+        if out["requested"] and time.time() - os.path.getmtime(SYS_REQUEST) > 600:
+            os.remove(SYS_REQUEST)
+            out["requested"] = False
+    except OSError:
+        pass
     try:
         with open(SYS_STATUS) as fh:
             st = json.load(fh)
