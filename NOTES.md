@@ -5509,3 +5509,99 @@ systems."
   the tooltip adds "For now they run only on Apple silicon Macs."
 - The gauntlet runs giant_blurb twice, once as an Apple-silicon Mac and
   once as Windows (SUPPORTED from the Ollama tags). 239/239.
+
+## 6b314 — The Windows giants, and two Windows bugs found on the way
+Per Patrick: "let's put those Windows ones in there too. If it detects
+that it's a Windows system, it can download those ... given they're not
+MLX, I don't think there's much of a purpose" on a Mac.
+- Two catalog rows on Ollama, WINDOWS_ONLY: DeepSeek V3.1 671B
+  (deepseek-v3.1:671b, the Terminus build, 404.5 GB) and Qwen 3 Coder
+  480B (qwen3-coder:480b, 290.1 GB; the bare tag and :latest are the
+  18.6 GB 30B). Registry-checked 2026-09-24, both Q4_K_M. Neither Mac
+  giant has local Ollama weights (GLM 5.3 is cloud-only there, DeepSeek
+  V3.2 left Ollama's library 2026-07-15). Off Windows the rows are
+  neither SUPPORTED nor routed, so a hand-pulled copy on a Mac is never
+  seated either. Intel Macs get neither pair.
+- The giants box names only this computer's giants: the Mac text is
+  unchanged; Windows reads "Qwen 3 Coder 480B and DeepSeek V3.1 671B.
+  They need 384–512 GB or more of memory (305–417 GB in use) and a
+  290–405 GB download."; an Intel Mac lists all four and says where
+  they run.
+- BUG (pre-existing, Windows): model_cached indexed MODEL_ROUTES for
+  rows with no route there (Hermes 4 14B and the MLX giants), so
+  /api/setup and /api/tiers raised on every call. The page swallowed
+  it: no wizard, no roster, nothing installable from the app on
+  Windows. model_cached answers False for an unrouted row, and both
+  callers filter by SUPPORTED.
+- BUG (pre-existing, every platform): ollama_pulled_tags added a bare
+  name for EVERY tag, so the retired "DeepSeek R1" row (bare
+  "deepseek-r1") read as on disk whenever deepseek-r1:8b or :671b was,
+  and cleanup deleted the first of them (671b sorts first). A bare name
+  now stands for :latest only, and _remove_models deletes <tag>:latest.
+  The retired LLaVA row now names llava:7b, the tag every version
+  pulled (the review caught that the bare "llava" only ever matched
+  through the old bug).
+- Giants are in no preset any more (rec, and _starter_labels, which is
+  Max and the More-models card), on the Mac too: one "Download" could
+  start 300-420 GB. They install one at a time from the roster, whose
+  button asks again with the size ("download 404.5 GB? click again").
+- An Ollama giant (slow_giant) is never seated for you: not by a tier,
+  a title or the funnel fallback, and the solo path skips the polish
+  pass. It runs when picked, with num_ctx 32768 (Ollama would pick 256k
+  on a big GPU, +67 GB), keep_alive 30m (Windows+CUDA loads without
+  mmap, so every reload reads 300-400 GB), an hour for the first byte,
+  and think:false for DeepSeek V3.1 (Ollama turns thinking on when a
+  request doesn't say, and the hidden reasoning costs minutes on CPU).
+  The step line says "Loading the model, then writing · 405 GB, can take
+  minutes" (the status line isn't drawn before the first words).
+  Hand-picked models are filtered by SUPPORTED only; a hand-picked Mac
+  giant still runs with the box unticked, as before.
+- A read timeout was neither URLError nor retried; it surfaced raw.
+  run_model now turns it into a plain message.
+- Downloads: progress is bytes across layers (1% of 404 GB is 4 GB,
+  so the 10-minute watchdog called healthy pulls "stalled"); the
+  watchdog waits 1 s per 100 MB while Ollama verifies; smallest first;
+  Windows kept awake during pulls (SetThreadExecutionState); giants
+  need Ollama 0.13.5+; time left is quoted up to 72 h and reads in
+  hours; a paused download over 50 GB is kept 14 days, not 24 h.
+- A GIANT'S PULL WATCHES ITS DRIVE. The first cut checked free space
+  before queueing a batch. The five-lens review (5 reviewers, 2
+  skeptics per finding) showed it ran on Macs too, failed a whole
+  preset when one model didn't fit, counted paused downloads at full
+  size, ignored pulls already running, and measured C: when the Ollama
+  app's Settings had moved the models (that server gets OLLAMA_MODELS,
+  we never do).
+  Now, during a giant's pull only, _giant_room finds the drive that
+  holds the download's own -partial file (this process's OLLAMA_MODELS,
+  the folder in %LOCALAPPDATA%\Ollama\server.log's "server config",
+  or ~/.ollama/models) and stops the pull when free space would end
+  under 20 GB (Ollama's own count of what is left, the file being
+  sparse) or is under 10 GB. Stopping closes the stream; Ollama keeps
+  the partial until it next starts (its PruneLayers deletes partials
+  over an hour old at startup), so a prompt Retry resumes and the note
+  says so. Can't find the file: it says nothing.
+- Second review round (3 reviewers, 2 skeptics per finding) confirmed
+  every first-round finding fixed or made moot, and found seven more,
+  now fixed: the log was read from a 400 KB tail (the config line sits
+  at its top, so a few hours of requests hid a moved folder; now up to
+  64 MB, last config line wins); the guard kept checking after the last
+  byte and could fail a finished install at "writing manifest" (it
+  stops checking once nothing is left); on exFAT, where Ollama's file
+  already holds its whole size, the 10 GB floor stopped a pull that
+  needed nothing more (skipped when the file is full size); a slow
+  giant hand-picked WITH other models got the council's 120 s and was
+  always abandoned mid-load (it now answers alone); the roster froze
+  unless its own click started a download (paintRoster now keeps
+  polling while anything moves), a repaint erased the two-step prompt
+  and a double-click confirmed it (the prompt lives in rosArmed, and a
+  confirm within 600 ms is ignored, for remove too); and failed Image
+  or Video installs showed a list "retry" that could start nothing
+  (studio rows are left to their cards).
+- The roster shows a download's % (or "waiting"), and a failed one its
+  reason in red with "retry"; after an install it follows the download
+  (rosTick) whether or not Manage is open. The reasons used to reach no
+  screen, and the row said "downloading" even when nothing started.
+- New gauntlet check: every script in the served page parses under
+  node, alone and together. A `function etaTxt` added here collided
+  with the answer timer's `let etaTxt`: a SyntaxError that would have
+  killed the whole page, and nothing parsed the page before.

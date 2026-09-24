@@ -1230,11 +1230,14 @@ check("clean-now flow wired",
       and '_b.get("force")' in _MILLENAI_SRC)
 # 6b284, per Patrick ("keep the design consistent"): the clean-up dialog
 # wears the house chrome, reports the real reason a removal failed, and
-# a retired Ollama row deletes the tag that is actually pulled
+# a retired Ollama row deletes an exact tag. 6b314: a bare retired tag
+# is its :latest pull only; "whatever is pulled" deleted deepseek-r1:671b
+# (or the catalog's own :8b) for the retired "DeepSeek R1" row
 check("clean-up dialog: house chrome, honest errors, exact tags",
       ".mu-foot .ghost{" in page and ".mu-foot .primary{" in page
       and '"errors": dict(_CLEANUP_LAST_ERRORS)' in _MILLENAI_SRC
-      and "resolve the" in _MILLENAI_SRC and "t.split(\":\")[0] == _tag" in _MILLENAI_SRC)
+      and 'target = _tag + ":latest"' in _MILLENAI_SRC
+      and "t.split(\":\")[0] == _tag" not in _MILLENAI_SRC)
 # 6b306, per Patrick: auto-clean on by default, a sweep on the first
 # launch after every update, and Update models in the post-update card.
 # The rules, run for real against a fake disk: the catalog is never
@@ -1453,6 +1456,28 @@ check("the page has no reference to an undeclared perf",
 check("the page script uses no undeclared names",
       not (set(_undecl) - _PAGE_HOST) and len(_undecl) > 20,
       str(sorted(set(_undecl) - _PAGE_HOST)))
+# THE PAGE PARSES (6b314). A name declared twice (`let etaTxt` for the
+# answer timer, then a new `function etaTxt`) is a SyntaxError that kills
+# the whole script, and nothing here parsed the page. node checks each
+# inline script, then all of them together, because a page's classic
+# scripts share one global scope.
+import subprocess
+_pscripts = re.findall(r"<script>(.*?)</script>", page, re.S)
+_pdir = __import__("tempfile").mkdtemp()
+_pbad = []
+for _i, _js in enumerate(_pscripts + [";\n".join(_pscripts)]):
+    _pf = os.path.join(_pdir, "s%d.js" % _i)
+    open(_pf, "w").write(_js)
+    try:
+        _pr = subprocess.run(["node", "--check", _pf], capture_output=True,
+                             text=True, timeout=60)
+        if _pr.returncode:
+            _pbad.append((_i, (_pr.stderr or "").strip().splitlines()[-1:] ))
+    except Exception as _e:
+        _pbad.append((_i, repr(_e)))
+check("the served page's scripts parse, alone and together",
+      _pscripts and sum(map(len, _pscripts)) > 200_000 and not _pbad,
+      "%r" % [len(_pscripts), sum(map(len, _pscripts)), _pbad])
 # 6b310, per Patrick: "we don't need a feature where friends can answer
 # each other's questions." Contribute (and the fleet hub behind it) is
 # gone: no worker, no hub routes, no UI, no invite, and startup scrubs
@@ -1534,7 +1559,8 @@ _si_ok = _si_ok and _si3 is False and time.time() - _t0 < 2 \
 _pn = {}
 for _x in _ast0.parse(_MILLENAI_SRC).body:
     if isinstance(_x, _ast0.Assign) and any(getattr(_tg, "id", "") in (
-            "CATALOG", "MODEL_INFO", "RETIRED_MODELS", "FALLBACK_PORTS")
+            "CATALOG", "MODEL_INFO", "RETIRED_MODELS", "FALLBACK_PORTS",
+            "WINDOWS_ONLY")
             for _tg in _x.targets):
         exec(_ast0.get_source_segment(_MILLENAI_SRC, _x), _pn)
 _eng = ({i["port"] for i in _pn["MODEL_INFO"].values() if i["port"]}
@@ -1555,17 +1581,28 @@ check("taken port: the window opens the server this app bound",
 # out, not trying to sell an upgrade"; the giants box must say what the
 # giants really need; and the (i) tips must not take seconds to appear.
 # 6b313, per Patrick: "we have a Windows version", so the box says
-# "systems", and where the giants can't run (they're MLX-only) the tip
-# says so. Run once as an Apple-silicon Mac, once as Windows.
-def _giant_blurb_on(supported):
-    _mw = {}
-    exec(_ast0.get_source_segment(_MILLENAI_SRC, [x for x in _ast0.parse(_MILLENAI_SRC).body
-         if getattr(x, "name", "") == "giant_blurb"][0]), dict(
-             MODEL_INFO=_pn["MODEL_INFO"], SUPPORTED=supported,
-             model_is_giant=lambda l: _pn["MODEL_INFO"][l]["mem"] > 128e9), _mw)
-    return _mw["giant_blurb"]()
-_gl, _gt = _giant_blurb_on({l: True for l in _pn["MODEL_INFO"]})
-_wl, _wt = _giant_blurb_on({l: bool(i["ollama"]) for l, i in _pn["MODEL_INFO"].items()})
+# "systems". 6b314, per Patrick: "If it detects that it's a Windows
+# system, it can download those": DeepSeek V3.1 671B and Qwen 3 Coder
+# 480B on Ollama, Windows only. The platform rule itself (the SUPPORTED
+# and MODEL_ROUTES code, from the source) runs as an Apple-silicon Mac,
+# as Windows and as an Intel Mac; the box's text is built on each.
+_PLAT = {"apple": (True, False), "windows": (False, True),
+         "intel": (False, False)}
+_plat = {}
+for _k, (_arm, _win) in _PLAT.items():
+    _pz = dict(MODEL_INFO=_pn["MODEL_INFO"], WINDOWS_ONLY=_pn["WINDOWS_ONLY"],
+               IS_ARM=_arm, IS_WIN=_win)
+    exec(_MILLENAI_SRC[_MILLENAI_SRC.index("# a model is usable here"):
+                       _MILLENAI_SRC.index("MLX_REPOS = {l: i")], _pz)
+    _pz["MODEL_MEM_BYTES"] = {l: i["mem"] for l, i in _pn["MODEL_INFO"].items()}
+    _exec_names(_pz, {"GIANT_GB", "model_is_giant", "slow_giant",
+                      "GIANT_CTX", "giant_blurb"})
+    _plat[_k] = _pz
+_gl, _gt = _plat["apple"]["giant_blurb"]()
+_wl, _wt = _plat["windows"]["giant_blurb"]()
+_il, _it = _plat["intel"]["giant_blurb"]()
+_WG = ("DeepSeek V3.1 671B", "Qwen 3 Coder 480B")
+_MG = ("GLM 5.3", "DeepSeek V3.2 671B")
 _jsf = lambda nm: _MILLENAI_SRC[_MILLENAI_SRC.index("function %s(" % nm):
                                 _MILLENAI_SRC.index("\n}\n", _MILLENAI_SRC.index(
                                     "function %s(" % nm)) + 3]
@@ -1603,14 +1640,256 @@ check("models window: your set updates, a bigger set adds, no upsell",
       and "closeSetup();runModelUpdate();return;}" in _MILLENAI_SRC
       and "if(!mine&&(rem[setupPlan]||0)<=0){" in _MILLENAI_SRC,
       str(_mo))
-check("giants box says what they need, from the catalog",
-      _gl == _wl == "Include models for 512 GB+ systems"
-      and "GLM 5.3" in _gt and "DeepSeek V3.2 671B" in _gt
-      and "512 GB or more of memory" in _gt and "download" in _gt
-      and "Mac" not in _gt and "Mac" not in _gl
-      and _wt == _gt + " For now they run only on Apple silicon Macs."
+check("giants box says what they need, from the catalog, per platform",
+      _gl == _wl == _il == "Include models for 512 GB+ systems"
+      # the Mac: exactly today's text, its two MLX giants only
+      and _gt == ("DeepSeek V3.2 671B and GLM 5.3. Each needs 512 GB or "
+                  "more of memory (390\u2013430 GB in use) and a "
+                  "378\u2013418 GB download.")
+      # Windows: its two Ollama giants, 404.5 rounds to 405
+      and _wt == ("Qwen 3 Coder 480B and DeepSeek V3.1 671B. They need "
+                  "384\u2013512 GB or more of memory (305\u2013417 GB in use) "
+                  "and a 290\u2013405 GB download.")
+      # an Intel Mac runs none: all four, and where they do run
+      and all(n in _it for n in _WG + _MG)
+      and _it.endswith("they run on Apple silicon Macs and on Windows.")
+      and "Mac" not in _gl
       and "128 GB+" not in _MILLENAI_SRC.split('HTML_CONTENT = r"""')[1]
-      and _MILLENAI_SRC.count("__GIANT_LABEL__") == 3, "%s | %s | %s" % (_gl, _gt, _wt))
+      and _MILLENAI_SRC.count("__GIANT_LABEL__") == 3,
+      "%s | %s | %s | %s" % (_gl, _gt, _wt, _it))
+_rt = {k: z["MODEL_ROUTES"] for k, z in _plat.items()}
+_sp = {k: {l for l, v in z["SUPPORTED"].items() if v} for k, z in _plat.items()}
+check("Windows giants: Windows only, exact Ollama tags, never on a Mac",
+      set(_WG) <= _sp["windows"] and not set(_WG) & _sp["apple"]
+      and not set(_WG) & _sp["intel"]
+      and not set(_WG) & (set(_rt["apple"]) | set(_rt["intel"]))
+      and _rt["windows"]["DeepSeek V3.1 671B"] == ("ollama", "deepseek-v3.1:671b")
+      and _rt["windows"]["Qwen 3 Coder 480B"] == ("ollama", "qwen3-coder:480b")
+      # the Mac keeps its MLX giants on MLX; Windows can't run them
+      and all(_rt["apple"][g][0] == "mlx" for g in _MG)
+      and not set(_MG) & _sp["windows"]
+      # nothing else moved: every other row as before on every platform
+      and all((_sp[k] - set(_WG)) == {l for l, i in _pn["MODEL_INFO"].items()
+                                       if l not in _WG and (
+                                           (i["mlx"] and _PLAT[k][0]) or i["ollama"])}
+              for k in _PLAT)
+      and all(_pn["MODEL_INFO"][g]["mem"] > 128e9 and not _pn["MODEL_INFO"][g]["mlx"]
+              and _pn["MODEL_INFO"][g]["port"] is None for g in _WG)
+      and _plat["windows"]["slow_giant"]("DeepSeek V3.1 671B")
+      and not _plat["apple"]["slow_giant"]("GLM 5.3")
+      and not _plat["windows"]["slow_giant"]("GPT-OSS 120B"),
+      "%r" % [sorted(_sp["windows"] & set(_WG + _MG)), sorted(_sp["apple"] & set(_WG + _MG))])
+# 6b314: on Windows, /api/setup and /api/tiers raised KeyError on every
+# call, because model_cached indexed MODEL_ROUTES for rows with no route
+# there (Hermes 4 14B and the MLX giants), so no model could be installed
+# from the app. Run model_cached over every row as Windows and as a Mac.
+_mc_err = []
+for _k in _PLAT:
+    _mz = dict(_plat[_k], MLX_REPOS={l: i["mlx"] for l, i in _pn["MODEL_INFO"].items() if i["mlx"]},
+               mlx_model_cached=lambda repo: False,
+               ollama_pulled_tags=lambda: {"qwen3-coder:480b"})
+    _exec_names(_mz, {"model_cached"})
+    for _l in _pn["MODEL_INFO"]:
+        try:
+            _hit = _mz["model_cached"](_l, {"qwen3-coder:480b", "deepseek-v3.1:671b"})
+            if _hit and _l not in _mz["MODEL_ROUTES"]:
+                _mc_err.append((_k, _l, "cached but unrouted"))
+            if _k != "windows" and _l in _WG and _hit:
+                _mc_err.append((_k, _l, "a Windows giant on a Mac"))
+        except Exception as _e:
+            _mc_err.append((_k, _l, repr(_e)))
+_ss_src = _MILLENAI_SRC[_MILLENAI_SRC.index("def setup_status()"):
+                        _MILLENAI_SRC.index("def _other_millenai_running")]
+check("Windows: the model list never raises on a row with no route",
+      not _mc_err
+      and "installed = {l for l, ok in SUPPORTED.items()\n                 if ok and model_cached(l, pulled)}" in _ss_src
+      and "if SUPPORTED.get(l) and model_cached(l, pulled)\n                           and l not in chosen" in _MILLENAI_SRC,
+      "%r" % _mc_err[:6])
+# 6b314: a bare name in ollama_pulled_tags stood for EVERY tag, so the
+# retired "DeepSeek R1" row (bare "deepseek-r1") read as on disk when
+# deepseek-r1:8b or :671b was, and cleanup deleted one of them.
+class _FakeTagsResp:
+    def __init__(self, body): self._b = body
+    def read(self): return self._b
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+_ptz = dict(_LH, urllib=__import__("urllib.request"),
+            ollama_url=lambda p: "http://127.0.0.1:1" + p)
+_exec_names(_ptz, {"ollama_pulled_tags", "_retired_on_disk", "RETIRED_MODELS"})
+_ptz["IS_ARM"] = False
+_ptz["mlx_model_cached"] = lambda repo: False
+_orig_uo = __import__("urllib.request").request.urlopen
+try:
+    __import__("urllib.request").request.urlopen = lambda *a, **k: _FakeTagsResp(json.dumps(
+        {"models": [{"name": "deepseek-r1:8b"}, {"name": "deepseek-r1:671b"},
+                    {"name": "llava:7b"}, {"name": "mistral:latest"}]}).encode())
+    _pt = _ptz["ollama_pulled_tags"]()
+finally:
+    __import__("urllib.request").request.urlopen = _orig_uo
+_rm_src = _MILLENAI_SRC[_MILLENAI_SRC.index("def _remove_models("):
+                        _MILLENAI_SRC.index("def _remove_models(") + 4000]
+check("a bare retired tag means its :latest pull and nothing else",
+      _pt is not None and "mistral" in _pt and "deepseek-r1" not in _pt
+      and "llava" not in _pt and "deepseek-r1:671b" in _pt
+      and not _ptz["_retired_on_disk"]("DeepSeek R1", _pt)
+      # every version pulled LLaVA as llava:7b, and cleanup still finds it
+      and _ptz["_retired_on_disk"]("LLaVA Vision 7B", _pt)
+      and _ptz["_retired_on_disk"]("DeepSeek R1", _pt | {"deepseek-r1"})
+      and 'target = _tag + ":latest"' in _rm_src
+      and "t.split(\":\")[0] == _tag" not in _rm_src,
+      "%r" % sorted(_pt or []))
+# 6b314: a giant on Ollama asks for a fixed context, stays loaded 30 min
+# and gets an hour for its first byte; everything else is unchanged.
+_soz = dict(_LH, ollama_url=lambda p: "http://127.0.0.1:1" + p,
+            urllib=__import__("urllib.request"))
+_exec_names(_soz, {"stream_ollama", "GIANT_CTX", "GIANT_KEEP_ALIVE",
+                   "GIANT_LOAD_TIMEOUT", "OLLAMA_THINK_OFF"})
+_so_seen = []
+class _FakeStream:
+    def __init__(self, lines): self._l = lines
+    def __iter__(self): return iter(self._l)
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+def _fake_uo(req, timeout=None):
+    _so_seen.append((json.loads(req.data), timeout))
+    return _FakeStream([b'{"message":{"content":"hi"},"done":true}\n'])
+try:
+    __import__("urllib.request").request.urlopen = _fake_uo
+    _so_out = []
+    _soz["stream_ollama"]("qwen3-coder:480b", [{"role": "user", "content": "x"}],
+                          _so_out.append, giant=True)
+    _soz["stream_ollama"]("deepseek-v3.1:671b", [{"role": "user", "content": "x"}],
+                          _so_out.append, giant=True)
+    _soz["stream_ollama"]("llama3.2:3b", [{"role": "user", "content": "x"}],
+                          _so_out.append)
+finally:
+    __import__("urllib.request").request.urlopen = _orig_uo
+check("a giant on Ollama: fixed context, stays loaded, an hour to load",
+      _so_out == ["hi", "hi", "hi"] and len(_so_seen) == 3
+      and "think" not in _so_seen[0][0]
+      and _so_seen[1][0].get("think") is False
+      and _so_seen[0][0]["keep_alive"] == "30m"
+      and _so_seen[0][0]["options"] == {"temperature": 0.75, "num_ctx": 32768}
+      and _so_seen[0][1] == 3600
+      and _so_seen[2][0]["keep_alive"] == "45s"
+      and "think" not in _so_seen[2][0]
+      and _so_seen[2][0]["options"] == {"temperature": 0.75}
+      and _so_seen[2][1] == 600
+      and "giant=model_is_giant(label))" in _MILLENAI_SRC
+      and "except (TimeoutError, socket.timeout):" in _MILLENAI_SRC,
+      "%r" % _so_seen)
+# 6b314: a 404 GB pull. Progress is bytes across every layer (the old
+# per-layer whole percent moved every 4 GB, so the watchdog called a
+# healthy download "stalled", and a small layer finishing last read
+# 99%). A giant's pull watches the drive that holds its file and stops
+# before the drive fills, with Ollama's own count of what is left; an
+# everyday model is never stopped. Smallest first; Windows kept awake.
+import tempfile as _tf6
+_gd = _tf6.mkdtemp()
+os.makedirs(os.path.join(_gd, "blobs"))
+open(os.path.join(_gd, "blobs", "sha256-a-partial"), "w").close()
+_plz = dict(_LH, urllib=__import__("urllib.request"),
+            ollama_url=lambda p: "http://127.0.0.1:1" + p,
+            _setup_lock=__import__("threading").RLock(),
+            MODEL_INFO=_pn["MODEL_INFO"], GIANT_GB=128, IS_WIN=False,
+            MODEL_MEM_BYTES={l: i["mem"] for l, i in _pn["MODEL_INFO"].items()},
+            MLX_EST_BYTES={l: int(i["gb"] * 1e9) for l, i in _pn["MODEL_INFO"].items()})
+_exec_names(_plz, {"_pull_ollama_model", "model_is_giant", "_giant_room",
+                   "_ollama_models_dirs", "_ollama_models_dir", "_is_sparse",
+                   "_disk_free_for", "GIANT_DISK_SPARE", "GIANT_DISK_FLOOR"})
+_pl_lines = [json.dumps(o).encode() + b"\n" for o in (
+    {"status": "pulling manifest"},
+    {"status": "pulling a", "digest": "sha256:a", "total": 290_000_000_000,
+     "completed": 1_500_000_000},
+    {"status": "pulling a", "digest": "sha256:a", "total": 290_000_000_000,
+     "completed": 3_000_000_000},
+    {"status": "pulling b", "digest": "sha256:b", "total": 11_000,
+     "completed": 11_000},
+    {"status": "verifying sha256 digest"})]
+def _pull_run(label, free, lines=None):
+    _plz["_setup_jobs"] = {label: {"status": "downloading", "pct": 0}}
+    _plz["_disk_free_for"] = lambda p: (free, p)
+    _env = os.environ.get("OLLAMA_MODELS")
+    os.environ["OLLAMA_MODELS"] = _gd
+    __import__("urllib.request").request.urlopen = lambda req, timeout=None: _FakeStream(lines or _pl_lines)
+    try:
+        _plz["_pull_ollama_model"](label, "t")
+        return "ok", _plz["_setup_jobs"][label]
+    except RuntimeError as _e:
+        return str(_e), _plz["_setup_jobs"][label]
+    finally:
+        __import__("urllib.request").request.urlopen = _orig_uo
+        if _env is None:
+            os.environ.pop("OLLAMA_MODELS", None)
+        else:
+            os.environ["OLLAMA_MODELS"] = _env
+_p_ok, _pj = _pull_run("Qwen 3 Coder 480B", 900e9)        # room to spare
+_p_short, _ = _pull_run("Qwen 3 Coder 480B", 100e9)       # 288.5 GB left
+_p_full, _ = _pull_run("Qwen 3 Coder 480B", 5e9)          # almost full
+_p_small, _ = _pull_run("Llama 3.2 3B", 5e9)              # never stopped
+# all bytes in: hashing and the manifest are never stopped, however
+# full the drive gets meanwhile
+_pl_done = [json.dumps(o).encode() + b"\n" for o in (
+    {"status": "pulling a", "digest": "sha256:a", "total": 290_000_000_000,
+     "completed": 290_000_000_000},
+    {"status": "verifying sha256 digest"}, {"status": "writing manifest"},
+    {"status": "success"})]
+_p_done, _ = _pull_run("Qwen 3 Coder 480B", 5e9, _pl_done)
+# a drive that can't do sparse files (exFAT): Ollama's file already
+# holds its whole size, so the pull takes nothing more; not stopped
+_plz["IS_WIN"] = True
+with open(os.path.join(_gd, "blobs", "sha256-a-partial"), "wb") as _f:
+    _f.truncate(290_000_000_000)
+try:
+    _p_prealloc, _ = _pull_run("Qwen 3 Coder 480B", 5e9)
+finally:
+    _plz["IS_WIN"] = False
+    open(os.path.join(_gd, "blobs", "sha256-a-partial"), "w").close()
+# the folder the Ollama app's server logged, a space in it and all
+_la = _tf6.mkdtemp()
+_moved = os.path.join(_la, "My Models")
+os.makedirs(_moved)
+os.makedirs(os.path.join(_la, "Ollama"))
+open(os.path.join(_la, "Ollama", "server.log"), "w").write(
+    'time=x level=INFO msg="server config" env="map[OLLAMA_MODELS:%s '
+    'OLLAMA_MULTIUSER_CACHE:false OLLAMA_NEW_ENGINE:false]"\n'
+    % _moved.replace("\\", "\\\\")
+    # a day of requests after the config line: well past any short tail
+    + '[GIN] 2026/09/24 - 12:00:00 | 200 | 1.2ms | 127.0.0.1 | GET "/api/tags"\n' * 8000)
+_plz["IS_WIN"] = True
+_env_la = os.environ.get("LOCALAPPDATA")
+os.environ["LOCALAPPDATA"] = _la
+try:
+    _dirs = _plz["_ollama_models_dirs"]()
+finally:
+    _plz["IS_WIN"] = False
+    if _env_la is None:
+        os.environ.pop("LOCALAPPDATA", None)
+    else:
+        os.environ["LOCALAPPDATA"] = _env_la
+_wk = _MILLENAI_SRC[_MILLENAI_SRC.index("def _ollama_install_worker("):
+                    _MILLENAI_SRC.index("def start_model_downloads(")]
+_smd = _MILLENAI_SRC[_MILLENAI_SRC.index("def start_model_downloads("):
+                     _MILLENAI_SRC.index("_dl_sample = {")]
+check("a 400 GB pull: bytes across layers; a giant stops before the drive fills",
+      _p_ok == "ok" and _pj.get("done_b") == 3_000_011_000 and _pj.get("pct") == 1
+      and _pj.get("phase") == "verifying"
+      and _p_short.startswith("needs 309 GB free on ") and "100 GB free" in _p_short
+      and "picks up where it stopped" not in _MILLENAI_SRC
+      and _p_full.startswith("stopped: ") and "almost full (5 GB free)" in _p_full
+      and _p_small == "ok" and _p_done == "ok" and _p_prealloc == "ok"
+      and "resumes unless Ollama restarts first" in _p_short
+      and _moved in _dirs
+      and "if _sg and len(council) > 1:\n                council = _sg[:1]" in _MILLENAI_SRC
+      and 'labels = sorted(labels, key=lambda l: MODEL_INFO[l]["gb"])' in _wk
+      and "_keep_awake(True)" in _wk and "_keep_awake(False)" in _wk
+      and "GIANT_OLLAMA_MIN" in _wk
+      and "_disk_free_for" not in _smd
+      and 'pct = (job["done_b"] // 1_000_000, job.get("phase", ""))' in _MILLENAI_SRC
+      and "limit = max(600, MLX_EST_BYTES.get(label, 0) / 1e8)" in _MILLENAI_SRC
+      and "ETA_CAP_MIN = 72 * 60" in _MILLENAI_SRC
+      and "min(999," not in _MILLENAI_SRC,
+      "%r" % [_p_ok, _pj, _p_short, _p_full, _p_small, _p_done, _p_prealloc, _dirs])
 check("(i) tips show at once, not after the browser's title delay",
       "#tip{position:fixed" in _MILLENAI_SRC and "QUICK TIPS (6b312" in _MILLENAI_SRC
       and "el.dataset.tip=el.title;el.removeAttribute(\"title\")" in _MILLENAI_SRC
@@ -2123,6 +2402,16 @@ _p_new0 = os.path.join(_ol, "blobs", "sha256-bb-partial-0"); open(_p_new0, "w").
 os.utime(_p_new0, (time.time() - _day2,) * 2)
 _blob = os.path.join(_ol, "blobs", "sha256-cc"); open(_blob, "w").write("x")
 os.utime(_blob, (time.time() - _day2,) * 2)
+# 6b314: a paused giant (over 50 GB; sparse, so it costs no disk here)
+# keeps two weeks, then goes
+_p_big = os.path.join(_ol, "blobs", "sha256-dd-partial")
+with open(_p_big, "wb") as _f:
+    _f.truncate(60_000_000_000)
+os.utime(_p_big, (time.time() - 3 * 86400,) * 2)
+_p_big_old = os.path.join(_ol, "blobs", "sha256-ee-partial")
+with open(_p_big_old, "wb") as _f:
+    _f.truncate(60_000_000_000)
+os.utime(_p_big_old, (time.time() - 15 * 86400,) * 2)
 _tmpf = os.path.join(_app, ".prefs-x.tmp"); open(_tmpf, "w").write("x")
 os.utime(_tmpf, (time.time() - _old,) * 2)
 _dev = os.path.join(_app, "cloud-dev-12345.json"); open(_dev, "w").write("{}")
@@ -2140,7 +2429,8 @@ _sw = dict(_LH, app_dir=lambda: _app, PORT=9897,
            _setup_lock=threading.RLock(), _setup_jobs={}, MODEL_ROUTES={},
            _port_in_use=lambda p: False, _sweep_hf_carcasses=lambda: 0)
 _exec_names(_sw, {"LEFTOVER_GRACE", "_fresh_under", "_hf_has_weights", "_rm_hf_repo",
-                  "_sweep_leftovers", "STUDIO_FAIL_MARK", "_dir_bytes_real"})
+                  "_sweep_leftovers", "STUDIO_FAIL_MARK", "_dir_bytes_real",
+                  "_ollama_models_dir"})
 _env0 = os.environ.get("OLLAMA_MODELS")
 os.environ["OLLAMA_MODELS"] = _ol
 try:
@@ -2155,12 +2445,14 @@ check("leftover sweep: failed downloads go; fresh, complete and foreign files st
       not _ex(_r_ret) and not _ex(_r_part) and _ex(_r_fresh) and _ex(_r_done)
       and not _ex(_r_stu) and _ex(_r_mine) and not _ex(_venv)
       and not _ex(_p_old) and _ex(_p_new) and _ex(_p_new0) and _ex(_blob)
+      and _ex(_p_big) and not _ex(_p_big_old)
       and not _ex(_tmpf) and not _ex(_dev) and _ex(_mine_dev)
       and "_sweep_leftovers()\n        # manual == the Clean-now button" in _MILLENAI_SRC
       and "_sweep_leftovers()      # a failed replacement leaves pieces" in _MILLENAI_SRC
       and "open(os.path.join(st[\"venv\"], STUDIO_FAIL_MARK), \"w\")" in _MILLENAI_SRC,
       "%r" % [_ex(x) for x in (_r_ret, _r_part, _r_fresh, _r_done, _r_stu, _r_mine, _venv,
-                               _p_old, _p_new, _blob, _tmpf, _dev, _mine_dev)])
+                               _p_old, _p_new, _blob, _p_big, _p_big_old, _tmpf, _dev,
+                               _mine_dev)])
 _LH["shutil"].rmtree(_lt, ignore_errors=True)
 check("per-task review fixes: guests free-first, titles per request, badge, sweeps",
       "run_council(council, full_messages, emit, status," in _MILLENAI_SRC
@@ -2212,6 +2504,29 @@ check("giant models only with both boxes ticked, and never in Max otherwise",
       and not set(_big) & set(_max0) and set(_big) <= set(_max3)
       and _gz["model_fits_machine"]("GPT-OSS 120B") in (True, False),
       "%r" % [_big, _v0, _v1, _v2, _v3])
+# 6b314: a giant is never in a preset (one "Download" on the More-models
+# card would start 300-420 GB) and never seated by a tier, title or
+# fallback on Ollama, where it runs from system RAM.
+_gz_set(True, True)
+_gz.update(HAS_PSUTIL=False)
+_exec_names(_gz, {"_starter_labels"})
+_rec3 = _gz["plan_labels"]("rec")
+_max3b = _gz["_starter_labels"]()
+_gz_set(False, False)
+_rt_src = _MILLENAI_SRC[_MILLENAI_SRC.index("def resolve_tier("):
+                        _MILLENAI_SRC.index("def _starter_labels(")]
+_mt_src = _MILLENAI_SRC[_MILLENAI_SRC.index("def make_title("):
+                        _MILLENAI_SRC.index("def make_title(") + 3000]
+check("giants: never in a preset; an Ollama giant is never seated for you",
+      _rec3 and _max3b and not set(_big) & set(_rec3)
+      and not set(_big) & set(_max3b)
+      and "and model_fits_memory(l) and not slow_giant(l))" in _rt_src
+      and "and not slow_giant(l)]" in _mt_src
+      and _MILLENAI_SRC.count("and not slow_giant(l)\n                                and model_cached(l)") == 1
+      and "and _is_substantive(prompt)\n                          and not slow_giant(lbl))" in _MILLENAI_SRC
+      and "if m in MODEL_ROUTES and SUPPORTED.get(m)]" in _MILLENAI_SRC
+      and 'step("draft", "Loading the model, then writing",' in _MILLENAI_SRC,
+      "%r" % [_rec3, _max3b])
 check("cloud wiring: ranked everywhere, no 6-id cap, no 4096 wall, one render try",
       "chat[:6]" not in _MILLENAI_SRC
       and '"max_tokens": 4096, "stream": True' not in _MILLENAI_SRC
@@ -2531,9 +2846,66 @@ check("settings: descriptions + Account pane + scoped forget",
 _nav = re.findall(r'data-pane="(p-[a-z]+)"', page)
 _panes = re.findall(r'class="spane[^"]*" id="(p-[a-z]+)"', page)
 _want = ["p-about", "p-account", "p-persona", "p-cloud", "p-models"]
+_gtip = page.split('id="giants-row"')[1].split('</label>')[0]
 check("the served page names the giants' real need",
       "Include models for 512 GB+ systems" in page and "128 GB+" not in page
-      and "__GIANT_" not in page and "GLM 5.3" in page)
+      and "__GIANT_" not in page and "GLM 5.3" in _gtip
+      # this Mac's box never names the Windows giants (6b314)
+      and "DeepSeek V3.1 671B" not in _gtip and "Qwen 3 Coder 480B" not in _gtip)
+# 6b314: a giant's install asks once more with its size; times over 90
+# minutes read in hours; every giant has a line in the roster
+# 6b314: the roster row itself, run in node: a failed giant shows its
+# reason and "retry", a download in flight its percent, a ready row
+# "remove", and an everyday model plain "install"
+_esc0 = _MILLENAI_SRC.index("function esc(s){")
+_ros0 = _MILLENAI_SRC.index("const rosArmed={};")
+_rjs = (_MILLENAI_SRC[_esc0:_MILLENAI_SRC.index(";}\n", _esc0) + 3]
+        + _MILLENAI_SRC[_ros0:_MILLENAI_SRC.index(
+            "\n}\n", _MILLENAI_SRC.index("function rosRow(")) + 3]
+        + 'const IS_LOCAL=true,ADV_USE={"Llama 3.2 3B":"quick"};'
+        'process.stdout.write(JSON.stringify(['
+        'rosRow({label:"DeepSeek V3.1 671B",est_gb:404.5,status:"error",giant:true,'
+        'note:"needs 437 GB free on C: to finish, 300 GB free"},false),'
+        'rosRow({label:"Qwen 3 Coder 480B",est_gb:290.1,status:"downloading",pct:12,giant:true},false),'
+        'rosRow({label:"Llama 3.2 3B",est_gb:1.8,status:"missing"},false),'
+        'rosRow({label:"Llama 3.2 3B",est_gb:1.8,status:"ready"},true),'
+        '(rosArmed["in:Qwen 3 Coder 480B"]=Date.now(),'
+        'rosRow({label:"Qwen 3 Coder 480B",est_gb:290.1,status:"missing",giant:true},false)),'
+        '(rosArmed["rm:Llama 3.2 3B"]=Date.now(),'
+        'rosRow({label:"Llama 3.2 3B",est_gb:1.8,status:"ready"},true))]));')
+try:
+    open(os.path.join(_si_dir, "ros.js"), "w").write(_rjs)
+    _ro = json.loads(subprocess.run(["node", os.path.join(_si_dir, "ros.js")],
+                                    capture_output=True, text=True, timeout=30).stdout)
+except Exception as _e:
+    _ro = ["ERR %s" % _e] * 6
+check("roster rows: a failed giant says why and offers retry",
+      'class="rd rerr"' in _ro[0] and "needs 437 GB free on C:" in _ro[0]
+      and 'data-giant="1">retry</span>' in _ro[0]
+      and '<span class="rgo">12%</span>' in _ro[1] and 'class="rin"' not in _ro[1]
+      and '">install</span>' in _ro[2] and "data-giant" not in _ro[2]
+      and ">quick<" in _ro[2]
+      and '">remove</span>' in _ro[3]
+      # an armed prompt survives a repaint of the list
+      and '">download 290.1 GB? click again</span>' in _ro[4]
+      and '">really remove? frees 1.8 GB</span>' in _ro[5], "%r" % _ro)
+check("giant installs ask twice; long downloads read in hours",
+      'if(i.dataset.giant==="1"){' in page and "if(age<600)return;" in page
+      and '"download "+i.dataset.gb+" GB? click again"' in page
+      # a failed download shows its reason and a retry in the list, and
+      # the list follows any download in flight (6b314)
+      and '<span class="rd rerr" title="\'+esc(m.note)+\'">' in page
+      and "function rosTick(){" in page and "manageTick();rosTick();" in page
+      and 'if(IS_LOCAL&&miss.some(m=>m.status==="downloading"||m.status==="queued"))' in page
+      and 'if(!(r.started||[]).includes(i.dataset.l)){' in page
+      and 'const ROS_SKIP=new Set(["Ollama engine","Image generation","Video generation"]);' in page
+      and "retry from the list" in page
+      and "(m.giant?'\" data-giant=\"1':'')" in page
+      and 'function dlEta(m){' in page
+      and page.count("dlEta(st.eta_min)") == 4 and "dlEta(et)" in page
+      and page.count("min left") == 1
+      and all('"%s":"' % g in page for g in ("GLM 5.3", "DeepSeek V3.2 671B",
+                                             "DeepSeek V3.1 671B", "Qwen 3 Coder 480B")))
 check("About leads the rail, Account right under it",
       _nav == _want and _panes == _want
       and '<button class="snav on" data-pane="p-about">About</button>' in page

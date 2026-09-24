@@ -402,8 +402,9 @@ def reveal(path: str):
 
 # ---------------------------------------------------------------- catalog
 # One row per model. `mlx` is an Apple-silicon-only 4-bit build; `ollama`
-# works on any Mac (Intel included). A model with no ollama tag simply
-# isn't available on Intel and is shown greyed out.
+# works on any Mac (Intel included) and on Windows. A model with no
+# ollama tag simply isn't available off Apple silicon. A row named in
+# WINDOWS_ONLY is offered on Windows alone (the Ollama giants, 6b314).
 #   port    — fixed local port for the MLX server (None = ollama only)
 #   mem/gb  — resident RAM once loaded, and on-disk download size
 #   star    — offered on the first-run setup screen
@@ -430,7 +431,20 @@ CATALOG = [
     ("GPT-OSS 120B",       "🌌", "120B", "big",  "mlx-community/gpt-oss-120b-MXFP4-Q4",            "gpt-oss:120b",      8924, 64.0, 61.0, False),
     ("GLM 5.3",            "👑", "744B", "big",  "mlx-community/GLM-5.3-4bit",                     None,                8944, 430.0, 418.3, False),
     ("DeepSeek V3.2 671B", "🌊", "671B", "big",  "mlx-community/DeepSeek-V3.2-4bit",               None,                8942, 390.0, 378.1, False),
+    # THE WINDOWS GIANTS (6b314, per Patrick: "If it detects that it's a
+    # Windows system, it can download those ... given they're not MLX, I
+    # don't think there's much of a purpose" on a Mac). Neither giant
+    # above has local Ollama weights (GLM 5.3 is cloud-only there and
+    # DeepSeek V3.2 left Ollama's library on 2026-07-15), so these two
+    # are the 512 GB class on Windows. Registry-checked 2026-09-24: both
+    # Q4_K_M, 404,494,157,246 and 290,058,835,902 bytes. NEVER the bare
+    # "qwen3-coder" or its :latest, which is the 18.6 GB 30B. mem is the
+    # weights plus the KV cache at GIANT_CTX plus buffers.
+    ("DeepSeek V3.1 671B", "🐋", "671B", "big",  None, "deepseek-v3.1:671b", None, 417.0, 404.5, False),
+    ("Qwen 3 Coder 480B",  "⌨️", "480B", "code", None, "qwen3-coder:480b",   None, 305.0, 290.1, False),
 ]
+
+WINDOWS_ONLY = {"DeepSeek V3.1 671B", "Qwen 3 Coder 480B"}
 
 # PRUNED, NOT FORGOTTEN (6b269, per Patrick: "what models can we prune
 # that are basically redundant or outdated"). Six rows left the
@@ -468,9 +482,9 @@ RETIRED_MODELS = {
     "Phi-4 14B":         ("mlx-community/phi-4-4bit", "phi4:14b", 8902, 8.2),
     "DeepSeek R1 7B":    ("mlx-community/DeepSeek-R1-Distill-Qwen-7B-4bit",
                           "deepseek-r1:7b", 8904, 4.3),
-    # bare tag on purpose: the default pull lands as llava:latest, and
-    # the cleanup resolves a bare retired tag to whatever is pulled
-    "LLaVA Vision 7B":   (None, "llava", None, 4.7),
+    # the exact name every version pulled (6b314): a bare tag now means
+    # its :latest pull only, and this app never pulled llava:latest
+    "LLaVA Vision 7B":   (None, "llava:7b", None, 4.7),
     "Qwen 3.6 27B":      ("mlx-community/Qwen3.6-27B-4bit", None, 8916, 16.1),
     "Llama 3.3 70B":     ("mlx-community/Llama-3.3-70B-Instruct-4bit",
                           "llama3.3:70b", 8920, 39.7),
@@ -625,6 +639,23 @@ def model_is_giant(label: str) -> bool:
     return MODEL_MEM_BYTES.get(label, 0) > GIANT_GB * 1e9
 
 
+# A GIANT ON OLLAMA (6b314) runs mostly from system RAM on a Windows
+# box, at a few words a second, and each cold load reads 290-405 GB
+# from disk. It answers when picked by hand; no tier, blend, preset or
+# fallback seats one on its own. The MLX giants on a 512 GB Mac Studio
+# are fast enough to stay in councils.
+GIANT_CTX = 32768           # Ollama would pick 256k with a big GPU (+67 GB)
+GIANT_KEEP_ALIVE = "30m"    # a pause must not throw away a 400 GB load
+GIANT_LOAD_TIMEOUT = 3600   # Ollama sends nothing until the load is done
+# giants whose Ollama template thinks by default; the others reject "think"
+OLLAMA_THINK_OFF = {"deepseek-v3.1:671b"}
+
+
+def slow_giant(label: str) -> bool:
+    return (model_is_giant(label)
+            and MODEL_ROUTES.get(label, ("",))[0] == "ollama")
+
+
 _html_escape = html.escape   # do_GET's page builder names a local `html`
 
 
@@ -632,31 +663,42 @@ def giant_blurb() -> tuple:
     """(label, tooltip) for the giants box, from the catalog (6b312, per
     Patrick: "128 GB+" undersold models that download about 400 GB and
     only run with 512 GB of memory). Nothing in the catalog sits between
-    GPT-OSS 120B's 64 GB and the giants' 390 GB, so the honest line is
+    GPT-OSS 120B's 64 GB and the giants' 300 GB, so the honest line is
     the memory they need, and the tooltip names them. It says "systems",
-    not "Macs", because Windows shows the same box (Patrick, 6b313); the
-    giants are MLX-only today, so there the tooltip says so."""
-    g = sorted((l for l in MODEL_INFO if model_is_giant(l)),
-               key=lambda l: MODEL_INFO[l]["mem"])
-    if not g:
+    not "Macs" (6b313), and names only the giants this computer can run
+    (6b314): GLM 5.3 and DeepSeek V3.2 on an Apple-silicon Mac, DeepSeek
+    V3.1 and Qwen 3 Coder on Windows. Where none can run (an Intel Mac),
+    it names them all and says where they do."""
+    every = [l for l in MODEL_INFO if model_is_giant(l)]
+    if not every:
         return ("Include the largest models", "None in this version.")
-    need = max(MODEL_INFO[l]["mem"] for l in g) / 1e9
-    tier = next((m for m in (192, 256, 512, 1024) if m >= need),
-                int(need))
+    here = [l for l in every if SUPPORTED.get(l)]
+    g = sorted(here or every, key=lambda l: MODEL_INFO[l]["mem"])
+
+    def tier_of(label):      # the memory size a machine is sold with
+        need = MODEL_INFO[label]["mem"] / 1e9
+        return next((m for m in (192, 256, 384, 512, 1024) if m >= need),
+                    int(need))
+    tiers = sorted({tier_of(l) for l in g})
+    tier = tiers[-1]
 
     def span(xs):
+        xs = [int(x + 0.5) for x in xs]      # 404.5 reads 405, not 404
         lo, hi = min(xs), max(xs)
         return "%d" % lo if lo == hi else "%d\u2013%d" % (lo, hi)
     names = (" and ".join(g) if len(g) < 3
              else ", ".join(g[:-1]) + " and " + g[-1])
-    tip = ("%s. %s %d GB or more of memory (%s GB in use) and a "
+    tip = ("%s. %s %s GB or more of memory (%s GB in use) and a "
            "%s GB download." % (
-               names, "Each needs" if len(g) > 1 else "Needs", tier,
-               span([round(MODEL_INFO[l]["mem"] / 1e9) for l in g]),
-               span([round(MODEL_INFO[l]["gb"]) for l in g])))
-    if not any(SUPPORTED.get(l) for l in g):
-        tip += (" For now %s only on Apple silicon Macs."
-                % ("they run" if len(g) > 1 else "it runs"))
+               names,
+               ("Needs" if len(g) == 1 else
+                "Each needs" if len(tiers) == 1 else "They need"),
+               "\u2013".join(map(str, tiers)),
+               span([MODEL_INFO[l]["mem"] / 1e9 for l in g]),
+               span([MODEL_INFO[l]["gb"] for l in g])))
+    if not here:
+        tip += (" None of them runs on this computer: they run on "
+                "Apple silicon Macs and on Windows.")
     return ("Include models for %d GB+ systems" % tier, tip)
 
 
@@ -678,13 +720,19 @@ MODEL_INFO = {c[0]: dict(icon=c[1], size=c[2], group=c[3], mlx=c[4],
                          mem=int(c[7] * 1e9), gb=c[8], star=c[9])
               for c in CATALOG}
 
-# a model is usable here if it has an engine this Mac can actually run
-SUPPORTED = {l: bool((i["mlx"] and IS_ARM) or i["ollama"])
+# a model is usable here if it has an engine this computer can actually
+# run. The Windows giants are Windows only (6b314): on a Mac, Apple
+# silicon or Intel, they are neither offered nor routed, so a copy
+# pulled by hand in Ollama can't be seated by a tier or a fallback.
+SUPPORTED = {l: bool(((i["mlx"] and IS_ARM) or i["ollama"])
+                     and (IS_WIN or l not in WINDOWS_ONLY))
              for l, i in MODEL_INFO.items()}
 
 # prefer MLX on Apple silicon (fast Metal), else Ollama
 MODEL_ROUTES = {}
 for _l, _i in MODEL_INFO.items():
+    if _l in WINDOWS_ONLY and not IS_WIN:
+        continue
     if _i["mlx"] and IS_ARM and _i["port"]:
         MODEL_ROUTES[_l] = ("mlx", _i["port"])
     elif _i["ollama"]:
@@ -2399,8 +2447,9 @@ def resolve_tier(name: str) -> list:
     pulled = ollama_pulled_tags() or set()
 
     def usable(l):
+        # a giant on Ollama is for hand-picked questions only (6b314)
         return (l in MODEL_ROUTES and model_cached(l, pulled)
-                and model_fits_memory(l))
+                and model_fits_memory(l) and not slow_giant(l))
 
     take_all = t.get("all")
 
@@ -2445,8 +2494,12 @@ def _starter_labels() -> list:
     machine would have installed only the 35B — no merger, no quick
     path). Build the spread by ROLE instead: flagship, Gemma merger,
     everyday mid, the quick pair, vision."""
+    # no giant in a preset (6b314): one "Download" on the More-models
+    # card would otherwise start a 300-420 GB pull. Giants are installed
+    # one at a time from the list, which names the size first.
     fits = [l for l in MODEL_INFO
-            if SUPPORTED.get(l) and model_fits_machine(l)]
+            if SUPPORTED.get(l) and model_fits_machine(l)
+            and not model_is_giant(l)]
     picks = []
 
     def add(label):
@@ -2528,8 +2581,12 @@ def plan_labels(plan: str) -> list:
         picks = [l for l in ("Llama 3.2 1B", "Llama 3.2 3B") if l in fits]
         return picks or small[:2]
     if plan == "rec":
+        # an efficient spread never holds a giant (6b314): with both
+        # boxes ticked, DeepSeek's 400 GB row replaced the 4.6 GB R1 8B
         groups = {}
         for l in fits:
+            if model_is_giant(l):
+                continue
             groups.setdefault(_family_of(l), []).append(l)
         picks = []
         for _fam, ls in groups.items():
@@ -3419,14 +3476,19 @@ def _ollama_bin():
 
 
 def ollama_pulled_tags():
-    """Set of pulled model names (with and without :tag), or None if down."""
+    """Set of pulled model names, or None if down. A bare name stands for
+    its :latest pull only (6b314). It used to be added for EVERY tag, so
+    the retired "DeepSeek R1" row (bare "deepseek-r1") read as on disk
+    whenever deepseek-r1:8b or :671b was, and auto-clean deleted one of
+    those instead."""
     try:
         with urllib.request.urlopen(
             ollama_url("/api/tags"), timeout=1.5
         ) as r:
             tags = json.loads(r.read().decode("utf-8")).get("models", [])
-            return ({m.get("name", "") for m in tags} |
-                    {m.get("name", "").split(":")[0] for m in tags})
+            names = {m.get("name", "") for m in tags}
+            return names | {n[:-len(":latest")] for n in names
+                            if n.endswith(":latest")}
     except Exception:
         return None
 
@@ -3435,7 +3497,13 @@ def model_cached(label, pulled=None):
     # NB: exact tag match only — ollama refuses "llama3.2:3b" even when
     # ":latest" is the same digest. Bare requested tags (e.g. "command-r")
     # still match because the pulled set includes bare names for :latest.
-    kind, target = MODEL_ROUTES[label]
+    # An unrouted label (an MLX-only row off Apple silicon, a Windows
+    # giant on a Mac) is simply not here. Indexing MODEL_ROUTES blindly
+    # made /api/setup and /api/tiers raise on every Windows PC (6b314).
+    route = MODEL_ROUTES.get(label)
+    if not route:
+        return False
+    kind, target = route
     if kind == "mlx":
         return mlx_model_cached(MLX_REPOS[label])
     if pulled is None:
@@ -3710,7 +3778,8 @@ def make_title(text: str, conf=None) -> str:
                 return t
     pulled = ollama_pulled_tags() or set()
     usable = [l for l in MODEL_ROUTES
-              if model_cached(l, pulled) and model_fits_memory(l)]
+              if model_cached(l, pulled) and model_fits_memory(l)
+              and not slow_giant(l)]
     # 1B models write poor titles; prefer something already resident, then
     # the smallest model that is still capable enough
     # 1B-class models produce garbage titles (seen looping "address address
@@ -6903,13 +6972,175 @@ def _ensure_ollama_ready() -> bool:
     return False
 
 
+def _ollama_models_dir() -> str:
+    """Where Ollama keeps its models, as this process sees it. A service
+    started elsewhere may have its own OLLAMA_MODELS; this is the best
+    guess without asking it."""
+    return (os.environ.get("OLLAMA_MODELS")
+            or os.path.expanduser(os.path.join("~", ".ollama", "models")))
+
+
+def _disk_free_for(path: str) -> tuple:
+    """(free bytes, the folder measured) at `path` or its nearest parent
+    that exists: the models folder may not exist before the first pull."""
+    p = os.path.abspath(path)
+    while not os.path.exists(p):
+        up = os.path.dirname(p)
+        if up == p:
+            break
+        p = up
+    try:
+        return shutil.disk_usage(p).free, p
+    except OSError:
+        return None, p
+
+
+# A GIANT'S PULL WATCHES ITS DRIVE (6b314). Nothing checked free space,
+# and a 404 GB pull would run the system drive to zero. Checking before
+# the pull guessed wrong (a paused download, a pull already running, a
+# model folder moved in the Ollama app's Settings), so the check runs
+# during the pull, on the drive that actually holds the download's file,
+# with Ollama's own count of what is left. Stopping keeps the partial
+# until Ollama next starts (it prunes partials over an hour old then),
+# so a prompt Retry resumes. Everyday models are never stopped.
+GIANT_DISK_SPARE = 20e9     # left free once a giant has finished
+GIANT_DISK_FLOOR = 10e9     # a giant's pull stops before the drive is this low
+
+
+def _ollama_models_dirs() -> list:
+    """Folders the running Ollama may keep models in: this process's
+    OLLAMA_MODELS, the folder the Ollama app's server logged (its
+    Settings move models without telling any other program) and the
+    default. Only for finding a pull's file; nothing is deleted here."""
+    out = [os.environ.get("OLLAMA_MODELS") or ""]
+    if IS_WIN:
+        try:
+            log = os.path.join(os.environ.get("LOCALAPPDATA", ""),
+                               "Ollama", "server.log")
+            # the app starts a fresh log per run and writes the config
+            # line at its top, then a line per request after it: read
+            # it all (up to 64 MB), and the LAST config line wins
+            with open(log, "rb") as f:
+                f.seek(max(0, os.path.getsize(log) - 64_000_000))
+                txt = f.read().decode("utf-8", "replace")
+            hits = re.findall(r"OLLAMA_MODELS:(.*?) (?=[A-Z][A-Z0-9_]*:)",
+                              txt)
+            if hits:
+                out.append(hits[-1].replace("\\\\", "\\"))
+        except Exception:
+            pass
+    out.append(_ollama_models_dir())
+    seen = []
+    for d in out:
+        if d and d not in seen and os.path.isdir(d):
+            seen.append(d)
+    return seen
+
+
+def _is_sparse(path: str) -> bool:
+    """Ollama sizes a download's file to the whole blob up front. When the
+    file is sparse (Ollama asks for it; APFS, ext4 and NTFS do it) the
+    free space hasn't paid for the unwritten rest yet."""
+    if not IS_WIN:
+        return True
+    try:
+        return bool(os.stat(path).st_file_attributes & 0x200)
+    except (OSError, AttributeError):
+        return False
+
+
+def _giant_room(layers: dict, where):
+    """(where, reason to stop or "") for a giant's pull. `where` is the
+    (folder, partial file) found on an earlier look, or None."""
+    if not layers:
+        return where, ""
+    if where is None:
+        big = max(layers, key=lambda d: layers[d][1])
+        name = big.replace(":", "-") + "-partial"
+        for d in _ollama_models_dirs():
+            f = os.path.join(d, "blobs", name)
+            if os.path.exists(f):
+                where = (d, f)
+                break
+        if where is None:
+            return None, ""       # can't see where it writes: say nothing
+    folder, part = where
+    left = sum(max(0, t - c) for c, t in layers.values())
+    if left <= 0:
+        return where, ""          # all here: hashing and the manifest
+    sparse = _is_sparse(part)
+    try:
+        if not sparse and os.path.getsize(part) >= max(
+                t for _c, t in layers.values()):
+            # the file already holds its whole size (a drive that can't
+            # do sparse files, like exFAT): the pull takes nothing more
+            return where, ""
+    except OSError:
+        return where, ""          # renamed: the download just finished
+    free, _p = _disk_free_for(folder)
+    if free is None:
+        return where, ""
+    drive = os.path.splitdrive(folder)[0] or folder
+    # Ollama keeps a stopped download until it next starts; it prunes
+    # partial files over an hour old then, so a retry after a restart
+    # of Ollama (or of this app, whose Ollama stops with it) starts over
+    tail = (" \u2014 make room, then press retry soon; it resumes "
+            "unless Ollama restarts first")
+    if free < GIANT_DISK_FLOOR:
+        return where, ("stopped: %s is almost full (%d GB free)%s"
+                       % (drive, free // 1_000_000_000, tail))
+    if sparse and free < left + GIANT_DISK_SPARE:
+        return where, ("needs %d GB free on %s to finish, %d GB free%s"
+                       % (int((left + GIANT_DISK_SPARE) / 1e9 + 0.5), drive,
+                          free // 1_000_000_000, tail))
+    return where, ""
+
+
+# Ollama versions the giants need (6b314): Qwen 3 Coder 480B's manifest
+# has no template and relies on the built-in renderer; DeepSeek V3.1
+# got its renderer and tool parsing in 0.13.5.
+GIANT_OLLAMA_MIN = (0, 13, 5)
+
+
+def _ollama_version() -> tuple:
+    """The running Ollama's version as a tuple, or () when unknown."""
+    try:
+        with urllib.request.urlopen(ollama_url("/api/version"),
+                                    timeout=3) as r:
+            v = json.loads(r.read().decode("utf-8")).get("version", "")
+        return tuple(int(x) for x in re.findall(r"\d+", v)[:3])
+    except Exception:
+        return ()
+
+
+def _keep_awake(on: bool):
+    """Windows: keep the PC from sleeping while models download (6b314).
+    A giant takes many hours, and a sleep stops the pull. The flag
+    belongs to the calling thread, so the worker sets and clears it."""
+    if not IS_WIN:
+        return
+    try:
+        import ctypes
+        ES_CONTINUOUS, ES_SYSTEM_REQUIRED = 0x80000000, 0x00000001
+        ctypes.windll.kernel32.SetThreadExecutionState(
+            ES_CONTINUOUS | (ES_SYSTEM_REQUIRED if on else 0))
+    except Exception:
+        pass
+
+
 def _pull_ollama_model(label: str, tag: str):
-    """`ollama pull` via the API, streaming progress into the job dict."""
+    """`ollama pull` via the API, streaming progress into the job dict.
+    Progress is BYTES across every layer (6b314): the old per-layer
+    whole percent moved every 4 GB on a 404 GB pull, so the watchdog
+    called a healthy download on an ordinary line "stalled"."""
     payload = json.dumps({"model": tag, "stream": True}).encode("utf-8")
     req = urllib.request.Request(
         ollama_url("/api/pull"), data=payload,
         headers={"Content-Type": "application/json"},
     )
+    layers = {}
+    est = MLX_EST_BYTES.get(label, 0)
+    guard, where, look = model_is_giant(label), None, 0.0
     with urllib.request.urlopen(req) as r:
         for raw in r:
             line = raw.decode("utf-8").strip()
@@ -6919,14 +7150,33 @@ def _pull_ollama_model(label: str, tag: str):
             if obj.get("error"):
                 raise RuntimeError(obj["error"])
             total, done = obj.get("total"), obj.get("completed")
-            if total:
-                with _setup_lock:
-                    _setup_jobs[label]["pct"] = min(
-                        99, int((done or 0) / total * 100))
+            dg = obj.get("digest") or ""
+            if total and dg:
+                layers[dg] = (int(done or 0), int(total))
+            got = sum(c for c, _t in layers.values())
+            want = max(est, sum(t for _c, t in layers.values()))
+            phase = str(obj.get("status") or "")
+            with _setup_lock:
+                job = _setup_jobs[label]
+                job["done_b"] = got
+                job["phase"] = ("verifying" if phase.startswith("verifying")
+                                else "")
+                if want:
+                    job["pct"] = min(99, int(got / want * 100))
+            if guard and layers and time.time() >= look:
+                look = time.time() + 15
+                where, stop = _giant_room(layers, where)
+                if stop:
+                    # leaving the loop closes the stream, which stops
+                    # Ollama's download and keeps what it has
+                    raise RuntimeError(stop)
 
 
 def _ollama_install_worker(labels: list):
-    """Engine first, then the models one at a time (kind to old disks)."""
+    """Engine first, then the models one at a time (kind to old disks),
+    smallest first (6b314): a 400 GB giant goes last, so the everyday
+    models aren't stuck behind many hours of it."""
+    labels = sorted(labels, key=lambda l: MODEL_INFO[l]["gb"])
     try:
         if not _ensure_ollama_ready():
             raise RuntimeError("the Ollama engine did not start")
@@ -6938,20 +7188,32 @@ def _ollama_install_worker(labels: list):
                 _setup_jobs[l] = {"status": "error",
                                   "note": "engine unavailable", "pct": 0}
         return
-    for label in labels:
-        with _setup_lock:
-            _setup_jobs[label] = {"status": "downloading", "note": "",
-                                  "pct": 0}
-        try:
-            _pull_ollama_model(label, MODEL_ROUTES[label][1])
+    _keep_awake(True)
+    try:
+        for label in labels:
             with _setup_lock:
-                _setup_jobs[label] = {"status": "done", "note": "",
-                                      "pct": 100}
-            _app_models_add(label)
-        except Exception as exc:
-            with _setup_lock:
-                _setup_jobs[label] = {"status": "error",
-                                      "note": str(exc)[:200], "pct": 0}
+                _setup_jobs[label] = {"status": "downloading", "note": "",
+                                      "pct": 0}
+            try:
+                if model_is_giant(label):
+                    have = _ollama_version()
+                    if have and have < GIANT_OLLAMA_MIN:
+                        raise RuntimeError(
+                            "needs Ollama %s or newer (this computer has "
+                            "%s) — update Ollama, then press Retry" % (
+                                ".".join(map(str, GIANT_OLLAMA_MIN)),
+                                ".".join(map(str, have))))
+                _pull_ollama_model(label, MODEL_ROUTES[label][1])
+                with _setup_lock:
+                    _setup_jobs[label] = {"status": "done", "note": "",
+                                          "pct": 100}
+                _app_models_add(label)
+            except Exception as exc:
+                with _setup_lock:
+                    _setup_jobs[label] = {"status": "error",
+                                          "note": str(exc)[:200], "pct": 0}
+    finally:
+        _keep_awake(False)
 
 
 def start_model_downloads(labels=None) -> list:
@@ -7031,6 +7293,8 @@ def _downloaded_bytes(pulled, labels=None) -> tuple:
             pass          # stalled/never started — counts as nothing yet
         elif kind == "mlx":
             have += min(est, _dir_bytes(_hf_model_dir(MLX_REPOS[label])))
+        elif "done_b" in job:
+            have += min(est, job["done_b"])       # bytes, all layers
         else:
             have += int(est * job.get("pct", 0) / 100)
     return have, want
@@ -7069,6 +7333,9 @@ def _dl_speed(have: int, hist=None) -> float:
 
 
 _job_watch = {}   # label -> (pct, ts of last movement)
+# the longest time-left the app will quote (6b314): 999 minutes was
+# under a giant's real time on an ordinary line
+ETA_CAP_MIN = 72 * 60
 
 
 def _retired_on_disk(label: str, pulled) -> bool:
@@ -7192,13 +7459,12 @@ def _remove_models(want: list) -> tuple:
             kind, target = (("mlx", _port) if (repo and IS_ARM)
                             else ("ollama", _tag))
             if kind == "ollama" and _tag and ":" not in _tag:
-                # the daemon deletes exact names only: resolve the
-                # bare tag to whatever is really pulled (6b284)
-                _pulled = ollama_pulled_tags() or set()
-                _exact = sorted(t for t in _pulled
-                                if ":" in t and t.split(":")[0] == _tag)
-                if _exact:
-                    target = _exact[0]
+                # the daemon deletes exact names only (6b284). A bare
+                # retired tag is the default pull, :latest, and nothing
+                # else (6b314): resolving it to "whatever is pulled"
+                # deleted deepseek-r1:671b, or the catalog's own
+                # deepseek-r1:8b, for the retired "DeepSeek R1" row
+                target = _tag + ":latest"
         else:
             errors[label] = "unknown model"
             continue
@@ -7411,7 +7677,8 @@ def model_update_status() -> dict:
             pct=min(99, round(have / want * 100)) if want else 99,
             have_gb=round(have / 1e9, 1), want_gb=round(want / 1e9, 1),
             speed_mbs=round(bps / 1e6, 1),
-            eta_min=(min(999, max(1, round((want - have) / bps / 60)))
+            eta_min=(min(ETA_CAP_MIN,
+                         max(1, round((want - have) / bps / 60)))
                      if bps > 2e5 and want > have else None))
     elif st.get("state") == "running":
         st["pct"] = 99
@@ -7451,7 +7718,8 @@ def setup_busy() -> dict:
             "updating": _modup.get("state") == "running",
             "overall_pct": round(have / want * 100) if want else 100,
             "speed_mbs": round(bps / 1e6, 1),
-            "eta_min": (min(999, max(1, round((want - have) / bps / 60)))
+            "eta_min": (min(ETA_CAP_MIN,
+                            max(1, round((want - have) / bps / 60)))
                         if bps > 2e5 and want > have else None)}
 
 
@@ -7476,12 +7744,21 @@ def setup_status() -> dict:
             elif (MODEL_ROUTES.get(label, ("",))[0] == "mlx"
                     and label in MLX_REPOS):
                 pct = _dir_bytes(_hf_model_dir(MLX_REPOS[label])) // 1_000_000
+            elif "done_b" in job:
+                # an Ollama pull, by the megabyte too (6b314)
+                pct = (job["done_b"] // 1_000_000, job.get("phase", ""))
             else:
                 pct = job.get("pct", 0)
+            # Ollama hashes the whole blob before it finishes and says
+            # nothing meanwhile: about an hour for a 404 GB giant on a
+            # slow disk, so that quiet gets 1 s per 100 MB
+            limit = 600
+            if job.get("phase") == "verifying":
+                limit = max(600, MLX_EST_BYTES.get(label, 0) / 1e8)
             prev = _job_watch.get(label)
             if prev is None or prev[0] != pct:
                 _job_watch[label] = (pct, now)
-            elif now - prev[1] > 600:
+            elif now - prev[1] > limit:
                 job["status"] = "error"
                 job["note"] = "stalled — press Retry"
                 _setup_jobs[label] = job
@@ -7528,6 +7805,7 @@ def setup_status() -> dict:
                 pct = job.get("pct", 0)
         models.append({"label": label, "est_gb": round(est / 1e9, 1),
                        "status": status, "pct": pct,
+                       "giant": model_is_giant(label),
                        "star": label in stars_now,
                        "supported": SUPPORTED.get(label, True),
                        "note": job.get("note", "")})
@@ -7553,7 +7831,8 @@ def setup_status() -> dict:
     # WHICH PRESET IS ON DISK (6b290, per Patrick: "highlight that so
     # the user knows which one they're on"). current = exactly this
     # set; installed = all of it plus extras; partial = some; none.
-    installed = {l for l in SUPPORTED if model_cached(l, pulled)}
+    installed = {l for l, ok in SUPPORTED.items()
+                 if ok and model_cached(l, pulled)}
     plan_state = {}
     for pl in ("min", "rec", "full", "all"):
         want_set = set(plan_labels(pl))
@@ -7577,7 +7856,8 @@ def setup_status() -> dict:
         "speed_mbs": round(bps / 1e6, 1) if busy else 0,
         # only quote a time once the window holds a real rate, and never
         # quote a silly one — an hour-plus reads as "we don't know"
-        "eta_min": (min(999, max(1, round((want - have) / bps / 60)))
+        "eta_min": (min(ETA_CAP_MIN,
+                        max(1, round((want - have) / bps / 60)))
                     if busy and bps > 2e5 and want > have else None),
         "busy": busy,
         # nag on first run only: once a couple of models work, the welcome
@@ -8693,24 +8973,41 @@ def run_search(query: str) -> str:
     return ctx
 
 
-def stream_ollama(tag: str, messages: list, emit) -> None:
+def stream_ollama(tag: str, messages: list, emit,
+                  giant: bool = False) -> None:
     """Stream NDJSON from Ollama, calling emit(text_chunk) as tokens arrive."""
+    options = {"temperature": 0.75}
+    extra = {}
+    if giant:
+        # a fixed context (6b314): left alone, Ollama sizes it from the
+        # GPU and a big card gets 256k, which adds ~67 GB to Qwen 3 Coder
+        options["num_ctx"] = GIANT_CTX
+        if tag in OLLAMA_THINK_OFF:
+            # Ollama turns thinking ON when a request doesn't say, and
+            # the hidden reasoning would cost minutes at CPU speed
+            extra["think"] = False
     payload = json.dumps({
+        **extra,
         "model": tag,
         "messages": messages,
         "stream": True,
         # unload fast after use: Ollama's default keep-alive left LLaVA
         # resident at 8.6 GB GPU for 5 minutes after every glance at an
-        # image — the llama-server runner ate cores "even when closed"
-        "keep_alive": "45s",
-        "options": {"temperature": 0.75},
+        # image — the llama-server runner ate cores "even when closed".
+        # A giant stays 30 minutes: Ollama on Windows+CUDA reads all of
+        # it from disk on every load (no mmap), which takes minutes.
+        "keep_alive": GIANT_KEEP_ALIVE if giant else "45s",
+        "options": options,
     }).encode("utf-8")
     req = urllib.request.Request(
         ollama_url("/api/chat"),
         data=payload,
         headers={"Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(req, timeout=600) as resp:
+    # Ollama sends nothing until the model is loaded, so for a giant the
+    # socket timeout has to cover a cold read of 300-400 GB
+    with urllib.request.urlopen(
+            req, timeout=GIANT_LOAD_TIMEOUT if giant else 600) as resp:
         for raw_line in resp:
             line = raw_line.decode("utf-8").strip()
             if not line:
@@ -8908,7 +9205,8 @@ def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
                 emit(chunk)
 
             if kind == "ollama":
-                stream_ollama(target, msgs, _tap)
+                stream_ollama(target, msgs, _tap,
+                              giant=model_is_giant(label))
             else:
                 # re-read (ensure may have moved the engine off a port
                 # another account holds) and check the listener afresh,
@@ -8942,6 +9240,17 @@ def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
                 continue
             e.cached_body = detail  # for offline_hint (read-once)
             raise  # real answer from the engine — surface it
+        except (TimeoutError, socket.timeout):
+            # a read that outwaits the socket timeout is not a URLError
+            # (6b314), so it skipped the retry below and surfaced raw.
+            # Retrying would only repeat the wait: say what happened.
+            if kind == "ollama" and model_is_giant(label):
+                raise RuntimeError(
+                    "%s didn't finish loading within an hour. It reads "
+                    "%d GB from disk on every load; a faster drive or "
+                    "more memory helps" % (label, round(
+                        MODEL_INFO[label]["gb"])))
+            raise RuntimeError("%s stopped answering (timed out)" % label)
         except urllib.error.URLError:
             # engine may be mid-startup, or another MillenAI instance on
             # this machine terminated it on ITS exit (shared 88xx ports —
@@ -12293,7 +12602,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 chosen = resolve_tier(name)
                 # installed models this tier can't use right now
                 skipped = [l for l in MODEL_INFO
-                           if model_cached(l, pulled) and l not in chosen
+                           if SUPPORTED.get(l) and model_cached(l, pulled)
+                           and l not in chosen
                            and not model_fits_memory(l)]
                 out[name] = {"desc": t["desc"], "models": chosen,
                              "skipped": skipped, "available": True}
@@ -12452,8 +12762,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 ollama_url("/api/tags"), timeout=1.5
             ) as r:
                 tags = json.loads(r.read().decode("utf-8")).get("models", [])
-                pulled = {m.get("name", "").split(":")[0] for m in tags} | \
-                         {m.get("name", "") for m in tags}
+                pulled = {m.get("name", "") for m in tags}
+                pulled |= {n[:-len(":latest")] for n in pulled
+                           if n.endswith(":latest")}
         except Exception:
             pulled = None  # ollama down
 
@@ -13044,6 +13355,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # exact models fell through to parroting the picks
                     lbl = next((l for l in MERGE_RANK
                                 if l not in BLEND_EXCLUDE
+                                and not slow_giant(l)
                                 and model_cached(l)
                                 and model_fits_memory(l)), "")
                     if lbl:
@@ -13459,7 +13771,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             council = resolve_tier(tier)
         else:
             council = [m for m in req_json.get("models", [])
-                       if m in MODEL_ROUTES]
+                       if m in MODEL_ROUTES and SUPPORTED.get(m)]
+            # a giant on Ollama picked WITH others answers alone (6b314):
+            # a council gives each drafter 120 s, and a cold 400 GB load
+            # alone takes minutes, so its draft was always abandoned
+            # while the load went on holding the machine
+            _sg = [m for m in council if slow_giant(m)]
+            if _sg and len(council) > 1:
+                council = _sg[:1]
         if cloud_only:
             # the line-up IS the bench — and it may legitimately be empty
             # (no keys), which run_cloud_only answers with instructions
@@ -14822,9 +15141,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # the sloppy ones came from. Bookish (recommendations)
                 # answers now get the rewrite too, fed the same grounded
                 # message so the reviser can check names against data.
+                # a giant on Ollama writes once (6b314): the draft-and-
+                # rewrite pass doubles a few-words-a-second answer
                 polish = (load_prefs(None).get("polish", True)
                           and not images and (not query or bookish)
-                          and _is_substantive(prompt))
+                          and _is_substantive(prompt)
+                          and not slow_giant(lbl))
                 if polish:
                     step("draft", "Drafting the answer", "run", lbl)
                     # TWO PASS: draft in silence, then stream the rewrite.
@@ -14867,7 +15189,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                         None,
                                         "kept the part before it wandered")
                 else:
-                    step("draft", "Writing the answer", "run", lbl)
+                    # the page draws the step, not the status line, while
+                    # nothing has streamed: that is where a giant's cold
+                    # load of 300-400 GB is explained (6b314)
+                    if slow_giant(lbl):
+                        step("draft", "Loading the model, then writing",
+                             "run", "%s · %d GB, can take minutes" % (
+                                 lbl, round(MODEL_INFO[lbl]["gb"])))
+                    else:
+                        step("draft", "Writing the answer", "run", lbl)
                     # guarded like every other path: a lone model that
                     # collapses into repetition gets cut back to its
                     # coherent prefix instead of streaming the loop
@@ -17123,6 +17453,8 @@ body.gen #chip-model{color:var(--accent)}
   border-bottom:1px dotted rgba(255,255,255,.3);margin-left:auto}
 .ros-row .rrm:hover{color:#e5605c}
 .ros-row .rin:hover{color:#57c98e}
+.ros-row .rerr{color:#e5605c}
+.ros-row .rgo{flex:none;color:var(--faint);margin-left:auto}
 /* THE LIST SCROLLS, THE WINDOW DOESN'T (6b258): 20+ models used to
    stretch the dialog past the screen, which is also why Manage kept
    ending up out of reach below the fold. */
@@ -18853,6 +19185,10 @@ const ADV_USE={
   "Qwen 3.8 27B":"heavyweight generalist and coder",
   "Qwen 3.6 35B MoE":"heavyweight generalist, fast for its size",
   "GPT-OSS 120B":"frontier-class open reasoning",
+  "GLM 5.3":"the largest open model \u2014 512 GB Macs",
+  "DeepSeek V3.2 671B":"frontier open model \u2014 512 GB Macs",
+  "DeepSeek V3.1 671B":"frontier open model \u2014 512 GB PCs, slow on CPU",
+  "Qwen 3 Coder 480B":"frontier open coder \u2014 384 GB+ PCs, slow on CPU",
 };
 const ADV_CLOUD={
   gemini:["Gemini","fast frontier drafts · free tier"],
@@ -22362,6 +22698,11 @@ const TICK='<svg class="tick" viewBox="0 0 24 24" aria-label="installed">'
   +'<path d="M7 12.4l3.3 3.3L17 9" fill="none" stroke-width="2.7"'
   +' stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
+/* time left in words (6b314): a giant takes many hours, and "about
+   1300 min" says nothing */
+function dlEta(m){
+  return m>=90?"about "+Math.round(m/60)+" hr":"about "+m+" min";
+}
 function renderSetup(st){
   const stars=st.models.filter(m=>m.star);
   setupAllReady=stars.every(m=>m.status==="ready");
@@ -22374,7 +22715,7 @@ function renderSetup(st){
     '<span>'+(anyDl?pct+'%':(setupAllReady?'complete':'not started'))+'</span></div>'+
     (anyDl?'<div class="big-speed">'+
       (st.speed_mbs>0?st.speed_mbs+' MB/s':'starting\u2026')+
-      (st.eta_min?' \u00b7 about '+st.eta_min+' min left':'')+'</div>'
+      (st.eta_min?' \u00b7 '+dlEta(st.eta_min)+' left':'')+'</div>'
       +'<div class="big-now">'+nowLine(st)+'</div>':'');
 
   // WHILE DOWNLOADING (first run or updates): one bar, bandwidth,
@@ -22707,7 +23048,7 @@ async function dlStripTick(){
       lbl.lastChild.textContent=[
         st.speed_mbs>0?(st.speed_mbs>=10?Math.round(st.speed_mbs)
           :st.speed_mbs)+" MB/s":"",
-        st.eta_min?"~"+st.eta_min+" min":""].filter(Boolean).join(" \u00b7 ");
+        st.eta_min?dlEta(st.eta_min).replace("about ","~"):""].filter(Boolean).join(" \u00b7 ");
     }
   }catch(e){}
   finally{dlStripBusy=false;}
@@ -23309,24 +23650,58 @@ lenSlider.addEventListener("change",()=>{
    pane stops behaving like a form. Owner at the machine only; the
    server refuses a mid-download removal either way. */
 let lastSetup=null,lastCloud=null,manageOn=false;
+/* a two-step prompt ("really remove?", a giant's "download 404.5 GB?")
+   lives here, not on the element, so a repaint of the list mid-decision
+   keeps it (6b314) */
+const rosArmed={};
+function rosArmedOn(k){return Date.now()-(rosArmed[k]||0)<15000;}
+/* rows that aren't models: plumbing, and the studios with their own cards */
+const ROS_SKIP=new Set(["Ollama engine","Image generation","Video generation"]);
 function rosRow(m,ready){
   const dot=ready?'<span class="rs rok">✓</span>'
                  :'<span class="rs rno">✕</span>';
+  // a download in flight shows its progress, and a failed one its
+  // reason and a retry (6b314): the reason (a full drive, an old
+  // Ollama) used to reach no screen at all
+  const going=!ready&&(m.status==="downloading"||m.status==="queued");
+  const failed=!ready&&m.status==="error";
   const act=!IS_LOCAL?""
     :ready
       ?'<span class="rrm" data-l="'+esc(m.label)+'" data-gb="'+m.est_gb
-        +'">remove</span>'
+        +'">'+(rosArmedOn("rm:"+m.label)
+          ?"really remove? frees "+m.est_gb+" GB":"remove")+'</span>'
+    :going
+      ?'<span class="rgo">'+(m.status==="queued"?"waiting":(m.pct||0)+"%")
+        +'</span>'
       :'<span class="rin" data-l="'+esc(m.label)+'" data-gb="'+m.est_gb
-        +'">install</span>';
+        +(m.giant?'" data-giant="1':'')+'">'
+        +(rosArmedOn("in:"+m.label)?"download "+m.est_gb+" GB? click again"
+          :failed?"retry":"install")+'</span>';
+  const why=failed&&m.note
+    ?'<span class="rd rerr" title="'+esc(m.note)+'">'+esc(m.note)+'</span>'
+    :'<span class="rd">'+esc(ADV_USE[m.label]||"")+'</span>';
   return '<div class="ros-row">'+dot
     +'<span class="rn">'+esc(m.label)+'</span>'
     +'<span class="rg">'+(m.est_gb?m.est_gb+"G":"")+'</span>'
-    +'<span class="rd">'+esc(ADV_USE[m.label]||"")+'</span>'+act+'</div>';
+    +why+act+'</div>';
+}
+/* the roster follows a download it started, Manage open or not (6b314):
+   manageTick stands down while the Manage box is shut */
+let rosTimer=0;
+function rosTick(){
+  clearTimeout(rosTimer);
+  rosTimer=setTimeout(async()=>{
+    let st;
+    try{st=await(await fetch("/api/setup")).json();}catch(e){return;}
+    lastSetup=st;paintRoster(st,lastCloud);   // it re-arms this tick
+  },4000);
 }
 function paintRoster(st,cloud){
   const host=$("#roster");if(!host||!st)return;
-  // real minds only — the "Ollama engine" pseudo-row is plumbing
-  const rows=(st.models||[]).filter(m=>m.label!=="Ollama engine");
+  // real minds only — the "Ollama engine" pseudo-row is plumbing, and
+  // the studios install from their own cards (6b314: a failed one
+  // showed a "retry" here that could never start anything)
+  const rows=(st.models||[]).filter(m=>!ROS_SKIP.has(m.label));
   const rdy=rows.filter(m=>m.status==="ready");
   const miss=rows.filter(m=>m.status!=="ready");
   const provs=(cloud&&cloud.providers)||{};
@@ -23351,6 +23726,9 @@ function paintRoster(st,cloud){
       +'<span class="rd">'+esc(ADV_CLOUD[k][1])+'</span></div>').join("");
   host.innerHTML=h;
   paintMgStats();
+  // the list follows any download in flight, whoever started it (6b314)
+  if(IS_LOCAL&&miss.some(m=>m.status==="downloading"||m.status==="queued"))
+    rosTick();
 }
 /* THE INVENTORY (6b258, per Patrick): what is on disk and what it
    costs, in models and in gigabytes, read from the same /api/setup
@@ -23454,7 +23832,7 @@ function studioHTML(key,st){
           et=(lastSetup&&lastSetup.eta_min)||0;
     h+='<div class="stprog"><div class="stbar"><i style="width:'+st.pct+'%"></i></div>'
       +'<div class="stnums"><span>'+st.pct+'%</span><span>'
-      +(sp?sp+" MB/s":"starting\u2026")+(et?" \u00b7 about "+et+" min left":"")
+      +(sp?sp+" MB/s":"starting\u2026")+(et?" \u00b7 "+dlEta(et)+" left":"")
       +'</span></div></div>';
   }
   h+='<div class="stacts">';
@@ -23618,15 +23996,18 @@ function manageTick(){
       $("#manage-note").textContent="downloading \u2014 "+st.have_gb+" of "
         +st.want_gb+" GB \u00b7 "+st.overall_pct+"%"
         +(st.speed_mbs>0?" \u00b7 "+st.speed_mbs+" MB/s":"")
-        +(st.eta_min?" \u00b7 about "+st.eta_min+" min left":"")
+        +(st.eta_min?" \u00b7 "+dlEta(st.eta_min)+" left":"")
         +(st.now&&st.now.length?" \u2014 "+st.now.map(m=>m.label+" "+m.pct+"%").join(", "):"")
         +(st.queued_n?" \u00b7 "+st.queued_n+" waiting":"");
       manageTick();
     }else{
-      const bad=(st.models||[]).filter(m=>m.status==="error");
+      // a studio's failure shows on its own card, not as a list retry
+      const bad=(st.models||[]).filter(m=>m.status==="error"
+        &&(m.label==="Ollama engine"||!ROS_SKIP.has(m.label)));
       $("#manage-note").textContent=bad.length
         ?bad.length+" download"+(bad.length>1?"s":"")+" failed \u2014 "
-          +bad.map(m=>m.label).join(", ")+" \u00b7 pick the preset again to retry"
+          +bad.map(m=>m.label+(m.note?" ("+m.note+")":"")).join(", ")
+          +" \u00b7 retry from the list"
         :"done \u2014 "+st.ready_n+" models installed";
       paintRoster(lastSetup,lastCloud);
     }
@@ -23669,8 +24050,7 @@ function muPaint(el,st){
   const offers=muOffers(p),n=offers.length;
   let h;
   if(st&&st.state==="running"){
-    const eta=st.eta_min?(st.eta_min>=90?"about "+Math.round(st.eta_min/60)+" hr"
-      :"about "+st.eta_min+" min"):"";
+    const eta=st.eta_min?dlEta(st.eta_min):"";
     h='<div class="mu-h">Updating your models</div>'
       +'<div class="mu-bar"><i style="width:'+(st.pct||0)+'%"></i></div>'
       +'<div class="mu-m">'+[(st.pct||0)+"%",
@@ -23854,23 +24234,46 @@ $("#plan-row").addEventListener("click",async e=>{
 });
 $("#roster").addEventListener("click",async e=>{
   const i=e.target.closest(".rin");if(!i)return;
+  // a giant asks once more, naming the size (6b314): one stray click
+  // would otherwise start a download that runs for many hours. The
+  // second half of a double-click doesn't count as the answer.
+  const k="in:"+i.dataset.l;
+  if(i.dataset.giant==="1"){
+    const age=Date.now()-(rosArmed[k]||0);
+    if(age>=15000){
+      rosArmed[k]=Date.now();
+      i.textContent="download "+i.dataset.gb+" GB? click again";
+      return;
+    }
+    if(age<600)return;
+  }
+  delete rosArmed[k];
   i.textContent="starting…";
   try{
-    await fetch("/api/model/download",{method:"POST",
+    const r=await(await fetch("/api/model/download",{method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({labels:[i.dataset.l]})});
+      body:JSON.stringify({labels:[i.dataset.l]})})).json();
+    if(!(r.started||[]).includes(i.dataset.l)){
+      // already queued elsewhere, or already here: the list says which
+      try{lastSetup=await(await fetch("/api/setup")).json();
+          paintRoster(lastSetup,lastCloud);}catch(e3){}
+      return;
+    }
     i.textContent="downloading";
     $("#manage-note").textContent=i.dataset.l+" \u2014 starting\u2026";
-    manageTick();
+    manageTick();rosTick();
   }catch(e2){i.textContent="failed";}
 });
 $("#roster").addEventListener("click",async e=>{
   const r=e.target.closest(".rrm");if(!r)return;
-  if(r.dataset.sure!=="1"){          // inline two-step, like Forget Me
-    r.dataset.sure="1";
+  const k="rm:"+r.dataset.l,age=Date.now()-(rosArmed[k]||0);
+  if(age>=15000){                    // inline two-step, like Forget Me
+    rosArmed[k]=Date.now();
     r.textContent="really remove? frees "+r.dataset.gb+" GB";
     return;
   }
+  if(age<600)return;                 // the second half of a double-click
+  delete rosArmed[k];
   r.textContent="removing…";
   let out={};
   try{out=await(await fetch("/api/model/remove",{method:"POST",
@@ -24775,10 +25178,14 @@ def _sweep_leftovers() -> int:
     # 3. Ollama's partial pulls: chunk files, never a finished blob, so
     #    nothing that any model shares. Skipped while we pull anything.
     if not any(MODEL_ROUTES.get(l, ("",))[0] == "ollama" for l in live):
-        blobs = os.path.join(os.environ.get("OLLAMA_MODELS")
-                             or os.path.expanduser("~/.ollama/models"),
-                             "blobs")
+        blobs = os.path.join(_ollama_models_dir(), "blobs")
         cut = time.time() - LEFTOVER_GRACE
+        # a giant's paused download (over 50 GB) keeps two weeks
+        # (6b314) while the Ollama that owns it keeps running (a user's
+        # own Ollama app across sleeps): 24 h would throw away hours of
+        # a pull that can still resume. Ollama itself prunes partials
+        # over an hour old when it starts.
+        big_cut = time.time() - 14 * 24 * 3600.0
         groups = {}
         for pth in glob.glob(os.path.join(blobs, "*-partial*")):
             key = re.sub(r"-partial(-\d+)?$", "", os.path.basename(pth))
@@ -24787,7 +25194,9 @@ def _sweep_leftovers() -> int:
         # still writing any part of it keeps all of it (found in review)
         for files in groups.values():
             try:
-                if max(os.stat(f).st_mtime for f in files) >= cut:
+                big = sum(os.stat(f).st_size for f in files) > 50e9
+                if max(os.stat(f).st_mtime for f in files) >= (
+                        big_cut if big else cut):
                     continue
             except OSError:
                 continue
