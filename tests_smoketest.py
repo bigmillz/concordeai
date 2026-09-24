@@ -1029,7 +1029,8 @@ def _fake_dl(labels):
     return list(labels)
 
 
-_mns.update(_remove_models=_fake_remove, start_model_downloads=_fake_dl)
+_mns.update(_remove_models=_fake_remove, start_model_downloads=_fake_dl,
+            _sweep_leftovers=lambda: 0)
 for _n in _ctree.body:
     if isinstance(_n, (_ast.FunctionDef, _ast.Assign)) and (
             getattr(_n, "name", "") in (
@@ -1174,7 +1175,8 @@ _exec_names(_cq, {"CLOUD_SKIP_IDS", "CLOUD_PICK_ORDER", "_CLAUDE_ID",
     "_dead_when", "DEAD_TTL", "cloud_model_alive", "_QUOTA_RX",
     "QUOTA_COOLDOWN", "GLITCH_COOLDOWN", "_http_body", "cloud_failure_kind",
     "_NO_CREDIT_RX", "_MODEL_GONE_RX", "cloud_note_failure", "cloud_glitch",
-    "_provider_of", "_claude_takes_effort", "_BAD_KEY_RX", "cloud_rest_left"})
+    "_provider_of", "_claude_takes_effort", "_BAD_KEY_RX", "cloud_rest_left",
+    "_img_parts", "_openai_messages"})
 _cooled, _saved = [], []
 _cq.update(_dead_seed=lambda: None,
            cloud_cool=lambda pid, note, secs=600.0: _cooled.append((pid, note, secs)),
@@ -1299,11 +1301,189 @@ check("review fixes: refusals wipe and hand over, honest Cloud Only, synced boxe
       and 'if d.get("stop_reason") == "refusal":' in _MILLENAI_SRC
       and "Your cloud providers didn't answer this one" in _MILLENAI_SRC
       and "cloud_names = {lbl for lbl, _c in _bench}" in _MILLENAI_SRC
-      and "cloud_text(conf, messages, timeout=70)" in _MILLENAI_SRC
+      and "cloud_text(conf, messages, timeout=70,\n" in _MILLENAI_SRC
+      and "timeout_rests=False" in _MILLENAI_SRC
       and "_busy = True" in _MILLENAI_SRC
       and "if model_is_giant(label) and not giants_on():\n        return False\n    if no_limits():" in _MILLENAI_SRC
       and _MILLENAI_SRC.count("        except Exception:\n            return False") >= 2
       and "function syncLimits" in page and "out of credit · top up the account" in page)
+# 6b308, per Patrick ("selecting the ideal model for different tasks …
+# keep it up to date as the models get cycled in and cycled out"): a
+# role per task with a version floor per line, ladders per task, one
+# more Claude try after a refusal, pictures in each provider's format.
+_exec_names(_cq, {"_img_parts", "_anthropic_turns", "_openai_messages",
+                  "KIMI_TESTED", "_cloud_ladder", "compositor_ladder",
+                  "work_ladder", "fast_cloud_ladder", "vision_ladder",
+                  "claude_refusal_conf", "LANE_ROLE"})
+_cq["_model_rest"].clear()
+_cc = _cq["cloud_candidates"]
+_ci = _chat["claude"]
+check("per-task roles: Haiku fast, Sonnet code, Opus work, floors drop old lines",
+      _cc("claude", _ci, "fast") == ["claude-haiku-4-5-20251001", "claude-sonnet-5"]
+      and _cc("claude", _ci, "code")[:2] == ["claude-sonnet-5", "claude-opus-5-5"]
+      and _cc("claude", _ci, "work")[:3] == ["claude-opus-5-5", "claude-opus-5", "claude-sonnet-5"]
+      and not any("-4-" in i or "fable" in i for i in _cc("claude", _ci, "composite"))
+      and "gemini-3.5-flash" not in _cc("gemini", _chat["gemini"], "seat")
+      and _cc("gemini", _chat["gemini"], "seat")[:3] == ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"]
+      and _cc("groq", _chat["groq"], "work") == ["openai/gpt-oss-120b", "openai/gpt-oss-20b"]
+      and _cc("groq", _chat["groq"], "seat")[0] == "qwen/qwen3.8-27b"
+      and _cc("groq", _chat["groq"], "fast", vision=True) == []
+      and _cc("kimi", _chat["kimi"], "seat", vision=True) == [],
+      "%r" % [_cc("claude", _ci, r) for r in ("fast", "code", "work")])
+check("new models are picked the day they appear; old lines only when nothing newer",
+      _cc("claude", _ci + ["claude-opus-5-6"], "composite")[0] == "claude-opus-5-6"
+      and _cc("claude", _ci + ["claude-haiku-5"], "fast")[0] == "claude-haiku-5"
+      and _cc("gemini", _chat["gemini"] + ["gemini-3.9-flash"], "seat")[0] == "gemini-3.9-flash"
+      and _cc("claude", ["claude-opus-4-8", "claude-haiku-4-5-20251001"], "seat")[0]
+          == "claude-opus-4-8")
+_PV = {"claude": {"key": "k", "base": "https://api.anthropic.com/v1", "status": "ok",
+                  "model": "claude-opus-5-5", "models": _ci, "name": "Claude"},
+       "gemini": {"key": "k", "base": _g, "status": "ok", "model": "gemini-3.8-flash",
+                  "models": _chat["gemini"], "name": "Gemini"},
+       "groq": {"key": "k", "base": _gr, "status": "ok", "model": "qwen/qwen3.8-27b",
+                "models": _chat["groq"], "name": "Groq"},
+       "kimi": {"key": "k", "base": _mo, "status": "ok", "model": "kimi-k3",
+                "models": _chat["kimi"], "name": "Kimi K3"}}
+_cq["_cloud_all"] = lambda: {"providers": _PV}
+_ord = lambda L: [(c["model"], c["role"]) for c in L]
+check("each task walks its own ladder, in its own order",
+      _ord(_cq["fast_cloud_ladder"]())[:3] == [("claude-haiku-4-5-20251001", "fast"),
+          ("openai/gpt-oss-120b", "fast"), ("gemini-3.5-flash-lite", "fast")]
+      and [c["name"] for c in _cq["fast_cloud_ladder"](guest=True)] == ["Groq", "Gemini", "Claude"]
+      and all(c["name"] != "Kimi K3" for c in _cq["fast_cloud_ladder"](utility=True))
+      and _ord(_cq["work_ladder"]("code"))[0] == ("claude-sonnet-5", "code")
+      and [c["name"] for c in _cq["work_ladder"]()] == ["Claude", "Groq", "Gemini", "Kimi K3"]
+      # a tunnel guest is free-first on every lane (review, 6b308)
+      and [c["name"] for c in _cq["work_ladder"]("code", guest=True)] == ["Groq", "Gemini", "Claude"]
+      and _ord(_cq["compositor_ladder"]())[0] == ("claude-opus-5-5", "composite")
+      and _ord(_cq["vision_ladder"]("Pro"))[0] == ("claude-opus-5-5", "composite")
+      and [c["name"] for c in _cq["vision_ladder"]("")] == ["Claude", "Gemini"]
+      and _cq["LANE_ROLE"]["Coding"] == "code" and _cq["LANE_ROLE"]["Resumes"] == "work",
+      "%r" % _ord(_cq["fast_cloud_ladder"]()))
+_rf = dict(_PV["claude"], model="claude-opus-5-5", _stop="refusal")
+check("a Claude refusal gets one try on the previous Opus generation, nothing else does",
+      (_cq["claude_refusal_conf"](_rf) or {}).get("model") == "claude-opus-4-8"
+      and _cq["claude_refusal_conf"](dict(_rf, _stop="end_turn")) is None
+      and _cq["claude_refusal_conf"](dict(_PV["groq"], _stop="refusal")) is None)
+_im = {"role": "user", "content": "what colour?",
+       "image_urls": ["data:image/png;base64,iVBORw0KGgo"], "images": ["iVBORw0KGgo"]}
+_at = _cq["_anthropic_turns"]([{"role": "system", "content": "s"}, _im])
+_om = _cq["_openai_messages"]([{"role": "user", "content": "hi", "images": []}, _im])
+check("pictures go in each provider's own format; plain turns stay plain",
+      _at[0]["content"][0] == {"type": "image", "source": {"type": "base64",
+          "media_type": "image/png", "data": "iVBORw0KGgo"}}
+      and _at[0]["content"][-1]["text"] == "what colour?"
+      and _om[0] == {"role": "user", "content": "hi"}
+      and _om[1]["content"][1]["image_url"]["url"] == "data:image/png;base64,iVBORw0KGgo")
+check("per-task wiring: lanes, vision first, refusals, titles/memory/pins, funnels, remote",
+      "_fl = work_ladder(\"code\", guest=self._remote())" in _MILLENAI_SRC
+      and "if images and _vis_cloud and _cloud_vision():" in _MILLENAI_SRC
+      and "and not _vis_cloud and not _vis_local:" in _MILLENAI_SRC
+      and "def _walk_ladder() -> bool:" in _MILLENAI_SRC
+      and "kwargs={\"conf\": _ans_conf}" in _MILLENAI_SRC
+      and "make_title(txt, conf=_conf)" in _MILLENAI_SRC
+      and "fast_cloud_ladder(utility=True) if effort == \"fast\"" in _MILLENAI_SRC
+      and "[cloud_conf()]" not in _MILLENAI_SRC
+      and "Funnels run on the owner's" in _MILLENAI_SRC
+      and "ladder = work_ladder(\"work\")" in _MILLENAI_SRC
+      and "\"x-goog-api-key\": gem[\"key\"]" in _MILLENAI_SRC
+      and 'name="fn-eff" value="fast"' in page and 'name="fn-eff" value="normal" checked' in page
+      and "effort:eff===\"fast\"?\"fast\":\"normal\"" in page)
+# the leftover sweep, on a fake disk: every kind of leftover goes, and
+# nothing fresh, complete, or not ours is touched
+_lt = _LH["tempfile"].mkdtemp()
+_hub, _ol, _app = (os.path.join(_lt, x) for x in ("hub", "ollama", "app"))
+for _d in (_hub, os.path.join(_ol, "blobs"), _app):
+    os.makedirs(_d)
+def _mkrepo(repo, files, age):
+    d = os.path.join(_hub, "models--" + repo.replace("/", "--"))
+    for f in files:
+        pth = os.path.join(d, "snapshots", "abc", f)
+        os.makedirs(os.path.dirname(pth), exist_ok=True)
+        open(pth, "w").write("x")
+        os.utime(pth, (time.time() - age, time.time() - age))
+    for root, dirs, fs in os.walk(d):
+        for n in dirs + fs:
+            os.utime(os.path.join(root, n), (time.time() - age, time.time() - age))
+    return d
+_old, _day2 = 3 * 3600, 2 * 86400
+_r_ret = _mkrepo("mlx-community/Retired-7B", ["config.json"], _old)
+_r_part = _mkrepo("mlx-community/Cur-9B", ["config.json"], _day2)
+_r_fresh = _mkrepo("mlx-community/Cur-14B", ["config.json"], 60)
+_r_done = _mkrepo("mlx-community/Cur-3B", ["config.json", "model.safetensors"], _day2)
+_r_stu = _mkrepo("studio/Img-4B", ["model_index.json"], _day2)
+_r_mine = _mkrepo("someone/their-own-model", ["config.json"], _day2)
+_venv = os.path.join(_lt, "venv-image"); os.makedirs(_venv)
+open(os.path.join(_venv, ".concorde-install-failed"), "w").close()
+os.utime(os.path.join(_venv, ".concorde-install-failed"), (time.time() - _day2,) * 2)
+_p_old = os.path.join(_ol, "blobs", "sha256-aa-partial"); open(_p_old, "w").write("x")
+os.utime(_p_old, (time.time() - _day2,) * 2)
+_p_new = os.path.join(_ol, "blobs", "sha256-bb-partial"); open(_p_new, "w").write("x")
+# an old chunk of a download whose data file is still being written stays
+_p_new0 = os.path.join(_ol, "blobs", "sha256-bb-partial-0"); open(_p_new0, "w").write("x")
+os.utime(_p_new0, (time.time() - _day2,) * 2)
+_blob = os.path.join(_ol, "blobs", "sha256-cc"); open(_blob, "w").write("x")
+os.utime(_blob, (time.time() - _day2,) * 2)
+_tmpf = os.path.join(_app, ".prefs-x.tmp"); open(_tmpf, "w").write("x")
+os.utime(_tmpf, (time.time() - _old,) * 2)
+_dev = os.path.join(_app, "cloud-dev-12345.json"); open(_dev, "w").write("{}")
+os.utime(_dev, (time.time() - _old,) * 2)
+_mine_dev = os.path.join(_app, "cloud-dev-9897.json"); open(_mine_dev, "w").write("{}")
+os.utime(_mine_dev, (time.time() - _old,) * 2)
+_sw = dict(_LH, app_dir=lambda: _app, PORT=9897,
+           _hf_model_dir=lambda repo: os.path.join(_hub, "models--" + repo.replace("/", "--")),
+           mlx_model_cached=lambda repo: repo == "mlx-community/Cur-3B",
+           MLX_REPOS={"Cur 9B": "mlx-community/Cur-9B", "Cur 14B": "mlx-community/Cur-14B",
+                      "Cur 3B": "mlx-community/Cur-3B"},
+           RETIRED_MODELS={"Retired 7B": ("mlx-community/Retired-7B", None, None, 4.0)},
+           STUDIOS={"image": {"row": "img", "venv": _venv, "tiers": [{"repo": "studio/Img-4B"}]}},
+           _studio_engine_ok=lambda k: False, _studio_bytes_forget=lambda k: None,
+           _setup_lock=threading.RLock(), _setup_jobs={}, MODEL_ROUTES={},
+           _port_in_use=lambda p: False, _sweep_hf_carcasses=lambda: 0)
+_exec_names(_sw, {"LEFTOVER_GRACE", "_fresh_under", "_hf_has_weights", "_rm_hf_repo",
+                  "_sweep_leftovers", "STUDIO_FAIL_MARK", "_dir_bytes_real"})
+_env0 = os.environ.get("OLLAMA_MODELS")
+os.environ["OLLAMA_MODELS"] = _ol
+try:
+    _sw["_sweep_leftovers"]()
+finally:
+    if _env0 is None:
+        os.environ.pop("OLLAMA_MODELS", None)
+    else:
+        os.environ["OLLAMA_MODELS"] = _env0
+_ex = os.path.exists
+check("leftover sweep: failed downloads go; fresh, complete and foreign files stay",
+      not _ex(_r_ret) and not _ex(_r_part) and _ex(_r_fresh) and _ex(_r_done)
+      and not _ex(_r_stu) and _ex(_r_mine) and not _ex(_venv)
+      and not _ex(_p_old) and _ex(_p_new) and _ex(_p_new0) and _ex(_blob)
+      and not _ex(_tmpf) and not _ex(_dev) and _ex(_mine_dev)
+      and "_sweep_leftovers()\n        # manual == the Clean-now button" in _MILLENAI_SRC
+      and "_sweep_leftovers()      # a failed replacement leaves pieces" in _MILLENAI_SRC
+      and "open(os.path.join(st[\"venv\"], STUDIO_FAIL_MARK), \"w\")" in _MILLENAI_SRC,
+      "%r" % [_ex(x) for x in (_r_ret, _r_part, _r_fresh, _r_done, _r_stu, _r_mine, _venv,
+                               _p_old, _p_new, _blob, _tmpf, _dev, _mine_dev)])
+_LH["shutil"].rmtree(_lt, ignore_errors=True)
+check("per-task review fixes: guests free-first, titles per request, badge, sweeps",
+      "run_council(council, full_messages, emit, status," in _MILLENAI_SRC
+      and "hurry=hurry_ev, guest=self._remote())" in _MILLENAI_SRC
+      and "_fast = fast_cloud_ladder(guest=guest)" in _MILLENAI_SRC
+      and "_last_cloud.pop(str(self._data_base()), None)" in _MILLENAI_SRC
+      and 'json.dumps({"w": "cloud"})' in _MILLENAI_SRC
+      and 'd.w==="cloud"' in page
+      and "if images and not cloud_only and not _vis_cloud and not _vis_local:" in _MILLENAI_SRC
+      and "if not quiet:        # a title that merely mentions billing" in _MILLENAI_SRC
+      and "repos.update(r[0] for r in RETIRED_MODELS.values() if r[0])" in _MILLENAI_SRC
+      and "not (_fu and _fu == owner_uid())" in _MILLENAI_SRC
+      and "elif not cloud_only:\n                            run_model(small" in _MILLENAI_SRC
+      and "Cloud power is off, so your cloud key can't drive" in _MILLENAI_SRC)
+# 6b308, per Patrick: the MODELS AVAILABLE chip ran 50 px past the
+# sidebar and squeezed the wordmark to nothing (its full-width rule was
+# written for a two-row header); both chips now sit on their own line
+_brow = page[page.index('<div id="brand-row">'):page.index('<div id="models-flag"')]
+check("header chips never overrun the sidebar or hide the wordmark",
+      "flex:1 0 100%" not in page
+      and _brow.count("<div") == _brow.count("</div>")
+      and page.index('id="get-app"') > page.index('id="models-flag"'))
 # the giants: hidden unless BOTH boxes are ticked, never in "Max" otherwise
 _gz = dict(_LH)
 exec(_MILLENAI_SRC[_MILLENAI_SRC.index("CATALOG = ["):
@@ -1337,8 +1517,8 @@ check("cloud wiring: ranked everywhere, no 6-id cap, no 4096 wall, one render tr
       "chat[:6]" not in _MILLENAI_SRC
       and '"max_tokens": 4096, "stream": True' not in _MILLENAI_SRC
       and "_anthropic_body(c, turns, sys_txt, CLOUD_MAX_OUT" in _MILLENAI_SRC
-      and "cloud_role_model(pid, c, \"composite\")" in _MILLENAI_SRC
-      and "cloud_role_model(pid, c, \"fast\")" in _MILLENAI_SRC
+      and '_cloud_ladder("composite", ("claude", "kimi", "gemini", "groq"))' in _MILLENAI_SRC
+      and '_cloud_ladder("utility" if utility else "fast", order)' in _MILLENAI_SRC
       and "/models?limit=1000" in _MILLENAI_SRC
       and '"claude-opus-5-5"),' in _MILLENAI_SRC
       and "A RENDER THAT STARTED IS THE ONLY TRY" in _MILLENAI_SRC

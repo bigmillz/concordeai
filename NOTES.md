@@ -5103,3 +5103,92 @@ installed giant still ran in tiers with the gate closed; Groq's final
 answer went to Qwen, which the free tier turns away (gpt-oss now); the
 effort parameter was sent to Sonnet 4.5, which 400s on it (effort now
 only on Opus 4.5+, Sonnet 4.6+ and Fable, each probed live).
+
+## 6b308 — the ideal model per task, and leftovers from failed downloads (uncut)
+
+Per Patrick ("selecting the ideal model for different tasks … especially
+if we can keep it up to date as the models get cycled in and cycled
+out", and "make sure that the auto clean feature removes leftovers from
+downloads that never finish"). A 16-agent workflow mapped every cloud
+call in the app to the model it really got, designed per task, and had
+each design challenged; Patrick decided the cost calls.
+
+ROLES (cloud_candidates), each ranked by parsed version with a FLOOR
+per line, so an older line drops out and a newer model is fielded the
+day it appears (no model id is named anywhere in the picking):
+- fast: Haiku, then Sonnet 5.x · Flash-Lite · gpt-oss (low effort)
+- utility: the same, never Kimi (titles, memory, map pins, funnel Fast)
+- code: Sonnet 5.x first (medium) — the Code tab, Patrick's pick
+- work: Opus 5.x (medium) — writing, resumes, exports, funnel verdict
+  and Normal stages, the remote agent
+- seat: Opus 5.x (medium), Gemini Flash 3.6+, Groq Qwen + gpt-oss
+- composite: Opus 5.x (high) — every final answer
+Floors: Claude 5.x (Haiku for quick), Gemini Flash 3.6+ (Lite any),
+Groq gpt-oss outside the seat. When a key reaches nothing above the
+floor, the floor gives way.
+
+LADDERS: fast = Claude, Groq, Gemini (a tunnel guest gets Groq, Gemini,
+Claude, so a visitor never lands on the owner's Anthropic bill);
+work/code = Claude, Groq, Gemini, Kimi; composite unchanged. Kimi stays
+off the quick ladders (KIMI_TESTED) until its effort values can be
+sent live — the account is suspended.
+
+REFUSALS: Opus 5.x runs classifiers that can decline firewall/SSH/VPN
+work. claude_refusal_conf gives one more try on the newest Opus of the
+previous generation (a rule, not a name), in the fast/work path, the
+council's final answer, Cloud Only, the funnel audit and the remote
+agent (no backoff sleep).
+
+NEW CLOUD JOBS (Patrick, all three): pasted images go to the vision
+ladder when cloud power is on (Haiku on Fast, Opus on Thinking/Pro/
+Cloud Only, Gemini Flash beside it; local vision model is the floor —
+Cloud Only reads images now). Titles, memory and map pins use the
+quick model of THE PROVIDER THAT WROTE THE ANSWER (_answered, marked on
+the request thread), quietly, so no second company sees the chat and a
+chat answered on this Mac never leaves it.
+
+FUNNELS: a Fast / Normal effort pair in the sidebar (Fast: Haiku, 1-2 s
+a stage; Normal: Opus 5.5 medium); a stage that fails the gate is redone
+on the work model either way; the audit stays Opus high. /api/funnel is
+owner-only now (a tunnel guest could spend the keys). The remote agent
+follows the cloud-power switch.
+
+LEFTOVERS (_sweep_leftovers), at launch, every six hours, after every
+cleanup and every Update models run, whatever the auto-clean switch
+says: incomplete HF folders of retired models (after 30 min idle) and of
+current ones (after a day idle, in case the download resumes); studio
+model folders with no weights at all; a studio engine whose install
+failed (marked by the installer, removed after a day); Ollama
+*-partial* chunks untouched for a day; this app's own crash temp files;
+and copies of the key file left by test instances on ports nothing
+serves. Nothing written recently is touched, and nothing not this app's
+own. Found on Patrick's Mac: three retired models' metadata-only folders
+and four plaintext key-file copies.
+
+ALSO: council drafts that run past the council's own deadline no longer
+rest Opus 5.5 (it took the final answer away); a hurried merge reaches
+the cloud only with cloud power on; the image key rides in a header;
+standard Veo ($3.20 a clip) is no longer a silent fallback.
+
+REVIEWED (five lenses, a skeptic per finding): 17 confirmed, 12
+distinct, all fixed. Tunnel guests reached the owner's Anthropic key
+first on the Code tab, exports and the hurried merge (the guest order now
+rides every ladder). A chat answered on this Mac could be titled in the
+cloud by the previous chat's provider (the record is now cleared when a
+question starts). The sweep could delete a COMPLETE retired model with a
+stale carcass beside it (carcasses of retired repos go first now). Quiet
+background calls could still bench a provider for an hour on a title
+that mentioned billing. A picture Claude read was badged "this Mac" (a
+"w": "cloud" marker at the end of the answer fixes the badge). Also:
+Cloud Only + picture never starts a local download and says when the
+vision providers are resting; the owner through the tunnel can run
+funnels; the remote agent says "turn on cloud power" when that's the
+only thing missing; a studio venv is marked from the start of its
+install, so a sibling's sweep can't take it mid-pip; Ollama partials are
+judged per download by their newest file.
+
+HEADER CHIPS (Patrick, from a screenshot): the MODELS AVAILABLE chip was
+263 px wide in a 300 px sidebar starting at x=89, and squeezed the
+wordmark to zero width. Its `flex:1 0 100%` was written for a two-row
+header. It and the web DOWNLOAD NOW chip now sit on their own line
+under the header; verified inside the sidebar at 300, 240 and 200 px.

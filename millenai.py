@@ -1184,8 +1184,7 @@ def _anthropic_stream(c: dict, messages: list, emit) -> bool:
     hoisted system prompt, and content_block_delta events."""
     sys_txt = "\n\n".join(m["content"] for m in messages
                            if m.get("role") == "system")
-    turns = [{"role": m["role"], "content": m["content"]}
-             for m in messages if m.get("role") in ("user", "assistant")]
+    turns = _anthropic_turns(messages)
     body = _anthropic_body(c, turns, sys_txt, CLOUD_MAX_OUT["claude"],
                            stream=True)
     req = urllib.request.Request(
@@ -1236,11 +1235,14 @@ def _anthropic_stream(c: dict, messages: list, emit) -> bool:
         return False
     if not got and stop != "max_tokens":
         cloud_glitch(c, "returned nothing")
+    if got:
+        _mark_answered(c)
     return got
 
 
 def cloud_text(c: dict, messages: list, timeout: int = 120,
-               max_tokens: int = 4096) -> str:
+               max_tokens: int = 4096, quiet: bool = False,
+               timeout_rests: bool = True) -> str:
     """One buffered completion from a SPECIFIC provider conf — the
     council/merge offload path (6b219). Empty string = didn't work."""
     try:
@@ -1251,7 +1253,7 @@ def cloud_text(c: dict, messages: list, timeout: int = 120,
             # its reasoning out of max_tokens, and a short cap returned
             # nothing at all (6b255, 6b307). Billing is by what's used.
             payload = json.dumps(_anthropic_body(
-                c, [m for m in messages if m["role"] != "system"], sys_txt,
+                c, _anthropic_turns(messages), sys_txt,
                 max(max_tokens, 16000), stream=False)).encode()
             req = urllib.request.Request(
                 c["base"].rstrip("/") + "/messages", data=payload,
@@ -1261,6 +1263,7 @@ def cloud_text(c: dict, messages: list, timeout: int = 120,
                          "User-Agent": "MillenAI/%s" % APP_VERSION})
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 d = json.loads(r.read().decode("utf-8", "replace"))
+            c["_stop"] = d.get("stop_reason") or ""
             if d.get("stop_reason") == "refusal":
                 return ""          # partial text of a refused turn: no draft
             out = "".join(b.get("text", "")
@@ -1275,9 +1278,11 @@ def cloud_text(c: dict, messages: list, timeout: int = 120,
             if not out.strip():
                 if d.get("stop_reason") in ("max_tokens", "refusal"):
                     return ""
-                cloud_glitch(c, "returned nothing")
+                if not quiet:
+                    cloud_glitch(c, "returned nothing")
             if _is_provider_error(out):
-                _cloud_budget_hit(c)
+                if not quiet:
+                    _cloud_budget_hit(c)
                 return ""
             return out
         # per-provider body (6b307): effort by role, Moonshot's pinned
@@ -1294,21 +1299,32 @@ def cloud_text(c: dict, messages: list, timeout: int = 120,
             d = json.loads(r.read().decode("utf-8", "replace"))
         out = (((d.get("choices") or [{}])[0].get("message") or {})
                .get("content", "") or "")
-        if not out.strip():
+        if not out.strip() and not quiet:
             # answered, said nothing: still "not working" as far as the
             # council is concerned, so rest it rather than ask again
             cloud_glitch(c, "returned nothing")
         if _is_provider_error(out):
-            _cloud_budget_hit(c)
+            if not quiet:        # a title that merely mentions billing
+                _cloud_budget_hit(c)
             return ""
         return out
     except urllib.error.HTTPError as exc:
-        cloud_note_failure(c, exc)
+        # QUIET (6b308): a background job (title, memory, map pins) must
+        # never rest the model the reader's next answer needs. Only a
+        # bad key or a withdrawn model is worth recording from there.
+        _b = _http_body(exc)
+        if (not quiet or cloud_failure_kind(exc.code, _b) == "auth"
+                or exc.code == 404 or (exc.code == 400
+                                       and _MODEL_GONE_RX.search(_b))):
+            cloud_note_failure(c, exc)
         return ""
     except Exception:
         # timeout, dropped connection, malformed JSON — all the same to
-        # the reader waiting for an answer
-        cloud_glitch(c, "not responding")
+        # the reader waiting for an answer. A council seat that simply
+        # ran past the council's own deadline is not broken, and resting
+        # it took Opus 5.5 away from the final answer (6b308)
+        if not quiet and timeout_rests:
+            cloud_glitch(c, "not responding")
         return ""
 
 
@@ -1372,59 +1388,95 @@ def _probe_model(base: str, key: str, model: str):
     urllib.request.urlopen(tq, timeout=25).read(400)
 
 
-def cloud_candidates(pid: str, ids, role: str = "seat") -> list:
-    """This provider's models for `role`, best first. role: "seat" (a
-    council draft), "composite" (the final answer) or "fast"."""
+def cloud_candidates(pid: str, ids, role: str = "seat",
+                     vision: bool = False) -> list:
+    """This provider's models for `role`, best first (6b307; per task
+    since 6b308, per Patrick: "selecting the ideal model for different
+    tasks … keep it up to date as the models get cycled in and cycled
+    out"). Roles: "seat" (council draft), "composite" (the final
+    answer), "work" (a single quality answer: writing, resumes,
+    exports, funnel verdicts, the remote agent), "code" (the Code tab),
+    "fast" (the quick answer) and "utility" (titles, memory, map pins).
+    Picked by parsed version with a FLOOR per line, so a model below
+    the current generation drops out on its own and a newer one is
+    fielded the day it shows up; nothing here names a model id. When
+    a key reaches no model above the floor, the floor gives way."""
     ids = [i for i in dict.fromkeys(ids or []) if i]
-    out = []
-    if pid == "claude":
-        fams = {}
-        for i in ids:
-            m = _CLAUDE_ID.match(i)
-            if m:
-                fams.setdefault(m.group(1), []).append(
-                    ((int(m.group(2)), int(m.group(3) or 0)), i))
-        order = (("haiku", "sonnet") if role == "fast"
-                 else ("opus", "sonnet", "haiku"))
-        for f in order:
-            out += [i for _v, i in sorted(fams.get(f, []), reverse=True)]
-    elif pid == "gemini":
-        flash, lite = [], []
-        for i in ids:
-            m = _GEM_FLASH.match(i)
-            if m:
-                # newest version first; at a tie the GA id beats -preview
-                key = (_vtuple(m.group(1)), not m.group(3))
-                (lite if m.group(2) else flash).append((key, i))
-        flash = [i for _k, i in sorted(flash, reverse=True)]
-        lite = [i for _k, i in sorted(lite, reverse=True)]
-        # no pro rung: 3.x Pro has no free tier, and its 429 (limit 0)
-        # used to bench the whole provider
-        out = (lite + flash) if role == "fast" else flash
-    elif pid == "groq":
-        qw = []
-        for i in ids:
-            m = _QWEN_ID.match(i)
-            if m:
-                qw.append(((_vtuple(m.group(1)), int(m.group(2))), i))
-        qw = [i for _k, i in sorted(qw, reverse=True)]
-        oss = [i for i in ("openai/gpt-oss-120b", "openai/gpt-oss-20b")
-               if i in ids]
-        # Qwen holds the council SEAT (Patrick's pick). The fast rung and
-        # the final answer stay on gpt-oss: ~500 tok/s with no thinking
-        # wall, and a long merge is exactly what the free tier's ~1,000
-        # output tokens a minute turns away for Qwen (seen live)
-        out = (qw + oss) if role == "seat" else (oss + qw)
-    elif pid == "kimi":
-        ks = []
-        for i in ids:
-            m = _KIMI_ID.match(i)
-            if m:
-                ks.append((_vtuple(m.group(1)), i))
-        out = [i for _k, i in sorted(ks, reverse=True)]
-    for want in CLOUD_PICK_ORDER.get(pid, []):
-        out += [i for i in ids if want in i.lower() and i not in out]
-    return list(dict.fromkeys(out))
+    quick = role in ("fast", "utility")
+
+    def ranked(floored: bool) -> list:
+        out = []
+        if pid == "claude":
+            fams = {}
+            for i in ids:
+                m = _CLAUDE_ID.match(i)
+                if m:
+                    fams.setdefault(m.group(1), []).append(
+                        ((int(m.group(2)), int(m.group(3) or 0)), i))
+            low = (5, 0) if floored else (0, 0)
+
+            def line(f, floor=(0, 0)):
+                return [i for v, i in sorted(fams.get(f, []), reverse=True)
+                        if v >= floor]
+            if quick:
+                out = line("haiku") + line("sonnet", low)
+            elif role == "code":
+                # Patrick's pick for the Code tab: Sonnet at medium
+                out = line("sonnet", low) + line("opus", low)
+            else:
+                out = line("opus", low) + line("sonnet", low)
+                if not floored:
+                    out += line("haiku")
+        elif pid == "gemini":
+            flash, lite = [], []
+            for i in ids:
+                m = _GEM_FLASH.match(i)
+                if not m:
+                    continue
+                v = _vtuple(m.group(1))
+                key = (v, not m.group(3))    # a tie goes to the GA id
+                if m.group(2):
+                    lite.append((key, i))
+                elif not floored or v >= (3, 6):
+                    flash.append((key, i))
+            flash = [i for _k, i in sorted(flash, reverse=True)]
+            lite = [i for _k, i in sorted(lite, reverse=True)]
+            # no pro rung: 3.x Pro has no free tier, and its 429 (limit
+            # 0) used to bench the whole provider
+            out = (lite + flash) if quick else flash
+        elif pid == "groq":
+            if vision:
+                return []        # nothing on Groq was seen to read images
+            qw = []
+            for i in ids:
+                m = _QWEN_ID.match(i)
+                if m:
+                    qw.append(((_vtuple(m.group(1)), int(m.group(2))), i))
+            qw = [i for _k, i in sorted(qw, reverse=True)]
+            oss = [i for i in ("openai/gpt-oss-120b", "openai/gpt-oss-20b")
+                   if i in ids]
+            # Qwen holds the council SEAT (Patrick's pick). Everything
+            # else stays on gpt-oss: ~500 tok/s with no thinking wall,
+            # and a long answer is exactly what the free tier's ~1,000
+            # output tokens a minute turns away for Qwen (seen live)
+            out = (qw + oss) if role == "seat" else oss
+        elif pid == "kimi":
+            if vision:
+                return []        # untested: the account is suspended
+            ks = []
+            for i in ids:
+                m = _KIMI_ID.match(i)
+                if m:
+                    ks.append((_vtuple(m.group(1)), i))
+            out = [i for _k, i in sorted(ks, reverse=True)]
+        return list(dict.fromkeys(out))
+    got = ranked(True) or ranked(False)
+    if not got and not vision:
+        # a lineup nothing above parses (a provider renamed its line):
+        # the old substring order is the last resort, never the first
+        for want in CLOUD_PICK_ORDER.get(pid, []):
+            got += [i for i in ids if want in i.lower() and i not in got]
+    return got
 
 
 # ONE MODEL RESTS, NOT THE PROVIDER (6b307). Found live the day these
@@ -1474,15 +1526,18 @@ def cloud_rest_left(pid: str, v: dict) -> int:
     return int(min(ends) - now) if ends else 0
 
 
-def cloud_role_model(pid: str, c: dict, role: str) -> str:
+def cloud_role_model(pid: str, c: dict, role: str, vision: bool = False,
+                     exclude=()) -> str:
     """The model this provider fields for `role` right now: the best
-    ranked one that is neither retired nor resting. Only the top few
-    are considered, so a provider never falls back to something far
-    below its pick; '' when all of them are out."""
+    ranked one that is neither retired, resting nor excluded (a model
+    that just refused, for the rest of that run). Only the top few are
+    considered, so a provider never falls back to something far below
+    its pick; '' when all of them are out."""
     ids = [c.get("model", "")] + list(c.get("models") or [])
-    cands = cloud_candidates(pid, ids, role)[:4] or [c.get("model", "")]
+    cands = cloud_candidates(pid, ids, role, vision)[:4]
     for m in cands:
-        if m and cloud_model_alive(m) and not cloud_model_resting(m):
+        if (m and m not in exclude and cloud_model_alive(m)
+                and not cloud_model_resting(m)):
             return m
     return ""
 
@@ -1491,9 +1546,68 @@ def cloud_role_model(pid: str, c: dict, role: str) -> str:
 # answers, and max_tokens pays for the reasoning too: at the old 4096
 # ceiling a hard question could spend it all thinking, come back empty,
 # and bench a healthy provider. Each value below was sent live first.
-_EFFORT = {"fast": "low", "seat": "medium", "composite": "high"}
+_EFFORT = {"fast": "low", "utility": "low", "seat": "medium",
+           "work": "medium", "code": "medium", "composite": "high"}
+# K3's effort values (low/high/max, no medium) could not be sent live:
+# the account was suspended. Until they are, Kimi keeps its old body,
+# stays off the quick ladders and sits last on the work ladder.
+KIMI_TESTED = False
 CLOUD_MAX_OUT = {"claude": 32000, "gemini": 16000, "groq": 8192,
                  "kimi": 16000}
+
+
+def _img_parts(m: dict) -> list:
+    """(media type, base64) for each image on a user message (6b308):
+    the chat handler keeps the data URLs in image_urls; a bare base64
+    list is sniffed by its first bytes."""
+    out = []
+    for u in m.get("image_urls") or []:
+        mm = re.match(r"data:([\w/+.-]+);base64,(.*)", str(u), re.S)
+        if mm:
+            out.append((mm.group(1), mm.group(2)))
+    if not out:
+        for b in m.get("images") or []:
+            b = str(b)
+            mt = ("image/png" if b.startswith("iVBOR") else
+                  "image/gif" if b.startswith("R0lG") else
+                  "image/webp" if b.startswith("UklGR") else "image/jpeg")
+            out.append((mt, b))
+    return out
+
+
+def _anthropic_turns(messages: list) -> list:
+    turns = []
+    for m in messages:
+        if m.get("role") not in ("user", "assistant"):
+            continue
+        imgs = _img_parts(m) if m.get("role") == "user" else []
+        if imgs:
+            content = [{"type": "image", "source": {
+                "type": "base64", "media_type": mt, "data": b}}
+                for mt, b in imgs]
+            content.append({"type": "text", "text":
+                            m.get("content") or "Describe this image."})
+        else:
+            content = m.get("content", "")
+        turns.append({"role": m["role"], "content": content})
+    return turns
+
+
+def _openai_messages(messages: list) -> list:
+    out = []
+    for m in messages:
+        imgs = _img_parts(m) if m.get("role") == "user" else []
+        if imgs:
+            out.append({"role": "user", "content": [
+                {"type": "text",
+                 "text": m.get("content") or "Describe this image."}] + [
+                {"type": "image_url",
+                 "image_url": {"url": "data:%s;base64,%s" % (mt, b)}}
+                for mt, b in imgs]})
+        else:
+            out.append({"role": m.get("role", "user"),
+                        "content": m.get("content", "")})
+    return out
 
 
 def _anthropic_body(c: dict, turns: list, sys_txt: str, max_tokens: int,
@@ -1529,8 +1643,8 @@ def _openai_body(c: dict, messages: list, max_tokens: int,
                  stream: bool) -> dict:
     base, model = c.get("base", ""), c.get("model", "")
     role = c.get("role") or "seat"
-    body = {"model": model, "messages": messages, "max_tokens": max_tokens,
-            "temperature": 0.75}
+    body = {"model": model, "messages": _openai_messages(messages),
+            "max_tokens": max_tokens, "temperature": 0.75}
     if stream:
         body["stream"] = True
     if "moonshot" in base:
@@ -1546,7 +1660,8 @@ def _openai_body(c: dict, messages: list, max_tokens: int,
         if "-lite" not in model:
             # medium even for the composite: "high" took 70s to say one
             # word and drew 503s under load (both seen live, 6b307)
-            body["reasoning_effort"] = {"fast": "low"}.get(role, "medium")
+            body["reasoning_effort"] = ("low" if role in ("fast", "utility")
+                                        else "medium")
     elif "groq" in base:
         if model.startswith("qwen/"):
             # Qwen thinks in <think> tags unless told to hide them
@@ -1732,18 +1847,14 @@ def cloud_bench() -> list:
     return bench
 
 
-def compositor_ladder() -> list:
-    """Confs to try for the COMPOSITE, strongest first (6b220): Claude,
-    then Kimi K3 (6b245 — frontier-class, 1M context), then Gemini,
-    then Groq, each fielding its ranked best (6b307: Opus 5.5 for
-    Claude, the newest GA Flash for Gemini).
-    Local Gemma 4 stays the no-cloud floor — it was only ever the best
-    LOCAL compositor."""
-    d = _cloud_all()
-    pv = d.get("providers") or {}
-    out = []
+def _cloud_ladder(role: str, order, vision: bool = False) -> list:
+    """Confs for `role`, one per healthy provider in `order`, each
+    fielding its ranked best for that role (6b308). A provider that is
+    resting, out of credit or has every model resting is left out."""
+    pv = _cloud_all().get("providers") or {}
     now = time.time()
-    for pid in ("claude", "kimi", "gemini", "groq"):
+    out = []
+    for pid in order:
         c = pv.get(pid)
         if not (c and c.get("status", "ok") == "ok" and c.get("key")
                 and c.get("base") and c.get("model")):
@@ -1753,49 +1864,99 @@ def compositor_ladder() -> list:
                 continue
         except (TypeError, ValueError):
             pass
-        # the ranked best that is alive and not resting (6b307). The old
-        # Gemini "pro" swap landed on gemini-2.5-pro (restricted since
-        # 2026-09-18); a dead or resting rung wastes a full round trip
-        # on every composite
-        m = cloud_role_model(pid, c, "composite")
-        if not m:
-            continue
-        out.append(dict(c, model=m, role="composite"))
+        m = cloud_role_model(pid, c, role, vision=vision)
+        if m:
+            out.append(dict(c, model=m, role=role))
     return out
 
 
-def fast_cloud_ladder() -> list:
-    """Confs for the FAST single-answer path, QUICKEST first (6b246,
-    per Patrick: 'prefer one fast cloud model over any LLM'). Speed
-    order, deliberately not strength order: Groq's LPUs stream hundreds
-    of tokens a second, Gemini's stored pick is already a flash model,
-    then Kimi, and Claude last — downshifted to its lightest (haiku)
-    when the inventory has one, because Fast is the default tier, fires
-    constantly, and should not burn frontier tokens on quick questions.
-    Unlike the old path (ONE shot at whichever provider was 'active'),
-    every healthy rung gets a try before local silicon."""
-    d = _cloud_all()
-    pv = d.get("providers") or {}
-    now = time.time()
-    out = []
-    for pid in ("groq", "gemini", "kimi", "claude"):
-        c = pv.get(pid)
-        if not (c and c.get("status", "ok") == "ok" and c.get("key")
-                and c.get("base") and c.get("model")):
-            continue
-        try:                       # resting quota = skip, it 429s anyway
-            if float(c.get("cool") or 0) > now:
-                continue
-        except (TypeError, ValueError):
-            pass
-        # each provider's own quick model (6b307): Haiku, Flash-Lite,
-        # gpt-oss at low effort. The Haiku downshift never fired before:
-        # the stored inventory stopped six ids short of it
-        m = cloud_role_model(pid, c, "fast")
-        if not m:
-            continue
-        out.append(dict(c, model=m, role="fast"))
-    return out
+def compositor_ladder() -> list:
+    """Confs for the COMPOSITE (the final written answer), strongest
+    first (6b220): Claude, then Kimi K3 (6b245), then Gemini, then Groq,
+    each at its ranked best: Opus 5.5 at high effort for Claude
+    (Patrick's pick). Local Gemma 4 stays the no-cloud floor."""
+    return _cloud_ladder("composite", ("claude", "kimi", "gemini", "groq"))
+
+
+def work_ladder(role: str = "work", guest: bool = False) -> list:
+    """A single answer where quality is the point (6b308): writing,
+    resumes, exports, funnel verdicts, the remote agent ("work": Opus
+    5.5 at medium), or the Code tab ("code": Sonnet 5 at medium, per
+    Patrick). Groq before Gemini, so a free-tier user keeps Gemini
+    Flash's small daily quota for council seats; Kimi last until its
+    effort values have been tried live."""
+    if guest:
+        # a tunnel guest's question never lands on the owner's
+        # Anthropic bill first, on any lane (found in review, 6b308)
+        order = ("groq", "gemini", "claude") + (("kimi",) if KIMI_TESTED
+                                                else ())
+    else:
+        order = (("claude", "kimi", "groq", "gemini") if KIMI_TESTED
+                 else ("claude", "groq", "gemini", "kimi"))
+    return _cloud_ladder(role, order)
+
+
+def fast_cloud_ladder(guest: bool = False, utility: bool = False) -> list:
+    """The QUICK answer (6b246; Haiku first since 6b308, per Patrick:
+    "fast haiku"). A tunnel guest gets the free providers first, so a
+    visitor's every question never lands on the owner's Anthropic bill.
+    `utility` is for background jobs (titles, memory, map pins, funnel
+    stages): low effort, never Kimi."""
+    order = (("groq", "gemini", "claude") if guest
+             else ("claude", "groq", "gemini"))
+    if KIMI_TESTED and not utility:
+        order += ("kimi",)
+    return _cloud_ladder("utility" if utility else "fast", order)
+
+
+def vision_ladder(tier: str = "", guest: bool = False) -> list:
+    """A pasted image, per Patrick (6b308): Haiku on Fast, Opus 5.5 at
+    medium on Thinking and Cloud Only, Opus 5.5 at high on Pro, with
+    Gemini's Flash line beside it. Only providers whose models were seen
+    to read images; the local vision model is the floor."""
+    role = {"Pro": "composite", "Thinking": "seat",
+            "Cloud Only": "seat"}.get(tier, "fast")
+    order = ("gemini", "claude") if guest else ("claude", "gemini")
+    return _cloud_ladder(role, order, vision=True)
+
+
+def claude_refusal_conf(c: dict):
+    """One more try after a Claude REFUSAL (6b308): the newest Opus of
+    the previous generation. Opus 5.x runs safety classifiers that can
+    stop benign firewall, SSH and VPN work (Patrick's daily work); the
+    generation before was not built with them. A rule, not a name, so
+    it moves along with the lineup. None when there is no such model or
+    the stop was anything but a refusal."""
+    if not c or _provider_of(c) != "claude" or c.get("_stop") != "refusal":
+        return None
+    m0 = _CLAUDE_ID.match(c.get("model", ""))
+    if not m0:
+        return None
+    major = int(m0.group(2))
+    older = []
+    for i in [c.get("model", "")] + list(c.get("models") or []):
+        m = _CLAUDE_ID.match(i)
+        if (m and m.group(1) == "opus" and int(m.group(2)) < major
+                and cloud_model_alive(i) and not cloud_model_resting(i)):
+            older.append(((int(m.group(2)), int(m.group(3) or 0)), i))
+    if not older:
+        return None
+    return dict(c, model=max(older)[1], _stop="")
+
+
+# WHO WROTE THE ANSWER (6b308): the conf that streamed the final answer
+# on this request's thread. Titles, memory and map pins then use THAT
+# provider's quick model, so a chat's words never reach a second
+# company, and a chat answered on this Mac never leaves it.
+_answered = {}
+_last_cloud = {}          # user key -> (conf, time) for /api/title
+
+
+def _mark_answered(c: dict):
+    try:
+        _answered[threading.get_ident()] = dict(c)
+    except Exception:
+        pass
 
 
 _bal_cache = {}   # pid -> (expires_ts, text)
@@ -1904,6 +2065,8 @@ def cloud_stream_conf(c: dict, messages: list, emit) -> bool:
             return False
         got = True
         _flush()
+    if got:
+        _mark_answered(c)
     return got
 
 
@@ -2464,6 +2627,12 @@ SHOW_AGENTS = False
 # The CODE tab owns the two code specialists (5.2, per Patrick: "pull
 # coding from agents and make it into a 3rd tab"); Agents keeps the rest.
 CODE_AGENTS = ("Coding", "Workspace", "Remote")
+# THE CLOUD ROLE EACH LANE ANSWERS IN (6b308, per Patrick: "selecting the
+# ideal model for different tasks"). Research and Remote run their own
+# flows; anything not listed is the quick answer.
+LANE_ROLE = {"Coding": "code", "Workspace": "code", "Math & Logic": "work",
+             "Writing": "work", "Resumes": "work",
+             "Hermes": "fast", "Mnemosyne": "fast"}
 
 
 def build_agent_rows() -> str:
@@ -3604,9 +3773,29 @@ TITLE_PROMPT = (
     "its topic.\n\nMESSAGE: ")
 
 
-def make_title(text: str) -> str:
+def _clean_title(raw: str) -> str:
+    title = " ".join(strip_think(strip_special(raw or "")).split())
+    title = title.split("\n")[0]
+    title = re.sub(r"^(topic|title)\s*:?\s*", "", title, flags=re.I)
+    title = title.strip("\"'*#\u2014- .")
+    return title if 2 < len(title) < 70 and not _looks_degenerate(title) \
+        else ""
+
+
+def make_title(text: str, conf=None) -> str:
     """Name a chat with a small model — reusing whatever engine is already
-    loaded, so it costs almost nothing."""
+    loaded, so it costs almost nothing. A chat the cloud answered is
+    named by that provider's quick model instead (6b308): a keys-only
+    user finally gets titles, and nothing new leaves the Mac."""
+    if conf:
+        m = cloud_role_model(_provider_of(conf), conf, "utility")
+        if m:
+            t = _clean_title(cloud_text(
+                dict(conf, model=m, role="utility"),
+                [{"role": "user", "content": TITLE_PROMPT + text[:600]}],
+                timeout=15, max_tokens=300, quiet=True))
+            if t:
+                return t
     pulled = ollama_pulled_tags() or set()
     usable = [l for l in MODEL_ROUTES
               if model_cached(l, pulled) and model_fits_memory(l)]
@@ -4184,6 +4373,12 @@ def _studio_install_worker(key: str, tid: str):
                 py = sys.executable
             subprocess.run([py, "-m", "venv", st["venv"]], check=True,
                            timeout=300, capture_output=True)
+            # marked FROM THE START (6b308): fresh while pip runs, so no
+            # instance's sweep takes it; a killed install ages out
+            try:
+                open(os.path.join(st["venv"], STUDIO_FAIL_MARK), "w").close()
+            except OSError:
+                pass
             subprocess.run([os.path.join(st["venv"], "bin", "pip"), "install",
                             "--quiet", "--upgrade", "pip"],
                            timeout=300, capture_output=True)
@@ -4193,6 +4388,11 @@ def _studio_install_worker(key: str, tid: str):
             if r.returncode != 0 or not _studio_engine_ok(key):
                 raise RuntimeError("engine install failed: "
                                    + (r.stderr or "")[-160:])
+        # a good engine clears the failed-install mark (6b307)
+        try:
+            os.remove(os.path.join(st["venv"], STUDIO_FAIL_MARK))
+        except OSError:
+            pass
         with _setup_lock:
             _setup_jobs[row]["note"] = ""
         if not _studio_model_ok(key, tid):
@@ -4211,8 +4411,20 @@ def _studio_install_worker(key: str, tid: str):
         with _setup_lock:
             _setup_jobs[row] = {"status": "error", "note": str(exc)[:200],
                                 "pct": 0}
+        # MARK A HALF-BUILT ENGINE (6b307): a failed pip run leaves GBs of
+        # venv behind that nothing would ever use. The mark is how the
+        # leftover sweep tells it from a working install; a retry that
+        # succeeds removes it.
+        try:
+            if os.path.isdir(st["venv"]) and not _studio_engine_ok(key):
+                open(os.path.join(st["venv"], STUDIO_FAIL_MARK), "w").close()
+        except OSError:
+            pass
     finally:
         _studio_bytes_forget(key)
+
+
+STUDIO_FAIL_MARK = ".concorde-install-failed"
 
 
 def start_studio_install(key: str, tid: str = "") -> bool:
@@ -4782,14 +4994,17 @@ def generate_image(prompt: str, over: dict = None, sock=None) -> tuple:
         # gemini-2.5-flash-image shuts down 2026-10-02 (6b307)
         for mdl in ("gemini-3.1-flash-lite-image", "gemini-3.1-flash-image"):
             try:
+                # the key rides in a header (6b308): in the URL it could
+                # surface in an error message
                 req = urllib.request.Request(
                     "https://generativelanguage.googleapis.com/v1beta/models/"
-                    "%s:generateContent?key=%s" % (mdl, gem["key"]),
+                    "%s:generateContent" % mdl,
                     data=json.dumps({
                         "contents": [{"parts": [{"text": prompt}]}],
                         "generationConfig": {"responseModalities": ["IMAGE"]}
                     }).encode(),
                     headers={"Content-Type": "application/json",
+                             "x-goog-api-key": gem["key"],
                              "User-Agent": "MillenAI/%s" % APP_VERSION})
                 with urllib.request.urlopen(req, timeout=120) as r:
                     d = json.loads(r.read().decode("utf-8", "replace"))
@@ -5912,8 +6127,10 @@ def _veo_video(prompt: str) -> str:
     key = gem["key"]
     base = "https://generativelanguage.googleapis.com/v1beta/"
     last = ""
-    for mdl in ("veo-3.1-fast-generate-preview", "veo-3.1-lite-generate-preview",
-                "veo-3.1-generate-preview"):
+    # standard Veo costs 4x Fast ($3.20 an 8 s clip) and is never a
+    # silent fallback (6b308)
+    for mdl in ("veo-3.1-fast-generate-preview",
+                "veo-3.1-lite-generate-preview"):
         try:
             req = urllib.request.Request(
                 base + "models/%s:predictLongRunning?key=%s" % (mdl, key),
@@ -6488,13 +6705,23 @@ def memory_text(base=None) -> str:
     return "\n".join("- " + i["fact"] for i in _load_memory(base)[-40:])
 
 
-def _extract_memory(label: str, user_msg: str, base=None):
+def _extract_memory(label: str, user_msg: str, base=None, conf=None):
     try:
-        parts = []
-        run_model(label, [{"role": "user",
-                           "content": MEMORY_PROMPT + user_msg[:2000]}],
-                  parts.append)
-        out = "".join(parts)
+        ask = [{"role": "user", "content": MEMORY_PROMPT + user_msg[:2000]}]
+        if conf:
+            # the provider that answered, on its quick model, quietly: a
+            # background job never rests the reader's next model (6b308)
+            m = cloud_role_model(_provider_of(conf), conf, "utility")
+            if not m:
+                return
+            out = cloud_text(dict(conf, model=m, role="utility"), ask,
+                             timeout=30, max_tokens=600, quiet=True)
+        else:
+            if not label:
+                return
+            parts = []
+            run_model(label, ask, parts.append)
+            out = "".join(parts)
         facts = [ln.strip()[2:].strip() for ln in out.splitlines()
                  if ln.strip().startswith("- ")]
         facts = [f for f in facts
@@ -7122,18 +7349,21 @@ def _auto_cleanup_pass(manual=False) -> list:
     ANY model download is in flight (the process can vanish or a dir
     can be mid-write); skips a model whose engine is resident."""
     try:
-        # manual == the Clean-now button (6b268, per Patrick): the
-        # user is asking RIGHT NOW, so the standing pref doesn't
-        # gate it, and the list they were shown is the whole list.
-        # Every safety guard below still applies.
-        if not manual and not auto_cleanup_on():
-            return []
         if _update.get("state") not in (None, "", "idle", "error"):
             return []
         with _setup_lock:
             if any((j or {}).get("status") in ("downloading", "queued")
                    for j in _setup_jobs.values()):
                 return []
+        # every cleanup clears failed-download leftovers first (6b307),
+        # whatever the switch says: none of it is a usable model
+        _sweep_leftovers()
+        # manual == the Clean-now button (6b268, per Patrick): the
+        # user is asking RIGHT NOW, so the standing pref doesn't
+        # gate it, and the list they were shown is the whole list.
+        # Every safety guard below still applies.
+        if not manual and not auto_cleanup_on():
+            return []
         plan = {u["old"]: u for u in model_updates()}
         targets = [l for l in superseded_installed(auto=not manual)
                    if not _resident(l)]
@@ -7222,6 +7452,10 @@ def _model_update_worker(plan: list, news: list):
             if pending:
                 time.sleep(3)
         _modup["failed"] += [u["old"] for u in pending]
+        try:
+            _sweep_leftovers()      # a failed replacement leaves pieces
+        except Exception:
+            pass
         _modup["state"] = "partial" if _modup["failed"] else "done"
     except Exception:
         _modup["state"] = "error"
@@ -8990,6 +9224,12 @@ def run_cloud_only(messages: list, emit, status, step) -> None:
     # next, and only report a problem once every single one is gone.
     if len(bench) == 1:
         lbl, c = bench[0]
+        # one provider's stream IS the final answer: it writes at the
+        # final answer's effort, Opus 5.5 high for Claude (6b308)
+        _pid = _provider_of(c)
+        _cm = cloud_role_model(_pid, c, "composite")
+        if _cm:
+            c = dict(c, model=_cm, role="composite")
         status("%s · cloud" % lbl)
         step("draft", "Drafting the answer", "run", lbl)
         try:
@@ -9002,8 +9242,13 @@ def run_cloud_only(messages: list, emit, status, step) -> None:
         # streaming failed — one non-streaming retry before giving up,
         # on whichever model the provider fields NOW (the one that just
         # failed is resting), and not at all after a refusal (6b307)
+        _rc = claude_refusal_conf(c)
+        if _rc and cloud_stream_conf(_rc, messages, emit):
+            step("draft", "Drafted the answer", "done", lbl)
+            return
         _m2 = ("" if c.get("_stop") == "refusal"
-               else cloud_role_model(_provider_of(c), c, "seat"))
+               else cloud_role_model(_pid, c, "composite",
+                                     exclude=(c.get("model"),)))
         text = strip_think(cloud_text(dict(c, model=_m2), messages)) \
             if _m2 else ""
         if text:
@@ -9068,7 +9313,7 @@ def _cloud_all_down() -> str:
 
 def run_council(labels: list, messages: list, emit, status,
                 reflect: bool = False, peer: bool = False,
-                cloud_only: bool = False,
+                cloud_only: bool = False, guest: bool = False,
                 bench_allow=None, comp: str = "",
                 hurry=None) -> None:
     """Ask each selected model in turn, then stream a merged answer.
@@ -9176,7 +9421,8 @@ def run_council(labels: list, messages: list, emit, status,
                 try:
                     # inside the council's 75 s shared deadline (6b307),
                     # so a stalled seat is rested before the merge
-                    t = strip_think(cloud_text(conf, messages, timeout=70))
+                    t = strip_think(cloud_text(conf, messages, timeout=70,
+                                               timeout_rests=False))
                 except Exception:
                     t = ""
                     cloud_glitch(conf, "not responding")
@@ -9461,26 +9707,39 @@ def run_council(labels: list, messages: list, emit, status,
     # local-merger floor below still catches everything.
     _hurry_fast = _hurried() and len(good) >= 2
     if _hurry_fast and not _comp_cloud:
-        _fast = fast_cloud_ladder()
+        _fast = fast_cloud_ladder(guest=guest)
         if _fast:
             _ladder = _fast
+    def _walk_ladder() -> bool:
+        for _cc in _ladder:
+            run_mark(compositor=_cc.get("model") or _cc.get("name", ""))
+            if _stream_composite(_cc):
+                return True
+            # a refusal gets one more Claude try before the next provider
+            _rc = claude_refusal_conf(_cc)
+            if _rc:
+                run_mark(compositor=_rc["model"])
+                if _stream_composite(_rc):
+                    return True
+        return False
     if cloud_only:
         # every rung here is a cloud one, and if they all fail the
         # strongest draft ships as it stands — a local merge would break
         # the one promise this tier makes
-        for _cc in _ladder:
-            run_mark(compositor=_cc.get("model") or _cc.get("name", ""))
-            if _stream_composite(_cc):
-                return
+        if _walk_ladder():
+            return
         emit(good[0][1])
         return
+    # the cloud writes the merge only when cloud power is on or the run
+    # named its clouds (6b308): a hurried merge used to reach the cloud
+    # with the switch off
+    _cloud_ok = bool(load_prefs(None).get("turbo")) or bool(bench_allow)
     if comp in MODEL_ROUTES:
         pass          # the user chose a LOCAL pen — no cloud ladder
-    elif _comp_cloud or _hurry_fast or load_prefs(None).get("turbo"):
-        for _cc in _ladder:
-            run_mark(compositor=_cc.get("model") or _cc.get("name", ""))
-            if _stream_composite(_cc):
-                return
+    elif _comp_cloud or (_hurry_fast and _cloud_ok) or \
+            load_prefs(None).get("turbo"):
+        if _walk_ladder():
+            return
     run_mark(compositor=merger)
     try:
         _stream_guarded(merger, synth, emit, status, good[0][1],
@@ -9918,9 +10177,13 @@ def remote_driver():
     """Who plans the commands: the strongest CLOUD brain when a key is
     active (agentic multi-step work needs it), else the strongest local
     coding model. Returns ('cloud', conf) or ('local', label) or None."""
-    ladder = compositor_ladder()      # claude, kimi, gemini, groq
-    if ladder:
-        return ("cloud", ladder[0])
+    # follows the cloud-power switch like every other path (6b308, per
+    # Patrick); a step is an intermediate turn, so it drives at the work
+    # effort (Opus 5.5 medium), not the final answer's
+    if load_prefs(None).get("turbo"):
+        ladder = work_ladder("work")
+        if ladder:
+            return ("cloud", ladder[0])
     pulled = ollama_pulled_tags() or set()
     for l in ("Qwen 3.8 27B", "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Gemma 4 26B", "Qwen 3.5 9B", "Gemma 4 12B", "Llama 3.2 3B"):
         if l in MODEL_ROUTES and model_cached(l, pulled) \
@@ -10076,6 +10339,13 @@ def run_remote_agent(messages, conf, autonomy, emit, status, step,
     returns True/False; the caller wires it to the approval channel."""
     driver = remote_driver()
     if not driver:
+        if (not load_prefs(None).get("turbo")
+                and work_ladder("work")):
+            emit("Cloud power is off, so your cloud key can't drive the "
+                 "remote agent. Turn on **Use cloud power** under "
+                 "**Settings › Cloud power**, or install a coding model "
+                 "in Settings.")
+            return
         emit("No model is available to drive the remote agent. Install a "
              "coding model in Settings, or add a cloud key.")
         return
@@ -10108,6 +10378,16 @@ def run_remote_agent(messages, conf, autonomy, emit, status, step,
             act = _parse_action(text)
             if act or text.strip():
                 break
+            # A REFUSAL IS NOT A RATE LIMIT (6b308): Opus 5.x can decline
+            # firewall and SSH work, which is this agent's whole job. The
+            # previous Opus generation takes over for the rest of the run,
+            # with no backoff sleep.
+            if driver[0] == "cloud":
+                _rc = claude_refusal_conf(driver[1])
+                if _rc:
+                    driver = ("cloud", _rc)
+                    driver_name = _rc.get("name", "cloud")
+                    continue
             # THE OTHER CAUSE IS A 429 (6b255, found live driving a real
             # upgrade): cloud_text swallows a rate limit as "", and the
             # old 1.5s-4.5s backoff gave up long before the window
@@ -10745,7 +11025,7 @@ def _stage_ok(data, asked, opts) -> bool:
 
 
 def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
-                 asked=None):
+                 asked=None, effort="normal"):
     """One stage: a question plus `opts` options, as structured data.
 
     `asked` is every question already put to the user. Without it the
@@ -10799,10 +11079,16 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
     # quota-resting, so every stage silently fell to a 4-bit local
     # model that shrugged at the axis rules. One resting provider must
     # cost one rung, not the whole funnel.
+    # THE USER PICKS THE EFFORT (6b308, per Patrick: "two radio buttons
+    # where the user can click either fast or normal"). Fast: the quick
+    # model (Haiku first), 1-2 s a stage; Normal: the work model (Opus
+    # 5.5 at medium). Either way a stage that fails the gate below gets
+    # one more pass on the work model.
     if load_prefs(None).get("turbo"):
-        for _conf in (compositor_ladder() or
-                      ([cloud_conf()] if cloud_conf() else [])):
-            raw = cloud_text(_conf, msgs, timeout=120)
+        for _conf in (fast_cloud_ladder(utility=True) if effort == "fast"
+                      else work_ladder("work")):
+            raw = cloud_text(_conf, msgs, timeout=60 if effort == "fast"
+                             else 120)
             if raw:
                 engine = str(_conf.get("model") or "cloud")
                 break
@@ -10833,7 +11119,7 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
     if ((not out or not _stage_ok(data, asked, opts))
             and load_prefs(None).get("turbo")):
         out = []
-        for _conf in compositor_ladder():
+        for _conf in work_ladder("work"):
             raw2 = cloud_text(_conf, msgs, timeout=120)
             m2 = re.search(r"\{[\s\S]*\}", raw2 or "")
             if not m2:
@@ -12597,6 +12883,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._send_json({"ok": True})
             return
         if self.path == "/api/funnel":
+            # funnels spend the OWNER's keys on every stage (6b308): a
+            # tunnel guest gets the answer engine, not a key meter
+            _fu = self._uid()
+            if self._remote() and not (_fu and _fu == owner_uid()):
+                self._send_json({"err": "Funnels run on the owner's "
+                                        "machine only."})
+                return
             n = int(self.headers.get("Content-Length", 0) or 0)
             try:
                 d = json.loads(self.rfile.read(n)) if n else {}
@@ -12612,6 +12905,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             total = max(1, min(20, int(d.get("stages", 5) or 5)))
             want_img = bool(d.get("images"))
             asked = [str(x)[:160] for x in (d.get("asked") or [])][:20]
+            effort = "fast" if d.get("effort") == "fast" else "normal"
             stage = len(picks) + 1
             if stage > total:
                 # the funnel is spent — summarise the path taken
@@ -12665,10 +12959,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          % (goal, reqs or "none", "; ".join(picks),
                             "; ".join(asked) or "not recorded")}]
                 out = ""
+                # the verdict is a draft the audit below checks, so it
+                # writes at the work effort; the audit is the final word
                 if load_prefs(None).get("turbo"):
-                    for _conf in (compositor_ladder() or
-                                  ([cloud_conf()] if cloud_conf()
-                                   else [])):
+                    for _conf in work_ladder("work"):
                         out = cloud_text(_conf, msgs, timeout=120)
                         if out:
                             break
@@ -12746,6 +13040,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         _fix = cloud_text(_conf, _audit, timeout=120)
                         if _fix:
                             break
+                        _rc = claude_refusal_conf(_conf)
+                        if _rc:
+                            _fix = cloud_text(_rc, _audit, timeout=120)
+                            if _fix:
+                                break
                     _fix = (_fix or "").strip()
                     # the audit's working lines stay private: only a
                     # VERDICT: block replaces the answer; a bare OK
@@ -12774,7 +13073,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                      "finish the funnel again.")})
                 return
             st = funnel_stage(goal, reqs, opts, stage, total, picks,
-                              want_img, asked)
+                              want_img, asked, effort=effort)
             self._send_json({"done": False, "stage": stage,
                              "total": total, "q": st["q"],
                              "options": st["options"],
@@ -12838,7 +13137,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 txt = json.loads(self.rfile.read(n)).get("text", "")
             except (ValueError, json.JSONDecodeError):
                 txt = ""
-            self._send_json({"title": make_title(txt) if txt else ""})
+            # a chat the cloud just answered is named by that provider's
+            # quick model (6b308); anything else stays on this Mac
+            _lc = _last_cloud.get(str(self._data_base()))
+            _conf = (_lc[0] if _lc and time.time() - _lc[1] < 300
+                     and load_prefs(None).get("turbo") else None)
+            self._send_json({"title": make_title(txt, conf=_conf)
+                             if txt else ""})
             return
         if self.path == "/api/open-logs":
             subprocess.Popen(
@@ -13060,6 +13365,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         auto_web = req_json.get("auto_web", True)
         # a tier resolves to its own line-up; otherwise honour explicit picks
         tier = req_json.get("tier") or ""
+        req_tier = tier               # before a picture resets it (6b308)
+        _answered.pop(threading.get_ident(), None)
+        # a new question voids the last one's "who answered": the title
+        # of a chat answered on this Mac must never go to the cloud
+        _last_cloud.pop(str(self._data_base()), None)
         if tier == "Smart":
             tier = "Fast"   # merged tiers (1.20) — old clients still send Smart
         if tier == "Best":
@@ -13254,6 +13564,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if not str(vm.get("content", "")).strip():
                 vm["content"] = "Describe this image in useful detail."
             vm["images"] = b64s
+            vm["image_urls"] = images     # media types, for the cloud (6b308)
             messages = messages[:-1] + [vm] if messages else [vm]
             council = ["Qwen 3.5 Vision 9B"]
             model_name = "Qwen 3.5 Vision 9B"
@@ -14218,10 +14529,38 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     pass
 
         kind, target = route
+        # PASTED IMAGES GO TO THE CLOUD WHEN CLOUD POWER IS ON (6b308, per
+        # Patrick): Haiku on Fast, Opus 5.5 on Thinking/Pro/Cloud Only,
+        # Gemini Flash beside it; the local vision model is the floor.
+        _vis_cloud = []
+        if images and (cloud_only or load_prefs(None).get("turbo")
+                       or req_cloud):
+            _vis_cloud = vision_ladder("Cloud Only" if cloud_only
+                                       else req_tier, guest=self._remote())
+            if req_cloud is not None:
+                _vis_cloud = [c for c in _vis_cloud
+                              if _provider_of(c) in req_cloud]
+        _vis_local = bool(images) and model_cached(
+            "Qwen 3.5 Vision 9B", ollama_pulled_tags() or set())
+
+        def _cloud_vision() -> bool:
+            for _vc in _vis_cloud:
+                status("cloud power \u2014 " + _vc.get("name", "cloud"))
+                if cloud_stream_conf(_vc, full_messages, emit):
+                    return True
+                _rc = claude_refusal_conf(_vc)
+                if _rc and cloud_stream_conf(_rc, full_messages, emit):
+                    return True
+            if cloud_only or not _vis_local:
+                emit("The cloud couldn\u2019t read that image just now"
+                     + ("" if cloud_only else
+                        ", and the local vision engine isn\u2019t installed "
+                        "yet (it downloads from **Settings \u203a Models**)")
+                     + ". Try again in a moment.")
+            return cloud_only or not _vis_local
         # first image before the vision engine exists: kick the download
         # and say so, instead of a cryptic connection error
-        if images and not model_cached("Qwen 3.5 Vision 9B",
-                                       ollama_pulled_tags() or set()):
+        if images and not cloud_only and not _vis_cloud and not _vis_local:
             try:
                 start_model_downloads(["Qwen 3.5 Vision 9B"])
                 emit("Getting the vision engine ready (about 6.6 GB) — "
@@ -14233,12 +14572,27 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             hb_stop.set()
             return
         try:
-            if cloud_only and images:
-                # the cloud path sends text only, so an image would be
-                # silently ignored — say so instead of answering blind
-                emit("☁️ **Cloud Only** doesn't read images yet — it "
-                     "sends text alone. Switch to Fast, Thinking or Pro "
-                     "and the local vision engine will look at it.")
+            if images and _vis_cloud and _cloud_vision():
+                pass          # a cloud model read the picture (6b308)
+            elif cloud_only and images:
+                # no vision rung right now: a key that is only resting is
+                # not "add a key" (found in review, 6b308)
+                _pv = _cloud_all().get("providers") or {}
+                _vk = [(p, _pv[p]) for p in ("claude", "gemini")
+                       if (_pv.get(p) or {}).get("key")
+                       and (_pv.get(p) or {}).get("status", "ok") == "ok"]
+                if _vk:
+                    _mins = max(1, min(cloud_rest_left(p, v)
+                                       for p, v in _vk) // 60)
+                    emit("☁️ **Cloud Only**: the providers that read "
+                         "images are busy or resting — try again in "
+                         "about %d minute%s." % (_mins,
+                                                 "" if _mins == 1 else "s"))
+                else:
+                    emit("☁️ **Cloud Only** reads images with a Claude or "
+                         "Gemini key. Add one under **Settings › Cloud "
+                         "power**, or switch to Fast, Thinking or Pro and "
+                         "the local vision engine will look at it.")
             elif cloud_only:
                 run_cloud_only(full_messages, emit, status, step)
             elif ag_remote:
@@ -14281,7 +14635,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             reflect=(tier == "Thinking"),
                             peer=(tier == "Pro"),
                             bench_allow=req_cloud, comp=req_comp,
-                            hurry=hurry_ev)
+                            hurry=hurry_ev, guest=self._remote())
             else:
                 lbl = route_label or model_name
                 # cloud is a pref, not a tier (Best retired in 5.3).
@@ -14292,7 +14646,19 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # list narrows the ladder (6b248) — and engages it even
                 # with the turbo pref off, because naming providers IS
                 # the opt-in; an empty list means none at all.
-                _fl = fast_cloud_ladder() if not images else []
+                # THE LANE PICKS THE ROLE (6b308): the Code tab answers on
+                # Sonnet 5 at medium, writing/resumes/exports on Opus 5.5
+                # at medium, everything else on the quick ladder (Haiku
+                # first; free providers first for a tunnel guest)
+                _lane = LANE_ROLE.get(agent_name, "")
+                if images:
+                    _fl = []       # pictures went to the vision ladder
+                elif _lane == "code":
+                    _fl = work_ladder("code", guest=self._remote())
+                elif export_req or _lane == "work":
+                    _fl = work_ladder("work", guest=self._remote())
+                else:
+                    _fl = fast_cloud_ladder(guest=self._remote())
                 if req_cloud is not None:
                     _fl = [c for c in _fl
                            if _provider_of(c) in req_cloud]
@@ -14320,6 +14686,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         status("cloud power \u2014 " + _nm)
                         _run_lbl([_nm])
                         if cloud_stream_conf(_fc, full_messages, emit):
+                            hb_stop.set()
+                            return
+                        # a refusal gets one more Claude try (6b308)
+                        _rc = claude_refusal_conf(_fc)
+                        if _rc and cloud_stream_conf(_rc, full_messages,
+                                                     emit):
                             hb_stop.set()
                             return
                     status("cloud power unavailable — running locally")
@@ -14430,6 +14802,18 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # arriving after this harmlessly answers ok:false (6b257)
             with _hurry_lock:
                 _hurry_jobs.pop(hurry_id, None)
+            # which provider wrote this answer, if any (6b308): titles,
+            # memory and map pins go back to it and nowhere else
+            _ans_conf = _answered.pop(threading.get_ident(), None)
+            if _ans_conf:
+                _last_cloud[str(user_base)] = (_ans_conf, time.time())
+                # the badge under the answer says "cloud", whatever the
+                # line-up said up front (a picture Claude read, 6b308)
+                try:
+                    _write((NUL + "RUN:" + json.dumps({"w": "cloud"})
+                            + NUL).encode("utf-8"))
+                except Exception:
+                    pass
             # THE MODULE MUST NOT DEPEND ON THE BIG MODEL REMEMBERING a
             # trailer (it forgets ~half the time, and doesn't always
             # bold names either — both seen live). A tiny model reads
@@ -14468,22 +14852,33 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         pass
                 elif (query and sent[0] > 120
                         and (placey or bookish) and not images
-                        and not cloud_only):   # pinning runs a local model
+                        and (_ans_conf or not cloud_only)):
                     step("places", "Finding the places", "run", "")
                     ans = "".join(answer_buf)[-2400:]
+                    _pin_ask = [
+                        {"role": "user", "content":
+                         "From the text below, list the real venue "
+                         "names it recommends (bars, restaurants, "
+                         "cafes, shops). Output ONLY a JSON array of "
+                         "strings, max 4, nothing else. If there are "
+                         "none, output [].\n\nTEXT:\n" + ans}]
                     # the model that JUST answered is already resident —
-                    # reaching for the 1B would swap engines and evict it
+                    # reaching for the 1B would swap engines and evict it.
+                    # A cloud answer is pinned by that provider's quick
+                    # model instead of loading a big local one (6b308)
                     small = route_label or model_name
-                    if small:
+                    _pm = (cloud_role_model(_provider_of(_ans_conf),
+                                            _ans_conf, "utility")
+                           if _ans_conf else "")
+                    if _pm or small:
                         got2 = []
-                        run_model(small, [
-                            {"role": "user", "content":
-                             "From the text below, list the real venue "
-                             "names it recommends (bars, restaurants, "
-                             "cafes, shops). Output ONLY a JSON array of "
-                             "strings, max 4, nothing else. If there are "
-                             "none, output [].\n\nTEXT:\n" + ans}],
-                            got2.append)
+                        if _pm:
+                            got2.append(cloud_text(
+                                dict(_ans_conf, model=_pm, role="utility"),
+                                _pin_ask, timeout=20, max_tokens=400,
+                                quiet=True))
+                        elif not cloud_only:
+                            run_model(small, _pin_ask, got2.append)
                         raw2 = strip_think("".join(got2))
                         m2 = re.search(r"\[[^\[\]]*\]", raw2, re.S)
                         names = []
@@ -14536,12 +14931,16 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 pass
             plain = prompt[8:] if prompt.lower().startswith("/search") \
                 else prompt
-            # the memory pass is a local model reading the question, so
-            # Cloud Only skips it too — nothing runs here means nothing
-            if plain and len(plain) > 12 and not cloud_only:
+            # the memory pass reads the question. A cloud answer is read by
+            # that same provider's quick model, so a keys-only user builds
+            # memory too and the words reach no second company (6b308); a
+            # local answer stays local, and Cloud Only never runs locally
+            if plain and len(plain) > 12 and (_ans_conf or not cloud_only):
                 threading.Thread(
                     target=_extract_memory,
-                    args=(route_label or council[0], plain, user_base),
+                    args=(route_label or (council[0] if council else ""),
+                          plain, user_base),
+                    kwargs={"conf": _ans_conf},
                     daemon=True).start()
 
 
@@ -14699,7 +15098,8 @@ body.resizing{cursor:col-resize;user-select:none}
   font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;
   color:#fff;background:#4a7fd4;border-radius:8px;padding:5px 9px;
   cursor:pointer;font-weight:700;
-  flex:1 0 100%;text-align:left;
+  display:block;box-sizing:border-box;width:100%;margin-top:6px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;
   animation:updatePulse 2.6s ease-in-out infinite;
 }
 #models-flag:hover{text-decoration:underline}
@@ -14711,8 +15111,8 @@ body.resizing{cursor:col-resize;user-select:none}
   font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;
   color:#111;background:#f2f2f2;text-decoration:none;
   border:none;border-radius:8px;
-  padding:7px 10px;font-weight:700;flex:1 0 100%;
-  display:flex;align-items:center;gap:6px;margin-top:4px;
+  padding:7px 10px;font-weight:700;box-sizing:border-box;width:100%;
+  display:flex;align-items:center;gap:6px;margin-top:6px;
   box-shadow:0 6px 20px -10px rgba(255,255,255,.55);
   transition:background .18s,transform .18s,box-shadow .25s;
 }
@@ -14933,6 +15333,21 @@ body.resizing{cursor:col-resize;user-select:none}
 #funnel-wrap .fgrid{display:grid;grid-template-columns:1fr 1fr 1fr;
   gap:8px;align-items:end}
 #funnel-wrap .fgrid .fq{flex-direction:column;align-items:stretch;gap:5px}
+/* the effort pair (6b308): two radios drawn as one pill, like the
+   Chat / Code / Funnels switch above */
+#funnel-wrap .fq .hint{margin-left:auto}
+.fseg{display:grid;grid-template-columns:1fr 1fr;gap:2px;padding:2px;
+  background:rgba(255,255,255,.04);border:1px solid var(--line);
+  border-radius:8px}
+.fseg label{position:relative;cursor:pointer;margin:0}
+#funnel-wrap .fseg input{position:absolute;opacity:0;width:1px;height:1px;
+  pointer-events:none}
+.fseg span{display:block;text-align:center;font:12px var(--sans);
+  color:var(--dim);padding:6px 0;border-radius:6px;
+  transition:background .15s,color .15s}
+.fseg label:hover span{color:var(--text)}
+.fseg input:checked+span{background:rgba(255,255,255,.12);color:var(--text)}
+.fseg input:focus-visible+span{outline:1px solid rgba(255,255,255,.35)}
 .fstage{margin:0 0 14px}
 .fstage .fsq{font-size:15px;color:#fff;font-weight:600;margin-bottom:10px}
 .fopts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
@@ -17382,11 +17797,14 @@ body.gen #chip-model{color:var(--accent)}
     </button>
     
     <div id="update-flag" hidden title="Install the update"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg></div>
+    </div>
+    <!-- 6b308, per Patrick: the chips sit on their OWN line under the
+         header. Inside the one-row header their full-width rule ran them
+         past the sidebar and squeezed the wordmark to nothing. -->
     <div id="models-flag" hidden
          title="More models fit this machine">MODELS AVAILABLE</div>
     <a id="get-app" hidden target="_blank" rel="noopener">DOWNLOAD NOW<i
       title="The desktop version runs on your own computer — faster, private, and it works offline.">i</i></a>
-    </div>
   </div>
 
 
@@ -17426,6 +17844,13 @@ body.gen #chip-model{color:var(--accent)}
         <option>5</option><option>6</option></select></label>
       <label class="fq">Stages<input id="fn-stages" type="number"
         min="1" max="20" value="5"></label>
+    </div>
+    <!-- 6b308, per Patrick: "two radio buttons where the user can click
+         either fast or normal for effort" -->
+    <div class="fq">Effort<i class="hint" title="With cloud power on — Fast: each question in a second or two on a quick model. Normal: a stronger model, a few seconds per question. The final recommendation is checked by the strongest model either way. With it off, this Mac answers every step.">i</i></div>
+    <div id="fn-effort" class="fseg" role="radiogroup" aria-label="Effort">
+      <label><input type="radio" name="fn-eff" value="fast"><span>Fast</span></label>
+      <label><input type="radio" name="fn-eff" value="normal" checked><span>Normal</span></label>
     </div>
     <button class="about-btn slim" id="fn-go">Start funnel</button>
   </div>
@@ -19748,6 +20173,8 @@ async function send(){
       // pull progress markers out so they never land in the answer
       full=raw.replace(/\u0000RUN:(.*?)\u0000/g,(_,j)=>{
                 try{const d=JSON.parse(j);
+                  if(d.w==="cloud"&&!/cloud/.test(lastModels))
+                    lastModels=(lastModels+" cloud").trim();
                   if(d.c!==undefined)setWho("Compositor: "+d.c);
                   else if(d.r)setWho(d.r.length
                     ?"Running\u2026 "+d.r.join(", "):"Running\u2026");
@@ -20844,9 +21271,11 @@ async function fnStep(){
 $("#fn-go").addEventListener("click",()=>{
   const goal=$("#fn-goal").value.trim();
   if(!goal){$("#fn-goal").focus();return;}
+  const eff=(document.querySelector('input[name="fn-eff"]:checked')||{}).value;
   fnState={goal:goal,reqs:$("#fn-reqs").value.trim(),
     opts:+$("#fn-opts").value,stages:+$("#fn-stages").value,
-    images:$("#fn-type").value==="images",picks:[],asked:[]};
+    images:$("#fn-type").value==="images",picks:[],asked:[],
+    effort:eff==="fast"?"fast":"normal"};
   curChat=null;messages=[];inner.innerHTML="";
   addMsg("user","Funnel: "+goal);
   messages.push({role:"user",content:"Funnel: "+goal});
@@ -20854,6 +21283,20 @@ $("#fn-go").addEventListener("click",()=>{
   fnState.chat=curChat;             // the funnel belongs to THIS chat
   fnStep();
 });
+
+/* the funnel effort is remembered (6b308) */
+(async()=>{try{
+  const pr=await(await fetch("/api/prefs")).json();
+  const r=document.querySelector('input[name="fn-eff"][value="'
+    +(pr.funnel_effort==="fast"?"fast":"normal")+'"]');
+  if(r)r.checked=true;
+}catch(e){}})();
+document.querySelectorAll('input[name="fn-eff"]').forEach(r=>
+  r.addEventListener("change",()=>{
+    if(!r.checked)return;
+    fetch("/api/prefs",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({funnel_effort:r.value})}).catch(()=>{});
+  }));
 
 /* ------------------------------------------------- command palette */
 // Search every chat — titles AND message bodies — plus the handful of
@@ -24039,6 +24482,9 @@ def _sweep_hf_carcasses(max_age: float = 1800.0) -> int:
     for lbl, repo in MLX_REPOS.items():
         if lbl not in live and repo:
             repos.add(repo)
+    # retired repos too (6b308): a stale carcass beside a COMPLETE retired
+    # model made it read incomplete, and the leftover sweep deleted it
+    repos.update(r[0] for r in RETIRED_MODELS.values() if r[0])
     for k, st in STUDIOS.items():
         if st["row"] not in live:
             repos.update(t["repo"] for t in st["tiers"])
@@ -24060,11 +24506,151 @@ def _sweep_hf_carcasses(max_age: float = 1800.0) -> int:
     return freed
 
 
+# EVERYTHING A DOWNLOAD THAT NEVER FINISHED LEAVES BEHIND (6b307, per
+# Patrick: "any leftovers from failed downloads and stuff like that is
+# taken out as well"). Found on his Mac: three retired models' folders
+# holding only metadata, which nothing counted as installed, so nothing
+# ever removed them. Only files this app knows the purpose of are
+# touched, and never one written recently: a download in flight, here or
+# in a sibling instance, keeps its files fresh.
+LEFTOVER_GRACE = 24 * 3600.0     # a current model's partial may resume
+
+
+def _fresh_under(path: str, secs: float) -> bool:
+    cut = time.time() - secs
+    try:
+        for root, dirs, files in os.walk(path):
+            for n in files + dirs:
+                try:
+                    if os.lstat(os.path.join(root, n)).st_mtime > cut:
+                        return True
+                except OSError:
+                    pass
+    except OSError:
+        pass
+    return False
+
+
+def _hf_has_weights(repo: str) -> bool:
+    snaps = os.path.join(_hf_model_dir(repo), "snapshots")
+    for pat in ("*.safetensors", "*.gguf", "*.bin", "*.npz"):
+        if glob.glob(os.path.join(snaps, "**", pat), recursive=True):
+            return True
+    return False
+
+
+def _rm_hf_repo(repo: str) -> int:
+    d = _hf_model_dir(repo)
+    size = _dir_bytes_real(d)
+    for pth in (d, os.path.join(os.path.dirname(d), ".locks",
+                                "models--" + repo.replace("/", "--"))):
+        shutil.rmtree(pth, ignore_errors=True)
+    return size
+
+
+def _sweep_leftovers() -> int:
+    """Delete what failed downloads left behind; returns bytes freed.
+    Runs at launch, every six hours, and after every cleanup and every
+    Update models run, whether or not auto-clean is on: none of it is a
+    model anyone can use."""
+    freed = 0
+    try:
+        freed += _sweep_hf_carcasses()          # stale *.incomplete blobs
+    except Exception:
+        pass
+    with _setup_lock:
+        live = {lbl for lbl, j in _setup_jobs.items()
+                if j.get("status") in ("downloading", "queued")}
+    # 1. MLX models that never completed. A retired one will never be
+    #    resumed; a current one gets a day in case its download resumes.
+    todo = [(repo, LEFTOVER_GRACE) for lbl, repo in MLX_REPOS.items()
+            if repo and lbl not in live]
+    todo += [(r[0], 1800.0) for r in RETIRED_MODELS.values() if r[0]]
+    for repo, grace in todo:
+        try:
+            d = _hf_model_dir(repo)
+            if (os.path.isdir(d) and not mlx_model_cached(repo)
+                    and not _fresh_under(d, grace)):
+                freed += _rm_hf_repo(repo)
+        except Exception:
+            pass
+    # 2. Studio models lay out differently, so only a folder with no
+    #    weights in it at all counts; and an engine whose install failed.
+    for k, st in STUDIOS.items():
+        if st["row"] in live:
+            continue
+        for t in st["tiers"]:
+            try:
+                d = _hf_model_dir(t["repo"])
+                if (os.path.isdir(d) and not _hf_has_weights(t["repo"])
+                        and not _fresh_under(d, LEFTOVER_GRACE)):
+                    freed += _rm_hf_repo(t["repo"])
+            except Exception:
+                pass
+        try:
+            mark = os.path.join(st["venv"], STUDIO_FAIL_MARK)
+            if (os.path.exists(mark) and time.time()
+                    - os.path.getmtime(mark) > LEFTOVER_GRACE
+                    and not _studio_engine_ok(k)):
+                freed += _dir_bytes_real(st["venv"])
+                shutil.rmtree(st["venv"], ignore_errors=True)
+                _studio_bytes_forget(k)
+        except Exception:
+            pass
+    # 3. Ollama's partial pulls: chunk files, never a finished blob, so
+    #    nothing that any model shares. Skipped while we pull anything.
+    if not any(MODEL_ROUTES.get(l, ("",))[0] == "ollama" for l in live):
+        blobs = os.path.join(os.environ.get("OLLAMA_MODELS")
+                             or os.path.expanduser("~/.ollama/models"),
+                             "blobs")
+        cut = time.time() - LEFTOVER_GRACE
+        groups = {}
+        for pth in glob.glob(os.path.join(blobs, "*-partial*")):
+            key = re.sub(r"-partial(-\d+)?$", "", os.path.basename(pth))
+            groups.setdefault(key, []).append(pth)
+        # one download's files go together, judged by the NEWEST: a pull
+        # still writing any part of it keeps all of it (found in review)
+        for files in groups.values():
+            try:
+                if max(os.stat(f).st_mtime for f in files) >= cut:
+                    continue
+            except OSError:
+                continue
+            for f in files:
+                try:
+                    size = os.stat(f).st_size
+                    os.remove(f)
+                    freed += size
+                except OSError:
+                    pass
+    # 4. This app's own temp files from a crash mid-save, and the copies
+    #    of the key file a test instance makes on a port nothing serves
+    base = app_dir()
+    hour_ago = time.time() - 3600
+    for pat in (".prefs-*.tmp", ".cloud-*.tmp"):
+        for pth in glob.glob(os.path.join(base, pat)):
+            try:
+                if os.path.getmtime(pth) < hour_ago:
+                    os.remove(pth)
+            except OSError:
+                pass
+    for pth in glob.glob(os.path.join(base, "cloud-dev-*.json*")):
+        try:
+            port = int(re.search(r"cloud-dev-(\d+)\.json",
+                                 os.path.basename(pth)).group(1))
+            if (port != PORT and not _port_in_use(port)
+                    and os.path.getmtime(pth) < hour_ago):
+                os.remove(pth)
+        except (OSError, AttributeError, ValueError):
+            pass
+    return freed
+
+
 def _warm_studio_cache():
     """Fill the studio disk-usage cache in the background at startup, so
     the page's first /api/setup does not pay for the walk (6b304)."""
     try:
-        _sweep_hf_carcasses()
+        _sweep_leftovers()
     except Exception:
         pass
     for k in STUDIOS:
@@ -24087,7 +24673,7 @@ def _mlx_janitor():
             swept[0] = time.time()
             _purge_stale_guests()
             sweep_all_exports()
-            _sweep_hf_carcasses()
+            _sweep_leftovers()
             _auto_cleanup_pass()   # no-op unless the pref is on
         try:
             if _mlx_procs and _mlx_last_use and \
