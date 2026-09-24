@@ -1028,7 +1028,7 @@ def search_request(req):
     out["where"] = where or None
     if rt:
         out["round_trip"] = {"outbound_cents": rt["outbound_cents"], "sources": rt["sources"],
-                             "applied": sum(1 for v in out["results"].values() if isinstance(v, list) for e in v if e.get("round_trip"))}
+                             "applied": len({e["id"] for v in out["results"].values() if isinstance(v, list) for e in v if e.get("round_trip")})}
     try:
         cheapest = min((e["ticket_cents"] for e in out["results"]["reference"]), default=None)
         out["signal"] = adapter.price_signal(meta.get("supplement_payload"), cheapest) if src == "api" else None

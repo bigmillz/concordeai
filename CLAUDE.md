@@ -591,6 +591,22 @@ airlines get two links and a sentence saying two tickets is normal; a points leg
 transfer walkthrough. The airline's own domain comes from the feed's conditions-of-carriage
 URL, falling back to `SITES`.
 
+**Round-trip fares** (2026-09-24, per Patrick). The return search carries the chosen outbound (`pairFor`, validated
+field by field in `server._round_trip_totals`), and Google is asked for the round trip in two calls
+(`live.serp_round_trip`: the outbounds, then the returns for that outbound by its `departure_token`). Where a return
+sold with that outbound costs less than the two one-ways, `data.build_slim` makes its ticket what the round trip adds
+to the outbound, BEFORE scoring, and the card, the sheet and the book step say it is one round-trip ticket (one link,
+on the outbound airline's site). A new outbound clears the returns priced for the old one. The feed is not asked: a
+two-slice Duffel request returns every outbound-and-return pair at once, and on its first live test that reply grew
+past the 453 MB droplet's memory and the kernel killed the service. `live.MAX_RESPONSE_BYTES` (15 MB; a one-way reply
+is at most about 5 MB) now refuses any reply that size before it is parsed. First live result: with AA100 out,
+BA117 home was $965 one-way and $526 as part of an $819 round trip; the cheapest trip that day was still two one-ways.
+
+**Search international markets is a DEMO** (found 2026-09-24): its prices come from a seeded formula in
+`researchRows`, labelled "examples, not live quotes", and it never searched another country. SerpApi cannot make it
+real: asking Google as India or the UK returns the US fares converted (every flight moved by the same percentage).
+Patrick decides whether it comes down, becomes links to the airlines' other-country sites, or waits for a feed.
+
 **A served page never shows made-up results** (per Patrick, 2026-09-21). Anyone gets
 `CONCORDEGO_ANON_SEARCHES` (4) real searches a day, counted per address at `/search`, which
 lives outside `/api` so Access lets it through; past that the page opens the account pop-up
