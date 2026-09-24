@@ -784,8 +784,23 @@ Delta's and is dropped. `adapter.merge_scenarios()` adds the options under the f
 and profiles, so a Delta row is graded and ranked like every other; `_feed.supplements`
 says how many came from where. `adapter_samples/serpapi-jfk-lhr.json` is SYNTHESIZED from
 the published schema (no key was on the machine) and says so; `live.py serp JFK LHR DATE`
-makes a real one. Three mutants in `mutate_adapter.py` cover it (39 now). It is a bandaid:
+makes a real one. Three mutants in `mutate_adapter.py` cover it. It is a bandaid:
 scraping by proxy can break without notice, and it cannot book.
+
+**Since 2026-09-24 the supplement asks for EVERY airline** (`serpapi_carriers` defaults to `["*"]`; a list
+narrows it again), after a price check against Google Flights on five round trips found the feed missing whole
+airlines (JetBlue, Southwest, Ryanair; United, Spirit and often Frontier on US domestic routes, where Duffel returned
+only American, Alaska and Frontier) and the cheaper fare brands of others (United, TAP, Vueling, Ryanair). Still one
+call per search. `merge_scenarios` drops a Google itinerary the feed already sells at the same price or less (same
+carrier, number and departure minute per segment, `_itin_key`) and keeps a cheaper one; the page's one-card-per-flight
+grouping then shows the flight once. Google's local clocks for an airport no table knows are stamped from the flight's
+own duration (`_offset_by_duration`: one end's offset known, the other's is arithmetic, rounded to the quarter hour),
+so a connection through such an airport is kept; with neither end known it still drops. And `data.build_slim` always
+puts the five cheapest tickets in the pool (`CHEAPEST_TICKETS`) whatever their rank: the ranking may demote a $159
+Frontier connection below a $201 nonstop, but it must be on the page with its reasons, never absent. Mutants cover all
+three (42 now). The check's harness is `/var/lib/concordego/parity/parity.py` on the droplet, run as the service user
+with `systemd-run --uid=concordego -p EnvironmentFile=/etc/concordego.env --wait --pipe`; it keeps its own HOME, so
+the site's allowances are untouched, and spends about five SerpApi calls a trip.
 
 **The price signal and the nearby days cost no new key** (2026-09-22, per Patrick: a paid feed
 has to earn its keep every month, not once). **The price signal** is read off the SerpApi
