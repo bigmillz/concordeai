@@ -1067,7 +1067,7 @@ def main():
     real_cfg = srv.live.serp_config
     bo = {"booking_options": [
         {"together": {"book_with": "Gotogate", "airline": None, "price": 286, "marketed_as": ["EI 108", "EI 156"], "booking_request": {"url": "https://www.google.com/travel/clk/f", "post_data": "u=abc"}}},
-        {"together": {"book_with": "Aer Lingus", "airline": True, "price": 293, "marketed_as": ["EI 108", "EI 156"], "booking_request": {"url": "https://www.google.com/travel/clk/f", "post_data": "u=def"}}},
+        {"together": {"book_with": "Aer Lingus", "airline": True, "price": 293, "option_title": "Saver", "marketed_as": ["EI 108", "EI 156"], "booking_request": {"url": "https://www.google.com/travel/clk/f", "post_data": "u=def"}}},
         {"together": {"book_with": "Booking.com", "airline": None, "price": 274, "marketed_as": ["EI 108", "EI 156"]}},
         {"together": {"book_with": "British Airways", "airline": True, "price": 413, "marketed_as": ["BA 2070", "BA 5914"]}},
         {"together": {"book_with": "Evil", "airline": None, "price": 100, "marketed_as": ["EI 108", "EI 156"], "booking_request": {"url": "https://evil.example/", "post_data": "x"}}},
@@ -1084,6 +1084,8 @@ def main():
               and not next(x for x in r["sellers"] if x["name"] == "British Airways")["same_flights"]
               and "Split" not in names and next(x for x in r["sellers"] if x["name"] == "Evil")["go"] is None
               and next(x for x in r["sellers"] if x["name"] == "Aer Lingus")["go"]["url"].startswith("https://www.google.com/"), str(names))
+        check("a seller's fare type travels with it when Google names one, and is empty when it does not",
+              r["airline"]["fare"] == "Saver" and r["cheapest_agency"]["fare"] == "", str(r["airline"]))
         check("a check the page sent with a bad token or query is refused before any call, and marked for a refund",
               srv.sellers_request(dict(good, token="bad token!")).get("field") == "sellers"
               and srv.sellers_request(dict(good, query=dict(good["query"], departure_id="<x>"))).get("field") == "sellers")

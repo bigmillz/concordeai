@@ -1027,6 +1027,8 @@ def sellers_request(req):
         req_b = t.get("booking_request") or {}
         url = str(req_b.get("url") or "")
         sellers.append({"name": str(t.get("book_with") or "")[:60], "airline": bool(t.get("airline")),
+                        # the fare type when Google names it ("Basic Economy"): one airline often sells three
+                        "fare": str(t.get("option_title") or "")[:40],
                         "cents": int(round(float(t["price"]) * 100)),
                         # the same flights under the same numbers; a codeshare sold under other numbers is noted
                         "same_flights": not sold or sold == fns,

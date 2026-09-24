@@ -979,7 +979,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr"></span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="05e9d1a">05e9d1a</code></span></span></footer>
+  <footer class="foot wfoot"><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="b73f8d2">b73f8d2</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -1006,7 +1006,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The standard trip for this route</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Prices are calculated in US dollars, then converted. Photos from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="05e9d1a">05e9d1a</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="dimmer">Prices are calculated in US dollars, then converted. Photos from Pexels.</span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="b73f8d2">b73f8d2</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1955,6 +1955,10 @@ function ledgerHTML(e){
 // travel agency after it with how much less it asks and what that costs you in help later. One lookup, on request.
 const SELLERS = {};
 let AGENCIES = false; try { AGENCIES = localStorage.getItem('concordego.agencies') === '1'; } catch (x) {}
+function shareNote(list){
+  const by = {}; list.forEach(x => { (by[x.name] = by[x.name] || []).push(x.cents); });
+  return Object.entries(by).map(([n, c]) => esc(n) + (c.length > 1 ? ' from ' : ' ') + money(Math.min(...c))).join(', ');
+}
 function sellersHTML(e){
   if (!SERVED || !e.seller_token || e.round_trip || !D.seller_query) return '';
   const sv = SELLERS[e.id], head = '<h4>Who sells this fare</h4>';
@@ -1964,10 +1968,11 @@ function sellersHTML(e){
   const air = sv.airline, same = sv.sellers.filter(x => x.same_flights), codeshare = sv.sellers.filter(x => !x.same_flights);
   const go = x => { if (!x.go) return ''; const fields = String(x.go.post || '').split('&').filter(Boolean).map(kv => { const i = kv.indexOf('='); const k = i < 0 ? kv : kv.slice(0, i), v = i < 0 ? '' : kv.slice(i + 1); let dk = k, dv = v; try { dk = decodeURIComponent(k.replace(/\+/g, ' ')); dv = decodeURIComponent(v.replace(/\+/g, ' ')); } catch (y) {} return `<input type="hidden" name="${esc(dk)}" value="${esc(dv)}">`; }).join('');
     return `<form method="post" action="${esc(x.go.url)}" target="_blank">${fields}<button class="ledger">Go</button></form>`; };
-  const li = x => `<li class="${x.airline ? 'air' : ''}"><span>${esc(x.name)}${x.airline ? ' <small>the airline</small>' : ''}</span><b>${money(x.cents)}</b>${!x.airline && air && x.cents < air.cents ? `<small class="less">${money(air.cents - x.cents)} less</small>` : '<small></small>'}${go(x)}</li>`;
+  const tag = x => [x.airline ? 'the airline' : '', x.fare || ''].filter(Boolean).join(' · ');
+  const li = x => `<li class="${x.airline ? 'air' : ''}"><span>${esc(x.name)}${tag(x) ? ` <small>${esc(tag(x))}</small>` : ''}</span><b>${money(x.cents)}</b>${!x.airline && air && x.cents < air.cents ? `<small class="less">${money(air.cents - x.cents)} less</small>` : '<small></small>'}${go(x)}</li>`;
   const agencies = same.filter(x => !x.airline);
   return `<section class="sellers">${head}<ul class="slist">${same.map(li).join('')}</ul>
-    ${codeshare.length ? `<p class="sdim">Also sold under other flight numbers: ${codeshare.map(x => esc(x.name) + ' ' + money(x.cents)).join(', ')}.</p>` : ''}
+    ${codeshare.length ? `<p class="sdim">Also sold under other flight numbers: ${shareNote(codeshare)}.</p>` : ''}
     ${agencies.length ? '<p class="sdim">Travel agencies: changes, refunds and help when a flight is disrupted go through the agency, not the airline.</p>' : ''}
     <label class="agt"><input type="checkbox" data-agencies ${AGENCIES ? 'checked' : ''}> Include travel agency prices <small>for flights you have checked</small></label></section>`;
 }
