@@ -164,22 +164,34 @@ def feed_details(offer):
 
 
 def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full=None, source_note=None, built_from="a live search",
-               dest_point=None, destination_full=None, supplement=None, round_trip=None):
+               dest_point=None, destination_full=None, supplement=None, round_trip=None, cabin=None):
     """A feed payload -> everything mock 10 reads. server.py calls this for a
     live search; main() below calls it for the checked-in sample."""
     sc = adapter.from_feed(raw, origin_key=origin_key, checked_bags=checked_bags, dest_point=dest_point)
+    geo = adapter.duffel_geo(raw)
+    if supplement and "error" not in sc:
+        # airports Google names that neither the curated table nor the feed's reply can place in time: their zones
+        # from Duffel's places, or the itineraries through them would be dropped (2026-09-24)
+        aps = adapter.load_enrichment()["airports"]["airports"]
+        named = {(f.get(k) or {}).get("id") for it in list(supplement.get("best_flights") or []) + list(supplement.get("other_flights") or [])
+                 for f in it.get("flights") or [] for k in ("departure_airport", "arrival_airport")}
+        need = {c for c in named if c and c not in geo and not (aps.get(c) or {}).get("zone")}
+        if need:
+            geo.update(server.airport_geo(need))
     if supplement and "error" not in sc:
         # Google Flights through SerpApi, for the carriers the feed cannot sell: normalised by its own
         # adapter with the feed's zones borrowed for airports the table does not know, then merged
         # under the feed's par and profiles, so a Delta row is graded and ranked like every other
         sc = adapter.merge_scenarios(sc, adapter.from_serpapi(
             supplement, origin_key=origin_key, checked_bags=checked_bags,
-            geo=adapter.duffel_geo(raw), dest_point=dest_point, carriers=server.live.serp_want()), "Google Flights")
+            geo=geo, dest_point=dest_point, carriers=server.live.serp_want()), "Google Flights")
+    if cabin in ("economy", "premium_economy", "business", "first") and "error" not in sc:
+        sc["query"]["cabin"] = cabin          # a leg below it is priced and flagged (scorer _cabin_short)
     # Google's booking token for each flight it listed, by the flights' own key: the page's "who sells this
     # fare" asks Google with it, for a Google row or for the feed's copy of the same flights (2026-09-24)
     seller_tokens = {}
     for it in list((supplement or {}).get("best_flights") or []) + list((supplement or {}).get("other_flights") or []):
-        if it.get("booking_token"):
+        if it.get("booking_token") and not it.get("_alt_cabin"):   # the other cabin's token answers another query
             seller_tokens.setdefault(adapter.serp_itin_key(it), it["booking_token"])
     # A round trip's return leg (2026-09-24): where the airline sells this return together with the outbound
     # already chosen for less than the two one-way tickets, the return's ticket becomes what the round trip
@@ -309,8 +321,8 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
         e["equipment"] = [s["equipment"] for s in v["segments"]]
         e["pitch"] = [(s["claims"] or {}).get("seat_pitch_inches") for s in v["segments"]]
         e["segments"] = [{"flight": s["flight"], "from": s["from"], "to": s["to"],
-                          "dep": s["dep"], "arr": s["arr"], "equipment": s["equipment"]}
-                         for s in v["segments"]]
+                          "dep": s["dep"], "arr": s["arr"], "equipment": s["equipment"], "cabin": so.get("cabin_marketed")}
+                         for s, so in zip(v["segments"], o["segments"])]
         e["booking"] = v["booking"]
         # Per-target: effective, the ledger and the legs (the ground choice can
         # differ by target, so the legs are per target too).
@@ -445,6 +457,7 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
 
     out["query"]["adults"] = int(sc["query"].get("adults") or 1) if isinstance(sc.get("query"), dict) else 1
     out["query"]["bags"] = checked_bags
+    out["query"]["cabin"] = sc["query"].get("cabin")
     if source_note:
         out["source_note"] = source_note
     return out

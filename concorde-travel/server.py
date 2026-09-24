@@ -761,6 +761,15 @@ def _fetch_raw(req):
              "adults": max(1, min(9, int(req.get("adults", 1)))), "currency": "USD", "limit": 50,
              "cabin": _cabin(req.get("cabin"))}
         raw, meta = live.search(q)
+        alt = _ALT_CABIN.get(q["cabin"])
+        fallback = {}
+        if raw is not None and alt and _offer_list(raw) is not None and (q["cabin"] == "first" or len(_offer_list(raw)) < 3):
+            # The neighbouring cabin too (2026-09-24, per Patrick): few trips are first class on every flight, so a
+            # first-class search also asks for business, and a business search that comes back thin asks for first.
+            # A leg below the cabin asked for is priced and flagged (scorer _cabin_short), never hidden.
+            raw2, _m2 = live.search(dict(q, cabin=alt))
+            if raw2 is not None and _offer_list(raw2) is not None:
+                raw, fallback["feed"] = _merge_duffel(raw, raw2)
         if raw is None:
             return ({"error": meta.get("error", "Search is unavailable. Try again later."),
                      "hint": meta.get("hint") or meta.get("how"),
@@ -769,6 +778,14 @@ def _fetch_raw(req):
         # feed cannot sell (Delta). Its absence or failure never fails the search.
         meta = dict(meta)
         meta["supplement_payload"], meta["supplement"] = _supplement(q)
+        if alt:
+            sup = meta["supplement_payload"]
+            if len(_serp_its(sup)) < (5 if q["cabin"] == "first" else 3):
+                sup2, _m2 = _supplement(dict(q, cabin=alt))
+                if _serp_its(sup2):
+                    meta["supplement_payload"], fallback["google"] = _merge_serp(sup, sup2, alt)
+        if fallback:
+            meta["cabin_fallback"] = dict(fallback, asked=q["cabin"], also=alt)
     else:
         return ({"error": "Unknown source %r. Use sample, inline or api." % src},)
     return raw, meta, where, src
@@ -776,6 +793,83 @@ def _fetch_raw(req):
 
 _CABINS = {"economy": "economy", "premium": "premium_economy", "premium_economy": "premium_economy",
            "business": "business", "first": "first"}
+_ALT_CABIN = {"first": "business", "business": "first"}
+
+
+def _offer_list(raw):
+    """A Duffel reply's offers, or None for any other shape (then nothing is merged)."""
+    d = (raw or {}).get("data")
+    return d.get("offers") if isinstance(d, dict) and isinstance(d.get("offers"), list) else None
+
+
+def _duffel_key(off):
+    segs = [sg for sl in off.get("slices") or [] for sg in sl.get("segments") or []]
+    return (tuple(((sg.get("marketing_carrier") or {}).get("iata_code"), str(sg.get("marketing_carrier_flight_number")),
+                   str(sg.get("departing_at"))[:16], ((sg.get("passengers") or [{}])[0] or {}).get("cabin_class"))
+                  for sg in segs), str(off.get("total_amount")))
+
+
+def _merge_duffel(a, b):
+    """(one Duffel reply holding both searches' offers, how many the second added): the same flights in the same
+    cabins at the same price appear once."""
+    oa, ob = _offer_list(a) or [], _offer_list(b) or []
+    seen = {_duffel_key(o) for o in oa}
+    extra = [o for o in ob if _duffel_key(o) not in seen]
+    out = dict(a)
+    out["data"] = dict(a["data"], offers=oa + extra)
+    return out, len(extra)
+
+
+def _serp_its(p):
+    return list((p or {}).get("best_flights") or []) + list((p or {}).get("other_flights") or [])
+
+
+def _merge_serp(a, b, alt):
+    """(one Google reply holding both cabins' itineraries, how many the second added). The second cabin's rows are
+    marked, so no seller check is offered on them (their booking token belongs to the other cabin's query), and the
+    price insight stays the first cabin's, or goes when it had none: a business-class history under a first-class
+    search would be the wrong yardstick."""
+    key = lambda it: (tuple((str(f.get("flight_number")), str((f.get("departure_airport") or {}).get("time")),
+                             str(f.get("travel_class"))) for f in it.get("flights") or []), it.get("price"))
+    seen = {key(it) for it in _serp_its(a)}
+    extra = [dict(it, _alt_cabin=alt) for it in _serp_its(b) if key(it) not in seen]
+    out = {k: v for k, v in (a or {}).items() if not (k == "price_insights" and not _serp_its(a))}
+    out["other_flights"] = list((a or {}).get("other_flights") or []) + extra
+    out.setdefault("best_flights", list((a or {}).get("best_flights") or []))
+    return out, len(extra)
+
+
+def airport_geo(codes):
+    """IATA -> {iata, lat, lon, country, city, tz} for airports the curated table and the feed's own reply do not
+    place, from Duffel's places (cached a year; 2026-09-24: a Google-only trip through Charlotte, Houston, Quito
+    and Cuenca was dropped whole for want of a zone). Nothing without a Duffel key; at most twelve a search."""
+    cfg = live.load_config()
+    if not (cfg.get("key") and cfg.get("provider") == "duffel"):
+        return {}
+    out = {}
+    for code in sorted({str(c).upper() for c in codes if re.match(r"^[A-Za-z]{3}$", str(c or ""))})[:12]:
+        def fetch(code=code):
+            req = urllib.request.Request("https://api.duffel.com/places/suggestions?query=" + code,
+                                         headers={"Authorization": "Bearer " + cfg["key"], "Duffel-Version": "v2",
+                                                  "Accept": "application/json", "User-Agent": "ConcordeGo/1.0 (go.flyconcordefly.com)"})
+            try:
+                with urllib.request.urlopen(req, timeout=6) as r:
+                    d = json.loads(r.read().decode("utf-8"))
+            except Exception:
+                return []
+            cands = []
+            for pl in d.get("data") or []:
+                cands.append(pl)
+                cands.extend(pl.get("airports") or [])        # a city place lists its airports
+            for pl in cands:
+                if pl.get("iata_code") == code and pl.get("type", "airport") == "airport" and pl.get("time_zone"):
+                    return [{"iata": code, "lat": pl.get("latitude"), "lon": pl.get("longitude"),
+                             "country": pl.get("iata_country_code"), "city": pl.get("city_name"), "tz": pl.get("time_zone")}]
+            return []
+        hit = _lookup_cached("duffel-airport", code, 365 * 86400, fetch)
+        if hit:
+            out[code] = hit[0]
+    return out
 
 
 def _cabin(word):
@@ -1068,7 +1162,8 @@ def search_request(req):
                                   origin_full=req.get("origin_address") or None,
                                   dest_point=dest_point,
                                   destination_full=(req.get("destination") if dest_point else None),
-                                  supplement=meta.get("supplement_payload"), round_trip=rt)
+                                  supplement=meta.get("supplement_payload"), round_trip=rt,
+                                  cabin=(_cabin(req.get("cabin")) if src == "api" else None))
     except ValueError as exc:
         return {"error": "No flights found for this date.", "detail": str(exc)}
     if not out["results"]["reference"]:

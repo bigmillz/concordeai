@@ -263,7 +263,7 @@ def from_kiwi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                 "departure_local": dep, "arrival_local": arr,
                 "tz_hint": {"departure": ap_from.get("zone", ""), "arrival": ap_to.get("zone", "")},
                 "equipment_code": "UNKNOWN",
-                "cabin_marketed": (s.get("cabinClass") or "economy").lower(),
+                "cabin_marketed": cabin_norm(s.get("cabinClass")),
                 "claims": {
                     "subfleet": {"coverage": "none", "policy": "route_median",
                                  "reason": "the feed carries no equipment code"
@@ -507,6 +507,20 @@ def _short_haul(o_iata: str, d_iata: str, enr: Dict[str, Any], geo: Optional[Dic
     return _ground.haversine_km(float(la1), float(lo1), float(la2), float(lo2)) <= SHORT_HAUL_KM
 
 
+def cabin_norm(word: Any) -> str:
+    """One cabin vocabulary whatever the feed says: Duffel's 'business', Google's 'Business Class', Kiwi's
+    'BUSINESS' and Amadeus's 'PREMIUM_ECONOMY' all become the scorer's economy / premium_economy / business / first
+    (2026-09-24: Google's 'business_class' matched nothing, so its premium rows graded as economy)."""
+    w = str(word or "").strip().lower().replace("-", " ").replace("_", " ")
+    if w.startswith("first"):
+        return "first"
+    if w.startswith("business") or w.startswith("upper"):
+        return "business"
+    if w.startswith("premium"):
+        return "premium_economy"
+    return "economy"
+
+
 def _carrier_rating(enr: Dict[str, Any], carrier: str, segments: List[Dict[str, Any]],
                     geo: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
     """The airline's curated rating for this trip, or None. A row's `short_haul` block replaces its rating and
@@ -680,7 +694,7 @@ def from_amadeus(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                             "arrival": ap_to.get("zone", "")},
                 "equipment_code": equip or "UNKNOWN",
                 "equipment_name": ac_names.get(equip, ""),
-                "cabin_marketed": (det.get("cabin") or "economy").lower(),
+                "cabin_marketed": cabin_norm(det.get("cabin")),
                 "claims": claims,
                 # Amadeus shopping carries no on-time record. Reliability is a
                 # separate feed (DOT/BTS by flight number) and is not pretended at.
@@ -1312,7 +1326,7 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                             "arrival": ap_to.get("zone", "")},
                 "equipment_code": equip or "UNKNOWN",
                 "equipment_name": ac.get("name", ""),
-                "cabin_marketed": (pax.get("cabin_class") or "economy").lower(),
+                "cabin_marketed": cabin_norm(pax.get("cabin_class")),
                 "claims": claims,
                 "reliability": {"coverage": "none", "policy": "route_median",
                                 "reason": "no on-time record joined for %s%s"
@@ -1836,7 +1850,7 @@ def from_serpapi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                 "tz_hint": {"departure": ap_from.get("zone", ""), "arrival": ap_to.get("zone", "")},
                 "equipment_code": "UNKNOWN",     # a NAME ("Boeing 767"), not a code: the cabin claim abstains
                 "equipment_name": str(f.get("airplane") or ""),
-                "cabin_marketed": str(f.get("travel_class") or "economy").lower().replace(" ", "_"),
+                "cabin_marketed": cabin_norm(f.get("travel_class")),
                 "claims": claims,
                 "reliability": {"coverage": "none", "policy": "route_median",
                                 "reason": "no on-time record joined for %s%s" % (mkt, num)},

@@ -996,7 +996,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr"></span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="fnotes"><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="a1a188b">a1a188b</code></span></span></footer>
+  <footer class="foot wfoot"><span class="fnotes"><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="b35de20">b35de20</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -1024,7 +1024,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The standard trip for this route</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="fnotes"><span>Prices are calculated in US dollars, then converted.</span><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="a1a188b">a1a188b</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="fnotes"><span>Prices are calculated in US dollars, then converted.</span><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="b35de20">b35de20</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1740,6 +1740,9 @@ function journey(e, r, ctx){
     }
     else if (l.kind === 'flight'){
       const sg = e.segments[k++], i = k - 1, why = [], det = ctx.refAir ? ctx.air(e)/ctx.refAir : 1;
+      { const want = D.query && D.query.cabin, have = sg && sg.cabin;
+        if (have in CABIN_RANK && have !== 'economy') why.push({t:CABIN_WORD[have] + ' cabin'});
+        if (want in CABIN_RANK && have in CABIN_RANK && CABIN_RANK[have] < CABIN_RANK[want]) why.push({t:CABIN_WORD[have] + ', not ' + CABIN_WORD[want].toLowerCase(), bad:true}); }
       if (e.rating == null) why.push({t:'Airline not rated yet'});
       // bands on the ratings' own scale, which since 2026-09-24 spans low-cost airlines too: the middle sits near .6
       else { why.push({t:e.carrier_name + (e.rating >= .76 ? ': well-rated airline' : e.rating >= .6 ? ': average rating' : ': below-average rating'), good:e.rating >= .76, bad:e.rating < .6});
@@ -1796,6 +1799,16 @@ const WANT_CON = {nonstop:'Not nonstop', short:'Long layover', long:'Short layov
 const JET = {781:'787-10', 789:'787-9', 788:'787-8', 359:'A350', 351:'A350-1000', 339:'A330neo', 338:'A330neo', '32N':'A321neo', '32Q':'A321neo', 223:'A220', '7M8':'737 MAX', '7M9':'737 MAX', 763:'767', 764:'767', 762:'767', 772:'777-200', 744:'747', 343:'A340', 346:'A340', 340:'A340', 332:'A330-200'};
 const OLDJET = /^(76[234]|772|744|34[036]|332)$/;
 const rnd15 = m => Math.max(15, Math.round(m/15)*15);
+// Cabins below the one asked for (per Patrick, 2026-09-24): a first-class search that has to use business on a
+// leg says so on the trip, always, and the scorer's cabin_short line has already ranked it down. Above is fine.
+const CABIN_RANK = {economy:0, premium_economy:1, business:2, first:3};
+const CABIN_WORD = {economy:'Economy', premium_economy:'Premium economy', business:'Business', first:'First class'};
+function cabinShort(e){
+  const want = D.query && D.query.cabin; if (!(want in CABIN_RANK) || want === 'economy') return null;
+  const below = (e.segments || []).filter(s => s.cabin in CABIN_RANK && CABIN_RANK[s.cabin] < CABIN_RANK[want]); if (!below.length) return null;
+  const kinds = [...new Set(below.map(s => s.cabin))], name = kinds.length === 1 ? CABIN_WORD[kinds[0]] : 'Below ' + CABIN_WORD[want].toLowerCase();
+  return below.length === e.segments.length ? name + (e.segments.length > 1 ? ' on every flight' : ', not ' + CABIN_WORD[want].toLowerCase()) : name + ' on ' + below.length + ' of ' + e.segments.length + ' flights';
+}
 function rawTerms(e, r, ctx){
   const T = [], pro = (id, text, w, keep) => T.push({side:'pro', id, text, w, keep}), con = (id, text, w, keep) => T.push({side:'con', id, text, w, keep});
   const L = Object.values(r.g).flat().concat(r.q || []), find = k => L.find(l => l.key === k && !l.off), cents = k => { const l = find(k); return l ? l.cents : 0; };
@@ -1807,6 +1820,8 @@ function rawTerms(e, r, ctx){
   if (ctx.spreadDoor >= 60){ const d = ctx.medDoor - e.door_minutes; if (d >= 45) pro('quicker', dur(rnd15(d)) + ' quicker', d*H/60 + 2000); else if (-d >= 60) con('slower', dur(rnd15(-d)) + ' slower', -d*H/60 + 2000); }
   const air = ctx.air(e); if (ctx.refAir && air/ctx.refAir >= 1.25) con('longway', 'Goes the long way', (air - ctx.refAir)*H/60 + 3000);
   if (cents('status') < 0) pro('status', 'Keeps your status', -cents('status') + 2000, true);
+  // always shown, first among the cons: the ranking already weighed it, the traveller should never miss it
+  { const cs = cabinShort(e); if (cs) con('cabinshort', cs, 1e7 + cents('cabin_short'), true); }
   if (e.stops === 0) pro('nonstop', 'Nonstop', 8000);
   else { e.by.cheapest.legs.filter(l => l.kind === 'layover').forEach((l, i) => { const sg = e.segments[i], apt = sg ? sg.to : '', h = sg ? +sg.arr.slice(0, 2) : 12, m = l.minutes;
       if (m >= 300 && (h >= 21 || h < 3)) con('overnight', 'Overnight at ' + apt, 9000);

@@ -70,6 +70,15 @@
           ],
           "format": "date"
         },
+        "cabin": {
+          "enum": [
+            "economy",
+            "premium_economy",
+            "business",
+            "first"
+          ],
+          "description": "The cabin the traveller asked for. A leg flown below it is priced (scorer _cabin_short); a leg above it is not. Absent means none was asked for."
+        },
         "route_par_cents": {
           "$ref": "#/$defs/money",
           "description": "The all-in effective cost a CLEAN option achieves on this route and date - a nonstop, bags sorted, sane ground at both ends. The GRADE is an option measured against this, which is why the grade does not move when the user switches target. A property of the route, not of any option, and curated: derive it from the option set and it stops being the same yardstick for every user."

@@ -124,6 +124,11 @@ class Tuning:
     fixtures they are supposed to be measured against."""
 
     # --- comfort ---
+    # What an hour in each cabin is worth over economy, for pricing a leg flown BELOW the cabin the traveller asked
+    # for (2026-09-24, per Patrick: a first-class search that has to use business on a leg is flagged and ranked
+    # down, never hidden). A leg above the cabin asked for costs nothing.
+    cabin_hour_cents: Tuple[Tuple[str, int], ...] = (("economy", 0), ("premium_economy", 2000),
+                                                     ("business", 6500), ("first", 9000))
     connectivity_cents: int = 6000          # a transatlantic crossing with no usable wifi
     cabin_uncertainty_cents: int = 4000     # full penalty when the subfleet is a coin flip
     cabin_certain_at: float = 0.85          # at or above this frequency, no uncertainty cost
@@ -629,6 +634,39 @@ def _risk_lines(option, scenario, prof, tuning) -> List[Line]:
     return lines
 
 
+CABIN_NAMES = {"economy": "economy", "premium_economy": "premium economy", "business": "business", "first": "first class"}
+
+
+def _cabin_short(option, scenario, prof, tuning) -> Optional[Line]:
+    """One line for every leg flown below the cabin the traveller asked for, priced by the hour at the gap between
+    the two cabins' hourly worth. None when no cabin was asked for (the fixtures) or every leg meets it."""
+    want = str((scenario.get("query") or {}).get("cabin") or "")
+    worth = dict(tuning.cabin_hour_cents)
+    if want not in worth:
+        return None
+    comfort = float(prof.get("comfort_weight", 1.0))
+    short, cents = [], 0
+    for s in option["segments"]:
+        have = str(s.get("cabin_marketed") or "economy")
+        gap = worth[want] - worth.get(have, 0)
+        if gap > 0:
+            m = minutes_between(s["departure_local"], s["arrival_local"])
+            cents += int(gap * m / 60 * comfort)
+            short.append("%s-%s in %s" % (s["origin"]["iata"], s["destination"]["iata"], CABIN_NAMES.get(have, have)))
+    if not short:
+        return None
+    n = len(option["segments"])
+    have1 = CABIN_NAMES.get(str(option["segments"][0].get("cabin_marketed") or "economy"), "economy")
+    label = ("%s, not %s" % (have1.capitalize(), CABIN_NAMES[want]) if n == 1 else
+             "No %s on any flight" % CABIN_NAMES[want] if len(short) == n else
+             "Below %s on %d of %d flights" % (CABIN_NAMES[want], len(short), n))
+    return Line(code="cabin_short",
+                label=label,
+                amount_cents=cents,
+                evidence="%s; you asked for %s" % (", ".join(short), CABIN_NAMES[want]),
+                overridable=True)
+
+
 def _comfort_lines(option, scenario, prof, tuning) -> List[Line]:
     lines: List[Line] = []
     comfort = float(prof.get("comfort_weight", 1.0))
@@ -636,6 +674,9 @@ def _comfort_lines(option, scenario, prof, tuning) -> List[Line]:
     long_haul = max(option["segments"],
                     key=lambda s: minutes_between(s["departure_local"], s["arrival_local"]))
     claims = long_haul.get("claims") or {}
+    below = _cabin_short(option, scenario, prof, tuning)
+    if below:
+        lines.append(below)
 
     conn = claims.get("connectivity_oceanic")
     if conn is not None:
@@ -1059,8 +1100,8 @@ def report_card(scenario: Dict[str, Any], option: Dict[str, Any],
     else:
         pts = _PITCH_UNKNOWN
         why.append("pitch unknown")
-    cabin = next((str(x.get("cabin_marketed")) for x in list(option.get("tickets", [])) + list(segments)
-                  if x.get("cabin_marketed")), "economy").lower()
+    cabin = str(long_leg.get("cabin_marketed") or next((str(x.get("cabin_marketed")) for x in list(option.get("tickets", []))
+                                                        + list(segments) if x.get("cabin_marketed")), "economy")).lower()
     if cabin in ("business", "first"):
         pts = max(pts, 4.3); why.append(cabin)
     elif cabin.startswith("premium"):

@@ -1152,6 +1152,72 @@ def main():
     check("the scorer counts the arrival block in door to door and names it in the time line",
           sc_a["options"][0]["arrival_process_minutes"]["p50"] > 0
           and "arrival" in next(l for l in led_a.lines if l.code == "time").evidence, str(led_a.door_to_door_minutes))
+    # cabins (2026-09-24, per Patrick): one vocabulary for every feed; a leg below the cabin asked for is priced and
+    # flagged, a leg above it is not; the neighbouring cabin's results merge in once each
+    check("cabin names from every feed become one vocabulary (Google's 'Business Class' and 'First Class' included)",
+          [adapter.cabin_norm(x) for x in ("Business Class", "First Class", "PREMIUM_ECONOMY", "Premium Economy",
+                                           "business", "ECONOMY", None, "first")]
+          == ["business", "first", "premium_economy", "premium_economy", "business", "economy", "economy", "first"])
+    import copy as _cp, scorer as _scr
+    sc_c = adapter.from_feed(dfl)
+    opt_c = _cp.deepcopy(sc_c["options"][0])
+    for sg_ in opt_c["segments"]:
+        sg_["cabin_marketed"] = "business"
+    sc_first = dict(sc_c, query=dict(sc_c["query"], cabin="first"))
+    sc_bus = dict(sc_c, query=dict(sc_c["query"], cabin="business"))
+    line_c = lambda sc0, o0: next((l for l in _scr.score(sc0, o0, "reference").lines if l.code == "cabin_short"), None)
+    opt_up = _cp.deepcopy(opt_c)
+    for sg_ in opt_up["segments"]:
+        sg_["cabin_marketed"] = "first"
+    lf, lb, lu, ln = line_c(sc_first, opt_c), line_c(sc_bus, opt_c), line_c(sc_bus, opt_up), line_c(sc_c, opt_c)
+    check("a business leg on a first-class search is priced by the hour and named; the same leg on a business search, "
+          "a first-class leg on a business search, and any leg with no cabin asked for cost nothing",
+          lf is not None and lf.amount_cents > 0 and "business" in lf.evidence and "first" in lf.label
+          and lb is None and lu is None and ln is None, str((lf, lb, lu, ln)))
+    import server as _srv
+    off = lambda num, cab, amt: {"total_amount": amt, "slices": [{"segments": [{"marketing_carrier": {"iata_code": "AA"},
+            "marketing_carrier_flight_number": num, "departing_at": "2026-10-21T08:00:00", "passengers": [{"cabin_class": cab}]}]}]}
+    a_ = {"data": {"offers": [off("1", "first", "900.00"), off("2", "business", "700.00")]}}
+    b_ = {"data": {"offers": [off("2", "business", "700.00"), off("3", "business", "650.00")]}}
+    m_, added_ = _srv._merge_duffel(a_, b_)
+    it_ = lambda fn, cls, p: {"price": p, "flights": [{"flight_number": fn, "travel_class": cls, "departure_airport": {"time": "2026-10-21 08:00"}}]}
+    sa = {"best_flights": [it_("AA 1", "First Class", 900)], "price_insights": {"lowest_price": 900}}
+    sb = {"best_flights": [it_("AA 1", "First Class", 900), it_("AA 3", "Business Class", 650)], "price_insights": {"lowest_price": 650}}
+    ms, adds = _srv._merge_serp(sa, sb, "business")
+    ms0, _ = _srv._merge_serp({"price_insights": {"lowest_price": 1200}, "best_flights": []}, sb, "business")
+    check("the neighbouring cabin merges in once each: the same flights, cabin and price are not repeated; Google's "
+          "second-cabin rows are marked, and a price insight survives only from the cabin asked for",
+          len(m_["data"]["offers"]) == 3 and added_ == 1 and adds == 1
+          and [i.get("_alt_cabin") for i in _srv._serp_its(ms)] == [None, "business"]
+          and ms.get("price_insights") == {"lowest_price": 900} and "price_insights" not in ms0,
+          str((len(m_["data"]["offers"]), added_, adds, ms.get("price_insights"), ms0.keys())))
+    # an airport neither the table nor the feed can place in time gets its zone from Duffel's places (stubbed here),
+    # instead of the whole itinerary being dropped
+    serp_c = _cp.deepcopy(serp)
+    it0 = _cp.deepcopy((serp_c.get("best_flights") or serp_c.get("other_flights"))[0])
+    f0 = it0["flights"][0]
+    f0["departure_airport"] = {"name": "Charlotte Douglas", "id": "CLT", "time": "2026-11-18 08:00"}
+    f0["arrival_airport"] = {"name": "Mariscal Sucre", "id": "UIO", "time": "2026-11-18 13:15"}
+    f0.update(duration=315, travel_class="Business Class", flight_number="DL 777")
+    it0.update(total_duration=315, price=1800)
+    pay_c = {"best_flights": [it0], "other_flights": []}
+    real_geo = _srv.airport_geo
+    asked_geo = []
+    try:
+        _srv.airport_geo = lambda codes: (asked_geo.append(sorted(codes)) or {
+            "CLT": {"iata": "CLT", "lat": 35.21, "lon": -80.94, "country": "US", "city": "Charlotte", "tz": "America/New_York"},
+            "UIO": {"iata": "UIO", "lat": -0.13, "lon": -78.36, "country": "EC", "city": "Quito", "tz": "America/Guayaquil"}})
+        got_c = mockdata.build_slim(dfl, supplement=pay_c, cabin="first")
+        _srv.airport_geo = lambda codes: {}
+        got_n = mockdata.build_slim(dfl, supplement=pay_c, cabin="first")
+    finally:
+        _srv.airport_geo = real_geo
+    rows_c = [e for v in got_c["results"].values() if isinstance(v, list) for e in v if e["route"][0] == "CLT"]
+    rows_n = [e for v in got_n["results"].values() if isinstance(v, list) for e in v if e["route"][0] == "CLT"]
+    check("a Google trip through airports no table knows is placed in time from Duffel's places and kept (dropped "
+          "without them), carries its cabin, and the query records the cabin asked for",
+          asked_geo == [["CLT", "UIO"]] and rows_c and not rows_n and rows_c[0]["segments"][0]["cabin"] == "business"
+          and got_c["query"]["cabin"] == "first", str((asked_geo, len(rows_c), len(rows_n))))
     d_sc = adapter.from_feed(dfl)
     procs = sorted({o["airport_process_minutes"]["p50"] for o in d_sc["options"]})
     check("every option of a real New York to London search is timed at an hour and a half at the airport",

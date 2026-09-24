@@ -45,6 +45,7 @@ GR = "concorde-travel/ground.py"
 PL = "concorde-travel/places.py"
 FA = "concorde-travel/enrichment/fares.json"
 PA = "concorde-travel/par.py"
+SC = "concorde-travel/scorer.py"
 
 
 def slice_fn(src, name):
@@ -250,6 +251,16 @@ MUTANTS = [
      'airport time: judge a trip by its first flight only, so New York to Chicago to London is timed as domestic'),
     (PA, "airport_minutes", 'p50 = max(floor, int(cur.get("p50") or 0))', 'p50 = int(cur.get("p50") or floor)',
      'airport time: let a curated median shorter than the floor win, so JFK to London gets 55 minutes'),
+    (AD, "cabin_norm", 'if w.startswith("business") or w.startswith("upper"):', 'if w == "business":',
+     'cabins: read only the bare word, so Google\'s "Business Class" rows grade as economy'),
+    (SC, "_cabin_short", 'gap = worth[want] - worth.get(have, 0)', 'gap = abs(worth[want] - worth.get(have, 0))',
+     'cabins: charge a first-class leg on a business search as if it were a downgrade'),
+    (SV, "_merge_serp", 'if not (k == "price_insights" and not _serp_its(a))', 'if True',
+     'cabins: keep a business-class price history under a first-class search that found none'),
+    (SV, "_merge_duffel", 'extra = [o for o in ob if _duffel_key(o) not in seen]', 'extra = list(ob)',
+     'cabins: list the same flights twice when both cabin searches return them'),
+    (DATA, "build_slim", 'if need:\n            geo.update(server.airport_geo(need))', 'if False:\n            geo.update(server.airport_geo(need))',
+     'zones: never ask Duffel where an unknown airport is, so a Google trip through Houston and Quito is dropped'),
     (AD, "_arrival_international", 'if o_iata in US_PRECLEARANCE and border_of(d_iata, enr, geo) == "us":',
      'if False:', 'arrival: ignore US preclearance, so Dublin to New York queues for passport control twice'),
     (AD, "_arrival_block", 'last = segments[-1]',

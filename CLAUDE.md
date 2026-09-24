@@ -962,6 +962,24 @@ research method is in the commit that added these rows.
 computed over mostly-abstained enrichment is not the same object as one over a curated
 route** — do not quietly drop that strip to make the results look more confident.
 
+**Cabins are a floor, flagged, never a filter** (2026-09-24, per Patrick, after a Charlotte to Cuenca first-class search
+came back empty: Duffel had no first-class offers and Google no first-class results, while Google's business answer
+mixed first, business and premium economy by leg). A first-class search also asks both providers for business
+(Duffel always, it is cheap; Google when first returns fewer than five), and a business search that comes back thin
+(under three) also asks for first; `server._merge_duffel` and `_merge_serp` list each flights-cabin-price once, mark
+Google's second-cabin rows so no seller check is offered on them (their booking token answers the other query), and
+keep a price history only from the cabin asked for. The cabin asked for rides in the scenario's `query.cabin`
+(schema), and `scorer._cabin_short` prices every leg flown BELOW it at the gap between the two cabins' hourly worth
+(`Tuning.cabin_hour_cents`: economy 0, premium economy $20, business $65, first $90 an hour, times the comfort
+weight), off the bill, in the order and the grade; a leg ABOVE it costs nothing (business search, domestic first
+leg). The page always names it first among the cons ("Business on 1 of 3 flights", "Business, not first class") and
+on the flight's hover card. `adapter.cabin_norm` puts every feed's cabin words into one vocabulary: Google's
+"Business Class" used to read as `business_class`, matched nothing, and graded as economy. The grade's comfort part
+now reads the LONG leg's cabin. **Airports no table knows are placed in time from Duffel's places**
+(`server.airport_geo`, cached a year, twelve a search): a Google-only trip through Charlotte, Houston, Quito and
+Cuenca used to be dropped whole, because Google gives local clocks with no zone and Duffel had returned nothing to
+borrow one from.
+
 **Airline ratings come from published scores** (2026-09-24, per Patrick, who asked whether AI could give "a general
 consensus for each airline": it can AUTHOR the table once, never answer at search time, which would let the same
 search reorder tomorrow). `enrichment/carrier_scores.json` holds each airline's published figures, gathered by
