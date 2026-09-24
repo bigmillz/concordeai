@@ -1,5 +1,5 @@
 {
- "_comment": "The published scores the airline ratings in carriers.json are computed from (concorde-travel/rate_airlines.py). Gathered 2026-09-24 by research agents from the publishers' own pages, every figure re-checked against its source by a second agent; none needed a numeric correction. Skytrax economy stars by haul come from skytraxratings.com (a separate read and check); many of those pages were last updated in 2020-2022. Refresh when AirHelp, ACSI or J.D. Power publish a new edition. Per-cabin Skytrax stars (skytrax_cabins) and the 2026 World Airline Awards cabin rankings (awards) were added the same day, read by one agent and checked by another; neither needed a correction.",
+ "_comment": "The published scores the airline ratings in carriers.json are computed from (concorde-travel/rate_airlines.py). Gathered 2026-09-24 by research agents from the publishers' own pages, every figure re-checked against its source by a second agent; none needed a numeric correction. Skytrax economy stars by haul come from skytraxratings.com (a separate read and check); many of those pages were last updated in 2020-2022. Refresh when AirHelp, ACSI or J.D. Power publish a new edition. Per-cabin Skytrax stars (skytrax_cabins) and the 2026 World Airline Awards cabin rankings (awards) were added the same day, read by one agent and checked by another; neither needed a correction. The reviewer consensus (reviews) is one agent's 1-5 reading of 2024-2026 reviews from established travel sites, two or three cited per cabin, every citation opened by a second agent (two dates corrected).",
  "_as_of": "2026-09-24",
  "airlines": {
   "4Y": {
@@ -2757,6 +2757,831 @@
      "MS": 19,
      "BA": 20
     }
+   }
+  }
+ },
+ "reviews": {
+  "DL": {
+   "first": {
+    "consensus": 3.5,
+    "product": "Delta First, domestic (A321neo)",
+    "summary": "Reviewers split: stylish privacy-wing seat and good service, but one finds the shell bulky and cramped.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/insights/delta-a321neo-first-class/",
+      "site": "One Mile at a Time",
+      "date": "2025-03-13",
+      "verdict": "Stylish, clever seat, but the bulky shell feels claustrophobic"
+     },
+     {
+      "url": "https://liveandletsfly.com/delta-air-lines-a321neo-first-class-review/",
+      "site": "Live and Let's Fly",
+      "date": "2025-10-16",
+      "verdict": "Flawless flight: comfortable seat, tasty food, attentive crew"
+     }
+    ]
+   },
+   "business": {
+    "consensus": 4,
+    "product": "Delta One Suite (A350-900)",
+    "summary": "Suites with doors, strong entertainment and food make it a top US business cabin; service varies.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/insights/delta-one-a350-business-class/",
+      "site": "One Mile at a Time",
+      "date": "2024-09-20",
+      "verdict": "Best long-haul business class of any US airline"
+     },
+     {
+      "url": "https://thepointsguy.com/airline/reviews/delta-one-a350-900-australia-using-miles/",
+      "site": "The Points Guy",
+      "date": "2025-04-30",
+      "verdict": "Exceptionally comfortable suites, worth a good-value award"
+     },
+     {
+      "url": "https://liveandletsfly.com/delta-a350-900-delta-one-business-class-review/",
+      "site": "Live and Let's Fly",
+      "date": "2026-06-10",
+      "verdict": "Pleasant and well equipped; service merely adequate"
+     }
+    ]
+   },
+   "economy": {
+    "consensus": 3.5,
+    "product": "Main Cabin (A330neo / A321neo / 737)",
+    "summary": "Solid US economy: good Wi-Fi, screens and friendly crews, with occasional worn seats and skipped service.",
+    "citations": [
+     {
+      "url": "https://simpleflying.com/flight-review-delta-air-lines-airbus-a330neo-economy-class/",
+      "site": "Simple Flying",
+      "date": "2024-02-11",
+      "verdict": "A330neo economy impressed with attentive, friendly crew"
+     },
+     {
+      "url": "https://liveandletsfly.com/review-delta-air-lines-a321neo-economy-class/",
+      "site": "Live and Let's Fly",
+      "date": "2025-05-14",
+      "verdict": "Smooth and productive, but worn seats on new jet"
+     },
+     {
+      "url": "https://liveandletsfly.com/delta-air-lines-737-900-economy-class-review/",
+      "site": "Live and Let's Fly",
+      "date": "2024-12-16",
+      "verdict": "Good Wi-Fi and power; service cancelled over mild turbulence"
+     }
+    ]
+   }
+  },
+  "UA": {
+   "first": {
+    "consensus": 3,
+    "product": "United First, domestic (737 MAX / A321neo)",
+    "summary": "Modern cabins with strong screens and tech; reviewers diverge on food, cleanliness and Wi-Fi reliability.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/insights/united-737-max-first-class/",
+      "site": "One Mile at a Time",
+      "date": "2025-02-22",
+      "verdict": "Pleasant, excellent tech and drinks, food only average"
+     },
+     {
+      "url": "https://liveandletsfly.com/united-airlines-bad-flight-first-class/",
+      "site": "Live and Let's Fly",
+      "date": "2026-05-09",
+      "verdict": "Disappointing: dead Wi-Fi, poor meal, dirty cabin"
+     }
+    ]
+   },
+   "business": {
+    "consensus": 3.5,
+    "product": "Polaris business (original seat, 777 / 787)",
+    "summary": "Reliable flat beds and industry-best bedding; catering lags rivals. New Polaris Suites only on few 787s.",
+    "citations": [
+     {
+      "url": "https://liveandletsfly.com/united-777-300er-polaris-business-class-review/",
+      "site": "Live and Let's Fly",
+      "date": "2026-05-06",
+      "verdict": "Food much improved; seat largely unchanged since 2018"
+     },
+     {
+      "url": "https://onemileatatime.com/reviews/united-polaris-business-class-777/",
+      "site": "One Mile at a Time",
+      "date": "2024-07-07",
+      "verdict": "Comfortable seat, great bedding, catering disappointed"
+     },
+     {
+      "url": "https://liveandletsfly.com/united-787-9-polaris-business-class-review/",
+      "site": "Live and Let's Fly",
+      "date": "2025-03-14",
+      "verdict": "Solid but unchanged product; bedding the highlight"
+     }
+    ]
+   },
+   "economy": {
+    "consensus": 3.5,
+    "product": "Economy (787-9 / A321neo)",
+    "summary": "Seatback screens, reliable Wi-Fi and full meals make long flights manageable; sleep remains hard.",
+    "citations": [
+     {
+      "url": "https://liveandletsfly.com/united-787-9-basic-economy-review/",
+      "site": "Live and Let's Fly",
+      "date": "2026-04-02",
+      "verdict": "10.5 hours in basic economy felt manageable, even productive"
+     },
+     {
+      "url": "https://liveandletsfly.com/united-a321neo-economy-review/",
+      "site": "Live and Let's Fly",
+      "date": "2026-04-07",
+      "verdict": "Likes A321neo screens and Wi-Fi; redeye still unrestful"
+     }
+    ]
+   }
+  },
+  "AA": {
+   "first": {
+    "consensus": 3,
+    "product": "Domestic First (A321neo / 737-800)",
+    "summary": "Roomy recliners, meals and fast Wi-Fi, but no seatback screens and sparse amenities keep it basic.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/reviews/american-first-class-737/",
+      "site": "One Mile at a Time",
+      "date": "2024-02-26",
+      "verdict": "Basic, consistent product that lags rivals' amenities and service"
+     },
+     {
+      "url": "https://liveandletsfly.com/review-american-airlines-a321neo-first-class/",
+      "site": "Live and Let's Fly",
+      "date": "2025-10-10",
+      "verdict": "Comfortable and fed, but not luxurious; no screens"
+     }
+    ]
+   },
+   "business": {
+    "consensus": 4.5,
+    "product": "Flagship Suite business (787-9P)",
+    "summary": "Door-equipped suites with strong tech and service; reviewers call it the new US benchmark, few jets.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/reviews/american-flagship-suite-business-class-787/",
+      "site": "One Mile at a Time",
+      "date": "2025-09-16",
+      "verdict": "Probably the best US-airline business class flown"
+     },
+     {
+      "url": "https://thepointsguy.com/airline/reviews/american-airlines-business-class-flagship-suite-preferred/",
+      "site": "The Points Guy",
+      "date": "2025-08-11",
+      "verdict": "Stylish, spacious upgrade; operations still need smoothing"
+     },
+     {
+      "url": "https://liveandletsfly.com/american-airlines-787-9-flagship-suites-business-class-review/",
+      "site": "Live and Let's Fly",
+      "date": "2025-09-24",
+      "verdict": "Major improvement; Wi-Fi pricing and dead charger disappoint"
+     }
+    ]
+   }
+  },
+  "LH": {
+   "first": {
+    "consensus": 4.5,
+    "product": "Allegris First Suite (A350-900)",
+    "summary": "Private enclosed suites with elegant finish; reviewers note odd design details and very few seats to book.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/reviews/lufthansa-allegris-first-class-a350/",
+      "site": "One Mile at a Time",
+      "date": "2025-09-06",
+      "verdict": "Huge leap forward, though design details fall short"
+     },
+     {
+      "url": "https://samchui.com/2025/03/09/trip-report-the-new-lufthansa-allegris-first-class/",
+      "site": "Sam Chui",
+      "date": "2025-03-09",
+      "verdict": "Truly next-generation, fully private first class"
+     }
+    ]
+   },
+   "business": {
+    "consensus": 3.5,
+    "product": "Allegris business (A350-900 / 787-9)",
+    "summary": "Much better than the old seat, but seat types vary widely; service and food middling.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/reviews/lufthansa-allegris-business-class-a350/",
+      "site": "One Mile at a Time",
+      "date": "2024-06-23",
+      "verdict": "Best seats impress; inconsistency between seat types hurts"
+     },
+     {
+      "url": "https://thepointsguy.com/airline/reviews/lufthansa-business-class-allegris-review/",
+      "site": "The Points Guy",
+      "date": "2025-06-27",
+      "verdict": "Substantial improvement with great tech; seat choices confusing"
+     },
+     {
+      "url": "https://onemileatatime.com/reviews/lufthansa-allegris-business-class-787/",
+      "site": "One Mile at a Time",
+      "date": "2026-08-15",
+      "verdict": "Improved but middling: slow service, food, no air nozzles"
+     }
+    ]
+   }
+  },
+  "BA": {
+   "business": {
+    "consensus": 4,
+    "product": "Club Suite (777 / A350 / 787-10)",
+    "summary": "Door-equipped suites make a dependable transatlantic flight; comfortable and well served but no wow factor.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/reviews/british-airways-club-suites-business-class-777/",
+      "site": "One Mile at a Time",
+      "date": "2025-03-02",
+      "verdict": "Reliable, comfortable, friendly; lacks wow but would refly"
+     },
+     {
+      "url": "https://thepointsguy.com/airline/reviews/british-airways-business-class/",
+      "site": "The Points Guy",
+      "date": "2025-04-16",
+      "verdict": "Spacious private suites; award taxes the main drawback"
+     }
+    ]
+   },
+   "economy": {
+    "consensus": 3,
+    "product": "World Traveller / Euro Traveller economy",
+    "summary": "Adequate and unremarkable; A380 upper-deck window seats praised, short-haul service plain but punctual.",
+    "citations": [
+     {
+      "url": "https://thepointsguy.com/airline/reviews/british-airways-economy-a380-review/",
+      "site": "The Points Guy",
+      "date": "2024-04-28",
+      "verdict": "A380 upper-deck windows among comfiest transatlantic economy seats"
+     },
+     {
+      "url": "https://liveandletsfly.com/british-airways-a320-economy-class-review-2025/",
+      "site": "Live and Let's Fly",
+      "date": "2025-09-15",
+      "verdict": "Boring but fine for a 90-minute hop"
+     }
+    ]
+   }
+  },
+  "AF": {
+   "first": {
+    "consensus": 5,
+    "product": "La Premiere suite, new (777-300ER)",
+    "summary": "Huge curtained suites with separate bed, superb ground service and dining; ranked among the world's best.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/reviews/air-france-la-premiere-first-class-suite-777/",
+      "site": "One Mile at a Time",
+      "date": "2025-06-11",
+      "verdict": "Spectacularly good, among the best first class anywhere"
+     },
+     {
+      "url": "https://samchui.com/videos/air-france-new-la-premiere-first-class-full-experience/",
+      "site": "Sam Chui",
+      "date": "2025-11-22",
+      "verdict": "Refined, distinctive suite with chaise and full bed"
+     }
+    ]
+   },
+   "business": {
+    "consensus": 4.5,
+    "product": "Business, new seat (A350 / refit 777)",
+    "summary": "Spacious private seats, free Starlink Wi-Fi and fine French catering; widely rated Europe's best business class.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/reviews/air-france-business-class-a350/",
+      "site": "One Mile at a Time",
+      "date": "2024-03-01",
+      "verdict": "Finest transatlantic business class among European airlines"
+     },
+     {
+      "url": "https://www.headforpoints.com/2026/01/19/review-air-france-business-class-a350/",
+      "site": "Head for Points",
+      "date": "2026-01-19",
+      "verdict": "Comfortable and well run; IFE and storage weak"
+     },
+     {
+      "url": "https://liveandletsfly.com/air-france-a350-business-class-first-impressions/",
+      "site": "Live and Let's Fly",
+      "date": "2026-08-18",
+      "verdict": "Best transatlantic premium cabin from a European carrier"
+     }
+    ]
+   },
+   "economy": {
+    "consensus": 3.5,
+    "product": "Economy (A350 / 787-9 / 777-300ER)",
+    "summary": "Comfortable modern cabins and courteous crews; catering better leaving Paris, occasional tech glitches.",
+    "citations": [
+     {
+      "url": "https://simpleflying.com/flight-review-air-france-boeing-787-9-dreamliner-economy-class/",
+      "site": "Simple Flying",
+      "date": "2024-02-17",
+      "verdict": "Competitive economy with French touches and professional crew"
+     },
+     {
+      "url": "https://thepointsguy.com/reviews/air-france-a350-900-economy-review/",
+      "site": "The Points Guy",
+      "date": "2025-02-24",
+      "verdict": "Comfortable transatlantic value despite some technical drawbacks"
+     },
+     {
+      "url": "https://liveandletsfly.com/air-france-777-economy-class-review/",
+      "site": "Live and Let's Fly",
+      "date": "2025-04-07",
+      "verdict": "Reasonably comfortable daytime crossing; good ex-Paris catering"
+     }
+    ]
+   }
+  },
+  "EK": {
+   "first": {
+    "consensus": 4.5,
+    "product": "First Class (A380, refreshed)",
+    "summary": "Shower spa, bar and lavish service make it memorable; the A380 suite design is ageing.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/reviews/emirates-first-class-airbus-a380/",
+      "site": "One Mile at a Time",
+      "date": "2024-04-21",
+      "verdict": "Exceptional luxury, though suite smaller than some rivals"
+     },
+     {
+      "url": "https://liveandletsfly.com/emirates-a380-first-class-first-impressions/",
+      "site": "Live and Let's Fly",
+      "date": "2026-07-24",
+      "verdict": "Dated decor, but superb crew, shower and bar"
+     }
+    ]
+   },
+   "business": {
+    "consensus": 3.5,
+    "product": "Business (A350 / refit 777 / A380)",
+    "summary": "Strong service, catering and the A380 bar; seats lack doors and trail rival Gulf suites.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/insights/emirates-a350-business-class/",
+      "site": "One Mile at a Time",
+      "date": "2026-02-16",
+      "verdict": "Well rounded: great soft product, seat not cutting-edge"
+     },
+     {
+      "url": "https://thepointsguy.com/airline/reviews/emirates-refurbished-777-business-class/",
+      "site": "The Points Guy",
+      "date": "2025-02-10",
+      "verdict": "Refit seats outdated and short on privacy"
+     },
+     {
+      "url": "https://www.headforpoints.com/2024/05/23/emirates-a380-business-class-review/",
+      "site": "Head for Points",
+      "date": "2024-05-23",
+      "verdict": "Excellent crew and bar; slow meals, no doors"
+     }
+    ]
+   }
+  },
+  "QR": {
+   "business": {
+    "consensus": 4.5,
+    "product": "Qsuite (777-300ER / A350)",
+    "summary": "Private door suites, dine-on-demand and polished service keep Qsuite a benchmark for business class.",
+    "citations": [
+     {
+      "url": "https://thepointsguy.com/airline/reviews/qatar-airways-qsuite-777/",
+      "site": "The Points Guy",
+      "date": "2024-12-09",
+      "verdict": "Still sets the long-haul business standard"
+     },
+     {
+      "url": "https://onemileatatime.com/reviews/qatar-airways-qsuites-business-class-777/",
+      "site": "One Mile at a Time",
+      "date": "2026-05-19",
+      "verdict": "Excellent across the board; A350 version slightly better"
+     },
+     {
+      "url": "https://simpleflying.com/flight-review-qatar-airways-boeing-777-qsuite-bangkok-doha/",
+      "site": "Simple Flying",
+      "date": "2024-08-06",
+      "verdict": "Delivered world-class comfort, privacy and service"
+     }
+    ]
+   }
+  },
+  "SQ": {
+   "business": {
+    "consensus": 4.5,
+    "product": "Business, long-haul (A350 / 777-300ER)",
+    "summary": "Very wide seats, exceptional service and plated meals; the angled, firm bed divides reviewers.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/reviews/singapore-airlines-business-class-777/",
+      "site": "One Mile at a Time",
+      "date": "2024-02-24",
+      "verdict": "Impeccable service and entertainment; bed on the firm side"
+     },
+     {
+      "url": "https://www.headforpoints.com/2024/07/01/review-singapore-airlines-a350-business-class-from-london-to-singapore/",
+      "site": "Head for Points",
+      "date": "2024-07-01",
+      "verdict": "Spacious, sturdy seat and excellent meals; choose bulkhead"
+     }
+    ]
+   }
+  },
+  "VS": {
+   "business": {
+    "consensus": 4,
+    "product": "Upper Class Suite (A350-1000)",
+    "summary": "Warm crews, good dining and the social Loft; seats show wear, awkward tray and little storage.",
+    "citations": [
+     {
+      "url": "https://www.headforpoints.com/2025/04/17/review-virgin-atlantic-upper-class-a350/",
+      "site": "Head for Points",
+      "date": "2025-04-17",
+      "verdict": "Still comfortable; crew lift a flawed seat design"
+     },
+     {
+      "url": "https://thepointsguy.com/airline/reviews/virgin-atlantic-a350-upper-class-review/",
+      "site": "The Points Guy",
+      "date": "2025-01-06",
+      "verdict": "Enjoyable service and dining; cabin wearing prematurely"
+     }
+    ]
+   }
+  },
+  "B6": {
+   "business": {
+    "consensus": 4.5,
+    "product": "Mint Suite / Mint (A321, A321LR)",
+    "summary": "Door suites on a narrowbody, excellent food and friendly crews; older A321s have dated screens.",
+    "citations": [
+     {
+      "url": "https://www.headforpoints.com/2024/05/14/review-jetblue-mint-business-class-flight-london-heathrow-to-boston/",
+      "site": "Head for Points",
+      "date": "2024-05-14",
+      "verdict": "Friendly crew and smart design legacy carriers should copy"
+     },
+     {
+      "url": "https://liveandletsfly.com/jetblue-a321-mint-review-2024/",
+      "site": "Live and Let's Fly",
+      "date": "2024-07-10",
+      "verdict": "Reliably comfortable, excellent service; entertainment dated"
+     },
+     {
+      "url": "https://liveandletsfly.com/jetblue-a321-mint-review-2025/",
+      "site": "Live and Let's Fly",
+      "date": "2025-10-24",
+      "verdict": "Consistently excellent food and service; rare Wi-Fi outage"
+     }
+    ]
+   },
+   "economy": {
+    "consensus": 4,
+    "product": "Core economy (A321 / A321LR / A220)",
+    "summary": "Most standard legroom among US airlines plus free Wi-Fi; meals vary and some cabins look worn.",
+    "citations": [
+     {
+      "url": "https://thepointsguy.com/airline/reviews/jetblue-economy-a321lr-review/",
+      "site": "The Points Guy",
+      "date": "2024-12-09",
+      "verdict": "Comfortable transatlantic economy with an inventive meal approach"
+     },
+     {
+      "url": "https://liveandletsfly.com/jetblue-a321lr-economy-class-review/",
+      "site": "Live and Let's Fly",
+      "date": "2025-07-16",
+      "verdict": "Excellent value: legroom, free Wi-Fi, decent meals"
+     },
+     {
+      "url": "https://liveandletsfly.com/jetblue-a220-300-economy-class-review/",
+      "site": "Live and Let's Fly",
+      "date": "2024-07-29",
+      "verdict": "Legroom and Wi-Fi good; worn A220, flat service"
+     }
+    ]
+   }
+  },
+  "AS": {
+   "first": {
+    "consensus": 4,
+    "product": "First Class (737 MAX 9 / 737-800)",
+    "summary": "Generous legroom, good food and friendly crews; no seatback screens and older Wi-Fi can fail.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/reviews/alaska-first-class-737-max/",
+      "site": "One Mile at a Time",
+      "date": "2024-12-08",
+      "verdict": "Best non-flat-bed domestic first class in the US"
+     },
+     {
+      "url": "https://liveandletsfly.com/alaska-airlines-737-9-max-first-class-review/",
+      "site": "Live and Let's Fly",
+      "date": "2026-01-12",
+      "verdict": "Good food and crew; Wi-Fi unusable half the flight"
+     },
+     {
+      "url": "https://liveandletsfly.com/review-alaska-airlines-737-800-first-class/",
+      "site": "Live and Let's Fly",
+      "date": "2026-01-19",
+      "verdict": "New seats, excellent crew, quality meal"
+     }
+    ]
+   }
+  },
+  "TK": {
+   "business": {
+    "consensus": 3.5,
+    "product": "Business (787-9 / A350)",
+    "summary": "Catering praised by every reviewer; narrow seats, uneven service and chaotic ground handling hold it back.",
+    "citations": [
+     {
+      "url": "https://thepointsguy.com/airline/reviews/turkish-a350-900-ist-jnb-business/",
+      "site": "The Points Guy",
+      "date": "2026-05-22",
+      "verdict": "Comfy seats, standout food, but operationally uneven"
+     },
+     {
+      "url": "https://thepointsguy.com/airline/reviews/turkish-airlines-787-9-business/",
+      "site": "The Points Guy",
+      "date": "2024-06-28",
+      "verdict": "Good food and IFE; service undermines the experience"
+     },
+     {
+      "url": "https://liveandletsfly.com/turkish-airlines-a350-turkoflot-business-class-review/",
+      "site": "Live and Let's Fly",
+      "date": "2024-04-02",
+      "verdict": "Private ex-Aeroflot seat and great food; reliability issues"
+     }
+    ]
+   }
+  },
+  "CX": {
+   "business": {
+    "consensus": 4.5,
+    "product": "Aria Suite (777-300ER)",
+    "summary": "Door suites with 4K screens and excellent bedding; footwell tight and still on few aircraft.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/reviews/cathay-pacific-aria-suite-business-class-777/",
+      "site": "One Mile at a Time",
+      "date": "2025-03-06",
+      "verdict": "Among the best business class experiences in the world"
+     },
+     {
+      "url": "https://thepointsguy.com/airline/reviews/cathay-pacific-business-class-aria-suite/",
+      "site": "The Points Guy",
+      "date": "2025-03-21",
+      "verdict": "Sophisticated, tech-rich and very comfortable"
+     },
+     {
+      "url": "https://www.headforpoints.com/2025/01/29/review-cathay-pacific-aria-suite-from-london-to-hong-kong/",
+      "site": "Head for Points",
+      "date": "2025-01-29",
+      "verdict": "Worthwhile upgrade; smaller footwell for tall flyers"
+     }
+    ]
+   }
+  },
+  "JL": {
+   "first": {
+    "consensus": 5,
+    "product": "First Class (A350-1000)",
+    "summary": "Vast suites, superb Japanese service and cuisine; reviewers unanimously place it at the very top.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/reviews/japan-airlines-first-class-a350/",
+      "site": "One Mile at a Time",
+      "date": "2024-03-15",
+      "verdict": "Possibly the reviewer's favourite first class anywhere"
+     },
+     {
+      "url": "https://liveandletsfly.com/jal-a350-1000-first-class-review/",
+      "site": "Live and Let's Fly",
+      "date": "2024-08-05",
+      "verdict": "One of the best flights of the reviewer's life"
+     },
+     {
+      "url": "https://thepointsguy.com/airline/reviews/japan-airlines-a350-new-first-class-review/",
+      "site": "The Points Guy",
+      "date": "2025-06-04",
+      "verdict": "Exceptional privacy, space, service and food"
+     }
+    ]
+   },
+   "business": {
+    "consensus": 4.5,
+    "product": "Business (A350-1000, Safran Unity suite)",
+    "summary": "Tall-walled private suites, strong tech and excellent food; only minor comfort quibbles.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/reviews/japan-airlines-business-class-a350/",
+      "site": "One Mile at a Time",
+      "date": "2024-12-28",
+      "verdict": "One of the world's best business class experiences"
+     },
+     {
+      "url": "https://www.headforpoints.com/2025/04/11/review-jal-business-class-from-tokyo-to-london/",
+      "site": "Head for Points",
+      "date": "2025-04-11",
+      "verdict": "Private, spacious and tasty; small comfort gaps"
+     }
+    ]
+   }
+  },
+  "KL": {
+   "business": {
+    "consensus": 3.5,
+    "product": "World Business Class (refit 777 / 787-10)",
+    "summary": "Solid seats and friendly crews; 787s lack doors, and Wi-Fi and catering can disappoint.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/reviews/klm-business-class-777/",
+      "site": "One Mile at a Time",
+      "date": "2024-04-08",
+      "verdict": "Good new seat; Wi-Fi and meal shortages hurt"
+     },
+     {
+      "url": "https://thepointsguy.com/airline/reviews/klm-business-class-new/",
+      "site": "The Points Guy",
+      "date": "2024-08-30",
+      "verdict": "Meaningful upgrade, though privacy panels are flimsy"
+     },
+     {
+      "url": "https://liveandletsfly.com/klm-787-10-business-class/",
+      "site": "Live and Let's Fly",
+      "date": "2025-04-22",
+      "verdict": "Solid but average; warm cabin, worn interior"
+     }
+    ]
+   }
+  },
+  "LX": {
+   "first": {
+    "consensus": 4,
+    "product": "First (777-300ER; SWISS Senses on A350)",
+    "summary": "Spacious suites, excellent food and friendly service; very good but short of the world's elite.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/reviews/swiss-first-class-777/",
+      "site": "One Mile at a Time",
+      "date": "2024-03-29",
+      "verdict": "Excellent, though just below the world's top first class"
+     },
+     {
+      "url": "https://onemileatatime.com/reviews/swiss-first-class-a350/",
+      "site": "One Mile at a Time",
+      "date": "2026-09-13",
+      "verdict": "Very good Senses suite, but little wow factor"
+     }
+    ]
+   },
+   "business": {
+    "consensus": 3.5,
+    "product": "Business (legacy A330 / 777; SWISS Senses on A350)",
+    "summary": "New Senses A350 seat a big step, though one reviewer found it hard; legacy cabins feel dated.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/reviews/swiss-senses-business-class-a350/",
+      "site": "One Mile at a Time",
+      "date": "2026-04-13",
+      "verdict": "Senses seat a big upgrade; amenities and service uneven"
+     },
+     {
+      "url": "https://liveandletsfly.com/new-swiss-a350-900-business-class-review/",
+      "site": "Live and Let's Fly",
+      "date": "2025-11-24",
+      "verdict": "Improved, but hard seat and cramped layout"
+     },
+     {
+      "url": "https://onemileatatime.com/reviews/swiss-business-class-a330/",
+      "site": "One Mile at a Time",
+      "date": "2024-02-10",
+      "verdict": "Legacy A330 cabin dated and underwhelming"
+     }
+    ]
+   }
+  },
+  "EY": {
+   "first": {
+    "consensus": 5,
+    "product": "First Apartment (A380)",
+    "summary": "Enclosed apartment with separate bed and shower; still top-tier a decade on, on few routes.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/reviews/etihad-first-class-a380/",
+      "site": "One Mile at a Time",
+      "date": "2024-01-04",
+      "verdict": "Among the world's premier first class experiences"
+     },
+     {
+      "url": "https://thepointsguy.com/airline/reviews/etihad-first-class-apartment/",
+      "site": "The Points Guy",
+      "date": "2024-12-09",
+      "verdict": "Still outstanding a decade after launch"
+     }
+    ]
+   }
+  },
+  "KE": {
+   "business": {
+    "consensus": 3.5,
+    "product": "Prestige Suites 2.0 (787-10); older Prestige on 777",
+    "summary": "New 787-10 suites modern and comfortable; older 777 seats dated; service pleasant, not exceptional.",
+    "citations": [
+     {
+      "url": "https://onemileatatime.com/reviews/korean-air-business-class-787/",
+      "site": "One Mile at a Time",
+      "date": "2024-12-15",
+      "verdict": "Good experience, just not amazing"
+     },
+     {
+      "url": "https://thepointsguy.com/airline/reviews/korean-air-business-class/",
+      "site": "The Points Guy",
+      "date": "2025-04-02",
+      "verdict": "Sleek suites and tech; doors not yet usable"
+     },
+     {
+      "url": "https://liveandletsfly.com/review-korean-air-777-300er-prestige-business-class/",
+      "site": "Live and Let's Fly",
+      "date": "2025-05-30",
+      "verdict": "Pleasant service; aging, dull 777 cabin"
+     }
+    ]
+   }
+  },
+  "BR": {
+   "business": {
+    "consensus": 4.5,
+    "product": "Royal Laurel (777-300ER)",
+    "summary": "Older seats, but outstanding service, food and amenities earn consistent praise from reviewers.",
+    "citations": [
+     {
+      "url": "https://www.headforpoints.com/2026/02/09/review-eva-air-business-class-from-bangkok-to-london/",
+      "site": "Head for Points",
+      "date": "2026-02-09",
+      "verdict": "Service masterclass and excellent dining despite older seats"
+     },
+     {
+      "url": "https://thepointsguy.com/airline/reviews/eva-air-777-business-class/",
+      "site": "The Points Guy",
+      "date": "2025-05-26",
+      "verdict": "Many touches made it feel like first class"
+     }
+    ]
+   }
+  },
+  "WN": {
+   "economy": {
+    "consensus": 3,
+    "product": "Economy / Extra Legroom (737)",
+    "summary": "No-frills economy; new extra-legroom rows help, but Wi-Fi and onboard service can underwhelm.",
+    "citations": [
+     {
+      "url": "https://thepointsguy.com/airline/southwest-airlines-extra-legroom-seats-experience/",
+      "site": "The Points Guy",
+      "date": "2025-10-30",
+      "verdict": "Extra-legroom rows a real comfort gain, not first"
+     },
+     {
+      "url": "https://liveandletsfly.com/southwest-737-700-review/",
+      "site": "Live and Let's Fly",
+      "date": "2025-08-27",
+      "verdict": "Predictable but underwhelming: no Wi-Fi, minimal service"
+     }
+    ]
+   }
+  },
+  "IB": {
+   "business": {
+    "consensus": 3.5,
+    "product": "Business (A350 'Next' / A321XLR)",
+    "summary": "A350 seats with doors well liked; narrowbody XLR comfortable but tight, with pared-back service.",
+    "citations": [
+     {
+      "url": "https://simpleflying.com/flight-review-iberia-airbus-a350-next-business-class-buenos-aires-madrid/",
+      "site": "Simple Flying",
+      "date": "2024-01-12",
+      "verdict": "Doors and quiet cabin impressed; would gladly refly"
+     },
+     {
+      "url": "https://onemileatatime.com/reviews/iberia-business-class-a321xlr/",
+      "site": "One Mile at a Time",
+      "date": "2025-07-18",
+      "verdict": "Decent narrowbody comfort, tight seat, slow service"
+     },
+     {
+      "url": "https://www.headforpoints.com/2025/01/21/review-iberia-business-class-airbus-a321xlr/",
+      "site": "Head for Points",
+      "date": "2025-01-21",
+      "verdict": "Surprisingly comfortable seat; service compromises on XLR"
+     }
+    ]
    }
   }
  }

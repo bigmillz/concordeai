@@ -5,7 +5,7 @@
   "baseline": 0.72,
   "ratings": {
     "4Y": {
-      "rating": 0.79,
+      "rating": 0.8,
       "note": "Lufthansa Group leisure airline; A330 Ocean Blue refit from 2027",
       "basis": "Skytrax economy 4 stars on its leisure scale (page 2025), the only published score found",
       "sources": [
@@ -17,11 +17,11 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
       "cabins": {
         "premium_economy": {
-          "rating": 0.79,
+          "rating": 0.8,
           "basis": "Skytrax premium economy 4 stars (page 2025)"
         },
         "business": {
-          "rating": 0.79,
+          "rating": 0.8,
           "basis": "Skytrax business 4 stars (page 2025)"
         }
       }
@@ -72,15 +72,17 @@
           "basis": "Skytrax premium economy 3.5 stars (page 2020), AirHelp 7.64 (2025), ACSI 78 (2026), J.D. Power 624 (2026)"
         },
         "business": {
-          "rating": 0.64,
-          "basis": "Skytrax business 3 stars (page 2020), AirHelp 7.64 (2025), ACSI 78 (2026), J.D. Power 624 (2026)"
+          "rating": 0.7,
+          "basis": "Skytrax business 3 stars (page 2020), reviewers 4.5/5 (Flagship Suite business (787-9P)), AirHelp 7.64 (2025), ACSI 78 (2026), J.D. Power 624 (2026)",
+          "product": "Flagship Suite business (787-9P)"
         },
         "first": {
-          "rating": 0.72,
-          "basis": "Skytrax first 4 stars (page 2020), AirHelp 7.64 (2025), ACSI 78 (2026), J.D. Power 624 (2026)",
+          "rating": 0.68,
+          "basis": "Skytrax first 4 stars (page 2020), reviewers 3/5 (Domestic First (A321neo / 737-800)), AirHelp 7.64 (2025), ACSI 78 (2026), J.D. Power 624 (2026)",
+          "product": "Domestic First (A321neo / 737-800)",
           "short_haul": {
-            "rating": 0.68,
-            "basis": "Skytrax short-haul first 3.5 stars (page 2020), AirHelp 7.64 (2025), ACSI 78 (2026), J.D. Power 624 (2026)"
+            "rating": 0.66,
+            "basis": "Skytrax short-haul first 3.5 stars (page 2020), reviewers 3/5 (Domestic First (A321neo / 737-800)), AirHelp 7.64 (2025), ACSI 78 (2026), J.D. Power 624 (2026)"
           }
         }
       }
@@ -111,32 +113,34 @@
     "AF": {
       "rating": 0.74,
       "note": "Mixed cabin generations across the widebody fleet",
-      "basis": "Skytrax economy 4 stars (page 2021), #11 World's Best Economy Class 2026, AirHelp 7.59 (2025)",
+      "basis": "Skytrax economy 4 stars (page 2021), reviewers 3.5/5, #11 World's Best Economy Class 2026, AirHelp 7.59 (2025)",
       "published_sources": [
         "https://skytraxratings.com/airlines/air-france-rating",
         "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines"
       ],
       "cabins": {
         "premium_economy": {
-          "rating": 0.81,
+          "rating": 0.82,
           "basis": "Skytrax premium economy 4 stars (page 2021), #9 World's Best Premium Economy 2026, AirHelp 7.59 (2025)"
         },
         "business": {
-          "rating": 0.75,
-          "basis": "Skytrax business 3.5 stars (page 2021), #8 World's Best Business Class 2026, AirHelp 7.59 (2025)",
+          "rating": 0.82,
+          "basis": "Skytrax business 3.5 stars (page 2021), reviewers 4.5/5 (Business, new seat (A350 / refit 777)), #8 World's Best Business Class 2026, AirHelp 7.59 (2025)",
+          "product": "Business, new seat (A350 / refit 777)",
           "short_haul": {
-            "rating": 0.81,
-            "basis": "Skytrax short-haul business 4 stars (page 2021), #8 World's Best Business Class 2026, AirHelp 7.59 (2025)"
+            "rating": 0.86,
+            "basis": "Skytrax short-haul business 4 stars (page 2021), reviewers 4.5/5 (Business, new seat (A350 / refit 777)), #8 World's Best Business Class 2026, AirHelp 7.59 (2025)"
           }
         },
         "first": {
-          "rating": 0.85,
-          "basis": "Skytrax first 4 stars (page 2021), #1 World's Best First Class 2026, AirHelp 7.59 (2025)"
+          "rating": 0.92,
+          "basis": "Skytrax first 4 stars (page 2021), reviewers 5/5 (La Premiere suite, new (777-300ER)), #1 World's Best First Class 2026, AirHelp 7.59 (2025)",
+          "product": "La Premiere suite, new (777-300ER)"
         }
       }
     },
     "AM": {
-      "rating": 0.66,
+      "rating": 0.67,
       "note": "Strong 2025 punctuality; seatback screens and free meals on mainline jets",
       "basis": "Skytrax economy 3 stars (page 2020), AirHelp 7.84 (2025)",
       "sources": [
@@ -168,8 +172,9 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
       "cabins": {
         "first": {
-          "rating": 0.61,
-          "basis": "Skytrax first 3.5 stars (page 2020), AirHelp 5.95 (2025), ACSI 75 (2026), J.D. Power 648 (2026)"
+          "rating": 0.64,
+          "basis": "Skytrax first 3.5 stars (page 2020), reviewers 4/5 (First Class (737 MAX 9 / 737-800)), AirHelp 5.95 (2025), ACSI 75 (2026), J.D. Power 648 (2026)",
+          "product": "First Class (737 MAX 9 / 737-800)"
         }
       }
     },
@@ -192,7 +197,7 @@
       }
     },
     "AY": {
-      "rating": 0.77,
+      "rating": 0.78,
       "note": "Economy 4 stars both hauls; AirHelp on-time 7.3/10",
       "basis": "Skytrax economy 4 stars (page 2020), AirHelp 7.41 (2025)",
       "sources": [
@@ -204,10 +209,10 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
       "cabins": {
         "business": {
-          "rating": 0.77,
+          "rating": 0.78,
           "basis": "Skytrax business 4 stars (page 2020), AirHelp 7.41 (2025)",
           "short_haul": {
-            "rating": 0.7,
+            "rating": 0.71,
             "basis": "Skytrax short-haul business 3.5 stars (page 2020), AirHelp 7.41 (2025)"
           }
         }
@@ -225,7 +230,7 @@
       "reviewed": false,
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
       "short_haul": {
-        "rating": 0.69,
+        "rating": 0.7,
         "note": "Short-haul economy rated 3.5 stars by Skytrax against 4 long-haul",
         "basis": "Skytrax short-haul economy 3.5 stars (page 2024), AirHelp 7.23 (2025)"
       },
@@ -241,9 +246,9 @@
       }
     },
     "B6": {
-      "rating": 0.62,
+      "rating": 0.65,
       "note": "Screens and free Wi-Fi fleetwide; claims handling sinks its AirHelp score",
-      "basis": "Skytrax economy 3.5 stars (page 2021), AirHelp 5.31 (2025), ACSI 78 (2026), J.D. Power 655 (2026)",
+      "basis": "Skytrax economy 3.5 stars (page 2021), reviewers 4/5, AirHelp 5.31 (2025), ACSI 78 (2026), J.D. Power 655 (2026)",
       "sources": [
         "https://skytraxratings.com/airlines/jetblue-airways-rating",
         "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
@@ -255,45 +260,47 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
       "cabins": {
         "business": {
-          "rating": 0.66,
-          "basis": "Skytrax business 4 stars (page 2021), AirHelp 5.31 (2025), ACSI 78 (2026), J.D. Power 655 (2026)"
+          "rating": 0.69,
+          "basis": "Skytrax business 4 stars (page 2021), reviewers 4.5/5 (Mint Suite / Mint (A321, A321LR)), AirHelp 5.31 (2025), ACSI 78 (2026), J.D. Power 655 (2026)",
+          "product": "Mint Suite / Mint (A321, A321LR)"
         }
       }
     },
     "BA": {
       "rating": 0.78,
       "note": "Full service, current cabin, through bags, real irregular-ops desk",
-      "basis": "Skytrax economy 3.5 stars (page 2026), #20 World's Best Economy Class 2026, AirHelp 7.44 (2025)",
+      "basis": "Skytrax economy 3.5 stars (page 2026), reviewers 3/5, #20 World's Best Economy Class 2026, AirHelp 7.44 (2025)",
       "published_sources": [
         "https://skytraxratings.com/airlines/british-airways-rating",
         "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines"
       ],
       "cabins": {
         "premium_economy": {
-          "rating": 0.7,
+          "rating": 0.71,
           "basis": "Skytrax premium economy 3.5 stars (page 2026), #12 World's Best Premium Economy 2026, AirHelp 7.44 (2025)"
         },
         "business": {
-          "rating": 0.7,
-          "basis": "Skytrax business 3.5 stars (page 2026), #19 World's Best Business Class 2026, AirHelp 7.44 (2025)",
+          "rating": 0.74,
+          "basis": "Skytrax business 3.5 stars (page 2026), reviewers 4/5 (Club Suite (777 / A350 / 787-10)), #19 World's Best Business Class 2026, AirHelp 7.44 (2025)",
+          "product": "Club Suite (777 / A350 / 787-10)",
           "short_haul": {
-            "rating": 0.64,
-            "basis": "Skytrax short-haul business 3 stars (page 2026), #19 World's Best Business Class 2026, AirHelp 7.44 (2025)"
+            "rating": 0.71,
+            "basis": "Skytrax short-haul business 3 stars (page 2026), reviewers 4/5 (Club Suite (777 / A350 / 787-10)), #19 World's Best Business Class 2026, AirHelp 7.44 (2025)"
           }
         },
         "first": {
-          "rating": 0.7,
+          "rating": 0.71,
           "basis": "Skytrax first 3.5 stars (page 2026), AirHelp 7.44 (2025)"
         }
       },
       "short_haul": {
-        "rating": 0.72,
+        "rating": 0.74,
         "note": "Short-haul economy rated 3 stars by Skytrax against 3.5 long-haul",
-        "basis": "Skytrax short-haul economy 3 stars (page 2026), #20 World's Best Economy Class 2026, AirHelp 7.44 (2025)"
+        "basis": "Skytrax short-haul economy 3 stars (page 2026), reviewers 3/5, #20 World's Best Economy Class 2026, AirHelp 7.44 (2025)"
       }
     },
     "BR": {
-      "rating": 0.88,
+      "rating": 0.89,
       "note": "Skytrax 5-star; regional A321 economy lacks seatback screens",
       "basis": "Skytrax economy 5 stars (page 2024), #4 World's Best Economy Class 2026, AirHelp 7.1 (2025)",
       "sources": [
@@ -305,15 +312,16 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
       "cabins": {
         "premium_economy": {
-          "rating": 0.82,
+          "rating": 0.83,
           "basis": "Skytrax premium economy 4 stars (page 2024), #1 World's Best Premium Economy 2026, AirHelp 7.1 (2025)"
         },
         "business": {
-          "rating": 0.85,
-          "basis": "Skytrax business 4.5 stars (page 2024), #10 World's Best Business Class 2026, AirHelp 7.1 (2025)",
+          "rating": 0.86,
+          "basis": "Skytrax business 4.5 stars (page 2024), reviewers 4.5/5 (Royal Laurel (777-300ER)), #10 World's Best Business Class 2026, AirHelp 7.1 (2025)",
+          "product": "Royal Laurel (777-300ER)",
           "short_haul": {
-            "rating": 0.88,
-            "basis": "Skytrax short-haul business 5 stars (page 2024), #10 World's Best Business Class 2026, AirHelp 7.1 (2025)"
+            "rating": 0.89,
+            "basis": "Skytrax short-haul business 5 stars (page 2024), reviewers 4.5/5 (Royal Laurel (777-300ER)), #10 World's Best Business Class 2026, AirHelp 7.1 (2025)"
           }
         }
       }
@@ -359,7 +367,7 @@
       }
     },
     "CX": {
-      "rating": 0.86,
+      "rating": 0.87,
       "note": "Skytrax 5-star, #3 in 2026; AirHelp on-time 7.6/10",
       "basis": "Skytrax economy 4.5 stars (page 2020), #2 World's Best Economy Class 2026, AirHelp 6.72 (2025)",
       "sources": [
@@ -370,21 +378,22 @@
       "reviewed": false,
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
       "short_haul": {
-        "rating": 0.86,
+        "rating": 0.87,
         "note": "Short-haul economy rated 5 stars by Skytrax against 4.5 long-haul",
         "basis": "Skytrax short-haul economy 5 stars (page 2020), #2 World's Best Economy Class 2026, AirHelp 6.72 (2025)"
       },
       "cabins": {
         "premium_economy": {
-          "rating": 0.83,
+          "rating": 0.84,
           "basis": "Skytrax premium economy 4.5 stars (page 2020), #4 World's Best Premium Economy 2026, AirHelp 6.72 (2025)"
         },
         "business": {
-          "rating": 0.86,
-          "basis": "Skytrax business 5 stars (page 2020), #3 World's Best Business Class 2026, AirHelp 6.72 (2025)"
+          "rating": 0.87,
+          "basis": "Skytrax business 5 stars (page 2020), reviewers 4.5/5 (Aria Suite (777-300ER)), #3 World's Best Business Class 2026, AirHelp 6.72 (2025)",
+          "product": "Aria Suite (777-300ER)"
         },
         "first": {
-          "rating": 0.83,
+          "rating": 0.84,
           "basis": "Skytrax first 4.5 stars (page 2020), #5 World's Best First Class 2026, AirHelp 6.72 (2025)"
         }
       }
@@ -414,11 +423,11 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
       "cabins": {
         "premium_economy": {
-          "rating": 0.71,
+          "rating": 0.72,
           "basis": "Skytrax premium economy 4 stars (page 2025), AirHelp 6.46 (2025)"
         },
         "business": {
-          "rating": 0.71,
+          "rating": 0.72,
           "basis": "Skytrax business 4 stars (page 2025), AirHelp 6.46 (2025)"
         }
       }
@@ -426,7 +435,7 @@
     "DL": {
       "rating": 0.8,
       "note": "Consistent transatlantic operation",
-      "basis": "Skytrax economy 3.5 stars (page 2020), #10 World's Best Economy Class 2026, AirHelp 7.46 (2025), ACSI 79 (2026), J.D. Power 667 (2026)",
+      "basis": "Skytrax economy 3.5 stars (page 2020), reviewers 3.5/5, #10 World's Best Economy Class 2026, AirHelp 7.46 (2025), ACSI 79 (2026), J.D. Power 667 (2026)",
       "published_sources": [
         "https://skytraxratings.com/airlines/delta-air-lines-rating",
         "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
@@ -439,12 +448,14 @@
           "basis": "Skytrax premium economy 3.5 stars (page 2020), #7 World's Best Premium Economy 2026, AirHelp 7.46 (2025), ACSI 79 (2026), J.D. Power 667 (2026)"
         },
         "business": {
-          "rating": 0.71,
-          "basis": "Skytrax business 3.5 stars (page 2020), #13 World's Best Business Class 2026, AirHelp 7.46 (2025), ACSI 79 (2026), J.D. Power 667 (2026)"
+          "rating": 0.73,
+          "basis": "Skytrax business 3.5 stars (page 2020), reviewers 4/5 (Delta One Suite (A350-900)), #13 World's Best Business Class 2026, AirHelp 7.46 (2025), ACSI 79 (2026), J.D. Power 667 (2026)",
+          "product": "Delta One Suite (A350-900)"
         },
         "first": {
           "rating": 0.71,
-          "basis": "Skytrax first 3.5 stars (page 2020), AirHelp 7.46 (2025), ACSI 79 (2026), J.D. Power 667 (2026)"
+          "basis": "Skytrax first 3.5 stars (page 2020), reviewers 3.5/5 (Delta First, domestic (A321neo)), AirHelp 7.46 (2025), ACSI 79 (2026), J.D. Power 667 (2026)",
+          "product": "Delta First, domestic (A321neo)"
         }
       }
     },
@@ -494,13 +505,13 @@
       ],
       "cabins": {
         "business": {
-          "rating": 0.72,
+          "rating": 0.73,
           "basis": "Skytrax business 4 stars (page 2025), AirHelp 6.61 (2025)"
         }
       }
     },
     "EK": {
-      "rating": 0.77,
+      "rating": 0.78,
       "note": "All-widebody fleet with seatback screens everywhere; AirHelp on-time 7.7/10",
       "basis": "Skytrax economy 4 stars (page 2020), AirHelp 7.45 (2025)",
       "sources": [
@@ -512,15 +523,17 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
       "cabins": {
         "business": {
-          "rating": 0.77,
-          "basis": "Skytrax business 4 stars (page 2020), #11 World's Best Business Class 2026, AirHelp 7.45 (2025)"
+          "rating": 0.74,
+          "basis": "Skytrax business 4 stars (page 2020), reviewers 3.5/5 (Business (A350 / refit 777 / A380)), #11 World's Best Business Class 2026, AirHelp 7.45 (2025)",
+          "product": "Business (A350 / refit 777 / A380)"
         },
         "first": {
           "rating": 0.91,
-          "basis": "Skytrax first 5 stars (page 2020), #4 World's Best First Class 2026, AirHelp 7.45 (2025)",
+          "basis": "Skytrax first 5 stars (page 2020), reviewers 4.5/5 (First Class (A380, refreshed)), #4 World's Best First Class 2026, AirHelp 7.45 (2025)",
+          "product": "First Class (A380, refreshed)",
           "short_haul": {
-            "rating": 0.81,
-            "basis": "Skytrax short-haul first 4 stars (page 2020), #4 World's Best First Class 2026, AirHelp 7.45 (2025)"
+            "rating": 0.85,
+            "basis": "Skytrax short-haul first 4 stars (page 2020), reviewers 4.5/5 (First Class (A380, refreshed)), #4 World's Best First Class 2026, AirHelp 7.45 (2025)"
           }
         }
       }
@@ -535,7 +548,7 @@
       ]
     },
     "EY": {
-      "rating": 0.74,
+      "rating": 0.75,
       "note": "AirHelp 2025 #2; most narrowbodies stream only, no seatback screens",
       "basis": "Skytrax economy 3.5 stars (page 2021), AirHelp 8.07 (2025)",
       "sources": [
@@ -547,15 +560,16 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
       "cabins": {
         "business": {
-          "rating": 0.81,
+          "rating": 0.82,
           "basis": "Skytrax business 4 stars (page 2021), #16 World's Best Business Class 2026, AirHelp 8.07 (2025)"
         },
         "first": {
-          "rating": 0.94,
-          "basis": "Skytrax first 5 stars (page 2021), AirHelp 8.07 (2025)",
+          "rating": 0.95,
+          "basis": "Skytrax first 5 stars (page 2021), reviewers 5/5 (First Apartment (A380)), AirHelp 8.07 (2025)",
+          "product": "First Apartment (A380)",
           "short_haul": {
-            "rating": 0.88,
-            "basis": "Skytrax short-haul first 4.5 stars (page 2021), AirHelp 8.07 (2025)"
+            "rating": 0.92,
+            "basis": "Skytrax short-haul first 4.5 stars (page 2021), reviewers 5/5 (First Apartment (A380)), AirHelp 8.07 (2025)"
           }
         }
       }
@@ -588,7 +602,7 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
     },
     "FI": {
-      "rating": 0.68,
+      "rating": 0.69,
       "note": "3-star, one economy product; AirHelp on-time 8.0/10, claims 5.3",
       "basis": "Skytrax economy 3.5 stars (page 2020), AirHelp 7.07 (2025)",
       "sources": [
@@ -600,11 +614,11 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
       "cabins": {
         "premium_economy": {
-          "rating": 0.68,
+          "rating": 0.69,
           "basis": "Skytrax premium economy 3.5 stars (page 2020), AirHelp 7.07 (2025)"
         },
         "business": {
-          "rating": 0.68,
+          "rating": 0.69,
           "basis": "Skytrax business 3.5 stars (page 2020), AirHelp 7.07 (2025)"
         }
       }
@@ -619,7 +633,7 @@
       ]
     },
     "G4": {
-      "rating": 0.38,
+      "rating": 0.37,
       "note": "Leisure ULCC, domestic only; above J.D. Power economy segment average",
       "basis": "Skytrax economy 3 stars on its low-cost scale (page 2020), AirHelp 5.05 (2025), J.D. Power 630 (2026)",
       "sources": [
@@ -647,11 +661,11 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
       "cabins": {
         "business": {
-          "rating": 0.66,
+          "rating": 0.67,
           "basis": "Skytrax business 3.5 stars (page 2020), AirHelp 6.73 (2025)"
         },
         "first": {
-          "rating": 0.66,
+          "rating": 0.67,
           "basis": "Skytrax first 3.5 stars (page 2020), AirHelp 6.73 (2025)"
         }
       }
@@ -678,17 +692,18 @@
       ],
       "cabins": {
         "premium_economy": {
-          "rating": 0.75,
+          "rating": 0.76,
           "basis": "Skytrax premium economy 4 stars (page 2023), #11 World's Best Premium Economy 2026, AirHelp 7.16 (2025)"
         },
         "business": {
-          "rating": 0.75,
-          "basis": "Skytrax business 4 stars (page 2023), #17 World's Best Business Class 2026, AirHelp 7.16 (2025)"
+          "rating": 0.73,
+          "basis": "Skytrax business 4 stars (page 2023), reviewers 3.5/5 (Business (A350 'Next' / A321XLR)), #17 World's Best Business Class 2026, AirHelp 7.16 (2025)",
+          "product": "Business (A350 'Next' / A321XLR)"
         }
       }
     },
     "JL": {
-      "rating": 0.9,
+      "rating": 0.91,
       "note": "Domestic 767/737 lack screens; international Sky Wider has 33-34in pitch",
       "basis": "Skytrax economy 5 stars (page 2022), #6 World's Best Economy Class 2026, AirHelp 7.32 (2025)",
       "sources": [
@@ -704,21 +719,23 @@
           "basis": "Skytrax premium economy 4 stars (page 2022), #6 World's Best Premium Economy 2026, AirHelp 7.32 (2025)"
         },
         "business": {
-          "rating": 0.86,
-          "basis": "Skytrax business 4.5 stars (page 2022), #9 World's Best Business Class 2026, AirHelp 7.32 (2025)",
+          "rating": 0.87,
+          "basis": "Skytrax business 4.5 stars (page 2022), reviewers 4.5/5 (Business (A350-1000, Safran Unity suite)), #9 World's Best Business Class 2026, AirHelp 7.32 (2025)",
+          "product": "Business (A350-1000, Safran Unity suite)",
           "short_haul": {
-            "rating": 0.9,
-            "basis": "Skytrax short-haul business 5 stars (page 2022), #9 World's Best Business Class 2026, AirHelp 7.32 (2025)"
+            "rating": 0.91,
+            "basis": "Skytrax short-haul business 5 stars (page 2022), reviewers 4.5/5 (Business (A350-1000, Safran Unity suite)), #9 World's Best Business Class 2026, AirHelp 7.32 (2025)"
           }
         },
         "first": {
-          "rating": 0.9,
-          "basis": "Skytrax first 5 stars (page 2022), #7 World's Best First Class 2026, AirHelp 7.32 (2025)"
+          "rating": 0.91,
+          "basis": "Skytrax first 5 stars (page 2022), reviewers 5/5 (First Class (A350-1000)), #7 World's Best First Class 2026, AirHelp 7.32 (2025)",
+          "product": "First Class (A350-1000)"
         }
       }
     },
     "KE": {
-      "rating": 0.79,
+      "rating": 0.8,
       "note": "Skytrax 5-star; AirHelp 2025 #90, near-zero claims-handling sub-score",
       "basis": "Skytrax economy 5 stars (page 2025), #14 World's Best Economy Class 2026, AirHelp 5.28 (2025)",
       "sources": [
@@ -730,15 +747,16 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
       "cabins": {
         "business": {
-          "rating": 0.66,
-          "basis": "Skytrax business 4 stars (page 2025), AirHelp 5.28 (2025)",
+          "rating": 0.63,
+          "basis": "Skytrax business 4 stars (page 2025), reviewers 3.5/5 (Prestige Suites 2.0 (787-10); older Prestige on 777), AirHelp 5.28 (2025)",
+          "product": "Prestige Suites 2.0 (787-10); older Prestige on 777",
           "short_haul": {
-            "rating": 0.72,
-            "basis": "Skytrax short-haul business 4.5 stars (page 2025), AirHelp 5.28 (2025)"
+            "rating": 0.66,
+            "basis": "Skytrax short-haul business 4.5 stars (page 2025), reviewers 3.5/5 (Prestige Suites 2.0 (787-10); older Prestige on 777), AirHelp 5.28 (2025)"
           }
         },
         "first": {
-          "rating": 0.79,
+          "rating": 0.8,
           "basis": "Skytrax first 5 stars (page 2025), AirHelp 5.28 (2025)"
         }
       }
@@ -753,8 +771,9 @@
       ],
       "cabins": {
         "business": {
-          "rating": 0.77,
-          "basis": "Skytrax business 4 stars (page 2021), AirHelp 7.39 (2025)"
+          "rating": 0.74,
+          "basis": "Skytrax business 4 stars (page 2021), reviewers 3.5/5 (World Business Class (refit 777 / 787-10)), AirHelp 7.39 (2025)",
+          "product": "World Business Class (refit 777 / 787-10)"
         }
       }
     },
@@ -794,21 +813,23 @@
       ],
       "cabins": {
         "premium_economy": {
-          "rating": 0.79,
+          "rating": 0.8,
           "basis": "Skytrax premium economy 4 stars (page 2022), #10 World's Best Premium Economy 2026, AirHelp 7.23 (2025)"
         },
         "business": {
-          "rating": 0.76,
-          "basis": "Skytrax business 4 stars (page 2022), #15 World's Best Business Class 2026, AirHelp 7.23 (2025)"
+          "rating": 0.73,
+          "basis": "Skytrax business 4 stars (page 2022), reviewers 3.5/5 (Allegris business (A350-900 / 787-9)), #15 World's Best Business Class 2026, AirHelp 7.23 (2025)",
+          "product": "Allegris business (A350-900 / 787-9)"
         },
         "first": {
-          "rating": 0.89,
-          "basis": "Skytrax first 5 stars (page 2022), #3 World's Best First Class 2026, AirHelp 7.23 (2025)"
+          "rating": 0.9,
+          "basis": "Skytrax first 5 stars (page 2022), reviewers 4.5/5 (Allegris First Suite (A350-900)), #3 World's Best First Class 2026, AirHelp 7.23 (2025)",
+          "product": "Allegris First Suite (A350-900)"
         }
       }
     },
     "LO": {
-      "rating": 0.78,
+      "rating": 0.79,
       "note": "Short-haul buy-on-board; AirHelp #10, on-time 8.3/10",
       "basis": "Skytrax economy 4 stars (page 2025), AirHelp 7.65 (2025)",
       "sources": [
@@ -820,11 +841,11 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
       "cabins": {
         "premium_economy": {
-          "rating": 0.78,
+          "rating": 0.79,
           "basis": "Skytrax premium economy 4 stars (page 2025), AirHelp 7.65 (2025)"
         },
         "business": {
-          "rating": 0.78,
+          "rating": 0.79,
           "basis": "Skytrax business 4 stars (page 2025), AirHelp 7.65 (2025)"
         }
       }
@@ -854,12 +875,14 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
       "cabins": {
         "business": {
-          "rating": 0.71,
-          "basis": "Skytrax business 4 stars (page 2020), AirHelp 6.36 (2025)"
+          "rating": 0.68,
+          "basis": "Skytrax business 4 stars (page 2020), reviewers 3.5/5 (Business (legacy A330 / 777; SWISS Senses on A350)), AirHelp 6.36 (2025)",
+          "product": "Business (legacy A330 / 777; SWISS Senses on A350)"
         },
         "first": {
-          "rating": 0.74,
-          "basis": "Skytrax first 4 stars (page 2020), #6 World's Best First Class 2026, AirHelp 6.36 (2025)"
+          "rating": 0.75,
+          "basis": "Skytrax first 4 stars (page 2020), reviewers 4/5 (First (777-300ER; SWISS Senses on A350)), #6 World's Best First Class 2026, AirHelp 6.36 (2025)",
+          "product": "First (777-300ER; SWISS Senses on A350)"
         }
       }
     },
@@ -878,7 +901,7 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
     },
     "NH": {
-      "rating": 0.91,
+      "rating": 0.92,
       "note": "International economy 34in pitch, 13.3in screens; domestic drinks only",
       "basis": "Skytrax economy 5 stars (page 2026), #5 World's Best Economy Class 2026, AirHelp 7.54 (2025)",
       "sources": [
@@ -889,31 +912,31 @@
       "reviewed": false,
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
       "short_haul": {
-        "rating": 0.88,
+        "rating": 0.89,
         "note": "Short-haul economy rated 4.5 stars by Skytrax against 5 long-haul",
         "basis": "Skytrax short-haul economy 4.5 stars (page 2026), #5 World's Best Economy Class 2026, AirHelp 7.54 (2025)"
       },
       "cabins": {
         "premium_economy": {
-          "rating": 0.84,
+          "rating": 0.85,
           "basis": "Skytrax premium economy 4.5 stars (page 2026), #14 World's Best Premium Economy 2026, AirHelp 7.54 (2025)"
         },
         "business": {
-          "rating": 0.91,
+          "rating": 0.92,
           "basis": "Skytrax business 5 stars (page 2026), #4 World's Best Business Class 2026, AirHelp 7.54 (2025)",
           "short_haul": {
-            "rating": 0.88,
+            "rating": 0.89,
             "basis": "Skytrax short-haul business 4.5 stars (page 2026), #4 World's Best Business Class 2026, AirHelp 7.54 (2025)"
           }
         },
         "first": {
-          "rating": 0.91,
+          "rating": 0.92,
           "basis": "Skytrax first 5 stars (page 2026), #8 World's Best First Class 2026, AirHelp 7.54 (2025)"
         }
       }
     },
     "OS": {
-      "rating": 0.77,
+      "rating": 0.78,
       "note": "Economy 4 stars both hauls; AirHelp on-time 8.3/10, claims 5.6",
       "basis": "Skytrax economy 4 stars (page 2021), #17 World's Best Economy Class 2026, AirHelp 7.4 (2025)",
       "sources": [
@@ -925,17 +948,17 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
       "cabins": {
         "premium_economy": {
-          "rating": 0.77,
+          "rating": 0.78,
           "basis": "Skytrax premium economy 4 stars (page 2021), #16 World's Best Premium Economy 2026, AirHelp 7.4 (2025)"
         },
         "business": {
-          "rating": 0.77,
+          "rating": 0.78,
           "basis": "Skytrax business 4 stars (page 2021), #20 World's Best Business Class 2026, AirHelp 7.4 (2025)"
         }
       }
     },
     "OZ": {
-      "rating": 0.79,
+      "rating": 0.8,
       "note": "Skytrax 5-star but outside 2026 top 100; AirHelp 2025 #92",
       "basis": "Skytrax economy 5 stars (page 2024), AirHelp 5.25 (2025)",
       "sources": [
@@ -950,7 +973,7 @@
           "rating": 0.66,
           "basis": "Skytrax business 4 stars (page 2024), AirHelp 5.25 (2025)",
           "short_haul": {
-            "rating": 0.72,
+            "rating": 0.73,
             "basis": "Skytrax short-haul business 4.5 stars (page 2024), AirHelp 5.25 (2025)"
           }
         }
@@ -982,7 +1005,7 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
     },
     "PR": {
-      "rating": 0.67,
+      "rating": 0.68,
       "note": "Strong on-time (AirHelp 8.1/10); domestic A320 pitch as low as 28in",
       "basis": "Skytrax economy 4 stars (page 2021), AirHelp 5.77 (2025)",
       "sources": [
@@ -994,11 +1017,11 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
       "cabins": {
         "premium_economy": {
-          "rating": 0.67,
+          "rating": 0.68,
           "basis": "Skytrax premium economy 4 stars (page 2021), AirHelp 5.77 (2025)"
         },
         "business": {
-          "rating": 0.67,
+          "rating": 0.68,
           "basis": "Skytrax business 4 stars (page 2021), AirHelp 5.77 (2025)"
         }
       }
@@ -1022,10 +1045,11 @@
       "cabins": {
         "business": {
           "rating": 0.95,
-          "basis": "Skytrax business 5 stars (page 2021), #1 World's Best Business Class 2026, AirHelp 8.16 (2025)",
+          "basis": "Skytrax business 5 stars (page 2021), reviewers 4.5/5 (Qsuite (777-300ER / A350)), #1 World's Best Business Class 2026, AirHelp 8.16 (2025)",
+          "product": "Qsuite (777-300ER / A350)",
           "short_haul": {
             "rating": 0.95,
-            "basis": "Skytrax short-haul business 4.5 stars (page 2021), #1 World's Best Business Class 2026, AirHelp 8.16 (2025)"
+            "basis": "Skytrax short-haul business 4.5 stars (page 2021), reviewers 4.5/5 (Qsuite (777-300ER / A350)), #1 World's Best Business Class 2026, AirHelp 8.16 (2025)"
           }
         },
         "first": {
@@ -1051,7 +1075,7 @@
           "basis": "Skytrax premium economy 3.5 stars (page 2021), AirHelp 7.29 (2025)"
         },
         "business": {
-          "rating": 0.76,
+          "rating": 0.77,
           "basis": "Skytrax business 4 stars (page 2021), AirHelp 7.29 (2025)"
         }
       }
@@ -1078,7 +1102,7 @@
           "basis": "Skytrax premium economy 3 stars (page 2020), AirHelp 7.66 (2025)"
         },
         "business": {
-          "rating": 0.78,
+          "rating": 0.79,
           "basis": "Skytrax business 4 stars (page 2020), AirHelp 7.66 (2025)",
           "short_haul": {
             "rating": 0.65,
@@ -1105,10 +1129,11 @@
         },
         "business": {
           "rating": 0.87,
-          "basis": "Skytrax business 4.5 stars (page 2024), #2 World's Best Business Class 2026, AirHelp 6.78 (2025)",
+          "basis": "Skytrax business 4.5 stars (page 2024), reviewers 4.5/5 (Business, long-haul (A350 / 777-300ER)), #2 World's Best Business Class 2026, AirHelp 6.78 (2025)",
+          "product": "Business, long-haul (A350 / 777-300ER)",
           "short_haul": {
             "rating": 0.87,
-            "basis": "Skytrax short-haul business 5 stars (page 2024), #2 World's Best Business Class 2026, AirHelp 6.78 (2025)"
+            "basis": "Skytrax short-haul business 5 stars (page 2024), reviewers 4.5/5 (Business, long-haul (A350 / 777-300ER)), #2 World's Best Business Class 2026, AirHelp 6.78 (2025)"
           }
         },
         "first": {
@@ -1118,7 +1143,7 @@
       }
     },
     "SY": {
-      "rating": 0.35,
+      "rating": 0.34,
       "note": "Leisure 737 operator, owned by Allegiant since May 2026",
       "basis": "Skytrax economy 3 stars on its low-cost scale (page 2020), the only published score found",
       "sources": [
@@ -1132,7 +1157,7 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
     },
     "TK": {
-      "rating": 0.77,
+      "rating": 0.78,
       "note": "Screens and meals even on narrowbodies; weak AirHelp claims score",
       "basis": "Skytrax economy 4 stars (page 2025), #8 World's Best Economy Class 2026, AirHelp 6.92 (2025)",
       "sources": [
@@ -1144,11 +1169,12 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
       "cabins": {
         "business": {
-          "rating": 0.84,
-          "basis": "Skytrax business 4.5 stars (page 2025), #6 World's Best Business Class 2026, AirHelp 6.92 (2025)",
+          "rating": 0.78,
+          "basis": "Skytrax business 4.5 stars (page 2025), reviewers 3.5/5 (Business (787-9 / A350)), #6 World's Best Business Class 2026, AirHelp 6.92 (2025)",
+          "product": "Business (787-9 / A350)",
           "short_haul": {
-            "rating": 0.77,
-            "basis": "Skytrax short-haul business 4 stars (page 2025), #6 World's Best Business Class 2026, AirHelp 6.92 (2025)"
+            "rating": 0.75,
+            "basis": "Skytrax short-haul business 4 stars (page 2025), reviewers 3.5/5 (Business (787-9 / A350)), #6 World's Best Business Class 2026, AirHelp 6.92 (2025)"
           }
         }
       }
@@ -1174,7 +1200,7 @@
       ],
       "cabins": {
         "business": {
-          "rating": 0.7,
+          "rating": 0.71,
           "basis": "Skytrax business 3.5 stars (page 2021), AirHelp 7.37 (2025)"
         }
       },
@@ -1222,7 +1248,7 @@
     "UA": {
       "rating": 0.66,
       "note": "Full service, ageing cabin on several transatlantic routes",
-      "basis": "Skytrax economy 3 stars (page 2020), AirHelp 7.54 (2025), ACSI 75 (2026), J.D. Power 608 (2026)",
+      "basis": "Skytrax economy 3 stars (page 2020), reviewers 3.5/5, AirHelp 7.54 (2025), ACSI 75 (2026), J.D. Power 608 (2026)",
       "published_sources": [
         "https://skytraxratings.com/airlines/united-airlines-rating",
         "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
@@ -1235,16 +1261,18 @@
           "basis": "Skytrax premium economy 3.5 stars (page 2020), #19 World's Best Premium Economy 2026, AirHelp 7.54 (2025), ACSI 75 (2026), J.D. Power 608 (2026)"
         },
         "business": {
-          "rating": 0.68,
-          "basis": "Skytrax business 4 stars (page 2020), AirHelp 7.54 (2025), ACSI 75 (2026), J.D. Power 608 (2026)",
+          "rating": 0.66,
+          "basis": "Skytrax business 4 stars (page 2020), reviewers 3.5/5 (Polaris business (original seat, 777 / 787)), AirHelp 7.54 (2025), ACSI 75 (2026), J.D. Power 608 (2026)",
+          "product": "Polaris business (original seat, 777 / 787)",
           "short_haul": {
             "rating": 0.64,
-            "basis": "Skytrax short-haul business 3.5 stars (page 2020), AirHelp 7.54 (2025), ACSI 75 (2026), J.D. Power 608 (2026)"
+            "basis": "Skytrax short-haul business 3.5 stars (page 2020), reviewers 3.5/5 (Polaris business (original seat, 777 / 787)), AirHelp 7.54 (2025), ACSI 75 (2026), J.D. Power 608 (2026)"
           }
         },
         "first": {
-          "rating": 0.64,
-          "basis": "Skytrax first 3.5 stars (page 2020), AirHelp 7.54 (2025), ACSI 75 (2026), J.D. Power 608 (2026)"
+          "rating": 0.62,
+          "basis": "Skytrax first 3.5 stars (page 2020), reviewers 3/5 (United First, domestic (737 MAX / A321neo)), AirHelp 7.54 (2025), ACSI 75 (2026), J.D. Power 608 (2026)",
+          "product": "United First, domestic (737 MAX / A321neo)"
         }
       }
     },
@@ -1300,12 +1328,13 @@
       ],
       "cabins": {
         "premium_economy": {
-          "rating": 0.84,
+          "rating": 0.85,
           "basis": "Skytrax premium economy 4 stars (page 2020), #5 World's Best Premium Economy 2026, AirHelp 8.03 (2025)"
         },
         "business": {
           "rating": 0.81,
-          "basis": "Skytrax business 4 stars (page 2020), #12 World's Best Business Class 2026, AirHelp 8.03 (2025)"
+          "basis": "Skytrax business 4 stars (page 2020), reviewers 4/5 (Upper Class Suite (A350-1000)), #12 World's Best Business Class 2026, AirHelp 8.03 (2025)",
+          "product": "Upper Class Suite (A350-1000)"
         }
       }
     },
@@ -1355,9 +1384,9 @@
       "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
     },
     "WN": {
-      "rating": 0.59,
+      "rating": 0.61,
       "note": "All-737 short-haul network; top J.D. Power economy score 2026",
-      "basis": "Skytrax economy 4 stars on its low-cost scale (page 2022), AirHelp 6.68 (2025), ACSI 77 (2026), J.D. Power 670 (2026)",
+      "basis": "Skytrax economy 4 stars on its low-cost scale (page 2022), reviewers 3/5, AirHelp 6.68 (2025), ACSI 77 (2026), J.D. Power 670 (2026)",
       "sources": [
         "https://skytraxratings.com/airlines/southwest-airlines-rating",
         "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
@@ -1392,7 +1421,7 @@
       }
     },
     "Y4": {
-      "rating": 0.35,
+      "rating": 0.34,
       "note": "Ultra-low-cost A320 family; paid food; Skytrax 3-Star on low-cost scale",
       "basis": "Skytrax economy 3 stars on its low-cost scale (page 2020), the only published score found",
       "sources": [
@@ -1433,7 +1462,7 @@
     },
     "skytrax": "Economy stars for the haul (long-haul for the main rating, short-haul for the short_haul block); low-cost-scale stars minus 1.5 and leisure-scale minus 0 to sit on the full-service scale",
     "calibration": {
-      "rating": "0.2568 + 0.7107 x composite",
+      "rating": "0.2503 + 0.7282 x composite",
       "fitted_on": [
         "AA",
         "AF",
@@ -1450,7 +1479,7 @@
         "VS",
         "VY"
       ],
-      "typical_miss": 0.065,
+      "typical_miss": 0.066,
       "clamp": [
         0.3,
         0.95

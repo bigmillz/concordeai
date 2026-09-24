@@ -1004,7 +1004,10 @@ Skytrax rates American's economy 3 stars on both hauls, so American has no split
 seatback screens until the 2028 deliveries. **Ratings are per CABIN** (2026-09-24, per Patrick: "Lufthansa's first class is amazing"
 is not a statement about its economy): a row's `cabins` block rates premium economy, business and first by the same
 arithmetic from that cabin's Skytrax stars by haul (`skytrax_cabins` in carrier_scores.json), a cited reviewer
-consensus when there is one, and the 2026 Skytrax World Airline Awards cabin categories (`awards`: +0.5 star for the
+consensus when there is one (`reviews`: 35 airline-cabins, one agent's 1-5 reading of 2024-2026 reviews from The
+Points Guy, One Mile at a Time, Head for Points, Executive Traveller and the like, two or three citations each, every
+citation opened by a second agent; averaged equally with the Skytrax stars, which are often from 2020, so a new
+product such as American's Flagship Suite counts), and the 2026 Skytrax World Airline Awards cabin categories (`awards`: +0.5 star for the
 top three, +0.25 for 4 to 10; economy takes its own category the same way), with the airline-wide AirHelp, ACSI and
 J.D. Power scores. `adapter._carrier_rating` uses the block for the cabin flown on the trip's LONGEST flight, so a
 first-class search on Lufthansa is rated 0.89 and its economy 0.75; the grade's comfort part and the ranking's
