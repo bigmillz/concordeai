@@ -517,8 +517,14 @@ Fixer's tracking feed), plus `CONCORDEGO_OWNERS`,
 THE SERVER and restart, from a laptop Terminal:
 
 ```bash
-ssh root@67.207.85.212 "echo 'CONCORDEGO_SERPAPI_KEY=...' >> /etc/concordego.env && systemctl restart concordego"
+ssh -t root@67.207.85.212 'read -rsp "Key: " k && echo && sed -i "/^CONCORDEGO_SERPAPI_KEY=/d" /etc/concordego.env && printf "CONCORDEGO_SERPAPI_KEY=%s\n" "$k" >> /etc/concordego.env && systemctl restart concordego && echo done'
 ```
+
+It prompts without echoing, so the key never reaches a command line, shell history or the screen; it drops the old
+line first (an `echo >>` leaves two); and `read` trims stray spaces. A hidden prompt DOES keep keyboard codes: on
+2026-09-24 the laptop copy of a new AeroDataBox key arrived with four Option/Control-arrow codes (`\x1b[1;7C` and
+kin) in front of it. Check the value's length afterwards, never the value (`cut -d= -f2- | awk '{print length}'`;
+a RapidAPI key is 50), and compare copies by a sha256 prefix.
 
 No spaces around the `=`, no quotes round the value, and `export` in lower case if the line
 carries it at all (the laptop's `~/.concordego/env` is sourced by a shell, and one `Export`
