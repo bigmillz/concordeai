@@ -476,7 +476,7 @@ sandbox this was written in reaches neither cloud and holds no such keys, so its
 run is on Patrick's laptop; it was dry-run against stubbed doctl, ssh and Cloudflare.
 `concorde-travel/deploy/droplet.sh BRANCH TUNNEL_TOKEN` is what it runs on the box (an Ubuntu
 droplet: systemd, a venv for the `anthropic` SDK, an hourly `concordego-update.timer` that
-resets the checkout to `origin/BRANCH` and restarts the service when HEAD moved, ufw with
+resets the checkout to `origin/BRANCH` and restarts the service when HEAD moved; since 2026-09-24 every git and pip step in it runs as the `concordego` user through `runuser`, root only restarts the service, and there is no `safe.directory` exception anywhere, so root's git refuses the checkout: root must never run git in a tree the web user can edit, whose `.git/config` could name a hook or an fsmonitor, ufw with
 ssh only, and cloudflared run from a tunnel token made in the Zero Trust dashboard, whose
 public hostname owns the DNS record so no script here touches DNS). **The box is locked
 down three ways** (2026-09-21): a DigitalOcean cloud firewall named `concordego` in front

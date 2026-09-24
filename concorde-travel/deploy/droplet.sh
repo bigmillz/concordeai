@@ -44,18 +44,21 @@ apt-get update -qq && apt-get install -y -qq git python3 python3-venv curl ufw >
 say "code: $REPO on $BRANCH -> $APP"
 id -u concordego >/dev/null 2>&1 || useradd --system --home "$APP" --shell /usr/sbin/nologin concordego
 usermod -aG systemd-journal concordego   # /admin shows the service journal
+# git and pip run as the app user, never as root: the checkout and the venv are that user's, and root
+# running git in them would obey whatever its .git/config says (per Patrick, 2026-09-24)
+mkdir -p "$APP" /var/lib/concordego && chown -R concordego:concordego "$APP" /var/lib/concordego
+app(){ runuser -u concordego -- env HOME=/var/lib/concordego PATH=/usr/local/bin:/usr/bin:/bin "$@"; }
 if [ -d "$APP/.git" ]; then
-  git -C "$APP" fetch -q origin "$BRANCH" && git -C "$APP" checkout -q -B "$BRANCH" "origin/$BRANCH"
+  app git -C "$APP" fetch -q origin "$BRANCH" && app git -C "$APP" checkout -q -B "$BRANCH" "origin/$BRANCH"
 else
-  git clone -q --branch "$BRANCH" --depth 50 "$REPO" "$APP"
+  app git clone -q --branch "$BRANCH" --depth 50 "$REPO" "$APP"
 fi
-# --system, not --global: the updater runs from systemd with no HOME, so root's
-# ~/.gitconfig is never read there and every hourly pull died on "dubious ownership"
-git config --system --add safe.directory "$APP" >/dev/null 2>&1 || true
-[ -d "$APP/venv" ] || python3 -m venv "$APP/venv"
-"$APP/venv/bin/pip" install -q --upgrade pip anthropic >/dev/null
-mkdir -p /var/lib/concordego && chown -R concordego:concordego "$APP" /var/lib/concordego
-echo "  at $(git -C "$APP" rev-parse --short HEAD): $(git -C "$APP" log -1 --format=%s | cut -c1-70)"
+# an older install let root run git here through a system-wide safe.directory; nothing needs it now
+git config --system --unset-all safe.directory "^$APP\$" >/dev/null 2>&1 || true
+git config --global --unset-all safe.directory "^$APP\$" >/dev/null 2>&1 || true
+[ -d "$APP/venv" ] || app python3 -m venv "$APP/venv"
+app "$APP/venv/bin/pip" install -q --upgrade pip anthropic >/dev/null
+echo "  at $(app git -C "$APP" rev-parse --short HEAD): $(app git -C "$APP" log -1 --format=%s | cut -c1-70)"
 
 say "environment file $ENVF"
 if [ ! -f "$ENVF" ]; then
@@ -109,19 +112,22 @@ say "hourly update from GitHub"
 cat > /usr/local/bin/concordego-update <<'UPD'
 #!/usr/bin/env bash
 # Pull the branch the droplet tracks; restart the service only when HEAD moved.
+# A root timer runs this, but every git and pip step runs AS the concordego user (per Patrick, 2026-09-24):
+# the checkout and the venv belong to that user, and root must never execute what it can edit (a hook or a
+# core.fsmonitor in .git/config, a replaced pip). Root does one thing here: restart the service.
 set -euo pipefail
 APP=/opt/concordego
-cd "$APP"
-BRANCH=$(git rev-parse --abbrev-ref HEAD)
-before=$(git rev-parse HEAD)
-git fetch -q origin "$BRANCH"
-after=$(git rev-parse "origin/$BRANCH")
+app(){ runuser -u concordego -- env HOME=/var/lib/concordego PATH=/usr/local/bin:/usr/bin:/bin "$@"; }
+BRANCH=$(app git -C "$APP" rev-parse --abbrev-ref HEAD)
+[[ "$BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]] || { echo "unexpected branch name; not updating"; exit 1; }
+before=$(app git -C "$APP" rev-parse HEAD)
+app git -C "$APP" fetch -q origin "$BRANCH"
+after=$(app git -C "$APP" rev-parse "origin/$BRANCH")
 if [ "$before" = "$after" ]; then echo "up to date at ${before:0:7} on $BRANCH"; exit 0; fi
-git reset -q --hard "origin/$BRANCH"
-chown -R concordego:concordego "$APP"
-"$APP/venv/bin/pip" install -q --upgrade anthropic >/dev/null 2>&1 || true
+app git -C "$APP" reset -q --hard "origin/$BRANCH"
+app "$APP/venv/bin/pip" install -q --upgrade anthropic >/dev/null 2>&1 || true
 systemctl restart concordego
-echo "updated ${before:0:7} -> ${after:0:7} on $BRANCH: $(git log -1 --format=%s | cut -c1-70)"
+echo "updated ${before:0:7} -> ${after:0:7} on $BRANCH: $(app git -C "$APP" log -1 --format=%s | cut -c1-70)"
 UPD
 chmod 755 /usr/local/bin/concordego-update
 cat > /etc/systemd/system/concordego-update.service <<UNIT
@@ -177,6 +183,7 @@ echo "  security updates unattended; reboots at 09:30 UTC only when required"
 
 say "system updates from the admin page"
 # a nightly check that installs nothing, and the admin page's Update / Update and restart buttons (per Patrick, 2026-09-24)
+# root runs a file from the checkout only here, when an admin re-runs this script by hand; the hourly job never does
 bash "$APP/concorde-travel/deploy/install-sysupdate.sh"
 
 say "cloudflared"
