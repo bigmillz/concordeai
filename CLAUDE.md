@@ -1178,7 +1178,18 @@ alone and its card says "Airline not rated yet", never "bad". **Inside each bloc
 plane then "· time" for a flight, a chair for a layover (a bed for an overnight one) then the airport code and time.
 `GLYPH` holds them (Material Icons paths, Apache 2.0) in the bar's dark ink; every full-size block is a CSS size
 container, so each piece appears only once the block is wide enough for it (glyph from 16px, the words from 40 to
-72px) and nothing is ever cut mid-word. The mini bars in the rows carry no glyphs.
+72px) and nothing is ever cut mid-word. The mini bars in the rows carry no glyphs. **Every bar is drawn to one
+scale** (per Patrick, 2026-09-24): the longest door-to-door trip the whole search returned, filtered out or not
+(`ctx.maxDoor` over `ALL`), fills its line and every other bar, the podium's full-size ones included, is that
+fraction of it; the clock labels under a short bar keep their room (`min-width:max-content`). **An arrival block**
+follows the last flight, blue like the airport block, with the suitcase: `par.arrival_minutes`, 15 minutes to walk
+off and out, 20 more for baggage claim when the traveller checks a bag, 35 more for passport control and customs when
+the LAST flight crosses a border (a border crossed earlier was cleared in the layover), and none of that 35 from a US
+preclearance airport into the US (`adapter.US_PRECLEARANCE`: the Canadian gateways, Dublin, Shannon, Nassau, Bermuda,
+Aruba, Abu Dhabi). It is the option's `arrival_process_minutes` (schema), counted in door to door by the scorer and
+named in its time line, and par's reference traveller, who checks the one bag its fare includes, gets it too; a
+fixture without the field models none. The account and Admin buttons sit at the right end of the top bar
+(`.baracct`), and the search summary gives way first so they keep one row.
 
 The results section is mock-2 from the design round: **every option on ONE
 clock.** A bar that always fills its row tells you how a trip is divided but not

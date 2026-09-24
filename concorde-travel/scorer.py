@@ -417,6 +417,15 @@ def timeline(scenario: Dict[str, Any], option: Dict[str, Any],
                             "Layover \u00b7 %s \u00b7 %s \u00b7 lands %02d:%02d"
                             % (lay["airport"], _hm(m), clock // 60, clock % 60)))
 
+    arr = option.get("arrival_process_minutes") or {}
+    if arr.get("p50"):
+        last = option["segments"][-1]["destination"]["iata"]
+        names = {"walk": "off the plane and out", "bags": "baggage claim", "border": "passport control and customs"}
+        parts = ", ".join("%s %s" % (names.get(k, k), _hm(v)) for k, v in (arr.get("parts") or {}).items())
+        legs.append(Leg("arrival", "arrival", arr["p50"], _band(arr["p50"], tuning.band_process),
+                        "%s at %s" % (parts or "Out of the airport", last),
+                        "Arrival \u00b7 %s" % _hm(arr["p50"])))
+
     inb, _ = chosen_ground(option, prof, "arrival", _ground_pref(scenario))
     if inb:
         m = inb["door_to_door_minutes"]["p50"]
@@ -859,15 +868,17 @@ def score(scenario: Dict[str, Any], option: Dict[str, Any],
         a, d = segs[lay["arrive_segment_id"]], segs[lay["depart_segment_id"]]
         lay_minutes += minutes_between(a["arrival_local"], d["departure_local"])
     process = (option.get("airport_process_minutes") or {}).get("p50", 0)
-    d2d = ground_minutes + process + air + lay_minutes
+    arrival = (option.get("arrival_process_minutes") or {}).get("p50", 0)     # 0 when none is modelled (the fixtures)
+    d2d = ground_minutes + process + air + lay_minutes + arrival
 
     lines.append(Line(
         code="time",
         label="%s door to door at %s an hour" % (_hm(d2d), _money(hourly)),
         amount_cents=d2d * hourly // 60,
-        evidence="ground %s + airport %s + air %s%s"
+        evidence="ground %s + airport %s + air %s%s%s"
                  % (_hm(ground_minutes), _hm(process), _hm(air),
-                    " + layover %s" % _hm(lay_minutes) if lay_minutes else ""),
+                    " + layover %s" % _hm(lay_minutes) if lay_minutes else "",
+                    " + arrival %s" % _hm(arrival) if arrival else ""),
         overridable=False))
 
     lines.extend(_layover_lines(option, scenario, prof, tuning))

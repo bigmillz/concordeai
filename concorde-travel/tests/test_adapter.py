@@ -1133,6 +1133,25 @@ def main():
                           json.load(open(os.path.join(HERE, "..", "enrichment", "carriers.json"), encoding="utf-8")))
     check("the ratings table is exactly what rate_airlines.py computes from the published scores (no hand edits to a "
           "formula-written row)", built == cars, str([c for c in set(built) | set(cars) if built.get(c) != cars.get(c)][:5]))
+    # off the plane and out (2026-09-24, per Patrick): 15 to walk out, 20 more with a checked bag, 35 more when the
+    # LAST flight crosses a border; a US preclearance airport lands as domestic
+    arr = lambda legs, bags, geo=None: adapter._arrival_block(
+        enr0, [{"origin": {"iata": a}, "destination": {"iata": b}} for a, b in legs], bags, geo)["p50"]
+    geo_a = {"LAX": {"country": "US"}, "ORD": {"country": "US"}, "YYZ": {"country": "CA"}}
+    check("arrival: 15 minutes inside one border, 35 with a checked bag, 70 across a border with one, a Dublin or "
+          "Toronto flight to the US lands as domestic, and only the last flight decides",
+          arr([("JFK", "LAX")], 0, geo_a) == 15 and arr([("JFK", "LAX")], 1, geo_a) == 35
+          and arr([("JFK", "LHR")], 1) == 70 and arr([("JFK", "LHR")], 0) == 50
+          and arr([("DUB", "JFK")], 1) == 35 and arr([("YYZ", "ORD")], 0, geo_a) == 15
+          and arr([("JFK", "CDG"), ("CDG", "FRA")], 1) == 35 and arr([("CDG", "JFK"), ("JFK", "LAX")], 0, geo_a) == 15,
+          str([arr([("JFK", "LAX")], 0, geo_a), arr([("JFK", "LHR")], 1), arr([("DUB", "JFK")], 1),
+               arr([("JFK", "CDG"), ("CDG", "FRA")], 1)]))
+    import scorer as _sc
+    sc_a = adapter.from_feed(dfl)
+    led_a = _sc.score(sc_a, sc_a["options"][0], "reference")
+    check("the scorer counts the arrival block in door to door and names it in the time line",
+          sc_a["options"][0]["arrival_process_minutes"]["p50"] > 0
+          and "arrival" in next(l for l in led_a.lines if l.code == "time").evidence, str(led_a.door_to_door_minutes))
     d_sc = adapter.from_feed(dfl)
     procs = sorted({o["airport_process_minutes"]["p50"] for o in d_sc["options"]})
     check("every option of a real New York to London search is timed at an hour and a half at the airport",

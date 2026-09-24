@@ -285,9 +285,25 @@ def airport_minutes(aps: Dict[str, Any], iata: str, international: bool) -> Dict
     return out
 
 
+# Off the plane and out of the airport (2026-09-24, per Patrick): the walk off and out, a baggage claim when the
+# traveller checks a bag (the first bags reach the belt 10 to 20 minutes after the doors open, the last 30 to 40),
+# and passport control and customs when the last flight crosses a border (queues typically 20 to 45 minutes at big
+# entry airports, longer at peaks). A flight from a US preclearance airport lands as domestic (adapter).
+ARRIVAL_MINUTES = {"walk": 15, "bags": 20, "border": 35}
+
+
+def arrival_minutes(international: bool, checked_bags: int) -> Dict[str, Any]:
+    parts = {"walk": ARRIVAL_MINUTES["walk"]}
+    if checked_bags and int(checked_bags) > 0:
+        parts["bags"] = ARRIVAL_MINUTES["bags"]
+    if international:
+        parts["border"] = ARRIVAL_MINUTES["border"]
+    return {"p50": sum(parts.values()), "parts": parts}
+
+
 def par_for(o: Dict[str, Any], d: Dict[str, Any], date: str,
-            enr: Dict[str, Any], scorer_mod, ground_mod, international: Optional[bool] = None
-            ) -> Tuple[int, Dict[str, Any]]:
+            enr: Dict[str, Any], scorer_mod, ground_mod, international: Optional[bool] = None,
+            arrival_international: Optional[bool] = None) -> Tuple[int, Dict[str, Any]]:
     """The par for a route, in cents, with its full basis.
 
     Builds the reference itinerary and scores it through the real scorer at the
@@ -362,6 +378,11 @@ def par_for(o: Dict[str, Any], d: Dict[str, Any], date: str,
         # timed as every real option is; a caller that has not asked the border question gets the country one
         "airport_process_minutes": airport_minutes(aps, o_iata, international if international is not None else
                                                    (o.get("country") or "").upper() != (d.get("country") or "").upper()),
+        # the reference traveller checks the one bag the reference fare includes
+        "arrival_process_minutes": arrival_minutes(
+            arrival_international if arrival_international is not None else (
+                international if international is not None else
+                (o.get("country") or "").upper() != (d.get("country") or "").upper()), 1),
         "booking": [{"who": "reference", "price_cents": fare, "direct": True, "note": ""}],
     }
     scenario = {

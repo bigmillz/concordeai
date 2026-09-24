@@ -182,8 +182,8 @@ MUTANTS = [
  (FA, None, '"piece": 1,\n        "amount_cents": 10000\n      },\n      {\n        "piece": 2,\n        "amount_cents": 12000',
   '"piece": 1,\n        "amount_cents": 1000\n      },\n      {\n        "piece": 2,\n        "amount_cents": 1200',
   'unknown-is-never-zero: make the fallback bag fee cheap'),
- (AD, "route_par", 'international=crosses_border(enr, o_iata, d_iata, geo))',
-  'international=crosses_border(enr, o_iata, d_iata, geo))\n'
+ (AD, "route_par", 'arrival_international=_arrival_international(enr, o_iata, d_iata, geo))',
+  'arrival_international=_arrival_international(enr, o_iata, d_iata, geo))\n'
   '    import inspect as _i\n'
   '    _opts = _i.currentframe().f_back.f_locals.get("options") or []\n'
   '    if _opts:\n'
@@ -250,6 +250,11 @@ MUTANTS = [
      'airport time: judge a trip by its first flight only, so New York to Chicago to London is timed as domestic'),
     (PA, "airport_minutes", 'p50 = max(floor, int(cur.get("p50") or 0))', 'p50 = int(cur.get("p50") or floor)',
      'airport time: let a curated median shorter than the floor win, so JFK to London gets 55 minutes'),
+    (AD, "_arrival_international", 'if o_iata in US_PRECLEARANCE and border_of(d_iata, enr, geo) == "us":',
+     'if False:', 'arrival: ignore US preclearance, so Dublin to New York queues for passport control twice'),
+    (AD, "_arrival_block", 'last = segments[-1]',
+     'last = {"origin": segments[0]["origin"], "destination": segments[-1]["destination"]}',
+     'arrival: judge the border on the whole trip, so Paris to Frankfurt after New York queues at Frankfurt again'),
     (AD, "_carrier_rating", 'use = dict(row, **row["short_haul"])', 'use = row',
      'ratings: ignore the short-haul rating, so a domestic flight is judged on the airline\'s long-haul product'),
 ]

@@ -1406,6 +1406,28 @@
             }
           }
         },
+        "arrival_process_minutes": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Off the plane and out of the last airport: the walk, baggage claim when the traveller checks a bag, and passport control and customs when the last flight crosses a border. Part of door-to-door; the bar renders it as its own segment. Absent means none is modelled.",
+          "properties": {
+            "p50": {
+              "type": "integer"
+            },
+            "p90": {
+              "type": "integer"
+            },
+            "source": {
+              "type": "string"
+            },
+            "parts": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer"
+              }
+            }
+          }
+        },
         "booking": {
           "type": "array",
           "items": {

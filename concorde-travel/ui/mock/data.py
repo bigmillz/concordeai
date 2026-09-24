@@ -305,6 +305,7 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
         e["bags_included"] = v["bag_included"]
         e["rating"] = (v["carrier_rating"] or {}).get("rating")
         e["rating_basis"] = (v["carrier_rating"] or {}).get("basis")
+        e["arrival_parts"] = (o.get("arrival_process_minutes") or {}).get("parts")   # walk, bags, border minutes
         e["equipment"] = [s["equipment"] for s in v["segments"]]
         e["pitch"] = [(s["claims"] or {}).get("seat_pitch_inches") for s in v["segments"]]
         e["segments"] = [{"flight": s["flight"], "from": s["from"], "to": s["to"],
