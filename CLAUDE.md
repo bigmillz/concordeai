@@ -1001,7 +1001,14 @@ the full-service one by a fitted offset (low-cost stars minus 1.5). 72 airlines 
 Air Premia have no published score and stay unrated. Where Skytrax rates short-haul economy differently (BA, ITA, TAP,
 Brussels, Qatar, ANA, Cathay), the row has a `short_haul` block that `adapter._carrier_rating` uses on a short-haul trip.
 Skytrax rates American's economy 3 stars on both hauls, so American has no split, though its narrowbodies lack
-seatback screens until the 2028 deliveries. Formula rows carry `reviewed: false`, a `basis` sentence the flight's card
+seatback screens until the 2028 deliveries. **Ratings are per CABIN** (2026-09-24, per Patrick: "Lufthansa's first class is amazing"
+is not a statement about its economy): a row's `cabins` block rates premium economy, business and first by the same
+arithmetic from that cabin's Skytrax stars by haul (`skytrax_cabins` in carrier_scores.json), a cited reviewer
+consensus when there is one, and the 2026 Skytrax World Airline Awards cabin categories (`awards`: +0.5 star for the
+top three, +0.25 for 4 to 10; economy takes its own category the same way), with the airline-wide AirHelp, ACSI and
+J.D. Power scores. `adapter._carrier_rating` uses the block for the cabin flown on the trip's LONGEST flight, so a
+first-class search on Lufthansa is rated 0.89 and its economy 0.75; the grade's comfort part and the ranking's
+carrier line both read it. Formula rows carry `reviewed: false`, a `basis` sentence the flight's card
 prints, and their sources; `test_adapter.py` asserts the table is exactly what the script computes, so a hand edit to
 a formula row fails. Refresh `carrier_scores.json` when AirHelp, ACSI or J.D. Power publish a new edition, then run
 the script with `--write`. A formula row is a DRAFT like the fleet and fare rows: it wants a person's pass.

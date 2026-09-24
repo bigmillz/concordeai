@@ -267,12 +267,14 @@ MUTANTS = [
      'grade: a business search that is economy on two of three flights grades as all-business'),
     (SC, "report_card", 'pts = sum(seat_points(sg) * m for sg, m in zip(segments, mins)) / sum(mins)',
      'pts = seat_points(long_leg)', 'grade: judge the seat on the long flight alone, as before'),
+    (AD, "_carrier_rating", 'block = (row.get("cabins") or {}).get(cab) if cab != "economy" else None', 'block = None',
+     'ratings: rate a first-class seat on the airline\'s economy'),
     (AD, "_arrival_international", 'if o_iata in US_PRECLEARANCE and border_of(d_iata, enr, geo) == "us":',
      'if False:', 'arrival: ignore US preclearance, so Dublin to New York queues for passport control twice'),
     (AD, "_arrival_block", 'last = segments[-1]',
      'last = {"origin": segments[0]["origin"], "destination": segments[-1]["destination"]}',
      'arrival: judge the border on the whole trip, so Paris to Frankfurt after New York queues at Frankfurt again'),
-    (AD, "_carrier_rating", 'use = dict(row, **row["short_haul"])', 'use = row',
+    (AD, "_carrier_rating", 'use = dict(use, **use["short_haul"])', 'use = use',
      'ratings: ignore the short-haul rating, so a domestic flight is judged on the airline\'s long-haul product'),
 ]
 

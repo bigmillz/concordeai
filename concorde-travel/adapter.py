@@ -531,10 +531,22 @@ def _carrier_rating(enr: Dict[str, Any], carrier: str, segments: List[Dict[str, 
     row = (cars.get("ratings") or {}).get(carrier)
     if not row:
         return None
+    # the cabin flown on the trip's longest flight picks the rating: Lufthansa's first class is not its economy
+    # (2026-09-24, per Patrick); economy, or a cabin nobody rates, uses the airline's own row
     use = row
-    if row.get("short_haul") and segments and _short_haul(segments[0]["origin"]["iata"],
+    if segments:
+        def _mins(sg):
+            try:
+                return (datetime.datetime.fromisoformat(sg["arrival_local"]) - datetime.datetime.fromisoformat(sg["departure_local"])).total_seconds()
+            except (KeyError, TypeError, ValueError):
+                return 0
+        cab = cabin_norm(max(segments, key=_mins).get("cabin_marketed"))
+        block = (row.get("cabins") or {}).get(cab) if cab != "economy" else None
+        if block:
+            use = dict(block, note=row.get("note", ""))
+    if use.get("short_haul") and segments and _short_haul(segments[0]["origin"]["iata"],
                                                          segments[-1]["destination"]["iata"], enr, geo):
-        use = dict(row, **row["short_haul"])
+        use = dict(use, **use["short_haul"])
     out = {"rating": use["rating"], "note": use.get("note", ""),
            "source": row.get("source") or cars["_source"], "as_of": row.get("as_of") or cars["_as_of"]}
     if use.get("basis"):

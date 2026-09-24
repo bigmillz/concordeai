@@ -1128,6 +1128,14 @@ def main():
           and all(cars[c].get("basis") and cars[c].get("sources") and 0.30 <= cars[c]["rating"] <= 0.95 for c in drafted)
           and all(0.30 <= r["short_haul"]["rating"] <= 0.95 for r in cars.values() if r.get("short_haul")),
           "unrated %s, drafted %d" % (unrated, len(drafted)))
+    # the cabin flown on the longest flight picks the rating (2026-09-24, per Patrick)
+    segc = lambda cab: [{"origin": {"iata": "JFK"}, "destination": {"iata": "FRA"}, "cabin_marketed": cab,
+                         "departure_local": "2026-11-18T18:00:00-05:00", "arrival_local": "2026-11-19T07:30:00+01:00"}]
+    lh_first, lh_econ = adapter._carrier_rating(enr0, "LH", segc("first")), adapter._carrier_rating(enr0, "LH", segc("economy"))
+    check("a first-class flight is rated on the airline's first class, economy on the airline's own rating, and the basis "
+          "names the cabin's published scores",
+          lh_first["rating"] == cars["LH"]["cabins"]["first"]["rating"] and lh_econ["rating"] == cars["LH"]["rating"]
+          and lh_first["rating"] != lh_econ["rating"] and "first" in lh_first["basis"], str((lh_first, lh_econ)))
     import rate_airlines as _ra
     built, _m = _ra.build(json.load(open(os.path.join(HERE, "..", "enrichment", "carrier_scores.json"), encoding="utf-8")),
                           json.load(open(os.path.join(HERE, "..", "enrichment", "carriers.json"), encoding="utf-8")))

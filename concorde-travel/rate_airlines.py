@@ -56,21 +56,100 @@ def stars_for(sk, haul, offs):
     return max(1.0, s - offs.get(sk.get("scale"), 0.0)), s
 
 
-def comp(a, haul, offs):
+AWARDS = {}     # cabin -> {code: rank}, filled by build() from carrier_scores.json
+REVIEWS = {}    # code -> {cabin: {consensus, product, ...}}
+
+
+def award_bonus(cabin, code):
+    """(stars added, rank): a Skytrax World Airline Awards cabin category puts the airline in its top ten, which is
+    passengers' own verdict and newer than most star pages: half a star for the top three, a quarter for 4 to 10."""
+    rk = (AWARDS.get(cabin) or {}).get(code)
+    return (0.5 if rk <= 3 else 0.25 if rk <= 10 else 0.0, rk) if rk else (0.0, None)
+
+
+def blend(skytrax, review):
+    """Skytrax stars and the cited reviewers' 1-5 verdict, equally, when both exist; either alone otherwise."""
+    parts = [x for x in (skytrax, review) if x is not None]
+    return sum(parts) / len(parts) if parts else None
+
+
+def comp(a, haul, offs, code=None):
     st, _ = stars_for(a.get("skytrax"), haul, offs)
     if st is None and a.get("skytrax_stars") is not None:
         st = a["skytrax_stars"]
+    rv = ((REVIEWS.get(code) or {}).get("economy") or {}).get("consensus") if code else None
+    st = blend(st, rv)
+    if st is not None and code:
+        st = min(5.0, st + award_bonus("economy", code)[0])
     return composite(st, a.get("airhelp_score"), a.get("acsi_score"), a.get("jdpower_score"))
+
+
+CABIN_WORD = {"premium_economy": "premium economy", "business": "business", "first": "first"}
+
+
+def cabin_blocks(code, a, offs, R):
+    """{cabin: {rating, basis, short_haul?}} for the premium cabins Skytrax rates or reviewers cite: the same
+    arithmetic as the economy rating, with that cabin's stars (and verdict and award) in place of economy's, and
+    the airline-wide punctuality and satisfaction scores alongside."""
+    sc, out = a.get("skytrax_cabins") or {}, {}
+    scale = (a.get("skytrax") or {}).get("scale") or "full"
+    year = sc.get("_page_year")
+    for cab in ("premium_economy", "business", "first"):
+        s = sc.get(cab) or {}
+        rv = (REVIEWS.get(code) or {}).get(cab) or {}
+        if s.get("long") is None and s.get("short") is None and rv.get("consensus") is None:
+            continue
+        bonus, rk = award_bonus(cab, code)
+
+        def stars(h):
+            raw = s.get(h) if s.get(h) is not None else s.get("short" if h == "long" else "long")
+            adj = None if raw is None else max(1.0, raw - offs.get(scale, 0.0))
+            b_ = blend(adj, rv.get("consensus"))
+            return (None if b_ is None else min(5.0, b_ + bonus)), raw
+
+        (sl, raw_l), (ss, raw_s) = stars("long"), stars("short")
+        other = [x for x in (("AirHelp %g (%s)" % (a["airhelp_score"], int(a.get("airhelp_year") or 2025))) if a.get("airhelp_score") is not None else None,
+                             ("ACSI %g (%s)" % (a["acsi_score"], int(a.get("acsi_year") or 0))) if a.get("acsi_score") is not None else None,
+                             ("J.D. Power %g (%s)" % (a["jdpower_score"], int(a.get("jdpower_year") or 0))) if a.get("jdpower_score") is not None else None) if x]
+
+        def basis(raw):
+            bits = []
+            if raw is not None:
+                bits.append("Skytrax %s %g stars%s" % (CABIN_WORD[cab], raw, " (page %s)" % year if year else ""))
+            if rv.get("consensus") is not None:
+                bits.append("reviewers %g/5%s" % (rv["consensus"], " (%s)" % rv["product"] if rv.get("product") else ""))
+            if rk:
+                bits.append("#%d World's Best %s %s" % (rk, {"premium_economy": "Premium Economy", "business": "Business Class",
+                                                              "first": "First Class"}[cab], AWARDS.get("_year") or ""))
+            return ", ".join(bits + other)
+
+        c_l = composite(sl, a.get("airhelp_score"), a.get("acsi_score"), a.get("jdpower_score"))
+        if c_l is None:
+            continue
+        block = {"rating": R(c_l), "basis": basis(raw_l)}
+        if rv.get("product"):
+            block["product"] = rv["product"]
+        if raw_s is not None and raw_l is not None and raw_s != raw_l:
+            c_s = composite(ss, a.get("airhelp_score"), a.get("acsi_score"), a.get("jdpower_score"))
+            block["short_haul"] = {"rating": R(c_s), "basis": basis(raw_s).replace("Skytrax %s" % CABIN_WORD[cab],
+                                                                                  "Skytrax short-haul %s" % CABIN_WORD[cab], 1)}
+        out[cab] = block
+    return out
 
 
 def build(scores, table):
     reviewed = {k: v for k, v in table["ratings"].items() if v.get("reviewed") is not False}
     air = scores["airlines"]
+    AWARDS.clear()
+    AWARDS.update({c: dict(v.get("ranks") or {}) for c, v in ((scores.get("awards") or {}).get("categories") or {}).items()})
+    AWARDS["_year"] = (scores.get("awards") or {}).get("year")
+    REVIEWS.clear()
+    REVIEWS.update(scores.get("reviews") or {})
     best = None
     for lc, le in itertools.product((0, 0.5, 1.0, 1.5), (0, 0.5, 1.0)):
         offs = {"low-cost": lc, "leisure": le}
-        pts = [(comp(air[k], "long", offs), v["rating"], k) for k, v in sorted(reviewed.items())
-               if k in air and comp(air[k], "long", offs) is not None]
+        pts = [(comp(air[k], "long", offs, k), v["rating"], k) for k, v in sorted(reviewed.items())
+               if k in air and comp(air[k], "long", offs, k) is not None]
         xs, ys = [p[0] for p in pts], [p[1] for p in pts]
         mx, my = statistics.mean(xs), statistics.mean(ys)
         b = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sum((x - mx) ** 2 for x in xs)
@@ -85,7 +164,7 @@ def build(scores, table):
 
     new = {}
     for code, a in sorted(air.items()):
-        c_long, c_short = comp(a, "long", offs), comp(a, "short", offs)
+        c_long, c_short = comp(a, "long", offs, code), comp(a, "short", offs, code)
         if c_long is None:
             continue
         sk = a.get("skytrax") or {}
@@ -101,6 +180,12 @@ def build(scores, table):
             bits.append("ACSI %g (%s)" % (a["acsi_score"], int(a.get("acsi_year") or 0)))
         if a.get("jdpower_score") is not None:
             bits.append("J.D. Power %g (%s)" % (a["jdpower_score"], int(a.get("jdpower_year") or 0)))
+        erk = award_bonus("economy", code)[1]
+        if erk:
+            bits.insert(1 if raw_l is not None else 0, "#%d World's Best Economy Class %s" % (erk, AWARDS.get("_year") or ""))
+        ev = (REVIEWS.get(code) or {}).get("economy") or {}
+        if ev.get("consensus") is not None:
+            bits.insert(1 if raw_l is not None else 0, "reviewers %g/5" % ev["consensus"])
         if len(bits) == 1:
             bits.append("the only published score found")
         row = {"rating": R(c_long), "note": (a.get("note") or "").strip().rstrip("."), "basis": ", ".join(bits),
@@ -112,6 +197,9 @@ def build(scores, table):
                                  "note": "Short-haul economy rated %g stars by Skytrax against %g long-haul" % (raw_s, raw_l),
                                  "basis": row["basis"].replace("Skytrax economy %g stars" % raw_l,
                                                                "Skytrax short-haul economy %g stars" % raw_s, 1)}
+        cb = cabin_blocks(code, a, offs, R)
+        if cb:
+            row["cabins"] = cb
         new[code] = row
     for code, al in ALIAS.items():
         for c in al:
@@ -121,10 +209,12 @@ def build(scores, table):
     merged = {}
     for code in sorted(set(reviewed) | set(new)):
         if code in reviewed:
-            r = {k: v for k, v in reviewed[code].items() if k not in ("basis", "published_sources", "short_haul")}
+            r = {k: v for k, v in reviewed[code].items() if k not in ("basis", "published_sources", "short_haul", "cabins")}
             n_ = new.get(code)
             if n_:
                 r["basis"], r["published_sources"] = n_["basis"], n_["sources"]
+                if n_.get("cabins"):
+                    r["cabins"] = n_["cabins"]        # the reviewed rating is economy's; the premium cabins are the formula's
                 if n_.get("short_haul"):
                     r["short_haul"] = {"rating": round(r["rating"] + n_["short_haul"]["rating"] - n_["rating"], 2),
                                        "note": n_["short_haul"]["note"], "basis": n_["short_haul"]["basis"]}
@@ -145,6 +235,12 @@ def build(scores, table):
                         "typical_miss": round((sse / n) ** 0.5, 3), "clamp": list(CLAMP)},
         "short_haul": "A short_haul block exists where Skytrax rates short-haul economy differently from long-haul; the "
                       "adapter uses it when the trip is short-haul (adapter._short_haul).",
+        "cabins": "A row's cabins block rates premium economy, business and first the same way from that cabin's Skytrax "
+                  "stars, the cited reviewers' 1-5 verdict (averaged with the stars when both exist), and the Skytrax "
+                  "World Airline Awards cabin category (+0.5 star for the top three, +0.25 for 4 to 10), with the "
+                  "airline-wide AirHelp, ACSI and J.D. Power scores. The adapter uses the block for the cabin flown on "
+                  "the trip's longest flight; economy uses the row's own rating, which takes the reviewers' economy "
+                  "verdict and the economy award the same way.",
     }
     return merged, method
 

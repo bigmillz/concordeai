@@ -1,5 +1,5 @@
 {
- "_comment": "The published scores the airline ratings in carriers.json are computed from (concorde-travel/rate_airlines.py). Gathered 2026-09-24 by research agents from the publishers' own pages, every figure re-checked against its source by a second agent; none needed a numeric correction. Skytrax economy stars by haul come from skytraxratings.com (a separate read and check); many of those pages were last updated in 2020-2022. Refresh when AirHelp, ACSI or J.D. Power publish a new edition.",
+ "_comment": "The published scores the airline ratings in carriers.json are computed from (concorde-travel/rate_airlines.py). Gathered 2026-09-24 by research agents from the publishers' own pages, every figure re-checked against its source by a second agent; none needed a numeric correction. Skytrax economy stars by haul come from skytraxratings.com (a separate read and check); many of those pages were last updated in 2020-2022. Refresh when AirHelp, ACSI or J.D. Power publish a new edition. Per-cabin Skytrax stars (skytrax_cabins) and the 2026 World Airline Awards cabin rankings (awards) were added the same day, read by one agent and checked by another; neither needed a correction.",
  "_as_of": "2026-09-24",
  "airlines": {
   "4Y": {
@@ -25,6 +25,22 @@
     "evidence": "Long-haul A330 economy includes two free meals, soft and hot drinks, and a personal HD screen. Short- and medium-haul A320 flights sell food and drinks from the Onboard Bar and stream to your own device. The Ocean Blue A330 refit, with 4K screens and Wi-Fi, starts in spring 2027.",
     "url": "https://www.discover-airlines.com/us/en/discover/travel-classes/economy-class/services-long-haul",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 4,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": 4
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Business Class, Premium Economy; Short haul: Business Class",
+    "_page_year": 2025
    }
   },
   "A3": {
@@ -53,6 +69,22 @@
     "evidence": "Skytrax publishes a single Aegean Economy rating (4 stars) based only on its short-haul product: seat, complimentary meals and drinks are rated 4 each. There is no separate long-haul Economy rating.",
     "url": "https://skytraxratings.com/airlines/aegean-airlines-rating",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": null,
+     "short": 4
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Business Class (single table headed 'Aegean Airlines')",
+    "_page_year": 2024
    }
   },
   "AA": {
@@ -87,6 +119,22 @@
     "evidence": "The claim holds for the hardware. American's 140+ long-haul widebodies have seatback screens. Its narrowbody fleet, which flies nearly all domestic routes, has none: screens come on 2028 deliveries, retrofits finish in the early 2030s, and Starlink reaches narrowbodies from 2027 (announced 18 Aug 2026).",
     "url": "https://skift.com/2026/08/18/american-brings-back-seatback-screens-on-narrowbody-aircraft/",
     "check": "corrected in part"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 3.5,
+     "short": null
+    },
+    "business": {
+     "long": 3,
+     "short": null
+    },
+    "first": {
+     "long": 4,
+     "short": 3.5
+    },
+    "_names": "Long haul: First Class, Business Class, Premium Economy, Economy Class; Short haul: First Class, Economy Class",
+    "_page_year": 2020
    }
   },
   "AC": {
@@ -118,6 +166,22 @@
     "evidence": "International Economy has an 8.9-inch seatback screen and a free hot meal (salad, bread, entrée, dessert). North America & Caribbean Economy also has an 8.9-inch seatback screen, but only a free snack, with Bistro meals to buy. The only gap is the meal.",
     "url": "https://www.aircanada.com/us/en/aco/home/fly/onboard/cabin-features/international-economy-class.html",
     "check": "corrected in part"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 4,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": 4
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Business Class, Premium Economy, Economy Class; Short haul: Business Class, Economy Class",
+    "_page_year": 2025
    }
   },
   "AF": {
@@ -146,6 +210,22 @@
     "evidence": "Skytrax rates Air France Economy 4 stars on both hauls. Short haul keeps complimentary snacks and drinks plus wifi (4 each); long haul adds seatback IFE and meals (4 each).",
     "url": "https://skytraxratings.com/airlines/air-france-rating",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 4,
+     "short": null
+    },
+    "business": {
+     "long": 3.5,
+     "short": 4
+    },
+    "first": {
+     "long": 4,
+     "short": null
+    },
+    "_names": "Long haul: First Class, Business Class, Premium Economy; Short haul: Business Class",
+    "_page_year": 2021
    }
   },
   "AM": {
@@ -172,6 +252,22 @@
     "evidence": "Skytrax rates Aeromexico economy 3 stars on both long haul and short haul. aeromexico.com says meals are free on every flight and scale with flight length, and a May 2026 review of the 737 MAX 8 found seatback screens, wifi, 30-inch pitch and a free meal.",
     "url": "https://skytraxratings.com/airlines/aeromexico-rating",
     "check": "corrected in part"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": 3.5,
+     "short": 3.5
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Business Class, AM Plus, Economy Class; Short haul: Business Class, AM Plus, Economy Class",
+    "_page_year": 2020
    }
   },
   "AS": {
@@ -206,6 +302,22 @@
     "evidence": "On Alaska's long-haul 787-9s from Seattle (Tokyo, Seoul, Rome), every seat has a seatback screen with Bluetooth, and Main Cabin gets two meals plus free beer and wine. Its 737 narrowbodies have no seatback screens and stream to your own device.",
     "url": "https://liveandletsfly.com/alaksa-airlines-787-9-seattle/",
     "check": "not supported by its source"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": null,
+     "short": null
+    },
+    "first": {
+     "long": null,
+     "short": 3.5
+    },
+    "_names": "Short haul only: First Class, Economy Class",
+    "_page_year": 2020
    }
   },
   "AV": {
@@ -232,6 +344,22 @@
     "evidence": "Avianca's help centre says economy to and from Europe includes snacks and a meal in every fare, while flights within the Americas, domestic ones included, sell food on board. Its 787s have seatback screens; its A320s stream to passengers' own devices.",
     "url": "https://ayuda.avianca.com/hc/en-us/articles/13523255092635-Which-flights-include-meals-onboard",
     "check": "corrected in part"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": 3,
+     "short": 3
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Business Class, Economy Class; Short haul: Business Class, Economy Class",
+    "_page_year": 2023
    }
   },
   "AY": {
@@ -260,6 +388,22 @@
     "evidence": "Skytrax rates Finnair Economy 4 stars on both hauls. Short haul has wifi-streamed IFE (4) and limited complimentary food (3) plus buy-on-board; long haul adds seatback IFE and meals (4 each).",
     "url": "https://skytraxratings.com/airlines/finnair-rating",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": 3.5
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Business Class; Short haul: Business Class",
+    "_page_year": 2020
    }
   },
   "AZ": {
@@ -288,6 +432,22 @@
     "evidence": "Skytrax rates ITA Airways Economy 4 stars on long haul and 3.5 on short haul. Seats are rated 4.5 on both; long haul adds seatback IFE (4) and meals (3.5), and short-haul complimentary snacks are rated 3.5.",
     "url": "https://skytraxratings.com/airlines/ita-airways-rating",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 4,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": 4
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Business Class, Premium Economy; Short haul: Business Class",
+    "_page_year": 2024
    }
   },
   "B6": {
@@ -322,6 +482,22 @@
     "evidence": "JetBlue's Core cabin comes with free Wi-Fi, live TV and movies at every seat, and free snacks and drinks, on every JetBlue-operated flight. The transatlantic A321LR has the same Core seat (about 32 in pitch) and screens, and adds a free meal.",
     "url": "https://www.jetblue.com/help/seats",
     "check": "not supported by its source"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": null,
+     "short": 4
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Short haul only: Mint, Economy Class",
+    "_page_year": 2021
    }
   },
   "BA": {
@@ -350,6 +526,22 @@
     "evidence": "Skytrax rates BA Economy 3.5 stars on long haul and 3 stars on short haul, calling short-haul Economy 'a budget style product'. Short-haul complimentary meals/snacks are rated 1 of 5 (buy-on-board rated 4), while long-haul meals, seatback IFE and wifi are each rated 4.",
     "url": "https://skytraxratings.com/airlines/british-airways-rating",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 3.5,
+     "short": null
+    },
+    "business": {
+     "long": 3.5,
+     "short": 3
+    },
+    "first": {
+     "long": 3.5,
+     "short": null
+    },
+    "_names": "Long haul: First Class, Business Class, Premium Economy; Short haul: Business Class",
+    "_page_year": 2026
    }
   },
   "BR": {
@@ -377,6 +569,22 @@
     "evidence": "Regional A321 Economy (31-32in pitch per EVA) has no seatback screens, only free 30-minute Wi-Fi. The 777-300ER has seatback screens in Economy at 31-33in pitch.",
     "url": "https://seatcompare.ai/insights/eva-air-a321-seat-selection-guide-2026",
     "check": "corrected in part"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 4,
+     "short": null
+    },
+    "business": {
+     "long": 4.5,
+     "short": 5
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Business Class, Premium Economy, Economy Class",
+    "_page_year": 2024
    }
   },
   "CI": {
@@ -404,6 +612,22 @@
     "evidence": "On the regional 737-800, entertainment is streamed to your own device through the Fantasy Sky portal, with no seatback screens and no Wi-Fi. The A321neo and the long-haul widebodies have seatback screens.",
     "url": "https://www.china-airlines.com/tw/en/fly/on-board/fleet/in_flight_entertainment",
     "check": "not supported by its source"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 4,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": 4
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Business Class, Premium Economy, Economy Class",
+    "_page_year": 2021
    }
   },
   "CM": {
@@ -431,6 +655,22 @@
     "evidence": "Copa uses Boeing 737s on every route, including flights over 6 hours to the US and Canada, so the cabin is the same whatever the length. Skytrax rates only short-haul cabins (economy 3.5 stars) and says the older aircraft are fine on short flights but less comfortable on long ones.",
     "url": "https://skytraxratings.com/airlines/copa-airlines-rating",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": null,
+     "short": 3.5
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Short haul only: Business Class, Economy Class",
+    "_page_year": 2020
    }
   },
   "CX": {
@@ -458,6 +698,22 @@
     "evidence": "Regional A321neo Economy has seatback screens at every seat and Wi-Fi, with 29-30in pitch (31in on the newer layout), against about 32in on the long-haul A350. The difference is mainly pitch.",
     "url": "https://seatmaps.com/airlines/cx-cathay-pacific/airbus-a321neo/",
     "check": "not supported by its source"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 4.5,
+     "short": null
+    },
+    "business": {
+     "long": 5,
+     "short": 5
+    },
+    "first": {
+     "long": 4.5,
+     "short": null
+    },
+    "_names": "First Class, Business Class, Premium Economy, Economy Class",
+    "_page_year": 2020
    }
   },
   "DE": {
@@ -484,6 +740,22 @@
     "evidence": "Long-haul economy on the A330neo has 76 cm (30 in) pitch, 13.3-inch 4K seatback screens, and a free hot meal, snack and soft drinks. On short- and medium-haul A320neo/A321neo flights, content streams to your own device only, and Condor says meals and drinks are not included.",
     "url": "https://www.condor.com/en-gb/information-services/help-contact/faq-frequently-asked-questions/on-board-services/food-drinks/",
     "check": "not supported by its source"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 4,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": 4
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Business Class, Premium Economy; Short haul: Business Class",
+    "_page_year": 2025
    }
   },
   "DL": {
@@ -518,6 +790,22 @@
     "evidence": "Delta finished free Delta Sync Wi-Fi on its entire domestic mainline fleet, and as of April 2025 it covered the transatlantic network too. Seatback screens are fleetwide on mainline (Skift counts 900+ aircraft), so apart from the free meal on long-haul, economy is one product on both hauls.",
     "url": "https://news.delta.com/keeping-you-connected-fast-free-wi-fi-now-most-transatlantic-routes-coming-regional-jets",
     "check": "corrected in part"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 3.5,
+     "short": null
+    },
+    "business": {
+     "long": 3.5,
+     "short": 3.5
+    },
+    "first": {
+     "long": null,
+     "short": 3.5
+    },
+    "_names": "Long haul: Business Class, Premium Economy, Economy Class; Short haul: First Class, Business Class, Economy Class",
+    "_page_year": 2020
    }
   },
   "DY": {
@@ -572,6 +860,22 @@
     "evidence": "Skytrax rates Aer Lingus Economy 4 stars on both hauls. Short haul is buy-on-board (complimentary food and drink rated 1 of 5); long haul adds seatback IFE, wifi and meals (4 each) and free beer and wine, per Skytrax.",
     "url": "https://skytraxratings.com/airlines/aer-lingus-rating",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": null
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Business Class; Short haul: Economy only",
+    "_page_year": 2025
    }
   },
   "EK": {
@@ -599,6 +903,22 @@
     "evidence": "Emirates flies only widebodies (A380, 777, A350) and has no domestic network; it advertises a personal HD screen at every Economy seat, up to 13.3in on refitted 777s and A380s, on short and long routes alike.",
     "url": "https://www.emirates.com/us/english/experience/cabin-features/economy-class/",
     "check": "not supported by its source"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": 4
+    },
+    "first": {
+     "long": 5,
+     "short": 4
+    },
+    "_names": "First Class, Business Class, Economy Class",
+    "_page_year": 2020
    }
   },
   "EW": {
@@ -653,6 +973,22 @@
     "evidence": "Since 2019, Economy on Etihad's A320 and A321 has had no seatback screens, only wireless streaming to your own device, while its widebodies keep seatback screens. The exception is the new A321LR, which has 13.3in 4K screens.",
     "url": "https://www.futuretravelexperience.com/2019/05/etihad-replaces-seatback-screens-wireless-ife-a320-321-economy/",
     "check": "not supported by its source"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": null
+    },
+    "first": {
+     "long": 5,
+     "short": 4.5
+    },
+    "_names": "First Class, Business Class, Economy Class",
+    "_page_year": 2021
    }
   },
   "F8": {
@@ -741,6 +1077,22 @@
     "evidence": "Skytrax publishes a single Icelandair Economy rating (3.5 stars) for the whole network, with no split by haul. Seat, IFE and wifi are rated 3.5; complimentary meals are rated 1 of 5 (buy-on-board).",
     "url": "https://skytraxratings.com/airlines/icelandair-rating",
     "check": "corrected in part"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 3.5,
+     "short": 3.5
+    },
+    "business": {
+     "long": 3.5,
+     "short": 3.5
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Business Class, Economy Comfort (single 'Summary Rating' table, no haul split)",
+    "_page_year": 2020
    }
   },
   "FR": {
@@ -829,6 +1181,22 @@
     "evidence": "The A330 and 787 widebodies flown long-haul have seatback screens. The A321neo (mainland to Hawaii) and the 717 (between the islands) have none and rely on streaming to your own device. The A321neo and A330 have Starlink Wi-Fi (Oct 2025).",
     "url": "https://beatofhawaii.com/hawaii-flights-quietly-lose-seatback-screens-and-travelers-feel-it/",
     "check": "not supported by its source"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": 3.5,
+     "short": null
+    },
+    "first": {
+     "long": null,
+     "short": 3.5
+    },
+    "_names": "Long haul: First / Business Class, Extra Comfort, Economy Class; Short haul: First Class, Extra Comfort, Economy Class",
+    "_page_year": 2020
    }
   },
   "HV": {
@@ -883,6 +1251,22 @@
     "evidence": "Skytrax rates Iberia Economy 4 stars on both hauls. Short haul is buy-on-board (complimentary food rated 1 of 5); long haul has seatback IFE (4), wifi (4.5) and meals (4).",
     "url": "https://skytraxratings.com/airlines/iberia-rating",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 4,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": 4
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Business Class, Premium Economy; Short haul: Business Class",
+    "_page_year": 2023
    }
   },
   "JL": {
@@ -910,6 +1294,22 @@
     "evidence": "Domestic 767 and 737 Economy has no personal screens (you stream to your own device over free Wi-Fi) and serves drinks only. International JAL SKY WIDER Economy (787, 777-300ER, 767) has 33-34in pitch, 10.6in screens and meals.",
     "url": "https://www.jal.co.jp/jp/en/dom/service/n/entertainment/",
     "check": "not supported by its source"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 4,
+     "short": null
+    },
+    "business": {
+     "long": 4.5,
+     "short": 5
+    },
+    "first": {
+     "long": 5,
+     "short": 5
+    },
+    "_names": "First Class, Business Class, Premium Economy, Economy Class",
+    "_page_year": 2022
    }
   },
   "KE": {
@@ -937,6 +1337,22 @@
     "evidence": "The A220-300 used on domestic routes has no seatback screens (streaming over Wi-Fi only), and a Dec 2022 review found no drinks or snacks served domestically. A321neo and widebody Economy have seatback screens (13.3in on the A321neo) and meals.",
     "url": "https://airlinesandme.com/review-korean-air-a220-300-economy-class-jeju-seoul-gimpo/",
     "check": "not supported by its source"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": 4.5
+    },
+    "first": {
+     "long": 5,
+     "short": null
+    },
+    "_names": "First Class, Business Class, Economy Class",
+    "_page_year": 2025
    }
   },
   "KL": {
@@ -965,6 +1381,22 @@
     "evidence": "Skytrax rates KLM Economy 4 stars on both long and short haul. Long haul adds seatback IFE, wifi and meals (4 each); short haul has complimentary snacks (3.5) and drinks (4) but no rated IFE.",
     "url": "https://skytraxratings.com/airlines/klm-royal-dutch-airlines-rating",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": 4
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Business Class; Short haul: Business Class",
+    "_page_year": 2021
    }
   },
   "LA": {
@@ -992,6 +1424,22 @@
     "evidence": "Economy on LATAM's 787, 767 and 777 widebodies has seatback screens and full meals. Its A320-family domestic flights stream entertainment to passengers' own devices and serve a free snack and drink. Skytrax still rates economy 4 stars on both long and short haul.",
     "url": "https://runwaygirlnetwork.com/2023/12/latam-brings-paramount-content-to-embedded-and-wireless-ife/",
     "check": "corrected in part"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": 4
+    },
+    "business": {
+     "long": 4,
+     "short": 3.5
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Business Class, Economy Class; Short haul: Business Class, Premium Economy, Economy Class",
+    "_page_year": 2026
    }
   },
   "LH": {
@@ -1020,6 +1468,22 @@
     "evidence": "Skytrax rates Lufthansa Economy 3.5 stars on both hauls. Short-haul complimentary food and drink are rated 0.5 of 5; long-haul meals are rated 3, with seatback IFE and wifi rated 4.",
     "url": "https://skytraxratings.com/airlines/lufthansa-rating",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 4,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": 4
+    },
+    "first": {
+     "long": 5,
+     "short": null
+    },
+    "_names": "Long haul: First Class, Business Class, Premium Economy; Short haul: Business Class",
+    "_page_year": 2022
    }
   },
   "LL": {
@@ -1072,6 +1536,22 @@
     "evidence": "Skytrax rates LOT Economy 4 stars on both hauls, but notes short-haul Economy is buy-on-board while long haul keeps complimentary meals and drinks. Long-haul seatback IFE and meals are rated 4.",
     "url": "https://skytraxratings.com/airlines/lot-polish-airlines-rating",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 4,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": 4
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Business Class, Premium Economy; Short haul: Business Class",
+    "_page_year": 2025
    }
   },
   "LS": {
@@ -1127,6 +1607,22 @@
     "evidence": "Skytrax rates SWISS Economy 4 stars on both hauls. Short haul has complimentary snacks from Zurich (4) but buy-on-board from Geneva (3.5); long haul adds seatback IFE and meals (4 each).",
     "url": "https://skytraxratings.com/airlines/swiss-international-air-lines-rating",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": 4
+    },
+    "first": {
+     "long": 4,
+     "short": null
+    },
+    "_names": "Long haul: First Class, Business Class; Short haul: Business Class",
+    "_page_year": 2020
    }
   },
   "MX": {
@@ -1183,6 +1679,22 @@
     "evidence": "International 777-300ER Economy has 34in pitch, 13.3in touch screens and full meals. Domestic Economy serves drinks only, though domestic Wi-Fi is free.",
     "url": "https://www.ana.co.jp/en/us/travel-information/cabin/b777-300er-economy-class/",
     "check": "not supported by its source"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 4.5,
+     "short": 4.5
+    },
+    "business": {
+     "long": 5,
+     "short": 4.5
+    },
+    "first": {
+     "long": 5,
+     "short": null
+    },
+    "_names": "ANA: First Class, ANA: Business Class, ANA: Premium Economy, ANA: Economy Class",
+    "_page_year": 2026
    }
   },
   "OS": {
@@ -1211,6 +1723,22 @@
     "evidence": "Skytrax rates Austrian Economy 4 stars on both hauls. Short haul has complimentary meals/snacks, drinks and wifi (4 each); long haul adds seatback IFE and meals (4 each).",
     "url": "https://skytraxratings.com/airlines/austrian-airlines-rating",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 4,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": 4
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Business Class, Premium Economy; Short haul: Business Class",
+    "_page_year": 2021
    }
   },
   "OZ": {
@@ -1237,6 +1765,22 @@
     "evidence": "Short-haul A321neo Economy has no personal screens, though a hot meal was still served on a one-hour Fukuoka-Incheon flight. Widebody long-haul Economy has seatback AVOD. Older A321ceos have 9in screens.",
     "url": "https://knaviation.net/asiana-a321neo-economy-review/",
     "check": "not supported by its source"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": 4.5
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Business Class, Economy Class",
+    "_page_year": 2024
    }
   },
   "PC": {
@@ -1293,6 +1837,22 @@
     "evidence": "Only Dash 8-400 turboprops and Embraer E195-E2 narrowbodies, flying within Canada and to the US, Mexico and the Caribbean. No widebody or long-haul flying.",
     "url": "https://en.wikipedia.org/wiki/Porter_Airlines",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": null,
+     "short": null
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Short haul only: Economy Class",
+    "_page_year": 2020
    }
   },
   "PR": {
@@ -1319,6 +1879,22 @@
     "evidence": "Domestic A320 Economy pitch is 28-29in on the V.1 layout (30-32in on V.2), while the A350-900 has 32in pitch, seatback AVOD and Wi-Fi (seatmaps.com). The A350-1000 is 10-abreast with 17in seats but 13.3in 4K screens.",
     "url": "https://seatmaps.com/airlines/pr-pal/airbus-a320/",
     "check": "not supported by its source"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 4,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": 4
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Business Class, Premium Economy, Economy Class",
+    "_page_year": 2021
    }
   },
   "QR": {
@@ -1346,6 +1922,22 @@
     "evidence": "Qatar's regional A320s have seatback AVOD screens at every seat and complimentary meals in Economy, like its widebodies. The one gap: Qatar lists Wi-Fi only on the A350, the A380 and some 777s and 787s.",
     "url": "https://www.qatarairways.com/en-us/fleet/airbus-a320.html",
     "check": "not supported by its source"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": 5,
+     "short": 4.5
+    },
+    "first": {
+     "long": 5,
+     "short": null
+    },
+    "_names": "First Class, Business Class, Economy Class",
+    "_page_year": 2021
    }
   },
   "SK": {
@@ -1374,6 +1966,22 @@
     "evidence": "Skytrax rates SAS Economy 3.5 stars on both hauls. Short haul is buy-on-board (complimentary food rated 1 of 5) with wifi (4); long haul has seatback IFE and wifi (4) but seat and meals rated 3.5.",
     "url": "https://skytraxratings.com/airlines/sas-scandinavian-airlines-rating",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 3.5,
+     "short": 3.5
+    },
+    "business": {
+     "long": 4,
+     "short": null
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Business Class, SAS Plus; Short haul: SAS Plus",
+    "_page_year": 2021
    }
   },
   "SN": {
@@ -1401,6 +2009,22 @@
     "evidence": "Skytrax rates Brussels Airlines Economy 3 stars on long haul but 3.5 on short haul. Short haul is buy-on-board (complimentary food and drink rated 1 of 5); long haul has seatback IFE (4) and food quantity rated 3.5.",
     "url": "https://skytraxratings.com/airlines/brussels-airlines-rating",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 3,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": 3
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Business Class, Economy Privilege; Short haul: Business Class",
+    "_page_year": 2020
    }
   },
   "SQ": {
@@ -1428,6 +2052,22 @@
     "evidence": "Regional 737-8 Economy has 30in pitch and a 10in HD screen, against 32in pitch and an 11.1in screen on the widebodies. Both have seatback screens and meals, so the only differences are 2in of pitch and screen size.",
     "url": "https://milelion.com/2021/11/17/hands-on-singapore-airlines-new-b737-8-economy-class-seat/",
     "check": "not supported by its source"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 4.5,
+     "short": null
+    },
+    "business": {
+     "long": 4.5,
+     "short": 5
+    },
+    "first": {
+     "long": 5,
+     "short": null
+    },
+    "_names": "First Class, Business Class, Premium Economy, Economy Class",
+    "_page_year": 2024
    }
   },
   "SY": {
@@ -1483,6 +2123,22 @@
     "evidence": "Turkish has fitted Economy on its narrowbodies with seatback screens on the same Planet entertainment system as its widebodies (12in on the A321neo), and serves meals even on domestic flights. Long-haul 777-300ER Economy pitch is 79 cm (about 31in).",
     "url": "https://allplane.tv/blog/2024/2/17/flight-review-turkish-airlines-economy-class-airbus-a321neo",
     "check": "not supported by its source"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": 4.5,
+     "short": 4
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Business Class, Economy Class",
+    "_page_year": 2025
    }
   },
   "TO": {
@@ -1522,6 +2178,22 @@
     "evidence": "Skytrax rates TAP Economy 3 stars on long haul and 3.5 on short haul. Long-haul seat, IFE, wifi and meals are each rated 3.5; short haul has seat 3 and complimentary snacks 3.5.",
     "url": "https://skytraxratings.com/airlines/tap-air-portugal-rating",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": 3.5,
+     "short": 3.5
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Business Class; Short haul: Business Class",
+    "_page_year": 2021
    }
   },
   "TS": {
@@ -1551,6 +2223,22 @@
     "evidence": "The same A321LR, A321XLR and A330 fleet flies both kinds of route, with a seatback screen at every seat. Transatlantic economy includes a free hot meal with wine; US, Canada and southern sun routes are buy-on-board. The only gap is the meal.",
     "url": "https://www.airtransat.com/en-GB/book/book-a-flight/on-board-comfort/economy-class/long-haul",
     "check": "corrected in part"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 4,
+     "short": 3.5
+    },
+    "business": {
+     "long": null,
+     "short": null
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Club Class, Economy Class; Short haul: Club Class, Economy Class",
+    "_page_year": 2020
    }
   },
   "U2": {
@@ -1612,6 +2300,22 @@
     "evidence": "By the end of 2025, 68% of United's narrowbody fleet had the Signature Interior, which has a seatback screen at every seat, and its 150,000+ seatback screens also cover the widebodies. Free Starlink Wi-Fi for MileagePlus members is so far on 300+ United Express regional jets. The rest of the gap is the free meal on long-haul (a borderline 'same').",
     "url": "https://www.sec.gov/Archives/edgar/data/100517/000010051726000014/ual_12312025erex991.htm",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 3.5,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": 3.5
+    },
+    "first": {
+     "long": null,
+     "short": 3.5
+    },
+    "_names": "Long haul: Business Class, Premium Plus, Economy Class; Short haul: First Class (domestic), Business Class (Int'l/T'Con), Economy Class",
+    "_page_year": 2020
    }
   },
   "UX": {
@@ -1638,6 +2342,22 @@
     "evidence": "Long-haul and Dreamliner flights have a touch screen at every seat and a free menu on transatlantic routes. Short- and medium-haul flights within Europe stream free content to your own device only, and food is buy-on-board.",
     "url": "https://www.aireuropa.com/us/en/aea/aexperience/services.html",
     "check": "not supported by its source"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": null,
+     "short": null
+    },
+    "business": {
+     "long": 3.5,
+     "short": 3.5
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Business Class; Short haul: Business Class",
+    "_page_year": 2020
    }
   },
   "V7": {
@@ -1740,6 +2460,22 @@
     "evidence": "Virgin Atlantic flies only long-haul, and Skytrax publishes long-haul ratings only: Economy 3.5 stars, with seatback IFE rated 4.5 and meals and wifi rated 4 each.",
     "url": "https://skytraxratings.com/airlines/virgin-atlantic-rating",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 4,
+     "short": null
+    },
+    "business": {
+     "long": 4,
+     "short": null
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Business Class, Premium Economy (no short-haul table)",
+    "_page_year": 2020
    }
   },
   "VY": {
@@ -1858,6 +2594,22 @@
     "evidence": "The 787 Dreamliner has touchscreen seatback monitors, and full meal service on transatlantic and transpacific routes. On the 737, entertainment comes through the Flight Guide on your own device, and economy gets a free soft drink and snack on flights over an hour.",
     "url": "https://www.westjet.com/en-ca/inflight/economy-cabin",
     "check": "confirmed"
+   },
+   "skytrax_cabins": {
+    "premium_economy": {
+     "long": 3.5,
+     "short": 3.5
+    },
+    "business": {
+     "long": 4,
+     "short": null
+    },
+    "first": {
+     "long": null,
+     "short": null
+    },
+    "_names": "Long haul: Business Class, Premium Economy, Economy Class; Short haul: Premium Economy, Economy Class",
+    "_page_year": 2020
    }
   },
   "Y4": {
@@ -1905,6 +2657,106 @@
     "evidence": "The fleet is all Boeing 787-9s, flying both short routes (Narita, Bangkok) and long ones (US). Economy pitch is going from 31in to at least 33in fleet-wide by end-2026; the first reconfigured jet entered service on 16 March 2026.",
     "url": "https://aerospaceglobalnews.com/news/air-premia-economy-legroom-seat-reduction-787/",
     "check": "corrected in part"
+   }
+  }
+ },
+ "awards": {
+  "year": 2026,
+  "source": "Skytrax World Airline Awards 2026, cabin categories",
+  "categories": {
+   "first": {
+    "name": "World's Best First Class",
+    "url": "https://www.worldairlineawards.com/worlds-best-first-class-airlines-2026/",
+    "ranks": {
+     "AF": 1,
+     "SQ": 2,
+     "LH": 3,
+     "EK": 4,
+     "CX": 5,
+     "LX": 6,
+     "JL": 7,
+     "NH": 8,
+     "QF": 9,
+     "QR": 10
+    }
+   },
+   "business": {
+    "name": "World's Best Business Class",
+    "url": "https://www.worldairlineawards.com/worlds-best-business-class-airlines-2026/",
+    "ranks": {
+     "QR": 1,
+     "SQ": 2,
+     "CX": 3,
+     "NH": 4,
+     "HU": 5,
+     "TK": 6,
+     "JX": 7,
+     "AF": 8,
+     "JL": 9,
+     "BR": 10,
+     "EK": 11,
+     "VS": 12,
+     "DL": 13,
+     "QF": 14,
+     "LH": 15,
+     "EY": 16,
+     "IB": 17,
+     "MH": 18,
+     "BA": 19,
+     "OS": 20
+    }
+   },
+   "premium_economy": {
+    "name": "World's Best Premium Economy Class",
+    "url": "https://www.worldairlineawards.com/worlds-best-airline-premium-economy-class-2026/",
+    "ranks": {
+     "BR": 1,
+     "EK": 2,
+     "SQ": 3,
+     "CX": 4,
+     "VS": 5,
+     "JL": 6,
+     "DL": 7,
+     "NZ": 8,
+     "AF": 9,
+     "LH": 10,
+     "IB": 11,
+     "BA": 12,
+     "QF": 13,
+     "NH": 14,
+     "KE": 15,
+     "OS": 16,
+     "AZ": 17,
+     "AC": 18,
+     "UA": 19,
+     "LX": 20
+    }
+   },
+   "economy": {
+    "name": "World's Best Economy Class",
+    "url": "https://www.worldairlineawards.com/worlds-best-economy-class-airlines-2026/",
+    "ranks": {
+     "SQ": 1,
+     "CX": 2,
+     "QR": 3,
+     "BR": 4,
+     "NH": 5,
+     "JL": 6,
+     "HU": 7,
+     "TK": 8,
+     "JX": 9,
+     "DL": 10,
+     "AF": 11,
+     "MH": 12,
+     "LH": 13,
+     "KE": 14,
+     "TG": 15,
+     "SV": 16,
+     "OS": 17,
+     "VS": 18,
+     "MS": 19,
+     "BA": 20
+    }
    }
   }
  }
