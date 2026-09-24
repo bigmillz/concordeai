@@ -2303,8 +2303,12 @@ def _contrib_loop(url: str, key: str, gen: int = 0):
                 _contrib_stop.wait(15)
                 continue
             pulled = ollama_pulled_tags() or set()
+            # MODEL_ROUTES first (6b309): model_cached raises on a label
+            # with no engine here (the MLX-only ones on Intel/Windows),
+            # which failed every lap as "hub offline — retrying"
             models = [l for l in MODEL_INFO
-                      if model_cached(l, pulled) and model_fits_memory(l)]
+                      if l in MODEL_ROUTES and model_cached(l, pulled)
+                      and model_fits_memory(l)]
             out = post("/api/fleet/register",
                        {"id": wid, "token": token,
                         "name": platform.node().split(".")[0][:20],
@@ -2327,18 +2331,37 @@ def _contrib_loop(url: str, key: str, gen: int = 0):
             if job.get("job"):
                 parts = []
                 _t0 = time.time()
+                _lbl = str(job.get("label") or "")
                 try:
-                    run_model(job["label"], job["messages"], parts.append)
+                    # THIS MAC'S OWN GPU, NOTHING ELSE (6b309, per
+                    # Patrick: "only contributing their own GPU, not
+                    # their cloud models that they're paying for").
+                    # Only a model this lap just advertised — downloaded
+                    # here and fitting in memory — is ever run for the
+                    # hub. run_model reaches only the engines on
+                    # 127.0.0.1 and never a cloud key, and an unknown
+                    # label must not fall through to its pick-any-local
+                    # fallback either: the hub gets an error, not a
+                    # model the owner never offered.
+                    if _lbl not in models:
+                        raise RuntimeError("not offered by this machine")
+                    run_model(_lbl, job["messages"], parts.append)
                     _txt = strip_think("".join(parts))
-                    post("/api/fleet/submit",
-                         {"id": wid, "token": token, "job": job["job"],
-                          "text": _txt})
-                    _ledger_add(seconds=time.time() - _t0,
-                                chars=len(_txt), jobs=1)
                 except Exception as exc:
                     post("/api/fleet/submit",
                          {"id": wid, "token": token, "job": job["job"],
                           "err": str(exc)[:100]})
+                else:
+                    post("/api/fleet/submit",
+                         {"id": wid, "token": token, "job": job["job"],
+                          "text": _txt})
+                    # a ledger that can't be written must not turn an
+                    # answered job into an error for the same job
+                    try:
+                        _ledger_add(seconds=time.time() - _t0,
+                                    chars=len(_txt), jobs=1)
+                    except (OSError, ValueError):
+                        pass
                 # THE TIME SHARE (6b257): rest for the complement of
                 # the lend slider — at 50% the Mac rests as long as it
                 # worked. Capped so one marathon job can't bench the
@@ -3759,7 +3782,7 @@ def _download_model(label: str):
                 pass
         with _setup_lock:
             _setup_jobs[label] = {"status": "done", "note": ""}
-        _ledger_add(label)
+        _app_models_add(label)
         _spawn_mlx_engine(label)
     except Exception as exc:
         with _setup_lock:
@@ -6661,12 +6684,12 @@ def store_prefs(d: dict, base=None):
 # models listed here. An install that predates the list vouches for
 # every model it knows (the app was the only thing offering them); a
 # brand-new install starts empty and records each download as it lands.
-def _ledger() -> set:
+def _app_models() -> set:
     v = load_prefs(None).get("app_models")
     return set(v) if isinstance(v, list) else set()
 
 
-def _ledger_add(label: str):
+def _app_models_add(label: str):
     try:
         with _prefs_lock:
             p = load_prefs(None)
@@ -6683,7 +6706,7 @@ def _ledger_add(label: str):
         pass
 
 
-def _ledger_seed(prefs: dict, existing: bool):
+def _app_models_seed(prefs: dict, existing: bool):
     """Called once, under _prefs_lock, on the first run that has the list."""
     if "app_models" not in prefs:
         prefs["app_models"] = ([*MODEL_INFO, *RETIRED_MODELS]
@@ -7049,7 +7072,7 @@ def _ollama_install_worker(labels: list):
             with _setup_lock:
                 _setup_jobs[label] = {"status": "done", "note": "",
                                       "pct": 100}
-            _ledger_add(label)
+            _app_models_add(label)
         except Exception as exc:
             with _setup_lock:
                 _setup_jobs[label] = {"status": "error",
@@ -7243,7 +7266,7 @@ def superseded_installed(pulled=None, auto=False) -> list:
     ups = [u for u in model_updates(pulled) if not u.get("gone")]
     if not auto:
         return [u["old"] for u in ups]
-    mine = _ledger()
+    mine = _app_models()
     return [u["old"] for u in ups if u["old"] in mine]
 
 
@@ -25117,7 +25140,7 @@ def maybe_version_splash():
             prefs = load_prefs()
             last = prefs.get("last_ident") or prefs.get("last_version")
             if real and "app_models" not in prefs:
-                _ledger_seed(prefs, existing=last is not None)
+                _app_models_seed(prefs, existing=last is not None)
                 store_prefs(prefs)
             if last == ident:
                 return

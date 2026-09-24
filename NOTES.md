@@ -5261,3 +5261,51 @@ ran" when the server says so, and retire unanswered when the run ends.
 The Veo slot is reserved before the paid submit and handed back only
 when no render started. ci_smoke.sh picks a free port, fails on a
 traceback and kills the app's children.
+
+ALSO FOUND (6b309): 6b306 defined _ledger_add(label) for the downloaded-
+models ledger, a second top-level _ledger_add after the Contribute GPU
+ledger's _ledger_add(seconds, chars, jobs). Python keeps the last, so
+since the 6.1 nightly every contributed job raised after submitting its
+answer, then submitted an error for the same job, and the contribution
+stats stopped. Mine are now _app_models / _app_models_add /
+_app_models_seed, and the gauntlet fails on any top-level function
+defined twice.
+
+THE WEB VERSION IS OFF (2026-09-24, per Patrick: "we don't really need
+that one anymore because I'd rather people download the app"). The
+hosted copy (net.millertechnology.millenai, ~/Library/MillenAI-live on
+:9889) served ai.millertechnology.net through the cloudflared tunnel and
+ran on the owner's own cloud.json, so any visitor with a guest pass was
+spending his keys. Stopped and disabled with its hourly updater; the
+tunnel, which also carried trucking.millertechnology.net (a static joke
+site, also retired), is stopped and disabled. The service files are in
+~/Library/LaunchAgents/disabled/ and ~/.cloudflared/config.yml has a
+dated backup, so all of it can come back. A scan of every commit of the
+public concordeai, concorde-site and the private concorde-vpn repos found
+none of the owner's keys and no key-shaped strings; builds ship only
+millenai.py, fonts, icons, vfx and a launcher.
+
+CONTRIBUTE LENDS THIS MAC'S GPU AND NOTHING ELSE (6b309, per Patrick:
+"make sure that if any user is contributing GPU, that they're only
+contributing their own GPU, not their cloud models that they're paying
+for"). It already couldn't reach a cloud: run_model knows only the MLX
+and Ollama engines on 127.0.0.1, and no catalog tag is an Ollama "-cloud"
+tag (those run on ollama.com and bill the user's Ollama account). But
+the worker ran whatever label the hub sent, and an unknown one fell
+through to run_model's pick-any-local-model fallback. Now it runs only a
+model it advertised that same lap and sends the hub an error for
+anything else. The gauntlet walks every function _contrib_loop can reach
+and fails on any cloud name or any URL that isn't 127.0.0.1; mutation-
+tested against a cloud fallback in run_model, a remote Ollama URL, a
+cloud tag in the catalog, a cloud_conf() read, and the guard removed or
+moved.
+
+Also: the advertised-models list called model_cached on every catalog
+label, which raises for a label with no engine on the machine (Hermes 4
+14B, GLM 5.3 and DeepSeek V3.2 are MLX-only), so on Intel and Windows
+every lap ended "hub offline — retrying" and Contribute never worked
+there. The ledger write moved out of the try, so a ledger that can't be
+written no longer turns an answered job into an error for the same job.
+
+NOTE: FLEET_HOME, Contribute's default hub, is ai.millertechnology.net —
+the web version switched off today. Contributors now have no hub.

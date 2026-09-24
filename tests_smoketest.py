@@ -305,6 +305,66 @@ _LH = {"re": re, "os": os, "sys": sys, "time": time, "json": json,
        "threading": __import__("threading"), "tempfile": __import__("tempfile"),
        "contextlib": __import__("contextlib"),
        "subprocess": __import__("subprocess"), "app_dir": lambda: "/tmp"}
+# 6b309: a function defined twice at the top level silently replaces the
+# first. 6b306's _ledger_add(label) replaced the Contribute ledger's
+# _ledger_add(seconds, chars, jobs), so every contributed job crashed
+# after answering and the stats stopped counting.
+import collections as _col, ast as _ast0
+_dups = [n for n, c in _col.Counter(
+    x.name for x in _ast0.parse(_MILLENAI_SRC).body
+    if isinstance(x, (_ast0.FunctionDef, _ast0.AsyncFunctionDef))).items() if c > 1]
+check("no function is defined twice at the top level", not _dups, str(_dups))
+# 6b309, per Patrick: "make sure that if any user is contributing GPU,
+# that they're only contributing their own GPU, not their cloud models
+# that they're paying for." Walk EVERYTHING the Contribute worker can
+# call: no cloud function, no cloud key, no address but this Mac's own
+# engines (the hub is reached only through the url it was given).
+import re as _re0
+_fdefs = {x.name: x for x in _ast0.parse(_MILLENAI_SRC).body
+          if isinstance(x, (_ast0.FunctionDef, _ast0.AsyncFunctionDef))}
+_reach, _todo = set(), ["_contrib_loop"]
+while _todo:
+    _f = _todo.pop()
+    if _f in _reach:
+        continue
+    _reach.add(_f)
+    _todo += [c.func.id for c in _ast0.walk(_fdefs[_f])
+              if isinstance(c, _ast0.Call) and isinstance(c.func, _ast0.Name)
+              and c.func.id in _fdefs]
+_CLOUDY = _re0.compile(r"cloud|anthropic|claude|gemini|groq|openrouter|"
+                       r"together|kimi|pollinations|turbo|api_key", _re0.I)
+_bad_names, _bad_urls = set(), set()
+for _f in _reach:
+    for _n in _ast0.walk(_fdefs[_f]):
+        _id = (_n.id if isinstance(_n, _ast0.Name) else
+               _n.attr if isinstance(_n, _ast0.Attribute) else "")
+        if _CLOUDY.search(_id) or _CLOUDY.search(_f):
+            _bad_names.add(_f + ":" + (_id or _f))
+        _s = (_n.value if isinstance(_n, _ast0.Constant)
+              and isinstance(_n.value, str) else
+              "".join(v.value for v in _n.values
+                      if isinstance(v, _ast0.Constant)
+                      and isinstance(v.value, str))
+              if isinstance(_n, _ast0.JoinedStr) else "")
+        if _re0.match(r"https?://", _s) and not _s.startswith(
+                "http://127.0.0.1:"):
+            _bad_urls.add(_f + ":" + _s)
+_cl = _MILLENAI_SRC.split("def _contrib_loop(")[1].split("\ndef ")[0]
+_cns = {}
+for _x in _ast0.parse(_MILLENAI_SRC).body:
+    if isinstance(_x, _ast0.Assign) and any(
+            getattr(_tg, "id", "") in ("CATALOG", "MODEL_INFO")
+            for _tg in _x.targets):
+        exec(_ast0.get_source_segment(_MILLENAI_SRC, _x), _cns)
+_cloud_tags = [i["ollama"] for i in _cns["MODEL_INFO"].values()
+               if "cloud" in str(i.get("ollama") or "").lower()]
+check("Contribute GPU runs only this Mac's own models, never a cloud",
+      "run_model" in _reach and len(_reach) > 10
+      and not _bad_names and not _bad_urls and not _cloud_tags
+      and -1 < _cl.find("if _lbl not in models:")
+      < _cl.find("run_model(_lbl,")
+      and "l in MODEL_ROUTES and model_cached(l, pulled)" in _cl,
+      "%s %s %s" % (sorted(_bad_names), sorted(_bad_urls), _cloud_tags))
 check("compiles with SyntaxWarning as an error (the THIN LIST crash)",
       __import__("subprocess").run(
           [sys.executable, "-W", "error::SyntaxWarning", "-c",
@@ -1230,8 +1290,8 @@ for _n in _ctree.body:
                 "_retired_on_disk", "model_updates", "superseded_installed",
                 "_gb_of", "_cleanup_stat", "auto_cleanup_on", "_resident",
                 "_auto_cleanup_pass", "start_model_update",
-                "_model_update_worker", "_ledger", "_ledger_add",
-                "_ledger_seed", "_offers_set")
+                "_model_update_worker", "_app_models", "_app_models_add",
+                "_app_models_seed", "_offers_set")
             or (isinstance(_n, _ast.Assign) and any(
                 getattr(t, "id", "") in ("_modup", "_modup_lock",
                                          "_modup_hist")
@@ -1324,13 +1384,13 @@ check("a failed replacement keeps the old model",
 # the ledger: an existing install vouches for what it knows, a new one
 # starts empty, and a download is recorded only once it's seeded
 _p1, _p2 = {}, {}
-_mns["_ledger_seed"](_p1, existing=True)
-_mns["_ledger_seed"](_p2, existing=False)
+_mns["_app_models_seed"](_p1, existing=True)
+_mns["_app_models_seed"](_p2, existing=False)
 _MD["prefs"] = {}
-_mns["_ledger_add"]("Qwen 3.5 9B")
+_mns["_app_models_add"]("Qwen 3.5 9B")
 _unseeded = "app_models" not in _MD["prefs"]
 _MD["prefs"] = {"app_models": []}
-_mns["_ledger_add"]("Qwen 3.5 9B")
+_mns["_app_models_add"]("Qwen 3.5 9B")
 check("ledger: seeded per install, downloads recorded",
       "Mistral Nemo 12B" in _p1["app_models"] and _p2["app_models"] == []
       and _unseeded and _MD["prefs"]["app_models"] == ["Qwen 3.5 9B"])
@@ -1339,7 +1399,7 @@ check("post-update sweep, endpoints, and the default wired",
       and "target=_post_update_cleanup" in _MILLENAI_SRC
       and '"/api/model/cleanup", "/api/model/update",' in _MILLENAI_SRC
       and 'self.path == "/api/model/update"' in _MILLENAI_SRC
-      and "_ledger_add(label)" in _MILLENAI_SRC.split(
+      and "_app_models_add(label)" in _MILLENAI_SRC.split(
           "def _download_model")[1][:1500]
       and "pr2.auto_cleanup!==false" in page
       and 'id="wiz-ac" checked' in page)
