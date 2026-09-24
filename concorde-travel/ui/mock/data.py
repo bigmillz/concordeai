@@ -35,6 +35,8 @@ import scorer     # noqa: E402
 import server     # noqa: E402
 
 POOL = 36          # options carried; a real page shows about this many before "more"
+CHEAPEST_TICKETS = 5   # always in the pool, whatever their rank
+TOP_PER_TARGET = 10    # the best under each target
 STEPS = 10         # triangle resolution: (STEPS+1)(STEPS+2)/2 = 66 weightings
 NAMED = {"cheapest": (1, 0, 0), "fastest": (0, 1, 0), "comfort": (0, 0, 1)}
 
@@ -172,7 +174,7 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
         # under the feed's par and profiles, so a Delta row is graded and ranked like every other
         sc = adapter.merge_scenarios(sc, adapter.from_serpapi(
             supplement, origin_key=origin_key, checked_bags=checked_bags,
-            geo=adapter.duffel_geo(raw), dest_point=dest_point), "Google Flights (Delta)")
+            geo=adapter.duffel_geo(raw), dest_point=dest_point, carriers=server.live.serp_want()), "Google Flights")
     # The raw offers, keyed the way the adapter names its options (the last ten
     # characters of the offer id), so the page can show everything the feed
     # said about a flight, not only what the scorer priced.
@@ -200,9 +202,15 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
     pool_ids = []
     for prof in NAMED:
         ranked = sorted(feasible, key=lambda o: (scorer.score(sc, o, prof).effective_cents, o["option_id"]))
-        for o in ranked[:10]:
+        for o in ranked[:TOP_PER_TARGET]:
             if o["option_id"] not in pool_ids:
                 pool_ids.append(o["option_id"])
+    # The cheapest tickets always reach the page (2026-09-24, a price check against Google Flights): a
+    # fare the ranking demotes for its hours or its airline is shown lower with its reasons, never left
+    # out, or a $159 Frontier fare disappears behind a $201 top pick and the page reads dearer than it is.
+    for o in sorted(feasible, key=lambda o: (adapter._ticket_cents(o), o["option_id"]))[:CHEAPEST_TICKETS]:
+        if o["option_id"] not in pool_ids:
+            pool_ids.append(o["option_id"])
     rest = [o for o in sorted(feasible, key=lambda o: (ref[o["option_id"]].effective_cents, o["option_id"]))
             if o["option_id"] not in pool_ids]
     need = max(0, POOL - len(pool_ids))

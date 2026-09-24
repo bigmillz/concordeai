@@ -58,6 +58,7 @@ module exists to prevent:
 
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import re
@@ -1617,6 +1618,26 @@ def duffel_geo(raw: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     return geo
 
 
+def _offset_by_duration(known_iso: Optional[str], other_naive: str, minutes: float, forward: bool) -> Optional[str]:
+    """One end of a flight stamped with its offset, the other end's local clock, and the flight's duration
+    -> the other end's UTC offset ('+09:00'), rounded to the quarter hour every real zone keeps; None when
+    the arithmetic lands outside the -12:00..+14:00 that zones span."""
+    try:
+        known = datetime.datetime.fromisoformat(str(known_iso))
+        other = datetime.datetime.fromisoformat(str(other_naive)[:19])
+    except (TypeError, ValueError):
+        return None
+    if known.tzinfo is None:
+        return None
+    step = datetime.timedelta(minutes=float(minutes))
+    other_utc = (known - step if not forward else known + step).astimezone(datetime.timezone.utc).replace(tzinfo=None)
+    off = round((other - other_utc).total_seconds() / 900.0) * 15
+    if not -12 * 60 <= off <= 14 * 60:
+        return None
+    sign = "+" if off >= 0 else "-"
+    return "%s%02d:%02d" % (sign, abs(off) // 60, abs(off) % 60)
+
+
 def from_serpapi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                  enr: Optional[Dict[str, Any]] = None, checked_bags: int = 1,
                  carriers: Sequence[str] = ("DL",), geo: Optional[Dict[str, Any]] = None,
@@ -1636,6 +1657,8 @@ def from_serpapi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
     bag_brands: Dict[str, str] = {}
 
     itins = list(raw.get("best_flights") or []) + list(raw.get("other_flights") or [])
+    derived: Dict[str, str] = {}      # airport -> UTC offset worked out from a flight's duration
+    derived_n = 0
     for n, it in enumerate(itins):
         flights = it.get("flights") or []
         if not flights:
@@ -1658,7 +1681,26 @@ def from_serpapi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
                 fail = "a segment without airports or times"
                 break
             dep, e1 = stamp(dep_naive, o_ap, enr, (geo.get(o_ap) or {}).get("tz"))
+            if e1 and o_ap in derived:
+                dep, e1 = dep_naive[:19] + derived[o_ap], None
             arr, e2 = stamp(arr_naive, d_ap, enr, (geo.get(d_ap) or {}).get("tz"))
+            if e2 and derived.get(d_ap):
+                arr, e2 = arr_naive[:19] + derived[d_ap], None
+            # Google gives local clocks and the flight's own duration: with one end's offset known, the
+            # other's is arithmetic, not a guess (a connection through an airport no table knows used to
+            # drop the itinerary; 2026-09-24). Neither end known still drops it.
+            mins = f.get("duration")
+            if isinstance(mins, (int, float)) and mins > 0:
+                if e2 and not e1:
+                    off = _offset_by_duration(dep, arr_naive, mins, forward=True)
+                    if off:
+                        arr, e2 = arr_naive[:19] + off, None
+                        derived[d_ap] = off; derived_n += 1
+                elif e1 and not e2:
+                    off = _offset_by_duration(arr, dep_naive, mins, forward=False)
+                    if off:
+                        dep, e1 = dep_naive[:19] + off, None
+                        derived[o_ap] = off; derived_n += 1
             if e1 or e2:
                 fail = e1 or e2
                 break
@@ -1810,12 +1852,21 @@ def from_serpapi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
         return {"error": "nothing could be normalised from Google Flights", "dropped": dropped,
                 "notes": notes}
 
-    for c, b in sorted(bag_brands.items()):
-        notes.append("%s comes from Google Flights through SerpApi, not from the airline's own "
-                     "inventory: the lowest fare is shown with no brand, so it is priced as %s "
-                     "with no bag (unknown is never cheap); no operating carrier is named; the "
-                     "aircraft is a name, not a code, so cabin claims abstain; booking is on the "
-                     "airline's site" % (c, b))
+    if len(bag_brands) <= 3:
+        for c, b in sorted(bag_brands.items()):
+            notes.append("%s comes from Google Flights through SerpApi, not from the airline's own "
+                         "inventory: the lowest fare is shown with no brand, so it is priced as %s "
+                         "with no bag (unknown is never cheap); no operating carrier is named; the "
+                         "aircraft is a name, not a code, so cabin claims abstain; booking is on the "
+                         "airline's site" % (c, b))
+    else:
+        # every airline Google shows: one sentence, not one per airline
+        notes.append("%d airlines' fares come from Google Flights through SerpApi (%s), not from the airlines' "
+                     "own inventory: each is priced as that airline's no-bag fare (unknown is never cheap), "
+                     "no operating carrier or aircraft code is named, and booking is on the airline's site"
+                     % (len(bag_brands), ", ".join(sorted(bag_brands))))
+    if derived_n:
+        notes.append("%d airport time zone%s worked out from the flight's own duration" % (derived_n, "" if derived_n == 1 else "s"))
     first = options[0]
     o_iata = first["segments"][0]["origin"]["iata"]
     d_iata = first["segments"][-1]["destination"]["iata"]
@@ -1915,14 +1966,47 @@ def price_signal(payload: Optional[Dict[str, Any]], lowest_now_cents: Optional[i
             "verdict": verdict, "reason": reason, "source": "Google Flights"}
 
 
+def _itin_key(o: Dict[str, Any]) -> tuple:
+    """The same flights, whichever source sold them: carrier, number and local departure minute per segment."""
+    return tuple((s["marketing"]["carrier"], int(s["marketing"].get("number") or 0), str(s.get("departure_local") or "")[:16])
+                 for s in o.get("segments") or [])
+
+
+def _ticket_cents(o: Dict[str, Any]) -> int:
+    total = 0
+    for t in o.get("tickets") or []:
+        p = t["price"]
+        total += int(p.get("base_cents") or 0) + sum(int(c.get("amount_cents") or 0)
+                                                     for b in ("taxes", "carrier_imposed", "agency_fees") for c in p.get(b) or [])
+    return total
+
+
 def merge_scenarios(main: Dict[str, Any], extra: Dict[str, Any], label: str) -> Dict[str, Any]:
     """Add a supplement's options to the main scenario: the main one's query,
     par and profiles stand (one par per route, whatever the source), ids that
     collide are suffixed, and the supplement's notes, drops and published
-    amenities ride along under its own name."""
+    amenities ride along under its own name.
+
+    A supplement option for flights the main feed already sells at the same
+    price or less is left out (the feed's is the richer record: brand, bags,
+    aircraft). One that is cheaper stays, and the page shows the flight once,
+    at its best-ranked fare (2026-09-24: Google carried cheaper fare brands of
+    flights the feed returned only at a dearer one)."""
     if not extra or extra.get("error") or not extra.get("options"):
         return main
     ids = {o["option_id"] for o in main["options"]}
+    have: Dict[tuple, int] = {}
+    for o in main["options"]:
+        k = _itin_key(o)
+        have[k] = min(have.get(k, 1 << 62), _ticket_cents(o))
+    kept = []
+    for o in extra["options"]:
+        if have.get(_itin_key(o), 1 << 62) <= _ticket_cents(o):
+            continue
+        kept.append(o)
+    extra = dict(extra, options=kept)
+    if not kept:
+        return main
     for o in extra["options"]:
         oid = o["option_id"]
         while oid in ids:

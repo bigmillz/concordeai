@@ -971,11 +971,57 @@ def main():
     check("from_feed dispatches a Google Flights payload to the supplement adapter",
           adapter.from_feed(serp)["fixture_id"] == ss["fixture_id"])
     ids = [o["option_id"] for o in ss["options"]]
-    check("only Delta survives: the Virgin nonstop and the Delta+Air France pair are dropped, and say why",
-          len(ids) == 1 and ids[0].startswith("google-dl1")
+    check("asked for Delta only, only Delta survives: the Virgin nonstop and the Delta+Air France pair are dropped, and say why",
+          len(ids) == 2 and all(i.startswith("google-dl") for i in ids)
           and sum("not one of the carriers" in d["why"] for d in ss["_dropped"]) == 2, str(ids))
-    check("the connection through BOS, an uncurated airport with no zone from the feed, DROPS and names it",
-          any("BOS" in d["why"] for d in ss["_dropped"]))
+    bos = next((o for o in ss["options"] if o["layovers"] and o["layovers"][0]["airport"] == "BOS"), None)
+    check("the connection through BOS, which no table here knows, is KEPT: BOS's offset is worked out from the flight's own "
+          "duration, New York's -05:00 in November, and a note says so",
+          bos is not None and bos["segments"][0]["arrival_local"].endswith("-05:00")
+          and bos["segments"][1]["departure_local"].endswith("-05:00")
+          and any("worked out from the flight's own duration" in n for n in ss["notes"]), str(bos and [s["arrival_local"] for s in bos["segments"]]))
+    check("the arithmetic itself: 21:15 at -05:00 plus 7h05 lands 09:20 local, which is +00:00; a flight that "
+          "would need +16:00 is refused",
+          adapter._offset_by_duration("2026-11-18T21:15:00-05:00", "2026-11-19T09:20:00", 425, forward=True) == "+00:00"
+          and adapter._offset_by_duration("2026-11-19T09:20:00+00:00", "2026-11-18T21:15:00", 425, forward=False) == "-05:00"
+          and adapter._offset_by_duration("2026-11-18T21:15:00-05:00", "2026-11-20T09:20:00", 425, forward=True) is None)
+    blind = json.loads(json.dumps(serp))
+    for it in (blind.get("best_flights") or []) + (blind.get("other_flights") or []):
+        for f in it.get("flights") or []:
+            f["departure_airport"]["id"] = "QQA"; f["arrival_airport"]["id"] = "QQB"
+    sb = adapter.from_serpapi(blind, carriers=())
+    check("a flight with NEITHER end's zone known still drops, naming the airport: nothing to work from",
+          not sb.get("options") and any("QQ" in d["why"] for d in (sb.get("_dropped") or sb.get("dropped") or [])))
+    every = adapter.from_serpapi(serp, carriers=())
+    check("asked for every airline (the default since 2026-09-24), the Virgin nonstop and the Delta+Air France pair stay",
+          len(every["options"]) == 4 and not any("not one of the carriers" in d["why"] for d in every["_dropped"]),
+          str([o["option_id"] for o in every["options"]]))
+    main = adapter.from_serpapi(serp, carriers=("DL",))
+    dup = json.loads(json.dumps(adapter.from_serpapi(serp, carriers=("DL",))))
+    cheaper = json.loads(json.dumps(dup["options"][0])); cheaper["tickets"][0]["price"]["base_cents"] -= 5000
+    dearer = json.loads(json.dumps(dup["options"][1])); dearer["tickets"][0]["price"]["base_cents"] += 5000
+    merged = adapter.merge_scenarios(json.loads(json.dumps(main)), dict(dup, options=[cheaper, dearer]), "test")
+    # the cheapest tickets always reach the page, whatever their rank (2026-09-24, the Google Flights price check)
+    sys.path.insert(0, os.path.join(HERE, "..", "ui", "mock"))
+    import data as mockdata
+    with open(os.path.join(HERE, "..", "adapter_samples", "duffel-jfk-lhr.json"), encoding="utf-8") as fh:
+        dfl = json.load(fh)
+    keep = (mockdata.POOL, mockdata.TOP_PER_TARGET)
+    try:
+        mockdata.POOL, mockdata.TOP_PER_TARGET = 1, 1
+        slim = mockdata.build_slim(dfl)
+    finally:
+        mockdata.POOL, mockdata.TOP_PER_TARGET = keep
+    shown = {e["ticket_cents"] for v in slim["results"].values() if isinstance(v, list) for e in v}
+    scd = adapter.from_feed(dfl)
+    feas = [o for o in scd["options"] if not any(sg["marketing"]["carrier"] == "ZZ" for sg in o["segments"])
+            and not scorer.score(scd, o, "reference").infeasible_reason and not scorer.score(scd, o, "reference").filtered_reason]
+    five = sorted(adapter._ticket_cents(o) for o in feas)[:mockdata.CHEAPEST_TICKETS]
+    check("with the pool cut to the single best per target, the five cheapest tickets still reach the page",
+          all(t in shown for t in five) and len(five) == 5, str((five, sorted(shown)[:8])))
+    check("merging: a supplement fare for flights the feed already sells at that price or less is left out; a cheaper one stays",
+          len(merged["options"]) == len(main["options"]) + 1
+          and min(adapter._ticket_cents(o) for o in merged["options"] if adapter._itin_key(o) == adapter._itin_key(cheaper)) == adapter._ticket_cents(cheaper))
     with_geo = adapter.from_serpapi(serp, carriers=("DL",), geo={"BOS": {"tz": "America/New_York", "lat": 42.36, "lon": -71.0, "country": "US", "city": "Boston"}})
     check("with the zone borrowed from the feed, the BOS connection is kept, with its layover at BOS",
           len(with_geo["options"]) == 2 and any(o["layovers"] and o["layovers"][0]["airport"] == "BOS" for o in with_geo["options"]))

@@ -1012,7 +1012,7 @@ def live_request(req):
         sc = adapter.merge_scenarios(sc, adapter.from_serpapi(
             _LIVE_META["supplement_payload"], origin_key=origin_text,
             checked_bags=int(req.get("checked_bags", 1)), geo=adapter.duffel_geo(raw),
-            dest_point=(where.get("destination") or {}).get("point")), "Google Flights (Delta)")
+            dest_point=(where.get("destination") or {}).get("point"), carriers=live.serp_want()), "Google Flights")
     _LIVE[sc["fixture_id"]] = sc
     out = _score_scenario(sc, req)
     out["coverage"] = adapter.coverage(sc)

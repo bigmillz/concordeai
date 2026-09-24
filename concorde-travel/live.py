@@ -650,10 +650,19 @@ def serp_config():
     key = env or cfg.get("serpapi_key") or ""
     quota = dict(_SERP_QUOTA_DEFAULT)
     quota.update(cfg.get("serpapi_quota") or {})
-    carriers = [str(c).upper() for c in (cfg.get("serpapi_carriers") or ["DL"]) if c]
+    # "*" (the default since 2026-09-24): every airline Google shows, not only the ones the feed cannot sell.
+    # A price check against Google Flights found the feed missing whole airlines (JetBlue, Southwest,
+    # Ryanair, United at home) and the cheaper fare brands of others; one call either way.
+    carriers = [str(c).upper() for c in (cfg.get("serpapi_carriers") or ["*"]) if c]
     return {"key": key, "quota": quota, "carriers": carriers,
             "_key_source": ("CONCORDEGO_SERPAPI_KEY" if env
                             else CONFIG_FILE if cfg.get("serpapi_key") else "none")}
+
+
+def serp_want():
+    """The carriers the Google adapter should keep: () for every airline when the config says "*"."""
+    c = serp_config()["carriers"]
+    return () if "*" in c else tuple(c)
 
 
 def _serp_quota_file():
@@ -688,6 +697,7 @@ def serp_search(origin, destination, date, adults=1, carriers=None, cfg=None, al
     if not carriers:
         return None, {"source": "none", "error": "no carriers to ask for",
                       "quota": quota_state(cfg, qf)}
+    wide = "*" in carriers
     if not allow_call:
         return None, {"source": "none", "error": "live calls are disabled for this request",
                       "quota": quota_state(cfg, qf)}
@@ -697,8 +707,10 @@ def serp_search(origin, destination, date, adults=1, carriers=None, cfg=None, al
     from urllib.parse import urlencode
     params = {"engine": "google_flights", "departure_id": origin, "arrival_id": destination,
               "outbound_date": date, "type": 2, "currency": "USD", "hl": "en", "gl": "us",
-              "adults": int(adults), "include_airlines": ",".join(carriers), "api_key": cfg["key"],
+              "adults": int(adults), "api_key": cfg["key"],
               "travel_class": _SERP_CLASS.get(cabin or "economy", 1)}
+    if not wide:
+        params["include_airlines"] = ",".join(carriers)
     req = urllib.request.Request(SERP_URL + "?" + urlencode(params),
                                  headers={"Accept": "application/json", "User-Agent": UA})
     secrets = (cfg["key"],)

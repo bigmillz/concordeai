@@ -28,6 +28,7 @@ fault that breaks it.
 import subprocess, shutil, sys, re, os
 
 AD = "concorde-travel/adapter.py"
+DATA = "concorde-travel/ui/mock/data.py"
 GR = "concorde-travel/ground.py"
 PL = "concorde-travel/places.py"
 FA = "concorde-travel/enrichment/fares.json"
@@ -209,6 +210,15 @@ MUTANTS = [
  (AD, "from_serpapi", 'if want and not all(c in want for c in codes):',
   'if want and not any(c in want for c in codes):',
   'serpapi: keep an itinerary with one Delta leg among other carriers'),
+    # 2026-09-24, the Google Flights price check: duplicates, the duration arithmetic, the cheapest tickets
+    (AD, "merge_scenarios", 'if have.get(_itin_key(o), 1 << 62) <= _ticket_cents(o):',
+     'if have.get(_itin_key(o), 1 << 62) >= _ticket_cents(o):',
+     'merge: keep the dearer duplicate and drop the cheaper one'),
+    (AD, "_offset_by_duration", 'other_utc = (known - step if not forward else known + step)',
+     'other_utc = (known + step if not forward else known - step)',
+     'serpapi: run the duration the wrong way when working out an offset'),
+    (DATA, "build_slim", '[:CHEAPEST_TICKETS]', '[:0]',
+     'pool: leave the cheapest tickets out when the ranking demotes them'),
 ]
 
 caught = skipped = 0

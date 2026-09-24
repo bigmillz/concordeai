@@ -111,10 +111,11 @@ def serp_checks():
         p, m = live.serp_search("JFK", "LHR", "2026-11-18", cfg=scfg)
         check("a search with a key reaches SerpApi once and comes back as api",
               p is not None and m["source"] == "api" and seen["n"] == 1)
-        check("the request asks Google Flights for Delta only, one way, in dollars",
-              all(x in seen["url"] for x in ("engine=google_flights", "include_airlines=DL", "type=2",
+        check("by default the request asks Google Flights for EVERY airline (no include_airlines), one way, in dollars",
+              all(x in seen["url"] for x in ("engine=google_flights", "type=2",
                                               "currency=USD", "departure_id=JFK", "arrival_id=LHR",
-                                              "outbound_date=2026-11-18")), seen["url"].replace(SECRET, "[key]"))
+                                              "outbound_date=2026-11-18")) and "include_airlines" not in seen["url"]
+              and scfg["carriers"] == ["*"] and live.serp_want() == (), seen["url"].replace(SECRET, "[key]"))
         check("one call was spent, on SerpApi's OWN counter, not the feed's",
               m["quota"]["day_calls"] == 1 and live.quota_state()["day_calls"] == 0)
         p2, m2 = live.serp_search("JFK", "LHR", "2026-11-18", cfg=scfg)
@@ -149,6 +150,10 @@ def serp_checks():
         check("status reports the SerpApi key as configured, from the environment, and never prints it",
               st["serpapi"]["key_configured"] and "CONCORDEGO_SERPAPI_KEY" in st["serpapi"]["key_source"]
               and SECRET not in json.dumps(st))
+        live.urllib.request.urlopen = fake_open
+        live.serp_search("JFK", "LHR", "2026-11-19", cfg=dict(scfg, carriers=["DL"]))
+        check("configured to a list, it asks for those airlines only (include_airlines=DL)",
+              "include_airlines=DL" in seen["url"], seen["url"].replace(SECRET, "[key]"))
     finally:
         live.urllib.request.urlopen = real
         os.environ.pop("CONCORDEGO_SERPAPI_KEY", None)
