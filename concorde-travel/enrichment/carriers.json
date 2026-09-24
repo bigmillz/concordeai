@@ -4,19 +4,942 @@
   "_source": "ConcordeGo curated carrier table, human-reviewed",
   "baseline": 0.72,
   "ratings": {
-    "BA": {"rating": 0.78, "note": "Full service, current cabin, through bags, real irregular-ops desk"},
-    "VS": {"rating": 0.79, "note": "Strong transatlantic hard product"},
-    "DL": {"rating": 0.80, "note": "Consistent transatlantic operation"},
-    "UA": {"rating": 0.66, "note": "Full service, ageing cabin on several transatlantic routes"},
-    "AA": {"rating": 0.63, "note": "Pre-refresh widebody cabins on much of the Atlantic"},
-    "KL": {"rating": 0.80, "note": "Current cabin, strong hub, single-terminal transfer"},
-    "AF": {"rating": 0.74, "note": "Mixed cabin generations across the widebody fleet"},
-    "LH": {"rating": 0.75, "note": "Consistent, punctual, dated seat on older frames"},
-    "IB": {"rating": 0.68, "note": "Adequate hard product, slower recovery when it goes wrong"},
-    "TP": {"rating": 0.61, "note": "Adequate hard product, weaker punctuality record"},
-    "EI": {"rating": 0.67, "note": "Narrowbody transatlantic, US preclearance at DUB"},
-    "VY": {"rating": 0.44, "note": "Low cost, no interline, thin recovery"},
-    "EW": {"rating": 0.46, "note": "Low cost, no interline"},
-    "FR": {"rating": 0.40, "note": "Low cost, no interline, separate ticket by construction"}
+    "4Y": {
+      "rating": 0.79,
+      "note": "Lufthansa Group leisure airline; A330 Ocean Blue refit from 2027",
+      "basis": "Skytrax economy 4 stars on its leisure scale (page 2025), the only published score found",
+      "sources": [
+        "https://skytraxratings.com/airlines/discover-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "5W": {
+      "rating": 0.42,
+      "note": "A321neo-heavy narrowbody fleet; AirHelp 2025 on-time score 7.7/10 (same airline group as W6)",
+      "basis": "Skytrax economy 3 stars on its low-cost scale (page 2020), AirHelp 7.17 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/wizz-air-rating",
+        "https://www.airhelp.com/en/airhelp-score/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "A3": {
+      "rating": 0.71,
+      "note": "Short-haul carrier; AirHelp rank 66, claims handling 4.1/10",
+      "basis": "Skytrax economy 4 stars (page 2024), AirHelp 6.34 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/aegean-airlines-rating",
+        "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "AA": {
+      "rating": 0.63,
+      "note": "Pre-refresh widebody cabins on much of the Atlantic",
+      "basis": "Skytrax economy 3 stars (page 2020), AirHelp 7.64 (2025), ACSI 78 (2026), J.D. Power 624 (2026)",
+      "published_sources": [
+        "https://skytraxratings.com/airlines/american-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+        "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+        "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/"
+      ]
+    },
+    "AC": {
+      "rating": 0.58,
+      "note": "Seatback screens on both hauls; free meals only on international",
+      "basis": "Skytrax economy 4 stars (page 2025), AirHelp 5.16 (2025), J.D. Power 576 (2026)",
+      "sources": [
+        "https://skytraxratings.com/airlines/air-canada-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+        "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "AF": {
+      "rating": 0.74,
+      "note": "Mixed cabin generations across the widebody fleet",
+      "basis": "Skytrax economy 4 stars (page 2021), AirHelp 7.59 (2025)",
+      "published_sources": [
+        "https://skytraxratings.com/airlines/air-france-rating",
+        "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines"
+      ]
+    },
+    "AM": {
+      "rating": 0.66,
+      "note": "Strong 2025 punctuality; seatback screens and free meals on mainline jets",
+      "basis": "Skytrax economy 3 stars (page 2020), AirHelp 7.84 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/aeromexico-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "AS": {
+      "rating": 0.58,
+      "note": "737s stream-only; 787s have screens; AS code covers Hawaiian since 2026",
+      "basis": "Skytrax economy 3 stars (page 2020), AirHelp 5.95 (2025), ACSI 75 (2026), J.D. Power 648 (2026)",
+      "sources": [
+        "https://skytraxratings.com/airlines/alaska-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+        "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+        "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "AV": {
+      "rating": 0.49,
+      "note": "Hybrid model: paid food in Americas, meals and screens to Europe",
+      "basis": "Skytrax economy 2.5 stars (page 2023), AirHelp 6.1 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/avianca-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "AY": {
+      "rating": 0.77,
+      "note": "Economy 4 stars both hauls; AirHelp on-time 7.3/10",
+      "basis": "Skytrax economy 4 stars (page 2020), AirHelp 7.41 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/finnair-rating",
+        "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "AZ": {
+      "rating": 0.76,
+      "note": "Long-haul economy rated above short-haul; AirHelp on-time 7.2/10",
+      "basis": "Skytrax economy 4 stars (page 2024), AirHelp 7.23 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/ita-airways-rating",
+        "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
+      "short_haul": {
+        "rating": 0.69,
+        "note": "Short-haul economy rated 3.5 stars by Skytrax against 4 long-haul",
+        "basis": "Skytrax short-haul economy 3.5 stars (page 2024), AirHelp 7.23 (2025)"
+      }
+    },
+    "B6": {
+      "rating": 0.63,
+      "note": "Screens and free Wi-Fi fleetwide; claims handling sinks its AirHelp score",
+      "basis": "Skytrax economy 3.5 stars (page 2021), AirHelp 5.31 (2025), ACSI 78 (2026), J.D. Power 655 (2026)",
+      "sources": [
+        "https://skytraxratings.com/airlines/jetblue-airways-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+        "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+        "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "BA": {
+      "rating": 0.78,
+      "note": "Full service, current cabin, through bags, real irregular-ops desk",
+      "basis": "Skytrax economy 3.5 stars (page 2026), AirHelp 7.44 (2025)",
+      "published_sources": [
+        "https://skytraxratings.com/airlines/british-airways-rating",
+        "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines"
+      ],
+      "short_haul": {
+        "rating": 0.71,
+        "note": "Short-haul economy rated 3 stars by Skytrax against 3.5 long-haul",
+        "basis": "Skytrax short-haul economy 3 stars (page 2026), AirHelp 7.44 (2025)"
+      }
+    },
+    "BR": {
+      "rating": 0.89,
+      "note": "Skytrax 5-star; regional A321 economy lacks seatback screens",
+      "basis": "Skytrax economy 5 stars (page 2024), AirHelp 7.1 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/eva-air-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "CI": {
+      "rating": 0.7,
+      "note": "Skytrax 4-star; 737-800 streams only; AirHelp on-time 6.8/10",
+      "basis": "Skytrax economy 4 stars (page 2021), AirHelp 6.15 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/china-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "CM": {
+      "rating": 0.6,
+      "note": "Top-tier 2025 punctuality; AirHelp total pulled down by claim handling",
+      "basis": "Skytrax economy 3.5 stars (page 2020), AirHelp 5.7 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/copa-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "CX": {
+      "rating": 0.8,
+      "note": "Skytrax 5-star, #3 in 2026; AirHelp on-time 7.6/10",
+      "basis": "Skytrax economy 4.5 stars (page 2020), AirHelp 6.72 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/cathay-pacific-airways-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
+      "short_haul": {
+        "rating": 0.86,
+        "note": "Short-haul economy rated 5 stars by Skytrax against 4.5 long-haul",
+        "basis": "Skytrax short-haul economy 5 stars (page 2020), AirHelp 6.72 (2025)"
+      }
+    },
+    "D8": {
+      "rating": 0.52,
+      "note": "Short-haul 737 operator since long-haul ended 2021; AirHelp claims 4.1 (same airline group as DY)",
+      "basis": "Skytrax economy 4 stars on its low-cost scale (page 2020), AirHelp 6.57 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/norwegian-rating",
+        "https://www.airhelp.com/en/airhelp-score/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "DE": {
+      "rating": 0.65,
+      "note": "New A330neo long-haul cabins; AirHelp 2025 on-time 7.0/10",
+      "basis": "Skytrax economy 3.5 stars on its leisure scale (page 2025), AirHelp 6.46 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/condor-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "DL": {
+      "rating": 0.8,
+      "note": "Consistent transatlantic operation",
+      "basis": "Skytrax economy 3.5 stars (page 2020), AirHelp 7.46 (2025), ACSI 79 (2026), J.D. Power 667 (2026)",
+      "published_sources": [
+        "https://skytraxratings.com/airlines/delta-air-lines-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+        "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+        "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/"
+      ]
+    },
+    "DS": {
+      "rating": 0.48,
+      "note": "A320-family short-haul; AirHelp 2025 claims handling 3.3/10 (same airline group as U2)",
+      "basis": "Skytrax economy 4 stars on its low-cost scale (page 2020), AirHelp 5.79 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/easyjet-rating",
+        "https://www.airhelp.com/en/airhelp-score/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "DY": {
+      "rating": 0.52,
+      "note": "Short-haul 737 operator since long-haul ended 2021; AirHelp claims 4.1",
+      "basis": "Skytrax economy 4 stars on its low-cost scale (page 2020), AirHelp 6.57 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/norwegian-rating",
+        "https://www.airhelp.com/en/airhelp-score/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "EC": {
+      "rating": 0.48,
+      "note": "A320-family short-haul; AirHelp 2025 claims handling 3.3/10 (same airline group as U2)",
+      "basis": "Skytrax economy 4 stars on its low-cost scale (page 2020), AirHelp 5.79 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/easyjet-rating",
+        "https://www.airhelp.com/en/airhelp-score/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "EI": {
+      "rating": 0.67,
+      "note": "Narrowbody transatlantic, US preclearance at DUB",
+      "basis": "Skytrax economy 4 stars (page 2025), AirHelp 6.61 (2025)",
+      "published_sources": [
+        "https://skytraxratings.com/airlines/aer-lingus-rating",
+        "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines"
+      ]
+    },
+    "EK": {
+      "rating": 0.77,
+      "note": "All-widebody fleet with seatback screens everywhere; AirHelp on-time 7.7/10",
+      "basis": "Skytrax economy 4 stars (page 2020), AirHelp 7.45 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/emirates-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "EW": {
+      "rating": 0.46,
+      "note": "Low cost, no interline",
+      "basis": "Skytrax economy 4 stars on its low-cost scale (page 2024), AirHelp 7.37 (2025)",
+      "published_sources": [
+        "https://skytraxratings.com/airlines/eurowings-rating",
+        "https://www.airhelp.com/en/airhelp-score/"
+      ]
+    },
+    "EY": {
+      "rating": 0.74,
+      "note": "AirHelp 2025 #2; most narrowbodies stream only, no seatback screens",
+      "basis": "Skytrax economy 3.5 stars (page 2021), AirHelp 8.07 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/etihad-airways-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "F8": {
+      "rating": 0.33,
+      "note": "All-737 low-cost carrier; not in Skytrax top 100",
+      "basis": "Skytrax economy 3 stars on its low-cost scale (page 2020), AirHelp 5.23 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/flair-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+        "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "F9": {
+      "rating": 0.38,
+      "note": "Ultra-low-cost A320neo operator; last in J.D. Power economy 2026",
+      "basis": "Skytrax economy 3 stars on its low-cost scale (page 2020), AirHelp 7.07 (2025), ACSI 69 (2026), J.D. Power 533 (2026)",
+      "sources": [
+        "https://skytraxratings.com/airlines/frontier-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+        "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+        "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "FI": {
+      "rating": 0.68,
+      "note": "3-star, one economy product; AirHelp on-time 8.0/10, claims 5.3",
+      "basis": "Skytrax economy 3.5 stars (page 2020), AirHelp 7.07 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/icelandair-rating",
+        "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "FR": {
+      "rating": 0.4,
+      "note": "Low cost, no interline, separate ticket by construction",
+      "basis": "Skytrax economy 3 stars on its low-cost scale (page 2020), AirHelp 5.67 (2025)",
+      "published_sources": [
+        "https://skytraxratings.com/airlines/ryanair-rating",
+        "https://www.airhelp.com/en/airhelp-score/"
+      ]
+    },
+    "G4": {
+      "rating": 0.38,
+      "note": "Leisure ULCC, domestic only; above J.D. Power economy segment average",
+      "basis": "Skytrax economy 3 stars on its low-cost scale (page 2020), AirHelp 5.05 (2025), J.D. Power 630 (2026)",
+      "sources": [
+        "https://skytraxratings.com/airlines/allegiant-air-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+        "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+        "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "HA": {
+      "rating": 0.6,
+      "note": "Flights sold as AS since April 2026; A330/787 have screens",
+      "basis": "Skytrax economy 3 stars (page 2020), AirHelp 6.73 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/hawaiian-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+        "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+        "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "HV": {
+      "rating": 0.42,
+      "note": "KLM-group leisure low-cost; 29-inch pitch per Skytrax",
+      "basis": "Skytrax economy 3 stars on its low-cost scale (page 2020), AirHelp 7.04 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/transavia-rating",
+        "https://www.airhelp.com/en/airhelp-score/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "IB": {
+      "rating": 0.68,
+      "note": "Adequate hard product, slower recovery when it goes wrong",
+      "basis": "Skytrax economy 4 stars (page 2023), AirHelp 7.16 (2025)",
+      "published_sources": [
+        "https://skytraxratings.com/airlines/iberia-rating",
+        "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines"
+      ]
+    },
+    "JL": {
+      "rating": 0.9,
+      "note": "Domestic 767/737 lack screens; international Sky Wider has 33-34in pitch",
+      "basis": "Skytrax economy 5 stars (page 2022), AirHelp 7.32 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/japan-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "KE": {
+      "rating": 0.79,
+      "note": "Skytrax 5-star; AirHelp 2025 #90, near-zero claims-handling sub-score",
+      "basis": "Skytrax economy 5 stars (page 2025), AirHelp 5.28 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/korean-air-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "KL": {
+      "rating": 0.8,
+      "note": "Current cabin, strong hub, single-terminal transfer",
+      "basis": "Skytrax economy 4 stars (page 2021), AirHelp 7.39 (2025)",
+      "published_sources": [
+        "https://skytraxratings.com/airlines/klm-royal-dutch-airlines-rating",
+        "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines"
+      ]
+    },
+    "LA": {
+      "rating": 0.7,
+      "note": "Skytrax 4-Star since March 2026; widebodies add seatback screens and meals",
+      "basis": "Skytrax economy 4 stars (page 2026), AirHelp 6.16 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/latam-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "LH": {
+      "rating": 0.75,
+      "note": "Consistent, punctual, dated seat on older frames",
+      "basis": "Skytrax economy 3.5 stars (page 2022), AirHelp 7.23 (2025)",
+      "published_sources": [
+        "https://skytraxratings.com/airlines/lufthansa-rating",
+        "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines"
+      ]
+    },
+    "LO": {
+      "rating": 0.79,
+      "note": "Short-haul buy-on-board; AirHelp #10, on-time 8.3/10",
+      "basis": "Skytrax economy 4 stars (page 2025), AirHelp 7.65 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/lot-polish-airlines-rating",
+        "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "LS": {
+      "rating": 0.33,
+      "note": "UK leisure 737/A321neo; AirHelp 2025 claims score 0.16/10",
+      "basis": "Skytrax economy 3 stars on its low-cost scale (page 2020), AirHelp 4.98 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/jet2-com-rating",
+        "https://www.airhelp.com/en/airhelp-score/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "LX": {
+      "rating": 0.71,
+      "note": "Economy 4 stars both hauls; AirHelp claims handling 3.7/10",
+      "basis": "Skytrax economy 4 stars (page 2020), AirHelp 6.36 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/swiss-international-air-lines-rating",
+        "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "MX": {
+      "rating": 0.3,
+      "note": "All-A220, domestic only; streaming entertainment, no seatback screens",
+      "basis": "AirHelp 5.06 (2025), the only published score found",
+      "sources": [
+        "https://skytraxratings.com/airlines/breeze-airways-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+        "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+        "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "NH": {
+      "rating": 0.91,
+      "note": "International economy 34in pitch, 13.3in screens; domestic drinks only",
+      "basis": "Skytrax economy 5 stars (page 2026), AirHelp 7.54 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/ana-all-nippon-airways-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
+      "short_haul": {
+        "rating": 0.85,
+        "note": "Short-haul economy rated 4.5 stars by Skytrax against 5 long-haul",
+        "basis": "Skytrax short-haul economy 4.5 stars (page 2026), AirHelp 7.54 (2025)"
+      }
+    },
+    "OS": {
+      "rating": 0.77,
+      "note": "Economy 4 stars both hauls; AirHelp on-time 8.3/10, claims 5.6",
+      "basis": "Skytrax economy 4 stars (page 2021), AirHelp 7.4 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/austrian-airlines-rating",
+        "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "OZ": {
+      "rating": 0.79,
+      "note": "Skytrax 5-star but outside 2026 top 100; AirHelp 2025 #92",
+      "basis": "Skytrax economy 5 stars (page 2024), AirHelp 5.25 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/asiana-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "PC": {
+      "rating": 0.33,
+      "note": "Turkish narrowbody low-cost; AirHelp 2025 claims handling 1.7/10",
+      "basis": "Skytrax economy 3 stars on its low-cost scale (page 2020), AirHelp 5.49 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/pegasus-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "PD": {
+      "rating": 0.66,
+      "note": "Dash 8 and E195-E2 only; Skytrax 4-star, 34th worldwide",
+      "basis": "Skytrax economy 4 stars (page 2020), AirHelp 5.03 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/porter-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+        "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "PR": {
+      "rating": 0.67,
+      "note": "Strong on-time (AirHelp 8.1/10); domestic A320 pitch as low as 28in",
+      "basis": "Skytrax economy 4 stars (page 2021), AirHelp 5.77 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/philippine-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "QR": {
+      "rating": 0.95,
+      "note": "Skytrax 5-star, AirHelp 2025 #1, on-time 8.3/10",
+      "basis": "Skytrax economy 5 stars (page 2021), AirHelp 8.16 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/qatar-airways-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
+      "short_haul": {
+        "rating": 0.88,
+        "note": "Short-haul economy rated 4.5 stars by Skytrax against 5 long-haul",
+        "basis": "Skytrax short-haul economy 4.5 stars (page 2021), AirHelp 8.16 (2025)"
+      }
+    },
+    "SK": {
+      "rating": 0.7,
+      "note": "3-star; best on-time in group (AirHelp 8.5/10)",
+      "basis": "Skytrax economy 3.5 stars (page 2021), AirHelp 7.29 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/sas-scandinavian-airlines-rating",
+        "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "SN": {
+      "rating": 0.65,
+      "note": "3-star; long-haul economy rated below short-haul; AirHelp #9",
+      "basis": "Skytrax economy 3 stars (page 2020), AirHelp 7.66 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/brussels-airlines-rating",
+        "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method",
+      "short_haul": {
+        "rating": 0.72,
+        "note": "Short-haul economy rated 3.5 stars by Skytrax against 3 long-haul",
+        "basis": "Skytrax short-haul economy 3.5 stars (page 2020), AirHelp 7.66 (2025)"
+      }
+    },
+    "SQ": {
+      "rating": 0.87,
+      "note": "Skytrax World's Best Airline 2026; strong on-time, weak claims handling",
+      "basis": "Skytrax economy 5 stars (page 2024), AirHelp 6.78 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/singapore-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "SY": {
+      "rating": 0.35,
+      "note": "Leisure 737 operator, owned by Allegiant since May 2026",
+      "basis": "Skytrax economy 3 stars on its low-cost scale (page 2020), the only published score found",
+      "sources": [
+        "https://skytraxratings.com/airlines/sun-country-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+        "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+        "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "TK": {
+      "rating": 0.74,
+      "note": "Screens and meals even on narrowbodies; weak AirHelp claims score",
+      "basis": "Skytrax economy 4 stars (page 2025), AirHelp 6.92 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/turkish-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "TO": {
+      "rating": 0.53,
+      "note": "",
+      "basis": "Skytrax economy 4 stars on its low-cost scale (page 2024), the only published score found",
+      "sources": [
+        "https://skytraxratings.com/airlines/transavia-france-rating"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "TP": {
+      "rating": 0.61,
+      "note": "Adequate hard product, weaker punctuality record",
+      "basis": "Skytrax economy 3 stars (page 2021), AirHelp 7.37 (2025)",
+      "published_sources": [
+        "https://skytraxratings.com/airlines/tap-air-portugal-rating",
+        "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines"
+      ],
+      "short_haul": {
+        "rating": 0.67,
+        "note": "Short-haul economy rated 3.5 stars by Skytrax against 3 long-haul",
+        "basis": "Skytrax short-haul economy 3.5 stars (page 2021), AirHelp 7.37 (2025)"
+      }
+    },
+    "TS": {
+      "rating": 0.74,
+      "note": "Leisure carrier; screens on every seat; free meals transatlantic only",
+      "basis": "Skytrax economy 4 stars on its leisure scale (page 2020), AirHelp 6.85 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/air-transat-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+        "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "U2": {
+      "rating": 0.48,
+      "note": "A320-family short-haul; AirHelp 2025 claims handling 3.3/10",
+      "basis": "Skytrax economy 4 stars on its low-cost scale (page 2020), AirHelp 5.79 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/easyjet-rating",
+        "https://www.airhelp.com/en/airhelp-score/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "UA": {
+      "rating": 0.66,
+      "note": "Full service, ageing cabin on several transatlantic routes",
+      "basis": "Skytrax economy 3 stars (page 2020), AirHelp 7.54 (2025), ACSI 75 (2026), J.D. Power 608 (2026)",
+      "published_sources": [
+        "https://skytraxratings.com/airlines/united-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+        "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+        "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/"
+      ]
+    },
+    "UX": {
+      "rating": 0.59,
+      "note": "787 long-haul, 737 short-haul; AirHelp 2025 claims score 0.0/10",
+      "basis": "Skytrax economy 3.5 stars (page 2020), AirHelp 5.25 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/air-europa-rating",
+        "https://www.airhelp.com/en/airhelp-score/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "V7": {
+      "rating": 0.52,
+      "note": "A319/A320 regional low-cost; AirHelp 2025 on-time 7.9, claims 4.4",
+      "basis": "Skytrax economy 4 stars on its low-cost scale (page 2024), AirHelp 6.62 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/volotea-rating",
+        "https://www.airhelp.com/en/airhelp-score/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "VB": {
+      "rating": 0.3,
+      "note": "Ultra-low-cost; 29-inch non-reclining seats, paid food; Skytrax 2-Star low-cost",
+      "basis": "Skytrax economy 2.5 stars on its low-cost scale (page 2020), the only published score found",
+      "sources": [
+        "https://skytraxratings.com/airlines/viva-aerobus-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "VS": {
+      "rating": 0.79,
+      "note": "Strong transatlantic hard product",
+      "basis": "Skytrax economy 3.5 stars (page 2020), AirHelp 8.03 (2025)",
+      "published_sources": [
+        "https://skytraxratings.com/airlines/virgin-atlantic-rating",
+        "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines"
+      ]
+    },
+    "VY": {
+      "rating": 0.44,
+      "note": "Low cost, no interline, thin recovery",
+      "basis": "Skytrax economy 4 stars on its low-cost scale (page 2020), AirHelp 6.97 (2025)",
+      "published_sources": [
+        "https://skytraxratings.com/airlines/vueling-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/"
+      ]
+    },
+    "W4": {
+      "rating": 0.42,
+      "note": "A321neo-heavy narrowbody fleet; AirHelp 2025 on-time score 7.7/10 (same airline group as W6)",
+      "basis": "Skytrax economy 3 stars on its low-cost scale (page 2020), AirHelp 7.17 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/wizz-air-rating",
+        "https://www.airhelp.com/en/airhelp-score/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "W6": {
+      "rating": 0.42,
+      "note": "A321neo-heavy narrowbody fleet; AirHelp 2025 on-time score 7.7/10",
+      "basis": "Skytrax economy 3 stars on its low-cost scale (page 2020), AirHelp 7.17 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/wizz-air-rating",
+        "https://www.airhelp.com/en/airhelp-score/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "W9": {
+      "rating": 0.42,
+      "note": "A321neo-heavy narrowbody fleet; AirHelp 2025 on-time score 7.7/10 (same airline group as W6)",
+      "basis": "Skytrax economy 3 stars on its low-cost scale (page 2020), AirHelp 7.17 (2025)",
+      "sources": [
+        "https://skytraxratings.com/airlines/wizz-air-rating",
+        "https://www.airhelp.com/en/airhelp-score/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "WN": {
+      "rating": 0.59,
+      "note": "All-737 short-haul network; top J.D. Power economy score 2026",
+      "basis": "Skytrax economy 4 stars on its low-cost scale (page 2022), AirHelp 6.68 (2025), ACSI 77 (2026), J.D. Power 670 (2026)",
+      "sources": [
+        "https://skytraxratings.com/airlines/southwest-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+        "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+        "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "WS": {
+      "rating": 0.55,
+      "note": "737s lack seatback screens; 787 long-haul has screens and meals",
+      "basis": "Skytrax economy 3.5 stars (page 2020), AirHelp 6.47 (2025), J.D. Power 553 (2026)",
+      "sources": [
+        "https://skytraxratings.com/airlines/westjet-airlines-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+        "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    },
+    "Y4": {
+      "rating": 0.35,
+      "note": "Ultra-low-cost A320 family; paid food; Skytrax 3-Star on low-cost scale",
+      "basis": "Skytrax economy 3 stars on its low-cost scale (page 2020), the only published score found",
+      "sources": [
+        "https://skytraxratings.com/airlines/volaris-rating",
+        "https://www.airhelp.com/en/airhelp-score/?score-type=airlines"
+      ],
+      "as_of": "2026-09-24",
+      "reviewed": false,
+      "source": "published scores (Skytrax, AirHelp, ACSI, J.D. Power), formula in _method"
+    }
+  },
+  "_method": {
+    "written": "2026-09-24",
+    "what": "Rows marked reviewed:false are arithmetic over published scores (enrichment/carrier_scores.json), not opinion, made by concorde-travel/rate_airlines.py: each score on 0..1 by a fixed absolute scale, the available ones averaged with fixed weights, and a linear map fitted to the reviewed rows puts the result on this table's scale.",
+    "scales": {
+      "stars": {
+        "reads_as_0": 1.0,
+        "reads_as_1": 5.0
+      },
+      "airhelp": {
+        "reads_as_0": 5.5,
+        "reads_as_1": 8.5
+      },
+      "acsi": {
+        "reads_as_0": 65.0,
+        "reads_as_1": 85.0
+      },
+      "jdpower": {
+        "reads_as_0": 550.0,
+        "reads_as_1": 750.0
+      }
+    },
+    "weights": {
+      "stars": 0.45,
+      "airhelp": 0.15,
+      "acsi": 0.2,
+      "jdpower": 0.2
+    },
+    "skytrax": "Economy stars for the haul (long-haul for the main rating, short-haul for the short_haul block); low-cost-scale stars minus 1.5 and leisure-scale minus 0 to sit on the full-service scale",
+    "calibration": {
+      "rating": "0.2590 + 0.7093 x composite",
+      "fitted_on": [
+        "AA",
+        "AF",
+        "BA",
+        "DL",
+        "EI",
+        "EW",
+        "FR",
+        "IB",
+        "KL",
+        "LH",
+        "TP",
+        "UA",
+        "VS",
+        "VY"
+      ],
+      "typical_miss": 0.066,
+      "clamp": [
+        0.3,
+        0.95
+      ]
+    },
+    "short_haul": "A short_haul block exists where Skytrax rates short-haul economy differently from long-haul; the adapter uses it when the trip is short-haul (adapter._short_haul)."
   }
 }

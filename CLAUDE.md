@@ -962,6 +962,25 @@ research method is in the commit that added these rows.
 computed over mostly-abstained enrichment is not the same object as one over a curated
 route** — do not quietly drop that strip to make the results look more confident.
 
+**Airline ratings come from published scores** (2026-09-24, per Patrick, who asked whether AI could give "a general
+consensus for each airline": it can AUTHOR the table once, never answer at search time, which would let the same
+search reorder tomorrow). `enrichment/carrier_scores.json` holds each airline's published figures, gathered by
+research agents from the publishers' own pages and re-checked figure by figure by a second agent (no number needed a
+correction): Skytrax economy stars by haul (skytraxratings.com; many pages date from 2020 to 2022, and the basis says
+which year), the AirHelp Score 2025, and for US and Canadian airlines ACSI 2026 and J.D. Power 2026 economy.
+`concorde-travel/rate_airlines.py` turns them into `carriers.json` ratings by fixed arithmetic: each score on 0..1 by a
+fixed absolute scale, weighted (Skytrax .45, AirHelp .15, ACSI .20, J.D. Power .20; AirHelp is light because half of
+it is punctuality, which the grade's reliability part already has, and claim handling), then one linear map fitted
+to the 14 ratings a person reviewed, which are kept as they are; Skytrax's low-cost and leisure scales are moved onto
+the full-service one by a fitted offset (low-cost stars minus 1.5). 72 airlines are rated; LEVEL, Lufthansa City and
+Air Premia have no published score and stay unrated. Where Skytrax rates short-haul economy differently (BA, ITA, TAP,
+Brussels, Qatar, ANA, Cathay), the row has a `short_haul` block that `adapter._carrier_rating` uses on a short-haul trip.
+Skytrax rates American's economy 3 stars on both hauls, so American has no split, though its narrowbodies lack
+seatback screens until the 2028 deliveries. Formula rows carry `reviewed: false`, a `basis` sentence the flight's card
+prints, and their sources; `test_adapter.py` asserts the table is exactly what the script computes, so a hand edit to
+a formula row fails. Refresh `carrier_scores.json` when AirHelp, ACSI or J.D. Power publish a new edition, then run
+the script with `--write`. A formula row is a DRAFT like the fleet and fare rows: it wants a person's pass.
+
 `enrichment/` is the curated moat: airports (zones with DST transition dates, MCT, service
 hours, inter-terminal), carriers (reviewed ratings), ground access by origin and hour, fleets
 and fare brands, and an (empty) route-par override table.

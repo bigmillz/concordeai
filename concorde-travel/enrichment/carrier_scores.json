@@ -1,0 +1,1911 @@
+{
+ "_comment": "The published scores the airline ratings in carriers.json are computed from (concorde-travel/rate_airlines.py). Gathered 2026-09-24 by research agents from the publishers' own pages, every figure re-checked against its source by a second agent; none needed a numeric correction. Skytrax economy stars by haul come from skytraxratings.com (a separate read and check); many of those pages were last updated in 2020-2022. Refresh when AirHelp, ACSI or J.D. Power publish a new edition.",
+ "_as_of": "2026-09-24",
+ "airlines": {
+  "4Y": {
+   "name": "Discover Airlines",
+   "business_model": "leisure",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 97,
+   "skytrax_awards_year": 2026,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/",
+   "note": "Lufthansa Group leisure airline; A330 Ocean Blue refit from 2027",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/discover-airlines-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 4,
+    "economy_short_haul": 4,
+    "scale": "leisure",
+    "page_note": "4-Star Leisure Airline, a separate Skytrax category. The ratings sit under 'Certified Airline Ratings' rather than 'Rating Summary'. Published 2025-12-17, last modified 2025-12-18.",
+    "page_year": 2025
+   },
+   "haul_product": {
+    "better": "long-haul",
+    "evidence": "Long-haul A330 economy includes two free meals, soft and hot drinks, and a personal HD screen. Short- and medium-haul A320 flights sell food and drinks from the Onboard Bar and stream to your own device. The Ocean Blue A330 refit, with 4K screens and Wi-Fi, starts in spring 2027.",
+    "url": "https://www.discover-airlines.com/us/en/discover/travel-classes/economy-class/services-long-haul",
+    "check": "confirmed"
+   }
+  },
+  "A3": {
+   "name": "Aegean Airlines",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 40,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 6.34,
+   "airhelp_rank": 66,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines",
+   "jdpower_segment": "n/a (not a North American airline)",
+   "note": "Short-haul carrier; AirHelp rank 66, claims handling 4.1/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/aegean-airlines-rating",
+    "overall_stars": 4,
+    "economy_long_haul": null,
+    "economy_short_haul": 4,
+    "scale": "full",
+    "page_note": "4-Star Airline. The Rating Summary has no long-haul or short-haul split: one table headed 'Aegean Airlines' gives Economy Class 4 stars. Every detail section on the page is labelled 'Short haul', so I",
+    "page_year": 2024
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "Skytrax publishes a single Aegean Economy rating (4 stars) based only on its short-haul product: seat, complimentary meals and drinks are rated 4 each. There is no separate long-haul Economy rating.",
+    "url": "https://skytraxratings.com/airlines/aegean-airlines-rating",
+    "check": "confirmed"
+   }
+  },
+  "AA": {
+   "name": "American Airlines",
+   "business_model": "full-service",
+   "skytrax_stars": 3,
+   "skytrax_awards_rank": 65,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.64,
+   "airhelp_rank": 11,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "airhelp_year": 2025,
+   "acsi_score": 78,
+   "acsi_url": "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+   "acsi_year": 2026,
+   "jdpower_score": 624,
+   "jdpower_segment": "Economy/Basic Economy",
+   "jdpower_url": "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/",
+   "jdpower_year": 2026,
+   "note": "Long-haul widebodies have screens; domestic narrowbodies none until 2028 retrofits.",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/american-airlines-rating",
+    "overall_stars": 3,
+    "economy_long_haul": 3,
+    "economy_short_haul": 3,
+    "scale": "full",
+    "page_note": "3-Star Airline. Page last modified 2020-08-18. The stars are icons, so I counted them from the page's HTML.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "long-haul",
+    "evidence": "The claim holds for the hardware. American's 140+ long-haul widebodies have seatback screens. Its narrowbody fleet, which flies nearly all domestic routes, has none: screens come on 2028 deliveries, retrofits finish in the early 2030s, and Starlink reaches narrowbodies from 2027 (announced 18 Aug 2026).",
+    "url": "https://skift.com/2026/08/18/american-brings-back-seatback-screens-on-narrowbody-aircraft/",
+    "check": "corrected in part"
+   }
+  },
+  "AC": {
+   "name": "Air Canada",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 17,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 5.16,
+   "airhelp_rank": 99,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "airhelp_year": 2025,
+   "jdpower_score": 576,
+   "jdpower_segment": "Economy/Basic Economy",
+   "jdpower_url": "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/",
+   "jdpower_year": 2026,
+   "note": "Seatback screens on both hauls; free meals only on international.",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/air-canada-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 4,
+    "economy_short_haul": 4,
+    "scale": "full",
+    "page_note": "4-Star Airline. Page last modified 2025-04-30.",
+    "page_year": 2025
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "International Economy has an 8.9-inch seatback screen and a free hot meal (salad, bread, entrée, dessert). North America & Caribbean Economy also has an 8.9-inch seatback screen, but only a free snack, with Bistro meals to buy. The only gap is the meal.",
+    "url": "https://www.aircanada.com/us/en/aco/home/fly/onboard/cabin-features/international-economy-class.html",
+    "check": "corrected in part"
+   }
+  },
+  "AF": {
+   "name": "Air France",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 7,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.59,
+   "airhelp_rank": 12,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines",
+   "jdpower_segment": "n/a (not a North American airline)",
+   "note": "Skytrax 2026 #7 in the world, best in Western Europe; AirHelp on-time 7.0/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/air-france-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 4,
+    "economy_short_haul": 4,
+    "scale": "full",
+    "page_note": "4-Star Airline. Page dated: last modified 2021-02-24.",
+    "page_year": 2021
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Skytrax rates Air France Economy 4 stars on both hauls. Short haul keeps complimentary snacks and drinks plus wifi (4 each); long haul adds seatback IFE and meals (4 each).",
+    "url": "https://skytraxratings.com/airlines/air-france-rating",
+    "check": "confirmed"
+   }
+  },
+  "AM": {
+   "name": "Aeroméxico",
+   "business_model": "full-service",
+   "skytrax_stars": 3,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.84,
+   "airhelp_rank": 6,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "Strong 2025 punctuality; seatback screens and free meals on mainline jets",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/aeromexico-rating",
+    "overall_stars": 3,
+    "economy_long_haul": 3,
+    "economy_short_haul": 3,
+    "scale": "full",
+    "page_note": "3-Star Airline. Page last modified 2020-08-18.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Skytrax rates Aeromexico economy 3 stars on both long haul and short haul. aeromexico.com says meals are free on every flight and scale with flight length, and a May 2026 review of the 737 MAX 8 found seatback screens, wifi, 30-inch pitch and a free meal.",
+    "url": "https://skytraxratings.com/airlines/aeromexico-rating",
+    "check": "corrected in part"
+   }
+  },
+  "AS": {
+   "name": "Alaska Airlines",
+   "business_model": "full-service",
+   "skytrax_stars": 3,
+   "skytrax_awards_rank": 51,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 5.95,
+   "airhelp_rank": 76,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "airhelp_year": 2025,
+   "acsi_score": 75,
+   "acsi_url": "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+   "acsi_year": 2026,
+   "jdpower_score": 648,
+   "jdpower_segment": "Economy/Basic Economy",
+   "jdpower_url": "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/",
+   "jdpower_year": 2026,
+   "note": "737s stream-only; 787s have screens; AS code covers Hawaiian since 2026.",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/alaska-airlines-rating",
+    "overall_stars": 3,
+    "economy_long_haul": null,
+    "economy_short_haul": 3,
+    "scale": "full",
+    "page_note": "3-Star Airline. Short haul only; the page has no long-haul table. Page last modified 2020-08-18.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "long-haul",
+    "evidence": "On Alaska's long-haul 787-9s from Seattle (Tokyo, Seoul, Rome), every seat has a seatback screen with Bluetooth, and Main Cabin gets two meals plus free beer and wine. Its 737 narrowbodies have no seatback screens and stream to your own device.",
+    "url": "https://liveandletsfly.com/alaksa-airlines-787-9-seattle/",
+    "check": "not supported by its source"
+   }
+  },
+  "AV": {
+   "name": "Avianca",
+   "business_model": "hybrid",
+   "skytrax_stars": 3,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 6.1,
+   "airhelp_rank": 73,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "Hybrid model: paid food in Americas, meals and screens to Europe",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/avianca-rating",
+    "overall_stars": 3,
+    "economy_long_haul": 2.5,
+    "economy_short_haul": 2.5,
+    "scale": "full",
+    "page_note": "3-Star Airline. The page says the rating is subject to review in early 2024 because Avianca is moving towards low-cost standards, and shows no update since. Page last modified 2023-12-29.",
+    "page_year": 2023
+   },
+   "haul_product": {
+    "better": "long-haul",
+    "evidence": "Avianca's help centre says economy to and from Europe includes snacks and a meal in every fare, while flights within the Americas, domestic ones included, sell food on board. Its 787s have seatback screens; its A320s stream to passengers' own devices.",
+    "url": "https://ayuda.avianca.com/hc/en-us/articles/13523255092635-Which-flights-include-meals-onboard",
+    "check": "corrected in part"
+   }
+  },
+  "AY": {
+   "name": "Finnair",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 33,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.41,
+   "airhelp_rank": 18,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines",
+   "jdpower_segment": "n/a (not a North American airline)",
+   "note": "Economy 4 stars both hauls; AirHelp on-time 7.3/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/finnair-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 4,
+    "economy_short_haul": 4,
+    "scale": "full",
+    "page_note": "4-Star Airline. Page dated: last modified 2020-08-18.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Skytrax rates Finnair Economy 4 stars on both hauls. Short haul has wifi-streamed IFE (4) and limited complimentary food (3) plus buy-on-board; long haul adds seatback IFE and meals (4 each).",
+    "url": "https://skytraxratings.com/airlines/finnair-rating",
+    "check": "confirmed"
+   }
+  },
+  "AZ": {
+   "name": "ITA Airways",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 49,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.23,
+   "airhelp_rank": 28,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines",
+   "jdpower_segment": "n/a (not a North American airline)",
+   "note": "Long-haul economy rated above short-haul; AirHelp on-time 7.2/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/ita-airways-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 4,
+    "economy_short_haul": 3.5,
+    "scale": "full",
+    "page_note": "4-Star Airline. Last modified 2024-06-14.",
+    "page_year": 2024
+   },
+   "haul_product": {
+    "better": "long-haul",
+    "evidence": "Skytrax rates ITA Airways Economy 4 stars on long haul and 3.5 on short haul. Seats are rated 4.5 on both; long haul adds seatback IFE (4) and meals (3.5), and short-haul complimentary snacks are rated 3.5.",
+    "url": "https://skytraxratings.com/airlines/ita-airways-rating",
+    "check": "confirmed"
+   }
+  },
+  "B6": {
+   "name": "JetBlue",
+   "business_model": "hybrid",
+   "skytrax_stars": 3,
+   "skytrax_awards_rank": 54,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 5.31,
+   "airhelp_rank": 89,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "airhelp_year": 2025,
+   "acsi_score": 78,
+   "acsi_url": "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+   "acsi_year": 2026,
+   "jdpower_score": 655,
+   "jdpower_segment": "Economy/Basic Economy",
+   "jdpower_url": "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/",
+   "jdpower_year": 2026,
+   "note": "Screens and free Wi-Fi fleetwide; claims handling sinks its AirHelp score.",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/jetblue-airways-rating",
+    "overall_stars": 3,
+    "economy_long_haul": null,
+    "economy_short_haul": 3.5,
+    "scale": "full",
+    "page_note": "3-Star Airline. Short haul only; the page has no long-haul table, including for transatlantic. Page last modified 2021-03-05.",
+    "page_year": 2021
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "JetBlue's Core cabin comes with free Wi-Fi, live TV and movies at every seat, and free snacks and drinks, on every JetBlue-operated flight. The transatlantic A321LR has the same Core seat (about 32 in pitch) and screens, and adds a free meal.",
+    "url": "https://www.jetblue.com/help/seats",
+    "check": "not supported by its source"
+   }
+  },
+  "BA": {
+   "name": "British Airways",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 23,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.44,
+   "airhelp_rank": 17,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines",
+   "jdpower_segment": "n/a (not a North American airline)",
+   "note": "4-star; short-haul economy buy-on-board; AirHelp on-time 7.4/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/british-airways-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 3.5,
+    "economy_short_haul": 3,
+    "scale": "full",
+    "page_note": "4-Star Airline. The page was last modified 2026-05-06, and its text refers to improvements during 2024. Method for all rows: WebFetch's markdown drops the star icons, so I fetched each page's raw HTML",
+    "page_year": 2026
+   },
+   "haul_product": {
+    "better": "long-haul",
+    "evidence": "Skytrax rates BA Economy 3.5 stars on long haul and 3 stars on short haul, calling short-haul Economy 'a budget style product'. Short-haul complimentary meals/snacks are rated 1 of 5 (buy-on-board rated 4), while long-haul meals, seatback IFE and wifi are each rated 4.",
+    "url": "https://skytraxratings.com/airlines/british-airways-rating",
+    "check": "confirmed"
+   }
+  },
+  "BR": {
+   "name": "EVA Air",
+   "business_model": "full-service",
+   "skytrax_stars": 5,
+   "skytrax_awards_rank": 11,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.1,
+   "airhelp_rank": 34,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "Skytrax 5-star; regional A321 economy lacks seatback screens",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/eva-air-rating",
+    "overall_stars": 5,
+    "economy_long_haul": 5,
+    "economy_short_haul": 5,
+    "scale": "full",
+    "page_note": "The page says it was 'Certified in 2024 as a 5-Star Airline'. Page last modified 2024-06-26.",
+    "page_year": 2024
+   },
+   "haul_product": {
+    "better": "long-haul",
+    "evidence": "Regional A321 Economy (31-32in pitch per EVA) has no seatback screens, only free 30-minute Wi-Fi. The 777-300ER has seatback screens in Economy at 31-33in pitch.",
+    "url": "https://seatcompare.ai/insights/eva-air-a321-seat-selection-guide-2026",
+    "check": "corrected in part"
+   }
+  },
+  "CI": {
+   "name": "China Airlines",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 30,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 6.15,
+   "airhelp_rank": 69,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "Skytrax 4-star; 737-800 streams only; AirHelp on-time 6.8/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/china-airlines-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 4,
+    "economy_short_haul": 4,
+    "scale": "full",
+    "page_note": "Page last modified 2021-02-24.",
+    "page_year": 2021
+   },
+   "haul_product": {
+    "better": "long-haul",
+    "evidence": "On the regional 737-800, entertainment is streamed to your own device through the Fantasy Sky portal, with no seatback screens and no Wi-Fi. The A321neo and the long-haul widebodies have seatback screens.",
+    "url": "https://www.china-airlines.com/tw/en/fly/on-board/fleet/in_flight_entertainment",
+    "check": "not supported by its source"
+   }
+  },
+  "CM": {
+   "name": "Copa Airlines",
+   "business_model": "full-service",
+   "skytrax_stars": 3,
+   "skytrax_awards_rank": 94,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 5.7,
+   "airhelp_rank": 83,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "Top-tier 2025 punctuality; AirHelp total pulled down by claim handling",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/copa-airlines-rating",
+    "overall_stars": 3,
+    "economy_long_haul": null,
+    "economy_short_haul": 3.5,
+    "scale": "full",
+    "page_note": "3-Star Airline. Short haul only; the page has no long-haul table. Page last modified 2020-08-18.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Copa uses Boeing 737s on every route, including flights over 6 hours to the US and Canada, so the cabin is the same whatever the length. Skytrax rates only short-haul cabins (economy 3.5 stars) and says the older aircraft are fine on short flights but less comfortable on long ones.",
+    "url": "https://skytraxratings.com/airlines/copa-airlines-rating",
+    "check": "confirmed"
+   }
+  },
+  "CX": {
+   "name": "Cathay Pacific",
+   "business_model": "full-service",
+   "skytrax_stars": 5,
+   "skytrax_awards_rank": 3,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 6.72,
+   "airhelp_rank": 51,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "Skytrax 5-star, #3 in 2026; AirHelp on-time 7.6/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/cathay-pacific-airways-rating",
+    "overall_stars": 5,
+    "economy_long_haul": 4.5,
+    "economy_short_haul": 5,
+    "scale": "full",
+    "page_note": "The cathay-pacific-rating slug redirects to cathay-pacific-airways-rating. Page last modified 2020-08-18.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Regional A321neo Economy has seatback screens at every seat and Wi-Fi, with 29-30in pitch (31in on the newer layout), against about 32in on the long-haul A350. The difference is mainly pitch.",
+    "url": "https://seatmaps.com/airlines/cx-cathay-pacific/airbus-a321neo/",
+    "check": "not supported by its source"
+   }
+  },
+  "DE": {
+   "name": "Condor",
+   "business_model": "leisure",
+   "skytrax_stars": 4,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 6.46,
+   "airhelp_rank": 61,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/",
+   "note": "New A330neo long-haul cabins; AirHelp 2025 on-time 7.0/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/condor-airlines-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 3.5,
+    "economy_short_haul": 3.5,
+    "scale": "leisure",
+    "page_note": "4-Star Leisure Airline, a separate Skytrax category from full-service airlines. Last modified 2025-01-23.",
+    "page_year": 2025
+   },
+   "haul_product": {
+    "better": "long-haul",
+    "evidence": "Long-haul economy on the A330neo has 76 cm (30 in) pitch, 13.3-inch 4K seatback screens, and a free hot meal, snack and soft drinks. On short- and medium-haul A320neo/A321neo flights, content streams to your own device only, and Condor says meals and drinks are not included.",
+    "url": "https://www.condor.com/en-gb/information-services/help-contact/faq-frequently-asked-questions/on-board-services/food-drinks/",
+    "check": "not supported by its source"
+   }
+  },
+  "DL": {
+   "name": "Delta Air Lines",
+   "business_model": "full-service",
+   "skytrax_stars": 3,
+   "skytrax_awards_rank": 25,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.46,
+   "airhelp_rank": 15,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "airhelp_year": 2025,
+   "acsi_score": 79,
+   "acsi_url": "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+   "acsi_year": 2026,
+   "jdpower_score": 667,
+   "jdpower_segment": "Economy/Basic Economy",
+   "jdpower_url": "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/",
+   "jdpower_year": 2026,
+   "note": "Seatback screens and free Wi-Fi fleetwide; top US airline in ACSI 2026.",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/delta-air-lines-rating",
+    "overall_stars": 3,
+    "economy_long_haul": 3.5,
+    "economy_short_haul": 3.5,
+    "scale": "full",
+    "page_note": "3-Star Airline. Page last modified 2020-08-18.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Delta finished free Delta Sync Wi-Fi on its entire domestic mainline fleet, and as of April 2025 it covered the transatlantic network too. Seatback screens are fleetwide on mainline (Skift counts 900+ aircraft), so apart from the free meal on long-haul, economy is one product on both hauls.",
+    "url": "https://news.delta.com/keeping-you-connected-fast-free-wi-fi-now-most-transatlantic-routes-coming-regional-jets",
+    "check": "corrected in part"
+   }
+  },
+  "DY": {
+   "name": "Norwegian Air Shuttle",
+   "business_model": "low-cost",
+   "skytrax_stars": 4,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 6.57,
+   "airhelp_rank": 58,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/",
+   "note": "Short-haul 737 operator since long-haul ended 2021; AirHelp claims 4.1",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/norwegian-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 4,
+    "economy_short_haul": 4,
+    "scale": "low-cost",
+    "page_note": "4-Star Low-Cost Airline, a separate Skytrax scale. Page dated: last modified 2020-08-18. It still shows a long-haul rating from Norwegian's old long-haul operation, which Norwegian has since closed (g",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "On 14 January 2021 Norwegian ended all long-haul flying and moved to a European short-haul network on narrowbody aircraft only. The long-haul sections on its Skytrax page are left over from before that.",
+    "url": "https://www.cnbc.com/2021/01/14/norwegian-air-to-end-long-haul-flights-focus-on-europe-.html",
+    "check": "corrected in part"
+   }
+  },
+  "EI": {
+   "name": "Aer Lingus",
+   "business_model": "hybrid",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 69,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 6.61,
+   "airhelp_rank": 57,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines",
+   "jdpower_segment": "n/a (not a North American airline)",
+   "note": "Short-haul buy-on-board; on-time 8.2/10, claims handling 3.9/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/aer-lingus-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 4,
+    "economy_short_haul": 4,
+    "scale": "full",
+    "page_note": "4-Star Airline. Last modified 2025-01-24.",
+    "page_year": 2025
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Skytrax rates Aer Lingus Economy 4 stars on both hauls. Short haul is buy-on-board (complimentary food and drink rated 1 of 5); long haul adds seatback IFE, wifi and meals (4 each) and free beer and wine, per Skytrax.",
+    "url": "https://skytraxratings.com/airlines/aer-lingus-rating",
+    "check": "confirmed"
+   }
+  },
+  "EK": {
+   "name": "Emirates",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 6,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.45,
+   "airhelp_rank": 16,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "All-widebody fleet with seatback screens everywhere; AirHelp on-time 7.7/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/emirates-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 4,
+    "economy_short_haul": 4,
+    "scale": "full",
+    "page_note": "Page last modified 2020-12-22. Stars read from the Rating Summary's star icons in the raw HTML; WebFetch's markdown drops those icons, so it reports them as missing.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Emirates flies only widebodies (A380, 777, A350) and has no domestic network; it advertises a personal HD screen at every Economy seat, up to 13.3in on refitted 777s and A380s, on short and long routes alike.",
+    "url": "https://www.emirates.com/us/english/experience/cabin-features/economy-class/",
+    "check": "not supported by its source"
+   }
+  },
+  "EW": {
+   "name": "Eurowings",
+   "business_model": "low-cost",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 43,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.37,
+   "airhelp_rank": 22,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/",
+   "note": "Lufthansa Group short-haul low-cost; AirHelp 2025 on-time 7.4/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/eurowings-rating",
+    "overall_stars": 4,
+    "economy_long_haul": null,
+    "economy_short_haul": 4,
+    "scale": "low-cost",
+    "page_note": "4-Star Low-Cost Airline, a separate Skytrax scale. Short haul only. Published and last modified 2024-09-11.",
+    "page_year": 2024
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "Flies only short-haul A320-family routes; the group's leisure long-haul flying is Discover Airlines. Skytrax rates short-haul Economy and BIZclass only.",
+    "url": "https://skytraxratings.com/airlines/eurowings-rating",
+    "check": "confirmed"
+   }
+  },
+  "EY": {
+   "name": "Etihad Airways",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 22,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 8.07,
+   "airhelp_rank": 2,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "AirHelp 2025 #2; most narrowbodies stream only, no seatback screens",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/etihad-airways-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 3.5,
+    "economy_short_haul": 3.5,
+    "scale": "full",
+    "page_note": "Page last modified 2021-02-24.",
+    "page_year": 2021
+   },
+   "haul_product": {
+    "better": "long-haul",
+    "evidence": "Since 2019, Economy on Etihad's A320 and A321 has had no seatback screens, only wireless streaming to your own device, while its widebodies keep seatback screens. The exception is the new A321LR, which has 13.3in 4K screens.",
+    "url": "https://www.futuretravelexperience.com/2019/05/etihad-replaces-seatback-screens-wireless-ife-a320-321-economy/",
+    "check": "not supported by its source"
+   }
+  },
+  "F8": {
+   "name": "Flair Airlines",
+   "business_model": "low-cost",
+   "skytrax_stars": 3,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 5.23,
+   "airhelp_rank": 95,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "airhelp_year": 2025,
+   "jdpower_segment": "not rated in 2026 study",
+   "jdpower_url": "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/",
+   "note": "All-737 low-cost carrier; not in Skytrax top 100.",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/flair-airlines-rating",
+    "overall_stars": 3,
+    "economy_long_haul": null,
+    "economy_short_haul": 3,
+    "scale": "low-cost",
+    "page_note": "3-Star Low-Cost Airline (low-cost scale). Short haul only. Page last modified 2020-08-18.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "An all-Boeing 737 (737-800 and 737 MAX 8) all-economy fleet flying within Canada and to the US, Mexico and the Caribbean. No long-haul flying.",
+    "url": "https://en.wikipedia.org/wiki/Flair_Airlines",
+    "check": "confirmed"
+   }
+  },
+  "F9": {
+   "name": "Frontier Airlines",
+   "business_model": "ultra-low-cost",
+   "skytrax_stars": 3,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.07,
+   "airhelp_rank": 36,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "airhelp_year": 2025,
+   "acsi_score": 69,
+   "acsi_url": "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+   "acsi_year": 2026,
+   "jdpower_score": 533,
+   "jdpower_segment": "Economy/Basic Economy",
+   "jdpower_url": "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/",
+   "jdpower_year": 2026,
+   "note": "Ultra-low-cost A320neo operator; last in J.D. Power economy 2026.",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/frontier-airlines-rating",
+    "overall_stars": 3,
+    "economy_long_haul": null,
+    "economy_short_haul": 3,
+    "scale": "low-cost",
+    "page_note": "3-Star Low-Cost Airline (low-cost scale). Short haul only. Page last modified 2020-08-18.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "An all-Airbus A320-family ultra-low-cost fleet flying US domestic and short Latin America/Caribbean routes, with one unbundled economy product and no long-haul.",
+    "url": "https://en.wikipedia.org/wiki/Frontier_Airlines",
+    "check": "corrected in part"
+   }
+  },
+  "FI": {
+   "name": "Icelandair",
+   "business_model": "hybrid",
+   "skytrax_stars": 3,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.07,
+   "airhelp_rank": 37,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines",
+   "jdpower_segment": "n/a (not a North American airline)",
+   "note": "3-star, one economy product; AirHelp on-time 8.0/10, claims 5.3",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/icelandair-rating",
+    "overall_stars": 3,
+    "economy_long_haul": 3.5,
+    "economy_short_haul": 3.5,
+    "scale": "full",
+    "page_note": "3-Star Airline. The page has no haul split anywhere: one 'Summary Rating' table gives Economy Class 3.5 (and Economy Comfort 3.5). I copied that single rating into both haul fields; null them if you n",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Skytrax publishes a single Icelandair Economy rating (3.5 stars) for the whole network, with no split by haul. Seat, IFE and wifi are rated 3.5; complimentary meals are rated 1 of 5 (buy-on-board).",
+    "url": "https://skytraxratings.com/airlines/icelandair-rating",
+    "check": "corrected in part"
+   }
+  },
+  "FR": {
+   "name": "Ryanair",
+   "business_model": "ultra-low-cost",
+   "skytrax_stars": 3,
+   "skytrax_awards_rank": 64,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 5.67,
+   "airhelp_rank": 84,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/",
+   "note": "All-737 short-haul fleet; AirHelp 2025 claims handling 3.3/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/ryanair-rating",
+    "overall_stars": 3,
+    "economy_long_haul": null,
+    "economy_short_haul": 3,
+    "scale": "low-cost",
+    "page_note": "3-Star Low-Cost Airline, a separate Skytrax scale from full-service carriers. Short haul only. Page dated: last modified 2020-08-19.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "Flies only short-haul European routes on one Boeing 737 economy product. Skytrax rates a single short-haul economy cabin, with buy-on-board food and strict bag charges.",
+    "url": "https://skytraxratings.com/airlines/ryanair-rating",
+    "check": "confirmed"
+   }
+  },
+  "G4": {
+   "name": "Allegiant Air",
+   "business_model": "ultra-low-cost",
+   "skytrax_stars": 3,
+   "skytrax_awards_rank": 63,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 5.05,
+   "airhelp_rank": 102,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "airhelp_year": 2025,
+   "acsi_url": "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+   "jdpower_score": 630,
+   "jdpower_segment": "Economy/Basic Economy",
+   "jdpower_url": "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/",
+   "jdpower_year": 2026,
+   "note": "Leisure ULCC, domestic only; above J.D. Power economy segment average.",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/allegiant-air-rating",
+    "overall_stars": 3,
+    "economy_long_haul": null,
+    "economy_short_haul": 3,
+    "scale": "low-cost",
+    "page_note": "3-Star Low-Cost Airline (low-cost scale). Short haul only. Page last modified 2020-08-18.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "A narrowbody (A320-family and 737 MAX) leisure airline on US domestic routes only, with one economy product.",
+    "url": "https://en.wikipedia.org/wiki/Allegiant_Air",
+    "check": "corrected in part"
+   }
+  },
+  "HA": {
+   "name": "Hawaiian Airlines",
+   "business_model": "full-service",
+   "skytrax_stars": 3,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 6.73,
+   "airhelp_rank": 50,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "airhelp_year": 2025,
+   "acsi_url": "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+   "jdpower_segment": "not rated in 2026 study",
+   "jdpower_url": "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/",
+   "note": "Flights sold as AS since April 2026; A330/787 have screens.",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/hawaiian-airlines-rating",
+    "overall_stars": 3,
+    "economy_long_haul": 3,
+    "economy_short_haul": 3,
+    "scale": "full",
+    "page_note": "3-Star Airline. Page last modified 2020-08-18.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "long-haul",
+    "evidence": "The A330 and 787 widebodies flown long-haul have seatback screens. The A321neo (mainland to Hawaii) and the 717 (between the islands) have none and rely on streaming to your own device. The A321neo and A330 have Starlink Wi-Fi (Oct 2025).",
+    "url": "https://beatofhawaii.com/hawaii-flights-quietly-lose-seatback-screens-and-travelers-feel-it/",
+    "check": "not supported by its source"
+   }
+  },
+  "HV": {
+   "name": "Transavia",
+   "business_model": "low-cost",
+   "skytrax_stars": 3,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.04,
+   "airhelp_rank": 40,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/",
+   "note": "KLM-group leisure low-cost; 29-inch pitch per Skytrax",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/transavia-rating",
+    "overall_stars": 3,
+    "economy_long_haul": null,
+    "economy_short_haul": 3,
+    "scale": "low-cost",
+    "page_note": "Transavia (Netherlands): 3-Star Low-Cost Airline, short haul only. Page dated: last modified 2020-08-19. Transavia France (TO) has its own page with a different rating; see the TO row.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "Short- and medium-haul leisure network only. Skytrax describes low-cost seats at 29-inch pitch and a limited buy-on-board food menu.",
+    "url": "https://skytraxratings.com/airlines/transavia-rating",
+    "check": "confirmed"
+   }
+  },
+  "IB": {
+   "name": "Iberia",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 16,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.16,
+   "airhelp_rank": 33,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines",
+   "jdpower_segment": "n/a (not a North American airline)",
+   "note": "Economy 4 stars both hauls; AirHelp on-time 8.2/10, claims 5.0",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/iberia-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 4,
+    "economy_short_haul": 4,
+    "scale": "full",
+    "page_note": "4-Star Airline. Last modified 2023-11-16.",
+    "page_year": 2023
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Skytrax rates Iberia Economy 4 stars on both hauls. Short haul is buy-on-board (complimentary food rated 1 of 5); long haul has seatback IFE (4), wifi (4.5) and meals (4).",
+    "url": "https://skytraxratings.com/airlines/iberia-rating",
+    "check": "confirmed"
+   }
+  },
+  "JL": {
+   "name": "Japan Airlines",
+   "business_model": "full-service",
+   "skytrax_stars": 5,
+   "skytrax_awards_rank": 9,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.32,
+   "airhelp_rank": 25,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "Domestic 767/737 lack screens; international Sky Wider has 33-34in pitch",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/japan-airlines-rating",
+    "overall_stars": 5,
+    "economy_long_haul": 5,
+    "economy_short_haul": 5,
+    "scale": "full",
+    "page_note": "Page last modified 2022-12-02.",
+    "page_year": 2022
+   },
+   "haul_product": {
+    "better": "long-haul",
+    "evidence": "Domestic 767 and 737 Economy has no personal screens (you stream to your own device over free Wi-Fi) and serves drinks only. International JAL SKY WIDER Economy (787, 777-300ER, 767) has 33-34in pitch, 10.6in screens and meals.",
+    "url": "https://www.jal.co.jp/jp/en/dom/service/n/entertainment/",
+    "check": "not supported by its source"
+   }
+  },
+  "KE": {
+   "name": "Korean Air",
+   "business_model": "full-service",
+   "skytrax_stars": 5,
+   "skytrax_awards_rank": 10,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 5.28,
+   "airhelp_rank": 90,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "Skytrax 5-star; AirHelp 2025 #90, near-zero claims-handling sub-score",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/korean-air-rating",
+    "overall_stars": 5,
+    "economy_long_haul": 5,
+    "economy_short_haul": 5,
+    "scale": "full",
+    "page_note": "The ratings table sits under 'Korean Air Rating'. Page last modified 2025-04-02.",
+    "page_year": 2025
+   },
+   "haul_product": {
+    "better": "long-haul",
+    "evidence": "The A220-300 used on domestic routes has no seatback screens (streaming over Wi-Fi only), and a Dec 2022 review found no drinks or snacks served domestically. A321neo and widebody Economy have seatback screens (13.3in on the A321neo) and meals.",
+    "url": "https://airlinesandme.com/review-korean-air-a220-300-economy-class-jeju-seoul-gimpo/",
+    "check": "not supported by its source"
+   }
+  },
+  "KL": {
+   "name": "KLM Royal Dutch Airlines",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 24,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.39,
+   "airhelp_rank": 20,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines",
+   "jdpower_segment": "n/a (not a North American airline)",
+   "note": "Economy 4 stars both hauls; AirHelp on-time 7.0/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/klm-royal-dutch-airlines-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 4,
+    "economy_short_haul": 4,
+    "scale": "full",
+    "page_note": "4-Star Airline. Page dated: last modified 2021-03-04.",
+    "page_year": 2021
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Skytrax rates KLM Economy 4 stars on both long and short haul. Long haul adds seatback IFE, wifi and meals (4 each); short haul has complimentary snacks (3.5) and drinks (4) but no rated IFE.",
+    "url": "https://skytraxratings.com/airlines/klm-royal-dutch-airlines-rating",
+    "check": "confirmed"
+   }
+  },
+  "LA": {
+   "name": "LATAM Airlines",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 42,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 6.16,
+   "airhelp_rank": 68,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "Skytrax 4-Star since March 2026; widebodies add seatback screens and meals",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/latam-airlines-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 4,
+    "economy_short_haul": 4,
+    "scale": "full",
+    "page_note": "4-Star Airline. Page last modified 2026-03-06, the most recent in this set.",
+    "page_year": 2026
+   },
+   "haul_product": {
+    "better": "long-haul",
+    "evidence": "Economy on LATAM's 787, 767 and 777 widebodies has seatback screens and full meals. Its A320-family domestic flights stream entertainment to passengers' own devices and serve a free snack and drink. Skytrax still rates economy 4 stars on both long and short haul.",
+    "url": "https://runwaygirlnetwork.com/2023/12/latam-brings-paramount-content-to-embedded-and-wireless-ife/",
+    "check": "corrected in part"
+   }
+  },
+  "LH": {
+   "name": "Lufthansa",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 14,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.23,
+   "airhelp_rank": 29,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines",
+   "jdpower_segment": "n/a (not a North American airline)",
+   "note": "Economy 3.5 stars both hauls; AirHelp claims handling 5.8/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/lufthansa-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 3.5,
+    "economy_short_haul": 3.5,
+    "scale": "full",
+    "page_note": "4-Star Airline. A separate, older Skytrax news post says Lufthansa is a 5-Star Airline, but the airline's rating page says 4-Star, and that page is what is recorded here. Last modified 2022-06-25.",
+    "page_year": 2022
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Skytrax rates Lufthansa Economy 3.5 stars on both hauls. Short-haul complimentary food and drink are rated 0.5 of 5; long-haul meals are rated 3, with seatback IFE and wifi rated 4.",
+    "url": "https://skytraxratings.com/airlines/lufthansa-rating",
+    "check": "confirmed"
+   }
+  },
+  "LL": {
+   "name": "LEVEL (IAG)",
+   "business_model": "low-cost",
+   "skytrax_awards_rank": 96,
+   "skytrax_awards_year": 2026,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/",
+   "note": "IAG long-haul low-cost, A330-200s from Barcelona; no AirHelp score",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/level-rating",
+    "overall_stars": null,
+    "economy_long_haul": null,
+    "economy_short_haul": null,
+    "scale": "full",
+    "page_note": "No page. LEVEL is not in skytraxratings.com's airline sitemap (234 URLs) or its A-Z index. The guessed URLs level-rating, level-airlines-rating and fly-level-rating all return 404, and a site search f",
+    "page_year": null
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "Long-haul only: an A330-200 fleet flying from Barcelona to the Americas (New York, Miami, Buenos Aires, Santiago, Lima from June 2026). No short-haul flights.",
+    "url": "https://simpleflying.com/level-iag-low-cost-airline-guide/",
+    "check": "not supported by its source"
+   }
+  },
+  "LO": {
+   "name": "LOT Polish Airlines",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 44,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.65,
+   "airhelp_rank": 10,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines",
+   "jdpower_segment": "n/a (not a North American airline)",
+   "note": "Short-haul buy-on-board; AirHelp #10, on-time 8.3/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/lot-polish-airlines-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 4,
+    "economy_short_haul": 4,
+    "scale": "full",
+    "page_note": "4-Star Airline. Published and last modified 2025-06-25.",
+    "page_year": 2025
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Skytrax rates LOT Economy 4 stars on both hauls, but notes short-haul Economy is buy-on-board while long haul keeps complimentary meals and drinks. Long-haul seatback IFE and meals are rated 4.",
+    "url": "https://skytraxratings.com/airlines/lot-polish-airlines-rating",
+    "check": "confirmed"
+   }
+  },
+  "LS": {
+   "name": "Jet2.com",
+   "business_model": "leisure",
+   "skytrax_stars": 3,
+   "skytrax_awards_rank": 67,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 4.98,
+   "airhelp_rank": 105,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/",
+   "note": "UK leisure 737/A321neo; AirHelp 2025 claims score 0.16/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/jet2-com-rating",
+    "overall_stars": 3,
+    "economy_long_haul": null,
+    "economy_short_haul": 3,
+    "scale": "low-cost",
+    "page_note": "The page is titled 'Jet2.com'. 3-Star Low-Cost Airline, a separate Skytrax scale. Short haul only. Page dated: last modified 2020-08-18.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "UK leisure short- and medium-haul flying only. Skytrax gives seat pitch as 28-30 inches by aircraft, with food pre-ordered or bought on board.",
+    "url": "https://skytraxratings.com/airlines/jet2-com-rating",
+    "check": "confirmed"
+   }
+  },
+  "LX": {
+   "name": "SWISS International Air Lines",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 19,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 6.36,
+   "airhelp_rank": 65,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines",
+   "jdpower_segment": "n/a (not a North American airline)",
+   "note": "Economy 4 stars both hauls; AirHelp claims handling 3.7/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/swiss-international-air-lines-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 4,
+    "economy_short_haul": 4,
+    "scale": "full",
+    "page_note": "The page title, visible text and badge all say 4-Star Airline, but the meta description still says 3-Star (stale). Recorded as 4. Page dated: last modified 2020-08-19.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Skytrax rates SWISS Economy 4 stars on both hauls. Short haul has complimentary snacks from Zurich (4) but buy-on-board from Geneva (3.5); long haul adds seatback IFE and meals (4 each).",
+    "url": "https://skytraxratings.com/airlines/swiss-international-air-lines-rating",
+    "check": "confirmed"
+   }
+  },
+  "MX": {
+   "name": "Breeze Airways",
+   "business_model": "low-cost",
+   "skytrax_awards_rank": 74,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 5.06,
+   "airhelp_rank": 101,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "airhelp_year": 2025,
+   "acsi_url": "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+   "jdpower_segment": "not rated in 2026 study",
+   "jdpower_url": "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/",
+   "note": "All-A220, domestic only; streaming entertainment, no seatback screens.",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/breeze-airways-rating",
+    "overall_stars": null,
+    "economy_long_haul": null,
+    "economy_short_haul": null,
+    "scale": "full",
+    "page_note": "No page. The guessed URL returns 404. Breeze is not in the A-Z index, the North America listing or the site's search. It is not rated.",
+    "page_year": null
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "An all-Airbus A220 fleet on US domestic routes only. Entertainment is streamed to your own device, with no seatback screens.",
+    "url": "https://en.wikipedia.org/wiki/Breeze_Airways",
+    "check": "confirmed"
+   }
+  },
+  "NH": {
+   "name": "All Nippon Airways (ANA)",
+   "business_model": "full-service",
+   "skytrax_stars": 5,
+   "skytrax_awards_rank": 4,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.54,
+   "airhelp_rank": 14,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "International economy 34in pitch, 13.3in screens; domestic drinks only",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/ana-all-nippon-airways-rating",
+    "overall_stars": 5,
+    "economy_long_haul": 5,
+    "economy_short_haul": 4.5,
+    "scale": "full",
+    "page_note": "The rows are labelled 'ANA: Economy Class'. The ratings table sits under 'ANA Rating'. Page last modified 2026-01-23.",
+    "page_year": 2026
+   },
+   "haul_product": {
+    "better": "long-haul",
+    "evidence": "International 777-300ER Economy has 34in pitch, 13.3in touch screens and full meals. Domestic Economy serves drinks only, though domestic Wi-Fi is free.",
+    "url": "https://www.ana.co.jp/en/us/travel-information/cabin/b777-300er-economy-class/",
+    "check": "not supported by its source"
+   }
+  },
+  "OS": {
+   "name": "Austrian Airlines",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 27,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.4,
+   "airhelp_rank": 19,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines",
+   "jdpower_segment": "n/a (not a North American airline)",
+   "note": "Economy 4 stars both hauls; AirHelp on-time 8.3/10, claims 5.6",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/austrian-airlines-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 4,
+    "economy_short_haul": 4,
+    "scale": "full",
+    "page_note": "4-Star Airline. Page dated: last modified 2021-02-24.",
+    "page_year": 2021
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Skytrax rates Austrian Economy 4 stars on both hauls. Short haul has complimentary meals/snacks, drinks and wifi (4 each); long haul adds seatback IFE and meals (4 each).",
+    "url": "https://skytraxratings.com/airlines/austrian-airlines-rating",
+    "check": "confirmed"
+   }
+  },
+  "OZ": {
+   "name": "Asiana Airlines",
+   "business_model": "full-service",
+   "skytrax_stars": 5,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 5.25,
+   "airhelp_rank": 92,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "Skytrax 5-star but outside 2026 top 100; AirHelp 2025 #92",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/asiana-airlines-rating",
+    "overall_stars": 5,
+    "economy_long_haul": 5,
+    "economy_short_haul": 5,
+    "scale": "full",
+    "page_note": "Page last modified 2024-07-23.",
+    "page_year": 2024
+   },
+   "haul_product": {
+    "better": "long-haul",
+    "evidence": "Short-haul A321neo Economy has no personal screens, though a hot meal was still served on a one-hour Fukuoka-Incheon flight. Widebody long-haul Economy has seatback AVOD. Older A321ceos have 9in screens.",
+    "url": "https://knaviation.net/asiana-a321neo-economy-review/",
+    "check": "not supported by its source"
+   }
+  },
+  "PC": {
+   "name": "Pegasus Airlines",
+   "business_model": "low-cost",
+   "skytrax_stars": 3,
+   "skytrax_awards_rank": 95,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 5.49,
+   "airhelp_rank": 86,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/",
+   "note": "Turkish narrowbody low-cost; AirHelp 2025 claims handling 1.7/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/pegasus-airlines-rating",
+    "overall_stars": 3,
+    "economy_long_haul": null,
+    "economy_short_haul": 3,
+    "scale": "low-cost",
+    "page_note": "3-Star Low-Cost Airline, a separate Skytrax scale. Short haul only. Page dated: last modified 2020-08-19.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "One narrowbody economy product on short- and medium-haul routes from Turkey. Skytrax rates only a short-haul economy product.",
+    "url": "https://skytraxratings.com/airlines/pegasus-airlines-rating",
+    "check": "confirmed"
+   }
+  },
+  "PD": {
+   "name": "Porter Airlines",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 34,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 5.03,
+   "airhelp_rank": 103,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "airhelp_year": 2025,
+   "jdpower_segment": "not rated in 2026 study",
+   "jdpower_url": "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/",
+   "note": "Dash 8 and E195-E2 only; Skytrax 4-star, 34th worldwide.",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/porter-airlines-rating",
+    "overall_stars": 4,
+    "economy_long_haul": null,
+    "economy_short_haul": 4,
+    "scale": "full",
+    "page_note": "4-Star Airline. Short haul only. Page last modified 2020-08-19.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "Only Dash 8-400 turboprops and Embraer E195-E2 narrowbodies, flying within Canada and to the US, Mexico and the Caribbean. No widebody or long-haul flying.",
+    "url": "https://en.wikipedia.org/wiki/Porter_Airlines",
+    "check": "confirmed"
+   }
+  },
+  "PR": {
+   "name": "Philippine Airlines",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 5.77,
+   "airhelp_rank": 82,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "Strong on-time (AirHelp 8.1/10); domestic A320 pitch as low as 28in",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/philippine-airlines-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 4,
+    "economy_short_haul": 4,
+    "scale": "full",
+    "page_note": "Page last modified 2021-03-04.",
+    "page_year": 2021
+   },
+   "haul_product": {
+    "better": "long-haul",
+    "evidence": "Domestic A320 Economy pitch is 28-29in on the V.1 layout (30-32in on V.2), while the A350-900 has 32in pitch, seatback AVOD and Wi-Fi (seatmaps.com). The A350-1000 is 10-abreast with 17in seats but 13.3in 4K screens.",
+    "url": "https://seatmaps.com/airlines/pr-pal/airbus-a320/",
+    "check": "not supported by its source"
+   }
+  },
+  "QR": {
+   "name": "Qatar Airways",
+   "business_model": "full-service",
+   "skytrax_stars": 5,
+   "skytrax_awards_rank": 2,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 8.16,
+   "airhelp_rank": 1,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "Skytrax 5-star, AirHelp 2025 #1, on-time 8.3/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/qatar-airways-rating",
+    "overall_stars": 5,
+    "economy_long_haul": 5,
+    "economy_short_haul": 4.5,
+    "scale": "full",
+    "page_note": "Page last modified 2021-11-02. The ratings table sits under 'Qatar Airways Rating', not a 'Rating Summary' heading.",
+    "page_year": 2021
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Qatar's regional A320s have seatback AVOD screens at every seat and complimentary meals in Economy, like its widebodies. The one gap: Qatar lists Wi-Fi only on the A350, the A380 and some 777s and 787s.",
+    "url": "https://www.qatarairways.com/en-us/fleet/airbus-a320.html",
+    "check": "not supported by its source"
+   }
+  },
+  "SK": {
+   "name": "SAS Scandinavian Airlines",
+   "business_model": "full-service",
+   "skytrax_stars": 3,
+   "skytrax_awards_rank": 76,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.29,
+   "airhelp_rank": 26,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines",
+   "jdpower_segment": "n/a (not a North American airline)",
+   "note": "3-star; best on-time in group (AirHelp 8.5/10)",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/sas-scandinavian-airlines-rating",
+    "overall_stars": 3,
+    "economy_long_haul": 3.5,
+    "economy_short_haul": 3.5,
+    "scale": "full",
+    "page_note": "3-Star Airline. Page dated: last modified 2021-03-04.",
+    "page_year": 2021
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Skytrax rates SAS Economy 3.5 stars on both hauls. Short haul is buy-on-board (complimentary food rated 1 of 5) with wifi (4); long haul has seatback IFE and wifi (4) but seat and meals rated 3.5.",
+    "url": "https://skytraxratings.com/airlines/sas-scandinavian-airlines-rating",
+    "check": "confirmed"
+   }
+  },
+  "SN": {
+   "name": "Brussels Airlines",
+   "business_model": "full-service",
+   "skytrax_stars": 3,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.66,
+   "airhelp_rank": 9,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines",
+   "jdpower_segment": "n/a (not a North American airline)",
+   "note": "3-star; long-haul economy rated below short-haul; AirHelp #9",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/brussels-airlines-rating",
+    "overall_stars": 3,
+    "economy_long_haul": 3,
+    "economy_short_haul": 3.5,
+    "scale": "full",
+    "page_note": "3-Star Airline. The long-haul table also lists Economy Privilege at 3.0. Page dated: last modified 2020-08-18.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "short-haul",
+    "evidence": "Skytrax rates Brussels Airlines Economy 3 stars on long haul but 3.5 on short haul. Short haul is buy-on-board (complimentary food and drink rated 1 of 5); long haul has seatback IFE (4) and food quantity rated 3.5.",
+    "url": "https://skytraxratings.com/airlines/brussels-airlines-rating",
+    "check": "confirmed"
+   }
+  },
+  "SQ": {
+   "name": "Singapore Airlines",
+   "business_model": "full-service",
+   "skytrax_stars": 5,
+   "skytrax_awards_rank": 1,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 6.78,
+   "airhelp_rank": 48,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "Skytrax World's Best Airline 2026; strong on-time, weak claims handling",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/singapore-airlines-rating",
+    "overall_stars": 5,
+    "economy_long_haul": 5,
+    "economy_short_haul": 5,
+    "scale": "full",
+    "page_note": "Page last modified 2024-07-23.",
+    "page_year": 2024
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Regional 737-8 Economy has 30in pitch and a 10in HD screen, against 32in pitch and an 11.1in screen on the widebodies. Both have seatback screens and meals, so the only differences are 2in of pitch and screen size.",
+    "url": "https://milelion.com/2021/11/17/hands-on-singapore-airlines-new-b737-8-economy-class-seat/",
+    "check": "not supported by its source"
+   }
+  },
+  "SY": {
+   "name": "Sun Country Airlines",
+   "business_model": "low-cost",
+   "skytrax_stars": 3,
+   "skytrax_awards_rank": 82,
+   "skytrax_awards_year": 2026,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "airhelp_year": 2025,
+   "acsi_url": "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+   "jdpower_segment": "not rated in 2026 study",
+   "jdpower_url": "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/",
+   "note": "Leisure 737 operator, owned by Allegiant since May 2026.",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/sun-country-airlines-rating",
+    "overall_stars": 3,
+    "economy_long_haul": null,
+    "economy_short_haul": 3,
+    "scale": "low-cost",
+    "page_note": "3-Star Low-Cost Airline (low-cost scale). Short haul only. Page last modified 2020-07-29.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "A Boeing 737-800/-900ER leisure airline flying within the US and to Mexico, Central America and the Caribbean, with one economy product and no long-haul. Allegiant's acquisition closed 13 May 2026.",
+    "url": "https://en.wikipedia.org/wiki/Sun_Country_Airlines",
+    "check": "confirmed"
+   }
+  },
+  "TK": {
+   "name": "Turkish Airlines",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 5,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 6.92,
+   "airhelp_rank": 45,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "Screens and meals even on narrowbodies; weak AirHelp claims score",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/turkish-airlines-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 4,
+    "economy_short_haul": 4,
+    "scale": "full",
+    "page_note": "Page last modified 2025-12-22.",
+    "page_year": 2025
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Turkish has fitted Economy on its narrowbodies with seatback screens on the same Planet entertainment system as its widebodies (12in on the A321neo), and serves meals even on domestic flights. Long-haul 777-300ER Economy pitch is 79 cm (about 31in).",
+    "url": "https://allplane.tv/blog/2024/2/17/flight-review-turkish-airlines-economy-class-airbus-a321neo",
+    "check": "not supported by its source"
+   }
+  },
+  "TO": {
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/transavia-france-rating",
+    "overall_stars": 4,
+    "economy_long_haul": null,
+    "economy_short_haul": 4,
+    "scale": "low-cost",
+    "page_note": "Not in the requested list; added because it is HV's sister airline and has its own page. The page says it was certified a 4-Star Low-Cost Airline in 2024. Short haul only. Last modified 2024-07-23.",
+    "page_year": 2024
+   }
+  },
+  "TP": {
+   "name": "TAP Air Portugal",
+   "business_model": "full-service",
+   "skytrax_stars": 3,
+   "skytrax_awards_rank": 73,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.37,
+   "airhelp_rank": 21,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines",
+   "jdpower_segment": "n/a (not a North American airline)",
+   "note": "3-star; weakest on-time here (AirHelp 5.8/10), strong claims",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/tap-air-portugal-rating",
+    "overall_stars": 3,
+    "economy_long_haul": 3,
+    "economy_short_haul": 3.5,
+    "scale": "full",
+    "page_note": "3-Star Airline. The page names the airline 'TAP Portugal'. Page dated: last modified 2021-03-04.",
+    "page_year": 2021
+   },
+   "haul_product": {
+    "better": "short-haul",
+    "evidence": "Skytrax rates TAP Economy 3 stars on long haul and 3.5 on short haul. Long-haul seat, IFE, wifi and meals are each rated 3.5; short haul has seat 3 and complimentary snacks 3.5.",
+    "url": "https://skytraxratings.com/airlines/tap-air-portugal-rating",
+    "check": "confirmed"
+   }
+  },
+  "TS": {
+   "name": "Air Transat",
+   "business_model": "leisure",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 59,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 6.85,
+   "airhelp_rank": 46,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "airhelp_year": 2025,
+   "jdpower_segment": "not rated in 2026 study",
+   "jdpower_url": "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/",
+   "note": "Leisure carrier; screens on every seat; free meals transatlantic only.",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/air-transat-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 4,
+    "economy_short_haul": 4,
+    "scale": "leisure",
+    "page_note": "4-Star Leisure Airline, which is rated on the leisure scale, not the full-service one. Page last modified 2020-08-10.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "The same A321LR, A321XLR and A330 fleet flies both kinds of route, with a seatback screen at every seat. Transatlantic economy includes a free hot meal with wine; US, Canada and southern sun routes are buy-on-board. The only gap is the meal.",
+    "url": "https://www.airtransat.com/en-GB/book/book-a-flight/on-board-comfort/economy-class/long-haul",
+    "check": "corrected in part"
+   }
+  },
+  "U2": {
+   "name": "easyJet",
+   "business_model": "low-cost",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 68,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 5.79,
+   "airhelp_rank": 81,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/",
+   "note": "A320-family short-haul; AirHelp 2025 claims handling 3.3/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/easyjet-rating",
+    "overall_stars": 4,
+    "economy_long_haul": null,
+    "economy_short_haul": 4,
+    "scale": "low-cost",
+    "page_note": "4-Star Low-Cost Airline, a separate Skytrax scale. Short haul only. Page dated: last modified 2020-08-18.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "Flies only short- and medium-haul routes on A320-family aircraft with one cabin. Skytrax rates only a short-haul economy product.",
+    "url": "https://skytraxratings.com/airlines/easyjet-rating",
+    "check": "confirmed"
+   }
+  },
+  "UA": {
+   "name": "United Airlines",
+   "business_model": "full-service",
+   "skytrax_stars": 3,
+   "skytrax_awards_rank": 45,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.54,
+   "airhelp_rank": 13,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "airhelp_year": 2025,
+   "acsi_score": 75,
+   "acsi_url": "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+   "acsi_year": 2026,
+   "jdpower_score": 608,
+   "jdpower_segment": "Economy/Basic Economy",
+   "jdpower_url": "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/",
+   "jdpower_year": 2026,
+   "note": "68% of narrowbodies refitted with seatback screens; 13th in AirHelp 2025.",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/united-airlines-rating",
+    "overall_stars": 3,
+    "economy_long_haul": 3,
+    "economy_short_haul": 3,
+    "scale": "full",
+    "page_note": "3-Star Airline. Page last modified 2020-08-19.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "By the end of 2025, 68% of United's narrowbody fleet had the Signature Interior, which has a seatback screen at every seat, and its 150,000+ seatback screens also cover the widebodies. Free Starlink Wi-Fi for MileagePlus members is so far on 300+ United Express regional jets. The rest of the gap is the free meal on long-haul (a borderline 'same').",
+    "url": "https://www.sec.gov/Archives/edgar/data/100517/000010051726000014/ual_12312025erex991.htm",
+    "check": "confirmed"
+   }
+  },
+  "UX": {
+   "name": "Air Europa",
+   "business_model": "full-service",
+   "skytrax_stars": 3,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 5.25,
+   "airhelp_rank": 94,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/",
+   "note": "787 long-haul, 737 short-haul; AirHelp 2025 claims score 0.0/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/air-europa-rating",
+    "overall_stars": 3,
+    "economy_long_haul": 3.5,
+    "economy_short_haul": 3.5,
+    "scale": "full",
+    "page_note": "3-Star Airline. Page dated: last modified 2020-08-18.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "long-haul",
+    "evidence": "Long-haul and Dreamliner flights have a touch screen at every seat and a free menu on transatlantic routes. Short- and medium-haul flights within Europe stream free content to your own device only, and food is buy-on-board.",
+    "url": "https://www.aireuropa.com/us/en/aea/aexperience/services.html",
+    "check": "not supported by its source"
+   }
+  },
+  "V7": {
+   "name": "Volotea",
+   "business_model": "low-cost",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 48,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 6.62,
+   "airhelp_rank": 55,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/",
+   "note": "A319/A320 regional low-cost; AirHelp 2025 on-time 7.9, claims 4.4",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/volotea-rating",
+    "overall_stars": 4,
+    "economy_long_haul": null,
+    "economy_short_haul": 4,
+    "scale": "low-cost",
+    "page_note": "4-Star Low-Cost Airline, a separate Skytrax scale. Short haul only. Last modified 2024-03-08.",
+    "page_year": 2024
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "Flies only short-haul routes between mid-sized European cities on A319/A320 aircraft. Skytrax rates only a short-haul economy product.",
+    "url": "https://skytraxratings.com/airlines/volotea-rating",
+    "check": "confirmed"
+   }
+  },
+  "VB": {
+   "name": "Viva Aerobus",
+   "business_model": "ultra-low-cost",
+   "skytrax_stars": 2,
+   "skytrax_awards_year": 2026,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "Ultra-low-cost; 29-inch non-reclining seats, paid food; Skytrax 2-Star low-cost",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/viva-aerobus-rating",
+    "overall_stars": 2,
+    "economy_long_haul": null,
+    "economy_short_haul": 2.5,
+    "scale": "low-cost",
+    "page_note": "2-Star Low-Cost Airline (low-cost scale). Short haul only. The Economy rating is 2.5 (two full stars and a half star). Page last modified 2020-08-20.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Viva flies one Airbus narrowbody fleet on its domestic and US routes. Skytrax rates only short-haul economy and cites non-reclining seats at 29-inch pitch and limited buy-onboard food.",
+    "url": "https://skytraxratings.com/airlines/viva-aerobus-rating",
+    "check": "confirmed"
+   }
+  },
+  "VL": {
+   "name": "Lufthansa City Airlines",
+   "business_model": "full-service",
+   "skytrax_awards_year": 2026,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/",
+   "note": "Lufthansa-branded A320neo/A319 feeder flights from Munich and Frankfurt; unrated",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/lufthansa-city-airlines-rating",
+    "overall_stars": null,
+    "economy_long_haul": null,
+    "economy_short_haul": null,
+    "scale": "full",
+    "page_note": "No page. Lufthansa City Airlines is not in the sitemap or the A-Z index. The guessed URLs lufthansa-city-airlines-rating and lufthansa-cityline-rating return 404, and a site search returned only the m",
+    "page_year": null
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "Short- and medium-haul feeder flights only, from the Munich and Frankfurt hubs (Frankfurt base opened 9 Feb 2026), on A320neo and A319 aircraft under the Lufthansa brand.",
+    "url": "https://newsroom.lufthansagroup.com/en/lufthansa-city-airlines-takes-delivery-of-its-first-all-new-airbus-a320neo/",
+    "check": "not supported by its source"
+   }
+  },
+  "VS": {
+   "name": "Virgin Atlantic",
+   "business_model": "full-service",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 18,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 8.03,
+   "airhelp_rank": 3,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en-int/airhelp-score/?score-type=airlines",
+   "jdpower_segment": "n/a (not a North American airline)",
+   "note": "Long-haul only; AirHelp 2025 third worldwide, on-time 8.0/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/virgin-atlantic-rating",
+    "overall_stars": 4,
+    "economy_long_haul": 3.5,
+    "economy_short_haul": null,
+    "scale": "full",
+    "page_note": "4-Star Airline. The page has a long-haul table only, with no short-haul table. Page dated: last modified 2020-08-20.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "Virgin Atlantic flies only long-haul, and Skytrax publishes long-haul ratings only: Economy 3.5 stars, with seatback IFE rated 4.5 and meals and wifi rated 4 each.",
+    "url": "https://skytraxratings.com/airlines/virgin-atlantic-rating",
+    "check": "confirmed"
+   }
+  },
+  "VY": {
+   "name": "Vueling",
+   "business_model": "low-cost",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 39,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 6.97,
+   "airhelp_rank": 44,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/",
+   "note": "A320-family short-haul; AirHelp 2025 on-time 8.3, claims 5.4",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/vueling-airlines-rating",
+    "overall_stars": 4,
+    "economy_long_haul": null,
+    "economy_short_haul": 4,
+    "scale": "low-cost",
+    "page_note": "4-Star Low-Cost Airline, a separate Skytrax scale. Short haul only. Page dated: last modified 2020-08-20.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "Flies only short-haul A320-family routes in Europe. Skytrax rates only a short-haul economy product.",
+    "url": "https://skytraxratings.com/airlines/vueling-airlines-rating",
+    "check": "confirmed"
+   }
+  },
+  "W6": {
+   "name": "Wizz Air",
+   "business_model": "ultra-low-cost",
+   "skytrax_stars": 3,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 7.17,
+   "airhelp_rank": 32,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/",
+   "note": "A321neo-heavy narrowbody fleet; AirHelp 2025 on-time score 7.7/10",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/wizz-air-rating",
+    "overall_stars": 3,
+    "economy_long_haul": null,
+    "economy_short_haul": 3,
+    "scale": "low-cost",
+    "page_note": "3-Star Low-Cost Airline, a separate Skytrax scale. Short haul only. Page dated: last modified 2020-08-20.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "Flies only a single-class A320/A321 narrowbody product on short- and medium-haul routes. Skytrax rates only a short-haul economy product.",
+    "url": "https://skytraxratings.com/airlines/wizz-air-rating",
+    "check": "confirmed"
+   }
+  },
+  "WN": {
+   "name": "Southwest Airlines",
+   "business_model": "low-cost",
+   "skytrax_stars": 4,
+   "skytrax_awards_rank": 89,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 6.68,
+   "airhelp_rank": 52,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "airhelp_year": 2025,
+   "acsi_score": 77,
+   "acsi_url": "https://theacsi.com/wp-content/uploads/2026/04/26apr_Travel-Study-FINAL.pdf",
+   "acsi_year": 2026,
+   "jdpower_score": 670,
+   "jdpower_segment": "Economy/Basic Economy",
+   "jdpower_url": "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/",
+   "jdpower_year": 2026,
+   "note": "All-737 short-haul network; top J.D. Power economy score 2026.",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/southwest-airlines-rating",
+    "overall_stars": 4,
+    "economy_long_haul": null,
+    "economy_short_haul": 4,
+    "scale": "low-cost",
+    "page_note": "4-Star Low-Cost Airline, which is rated on the low-cost scale, not the full-service one. Short haul only. Page last modified 2022-01-06.",
+    "page_year": 2022
+   },
+   "haul_product": {
+    "better": "not-applicable",
+    "evidence": "An all-Boeing 737 fleet flying only within the US, Mexico, Central America and the Caribbean, with one economy product and no long-haul flying.",
+    "url": "https://en.wikipedia.org/wiki/Southwest_Airlines",
+    "check": "corrected in part"
+   }
+  },
+  "WS": {
+   "name": "WestJet",
+   "business_model": "hybrid",
+   "skytrax_stars": 3,
+   "skytrax_awards_rank": 85,
+   "skytrax_awards_year": 2026,
+   "airhelp_score": 6.47,
+   "airhelp_rank": 59,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "airhelp_year": 2025,
+   "jdpower_score": 553,
+   "jdpower_segment": "Economy/Basic Economy",
+   "jdpower_url": "https://www.jdpower.com/business/press-releases/2026-north-america-airline-satisfaction-study/",
+   "jdpower_year": 2026,
+   "note": "737s lack seatback screens; 787 long-haul has screens and meals.",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/westjet-airlines-rating",
+    "overall_stars": 3,
+    "economy_long_haul": 3.5,
+    "economy_short_haul": 3.5,
+    "scale": "full",
+    "page_note": "3-Star Airline. Page last modified 2020-08-20.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "long-haul",
+    "evidence": "The 787 Dreamliner has touchscreen seatback monitors, and full meal service on transatlantic and transpacific routes. On the 737, entertainment comes through the Flight Guide on your own device, and economy gets a free soft drink and snack on flights over an hour.",
+    "url": "https://www.westjet.com/en-ca/inflight/economy-cabin",
+    "check": "confirmed"
+   }
+  },
+  "Y4": {
+   "name": "Volaris",
+   "business_model": "ultra-low-cost",
+   "skytrax_stars": 3,
+   "skytrax_awards_year": 2026,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "Ultra-low-cost A320 family; paid food; Skytrax 3-Star on low-cost scale",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/volaris-rating",
+    "overall_stars": 3,
+    "economy_long_haul": null,
+    "economy_short_haul": 3,
+    "scale": "low-cost",
+    "page_note": "3-Star Low-Cost Airline (low-cost scale). Short haul only. Page last modified 2020-08-20.",
+    "page_year": 2020
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "Volaris flies one A319/A320/A321 fleet on its domestic and US routes. Skytrax rates only short-haul economy and describes standard low-cost seats, buy-onboard food and uneven cabin upkeep.",
+    "url": "https://skytraxratings.com/airlines/volaris-rating",
+    "check": "confirmed"
+   }
+  },
+  "YP": {
+   "name": "Air Premia",
+   "business_model": "hybrid",
+   "skytrax_awards_year": 2026,
+   "airhelp_year": 2025,
+   "airhelp_url": "https://www.airhelp.com/en/airhelp-score/?score-type=airlines",
+   "note": "All-787 hybrid carrier; no Skytrax rating, not in AirHelp 2025",
+   "skytrax": {
+    "url": "https://skytraxratings.com/airlines/air-premia-rating",
+    "overall_stars": null,
+    "economy_long_haul": null,
+    "economy_short_haul": null,
+    "scale": "full",
+    "page_note": "No page: the URL returns 404, the site search finds nothing and the airline sitemap's 234 entries have no Air Premia. Skytrax has passenger reviews on airlinequality.com only, and those are not certif",
+    "page_year": null
+   },
+   "haul_product": {
+    "better": "same",
+    "evidence": "The fleet is all Boeing 787-9s, flying both short routes (Narita, Bangkok) and long ones (US). Economy pitch is going from 31in to at least 33in fleet-wide by end-2026; the first reconfigured jet entered service on 16 March 2026.",
+    "url": "https://aerospaceglobalnews.com/news/air-premia-economy-legroom-seat-reduction-787/",
+    "check": "corrected in part"
+   }
+  }
+ }
+}

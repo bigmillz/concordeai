@@ -1116,6 +1116,23 @@ def main():
           "and the row's own source and date travel with it",
           r_long["rating"] == 0.8 and r_short["rating"] == 0.6 and r_short["note"] == "short" and r_long["source"] == "test"
           and adapter._carrier_rating(enr_r, "NOPE", seg("JFK", "LHR")) is None, str((r_long, r_short)))
+    # the ratings table (2026-09-24): every airline the fare table prices is rated, except the three nobody publishes
+    # a score for, and every rating a formula wrote names the published scores behind it and where they are
+    cars = enr0["carriers"]["ratings"]
+    priced = {k.split(":")[0] for k in enr0["fares"]["brands"]} if "fares" in enr0 else set()
+    unrated = sorted(c for c in priced if c not in cars)
+    drafted = [c for c, r in cars.items() if r.get("reviewed") is False]
+    check("every airline with a fare row has a rating but LEVEL, Lufthansa City and Air Premia (no published score), "
+          "and every formula-written rating names its basis and sources and sits inside 0.30 to 0.95",
+          (not priced or set(unrated) <= {"LL", "VL", "YP"}) and len(drafted) >= 50
+          and all(cars[c].get("basis") and cars[c].get("sources") and 0.30 <= cars[c]["rating"] <= 0.95 for c in drafted)
+          and all(0.30 <= r["short_haul"]["rating"] <= 0.95 for r in cars.values() if r.get("short_haul")),
+          "unrated %s, drafted %d" % (unrated, len(drafted)))
+    import rate_airlines as _ra
+    built, _m = _ra.build(json.load(open(os.path.join(HERE, "..", "enrichment", "carrier_scores.json"), encoding="utf-8")),
+                          json.load(open(os.path.join(HERE, "..", "enrichment", "carriers.json"), encoding="utf-8")))
+    check("the ratings table is exactly what rate_airlines.py computes from the published scores (no hand edits to a "
+          "formula-written row)", built == cars, str([c for c in set(built) | set(cars) if built.get(c) != cars.get(c)][:5]))
     d_sc = adapter.from_feed(dfl)
     procs = sorted({o["airport_process_minutes"]["p50"] for o in d_sc["options"]})
     check("every option of a real New York to London search is timed at an hour and a half at the airport",

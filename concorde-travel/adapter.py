@@ -522,8 +522,8 @@ def _carrier_rating(enr: Dict[str, Any], carrier: str, segments: List[Dict[str, 
         use = dict(row, **row["short_haul"])
     out = {"rating": use["rating"], "note": use.get("note", ""),
            "source": row.get("source") or cars["_source"], "as_of": row.get("as_of") or cars["_as_of"]}
-    if row.get("basis"):
-        out["basis"] = row["basis"]             # the published scores behind it, for the page's flight card
+    if use.get("basis"):
+        out["basis"] = use["basis"]             # the published scores behind it, for the page's flight card
     return out
 
 
