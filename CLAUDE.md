@@ -603,7 +603,7 @@ rollover).
 **Three things a signed-in person carries** (2026-09-21, per Patrick). **Status is a
 credit in the order**: a held tier (own programme, or an alliance tier the operator belongs
 to) gives a flight that keeps it earning a credit at what the traveller says keeping it is
-worth (`S.statusWorth`, a select beside the status chips, $60 by default), named on the row
+worth (`S.statusWorth`, shown since 2026-09-23 as "Prefer airlines where I have status: Off / A little / Some / Strongly", which are $0 / $30 / $60 / $150, Some by default; per Patrick the dollar picker was unreadable), named on the row
 ("Keeps your SkyTeam Elite Plus") and in the ledger, never on the money bill and never in
 the grade. **The flying personality** is eight chip questions (`QUIZ`) that become a persona:
 a point on the dial plus its own priced terms (`personaLines`: a nervous flyer's

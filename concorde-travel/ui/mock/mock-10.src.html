@@ -2313,12 +2313,14 @@ function plineHTML(sec, k, i){
     : `<input class="pv" data-psec="${sec}" data-pi="${i}" inputmode="numeric" autocomplete="off" placeholder="${P.ph}" aria-label="${P.ph}"${k ? '' : ' disabled'} value="${k && S.pts[k] ? S.pts[k].toLocaleString() : ''}">`;
   return `<div class="pline">${pick}${val}<button type="button" class="x" data-prm="${sec}:${i}" aria-label="Remove">×</button></div>`;
 }
+// status preference (per Patrick, 2026-09-23): a strength in words, not a dollar figure; Off / A little / Some / Strongly
+// are $0 / $30 / $60 / $150 of credit per flight in the ranking, the same arithmetic as before, named on the flight's row
 function paintPts(){
   $('#pts').innerHTML = Object.entries(PSEC).map(([sec, P]) => {
     const rows = S.prow[sec], full = rows.filter(Boolean).length >= P.keys().length;
     return `<div class="psec"><span class="lab">${P.label}</span>${rows.map((k, i) => plineHTML(sec, k, i)).join('')}${full ? '' : `<button type="button" class="addrow" data-padd="${sec}">+ Add another</button>`}</div>`;
   }).join('') +
-    (Object.values(S.status).some(Boolean) ? `<p class="ptnote stworth">Value of earning status: <select id="stworth" aria-label="Value of earning status, per flight">${[0, 3000, 6000, 12000, 25000].map(c => `<option value="${c}"${S.statusWorth === c ? ' selected' : ''}>${money(c)}</option>`).join('')}</select> per flight. Flights that earn it rank higher.</p>` : '') +
+    (Object.values(S.status).some(Boolean) ? `<p class="ptnote stworth">Prefer airlines where I have status: <select id="stworth" aria-label="Prefer airlines where I have status">${[[0, 'Off'], [3000, 'A little'], [6000, 'Some'], [15000, 'Strongly']].map(([c, t]) => `<option value="${c}"${S.statusWorth === c ? ' selected' : ''}>${t}</option>`).join('')}</select><br>Flights that earn your status rank higher.</p>` : '') +
     '<p class="ptnote">Each flight shows cash or points, whichever is cheaper. Award prices are samples. Upgrade odds are estimates.</p>';
 }
 const pfocus = (sec, i, cls) => { const f = document.querySelector(`#pts .${cls}[data-psec="${sec}"][data-pi="${i}"]`); if (f) f.focus(); };
