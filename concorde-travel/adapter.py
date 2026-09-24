@@ -350,9 +350,7 @@ def from_kiwi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
             "segments": segments,
             "layovers": layovers,
             "ground": {"outbound": out_modes, "arrival": in_modes},
-            "airport_process_minutes": (enr["airports"]["airports"]
-                                        .get(segments[0]["origin"]["iata"], {})
-                                        .get("process_minutes") or {"p50": 60}),
+            "airport_process_minutes": _airport_block(enr, segments),
             "booking": [{"who": "Kiwi.com", "price_cents": total_cents, "direct": False,
                          "note": "Self-transfer protection is Kiwi's own, not the airlines'"
                                  if len(groups) > 1 else "Sold by Kiwi.com, not the airline"}],
@@ -784,9 +782,7 @@ def from_amadeus(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
             "segments": segments,
             "layovers": layovers,
             "ground": {"outbound": out_modes, "arrival": in_modes},
-            "airport_process_minutes": (enr["airports"]["airports"]
-                                        .get(segments[0]["origin"]["iata"], {})
-                                        .get("process_minutes") or {"p50": 60}),
+            "airport_process_minutes": _airport_block(enr, segments),
             "booking": [{"who": carrier_names.get(issuing, issuing).title(),
                          "price_cents": total_cents, "direct": True,
                          "note": "Book direct with %s." % issuing}],
@@ -1014,6 +1010,17 @@ def crosses_border(enr: Dict[str, Any], from_iata: str, to_iata: str,
     return ba != bb
 
 
+def _airport_block(enr: Dict[str, Any], segments: List[Dict[str, Any]],
+                   geo: Optional[Dict[str, Any]] = None) -> Dict[str, int]:
+    """How long before departure the traveller is at the first airport (2026-09-24, per Patrick): an hour when
+    the whole trip stays inside one border, an hour and a half when any flight crosses one, or the curated
+    airport's own median when that is longer. The rule itself lives in par.airport_minutes, so the reference
+    itinerary and every real option are timed the same way and the speed grade compares like with like."""
+    first = segments[0]["origin"]["iata"]
+    intl = any(crosses_border(enr, first, s["destination"]["iata"], geo) for s in segments)
+    return _par.airport_minutes(enr["airports"]["airports"], first, intl)
+
+
 # ------------------------------------------------------------------- par
 
 def route_par(o_iata: str, d_iata: str, date: str, enr: Dict[str, Any],
@@ -1058,7 +1065,8 @@ def route_par(o_iata: str, d_iata: str, date: str, enr: Dict[str, Any],
                         "reads_as": "no coordinates for %s" % " and ".join(missing)}
     if scorer_mod is None:
         import scorer as scorer_mod                     # the adapter may import the scorer; never the reverse
-    par, basis = _par.par_for(o, d, date, enr, scorer_mod, _ground)
+    par, basis = _par.par_for(o, d, date, enr, scorer_mod, _ground,
+                              international=crosses_border(enr, o_iata, d_iata, geo))
     notes.append("par for %s-%s is modelled, not curated: %s, $%d all in"
                  % (o_iata, d_iata, basis["reads_as"], par // 100))
     return par, basis
@@ -1386,9 +1394,7 @@ def from_duffel(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
             "segments": segments,
             "layovers": layovers,
             "ground": {"outbound": out_modes, "arrival": in_modes},
-            "airport_process_minutes": (enr["airports"]["airports"]
-                                        .get(segments[0]["origin"]["iata"], {})
-                                        .get("process_minutes") or {"p50": 60}),
+            "airport_process_minutes": _airport_block(enr, segments, geo),
             "booking": [{"who": (offer.get("owner") or {}).get("name", issuing),
                          "price_cents": total_cents, "direct": True,
                          "note": "Book direct with the airline."}],
@@ -1879,9 +1885,7 @@ def from_serpapi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
             "layovers": layovers,
             "tickets": [ticket],
             "ground": {"outbound": out_modes, "arrival": in_modes},
-            "airport_process_minutes": (enr["airports"]["airports"]
-                                        .get(segments[0]["origin"]["iata"], {})
-                                        .get("process_minutes") or {"p50": 60}),
+            "airport_process_minutes": _airport_block(enr, segments, geo),
             "booking": [{"who": airline_name, "price_cents": total_cents, "direct": True,
                          "note": "Price from Google Flights. Book on %s's own site."
                                  % airline_name}],

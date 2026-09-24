@@ -266,8 +266,27 @@ def reference_departure_minutes(o: Dict[str, Any], d: Dict[str, Any], miles: flo
     return 19 * 60 + 30 if long_haul_east else 10 * 60
 
 
+# How long before departure a traveller is at the airport (2026-09-24, per Patrick): check-in, a bag drop,
+# security, the walk, and boarding, which closes before the doors do. Airlines close bag drop about 45 minutes
+# before a domestic departure and 60 before an international one, and start boarding 30 to 45 and 45 to 60
+# minutes out, so an hour at home and an hour and a half across a border is the least a traveller who cannot
+# run should allow. A curated airport's own median wins when it is longer. International means the trip
+# crosses a border (adapter.crosses_border: Paris to Frankfurt is inside one, New York to Toronto is not).
+AIRPORT_MINUTES = {"domestic": 60, "international": 90}
+
+
+def airport_minutes(aps: Dict[str, Any], iata: str, international: bool) -> Dict[str, int]:
+    floor = AIRPORT_MINUTES["international" if international else "domestic"]
+    cur = (aps.get(iata) or {}).get("process_minutes") or {}
+    p50 = max(floor, int(cur.get("p50") or 0))
+    out = {"p50": p50}
+    if cur.get("p90"):
+        out["p90"] = max(p50, int(cur["p90"]))
+    return out
+
+
 def par_for(o: Dict[str, Any], d: Dict[str, Any], date: str,
-            enr: Dict[str, Any], scorer_mod, ground_mod
+            enr: Dict[str, Any], scorer_mod, ground_mod, international: Optional[bool] = None
             ) -> Tuple[int, Dict[str, Any]]:
     """The par for a route, in cents, with its full basis.
 
@@ -340,7 +359,9 @@ def par_for(o: Dict[str, Any], d: Dict[str, Any], date: str,
                             "source": "reference itinerary: long-run system average"}}],
         "layovers": [],
         "ground": {"outbound": out_modes, "arrival": in_modes},
-        "airport_process_minutes": o_ap.get("process_minutes") or {"p50": 60},
+        # timed as every real option is; a caller that has not asked the border question gets the country one
+        "airport_process_minutes": airport_minutes(aps, o_iata, international if international is not None else
+                                                   (o.get("country") or "").upper() != (d.get("country") or "").upper()),
         "booking": [{"who": "reference", "price_cents": fare, "direct": True, "note": ""}],
     }
     scenario = {

@@ -423,10 +423,13 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
     apts = apts.get("airports") or apts
     codes = sorted({c for e in entries.values() for c in e["route"]})
     out["airports"] = {}
+    # the border every airport sits behind, curated or not (from the feed's own country codes), so the page can
+    # tell a connection that means passport control from one that does not (2026-09-24)
+    enr_b, geo_b = adapter.load_enrichment(), adapter.duffel_geo(raw)
     for c in codes:
         a = apts.get(c)
         if not a:
-            out["airports"][c] = {"curated": False}
+            out["airports"][c] = {"curated": False, "border": adapter.border_of(c, enr_b, geo_b)}
             continue
         out["airports"][c] = {"curated": True, "city": a.get("city"), "border": a.get("border"),
                               "mct": (a.get("mct_minutes") or {}).get("default"),

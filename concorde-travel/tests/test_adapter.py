@@ -1091,6 +1091,23 @@ def main():
               and srv.sellers_request(dict(good, query=dict(good["query"], departure_id="<x>"))).get("field") == "sellers")
     finally:
         srv.live.serp_booking_options, srv.live.serp_config = real_bo, real_cfg
+    # the airport time before departure (2026-09-24, per Patrick): an hour inside one border, an hour and a half
+    # across one, and a curated airport's own median when that is longer
+    enr0 = adapter.load_enrichment()
+    blk = lambda legs, geo=None: adapter._airport_block(
+        enr0, [{"origin": {"iata": a}, "destination": {"iata": b}} for a, b in legs], geo)["p50"]
+    geo_na = {"LAX": {"country": "US"}, "ORD": {"country": "US"}, "YYZ": {"country": "CA"}}
+    check("an hour at the airport inside one border, an hour and a half across one (a domestic first leg included), "
+          "and a curated airport's longer median stands",
+          blk([("JFK", "LAX")], geo_na) == 60 and blk([("JFK", "LHR")]) == 90 and blk([("JFK", "YYZ")], geo_na) == 90
+          and blk([("JFK", "ORD"), ("ORD", "LHR")], geo_na) == 90 and blk([("EWR", "LAX")], geo_na) == 70
+          and blk([("CDG", "FRA")]) == 60,
+          str([blk([("JFK", "LAX")], geo_na), blk([("JFK", "LHR")]), blk([("JFK", "ORD"), ("ORD", "LHR")], geo_na),
+               blk([("EWR", "LAX")], geo_na), blk([("CDG", "FRA")])]))
+    d_sc = adapter.from_feed(dfl)
+    procs = sorted({o["airport_process_minutes"]["p50"] for o in d_sc["options"]})
+    check("every option of a real New York to London search is timed at an hour and a half at the airport",
+          procs == [90], str(procs))
     # the server keys Google's round-trip returns the way the adapter keys the same flights
     import server as srv
     calls = {"serp": 0}

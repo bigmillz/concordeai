@@ -324,6 +324,7 @@ details[open] summary:after{content:"–"}
 .jmini .jseg:first-child{border-radius:4px 0 0 4px}.jmini .jseg:last-child{border-radius:0 4px 4px 0}
 .jseg{position:relative;height:100%;min-width:3px;background:var(--sc,rgba(255,255,255,.16));transform-origin:left center;transition:filter .2s}
 .jseg.neutral{background:rgba(255,255,255,.16)}
+.jseg.process{background:oklch(.76 .11 245)}
 .jseg:hover{filter:brightness(1.15)}
 .jseg i{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:500 9px/1 var(--mono);letter-spacing:.01em;color:rgba(0,0,0,.74);white-space:nowrap;overflow:hidden;font-style:normal;padding:0 3px}
 .jseg.neutral i{color:rgba(255,255,255,.8)}
@@ -981,7 +982,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr"></span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="fnotes"><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="6d85c36">6d85c36</code></span></span></footer>
+  <footer class="foot wfoot"><span class="fnotes"><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="31b3583">31b3583</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -1008,7 +1009,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The standard trip for this route</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="fnotes"><span>Prices are calculated in US dollars, then converted.</span><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="6d85c36">6d85c36</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="fnotes"><span>Prices are calculated in US dollars, then converted.</span><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="31b3583">31b3583</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1640,7 +1641,8 @@ function sealHTML(e, small){
 // stretch is. A ride is judged on its minutes and its fare; a layover on its
 // length and the hour it lands; a flight on how far round the route goes
 // against the shortest nonstop in the results, and on the airline's rating.
-// The airport hour is the same for everyone, so it stays neutral.
+// The airport block is time, not a verdict, so it wears its own blue rather than the grey that reads as
+// "something is wrong" (per Patrick, 2026-09-24): an hour inside one border, an hour and a half across one.
 const clamp01 = x => Math.max(0, Math.min(1, x));
 let AP = D.airports || {};
 const groundQ = (m, cents) => clamp01(1 - Math.max(0, m - 40)/170 - (cents >= 6000 ? .25 : cents >= 3000 ? .1 : 0));
@@ -1652,14 +1654,26 @@ function closedMinutes(apt, lands, minutes){
   const [o, c] = svc.hours.split('-').map(hm2m), t0 = hm2m(lands); let closed = 0;
   for (let t = t0; t < t0 + minutes; t++){ const tt = t % 1440; if (!(o <= c ? o <= tt && tt < c : tt >= o || tt < c)) closed++; } return closed;
 }
-function layoverQ(m, s, apt){
-  const h = s ? +s.arr.slice(0, 2) : 12; let q;
-  if (m >= 300 && (h >= 21 || h < 3)) q = .04; else if (m < 45) q = .1; else if (m < 60) q = .35; else if (m < 75) q = .6; else if (m <= 180) q = 1; else if (m <= 300) q = 1 - (m - 180)/240; else q = Math.max(0, .5 - (m - 300)/360);
+// Layover colour (per Patrick, 2026-09-24): green while there is time to walk it, not run it, and before the wait
+// eats the day; red when it is too short to trust or long enough to lose the day; amber in between. A connection
+// that crosses a border (passport control, or a transfer across one) needs more on the short side.
+const LAYOVER = {domestic:{red:45, green:[75, 150], redLong:300}, border:{red:60, green:[105, 180], redLong:360}};
+function layoverQ(m, s, apt, border){
+  const t = LAYOVER[border ? 'border' : 'domestic'], h = s ? +s.arr.slice(0, 2) : 12, lo = .05; let q;
+  if (m <= t.red) q = lo;
+  else if (m < t.green[0]) q = lo + (1 - lo)*(m - t.red)/(t.green[0] - t.red);
+  else if (m <= t.green[1]) q = 1;
+  else if (m < t.redLong) q = 1 - (1 - lo)*(m - t.green[1])/(t.redLong - t.green[1]);
+  else q = lo;
+  if (m >= 300 && (h >= 21 || h < 3)) q = Math.min(q, .04);
+  // under the airport's own minimum connection time is red whatever the band says
+  const ap = AP[apt] || {}; if (ap.curated && ap.mct && m < ap.mct + 15) q = Math.min(q, .08);
   // shut terminal: two hours or more with nothing open is red whatever the length
   const closed = s ? closedMinutes(apt, s.arr, m) : null; if (closed != null){ if (closed >= 120) q = Math.min(q, .06); else if (closed >= 45) q = Math.min(q, .35); }
   return q;
 }
-function flightQ(e, ctx){ const det = e.stops && ctx.refAir ? ctx.air(e)/ctx.refAir : 1, qd = clamp01(1 - (det - 1.08)/.9), qr = e.rating == null ? .5 : clamp01((e.rating - .55)/.3); return clamp01(.65*qd + .35*qr); }
+// an unrated airline is judged on its route alone: the colour says what is known, not a guess at the rest
+function flightQ(e, ctx){ const det = e.stops && ctx.refAir ? ctx.air(e)/ctx.refAir : 1, qd = clamp01(1 - (det - 1.08)/.9); if (e.rating == null) return qd; const qr = clamp01((e.rating - .55)/.3); return clamp01(.65*qd + .35*qr); }
 const verdictOf = q => q == null ? 'Neutral' : q >= .75 ? 'Good' : q >= .5 ? 'Fine' : q >= .3 ? 'Rough' : 'Bad';
 const UNION = {us:'the US', uk:'the UK', ie:'Ireland', schengen:'Schengen', tr:'Türkiye'};
 const clockAdd = (iso, mins) => { const t = ((+iso.slice(11, 13)*60 + +iso.slice(14, 16) + mins) % 1440 + 1440) % 1440; return String(Math.floor(t/60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'); };
@@ -1677,10 +1691,14 @@ function journey(e, r, ctx){
       if (!why.length) why.push({t: 'Typical ride'});
       out.push({kind:'ground', minutes:mins, q:groundQ(mins, cents), label:dur(mins), title:(end === 'out' ? 'To ' : 'From ') + apt + ' · ' + dur(mins) + (m ? ' · ' + money(cents) : ''), why});
     }
-    else if (l.kind === 'process') out.push({kind:'process', minutes:l.minutes, q:null, label:'airport', title:'At the airport · ' + dur(l.minutes), why:[{t:'Check-in, security and the walk to the gate'}, {t:'Same for every flight'}]});
+    else if (l.kind === 'process'){
+      const o = AP[e.route[0]] || {}, abroad = !!o.border && e.route.slice(1).some(c => (AP[c] || {}).border && AP[c].border !== o.border);
+      out.push({kind:'process', minutes:l.minutes, q:null, label:dur(l.minutes), long:'airport · ' + dur(l.minutes), title:'At the airport · ' + dur(l.minutes),
+        why:[{t:'Arrive ' + dur(l.minutes) + ' before takeoff'}, {t:abroad ? 'International: bag drop and boarding close earlier' : 'Check-in, security and the walk to the gate'}]});
+    }
     else if (l.kind === 'flight'){
       const sg = e.segments[k++], i = k - 1, why = [], det = ctx.refAir ? ctx.air(e)/ctx.refAir : 1;
-      if (e.rating == null) why.push({t:'No rating for this airline', bad:true});
+      if (e.rating == null) why.push({t:'Airline not rated yet'});
       else why.push({t:e.carrier_name + (e.rating >= .76 ? ': well-rated airline' : e.rating >= .7 ? ': average rating' : ': below-average rating'), good:e.rating >= .76, bad:e.rating < .7});
       if (e.stops && det >= 1.15) why.push({t:'Long way round: ' + dur(ctx.air(e)) + ' flying vs ' + dur(ctx.refAir) + ' nonstop', bad:true});
       const dh = sg ? +sg.dep.slice(0, 2) : 12; if (l.minutes >= 300 && dh >= 20) why.push({t:'Overnight flight'});
@@ -1693,15 +1711,18 @@ function journey(e, r, ctx){
       const closed = sg ? closedMinutes(apt, sg.arr, m) : null, svc = a.curated ? (a.services || []).find(x => x.hours) : null;
       if (closed != null && closed >= 45) why.push({t:'Lands ' + sg.arr + (nx ? ', leaves ' + nx.dep : '') + '. ' + (svc.what || 'Shops') + ' open ' + svc.hours + ', so ' + dur(closed) + ' with nothing open', bad:true});
       else if (m >= 300 && (h >= 21 || h < 3)) why.push({t:'Overnight in the terminal: lands ' + sg.arr + (nx ? ', leaves ' + nx.dep : ''), bad:true});
+      const prev = sg ? AP[sg.from] || {} : {}, crossing = !!(a.border && prev.border && a.border !== prev.border), band = LAYOVER[crossing ? 'border' : 'domestic'];
       if (a.curated && a.mct && m < a.mct + 15) why.push({t:'Tight: ' + dur(m) + '. Minimum here: ' + a.mct + 'm', bad:true});
-      else if (m < 55) why.push({t:'Tight: ' + dur(m) + ' to make the connection', bad:true});
-      if (m >= 300 && !(closed >= 45)) why.push({t:dur(m) + ' in the terminal', bad:true});
+      else if (m <= band.red) why.push({t:'Tight: ' + dur(m) + ' to make the connection', bad:true});
+      else if (m < band.green[0]) why.push({t:'Short: ' + dur(band.green[0]) + ' or more is comfortable' + (crossing ? ' across a border' : '')});
+      if (m >= band.redLong && !(closed >= 45)) why.push({t:dur(m) + ' in the terminal', bad:true});
+      else if (m > band.green[1] && !(closed >= 45)) why.push({t:'Long wait: ' + dur(m)});
       const from = AP[e.route[0]] || {}, to = AP[e.route[e.route.length - 1]] || {};
       if (a.border && from.border && a.border !== from.border) why.push({t:'Passport control: entering ' + (UNION[a.border] || a.border) + (to.border && to.border !== a.border ? ', and again at ' + e.route[e.route.length - 1] : '')});
       if (!a.curated) why.push({t:'Estimate: no airport details for ' + apt});
       if (svc && svc.hours === '24h') why.push({t:(svc.what || 'The terminal') + ' is open 24 hours', good:true});
-      if (!why.some(x => x.bad) && m >= 60 && m <= 180) why.push({t:'Good connection time' + (svc && closed === 0 ? ', everything open' : ''), good:true});
-      out.push({kind:'layover', minutes:m, q:layoverQ(m, sg, apt), label:apt + ' ' + dur(m), title:'Layover · ' + apt + (a.city ? ', ' + a.city : '') + ' · ' + dur(m) + (sg ? ' · lands ' + sg.arr : ''), why});
+      if (!why.some(x => x.bad) && m >= band.green[0] && m <= band.green[1]) why.push({t:'Good connection time' + (svc && closed === 0 ? ', everything open' : ''), good:true});
+      out.push({kind:'layover', minutes:m, q:layoverQ(m, sg, apt, crossing), label:apt + ' ' + dur(m), title:'Layover · ' + apt + (a.city ? ', ' + a.city : '') + ' · ' + dur(m) + (sg ? ' · lands ' + sg.arr : ''), why});
     }
   }
   return out;
@@ -1709,8 +1730,8 @@ function journey(e, r, ctx){
 function journeyHTML(e, r, ctx, compact){
   const segs = journey(e, r, ctx), total = segs.reduce((a, x) => a + x.minutes, 0) || 1;
   let w = segs.map(x => Math.max(compact ? 1.6 : 3.2, 100*x.minutes/total)); const sum = w.reduce((a, x) => a + x, 0); w = w.map(x => 100*x/sum);
-  const card = x => `<div class="jh"><i></i><b>${esc(x.title)}</b><em>${verdictOf(x.q)}</em></div><ul>${x.why.map(w => `<li class="${w.bad ? 'bad' : w.good ? 'good' : ''}">${esc(w.t)}</li>`).join('')}</ul>`;
-  const bar = `<span class="jbar"${compact ? ` style="width:${(100*Math.min(1, total/Math.max(ctx.maxDoor || 0, total))).toFixed(1)}%"` : ''}>${segs.map((x, i) => `<span class="jseg ${x.kind}${x.q == null ? ' neutral' : ''}" style="width:${w[i].toFixed(2)}%;--i:${i}${x.q == null ? '' : ';--sc:' + scaleColor(x.q, .19)}" data-tip="${esc(card(x))}" aria-label="${esc(x.title + ': ' + verdictOf(x.q) + '. ' + x.why.map(w => w.t).join('. '))}"${compact ? '' : ' tabindex="0"'}>${!compact && w[i] >= 9 ? '<i>' + esc(w[i] >= 22 && x.long ? x.long : x.label) + '</i>' : ''}</span>`).join('')}</span>`;
+  const card = x => `<div class="jh"><i></i><b>${esc(x.title)}</b><em>${x.kind === 'process' ? '' : verdictOf(x.q)}</em></div><ul>${x.why.map(w => `<li class="${w.bad ? 'bad' : w.good ? 'good' : ''}">${esc(w.t)}</li>`).join('')}</ul>`;
+  const bar = `<span class="jbar"${compact ? ` style="width:${(100*Math.min(1, total/Math.max(ctx.maxDoor || 0, total))).toFixed(1)}%"` : ''}>${segs.map((x, i) => `<span class="jseg ${x.kind}${x.q == null && x.kind !== 'process' ? ' neutral' : ''}" style="width:${w[i].toFixed(2)}%;--i:${i}${x.q == null ? '' : ';--sc:' + scaleColor(x.q, .19)}" data-tip="${esc(card(x))}" aria-label="${esc(x.title + (x.kind === 'process' ? '' : ': ' + verdictOf(x.q)) + '. ' + x.why.map(w => w.t).join('. '))}"${compact ? '' : ' tabindex="0"'}>${!compact && w[i] >= 9 ? '<i>' + esc(w[i] >= 22 && x.long ? x.long : x.label) + '</i>' : ''}</span>`).join('')}</span>`;
   // in a row: the bar alone, its length the trip's length against the longest in the results, so a long day reads long
   if (compact) return `<span class="jmini" title="${dur(total)} door to door">${bar}</span>`;
   const fi = Math.max(0, segs.findIndex(x => x.kind === 'flight')), pre = segs.slice(0, fi).reduce((a, x) => a + x.minutes, 0), last = segs[segs.length - 1], post = last && last.kind === 'ground' ? last.minutes : 0;

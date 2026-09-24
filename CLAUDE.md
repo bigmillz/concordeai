@@ -753,8 +753,11 @@ curve it is meant to be testing is a fixture that tests nothing.
 
 **The test suites are mutation-tested.** `test_scorer.py` catches 12 of 12 seeded faults and
 `validate.py` 10 of 10; `tests/mutate_adapter.py` is an executable runner for the adapters
-and must stay at 26/26 with **zero skips** — a skipped mutant never ran and is not a pass.
-If a change makes a suite pass that should not, the suite has lost a guard.
+and must stay at every mutant caught (50 of 50 on 2026-09-24) with **zero skips** — a skipped mutant never ran
+and is not a pass. If a change makes a suite pass that should not, the suite has lost a guard. **The runner works in
+a scratch copy outside the checkout** (since 2026-09-24): run in place, Google Drive's sync raced its
+write-and-restore cycle and left two mutants in `par.py` after a run that reported every fault caught. If a SKIP
+ever appears, first check that the file still holds the original line.
 
 **The narrator is the only non-deterministic surface, and it is fenced.** `narrator.brief()`
 precomputes every number the prose may contain — the model picks words, never arithmetic —
@@ -1140,6 +1143,18 @@ first call, so its parameter names, POST body, `Duffel-Version` header and stati
 are correct against the live service. Amadeus and Kiwi remain unverified.
 
 ## The results timeline
+
+**The journey bar's colours** (2026-09-24, per Patrick). Each block is coloured by how good that stretch is, on the
+page's red-to-green scale, except the airport block, which is time rather than a verdict and wears its own blue
+(grey read as "something is wrong"). **Airport time** is how long before takeoff the traveller is at the airport:
+`par.airport_minutes`, an hour when the trip stays inside one border and an hour and a half when any flight crosses
+one (airlines close bag drop 45 and 60 minutes out), or the curated airport's median when longer; the adapter
+(`_airport_block`) and par use the same rule, so the speed grade still compares like with like. **Layovers** use
+`LAYOVER` in the page: inside one border red at 45 minutes or less, green from 1h15 to 2h30, red from 5 hours;
+at a connection that crosses a border red at an hour or less, green from 1h45 to 3 hours, red from 6 hours; amber
+between, and the airport's own minimum connection, an overnight in the terminal and a shut terminal still force
+red. **Flights** are coloured by the detour and the airline's rating; an unrated airline is coloured on the detour
+alone and its card says "Airline not rated yet", never "bad".
 
 The results section is mock-2 from the design round: **every option on ONE
 clock.** A bar that always fills its row tells you how a trip is divided but not

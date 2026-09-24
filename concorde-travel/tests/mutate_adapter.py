@@ -25,7 +25,18 @@ cabin claim into a certainty. If you add a behaviour worth protecting, add the
 fault that breaks it.
 """
 
-import subprocess, shutil, sys, re, os
+import subprocess, shutil, sys, re, os, tempfile
+
+# Every mutant is written, tested and restored in a SCRATCH COPY, never in the checkout (2026-09-24). The repo
+# lives in Google Drive, and its sync raced the runner's write-and-restore cycle: after a run that reported every
+# fault caught, par.py still held two mutants (a 10:00 reference departure and a disabled nonstop-range rule),
+# which the next run then silently skipped. Nothing here may write to the real tree.
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+WORK = tempfile.mkdtemp(prefix="concordego-mutate-")
+for _d in ("concorde-travel", "fixtures"):
+    shutil.copytree(os.path.join(ROOT, _d), os.path.join(WORK, _d),
+                    ignore=shutil.ignore_patterns("__pycache__", "*.bak", ".DS_Store"))
+os.chdir(WORK)
 
 AD = "concorde-travel/adapter.py"
 DATA = "concorde-travel/ui/mock/data.py"
@@ -171,8 +182,8 @@ MUTANTS = [
  (FA, None, '"piece": 1,\n        "amount_cents": 10000\n      },\n      {\n        "piece": 2,\n        "amount_cents": 12000',
   '"piece": 1,\n        "amount_cents": 1000\n      },\n      {\n        "piece": 2,\n        "amount_cents": 1200',
   'unknown-is-never-zero: make the fallback bag fee cheap'),
- (AD, "route_par", 'par, basis = _par.par_for(o, d, date, enr, scorer_mod, _ground)',
-  'par, basis = _par.par_for(o, d, date, enr, scorer_mod, _ground)\n'
+ (AD, "route_par", 'international=crosses_border(enr, o_iata, d_iata, geo))',
+  'international=crosses_border(enr, o_iata, d_iata, geo))\n'
   '    import inspect as _i\n'
   '    _opts = _i.currentframe().f_back.f_locals.get("options") or []\n'
   '    if _opts:\n'
@@ -234,6 +245,11 @@ MUTANTS = [
      'round trip: key Google\'s returns by a clock the adapter never writes, so no return ever matches'),
     (SV, "sellers_request", '"same_flights": not sold or sold == fns,', '"same_flights": True,',
      'sellers: price a codeshare under other flight numbers as if it were these flights'),
+    (AD, "_airport_block", 'intl = any(crosses_border(enr, first, s["destination"]["iata"], geo) for s in segments)',
+     'intl = crosses_border(enr, first, segments[0]["destination"]["iata"], geo)',
+     'airport time: judge a trip by its first flight only, so New York to Chicago to London is timed as domestic'),
+    (PA, "airport_minutes", 'p50 = max(floor, int(cur.get("p50") or 0))', 'p50 = int(cur.get("p50") or floor)',
+     'airport time: let a curated median shorter than the floor win, so JFK to London gets 55 minutes'),
 ]
 
 caught = skipped = 0
@@ -265,6 +281,8 @@ for path, fn, old, new, why in MUTANTS:
     caught += ok
     print("  %s  %s" % ("caught " if ok else "MISSED!", why))
 ran = len(MUTANTS) - skipped
+os.chdir(ROOT)
+shutil.rmtree(WORK, ignore_errors=True)
 print("\n%d/%d seeded faults caught (%d skipped)" % (caught, ran, skipped))
 # A skip is a mutant that never ran. It is not a pass.
 sys.exit(0 if caught == ran and not skipped else 1)
