@@ -5192,3 +5192,72 @@ HEADER CHIPS (Patrick, from a screenshot): the MODELS AVAILABLE chip was
 wordmark to zero width. Its `flex:1 0 100%` was written for a two-row
 header. It and the web DOWNLOAD NOW chip now sit on their own line
 under the header; verified inside the sidebar at 300, 240 and 200 px.
+
+## 6b309 — the harness fixes: the Remote agent's gate, guest renders, a nightly check (uncut)
+
+Per Patrick ("where appropriate, do we have agents and harnesses in
+place", then "do both"). An eight-agent audit rated every agent and
+pipeline; these are its five small, first fixes.
+
+THE REMOTE AGENT'S GATE. classify_cmd decides what runs without asking.
+Fed real commands, it let Auto mode take a network interface down,
+delete the default route, or rewrite sshd_config behind a 2>/dev/null,
+and let Full mode run rm -rf --no-preserve-root /; it flagged reading
+/etc/passwd as dangerous. Now: rm with long flags, the lockout commands
+(interface/route/address down, flush, delete) and curl|sh are danger;
+sed -i, find -delete/-exec, curl/wget that write files, journalctl
+vacuum and git config with a value are writes; ip, ifconfig, wget, git
+config and hostname are judged by their subcommand; discarding output
+no longer switches off the redirect check; the power verbs and passwd
+count only as the command itself. 66 real commands are pinned in the
+gauntlet, including the everyday reads that must not start asking.
+
+AUTONOMY FAILS CLOSED, AND SILENCE IS NOT CONSENT. Any level other than
+manual/auto/full now means manual (it used to mean Full). An approval
+nobody answers in 10 minutes pauses the run ("nothing ran; say keep
+going") instead of being told to the model as a decline; only an
+explicit yes runs a batch or a reboot ("expired" is a truthy word, so
+the reboot path checks it first).
+
+OUTPUT IS DATA. What the server prints goes back to the model fenced in
+<command_output>, with REMOTE_SYSTEM saying it is never an instruction,
+and with private keys, password hashes and token-like values redacted
+before any model sees it. The Remote, Coding, Workspace and Research
+lanes no longer auto-search the web (/search still does): snippets were
+landing in a root shell's task.
+
+GUEST RENDERS. A tunnel guest (not the owner's uid) gets no video (a
+cloud clip is ~$0.80 on the owner's key; a local one holds the only
+render slot for up to an hour) and no Gemini-made pictures. The owner's
+cloud video stops at 5 clips a day (pref veo_daily_cap).
+
+THE NIGHTLY CHECKS ITSELF. ci_smoke.sh compiles with SyntaxWarning as an
+error, boots the app headless in an empty home with no models or keys,
+and requires the page (no unreplaced __TOKENS__) and /api/stats. Proven
+locally to fail on a syntax warning, an import crash and an unreplaced
+token. nightly.yml runs it before building anything.
+
+turbo.sh is deleted: it wrote cloud.json whole and erased every other
+provider's key.
+
+REVIEWED (five lenses, a skeptic per finding): 22 confirmed. The one
+that mattered most was mine: counting the power verbs and passwd only
+in command position (to stop reading /etc/passwd from asking) let
+/sbin/reboot, sudo -u root reboot, systemctl --no-block reboot, a
+scheduled reboot, $(reboot) and awk system("reboot") through. The
+classifier now FAILS CLOSED: those words anywhere make a command
+dangerous unless only a plain reader (cat, grep, getent, journalctl…)
+touches them with no substitution and no pipe into a shell. Also fixed:
+a lone & and $( )/backticks/<( ) hid a second command; bash's >&file
+went unseen (a disk wipe read as "read"); quoted targets, rsync
+--delete /, find / -delete and writes to passwd/shadow/sudoers/fstab
+were only writes; iproute2's short forms (ip l s eth0 down) and nmcli/
+networking stops escaped the lockout rules; curl -f read as -F. 137
+commands pinned. Redaction now runs before output is cut (a key cut in
+half slipped past), catches quoted JSON keys, never crosses a line or
+hides a path; the fence carries a per-call id. /search can't feed the
+Remote agent. Approval cards are drawn once, show "expired — nothing
+ran" when the server says so, and retire unanswered when the run ends.
+The Veo slot is reserved before the paid submit and handed back only
+when no render started. ci_smoke.sh picks a free port, fails on a
+traceback and kills the app's children.

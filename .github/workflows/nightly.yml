@@ -7,7 +7,7 @@ name: nightly
 on:
   push:
     branches: [main]
-    paths: [millenai.py, build_dmg.sh, build_windows.sh, fonts/**, icons/**]
+    paths: [millenai.py, build_dmg.sh, build_macos_app.sh, build_windows.sh, ci_smoke.sh, MillenAI.icns, fonts/**, vfx/**, .github/workflows/nightly.yml]
   workflow_dispatch:
 concurrency: { group: nightly, cancel-in-progress: true }
 permissions: { contents: write }
@@ -31,6 +31,10 @@ jobs:
           p.write_text(s)
           PY
           echo "SHA=$SHA" >> "$GITHUB_ENV"
+      # 6b309: nothing publishes unless it compiles with warnings as
+      # errors AND boots headless with no models and no keys
+      - name: Compile and boot check
+        run: ./ci_smoke.sh
       - name: Build the macOS DMG and the Windows zip
         run: |
           mkdir -p "$HOME/Library/Application Support/MillenAI"
