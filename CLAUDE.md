@@ -407,12 +407,39 @@ loop on it, but also do the asterisks", and never make anyone dig through terms 
 typical price rather than this fare's own, a quote, or a published price carries a small asterisk (`EST` in mock-10,
 `sup.est`), and the panel it sits in ends with one plain italic line saying what the asterisk means and that the
 traveller can remove the line and add their own: the bill (`.estnote`, "Estimate, not a quote. Found the real
-price? Remove the line with × and add your own."), the results (`.estfoot`), the Flight Fixer. Marked today: the
-add-on prices (wifi pass, lounge day pass, extra-legroom seat, seat choice, priority boarding, insurance: flat
-typical prices, `ADDONS[].basis`), hotel nights (a Google Hotels median is an average, not a quote), rides the
+price? Remove the line with × and add your own."), the results (`.estfoot`), the Flight Fixer. Marked today: an
+add-on price that is not the airline's own published figure (below), hotel nights (a Google Hotels median is an average, not a quote), rides the
 ground model worked out rather than a curated fare (`mode.estimated`), bags priced on the default ladder because
 the airline publishes none, the times out the door, the modelled fair fare, and the Fixer's odds and hotel nights.
 A bill line carries `est:true`; `hasEst(r)` says whether a bill holds any. Tell Patrick about every new estimate.
+
+**Add-on prices are the airlines' own where they publish one** (2026-09-25, per Patrick: "if you have any other way
+to come up with more accurate prices for those, then I'm all ears"). `enrichment/addons.json` holds wifi, seat choice,
+extra-legroom, priority boarding and lounge prices per airline, by haul, researched from the airlines' own pages and
+re-checked by a second reader (sources, dates and corrections in each row), and insurance as a share of the ticket
+(4 to 10%, 6.5% typical: the insurers' trade association and Squaremouth's own sales). `addons.page_table()` strips
+the sources and `build.py` inlines the prices as `__ADDONS__`; `addonPrice` in mock-10 reads the airline flying the
+longest flight, short-haul being a trip inside one border or with no flight over four hours. A price the airline
+publishes exactly, or the top of its published range (`upto`), carries no asterisk; a "from" price, a figure from a
+secondary source, free wifi on only part of a fleet and a price in doubt (Air Canada's lounge page names no currency)
+keep it; an airline that does not sell the thing (Delta's Sky Club day passes, Virgin's Clubhouses) says so and prices
+the typical alternative, marked; everything else falls back to the typical price (`typical` in the file, or the
+page's flat figure), marked. A price published for one haul never stands in for the other: Air Canada's free wifi is
+within North America, so across the Atlantic the typical pass stands. Wifi free to members of a free loyalty
+programme is $0 on the bill, naming the programme (Delta, United on Starlink, Southwest, Air Canada, Air France,
+KLM in Europe, SAS; JetBlue for everyone). Most airline pages refuse automated readers and the Internet Archive was
+not reachable from the research session, so American, United, BA, Lufthansa, Air France, KLM, Iberia, Aer Lingus,
+Turkish and Icelandair's seat and lounge prices are still the typical ones: a person with a browser can fill them
+in. `tests/test_records.py` runs the page's own pricing under node, and mutants guard each rule.
+
+**Ride fares were checked against the operators and regulators** (2026-09-25). `ground.json`'s transit fares were
+read from the operators' own pages and converted at the ECB rate of the day (the Paris airport ticket EUR 14, the
+Elizabeth line GBP 14.60, Lisbon's metro with its card, Madrid's with the EUR 3 airport supplement at the top of its
+range); the Aerobus and the Schiphol night train run all night; the Malpensa Express's last train from the airport is
+22:09. The official taxi tariffs showed the fare bands under the real fare in four countries, which the "lean high"
+rule forbids: Spain and Italy moved to the upper band, the Netherlands to the high band, Turkey to the mid band
+(`ground.py`, with the tariffs in its comment), and `test_records.py` checks the model against Madrid's, Barcelona's
+and Istanbul's official fares. Rideshare prices have no published source anywhere and stay estimates.
 
 **Hotel prices are real averages** (2026-09-24, per Patrick): `GET /hotels?near=IATA&date=` or `?q=place&lat=&lon=&date=`
 (outside the door) asks Google Hotels through SerpApi (`live.serp_hotels`, the same plan and counters as the flight
@@ -800,11 +827,14 @@ curve it is meant to be testing is a fixture that tests nothing.
 
 **The test suites are mutation-tested.** `test_scorer.py` catches 12 of 12 seeded faults and
 `validate.py` 10 of 10; `tests/mutate_adapter.py` is an executable runner for the adapters
-and must stay at every mutant caught (87 of 87 on 2026-09-25, the points charts, planner and pool, hotels, DOT records, the Fixer and the fleet table among them; it runs `test_points.py`, `test_records.py` and `test_rescue.py` too, and `MUTATE_ONLY=planner` runs just the mutants whose description holds that word) with **zero skips** — a skipped mutant never ran
+and must stay at every mutant caught (92 of 92 on 2026-09-25, the points charts, planner and pool, hotels, DOT records, the Fixer, the fleet table, the add-on prices and the ride-fare bands among them; it runs `test_points.py`, `test_records.py` and `test_rescue.py` too, and `MUTATE_ONLY=planner` runs just the mutants whose description holds that word) with **zero skips** — a skipped mutant never ran
 and is not a pass. If a change makes a suite pass that should not, the suite has lost a guard. **The runner works in
 a scratch copy outside the checkout** (since 2026-09-24): run in place, Google Drive's sync raced its
 write-and-restore cycle and left two mutants in `par.py` after a run that reported every fault caught. If a SKIP
-ever appears, first check that the file still holds the original line.
+ever appears, first check that the file still holds the original line. **The enrichment JSON files are written with two-space
+indent and characters unescaped** (`json.dump(d, fh, indent=2, ensure_ascii=False)` plus a closing newline): several
+mutants anchor on their exact text, so re-indenting one turns every such mutant into a SKIP and the diff into the whole
+file (2026-09-25).
 
 **The narrator is the only non-deterministic surface, and it is fenced.** `narrator.brief()`
 precomputes every number the prose may contain — the model picks words, never arithmetic —

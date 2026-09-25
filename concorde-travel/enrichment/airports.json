@@ -1,1757 +1,1757 @@
 {
- "_comment": "Curated airport facts. The scorer needs an explicit UTC offset per timestamp and no feed supplies one, so the offset rules live here: the transition dates are the curated part, and deriving an offset from them needs no timezone database at scoring time. Only airports in scope are listed; anything else abstains, which is the point.",
- "_as_of": "2026-09-25",
- "zones": {
-  "America/New_York": {
-   "standard": "-05:00",
-   "daylight": "-04:00",
-   "dst": {
-    "2026": [
-     "2026-03-08",
-     "2026-11-01"
-    ],
-    "2027": [
-     "2027-03-14",
-     "2027-11-07"
-    ]
-   }
-  },
-  "Europe/London": {
-   "standard": "+00:00",
-   "daylight": "+01:00",
-   "dst": {
-    "2026": [
-     "2026-03-29",
-     "2026-10-25"
-    ],
-    "2027": [
-     "2027-03-28",
-     "2027-10-31"
-    ]
-   }
-  },
-  "Europe/Paris": {
-   "standard": "+01:00",
-   "daylight": "+02:00",
-   "dst": {
-    "2026": [
-     "2026-03-29",
-     "2026-10-25"
-    ],
-    "2027": [
-     "2027-03-28",
-     "2027-10-31"
-    ]
-   }
-  },
-  "Europe/Amsterdam": {
-   "standard": "+01:00",
-   "daylight": "+02:00",
-   "dst": {
-    "2026": [
-     "2026-03-29",
-     "2026-10-25"
-    ],
-    "2027": [
-     "2027-03-28",
-     "2027-10-31"
-    ]
-   }
-  },
-  "Europe/Madrid": {
-   "standard": "+01:00",
-   "daylight": "+02:00",
-   "dst": {
-    "2026": [
-     "2026-03-29",
-     "2026-10-25"
-    ],
-    "2027": [
-     "2027-03-28",
-     "2027-10-31"
-    ]
-   }
-  },
-  "Europe/Rome": {
-   "standard": "+01:00",
-   "daylight": "+02:00",
-   "dst": {
-    "2026": [
-     "2026-03-29",
-     "2026-10-25"
-    ],
-    "2027": [
-     "2027-03-28",
-     "2027-10-31"
-    ]
-   }
-  },
-  "Europe/Lisbon": {
-   "standard": "+00:00",
-   "daylight": "+01:00",
-   "dst": {
-    "2026": [
-     "2026-03-29",
-     "2026-10-25"
-    ],
-    "2027": [
-     "2027-03-28",
-     "2027-10-31"
-    ]
-   }
-  },
-  "Europe/Berlin": {
-   "standard": "+01:00",
-   "daylight": "+02:00",
-   "dst": {
-    "2026": [
-     "2026-03-29",
-     "2026-10-25"
-    ],
-    "2027": [
-     "2027-03-28",
-     "2027-10-31"
-    ]
-   }
-  },
-  "Europe/Zurich": {
-   "standard": "+01:00",
-   "daylight": "+02:00",
-   "dst": {
-    "2026": [
-     "2026-03-29",
-     "2026-10-25"
-    ],
-    "2027": [
-     "2027-03-28",
-     "2027-10-31"
-    ]
-   }
-  },
-  "Europe/Warsaw": {
-   "standard": "+01:00",
-   "daylight": "+02:00",
-   "dst": {
-    "2026": [
-     "2026-03-29",
-     "2026-10-25"
-    ],
-    "2027": [
-     "2027-03-28",
-     "2027-10-31"
-    ]
-   }
-  },
-  "Europe/Copenhagen": {
-   "standard": "+01:00",
-   "daylight": "+02:00",
-   "dst": {
-    "2026": [
-     "2026-03-29",
-     "2026-10-25"
-    ],
-    "2027": [
-     "2027-03-28",
-     "2027-10-31"
-    ]
-   }
-  },
-  "Europe/Dublin": {
-   "standard": "+00:00",
-   "daylight": "+01:00",
-   "dst": {
-    "2026": [
-     "2026-03-29",
-     "2026-10-25"
-    ],
-    "2027": [
-     "2027-03-28",
-     "2027-10-31"
-    ]
-   }
-  },
-  "Atlantic/Reykjavik": {
-   "standard": "+00:00",
-   "observes_dst": false,
-   "why": "Iceland has never observed summer time"
-  },
-  "Europe/Istanbul": {
-   "standard": "+03:00",
-   "observes_dst": false,
-   "why": "Turkey abolished summer time in 2016 and sits on permanent UTC+3"
-  }
- },
- "airports": {
-  "JFK": {
-   "zone": "America/New_York",
-   "iata_area": 1,
-   "schengen": false,
-   "process_minutes": {
-    "p50": 55,
-    "p90": 85
-   },
-   "border": "us",
-   "lat": 40.6413,
-   "lon": -73.7781,
-   "country": "US",
-   "city": "New York"
-  },
-  "EWR": {
-   "zone": "America/New_York",
-   "iata_area": 1,
-   "schengen": false,
-   "process_minutes": {
-    "p50": 70,
-    "p90": 105
-   },
-   "border": "us",
-   "lat": 40.6895,
-   "lon": -74.1745,
-   "country": "US",
-   "city": "Newark"
-  },
-  "LHR": {
-   "zone": "Europe/London",
-   "iata_area": 2,
-   "schengen": false,
-   "process_minutes": {
-    "p50": 60,
-    "p90": 95
-   },
-   "mct_minutes": {
-    "default": 75,
-    "T3-T5": 90
-   },
-   "services": [
-    {
-     "what": "Terminal retail and food",
-     "hours_local": "05:00-22:00"
-    }
-   ],
-   "inter_terminal": {
-    "mode": "airside_bus",
-    "minutes": 25,
-    "headway_minutes": 8,
-    "operating_hours_local": "05:00-23:00"
-   },
-   "border": "uk",
-   "lat": 51.47,
-   "lon": -0.4543,
-   "country": "GB",
-   "city": "London"
-  },
-  "CDG": {
-   "zone": "Europe/Paris",
-   "iata_area": 2,
-   "schengen": true,
-   "process_minutes": {
-    "p50": 60,
-    "p90": 100
-   },
-   "mct_minutes": {
-    "default": 90,
-    "2E-2F": 60
-   },
-   "night_curfew": {
-    "arrivals": [
-     "00:30",
-     "05:29"
-    ],
-    "departures": [
-     "00:00",
-     "04:59"
-    ],
-    "source": "arretes of 6 Nov 2003"
-   },
-   "services": [
-    {
-     "what": "Terminal 2 retail",
-     "hours_local": "05:00-23:30"
+  "_comment": "Curated airport facts. The scorer needs an explicit UTC offset per timestamp and no feed supplies one, so the offset rules live here: the transition dates are the curated part, and deriving an offset from them needs no timezone database at scoring time. Only airports in scope are listed; anything else abstains, which is the point.",
+  "_as_of": "2026-09-25",
+  "zones": {
+    "America/New_York": {
+      "standard": "-05:00",
+      "daylight": "-04:00",
+      "dst": {
+        "2026": [
+          "2026-03-08",
+          "2026-11-01"
+        ],
+        "2027": [
+          "2027-03-14",
+          "2027-11-07"
+        ]
+      }
     },
-    {
-     "what": "Landside admission to Terminal 2",
-     "hours_local": "04:00-22:30"
-    }
-   ],
-   "inter_terminal": {
-    "mode": "walk",
-    "minutes": 35,
-    "headway_minutes": 0,
-    "operating_hours_local": "CDGVAL 04:00-01:00, then a 25-minute-headway bus"
-   },
-   "border": "schengen",
-   "lat": 49.0097,
-   "lon": 2.5479,
-   "country": "FR",
-   "city": "Paris"
-  },
-  "AMS": {
-   "zone": "Europe/Amsterdam",
-   "iata_area": 2,
-   "schengen": true,
-   "process_minutes": {
-    "p50": 55,
-    "p90": 85
-   },
-   "mct_minutes": {
-    "default": 50
-   },
-   "services": [
-    {
-     "what": "Schiphol retail and food",
-     "hours_local": "06:00-22:00"
+    "Europe/London": {
+      "standard": "+00:00",
+      "daylight": "+01:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
     },
-    {
-     "what": "Train to Amsterdam Centraal",
-     "hours_local": "05:50-00:30"
-    }
-   ],
-   "inter_terminal": {
-    "mode": "walk",
-    "minutes": 15,
-    "headway_minutes": 0,
-    "operating_hours_local": "always"
-   },
-   "leave_airport_viable": true,
-   "border": "schengen",
-   "lat": 52.3105,
-   "lon": 4.7683,
-   "country": "NL",
-   "city": "Amsterdam"
-  },
-  "MAD": {
-   "zone": "Europe/Madrid",
-   "iata_area": 2,
-   "schengen": true,
-   "process_minutes": {
-    "p50": 60,
-    "p90": 95
-   },
-   "mct_minutes": {
-    "default": 60
-   },
-   "services": [
-    {
-     "what": "Terminal retail and food",
-     "hours_local": "05:00-23:00"
-    }
-   ],
-   "inter_terminal": {
-    "mode": "airside_bus",
-    "minutes": 20,
-    "headway_minutes": 10,
-    "operating_hours_local": "05:00-23:30"
-   },
-   "border": "schengen",
-   "lat": 40.4839,
-   "lon": -3.568,
-   "country": "ES",
-   "city": "Madrid"
-  },
-  "LIS": {
-   "zone": "Europe/Lisbon",
-   "iata_area": 2,
-   "schengen": true,
-   "process_minutes": {
-    "p50": 55,
-    "p90": 90
-   },
-   "mct_minutes": {
-    "default": 60
-   },
-   "services": [
-    {
-     "what": "Terminal 1 retail and food",
-     "hours_local": "05:00-23:00"
-    }
-   ],
-   "inter_terminal": {
-    "mode": "walk",
-    "minutes": 12,
-    "headway_minutes": 0,
-    "operating_hours_local": "always"
-   },
-   "border": "schengen",
-   "lat": 38.7742,
-   "lon": -9.1342,
-   "country": "PT",
-   "city": "Lisbon"
-  },
-  "MXP": {
-   "zone": "Europe/Rome",
-   "iata_area": 2,
-   "schengen": true,
-   "process_minutes": {
-    "p50": 55,
-    "p90": 85
-   },
-   "mct_minutes": {
-    "default": 60
-   },
-   "services": [
-    {
-     "what": "Terminal retail",
-     "hours_local": "05:30-22:30"
-    }
-   ],
-   "border": "schengen",
-   "lat": 45.6301,
-   "lon": 8.7255,
-   "country": "IT",
-   "city": "Milan"
-  },
-  "BCN": {
-   "zone": "Europe/Madrid",
-   "iata_area": 2,
-   "schengen": true,
-   "process_minutes": {
-    "p50": 55,
-    "p90": 90
-   },
-   "mct_minutes": {
-    "default": 45
-   },
-   "services": [
-    {
-     "what": "Terminal 1 retail and food",
-     "hours_local": "05:00-23:00"
-    }
-   ],
-   "inter_terminal": {
-    "mode": "landside_bus",
-    "minutes": 18,
-    "headway_minutes": 10,
-    "operating_hours_local": "05:00-23:30"
-   },
-   "border": "schengen",
-   "lat": 41.2974,
-   "lon": 2.0833,
-   "country": "ES",
-   "city": "Barcelona"
-  },
-  "FRA": {
-   "zone": "Europe/Berlin",
-   "iata_area": 2,
-   "schengen": true,
-   "border": "schengen",
-   "process_minutes": {
-    "p50": 60,
-    "p90": 100
-   },
-   "mct_minutes": {
-    "default": 60
-   },
-   "night_curfew": {
-    "arrivals": [
-     "23:00",
-     "04:59"
-    ],
-    "departures": [
-     "23:00",
-     "04:59"
-    ],
-    "source": "Fraport hours of operation: no flights 23:00-05:00; a quota of 133 movements a night covers 22:00-23:00 and 05:00-06:00 (upheld by the Federal Administrative Court, 2012)"
-   },
-   "services": [
-    {
-     "what": "Terminal 1 and 3 shops after security",
-     "hours_local": "06:00-21:30",
-     "note": "Terminal 2 closed on 9 June 2026"
+    "Europe/Paris": {
+      "standard": "+01:00",
+      "daylight": "+02:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
     },
-    {
-     "what": "Long-distance rail at Fernbahnhof",
-     "hours_local": "05:00-00:30",
-     "note": "Fraport publishes no first or last long-distance train; the hours are Deutsche Bahn's usual and unverified"
-    }
-   ],
-   "inter_terminal": {
-    "mode": "airside_train",
-    "minutes": 8,
-    "headway_minutes": 3,
-    "operating_hours_local": "SkyLine T1 to T3 04:00-23:00; from 22:00 to 05:00 a bus stops landside, so a night transfer re-clears security"
-   },
-   "leave_airport_viable": true,
-   "needs_primary_source": true,
-   "lat": 50.0379,
-   "lon": 8.5622,
-   "country": "DE",
-   "city": "Frankfurt",
-   "_evidence": {
-    "checked": "2026-09-25",
-    "items": [
-     {
-      "item": "FRA mct_minutes (default and T1-T2)",
-      "verdict": "corrected",
-      "found": "Lufthansa: MCT at Frankfurt raised from 45-50 min to 60 min from 30 Mar 2025 for intra-European to intra-European, Schengen to USA, Schengen to Singapore and Schengen to South Africa connections. Terminal 2 closed on 9 Jun 2026; its airlines moved to Terminal 3, so the T1-T2 pair no longer exists. No published T1-T3 MCT found.",
-      "url": "https://irreg.lufthansaexperts.com/en/news/frankfurt-airport-increase-of-the-minimum-connecting-time-mct-to-60-minutes.html",
-      "date": "2024-09-10 (page); T2 closure per https://www.fraport.com/en/newsroom/press-releases/2026/q2/terminal-2-closed-for-refurbishment-starting-today.html dated 2026-06-09",
-      "primary": true,
-      "note": "Lufthansa eXperts is Lufthansa's own site for travel agents. Default should be 60, not 45. Replace the T1-T2 key; nothing published for T1-T3. Only 'default' is read by adapter.py, so the terminal pairs are never used."
-     },
-     {
-      "item": "FRA night_curfew",
-      "verdict": "confirmed",
-      "found": "Fraport: 'Between 11:00 p.m. and 5:00 a.m. CEST, there is a ban on night flights.' No more than 133 movements a night (yearly average) are allowed in 22:00-23:00 and 05:00-06:00. The page gives no legal basis. The Hessian VGH ruling of Oct 2011 was upheld by the Federal Administrative Court on 4 Apr 2012 (secondary).",
-      "url": "https://www.fraport.com/en/business-areas/operations/airside-and-terminal-operations/hours-of-operation.html",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": "The hours match. The shoulder quota also covers 05:00-06:00, not just 22:00-23:00. For the source line, BVerwG 2012 is the final ruling."
-     },
-     {
-      "item": "FRA services: Terminal 1 and 2 retail",
-      "verdict": "corrected",
-      "found": "Heinemann duty free (the main airside retailer): T1 areas Z/A/B mostly 06:00-21:00, 21:30 or 22:00, some counters listed from 03:00, area C 07:00/07:30-21:30. Terminal 3 areas H and J: 06:00-21:30.",
-      "url": "https://www.frankfurt-airport.com/en/locations/h/heinemann.html",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": "Rename to Terminal 1 and 3 (T2 closed). 06:00-21:30 is the typical airside window. The 03:00 openings on the page may be listing errors."
-     },
-     {
-      "item": "FRA services: long-distance rail at Fernbahnhof",
-      "verdict": "not_found",
-      "found": null,
-      "url": "https://www.frankfurt-airport.com/en/transport-and-parking/to-from-the-airport/travel-by-train.html",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": "Fraport names S8/S9 and RB58/RE59/RE2/RE3 at the regional station and sends readers to DB for long-distance times. No first or last train found. The Fernbahnhof page names DB as operator and gives no hours."
-     },
-     {
-      "item": "FRA inter_terminal",
-      "verdict": "corrected",
-      "found": "SkyLine T1 to T3: 8 minutes. Runs 04:00-23:00 every 2-3 minutes. A shuttle bus runs 22:00-05:00 and stops in the arrivals forecourts. Terminal 2 closed 9 Jun 2026.",
-      "url": "https://www.frankfurt-airport.com/en/at-the-airport/orientation.html",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": "Travel time from https://terminal3.frankfurt-airport.com/en/sky-line-people-mover. Should read minutes 8, headway 3, hours 04:00-23:00. No source says whether SkyLine to T3 keeps connecting passengers airside. The night bus stops landside, so night transfers re-clear security."
-     },
-     {
-      "item": "FRA leave_airport_viable",
-      "verdict": "confirmed",
-      "found": "S8 and S9 S-Bahn plus regional trains link the airport regional station (T1 level 0) to Frankfurt",
-      "url": "https://www.frankfurt-airport.com/en/transport-and-parking/to-from-the-airport/travel-by-train.html",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": "The page gives no journey time to Frankfurt Hbf."
-     },
-     {
-      "item": "FRA border/schengen",
-      "verdict": "confirmed",
-      "found": "Germany is one of the 25 EU states in Schengen. The area has 29 countries; Ireland opts out and Cyprus does not yet apply it fully.",
-      "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
-      "date": "2025-05-27 (page update)",
-      "primary": true,
-      "note": "The page lists no EU states by name. Germany follows from EU-27 minus Ireland and Cyprus."
-     },
-     {
-      "item": "FRA process_minutes (what passengers are told to allow)",
-      "verdict": "no_primary_source",
-      "found": "Fraport guideline: non-EU passengers at least 3 hours before departure; EU passengers with checked bags about 2.5 hours; EU passengers with hand luggage only about 2 hours",
-      "url": "https://www.frankfurt-airport.com/en/airport-guide/travel-guide.html",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": "No source measures arrival-to-gate minutes. This is the advised arrival time. Lufthansa's check-in deadline page returned 403."
-     }
-    ],
-    "second_check": []
-   }
-  },
-  "MUC": {
-   "zone": "Europe/Berlin",
-   "iata_area": 2,
-   "schengen": true,
-   "border": "schengen",
-   "process_minutes": {
-    "p50": 50,
-    "p90": 85
-   },
-   "mct_minutes": {
-    "default": 35,
-    "T1-T2": 50
-   },
-   "night_curfew": {
-    "arrivals": [
-     "00:00",
-     "04:59"
-    ],
-    "departures": [
-     "00:00",
-     "04:59"
-    ],
-    "source": "Munich night-flight restriction"
-   },
-   "services": [
-    {
-     "what": "Terminal 2 retail and the Munich Airport Center",
-     "hours_local": "06:00-22:00"
-    }
-   ],
-   "inter_terminal": {
-    "mode": "airside_walk",
-    "minutes": 15,
-    "headway_minutes": 0,
-    "operating_hours_local": "T2 to its satellite by underground train (about a minute, every 4 minutes, 04:00-00:00); T1 to T2 by free bus (5 to 7 minutes, every 10 minutes 07:00-17:00, less often early and late)"
-   },
-   "leave_airport_viable": true,
-   "needs_primary_source": true,
-   "lat": 48.3537,
-   "lon": 11.775,
-   "country": "DE",
-   "city": "Munich",
-   "_evidence": {
-    "checked": "2026-09-25",
-    "items": [
-     {
-      "item": "MUC mct_minutes (default and T1-T2)",
-      "verdict": "no_primary_source",
-      "found": "30 minutes within Terminal 2 (secondary sources only). Munich Airport's connecting page gives no MCT.",
-      "url": "https://www.munich-airport.com/connecting-flights-260553",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": "Secondary sources say 30 min within T2 (Executive Traveller, travelvient.com, primary=false). No primary figure found for T1-T2. Lufthansa pages returned 403."
-     },
-     {
-      "item": "MUC night_curfew",
-      "verdict": "confirmed",
-      "found": "Core night midnight-5 a.m.: only mail flights and DFS survey flights are allowed automatically; others need individual approval from the Bavarian State Ministry, or are emergencies. 22:00-24:00 and 05:00-06:00: bonus-list aircraft only, at most 28 scheduled or charter flights a night. Approved by the District Government of Upper Bavaria in March 2001.",
-      "url": "https://www.munich-airport.com/night-flight-264466",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": "The hours match. Suggested source line: 'District Government of Upper Bavaria night-flight regulation, March 2001'."
-     },
-     {
-      "item": "MUC services: Terminal 2 retail and Munich Airport Center",
-      "verdict": "confirmed",
-      "found": "MyDutyFree, T2 satellite (gates K/L): daily 05:30-21:45, 06:00-21:45 and 06:00-22:00. Other T2 counters 06:00-22:00 and 06:00-22:15. T1 gates A: 04:30/05:00-22:30.",
-      "url": "https://www.munich-airport.com/mydutyfree-524473",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": "Close enough to 06:00-22:00 for T2. Some counters open from 05:30. No Munich Airport Center hours found."
-     },
-     {
-      "item": "MUC inter_terminal",
-      "verdict": "corrected",
-      "found": "T2 to satellite: underground shuttle train, about 1 minute, every 4 minutes, daily 04:00-midnight. T1 to T2: free shuttle bus, 5-7 minutes, every 10 minutes 07:00-17:00, less often early and late.",
-      "url": "https://www.munich-airport.com/connecting-flights-260553",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": "The APM hours are 04:00-24:00, not 04:30-01:00. For a T2 connection the mode is airside_train, with about 1 minute plus a 4-minute headway."
-     },
-     {
-      "item": "MUC leave_airport_viable",
-      "verdict": "confirmed",
-      "found": "S1 and S8 S-Bahn leave for the city centre every 20 minutes",
-      "url": "https://www.munich-airport.com/frequently-asked-questions-376207",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": "No journey time on the page."
-     },
-     {
-      "item": "MUC border/schengen",
-      "verdict": "confirmed",
-      "found": "Germany is in Schengen (25 EU + 4 non-EU states)",
-      "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
-      "date": "2025-05-27 (page update)",
-      "primary": true,
-      "note": ""
-     },
-     {
-      "item": "MUC process_minutes (what passengers are told to allow)",
-      "verdict": "not_found",
-      "found": null,
-      "url": "https://www.munich-airport.com/check-in-261005",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": "Munich Airport gives no general figure: 'Be in the terminal early, but not before the counters open.' The FAQ only says to book mobility assistance 2 h ahead (3 h intercontinental). Lufthansa's deadlines page returned 403."
-     }
-    ],
-    "second_check": [
-     {
-      "item": "MUC leave_airport_viable (journey time)",
-      "claimed": "No journey time on the page. The KEF note also compares against 'MUC (40 min, flagged true)'.",
-      "correct_value": "The same FAQ page says: 'The journey to the main station at the center of Munich takes approx. 45 minutes' (S1/S8 every 20 minutes).",
-      "url": "https://www.munich-airport.com/frequently-asked-questions-376207",
-      "note": "This affects the comparison used to argue that FCO (32 min) and KEF (45 min) should be viable: Munich is 45 minutes, not 40."
-     },
-     {
-      "item": "MUC mct_minutes (secondary figure)",
-      "claimed": "Secondary sources say 30 min within T2 (Executive Traveller, travelvient.com)",
-      "correct_value": "travelvient.com gives 'OAG airport standard is 30/60/90/90': domestic to domestic 30 minutes, domestic to international 60, international to domestic 90, international to international 90. It gives '30-35 min' only for connections within the same Schengen zone. For a transatlantic connection, the secondary figure is 60-90 minutes, not 30.",
-      "url": "https://travelvient.com/tools/airports/muc/",
-      "note": "This source is still secondary (primary=false). Executive Traveller was not checked because the web search budget was spent."
-     }
-    ]
-   }
-  },
-  "ZRH": {
-   "zone": "Europe/Zurich",
-   "iata_area": 2,
-   "schengen": true,
-   "border": "schengen",
-   "process_minutes": {
-    "p50": 45,
-    "p90": 75
-   },
-   "mct_minutes": {
-    "default": 40
-   },
-   "night_curfew": {
-    "arrivals": [
-     "23:30",
-     "05:59"
-    ],
-    "departures": [
-     "23:30",
-     "05:59"
-    ],
-    "source": "Swiss night-flight ban"
-   },
-   "services": [
-    {
-     "what": "Zurich Duty Free, Airside Center",
-     "hours_local": "05:00-22:00"
-    }
-   ],
-   "inter_terminal": {
-    "mode": "airside_train",
-    "minutes": 20,
-    "headway_minutes": 0,
-    "operating_hours_local": "Skymetro from gates A, B and D to E; SWISS allows 15-20 minutes A/B to E and 25-30 E to A"
-   },
-   "leave_airport_viable": true,
-   "needs_primary_source": true,
-   "lat": 47.4647,
-   "lon": 8.5492,
-   "country": "CH",
-   "city": "Zurich",
-   "_evidence": {
-    "checked": "2026-09-25",
-    "items": [
-     {
-      "item": "ZRH mct_minutes (default)",
-      "verdict": "no_primary_source",
-      "found": "40 minutes (secondary only)",
-      "url": "https://travelvient.com/tools/airports/zrh/",
-      "date": "2026-09-24 (read)",
-      "primary": false,
-      "note": "flughafen-zuerich.ch returns 403 or a bot check to automated reads. No attempt was made to pass the bot check. SWISS publishes gate-to-gate walking times (next item) but no MCT."
-     },
-     {
-      "item": "ZRH night_curfew",
-      "verdict": "confirmed",
-      "found": "Airport: open to civil traffic until 23:00. 23:00-23:30 is kept for clearing delays without a permit. Federal VIL: departures banned 00:00-06:00, arrivals 00:00-05:00. Zurich slot curfew: no arrival slots 23:00-06:09 CET, no departure slots 22:46-05:44 CET, charters' last slot 21:45.",
-      "url": "https://newsroom.flughafen-zuerich.ch/en/nighttime-peace-initiative-violates-federal-law-and-undermines-the-accessibility-of-switzerland/",
-      "date": "2025-01-09 (page)",
-      "primary": true,
-      "note": "The newsroom page misprints the opening as '18:00 to 23:00'; it means 06:00. Slot times: https://www.slotcoordination.ch/airport-information/zurich-zrhlszh/restrictions-zurich.html/112 (the Swiss slot coordinator). Legal basis: federal operating regulations under VIL (SR 748.131.1). Scheduled flights end about 23:00, not 23:30."
-     },
-     {
-      "item": "ZRH services: airside retail and food",
-      "verdict": "corrected",
-      "found": "Zurich Duty Free, Airside Center: open daily 05:00-22:00",
-      "url": "https://www.flughafen-zuerich.ch/en/passengers/shopping-and-enjoy/shops/all-shops/zurich-duty-free-airsidecenter-level1",
-      "date": "2026-09-24 (read via search-engine snippet)",
-      "primary": true,
-      "note": "The airport runs Zurich Duty Free itself. The page blocks automated reads, so the hours come from the search index's copy of it. Worth a manual check."
-     },
-     {
-      "item": "ZRH inter_terminal",
-      "verdict": "corrected",
-      "found": "SWISS walking-time table: E to gates A01-86 25-30 min; E to B01-10 25-30; E to B31-43 20-25; A/B to E16-67 15-20; D to E 15-20; E to E 10-15. 'The Skymetro will take you non-stop from Gates A, B and D to Gates E.'",
-      "url": "https://www.swiss.com/xk/en/fly/airport/zurich-airport.html",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": "For the Dock E to A/B transfer the scorer cares about, 15-30 min gate to gate is realistic, not 10. No primary source for Skymetro headway or hours."
-     },
-     {
-      "item": "ZRH leave_airport_viable",
-      "verdict": "confirmed",
-      "found": "SBB trains from Zurich Airport to Zurich HB every 10 minutes, 10-minute journey",
-      "url": "https://www.rome2rio.com/s/Zurich-Airport-ZRH/Z%C3%BCrich-HB",
-      "date": "2026-09-24 (read)",
-      "primary": false,
-      "note": "The airport's own transport page (flughafen-zuerich.ch/.../train-tram-and-bus) returns 403."
-     },
-     {
-      "item": "ZRH border/schengen",
-      "verdict": "confirmed",
-      "found": "Switzerland is one of the 4 non-EU Schengen members",
-      "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
-      "date": "2025-05-27 (page update)",
-      "primary": true,
-      "note": "Switzerland is not in the EU customs union, but the border field is about passport control, so Schengen is right."
-     },
-     {
-      "item": "ZRH process_minutes (what passengers are told to allow)",
-      "verdict": "no_primary_source",
-      "found": "SWISS: 'get to the airport around 2 hours before departure (short-haul routes) or 3 hours before departure (long-haul routes)'. For US flights, at least 3 hours.",
-      "url": "https://www.swiss.com/ch/en/fly/check-in/check-in-times",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": "SWISS is the hub airline. This is the advised arrival time, not a measured process time."
-     }
-    ],
-    "second_check": [
-     {
-      "item": "ZRH mct_minutes (secondary figure)",
-      "claimed": "40 minutes (secondary only)",
-      "correct_value": "travelvient.com, citing the OAG standard: 40 minutes domestic to domestic and international to international; 50 minutes domestic to international and international to domestic.",
-      "url": "https://travelvient.com/tools/airports/zrh/",
-      "note": "Minor. 40 is only half the picture, and the source is still secondary."
-     }
-    ]
-   }
-  },
-  "GVA": {
-   "zone": "Europe/Zurich",
-   "iata_area": 2,
-   "schengen": true,
-   "border": "schengen",
-   "process_minutes": {
-    "p50": 40,
-    "p90": 70
-   },
-   "mct_minutes": {
-    "default": 45
-   },
-   "night_curfew": {
-    "arrivals": [
-     "00:00",
-     "05:59"
-    ],
-    "departures": [
-     "00:00",
-     "05:59"
-    ],
-    "source": "Geneva night-flight ban"
-   },
-   "services": [
-    {
-     "what": "Duty free, main shop",
-     "hours_local": "05:10-21:30",
-     "note": "the terminal building is closed 00:00-04:00"
-    }
-   ],
-   "inter_terminal": {
-    "mode": "walk",
-    "minutes": 10,
-    "headway_minutes": 0,
-    "operating_hours_local": "one terminal"
-   },
-   "leave_airport_viable": true,
-   "needs_primary_source": true,
-   "lat": 46.2381,
-   "lon": 6.1089,
-   "country": "CH",
-   "city": "Geneva",
-   "_evidence": {
-    "checked": "2026-09-25",
-    "items": [
-     {
-      "item": "GVA mct_minutes (default)",
-      "verdict": "no_primary_source",
-      "found": null,
-      "url": "https://www.gva.ch/en/passengers/travel-preparation/faq",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": "Geneva Airport's FAQ and check-in pages give no MCT. Forums say '45 minutes or less' (TripAdvisor, primary=false)."
-     },
-     {
-      "item": "GVA night_curfew",
-      "verdict": "confirmed",
-      "found": "Federal VIL: departures banned 00:00-06:00, arrivals 00:00-05:00. Both are conditional 22:00-24:00, and arrivals also 05:00-06:00. Geneva slot curfew: arrivals 00:00-06:04 CET, departures '2126-0559CET' as printed. The terminal is closed 00:00-04:00.",
-      "url": "https://www.slotcoordination.ch/airport-information/geneva-gvalsgg/restrictions-geneva.html/110",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "Legally, arrivals may land from 05:00, but no arrival slots are given before 06:04, so 00:00-05:59 works for scheduled flights. The 21:26 departure slot curfew as printed looks odd (maybe a typo for 22:26); check before use. Terminal closure: https://www.gva.ch/en/passengers/travel-preparation/at-the-airport/check-in."
-     },
-     {
-      "item": "GVA services: single-terminal retail",
-      "verdict": "corrected",
-      "found": "Duty Free main shop and Premium: Monday-Sunday 05:10-21:30. Aile Est shop: 05:15-21:30. Schengen duty free: 05:15-20:30. The terminal building is closed 00:00-04:00.",
-      "url": "https://www.gva.ch/en/passengers/shops-and-restaurants/shops-and-duty-free/duty-free-boutique-principale",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": "Airside retail runs about 05:10-21:30."
-     },
-     {
-      "item": "GVA inter_terminal",
-      "verdict": "confirmed",
-      "found": "Terminal 1 is the year-round terminal. T2 is a small seasonal terminal, open only on winter weekends for ski charter arrivals, about 300 m on foot landside from T1 arrivals. A France sector also exists.",
-      "url": "https://www.gva.ch/en/passengers/travel-preparation/general-information/info-t2",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": "'One terminal' is right for connections. No primary source for the 10-minute figure."
-     },
-     {
-      "item": "GVA leave_airport_viable",
-      "verdict": "confirmed",
-      "found": "'The train connects the airport to/from Geneva city centre in just seven minutes, with a frequency of every twelve minutes during peak hours' (Geneva-Cornavin)",
-      "url": "https://www.gva.ch/en/passengers/travel-preparation/faq",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": ""
-     },
-     {
-      "item": "GVA border/schengen",
-      "verdict": "confirmed",
-      "found": "Switzerland is in Schengen",
-      "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
-      "date": "2025-05-27 (page update)",
-      "primary": true,
-      "note": "GVA also has a French sector. That does not change the Schengen border."
-     },
-     {
-      "item": "GVA process_minutes (what passengers are told to allow)",
-      "verdict": "no_primary_source",
-      "found": "Check-in page: arrive 'around 3 hours before departure', earlier in peak (winter) seasons. FAQ: 'no later than two hours before the published departure time' if no other time is given. SWISS: 2 h short-haul, 3 h long-haul.",
-      "url": "https://www.gva.ch/en/passengers/travel-preparation/at-the-airport/check-in",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": "The airport's two pages disagree (3 h vs 2 h minimum)."
-     }
-    ],
-    "second_check": [
-     {
-      "item": "GVA process_minutes (the airport's pages disagree)",
-      "claimed": "The FAQ says 'no later than two hours before the published departure time', so Geneva's two pages disagree (3 h vs 2 h)",
-      "correct_value": "The two-hour line is in the FAQ answer about GVAssistance, the assistance for passengers with reduced mobility: 'If no specific time has been indicated, you must arrive no later than two hours before the published departure time of your flight, at the check-in counters in Terminal 1 or at one of the assistance reception points located at P1, P20, or the TPG stop.' Geneva's general advice is about 3 hours (check-in page). The pages do not disagree.",
-      "url": "https://www.gva.ch/en/passengers/travel-preparation/faq",
-      "note": "Checked against the raw FAQ text. The 3-hour figure is at https://www.gva.ch/en/passengers/travel-preparation/at-the-airport/check-in."
-     }
-    ]
-   }
-  },
-  "FCO": {
-   "zone": "Europe/Rome",
-   "iata_area": 2,
-   "schengen": true,
-   "border": "schengen",
-   "process_minutes": {
-    "p50": 55,
-    "p90": 95
-   },
-   "mct_minutes": {
-    "default": 50
-   },
-   "services": [
-    {
-     "what": "Terminal 1 and 3 retail",
-     "hours_local": "05:30-22:30"
-    }
-   ],
-   "inter_terminal": {
-    "mode": "airside_walk",
-    "minutes": 30,
-    "headway_minutes": 0,
-    "operating_hours_local": "T1 and T3 connect on foot inside the transit area; the furthest gates are about 30 minutes apart (ITA Airways)"
-   },
-   "leave_airport_viable": true,
-   "needs_primary_source": true,
-   "lat": 41.8003,
-   "lon": 12.2389,
-   "country": "IT",
-   "city": "Rome",
-   "_evidence": {
-    "checked": "2026-09-25",
-    "items": [
-     {
-      "item": "FCO mct_minutes (default and T1-T3)",
-      "verdict": "no_primary_source",
-      "found": "ITA Airways: 'The minimum transfer time between the furthest-apart gates is approximately 30 minutes', moving between terminals 'without leaving the transit area'. No MCT number published.",
-      "url": "https://www.ita-airways.com/ly/en/world-of-ita-airways/discover-ita-airways/roma-fiumicino/boarding",
-      "date": "2026-09-24 (read via search-engine snippet)",
-      "primary": true,
-      "note": "ita-airways.com and adr.it block automated reads (403 or empty 202), so this was read from the search index. A 90-minute T1-T3 figure is hard to square with a 30-minute worst-case walk that stays airside."
-     },
-     {
-      "item": "FCO services: Terminal 1 and 3 retail",
-      "verdict": "not_found",
-      "found": null,
-      "url": "https://www.adr.it/web/aeroporti-di-roma-en/pax-fco-airport-map",
-      "date": "2026-09-24 (read attempt)",
-      "primary": true,
-      "note": "The ADR site returns an empty 202 or a CloudFront 403 to automated reads."
-     },
-     {
-      "item": "FCO inter_terminal",
-      "verdict": "corrected",
-      "found": "T1 (gates A, Schengen and domestic) and T3 (gates E, non-Schengen) connect on foot inside the transit area. Furthest gates about 30 minutes apart (ITA Airways).",
-      "url": "https://www.ita-airways.com/ly/en/world-of-ita-airways/discover-ita-airways/roma-fiumicino/boarding",
-      "date": "2026-09-24 (read via search-engine snippet)",
-      "primary": true,
-      "note": "Should be airside_walk. Up to about 30 min, with no bus or headway. Non-Schengen to Schengen connections still pass passport control."
-     },
-     {
-      "item": "FCO leave_airport_viable",
-      "verdict": "corrected",
-      "found": "Leonardo Express to Roma Termini: 32 minutes, every 15 minutes, EUR 14",
-      "url": "https://www.trenitalia.com/en/connections/leonardo-express.html",
-      "date": "2026-09-24 (read)",
-      "primary": true,
-      "note": "A judgement call. The rail link is as good as MUC's (flagged true). First and last trains are not on the page."
-     },
-     {
-      "item": "FCO border/schengen",
-      "verdict": "confirmed",
-      "found": "Italy is in Schengen",
-      "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
-      "date": "2025-05-27 (page update)",
-      "primary": true,
-      "note": ""
-     },
-     {
-      "item": "FCO process_minutes (what passengers are told to allow)",
-      "verdict": "not_found",
-      "found": null,
-      "url": "https://www.adr.it/web/aeroporti-di-roma-en/pax-fco-cheks",
-      "date": "2026-09-24 (read attempt)",
-      "primary": true,
-      "note": "The ADR and ITA Airways pages were unreadable (blocked)."
-     }
-    ],
-    "second_check": []
-   }
-  },
-  "WAW": {
-   "zone": "Europe/Warsaw",
-   "iata_area": 2,
-   "schengen": true,
-   "border": "schengen",
-   "process_minutes": {
-    "p50": 45,
-    "p90": 75
-   },
-   "mct_minutes": {
-    "default": 40
-   },
-   "services": [
-    {
-     "what": "Baltona duty free, airside",
-     "hours_local": "04:00-23:00"
+    "Europe/Amsterdam": {
+      "standard": "+01:00",
+      "daylight": "+02:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
     },
-    {
-     "what": "Food point near gates 36/37 (Schengen side)",
-     "hours_local": "24h"
-    }
-   ],
-   "inter_terminal": {
-    "mode": "walk",
-    "minutes": 10,
-    "headway_minutes": 0,
-    "operating_hours_local": "one terminal"
-   },
-   "leave_airport_viable": true,
-   "needs_primary_source": true,
-   "lat": 52.1657,
-   "lon": 20.9671,
-   "country": "PL",
-   "city": "Warsaw",
-   "night_note": "No curfew: the airport and border control are open 24 hours; 22:00-06:00 is limited to noise-certified aircraft (PANSA AIP AD 2.21)",
-   "_evidence": {
-    "checked": "2026-09-25",
-    "items": [
-     {
-      "item": "WAW mct_minutes (default)",
-      "verdict": "no_primary_source",
-      "found": null,
-      "url": "https://www.lotnisko-chopina.pl/en/before-flight/transfer-passenger-connecting-flight/",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "The airport says connection time 'depends on your arrival and departure destinations' and to ask the airline. It also sets out the S-S, S-NS, NS-S and NS-NS procedures. No LOT figure found."
-     },
-     {
-      "item": "WAW night_curfew",
-      "verdict": "corrected",
-      "found": "No curfew. The aerodrome and customs/immigration are H24. AIP AD 2.21: movements 'restricted' 2100-0500 UTC winter / 2000-0400 summer (22:00-06:00 local) to aircraft noise-certified to ICAO Annex 16 Chapter 3, 4, 5, 10 or 14. Training, test and technical flights are banned. Planning scheduled flights is 'recommended to avoid'.",
-      "url": "https://docs.pansa.pl/ais/eaipifr/AIRAC%20AMDT%2009-26_2026_09_03/eAIP/AD%202%20EPWA%201-en-GB.html",
-      "date": "2026-09-03 (AIRAC effective)",
-      "primary": true,
-      "note": "PANSA is the Polish state air navigation service. Suggest dropping the curfew, or recording 22:00-06:00 as a noise restriction, not a ban. No code reads night_curfew today."
-     },
-     {
-      "item": "WAW services: single-terminal retail",
-      "verdict": "corrected",
-      "found": "Baltona Duty Free, airside Schengen (gates 25/26 and 38/39) and non-Schengen (gates 21/22): 04:00-23:00. Aelia Duty Free, Schengen airside center: 06:00-21:30. 1 Minute Smacznego! food point: 24h near gates 36/37 (Schengen), 04:00-22:00 near gates 1N-4N (non-Schengen).",
-      "url": "https://www.lotnisko-chopina.pl/en/service-points/shops/baltona-duty-free/",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "The 24h and non-Schengen lines come from https://www.lotnisko-chopina.pl/en/service-points/shops/1-minute-smacznego/ and https://www.lotnisko-chopina.pl/en/service-points/shops/baltona-duty-free-last-minute/. Airside retail runs about 04:00-23:00 and Schengen-side food is 24h. The 1 Minute page's line order is ambiguous."
-     },
-     {
-      "item": "WAW inter_terminal",
-      "verdict": "confirmed",
-      "found": "One terminal with Schengen and non-Schengen zones (non-Schengen gates marked 'N'). Border control applies between the zones.",
-      "url": "https://www.lotnisko-chopina.pl/en/before-flight/transfer-passenger-connecting-flight/",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "No primary source for the 10-minute walk."
-     },
-     {
-      "item": "WAW leave_airport_viable",
-      "verdict": "confirmed",
-      "found": "SKM S2/S3 and Koleje Mazowieckie RL: about 30 minutes to central Warsaw stations. Station under the terminal. Line 175 bus daily; N32 night bus.",
-      "url": "https://www.lotnisko-chopina.pl/en/to-and-from-the-airport/",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": ""
-     },
-     {
-      "item": "WAW border/schengen",
-      "verdict": "confirmed",
-      "found": "Poland is in Schengen",
-      "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
-      "date": "2025-05-27 (page update)",
-      "primary": true,
-      "note": ""
-     },
-     {
-      "item": "WAW process_minutes (what passengers are told to allow)",
-      "verdict": "no_primary_source",
-      "found": "'at least two hours before departure' for Schengen flights and 'at least three hours' for long-haul. Check-in closes 30 min before domestic/European and 1 h before long-haul.",
-      "url": "https://www.lotnisko-chopina.pl/en/before-flight/check-in-at-the-airport/",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "This is the advised arrival time."
-     }
-    ],
-    "second_check": []
-   }
-  },
-  "CPH": {
-   "zone": "Europe/Copenhagen",
-   "iata_area": 2,
-   "schengen": true,
-   "border": "schengen",
-   "process_minutes": {
-    "p50": 45,
-    "p90": 75
-   },
-   "mct_minutes": {
-    "default": 45
-   },
-   "services": [
-    {
-     "what": "Shops after security",
-     "hours_local": "06:00-22:00"
+    "Europe/Madrid": {
+      "standard": "+01:00",
+      "daylight": "+02:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
     },
-    {
-     "what": "Tax-free shop after security",
-     "hours_local": "24h"
+    "Europe/Rome": {
+      "standard": "+01:00",
+      "daylight": "+02:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
     },
-    {
-     "what": "Metro to Nørreport",
-     "hours_local": "24h",
-     "note": "every 4-6 minutes by day, 15-20 at night; about 15 minutes to Nørreport"
+    "Europe/Lisbon": {
+      "standard": "+00:00",
+      "daylight": "+01:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
+    },
+    "Europe/Berlin": {
+      "standard": "+01:00",
+      "daylight": "+02:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
+    },
+    "Europe/Zurich": {
+      "standard": "+01:00",
+      "daylight": "+02:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
+    },
+    "Europe/Warsaw": {
+      "standard": "+01:00",
+      "daylight": "+02:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
+    },
+    "Europe/Copenhagen": {
+      "standard": "+01:00",
+      "daylight": "+02:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
+    },
+    "Europe/Dublin": {
+      "standard": "+00:00",
+      "daylight": "+01:00",
+      "dst": {
+        "2026": [
+          "2026-03-29",
+          "2026-10-25"
+        ],
+        "2027": [
+          "2027-03-28",
+          "2027-10-31"
+        ]
+      }
+    },
+    "Atlantic/Reykjavik": {
+      "standard": "+00:00",
+      "observes_dst": false,
+      "why": "Iceland has never observed summer time"
+    },
+    "Europe/Istanbul": {
+      "standard": "+03:00",
+      "observes_dst": false,
+      "why": "Turkey abolished summer time in 2016 and sits on permanent UTC+3"
     }
-   ],
-   "inter_terminal": {
-    "mode": "airside_walk",
-    "minutes": 12,
-    "headway_minutes": 0,
-    "operating_hours_local": "T2 and T3 connect airside"
-   },
-   "leave_airport_viable": true,
-   "needs_primary_source": true,
-   "lat": 55.618,
-   "lon": 12.6508,
-   "country": "DK",
-   "city": "Copenhagen",
-   "_evidence": {
-    "checked": "2026-09-25",
-    "items": [
-     {
-      "item": "CPH mct_minutes (default)",
-      "verdict": "no_primary_source",
-      "found": null,
-      "url": "https://www.cph.dk/en/flight-information/transfer",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "The transfer page publishes no MCT. It calls CPH a 'one roof terminal' and names a Transfer Center between gates B and C. SAS was not checked."
-     },
-     {
-      "item": "CPH services: Terminal 2 and 3 retail",
-      "verdict": "corrected",
-      "found": "After-security shops mostly 06:00-22:00. TAX FREE after security: 'Always open'. 7-Eleven before security: 'Always open'.",
-      "url": "https://www.cph.dk/en/shopping-dining/shops",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "Airside has one 24-hour shop (TAX FREE), so a CPH layover is never 'dead'. Model it as 24h plus 06:00-22:00 for the rest."
-     },
-     {
-      "item": "CPH services: Metro to Kobenhavn H",
-      "verdict": "corrected",
-      "found": "'The Metro runs every 4-6 minute during the day and evening hours, and at a 15-20 minute intervals at night.' 15 minutes from Nørreport Station. The station adjoins Terminal 3.",
-      "url": "https://www.cph.dk/en/parking-transport/bus-train-metro-taxi/metro",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "The Metro runs round the clock and goes to Nørreport, not København H (trains serve København H). Relabel and use '24h'."
-     },
-     {
-      "item": "CPH inter_terminal",
-      "verdict": "confirmed",
-      "found": "'Airport map - One roof terminal'; 'All shopping and dining are under the same roof'",
-      "url": "https://www.cph.dk/en/flight-information/transfer",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "No primary source for the 12-minute figure."
-     },
-     {
-      "item": "CPH leave_airport_viable",
-      "verdict": "confirmed",
-      "found": "'You can easily leave Copenhagen Airport during a layover'. Metro to the city centre in under 15 minutes.",
-      "url": "https://www.cph.dk/en/flight-information/transfer",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": ""
-     },
-     {
-      "item": "CPH border/schengen",
-      "verdict": "confirmed",
-      "found": "Denmark is in Schengen. The transfer page notes EES registration for arrivals.",
-      "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
-      "date": "2025-05-27 (page update)",
-      "primary": true,
-      "note": ""
-     },
-     {
-      "item": "CPH process_minutes (what passengers are told to allow)",
-      "verdict": "no_primary_source",
-      "found": "'at least 2 hours before departure if you are traveling within the Schengen area and at least 3 hours before departure if you are traveling outside the Schengen area'",
-      "url": "https://www.cph.dk/en/practical/tips-for-the-journey",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "This is the advised arrival time."
-     }
-    ],
-    "second_check": [
-     {
-      "item": "CPH leave_airport_viable (quotation)",
-      "claimed": "'You can easily leave Copenhagen Airport during a layover'",
-      "correct_value": "The page says: 'Yes, you are allowed to leave Copenhagen Airport during a layover.' It adds that you need a valid boarding pass and your passport or visa, and should 'allocate extra time for going through security control and, if applicable, passport control'. It also says the airport hotels near the metro are 'less than 15 minutes from Copenhagen's city center'.",
-      "url": "https://www.cph.dk/en/flight-information/transfer",
-      "note": "The substance holds (viable = true). The quotation was wrong. The page was read in the browser pane, because plain fetches get an Akamai 403."
-     }
-    ]
-   }
   },
-  "DUS": {
-   "zone": "Europe/Berlin",
-   "iata_area": 2,
-   "schengen": true,
-   "border": "schengen",
-   "process_minutes": {
-    "p50": 45,
-    "p90": 80
-   },
-   "mct_minutes": {
-    "default": 45
-   },
-   "night_curfew": {
-    "arrivals": [
-     "23:00",
-     "05:59"
-    ],
-    "departures": [
-     "22:00",
-     "05:59"
-    ],
-    "source": "German AIP EDDL AD 2.20 (scheduled jets; a delayed departure may leave until 23:00 by individual exception)"
-   },
-   "services": [
-    {
-     "what": "Pier shops (Heinemann)",
-     "hours_local": "04:00-21:00",
-     "note": "open from 04:00 (C from 04:30) until 30 minutes before the last departure; the closing hour is not published, so 21:00 is assumed"
+  "airports": {
+    "JFK": {
+      "zone": "America/New_York",
+      "iata_area": 1,
+      "schengen": false,
+      "process_minutes": {
+        "p50": 55,
+        "p90": 85
+      },
+      "border": "us",
+      "lat": 40.6413,
+      "lon": -73.7781,
+      "country": "US",
+      "city": "New York"
+    },
+    "EWR": {
+      "zone": "America/New_York",
+      "iata_area": 1,
+      "schengen": false,
+      "process_minutes": {
+        "p50": 70,
+        "p90": 105
+      },
+      "border": "us",
+      "lat": 40.6895,
+      "lon": -74.1745,
+      "country": "US",
+      "city": "Newark"
+    },
+    "LHR": {
+      "zone": "Europe/London",
+      "iata_area": 2,
+      "schengen": false,
+      "process_minutes": {
+        "p50": 60,
+        "p90": 95
+      },
+      "mct_minutes": {
+        "default": 75,
+        "T3-T5": 90
+      },
+      "services": [
+        {
+          "what": "Terminal retail and food",
+          "hours_local": "05:00-22:00"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "airside_bus",
+        "minutes": 25,
+        "headway_minutes": 8,
+        "operating_hours_local": "05:00-23:00"
+      },
+      "border": "uk",
+      "lat": 51.47,
+      "lon": -0.4543,
+      "country": "GB",
+      "city": "London"
+    },
+    "CDG": {
+      "zone": "Europe/Paris",
+      "iata_area": 2,
+      "schengen": true,
+      "process_minutes": {
+        "p50": 60,
+        "p90": 100
+      },
+      "mct_minutes": {
+        "default": 90,
+        "2E-2F": 60
+      },
+      "night_curfew": {
+        "arrivals": [
+          "00:30",
+          "05:29"
+        ],
+        "departures": [
+          "00:00",
+          "04:59"
+        ],
+        "source": "arretes of 6 Nov 2003"
+      },
+      "services": [
+        {
+          "what": "Terminal 2 retail",
+          "hours_local": "05:00-23:30"
+        },
+        {
+          "what": "Landside admission to Terminal 2",
+          "hours_local": "04:00-22:30"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "walk",
+        "minutes": 35,
+        "headway_minutes": 0,
+        "operating_hours_local": "CDGVAL 04:00-01:00, then a 25-minute-headway bus"
+      },
+      "border": "schengen",
+      "lat": 49.0097,
+      "lon": 2.5479,
+      "country": "FR",
+      "city": "Paris"
+    },
+    "AMS": {
+      "zone": "Europe/Amsterdam",
+      "iata_area": 2,
+      "schengen": true,
+      "process_minutes": {
+        "p50": 55,
+        "p90": 85
+      },
+      "mct_minutes": {
+        "default": 50
+      },
+      "services": [
+        {
+          "what": "Schiphol retail and food",
+          "hours_local": "06:00-22:00"
+        },
+        {
+          "what": "Train to Amsterdam Centraal",
+          "hours_local": "05:50-00:30"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "walk",
+        "minutes": 15,
+        "headway_minutes": 0,
+        "operating_hours_local": "always"
+      },
+      "leave_airport_viable": true,
+      "border": "schengen",
+      "lat": 52.3105,
+      "lon": 4.7683,
+      "country": "NL",
+      "city": "Amsterdam"
+    },
+    "MAD": {
+      "zone": "Europe/Madrid",
+      "iata_area": 2,
+      "schengen": true,
+      "process_minutes": {
+        "p50": 60,
+        "p90": 95
+      },
+      "mct_minutes": {
+        "default": 60
+      },
+      "services": [
+        {
+          "what": "Terminal retail and food",
+          "hours_local": "05:00-23:00"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "airside_bus",
+        "minutes": 20,
+        "headway_minutes": 10,
+        "operating_hours_local": "05:00-23:30"
+      },
+      "border": "schengen",
+      "lat": 40.4839,
+      "lon": -3.568,
+      "country": "ES",
+      "city": "Madrid"
+    },
+    "LIS": {
+      "zone": "Europe/Lisbon",
+      "iata_area": 2,
+      "schengen": true,
+      "process_minutes": {
+        "p50": 55,
+        "p90": 90
+      },
+      "mct_minutes": {
+        "default": 60
+      },
+      "services": [
+        {
+          "what": "Terminal 1 retail and food",
+          "hours_local": "05:00-23:00"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "walk",
+        "minutes": 12,
+        "headway_minutes": 0,
+        "operating_hours_local": "always"
+      },
+      "border": "schengen",
+      "lat": 38.7742,
+      "lon": -9.1342,
+      "country": "PT",
+      "city": "Lisbon"
+    },
+    "MXP": {
+      "zone": "Europe/Rome",
+      "iata_area": 2,
+      "schengen": true,
+      "process_minutes": {
+        "p50": 55,
+        "p90": 85
+      },
+      "mct_minutes": {
+        "default": 60
+      },
+      "services": [
+        {
+          "what": "Terminal retail",
+          "hours_local": "05:30-22:30"
+        }
+      ],
+      "border": "schengen",
+      "lat": 45.6301,
+      "lon": 8.7255,
+      "country": "IT",
+      "city": "Milan"
+    },
+    "BCN": {
+      "zone": "Europe/Madrid",
+      "iata_area": 2,
+      "schengen": true,
+      "process_minutes": {
+        "p50": 55,
+        "p90": 90
+      },
+      "mct_minutes": {
+        "default": 45
+      },
+      "services": [
+        {
+          "what": "Terminal 1 retail and food",
+          "hours_local": "05:00-23:00"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "landside_bus",
+        "minutes": 18,
+        "headway_minutes": 10,
+        "operating_hours_local": "05:00-23:30"
+      },
+      "border": "schengen",
+      "lat": 41.2974,
+      "lon": 2.0833,
+      "country": "ES",
+      "city": "Barcelona"
+    },
+    "FRA": {
+      "zone": "Europe/Berlin",
+      "iata_area": 2,
+      "schengen": true,
+      "border": "schengen",
+      "process_minutes": {
+        "p50": 60,
+        "p90": 100
+      },
+      "mct_minutes": {
+        "default": 60
+      },
+      "night_curfew": {
+        "arrivals": [
+          "23:00",
+          "04:59"
+        ],
+        "departures": [
+          "23:00",
+          "04:59"
+        ],
+        "source": "Fraport hours of operation: no flights 23:00-05:00; a quota of 133 movements a night covers 22:00-23:00 and 05:00-06:00 (upheld by the Federal Administrative Court, 2012)"
+      },
+      "services": [
+        {
+          "what": "Terminal 1 and 3 shops after security",
+          "hours_local": "06:00-21:30",
+          "note": "Terminal 2 closed on 9 June 2026"
+        },
+        {
+          "what": "Long-distance rail at Fernbahnhof",
+          "hours_local": "05:00-00:30",
+          "note": "Fraport publishes no first or last long-distance train; the hours are Deutsche Bahn's usual and unverified"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "airside_train",
+        "minutes": 8,
+        "headway_minutes": 3,
+        "operating_hours_local": "SkyLine T1 to T3 04:00-23:00; from 22:00 to 05:00 a bus stops landside, so a night transfer re-clears security"
+      },
+      "leave_airport_viable": true,
+      "needs_primary_source": true,
+      "lat": 50.0379,
+      "lon": 8.5622,
+      "country": "DE",
+      "city": "Frankfurt",
+      "_evidence": {
+        "checked": "2026-09-25",
+        "items": [
+          {
+            "item": "FRA mct_minutes (default and T1-T2)",
+            "verdict": "corrected",
+            "found": "Lufthansa: MCT at Frankfurt raised from 45-50 min to 60 min from 30 Mar 2025 for intra-European to intra-European, Schengen to USA, Schengen to Singapore and Schengen to South Africa connections. Terminal 2 closed on 9 Jun 2026; its airlines moved to Terminal 3, so the T1-T2 pair no longer exists. No published T1-T3 MCT found.",
+            "url": "https://irreg.lufthansaexperts.com/en/news/frankfurt-airport-increase-of-the-minimum-connecting-time-mct-to-60-minutes.html",
+            "date": "2024-09-10 (page); T2 closure per https://www.fraport.com/en/newsroom/press-releases/2026/q2/terminal-2-closed-for-refurbishment-starting-today.html dated 2026-06-09",
+            "primary": true,
+            "note": "Lufthansa eXperts is Lufthansa's own site for travel agents. Default should be 60, not 45. Replace the T1-T2 key; nothing published for T1-T3. Only 'default' is read by adapter.py, so the terminal pairs are never used."
+          },
+          {
+            "item": "FRA night_curfew",
+            "verdict": "confirmed",
+            "found": "Fraport: 'Between 11:00 p.m. and 5:00 a.m. CEST, there is a ban on night flights.' No more than 133 movements a night (yearly average) are allowed in 22:00-23:00 and 05:00-06:00. The page gives no legal basis. The Hessian VGH ruling of Oct 2011 was upheld by the Federal Administrative Court on 4 Apr 2012 (secondary).",
+            "url": "https://www.fraport.com/en/business-areas/operations/airside-and-terminal-operations/hours-of-operation.html",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": "The hours match. The shoulder quota also covers 05:00-06:00, not just 22:00-23:00. For the source line, BVerwG 2012 is the final ruling."
+          },
+          {
+            "item": "FRA services: Terminal 1 and 2 retail",
+            "verdict": "corrected",
+            "found": "Heinemann duty free (the main airside retailer): T1 areas Z/A/B mostly 06:00-21:00, 21:30 or 22:00, some counters listed from 03:00, area C 07:00/07:30-21:30. Terminal 3 areas H and J: 06:00-21:30.",
+            "url": "https://www.frankfurt-airport.com/en/locations/h/heinemann.html",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": "Rename to Terminal 1 and 3 (T2 closed). 06:00-21:30 is the typical airside window. The 03:00 openings on the page may be listing errors."
+          },
+          {
+            "item": "FRA services: long-distance rail at Fernbahnhof",
+            "verdict": "not_found",
+            "found": null,
+            "url": "https://www.frankfurt-airport.com/en/transport-and-parking/to-from-the-airport/travel-by-train.html",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": "Fraport names S8/S9 and RB58/RE59/RE2/RE3 at the regional station and sends readers to DB for long-distance times. No first or last train found. The Fernbahnhof page names DB as operator and gives no hours."
+          },
+          {
+            "item": "FRA inter_terminal",
+            "verdict": "corrected",
+            "found": "SkyLine T1 to T3: 8 minutes. Runs 04:00-23:00 every 2-3 minutes. A shuttle bus runs 22:00-05:00 and stops in the arrivals forecourts. Terminal 2 closed 9 Jun 2026.",
+            "url": "https://www.frankfurt-airport.com/en/at-the-airport/orientation.html",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": "Travel time from https://terminal3.frankfurt-airport.com/en/sky-line-people-mover. Should read minutes 8, headway 3, hours 04:00-23:00. No source says whether SkyLine to T3 keeps connecting passengers airside. The night bus stops landside, so night transfers re-clear security."
+          },
+          {
+            "item": "FRA leave_airport_viable",
+            "verdict": "confirmed",
+            "found": "S8 and S9 S-Bahn plus regional trains link the airport regional station (T1 level 0) to Frankfurt",
+            "url": "https://www.frankfurt-airport.com/en/transport-and-parking/to-from-the-airport/travel-by-train.html",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": "The page gives no journey time to Frankfurt Hbf."
+          },
+          {
+            "item": "FRA border/schengen",
+            "verdict": "confirmed",
+            "found": "Germany is one of the 25 EU states in Schengen. The area has 29 countries; Ireland opts out and Cyprus does not yet apply it fully.",
+            "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
+            "date": "2025-05-27 (page update)",
+            "primary": true,
+            "note": "The page lists no EU states by name. Germany follows from EU-27 minus Ireland and Cyprus."
+          },
+          {
+            "item": "FRA process_minutes (what passengers are told to allow)",
+            "verdict": "no_primary_source",
+            "found": "Fraport guideline: non-EU passengers at least 3 hours before departure; EU passengers with checked bags about 2.5 hours; EU passengers with hand luggage only about 2 hours",
+            "url": "https://www.frankfurt-airport.com/en/airport-guide/travel-guide.html",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": "No source measures arrival-to-gate minutes. This is the advised arrival time. Lufthansa's check-in deadline page returned 403."
+          }
+        ],
+        "second_check": []
+      }
+    },
+    "MUC": {
+      "zone": "Europe/Berlin",
+      "iata_area": 2,
+      "schengen": true,
+      "border": "schengen",
+      "process_minutes": {
+        "p50": 50,
+        "p90": 85
+      },
+      "mct_minutes": {
+        "default": 35,
+        "T1-T2": 50
+      },
+      "night_curfew": {
+        "arrivals": [
+          "00:00",
+          "04:59"
+        ],
+        "departures": [
+          "00:00",
+          "04:59"
+        ],
+        "source": "Munich night-flight restriction"
+      },
+      "services": [
+        {
+          "what": "Terminal 2 retail and the Munich Airport Center",
+          "hours_local": "06:00-22:00"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "airside_walk",
+        "minutes": 15,
+        "headway_minutes": 0,
+        "operating_hours_local": "T2 to its satellite by underground train (about a minute, every 4 minutes, 04:00-00:00); T1 to T2 by free bus (5 to 7 minutes, every 10 minutes 07:00-17:00, less often early and late)"
+      },
+      "leave_airport_viable": true,
+      "needs_primary_source": true,
+      "lat": 48.3537,
+      "lon": 11.775,
+      "country": "DE",
+      "city": "Munich",
+      "_evidence": {
+        "checked": "2026-09-25",
+        "items": [
+          {
+            "item": "MUC mct_minutes (default and T1-T2)",
+            "verdict": "no_primary_source",
+            "found": "30 minutes within Terminal 2 (secondary sources only). Munich Airport's connecting page gives no MCT.",
+            "url": "https://www.munich-airport.com/connecting-flights-260553",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": "Secondary sources say 30 min within T2 (Executive Traveller, travelvient.com, primary=false). No primary figure found for T1-T2. Lufthansa pages returned 403."
+          },
+          {
+            "item": "MUC night_curfew",
+            "verdict": "confirmed",
+            "found": "Core night midnight-5 a.m.: only mail flights and DFS survey flights are allowed automatically; others need individual approval from the Bavarian State Ministry, or are emergencies. 22:00-24:00 and 05:00-06:00: bonus-list aircraft only, at most 28 scheduled or charter flights a night. Approved by the District Government of Upper Bavaria in March 2001.",
+            "url": "https://www.munich-airport.com/night-flight-264466",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": "The hours match. Suggested source line: 'District Government of Upper Bavaria night-flight regulation, March 2001'."
+          },
+          {
+            "item": "MUC services: Terminal 2 retail and Munich Airport Center",
+            "verdict": "confirmed",
+            "found": "MyDutyFree, T2 satellite (gates K/L): daily 05:30-21:45, 06:00-21:45 and 06:00-22:00. Other T2 counters 06:00-22:00 and 06:00-22:15. T1 gates A: 04:30/05:00-22:30.",
+            "url": "https://www.munich-airport.com/mydutyfree-524473",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": "Close enough to 06:00-22:00 for T2. Some counters open from 05:30. No Munich Airport Center hours found."
+          },
+          {
+            "item": "MUC inter_terminal",
+            "verdict": "corrected",
+            "found": "T2 to satellite: underground shuttle train, about 1 minute, every 4 minutes, daily 04:00-midnight. T1 to T2: free shuttle bus, 5-7 minutes, every 10 minutes 07:00-17:00, less often early and late.",
+            "url": "https://www.munich-airport.com/connecting-flights-260553",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": "The APM hours are 04:00-24:00, not 04:30-01:00. For a T2 connection the mode is airside_train, with about 1 minute plus a 4-minute headway."
+          },
+          {
+            "item": "MUC leave_airport_viable",
+            "verdict": "confirmed",
+            "found": "S1 and S8 S-Bahn leave for the city centre every 20 minutes",
+            "url": "https://www.munich-airport.com/frequently-asked-questions-376207",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": "No journey time on the page."
+          },
+          {
+            "item": "MUC border/schengen",
+            "verdict": "confirmed",
+            "found": "Germany is in Schengen (25 EU + 4 non-EU states)",
+            "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
+            "date": "2025-05-27 (page update)",
+            "primary": true,
+            "note": ""
+          },
+          {
+            "item": "MUC process_minutes (what passengers are told to allow)",
+            "verdict": "not_found",
+            "found": null,
+            "url": "https://www.munich-airport.com/check-in-261005",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": "Munich Airport gives no general figure: 'Be in the terminal early, but not before the counters open.' The FAQ only says to book mobility assistance 2 h ahead (3 h intercontinental). Lufthansa's deadlines page returned 403."
+          }
+        ],
+        "second_check": [
+          {
+            "item": "MUC leave_airport_viable (journey time)",
+            "claimed": "No journey time on the page. The KEF note also compares against 'MUC (40 min, flagged true)'.",
+            "correct_value": "The same FAQ page says: 'The journey to the main station at the center of Munich takes approx. 45 minutes' (S1/S8 every 20 minutes).",
+            "url": "https://www.munich-airport.com/frequently-asked-questions-376207",
+            "note": "This affects the comparison used to argue that FCO (32 min) and KEF (45 min) should be viable: Munich is 45 minutes, not 40."
+          },
+          {
+            "item": "MUC mct_minutes (secondary figure)",
+            "claimed": "Secondary sources say 30 min within T2 (Executive Traveller, travelvient.com)",
+            "correct_value": "travelvient.com gives 'OAG airport standard is 30/60/90/90': domestic to domestic 30 minutes, domestic to international 60, international to domestic 90, international to international 90. It gives '30-35 min' only for connections within the same Schengen zone. For a transatlantic connection, the secondary figure is 60-90 minutes, not 30.",
+            "url": "https://travelvient.com/tools/airports/muc/",
+            "note": "This source is still secondary (primary=false). Executive Traveller was not checked because the web search budget was spent."
+          }
+        ]
+      }
+    },
+    "ZRH": {
+      "zone": "Europe/Zurich",
+      "iata_area": 2,
+      "schengen": true,
+      "border": "schengen",
+      "process_minutes": {
+        "p50": 45,
+        "p90": 75
+      },
+      "mct_minutes": {
+        "default": 40
+      },
+      "night_curfew": {
+        "arrivals": [
+          "23:30",
+          "05:59"
+        ],
+        "departures": [
+          "23:30",
+          "05:59"
+        ],
+        "source": "Swiss night-flight ban"
+      },
+      "services": [
+        {
+          "what": "Zurich Duty Free, Airside Center",
+          "hours_local": "05:00-22:00"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "airside_train",
+        "minutes": 20,
+        "headway_minutes": 0,
+        "operating_hours_local": "Skymetro from gates A, B and D to E; SWISS allows 15-20 minutes A/B to E and 25-30 E to A"
+      },
+      "leave_airport_viable": true,
+      "needs_primary_source": true,
+      "lat": 47.4647,
+      "lon": 8.5492,
+      "country": "CH",
+      "city": "Zurich",
+      "_evidence": {
+        "checked": "2026-09-25",
+        "items": [
+          {
+            "item": "ZRH mct_minutes (default)",
+            "verdict": "no_primary_source",
+            "found": "40 minutes (secondary only)",
+            "url": "https://travelvient.com/tools/airports/zrh/",
+            "date": "2026-09-24 (read)",
+            "primary": false,
+            "note": "flughafen-zuerich.ch returns 403 or a bot check to automated reads. No attempt was made to pass the bot check. SWISS publishes gate-to-gate walking times (next item) but no MCT."
+          },
+          {
+            "item": "ZRH night_curfew",
+            "verdict": "confirmed",
+            "found": "Airport: open to civil traffic until 23:00. 23:00-23:30 is kept for clearing delays without a permit. Federal VIL: departures banned 00:00-06:00, arrivals 00:00-05:00. Zurich slot curfew: no arrival slots 23:00-06:09 CET, no departure slots 22:46-05:44 CET, charters' last slot 21:45.",
+            "url": "https://newsroom.flughafen-zuerich.ch/en/nighttime-peace-initiative-violates-federal-law-and-undermines-the-accessibility-of-switzerland/",
+            "date": "2025-01-09 (page)",
+            "primary": true,
+            "note": "The newsroom page misprints the opening as '18:00 to 23:00'; it means 06:00. Slot times: https://www.slotcoordination.ch/airport-information/zurich-zrhlszh/restrictions-zurich.html/112 (the Swiss slot coordinator). Legal basis: federal operating regulations under VIL (SR 748.131.1). Scheduled flights end about 23:00, not 23:30."
+          },
+          {
+            "item": "ZRH services: airside retail and food",
+            "verdict": "corrected",
+            "found": "Zurich Duty Free, Airside Center: open daily 05:00-22:00",
+            "url": "https://www.flughafen-zuerich.ch/en/passengers/shopping-and-enjoy/shops/all-shops/zurich-duty-free-airsidecenter-level1",
+            "date": "2026-09-24 (read via search-engine snippet)",
+            "primary": true,
+            "note": "The airport runs Zurich Duty Free itself. The page blocks automated reads, so the hours come from the search index's copy of it. Worth a manual check."
+          },
+          {
+            "item": "ZRH inter_terminal",
+            "verdict": "corrected",
+            "found": "SWISS walking-time table: E to gates A01-86 25-30 min; E to B01-10 25-30; E to B31-43 20-25; A/B to E16-67 15-20; D to E 15-20; E to E 10-15. 'The Skymetro will take you non-stop from Gates A, B and D to Gates E.'",
+            "url": "https://www.swiss.com/xk/en/fly/airport/zurich-airport.html",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": "For the Dock E to A/B transfer the scorer cares about, 15-30 min gate to gate is realistic, not 10. No primary source for Skymetro headway or hours."
+          },
+          {
+            "item": "ZRH leave_airport_viable",
+            "verdict": "confirmed",
+            "found": "SBB trains from Zurich Airport to Zurich HB every 10 minutes, 10-minute journey",
+            "url": "https://www.rome2rio.com/s/Zurich-Airport-ZRH/Z%C3%BCrich-HB",
+            "date": "2026-09-24 (read)",
+            "primary": false,
+            "note": "The airport's own transport page (flughafen-zuerich.ch/.../train-tram-and-bus) returns 403."
+          },
+          {
+            "item": "ZRH border/schengen",
+            "verdict": "confirmed",
+            "found": "Switzerland is one of the 4 non-EU Schengen members",
+            "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
+            "date": "2025-05-27 (page update)",
+            "primary": true,
+            "note": "Switzerland is not in the EU customs union, but the border field is about passport control, so Schengen is right."
+          },
+          {
+            "item": "ZRH process_minutes (what passengers are told to allow)",
+            "verdict": "no_primary_source",
+            "found": "SWISS: 'get to the airport around 2 hours before departure (short-haul routes) or 3 hours before departure (long-haul routes)'. For US flights, at least 3 hours.",
+            "url": "https://www.swiss.com/ch/en/fly/check-in/check-in-times",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": "SWISS is the hub airline. This is the advised arrival time, not a measured process time."
+          }
+        ],
+        "second_check": [
+          {
+            "item": "ZRH mct_minutes (secondary figure)",
+            "claimed": "40 minutes (secondary only)",
+            "correct_value": "travelvient.com, citing the OAG standard: 40 minutes domestic to domestic and international to international; 50 minutes domestic to international and international to domestic.",
+            "url": "https://travelvient.com/tools/airports/zrh/",
+            "note": "Minor. 40 is only half the picture, and the source is still secondary."
+          }
+        ]
+      }
+    },
+    "GVA": {
+      "zone": "Europe/Zurich",
+      "iata_area": 2,
+      "schengen": true,
+      "border": "schengen",
+      "process_minutes": {
+        "p50": 40,
+        "p90": 70
+      },
+      "mct_minutes": {
+        "default": 45
+      },
+      "night_curfew": {
+        "arrivals": [
+          "00:00",
+          "05:59"
+        ],
+        "departures": [
+          "00:00",
+          "05:59"
+        ],
+        "source": "Geneva night-flight ban"
+      },
+      "services": [
+        {
+          "what": "Duty free, main shop",
+          "hours_local": "05:10-21:30",
+          "note": "the terminal building is closed 00:00-04:00"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "walk",
+        "minutes": 10,
+        "headway_minutes": 0,
+        "operating_hours_local": "one terminal"
+      },
+      "leave_airport_viable": true,
+      "needs_primary_source": true,
+      "lat": 46.2381,
+      "lon": 6.1089,
+      "country": "CH",
+      "city": "Geneva",
+      "_evidence": {
+        "checked": "2026-09-25",
+        "items": [
+          {
+            "item": "GVA mct_minutes (default)",
+            "verdict": "no_primary_source",
+            "found": null,
+            "url": "https://www.gva.ch/en/passengers/travel-preparation/faq",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": "Geneva Airport's FAQ and check-in pages give no MCT. Forums say '45 minutes or less' (TripAdvisor, primary=false)."
+          },
+          {
+            "item": "GVA night_curfew",
+            "verdict": "confirmed",
+            "found": "Federal VIL: departures banned 00:00-06:00, arrivals 00:00-05:00. Both are conditional 22:00-24:00, and arrivals also 05:00-06:00. Geneva slot curfew: arrivals 00:00-06:04 CET, departures '2126-0559CET' as printed. The terminal is closed 00:00-04:00.",
+            "url": "https://www.slotcoordination.ch/airport-information/geneva-gvalsgg/restrictions-geneva.html/110",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "Legally, arrivals may land from 05:00, but no arrival slots are given before 06:04, so 00:00-05:59 works for scheduled flights. The 21:26 departure slot curfew as printed looks odd (maybe a typo for 22:26); check before use. Terminal closure: https://www.gva.ch/en/passengers/travel-preparation/at-the-airport/check-in."
+          },
+          {
+            "item": "GVA services: single-terminal retail",
+            "verdict": "corrected",
+            "found": "Duty Free main shop and Premium: Monday-Sunday 05:10-21:30. Aile Est shop: 05:15-21:30. Schengen duty free: 05:15-20:30. The terminal building is closed 00:00-04:00.",
+            "url": "https://www.gva.ch/en/passengers/shops-and-restaurants/shops-and-duty-free/duty-free-boutique-principale",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": "Airside retail runs about 05:10-21:30."
+          },
+          {
+            "item": "GVA inter_terminal",
+            "verdict": "confirmed",
+            "found": "Terminal 1 is the year-round terminal. T2 is a small seasonal terminal, open only on winter weekends for ski charter arrivals, about 300 m on foot landside from T1 arrivals. A France sector also exists.",
+            "url": "https://www.gva.ch/en/passengers/travel-preparation/general-information/info-t2",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": "'One terminal' is right for connections. No primary source for the 10-minute figure."
+          },
+          {
+            "item": "GVA leave_airport_viable",
+            "verdict": "confirmed",
+            "found": "'The train connects the airport to/from Geneva city centre in just seven minutes, with a frequency of every twelve minutes during peak hours' (Geneva-Cornavin)",
+            "url": "https://www.gva.ch/en/passengers/travel-preparation/faq",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": ""
+          },
+          {
+            "item": "GVA border/schengen",
+            "verdict": "confirmed",
+            "found": "Switzerland is in Schengen",
+            "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
+            "date": "2025-05-27 (page update)",
+            "primary": true,
+            "note": "GVA also has a French sector. That does not change the Schengen border."
+          },
+          {
+            "item": "GVA process_minutes (what passengers are told to allow)",
+            "verdict": "no_primary_source",
+            "found": "Check-in page: arrive 'around 3 hours before departure', earlier in peak (winter) seasons. FAQ: 'no later than two hours before the published departure time' if no other time is given. SWISS: 2 h short-haul, 3 h long-haul.",
+            "url": "https://www.gva.ch/en/passengers/travel-preparation/at-the-airport/check-in",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": "The airport's two pages disagree (3 h vs 2 h minimum)."
+          }
+        ],
+        "second_check": [
+          {
+            "item": "GVA process_minutes (the airport's pages disagree)",
+            "claimed": "The FAQ says 'no later than two hours before the published departure time', so Geneva's two pages disagree (3 h vs 2 h)",
+            "correct_value": "The two-hour line is in the FAQ answer about GVAssistance, the assistance for passengers with reduced mobility: 'If no specific time has been indicated, you must arrive no later than two hours before the published departure time of your flight, at the check-in counters in Terminal 1 or at one of the assistance reception points located at P1, P20, or the TPG stop.' Geneva's general advice is about 3 hours (check-in page). The pages do not disagree.",
+            "url": "https://www.gva.ch/en/passengers/travel-preparation/faq",
+            "note": "Checked against the raw FAQ text. The 3-hour figure is at https://www.gva.ch/en/passengers/travel-preparation/at-the-airport/check-in."
+          }
+        ]
+      }
+    },
+    "FCO": {
+      "zone": "Europe/Rome",
+      "iata_area": 2,
+      "schengen": true,
+      "border": "schengen",
+      "process_minutes": {
+        "p50": 55,
+        "p90": 95
+      },
+      "mct_minutes": {
+        "default": 50
+      },
+      "services": [
+        {
+          "what": "Terminal 1 and 3 retail",
+          "hours_local": "05:30-22:30"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "airside_walk",
+        "minutes": 30,
+        "headway_minutes": 0,
+        "operating_hours_local": "T1 and T3 connect on foot inside the transit area; the furthest gates are about 30 minutes apart (ITA Airways)"
+      },
+      "leave_airport_viable": true,
+      "needs_primary_source": true,
+      "lat": 41.8003,
+      "lon": 12.2389,
+      "country": "IT",
+      "city": "Rome",
+      "_evidence": {
+        "checked": "2026-09-25",
+        "items": [
+          {
+            "item": "FCO mct_minutes (default and T1-T3)",
+            "verdict": "no_primary_source",
+            "found": "ITA Airways: 'The minimum transfer time between the furthest-apart gates is approximately 30 minutes', moving between terminals 'without leaving the transit area'. No MCT number published.",
+            "url": "https://www.ita-airways.com/ly/en/world-of-ita-airways/discover-ita-airways/roma-fiumicino/boarding",
+            "date": "2026-09-24 (read via search-engine snippet)",
+            "primary": true,
+            "note": "ita-airways.com and adr.it block automated reads (403 or empty 202), so this was read from the search index. A 90-minute T1-T3 figure is hard to square with a 30-minute worst-case walk that stays airside."
+          },
+          {
+            "item": "FCO services: Terminal 1 and 3 retail",
+            "verdict": "not_found",
+            "found": null,
+            "url": "https://www.adr.it/web/aeroporti-di-roma-en/pax-fco-airport-map",
+            "date": "2026-09-24 (read attempt)",
+            "primary": true,
+            "note": "The ADR site returns an empty 202 or a CloudFront 403 to automated reads."
+          },
+          {
+            "item": "FCO inter_terminal",
+            "verdict": "corrected",
+            "found": "T1 (gates A, Schengen and domestic) and T3 (gates E, non-Schengen) connect on foot inside the transit area. Furthest gates about 30 minutes apart (ITA Airways).",
+            "url": "https://www.ita-airways.com/ly/en/world-of-ita-airways/discover-ita-airways/roma-fiumicino/boarding",
+            "date": "2026-09-24 (read via search-engine snippet)",
+            "primary": true,
+            "note": "Should be airside_walk. Up to about 30 min, with no bus or headway. Non-Schengen to Schengen connections still pass passport control."
+          },
+          {
+            "item": "FCO leave_airport_viable",
+            "verdict": "corrected",
+            "found": "Leonardo Express to Roma Termini: 32 minutes, every 15 minutes, EUR 14",
+            "url": "https://www.trenitalia.com/en/connections/leonardo-express.html",
+            "date": "2026-09-24 (read)",
+            "primary": true,
+            "note": "A judgement call. The rail link is as good as MUC's (flagged true). First and last trains are not on the page."
+          },
+          {
+            "item": "FCO border/schengen",
+            "verdict": "confirmed",
+            "found": "Italy is in Schengen",
+            "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
+            "date": "2025-05-27 (page update)",
+            "primary": true,
+            "note": ""
+          },
+          {
+            "item": "FCO process_minutes (what passengers are told to allow)",
+            "verdict": "not_found",
+            "found": null,
+            "url": "https://www.adr.it/web/aeroporti-di-roma-en/pax-fco-cheks",
+            "date": "2026-09-24 (read attempt)",
+            "primary": true,
+            "note": "The ADR and ITA Airways pages were unreadable (blocked)."
+          }
+        ],
+        "second_check": []
+      }
+    },
+    "WAW": {
+      "zone": "Europe/Warsaw",
+      "iata_area": 2,
+      "schengen": true,
+      "border": "schengen",
+      "process_minutes": {
+        "p50": 45,
+        "p90": 75
+      },
+      "mct_minutes": {
+        "default": 40
+      },
+      "services": [
+        {
+          "what": "Baltona duty free, airside",
+          "hours_local": "04:00-23:00"
+        },
+        {
+          "what": "Food point near gates 36/37 (Schengen side)",
+          "hours_local": "24h"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "walk",
+        "minutes": 10,
+        "headway_minutes": 0,
+        "operating_hours_local": "one terminal"
+      },
+      "leave_airport_viable": true,
+      "needs_primary_source": true,
+      "lat": 52.1657,
+      "lon": 20.9671,
+      "country": "PL",
+      "city": "Warsaw",
+      "night_note": "No curfew: the airport and border control are open 24 hours; 22:00-06:00 is limited to noise-certified aircraft (PANSA AIP AD 2.21)",
+      "_evidence": {
+        "checked": "2026-09-25",
+        "items": [
+          {
+            "item": "WAW mct_minutes (default)",
+            "verdict": "no_primary_source",
+            "found": null,
+            "url": "https://www.lotnisko-chopina.pl/en/before-flight/transfer-passenger-connecting-flight/",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "The airport says connection time 'depends on your arrival and departure destinations' and to ask the airline. It also sets out the S-S, S-NS, NS-S and NS-NS procedures. No LOT figure found."
+          },
+          {
+            "item": "WAW night_curfew",
+            "verdict": "corrected",
+            "found": "No curfew. The aerodrome and customs/immigration are H24. AIP AD 2.21: movements 'restricted' 2100-0500 UTC winter / 2000-0400 summer (22:00-06:00 local) to aircraft noise-certified to ICAO Annex 16 Chapter 3, 4, 5, 10 or 14. Training, test and technical flights are banned. Planning scheduled flights is 'recommended to avoid'.",
+            "url": "https://docs.pansa.pl/ais/eaipifr/AIRAC%20AMDT%2009-26_2026_09_03/eAIP/AD%202%20EPWA%201-en-GB.html",
+            "date": "2026-09-03 (AIRAC effective)",
+            "primary": true,
+            "note": "PANSA is the Polish state air navigation service. Suggest dropping the curfew, or recording 22:00-06:00 as a noise restriction, not a ban. No code reads night_curfew today."
+          },
+          {
+            "item": "WAW services: single-terminal retail",
+            "verdict": "corrected",
+            "found": "Baltona Duty Free, airside Schengen (gates 25/26 and 38/39) and non-Schengen (gates 21/22): 04:00-23:00. Aelia Duty Free, Schengen airside center: 06:00-21:30. 1 Minute Smacznego! food point: 24h near gates 36/37 (Schengen), 04:00-22:00 near gates 1N-4N (non-Schengen).",
+            "url": "https://www.lotnisko-chopina.pl/en/service-points/shops/baltona-duty-free/",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "The 24h and non-Schengen lines come from https://www.lotnisko-chopina.pl/en/service-points/shops/1-minute-smacznego/ and https://www.lotnisko-chopina.pl/en/service-points/shops/baltona-duty-free-last-minute/. Airside retail runs about 04:00-23:00 and Schengen-side food is 24h. The 1 Minute page's line order is ambiguous."
+          },
+          {
+            "item": "WAW inter_terminal",
+            "verdict": "confirmed",
+            "found": "One terminal with Schengen and non-Schengen zones (non-Schengen gates marked 'N'). Border control applies between the zones.",
+            "url": "https://www.lotnisko-chopina.pl/en/before-flight/transfer-passenger-connecting-flight/",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "No primary source for the 10-minute walk."
+          },
+          {
+            "item": "WAW leave_airport_viable",
+            "verdict": "confirmed",
+            "found": "SKM S2/S3 and Koleje Mazowieckie RL: about 30 minutes to central Warsaw stations. Station under the terminal. Line 175 bus daily; N32 night bus.",
+            "url": "https://www.lotnisko-chopina.pl/en/to-and-from-the-airport/",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": ""
+          },
+          {
+            "item": "WAW border/schengen",
+            "verdict": "confirmed",
+            "found": "Poland is in Schengen",
+            "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
+            "date": "2025-05-27 (page update)",
+            "primary": true,
+            "note": ""
+          },
+          {
+            "item": "WAW process_minutes (what passengers are told to allow)",
+            "verdict": "no_primary_source",
+            "found": "'at least two hours before departure' for Schengen flights and 'at least three hours' for long-haul. Check-in closes 30 min before domestic/European and 1 h before long-haul.",
+            "url": "https://www.lotnisko-chopina.pl/en/before-flight/check-in-at-the-airport/",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "This is the advised arrival time."
+          }
+        ],
+        "second_check": []
+      }
+    },
+    "CPH": {
+      "zone": "Europe/Copenhagen",
+      "iata_area": 2,
+      "schengen": true,
+      "border": "schengen",
+      "process_minutes": {
+        "p50": 45,
+        "p90": 75
+      },
+      "mct_minutes": {
+        "default": 45
+      },
+      "services": [
+        {
+          "what": "Shops after security",
+          "hours_local": "06:00-22:00"
+        },
+        {
+          "what": "Tax-free shop after security",
+          "hours_local": "24h"
+        },
+        {
+          "what": "Metro to Nørreport",
+          "hours_local": "24h",
+          "note": "every 4-6 minutes by day, 15-20 at night; about 15 minutes to Nørreport"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "airside_walk",
+        "minutes": 12,
+        "headway_minutes": 0,
+        "operating_hours_local": "T2 and T3 connect airside"
+      },
+      "leave_airport_viable": true,
+      "needs_primary_source": true,
+      "lat": 55.618,
+      "lon": 12.6508,
+      "country": "DK",
+      "city": "Copenhagen",
+      "_evidence": {
+        "checked": "2026-09-25",
+        "items": [
+          {
+            "item": "CPH mct_minutes (default)",
+            "verdict": "no_primary_source",
+            "found": null,
+            "url": "https://www.cph.dk/en/flight-information/transfer",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "The transfer page publishes no MCT. It calls CPH a 'one roof terminal' and names a Transfer Center between gates B and C. SAS was not checked."
+          },
+          {
+            "item": "CPH services: Terminal 2 and 3 retail",
+            "verdict": "corrected",
+            "found": "After-security shops mostly 06:00-22:00. TAX FREE after security: 'Always open'. 7-Eleven before security: 'Always open'.",
+            "url": "https://www.cph.dk/en/shopping-dining/shops",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "Airside has one 24-hour shop (TAX FREE), so a CPH layover is never 'dead'. Model it as 24h plus 06:00-22:00 for the rest."
+          },
+          {
+            "item": "CPH services: Metro to Kobenhavn H",
+            "verdict": "corrected",
+            "found": "'The Metro runs every 4-6 minute during the day and evening hours, and at a 15-20 minute intervals at night.' 15 minutes from Nørreport Station. The station adjoins Terminal 3.",
+            "url": "https://www.cph.dk/en/parking-transport/bus-train-metro-taxi/metro",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "The Metro runs round the clock and goes to Nørreport, not København H (trains serve København H). Relabel and use '24h'."
+          },
+          {
+            "item": "CPH inter_terminal",
+            "verdict": "confirmed",
+            "found": "'Airport map - One roof terminal'; 'All shopping and dining are under the same roof'",
+            "url": "https://www.cph.dk/en/flight-information/transfer",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "No primary source for the 12-minute figure."
+          },
+          {
+            "item": "CPH leave_airport_viable",
+            "verdict": "confirmed",
+            "found": "'You can easily leave Copenhagen Airport during a layover'. Metro to the city centre in under 15 minutes.",
+            "url": "https://www.cph.dk/en/flight-information/transfer",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": ""
+          },
+          {
+            "item": "CPH border/schengen",
+            "verdict": "confirmed",
+            "found": "Denmark is in Schengen. The transfer page notes EES registration for arrivals.",
+            "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
+            "date": "2025-05-27 (page update)",
+            "primary": true,
+            "note": ""
+          },
+          {
+            "item": "CPH process_minutes (what passengers are told to allow)",
+            "verdict": "no_primary_source",
+            "found": "'at least 2 hours before departure if you are traveling within the Schengen area and at least 3 hours before departure if you are traveling outside the Schengen area'",
+            "url": "https://www.cph.dk/en/practical/tips-for-the-journey",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "This is the advised arrival time."
+          }
+        ],
+        "second_check": [
+          {
+            "item": "CPH leave_airport_viable (quotation)",
+            "claimed": "'You can easily leave Copenhagen Airport during a layover'",
+            "correct_value": "The page says: 'Yes, you are allowed to leave Copenhagen Airport during a layover.' It adds that you need a valid boarding pass and your passport or visa, and should 'allocate extra time for going through security control and, if applicable, passport control'. It also says the airport hotels near the metro are 'less than 15 minutes from Copenhagen's city center'.",
+            "url": "https://www.cph.dk/en/flight-information/transfer",
+            "note": "The substance holds (viable = true). The quotation was wrong. The page was read in the browser pane, because plain fetches get an Akamai 403."
+          }
+        ]
+      }
+    },
+    "DUS": {
+      "zone": "Europe/Berlin",
+      "iata_area": 2,
+      "schengen": true,
+      "border": "schengen",
+      "process_minutes": {
+        "p50": 45,
+        "p90": 80
+      },
+      "mct_minutes": {
+        "default": 45
+      },
+      "night_curfew": {
+        "arrivals": [
+          "23:00",
+          "05:59"
+        ],
+        "departures": [
+          "22:00",
+          "05:59"
+        ],
+        "source": "German AIP EDDL AD 2.20 (scheduled jets; a delayed departure may leave until 23:00 by individual exception)"
+      },
+      "services": [
+        {
+          "what": "Pier shops (Heinemann)",
+          "hours_local": "04:00-21:00",
+          "note": "open from 04:00 (C from 04:30) until 30 minutes before the last departure; the closing hour is not published, so 21:00 is assumed"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "walk",
+        "minutes": 12,
+        "headway_minutes": 0,
+        "operating_hours_local": "one terminal, three concourses"
+      },
+      "leave_airport_viable": true,
+      "needs_primary_source": true,
+      "lat": 51.2895,
+      "lon": 6.7668,
+      "country": "DE",
+      "city": "Dusseldorf",
+      "_evidence": {
+        "checked": "2026-09-25",
+        "items": [
+          {
+            "item": "DUS mct_minutes (default)",
+            "verdict": "no_primary_source",
+            "found": null,
+            "url": "https://www.dus.com/en/flights/transferring",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "The page says only: 'The three piers are connected via transfer corridors.' No MCT."
+          },
+          {
+            "item": "DUS night_curfew",
+            "verdict": "corrected",
+            "found": "German AIP EDDL AD 2.20 (Chapter 3 bonus-list jets), in local time. Scheduled take-offs not permitted 22:00-06:00; delayed scheduled take-offs up to 23:00 only by individual exception. Scheduled landings not permitted 23:00-06:00. Delayed landings not permitted 23:30-06:00. Home-based carriers' delayed landings not permitted 00:00-05:00.",
+            "url": "https://aip.dfs.de/BasicIFR/2026SEP03/pages/EDAA33297B796034451BEB000625130D.html",
+            "date": "AIP page AMDT 10/25; AIRAC effective 2026-09-03",
+            "primary": true,
+            "note": "The AIP gives '2100 (2000) UTC' etc.; converted to local. Departures should start at 22:00, not 23:00. Enforced by the Luftaufsicht (Bezirksregierung Düsseldorf). Page image read by OCR."
+          },
+          {
+            "item": "DUS services: concourse retail",
+            "verdict": "corrected",
+            "found": "Heinemann Duty Free: Pier A from 4:00, Pier B from 4:00am, Pier C from 4:30, each until 30 minutes before the last flight. HOLLMANN Buch & Presse, piers A/B/C: from 5:00 to 30 minutes before the last departure.",
+            "url": "https://www.dus.com/en/shop-and-dine/shops/heinemann-duesseldorf-duty-free",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "The close tracks the last departure, which the rules above cap at about 22:00-23:00. Suggest 04:00-22:00. Terminal is open 24h (dus.com/de-de/faq)."
+          },
+          {
+            "item": "DUS inter_terminal",
+            "verdict": "confirmed",
+            "found": "'The three piers are connected via transfer corridors.' SkyTrain (terminal to long-distance station) runs 03:45-00:45, every 5-7 minutes, within 7 minutes.",
+            "url": "https://www.dus.com/en/flights/transferring",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "No primary source for the 12-minute walk. SkyTrain figures from https://www.dus.com/en/to-and-from/bus-and-train."
+          },
+          {
+            "item": "DUS leave_airport_viable",
+            "verdict": "confirmed",
+            "found": "SkyTrain to the long-distance station; S11 from the terminal station; about 18 minutes to Düsseldorf Hbf, generally every 20 minutes (30 off-peak). Last departure about 1 a.m.",
+            "url": "https://www.dus.com/en/to-and-from/bus-and-train",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": ""
+          },
+          {
+            "item": "DUS border/schengen",
+            "verdict": "confirmed",
+            "found": "Germany is in Schengen",
+            "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
+            "date": "2025-05-27 (page update)",
+            "primary": true,
+            "note": ""
+          },
+          {
+            "item": "DUS process_minutes (what passengers are told to allow)",
+            "verdict": "not_found",
+            "found": null,
+            "url": "https://www.dus.com/en/inform/check-in",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "No hour figure: 'Check with your airline or tour operator how long before departure you should be at the airport.' Check-in generally opens 03:30. The FAQ says airlines open counters at most 3 hours before departure."
+          }
+        ],
+        "second_check": [
+          {
+            "item": "DUS leave_airport_viable (rail figures)",
+            "claimed": "S11 from the terminal station; about 18 minutes to Düsseldorf Hbf, generally every 20 minutes (30 off-peak); last departure about 1 a.m.",
+            "correct_value": "Those figures belong to the U80 light rail (Düsseldorf Central Station to Flughafen Terminal): about 18 minutes, generally every 20 minutes, every 30 off-peak and on Sundays, first arrival shortly after 4 a.m., last departure about 1 a.m. The page gives no journey time, frequency or hours for the S11.",
+            "url": "https://www.dus.com/en/to-and-from/bus-and-train",
+            "note": "The verdict (viable = true) stands. Only the line the numbers belong to changes. The SkyTrain figures (03:45-00:45, every 5-7 minutes, within 7 minutes) are correct."
+          }
+        ]
+      }
+    },
+    "KEF": {
+      "zone": "Atlantic/Reykjavik",
+      "iata_area": 2,
+      "schengen": true,
+      "border": "schengen",
+      "process_minutes": {
+        "p50": 45,
+        "p90": 75
+      },
+      "mct_minutes": {
+        "default": 45
+      },
+      "services": [
+        {
+          "what": "Ísland Duty Free",
+          "hours_local": "24h"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "airside_walk",
+        "minutes": 12,
+        "headway_minutes": 0,
+        "operating_hours_local": "one terminal, Schengen and non-Schengen piers"
+      },
+      "leave_airport_viable": true,
+      "needs_primary_source": true,
+      "lat": 63.985,
+      "lon": -22.6056,
+      "country": "IS",
+      "city": "Reykjavik",
+      "_evidence": {
+        "checked": "2026-09-25",
+        "items": [
+          {
+            "item": "KEF mct_minutes (default)",
+            "verdict": "no_primary_source",
+            "found": null,
+            "url": "https://www.kefairport.com/",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "The airport site publishes no MCT. icelandair.com served a Cloudflare bot check, which was not attempted."
+          },
+          {
+            "item": "KEF services: Leifsstod retail aligned to connection banks",
+            "verdict": "corrected",
+            "found": "'Ísland Duty Free airport shops are open 24/7 every day of the year.' Locations: main building departures 2nd floor after security; south building 1st floor near D gates; arrivals near baggage claim.",
+            "url": "https://www.kefairport.com/shopping/island-duty-free",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "The same text is on the Icelandic page (kefairport.is/verslanir/island-duty-free). Restaurant hours are not published."
+          },
+          {
+            "item": "KEF inter_terminal",
+            "verdict": "confirmed",
+            "found": "Main building plus a south building with D gates. Elda Bar is listed 'in the Non-Schengen area'.",
+            "url": "https://www.kefairport.com/shopping/island-duty-free",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "No primary source for the 12-minute figure."
+          },
+          {
+            "item": "KEF leave_airport_viable",
+            "verdict": "corrected",
+            "found": "Flybus: 45 minutes to Reykjavík (BSÍ), leaving 40 minutes after each plane lands. The airport says about 40 minutes by road from central Reykjavík. Strætó public buses also run.",
+            "url": "https://www.kefairport.com/services/bus",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "A judgement call. A long layover can leave, like MUC (40 min, flagged true), and the scorer already requires enough usable time. Road time from https://www.kefairport.is/thjonusta/til-og-fra."
+          },
+          {
+            "item": "KEF border/schengen",
+            "verdict": "confirmed",
+            "found": "Iceland is one of the 4 non-EU Schengen members",
+            "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
+            "date": "2025-05-27 (page update)",
+            "primary": true,
+            "note": ""
+          },
+          {
+            "item": "KEF process_minutes (what passengers are told to allow)",
+            "verdict": "not_found",
+            "found": null,
+            "url": "https://www.kefairport.com/flights/departures",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "No advice on kefairport.com. The 15 Aug 2026 notice (https://www.kefairport.com/news/busier-security-screening) warns of longer security queues and gives no time."
+          }
+        ],
+        "second_check": [
+          {
+            "item": "KEF inter_terminal (non-Schengen evidence)",
+            "claimed": "Main building plus a south building with D gates. Elda Bar is listed 'in the Non-Schengen area'.",
+            "correct_value": "The cited page lists the main building (departures, 2nd floor, after security), the south building (departures, 1st floor, near D gates) and arrivals. It has no mention of Elda Bar and no Schengen or non-Schengen wording, in the rendered text or the raw HTML.",
+            "url": "https://www.kefairport.com/shopping/island-duty-free",
+            "note": "The row's 'Schengen and non-Schengen piers' wording is probably right, but this URL does not support it."
+          }
+        ]
+      }
+    },
+    "DUB": {
+      "zone": "Europe/Dublin",
+      "iata_area": 2,
+      "schengen": false,
+      "border": "ie",
+      "process_minutes": {
+        "p50": 50,
+        "p90": 85
+      },
+      "mct_minutes": {
+        "default": 60,
+        "T1-T2": 90
+      },
+      "services": [
+        {
+          "what": "Shops after security, Terminals 1 and 2",
+          "hours_local": "04:00-21:00",
+          "note": "Terminal 1's duty free stays open to 22:00"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "airside_walk",
+        "minutes": 15,
+        "headway_minutes": 0,
+        "operating_hours_local": "Through-ticketed passengers follow Flight Connections signs, all connection gates under one roof (Dublin Airport); no walking time is published"
+      },
+      "leave_airport_viable": true,
+      "needs_primary_source": true,
+      "lat": 53.4213,
+      "lon": -6.2701,
+      "country": "IE",
+      "city": "Dublin",
+      "_evidence": {
+        "checked": "2026-09-25",
+        "items": [
+          {
+            "item": "DUB mct_minutes (default and T1-T2)",
+            "verdict": "no_primary_source",
+            "found": null,
+            "url": "https://www.dublinairport.com/flight-information/connections",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "No MCT published. T1 and T2 are 'a five-minute walk apart' on an airside connections route (next items), so 90 minutes for T1-T2 is hard to support."
+          },
+          {
+            "item": "DUB night_curfew",
+            "verdict": "confirmed",
+            "found": "'We only close on Christmas Day. Otherwise, Dublin Airport is open 24/7.'",
+            "url": "https://www.dublinairport.com/at-the-airport/advice-helpful-services/frequently-asked-questions",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "No curfew at airport level. North Runway night-use planning conditions were not checked."
+          },
+          {
+            "item": "DUB services: Terminal 1 and 2 retail",
+            "verdict": "corrected",
+            "found": "T1 after security: Dublin Airport Duty Free Mon-Sun 04:00-22:00; WHSmith 04:00-21:00. T2 after security: Duty Free 04:00-21:00; WHSmith 04:00-21:00.",
+            "url": "https://www.dublinairport.com/at-the-airport/shopping/shops-in-the-terminals",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "Airside retail opens at 04:00 and closes 21:00 (T2) or 22:00 (T1)."
+          },
+          {
+            "item": "DUB inter_terminal",
+            "verdict": "corrected",
+            "found": "'All our Flight Connection gates are under one roof, so no shuttles needed.' 'T1 and T2 are a five-minute walk apart.' Carry-on passengers follow 'Flight Connections' signs, 'unless you're travelling outside 06:00-13:00hrs through Terminal 1'; then they exit via baggage reclaim and re-clear security. Self-connectors with checked bags go landside and check in again.",
+            "url": "https://www.dublinairport.com/flight-information/connections",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "The largest error in this table. A through-ticketed T1-T2 connection is an airside walk of about 5 minutes. Security re-clearing applies only to self-connectors, or to T1 outside 06:00-13:00. adapter.py still adds security_reclear_required for separate tickets."
+          },
+          {
+            "item": "DUB leave_airport_viable",
+            "verdict": "confirmed",
+            "found": "'The Transport for Ireland (TFI) Network provides frequent, reliable and 24-hour bus services'",
+            "url": "https://www.dublinairport.com/to-from-the-airport/by-bus",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "No journey time on the page."
+          },
+          {
+            "item": "DUB border/schengen",
+            "verdict": "confirmed",
+            "found": "'Ireland ... is exceptionally allowed by the Schengen Protocol not to apply the Schengen rules (opt out) so it continues to enforce its own visa and border policies.'",
+            "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
+            "date": "2025-05-27 (page update)",
+            "primary": true,
+            "note": "DUB also has US Preclearance (https://www.dublinairport.com/flight-information/travelling-to-usa/usa-preclearance), which adapter.US_PRECLEARANCE already covers."
+          },
+          {
+            "item": "DUB process_minutes (what passengers are told to allow)",
+            "verdict": "no_primary_source",
+            "found": "'We suggest that you arrive 2 hours before your scheduled departure if you're flying short-haul and 3 hours before long-haul flights.'",
+            "url": "https://www.dublinairport.com/at-the-airport/check-in",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "This is the advised arrival time."
+          }
+        ],
+        "second_check": [
+          {
+            "item": "DUB inter_terminal (T1 to T2 connection)",
+            "claimed": "A through-ticketed T1-T2 connection is an airside walk of about 5 minutes. Only carry-on passengers connecting through T1 outside 06:00-13:00 re-clear security.",
+            "correct_value": "The page's 'T1 and T2 are a five-minute walk apart' appears only under 'Self-connecting Passengers, with checked-in luggage', which is a landside walk after baggage claim and customs. The 06:00-13:00 T1 exception also appears only under self-connecting passengers with carry-on. For single-booking passengers the page says only to 'follow the Flight Connections signs and have your documents ready for inspection', and that 'All our Flight Connection gates are under one roof, so no shuttles needed.' So the table's landside-only row is wrong for through tickets. But no primary source gives an airside walking time, and the page does not say whether through passengers are screened again.",
+            "url": "https://www.dublinairport.com/flight-information/connections",
+            "note": "Read from the raw page HTML. Changing the mode away from landside is supported. Setting minutes to 5 is not: that figure is the landside self-connector walk."
+          },
+          {
+            "item": "DUB mct_minutes note",
+            "claimed": "T1 and T2 are 'a five-minute walk apart' on an airside connections route",
+            "correct_value": "The five-minute figure is given for self-connectors walking landside between terminals, not for the airside Flight Connections route. No MCT is published.",
+            "url": "https://www.dublinairport.com/flight-information/connections",
+            "note": "The conclusion that 90 minutes for T1-T2 is hard to support may still hold, but not on this evidence."
+          }
+        ]
+      }
+    },
+    "SNN": {
+      "zone": "Europe/Dublin",
+      "iata_area": 2,
+      "schengen": false,
+      "border": "ie",
+      "process_minutes": {
+        "p50": 35,
+        "p90": 60
+      },
+      "mct_minutes": {
+        "default": 45
+      },
+      "services": [
+        {
+          "what": "Single-terminal retail",
+          "hours_local": "05:30-20:00"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "walk",
+        "minutes": 8,
+        "headway_minutes": 0,
+        "operating_hours_local": "one terminal"
+      },
+      "leave_airport_viable": false,
+      "needs_primary_source": true,
+      "lat": 52.7019,
+      "lon": -8.9248,
+      "country": "IE",
+      "city": "Shannon",
+      "_evidence": {
+        "checked": "2026-09-25",
+        "items": [
+          {
+            "item": "SNN mct_minutes (default)",
+            "verdict": "not_found",
+            "found": null,
+            "url": "https://www.shannonairport.ie/",
+            "date": "2026-09-25 (read attempt)",
+            "primary": true,
+            "note": "shannonairport.ie returns 403 to curl, the fetch tool and the preview browser."
+          },
+          {
+            "item": "SNN services: single-terminal retail",
+            "verdict": "not_found",
+            "found": null,
+            "url": "https://www.shannonairport.ie/",
+            "date": "2026-09-25 (read attempt)",
+            "primary": true,
+            "note": "Site blocked (403)."
+          },
+          {
+            "item": "SNN inter_terminal",
+            "verdict": "not_found",
+            "found": null,
+            "url": "https://www.shannonairport.ie/",
+            "date": "2026-09-25 (read attempt)",
+            "primary": true,
+            "note": "Site blocked (403)."
+          },
+          {
+            "item": "SNN leave_airport_viable",
+            "verdict": "not_found",
+            "found": null,
+            "url": "https://www.shannonairport.ie/",
+            "date": "2026-09-25 (read attempt)",
+            "primary": true,
+            "note": "Site blocked (403)."
+          },
+          {
+            "item": "SNN border/schengen",
+            "verdict": "confirmed",
+            "found": "Ireland opts out of Schengen",
+            "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
+            "date": "2025-05-27 (page update)",
+            "primary": true,
+            "note": ""
+          },
+          {
+            "item": "SNN process_minutes (what passengers are told to allow)",
+            "verdict": "not_found",
+            "found": null,
+            "url": "https://www.shannonairport.ie/",
+            "date": "2026-09-25 (read attempt)",
+            "primary": true,
+            "note": "Site blocked (403)."
+          }
+        ],
+        "second_check": []
+      }
+    },
+    "IST": {
+      "zone": "Europe/Istanbul",
+      "iata_area": 2,
+      "schengen": false,
+      "border": "tr",
+      "process_minutes": {
+        "p50": 60,
+        "p90": 105
+      },
+      "mct_minutes": {
+        "default": 60
+      },
+      "services": [
+        {
+          "what": "Airside retail and food",
+          "hours_local": "24h"
+        }
+      ],
+      "inter_terminal": {
+        "mode": "airside_walk",
+        "minutes": 25,
+        "headway_minutes": 0,
+        "operating_hours_local": "one terminal, but gate-to-gate walks reach 25 minutes"
+      },
+      "leave_airport_viable": false,
+      "needs_primary_source": true,
+      "lat": 41.2753,
+      "lon": 28.7519,
+      "country": "TR",
+      "city": "Istanbul",
+      "_evidence": {
+        "checked": "2026-09-25",
+        "items": [
+          {
+            "item": "IST mct_minutes (default)",
+            "verdict": "no_primary_source",
+            "found": null,
+            "url": "https://www.istairport.com/en/flights/airport-guides/transfer-passenger-guide",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "The transfer guide shows four route diagrams (intl-intl etc.) and no MCT. The FAQ has none either. Turkish Airlines was not reachable."
+          },
+          {
+            "item": "IST services: airside retail and food",
+            "verdict": "confirmed",
+            "found": "Atasay store, International Airside, A-B Pier: 'Opening Hours 24/7 Open'",
+            "url": "https://www.istairport.com/en/services/shopping/stores/atasay-close-to-a-b-pier?locale=en",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "One airside store checked. The restaurants page gives no hours."
+          },
+          {
+            "item": "IST inter_terminal",
+            "verdict": "no_primary_source",
+            "found": null,
+            "url": "https://www.istairport.com/en/flights/airport-guides/transfer-passenger-guide",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "The page shows one terminal with transfer routes but gives no walking times."
+          },
+          {
+            "item": "IST leave_airport_viable",
+            "verdict": "no_primary_source",
+            "found": "M11 metro (Gayrettepe/Kağıthane to Istanbul Airport, running since 22 Jan 2023) and Havaist buses on 11 routes to the city",
+            "url": "https://www.istairport.com/en/airport/airport-transportation/urban-transportation/public-transportation",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "No journey times or hours on the page, so it cannot settle the judgement. Leaving also means Turkish passport control."
+          },
+          {
+            "item": "IST border/schengen",
+            "verdict": "confirmed",
+            "found": "Schengen is 25 EU + Iceland, Norway, Switzerland, Liechtenstein. Türkiye is not a member.",
+            "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
+            "date": "2025-05-27 (page update)",
+            "primary": true,
+            "note": ""
+          },
+          {
+            "item": "IST process_minutes (what passengers are told to allow)",
+            "verdict": "no_primary_source",
+            "found": "'Passengers are advised to check-in at least 3 hours prior to departure for international flights, and at least 2 hours prior to departure for domestic flights.'",
+            "url": "https://www.istairport.com/en/faq",
+            "date": "2026-09-25 (read)",
+            "primary": true,
+            "note": "This is the advised arrival time."
+          }
+        ],
+        "second_check": []
+      }
     }
-   ],
-   "inter_terminal": {
-    "mode": "walk",
-    "minutes": 12,
-    "headway_minutes": 0,
-    "operating_hours_local": "one terminal, three concourses"
-   },
-   "leave_airport_viable": true,
-   "needs_primary_source": true,
-   "lat": 51.2895,
-   "lon": 6.7668,
-   "country": "DE",
-   "city": "Dusseldorf",
-   "_evidence": {
-    "checked": "2026-09-25",
-    "items": [
-     {
-      "item": "DUS mct_minutes (default)",
-      "verdict": "no_primary_source",
-      "found": null,
-      "url": "https://www.dus.com/en/flights/transferring",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "The page says only: 'The three piers are connected via transfer corridors.' No MCT."
-     },
-     {
-      "item": "DUS night_curfew",
-      "verdict": "corrected",
-      "found": "German AIP EDDL AD 2.20 (Chapter 3 bonus-list jets), in local time. Scheduled take-offs not permitted 22:00-06:00; delayed scheduled take-offs up to 23:00 only by individual exception. Scheduled landings not permitted 23:00-06:00. Delayed landings not permitted 23:30-06:00. Home-based carriers' delayed landings not permitted 00:00-05:00.",
-      "url": "https://aip.dfs.de/BasicIFR/2026SEP03/pages/EDAA33297B796034451BEB000625130D.html",
-      "date": "AIP page AMDT 10/25; AIRAC effective 2026-09-03",
-      "primary": true,
-      "note": "The AIP gives '2100 (2000) UTC' etc.; converted to local. Departures should start at 22:00, not 23:00. Enforced by the Luftaufsicht (Bezirksregierung Düsseldorf). Page image read by OCR."
-     },
-     {
-      "item": "DUS services: concourse retail",
-      "verdict": "corrected",
-      "found": "Heinemann Duty Free: Pier A from 4:00, Pier B from 4:00am, Pier C from 4:30, each until 30 minutes before the last flight. HOLLMANN Buch & Presse, piers A/B/C: from 5:00 to 30 minutes before the last departure.",
-      "url": "https://www.dus.com/en/shop-and-dine/shops/heinemann-duesseldorf-duty-free",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "The close tracks the last departure, which the rules above cap at about 22:00-23:00. Suggest 04:00-22:00. Terminal is open 24h (dus.com/de-de/faq)."
-     },
-     {
-      "item": "DUS inter_terminal",
-      "verdict": "confirmed",
-      "found": "'The three piers are connected via transfer corridors.' SkyTrain (terminal to long-distance station) runs 03:45-00:45, every 5-7 minutes, within 7 minutes.",
-      "url": "https://www.dus.com/en/flights/transferring",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "No primary source for the 12-minute walk. SkyTrain figures from https://www.dus.com/en/to-and-from/bus-and-train."
-     },
-     {
-      "item": "DUS leave_airport_viable",
-      "verdict": "confirmed",
-      "found": "SkyTrain to the long-distance station; S11 from the terminal station; about 18 minutes to Düsseldorf Hbf, generally every 20 minutes (30 off-peak). Last departure about 1 a.m.",
-      "url": "https://www.dus.com/en/to-and-from/bus-and-train",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": ""
-     },
-     {
-      "item": "DUS border/schengen",
-      "verdict": "confirmed",
-      "found": "Germany is in Schengen",
-      "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
-      "date": "2025-05-27 (page update)",
-      "primary": true,
-      "note": ""
-     },
-     {
-      "item": "DUS process_minutes (what passengers are told to allow)",
-      "verdict": "not_found",
-      "found": null,
-      "url": "https://www.dus.com/en/inform/check-in",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "No hour figure: 'Check with your airline or tour operator how long before departure you should be at the airport.' Check-in generally opens 03:30. The FAQ says airlines open counters at most 3 hours before departure."
-     }
-    ],
-    "second_check": [
-     {
-      "item": "DUS leave_airport_viable (rail figures)",
-      "claimed": "S11 from the terminal station; about 18 minutes to Düsseldorf Hbf, generally every 20 minutes (30 off-peak); last departure about 1 a.m.",
-      "correct_value": "Those figures belong to the U80 light rail (Düsseldorf Central Station to Flughafen Terminal): about 18 minutes, generally every 20 minutes, every 30 off-peak and on Sundays, first arrival shortly after 4 a.m., last departure about 1 a.m. The page gives no journey time, frequency or hours for the S11.",
-      "url": "https://www.dus.com/en/to-and-from/bus-and-train",
-      "note": "The verdict (viable = true) stands. Only the line the numbers belong to changes. The SkyTrain figures (03:45-00:45, every 5-7 minutes, within 7 minutes) are correct."
-     }
-    ]
-   }
   },
-  "KEF": {
-   "zone": "Atlantic/Reykjavik",
-   "iata_area": 2,
-   "schengen": true,
-   "border": "schengen",
-   "process_minutes": {
-    "p50": 45,
-    "p90": 75
-   },
-   "mct_minutes": {
-    "default": 45
-   },
-   "services": [
-    {
-     "what": "Ísland Duty Free",
-     "hours_local": "24h"
-    }
-   ],
-   "inter_terminal": {
-    "mode": "airside_walk",
-    "minutes": 12,
-    "headway_minutes": 0,
-    "operating_hours_local": "one terminal, Schengen and non-Schengen piers"
-   },
-   "leave_airport_viable": true,
-   "needs_primary_source": true,
-   "lat": 63.985,
-   "lon": -22.6056,
-   "country": "IS",
-   "city": "Reykjavik",
-   "_evidence": {
-    "checked": "2026-09-25",
-    "items": [
-     {
-      "item": "KEF mct_minutes (default)",
-      "verdict": "no_primary_source",
-      "found": null,
-      "url": "https://www.kefairport.com/",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "The airport site publishes no MCT. icelandair.com served a Cloudflare bot check, which was not attempted."
-     },
-     {
-      "item": "KEF services: Leifsstod retail aligned to connection banks",
-      "verdict": "corrected",
-      "found": "'Ísland Duty Free airport shops are open 24/7 every day of the year.' Locations: main building departures 2nd floor after security; south building 1st floor near D gates; arrivals near baggage claim.",
-      "url": "https://www.kefairport.com/shopping/island-duty-free",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "The same text is on the Icelandic page (kefairport.is/verslanir/island-duty-free). Restaurant hours are not published."
-     },
-     {
-      "item": "KEF inter_terminal",
-      "verdict": "confirmed",
-      "found": "Main building plus a south building with D gates. Elda Bar is listed 'in the Non-Schengen area'.",
-      "url": "https://www.kefairport.com/shopping/island-duty-free",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "No primary source for the 12-minute figure."
-     },
-     {
-      "item": "KEF leave_airport_viable",
-      "verdict": "corrected",
-      "found": "Flybus: 45 minutes to Reykjavík (BSÍ), leaving 40 minutes after each plane lands. The airport says about 40 minutes by road from central Reykjavík. Strætó public buses also run.",
-      "url": "https://www.kefairport.com/services/bus",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "A judgement call. A long layover can leave, like MUC (40 min, flagged true), and the scorer already requires enough usable time. Road time from https://www.kefairport.is/thjonusta/til-og-fra."
-     },
-     {
-      "item": "KEF border/schengen",
-      "verdict": "confirmed",
-      "found": "Iceland is one of the 4 non-EU Schengen members",
-      "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
-      "date": "2025-05-27 (page update)",
-      "primary": true,
-      "note": ""
-     },
-     {
-      "item": "KEF process_minutes (what passengers are told to allow)",
-      "verdict": "not_found",
-      "found": null,
-      "url": "https://www.kefairport.com/flights/departures",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "No advice on kefairport.com. The 15 Aug 2026 notice (https://www.kefairport.com/news/busier-security-screening) warns of longer security queues and gives no time."
-     }
-    ],
-    "second_check": [
-     {
-      "item": "KEF inter_terminal (non-Schengen evidence)",
-      "claimed": "Main building plus a south building with D gates. Elda Bar is listed 'in the Non-Schengen area'.",
-      "correct_value": "The cited page lists the main building (departures, 2nd floor, after security), the south building (departures, 1st floor, near D gates) and arrivals. It has no mention of Elda Bar and no Schengen or non-Schengen wording, in the rendered text or the raw HTML.",
-      "url": "https://www.kefairport.com/shopping/island-duty-free",
-      "note": "The row's 'Schengen and non-Schengen piers' wording is probably right, but this URL does not support it."
-     }
-    ]
-   }
-  },
-  "DUB": {
-   "zone": "Europe/Dublin",
-   "iata_area": 2,
-   "schengen": false,
-   "border": "ie",
-   "process_minutes": {
-    "p50": 50,
-    "p90": 85
-   },
-   "mct_minutes": {
-    "default": 60,
-    "T1-T2": 90
-   },
-   "services": [
-    {
-     "what": "Shops after security, Terminals 1 and 2",
-     "hours_local": "04:00-21:00",
-     "note": "Terminal 1's duty free stays open to 22:00"
-    }
-   ],
-   "inter_terminal": {
-    "mode": "airside_walk",
-    "minutes": 15,
-    "headway_minutes": 0,
-    "operating_hours_local": "Through-ticketed passengers follow Flight Connections signs, all connection gates under one roof (Dublin Airport); no walking time is published"
-   },
-   "leave_airport_viable": true,
-   "needs_primary_source": true,
-   "lat": 53.4213,
-   "lon": -6.2701,
-   "country": "IE",
-   "city": "Dublin",
-   "_evidence": {
-    "checked": "2026-09-25",
-    "items": [
-     {
-      "item": "DUB mct_minutes (default and T1-T2)",
-      "verdict": "no_primary_source",
-      "found": null,
-      "url": "https://www.dublinairport.com/flight-information/connections",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "No MCT published. T1 and T2 are 'a five-minute walk apart' on an airside connections route (next items), so 90 minutes for T1-T2 is hard to support."
-     },
-     {
-      "item": "DUB night_curfew",
-      "verdict": "confirmed",
-      "found": "'We only close on Christmas Day. Otherwise, Dublin Airport is open 24/7.'",
-      "url": "https://www.dublinairport.com/at-the-airport/advice-helpful-services/frequently-asked-questions",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "No curfew at airport level. North Runway night-use planning conditions were not checked."
-     },
-     {
-      "item": "DUB services: Terminal 1 and 2 retail",
-      "verdict": "corrected",
-      "found": "T1 after security: Dublin Airport Duty Free Mon-Sun 04:00-22:00; WHSmith 04:00-21:00. T2 after security: Duty Free 04:00-21:00; WHSmith 04:00-21:00.",
-      "url": "https://www.dublinairport.com/at-the-airport/shopping/shops-in-the-terminals",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "Airside retail opens at 04:00 and closes 21:00 (T2) or 22:00 (T1)."
-     },
-     {
-      "item": "DUB inter_terminal",
-      "verdict": "corrected",
-      "found": "'All our Flight Connection gates are under one roof, so no shuttles needed.' 'T1 and T2 are a five-minute walk apart.' Carry-on passengers follow 'Flight Connections' signs, 'unless you're travelling outside 06:00-13:00hrs through Terminal 1'; then they exit via baggage reclaim and re-clear security. Self-connectors with checked bags go landside and check in again.",
-      "url": "https://www.dublinairport.com/flight-information/connections",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "The largest error in this table. A through-ticketed T1-T2 connection is an airside walk of about 5 minutes. Security re-clearing applies only to self-connectors, or to T1 outside 06:00-13:00. adapter.py still adds security_reclear_required for separate tickets."
-     },
-     {
-      "item": "DUB leave_airport_viable",
-      "verdict": "confirmed",
-      "found": "'The Transport for Ireland (TFI) Network provides frequent, reliable and 24-hour bus services'",
-      "url": "https://www.dublinairport.com/to-from-the-airport/by-bus",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "No journey time on the page."
-     },
-     {
-      "item": "DUB border/schengen",
-      "verdict": "confirmed",
-      "found": "'Ireland ... is exceptionally allowed by the Schengen Protocol not to apply the Schengen rules (opt out) so it continues to enforce its own visa and border policies.'",
-      "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
-      "date": "2025-05-27 (page update)",
-      "primary": true,
-      "note": "DUB also has US Preclearance (https://www.dublinairport.com/flight-information/travelling-to-usa/usa-preclearance), which adapter.US_PRECLEARANCE already covers."
-     },
-     {
-      "item": "DUB process_minutes (what passengers are told to allow)",
-      "verdict": "no_primary_source",
-      "found": "'We suggest that you arrive 2 hours before your scheduled departure if you're flying short-haul and 3 hours before long-haul flights.'",
-      "url": "https://www.dublinairport.com/at-the-airport/check-in",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "This is the advised arrival time."
-     }
-    ],
-    "second_check": [
-     {
-      "item": "DUB inter_terminal (T1 to T2 connection)",
-      "claimed": "A through-ticketed T1-T2 connection is an airside walk of about 5 minutes. Only carry-on passengers connecting through T1 outside 06:00-13:00 re-clear security.",
-      "correct_value": "The page's 'T1 and T2 are a five-minute walk apart' appears only under 'Self-connecting Passengers, with checked-in luggage', which is a landside walk after baggage claim and customs. The 06:00-13:00 T1 exception also appears only under self-connecting passengers with carry-on. For single-booking passengers the page says only to 'follow the Flight Connections signs and have your documents ready for inspection', and that 'All our Flight Connection gates are under one roof, so no shuttles needed.' So the table's landside-only row is wrong for through tickets. But no primary source gives an airside walking time, and the page does not say whether through passengers are screened again.",
-      "url": "https://www.dublinairport.com/flight-information/connections",
-      "note": "Read from the raw page HTML. Changing the mode away from landside is supported. Setting minutes to 5 is not: that figure is the landside self-connector walk."
-     },
-     {
-      "item": "DUB mct_minutes note",
-      "claimed": "T1 and T2 are 'a five-minute walk apart' on an airside connections route",
-      "correct_value": "The five-minute figure is given for self-connectors walking landside between terminals, not for the airside Flight Connections route. No MCT is published.",
-      "url": "https://www.dublinairport.com/flight-information/connections",
-      "note": "The conclusion that 90 minutes for T1-T2 is hard to support may still hold, but not on this evidence."
-     }
-    ]
-   }
-  },
-  "SNN": {
-   "zone": "Europe/Dublin",
-   "iata_area": 2,
-   "schengen": false,
-   "border": "ie",
-   "process_minutes": {
-    "p50": 35,
-    "p90": 60
-   },
-   "mct_minutes": {
-    "default": 45
-   },
-   "services": [
-    {
-     "what": "Single-terminal retail",
-     "hours_local": "05:30-20:00"
-    }
-   ],
-   "inter_terminal": {
-    "mode": "walk",
-    "minutes": 8,
-    "headway_minutes": 0,
-    "operating_hours_local": "one terminal"
-   },
-   "leave_airport_viable": false,
-   "needs_primary_source": true,
-   "lat": 52.7019,
-   "lon": -8.9248,
-   "country": "IE",
-   "city": "Shannon",
-   "_evidence": {
-    "checked": "2026-09-25",
-    "items": [
-     {
-      "item": "SNN mct_minutes (default)",
-      "verdict": "not_found",
-      "found": null,
-      "url": "https://www.shannonairport.ie/",
-      "date": "2026-09-25 (read attempt)",
-      "primary": true,
-      "note": "shannonairport.ie returns 403 to curl, the fetch tool and the preview browser."
-     },
-     {
-      "item": "SNN services: single-terminal retail",
-      "verdict": "not_found",
-      "found": null,
-      "url": "https://www.shannonairport.ie/",
-      "date": "2026-09-25 (read attempt)",
-      "primary": true,
-      "note": "Site blocked (403)."
-     },
-     {
-      "item": "SNN inter_terminal",
-      "verdict": "not_found",
-      "found": null,
-      "url": "https://www.shannonairport.ie/",
-      "date": "2026-09-25 (read attempt)",
-      "primary": true,
-      "note": "Site blocked (403)."
-     },
-     {
-      "item": "SNN leave_airport_viable",
-      "verdict": "not_found",
-      "found": null,
-      "url": "https://www.shannonairport.ie/",
-      "date": "2026-09-25 (read attempt)",
-      "primary": true,
-      "note": "Site blocked (403)."
-     },
-     {
-      "item": "SNN border/schengen",
-      "verdict": "confirmed",
-      "found": "Ireland opts out of Schengen",
-      "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
-      "date": "2025-05-27 (page update)",
-      "primary": true,
-      "note": ""
-     },
-     {
-      "item": "SNN process_minutes (what passengers are told to allow)",
-      "verdict": "not_found",
-      "found": null,
-      "url": "https://www.shannonairport.ie/",
-      "date": "2026-09-25 (read attempt)",
-      "primary": true,
-      "note": "Site blocked (403)."
-     }
-    ],
-    "second_check": []
-   }
-  },
-  "IST": {
-   "zone": "Europe/Istanbul",
-   "iata_area": 2,
-   "schengen": false,
-   "border": "tr",
-   "process_minutes": {
-    "p50": 60,
-    "p90": 105
-   },
-   "mct_minutes": {
-    "default": 60
-   },
-   "services": [
-    {
-     "what": "Airside retail and food",
-     "hours_local": "24h"
-    }
-   ],
-   "inter_terminal": {
-    "mode": "airside_walk",
-    "minutes": 25,
-    "headway_minutes": 0,
-    "operating_hours_local": "one terminal, but gate-to-gate walks reach 25 minutes"
-   },
-   "leave_airport_viable": false,
-   "needs_primary_source": true,
-   "lat": 41.2753,
-   "lon": 28.7519,
-   "country": "TR",
-   "city": "Istanbul",
-   "_evidence": {
-    "checked": "2026-09-25",
-    "items": [
-     {
-      "item": "IST mct_minutes (default)",
-      "verdict": "no_primary_source",
-      "found": null,
-      "url": "https://www.istairport.com/en/flights/airport-guides/transfer-passenger-guide",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "The transfer guide shows four route diagrams (intl-intl etc.) and no MCT. The FAQ has none either. Turkish Airlines was not reachable."
-     },
-     {
-      "item": "IST services: airside retail and food",
-      "verdict": "confirmed",
-      "found": "Atasay store, International Airside, A-B Pier: 'Opening Hours 24/7 Open'",
-      "url": "https://www.istairport.com/en/services/shopping/stores/atasay-close-to-a-b-pier?locale=en",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "One airside store checked. The restaurants page gives no hours."
-     },
-     {
-      "item": "IST inter_terminal",
-      "verdict": "no_primary_source",
-      "found": null,
-      "url": "https://www.istairport.com/en/flights/airport-guides/transfer-passenger-guide",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "The page shows one terminal with transfer routes but gives no walking times."
-     },
-     {
-      "item": "IST leave_airport_viable",
-      "verdict": "no_primary_source",
-      "found": "M11 metro (Gayrettepe/Kağıthane to Istanbul Airport, running since 22 Jan 2023) and Havaist buses on 11 routes to the city",
-      "url": "https://www.istairport.com/en/airport/airport-transportation/urban-transportation/public-transportation",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "No journey times or hours on the page, so it cannot settle the judgement. Leaving also means Turkish passport control."
-     },
-     {
-      "item": "IST border/schengen",
-      "verdict": "confirmed",
-      "found": "Schengen is 25 EU + Iceland, Norway, Switzerland, Liechtenstein. Türkiye is not a member.",
-      "url": "https://home-affairs.ec.europa.eu/policies/schengen/schengen-area_en",
-      "date": "2025-05-27 (page update)",
-      "primary": true,
-      "note": ""
-     },
-     {
-      "item": "IST process_minutes (what passengers are told to allow)",
-      "verdict": "no_primary_source",
-      "found": "'Passengers are advised to check-in at least 3 hours prior to departure for international flights, and at least 2 hours prior to departure for domestic flights.'",
-      "url": "https://www.istairport.com/en/faq",
-      "date": "2026-09-25 (read)",
-      "primary": true,
-      "note": "This is the advised arrival time."
-     }
-    ],
-    "second_check": []
-   }
-  }
- },
- "_review": "The rows flagged needs_primary_source were added to cover the European connection points a real JFK-LHR search actually returns. MCT, curfew and inter-terminal figures are curated from published airport and carrier data and are the right shape at roughly the right magnitude; each still wants checking against the airport's own published minimum connection time before a dollar figure built on it is shown to a stranger. AMS, BCN, CDG, EWR, JFK, LHR, LIS, MAD and MXP predate this and carry no flag. Deliberately NOT added: BOS, IAD, ATL, BOG, CMN, TLV and AUH - a JFK-LHR search returns connections through all of them and every one is outside the transatlantic scope, so they go on dropping. CHECKED 2026-09-25: the twelve flagged European rows were researched against the airports' and airlines' own pages (and the national AIPs for curfews) and re-checked by a second reader; corrections are applied and each row keeps the findings under _evidence. Still without a primary source: the minimum connection time everywhere except Frankfurt (60 minutes, Lufthansa), since airports rarely publish one, and process_minutes, which no airport measures (the airports' own advice, usually 3 hours before a long-haul flight, is recorded instead). Shannon's page gave nothing. needs_primary_source therefore stays on these rows."
+  "_review": "The rows flagged needs_primary_source were added to cover the European connection points a real JFK-LHR search actually returns. MCT, curfew and inter-terminal figures are curated from published airport and carrier data and are the right shape at roughly the right magnitude; each still wants checking against the airport's own published minimum connection time before a dollar figure built on it is shown to a stranger. AMS, BCN, CDG, EWR, JFK, LHR, LIS, MAD and MXP predate this and carry no flag. Deliberately NOT added: BOS, IAD, ATL, BOG, CMN, TLV and AUH - a JFK-LHR search returns connections through all of them and every one is outside the transatlantic scope, so they go on dropping. CHECKED 2026-09-25: the twelve flagged European rows were researched against the airports' and airlines' own pages (and the national AIPs for curfews) and re-checked by a second reader; corrections are applied and each row keeps the findings under _evidence. Still without a primary source: the minimum connection time everywhere except Frankfurt (60 minutes, Lufthansa), since airports rarely publish one, and process_minutes, which no airport measures (the airports' own advice, usually 3 hours before a long-haul flight, is recorded instead). Shannon's page gave nothing. needs_primary_source therefore stays on these rows."
 }

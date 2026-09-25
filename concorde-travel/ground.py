@@ -46,11 +46,17 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # The airport fee is a real, separate thing: pickup and dropoff charges, and the
 # tolls that usually sit on an airport approach. Rolling it into the per-mile
 # rate makes short airport runs look far too cheap.
+# Checked against the official taxi tariffs on 2026-09-25 (the regulators' own pages, re-checked by a second reader):
+# Spain and Italy moved up a band (Madrid's airport flat fare is EUR 33 and its per-km rate EUR 1.40; Barcelona EUR 1.35
+# to 1.66 a km plus a EUR 4.60 airport supplement; Rome EUR 1.33 to 1.73 a km and EUR 55 flat from Fiumicino, all of
+# which the mid band priced under), the Netherlands to the high band (a national maximum of EUR 3.17 a km plus EUR 0.52
+# a minute), and Turkey to the mid band (Istanbul, from 20 July 2026: 47.92 TL a km, about $41 from the airport to
+# Taksim against the lower band's $35). Being under the real fare is the one mistake this table must not make.
 FARE_BANDS = {
-    "high":   (350, 275, 45, 1200, "US CA CH NO DK IS AU NZ SE JP"),
-    "upper":  (300, 205, 36,  800, "GB DE FR NL IE AT BE FI SG IL AE QA LU"),
-    "mid":    (200, 130, 22,  400, "ES IT PT GR CZ PL HU HR KR TW CL UY EE LT LV SK SI"),
-    "lower":  (120,  80, 14,  200, "MX BR AR TR TH MY ZA CN RU RO BG RS UA CO PE"),
+    "high":   (350, 275, 45, 1200, "US CA CH NO DK IS AU NZ SE JP NL"),
+    "upper":  (300, 205, 36,  800, "GB DE FR IE AT BE FI SG IL AE QA LU ES IT"),
+    "mid":    (200, 130, 22,  400, "PT GR CZ PL HU HR KR TW CL UY EE LT LV SK SI TR"),
+    "lower":  (120,  80, 14,  200, "MX BR AR TH MY ZA CN RU RO BG RS UA CO PE"),
     "low":    ( 80,  45,  9,  100, "IN ID VN PH EG PK BD NG KE MA LK NP KH"),
 }
 _BAND_BY_COUNTRY = {c: name for name, (_, _, _, _, cc) in FARE_BANDS.items()

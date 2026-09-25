@@ -45,6 +45,7 @@ GR = "concorde-travel/ground.py"
 PL = "concorde-travel/places.py"
 FA = "concorde-travel/enrichment/fares.json"
 FL = "concorde-travel/enrichment/fleets.json"
+AO = "concorde-travel/enrichment/addons.json"
 PA = "concorde-travel/par.py"
 SC = "concorde-travel/scorer.py"
 PT = "concorde-travel/points.py"
@@ -228,11 +229,25 @@ MUTANTS = [
  (PL, "covers", '''    return code == iata or iata in METRO.get(code, set())''',
   '''    return True''',
   'places: call every airport a match for every metro'),
+ # published add-on prices and ride fares (2026-09-25): a "from" price keeps its asterisk, an add-on the airline does
+ # not sell is never free, insurance stays inside its published range, and the fare bands stay at or over the official taxi fares
+ (UI, None, "est:!!(p.from || p.est)};", "est:!!p.est};",
+  'add-ons: a "from" price loses its asterisk'),
+ (UI, None, "if (p && p.not_sold) return {cents:fallback.cents,", "if (p && p.not_sold) return {cents:0,",
+  'add-ons: an add-on the airline does not sell is priced at nothing'),
+ (UI, None, "const p = row && (shortHaul(e) ? row.short : row.long);", "const p = row && (shortHaul(e) ? (row.short || row.long) : (row.long || row.short));",
+  'add-ons: a price published for one haul stands in for the other'),
+ (UI, None, "if (p && p.free) return {cents:0, basis:p.free, est:!!p.est};", "if (p && p.free) return {cents:0, basis:p.free, est:false};",
+  'add-ons: free wifi on part of a fleet loses its asterisk'),
+ (AO, None, '"typical": 0.065,', '"typical": 0.02,',
+  'add-ons: insurance priced under its published range'),
+ (GR, None, '"GB DE FR IE AT BE FI SG IL AE QA LU ES IT"),\n    "mid":    (200, 130, 22,  400, "PT GR', '"GB DE FR IE AT BE FI SG IL AE QA LU IT"),\n    "mid":    (200, 130, 22,  400, "ES PT GR',
+  'rides: Spain back in the band that priced under its official taxi fares'),
  # the fleet table, checked against published sources on 2026-09-25: a row may not claim a review it did not get,
  # and a no-wifi row may not read as wifi
- (FL, None, '"value": "787-9 in the original 2015 cabin, with the old Club World (7 of 18 now have Club Suite)",\n    "observed_frequency": 0.61,\n    "sample_size": 18,\n    "observation_window": "the carrier\'s frames of this type (fleet composition, 2026-09)",\n    "source": "Published sources, checked 2026-09-25: flyertalk.com, headforpoints.com, onemileatatime.com, aerolopa.com",\n    "as_of": "2026-09-25",\n    "needs_primary_source": true', '"value": "787-9 in the original 2015 cabin, with the old Club World (7 of 18 now have Club Suite)",\n    "observed_frequency": 0.61,\n    "sample_size": 18,\n    "observation_window": "the carrier\'s frames of this type (fleet composition, 2026-09)",\n    "source": "Published sources, checked 2026-09-25: flyertalk.com, headforpoints.com, onemileatatime.com, aerolopa.com",\n    "as_of": "2026-09-25",\n    "needs_primary_source": false',
+ (FL, None, '"value": "787-9 in the original 2015 cabin, with the old Club World (7 of 18 now have Club Suite)",\n        "observed_frequency": 0.61,\n        "sample_size": 18,\n        "observation_window": "the carrier\'s frames of this type (fleet composition, 2026-09)",\n        "source": "Published sources, checked 2026-09-25: flyertalk.com, headforpoints.com, onemileatatime.com, aerolopa.com",\n        "as_of": "2026-09-25",\n        "needs_primary_source": true', '"value": "787-9 in the original 2015 cabin, with the old Club World (7 of 18 now have Club Suite)",\n        "observed_frequency": 0.61,\n        "sample_size": 18,\n        "observation_window": "the carrier\'s frames of this type (fleet composition, 2026-09)",\n        "source": "Published sources, checked 2026-09-25: flyertalk.com, headforpoints.com, onemileatatime.com, aerolopa.com",\n        "as_of": "2026-09-25",\n        "needs_primary_source": false',
   'fleet table: mark a row reviewed that no airline or manufacturer source backs'),
- (FL, None, '"value": "No wifi",\n    "observed_frequency": 1.0,\n    "outcome": false,\n    "sample_size": 11,', '"value": "No wifi",\n    "observed_frequency": 1.0,\n    "outcome": true,\n    "sample_size": 11,',
+ (FL, None, '"value": "No wifi",\n        "observed_frequency": 1.0,\n        "outcome": false,\n        "sample_size": 11,', '"value": "No wifi",\n        "observed_frequency": 1.0,\n        "outcome": true,\n        "sample_size": 11,',
   'fleet table: read "No wifi" as the good case'),
  (FA, None, '"piece": 1,\n        "amount_cents": 10000\n      },\n      {\n        "piece": 2,\n        "amount_cents": 12000',
   '"piece": 1,\n        "amount_cents": 1000\n      },\n      {\n        "piece": 2,\n        "amount_cents": 1200',

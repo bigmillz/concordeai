@@ -1015,7 +1015,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr"></span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="fnotes"><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="9d26ac1">9d26ac1</code></span></span></footer>
+  <footer class="foot wfoot"><span class="fnotes"><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-25">2026-09-25</time> · build <code id="build" data-build="8f3750e">8f3750e</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -1043,7 +1043,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The standard trip for this route</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="fnotes"><span>Prices are calculated in US dollars, then converted.</span><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="9d26ac1">9d26ac1</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="fnotes"><span>Prices are calculated in US dollars, then converted.</span><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-25">2026-09-25</time> · build <code id="build" data-build="8f3750e">8f3750e</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1448,15 +1448,39 @@ function priceArrived(){ clearTimeout(priceTimer); priceTimer = setTimeout(() =>
 const nightOf = iso => { const d = new Date(String(iso).slice(0, 10) + 'T12:00:00Z'); if (+String(iso).slice(11, 13) < 12) d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); };
 function destHotel(e){
   const q = D.query.destination_full || D.query.destination || e.route[e.route.length - 1], h = hotelNight({q, date:nightOf(e.arrive.slice(0, 11) + '18:00')});
-  return h ? {cents:h.cents, basis:h.basis} : {cents:HOTEL_GUESS, basis:'typical price, not a quote'};
+  return h ? {cents:h.cents, basis:h.basis, est:true} : {cents:HOTEL_GUESS, basis:'typical price, not a quote', est:true};
+}
+// Published add-on prices (2026-09-25, per Patrick: "if you have any other way to come up with more accurate prices
+// for those, then I'm all ears"): enrichment/addons.json, researched from the airlines' own pages and re-checked, and
+// inlined by build.py. The airline flying the longest flight decides; short-haul is a trip inside one border or with
+// no flight over four hours, as the bag fees read it. A "from" price is the airline's cheapest, so it keeps its
+// asterisk; with no published price the typical one stands, marked.
+const ADDP = {"prices":{"lounge":{"AC":{"code":"AC","long":{"cents":7900,"upto":true,"est":true},"short":{"cents":7900,"upto":true,"est":true}},"AY":{"code":"AY","long":{"cents":5500,"upto":true},"short":{"cents":5500,"upto":true}},"DL":{"code":"DL","long":{"not_sold":"Delta no longer sells Sky Club day passes"},"short":{"not_sold":"Delta no longer sells Sky Club day passes"}},"VS":{"code":"VS","long":{"not_sold":"Virgin's Clubhouses are for Upper Class only"},"short":{"not_sold":"Virgin's Clubhouses are for Upper Class only"}}},"priority":{"F9":{"code":"F9","long":{"cents":999,"upto":true},"short":{"cents":999,"upto":true}},"TP":{"code":"TP","long":{"cents":1000,"from":true},"short":{"cents":1000,"from":true}}},"wifi":{"DL":{"code":"DL","long":{"free":"free for SkyMiles members on most flights (free to join)","est":true},"short":{"free":"free for SkyMiles members on most flights (free to join)","est":true}},"UA":{"code":"UA","long":null,"short":{"free":"free for MileagePlus members on United's Starlink aircraft (free to join)","est":true}},"B6":{"code":"B6","long":{"free":"free for everyone on every JetBlue aircraft"},"short":{"free":"free for everyone on every JetBlue aircraft"}},"AS":{"code":"AS","long":{"cents":800},"short":{"cents":800}},"WN":{"code":"WN","long":{"free":"free for Rapid Rewards members (free to join)"},"short":{"free":"free for Rapid Rewards members (free to join)"}},"AA":{"code":"AA","long":null,"short":{"free":"free for AAdvantage members (free to join)","est":true}},"AC":{"code":"AC","long":null,"short":{"free":"free for Aeroplan members within North America (free to join)"}},"WS":{"code":"WS","long":null,"short":{"free":"free for WestJet Rewards members on its Starlink aircraft (free to join)","est":true}},"BA":{"code":"BA","long":{"cents":2908,"upto":true},"short":{"cents":1586,"upto":true}},"VS":{"code":"VS","long":{"cents":2775,"est":true},"short":null},"AF":{"code":"AF","long":{"free":"free for Flying Blue members on aircraft with high-speed wifi (free to join)","est":true},"short":{"free":"free for Flying Blue members on aircraft with high-speed wifi (free to join)","est":true}},"KL":{"code":"KL","long":null,"short":{"free":"free for Flying Blue members on European flights (free to join)"}},"LH":{"code":"LH","long":{"cents":2700,"from":true},"short":{"cents":910}},"LX":{"code":"LX","long":{"cents":4000,"from":true},"short":{"cents":967}},"OS":{"code":"OS","long":{"cents":2700},"short":{"cents":910}},"AY":{"code":"AY","long":{"cents":2837},"short":{"cents":1359}},"SK":{"code":"SK","long":null,"short":{"free":"free for EuroBonus members (free to join)"}},"AZ":{"code":"AZ","long":{"cents":2842},"short":{"cents":910}},"IB":{"code":"IB","long":{"free":"free on Iberia's Starlink aircraft","est":true},"short":{"free":"free on Iberia's Starlink aircraft","est":true}},"FI":{"code":"FI","long":{"cents":2729,"est":true},"short":{"cents":1365,"est":true}},"EY":{"code":"EY","long":{"cents":1999,"est":true},"short":{"cents":999,"est":true}},"LO":{"code":"LO","long":{"cents":2900,"est":true},"short":null},"EK":{"code":"EK","long":{"cents":1999,"upto":true,"est":true},"short":null},"QR":{"code":"QR","long":{"free":"free on Qatar Airways' Starlink aircraft","est":true},"short":{"free":"free on Qatar Airways' Starlink aircraft","est":true}}},"seat":{"WN":{"code":"WN","long":{"cents":400,"from":true},"short":{"cents":400,"from":true}},"F9":{"code":"F9","long":{"cents":1500,"from":true},"short":{"cents":1500,"from":true}},"WS":{"code":"WS","long":{"cents":500,"from":true},"short":{"cents":500,"from":true}},"IB":{"code":"IB","long":{"cents":2100,"from":true},"short":{"cents":1200,"from":true}},"AY":{"code":"AY","long":{"cents":500,"from":true},"short":{"cents":500,"from":true}}},"legroom":{"AS":{"code":"AS","long":{"cents":1500,"from":true},"short":{"cents":1500,"from":true}},"AC":{"code":"AC","long":{"cents":2000,"from":true},"short":{"cents":2000,"from":true}},"WS":{"code":"WS","long":{"cents":2000,"from":true},"short":{"cents":2000,"from":true}},"AF":{"code":"AF","long":{"cents":13641,"upto":true},"short":null},"KL":{"code":"KL","long":{"cents":12504,"upto":true},"short":null},"IB":{"code":"IB","long":{"cents":9700,"from":true},"short":{"cents":2700,"from":true}},"AY":{"code":"AY","long":{"cents":1500,"from":true},"short":{"cents":1500,"from":true}},"UA":{"code":"UA","long":{"cents":2900,"from":true,"est":true},"short":{"cents":2900,"from":true,"est":true}},"AA":{"code":"AA","long":{"cents":2000,"from":true,"est":true},"short":{"cents":2000,"from":true,"est":true}}}},"insurance":{"low":0.04,"high":0.1,"typical":0.065},"typical":{"lounge":{"cents":6000,"basis":"a walk-in lounge's price (Escape Lounges, $60 at the door)"},"priority":{"cents":2500,"basis":"typical price, not this airline's"}}};
+const longestFlight = e => Math.max(0, ...e.by.cheapest.legs.filter(l => l.kind === 'flight').map(l => l.minutes));
+function shortHaul(e){ const b = new Set(e.route.map(c => (D.airports[c] || {}).border)); return (b.size === 1 && !b.has(undefined)) || longestFlight(e) < 240; }
+function addonPrice(kind, e, typical){
+  const t = (ADDP.prices || {})[kind] || {}, row = t[e.operator] || t[e.carrier], who = airName((row && row.code) || e.operator || e.carrier);
+  // a price published for one haul never stands in for the other ("free within North America" is not a transatlantic promise)
+  const p = row && (shortHaul(e) ? row.short : row.long);
+  const fallback = (ADDP.typical || {})[kind] || {cents:typical, basis:'typical price, not this airline\'s'};
+  if (p && p.free) return {cents:0, basis:p.free, est:!!p.est};
+  // the airline does not sell it (Delta's Sky Club day passes): the typical way to buy it instead, marked
+  if (p && p.not_sold) return {cents:fallback.cents, basis:p.not_sold + '; ' + fallback.basis, est:true};
+  if (p && p.cents != null) return {cents:p.cents, basis:(p.from ? 'from ' : p.upto ? 'up to ' : '') + who + (/s$/.test(who) ? '\'' : '\'s') + ' published price', est:!!(p.from || p.est)};
+  return {cents:fallback.cents, basis:fallback.basis, est:true};
+}
+function insurancePrice(e){
+  const r = ADDP.insurance;
+  if (!r || !r.typical) return {cents:3800, basis:'typical price, not a quote', est:true};
+  return {cents:Math.round(e.ticket_cents * r.typical), basis:'about ' + +(r.typical*100).toFixed(1) + '% of the ticket, typical for a full trip policy (' + +(r.low*100).toFixed(1) + '–' + +(r.high*100).toFixed(1) + '%)', est:true};
 }
 const ADDONS = {
-  wifi:{label:'Wifi pass', cents:1900, basis:'typical price, not this airline\'s', sells:e => e.wifi_cost === 'paid', has:e => e.wifi_cost === 'free', want:'wifi', why:'you picked free wifi; this fare charges for it'},
-  lounge:{label:'Lounge day pass', cents:6500, basis:'typical price, not a quote', sells:() => true, has:() => false, why:'added by you'},
-  legroom:{label:'Extra-legroom seat', cents:7900, basis:'typical price, not this airline\'s', sells:() => true, has:e => WANTS.find(w => w.id === 'legroom').ok(e), want:'legroom', why:'you asked for extra legroom; no seat on this fare is listed at 32 inches or more'},
-  seat:{label:'Pick your seat', cents:3000, basis:'typical price, not this airline\'s', sells:e => e.seat_selection === 'paid', has:e => e.seat_selection !== 'paid', why:'seat selection is paid on this fare'},
-  priority:{label:'Priority boarding', cents:2500, basis:'typical price, not this airline\'s', sells:() => true, has:() => false, why:'added by you'},
-  insurance:{label:'Travel insurance', cents:3800, basis:'typical price, not a quote', sells:() => true, has:() => false, why:'added by you'},
+  wifi:{label:'Wifi pass', cents:1900, price:e => addonPrice('wifi', e, 1900), sells:e => e.wifi_cost === 'paid', has:e => e.wifi_cost === 'free', want:'wifi', why:'you picked free wifi; this fare charges for it'},
+  lounge:{label:'Lounge day pass', cents:6500, price:e => addonPrice('lounge', e, 6500), sells:() => true, has:() => false, why:'added by you'},
+  legroom:{label:'Extra-legroom seat', cents:7900, price:e => addonPrice('legroom', e, 7900), sells:() => true, has:e => WANTS.find(w => w.id === 'legroom').ok(e), want:'legroom', why:'you asked for extra legroom; no seat on this fare is listed at 32 inches or more'},
+  seat:{label:'Pick your seat', cents:3000, price:e => addonPrice('seat', e, 3000), sells:e => e.seat_selection === 'paid', has:e => e.seat_selection !== 'paid', why:'seat selection is paid on this fare'},
+  priority:{label:'Priority boarding', cents:2500, price:e => addonPrice('priority', e, 2500), sells:() => true, has:() => false, why:'added by you'},
+  insurance:{label:'Travel insurance', cents:3800, price:insurancePrice, sells:() => true, has:() => false, why:'added by you'},
   hotel:{label:'Hotel at destination', cents:18000, price:destHotel, sells:() => true, has:() => false, why:'added by you', group:'stay'},
 };
 const hourlyAt = () => Math.round(S.a*PR.cheapest.hourly_value_cents + S.b*PR.fastest.hourly_value_cents + S.c*PR.comfort.hourly_value_cents);
@@ -1538,8 +1562,8 @@ function bill(e, opts){
     for (const [k, a] of Object.entries(ADDONS)){
       const wanted = (a.want && S.wants.has(a.want)) || S.extra[k]; if (!wanted || S.off.has(k)) continue;
       if (a.has(e)) line(a.group || 'addons', {key:k, label:a.label.replace(' day pass', '').replace(' pass', '').replace('Pick your seat', 'Seat choice').trim() + ' included', cents:0, included:true, evidence:'comes with this fare', removable:true});
-      else if (a.sells(e)){ const pr = a.price ? a.price(e) : {cents:a.cents, basis:a.basis};
-        line(a.group || 'addons', {key:k, label:a.label, cents:pr.cents, est:true, evidence:a.why + ' · ' + pr.basis, removable:true}); }
+      else if (a.sells(e)){ const pr = a.price(e);
+        line(a.group || 'addons', {key:k, label:a.label, cents:pr.cents, est:pr.est !== false, evidence:a.why + ' · ' + pr.basis, removable:true}); }
     }
     const on = overnight(e);
     if (on && !S.off.has('hotel-auto')){ const hn = hotelNight({near:on.airport, date:on.night});
@@ -2067,7 +2091,7 @@ function addMenuHTML(e){
   const bagsIn = e.bags_included, next = partyBags() + S.extra.bag + 1, nextCost = next > bagsIn ? bagCost(e, next - bagsIn) - bagCost(e, Math.max(0, next - 1 - bagsIn)) : 0;
   return `<div class="addmenu">
     <div class="bagrow"><span>Extra checked bags</span><button data-add="bag-" aria-label="One fewer bag">−</button><b>${S.extra.bag} extra</b><button data-add="bag+" aria-label="One more bag">+</button><span>Next bag: ${nextCost ? money(nextCost) : 'included'} on this fare</span></div>
-    ${Object.entries(ADDONS).map(([k, a]) => { const on = (a.want && S.wants.has(a.want) || S.extra[k]) && !S.off.has(k); return `<button class="ad" data-add="${k}" ${on ? 'disabled' : ''}>${esc(a.label)}<i>${a.has(e) ? 'included' : a.sells(e) ? money(a.cents) : 'not sold'}</i></button>`; }).join('')}
+    ${Object.entries(ADDONS).map(([k, a]) => { const on = (a.want && S.wants.has(a.want) || S.extra[k]) && !S.off.has(k); return `<button class="ad" data-add="${k}" ${on ? 'disabled' : ''}>${esc(a.label)}<i>${a.has(e) ? 'included' : a.sells(e) ? (p => money(p.cents) + (p.est ? EST : ''))(a.price(e)) : 'not sold'}</i></button>`; }).join('')}
     <form data-custom onsubmit="return false"><input name="label" placeholder="Other, e.g. airport parking" aria-label="Expense"><input name="amt" inputmode="numeric" placeholder="${esc(CURRENCIES[CUR].sym.trim())}" aria-label="Amount"><button data-addcustom>Add</button></form></div>`;
 }
 // What the airline's own offer says about the flight, above the bill: the

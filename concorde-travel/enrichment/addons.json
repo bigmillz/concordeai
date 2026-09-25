@@ -1,0 +1,1007 @@
+{
+  "_about": "Published prices for the add-ons a traveller can put on the bill: wifi, seat choice, an extra-legroom seat, priority boarding, a lounge day pass, and travel insurance as a share of the ticket. Researched from the airlines' own pages and re-checked by a second reader (2026-09-25, per Patrick). build.py inlines only the prices; the sources stay here.",
+  "_method": "Keyed by the airline flying the longest flight. Each row has a 'long' and a 'short' price in US cents (short-haul: a trip inside one border, or no flight over four hours). 'from': true marks a published starting price (the airline's cheapest), which the page still marks with its estimate asterisk. 'free': a sentence when the airline gives it away (to everyone, or to members of its free loyalty programme). Foreign-currency prices are converted at the rate on the as_of date and say so. A figure with no primary source is left out, and the page falls back to its typical price, marked.",
+  "prices": {
+    "lounge": {
+      "AC": {
+        "long": {
+          "cents": 7900,
+          "upto": true,
+          "est": true
+        },
+        "short": {
+          "cents": 7900,
+          "upto": true,
+          "est": true
+        },
+        "note": "Maple Leaf Lounge as a travel option: $49 (Premium Economy, Latitude), $59 (Comfort), $79 (Flex), bought at booking or 24 hours ahead, never at the airport. The page shows no currency (the Canadian and US pages show the same numbers), so it is read as US dollars and marked.",
+        "sources": [
+          {
+            "url": "https://www.aircanada.com/ca/en/aco/home/fly/premium-services/maple-leaf-lounges.html",
+            "date": "2026-09-25",
+            "note": ""
+          }
+        ]
+      },
+      "AY": {
+        "long": {
+          "cents": 5500,
+          "upto": true
+        },
+        "short": {
+          "cents": 5500,
+          "upto": true
+        },
+        "note": "Finnair Lounges at Helsinki, $15 to $55.",
+        "sources": [
+          {
+            "url": "https://www.finnair.com/us-en/baggage-fees-and-optional-travel-fees",
+            "date": "2026-09-25",
+            "note": ""
+          }
+        ]
+      },
+      "DL": {
+        "long": {
+          "not_sold": "Delta no longer sells Sky Club day passes"
+        },
+        "short": {
+          "not_sold": "Delta no longer sells Sky Club day passes"
+        },
+        "sources": [
+          {
+            "url": "https://www.delta.com/us/en/delta-sky-club/access",
+            "date": "2026-09-25",
+            "note": "'The sale of the Single Visit Passes has been discontinued.'"
+          }
+        ]
+      },
+      "VS": {
+        "long": {
+          "not_sold": "Virgin's Clubhouses are for Upper Class only"
+        },
+        "short": {
+          "not_sold": "Virgin's Clubhouses are for Upper Class only"
+        },
+        "note": "Economy and Premium are pointed to No1 Lounges (Heathrow, Gatwick, Birmingham, Luton) and The Club (Orlando, Atlanta, New Orleans), with no price on Virgin's page.",
+        "sources": [
+          {
+            "url": "https://www.virginatlantic.com/en-US/experience/upgrades-and-extras/airport-lounges",
+            "date": "2026-09-25",
+            "note": ""
+          }
+        ]
+      }
+    },
+    "priority": {
+      "F9": {
+        "long": {
+          "cents": 999,
+          "upto": true
+        },
+        "short": {
+          "cents": 999,
+          "upto": true
+        },
+        "note": "Priority Boarding $0.99 to $9.99 per passenger per direction (Board First $2.99 to $14.99, only with a paid carry-on).",
+        "sources": [
+          {
+            "url": "https://www.flyfrontier.com/optional-services/",
+            "date": "2026-09-25",
+            "note": ""
+          }
+        ]
+      },
+      "TP": {
+        "long": {
+          "cents": 1000,
+          "from": true
+        },
+        "short": {
+          "cents": 1000,
+          "from": true
+        },
+        "note": "Premium Boarding from EUR 8 / USD 10 / CAD 14 per flight segment, varying by channel, date and route.",
+        "sources": [
+          {
+            "url": "https://www.flytap.com/en-us/manage-booking/extras/boarding",
+            "date": "2026-09-25",
+            "note": ""
+          }
+        ]
+      }
+    },
+    "wifi": {
+      "DL": {
+        "long": {
+          "free": "free for SkyMiles members on most flights (free to join)",
+          "est": true
+        },
+        "short": {
+          "free": "free for SkyMiles members on most flights (free to join)",
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://www.delta.com/us/en/onboard/inflight-entertainment/onboard-wifi",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "\"Free Wi-Fi is available for SkyMiles Members on most domestic and international flights today\" (Delta Sync, presented by T-Mobile). Coverage map: Europe full, Asia none"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          {
+            "item": "DL wifi: who gets it free (page date)",
+            "claimed": "read 2026-09-25 (page undated)",
+            "correct_value": "The page carries a coverage map dated October 2025 (image file 'dswf-coverage-map-oct-2025.jpg'), which is where 'Europe: Full Wi-Fi Coverage / Asia: No Wi-Fi Coverage' comes from. The page also says 'The majority of our international flights offer fast, free Wi-Fi' and free Delta Sync Wi-Fi 'on most domestic U.S. flights'.",
+            "url": "https://www.delta.com/us/en/onboard/inflight-entertainment/onboard-wifi",
+            "note": "The substance is right; the fix is to date the coverage claim Oct-2025. The page publishes no flight-pass price, as the researcher said."
+          }
+        ]
+      },
+      "UA": {
+        "long": null,
+        "short": {
+          "free": "free for MileagePlus members on United's Starlink aircraft (free to join)",
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://united.mediaroom.com/2026-09-17-United-Teams-Up-with-DISH-to-Broadcast-Professional-and-College-Football-Games-Live-on-Starlink-Enabled-Seatback-Screens",
+            "date": "2026-09-17",
+            "primary": true,
+            "note": "\"Starlink Wi-Fi is free for United MileagePlus members\" and \"Starlink is free for MileagePlus members in every class of service\". Active on more than 560 mainline and United Express aircraft. The first transatlantic widebody (777-200, EWR t"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          {
+            "item": "UA Economy Plus per flight (example prices)",
+            "claimed": "Examples: $43-45 short domestic, $272-329 long international",
+            "correct_value": "San Francisco to Los Angeles: $43-$45 a seat ($52 as a bundle). San Francisco to Singapore: $299-$329 a seat. $272 was the BUNDLE price, not the low end of the seat range. The $29-$299 'United states' range is correct, and the article adds that some seats cost more. It was published 2024-02-05 and updated 2024-02-06, a secondary source.",
+            "url": "https://onemileatatime.com/guides/united-airlines-economy-plus/",
+            "note": "Mixing the bundle price into the range understates the long-haul low end. Subscriptions check out: $599-$799 solo, $799-$999 with one companion, $1,099-$1,299 with up to eight."
+          }
+        ]
+      },
+      "B6": {
+        "long": {
+          "free": "free for everyone on every JetBlue aircraft"
+        },
+        "short": {
+          "free": "free for everyone on every JetBlue aircraft"
+        },
+        "sources": [
+          {
+            "url": "https://www.news.jetblue.com/latest-news/press-release-details/2025/Fly-Fi-Moves-Forward-JetBlue-Becomes-First-Airline-for-Amazons-Project-Kuiper-Elevating-Inflight-Connectivity-for-Customers/default.aspx",
+            "date": "2025-09-04",
+            "primary": true,
+            "note": "\"free, high-speed Wi-Fi on every aircraft in its fleet\" ... \"always for free\". The press release names no loyalty condition"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "AS": {
+        "long": {
+          "cents": 800
+        },
+        "short": {
+          "cents": 800
+        },
+        "sources": [
+          {
+            "url": "https://news.alaskaair.com/guest-experience/alaska-airlines-journey-to-connectivity-free-wi-fi-thanks-to-t-mobile-powered-by-starlink/",
+            "date": "2026-08-28",
+            "primary": true,
+            "note": "\"Atmos Rewards members unlock free, uninterrupted access to Starlink Wi-Fi\" on Starlink aircraft: 93 E175s, 12 737-8s, 18 A321neos, 24 A330s (38% of the fleet). 787s by end of 2026"
+          },
+          {
+            "url": "https://www.alaskaair.com/content/travel-info/flight-experience/inflight-entertainment/wifi",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "\"$8 per flight\" (Standard and Basic Wi-Fi). Main Cabin page: \"$8 USD\" on \"most Alaska-operated flights\""
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          {
+            "item": "AS wifi: who gets it free (Starlink fleet counts and 787 timeline)",
+            "claimed": "93 E175s, 12 737-8s, 18 A321neos, 24 A330s (38% of the fleet). 787s by end of 2026",
+            "correct_value": "The tracker (last refreshed 2026-08-28, next update due 2026-09-28) lists E175 93 connected; 737-8 12 connected and 8 pending; A321neo 18; A330 24; 787 5 'pending update'; 38% of the fleet. It gives no date for the 787s. 'By end of 2026' is not supported. Alaska's wifi page gives a full-fleet rollout 'by the end of 2027', and it names only 'all Embraer E175s and select Boeing 737 MAX 8s' as Starlink aircraft today (the Hawaiian A330 and A321neo appear only on the tracker).",
+            "url": "https://news.alaskaair.com/guest-experience/alaska-airlines-journey-to-connectivity-free-wi-fi-thanks-to-t-mobile-powered-by-starlink/",
+            "note": "The 2027 full-fleet target is on https://www.alaskaair.com/content/travel-info/flight-experience/inflight-entertainment/wifi. Both pages are Alaska's own, so they are primary."
+          }
+        ]
+      },
+      "WN": {
+        "long": {
+          "free": "free for Rapid Rewards members (free to join)"
+        },
+        "short": {
+          "free": "free for Rapid Rewards members (free to join)"
+        },
+        "sources": [
+          {
+            "url": "https://www.southwest.com/html/customer-service/travel-fees.html",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "\"WiFi Internet Access: $8 (free for Rapid Rewards Members)\". Help centre: \"purchase WiFi for $8 per device from takeoff to landing\""
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "AA": {
+        "long": null,
+        "short": {
+          "free": "free for AAdvantage members (free to join)",
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://onemileatatime.com/news/american-airlines-free-wifi/",
+            "date": "2026-01-25",
+            "primary": false,
+            "note": "\"Free Wi-Fi is available exclusively for members of the carrier's AAdvantage program\" (no status needed). Covers Viasat/Intelsat domestic narrowbodies and regional jets; Viasat widebodies (787-9, some 787-8) were due \"in the coming weeks\""
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          {
+            "item": "AA wifi: who gets it free (aircraft scope)",
+            "claimed": "Covers Viasat/Intelsat domestic narrowbodies and regional jets",
+            "correct_value": "The article says 'all narrow body mainline and regional aircraft that have Viasat and Intelsat connectivity'. It covers every such narrowbody, not only domestic flights. On widebodies: 'In the coming weeks, the airline should also finalize rolling out free Wi-Fi on wide body aircraft with the Viasat system' (new 787-9s and a few newer 787-8s). The airline says Panasonic aircraft will follow but gives 'no timeline'.",
+            "url": "https://onemileatatime.com/news/american-airlines-free-wifi/",
+            "note": "This is a secondary source dated 2026-01-25. The quoted 'in the coming weeks' is accurate. The Panasonic widebodies (777s and most 787-8s, the transatlantic fleet) had no free wifi date at that point. The 2026-05-26 OMAAT article says Starlink, from early 2027 on 500+ A320-family aircraft, may not even need AAdvantage membership."
+          }
+        ]
+      },
+      "AC": {
+        "long": null,
+        "short": {
+          "free": "free for Aeroplan members within North America (free to join)"
+        },
+        "sources": [
+          {
+            "url": "https://www.aircanada.com/ca/en/aco/home/fly/onboard/wi-fi.html",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "\"Free Wi-Fi for Aeroplan Members, United MileagePlus members and Business Class passengers\" on \"flights within North America and to Sun destinations\". \"Free Wi-Fi on Air Canada long-haul international flights are planned to be added in 2026"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "WS": {
+        "long": null,
+        "short": {
+          "free": "free for WestJet Rewards members on its Starlink aircraft (free to join)",
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://www.westjet.com/en-ca/inflight/entertainment",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "\"WestJet Wi-Fi presented by TELUS is our fast and reliable inflight internet, free for WestJet Rewards members\", \"now available on over 100 aircraft\""
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "BA": {
+        "long": {
+          "cents": 2908,
+          "upto": true
+        },
+        "short": {
+          "cents": 1586,
+          "upto": true
+        },
+        "sources": [
+          {
+            "url": "https://www.britishairways.com/content/information/entertainment/wifi-on-board",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "Messaging: \"Free for members of The British Airways Club\"; Stream package \"Free for customers travelling in First\""
+          },
+          {
+            "url": "https://mediacentre.britishairways.com/news/19032026/british-airways-first-starlink-flight-takes-off-making-the-airline-the-first-in-the-uk-to-launch-the-fastest-wi-fi-in-the-sky",
+            "date": "2026-03-19",
+            "primary": true,
+            "note": "\"available for all customers, in every cabin, free of charge\"; first aircraft a 787-8; \"Within the next two years the entire British Airways fleet of more than 300 aircraft\" (long-haul and short-haul, excluding BA Cityflyer)"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "VS": {
+        "long": {
+          "cents": 2775,
+          "est": true
+        },
+        "short": null,
+        "sources": [
+          {
+            "url": "https://www.virginatlantic.com/experience/inflight-entertainment/connectivity/starlink",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "Free for all passengers on Starlink aircraft: \"Log in with your Flying Club details to connect\"; \"now available across our A350 fleet ... until rollout completes in 2027\""
+          },
+          {
+            "url": "https://flywith.virginatlantic.com/gb/en/inflight-entertainment/wifi-and-power/aircraft-b787.html",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "Basic surf £12.99 Full flight; Premium surf £29.99 Full flight; Messaging £2.99 Full flight; Streaming £24.99 3 hours"
+          },
+          {
+            "url": "https://flywith.virginatlantic.com/gb/en/inflight-entertainment/wifi-and-power/aircraft-a330neo.html",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "Full flight £18.99; 1 hour £5.99; 20 minutes free for all; Facebook Messenger and Bloomberg free for the full flight"
+          },
+          {
+            "url": "https://flywith.virginatlantic.com/gb/en/inflight-entertainment/wifi-and-power/aircraft-a330.html",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "Full Flight Pass £20.99; 1 Hour Pass £5.99; Messaging £2.99 Full flight"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [],
+        "note": "published for long-haul only; a short-haul trip takes the typical price, marked"
+      },
+      "AF": {
+        "long": {
+          "free": "free for Flying Blue members on aircraft with high-speed wifi (free to join)",
+          "est": true
+        },
+        "short": {
+          "free": "free for Flying Blue members on aircraft with high-speed wifi (free to join)",
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://wwws.airfrance.us/information/prepare/divertissements-wifi-presse/wifi-a-bord",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "High-speed (Starlink) wifi: \"This service is reserved for our Flying Blue members\"; aircraft not yet equipped: \"the free Message Pass and the paid Wifi Pass\""
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "KL": {
+        "long": null,
+        "short": {
+          "free": "free for Flying Blue members on European flights (free to join)"
+        },
+        "sources": [
+          {
+            "url": "https://www.klm.com/information/travel-class-extra-options/inflight-wifi",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "European flights: WiFi Pass \"It's free for all Flying Blue members\"; intercontinental: \"Our free Message Pass is available exclusively for Flying Blue members\""
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "LH": {
+        "long": {
+          "cents": 2700,
+          "from": true
+        },
+        "short": {
+          "cents": 910
+        },
+        "sources": [
+          {
+            "url": "https://www.lufthansa.com/us/en/flynet",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "FlyNet Messaging free for \"Travel ID and Miles & More members\"; free premium for HON Circle and First Class on short/medium-haul, First Class on long-haul"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          {
+            "item": "LH wifi free: who (FlyNet), short/medium-haul free premium",
+            "claimed": "Free premium for HON Circle and First Class on short/medium-haul",
+            "correct_value": "Short and medium-haul: \"HON Circle member and connecting First Class Passengers enjoy free premium access when logging in with their Miles and More or Travel ID account\". It covers passengers connecting from a First Class long-haul flight, not a First cabin on short-haul, which Lufthansa does not have. Long-haul: \"First Class passengers enjoy free premium access when flying on a Lufthansa operated flight.\" The messaging line (free for Travel ID and Miles & More members) and the prices are correct.",
+            "url": "https://www.lufthansa.com/us/en/flynet",
+            "note": "Read through the r.jina.ai reader because a direct fetch gets 403. The other figures on this page are confirmed."
+          }
+        ]
+      },
+      "LX": {
+        "long": {
+          "cents": 4000,
+          "from": true
+        },
+        "short": {
+          "cents": 967
+        },
+        "sources": [
+          {
+            "url": "https://www.swiss.com/us/en/fly/on-board/entertainment-on-board",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "\"SWISS Connect offers unlimited free messaging via Wi-Fi on all long-haul and selected short-haul flights\"; \"SWISS First guests and HON Circle members enjoy complimentary Wi-Fi\""
+          },
+          {
+            "url": "https://www.swiss.com/us/en/fly/on-board/swiss-connect",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "For the full duration of your flight: From CHF 35 / EUR 37 / USD 40"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "OS": {
+        "long": {
+          "cents": 2700
+        },
+        "short": {
+          "cents": 910
+        },
+        "sources": [
+          {
+            "url": "https://www.austrian.com/us/en/fly/on-board/lhg-wifi",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "Lufthansa Group Wi-Fi \"free of charge in all travel classes with your Travel ID or Miles & More Servicecard number\" (selected aircraft, \"Rolling out across the fleet until end of 2029\"); FlyNet Messaging free for Travel ID and Miles & More "
+          },
+          {
+            "url": "https://www.austrian.com/us/en/internet-on-board",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "FlyNet Premium Full Flight: EUR 25 / USD 27 / CNY 200 or 8,300 miles"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "AY": {
+        "long": {
+          "cents": 2837
+        },
+        "short": {
+          "cents": 1359
+        },
+        "sources": [
+          {
+            "url": "https://www.finnair.com/us-en/in-flight-entertainment-and-wi-fi/wi-fi",
+            "date": "2026-08-31",
+            "primary": true,
+            "note": "Short-haul Message (full flight): \"Complimentary for Finnair Plus members\"; Finnair Plus Silver/Gold/Platinum get Browse on long-haul and Stream on short-haul; Business Classic/Flex included"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "SK": {
+        "long": null,
+        "short": {
+          "free": "free for EuroBonus members (free to join)"
+        },
+        "sources": [
+          {
+            "url": "https://www.sasgroup.net/newsroom/press-releases/2026/sas-completes-starlink-installation-across-entire-airbus-a320neo-fleet-in-just-six-months/",
+            "date": "2026-09-01",
+            "primary": true,
+            "note": "\"EuroBonus members can access the service free of charge\" (Starlink); all 81 Airbus A320neo equipped"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "AZ": {
+        "long": {
+          "cents": 2842
+        },
+        "short": {
+          "cents": 910
+        },
+        "sources": [
+          {
+            "url": "https://www.ita-airways.com/it/en/world-of-ita-airways/services-on-board/connectivity-on-board",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "\"Free Messaging 30 minutes\" for all passengers; Business Class on long-haul (and international A321neo flights over three hours): free messaging \"for the entire duration of your flight\""
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "IB": {
+        "long": {
+          "free": "free on Iberia's Starlink aircraft",
+          "est": true
+        },
+        "short": {
+          "free": "free on Iberia's Starlink aircraft",
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://www.iberia.com/us/on-board/wifi/starlink/",
+            "date": "2026-06-22",
+            "primary": true,
+            "note": "\"On aircraft equipped with Starlink, all customers have free access\"; \"Available for Iberia Club members, partner programs and customers who register during the flight\""
+          },
+          {
+            "url": "https://www.iberia.com/us/on-board/wifi/",
+            "date": "2026-05-25",
+            "primary": true,
+            "note": "Free messaging for Business class, Iberia Club members, and anyone who registers with Iberia Club during the flight"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "FI": {
+        "long": {
+          "cents": 2729,
+          "est": true
+        },
+        "short": {
+          "cents": 1365,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://onemileatatime.com/reviews/icelandair-saga-business-class-a321lr/",
+            "date": "2026-02-01",
+            "primary": false,
+            "note": "\"Saga Class customers receive free Wi-Fi\" (Viasat on the A321LR and 737 MAX)"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "EY": {
+        "long": {
+          "cents": 1999,
+          "est": true
+        },
+        "short": {
+          "cents": 999,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://onemileatatime.com/news/etihad-wi-fi/",
+            "date": "2023-04-14",
+            "primary": false,
+            "note": "All Etihad Guest members: free messaging (text only). First Class and Etihad Guest Platinum: free \"Stream\" (unlimited). Gold: 25% off Stream"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "LO": {
+        "long": {
+          "cents": 2900,
+          "est": true
+        },
+        "short": null,
+        "sources": [
+          {
+            "url": "https://onemileatatime.com/news/lot-polish-airlines-viasat-wi-fi/",
+            "date": "2026-03-06",
+            "primary": false,
+            "note": "\"a $7 chat pass that allows instant messaging, plus a $29 streaming pass that allows full internet use without data caps\""
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [],
+        "note": "published for long-haul only; a short-haul trip takes the typical price, marked"
+      },
+      "EK": {
+        "long": {
+          "cents": 1999,
+          "upto": true,
+          "est": true
+        },
+        "short": null,
+        "sources": [
+          {
+            "url": "https://onemileatatime.com/news/emirates-free-starlink-wi-fi/",
+            "date": "2026-04-28",
+            "primary": false,
+            "note": "\"When available, Starlink Wi-Fi is free\" ... \"You don't even have to be an Emirates Skywards member to use the service.\" Installation is under way on 777s and A380s"
+          },
+          {
+            "url": "https://onemileatatime.com/news/emirates-free-wi-fi-messaging/",
+            "date": "2023-05-19",
+            "primary": false,
+            "note": "\"$9.99-19.99, depending on the length of the flight\""
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [],
+        "note": "published for long-haul only; a short-haul trip takes the typical price, marked"
+      },
+      "QR": {
+        "long": {
+          "free": "free on Qatar Airways' Starlink aircraft",
+          "est": true
+        },
+        "short": {
+          "free": "free on Qatar Airways' Starlink aircraft",
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://onemileatatime.com/news/qatar-airways-free-starlink-wi-fi/",
+            "date": "2026-08-20",
+            "primary": false,
+            "note": "On Starlink aircraft (777s, A350s and 787-8s done; 787-9s next), \"Qatar Airways is offering this Wi-Fi on a complimentary basis, with one-click access.\""
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      }
+    },
+    "seat": {
+      "WN": {
+        "long": {
+          "cents": 400,
+          "from": true
+        },
+        "short": {
+          "cents": 400,
+          "from": true
+        },
+        "sources": [
+          {
+            "url": "https://www.southwest.com/html/customer-service/travel-fees.html",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "\"Paid seat upgrades: $4-$250 per segment, per Customer\""
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "F9": {
+        "long": {
+          "cents": 1500,
+          "from": true
+        },
+        "short": {
+          "cents": 1500,
+          "from": true
+        },
+        "sources": [
+          {
+            "url": "https://www.flyfrontier.com/optional-services/",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "\"Seats: From $15 per passenger, per flight segment (Non-Refundable)\""
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "WS": {
+        "long": {
+          "cents": 500,
+          "from": true
+        },
+        "short": {
+          "cents": 500,
+          "from": true
+        },
+        "sources": [
+          {
+            "url": "https://www.westjet.com/en-ca/flights/fees",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "\"$5–$400\". EconoFlex: \"No fee\""
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "IB": {
+        "long": {
+          "cents": 2100,
+          "from": true
+        },
+        "short": {
+          "cents": 1200,
+          "from": true
+        },
+        "sources": [
+          {
+            "url": "https://www.iberia.com/us/seat-reservation/",
+            "date": "2023-03-27",
+            "primary": true,
+            "note": "Online: from EUR 18/USD 21/GBP 16; Airport: from EUR 22/USD 25/GBP 19"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "AY": {
+        "long": {
+          "cents": 500,
+          "from": true
+        },
+        "short": {
+          "cents": 500,
+          "from": true
+        },
+        "sources": [
+          {
+            "url": "https://www.finnair.com/us-en/baggage-fees-and-optional-travel-fees",
+            "date": "2023-05-31",
+            "primary": true,
+            "note": "$5–110"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      }
+    },
+    "legroom": {
+      "AS": {
+        "long": {
+          "cents": 1500,
+          "from": true
+        },
+        "short": {
+          "cents": 1500,
+          "from": true
+        },
+        "sources": [
+          {
+            "url": "https://www.alaskaair.com/content/travel-info/flight-experience/premium-class",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "\"Upgrade to Premium Class starting at just $15 USD\""
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          {
+            "item": "AS wifi: who gets it free (Starlink fleet counts and 787 timeline)",
+            "claimed": "93 E175s, 12 737-8s, 18 A321neos, 24 A330s (38% of the fleet). 787s by end of 2026",
+            "correct_value": "The tracker (last refreshed 2026-08-28, next update due 2026-09-28) lists E175 93 connected; 737-8 12 connected and 8 pending; A321neo 18; A330 24; 787 5 'pending update'; 38% of the fleet. It gives no date for the 787s. 'By end of 2026' is not supported. Alaska's wifi page gives a full-fleet rollout 'by the end of 2027', and it names only 'all Embraer E175s and select Boeing 737 MAX 8s' as Starlink aircraft today (the Hawaiian A330 and A321neo appear only on the tracker).",
+            "url": "https://news.alaskaair.com/guest-experience/alaska-airlines-journey-to-connectivity-free-wi-fi-thanks-to-t-mobile-powered-by-starlink/",
+            "note": "The 2027 full-fleet target is on https://www.alaskaair.com/content/travel-info/flight-experience/inflight-entertainment/wifi. Both pages are Alaska's own, so they are primary."
+          }
+        ]
+      },
+      "AC": {
+        "long": {
+          "cents": 2000,
+          "from": true
+        },
+        "short": {
+          "cents": 2000,
+          "from": true
+        },
+        "sources": [
+          {
+            "url": "https://www.aircanada.com/ca/en/aco/home/fly/onboard/preferred-seats.html",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "\"Preferred Seat prices range from $20 to $199 CAD/USD\""
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "WS": {
+        "long": {
+          "cents": 2000,
+          "from": true
+        },
+        "short": {
+          "cents": 2000,
+          "from": true
+        },
+        "sources": [
+          {
+            "url": "https://www.westjet.com/en-ca/flights/fees",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "\"$20–$400\" (UltraBasic, Econo and EconoFlex)"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "AF": {
+        "long": {
+          "cents": 13641,
+          "upto": true
+        },
+        "short": null,
+        "sources": [
+          {
+            "url": "https://wwws.airfrance.us/information/legal/fees-and-paid-options",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "Between EUR 70-120"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [],
+        "note": "published for long-haul only; a short-haul trip takes the typical price, marked"
+      },
+      "KL": {
+        "long": {
+          "cents": 12504,
+          "upto": true
+        },
+        "short": null,
+        "sources": [
+          {
+            "url": "https://www.klm.com/information/legal/fees-paid-options",
+            "date": "2026-09-25",
+            "primary": true,
+            "note": "Between EUR 50-110"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [],
+        "note": "published for long-haul only; a short-haul trip takes the typical price, marked"
+      },
+      "IB": {
+        "long": {
+          "cents": 9700,
+          "from": true
+        },
+        "short": {
+          "cents": 2700,
+          "from": true
+        },
+        "sources": [
+          {
+            "url": "https://www.iberia.com/us/seat-reservation/",
+            "date": "2023-03-27",
+            "primary": true,
+            "note": "Online: from EUR 83/USD 97/GBP 72; Airport: from EUR 100/USD 116/GBP 86"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "AY": {
+        "long": {
+          "cents": 1500,
+          "from": true
+        },
+        "short": {
+          "cents": 1500,
+          "from": true
+        },
+        "sources": [
+          {
+            "url": "https://www.finnair.com/us-en/baggage-fees-and-optional-travel-fees",
+            "date": "2023-05-31",
+            "primary": true,
+            "note": "$15–130"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
+      },
+      "UA": {
+        "long": {
+          "cents": 2900,
+          "from": true,
+          "est": true
+        },
+        "short": {
+          "cents": 2900,
+          "from": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://onemileatatime.com/guides/united-airlines-economy-plus/",
+            "date": "2024-02-05",
+            "primary": false,
+            "note": "\"United states that the cost ranges from $29 to $299 per flight\". Examples: $43-45 short domestic, $272-329 long international"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          {
+            "item": "UA Economy Plus per flight (example prices)",
+            "claimed": "Examples: $43-45 short domestic, $272-329 long international",
+            "correct_value": "San Francisco to Los Angeles: $43-$45 a seat ($52 as a bundle). San Francisco to Singapore: $299-$329 a seat. $272 was the BUNDLE price, not the low end of the seat range. The $29-$299 'United states' range is correct, and the article adds that some seats cost more. It was published 2024-02-05 and updated 2024-02-06, a secondary source.",
+            "url": "https://onemileatatime.com/guides/united-airlines-economy-plus/",
+            "note": "Mixing the bundle price into the range understates the long-haul low end. Subscriptions check out: $599-$799 solo, $799-$999 with one companion, $1,099-$1,299 with up to eight."
+          }
+        ]
+      },
+      "AA": {
+        "long": {
+          "cents": 2000,
+          "from": true,
+          "est": true
+        },
+        "short": {
+          "cents": 2000,
+          "from": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://onemileatatime.com/guides/american-airlines-main-cabin-extra/",
+            "date": "2024-01-10",
+            "primary": false,
+            "note": "\"Main Cabin Extra starts at $20\". Examples: Miami to Tampa \"$26 to $28\", Dallas to Seoul Incheon \"$142 to $183\""
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          {
+            "item": "AA wifi: who gets it free (aircraft scope)",
+            "claimed": "Covers Viasat/Intelsat domestic narrowbodies and regional jets",
+            "correct_value": "The article says 'all narrow body mainline and regional aircraft that have Viasat and Intelsat connectivity'. It covers every such narrowbody, not only domestic flights. On widebodies: 'In the coming weeks, the airline should also finalize rolling out free Wi-Fi on wide body aircraft with the Viasat system' (new 787-9s and a few newer 787-8s). The airline says Panasonic aircraft will follow but gives 'no timeline'.",
+            "url": "https://onemileatatime.com/news/american-airlines-free-wifi/",
+            "note": "This is a secondary source dated 2026-01-25. The quoted 'in the coming weeks' is accurate. The Panasonic widebodies (777s and most 787-8s, the transatlantic fleet) had no free wifi date at that point. The 2026-05-26 OMAAT article says Starlink, from early 2027 on 500+ A320-family aircraft, may not even need AAdvantage membership."
+          }
+        ]
+      }
+    }
+  },
+  "insurance": {
+    "low": 0.04,
+    "high": 0.1,
+    "typical": 0.065,
+    "note": "A comprehensive trip policy as a share of the trip cost. The insurers' trade association says 4% to 8%; Squaremouth, a marketplace reporting its own sales, says 4% to 10%, about 6% in 2026 and 6.5% over 25 Aug to 24 Sep 2026. Neither sets premiums, so it stays an estimate, marked. The page applies it to the ticket.",
+    "sources": [
+      {
+        "url": "https://www.ustia.org/about-ustia/faq/",
+        "date": "2026-09-25",
+        "note": "4% to 8% of the total trip (trade association, not a price-setter)"
+      },
+      {
+        "url": "https://www.squaremouth.com/travel-advice/cost-for-travel-insurance",
+        "date": "2026-07-15",
+        "note": "4%-10%, about 6% in 2026"
+      },
+      {
+        "url": "https://www.squaremouth.com/resources/live-data",
+        "date": "2026-09-24",
+        "note": "6.5% of total trip cost, last 30 days"
+      }
+    ]
+  },
+  "typical": {
+    "lounge": {
+      "cents": 6000,
+      "basis": "a walk-in lounge's price (Escape Lounges, $60 at the door)",
+      "sources": [
+        {
+          "url": "https://www.escapelounges.com/us/airport-lounges/phoenix/terminal-4/",
+          "date": "2026-09-25",
+          "note": "from $45 pre-booked, $60 walk-up"
+        },
+        {
+          "url": "https://www.prioritypass.com/en-GB/join-prioritypass",
+          "date": "2026-09-25",
+          "note": "US$35 per visit on the Standard plan, US$99 a year"
+        }
+      ]
+    },
+    "priority": {
+      "cents": 2500,
+      "basis": "typical price, not this airline's",
+      "sources": [],
+      "note": "Most airlines' pages refuse automated readers; the readable ones (Frontier, TAP) are in 'prices'."
+    }
+  },
+  "_not_readable": "2026-09-25: the lounge and boarding pages of American, United, British Airways, Lufthansa, Air France, KLM, Iberia, Aer Lingus, Turkish, Icelandair and Wizz refuse automated readers, and the Internet Archive was not reachable from this session, so those airlines stay on the typical price, marked. A person with a browser can read them."
+}

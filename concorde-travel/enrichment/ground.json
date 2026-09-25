@@ -1,6 +1,6 @@
 {
   "_comment": "Ground access by (origin key, airport, hour band). The origin key stands in for a geocode until a geocoder exists; an origin we have not curated abstains rather than guessing, because a confidently wrong ground estimate is the failure mode this product exists to avoid. Fares carry effective dates: three of these moved inside one year.",
-  "_as_of": "2026-03-01",
+  "_as_of": "2026-09-25",
   "origins": {
     "bushwick-brooklyn": {
       "label": "Bushwick, Brooklyn, NY",
@@ -99,7 +99,7 @@
         "mode_id": "lhr-elizabeth",
         "mode": "Elizabeth line",
         "mode_kind": "transit",
-        "fare_cents": 1700,
+        "fare_cents": 1930,
         "door_to_door_minutes": {
           "p50": 44,
           "p90": 58
@@ -107,7 +107,8 @@
         "transfers": 1,
         "hours": "05:30-23:40",
         "feasible": true,
-        "infeasible_reason": "The Elizabeth line does not run overnight."
+        "infeasible_reason": "The Elizabeth line does not run overnight.",
+        "source": "TfL fares API, 2026-09-25: GBP 14.60 adult pay as you go, Heathrow T2&3 to Paddington (Liverpool Street GBP 15.50); ECB reference rate of 2026-09-24 (EUR 1 = USD 1.137, GBP 1 = USD 1.322), rounded up"
       },
       {
         "mode_id": "lhr-cab",
@@ -129,7 +130,7 @@
         "mode_id": "cdg-rer",
         "mode": "RER B",
         "mode_kind": "transit",
-        "fare_cents": 1300,
+        "fare_cents": 1600,
         "door_to_door_minutes": {
           "p50": 55,
           "p90": 80
@@ -137,7 +138,8 @@
         "transfers": 1,
         "hours": "04:50-23:50",
         "feasible": true,
-        "infeasible_reason": "RER B does not run overnight."
+        "infeasible_reason": "RER B does not run overnight.",
+        "source": "Île-de-France Mobilités open data (updated 2026-09-24): Paris Région <> Aéroports ticket EUR 14; ECB reference rate of 2026-09-24 (EUR 1 = USD 1.137, GBP 1 = USD 1.322), rounded up"
       },
       {
         "mode_id": "cdg-rideshare",
@@ -165,9 +167,10 @@
           "p90": 40
         },
         "transfers": 0,
-        "hours": "05:50-00:30",
+        "hours": "any",
         "feasible": true,
-        "infeasible_reason": "The airport train does not run overnight."
+        "infeasible_reason": "The airport train does not run overnight.",
+        "note": "NS runs a night train about hourly through Schiphol after the last regular train, so the airport is never cut off; the 2026 fare was not readable (EUR 5.20 in 2025)."
       },
       {
         "mode_id": "ams-rideshare",
@@ -189,7 +192,7 @@
         "mode_id": "mad-metro",
         "mode": "Metro line 8",
         "mode_kind": "transit",
-        "fare_cents": 500,
+        "fare_cents": 570,
         "door_to_door_minutes": {
           "p50": 42,
           "p90": 55
@@ -197,7 +200,8 @@
         "transfers": 1,
         "hours": "06:05-01:30",
         "feasible": true,
-        "infeasible_reason": "The metro does not run overnight."
+        "infeasible_reason": "The metro does not run overnight.",
+        "source": "Metro de Madrid: single EUR 1.50 to 2.00 plus the compulsory EUR 3 airport supplement, priced at the top (EUR 5.00); ECB reference rate of 2026-09-24 (EUR 1 = USD 1.137, GBP 1 = USD 1.322), rounded up"
       },
       {
         "mode_id": "mad-rideshare",
@@ -225,9 +229,10 @@
           "p90": 80
         },
         "transfers": 1,
-        "hours": "05:26-23:26",
+        "hours": "05:09-22:09",
         "feasible": true,
-        "infeasible_reason": "The Malpensa Express does not run overnight."
+        "infeasible_reason": "The Malpensa Express does not run overnight.",
+        "note": "SEA (the airport operator): Terminal 1-2 to Milano Centrale 05:09 to 22:09 every 30 minutes; the Cadorna branch's last train was not readable, so the earlier Centrale time stands. Fare unverified (malpensaexpress.it refuses automated readers)."
       },
       {
         "mode_id": "mxp-rideshare",
@@ -249,7 +254,7 @@
         "mode_id": "lis-metro",
         "mode": "Metro red line",
         "mode_kind": "transit",
-        "fare_cents": 190,
+        "fare_cents": 280,
         "door_to_door_minutes": {
           "p50": 35,
           "p90": 50
@@ -257,7 +262,8 @@
         "transfers": 1,
         "hours": "06:30-01:00",
         "feasible": true,
-        "infeasible_reason": "The metro does not run overnight."
+        "infeasible_reason": "The metro does not run overnight.",
+        "source": "Metro de Lisboa / Carris: single EUR 1.90 plus the EUR 0.50 navegante card a visitor must buy; ECB reference rate of 2026-09-24 (EUR 1 = USD 1.137, GBP 1 = USD 1.322), rounded up"
       },
       {
         "mode_id": "lis-rideshare",
@@ -285,9 +291,10 @@
           "p90": 60
         },
         "transfers": 1,
-        "hours": "05:00-01:00",
+        "hours": "any",
         "feasible": true,
-        "infeasible_reason": "The Aerobus does not run 01:00-05:00."
+        "infeasible_reason": "The Aerobus does not run 01:00-05:00.",
+        "note": "Runs 24 hours, every 5-10 minutes by day and every 20 minutes from 00:35 to 05:00 (Aerobus). The fare was not readable from Aerobus's own page, so the figure is unverified."
       },
       {
         "mode_id": "bcn-rideshare",
@@ -313,5 +320,6 @@
         "basis": "how the number was arrived at, and when"
       }
     }
-  }
+  },
+  "_checked": "2026-09-25: every transit fare and taxi figure here was checked against the operator's or regulator's own page and re-checked by a second reader. Confirmed: the New York subway, AirTrain JFK and NJ Transit fares, Madrid's airport supplement, Lisbon's metro hours, the NYC TLC JFK flat fare. Corrected: the Paris airport ticket, the Elizabeth line, Lisbon's and Madrid's metro fares, the Aerobus and Schiphol night service, the Malpensa Express's last train. Not readable (the operators refuse automated readers): the Malpensa Express and Aerobus fares, and most service hours. Rideshare fares have no published source anywhere and stay estimates."
 }

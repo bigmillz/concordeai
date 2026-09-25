@@ -8,12 +8,18 @@ Synthetic answers stand in for the network and the built table, so nothing here 
 files. What matters is what each refuses: a hotel average from two hotels, a holiday rental or a hotel across town;
 an on-time share that forgets cancellations; a regional flight that misses its parent's record.
 """
+import json
 import os
+import shutil
+import subprocess
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
 import adapter                                              # noqa: E402
+import addons                                               # noqa: E402
+import ground                                               # noqa: E402
 import ontime                                               # noqa: E402
 import server                                               # noqa: E402
 
@@ -78,6 +84,79 @@ def main():
     finally:
         ontime._DOC.clear()
         ontime._DOC.update(saved)
+
+    # ---- published add-on prices (enrichment/addons.json, 2026-09-25): every price carries a source; the page gets
+    # the prices only; a "from" price and a price in doubt keep their asterisk; the fallback is always marked
+    doc = addons.load()
+    bad = []
+    for kind, rows in (doc.get("prices") or {}).items():
+        for code, row in rows.items():
+            if not (row.get("sources") and all(x.get("url", "").startswith("https://") and x.get("date") for x in row["sources"])):
+                bad.append("%s %s: no dated source" % (kind, code))
+            hauls = [row.get(h) for h in ("long", "short") if row.get(h)]
+            if not hauls or not all(isinstance(q.get("cents"), int) and q["cents"] >= 0 or q.get("free") or q.get("not_sold")
+                                    for q in hauls):
+                bad.append("%s %s: no price" % (kind, code))
+    ins = doc.get("insurance") or {}
+    check("every published add-on price has a dated source and a price", not bad, "; ".join(bad[:4]))
+    check("insurance is a share of the ticket inside its published range (4-10%)",
+          0 < ins.get("low", 0) <= ins.get("typical", 0) <= ins.get("high", 0) <= 0.15 and ins.get("sources"))
+    check("the page's table carries prices only, never a source", "http" not in json.dumps(addons.page_table()))
+    node = shutil.which("node")
+    if not node:
+        print("  skip the add-on pricing checks: no node on this machine")
+    else:
+        src = open(os.path.join(HERE, "..", "ui", "mock", "mock-10.src.html"), encoding="utf-8").read()
+        a, b = src.index("// Published add-on prices"), src.index("const ADDONS = {")
+        js = ("const D = {airports:{JFK:{border:'us'}, LAX:{border:'us'}, LHR:{border:'uk'}}}; "
+              "const airName = c => ({DL:'Delta', TP:'TAP', F9:'Frontier', AC:'Air Canada'})[c] || c;\n"
+              + src[a:b].replace("__ADDONS__", json.dumps(addons.page_table())) + """
+const e = (c, route, mins) => ({carrier:c, operator:c, route, ticket_cents:100000, by:{cheapest:{legs:[{kind:'flight', minutes:mins}]}}});
+const lhr = c => e(c, ['JFK', 'LHR'], 420);
+console.log(JSON.stringify({dl:addonPrice('lounge', lhr('DL'), 6500), tp:addonPrice('priority', lhr('TP'), 2500),
+  f9:addonPrice('priority', e('F9', ['JFK', 'LAX'], 360), 2500), zz:addonPrice('priority', lhr('ZZ'), 2500),
+  ac:addonPrice('lounge', lhr('AC'), 6500), ins:insurancePrice(lhr('BA')), short:shortHaul(e('F9', ['JFK', 'LAX'], 360)),
+  acwifi:addonPrice('wifi', lhr('AC'), 1900), acwifi_short:addonPrice('wifi', e('AC', ['JFK', 'LAX'], 360), 1900),
+  dlwifi:addonPrice('wifi', lhr('DL'), 1900), b6wifi:addonPrice('wifi', lhr('B6'), 1900)}));""")
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as fh:
+            fh.write(js)
+        r = subprocess.run([node, fh.name], capture_output=True, text=True)
+        os.unlink(fh.name)
+        if r.returncode:
+            check("the page's add-on pricing runs", False, r.stderr[-600:])
+        else:
+            o = json.loads(r.stdout)
+            check("an add-on the airline does not sell (Delta's day pass) says so and prices the walk-in lounge, marked",
+                  "no longer sells" in o["dl"]["basis"] and o["dl"]["est"] and o["dl"]["cents"] == doc["typical"]["lounge"]["cents"], str(o["dl"]))
+            check("a 'from' price is the airline's own and keeps its asterisk (TAP boarding from $10)",
+                  o["tp"]["cents"] == 1000 and o["tp"]["est"] and o["tp"]["basis"].startswith("from TAP"), str(o["tp"]))
+            check("a published top price needs no asterisk (Frontier up to $9.99), and a trip inside one border is short-haul",
+                  o["f9"]["cents"] == 999 and not o["f9"]["est"] and o["short"], str(o["f9"]))
+            check("a price in doubt keeps its asterisk (Air Canada's lounge page names no currency)", o["ac"]["est"], str(o["ac"]))
+            check("an airline with no published price takes the typical one, marked", o["zz"]["est"] and o["zz"]["cents"] == 2500, str(o["zz"]))
+            check("insurance is the typical share of the ticket (6.5% of $1,000), marked", o["ins"]["cents"] == 6500 and o["ins"]["est"], str(o["ins"]))
+            check("a price published for one haul never stands in for the other (Air Canada's free wifi is within North "
+                  "America, so across the Atlantic the typical pass stands, marked)",
+                  o["acwifi"]["cents"] == 1900 and o["acwifi"]["est"] and o["acwifi_short"]["cents"] == 0, str(o["acwifi"]))
+            check("free wifi for members is $0 and says so; free on only part of the fleet keeps its asterisk (Delta), free "
+                  "everywhere does not (JetBlue)", o["dlwifi"]["cents"] == 0 and o["dlwifi"]["est"] and "SkyMiles" in o["dlwifi"]["basis"]
+                  and o["b6wifi"]["cents"] == 0 and not o["b6wifi"]["est"], str(o["dlwifi"]) + str(o["b6wifi"]))
+
+    # ---- ride estimates lean high: at or above the official taxi fares the fare bands were checked against (2026-09-25)
+    enr = adapter.load_enrichment()
+    official = [("Puerta del Sol, Madrid", "ES", 40.4169, -3.7035, "MAD", 40.4936, -3.5668, 3750),    # flat EUR 33
+                ("Placa Catalunya, Barcelona", "ES", 41.3870, 2.1700, "BCN", 41.2974, 2.0833, 3300),  # T-1 meter, EUR 29
+                ("Taksim, Istanbul", "TR", 41.0370, 28.9850, "IST", 41.2753, 28.7519, 4070)]      # meter, ~1,990 TL
+    low = []
+    for label, cc, la, lo, iata, ala, alo, cents in official:
+        ap = {"iata": iata, "lat": ala, "lon": alo, "country": cc, "city": label.split(", ")[1]}
+        o, _how = ground.resolve_origin(label, enr, ap)
+        modes, _src = ground.modes_for(dict(o, lat=la, lon=lo, country=cc), ap, 14 * 60, enr)
+        ride = next((m for m in modes if m.get("mode_kind") == "rideshare" or "ide" in m["mode"]), None)
+        if not ride or ride["fare_cents"] < cents:
+            low.append("%s %s under %d" % (iata, ride and ride["fare_cents"], cents))
+    check("a ride estimate is never under the official taxi fare it was checked against (Madrid, Barcelona, Istanbul)",
+          not low, "; ".join(low))
 
     print("\n%d checks, %d failed" % (N[0], len(FAILS)))
     for f in FAILS:

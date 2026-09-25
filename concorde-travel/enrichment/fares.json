@@ -347,7 +347,7 @@
             "amount_cents": 20000
           }
         ],
-        "note": "DL Delta Main Basic (short-haul): no checked bag; next pieces $45 / $55 / $200 one-way, Delta publishes one price for every channel, with no prepay discount. Short haul is the domestic price on tickets booked on or after 2026-04-08. Long haul is the US\u2013Europe Main Basic price",
+        "note": "DL Delta Main Basic (short-haul): no checked bag; next pieces $45 / $55 / $200 one-way, Delta publishes one price for every channel, with no prepay discount. Short haul is the domestic price on tickets booked on or after 2026-04-08. Long haul is the US–Europe Main Basic price",
         "sources": [
           "https://www.delta.com/us/en/baggage/overview",
           "https://upgradedpoints.com/news/delta-raising-checked-bag-fees-2026/",
@@ -390,7 +390,7 @@
             "amount_cents": 20000
           }
         ],
-        "note": "DL Delta Main Basic (short-haul): no checked bag; next pieces $45 / $55 / $200 one-way, Delta publishes one price for every channel, with no prepay discount. Short haul is the domestic price on tickets booked on or after 2026-04-08. Long haul is the US\u2013Europe Main Basic price",
+        "note": "DL Delta Main Basic (short-haul): no checked bag; next pieces $45 / $55 / $200 one-way, Delta publishes one price for every channel, with no prepay discount. Short haul is the domestic price on tickets booked on or after 2026-04-08. Long haul is the US–Europe Main Basic price",
         "sources": [
           "https://www.delta.com/us/en/baggage/overview",
           "https://upgradedpoints.com/news/delta-raising-checked-bag-fees-2026/",
@@ -432,7 +432,7 @@
             "amount_cents": 20000
           }
         ],
-        "note": "DL Delta Main Basic (short-haul): no checked bag; next pieces $45 / $55 / $200 one-way, Delta publishes one price for every channel, with no prepay discount. Short haul is the domestic price on tickets booked on or after 2026-04-08. Long haul is the US\u2013Europe Main Basic price",
+        "note": "DL Delta Main Basic (short-haul): no checked bag; next pieces $45 / $55 / $200 one-way, Delta publishes one price for every channel, with no prepay discount. Short haul is the domestic price on tickets booked on or after 2026-04-08. Long haul is the US–Europe Main Basic price",
         "sources": [
           "https://www.delta.com/us/en/baggage/overview",
           "https://upgradedpoints.com/news/delta-raising-checked-bag-fees-2026/",
@@ -474,7 +474,7 @@
             "amount_cents": 20000
           }
         ],
-        "note": "DL Delta Main Basic (short-haul): no checked bag; next pieces $45 / $55 / $200 one-way, Delta publishes one price for every channel, with no prepay discount. Short haul is the domestic price on tickets booked on or after 2026-04-08. Long haul is the US\u2013Europe Main Basic price",
+        "note": "DL Delta Main Basic (short-haul): no checked bag; next pieces $45 / $55 / $200 one-way, Delta publishes one price for every channel, with no prepay discount. Short haul is the domestic price on tickets booked on or after 2026-04-08. Long haul is the US–Europe Main Basic price",
         "sources": [
           "https://www.delta.com/us/en/baggage/overview",
           "https://upgradedpoints.com/news/delta-raising-checked-bag-fees-2026/",
@@ -2345,7 +2345,7 @@
           "amount_cents": 6400
         }
       ],
-      "note": "U2 Standard (short-haul): no checked bag; next pieces $64 / $64 / $64 one-way, 23kg hold bag added online during booking, top of the range secondary trackers quote from easyJet's fees page, \u00a39.49-\u00a350.00 one way per bag (\u00a350 = $64); up to three hold bags each at the same per-bag price",
+      "note": "U2 Standard (short-haul): no checked bag; next pieces $64 / $64 / $64 one-way, 23kg hold bag added online during booking, top of the range secondary trackers quote from easyJet's fees page, £9.49-£50.00 one way per bag (£50 = $64); up to three hold bags each at the same per-bag price",
       "sources": [
         "https://www.easyjet.com/en/help-centre/policy-terms-and-conditions/fees-charges",
         "https://www.sendmybag.com/airlines/easyjet-baggage-allowance/",
@@ -2378,7 +2378,7 @@
           "amount_cents": 9300
         }
       ],
-      "note": "W6 Basic (short-haul): no checked bag; next pieces $93 / $93 / $93 one-way, 20kg checked bag bought online during booking, at the top of the stated online/call-centre range \u20ac13.00-\u20ac86.50 (\u20ac86.50 = $93), not the airport price. Each of the up to three bags bought online is priced per piece",
+      "note": "W6 Basic (short-haul): no checked bag; next pieces $93 / $93 / $93 one-way, 20kg checked bag bought online during booking, at the top of the stated online/call-centre range €13.00-€86.50 (€86.50 = $93), not the airport price. Each of the up to three bags bought online is priced per piece",
       "sources": [
         "https://www.mybaggage.com/shipping/airlines/wizz-air-baggage-allowance/",
         "https://www.sendmybag.com/airlines/wizz-air-baggage-allowance/",
@@ -2411,7 +2411,7 @@
           "amount_cents": 9300
         }
       ],
-      "note": "W9 Basic (short-haul): no checked bag; next pieces $93 / $93 / $93 one-way, The group schedule: 20kg checked bag bought online during booking, at the top of the stated online range \u20ac13.00-\u20ac86.50 (\u20ac86.50 = $93); charged in GBP on UK-origin bookings",
+      "note": "W9 Basic (short-haul): no checked bag; next pieces $93 / $93 / $93 one-way, The group schedule: 20kg checked bag bought online during booking, at the top of the stated online range €13.00-€86.50 (€86.50 = $93); charged in GBP on UK-origin bookings",
       "sources": [
         "https://www.mybaggage.com/shipping/airlines/wizz-air-baggage-allowance/",
         "https://www.sendmybag.com/airlines/wizz-air-baggage-allowance/",
@@ -2472,7 +2472,7 @@
           "amount_cents": 10700
         }
       ],
-      "note": "VY Basic (short-haul): no checked bag; next pieces $107 / $107 / $107 one-way, 25kg bag (the tier that fits a 23kg suitcase and the one Vueling includes in its higher fares) bought on the web/app during booking, top of Vueling's own stated range 'From 18 to 99 EUR' (\u20ac99 = $107); the 20kg bag is 'From 14 to 96 EUR' ($104)",
+      "note": "VY Basic (short-haul): no checked bag; next pieces $107 / $107 / $107 one-way, 25kg bag (the tier that fits a 23kg suitcase and the one Vueling includes in its higher fares) bought on the web/app during booking, top of Vueling's own stated range 'From 18 to 99 EUR' (€99 = $107); the 20kg bag is 'From 14 to 96 EUR' ($104)",
       "sources": [
         "https://help.vueling.com/hc/en-gb/articles/19798784049041-Checked-Luggage-Allowance",
         "https://help.vueling.com/hc/en-gb/articles/19798835176081-Hand-Luggage-Allowance-Cabin-bags-allowance",
@@ -2493,7 +2493,7 @@
           "amount_cents": 7600
         }
       ],
-      "note": "LL Light (long-haul): no checked bag; next pieces $76 one-way, 1st 23kg bag on 'Web (Booking)' for New York (JFK) to Barcelona, the Season B (peak) price of \u20ac70 ($76); LEVEL's own table runs \u20ac65-\u20ac70 on BCN routes and \u20ac78-\u20ac91 to 'other intercontinental destinations' via BCN (up to $98 from LAX/SFO)",
+      "note": "LL Light (long-haul): no checked bag; next pieces $76 one-way, 1st 23kg bag on 'Web (Booking)' for New York (JFK) to Barcelona, the Season B (peak) price of €70 ($76); LEVEL's own table runs €65-€70 on BCN routes and €78-€91 to 'other intercontinental destinations' via BCN (up to $98 from LAX/SFO)",
       "sources": [
         "https://lv-contentmanager-webapp-pro.azurewebsites.net/media/d5vh2bbo/us-23kg-checked-baggage-fees.pdf",
         "http://web.archive.org/web/20260113100913/https://www.flylevel.com/en/why-level/baggage",
@@ -3648,7 +3648,7 @@
           "amount_cents": 6400
         }
       ],
-      "note": "EC (same policy as U2) Standard (short-haul): no checked bag; next pieces $64 / $64 / $64 one-way, 23kg hold bag added online during booking, top of the range secondary trackers quote from easyJet's fees page, \u00a39.49-\u00a350.00 one way per bag (\u00a350 = $64); up to three hold bags each at the same per-bag price",
+      "note": "EC (same policy as U2) Standard (short-haul): no checked bag; next pieces $64 / $64 / $64 one-way, 23kg hold bag added online during booking, top of the range secondary trackers quote from easyJet's fees page, £9.49-£50.00 one way per bag (£50 = $64); up to three hold bags each at the same per-bag price",
       "sources": [
         "https://www.easyjet.com/en/help-centre/policy-terms-and-conditions/fees-charges",
         "https://www.sendmybag.com/airlines/easyjet-baggage-allowance/",
@@ -3681,7 +3681,7 @@
           "amount_cents": 6400
         }
       ],
-      "note": "DS (same policy as U2) Standard (short-haul): no checked bag; next pieces $64 / $64 / $64 one-way, 23kg hold bag added online during booking, top of the range secondary trackers quote from easyJet's fees page, \u00a39.49-\u00a350.00 one way per bag (\u00a350 = $64); up to three hold bags each at the same per-bag price",
+      "note": "DS (same policy as U2) Standard (short-haul): no checked bag; next pieces $64 / $64 / $64 one-way, 23kg hold bag added online during booking, top of the range secondary trackers quote from easyJet's fees page, £9.49-£50.00 one way per bag (£50 = $64); up to three hold bags each at the same per-bag price",
       "sources": [
         "https://www.easyjet.com/en/help-centre/policy-terms-and-conditions/fees-charges",
         "https://www.sendmybag.com/airlines/easyjet-baggage-allowance/",
@@ -3714,7 +3714,7 @@
           "amount_cents": 9300
         }
       ],
-      "note": "W4 (same policy as W6) Basic (short-haul): no checked bag; next pieces $93 / $93 / $93 one-way, 20kg checked bag bought online during booking, at the top of the stated online/call-centre range \u20ac13.00-\u20ac86.50 (\u20ac86.50 = $93), not the airport price. Each of the up to three bags bought online is priced per piece",
+      "note": "W4 (same policy as W6) Basic (short-haul): no checked bag; next pieces $93 / $93 / $93 one-way, 20kg checked bag bought online during booking, at the top of the stated online/call-centre range €13.00-€86.50 (€86.50 = $93), not the airport price. Each of the up to three bags bought online is priced per piece",
       "sources": [
         "https://www.mybaggage.com/shipping/airlines/wizz-air-baggage-allowance/",
         "https://www.sendmybag.com/airlines/wizz-air-baggage-allowance/",
@@ -3748,5 +3748,6 @@
       }
     ]
   },
-  "_short_haul_policy": "A row's `short_haul` block replaces its tiers, included bags and carry-on when the trip starts and ends in one country or covers at most 3,500 km (adapter._short_haul): airlines charge domestic and regional bag fees there, not their long-haul ones. `includes_carry_on` false means the lowest fare excludes a full-size overhead bag. Rows and blocks added on 2026-09-24 carry the sources read and whether a second check confirmed them; `needs_primary_source` marks the ones it could not."
+  "_short_haul_policy": "A row's `short_haul` block replaces its tiers, included bags and carry-on when the trip starts and ends in one country or covers at most 3,500 km (adapter._short_haul): airlines charge domestic and regional bag fees there, not their long-haul ones. `includes_carry_on` false means the lowest fare excludes a full-size overhead bag. Rows and blocks added on 2026-09-24 carry the sources read and whether a second check confirmed them; `needs_primary_source` marks the ones it could not.",
+  "_checked_2026_09_25": "The 13 rows flagged needs_primary_source were re-checked on 2026-09-25 with page fetches only. None of the airlines' fee pages could be read (Breeze, Transavia, Air Europa, Lufthansa City and Lufthansa refuse automated readers; Wizz answers 405; Jet2 and LATAM time out; Air Transat and Viva Aerobus render their fees by script), and the Internet Archive was not reachable, so every flagged row stays flagged and marked. Allegiant's own page prints no per-bag checked price (only a route calculator) and a $10 to $75 carry-on range. Wizz Air Abu Dhabi (5W) stopped flying on 1 September 2025 (Wizz Air Holdings' RNS of 14 July 2025), so its row can never match a live flight. A person with a browser can read the rest."
 }

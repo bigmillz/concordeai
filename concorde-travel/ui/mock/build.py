@@ -20,6 +20,8 @@ import sys as _sys
 _sys.path.insert(0, os.path.join(HERE, "..", ".."))
 import points      # noqa: E402  the transfer table, programmes and status bags the page plans with (enrichment/points.json)
 POINTS = json.dumps(points.page_table(), ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+import addons      # noqa: E402  published add-on prices (enrichment/addons.json); the sources stay in the file
+ADDONS = json.dumps(addons.page_table(), ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
 # The stamp in the page footers: the checkout's HEAD and its date. server.py rewrites both from git at serve time,
 # so a served page always shows what is running; this is what a page opened as a file shows.
 def _git(*args):
@@ -38,7 +40,7 @@ for src in sorted(glob.glob(os.path.join(HERE, "mock-*.src.html"))):
     out = os.path.join(HERE, "mock-%d.html" % n)
     open(out, "w", encoding="utf-8").write(html.replace("__DATA__", data).replace("__PHOTOS__", ph)
                                            .replace("__BUILD__", BUILD).replace("__UPDATED__", UPDATED)
-                                           .replace("__POINTS__", POINTS))
+                                           .replace("__POINTS__", POINTS).replace("__ADDONS__", ADDONS))
     print("mock-%d.html  %6.0f KB" % (n, os.path.getsize(out) / 1024))
     # One bad line kills the whole client silently (a duplicate const did, 2026-09-21), so every built page's
     # scripts are syntax-checked with node when it is on the machine. Skipped, and said so, without it.
