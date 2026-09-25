@@ -1874,7 +1874,12 @@ def from_serpapi(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",
             continue
 
         issuing = segments[0]["marketing"]["carrier"]
-        brand = _serp_brand(enr, issuing)
+        # Google names no fare, only the cabin. An economy trip is priced as the carrier's no-bag brand (unknown is
+        # never cheap); a premium one is named by its cabin, never as "Basic Economy" (2026-09-24: a $10,494 Delta
+        # One read Basic Economy), and with no curated row for it, its bags go on the default price
+        top = max((sg["cabin_marketed"] for sg in segments), key=lambda c: ["economy", "premium_economy", "business", "first"].index(c)
+                  if c in ("economy", "premium_economy", "business", "first") else 0)
+        brand = _serp_brand(enr, issuing) if top == "economy" else {"premium_economy": "Premium Economy", "business": "Business", "first": "First"}[top]
         short = _short_haul(segments[0]["origin"]["iata"], segments[-1]["destination"]["iata"], enr, geo)
         frow, dft = _fare_row(enr, issuing, brand, short)
         tiers, _ = _bag_tiers(enr, issuing, brand, short)

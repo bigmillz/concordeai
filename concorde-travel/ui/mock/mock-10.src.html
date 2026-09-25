@@ -437,6 +437,10 @@ details[open] summary:after{content:"–"}
 .book p{color:var(--dim);font-size:12.5px;line-height:1.5}
 .book .choose{flex:0 0 auto}
 .awards{list-style:none;display:flex;flex-direction:column;gap:8px}
+.awards li small{display:block;margin-top:4px;color:var(--faint);font-size:11.5px}.awards li .ledger{padding:0;font-size:12.5px}
+.ptbest{margin:0 0 18px;padding:14px 18px;border:1px solid rgba(53,224,138,.35);border-radius:14px;background:rgba(53,224,138,.05);font-size:13.5px;line-height:1.5;color:var(--dim)}
+.ptbest>b{display:block;color:var(--text);font-weight:500;margin-bottom:4px}.ptbest ol{margin:4px 0 6px 18px;padding:0}.ptbest li{margin:3px 0}
+.ptbest li b{color:var(--green);font-weight:500}.ptbest .ledger{padding:0;font-size:13.5px}.ptbest p{margin:0;font-size:12px;color:var(--faint)}.ptbest p.lead{font-size:13.5px;color:var(--dim)}
 .awards li{border:1px solid var(--line-soft);border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.45;color:var(--dim)}
 .awards li b{color:var(--text);font-weight:500}
 .awards li.good{border-color:rgba(53,224,138,.5)}.awards li.good b{color:var(--green)}
@@ -1026,7 +1030,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 <div id="results" class="hidden"><div class="wrapin">
   <div class="stepper" id="stepper"></div>
   <section id="bookstep" class="hidden" aria-label="Book the trip"></section>
-  <section aria-label="Top recommendations"><div class="sechead"><h2>Top recommendations</h2><p id="lede" hidden></p></div><div class="signal" id="signal" hidden></div><div class="flex" id="flex" hidden></div><div class="three" id="doors"></div></section>
+  <section aria-label="Top recommendations"><div class="sechead"><h2>Top recommendations</h2><p id="lede" hidden></p></div><div class="signal" id="signal" hidden></div><div class="flex" id="flex" hidden></div><div id="ptbest"></div><div class="three" id="doors"></div></section>
   <section aria-label="Everything else"><div class="sechead"><h2>More flights</h2><p id="listnote"></p></div><ol class="list" id="list"></ol><button class="morebtn" id="morebtn"></button><p class="hiddenrows" id="hiddenrows"></p></section>
   <section class="research" id="research" aria-label="Check other countries">
     <div class="sechead"><h2>Check other countries</h2></div>
@@ -1118,7 +1122,7 @@ function logo(code, big){
   return `<span class="logo${big ? ' big' : ''}${LUM.has(code) ? ' lum' : ''}" style="--brand:${BRAND[code] || '#3a3d46'}" title="${esc(a.name || airName(code))}">` +
     (src ? `<img alt="" src="${esc(src)}" onload="this.parentNode.classList.add('on')">` : '') + `<b>${esc(code)}</b></span>`;
 }
-const ALLIANCE = {oneworld:['BA','AA','IB','AY','AS','QR','CX','JL','QF','RJ','MH','AT','UL','WY'], skyteam:['DL','VS','AF','KL','AZ','KE','AM','SV','MU','GA','VN','CI','UX','OK','RO','ME','KQ'], star:['LH','LX','TK','LO','UA','AC','OS','SN','SK','TP','SQ','NH','TG','ET','MS','SA','A3','AI','BR','CA','CM','NZ','OU','OZ','ZH']};
+const ALLIANCE = {oneworld:['BA','AA','IB','AY','AS','QR','CX','JL','QF','RJ','MH','AT','UL','WY','FJ'], skyteam:['DL','VS','AF','KL','KE','AM','SV','MU','GA','VN','CI','UX','RO','ME','KQ','AR','MF','SK'], star:['LH','LX','TK','LO','UA','AC','OS','SN','TP','SQ','NH','TG','ET','MS','SA','A3','AI','BR','CA','CM','NZ','OU','OZ','ZH','AV','AZ']};
 
 // ---- every airline Duffel can sell (its own list, 2026-09: 29 direct, 112 through Travelport), by region. The
 // chips show the majors; "More airlines" opens the rest. A code not in the search still gets a name and a logo from
@@ -1140,7 +1144,7 @@ const AIRNAME = {american:'AA',aa:'AA','british airways':'BA',ba:'BA',british:'B
 // ---- state
 const S = {trip:'round', a:1, b:0, c:0, preset:'1,0,0', asap:false, wants:new Set(), rules:[], ride:'either', off:new Set(), menu:false, open:new Set(),
   extra:{bag:0, wifi:false, seat:false, legroom:false, lounge:false, priority:false, insurance:false, hotel:false, custom:[]}, adv:{dep0:0, dep1:24, arr0:0, arr1:24, cabin:'economy', stops:2, alli:new Set(), out:new Set()},
-  pts:{amex:0, chase:0, capone:0, citi:0, bilt:0, marriott:0, avios:0, virgin:0, aa:0, delta:0, mm:0, ms:0, fb:0, ac:0, ua:0}, prow:{banks:[''], progs:[''], status:['']}, statusWorth:6000, pay:{}, legIdx:0, legPick:{}, stage:'legs', status:{}, shown:12, T:'mine',
+  pts:{}, prow:{banks:[''], progs:[''], status:['']}, statusWorth:6000, pay:{}, legIdx:0, legPick:{}, stage:'legs', status:{}, shown:12, T:'mine',
   legs:[{from:'', to:'', date:'Wed 18 Nov'}], back:'Wed 25 Nov', pax:'1 adult', bags:'1 checked bag'};
 
 // ---- wants: a predicate, a charge when it is missing, and a hint when nothing has it
@@ -1180,160 +1184,180 @@ function prepWants(){
 }
 prepWants();
 
-// ---- points: a demo award chart for this route and the transfer partners that reach it.
-// Curated for the mockup, 2026-09; not live availability.
-// Programmes that can book a flight this feed returns, and the sources that reach them. Only the ones with an
-// award on a flight in the current search are offered; the rest stay out of the way (2026-09-21).
-const PROG = {avios:{name:'Avios', fair:1.3, via:['amex','chase','capone','citi','bilt','marriott']}, virgin:{name:'Virgin Points', fair:1.4, via:['amex','chase','capone','citi','bilt','marriott']},
-  aa:{name:'AAdvantage', fair:1.5, via:['bilt','marriott']}, delta:{name:'SkyMiles', fair:1.2, via:['amex','marriott']}, mm:{name:'Miles & More', fair:1.4, via:['capone','marriott']}, ms:{name:'Miles&Smiles', fair:1.6, via:['capone','citi','bilt','marriott']},
-  fb:{name:'Flying Blue', fair:1.2, via:['amex','chase','capone','citi','bilt','marriott']}, ac:{name:'Aeroplan', fair:1.4, via:['amex','chase','capone','bilt','marriott']}, ua:{name:'MileagePlus', fair:1.2, via:['chase','bilt','marriott']}};
-// the banks move 1:1; Marriott Bonvoy moves 3:1 and a Bonvoy point is worth about 0.7c on its own (the 5,000-mile bonus per 60,000 moved is in the playbook, not the arithmetic)
-const SOURCE = {amex:{r:1}, chase:{r:1}, capone:{r:1}, citi:{r:1}, bilt:{r:1}, marriott:{r:1/3, fair:.7}};
-const BANKS = ['amex','chase','capone','citi','bilt','marriott'];
-const BANK = {amex:'Amex Membership Rewards', chase:'Chase Ultimate Rewards', capone:'Capital One miles', citi:'Citi ThankYou', bilt:'Bilt', marriott:'Marriott Bonvoy',
-  avios:'British Airways Avios', virgin:'Virgin Points', aa:'American AAdvantage', delta:'Delta SkyMiles', mm:'Lufthansa Miles & More', ms:'Turkish Miles&Smiles', fb:'Air France-KLM Flying Blue', ac:'Air Canada Aeroplan', ua:'United MileagePlus'};
-const SHORT = {amex:'Amex', chase:'Chase', capone:'Capital One', citi:'Citi', bilt:'Bilt', marriott:'Marriott', avios:'Avios', virgin:'Virgin', aa:'AAdvantage', delta:'SkyMiles', mm:'Miles & More', ms:'Miles&Smiles', fb:'Flying Blue', ac:'Aeroplan', ua:'MileagePlus'};
-const rlabel = r => r > 1 ? '1:' + r : r < 1 ? Math.round(1/r) + ':1' : '1:1';
-// Transfer bonuses: none. The one that stood here was invented (2026-09-24, per Patrick: no sample data); a bonus
-// shows only when it is read from the bank's own page with its end date.
-const BONUS = {};
-// the demo award chart for this route, economy one way. STAR is what Aeroplan and MileagePlus charge for any Star
-// Alliance partner on it, FB what Flying Blue charges across SkyTeam; both are gated by the operator being in the search.
-const STAR = [{p:'ac', pts:35000, fees:9000, why:'Aeroplan partner award: no fuel surcharge, a partner booking fee'}, {p:'ua', pts:35000, fees:600, why:'MileagePlus partner saver'}];
-const MM = {p:'mm', pts:30000, fees:15000, why:'Miles & More economy'};
-const AWARD = {BA:[{p:'avios', pts:13000, fees:35000, why:'off-peak economy; BA adds a carrier surcharge'}],
-  VS:[{p:'virgin', pts:10000, fees:15000, why:'Flying Club economy'}, {p:'fb', pts:30000, fees:20000, why:'Flying Blue partner award; Virgin\'s surcharge applies'}],
-  AA:[{p:'aa', pts:30000, fees:600, why:'AAdvantage saver'}], DL:[{p:'delta', pts:32000, fees:600, why:'SkyMiles main'}, {p:'fb', pts:30000, fees:6000, why:'Flying Blue partner award on Delta, mostly taxes'}],
-  AY:[{p:'avios', pts:15000, fees:12000, why:'Finnair Plus, Avios'}], EI:[{p:'avios', pts:13000, fees:8000, why:'Aer Lingus, low fees'}], IB:[{p:'avios', pts:13000, fees:35000, why:'on BA metal, BA surcharge'}], AS:[{p:'avios', pts:13000, fees:35000, why:'flown by BA; book with Avios'}],
-  LH:[MM, ...STAR], LX:[MM, ...STAR], OS:[MM, ...STAR], SN:[MM, ...STAR], TK:[{p:'ms', pts:30000, fees:10000, why:'Miles&Smiles economy'}, ...STAR], SK:STAR, TP:STAR, LO:STAR,
-  UA:[{p:'ua', pts:33000, fees:600, why:'MileagePlus saver on United, priced dynamically'}, STAR[0]], AC:[{p:'ac', pts:35000, fees:9000, why:'Aeroplan on Air Canada'}, STAR[1]],
-  AF:[{p:'fb', pts:30000, fees:15000, why:'Flying Blue economy; a surcharge on Air France metal'}], KL:[{p:'fb', pts:30000, fees:15000, why:'Flying Blue economy; a surcharge on KLM metal'}], AZ:[{p:'fb', pts:30000, fees:15000, why:'Flying Blue partner award on ITA'}]};
-function awardsFor(e){
-  const out = [];
-  for (const a of (AWARD[e.operator] || AWARD[e.carrier] || [])){
-    const prog = PROG[a.p], have = S.pts[a.p] || 0, bonus = BONUS[a.p];
-    let path = null, short = a.pts - have, spend = a.pts, ratio = 1, via = null;
-    if (short <= 0) path = 'your ' + prog.name;
-    else {
-      // a bonus from a bank you hold counts first: fewer of your points buy the same award
-      const srcs = prog.via.map(k => ({k, r: bonus && bonus.from === k ? bonus.ratio : (SOURCE[k] || {r:1}).r})).filter(x => (S.pts[x.k] || 0) * x.r >= short).sort((x, y) => (y.r - x.r) || (S.pts[y.k] - S.pts[x.k]));
-      if (srcs.length){ via = srcs[0].k; ratio = srcs[0].r; spend = have + Math.ceil(short / ratio); path = SHORT[via] + ' → ' + prog.name + ' ' + rlabel(ratio); }
+// ---- points and miles (2026-09-24, per Patrick: no sample data, and "if a person spends the time putting in all
+// their miles and points and airline status, then that should work to their advantage").
+// The server prices each flight's award from the PUBLISHED charts (points.py over enrichment/points.json): what a
+// seat costs in each programme if the airline releases one, per person, one way. This plans the cheapest way to
+// cover that from the balances typed in step 3: miles already in the programme first, then Avios from another
+// Avios account, then card points, cheapest per arriving mile, with each bank's own ratio, minimum, block size
+// and any transfer bonus still running today. Points are valued at The Points Guy's monthly valuations, so
+// "better than cash" means the ticket costs more than the points are worth elsewhere. Programmes with no chart are
+// named as able to book the flight, never priced. Nothing here says a seat is available: the steps say check first.
+const PTS = __POINTS__;
+const BANKS = Object.keys(PTS.banks), PROGS = Object.keys(PTS.programmes);
+const PNAME = k => (PTS.banks[k] || PTS.programmes[k] || {}).name || k;
+const PSHORT = k => PTS.banks[k] ? PTS.banks[k].short : ((PTS.programmes[k] || {}).name || k);
+const PCUR = k => (PTS.programmes[k] || {}).currency || 'points';
+const fmtN = n => Math.round(n).toLocaleString('en-US');
+const todayLocal = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const niceDay = d => new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', {month:'long', day:'numeric', timeZone:'UTC'});
+// balances saved from an earlier version of this page used other keys
+const PT_OLD = {avios:'ba', virgin:'vs', delta:'dl', mm:'lh', ms:'tk', fb:'af'};
+function bonusOf(bank, prog){ return (PTS.banks[bank].bonuses || []).find(x => x.to === prog && x.ends >= todayLocal()) || null; }
+function arriveOf(row, send, bonus){
+  let a = Math.floor(send * row.to / row.from * (bonus ? 1 + bonus.percent / 100 : 1) + 1e-9);
+  if (row.bonus_per_60k) a += Math.floor(send / 60000) * row.bonus_per_60k;     // Marriott's bonus per 60,000 moved at once
+  return a;
+}
+function sendFor(row, need, bonus){
+  const step = row.step || 1000, min = Math.max(row.min || step, step);
+  let x = Math.max(min, Math.ceil(need * row.from / row.to / (bonus ? 1 + bonus.percent / 100 : 1) / step) * step);
+  while (arriveOf(row, x, bonus) < need) x += step;
+  if (row.bonus_per_60k) while (x - step >= min && arriveOf(row, x - step, bonus) >= need) x -= step;
+  return x;
+}
+const ratioText = row => { const g = (a, b) => b ? g(b, a % b) : a, f = row.from, t = row.to; if (f === t) return '1:1'; const k = Number.isInteger(f) && Number.isInteger(t) ? g(f, t) : 1; return fmtN(f / k) + ':' + fmtN(t / k); };
+// a fee in another currency, in US cents at today's rate; with no rate, read as dollars (a little high, never low)
+const localFee = f => { const c = CURRENCIES[f.currency]; return Math.round(f.amount * 100 / (c && c.rate ? c.rate : 1)); };
+// what earlier legs of this trip already spent, so a round trip never plans the same points twice
+function usedBefore(){
+  const u = {};
+  Object.keys(S.legPick).map(Number).filter(i => i < S.legIdx).forEach(i => { const s = S.legPick[i].snap; if (s.pay === 'points' && s.award && s.award.take) for (const [k, v] of Object.entries(s.award.take)) u[k] = (u[k] || 0) + v; });
+  return u;
+}
+function planAward(e, a, used){
+  const P = PTS.programmes[a.prog] || {}, n = paxCount(), need = a.miles * n, U = used || {};
+  const avail = k => Math.max(0, (S.pts[k] || 0) - (U[k] || 0));
+  const take = {}, moves = []; let left = need, cost = 0, xfee = 0, unknown = P.cents == null;
+  const own = Math.min(avail(a.prog), left);
+  if (own > 0){ take[a.prog] = own; left -= own; cost += own * (P.cents || 0); }
+  if (left > 0 && PTS.avios_family.includes(a.prog)) for (const k of PTS.avios_family){
+    if (k === a.prog || left <= 0) continue; const x = Math.min(avail(k), left); if (x <= 0) continue;
+    take[k] = x; left -= x; cost += x * (PTS.programmes[k].cents || 0); moves.push({kind:'combine', from:k, send:x, arrive:x}); }
+  if (left > 0){
+    const opts = BANKS.filter(b => avail(b) > 0 && PTS.banks[b].partners[a.prog]).map(b => {
+      const row = PTS.banks[b].partners[a.prog], bonus = bonusOf(b, a.prog), eff = row.to / row.from * (bonus ? 1 + bonus.percent / 100 : 1) + (row.bonus_per_60k ? row.bonus_per_60k / 60000 : 0);
+      return {b, row, bonus, per:(PTS.banks[b].cents + (row.fee ? row.fee.per_point_usd * 100 : 0)) / eff}; }).sort((x, y) => x.per - y.per);
+    for (const o of opts){
+      if (left <= 0) break;
+      const bal = avail(o.b), step = o.row.step || 1000, min = Math.max(o.row.min || step, step);
+      let send = sendFor(o.row, left, o.bonus);
+      if (send > bal){ send = Math.floor(bal / step) * step; if (send < min) continue; }
+      const arrive = arriveOf(o.row, send, o.bonus);
+      moves.push({kind:'bank', from:o.b, send, arrive, row:o.row, bonus:o.bonus});
+      take[o.b] = send; left -= arrive; cost += send * PTS.banks[o.b].cents;
+      if (o.row.fee) xfee += Math.min(o.row.fee.cap_usd * 100, Math.round(send * o.row.fee.per_point_usd * 100));
     }
-    // the test is in dollars: the points, valued at what the programme usually
-    // returns, plus the fees, against the fare they replace. Cents a point is the
-    // same comparison per point; the margin is what the user actually keeps.
-    // what the points used are worth: the programme's own at its fair value, plus whatever is moved in at the source's
-    const moved = via ? Math.ceil(short / ratio) : 0, fairPt = via ? ((SOURCE[via] || {}).fair || prog.fair) : prog.fair;
-    const value = (e.ticket_cents - a.fees) / spend, worth = Math.round(Math.min(have, a.pts) * prog.fair + moved * fairPt), margin = e.ticket_cents - a.fees - worth;
-    out.push({...a, prog, value, path, short, spend, ratio, via, bonus: ratio > 1 ? bonus : null, worth, margin, fairPt, good: !!path && margin > 0, saves: e.ticket_cents - a.fees});
   }
-  return out.sort((x, y) => (y.good - x.good) || (y.value - x.value));
+  const ok = left <= 0, known = Math.round((a.fee_usd || 0) * 100 * n + (a.fee_local ? localFee(a.fee_local) * n : 0) + xfee);
+  const worth = Math.round(cost), head = ok && !unknown ? e.ticket_cents - worth - known : null;
+  return {a, P, need, own, moves, take, ok, short:ok ? 0 : left, spare:ok ? -left : 0, worth, known, xfee, head, unknown,
+          good: !!(ok && head !== null && head >= 1000 && a.surcharge !== 'high'), spend:Object.values(take).reduce((t, v) => t + v, 0)};
 }
-// Cash beside points, both in full. The star goes to the better value; the
-// reason sits behind the (i), two short lines from precomputed figures. In the
-// product the narrator writes those lines, current to the query (a transfer
-// bonus, a peak date), and the verifier holds them to the figures.
-function ptTip(e, a, total){
-  const c = moneyPt(a.value), fair = moneyPt(a.fairPt), award = a.pts.toLocaleString() + ' ' + esc(a.prog.name) + ' + ' + money(a.fees) + ' fees';
-  if (!a.path) return `Not enough points for this ${esc(a.prog.name)} award.<small>Award: ${award}.</small>`;
-  if (a.value <= 0) return `Award fees (${money(a.fees)}) are more than the ${money(e.ticket_cents)} fare.<small>Award: ${award}.</small>`;
-  const path = a.via ? esc(SHORT[a.via]) + ' → ' + esc(a.prog.name) + ' at ' + rlabel(a.ratio) + (a.bonus ? ' (bonus until ' + esc(a.bonus.until) + ')' : '') : 'from your ' + esc(a.prog.name);
-  const bank = a.via ? esc(SHORT[a.via]) + (S.pts[a.p] > 0 ? ' + ' + esc(SHORT[a.p]) : '') : esc(a.prog.name), rest = total - e.ticket_cents + a.fees, eq = total - a.margin;
-  const sum = `${a.spend.toLocaleString()} ${bank} points are worth about ${money(a.worth)} (${fair} each). Plus ${money(rest)} cash: <b>${money(eq)} all in</b>`;
-  if (a.good) return `${sum}, ${money(a.margin)} less than ${money(total)} cash. Value: ${c} a point. Typical: ${fair}.<small>${path}. Award: ${award}.</small>`;
-  return `${sum}, ${money(-a.margin)} more than ${money(total)} cash. Value: ${c} a point. Typical: ${fair}.<small>${path}. Award: ${award}.</small>`;
+const PLANS = new Map();
+function plansOf(e){
+  const used = usedBefore(), key = e.id + '|' + paxCount() + '|' + JSON.stringify(S.pts) + '|' + JSON.stringify(used);
+  if (!PLANS.has(key)){
+    const ps = (e.awards || []).map(a => planAward(e, a, used));
+    // the best use first: a plan that works and beats cash, then any plan that works, then the nearest miss
+    ps.sort((x, y) => (y.good - x.good) || (y.ok - x.ok) || ((y.head ?? -1e12) - (x.head ?? -1e12)) || (x.short - y.short) || (x.a.miles - y.a.miles));
+    if (PLANS.size > 4000) PLANS.clear();
+    PLANS.set(key, ps);
+  }
+  return PLANS.get(key);
 }
-// ---- booking with points, step by step. What a friend who does this for a
-// living would tell you: check space BEFORE you transfer, which site sells
-// this seat for these points, how the bank moves them and how fast, what the
-// fees are and which card to pay them with, and the cheaper way round when
-// one exists. Every figure comes from awardsFor(); the words around them come
-// from this curated table (as of 2026-09, and these change: the page says
-// so). In the product the narrator writes the prose from the same brief and
-// the verifier holds it to these numbers.
-const PLAY = {
-  virgin: {site:'virginatlantic.com', search:'Sign in to Flying Club, search the date with "Pay with points" on, and look for a Standard economy reward on this flight.',
-    fees:'Virgin adds a carrier surcharge on its own flights; the fees quoted here are for economy.', cancel:'You can cancel for a fee and get the points back.',
-    tips:['Virgin Points also book Delta flights, with much lower fees. Check space on delta.com, then book on virginatlantic.com.']},
-  avios: {site:'ba.com', search:'Sign in to the Executive Club, search with "Book with Avios", and check the Reward Flight Saver price for this flight on this date.',
-    fees:'BA\'s own flights add a big carrier surcharge.', cancel:'You can cancel for a fee and get the Avios and most taxes back.',
-    tips:['Avios move 1:1 between British Airways, Iberia and Aer Lingus. Iberia and Aer Lingus flights carry much lower surcharges. Price those first if they fly your route.']},
-  aa: {site:'aa.com', search:'Sign in to AAdvantage, search with "Redeem miles", and look for the Web Special or MileSAAver price on this flight.',
-    fees:'This fee is mostly government taxes.', cancel:'If you cancel, American returns the miles free.',
-    tips:['Only Bilt and Marriott transfer to AAdvantage. Otherwise, use miles already in the account.']},
-  delta: {site:'delta.com', search:'Sign in to SkyMiles, search with "Shop with miles", and compare miles with cash. Delta award prices change often.',
-    fees:'Delta charges little beyond taxes on its own flights.', cancel:'Most Main Cabin awards can be canceled free, with the miles returned.',
-    tips:['Of the banks, only Amex transfers to SkyMiles. The same seat is often cheaper with Virgin Points on virginatlantic.com.']},
-  mm: {site:'miles-and-more.com', search:'Sign in to Miles & More and search the award calendar for this flight.',
-    fees:'Lufthansa Group awards carry a surcharge, which is most of the fee here.', cancel:'Awards can be refunded for a fee.',
-    tips:['Capital One is the only bank that transfers to Miles & More. Marriott Bonvoy transfers at 3:1.']},
-  ms: {site:'turkishairlines.com', search:'Sign in to Miles&Smiles and search the award on the airline\'s own site; partner sites do not show it.',
-    fees:'Turkish keeps its surcharges moderate.', cancel:'You can cancel for a fee.',
-    tips:['Capital One, Citi and Bilt transfer to Miles&Smiles 1:1. Transfers can take up to a day.']},
-  fb: {site:'airfrance.com or klm.com', search:'Sign in to Flying Blue, search with "Pay with Miles", and find the Economy award. Prices change often.',
-    fees:'Air France and KLM add a surcharge on their own flights; on a Delta-operated flight it is mostly taxes.', cancel:'Award tickets can be refunded for a fee up to departure.',
-    tips:['Amex, Chase, Capital One, Citi and Bilt transfer 1:1, usually in minutes. Find the seat first.', 'Monthly Promo Rewards take 25% or more off some routes. Check the list first.']},
-  ac: {site:'aircanada.com', search:'Sign in to Aeroplan, search with "Book with points" on aircanada.com, and look for the partner award on this Star Alliance flight.',
-    fees:'Aeroplan adds no fuel surcharge on partners; the fee here is its partner booking charge plus taxes.', cancel:'You can cancel for a fee and get the points back.',
-    tips:['Amex, Chase, Capital One and Bilt transfer 1:1, usually within minutes; Marriott Bonvoy moves 3:1 with 5,000 bonus miles per 60,000.', 'Lufthansa, SWISS, TAP and Turkish cost the same points here. Pick the best fee and time.']},
-  ua: {site:'united.com', search:'Sign in to MileagePlus, search with "Book with miles" on united.com, and look for the Saver award on this flight; United prices dynamically.',
-    fees:'United adds no surcharge; the fee is taxes.', cancel:'If you cancel, United returns the miles free.',
-    tips:['Chase and Bilt transfer 1:1, usually in minutes. The same seat often costs fewer points with Aeroplan.']},
-};
-const BANKPATH = {amex:'americanexpress.com → Rewards → Transfer points', chase:'chase.com → Ultimate Rewards → Transfer to travel partners', capone:'capitalone.com → Rewards → Transfer miles', citi:'citi.com → ThankYou Rewards → Points transfer', bilt:'Bilt app → Points → Transfer', marriott:'marriott.com → Bonvoy → Points → Transfer to airline miles'};
-const SPEED = {'chase>virgin':'usually within minutes', 'amex>virgin':'usually within minutes', 'chase>avios':'usually within minutes', 'amex>avios':'usually within minutes, occasionally a day or two', 'amex>delta':'usually within minutes', 'bilt>aa':'usually within minutes', 'capone>ms':'up to a day', 'citi>ms':'up to a day', 'bilt>ms':'up to a day',
-  'amex>fb':'usually within minutes', 'chase>fb':'usually within minutes', 'capone>fb':'usually within minutes', 'citi>fb':'usually within minutes', 'bilt>fb':'usually within minutes',
-  'amex>ac':'usually within minutes', 'chase>ac':'usually within minutes', 'capone>ac':'usually within minutes', 'bilt>ac':'usually within minutes', 'chase>ua':'usually within minutes', 'bilt>ua':'usually within minutes',
-  'marriott>avios':'transfers take 2 to 7 days', 'marriott>virgin':'transfers take 2 to 7 days', 'marriott>aa':'transfers take 2 to 7 days', 'marriott>delta':'transfers take 2 to 7 days', 'marriott>mm':'transfers take 2 to 7 days', 'marriott>ms':'transfers take 2 to 7 days', 'marriott>fb':'transfers take 2 to 7 days', 'marriott>ac':'transfers take 2 to 7 days', 'marriott>ua':'transfers take 2 to 7 days'};
-function playbookHTML(e, r){
-  const aw = awardsFor(e), a = aw[0]; if (!a) return '';
-  const P = PLAY[a.p] || {}, prog = a.prog.name, have = S.pts[a.p] || 0, total = r.total, rest = total - e.ticket_cents + a.fees, eq = total - a.margin;
-  const S1 = [], step = (h, t, path) => S1.push(`<li><h4>${h}</h4><p>${t}${path ? `<br><span class="path">${esc(path)}</span>` : ''}</p></li>`);
-  // 1. space first
-  step('Find the award seat first', `${esc(P.search || 'Search the award on the program\'s site.')} Look for <b>${esc(e.flight)} on ${esc(niceDate(D.query.date))}</b>, ${esc(e.route.join(' → '))}, at <b>${a.pts.toLocaleString()} ${esc(prog)} + ${money(a.fees)}</b>. If the price is higher, compare it with cash first. <b>Transfers can't be undone.</b>`, P.site);
-  // 2. the transfer
-  if (!a.path){
-    const banks = a.prog.via.map(k => SHORT[k]).join(', ');
-    step('Not enough points', `Needed: <b>${a.pts.toLocaleString()}</b> ${esc(prog)}. You have ${have.toLocaleString()}. ${esc(banks)} points transfer to ${esc(prog)}, but your balances do not cover the rest. Pay cash.`);
-  } else if (a.short <= 0){
-    step('No transfer needed', `You have <b>${have.toLocaleString()} ${esc(prog)}</b>. This award needs ${a.pts.toLocaleString()}.`);
+const bestPlan = e => plansOf(e)[0] || null;
+BANKS.concat(PROGS).forEach(k => { if (!(k in S.pts)) S.pts[k] = 0; });
+const anyPoints = () => Object.values(S.pts).some(v => v > 0);
+const srcText = p => { const ks = Object.keys(p.take); return ks.map(k => PSHORT(k)).join(' + ') || PSHORT(p.a.prog); };
+const bookableKeys = e => (e.award_bookable || []).slice().sort((x, y) => ((S.pts[y] > 0) - (S.pts[x] > 0)) || ((PTS.programmes[y].home === (e.operator || e.carrier)) - (PTS.programmes[x].home === (e.operator || e.carrier))) || PNAME(x).localeCompare(PNAME(y)));
+const bookableText = e => bookableKeys(e).map(k => PNAME(k) + (S.pts[k] > 0 ? ' (you have ' + fmtN(S.pts[k]) + ')' : ''));
+const opName = e => { const op = e.operator || e.carrier; return op !== e.carrier ? ((D.airlines || {})[op] || {}).name || op : ''; };
+// Cash beside points, both in full. The star goes to the better value; the reason sits behind the (i).
+function ptTip(e, p, total){
+  const a = p.a, head = `${fmtN(a.miles)} ${esc(PCUR(a.prog))}${paxCount() > 1 ? ' each' : ''} with ${esc(p.P.name)}`;
+  if (!p.ok) return `${head}. Your balances are ${fmtN(p.short)} short.<small>${esc(a.basis)}.</small>`;
+  if (p.unknown) return `${head}. The Points Guy publishes no value for ${esc(p.P.name)}, so this is not compared with cash.<small>${esc(a.basis)}.</small>`;
+  const cpp = (e.ticket_cents - p.known) / p.need;
+  return `${head}: ${fmtN(p.spend)} ${esc(srcText(p))} points, worth about ${money(p.worth)}${p.known ? ', plus ' + money(p.known) + ' in published fees' : ''}. The ticket is ${money(e.ticket_cents)}, so points come out ${p.head >= 0 ? money(p.head) + ' ahead' : money(-p.head) + ' behind'}${a.surcharge === 'high' ? ', before carrier charges that can be several hundred dollars' : ', before taxes and charges at booking'}. That is ${moneyPt(cpp)} a point.<small>${esc(a.basis)}. Point values: ${esc(PTS.valuation.source)}.</small>`;
+}
+// ---- booking with points, step by step: check the seat BEFORE moving anything, then the transfers with each
+// bank's own ratio, block size, bonus and timing, then what cash is still due, then the cheaper ways round.
+function playbookHTML(e, r, pick){
+  const ps = plansOf(e), p = pick || ps[0]; if (!p) return '';
+  const a = p.a, P = p.P, n = paxCount(), total = r.total, S1 = [], step = (h, t, path) => S1.push(`<li><h4>${h}</h4><p>${t}${path ? `<br><span class="path">${esc(path)}</span>` : ''}</p></li>`);
+  const cur = PCUR(a.prog), flown = opName(e), seat = flown ? `the <b>${esc(flown)}</b> flight on <b>${esc(niceDate(e.depart.slice(0, 10)))}</b> (sold as ${esc(e.flight)}), ${esc(e.route.join(' → '))}, leaving ${hm(e.depart)}` : `<b>${esc(e.flight)} on ${esc(niceDate(e.depart.slice(0, 10)))}</b>, ${esc(e.route.join(' → '))}`;
+  step('Find the award seat first', `${esc(P.search || 'Search award flights on ' + (P.site || 'the programme\'s site'))}. Look for ${seat} at <b>${fmtN(a.miles)} ${esc(cur)}</b>${n > 1 ? ' each, ' + fmtN(p.need) + ' for ' + n : ''}${a.low ? ` (${fmtN(a.low)} ${esc(a.low_when)})` : ''}${a.floor ? ', the lowest level it publishes' : ''}. The chart price holds only when the airline releases a seat at it. <b>Transfers can't be undone.</b>`, P.site);
+  if (!p.ok){
+    const reach = BANKS.filter(b => PTS.banks[b].partners[a.prog]).map(b => PTS.banks[b].short);
+    step('Not enough points', `Needed: <b>${fmtN(p.need)}</b> ${esc(cur)}. Your balances cover ${fmtN(p.need - p.short)}. ${reach.length ? esc([...new Set(reach)].join(', ')) + ' points move to ' + esc(P.name) + '.' : 'No card programme moves points to ' + esc(P.name) + '.'} Pay cash, or top up first.`);
+  } else if (!p.moves.length){
+    step('No transfer needed', `You have <b>${fmtN(S.pts[a.prog])} ${esc(cur)}</b> with ${esc(P.name)}. This uses ${fmtN(p.need)}.`);
   } else {
-    const bank = SHORT[a.via], inc = a.via === 'marriott' ? 3000 : 1000, need = Math.ceil(a.short / a.ratio), move = Math.ceil(need / inc) * inc, arrive = Math.floor(move * a.ratio);
-    step(`Move ${move.toLocaleString()} ${bank} points to ${prog}`, `You need ${a.short.toLocaleString()} more ${esc(prog)}. ${bank} transfers in ${inc.toLocaleString()}-point blocks at ${rlabel(a.ratio)}${a.bonus ? ' (bonus until ' + esc(a.bonus.until) + ')' : ''}. Send <b>${move.toLocaleString()}</b> and <b>${arrive.toLocaleString()}</b> arrive${arrive - a.short > 0 ? ', leaving ' + (arrive - a.short).toLocaleString() + ' spare in the account' : ''}. Link your ${esc(prog)} account to ${bank} first; the names must match. ${esc((x => x[0].toUpperCase() + x.slice(1))(SPEED[a.via + '>' + a.p] || 'transfers to this program can take a day or more'))}. Do this after step 1.`, BANKPATH[a.via]);
+    if (p.own) step(`Use the ${fmtN(p.own)} ${esc(cur)} you already have`, `They are in your ${esc(P.name)} account. The rest comes from the steps below.`);
+    for (const m of p.moves){
+      if (m.kind === 'combine'){ step(`Move ${fmtN(m.send)} Avios from ${esc(PNAME(m.from))}`, `Avios move 1:1 between British Airways, Qatar, Iberia, Aer Lingus and Finnair accounts. Each programme sets its own rules for combining, so check them on its site first.`); continue; }
+      const B = PTS.banks[m.from], bn = m.bonus ? ` With the ${m.bonus.percent}% transfer bonus that runs until ${esc(niceDay(m.bonus.ends))}` : '';
+      step(`Move ${fmtN(m.send)} ${esc(B.short)} points to ${esc(P.name)}`,
+        `${esc(B.short)} moves points at ${ratioText(m.row)}${m.row.step && m.row.step > 1 ? ', in blocks of ' + fmtN(m.row.step) : ''}${m.row.min ? ', at least ' + fmtN(m.row.min) : ''}${m.row.bonus_per_60k ? ', and adds ' + fmtN(m.row.bonus_per_60k) + ' miles for every 60,000 moved at once' : ''}.${bn ? bn + '.' : ''} Send <b>${fmtN(m.send)}</b> and <b>${fmtN(m.arrive)}</b> arrive${p.spare > 0 && m === p.moves[p.moves.length - 1] ? ', leaving ' + fmtN(p.spare) + ' spare in the account' : ''}. ` +
+        `Link your ${esc(P.name)} account in ${esc(B.short)} first; the names must match. Timing: ${esc(m.row.time)}. ${m.row.fee ? esc(B.short) + ' charges ' + money(Math.min(m.row.fee.cap_usd * 100, Math.round(m.send * m.row.fee.per_point_usd * 100))) + ' for this transfer (' + esc(m.row.fee.what) + '). ' : ''}${m.row.note ? esc(m.row.note) + '. ' : ''}${B.needs ? 'Transfers need ' + esc(B.needs) + '. ' : ''}Do this after step 1.`, B.path);
+    }
   }
-  // 3. book
-  if (a.path) step('Book and pay the fees', `On <b>${esc(P.site || 'the program\'s site')}</b>, find the same flight with points and pay the <b>${money(a.fees)}</b> in taxes and fees. ${esc(P.fees || '')} Use a card with no foreign transaction fee.`);
-  // 4. the cheaper way round, if the table knows one
-  for (const t of (P.tips || [])) step('Worth checking first', esc(t));
-  // 5. after
-  if (a.path) step('After booking', `Save the confirmation and pick a seat. Seat choice on this fare is <b>${e.seat_selection === 'paid' ? 'paid' : 'included'}</b>. ${esc(P.cancel || '')}`);
-  const verdict = !a.path ? `Not enough points for this award.` : a.good ? `<b>Points save ${money(a.margin)}.</b> ${a.spend.toLocaleString()} ${esc(SHORT[a.via || a.p]) + (a.via && S.pts[a.p] > 0 ? ' + ' + esc(SHORT[a.p]) : '')} points are worth about ${money(a.worth)} (${moneyPt(a.fairPt)} each). Plus ${money(rest)} cash: ${money(eq)} all in, against ${money(total)} cash.`
-    : `<b>Cash saves ${money(-a.margin)}.</b> Value: ${moneyPt(a.value)} a point. Typical: ${moneyPt(a.fairPt)}. Keep the points.`;
+  if (p.ok) step('Book, then pay the taxes and charges', `On <b>${esc(P.site)}</b>, book the same flight with ${esc(cur)}, then pay ${esc(String(a.fees || 'the taxes and charges').replace(/^plus /, ''))}${a.fee_known ? ' (' + money(a.fee_usd * 100 * n) + ' as Virgin prints it)' : ''}.`);
+  // the cheaper ways round: the bank's own travel site, the next award, the programmes with no chart
+  const alt = [];
+  const via = p.moves.find(m => m.kind === 'bank');
+  if (via && PTS.banks[via.from].portal_cents) alt.push(`Paying for the ticket in ${esc(PTS.banks[via.from].short)}'s travel site would take about <b>${fmtN(e.ticket_cents / PTS.banks[via.from].portal_cents)}</b> ${esc(PTS.banks[via.from].short)} points (${esc(PTS.banks[via.from].portal)}). This transfer uses ${fmtN(via.send)}.`);
+  const next = plansOf(e).filter(x => x !== p && x.ok)[0];
+  if (next) alt.push(`Next best: ${fmtN(next.a.miles)} ${esc(PCUR(next.a.prog))} with ${esc(next.P.name)} (${esc(next.a.basis)})${next.head !== null ? ', ' + (next.head >= 0 ? money(next.head) + ' ahead of cash' : money(-next.head) + ' behind cash') : ''}.`);
+  const dyn = bookableText(e);
+  if (dyn.length) alt.push(`${esc(dyn.join(', '))} can also book this flight. ${dyn.length > 1 ? 'They publish' : 'It publishes'} no award chart, so the price is only on ${dyn.length > 1 ? 'their sites' : 'its site'}.`);
+  if (alt.length) step('Worth checking first', alt.join('<br>'));
+  const verdict = !p.ok ? `Your balances are ${fmtN(p.short)} ${esc(cur)} short for this award.`
+    : p.unknown ? `The Points Guy publishes no value for ${esc(P.name)}, so this is not compared with cash.`
+    : a.surcharge === 'high' ? `<b>Check the cash charge before you move anything.</b> On points this is ${money(p.head)} ${p.head >= 0 ? 'ahead of' : 'behind'} the ${money(e.ticket_cents)} ticket before carrier charges, and ${esc(a.fees)}.`
+    : p.good ? `<b>Points come out about ${money(p.head)} ahead of cash.</b> ${fmtN(p.spend)} ${esc(srcText(p))} points are worth about ${money(p.worth)} at The Points Guy's values; the ticket is ${money(e.ticket_cents)}. That is before the taxes and charges at booking.`
+    : `<b>Cash is the better use.</b> ${fmtN(p.spend)} points are worth about ${money(p.worth)}, ${p.head < 0 ? 'more than' : 'about the same as'} the ${money(e.ticket_cents)} ticket. Keep the points.`;
+  const moved = p.moves.filter(m => m.kind === 'bank').reduce((t, m) => t + m.send, 0);
   return `<div class="play"><p class="lede">${verdict}</p>
-    ${a.path ? `<div class="warn"><b>First:</b> find the award seat on ${esc(P.site || 'the site')} before any transfer. Transfers can't be undone.</div>` : ''}
+    ${p.ok ? `<div class="warn"><b>First:</b> find the award seat on ${esc(P.site)} before any transfer. Transfers can't be undone.</div>` : ''}
     <ol class="steps">${S1.join('')}</ol>
-    <div class="sum"><div><span>Points to move</span><b class="fig">${a.path && a.short > 0 ? (x => Math.ceil(Math.ceil(a.short / a.ratio) / x) * x)(a.via === 'marriott' ? 3000 : 1000).toLocaleString() : a.path ? '0' : '—'}</b><span>${a.path && a.short > 0 ? 'from ' + esc(SHORT[a.via]) : a.path ? 'already in ' + esc(prog) : 'no route'}</span></div>
-      <div><span>Cash still due</span><b class="fig">${money(rest)}</b><span>${money(a.fees)} award fees + ${money(total - e.ticket_cents)} extras</span></div></div>
-    <p class="pnote">Program rules and transfer ratios as of September 2026. Check the bank's transfer page before moving points.</p></div>`;
+    <div class="sum"><div><span>Points to move</span><b class="fig">${p.ok ? fmtN(moved) : '—'}</b><span>${!p.ok ? 'not enough points' : moved ? 'from ' + esc([...new Set(p.moves.filter(m => m.kind === 'bank').map(m => PTS.banks[m.from].short))].join(' + ')) : 'already in ' + esc(P.name)}</span></div>
+      <div><span>Cash still due</span><b class="fig">${money(total - e.ticket_cents + p.known)}</b><span>${p.known ? money(p.known) + ' published fees + ' : ''}${money(total - e.ticket_cents)} extras, plus taxes and charges</span></div></div>
+    <p class="pnote">${esc(a.chart_name)}: ${a.secondary ? 'from a dated secondary source, ' : ''}as of ${esc(String(a.as_of || PTS.as_of).slice(0, 60))}. Point values: ${esc(PTS.valuation.source)}. Transfer ratios read from each bank on ${esc(niceDay(PTS.as_of))}.${a.caveat ? ' ' + esc(a.caveat) + '.' : ''}</p></div>`;
 }
-function openPlaybook(id){
-  const e = ALL.find(x => x.id === id), r = bill(e), a = awardsFor(e)[0]; if (!a) return;
-  $('#sheetroot').innerHTML = `<div class="sheetwrap" id="sheetwrap" data-id="${esc(e.id)}"><div class="sheet" role="dialog" aria-modal="true" aria-label="Booking with points"><div class="hd"><h3>Booking ${esc(e.carrier_name)} ${esc(e.flight)} with points<span>${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)} · step by step</span></h3><button class="x" id="x" aria-label="Close">×</button></div><div class="detail">${playbookHTML(e, r)}</div></div></div>`;
+function openPlaybook(id, which){
+  const e = ALL.find(x => x.id === id), r = bill(e), ps = plansOf(e), p = ps[+which || 0]; if (!p) return;
+  $('#sheetroot').innerHTML = `<div class="sheetwrap" id="sheetwrap" data-id="${esc(e.id)}"><div class="sheet" role="dialog" aria-modal="true" aria-label="Booking with points"><div class="hd"><h3>Booking ${esc(e.carrier_name)} ${esc(e.flight)} with points<span>${fmtN(p.need)} ${esc(PCUR(p.a.prog))} with ${esc(p.P.name)} · step by step</span></h3><button class="x" id="x" aria-label="Close">×</button></div><div class="detail">${playbookHTML(e, r, p)}</div></div></div>`;
   $('#x').focus();
 }
-// which way this flight is being bought: the person's pick, else whichever is the better value
-function payPick(e, a){ const a2 = a === undefined ? awardsFor(e)[0] : a; return S.pay[e.id] || (a2 && a2.good ? 'points' : 'cash'); }
+// which way this flight is being bought: the person's pick, else points when they beat cash
+function payPick(e, p){ const b = p === undefined ? bestPlan(e) : p; return S.pay[e.id] || (b && b.good ? 'points' : 'cash'); }
 function payHTML(e, total){
-  const a = awardsFor(e)[0], ptsWin = !!(a && a.good), pick = payPick(e, a), col = (cls, head, body, kind) => `<div class="pay ${cls}${kind && pick === kind ? ' pick' : ''}"${kind ? ` data-pick="${kind}" role="button" tabindex="0" aria-pressed="${pick === kind}"` : ''}>${head}${body}</div>`;
-  const head = (label, win) => `<div class="ph">${label}${win ? '<i class="star" title="Better value">★</i>' : ''}</div>`;
-  const cash = col('cash' + (ptsWin ? '' : ' best'), head('Cash', !ptsWin), `<b class="num fig">${money(total)}</b><span class="unit">all in</span><em>${money(e.ticket_cents)} ticket</em><div class="v">+ ${money(total - e.ticket_cents)} extras</div>`, 'cash');
+  const p = bestPlan(e), win = !!(p && p.good), pick = payPick(e, p), col = (cls, head, body, kind) => `<div class="pay ${cls}${kind && pick === kind ? ' pick' : ''}"${kind ? ` data-pick="${kind}" role="button" tabindex="0" aria-pressed="${pick === kind}"` : ''}>${head}${body}</div>`;
+  const head = (label, w) => `<div class="ph">${label}${w ? '<i class="star" title="Better value">★</i>' : ''}</div>`;
+  const cash = col('cash' + (win ? '' : ' best'), head('Cash', !win), `<b class="num fig">${money(total)}</b><span class="unit">all in</span><em>${money(e.ticket_cents)} ticket</em><div class="v">+ ${money(total - e.ticket_cents)} extras</div>`, 'cash');
   let pts;
-  if (!a) pts = col('points dim', head('Points', false), `<b class="num fig">—</b><span class="unit dim">no points price</span><em>for this airline</em>`);
-  else { const usable = a.path && a.value > 0, rest = total - e.ticket_cents + a.fees, tip = `<button class="info" type="button" aria-expanded="false" aria-label="Points vs. cash">i</button><span class="tip" role="tooltip">${ptTip(e, a, total)}</span>`;
-    pts = col('points' + (ptsWin ? ' best' : '') + (usable ? '' : ' dim'), head('Points', ptsWin),
-      `<b class="num fig">${a.spend.toLocaleString()}</b><span class="unit${usable ? '' : ' dim'}">${a.via ? esc(SHORT[a.via]) + (S.pts[a.p] > 0 ? ' + ' + esc(SHORT[a.p]) : '') + ' pts' : esc(a.prog.name)}</span><em>+ ${money(rest)} cash</em>` +
-      `<div class="v">${!a.path ? 'no route' : a.value <= 0 ? 'fees exceed fare' : '<b class="num">≈ ' + money(total - a.margin) + '</b> all in'}${tip}</div>`, 'points'); }
+  const dyn = bookableText(e);
+  if (!p) pts = col('points dim', head('Points', false), `<b class="num fig">—</b><span class="unit dim">${dyn.length ? 'no published price' : 'no points price'}</span><em>${dyn.length ? 'check ' + esc(PTS.programmes[bookableKeys(e)[0]].site) : 'for this airline'}</em>`);
+  else if (!anyPoints()) pts = col('points dim', head('Points', false), `<b class="num fig">${fmtN(p.a.miles)}</b><span class="unit dim">${esc(PCUR(p.a.prog))}</span><em>${esc(p.P.name)}</em><div class="v">add your points in step 3</div>`);
+  else { const tip = `<button class="info" type="button" aria-expanded="false" aria-label="Points vs. cash">i</button><span class="tip" role="tooltip">${ptTip(e, p, total)}</span>`;
+    pts = col('points' + (win ? ' best' : '') + (p.ok ? '' : ' dim'), head('Points', win),
+      `<b class="num fig">${fmtN(p.ok ? p.spend : p.need)}</b><span class="unit${p.ok ? '' : ' dim'}">${esc(p.ok ? srcText(p) + ' pts' : PCUR(p.a.prog))}</span><em>${p.ok ? '+ ' + money(total - e.ticket_cents + p.known) + ' extras, plus taxes' : fmtN(p.short) + ' short'}</em>` +
+      `<div class="v">${!p.ok ? esc(p.P.name) : p.head === null ? 'value unknown' : p.head >= 0 ? '<b class="num">' + money(p.head) + '</b> ahead of cash' : money(-p.head) + ' behind cash'}${tip}</div>`, 'points'); }
   return `<div class="paycols">${cash}${pts}</div>`;
+}
+// the best use of the balances across this search: up to three flights where points beat cash by the most
+function pointsBestHTML(rows){
+  if (!anyPoints()) return '';
+  const best = rows.map(r => ({r, p:bestPlan(r.e)})).filter(x => x.p && x.p.good).sort((x, y) => y.p.head - x.p.head).slice(0, 3);
+  if (!best.length){
+    // nothing affordable: say how close the nearest award is, and what it would need
+    const near = rows.map(r => ({r, p:bestPlan(r.e)})).filter(x => x.p && !x.p.ok && x.p.a.surcharge !== 'high' && x.p.P.cents != null).sort((x, y) => x.p.short - y.p.short)[0];
+    return `<div class="ptbest"><b>Your points</b><p class="lead">${near ? `Closest: ${esc(near.r.e.carrier_name)} ${esc(near.r.e.flight)} needs ${fmtN(near.p.need)} ${esc(PCUR(near.p.a.prog))} with ${esc(near.p.P.name)}. Your balances are ${fmtN(near.p.short)} short.` : 'None of these flights is a better deal on points than paying cash, at today\'s point values.'}${rows.some(r => (r.e.award_bookable || []).length) ? ' Some flights can be booked with programmes that publish no chart; their prices are on the airlines\' sites.' : ''}</p></div>`;
+  }
+  return `<div class="ptbest"><b>Best use of your points</b><ol>${best.map(({r, p}) => { const e = r.e, bank = p.moves.filter(m => m.kind === 'bank');
+    return `<li><button class="ledger" data-play="${esc(e.id)}">${esc(e.carrier_name)} ${esc(e.flight)}, ${esc(e.route[0])} → ${esc(e.route[e.route.length - 1])}</button> ${bank.length ? 'Move ' + bank.map(m => fmtN(m.send) + ' ' + esc(PTS.banks[m.from].short)).join(' and ') + ' to ' + esc(p.P.name) + (p.own ? ', add your ' + fmtN(p.own) : '') : 'Use ' + fmtN(p.need) + ' ' + esc(PCUR(p.a.prog)) + ' from ' + esc(p.P.name)}${p.moves.some(m => m.bonus) ? ' (transfer bonus)' : ''}: <b>${money(p.head)}</b> ahead of cash.</li>`; }).join('')}</ol><p>Chart prices, if the airline releases the seat. Before taxes and charges.</p></div>`;
 }
 
 // ---- the triangle
@@ -1475,9 +1499,11 @@ function bill(e, opts){
     q.push({key:l.code, label:l.label, evidence:l.evidence, cents:l.cents, credit:l.cents < 0});
   }
   // add-ons: bags from the sentence and the ladder, then what your choices imply, then what you added
-  const bagsIn = e.bags_included, total = partyBags() + S.extra.bag, paid = Math.max(0, total - bagsIn);
+  const perk = bagPerk(e), bagsIn = perk ? Math.max(e.bags_included, perk.free) : e.bags_included, total = partyBags() + S.extra.bag, paid = Math.max(0, total - bagsIn);
   const B = find('bags');
-  if (total === (D.query.bags ?? 1) && B) line('addons', {key:'bags', label:B.label, evidence:B.evidence, cents:B.cents});
+  if (perk && total > e.bags_included) line('addons', {key:'bags', label:paid ? paid + ' checked bag' + (paid > 1 ? 's' : '') + ' not included' : 'Checked bags', cents:paid ? bagCost(e, paid) : 0,
+      evidence:'Your ' + perk.name + ': ' + perk.free + ' checked bag' + (perk.free > 1 ? 's' : '') + ' free on ' + (e.operator || e.carrier) + (paid ? ', ' + paid + ' more to pay' : '') + ' · ' + perk.source, removable: S.extra.bag > 0});
+  else if (total === (D.query.bags ?? 1) && B) line('addons', {key:'bags', label:B.label, evidence:B.evidence, cents:B.cents});
   else if (paid > 0) line('addons', {key:'bags', label: paid + ' checked bag' + (paid > 1 ? 's' : '') + ' not included', cents:bagCost(e, paid),
       evidence: total + ' checked, ' + bagsIn + ' included with ' + e.brand + ' · bag fees: ' + (e.bag_tiers.length ? e.bag_tiers.map(t => money(t.amount_cents)).join(', ') + ', then ' + money(Math.max(...e.bag_tiers.map(t => t.amount_cents))) + ' each' : 'not published, so priced high') + (S.extra.bag ? ' · ' + S.extra.bag + ' added by you' : ''), removable: S.extra.bag > 0});
   else if (total > 0) line('addons', {key:'bags', label: total + ' checked bag' + (total > 1 ? 's' : '') + ' included', cents:0, included:true, evidence:e.brand + ' includes ' + bagsIn});
@@ -1499,6 +1525,10 @@ function bill(e, opts){
   // the order, at what you say keeping it is worth, named on the row and in the ledger; never a filter, never on
   // the money bill, never in the grade
   personaLines(e).forEach(x => q.push(x));
+  // points (2026-09-24): when the balances in step 3 cover this flight's award and the points are worth less than
+  // the ticket, the flight ranks as if its ticket cost what the points are worth, so the best use of the points rises
+  { const pp = bestPlan(e); if (pp && pp.good && payPick(e, pp) === 'points') q.push({key:'points', label:'Paid with points', cents:-pp.head, credit:true,
+      evidence:fmtN(pp.spend) + ' ' + srcText(pp) + ' points, worth about ' + money(pp.worth) + ', instead of the ' + money(e.ticket_cents) + ' ticket · credit'}); }
   const sh = statusHeld(e);
   if (sh && S.statusWorth) q.push({key:'status', label:'Keeps your ' + sh.name, cents:-S.statusWorth, credit:true,
       evidence:(sh.via === 'own' ? 'the program\'s own airline' : 'a ' + ({star:'Star Alliance', oneworld:'oneworld', skyteam:'SkyTeam'}[sh.alliance] || sh.alliance) + ' partner') + ', so your status keeps earning · credit'});
@@ -1601,6 +1631,24 @@ function paintPresets(){
 }
 // the status this flight keeps earning, if the traveller holds one: the operator's own programme, a programme
 // whose codes include the operator, or an alliance tier the operator belongs to
+// free checked bags from a held status (points.json status_bags, from each airline's own pages): the airline's own
+// tier on its own flights, and the alliance tier it maps to on partners. 'total' is that many bags free in all,
+// 'extra' is that many more than the fare includes. The best one wins; the member's own bags only.
+function bagPerk(e){
+  const SB = PTS.status_bags, op = e.operator || e.carrier, brand = String(e.brand || '').toLowerCase(), AL = {star:'Star Alliance', oneworld:'oneworld', skyteam:'SkyTeam'};
+  let best = null;
+  const consider = (rule, name, source) => { if (!rule) return; const free = rule[0] === 'total' ? rule[1] : e.bags_included + rule[1]; if (!best || free > best.free) best = {free, name, source}; };
+  for (const [code, tier] of Object.entries(S.status)){
+    if (!tier || !STATUS[code]) continue;
+    const st = STATUS[code], own = SB.own[code];
+    if (own && own.carriers.includes(op)) consider(own.tiers[tier], st.name + ' ' + tier, own.source);
+    const eq = st.alliance ? [st.alliance, tier] : (SB.equivalent[code] || {})[tier];
+    const al = eq && SB.alliance[eq[0]];
+    if (al && al.carriers.includes(op) && !(al.not_on && al.not_on.carriers.includes(op) && al.not_on.brands.some(b => brand.includes(b))))
+      consider(al.tiers[eq[1]], (st.alliance ? AL[eq[0]] : st.name) + ' ' + tier + (st.alliance ? '' : ' (' + AL[eq[0]] + ' ' + eq[1] + ')'), al.source);
+  }
+  return best && best.free > e.bags_included ? best : null;
+}
 function statusHeld(e){
   const op = e.operator || e.carrier;
   for (const [code, st] of Object.entries(STATUS)){
@@ -1828,9 +1876,10 @@ function rawTerms(e, r, ctx){
   const T = [], pro = (id, text, w, keep) => T.push({side:'pro', id, text, w, keep}), con = (id, text, w, keep) => T.push({side:'con', id, text, w, keep});
   const L = Object.values(r.g).flat().concat(r.q || []), find = k => L.find(l => l.key === k && !l.off), cents = k => { const l = find(k); return l ? l.cents : 0; };
   const H = ctx.hourly, apt0 = e.route[0], aptN = e.route[e.route.length - 1];
-  // price, against the field
-  if (ctx.spreadTotal >= .08){ const d = ctx.medTotal - r.total; if (d >= Math.max(3000, .06*ctx.medTotal)) pro('under', money(d) + ' under most', d); else if (-d >= Math.max(3000, .08*ctx.medTotal)) con('over', money(-d) + ' over most', -d); }
-  if (ctx.rank(ctx.tickets, e.ticket_cents) <= .25 && ctx.rank(ctx.totals, r.total) >= .5) con('fees', 'Cheap ticket, costly extras', 4000);
+  // price, against the field (not when points pay for the ticket: its cash price is then beside the point)
+  const onPoints = (() => { const pp = bestPlan(e); return !!(pp && pp.good && payPick(e, pp) === 'points'); })();
+  if (ctx.spreadTotal >= .08 && !onPoints){ const d = ctx.medTotal - r.total; if (d >= Math.max(3000, .06*ctx.medTotal)) pro('under', money(d) + ' under most', d); else if (-d >= Math.max(3000, .08*ctx.medTotal)) con('over', money(-d) + ' over most', -d); }
+  if (!onPoints && ctx.rank(ctx.tickets, e.ticket_cents) <= .25 && ctx.rank(ctx.totals, r.total) >= .5) con('fees', 'Cheap ticket, costly extras', 4000);
   // time, against the field
   if (ctx.spreadDoor >= 60){ const d = ctx.medDoor - e.door_minutes; if (d >= 45) pro('quicker', dur(rnd15(d)) + ' quicker', d*H/60 + 2000); else if (-d >= 60) con('slower', dur(rnd15(-d)) + ' slower', -d*H/60 + 2000); }
   const air = ctx.air(e); if (ctx.refAir && air/ctx.refAir >= 1.25) con('longway', 'Goes the long way', (air - ctx.refAir)*H/60 + 3000);
@@ -1875,7 +1924,7 @@ function rawTerms(e, r, ctx){
   if (gi){ if (gi.cents >= 5000) con('ridein', money(gi.cents) + ' ride from ' + aptN, gi.cents + gi.minutes*H/60); else if (gi.minutes >= ctx.medGroundIn + 30) con('farin', dur(gi.minutes) + ' from ' + aptN, (gi.minutes - ctx.medGroundIn)*H/60 + 1500); }
   if (find('hotel-auto')) con('hotel', 'Hotel night ' + money(cents('hotel-auto')), 18000, true);
   for (const d of r.dem){ const id = d.key.replace('want-', ''); if (WANT_CON[id]) con('want-' + id, WANT_CON[id], d.cents, true); }
-  const a = awardsFor(e)[0]; if (a && a.good) pro('points', 'Points ' + money(a.margin) + ' under cash', Math.max(2000, a.margin));
+  const pp = bestPlan(e); if (pp && pp.good && payPick(e, pp) === 'points') pro('points', 'Points: ' + money(pp.head) + ' ahead of cash', Math.max(2000, pp.head));
   const rel = cents('reliability'); if (rel < 0) pro('ontime', 'Good on-time record', 1000 - rel); else if (rel > 0 && rel < 3000) con('delays', 'Weak on-time record', rel); else if (rel >= 3000) con('norecord', 'No on-time data', 1000);
   return T;
 }
@@ -1948,13 +1997,13 @@ function paintDoors(rows, ctx){
 
 // ---- the list
 function rowHTML(r, ctx){
-  const e = r.e, a = awardsFor(e)[0], lc = s => s.charAt(0).toLowerCase() + s.slice(1);
+  const e = r.e, pp = bestPlan(e), lc = s => s.charAt(0).toLowerCase() + s.slice(1);
   return `<li class="row" data-id="${esc(e.id)}" aria-expanded="false">
     <button class="rowbtn" data-row="${esc(e.id)}">
       ${logo(e.carrier, true)}${sealHTML(e, true)}
       <span class="rw"><b>${esc(e.carrier_name)}</b><span>${esc(e.flight)} · ${esc(e.brand)}${fareAlts(e)}</span><small>${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} · ${stopsText(e)} · ${dur(e.door_minutes)}</small>
         ${journeyHTML(e, r, ctx, true)}
-        ${r.adds.length ? `<span class="dem" style="color:var(--dim)">+${money(r.adds.reduce((s, x) => s + x.cents, 0))} ${esc(r.adds.map(x => lc(x.label)).join(', '))}</span>` : ''}${r.dem.map(d => `<span class="dem">${esc(lc(d.label))}</span>`).join('')}${a && a.good ? `<span class="pt">★ points: ${a.spend.toLocaleString()} ${esc((BANK[a.via] || a.prog.name).split(' ')[0])} ≈ ${money(r.total - a.margin)} all in, ${money(a.margin)} under cash</span>` : ''}</span>
+        ${r.adds.length ? `<span class="dem" style="color:var(--dim)">+${money(r.adds.reduce((s, x) => s + x.cents, 0))} ${esc(r.adds.map(x => lc(x.label)).join(', '))}</span>` : ''}${r.dem.map(d => `<span class="dem">${esc(lc(d.label))}</span>`).join('')}${pp && pp.good ? `<span class="pt">★ points: ${fmtN(pp.spend)} ${esc(srcText(pp))} with ${esc(pp.P.name)}, ${money(pp.head)} ahead of cash</span>` : ''}</span>
       <span class="when">${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''}<i>${stopsText(e)} · ${dur(e.door_minutes)}</i></span>
       <span class="amt"><b>${money(r.total)}</b><i>${money(e.ticket_cents)} ticket</i></span><span class="chev">›</span>
     </button><div class="detail" hidden></div></li>`;
@@ -1974,7 +2023,7 @@ function paintList(rows, hidden, animate, ctx){
 }
 function paint(animate){
   const {rows, hidden} = ranked(), ctx = rows.length ? statsFor(rows) : null;
-  paintDoors(rows, ctx); paintList(rows, hidden, animate, ctx);
+  paintDoors(rows, ctx); paintList(rows, hidden, animate, ctx); $('#ptbest').innerHTML = pointsBestHTML(rows);
   if (W && W.mode === 'results') summary();
 }
 
@@ -2074,7 +2123,7 @@ function priceChartHTML(e){
     <p class="pnote">The lowest fare on this route for your date, any airline, each day for the last ${Math.round((d1 - d0) / 864e5)} days (Google Flights). ${g.low_cents != null && g.high_cents != null ? 'The band is the usual range.' : ''}${tip}</p></section>`;
 }
 function ledgerHTML(e){
-  const r = bill(e), b = e.booking[0], aw = awardsFor(e);
+  const r = bill(e), b = e.booking[0], aw = plansOf(e), dyn = bookableText(e);
   const restore = [...S.off].filter(k => RESTORE[k] && (k !== 'hotel-auto' || overnight(e)));
   const grp = (k, title) => { const lines = r.g[k]; if (!lines.length && k !== 'addons' && k !== 'stay') return ''; if (!lines.length && k === 'stay' && !restore.includes('hotel-auto')) return '';
     return `<section class="grp"><header><h4>${title}</h4><b class="${r.sub[k] < 0 ? 'cr' : ''}">${r.sub[k] < 0 ? '−' : ''}${money(r.sub[k])}</b></header><ul class="lines">${lines.map(lineHTML).join('')}</ul>${!lines.length ? '<div class="empty">None.</div>' : ''}
@@ -2087,7 +2136,7 @@ function ledgerHTML(e){
       <button class="choose" data-select="${esc(e.id)}">${selectLabel()}${b ? ' · ' + money(b.price_cents) : ''}</button>
       <p>${S.trip === 'round' ? (S.legIdx === 0 ? 'Then pick your return.' : 'Then book both legs.') : 'Then book with the airline.'}</p>
       ${aw.length ? `<button class="ledger" data-play="${esc(e.id)}" style="text-align:left;padding:4px 0">${aw[0].good ? '★ ' : ''}Book with points, step by step →</button>` : ''}
-      ${aw.length ? '<h4 style="margin-top:6px">With points</h4><ul class="awards">' + aw.map(a => `<li class="${a.good ? 'good' : ''}"><b>${a.good ? '★ ' : ''}${a.pts.toLocaleString()} ${esc(a.prog.name)} + ${money(a.fees)}</b> · <span class="v">${a.value <= 0 ? 'fees exceed the fare' : moneyPt(a.value) + '/pt · ≈ ' + money(r.total - a.margin) + ' all in'}</span>${a.path ? ' · ' + esc(a.path) : ' · not reachable with your points'}${a.bonus ? ' until ' + esc(a.bonus.until) : ''}</li>`).join('') + '</ul>' : ''}
+      ${aw.length || dyn.length ? '<h4 style="margin-top:6px">With points</h4><ul class="awards">' + aw.map((p, i) => `<li class="${p.good ? 'good' : ''}"><b>${p.good ? '★ ' : ''}${fmtN(p.a.miles)} ${esc(PCUR(p.a.prog))}</b> with ${esc(p.P.name)}${paxCount() > 1 ? ' (each)' : ''}${p.a.low ? ', ' + fmtN(p.a.low) + ' ' + esc(p.a.low_when) : ''} · <span class="v">${!anyPoints() ? 'add your points in step 3' : !p.ok ? fmtN(p.short) + ' short' : p.head === null ? 'value unknown' : p.head >= 0 ? money(p.head) + ' ahead of cash' : money(-p.head) + ' behind cash'}</span>${p.ok && p.moves.length ? ' · ' + esc(p.moves.map(m => m.kind === 'bank' ? 'move ' + fmtN(m.send) + ' ' + PTS.banks[m.from].short : 'move ' + fmtN(m.send) + ' Avios').join(', ')) : ''} · <button class="ledger" data-play="${esc(e.id)}" data-which="${i}">steps</button><small>${esc(p.a.basis)}${p.a.fees ? ', ' + esc(p.a.fees) : ''}.${p.a.surcharge === 'high' ? ' Carrier charges are high on this one.' : ''}</small></li>`).join('') + (dyn.length ? `<li><b>${esc(dyn.join(', '))}</b> can book this too, with no published chart: the price is on ${dyn.length > 1 ? 'their sites' : 'its site'}.</li>` : '') + '</ul>' : ''}
       <p>Grade <b>${e.grade}</b>${e.card && e.card.points != null ? ' (' + e.card.points.toFixed(1) + ' of 4.3)' : ''}.</p></div>`;
 }
 // ---- who sells this fare (2026-09-24, per Patrick): Google's sellers for one flight, the airline first, every
@@ -2183,10 +2232,10 @@ function paintStepper(){
 // ---- the flow: pick a leg, get the next one, then one booking card for the whole trip
 function closeSheet(){ $('#sheetroot').innerHTML = ''; }
 function snapshot(e){
-  const b = e.booking && e.booking[0], aw = awardsFor(e)[0], host = (() => { try { return new URL((e.details || {}).carriage_url || '').host; } catch (x) { return ''; } })();
+  const b = e.booking && e.booking[0], aw = bestPlan(e), host = (() => { try { return new URL((e.details || {}).carriage_url || '').host; } catch (x) { return ''; } })();
   return {id:e.id, carrier:e.carrier, carrier_name:e.carrier_name, flight:e.flight, route:e.route.slice(), depart:e.depart, arrive:e.arrive, day_offset:e.day_offset, brand:e.brand, ticket_cents:e.ticket_cents, total_cents:bill(e).total,
-    pay:payPick(e, aw), award:aw ? {p:aw.p, name:aw.prog.name, pts:aw.pts, fees:aw.fees, spend:aw.spend, via:aw.via, good:aw.good} : null, site:(SITES[e.carrier] && host.endsWith(SITES[e.carrier].replace(/^www\./, '')) ? SITES[e.carrier] : host) || SITES[e.carrier] || '', who:b ? b.who : e.carrier_name,
-    play: payPick(e, aw) === 'points' && aw ? playbookHTML(e, bill(e)) : '', round_trip:e.round_trip || null};
+    pay:payPick(e, aw), award:aw && aw.ok ? {prog:aw.a.prog, name:aw.P.name, cur:PCUR(aw.a.prog), need:aw.need, spend:aw.spend, src:srcText(aw), take:Object.assign({}, aw.take), known:aw.known, good:aw.good} : null, site:(SITES[e.carrier] && host.endsWith(SITES[e.carrier].replace(/^www\./, '')) ? SITES[e.carrier] : host) || SITES[e.carrier] || '', who:b ? b.who : e.carrier_name,
+    play: payPick(e, aw) === 'points' && aw ? playbookHTML(e, bill(e), aw) : '', round_trip:e.round_trip || null};
 }
 async function selectLeg(id){
   const e = ALL.find(x => x.id === id); if (!e) return;
@@ -2216,16 +2265,20 @@ function pairFor(i){
 }
 async function fetchLeg(i){
   const L0 = S.legs[0], from = S.trip === 'round' ? L0.to : S.legs[i].from, to = S.trip === 'round' ? L0.from : S.legs[i].to, dateStr = S.trip === 'round' ? S.back : S.legs[i].date, date = toISODate(dateStr);
-  if (!(SERVED && date)){ S.notice = (S.trip === 'round' ? 'Return' : 'Flight ' + (i+1)) + ': sample results, the outbound flights reversed. Open the website for live results.'; return null; }
+  if (!SERVED){ S.notice = (S.trip === 'round' ? 'Return' : 'Flight ' + (i+1)) + ': sample results, the outbound flights reversed. Open the website for live results.'; return null; }
+  // a served page never shows made-up results (2026-09-24): no date or a failed search is said, never stood in for
+  if (!date){ legError('Pick a date for ' + (S.trip === 'round' ? 'your return' : 'flight ' + (i+1)) + ' first.'); return undefined; }
   const box = $('#loading'); box.classList.remove('hidden'); runProgress(box, SEARCH_STAGES, 9000, () => {});
   let res;
   try { const r = await fetch('/search', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'api', origin:from, origin_address:from, destination:to, date, adults:paxCount(), checked_bags:partyBags(), cabin:S.adv.cabin, trip:{leg:1}, pair:pairFor(i)})}); res = await r.json(); }
   catch (x){ res = {error:'no response'}; }
   box.classList.add('hidden');
-  if (res.error){ if (res.sign_in){ openAccount(res); return undefined; } S.notice = (S.trip === 'round' ? 'The return search' : 'This search') + ' failed (' + res.error + '). Showing the outbound flights reversed, as a sample.'; return null; }
+  if (res.error){ if (res.sign_in){ openAccount(res); return undefined; } legError((S.trip === 'round' ? 'The return search' : 'The search for flight ' + (i+1)) + ' failed: ' + res.error + ' Try again, or change the date.'); return undefined; }
   S.notice = (S.trip === 'round' ? 'Return leg. ' : 'Flight ' + (i+1) + '. ') + (res.source_note || 'Live results.'); refreshLeft(); return res;
 }
-// a stand-in for a leg nobody has searched yet: the outbound, the other way round, on that leg's date. Said so in the lede.
+function legError(msg){ setTimeout(() => { const l = $('#lede'); l.textContent = msg; l.hidden = false; l.scrollIntoView({block:'center'}); }, 0); }
+// a stand-in for a leg nobody has searched yet, only when the page is opened as a file: the outbound, the other way
+// round, on that leg's date. Said so in the lede.
 function mirrorData(d0, i){ d0 = Object.assign({}, d0, {signal:null});
   const d = JSON.parse(JSON.stringify(d0)), dateStr = S.trip === 'round' ? S.back : (S.legs[i] || {}).date, iso = toISODate(dateStr) || d.query.date;
   const onDate = (stamp, plus) => { const m = /^(\d{4}-\d{2}-\d{2})(.*)$/.exec(stamp || ''); if (!m) return stamp; const t = new Date(iso + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + (plus || 0)); return t.toISOString().slice(0, 10) + m[2]; };
@@ -2264,7 +2317,7 @@ function bookHTML(){
   // one round-trip ticket (2026-09-24): both flights priced together, so they are booked together, on the outbound airline's site
   const rt = S.trip === 'round' && snaps.length === 2 && cash.length === 2 && snaps[1].round_trip ? snaps[1].round_trip : null;
   const legRow = (p, i) => `<div class="bleg"><div class="blogo">${logo(p.carrier, true)}</div><div class="binfo"><b>${esc(names[i][0])} · ${esc(names[i][1] || '')}</b><span>${esc(p.carrier_name)} ${esc(p.flight)} · ${esc(p.route.join(' → '))} · ${hm(p.depart)} → ${hm(p.arrive)}${p.day_offset ? ' +1' : ''} · ${esc(p.brand)}</span></div>
-      <div class="bpay">${p.pay === 'points' && p.award ? `<b class="fig">${p.award.spend.toLocaleString()}</b><span>${esc(p.award.via ? SHORT[p.award.via] + ' pts' : p.award.name)} + ${money(p.award.fees)}</span>` : `<b class="fig">${money(p.total_cents)}</b><span>all in</span>`}</div>
+      <div class="bpay">${p.pay === 'points' && p.award ? `<b class="fig">${fmtN(p.award.spend)}</b><span>${esc(p.award.src)} pts + taxes</span>` : `<b class="fig">${money(p.total_cents)}</b><span>all in</span>`}</div>
       <button class="ledger" data-changeleg="${i}">Change</button></div>`;
   const k = CURRENCIES[CUR], total = cash.reduce((t, x) => t + Math.round(x.total_cents * k.rate / 100) * 100 / k.rate, 0);   // the sum of the figures shown, so the total never reads a dollar off the legs
   let links = '';
@@ -2278,9 +2331,9 @@ function bookHTML(){
       if (!same && !rt) links += '<p class="bnote">Different airlines mean separate tickets. That is normal and often cheaper.</p>'; }
     if (rt) links += `<p class="bnote">Book both flights together as one round-trip ticket: ${money(rt.total_cents)} for the pair, ${money(rt.one_way_cents - (rt.total_cents - rt.outbound_cents))} less than two one-way tickets. Booked separately, they cost more.</p>`;
   }
-  const walks = pts.map(p => { const i = snaps.indexOf(p); return `<section class="bwalk"><h3>${esc(names[i][0])} with ${esc(p.award.name)}: ${p.award.spend.toLocaleString()} ${esc(p.award.via ? SHORT[p.award.via] + ' points' : p.award.name)} + ${money(p.award.fees)}</h3>${p.play || '<p class="bnote">No walkthrough for this award.</p>'}</section>`; }).join('');
-  const sameProg = pts.length > 1 && pts.every(p => p.award.p === pts[0].award.p && (p.award.via || '') === (pts[0].award.via || ''));
-  const ptsHead = pts.length ? `<p class="bnote">${pts.length > 1 ? (sameProg ? (pts.length === 2 ? 'Both flights' : 'All ' + pts.length + ' flights') + ' book with ' + esc(pts[0].award.name) + '. ' + (pts[0].award.via ? 'Transfer <b>' : 'Use <b>') + pts.reduce((t, p) => t + p.award.spend, 0).toLocaleString() + '</b> ' + esc(pts[0].award.via ? SHORT[pts[0].award.via] : pts[0].award.name) + ' points' + (pts[0].award.via ? ' once' : '') + ', then book each flight below. Check award seats on every flight before you ' + (pts[0].award.via ? 'transfer.' : 'book.') : 'Each flight books separately. Check award seats on every flight before you transfer points.') : ''}</p>` : '';
+  const walks = pts.map(p => { const i = snaps.indexOf(p); return `<section class="bwalk"><h3>${esc(names[i][0])} with ${esc(p.award.name)}: ${fmtN(p.award.need)} ${esc(p.award.cur)}</h3>${p.play || '<p class="bnote">No walkthrough for this award.</p>'}</section>`; }).join('');
+  // each leg's plan was made after the earlier legs' points were set aside, so the totals here never count a point twice
+  const ptsHead = pts.length > 1 ? `<p class="bnote">${pts.length === 2 ? 'Both flights' : 'All ' + pts.length + ' flights'} use points. Each leg's steps below come after the one before it, and together they use ${esc(Object.entries(pts.reduce((t, p) => { for (const [k, v] of Object.entries(p.award.take || {})) t[k] = (t[k] || 0) + v; return t; }, {})).map(([k, v]) => fmtN(v) + ' ' + PSHORT(k)).join(', '))}. Check award seats on every flight before you move any points.</p>` : '';
   return `<div class="sechead"><h2>Book it</h2><p>${rt ? 'One round-trip ticket.' : same ? 'One airline for the whole trip.' : 'Different airlines, separate tickets.'} ${cash.length ? 'Cash total: <b>' + money(total) + '</b>' + (pts.length ? '. Points steps are below.' : '.') : 'All on points. Steps for each flight are below.'}</p></div>
     <div class="bookcard">${snaps.map(legRow).join('')}
     <div class="blinks">${links}</div>${ptsHead}${walks}
@@ -2456,16 +2509,35 @@ function airlinesSheet(){
 const STATUS = {DL:{name:'Delta Medallion', tiers:['Silver','Gold','Platinum','Diamond']}, AA:{name:'AAdvantage', tiers:['Gold','Platinum','Platinum Pro','Executive Platinum']},
   UA:{name:'United Premier', tiers:['Silver','Gold','Platinum','1K']}, BA:{name:'BA Executive Club', tiers:['Bronze','Silver','Gold']}, VS:{name:'Virgin Flying Club', tiers:['Silver','Gold']},
   LH:{name:'Miles & More', tiers:['Frequent Traveller','Senator','HON Circle'], codes:['LH','LX','OS','SN']}, AF:{name:'Flying Blue', tiers:['Silver','Gold','Platinum'], codes:['AF','KL']},
-  AS:{name:'Atmos Rewards', tiers:['Silver','Gold','Platinum','Titanium']}, TK:{name:'Miles&Smiles', tiers:['Classic Plus','Elite','Elite Plus']}, AC:{name:'Aeroplan Elite', tiers:['25K','35K','50K','75K','Super Elite']},
+  AS:{name:'Atmos Rewards', tiers:['Silver','Gold','Platinum','Titanium']}, TK:{name:'Miles&Smiles', tiers:['Classic Plus','Elite','Elite Plus']},
+  B6:{name:'JetBlue Mosaic', tiers:['Mosaic 1','Mosaic 2','Mosaic 3','Mosaic 4']}, WN:{name:'Southwest A-List', tiers:['A-List','A-List Preferred']}, AC:{name:'Aeroplan Elite', tiers:['25K','35K','50K','75K','Super Elite']},
   star:{name:'Star Alliance status', tiers:['Silver','Gold'], alliance:'star'}, oneworld:{name:'oneworld status', tiers:['Ruby','Sapphire','Emerald'], alliance:'oneworld'}, skyteam:{name:'SkyTeam status', tiers:['Elite','Elite Plus'], alliance:'skyteam'}};
 Object.keys(STATUS).forEach(k => { if (!(k in S.status)) S.status[k] = ''; });
+// the wallet (2026-09-24): balances and status are kept in this browser, and in the account when signed in, so
+// entering them once keeps working for the person on every later search
+function walletOf(){ const w = {pts:{}, status:{}}; for (const [k, v] of Object.entries(S.pts)) if (v > 0) w.pts[k] = v; for (const [k, v] of Object.entries(S.status)) if (v) w.status[k] = v; return w; }
+function applyWallet(w){
+  if (!w || typeof w !== 'object') return false; let any = false;
+  for (const [k0, v] of Object.entries(w.pts || {})){ const k = PT_OLD[k0] || k0; if (k in S.pts && +v > 0){ S.pts[k] = Math.min(1e9, Math.round(+v)); any = true; } }
+  for (const [k, v] of Object.entries(w.status || {})) if (STATUS[k] && STATUS[k].tiers.includes(v)){ S.status[k] = v; any = true; }
+  if (any){ S.prow.banks = BANKS.filter(k => S.pts[k] > 0); S.prow.progs = PROGS.filter(k => S.pts[k] > 0); S.prow.status = Object.keys(STATUS).filter(k => S.status[k]);
+    ['banks', 'progs', 'status'].forEach(k => { if (!S.prow[k].length) S.prow[k] = ['']; }); }
+  return any;
+}
+let walletTimer = null;
+function saveWallet(){
+  const w = walletOf(); try { localStorage.setItem('concordego.wallet', JSON.stringify(w)); } catch (e) {}
+  clearTimeout(walletTimer);
+  if (SERVED && S.user && S.user.email) walletTimer = setTimeout(() => fetch('/api/profile', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({wallet:w})}).catch(() => {}), 800);
+}
+try { applyWallet(JSON.parse(localStorage.getItem('concordego.wallet') || 'null')); } catch (e) {}
 const statusKey = op => Object.keys(STATUS).find(k => !STATUS[k].alliance && (k === op || (STATUS[k].codes || []).includes(op)));
 const statusCodes = ([k, st]) => st.alliance ? ALLI[st.alliance] : (st.codes || [k]);
 // every programme and every status, always: what a person holds does not change with the search (per Patrick,
 // 2026-09-21: chips that vanished "for no apparent reason"); a programme with no award on these flights says so on the card
 function statusInPlay(){ return Object.entries(STATUS); }
-function progsInPlay(){ return Object.keys(PROG); }
-const ALLI = {skyteam:['DL','VS','AF','KL','AZ','KE','AM','SV','MU','GA','VN','CI','UX','OK','RO','ME','KQ'], oneworld:['AA','BA','IB','AY','AS','QR','CX','JL','QF','RJ','MH','AT','UL','WY'], star:['UA','LH','LX','TK','LO','AC','OS','SN','SK','TP','SQ','NH','TG','ET','MS','SA','A3','AI','BR','CA','CM','NZ','OU','OZ','ZH']};
+function progsInPlay(){ return PROGS.slice(); }
+const ALLI = ALLIANCE;
 const CABIN_NAMES = {economy:'Economy', premium:'Premium economy', business:'Business', first:'First'};
 function setCabin(v){ S.adv.cabin = v; $('#cabin').value = v; const q = $('#q-cabin'); if (q) q.value = CABIN_NAMES[v]; if (W.mode === 'results') summary();
   WANTS.find(w => w.id === 'lieflat').hint = v === 'economy' ? 'No lie-flat seats in economy. Search Business to see them.' : 'No lie-flat seats in these results. Try another cabin or date.'; paintChips(); }
@@ -2480,10 +2552,11 @@ const pct = p => p < .005 ? 'under 1%' : '~' + Math.round(p*100) + '%';
 // which everything that prices points, upgrades and the status credit already reads.
 const STLABEL = {DL:'Delta Medallion', AA:'American AAdvantage', UA:'United Premier', BA:'British Airways Executive Club', VS:'Virgin Atlantic Flying Club',
   LH:'Lufthansa Miles & More', AF:'Air France-KLM Flying Blue', AS:'Alaska Atmos Rewards', TK:'Turkish Miles&Smiles', AC:'Air Canada Aeroplan',
+  B6:'JetBlue TrueBlue Mosaic', WN:'Southwest Rapid Rewards A-List',
   star:'Star Alliance', oneworld:'oneworld', skyteam:'SkyTeam'};
 const PSEC = {
-  banks:{label:'Card points', keys:() => BANKS.slice(), name:k => BANK[k], ph:'Points'},
-  progs:{label:'Airline miles', keys:() => progsInPlay(), name:k => BANK[k], ph:'Miles'},
+  banks:{label:'Card points', keys:() => BANKS.slice(), name:k => PNAME(k), ph:'Points'},
+  progs:{label:'Airline miles', keys:() => progsInPlay(), name:k => PNAME(k), ph:'Miles'},
   status:{label:'Status', keys:() => statusInPlay().map(x => x[0]), name:k => STLABEL[k] || STATUS[k].name, ph:'Level'},
 };
 const byName = sec => (a, b) => PSEC[sec].name(a).localeCompare(PSEC[sec].name(b), 'en', {sensitivity:'base'});
@@ -2504,7 +2577,7 @@ function paintPts(){
     return `<div class="psec"><span class="lab">${P.label}</span>${rows.map((k, i) => plineHTML(sec, k, i)).join('')}${full ? '' : `<button type="button" class="addrow" data-padd="${sec}">+ Add another</button>`}</div>`;
   }).join('') +
     (Object.values(S.status).some(Boolean) ? `<p class="ptnote stworth">Prefer airlines where I have status: <select id="stworth" aria-label="Prefer airlines where I have status">${[[0, 'Off'], [3000, 'A little'], [6000, 'Some'], [15000, 'Strongly']].map(([c, t]) => `<option value="${c}"${S.statusWorth === c ? ' selected' : ''}>${t}</option>`).join('')}</select><br>Flights that earn your status rank higher.</p>` : '') +
-    '<p class="ptnote">Each flight shows cash or points, whichever is cheaper. Award prices are samples.</p>';
+    `<p class="ptnote">Each flight shows cash or points, whichever is the better deal. Award prices come from the airlines' published charts, when a seat is released at that price. Points are valued at ${esc(PTS.valuation.source)}.</p>`;
 }
 const pfocus = (sec, i, cls) => { const f = document.querySelector(`#pts .${cls}[data-psec="${sec}"][data-pi="${i}"]`); if (f) f.focus(); };
 document.addEventListener('change', ev => { const w = ev.target.closest('#stworth'); if (w){ S.statusWorth = +w.value; paint(false); return; }
@@ -2512,8 +2585,8 @@ document.addEventListener('change', ev => { const w = ev.target.closest('#stwort
   if (t.classList.contains('pk')){ const now = t.value;
     // a balance follows its row to the newly picked program; a status level does not (the tiers differ)
     if (sec === 'status'){ if (was) S.status[was] = ''; } else if (was){ if (now && !S.pts[now]) S.pts[now] = S.pts[was] || 0; S.pts[was] = 0; }
-    rows[i] = now; paintPts(); paint(false); if (now) pfocus(sec, i, 'pv'); return; }
-  if (sec === 'status' && was){ S.status[was] = t.value; paintPts(); paint(false); pfocus(sec, i, 'pv'); } });
+    rows[i] = now; paintPts(); paint(false); saveWallet(); if (now) pfocus(sec, i, 'pv'); return; }
+  if (sec === 'status' && was){ S.status[was] = t.value; paintPts(); paint(false); saveWallet(); pfocus(sec, i, 'pv'); } });
 
 // ---- the sky. The site's own (concorde-site, index.html), ported as it is:
 // a starfield on three parallax depths with glinting hero stars, streaming
@@ -2959,7 +3032,7 @@ document.addEventListener('input', ev => { if (ev.target.id === 'airq'){ S.airq 
 document.addEventListener('click', ev => { if (ev.target.closest('#moreair')){ S.airq = ''; airlinesSheet(); return; }
   const b = ev.target.closest('#airgroups [data-c]'); if (!b) return; const c = b.dataset.c; S.adv.out.has(c) ? S.adv.out.delete(c) : S.adv.out.add(c); b.setAttribute('aria-pressed', String(S.adv.out.has(c))); paintCarriers(); if (W.mode === 'results'){ paint(false); summary(); } });
 $('#carriers').addEventListener('click', ev => { const b = ev.target.closest('[data-c]'); if (!b) return; const c = b.dataset.c; S.adv.out.has(c) ? S.adv.out.delete(c) : S.adv.out.add(c); b.setAttribute('aria-pressed', String(S.adv.out.has(c))); paint(true); });
-$('#pts').addEventListener('input', ev => { const t = ev.target.closest('input.pv[data-psec]'); if (!t) return; const k = S.prow[t.dataset.psec][+t.dataset.pi]; if (!k) return; S.pts[k] = +String(t.value).replace(/[^\d]/g, '') || 0; paint(false); });
+$('#pts').addEventListener('input', ev => { const t = ev.target.closest('input.pv[data-psec]'); if (!t) return; const k = S.prow[t.dataset.psec][+t.dataset.pi]; if (!k) return; S.pts[k] = +String(t.value).replace(/[^\d]/g, '') || 0; paint(false); saveWallet(); });
 $('#list').addEventListener('click', ev => { const b = ev.target.closest('[data-row]'); if (!b) return; const li = b.closest('.row'), open = li.getAttribute('aria-expanded') === 'true', det = li.querySelector('.detail'); li.setAttribute('aria-expanded', String(!open)); if (!open){ det.innerHTML = ledgerHTML(ALL.find(x => x.id === li.dataset.id)); S.open.add(li.dataset.id); } else S.open.delete(li.dataset.id); det.hidden = open; });
 $('#morebtn').addEventListener('click', () => { S.shown += 12; paint(false); });
 // the bill's controls, wherever a bill is open (a row or the sheet); every change is global
@@ -2982,7 +3055,7 @@ $('#doors').addEventListener('click', ev => {
   const pk = ev.target.closest('.pay[data-pick]'); if (pk){ const art = pk.closest('[data-id]'); if (art){ S.pay[art.dataset.id] = pk.dataset.pick; paint(false); } }
 });
 $('#doors').addEventListener('keydown', ev => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches('.pay[data-pick]')){ ev.preventDefault(); ev.target.click(); } });
-document.addEventListener('click', ev => { const b = ev.target.closest('[data-play]'); if (b){ ev.stopPropagation(); openPlaybook(b.dataset.play); } }, true);
+document.addEventListener('click', ev => { const b = ev.target.closest('[data-play]'); if (b){ ev.stopPropagation(); openPlaybook(b.dataset.play, b.dataset.which); } }, true);
 document.addEventListener('click', ev => { const i = ev.target.closest('.info'); document.querySelectorAll('.info[aria-expanded=true]').forEach(x => { if (x !== i) x.setAttribute('aria-expanded', 'false'); }); if (i) i.setAttribute('aria-expanded', i.getAttribute('aria-expanded') === 'true' ? 'false' : 'true'); });
 document.addEventListener('click', ev => { if (ev.target.id === 'x' || ev.target.id === 'sheetwrap') $('#sheetroot').innerHTML = ''; });
 $('#go').addEventListener('click', enterResults);
@@ -3177,7 +3250,7 @@ document.addEventListener('click', ev => {
   const tn = ev.target.closest('#tournext'); if (tn){ openTour(+tn.dataset.i); return; }
   if (ev.target.closest('#tourdone')){ closeAccount(); return; }
   if (ev.target.closest('#quizsave')){ const ans = {}; document.querySelectorAll('.qz .q').forEach(q => { const on = q.querySelector('.pchip.on'); if (on) ans[q.dataset.q] = +on.dataset.i; }); if (Object.keys(ans).length < QUIZ.length){ $('#quizerr').textContent = 'Answer all eight questions.'; return; } savePersona(personaFrom(ans)); if (W.mode === 'results' || S.preset === 'mine'){ setWeights(S.persona.a, S.persona.b, S.persona.c, 'mine'); paint(false); } openProfile(); return; }
-  if (ev.target.closest('#quizdrop')){ S.persona = null; try { localStorage.removeItem('concordego.persona'); } catch (e) {} if (SERVED && S.user && S.user.email) fetch('/api/profile', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'}).catch(() => {}); if (S.preset === 'mine') setWeights(.34, .33, .33, '.34,.33,.33'); paintPresets(); openProfile(); return; }
+  if (ev.target.closest('#quizdrop')){ S.persona = null; try { localStorage.removeItem('concordego.persona'); } catch (e) {} if (SERVED && S.user && S.user.email) fetch('/api/profile', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{"persona":null}'}).catch(() => {}); if (S.preset === 'mine') setWeights(.34, .33, .33, '.34,.33,.33'); paintPresets(); openProfile(); return; }
   const qc = ev.target.closest('.qz .pchip'); if (qc){ qc.parentElement.querySelectorAll('.pchip').forEach(x => x.classList.toggle('on', x === qc)); return; }
   if (ev.target.closest('#acctx, #acctno') || ev.target.id === 'acct'){ closeAccount(); return; }
   if (ev.target.closest('#acctgo')){ if (SERVED) location.href = '/api/signin?next=' + encodeURIComponent(location.pathname); else { S.user = {email:'you@example.com', demo:true}; paintAccount(); closeAccount(); } return; }
@@ -3186,7 +3259,10 @@ document.addEventListener('click', ev => {
 }, true);
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('#acct').classList.contains('hidden')) closeAccount(); });
 document.addEventListener('keydown', ev => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('.rsc .alt[data-alt]')){ ev.preventDefault(); showAlternatives(ev.target.dataset.alt); } });
-if (SERVED) fetch('/whoami').then(r => r.json()).then(w => { S.user = w.owner ? {owner:true, email:w.email || '', viaAccess: w.remote && !!w.email} : w.email ? {email:w.email, left:w.left, viaAccess:true, unlimited:!!w.unlimited} : null; S.recent = w.recent || []; S.free = w.free_left; S.freeMax = (w.allowances || {}).free; S.persona = (w.profile && w.profile.persona) || loadLocalPersona(); if (S.persona && !(w.profile && w.profile.persona) && S.user && S.user.email) savePersona(S.persona); paintPresets(); paintAccount(); }).catch(() => paintAccount()); else paintAccount();
+if (SERVED) fetch('/whoami').then(r => r.json()).then(w => { S.user = w.owner ? {owner:true, email:w.email || '', viaAccess: w.remote && !!w.email} : w.email ? {email:w.email, left:w.left, viaAccess:true, unlimited:!!w.unlimited} : null; S.recent = w.recent || []; S.free = w.free_left; S.freeMax = (w.allowances || {}).free; S.persona = (w.profile && w.profile.persona) || loadLocalPersona(); if (S.persona && !(w.profile && w.profile.persona) && S.user && S.user.email) savePersona(S.persona);
+  { const mine = walletOf(), empty = !Object.keys(mine.pts).length && !Object.keys(mine.status).length;
+    if (w.profile && w.profile.wallet && empty){ if (applyWallet(w.profile.wallet)){ try { localStorage.setItem('concordego.wallet', JSON.stringify(walletOf())); } catch (e) {} paintPts(); paint(false); } }
+    else if (!empty && S.user && S.user.email && !(w.profile && w.profile.wallet)) saveWallet(); } paintPresets(); paintAccount(); }).catch(() => paintAccount()); else paintAccount();
 // the hover card: one element, filled from the segment under the pointer
 const JT = document.createElement('div'); JT.className = 'jtip'; JT.setAttribute('role', 'tooltip'); JT.hidden = true; document.body.appendChild(JT);
 let jtFor = null;
@@ -3411,7 +3487,7 @@ document.addEventListener('click', ev => {
   const pa = ev.target.closest('#pts [data-padd]'); if (pa){ const sec = pa.dataset.padd, rows = S.prow[sec]; let i = rows.indexOf(''); if (i < 0){ rows.push(''); i = rows.length - 1; paintPts(); } pfocus(sec, i, 'pk'); return; }
   const pr = ev.target.closest('#pts [data-prm]'); if (pr){ const [sec, n] = pr.dataset.prm.split(':'), rows = S.prow[sec], k = rows[+n];
     if (k){ if (sec === 'status') S.status[k] = ''; else S.pts[k] = 0; }
-    rows.splice(+n, 1); if (!rows.length) rows.push(''); paintPts(); paint(false); return; }
+    rows.splice(+n, 1); if (!rows.length) rows.push(''); paintPts(); paint(false); saveWallet(); return; }
 });
 document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && W.mode === 'wizard' && ev.target.matches('#sentence input, #sentence select')){ ev.preventDefault(); if (S.trip === 'fix'){ if (ev.target.id === 'rs-flight'){ const b = $('#rs-lookup'); if (b && !b.disabled) lookupFlight(); } else { const b = $('#rs-go'); if (b && !b.disabled) runRescue(); } return; } finishStep(W.step); goStep(W.step + 1); } });
 const io = new IntersectionObserver(es => { es.forEach(x => { if (x.isIntersecting){ W.step = +x.target.dataset.step; paintSteps(); } }); }, {rootMargin:'-45% 0px -50% 0px'});
@@ -3435,7 +3511,7 @@ function summary(){
   if (!(A.arr0 === 0 && A.arr1 === 24)) chips.push('arrive ' + String(A.arr0).padStart(2,'0') + '–' + String(A.arr1).padStart(2,'0'));
   if (A.alli.size) chips.push([...A.alli].join(', '));
   if (A.out.size) chips.push(A.out.size + ' airline' + (A.out.size > 1 ? 's' : '') + ' left out');
-  const pts = Object.entries(S.pts).filter(([k, v]) => v > 0).map(([k, v]) => SHORT[k] + ' ' + Math.round(v/1000) + 'k'); if (pts.length) chips.push(pts.join(', '));
+  const pts = Object.entries(S.pts).filter(([k, v]) => v > 0).map(([k, v]) => PSHORT(k) + ' ' + Math.round(v/1000) + 'k'); if (pts.length) chips.push(pts.join(', '));
   const extra = Object.entries(S.extra).filter(([k, v]) => k !== 'custom' && k !== 'bag' && v).map(([k]) => ADDONS[k].label.toLowerCase()); if (S.extra.bag) extra.unshift(S.extra.bag + ' extra bag' + (S.extra.bag > 1 ? 's' : '')); if (extra.length) chips.push(extra.join(', '));
   $('#sumchips').innerHTML = chips.map(c => `<i>${esc(c)}</i>`).join('');
 }
@@ -3456,7 +3532,7 @@ function toISODate(str){
   let y = m[3] ? +m[3] : now.getFullYear(); let d = new Date(y, mon, day); if (!m[3] && d < today) d = new Date(y + 1, mon, day);
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
-const paxCount = () => ({'1 adult':1, '2 adults':2, 'Family of 4':4}[S.pax] || 1);
+function paxCount(){ return {'1 adult':1, '2 adults':2, 'Family of 4':4}[S.pax] || 1; }   // a declaration: the points plan reads it before this line runs
 // Served and signed in, the search is real: what was typed goes to /api/search
 // and the page is rebuilt from what comes back. Anyone else sees the recording,
 // and the lede says so. Opened as a file there is no server, so the recording

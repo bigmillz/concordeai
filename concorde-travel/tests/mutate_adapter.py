@@ -46,6 +46,8 @@ PL = "concorde-travel/places.py"
 FA = "concorde-travel/enrichment/fares.json"
 PA = "concorde-travel/par.py"
 SC = "concorde-travel/scorer.py"
+PT = "concorde-travel/points.py"
+UI = "concorde-travel/ui/mock/mock-10.src.html"
 
 
 def slice_fn(src, name):
@@ -67,6 +69,33 @@ def _uncache():
         shutil.rmtree(os.path.join(d, "__pycache__"), ignore_errors=True)
 
 MUTANTS = [
+ # points and miles (2026-09-24): award charts and the page's transfer planner; caught by test_points.py
+ (PT, "rule_vs_afkl", 'return _out(cid, ch, max(whole, each), cab,', 'return _out(cid, ch, whole, cab,',
+  'points: price an Air France connection as one journey when flight by flight costs more'),
+ (PT, "rule_zones", 'if any(region(zones, s["to"], F[s["to"]]) not in (za, zb) for s in segs[:-1]):', 'if False:',
+  'points: price New York-Bogota-London as a two-region award'),
+ (PT, "rule_atmos_partner", 'if len(segs) != 1 or segs[0]["op"] not in ch["operators"]:', 'if segs[0]["op"] not in ch["operators"]:',
+  'points: price a connection on a nonstop-only chart by its first flight'),
+ (PT, "awards", 'if any(s["op"] in HIGH_CHARGES for s in segs):', 'if False:',
+  "points: show a British Airways flight booked with another programme as if BA added no charges"),
+ (PT, "rule_vs_delta", 'season = _season(ch["season_dates"], s["date"])', 'season = "off-peak"',
+  'points: price every Delta date at Virgin\'s off-peak level'),
+ (PT, "awards", 'op=s["mk"] if s.get("op") != s.get("mk") and s.get("op") in reg.get(s.get("mk"), []) else s.get("op")', 'op=s.get("op")',
+  'points: treat Lufthansa CityLine and Delta Connection as other airlines, so their trips go unpriced'),
+ (PT, "rule_aa_partner", 'if far == "Europe" and cab == "economy" and outbound and', 'if far == "Europe" and cab == "economy" and',
+  'points: apply American\'s Europe off-peak price to flights home as well'),
+ (PT, "awards", 'if k not in have and ops <= set(p.get("dynamic") or []) and ops <= set(p.get("books") or []))',
+  'if k not in have and ops <= set(p.get("books") or []))', 'points: list a charted programme as having no chart'),
+ (UI, None, "return (PTS.banks[bank].bonuses || []).find(x => x.to === prog && x.ends >= todayLocal()) || null;",
+  "return (PTS.banks[bank].bonuses || []).find(x => x.to === prog) || null;", 'planner: keep counting a transfer bonus after it ends'),
+ (UI, None, "if (row.bonus_per_60k) a += Math.floor(send / 60000) * row.bonus_per_60k;", "",
+  "planner: forget Marriott's 5,000 miles per 60,000 moved"),
+ (UI, None, "const own = Math.min(avail(a.prog), left);", "const own = 0;", 'planner: ignore the miles already in the programme'),
+ (UI, None, "}).sort((x, y) => x.per - y.per);", "});", 'planner: move the dearest card points first'),
+ (UI, None, "good: !!(ok && head !== null && head >= 1000 && a.surcharge !== 'high'),", "good: !!(ok && head !== null && head >= 1000),",
+  'planner: recommend points on a flight whose carrier charges can eat the saving'),
+ (DATA, "build_slim", 'for o in sorted((o for o in feasible if per_mile(o) > 0), key=lambda o: (-per_mile(o), o["option_id"]))[:BEST_AWARDS]:',
+  'for o in []:', 'pool: leave out the flights where points buy the most, so a points holder never sees them'),
  (AD, "from_amadeus", 'op = ((s.get("operating") or {}).get("carrierCode") or mkt)',
   'op = mkt', 'amadeus: ignore the operating block'),
  (AD, "from_amadeus", '''            if e1 or e2:
@@ -278,6 +307,10 @@ MUTANTS = [
      'ratings: ignore the short-haul rating, so a domestic flight is judged on the airline\'s long-haul product'),
 ]
 
+# MUTATE_ONLY="planner" runs just the mutants whose description contains it (a quick check after adding a guard)
+ONLY = os.environ.get("MUTATE_ONLY")
+if ONLY:
+    MUTANTS = [m for m in MUTANTS if ONLY in m[4]]
 caught = skipped = 0
 for path, fn, old, new, why in MUTANTS:
     shutil.copy(path, path + ".bak")
@@ -302,6 +335,9 @@ for path, fn, old, new, why in MUTANTS:
     r = subprocess.run([sys.executable, "-B", "concorde-travel/tests/test_adapter.py"],
                        env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"),
                        capture_output=True, text=True)
+    if r.returncode == 0:        # the points suite guards the award charts, the planner and the pool
+        r = subprocess.run([sys.executable, "-B", "concorde-travel/tests/test_points.py"],
+                           env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"), capture_output=True, text=True)
     shutil.move(path + ".bak", path)
     ok = r.returncode != 0
     caught += ok

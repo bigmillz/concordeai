@@ -446,6 +446,8 @@ python3 concorde-travel/par.py JFK LHR 2026-11-18   # the reference itinerary an
 python3 fixtures/validate.py                  # fixture schema + semantics
 python3 concorde-travel/tests/test_scorer.py  # the fixtures' own assertions, executed
 python3 concorde-travel/tests/test_narrator.py   # the narrator's guard rails (no key needed)
+python3 concorde-travel/tests/test_points.py     # award charts and the page's transfer planner, offline
+python3 concorde-travel/points.py JFK LHR DL business 2026-11-18   # what the published charts say for one flight
 python3 concorde-travel/tests/test_adapter.py    # live normalisation, replayed offline
 python3 concorde-travel/tests/test_live.py       # quota, cache and key handling, offline
 python3 concorde-travel/live.py status           # key, quota and cache state
@@ -753,7 +755,7 @@ curve it is meant to be testing is a fixture that tests nothing.
 
 **The test suites are mutation-tested.** `test_scorer.py` catches 12 of 12 seeded faults and
 `validate.py` 10 of 10; `tests/mutate_adapter.py` is an executable runner for the adapters
-and must stay at every mutant caught (50 of 50 on 2026-09-24) with **zero skips** — a skipped mutant never ran
+and must stay at every mutant caught (76 of 76 on 2026-09-24, the points charts, planner and pool among them; it runs `test_points.py` too, and `MUTATE_ONLY=planner` runs just those) with **zero skips** — a skipped mutant never ran
 and is not a pass. If a change makes a suite pass that should not, the suite has lost a guard. **The runner works in
 a scratch copy outside the checkout** (since 2026-09-24): run in place, Google Drive's sync raced its
 write-and-restore cycle and left two mutants in `par.py` after a run that reported every fault caught. If a SKIP
@@ -1287,8 +1289,7 @@ vocabulary in `wish.py` lists every want the grid does), a **wish box**
 typed or spoken (the browser's own speech recognition) that becomes visible,
 removable rules and weights, advanced windows / cabin / stops / alliances /
 airlines-to-leave-out (these hide, and say what they hid), and **points
-balances** with a demo award chart and 1:1 transfer partners that say whether
-points beat cash in cents per point. **The three cards are a podium** (2026-09-21, per Patrick: "2nd, 1st, 3rd, with 1st being a
+balances** priced on the airlines' published award charts (below). **The three cards are a podium** (2026-09-21, per Patrick: "2nd, 1st, 3rd, with 1st being a
 little larger ... the podium in auto racing", then "taller rather than wider"): second on the
 left, first in the middle, third on the right, all one width, first place taller at both
 ends (a taller picture, more room under the buttons), the three centred on one line. The DOM
@@ -1299,13 +1300,49 @@ a program picked from an alphabetical dropdown, a balance beside it (a level dro
 for status), an × to remove the row, and "+ Add another" under the list. A program
 already picked in a section is not offered again in it. The rows (`S.prow`) only say
 what is shown; balances and levels stay in `S.pts` and `S.status`, which the points
-pricing, upgrade odds and status credit read. A balance follows its row when the
-program is changed; a level does not, since the tiers differ.
+pricing, the status bags and status credit read. A balance follows its row when the
+program is changed; a level does not, since the tiers differ. The wallet is saved in the browser
+(`concordego.wallet`) and, signed in, in the profile (`/api/profile` merges `wallet` and `persona`
+separately; `server._clean_wallet` keeps whole numbers and short level names only).
 **Every programme and every status is offered, always** (2026-09-21, per Patrick: gated
 chips "kept disappearing"; what a person holds does not change with the search); a
-programme with no award on these flights says "no route" on the card. One tier per
-alliance (Star, oneworld, SkyTeam) stands in for every partner. Marriott Bonvoy
-is a source at 3:1 valued at its own 0.7¢, so a 3:1 move is never priced as 1:1. It wears the Concorde family's own
+programme with no award on these flights says so on the card. One tier per
+alliance (Star, oneworld, SkyTeam) stands in for every partner.
+
+**Points and miles are real data** (2026-09-24, per Patrick: "if a person spends the time putting in all their
+miles and points and airline status, then that should work to their advantage", and no sample data).
+`enrichment/points.json` holds the banks' transfer tables (Amex, Chase, Citi in two card tiers, Capital One, Bilt,
+Wells Fargo, Marriott: ratio, minimum, block, timing, fees, and transfer bonuses with end dates, which lapse by
+themselves), 28 programmes with The Points Guy's monthly valuations (unknown is `null`, never zero), 20 PUBLISHED
+award charts, status bag rules, and the geography the charts need. It was researched and checked by a second reader on
+2026-09-24 (sources and as-of dates in each chart; a secondary source says so); change a figure only with its source.
+`points.py` prices each flight in the programmes whose chart covers it, in its own cabin, deterministic, no network:
+Virgin on Delta (region table and Virgin's season calendar), Air France-KLM, SkyTeam, El Al, SAA/WestJet, Virgin
+Australia; BA on its own flights (route tiers, peak shown, off-peak as `low`) and one partner (per flight); Iberia;
+Qatar on partners and on American; AAdvantage on partners (region, Europe off-peak outbound only); Atmos (floors,
+nonstop); Aeroplan on partners (zones, miles flown); ANA, Turkish (own additive through Istanbul, Star partners),
+Miles & More (partners, half the round-trip chart), Singapore. Rules it holds to, each with a test and a mutant:
+**a programme with no chart (Delta, United, Flying Blue, AAdvantage and Virgin on their own flights, Aeroplan on
+United) is named as able to book, never priced**; where a chart's rule is unclear the higher price is used (an Air
+France connection: journey or flight by flight); a connection through a third region is not a two-region award;
+British Airways' carrier charges are flagged whichever programme books its flight; a regional airline (CityLine,
+Delta Connection) books as its parent. `data.build_slim` puts `awards` and `award_bookable` on every flight and
+always keeps the `BEST_AWARDS` (6) flights where a chart buys the most ticket per mile in the pool, since the pool
+is cut before anyone's points are known (a $10,494 Delta One that 47,500 Virgin points buy was left out).
+**The page plans the transfer** (`planAward` in mock-10, from `points.page_table()` inlined as `__POINTS__` by
+`build.py`): miles already in the programme first, then Avios from another Avios account, then card points
+cheapest per arriving mile, with each bank's block size, minimum, running bonus, Marriott's miles per 60,000 and
+Amex's excise fee; a round trip's later legs plan with what the earlier legs left. Points beat cash when the ticket
+costs more than the points are worth at those valuations plus the published fees ("before taxes and charges");
+then the flight ranks as if its ticket cost what the points are worth (a credit in the order, never on the money
+bill), the card shows a points column with the plan, "Best use of your points" lists the top three above the
+podium, and the step-by-step guide says check the seat first, the moves, the timing, the cash at booking, what the
+bank's own travel site would take instead, and the programmes with no chart (with the balance you hold there). A
+flight whose carrier charges can eat the saving is never recommended on points. **A held status takes bag fees off
+the bill** (`bagPerk`: the airline's own tier on its own flights, the alliance tier on partners, Star Gold not on
+Lufthansa Economy Light). Award-seat availability is not known here: no award search API sells to a site like this
+without a commercial agreement (seats.aero, AwardTool, point.me), and that is Patrick's decision.
+`tests/test_points.py` runs the charts and the page's own planner (under node). It wears the Concorde family's own
 tokens (`--bg #101013`, Michroma / Space Grotesk / Plex Mono, the app's amber,
 blue and purple for the three targets). Round two (05–08: Shortlist, Board,
 Lines, Dial) and round one (01–04) are kept for the record.

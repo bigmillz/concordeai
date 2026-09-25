@@ -234,6 +234,21 @@ def _users_profile(email):
         return None
 
 
+def _clean_wallet(w):
+    """A person's points balances and status levels, as the page sends them: known-looking keys, whole numbers and
+    short level names only, never anything else (2026-09-24: the wallet is saved so it keeps working for them)."""
+    if not isinstance(w, dict):
+        return None
+    pts, st = {}, {}
+    for k, v in list((w.get("pts") or {}).items())[:60] if isinstance(w.get("pts"), dict) else []:
+        if re.match(r"^[a-z_]{2,12}$", str(k)) and isinstance(v, (int, float)) and 0 < v <= 1e9:
+            pts[str(k)] = int(v)
+    for k, v in list((w.get("status") or {}).items())[:30] if isinstance(w.get("status"), dict) else []:
+        if re.match(r"^[A-Za-z0-9]{2,10}$", str(k)) and isinstance(v, str) and 0 < len(v) <= 30 and re.match(r"^[A-Za-z0-9 +-]+$", v):
+            st[str(k)] = v
+    return {"pts": pts, "status": st} if (pts or st) else None
+
+
 def _users_profile_set(email, profile):
     """The signed-in person's profile: today the flying personality (the quiz's
     answers and the persona they make), kept small and only ever theirs."""
@@ -2165,9 +2180,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._json({"error": "Bad request: %s" % exc})
             if not who or "@" not in who:
                 return self._json({"ok": False, "local": who == "owner", "error": None if who == "owner" else "Sign in to save your profile."})
-            persona = body.get("persona") if isinstance(body, dict) and isinstance(body.get("persona"), dict) else None
-            profile = {"persona": persona} if persona else {}
-            if len(json.dumps(profile)) > 4000:
+            # the fields sent are replaced, the rest kept: the personality and the wallet are saved separately
+            profile = dict(_users_profile(who) or {})
+            if isinstance(body, dict) and "persona" in body:
+                if isinstance(body.get("persona"), dict):
+                    profile["persona"] = body["persona"]
+                else:
+                    profile.pop("persona", None)
+            if isinstance(body, dict) and "wallet" in body:
+                w = _clean_wallet(body.get("wallet"))
+                if w:
+                    profile["wallet"] = w
+                else:
+                    profile.pop("wallet", None)
+            if len(json.dumps(profile)) > 8000:
                 return self._json({"ok": False, "error": "Profile too large."})
             _users_profile_set(who, profile)
             return self._json({"ok": True, "profile": profile})

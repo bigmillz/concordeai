@@ -1,0 +1,7784 @@
+{
+ "_about": "Points and miles for ConcordeGo, researched 2026-09-24 from the banks' and airlines' own pages where they could be read, and from dated secondary sources where they could not (each chart says which). Each research file was checked by a second reader and its corrections applied. Award charts are the published PRICE of a seat if one is released; no chart says a seat is available. Built by the lead session; change a figure only with its source.",
+ "as_of": "2026-09-24",
+ "valuation": {
+  "source": "The Points Guy, September 2026 valuations",
+  "url": "https://thepointsguy.com/guide/monthly-valuations/",
+  "month": "September 2026. Source: TPG, 'What are points and miles worth? TPG's Sept. 2026 valuations', published 2026-09-01, updated 2026-09-09, read 2026-09-24. TPG publishes no value for Lufthansa Miles & More. That row is left out on purpose: the value is unknown, not zero. TPG's 'Capital One' row is used for Capital One Miles, 'Bilt' for Bilt Rewards and 'Avios' for British Airways Avios."
+ },
+ "regional": {
+  "LH": [
+   "CL",
+   "VL",
+   "EN"
+  ],
+  "LX": [
+   "2L",
+   "WK"
+  ],
+  "OS": [
+   "VO"
+  ],
+  "AF": [
+   "A5"
+  ],
+  "KL": [
+   "WA"
+  ],
+  "BA": [
+   "CJ"
+  ],
+  "IB": [
+   "I2",
+   "YW"
+  ],
+  "AA": [
+   "MQ",
+   "OH",
+   "PT",
+   "YX",
+   "OO"
+  ],
+  "DL": [
+   "9E",
+   "OO",
+   "YX",
+   "G7",
+   "CP",
+   "ZW"
+  ],
+  "UA": [
+   "OO",
+   "YX",
+   "G7",
+   "ZW",
+   "C5",
+   "AX",
+   "EV"
+  ],
+  "AC": [
+   "QK",
+   "RV",
+   "ZX",
+   "KV"
+  ],
+  "AS": [
+   "QX",
+   "OO"
+  ],
+  "SK": [
+   "WX",
+   "XR",
+   "EE"
+  ],
+  "AY": [
+   "N7"
+  ],
+  "EI": [
+   "EG"
+  ]
+ },
+ "banks": {
+  "amex": {
+   "name": "American Express Membership Rewards",
+   "short": "Amex",
+   "cents": 2,
+   "path": "americanexpress.com, then Rewards, then Transfer points",
+   "portal": "Amex Travel pays 1¢ a point on flights",
+   "portal_cents": 1.0,
+   "source": "https://global.americanexpress.com/rewards/transfer?tier=MR",
+   "partners": {
+    "ac": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "48 hours (Amex estimated transfer time)"
+    },
+    "af": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "48 hours (Amex estimated transfer time)"
+    },
+    "am": {
+     "from": 1000,
+     "to": 1600,
+     "min": 1000,
+     "step": 1000,
+     "time": "48 hours (Amex estimated transfer time)"
+    },
+    "av": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "72 hours (Amex estimated transfer time)"
+    },
+    "b6": {
+     "from": 250,
+     "to": 200,
+     "min": 250,
+     "step": 250,
+     "time": "48 hours (Amex estimated transfer time)",
+     "fee": {
+      "per_point_usd": 0.0006,
+      "cap_usd": 99,
+      "what": "Amex's excise tax offset fee on transfers to US airlines"
+     }
+    },
+    "ba": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "48 hours (Amex estimated transfer time)"
+    },
+    "cx": {
+     "from": 1000,
+     "to": 800,
+     "min": 1000,
+     "step": 1000,
+     "time": "48 hours (Amex estimated transfer time)"
+    },
+    "dl": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "48 hours (Amex estimated transfer time)",
+     "fee": {
+      "per_point_usd": 0.0006,
+      "cap_usd": 99,
+      "what": "Amex's excise tax offset fee on transfers to US airlines"
+     }
+    },
+    "ei": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "48 hours (Amex estimated transfer time)"
+    },
+    "ek": {
+     "from": 1000,
+     "to": 800,
+     "min": 1000,
+     "step": 1000,
+     "time": "48 hours (Amex estimated transfer time)"
+    },
+    "ib": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "48 hours (Amex estimated transfer time)"
+    },
+    "nh": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "4 days (Amex estimated transfer time)"
+    },
+    "qf": {
+     "from": 500,
+     "to": 500,
+     "min": 500,
+     "step": 500,
+     "time": "48 hours (Amex estimated transfer time)"
+    },
+    "qr": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "48 hours (Amex estimated transfer time)"
+    },
+    "sq": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "48 hours (Amex estimated transfer time)"
+    },
+    "vs": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "48 hours (Amex estimated transfer time)"
+    }
+   },
+   "bonuses": [
+    {
+     "to": "ba",
+     "percent": 30,
+     "ends": "2026-09-27",
+     "url": "https://frequentmiler.com/30-percent-transfer-bonus-american-express-membership-rewards-avios-british-airways-iberia-aer-lingus/"
+    },
+    {
+     "to": "ib",
+     "percent": 30,
+     "ends": "2026-09-27",
+     "url": "https://frequentmiler.com/30-percent-transfer-bonus-american-express-membership-rewards-avios-british-airways-iberia-aer-lingus/"
+    },
+    {
+     "to": "ei",
+     "percent": 30,
+     "ends": "2026-09-27",
+     "url": "https://frequentmiler.com/30-percent-transfer-bonus-american-express-membership-rewards-avios-british-airways-iberia-aer-lingus/"
+    }
+   ]
+  },
+  "chase": {
+   "name": "Chase Ultimate Rewards",
+   "short": "Chase",
+   "cents": 2.05,
+   "path": "chase.com, then Ultimate Rewards, then Transfer to travel partners",
+   "portal": "Chase Travel pays 1¢ a point or more, depending on the card",
+   "portal_cents": 1.0,
+   "source": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred",
+   "partners": {
+    "ac": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Most transfers process by the next business day; up to 7 business days"
+    },
+    "af": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Most transfers process by the next business day; up to 7 business days"
+    },
+    "b6": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Most transfers process by the next business day; up to 7 business days"
+    },
+    "ba": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Most transfers process by the next business day; up to 7 business days"
+    },
+    "ei": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Most transfers process by the next business day; up to 7 business days"
+    },
+    "ib": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Most transfers process by the next business day; up to 7 business days"
+    },
+    "sq": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Most transfers process by the next business day; up to 7 business days"
+    },
+    "ua": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Most transfers process by the next business day; up to 7 business days"
+    },
+    "vs": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Most transfers process by the next business day; up to 7 business days"
+    },
+    "wn": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Most transfers process by the next business day; up to 7 business days"
+    }
+   },
+   "bonuses": [
+    {
+     "to": "ac",
+     "percent": 20,
+     "ends": "2026-09-30",
+     "url": "https://frequentmiler.com/get-20-bonus-when-transferring-chase-ultimate-rewards-to-air-canada-aeroplan-stack-with-10-cardholder-bonus/"
+    }
+   ],
+   "needs": "a Sapphire Preferred, Sapphire Reserve or Ink Business Preferred"
+  },
+  "citi": {
+   "name": "Citi ThankYou (Strata Premier, Strata Elite or Prestige)",
+   "short": "Citi",
+   "cents": 1.9,
+   "path": "thankyou.com, then Points transfer",
+   "portal": "Citi Travel pays 1¢ a point",
+   "portal_cents": 1.0,
+   "source": "https://www.thankyou.com/partnerProgramsListing.htm",
+   "partners": {
+    "aa": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days",
+     "note": "Citi adds an excise tax offset fee on transfers to US airlines; its amount is not published"
+    },
+    "af": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "av": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "b6": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days",
+     "note": "Citi adds an excise tax offset fee on transfers to US airlines; its amount is not published"
+    },
+    "br": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "cx": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "ek": {
+     "from": 1000,
+     "to": 800,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "ey": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "jl": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "Typically within 24 hours; may take up to 5 business days"
+    },
+    "qf": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "qr": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "sq": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "tk": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "vs": {
+     "from": 1000,
+     "to": 1000,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days",
+     "note": "One transfer a day to Virgin"
+    }
+   },
+   "bonuses": [
+    {
+     "to": "av",
+     "percent": 25,
+     "ends": "2026-10-24",
+     "url": "https://www.thankyou.com/partnerProgramsListing.htm"
+    },
+    {
+     "to": "jl",
+     "percent": 30,
+     "ends": "2026-10-24",
+     "url": "https://www.thankyou.com/partnerProgramsListing.htm"
+    }
+   ]
+  },
+  "citi_basic": {
+   "name": "Citi ThankYou (other cards)",
+   "short": "Citi",
+   "cents": 1.9,
+   "path": "thankyou.com, then Points transfer",
+   "portal": "Citi Travel pays 1¢ a point",
+   "portal_cents": 1.0,
+   "source": "https://www.thankyou.com/partnerProgramsListing.htm",
+   "partners": {
+    "aa": {
+     "from": 1000,
+     "to": 700,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days",
+     "note": "Citi adds an excise tax offset fee on transfers to US airlines; its amount is not published"
+    },
+    "af": {
+     "from": 1000,
+     "to": 700,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "av": {
+     "from": 1000,
+     "to": 700,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "b6": {
+     "from": 1000,
+     "to": 700,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days",
+     "note": "Not from a Citi ThankYou Mastercard alone. Citi adds an excise tax offset fee on transfers to US airlines; its amount is not published"
+    },
+    "br": {
+     "from": 1000,
+     "to": 700,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "cx": {
+     "from": 1000,
+     "to": 700,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "ek": {
+     "from": 1000,
+     "to": 560,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "ey": {
+     "from": 1000,
+     "to": 700,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "jl": {
+     "from": 1000,
+     "to": 700,
+     "min": 1000,
+     "step": 1000,
+     "time": "Typically within 24 hours; may take up to 5 business days"
+    },
+    "qf": {
+     "from": 1000,
+     "to": 700,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "qr": {
+     "from": 1000,
+     "to": 700,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "sq": {
+     "from": 1000,
+     "to": 700,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "tk": {
+     "from": 1000,
+     "to": 700,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days"
+    },
+    "vs": {
+     "from": 1000,
+     "to": 700,
+     "min": 1000,
+     "step": 1000,
+     "time": "Often within 24 hours; may take up to 5 business days",
+     "note": "One transfer a day to Virgin"
+    }
+   },
+   "bonuses": [
+    {
+     "to": "av",
+     "percent": 25,
+     "ends": "2026-10-24",
+     "url": "https://www.thankyou.com/partnerProgramsListing.htm"
+    },
+    {
+     "to": "jl",
+     "percent": 30,
+     "ends": "2026-10-24",
+     "url": "https://www.thankyou.com/partnerProgramsListing.htm"
+    }
+   ]
+  },
+  "capone": {
+   "name": "Capital One Miles",
+   "short": "Capital One",
+   "cents": 1.85,
+   "path": "capitalone.com, then Rewards, then Transfer miles",
+   "portal": "Capital One Travel pays 1¢ a mile",
+   "portal_cents": 1.0,
+   "source": "https://www.capitalone.com/learn-grow/money-management/venture-miles-transfer-partnerships/",
+   "partners": {
+    "ac": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Capital One does not publish a transfer time"
+    },
+    "af": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Capital One does not publish a transfer time"
+    },
+    "am": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Capital One does not publish a transfer time"
+    },
+    "av": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Capital One does not publish a transfer time"
+    },
+    "ay": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Capital One does not publish a transfer time"
+    },
+    "b6": {
+     "from": 5,
+     "to": 3,
+     "min": 1000,
+     "step": 1000,
+     "time": "Capital One does not publish a transfer time"
+    },
+    "ba": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Capital One does not publish a transfer time"
+    },
+    "br": {
+     "from": 2,
+     "to": 1.5,
+     "min": 1000,
+     "step": 1000,
+     "time": "Capital One does not publish a transfer time"
+    },
+    "cx": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Capital One does not publish a transfer time"
+    },
+    "ek": {
+     "from": 2,
+     "to": 1.5,
+     "min": 1000,
+     "step": 1000,
+     "time": "Capital One does not publish a transfer time"
+    },
+    "ey": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Capital One does not publish a transfer time"
+    },
+    "jl": {
+     "from": 2,
+     "to": 1.5,
+     "min": 1000,
+     "step": 1000,
+     "time": "Capital One does not publish a transfer time"
+    },
+    "qf": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Capital One does not publish a transfer time"
+    },
+    "qr": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Capital One does not publish a transfer time"
+    },
+    "sq": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Capital One does not publish a transfer time"
+    },
+    "tk": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Capital One does not publish a transfer time"
+    },
+    "tp": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Capital One does not publish a transfer time"
+    },
+    "vs": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Capital One does not publish a transfer time"
+    }
+   },
+   "bonuses": [
+    {
+     "to": "jl",
+     "percent": 30,
+     "ends": "2026-09-30",
+     "url": "https://onemileatatime.com/deals/capital-one-japan-airlines-mileage-bank-transfer-bonus/"
+    }
+   ]
+  },
+  "bilt": {
+   "name": "Bilt Rewards",
+   "short": "Bilt",
+   "cents": 2.2,
+   "path": "the Bilt app, then Points, then Transfer",
+   "portal": "Bilt Travel pays 1.25¢ a point",
+   "portal_cents": 1.25,
+   "source": "https://support.biltrewards.com/hc/en-us/articles/19086448638989-Bilt-s-Transfer-Partners",
+   "partners": {
+    "ac": {
+     "from": 1,
+     "to": 1,
+     "min": 2000,
+     "step": 1000,
+     "time": "Usually immediate; allow up to 48 hours"
+    },
+    "af": {
+     "from": 1,
+     "to": 1,
+     "min": 2000,
+     "step": 1000,
+     "time": "Usually immediate; allow up to 48 hours"
+    },
+    "as": {
+     "from": 1,
+     "to": 1,
+     "min": 2000,
+     "step": 1000,
+     "time": "Usually immediate; allow up to 48 hours"
+    },
+    "av": {
+     "from": 1,
+     "to": 1,
+     "min": 2000,
+     "step": 1000,
+     "time": "Usually immediate; allow up to 48 hours"
+    },
+    "ba": {
+     "from": 1,
+     "to": 1,
+     "min": 2000,
+     "step": 1000,
+     "time": "Usually immediate; allow up to 48 hours"
+    },
+    "cx": {
+     "from": 1,
+     "to": 1,
+     "min": 2000,
+     "step": 1000,
+     "time": "Usually immediate; allow up to 48 hours"
+    },
+    "ei": {
+     "from": 1,
+     "to": 1,
+     "min": 2000,
+     "step": 1000,
+     "time": "Usually immediate; allow up to 48 hours"
+    },
+    "ek": {
+     "from": 1,
+     "to": 1,
+     "min": 2000,
+     "step": 1000,
+     "time": "Usually immediate; allow up to 48 hours"
+    },
+    "ey": {
+     "from": 1,
+     "to": 1,
+     "min": 2000,
+     "step": 1000,
+     "time": "Usually immediate; allow up to 48 hours"
+    },
+    "ib": {
+     "from": 1,
+     "to": 1,
+     "min": 2000,
+     "step": 1000,
+     "time": "Usually immediate; allow up to 48 hours"
+    },
+    "jl": {
+     "from": 1,
+     "to": 1,
+     "min": 2000,
+     "step": 1000,
+     "time": "Usually immediate; allow up to 48 hours"
+    },
+    "qr": {
+     "from": 1,
+     "to": 1,
+     "min": 2000,
+     "step": 1000,
+     "time": "Usually immediate; allow up to 48 hours"
+    },
+    "tk": {
+     "from": 1,
+     "to": 1,
+     "min": 2000,
+     "step": 1000,
+     "time": "Usually immediate; allow up to 48 hours"
+    },
+    "tp": {
+     "from": 1,
+     "to": 1,
+     "min": 2000,
+     "step": 1000,
+     "time": "Usually immediate; allow up to 48 hours"
+    },
+    "ua": {
+     "from": 1,
+     "to": 1,
+     "min": 2000,
+     "step": 1000,
+     "time": "Usually immediate; allow up to 48 hours"
+    },
+    "vs": {
+     "from": 1,
+     "to": 1,
+     "min": 2000,
+     "step": 1000,
+     "time": "Usually immediate; allow up to 48 hours"
+    },
+    "wn": {
+     "from": 1,
+     "to": 1,
+     "min": 2000,
+     "step": 1000,
+     "time": "Allow up to 72 hours"
+    }
+   },
+   "bonuses": []
+  },
+  "wells": {
+   "name": "Wells Fargo Rewards",
+   "short": "Wells Fargo",
+   "cents": 1.75,
+   "path": "wellsfargo.com, then Rewards, then Transfer to travel partners",
+   "portal": "Wells Fargo Travel pays 1¢ a point",
+   "portal_cents": 1.0,
+   "source": "https://www.wellsfargo.com/credit-cards/autograph-journey-visa/terms/",
+   "partners": {
+    "af": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Wells Fargo does not publish a transfer time"
+    },
+    "av": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Wells Fargo does not publish a transfer time"
+    },
+    "b6": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Wells Fargo does not publish a transfer time"
+    },
+    "ba": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Wells Fargo does not publish a transfer time"
+    },
+    "cx": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Wells Fargo does not publish a transfer time"
+    },
+    "ei": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Wells Fargo does not publish a transfer time"
+    },
+    "ib": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Wells Fargo does not publish a transfer time"
+    },
+    "vs": {
+     "from": 1,
+     "to": 1,
+     "min": 1000,
+     "step": 1000,
+     "time": "Near real time; allow up to 72 hours (Virgin Red support)"
+    }
+   },
+   "bonuses": []
+  },
+  "marriott": {
+   "name": "Marriott Bonvoy",
+   "short": "Marriott",
+   "cents": 0.75,
+   "path": "marriott.com, then Bonvoy, then Transfer points to airline miles",
+   "portal": null,
+   "portal_cents": null,
+   "source": "https://www.marriott.com/loyalty/redeem/travel/points-to-miles.mi",
+   "partners": {
+    "aa": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 0,
+     "time": "In most cases within 1 week"
+    },
+    "ac": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "af": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "am": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "as": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "av": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "ba": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "cx": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "dl": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "ei": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "ek": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "ey": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "f9": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "ib": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "jl": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "nh": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "qf": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "qr": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "sq": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "tk": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "tp": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "ua": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 10000,
+     "time": "In most cases within 1 week"
+    },
+    "vs": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    },
+    "wn": {
+     "from": 3,
+     "to": 1,
+     "min": 3000,
+     "step": 3000,
+     "bonus_per_60k": 5000,
+     "time": "In most cases within 1 week"
+    }
+   },
+   "bonuses": []
+  }
+ },
+ "programmes": {
+  "ba": {
+   "name": "British Airways Club",
+   "currency": "Avios",
+   "site": "ba.com",
+   "books": [
+    "AA",
+    "AS",
+    "AT",
+    "AY",
+    "BA",
+    "CX",
+    "FJ",
+    "IB",
+    "JL",
+    "MH",
+    "QF",
+    "QR",
+    "RJ",
+    "UL",
+    "WY"
+   ],
+   "search": "Sign in on ba.com and search with Avios on",
+   "home": "BA",
+   "cents": 1.4
+  },
+  "ib": {
+   "name": "Iberia Club",
+   "currency": "Avios",
+   "site": "iberia.com",
+   "books": [
+    "IB"
+   ],
+   "search": "Sign in on iberia.com and search with Avios on",
+   "home": "IB",
+   "cents": 1.4,
+   "cents_note": "TPG values Avios as one currency"
+  },
+  "qr": {
+   "name": "Qatar Airways Privilege Club",
+   "currency": "Avios",
+   "site": "qatarairways.com",
+   "books": [
+    "AA",
+    "AS",
+    "AT",
+    "AY",
+    "BA",
+    "CX",
+    "FJ",
+    "IB",
+    "JL",
+    "MH",
+    "QF",
+    "QR",
+    "RJ",
+    "UL",
+    "WY"
+   ],
+   "search": "Sign in on qatarairways.com and search Privilege Club award flights",
+   "home": "QR",
+   "cents": 1.4,
+   "cents_note": "TPG values Avios as one currency",
+   "dynamic": [
+    "QR"
+   ]
+  },
+  "ei": {
+   "name": "Aer Lingus AerClub",
+   "currency": "Avios",
+   "site": "aerlingus.com",
+   "books": [
+    "EI"
+   ],
+   "search": "Sign in on aerlingus.com and search with Avios",
+   "home": "EI",
+   "cents": 1.4,
+   "cents_note": "TPG values Avios as one currency",
+   "dynamic": [
+    "EI"
+   ]
+  },
+  "ay": {
+   "name": "Finnair Plus",
+   "currency": "Avios",
+   "site": "finnair.com",
+   "books": [
+    "AA",
+    "AS",
+    "AT",
+    "AY",
+    "BA",
+    "CX",
+    "FJ",
+    "IB",
+    "JL",
+    "MH",
+    "QF",
+    "QR",
+    "RJ",
+    "UL",
+    "WY"
+   ],
+   "search": "Sign in on finnair.com and search award flights",
+   "home": "AY",
+   "cents": 1.4,
+   "cents_note": "TPG values Avios as one currency",
+   "dynamic": [
+    "AA",
+    "AS",
+    "AT",
+    "AY",
+    "BA",
+    "CX",
+    "FJ",
+    "IB",
+    "JL",
+    "MH",
+    "QF",
+    "QR",
+    "RJ",
+    "UL",
+    "WY"
+   ]
+  },
+  "aa": {
+   "name": "American AAdvantage",
+   "currency": "miles",
+   "site": "aa.com",
+   "books": [
+    "AA",
+    "AS",
+    "AT",
+    "AY",
+    "BA",
+    "CX",
+    "CZ",
+    "EI",
+    "EY",
+    "FJ",
+    "G3",
+    "HA",
+    "IB",
+    "JA",
+    "JL",
+    "MH",
+    "QF",
+    "QR",
+    "RJ",
+    "TN",
+    "UL",
+    "WY"
+   ],
+   "search": "Sign in on aa.com and search with Redeem miles",
+   "home": "AA",
+   "cents": 1.45,
+   "dynamic": [
+    "AA"
+   ]
+  },
+  "as": {
+   "name": "Alaska Atmos Rewards",
+   "currency": "points",
+   "site": "alaskaair.com",
+   "books": [
+    "AA",
+    "AS",
+    "AT",
+    "AY",
+    "BA",
+    "CX",
+    "EI",
+    "FI",
+    "FJ",
+    "HA",
+    "IB",
+    "JL",
+    "MH",
+    "QF",
+    "QR",
+    "RJ",
+    "UL",
+    "WY"
+   ],
+   "search": "Sign in on alaskaair.com and search with Use points",
+   "home": "AS",
+   "cents": 1.55
+  },
+  "vs": {
+   "name": "Virgin Atlantic Flying Club",
+   "currency": "Virgin Points",
+   "site": "virginatlantic.com",
+   "books": [
+    "AF",
+    "AM",
+    "AR",
+    "CI",
+    "DL",
+    "GA",
+    "KE",
+    "KL",
+    "KQ",
+    "LA",
+    "LY",
+    "ME",
+    "MF",
+    "MU",
+    "NH",
+    "NZ",
+    "RO",
+    "SA",
+    "SK",
+    "SV",
+    "UX",
+    "VA",
+    "VN",
+    "VS",
+    "WS"
+   ],
+   "search": "Sign in on virginatlantic.com and search with Pay with points on",
+   "home": "VS",
+   "cents": 1.45,
+   "dynamic": [
+    "VS"
+   ]
+  },
+  "dl": {
+   "name": "Delta SkyMiles",
+   "currency": "miles",
+   "site": "delta.com",
+   "books": [
+    "AF",
+    "AM",
+    "AR",
+    "CI",
+    "DL",
+    "GA",
+    "KE",
+    "KL",
+    "KQ",
+    "LA",
+    "ME",
+    "MF",
+    "MU",
+    "RO",
+    "SK",
+    "SV",
+    "UX",
+    "VN",
+    "VS",
+    "WS"
+   ],
+   "search": "Search delta.com with Shop with miles",
+   "home": "DL",
+   "cents": 1.2,
+   "dynamic": [
+    "AF",
+    "AM",
+    "AR",
+    "CI",
+    "DL",
+    "GA",
+    "KE",
+    "KL",
+    "KQ",
+    "LA",
+    "ME",
+    "MF",
+    "MU",
+    "RO",
+    "SK",
+    "SV",
+    "UX",
+    "VN",
+    "VS",
+    "WS"
+   ]
+  },
+  "af": {
+   "name": "Air France-KLM Flying Blue",
+   "currency": "miles",
+   "site": "flyingblue.com",
+   "books": [
+    "AF",
+    "AM",
+    "AR",
+    "CI",
+    "DL",
+    "GA",
+    "KE",
+    "KL",
+    "KQ",
+    "ME",
+    "MF",
+    "MU",
+    "RO",
+    "SK",
+    "SV",
+    "UX",
+    "VN",
+    "VS"
+   ],
+   "search": "Sign in on airfrance.com or klm.com and search with miles",
+   "home": "AF",
+   "cents": 1.4,
+   "dynamic": [
+    "AF",
+    "AM",
+    "AR",
+    "CI",
+    "DL",
+    "GA",
+    "KE",
+    "KL",
+    "KQ",
+    "ME",
+    "MF",
+    "MU",
+    "RO",
+    "SK",
+    "SV",
+    "UX",
+    "VN",
+    "VS"
+   ]
+  },
+  "ua": {
+   "name": "United MileagePlus",
+   "currency": "miles",
+   "site": "united.com",
+   "books": [
+    "A3",
+    "AC",
+    "AI",
+    "AV",
+    "AZ",
+    "BR",
+    "CA",
+    "CM",
+    "ET",
+    "LH",
+    "LO",
+    "LX",
+    "MS",
+    "NH",
+    "NZ",
+    "OS",
+    "OU",
+    "OZ",
+    "SA",
+    "SN",
+    "SQ",
+    "TG",
+    "TK",
+    "TP",
+    "UA",
+    "ZH"
+   ],
+   "search": "Search united.com with Book with miles",
+   "home": "UA",
+   "cents": 1.2,
+   "dynamic": [
+    "A3",
+    "AC",
+    "AI",
+    "AV",
+    "AZ",
+    "BR",
+    "CA",
+    "CM",
+    "ET",
+    "LH",
+    "LO",
+    "LX",
+    "MS",
+    "NH",
+    "NZ",
+    "OS",
+    "OU",
+    "OZ",
+    "SA",
+    "SN",
+    "SQ",
+    "TG",
+    "TK",
+    "TP",
+    "UA",
+    "ZH"
+   ]
+  },
+  "ac": {
+   "name": "Air Canada Aeroplan",
+   "currency": "points",
+   "site": "aircanada.com",
+   "books": [
+    "A3",
+    "AC",
+    "AI",
+    "AV",
+    "AZ",
+    "BR",
+    "CA",
+    "CM",
+    "EI",
+    "EK",
+    "ET",
+    "EY",
+    "FZ",
+    "LH",
+    "LO",
+    "LX",
+    "MS",
+    "NH",
+    "NZ",
+    "OS",
+    "OU",
+    "OZ",
+    "PR",
+    "SA",
+    "SN",
+    "SQ",
+    "TG",
+    "TK",
+    "TP",
+    "UA",
+    "ZH"
+   ],
+   "search": "Sign in on aircanada.com and search with Book with points",
+   "home": "AC",
+   "cents": 1.5,
+   "dynamic": [
+    "AC",
+    "UA",
+    "EK",
+    "EY",
+    "FZ",
+    "PR"
+   ]
+  },
+  "tk": {
+   "name": "Turkish Miles&Smiles",
+   "currency": "miles",
+   "site": "turkishairlines.com",
+   "books": [
+    "A3",
+    "AC",
+    "AI",
+    "AV",
+    "AZ",
+    "BR",
+    "CA",
+    "CM",
+    "ET",
+    "LH",
+    "LO",
+    "LX",
+    "MS",
+    "NH",
+    "NZ",
+    "OS",
+    "OU",
+    "OZ",
+    "SA",
+    "SN",
+    "SQ",
+    "TG",
+    "TK",
+    "TP",
+    "UA",
+    "ZH"
+   ],
+   "search": "Sign in on turkishairlines.com and search award tickets",
+   "home": "TK",
+   "cents": 1.1,
+   "dynamic": []
+  },
+  "lh": {
+   "name": "Lufthansa Miles & More",
+   "currency": "miles",
+   "site": "miles-and-more.com",
+   "books": [
+    "A3",
+    "AC",
+    "AI",
+    "AV",
+    "AZ",
+    "BR",
+    "CA",
+    "CM",
+    "ET",
+    "LH",
+    "LO",
+    "LX",
+    "MS",
+    "NH",
+    "NZ",
+    "OS",
+    "OU",
+    "OZ",
+    "SA",
+    "SN",
+    "SQ",
+    "TG",
+    "TK",
+    "TP",
+    "UA",
+    "ZH"
+   ],
+   "search": "Sign in on miles-and-more.com and search award flights",
+   "home": "LH",
+   "cents": null,
+   "dynamic": [
+    "LH",
+    "LX",
+    "OS",
+    "SN",
+    "EN"
+   ]
+  },
+  "nh": {
+   "name": "ANA Mileage Club",
+   "currency": "miles",
+   "site": "ana.co.jp",
+   "books": [
+    "A3",
+    "AC",
+    "AI",
+    "AV",
+    "AZ",
+    "BR",
+    "CA",
+    "CM",
+    "ET",
+    "EY",
+    "LH",
+    "LO",
+    "LX",
+    "MS",
+    "NH",
+    "NZ",
+    "OS",
+    "OU",
+    "OZ",
+    "PR",
+    "SA",
+    "SN",
+    "SQ",
+    "TG",
+    "TK",
+    "TP",
+    "UA",
+    "VA",
+    "VN",
+    "VS",
+    "ZH"
+   ],
+   "search": "Sign in on ana.co.jp and search partner award flights",
+   "home": "NH",
+   "cents": 1.4,
+   "dynamic": [
+    "NH"
+   ]
+  },
+  "sq": {
+   "name": "Singapore KrisFlyer",
+   "currency": "miles",
+   "site": "singaporeair.com",
+   "books": [
+    "A3",
+    "AC",
+    "AI",
+    "AV",
+    "AZ",
+    "BR",
+    "CA",
+    "CM",
+    "ET",
+    "LH",
+    "LO",
+    "LX",
+    "MS",
+    "NH",
+    "NZ",
+    "OS",
+    "OU",
+    "OZ",
+    "SA",
+    "SN",
+    "SQ",
+    "TG",
+    "TK",
+    "TP",
+    "UA",
+    "ZH"
+   ],
+   "search": "Sign in on singaporeair.com and search Redeem flights",
+   "home": "SQ",
+   "cents": 1.3,
+   "dynamic": [
+    "A3",
+    "AC",
+    "AI",
+    "AV",
+    "AZ",
+    "BR",
+    "CA",
+    "CM",
+    "ET",
+    "LH",
+    "LO",
+    "LX",
+    "MS",
+    "NH",
+    "NZ",
+    "OS",
+    "OU",
+    "OZ",
+    "SA",
+    "SN",
+    "TG",
+    "TK",
+    "TP",
+    "UA",
+    "ZH"
+   ]
+  },
+  "av": {
+   "name": "Avianca LifeMiles",
+   "currency": "miles",
+   "site": "lifemiles.com",
+   "books": [
+    "A3",
+    "AC",
+    "AI",
+    "AV",
+    "AZ",
+    "BR",
+    "CA",
+    "CM",
+    "ET",
+    "LH",
+    "LO",
+    "LX",
+    "MS",
+    "NH",
+    "NZ",
+    "OS",
+    "OU",
+    "OZ",
+    "SA",
+    "SN",
+    "SQ",
+    "TG",
+    "TK",
+    "TP",
+    "UA",
+    "ZH"
+   ],
+   "home": "AV",
+   "cents": 1.55,
+   "dynamic": [
+    "A3",
+    "AC",
+    "AI",
+    "AV",
+    "AZ",
+    "BR",
+    "CA",
+    "CM",
+    "ET",
+    "LH",
+    "LO",
+    "LX",
+    "MS",
+    "NH",
+    "NZ",
+    "OS",
+    "OU",
+    "OZ",
+    "SA",
+    "SN",
+    "SQ",
+    "TG",
+    "TK",
+    "TP",
+    "UA",
+    "ZH"
+   ]
+  },
+  "cx": {
+   "name": "Cathay Asia Miles",
+   "currency": "miles",
+   "site": "cathaypacific.com",
+   "books": [
+    "AA",
+    "AS",
+    "AT",
+    "AY",
+    "BA",
+    "CX",
+    "FJ",
+    "IB",
+    "JL",
+    "MH",
+    "QF",
+    "QR",
+    "RJ",
+    "UL",
+    "WY"
+   ],
+   "home": "CX",
+   "cents": 1.3,
+   "dynamic": [
+    "AA",
+    "AS",
+    "AT",
+    "AY",
+    "BA",
+    "CX",
+    "FJ",
+    "IB",
+    "JL",
+    "MH",
+    "QF",
+    "QR",
+    "RJ",
+    "UL",
+    "WY"
+   ]
+  },
+  "jl": {
+   "name": "JAL Mileage Bank",
+   "currency": "miles",
+   "site": "jal.co.jp",
+   "books": [
+    "AA",
+    "AS",
+    "AT",
+    "AY",
+    "BA",
+    "CX",
+    "FJ",
+    "IB",
+    "JL",
+    "MH",
+    "QF",
+    "QR",
+    "RJ",
+    "UL",
+    "WY"
+   ],
+   "home": "JL",
+   "cents": null,
+   "dynamic": [
+    "AA",
+    "AS",
+    "AT",
+    "AY",
+    "BA",
+    "CX",
+    "FJ",
+    "IB",
+    "JL",
+    "MH",
+    "QF",
+    "QR",
+    "RJ",
+    "UL",
+    "WY"
+   ]
+  },
+  "ek": {
+   "name": "Emirates Skywards",
+   "currency": "miles",
+   "site": "emirates.com",
+   "books": [
+    "EK"
+   ],
+   "home": "EK",
+   "cents": 1.2,
+   "dynamic": [
+    "EK"
+   ]
+  },
+  "ey": {
+   "name": "Etihad Guest",
+   "currency": "miles",
+   "site": "etihad.com",
+   "books": [
+    "EY"
+   ],
+   "home": "EY",
+   "cents": 1.2,
+   "dynamic": [
+    "EY"
+   ]
+  },
+  "br": {
+   "name": "EVA Infinity MileageLands",
+   "currency": "miles",
+   "site": "evaair.com",
+   "books": [
+    "A3",
+    "AC",
+    "AI",
+    "AV",
+    "AZ",
+    "BR",
+    "CA",
+    "CM",
+    "ET",
+    "LH",
+    "LO",
+    "LX",
+    "MS",
+    "NH",
+    "NZ",
+    "OS",
+    "OU",
+    "OZ",
+    "SA",
+    "SN",
+    "SQ",
+    "TG",
+    "TK",
+    "TP",
+    "UA",
+    "ZH"
+   ],
+   "home": "BR",
+   "cents": null,
+   "dynamic": [
+    "A3",
+    "AC",
+    "AI",
+    "AV",
+    "AZ",
+    "BR",
+    "CA",
+    "CM",
+    "ET",
+    "LH",
+    "LO",
+    "LX",
+    "MS",
+    "NH",
+    "NZ",
+    "OS",
+    "OU",
+    "OZ",
+    "SA",
+    "SN",
+    "SQ",
+    "TG",
+    "TK",
+    "TP",
+    "UA",
+    "ZH"
+   ]
+  },
+  "qf": {
+   "name": "Qantas Frequent Flyer",
+   "currency": "points",
+   "site": "qantas.com",
+   "books": [
+    "AA",
+    "AS",
+    "AT",
+    "AY",
+    "BA",
+    "CX",
+    "FJ",
+    "IB",
+    "JL",
+    "MH",
+    "QF",
+    "QR",
+    "RJ",
+    "UL",
+    "WY"
+   ],
+   "home": "QF",
+   "cents": 1.2,
+   "dynamic": [
+    "AA",
+    "AS",
+    "AT",
+    "AY",
+    "BA",
+    "CX",
+    "FJ",
+    "IB",
+    "JL",
+    "MH",
+    "QF",
+    "QR",
+    "RJ",
+    "UL",
+    "WY"
+   ]
+  },
+  "am": {
+   "name": "Aeromexico Rewards",
+   "currency": "points",
+   "site": "aeromexico.com",
+   "books": [
+    "AF",
+    "AM",
+    "AR",
+    "CI",
+    "DL",
+    "GA",
+    "KE",
+    "KL",
+    "KQ",
+    "ME",
+    "MF",
+    "MU",
+    "RO",
+    "SK",
+    "SV",
+    "UX",
+    "VN",
+    "VS"
+   ],
+   "home": "AM",
+   "cents": 0.8,
+   "dynamic": [
+    "AF",
+    "AM",
+    "AR",
+    "CI",
+    "DL",
+    "GA",
+    "KE",
+    "KL",
+    "KQ",
+    "ME",
+    "MF",
+    "MU",
+    "RO",
+    "SK",
+    "SV",
+    "UX",
+    "VN",
+    "VS"
+   ]
+  },
+  "tp": {
+   "name": "TAP Miles&Go",
+   "currency": "miles",
+   "site": "flytap.com",
+   "books": [
+    "A3",
+    "AC",
+    "AI",
+    "AV",
+    "AZ",
+    "BR",
+    "CA",
+    "CM",
+    "ET",
+    "LH",
+    "LO",
+    "LX",
+    "MS",
+    "NH",
+    "NZ",
+    "OS",
+    "OU",
+    "OZ",
+    "SA",
+    "SN",
+    "SQ",
+    "TG",
+    "TK",
+    "TP",
+    "UA",
+    "ZH"
+   ],
+   "home": "TP",
+   "cents": null,
+   "dynamic": [
+    "A3",
+    "AC",
+    "AI",
+    "AV",
+    "AZ",
+    "BR",
+    "CA",
+    "CM",
+    "ET",
+    "LH",
+    "LO",
+    "LX",
+    "MS",
+    "NH",
+    "NZ",
+    "OS",
+    "OU",
+    "OZ",
+    "SA",
+    "SN",
+    "SQ",
+    "TG",
+    "TK",
+    "TP",
+    "UA",
+    "ZH"
+   ]
+  },
+  "b6": {
+   "name": "JetBlue TrueBlue",
+   "currency": "points",
+   "site": "jetblue.com",
+   "books": [
+    "B6"
+   ],
+   "home": "B6",
+   "cents": 1.35,
+   "dynamic": [
+    "B6"
+   ]
+  },
+  "wn": {
+   "name": "Southwest Rapid Rewards",
+   "currency": "points",
+   "site": "southwest.com",
+   "books": [
+    "WN"
+   ],
+   "home": "WN",
+   "cents": 1.25,
+   "dynamic": [
+    "WN"
+   ]
+  },
+  "f9": {
+   "name": "Frontier Miles",
+   "currency": "miles",
+   "site": "flyfrontier.com",
+   "books": [
+    "F9"
+   ],
+   "home": "F9",
+   "cents": 1.3,
+   "dynamic": [
+    "F9"
+   ]
+  }
+ },
+ "avios_family": [
+  "ba",
+  "qr",
+  "ib",
+  "ei",
+  "ay"
+ ],
+ "charts": {
+  "ba-own": {
+   "programmes": [
+    "ba"
+   ],
+   "name": "British Airways' own flights",
+   "rule": "ba_own",
+   "url": "https://www.britishairways.com/content/the-british-airways-club/avios/spending-avios/reward-flights",
+   "as_of": "Head for Points table 'How many Avios do you need to fly to ....?' by Rob Burgess, published 2026-08-01, modified 2026-08-31 (https://www.headforpoints.com/2026/08/01/how-many-avios-do-you-need-to-fly-to/); reflects the 2025-12-15 Avios increase and the 2026-05-27 cash increase",
+   "tiers": [
+    {
+     "tier": 1,
+     "cities": [
+      "Aberdeen",
+      "Amsterdam",
+      "Basel",
+      "Belfast",
+      "Bergerac",
+      "Berlin",
+      "Billund",
+      "Bordeaux",
+      "Brussels",
+      "Chambery",
+      "Copenhagen",
+      "Dublin",
+      "Düsseldorf",
+      "Edinburgh",
+      "Frankfurt",
+      "Geneva",
+      "Glasgow",
+      "Gothenburg",
+      "Guernsey",
+      "Hamburg",
+      "Hannover",
+      "Innsbruck",
+      "Inverness",
+      "Jersey",
+      "Luxembourg",
+      "Lyon",
+      "Manchester",
+      "Marseille",
+      "Milan",
+      "Montpellier",
+      "Munich",
+      "Newcastle",
+      "Nice",
+      "Nuremberg",
+      "Paris",
+      "Prague",
+      "Rotterdam",
+      "Salzburg",
+      "San Sebastian",
+      "Toulouse",
+      "Turin",
+      "Zurich"
+     ],
+     "off-peak": {
+      "economy": 10000,
+      "business": 16500
+     },
+     "peak": {
+      "economy": 10750,
+      "business": 18000
+     }
+    },
+    {
+     "tier": 2,
+     "cities": [
+      "Algiers",
+      "Alicante",
+      "Barcelona",
+      "Bari",
+      "Bastia",
+      "Bologna",
+      "Brindisi",
+      "Budapest",
+      "Cagliari",
+      "Dubrovnik",
+      "Faro",
+      "Figari",
+      "Florence",
+      "Gibraltar",
+      "Ibiza",
+      "Krakow",
+      "Lisbon",
+      "Ljubljana",
+      "Madrid",
+      "Malaga",
+      "Menorca",
+      "Naples",
+      "Olbia",
+      "Oslo",
+      "Palermo",
+      "Palma",
+      "Perugia",
+      "Pisa",
+      "Porto",
+      "Rimini",
+      "Rome",
+      "Salerno",
+      "Seville",
+      "Split",
+      "Stockholm",
+      "Tivat",
+      "Valencia",
+      "Venice",
+      "Verona",
+      "Vienna",
+      "Warsaw",
+      "Zagreb"
+     ],
+     "off-peak": {
+      "economy": 13000,
+      "business": 22000
+     },
+     "peak": {
+      "economy": 14000,
+      "business": 24500
+     }
+    },
+    {
+     "tier": 3,
+     "cities": [
+      "Agadir",
+      "Amman",
+      "Antalya",
+      "Athens",
+      "Bodrum",
+      "Bucharest",
+      "Cairo",
+      "Catania",
+      "Chania",
+      "Corfu",
+      "Dalaman",
+      "Funchal",
+      "Gran Canaria",
+      "Istanbul",
+      "Ivalo",
+      "Kefalonia",
+      "Kos",
+      "Lanzarote",
+      "Larnaca",
+      "Malta",
+      "Marrakech",
+      "Mykonos",
+      "Paphos",
+      "Ponta Delgada",
+      "Preveza Lefkada",
+      "Rabat",
+      "Reykjavik",
+      "Rhodes",
+      "Santorini",
+      "Sharm El Sheikh",
+      "Skiathos",
+      "Sofia",
+      "Tbilisi",
+      "Tel Aviv",
+      "Tenerife",
+      "Thessaloniki",
+      "Tirana",
+      "Tromso",
+      "Zakynthos"
+     ],
+     "off-peak": {
+      "economy": 15000,
+      "business": 26750
+     },
+     "peak": {
+      "economy": 16750,
+      "business": 30000
+     }
+    },
+    {
+     "tier": 4,
+     "cities": [
+      "Abuja"
+     ],
+     "off-peak": {
+      "economy": 24750,
+      "premium_economy": 41250,
+      "business": 77000
+     },
+     "peak": {
+      "economy": 30250,
+      "premium_economy": 52250,
+      "business": 88000
+     }
+    },
+    {
+     "tier": 5,
+     "cities": [
+      "Abu Dhabi",
+      "Accra",
+      "Bahrain",
+      "Baltimore",
+      "Bermuda",
+      "Boston",
+      "Chicago",
+      "Cincinnati",
+      "Doha",
+      "Dubai",
+      "Islamabad",
+      "Lagos",
+      "Montreal",
+      "New York",
+      "Philadelphia",
+      "Pittsburgh",
+      "Riyadh",
+      "Toronto",
+      "Washington DC"
+     ],
+     "off-peak": {
+      "economy": 27500,
+      "premium_economy": 46750,
+      "business": 88000
+     },
+     "peak": {
+      "economy": 33000,
+      "premium_economy": 66000,
+      "business": 99000
+     }
+    },
+    {
+     "tier": 6,
+     "cities": [
+      "Antigua",
+      "Atlanta",
+      "Austin",
+      "Barbados",
+      "Bengalaru",
+      "Cancun",
+      "Cape Town",
+      "Chennai",
+      "Colombo",
+      "Dallas",
+      "Delhi",
+      "Denver",
+      "Georgetown (Guyana)",
+      "Grand Cayman",
+      "Grenada",
+      "Houston",
+      "Hyderabad",
+      "Johannesburg",
+      "Kingston",
+      "Las Vegas",
+      "Los Angeles",
+      "Male",
+      "Mexico City",
+      "Miami",
+      "Mumbai",
+      "Nairobi",
+      "Nashville",
+      "Nassau",
+      "New Orleans",
+      "Orlando",
+      "Phoenix",
+      "Port of Spain",
+      "Portland (Oregon)",
+      "Punta Cana",
+      "San Diego",
+      "San Francisco",
+      "San Jose (C’Rica)",
+      "Seattle",
+      "St Kitts",
+      "St Louis",
+      "St Lucia",
+      "Tampa",
+      "Tobago",
+      "Turks and Caicos",
+      "Vancouver"
+     ],
+     "off-peak": {
+      "economy": 33000,
+      "premium_economy": 52250,
+      "business": 99000
+     },
+     "peak": {
+      "economy": 38500,
+      "premium_economy": 74250,
+      "business": 110000
+     }
+    },
+    {
+     "tier": 7,
+     "cities": [
+      "Bangkok",
+      "Hong Kong",
+      "Mauritius",
+      "Rio De Janeiro",
+      "Sao Paulo",
+      "Shanghai",
+      "Tokyo"
+     ],
+     "off-peak": {
+      "economy": 38500,
+      "premium_economy": 55000,
+      "business": 110000
+     },
+     "peak": {
+      "economy": 44000,
+      "premium_economy": 85250,
+      "business": 121000
+     }
+    },
+    {
+     "tier": 8,
+     "cities": [
+      "Buenos Aires",
+      "Kuala Lumpur",
+      "Santiago",
+      "Singapore"
+     ],
+     "off-peak": {
+      "economy": 44000,
+      "premium_economy": 60500,
+      "business": 121000
+     },
+     "peak": {
+      "economy": 49500,
+      "premium_economy": 88000,
+      "business": 132000
+     }
+    },
+    {
+     "tier": 9,
+     "cities": [
+      "Melbourne",
+      "Sydney"
+     ],
+     "off-peak": {
+      "economy": 55000,
+      "premium_economy": 88000,
+      "business": 159500
+     },
+     "peak": {
+      "economy": 60500,
+      "premium_economy": 126500,
+      "business": 187000
+     }
+    }
+   ],
+   "season": "BA's peak and off-peak calendar",
+   "surcharge": "high",
+   "fees": "plus BA's fixed cash charge per flight, several hundred dollars across the Atlantic (AwardWallet)",
+   "secondary": true
+  },
+  "ba-partner": {
+   "programmes": [
+    "ba"
+   ],
+   "name": "British Airways Avios on one partner airline",
+   "rule": "ba_partner",
+   "url": "https://www.britishairways.com/content/the-british-airways-club/avios/spending-avios/reward-flights",
+   "as_of": "Verylvke, 'BA Avios partner award devaluation (full chart included)', 2025-12-19 (https://www.verylvke.com/en/2025/12/19/ba-avios-partner-award-devaluation-full-chart-included/); zones 1-4 corroborated by The MileLion, 2025-12-16 (https://milelion.com/2025/12/16/details-british-airways-avios-award-devaluation/); per flight and additive, and within North America the first band prices as the second (The MileLion, 2025-12-16)",
+   "groups": {
+    "AA/AS": [
+     {
+      "min": 1,
+      "max": 650,
+      "economy": 13500,
+      "business": 26500
+     },
+     {
+      "min": 651,
+      "max": 1150,
+      "economy": 18000,
+      "business": 35500
+     },
+     {
+      "min": 1151,
+      "max": 2000,
+      "economy": 20000,
+      "business": 44000
+     },
+     {
+      "min": 2001,
+      "max": 3000,
+      "economy": 22000,
+      "business": 55000
+     }
+    ],
+    "other": [
+     {
+      "min": 1,
+      "max": 650,
+      "economy": 6500,
+      "business": 14000
+     },
+     {
+      "min": 651,
+      "max": 1150,
+      "economy": 10000,
+      "business": 18500
+     },
+     {
+      "min": 1151,
+      "max": 2000,
+      "economy": 12500,
+      "business": 24500
+     },
+     {
+      "min": 2001,
+      "max": 3000,
+      "economy": 14500,
+      "business": 43000
+     }
+    ],
+    "CX/CZ": [
+     {
+      "min": 1,
+      "max": 650,
+      "economy": 11000,
+      "business": 23000
+     },
+     {
+      "min": 651,
+      "max": 1150,
+      "economy": 13500,
+      "business": 33000
+     },
+     {
+      "min": 1151,
+      "max": 2000,
+      "economy": 16000,
+      "business": 36000
+     },
+     {
+      "min": 2001,
+      "max": 3000,
+      "economy": 17500,
+      "business": 51500
+     }
+    ],
+    "JL": [
+     {
+      "min": 1,
+      "max": 650,
+      "economy": 12000,
+      "business": 19500
+     },
+     {
+      "min": 651,
+      "max": 1150,
+      "economy": 12500,
+      "business": 29500
+     },
+     {
+      "min": 1151,
+      "max": 2000,
+      "economy": 16000,
+      "business": 34500
+     },
+     {
+      "min": 2001,
+      "max": 3000,
+      "economy": 17500,
+      "business": 51500
+     }
+    ],
+    "all": [
+     {
+      "min": 3001,
+      "max": 4000,
+      "economy": 23000,
+      "business": 68500
+     },
+     {
+      "min": 4001,
+      "max": 5500,
+      "economy": 28500,
+      "business": 85000
+     },
+     {
+      "min": 5501,
+      "max": 6500,
+      "economy": 34500,
+      "business": 102500
+     },
+     {
+      "min": 6501,
+      "max": 7000,
+      "economy": 40000,
+      "business": 120000
+     },
+     {
+      "min": 7001,
+      "max": null,
+      "economy": 57000,
+      "business": 170000
+     }
+    ]
+   },
+   "partners": [
+    "AA",
+    "AS",
+    "AT",
+    "CX",
+    "CZ",
+    "FJ",
+    "JL",
+    "MH",
+    "QF",
+    "RJ",
+    "UL",
+    "WY"
+   ],
+   "surcharge": "may",
+   "fees": "plus the airline's taxes and charges, which vary by airline and route",
+   "caveat": "American and Alaska: the two sources disagree below 3,000 miles; this uses the higher",
+   "secondary": true
+  },
+  "ib-own": {
+   "programmes": [
+    "ib",
+    "ba"
+   ],
+   "name": "Iberia's own flights",
+   "rule": "distance_season",
+   "url": "https://www.headforpoints.com/2025/06/23/iberia-devalues-avios-reward-chart/",
+   "as_of": "Head for Points, 'Iberia devalues its Avios reward chart by up to 20%', published 2025-06-23, modified 2026-07-13; chart in force from the start of June 2025. iberia.com returned 403 to every request on 2026-09-24, so the chart could not be read at source.",
+   "operators": [
+    "IB"
+   ],
+   "nonstop": true,
+   "bands": {
+    "off-peak": [
+     {
+      "min": 1,
+      "max": 650,
+      "economy": 3500,
+      "business": 9750
+     },
+     {
+      "min": 651,
+      "max": 1150,
+      "economy": 6500,
+      "business": 16500
+     },
+     {
+      "min": 1151,
+      "max": 2000,
+      "economy": 9500,
+      "business": 22000
+     },
+     {
+      "min": 2001,
+      "max": 3000,
+      "economy": 10500,
+      "business": 23000
+     },
+     {
+      "min": 3001,
+      "max": 4000,
+      "economy": 16000,
+      "premium_economy": 29500,
+      "business": 40500
+     },
+     {
+      "min": 4001,
+      "max": 5500,
+      "economy": 20000,
+      "premium_economy": 36750,
+      "business": 50500
+     },
+     {
+      "min": 5501,
+      "max": 6500,
+      "economy": 24000,
+      "premium_economy": 44000,
+      "business": 60500
+     },
+     {
+      "min": 6501,
+      "max": 7000,
+      "economy": 28250,
+      "premium_economy": 51000,
+      "business": 70500
+     },
+     {
+      "min": 7001,
+      "max": null,
+      "economy": 41000,
+      "premium_economy": 71000,
+      "business": 97000
+     }
+    ],
+    "peak": [
+     {
+      "min": 1,
+      "max": 650,
+      "economy": 4750,
+      "business": 11500
+     },
+     {
+      "min": 651,
+      "max": 1150,
+      "economy": 8000,
+      "business": 18250
+     },
+     {
+      "min": 1151,
+      "max": 2000,
+      "economy": 10750,
+      "business": 24000
+     },
+     {
+      "min": 2001,
+      "max": 3000,
+      "economy": 12000,
+      "business": 31000
+     },
+     {
+      "min": 3001,
+      "max": 4000,
+      "economy": 19500,
+      "premium_economy": 40250,
+      "business": 59000
+     },
+     {
+      "min": 4001,
+      "max": 5500,
+      "economy": 24250,
+      "premium_economy": 50500,
+      "business": 74000
+     },
+     {
+      "min": 5501,
+      "max": 6500,
+      "economy": 29250,
+      "premium_economy": 60500,
+      "business": 88000
+     },
+     {
+      "min": 6501,
+      "max": 7000,
+      "economy": 34250,
+      "premium_economy": 70500,
+      "business": 103500
+     },
+     {
+      "min": 7001,
+      "max": null,
+      "economy": 49250,
+      "premium_economy": 97000,
+      "business": 140000
+     }
+    ]
+   },
+   "season": "Iberia's peak and off-peak calendar",
+   "surcharge": "low",
+   "fees": "plus taxes and carrier charges, which Head for Points calls low",
+   "exclude_routes": [
+    [
+     "LHR",
+     "MAD"
+    ],
+    [
+     "LGW",
+     "MAD"
+    ],
+    [
+     "MAD",
+     "BCN"
+    ]
+   ],
+   "secondary": true
+  },
+  "as-partner": {
+   "programmes": [
+    "as"
+   ],
+   "name": "Atmos Rewards on partner airlines",
+   "rule": "atmos_partner",
+   "url": "https://www.alaskaair.com/atmosrewards/content/use-points/award-charts",
+   "as_of": "alaskaair.com award-charts page as archived 2026-09-13 (chart blocks last updated 2026-05-06); the live page is behind a JavaScript challenge",
+   "operators": [
+    "AA",
+    "AT",
+    "AY",
+    "BA",
+    "CX",
+    "EI",
+    "FI",
+    "FJ",
+    "IB",
+    "JL",
+    "MH",
+    "QF",
+    "QR",
+    "RJ",
+    "UL",
+    "WY"
+   ],
+   "nonstop": true,
+   "floor": true,
+   "regions": {
+    "Americas": [
+     {
+      "min": 0,
+      "max": 700,
+      "economy": 4500,
+      "premium_economy": 6000,
+      "business": 9000,
+      "first": 13500
+     },
+     {
+      "min": 701,
+      "max": 1400,
+      "economy": 7500,
+      "premium_economy": 10000,
+      "business": 15000,
+      "first": 25000
+     },
+     {
+      "min": 1401,
+      "max": 2100,
+      "economy": 12500,
+      "premium_economy": 17500,
+      "business": 25000,
+      "first": 40000
+     },
+     {
+      "min": 2101,
+      "max": 4000,
+      "economy": 17500,
+      "premium_economy": 22500,
+      "business": 35000,
+      "first": 52500
+     },
+     {
+      "min": 4001,
+      "max": 6000,
+      "economy": 25000,
+      "premium_economy": 32500,
+      "business": 50000,
+      "first": 75000
+     },
+     {
+      "min": 6001,
+      "max": null,
+      "economy": 30000,
+      "premium_economy": 40000,
+      "business": 60000,
+      "first": 90000
+     }
+    ],
+    "Europe, Middle East, Africa": [
+     {
+      "min": 0,
+      "max": 1500,
+      "economy": 7500,
+      "premium_economy": 10000,
+      "business": 15000,
+      "first": 22500
+     },
+     {
+      "min": 1501,
+      "max": 3500,
+      "economy": 22500,
+      "premium_economy": 30000,
+      "business": 45000,
+      "first": 67500
+     },
+     {
+      "min": 3501,
+      "max": 5000,
+      "economy": 27500,
+      "premium_economy": 35000,
+      "business": 55000,
+      "first": 82500
+     },
+     {
+      "min": 5001,
+      "max": 7000,
+      "economy": 35000,
+      "premium_economy": 45000,
+      "business": 70000,
+      "first": 105000
+     },
+     {
+      "min": 7001,
+      "max": 10000,
+      "economy": 42500,
+      "premium_economy": 55000,
+      "business": 85000,
+      "first": 130000
+     },
+     {
+      "min": 10000,
+      "max": null,
+      "economy": 55000,
+      "premium_economy": 72500,
+      "business": 110000,
+      "first": 165000
+     }
+    ],
+    "Asia Pacific": [
+     {
+      "min": 0,
+      "max": 1500,
+      "economy": 7500,
+      "premium_economy": 10000,
+      "business": 15000,
+      "first": 22500
+     },
+     {
+      "min": 1501,
+      "max": 3000,
+      "economy": 25000,
+      "premium_economy": 32500,
+      "business": 50000,
+      "first": 75000
+     },
+     {
+      "min": 3001,
+      "max": 5000,
+      "economy": 30000,
+      "premium_economy": 40000,
+      "business": 60000,
+      "first": 90000
+     },
+     {
+      "min": 5001,
+      "max": 7000,
+      "economy": 37500,
+      "premium_economy": 50000,
+      "business": 75000,
+      "first": 110000
+     },
+     {
+      "min": 7001,
+      "max": 10000,
+      "economy": 42500,
+      "premium_economy": 55000,
+      "business": 85000,
+      "first": 130000
+     },
+     {
+      "min": 10000,
+      "max": null,
+      "economy": 65000,
+      "premium_economy": 85000,
+      "business": 130000,
+      "first": 195000
+     }
+    ]
+   },
+   "fee_usd": 25.6,
+   "surcharge": "may",
+   "fees": "plus taxes from $5.60 and a $20 partner award fee each way (Summit cardholders skip the fee)"
+  },
+  "as-own": {
+   "programmes": [
+    "as"
+   ],
+   "name": "Alaska and Hawaiian flights",
+   "rule": "distance",
+   "url": "https://www.alaskaair.com/atmosrewards/content/use-points/award-charts",
+   "as_of": "alaskaair.com as archived 2026-09-13 (block updated 2026-05-05)",
+   "operators": [
+    "AS",
+    "HA"
+   ],
+   "nonstop": true,
+   "floor": true,
+   "business_as": "first",
+   "bands": [
+    {
+     "min": 0,
+     "max": 700,
+     "economy": 4500,
+     "first": 15000
+    },
+    {
+     "min": 701,
+     "max": 1400,
+     "economy": 7500,
+     "first": 25000
+    },
+    {
+     "min": 1401,
+     "max": 2100,
+     "economy": 10000,
+     "first": 25000
+    },
+    {
+     "min": 2101,
+     "max": 3500,
+     "economy": 12500,
+     "first": 30000
+    },
+    {
+     "min": 3501,
+     "max": null,
+     "economy": 20000,
+     "first": 60000
+    }
+   ],
+   "fee_usd": 5.6,
+   "surcharge": "none",
+   "fees": "plus taxes from $5.60 each way"
+  },
+  "aa-partner": {
+   "programmes": [
+    "aa"
+   ],
+   "name": "AAdvantage on partner airlines",
+   "rule": "aa_partner",
+   "url": "https://www.aa.com/web/i18n/aadvantage-program/use-miles/partner-airline-flights.html",
+   "as_of": "Figures: AwardWallet, 'American Airlines Award Chart' by Brie Bash, 2026-07-05 (https://awardwallet.com/airlines/american-aadvantage/aa-award-chart/). Region definitions, off-peak dates and rules: aa.com partner page as archived 2026-09-15 (aa.com itself returned 403, and its chart loads from a JSON file that could not be fetched).",
+   "operators": [
+    "AS",
+    "BA",
+    "CX",
+    "CZ",
+    "EI",
+    "EY",
+    "FJ",
+    "AY",
+    "G3",
+    "HA",
+    "IB",
+    "JL",
+    "JA",
+    "MH",
+    "WY",
+    "QF",
+    "QR",
+    "AT",
+    "RJ",
+    "UL",
+    "TN"
+   ],
+   "regions": {
+    "Contiguous 48 US & Canada": {
+     "standard": {
+      "economy": 12500,
+      "premium_economy": 22500,
+      "business": 25000,
+      "first": 50000
+     }
+    },
+    "Alaska": {
+     "standard": {
+      "economy": 15000,
+      "premium_economy": 25000,
+      "business": 30000,
+      "first": 55000
+     }
+    },
+    "Hawaii": {
+     "standard": {
+      "economy": 22500,
+      "premium_economy": 50000,
+      "business": 55000,
+      "first": 80000
+     }
+    },
+    "Caribbean": {
+     "standard": {
+      "economy": 17500,
+      "business": 27500,
+      "first": 52500
+     }
+    },
+    "Mexico": {
+     "standard": {
+      "economy": 17500,
+      "business": 27500,
+      "first": 52500
+     }
+    },
+    "Central America": {
+     "standard": {
+      "economy": 17500,
+      "business": 27500,
+      "first": 52500
+     }
+    },
+    "South America Region 1": {
+     "standard": {
+      "economy": 20000,
+      "business": 30000,
+      "first": 55000
+     }
+    },
+    "South America Region 2": {
+     "standard": {
+      "economy": 30000,
+      "premium_economy": 40000,
+      "business": 57500,
+      "first": 85000
+     }
+    },
+    "Europe": {
+     "standard": {
+      "economy": 30000,
+      "premium_economy": 40000,
+      "business": 57500,
+      "first": 85000
+     },
+     "off-peak": {
+      "economy": 22500
+     }
+    },
+    "Middle East": {
+     "standard": {
+      "economy": 40000,
+      "premium_economy": 62500,
+      "business": 70000,
+      "first": 115000
+     }
+    },
+    "Indian Subcontinent": {
+     "standard": {
+      "economy": 40000,
+      "premium_economy": 62500,
+      "business": 70000,
+      "first": 115000
+     }
+    },
+    "Africa": {
+     "standard": {
+      "economy": 40000,
+      "premium_economy": 65000,
+      "business": 75000,
+      "first": 120000
+     }
+    },
+    "Asia Region 1": {
+     "standard": {
+      "economy": 35000,
+      "premium_economy": 50000,
+      "business": 60000,
+      "first": 80000
+     }
+    },
+    "Asia Region 2": {
+     "standard": {
+      "economy": 37500,
+      "premium_economy": 50000,
+      "business": 70000,
+      "first": 110000
+     }
+    },
+    "South Pacific": {
+     "standard": {
+      "economy": 40000,
+      "premium_economy": 65000,
+      "business": 80000,
+      "first": 110000
+     }
+    }
+   },
+   "europe_offpeak": [
+    [
+     "01-10",
+     "03-14"
+    ],
+    [
+     "11-01",
+     "12-14"
+    ]
+   ],
+   "floor": true,
+   "surcharge": "may",
+   "surcharge_high": [
+    "BA"
+   ],
+   "fees": "plus taxes and the airline's carrier charges; on British Airways to and from Europe they run to several hundred dollars (AwardWallet)",
+   "secondary": true
+  },
+  "ac-partner": {
+   "programmes": [
+    "ac"
+   ],
+   "name": "Aeroplan on partner airlines",
+   "rule": "aeroplan",
+   "url": "https://www.aircanada.com/content/dam/aircanada/loyalty-content/documents/flight-rewards-chart-en.pdf",
+   "as_of": "Flight Reward Chart 2026-08 (PDF created 2026-08-17), read 2026-09-24; partner prices changed for tickets booked or reissued on/after 2026-06-01",
+   "operators": [
+    "A3",
+    "AI",
+    "AV",
+    "AZ",
+    "BR",
+    "CA",
+    "CM",
+    "ET",
+    "LH",
+    "LO",
+    "LX",
+    "MS",
+    "NH",
+    "NZ",
+    "OS",
+    "OU",
+    "OZ",
+    "SA",
+    "SN",
+    "SQ",
+    "TG",
+    "TK",
+    "TP",
+    "ZH"
+   ],
+   "rows": [
+    {
+     "a": "North America",
+     "b": "North America",
+     "min": 0,
+     "max": 500,
+     "economy": 6000,
+     "business": 15000
+    },
+    {
+     "a": "North America",
+     "b": "North America",
+     "min": 501,
+     "max": 1500,
+     "economy": 10000,
+     "business": 20000
+    },
+    {
+     "a": "North America",
+     "b": "North America",
+     "min": 1501,
+     "max": 2750,
+     "economy": 12500,
+     "business": 25000
+    },
+    {
+     "a": "North America",
+     "b": "North America",
+     "min": 2751,
+     "max": null,
+     "economy": 22500,
+     "business": 35000
+    },
+    {
+     "a": "North America",
+     "b": "Atlantic",
+     "min": 0,
+     "max": 4000,
+     "economy": 32500,
+     "business": 60000,
+     "first": 90000
+    },
+    {
+     "a": "North America",
+     "b": "Atlantic",
+     "min": 4001,
+     "max": 6000,
+     "economy": 42500,
+     "business": 75000,
+     "first": 120000
+    },
+    {
+     "a": "North America",
+     "b": "Atlantic",
+     "min": 6001,
+     "max": 8000,
+     "economy": 60000,
+     "business": 90000,
+     "first": 150000
+    },
+    {
+     "a": "North America",
+     "b": "Atlantic",
+     "min": 8001,
+     "max": null,
+     "economy": 75000,
+     "business": 110000,
+     "first": 165000
+    },
+    {
+     "a": "North America",
+     "b": "Pacific",
+     "min": 0,
+     "max": 5000,
+     "economy": 32500,
+     "business": 55000,
+     "first": 90000
+    },
+    {
+     "a": "North America",
+     "b": "Pacific",
+     "min": 5001,
+     "max": 7500,
+     "economy": 50000,
+     "business": 85000,
+     "first": 120000
+    },
+    {
+     "a": "North America",
+     "b": "Pacific",
+     "min": 7501,
+     "max": 11000,
+     "economy": 65000,
+     "business": 102500,
+     "first": 140000
+    },
+    {
+     "a": "North America",
+     "b": "Pacific",
+     "min": 11001,
+     "max": null,
+     "economy": 70000,
+     "business": 115000,
+     "first": 150000
+    },
+    {
+     "a": "North America",
+     "b": "South America",
+     "min": 0,
+     "max": 2500,
+     "economy": 20000,
+     "business": 40000,
+     "first": 60000
+    },
+    {
+     "a": "North America",
+     "b": "South America",
+     "min": 2501,
+     "max": 4500,
+     "economy": 30000,
+     "business": 50000,
+     "first": 80000
+    },
+    {
+     "a": "North America",
+     "b": "South America",
+     "min": 4501,
+     "max": null,
+     "economy": 40000,
+     "business": 60000,
+     "first": 100000
+    },
+    {
+     "a": "Atlantic",
+     "b": "Atlantic",
+     "min": 0,
+     "max": 1000,
+     "economy": 7500,
+     "business": 12500,
+     "first": 25000
+    },
+    {
+     "a": "Atlantic",
+     "b": "Atlantic",
+     "min": 1001,
+     "max": 2000,
+     "economy": 15000,
+     "business": 22500,
+     "first": 40000
+    },
+    {
+     "a": "Atlantic",
+     "b": "Atlantic",
+     "min": 2001,
+     "max": 4000,
+     "economy": 30000,
+     "business": 40000,
+     "first": 75000
+    },
+    {
+     "a": "Atlantic",
+     "b": "Atlantic",
+     "min": 4001,
+     "max": 6000,
+     "economy": 42500,
+     "business": 70000,
+     "first": 100000
+    },
+    {
+     "a": "Atlantic",
+     "b": "Atlantic",
+     "min": 6001,
+     "max": null,
+     "economy": 50000,
+     "business": 95000,
+     "first": 130000
+    },
+    {
+     "a": "Pacific",
+     "b": "Pacific",
+     "min": 0,
+     "max": 1000,
+     "economy": 8000,
+     "business": 20000,
+     "first": 25000
+    },
+    {
+     "a": "Pacific",
+     "b": "Pacific",
+     "min": 1001,
+     "max": 2000,
+     "economy": 15000,
+     "business": 30000,
+     "first": 50000
+    },
+    {
+     "a": "Pacific",
+     "b": "Pacific",
+     "min": 2001,
+     "max": 5000,
+     "economy": 30000,
+     "business": 52500,
+     "first": 60000
+    },
+    {
+     "a": "Pacific",
+     "b": "Pacific",
+     "min": 5001,
+     "max": 7000,
+     "economy": 35000,
+     "business": 72500,
+     "first": 80000
+    },
+    {
+     "a": "Pacific",
+     "b": "Pacific",
+     "min": 7001,
+     "max": null,
+     "economy": 50000,
+     "business": 85000,
+     "first": 130000
+    },
+    {
+     "a": "Atlantic",
+     "b": "Pacific",
+     "min": 0,
+     "max": 2500,
+     "economy": 25000,
+     "business": 47500,
+     "first": 55000
+    },
+    {
+     "a": "Atlantic",
+     "b": "Pacific",
+     "min": 2501,
+     "max": 5000,
+     "economy": 40000,
+     "business": 75000,
+     "first": 95000
+    },
+    {
+     "a": "Atlantic",
+     "b": "Pacific",
+     "min": 5001,
+     "max": 7000,
+     "economy": 60000,
+     "business": 92500,
+     "first": 120000
+    },
+    {
+     "a": "Atlantic",
+     "b": "Pacific",
+     "min": 7001,
+     "max": null,
+     "economy": 75000,
+     "business": 130000,
+     "first": 150000
+    },
+    {
+     "a": "South America",
+     "b": "South America",
+     "min": 0,
+     "max": 1600,
+     "economy": 10000,
+     "business": 20000,
+     "first": 30000
+    },
+    {
+     "a": "South America",
+     "b": "South America",
+     "min": 1601,
+     "max": null,
+     "economy": 20000,
+     "business": 35000,
+     "first": 50000
+    },
+    {
+     "a": "Atlantic",
+     "b": "South America",
+     "min": 0,
+     "max": 7000,
+     "economy": 45000,
+     "business": 80000,
+     "first": 100000
+    },
+    {
+     "a": "Atlantic",
+     "b": "South America",
+     "min": 7001,
+     "max": null,
+     "economy": 60000,
+     "business": 100000,
+     "first": 130000
+    },
+    {
+     "a": "Pacific",
+     "b": "South America",
+     "min": 0,
+     "max": 11000,
+     "economy": 60000,
+     "business": 90000,
+     "first": 130000
+    },
+    {
+     "a": "Pacific",
+     "b": "South America",
+     "min": 11001,
+     "max": null,
+     "economy": 80000,
+     "business": 140000,
+     "first": 200000
+    }
+   ],
+   "fee": {
+    "amount": 39,
+    "currency": "CAD"
+   },
+   "surcharge": "may",
+   "fees": "plus a CA$39 partner booking fee and taxes"
+  },
+  "nh-partner": {
+   "programmes": [
+    "nh"
+   ],
+   "name": "ANA miles on partner airlines",
+   "rule": "zones",
+   "zoneset": "ana",
+   "url": "https://www.ana.co.jp/en/jp/guide/amc/award/tk/zone/",
+   "as_of": "ana.co.jp read 2026-09-24; one-way chart 'available for reservations and tickets issued on/after June 24, 2025'",
+   "operators": [
+    "A3",
+    "AC",
+    "AI",
+    "AV",
+    "AZ",
+    "BR",
+    "CA",
+    "CM",
+    "ET",
+    "LH",
+    "LO",
+    "LX",
+    "MS",
+    "NZ",
+    "OS",
+    "OU",
+    "OZ",
+    "SA",
+    "SN",
+    "SQ",
+    "TG",
+    "TK",
+    "TP",
+    "UA",
+    "ZH"
+   ],
+   "rows": [
+    {
+     "a": "Japan (Zone 1-B)",
+     "b": "South Korea, Russia 1 (Zone 2)",
+     "economy": 9000,
+     "business": 16500,
+     "first": 27000
+    },
+    {
+     "a": "Japan (Zone 1-B)",
+     "b": "Asia 1 (Zone 3)",
+     "economy": 11500,
+     "business": 21500,
+     "first": 34500
+    },
+    {
+     "a": "Japan (Zone 1-B)",
+     "b": "Asia 2, Russia 3 (Zone 4)",
+     "economy": 19000,
+     "business": 31500,
+     "first": 57000
+    },
+    {
+     "a": "Japan (Zone 1-B)",
+     "b": "Hawaii (Zone 5)",
+     "economy": 21500,
+     "business": 44500,
+     "first": 75500
+    },
+    {
+     "a": "Japan (Zone 1-B)",
+     "b": "North America (Zone 6)",
+     "economy": 27500,
+     "business": 58500,
+     "first": 93500
+    },
+    {
+     "a": "Japan (Zone 1-B)",
+     "b": "Europe, Russia 2 (Zone 7)",
+     "economy": 31000,
+     "business": 60500,
+     "first": 103500
+    },
+    {
+     "a": "Japan (Zone 1-B)",
+     "b": "Africa and the Middle East (Zone 8)",
+     "economy": 50000,
+     "business": 92500,
+     "first": 145000
+    },
+    {
+     "a": "Japan (Zone 1-B)",
+     "b": "Central and South America (Zone 9)",
+     "economy": 57500,
+     "business": 97500,
+     "first": 163500
+    },
+    {
+     "a": "Japan (Zone 1-B)",
+     "b": "Oceania, Micronesia (Zone 10)",
+     "economy": 25000,
+     "business": 45500,
+     "first": 75000
+    },
+    {
+     "a": "South Korea, Russia 1 (Zone 2)",
+     "b": "South Korea, Russia 1 (Zone 2)",
+     "economy": 7500,
+     "business": 15000,
+     "first": 22500
+    },
+    {
+     "a": "South Korea, Russia 1 (Zone 2)",
+     "b": "Asia 1 (Zone 3)",
+     "economy": 11000,
+     "business": 21000,
+     "first": 33000
+    },
+    {
+     "a": "South Korea, Russia 1 (Zone 2)",
+     "b": "Asia 2, Russia 3 (Zone 4)",
+     "economy": 18500,
+     "business": 31000,
+     "first": 55500
+    },
+    {
+     "a": "South Korea, Russia 1 (Zone 2)",
+     "b": "Hawaii (Zone 5)",
+     "economy": 27500,
+     "business": 55500,
+     "first": 96500
+    },
+    {
+     "a": "South Korea, Russia 1 (Zone 2)",
+     "b": "North America (Zone 6)",
+     "economy": 30000,
+     "business": 65000,
+     "first": 102000
+    },
+    {
+     "a": "South Korea, Russia 1 (Zone 2)",
+     "b": "Europe, Russia 2 (Zone 7)",
+     "economy": 30000,
+     "business": 59000,
+     "first": 100000
+    },
+    {
+     "a": "South Korea, Russia 1 (Zone 2)",
+     "b": "Africa and the Middle East (Zone 8)",
+     "economy": 48500,
+     "business": 90500,
+     "first": 140500
+    },
+    {
+     "a": "South Korea, Russia 1 (Zone 2)",
+     "b": "Central and South America (Zone 9)",
+     "economy": 61000,
+     "business": 103500,
+     "first": 173500
+    },
+    {
+     "a": "South Korea, Russia 1 (Zone 2)",
+     "b": "Oceania, Micronesia (Zone 10)",
+     "economy": 27500,
+     "business": 48000,
+     "first": 90000
+    },
+    {
+     "a": "Asia 1 (Zone 3)",
+     "b": "Asia 1 (Zone 3)",
+     "economy": 10000,
+     "business": 20000,
+     "first": 30000
+    },
+    {
+     "a": "Asia 1 (Zone 3)",
+     "b": "Asia 2, Russia 3 (Zone 4)",
+     "economy": 18000,
+     "business": 30500,
+     "first": 54000
+    },
+    {
+     "a": "Asia 1 (Zone 3)",
+     "b": "Hawaii (Zone 5)",
+     "economy": 27500,
+     "business": 55500,
+     "first": 96500
+    },
+    {
+     "a": "Asia 1 (Zone 3)",
+     "b": "North America (Zone 6)",
+     "economy": 30000,
+     "business": 65000,
+     "first": 102000
+    },
+    {
+     "a": "Asia 1 (Zone 3)",
+     "b": "Europe, Russia 2 (Zone 7)",
+     "economy": 30000,
+     "business": 59000,
+     "first": 100000
+    },
+    {
+     "a": "Asia 1 (Zone 3)",
+     "b": "Africa and the Middle East (Zone 8)",
+     "economy": 48000,
+     "business": 89500,
+     "first": 139000
+    },
+    {
+     "a": "Asia 1 (Zone 3)",
+     "b": "Central and South America (Zone 9)",
+     "economy": 61000,
+     "business": 103500,
+     "first": 173500
+    },
+    {
+     "a": "Asia 1 (Zone 3)",
+     "b": "Oceania, Micronesia (Zone 10)",
+     "economy": 25000,
+     "business": 48000,
+     "first": 90000
+    },
+    {
+     "a": "Asia 2, Russia 3 (Zone 4)",
+     "b": "Asia 2, Russia 3 (Zone 4)",
+     "economy": 15000,
+     "business": 27500,
+     "first": 45000
+    },
+    {
+     "a": "Asia 2, Russia 3 (Zone 4)",
+     "b": "Hawaii (Zone 5)",
+     "economy": 32500,
+     "business": 65000,
+     "first": 121000
+    },
+    {
+     "a": "Asia 2, Russia 3 (Zone 4)",
+     "b": "North America (Zone 6)",
+     "economy": 40000,
+     "business": 68000,
+     "first": 120000
+    },
+    {
+     "a": "Asia 2, Russia 3 (Zone 4)",
+     "b": "Europe, Russia 2 (Zone 7)",
+     "economy": 29500,
+     "business": 47000,
+     "first": 88500
+    },
+    {
+     "a": "Asia 2, Russia 3 (Zone 4)",
+     "b": "Africa and the Middle East (Zone 8)",
+     "economy": 36000,
+     "business": 67000,
+     "first": 104500
+    },
+    {
+     "a": "Asia 2, Russia 3 (Zone 4)",
+     "b": "Central and South America (Zone 9)",
+     "economy": 67500,
+     "business": 114000,
+     "first": 157500
+    },
+    {
+     "a": "Asia 2, Russia 3 (Zone 4)",
+     "b": "Oceania, Micronesia (Zone 10)",
+     "economy": 23000,
+     "business": 43500,
+     "first": 83000
+    },
+    {
+     "a": "Hawaii (Zone 5)",
+     "b": "Hawaii (Zone 5)",
+     "economy": 10000,
+     "business": 20000,
+     "first": 30000
+    },
+    {
+     "a": "Hawaii (Zone 5)",
+     "b": "North America (Zone 6)",
+     "economy": 23500,
+     "business": 42500,
+     "first": 67500
+    },
+    {
+     "a": "Hawaii (Zone 5)",
+     "b": "Europe, Russia 2 (Zone 7)",
+     "economy": 35000,
+     "business": 65000,
+     "first": 105000
+    },
+    {
+     "a": "Hawaii (Zone 5)",
+     "b": "Africa and the Middle East (Zone 8)",
+     "economy": 45000,
+     "business": 72500,
+     "first": 110000
+    },
+    {
+     "a": "Hawaii (Zone 5)",
+     "b": "Central and South America (Zone 9)",
+     "economy": 35000,
+     "business": 65000,
+     "first": 105000
+    },
+    {
+     "a": "Hawaii (Zone 5)",
+     "b": "Oceania, Micronesia (Zone 10)",
+     "economy": 30000,
+     "business": 55000,
+     "first": 100500
+    },
+    {
+     "a": "North America (Zone 6)",
+     "b": "North America (Zone 6)",
+     "economy": 15000,
+     "business": 27500,
+     "first": 45000
+    },
+    {
+     "a": "North America (Zone 6)",
+     "b": "Europe, Russia 2 (Zone 7)",
+     "economy": 27500,
+     "business": 50000,
+     "first": 82500
+    },
+    {
+     "a": "North America (Zone 6)",
+     "b": "Africa and the Middle East (Zone 8)",
+     "economy": 35000,
+     "business": 65000,
+     "first": 105000
+    },
+    {
+     "a": "North America (Zone 6)",
+     "b": "Central and South America (Zone 9)",
+     "economy": 30000,
+     "business": 48000,
+     "first": 90000
+    },
+    {
+     "a": "North America (Zone 6)",
+     "b": "Oceania, Micronesia (Zone 10)",
+     "economy": 37500,
+     "business": 72500,
+     "first": 123000
+    },
+    {
+     "a": "Europe, Russia 2 (Zone 7)",
+     "b": "Europe, Russia 2 (Zone 7)",
+     "economy": 15000,
+     "business": 27500,
+     "first": 45000
+    },
+    {
+     "a": "Europe, Russia 2 (Zone 7)",
+     "b": "Africa and the Middle East (Zone 8)",
+     "economy": 30000,
+     "business": 51000,
+     "first": 91000
+    },
+    {
+     "a": "Europe, Russia 2 (Zone 7)",
+     "b": "Central and South America (Zone 9)",
+     "economy": 35000,
+     "business": 65000,
+     "first": 105000
+    },
+    {
+     "a": "Europe, Russia 2 (Zone 7)",
+     "b": "Oceania, Micronesia (Zone 10)",
+     "economy": 40000,
+     "business": 83500,
+     "first": 142000
+    },
+    {
+     "a": "Africa and the Middle East (Zone 8)",
+     "b": "Africa and the Middle East (Zone 8)",
+     "economy": 17500,
+     "business": 30000,
+     "first": 45000
+    },
+    {
+     "a": "Africa and the Middle East (Zone 8)",
+     "b": "Central and South America (Zone 9)",
+     "economy": 34000,
+     "business": 58500,
+     "first": 101500
+    },
+    {
+     "a": "Africa and the Middle East (Zone 8)",
+     "b": "Oceania, Micronesia (Zone 10)",
+     "economy": 35000,
+     "business": 66500,
+     "first": 115000
+    },
+    {
+     "a": "Central and South America (Zone 9)",
+     "b": "Central and South America (Zone 9)",
+     "economy": 17500,
+     "business": 30000,
+     "first": 45000
+    },
+    {
+     "a": "Central and South America (Zone 9)",
+     "b": "Oceania, Micronesia (Zone 10)",
+     "economy": 40000,
+     "business": 83500,
+     "first": 142000
+    },
+    {
+     "a": "Oceania, Micronesia (Zone 10)",
+     "b": "Oceania, Micronesia (Zone 10)",
+     "economy": 15000,
+     "business": 27500,
+     "first": 45000
+    }
+   ],
+   "surcharge": "high",
+   "fees": "plus taxes and the airlines' fuel surcharges, which ANA collects on partner awards"
+  },
+  "vs-delta": {
+   "programmes": [
+    "vs"
+   ],
+   "name": "Virgin Points on Delta",
+   "rule": "vs_delta",
+   "url": "https://www.virginatlantic.com/en-US/flying-club/airline-partners/delta-air-lines",
+   "as_of": "2026-09-24 (page read; no date on page; season calendar runs to Sep 2027)",
+   "operators": [
+    "DL"
+   ],
+   "connection_carriers": [
+    "9E",
+    "OO",
+    "YX",
+    "CP",
+    "G7",
+    "QX",
+    "ZW"
+   ],
+   "us_regions": {
+    "East Coast USA": [
+     "BOS",
+     "JFK",
+     "LGA",
+     "EWR",
+     "PHL"
+    ],
+    "Central USA": [
+     "ATL",
+     "DTW",
+     "MSP",
+     "MCO",
+     "TPA",
+     "MIA"
+    ],
+    "West Coast USA": [
+     "SLC",
+     "SEA",
+     "LAX",
+     "LAS",
+     "PDX"
+    ]
+   },
+   "transatlantic": [
+    {
+     "a": "UK",
+     "b": "East Coast USA",
+     "season": "off-peak",
+     "economy": 10000,
+     "premium_economy": 25000,
+     "business": 47500
+    },
+    {
+     "a": "UK",
+     "b": "Central USA",
+     "season": "off-peak",
+     "economy": 12500,
+     "premium_economy": 27500,
+     "business": 47500
+    },
+    {
+     "a": "UK",
+     "b": "West Coast USA",
+     "season": "off-peak",
+     "economy": 15000,
+     "premium_economy": 37500,
+     "business": 67500
+    },
+    {
+     "a": "UK",
+     "b": "East Coast USA",
+     "season": "peak",
+     "premium_economy": 35000,
+     "business": 57500,
+     "economy": 25500,
+     "note": "Virgin's page prints two peak tables; this is the higher"
+    },
+    {
+     "a": "UK",
+     "b": "Central USA",
+     "season": "peak",
+     "premium_economy": 37500,
+     "business": 57500,
+     "economy": 27500,
+     "note": "Virgin's page prints two peak tables; this is the higher"
+    },
+    {
+     "a": "UK",
+     "b": "West Coast USA",
+     "season": "peak",
+     "premium_economy": 47500,
+     "business": 77500,
+     "economy": 30000,
+     "note": "Virgin's page prints two peak tables; this is the higher"
+    },
+    {
+     "a": "Europe (ex UK)",
+     "b": "East Coast USA",
+     "season": "off-peak",
+     "economy": 30000,
+     "premium_economy": 32500,
+     "business": 47500
+    },
+    {
+     "a": "Europe (ex UK)",
+     "b": "Central USA",
+     "season": "off-peak",
+     "economy": 30000,
+     "premium_economy": 32500,
+     "business": 47500
+    },
+    {
+     "a": "Europe (ex UK)",
+     "b": "West Coast USA",
+     "season": "off-peak",
+     "economy": 30000,
+     "premium_economy": 40000,
+     "business": 67500
+    },
+    {
+     "a": "Europe (ex UK)",
+     "b": "East Coast USA",
+     "season": "peak",
+     "economy": 30000,
+     "business": 57500,
+     "premium_economy": 42500,
+     "note": "Virgin's page prints two peak tables; this is the higher"
+    },
+    {
+     "a": "Europe (ex UK)",
+     "b": "Central USA",
+     "season": "peak",
+     "economy": 30000,
+     "business": 57500,
+     "premium_economy": 42500,
+     "note": "Virgin's page prints two peak tables; this is the higher"
+    },
+    {
+     "a": "Europe (ex UK)",
+     "b": "West Coast USA",
+     "season": "peak",
+     "economy": 30000,
+     "business": 77500,
+     "premium_economy": 50000,
+     "note": "Virgin's page prints two peak tables; this is the higher"
+    }
+   ],
+   "other": [
+    {
+     "min": 0,
+     "max": 500,
+     "economy": 7500,
+     "premium_economy": 12000,
+     "business": 21000
+    },
+    {
+     "min": 501,
+     "max": 1000,
+     "economy": 11000,
+     "premium_economy": 26000
+    },
+    {
+     "min": 1001,
+     "max": 1500,
+     "economy": 16500,
+     "premium_economy": 38000,
+     "business": 41500
+    },
+    {
+     "min": 1501,
+     "max": 2000,
+     "economy": 18500,
+     "premium_economy": 42500,
+     "business": 59500
+    },
+    {
+     "min": 2001,
+     "max": 3000,
+     "economy": 22000,
+     "premium_economy": 46000,
+     "business": 66500
+    },
+    {
+     "min": 3001,
+     "max": 4000,
+     "economy": 35000,
+     "premium_economy": 57500,
+     "business": 80000
+    },
+    {
+     "min": 4001,
+     "max": 5000,
+     "economy": 44000,
+     "premium_economy": 75000,
+     "business": 105000
+    },
+    {
+     "min": 5001,
+     "max": 6000,
+     "economy": 49500,
+     "premium_economy": 90000,
+     "business": 130000
+    },
+    {
+     "min": 6001,
+     "max": null,
+     "economy": 65500,
+     "premium_economy": 115000,
+     "business": 165000
+    }
+   ],
+   "season_dates": {
+    "peak": [
+     [
+      "2025-12-06",
+      "2026-01-04"
+     ],
+     [
+      "2026-03-20",
+      "2026-04-12"
+     ],
+     [
+      "2026-06-14",
+      "2026-09-01"
+     ],
+     [
+      "2026-10-23",
+      "2026-11-03"
+     ],
+     [
+      "2026-12-07",
+      "2027-01-03"
+     ],
+     [
+      "2027-03-18",
+      "2027-04-13"
+     ],
+     [
+      "2027-06-13",
+      "2027-09-01"
+     ]
+    ],
+    "off-peak": [
+     [
+      "2026-01-05",
+      "2026-03-19"
+     ],
+     [
+      "2026-04-13",
+      "2026-06-13"
+     ],
+     [
+      "2026-09-02",
+      "2026-10-22"
+     ],
+     [
+      "2026-11-04",
+      "2026-12-06"
+     ],
+     [
+      "2027-01-04",
+      "2027-03-17"
+     ],
+     [
+      "2027-04-14",
+      "2027-06-12"
+     ]
+    ]
+   },
+   "fees_from": {
+    "UK": {
+     "economy": 322.8,
+     "premium_economy": 503.5,
+     "business": 1027.8
+    },
+    "Europe (ex UK)": {
+     "economy": 5.6,
+     "premium_economy": 503.5,
+     "business": 1032.3
+    }
+   },
+   "surcharge": "may",
+   "fees": "plus taxes and charges; Virgin prints them for departures from the UK and Europe, not from the US"
+  },
+  "vs-afkl": {
+   "programmes": [
+    "vs"
+   ],
+   "name": "Virgin Points on Air France and KLM",
+   "rule": "vs_afkl",
+   "url": "https://www.virginatlantic.com/flying-club/airline-partners/air-france",
+   "as_of": "2026-09-24 (page read; no date on page). The KLM page (https://www.virginatlantic.com/flying-club/airline-partners/klm) prints the identical chart.",
+   "operators": [
+    "AF",
+    "KL",
+    "A5",
+    "WA"
+   ],
+   "short": {
+    "off-peak": [
+     {
+      "min": 0,
+      "max": 600,
+      "economy": 4000,
+      "business": 8000
+     },
+     {
+      "min": 601,
+      "max": 1249,
+      "economy": 7500,
+      "business": 25000
+     },
+     {
+      "min": 1250,
+      "max": 1749,
+      "economy": 9000,
+      "business": 30000
+     }
+    ],
+    "peak": [
+     {
+      "min": 0,
+      "max": 600,
+      "economy": 4500,
+      "business": 9000
+     },
+     {
+      "min": 601,
+      "max": 1249,
+      "economy": 8500,
+      "business": 26000
+     },
+     {
+      "min": 1250,
+      "max": 1749,
+      "economy": 11000,
+      "business": 32000
+     }
+    ]
+   },
+   "zones": [
+    {
+     "a": 1,
+     "b": 2,
+     "season": "off-peak",
+     "economy": 9000,
+     "premium_economy": 18600,
+     "business": 30000
+    },
+    {
+     "a": 1,
+     "b": 3,
+     "season": "off-peak",
+     "economy": 12000,
+     "premium_economy": 24000,
+     "business": 50000
+    },
+    {
+     "a": 1,
+     "b": 4,
+     "season": "off-peak",
+     "economy": 12000,
+     "premium_economy": 24000,
+     "business": 48500
+    },
+    {
+     "a": 1,
+     "b": 5,
+     "season": "off-peak",
+     "economy": 15000,
+     "premium_economy": 30000,
+     "business": 61000
+    },
+    {
+     "a": 1,
+     "b": 6,
+     "season": "off-peak",
+     "economy": 12000,
+     "premium_economy": 24000,
+     "business": 48500
+    },
+    {
+     "a": 1,
+     "b": 7,
+     "season": "off-peak",
+     "economy": 15000,
+     "premium_economy": 39000,
+     "business": 77500
+    },
+    {
+     "a": 1,
+     "b": 8,
+     "season": "off-peak",
+     "economy": 17000,
+     "premium_economy": 34000,
+     "business": 87500
+    },
+    {
+     "a": 1,
+     "b": 9,
+     "season": "off-peak",
+     "economy": 21000,
+     "premium_economy": 42000,
+     "business": 112000
+    },
+    {
+     "a": 1,
+     "b": 10,
+     "season": "off-peak",
+     "economy": 31000,
+     "premium_economy": 62000,
+     "business": 188500
+    },
+    {
+     "a": 2,
+     "b": 6,
+     "season": "off-peak",
+     "economy": 20000,
+     "premium_economy": 40000,
+     "business": 66500
+    },
+    {
+     "a": 2,
+     "b": 7,
+     "season": "off-peak",
+     "economy": 23000,
+     "premium_economy": 54500,
+     "business": 110000
+    },
+    {
+     "a": 3,
+     "b": 6,
+     "season": "off-peak",
+     "economy": 25000,
+     "premium_economy": 50000,
+     "business": 97500
+    },
+    {
+     "a": 3,
+     "b": 7,
+     "season": "off-peak",
+     "economy": 28000,
+     "premium_economy": 56000,
+     "business": 110000
+    },
+    {
+     "a": 4,
+     "b": 6,
+     "season": "off-peak",
+     "economy": 24500,
+     "premium_economy": 49000,
+     "business": 98500
+    },
+    {
+     "a": 4,
+     "b": 7,
+     "season": "off-peak",
+     "economy": 28000,
+     "premium_economy": 57000,
+     "business": 110000
+    },
+    {
+     "a": 5,
+     "b": 6,
+     "season": "off-peak",
+     "economy": 28000,
+     "premium_economy": 56000,
+     "business": 110000
+    },
+    {
+     "a": 5,
+     "b": 7,
+     "season": "off-peak",
+     "economy": 31000,
+     "premium_economy": 62000,
+     "business": 122500
+    },
+    {
+     "a": 6,
+     "b": 7,
+     "season": "off-peak",
+     "economy": 14000,
+     "premium_economy": 28000,
+     "business": 60000
+    },
+    {
+     "a": 6,
+     "b": 8,
+     "season": "off-peak",
+     "economy": 32500,
+     "premium_economy": 54000,
+     "business": 116000
+    },
+    {
+     "a": 6,
+     "b": 9,
+     "season": "off-peak",
+     "economy": 34500,
+     "premium_economy": 69000,
+     "business": 135000
+    },
+    {
+     "a": 6,
+     "b": 10,
+     "season": "off-peak",
+     "economy": 44000,
+     "premium_economy": 88000
+    },
+    {
+     "a": 7,
+     "b": 8,
+     "season": "off-peak",
+     "economy": 43000,
+     "premium_economy": 76000,
+     "business": 156000
+    },
+    {
+     "a": 7,
+     "b": 9,
+     "season": "off-peak",
+     "economy": 49000,
+     "premium_economy": 98000,
+     "business": 147500
+    },
+    {
+     "a": 7,
+     "b": 10,
+     "season": "off-peak",
+     "economy": 42000,
+     "premium_economy": 84000,
+     "business": 185000
+    },
+    {
+     "a": 1,
+     "b": 2,
+     "season": "peak",
+     "economy": 19000,
+     "premium_economy": 28600,
+     "business": 40000
+    },
+    {
+     "a": 1,
+     "b": 3,
+     "season": "peak",
+     "economy": 22000,
+     "premium_economy": 34000,
+     "business": 60000
+    },
+    {
+     "a": 1,
+     "b": 4,
+     "season": "peak",
+     "economy": 22000,
+     "premium_economy": 34000,
+     "business": 58500
+    },
+    {
+     "a": 1,
+     "b": 5,
+     "season": "peak",
+     "economy": 25000,
+     "premium_economy": 40000,
+     "business": 71000
+    },
+    {
+     "a": 1,
+     "b": 6,
+     "season": "peak",
+     "economy": 22000,
+     "premium_economy": 34000,
+     "business": 58500
+    },
+    {
+     "a": 1,
+     "b": 7,
+     "season": "peak",
+     "economy": 25000,
+     "premium_economy": 49000,
+     "business": 87500
+    },
+    {
+     "a": 1,
+     "b": 8,
+     "season": "peak",
+     "economy": 27000,
+     "premium_economy": 44000,
+     "business": 97500
+    },
+    {
+     "a": 1,
+     "b": 9,
+     "season": "peak",
+     "economy": 31000,
+     "premium_economy": 52000,
+     "business": 122000
+    },
+    {
+     "a": 1,
+     "b": 10,
+     "season": "peak",
+     "economy": 41000,
+     "premium_economy": 72000,
+     "business": 198500
+    },
+    {
+     "a": 2,
+     "b": 6,
+     "season": "peak",
+     "economy": 30000,
+     "premium_economy": 50000,
+     "business": 76500
+    },
+    {
+     "a": 2,
+     "b": 7,
+     "season": "peak",
+     "economy": 33000,
+     "premium_economy": 64500,
+     "business": 120000
+    },
+    {
+     "a": 3,
+     "b": 6,
+     "season": "peak",
+     "economy": 35000,
+     "premium_economy": 60000,
+     "business": 107500
+    },
+    {
+     "a": 3,
+     "b": 7,
+     "season": "peak",
+     "economy": 38000,
+     "premium_economy": 66000,
+     "business": 120000
+    },
+    {
+     "a": 4,
+     "b": 6,
+     "season": "peak",
+     "economy": 34500,
+     "premium_economy": 59000,
+     "business": 108500
+    },
+    {
+     "a": 4,
+     "b": 7,
+     "season": "peak",
+     "economy": 38000,
+     "premium_economy": 67000,
+     "business": 120000
+    },
+    {
+     "a": 5,
+     "b": 6,
+     "season": "peak",
+     "economy": 38000,
+     "business": 120000
+    },
+    {
+     "a": 5,
+     "b": 7,
+     "season": "peak",
+     "economy": 41000,
+     "premium_economy": 72000,
+     "business": 132500
+    },
+    {
+     "a": 6,
+     "b": 7,
+     "season": "peak",
+     "economy": 24000,
+     "premium_economy": 38000,
+     "business": 70000
+    },
+    {
+     "a": 6,
+     "b": 8,
+     "season": "peak",
+     "economy": 42500,
+     "premium_economy": 64000,
+     "business": 126000
+    },
+    {
+     "a": 6,
+     "b": 9,
+     "season": "peak",
+     "economy": 44500,
+     "premium_economy": 79000,
+     "business": 145000
+    },
+    {
+     "a": 6,
+     "b": 10,
+     "season": "peak",
+     "economy": 54000,
+     "premium_economy": 98000,
+     "business": 182500
+    },
+    {
+     "a": 7,
+     "b": 8,
+     "season": "peak",
+     "economy": 53000,
+     "premium_economy": 86000,
+     "business": 166000
+    },
+    {
+     "a": 7,
+     "b": 9,
+     "season": "peak",
+     "economy": 59000,
+     "premium_economy": 108000,
+     "business": 157500
+    },
+    {
+     "a": 7,
+     "b": 10,
+     "season": "peak",
+     "economy": 52000,
+     "premium_economy": 94000,
+     "business": 195000
+    }
+   ],
+   "season_dates": {
+    "peak": [
+     [
+      "2025-12-06",
+      "2026-01-04"
+     ],
+     [
+      "2026-03-20",
+      "2026-04-12"
+     ],
+     [
+      "2026-06-14",
+      "2026-09-01"
+     ],
+     [
+      "2026-10-23",
+      "2026-11-03"
+     ],
+     [
+      "2026-12-07",
+      "2027-01-03"
+     ],
+     [
+      "2027-03-18",
+      "2027-04-13"
+     ],
+     [
+      "2027-06-13",
+      "2027-09-01"
+     ]
+    ],
+    "off-peak": [
+     [
+      "2026-01-05",
+      "2026-03-19"
+     ],
+     [
+      "2026-04-13",
+      "2026-06-13"
+     ],
+     [
+      "2026-09-02",
+      "2026-10-22"
+     ],
+     [
+      "2026-11-04",
+      "2026-12-06"
+     ],
+     [
+      "2027-01-04",
+      "2027-03-17"
+     ],
+     [
+      "2027-04-14",
+      "2027-06-12"
+     ]
+    ]
+   },
+   "surcharge": "may",
+   "fees": "plus taxes, fees and carrier surcharges, not printed by Virgin"
+  },
+  "vs-skyteam": {
+   "programmes": [
+    "vs"
+   ],
+   "name": "Virgin Points on SkyTeam partners",
+   "rule": "distance",
+   "url": "https://www.virginatlantic.com/flying-club/airline-partners/scandinavian-airlines",
+   "as_of": "2026-09-24 (pages read; no date on pages)",
+   "operators": [
+    "AM",
+    "UX",
+    "GA",
+    "KQ",
+    "KE",
+    "ME",
+    "SV",
+    "RO",
+    "MF",
+    "AR",
+    "CI",
+    "SK",
+    "VN",
+    "MU"
+   ],
+   "nonstop": true,
+   "cabins_by_operator": {
+    "premium_economy": [
+     "AR",
+     "CI",
+     "SK",
+     "VN"
+    ],
+    "first": [
+     "MU"
+    ]
+   },
+   "bands": [
+    {
+     "min": 0,
+     "max": 500,
+     "economy": 5500,
+     "premium_economy": 9000,
+     "business": 14500,
+     "first": 20000
+    },
+    {
+     "min": 501,
+     "max": 1000,
+     "economy": 7000,
+     "premium_economy": 12500,
+     "business": 15500,
+     "first": 32500
+    },
+    {
+     "min": 1001,
+     "max": 1500,
+     "economy": 10000,
+     "premium_economy": 16000,
+     "business": 21500,
+     "first": 40000
+    },
+    {
+     "min": 1501,
+     "max": 2250,
+     "economy": 11500,
+     "premium_economy": 22000,
+     "business": 35500,
+     "first": 47500
+    },
+    {
+     "min": 2251,
+     "max": 3000,
+     "economy": 15000,
+     "premium_economy": 26500,
+     "business": 40000,
+     "first": 60000
+    },
+    {
+     "min": 3001,
+     "max": 4000,
+     "economy": 20500,
+     "premium_economy": 37500,
+     "business": 60000,
+     "first": 80000
+    },
+    {
+     "min": 4001,
+     "max": 5000,
+     "economy": 25500,
+     "premium_economy": 47500,
+     "business": 75000,
+     "first": 102000
+    },
+    {
+     "min": 5001,
+     "max": 6000,
+     "economy": 31500,
+     "premium_economy": 57500,
+     "business": 85000,
+     "first": 123000
+    },
+    {
+     "min": 6001,
+     "max": 7000,
+     "economy": 37000,
+     "premium_economy": 70000,
+     "business": 100000,
+     "first": 140000
+    },
+    {
+     "min": 7001,
+     "max": 12000,
+     "economy": 50000,
+     "premium_economy": 95000,
+     "business": 140000,
+     "first": 195000
+    }
+   ],
+   "surcharge": "may",
+   "fees": "plus taxes, fees and carrier surcharges, not printed by Virgin"
+  },
+  "vs-elal": {
+   "programmes": [
+    "vs"
+   ],
+   "name": "Virgin Points on El Al",
+   "rule": "distance",
+   "url": "https://www.virginatlantic.com/flying-club/airline-partners/el-al",
+   "as_of": "2026-09-24 (page read; no date on page)",
+   "operators": [
+    "LY"
+   ],
+   "nonstop": true,
+   "bands": [
+    {
+     "min": 0,
+     "max": 500,
+     "economy": 5500,
+     "premium_economy": 10000,
+     "business": 20000
+    },
+    {
+     "min": 501,
+     "max": 1000,
+     "economy": 11000,
+     "premium_economy": 17000,
+     "business": 28000
+    },
+    {
+     "min": 1001,
+     "max": 1500,
+     "economy": 17500,
+     "premium_economy": 27000,
+     "business": 45000
+    },
+    {
+     "min": 1501,
+     "max": 2250,
+     "economy": 26000,
+     "premium_economy": 32000,
+     "business": 70000
+    },
+    {
+     "min": 2251,
+     "max": 3000,
+     "economy": 31000,
+     "premium_economy": 41000,
+     "business": 80000
+    },
+    {
+     "min": 3001,
+     "max": 4000,
+     "economy": 41000,
+     "premium_economy": 54000,
+     "business": 97000
+    },
+    {
+     "min": 4001,
+     "max": 5000,
+     "economy": 52000,
+     "premium_economy": 68000,
+     "business": 125000
+    },
+    {
+     "min": 5001,
+     "max": 6000,
+     "economy": 62000,
+     "premium_economy": 84000,
+     "business": 150000
+    },
+    {
+     "min": 6001,
+     "max": 7000,
+     "economy": 73000,
+     "premium_economy": 97000,
+     "business": 175000
+    },
+    {
+     "min": 7001,
+     "max": null,
+     "economy": 91000,
+     "premium_economy": 122000,
+     "business": 220000
+    }
+   ],
+   "surcharge": "may",
+   "fees": "plus taxes, fees and carrier surcharges, not printed by Virgin"
+  },
+  "vs-saws": {
+   "programmes": [
+    "vs"
+   ],
+   "name": "Virgin Points on South African Airways and WestJet",
+   "rule": "distance",
+   "url": "https://www.virginatlantic.com/flying-club/airline-partners/westjet",
+   "as_of": "2026-09-24 (pages read; no date on pages)",
+   "operators": [
+    "SA",
+    "WS"
+   ],
+   "nonstop": true,
+   "cabins_by_operator": {
+    "premium_economy": [
+     "WS"
+    ]
+   },
+   "bands": [
+    {
+     "min": 0,
+     "max": 500,
+     "economy": 6000,
+     "premium_economy": 10000,
+     "business": 15000
+    },
+    {
+     "min": 501,
+     "max": 1000,
+     "economy": 9000,
+     "premium_economy": 15000,
+     "business": 20000
+    },
+    {
+     "min": 1001,
+     "max": 1500,
+     "economy": 12000,
+     "premium_economy": 20000,
+     "business": 25000
+    },
+    {
+     "min": 1501,
+     "max": 2250,
+     "economy": 15000,
+     "premium_economy": 25000,
+     "business": 35000
+    },
+    {
+     "min": 2251,
+     "max": 3000,
+     "economy": 17500,
+     "premium_economy": 30000,
+     "business": 47500
+    },
+    {
+     "min": 3001,
+     "max": 4000,
+     "economy": 22500,
+     "premium_economy": 40000,
+     "business": 62500
+    },
+    {
+     "min": 4001,
+     "max": 5000,
+     "economy": 27500,
+     "premium_economy": 50000,
+     "business": 80000
+    },
+    {
+     "min": 5001,
+     "max": 6000,
+     "economy": 32500,
+     "premium_economy": 60000,
+     "business": 90000
+    },
+    {
+     "min": 6001,
+     "max": 7000,
+     "economy": 40000,
+     "premium_economy": 70000,
+     "business": 105000
+    },
+    {
+     "min": 7001,
+     "max": null,
+     "economy": 50000,
+     "premium_economy": 100000,
+     "business": 150000
+    }
+   ],
+   "surcharge": "may",
+   "fees": "plus taxes, fees and carrier surcharges, not printed by Virgin"
+  },
+  "vs-va": {
+   "programmes": [
+    "vs"
+   ],
+   "name": "Virgin Points on Virgin Australia",
+   "rule": "distance",
+   "url": "https://www.virginatlantic.com/flying-club/airline-partners/virgin-australia",
+   "as_of": "2026-09-24 (page read; no date on page)",
+   "operators": [
+    "VA"
+   ],
+   "nonstop": true,
+   "bands": [
+    {
+     "min": 0,
+     "max": 400,
+     "economy": 8000
+    },
+    {
+     "min": 400,
+     "max": 599,
+     "economy": 12500
+    },
+    {
+     "min": 600,
+     "max": 1199,
+     "economy": 15000
+    },
+    {
+     "min": 1200,
+     "max": 2999,
+     "economy": 20000
+    },
+    {
+     "min": 3000,
+     "max": 3999,
+     "economy": 35000
+    },
+    {
+     "min": 4000,
+     "max": 4999,
+     "economy": 40000
+    },
+    {
+     "min": 5000,
+     "max": null,
+     "economy": 47000
+    }
+   ],
+   "surcharge": "may",
+   "fees": "plus taxes, fees and carrier surcharges, not printed by Virgin"
+  },
+  "tk-own": {
+   "programmes": [
+    "tk"
+   ],
+   "name": "Turkish Airlines' own flights",
+   "rule": "tk_own",
+   "url": "https://www.turkishairlines.com/en-us/miles-and-smiles/redeem-miles/redeem-miles-on-flights/turkish-airlines-award-tickets/",
+   "as_of": "2026-07-14 (tables checked against Turkish's official award tables by AwardFares, 'Updated Jul 14, 2026'); turkishairlines.com timed out from here, so figures are from that dated publication: https://awardfares.com/blog/miles-and-smiles-guide/",
+   "operators": [
+    "TK"
+   ],
+   "promotion": {
+    "Türkiye": {
+     "economy": 4500,
+     "business": 10000
+    },
+    "Europe 1": {
+     "economy": 10000,
+     "business": 20000
+    },
+    "Europe 2": {
+     "economy": 15000,
+     "business": 25000
+    },
+    "Central Asia": {
+     "economy": 20000,
+     "business": 35000
+    },
+    "Middle East": {
+     "economy": 18000,
+     "business": 28000
+    },
+    "North Africa": {
+     "economy": 20000,
+     "business": 40000
+    },
+    "Central Africa": {
+     "economy": 25000,
+     "business": 60000
+    },
+    "Southern Africa": {
+     "economy": 35000,
+     "business": 75000
+    },
+    "Far East": {
+     "economy": 35000,
+     "business": 65000
+    },
+    "North America": {
+     "economy": 40000,
+     "business": 65000
+    },
+    "South America": {
+     "economy": 50000,
+     "business": 75000
+    },
+    "Oceania": {
+     "economy": 60000,
+     "business": 140000
+    }
+   },
+   "standard": {
+    "Türkiye": {
+     "economy": 8500,
+     "business": 15000
+    },
+    "Europe 1": {
+     "economy": 15000,
+     "business": 30000
+    },
+    "Europe 2": {
+     "economy": 20000,
+     "business": 40000
+    },
+    "Central Asia": {
+     "economy": 25000,
+     "business": 50000
+    },
+    "Middle East": {
+     "economy": 23000,
+     "business": 45000
+    },
+    "North Africa": {
+     "economy": 35000,
+     "business": 55000
+    },
+    "Central Africa": {
+     "economy": 55000,
+     "business": 110000
+    },
+    "Southern Africa": {
+     "economy": 70000,
+     "business": 150000
+    },
+    "Far East": {
+     "economy": 55000,
+     "business": 140000
+    },
+    "North America": {
+     "economy": 55000,
+     "business": 135000
+    },
+    "South America": {
+     "economy": 65000,
+     "business": 145000
+    },
+    "Oceania": {
+     "economy": 100000,
+     "business": 210000
+    }
+   },
+   "surcharge": "may",
+   "fees": "plus taxes and surcharges, observed at about $200 to $250 each way across the Atlantic (AwardFares)"
+  },
+  "tk-star": {
+   "programmes": [
+    "tk"
+   ],
+   "name": "Miles&Smiles on Star Alliance partners",
+   "rule": "zones",
+   "zoneset": "tk",
+   "url": "https://www.turkishairlines.com/en-us/miles-and-smiles/account/book-star-award-tickets/",
+   "as_of": "2026-07-14 (AwardFares, checked against the official tables; region chart unchanged by the 3 Dec 2025 devaluation): https://awardfares.com/blog/miles-and-smiles-guide/",
+   "operators": [
+    "A3",
+    "AC",
+    "AI",
+    "AV",
+    "AZ",
+    "BR",
+    "CA",
+    "CM",
+    "ET",
+    "LH",
+    "LO",
+    "LX",
+    "MS",
+    "NH",
+    "NZ",
+    "OS",
+    "OU",
+    "OZ",
+    "SA",
+    "SN",
+    "SQ",
+    "TG",
+    "TP",
+    "UA",
+    "ZH"
+   ],
+   "nonstop": true,
+   "rows": [
+    {
+     "a": "Türkiye",
+     "b": "North America",
+     "economy": 40000,
+     "business": 65000,
+     "first": 100000
+    },
+    {
+     "a": "Europe 1",
+     "b": "North America",
+     "economy": 50000,
+     "business": 85000,
+     "first": 130000
+    },
+    {
+     "a": "Europe 2",
+     "b": "North America",
+     "economy": 55000,
+     "business": 90000,
+     "first": 135000
+    },
+    {
+     "a": "Central Asia",
+     "b": "North America",
+     "economy": 60000,
+     "business": 100000,
+     "first": 150000
+    },
+    {
+     "a": "Middle East",
+     "b": "North America",
+     "economy": 58000,
+     "business": 93000,
+     "first": 140000
+    },
+    {
+     "a": "North Africa",
+     "b": "North America",
+     "economy": 60000,
+     "business": 105000,
+     "first": 160000
+    },
+    {
+     "a": "Central Africa",
+     "b": "North America",
+     "economy": 65000,
+     "business": 125000,
+     "first": 190000
+    },
+    {
+     "a": "Southern Africa",
+     "b": "North America",
+     "economy": 75000,
+     "business": 140000,
+     "first": 210000
+    },
+    {
+     "a": "Far East",
+     "b": "North America",
+     "economy": 75000,
+     "business": 130000,
+     "first": 195000
+    },
+    {
+     "a": "North America",
+     "b": "North America",
+     "economy": 30000,
+     "business": 40000,
+     "first": 50000
+    },
+    {
+     "a": "North America",
+     "b": "South America",
+     "economy": 90000,
+     "business": 140000,
+     "first": 210000
+    },
+    {
+     "a": "North America",
+     "b": "Oceania",
+     "economy": 100000,
+     "business": 205000,
+     "first": 290000
+    },
+    {
+     "a": "Türkiye",
+     "b": "Europe 1",
+     "economy": 10000,
+     "business": 20000,
+     "first": 30000
+    },
+    {
+     "a": "Europe 1",
+     "b": "Europe 1",
+     "economy": 25000,
+     "business": 35000,
+     "first": 45000
+    },
+    {
+     "a": "Europe 1",
+     "b": "Europe 2",
+     "economy": 25000,
+     "business": 45000,
+     "first": 65000
+    },
+    {
+     "a": "Europe 1",
+     "b": "Central Asia",
+     "economy": 30000,
+     "business": 55000,
+     "first": 80000
+    },
+    {
+     "a": "Europe 1",
+     "b": "Middle East",
+     "economy": 28000,
+     "business": 48000,
+     "first": 70000
+    },
+    {
+     "a": "Europe 1",
+     "b": "North Africa",
+     "economy": 30000,
+     "business": 60000,
+     "first": 90000
+    },
+    {
+     "a": "Europe 1",
+     "b": "Central Africa",
+     "economy": 35000,
+     "business": 80000,
+     "first": 120000
+    },
+    {
+     "a": "Europe 1",
+     "b": "Southern Africa",
+     "economy": 45000,
+     "business": 95000,
+     "first": 140000
+    },
+    {
+     "a": "Europe 1",
+     "b": "Far East",
+     "economy": 45000,
+     "business": 85000,
+     "first": 130000
+    },
+    {
+     "a": "Europe 1",
+     "b": "South America",
+     "economy": 60000,
+     "business": 95000,
+     "first": 140000
+    },
+    {
+     "a": "Europe 1",
+     "b": "Oceania",
+     "economy": 70000,
+     "business": 160000,
+     "first": 230000
+    },
+    {
+     "a": "Türkiye",
+     "b": "Europe 2",
+     "economy": 15000,
+     "business": 25000,
+     "first": 35000
+    },
+    {
+     "a": "Europe 2",
+     "b": "Europe 2",
+     "economy": 25000,
+     "business": 35000,
+     "first": 45000
+    },
+    {
+     "a": "Europe 2",
+     "b": "Central Asia",
+     "economy": 35000,
+     "business": 60000,
+     "first": 90000
+    },
+    {
+     "a": "Europe 2",
+     "b": "Middle East",
+     "economy": 33000,
+     "business": 53000,
+     "first": 80000
+    },
+    {
+     "a": "Europe 2",
+     "b": "North Africa",
+     "economy": 35000,
+     "business": 65000,
+     "first": 100000
+    },
+    {
+     "a": "Europe 2",
+     "b": "Central Africa",
+     "economy": 40000,
+     "business": 85000,
+     "first": 130000
+    },
+    {
+     "a": "Europe 2",
+     "b": "Southern Africa",
+     "economy": 50000,
+     "business": 100000,
+     "first": 150000
+    },
+    {
+     "a": "Europe 2",
+     "b": "Far East",
+     "economy": 50000,
+     "business": 90000,
+     "first": 135000
+    },
+    {
+     "a": "Europe 2",
+     "b": "South America",
+     "economy": 65000,
+     "business": 100000,
+     "first": 150000
+    },
+    {
+     "a": "Europe 2",
+     "b": "Oceania",
+     "economy": 75000,
+     "business": 165000,
+     "first": 230000
+    }
+   ],
+   "same_country": {
+    "economy": 15000,
+    "business": 22500,
+    "first": 30000
+   },
+   "surcharge": "may",
+   "fees": "plus taxes and the partner's surcharges, which vary by airline"
+  },
+  "lh-mm": {
+   "programmes": [
+    "lh"
+   ],
+   "name": "Miles & More on partner airlines",
+   "rule": "zones",
+   "zoneset": "mm",
+   "url": "https://www.miles-and-more.com/row/en/program/news/info-page-award-flight-table.html",
+   "as_of": "Chart 'for bookings from 3 June 2025' (Miles & More's own 'Award Flights' PDF, Flight_Awards_2025_EN, as hosted at https://loyaltylobby.com/wp-content/uploads/2025/02/NEW-LH-MM-Flight_Awards_2025_EN.pdf; miles-and-more.com returned 403 from here)",
+   "operators": [
+    "A3",
+    "AC",
+    "AI",
+    "AV",
+    "AZ",
+    "BR",
+    "CA",
+    "CM",
+    "ET",
+    "LO",
+    "MS",
+    "NH",
+    "NZ",
+    "OU",
+    "OZ",
+    "SA",
+    "SQ",
+    "TG",
+    "TK",
+    "TP",
+    "UA",
+    "ZH"
+   ],
+   "rows": [
+    {
+     "a": "Europe",
+     "b": "Europe",
+     "economy": 14000,
+     "business": 25000
+    },
+    {
+     "a": "Europe",
+     "b": "North America",
+     "economy": 25000,
+     "premium_economy": 42500,
+     "business": 62500,
+     "first": 107500
+    },
+    {
+     "a": "Europe",
+     "b": "Hawaii",
+     "economy": 47500,
+     "business": 107500,
+     "first": 165000
+    },
+    {
+     "a": "Europe",
+     "b": "Central America/Caribbean",
+     "economy": 35000,
+     "premium_economy": 47500,
+     "business": 70000,
+     "first": 112500
+    },
+    {
+     "a": "Europe",
+     "b": "South America",
+     "economy": 37500,
+     "premium_economy": 55000,
+     "business": 80000,
+     "first": 122500
+    },
+    {
+     "a": "Europe",
+     "b": "Middle East/Caucasus/North & Central Africa",
+     "economy": 21000,
+     "premium_economy": 27500,
+     "business": 37500,
+     "first": 70000
+    },
+    {
+     "a": "Europe",
+     "b": "Southern Africa",
+     "economy": 25000,
+     "premium_economy": 42500,
+     "business": 62500,
+     "first": 107500
+    },
+    {
+     "a": "Europe",
+     "b": "India",
+     "economy": 25000,
+     "premium_economy": 42500,
+     "business": 62500,
+     "first": 107500
+    },
+    {
+     "a": "Europe",
+     "b": "Southeast Asia",
+     "economy": 42500,
+     "premium_economy": 55000,
+     "business": 100000,
+     "first": 130000
+    },
+    {
+     "a": "Europe",
+     "b": "Central Asia/Far East",
+     "economy": 37500,
+     "premium_economy": 55000,
+     "business": 85000,
+     "first": 130000
+    },
+    {
+     "a": "Europe",
+     "b": "Australia/New Zealand/Oceania",
+     "economy": 55000,
+     "business": 130000,
+     "first": 197500
+    },
+    {
+     "a": "North America",
+     "b": "North America",
+     "economy": 17500,
+     "business": 30000,
+     "first": 40000
+    },
+    {
+     "a": "North America",
+     "b": "Hawaii",
+     "economy": 22500,
+     "business": 37500,
+     "first": 67500
+    },
+    {
+     "a": "North America",
+     "b": "Central America/Caribbean",
+     "economy": 17500,
+     "business": 30000,
+     "first": 45000
+    },
+    {
+     "a": "North America",
+     "b": "South America",
+     "economy": 25000,
+     "business": 62500,
+     "first": 107500
+    },
+    {
+     "a": "North America",
+     "b": "Middle East/Caucasus/North & Central Africa",
+     "economy": 37500,
+     "business": 75000,
+     "first": 120000
+    },
+    {
+     "a": "North America",
+     "b": "Southern Africa",
+     "economy": 47500,
+     "business": 107500,
+     "first": 165000
+    },
+    {
+     "a": "North America",
+     "b": "India",
+     "economy": 47500,
+     "business": 107500,
+     "first": 165000
+    },
+    {
+     "a": "North America",
+     "b": "Southeast Asia",
+     "economy": 37500,
+     "business": 85000,
+     "first": 130000
+    },
+    {
+     "a": "North America",
+     "b": "Central Asia/Far East",
+     "economy": 37500,
+     "business": 85000,
+     "first": 130000
+    },
+    {
+     "a": "North America",
+     "b": "Australia/New Zealand/Oceania",
+     "economy": 42500,
+     "business": 75000,
+     "first": 120000
+    }
+   ],
+   "note": "Miles & More prints a round-trip chart; one way is half (10xTravel)",
+   "surcharge": "high",
+   "fees": "plus taxes and the airlines' surcharges, which Miles & More collects",
+   "secondary": true
+  },
+  "sq-own": {
+   "programmes": [
+    "sq"
+   ],
+   "name": "Singapore Airlines' own flights",
+   "rule": "sq_own",
+   "url": "https://www.singaporeair.com/content/dam/sia/web-assets/pdfs/ppsclub-krisflyer/krisflyer/progupdates/awardcharts/SingaporeAirlinesOne-WayAdvantageSaverAwardChartupdated1Nov25.pdf",
+   "as_of": "Effective 1 Nov 2025 (Singapore Airlines' chart 'updated 1Nov25'; singaporeair.com returned 403 from here, figures as reproduced by SuiteSmile, source 'Singapore Airlines', updated 28 Mar 2026: https://suitesmile.com/blog/2026/03/28/krisflyer-award-charts-saver-advantage-access/)",
+   "operators": [
+    "SQ"
+   ],
+   "nonstop": true,
+   "saver": {
+    "2": {
+     "economy": 8000,
+     "business": 22000,
+     "first": 32000
+    },
+    "3": {
+     "economy": 13000,
+     "business": 25000,
+     "first": 38000
+    },
+    "4": {
+     "economy": 15500,
+     "premium_economy": 28000,
+     "business": 35500,
+     "first": 47500
+    },
+    "5": {
+     "economy": 20500,
+     "premium_economy": 36000,
+     "business": 45000,
+     "first": 61500
+    },
+    "6": {
+     "economy": 19000,
+     "premium_economy": 36000,
+     "business": 45000,
+     "first": 61500
+    },
+    "7": {
+     "economy": 25500,
+     "premium_economy": 39500,
+     "business": 54500,
+     "first": 81000
+    },
+    "8": {
+     "economy": 20500,
+     "business": 42500,
+     "first": 60500
+    },
+    "9": {
+     "economy": 29000,
+     "premium_economy": 53500,
+     "business": 72000,
+     "first": 98000
+    },
+    "10": {
+     "economy": 32000,
+     "premium_economy": 51500,
+     "business": 68000,
+     "first": 95000
+    },
+    "11": {
+     "economy": 44000,
+     "premium_economy": 74500,
+     "business": 108500,
+     "first": 148000
+    },
+    "12": {
+     "economy": 44000,
+     "premium_economy": 79000,
+     "business": 112500,
+     "first": 154000
+    },
+    "13": {
+     "economy": 46000,
+     "premium_economy": 84500,
+     "business": 117000,
+     "first": 156000
+    }
+   },
+   "advantage": {
+    "2": {
+     "economy": 16500,
+     "business": 40500,
+     "first": 60500
+    },
+    "3": {
+     "economy": 27500,
+     "business": 46000,
+     "first": 72000
+    },
+    "4": {
+     "economy": 33000,
+     "business": 57500,
+     "first": 84000
+    },
+    "5": {
+     "economy": 44000,
+     "business": 75000,
+     "first": 112500
+    },
+    "6": {
+     "economy": 40500,
+     "business": 75000,
+     "first": 112500
+    },
+    "7": {
+     "economy": 49500,
+     "business": 80500,
+     "first": 138000
+    },
+    "8": {
+     "economy": 40500,
+     "business": 75000,
+     "first": 114500
+    },
+    "9": {
+     "economy": 60500,
+     "business": 103500,
+     "first": 178500
+    },
+    "10": {
+     "economy": 66500,
+     "business": 122000,
+     "first": 171000
+    },
+    "11": {
+     "economy": 79000,
+     "business": 141500,
+     "first": 259500
+    },
+    "12": {
+     "economy": 79000,
+     "business": 148000,
+     "first": 262000
+    },
+    "13": {
+     "economy": 84500,
+     "business": 165000,
+     "first": 279500
+    }
+   },
+   "surcharge": "may",
+   "fees": "plus taxes and charges, paid in cash"
+  },
+  "qr-partner": {
+   "programmes": [
+    "qr"
+   ],
+   "name": "Qatar Avios on partner airlines",
+   "rule": "distance",
+   "url": "https://www.qatarairways.com/en/Privilege-Club/redeem-avios/flights/partner-airlines.html",
+   "as_of": "2026-07-07 (AwardFares Qatar guide, 'Updated Jul 7, 2026', reproducing Qatar's published partner chart: https://awardfares.com/blog/qatar-airways-privilege-club-guide/); qatarairways.com timed out from here",
+   "operators": [
+    "AT",
+    "AY",
+    "BA",
+    "CX",
+    "FJ",
+    "IB",
+    "JL",
+    "MH",
+    "QF",
+    "RJ",
+    "UL",
+    "WY"
+   ],
+   "nonstop": true,
+   "bands": [
+    {
+     "min": 1,
+     "max": 650,
+     "economy": 6000,
+     "premium_economy": 9000,
+     "business": 12500,
+     "first": 24000
+    },
+    {
+     "min": 651,
+     "max": 1151,
+     "economy": 9000,
+     "premium_economy": 12500,
+     "business": 16500,
+     "first": 33000
+    },
+    {
+     "min": 1152,
+     "max": 2000,
+     "economy": 11000,
+     "premium_economy": 16500,
+     "business": 22000,
+     "first": 44000
+    },
+    {
+     "min": 2001,
+     "max": 3000,
+     "economy": 13000,
+     "premium_economy": 19500,
+     "business": 34000,
+     "first": 51000
+    },
+    {
+     "min": 3001,
+     "max": 4000,
+     "economy": 18000,
+     "premium_economy": 27000,
+     "business": 42500,
+     "first": 68000
+    },
+    {
+     "min": 4001,
+     "max": 5500,
+     "economy": 24000,
+     "premium_economy": 36000,
+     "business": 50000,
+     "first": 85000
+    },
+    {
+     "min": 5501,
+     "max": 6500,
+     "economy": 30500,
+     "premium_economy": 45750,
+     "business": 63750,
+     "first": 103000
+    },
+    {
+     "min": 6501,
+     "max": 7000,
+     "economy": 34000,
+     "premium_economy": 51500,
+     "business": 72250,
+     "first": 120000
+    },
+    {
+     "min": 7001,
+     "max": null,
+     "economy": 42500,
+     "premium_economy": 51500,
+     "business": 85000,
+     "first": 154500
+    }
+   ],
+   "surcharge": "none",
+   "fees": "plus taxes, typically $30 to $100; Qatar adds no fuel surcharge (AwardFares)",
+   "secondary": true
+  },
+  "qr-aa": {
+   "programmes": [
+    "qr"
+   ],
+   "name": "Qatar Avios on American and Alaska",
+   "rule": "distance",
+   "url": "https://www.qatarairways.com/en/Privilege-Club/redeem-avios/flights/partner-airlines.html",
+   "as_of": "2026-07-07 (AwardFares, reproducing Qatar's published chart: https://awardfares.com/blog/qatar-airways-privilege-club-guide/)",
+   "operators": [
+    "AA",
+    "AS"
+   ],
+   "nonstop": true,
+   "bands": [
+    {
+     "min": 1,
+     "max": 650,
+     "economy": 9500,
+     "business": 20000
+    },
+    {
+     "min": 651,
+     "max": 1151,
+     "economy": 12000,
+     "business": 26000
+    },
+    {
+     "min": 1152,
+     "max": 2000,
+     "economy": 18500,
+     "business": 43000
+    },
+    {
+     "min": 2001,
+     "max": 3000,
+     "economy": 25500,
+     "business": 57000
+    },
+    {
+     "min": 3001,
+     "max": null,
+     "economy": 34000,
+     "business": 68000
+    }
+   ],
+   "surcharge": "none",
+   "fees": "plus taxes; Qatar adds no fuel surcharge (AwardFares)",
+   "secondary": true
+  }
+ },
+ "status_bags": {
+  "_about": "Free checked bags a status gives, from each airline's own pages (research 2026-09-24, checked by a second reader). 'total' means that many bags free in all; 'extra' means that many more than the fare includes. Applied to the member's own bags only; many programmes extend it to companions on the same booking.",
+  "own": {
+   "DL": {
+    "carriers": [
+     "DL",
+     "AF",
+     "AM",
+     "AR",
+     "CI",
+     "DL",
+     "GA",
+     "KE",
+     "KL",
+     "KQ",
+     "ME",
+     "MF",
+     "MU",
+     "RO",
+     "SK",
+     "SV",
+     "UX",
+     "VN",
+     "VS"
+    ],
+    "tiers": {
+     "Silver": [
+      "total",
+      1
+     ],
+     "Gold": [
+      "total",
+      2
+     ],
+     "Platinum": [
+      "total",
+      3
+     ],
+     "Diamond": [
+      "total",
+      3
+     ]
+    },
+    "source": "delta.com Medallion benefits"
+   },
+   "UA": {
+    "carriers": [
+     "UA"
+    ],
+    "tiers": {
+     "Silver": [
+      "total",
+      1
+     ],
+     "Gold": [
+      "total",
+      2
+     ],
+     "Platinum": [
+      "total",
+      3
+     ],
+     "1K": [
+      "total",
+      3
+     ]
+    },
+    "source": "united.com Premier benefits"
+   },
+   "AA": {
+    "carriers": [
+     "AA"
+    ],
+    "tiers": {
+     "Gold": [
+      "total",
+      1
+     ],
+     "Platinum": [
+      "total",
+      2
+     ],
+     "Platinum Pro": [
+      "total",
+      3
+     ],
+     "Executive Platinum": [
+      "total",
+      3
+     ]
+    },
+    "source": "aa.com checked bags"
+   },
+   "AS": {
+    "carriers": [
+     "AS",
+     "HA"
+    ],
+    "tiers": {
+     "Silver": [
+      "total",
+      1
+     ],
+     "Gold": [
+      "total",
+      2
+     ],
+     "Platinum": [
+      "total",
+      3
+     ],
+     "Titanium": [
+      "total",
+      3
+     ]
+    },
+    "source": "alaskaair.com Atmos status"
+   },
+   "BA": {
+    "carriers": [
+     "BA"
+    ],
+    "tiers": {
+     "Silver": [
+      "total",
+      2
+     ],
+     "Gold": [
+      "extra",
+      1
+     ]
+    },
+    "source": "britishairways.com status benefits"
+   },
+   "B6": {
+    "carriers": [
+     "B6"
+    ],
+    "tiers": {
+     "Mosaic 1": [
+      "total",
+      1
+     ],
+     "Mosaic 2": [
+      "total",
+      2
+     ],
+     "Mosaic 3": [
+      "total",
+      2
+     ],
+     "Mosaic 4": [
+      "total",
+      2
+     ]
+    },
+    "source": "jetblue.com Mosaic benefits"
+   },
+   "WN": {
+    "carriers": [
+     "WN"
+    ],
+    "tiers": {
+     "A-List": [
+      "total",
+      1
+     ],
+     "A-List Preferred": [
+      "total",
+      2
+     ]
+    },
+    "source": "southwest.com A-List benefits"
+   },
+   "AC": {
+    "carriers": [
+     "AC"
+    ],
+    "tiers": {
+     "25K": [
+      "extra",
+      1
+     ],
+     "35K": [
+      "total",
+      3
+     ],
+     "50K": [
+      "total",
+      3
+     ],
+     "75K": [
+      "total",
+      3
+     ],
+     "Super Elite": [
+      "total",
+      3
+     ]
+    },
+    "source": "aircanada.com baggage for Aeroplan Elite"
+   }
+  },
+  "alliance": {
+   "star": {
+    "carriers": [
+     "A3",
+     "AC",
+     "AI",
+     "AV",
+     "BR",
+     "CA",
+     "CM",
+     "ET",
+     "LH",
+     "LO",
+     "LX",
+     "MS",
+     "NH",
+     "NZ",
+     "OS",
+     "OU",
+     "OZ",
+     "SA",
+     "SN",
+     "SQ",
+     "TG",
+     "TK",
+     "TP",
+     "UA",
+     "ZH",
+     "AZ"
+    ],
+    "tiers": {
+     "Gold": [
+      "extra",
+      1
+     ]
+    },
+    "source": "staralliance.com Gold benefits",
+    "not_on": {
+     "brands": [
+      "light"
+     ],
+     "carriers": [
+      "LH",
+      "LX",
+      "OS",
+      "SN",
+      "EN"
+     ]
+    }
+   },
+   "oneworld": {
+    "carriers": [
+     "AA",
+     "AS",
+     "BA",
+     "CX",
+     "AY",
+     "IB",
+     "JL",
+     "MH",
+     "QF",
+     "QR",
+     "AT",
+     "RJ",
+     "UL",
+     "FJ",
+     "WY"
+    ],
+    "tiers": {
+     "Sapphire": [
+      "extra",
+      1
+     ],
+     "Emerald": [
+      "extra",
+      1
+     ]
+    },
+    "source": "oneworld.com status benefits"
+   },
+   "skyteam": {
+    "carriers": [
+     "AF",
+     "AM",
+     "AR",
+     "CI",
+     "DL",
+     "GA",
+     "KE",
+     "KL",
+     "KQ",
+     "ME",
+     "MF",
+     "MU",
+     "RO",
+     "SK",
+     "SV",
+     "UX",
+     "VN",
+     "VS"
+    ],
+    "tiers": {
+     "Elite": [
+      "extra",
+      1
+     ],
+     "Elite Plus": [
+      "extra",
+      1
+     ]
+    },
+    "source": "skyteam.com Elite benefits"
+   }
+  },
+  "equivalent": {
+   "DL": {
+    "Silver": [
+     "skyteam",
+     "Elite"
+    ],
+    "Gold": [
+     "skyteam",
+     "Elite Plus"
+    ],
+    "Platinum": [
+     "skyteam",
+     "Elite Plus"
+    ],
+    "Diamond": [
+     "skyteam",
+     "Elite Plus"
+    ]
+   },
+   "VS": {
+    "Silver": [
+     "skyteam",
+     "Elite"
+    ],
+    "Gold": [
+     "skyteam",
+     "Elite Plus"
+    ]
+   },
+   "AF": {
+    "Silver": [
+     "skyteam",
+     "Elite"
+    ],
+    "Gold": [
+     "skyteam",
+     "Elite Plus"
+    ],
+    "Platinum": [
+     "skyteam",
+     "Elite Plus"
+    ]
+   },
+   "UA": {
+    "Silver": [
+     "star",
+     "Silver"
+    ],
+    "Gold": [
+     "star",
+     "Gold"
+    ],
+    "Platinum": [
+     "star",
+     "Gold"
+    ],
+    "1K": [
+     "star",
+     "Gold"
+    ]
+   },
+   "LH": {
+    "Frequent Traveller": [
+     "star",
+     "Silver"
+    ],
+    "Senator": [
+     "star",
+     "Gold"
+    ],
+    "HON Circle": [
+     "star",
+     "Gold"
+    ]
+   },
+   "TK": {
+    "Classic Plus": [
+     "star",
+     "Silver"
+    ],
+    "Elite": [
+     "star",
+     "Gold"
+    ],
+    "Elite Plus": [
+     "star",
+     "Gold"
+    ]
+   },
+   "AC": {
+    "25K": [
+     "star",
+     "Silver"
+    ],
+    "35K": [
+     "star",
+     "Gold"
+    ],
+    "50K": [
+     "star",
+     "Gold"
+    ],
+    "75K": [
+     "star",
+     "Gold"
+    ],
+    "Super Elite": [
+     "star",
+     "Gold"
+    ]
+   },
+   "AA": {
+    "Gold": [
+     "oneworld",
+     "Ruby"
+    ],
+    "Platinum": [
+     "oneworld",
+     "Sapphire"
+    ],
+    "Platinum Pro": [
+     "oneworld",
+     "Emerald"
+    ],
+    "Executive Platinum": [
+     "oneworld",
+     "Emerald"
+    ]
+   },
+   "BA": {
+    "Bronze": [
+     "oneworld",
+     "Ruby"
+    ],
+    "Silver": [
+     "oneworld",
+     "Sapphire"
+    ],
+    "Gold": [
+     "oneworld",
+     "Emerald"
+    ]
+   },
+   "AS": {
+    "Silver": [
+     "oneworld",
+     "Ruby"
+    ],
+    "Gold": [
+     "oneworld",
+     "Sapphire"
+    ],
+    "Platinum": [
+     "oneworld",
+     "Emerald"
+    ],
+    "Titanium": [
+     "oneworld",
+     "Emerald"
+    ]
+   }
+  }
+ },
+ "geo": {
+  "country_sets": {
+   "europe": [
+    "AD",
+    "AL",
+    "AT",
+    "BA",
+    "BE",
+    "BG",
+    "BY",
+    "CH",
+    "CY",
+    "CZ",
+    "DE",
+    "DK",
+    "EE",
+    "ES",
+    "FI",
+    "FO",
+    "FR",
+    "GB",
+    "GI",
+    "GR",
+    "HR",
+    "HU",
+    "IE",
+    "IS",
+    "IT",
+    "LI",
+    "LT",
+    "LU",
+    "LV",
+    "MC",
+    "MD",
+    "ME",
+    "MK",
+    "MT",
+    "NL",
+    "NO",
+    "PL",
+    "PT",
+    "RO",
+    "RS",
+    "SE",
+    "SI",
+    "SK",
+    "SM",
+    "UA",
+    "VA",
+    "XK"
+   ],
+   "mideast": [
+    "AE",
+    "BH",
+    "IL",
+    "IQ",
+    "IR",
+    "JO",
+    "KW",
+    "LB",
+    "OM",
+    "PS",
+    "QA",
+    "SA",
+    "SY",
+    "YE"
+   ],
+   "north_africa": [
+    "DZ",
+    "EG",
+    "LY",
+    "MA",
+    "SD",
+    "TN"
+   ],
+   "southern_africa": [
+    "ZA",
+    "NA",
+    "BW",
+    "ZW",
+    "ZM",
+    "MZ",
+    "LS",
+    "SZ"
+   ],
+   "africa_rest": [
+    "AO",
+    "BF",
+    "BI",
+    "BJ",
+    "CD",
+    "CF",
+    "CG",
+    "CI",
+    "CM",
+    "CV",
+    "DJ",
+    "ER",
+    "ET",
+    "GA",
+    "GH",
+    "GM",
+    "GN",
+    "GQ",
+    "GW",
+    "KE",
+    "KM",
+    "LR",
+    "MG",
+    "ML",
+    "MR",
+    "MU",
+    "MW",
+    "NE",
+    "NG",
+    "RE",
+    "RW",
+    "SC",
+    "SL",
+    "SN",
+    "SO",
+    "SS",
+    "ST",
+    "TD",
+    "TG",
+    "TZ",
+    "UG",
+    "YT"
+   ],
+   "south_asia": [
+    "IN",
+    "PK",
+    "BD",
+    "LK",
+    "NP",
+    "BT",
+    "MV",
+    "AF"
+   ],
+   "central_asia": [
+    "KZ",
+    "KG",
+    "TJ",
+    "TM",
+    "UZ"
+   ],
+   "caucasus": [
+    "AM",
+    "AZ",
+    "GE"
+   ],
+   "east_asia": [
+    "CN",
+    "HK",
+    "MO",
+    "TW",
+    "JP",
+    "KR",
+    "KP",
+    "MN"
+   ],
+   "southeast_asia": [
+    "BN",
+    "KH",
+    "ID",
+    "LA",
+    "MY",
+    "MM",
+    "PH",
+    "SG",
+    "TH",
+    "TL",
+    "VN"
+   ],
+   "oceania": [
+    "AU",
+    "NZ",
+    "FJ",
+    "PG",
+    "NC",
+    "PF",
+    "WS",
+    "TO",
+    "VU",
+    "SB",
+    "KI",
+    "FM",
+    "MH",
+    "PW",
+    "GU",
+    "MP",
+    "AS",
+    "CK",
+    "NR",
+    "TV"
+   ],
+   "central_america": [
+    "BZ",
+    "CR",
+    "SV",
+    "GT",
+    "HN",
+    "NI",
+    "PA"
+   ],
+   "caribbean": [
+    "AG",
+    "AI",
+    "AW",
+    "BB",
+    "BL",
+    "BQ",
+    "BS",
+    "CU",
+    "CW",
+    "DM",
+    "DO",
+    "GD",
+    "GP",
+    "HT",
+    "JM",
+    "KN",
+    "KY",
+    "LC",
+    "MF",
+    "MQ",
+    "MS",
+    "PR",
+    "SX",
+    "TC",
+    "TT",
+    "VC",
+    "VG",
+    "VI"
+   ],
+   "south_america": [
+    "AR",
+    "BO",
+    "BR",
+    "CL",
+    "CO",
+    "EC",
+    "FK",
+    "GF",
+    "GY",
+    "PE",
+    "PY",
+    "SR",
+    "UY",
+    "VE"
+   ]
+  },
+  "canaries_madeira_azores": [
+   "LPA",
+   "TFS",
+   "TFN",
+   "ACE",
+   "FUE",
+   "SPC",
+   "GMZ",
+   "VDE",
+   "FNC",
+   "PXO",
+   "PDL",
+   "TER",
+   "HOR"
+  ],
+  "london": [
+   "LHR",
+   "LGW",
+   "LCY",
+   "STN",
+   "LTN"
+  ],
+  "ba_city": {
+   "JFK": "New York",
+   "EWR": "New York",
+   "IAD": "Washington DC",
+   "DCA": "Washington DC",
+   "BWI": "Baltimore",
+   "ORD": "Chicago",
+   "BOS": "Boston",
+   "PHL": "Philadelphia",
+   "PIT": "Pittsburgh",
+   "CVG": "Cincinnati",
+   "YYZ": "Toronto",
+   "YUL": "Montreal",
+   "BDA": "Bermuda",
+   "ATL": "Atlanta",
+   "AUS": "Austin",
+   "DFW": "Dallas",
+   "DEN": "Denver",
+   "IAH": "Houston",
+   "LAS": "Las Vegas",
+   "LAX": "Los Angeles",
+   "MIA": "Miami",
+   "BNA": "Nashville",
+   "MSY": "New Orleans",
+   "MCO": "Orlando",
+   "PHX": "Phoenix",
+   "PDX": "Portland (Oregon)",
+   "SAN": "San Diego",
+   "SFO": "San Francisco",
+   "SEA": "Seattle",
+   "STL": "St Louis",
+   "TPA": "Tampa",
+   "YVR": "Vancouver",
+   "MEX": "Mexico City",
+   "CUN": "Cancun",
+   "SJO": "San Jose (C’Rica)",
+   "GCM": "Grand Cayman",
+   "KIN": "Kingston",
+   "NAS": "Nassau",
+   "PUJ": "Punta Cana",
+   "PLS": "Turks and Caicos",
+   "SKB": "St Kitts",
+   "UVF": "St Lucia",
+   "POS": "Port of Spain",
+   "TAB": "Tobago",
+   "ANU": "Antigua",
+   "BGI": "Barbados",
+   "GND": "Grenada",
+   "GEO": "Georgetown (Guyana)",
+   "BLR": "Bengalaru",
+   "MAA": "Chennai",
+   "CMB": "Colombo",
+   "DEL": "Delhi",
+   "HYD": "Hyderabad",
+   "BOM": "Mumbai",
+   "MLE": "Male",
+   "NBO": "Nairobi",
+   "CPT": "Cape Town",
+   "JNB": "Johannesburg",
+   "AUH": "Abu Dhabi",
+   "ACC": "Accra",
+   "BAH": "Bahrain",
+   "DOH": "Doha",
+   "DXB": "Dubai",
+   "ISB": "Islamabad",
+   "LOS": "Lagos",
+   "RUH": "Riyadh",
+   "ABV": "Abuja",
+   "BKK": "Bangkok",
+   "HKG": "Hong Kong",
+   "MRU": "Mauritius",
+   "GIG": "Rio De Janeiro",
+   "GRU": "Sao Paulo",
+   "PVG": "Shanghai",
+   "HND": "Tokyo",
+   "NRT": "Tokyo",
+   "EZE": "Buenos Aires",
+   "KUL": "Kuala Lumpur",
+   "SCL": "Santiago",
+   "SIN": "Singapore",
+   "MEL": "Melbourne",
+   "SYD": "Sydney",
+   "CDG": "Paris",
+   "ORY": "Paris",
+   "MXP": "Milan",
+   "LIN": "Milan",
+   "FCO": "Rome",
+   "BER": "Berlin",
+   "TLV": "Tel Aviv",
+   "CAI": "Cairo",
+   "AMM": "Amman",
+   "IST": "Istanbul",
+   "KEF": "Reykjavik",
+   "ATH": "Athens",
+   "LIS": "Lisbon",
+   "MAD": "Madrid",
+   "BCN": "Barcelona"
+  },
+  "us_state": {
+   "JFK": "NY",
+   "LGA": "NY",
+   "EWR": "NJ",
+   "BOS": "MA",
+   "PHL": "PA",
+   "PIT": "PA",
+   "IAD": "VA",
+   "DCA": "VA",
+   "BWI": "MD",
+   "ATL": "GA",
+   "MIA": "FL",
+   "MCO": "FL",
+   "TPA": "FL",
+   "FLL": "FL",
+   "RSW": "FL",
+   "JAX": "FL",
+   "PBI": "FL",
+   "ORD": "IL",
+   "MDW": "IL",
+   "DTW": "MI",
+   "CLE": "OH",
+   "CMH": "OH",
+   "CVG": "KY",
+   "MSP": "MN",
+   "CLT": "NC",
+   "RDU": "NC",
+   "BNA": "TN",
+   "MSY": "LA",
+   "IAH": "TX",
+   "HOU": "TX",
+   "DFW": "TX",
+   "DAL": "TX",
+   "AUS": "TX",
+   "SAT": "TX",
+   "DEN": "CO",
+   "LAX": "CA",
+   "SFO": "CA",
+   "SAN": "CA",
+   "SJC": "CA",
+   "OAK": "CA",
+   "SMF": "CA",
+   "SNA": "CA",
+   "SEA": "WA",
+   "PDX": "OR",
+   "SLC": "UT",
+   "LAS": "NV",
+   "PHX": "AZ",
+   "HNL": "HI",
+   "OGG": "HI",
+   "KOA": "HI",
+   "LIH": "HI",
+   "ANC": "AK",
+   "FAI": "AK",
+   "STL": "MO",
+   "MCI": "MO",
+   "IND": "IN",
+   "MKE": "WI",
+   "BDL": "CT",
+   "PVD": "RI",
+   "SYR": "NY",
+   "BUF": "NY",
+   "ROC": "NY",
+   "ALB": "NY",
+   "SWF": "NY",
+   "HPN": "NY",
+   "ISP": "NY",
+   "SAV": "GA",
+   "CHS": "SC",
+   "RIC": "VA",
+   "ORF": "VA",
+   "SDF": "KY",
+   "MEM": "TN",
+   "OKC": "OK",
+   "TUL": "OK",
+   "ABQ": "NM",
+   "BOI": "ID",
+   "ELP": "TX",
+   "ONT": "CA",
+   "BUR": "CA",
+   "LGB": "CA",
+   "PSP": "CA",
+   "TUS": "AZ"
+  },
+  "ca_province": {
+   "YYZ": "ON",
+   "YOW": "ON",
+   "YTZ": "ON",
+   "YHM": "ON",
+   "YUL": "QC",
+   "YQB": "QC",
+   "YVR": "BC",
+   "YYC": "AB",
+   "YEG": "AB",
+   "YWG": "MB",
+   "YHZ": "NS"
+  },
+  "vs_zones": {
+   "1": {
+    "countries": [
+     "GB",
+     "IE",
+     "FR",
+     "DE",
+     "NL",
+     "BE",
+     "LU",
+     "CH",
+     "AT",
+     "ES",
+     "PT",
+     "IT",
+     "DK",
+     "NO",
+     "SE",
+     "MC",
+     "AD",
+     "LI",
+     "SM",
+     "VA"
+    ]
+   },
+   "2": {
+    "countries": [
+     "GR",
+     "PL",
+     "CZ",
+     "TR",
+     "IL",
+     "IS",
+     "MA",
+     "HU",
+     "SK",
+     "RO",
+     "BG",
+     "HR",
+     "SI",
+     "RS",
+     "BA",
+     "ME",
+     "MK",
+     "AL",
+     "EE",
+     "LV",
+     "LT",
+     "TN",
+     "DZ"
+    ],
+    "airports": [
+     "LPA",
+     "TFS",
+     "TFN",
+     "ACE",
+     "FUE",
+     "SPC"
+    ]
+   },
+   "3": {
+    "countries": [
+     "AE",
+     "QA",
+     "SA",
+     "KW",
+     "BH",
+     "OM",
+     "JO",
+     "LB"
+    ]
+   },
+   "5": {
+    "countries": [
+     "ZA",
+     "MU",
+     "SC",
+     "IN",
+     "LK",
+     "MV"
+    ]
+   },
+   "6": {
+    "us_states": [
+     "NY",
+     "NJ",
+     "PA",
+     "MA",
+     "DC",
+     "FL",
+     "GA",
+     "IL",
+     "MI",
+     "OH"
+    ],
+    "ca_provinces": [
+     "ON",
+     "QC"
+    ],
+    "countries": [
+     "AG",
+     "AI",
+     "AW",
+     "BB",
+     "BL",
+     "BQ",
+     "BS",
+     "CU",
+     "CW",
+     "DM",
+     "DO",
+     "GD",
+     "GP",
+     "HT",
+     "JM",
+     "KN",
+     "KY",
+     "LC",
+     "MF",
+     "MQ",
+     "MS",
+     "PR",
+     "SX",
+     "TC",
+     "TT",
+     "VC",
+     "VG",
+     "VI"
+    ]
+   },
+   "7": {
+    "us_states": [
+     "TX",
+     "CO",
+     "CA",
+     "WA",
+     "HI",
+     "AK"
+    ],
+    "countries": [
+     "MX",
+     "BZ",
+     "CR",
+     "SV",
+     "GT",
+     "HN",
+     "NI",
+     "PA"
+    ]
+   },
+   "8": {
+    "countries": [
+     "AR",
+     "BO",
+     "BR",
+     "CL",
+     "CO",
+     "EC",
+     "FK",
+     "GF",
+     "GY",
+     "PE",
+     "PY",
+     "SR",
+     "UY",
+     "VE"
+    ]
+   },
+   "9": {
+    "countries": [
+     "JP",
+     "KR",
+     "CN",
+     "HK",
+     "TW"
+    ]
+   },
+   "10": {
+    "countries": [
+     "AU",
+     "NZ"
+    ]
+   }
+  },
+  "ana_zones": {
+   "Japan (Zone 1-B)": {
+    "countries": [
+     "JP"
+    ]
+   },
+   "South Korea, Russia 1 (Zone 2)": {
+    "countries": [
+     "KR"
+    ]
+   },
+   "Hawaii (Zone 5)": {
+    "us_hawaii": true
+   },
+   "North America (Zone 6)": {
+    "countries": [
+     "US",
+     "CA"
+    ],
+    "not_hawaii": true
+   },
+   "Europe, Russia 2 (Zone 7)": {
+    "countries": [
+     "AD",
+     "AL",
+     "AT",
+     "BA",
+     "BE",
+     "BG",
+     "CH",
+     "CY",
+     "CZ",
+     "DE",
+     "DK",
+     "EE",
+     "ES",
+     "FI",
+     "FO",
+     "FR",
+     "GB",
+     "GI",
+     "GR",
+     "HR",
+     "HU",
+     "IE",
+     "IS",
+     "IT",
+     "LI",
+     "LT",
+     "LU",
+     "LV",
+     "MC",
+     "ME",
+     "MK",
+     "MT",
+     "NL",
+     "NO",
+     "PL",
+     "PT",
+     "RO",
+     "RS",
+     "SE",
+     "SI",
+     "SK",
+     "SM",
+     "VA",
+     "XK"
+    ]
+   }
+  },
+  "tk_regions": {
+   "Türkiye": {
+    "countries": [
+     "TR"
+    ]
+   },
+   "Europe 1": {
+    "countries": [
+     "AL",
+     "AM",
+     "BA",
+     "BG",
+     "HR",
+     "GE",
+     "GR",
+     "HU",
+     "XK",
+     "MD",
+     "ME",
+     "MK",
+     "RO",
+     "RS",
+     "SI",
+     "UA"
+    ]
+   },
+   "Europe 2": {
+    "countries": [
+     "AT",
+     "AZ",
+     "BY",
+     "BE",
+     "CZ",
+     "DK",
+     "EE",
+     "FO",
+     "FI",
+     "FR",
+     "DE",
+     "IS",
+     "IE",
+     "IT",
+     "LV",
+     "LT",
+     "LU",
+     "MT",
+     "NL",
+     "NO",
+     "PL",
+     "PT",
+     "RU",
+     "SK",
+     "ES",
+     "SE",
+     "CH",
+     "GB"
+    ]
+   },
+   "North America": {
+    "countries": [
+     "US",
+     "CA",
+     "MX",
+     "GL"
+    ]
+   }
+  },
+  "mm_regions": {
+   "North America": {
+    "countries": [
+     "US",
+     "CA",
+     "GL"
+    ],
+    "not_hawaii": true
+   },
+   "Hawaii": {
+    "us_hawaii": true
+   },
+   "Europe": {
+    "countries": [
+     "AD",
+     "AL",
+     "AT",
+     "BA",
+     "BE",
+     "BG",
+     "BY",
+     "CH",
+     "CY",
+     "CZ",
+     "DE",
+     "DK",
+     "EE",
+     "ES",
+     "FI",
+     "FO",
+     "FR",
+     "GB",
+     "GI",
+     "GR",
+     "HR",
+     "HU",
+     "IE",
+     "IS",
+     "IT",
+     "LI",
+     "LT",
+     "LU",
+     "LV",
+     "MC",
+     "MD",
+     "ME",
+     "MK",
+     "MT",
+     "NL",
+     "NO",
+     "PL",
+     "PT",
+     "RO",
+     "RS",
+     "SE",
+     "SI",
+     "SK",
+     "SM",
+     "UA",
+     "VA",
+     "XK",
+     "TR",
+     "RU"
+    ],
+    "not_airports": [
+     "LPA",
+     "TFS",
+     "TFN",
+     "ACE",
+     "FUE",
+     "SPC",
+     "GMZ",
+     "VDE",
+     "FNC",
+     "PXO",
+     "PDL",
+     "TER",
+     "HOR"
+    ]
+   },
+   "Central America/Caribbean": {
+    "countries": [
+     "MX",
+     "BZ",
+     "CR",
+     "SV",
+     "GT",
+     "HN",
+     "NI",
+     "PA",
+     "AG",
+     "AI",
+     "AW",
+     "BB",
+     "BL",
+     "BQ",
+     "BS",
+     "CU",
+     "CW",
+     "DM",
+     "DO",
+     "GD",
+     "GP",
+     "HT",
+     "JM",
+     "KN",
+     "KY",
+     "LC",
+     "MF",
+     "MQ",
+     "MS",
+     "PR",
+     "SX",
+     "TC",
+     "TT",
+     "VC",
+     "VG",
+     "VI"
+    ]
+   },
+   "South America": {
+    "countries": [
+     "AR",
+     "BO",
+     "BR",
+     "CL",
+     "CO",
+     "EC",
+     "FK",
+     "GF",
+     "GY",
+     "PE",
+     "PY",
+     "SR",
+     "UY",
+     "VE"
+    ]
+   },
+   "Middle East/Caucasus/North & Central Africa": {
+    "countries": [
+     "AE",
+     "BH",
+     "IL",
+     "IQ",
+     "IR",
+     "JO",
+     "KW",
+     "LB",
+     "OM",
+     "PS",
+     "QA",
+     "SA",
+     "SY",
+     "YE",
+     "AM",
+     "AZ",
+     "GE",
+     "DZ",
+     "EG",
+     "LY",
+     "MA",
+     "SD",
+     "TN"
+    ],
+    "airports": [
+     "LPA",
+     "TFS",
+     "TFN",
+     "ACE",
+     "FUE",
+     "SPC",
+     "GMZ",
+     "VDE",
+     "FNC",
+     "PXO",
+     "PDL",
+     "TER",
+     "HOR"
+    ]
+   },
+   "Southern Africa": {
+    "countries": [
+     "ZA",
+     "NA",
+     "BW",
+     "ZW",
+     "ZM",
+     "MZ",
+     "LS",
+     "SZ"
+    ]
+   },
+   "India": {
+    "countries": [
+     "IN"
+    ]
+   },
+   "Southeast Asia": {
+    "countries": [
+     "BN",
+     "KH",
+     "ID",
+     "LA",
+     "MY",
+     "MM",
+     "PH",
+     "SG",
+     "TH",
+     "TL",
+     "VN"
+    ]
+   },
+   "Central Asia/Far East": {
+    "countries": [
+     "CN",
+     "HK",
+     "MO",
+     "TW",
+     "JP",
+     "KR",
+     "KP",
+     "MN",
+     "KZ",
+     "KG",
+     "TJ",
+     "TM",
+     "UZ"
+    ]
+   },
+   "Australia/New Zealand/Oceania": {
+    "countries": [
+     "AU",
+     "NZ",
+     "FJ",
+     "PG",
+     "NC",
+     "PF",
+     "WS",
+     "TO",
+     "VU",
+     "SB",
+     "KI",
+     "FM",
+     "MH",
+     "PW",
+     "GU",
+     "MP",
+     "AS",
+     "CK",
+     "NR",
+     "TV"
+    ]
+   }
+  },
+  "sq_zones": {
+   "2": {
+    "countries": [
+     "MY",
+     "ID",
+     "BN"
+    ]
+   },
+   "3": {
+    "countries": [
+     "PH",
+     "TH",
+     "VN",
+     "MM",
+     "KH"
+    ]
+   },
+   "4": {
+    "countries": [
+     "HK",
+     "TW"
+    ],
+    "airports": [
+     "CAN",
+     "SZX",
+     "XMN"
+    ]
+   },
+   "5": {
+    "airports": [
+     "PEK",
+     "PKX",
+     "PVG",
+     "SHA"
+    ]
+   },
+   "6": {
+    "countries": [
+     "IN",
+     "LK",
+     "MV",
+     "BD"
+    ]
+   },
+   "7": {
+    "countries": [
+     "JP",
+     "KR"
+    ]
+   },
+   "8": {
+    "airports": [
+     "PER",
+     "DRW"
+    ]
+   },
+   "9": {
+    "countries": [
+     "AU",
+     "NZ"
+    ],
+    "not_airports": [
+     "PER",
+     "DRW"
+    ]
+   },
+   "10": {
+    "countries": [
+     "AE",
+     "BH",
+     "IL",
+     "IQ",
+     "IR",
+     "JO",
+     "KW",
+     "LB",
+     "OM",
+     "PS",
+     "QA",
+     "SA",
+     "SY",
+     "YE",
+     "DZ",
+     "EG",
+     "LY",
+     "MA",
+     "SD",
+     "TN",
+     "ZA",
+     "NA",
+     "BW",
+     "ZW",
+     "ZM",
+     "MZ",
+     "LS",
+     "SZ",
+     "AO",
+     "BF",
+     "BI",
+     "BJ",
+     "CD",
+     "CF",
+     "CG",
+     "CI",
+     "CM",
+     "CV",
+     "DJ",
+     "ER",
+     "ET",
+     "GA",
+     "GH",
+     "GM",
+     "GN",
+     "GQ",
+     "GW",
+     "KE",
+     "KM",
+     "LR",
+     "MG",
+     "ML",
+     "MR",
+     "MU",
+     "MW",
+     "NE",
+     "NG",
+     "RE",
+     "RW",
+     "SC",
+     "SL",
+     "SN",
+     "SO",
+     "SS",
+     "ST",
+     "TD",
+     "TG",
+     "TZ",
+     "UG",
+     "YT",
+     "TR"
+    ]
+   },
+   "11": {
+    "countries": [
+     "AD",
+     "AL",
+     "AT",
+     "BA",
+     "BE",
+     "BG",
+     "BY",
+     "CH",
+     "CY",
+     "CZ",
+     "DE",
+     "DK",
+     "EE",
+     "ES",
+     "FI",
+     "FO",
+     "FR",
+     "GB",
+     "GI",
+     "GR",
+     "HR",
+     "HU",
+     "IE",
+     "IS",
+     "IT",
+     "LI",
+     "LT",
+     "LU",
+     "LV",
+     "MC",
+     "MD",
+     "ME",
+     "MK",
+     "MT",
+     "NL",
+     "NO",
+     "PL",
+     "PT",
+     "RO",
+     "RS",
+     "SE",
+     "SI",
+     "SK",
+     "SM",
+     "UA",
+     "VA",
+     "XK"
+    ]
+   },
+   "12": {
+    "airports": [
+     "SFO",
+     "LAX",
+     "SEA"
+    ]
+   },
+   "13": {
+    "airports": [
+     "JFK",
+     "EWR"
+    ]
+   }
+  }
+ }
+}

@@ -31,11 +31,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, os.path.join(ROOT, "concorde-travel"))
 import adapter    # noqa: E402
+import points     # noqa: E402
 import scorer     # noqa: E402
 import server     # noqa: E402
 
 POOL = 36          # options carried; a real page shows about this many before "more"
 CHEAPEST_TICKETS = 5   # always in the pool, whatever their rank
+BEST_AWARDS = 6        # and the flights where a published award chart buys the most ticket per mile
 TOP_PER_TARGET = 10    # the best under each target
 STEPS = 10         # triangle resolution: (STEPS+1)(STEPS+2)/2 = 66 weightings
 NAMED = {"cheapest": (1, 0, 0), "fastest": (0, 1, 0), "comfort": (0, 0, 1)}
@@ -255,6 +257,20 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
     for o in sorted(feasible, key=lambda o: (adapter._ticket_cents(o), o["option_id"]))[:CHEAPEST_TICKETS]:
         if o["option_id"] not in pool_ids:
             pool_ids.append(o["option_id"])
+    # Award prices for every flight, before the pool is cut (2026-09-24): the pool is chosen before anyone's points
+    # are known, and a $6,700 Delta One that 47,500 Virgin points buy ranked too low on cash to reach the page. The
+    # flights where a published chart buys the most ticket per mile always reach it, shown lower with their reasons.
+    pfacts = points.facts_for({sg[k]["iata"] for op_ in feasible for sg in op_["segments"] for k in ("origin", "destination")},
+                              adapter.load_enrichment()["airports"]["airports"], geo)
+    award_of = {o["option_id"]: points.awards([{"from": sg["origin"]["iata"], "to": sg["destination"]["iata"],
+                                                 "op": (sg.get("operating") or {}).get("carrier") or sg["marketing"]["carrier"],
+                                                 "mk": sg["marketing"]["carrier"], "cabin": sg.get("cabin_marketed"),
+                                                 "date": str(sg.get("departure_local") or "")[:10]} for sg in o["segments"]], pfacts)
+                for o in feasible}
+    per_mile = lambda o: max([adapter._ticket_cents(o) / a["miles"] for a in award_of[o["option_id"]]["priced"] if a["miles"]] or [0])
+    for o in sorted((o for o in feasible if per_mile(o) > 0), key=lambda o: (-per_mile(o), o["option_id"]))[:BEST_AWARDS]:
+        if o["option_id"] not in pool_ids:
+            pool_ids.append(o["option_id"])
     rest = [o for o in sorted(feasible, key=lambda o: (ref[o["option_id"]].effective_cents, o["option_id"]))
             if o["option_id"] not in pool_ids]
     need = max(0, POOL - len(pool_ids))
@@ -333,6 +349,13 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
                           "dep": s["dep"], "arr": s["arr"], "equipment": s["equipment"], "cabin": so.get("cabin_marketed")}
                          for s, so in zip(v["segments"], o["segments"])]
         e["booking"] = v["booking"]
+        # award prices from the published charts (points.py), per flight in its own cabin: what a seat costs in each
+        # programme if one is released, and the programmes that can book it but publish no price (2026-09-24)
+        aw = award_of[o["option_id"]]
+        e["awards"] = [{k: a[k] for k in ("prog", "chart", "chart_name", "miles", "low", "low_when", "cabin", "basis", "fee_usd",
+                                          "fee_known", "fee_local", "fees", "surcharge", "floor", "season", "caveat", "url", "secondary")
+                        if a.get(k) not in (None, False, "")} for a in aw["priced"]]
+        e["award_bookable"] = aw["bookable"]
         # Per-target: effective, the ledger and the legs (the ground choice can
         # differ by target, so the legs are per target too).
         e["by"] = {}
