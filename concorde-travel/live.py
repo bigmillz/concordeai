@@ -967,6 +967,89 @@ def flight_status(number, date, cfg=None, allow_call=True):
     return payload, {"source": "api", "quota": quota_state(cfg, qf)}
 
 
+# ------------------------------------------------------------ duffel extras
+#
+# The real bag and seat prices for ONE offer (2026-09-25, per Patrick: "go ahead with Duffel's per flight lookups for
+# the airlines that we can do that for"). Duffel quotes them only for the airlines it connects to directly (UA, BA, AF,
+# KL, LH, LX, OS, SN both; AA seats; EK and TP bags, per its airline pages), never on the search, and only through two
+# more calls: the offer with return_available_services, and its seat maps. By the Duffel services agreement only offer
+# REQUESTS count as searches, so these are believed free, but they get their own counters anyway, and the same
+# discipline: cache first (an offer lives about 30 minutes), quota reserved before the call, the key never escaping.
+_DUFFEL_EXTRAS_QUOTA = {"per_day": 300, "per_month": 6000, "min_seconds_between_calls": 0.4, "cache_ttl_seconds": 1500}
+
+
+def _duffel_extras_quota_file():
+    return os.path.join(os.path.dirname(QUOTA_FILE), "quota-duffel-extras.json")
+
+
+def duffel_extras(offer_id, cfg=None, allow_call=True):
+    """(payload, meta): {"offer": the offer with its available services or None, "seat_maps": [...]} for one Duffel
+    offer id. An expired or unknown offer, and a seat map the airline does not give, are answers (empty), not errors."""
+    cfg = cfg or load_config()
+    oid = str(offer_id or "")
+    if not re.match(r"^off_[A-Za-z0-9]{10,40}$", oid):
+        return None, {"source": "none", "error": "Not a flight this lookup can price."}
+    if cfg.get("provider") != "duffel":
+        return None, {"source": "none", "error": "Extras are priced only for the Duffel feed."}
+    quota = dict(_DUFFEL_EXTRAS_QUOTA)
+    quota.update(cfg.get("duffel_extras_quota") or {})
+    qcfg = {"quota": quota}
+    qf = _duffel_extras_quota_file()
+    query = {"engine": "duffel-extras", "offer": oid}
+    hit = cache_get(query, quota["cache_ttl_seconds"])
+    if hit:
+        return hit["payload"], {"source": "cache", "age_seconds": hit["_age_seconds"], "quota": quota_state(qcfg, qf)}
+    have, missing = credentials_complete(cfg)
+    if not have:
+        return None, {"source": "none", "error": missing, "quota": quota_state(qcfg, qf)}
+    if not allow_call:
+        return None, {"source": "none", "error": "live calls are disabled for this request", "quota": quota_state(qcfg, qf)}
+    headers, auth_err = _auth_headers(cfg)
+    if auth_err:
+        return None, {"source": "none", "error": auth_err, "quota": quota_state(qcfg, qf)}
+    hdrs = dict(headers)
+    hdrs.update(cfg.get("extra_headers") or {})
+    hdrs.update({"Accept": "application/json", "User-Agent": UA})
+    secrets = (cfg.get("key") or "", cfg.get("secret", "")) + tuple(headers.values())
+    base = (cfg.get("base") or "https://api.duffel.com").rstrip("/")
+
+    def get(path):
+        ok, why = _reserve_paced(qcfg, qf)
+        if not ok:
+            return "quota", why
+        req = urllib.request.Request(base + path, headers=hdrs)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return r.status, json.loads(r.read(MAX_RESPONSE_BYTES).decode("utf-8", "replace"))
+        except urllib.error.HTTPError as exc:
+            try:
+                body = json.loads(exc.read().decode("utf-8", "replace")[:4000])
+            except Exception:
+                body = {}
+            return exc.code, body
+        except (urllib.error.URLError, OSError, ValueError) as exc:
+            _refund(qf)
+            return "net", redact(str(exc), *secrets)
+
+    st, off = get("/air/offers/%s?return_available_services=true" % oid)
+    if st in ("quota", "net"):
+        return None, {"source": "none", "error": off if st == "quota" else "Could not reach the flight service. Try again.",
+                      "quota": quota_state(qcfg, qf)}
+    codes = [str(e.get("code") or "") for e in ((off or {}).get("errors") or [])] if isinstance(off, dict) else []
+    if st != 200:
+        # an expired or withdrawn offer is an answer: nothing to price any more, and the page says so
+        payload = {"offer": None, "seat_maps": [], "expired": st in (404, 410, 422) or "offer_expired" in codes,
+                   "error_codes": codes}
+        cache_put(query, payload)
+        return payload, {"source": "api", "quota": quota_state(qcfg, qf), "status": st}
+    st2, sm = get("/air/seat_maps?offer_id=%s" % oid)
+    seat_maps = (sm.get("data") or []) if st2 == 200 and isinstance(sm, dict) else []
+    payload = {"offer": off.get("data"), "seat_maps": seat_maps, "expired": False,
+               "seat_map_status": st2 if st2 not in ("quota", "net") else None}
+    cache_put(query, payload)
+    return payload, {"source": "api", "quota": quota_state(qcfg, qf)}
+
+
 def _count_results(payload):
     """How many itineraries came back, across three unrelated response shapes.
 

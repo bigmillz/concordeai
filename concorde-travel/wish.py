@@ -29,7 +29,8 @@ WANTS = {
     "legroom": "Extra legroom", "flex": "Flexible ticket",
     "day": "Daytime flight", "refund": "Refundable", "co2": "Lower emissions",
     "sameapt": "Same airport", "bagin": "Bag included", "carryon": "Free carry-on",
-    "toprated": "Top-rated airline",
+    "toprated": "Top-rated airline", "overnight": "Overnight flight", "meals": "Meals served",
+    "lounge": "Lounge access",
 }
 TILTS = {
     "asap": "Get there as soon as possible", "1,0,0": "Lean toward price",

@@ -56,3 +56,38 @@ for src in sorted(glob.glob(os.path.join(HERE, "mock-*.src.html"))):
                 sys.exit("mock-%d.html script %d does not parse; the page would be dead:\n%s" % (n, i, r.stderr.strip()[-600:]))
     elif n == 10:
         print("  (no node on this machine: the scripts were not syntax-checked)")
+    # A script that parses can still die while the page loads: a shared const read before its line has run throws in
+    # the temporal dead zone and stops every line after it (2026-09-25: the lounge chip's rules were read by prepWants,
+    # which runs at load, above where they were defined). So mock 10 is opened in headless Chrome, when this machine
+    # has it, and any error while it loads stops the build. Skipped, and said so, without Chrome.
+    if n == 10:
+        chrome = next((c for c in ("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", shutil.which("google-chrome") or "",
+                                   shutil.which("chromium") or "", shutil.which("chromium-browser") or "") if c and os.path.exists(c)), None)
+        if chrome:
+            page = open(out, encoding="utf-8").read()
+            probe = ('<script>window.__E=[];addEventListener("error",e=>__E.push(e.error&&e.error.stack||e.message));'
+                     'addEventListener("unhandledrejection",e=>__E.push(String(e.reason&&e.reason.stack||e.reason)));</script>')
+            done = ('<script>addEventListener("load",()=>setTimeout(()=>{document.body.innerHTML="<pre id=loaderr></pre>";'
+                    'document.getElementById("loaderr").textContent=JSON.stringify(__E)},800));</script>')
+            i = page.index("<head>") + 6 if "<head>" in page else 0
+            page = page[:i] + probe + page[i:]
+            j = page.rindex("</body>")
+            page = page[:j] + done + page[j:]
+            with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False, encoding="utf-8") as fh:
+                fh.write(page)
+            try:
+                r = subprocess.run([chrome, "--headless=new", "--disable-gpu", "--virtual-time-budget=6000", "--dump-dom", "file://" + fh.name],
+                                   capture_output=True, text=True, timeout=120)
+            finally:
+                os.unlink(fh.name)
+            m = re.search(r'<pre id="loaderr">(.*?)</pre>', r.stdout, re.S)
+            import html as _html
+            errs = json.loads(_html.unescape(m.group(1))) if m else None
+            if errs is None:
+                print("  (headless Chrome gave no answer: the page was not load-checked)")
+            elif errs:
+                sys.exit("mock-10.html throws while it loads; the page would be dead:\n" + "\n".join(str(e)[:400] for e in errs[:3]))
+            else:
+                print("  mock-10.html loads with no errors (headless Chrome)")
+        else:
+            print("  (no Chrome on this machine: the page was not load-checked)")

@@ -507,6 +507,84 @@ def _short_haul(o_iata: str, d_iata: str, enr: Dict[str, Any], geo: Optional[Dic
     return _ground.haversine_km(float(la1), float(lo1), float(la2), float(lo2)) <= SHORT_HAUL_KM
 
 
+# IATA traffic conference areas by country (Area 1 the Americas, Area 3 Asia and the Pacific, everything else Area 2:
+# Europe, Africa, the Middle East). Airlines' long-haul catering follows intercontinental flying, which is what an area
+# crossing is (2026-09-25): New York to Dublin crosses, New York to Costa Rica and Canada to Hawaii do not.
+_AREA1 = set(("US CA MX GT BZ SV HN NI CR PA CO VE EC PE BO CL AR UY PY BR GY SR GF CU JM HT DO PR BS BB TT AG DM LC VC GD "
+              "KN AI VG VI KY TC BM AW CW SX BQ MQ GP MS BL MF PM GL FK").split())
+_AREA3 = set(("CN JP KR KP TW HK MO MN IN PK BD LK NP BT MV AF MM TH LA KH VN MY SG ID BN PH TL AU NZ PG FJ SB VU NC PF WS "
+              "TO KI TV NR FM MH PW GU MP CK NU WF KZ UZ TM TJ KG").split())
+
+
+def iata_area(iata: str, enr: Dict[str, Any], geo: Optional[Dict[str, Any]] = None) -> Optional[int]:
+    """The airport's IATA area: the curated table's, else from its country; None when neither is known."""
+    ap = ((enr.get("airports") or {}).get("airports") or {}).get(iata) or {}
+    if ap.get("iata_area"):
+        return int(ap["iata_area"])
+    cc = str(ap.get("country") or ((geo or {}).get(iata) or {}).get("country") or "").upper()
+    if not cc:
+        return None
+    return 1 if cc in _AREA1 else 3 if cc in _AREA3 else 2
+
+
+def meal_long_haul(o_iata: str, d_iata: str, minutes: int, enr: Dict[str, Any], geo: Optional[Dict[str, Any]] = None) -> bool:
+    """Whether a flight gets an airline's LONG-haul catering: it crosses an IATA area, or it covers more than
+    SHORT_HAUL_KM and runs 8 hours or more (New York to Sao Paulo stays in the Americas and is a long-haul flight).
+    Seattle to Costa Rica, Canada to Hawaii and Frankfurt to Cape Verde get the short-haul product, and read so."""
+    a, b = iata_area(o_iata, enr, geo), iata_area(d_iata, enr, geo)
+    if a and b and a != b:
+        return True
+    return (not _short_haul(o_iata, d_iata, enr, geo)) and int(minutes or 0) >= 480
+
+
+_MEALS: Dict[str, Any] = {}
+
+
+def load_meals() -> Dict[str, Any]:
+    """enrichment/meals.json: each airline's published catering by cabin and flight length (2026-09-25, per Patrick:
+    "so people don't end up with a bag of pretzels on a long flight instead of an actual meal")."""
+    if not _MEALS:
+        try:
+            with open(os.path.join(ENRICH, "meals.json"), encoding="utf-8") as fh:
+                _MEALS.update(json.load(fh))
+        except (OSError, ValueError):
+            _MEALS.update({"airlines": {}})
+    return _MEALS
+
+
+def meal_for(carrier: Any, cabin: Any, minutes: Any, short_haul: bool, brand: Any = "",
+             table: Optional[Dict[str, Any]] = None) -> Tuple[Optional[str], str]:
+    """What the airline flying the longest flight publishes it serves in that cabin on a flight that long:
+    ("meal" | "snack" | "buy" | "none", the rule's sentence), or (None, "") when it publishes nothing that fits.
+    A rule for the fare brand (a Basic or Light fare with no meal) wins over the cabin's; premium economy with no
+    rule of its own reads economy's (never better than what is published); unknown is never a meal."""
+    rows = ((table or load_meals()).get("airlines") or {}).get(str(carrier or "").upper()) or []
+    cab = cabin_norm(cabin) if cabin else "economy"
+    mins = int(minutes or 0)
+    words = set(re.findall(r"[a-z]+", str(brand or "").lower()))
+
+    def fits(r, want_cabin):
+        if r.get("cabin") != want_cabin:
+            return False
+        if r.get("haul", "all") != "all" and (r["haul"] == "short") != bool(short_haul):
+            return False
+        if r.get("min_minutes") is not None and mins < int(r["min_minutes"]):
+            return False
+        if r.get("max_minutes") is not None and mins > int(r["max_minutes"]):
+            return False
+        return True
+    for want in ([cab, "economy"] if cab == "premium_economy" else [cab]):
+        cands = [r for r in rows if fits(r, want)]
+        branded = [r for r in cands if r.get("brands") and words & {w.lower() for w in r["brands"]}]
+        plain = [r for r in cands if not r.get("brands")]
+        pick = branded or plain
+        if pick:
+            # the most specific rule: one bounded by flight length beats an open one
+            pick.sort(key=lambda r: -((r.get("min_minutes") is not None) + (r.get("max_minutes") is not None)))
+            return pick[0].get("served"), pick[0].get("rule") or ""
+    return None, ""
+
+
 def cabin_norm(word: Any) -> str:
     """One cabin vocabulary whatever the feed says: Duffel's 'business', Google's 'Business Class', Kiwi's
     'BUSINESS' and Amadeus's 'PREMIUM_ECONOMY' all become the scorer's economy / premium_economy / business / first
@@ -626,6 +704,67 @@ def _fleet_claims(enr: Dict[str, Any], operating: str, equipment: str,
         }
     return {"subfleet": dict(row["subfleet"]),
             "connectivity_oceanic": dict(row["connectivity_oceanic"])}
+
+
+LEGROOM_SEAT = re.compile(r"extra|legroom|leg room|plus|comfort|space|exit|main cabin extra|preferred plus", re.I)
+
+
+def duffel_extras_summary(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """One offer's own bag and seat prices, from Duffel's offer-with-services and seat-map replies (live.duffel_extras,
+    2026-09-25). Only what the airline PRICED counts: a seat whose available_services is empty is unavailable, never
+    free, and an empty services list means the airline quotes none here, never that bags are free (unknown is never
+    cheap). Amounts stay in the offer's own currency; the server converts them.
+
+    -> {"bags": [{"kind", "amount", "currency", "max", "kg"}], "seat": {"any", "legroom", "free", "currency",
+        "segments", "priced_segments"} or None, "expired": bool}"""
+    out: Dict[str, Any] = {"bags": [], "seat": None, "expired": bool((payload or {}).get("expired"))}
+    off = (payload or {}).get("offer") or {}
+    for svc in off.get("available_services") or []:
+        if svc.get("type") != "baggage":
+            continue
+        md = svc.get("metadata") or {}
+        try:
+            amount = float(svc.get("total_amount"))
+        except (TypeError, ValueError):
+            continue
+        out["bags"].append({"kind": md.get("type") or "checked", "amount": amount, "currency": svc.get("total_currency"),
+                            "max": int(svc.get("maximum_quantity") or 1), "kg": md.get("maximum_weight_kg")})
+    out["bags"].sort(key=lambda b: (b["kind"] != "checked", b["amount"]))
+    maps = (payload or {}).get("seat_maps") or []
+    any_total, leg_total, priced, free, cur = 0.0, 0.0, 0, False, None
+    leg_every = True
+    for m in maps:
+        cheapest, cheapest_leg = None, None
+        for cab in m.get("cabins") or []:
+            for row in cab.get("rows") or []:
+                for sec in row.get("sections") or []:
+                    for el in sec.get("elements") or []:
+                        if el.get("type") != "seat":
+                            continue
+                        for sv in el.get("available_services") or []:
+                            try:
+                                amt = float(sv.get("total_amount"))
+                            except (TypeError, ValueError):
+                                continue
+                            cur = cur or sv.get("total_currency")
+                            cheapest = amt if cheapest is None else min(cheapest, amt)
+                            if LEGROOM_SEAT.search(" ".join([el.get("name") or ""] + list(el.get("disclosures") or []))):
+                                cheapest_leg = amt if cheapest_leg is None else min(cheapest_leg, amt)
+        if cheapest is None:
+            leg_every = False
+            continue
+        priced += 1
+        any_total += cheapest
+        free = free or cheapest == 0
+        if cheapest_leg is None:
+            leg_every = False
+        else:
+            leg_total += cheapest_leg
+    if priced and priced == len(maps):
+        # a seat on every flight of the trip is the price of choosing one; a map with nothing on sale leaves it unknown
+        out["seat"] = {"any": round(any_total, 2), "legroom": round(leg_total, 2) if leg_every else None,
+                       "free": free and any_total == 0, "currency": cur, "segments": len(maps), "priced_segments": priced}
+    return out
 
 
 def from_amadeus(raw: Dict[str, Any], origin_key: str = "bushwick-brooklyn",

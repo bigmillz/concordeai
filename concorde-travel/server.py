@@ -965,6 +965,63 @@ def hotel_summary(payload, lat=None, lon=None, radius_km=HOTEL_RADIUS_KM):
             "radius_km": radius_km if lat is not None else None}
 
 
+# The airlines Duffel prices extras for (its airline pages, read 2026-09-25): both bags and seats on UA, BA, AF, KL, LH,
+# LX, OS, SN; seats on AA; bags on EK and TP. An offer from any other airline is never looked up, so nothing is spent on
+# a reply that cannot hold a price. CONCORDEGO_EXTRAS_AIRLINES overrides the list.
+EXTRAS_AIRLINES = set((os.environ.get("CONCORDEGO_EXTRAS_AIRLINES") or "UA BA AF KL LH LX OS SN AA EK TP").split())
+EXTRAS_CALLS = int(os.environ.get("CONCORDEGO_EXTRAS_CALLS") or 400)      # uncached lookups a day, site-wide
+
+
+def _to_cents(amount, currency, rates):
+    cur = (currency or "USD").upper()
+    if cur == "USD":
+        return int(round(amount * 100))
+    r = (rates or {}).get(cur)
+    return int(round(amount / r * 100 + 0.4999)) if r else None      # a price in a currency we cannot convert is dropped
+
+
+def extras_request(q, remote=False, headers=None):
+    """GET /extras?offer=off_...&owner=BA -> this flight's own bag and seat prices from the airline, through Duffel
+    (2026-09-25, per Patrick), in US cents: {"bags": [...], "seat": {...} or None, "expired": bool, "owner"}. Only for
+    the airlines Duffel prices extras for; each uncached lookup counts against a few dozen a day per address and
+    EXTRAS_CALLS site-wide."""
+    oid = (q.get("offer") or [""])[0].strip()
+    owner = re.sub(r"[^A-Z0-9]", "", (q.get("owner") or [""])[0].upper())[:2]
+    if not re.match(r"^off_[A-Za-z0-9]{10,40}$", oid):
+        return {"error": "Not a flight this lookup can price."}
+    if owner not in EXTRAS_AIRLINES:
+        return {"error": "This airline's own extras are not quoted through the feed.", "owner": owner, "unsupported": True}
+    if remote:
+        ip = ((headers or {}).get("Cf-Connecting-Ip") or (headers or {}).get("X-Forwarded-For") or "?").split(",")[0].strip()
+        ok, _ = _users_take("ip:" + ip, "extras", 40)
+        if not ok:
+            return {"error": "Today's lookups are used up. The typical prices stand, marked.", "limit": True}
+    hit, _ = live.duffel_extras(oid, allow_call=False)
+    if hit is None:
+        ok, _ = _users_take("_extras", "extras", EXTRAS_CALLS)
+        if not ok:
+            return {"error": "Today's lookups are used up. The typical prices stand, marked.", "limit": True}
+        hit, meta = live.duffel_extras(oid)
+        if hit is None:
+            return {"error": meta.get("error") or "The lookup failed.", "owner": owner}
+    summ = adapter.duffel_extras_summary(hit)
+    rates = (rates_request() or {}).get("rates") or {}
+    bags = []
+    for b in summ["bags"]:
+        c = _to_cents(b["amount"], b["currency"], rates)
+        if c is not None:
+            bags.append({"kind": b["kind"], "cents": c, "max": b["max"], "kg": b["kg"]})
+    seat = None
+    if summ["seat"]:
+        sc = summ["seat"]
+        seat = {"any_cents": _to_cents(sc["any"], sc["currency"], rates),
+                "legroom_cents": _to_cents(sc["legroom"], sc["currency"], rates) if sc["legroom"] is not None else None,
+                "free": sc["free"], "segments": sc["segments"]}
+        if seat["any_cents"] is None:
+            seat = None
+    return {"owner": owner, "bags": bags, "seat": seat, "expired": summ["expired"]}
+
+
 def hotels_request(q, remote=False, headers=None):
     """GET /hotels?near=LHR&date=2026-11-19  or  ?q=<address>&lat=&lon=&date=  -> the typical nightly rate there
     that night, from Google Hotels (2026-09-24, per Patrick). Cached twelve hours per place and night; each uncached
@@ -1524,6 +1581,37 @@ def sys_update(mode):
     return {"ok": True, "mode": mode}
 
 
+MEM_WARN_MB = 120      # under this much available, the admin page turns the memory card orange: time to size up
+
+
+def memory_status():
+    """The box's memory and this service's, for the admin page (2026-09-25, per Patrick: "keep me in the loop on memory
+    on the server in case we need to bump it up"). Read from /proc on Linux; on a Mac only the process's own peak is
+    known, and the rest is None rather than a guess."""
+    out = {"total_mb": None, "available_mb": None, "swap_total_mb": None, "swap_free_mb": None, "rss_mb": None,
+           "peak_mb": None, "warn_below_mb": MEM_WARN_MB}
+    try:
+        info = {}
+        with open("/proc/meminfo") as fh:
+            for line in fh:
+                k, v = line.split(":", 1)
+                info[k] = int(v.split()[0]) // 1024
+        out.update(total_mb=info.get("MemTotal"), available_mb=info.get("MemAvailable"),
+                   swap_total_mb=info.get("SwapTotal"), swap_free_mb=info.get("SwapFree"))
+        with open("/proc/self/status") as fh:
+            for line in fh:
+                if line.startswith(("VmRSS:", "VmHWM:")):
+                    out["rss_mb" if line.startswith("VmRSS") else "peak_mb"] = int(line.split()[1]) // 1024
+    except (OSError, ValueError):
+        try:
+            import resource
+            peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            out["peak_mb"] = int(peak / (1024 * 1024 if sys.platform == "darwin" else 1024))
+        except Exception:
+            pass
+    return out
+
+
 def admin_status(fetch=False):
     out = {"repo": REPO_DIR, "uptime_s": int(time.time() - STARTED), "pid": os.getpid(), "python": sys.version.split()[0],
            "owners": sorted(OWNERS), "log_source": None, "now": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
@@ -1558,6 +1646,7 @@ def admin_status(fetch=False):
     import shutil
     out["log_source"] = "journal" if shutil.which("journalctl") else (LOG_FILE or None)
     out["system"] = sys_status()
+    out["memory"] = memory_status()
     return out
 
 
@@ -1989,6 +2078,17 @@ const ago = s => s < 90 ? s + 's' : s < 5400 ? Math.round(s/60) + ' min' : s < 1
 const when = iso => iso ? new Date(iso).toLocaleString() : '—';
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function j(url, opts){ if (opts && opts.method === 'POST') opts = Object.assign({}, opts, {headers: Object.assign({'Content-Type':'application/json', 'X-ConcordeGo-Admin':'1'}, opts.headers || {})}); const r = await fetch(url, opts); if (!r.ok) throw new Error(r.status + ' ' + r.statusText); return r.json(); }
+// memory (2026-09-25, per Patrick): orange when the box runs short, so a bigger droplet is decided before the kernel decides
+function memCard(m){
+  const low = m.available_mb != null && m.available_mb < m.warn_below_mb;
+  const head = m.available_mb == null ? 'not measurable here' : `<span class="${low ? 'warn' : 'ok'}">${m.available_mb} MB free</span> of ${m.total_mb} MB`;
+  const bits = [];
+  if (m.rss_mb != null) bits.push('this service ' + m.rss_mb + ' MB');
+  if (m.peak_mb != null) bits.push('its peak ' + m.peak_mb + ' MB');
+  if (m.swap_total_mb != null) bits.push(m.swap_total_mb ? 'swap ' + (m.swap_total_mb - m.swap_free_mb) + ' of ' + m.swap_total_mb + ' MB used' : 'no swap');
+  if (low) bits.push('under ' + m.warn_below_mb + ' MB free: time to size up the droplet');
+  return ['Memory', head, bits.join(' · ')];
+}
 function paint(st){ ST = st; const h = st.head || {}, behind = st.behind; paintKey(st);
   const cards = [
     ['Running', `<b>${h.short || '?'}</b> on ${st.branch || '?'}`, (h.subject || '') + (h.date ? ' · ' + when(h.date) : '')],
@@ -1997,6 +2097,7 @@ function paint(st){ ST = st; const h = st.head || {}, behind = st.behind; paintK
     ['Flight API', st.live && st.live.key_configured ? `<span class="ok">${st.live.provider} key on</span>` : '<span class="warn">no key: live search off</span>', st.live && st.live.quota ? `today ${st.live.quota.day_calls}/${st.live.quota.day_limit} · month ${st.live.quota.month_calls}/${st.live.quota.month_limit}` : ''],
     ['Claude', st.narrator ? '<span class="ok">key on</span>' : '<span class="warn">no key: template only</span>', 'narrator, wish box, Flight Fixer advice'],
     sysCard(st.system || {}),
+    memCard(st.memory || {}),
     ['People today', st.users_today.length ? st.users_today.length + ' signed in' : 'none', st.users_today.slice(0, 4).map(u => `${u.email} ${u.searches}/${st.allowances.searches} · ${u.wishes}/${st.allowances.wishes}`).join('<br>')],
   ];
   $('#cards').innerHTML = cards.map(c => `<div class="card"><div class="k">${c[0]}</div><div class="v">${c[1]}</div><div class="s">${c[2]}</div></div>`).join('');
@@ -2177,6 +2278,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     n = 300
                 return self._json(admin_logs((q.get("unit") or ["server"])[0], n))
             return self.send_error(404)
+        if path in ("/extras", "/api/extras"):
+            # this flight's own bag and seat prices, from the airline through Duffel (2026-09-25)
+            return self._json(extras_request(dict(urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)), self._remote(), self.headers))
         if path == "/hotels":
             # the typical nightly rate near an airport or a place, from Google Hotels (2026-09-24)
             return self._json(hotels_request(dict(urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)), self._remote(), self.headers))

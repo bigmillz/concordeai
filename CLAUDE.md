@@ -441,6 +441,13 @@ rule forbids: Spain and Italy moved to the upper band, the Netherlands to the hi
 (`ground.py`, with the tariffs in its comment), and `test_records.py` checks the model against Madrid's, Barcelona's
 and Istanbul's official fares. Rideshare prices have no published source anywhere and stay estimates.
 
+**The airline extras checklist** (2026-09-25, per Patrick) is a claude.ai artifact, https://claude.ai/artifact/96dDdGVmSX8aqQSquH9TnU,
+with a `db` collection `rows`: 143 prices the site still guesses (seat choice, extra legroom, wifi, lounge day passes,
+priority boarding for 31 airlines, and the 12 unverified bag-fee rows), each with the airline's own page, what to
+read there, what the site uses now, and the second reader's note. Patrick types the published price into a row
+(`entered`: amount, currency, exact / from / up to, haul or bag piece, note, or not sold); read them back with the
+ArtifactData tool (`list` on `rows`) and write them into `enrichment/addons.json` or `fares.json` with their URL and date.
+
 **Hotel prices are real averages** (2026-09-24, per Patrick): `GET /hotels?near=IATA&date=` or `?q=place&lat=&lon=&date=`
 (outside the door) asks Google Hotels through SerpApi (`live.serp_hotels`, the same plan and counters as the flight
 supplement) and answers `server.hotel_summary`: the MEDIAN nightly rate, taxes in, of up to twenty hotels (never
@@ -567,7 +574,9 @@ it), `concordego-updates-check.timer` (07:00 UTC and 3 minutes after boot, `--ch
 `/var/lib/concordego-sys/status.json`), and `concordego-sysupdate.path`, which starts the update when the page
 writes the ONE word `update` or `reboot` to `/var/lib/concordego/sysupdate-request`. The web process never runs
 anything as root; root never writes where the web user can. "Pending" counts what an upgrade would install now;
-Ubuntu's phased updates are listed apart as held back. The page shows an orange "Updates pending (N)" button
+Ubuntu's phased updates are listed apart as held back. A **Memory** card (2026-09-25, per Patrick: "keep me in the loop on memory on the server in case we need to bump it
+up") shows the box's free memory, the service's size now and at its peak, and swap, from `/proc` (`server.memory_status`);
+it turns orange under `MEM_WARN_MB` (120 MB) free. The page shows an orange "Updates pending (N)" button
 opening Update (site stays up) and Update and restart (shown when a kernel or C library is involved or a reboot
 is waiting). Every admin POST must carry `X-ConcordeGo-Admin: 1`, which only the page's own fetch sets, and the
 POST body is read before any refusal (an unread body on a kept-alive connection became the next request line).
@@ -757,11 +766,20 @@ chances, at ten to midnight there are not): **the chance of making the updated f
 chance it still goes today; anything past midnight is lost). **For a US domestic flight it comes from US DOT
 records** (2026-09-24, per Patrick; `ontime.py`, `rescue._dot_model`): of the flights from the same airport,
 scheduled in the same three-hour block, that were already at least as late, the share that left within each
-further stretch of time. The files cannot say which cancellations came after a flight was already late, so each
-chance is a RANGE (2026-09-25, after counting every cancellation against leaving read 22% where the late flights
-alone said 52%): the low end counts every cancellation in the block against leaving, the high end none, and the
-page prints "22–52%" with the band shaded on the chart (`p`/`p_hi`, `p_flight_hi`, `p_today_hi`, `on_time_hi`). The
-result says "from US DOT records*" and the basis explains the range. Anywhere else
+further stretch of time. The files cannot date a cancellation, so how many already-late flights ended cancelled is
+MEASURED another way (2026-09-25, per Patrick: "22 to 52% is pretty wide"): every row carries the plane's tail number,
+so `ontime.build` follows each plane through its day, and a flight whose plane landed from its previous leg too late
+for it to leave sooner (landing + a 25-minute turn, `TURN`, a floor) was at least that late whatever happened next.
+Among those flights (`kn`, by threshold, per airport and three-hour block) the share cancelled (`kc`) is the
+cancellation rate of flights already that late, with its 95% Wilson interval (`ontime.cancel_rate`); the airport's
+own block when it has `MIN_KNOWN` (40) such flights, else the country's same block. The Fixer counts that share
+against leaving: a best figure (`p_mid`) with the margin as its range (`p` low, `p_hi` high), and the page prints
+"about 65% (59–69%)" with the band shaded. On the same JFK evening case the old every-or-none bounds said 34% to 81%.
+Measured on the full year (2025-08 to 2026-07): of 158 JFK flights 6-9 PM whose plane was 3 h late, 31 were
+cancelled (20%, 14-27%); O'Hare runs about 30%, the country about 11%. Most cancellations are never "a late flight
+that got cancelled": in August 2025, 16% had no plane assigned at all and 24% lost their plane to its cancelled
+previous flight. A table built before this step falls back to the old bounds. The result says "from US DOT records*"
+and the basis names the measurement. Anywhere else
 (abroad, or a foreign airline) the old model stands, labelled an estimate: a delayed flight leaves when the airline
 says 55% of the time, the rest slipping by the hour, the cancellation risk growing with the delay and jumping
 after 21:00 and 23:00. And **the chance you fly today at all** (at hour h,
@@ -827,7 +845,7 @@ curve it is meant to be testing is a fixture that tests nothing.
 
 **The test suites are mutation-tested.** `test_scorer.py` catches 12 of 12 seeded faults and
 `validate.py` 10 of 10; `tests/mutate_adapter.py` is an executable runner for the adapters
-and must stay at every mutant caught (92 of 92 on 2026-09-25, the points charts, planner and pool, hotels, DOT records, the Fixer, the fleet table, the add-on prices and the ride-fare bands among them; it runs `test_points.py`, `test_records.py` and `test_rescue.py` too, and `MUTATE_ONLY=planner` runs just the mutants whose description holds that word) with **zero skips** — a skipped mutant never ran
+and must stay at every mutant caught (101 of 101 on 2026-09-25, the points charts, planner and pool, hotels, DOT records and the measured cancellation rate, the Fixer, the fleet table, the add-on prices, a flight's own Duffel extras, the lounge rules, the meals table and the ride-fare bands among them; it runs `test_points.py`, `test_records.py` and `test_rescue.py` too, and `MUTATE_ONLY=planner` runs just the mutants whose description holds that word) with **zero skips** — a skipped mutant never ran
 and is not a pass. If a change makes a suite pass that should not, the suite has lost a guard. **The runner works in
 a scratch copy outside the checkout** (since 2026-09-24): run in place, Google Drive's sync raced its
 write-and-restore cycle and left two mutants in `par.py` after a run that reported every fault caught. If a SKIP
@@ -952,6 +970,25 @@ so while it prices. Nearby AIRPORTS need no button: a city resolves to its metro
 so JFK, EWR and LGA (or all five of London's) are weighed in one search, which is the product.
 `test_adapter.py` fences the signal offline on the synthesized SerpApi sample, which now
 carries a `price_insights` block.
+
+**A flight's own bag and seat prices, through Duffel** (2026-09-25, per Patrick: "go ahead with Duffel's per flight
+lookups for the airlines that we can do that for"). Opening a flight's details asks `/extras?offer=&owner=` (`/api/extras`
+inside the door; `server.extras_request`, `live.duffel_extras`, `adapter.duffel_extras_summary`): the offer with
+`return_available_services=true` and its seat maps, one lookup per opened flight, cached 25 minutes (an offer lives
+about 30), on its own counters (`quota-duffel-extras.json`, 300 a day), 40 a day per address and `CONCORDEGO_EXTRAS_CALLS`
+(400) site-wide. By Duffel's services agreement only offer REQUESTS count as searches, so these are believed free (Duffel
+does not say so outright). Only what the airline PRICED counts: a seat with no service on sale is unavailable, never
+free; an empty services list is unknown, never free bags; extra legroom is the cheapest seat named or disclosed as
+extra legroom, exit, plus or comfort, on EVERY flight of the trip or unknown. What comes back replaces the published or
+typical price on the bill, unmarked (`bagLadder`, `addonPrice` in mock-10), in dollars at the ECB rate. It is asked only
+for the airlines Duffel quotes extras for (`EXTRAS_AIRLINES`, from Duffel's airline pages: bags and seats on UA, BA, AF,
+KL, LH, LX, OS, SN; seats on AA; bags on EK and TP; `CONCORDEGO_EXTRAS_AIRLINES` overrides). **On the live account on
+2026-09-25 it priced nothing**: 47 lookups across New York to London, Los Angeles and Paris found no bag service on any
+airline and no priced seat (American's seat map names Main Cabin Extra, Preferred and Standard seats and prices none;
+the rest refused with Travelport's `seat_map_unavailable`). Every offer came through Travelport; none of Duffel's direct
+connections (BA, UA, AF, KL, LH NDC) appeared at all, which is an account setting in Duffel's dashboard for Patrick to
+check. `adapter_samples/duffel-extras-aa-unpriced.json` is that real American reply; `duffel-extras-synthesized.json`
+is built from Duffel's documented shapes and says so.
 
 **Duffel CAN quote a bag price, but never on the search response.** `available_services` was
 empty on all 172 offers of the real capture — it is populated only by
@@ -1201,7 +1238,10 @@ Each picture drifts for as long as it is up: one slow zoom with a slide, 20s lon
 though a picture lives 6.5s, the end points chosen per picture inside the 16px of slack, and
 a re-paint picks the drift up where it was. The swaps run on timers, never
 `requestAnimationFrame`, which a hidden tab never fires; and `build.py` syntax-checks every
-built page with node, because one duplicate `const` killed the whole client silently.
+built page with node, because one duplicate `const` killed the whole client silently, and since 2026-09-25 also
+opens mock 10 in headless Chrome and stops the build on any error while it loads: a script that parses can still die
+at load when a shared `const` is read before its line runs (the lounge chip's rules were read by `prepWants`, which
+runs at load, above where they were defined).
 
 **The destination field takes an address too** (2026-09-21, per Patrick: "so the person can get
 to a hotel or wherever they're staying"). `server.geo_place()` geocodes anything with a digit
@@ -1359,7 +1399,7 @@ start one, same as the desktop app's gauntlet.
 is the converged direction** (2026-09-20, after Patrick picked Shortlist and the
 Dial from round two): the sentence-form search with round trip / one way /
 multi-city, the price–speed–comfort triangle with a "get me there now" preset
-(earliest arrival, price shown but not ranked), fifteen **wants that charge rather
+(earliest arrival, price shown but not ranked), eighteen **wants that charge rather
 than filter** (a flight lacking one is priced for it and sinks, reason shown;
 a want nothing can meet says so instead of sinking everything; the refund term and
 CO₂ per offer came on 2026-09-21, the last charged as the gap to the cleanest option
@@ -1374,9 +1414,28 @@ selection on a search, the adapters record "paid", so it would match nothing. Lo
 day pass is still an add-on anyone can put on the bill. Lie-flat seat reads the seat itself since 2026-09-24
 (`e.lie_flat` from `data.build_slim`: Duffel's seat type `full_flat`, `full_flat_pod` or `private_suite` on the
 longest flight, or Google's "Lie flat seat" / "Individual suite" extensions), no longer the cabin's name, which had
-marked TAP's Executive and Icelandair's Saga Premium recliners as flat. The fifteen sit in a fixed grid, five across when the panel
-is wider than 760px and three otherwise (a container query on `.wants`), so every row is full, and on a phone a long
-label wraps rather than being cut. The wish box's
+marked TAP's Executive and Icelandair's Saga Premium recliners as flat. **Three came in on 2026-09-25** (per Patrick):
+Lounge access came back as an opt-in chip (never added unless picked; picked, a ticket that already gets you in meets it
+and the rest carry a day pass on the bill: `loungeAccess`, business or first on a trip that crosses a border, a lie-flat
+premium flight at home, JetBlue's BlueHouse at JFK and Boston only, Icelandair's Saga Premium at Keflavik, Aer Lingus
+AerSpace, or a status tier's published lounge rule in `LOUNGE_STATUS`, researched from the airlines' and alliances' own
+pages and re-checked on 2026-09-25: most elite tiers only on an international trip and their alliance's flights,
+AAdvantage and Atmos elites only on trips that leave North America, Delta Medallions no Sky Club in Main Cabin and
+nothing on a Basic or Light fare, Turkish's rules unconfirmed so it claims nothing; never the fare's name), Overnight
+flight beside Daytime flight (leaves at 17:00 or later and lands the next morning before noon; picking one clears the
+other, `OPPOSITE`), and Meals served (`e.meal === 'meal'`: the published catering of the airline OPERATING the longest
+flight, for its cabin and length, `enrichment/meals.json` through `adapter.meal_for`; a snack, food for sale or no
+published policy is not a meal). `meals.json` holds 209 rules for 71 airlines, researched from the airlines' own
+food-and-drink pages, re-checked, turned into rules by a second pass and checked again against the source text
+(2026-09-25). For meals, LONG haul is the longest flight crossing an IATA area, or covering over 3,500 km and running 8
+hours or more (`adapter.meal_long_haul`, areas from the airport table or the country): New York to Dublin is long, New
+York to Sao Paulo is long, and Seattle to Costa Rica, Canada to Hawaii and Frankfurt to Cape Verde get the short-haul
+product. Long-haul rules carry no minimum time (every such flight is past the published cut-offs; the invented floors
+that first came out of the conversion would have left New York to Dublin unknown). Rules are conservative: a meal only
+on named routes, on "select flights" or by time of day is not promised; a Basic or Light fare's own rule wins; an
+airline with no rule is unknown. The second checker could not read six airlines' rows (OS, SN, EI, IB, UX, VY), which
+the file says. The eighteen sit in a fixed grid, six across when the panel is wider than 880px and three otherwise (a
+container query on `.wants`), so every row is full, and on a phone a long label wraps rather than being cut. The wish box's
 vocabulary in `wish.py` lists every want the grid does), a **wish box**
 typed or spoken (the browser's own speech recognition) that becomes visible,
 removable rules and weights, advanced windows / cabin / stops / alliances /

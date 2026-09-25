@@ -85,6 +85,94 @@ def main():
         ontime._DOC.clear()
         ontime._DOC.update(saved)
 
+    # ---- the inbound step (2026-09-25): a tiny synthetic month. Plane N1 lands at JFK at 18:40, 3 h 10 m late, so its
+    # 16:00 flight could not leave before 19:05 (a 25-minute turn): at least 3 h late, and it was cancelled. Plane N2
+    # lands on time at 16:30 and its 16:40 flight leaves 15 minutes late. Plane N3's 18:30 flight is its first of the
+    # day and is cancelled: it tells nothing about lateness and is not counted.
+    import zipfile
+    cols = ["FlightDate", "Reporting_Airline", "Flight_Number_Reporting_Airline", "Origin", "Dest", "Cancelled", "Diverted",
+            "ArrDelay", "DepDelay", "CRSDepTime", "CRSArrTime", "Tail_Number"]
+    rows = [["2025-08-01", "AA", "10", "BOS", "JFK", "0.00", "0.00", "190", "185", "1400", "1530", "N1"],
+            ["2025-08-01", "AA", "11", "JFK", "MIA", "1.00", "0.00", "", "", "1600", "1900", "N1"],
+            ["2025-08-01", "AA", "20", "BOS", "JFK", "0.00", "0.00", "0", "0", "1500", "1630", "N2"],
+            ["2025-08-01", "AA", "21", "JFK", "MIA", "0.00", "0.00", "20", "15", "1640", "1940", "N2"],
+            ["2025-08-01", "AA", "31", "JFK", "ORD", "1.00", "0.00", "", "", "1830", "2030", "N3"]]
+    tmp = tempfile.mkdtemp()
+    try:
+        zp = os.path.join(tmp, "m.zip")
+        with zipfile.ZipFile(zp, "w") as z:
+            z.writestr("m.csv", ",".join(cols) + "\n" + "\n".join(",".join(r) for r in rows) + "\n")
+        saved_path = ontime.PATH
+        ontime.build([zp], out=os.path.join(tmp, "t.json.gz"))
+        import gzip
+        doc = json.load(gzip.open(os.path.join(tmp, "t.json.gz"), "rt"))
+        cell, night = doc["fixer"]["JFK"]["5"], doc["fixer"]["JFK"]["6"]
+        ti = doc["thresholds"].index(180)
+        check("the inbound step: a plane landing 3 h 10 m late makes its next flight known 3 h late (cancelled here); an "
+              "on-time plane's flight counts only at 0; a first flight of the day tells nothing",
+              cell["kn"][ti] == 1 and cell["kc"][ti] == 1 and cell["kn"][0] == 2 and cell["kc"][0] == 1
+              and night["cancelled"] == 1 and not any(night["kn"]),
+              str({k: cell[k] for k in ("kn", "kc", "cancelled")}) + str(night.get("kn")))
+        lo_q, q, hi_q = ontime.cancel_rate(400, 40)
+        check("the cancellation rate carries its 95% margin of error (40 of 400: 10%, about 7.4% to 13.3%)",
+              abs(q - 0.10) < 1e-9 and 0.07 < lo_q < 0.08 and 0.13 < hi_q < 0.14, str((lo_q, q, hi_q)))
+        check("memory readout: numbers where the box reports them, never a guess",
+              set(server.memory_status()) >= {"total_mb", "available_mb", "rss_mb", "peak_mb", "warn_below_mb"}
+              and all(v is None or isinstance(v, int) for k, v in server.memory_status().items()))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    # ---- a flight's own extras through Duffel (2026-09-25): only what the airline priced counts
+    samples = os.path.join(HERE, "..", "adapter_samples")
+    syn = json.load(open(os.path.join(samples, "duffel-extras-synthesized.json")))
+    x = adapter.duffel_extras_summary(syn)
+    check("a flight's own quote: two checked bags at $45 and $65 (the insurance service is not a bag), cheapest first",
+          [(b["kind"], b["amount"]) for b in x["bags"]] == [("checked", 45.0), ("checked", 65.0)], str(x["bags"]))
+    check("a seat on every flight is the price of choosing one ($32 + $0), and extra legroom is unknown when one "
+          "flight sells none", x["seat"] and x["seat"]["any"] == 32.0 and x["seat"]["legroom"] is None and not x["seat"]["free"],
+          str(x["seat"]))
+    real = json.load(open(os.path.join(samples, "duffel-extras-aa-unpriced.json")))
+    y = adapter.duffel_extras_summary(real)
+    check("a REAL seat map with no seat on sale (American, 2026-09-25) and no bag services prices nothing: unknown, never free",
+          y["seat"] is None and y["bags"] == [], str(y))
+    check("an unsupported airline is refused before any call", server.extras_request({"offer": ["off_0000BAmB8MyZMTvVJXPEVg"],
+          "owner": ["IB"]}).get("unsupported") is True and "error" in server.extras_request({"offer": ["x"], "owner": ["BA"]}))
+
+    # ---- meals (2026-09-25): the operating airline's published catering, by cabin, haul and flight length
+    T = {"airlines": {
+        "AA": [{"cabin": "economy", "haul": "short", "served": "snack", "rule": "snacks"},
+               {"cabin": "economy", "haul": "short", "min_minutes": 300, "served": "meal", "rule": "meal on long domestic"},
+               {"cabin": "economy", "haul": "long", "served": "meal", "rule": "meals abroad"}],
+        "FI": [{"cabin": "economy", "haul": "long", "served": "buy", "rule": "food for sale"},
+               {"cabin": "premium_economy", "haul": "all", "served": "meal", "rule": "Saga meal"}],
+        "LL": [{"cabin": "economy", "haul": "long", "served": "meal", "rule": "meal"},
+               {"cabin": "economy", "haul": "long", "brands": ["basic"], "served": "buy", "rule": "Basic: food for sale"}]}}
+    mf = lambda *a, **k: adapter.meal_for(*a, table=T, **k)[0]
+    check("meals: a short US domestic flight is a snack, a long domestic one a meal, one abroad a meal",
+          mf("AA", "economy", 150, True) == "snack" and mf("AA", "economy", 330, True) == "meal" and mf("AA", "economy", 420, False) == "meal")
+    check("meals: food for sale is not a meal (Icelandair economy across the Atlantic), and premium has its own rule",
+          mf("FI", "economy", 400, False) == "buy" and mf("FI", "premium_economy", 400, False) == "meal")
+    check("meals: a Basic fare with no meal wins over the cabin's rule; an airline with no published policy is unknown",
+          mf("LL", "economy", 480, False, "LEVEL Basic") == "buy" and mf("LL", "economy", 480, False, "Optima") == "meal"
+          and mf("ZZ", "economy", 480, False) is None)
+
+    # meals' long haul is an intercontinental flight, or one over 3,500 km of 8 hours or more
+    enr = adapter.load_enrichment()
+    geo = {"SEA": {"country": "US", "lat": 47.45, "lon": -122.31}, "LIR": {"country": "CR", "lat": 10.59, "lon": -85.54},
+           "GRU": {"country": "BR", "lat": -23.43, "lon": -46.47}, "YYC": {"country": "CA", "lat": 51.13, "lon": -114.01},
+           "HNL": {"country": "US", "lat": 21.32, "lon": -157.92}, "SID": {"country": "CV", "lat": 16.74, "lon": -22.95}}
+    lh = lambda o, d, m: adapter.meal_long_haul(o, d, m, enr, geo)
+    check("meals' long haul: New York to Dublin crosses an IATA area (long at 6h25); New York to Sao Paulo is long at "
+          "9h40; Seattle to Costa Rica, Calgary to Honolulu and Frankfurt to Cape Verde get the short-haul product",
+          lh("JFK", "DUB", 385) and lh("JFK", "GRU", 580) and not lh("SEA", "LIR", 360) and not lh("YYC", "HNL", 390)
+          and not lh("FRA", "SID", 330))
+    meals = adapter.load_meals().get("airlines") or {}
+    badm = [c for c, rs in meals.items() for r in rs
+            if r.get("served") not in ("meal", "snack", "buy", "none") or not str(r.get("url", "")).startswith("http")
+            or not r.get("date") or (r.get("haul") == "long" and r.get("min_minutes") is not None)]
+    check("the meals table: every rule served meal, snack, buy or none, with its source and date, and no long-haul floor",
+          len(meals) > 50 and not badm, str(badm[:5]))
+
     # ---- published add-on prices (enrichment/addons.json, 2026-09-25): every price carries a source; the page gets
     # the prices only; a "from" price and a price in doubt keep their asterisk; the fallback is always marked
     doc = addons.load()
@@ -141,6 +229,39 @@ console.log(JSON.stringify({dl:addonPrice('lounge', lhr('DL'), 6500), tp:addonPr
             check("free wifi for members is $0 and says so; free on only part of the fleet keeps its asterisk (Delta), free "
                   "everywhere does not (JetBlue)", o["dlwifi"]["cents"] == 0 and o["dlwifi"]["est"] and "SkyMiles" in o["dlwifi"]["basis"]
                   and o["b6wifi"]["cents"] == 0 and not o["b6wifi"]["est"], str(o["dlwifi"]) + str(o["b6wifi"]))
+
+    # ---- lounge access (2026-09-25): the published rules, run from the page itself
+    if node:
+        src = open(os.path.join(HERE, "..", "ui", "mock", "mock-10.src.html"), encoding="utf-8").read()
+        al = src[src.index("const ALLIANCE = {"):]
+        al = al[:al.index("\n")]
+        blk = src[src.index("// Lounge access (2026-09-25"):src.index("const WANTS = [")]
+        js = (al + "\nconst S = {status:{}}; const STATUS = {};\n"
+              "const D = {airports:{JFK:{border:'us'}, LAX:{border:'us'}, LHR:{border:'uk'}, CDG:{border:'schengen'}}};\n" + blk + """
+const mk = (c, route, cabin, brand) => ({carrier:c, operator:c, route, brand:brand || 'Main', lie_flat:false,
+  segments:[{cabin}], by:{cheapest:{legs:[{kind:'flight', minutes:400}]}}});
+const run = (st, e) => { S.status = st; return loungeAccess(e); };
+console.log(JSON.stringify({
+  sapphire:run({oneworld:'Sapphire'}, mk('AA', ['JFK','LHR'], 'economy')), aaPlatDom:run({AA:'Platinum'}, mk('AA', ['JFK','LAX'], 'economy')),
+  aaPlatIntl:run({AA:'Platinum'}, mk('AA', ['JFK','LHR'], 'economy')), dlGoldDL:run({DL:'Gold'}, mk('DL', ['JFK','CDG'], 'economy')),
+  dlGoldAF:run({DL:'Gold'}, mk('AF', ['JFK','CDG'], 'economy')), dlGoldLight:run({DL:'Gold'}, mk('AF', ['JFK','CDG'], 'economy', 'Economy Light')),
+  uaGoldDom:run({UA:'Gold'}, mk('UA', ['JFK','LAX'], 'economy')), starGoldDom:run({star:'Gold'}, mk('UA', ['JFK','LAX'], 'economy')),
+  mintLAX:run({}, mk('B6', ['LAX','JFK'], 'business')), bizIntl:run({}, mk('BA', ['JFK','LHR'], 'business')), none:run({}, mk('BA', ['JFK','LHR'], 'economy'))}));""")
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as fh:
+            fh.write(js)
+        r = subprocess.run([node, fh.name], capture_output=True, text=True)
+        os.unlink(fh.name)
+        if r.returncode:
+            check("the page's lounge rules run", False, r.stderr[-600:])
+        else:
+            o = json.loads(r.stdout)
+            check("lounge: oneworld Sapphire gets in on American across the Atlantic; AAdvantage Platinum only on a trip "
+                  "that leaves North America", bool(o["sapphire"]) and not o["aaPlatDom"] and bool(o["aaPlatIntl"]), str(o))
+            check("lounge: a Delta Medallion gets no Sky Club in Delta economy, gets a SkyTeam lounge flying Air France "
+                  "abroad, and nothing on a Light fare", not o["dlGoldDL"] and bool(o["dlGoldAF"]) and not o["dlGoldLight"], str(o))
+            check("lounge: United Premier Gold only abroad, Star Gold from another programme at home too; Mint from Los "
+                  "Angeles has no BlueHouse; business abroad includes it; plain economy does not",
+                  not o["uaGoldDom"] and bool(o["starGoldDom"]) and not o["mintLAX"] and bool(o["bizIntl"]) and not o["none"], str(o))
 
     # ---- ride estimates lean high: at or above the official taxi fares the fare bands were checked against (2026-09-25)
     enr = adapter.load_enrichment()

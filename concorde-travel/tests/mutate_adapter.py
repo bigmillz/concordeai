@@ -85,7 +85,7 @@ MUTANTS = [
   'records: leave cancellations out of the on-time share, so a flight cancelled every week looks punctual'),
  (OT, "claim", 'cands = [c for c in [operating, marketing] + list((regional or {}).get(marketing or "", [])) if c]',
   'cands = [c for c in [operating, marketing] if c]', "records: miss a Delta Connection flight's record under its regional airline"),
- (RS, "_dot_model", 'pool = n + (c if cancels else 0) - F(base + since)', 'pool = n - F(base + since)',
+ (RS, "_dot_model", 'pool = n + cancelled_late(mode) - F(base + since)', 'pool = n - F(base + since)',
   "fixer: forget the cancellations, so the odds of leaving read high"),
  (RS, "_dot_model", 'if not o or sched is None or sit.get("international") or not sit.get("us"):', 'if not o or sched is None:',
   'fixer: read US domestic records for an international flight'),
@@ -229,6 +229,33 @@ MUTANTS = [
  (PL, "covers", '''    return code == iata or iata in METRO.get(code, set())''',
   '''    return True''',
   'places: call every airport a match for every metro'),
+ # lounge access (2026-09-25): an international-only tier is never granted at home, and a Basic fare keeps nothing
+ (UI, None, "if ((r.intl && !abroad) || (r.outNA && !leavesNA) || (r.noBasic && basic) || (r.from && !r.from.includes(from))) continue;",
+  "if ((r.outNA && !leavesNA) || (r.noBasic && basic) || (r.from && !r.from.includes(from))) continue;",
+  'lounge: an international-only status tier granted on a trip at home'),
+ (UI, None, "if ((r.intl && !abroad) || (r.outNA && !leavesNA) || (r.noBasic && basic) || (r.from && !r.from.includes(from))) continue;",
+  "if ((r.intl && !abroad) || (r.outNA && !leavesNA) || (r.from && !r.from.includes(from))) continue;",
+  'lounge: a Basic or Light fare keeps the status lounge'),
+ # meals (2026-09-25): a Basic fare's own rule wins, and a policy nobody publishes is never a meal
+ (AD, "meal_for", "        pick = branded or plain\n", "        pick = plain or branded\n",
+  'meals: the fare brand\'s own no-meal rule ignored'),
+ (AD, "meal_for", "    return None, \"\"\n", "    return \"meal\", \"published nowhere\"\n",
+  'meals: an airline with no published policy read as serving a meal'),
+ (AD, "meal_long_haul", "    if a and b and a != b:\n        return True\n", "",
+  'meals: an intercontinental flight read by distance alone'),
+ # a flight's own extras through Duffel (2026-09-25): a seat map with nothing on sale is unknown, never free, and an
+ # airline Duffel quotes nothing for is never looked up
+ (AD, "duffel_extras_summary", "        if cheapest is None:\n            leg_every = False\n            continue\n",
+  "        if cheapest is None:\n            cheapest = 0.0\n",
+  'extras: a seat map with nothing on sale read as free seats'),
+ (SV, "extras_request", "    if owner not in EXTRAS_AIRLINES:\n", "    if False:\n",
+  'extras: look up an airline Duffel quotes no extras for'),
+ # the measured cancellation rate (2026-09-25): the ends of the range come from the right ends of its margin, and a
+ # plane's lateness counts the quickest turn, so it is a floor
+ (RS, "_dot_model", 'q = {"low": rate[2], "mid": rate[1], "high": rate[0]}[mode]', 'q = {"low": rate[0], "mid": rate[1], "high": rate[2]}[mode]',
+  'fixer: the range ends taken from the wrong ends of the cancellation margin'),
+ (OT, "build", "late = landed + TURN - sched", "late = landed - sched",
+  'records: a plane\'s lateness read without the turn time'),
  # published add-on prices and ride fares (2026-09-25): a "from" price keeps its asterisk, an add-on the airline does
  # not sell is never free, insurance stays inside its published range, and the fare bands stay at or over the official taxi fares
  (UI, None, "est:!!(p.from || p.est)};", "est:!!p.est};",

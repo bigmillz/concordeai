@@ -179,6 +179,8 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
     """A feed payload -> everything mock 10 reads. server.py calls this for a
     live search; main() below calls it for the checked-in sample."""
     geo = adapter.duffel_geo(raw)
+    meal_enr = adapter.load_enrichment()                 # the airports' countries, for the meals' short-haul test
+    query_cabin = cabin or "economy"
     if supplement:
         # airports Google names that neither the curated table nor the feed's reply can place in time: their zones
         # from Duffel's places, or the itineraries through them would be dropped (2026-09-24)
@@ -409,11 +411,28 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
         e["wifi_published"] = bool(am.get("wifi")); e["power_published"] = bool(am.get("power"))
         e["wifi_cost"] = am.get("wifi_cost")
         e["lie_flat"] = am.get("lie_flat")
+        # the meal on the longest flight, from its operating airline's published catering (enrichment/meals.json,
+        # 2026-09-25): "meal", "snack", "buy", "none", or None when the airline publishes nothing that fits
+        segs = o.get("segments") or []
+        if segs:
+            k = max(range(len(segs)), key=lambda i: scorer.minutes_between(segs[i]["departure_local"], segs[i]["arrival_local"]))
+            sg = segs[k]
+            op = (sg.get("operating") or {}).get("carrier") or (sg.get("marketing") or {}).get("carrier")
+            mins = scorer.minutes_between(sg["departure_local"], sg["arrival_local"])
+            short = not adapter.meal_long_haul(sg["origin"]["iata"], sg["destination"]["iata"], mins, meal_enr, geo)
+            e["meal"], e["meal_basis"] = adapter.meal_for(op, sg.get("cabin_marketed") or query_cabin, mins, short, e.get("brand"))
         e["layover_minutes"] = [l["minutes"] for l in e["legs"] if l["kind"] == "layover"]
         g = o.get("_google")
         e["details"] = google_details(g) if g else feed_details(by_tail.get(e["id"].rsplit("-", 1)[-1]))
         if g:
             e["source"] = "google"
+        else:
+            # the feed's own offer id and the airline that sells it, so the details sheet can ask for this flight's
+            # own bag and seat prices (/extras, 2026-09-25); an offer lives about 30 minutes, so an old id just expires
+            raw_off = by_tail.get(e["id"].rsplit("-", 1)[-1]) or {}
+            if str(raw_off.get("id") or "").startswith("off_"):
+                e["offer"] = raw_off["id"]
+                e["owner"] = (raw_off.get("owner") or {}).get("iata_code")
         # What the bill needs to be rebuilt as choices change: the fare's own bag
         # ladder and seat terms, and every ground mode at each end with its fare
         # and minutes, so a rideshare/transit choice is a swap, not a re-score.

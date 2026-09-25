@@ -14,9 +14,12 @@ Two tables, built once by `python3 concorde-travel/ontime.py build ZIP...` into 
   fixer    for each origin airport and three-hour block of scheduled departure, and each delay already reached D:
            how many flights were at least D late leaving, how much longer they took to leave (counts at each extra
            slip), and how many flights in that block were cancelled. The Flight Fixer reads "of the flights here that
-           were already D late, this many left within the next hour" off it. Cancellations cannot be dated in these
-           files, so every cancellation in the block counts against leaving, which makes the odds LOW rather than high
-           (unknown is never cheap).
+           were already D late, this many left within the next hour" off it. The files cannot date a cancellation, so
+           the share of already-late flights that ended cancelled is MEASURED another way (2026-09-25, per Patrick:
+           "22 to 52% is pretty wide"): every row carries the plane's tail number, so a flight whose plane landed from
+           its previous leg too late for it to leave within D minutes was at least D late, whatever happened next.
+           Among those flights (`kn`, by threshold) the ones cancelled (`kc`) give the cancellation rate of flights
+           already D late, with its margin of error, instead of the old 0-to-every-cancellation range.
 
 No network at run time; the table is read once, lazily.
 """
@@ -33,8 +36,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PATH = os.path.join(HERE, "enrichment", "ontime.json.gz")
 MIN_FLIGHTS = 20
 THRESHOLDS = (0, 30, 60, 90, 120, 180, 240, 300, 360)          # minutes already late
+TURN = 25            # the quickest a plane is turned round: a lateness read off its inbound is a floor, never a guess high
 SLIPS = (0, 15, 30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480, 720)   # further minutes before leaving
 BLOCKS = 8                                                       # three-hour blocks of scheduled departure
+MIN_KNOWN = 40       # late-arriving planes a block needs before its own cancellation rate is read, else the country's
 
 
 def _pct(xs: List[int], p: float) -> int:
@@ -58,6 +63,8 @@ def build(zips: List[str], out: str = PATH) -> Dict[str, Any]:
     routes: Dict[str, List[Any]] = {}
     fixer: Dict[str, Dict[int, Dict[str, Any]]] = {}
     months = []
+    new_cell = lambda: {"n": 0, "cancelled": 0, "ge": [0] * len(THRESHOLDS), "slip": [[0] * len(SLIPS) for _ in THRESHOLDS],
+                        "kn": [0] * len(THRESHOLDS), "kc": [0] * len(THRESHOLDS)}
     for path in sorted(zips):
         z = zipfile.ZipFile(path)
         name = next(n for n in z.namelist() if n.endswith(".csv"))
@@ -66,6 +73,7 @@ def build(zips: List[str], out: str = PATH) -> Dict[str, Any]:
             head = next(r)
             ix = {h: i for i, h in enumerate(head)}
             got = None
+            legs: Dict[Any, List[Any]] = {}          # (date, tail) -> the plane's flights that day, for the inbound step
             for row in r:
                 if len(row) < len(head) - 1:
                     continue
@@ -90,8 +98,11 @@ def build(zips: List[str], out: str = PATH) -> Dict[str, Any]:
                 if sched is None:
                     continue
                 block = min(BLOCKS - 1, sched // 180)
-                cell = fixer.setdefault(o, {}).setdefault(block, {"n": 0, "cancelled": 0, "ge": [0] * len(THRESHOLDS),
-                                                                   "slip": [[0] * len(SLIPS) for _ in THRESHOLDS]})
+                cell = fixer.setdefault(o, {}).setdefault(block, new_cell())
+                tail = row[ix["Tail_Number"]].strip()
+                if tail:
+                    legs.setdefault((row[ix["FlightDate"]], tail), []).append(
+                        (sched, o, d, canc, div, _hhmm(row[ix["CRSArrTime"]]), float(arr) if arr != "" else None, block))
                 cell["n"] += 1
                 if canc:
                     cell["cancelled"] += 1
@@ -107,6 +118,26 @@ def build(zips: List[str], out: str = PATH) -> Dict[str, Any]:
                     for si, s in enumerate(SLIPS):
                         if extra <= s:
                             cell["slip"][ti][si] += 1
+        # the inbound step: a flight whose plane landed from its previous leg (same tail, same day, into this airport)
+        # too late for it to leave within D minutes was at least D late before anything else happened to it
+        for day_legs in legs.values():
+            day_legs.sort(key=lambda x: x[0])
+            for i, (sched, o, _d, canc, _div, _sa, _ad, block) in enumerate(day_legs):
+                prev = next((p for p in reversed(day_legs[:i]) if p[2] == o), None)
+                if prev is None or prev[3] or prev[4] or prev[6] is None or prev[5] is None:
+                    continue                     # first flight of the day, or the plane never came: nothing to read
+                landed = prev[5] + prev[6]
+                if landed < prev[0] - 120:       # scheduled to land after midnight
+                    landed += 1440
+                late = landed + TURN - sched
+                if late < 0:
+                    continue
+                cell = fixer[o][block]
+                for ti, t in enumerate(THRESHOLDS):
+                    if late < t:
+                        break
+                    cell["kn"][ti] += 1
+                    cell["kc"][ti] += canc
         months.append(got)
         print("read", os.path.basename(path), got, file=sys.stderr)
     pack = lambda rec: [rec[0], rec[1], rec[2], _pct(rec[3], .5), _pct(rec[3], .9)]
@@ -116,10 +147,12 @@ def build(zips: List[str], out: str = PATH) -> Dict[str, Any]:
     nat: Dict[int, Dict[str, Any]] = {}
     for cells in fixer.values():
         for b, c in cells.items():
-            t = nat.setdefault(b, {"n": 0, "cancelled": 0, "ge": [0] * len(THRESHOLDS), "slip": [[0] * len(SLIPS) for _ in THRESHOLDS]})
+            t = nat.setdefault(b, new_cell())
             t["n"] += c["n"]
             t["cancelled"] += c["cancelled"]
             t["ge"] = [a + b2 for a, b2 in zip(t["ge"], c["ge"])]
+            t["kn"] = [a + b2 for a, b2 in zip(t["kn"], c["kn"])]
+            t["kc"] = [a + b2 for a, b2 in zip(t["kc"], c["kc"])]
             t["slip"] = [[a + b2 for a, b2 in zip(x, y)] for x, y in zip(t["slip"], c["slip"])]
     fixer["*"] = nat
     months = sorted(m for m in months if m)
@@ -194,11 +227,32 @@ def fixer_cell(origin: str, sched_minutes: int, delay_minutes: int) -> Optional[
     for where in (origin, "*"):
         c = (fx.get(where) or {}).get(block)
         if c and c["ge"][ti] >= 30:
-            return {"n_late": c["ge"][ti], "cancelled": c["cancelled"], "block_flights": c["n"],
-                    "slips": list(zip(D.get("slips") or SLIPS, c["slip"][ti])), "threshold": th[ti],
-                    "where": "US flights" if where == "*" else "flights from " + where,
-                    "window": D.get("window") or ""}
+            out = {"n_late": c["ge"][ti], "cancelled": c["cancelled"], "block_flights": c["n"],
+                   "slips": list(zip(D.get("slips") or SLIPS, c["slip"][ti])), "threshold": th[ti],
+                   "where": "US flights" if where == "*" else "flights from " + where,
+                   "window": D.get("window") or ""}
+            # the cancellation rate of flights already this late, read off late-arriving planes: this airport's block
+            # when it holds MIN_KNOWN of them, else the country's same block; None with a table built before the step
+            for kw in (where, "*"):
+                k = (fx.get(kw) or {}).get(block) or {}
+                if len(k.get("kn") or []) > ti and k["kn"][ti] >= MIN_KNOWN:
+                    out.update(known_late=k["kn"][ti], known_cancelled=k["kc"][ti],
+                               known_where="US flights" if kw == "*" else "flights from " + kw)
+                    break
+            return out
     return None
+
+
+def cancel_rate(known_late: int, known_cancelled: int, z: float = 1.96):
+    """The share of already-late flights that ended cancelled, with its 95% Wilson interval: (low, mid, high)."""
+    n = float(known_late)
+    if n <= 0:
+        return None
+    p = known_cancelled / n
+    den = 1 + z * z / n
+    mid = (p + z * z / (2 * n)) / den
+    half = z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5) / den
+    return max(0.0, mid - half), p, min(1.0, mid + half)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,173 @@
+{
+ "_provenance": {
+  "what": "SYNTHESIZED from Duffel's documented shapes (offers with return_available_services, seat maps; duffel.com/docs/api/v2, read 2026-09-25), because no airline the live account reaches quoted extras on 2026-09-25. Two flights; bags 45 and 65 USD; seats 32 and 0; extra legroom 89 on the first flight only.",
+  "synthesized": true
+ },
+ "offer": {
+  "total_currency": "USD",
+  "owner": {
+   "iata_code": "BA"
+  },
+  "available_services": [
+   {
+    "id": "ase_1",
+    "type": "baggage",
+    "total_amount": "45.00",
+    "total_currency": "USD",
+    "maximum_quantity": 1,
+    "passenger_ids": [
+     "pas_1"
+    ],
+    "segment_ids": [
+     "seg_1",
+     "seg_2"
+    ],
+    "metadata": {
+     "type": "checked",
+     "maximum_weight_kg": 23
+    }
+   },
+   {
+    "id": "ase_2",
+    "type": "baggage",
+    "total_amount": "65.00",
+    "total_currency": "USD",
+    "maximum_quantity": 1,
+    "passenger_ids": [
+     "pas_1"
+    ],
+    "segment_ids": [
+     "seg_1",
+     "seg_2"
+    ],
+    "metadata": {
+     "type": "checked",
+     "maximum_weight_kg": 23
+    }
+   },
+   {
+    "id": "ase_3",
+    "type": "cancel_for_any_reason",
+    "total_amount": "30.00",
+    "total_currency": "USD",
+    "maximum_quantity": 1
+   }
+  ]
+ },
+ "seat_maps": [
+  {
+   "id": "sea_1",
+   "segment_id": "seg_1",
+   "slice_id": "sli_1",
+   "cabins": [
+    {
+     "cabin_class": "economy",
+     "deck": 0,
+     "aisles": 2,
+     "rows": [
+      {
+       "sections": [
+        {
+         "elements": [
+          {
+           "type": "seat",
+           "designator": "20A",
+           "name": "Standard seat",
+           "disclosures": [],
+           "available_services": [
+            {
+             "id": "ase_s1",
+             "passenger_id": "pas_1",
+             "total_amount": "32.00",
+             "total_currency": "USD"
+            }
+           ]
+          },
+          {
+           "type": "seat",
+           "designator": "20B",
+           "name": "Standard seat",
+           "disclosures": [],
+           "available_services": []
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "sections": [
+        {
+         "elements": [
+          {
+           "type": "exit_row"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "sections": [
+        {
+         "elements": [
+          {
+           "type": "seat",
+           "designator": "30A",
+           "name": "Extra legroom",
+           "disclosures": [
+            "Extra legroom"
+           ],
+           "available_services": [
+            {
+             "id": "ase_s2",
+             "passenger_id": "pas_1",
+             "total_amount": "89.00",
+             "total_currency": "USD"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "sea_2",
+   "segment_id": "seg_2",
+   "slice_id": "sli_1",
+   "cabins": [
+    {
+     "cabin_class": "economy",
+     "deck": 0,
+     "aisles": 1,
+     "rows": [
+      {
+       "sections": [
+        {
+         "elements": [
+          {
+           "type": "seat",
+           "designator": "5C",
+           "name": "Standard seat",
+           "disclosures": [],
+           "available_services": [
+            {
+             "id": "ase_s3",
+             "passenger_id": "pas_1",
+             "total_amount": "0.00",
+             "total_currency": "USD"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

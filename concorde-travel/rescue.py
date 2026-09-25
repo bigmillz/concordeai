@@ -399,13 +399,30 @@ def _dot_model(sit: Dict[str, Any], planned: datetime, delay: int) -> Optional[D
                 return c0 + (c1 - c0) * (x - x0) / float(x1 - x0)
         return float(pts[-1][1])
 
-    def goes(since: float, until: float, cancels: bool = True) -> float:
+    # How many of the flights already this late ended cancelled. Measured (2026-09-25, per Patrick: the old range was
+    # "pretty wide") from flights whose plane landed too late for them to leave sooner (ontime.py's inbound step): the
+    # share cancelled among those, with its 95% margin of error, stands for the share among these. A table built before
+    # that step falls back to the old bounds: every cancellation in the block, or none.
+    rate = ontime.cancel_rate(cell["known_late"], cell["known_cancelled"]) if cell.get("known_late") else None
+
+    def cancelled_late(mode: str) -> float:
+        if rate is None:
+            return float(c) if mode == "low" else 0.0 if mode == "high" else c / 2.0
+        q = {"low": rate[2], "mid": rate[1], "high": rate[0]}[mode]      # more cancellations, lower chance
+        return n * q / (1.0 - q) if q < 1 else float(c)
+
+    def goes(since: float, until: float, mode: Any = "low") -> float:
         """Chance it leaves between `since` and `until` minutes after its planned time, given it has not left by
-        `since`. The files cannot say which cancellations came after a delay, so the chance is a RANGE: with every
-        cancellation in the block counted against leaving (cancels=True, the low end) and with none (the high end)."""
-        pool = n + (c if cancels else 0) - F(base + since)
+        `since`: 'low' and 'high' are the ends of the range, 'mid' the best single figure. (True and False still
+        mean the low and high ends.)"""
+        mode = {True: "low", False: "high"}.get(mode, mode)
+        pool = n + cancelled_late(mode) - F(base + since)
         return max(0.0, min(1.0, (F(base + until) - F(base + since)) / pool)) if pool > 0 else 0.0
-    return {"goes": goes, "cell": cell, "cancel": (c / float(n + c - F(base))) if (n + c - F(base)) > 0 else None}
+    left = n - F(base)
+    cancel = {m: (cancelled_late(m) / (left + cancelled_late(m))) if (left + cancelled_late(m)) > 0 else None
+              for m in ("low", "mid", "high")}
+    return {"goes": goes, "cell": cell, "rate": rate, "cancel": cancel["low"], "cancel_mid": cancel["mid"],
+            "cancel_lo": cancel["high"]}
 
 
 def odds(sit: Dict[str, Any], now: Optional[datetime], options: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
@@ -431,6 +448,7 @@ def odds(sit: Dict[str, Any], now: Optional[datetime], options: Optional[List[Di
             since = max(0.0, (h - ph) * 60.0)
             gone = h >= 24 or since >= end
             fcurve.append({"hour": h, "p": 0.0 if gone else round(dot["goes"](since, end), 3),
+                           "p_mid": 0.0 if gone else round(dot["goes"](since, end, "mid"), 3),
                            "p_hi": 0.0 if gone else round(dot["goes"](since, end, False), 3)})
     elif planned is not None and not cancelled:
         ph = (planned - day0).total_seconds() / 3600.0      # hours since today's midnight: 1:15 AM tomorrow is 25.25, not 1.25
@@ -447,6 +465,7 @@ def odds(sit: Dict[str, Any], now: Optional[datetime], options: Optional[List[Di
             ph = (planned - day0).total_seconds() / 3600.0
             p_flight = fcurve[0]["p"] if (passed and fcurve) else round(dot["goes"](0.0, max(0.0, (24.0 - ph) * 60.0)), 3)
             p_flight_hi = fcurve[0]["p_hi"] if (passed and fcurve) else round(dot["goes"](0.0, max(0.0, (24.0 - ph) * 60.0), False), 3)
+            p_flight_mid = fcurve[0]["p_mid"] if (passed and fcurve) else round(dot["goes"](0.0, max(0.0, (24.0 - ph) * 60.0), "mid"), 3)
         else:
             p_flight = fcurve[0]["p"] if (passed and fcurve) else _flight_goes_today(planned, delay)
     else:
@@ -465,17 +484,24 @@ def odds(sit: Dict[str, Any], now: Optional[datetime], options: Optional[List[Di
         p_alt = 1.0 - (1.0 - _ALT_TAKES_YOU) ** n if n else 0.0
         pf = next((k["p"] for k in fcurve if k["hour"] == h), 0.0)
         pf_hi = next((k.get("p_hi", k["p"]) for k in fcurve if k["hour"] == h), 0.0)
+        pf_mid = next((k.get("p_mid", k["p"]) for k in fcurve if k["hour"] == h), 0.0)
         # never certain: a seat on sale is not a seat in hand, so the line tops out at 97%
         row = {"hour": h, "p": round(min(0.97, 1.0 - (1.0 - pf) * (1.0 - p_alt)), 3), "alternatives_left": n}
         if dot:
             row["p_hi"] = round(min(0.97, 1.0 - (1.0 - pf_hi) * (1.0 - p_alt)), 3)
+            row["p_mid"] = round(min(0.97, 1.0 - (1.0 - pf_mid) * (1.0 - p_alt)), 3)
         tcurve.append(row)
     p_today = next((k["p"] for k in tcurve if k["hour"] >= now.hour + now.minute / 60.0), tcurve[0]["p"] if tcurve else 0.0)
     p_today_hi = next((k.get("p_hi", k["p"]) for k in tcurve if k["hour"] >= now.hour + now.minute / 60.0), tcurve[0].get("p_hi", tcurve[0]["p"]) if tcurve else 0.0)
+    p_today_mid = next((k.get("p_mid", k["p"]) for k in tcurve if k["hour"] >= now.hour + now.minute / 60.0), tcurve[0].get("p_mid", tcurve[0]["p"]) if tcurve else 0.0)
     cancel = (dot["cancel"] if dot else _cancel_risk(delay, planned.hour + planned.minute / 60.0)) if (planned is not None and not cancelled) else None
     on_time_p = round(dot["goes"](0.0, 15.0), 3) if dot else _SLIP[0][1]
     on_time_hi = round(dot["goes"](0.0, 15.0, False), 3) if dot else None
-    rng = lambda lo, hi: ("%d%%" % round(lo * 100)) if hi is None or round(hi * 100) <= round(lo * 100) else "%d%% to %d%%" % (round(lo * 100), round(hi * 100))
+    on_time_mid = round(dot["goes"](0.0, 15.0, "mid"), 3) if dot else None
+    rng = lambda lo, hi, mid=None: ("%d%%" % round(lo * 100)) if hi is None or round(hi * 100) <= round(lo * 100) else (
+        ("about %d%% (%d%% to %d%%)" % (round(mid * 100), round(lo * 100), round(hi * 100))) if mid is not None and dot and dot.get("rate")
+        else "%d%% to %d%%" % (round(lo * 100), round(hi * 100)))
+    measured = bool(dot and dot.get("rate"))
     tr = sit.get("tracking") or {}
     hm12 = lambda t: t.strftime("%I:%M %p").lstrip("0")
     upd = _parse(tr.get("last_updated"))
@@ -484,7 +510,16 @@ def odds(sit: Dict[str, Any], now: Optional[datetime], options: Optional[List[Di
                   (", %s late" % narrator._hm(tr["delay_minutes"])) if tr.get("delay_minutes") else "",
                   (", aircraft %s" % tr["aircraft"]) if tr.get("aircraft") else "")
               if tr.get("observed") else "")
-             + (("From US DOT records (%s): %s %s scheduled in the same three hours were already %s late or more. The "
+             + (("From US DOT records (%s): %s %s scheduled in the same three hours were already %s late or more. "
+                 "Some flights that late end up cancelled: of %s %s whose plane landed too late for them to leave "
+                 "sooner, %s were cancelled (%s), so that share is counted against leaving. The ranges are its margin "
+                 "of error. " % (
+                     dot["cell"]["window"], format(dot["cell"]["n_late"], ",d"), dot["cell"]["where"],
+                     narrator._hm(dot["cell"]["threshold"]) if dot["cell"]["threshold"] else "0 minutes",
+                     format(dot["cell"]["known_late"], ",d"), dot["cell"]["known_where"], format(dot["cell"]["known_cancelled"], ",d"),
+                     ("%.1f%%" % (100.0 * dot["rate"][1])).replace(".0%", "%")))
+                if measured else
+                ("From US DOT records (%s): %s %s scheduled in the same three hours were already %s late or more. The "
                  "chances are ranges because the records cannot say which of the %s cancellations in those hours came "
                  "after a delay: the low end counts them all against leaving, the high end none. " % (
                      dot["cell"]["window"], format(dot["cell"]["n_late"], ",d"), dot["cell"]["where"],
@@ -492,16 +527,23 @@ def odds(sit: Dict[str, Any], now: Optional[datetime], options: Optional[List[Di
                 if dot else "Estimated from the time of day and the delay so far, not from records: no US DOT record covers this flight. ")
              + ("Your flight: %s, leaving at %s. Cancellation risk: %s. Chance it leaves within 15 minutes of the new time: %s. %s"
                 % (("%s late" % narrator._hm(delay)) if delay else "no delay yet", hm12(planned),
-                   ("up to %d%%" % round(cancel * 100)) if dot else "%d%%" % round(cancel * 100), rng(on_time_p, on_time_hi),
+                   (("about %d%% (%d%% to %d%%)" % (round(dot["cancel_mid"] * 100), round(dot["cancel_lo"] * 100), round(cancel * 100)))
+                    if measured else ("up to %d%%" % round(cancel * 100)) if dot else "%d%%" % round(cancel * 100)),
+                   rng(on_time_p, on_time_hi, on_time_mid),
                    "After midnight it counts as lost. " if planned.date() == now.date() else "")
                 if cancel is not None else "Your flight is canceled, so only other flights count. " if sit.get("kind") == "cancelled"
                 else "No new departure time yet, so only other flights count. ")
              + "Flying today: each other flight leaving 75+ minutes from now counts as a 50%% chance of a seat. "
                "Flights that qualify: %d." % sum(1 for d in deps if d >= now + timedelta(minutes=BUFFER_MINUTES)))
     hi = lambda v: round(v, 2) if dot else None
-    return {"flight": {"p": round(p_flight, 2), "p_hi": hi(p_flight_hi) if (dot and planned is not None and not cancelled) else None, "curve": fcurve},
-            "today": {"p": round(p_today, 2), "p_hi": hi(p_today_hi), "curve": tcurve},
-            "modelled": not dot, "from_records": bool(dot), "records": ({k: dot["cell"][k] for k in ("n_late", "cancelled", "threshold", "where", "window")} if dot else None), "observed_status": bool(tr.get("observed")), "planned": planned.isoformat() if planned else None,
+    mid = lambda v: round(v, 2) if measured else None
+    has_flight = bool(dot and planned is not None and not cancelled)
+    return {"flight": {"p": round(p_flight, 2), "p_hi": hi(p_flight_hi) if has_flight else None,
+                       "p_mid": mid(p_flight_mid) if has_flight else None, "curve": fcurve},
+            "today": {"p": round(p_today, 2), "p_hi": hi(p_today_hi), "p_mid": mid(p_today_mid), "curve": tcurve},
+            "modelled": not dot, "from_records": bool(dot), "measured_cancellations": measured,
+            "records": ({k: dot["cell"].get(k) for k in ("n_late", "cancelled", "threshold", "where", "window", "known_late",
+                                                          "known_cancelled", "known_where")} if dot else None), "observed_status": bool(tr.get("observed")), "planned": planned.isoformat() if planned else None,
             "planned_passed": passed,
             "cancel_risk": cancel, "basis": basis}
 
@@ -511,8 +553,12 @@ def _clock(iso: Optional[str]) -> str:
 
 
 def _pct_range(o: Dict[str, Any]) -> str:
-    lo, hi = round((o.get("p") or 0) * 100), o.get("p_hi")
-    return "%d%%" % lo if hi is None or round(hi * 100) <= lo else "%d%% to %d%%" % (lo, round(hi * 100))
+    lo, hi, mid = round((o.get("p") or 0) * 100), o.get("p_hi"), o.get("p_mid")
+    if hi is None or round(hi * 100) <= lo:
+        return "%d%%" % lo
+    if mid is not None:
+        return "about %d%% (%d%% to %d%%)" % (round(mid * 100), lo, round(hi * 100))
+    return "%d%% to %d%%" % (lo, round(hi * 100))
 
 
 def brief(sit: Dict[str, Any], a: Dict[str, Any]) -> Dict[str, Any]:

@@ -126,6 +126,27 @@ def main():
               "end none, and the advice says the range", abs(od["flight"]["p_hi"] - want_hi) < 0.005 and od["flight"]["p_hi"] > od["flight"]["p"]
               and all(k["p_hi"] >= k["p"] for k in od["flight"]["curve"]) and "%d%% to %d%%" % (round(want * 100), round(want_hi * 100)) in rescue._pct_range(od["flight"]),
               str((od["flight"]["p"], od["flight"]["p_hi"], want_hi)))
+        # the measured rate (2026-09-25): of 400 flights here whose plane landed 3 h late or worse, 40 were cancelled.
+        # That 10% (Wilson 95% interval) replaces "every cancellation, or none": a best figure and a narrow range.
+        ontime._DOC["fixer"]["JFK"]["6"].update({"kn": [0, 0, 0, 0, 0, 400, 0], "kc": [0, 0, 0, 0, 0, 40, 0]})
+        om = rescue.odds(dsit, datetime.fromisoformat("2026-11-18T20:00:00-05:00"), [])
+        lo_q, q, hi_q = ontime.cancel_rate(400, 40)
+        left = 85 - 10
+        want_mid = round(left / (100 + 100 * q / (1 - q) - 10), 3)
+        want_lo = round(left / (100 + 100 * hi_q / (1 - hi_q) - 10), 3)
+        want_hi2 = round(left / (100 + 100 * lo_q / (1 - lo_q) - 10), 3)
+        f = om["flight"]
+        check("with late-arriving planes measured, the share of already-late flights cancelled is 40 of 400 and the "
+              "odds are a best figure inside its margin of error (%.0f%%, %.0f-%.0f%%), far narrower than every-or-none"
+              % (want_mid * 100, want_lo * 100, want_hi2 * 100),
+              om["measured_cancellations"] and abs(f["p_mid"] - want_mid) < 0.006 and abs(f["p"] - want_lo) < 0.006
+              and abs(f["p_hi"] - want_hi2) < 0.006 and f["p"] <= f["p_mid"] <= f["p_hi"]
+              and (f["p_hi"] - f["p"]) < (want_hi - want) / 2, str(f))
+        check("the advice gives the best figure with its range, and the basis names the measurement",
+              rescue._pct_range(f).startswith("about %d%%" % round(want_mid * 100)) and "40 were cancelled" in om["basis"]
+              and "margin of error" in om["basis"], rescue._pct_range(f) + " | " + om["basis"][:200])
+        check("every point of the curve keeps low <= best <= high", all(k["p"] <= k["p_mid"] <= k["p_hi"] for k in f["curve"]),
+              str([(k["p"], k["p_mid"], k["p_hi"]) for k in f["curve"]][:4]))
         oi = rescue.odds(dict(dsit, international=True), datetime.fromisoformat("2026-11-18T20:00:00-05:00"), [])
         check("an international flight has no DOT record and stays an estimate", oi["modelled"] and not oi["from_records"])
     finally:

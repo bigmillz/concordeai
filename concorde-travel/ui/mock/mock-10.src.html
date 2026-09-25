@@ -124,12 +124,12 @@ h1,h2,h3{font-weight:400;letter-spacing:-.02em;text-wrap:balance}
 .chip[aria-pressed=true] .n{color:var(--bg);background:rgba(0,0,0,.12)}
 .chip.zero{opacity:.55}
 /* wants as a fixed grid, four across and two on phones, so no row ends with a stray chip (per Patrick, 2026-09-22) */
-#chips{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+#chips{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
 #chips .chip{display:flex;justify-content:space-between;min-width:0;padding:8px 10px;gap:6px}
 #chips .chip .l{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wants{container-type:inline-size}
-@container (max-width:760px){#chips{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@container (max-width:420px){#chips .chip{border-radius:14px;align-items:center}#chips .chip .l{white-space:normal;overflow:visible;line-height:1.25}}   /* on a phone a long label wraps to a second line rather than being cut */   /* fifteen wants: five across when the panel has room, three otherwise, so every row is full */
+@container (max-width:880px){#chips{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@container (max-width:420px){#chips .chip{border-radius:14px;align-items:center}#chips .chip .l{white-space:normal;overflow:visible;line-height:1.25}}   /* on a phone a long label wraps to a second line rather than being cut */   /* eighteen wants: six across when the panel has room, three otherwise, so every row is full */
 .chipnote{margin-top:10px;font-size:12.5px;color:var(--price);line-height:1.5}
 
 .wish{margin-top:22px;border-top:1px solid var(--line);padding-top:18px}
@@ -1154,14 +1154,66 @@ const NEWGEN = /^(78[1789]|359|351|339|338|32N|32Q|223|7M[89])$/;
 // what the search's offers support: loyalty programmes (the feed lists them per offer) and the airlines that actually fly it
 let LOY = new Set(), OPS = new Set(), CO2MIN = null, CO2MED = null;
 const kgOf = e => +((e.details || {}).emissions_kg) || 0;
+// Lounge access (2026-09-25; defined before WANTS, whose prepWants runs at load and asks it): who already gets in, from published rules, never from a fare's name. The cabin on the
+// longest flight (business or first on a trip that crosses a border; a lie-flat premium flight at home), or a status the
+// traveller holds (LOUNGE_STATUS, the airlines' and alliances' own rules). Returns the reason, or null.
+// The rules, from the airlines' and alliances' own pages (researched and re-checked 2026-09-25; Turkish's could not be
+// confirmed, so it claims nothing): `on` the airlines whose flights qualify, `intl` only on a trip that crosses a border,
+// `outNA` only on a trip that leaves North America (AAdvantage and Atmos elites), `noBasic` never on a Basic or Light
+// fare (Delta says so outright; American's 2026 Basic Economy rule is unclear, so it is read the stricter way),
+// `from` only departing these airports (JetBlue's BlueHouse).
+const L_SKY = ALLIANCE.skyteam, L_ONE = ALLIANCE.oneworld.concat(['HA']), L_STAR = ALLIANCE.star, L_LHG = ['LH', 'LX', 'OS', 'SN', 'EN', 'VL', '4Y'];
+const LOUNGE_STATUS = {
+  DL:{Gold:{on:L_SKY.filter(c => c !== 'DL'), intl:true, noBasic:true}, Platinum:{on:L_SKY.filter(c => c !== 'DL'), intl:true, noBasic:true}, Diamond:{on:L_SKY.filter(c => c !== 'DL'), intl:true, noBasic:true}},
+  AA:{Platinum:{on:L_ONE, outNA:true, noBasic:true}, 'Platinum Pro':{on:L_ONE, outNA:true, noBasic:true}, 'Executive Platinum':{on:L_ONE, outNA:true, noBasic:true}},
+  UA:{Gold:{on:L_STAR, intl:true}, Platinum:{on:L_STAR, intl:true}, '1K':{on:L_STAR, intl:true}},
+  BA:{Silver:{on:L_ONE}, Gold:{on:L_ONE}},
+  VS:{Gold:{on:L_SKY}},
+  LH:{'Frequent Traveller':{on:L_LHG}, Senator:{on:L_STAR}, 'HON Circle':{on:L_STAR}},
+  AF:{Gold:{on:L_SKY, intl:true}, Platinum:{on:L_SKY, intl:true}},
+  AS:{Gold:{on:L_ONE, outNA:true}, Platinum:{on:L_ONE, outNA:true}, Titanium:{on:L_ONE, outNA:true}},
+  B6:{'Mosaic 4':{on:['B6'], from:['JFK', 'BOS']}},
+  AC:{'50K':{on:L_STAR}, '75K':{on:L_STAR}, 'Super Elite':{on:L_STAR}},
+  star:{Gold:{on:L_STAR}}, oneworld:{Sapphire:{on:L_ONE}, Emerald:{on:L_ONE}}, skyteam:{'Elite Plus':{on:L_SKY, intl:true}},
+};
+const NORTH_AMERICA = new Set('us ca mx bs bm pr vi ag ai aw bb bq cu cw dm do gd gp ht jm kn ky lc mq ms sx tc tt vc vg'.split(' '));
+function loungeAccess(e){
+  const legs = e.by.cheapest.legs.filter(l => l.kind === 'flight'), segs = e.segments || [];
+  let k = 0; legs.forEach((l, i) => { if (l.minutes > legs[k].minutes) k = i; });
+  const cab = String((segs[k] || segs[0] || {}).cabin || '').toLowerCase(), brand = String(e.brand || '').toLowerCase(), basic = /\b(basic|light|saver)\b/.test(brand);
+  const borders = new Set(e.route.map(c => (D.airports[c] || {}).border));
+  const abroad = borders.size > 1 || borders.has(undefined), leavesNA = [...borders].some(b => !b || !NORTH_AMERICA.has(b));
+  const who = e.operator || e.carrier, from = e.route[0];
+  // the cabin: JetBlue's Mint has the BlueHouse at JFK and Boston only, and Mint Basic none; Icelandair's Saga Premium
+  // has Keflavik's lounge; Aer Lingus AerSpace, an economy brand, includes one
+  if (who === 'B6' && /business|first/.test(cab)) return ['JFK', 'BOS'].includes(from) && !basic ? 'Mint includes the BlueHouse at ' + from : null;
+  if (who === 'FI' && /business|first|premium/.test(cab)) return 'Saga Premium includes the Keflavik lounge';
+  if (who === 'EI' && /aerspace/.test(brand)) return 'AerSpace includes the lounge';
+  if (/business|first/.test(cab) && abroad) return (cab.includes('first') ? 'First' : 'Business') + ' on an international trip includes the lounge';
+  if (/business|first/.test(cab) && e.lie_flat === true) return 'Lie-flat premium seats on this route include the lounge';
+  for (const [prog, tier] of Object.entries(S.status || {})){
+    const r = tier && (LOUNGE_STATUS[prog] || {})[tier];
+    if (!r) continue;
+    if (!r.on.includes(who) && !r.on.includes(e.carrier)) continue;
+    if ((r.intl && !abroad) || (r.outNA && !leavesNA) || (r.noBasic && basic) || (r.from && !r.from.includes(from))) continue;
+    const name = {DL:t => t + ' Medallion', AA:t => 'AAdvantage ' + t, UA:t => 'Premier ' + t, BA:t => 'BA ' + t, VS:t => 'Flying Club ' + t,
+      AF:t => 'Flying Blue ' + t, AS:t => 'Atmos ' + t, AC:t => 'Aeroplan ' + t, star:t => 'Star Alliance ' + t, oneworld:t => 'oneworld ' + t,
+      skyteam:t => 'SkyTeam ' + t}[prog];
+    return 'Your ' + (name ? name(tier) : tier) + ' status gets you in' + (r.intl || r.outNA ? ' on this international trip' : '');
+  }
+  return null;
+}
 const WANTS = [
-  // routing, then schedule and fare, then cabin, then the rest. Fifteen since lounge access went (2026-09-24, per Patrick:
-  // it was guessed from the fare's name, and many travellers get it from a card or status), so five to a row, or three
+  // routing, then schedule and fare, then cabin, then the rest. Eighteen since 2026-09-25 (per Patrick: lounge access back as
+  // a chip, never added unless picked; overnight beside daytime; meals served), so six to a row, or three, every row full
   {id:'nonstop', label:'Nonstop', cents:15000, ok:e => e.stops === 0},
   {id:'short', label:'Short layovers', cents:8000, ok:e => e.stops === 0 || e.layover_minutes.every(m => m <= 150)},
   {id:'long', label:'Long layover', cents:6000, ok:e => e.layover_minutes.some(m => m >= 300)},
   {id:'sameapt', label:'Same airport', cents:12000, ok:e => (e.segments || []).every((g, i, a) => i === 0 || a[i-1].to === g.from)},
   {id:'day', label:'Daytime flight', cents:5000, ok:e => { const h = hour(e.depart); return h >= 6 && h < 15; }},
+  // leaves in the evening and lands the next morning: a night on board instead of a day or a hotel (picking it clears
+  // Daytime flight, and the other way round)
+  {id:'overnight', label:'Overnight flight', cents:5000, ok:e => { const d = hour(e.depart), a = hour(e.arrive); return (e.day_offset || 0) >= 1 && d >= 17 && a < 12; }},
   {id:'flex', label:'Flexible ticket', cents:9000, ok:e => e.refundable || e.changes === 'fee' || e.changes === 'free'},
   {id:'refund', label:'Refundable', cents:12000, ok:e => e.refundable === true, hint:'No refundable economy fares here. Flexible ticket covers changes.'},
   {id:'bagin', label:'Bag included', cents:3500, ok:e => (e.bags_included || 0) >= 1, hint:'No fare here includes a checked bag.'},
@@ -1171,7 +1223,13 @@ const WANTS = [
   {id:'lieflat', label:'Lie-flat seat', cents:40000, ok:e => e.lie_flat === true, hint:'No lie-flat seats in these results. Switch the cabin to Business.'},
   {id:'legroom', label:'Extra legroom', cents:3000, ok:e => e.pitch.some(p => (p || 0) >= 32), hint:'No economy seat here has 32 inches of legroom. Try premium economy.'},
   {id:'newgen', label:'787 / A350 / neo', cents:4000, ok:e => e.equipment.some(x => NEWGEN.test(x))},
-  {id:'wifi', label:'Free wifi', cents:3000, ok:e => e.wifi_cost === 'free', hint:'No fare here lists free wifi.'},   // a fare that sells a pass gets the pass on its bill; one with no wifi ranks lower
+  {id:'wifi', label:'Free wifi', cents:3000, ok:e => e.wifi_cost === 'free', hint:'No fare here lists free wifi.'},
+  // the airline's published catering for this cabin and flight length (enrichment/meals.json, by data.py): a meal, not a
+  // snack or food for sale; a policy nobody publishes counts as no meal listed
+  {id:'meals', label:'Meals served', cents:2500, ok:e => e.meal === 'meal', hint:'No flight here lists a meal in this cabin.'},
+  // opt-in only (per Patrick, 2026-09-25): when picked, a ticket that gets you in (the cabin, or your status) meets it and
+  // the rest carry a day pass on the bill; nothing is added unless the chip is picked
+  {id:'lounge', label:'Lounge access', cents:6500, ok:e => !!loungeAccess(e)},   // a fare that sells a pass gets the pass on its bill; one with no wifi ranks lower
   {id:'toprated', label:'Top-rated airline', cents:4000, ok:e => e.rating != null && e.rating >= .76, hint:'No top-rated airline on this route.'},
   // the cleaner half of the search has it; the dirtier half is charged the gap to the cleanest option at $60 a tonne, and an unreported figure is never counted as clean
   {id:'co2', label:'Lower emissions', cents:4000, prep:() => { const ks = ALL.map(kgOf).filter(Boolean).sort((a, b) => a - b); CO2MIN = ks.length ? ks[0] : null; CO2MED = ks.length ? ks[Math.floor((ks.length - 1)/2)] : null; },
@@ -1458,7 +1516,31 @@ function destHotel(e){
 const ADDP = __ADDONS__;
 const longestFlight = e => Math.max(0, ...e.by.cheapest.legs.filter(l => l.kind === 'flight').map(l => l.minutes));
 function shortHaul(e){ const b = new Set(e.route.map(c => (D.airports[c] || {}).border)); return (b.size === 1 && !b.has(undefined)) || longestFlight(e) < 240; }
+// This flight's own extras (2026-09-25, per Patrick): when the details sheet opens on a flight sold by an airline Duffel
+// quotes extras for, /extras asks for its bag and seat prices; what comes back replaces the published or typical price,
+// unmarked. Nothing is asked for a flight nobody opened, or an airline that quotes none.
+const EXTRAS_AIRLINES = new Set(['UA', 'BA', 'AF', 'KL', 'LH', 'LX', 'OS', 'SN', 'AA', 'EK', 'TP']);
+const EXTRAS = {};
+function flightExtras(e){
+  if (!e || !e.offer || !EXTRAS_AIRLINES.has(e.owner)) return null;
+  const x = EXTRAS[e.offer];
+  if (x && x !== 'pending') return x;
+  if (!x && SERVED){ EXTRAS[e.offer] = 'pending';
+    fetch('/extras?' + new URLSearchParams({offer:e.offer, owner:e.owner})).then(r => r.json()).then(d => { EXTRAS[e.offer] = d || {}; if (d && (d.seat || (d.bags || []).length)) priceArrived(); }).catch(() => { EXTRAS[e.offer] = {}; }); }
+  return null;
+}
+const ownExtras = e => { const x = e && e.offer && EXTRAS[e.offer]; return x && x !== 'pending' ? x : null; };
+function bagLadder(e){
+  // the airline's own quote for this flight, piece by piece, else the fare's published ladder
+  const x = ownExtras(e), own = x && (x.bags || []).filter(b => b.kind === 'checked');
+  if (own && own.length){ const t = []; own.slice().sort((a, b) => a.cents - b.cents).forEach(b => { for (let i = 0; i < Math.max(1, b.max || 1); i++) t.push(b.cents); }); return {tiers:t, own:true}; }
+  return {tiers:e.bag_tiers.slice().sort((x, y) => x.piece - y.piece).map(x => x.amount_cents), own:false};
+}
 function addonPrice(kind, e, typical){
+  const x = ownExtras(e), seat = x && x.seat, flier = airName(e.owner || e.carrier);
+  if (seat && kind === 'seat') return seat.free ? {cents:0, basis:'free seat choice on this flight (' + flier + (/s$/.test(flier) ? '\'' : '\'s') + ' seat map)', est:false}
+    : {cents:seat.any_cents, basis:flier + (/s$/.test(flier) ? '\'' : '\'s') + ' price for this flight' + (seat.segments > 1 ? ', a seat on each of its ' + seat.segments + ' flights' : ''), est:false};
+  if (seat && kind === 'legroom' && seat.legroom_cents != null) return {cents:seat.legroom_cents, basis:flier + (/s$/.test(flier) ? '\'' : '\'s') + ' extra-legroom seat price for this flight', est:false};
   const t = (ADDP.prices || {})[kind] || {}, row = t[e.operator] || t[e.carrier], who = airName((row && row.code) || e.operator || e.carrier);
   // a price published for one haul never stands in for the other ("free within North America" is not a transatlantic promise)
   const p = row && (shortHaul(e) ? row.short : row.long);
@@ -1476,7 +1558,7 @@ function insurancePrice(e){
 }
 const ADDONS = {
   wifi:{label:'Wifi pass', cents:1900, price:e => addonPrice('wifi', e, 1900), sells:e => e.wifi_cost === 'paid', has:e => e.wifi_cost === 'free', want:'wifi', why:'you picked free wifi; this fare charges for it'},
-  lounge:{label:'Lounge day pass', cents:6500, price:e => addonPrice('lounge', e, 6500), sells:() => true, has:() => false, why:'added by you'},
+  lounge:{label:'Lounge day pass', cents:6500, price:e => addonPrice('lounge', e, 6500), sells:() => true, has:e => !!loungeAccess(e), hasWhy:loungeAccess, want:'lounge', why:'you asked for lounge access; this ticket does not include it'},
   legroom:{label:'Extra-legroom seat', cents:7900, price:e => addonPrice('legroom', e, 7900), sells:() => true, has:e => WANTS.find(w => w.id === 'legroom').ok(e), want:'legroom', why:'you asked for extra legroom; no seat on this fare is listed at 32 inches or more'},
   seat:{label:'Pick your seat', cents:3000, price:e => addonPrice('seat', e, 3000), sells:e => e.seat_selection === 'paid', has:e => e.seat_selection !== 'paid', why:'seat selection is paid on this fare'},
   priority:{label:'Priority boarding', cents:2500, price:e => addonPrice('priority', e, 2500), sells:() => true, has:() => false, why:'added by you'},
@@ -1497,8 +1579,8 @@ function pickGround(modes, hourly, prefer){
   return {mode:f[0], note};
 }
 function bagCost(e, pieces){
-  // this fare's own ladder, extended past its last tier by repeating the dearest
-  const t = e.bag_tiers.slice().sort((x, y) => x.piece - y.piece).map(x => x.amount_cents), dear = t.length ? Math.max(...t) : 10000;
+  // this flight's own quote when the airline gave one, else the fare's ladder, extended past its last tier by repeating the dearest
+  const t = bagLadder(e).tiers, dear = t.length ? Math.max(...t) : 10000;
   let c = 0; for (let i = 0; i < pieces; i++) c += i < t.length ? t[i] : dear; return c;
 }
 function overnight(e){
@@ -1555,13 +1637,13 @@ function bill(e, opts){
   if (perk && total > e.bags_included) line('addons', {key:'bags', label:paid ? paid + ' checked bag' + (paid > 1 ? 's' : '') + ' not included' : 'Checked bags', cents:paid ? bagCost(e, paid) : 0,
       evidence:'Your ' + perk.name + ': ' + perk.free + ' checked bag' + (perk.free > 1 ? 's' : '') + ' free on ' + (e.operator || e.carrier) + (paid ? ', ' + paid + ' more to pay' : '') + ' · ' + perk.source, removable: S.extra.bag > 0});
   else if (total === (D.query.bags ?? 1) && B) line('addons', {key:'bags', label:B.label, evidence:B.evidence, cents:B.cents});
-  else if (paid > 0) line('addons', {key:'bags', label: paid + ' checked bag' + (paid > 1 ? 's' : '') + ' not included', cents:bagCost(e, paid), est:!e.bag_tiers.length,
-      evidence: total + ' checked, ' + bagsIn + ' included with ' + e.brand + ' · bag fees: ' + (e.bag_tiers.length ? e.bag_tiers.map(t => money(t.amount_cents)).join(', ') + ', then ' + money(Math.max(...e.bag_tiers.map(t => t.amount_cents))) + ' each' : 'not published, so priced high') + (S.extra.bag ? ' · ' + S.extra.bag + ' added by you' : ''), removable: S.extra.bag > 0});
+  else if (paid > 0) line('addons', {key:'bags', label: paid + ' checked bag' + (paid > 1 ? 's' : '') + ' not included', cents:bagCost(e, paid), est:!bagLadder(e).tiers.length,
+      evidence: total + ' checked, ' + bagsIn + ' included with ' + e.brand + ' · ' + ((lad => lad.own ? 'this flight\'s own bag price from ' + airName(e.owner || e.carrier) + ': ' + lad.tiers.map(money).join(', ') : 'bag fees: ' + (lad.tiers.length ? lad.tiers.map(money).join(', ') + ', then ' + money(Math.max(...lad.tiers)) + ' each' : 'not published, so priced high'))(bagLadder(e))) + (S.extra.bag ? ' · ' + S.extra.bag + ' added by you' : ''), removable: S.extra.bag > 0});
   else if (total > 0) line('addons', {key:'bags', label: total + ' checked bag' + (total > 1 ? 's' : '') + ' included', cents:0, included:true, evidence:e.brand + ' includes ' + bagsIn});
   {
     for (const [k, a] of Object.entries(ADDONS)){
       const wanted = (a.want && S.wants.has(a.want)) || S.extra[k]; if (!wanted || S.off.has(k)) continue;
-      if (a.has(e)) line(a.group || 'addons', {key:k, label:a.label.replace(' day pass', '').replace(' pass', '').replace('Pick your seat', 'Seat choice').trim() + ' included', cents:0, included:true, evidence:'comes with this fare', removable:true});
+      if (a.has(e)) line(a.group || 'addons', {key:k, label:a.label.replace(' day pass', '').replace(' pass', '').replace('Pick your seat', 'Seat choice').trim() + ' included', cents:0, included:true, evidence:(a.hasWhy && a.hasWhy(e)) || 'comes with this fare', removable:true});
       else if (a.sells(e)){ const pr = a.price(e);
         line(a.group || 'addons', {key:k, label:a.label, cents:pr.cents, est:pr.est !== false, evidence:a.why + ' · ' + pr.basis, removable:true}); }
     }
@@ -1910,7 +1992,7 @@ function journeyHTML(e, r, ctx, compact){
 // it is worth $80 or more either way, or is a want the user named. Each term
 // carries a weight in cents, and the four heaviest a side are shown. Everything
 // here is a line with a figure in the full ledger; this is the short form.
-const WANT_CON = {nonstop:'Not nonstop', short:'Long layover', long:'Short layover', lieflat:'No lie-flat', newgen:'Older jet', wifi:'No wifi', legroom:'Tight seat', flex:'No changes', day:'Not daytime'};
+const WANT_CON = {nonstop:'Not nonstop', short:'Long layover', long:'Short layover', lieflat:'No lie-flat', newgen:'Older jet', wifi:'No wifi', legroom:'Tight seat', flex:'No changes', day:'Not daytime', overnight:'Not overnight', meals:'No meal listed', lounge:'No lounge'};
 const JET = {781:'787-10', 789:'787-9', 788:'787-8', 359:'A350', 351:'A350-1000', 339:'A330neo', 338:'A330neo', '32N':'A321neo', '32Q':'A321neo', 223:'A220', '7M8':'737 MAX', '7M9':'737 MAX', 763:'767', 764:'767', 762:'767', 772:'777-200', 744:'747', 343:'A340', 346:'A340', 340:'A340', 332:'A330-200'};
 const OLDJET = /^(76[234]|772|744|34[036]|332)$/;
 const rnd15 = m => Math.max(15, Math.round(m/15)*15);
@@ -2228,6 +2310,7 @@ document.addEventListener('click', async ev => {
 document.addEventListener('change', ev => { const c = ev.target.closest('[data-agencies]'); if (!c) return; AGENCIES = c.checked; try { localStorage.setItem('concordego.agencies', AGENCIES ? '1' : '0'); } catch (x) {} rerenderBills(); });
 function openSheet(id){
   const e = ALL.find(x => x.id === id);
+  flightExtras(e);      // ask for this flight's own bag and seat prices; the bill redraws when they arrive
   $('#sheetroot').innerHTML = `<div class="sheetwrap" id="sheetwrap" data-id="${esc(e.id)}"><div class="sheet" role="dialog" aria-modal="true" aria-label="Flight details"><div class="hd"><h3>${esc(e.carrier_name)} ${esc(e.flight)}<span>${esc(e.brand)}</span></h3><button class="x" id="x" aria-label="Close">×</button></div><div class="detail">${ledgerHTML(e)}</div></div></div>`;
   if (S.fixerWarn){ const hd = document.querySelector('#sheetwrap .sheet .hd'); if (hd) hd.insertAdjacentHTML('afterend', '<p class="fixwarn">Ask airline staff to rebook you first, on the same airline if possible. A second ticket can mean paying twice. Checked bags do not transfer to another airline.</p>'); }
   $('#x').focus();
@@ -2412,6 +2495,9 @@ function parseWish(text){
   if (/legroom|leg room|tall/.test(t)) out.push({kind:'want', id:'legroom', label:'Extra legroom'});
   if (/flexib|refund|might change|may change/.test(t)) out.push({kind:'want', id:'flex', label:'Flexible ticket'});
   if (/no red[- ]?eye|not overnight|daytime|during the day|no overnight/.test(t)) out.push({kind:'want', id:'day', label:'Daytime flight'});
+  else if (/overnight|red[- ]?eye|sleep on the (plane|flight)|fly at night|night flight/.test(t)) out.push({kind:'want', id:'overnight', label:'Overnight flight'});
+  if (/\bmeals?\b|hot food|real food|dinner on board|fed on (the )?(plane|flight)|no pretzels/.test(t)) out.push({kind:'want', id:'meals', label:'Meals served'});
+  if (/lounge/.test(t)) out.push({kind:'want', id:'lounge', label:'Lounge access'});
   if (/bag included|free (?:checked )?bag|includes? a (?:checked )?bag/.test(t)) out.push({kind:'want', id:'bagin', label:'Bag included'});
   if (/carry[- ]?on|cabin bag|overhead bin/.test(t)) out.push({kind:'want', id:'carryon', label:'Free carry-on'});
   if (/good airline|top[- ]rated|best airline|well[- ]rated|reputable airline/.test(t)) out.push({kind:'want', id:'toprated', label:'Top-rated airline'});
@@ -2487,7 +2573,7 @@ async function applyWish(text, box){
   if (m && !items.length && m.ask){ S.thread.push({text, items:[], reply:m.ask}); if (box) box.value = ''; renderThread(); toast(m.ask); return; }
   if (!items.length && isQuestion(text)){ const reply = answerFor(text); S.thread.push({text, items:[], reply}); if (box) box.value = ''; renderThread(); toast(reply); return; }
   for (const x of items){
-    if (x.kind === 'want') S.wants.add(x.id);
+    if (x.kind === 'want') addWant(x.id);
     else if (x.kind === 'avoid' || x.kind === 'after' || x.kind === 'before' || x.kind === 'max'){ if (!S.rules.some(r => r.label === x.label)) S.rules.push(x); }
     else if (x.kind === 'tilt'){ x.prev = [S.a, S.b, S.c, S.preset]; if (x.p === 'asap') setWeights(0, 1, 0, 'asap'); else { const [a, b, c] = x.p.split(',').map(Number); setWeights(a, b, c, x.p); } }
   }
@@ -3048,7 +3134,9 @@ document.addEventListener('keydown', ev => {
     if (ev.key === 'ArrowLeft'){ a += s; b -= s; } else if (ev.key === 'ArrowRight'){ b += s; a -= s; } else if (ev.key === 'ArrowUp'){ c += s; a -= s/2; b -= s/2; } else if (ev.key === 'ArrowDown'){ c -= s; a += s/2; b += s/2; } else return;
     a = Math.max(0,a); b = Math.max(0,b); c = Math.max(0,c); const t = a+b+c; setWeights(a/t, b/t, c/t, null); ev.preventDefault(); }
 });
-$('#chips').addEventListener('click', ev => { const b = ev.target.closest('[data-w]'); if (!b) return; const id = b.dataset.w; S.wants.has(id) ? S.wants.delete(id) : S.wants.add(id); paintChips(); paint(true); });
+const OPPOSITE = {day:'overnight', overnight:'day'};
+function addWant(id){ S.wants.add(id); if (OPPOSITE[id]) S.wants.delete(OPPOSITE[id]); }
+$('#chips').addEventListener('click', ev => { const b = ev.target.closest('[data-w]'); if (!b) return; const id = b.dataset.w; S.wants.has(id) ? S.wants.delete(id) : addWant(id); paintChips(); paint(true); });
 $('#wishgo').addEventListener('click', () => applyWish($('#wish').value, $('#wish')));
 $('#wish').addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); applyWish($('#wish').value, $('#wish')); } });
 $('#dsend').addEventListener('click', () => applyWish($('#dwish').value, $('#dwish')));
@@ -3215,7 +3303,7 @@ function paintRescue(res){
   const night = r => { const n = r.night; if (!n) return ''; return `<button type="button" class="nightmore" data-night="${esc(r.id)}">more</button><div class="night hidden" id="night-${esc(r.id)}"><span>Room: ${money(n.hotel_cents)}${EST} · ${esc(n.hotel_basis)}.</span>${n.rides.length ? n.rides.map(x => `<span>${esc(x.label[0].toUpperCase() + x.label.slice(1))}: ${money(x.cents)} · ${esc(x.mode.toLowerCase())}, about ${dur(x.minutes)}.</span>`).join('') + `<span>${esc(n.rides_basis[0].toUpperCase() + n.rides_basis.slice(1))}.</span>` : `<span>${esc(n.rides_basis || 'No ride estimate.')}</span>`}</div>`; };
   const alt = r => `<div class="alt"${known.has(r.id) ? ` data-alt="${esc(r.id)}" role="button" tabindex="0"` : ''}><div><b>${esc(r.flight)}</b>${known.has(r.id) ? '' : '<span class="tmrw">tomorrow</span>'} · ${esc((r.route || []).join(' → '))} · ${hm(r.depart)} → ${hm(r.arrive)}${r.stops ? ' · ' + r.stops + (r.stops > 1 ? ' stops' : ' stop') : ' · nonstop'}<small>${r.lines.map(l => esc(l.label) + ': ' + (l.cents < 0 ? '−' : '') + money(Math.abs(l.cents)) + (/hotel|ride/i.test(l.label) ? EST : '')).join(' · ')}${night(r)}</small></div><div class="net">${V.option && V.option.id === r.id ? '★ ' : ''}${r.net_cents < 0 ? '−' : ''}${money(Math.abs(r.net_cents))}<small>net</small></div></div>`;
   const head = V.action === 'switch' && V.option ? 'Switch to ' + V.option.flight + (V.ahead_cents ? ', ' + money(V.ahead_cents) + ' ahead' : '') : V.action === 'stay' ? 'Stay with the airline' : 'Wait it out';
-  const od = a.odds || {}, pct = x => Math.round(x * 100) + '%', pr = o => o.p_hi != null && Math.round(o.p_hi * 100) > Math.round(o.p * 100) ? Math.round(o.p * 100) + '–' + pct(o.p_hi) : pct(o.p), c12 = iso => { const t = split12(hm(iso)); return t.h12 + ' ' + t.ampm.toUpperCase(); };
+  const od = a.odds || {}, pct = x => Math.round(x * 100) + '%', pr = o => o.p_hi != null && Math.round(o.p_hi * 100) > Math.round(o.p * 100) ? (o.p_mid != null ? 'about ' + pct(o.p_mid) + ' (' + Math.round(o.p * 100) + '–' + pct(o.p_hi) + ')' : Math.round(o.p * 100) + '–' + pct(o.p_hi)) : pct(o.p), c12 = iso => { const t = split12(hm(iso)); return t.h12 + ' ' + t.ampm.toUpperCase(); };
   const oddsHTML = !(od.today && od.today.p != null) ? '' : `
     ${od.planned && od.flight && od.flight.p != null ? `<div class="odds"><b>${pr(od.flight)}</b><span>chance your ${c12(od.planned)} flight leaves today${od.planned_passed ? ' (that time has passed)' : ''}</span><small>${od.from_records ? 'from US DOT records' + EST : 'estimate' + EST}${od.observed_status ? ', with airline status' : ''}</small></div>${oddsChart(od.flight.curve, 'Chance it still leaves today if it slips to each hour.')}` : ''}
     <div class="odds"><b>${pr(od.today)}</b><span>chance you fly out today</span><small>estimate${EST}</small></div>${oddsChart(od.today.curve, 'Chance by hour: your flight, or another leaving 75+ minutes later.')}
@@ -3250,8 +3338,9 @@ function showAlternatives(openId){
 function oddsChart(c, caption){
   c = c || []; if (!c.length) return '';
   const W = 560, H = 130, L = 34, R = 10, T = 10, B = 26, x = h => L + (h - c[0].hour) / Math.max(1, c[c.length - 1].hour - c[0].hour) * (W - L - R), y = p => T + (1 - p) * (H - T - B);
-  const pts = c.map(k => x(k.hour).toFixed(1) + ',' + y(k.p).toFixed(1)).join(' ');
-  // from US DOT records the chance is a range (the files cannot date a cancellation): a band from low to high
+  // the line is the best figure when the records measure it (2026-09-25), inside the band of its margin of error
+  const pts = c.map(k => x(k.hour).toFixed(1) + ',' + y(k.p_mid ?? k.p).toFixed(1)).join(' ');
+  // from US DOT records the chance is a range: a band from low to high
   const band = c.some(k => k.p_hi != null && k.p_hi > k.p) ? `<polygon class="band" points="${c.map(k => x(k.hour).toFixed(1) + ',' + y(k.p_hi ?? k.p).toFixed(1)).join(' ')} ${c.slice().reverse().map(k => x(k.hour).toFixed(1) + ',' + y(k.p).toFixed(1)).join(' ')}"/>` : '';
   const grid = [0, .5, 1].map(p => `<line class="g" x1="${L}" x2="${W - R}" y1="${y(p)}" y2="${y(p)}"/><text x="2" y="${y(p) + 3}">${Math.round(p * 100)}%</text>`).join('');
   const ticks = c.filter((k, i) => i % Math.max(1, Math.floor(c.length / 6)) === 0 || i === c.length - 1).map(k => `<text x="${x(k.hour)}" y="${H - 8}" text-anchor="middle">${String(k.hour % 24).padStart(2, '0')}:00</text>`).join('');
