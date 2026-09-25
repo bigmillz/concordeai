@@ -95,7 +95,42 @@ def main():
     check("cancelled at twenty past eleven at night, with nothing left to leave, flying today is nil", o23["today"]["p"] == 0.0, str(o23["today"]["p"]))
     o2 = rescue.odds({"kind": "delayed", "delay_minutes": 300, "new_depart": "2026-11-18T23:20:00-05:00"}, datetime.fromisoformat("2026-11-18T22:30:00-05:00"), [])
     check("a five-hour delay pushed to 23:20 leaves slim odds for the flight", o2["flight"]["p"] < 0.45, str(o2["flight"]["p"]))
-    check("the odds say they are modelled", o["modelled"] and "Modelled" in o["basis"])
+    check("with no US DOT record, the odds say they are estimated, not from records",
+          o["modelled"] and not o["from_records"] and "Estimated" in o["basis"] and "not from records" in o["basis"])
+    # from US DOT records (2026-09-24, per Patrick): a synthetic block stands in for the table so this stays offline.
+    # 100 flights from JFK in the 6-9 PM block were at least 3 hours late; 40 left within 15 more minutes, 70 within
+    # an hour, 90 within three hours, all within twelve; 20 flights in the block were cancelled.
+    import ontime
+    saved = dict(ontime._DOC)
+    try:
+        ontime._DOC.clear()
+        ontime._DOC.update({"thresholds": [0, 30, 60, 90, 120, 180, 240], "slips": [0, 15, 60, 180, 720], "blocks": 8,
+                            "window": "test", "flights": {},
+                            "fixer": {"JFK": {"6": {"n": 1500, "cancelled": 20, "ge": [900, 400, 300, 250, 200, 100, 50],
+                                                    "slip": [[0] * 5] * 5 + [[10, 40, 70, 90, 100]] + [[0] * 5]}}}})
+        dsit = {"kind": "delayed", "delay_minutes": 180, "origin_iata": "JFK", "us": True, "international": False,
+                "sched_depart": "2026-11-18T18:30:00-05:00", "new_depart": "2026-11-18T21:30:00-05:00"}
+        od = rescue.odds(dsit, datetime.fromisoformat("2026-11-18T20:00:00-05:00"), [])
+        # it has left by none of the 10 at-threshold flights yet? It is exactly 3 h late at 21:30, so the pool is
+        # 100 + 20 - F(0)=10 -> 110; it leaves before midnight (2.5 h later: F(150) = 70 + 20*90/120 = 85) -> (85-10)/110
+        want = round((70 + (90 - 70) * (150 - 60) / 120.0 - 10) / 110.0, 3)
+        check("a US domestic flight's odds come from the DOT block: of the flights already as late, the share that left "
+              "before midnight, with every cancellation counted against leaving",
+              od["from_records"] and not od["modelled"] and abs(od["flight"]["p"] - want) < 0.005
+              and "US DOT records" in od["basis"] and od["records"]["n_late"] == 100, str((od["flight"]["p"], want, od["basis"][:160])))
+        check("the DOT odds never rise as the evening runs out", all(a["p"] >= b["p"] for a, b in zip(od["flight"]["curve"], od["flight"]["curve"][1:])),
+              str([k["p"] for k in od["flight"]["curve"]]))
+        # the high end counts no cancellation against leaving: (85 - 10) / (100 - 10)
+        want_hi = round((70 + (90 - 70) * (150 - 60) / 120.0 - 10) / 90.0, 3)
+        check("the DOT odds are a range: the low end counts every cancellation in the block against leaving, the high "
+              "end none, and the advice says the range", abs(od["flight"]["p_hi"] - want_hi) < 0.005 and od["flight"]["p_hi"] > od["flight"]["p"]
+              and all(k["p_hi"] >= k["p"] for k in od["flight"]["curve"]) and "%d%% to %d%%" % (round(want * 100), round(want_hi * 100)) in rescue._pct_range(od["flight"]),
+              str((od["flight"]["p"], od["flight"]["p_hi"], want_hi)))
+        oi = rescue.odds(dict(dsit, international=True), datetime.fromisoformat("2026-11-18T20:00:00-05:00"), [])
+        check("an international flight has no DOT record and stays an estimate", oi["modelled"] and not oi["from_records"])
+    finally:
+        ontime._DOC.clear()
+        ontime._DOC.update(saved)
     op = rescue.odds({"kind": "delayed", "delay_minutes": 212, "new_depart": "2026-11-18T17:45:00-05:00"}, datetime.fromisoformat("2026-11-18T22:28:00-05:00"), [])
     check("a posted departure that has passed makes the headline the curve's first point, and says it passed",
           op["planned_passed"] and abs(op["flight"]["p"] - op["flight"]["curve"][0]["p"]) < 0.01 and op["flight"]["p"] < 0.3, str(op["flight"]))

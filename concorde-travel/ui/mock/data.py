@@ -37,7 +37,16 @@ import server     # noqa: E402
 
 POOL = 36          # options carried; a real page shows about this many before "more"
 CHEAPEST_TICKETS = 5   # always in the pool, whatever their rank
-BEST_AWARDS = 6        # and the flights where a published award chart buys the most ticket per mile
+BEST_AWARDS = 6
+FLAT_SEATS = {"full_flat", "full_flat_pod", "private_suite"}
+
+
+def _span_minutes(a, b):
+    import datetime as _dt
+    try:
+        return int((_dt.datetime.fromisoformat(str(b)[:19]) - _dt.datetime.fromisoformat(str(a)[:19])).total_seconds() // 60)
+    except (TypeError, ValueError):
+        return 0        # and the flights where a published award chart buys the most ticket per mile
 TOP_PER_TARGET = 10    # the best under each target
 STEPS = 10         # triangle resolution: (STEPS+1)(STEPS+2)/2 = 66 weightings
 NAMED = {"cheapest": (1, 0, 0), "fastest": (0, 1, 0), "comfort": (0, 0, 1)}
@@ -185,17 +194,17 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
     google_only = bool(isinstance(d0, dict) and d0.get("offers") == [] and supplement
                        and (supplement.get("best_flights") or supplement.get("other_flights")))
     if google_only:
-        sc = adapter.from_serpapi(supplement, origin_key=origin_key, checked_bags=checked_bags,
-                                  geo=geo, dest_point=dest_point, carriers=server.live.serp_want())
+        sc = adapter.join_ontime(adapter.from_serpapi(supplement, origin_key=origin_key, checked_bags=checked_bags,
+                                  geo=geo, dest_point=dest_point, carriers=server.live.serp_want()))
     else:
         sc = adapter.from_feed(raw, origin_key=origin_key, checked_bags=checked_bags, dest_point=dest_point)
     if supplement and "error" not in sc and not google_only:
         # Google Flights through SerpApi, for the carriers the feed cannot sell: normalised by its own
         # adapter with the feed's zones borrowed for airports the table does not know, then merged
         # under the feed's par and profiles, so a Delta row is graded and ranked like every other
-        sc = adapter.merge_scenarios(sc, adapter.from_serpapi(
+        sc = adapter.merge_scenarios(sc, adapter.join_ontime(adapter.from_serpapi(
             supplement, origin_key=origin_key, checked_bags=checked_bags,
-            geo=geo, dest_point=dest_point, carriers=server.live.serp_want()), "Google Flights")
+            geo=geo, dest_point=dest_point, carriers=server.live.serp_want())), "Google Flights")
     if cabin in ("economy", "premium_economy", "business", "first") and "error" not in sc:
         sc["query"]["cabin"] = cabin          # a leg below it is priced and flagged (scorer _cabin_short)
     # Google's booking token for each flight it listed, by the flights' own key: the page's "who sells this
@@ -299,16 +308,23 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
                                                         "lockup": who.get("logo_lockup_url")})
         wifi = power = False
         wifi_cost = None
+        long_seat, long_min = None, -1
         for sl in off.get("slices", []):
             for sg in sl.get("segments", []):
                 am = ((sg.get("passengers") or [{}])[0].get("cabin") or {}).get("amenities") or {}
+                # the seat on the longest flight, as the airline publishes it (Duffel's seat.type: full_flat,
+                # full_flat_pod and private_suite lie flat; recliner and standard do not), for the lie-flat want
+                mins = _span_minutes(sg.get("departing_at"), sg.get("arriving_at"))
+                if mins > long_min:
+                    long_min, long_seat = mins, (am.get("seat") or {}).get("type")
                 w = am.get("wifi") or {}
                 wifi = wifi or bool(w.get("available"))
                 if w.get("available") and w.get("cost") in ("free", "paid"):
                     # the long leg decides; a paid pass anywhere on the trip is a paid trip
                     wifi_cost = "paid" if (wifi_cost == "paid" or w["cost"] == "paid") else "free"
                 power = power or bool((am.get("power") or {}).get("available"))
-        amenities[(off["id"] or "")[-10:].lower().replace("_", "-")] = {"wifi": wifi, "power": power, "wifi_cost": wifi_cost}
+        amenities[(off["id"] or "")[-10:].lower().replace("_", "-")] = {"wifi": wifi, "power": power, "wifi_cost": wifi_cost,
+                                                                     "lie_flat": (long_seat in FLAT_SEATS) if long_seat else None}
 
     for o in sc["options"]:                          # the supplement's airlines, with Google's logo
         g = o.get("_google")
@@ -346,7 +362,8 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
         e["equipment"] = [s["equipment"] for s in v["segments"]]
         e["pitch"] = [(s["claims"] or {}).get("seat_pitch_inches") for s in v["segments"]]
         e["segments"] = [{"flight": s["flight"], "from": s["from"], "to": s["to"],
-                          "dep": s["dep"], "arr": s["arr"], "equipment": s["equipment"], "cabin": so.get("cabin_marketed")}
+                          "dep": s["dep"], "arr": s["arr"], "equipment": s["equipment"], "cabin": so.get("cabin_marketed"),
+                          "arr_iso": str(so.get("arrival_local") or "")[:16]}
                          for s, so in zip(v["segments"], o["segments"])]
         e["booking"] = v["booking"]
         # award prices from the published charts (points.py), per flight in its own cabin: what a seat costs in each
@@ -381,10 +398,17 @@ def build_slim(raw, origin_key="Bushwick, Brooklyn", checked_bags=1, origin_full
         if o.get("_google"):                         # Google's amenity sentences, published like Duffel's
             ext = [str(x).lower() for leg in (o["_google"].get("legs") or []) for x in (leg.get("extensions") or [])]
             wx = [x for x in ext if "wi-fi" in x or "wifi" in x]
+            legs = o["_google"].get("legs") or []
+            longest = max(legs, key=lambda l: int(l.get("minutes") or 0)) if legs else {}
+            lx = [str(x).lower() for x in (longest.get("extensions") or [])]
             am = {"wifi": any("no wi-fi" not in x for x in wx), "power": any("power" in x or "usb" in x for x in ext),
-                  "wifi_cost": "paid" if any("fee" in x for x in wx) else "free" if any("free" in x for x in wx) else None}
+                  "wifi_cost": "paid" if any("fee" in x for x in wx) else "free" if any("free" in x for x in wx) else None,
+                  # Google's seat sentence for the longest flight: "Lie flat seat" or "Individual suite" lie flat
+                  "lie_flat": True if any("lie flat" in x or "individual suite" in x for x in lx)
+                  else False if any("recliner" in x or "reclining" in x for x in lx) else None}
         e["wifi_published"] = bool(am.get("wifi")); e["power_published"] = bool(am.get("power"))
         e["wifi_cost"] = am.get("wifi_cost")
+        e["lie_flat"] = am.get("lie_flat")
         e["layover_minutes"] = [l["minutes"] for l in e["legs"] if l["kind"] == "layover"]
         g = o.get("_google")
         e["details"] = google_details(g) if g else feed_details(by_tail.get(e["id"].rsplit("-", 1)[-1]))

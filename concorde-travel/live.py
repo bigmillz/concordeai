@@ -786,11 +786,11 @@ def serp_search(origin, destination, date, adults=1, carriers=None, cfg=None, al
     return payload, {"source": "api", "quota": quota_state(cfg, qf)}
 
 
-def _serp_fetch(cfg, cache_query, params):
+def _serp_fetch(cfg, cache_query, params, ttl=None):
     """One SerpApi call with the supplement's discipline: cache before quota, quota reserved (paced) before
     the call, a miss never cached, the key redacted from everything that escapes."""
     qf = _serp_quota_file()
-    hit = cache_get(cache_query, cfg["quota"]["cache_ttl_seconds"])
+    hit = cache_get(cache_query, ttl or cfg["quota"]["cache_ttl_seconds"])
     if hit:
         return hit["payload"], {"source": "cache", "age_seconds": hit["_age_seconds"], "quota": quota_state(cfg, qf)}
     if not cfg.get("key"):
@@ -820,6 +820,16 @@ def _serp_fetch(cfg, cache_query, params):
                       "error": redact("SerpApi: %s" % (payload.get("error") if isinstance(payload, dict) else "unexpected response"), cfg["key"])}
     cache_put(cache_query, payload)
     return payload, {"source": "api", "quota": quota_state(cfg, qf)}
+
+
+def serp_hotels(q, check_in, check_out, cfg=None):
+    """(Google Hotels' answer for one place and night, meta), in dollars, through the same SerpApi plan and
+    counters as the flights (2026-09-24, per Patrick: a real average for hotels near the airport, not a
+    $180 guess). One call per place and night, cached twelve hours: room prices move, but not by the minute."""
+    cfg = cfg or serp_config()
+    params = {"engine": "google_hotels", "q": str(q)[:120], "check_in_date": check_in, "check_out_date": check_out,
+              "adults": 1, "currency": "USD", "gl": "us", "hl": "en"}
+    return _serp_fetch(cfg, dict(params, _kind="hotels"), params, ttl=12 * 3600)
 
 
 def _serp_fns(it):

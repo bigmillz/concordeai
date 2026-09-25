@@ -2162,7 +2162,36 @@ def merge_scenarios(main: Dict[str, Any], extra: Dict[str, Any], label: str) -> 
     return main
 
 
+def join_ontime(sc: Dict[str, Any]) -> Dict[str, Any]:
+    """Each flight's US DOT on-time record where DOT has one (ontime.py; US airlines within the US only), in place of
+    the abstain every feed leaves (2026-09-24, per Patrick): the grade's reliability part and the missed-connection
+    risk then read a real record. A flight DOT does not cover keeps its abstain, which is priced, never free."""
+    if not isinstance(sc, dict) or "error" in sc:
+        return sc
+    import ontime                                     # noqa: E402  (a local table, no network)
+    try:
+        import points                                 # noqa: E402  (which regional airlines fly for whom)
+        reg = points.load().get("regional") or {}
+    except Exception:
+        reg = {}
+    for o in sc.get("options") or []:
+        for sg in o.get("segments") or []:
+            if isinstance(sg.get("reliability"), dict) and sg["reliability"].get("coverage") != "none":
+                continue
+            mk = (sg.get("marketing") or {}).get("carrier")
+            op = (sg.get("operating") or {}).get("carrier") or mk
+            num = (sg.get("marketing") or {}).get("number")
+            rec = ontime.claim(op, mk, num, (sg.get("origin") or {}).get("iata"), (sg.get("destination") or {}).get("iata"), reg)
+            if rec:
+                sg["reliability"] = rec
+    return sc
+
+
 def from_feed(raw: Dict[str, Any], **kw) -> Dict[str, Any]:
+    return join_ontime(_from_feed(raw, **kw))
+
+
+def _from_feed(raw: Dict[str, Any], **kw) -> Dict[str, Any]:
     """Dispatch on the payload's own shape rather than on a caller-supplied
     name, so a profile pointed at the wrong provider fails as a parse error
     here instead of as a plausible-looking scenario built from the wrong keys.

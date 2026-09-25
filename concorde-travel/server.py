@@ -926,6 +926,112 @@ def flight_request(q, remote, headers):
     return {"tracking": tr, "fetched": meta.get("source"), "age_seconds": meta.get("age_seconds")}
 
 
+# uncached Google Hotels lookups a day, site-wide. They come out of the same SerpApi plan as the flight supplement
+# (its own day and month limits still apply), so the default leaves most of the day's searches to the flights;
+# raise it with the plan.
+HOTEL_CALLS = int(os.environ.get("CONCORDEGO_HOTEL_CALLS") or 10)
+HOTEL_RADIUS_KM = 10
+
+
+def hotel_summary(payload, lat=None, lon=None, radius_km=HOTEL_RADIUS_KM):
+    """Google Hotels' properties -> the typical nightly rate near a point: the MEDIAN of up to twenty hotels
+    (not holiday rentals) within radius_km, with the middle half's range. None when fewer than three priced
+    hotels are near enough to stand for the place: an average of two is not an average."""
+    import ground                                      # noqa: E402  (distances only)
+    rows = []
+    for p in (payload or {}).get("properties") or []:
+        if str(p.get("type") or "hotel").lower() != "hotel":
+            continue
+        rate = (p.get("rate_per_night") or {}).get("extracted_lowest")
+        try:
+            rate = float(rate)
+        except (TypeError, ValueError):
+            continue
+        if not 10 <= rate <= 5000:
+            continue
+        gps = p.get("gps_coordinates") or {}
+        km = None
+        if lat is not None and lon is not None and gps.get("latitude") is not None and gps.get("longitude") is not None:
+            km = ground.haversine_km(float(lat), float(lon), float(gps["latitude"]), float(gps["longitude"]))
+            if km > radius_km:
+                continue
+        rows.append((km if km is not None else 0.0, int(round(rate * 100))))
+    rows = sorted(rows)[:20]
+    if len(rows) < 3:
+        return None
+    cents = sorted(c for _, c in rows)
+    mid = lambda xs: xs[len(xs) // 2] if len(xs) % 2 else (xs[len(xs) // 2 - 1] + xs[len(xs) // 2]) // 2
+    return {"cents": mid(cents), "low_cents": cents[len(cents) // 4], "high_cents": cents[(3 * len(cents)) // 4], "n": len(cents),
+            "radius_km": radius_km if lat is not None else None}
+
+
+def hotels_request(q, remote=False, headers=None):
+    """GET /hotels?near=LHR&date=2026-11-19  or  ?q=<address>&lat=&lon=&date=  -> the typical nightly rate there
+    that night, from Google Hotels (2026-09-24, per Patrick). Cached twelve hours per place and night; each uncached
+    lookup counts against HOTEL_CALLS a day site-wide and a dozen a day per address. It is an average of real prices,
+    not a quote, and the page marks it so."""
+    date = (q.get("date") or [""])[0][:10]
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+        return {"error": "Pick a date."}
+    try:
+        day = datetime.date.fromisoformat(date)
+    except ValueError:
+        return {"error": "Pick a valid date."}
+    if day < datetime.date.today() - datetime.timedelta(days=1) or day > datetime.date.today() + datetime.timedelta(days=330):
+        return {"error": "That night is out of range."}
+    near = re.sub(r"[^A-Za-z]", "", (q.get("near") or [""])[0]).upper()[:3]
+    text = re.sub(r"[^\w ,.'&#-]", "", (q.get("q") or [""])[0], flags=re.U).strip()[:100]
+    lat = lon = None
+    if near and len(near) == 3:
+        apt = (adapter.load_enrichment()["airports"]["airports"].get(near) or {})
+        if apt.get("lat") is None:
+            apt = (airport_geo([near]).get(near) or {})
+        lat, lon = apt.get("lat"), apt.get("lon")
+        where, query = near, "hotels near %s airport" % near
+    elif text:
+        try:
+            lat, lon = float((q.get("lat") or [""])[0]), float((q.get("lon") or [""])[0])
+        except ValueError:
+            lat = lon = None
+        where, query = text, "hotels near %s" % text
+    else:
+        return {"error": "Name an airport or a place."}
+    key = "%s|%s" % (query.lower(), date)
+    os.makedirs(SUGGEST_DIR, exist_ok=True)
+    path = os.path.join(SUGGEST_DIR, "hotels-" + hashlib.sha1(key.encode("utf-8")).hexdigest()[:16] + ".json")
+    try:
+        if time.time() - os.path.getmtime(path) < 12 * 3600:
+            with open(path) as f:
+                return json.load(f)
+    except OSError:
+        pass
+    if remote:
+        ip = ((headers or {}).get("Cf-Connecting-Ip") or (headers or {}).get("X-Forwarded-For") or "?").split(",")[0].strip()
+        ok, _ = _users_take("ip:" + ip, "hotels", 12)
+        if not ok:
+            return {"error": "Daily limit reached for hotel prices.", "limited": True}
+    ok, _ = _users_take("_hotels", "hotels", HOTEL_CALLS)
+    if not ok:
+        return {"error": "Daily limit reached for hotel prices.", "limited": True}
+    out_day = (day + datetime.timedelta(days=1)).isoformat()
+    payload, meta = live.serp_hotels(query, date, out_day)
+    if payload is None:
+        return {"error": "Hotel prices are unavailable right now.", "detail": meta.get("error")}
+    sm = hotel_summary(payload, lat, lon)
+    if not sm:
+        return {"error": "Too few hotels priced near %s that night." % where}
+    nice = day.strftime("%a %d %b").replace(" 0", " ")
+    out = dict(sm, where=where, date=date, source="Google Hotels",
+               basis="median nightly rate of %d hotels%s %s, %s (Google Hotels)" % (
+                   sm["n"], (" within %d km of" % sm["radius_km"]) if sm.get("radius_km") else " near", where, nice))
+    try:
+        with open(path, "w") as f:
+            json.dump(out, f)
+    except OSError:
+        pass
+    return out
+
+
 FLEX_PER_DAY = int(os.environ.get("CONCORDEGO_FLEX_PER_DAY") or 40)
 
 
@@ -1010,6 +1116,12 @@ def rescue_request(req):
     # the typed text is often a city ("New York"): resolve it, then take the first curated airport of the metro
     pick = lambda typed: next((aps[a] for a in places.airports_for(places.resolve(typed)[0] or typed) if a in aps), {})
     o_ap, d_ap = pick(o), pick(d)
+    # the airport the delayed flight leaves from, for its DOT record: the one the traveller named, else the
+    # airport the day's results leave from most
+    from collections import Counter as _Counter
+    typed_code = (places.resolve(o)[0] or "").upper()
+    firsts = _Counter(r["route"][0] for r in found if r.get("route"))
+    sit.setdefault("origin_iata", typed_code if typed_code in firsts else (firsts.most_common(1)[0][0] if firsts else typed_code))
     sit.setdefault("us", (o_ap.get("border") == "us") or (d_ap.get("border") == "us"))
     sit.setdefault("eu", o_ap.get("border") in ("schengen", "ie"))
     sit.setdefault("international", bool(o_ap.get("border") and d_ap.get("border") and o_ap.get("border") != d_ap.get("border")))
@@ -1028,6 +1140,8 @@ def rescue_request(req):
         newdep = (datetime.datetime.fromisoformat(newdep) + datetime.timedelta(days=1)).isoformat()   # 11:30 PM delayed to 1:15 AM leaves tomorrow, +1 or not
     if newdep:
         sit["new_depart"] = newdep
+    if sched:
+        sit["sched_depart"] = sched
     if sched and newdep:
         sit["delay_minutes"] = max(0, int((datetime.datetime.fromisoformat(newdep) - datetime.datetime.fromisoformat(sched)).total_seconds() // 60))
     newarr, rbarr = clock(sit.get("new_arr_clock"), arr_off), clock(sit.get("rebook_arr_clock"), arr_off)
@@ -1057,7 +1171,18 @@ def rescue_request(req):
                     airports.setdefault(k, {"iata": k, "lat": g["lat"], "lon": g["lon"], "country": g.get("country")})
     except Exception:
         pass
-    a = rescue.assess(sit, found, now=now, airports=airports, hotels=rescue.load_hotels())
+    # a night near the airport tomorrow's flights leave from: the median of real hotels there tonight (Google
+    # Hotels), where the lookup answers; the curated typical rate otherwise, and the row says which
+    hotels = rescue.load_hotels()
+    tonight = (now or datetime.datetime.now()).date().isoformat()
+    tomorrow = ((now or datetime.datetime.now()).date() + datetime.timedelta(days=1)).isoformat()
+    leave_from = _Counter(r["route"][0] for r in found if str(r.get("depart") or "")[:10] == tomorrow and r.get("route"))
+    hotels["live"] = {}
+    for ap, _n in leave_from.most_common(2):
+        h = hotels_request({"near": [ap], "date": [tonight]})   # the rescue itself is metered; the site-wide hotel cap still holds
+        if h.get("cents"):
+            hotels["live"][ap] = h
+    a = rescue.assess(sit, found, now=now, airports=airports, hotels=hotels)
     b = rescue.brief(sit, a)
     prose = rescue.narrate(b, allow_model=bool(os.environ.get("ANTHROPIC_API_KEY")))
     return {"assessment": a, "advice": prose, "searched": dates, "feed": feed, "found": len(found), "notes": errors,
@@ -1227,10 +1352,10 @@ def live_request(req):
     if sc.get("error"):
         return sc
     if _LIVE_META.get("supplement_payload"):
-        sc = adapter.merge_scenarios(sc, adapter.from_serpapi(
+        sc = adapter.merge_scenarios(sc, adapter.join_ontime(adapter.from_serpapi(
             _LIVE_META["supplement_payload"], origin_key=origin_text,
             checked_bags=int(req.get("checked_bags", 1)), geo=adapter.duffel_geo(raw),
-            dest_point=(where.get("destination") or {}).get("point"), carriers=live.serp_want()), "Google Flights")
+            dest_point=(where.get("destination") or {}).get("point"), carriers=live.serp_want())), "Google Flights")
     _LIVE[sc["fixture_id"]] = sc
     out = _score_scenario(sc, req)
     out["coverage"] = adapter.coverage(sc)
@@ -2052,6 +2177,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     n = 300
                 return self._json(admin_logs((q.get("unit") or ["server"])[0], n))
             return self.send_error(404)
+        if path == "/hotels":
+            # the typical nightly rate near an airport or a place, from Google Hotels (2026-09-24)
+            return self._json(hotels_request(dict(urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)), self._remote(), self.headers))
         if path == "/flight":
             # the Flight Fixer's tracking lookup: a flight number and a date -> the observed status
             # fully qualified: do_GET imports parse_qs locally further down, which makes the bare name a local here

@@ -402,6 +402,41 @@ flight, and "add an expense" at the bottom adds more, from five extra bags price
 this fare's own ladder to a lounge pass to a line of their own. Nothing is charged
 silently and nothing is removed silently: a removed line leaves a chip to put it back.
 
+**Every estimate is marked** (2026-09-24, per Patrick, a standing rule: "anything that's an estimate, keep me in the
+loop on it, but also do the asterisks", and never make anyone dig through terms to learn it). A figure that is a
+typical price rather than this fare's own, a quote, or a published price carries a small asterisk (`EST` in mock-10,
+`sup.est`), and the panel it sits in ends with one plain italic line saying what the asterisk means and that the
+traveller can remove the line and add their own: the bill (`.estnote`, "Estimate, not a quote. Found the real
+price? Remove the line with × and add your own."), the results (`.estfoot`), the Flight Fixer. Marked today: the
+add-on prices (wifi pass, lounge day pass, extra-legroom seat, seat choice, priority boarding, insurance: flat
+typical prices, `ADDONS[].basis`), hotel nights (a Google Hotels median is an average, not a quote), rides the
+ground model worked out rather than a curated fare (`mode.estimated`), bags priced on the default ladder because
+the airline publishes none, the times out the door, the modelled fair fare, and the Fixer's odds and hotel nights.
+A bill line carries `est:true`; `hasEst(r)` says whether a bill holds any. Tell Patrick about every new estimate.
+
+**Hotel prices are real averages** (2026-09-24, per Patrick): `GET /hotels?near=IATA&date=` or `?q=place&lat=&lon=&date=`
+(outside the door) asks Google Hotels through SerpApi (`live.serp_hotels`, the same plan and counters as the flight
+supplement) and answers `server.hotel_summary`: the MEDIAN nightly rate, taxes in, of up to twenty hotels (never
+holiday rentals) within 10 km of the airport, with the middle half's range, or nothing when fewer than three are
+priced. Cached twelve hours per place and night; an uncached lookup counts against `CONCORDEGO_HOTEL_CALLS` (10 a
+day site-wide, so the flights keep most of the SerpApi day; raise it with the plan) and a dozen a day per address.
+The page asks for the overnight-layover hotel (`hotelNight`, the night being the landing date, or the evening before
+when landing in the small hours) and the "Hotel at destination" add-on (`destHotel`, near the address or the city);
+until the answer arrives, or opened as a file, the flat $180 stands, marked. First real answer: 18 hotels near
+Heathrow on 18 Nov 2026, median $91 a night.
+
+**US DOT on-time records** (2026-09-24, per Patrick, who approved downloading a year of the Bureau of Transportation
+Statistics' "Reporting Carrier On-Time Performance" files). `concorde-travel/ontime.py build ZIP...` boils twelve
+monthly zips (about 30 MB each, downloaded to a scratch folder and deleted after, never committed) into
+`enrichment/ontime.json.gz`: each flight number's record on each route (scheduled, arrived within 15 minutes with
+cancelled and diverted counted as late as DOT counts them, cancelled, median and 90th-percentile arrival delay;
+kept at 20 or more flights a year) plus each airline's route across all its numbers, and the Flight Fixer's delay
+table (above). Only US airlines within the US are in it. `adapter.join_ontime` puts the record on every segment it
+covers, in place of the feeds' abstain (a regional flight is looked up under its parent's regional airlines, from
+`points.json`'s `regional` table), so the grade's reliability part reads a real on-time share and the missed-connection
+risk real delay percentiles; a flight DOT does not cover keeps its priced abstain. Rebuild monthly-ish with the newest
+twelve months (the files lag about two months). `tests/test_records.py` fences hotels and records offline.
+
 ## Enrichment layers, easiest first
 
 1. **Ground access** — geocode the *actual* origin, not the city, and model time of day.
@@ -447,6 +482,7 @@ python3 fixtures/validate.py                  # fixture schema + semantics
 python3 concorde-travel/tests/test_scorer.py  # the fixtures' own assertions, executed
 python3 concorde-travel/tests/test_narrator.py   # the narrator's guard rails (no key needed)
 python3 concorde-travel/tests/test_points.py     # award charts and the page's transfer planner, offline
+python3 concorde-travel/tests/test_records.py    # hotel averages and US DOT on-time records, offline
 python3 concorde-travel/points.py JFK LHR DL business 2026-11-18   # what the published charts say for one flight
 python3 concorde-travel/tests/test_adapter.py    # live normalisation, replayed offline
 python3 concorde-travel/tests/test_live.py       # quota, cache and key handling, offline
@@ -672,10 +708,11 @@ credit in the order**: a held tier (own programme, or an alliance tier the opera
 to) gives a flight that keeps it earning a credit at what the traveller says keeping it is
 worth (`S.statusWorth`, shown since 2026-09-23 as "Prefer airlines where I have status: Off / A little / Some / Strongly", which are $0 / $30 / $60 / $150, Some by default; per Patrick the dollar picker was unreadable), named on the row
 ("Keeps your SkyTeam Elite Plus") and in the ledger, never on the money bill and never in
-the grade. **The flying personality** is eight chip questions (`QUIZ`) that become a persona:
+the grade. **The flying personality** is seven chip questions (`QUIZ`) that become a persona:
 a point on the dial plus its own priced terms (`personaLines`: a nervous flyer's
 connections, red-eyes and low-rated carriers; a foodie's long daytime layover in a food
-city as a credit; lounge, wifi and power; "never" red-eyes or connections), offered as a
+city as a credit; wifi and power; "never" red-eyes or connections; the lounge question went on 2026-09-24,
+per Patrick, because lounge access was guessed from the fare's name), offered as a
 "Me" preset beside cheapest, fastest and comfort. It ranks by the same arithmetic, every
 term named on the row, and the grade never sees it. Saved to the person's profile on the
 server (`/api/profile`, `users.json[email].profile`, sent back by `/whoami`) or this
@@ -687,22 +724,30 @@ lifts) says the premise in a breath, how it works in three lines, and hands off 
 **The Flight Fixer** (`rescue.py`, `/rescue` outside the door on the free allowance,
 `/api/rescue` inside it; the fourth trip type beside round trip, one way and multi-city,
 whose form is the search's own fields with the required ones marked and a line saying the
-more you add the surer the call). It also puts two numbers on the day (`rescue.odds()`), MODELLED and
-labelled so, each with its own line chart open on the result and both FALLING through the
-day (per Patrick, 2026-09-21: at nine there is a day of chances, at ten to midnight there
-are not): **the chance of making the updated flight** (if it slips to hour h, the chance it
-still goes today: a delayed flight leaves when the airline says 55% of the time, the rest
-slipping by the hour; the cancellation risk grows with the delay and jumps after 21:00 and
-23:00; anything past midnight is lost) and **the chance you fly today at all** (at hour h,
+more you add the surer the call). It also puts two numbers on the day (`rescue.odds()`), each with its own line
+chart open on the result and both FALLING through the day (per Patrick, 2026-09-21: at nine there is a day of
+chances, at ten to midnight there are not): **the chance of making the updated flight** (if it slips to hour h, the
+chance it still goes today; anything past midnight is lost). **For a US domestic flight it comes from US DOT
+records** (2026-09-24, per Patrick; `ontime.py`, `rescue._dot_model`): of the flights from the same airport,
+scheduled in the same three-hour block, that were already at least as late, the share that left within each
+further stretch of time. The files cannot say which cancellations came after a flight was already late, so each
+chance is a RANGE (2026-09-25, after counting every cancellation against leaving read 22% where the late flights
+alone said 52%): the low end counts every cancellation in the block against leaving, the high end none, and the
+page prints "22–52%" with the band shaded on the chart (`p`/`p_hi`, `p_flight_hi`, `p_today_hi`, `on_time_hi`). The
+result says "from US DOT records*" and the basis explains the range. Anywhere else
+(abroad, or a foreign airline) the old model stands, labelled an estimate: a delayed flight leaves when the airline
+says 55% of the time, the rest slipping by the hour, the cancellation risk growing with the delay and jumping
+after 21:00 and 23:00. And **the chance you fly today at all** (at hour h,
 the flight's own chance or one of the day's own alternatives still leaving 75 minutes on,
 each given an even chance of taking you, capped at 97% because a seat on sale is not a seat
 in hand). Times on the form are 12-hour with an AM/PM toggle; a 24-hour entry picks its half
 by itself. The alternatives on the result open the details sheet, with a warning to ask the
 airline's staff first, and "See all alternative flights" shows the day's results as an
 ordinary search narrowed by a visible "leaves after" rule. **A next-day option carries the
-night**: a typical room rate near the airport it leaves from (`enrichment/hotels.json`, 65
-airports and country defaults, DRAFTED from general knowledge on 2026-09-21, never a live
-price, and the row says so) and the ground model's own rideshare estimate for a hotel 4 km
+night**: the median nightly rate of real hotels within 10 km of the airport it leaves from, tonight, from Google
+Hotels (`server.hotels_request`, below) for the two airports tomorrow's flights leave from most; where that lookup
+does not answer, the typical rate from `enrichment/hotels.json` (65 airports and country defaults, DRAFTED from
+general knowledge on 2026-09-21, never a live price, and the row says so); and the ground model's own rideshare estimate for a hotel 4 km
 out, there at this hour and back two hours before the flight, both itemised and both under
 "more" on the row. One row per flight, the cheapest fare standing for it. **The tracking
 feed is AeroDataBox** (2026-09-21, through RapidAPI; `live.flight_status(number, date)` on its
@@ -755,7 +800,7 @@ curve it is meant to be testing is a fixture that tests nothing.
 
 **The test suites are mutation-tested.** `test_scorer.py` catches 12 of 12 seeded faults and
 `validate.py` 10 of 10; `tests/mutate_adapter.py` is an executable runner for the adapters
-and must stay at every mutant caught (76 of 76 on 2026-09-24, the points charts, planner and pool among them; it runs `test_points.py` too, and `MUTATE_ONLY=planner` runs just those) with **zero skips** — a skipped mutant never ran
+and must stay at every mutant caught (87 of 87 on 2026-09-25, the points charts, planner and pool, hotels, DOT records, the Fixer and the fleet table among them; it runs `test_points.py`, `test_records.py` and `test_rescue.py` too, and `MUTATE_ONLY=planner` runs just the mutants whose description holds that word) with **zero skips** — a skipped mutant never ran
 and is not a pass. If a change makes a suite pass that should not, the suite has lost a guard. **The runner works in
 a scratch copy outside the checkout** (since 2026-09-24): run in place, Google Drive's sync raced its
 write-and-restore cycle and left two mutants in `par.py` after a run that reported every fault caught. If a SKIP
@@ -923,20 +968,33 @@ against `enrichment/fleets.json` into a **hedged claim with an observed frequenc
 type with no curated row **abstains**. Better data is what hard rule 2 is for, not a reason
 to relax it.
 
-**`enrichment/fleets.json` and `enrichment/fares.json` are populated DRAFTS** (92 fleet rows
-and 82 brand rows as of 2026-09-20, 131 since 2026-09-24, covering every carrier a real JFK–LHR search returns and
-the narrowbodies that feed their hubs). Marked in the files, every fleet row carrying
-`needs_primary_source: true`, counted by `coverage()`, amber in the interface. A claim from
-an unreviewed table is *more* dangerous than an abstain — an abstain announces itself in the
-ledger, a draft row prints a confident dollar figure. They need a human pass before any
-number built on them goes in front of a stranger. Two things about their content:
+**`enrichment/fleets.json` was CHECKED against published sources on 2026-09-25** (per Patrick: "run the research
+pass"). All 92 draft rows were researched by four agents against dated sources (airline fleet pages, reports and
+press releases where they could be read; Airbus Orders & Deliveries; aeroLOPA seat maps; the aviation press) and
+every figure re-checked by a second agent who opened the sources. 90 rows remain: ITA's A330-300 and Austrian's
+777-300ER are gone (no longer flown) and Etihad's A350-1000 moved from `EY:359` to `EY:351`. Each row keeps its
+audit trail under `_evidence` (frame count and source, the layouts with their frame counts, the wifi system,
+every source with its date and whether it is the airline's or the manufacturer's, what changed from the draft, and
+the second reader's corrections); the second reader's unresolved doubts are in `_unchecked_by_the_second_reader`.
+`needs_primary_source` stays true on 24 of the 165 claims, where no airline or manufacturer source backs the row
+(many airline fleet pages refuse automated readers, so aeroLOPA and the press carry the count: all of BA's rows,
+Air France's 777-200ER, Iberia's A330-200 and others) or confidence was low. Where nobody publishes the split or
+the wifi count, the claim ABSTAINS (3 cabin claims: Air France's 777-200ER and both Royal Air Maroc 787s; 12 wifi
+claims: ITA, SAS, LOT, Royal Air Maroc, Avianca, Turkish's A330-300, Delta's E175) rather than guessing. Rows with no
+wifi at all (SWISS's A321neo, TAP's A320neo and A330-200, Austrian's 767, Brussels's A330-300) say "No wifi" with
+`outcome: false`. `test_adapter.py` fences the table's shape and two mutants guard it. Refits move monthly (BA's
+787-9 and A380 Club Suite, Lufthansa's Allegris, United's Elevated 787-9s, American's Flagship Suites): re-check the
+rows whose `_evidence` names a refit in progress. `enrichment/fares.json` is still a populated draft for the rows
+the bag-fee research did not reach. A claim from an unreviewed table is *more* dangerous than an abstain — an
+abstain announces itself in the ledger, a draft row prints a confident dollar figure. Two things about their content:
 
-- **A fleet row's frequency is the share of the carrier's FRAMES of that type in the
-  described configuration**, with `sample_size` the frame count and the window saying so.
-  That is the honest quantity available without tail-number observations; the earlier draft
-  claimed "the last 60 transatlantic departures" for numbers nobody had counted, which is
-  the manufactured observation hard rule 2 forbids. Where a refit is under way the share is
-  put below the halfway point unless known to be further along.
+- **A fleet row's frequency is the share of the carrier's FRAMES of that type in the MOST COMMON configuration**
+  (since 2026-09-25; the rows used to name the BETTER configuration, which made American's 777-300ER, one refitted
+  jet in twenty, read as a coin flip when it is 95% the older cabin), with `sample_size` the frame count and the
+  window saying so. That is the honest quantity available without tail-number observations, and it is what the
+  scorer's "cabin may vary" cost measures: uncertainty, not quality (the cabin's quality is the per-cabin airline
+  rating). The earlier draft claimed "the last 60 transatlantic departures" for numbers nobody had counted, which is
+  the manufactured observation hard rule 2 forbids.
 - **A fare row carries `feed_name`** — the wording the feed uses ("Basic Economy", "Partner
   Main", alternatives separated by `/`) — and `_brand_key()` matches that exactly before it
   walks words, so `UA:BASIC` and `UA:ECONOMY` no longer depend on which row comes first. Never
@@ -1271,7 +1329,7 @@ start one, same as the desktop app's gauntlet.
 is the converged direction** (2026-09-20, after Patrick picked Shortlist and the
 Dial from round two): the sentence-form search with round trip / one way /
 multi-city, the price–speed–comfort triangle with a "get me there now" preset
-(earliest arrival, price shown but not ranked), sixteen **wants that charge rather
+(earliest arrival, price shown but not ranked), fifteen **wants that charge rather
 than filter** (a flight lacking one is priced for it and sinks, reason shown;
 a want nothing can meet says so instead of sinking everything; the refund term and
 CO₂ per offer came on 2026-09-21, the last charged as the gap to the cleanest option
@@ -1281,10 +1339,14 @@ airport on a connection, bag included, free carry-on (the fare's own allowance,
 `carry_on` from `data.build_slim`; a feed that does not say reads as not included) and
 top-rated airline (rating at or above .76, the page's own "well-rated" line). Wifi became free wifi the same day (`wifi_cost === 'free'`, the long leg deciding as in `data.py`): a fare that sells a pass gets the pass on its bill, one with none ranks lower. Free
 seat choice was considered and left out: Duffel and Google never report seat
-selection on a search, the adapters record "paid", so it would match nothing. The
-sixteen sit in a fixed grid, four across when the panel is at least 690px wide and two
-otherwise (a container query on `.wants`; never three, since sixteen does not divide
-by three), and on a phone a long label wraps rather than being cut. The wish box's
+selection on a search, the adapters record "paid", so it would match nothing. Lounge access went on 2026-09-24
+(per Patrick: it was guessed from the fare's name, and many travellers have it from a card or status); a lounge
+day pass is still an add-on anyone can put on the bill. Lie-flat seat reads the seat itself since 2026-09-24
+(`e.lie_flat` from `data.build_slim`: Duffel's seat type `full_flat`, `full_flat_pod` or `private_suite` on the
+longest flight, or Google's "Lie flat seat" / "Individual suite" extensions), no longer the cabin's name, which had
+marked TAP's Executive and Icelandair's Saga Premium recliners as flat. The fifteen sit in a fixed grid, five across when the panel
+is wider than 760px and three otherwise (a container query on `.wants`), so every row is full, and on a phone a long
+label wraps rather than being cut. The wish box's
 vocabulary in `wish.py` lists every want the grid does), a **wish box**
 typed or spoken (the browser's own speech recognition) that becomes visible,
 removable rules and weights, advanced windows / cabin / stops / alliances /

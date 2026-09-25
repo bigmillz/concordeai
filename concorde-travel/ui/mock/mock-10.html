@@ -124,12 +124,12 @@ h1,h2,h3{font-weight:400;letter-spacing:-.02em;text-wrap:balance}
 .chip[aria-pressed=true] .n{color:var(--bg);background:rgba(0,0,0,.12)}
 .chip.zero{opacity:.55}
 /* wants as a fixed grid, four across and two on phones, so no row ends with a stray chip (per Patrick, 2026-09-22) */
-#chips{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+#chips{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
 #chips .chip{display:flex;justify-content:space-between;min-width:0;padding:8px 10px;gap:6px}
 #chips .chip .l{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wants{container-type:inline-size}
-@container (max-width:690px){#chips{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@container (max-width:420px){#chips .chip{border-radius:14px;align-items:center}#chips .chip .l{white-space:normal;overflow:visible;line-height:1.25}}   /* on a phone a long label wraps to a second line rather than being cut */   /* four across only when the panel has room for the longest label; two otherwise, never three (16 does not divide by three) */
+@container (max-width:760px){#chips{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@container (max-width:420px){#chips .chip{border-radius:14px;align-items:center}#chips .chip .l{white-space:normal;overflow:visible;line-height:1.25}}   /* on a phone a long label wraps to a second line rather than being cut */   /* fifteen wants: five across when the panel has room, three otherwise, so every row is full */
 .chipnote{margin-top:10px;font-size:12.5px;color:var(--price);line-height:1.5}
 
 .wish{margin-top:22px;border-top:1px solid var(--line);padding-top:18px}
@@ -437,6 +437,8 @@ details[open] summary:after{content:"–"}
 .book p{color:var(--dim);font-size:12.5px;line-height:1.5}
 .book .choose{flex:0 0 auto}
 .awards{list-style:none;display:flex;flex-direction:column;gap:8px}
+sup.est{font-size:.72em;margin-left:1px;color:var(--faint);font-weight:400;vertical-align:.45em;line-height:0}
+.estnote,.estfoot{font-size:12px;font-style:italic;color:var(--faint);line-height:1.5;margin:10px 2px 0}.estfoot{margin:14px 0 0;text-align:center}
 .awards li small{display:block;margin-top:4px;color:var(--faint);font-size:11.5px}.awards li .ledger{padding:0;font-size:12.5px}
 .ptbest{margin:0 0 18px;padding:14px 18px;border:1px solid rgba(53,224,138,.35);border-radius:14px;background:rgba(53,224,138,.05);font-size:13.5px;line-height:1.5;color:var(--dim)}
 .ptbest>b{display:block;color:var(--text);font-weight:500;margin-bottom:4px}.ptbest ol{margin:4px 0 6px 18px;padding:0}.ptbest li{margin:3px 0}
@@ -869,7 +871,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
 .flex .note{flex-basis:100%;color:var(--faint);font-size:12px}
 .rsc .odds{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 10px}.rsc .odds b{font-family:var(--mono);font-size:26px}.rsc .odds small{color:var(--faint)}
 .rsc .odds button{color:var(--dim);font-size:12.5px;border-bottom:1px solid var(--line)}
-.rsc .chart{margin:6px 0 12px}.rsc .chart svg{width:100%;height:130px;display:block}.rsc .chart text{fill:var(--faint);font:10px var(--mono)}.rsc .chart .l{fill:none;stroke:var(--speed);stroke-width:2}.rsc .chart .g{stroke:var(--line)}
+.rsc .chart{margin:6px 0 12px}.rsc .chart svg{width:100%;height:130px;display:block}.rsc .chart text{fill:var(--faint);font:10px var(--mono)}.rsc .chart .l{fill:none;stroke:var(--speed);stroke-width:2}.rsc .chart .band{fill:rgba(77,163,255,.16);stroke:none}.rsc .chart .g{stroke:var(--line)}
 .rsc .fld{padding:10px 12px}.rsc .fld input{font-size:15px}
 .rsc .chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}.rsc .pchip{cursor:pointer}.rsc .pchip.on{border-color:var(--speed);color:var(--text);background:rgba(120,160,255,.08)}
 .rsc h4{font-family:var(--disp);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin:14px 0 6px}
@@ -1013,7 +1015,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     </div></div></div></div>
     <div class="nav"><button class="back" data-back="3">Back</button><button class="go" id="go">Find my flights <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M8 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="hintr"></span></div></div>
   </div></section>
-  <footer class="foot wfoot"><span class="fnotes"><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="054648b">054648b</code></span></span></footer>
+  <footer class="foot wfoot"><span class="fnotes"><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="9d26ac1">9d26ac1</code></span></span></footer>
 </main>
 
 <div class="bar hidden" id="bar"><div class="barin">
@@ -1031,7 +1033,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
   <div class="stepper" id="stepper"></div>
   <section id="bookstep" class="hidden" aria-label="Book the trip"></section>
   <section aria-label="Top recommendations"><div class="sechead"><h2>Top recommendations</h2><p id="lede" hidden></p></div><div class="signal" id="signal" hidden></div><div class="flex" id="flex" hidden></div><div id="ptbest"></div><div class="three" id="doors"></div></section>
-  <section aria-label="Everything else"><div class="sechead"><h2>More flights</h2><p id="listnote"></p></div><ol class="list" id="list"></ol><button class="morebtn" id="morebtn"></button><p class="hiddenrows" id="hiddenrows"></p></section>
+  <section aria-label="Everything else"><div class="sechead"><h2>More flights</h2><p id="listnote"></p></div><ol class="list" id="list"></ol><button class="morebtn" id="morebtn"></button><p class="hiddenrows" id="hiddenrows"></p><p class="estfoot">* Estimates: typical prices for rides, hotels and extras, not quotes, and the times out the door built on them. Found a real price? Open the flight, remove the line and add your own.</p></section>
   <section class="research" id="research" aria-label="Check other countries">
     <div class="sechead"><h2>Check other countries</h2></div>
     <div class="rbox" id="rbox"></div>
@@ -1041,7 +1043,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
     <div><h2>The standard trip for this route</h2><ul id="parledger"></ul></div>
   </section>
   <div class="cov" id="cov"></div>
-  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="fnotes"><span>Prices are calculated in US dollars, then converted.</span><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="054648b">054648b</code></span></span></footer>
+  <footer class="foot"><label>Currency <select id="cur" aria-label="Currency"></select></label><span id="curnote"></span><span id="whoami"></span><span class="fnotes"><span>Prices are calculated in US dollars, then converted.</span><span class="credit">Photos from <a href="https://www.pexels.com/" target="_blank" rel="noopener">Pexels</a> · Flight status from <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a></span></span><span class="stamp"><span class="brand"><span class="lockup">Concorde<span class="tld">Go</span></span></span><span class="built">Updated <time id="updated" data-updated="2026-09-24">2026-09-24</time> · build <code id="build" data-build="9d26ac1">9d26ac1</code></span></span></footer>
 </div></div>
 
 <div class="dock mini" id="dock"><div class="dockin">
@@ -1153,7 +1155,8 @@ const NEWGEN = /^(78[1789]|359|351|339|338|32N|32Q|223|7M[89])$/;
 let LOY = new Set(), OPS = new Set(), CO2MIN = null, CO2MED = null;
 const kgOf = e => +((e.details || {}).emissions_kg) || 0;
 const WANTS = [
-  // laid out four to a row (2026-09-22, per Patrick): routing, then schedule and fare, then cabin, then the rest; 16 fill the grid
+  // routing, then schedule and fare, then cabin, then the rest. Fifteen since lounge access went (2026-09-24, per Patrick:
+  // it was guessed from the fare's name, and many travellers get it from a card or status), so five to a row, or three
   {id:'nonstop', label:'Nonstop', cents:15000, ok:e => e.stops === 0},
   {id:'short', label:'Short layovers', cents:8000, ok:e => e.stops === 0 || e.layover_minutes.every(m => m <= 150)},
   {id:'long', label:'Long layover', cents:6000, ok:e => e.layover_minutes.some(m => m >= 300)},
@@ -1164,11 +1167,11 @@ const WANTS = [
   {id:'bagin', label:'Bag included', cents:3500, ok:e => (e.bags_included || 0) >= 1, hint:'No fare here includes a checked bag.'},
   // carry_on comes from the fare's own allowance; the checked-in recording predates the field, so absent there reads as included (every fare in it has one)
   {id:'carryon', label:'Free carry-on', cents:6500, ok:e => e.carry_on !== false, hint:'Every fare here charges for a carry-on.'},
-  {id:'lieflat', label:'Lie-flat seat', cents:40000, ok:e => false, hint:'No lie-flat seats in economy. Switch the cabin to Business.'},
+  // the seat on the longest flight as the airline publishes it (Duffel's seat type, Google's seat sentence); unknown is no
+  {id:'lieflat', label:'Lie-flat seat', cents:40000, ok:e => e.lie_flat === true, hint:'No lie-flat seats in these results. Switch the cabin to Business.'},
   {id:'legroom', label:'Extra legroom', cents:3000, ok:e => e.pitch.some(p => (p || 0) >= 32), hint:'No economy seat here has 32 inches of legroom. Try premium economy.'},
   {id:'newgen', label:'787 / A350 / neo', cents:4000, ok:e => e.equipment.some(x => NEWGEN.test(x))},
   {id:'wifi', label:'Free wifi', cents:3000, ok:e => e.wifi_cost === 'free', hint:'No fare here lists free wifi.'},   // a fare that sells a pass gets the pass on its bill; one with no wifi ranks lower
-  {id:'lounge', label:'Lounge access', cents:6500, ok:e => e.brand.toLowerCase().includes('flex') || e.refundable},
   {id:'toprated', label:'Top-rated airline', cents:4000, ok:e => e.rating != null && e.rating >= .76, hint:'No top-rated airline on this route.'},
   // the cleaner half of the search has it; the dirtier half is charged the gap to the cleanest option at $60 a tonne, and an unreported figure is never counted as clean
   {id:'co2', label:'Lower emissions', cents:4000, prep:() => { const ks = ALL.map(kgOf).filter(Boolean).sort((a, b) => a - b); CO2MIN = ks.length ? ks[0] : null; CO2MED = ks.length ? ks[Math.floor((ks.length - 1)/2)] : null; },
@@ -1336,7 +1339,7 @@ function payPick(e, p){ const b = p === undefined ? bestPlan(e) : p; return S.pa
 function payHTML(e, total){
   const p = bestPlan(e), win = !!(p && p.good), pick = payPick(e, p), col = (cls, head, body, kind) => `<div class="pay ${cls}${kind && pick === kind ? ' pick' : ''}"${kind ? ` data-pick="${kind}" role="button" tabindex="0" aria-pressed="${pick === kind}"` : ''}>${head}${body}</div>`;
   const head = (label, w) => `<div class="ph">${label}${w ? '<i class="star" title="Better value">★</i>' : ''}</div>`;
-  const cash = col('cash' + (win ? '' : ' best'), head('Cash', !win), `<b class="num fig">${money(total)}</b><span class="unit">all in</span><em>${money(e.ticket_cents)} ticket</em><div class="v">+ ${money(total - e.ticket_cents)} extras</div>`, 'cash');
+  const cash = col('cash' + (win ? '' : ' best'), head('Cash', !win), `<b class="num fig">${money(total)}</b><span class="unit">all in</span><em>${money(e.ticket_cents)} ticket</em><div class="v">+ ${money(total - e.ticket_cents)} extras${hasEst(bill(e)) ? EST : ''}</div>`, 'cash');
   let pts;
   const dyn = bookableText(e);
   if (!p) pts = col('points dim', head('Points', false), `<b class="num fig">—</b><span class="unit dim">${dyn.length ? 'no published price' : 'no points price'}</span><em>${dyn.length ? 'check ' + esc(PTS.programmes[bookableKeys(e)[0]].site) : 'for this airline'}</em>`);
@@ -1424,14 +1427,37 @@ function excluded(e){
 // prices them, and rounding is folded into the time line.
 const RIDES = {either:'best option', rideshare:'rideshare', transit:'public transit'};
 const COMFORT = new Set(['connectivity','cabin_uncertain','pitch','redeye','boarding','carrier','mct_margin','lounge']);
+// ---- estimates are marked (2026-09-24, per Patrick): every figure that is a typical price rather than this fare's
+// own or a quote carries a small asterisk, and the page says in one plain line, at the bottom, what it means and that
+// the traveller can remove the line and add their own. Never hidden in terms; never a legal disclaimer.
+const EST = '<sup class="est" title="Estimate">*</sup>';
+// Hotel prices (2026-09-24, per Patrick): the median nightly rate of real hotels near the airport or the place that
+// night, from Google Hotels through the server (/hotels, cached twelve hours, capped per day). An average of real
+// prices, not a quote, so it is marked like any estimate; until it arrives (or opened as a file) the flat guess stands.
+const HOTELS = {}, HOTEL_GUESS = 18000;
+function hotelNight(params){
+  const key = JSON.stringify(params), h = HOTELS[key];
+  if (h && h !== 'pending') return h.cents ? h : null;
+  if (!h && SERVED){ HOTELS[key] = 'pending';
+    fetch('/hotels?' + new URLSearchParams(params)).then(r => r.json()).then(d => { HOTELS[key] = d && d.cents ? d : {none:true}; if (d && d.cents) priceArrived(); }).catch(() => { HOTELS[key] = {none:true}; }); }
+  return null;
+}
+let priceTimer = null;
+function priceArrived(){ clearTimeout(priceTimer); priceTimer = setTimeout(() => { paint(false); const sw = $('#sheetwrap'); if (sw && sw.querySelector('.bill')){ const e = ALL.find(x => x.id === sw.dataset.id); if (e) sw.querySelector('.detail').innerHTML = ledgerHTML(e); } }, 150); }
+// the night a hotel is for: the local date of arrival, or the evening before when landing in the small hours
+const nightOf = iso => { const d = new Date(String(iso).slice(0, 10) + 'T12:00:00Z'); if (+String(iso).slice(11, 13) < 12) d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); };
+function destHotel(e){
+  const q = D.query.destination_full || D.query.destination || e.route[e.route.length - 1], h = hotelNight({q, date:nightOf(e.arrive.slice(0, 11) + '18:00')});
+  return h ? {cents:h.cents, basis:h.basis} : {cents:HOTEL_GUESS, basis:'typical price, not a quote'};
+}
 const ADDONS = {
-  wifi:{label:'Wifi pass', cents:1900, sells:e => e.wifi_cost === 'paid', has:e => e.wifi_cost === 'free', want:'wifi', why:'you picked free wifi; this fare charges for it'},
-  lounge:{label:'Lounge day pass', cents:6500, sells:() => true, has:e => WANTS.find(w => w.id === 'lounge').ok(e), want:'lounge', why:'you asked for lounge access; this fare does not include it'},
-  legroom:{label:'Extra-legroom seat', cents:7900, sells:() => true, has:e => WANTS.find(w => w.id === 'legroom').ok(e), want:'legroom', why:'you asked for extra legroom; no seat on this fare is listed at 32 inches or more'},
-  seat:{label:'Pick your seat', cents:3000, sells:e => e.seat_selection === 'paid', has:e => e.seat_selection !== 'paid', why:'seat selection is paid on this fare'},
-  priority:{label:'Priority boarding', cents:2500, sells:() => true, has:() => false, why:'added by you'},
-  insurance:{label:'Travel insurance', cents:3800, sells:() => true, has:() => false, why:'added by you'},
-  hotel:{label:'Hotel at destination', cents:18000, sells:() => true, has:() => false, why:'added by you', group:'stay'},
+  wifi:{label:'Wifi pass', cents:1900, basis:'typical price, not this airline\'s', sells:e => e.wifi_cost === 'paid', has:e => e.wifi_cost === 'free', want:'wifi', why:'you picked free wifi; this fare charges for it'},
+  lounge:{label:'Lounge day pass', cents:6500, basis:'typical price, not a quote', sells:() => true, has:() => false, why:'added by you'},
+  legroom:{label:'Extra-legroom seat', cents:7900, basis:'typical price, not this airline\'s', sells:() => true, has:e => WANTS.find(w => w.id === 'legroom').ok(e), want:'legroom', why:'you asked for extra legroom; no seat on this fare is listed at 32 inches or more'},
+  seat:{label:'Pick your seat', cents:3000, basis:'typical price, not this airline\'s', sells:e => e.seat_selection === 'paid', has:e => e.seat_selection !== 'paid', why:'seat selection is paid on this fare'},
+  priority:{label:'Priority boarding', cents:2500, basis:'typical price, not this airline\'s', sells:() => true, has:() => false, why:'added by you'},
+  insurance:{label:'Travel insurance', cents:3800, basis:'typical price, not a quote', sells:() => true, has:() => false, why:'added by you'},
+  hotel:{label:'Hotel at destination', cents:18000, price:destHotel, sells:() => true, has:() => false, why:'added by you', group:'stay'},
 };
 const hourlyAt = () => Math.round(S.a*PR.cheapest.hourly_value_cents + S.b*PR.fastest.hourly_value_cents + S.c*PR.comfort.hourly_value_cents);
 const cwAt = () => S.a*PR.cheapest.comfort_weight + S.b*PR.fastest.comfort_weight + S.c*PR.comfort.comfort_weight;
@@ -1454,7 +1480,8 @@ function bagCost(e, pieces){
 function overnight(e){
   // a layover that runs through the small hours: lands late, leaves in the morning
   let k = 0; for (const l of e.by.cheapest.legs){ if (l.kind !== 'layover') continue; const seg = e.segments[k]; k++;
-    const h = +seg.arr.slice(0,2); if (l.minutes >= 300 && (h >= 21 || h < 3)) return {airport:seg.to, lands:seg.arr, next:(e.segments[k] || {}).dep, minutes:l.minutes}; }
+    const h = +seg.arr.slice(0,2); if (l.minutes >= 300 && (h >= 21 || h < 3)) return {airport:seg.to, lands:seg.arr, next:(e.segments[k] || {}).dep, minutes:l.minutes,
+      night:nightOf(seg.arr_iso || (e.depart.slice(0, 11) + seg.arr))}; }
   return null;
 }
 function linesAt(e, idx){
@@ -1486,7 +1513,7 @@ function bill(e, opts){
     if (prefer){ const pk = pickGround(modes, hourly, prefer); if (pk.mode) mode = pk.mode; note = pk.note; }
     const curMin = cur ? cur.minutes : 0, mins = mode ? mode.minutes : curMin, cents = off ? 0 : (mode ? mode.cents : (ref ? ref.cents : 0));
     dmin += mins - curMin; gm += mins; rides[end] = mode ? {...mode, cents} : null;
-    line('transport', {key:code, label: ref ? ref.label : (end === 'out' ? 'To the airport' : 'From the airport'), cents, removable:true, off,
+    line('transport', {key:code, label: ref ? ref.label : (end === 'out' ? 'To the airport' : 'From the airport'), cents, removable:true, off, est:!off && !!(mode && mode.estimated),
       evidence: off ? 'No fare: someone is driving you · ' + dur(mins) : (mode ? mode.mode + ' · ' + dur(mins) + (mode.estimated ? ' · estimated' : '') + (note ? ' · ' + note : '') : (ref ? ref.evidence : ''))});
   });
   // Your time, comfort and risk are NOT lines on the bill (per Patrick, 2026-09-21:
@@ -1504,17 +1531,20 @@ function bill(e, opts){
   if (perk && total > e.bags_included) line('addons', {key:'bags', label:paid ? paid + ' checked bag' + (paid > 1 ? 's' : '') + ' not included' : 'Checked bags', cents:paid ? bagCost(e, paid) : 0,
       evidence:'Your ' + perk.name + ': ' + perk.free + ' checked bag' + (perk.free > 1 ? 's' : '') + ' free on ' + (e.operator || e.carrier) + (paid ? ', ' + paid + ' more to pay' : '') + ' · ' + perk.source, removable: S.extra.bag > 0});
   else if (total === (D.query.bags ?? 1) && B) line('addons', {key:'bags', label:B.label, evidence:B.evidence, cents:B.cents});
-  else if (paid > 0) line('addons', {key:'bags', label: paid + ' checked bag' + (paid > 1 ? 's' : '') + ' not included', cents:bagCost(e, paid),
+  else if (paid > 0) line('addons', {key:'bags', label: paid + ' checked bag' + (paid > 1 ? 's' : '') + ' not included', cents:bagCost(e, paid), est:!e.bag_tiers.length,
       evidence: total + ' checked, ' + bagsIn + ' included with ' + e.brand + ' · bag fees: ' + (e.bag_tiers.length ? e.bag_tiers.map(t => money(t.amount_cents)).join(', ') + ', then ' + money(Math.max(...e.bag_tiers.map(t => t.amount_cents))) + ' each' : 'not published, so priced high') + (S.extra.bag ? ' · ' + S.extra.bag + ' added by you' : ''), removable: S.extra.bag > 0});
   else if (total > 0) line('addons', {key:'bags', label: total + ' checked bag' + (total > 1 ? 's' : '') + ' included', cents:0, included:true, evidence:e.brand + ' includes ' + bagsIn});
   {
     for (const [k, a] of Object.entries(ADDONS)){
       const wanted = (a.want && S.wants.has(a.want)) || S.extra[k]; if (!wanted || S.off.has(k)) continue;
       if (a.has(e)) line(a.group || 'addons', {key:k, label:a.label.replace(' day pass', '').replace(' pass', '').replace('Pick your seat', 'Seat choice').trim() + ' included', cents:0, included:true, evidence:'comes with this fare', removable:true});
-      else if (a.sells(e)) line(a.group || 'addons', {key:k, label:a.label, cents:a.cents, evidence:a.why, removable:true});
+      else if (a.sells(e)){ const pr = a.price ? a.price(e) : {cents:a.cents, basis:a.basis};
+        line(a.group || 'addons', {key:k, label:a.label, cents:pr.cents, est:true, evidence:a.why + ' · ' + pr.basis, removable:true}); }
     }
     const on = overnight(e);
-    if (on && !S.off.has('hotel-auto')) line('stay', {key:'hotel-auto', label:'Hotel near ' + on.airport, cents:18000, removable:true, evidence:'lands ' + on.lands + ', next flight ' + on.next + ' · ' + dur(on.minutes) + ' overnight · estimate'});
+    if (on && !S.off.has('hotel-auto')){ const hn = hotelNight({near:on.airport, date:on.night});
+      line('stay', {key:'hotel-auto', label:'Hotel near ' + on.airport, cents:hn ? hn.cents : HOTEL_GUESS, est:true, removable:true,
+        evidence:'lands ' + on.lands + ', next flight ' + on.next + ' · ' + dur(on.minutes) + ' overnight · ' + (hn ? hn.basis : 'typical price, not a quote')}); }
     S.extra.custom.forEach((c, i) => line('addons', {key:'custom-' + i, label:c.label, cents:c.cents, evidence:'added by you', removable:true}));
     // wants with nothing to buy: weighed in the order, named on the row, never billed
     for (const id of S.wants){ const w = WANTS.find(x => x.id === id); if (!w.count || w.ok(e)) continue; if (ADDONS[id] && !S.off.has(id) && (ADDONS[id].sells(e) || ADDONS[id].has(e))) continue;
@@ -1538,6 +1568,7 @@ function bill(e, opts){
           dem:q.filter(x => x.want), adds:g.addons.filter(x => x.key !== 'bags' && x.cents > 0).concat(g.stay), base:e.grid[idx]};
 }
 function priced(e){ return bill(e); }
+const hasEst = (r, groups) => (groups || ['transport', 'stay', 'addons']).some(k => (r.g[k] || []).some(l => l.est && l.cents));
 // ---- the Flight Fixer's form: the search's own fields and labels, what is required marked, the rest optional
 // 12-hour clocks for people (per Patrick, 2026-09-21): typed as 6:30 with AM or PM, or as 18:30, which picks PM by itself
 function split12(v){ const m = /^\s*(\d{1,2}):(\d{2})\s*(\+1)?\s*$/.exec(v || ''); if (!m) return {h12:'', ampm:''}; let h = +m[1]; const ampm = h >= 12 ? 'pm' : 'am'; h = h % 12 || 12; return {h12: h + ':' + m[2] + (m[3] ? ' +1' : ''), ampm}; }
@@ -1573,13 +1604,12 @@ function fareAlts(e){ const f = e.fares || []; return f.length ? ' · also ' + f
 // same arithmetic as everything else; nothing here is a filter, and the grade never sees it.
 const QUIZ = [
   {id:'hours', q:'A flight costs $80 more and saves two hours. You…', a:[['Pay the extra', {speed:2}], ['Keep the money', {price:2}], ['Depends on the day', {}]]},
-  {id:'layover', q:'A four-hour layover is…', a:[['Wasted time', {speed:1}], ['A chance to eat in a new city', {foodie:2}], ['Fine with a good lounge', {lounge:2}]]},
+  {id:'layover', q:'A four-hour layover is…', a:[['Wasted time', {speed:1}], ['A chance to eat in a new city', {foodie:2}], ['Fine, I can relax', {}]]},
   {id:'cabin', q:'In the air, what matters most?', a:[['Space and a quiet cabin', {comfort:2}], ['Wifi and power', {tech:2}], ['The price of the seat', {price:2}]]},
   {id:'nerves', q:'Flying makes you…', a:[['Calm', {}], ['A little tense', {nervous:1}], ['Very anxious', {nervous:2, comfort:1}]]},
   {id:'redeye', q:'Red-eyes are…', a:[['Fine, I sleep anywhere', {redeye_ok:1}], ['A last resort', {}], ['Never', {noredeye:1}]]},
   {id:'stops', q:'Connections are…', a:[['Fine if they save money', {price:1}], ['Only if nonstop costs much more', {}], ['Never', {nonstop:1, speed:1}]]},
   {id:'crew', q:'Airline service…', a:[['Matters a lot', {crew:2}], ['A bit', {crew:1}], ['Not at all', {price:1}]]},
-  {id:'lounge', q:'A lounge before the flight is…', a:[['Essential', {lounge:2}], ['Nice', {lounge:1}], ['Not my thing', {}]]},
 ];
 const FOOD_CITY = ['CDG','AMS','LIS','MAD','BCN','FCO','IST','SIN','HKG','NRT','HND','ICN','BKK','MEX','CPH','TLV','DXB','MUC'];
 function personaFrom(answers){
@@ -1588,12 +1618,11 @@ function personaFrom(answers){
   if (t.nervous >= 2) t.comfort += 1;
   const sum = t.price + t.speed + t.comfort, a = t.price/sum, b = t.speed/sum, c = t.comfort/sum;
   const lead = [['price', 'Careful spender'], ['speed', 'Time saver'], ['comfort', 'Comfort first']].sort((x, y) => t[y[0]] - t[x[0]])[0][1];
-  const tag = t.nervous >= 2 ? 'Nervous flyer' : t.foodie >= 2 ? 'Layover foodie' : t.lounge >= 2 ? 'Lounge regular' : t.tech >= 2 ? 'Works on board' : t.nervous === 1 ? 'Tense flyer' : '';
+  const tag = t.nervous >= 2 ? 'Nervous flyer' : t.foodie >= 2 ? 'Layover foodie' : t.tech >= 2 ? 'Works on board' : t.nervous === 1 ? 'Tense flyer' : '';
   const name = tag ? tag + ', ' + lead.toLowerCase() : lead;
   const bits = [];
   if (t.nervous) bits.push(t.nervous >= 2 ? 'fewer connections, daytime flights and well-rated airlines strongly preferred' : 'fewer connections, daytime flights and well-rated airlines preferred');
   if (t.foodie >= 2) bits.push('a long daytime layover in a food city is a plus');
-  if (t.lounge) bits.push(t.lounge >= 2 ? 'lounge access counts a lot' : 'lounge access counts a little');
   if (t.tech >= 2) bits.push('wifi and power at the seat count');
   if (t.noredeye) bits.push('red-eyes rank lower');
   if (t.nonstop) bits.push('nonstops first');
@@ -1611,7 +1640,6 @@ function personaLines(e){
     if (rating == null || rating < .72) add('crew', rating == null ? 'unrated airline' : 'lower-rated airline', 4000 * k, 'you said flying makes you ' + (k >= 2 ? 'anxious' : 'tense')); }
   else if (t.crew >= 2 && (rating == null || rating < .72)) add('crew', rating == null ? 'unrated airline' : 'lower-rated airline', 3000, 'you said airline service matters a lot');
   if (t.foodie >= 2){ const segs = e.segments || []; lay.forEach((m, i) => { const apt = (segs[i] || {}).to, lh = segs[i] ? +segs[i].arr.slice(0, 2) : 12; if (m >= 180 && m <= 600 && FOOD_CITY.includes(apt) && lh >= 8 && lh <= 19) add('food', dur(m) + ' in ' + apt, -5000, 'a long daytime layover in a food city · credit'); }); }
-  if (t.lounge && !(e.brand.toLowerCase().includes('flex') || e.refundable)) add('lounge', 'no lounge access', 2500 * t.lounge, 'estimated from the fare type');
   if (t.tech >= 2){ if (!e.wifi_published) add('wifi', 'no wifi listed', 3000, 'you picked wifi and power'); if (!e.power_published) add('power', 'no seat power listed', 2000, 'you picked wifi and power'); }
   if (t.noredeye && redeye) add('noredeye', 'red-eye', 6000, 'you said no red-eyes');
   if (t.nonstop && e.stops > 0) add('nonstop', 'not nonstop', 9000, 'you said no connections');
@@ -1847,7 +1875,7 @@ function journeyHTML(e, r, ctx, compact){
   if (compact) return `<span class="jmini" title="${dur(total)} door to door">${bar}</span>`;
   const fi = Math.max(0, segs.findIndex(x => x.kind === 'flight')), pre = segs.slice(0, fi).reduce((a, x) => a + x.minutes, 0), lf = segs.map(x => x.kind).lastIndexOf('flight'), post = segs.slice(lf + 1).reduce((a, x) => a + x.minutes, 0);   // arrival block and ride
   return `<div class="journey">${bar}
-    <div class="jlab" style="width:${frac}%"><span><b>${clockAdd(e.depart, -pre)}</b> out the door</span><span><b>${clockAdd(e.arrive, post)}</b>${e.day_offset ? ' +1' : ''} in ${esc(D.query.destination)}</span></div></div>`;
+    <div class="jlab" style="width:${frac}%"><span><b>${clockAdd(e.depart, -pre)}</b>${EST} out the door</span><span><b>${clockAdd(e.arrive, post)}</b>${e.day_offset ? ' +1' : ''} in ${esc(D.query.destination)}</span></div></div>`;
 }
 
 // Pros and cons. Every term is judged against the rest of the results, not in
@@ -1858,7 +1886,7 @@ function journeyHTML(e, r, ctx, compact){
 // it is worth $80 or more either way, or is a want the user named. Each term
 // carries a weight in cents, and the four heaviest a side are shown. Everything
 // here is a line with a figure in the full ledger; this is the short form.
-const WANT_CON = {nonstop:'Not nonstop', short:'Long layover', long:'Short layover', lieflat:'No lie-flat', newgen:'Older jet', wifi:'No wifi', legroom:'Tight seat', lounge:'No lounge', flex:'No changes', day:'Not daytime'};
+const WANT_CON = {nonstop:'Not nonstop', short:'Long layover', long:'Short layover', lieflat:'No lie-flat', newgen:'Older jet', wifi:'No wifi', legroom:'Tight seat', flex:'No changes', day:'Not daytime'};
 const JET = {781:'787-10', 789:'787-9', 788:'787-8', 359:'A350', 351:'A350-1000', 339:'A330neo', 338:'A330neo', '32N':'A321neo', '32Q':'A321neo', 223:'A220', '7M8':'737 MAX', '7M9':'737 MAX', 763:'767', 764:'767', 762:'767', 772:'777-200', 744:'747', 343:'A340', 346:'A340', 340:'A340', 332:'A330-200'};
 const OLDJET = /^(76[234]|772|744|34[036]|332)$/;
 const rnd15 = m => Math.max(15, Math.round(m/15)*15);
@@ -1949,7 +1977,7 @@ function statsFor(rows){
   ctx.share = k => (count[k] || 0) / (rows.length || 1);
   return ctx;
 }
-const amtHTML = l => l.cents === 0 ? (l.included ? 'included' : '—') : l.cents < 0 ? '−' + money(l.cents) + '<small>credit</small>' : '+' + money(l.cents);
+const amtHTML = l => l.cents === 0 ? (l.included ? 'included' : '—') : l.cents < 0 ? '−' + money(l.cents) + '<small>credit</small>' : '+' + money(l.cents) + (l.est ? EST : '');
 // When speed is the ask, what it costs: this flight's extra cash over the
 // cheapest, per hour it saves. Shown only when it both costs more and is
 // quicker; a flight that is dearer AND slower has nothing to say here.
@@ -2003,7 +2031,7 @@ function rowHTML(r, ctx){
       ${logo(e.carrier, true)}${sealHTML(e, true)}
       <span class="rw"><b>${esc(e.carrier_name)}</b><span>${esc(e.flight)} · ${esc(e.brand)}${fareAlts(e)}</span><small>${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} · ${stopsText(e)} · ${dur(e.door_minutes)}</small>
         ${journeyHTML(e, r, ctx, true)}
-        ${r.adds.length ? `<span class="dem" style="color:var(--dim)">+${money(r.adds.reduce((s, x) => s + x.cents, 0))} ${esc(r.adds.map(x => lc(x.label)).join(', '))}</span>` : ''}${r.dem.map(d => `<span class="dem">${esc(lc(d.label))}</span>`).join('')}${pp && pp.good ? `<span class="pt">★ points: ${fmtN(pp.spend)} ${esc(srcText(pp))} with ${esc(pp.P.name)}, ${money(pp.head)} ahead of cash</span>` : ''}</span>
+        ${r.adds.length ? `<span class="dem" style="color:var(--dim)">+${money(r.adds.reduce((s, x) => s + x.cents, 0))}${r.adds.some(x => x.est) ? EST : ''} ${esc(r.adds.map(x => lc(x.label)).join(', '))}</span>` : ''}${r.dem.map(d => `<span class="dem">${esc(lc(d.label))}</span>`).join('')}${pp && pp.good ? `<span class="pt">★ points: ${fmtN(pp.spend)} ${esc(srcText(pp))} with ${esc(pp.P.name)}, ${money(pp.head)} ahead of cash</span>` : ''}</span>
       <span class="when">${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''}<i>${stopsText(e)} · ${dur(e.door_minutes)}</i></span>
       <span class="amt"><b>${money(r.total)}</b><i>${money(e.ticket_cents)} ticket</i></span><span class="chev">›</span>
     </button><div class="detail" hidden></div></li>`;
@@ -2131,7 +2159,7 @@ function ledgerHTML(e){
       ${k === 'transport' ? `<div class="restore">${restore.filter(x => x.startsWith('ground')).map(x => `<span>${esc(RESTORE[x])} removed: someone is driving you<button data-restore="${x}">add back</button></span>`).join('')}</div>` : ''}
       ${k === 'stay' && restore.includes('hotel-auto') ? `<div class="restore"><span>Hotel removed: sleeping in the terminal<button data-restore="hotel-auto">add back</button></span></div>` : ''}</section>`; };
   return `${sheetJourney(e, r)}${factsHTML(e)}<div class="bill">${GROUPS.map(([k, t]) => grp(k, t)).join('')}
-    <div class="btotal"><span>All in</span><b>${money(r.total)}</b></div></div>${priceChartHTML(e)}${sellersHTML(e)}
+    <div class="btotal"><span>All in</span><b>${money(r.total)}${hasEst(r) ? EST : ''}</b></div>${hasEst(r) ? '<p class="estnote">* Estimate, not a quote. Found the real price? Remove the line with × and add your own.</p>' : ''}</div>${priceChartHTML(e)}${sellersHTML(e)}
     <div class="book"><h4>${esc(e.carrier_name)} ${esc(e.flight)}</h4><p>${esc(e.route.join(' → '))} · ${hm(e.depart)} → ${hm(e.arrive)}${e.day_offset ? ' +1' : ''} · ${stopsText(e)}<br>${b ? esc(b.note) : ''}</p>
       <button class="choose" data-select="${esc(e.id)}">${selectLabel()}${b ? ' · ' + money(b.price_cents) : ''}</button>
       <p>${S.trip === 'round' ? (S.legIdx === 0 ? 'Then pick your return.' : 'Then book both legs.') : 'Then book with the airline.'}</p>
@@ -2358,7 +2386,6 @@ function parseWish(text){
   if (/long layover|stopover|see the city/.test(t)) out.push({kind:'want', id:'long', label:'A long layover'});
   if (/wifi|wi-fi|internet/.test(t)) out.push({kind:'want', id:'wifi', label:'Free wifi'});
   if (/legroom|leg room|tall/.test(t)) out.push({kind:'want', id:'legroom', label:'Extra legroom'});
-  if (/lounge/.test(t)) out.push({kind:'want', id:'lounge', label:'Lounge access'});
   if (/flexib|refund|might change|may change/.test(t)) out.push({kind:'want', id:'flex', label:'Flexible ticket'});
   if (/no red[- ]?eye|not overnight|daytime|during the day|no overnight/.test(t)) out.push({kind:'want', id:'day', label:'Daytime flight'});
   if (/bag included|free (?:checked )?bag|includes? a (?:checked )?bag/.test(t)) out.push({kind:'want', id:'bagin', label:'Bag included'});
@@ -2916,7 +2943,7 @@ function loadData(d){
   paintPar(); paintCov(); paintSignal(); { const f = $('#flex'); if (f){ f.hidden = true; f.innerHTML = ''; } }
 }
 function paintPar(){
-$('#how1').innerHTML = (P.fare_cents != null ? 'Fair fare for this route: <b>' + money(P.fare_cents) + '</b> (' + (P.holiday ? esc(P.holiday) + ' fare, ' + P.holiday_factor.toFixed(2) + '× usual' : (P.season_factor < .95 ? 'off-season' : P.season_factor > 1.05 ? 'peak-season' : 'regular') + ' fare') + ', ' + P.miles.toLocaleString() + ' miles). ' : '') + 'Standard trip: a nonstop in economy with one bag, leaving at ' + esc(P.reference.departs_local) + ', ' + dur(P.reference.door_to_door_minutes) + ' door to door. Total with rides and time: <b>' + money(D.query.par_cents) + '</b>. Each grade compares a flight to this trip.';
+$('#how1').innerHTML = (P.fare_cents != null ? 'Fair fare for this route: <b>' + money(P.fare_cents) + EST + '</b> (' + (P.holiday ? esc(P.holiday) + ' fare, ' + P.holiday_factor.toFixed(2) + '× usual' : (P.season_factor < .95 ? 'off-season' : P.season_factor > 1.05 ? 'peak-season' : 'regular') + ' fare') + ', ' + P.miles.toLocaleString() + ' miles). ' : '') + 'Standard trip: a nonstop in economy with one bag, leaving at ' + esc(P.reference.departs_local) + ', ' + dur(P.reference.door_to_door_minutes) + ' door to door. Total with rides and time: <b>' + money(D.query.par_cents) + '</b>. Each grade compares a flight to this trip.' + (P.fare_cents != null ? '<br><i class="estnote" style="display:inline">* Worked out from the route\'s distance, market and season, not from this search.</i>' : '');
 $('#parledger').innerHTML = P.ledger.map(l => `<li><span>${esc(l.label)}</span><span class="num">${signed(l.cents)}</span></li>`).join('') + `<li class="t"><span>Total</span><span class="num">${money(P.par_cents)}</span></li>`;
 }
 paintPar();
@@ -3161,14 +3188,14 @@ async function runRescue(){
 function paintRescue(res){
   const a = res.assessment, V = a.verdict, hm = iso => iso ? iso.slice(11, 16) : '';
   RS.search = res.search || null; RS.loaded = false; const known = new Set(((RS.search || {}).results || {}).reference ? RS.search.results.reference.map(e => e.id) : []);
-  const night = r => { const n = r.night; if (!n) return ''; return `<button type="button" class="nightmore" data-night="${esc(r.id)}">more</button><div class="night hidden" id="night-${esc(r.id)}"><span>Room: ${money(n.hotel_cents)} · ${esc(n.hotel_basis)}.</span>${n.rides.length ? n.rides.map(x => `<span>${esc(x.label[0].toUpperCase() + x.label.slice(1))}: ${money(x.cents)} · ${esc(x.mode.toLowerCase())}, about ${dur(x.minutes)}.</span>`).join('') + `<span>${esc(n.rides_basis[0].toUpperCase() + n.rides_basis.slice(1))}.</span>` : `<span>${esc(n.rides_basis || 'No ride estimate.')}</span>`}</div>`; };
-  const alt = r => `<div class="alt"${known.has(r.id) ? ` data-alt="${esc(r.id)}" role="button" tabindex="0"` : ''}><div><b>${esc(r.flight)}</b>${known.has(r.id) ? '' : '<span class="tmrw">tomorrow</span>'} · ${esc((r.route || []).join(' → '))} · ${hm(r.depart)} → ${hm(r.arrive)}${r.stops ? ' · ' + r.stops + (r.stops > 1 ? ' stops' : ' stop') : ' · nonstop'}<small>${r.lines.map(l => esc(l.label) + ': ' + (l.cents < 0 ? '−' : '') + money(Math.abs(l.cents))).join(' · ')}${night(r)}</small></div><div class="net">${V.option && V.option.id === r.id ? '★ ' : ''}${r.net_cents < 0 ? '−' : ''}${money(Math.abs(r.net_cents))}<small>net</small></div></div>`;
+  const night = r => { const n = r.night; if (!n) return ''; return `<button type="button" class="nightmore" data-night="${esc(r.id)}">more</button><div class="night hidden" id="night-${esc(r.id)}"><span>Room: ${money(n.hotel_cents)}${EST} · ${esc(n.hotel_basis)}.</span>${n.rides.length ? n.rides.map(x => `<span>${esc(x.label[0].toUpperCase() + x.label.slice(1))}: ${money(x.cents)} · ${esc(x.mode.toLowerCase())}, about ${dur(x.minutes)}.</span>`).join('') + `<span>${esc(n.rides_basis[0].toUpperCase() + n.rides_basis.slice(1))}.</span>` : `<span>${esc(n.rides_basis || 'No ride estimate.')}</span>`}</div>`; };
+  const alt = r => `<div class="alt"${known.has(r.id) ? ` data-alt="${esc(r.id)}" role="button" tabindex="0"` : ''}><div><b>${esc(r.flight)}</b>${known.has(r.id) ? '' : '<span class="tmrw">tomorrow</span>'} · ${esc((r.route || []).join(' → '))} · ${hm(r.depart)} → ${hm(r.arrive)}${r.stops ? ' · ' + r.stops + (r.stops > 1 ? ' stops' : ' stop') : ' · nonstop'}<small>${r.lines.map(l => esc(l.label) + ': ' + (l.cents < 0 ? '−' : '') + money(Math.abs(l.cents)) + (/hotel|ride/i.test(l.label) ? EST : '')).join(' · ')}${night(r)}</small></div><div class="net">${V.option && V.option.id === r.id ? '★ ' : ''}${r.net_cents < 0 ? '−' : ''}${money(Math.abs(r.net_cents))}<small>net</small></div></div>`;
   const head = V.action === 'switch' && V.option ? 'Switch to ' + V.option.flight + (V.ahead_cents ? ', ' + money(V.ahead_cents) + ' ahead' : '') : V.action === 'stay' ? 'Stay with the airline' : 'Wait it out';
-  const od = a.odds || {}, pct = x => Math.round(x * 100) + '%', c12 = iso => { const t = split12(hm(iso)); return t.h12 + ' ' + t.ampm.toUpperCase(); };
+  const od = a.odds || {}, pct = x => Math.round(x * 100) + '%', pr = o => o.p_hi != null && Math.round(o.p_hi * 100) > Math.round(o.p * 100) ? Math.round(o.p * 100) + '–' + pct(o.p_hi) : pct(o.p), c12 = iso => { const t = split12(hm(iso)); return t.h12 + ' ' + t.ampm.toUpperCase(); };
   const oddsHTML = !(od.today && od.today.p != null) ? '' : `
-    ${od.planned && od.flight && od.flight.p != null ? `<div class="odds"><b>${pct(od.flight.p)}</b><span>chance your ${c12(od.planned)} flight leaves today${od.planned_passed ? ' (that time has passed)' : ''}</span><small>${od.observed_status ? 'estimate, with airline status' : 'estimate'}</small></div>${oddsChart(od.flight.curve, 'Chance it still leaves today if it slips to each hour.')}` : ''}
-    <div class="odds"><b>${pct(od.today.p)}</b><span>chance you fly out today</span><small>estimate</small></div>${oddsChart(od.today.curve, 'Chance by hour: your flight, or another leaving 75+ minutes later.')}
-    <p class="fine">${esc(od.basis || '')}</p>`;
+    ${od.planned && od.flight && od.flight.p != null ? `<div class="odds"><b>${pr(od.flight)}</b><span>chance your ${c12(od.planned)} flight leaves today${od.planned_passed ? ' (that time has passed)' : ''}</span><small>${od.from_records ? 'from US DOT records' + EST : 'estimate' + EST}${od.observed_status ? ', with airline status' : ''}</small></div>${oddsChart(od.flight.curve, 'Chance it still leaves today if it slips to each hour.')}` : ''}
+    <div class="odds"><b>${pr(od.today)}</b><span>chance you fly out today</span><small>estimate${EST}</small></div>${oddsChart(od.today.curve, 'Chance by hour: your flight, or another leaving 75+ minutes later.')}
+    <p class="fine">${esc(od.basis || '')}</p><p class="estnote">* Estimates from records and typical prices, not promises. The chance of a seat on another flight is a rough even chance each, since airlines do not publish how full they are.</p>`;
   $('#accth').textContent = '☎️ The Call';
   $('#acctbody').innerHTML = `<div class="rsc">${oddsHTML}<div class="verdict"><b>${esc(head)}</b><p class="advice">${esc(res.advice.advice)}</p></div>
     <h4>Your options today${res.searched.length > 1 ? ' and tomorrow' : ''} · ${res.found} found</h4>${a.options.slice(0, 4).map(alt).join('') || '<p>No flights leave in time.</p>'}
@@ -3200,9 +3227,11 @@ function oddsChart(c, caption){
   c = c || []; if (!c.length) return '';
   const W = 560, H = 130, L = 34, R = 10, T = 10, B = 26, x = h => L + (h - c[0].hour) / Math.max(1, c[c.length - 1].hour - c[0].hour) * (W - L - R), y = p => T + (1 - p) * (H - T - B);
   const pts = c.map(k => x(k.hour).toFixed(1) + ',' + y(k.p).toFixed(1)).join(' ');
+  // from US DOT records the chance is a range (the files cannot date a cancellation): a band from low to high
+  const band = c.some(k => k.p_hi != null && k.p_hi > k.p) ? `<polygon class="band" points="${c.map(k => x(k.hour).toFixed(1) + ',' + y(k.p_hi ?? k.p).toFixed(1)).join(' ')} ${c.slice().reverse().map(k => x(k.hour).toFixed(1) + ',' + y(k.p).toFixed(1)).join(' ')}"/>` : '';
   const grid = [0, .5, 1].map(p => `<line class="g" x1="${L}" x2="${W - R}" y1="${y(p)}" y2="${y(p)}"/><text x="2" y="${y(p) + 3}">${Math.round(p * 100)}%</text>`).join('');
   const ticks = c.filter((k, i) => i % Math.max(1, Math.floor(c.length / 6)) === 0 || i === c.length - 1).map(k => `<text x="${x(k.hour)}" y="${H - 8}" text-anchor="middle">${String(k.hour % 24).padStart(2, '0')}:00</text>`).join('');
-  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}<polyline class="l" points="${pts}"/>${ticks}</svg><p class="fine">${esc(caption || '')}</p></div>`;
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}${band}<polyline class="l" points="${pts}"/>${ticks}</svg><p class="fine">${esc(caption || '')}</p></div>`;
 }
 // the first-launch tour (per Patrick, 2026-09-21): the premise in a breath, how it works in three lines, then the
 // quiz. Once per browser; the profile can always reopen the quiz.

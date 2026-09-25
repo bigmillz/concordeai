@@ -222,8 +222,36 @@ def main():
           0.0 < sub["observed_frequency"] < 1.0, str(sub.get("observed_frequency")))
     check("carrying the evidence the narrator is allowed to quote",
           all(k in sub for k in ("sample_size", "observation_window", "source", "as_of")))
-    check("and flagged as needing a primary source, because the table is a draft",
+    check("and flagged as needing a primary source, since no airline or manufacturer source backs BA's 787-9 count",
           sub.get("needs_primary_source") is True)
+
+    # The fleet table was checked against published sources on 2026-09-25 (per Patrick: the rows were drafts from
+    # memory). What a row may say is fenced here: a dated claim with its sources, or an abstain; never a primary
+    # source it does not have, and never "no wifi" read as wifi.
+    fleets = json.load(open(os.path.join(HERE, "..", "enrichment", "fleets.json")))["fleets"]
+    bad = []
+    for key, row in fleets.items():
+        ev = row.get("_evidence") or {}
+        prim = any(s.get("primary") for s in ev.get("sources") or [])
+        if not ev.get("sources") or not ev.get("checked"):
+            bad.append(key + ": no sources")
+        for name in ("subfleet", "connectivity_oceanic"):
+            c = row.get(name) or {}
+            if c.get("coverage") == "none":
+                if not c.get("reason"):
+                    bad.append("%s %s: abstain without a reason" % (key, name))
+                continue
+            if not (0.0 <= c.get("observed_frequency", -1) <= 1.0 and int(c.get("sample_size") or 0) >= 1
+                    and re.match(r"\d{4}-\d\d-\d\d$", c.get("as_of", "")) and c.get("source")):
+                bad.append("%s %s: not a dated claim" % (key, name))
+            if c.get("needs_primary_source") is False and not prim:
+                bad.append("%s %s: marked reviewed with no primary source" % (key, name))
+            if c.get("value") == "No wifi" and c.get("outcome") is not False:
+                bad.append("%s: 'No wifi' reads as the good case" % key)
+    check("every fleet row is a dated, sourced claim or an abstain, and none claims a primary source it lacks",
+          not bad, "; ".join(bad[:4]))
+    check("types the airline no longer flies (ITA's A330-300, Austrian's 777-300ER) and a wrong code (Etihad's "
+          "A350-1000 under the A350-900's) are gone", not ({"AZ:333", "OS:77W", "EY:359"} & set(fleets)) and "EY:351" in fleets)
     kl = aopts["kl642-light-5"]
     short = next(s for s in kl["segments"] if s["equipment_code"] == "73H")
     check("a type with NO curated row abstains rather than being guessed from the type",

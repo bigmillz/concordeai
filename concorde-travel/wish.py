@@ -26,7 +26,7 @@ MODEL = "claude-opus-5"
 WANTS = {
     "nonstop": "Nonstop", "short": "Short layovers", "long": "A long layover",
     "lieflat": "Lie-flat seat matters", "newgen": "787 / A350 / neo", "wifi": "Free wifi",
-    "legroom": "Extra legroom", "lounge": "Lounge access", "flex": "Flexible ticket",
+    "legroom": "Extra legroom", "flex": "Flexible ticket",
     "day": "Daytime flight", "refund": "Refundable", "co2": "Lower emissions",
     "sameapt": "Same airport", "bagin": "Bag included", "carryon": "Free carry-on",
     "toprated": "Top-rated airline",

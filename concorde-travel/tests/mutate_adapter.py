@@ -44,9 +44,12 @@ SV = "concorde-travel/server.py"
 GR = "concorde-travel/ground.py"
 PL = "concorde-travel/places.py"
 FA = "concorde-travel/enrichment/fares.json"
+FL = "concorde-travel/enrichment/fleets.json"
 PA = "concorde-travel/par.py"
 SC = "concorde-travel/scorer.py"
 PT = "concorde-travel/points.py"
+OT = "concorde-travel/ontime.py"
+RS = "concorde-travel/rescue.py"
 UI = "concorde-travel/ui/mock/mock-10.src.html"
 
 
@@ -69,6 +72,22 @@ def _uncache():
         shutil.rmtree(os.path.join(d, "__pycache__"), ignore_errors=True)
 
 MUTANTS = [
+ # real records in place of guesses (2026-09-24): hotel prices, DOT on-time records, the Fixer's odds
+ (SV, "hotel_summary", 'if str(p.get("type") or "hotel").lower() != "hotel":', 'if False:',
+  'hotels: count holiday rentals in the hotel average'),
+ (SV, "hotel_summary", 'return {"cents": mid(cents),', 'return {"cents": sum(cents) // len(cents),',
+  'hotels: a mean, so one $400 suite drags the typical night up'),
+ (SV, "hotel_summary", '            if km > radius_km:\n                continue\n', '',
+  'hotels: count a hotel across town as near the airport'),
+ (SV, "hotel_summary", '    if len(rows) < 3:', '    if len(rows) < 1:', 'hotels: call two hotels an average'),
+ (OT, "claim", 'return {"on_time_fraction": round(ok / float(n), 3),', 'return {"on_time_fraction": round(ok / float(n - canc), 3),',
+  'records: leave cancellations out of the on-time share, so a flight cancelled every week looks punctual'),
+ (OT, "claim", 'cands = [c for c in [operating, marketing] + list((regional or {}).get(marketing or "", [])) if c]',
+  'cands = [c for c in [operating, marketing] if c]', "records: miss a Delta Connection flight's record under its regional airline"),
+ (RS, "_dot_model", 'pool = n + (c if cancels else 0) - F(base + since)', 'pool = n - F(base + since)',
+  "fixer: forget the cancellations, so the odds of leaving read high"),
+ (RS, "_dot_model", 'if not o or sched is None or sit.get("international") or not sit.get("us"):', 'if not o or sched is None:',
+  'fixer: read US domestic records for an international flight'),
  # points and miles (2026-09-24): award charts and the page's transfer planner; caught by test_points.py
  (PT, "rule_vs_afkl", 'return _out(cid, ch, max(whole, each), cab,', 'return _out(cid, ch, whole, cab,',
   'points: price an Air France connection as one journey when flight by flight costs more'),
@@ -209,6 +228,12 @@ MUTANTS = [
  (PL, "covers", '''    return code == iata or iata in METRO.get(code, set())''',
   '''    return True''',
   'places: call every airport a match for every metro'),
+ # the fleet table, checked against published sources on 2026-09-25: a row may not claim a review it did not get,
+ # and a no-wifi row may not read as wifi
+ (FL, None, '"value": "787-9 in the original 2015 cabin, with the old Club World (7 of 18 now have Club Suite)",\n    "observed_frequency": 0.61,\n    "sample_size": 18,\n    "observation_window": "the carrier\'s frames of this type (fleet composition, 2026-09)",\n    "source": "Published sources, checked 2026-09-25: flyertalk.com, headforpoints.com, onemileatatime.com, aerolopa.com",\n    "as_of": "2026-09-25",\n    "needs_primary_source": true', '"value": "787-9 in the original 2015 cabin, with the old Club World (7 of 18 now have Club Suite)",\n    "observed_frequency": 0.61,\n    "sample_size": 18,\n    "observation_window": "the carrier\'s frames of this type (fleet composition, 2026-09)",\n    "source": "Published sources, checked 2026-09-25: flyertalk.com, headforpoints.com, onemileatatime.com, aerolopa.com",\n    "as_of": "2026-09-25",\n    "needs_primary_source": false',
+  'fleet table: mark a row reviewed that no airline or manufacturer source backs'),
+ (FL, None, '"value": "No wifi",\n    "observed_frequency": 1.0,\n    "outcome": false,\n    "sample_size": 11,', '"value": "No wifi",\n    "observed_frequency": 1.0,\n    "outcome": true,\n    "sample_size": 11,',
+  'fleet table: read "No wifi" as the good case'),
  (FA, None, '"piece": 1,\n        "amount_cents": 10000\n      },\n      {\n        "piece": 2,\n        "amount_cents": 12000',
   '"piece": 1,\n        "amount_cents": 1000\n      },\n      {\n        "piece": 2,\n        "amount_cents": 1200',
   'unknown-is-never-zero: make the fallback bag fee cheap'),
@@ -335,8 +360,11 @@ for path, fn, old, new, why in MUTANTS:
     r = subprocess.run([sys.executable, "-B", "concorde-travel/tests/test_adapter.py"],
                        env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"),
                        capture_output=True, text=True)
-    if r.returncode == 0:        # the points suite guards the award charts, the planner and the pool
-        r = subprocess.run([sys.executable, "-B", "concorde-travel/tests/test_points.py"],
+    # the other suites guard the award charts, the planner and the pool; hotels and on-time records; the Fixer
+    for suite in ("test_points.py", "test_records.py", "test_rescue.py"):
+        if r.returncode != 0:
+            break
+        r = subprocess.run([sys.executable, "-B", "concorde-travel/tests/" + suite],
                            env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"), capture_output=True, text=True)
     shutil.move(path + ".bak", path)
     ok = r.returncode != 0
