@@ -20,6 +20,7 @@ First use of an MLX engine downloads its weights from Hugging Face.
 """
 
 import atexit
+import sysconfig
 import calendar
 import glob
 import json
@@ -373,6 +374,19 @@ IS_WIN = sys.platform == "win32"
 # MLX is Apple-silicon only; everywhere else inference goes through Ollama
 # (which uses CUDA automatically on an NVIDIA box).
 IS_ARM = IS_MAC and platform.machine() == "arm64"
+
+# THE APP'S WORDS SAY PC OFF A MAC (6b317). Found on Windows: the welcome
+# read "private, and entirely on this Mac". The page and the app's own
+# replies say "this Mac" in some fifty places; off a Mac they say PC.
+_MAC_WORDS = re.compile(r"\b([Tt]his|[Yy]our|[Tt]he) ([Mm])ac\b")
+
+
+def pc_words(text: str) -> str:
+    if IS_MAC:
+        return text
+    return _MAC_WORDS.sub(
+        lambda m: m.group(1) + " " + ("PC" if m.group(2) == "M" else "pc"),
+        text)
 
 
 def app_dir() -> str:
@@ -3467,7 +3481,24 @@ OLLAMA_TGZ_URL = "https://ollama.com/download/ollama-darwin.tgz"
 # over HTTP, so it should always be the *native* build — emulated UI, native
 # inference.
 def _win_native_machine() -> str:
-    """Hardware architecture, seeing through x64/x86 emulation."""
+    """Hardware architecture, seeing through x64/x86 emulation.
+    6b317, found in a Windows 11 ARM VM: under x64 emulation Windows
+    tells an x64 process it runs on AMD64 (IsWow64Process2 included), so
+    the app fetched the 1.46 GB x64 Ollama, CUDA and all, to run emulated,
+    instead of the 208 MB native ARM64 one. The system's own setting in
+    the registry and Python's platform.machine() see the real chip."""
+    try:
+        import winreg
+        k = winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment")
+        if str(winreg.QueryValueEx(k, "PROCESSOR_ARCHITECTURE")[0]
+               ).upper() == "ARM64":
+            return "arm64"
+    except Exception:
+        pass
+    if platform.machine().lower() in ("arm64", "aarch64"):
+        return "arm64"
     try:
         import ctypes
         proc, native = ctypes.c_ushort(), ctypes.c_ushort()
@@ -3484,9 +3515,10 @@ def _win_native_machine() -> str:
 
 
 IS_WIN_ARM = IS_WIN and _win_native_machine() == "arm64"
-# true when an ARM box is running us through x64 emulation
-IS_WIN_EMULATED = IS_WIN_ARM and platform.machine().lower() not in (
-    "arm64", "aarch64")
+# true when an ARM box is running us through x64 emulation: the Python
+# build itself says (platform.machine() reports the chip, not the build)
+IS_WIN_EMULATED = IS_WIN_ARM and not sysconfig.get_platform().endswith(
+    "arm64")
 OLLAMA_ZIP_URL = ("https://github.com/ollama/ollama/releases/latest/download/"
                   + ("ollama-windows-arm64.zip" if IS_WIN_ARM
                      else "ollama-windows-amd64.zip"))
@@ -3735,10 +3767,64 @@ def _spawn_ollama_serve() -> bool:
     return True
 
 
+def _pe_machine(path: str) -> int:
+    """The machine field of a Windows executable's PE header, or 0."""
+    try:
+        with open(path, "rb") as f:
+            head = f.read(4096)
+        pe = int.from_bytes(head[0x3C:0x40], "little")
+        return int.from_bytes(head[pe + 4:pe + 6], "little")
+    except Exception:
+        return 0
+
+
+def _wrong_arch_engine() -> bool:
+    """The app's own Ollama is the x64 build on an ARM64 PC (6b317)."""
+    if not IS_WIN_ARM:
+        return False
+    exe = os.path.join(_MANAGED_BIN_DIR, "ollama.exe")
+    return os.path.exists(exe) and _pe_machine(exe) == 0x8664
+
+
+def _replace_engine_native():
+    """Swap an x64 engine for the native ARM64 one, once, in the
+    background with progress; if the download fails the x64 one goes
+    back, so the app keeps working."""
+    old = _MANAGED_BIN_DIR + ".x64"
+    with _setup_lock:
+        _setup_jobs[ENGINE_ROW] = {"status": "downloading", "pct": 0,
+                                   "note": "the native ARM64 engine"}
+    try:
+        shutil.rmtree(old, ignore_errors=True)
+        os.replace(_MANAGED_BIN_DIR, old)
+        _download_ollama_binary()
+        shutil.rmtree(old, ignore_errors=True)
+        with _setup_lock:
+            _setup_jobs[ENGINE_ROW] = {"status": "done", "note": "",
+                                       "pct": 100}
+    except Exception as exc:
+        if (os.path.isdir(old) and not os.path.exists(
+                os.path.join(_MANAGED_BIN_DIR, "ollama.exe"))):
+            shutil.rmtree(_MANAGED_BIN_DIR, ignore_errors=True)
+            try:
+                os.replace(old, _MANAGED_BIN_DIR)
+            except OSError:
+                pass
+        with _setup_lock:
+            _setup_jobs[ENGINE_ROW] = {"status": "error", "pct": 0,
+                                       "note": str(exc)[:200]}
+    _spawn_ollama_serve()
+
+
 def start_managed_engines():
     # MLX engines are started on demand (see ensure_mlx_engine) — each one
     # pins its whole model in RAM, so loading all of them at launch would
     # cost ~14 GB and starve the big Ollama models.
+    if _wrong_arch_engine() and not _port_in_use(OLLAMA_PORT[0]):
+        # an ARM64 PC got the x64 engine before 6b317: fetch the native
+        # one without holding up the window
+        threading.Thread(target=_replace_engine_native, daemon=True).start()
+        return
     _spawn_ollama_serve()
 
 
@@ -6989,6 +7075,15 @@ def _download_ollama_binary():
 
 def _ensure_ollama_ready() -> bool:
     """Binary on disk + server answering. Downloads the engine if needed."""
+    # the native ARM64 engine may be arriving (6b317): wait for it rather
+    # than download a second copy into the same folder
+    for _ in range(1800):
+        with _setup_lock:
+            busy = (_setup_jobs.get(ENGINE_ROW, {}).get("status")
+                    == "downloading")
+        if not busy:
+            break
+        time.sleep(0.5)
     if _ollama_bin() is None:
         with _setup_lock:
             _setup_jobs[ENGINE_ROW] = {"status": "downloading",
@@ -7192,6 +7287,7 @@ def _pull_ollama_model(label: str, tag: str):
             with _setup_lock:
                 job = _setup_jobs[label]
                 job["done_b"] = got
+                job["total_b"] = want      # Ollama's own size (6b317)
                 job["phase"] = ("verifying" if phase.startswith("verifying")
                                 else "")
                 if want:
@@ -7316,10 +7412,15 @@ def _downloaded_bytes(pulled, labels=None) -> tuple:
                 est, _dir_bytes_real(_hf_model_dir(_t["repo"])))
             continue
         est = MLX_EST_BYTES.get(label, 0)
-        want += est
         kind = MODEL_ROUTES.get(label, ("",))[0]
         with _setup_lock:
             job = dict(_setup_jobs.get(label, {}))
+        # the catalog's size is the Mac's MLX build; an Ollama pull knows
+        # its own, larger or smaller (6b317: on Windows the overall bar
+        # read 100% with the 3B at 90%, its file being 2.0 GB, not 1.8)
+        if kind == "ollama" and job.get("total_b"):
+            est = int(job["total_b"])
+        want += est
         if model_cached(label, pulled):
             have += est
         elif job.get("status") not in ("downloading", "queued"):
@@ -7939,10 +8040,34 @@ def _other_millenai_running() -> bool:
     # THIS USER'S siblings only (6b310): another login's app shares no
     # engine with us any more, and counting it left ours running forever
     try:
-        out = subprocess.run(["pgrep", "-U", str(os.getuid()), "-f",
-                              "millenai.py"],
-                             capture_output=True, text=True, timeout=4).stdout
-        pids = {int(x) for x in out.split() if x.isdigit()}
+        if IS_WIN and HAS_PSUTIL:
+            # Windows has no pgrep, and os.getuid (6b317): psutil sees our
+            # own processes' command lines, and another user's are denied
+            me = psutil.Process().username()
+            # our own ancestors are not siblings: the venv's launcher
+            # python, and a cmd.exe that started us, both name
+            # millenai.py (a cmd wrapper once kept a quit from stopping
+            # Ollama, seen in the VM); only Python processes count
+            mine = {a.pid for a in psutil.Process().parents()}
+            pids = set()
+            for pr in psutil.process_iter(["pid", "name", "cmdline",
+                                           "username"]):
+                try:
+                    if (pr.info["username"] == me
+                            and pr.info["pid"] not in mine
+                            and str(pr.info["name"] or "").lower()
+                            .startswith("python")
+                            and any("millenai.py" in str(a)
+                                    for a in (pr.info["cmdline"] or []))):
+                        pids.add(pr.info["pid"])
+                except Exception:
+                    pass
+        else:
+            out = subprocess.run(["pgrep", "-U", str(os.getuid()), "-f",
+                                  "millenai.py"],
+                                 capture_output=True, text=True,
+                                 timeout=4).stdout
+            pids = {int(x) for x in out.split() if x.isdigit()}
         pids.discard(os.getpid())
         pids.discard(os.getppid())
         if pids:
@@ -7967,6 +8092,31 @@ def _proc_port(p) -> str:
     return str(getattr(p, "_cai_port", ""))
 
 
+def _stop_proc(p):
+    """Stop a process we started. On Windows, terminate() ends only that
+    one process: `ollama serve`'s model runner lived on, holding its
+    memory, its graphics memory and the engine folder (6b317, seen in a
+    Windows VM: our Ollama still serving two hours after the app quit).
+    There the whole tree goes."""
+    if IS_WIN:
+        try:
+            if HAS_PSUTIL:
+                kids = psutil.Process(p.pid).children(recursive=True)
+                for k in kids:
+                    try:
+                        k.kill()
+                    except Exception:
+                        pass
+            else:
+                subprocess.run(["taskkill", "/T", "/F", "/PID", str(p.pid)],
+                               capture_output=True, timeout=10,
+                               creationflags=getattr(
+                                   subprocess, "CREATE_NO_WINDOW", 0))
+        except Exception:
+            pass
+    p.terminate()
+
+
 def stop_managed_engines():
     # THE ORPHAN FACTORY, finally closed: this used to clear() _mlx_procs
     # without terminating them — every quit left engines pinning wired
@@ -7983,14 +8133,14 @@ def stop_managed_engines():
         for p in list(_managed_procs) + list(_mlx_procs.values()):
             try:
                 if _proc_port(p) in {str(x) for x in _RELOCATED}:
-                    p.terminate()
+                    _stop_proc(p)
             except Exception:
                 pass
         _mlx_procs.clear()
         return
     for p in list(_managed_procs) + list(_mlx_procs.values()):
         try:
-            p.terminate()
+            _stop_proc(p)
         except Exception:
             pass
     for p in list(_managed_procs) + list(_mlx_procs.values()):
@@ -8224,12 +8374,106 @@ def _page_text(url: str, cap: int = 2600, meta: list = None) -> str:
 _SEARCH_BACKENDS = ("bing", "auto", "duckduckgo")
 
 
+_SEARCH_PROXY = {"url": None, "tried": False}
+
+
+def _search_proxy():
+    """Windows: a CONNECT proxy on 127.0.0.1 for the search library, or
+    None (6b317, found in a Windows VM). ddgs resolves names itself, over
+    a UDP socket bound to every interface, so the first web search met a
+    Windows Firewall prompt for Python ("allow public and private
+    networks?"), and behind VMware's DNS proxy the lookup failed outright.
+    Through this proxy Windows resolves the name and nothing listens
+    beyond this computer. HTTPS to port 443 only, TLS end to end (ddgs's
+    own), and a password per run so no other program can use it."""
+    if _SEARCH_PROXY["tried"]:
+        return _SEARCH_PROXY["url"]
+    _SEARCH_PROXY["tried"] = True
+    import base64 as _b64
+    user, pw = "concorde", secrets.token_hex(16)
+    want = b"Basic " + _b64.b64encode(("%s:%s" % (user, pw)).encode())
+
+    def pipe(a, b):
+        try:
+            while True:
+                d = a.recv(65536)
+                if not d:
+                    break
+                b.sendall(d)
+        except OSError:
+            pass
+        for x in (a, b):
+            try:
+                x.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+
+    def handle(c):
+        up = None
+        try:
+            c.settimeout(20)
+            head = b""
+            while b"\r\n\r\n" not in head and len(head) < 16384:
+                d = c.recv(4096)
+                if not d:
+                    raise ValueError("closed")
+                head += d
+            lines = head.split(b"\r\n\r\n", 1)[0].split(b"\r\n")
+            verb, target = (lines[0].split(b" ") + [b"", b""])[:2]
+            auth = [ln.split(b":", 1)[1].strip() for ln in lines[1:]
+                    if ln.lower().startswith(b"proxy-authorization:")]
+            host, _, port = target.decode("latin-1").rpartition(":")
+            if (verb != b"CONNECT" or port != "443" or not host
+                    or not auth or not secrets.compare_digest(auth[0], want)):
+                raise ValueError("refused")
+            up = socket.create_connection((host.strip("[]"), 443), timeout=20)
+            c.settimeout(None)
+            up.settimeout(None)
+            c.sendall(b"HTTP/1.1 200 Connection established\r\n\r\n")
+            rest = head.split(b"\r\n\r\n", 1)[1]
+            if rest:
+                up.sendall(rest)
+            threading.Thread(target=pipe, args=(up, c), daemon=True).start()
+            pipe(c, up)
+        except Exception:
+            try:
+                c.sendall(b"HTTP/1.1 403 Forbidden\r\n\r\n")
+            except OSError:
+                pass
+            for x in (c, up):
+                try:
+                    x and x.close()
+                except OSError:
+                    pass
+
+    try:
+        srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        srv.bind(("127.0.0.1", 0))
+        srv.listen(32)
+    except OSError:
+        return None
+
+    def serve():
+        while True:
+            try:
+                c, _a = srv.accept()
+            except OSError:
+                return
+            threading.Thread(target=handle, args=(c,), daemon=True).start()
+    threading.Thread(target=serve, daemon=True).start()
+    _SEARCH_PROXY["url"] = "http://%s:%s@127.0.0.1:%d" % (
+        user, pw, srv.getsockname()[1])
+    return _SEARCH_PROXY["url"]
+
+
 def _ddg_text(query: str, limit: int = 5) -> list:
     """Raw engine hits, trying several backends until one answers.
     Never raises — an empty list means every engine struck out."""
+    proxy = _search_proxy() if IS_WIN else None
     for backend in _SEARCH_BACKENDS:
         try:
-            rows = DDGS().text(query, max_results=limit, backend=backend)
+            rows = (DDGS(proxy=proxy) if proxy else DDGS()).text(
+                query, max_results=limit, backend=backend)
             if rows:
                 return rows
         except Exception:
@@ -8592,11 +8836,24 @@ def _venue_now(tzname: str = ""):
     return time.localtime()
 
 
+_NOPAD = re.compile(r"%-([dmHIMSjy])")
+
+
+def strftime_np(fmt: str, t=None) -> str:
+    """time.strftime that also takes the unpadded %-d / %-I codes, which
+    Windows rejects outright (6b317, found in a Windows VM: every chat
+    died before its first word on "%A, %B %-d, %Y")."""
+    t = time.localtime() if t is None else t
+    fmt = _NOPAD.sub(lambda m: str(int(time.strftime("%" + m.group(1), t))),
+                     fmt)
+    return time.strftime(fmt, t)
+
+
 def _venue_stamp(fmt: str) -> str:
     """strftime on the venue's clock, suffixed with the place when it
     differs from the host's — 'Sunday 5:38PM in Brooklyn'."""
     tzname = getattr(_tl_search, "tz", "") or ""
-    out = time.strftime(fmt, _venue_now(tzname))
+    out = strftime_np(fmt, _venue_now(tzname))
     where = getattr(_tl_search, "tz_place", "") or ""
     if tzname and where and tzname != _host_tz():
         out += " in " + where
@@ -11131,7 +11388,8 @@ def offline_hint(kind: str, err: Exception) -> str:
     text = str(err).lower()
     if any(s in text for s in ("signal: killed", "unexpected eof",
                                "process has terminated")):
-        return ("⚠️ This model ran out of memory and the engine stopped it.\n\n"
+        return pc_words(
+                "⚠️ This model ran out of memory and the engine stopped it.\n\n"
                 "It needs more free RAM than this Mac has right now. Close "
                 "some apps and retry, or pick a smaller model — the ones at "
                 "the top of the sidebar are much lighter.")
@@ -14547,7 +14805,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 }
 
         # local models have no clock — without this "today" is meaningless
-        today = time.strftime("%A, %B %-d, %Y")
+        today = strftime_np("%A, %B %-d, %Y")
         dated_system = dict(SYSTEM_PROMPT)
         if export_req and export_req["lane"] == "draft":
             _xk = EXPORT_KIND.get(export_req["ext"] or "md", ("text", "file"))
@@ -14865,11 +15123,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 step("video", "Couldn\u2019t make the video", "done",
                      str(exc)[:70])
                 if "VEO_CAP:" in str(exc):
+                    # local video exists only on Apple silicon (6b317)
                     emit("That\u2019s today\u2019s cloud-video limit (%d "
-                         "clips, about $0.80 each). It resets tomorrow; "
-                         "video made on this Mac isn\u2019t limited."
-                         % int(load_prefs(None).get("veo_daily_cap",
-                                                    VEO_DAILY_CAP) or 0))
+                         "clips, about $0.80 each). It resets tomorrow%s."
+                         % (int(load_prefs(None).get("veo_daily_cap",
+                                                     VEO_DAILY_CAP) or 0),
+                            "; video made on this Mac isn\u2019t limited"
+                            if studio_supported() else ""))
                 elif video_ready():
                     emit("The video engine on this Mac hit a snag and the "
                          "cloud couldn\u2019t step in \u2014 try once more in a "
@@ -14880,8 +15140,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          "Manage models**, then ask again. A cloud key under "
                          "Cloud power also works.")
                 else:
-                    emit("Video generation runs on this Mac only on Apple "
-                         "Silicon; here it needs a cloud key under "
+                    emit("Making video on this computer needs an Apple "
+                         "silicon Mac; here it needs a cloud key under "
                          "**Settings \u203a Cloud power**.")
             hb_stop.set()
             return
@@ -14936,8 +15196,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          "entirely here \u2014 then ask again. A cloud key "
                          "under Cloud power also works." % IMAGE_GB)
                 else:
-                    emit("Image generation runs on this Mac only on Apple "
-                         "Silicon; here it needs a cloud key under "
+                    emit("Making pictures on this computer needs an Apple "
+                         "silicon Mac; here it needs a cloud key under "
                          "**Settings \u203a Cloud power**.")
             hb_stop.set()
             return
@@ -25057,6 +25317,9 @@ input.focus();
 </body>
 </html>
 """
+# the page's own words say PC off a Mac (6b317); the chat's model text is
+# never touched, only this app's copy
+HTML_CONTENT = pc_words(HTML_CONTENT)
 
 
 _mlx_last_use = 0.0

@@ -3207,6 +3207,154 @@ check("Windows starts: no SIGHUP at import, and a crash is never silent",
       and '"%PYC%" -m pip install --upgrade pip' in _bat,
       "%r" % [_sig_err, _sig_calls, sorted(_top_sigs - _WIN_SIGS), _crash_txt[-120:], _box])
 
+# 6b317, found on Windows: the welcome said "private, and entirely on
+# this Mac". Off a Mac, the page and the app's own replies say PC; on a
+# Mac nothing changes. The page, as a PC would get it:
+_pw = {"re": re}
+_exec_names(_pw, {"_MAC_WORDS", "pc_words"})
+_pw["IS_MAC"] = False
+_h0 = _MILLENAI_SRC.index('HTML_CONTENT = r"""') + len('HTML_CONTENT = r"""')
+_page_src = _MILLENAI_SRC[_h0:_MILLENAI_SRC.index('\n"""\n', _h0)]
+_pc_page = _pw["pc_words"](_page_src)
+_pw["IS_MAC"] = True
+_mac_page = _pw["pc_words"](_page_src)
+_mac_left = re.findall(r"\b(?:[Tt]his|[Yy]our|[Tt]he) [Mm]ac\b", _pc_page)
+check("off a Mac the app says PC; on a Mac nothing changes",
+      not _mac_left and _mac_page == _page_src
+      and "entirely on this PC" in _pc_page
+      and "ready \u00b7 this pc" in _pc_page
+      and "HTML_CONTENT = pc_words(HTML_CONTENT)" in _MILLENAI_SRC
+      and "Making pictures on this computer needs an Apple" in _MILLENAI_SRC
+      and "Making video on this computer needs an Apple" in _MILLENAI_SRC
+      and "Image generation runs on this Mac only" not in _MILLENAI_SRC
+      and "return pc_words(\n" in _MILLENAI_SRC,
+      "%r" % _mac_left[:5])
+
+# 6b317, seen in a Windows VM: our Ollama still serving two hours after
+# the app quit. terminate() there ends only `ollama serve`, not its model
+# runner; the whole tree goes now. And Windows has no pgrep: siblings are
+# found through psutil.
+import types as _t17
+_killed = []
+class _Kid:
+    def __init__(self, n): self.n = n
+    def kill(self): _killed.append(self.n)
+class _PP:
+    def __init__(self, pid=None): self.pid = pid
+    def children(self, recursive=False): return [_Kid("runner"), _Kid("helper")] if recursive else []
+    def username(self): return "MBP\\pat"
+    def parents(self): return [_t17.SimpleNamespace(pid=1), _t17.SimpleNamespace(pid=9)]
+class _Popen:
+    pid = 4242
+    def terminate(self): _killed.append("serve")
+_sp = {"IS_WIN": True, "HAS_PSUTIL": True, "subprocess": subprocess,
+       "psutil": _t17.SimpleNamespace(Process=_PP)}
+_exec_names(_sp, {"_stop_proc"})
+_sp["_stop_proc"](_Popen())
+_killed_win = list(_killed)
+_killed[:] = []
+_sp["IS_WIN"] = False
+_sp["_stop_proc"](_Popen())
+_killed_mac = list(_killed)
+_procs = [{"pid": 10, "name": "python.exe", "cmdline": ["pythonw.exe", "C:\\x\\millenai.py"], "username": "MBP\\pat"},
+          # our ancestors (the venv launcher, a cmd.exe wrapper) never count
+          {"pid": 9, "name": "cmd.exe", "cmdline": ["cmd", "/c", "python.exe millenai.py"], "username": "MBP\\pat"},
+          {"pid": 13, "name": "cmd.exe", "cmdline": ["cmd", "/c", "notepad millenai.py"], "username": "MBP\\pat"},
+          {"pid": 11, "name": "pythonw.exe", "cmdline": ["pythonw.exe", "C:\\y\\millenai.py"], "username": "MBP\\pat"},
+          {"pid": 12, "name": "python.exe", "cmdline": ["python.exe", "millenai.py"], "username": "MBP\\other"}]
+def _pi(attrs):
+    return [_t17.SimpleNamespace(info=d) for d in _procs]
+_om = {"IS_WIN": True, "HAS_PSUTIL": True, "PORT": 8889,
+       "_port_in_use": lambda p: False, "_listener_is_mine": lambda p: None,
+       "subprocess": subprocess,
+       "psutil": _t17.SimpleNamespace(Process=_PP, process_iter=_pi),
+       "os": _t17.SimpleNamespace(getpid=lambda: 10, getppid=lambda: 1)}
+_exec_names(_om, {"_other_millenai_running"})
+_sib1 = _om["_other_millenai_running"]()          # pid 11 is ours too
+_procs.pop(3)
+_sib0 = _om["_other_millenai_running"]()          # only us, our wrapper, another user's
+check("Windows: quitting stops Ollama's whole tree; siblings are seen",
+      _killed_win == ["runner", "helper", "serve"] and _killed_mac == ["serve"]
+      and _sib1 is True and _sib0 is False,
+      "%r" % [_killed_win, _killed_mac, _sib1, _sib0])
+
+# 6b317, found in a Windows VM: EVERY chat died before its first word on
+# time.strftime("%A, %B %-d, %Y"): %-d is a Mac/Linux extension Windows
+# rejects. strftime_np, run against a Windows-strict strftime, and no
+# plain strftime call may name a %- code again.
+import time as _tw17
+def _strict_strftime(fmt, t=None):
+    if re.search(r"%-", fmt):
+        raise ValueError("Invalid format string")
+    return _tw17.strftime(fmt, t) if t is not None else _tw17.strftime(fmt)
+_st = {"re": re, "time": _t17.SimpleNamespace(strftime=_strict_strftime,
+                                              localtime=_tw17.localtime)}
+_exec_names(_st, {"_NOPAD", "strftime_np"})
+_tt = _tw17.strptime("2026-09-06 17:07", "%Y-%m-%d %H:%M")
+try:
+    _np = (_st["strftime_np"]("%A, %B %-d, %Y, %-I:%M%p", _tt),
+           _st["strftime_np"]("%A %-I:%M%p", _tt))
+except Exception as _e:
+    _np = repr(_e)
+_h0s = _MILLENAI_SRC.index('HTML_CONTENT = r"""')
+_h1s = _MILLENAI_SRC.index('\n"""\n', _h0s)
+_py_src = _MILLENAI_SRC[:_h0s] + _MILLENAI_SRC[_h1s:]
+_raw_np = re.findall(r"(?<![_a-z])strftime\(\s*[\"'][^\"']*%-", _py_src)
+check("dates format on Windows: no %-d reaches time.strftime",
+      _np == ("Sunday, September 6, 2026, 5:07PM", "Sunday 5:07PM")
+      and not _raw_np
+      and 'today = strftime_np("%A, %B %-d, %Y")' in _MILLENAI_SRC
+      and "out = strftime_np(fmt, _venue_now(tzname))" in _MILLENAI_SRC,
+      "%r" % [_np, _raw_np])
+
+# 6b317, seen downloading Llama 3.2 3B on Windows: the overall bar read
+# 100% with the model at 90%, sized from the Mac's 1.8 GB MLX build while
+# Ollama's file is 2.0 GB. An Ollama job carries its own total now.
+_db = {"_setup_lock": __import__("threading").RLock(),
+       "_setup_jobs": {"Llama 3.2 3B": {"status": "downloading", "done_b": 1_800_000_000,
+                                        "total_b": 2_019_000_000, "pct": 89}},
+       "MLX_EST_BYTES": {"Llama 3.2 3B": 1_800_000_000},
+       "MODEL_ROUTES": {"Llama 3.2 3B": ("ollama", "llama3.2:3b")},
+       "_STUDIO_ROWS": {}, "model_cached": lambda l, p=None: False,
+       "_batch_labels": lambda: ["Llama 3.2 3B"]}
+_exec_names(_db, {"_downloaded_bytes"})
+_hw = _db["_downloaded_bytes"](set())
+check("the overall bar measures an Ollama pull by Ollama's own size",
+      _hw == (1_800_000_000, 2_019_000_000)
+      and 'job["total_b"] = want' in _MILLENAI_SRC, "%r" % (_hw,))
+
+# 6b317, found in a Windows VM: the search library resolves names over a
+# UDP socket bound to every interface, which brought up a Windows Firewall
+# prompt for Python on the first web search (and failed behind VMware's
+# DNS). On Windows it goes through a CONNECT proxy on 127.0.0.1: HTTPS to
+# 443 only, with a password per run. Its refusals, run for real:
+import socket as _so17, base64 as _b17
+_spx = {"socket": _so17, "secrets": __import__("secrets"),
+        "threading": __import__("threading")}
+_exec_names(_spx, {"_SEARCH_PROXY", "_search_proxy"})
+_purl = _spx["_search_proxy"]()
+_pcred, _paddr = _purl[len("http://"):].split("@")
+_phost, _pport = _paddr.split(":")
+def _proxy_says(req):
+    s = _so17.create_connection((_phost, int(_pport)), timeout=10)
+    s.sendall(req)
+    try:
+        return s.recv(64).split(b"\r\n")[0]
+    finally:
+        s.close()
+_auth = b"Proxy-Authorization: Basic " + _b17.b64encode(_pcred.encode()) + b"\r\n"
+_pr = (_proxy_says(b"CONNECT example.com:443 HTTP/1.1\r\n\r\n"),
+       _proxy_says(b"CONNECT example.com:22 HTTP/1.1\r\n" + _auth + b"\r\n"),
+       _proxy_says(b"GET http://example.com/ HTTP/1.1\r\n" + _auth + b"\r\n"),
+       _proxy_says(b"CONNECT 127.0.0.1:443 HTTP/1.1\r\n" + _auth + b"\r\n"))
+_ddg_src = _MILLENAI_SRC[_MILLENAI_SRC.index("def _ddg_text("):]
+_ddg_src = _ddg_src[:_ddg_src.index("\n\n\n")]
+check("Windows web search goes through a loopback proxy that refuses strangers",
+      _phost == "127.0.0.1" and _pr == (b"HTTP/1.1 403 Forbidden",) * 4
+      and "proxy = _search_proxy() if IS_WIN else None" in _ddg_src
+      and "DDGS(proxy=proxy)" in _ddg_src,
+      "%r" % (_pr,))
+
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")

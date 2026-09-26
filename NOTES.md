@@ -5629,3 +5629,55 @@ crash was invisible.
   run as pythonw would, writes the log and shows the box; the launcher
   keeps its checks. Mutation-tested (SIGHUP back, hook removed, no log,
   no box).
+
+## 6b317 — Windows: the app says PC, and quitting stops Ollama
+Found testing the 445085b nightly in Patrick's Windows 11 ARM VM, driven
+from the Mac through a small command relay (a PowerShell loop in the VM
+polling the Mac on the VMware network; no admin rights, no settings).
+- The welcome read "private, and entirely on this Mac". pc_words()
+  turns "this/your/the Mac" into PC off a Mac: the whole page once at
+  start (25 places), and the out-of-memory hint. The two replies Windows
+  can give about local pictures and video now say they need an Apple
+  silicon Mac, and the cloud-video limit no longer promises unlimited
+  local video where there is none. On a Mac nothing changes.
+- Our Ollama was still serving two hours after the app quit: on Windows
+  terminate() ends only `ollama serve`, and its model runner lived on
+  with its memory, its graphics memory and the engine folder locked.
+  _stop_proc kills the whole tree there (psutil, or taskkill /T /F).
+- Windows has no pgrep or os.getuid, so a sibling app went unseen and a
+  quit could stop the Ollama another copy was using. psutil finds this
+  user's other millenai.py processes: Python ones only, never our own
+  ancestors (the venv's launcher python, or a cmd.exe that started us;
+  a cmd wrapper counted as a sibling once and a quit left Ollama up).
+  Verified in the VM: after a chat, python -> ollama.exe ->
+  llama-server.exe; closing the window stopped all of them.
+- WEB SEARCH ON WINDOWS: the search library (ddgs, via primp) resolves
+  names itself over a UDP socket bound to every interface. Windows met
+  the first search with a firewall prompt for Python ("Do you want to
+  allow public and private networks to access this app?"), and behind
+  VMware's DNS proxy the lookup failed outright (hickory rejects its
+  reply), so search silently returned nothing. On Windows ddgs now goes
+  through _search_proxy, a CONNECT proxy on 127.0.0.1 (HTTPS to 443
+  only, TLS end to end, a password per run): Windows resolves the names
+  and nothing listens beyond this computer. Verified in the VM: a search
+  answered with sources, and the app held only loopback sockets.
+- The overall download bar measured an Ollama pull against the Mac's
+  MLX size (Llama 3.2 3B: 1.8 GB against Ollama's 2.0 GB), so it read
+  100% with the model at 90%. An Ollama job carries its own total.
+- EVERY CHAT ON WINDOWS FAILED: time.strftime("%A, %B %-d, %Y") raised
+  ValueError before the first word (%-d is a Mac/Linux extension). The
+  window just said the connection closed. strftime_np() makes the
+  unpadded %-d/%-I itself; the three chat-path formats use it. Verified
+  in the VM: Llama 3.2 1B answered.
+- WINDOWS ON ARM GOT THE x64 ENGINE: under x64 emulation Windows tells
+  the process it runs on AMD64 (IsWow64Process2 too), so an ARM64 PC
+  downloaded the 1.46 GB x64 Ollama, CUDA libraries and all, to run
+  emulated, instead of the 208 MB native ARM64 build the README
+  promises. _win_native_machine now reads the system's own
+  PROCESSOR_ARCHITECTURE from the registry, and platform.machine()
+  (both report the real chip); IS_WIN_EMULATED comes from the Python
+  build (sysconfig). A PC that already got the x64 engine has it
+  replaced once, in the background with progress, and the x64 one comes
+  back if the download fails; installs wait for that download rather
+  than start a second one. Verified in the VM: "Windows ARM64", and the
+  running engine is an ARM64 binary with the installed model intact.
