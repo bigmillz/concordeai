@@ -5680,7 +5680,9 @@ polling the Mac on the VMware network; no admin rights, no settings).
   native one beside it: the ARM64 build downloads into bin.arm64 while
   the x64 one keeps serving, must be an ARM64 binary (its PE header),
   and goes in at a later launch, before any Ollama of ours starts, and
-  not while another copy of the app runs. A swap cut short between its
+  not while another copy of the app runs (which doesn't stage either);
+  the file is checked again just before it goes in, and a missing engine
+  folder just takes it. A swap cut short between its
   two renames is undone at the next launch. (The first version moved
   the x64 engine aside and THEN downloaded; the review showed a quit
   mid-download left no engine and stranded the x64 copy. It never
@@ -5692,8 +5694,9 @@ polling the Mac on the VMware network; no admin rights, no settings).
   Such a PC now gets Whisper small (464 MB) decoded greedily: 12.5 s,
   then 8 s, same words. "Usable" means a CUDA device AND NVIDIA's cuBLAS
   and cuDNN, which CTranslate2 loads on the first word and most Windows
-  PCs lack; with only the driver, the first transcription threw. A card
-  that fails anyway falls back to the CPU with the model already on disk.
+  PCs lack, and float16 (a GTX 10-series lacks it); with only the driver,
+  the first transcription threw. A card that fails anyway falls back to
+  the CPU with the model already on disk.
 - READ ALOUD ON WINDOWS never spoke a reply holding "č", an arrow or an
   emoji: the text went to PowerShell through a cp1252 pipe, the write
   threw, the pipe stayed open, and PowerShell waited on it forever. It
@@ -5708,8 +5711,16 @@ polling the Mac on the VMware network; no admin rights, no settings).
   asked wttr.in and the geocoder about a place called "Chicago right
   now" (a 500 and nothing), so the answer had no live data; "Chicago
   weather" named no place at all. weather_place() takes the time words
-  out wherever they sit and reads a place before "weather" too, and a
-  request ("tell me the weather") is not a place. wttr.in also stopped
+  out wherever they sit, and reads "Boston's weather" and "weather
+  Denver" too. The review's catch: wttr.in turns ANY string into a real
+  town ("What's" became Pesaro, "running" Norway, "Chicago and" Bosnia),
+  so a loose guess answers with another city's weather, worse than
+  none. Only a slot that reads as a place is taken: tails cut ("and",
+  "going to be"), possessives, activities ("for running"), generic
+  settings ("at the beach", "for the game") and request words refused,
+  a sales "forecast" is no weather question. "Near me", "outside" and a
+  question naming no place ("what's today's weather") use the home area
+  when one is set. 106 phrasings in the gauntlet. wttr.in also stopped
   sending localObsDateTime, which had quietly turned off the stale-
   reading check (6b270) and moved the night check onto the host's clock:
   the age now comes from observation_time (UTC) and night from the
@@ -5724,6 +5735,7 @@ polling the Mac on the VMware network; no admin rights, no settings).
   198.18.x.x. Its test runs over a fake network now: the old probes
   passed only because nothing listened on the Mac's port 443.
 - Every .pptx export threw on every platform: the title slide's date
-  called _venue_stamp() without the format it requires. The gauntlet
-  now writes a real deck. The on-demand pip install of the export
+  called _venue_stamp() without the format it requires (and that is the
+  chat's venue clock, "... in Tokyo"). A plain local date now; the
+  gauntlet writes a real deck. The on-demand pip install of the export
   libraries no longer flashes a console window on Windows.

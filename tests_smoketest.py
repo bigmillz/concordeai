@@ -313,12 +313,15 @@ check("export engines: stdlib formats all write real files",
       all(isinstance(_xmade.get(e), int) and _xmade[e] > 0
           for e in ("csv", "md", "mmd", "py", "anki", "zip")), str(_xmade))
 # a deck, for real (6b317, review): the title slide's date called
-# _venue_stamp() with no format and every .pptx export threw. Absent from
-# this namespace, the guard skipped the call, so give it the real shape.
+# _venue_stamp() with no format and every .pptx export threw (a guard
+# for this very namespace skipped the call here). A plain date now.
 _xdeck = ""
 try:
     import pptx as _pptx
-    _XNS["_venue_stamp"] = lambda fmt: time.strftime(fmt.replace("%-d", "%d"))
+    _np0 = _MILLENAI_SRC.index("_NOPAD = re.compile(")
+    _np1 = "    return time.strftime(fmt, t)\n"
+    _XNS.setdefault("time", time)
+    exec(_MILLENAI_SRC[_np0:_MILLENAI_SRC.index(_np1, _np0) + len(_np1)], _XNS)
     _pp = os.path.join(__import__("tempfile").gettempdir(), "gaunt_x.pptx")
     _XNS["ex_slides"](_XSAMPLE, "pptx", _pp, title="Trip")
     _xdeck = _pptx.Presentation(_pp).slides[0].placeholders[1].text
@@ -3452,7 +3455,7 @@ check("Windows web search goes through a loopback proxy that refuses strangers",
 # the card AND NVIDIA's cuBLAS/cuDNN, which most Windows PCs lack; a card
 # that fails anyway falls back to the CPU instead of losing voice.
 import builtins as _bi17, io as _io17, wave as _wv17
-def _voice_ns(mac, devices, dlls, gpu_breaks):
+def _voice_ns(mac, devices, dlls, gpu_breaks, f16=True):
     log = []
     class _WM:
         def __init__(self, repo, device, compute_type):
@@ -3468,7 +3471,10 @@ def _voice_ns(mac, devices, dlls, gpu_breaks):
     def _windll(name, winmode=None):
         if name not in dlls or winmode != 0:
             raise OSError(name)
-    fakes = {"ctranslate2": _t17.SimpleNamespace(get_cuda_device_count=lambda: devices),
+    fakes = {"ctranslate2": _t17.SimpleNamespace(
+                 get_cuda_device_count=lambda: devices,
+                 get_supported_compute_types=lambda d: (
+                     {"float16", "int8", "float32"} if f16 else {"int8", "float32"})),
              "faster_whisper": _t17.SimpleNamespace(WhisperModel=_WM),
              "ctypes": _t17.SimpleNamespace(WinDLL=_windll)}
     def _imp(name, *a, **k):
@@ -3488,6 +3494,7 @@ _both = {"cublas64_12.dll", "cudnn64_9.dll"}
 _vr = {}
 for _k, _args in {"cpu": (False, 0, _both, False),
                   "no-cudnn": (False, 1, {"cublas64_12.dll"}, False),
+                  "no-float16": (False, 1, _both, False, False),
                   "gpu": (False, 1, _both, False),
                   "gpu-breaks": (False, 1, _both, True)}.items():
     _ns, _log = _voice_ns(*_args)
@@ -3505,6 +3512,7 @@ _voice_src = _MILLENAI_SRC[_MILLENAI_SRC.index("def _voice_ready("):
 check("voice on a PC: the small model greedy on the CPU, the big one only on a usable card",
       _vr["cpu"] == ("faster-whisper-small", True, _cpu_run)
       and _vr["no-cudnn"] == ("faster-whisper-small", True, _cpu_run)
+      and _vr["no-float16"] == ("faster-whisper-small", True, _cpu_run)
       and _vr["gpu"] == (_L, True, [("load", _big, "cuda", "float16"),
                                     ("beam", 5), ("beam", 5)])
       and _vr["gpu-breaks"] == (_L, True, [("load", _big, "cuda", "float16"),
@@ -3529,11 +3537,14 @@ class _SP:
     def write(self, b):
         if not isinstance(b, bytes):
             b.encode("cp1252")          # what a Windows text pipe does
+        if _sp_fail:
+            raise BrokenPipeError(32, "The pipe is being closed")
         self.buf += b
     def close(self):
         self.closed = True
     def poll(self):
         return 0
+_sp_fail = False
 _spk = {"re": re, "IS_WIN": True, "_say_proc": None,
         "strip_think": lambda t: t,
         "subprocess": _t17.SimpleNamespace(Popen=_SP, PIPE=-1, CREATE_NO_WINDOW=0x08000000)}
@@ -3545,8 +3556,16 @@ try:
 except Exception as _e:
     _sp_err = repr(_e)
 _sp = _spoke[-1] if _spoke else None
+# PowerShell gone before the text arrived: the pipe still closes
+_sp_fail = True
+try:
+    _spk["_speak"](_say)
+except Exception as _e:
+    _sp_err = repr(_e)
+_sp_fail = False
 check("Windows reads any reply aloud: UTF-8 in, UTF-8 read, the pipe always closed",
       _sp_err is None and _sp is not None and _sp.closed
+      and len(_spoke) == 2 and _spoke[-1].closed
       and _sp.buf.decode("utf-8") == _say and not _sp.kw.get("text")
       and "[Text.Encoding]::UTF8" in _sp.args[-1]
       and "OpenStandardInput()" in _sp.args[-1],
@@ -3557,30 +3576,117 @@ check("Windows reads any reply aloud: UTF-8 in, UTF-8 read, the pipe always clos
 # geocoder were asked about "Chicago right now" and the answer had no
 # live data. Only a zip code had ever been tested.
 _wxp = {"re": re}
-_exec_names(_wxp, {"_WX_WHEN", "_WX_NOT_PLACE", "weather_place"})
-_WXQ = {"What's the weather in Chicago right now?": "Chicago",
-        "What's the weather like in Paris this weekend?": "Paris",
-        "Chicago weather": "Chicago",
-        "chicago weather tomorrow": "chicago",
-        "What's the weather going to be like in Denver tomorrow?": "Denver",
-        "weather forecast for London next week": "London",
-        "whats the weather for tomorrow in New York": "New York",
-        "what will the weather be in Tokyo on Friday": "Tokyo",
-        "weather in Boston Sunday": "Boston",
-        "weather at Sunday River": "Sunday River",
-        "whats the weather in 11221": "11221,us",
-        "tomorrow's forecast for Seattle, WA": "Seattle, WA",
-        "what's the Denver forecast": "Denver",
-        "How's the weather?": "", "tell me the weather": "",
-        "can you check the weather": "", "what's the local weather": "",
-        "what's the weather like today": ""}
+_WXN = {"WX_HERE", "_WX_WHEN", "_WX_NOT_PLACE", "_WX_DESCRIBE", "_WX_NOT_BEFORE",
+                  "_WX_NOT_AFTER", "_WX_ACTIVITY", "_WX_GENERIC", "_WX_SELF",
+                  "_WX_FILLER", "_WX_NOT_WX", "_wx_words_ok", "weather_place"}
+_exec_names(_wxp, _WXN)
+_WXH = "~here"
+# a place, the home area (H), or nothing: wttr.in turns ANY string into
+# some real town (review: "What's" was Pesaro, "running" Norway)
+_WXQ = {
+ # places
+ "What's the weather in Chicago right now?": "Chicago",
+ "weather in Chicago today": "Chicago",
+ "What's the weather like in Paris this weekend?": "Paris",
+ "Chicago weather": "Chicago",
+ "chicago weather tomorrow": "chicago",
+ "what's the temperature in Denver tomorrow": "Denver",
+ "What's the weather going to be like in Denver tomorrow?": "Denver",
+ "weather forecast for London next week": "London",
+ "whats the weather for tomorrow in New York": "New York",
+ "weather in New York for tomorrow": "New York",
+ "what will the weather be in Tokyo on Friday": "Tokyo",
+ "weather in Boston Sunday": "Boston",
+ "weather at Sunday River": "Sunday River",
+ "whats the weather in 11221": "11221,us",
+ "what's the weather in brooklyn this weekend": "brooklyn",
+ "what's the Denver forecast": "Denver",
+ "today's weather in Chicago": "Chicago",
+ "tomorrow's forecast for Seattle, WA": "Seattle, WA",
+ "weather in São Paulo right now": "São Paulo",
+ "what's the weather in the Bronx tonight": "the Bronx",
+ "new york city weather this weekend": "new york city",
+ "Weather in Chicago now": "Chicago",
+ "what's Boston's weather": "Boston",
+ "Boston’s weather": "Boston",
+ "NYC's weather": "NYC",
+ "weather in Chicago today and tomorrow": "Chicago",
+ "what's the weather in Chicago going to be like tomorrow": "Chicago",
+ "what's the weather in Chicago supposed to be tomorrow": "Chicago",
+ "weather Denver": "Denver",
+ "weather chicago now": "chicago",
+ "weather in Salt Lake City": "Salt Lake City",
+ "weather in Hot Springs, Arkansas": "Hot Springs, Arkansas",
+ "forecast for the Outer Banks this weekend": "the Outer Banks",
+ "weather in the hamptons": "the hamptons",
+ "weather in St. John's": "St. John's",
+ "weather in Mexico City in the morning": "Mexico City",
+ "is it going to rain? weather in Seattle": "Seattle",
+ "weather in Paris, France": "Paris, France",
+ "What's the weather like in the Bay Area?": "the Bay Area",
+ # home area
+ "How's the weather?": _WXH, "whats the weather": _WXH,
+ "what's the weather like today": _WXH, "What's today's weather?": _WXH,
+ "what's tomorrow's forecast": _WXH, "what's tonight's weather": _WXH,
+ "How's today's weather looking": _WXH, "What's this weekend's weather": _WXH,
+ "weather near me": _WXH, "what's the weather around here": _WXH,
+ "weather in my area": _WXH, "what's the local weather": _WXH,
+ "what's the temperature outside": _WXH, "weather today": _WXH,
+ "what's the forecast": _WXH,
+ # not places
+ "tell me the weather": _WXH, "can you check the weather": _WXH,
+ "What's today's temperature": _WXH, "what temperature is it": _WXH,
+ "what's the weather like for running today": "",
+ "I'm heading to Denver next week, what's the weather going to be like for hiking?": "",
+ "what's the weather for the game tonight": "",
+ "nice weather today": _WXH, "severe weather today": _WXH, "hot weather tips": "",
+ "what temperature should I cook chicken at": "",
+ "what's the sales forecast for Q3": "",
+ "weather at the beach": "", "weather report": "",
+ "what's the weather for my trip": "",
+ "weather in the mountains this weekend": "",
+ # round two
+ "What's the weather like in NYC?": "NYC", "weather in LA": "LA",
+ "Will it rain in London tomorrow?": "",
+ "what's the weather in london like": "london",
+ "What is the weather forecast for Miami, FL this week?": "Miami, FL",
+ "weather forecast": _WXH, "7 day forecast for Austin": "Austin",
+ "hourly weather for Portland Oregon": "Portland Oregon",
+ "what's the weather in Portland, OR": "Portland, OR",
+ "weather in Washington DC": "Washington DC",
+ "Is it going to snow in Denver? What's the forecast": "",
+ "What's the weather gonna be like this weekend in Brooklyn": "Brooklyn",
+ "weather this weekend": _WXH, "any weather alerts for Miami": "Miami",
+ "Chicago weather this week": "Chicago",
+ "What's the weather like where you are": "",
+ "what's the weather in my city": _WXH,
+ "whats the weather like at my place": _WXH,
+ "weather for 10001": "10001,us",
+ "weather in Tokyo, Japan in celsius": "Tokyo, Japan",
+ "weather in Boston at noon": "Boston",
+ "weather in Newcastle upon Tyne": "Newcastle upon Tyne",
+ "weather in Rio de Janeiro": "Rio de Janeiro",
+ "forecast for Kingston upon Hull": "Kingston upon Hull",
+ "what's the weather like in Beijing": "Beijing",
+ "weather forecast for Reading this weekend": "Reading",
+ "weather in Wyoming": "Wyoming",
+ "what's the weather in Nice": "Nice",
+ "what's the temperature going to be in Phoenix on Saturday": "Phoenix",
+ "Temperature in Dubai right now": "Dubai",
+ "what's the weather": _WXH, "weather?": _WXH,
+ "whats the weather like rn": "",
+ "What's the high temperature today": _WXH,
+ "what's the weather in Chicago and New York": "Chicago",
+ "Weather in Chicago vs Milwaukee": "Chicago",
+}
 _wxbad = {q: _wxp["weather_place"](q) for q in _WXQ
           if _wxp["weather_place"](q) != _WXQ[q]}
 # wttr.in no longer sends localObsDateTime: the age and the night sky
 # come from observation_time (UTC) and the longitude, fed here
 import io as _io18, json as _js18, time as _tm18
 _wx_urls = []
-def _wx_feed(age_min, sun_hour, desc="Sunny"):
+def _wx_feed(age_min, sun_hour, desc="Sunny", ask="what's the weather in Chicago right now?",
+             home=""):
     g = _tm18.gmtime(_tm18.time() - age_min * 60)
     lon = ((sun_hour - (g.tm_hour + g.tm_min / 60.0)) * 15 + 540) % 360 - 180
     j1 = {"current_condition": [{
@@ -3601,11 +3707,18 @@ def _wx_feed(age_min, sun_hour, desc="Sunny"):
                   _wx_urls.append(url), _R(_js18.dumps(j1).encode()))[1]),
               parse=__import__("urllib.parse").parse),
           "_venue_now": lambda tz="": _tm18.localtime(),
-          "_tl_search": _t17.SimpleNamespace(), "_geocode": lambda q: None}
-    _exec_names(ns, {"_WX_WHEN", "_WX_NOT_PLACE", "weather_place", "weather_snippets"})
-    return ns["weather_snippets"]("what's the weather in Chicago right now?")
+          "_tl_search": _t17.SimpleNamespace(), "_geocode": lambda q: None,
+          "load_prefs": lambda ident=None: {"home_area": home}}
+    _exec_names(ns, _WXN | {"weather_snippets"})
+    return ns["weather_snippets"](ask)
 _wxf = {"fresh day": _wx_feed(30, 13), "stale": _wx_feed(180, 13),
         "fresh night": _wx_feed(10, 2)}
+_wx_n = len(_wx_urls)
+# no place named: the home area when one is set, else nothing asked at all
+_wxf["home"] = _wx_feed(30, 13, ask="What's today's weather?", home="Chicago")
+_wxf["no home"] = _wx_feed(30, 13, ask="What's today's weather?")
+_wxf["not a place"] = _wx_feed(30, 13, ask="what's the weather for the game tonight",
+                               home="Chicago")
 check("weather questions name their place, time words left out; the reading's age is real",
       not _wxbad
       and _wxf["fresh day"] and "observed 30 min ago" in _wxf["fresh day"]
@@ -3616,6 +3729,9 @@ check("weather questions name their place, time words left out; the reading's ag
       and "59°F" in _wxf["fresh day"] and "Sunny" in _wxf["fresh day"]
       and _wxf["stale"] is None
       and _wxf["fresh night"] and ", clear, wind" in _wxf["fresh night"]
+      and _wxf["home"] and _wxf["home"].startswith("LIVE WEATHER for Chicago (station:")
+      and _wxf["no home"] is None and _wxf["not a place"] is None
+      and len(_wx_urls) == _wx_n + 1
       and _wx_urls and all(u == "https://wttr.in/Chicago?format=j1" for u in _wx_urls)
       and 'cur.get("localObsDateTime")' not in _MILLENAI_SRC,
       "%r" % [_wxbad, _wxf])
@@ -3699,15 +3815,38 @@ _os19.makedirs(_os19.path.join(_rt, "bin"))
 _ns["_settle_engine_dir"]()
 _ew["cut"] = (_ls(), _ns["_wrong_arch_engine"]())
 _ok_cut = _ew["cut"] == (["bin"], True)
-# a folder still in use, or another copy of the app: wait, keep x64
+# a folder still in use: wait, keep x64, and don't fetch it again
 _oks = []
-for _kw in ({"locked": True}, {"sibling": True}):
-    _ns, _lg, _rt, _ls = _engine_world(**_kw)
-    _ns["start_managed_engines"](); _ns["start_managed_engines"]()
-    _ew[str(_kw)] = (_ls(), list(_lg["spawned"]))
-    # ...and the finished download waits; it isn't fetched again
-    _oks.append(_ew[str(_kw)] == (["bin", "bin.arm64"], [0x8664, 0x8664])
-                and _lg["fetches"] == 1)
+_ns, _lg, _rt, _ls = _engine_world(locked=True)
+_ns["start_managed_engines"](); _ns["start_managed_engines"]()
+_ew["locked"] = (_ls(), list(_lg["spawned"]), _lg["fetches"])
+_oks.append(_ew["locked"] == (["bin", "bin.arm64"], [0x8664, 0x8664], 1))
+# another copy of the app running: it neither stages nor swaps
+_ns, _lg, _rt, _ls = _engine_world(sibling=True)
+_ns["start_managed_engines"](); _ns["start_managed_engines"]()
+_ew["sibling"] = (_ls(), list(_lg["spawned"]), _lg["fetches"])
+_oks.append(_ew["sibling"] == (["bin"], [0x8664, 0x8664], 0))
+# ...nor swaps in a download finished before it started
+_ns, _lg, _rt, _ls = _engine_world()
+_ns["start_managed_engines"]()
+_ns["_other_millenai_running"] = lambda: True
+_ns["start_managed_engines"]()
+_ew["sibling later"] = (_ls(), list(_lg["spawned"]))
+_oks.append(_ew["sibling later"] == (["bin", "bin.arm64"], [0x8664, 0x8664]))
+# no engine folder at all, a finished download waiting: it goes in
+_ns, _lg, _rt, _ls = _engine_world()
+_ns["start_managed_engines"]()
+_sh19.rmtree(_os19.path.join(_rt, "bin"))
+_ns["start_managed_engines"]()
+_ew["no bin"] = (_ls(), list(_lg["spawned"]))
+_oks.append(_ew["no bin"] == (["bin"], [0x8664, 0xAA64]))
+# a staged file that stopped being ARM64 after its marker never goes in
+_ns, _lg, _rt, _ls = _engine_world()
+_ns["start_managed_engines"]()
+_pe(_os19.path.join(_rt, "bin.arm64", "ollama.exe"), 0x8664)
+_ns["_settle_engine_dir"]()
+_ew["bad stage"] = (_ls(), _ns["_wrong_arch_engine"]())
+_oks.append(_ew["bad stage"] == (["bin"], True))
 check("ARM64 PCs get the native engine without ever being left with none",
       _ok_normal and _ok_quit and _ok_wrong and _ok_cut and all(_oks)
       and "def _replace_engine_native" not in _MILLENAI_SRC,

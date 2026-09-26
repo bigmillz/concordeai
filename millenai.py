@@ -2797,49 +2797,143 @@ def model_fits_memory(label: str) -> bool:
     return need * factor < avail
 
 # THE PLACE A WEATHER QUESTION NAMES (6b317, found asking a Windows VM
-# "what's the weather in Chicago right now"): everything after "weather
-# in" was the place, so wttr.in was asked for "Chicago right now" (an
-# error) and the geocoder too (nothing), and the answer had no live data.
-# Time words come out wherever they sit, and "Chicago weather" names a
-# place as well. Only the zip code had ever been tested.
+# "what's the weather in Chicago right now"): the place was everything
+# after "weather in", so wttr.in and the geocoder were asked about
+# "Chicago right now" and the answer had no live data; only a zip code
+# had ever been tested. Time words now come out wherever they sit. And
+# wttr.in turns ANY string into some real town (review: "What's" is
+# Pesaro, "running" is in Norway), so a wrong guess answers with another
+# city's weather, worse than none: only a slot that reads as a place is
+# taken. "Near me", "outside" and a question naming no place at all mean
+# the home area (WX_HERE).
+WX_HERE = "~here"
 _WX_WHEN = re.compile(
     r"\b(?:right now|now|currently|at the moment|over the weekend|"
-    r"(?:today|tonight|tomorrow)(?:'s|s)?(?: (?:morning|afternoon|evening|"
-    r"night))?|(?:this|next) (?:weekend|week|morning|afternoon|evening)|"
-    r"(?:on|this|next) (?:mon|tues|wednes|thurs|fri|satur|sun)day"
-    r"(?: (?:morning|afternoon|evening|night))?)\b"
+    r"(?:today|tonight|tomorrow)(?:'s|s)?"
+    r"(?: (?:morning|afternoon|evening|night))?|"
+    r"(?:this|next|the) (?:weekend|week|month)(?:'s)?|"
+    r"(?:this|next) (?:morning|afternoon|evening)|"
+    r"(?:in|for|over) the (?:morning|afternoon|evening|next few days|"
+    r"coming days|days ahead|week ahead)|at night|"
+    r"(?:in|for) (?:a bit|an hour|a few hours|\d+ (?:hours?|days?))|"
+    r"(?:on|this|next) (?:mon|tues|wednes|thurs|fri|satur|sun)day(?:'s)?"
+    r"(?: (?:morning|afternoon|evening|night))?|"
+    r"(?:in|this|next) (?:january|february|march|april|june|july|august|"
+    r"september|october|november|december|spring|summer|fall|autumn|"
+    r"winter))\b"
     r"|\b(?:mon|tues|wednes|thurs|fri|satur|sun)day\s*$", re.I)
-# words that say the text before "weather" is a request, not a place
-_WX_NOT_PLACE = set("""a an the me my our your you i we it is are be can could
-would will please tell give show get check know what whats how hows local
-current outside there here""".split())
+# words no place name is made of
+_WX_NOT_PLACE = set("""a an me my our your you i we us it it's its is are was
+be been being can could would will should please tell give show get check know
+find see what what's whats how how's hows where where's wheres when why who
+which there here outside local current general vs versus going gonna
+supposed looking like any some do does did""".split())
+# ...and the ones that before "weather" describe it, not place it
+_WX_DESCRIBE = set("""nice good bad great best worst severe extreme hot cold
+warm cool wet dry rainy stormy sunny cloudy windy snowy crazy weird perfect
+beautiful lovely awful terrible typical usual normal average fair foul
+inclement winter summer spring fall autumn the high low max min daily hourly
+weekly extended 5-day 7-day 10-day 14-day current local""".split())
+_WX_NOT_BEFORE = _WX_NOT_PLACE | _WX_DESCRIBE
+# ...and after a bare "weather" ("weather report")
+_WX_NOT_AFTER = _WX_NOT_PLACE | set("""report reports update updates alert alerts
+warning warnings radar map maps app apps tips channel station forecast
+forecasts conditions news today the""".split())
+# what "for" means when it isn't a place
+_WX_ACTIVITY = set("""running run hiking hike skiing biking cycling golf golfing
+fishing surfing camping sailing walking walk jogging swimming driving drive
+flying flight travel traveling travelling boating climbing kayaking
+snowboarding beach picnic wedding game party parade concert trip commute
+event outdoors""".split())
+# a generic setting after "the" is no place: "at the beach", "the game"
+_WX_GENERIC = set("""city mountains mountain beach park area neighborhood
+neighbourhood suburbs country countryside woods lake desert coast north south
+east west region state world game match wedding party parade trip weekend
+week office airport""".split())
+_WX_SELF = re.compile(r"\b(?:near|around|by) (?:me|here|us)\b|\b(?:in|for) "
+                      r"(?:my|our) (?:area|location|neighbou?rhood|city|town)"
+                      r"\b|\b(?:outside|around here|at home|local|at my "
+                      r"(?:place|house|apartment))\b", re.I)
+_WX_FILLER = set("""like be going gonna looking look is it will to for
+the in out there here supposed today now forecast forecasts temperature
+temperatures""".split())
+# a sales or rate "forecast" is no weather question
+_WX_NOT_WX = re.compile(r"\b(?:sales|revenue|earnings|budget|economic|market|"
+                        r"stock|price|inflation|rates?|demand|financial|"
+                        r"traffic|cash ?flow)\b", re.I)
+
+
+def _wx_words_ok(cand: str, stop: set, most: int = 5) -> bool:
+    words = re.findall(r"[\w'.-]+", cand.lower())
+    return (0 < len(words) <= most and not stop.intersection(words)
+            and any(ch.isalpha() for ch in cand))
 
 
 def weather_place(q: str) -> str:
-    """The place in a weather question, "" when it names none."""
+    """The place in a weather question; WX_HERE for the home area; ""
+    when the question names something that isn't a place."""
+    q = q.replace("\u2019", "'")
     m = re.search(r"\b(\d{5})\b", q)
     # a bare 5-digit zip is ambiguous worldwide — 11221 alone resolved to
     # Vilnius, Lithuania; ',us' pins it to Brooklyn
     if m:
         return m.group(1) + ",us"
+    if _WX_NOT_WX.search(q) or not re.search(
+            r"\b(?:weather|forecast|temperatures?)\b", q, re.I):
+        return ""
     s = " ".join(_WX_WHEN.sub(" ", q).split()).strip(" ?.!,")
-    m = re.search(r"\b(?:weather|forecast|temperatures?)\b.*?"
-                  r"\b(?:in|for|at|near|around)\s+(.+)$", s, re.I)
+    kw = r"\b(?:weather|forecast|temperatures?)\b"
+    loc = None
+    m = re.search(kw + r".*?\b(in|for|at|near|around)\s+(.+)$", s, re.I)
     if m:
-        loc = m.group(1)
-    else:
-        # "Chicago weather", "what's the Denver forecast"
-        m = re.match(r"(.*?)\b(?:weather|forecast|temperatures?)\b", s, re.I)
-        pre = re.sub(r"^(?:what(?:'s| is)|how(?:'s| is)|whats|hows)\s+"
-                     r"(?:the\s+)?", "", (m.group(1) if m else "").strip(),
-                     flags=re.I)
-        words = re.findall(r"[\w'.-]+", pre.lower())
-        loc = (pre if 0 < len(words) <= 4
-               and not _WX_NOT_PLACE.intersection(words) else "")
-    # what the time words left behind: "for in Chicago", "Chicago for"
-    loc = re.sub(r"^(?:(?:in|for|at|near|around|like)\s+)+", "", loc,
-                 flags=re.I)
-    loc = re.sub(r"(?:\s+(?:in|for|at|on|like|be))+$", "", loc, flags=re.I)
+        prep, loc = m.group(1).lower(), m.group(2)
+        # what the time words left: "for [tomorrow] in New York"
+        while True:
+            m2 = re.match(r"(in|for|at|near|around)\s+(.+)$", loc, re.I)
+            if not m2:
+                break
+            prep, loc = m2.group(1).lower(), m2.group(2)
+        # what follows the place: "Chicago and", "Chicago going to be"
+        # (lower case: "Portland, OR" keeps its state)
+        loc = re.split(r"\s+(?:and|or|&|vs\.?|versus|going|gonna|supposed|"
+                       r"looking|be|like|will|is|are|for|this|next|on|to|so|"
+                       r"because|since|if|when|with|without|in|at|near|"
+                       r"around|during|over|by|from|using)\b", loc,
+                       maxsplit=1)[0].strip(" ,?.!'\"")
+        low = loc.lower().split()
+        if not low:
+            loc = None
+        elif low[0] in _WX_ACTIVITY or (prep == "for" and low[0] in (
+                "my", "our", "your", "a", "an", "this", "that")):
+            return ""
+        elif low[0] == "the" and (len(low) < 2 or low[1] in _WX_GENERIC or (
+                prep in ("at", "for") and not loc.split()[1][:1].isupper())):
+            return ""
+        elif not _wx_words_ok(loc, _WX_NOT_PLACE):
+            return WX_HERE if _WX_SELF.search(q) else ""
+    if loc is None:
+        m = re.match(r"(.*?)" + kw + r"\s*(.*)$", s, re.I)
+        before = m.group(1).strip() if m else ""
+        after = m.group(2).strip() if m else ""
+        # "what's Boston's weather", "NYC weather"
+        before = re.sub(r"^(?:(?:what|how)(?:'s| is| will)?|whats|hows|"
+                        r"(?:can|could) you (?:check|tell me|give me)|tell me|"
+                        r"give me|show me|check|get)\b\s*(?:the\b\s*)?", "",
+                        before, flags=re.I)
+        before = re.sub(r"'s$", "", before.strip())
+        if set(re.findall(r"[\w'.-]+", before.lower())) <= _WX_DESCRIBE:
+            before = ""                 # "nice weather", "the high temperature"
+        # "like", "going to be", "is it": nothing that names anything
+        rest = [w for w in re.findall(r"[\w'.-]+", after.lower())
+                if w not in _WX_FILLER]
+        if before and _wx_words_ok(before, _WX_NOT_BEFORE, 4):
+            loc = before
+        elif rest and not before and _wx_words_ok(after, _WX_NOT_AFTER, 3):
+            loc = after                 # "weather Denver"
+        elif _WX_SELF.search(q) or (not before and not rest):
+            return WX_HERE
+        else:
+            return ""
     return loc.strip(" ,?.!'\"")
 
 
@@ -2850,6 +2944,9 @@ def weather_snippets(q: str):
     forecast. wttr.in resolves a zip or place name to actual conditions,
     no API key. None on any failure — the caller falls back to search."""
     loc = weather_place(q)
+    if loc == WX_HERE:
+        # "what's the weather", "near me": the home area, when one is set
+        loc = str(load_prefs(None).get("home_area") or "").strip()
     if not loc or len(loc) > 60:
         return None
     # weekday names on every forecast line — a Friday "this weekend"
@@ -2899,8 +2996,8 @@ def weather_snippets(q: str):
         # not call it Chicago's weather (6b317). A place asked for by name
         # leads; a zip keeps the area it resolved to.
         if not loc.endswith(",us"):
-            name = "%s (station: %s)" % (loc.title() if loc.islower()
-                                         else loc, name)
+            name = "%s (station: %s)" % (" ".join(
+                w[:1].upper() + w[1:] for w in loc.split()), name)
         # SANITY (6b270, judged 2.0: "87°F and sunny right now" at
         # 3:30 AM — a stale daytime observation served as current,
         # above the day's own high). A reading older than two hours
@@ -3854,6 +3951,8 @@ _ENGINE_ARM_DONE = os.path.join(_ENGINE_ARM_STAGE, "complete")
 
 
 def _stage_native_engine():
+    if _other_millenai_running():
+        return                    # one copy stages; the next launch checks
     try:
         shutil.rmtree(_ENGINE_ARM_STAGE, ignore_errors=True)
         _download_ollama_binary(_ENGINE_ARM_STAGE, row=None)
@@ -3880,10 +3979,14 @@ def _settle_engine_dir():
             return
     if not os.path.exists(_ENGINE_ARM_DONE) or _other_millenai_running():
         return
+    if _pe_machine(os.path.join(_ENGINE_ARM_STAGE, exe)) != 0xAA64:
+        shutil.rmtree(_ENGINE_ARM_STAGE, ignore_errors=True)
+        return
     shutil.rmtree(old, ignore_errors=True)
     try:
         # fails while anything still runs from the old folder
-        os.replace(_MANAGED_BIN_DIR, old)
+        if os.path.exists(_MANAGED_BIN_DIR):
+            os.replace(_MANAGED_BIN_DIR, old)
     except OSError:
         return
     try:
@@ -5864,10 +5967,10 @@ def ex_slides(text, ext, path, title=""):
     s = prs.slides.add_slide(prs.slide_layouts[0])
     s.shapes.title.text = x_strip_md(title or "ConcordeAI")[:120]
     if len(s.placeholders) > 1:
-        # the date under the title. _venue_stamp takes a format and was
-        # called without one, so every deck export threw (review, 6b317)
-        s.placeholders[1].text = (_venue_stamp("%B %-d, %Y")
-                                  if "_venue_stamp" in globals() else "")
+        # the date under the title: _venue_stamp() was called without the
+        # format it needs, so every deck export threw (review, 6b317); and
+        # it's the chat's venue clock ("... in Tokyo"), not a document date
+        s.placeholders[1].text = strftime_np("%B %-d, %Y")
     cur, bullets = None, []
 
     def flush():
@@ -6999,7 +7102,10 @@ def _whisper_cuda() -> bool:
         ok = False
         try:
             import ctranslate2
-            ok = ctranslate2.get_cuda_device_count() > 0
+            # ...that does float16 (review: a GTX 10-series passes the
+            # rest, fetches the big model, then can't load it that way)
+            ok = (ctranslate2.get_cuda_device_count() > 0 and "float16"
+                  in ctranslate2.get_supported_compute_types("cuda"))
             if ok and IS_WIN:
                 import ctypes
                 for dll in ("cublas64_12.dll", "cudnn64_9.dll"):
