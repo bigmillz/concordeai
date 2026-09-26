@@ -408,14 +408,14 @@ check("the hot status endpoint is cheap and the idle strip cheaper",
 # cloud.json: four threads resting four providers at once must never
 # lose a key or leave the file unreadable (it did in 71 of 500 rounds)
 _cd = _LH["tempfile"].mkdtemp(); _cf = os.path.join(_cd, "cloud.json")
-_cns = dict(_LH, CLOUD_FILE=_cf, QUOTA_COOLDOWN=600.0)
+_cns = dict(_LH, CLOUD_FILE=_cf, QUOTA_COOLDOWN=600.0, IS_WIN=False)
 import ast as _ast
 _ctree = _ast.parse(_MILLENAI_SRC)
 exec(_MILLENAI_SRC[_MILLENAI_SRC.index("try:\n    import fcntl as _fcntl"):
                    _MILLENAI_SRC.index("def _cloud_save_state(")], _cns)
 for _n in _ctree.body:
     if isinstance(_n, _ast.FunctionDef) and _n.name in (
-            "_cloud_all", "_cloud_save_state", "cloud_cool"):
+            "_cloud_all", "_cloud_save_state", "cloud_cool", "_replace_into"):
         exec(_ast.get_source_segment(_MILLENAI_SRC, _n), _cns)
 _bad = 0
 for _r in range(60):
@@ -427,8 +427,11 @@ for _r in range(60):
     _ts = [_cns["threading"].Thread(target=_w, args=(p,)) for p in "abcd"]
     [x.start() for x in _ts]; [x.join() for x in _ts]
     try:
-        if len([1 for v in json.load(open(_cf))["providers"].values()
-                if v.get("key")]) < 4:
+        # every key kept AND every rest landed: a write that silently
+        # failed (the review found one) would keep the keys and pass
+        _pv = json.load(open(_cf))["providers"].values()
+        if (len([1 for v in _pv if v.get("key")]) < 4
+                or len([1 for v in _pv if v.get("cool")]) < 4):
             _bad += 1
     except Exception:
         _bad += 1
@@ -3900,11 +3903,15 @@ _lb0 = _M.index("def _loopback_host("); _lb1 = _M.index("urllib.request.install_
 _lb_ns = {"urllib": __import__("urllib")}
 exec(_M[_lb0:_lb1], _lb_ns)
 _op20 = _ur20.build_opener(_lb_ns["_LoopbackDirect"]({"http": "http://127.0.0.1:%d" % _prx20}))
+_pb0 = _ur20.proxy_bypass
+_ur20.proxy_bypass = lambda h: False      # this host's no_proxy is not the test
 try:
     _lbr = (_op20.open("http://127.0.0.1:%d/api/tags" % _eng20, timeout=5).read(),
             _op20.open("http://example.invalid/x", timeout=5).read())
 except Exception as _e:
     _lbr = repr(_e)
+finally:
+    _ur20.proxy_bypass = _pb0
 check("a system proxy never gets the app's calls to its own engine on 127.0.0.1",
       _lbr == (b"engine", b"proxy") and all(_lb_ns["_loopback_host"](h) for h in
       ("127.0.0.1:11434", "localhost:8889", "[::1]:11434", "127.0.0.5"))
@@ -3927,11 +3934,18 @@ try:
 except Exception as _e:
     _cw_ok = repr(_e)
 _cw_left = [f for f in _os20.listdir(_cw_dir) if f.endswith(".tmp")]
+import contextlib as _cl20
+_css = {"_cloud_txn": _cl20.nullcontext, "_cloud_read_strict": lambda: {},
+        "_cloud_write": lambda d: None}
+_exec_names(_css, {"_cloud_save_state"})
+_css_ok = _css["_cloud_save_state"]("groq", {"status": "ok"})
+def _css_boom(d): raise AttributeError("module 'os' has no attribute 'fchmod'")
+_css["_cloud_write"] = _css_boom
+_css_bad = _css["_cloud_save_state"]("groq", {"status": "ok"})
 check("Windows: a cloud key is saved without os.fchmod, and a failed save isn't called saved",
-      _cw_ok is True and not _cw_left
-      and "if not _cloud_save_state(which, {\"name\": name, \"base\": base," in _M
-      and "self._send_json({\"ok\": False, \"err\": _KEY_NOT_SAVED})" in _M,
-      "%r" % [_cw_ok, _cw_left])
+      _cw_ok is True and not _cw_left and _css_ok is True and _css_bad is False
+      and _M.count('self._send_json({"ok": False, "err": _KEY_NOT_SAVED})') == 2,
+      "%r" % [_cw_ok, _cw_left, _css_ok, _css_bad])
 
 # a blocked replace on Windows waits for the reader instead of losing the save
 _rp_calls = []
@@ -3958,15 +3972,13 @@ check("Windows: settings and cloud writes wait out a reader instead of failing",
 
 # the venue's clock on Windows: offsets, not /etc/localtime; tzdata installs
 import datetime as _dt20
-_here = time.localtime().tm_gmtoff
-_same = next((z for z in ("UTC", "Etc/GMT", "America/New_York", "Europe/London", "Asia/Tokyo",
-                          "America/Los_Angeles", "Europe/Berlin", "Asia/Kolkata")
-              if int(_dt20.datetime.now(__import__("zoneinfo").ZoneInfo(z)).utcoffset().total_seconds()) == _here), None)
-_diff = "Asia/Tokyo" if _same != "Asia/Tokyo" else "America/New_York"
-_vh = {"IS_WIN": True, "time": time, "_host_tz": lambda: ""}
+_ny_off = int(_dt20.datetime.now(__import__("zoneinfo").ZoneInfo("America/New_York")).utcoffset().total_seconds())
+_vh = {"IS_WIN": True, "_host_tz": lambda: "",
+       "time": _t17.SimpleNamespace(localtime=lambda: _t17.SimpleNamespace(tm_gmtoff=_ny_off))}
 _exec_names(_vh, {"_venue_is_host"})
+_same, _diff = "America/New_York", "Asia/Tokyo"      # a PC on New York time
 check("Windows: the venue clock compares offsets; tzdata comes with setup or on demand",
-      (_same is None or _vh["_venue_is_host"](_same) is True)
+      _vh["_venue_is_host"](_same) is True
       and _vh["_venue_is_host"](_diff) is False
       and _vh["_venue_is_host"]("Not/AZone") is True
       and "threading.Thread(target=_ensure_tzdata, daemon=True).start()" in _M
@@ -3976,8 +3988,8 @@ check("Windows: the venue clock compares offsets; tzdata comes with setup or on 
       "%r" % [_same, _diff])
 
 # Windows is offered its update: the release's zip (or .msi when installed)
-def _upd(tag, frozen=False, mac=False, name="6.2"):
-    ns = {"IS_MAC": mac, "sys": _t17.SimpleNamespace(frozen=frozen) if frozen else _t17.SimpleNamespace(),
+def _upd(tag, frozen=False, mac=False, name="6.2", arm=False, arm_msi=False):
+    ns = {"IS_MAC": mac, "IS_WIN_ARM": arm, "IS_WIN_EMULATED": False, "sys": _t17.SimpleNamespace(frozen=frozen) if frozen else _t17.SimpleNamespace(),
           "APP_BUILD": 300, "APP_NIGHTLY": "", "APP_VERSION": "6.1.0", "re": re,
           "urllib": __import__("urllib"),
           "_update": {}, "_gh_time": lambda s: 0, "short_version": lambda: "6.1",
@@ -3986,17 +3998,24 @@ def _upd(tag, frozen=False, mac=False, name="6.2"):
           "_channel_release": lambda: {"tag_name": tag, "name": name, "html_url": "https://github.com/x/r",
               "assets": [{"name": "ConcordeAI-6.2.dmg", "browser_download_url": "https://github.com/x/a.dmg", "size": 9e7},
                          {"name": "ConcordeAI-6.2.msi", "browser_download_url": "https://github.com/x/a.msi", "size": 8e7},
-                         {"name": "ConcordeAI-6.2-Windows.zip", "browser_download_url": "https://github.com/x/w.zip", "size": 4e5}]}}
+                         {"name": "ConcordeAI-6.2-Windows.zip", "browser_download_url": "https://github.com/x/w.zip", "size": 4e5}]
+              + ([{"name": "ConcordeAI-6.2-arm64.msi", "browser_download_url": "https://github.com/x/arm.msi", "size": 7e7}]
+                 if arm_msi else [])}}
     _exec_names(ns, {"_check_update_live"})
     return ns["_check_update_live"]()
 _u_new, _u_msi, _u_old, _u_mac = _upd("v320"), _upd("v320", frozen=True), _upd("v290"), _upd("v320", mac=True)
 # a higher tag with a LOWER version (6.0.4's v274 against 6.1's build 273)
 _u_down = _upd("v320", name="6.0.4")
+# a native ARM64 install: never the x64 installer
+_u_arm, _u_arm2 = _upd("v320", frozen=True, arm=True), _upd("v320", frozen=True, arm=True, arm_msi=True)
 check("Windows is offered its update (the zip, or the .msi when installed) and never told 'up to date'",
       _u_new["available"] and _u_new["manual"] == "https://github.com/x/w.zip"
       and _u_msi["manual"] == "https://github.com/x/a.msi"
       and not _u_old["available"] and not _u_old["manual"]
       and not _u_down["available"]
+      and _u_arm["manual"] == "https://github.com/x/r"
+      and _u_arm2["manual"] == "https://github.com/x/arm.msi"
+      and _upd("v320", frozen=True, arm_msi=True)["manual"] == "https://github.com/x/a.msi"
       and not _u_mac["available"] and "manual" not in _u_mac
       and 'if self.path == "/api/update/download":' in _M
       and 'ok = url.startswith("https://github.com/")' in _M
@@ -4036,7 +4055,10 @@ check("the page on a PC: no `ollama` commands, PC mic and SSH advice, drops atta
       "const IS_PC=false;" in _pg and "__IS_PC__" not in _pg
       and "const eng=(!tier&&!advOn)?engineState[model]:null;" in _pg
       and "Or just click a model with a green dot" not in _pg
-      and 'addEventListener("drop",e=>{' in _pg and 'addEventListener("dragover",e=>{e.preventDefault();' in _pg
+      and 'addEventListener("drop",e=>{\n  if(!hasFiles(e))return;' in _pg
+      and 'addEventListener("dragover",e=>{\n  if(!hasFiles(e))return;' in _pg
+      and "else if(DROP_TEXT.test(f.name)&&f.size<2_000_000)addDocFile(f);" in _pg
+      and "if(!upGo.disabled)upGo.textContent=" in _pg
       and "select{color-scheme:dark}" in _pg and "select option{background:#16171b;color:#ececec}" in _pg
       and "scrollbar-color:#3a3b41 transparent;" in _pg
       and "Settings \\u25b8 Privacy & security \\u25b8 Microphone" in _pg
@@ -4063,9 +4085,15 @@ def _cpu(name):
 _cpus = {n: _cpu(n) for n in ("13th Gen Intel(R) Core(TM) i7-13700H", "AMD Ryzen 7 7840U w/ Radeon 780M Graphics",
          "Snapdragon(R) X Elite - X1E78100 - Qualcomm(R) Oryon(TM) CPU", "AMD Ryzen Threadripper PRO 7995WX 96-Cores",
          "Intel(R) Core(TM) Ultra 7 155H", "Apple silicon", "")}
+def _no_smi(*a, **k): raise FileNotFoundError("nvidia-smi")
+_chn = {"IS_WIN": True, "re": re, "subprocess": _t17.SimpleNamespace(run=_no_smi),
+        "_pc_cpu_name": lambda: "CORE I7",
+        "platform": _t17.SimpleNamespace(processor=lambda: "Intel64 Family 6 Model 154")}
+_exec_names(_chn, {"chip_name"})
+_cpus["chip_name() without nvidia-smi"] = _chn["chip_name"]()
 check("a PC's chip reads CORE I7 / RYZEN 7 / SNAPDRAGON X ELITE, not INTEL64 or ARMV8",
       list(_cpus.values()) == ["CORE I7", "RYZEN 7", "SNAPDRAGON X ELITE", "THREADRIPPER",
-                               "CORE ULTRA 7", "APPLE SILICON", "ARMV8"],
+                               "CORE ULTRA 7", "APPLE SILICON", "ARMV8", "CORE I7"],
       "%r" % _cpus)
 
 # the window fits a laptop's work area; WebView2 missing says so
@@ -4142,6 +4170,9 @@ check("plans count a shared download once; an abandoned council draft stops and 
       _pl["plan_labels"]("rec") == ["Qwen 3.5 9B", "Llama 3.2 3B"]
       and "def _collect(chunk, _p=parts, _s=_stop):" in _M
       and "def _draft_local(_lbl=label, _c=_collect, _e=_err):" in _M
+      and "                run_model(_lbl, messages, _c," in _M
+      and "                _e.append(exc)" in _M
+      and "                run_model(_lbl, messages, parts.append," not in _M
       and "            _stop.set()\n" in _M
       and "class _DraftAbandoned(Exception):" in _M
       and "want_set = {MODEL_ROUTES.get(l, (None, l)) for l in plan_labels(pl)}" in _M,
@@ -4154,7 +4185,17 @@ if _XNS:
         _XNS.setdefault("secrets", __import__("secrets"))
         _XNS.setdefault("time", time)
         _ip = _os20.path.join(_tf20.mkdtemp(), "t.ics")
-        _XNS["ex_calendar"]("- 1969-07-16: Apollo 11 launches\n- 2026-11-01: fall back\n", "ics", _ip)
+        # a US zone, so the fall-back day is one whatever this host's is
+        _tz0 = _os20.environ.get("TZ")
+        _os20.environ["TZ"] = "America/New_York"; time.tzset()
+        try:
+            _XNS["ex_calendar"]("- 1969-07-16: Apollo 11 launches\n- 2026-11-01: fall back\n", "ics", _ip)
+        finally:
+            if _tz0 is None:
+                _os20.environ.pop("TZ", None)
+            else:
+                _os20.environ["TZ"] = _tz0
+            time.tzset()
         _ics = open(_ip, encoding="utf-8").read()
     except Exception as _e:
         _ics = "ERR " + repr(_e)
@@ -4167,6 +4208,42 @@ check("exports: pre-1970 and fall-back days are right; a frozen build says it ca
       and _ex["_export_install"] == {"state": "error", "note": "not included in this build"}
       and "this computer couldn't install the document engines" in _M,
       _ics[:200])
+
+# the backdrop on Windows: Apple's root joins the usual ones for clip
+# downloads (it IS Apple's: the fingerprint Apple lists), and a failed
+# clip says so for ten minutes instead of restarting on every poll
+import hashlib as _hl21, base64 as _b6421
+# (a fake store: this Mac's default one already holds Apple's root, so
+# only the call itself shows the app adds it where Windows' doesn't)
+_loaded = []
+class _FakeCtx:
+    def load_verify_locations(self, cadata=None, **k): _loaded.append(cadata)
+_fake_ssl = _t17.SimpleNamespace(create_default_context=lambda: _FakeCtx())
+_sk = {"__builtins__": dict(vars(_bi20), __import__=lambda n, g=None, l=None, f=(), lv=0:
+                            (_fake_ssl if n == "ssl" else _bi20.__import__(n, g, l, f, lv)))}
+_exec_names(_sk, {"_APPLE_ROOT_CA", "_sky_tls", "_sky_context"})
+_der = _b6421.b64decode("".join(_sk["_APPLE_ROOT_CA"].strip().splitlines()[1:-1]))
+_sk["_sky_context"](); _sk["_sky_context"]()
+# and the real thing loads it (a malformed PEM would raise here)
+__import__("ssl").create_default_context().load_verify_locations(cadata=_sk["_APPLE_ROOT_CA"])
+_ctx_roots = _loaded
+_starts = []
+_sks = {"os": _os20, "time": time, "SKY_SOURCES": ["u0"], "_sky_path": lambda i: "/nonexistent/sky.mov",
+        "_sky_lock": __import__("threading").Lock(), "_sky_fetch": lambda i: None,
+        "threading": _t17.SimpleNamespace(Thread=lambda target, args, daemon: _t17.SimpleNamespace(
+            start=lambda: _starts.append(args)))}
+_exec_names(_sks, {"sky_status"})
+_sks["_sky_jobs"] = {0: {"status": "error", "pct": 0, "t": time.time(), "note": "HTTP Error 404"}}
+_held = _sks["sky_status"](0)
+_sks["_sky_jobs"] = {0: {"status": "error", "pct": 0, "t": time.time() - 700, "note": "x"}}
+_retried = _sks["sky_status"](0)
+check("the backdrop: Apple's root for its clips, and a failed clip reports its error",
+      _hl21.sha256(_der).hexdigest().upper().startswith("B0B1730ECBC7FF4505142C49F1295E6E")
+      and _ctx_roots == [_sk["_APPLE_ROOT_CA"]]      # once, cached
+      and _held == {"status": "error", "pct": 0, "note": "HTTP Error 404"}
+      and _retried == {"status": "downloading", "pct": 0} and _starts == [(0,)]
+      and "context=_sky_context()) as r" in _M,
+      "%r" % [_held, _retried, _starts, len(_ctx_roots)])
 
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)

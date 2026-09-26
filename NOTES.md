@@ -5778,6 +5778,16 @@ polling the Mac on the VMware network; no admin rights, no settings).
     the MSI lacking the export libraries, and abandoned council drafts
     that kept Ollama generating (and wrote into the next model's draft,
     a bug on the Mac too).
+- The review of the sweep fixes: the new drop handler took EVERY drop,
+  so text and links dragged into the composer did nothing (the Mac
+  too); it takes only drags carrying files, and only the types the
+  attach button accepts (a dropped PDF reached the model as garbage
+  framed as real data). An installed ARM64 build is never offered the
+  x64 .msi. The update dialog no longer relabels a running Mac update.
+  A window maximized, then minimized, comes back maximized. The log
+  rotates by rename. And six checks that could pass with their bug
+  back now can't (one, the concurrent cloud.json writers, wrote
+  nothing at all after _replace_into was added).
 - THE LAUNCHER checks for a real Python 3.10+: Windows ships a "python"
   that only opens the Microsoft Store, and `where python` found it. Its
   "ready" marker now names what setup installs, so adding a dependency

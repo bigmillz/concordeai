@@ -109,9 +109,15 @@ if sys.platform == "win32":
                                or os.path.expanduser("~"), "MillenAI", "logs")
             os.makedirs(_pd, exist_ok=True)
             _pp = os.path.join(_pd, "app.log")
-            _big = os.path.exists(_pp) and os.path.getsize(_pp) > 5_000_000
-            _plog = open(_pp, "w" if _big else "a", encoding="utf-8",
-                         errors="replace", buffering=1)
+            if os.path.exists(_pp) and os.path.getsize(_pp) > 5_000_000:
+                try:
+                    # renamed, never truncated: a second copy starting must
+                    # not wipe the log the running one writes (review)
+                    os.replace(_pp, _pp + ".1")
+                except OSError:
+                    pass
+            _plog = open(_pp, "a", encoding="utf-8", errors="replace",
+                         buffering=1)
         except OSError:
             _plog = open(os.devnull, "w", encoding="utf-8")
         if sys.stdout is None:
@@ -6945,9 +6951,20 @@ def _check_update_live():
     # is the release's own Windows file (the .msi for an installed app,
     # the zip otherwise), opened in the browser: nothing installs itself.
     if not IS_MAC:
-        ends = ".msi" if getattr(sys, "frozen", False) else "-Windows.zip"
+        _frozen = getattr(sys, "frozen", False)
+        if _frozen and IS_WIN_ARM and not IS_WIN_EMULATED:
+            # a native ARM64 install never gets the x64 installer (review):
+            # its own .msi, or the release page when there is none
+            def _mine(n):
+                return n.endswith(".msi") and "arm64" in n.lower()
+        elif _frozen:
+            def _mine(n):
+                return n.endswith(".msi") and "arm64" not in n.lower()
+        else:
+            def _mine(n):
+                return n.endswith("-Windows.zip")
         win = next((a for a in rel.get("assets", [])
-                    if a.get("name", "").endswith(ends)), None) or {}
+                    if _mine(a.get("name", ""))), None) or {}
         manual = (win.get("browser_download_url")
                   or rel.get("html_url") or "") if newer else ""
         _update["manual"] = manual
@@ -13794,7 +13811,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # on Windows restore() un-maximizes too (6b317, from
                     # the sweep): only a minimized window is restored
                     if not IS_WIN or _WIN_STATE["min"]:
+                        _was_max = _WIN_STATE["max"]
                         _w.restore()
+                        if IS_WIN and _was_max:
+                            _w.maximize()   # it was maximized before
                     _w.show()
                     if IS_MAC:
                         from AppKit import NSApp
@@ -16425,7 +16445,7 @@ def _write_instance_note():
     atexit.register(_drop)
 
 
-_WIN_STATE = {"min": False}      # the window, as its events report it
+_WIN_STATE = {"min": False, "max": False}   # as the window's events say
 
 
 def _hand_off() -> bool:
@@ -21563,15 +21583,26 @@ $("#fpick").addEventListener("change",()=>{
 });
 // A DROPPED FILE ATTACHES (6b317, from the Windows sweep): with no drop
 // handler, WebView2 navigated the whole window to the file, the app was
-// gone and nothing led back. Anywhere in the window, a drop is a chip.
-addEventListener("dragover",e=>{e.preventDefault();
-  if(e.dataTransfer)e.dataTransfer.dropEffect="copy";});
+// gone and nothing led back. Only a drag that carries FILES is taken
+// (review: taking every drop stopped text and links landing in the
+// composer), and only what the attach button accepts: a PDF read as
+// text reached the model as garbage framed as real data.
+const DROP_TEXT=/\.(txt|md|markdown|csv|json|js|ts|py|html|css|log|sh|ya?ml|xml|toml|rtf)$/i;
+const hasFiles=e=>!!(e.dataTransfer&&[...(e.dataTransfer.types||[])].includes("Files"));
+addEventListener("dragover",e=>{
+  if(!hasFiles(e))return;
+  e.preventDefault();e.dataTransfer.dropEffect="copy";});
 addEventListener("drop",e=>{
+  if(!hasFiles(e))return;
   e.preventDefault();
-  [...((e.dataTransfer&&e.dataTransfer.files)||[])].forEach(f=>{
+  const skipped=[];
+  [...(e.dataTransfer.files||[])].forEach(f=>{
     if(f.type.startsWith("image/"))addImageFile(f);
-    else if(f.size<2_000_000)addDocFile(f);
+    else if(DROP_TEXT.test(f.name)&&f.size<2_000_000)addDocFile(f);
+    else skipped.push(f.name);
   });
+  if(skipped.length)input.placeholder="can't read "+skipped[0]
+    +" here \u2014 text files and images only";
 });
 input.addEventListener("paste",e=>{
   const items=[...(e.clipboardData||{}).items||[]]
@@ -25559,7 +25590,8 @@ function openUpdate(){
      "installer). Your chats and everything it remembers are kept."
     :"Downloads "+upInfo.size_mb+" MB from GitHub, then restarts. "+
      "Your chats and everything it remembers are kept.";
-  upGo.textContent=upInfo.manual?"Download":"Update now";
+  // never over a Mac update already running (review)
+  if(!upGo.disabled)upGo.textContent=upInfo.manual?"Download":"Update now";
   upVeil.hidden=false;
 }
 $("#update-flag").addEventListener("click",openUpdate);
@@ -26910,8 +26942,10 @@ if __name__ == "__main__":
         )
         try:
             window.events.minimized += lambda: _WIN_STATE.update(min=True)
-            window.events.restored += lambda: _WIN_STATE.update(min=False)
-            window.events.maximized += lambda: _WIN_STATE.update(min=False)
+            window.events.restored += lambda: _WIN_STATE.update(
+                min=False, max=False)
+            window.events.maximized += lambda: _WIN_STATE.update(
+                min=False, max=True)
         except Exception:
             pass
         # pywebview defaults to private_mode=True — an EPHEMERAL WebKit
