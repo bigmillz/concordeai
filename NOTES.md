@@ -5676,10 +5676,16 @@ polling the Mac on the VMware network; no admin rights, no settings).
   promises. _win_native_machine now reads the system's own
   PROCESSOR_ARCHITECTURE from the registry, and platform.machine()
   (both report the real chip); IS_WIN_EMULATED comes from the Python
-  build (sysconfig). A PC that already got the x64 engine has it
-  replaced once, in the background with progress, and the x64 one comes
-  back if the download fails; installs wait for that download rather
-  than start a second one. Verified in the VM: "Windows ARM64", and the
+  build (sysconfig). A PC that already got the x64 engine gets the
+  native one beside it: the ARM64 build downloads into bin.arm64 while
+  the x64 one keeps serving, must be an ARM64 binary (its PE header),
+  and goes in at a later launch, before any Ollama of ours starts, and
+  not while another copy of the app runs. A swap cut short between its
+  two renames is undone at the next launch. (The first version moved
+  the x64 engine aside and THEN downloaded; the review showed a quit
+  mid-download left no engine and stranded the x64 copy. It never
+  shipped.) Engine downloads take a lock, so two install batches can't
+  write one .part file. Verified in the VM: "Windows ARM64", and the
   running engine is an ARM64 binary with the installed model intact.
 - VOICE ON A PC WITHOUT A USABLE NVIDIA CARD took 76 s, then 43 s, to
   write down a 3 s sentence (large-v3-turbo, 5-way beam, on the CPU).
@@ -5696,4 +5702,28 @@ polling the Mac on the VMware network; no admin rights, no settings).
   PowerShell exited.
 - A pull's last stretch is Ollama hashing the finished file, silently:
   100 s at "99%" for a 2 GB model in the VM. The row and the line of
-  models moving say "checking" then.
+  models moving say "checking" then. A finished pull keeps its Ollama
+  size, so the overall bar no longer steps back when one completes.
+- WEATHER, EVERY PLATFORM: "what's the weather in Chicago right now"
+  asked wttr.in and the geocoder about a place called "Chicago right
+  now" (a 500 and nothing), so the answer had no live data; "Chicago
+  weather" named no place at all. weather_place() takes the time words
+  out wherever they sit and reads a place before "weather" too, and a
+  request ("tell me the weather") is not a place. wttr.in also stopped
+  sending localObsDateTime, which had quietly turned off the stale-
+  reading check (6b270) and moved the night check onto the host's clock:
+  the age now comes from observation_time (UTC) and night from the
+  place's longitude. And wttr.in names its station's area ("Mccormick-
+  ville, Illinois" for Chicago), which Gemma refused to call Chicago's
+  weather: the place asked about leads, the station follows. Only the
+  zip code (11221) had ever been tested; a live "Chicago right now"
+  check joins it.
+- The search proxy won't tunnel back into this computer (a name that
+  resolves to loopback) and dials the address it checked; private
+  addresses stay allowed, since a fake-IP VPN answers every name with
+  198.18.x.x. Its test runs over a fake network now: the old probes
+  passed only because nothing listened on the Mac's port 443.
+- Every .pptx export threw on every platform: the title slide's date
+  called _venue_stamp() without the format it requires. The gauntlet
+  now writes a real deck. The on-demand pip install of the export
+  libraries no longer flashes a console window on Windows.

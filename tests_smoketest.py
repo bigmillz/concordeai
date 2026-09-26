@@ -312,6 +312,20 @@ if _XNS:
 check("export engines: stdlib formats all write real files",
       all(isinstance(_xmade.get(e), int) and _xmade[e] > 0
           for e in ("csv", "md", "mmd", "py", "anki", "zip")), str(_xmade))
+# a deck, for real (6b317, review): the title slide's date called
+# _venue_stamp() with no format and every .pptx export threw. Absent from
+# this namespace, the guard skipped the call, so give it the real shape.
+_xdeck = ""
+try:
+    import pptx as _pptx
+    _XNS["_venue_stamp"] = lambda fmt: time.strftime(fmt.replace("%-d", "%d"))
+    _pp = os.path.join(__import__("tempfile").gettempdir(), "gaunt_x.pptx")
+    _XNS["ex_slides"](_XSAMPLE, "pptx", _pp, title="Trip")
+    _xdeck = _pptx.Presentation(_pp).slides[0].placeholders[1].text
+except Exception as _ex:
+    _xdeck = "ERR " + repr(_ex)[:120]
+check("export: a slide deck writes, dated on its title slide",
+      time.strftime("%Y") in _xdeck and not _xdeck.startswith("ERR"), _xdeck)
 # a Mermaid export must be valid Mermaid, not whatever fence came first
 _xmmd = ""
 try:
@@ -3107,6 +3121,12 @@ t = chat({"model": "", "models": [], "tier": "Fast", "auto_web": True,
           "messages": [{"role": "user", "content": "whats the weather in 11221"}]})
 check("weather answer carries real data", ("°F" in t or "degrees" in t or " mph" in t)
       and "⚠️" not in t and len(t) > 60, t[:120])
+# a place by name with a time phrase after it (6b317): this one answered
+# with no live data
+t = chat({"model": "", "models": [], "tier": "Fast", "auto_web": True,
+          "messages": [{"role": "user", "content": "What's the weather in Chicago right now?"}]})
+check("a named place 'right now' gets real weather too",
+      "°F" in t and "⚠️" not in t and "No live weather" not in t, t[:160])
 
 # 6b310: the fleet hub is gone — its routes answer 404 even with the key
 s, h, b = req("/api/fleet/register", "POST",
@@ -3257,10 +3277,12 @@ class _PP:
     def __init__(self, pid=None): self.pid = pid
     def children(self, recursive=False): return [_Kid("runner"), _Kid("helper")] if recursive else []
     def username(self): return "MBP\\pat"
-    def parents(self): return [_t17.SimpleNamespace(pid=1), _t17.SimpleNamespace(pid=9)]
+    def parents(self): return [_t17.SimpleNamespace(pid=1), _t17.SimpleNamespace(pid=9),
+                               _t17.SimpleNamespace(pid=14)]
 class _Popen:
     pid = 4242
     def terminate(self): _killed.append("serve")
+    def wait(self, timeout=None): return 0
 _sp = {"IS_WIN": True, "HAS_PSUTIL": True, "subprocess": subprocess,
        "psutil": _t17.SimpleNamespace(Process=_PP)}
 _exec_names(_sp, {"_stop_proc"})
@@ -3270,10 +3292,20 @@ _killed[:] = []
 _sp["IS_WIN"] = False
 _sp["_stop_proc"](_Popen())
 _killed_mac = list(_killed)
+# ...and a quit really goes through it (review: putting terminate() back
+# in stop_managed_engines went unnoticed)
+_killed[:] = []
+_sp.update(IS_WIN=True, _managed_procs=[_Popen()], _mlx_procs={}, _RELOCATED=set(),
+           _other_millenai_running=lambda: False, _proc_port=lambda p: "11434")
+_exec_names(_sp, {"stop_managed_engines"})
+_sp["stop_managed_engines"]()
+_killed_quit = list(_killed)
 _procs = [{"pid": 10, "name": "python.exe", "cmdline": ["pythonw.exe", "C:\\x\\millenai.py"], "username": "MBP\\pat"},
           # our ancestors (the venv launcher, a cmd.exe wrapper) never count
           {"pid": 9, "name": "cmd.exe", "cmdline": ["cmd", "/c", "python.exe millenai.py"], "username": "MBP\\pat"},
           {"pid": 13, "name": "cmd.exe", "cmdline": ["cmd", "/c", "notepad millenai.py"], "username": "MBP\\pat"},
+          # the venv's python.exe that started the real one: an ancestor
+          {"pid": 14, "name": "python.exe", "cmdline": ["python.exe", "C:\\x\\millenai.py"], "username": "MBP\\pat"},
           {"pid": 11, "name": "pythonw.exe", "cmdline": ["pythonw.exe", "C:\\y\\millenai.py"], "username": "MBP\\pat"},
           {"pid": 12, "name": "python.exe", "cmdline": ["python.exe", "millenai.py"], "username": "MBP\\other"}]
 def _pi(attrs):
@@ -3285,12 +3317,13 @@ _om = {"IS_WIN": True, "HAS_PSUTIL": True, "PORT": 8889,
        "os": _t17.SimpleNamespace(getpid=lambda: 10, getppid=lambda: 1)}
 _exec_names(_om, {"_other_millenai_running"})
 _sib1 = _om["_other_millenai_running"]()          # pid 11 is ours too
-_procs.pop(3)
+_procs[:] = [d for d in _procs if d["pid"] != 11]
 _sib0 = _om["_other_millenai_running"]()          # only us, our wrapper, another user's
 check("Windows: quitting stops Ollama's whole tree; siblings are seen",
       _killed_win == ["runner", "helper", "serve"] and _killed_mac == ["serve"]
+      and _killed_quit == ["runner", "helper", "serve"]
       and _sib1 is True and _sib0 is False,
-      "%r" % [_killed_win, _killed_mac, _sib1, _sib0])
+      "%r" % [_killed_win, _killed_mac, _killed_quit, _sib1, _sib0])
 
 # 6b317, found in a Windows VM: EVERY chat died before its first word on
 # time.strftime("%A, %B %-d, %Y"): %-d is a Mac/Linux extension Windows
@@ -3333,41 +3366,85 @@ _db = {"_setup_lock": __import__("threading").RLock(),
        "_batch_labels": lambda: ["Llama 3.2 3B"]}
 _exec_names(_db, {"_downloaded_bytes"})
 _hw = _db["_downloaded_bytes"](set())
+# ...and keeps it once the pull finishes (review): the finished job used
+# to drop its size, and the bar and its speed stepped backwards
+def _fake_pull(label, tag):
+    with _db["_setup_lock"]:
+        _db["_setup_jobs"][label].update(done_b=2_019_000_000, total_b=2_019_000_000)
+_db.update(MODEL_INFO={"Llama 3.2 3B": {"gb": 1.8}}, ENGINE_ROW="Ollama engine",
+           _ensure_ollama_ready=lambda: True, _keep_awake=lambda on: None,
+           model_is_giant=lambda l: False, _pull_ollama_model=_fake_pull,
+           _app_models_add=lambda l: None)
+_exec_names(_db, {"_ollama_install_worker"})
+_db["_ollama_install_worker"](["Llama 3.2 3B"])
+_db["model_cached"] = lambda l, p=None: True
+_hw2 = _db["_downloaded_bytes"](set())
 check("the overall bar measures an Ollama pull by Ollama's own size",
       _hw == (1_800_000_000, 2_019_000_000)
-      and 'job["total_b"] = want' in _MILLENAI_SRC, "%r" % (_hw,))
+      and _hw2 == (2_019_000_000, 2_019_000_000)
+      and _db["_setup_jobs"]["Llama 3.2 3B"]["status"] == "done"
+      and 'job["total_b"] = want' in _MILLENAI_SRC, "%r" % [_hw, _hw2])
 
 # 6b317, found in a Windows VM: the search library resolves names over a
 # UDP socket bound to every interface, which brought up a Windows Firewall
 # prompt for Python on the first web search (and failed behind VMware's
 # DNS). On Windows it goes through a CONNECT proxy on 127.0.0.1: HTTPS to
-# 443 only, with a password per run. Its refusals, run for real:
+# 443 only, with a password per run, never back into this computer. Run
+# for real, over a fake network (review: the old probes passed only
+# because nothing listened on this machine's port 443):
 import socket as _so17, base64 as _b17
-_spx = {"socket": _so17, "secrets": __import__("secrets"),
+_dials = []
+_NAMES = {"example.com": ["93.184.215.14"], "localhost": ["127.0.0.1", "::1"],
+          "127.0.0.1": ["127.0.0.1"], "fake-ip.example": ["198.18.0.7"]}
+def _gai(host, port, type=0):
+    return [(0, type, 0, "", (a, port)) for a in _NAMES.get(host, [])]
+def _dial(addr, timeout=None):
+    a, b = _so17.socketpair()
+    _dials.append((addr, b))
+    return a
+_fsock = _t17.SimpleNamespace(**{k: getattr(_so17, k) for k in (
+    "socket", "AF_INET", "SOCK_STREAM", "SHUT_RDWR")})
+_fsock.getaddrinfo, _fsock.create_connection = _gai, _dial
+_spx = {"socket": _fsock, "secrets": __import__("secrets"),
         "threading": __import__("threading")}
 _exec_names(_spx, {"_SEARCH_PROXY", "_search_proxy"})
 _purl = _spx["_search_proxy"]()
 _pcred, _paddr = _purl[len("http://"):].split("@")
 _phost, _pport = _paddr.split(":")
-def _proxy_says(req):
+def _proxy_says(req, then=b""):
     s = _so17.create_connection((_phost, int(_pport)), timeout=10)
     s.sendall(req)
     try:
-        return s.recv(64).split(b"\r\n")[0]
+        line = s.recv(64).split(b"\r\n")[0]
+        if then and line.endswith(b"200 Connection established"):
+            s.sendall(then)
+            __import__("time").sleep(0.2)
+        return line
     finally:
         s.close()
 _auth = b"Proxy-Authorization: Basic " + _b17.b64encode(_pcred.encode()) + b"\r\n"
 _pr = (_proxy_says(b"CONNECT example.com:443 HTTP/1.1\r\n\r\n"),
        _proxy_says(b"CONNECT example.com:22 HTTP/1.1\r\n" + _auth + b"\r\n"),
        _proxy_says(b"GET http://example.com/ HTTP/1.1\r\n" + _auth + b"\r\n"),
-       _proxy_says(b"CONNECT 127.0.0.1:443 HTTP/1.1\r\n" + _auth + b"\r\n"))
+       _proxy_says(b"CONNECT 127.0.0.1:443 HTTP/1.1\r\n" + _auth + b"\r\n"),
+       _proxy_says(b"CONNECT localhost:443 HTTP/1.1\r\n" + _auth + b"\r\n"))
+_refused_dials = list(_dials)
+_ok_ex = _proxy_says(b"CONNECT example.com:443 HTTP/1.1\r\n" + _auth + b"\r\n",
+                     then=b"hello")
+_ok_fk = _proxy_says(b"CONNECT fake-ip.example:443 HTTP/1.1\r\n" + _auth + b"\r\n")
+_dials[0][1].settimeout(5) if _dials else None
+_got = _dials[0][1].recv(16) if _dials else b""
 _ddg_src = _MILLENAI_SRC[_MILLENAI_SRC.index("def _ddg_text("):]
 _ddg_src = _ddg_src[:_ddg_src.index("\n\n\n")]
 check("Windows web search goes through a loopback proxy that refuses strangers",
-      _phost == "127.0.0.1" and _pr == (b"HTTP/1.1 403 Forbidden",) * 4
+      _phost == "127.0.0.1" and _pr == (b"HTTP/1.1 403 Forbidden",) * 5
+      and not _refused_dials
+      and _ok_ex == _ok_fk == b"HTTP/1.1 200 Connection established"
+      and [d[0] for d in _dials] == [("93.184.215.14", 443), ("198.18.0.7", 443)]
+      and _got == b"hello"
       and "proxy = _search_proxy() if IS_WIN else None" in _ddg_src
       and "DDGS(proxy=proxy)" in _ddg_src,
-      "%r" % (_pr,))
+      "%r" % [_pr, _refused_dials, _ok_ex, _ok_fk, [d[0] for d in _dials], _got])
 
 # 6b317, measured in a Windows VM: voice took 43 s to write down 3 s of
 # speech (large-v3-turbo, 5-way beam, on the CPU). A PC without a usable
@@ -3474,6 +3551,167 @@ check("Windows reads any reply aloud: UTF-8 in, UTF-8 read, the pipe always clos
       and "[Text.Encoding]::UTF8" in _sp.args[-1]
       and "OpenStandardInput()" in _sp.args[-1],
       "%r" % [_sp_err, _sp and (_sp.closed, _sp.buf[:40], _sp.kw)])
+
+# 6b317, found asking a Windows VM "what's the weather in Chicago right
+# now": the place was everything after "weather in", so wttr.in and the
+# geocoder were asked about "Chicago right now" and the answer had no
+# live data. Only a zip code had ever been tested.
+_wxp = {"re": re}
+_exec_names(_wxp, {"_WX_WHEN", "_WX_NOT_PLACE", "weather_place"})
+_WXQ = {"What's the weather in Chicago right now?": "Chicago",
+        "What's the weather like in Paris this weekend?": "Paris",
+        "Chicago weather": "Chicago",
+        "chicago weather tomorrow": "chicago",
+        "What's the weather going to be like in Denver tomorrow?": "Denver",
+        "weather forecast for London next week": "London",
+        "whats the weather for tomorrow in New York": "New York",
+        "what will the weather be in Tokyo on Friday": "Tokyo",
+        "weather in Boston Sunday": "Boston",
+        "weather at Sunday River": "Sunday River",
+        "whats the weather in 11221": "11221,us",
+        "tomorrow's forecast for Seattle, WA": "Seattle, WA",
+        "what's the Denver forecast": "Denver",
+        "How's the weather?": "", "tell me the weather": "",
+        "can you check the weather": "", "what's the local weather": "",
+        "what's the weather like today": ""}
+_wxbad = {q: _wxp["weather_place"](q) for q in _WXQ
+          if _wxp["weather_place"](q) != _WXQ[q]}
+# wttr.in no longer sends localObsDateTime: the age and the night sky
+# come from observation_time (UTC) and the longitude, fed here
+import io as _io18, json as _js18, time as _tm18
+_wx_urls = []
+def _wx_feed(age_min, sun_hour, desc="Sunny"):
+    g = _tm18.gmtime(_tm18.time() - age_min * 60)
+    lon = ((sun_hour - (g.tm_hour + g.tm_min / 60.0)) * 15 + 540) % 360 - 180
+    j1 = {"current_condition": [{
+              "observation_time": _tm18.strftime("%I:%M %p", g),
+              "temp_F": "59", "FeelsLikeF": "57", "weatherDesc": [{"value": desc + " "}],
+              "windspeedMiles": "7", "humidity": "46"}],
+          "nearest_area": [{"areaName": [{"value": "Mccormickville"}],
+                            "region": [{"value": "Illinois"}],
+                            "longitude": "%.3f" % lon}],
+          "weather": [{"date": "2026-09-26", "maxtempF": "61", "mintempF": "50",
+                       "hourly": [{}] * 4 + [{"weatherDesc": [{"value": "Cloudy"}]}]}]}
+    class _R(_io18.BytesIO):
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+    ns = {"re": re, "time": _tm18, "json": _js18,
+          "urllib": _t17.SimpleNamespace(
+              request=_t17.SimpleNamespace(urlopen=lambda url, timeout=0: (
+                  _wx_urls.append(url), _R(_js18.dumps(j1).encode()))[1]),
+              parse=__import__("urllib.parse").parse),
+          "_venue_now": lambda tz="": _tm18.localtime(),
+          "_tl_search": _t17.SimpleNamespace(), "_geocode": lambda q: None}
+    _exec_names(ns, {"_WX_WHEN", "_WX_NOT_PLACE", "weather_place", "weather_snippets"})
+    return ns["weather_snippets"]("what's the weather in Chicago right now?")
+_wxf = {"fresh day": _wx_feed(30, 13), "stale": _wx_feed(180, 13),
+        "fresh night": _wx_feed(10, 2)}
+check("weather questions name their place, time words left out; the reading's age is real",
+      not _wxbad
+      and _wxf["fresh day"] and "observed 30 min ago" in _wxf["fresh day"]
+      # the place asked about leads, not wttr.in's station area (a model
+      # told "Mccormickville" wouldn't call it Chicago's weather)
+      and _wxf["fresh day"].startswith(
+          "LIVE WEATHER for Chicago (station: Mccormickville, Illinois)")
+      and "59°F" in _wxf["fresh day"] and "Sunny" in _wxf["fresh day"]
+      and _wxf["stale"] is None
+      and _wxf["fresh night"] and ", clear, wind" in _wxf["fresh night"]
+      and _wx_urls and all(u == "https://wttr.in/Chicago?format=j1" for u in _wx_urls)
+      and 'cur.get("localObsDateTime")' not in _MILLENAI_SRC,
+      "%r" % [_wxbad, _wxf])
+
+# 6b317: an ARM64 PC that got the x64 engine is given the native one. The
+# first version moved the x64 engine aside and then downloaded, so a quit
+# mid-download left no engine (review). Now the native build downloads
+# beside it while x64 serves, must BE ARM64, and goes in at a later
+# launch before our Ollama starts; a swap cut short is undone.
+import tempfile as _tf19, shutil as _sh19, os as _os19
+def _pe(path, machine):
+    b = bytearray(0x100)
+    b[0:2] = b"MZ"
+    b[0x3C:0x40] = (0x80).to_bytes(4, "little")
+    b[0x80:0x84] = b"PE\0\0"
+    b[0x84:0x86] = machine.to_bytes(2, "little")
+    _os19.makedirs(_os19.path.dirname(path), exist_ok=True)
+    open(path, "wb").write(bytes(b))
+def _engine_world(get=0xAA64, sibling=False, locked=False):
+    root = _tf19.mkdtemp()
+    log = {"spawned": [], "fetches": 0}
+    class _Th:
+        def __init__(self, target, daemon=None): self.t = target
+        def start(self):
+            try:
+                self.t()
+            except KeyboardInterrupt:      # the app quit mid-download
+                pass
+    def _dl(dest, row=None):
+        log["fetches"] += 1
+        _pe(_os19.path.join(dest, "ollama.exe"), get)
+        _os19.makedirs(_os19.path.join(dest, "lib"), exist_ok=True)
+        if log.get("quit"):
+            raise KeyboardInterrupt
+    def _replace(a, b):
+        if locked and a.endswith("bin"):
+            raise PermissionError("[WinError 5] Access is denied")
+        _os19.replace(a, b)
+    ns = {"os": _t17.SimpleNamespace(path=_os19.path, replace=_replace,
+                                     remove=_os19.remove),
+          "shutil": _sh19, "threading": _t17.SimpleNamespace(Thread=_Th),
+          "IS_WIN_ARM": True, "_MANAGED_BIN_DIR": _os19.path.join(root, "bin"),
+          "_download_ollama_binary": _dl,
+          "_other_millenai_running": lambda: sibling}
+    ns["_spawn_ollama_serve"] = lambda: log["spawned"].append(
+        ns["_pe_machine"](_os19.path.join(ns["_MANAGED_BIN_DIR"], "ollama.exe")))
+    _exec_names(ns, {"_pe_machine", "_wrong_arch_engine", "_ENGINE_ARM_STAGE",
+                     "_ENGINE_ARM_DONE", "_stage_native_engine",
+                     "_settle_engine_dir", "start_managed_engines"})
+    _pe(_os19.path.join(root, "bin", "ollama.exe"), 0x8664)
+    def ls():
+        return sorted(d for d in _os19.listdir(root))
+    return ns, log, root, ls
+_ew = {}
+# the normal path: x64 serves while the native one downloads, then it's in
+_ns, _lg, _rt, _ls = _engine_world()
+_ns["start_managed_engines"](); _a = (_ls(), list(_lg["spawned"]))
+_ns["start_managed_engines"](); _b = (_ls(), list(_lg["spawned"]), _lg["fetches"])
+_ew["normal"] = (_a, _b)
+_ok_normal = (_a == (["bin", "bin.arm64"], [0x8664])
+              and _b == (["bin"], [0x8664, 0xAA64], 1))
+# quit mid-download: the x64 engine is untouched; the next launch refetches
+_ns, _lg, _rt, _ls = _engine_world()
+_lg["quit"] = True
+_ns["start_managed_engines"](); _a = (_ls(), list(_lg["spawned"]))
+_lg["quit"] = False
+_ns["start_managed_engines"](); _ns["start_managed_engines"]()
+_b = (_ls(), list(_lg["spawned"]), _lg["fetches"])
+_ew["quit"] = (_a, _b)
+_ok_quit = (_a[1] == [0x8664] and "bin" in _a[0]
+            and _b == (["bin"], [0x8664, 0x8664, 0xAA64], 2))
+# a download that isn't ARM64 never goes in
+_ns, _lg, _rt, _ls = _engine_world(get=0x8664)
+_ns["start_managed_engines"](); _ns["start_managed_engines"]()
+_ew["wrong"] = (_ls(), list(_lg["spawned"]))
+_ok_wrong = _ew["wrong"] == (["bin"], [0x8664, 0x8664])
+# a swap cut short between its two renames is undone at the next launch
+_ns, _lg, _rt, _ls = _engine_world()
+_os19.replace(_os19.path.join(_rt, "bin"), _os19.path.join(_rt, "bin.x64"))
+_os19.makedirs(_os19.path.join(_rt, "bin"))
+_ns["_settle_engine_dir"]()
+_ew["cut"] = (_ls(), _ns["_wrong_arch_engine"]())
+_ok_cut = _ew["cut"] == (["bin"], True)
+# a folder still in use, or another copy of the app: wait, keep x64
+_oks = []
+for _kw in ({"locked": True}, {"sibling": True}):
+    _ns, _lg, _rt, _ls = _engine_world(**_kw)
+    _ns["start_managed_engines"](); _ns["start_managed_engines"]()
+    _ew[str(_kw)] = (_ls(), list(_lg["spawned"]))
+    # ...and the finished download waits; it isn't fetched again
+    _oks.append(_ew[str(_kw)] == (["bin", "bin.arm64"], [0x8664, 0x8664])
+                and _lg["fetches"] == 1)
+check("ARM64 PCs get the native engine without ever being left with none",
+      _ok_normal and _ok_quit and _ok_wrong and _ok_cut and all(_oks)
+      and "def _replace_engine_native" not in _MILLENAI_SRC,
+      "%r" % _ew)
 
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)

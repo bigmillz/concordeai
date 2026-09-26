@@ -2796,18 +2796,60 @@ def model_fits_memory(label: str) -> bool:
     factor = 1.3 if "MoE" in label else 1.5
     return need * factor < avail
 
+# THE PLACE A WEATHER QUESTION NAMES (6b317, found asking a Windows VM
+# "what's the weather in Chicago right now"): everything after "weather
+# in" was the place, so wttr.in was asked for "Chicago right now" (an
+# error) and the geocoder too (nothing), and the answer had no live data.
+# Time words come out wherever they sit, and "Chicago weather" names a
+# place as well. Only the zip code had ever been tested.
+_WX_WHEN = re.compile(
+    r"\b(?:right now|now|currently|at the moment|over the weekend|"
+    r"(?:today|tonight|tomorrow)(?:'s|s)?(?: (?:morning|afternoon|evening|"
+    r"night))?|(?:this|next) (?:weekend|week|morning|afternoon|evening)|"
+    r"(?:on|this|next) (?:mon|tues|wednes|thurs|fri|satur|sun)day"
+    r"(?: (?:morning|afternoon|evening|night))?)\b"
+    r"|\b(?:mon|tues|wednes|thurs|fri|satur|sun)day\s*$", re.I)
+# words that say the text before "weather" is a request, not a place
+_WX_NOT_PLACE = set("""a an the me my our your you i we it is are be can could
+would will please tell give show get check know what whats how hows local
+current outside there here""".split())
+
+
+def weather_place(q: str) -> str:
+    """The place in a weather question, "" when it names none."""
+    m = re.search(r"\b(\d{5})\b", q)
+    # a bare 5-digit zip is ambiguous worldwide — 11221 alone resolved to
+    # Vilnius, Lithuania; ',us' pins it to Brooklyn
+    if m:
+        return m.group(1) + ",us"
+    s = " ".join(_WX_WHEN.sub(" ", q).split()).strip(" ?.!,")
+    m = re.search(r"\b(?:weather|forecast|temperatures?)\b.*?"
+                  r"\b(?:in|for|at|near|around)\s+(.+)$", s, re.I)
+    if m:
+        loc = m.group(1)
+    else:
+        # "Chicago weather", "what's the Denver forecast"
+        m = re.match(r"(.*?)\b(?:weather|forecast|temperatures?)\b", s, re.I)
+        pre = re.sub(r"^(?:what(?:'s| is)|how(?:'s| is)|whats|hows)\s+"
+                     r"(?:the\s+)?", "", (m.group(1) if m else "").strip(),
+                     flags=re.I)
+        words = re.findall(r"[\w'.-]+", pre.lower())
+        loc = (pre if 0 < len(words) <= 4
+               and not _WX_NOT_PLACE.intersection(words) else "")
+    # what the time words left behind: "for in Chicago", "Chicago for"
+    loc = re.sub(r"^(?:(?:in|for|at|near|around|like)\s+)+", "", loc,
+                 flags=re.I)
+    loc = re.sub(r"(?:\s+(?:in|for|at|on|like|be))+$", "", loc, flags=re.I)
+    return loc.strip(" ,?.!'\"")
+
+
 def weather_snippets(q: str):
     """Real numbers for weather questions. Generic web snippets for
     'weather in 11221' returned Moscow forecasts and kids' videos (seen
     live) — honest models reported garbage, confident ones invented a
     forecast. wttr.in resolves a zip or place name to actual conditions,
     no API key. None on any failure — the caller falls back to search."""
-    m = re.search(r"\b(\d{5})\b", q)
-    # a bare 5-digit zip is ambiguous worldwide — 11221 alone resolved to
-    # Vilnius, Lithuania; ',us' pins it to Brooklyn
-    loc = (m.group(1) + ",us") if m else re.sub(
-        r".*?\b(?:weather|forecast|temperature)\b\s*(?:in|for|at|like in|like)?\s*",
-        "", q, flags=re.I).strip(" ?.!") or ""
+    loc = weather_place(q)
     if not loc or len(loc) > 60:
         return None
     # weekday names on every forecast line — a Friday "this weekend"
@@ -2852,30 +2894,45 @@ def weather_snippets(q: str):
         area = d["nearest_area"][0]
         name = "%s, %s" % (area["areaName"][0]["value"],
                            area["region"][0]["value"])
+        # wttr.in names the area of its nearest station: Chicago came back
+        # as "Mccormickville, Illinois", and the model, told that, would
+        # not call it Chicago's weather (6b317). A place asked for by name
+        # leads; a zip keeps the area it resolved to.
+        if not loc.endswith(",us"):
+            name = "%s (station: %s)" % (loc.title() if loc.islower()
+                                         else loc, name)
         # SANITY (6b270, judged 2.0: "87°F and sunny right now" at
         # 3:30 AM — a stale daytime observation served as current,
         # above the day's own high). A reading older than two hours
         # or hotter than today's forecast high is not "right now";
         # this rung steps aside and the next one answers.
-        _obs = str(cur.get("localObsDateTime") or "")
+        # wttr.in stopped sending localObsDateTime (seen 2026-09, 6b317),
+        # which left the age check and the night check below on the
+        # host's clock. observation_time, in UTC, dates the reading; the
+        # place's longitude gives its sun time (and the old local-time
+        # math was hours off for a place in another time zone anyway).
+        _age, _hr, _seen = 0.0, _venue_now().tm_hour, "just now"
         try:
-            _age = time.time() - time.mktime(
-                time.strptime(_obs, "%Y-%m-%d %I:%M %p"))
+            _ot = time.strptime(str(cur.get("observation_time")), "%I:%M %p")
+            _g = time.gmtime()
+            _age = float(((_g.tm_hour - _ot.tm_hour) * 3600
+                          + (_g.tm_min - _ot.tm_min) * 60) % 86400)
+            if _age > 86400 - 1800:        # a clock running a little fast
+                _age = 0.0
+            _seen = "%d min ago" % (_age // 60)
+            _hr = int((_ot.tm_hour + _ot.tm_min / 60.0
+                       + float(area["longitude"]) / 15) % 24)
         except Exception:
-            _age = 0.0
+            pass
         _hi = float(d["weather"][0]["maxtempF"]) if d.get("weather") else 999
         if _age > 2 * 3600 or float(cur["temp_F"]) > _hi + 3:
             raise ValueError("stale or impossible reading")
-        _desc = cur["weatherDesc"][0]["value"]
-        try:      # the observation's own local hour, not the host's
-            _hr = time.strptime(_obs, "%Y-%m-%d %I:%M %p").tm_hour
-        except Exception:
-            _hr = _venue_now().tm_hour
+        _desc = cur["weatherDesc"][0]["value"].strip()
         if _hr < 6 or _hr >= 20:
             # no sun at night: the feed says "Sunny" for a clear sky
             _desc = re.sub(r"\bsunny\b", "clear", _desc, flags=re.I)
         out = ["LIVE WEATHER for %s (source: wttr.in, observed %s):"
-               % (name, _obs or "just now"),
+               % (name, _seen),
                "Right now: %s°F (feels like %s°F), %s, wind %s mph, "
                "humidity %s%%" % (
                    cur["temp_F"], cur["FeelsLikeF"], _desc,
@@ -2885,7 +2942,7 @@ def weather_snippets(q: str):
                 _wd(day["date"]), day["date"],
                 day["maxtempF"], day["mintempF"],
                 day["hourly"][4]["weatherDesc"][0]["value"]))
-        _tl_search.weather_src = {"t": "Live weather — " + name,
+        _tl_search.weather_src = {"t": "Live weather — " + name.split(" (station")[0],
                                   "u": "https://wttr.in/%s"
                                        % urllib.parse.quote(loc)}
         return "\n".join(out)
@@ -3786,45 +3843,75 @@ def _wrong_arch_engine() -> bool:
     return os.path.exists(exe) and _pe_machine(exe) == 0x8664
 
 
-def _replace_engine_native():
-    """Swap an x64 engine for the native ARM64 one, once, in the
-    background with progress; if the download fails the x64 one goes
-    back, so the app keeps working."""
-    old = _MANAGED_BIN_DIR + ".x64"
-    with _setup_lock:
-        _setup_jobs[ENGINE_ROW] = {"status": "downloading", "pct": 0,
-                                   "note": "the native ARM64 engine"}
+# THE NATIVE ENGINE ARRIVES BESIDE THE OLD ONE (6b317, from review). The
+# first version moved the x64 engine aside and then downloaded: quitting
+# during the download left no engine at all, chats failed meanwhile, and
+# the x64 copy was stranded. Now the ARM64 build downloads into its own
+# folder while the x64 one keeps serving, is checked to be ARM64, and
+# goes in at a later launch, before any Ollama of ours starts.
+_ENGINE_ARM_STAGE = _MANAGED_BIN_DIR + ".arm64"
+_ENGINE_ARM_DONE = os.path.join(_ENGINE_ARM_STAGE, "complete")
+
+
+def _stage_native_engine():
     try:
-        shutil.rmtree(old, ignore_errors=True)
+        shutil.rmtree(_ENGINE_ARM_STAGE, ignore_errors=True)
+        _download_ollama_binary(_ENGINE_ARM_STAGE, row=None)
+        if _pe_machine(os.path.join(_ENGINE_ARM_STAGE,
+                                    "ollama.exe")) != 0xAA64:
+            raise RuntimeError("the download is not an ARM64 engine")
+        open(_ENGINE_ARM_DONE, "w").close()
+    except Exception:
+        shutil.rmtree(_ENGINE_ARM_STAGE, ignore_errors=True)
+
+
+def _settle_engine_dir():
+    """Before our Ollama starts: undo a swap cut short, then put a fully
+    downloaded native engine in place. Any step that fails leaves the
+    engine that was working; the swap is tried again next launch."""
+    exe = "ollama.exe"
+    old = _MANAGED_BIN_DIR + ".x64"
+    if (not os.path.exists(os.path.join(_MANAGED_BIN_DIR, exe))
+            and os.path.exists(os.path.join(old, exe))):
+        shutil.rmtree(_MANAGED_BIN_DIR, ignore_errors=True)
+        try:
+            os.replace(old, _MANAGED_BIN_DIR)
+        except OSError:
+            return
+    if not os.path.exists(_ENGINE_ARM_DONE) or _other_millenai_running():
+        return
+    shutil.rmtree(old, ignore_errors=True)
+    try:
+        # fails while anything still runs from the old folder
         os.replace(_MANAGED_BIN_DIR, old)
-        _download_ollama_binary()
-        shutil.rmtree(old, ignore_errors=True)
-        with _setup_lock:
-            _setup_jobs[ENGINE_ROW] = {"status": "done", "note": "",
-                                       "pct": 100}
-    except Exception as exc:
-        if (os.path.isdir(old) and not os.path.exists(
-                os.path.join(_MANAGED_BIN_DIR, "ollama.exe"))):
-            shutil.rmtree(_MANAGED_BIN_DIR, ignore_errors=True)
-            try:
-                os.replace(old, _MANAGED_BIN_DIR)
-            except OSError:
-                pass
-        with _setup_lock:
-            _setup_jobs[ENGINE_ROW] = {"status": "error", "pct": 0,
-                                       "note": str(exc)[:200]}
-    _spawn_ollama_serve()
+    except OSError:
+        return
+    try:
+        os.replace(_ENGINE_ARM_STAGE, _MANAGED_BIN_DIR)
+    except OSError:
+        try:
+            os.replace(old, _MANAGED_BIN_DIR)
+        except OSError:
+            pass
+        return
+    try:
+        os.remove(os.path.join(_MANAGED_BIN_DIR, "complete"))
+    except OSError:
+        pass
+    shutil.rmtree(old, ignore_errors=True)
 
 
 def start_managed_engines():
     # MLX engines are started on demand (see ensure_mlx_engine) — each one
     # pins its whole model in RAM, so loading all of them at launch would
     # cost ~14 GB and starve the big Ollama models.
-    if _wrong_arch_engine() and not _port_in_use(OLLAMA_PORT[0]):
-        # an ARM64 PC got the x64 engine before 6b317: fetch the native
-        # one without holding up the window
-        threading.Thread(target=_replace_engine_native, daemon=True).start()
-        return
+    if IS_WIN_ARM:
+        _settle_engine_dir()
+        if _wrong_arch_engine() and not os.path.exists(_ENGINE_ARM_DONE):
+            # an ARM64 PC got the x64 engine before 6b317: fetch the
+            # native one while the x64 one serves
+            threading.Thread(target=_stage_native_engine,
+                             daemon=True).start()
     _spawn_ollama_serve()
 
 
@@ -5228,7 +5315,10 @@ def _install_export_deps_worker():
             pip = os.path.join(os.path.dirname(sys.executable), "pip")
         r = subprocess.run([pip, "install", "--quiet", "--only-binary=:all:"]
                            + list(EXPORT_DEPS),
-                           capture_output=True, text=True, timeout=900)
+                           capture_output=True, text=True, timeout=900,
+                           # no console window flashing up on Windows
+                           creationflags=getattr(subprocess,
+                                                 "CREATE_NO_WINDOW", 0))
         if r.returncode != 0:
             raise RuntimeError((r.stderr or "")[-200:])
         _export_install.update(state="ready" if _export_deps_ok() else "error",
@@ -5774,8 +5864,10 @@ def ex_slides(text, ext, path, title=""):
     s = prs.slides.add_slide(prs.slide_layouts[0])
     s.shapes.title.text = x_strip_md(title or "ConcordeAI")[:120]
     if len(s.placeholders) > 1:
-        s.placeholders[1].text = _venue_stamp() if "_venue_stamp" in globals() \
-            else ""
+        # the date under the title. _venue_stamp takes a format and was
+        # called without one, so every deck export threw (review, 6b317)
+        s.placeholders[1].text = (_venue_stamp("%B %-d, %Y")
+                                  if "_venue_stamp" in globals() else "")
     cur, bullets = None, []
 
     def flush():
@@ -7088,11 +7180,13 @@ def _stop_speaking():
 ENGINE_ROW = "Ollama engine"
 
 
-def _download_ollama_binary():
-    """Fetch the signed universal Ollama CLI, with job progress."""
-    os.makedirs(_MANAGED_BIN_DIR, exist_ok=True)
+def _download_ollama_binary(dest=None, row=ENGINE_ROW):
+    """Fetch the signed universal Ollama CLI into `dest` (the engine
+    folder), with progress on `row`'s job when there is one."""
+    dest = dest or _MANAGED_BIN_DIR
+    os.makedirs(dest, exist_ok=True)
     url = OLLAMA_ZIP_URL if IS_WIN else OLLAMA_TGZ_URL
-    tmp = os.path.join(_MANAGED_BIN_DIR,
+    tmp = os.path.join(dest,
                        "ollama.zip.part" if IS_WIN else "ollama.tgz.part")
     req = urllib.request.Request(url,
                                  headers={"User-Agent": "MillenAI/1.0"})
@@ -7106,47 +7200,46 @@ def _download_ollama_binary():
             f.write(chunk)
             done += len(chunk)
             with _setup_lock:
-                _setup_jobs[ENGINE_ROW]["pct"] = min(99, int(done / total * 100))
+                job = _setup_jobs.get(row) if row else None
+                if job is not None:
+                    job["pct"] = min(99, int(done / total * 100))
     if IS_WIN:
         import zipfile
         with zipfile.ZipFile(tmp) as z:
-            z.extractall(_MANAGED_BIN_DIR)
+            z.extractall(dest)
         os.remove(tmp)
         # the zip nests the binary under bin/ or ollama/ depending on build
-        if not os.path.exists(os.path.join(_MANAGED_BIN_DIR, "ollama.exe")):
-            for root, _d, files in os.walk(_MANAGED_BIN_DIR):
+        if not os.path.exists(os.path.join(dest, "ollama.exe")):
+            for root, _d, files in os.walk(dest):
                 if "ollama.exe" in files:
                     _MANAGED_BIN_DIR_FOUND.append(root)
                     break
         return
     with tarfile.open(tmp) as t:
         try:
-            t.extractall(_MANAGED_BIN_DIR, filter="data")
+            t.extractall(dest, filter="data")
         except TypeError:  # python < 3.12 has no filter kwarg
-            t.extractall(_MANAGED_BIN_DIR)
+            t.extractall(dest)
     os.remove(tmp)
-    os.chmod(os.path.join(_MANAGED_BIN_DIR, "ollama"), 0o755)
+    os.chmod(os.path.join(dest, "ollama"), 0o755)
+
+
+_ENGINE_DL_LOCK = threading.Lock()
 
 
 def _ensure_ollama_ready() -> bool:
     """Binary on disk + server answering. Downloads the engine if needed."""
-    # the native ARM64 engine may be arriving (6b317): wait for it rather
-    # than download a second copy into the same folder
-    for _ in range(1800):
-        with _setup_lock:
-            busy = (_setup_jobs.get(ENGINE_ROW, {}).get("status")
-                    == "downloading")
-        if not busy:
-            break
-        time.sleep(0.5)
-    if _ollama_bin() is None:
-        with _setup_lock:
-            _setup_jobs[ENGINE_ROW] = {"status": "downloading",
-                                       "note": "", "pct": 0}
-        _download_ollama_binary()
-        with _setup_lock:
-            _setup_jobs[ENGINE_ROW] = {"status": "done", "note": "",
-                                       "pct": 100}
+    # one download at a time: two install batches both finding no engine
+    # wrote the same .part file
+    with _ENGINE_DL_LOCK:
+        if _ollama_bin() is None:
+            with _setup_lock:
+                _setup_jobs[ENGINE_ROW] = {"status": "downloading",
+                                           "note": "", "pct": 0}
+            _download_ollama_binary()
+            with _setup_lock:
+                _setup_jobs[ENGINE_ROW] = {"status": "done", "note": "",
+                                           "pct": 100}
     _spawn_ollama_serve()
     for _ in range(40):
         if _port_in_use(OLLAMA_PORT[0]):
@@ -7389,8 +7482,12 @@ def _ollama_install_worker(labels: list):
                                 ".".join(map(str, have))))
                 _pull_ollama_model(label, MODEL_ROUTES[label][1])
                 with _setup_lock:
-                    _setup_jobs[label] = {"status": "done", "note": "",
-                                          "pct": 100}
+                    # the size stays with the finished job: dropping it
+                    # stepped the overall bar (and its speed) backwards
+                    # the moment a pull finished (6b317, review)
+                    _setup_jobs[label] = {
+                        "status": "done", "note": "", "pct": 100,
+                        "total_b": _setup_jobs.get(label, {}).get("total_b")}
                 _app_models_add(label)
             except Exception as exc:
                 with _setup_lock:
@@ -8446,11 +8543,15 @@ def _search_proxy():
     networks?"), and behind VMware's DNS proxy the lookup failed outright.
     Through this proxy Windows resolves the name and nothing listens
     beyond this computer. HTTPS to port 443 only, TLS end to end (ddgs's
-    own), and a password per run so no other program can use it."""
+    own), and a password per run so no other program can use it. It
+    won't tunnel back into this computer (a name resolving to loopback);
+    private addresses stay allowed, since a fake-IP VPN answers every
+    name with one."""
     if _SEARCH_PROXY["tried"]:
         return _SEARCH_PROXY["url"]
     _SEARCH_PROXY["tried"] = True
     import base64 as _b64
+    import ipaddress as _ipa
     user, pw = "concorde", secrets.token_hex(16)
     want = b"Basic " + _b64.b64encode(("%s:%s" % (user, pw)).encode())
 
@@ -8487,7 +8588,21 @@ def _search_proxy():
             if (verb != b"CONNECT" or port != "443" or not host
                     or not auth or not secrets.compare_digest(auth[0], want)):
                 raise ValueError("refused")
-            up = socket.create_connection((host.strip("[]"), 443), timeout=20)
+            outs = []
+            for fam in socket.getaddrinfo(host.strip("[]"), 443,
+                                          type=socket.SOCK_STREAM):
+                ip = _ipa.ip_address(fam[4][0].split("%")[0])
+                if not (ip.is_loopback or ip.is_unspecified):
+                    outs.append(fam[4][0])
+            if not outs:
+                raise ValueError("refused")
+            for i, a in enumerate(outs):     # the checked address itself
+                try:
+                    up = socket.create_connection((a, 443), timeout=20)
+                    break
+                except OSError:
+                    if i == len(outs) - 1:
+                        raise
             c.settimeout(None)
             up.settimeout(None)
             c.sendall(b"HTTP/1.1 200 Connection established\r\n\r\n")
