@@ -5605,3 +5605,27 @@ MLX, I don't think there's much of a purpose" on a Mac.
   node, alone and together. A `function etaTxt` added here collided
   with the answer timer's `let etaTxt`: a SyntaxError that would have
   killed the whole page, and nothing parsed the page before.
+
+## 6b316 — The Windows build starts
+Patrick, testing the nightly in a Windows 11 ARM VM: "it installed a
+bunch of stuff and now it does nothing in Windows." Run with a console,
+it died at import: `AttributeError: module 'signal' has no attribute
+'SIGHUP'`. The signal handlers named SIGHUP, which Windows doesn't have,
+and that line dates from the first commit, so the Windows build has
+never started on Windows. The launcher runs pythonw (no console), so the
+crash was invisible.
+- The handlers are looked up with getattr and skipped when missing.
+- On Windows an uncaught error now goes to
+  %LOCALAPPDATA%\MillenAI\crash.log and a message box ("ConcordeAI
+  couldn't start"), so a failure is never silent again.
+- ConcordeAI.bat marks setup done only once pip has succeeded (a failed
+  install used to leave a venv behind and every later run skipped setup),
+  says why and pauses when it fails, upgrades pip with python -m pip, and
+  installs voice input (faster-whisper) separately, since it's optional.
+- Verified in the VM: with the fix, the window opens and the first-run
+  wizard lists Basic 1.3 GB, Pro 10.9 GB, Max 58.7 GB.
+- Gauntlet: the signal loop runs against a Windows-shaped signal module;
+  no top-level code may name a signal Windows lacks; the crash hook,
+  run as pythonw would, writes the log and shows the box; the launcher
+  keeps its checks. Mutation-tested (SIGHUP back, hook removed, no log,
+  no box).

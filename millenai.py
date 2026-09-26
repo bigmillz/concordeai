@@ -52,6 +52,39 @@ import urllib.error
 import urllib.parse
 import webbrowser
 
+# A CRASH ON WINDOWS MUST BE SEEN (6b316). The launcher starts us with
+# pythonw, which has no console, so a failure at startup vanished: the
+# Windows build died on its first run for its whole life (a SIGHUP that
+# Windows doesn't have) and looked like it "does nothing" (Patrick, in a
+# Windows 11 VM). Any uncaught error now goes to
+# %LOCALAPPDATA%\MillenAI\crash.log and a message box.
+if sys.platform == "win32":
+    def _win_fatal(kind, value, tb):
+        import traceback
+        text = "".join(traceback.format_exception(kind, value, tb))
+        log = os.path.join(os.environ.get("LOCALAPPDATA")
+                           or os.path.expanduser("~"), "MillenAI",
+                           "crash.log")
+        try:
+            os.makedirs(os.path.dirname(log), exist_ok=True)
+            with open(log, "a", encoding="utf-8") as f:
+                f.write(time.strftime("%Y-%m-%d %H:%M:%S\n") + text + "\n")
+        except OSError:
+            pass
+        if sys.stderr is not None:
+            sys.__excepthook__(kind, value, tb)
+        if not issubclass(kind, KeyboardInterrupt):
+            try:
+                import ctypes
+                ctypes.windll.user32.MessageBoxW(
+                    None, "ConcordeAI couldn't start.\n\n%s: %s\n\n"
+                    "The details are in %s" % (kind.__name__,
+                                               str(value)[:400], log),
+                    "ConcordeAI", 0x10)
+            except Exception:
+                pass
+    sys.excepthook = _win_fatal
+
 # xet-backed HF downloads materialise files only on completion, which blinds
 # the on-disk progress meter (and anonymous xet gets rate-limited harder) —
 # force the classic CDN path for us and every engine we spawn.
@@ -7982,7 +8015,12 @@ def _signal_exit(signum, _frame):
     os._exit(0)
 
 
-for _sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+# Windows has no SIGHUP: naming it here killed every Windows launch at
+# import, from the first version on (6b316)
+for _sig in (getattr(signal, _n, None)
+             for _n in ("SIGTERM", "SIGINT", "SIGHUP")):
+    if _sig is None:
+        continue
     try:
         signal.signal(_sig, _signal_exit)
     except (ValueError, OSError):

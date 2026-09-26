@@ -3131,6 +3131,82 @@ t = chat({"model": "", "models": [], "tier": "", "auto_web": False,
 check("vision answers about the pixels", "red" in t.lower() and "⚠️" not in t,
       t[:100])
 
+# 6b316: THE WINDOWS BUILD NEVER STARTED. Top-level code named
+# signal.SIGHUP, which Windows doesn't have, so every launch died at
+# import, and pythonw hid it: Patrick's Windows 11 VM "installed a bunch
+# of stuff and now it does nothing". (1) the signal loop, run against a
+# Windows-shaped signal module; (2) no top-level code names a signal
+# Windows lacks; (3) a crash under pythonw is logged and shown; (4) the
+# launcher only calls setup done once it has worked.
+import ast as _astw, types as _tw
+_WIN_SIGS = {"SIGTERM", "SIGINT", "SIGABRT", "SIGFPE", "SIGILL", "SIGSEGV",
+             "SIGBREAK"}
+_top_sigs = set()
+for _node in _astw.parse(_MILLENAI_SRC).body:
+    if isinstance(_node, (_astw.FunctionDef, _astw.AsyncFunctionDef,
+                          _astw.ClassDef)):
+        continue
+    for _sub in _astw.walk(_node):
+        if (isinstance(_sub, _astw.Attribute) and isinstance(_sub.value, _astw.Name)
+                and _sub.value.id == "signal" and _sub.attr.startswith("SIG")
+                and not _sub.attr.startswith("SIG_")):
+            _top_sigs.add(_sub.attr)
+_sig_src = _MILLENAI_SRC[_MILLENAI_SRC.index("for _sig in (getattr(signal, _n, None)"):]
+_sig_src = _sig_src[:_sig_src.index("\n\n")]
+_sig_calls = []
+_ws = _tw.SimpleNamespace(SIGTERM=15, SIGINT=2,
+                          signal=lambda s, h: _sig_calls.append(s))
+try:
+    exec(_sig_src, {"signal": _ws, "_signal_exit": lambda *a: None})
+    _sig_err = None
+except Exception as _e:
+    _sig_err = repr(_e)
+# the crash hook, as pythonw on Windows would run it (no stderr)
+# the whole top-level block, up to the next line that isn't indented
+_hook_src = _MILLENAI_SRC[_MILLENAI_SRC.index('if sys.platform == "win32":\n    def _win_fatal'):]
+_hook_src = _hook_src[:re.search(r"\n(?=[^\s])", _hook_src).start() + 1]
+_hook_dir = __import__("tempfile").mkdtemp()
+_box = []
+_fake_ctypes = _tw.ModuleType("ctypes")
+_fake_ctypes.windll = _tw.SimpleNamespace(user32=_tw.SimpleNamespace(
+    MessageBoxW=lambda *a: _box.append(a)))
+_fsys = _tw.SimpleNamespace(platform="win32", stderr=None,
+                            __excepthook__=lambda *a: None, excepthook=None)
+_real_ctypes = sys.modules.get("ctypes")
+sys.modules["ctypes"] = _fake_ctypes
+_env_la = os.environ.get("LOCALAPPDATA")
+os.environ["LOCALAPPDATA"] = _hook_dir
+try:
+    _hz = {"sys": _fsys, "os": os, "time": time}
+    exec(_hook_src, _hz)
+    _hook_on = _fsys.excepthook is _hz.get("_win_fatal")
+    try:
+        raise AttributeError("module 'signal' has no attribute 'SIGHUP'")
+    except AttributeError as _e:
+        if callable(_fsys.excepthook):
+            _fsys.excepthook(type(_e), _e, _e.__traceback__)
+finally:
+    sys.modules["ctypes"] = _real_ctypes
+    if _env_la is None:
+        os.environ.pop("LOCALAPPDATA", None)
+    else:
+        os.environ["LOCALAPPDATA"] = _env_la
+_crash = os.path.join(_hook_dir, "MillenAI", "crash.log")
+_crash_txt = open(_crash).read() if os.path.exists(_crash) else ""
+_bat = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         "build_windows.sh")).read()
+check("Windows starts: no SIGHUP at import, and a crash is never silent",
+      _sig_err is None and _sig_calls == [15, 2]
+      and not (_top_sigs - _WIN_SIGS)
+      and _hook_on and "SIGHUP" in _crash_txt and "AttributeError" in _crash_txt
+      and len(_box) == 1 and "couldn't start" in _box[0][1]
+      and _crash in _box[0][1]
+      and 'if not exist "%READY%" (' in _bat
+      and "if errorlevel 1 goto setupfail" in _bat
+      and 'echo ok> "%READY%"' in _bat
+      and '"%PYC%" -m pip install --upgrade pip' in _bat,
+      "%r" % [_sig_err, _sig_calls, sorted(_top_sigs - _WIN_SIGS), _crash_txt[-120:], _box])
+
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")

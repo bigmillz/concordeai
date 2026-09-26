@@ -36,7 +36,9 @@ setlocal
 set "SUPPORT=%LOCALAPPDATA%\MillenAI"
 set "VENV=%SUPPORT%\venv"
 set "PY=%VENV%\Scripts\pythonw.exe"
+set "PYC=%VENV%\Scripts\python.exe"
 set "PIP=%VENV%\Scripts\pip.exe"
+set "READY=%VENV%\concorde-ready"
 if not exist "%SUPPORT%" mkdir "%SUPPORT%"
 
 where python >nul 2>&1
@@ -47,14 +49,33 @@ if errorlevel 1 (
   exit /b 1
 )
 
-if not exist "%PY%" (
+rem Setup counts as done only once it has worked (6b316): a failed pip
+rem install used to leave a venv behind, and every later run skipped
+rem setup and started an app that could not run.
+if not exist "%READY%" (
   echo First run: setting up the AI engine. This takes a few minutes...
-  python -m venv "%VENV%"
-  "%PIP%" install --upgrade pip
-  "%PIP%" install pywebview ddgs psutil faster-whisper
+  if not exist "%PYC%" python -m venv "%VENV%"
+  if not exist "%PYC%" goto setupfail
+  "%PYC%" -m pip install --upgrade pip
+  "%PIP%" install pywebview ddgs psutil
+  if errorlevel 1 goto setupfail
+  rem voice input is optional; its engine has no wheel for every PC
+  "%PIP%" install faster-whisper
+  echo ok> "%READY%"
 )
 
+rem pythonw has no console; if the app can't start it shows a message
+rem box and writes %LOCALAPPDATA%\MillenAI\crash.log
 start "" "%PY%" "%~dp0millenai.py"
+exit /b 0
+
+:setupfail
+echo.
+echo Setup didn't finish; the messages above say why. On Windows on ARM,
+echo install the x64 Python from python.org (see README.txt), then run
+echo ConcordeAI.bat again.
+pause
+exit /b 1
 BAT
 
 cat <<README | crlf > "$STAGE/README.txt"
