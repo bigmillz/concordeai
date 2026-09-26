@@ -720,7 +720,10 @@ the airline's own price by default, or, with "Include travel agency prices" tick
 the cheapest agency as a credit that names it. A difference under a dollar adds no line. **The same call carries
 Google's bag fees for each seller's fare** ("1st checked bag: 35", `adapter.google_bag_prices`), so once a flight is
 checked its bag line uses the fees Google lists with the airline's own fare, after this flight's Duffel quote and
-before the table (`bagLadder`); a range is priced at its top and keeps the asterisk. No extra call is spent.
+before the table (`bagLadder`); a range is priced at its top and keeps the asterisk. No extra call is spent. **The
+seller check answered 404 from the day it shipped until 2026-09-25**: the POST handler's route allowlist did not name
+`/api/sellers`, though its dispatch table did, and every test called `sellers_request` directly. `test_adapter.py` now
+compares the two lists and a mutant drops the route. Any new POST route goes in BOTH.
 
 **A served page never shows made-up results** (per Patrick, 2026-09-21). Anyone gets
 `CONCORDEGO_ANON_SEARCHES` (4) real searches a day, counted per address at `/search`, which
@@ -857,7 +860,7 @@ curve it is meant to be testing is a fixture that tests nothing.
 
 **The test suites are mutation-tested.** `test_scorer.py` catches 12 of 12 seeded faults and
 `validate.py` 10 of 10; `tests/mutate_adapter.py` is an executable runner for the adapters
-and must stay at every mutant caught (111 of 111 on 2026-09-25, the points charts, planner and pool, hotels, DOT records and the measured cancellation rate, the Fixer, the fleet table, the add-on prices, a flight's own Duffel extras, the lounge rules, the meals table and the ride-fare bands among them; it runs `test_points.py`, `test_records.py` and `test_rescue.py` too, and `MUTATE_ONLY=planner` runs just the mutants whose description holds that word) with **zero skips** — a skipped mutant never ran
+and must stay at every mutant caught (112 of 112 on 2026-09-25, the points charts, planner and pool, hotels, DOT records and the measured cancellation rate, the Fixer, the fleet table, the add-on prices, a flight's own Duffel extras, the lounge rules, the meals table and the ride-fare bands among them; it runs `test_points.py`, `test_records.py` and `test_rescue.py` too, and `MUTATE_ONLY=planner` runs just the mutants whose description holds that word) with **zero skips** — a skipped mutant never ran
 and is not a pass. If a change makes a suite pass that should not, the suite has lost a guard. **The runner works in
 a scratch copy outside the checkout** (since 2026-09-24): run in place, Google Drive's sync raced its
 write-and-restore cycle and left two mutants in `par.py` after a run that reported every fault caught. If a SKIP

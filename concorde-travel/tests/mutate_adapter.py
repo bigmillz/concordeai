@@ -366,6 +366,8 @@ MUTANTS = [
     (AD, "serp_itin_key", 'str((f.get("departure_airport") or {}).get("time") or "").replace(" ", "T")[:16])',
      'str((f.get("departure_airport") or {}).get("time") or "")[:16])',
      'round trip: key Google\'s returns by a clock the adapter never writes, so no return ever matches'),
+    (SV, None, '                        "/api/sellers"):\n            return self.send_error(404)', '                        ):\n            return self.send_error(404)',
+     'sellers: the seller check dropped from the POST allowlist (answers 404)'),
     (SV, "sellers_request", '"same_flights": not sold or sold == fns,', '"same_flights": True,',
      'sellers: price a codeshare under other flight numbers as if it were these flights'),
     (AD, "_airport_block", 'intl = any(crosses_border(enr, first, s["destination"]["iata"], geo) for s in segments)',

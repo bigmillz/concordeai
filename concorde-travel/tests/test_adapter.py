@@ -1095,7 +1095,8 @@ def main():
     real_cfg = srv.live.serp_config
     bo = {"booking_options": [
         {"together": {"book_with": "Gotogate", "airline": None, "price": 286, "marketed_as": ["EI 108", "EI 156"], "booking_request": {"url": "https://www.google.com/travel/clk/f", "post_data": "u=abc"}}},
-        {"together": {"book_with": "Aer Lingus", "airline": True, "price": 293, "option_title": "Saver", "marketed_as": ["EI 108", "EI 156"], "booking_request": {"url": "https://www.google.com/travel/clk/f", "post_data": "u=def"}}},
+        {"together": {"book_with": "Aer Lingus", "airline": True, "price": 293, "option_title": "Saver", "marketed_as": ["EI 108", "EI 156"], "booking_request": {"url": "https://www.google.com/travel/clk/f", "post_data": "u=def"},
+                      "baggage_prices": ["1 free carry-on", "1st checked bag: 75", "2nd checked bag: 100-120"]}},
         {"together": {"book_with": "Booking.com", "airline": None, "price": 274, "marketed_as": ["EI 108", "EI 156"]}},
         {"together": {"book_with": "British Airways", "airline": True, "price": 413, "marketed_as": ["BA 2070", "BA 5914"]}},
         {"together": {"book_with": "Evil", "airline": None, "price": 100, "marketed_as": ["EI 108", "EI 156"], "booking_request": {"url": "https://evil.example/", "post_data": "x"}}},
@@ -1112,6 +1113,15 @@ def main():
               and not next(x for x in r["sellers"] if x["name"] == "British Airways")["same_flights"]
               and "Split" not in names and next(x for x in r["sellers"] if x["name"] == "Evil")["go"] is None
               and next(x for x in r["sellers"] if x["name"] == "Aer Lingus")["go"]["url"].startswith("https://www.google.com/"), str(names))
+        check("a seller's bag fees travel with it (the airline's own fare: $75, then $100-120 priced at $120 and flagged)",
+              r["airline"]["bags"] == [{"piece": 1, "cents": 7500, "range": False}, {"piece": 2, "cents": 12000, "range": True}]
+              and r["cheapest_agency"]["bags"] == [], str(r["airline"].get("bags")))
+        # the POST handler answers only the routes its allowlist names: every route its dispatch serves must be in it
+        src = open(os.path.join(HERE, "..", "server.py"), encoding="utf-8").read()
+        allow = set(re.findall(r'"(/api/[a-z]+)"', re.search(r'if path not in \(("/api/score".*?)\):\n\s*return self.send_error\(404\)', src, re.S).group(1)))
+        served = set(re.findall(r'"(/api/[a-z]+)": [a-z_]+_request', re.search(r'fn = \{("/api/score": score_request.*?)\}\[path\]', src, re.S).group(1)))
+        check("every POST route the server dispatches is on its allowlist (the seller check answered 404 for a day)",
+              served and served <= allow, str(sorted(served - allow)))
         check("a seller's fare type travels with it when Google names one, and is empty when it does not",
               r["airline"]["fare"] == "Saver" and r["cheapest_agency"]["fare"] == "", str(r["airline"]))
         check("a check the page sent with a bad token or query is refused before any call, and marked for a refund",

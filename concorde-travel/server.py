@@ -2431,7 +2431,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._json({"ok": False, "error": "Profile too large."})
             _users_profile_set(who, profile)
             return self._json({"ok": True, "profile": profile})
-        if path not in ("/api/score", "/api/narrate", "/api/live", "/api/wish", "/api/search", "/api/rescue", "/api/flex"):
+        # every route the dispatch below serves must be listed here, or it answers 404 (the seller check did, from
+        # 2026-09-24 to 09-25, because only the dispatch named it); test_adapter compares the two
+        if path not in ("/api/score", "/api/narrate", "/api/live", "/api/wish", "/api/search", "/api/rescue", "/api/flex",
+                        "/api/sellers"):
             return self.send_error(404)
         try:
             n = int(self.headers.get("Content-Length") or 0)
