@@ -451,8 +451,8 @@ rule forbids: Spain and Italy moved to the upper band, the Netherlands to the hi
 (`ground.py`, with the tariffs in its comment), and `test_records.py` checks the model against Madrid's, Barcelona's
 and Istanbul's official fares. Rideshare prices have no published source anywhere and stay estimates.
 
-**The airline extras checklist is RETIRED** (2026-09-25): https://claude.ai/artifact/96dDdGVmSX8aqQSquH9TnU held 143 rows for
-Patrick to fill by hand; nothing was entered, and the second pass above replaced it. Do not ask him to fill it in. Bag
+**The airline extras checklist is gone** (a claude.ai artifact of 143 rows for Patrick to fill by hand; nothing was
+entered, the second pass above replaced it, and he had it deleted on 2026-09-26). Do not make another. Bag
 fees moved the same day where the airline's own Duffel quote or the research said so: BA Basic's first bag $70 across
 the Atlantic and $60 in Europe (was $85 and $102), the Lufthansa group's Light and Basic in Europe $45.61 then $74.12
 (EUR 40 / 65; was $70), Wizz $98.64 (EUR 86.50 at today's rate), Viva Aerobus $65; each row's `note_2026_09_25` says why.
