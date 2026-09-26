@@ -187,7 +187,11 @@ def main():
           gb(["1 free carry-on", "1st checked bag: $35", "2nd checked bag: $45"]) == [{"piece": 1, "cents": 3500, "range": False}, {"piece": 2, "cents": 4500, "range": False}]
           and gb(["1st checked bag: 99-187"]) == [{"piece": 1, "cents": 18700, "range": True}]
           and gb(["1 free checked bag", "2nd checked bag: 100"]) == [{"piece": 1, "cents": 0, "range": False}, {"piece": 2, "cents": 10000, "range": False}]
-          and gb(["Carry-on bag: 25"]) == [] and gb(None) == [])
+          and gb(["Carry-on bag: 25"]) == [] and gb(None) == []
+          # Google's own wording, from real replies (2026-09-25): American and BA Basic across the Atlantic, BA Standard
+          and gb(["1 free carry-on", "1st checked bag: 85"]) == [{"piece": 1, "cents": 8500, "range": False}]
+          and gb(["1 free carry-on", "1st checked bag: 70-85"]) == [{"piece": 1, "cents": 8500, "range": True}]
+          and gb(["1 free carry-on", "1st checked bag free"]) == [{"piece": 1, "cents": 0, "range": False}])
 
     # ---- published add-on prices (enrichment/addons.json, 2026-09-25): every price carries a source; the page gets
     # the prices only; a "from" price and a price in doubt keep their asterisk; the fallback is always marked
