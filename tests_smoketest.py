@@ -1463,7 +1463,7 @@ localStorage location matchMedia navigator parseFloat parseInt performance
 requestAnimationFrame setInterval setTimeout window""".split())
 # L is Leaflet, loaded from unpkg before any map mounts; the __X__ names
 # are placeholders the server fills in before the page is sent
-_PAGE_HOST |= {"L", "__JUST_UPDATED__", "__USER_CITY__", "__USER_NICK__"}
+_PAGE_HOST |= {"L", "__IS_PC__", "__JUST_UPDATED__", "__USER_CITY__", "__USER_NICK__"}
 _undecl = _jsscan.undeclared(_jsscan.page_script(_MILLENAI_SRC))
 _brand = _MILLENAI_SRC.split("the brand chameleon runs on its own gentle clock")[1][:600]
 check("the page has no reference to an undeclared perf",
@@ -1719,7 +1719,7 @@ _ss_src = _MILLENAI_SRC[_MILLENAI_SRC.index("def setup_status()"):
                         _MILLENAI_SRC.index("def _other_millenai_running")]
 check("Windows: the model list never raises on a row with no route",
       not _mc_err
-      and "installed = {l for l, ok in SUPPORTED.items()\n                 if ok and model_cached(l, pulled)}" in _ss_src
+      and "installed = {MODEL_ROUTES.get(l, (None, l)) for l, ok in SUPPORTED.items()\n                 if ok and model_cached(l, pulled)}" in _ss_src
       and "if SUPPORTED.get(l) and model_cached(l, pulled)\n                           and l not in chosen" in _MILLENAI_SRC,
       "%r" % _mc_err[:6])
 # 6b314: a bare name in ollama_pulled_tags stood for EVERY tag, so the
@@ -2504,9 +2504,10 @@ _gz.update(MODEL_MEM_BYTES={l: i["mem"] for l, i in _gz["MODEL_INFO"].items()},
            machine_budget_bytes=lambda: 40e9,
            no_limits=lambda: _GP["no_limits"],
            load_prefs=lambda base=None: dict(_GP),
-           _starter_labels=lambda: [])
+           _starter_labels=lambda: [], MODEL_ROUTES={})
 _exec_names(_gz, {"GIANT_GB", "_giants", "giants_on", "model_is_giant",
-                  "model_fits_machine", "plan_labels", "_family_of", "_gen_of"})
+                  "model_fits_machine", "plan_labels", "_plan_labels",
+                  "_family_of", "_gen_of"})
 def _gz_set(nl, gi):
     _GP.update(no_limits=nl, include_giants=gi); _gz["_giants"]["v"] = None
 _big = [l for l, i in _gz["MODEL_INFO"].items() if i["mem"] > 128e9]
@@ -3207,7 +3208,7 @@ _box = []
 _fake_ctypes = _tw.ModuleType("ctypes")
 _fake_ctypes.windll = _tw.SimpleNamespace(user32=_tw.SimpleNamespace(
     MessageBoxW=lambda *a: _box.append(a)))
-_fsys = _tw.SimpleNamespace(platform="win32", stderr=None,
+_fsys = _tw.SimpleNamespace(platform="win32", stderr=None, stdout=None,
                             __excepthook__=lambda *a: None, excepthook=None)
 _real_ctypes = sys.modules.get("ctypes")
 sys.modules["ctypes"] = _fake_ctypes
@@ -3851,6 +3852,316 @@ check("ARM64 PCs get the native engine without ever being left with none",
       _ok_normal and _ok_quit and _ok_wrong and _ok_cut and all(_oks)
       and "def _replace_engine_native" not in _MILLENAI_SRC,
       "%r" % _ew)
+
+# ---------------------------------------------------------------------
+# THE WINDOWS SWEEP (6b317): five reviewers read the whole file against a
+# Windows checklist, a skeptic re-checked each finding, and these are
+# the confirmed ones, each run for real with Windows-shaped fakes.
+import tempfile as _tf20, os as _os20, io as _io20, builtins as _bi20
+_M = _MILLENAI_SRC
+
+# pythonw: stdout/stderr None -> a log, so a progress bar can't raise
+_w0 = _M.index("    # PYTHONW HAS NO CONSOLE")
+_w1 = _M.index("            sys.stderr = _plog\n", _w0) + len("            sys.stderr = _plog\n")
+_pw_dir = _tf20.mkdtemp()
+_pw_sys = _t17.SimpleNamespace(stdout=None, stderr=None)
+_pw_os = _t17.SimpleNamespace(path=_os20.path, makedirs=_os20.makedirs, devnull=_os20.devnull,
+                              environ={"LOCALAPPDATA": _pw_dir})
+_pw_ns = {"sys": _pw_sys, "os": _pw_os}
+exec("if True:\n" + _M[_w0:_w1], _pw_ns)
+try:
+    _pw_sys.stderr.write("progress 50%\r"); _pw_sys.stdout.write("hi\n"); _pw_sys.stderr.flush()
+    _pw_ok = "progress 50%" in open(_os20.path.join(_pw_dir, "MillenAI", "logs", "app.log"),
+                                    encoding="utf-8").read()
+except Exception as _e:
+    _pw_ok = repr(_e)
+check("Windows (pythonw): stdout and stderr go to a log; voice's download can't die on None",
+      _pw_ok is True and 'os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")' in _M,
+      "%r" % _pw_ok)
+
+# loopback never through the system proxy; the internet still is
+import http.server as _hs20, socketserver as _ss20, threading as _th20, urllib.request as _ur20
+_hits20 = []
+class _H20(_hs20.BaseHTTPRequestHandler):
+    def do_GET(self):
+        _hits20.append(self.server.nm); b = self.server.nm.encode()
+        self.send_response(200); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+    def log_message(self, *a): pass
+def _srv20(nm):
+    s_ = _ss20.TCPServer(("127.0.0.1", 0), _H20); s_.nm = nm
+    _th20.Thread(target=s_.serve_forever, daemon=True).start(); return s_.server_address[1]
+_eng20, _prx20 = _srv20("engine"), _srv20("proxy")
+_lb0 = _M.index("def _loopback_host("); _lb1 = _M.index("urllib.request.install_opener(", _lb0)
+_lb_ns = {"urllib": __import__("urllib")}
+exec(_M[_lb0:_lb1], _lb_ns)
+_op20 = _ur20.build_opener(_lb_ns["_LoopbackDirect"]({"http": "http://127.0.0.1:%d" % _prx20}))
+try:
+    _lbr = (_op20.open("http://127.0.0.1:%d/api/tags" % _eng20, timeout=5).read(),
+            _op20.open("http://example.invalid/x", timeout=5).read())
+except Exception as _e:
+    _lbr = repr(_e)
+check("a system proxy never gets the app's calls to its own engine on 127.0.0.1",
+      _lbr == (b"engine", b"proxy") and all(_lb_ns["_loopback_host"](h) for h in
+      ("127.0.0.1:11434", "localhost:8889", "[::1]:11434", "127.0.0.5"))
+      and not _lb_ns["_loopback_host"]("api.groq.com:443")
+      and "urllib.request.install_opener(urllib.request.build_opener(_LoopbackDirect()))" in _M,
+      "%r" % (_lbr,))
+
+# cloud keys save on a Windows Python without os.fchmod; a failed save says so
+_cw_dir = _tf20.mkdtemp()
+class _NoFchmod:
+    def __getattr__(self, n):
+        if n == "fchmod": raise AttributeError("module 'os' has no attribute 'fchmod'")
+        return getattr(_os20, n)
+_cw = {"os": _NoFchmod(), "tempfile": _tf20, "json": json, "IS_WIN": True, "time": time,
+       "CLOUD_FILE": _os20.path.join(_cw_dir, "cloud.json")}
+_exec_names(_cw, {"_cloud_write", "_replace_into"})
+try:
+    _cw["_cloud_write"]({"providers": {"groq": {"key": "k"}}})
+    _cw_ok = json.load(open(_cw["CLOUD_FILE"])) == {"providers": {"groq": {"key": "k"}}}
+except Exception as _e:
+    _cw_ok = repr(_e)
+_cw_left = [f for f in _os20.listdir(_cw_dir) if f.endswith(".tmp")]
+check("Windows: a cloud key is saved without os.fchmod, and a failed save isn't called saved",
+      _cw_ok is True and not _cw_left
+      and "if not _cloud_save_state(which, {\"name\": name, \"base\": base," in _M
+      and "self._send_json({\"ok\": False, \"err\": _KEY_NOT_SAVED})" in _M,
+      "%r" % [_cw_ok, _cw_left])
+
+# a blocked replace on Windows waits for the reader instead of losing the save
+_rp_calls = []
+def _rp_replace(a, b):
+    _rp_calls.append(1)
+    if len(_rp_calls) < 3: raise PermissionError(13, "in use")
+_rp = {"os": _t17.SimpleNamespace(replace=_rp_replace), "IS_WIN": True,
+       "time": _t17.SimpleNamespace(sleep=lambda s: None)}
+_exec_names(_rp, {"_replace_into"})
+try:
+    _rp["_replace_into"]("a", "b")
+    _rp_win = len(_rp_calls)
+except PermissionError:
+    _rp_win = "raised on Windows"
+_rp_calls.clear(); _rp["IS_WIN"] = False
+try:
+    _rp["_replace_into"]("a", "b"); _rp_mac = "no raise"
+except PermissionError:
+    _rp_mac = "raised"
+check("Windows: settings and cloud writes wait out a reader instead of failing",
+      _rp_win == 3 and _rp_mac == "raised"
+      and "        _replace_into(tmp, p)" in _M and "        _replace_into(tmp, CLOUD_FILE)" in _M,
+      "%r" % [_rp_win, _rp_mac])
+
+# the venue's clock on Windows: offsets, not /etc/localtime; tzdata installs
+import datetime as _dt20
+_here = time.localtime().tm_gmtoff
+_same = next((z for z in ("UTC", "Etc/GMT", "America/New_York", "Europe/London", "Asia/Tokyo",
+                          "America/Los_Angeles", "Europe/Berlin", "Asia/Kolkata")
+              if int(_dt20.datetime.now(__import__("zoneinfo").ZoneInfo(z)).utcoffset().total_seconds()) == _here), None)
+_diff = "Asia/Tokyo" if _same != "Asia/Tokyo" else "America/New_York"
+_vh = {"IS_WIN": True, "time": time, "_host_tz": lambda: ""}
+_exec_names(_vh, {"_venue_is_host"})
+check("Windows: the venue clock compares offsets; tzdata comes with setup or on demand",
+      (_same is None or _vh["_venue_is_host"](_same) is True)
+      and _vh["_venue_is_host"](_diff) is False
+      and _vh["_venue_is_host"]("Not/AZone") is True
+      and "threading.Thread(target=_ensure_tzdata, daemon=True).start()" in _M
+      and "if tzname and where and not _venue_is_host(tzname):" in _M
+      and '"%PIP%" install pywebview ddgs psutil tzdata' in open("build_windows.sh").read()
+      and '"--collect-data", "tzdata"' in open("build_windows_exe.ps1").read(),
+      "%r" % [_same, _diff])
+
+# Windows is offered its update: the release's zip (or .msi when installed)
+def _upd(tag, frozen=False, mac=False, name="6.2"):
+    ns = {"IS_MAC": mac, "sys": _t17.SimpleNamespace(frozen=frozen) if frozen else _t17.SimpleNamespace(),
+          "APP_BUILD": 300, "APP_NIGHTLY": "", "APP_VERSION": "6.1.0", "re": re,
+          "urllib": __import__("urllib"),
+          "_update": {}, "_gh_time": lambda s: 0, "short_version": lambda: "6.1",
+          "_app_bundle_path": lambda: None,
+          "_build_from_tag": lambda t: int(re.sub(r"\D", "", t) or 0),
+          "_channel_release": lambda: {"tag_name": tag, "name": name, "html_url": "https://github.com/x/r",
+              "assets": [{"name": "ConcordeAI-6.2.dmg", "browser_download_url": "https://github.com/x/a.dmg", "size": 9e7},
+                         {"name": "ConcordeAI-6.2.msi", "browser_download_url": "https://github.com/x/a.msi", "size": 8e7},
+                         {"name": "ConcordeAI-6.2-Windows.zip", "browser_download_url": "https://github.com/x/w.zip", "size": 4e5}]}}
+    _exec_names(ns, {"_check_update_live"})
+    return ns["_check_update_live"]()
+_u_new, _u_msi, _u_old, _u_mac = _upd("v320"), _upd("v320", frozen=True), _upd("v290"), _upd("v320", mac=True)
+# a higher tag with a LOWER version (6.0.4's v274 against 6.1's build 273)
+_u_down = _upd("v320", name="6.0.4")
+check("Windows is offered its update (the zip, or the .msi when installed) and never told 'up to date'",
+      _u_new["available"] and _u_new["manual"] == "https://github.com/x/w.zip"
+      and _u_msi["manual"] == "https://github.com/x/a.msi"
+      and not _u_old["available"] and not _u_old["manual"]
+      and not _u_down["available"]
+      and not _u_mac["available"] and "manual" not in _u_mac
+      and 'if self.path == "/api/update/download":' in _M
+      and 'ok = url.startswith("https://github.com/")' in _M
+      and '"/api/update/install", "/api/update/download",' in _M
+      and "        if not HAS_WEBVIEW:\n            return\n        _JUST_UPDATED[0] = str(last)" in _M,
+      "%r" % [_u_new, _u_msi.get("manual"), _u_old.get("available"), _u_mac.get("available")])
+
+# no console windows: every child is quiet by default; ssh output is UTF-8
+_pq0 = _M.index('if sys.platform == "win32":\n    # NO CONSOLE WINDOWS')
+_pq1 = _M.index("    subprocess.Popen.__init__ = _quiet_popen\n", _pq0) + len("    subprocess.Popen.__init__ = _quiet_popen\n")
+_pq_seen = []
+class _FakePopen:
+    def __init__(self, *a, **k): _pq_seen.append(k.get("creationflags"))
+_pq_sub = _t17.SimpleNamespace(Popen=_FakePopen, CREATE_NO_WINDOW=0x08000000)
+exec(_M[_pq0:_pq1], {"sys": _t17.SimpleNamespace(platform="win32"), "subprocess": _pq_sub})
+_FakePopen(["nvidia-smi"]); _FakePopen(["x"], creationflags=0x10)
+_ssh_kw = {}
+def _ssh_fake_run(argv, **k):
+    _ssh_kw.update(k); return _t17.SimpleNamespace(returncode=0, stdout="\u25cf nginx.service", stderr="")
+_sr = {"subprocess": _t17.SimpleNamespace(run=_ssh_fake_run, TimeoutExpired=Exception),
+       "_ssh_argv": lambda c: ["ssh"], "os": _os20}
+_exec_names(_sr, {"ssh_run"})
+_sr_out = _sr["ssh_run"]({}, "systemctl status nginx")
+_sa = {"os": _os20}
+_exec_names(_sa, {"_ssh_argv"})
+check("Windows: no console window flashes; ssh reads UTF-8; quoted paths are accepted",
+      _pq_seen == [0x08000000, 0x10]
+      and _ssh_kw.get("encoding") == "utf-8" and _ssh_kw.get("errors") == "replace"
+      and _sr_out == (0, "\u25cf nginx.service")
+      and _sa["_ssh_argv"]({"key": '"C:\\Users\\pat\\.ssh\\id"', "host": "h"})[-2] == "C:\\Users\\pat\\.ssh\\id"
+      and "(q.get(\"root\", [\"\"])[0]).strip().strip('\"'))" in _M,
+      "%r" % [_pq_seen, _ssh_kw, _sr_out])
+
+# the page on a PC: its commands, words and behaviour
+_pg = page
+check("the page on a PC: no `ollama` commands, PC mic and SSH advice, drops attach, dark dropdowns",
+      "const IS_PC=false;" in _pg and "__IS_PC__" not in _pg
+      and "const eng=(!tier&&!advOn)?engineState[model]:null;" in _pg
+      and "Or just click a model with a green dot" not in _pg
+      and 'addEventListener("drop",e=>{' in _pg and 'addEventListener("dragover",e=>{e.preventDefault();' in _pg
+      and "select{color-scheme:dark}" in _pg and "select option{background:#16171b;color:#ececec}" in _pg
+      and "scrollbar-color:#3a3b41 transparent;" in _pg
+      and "Settings \\u25b8 Privacy & security \\u25b8 Microphone" in _pg
+      and "voice input isn't installed on this PC" in _pg
+      and "function keyCopyCmd(u,h){" in _pg and "ssh-copy-id your key first" not in _pg
+      and '$("#gpu-meter").hidden=(IS_PC&&gpu==null);' in _pg
+      and '"Install it in Settings \\u203a Models, then try again."' in _M
+      and "The model engine isn't answering yet." in _M,
+      "")
+
+# a PC's processor by name
+def _cpu(name):
+    class _K:
+        def __enter__(s): return s
+        def __exit__(s, *a): return False
+    wr = _t17.SimpleNamespace(HKEY_LOCAL_MACHINE=0, OpenKey=lambda *a: _K(),
+                              QueryValueEx=lambda k, v: (name, 1))
+    def _imp(n, *a, **k):
+        return wr if n == "winreg" else _bi20.__import__(n, *a, **k)
+    ns = {"__builtins__": dict(vars(_bi20), __import__=_imp), "re": re,
+          "platform": _t17.SimpleNamespace(processor=lambda: "ARMv8 (64-bit) Family 8")}
+    _exec_names(ns, {"_pc_cpu_name"})
+    return ns["_pc_cpu_name"]()
+_cpus = {n: _cpu(n) for n in ("13th Gen Intel(R) Core(TM) i7-13700H", "AMD Ryzen 7 7840U w/ Radeon 780M Graphics",
+         "Snapdragon(R) X Elite - X1E78100 - Qualcomm(R) Oryon(TM) CPU", "AMD Ryzen Threadripper PRO 7995WX 96-Cores",
+         "Intel(R) Core(TM) Ultra 7 155H", "Apple silicon", "")}
+check("a PC's chip reads CORE I7 / RYZEN 7 / SNAPDRAGON X ELITE, not INTEL64 or ARMV8",
+      list(_cpus.values()) == ["CORE I7", "RYZEN 7", "SNAPDRAGON X ELITE", "THREADRIPPER",
+                               "CORE ULTRA 7", "APPLE SILICON", "ARMV8"],
+      "%r" % _cpus)
+
+# the window fits a laptop's work area; WebView2 missing says so
+class _Rect:
+    left = top = 0; right = 1536; bottom = 816        # 1080p at 125%, logical
+def _fit(dpi):
+    u32 = _t17.SimpleNamespace(SystemParametersInfoW=lambda *a: 1, GetDpiForSystem=lambda: dpi)
+    ct = _t17.SimpleNamespace(windll=_t17.SimpleNamespace(user32=u32), byref=lambda r: r)
+    wt = _t17.SimpleNamespace(RECT=_Rect)
+    def _imp(n, *a, **k):
+        if n == "ctypes": return ct
+        if n == "ctypes.wintypes" or (n == "ctypes" and a): return ct
+        return _bi20.__import__(n, *a, **k)
+    ct.wintypes = wt
+    ns = {"__builtins__": dict(vars(_bi20), __import__=lambda n, g=None, l=None, f=(), lv=0:
+                               (ct if n == "ctypes" else _bi20.__import__(n, g, l, f, lv))),
+          "IS_WIN": True}
+    _exec_names(ns, {"_fit_window"})
+    return ns["_fit_window"](1320, 860, 940, 620)
+_fw96 = _fit(96)
+_boxes = []
+def _wv2(present):
+    class _K:
+        def __enter__(s): return s
+        def __exit__(s, *a): return False
+    def _open(root, path):
+        if not present: raise OSError("no key")
+        return _K()
+    wr = _t17.SimpleNamespace(HKEY_LOCAL_MACHINE=1, HKEY_CURRENT_USER=2, OpenKey=_open,
+                              QueryValueEx=lambda k, v: ("126.0.2592.87", 1))
+    ct = _t17.SimpleNamespace(windll=_t17.SimpleNamespace(user32=_t17.SimpleNamespace(
+        MessageBoxW=lambda *a: _boxes.append(a[1]))))
+    ns = {"__builtins__": dict(vars(_bi20), __import__=lambda n, g=None, l=None, f=(), lv=0:
+                               ({"winreg": wr, "ctypes": ct}.get(n) or _bi20.__import__(n, g, l, f, lv))),
+          "IS_WIN": True, "APP_NAME": "ConcordeAI"}
+    _exec_names(ns, {"_webview2_missing"})
+    return ns["_webview2_missing"]()
+_wv_have, _wv_none = _wv2(True), _wv2(False)
+check("Windows: the window fits the screen; no WebView2 means a message and the browser",
+      _fw96 == (1320, 776, 940, 620) and _wv_have is False and _wv_none is True
+      and len(_boxes) == 1 and "WebView2 Runtime" in _boxes[0]
+      and "elif HAS_WEBVIEW and not _webview2_missing():" in _M
+      and 'if not IS_WIN or _WIN_STATE["min"]:' in _M
+      and "ctypes.windll.user32.AllowSetForegroundWindow(-1)" in _M
+      and "every port it can use is taken" in _M,
+      "%r" % [_fw96, _wv_have, _wv_none, _boxes])
+
+# a service Ollama (SYSTEM) no longer blocks every local model
+class _AD(Exception): pass
+class _NSP(Exception): pass
+def _wlm(owner_err):
+    class _P:
+        def __init__(s, pid=None): s.pid = pid
+        def username(s):
+            if s.pid == 77: raise owner_err()
+            return "PC\\pat"
+    ps = _t17.SimpleNamespace(Process=lambda pid=None: _P(pid if pid is not None else 1),
+                              AccessDenied=_AD, NoSuchProcess=_NSP, CONN_LISTEN="LISTEN",
+                              net_connections=lambda kind: [_t17.SimpleNamespace(
+                                  laddr=_t17.SimpleNamespace(port=11434), status="LISTEN", pid=77)])
+    ns = {"HAS_PSUTIL": True, "psutil": ps, "os": _t17.SimpleNamespace(getpid=lambda: 1),
+          "subprocess": subprocess}
+    _exec_names(ns, {"_win_listener_mine"})
+    return ns["_win_listener_mine"](11434)
+check("Windows: an Ollama service whose owner can't be read is 'not ours', so ours starts",
+      _wlm(_AD) is False and _wlm(_NSP) is None, "%r" % [_wlm(_AD), _wlm(_NSP)])
+
+# plans count a shared download once; council drafts stop and keep apart
+_pl = {"MODEL_ROUTES": {"Qwen 3.5 9B": ("ollama", "qwen3.5:9b"), "Qwen 3.5 Vision 9B": ("ollama", "qwen3.5:9b"),
+                        "Llama 3.2 3B": ("ollama", "llama3.2:3b")},
+       "_plan_labels": lambda p: ["Qwen 3.5 9B", "Qwen 3.5 Vision 9B", "Llama 3.2 3B"]}
+_exec_names(_pl, {"plan_labels"})
+check("plans count a shared download once; an abandoned council draft stops and writes nowhere else",
+      _pl["plan_labels"]("rec") == ["Qwen 3.5 9B", "Llama 3.2 3B"]
+      and "def _collect(chunk, _p=parts, _s=_stop):" in _M
+      and "def _draft_local(_lbl=label, _c=_collect, _e=_err):" in _M
+      and "            _stop.set()\n" in _M
+      and "class _DraftAbandoned(Exception):" in _M
+      and "want_set = {MODEL_ROUTES.get(l, (None, l)) for l in plan_labels(pl)}" in _M,
+      "%r" % _pl["plan_labels"]("rec"))
+
+# exports: a 1969 all-day event (Windows' mktime can't); a frozen build is honest
+_ics = ""
+if _XNS:
+    try:
+        _XNS.setdefault("secrets", __import__("secrets"))
+        _XNS.setdefault("time", time)
+        _ip = _os20.path.join(_tf20.mkdtemp(), "t.ics")
+        _XNS["ex_calendar"]("- 1969-07-16: Apollo 11 launches\n- 2026-11-01: fall back\n", "ics", _ip)
+        _ics = open(_ip, encoding="utf-8").read()
+    except Exception as _e:
+        _ics = "ERR " + repr(_e)
+_ex = {"sys": _t17.SimpleNamespace(frozen=True), "_export_install": {"state": "idle", "note": ""}}
+_exec_names(_ex, {"_install_export_deps_worker"})
+_ex["_install_export_deps_worker"]()
+check("exports: pre-1970 and fall-back days are right; a frozen build says it can't install",
+      "DTEND;VALUE=DATE:19690717" in _ics and "DTEND;VALUE=DATE:20261102" in _ics
+      and "mktime(time.strptime(day" not in _M
+      and _ex["_export_install"] == {"state": "error", "note": "not included in this build"}
+      and "this computer couldn't install the document engines" in _M,
+      _ics[:200])
 
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)

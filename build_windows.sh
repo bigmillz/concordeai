@@ -57,7 +57,8 @@ if not exist "%READY%" (
   if not exist "%PYC%" python -m venv "%VENV%"
   if not exist "%PYC%" goto setupfail
   "%PYC%" -m pip install --upgrade pip
-  "%PIP%" install pywebview ddgs psutil
+  rem tzdata: Windows has no time-zone database of its own (6b317)
+  "%PIP%" install pywebview ddgs psutil tzdata
   if errorlevel 1 goto setupfail
   rem voice input is optional; its engine has no wheel for every PC
   "%PIP%" install faster-whisper

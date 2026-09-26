@@ -51,6 +51,18 @@ import socketserver
 import urllib.request
 import urllib.error
 import urllib.parse
+if sys.platform == "win32":
+    # NO CONSOLE WINDOWS (6b317, from the Windows sweep): under pythonw
+    # every console program we start (nvidia-smi, ssh, ollama rm, pip...)
+    # flashed a black window, and closing one killed its job. Quiet is
+    # the default for every child; one that wants a window says so.
+    _popen_init = subprocess.Popen.__init__
+
+    def _quiet_popen(self, *a, **k):
+        if not k.get("creationflags"):
+            k["creationflags"] = subprocess.CREATE_NO_WINDOW
+        _popen_init(self, *a, **k)
+    subprocess.Popen.__init__ = _quiet_popen
 import webbrowser
 
 # A CRASH ON WINDOWS MUST BE SEEN (6b316). The launcher starts us with
@@ -86,10 +98,60 @@ if sys.platform == "win32":
                 pass
     sys.excepthook = _win_fatal
 
+    # PYTHONW HAS NO CONSOLE (6b317, from the Windows sweep): the shipped
+    # app runs under pythonw.exe, where sys.stdout and sys.stderr are
+    # None, and a library writing a progress bar there raised. The voice
+    # model's download died before its first byte, so voice never
+    # installed. Both go to a log instead (a fresh one past 5 MB).
+    if sys.stdout is None or sys.stderr is None:
+        try:
+            _pd = os.path.join(os.environ.get("LOCALAPPDATA")
+                               or os.path.expanduser("~"), "MillenAI", "logs")
+            os.makedirs(_pd, exist_ok=True)
+            _pp = os.path.join(_pd, "app.log")
+            _big = os.path.exists(_pp) and os.path.getsize(_pp) > 5_000_000
+            _plog = open(_pp, "w" if _big else "a", encoding="utf-8",
+                         errors="replace", buffering=1)
+        except OSError:
+            _plog = open(os.devnull, "w", encoding="utf-8")
+        if sys.stdout is None:
+            sys.stdout = _plog
+        if sys.stderr is None:
+            sys.stderr = _plog
+
 # xet-backed HF downloads materialise files only on completion, which blinds
 # the on-disk progress meter (and anonymous xet gets rate-limited harder) —
 # force the classic CDN path for us and every engine we spawn.
 os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+if sys.platform == "win32":
+    # no console to draw them in; progress is read from disk anyway
+    os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+
+
+# LOOPBACK NEVER GOES THROUGH A PROXY (6b317, from the Windows sweep). On
+# a PC with a manual system proxy (common on work laptops) urllib sent
+# every call to our own Ollama on 127.0.0.1 to that proxy, which can't
+# reach it: installed models read as missing, downloads failed and every
+# chat said Ollama wasn't running. Windows' "don't use the proxy for local
+# addresses" covers only dotless names in urllib. Everything else keeps
+# the system proxy.
+def _loopback_host(hostport: str) -> bool:
+    h = (hostport or "").lower()
+    if h.startswith("["):
+        h = h[1:h.find("]")]
+    elif h.count(":") == 1:
+        h = h.rsplit(":", 1)[0]
+    return h in ("localhost", "::1") or h.startswith("127.")
+
+
+class _LoopbackDirect(urllib.request.ProxyHandler):
+    def proxy_open(self, req, proxy, type):
+        if _loopback_host(req.host):
+            return None             # the plain HTTP handler goes direct
+        return super().proxy_open(req, proxy, type)
+
+
+urllib.request.install_opener(urllib.request.build_opener(_LoopbackDirect()))
 
 # ---------------------------------------------------------------- optional deps
 try:
@@ -961,12 +1023,17 @@ def _cloud_write(d: dict):
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(CLOUD_FILE) or ".",
                                prefix=".cloud-", suffix=".tmp")
     try:
-        os.fchmod(fd, 0o600)
+        # os.fchmod only exists on Windows from Python 3.13 (6b317, from
+        # the Windows sweep): on 3.10-3.12 it raised, the fd never closed,
+        # and no cloud key could ever be saved. Windows' own ACL on
+        # %LOCALAPPDATA% keeps the file private there.
+        if not IS_WIN:
+            os.fchmod(fd, 0o600)
         with os.fdopen(fd, "w") as f:
             json.dump(d, f)
             f.flush()
             os.fsync(f.fileno())
-        os.replace(tmp, CLOUD_FILE)
+        _replace_into(tmp, CLOUD_FILE)
     except Exception:
         try:
             os.remove(tmp)
@@ -975,7 +1042,13 @@ def _cloud_write(d: dict):
         raise
 
 
-def _cloud_save_state(which: str, entry: dict, make_active=False):
+_KEY_NOT_SAVED = ("the key works, but this computer couldn't save it "
+                  "\u2014 check that the ConcordeAI folder isn't read-only")
+
+
+def _cloud_save_state(which: str, entry: dict, make_active=False) -> bool:
+    """False when the state couldn't be written (the key-save route says
+    so rather than "saved", 6b317)."""
     try:
         with _cloud_txn():
             d = _cloud_read_strict()
@@ -984,8 +1057,9 @@ def _cloud_save_state(which: str, entry: dict, make_active=False):
                 if entry.get("status") == "ok":
                     d["active"] = which
             _cloud_write(d)
+        return True
     except Exception:
-        pass
+        return False
 
 
 # WHY A CLOUD CALL FAILED (6b233). cloud_text swallowed every exception
@@ -2610,6 +2684,20 @@ def _family_of(label: str) -> str:
 
 
 def plan_labels(plan: str) -> list:
+    """The plan's models, one per download (6b317, from the Windows
+    sweep): off Apple silicon Qwen 3.5 9B and its Vision row are the SAME
+    Ollama tag, and plans counted it twice, 6.6 GB too many."""
+    out, seen = [], set()
+    for l in _plan_labels(plan):
+        key = MODEL_ROUTES.get(l, (None, l))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(l)
+    return out
+
+
+def _plan_labels(plan: str) -> list:
     """Install plans. basic/pro/max belong to the first-run wizard and
     are unchanged; min/rec/full/all drive the Manage-models selector
     (6b258, per Patrick):
@@ -2693,6 +2781,37 @@ def budget_label() -> str:
     return ("%d GB VRAM" % round(v / 1e9)) if v else ""
 
 
+def _pc_cpu_name() -> str:
+    """A PC's processor, shortly (6b317, from the Windows sweep): it read
+    "INTEL64", "AMD64" or "ARMV8", Windows' architecture caption. The
+    name Windows keeps is e.g. "13th Gen Intel(R) Core(TM) i7-13700H"."""
+    brand = ""
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                            r"HARDWARE\DESCRIPTION\System\CentralProcessor"
+                            r"\0") as k:
+            brand = str(winreg.QueryValueEx(k, "ProcessorNameString")[0])
+    except Exception:
+        pass
+    b = re.sub(r"\((?:R|TM)\)|\bCPU\b|\bProcessor\b|\d+(?:st|nd|rd|th) Gen\b",
+               " ", brand.split("@")[0])
+    b = " ".join(b.split())
+    for rx, fmt in ((r"(Threadripper)\b", "%s"),
+                    (r"Core ?(i\d)\b", "CORE %s"),
+                    (r"Core (Ultra \d)\b", "CORE %s"),
+                    (r"(Ryzen(?: AI)?(?: Max\+?)?(?: \d{1,3})?)\b", "%s"),
+                    (r"(Snapdragon(?: X)?(?: Elite| Plus)?)", "%s"),
+                    (r"(Xeon|Celeron|Pentium|Atom|EPYC)\b",
+                     "%s")):
+        m = re.search(rx, b, re.I)
+        if m:
+            return (fmt % m.group(1)).upper()[:18]
+    if b:
+        return b.upper()[:18]
+    return (platform.processor() or "PC").split()[0].upper()[:18]
+
+
 def chip_name() -> str:
     """Short marketing name of the CPU: 'M4 PRO', 'CORE I7', etc."""
     if IS_WIN:
@@ -2708,7 +2827,7 @@ def chip_name() -> str:
                 return " ".join(name.split()).upper()[:18]
         except Exception:
             pass
-        return (platform.processor() or "PC").split()[0].upper()[:18]
+        return _pc_cpu_name()
     try:
         brand = subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"],
                                capture_output=True, text=True,
@@ -3533,6 +3652,15 @@ def _win_listener_mine(port: int):
                     and c.status == psutil.CONN_LISTEN):
                 try:
                     users.add(psutil.Process(c.pid).username().lower())
+                except psutil.AccessDenied:
+                    # a service's owner can't be read without elevation,
+                    # every time: "can't tell" left no local model working
+                    # for good (6b317, from the Windows sweep). Not ours,
+                    # then: ours starts on a free port, and that one never
+                    # sees anyone else's questions.
+                    users.add("?unreadable")
+                except psutil.NoSuchProcess:
+                    continue
                 except Exception:
                     return None
     else:
@@ -5411,6 +5539,12 @@ _export_install = {"state": "idle", "note": ""}
 
 
 def _install_export_deps_worker():
+    if getattr(sys, "frozen", False):
+        # an installed (frozen) app can't pip-install into itself; its
+        # build carries these libraries (6b317)
+        _export_install.update(state="error",
+                               note="not included in this build")
+        return
     try:
         _export_install.update(state="installing", note="")
         pip = os.path.join(app_dir(), "venv", "bin", "pip")
@@ -6060,8 +6194,16 @@ def ex_calendar(text, ext, path, title=""):
                         "DTEND%s:%s" % (";TZID=" + tz if tz else "", en),
                         summary))
         else:
-            nxt = time.strftime("%Y%m%d", time.localtime(
-                time.mktime(time.strptime(day, "%Y%m%d")) + 86400))
+            # calendar arithmetic, not epoch seconds (6b317, from the
+            # Windows sweep): Windows' mktime can't go before 1970, so a
+            # 1969 date sank the whole file, and on a fall-back day
+            # "+86400 s" landed on the same date everywhere
+            import datetime as _dt
+            try:
+                nxt = (_dt.datetime.strptime(day, "%Y%m%d").date()
+                       + _dt.timedelta(days=1)).strftime("%Y%m%d")
+            except ValueError:
+                continue                    # an impossible date: skip it
             evs.append(("DTSTART;VALUE=DATE:" + day,
                         "DTEND;VALUE=DATE:" + nxt, summary))
     if not evs:
@@ -6224,6 +6366,13 @@ def run_export(text: str, ext: str, title: str = "", base=None,
         raise RuntimeError("I don't know how to write a .%s file" % ext)
     kind = EXPORT_KIND[ext][0]
     if ext in EXPORT_NEEDS_DEPS and not ensure_export_deps(block_s=90):
+        # a failed install says why, not "still installing" forever
+        # (6b317, from the Windows sweep)
+        if _export_install.get("state") == "error":
+            raise RuntimeError(
+                "this computer couldn't install the document engines for "
+                ".%s files (%s) — Markdown, CSV or HTML still work"
+                % (ext, (_export_install.get("note") or "no details")[:120]))
         raise RuntimeError(
             "the document engines are still installing (about 70 MB, once) "
             "— ask again in a minute")
@@ -6780,6 +6929,34 @@ def _check_update_live():
         newer = bool(_rsha) and _rsha != _mine
     else:
         newer = _build_from_tag(tag) > APP_BUILD
+        # never "update" to an older version (6b317, found testing in a
+        # Windows VM): 6.0.4's tag v274 outnumbers the 6.1 code's
+        # APP_BUILD 273, so a 6.1 build on the stable channel was offered
+        # 6.0.4
+        _rv = re.match(r"\s*(\d+(?:\.\d+)*)", rel.get("name") or "")
+        if newer and _rv:
+            def _vt(v):
+                return (tuple(int(x) for x in v.split(".")) + (0, 0, 0))[:3]
+            if _vt(_rv.group(1)) < _vt(APP_VERSION):
+                newer = False
+    # WINDOWS IS OFFERED ITS DOWNLOAD (6b317, from the Windows sweep):
+    # "available" needed a .dmg and a Mac app bundle, so a PC was told
+    # "You're up to date" beside a newer release's notes. There the offer
+    # is the release's own Windows file (the .msi for an installed app,
+    # the zip otherwise), opened in the browser: nothing installs itself.
+    if not IS_MAC:
+        ends = ".msi" if getattr(sys, "frozen", False) else "-Windows.zip"
+        win = next((a for a in rel.get("assets", [])
+                    if a.get("name", "").endswith(ends)), None) or {}
+        manual = (win.get("browser_download_url")
+                  or rel.get("html_url") or "") if newer else ""
+        _update["manual"] = manual
+        return {"configured": True, "available": bool(manual),
+                "manual": manual,
+                "latest": shown, "tag": tag, "current": short_version(),
+                "published": rel.get("published_at", ""),
+                "notes": (rel.get("body") or "")[:4000],
+                "size_mb": round(win.get("size", 0) / 1e6, 1)}
     return {"configured": True,
             "available": bool(dmg) and newer
                          and _app_bundle_path() is not None,
@@ -6915,6 +7092,20 @@ def load_prefs(base=None) -> dict:
 _prefs_lock = threading.RLock()
 
 
+def _replace_into(tmp: str, dst: str):
+    """os.replace, waiting out a reader on Windows (6b317, from the
+    Windows sweep): there a file can't be replaced while another thread
+    has it open, so a save that met a read raised and was lost."""
+    for n in range(20):
+        try:
+            os.replace(tmp, dst)
+            return
+        except PermissionError:
+            if not IS_WIN or n == 19:
+                raise
+            time.sleep(0.05)
+
+
 def store_prefs(d: dict, base=None):
     """Atomic, with a UNIQUE temp file per save (6b304). Every save used to
     write prefs.json.tmp, so two at once could rename one another's
@@ -6927,7 +7118,7 @@ def store_prefs(d: dict, base=None):
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(d, f)
-        os.replace(tmp, p)
+        _replace_into(tmp, p)
     except Exception:
         try:
             os.remove(tmp)
@@ -8228,11 +8419,12 @@ def setup_status() -> dict:
     # WHICH PRESET IS ON DISK (6b290, per Patrick: "highlight that so
     # the user knows which one they're on"). current = exactly this
     # set; installed = all of it plus extras; partial = some; none.
-    installed = {l for l, ok in SUPPORTED.items()
+    # compared by download, not by row: two rows can share one (6b317)
+    installed = {MODEL_ROUTES.get(l, (None, l)) for l, ok in SUPPORTED.items()
                  if ok and model_cached(l, pulled)}
     plan_state = {}
     for pl in ("min", "rec", "full", "all"):
-        want_set = set(plan_labels(pl))
+        want_set = {MODEL_ROUTES.get(l, (None, l)) for l in plan_labels(pl)}
         if want_set and want_set == installed:
             plan_state[pl] = "current"
         elif want_set and want_set <= installed:
@@ -9137,9 +9329,52 @@ def _venue_stamp(fmt: str) -> str:
     tzname = getattr(_tl_search, "tz", "") or ""
     out = strftime_np(fmt, _venue_now(tzname))
     where = getattr(_tl_search, "tz_place", "") or ""
-    if tzname and where and tzname != _host_tz():
+    if tzname and where and not _venue_is_host(tzname):
         out += " in " + where
     return out
+
+
+def _venue_is_host(tzname: str) -> bool:
+    """Is this zone the host's own clock? Windows has no /etc/localtime
+    (6b317, from the Windows sweep: every answer said "... in Brooklyn"
+    even in Brooklyn), so there a zone counts as the host's when it keeps
+    the host's time right now; with no zone data at all the clock used
+    IS the host's, so it gets no "in <place>"."""
+    if not IS_WIN:
+        return tzname == _host_tz()
+    try:
+        from zoneinfo import ZoneInfo
+        import datetime as _dt
+        off = _dt.datetime.now(ZoneInfo(tzname)).utcoffset()
+        return (off is not None
+                and int(off.total_seconds()) == time.localtime().tm_gmtoff)
+    except Exception:
+        return True
+
+
+def _ensure_tzdata():
+    """Windows has no time-zone database of its own, and zoneinfo needs
+    the tzdata package there (6b317, from the Windows sweep: without it
+    every venue and home-area clock quietly fell back to the PC's, so a
+    Tokyo bar was "open" on a New York clock). ConcordeAI.bat installs it
+    now; a setup from before that fetches it once, in the background."""
+    if not IS_WIN or getattr(sys, "frozen", False):
+        return
+    try:
+        import tzdata  # noqa: F401
+        return
+    except ImportError:
+        pass
+    try:
+        subprocess.run([os.path.join(os.path.dirname(sys.executable), "pip"),
+                        "install", "--quiet", "tzdata"],
+                       capture_output=True, timeout=600,
+                       creationflags=getattr(subprocess,
+                                             "CREATE_NO_WINDOW", 0))
+        import importlib
+        importlib.invalidate_caches()
+    except Exception:
+        pass
 
 
 def _host_tz() -> str:
@@ -9753,6 +9988,10 @@ def _retire_engine(label: str):
                 pass
 
 
+class _DraftAbandoned(Exception):
+    """Raised from a council draft's emit once the council moved on."""
+
+
 def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
     """Stream one model's answer, handling engine startup and templates."""
     # NO 70B fallback: an unknown label used to route to llama3.3:70b on
@@ -10364,13 +10603,28 @@ def run_council(labels: list, messages: list, emit, status,
         status(f"asking {label} · {i} of {len(labels)}")
         parts = []
         _err = []
+        _stop = threading.Event()
 
-        def _draft_local(_lbl=label):
+        # each draft keeps ITS OWN lists and stop switch (6b317, from the
+        # Windows sweep): the thread read `parts` and `_err` through the
+        # loop's variables, so an abandoned draft kept writing into the
+        # next model's answer. And on Ollama (every model on Windows)
+        # nothing stopped it: its stream stayed open and it generated on,
+        # taking the CPU from the drafts after it. Now its next token
+        # closes the stream, and Ollama stops.
+        def _collect(chunk, _p=parts, _s=_stop):
+            if _s.is_set():
+                raise _DraftAbandoned()
+            _p.append(chunk)
+
+        def _draft_local(_lbl=label, _c=_collect, _e=_err):
             try:
-                run_model(_lbl, messages, parts.append,
+                run_model(_lbl, messages, _c,
                           thinking=(reflect and _lbl.startswith("Qwen")))
+            except _DraftAbandoned:
+                pass
             except Exception as exc:      # noqa: BLE001 — recorded below
-                _err.append(exc)
+                _e.append(exc)
         _lt = threading.Thread(target=_draft_local, daemon=True)
         _lt.start()
         # joined in slices so a mid-generation Answer-now cuts the wait
@@ -10382,9 +10636,10 @@ def run_council(labels: list, messages: list, emit, status,
             if _hurried() and _have_draft():
                 break
         if _lt.is_alive():
-            # abandoned, not killed: it is a daemon, and the NEXT model's
-            # engine swap stops the process it is stuck in. Keep whatever
-            # it managed to stream if that is already a usable answer.
+            # abandoned: its next token ends its stream (and an MLX
+            # engine swap stops the process it is stuck in). Keep
+            # whatever it streamed if that is already a usable answer.
+            _stop.set()
             _partial = strip_think("".join(parts))
             took_part(label, _partial if len(_partial) > 200
                       else "(no answer — too slow)")
@@ -10808,7 +11063,8 @@ def _ssh_argv(conf: dict) -> list:
     port = str(conf.get("port") or "22")
     if port != "22":
         argv += ["-p", port]
-    key = (conf.get("key") or "").strip()
+    # Explorer's "Copy as path" wraps a path in quotes (6b317)
+    key = (conf.get("key") or "").strip().strip('"')
     if key:
         argv += ["-i", os.path.expanduser(key)]
     argv.append("%s@%s" % (conf.get("user", "root"), conf.get("host", "")))
@@ -10819,8 +11075,12 @@ def ssh_run(conf: dict, cmd: str, timeout: int = 120):
     """(exit_code, combined_output). rc -1 == the connection itself
     failed; the text carries ssh's own words so the UI can guide."""
     try:
+        # UTF-8, never strict (6b317, from the Windows sweep): Windows
+        # decoded a server's output as cp1252, so systemctl's "\u25cf" read
+        # as "ssh failed" (exit -1) for a command that had run
         p = subprocess.run(_ssh_argv(conf) + [cmd],
-                           capture_output=True, text=True, timeout=timeout)
+                           capture_output=True, encoding="utf-8",
+                           errors="replace", timeout=timeout)
         out = (p.stdout or "") + (p.stderr or "")
         return p.returncode, out
     except subprocess.TimeoutExpired:
@@ -11458,11 +11718,17 @@ def run_remote_agent(messages, conf, autonomy, emit, status, step,
     status("connecting to %s" % host)
     rc, out = ssh_run(conf, "echo __ok__ && uname -a", timeout=20)
     if rc != 0 or "__ok__" not in out:
+        _u = conf.get("user", "root")
+        # Windows has no ssh-copy-id: a PC gets the PowerShell line (6b317)
+        _cp = (('type $env:USERPROFILE\\.ssh\\id_ed25519.pub | ssh %s@%s '
+                '"umask 077; mkdir -p ~/.ssh; cat >> ~/.ssh/authorized_keys"'
+                '` in PowerShell' % (_u, host)) if IS_WIN
+               else "ssh-copy-id %s@%s`" % (_u, host))
         emit("**Couldn't connect to %s.**\n\n```\n%s\n```\n\nThis agent "
              "uses key-based SSH only. Make sure your key is set up "
-             "(`ssh-copy-id %s@%s`) and the host, user and port are right "
+             "(`%s) and the host, user and port are right "
              "in the connection settings."
-             % (host, out.strip()[:400], conf.get("user", "root"), host))
+             % (host, out.strip()[:400], _cp))
         return
     step("conn", "Connected to " + host, "done", out.strip().split("\n")[0][:60])
     convo = [{"role": "system", "content": REMOTE_SYSTEM}] + list(messages)
@@ -11650,14 +11916,23 @@ def offline_hint(kind: str, err: Exception) -> str:
             pass
         detail = detail.strip()[:500]
         if kind == "ollama" and err.code == 404:
+            # a PC has no `ollama` command; the app's own copy is private
+            # (6b317, from the Windows sweep): point at the app instead
             return ("⚠️ Ollama is running but that model isn't pulled.\n\n"
                     f"`{detail or 'model not found'}`\n\n"
-                    "Run `ollama pull <model>` and try again.")
+                    + ("Install it in Settings \u203a Models, then try again."
+                       if IS_WIN else
+                       "Run `ollama pull <model>` and try again."))
         return (f"⚠️ The engine rejected the request (HTTP {err.code}).\n\n"
                 + (f"It says: **{detail}**" if detail
                    else "No details were provided."))
     if isinstance(err, urllib.error.URLError):
         if kind == "ollama":
+            if IS_WIN:
+                return ("⚠️ The model engine isn't answering yet. It can "
+                        "take a minute to start after launch; try again "
+                        "shortly. If it keeps happening, quit and reopen "
+                        "ConcordeAI.")
             return ("⚠️ Ollama isn't reachable on port %d.\n\n"
                     % OLLAMA_PORT[0] +
                     "Start it with `ollama serve`, and make sure the model is "
@@ -11799,6 +12074,53 @@ _sky_lock = threading.Lock()
 _last_seen = {}          # identity -> last request ts, for the user count
 _sky_jobs = {}          # idx -> {"status": ..., "pct": int}
 
+# APPLE'S ROOT, FOR THE BACKDROPS ON WINDOWS (6b317, found in a Windows
+# VM): sylvan.apple.com chains to "Apple Root CA", which Windows' own
+# store doesn't carry, so every clip failed TLS and the backdrop never
+# loaded there. It is added to the usual roots for these downloads only.
+# The public certificate; SHA-256 B0B1730E...1001F024, as Apple lists it.
+_APPLE_ROOT_CA = """-----BEGIN CERTIFICATE-----
+MIIEuzCCA6OgAwIBAgIBAjANBgkqhkiG9w0BAQUFADBiMQswCQYDVQQGEwJVUzET
+MBEGA1UEChMKQXBwbGUgSW5jLjEmMCQGA1UECxMdQXBwbGUgQ2VydGlmaWNhdGlv
+biBBdXRob3JpdHkxFjAUBgNVBAMTDUFwcGxlIFJvb3QgQ0EwHhcNMDYwNDI1MjE0
+MDM2WhcNMzUwMjA5MjE0MDM2WjBiMQswCQYDVQQGEwJVUzETMBEGA1UEChMKQXBw
+bGUgSW5jLjEmMCQGA1UECxMdQXBwbGUgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkx
+FjAUBgNVBAMTDUFwcGxlIFJvb3QgQ0EwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAw
+ggEKAoIBAQDkkakJH5HbHkdQ6wXtXnmELes2oldMVeyLGYne+Uts9QerIjAC6Bg+
++FAJ039BqJj50cpmnCRrEdCju+QbKsMflZ56DKRHi1vUFjczy8QPTc4UadHJGXL1
+XQ7Vf1+b8iUDulWPTV0N8WQ1IxVLFVkds5T39pyez1C6wVhQZ48ItCD3y6wsIG9w
+tj8BMIy3Q88PnT3zK0koGsj+zrW5DtleHNbLPbU6rfQPDgCSC7EhFi501TwN22IW
+q6NxkkdTVcGvL0Gz+PvjcM3mo0xFfh9Ma1CWQYnEdGILEINBhzOKgbEwWOxaBDKM
+aLOPHd5lc/9nXmW8Sdh2nzMUZaF3lMktAgMBAAGjggF6MIIBdjAOBgNVHQ8BAf8E
+BAMCAQYwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUK9BpR5R2Cf70a40uQKb3
+R01/CF4wHwYDVR0jBBgwFoAUK9BpR5R2Cf70a40uQKb3R01/CF4wggERBgNVHSAE
+ggEIMIIBBDCCAQAGCSqGSIb3Y2QFATCB8jAqBggrBgEFBQcCARYeaHR0cHM6Ly93
+d3cuYXBwbGUuY29tL2FwcGxlY2EvMIHDBggrBgEFBQcCAjCBthqBs1JlbGlhbmNl
+IG9uIHRoaXMgY2VydGlmaWNhdGUgYnkgYW55IHBhcnR5IGFzc3VtZXMgYWNjZXB0
+YW5jZSBvZiB0aGUgdGhlbiBhcHBsaWNhYmxlIHN0YW5kYXJkIHRlcm1zIGFuZCBj
+b25kaXRpb25zIG9mIHVzZSwgY2VydGlmaWNhdGUgcG9saWN5IGFuZCBjZXJ0aWZp
+Y2F0aW9uIHByYWN0aWNlIHN0YXRlbWVudHMuMA0GCSqGSIb3DQEBBQUAA4IBAQBc
+NplMLXi37Yyb3PN3m/J20ncwT8EfhYOFG5k9RzfyqZtAjizUsZAS2L70c5vu0mQP
+y3lPNNiiPvl4/2vIB+x9OYOLUyDTOMSxv5pPCmv/K/xZpwUJfBdAVhEedNO3iyM7
+R6PVbyTi69G3cN8PReEnyvFteO3ntRcXqNx+IjXKJdXZD9Zr1KIkIxH3oayPc4Fg
+xhtbCS+SsvhESPBgOJ4V9T0mZyCKM2r3DYLP3uujL/lTaltkwGMzd/c6ByxW69oP
+IQ7aunMZT7XZNn/Bh1XZp5m5MkL72NVxnn6hUrcbvZNCJBIqxw8dtk2cXmPIS4AX
+UKqK1drk/NAJBzewdXUh
+-----END CERTIFICATE-----"""
+_sky_tls = {"ctx": None}
+
+
+def _sky_context():
+    if _sky_tls["ctx"] is None:
+        import ssl
+        ctx = ssl.create_default_context()
+        try:
+            ctx.load_verify_locations(cadata=_APPLE_ROOT_CA)
+        except Exception:
+            pass
+        _sky_tls["ctx"] = ctx
+    return _sky_tls["ctx"]
+
 
 def _sky_dir() -> str:
     return os.path.join(app_dir(), "sky")
@@ -11908,7 +12230,8 @@ def _sky_fetch(i: int):
         os.makedirs(_sky_dir(), exist_ok=True)
         req = urllib.request.Request(SKY_SOURCES[i],
                                      headers={"User-Agent": "MillenAI"})
-        with urllib.request.urlopen(req, timeout=60) as r, \
+        with urllib.request.urlopen(req, timeout=60,
+                                    context=_sky_context()) as r, \
                 open(tmp, "wb") as out:
             total = int(r.headers.get("Content-Length") or 0)
             got = 0
@@ -11950,7 +12273,7 @@ def _sky_fetch(i: int):
             pass
     except Exception as exc:
         with _sky_lock:
-            _sky_jobs[i] = {"status": "error", "pct": 0,
+            _sky_jobs[i] = {"status": "error", "pct": 0, "t": time.time(),
                             "note": str(exc)[:120]}
         try:
             os.remove(tmp)
@@ -11967,6 +12290,12 @@ def sky_status(i: int, warm: bool = False) -> dict:
         job = _sky_jobs.get(i)
         if job and job.get("status") != "error":
             return dict(job)
+        # A FAILED CLIP SAYS SO (6b317): the next poll restarted it at
+        # once, so the page never saw "error" and never moved on; a clip
+        # Apple retired (or, on Windows, one it couldn't verify) sat at
+        # "Loading · 0%" for good. It may be tried again in ten minutes.
+        if job and time.time() - job.get("t", 0) < 600:
+            return {k: v for k, v in job.items() if k != "t"}
         # ONE download at a time: several launches/refreshes each kicking a
         # 400 MB prewarm saturated the line and made everything feel slow.
         # A background warm never starts while anything else is fetching;
@@ -12640,7 +12969,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                    "/api/studio/opts",
                    "/api/export/reveal",
                    "/api/model/cleanup", "/api/model/update",
-                   "/api/update/install",
+                   "/api/update/install", "/api/update/download",
                    "/api/speak", "/api/voice/prepare",
                    "/api/remote/config", "/api/remote/test",
                    "/api/remote/approve")
@@ -12810,6 +13139,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     .replace("__APP_BETA__",
                              'VERSION <b class="vnum">%s</b>' % short_version())
                     .replace("__CHIP__", chip_name())
+                    .replace("__IS_PC__", json.dumps(IS_WIN))
                     .replace("__GIANT_LABEL__", _html_escape(giant_blurb()[0]))
                     .replace("__GIANT_TIP__", _html_escape(giant_blurb()[1]))
                     .replace("__MEM_LABEL__", mem_label())
@@ -12938,7 +13268,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             q = urllib.parse.parse_qs(
                 urllib.parse.urlparse(self.path).query)
             if self.path.startswith("/api/workspace/set"):
-                root = os.path.expanduser((q.get("root", [""])[0]).strip())
+                # Explorer's "Copy as path" wraps it in quotes (6b317)
+                root = os.path.expanduser(
+                    (q.get("root", [""])[0]).strip().strip('"'))
                 if not root or not os.path.isdir(root):
                     self._send_json({"ok": False,
                                      "err": "that folder doesn't exist"})
@@ -13459,7 +13791,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                     or 0))
                 if HAS_WEBVIEW and webview.windows:
                     _w = webview.windows[0]
-                    _w.restore()
+                    # on Windows restore() un-maximizes too (6b317, from
+                    # the sweep): only a minimized window is restored
+                    if not IS_WIN or _WIN_STATE["min"]:
+                        _w.restore()
                     _w.show()
                     if IS_MAC:
                         from AppKit import NSApp
@@ -13658,7 +13993,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # an account with no money is saved too, but says so
                     # and sits out an hour, not ten minutes (6b307)
                     _broke = bool(_NO_CREDIT_RX.search(raw or detail))
-                    _cloud_save_state(which, {"name": name, "base": base,
+                    _saved = _cloud_save_state(which, {"name": name, "base": base,
                                               "key": key, "model": model,
                                               "models": found,
                                               "status": "ok",
@@ -13671,6 +14006,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                                        "rate limited — "
                                                        "resting")},
                                       make_active=True)
+                    if not _saved:
+                        self._send_json({"ok": False, "err": _KEY_NOT_SAVED})
+                        return
                     p = load_prefs(None); p["turbo"] = True; store_prefs(p)
                     self._send_json({
                         "ok": True, "name": name, "model": model,
@@ -13730,11 +14068,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # the in-memory set has to forget too or the freshly
                 # discovered models stay benched
                 cloud_revive(found + [model])
-                _cloud_save_state(which, {"name": name, "base": base,
-                                          "key": key, "model": model,
-                                          "models": found,
-                                          "status": "ok"},
-                                  make_active=True)
+                if not _cloud_save_state(which, {"name": name, "base": base,
+                                                 "key": key, "model": model,
+                                                 "models": found,
+                                                 "status": "ok"},
+                                         make_active=True):
+                    self._send_json({"ok": False, "err": _KEY_NOT_SAVED})
+                    return
             except Exception as exc:
                 self._send_json({"ok": False, "err": str(exc)[:80]})
                 return
@@ -13844,6 +14184,18 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if _update["state"] in ("idle", "error"):
                 threading.Thread(target=_do_update, daemon=True).start()
             self._send_json({"ok": True})
+            return
+        if self.path == "/api/update/download":
+            # a PC's update: its release file, in the browser. Only the
+            # URL the update check found is ever opened.
+            url = str(_update.get("manual") or "")
+            ok = url.startswith("https://github.com/")
+            if ok:
+                try:
+                    webbrowser.open(url)
+                except Exception:
+                    ok = False
+            self._send_json({"ok": ok})
             return
         if self.path == "/api/funnel":
             # funnels spend the OWNER's keys on every stage (6b308): a
@@ -16073,8 +16425,19 @@ def _write_instance_note():
     atexit.register(_drop)
 
 
+_WIN_STATE = {"min": False}      # the window, as its events report it
+
+
 def _hand_off() -> bool:
     """Ask the running copy to come forward. True when it answered."""
+    if IS_WIN:
+        # Windows only lets the process the user just started take the
+        # foreground; pass that right on to the running copy (6b317)
+        try:
+            import ctypes
+            ctypes.windll.user32.AllowSetForegroundWindow(-1)   # ASFW_ANY
+        except Exception:
+            pass
     try:
         with open(INSTANCE_NOTE) as fh:
             d = json.load(fh)
@@ -16103,6 +16466,71 @@ def _already_open_notice():
             ctypes.windll.user32.MessageBoxW(None, msg, APP_NAME, 0x40)
     except Exception:
         pass
+
+
+def _fit_window(w, h, min_w, min_h):
+    """The window's size, fitted to a PC's screen (6b317, from the Windows
+    sweep): 1320x860 is taller than a 1080p laptop's work area at 125%
+    or 150% scaling, and Windows, unlike macOS, left the composer under
+    the taskbar. Sizes are in the same logical pixels pywebview uses."""
+    if not IS_WIN:
+        return w, h, min_w, min_h
+    try:
+        import ctypes
+        from ctypes import wintypes
+        r = wintypes.RECT()
+        ctypes.windll.user32.SystemParametersInfoW(0x30, 0, ctypes.byref(r),
+                                                   0)      # SPI_GETWORKAREA
+        try:
+            sc = ctypes.windll.user32.GetDpiForSystem() / 96.0
+        except Exception:
+            sc = 1.0
+        sc = max(1.0, sc)
+        aw, ah = (r.right - r.left) / sc, (r.bottom - r.top) / sc
+        if aw < 200 or ah < 200:
+            return w, h, min_w, min_h
+        w2, h2 = int(min(w, aw - 40)), int(min(h, ah - 40))
+        return w2, h2, min(min_w, w2), min(min_h, h2)
+    except Exception:
+        return w, h, min_w, min_h
+
+
+def _webview2_missing() -> bool:
+    """Windows without Microsoft's WebView2 Runtime (6b317, from the
+    sweep): pywebview fell back to Internet Explorer, which can't run the
+    page, and the window sat dead. Say so and use the browser instead."""
+    if not IS_WIN:
+        return False
+    try:
+        import winreg
+        guid = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+        for root, path in (
+                (winreg.HKEY_LOCAL_MACHINE,
+                 "SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\"
+                 + guid),
+                (winreg.HKEY_LOCAL_MACHINE,
+                 "SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\" + guid),
+                (winreg.HKEY_CURRENT_USER,
+                 "Software\\Microsoft\\EdgeUpdate\\Clients\\" + guid)):
+            try:
+                with winreg.OpenKey(root, path) as k:
+                    v = str(winreg.QueryValueEx(k, "pv")[0])
+                    if v and v != "0.0.0.0":
+                        return False
+            except OSError:
+                continue
+    except Exception:
+        return False          # can't tell: let pywebview try
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(
+            None, "%s needs Microsoft's WebView2 Runtime to draw its "
+            "window, and this PC doesn't have it. It's free: search for "
+            "\"WebView2 Runtime\" at microsoft.com.\n\nFor now %s opens "
+            "in your web browser." % (APP_NAME, APP_NAME), APP_NAME, 0x40)
+    except Exception:
+        pass
+    return True
 
 
 def start_backend(server=None):
@@ -16139,6 +16567,11 @@ if("__WIN_WIPE__"==="1"&&
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Michroma&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+/* dropdown lists draw dark (6b317, from the Windows sweep): WebView2
+   paints a <select>'s popup itself, and ours came out near-white text
+   on white; the Mac's native menus never showed it */
+select{color-scheme:dark}
+select option{background:#16171b;color:#ececec}
 :root{
   --bg:#101013;
   --panel:#0a0a0c;
@@ -17965,6 +18398,9 @@ body.gen #chip-model{color:var(--accent)}
 #about-body{
   padding:0 24px;overflow-y:auto;flex:1 1 auto;min-height:0;
   scrollbar-width:thin;
+  /* Chromium (WebView2) takes these over the ::-webkit rules once
+     scrollbar-width is set, and drew a light bar on the dark pane */
+  scrollbar-color:#3a3b41 transparent;
 }
 #about-body::-webkit-scrollbar{width:8px}
 #about-body::-webkit-scrollbar-thumb{
@@ -19568,6 +20004,8 @@ const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 // models — model management, GPU sharing and install nudges belong to
 // the owner sitting at it, never to the borrower
 const IS_LOCAL=location.hostname==="127.0.0.1"||location.hostname==="localhost";
+// a Windows PC (6b317): its commands, settings and words differ
+const IS_PC=__IS_PC__;
 
 /* ------------------------------------------------------------- state */
 let messages=[], generating=false, abortCtl=null;
@@ -20139,9 +20577,18 @@ async function remoteRefresh(){
       $("#rm-key").value=c.key||"";
       $("#rm-note").textContent=c.configured
         ?"Saved. Test the connection, then just tell me what you need done."
-        :"Key-based SSH. On a fresh box: ssh-copy-id your key first.";
+        :"Key-based SSH. On a fresh box, install your key first: "+keyCopyCmd("user","host");
     }
   }catch(e){}
+}
+// the key-install command for this computer (6b317): Windows has no
+// ssh-copy-id, so a PC gets the PowerShell line that does the same
+function keyCopyCmd(u,h){
+  return IS_PC
+    ?'type $env:USERPROFILE\\.ssh\\id_ed25519.pub | ssh '+u+"@"+h
+      +' "umask 077; mkdir -p ~/.ssh; cat >> ~/.ssh/authorized_keys"'
+      +"  (in PowerShell; make a key first with  ssh-keygen -t ed25519  if you have none)"
+    :"ssh-copy-id "+u+"@"+h;
 }
 async function remoteSave(){
   const body={host:$("#rm-host").value.trim(),user:$("#rm-user").value.trim(),
@@ -20167,9 +20614,8 @@ if($("#rm-test"))$("#rm-test").addEventListener("click",async()=>{
       headers:{"Content-Type":"application/json"},body:"{}"})).json();
     note.textContent=r.ok?"✓ connected — "+(r.detail||"ready")
       :"✗ "+(r.detail||"couldn't connect")
-        +"\nKey-based SSH only: run  ssh-copy-id "
-        +$("#rm-user").value.trim()+"@"+$("#rm-host").value.trim()
-        +"  to install your key.";
+        +"\nKey-based SSH only: install your key with  "
+        +keyCopyCmd($("#rm-user").value.trim(),$("#rm-host").value.trim());
   }catch(e){note.textContent="network error";}
 });
 // the CODE tab's two rows: always visible, plain radio behavior
@@ -21115,6 +21561,18 @@ $("#fpick").addEventListener("change",()=>{
   });
   $("#fpick").value="";
 });
+// A DROPPED FILE ATTACHES (6b317, from the Windows sweep): with no drop
+// handler, WebView2 navigated the whole window to the file, the app was
+// gone and nothing led back. Anywhere in the window, a drop is a chip.
+addEventListener("dragover",e=>{e.preventDefault();
+  if(e.dataTransfer)e.dataTransfer.dropEffect="copy";});
+addEventListener("drop",e=>{
+  e.preventDefault();
+  [...((e.dataTransfer&&e.dataTransfer.files)||[])].forEach(f=>{
+    if(f.type.startsWith("image/"))addImageFile(f);
+    else if(f.size<2_000_000)addDocFile(f);
+  });
+});
 input.addEventListener("paste",e=>{
   const items=[...(e.clipboardData||{}).items||[]]
     .filter(it=>it.type&&it.type.startsWith("image/"));
@@ -21170,13 +21628,19 @@ async function send(){
       ||(engineState[m].up&&engineState[m].mem_ok!==false));
     if(live.length&&live.length<council.length){council=live;paintModels();}
   }
-  const eng=engineState[model];
+  // ONLY A HAND-PICKED MODEL IS CHECKED HERE (6b317, from the Windows
+  // sweep): `model` is a stale default whenever a tier or the Advanced
+  // list is in charge, and the server picks what actually runs. A PC
+  // with just Llama 3.2 1B was refused and told to run `ollama pull`
+  // in a terminal, a command it doesn't have.
+  const eng=(!tier&&!advOn)?engineState[model]:null;
   if(eng&&!eng.up){
     input.value="";input.style.height="auto";
     addMsg("user",text);
     const help="⚠️ **"+model+"** isn't running ("+eng.note+").\n\n"+
-      (eng.cmd?"Start it in a terminal:\n\n```\n"+eng.cmd+"\n```\n\nOr just click a model with a green dot — those are ready now.":
-      "Click a model with a green dot — those are ready now.");
+      (IS_PC?"Pick a tier instead, or install it in Settings \u203a Models.":
+      eng.cmd?"Start it in a terminal:\n\n```\n"+eng.cmd+"\n```\n\nOr pick a tier; those use what's installed.":
+      "Pick a tier; those use what's installed.");
     addMsg("assistant",help);
     return;
   }
@@ -22591,6 +23055,9 @@ async function pollStats(){
     gpu=st.gpu_pct;
     memPct=(st.mem_pressure!=null?st.mem_pressure:st.mem_pct);
   }catch(e){}
+  // a PC with no GPU readings (no NVIDIA card) shows no bar rather
+  // than a made-up one (6b317, from the Windows sweep)
+  if($("#gpu-meter"))$("#gpu-meter").hidden=(IS_PC&&gpu==null);
   if(gpu==null){
     // ambient fallback — clearly approximate
     simGpu=Math.max(2,Math.min(97,simGpu+(Math.random()-0.5)*8+(generating?22:-16)));
@@ -23214,7 +23681,9 @@ function wavEncode(chunks,srIn){
 async function ensureVoice(){
   if(voiceReady)return true;
   const st=await(await fetch("/api/voice/status")).json();
-  if(!st.supported){input.placeholder="voice input needs an Apple silicon Mac";return false;}
+  if(!st.supported){input.placeholder=IS_PC
+    ?"voice input isn't installed on this PC (its speech engine didn't install)"
+    :"voice input needs an Apple silicon Mac";return false;}
   if(st.ready){voiceReady=true;return true;}
   await fetch("/api/voice/prepare",{method:"POST"});
   input.placeholder="getting the voice engine ("+(st.pct||0)+"%)\u2026 tap the mic again soon";
@@ -23222,6 +23691,11 @@ async function ensureVoice(){
     const s2=await(await fetch("/api/voice/status")).json();
     if(s2.ready){clearInterval(voicePoll);voicePoll=null;voiceReady=true;
       input.placeholder="voice ready \u2014 tap the mic and talk";}
+    else if(s2.note&&!s2.downloading){
+      // a failed fetch says so; tapping the mic again retries (6b317)
+      clearInterval(voicePoll);voicePoll=null;
+      input.placeholder="the voice engine didn't download ("+s2.note.slice(0,80)
+        +") \u2014 tap the mic to try again";}
     else input.placeholder="getting the voice engine ("+(s2.pct||0)+"%)\u2026";
   },2000);
   return false;
@@ -23264,7 +23738,10 @@ micBtn.addEventListener("click",async()=>{
     body:JSON.stringify({stop:true})});   // barge-in: stop any reply audio
   if(!(await ensureVoice()))return;
   try{await startRec();}
-  catch(e){input.placeholder="microphone blocked \u2014 allow it in System Settings \u25b8 Privacy";}
+  catch(e){input.placeholder=e&&e.name==="NotFoundError"
+    ?"no microphone found"
+    :IS_PC?"microphone blocked \u2014 allow it in Settings \u25b8 Privacy & security \u25b8 Microphone"
+    :"microphone blocked \u2014 allow it in System Settings \u25b8 Privacy";}
 });
 
 input.focus();
@@ -25039,7 +25516,7 @@ $("#about-check").addEventListener("click",async ev=>{
     if(!r.configured){b.textContent="Updates not configured";}
     else if(r.available){
       upInfo=r;$("#update-flag").hidden=false;
-      b.textContent="Update to "+r.latest;
+      b.textContent=(r.manual?"Download ":"Update to ")+r.latest;
       b.disabled=false;
       b.onclick=()=>{aboutVeil.hidden=true;openUpdate();};
       return;
@@ -25073,14 +25550,25 @@ async function checkUpdate(){
 function openUpdate(){
   if(!upInfo)return;
   $("#up-ver").textContent=upInfo.latest+"  \u2022  you have "+upInfo.current;
-  $("#up-detail").textContent=
-    "Downloads "+upInfo.size_mb+" MB from GitHub, then restarts. "+
-    "Your chats and everything it remembers are kept.";
+  $("#up-detail").textContent=upInfo.manual
+    // a PC gets its release file in the browser (6b317): unzip it over
+    // this folder, or run the installer; chats live elsewhere and stay
+    ?"Opens the "+(upInfo.size_mb?upInfo.size_mb+" MB ":"")+"download from "+
+     "GitHub in your browser. Quit ConcordeAI and unzip it where this "+
+     "copy is, replacing the old ConcordeAI folder (or run the "+
+     "installer). Your chats and everything it remembers are kept."
+    :"Downloads "+upInfo.size_mb+" MB from GitHub, then restarts. "+
+     "Your chats and everything it remembers are kept.";
+  upGo.textContent=upInfo.manual?"Download":"Update now";
   upVeil.hidden=false;
 }
 $("#update-flag").addEventListener("click",openUpdate);
 $("#up-later").addEventListener("click",()=>{upVeil.hidden=true;});
 upGo.addEventListener("click",async()=>{
+  if(upInfo&&upInfo.manual){
+    await fetch("/api/update/download",{method:"POST"});
+    upVeil.hidden=true;return;
+  }
   upGo.disabled=true;upGo.textContent="Downloading\u2026";
   upBar.hidden=false;
   await fetch("/api/update/install",{method:"POST"});
@@ -25964,7 +26452,9 @@ def maybe_version_splash():
             return          # fresh install gets the boot wipe, not this
         if real:
             _UPDATE_LANDED[0] = True
-        if not (HAS_WEBVIEW and IS_MAC):
+        # any app window shows it: the Mac-only gate was left from the
+        # old full-screen splash, so Windows never saw What's new (6b317)
+        if not HAS_WEBVIEW:
             return
         _JUST_UPDATED[0] = str(last)
     except Exception:
@@ -26060,6 +26550,16 @@ if __name__ == "__main__":
         _server = bind_backend()
     except OSError as exc:
         print(f"\n  {APP_NAME} can't start: no free port ({exc}).\n")
+        if IS_WIN:
+            # pythonw has no console to print to (6b317, from the sweep)
+            try:
+                import ctypes
+                ctypes.windll.user32.MessageBoxW(
+                    None, "%s can't start: every port it can use is taken "
+                    "(%s). Restarting Windows usually frees them."
+                    % (APP_NAME, str(exc)[:200]), APP_NAME, 0x10)
+            except Exception:
+                pass
         sys.exit(1)
     if DEFAULT_APP:
         _write_instance_note()
@@ -26075,6 +26575,7 @@ if __name__ == "__main__":
         _SWEEP_DONE.set()
     threading.Thread(target=_mlx_janitor, daemon=True).start()
     threading.Thread(target=_warm_studio_cache, daemon=True).start()
+    threading.Thread(target=_ensure_tzdata, daemon=True).start()
     start_managed_engines()
     if not HAS_SEARCH:
         print("  (web search disabled — pip install ddgs to enable)")
@@ -26393,19 +26894,26 @@ if __name__ == "__main__":
                 time.sleep(100)
         except KeyboardInterrupt:
             print("\n  shutting down. o7\n")
-    elif HAS_WEBVIEW:
+    elif HAS_WEBVIEW and not _webview2_missing():
         # Native macOS window (WKWebView). Blocks until the window closes.
+        _ww, _wh, _mw, _mh = _fit_window(1320, 860, 940, 620)
         window = webview.create_window(
             f"{APP_NAME} {short_version()}"
             + (" \u2014 TEST BUILD" if os.environ.get(
                 "MILLENAI_TESTBUILD") else ""),
             url,
-            width=1320,
-            height=860,
-            min_size=(940, 620),
+            width=_ww,
+            height=_wh,
+            min_size=(_mw, _mh),
             background_color="#0a0a0c",
             text_select=True,   # pywebview blocks selection by default
         )
+        try:
+            window.events.minimized += lambda: _WIN_STATE.update(min=True)
+            window.events.restored += lambda: _WIN_STATE.update(min=False)
+            window.events.maximized += lambda: _WIN_STATE.update(min=False)
+        except Exception:
+            pass
         # pywebview defaults to private_mode=True — an EPHEMERAL WebKit
         # data store that wipes localStorage on every launch. That's why
         # the backdrop opened on the same dark-set clip forever: skynext,

@@ -5734,6 +5734,50 @@ polling the Mac on the VMware network; no admin rights, no settings).
   addresses stay allowed, since a fake-IP VPN answers every name with
   198.18.x.x. Its test runs over a fake network now: the old probes
   passed only because nothing listened on the Mac's port 443.
+- THE BACKDROP ON WINDOWS had never loaded: Apple's video host chains to
+  "Apple Root CA", which Windows' store lacks, so every clip failed TLS.
+  The public root is added for those downloads only. And a failed clip
+  now says so: a status poll restarted it at once, so the page never
+  saw "error" and sat at "Loading · 0%" for good (Apple has retired
+  clip #0, so the Mac could hit it too). Retried after ten minutes.
+- THE WINDOWS SWEEP: five reviewers read the whole file against a
+  Windows checklist, each finding re-checked by a skeptic; 39 of 42
+  held, and all are fixed, each with a gauntlet check run on fakes:
+  - pythonw has no stdout/stderr, so the voice model's download (a
+    progress bar) raised before its first byte: voice never installed
+    from the shipped build. Both go to logs\app.log. Proven in the VM:
+    the same download fails under pythonw, and works with the fix.
+  - a manual system proxy (work laptops) got every call to our own
+    Ollama on 127.0.0.1; loopback now always goes direct.
+  - cloud keys were never saved on Python 3.10-3.12 (no os.fchmod on
+    Windows there), behind an "ok"; a failed save now says so.
+  - no tzdata on Windows: every venue and home clock was the PC's, and
+    "in <place>" was added even at home. The .bat installs tzdata, an
+    older setup fetches it once, and "same clock" compares offsets.
+  - Windows was never offered an update ("You're up to date" beside a
+    newer release): it now offers the release's zip (the .msi when
+    installed) in the browser. What's new now shows on Windows too.
+    And no build is offered an OLDER version: 6.0.4's tag v274
+    outnumbers the 6.1 code's APP_BUILD 273.
+  - every console program flashed a black window under pythonw:
+    quiet is now the default for every child process.
+  - ssh output decoded as cp1252 turned systemctl's "\u25cf" into a
+    failed step; SSH advice named ssh-copy-id, which Windows lacks.
+  - the page told PCs to run `ollama serve` and refused to send when a
+    stale default model wasn't pulled; a dropped file replaced the whole
+    app; dropdowns drew white on white in WebView2; mic messages named
+    an Apple silicon Mac and macOS settings; "Copy as path" quotes broke
+    the workspace and key fields; the chip read INTEL64/AMD64/ARMV8
+    beside a made-up GPU meter.
+  - the window (1320x860) overflowed a 1080p laptop's work area at
+    125-150% scaling; a second launch un-maximized it; no WebView2 left
+    a dead IE window; "no free port" exited silently.
+  - smaller: settings saves lost to a reader holding the file, .ics
+    before 1970, Qwen 3.5 9B counted twice where it shares a download
+    with its Vision row, a service-run Ollama blocking every local model,
+    the MSI lacking the export libraries, and abandoned council drafts
+    that kept Ollama generating (and wrote into the next model's draft,
+    a bug on the Mac too).
 - Every .pptx export threw on every platform: the title slide's date
   called _venue_stamp() without the format it requires (and that is the
   chat's venue clock, "... in Tokyo"). A plain local date now; the

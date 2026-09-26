@@ -143,7 +143,11 @@ if (-not (Test-Path "$bv\Scripts\python.exe")) {
 $bpy = "$bv\Scripts\python.exe"
 Write-Host "-> installing build dependencies (a few minutes the first time)"
 & $bpy -m pip install --upgrade pip | Out-Null
-$deps = @("pyinstaller", "pywebview", "ddgs", "psutil", "huggingface_hub")
+# tzdata: Windows has no time-zone database of its own. The four export
+# libraries can't be pip-installed on demand inside a frozen app, so they
+# ship in it (6b317, from the Windows sweep).
+$deps = @("pyinstaller", "pywebview", "ddgs", "psutil", "huggingface_hub",
+          "tzdata", "reportlab", "openpyxl", "python-docx", "python-pptx")
 if ($isArm) {
   # pythonnet - pywebview's default Windows backend - has no ARM64 wheel, so
   # drive the Qt backend instead; PySide6 and QtWebEngine do ship one.
@@ -167,7 +171,8 @@ $pyiArgs = @(
   "--noconfirm", "--clean", "--windowed", "--onedir",
   "--name", "MillenAI",
   "--icon", "MillenAI.ico",
-  "--collect-all", "webview"
+  "--collect-all", "webview",
+  "--collect-data", "tzdata"
 )
 # pywebview resolves its backend dynamically, so PyInstaller cannot see it
 if ($isArm) {
