@@ -977,7 +977,7 @@ html.splashlift body > :not(.splash):not(.stars):not(.hdr-boost):not(svg):not(sc
       </div>
       <div class="wants">
         <h2>Wants and needs</h2>
-        <p class="sub">Flights missing a pick rank lower. Numbers show how many match.</p>
+        <p class="sub" id="chipsub">Flights missing a pick rank lower. Numbers show how many match.</p>
         <div class="chips" id="chips"></div><p class="chipnote hidden" id="chipnote"></p>
         <div class="wish">
           <h3><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1l1.7 4.2L14 6.4l-3.3 3 .9 4.5L8 11.6l-3.6 2.3.9-4.5-3.3-3 4.3-1.2z"/></svg>Make a wish</h3>
@@ -1540,7 +1540,7 @@ function addonPrice(kind, e, typical){
   const x = ownExtras(e), seat = x && x.seat, flier = airName(e.owner || e.carrier);
   if (seat && kind === 'seat') return seat.free ? {cents:0, basis:'free seat choice on this flight (' + flier + (/s$/.test(flier) ? '\'' : '\'s') + ' seat map)', est:false}
     : {cents:seat.any_cents, basis:flier + (/s$/.test(flier) ? '\'' : '\'s') + ' price for this flight' + (seat.segments > 1 ? ', a seat on each of its ' + seat.segments + ' flights' : ''), est:false};
-  if (seat && kind === 'legroom' && seat.legroom_cents != null) return {cents:seat.legroom_cents, basis:flier + (/s$/.test(flier) ? '\'' : '\'s') + ' extra-legroom seat price for this flight', est:false};
+  if (seat && kind === 'legroom' && seat.legroom_cents != null) return {cents:seat.legroom_cents, basis:flier + (/s$/.test(flier) ? '\'' : '\'s') + ' extra-legroom seat price for this flight' + (seat.segments > 1 ? ', on the long flight' : ''), est:false};
   const t = (ADDP.prices || {})[kind] || {}, row = t[e.operator] || t[e.carrier], who = airName((row && row.code) || e.operator || e.carrier);
   // a price published for one haul never stands in for the other ("free within North America" is not a transatlantic promise)
   const p = row && (shortHaul(e) ? row.short : row.long);
@@ -2615,9 +2615,13 @@ function paintChips(){
   // left among flights that already meet every other pick, so a combination nobody flies reads 0 and goes grey
   const picked = [...S.wants].map(id => WANTS.find(w => w.id === id)).filter(Boolean);
   const meets = (e, skip) => picked.every(w => w === skip || w.ok(e));
+  // Served, the page holds a sample recording until a search loads (2026-09-25, per Patrick: a first-class search read
+  // "Lie-flat 0, Meals 0" off the sample's economy flights), so the chips carry no numbers until a search has run
+  const counted = !SERVED || S.counted;
   WANTS.forEach(w => { w.now = ALL.filter(e => w.ok(e) && meets(e, w)).length; });
-  $('#chips').innerHTML = WANTS.map(w => `<button class="chip${w.now ? '' : ' zero'}" data-w="${w.id}" aria-pressed="${S.wants.has(w.id)}" title="${w.now === w.count ? '' : esc(w.count + ' have it, ' + w.now + ' with your other picks')}"><span class="l">${esc(w.label)}</span><span class="n">${w.now}</span></button>`).join('');
-  const z = [...S.wants].map(id => WANTS.find(w => w.id === id)).filter(w => !w.count && w.hint);
+  $('#chips').innerHTML = WANTS.map(w => `<button class="chip${w.now || !counted ? '' : ' zero'}" data-w="${w.id}" aria-pressed="${S.wants.has(w.id)}" title="${w.now === w.count || !counted ? '' : esc(w.count + ' have it, ' + w.now + ' with your other picks')}"><span class="l">${esc(w.label)}</span>${counted ? `<span class="n">${w.now}</span>` : ''}</button>`).join('');
+  $('#chipsub').textContent = counted ? 'Flights missing a pick rank lower. Numbers show how many match.' : 'Flights missing a pick rank lower. After you search, numbers show how many match.';
+  const z = counted ? [...S.wants].map(id => WANTS.find(w => w.id === id)).filter(w => !w.count && w.hint) : [];
   $('#chipnote').classList.toggle('hidden', !z.length); $('#chipnote').textContent = z.map(w => w.hint).join(' ');
 }
 function carrierChip(c){ return `<button class="cbtn" data-c="${c}" aria-pressed="${S.adv.out.has(c)}">${logo(c)}<span>${esc(airName(c))}</span></button>`; }
@@ -3048,7 +3052,7 @@ document.addEventListener('click', ev => {
 function loadData(d){
   D = d; ALL = D.results.reference.slice(); PR = D.profiles; AIR = D.airlines || {}; AP = D.airports || {}; P = D.par;
   GRID = {}; D.grid_points.forEach((p, i) => { GRID[Math.round(p[0]*10) + '-' + Math.round(p[1]*10)] = i; });
-  prepWants(); paintPts();
+  prepWants(); S.counted = true; paintChips(); paintPts();
   PH.city = cityOf(D.query); DOOR_IDS = []; S.open = new Set(); PH.slots = null; PH.wide = null; fetchPhotos();
   paintPar(); paintCov(); paintSignal(); { const f = $('#flex'); if (f){ f.hidden = true; f.innerHTML = ''; } }
 }

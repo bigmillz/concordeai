@@ -845,7 +845,7 @@ curve it is meant to be testing is a fixture that tests nothing.
 
 **The test suites are mutation-tested.** `test_scorer.py` catches 12 of 12 seeded faults and
 `validate.py` 10 of 10; `tests/mutate_adapter.py` is an executable runner for the adapters
-and must stay at every mutant caught (101 of 101 on 2026-09-25, the points charts, planner and pool, hotels, DOT records and the measured cancellation rate, the Fixer, the fleet table, the add-on prices, a flight's own Duffel extras, the lounge rules, the meals table and the ride-fare bands among them; it runs `test_points.py`, `test_records.py` and `test_rescue.py` too, and `MUTATE_ONLY=planner` runs just the mutants whose description holds that word) with **zero skips** — a skipped mutant never ran
+and must stay at every mutant caught (104 of 104 on 2026-09-25, the points charts, planner and pool, hotels, DOT records and the measured cancellation rate, the Fixer, the fleet table, the add-on prices, a flight's own Duffel extras, the lounge rules, the meals table and the ride-fare bands among them; it runs `test_points.py`, `test_records.py` and `test_rescue.py` too, and `MUTATE_ONLY=planner` runs just the mutants whose description holds that word) with **zero skips** — a skipped mutant never ran
 and is not a pass. If a change makes a suite pass that should not, the suite has lost a guard. **The runner works in
 a scratch copy outside the checkout** (since 2026-09-24): run in place, Google Drive's sync raced its
 write-and-restore cycle and left two mutants in `par.py` after a run that reported every fault caught. If a SKIP
@@ -979,7 +979,8 @@ about 30), on its own counters (`quota-duffel-extras.json`, 300 a day), 40 a day
 (400) site-wide. By Duffel's services agreement only offer REQUESTS count as searches, so these are believed free (Duffel
 does not say so outright). Only what the airline PRICED counts: a seat with no service on sale is unavailable, never
 free; an empty services list is unknown, never free bags; extra legroom is the cheapest seat named or disclosed as
-extra legroom, exit, plus or comfort, on EVERY flight of the trip or unknown. What comes back replaces the published or
+extra legroom, exit, plus or comfort on the trip's LONGEST flight (the one the Extra legroom want judges; asking for it
+on every flight left a SWISS trip's $113 transatlantic seat unknown because its short connection sold none). What comes back replaces the published or
 typical price on the bill, unmarked (`bagLadder`, `addonPrice` in mock-10), in dollars at the ECB rate. It is asked only
 for the airlines Duffel quotes extras for (`EXTRAS_AIRLINES`, from Duffel's airline pages: bags and seats on UA, BA, AF,
 KL, LH, LX, OS, SN; seats on AA; bags on EK and TP; `CONCORDEGO_EXTRAS_AIRLINES` overrides). **On the live account on
@@ -987,7 +988,14 @@ KL, LH, LX, OS, SN; seats on AA; bags on EK and TP; `CONCORDEGO_EXTRAS_AIRLINES`
 airline and no priced seat (American's seat map names Main Cabin Extra, Preferred and Standard seats and prices none;
 the rest refused with Travelport's `seat_map_unavailable`). Every offer came through Travelport; none of Duffel's direct
 connections (BA, UA, AF, KL, LH NDC) appeared at all, which is an account setting in Duffel's dashboard for Patrick to
-check. `adapter_samples/duffel-extras-aa-unpriced.json` is that real American reply; `duffel-extras-synthesized.json`
+check. **That evening it worked** (2026-09-25): Duffel's dashboard, Airlines, lists each airline with a Status (BA:
+Active, Content "Duffel Content", Source "British Airways", full support for bags and seats); the Lufthansa group was
+already on and Patrick requested the others. The same New York to London search then returned 300 offers with BA's own
+34 among them, and the lookups priced them: BA Basic Economy a $70 first bag and seats from $62, BA Standard a $90
+second bag, Lufthansa Economy Light a $90 bag and $47.90 for a seat on both flights, SWISS an "EXTRA LEGROOM SEAT" at
+$113. BA names every economy seat just "SEAT" ($62 to $154), so its extra legroom stays on the published or typical
+price; American still quotes nothing (bags "coming soon" on Duffel, its seat map unpriced). The search's supplier wait
+(20 s) was never the cause: both 20 s and 60 s returned in about 4 s with the same offers. `adapter_samples/duffel-extras-aa-unpriced.json` is that real American reply; `duffel-extras-synthesized.json`
 is built from Duffel's documented shapes and says so.
 
 **Duffel CAN quote a bag price, but never on the search response.** `available_services` was
@@ -1433,8 +1441,12 @@ York to Sao Paulo is long, and Seattle to Costa Rica, Canada to Hawaii and Frank
 product. Long-haul rules carry no minimum time (every such flight is past the published cut-offs; the invented floors
 that first came out of the conversion would have left New York to Dublin unknown). Rules are conservative: a meal only
 on named routes, on "select flights" or by time of day is not promised; a Basic or Light fare's own rule wins; an
-airline with no rule is unknown. The second checker could not read six airlines' rows (OS, SN, EI, IB, UX, VY), which
-the file says. The eighteen sit in a fixed grid, six across when the panel is wider than 880px and three otherwise (a
+airline with no rule is unknown. A business or first cabin with no rule of its own takes a MEAL from the cabin below it
+(`meal_for`'s ladder; United publishes only economy's, and a first-class search read "no meal" on 9 of 36 flights), never
+a snack or food for sale, which says nothing about the front. The second checker could not read six airlines' rows (OS,
+SN, EI, IB, UX, VY), which the file says. **Served, the chips carry no numbers until a search has loaded** (`S.counted`,
+set by `loadData`, which also repaints them): before that the page holds the sample recording, and a first-class search
+read "Lie-flat 0, Meals 0, Lounge 0" off its economy flights (2026-09-25). Opened as a file the sample's counts show. The eighteen sit in a fixed grid, six across when the panel is wider than 880px and three otherwise (a
 container query on `.wants`), so every row is full, and on a phone a long label wraps rather than being cut. The wish box's
 vocabulary in `wish.py` lists every want the grid does), a **wish box**
 typed or spoken (the browser's own speech recognition) that becomes visible,

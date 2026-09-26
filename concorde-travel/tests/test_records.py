@@ -128,9 +128,9 @@ def main():
     x = adapter.duffel_extras_summary(syn)
     check("a flight's own quote: two checked bags at $45 and $65 (the insurance service is not a bag), cheapest first",
           [(b["kind"], b["amount"]) for b in x["bags"]] == [("checked", 45.0), ("checked", 65.0)], str(x["bags"]))
-    check("a seat on every flight is the price of choosing one ($32 + $0), and extra legroom is unknown when one "
-          "flight sells none", x["seat"] and x["seat"]["any"] == 32.0 and x["seat"]["legroom"] is None and not x["seat"]["free"],
-          str(x["seat"]))
+    check("a seat on every flight is the price of choosing one ($32 + $0), and extra legroom is the long flight's ($89 on "
+          "the 7h10m flight; the 1h20m connection sells none)", x["seat"] and x["seat"]["any"] == 32.0 and x["seat"]["legroom"] == 89.0
+          and not x["seat"]["free"], str(x["seat"]))
     real = json.load(open(os.path.join(samples, "duffel-extras-aa-unpriced.json")))
     y = adapter.duffel_extras_summary(real)
     check("a REAL seat map with no seat on sale (American, 2026-09-25) and no bag services prices nothing: unknown, never free",
@@ -155,6 +155,13 @@ def main():
     check("meals: a Basic fare with no meal wins over the cabin's rule; an airline with no published policy is unknown",
           mf("LL", "economy", 480, False, "LEVEL Basic") == "buy" and mf("LL", "economy", 480, False, "Optima") == "meal"
           and mf("ZZ", "economy", 480, False) is None)
+    T["airlines"]["XB"] = [{"cabin": "economy", "haul": "long", "served": "buy", "rule": "food for sale"}]
+    check("meals: business or first with no rule of its own takes a meal from a cabin below it (American first "
+          "abroad, Icelandair business over its Saga premium), never a snack or food for sale (unknown then)",
+          mf("AA", "first", 480, False) == "meal" and mf("AA", "business", 420, False) == "meal"
+          and mf("AA", "business", 150, True) is None and mf("FI", "business", 400, False) == "meal"
+          and mf("XB", "business", 480, False) is None and mf("XB", "first", 480, False) is None
+          and mf("ZZ", "first", 480, False) is None)
 
     # meals' long haul is an intercontinental flight, or one over 3,500 km of 8 hours or more
     enr = adapter.load_enrichment()

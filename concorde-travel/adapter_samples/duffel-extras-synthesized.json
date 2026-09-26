@@ -1,6 +1,6 @@
 {
  "_provenance": {
-  "what": "SYNTHESIZED from Duffel's documented shapes (offers with return_available_services, seat maps; duffel.com/docs/api/v2, read 2026-09-25), because no airline the live account reaches quoted extras on 2026-09-25. Two flights; bags 45 and 65 USD; seats 32 and 0; extra legroom 89 on the first flight only.",
+  "what": "SYNTHESIZED from Duffel's documented shapes (offers with return_available_services, seat maps; duffel.com/docs/api/v2, read 2026-09-25), because no airline the live account reaches quoted extras on 2026-09-25. Two flights; bags 45 and 65 USD; seats 32 and 0; extra legroom 89 on the first (long, 7h10m) flight only; the second flight is 1h20m.",
   "synthesized": true
  },
  "offer": {
@@ -51,6 +51,20 @@
     "total_amount": "30.00",
     "total_currency": "USD",
     "maximum_quantity": 1
+   }
+  ],
+  "slices": [
+   {
+    "segments": [
+     {
+      "id": "seg_1",
+      "duration": "PT7H10M"
+     },
+     {
+      "id": "seg_2",
+      "duration": "PT1H20M"
+     }
+    ]
    }
   ]
  },

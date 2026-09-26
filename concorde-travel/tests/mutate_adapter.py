@@ -243,11 +243,18 @@ MUTANTS = [
   'meals: an airline with no published policy read as serving a meal'),
  (AD, "meal_long_haul", "    if a and b and a != b:\n        return True\n", "",
   'meals: an intercontinental flight read by distance alone'),
+ (AD, "meal_for", "            if served == \"meal\":\n", "            if served:\n",
+  'meals: a snack or food for sale below read as the front cabin\'s catering'),
+ (AD, "meal_for", "    for want in ladder[ladder.index(cab):]:\n", "    for want in ladder[ladder.index(cab):][:1] + ([\"economy\"] if cab == \"premium_economy\" else []):\n",
+  'meals: first or business with no rule of its own read as unknown though economy is fed'),
  # a flight's own extras through Duffel (2026-09-25): a seat map with nothing on sale is unknown, never free, and an
  # airline Duffel quotes nothing for is never looked up
- (AD, "duffel_extras_summary", "        if cheapest is None:\n            leg_every = False\n            continue\n",
+ (AD, "duffel_extras_summary", "        if cheapest is None:\n            continue\n",
   "        if cheapest is None:\n            cheapest = 0.0\n",
   'extras: a seat map with nothing on sale read as free seats'),
+ (AD, "duffel_extras_summary", "longest = max(maps, key=lambda mp: mins.get(mp.get(\"segment_id\"), -1))",
+  "longest = min(maps, key=lambda mp: mins.get(mp.get(\"segment_id\"), -1))",
+  'extras: extra legroom priced on the short connection instead of the long flight'),
  (SV, "extras_request", "    if owner not in EXTRAS_AIRLINES:\n", "    if False:\n",
   'extras: look up an airline Duffel quotes no extras for'),
  # the measured cancellation rate (2026-09-25): the ends of the range come from the right ends of its margin, and a

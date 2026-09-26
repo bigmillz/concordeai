@@ -573,7 +573,8 @@ def meal_for(carrier: Any, cabin: Any, minutes: Any, short_haul: bool, brand: An
         if r.get("max_minutes") is not None and mins > int(r["max_minutes"]):
             return False
         return True
-    for want in ([cab, "economy"] if cab == "premium_economy" else [cab]):
+    ladder = ["first", "business", "premium_economy", "economy"]
+    for want in ladder[ladder.index(cab):]:
         cands = [r for r in rows if fits(r, want)]
         branded = [r for r in cands if r.get("brands") and words & {w.lower() for w in r["brands"]}]
         plain = [r for r in cands if not r.get("brands")]
@@ -581,7 +582,17 @@ def meal_for(carrier: Any, cabin: Any, minutes: Any, short_haul: bool, brand: An
         if pick:
             # the most specific rule: one bounded by flight length beats an open one
             pick.sort(key=lambda r: -((r.get("min_minutes") is not None) + (r.get("max_minutes") is not None)))
-            return pick[0].get("served"), pick[0].get("rule") or ""
+            served, rule = pick[0].get("served"), pick[0].get("rule") or ""
+            if want == cab or (cab == "premium_economy" and want == "economy"):
+                return served, rule
+            # a business or first cabin with no rule of its own (United publishes only economy's; American's first
+            # was not researched): a cabin below it that serves a meal on this flight means this one does too, since
+            # no airline feeds its front cabin less than its back one (2026-09-25, per Patrick: a first-class search
+            # read "no meal"). A snack or food for sale below says nothing about the front, so that stays unknown.
+            if served == "meal":
+                return "meal", "%s gets a meal on this flight, so %s does too. %s" % (
+                    want.replace("_", " ").capitalize(), cab.replace("_", " "), rule)
+            break
     return None, ""
 
 
@@ -731,8 +742,18 @@ def duffel_extras_summary(payload: Dict[str, Any]) -> Dict[str, Any]:
                             "max": int(svc.get("maximum_quantity") or 1), "kg": md.get("maximum_weight_kg")})
     out["bags"].sort(key=lambda b: (b["kind"] != "checked", b["amount"]))
     maps = (payload or {}).get("seat_maps") or []
-    any_total, leg_total, priced, free, cur = 0.0, 0.0, 0, False, None
-    leg_every = True
+    # extra legroom is priced on the trip's LONGEST flight, the one the Extra legroom want judges (2026-09-25: a
+    # SWISS trip had an $113 extra-legroom seat across the Atlantic and none on its short connection, and asking for
+    # one on every flight left the price unknown). A trip whose flight lengths the offer does not give reads its
+    # first map as the long one only when there is a single flight.
+    mins = {}
+    for sl in off.get("slices") or []:
+        for sg in sl.get("segments") or []:
+            m = re.match(r"^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?", str(sg.get("duration") or ""))
+            if sg.get("id") and m and any(m.groups()):
+                mins[sg["id"]] = int(m.group(1) or 0) * 1440 + int(m.group(2) or 0) * 60 + int(m.group(3) or 0)
+    longest = max(maps, key=lambda mp: mins.get(mp.get("segment_id"), -1)) if maps and (mins or len(maps) == 1) else None
+    any_total, leg_price, priced, free, cur = 0.0, None, 0, False, None
     for m in maps:
         cheapest, cheapest_leg = None, None
         for cab in m.get("cabins") or []:
@@ -751,18 +772,15 @@ def duffel_extras_summary(payload: Dict[str, Any]) -> Dict[str, Any]:
                             if LEGROOM_SEAT.search(" ".join([el.get("name") or ""] + list(el.get("disclosures") or []))):
                                 cheapest_leg = amt if cheapest_leg is None else min(cheapest_leg, amt)
         if cheapest is None:
-            leg_every = False
             continue
         priced += 1
         any_total += cheapest
         free = free or cheapest == 0
-        if cheapest_leg is None:
-            leg_every = False
-        else:
-            leg_total += cheapest_leg
+        if m is longest and cheapest_leg is not None:
+            leg_price = cheapest_leg
     if priced and priced == len(maps):
         # a seat on every flight of the trip is the price of choosing one; a map with nothing on sale leaves it unknown
-        out["seat"] = {"any": round(any_total, 2), "legroom": round(leg_total, 2) if leg_every else None,
+        out["seat"] = {"any": round(any_total, 2), "legroom": round(leg_price, 2) if leg_price is not None else None,
                        "free": free and any_total == 0, "currency": cur, "segments": len(maps), "priced_segments": priced}
     return out
 
