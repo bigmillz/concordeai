@@ -6889,8 +6889,40 @@ def _extract_memory(label: str, user_msg: str, base=None, conf=None):
 # STT: whisper via MLX (Apple silicon only). TTS: macOS built-in `say`.
 WHISPER_REPO = ("deepdml/faster-whisper-large-v3-turbo-ct2" if not IS_MAC
                 else "mlx-community/whisper-large-v3-turbo")
+# VOICE ON A PC WITHOUT A GRAPHICS CARD (6b317, measured in a Windows
+# VM: large-v3-turbo with a 5-way beam took 43 s to write down 3 s of
+# speech on the CPU). Whisper "small", decoded greedily, is the CPU's
+# model; an NVIDIA card keeps large-v3-turbo.
+WHISPER_REPO_CPU = "Systran/faster-whisper-small"
 _whisper_lock = threading.Lock()
 _fw_model = None   # cached faster-whisper model (non-mac)
+_fw_cuda = {"v": None, "failed": False}
+
+
+def _whisper_cuda() -> bool:
+    """An NVIDIA card faster-whisper can really use. The driver alone isn't
+    enough: CTranslate2 loads NVIDIA's cuBLAS and cuDNN on the first word,
+    most Windows PCs don't have them, and the transcription threw."""
+    if _fw_cuda["v"] is None:
+        ok = False
+        try:
+            import ctranslate2
+            ok = ctranslate2.get_cuda_device_count() > 0
+            if ok and IS_WIN:
+                import ctypes
+                for dll in ("cublas64_12.dll", "cudnn64_9.dll"):
+                    ctypes.WinDLL(dll, winmode=0)   # 0: the PATH search
+        except Exception:
+            ok = False
+        _fw_cuda["v"] = ok
+    return _fw_cuda["v"]
+
+
+def _whisper_repo() -> str:
+    """The speech model this computer downloads and runs."""
+    if IS_MAC or _whisper_cuda():
+        return WHISPER_REPO
+    return WHISPER_REPO_CPU
 _say_proc = None
 
 
@@ -6912,7 +6944,7 @@ def _voice_supported() -> bool:
 
 
 def _voice_ready() -> bool:
-    d = _hf_model_dir(WHISPER_REPO)
+    d = _hf_model_dir(_whisper_repo())
     snaps = glob.glob(os.path.join(d, "snapshots", "*", "config.json"))
     if not snaps:
         return False
@@ -6936,7 +6968,7 @@ def _prepare_voice():
     def work():
         try:
             from huggingface_hub import snapshot_download
-            snapshot_download(WHISPER_REPO)
+            snapshot_download(_whisper_repo())
             with _setup_lock:
                 _setup_jobs[VOICE_ROW] = {"status": "done", "note": "",
                                           "pct": 100}
@@ -6967,18 +6999,31 @@ def _transcribe_wav(wav_bytes: bytes) -> str:
         if IS_ARM:
             out = mlx_whisper.transcribe(audio, path_or_hf_repo=WHISPER_REPO)
             return out["text"].strip()
-        # faster-whisper: CUDA when the box has it, CPU otherwise
-        from faster_whisper import WhisperModel
+        # faster-whisper: CUDA when the box can use it, CPU otherwise
         global _fw_model
-        if _fw_model is None:
-            try:
-                _fw_model = WhisperModel(WHISPER_REPO, device="cuda",
-                                         compute_type="float16")
-            except Exception:
-                _fw_model = WhisperModel(WHISPER_REPO, device="cpu",
-                                         compute_type="int8")
-        segments, _info = _fw_model.transcribe(audio, beam_size=5)
-        return " ".join(sg.text for sg in segments).strip()
+        gpu = _whisper_cuda() and not _fw_cuda["failed"]
+        try:
+            return _fw_transcribe(audio, gpu)
+        except Exception:
+            if not gpu:
+                raise
+        # the card failed anyway: the same model, on the CPU from now on
+        _fw_cuda["failed"] = True
+        _fw_model = None
+        return _fw_transcribe(audio, False)
+
+
+def _fw_transcribe(audio, gpu: bool) -> str:
+    global _fw_model
+    from faster_whisper import WhisperModel
+    if _fw_model is None:
+        _fw_model = WhisperModel(_whisper_repo(),
+                                 device="cuda" if gpu else "cpu",
+                                 compute_type="float16" if gpu else "int8")
+    # the words are decoded while the segments are read, so a card that
+    # fails does so inside this call
+    segments, _info = _fw_model.transcribe(audio, beam_size=5 if gpu else 1)
+    return " ".join(sg.text for sg in segments).strip()
 
 
 def _speak(text: str):
@@ -7003,19 +7048,29 @@ def _speak(text: str):
     if not text:
         return
     if IS_WIN:
-        # SAPI through PowerShell — built in, no download
+        # SAPI through PowerShell — built in, no download. The text goes in
+        # as UTF-8 and is read as UTF-8 (6b317, found in a Windows VM):
+        # Python's Windows default, cp1252, has no "č", arrows or emoji, so
+        # the write threw, the pipe stayed open, and PowerShell waited on it
+        # forever without saying a word.
         ps = ("Add-Type -AssemblyName System.Speech;"
+              "$r=New-Object IO.StreamReader([Console]::OpenStandardInput(),"
+              "[Text.Encoding]::UTF8);"
               "$s=New-Object System.Speech.Synthesis.SpeechSynthesizer;"
-              "$s.Speak([Console]::In.ReadToEnd())")
+              "$s.Speak($r.ReadToEnd())")
         _say_proc = subprocess.Popen(
             ["powershell", "-NoProfile", "-Command", ps],
-            stdin=subprocess.PIPE, text=True,
+            stdin=subprocess.PIPE,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         try:
-            _say_proc.stdin.write(text)
-            _say_proc.stdin.close()
+            _say_proc.stdin.write(text.encode("utf-8"))
         except Exception:
             pass
+        finally:
+            try:
+                _say_proc.stdin.close()
+            except Exception:
+                pass
     else:
         _say_proc = subprocess.Popen(["say", text])
 
@@ -7939,6 +7994,11 @@ def setup_status() -> dict:
                 pct = job.get("pct", 0)
         models.append({"label": label, "est_gb": round(est / 1e9, 1),
                        "status": status, "pct": pct,
+                       # Ollama hashes the whole file after the last byte
+                       # and says nothing meanwhile: 100 s at "99%" for a
+                       # 2 GB model on a slow PC (6b317). Say so.
+                       "checking": (status == "downloading"
+                                    and job.get("phase") == "verifying"),
                        "giant": model_is_giant(label),
                        "star": label in stars_now,
                        "supported": SUPPORTED.get(label, True),
@@ -7981,7 +8041,8 @@ def setup_status() -> dict:
     return {
         # the models moving right now, and how many wait behind them —
         # so the bar is never the only sign of life
-        "now": [{"label": m["label"], "pct": m["pct"]}
+        "now": [{"label": m["label"], "pct": m["pct"],
+                 "checking": m.get("checking", False)}
                 for m in models if m["status"] == "downloading"][:4],
         "queued_n": sum(1 for m in models if m["status"] == "queued"),
         "plan_state": plan_state,
@@ -12977,9 +13038,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 job = dict(_setup_jobs.get(VOICE_ROW, {}))
             pct = job.get("pct", 0)
             if job.get("status") == "downloading":
-                est = 1_600_000_000
+                repo = _whisper_repo()
+                est = (1_600_000_000 if repo == WHISPER_REPO
+                       else 490_000_000)
                 pct = min(99, round(
-                    _dir_bytes(_hf_model_dir(WHISPER_REPO)) / est * 100))
+                    _dir_bytes(_hf_model_dir(repo)) / est * 100))
             self._send_json({"supported": _voice_supported(),
                              "ready": _voice_supported() and _voice_ready(),
                              "downloading": job.get("status") == "downloading",
@@ -23045,7 +23108,7 @@ function renderSetup(st){
   // …then every model individually, so anything can be added on its own
   const state=m=>{
     if(m.status==="ready")   return TICK;
-    if(m.status==="downloading") return '<span class="st dl">'+m.pct+'%</span>';
+    if(m.status==="downloading") return '<span class="st dl">'+dlPct(m)+'</span>';
     if(m.status==="queued")  return '<span class="st wait">queued</span>';
     if(m.status==="error")   return '<span class="st err" title="'+esc(m.note)+'">failed</span>';
     return '<span class="st get">'+m.est_gb+' GB \u2193</span>';
@@ -23128,9 +23191,11 @@ function setTitle(t,s){
   if(h)h.textContent=t;
   if(p)p.textContent=s;
 }
+// a pull's last stretch is Ollama checking the file, not a stuck 99%
+function dlPct(m){return m.checking?"checking":(m.pct||0)+"%";}
 // the models moving right now, by name — a bar alone can look frozen
 function nowLine(st){
-  const now=(st.now||[]).map(m=>esc(m.label)+" \u00b7 "+m.pct+"%");
+  const now=(st.now||[]).map(m=>esc(m.label)+" \u00b7 "+dlPct(m));
   const q=st.queued_n?(st.queued_n+" waiting"):"";
   return [now.join("  \u00b7  "),q].filter(Boolean).join("  \u00b7  ");
 }
@@ -23969,7 +24034,7 @@ function rosRow(m,ready){
         +'">'+(rosArmedOn("rm:"+m.label)
           ?"really remove? frees "+m.est_gb+" GB":"remove")+'</span>'
     :going
-      ?'<span class="rgo">'+(m.status==="queued"?"waiting":(m.pct||0)+"%")
+      ?'<span class="rgo">'+(m.status==="queued"?"waiting":dlPct(m))
         +'</span>'
       :'<span class="rin" data-l="'+esc(m.label)+'" data-gb="'+m.est_gb
         +(m.giant?'" data-giant="1':'')+'">'
@@ -24295,7 +24360,7 @@ function manageTick(){
         +st.want_gb+" GB \u00b7 "+st.overall_pct+"%"
         +(st.speed_mbs>0?" \u00b7 "+st.speed_mbs+" MB/s":"")
         +(st.eta_min?" \u00b7 "+dlEta(st.eta_min)+" left":"")
-        +(st.now&&st.now.length?" \u2014 "+st.now.map(m=>m.label+" "+m.pct+"%").join(", "):"")
+        +(st.now&&st.now.length?" \u2014 "+st.now.map(m=>m.label+" "+dlPct(m)).join(", "):"")
         +(st.queued_n?" \u00b7 "+st.queued_n+" waiting":"");
       manageTick();
     }else{
@@ -25369,6 +25434,7 @@ def _sweep_hf_carcasses(max_age: float = 1800.0) -> int:
             repos.update(t["repo"] for t in st["tiers"])
     try:
         repos.add(WHISPER_REPO)
+        repos.add(WHISPER_REPO_CPU)
     except NameError:
         pass
     freed, cut = 0, time.time() - max_age

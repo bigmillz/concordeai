@@ -2859,7 +2859,11 @@ check("the served page names the giants' real need",
 # "remove", and an everyday model plain "install"
 _esc0 = _MILLENAI_SRC.index("function esc(s){")
 _ros0 = _MILLENAI_SRC.index("const rosArmed={};")
+_dlp0 = _MILLENAI_SRC.index("function dlPct(m){")
 _rjs = (_MILLENAI_SRC[_esc0:_MILLENAI_SRC.index(";}\n", _esc0) + 3]
+        + _MILLENAI_SRC[_dlp0:_MILLENAI_SRC.index("\n", _dlp0) + 1]
+        + _MILLENAI_SRC[_MILLENAI_SRC.index("function nowLine(st){"):
+                        _MILLENAI_SRC.index("\n}\n", _MILLENAI_SRC.index("function nowLine(st){")) + 3]
         + _MILLENAI_SRC[_ros0:_MILLENAI_SRC.index(
             "\n}\n", _MILLENAI_SRC.index("function rosRow(")) + 3]
         + 'const IS_LOCAL=true,ADV_USE={"Llama 3.2 3B":"quick"};'
@@ -2872,13 +2876,15 @@ _rjs = (_MILLENAI_SRC[_esc0:_MILLENAI_SRC.index(";}\n", _esc0) + 3]
         '(rosArmed["in:Qwen 3 Coder 480B"]=Date.now(),'
         'rosRow({label:"Qwen 3 Coder 480B",est_gb:290.1,status:"missing",giant:true},false)),'
         '(rosArmed["rm:Llama 3.2 3B"]=Date.now(),'
-        'rosRow({label:"Llama 3.2 3B",est_gb:1.8,status:"ready"},true))]));')
+        'rosRow({label:"Llama 3.2 3B",est_gb:1.8,status:"ready"},true)),'
+        'rosRow({label:"Hermes 3 8B",est_gb:4.6,status:"downloading",pct:99,checking:true},false),'
+        'nowLine({now:[{label:"Hermes 3 8B",pct:99,checking:true},{label:"Gemma 4 12B",pct:40}]})]));')
 try:
     open(os.path.join(_si_dir, "ros.js"), "w").write(_rjs)
     _ro = json.loads(subprocess.run(["node", os.path.join(_si_dir, "ros.js")],
                                     capture_output=True, text=True, timeout=30).stdout)
 except Exception as _e:
-    _ro = ["ERR %s" % _e] * 6
+    _ro = ["ERR %s" % _e] * 8
 check("roster rows: a failed giant says why and offers retry",
       'class="rd rerr"' in _ro[0] and "needs 437 GB free on C:" in _ro[0]
       and 'data-giant="1">retry</span>' in _ro[0]
@@ -2888,7 +2894,15 @@ check("roster rows: a failed giant says why and offers retry",
       and '">remove</span>' in _ro[3]
       # an armed prompt survives a repaint of the list
       and '">download 290.1 GB? click again</span>' in _ro[4]
-      and '">really remove? frees 1.8 GB</span>' in _ro[5], "%r" % _ro)
+      and '">really remove? frees 1.8 GB</span>' in _ro[5]
+      # Ollama checking a finished file reads "checking", not a stuck 99%
+      # (6b317), in the row and in the line of models moving
+      and '<span class="rgo">checking</span>' in _ro[6]
+      and _ro[7] == "Hermes 3 8B \u00b7 checking  \u00b7  Gemma 4 12B \u00b7 40%"
+      and '"checking": (status == "downloading"' in _MILLENAI_SRC
+      and '"checking": m.get("checking", False)}' in _MILLENAI_SRC
+      and _MILLENAI_SRC.count("dlPct(m)") == 5
+      and 'm.pct+"%"' not in page, "%r" % _ro)
 check("giant installs ask twice; long downloads read in hours",
       'if(i.dataset.giant==="1"){' in page and "if(age<600)return;" in page
       and '"download "+i.dataset.gb+" GB? click again"' in page
@@ -3354,6 +3368,112 @@ check("Windows web search goes through a loopback proxy that refuses strangers",
       and "proxy = _search_proxy() if IS_WIN else None" in _ddg_src
       and "DDGS(proxy=proxy)" in _ddg_src,
       "%r" % (_pr,))
+
+# 6b317, measured in a Windows VM: voice took 43 s to write down 3 s of
+# speech (large-v3-turbo, 5-way beam, on the CPU). A PC without a usable
+# NVIDIA card gets Whisper small, decoded greedily (8 s). "Usable" means
+# the card AND NVIDIA's cuBLAS/cuDNN, which most Windows PCs lack; a card
+# that fails anyway falls back to the CPU instead of losing voice.
+import builtins as _bi17, io as _io17, wave as _wv17
+def _voice_ns(mac, devices, dlls, gpu_breaks):
+    log = []
+    class _WM:
+        def __init__(self, repo, device, compute_type):
+            self.dev = device
+            log.append(("load", repo, device, compute_type))
+        def transcribe(self, audio, beam_size):
+            log.append(("beam", beam_size))
+            def gen():
+                if self.dev == "cuda" and gpu_breaks:
+                    raise RuntimeError("Library cublas64_12.dll is not found")
+                yield _t17.SimpleNamespace(text=" hello there")
+            return gen(), None
+    def _windll(name, winmode=None):
+        if name not in dlls or winmode != 0:
+            raise OSError(name)
+    fakes = {"ctranslate2": _t17.SimpleNamespace(get_cuda_device_count=lambda: devices),
+             "faster_whisper": _t17.SimpleNamespace(WhisperModel=_WM),
+             "ctypes": _t17.SimpleNamespace(WinDLL=_windll)}
+    def _imp(name, *a, **k):
+        return fakes[name] if name in fakes else _bi17.__import__(name, *a, **k)
+    ns = {"__builtins__": dict(vars(_bi17), __import__=_imp),
+          "IS_MAC": mac, "IS_WIN": not mac, "IS_ARM": False,
+          "threading": __import__("threading")}
+    _exec_names(ns, {"WHISPER_REPO", "WHISPER_REPO_CPU", "_whisper_lock",
+                     "_fw_model", "_fw_cuda", "_whisper_cuda", "_whisper_repo",
+                     "_transcribe_wav", "_fw_transcribe"})
+    return ns, log
+_wbuf = _io17.BytesIO()
+with _wv17.open(_wbuf, "wb") as _w:
+    _w.setnchannels(1); _w.setsampwidth(2); _w.setframerate(16000)
+    _w.writeframes(b"\0\0" * 1600)
+_both = {"cublas64_12.dll", "cudnn64_9.dll"}
+_vr = {}
+for _k, _args in {"cpu": (False, 0, _both, False),
+                  "no-cudnn": (False, 1, {"cublas64_12.dll"}, False),
+                  "gpu": (False, 1, _both, False),
+                  "gpu-breaks": (False, 1, _both, True)}.items():
+    _ns, _log = _voice_ns(*_args)
+    try:
+        _txt = [_ns["_transcribe_wav"](_wbuf.getvalue()) for _ in (1, 2)]
+    except Exception as _e:
+        _txt = [repr(_e)] * 2
+    _vr[_k] = (_ns["_whisper_repo"]().split("/")[-1], _txt[0] == _txt[1] == "hello there", _log)
+_mac_ns, _ = _voice_ns(True, 1, _both, False)
+_L, _S = "faster-whisper-large-v3-turbo-ct2", "Systran/faster-whisper-small"
+_cpu_run = [("load", _S, "cpu", "int8"), ("beam", 1), ("beam", 1)]
+_big = "deepdml/" + _L
+_voice_src = _MILLENAI_SRC[_MILLENAI_SRC.index("def _voice_ready("):
+                           _MILLENAI_SRC.index("def _transcribe_wav(")]
+check("voice on a PC: the small model greedy on the CPU, the big one only on a usable card",
+      _vr["cpu"] == ("faster-whisper-small", True, _cpu_run)
+      and _vr["no-cudnn"] == ("faster-whisper-small", True, _cpu_run)
+      and _vr["gpu"] == (_L, True, [("load", _big, "cuda", "float16"),
+                                    ("beam", 5), ("beam", 5)])
+      and _vr["gpu-breaks"] == (_L, True, [("load", _big, "cuda", "float16"),
+                                           ("beam", 5),
+                                           ("load", _big, "cpu", "int8"),
+                                           ("beam", 1), ("beam", 1)])
+      and _mac_ns["_whisper_repo"]() == "mlx-community/whisper-large-v3-turbo"
+      and _voice_src.count("_whisper_repo()") == 2
+      and "_hf_model_dir(WHISPER_REPO)" not in _MILLENAI_SRC,
+      "%r" % _vr)
+
+# 6b317, found in a Windows VM: a reply with "č", an arrow or an emoji was
+# never read aloud. The text went to PowerShell through a cp1252 pipe, the
+# write threw, the pipe stayed open and PowerShell waited forever. Now it
+# goes in as UTF-8 bytes, is read as UTF-8, and the pipe always closes.
+_spoke = []
+class _SP:
+    def __init__(self, args, stdin=None, creationflags=0, **kw):
+        self.args, self.kw, self.closed, self.buf = args, kw, False, b""
+        self.stdin = self
+        _spoke.append(self)
+    def write(self, b):
+        if not isinstance(b, bytes):
+            b.encode("cp1252")          # what a Windows text pipe does
+        self.buf += b
+    def close(self):
+        self.closed = True
+    def poll(self):
+        return 0
+_spk = {"re": re, "IS_WIN": True, "_say_proc": None,
+        "strip_think": lambda t: t,
+        "subprocess": _t17.SimpleNamespace(Popen=_SP, PIPE=-1, CREATE_NO_WINDOW=0x08000000)}
+_exec_names(_spk, {"_speak", "_stop_speaking"})
+_say = "Tadej Pogačar won — it’s 20°C → fine \U0001F642"
+try:
+    _spk["_speak"](_say)
+    _sp_err = None
+except Exception as _e:
+    _sp_err = repr(_e)
+_sp = _spoke[-1] if _spoke else None
+check("Windows reads any reply aloud: UTF-8 in, UTF-8 read, the pipe always closed",
+      _sp_err is None and _sp is not None and _sp.closed
+      and _sp.buf.decode("utf-8") == _say and not _sp.kw.get("text")
+      and "[Text.Encoding]::UTF8" in _sp.args[-1]
+      and "OpenStandardInput()" in _sp.args[-1],
+      "%r" % [_sp_err, _sp and (_sp.closed, _sp.buf[:40], _sp.kw)])
 
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)

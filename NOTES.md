@@ -5681,3 +5681,19 @@ polling the Mac on the VMware network; no admin rights, no settings).
   back if the download fails; installs wait for that download rather
   than start a second one. Verified in the VM: "Windows ARM64", and the
   running engine is an ARM64 binary with the installed model intact.
+- VOICE ON A PC WITHOUT A USABLE NVIDIA CARD took 76 s, then 43 s, to
+  write down a 3 s sentence (large-v3-turbo, 5-way beam, on the CPU).
+  Such a PC now gets Whisper small (464 MB) decoded greedily: 12.5 s,
+  then 8 s, same words. "Usable" means a CUDA device AND NVIDIA's cuBLAS
+  and cuDNN, which CTranslate2 loads on the first word and most Windows
+  PCs lack; with only the driver, the first transcription threw. A card
+  that fails anyway falls back to the CPU with the model already on disk.
+- READ ALOUD ON WINDOWS never spoke a reply holding "č", an arrow or an
+  emoji: the text went to PowerShell through a cp1252 pipe, the write
+  threw, the pipe stayed open, and PowerShell waited on it forever. It
+  goes in as UTF-8 bytes now, is read as UTF-8, and the pipe always
+  closes. Verified in the VM: a reply with all three was spoken and its
+  PowerShell exited.
+- A pull's last stretch is Ollama hashing the finished file, silently:
+  100 s at "99%" for a 2 GB model in the VM. The row and the line of
+  models moving say "checking" then.
