@@ -1323,6 +1323,8 @@ def sellers_request(req):
                         "cents": int(round(float(t["price"]) * 100)),
                         # the same flights under the same numbers; a codeshare sold under other numbers is noted
                         "same_flights": not sold or sold == fns,
+                        # the bag fees Google lists with this seller's fare: free with the check that fetched them
+                        "bags": adapter.google_bag_prices(t.get("baggage_prices")),
                         "go": {"url": url, "post": str(req_b.get("post_data") or "")[:4000]} if url.startswith("https://www.google.com/") else None})
     if not sellers:
         return {"error": "Google lists no seller for this flight right now."}

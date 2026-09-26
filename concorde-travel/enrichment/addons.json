@@ -5,14 +5,18 @@
     "lounge": {
       "AC": {
         "long": {
-          "cents": 7900,
+          "cents": 5586,
           "upto": true,
-          "est": true
+          "low": 3465,
+          "high": 5586,
+          "_was": "79 CAD at the ECB rate of 2026-09-25"
         },
         "short": {
-          "cents": 7900,
+          "cents": 5586,
           "upto": true,
-          "est": true
+          "low": 3465,
+          "high": 5586,
+          "_was": "79 CAD at the ECB rate of 2026-09-25"
         },
         "note": "Maple Leaf Lounge as a travel option: $49 (Premium Economy, Latitude), $59 (Comfort), $79 (Flex), bought at booking or 24 hours ahead, never at the airport. The page shows no currency (the Canadian and US pages show the same numbers), so it is read as US dollars and marked.",
         "sources": [
@@ -21,7 +25,12 @@
             "date": "2026-09-25",
             "note": ""
           }
-        ]
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): The Air Canada page lists Premium Economy $49, Latitude $49, Comfort $59, Flex $79, bought 24 hours ahead and not at the airport. The page as read lists only those fares as eligible and did not explicitly exclude Basic or Standard."
+        ],
+        "confidence": "high"
       },
       "AY": {
         "long": {
@@ -71,6 +80,593 @@
             "note": ""
           }
         ]
+      },
+      "LO": {
+        "long": null,
+        "short": {
+          "cents": 4695,
+          "reported": true,
+          "est": true,
+          "_was": "180 PLN at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://knaviation.net/lot-lounge-schengen-warsaw-review/",
+            "date": "2024-01-15",
+            "primary": false,
+            "publisher": "KN Aviation"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "short (corrected): No source I could open states PLN 210: LOT's page was blocked by Akamai twice and web search was exhausted. The only opened source, KN Aviation (Jan 2024), states PLN 180 without naming the fare class, so the figure is corrected to that, with low confidence."
+        ],
+        "confidence": "low"
+      },
+      "UA": {
+        "long": {
+          "cents": 5900,
+          "reported": true,
+          "est": true
+        },
+        "short": {
+          "cents": 5900,
+          "reported": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://thepointsguy.com/airline/ultimate-guide-united-club-access/",
+            "date": "2025-04-02",
+            "primary": false,
+            "publisher": "The Points Guy"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): TPG (2 Apr 2025) states '$59 at United Club locations or through the United mobile app' and the 3-hour rule. United's page timed out and LoungeDeal returned 403, so confidence is lowered from high to medium: only a secondary source from 2025 backs it."
+        ],
+        "confidence": "medium"
+      },
+      "WS": {
+        "long": {
+          "not_sold": "WestJet sells no entry to its own lounge"
+        },
+        "short": {
+          "not_sold": "WestJet sells no entry to its own lounge"
+        },
+        "sources": [
+          {
+            "url": "https://www.westjet.com/en-ca/airport/lounges",
+            "date": "as of 2026-09-25",
+            "primary": true,
+            "publisher": "WestJet"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): WestJet's lounges page lists the partner walk-in rates exactly as given and offers no paid Elevation Lounge entry. It does not say in words that Elevation entry is unsold, so confidence is lowered to medium."
+        ],
+        "confidence": "medium"
+      },
+      "AA": {
+        "long": {
+          "cents": 7900
+        },
+        "short": {
+          "cents": 7900
+        },
+        "sources": [
+          {
+            "url": "https://loungenerd.com/news/american-airlines-increasing-membership-access-pricing-2026",
+            "date": "2026-08-04",
+            "primary": false,
+            "publisher": "LoungeNerd"
+          },
+          {
+            "url": "https://www.aa.com/web/i18n/travel-info/clubs/admirals-club-access.html",
+            "date": "undated (403 to automated readers)",
+            "primary": true,
+            "publisher": "American Airlines"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): LoungeNerd (4 Aug 2026): 'One-Day passes will remain unchanged and cost $79 (or 7,900 miles)'. The aa.com page was not readable, so the peak-season restriction was not re-checked."
+        ],
+        "confidence": "high"
+      },
+      "EY": {
+        "long": {
+          "cents": 14704,
+          "low": 13342,
+          "high": 16065,
+          "reported": true,
+          "est": true,
+          "_was": "540 AED at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 14704,
+          "low": 13342,
+          "high": 16065,
+          "reported": true,
+          "est": true,
+          "_was": "540 AED at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://www.pointhacks.com.au/reviews/etihad-business-class-lounge-abu-dhabi-terminal-a/",
+            "date": "2024-09-17",
+            "primary": false,
+            "publisher": "Point Hacks"
+          },
+          {
+            "url": "https://onemileatatime.com/guides/buy-etihad-lounge-access/",
+            "date": "2024-01-10",
+            "primary": false,
+            "publisher": "One Mile at a Time"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Point Hacks states 'AED490 ... up to 4 hours, or AED630 ... up to 8 hours', subject to capacity; OMAAT states '590 AED, or 160 USD' for four hours with children 2-12 half price. OMAAT does not say the 590 is the at-the-lounge price, so that detail was dropped."
+        ],
+        "confidence": "medium"
+      },
+      "QR": {
+        "long": {
+          "cents": 12363,
+          "from": true,
+          "reported": true,
+          "est": true,
+          "_was": "450 QAR at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 12363,
+          "from": true,
+          "reported": true,
+          "est": true,
+          "_was": "450 QAR at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://www.pointhacks.com.au/reviews/qatar-airways-al-mourjan-business-lounge-the-garden-doha/",
+            "date": "2025-09-11",
+            "primary": false,
+            "publisher": "Point Hacks"
+          },
+          {
+            "url": "https://pointszilla.com/can-you-buy-access-to-qatar-lounges-in-doha",
+            "date": "2026-02-28",
+            "primary": false,
+            "publisher": "Pointszilla"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Point Hacks (updated 11 Sep 2025): 'pre-purchase access for 450 QAR ... or ... 500 QAR at the door'; pointszilla (28 Feb 2026) corroborates QAR 500 at the airport."
+        ],
+        "confidence": "medium"
+      },
+      "AS": {
+        "long": {
+          "cents": 6500
+        },
+        "short": {
+          "cents": 6500
+        },
+        "sources": [
+          {
+            "url": "https://onemileatatime.com/guides/alaska-lounge-access/",
+            "date": "2026-09-06",
+            "primary": false,
+            "publisher": "One Mile at a Time"
+          },
+          {
+            "url": "https://www.alaskaair.com/content/airport-lounge/day-pass",
+            "date": "undated (body not readable)",
+            "primary": true,
+            "publisher": "Alaska Airlines"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Alaska's own page did not render, but OMAAT (6 Sep 2026) states the day pass is '$65 per person' and a $35 pass for first class passengers. The checklist's $35 military discount was not found and is replaced by OMAAT's first-class discount."
+        ],
+        "confidence": "medium"
+      },
+      "AF": {
+        "long": {
+          "cents": 11403,
+          "est": true,
+          "_was": "100 EUR at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 11403,
+          "est": true,
+          "_was": "100 EUR at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://pointstoseats.com/2026/03/14/lounge-review-air-france-lounge-at-paris-charles-de-gaulle-cdg-terminal-2e-hall-l/",
+            "date": "2026-03-14",
+            "primary": false,
+            "publisher": "Points to Seats"
+          },
+          {
+            "url": "https://wwws.airfrance.us/information/legal/edito-option-salon",
+            "date": "undated (timed out 2026-09-25)",
+            "primary": true,
+            "publisher": "Air France"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (corrected): Points to Seats (14 Mar 2026) says a pass can be bought by anybody, space permitting, and was quoted about EUR 100. No source I could open states the EUR 60 low end, so the range was removed. Air France's page timed out."
+        ],
+        "confidence": "low"
+      },
+      "FI": {
+        "long": {
+          "not_sold": "Icelandair's Saga Lounge sells no day passes"
+        },
+        "short": {
+          "not_sold": "Icelandair's Saga Lounge sells no day passes"
+        },
+        "sources": [
+          {
+            "url": "https://outandout.boardingarea.com/icelandair-saga-lounge-review/",
+            "date": "2018-06-27",
+            "primary": false,
+            "publisher": "Out and Out (BoardingArea)"
+          },
+          {
+            "url": "https://beautifullifebeautifulworld.com/2025/10/28/review-icelandair-saga-lounge-kef/",
+            "date": "2025-10-28",
+            "primary": false,
+            "publisher": "Beautiful World Beautiful Life"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): The 2018 BoardingArea review says twice that day passes cannot be bought. The 2025 review confirms who has access and that Priority Pass is not accepted, but says nothing about day passes. The 'not sold' claim rests on a 2018 source, so confidence is low."
+        ],
+        "confidence": "low"
+      },
+      "LX": {
+        "long": {
+          "cents": 5916,
+          "_was": "49 CHF at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 5916,
+          "_was": "49 CHF at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://thealviator.com/2023/12/buy-swiss-lounge-access/",
+            "date": "2023-12-28",
+            "primary": false,
+            "publisher": "The Alviator"
+          },
+          {
+            "url": "https://www.swiss.com/us/en/customer-support/faq/lounge-voucher",
+            "date": "undated (read 2026-09-25)",
+            "primary": true,
+            "publisher": "SWISS"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): The Alviator (28 Dec 2023) states 49 CHF economy, 39 CHF Premium Economy and 69 CHF arrivals, for Zurich lounges; Geneva is not named there. The swiss.com FAQ (read today) confirms the voucher's conditions but prints no price. The only source for the figure is a 2023 secondary, so confidence is lowered to low."
+        ],
+        "confidence": "low"
+      },
+      "F9": {
+        "long": {
+          "not_sold": "Frontier has no lounges"
+        },
+        "short": {
+          "not_sold": "Frontier has no lounges"
+        },
+        "sources": [
+          {
+            "url": "https://faq.flyfrontier.com/",
+            "date": "undated (read 2026-09-25)",
+            "primary": true,
+            "publisher": "Frontier"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Read Frontier's help-centre index today: no topic or mention of airport lounges. The optional-services page lists no lounge product either."
+        ],
+        "confidence": "medium"
+      },
+      "EI": {
+        "long": {
+          "cents": 2851,
+          "low": 2851,
+          "high": 3421,
+          "reported": true,
+          "est": true,
+          "_was": "25 EUR at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 2851,
+          "low": 2851,
+          "high": 3421,
+          "reported": true,
+          "est": true,
+          "_was": "25 EUR at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://liveandletsfly.com/review-aer-lingus-lounge-london-lhr/",
+            "date": "2026-03-14",
+            "primary": false,
+            "publisher": "Live and Let's Fly"
+          },
+          {
+            "url": "https://www.flyertalk.com/forum/aer-lingus-aerclub/1431119-faq-no-1-aer-lingus-lounges.html",
+            "date": "2022-10-06",
+            "primary": false,
+            "publisher": "FlyerTalk"
+          },
+          {
+            "url": "https://travelupdate.com/aer-lingus-lounge-dublin-review/",
+            "date": "2019-07-27",
+            "primary": false,
+            "publisher": "TravelUpdate"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): The FlyerTalk FAQ (edited 6 Oct 2022) states EUR 25 at DUB and ORK and GBP 23 / EUR 25 at LHR, and TravelUpdate (2019) states EUR 30 at Dublin. The 2026 review confirms paid access exists but gives no price. The figures are old."
+        ],
+        "confidence": "low"
+      },
+      "FR": {
+        "long": {
+          "not_sold": "Ryanair has no lounges"
+        },
+        "short": {
+          "not_sold": "Ryanair has no lounges"
+        },
+        "sources": [
+          {
+            "url": "https://travellon.com/ryanair-fees-complete-list",
+            "date": "2026-08-23",
+            "primary": false,
+            "publisher": "Travellon"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Travellon confirms Fast Track at about GBP 5-12, included in Flexi Plus, but never mentions lounges, and neither does Wikipedia's Ryanair article. No opened source states 'no lounges', though it is widely known. Kept at low confidence for a person to confirm."
+        ],
+        "confidence": "low"
+      },
+      "SN": {
+        "long": {
+          "not_sold": "Brussels Airlines' lounge is closed for renovation and sells no entry"
+        },
+        "short": {
+          "not_sold": "Brussels Airlines' lounge is closed for renovation and sells no entry"
+        },
+        "sources": [
+          {
+            "url": "https://travelradar.aero/new-pop-up-lounge-for-premium-passengers-at-brussels-airport/",
+            "date": "2025-12-15",
+            "primary": false,
+            "publisher": "Travel Radar"
+          },
+          {
+            "url": "https://business.lufthansagroup.com/gb/en/program/experts/news/reopening-of-the-brussels-airlines-lounge-the-loft-delayed",
+            "date": "undated",
+            "primary": true,
+            "publisher": "Lufthansa Group (returns 403; not read)"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Travel Radar (updated 15 Dec 2025) states that THE LOFT closes 'as of January 7th, 2026' (not 5 Jan) until about the end of summer, and that 'lounge access will not be sold separately' meanwhile. The reported delay and the EUR 49 normal price could not be re-read (403)."
+        ],
+        "confidence": "medium"
+      },
+      "B6": {
+        "long": {
+          "not_sold": "JetBlue sells BlueHouse passes only to its Mosaic members"
+        },
+        "short": {
+          "not_sold": "JetBlue sells BlueHouse passes only to its Mosaic members"
+        },
+        "sources": [
+          {
+            "url": "https://awardwallet.com/airlines/jetblue-trueblue/jetblue-bluehouse-lounges/",
+            "date": "2026-08-27",
+            "primary": false,
+            "publisher": "AwardWallet"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): AwardWallet (27 Aug 2026) states day passes for Mosaic 3 ($59) and Mosaic 1/2 and Plus/Business cardholders ($79), with Blue Basic excluded. jetblue.com/bluehouse rendered empty. Confidence is lowered to medium because only a secondary source backs it."
+        ],
+        "confidence": "medium"
+      },
+      "OS": {
+        "long": {
+          "cents": 4447,
+          "from": true,
+          "est": true,
+          "_was": "39 EUR at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 4447,
+          "from": true,
+          "est": true,
+          "_was": "39 EUR at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://www.loungepair.com/guides/vienna-airport-lounges-vie-complete-guide/",
+            "date": "2026-06-15",
+            "primary": false,
+            "publisher": "LoungePair"
+          },
+          {
+            "url": "https://vienna-vie-international-airport.com/en/vienna-airport-lounges",
+            "date": "2026-07-27",
+            "primary": false,
+            "publisher": "Vienna Airport Guide (unofficial)"
+          },
+          {
+            "url": "https://www.austrian.com/us/en/lounges-vienna-airport",
+            "date": "undated",
+            "primary": true,
+            "publisher": "Austrian Airlines (returns 403; not read)"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): LoungePair (15 Jun 2026) states 'EUR 39-59' at reception and 'EUR 49-59' pre-booked online, and the Vienna guide (27 Jul 2026) states 'typically in the EUR 39-59 range' for the Business Lounge only. austrian.com returns 403."
+        ],
+        "confidence": "medium"
+      },
+      "EK": {
+        "long": {
+          "cents": 15000,
+          "reported": true,
+          "est": true
+        },
+        "short": {
+          "cents": 15000,
+          "reported": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://onemileatatime.com/guides/buy-emirates-lounge-access/",
+            "date": "2026-01-08",
+            "primary": false,
+            "publisher": "One Mile at a Time"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): OMAAT (8 Jan 2026) states $150 Skywards / $175 non-member for the Dubai business lounge, $250/$300 first lounge for Economy, $125/$155 outstations, VAT extra up to 20%, card only. The 'no advance purchase at most locations' detail was not stated in what I read."
+        ],
+        "confidence": "medium"
+      },
+      "KL": {
+        "long": {
+          "cents": 8552,
+          "low": 6272,
+          "high": 8552,
+          "reported": true,
+          "est": true,
+          "_was": "75 EUR at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 6842,
+          "reported": true,
+          "est": true,
+          "_was": "60 EUR at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://www.amsterdamtips.com/schiphol-airport-lounges",
+            "date": "2026-09-17",
+            "primary": false,
+            "publisher": "AmsterdamTips"
+          },
+          {
+            "url": "https://www.headforpoints.com/2024/02/29/review-klm-crown-lounge-52-amsterdam-schiphol-airport/",
+            "date": "2024-02-29",
+            "primary": false,
+            "publisher": "Head for Points"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "long (confirmed): AmsterdamTips (17 Sep 2026) states EUR 75 for Lounge 52; Head for Points (2024) states EUR 65 at the door, EUR 55 in advance, Silver 25% off pre-booked. Neither page I read mentions off-peak-only or the 3,500-9,000 miles figure.",
+          "short (confirmed): AmsterdamTips (17 Sep 2026) states 'EUR 60 for Lounge 25'. It does not mention off-peak or advance-purchase conditions, so those were removed from the note."
+        ],
+        "confidence": "low"
+      },
+      "BA": {
+        "long": {
+          "not_sold": "British Airways does not sell lounge entry"
+        },
+        "short": {
+          "not_sold": "British Airways does not sell lounge entry"
+        },
+        "sources": [
+          {
+            "url": "https://www.headforpoints.com/2026/09/22/can-you-pay-to-get-into-a-british-airways-airport-lounge/",
+            "date": "2026-09-22",
+            "primary": false,
+            "publisher": "Head for Points"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Head for Points (22 Sep 2026) states 'British Airways does not sell airport lounge access, for cash or Avios.'"
+        ],
+        "confidence": "high"
+      },
+      "TP": {
+        "long": {
+          "cents": 3079,
+          "est": true,
+          "_was": "27 EUR at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 3079,
+          "est": true,
+          "_was": "27 EUR at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/tap-air-portugal-review/",
+            "date": "2026-01-11",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          },
+          {
+            "url": "https://www.flytap.com/en-gb/at-the-airport/lounges",
+            "date": "undated",
+            "primary": true,
+            "publisher": "TAP Air Portugal (no price on the page)"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (corrected): Upgraded Points states 'Lounge access can be purchased by economy passengers for EUR 27 ($30) or 5,600 miles'. TAP's lounge page (en-gb; en-us redirected) says access can be bought but prints no price, so the EUR 25-60 range is dropped and the kind changed from range to typical."
+        ],
+        "confidence": "low"
+      },
+      "WN": {
+        "long": {
+          "not_sold": "Southwest has no lounges"
+        },
+        "short": {
+          "not_sold": "Southwest has no lounges"
+        },
+        "sources": [
+          {
+            "url": "https://www.southwest.com/html/customer-service/travel-fees.html",
+            "date": "undated (read 2026-09-25)",
+            "primary": true,
+            "publisher": "Southwest Airlines"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Southwest's optional-charges table lists no lounge product; Southwest operates no lounges."
+        ],
+        "confidence": "high"
       }
     },
     "priority": {
@@ -109,6 +705,489 @@
             "note": ""
           }
         ]
+      },
+      "W6": {
+        "long": {
+          "cents": 3923,
+          "low": 1140,
+          "high": 6705,
+          "reported": true,
+          "est": true,
+          "_was": "34.4 EUR at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 3923,
+          "low": 1140,
+          "high": 6705,
+          "reported": true,
+          "est": true,
+          "_was": "34.4 EUR at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://baggagepolicies.com/wizz-air-baggage-policy/",
+            "date": "2026-08-18",
+            "primary": false,
+            "publisher": "BaggagePolicies.com"
+          },
+          {
+            "url": "https://www.airlinesgrouptravel.com/blog/how-and-what-you-get-with-wizz-priority",
+            "date": "undated",
+            "primary": false,
+            "publisher": "Airlines Group Travel"
+          },
+          {
+            "url": "https://www.mrplaneguy.com/post/wizz-air-review",
+            "date": "2026-04-30",
+            "primary": false,
+            "publisher": "Mr Plane Guy"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): BaggagePolicies states EUR 10-58.80 online and EUR 55 at the airport. Airlines Group Travel's EUR 13.00-55.80 and the GBP 18 review agree. The Airlines Group Travel page shows no date of its own (only a 2026 copyright)."
+        ],
+        "confidence": "medium"
+      },
+      "UA": {
+        "long": {
+          "cents": 1500,
+          "from": true,
+          "est": true
+        },
+        "short": {
+          "cents": 1500,
+          "from": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://www.travelcodex.com/united-premier-access-waste-money/",
+            "date": "2026-07-09",
+            "primary": false,
+            "publisher": "Travel Codex"
+          },
+          {
+            "url": "https://www.united.com/en/us/fly/travel/trip-planning/premier-access.html",
+            "date": "undated",
+            "primary": true,
+            "publisher": "United Airlines"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Travel Codex (9 Jul 2026) states 'around $15 on shorter domestic segments to $50 or more'; its $9 figure is from a 2013 report. United's Premier Access page timed out for me, so the primary wording is unconfirmed."
+        ],
+        "confidence": "medium"
+      },
+      "DL": {
+        "long": {
+          "not_sold": "Delta does not sell priority boarding on its own"
+        },
+        "short": {
+          "not_sold": "Delta does not sell priority boarding on its own"
+        },
+        "sources": [
+          {
+            "url": "https://thepointsguy.com/news/delta-cuts-trip-extras-discounted-wi-fi/",
+            "date": "2020-08-27",
+            "primary": false,
+            "publisher": "The Points Guy"
+          },
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/delta-air-lines-boarding-zones/",
+            "date": "2026-09-01",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          },
+          {
+            "url": "https://www.delta.com/us/en/onboard/onboard-experience/travel-experiences",
+            "date": "as of 2026-09-25",
+            "primary": true,
+            "publisher": "Delta Air Lines"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): TPG confirms the $15 coach purchase was removed in Aug 2020. Delta's page ties boarding zones to the fare tier, status and cards, with no standalone purchase. No source states 'not sold' outright, so confidence stays medium."
+        ],
+        "confidence": "medium"
+      },
+      "VS": {
+        "long": {
+          "free": "Virgin boards Flying Club members early for free (free to join)",
+          "est": true
+        },
+        "short": {
+          "free": "Virgin boards Flying Club members early for free (free to join)",
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://www.headforpoints.com/2024/03/15/virgin-atlantic-adds-priority-boarding-for-flying-club-members/",
+            "date": "2024-03-15",
+            "primary": false,
+            "publisher": "Head for Points"
+          },
+          {
+            "url": "https://awardwallet.com/airlines/virgin-atlantic-flying-club/boarding-groups/",
+            "date": "2024-03-18",
+            "primary": false,
+            "publisher": "AwardWallet"
+          },
+          {
+            "url": "https://www.virginatlantic.com/experience/upgrades-and-extras/optional-service-and-travel-fees",
+            "date": "as of 2026-09-25",
+            "primary": true,
+            "publisher": "Virgin Atlantic"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Head for Points confirms priority boarding for Light and Classic passengers with a Flying Club number, behind Delight and SkyTeam elites. AwardWallet gives Group 5 from 14 Mar 2024. Virgin's fees page lists no paid priority boarding."
+        ],
+        "confidence": "medium"
+      },
+      "WS": {
+        "long": {
+          "not_sold": "WestJet does not sell priority boarding on its own"
+        },
+        "short": {
+          "not_sold": "WestJet does not sell priority boarding on its own"
+        },
+        "sources": [
+          {
+            "url": "https://www.westjet.com/en-ca/flights/fees",
+            "date": "as of 2026-09-25",
+            "primary": true,
+            "publisher": "WestJet"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): WestJet's own fees page lists no priority product. It lists seat fees of $5 to $400 and Extended Comfort from $20, as stated."
+        ],
+        "confidence": "high"
+      },
+      "AA": {
+        "long": {
+          "cents": 4150,
+          "low": 900,
+          "high": 7400,
+          "reported": true,
+          "est": true
+        },
+        "short": {
+          "cents": 4150,
+          "low": 900,
+          "high": 7400,
+          "reported": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://www.explore.com/1319642/how-priority-boarding-american-airline/",
+            "date": "2023-06-24",
+            "primary": false,
+            "publisher": "Explore"
+          },
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/american-airlines-boarding-groups/",
+            "date": "2026-08-30",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Explore (24 Jun 2023) states the add-on 'can cost anywhere between $9 and $74'; Upgraded Points (30 Aug 2026) confirms it is still sold for Group 4 without a price. The range is three years old."
+        ],
+        "confidence": "low"
+      },
+      "AC": {
+        "long": {
+          "not_sold": "Air Canada does not sell priority boarding on its own"
+        },
+        "short": {
+          "not_sold": "Air Canada does not sell priority boarding on its own"
+        },
+        "sources": [
+          {
+            "url": "https://www.aircanada.com/ca/en/aco/home/fly/premium-services/priority-services.html",
+            "date": "undated (read 2026-09-25)",
+            "primary": true,
+            "publisher": "Air Canada"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): The Air Canada priority services page lists eligibility only by cabin, fare, status and card, with no standalone purchase."
+        ],
+        "confidence": "high"
+      },
+      "AS": {
+        "long": {
+          "not_sold": "Alaska does not sell priority boarding on its own"
+        },
+        "short": {
+          "not_sold": "Alaska does not sell priority boarding on its own"
+        },
+        "sources": [
+          {
+            "url": "https://www.alaskaair.com/content/travel-info/flight-experience/our-boarding-process",
+            "date": "undated (read 2026-09-25)",
+            "primary": true,
+            "publisher": "Alaska Airlines"
+          },
+          {
+            "url": "https://www.alaskaair.com/content/travel-info/flight-experience/premium-class",
+            "date": "undated (read 2026-09-25)",
+            "primary": true,
+            "publisher": "Alaska Airlines"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Alaska's boarding page assigns groups by status, fare and cabin with no purchase option, Saver in Group F; the Premium Class page says 'starting at just $15 USD' with early boarding."
+        ],
+        "confidence": "high"
+      },
+      "AY": {
+        "long": {
+          "not_sold": "Finnair does not sell priority boarding on its own"
+        },
+        "short": {
+          "not_sold": "Finnair does not sell priority boarding on its own"
+        },
+        "sources": [
+          {
+            "url": "https://www.finnair.com/us-en/travel-extras-available-for-purchase/priority-services",
+            "date": "undated (read 2026-09-25)",
+            "primary": true,
+            "publisher": "Finnair"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Finnair's page: 'Priority check-in and security are sold as a bundle', from EUR 15.90 one way; priority boarding is not part of it."
+        ],
+        "confidence": "high"
+      },
+      "AF": {
+        "long": {
+          "not_sold": "Air France does not sell priority boarding on its own"
+        },
+        "short": {
+          "not_sold": "Air France does not sell priority boarding on its own"
+        },
+        "sources": [
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/air-france-boarding-groups/",
+            "date": "2026-01-23",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          },
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/air-france-review/",
+            "date": "2026-01-23",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Both Upgraded Points pages (23 Jan 2026) tie SkyPriority to premium economy and above or to status, and neither mentions a paid add-on. This rests on an absence in secondary sources, so confidence is low."
+        ],
+        "confidence": "low"
+      },
+      "LX": {
+        "long": {
+          "not_sold": "SWISS does not sell priority boarding on its own"
+        },
+        "short": {
+          "not_sold": "SWISS does not sell priority boarding on its own"
+        },
+        "sources": [
+          {
+            "url": "https://www.swiss.com/us/en/book-and-manage/swiss-choice",
+            "date": "undated (read 2026-09-25)",
+            "primary": true,
+            "publisher": "SWISS"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): The SWISS Choice page (read today) lists the add-ons, and priority boarding is not among them. A low-grade 2024 blog mentions paying for 'priority boarding' vaguely, but it is not a credible contradiction."
+        ],
+        "confidence": "medium"
+      },
+      "EI": {
+        "long": null,
+        "short": {
+          "cents": 683,
+          "from": true,
+          "reported": true,
+          "est": true,
+          "_was": "5.99 EUR at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://www.cabinzero.com/blogs/air-travel-tips/aer-lingus-airlines-baggage-allowance-guide",
+            "date": "2024-09-26",
+            "primary": false,
+            "publisher": "CabinZero"
+          },
+          {
+            "url": "https://travelupdate.com/aer-lingus-cabin-bag-fee/",
+            "date": "2021-07-12",
+            "primary": false,
+            "publisher": "TravelUpdate"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "short (confirmed): CabinZero (26 Sep 2024) states 'priority boarding starting from EUR 5.99' on European Saver fares, and TravelUpdate (2021) paid EUR 8.99. Neither source states the fare or tier inclusions given in the original note."
+        ],
+        "confidence": "medium"
+      },
+      "FR": {
+        "long": {
+          "cents": 2783,
+          "low": 795,
+          "high": 4771,
+          "reported": true,
+          "est": true,
+          "_was": "21 GBP at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 2783,
+          "low": 795,
+          "high": 4771,
+          "reported": true,
+          "est": true,
+          "_was": "21 GBP at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://travellon.com/ryanair-fees-complete-list",
+            "date": "2026-08-23",
+            "primary": false,
+            "publisher": "Travellon"
+          },
+          {
+            "url": "https://flighttribe.co.uk/ryanair-priority-boarding/",
+            "date": "2026-09-23",
+            "primary": false,
+            "publisher": "Flight Tribe"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (corrected): Travellon states 'GBP 6-GBP 36 at booking', and Flight Tribe (Aug 2026) states 'GBP 12 to GBP 36' at booking and 'GBP 20 to GBP 45.50' later. Both are in GBP, and no readable source gives EUR, so the currency is corrected to GBP. The sources disagree on the floor."
+        ],
+        "confidence": "medium"
+      },
+      "SN": {
+        "long": {
+          "not_sold": "Brussels Airlines does not sell priority boarding on its own"
+        },
+        "short": {
+          "not_sold": "Brussels Airlines does not sell priority boarding on its own"
+        },
+        "sources": [
+          {
+            "url": "https://www.brusselsairlines.com/en-pl/practical-information/travel-info/on-board/travel-classes/shorthaul/flex-fast/default.aspx",
+            "date": "undated",
+            "primary": true,
+            "publisher": "Brussels Airlines (search snippet; page returns 403)"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): The Flex&Fast page returned 403, and the search budget was exhausted, so this could not be re-checked. Nothing found contradicts it. Kept at low confidence."
+        ],
+        "confidence": "low"
+      },
+      "B6": {
+        "long": {
+          "not_sold": "JetBlue does not sell priority boarding on its own"
+        },
+        "short": {
+          "not_sold": "JetBlue does not sell priority boarding on its own"
+        },
+        "sources": [
+          {
+            "url": "https://www.jetblue.com/legal/fees",
+            "date": "undated",
+            "primary": true,
+            "publisher": "JetBlue"
+          },
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/jetblue-airways-review/",
+            "date": "2026-06-10",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): jetblue.com's fees page lists 'Priority security price: Starting at $20 one way' (not $20-25) and no priority-boarding add-on. Upgraded Points lists only expedited security as an add-on. Medium, because an absence is harder to prove."
+        ],
+        "confidence": "medium"
+      },
+      "EK": {
+        "long": {
+          "not_sold": "Emirates does not sell priority boarding on its own"
+        },
+        "short": {
+          "not_sold": "Emirates does not sell priority boarding on its own"
+        },
+        "sources": [
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/emirates-boarding-process-and-groups/",
+            "date": "2026-02-13",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Upgraded Points states 'At this time you cannot purchase priority boarding when seated in economy', except by upgrading. It lists Skywards Silver among those who get priority, so the note now names Silver too."
+        ],
+        "confidence": "medium"
+      },
+      "WN": {
+        "long": {
+          "cents": 4250,
+          "low": 1000,
+          "high": 7500,
+          "est": true
+        },
+        "short": {
+          "cents": 4250,
+          "low": 1000,
+          "high": 7500,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://www.southwest.com/html/customer-service/travel-fees.html",
+            "date": "undated (read 2026-09-25)",
+            "primary": true,
+            "publisher": "Southwest Airlines"
+          },
+          {
+            "url": "https://www.southwest.com/customer-enhancements/assigned-seating/",
+            "date": "undated (read 2026-09-25)",
+            "primary": true,
+            "publisher": "Southwest Airlines"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): The fees page states Priority Boarding '$10-$75 per segment, per Customer'; the assigned-seating page says it can be bought 'beginning 24 hours prior to departure'."
+        ],
+        "confidence": "high"
       }
     },
     "wifi": {
@@ -137,8 +1216,10 @@
             "correct_value": "The page carries a coverage map dated October 2025 (image file 'dswf-coverage-map-oct-2025.jpg'), which is where 'Europe: Full Wi-Fi Coverage / Asia: No Wi-Fi Coverage' comes from. The page also says 'The majority of our international flights offer fast, free Wi-Fi' and free Delta Sync Wi-Fi 'on most domestic U.S. flights'.",
             "url": "https://www.delta.com/us/en/onboard/inflight-entertainment/onboard-wifi",
             "note": "The substance is right; the fix is to date the coverage claim Oct-2025. The page publishes no flight-pass price, as the researcher said."
-          }
-        ]
+          },
+          "both (confirmed): Delta's own wifi page states free wifi for SkyMiles members on most domestic and international flights, lists the aircraft, and says there is no coverage over Asia."
+        ],
+        "confidence": "high"
       },
       "UA": {
         "long": null,
@@ -152,6 +1233,24 @@
             "date": "2026-09-17",
             "primary": true,
             "note": "\"Starlink Wi-Fi is free for United MileagePlus members\" and \"Starlink is free for MileagePlus members in every class of service\". Active on more than 560 mainline and United Express aircraft. The first transatlantic widebody (777-200, EWR t"
+          },
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/united-inflight-wi-fi/",
+            "date": "2026-06-10",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          },
+          {
+            "url": "https://onemileatatime.com/news/united-airlines-free-starlink-wi-fi/",
+            "date": "2026-06",
+            "primary": false,
+            "publisher": "One Mile at a Time"
+          },
+          {
+            "url": "https://finance.yahoo.com/sectors/technology/articles/united-airlines-quietly-cuts-free-161213647.html",
+            "date": "2026-04-17",
+            "primary": false,
+            "publisher": "Yahoo Finance"
           }
         ],
         "checked": "2026-09-25",
@@ -162,8 +1261,10 @@
             "correct_value": "San Francisco to Los Angeles: $43-$45 a seat ($52 as a bundle). San Francisco to Singapore: $299-$329 a seat. $272 was the BUNDLE price, not the low end of the seat range. The $29-$299 'United states' range is correct, and the article adds that some seats cost more. It was published 2024-02-05 and updated 2024-02-06, a secondary source.",
             "url": "https://onemileatatime.com/guides/united-airlines-economy-plus/",
             "note": "Mixing the bundle price into the range understates the long-haul low end. Subscriptions check out: $599-$799 solo, $799-$999 with one companion, $1,099-$1,299 with up to eight."
-          }
-        ]
+          },
+          "short (confirmed): Upgraded Points (10 Jun 2026) and Yahoo (Apr 2026) both state $8 for members and $10 for non-members on non-Starlink aircraft. OMAAT confirms 400+ Starlink aircraft free to members. Confidence is lowered to medium because only secondary sources back it."
+        ],
+        "confidence": "medium"
       },
       "B6": {
         "long": {
@@ -234,7 +1335,13 @@
         "second_check": []
       },
       "AA": {
-        "long": null,
+        "long": {
+          "cents": 2700,
+          "low": 1900,
+          "high": 3500,
+          "reported": true,
+          "est": true
+        },
         "short": {
           "free": "free for AAdvantage members (free to join)",
           "est": true
@@ -245,6 +1352,24 @@
             "date": "2026-01-25",
             "primary": false,
             "note": "\"Free Wi-Fi is available exclusively for members of the carrier's AAdvantage program\" (no status needed). Covers Viasat/Intelsat domestic narrowbodies and regional jets; Viasat widebodies (787-9, some 787-8) were due \"in the coming weeks\""
+          },
+          {
+            "url": "https://awardwallet.com/airlines/american-aadvantage/american-airlines-wifi/",
+            "date": "2026-01-06",
+            "primary": false,
+            "publisher": "AwardWallet"
+          },
+          {
+            "url": "https://news.aa.com/news/news-details/2026/American-Airlines-launches-FREE-high-speed-Wi-Fi-sponsored-by-ATT-available-on-more-aircraft-than-any-other-carrier-in-the-world/default.aspx",
+            "date": "2026-01-06 (not re-read: 429 to automated readers)",
+            "primary": true,
+            "publisher": "American Airlines Newsroom"
+          },
+          {
+            "url": "https://simpleflying.com/american-airlines-free-wi-fi-why-some-passengers-will-still-pay/",
+            "date": "2026-01-06",
+            "primary": false,
+            "publisher": "Simple Flying"
           }
         ],
         "checked": "2026-09-25",
@@ -255,8 +1380,11 @@
             "correct_value": "The article says 'all narrow body mainline and regional aircraft that have Viasat and Intelsat connectivity'. It covers every such narrowbody, not only domestic flights. On widebodies: 'In the coming weeks, the airline should also finalize rolling out free Wi-Fi on wide body aircraft with the Viasat system' (new 787-9s and a few newer 787-8s). The airline says Panasonic aircraft will follow but gives 'no timeline'.",
             "url": "https://onemileatatime.com/news/american-airlines-free-wifi/",
             "note": "This is a secondary source dated 2026-01-25. The quoted 'in the coming weeks' is accurate. The Panasonic widebodies (777s and most 787-8s, the transatlantic fleet) had no free wifi date at that point. The 2026-05-26 OMAAT article says Starlink, from early 2027 on 500+ A320-family aircraft, may not even need AAdvantage membership."
-          }
-        ]
+          },
+          "short (confirmed): AwardWallet (6 Jan 2026) states complimentary Wi-Fi for AAdvantage members launched 6 Jan 2026 on Viasat/Intelsat aircraft covering 100% of narrowbody and dual-class regional fleets. The AA newsroom page was not re-read.",
+          "long (confirmed): Simple Flying (6 Jan 2026) states 777 and most 787 passengers pay 'ranging from $19 to $35 for a full-flight pass'. Could not check for a newer widebody rollout update (search budget exhausted), so the figure is as of January 2026."
+        ],
+        "confidence": "mixed"
       },
       "AC": {
         "long": null,
@@ -269,13 +1397,25 @@
             "date": "2026-09-25",
             "primary": true,
             "note": "\"Free Wi-Fi for Aeroplan Members, United MileagePlus members and Business Class passengers\" on \"flights within North America and to Sun destinations\". \"Free Wi-Fi on Air Canada long-haul international flights are planned to be added in 2026"
+          },
+          {
+            "url": "https://princeoftravel.com/guides/air-canada-wifi/",
+            "date": "2024-09-03",
+            "primary": false,
+            "publisher": "Prince of Travel"
           }
         ],
         "checked": "2026-09-25",
-        "second_check": []
+        "second_check": [
+          "short (confirmed): Air Canada's Wi-Fi page offers complimentary streaming-quality internet 'on flights within North America and to Sun destinations' for Aeroplan members; Prince of Travel (Sep 2024) lists the CAD 21 one-way pass."
+        ],
+        "confidence": "high"
       },
       "WS": {
-        "long": null,
+        "long": {
+          "cents": 1556,
+          "_was": "22 CAD at the ECB rate of 2026-09-25"
+        },
         "short": {
           "free": "free for WestJet Rewards members on its Starlink aircraft (free to join)",
           "est": true
@@ -286,10 +1426,32 @@
             "date": "2026-09-25",
             "primary": true,
             "note": "\"WestJet Wi-Fi presented by TELUS is our fast and reliable inflight internet, free for WestJet Rewards members\", \"now available on over 100 aircraft\""
+          },
+          {
+            "url": "https://www.westjet.com/en-ca/help/westjet-wifi",
+            "date": "as of 2026-09-25",
+            "primary": true,
+            "publisher": "WestJet"
+          },
+          {
+            "url": "https://milesopedia.com/en/guide/tutorials/westjet-free-wifi/",
+            "date": "2026-09-16",
+            "primary": false,
+            "publisher": "Milesopedia"
+          },
+          {
+            "url": "https://www.westjet.com/en-ca/help/westjet-connect",
+            "date": "as of 2026-09-25",
+            "primary": true,
+            "publisher": "WestJet"
           }
         ],
         "checked": "2026-09-25",
-        "second_check": []
+        "second_check": [
+          "short (confirmed): WestJet's own wifi page states free wifi for Rewards members on over 100 aircraft of the 737 fleet, and 'Wi-Fi for a fee' on WestJet Connect aircraft.",
+          "long (confirmed): Milesopedia states '$22 for the duration of the flight', but its Starlink text is from 2024 (rollout 'until 2026') and it names no aircraft. WestJet's pages give no price. The first reader's claim of a 2026 Starlink fit to the 787s was not found in any opened source."
+        ],
+        "confidence": "mixed"
       },
       "BA": {
         "long": {
@@ -319,10 +1481,19 @@
       },
       "VS": {
         "long": {
-          "cents": 2775,
-          "est": true
+          "cents": 2119,
+          "low": 1721,
+          "high": 2517,
+          "est": true,
+          "_was": "15.99 GBP at the ECB rate of 2026-09-25"
         },
-        "short": null,
+        "short": {
+          "cents": 2119,
+          "low": 1721,
+          "high": 2517,
+          "est": true,
+          "_was": "15.99 GBP at the ECB rate of 2026-09-25"
+        },
         "sources": [
           {
             "url": "https://www.virginatlantic.com/experience/inflight-entertainment/connectivity/starlink",
@@ -347,11 +1518,26 @@
             "date": "2026-09-25",
             "primary": true,
             "note": "Full Flight Pass £20.99; 1 Hour Pass £5.99; Messaging £2.99 Full flight"
+          },
+          {
+            "url": "https://www.virginatlantic.com/experience/inflight-entertainment/connectivity/b787",
+            "date": "as of 2026-09-25",
+            "primary": true,
+            "publisher": "Virgin Atlantic"
+          },
+          {
+            "url": "https://www.virginatlantic.com/experience/inflight-entertainment/connectivity/a330neo",
+            "date": "as of 2026-09-25",
+            "primary": true,
+            "publisher": "Virgin Atlantic"
           }
         ],
         "checked": "2026-09-25",
-        "second_check": [],
-        "note": "published for long-haul only; a short-haul trip takes the typical price, marked"
+        "second_check": [
+          "both (confirmed): Virgin's own pages state GBP 12.99 Basic Surf (787), GBP 18.99 Full Flight (A330neo) and free Starlink for Flying Club on the A350s. The 787 feature grid did not render reliably and read as if the GBP 2.99 Messaging pass also allowed browsing, which could not be ruled out, so confidence is lowered to medium."
+        ],
+        "note": "published for long-haul only; a short-haul trip takes the typical price, marked",
+        "confidence": "medium"
       },
       "AF": {
         "long": {
@@ -368,13 +1554,39 @@
             "date": "2026-09-25",
             "primary": true,
             "note": "High-speed (Starlink) wifi: \"This service is reserved for our Flying Blue members\"; aircraft not yet equipped: \"the free Message Pass and the paid Wifi Pass\""
+          },
+          {
+            "url": "https://onemileatatime.com/news/air-france-free-starlink-wi-fi/",
+            "date": "2026-06-08",
+            "primary": false,
+            "publisher": "One Mile at a Time"
+          },
+          {
+            "url": "https://aviationa2z.com/index.php/2026/06/09/air-france-accelerates-starlink-rollout-equipping-nearly-60-of-aircraft/",
+            "date": "2026-06-09",
+            "primary": false,
+            "publisher": "Aviation A2Z"
+          },
+          {
+            "url": "https://onemileatatime.com/air-france-wifi/",
+            "date": "2018-10-02",
+            "primary": false,
+            "publisher": "One Mile at a Time"
           }
         ],
         "checked": "2026-09-25",
-        "second_check": []
+        "second_check": [
+          "long (confirmed): OMAAT (8 Jun 2026) and Aviation A2Z (9 Jun 2026) both say it is free to Flying Blue members, with the same rollout figures. The A350 count (30 of 41) was added. The 2018 pass prices check out against OMAAT.",
+          "short (confirmed): OMAAT (8 Jun 2026) states the free Flying Blue access and the A220/A320/A321 counts exactly as given. OMAAT (2 Oct 2018) states the EUR 3 and EUR 5 Surf passes."
+        ],
+        "confidence": "medium"
       },
       "KL": {
-        "long": null,
+        "long": {
+          "cents": 2000,
+          "reported": true,
+          "est": true
+        },
         "short": {
           "free": "free for Flying Blue members on European flights (free to join)"
         },
@@ -384,10 +1596,38 @@
             "date": "2026-09-25",
             "primary": true,
             "note": "European flights: WiFi Pass \"It's free for all Flying Blue members\"; intercontinental: \"Our free Message Pass is available exclusively for Flying Blue members\""
+          },
+          {
+            "url": "https://seatwifi.com/klm-wifi-cost",
+            "date": "2026-06-07",
+            "primary": false,
+            "publisher": "SeatWiFi"
+          },
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/klm-review/",
+            "date": "2026-01-23",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          },
+          {
+            "url": "https://paxex.aero/klm-free-wifi-europe/",
+            "date": "2026-01-21",
+            "primary": false,
+            "publisher": "PaxEx.Aero"
+          },
+          {
+            "url": "https://runwaygirlnetwork.com/2026/01/klm-offers-viasat-powered-free-wi-fi-on-european-flights/",
+            "date": "2026-01",
+            "primary": false,
+            "publisher": "Runway Girl Network"
           }
         ],
         "checked": "2026-09-25",
-        "second_check": []
+        "second_check": [
+          "long (corrected): SeatWiFi (7 Jun 2026) states the full-flight Surf pass as '$20 USD (~EUR 18)', so the figure is USD 20 with EUR 18 only an approximation; the kind moves from exact to typical since it is a secondary source that says rates may vary by flight. Upgraded Points' EUR 9-30 range agrees.",
+          "short (confirmed): Runway Girl Network states free Wi-Fi on European flights 'to members of its Flying Blue loyalty program', 51 aircraft installed plus 17 slated (68); PaxEx confirms Flying Blue membership required and half the short-haul fleet at launch."
+        ],
+        "confidence": "medium"
       },
       "LH": {
         "long": {
@@ -484,7 +1724,9 @@
         "second_check": []
       },
       "SK": {
-        "long": null,
+        "long": {
+          "cents": 1600
+        },
         "short": {
           "free": "free for EuroBonus members (free to join)"
         },
@@ -494,10 +1736,32 @@
             "date": "2026-09-01",
             "primary": true,
             "note": "\"EuroBonus members can access the service free of charge\" (Starlink); all 81 Airbus A320neo equipped"
+          },
+          {
+            "url": "https://onemileatatime.com/news/sas-free-starlink-wi-fi/",
+            "date": "2026-09-02",
+            "primary": false,
+            "publisher": "One Mile at a Time"
+          },
+          {
+            "url": "https://www.sasgroup.net/newsroom/press-releases/2026/sas-goes-live-with-starlink-high-speed-wifi/",
+            "date": "2026-03-24",
+            "primary": true,
+            "publisher": "SAS"
+          },
+          {
+            "url": "https://connect.flysas.com/home",
+            "date": "undated (read 2026-09-25)",
+            "primary": true,
+            "publisher": "SAS"
           }
         ],
         "checked": "2026-09-25",
-        "second_check": []
+        "second_check": [
+          "short (confirmed): The SAS press release (24 Mar 2026) says it is free to EuroBonus members from 24 March. OMAAT (2 Sep 2026) confirms all A320neos (46 of 72) and names the unfitted types. The 16 USD for unfitted aircraft comes from SAS's own onboard portal.",
+          "long (confirmed): The SAS portal, read today, states the 149 SEK / 149 NOK / 16 USD / 3,000 EB points browsing access and the tier rules exactly. OMAAT (2 Sep 2026) confirms the A330 and A350 are not yet on Starlink. The portal is undated, so confidence stays medium."
+        ],
+        "confidence": "mixed"
       },
       "AZ": {
         "long": {
@@ -538,19 +1802,38 @@
             "date": "2026-05-25",
             "primary": true,
             "note": "Free messaging for Business class, Iberia Club members, and anyone who registers with Iberia Club during the flight"
+          },
+          {
+            "url": "https://iberiaclubmagazine.iberia.com/en/articles/2025/11/wifi-news/",
+            "date": "2025-11",
+            "primary": true,
+            "publisher": "Iberia Club Magazine"
+          },
+          {
+            "url": "https://seatwifi.com/iberia-free-wifi",
+            "date": "undated",
+            "primary": false,
+            "publisher": "SeatWiFi"
           }
         ],
         "checked": "2026-09-25",
-        "second_check": []
+        "second_check": [
+          "both (confirmed): Iberia's magazine states all classes 'free of charge', long and short haul, with implementation 'completed throughout 2026'. SeatWiFi says the same and that it is still verifying. Neither mentions a login requirement or the current share of the fleet fitted."
+        ],
+        "confidence": "medium"
       },
       "FI": {
         "long": {
-          "cents": 2729,
-          "est": true
+          "cents": 2737,
+          "reported": true,
+          "est": true,
+          "_was": "24 EUR at the ECB rate of 2026-09-25"
         },
         "short": {
-          "cents": 1365,
-          "est": true
+          "cents": 1368,
+          "reported": true,
+          "est": true,
+          "_was": "12 EUR at the ECB rate of 2026-09-25"
         },
         "sources": [
           {
@@ -558,18 +1841,36 @@
             "date": "2026-02-01",
             "primary": false,
             "note": "\"Saga Class customers receive free Wi-Fi\" (Viasat on the A321LR and 737 MAX)"
+          },
+          {
+            "url": "https://www.cestee.com/airline/icelandair/services",
+            "date": "2025-09-29",
+            "primary": false,
+            "publisher": "Cestee"
+          },
+          {
+            "url": "https://flightwifi.app/airlines/icelandair/",
+            "date": "last verified 2026-08",
+            "primary": false,
+            "publisher": "FlightWifi"
           }
         ],
         "checked": "2026-09-25",
-        "second_check": []
+        "second_check": [
+          "long (confirmed): Cestee (29 Sep 2025) states EUR 24 for the whole flight between Europe and America. FlightWifi (verified Aug 2026) gives about EUR 24 to North America on the A321 and 737 MAX, free for Saga Premium, Saga Premium Flex and Saga Gold. Neither mentions a lower 757/767 price.",
+          "short (confirmed): Cestee (29 Sep 2025) states EUR 12 for Europe to Iceland and no wifi on domestic, Greenland and Faroe flights. FlightWifi (Aug 2026) gives about EUR 12 to Europe."
+        ],
+        "confidence": "medium"
       },
       "EY": {
         "long": {
           "cents": 1999,
+          "reported": true,
           "est": true
         },
         "short": {
           "cents": 999,
+          "reported": true,
           "est": true
         },
         "sources": [
@@ -578,36 +1879,67 @@
             "date": "2023-04-14",
             "primary": false,
             "note": "All Etihad Guest members: free messaging (text only). First Class and Etihad Guest Platinum: free \"Stream\" (unlimited). Gold: 25% off Stream"
+          },
+          {
+            "url": "https://flightwifi.app/airlines/etihad-airways/",
+            "date": "2026-08 (last verified)",
+            "primary": false,
+            "publisher": "FlightWifi"
           }
         ],
         "checked": "2026-09-25",
-        "second_check": []
+        "second_check": [
+          "long (confirmed): FlightWifi (verified Aug 2026) gives Surf US$19.99 on 7+ hour flights; OMAAT (Apr 2023) gives $19.99 for the long-flight Stream pass. The Etihad news page timed out twice.",
+          "short (confirmed): FlightWifi (Aug 2026) gives Surf US$9.99 under 7 hours; OMAAT (2023) gives $9.99 for shorter flights."
+        ],
+        "confidence": "medium"
       },
       "LO": {
         "long": {
           "cents": 2900,
+          "reported": true,
           "est": true
         },
-        "short": null,
+        "short": {
+          "not_sold": "LOT's short-haul planes have no wifi"
+        },
         "sources": [
           {
             "url": "https://onemileatatime.com/news/lot-polish-airlines-viasat-wi-fi/",
             "date": "2026-03-06",
             "primary": false,
             "note": "\"a $7 chat pass that allows instant messaging, plus a $29 streaming pass that allows full internet use without data caps\""
+          },
+          {
+            "url": "https://cleanwhale.pl/en/blog/lot-polish-airlines-onboard-wifi-availability-speed-and-how-to-connect",
+            "date": "2025-11-30",
+            "primary": false,
+            "publisher": "CleanWhale"
           }
         ],
         "checked": "2026-09-25",
-        "second_check": [],
-        "note": "published for long-haul only; a short-haul trip takes the typical price, marked"
+        "second_check": [
+          "long (confirmed): OMAAT (6 Mar 2026) states the USD 7 chat and USD 29 full-internet passes. It also says only one 787 was equipped, with two more due by April and no completion date, so the old note's 'on the 787 fleet' overstated coverage and has been corrected.",
+          "short (confirmed): CleanWhale (updated 30 Nov 2025) states that short-haul E-Jets and 737s are not scheduled for wifi, and OMAAT describes the Viasat install as 787-only."
+        ],
+        "note": "published for long-haul only; a short-haul trip takes the typical price, marked",
+        "confidence": "medium"
       },
       "EK": {
         "long": {
           "cents": 1999,
           "upto": true,
+          "low": 999,
+          "high": 1999,
+          "reported": true,
           "est": true
         },
-        "short": null,
+        "short": {
+          "cents": 999,
+          "from": true,
+          "reported": true,
+          "est": true
+        },
         "sources": [
           {
             "url": "https://onemileatatime.com/news/emirates-free-starlink-wi-fi/",
@@ -620,11 +1952,27 @@
             "date": "2023-05-19",
             "primary": false,
             "note": "\"$9.99-19.99, depending on the length of the flight\""
+          },
+          {
+            "url": "https://awardwallet.com/airlines/emirates-wifi/",
+            "date": "2025-12-25",
+            "primary": false,
+            "publisher": "AwardWallet"
+          },
+          {
+            "url": "https://gulfnews.com/business/aviation/emirates-rolls-out-free-starlink-wifi-to-more-destinations-in-europe-asia-americas-1.500541436",
+            "date": "2026-05-15",
+            "primary": false,
+            "publisher": "Gulf News"
           }
         ],
         "checked": "2026-09-25",
-        "second_check": [],
-        "note": "published for long-haul only; a short-haul trip takes the typical price, marked"
+        "second_check": [
+          "long (confirmed): AwardWallet states the Wi-Fi package '$9.99-$19.99' for unlimited Wi-Fi for the entire flight, chat $2.99-5.99, free chat for Blue/Silver/Gold in Economy. Gulf News confirms 33 Starlink aircraft as of 14 May, free in all cabins, but gives the target as 232 aircraft, not '150 by end of 2026 / mid-2027'; the note was adjusted.",
+          "short (confirmed): AwardWallet states the full-flight pass is $9.99-19.99; 'from $9.99' is what it supports. It does not tie a price to short haul, so the short-haul reading remains an inference."
+        ],
+        "note": "published for long-haul only; a short-haul trip takes the typical price, marked",
+        "confidence": "mixed"
       },
       "QR": {
         "long": {
@@ -641,10 +1989,193 @@
             "date": "2026-08-20",
             "primary": false,
             "note": "On Starlink aircraft (777s, A350s and 787-8s done; 787-9s next), \"Qatar Airways is offering this Wi-Fi on a complimentary basis, with one-click access.\""
+          },
+          {
+            "url": "https://awardwallet.com/airlines/qatar-airways-wifi/",
+            "date": "2026-08-06",
+            "primary": false,
+            "publisher": "AwardWallet"
           }
         ],
         "checked": "2026-09-25",
-        "second_check": []
+        "second_check": [
+          "both (confirmed): AwardWallet (6 Aug 2026): 'only Privilege Club members get access to free Wi-Fi on the entire flight', others 45 minutes, non-Starlink from $10. OMAAT (Aug 2026) confirms the fleet coverage and 787-9s by end of 2026."
+        ],
+        "confidence": "high"
+      },
+      "W6": {
+        "long": {
+          "not_sold": "Wizz Air has no wifi yet"
+        },
+        "short": {
+          "not_sold": "Wizz Air has no wifi yet"
+        },
+        "sources": [
+          {
+            "url": "https://www.euronews.com/next/2026/06/08/wizz-air-announces-starlink-wifi-deal-as-other-budget-rivals-hold-back",
+            "date": "2026-06-08",
+            "primary": false,
+            "publisher": "Euronews"
+          },
+          {
+            "url": "https://www.aviationjobsearch.com/career-hub/articles/insights/industry-news/wizz-air-introduces-wizz-class-premium-seats-and-wifi-service",
+            "date": "2026-02-10",
+            "primary": false,
+            "publisher": "Aviation Job Search"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Euronews confirms Starlink from 2027 with pricing undisclosed. Aviation Job Search confirms the Wizz Play trial on select aircraft with no price. Neither states outright that there is no wifi today, and a trial exists, so confidence is lowered to medium."
+        ],
+        "confidence": "medium"
+      },
+      "F9": {
+        "long": {
+          "not_sold": "Frontier has no wifi yet"
+        },
+        "short": {
+          "not_sold": "Frontier has no wifi yet"
+        },
+        "sources": [
+          {
+            "url": "https://faq.flyfrontier.com/help/do-you-offer-wi-fi-tv-movies-or-other-in-flight-entertainment",
+            "date": "undated (read 2026-09-25)",
+            "primary": true,
+            "publisher": "Frontier"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Frontier's help page (read today) states both sentences word for word, and adds that there are no electrical outlets on board."
+        ],
+        "confidence": "high"
+      },
+      "EI": {
+        "long": {
+          "cents": 2499
+        },
+        "short": {
+          "not_sold": "Aer Lingus's short-haul planes have no wifi"
+        },
+        "sources": [
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/aer-lingus-review/",
+            "date": "2026-01-20",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          },
+          {
+            "url": "https://www.cestee.com/airline/aer-lingus/services",
+            "date": "2025-11-18",
+            "primary": false,
+            "publisher": "Cestee"
+          },
+          {
+            "url": "https://mediacentre.aerlingus.com/news/work-stream-or-game-aer-lingus-takes-off-with-starlink-the-fastest-wi-fi-in-the-sky/29032026",
+            "date": "2026-03-29",
+            "primary": true,
+            "publisher": "Aer Lingus Media Centre"
+          },
+          {
+            "url": "https://onemileatatime.com/news/aer-lingus-free-starlink-wi-fi/",
+            "date": "2026-03-29",
+            "primary": false,
+            "publisher": "One Mile at a Time"
+          },
+          {
+            "url": "https://seatwifi.com/aer-lingus-free-wifi",
+            "date": "undated",
+            "primary": false,
+            "publisher": "SeatWiFi"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "long (confirmed): Upgraded Points gives Premium 'EUR 20.49/GBP 17.99 ($24.99)', and Cestee names the full-flight pass 'Don't miss a thing' at EUR 20.49. The Aer Lingus release says Starlink is free across all cabins, starting 29 Mar 2026 on EI105, with long haul complete by Q1 2027. OMAAT says no loyalty membership is required.",
+          "short (confirmed): The Aer Lingus release only says short-haul (non-regional) aircraft come after long haul, with no date. SeatWiFi states the A320 short-haul fleet 'does not currently have WiFi installed'. aerlingus.com's wifi page still returns 405."
+        ],
+        "confidence": "medium"
+      },
+      "FR": {
+        "long": {
+          "not_sold": "Ryanair has no wifi"
+        },
+        "short": {
+          "not_sold": "Ryanair has no wifi"
+        },
+        "sources": [
+          {
+            "url": "https://seatwifi.com/ryanair-free-wifi",
+            "date": "2026-06-07",
+            "primary": false,
+            "publisher": "SeatWiFi"
+          },
+          {
+            "url": "https://help.ryanair.com/hc/en-gb/articles/12890696574609-Will-there-be-Wi-Fi-on-board",
+            "date": "undated",
+            "primary": true,
+            "publisher": "Ryanair Help Centre (returns 403; not read)"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): SeatWiFi (verified 7 Jun 2026) states 'There is no WiFi on Ryanair, free or paid' and gives the CEO's 3-5 year remark. Ryanair's own help article refused the reader, so confidence is lowered to medium."
+        ],
+        "confidence": "medium"
+      },
+      "SN": {
+        "long": {
+          "not_sold": "Brussels Airlines has no wifi yet"
+        },
+        "short": {
+          "not_sold": "Brussels Airlines has no wifi yet"
+        },
+        "sources": [
+          {
+            "url": "https://newsroom.lufthansagroup.com/en/lufthansa-group-launches-free-high-speed-internet-from-starlink/",
+            "date": "2026-08-10",
+            "primary": true,
+            "publisher": "Lufthansa Group Newsroom"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): The Lufthansa Group newsroom (10 Aug 2026) confirms the 19 Aug 2026 first flight, that Brussels aircraft are next, the 2029 completion, and free access for Miles & More / Travel ID users. It does not say outright that Brussels has no wifi today, and the Miles & More page returned 403, so confidence is low."
+        ],
+        "confidence": "low"
+      },
+      "TK": {
+        "long": {
+          "cents": 3500,
+          "reported": true,
+          "est": true
+        },
+        "short": {
+          "cents": 1500,
+          "reported": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://seatwifi.com/turkish-wifi-cost",
+            "date": "2026-06-14",
+            "primary": false,
+            "publisher": "SeatWiFi"
+          },
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/turkish-airlines-review/",
+            "date": "2026-05-16",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "long (confirmed): SeatWiFi (14 Jun 2026) states 'Unlimited WiFi (long-haul): $35' and Upgraded Points '$8 and $35 for internet packages on long-haul flights'. Both secondary; the airline page was not reached.",
+          "short (confirmed): SeatWiFi (14 Jun 2026) states 'Unlimited WiFi (short-haul): $15'. Single secondary source."
+        ],
+        "confidence": "low"
       }
     },
     "seat": {
@@ -747,6 +2278,766 @@
         ],
         "checked": "2026-09-25",
         "second_check": []
+      },
+      "W6": {
+        "long": {
+          "cents": 1368,
+          "low": 456,
+          "high": 2281,
+          "reported": true,
+          "est": true,
+          "_was": "12 EUR at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 1368,
+          "low": 456,
+          "high": 2281,
+          "reported": true,
+          "est": true,
+          "_was": "12 EUR at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://camli.com/airlines/wizz-air/seat-selection",
+            "date": "2026-08",
+            "primary": false,
+            "publisher": "Camli"
+          },
+          {
+            "url": "https://flighttribe.co.uk/wizz-air-seat-selection/",
+            "date": "2026-08-30",
+            "primary": false,
+            "publisher": "Flight Tribe"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Camli (Aug 2026) states EUR 4-20 for a standard seat. Flight Tribe says 'from around GBP 11' and that Wizz publishes no fixed list. Secondary sources only."
+        ],
+        "confidence": "low"
+      },
+      "LO": {
+        "long": {
+          "cents": 3000,
+          "reported": true,
+          "est": true
+        },
+        "short": {
+          "cents": 1400,
+          "reported": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://www.flycoair.com/blog/lot-polish-airlines-seat-selection",
+            "date": "undated",
+            "primary": false,
+            "publisher": "FlyCoAir (travel agency blog)"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "long (confirmed): The FlyCoAir blog states 110 PLN / 25 EUR / 30 USD for a long-haul Standard Zone seat. It is undated (its other posts are from late 2024), and lot.com blocked my reader too.",
+          "short (confirmed): FlyCoAir states 50 PLN / 14 EUR / 14 USD for international short haul and 20 PLN for domestic. The Pasazer.com page returned only a database error twice, so it is dropped as a source."
+        ],
+        "confidence": "low"
+      },
+      "UA": {
+        "long": null,
+        "short": {
+          "cents": 1500,
+          "low": 1000,
+          "high": 2000,
+          "reported": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://thriftytraveler.com/guides/airlines/united-basic-economy/",
+            "date": "2026-09-03",
+            "primary": false,
+            "publisher": "Thrifty Traveler"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "short (confirmed): Thrifty Traveler (3 Sep 2026) states '$10 to $20 per seat' and the IAH-IAD examples. It does not split domestic from international; its examples are domestic."
+        ],
+        "confidence": "medium"
+      },
+      "DL": {
+        "long": null,
+        "short": {
+          "cents": 2750,
+          "low": 1000,
+          "high": 4500,
+          "reported": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://thriftytraveler.com/guides/airlines/delta-basic-economy-pick-seat/",
+            "date": "2026-08-17",
+            "primary": false,
+            "publisher": "Thrifty Traveler"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "short (confirmed): Thrifty Traveler (modified 17 Aug 2026) states '$10 to $45 or more per domestic flight' and the $29 MSP-LGA example. A single secondary source."
+        ],
+        "confidence": "medium"
+      },
+      "VS": {
+        "long": {
+          "cents": 3313,
+          "from": true,
+          "est": true,
+          "_was": "25 GBP at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 3313,
+          "from": true,
+          "est": true,
+          "_was": "25 GBP at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://flighttribe.co.uk/virgin-atlantic-seat-selection/",
+            "date": "2026-08-30",
+            "primary": false,
+            "publisher": "Flight Tribe"
+          },
+          {
+            "url": "https://www.virginatlantic.com/policies/seating-terms-and-conditions",
+            "date": "as of 2026-09-25",
+            "primary": true,
+            "publisher": "Virgin Atlantic"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Flight Tribe (updated 30 Aug 2026) states 'from around GBP 25 per person per sector'. Virgin's terms confirm seats are sold but give no amount."
+        ],
+        "confidence": "low"
+      },
+      "AA": {
+        "long": null,
+        "short": {
+          "cents": 1000,
+          "from": true,
+          "reported": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://thriftytraveler.com/guides/airlines/american-airlines-basic-economy/",
+            "date": "2026-08-18",
+            "primary": false,
+            "publisher": "Thrifty Traveler"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "short (confirmed): Thrifty Traveler (modified 18 Aug 2026) states the seat fee 'typically starts at $10 or $12 for a middle seat', paid per segment, with no domestic/international split. Secondary source only."
+        ],
+        "confidence": "medium"
+      },
+      "EY": {
+        "long": {
+          "cents": 2750,
+          "low": 1500,
+          "high": 4000,
+          "reported": true,
+          "est": true
+        },
+        "short": {
+          "cents": 2750,
+          "low": 1500,
+          "high": 4000,
+          "reported": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://flightsupportguide.nicepage.io/blog/etihad-seat-selection-guide-2026-fees-map-booking.html",
+            "date": "2026-08-18",
+            "primary": false,
+            "publisher": "Flight Support Guide (blog)"
+          },
+          {
+            "url": "https://onemileatatime.com/news/etihad-seat-assignment/",
+            "date": "2023-11-20",
+            "primary": false,
+            "publisher": "One Mile at a Time"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): The blog states '$15-$40 depending on route length'; it uses outdated fare names, so it may be generic content. OMAAT confirms zonal pricing from Nov 2023 but gives no amounts."
+        ],
+        "confidence": "low"
+      },
+      "QR": {
+        "long": {
+          "cents": 2500,
+          "reported": true,
+          "est": true
+        },
+        "short": {
+          "cents": 2500,
+          "reported": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://www.flyertalk.com/forum/qatar-airways-privilege-club/2036359-seat-selection-charges.html",
+            "date": "2021-03-21",
+            "primary": false,
+            "publisher": "FlyerTalk"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): The FlyerTalk post of 21 Mar 2021 states '$25 per segment or $100 for the 4 segment International trip' on fare class O. A single forum report five years old."
+        ],
+        "confidence": "low"
+      },
+      "AC": {
+        "long": {
+          "cents": 6187,
+          "low": 1768,
+          "high": 10606,
+          "est": true,
+          "_was": "87.5 CAD at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 3359,
+          "low": 1061,
+          "high": 5657,
+          "est": true,
+          "_was": "47.5 CAD at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://www.aircanada.com/us/en/aco/home/legal/products-and-services.html",
+            "date": "2024-10-28",
+            "primary": true,
+            "publisher": "Air Canada"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "long (confirmed): Air Canada's products-and-services page (28 Oct 2024) lists Basic 'International Flights: $25.00 - $150.00' and Standard $25-150 to select international destinations, per one-way segment, taxes in.",
+          "short (confirmed): Same Air Canada page: 'Within Canada / Canada-U.S.: $15.00 - $80.00' for Basic and Standard, Caribbean and Mexico $25-100 on Basic."
+        ],
+        "confidence": "high"
+      },
+      "LH": {
+        "long": {
+          "cents": 4390,
+          "seen": true,
+          "est": true
+        },
+        "short": {
+          "cents": 1400,
+          "seen": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://travel-dealz.com/news/lufthansa-allegris-seat-fees/",
+            "date": "2024-12-03",
+            "primary": false,
+            "publisher": "Travel-Dealz"
+          },
+          {
+            "url": "https://www.fondtravels.com/blog/travel-tips/lufthansa-seat-selection",
+            "date": "2025-09-23",
+            "primary": false,
+            "publisher": "Fond Travels (blog)"
+          },
+          {
+            "url": "https://duffel.com/docs/api/v2/seat-maps",
+            "date": "2026-09-25",
+            "primary": true,
+            "publisher": "Lufthansa's own seat map, through Duffel",
+            "note": "JFK to FRA: $43.90 on Light and Comfort; free on Flex"
+          },
+          {
+            "url": "https://duffel.com/docs/api/v2/seat-maps",
+            "date": "2026-09-25",
+            "primary": true,
+            "publisher": "Lufthansa's own seat map, through Duffel",
+            "note": "FRA to BCN: $14 on Basic, Light and Comfort"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "long (confirmed): Travel-Dealz (3 Dec 2024) tables Classic Seat EUR 30 / 35 / 45 by near / medium / far (US East Coast is medium, EUR 35); Fondtravels confirms 'from EUR 30'. Secondary sources only.",
+          "short (confirmed): Fondtravels (23 Sep 2025) states Europe short-haul Classic Seat 'From EUR 14'. Single low-quality secondary source."
+        ],
+        "confidence": "mixed"
+      },
+      "AS": {
+        "long": {
+          "not_sold": "Alaska assigns Saver seats at check-in and sells no seat choice"
+        },
+        "short": {
+          "not_sold": "Alaska assigns Saver seats at check-in and sells no seat choice"
+        },
+        "sources": [
+          {
+            "url": "https://www.alaskaair.com/content/travel-info/flight-experience/saver",
+            "date": "undated (read 2026-09-25)",
+            "primary": true,
+            "publisher": "Alaska Airlines"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Alaska's Saver page states 'Seats will be assigned at check-in', with advance seats only by buying Premium Class or First."
+        ],
+        "confidence": "high"
+      },
+      "LX": {
+        "long": {
+          "cents": 4390,
+          "seen": true,
+          "est": true
+        },
+        "short": {
+          "cents": 1400,
+          "seen": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://www.mightytravels.com/2024/05/swiss-airlines-seat-selection-policies-a-comprehensive-guide-for-flyers/",
+            "date": "2024-05-08",
+            "primary": false,
+            "publisher": "Mighty Travels"
+          },
+          {
+            "url": "https://www.swiss.com/us/en/book-and-manage/swiss-choice/advance-seat-reservation",
+            "date": "undated (read 2026-09-25)",
+            "primary": true,
+            "publisher": "SWISS"
+          },
+          {
+            "url": "https://duffel.com/docs/api/v2/seat-maps",
+            "date": "2026-09-25",
+            "primary": true,
+            "publisher": "SWISS's own seat map, through Duffel",
+            "note": "JFK to ZRH (LX 15, sold by Lufthansa Group): $43.90; free on Flex"
+          },
+          {
+            "url": "https://duffel.com/docs/api/v2/seat-maps",
+            "date": "2026-09-25",
+            "primary": true,
+            "publisher": "SWISS's own seat map, through Duffel",
+            "note": "ZRH to LHR (LX 340): $14"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "short (confirmed): Mighty Travels (8 May 2024) states CHF 16 per leg as the minimum for a Classic seat. swiss.com (read today) confirms the price depends on flight duration and destination and is included in Flex, but gives no figure. It rests on one weak secondary source."
+        ],
+        "confidence": "low"
+      },
+      "EI": {
+        "long": {
+          "cents": 2999,
+          "from": true,
+          "reported": true,
+          "est": true
+        },
+        "short": {
+          "cents": 569,
+          "from": true,
+          "reported": true,
+          "est": true,
+          "_was": "4.99 EUR at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://www.thejournal.ie/aer-lingus-free-seat-selection-6922066-Jan2026/",
+            "date": "2026-01-09",
+            "primary": false,
+            "publisher": "TheJournal.ie"
+          },
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/aer-lingus-review/",
+            "date": "2026-01-20",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          },
+          {
+            "url": "https://thepointsguy.com/deals/aer-lingus-discount-flights-ireland",
+            "date": "2023-01-11",
+            "primary": false,
+            "publisher": "The Points Guy"
+          },
+          {
+            "url": "https://irelandpoint.org/blog/aer-lingus-cheap-flights/",
+            "date": "2026-09-03",
+            "primary": false,
+            "publisher": "Ireland Point"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "short (confirmed): TheJournal (9 Jan 2026) states Saver seats 'start from EUR 4.99', and Upgraded Points (20 Jan 2026) states EUR 4.99 / GBP 4.99 ($6) for standard seats within Europe. Only secondary sources were readable, and neither confirms the 'Standard+ / at check-in' detail, so confidence is lowered to medium.",
+          "long (confirmed): TPG (11 Jan 2023) does state 'anywhere from $29.99 to $114.99'. However, the 2026 exit-row price ($124.99) shows the table has moved since then, and irelandpoint (2026, weak) gives 'from EUR 54.99'. Kept only as a stale low-confidence floor."
+        ],
+        "confidence": "mixed"
+      },
+      "FR": {
+        "long": {
+          "cents": 398,
+          "from": true,
+          "est": true,
+          "_was": "3 GBP at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 398,
+          "from": true,
+          "est": true,
+          "_was": "3 GBP at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://flighttribe.co.uk/ryanair-seat-selection/",
+            "date": "2026-09-21",
+            "primary": false,
+            "publisher": "Flight Tribe"
+          },
+          {
+            "url": "https://travellon.com/ryanair-fees-complete-list",
+            "date": "2026-08-23",
+            "primary": false,
+            "publisher": "Travellon"
+          },
+          {
+            "url": "https://help.ryanair.com/hc/en-us/articles/360017824678-Reserved-Seating",
+            "date": "undated",
+            "primary": true,
+            "publisher": "Ryanair Help Centre (returns 403; not read)"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (corrected): Flight Tribe ('From GBP 3', rows 6-15 and 18-33) and Travellon (23 Aug 2026, 'from GBP 3 per person, each way') both state the figure in GBP. No opened source states EUR 3, since Ryanair's help centre and fees pages refused or rendered empty, so the currency is corrected to GBP and confidence lowered to medium."
+        ],
+        "confidence": "medium"
+      },
+      "SN": {
+        "long": {
+          "cents": 5131,
+          "low": 4447,
+          "high": 5131,
+          "est": true,
+          "_was": "45 EUR at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 1400,
+          "seen": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://www.brusselsairlines.com/us/en/extra-services/seat-reservation",
+            "date": "undated",
+            "primary": true,
+            "publisher": "Brussels Airlines (search snippet; page returns 403)"
+          },
+          {
+            "url": "https://www.fondtravels.com/blog/travel-tips/lufthansa-seat-selection",
+            "date": "2025-09-23",
+            "primary": false,
+            "publisher": "Fondtravels (Lufthansa's table)"
+          },
+          {
+            "url": "https://www.brusselsairlines.com/bf/en/extra-services/seat-reservation",
+            "date": "undated",
+            "primary": true,
+            "publisher": "Brussels Airlines (search snippet; page returns 403)"
+          },
+          {
+            "url": "https://aviation.direct/en/Lufthansa-Group-increases-seat-reservation-fees-significantly",
+            "date": "2024-10",
+            "primary": false,
+            "publisher": "Aviation.Direct (returns 403; not read)"
+          },
+          {
+            "url": "https://duffel.com/docs/api/v2/seat-maps",
+            "date": "2026-09-25",
+            "primary": true,
+            "publisher": "Brussels Airlines's own seat map, through Duffel",
+            "note": "BRU to MAD (SN 3731): $14"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "short (confirmed): Could not reopen Brussels' page (403), and aviation.direct also returned 403. With the search budget exhausted, the snippet could not be reproduced. The EUR 14 matches Fondtravels' Lufthansa table ('Classic Seat from EUR 14' short haul), so it is kept at low confidence.",
+          "long (confirmed): Neither the Brussels page nor aviation.direct could be opened (403), so neither 39 nor 45 was seen directly. The only readable figure is Lufthansa's intercontinental 'from EUR 30' (Fondtravels). Kept as a low-confidence typical figure for a person to check."
+        ],
+        "confidence": "low"
+      },
+      "B6": {
+        "long": null,
+        "short": {
+          "cents": 1450,
+          "low": 400,
+          "high": 2500,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/jetblue-airways-review/",
+            "date": "2026-06-10",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          },
+          {
+            "url": "https://thriftytraveler.com/airlines/jetblue/basic-economy-guide/",
+            "date": "2025-01-29",
+            "primary": false,
+            "publisher": "Thrifty Traveler"
+          },
+          {
+            "url": "https://www.jetblue.com/help/seats",
+            "date": "undated",
+            "primary": true,
+            "publisher": "JetBlue"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "short (confirmed): Upgraded Points (updated 10 Jun 2026) states '$4 to $25 each way' for Blue Basic. Thrifty Traveler states $10-12 middle and $14 rear window. jetblue.com/help/seats says 'Fee for Main Base ... varies by route'. The fees page lists the Main Base / EvenMore fare names."
+        ],
+        "confidence": "medium"
+      },
+      "OS": {
+        "long": {
+          "cents": 4390,
+          "seen": true,
+          "est": true
+        },
+        "short": {
+          "cents": 1400,
+          "seen": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://www.fondtravels.com/blog/travel-tips/lufthansa-seat-selection",
+            "date": "2025-09-23",
+            "primary": false,
+            "publisher": "Fondtravels (Lufthansa's table)"
+          },
+          {
+            "url": "https://aviation.direct/en/Lufthansa-Group-increases-seat-reservation-fees-significantly",
+            "date": "2024-10",
+            "primary": false,
+            "publisher": "Aviation.Direct (returns 403; not read)"
+          },
+          {
+            "url": "https://duffel.com/docs/api/v2/seat-maps",
+            "date": "2026-09-25",
+            "primary": true,
+            "publisher": "Austrian's own seat map, through Duffel",
+            "note": "JFK to VIE (OS 36): $43.90; free on Flex"
+          },
+          {
+            "url": "https://duffel.com/docs/api/v2/seat-maps",
+            "date": "2026-09-25",
+            "primary": true,
+            "publisher": "Austrian's own seat map, through Duffel",
+            "note": "VIE to CDG (OS 369): $14"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "short (confirmed): No opened source gives Austrian's own price. austrian.com, the LHG PDF and aviation.direct all returned 403. Fondtravels states Lufthansa's 'Classic Seat ... from EUR 14 (short-haul)', and the group-wide application is unverified.",
+          "long (confirmed): The EUR 45 source (aviation.direct) returned 403. The only readable figure is Lufthansa's intercontinental 'from EUR 30' (Fondtravels), so low is widened to 30. Nothing Austrian-specific was found."
+        ],
+        "confidence": "low"
+      },
+      "EK": {
+        "long": {
+          "cents": 2500,
+          "low": 1500,
+          "high": 3500,
+          "reported": true,
+          "est": true
+        },
+        "short": {
+          "cents": 2500,
+          "low": 1500,
+          "high": 3500,
+          "reported": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/emirates-review/",
+            "date": "2026-02-13",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Upgraded Points (13 Feb 2026) states Regular $15-35, Preferred $25-80, Twin $35-135, Extra legroom $55-205. The emirates.com terms page timed out twice, so the USD 7-260 figure is unverified and its source was dropped."
+        ],
+        "confidence": "medium"
+      },
+      "KL": {
+        "long": {
+          "cents": 2281,
+          "reported": true,
+          "est": true,
+          "_was": "20 EUR at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 1140,
+          "reported": true,
+          "est": true,
+          "_was": "10 EUR at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://www.insideflyer.com/2019/12/13/klm-seat-types-in-economy-overview-and-discounts/",
+            "date": "2019-12-13",
+            "primary": false,
+            "publisher": "InsideFlyer"
+          },
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/klm-review/",
+            "date": "2026-01-23",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "long (confirmed): InsideFlyer (2019) states EUR 20 for a standard intercontinental seat; Upgraded Points (Jan 2026) only says pricing depends on the flight. klm.com timed out every time, so nothing newer was found.",
+          "short (confirmed): InsideFlyer (2019) states EUR 10 for a standard seat on European flights. Nothing current found; klm.com timed out."
+        ],
+        "confidence": "low"
+      },
+      "TK": {
+        "long": {
+          "cents": 3750,
+          "low": 1500,
+          "high": 6000,
+          "reported": true,
+          "est": true
+        },
+        "short": {
+          "cents": 3750,
+          "low": 1500,
+          "high": 6000,
+          "reported": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/turkish-airlines-review/",
+            "date": "2026-05-16",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Upgraded Points (16 May 2026) states '$15 to $60' for international economy seats and TRY 160-380 ($4-9) for domestic standard seats; the domestic figure is added to the note. Secondary only; turkishairlines.com was not reached."
+        ],
+        "confidence": "low"
+      },
+      "BA": {
+        "long": {
+          "cents": 4100,
+          "seen": true,
+          "est": true,
+          "low": 2000,
+          "high": 6200
+        },
+        "short": {
+          "cents": 2300,
+          "seen": true,
+          "est": true,
+          "low": 1820,
+          "high": 2780
+        },
+        "sources": [
+          {
+            "url": "https://www.headforpoints.com/2026/09/24/does-british-airways-charge-for-seat-selection-5/",
+            "date": "2026-09-24",
+            "primary": false,
+            "publisher": "Head for Points"
+          },
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/british-airways-review/",
+            "date": "2026-06-16",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          },
+          {
+            "url": "https://duffel.com/docs/api/v2/seat-maps",
+            "date": "2026-09-25",
+            "primary": true,
+            "publisher": "British Airways's own seat map, through Duffel",
+            "note": "JFK and BOS to LHR: $62 on Basic Economy, $20 on Standard Economy"
+          },
+          {
+            "url": "https://duffel.com/docs/api/v2/seat-maps",
+            "date": "2026-09-25",
+            "primary": true,
+            "publisher": "British Airways's own seat map, through Duffel",
+            "note": "LHR to EDI, LHR to MAD and ZRH to LHR: $18.20 to $27.80 on Basic and Plus; free on Plus Select"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "long (confirmed): Head for Points (24 Sep 2026) states World Traveller standard GBP 20, twin GBP 30, 'available from' prices, up to GBP 70+ on London-LA, free 24h out; Upgraded Points states long-haul from $30.",
+          "short (confirmed): Head for Points states Euro Traveller standard from GBP 7; Upgraded Points 'short-haul flights starting at $11'."
+        ],
+        "confidence": "medium"
+      },
+      "TP": {
+        "long": {
+          "cents": 1710,
+          "from": true,
+          "est": true,
+          "_was": "15 EUR at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 1710,
+          "from": true,
+          "est": true,
+          "_was": "15 EUR at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/tap-air-portugal-review/",
+            "date": "2026-01-11",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          },
+          {
+            "url": "https://www.flytap.com/en-us/booking-information/book-your-favourite-seat",
+            "date": "undated",
+            "primary": true,
+            "publisher": "TAP Air Portugal"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Upgraded Points (11 Jan 2026) states standard seats 'typically starting around EUR 15 ($16)'; TAP's page confirms dynamic pricing and fees on Discount, Basic and Classic, with no figure."
+        ],
+        "confidence": "low"
       }
     },
     "legroom": {
@@ -823,36 +3114,70 @@
           "cents": 13641,
           "upto": true
         },
-        "short": null,
+        "short": {
+          "cents": 2851,
+          "low": 1140,
+          "high": 4561,
+          "reported": true,
+          "est": true,
+          "_was": "25 EUR at the ECB rate of 2026-09-25"
+        },
         "sources": [
           {
             "url": "https://wwws.airfrance.us/information/legal/fees-and-paid-options",
             "date": "2026-09-25",
             "primary": true,
             "note": "Between EUR 70-120"
+          },
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/air-france-review/",
+            "date": "2026-01-23",
+            "primary": false,
+            "publisher": "Upgraded Points"
           }
         ],
         "checked": "2026-09-25",
-        "second_check": [],
-        "note": "published for long-haul only; a short-haul trip takes the typical price, marked"
+        "second_check": [
+          "long (confirmed): Upgraded Points (updated 23 Jan 2026) gives EUR 50 to 100 on longer flights, under its extra-legroom heading. Air France's fees page (.us and .co.uk) timed out, so only a secondary source backs this and confidence drops to low.",
+          "short (confirmed): Upgraded Points (23 Jan 2026) states EUR 10 to 40 on shorter flights for extra-legroom seats. It is the only (secondary) source, so confidence is low."
+        ],
+        "note": "published for long-haul only; a short-haul trip takes the typical price, marked",
+        "confidence": "low"
       },
       "KL": {
         "long": {
           "cents": 12504,
           "upto": true
         },
-        "short": null,
+        "short": {
+          "cents": 2281,
+          "low": 1140,
+          "high": 3421,
+          "reported": true,
+          "est": true,
+          "_was": "20 EUR at the ECB rate of 2026-09-25"
+        },
         "sources": [
           {
             "url": "https://www.klm.com/information/legal/fees-paid-options",
             "date": "2026-09-25",
             "primary": true,
             "note": "Between EUR 50-110"
+          },
+          {
+            "url": "https://www.insideflyer.com/2019/12/13/klm-seat-types-in-economy-overview-and-discounts/",
+            "date": "2019-12-13",
+            "primary": false,
+            "publisher": "InsideFlyer"
           }
         ],
         "checked": "2026-09-25",
-        "second_check": [],
-        "note": "published for long-haul only; a short-haul trip takes the typical price, marked"
+        "second_check": [
+          "long (corrected): KLM's fees page (klm.com and klm.co.uk) timed out three times, so the EUR 50-110 figure could not be confirmed; the only source I could open, InsideFlyer 2019, states 'between 50 and 90 Euro on longhaul routes'. If someone can read KLM's page, its 50-110 should replace this.",
+          "short (confirmed): InsideFlyer (2019) states '10 to 30 euro on European flights' for extra legroom seats. Stale; nothing newer found."
+        ],
+        "note": "published for long-haul only; a short-haul trip takes the typical price, marked",
+        "confidence": "low"
       },
       "IB": {
         "long": {
@@ -896,13 +3221,17 @@
       },
       "UA": {
         "long": {
-          "cents": 2900,
-          "from": true,
+          "cents": 16000,
+          "low": 12000,
+          "high": 20000,
+          "reported": true,
           "est": true
         },
         "short": {
-          "cents": 2900,
-          "from": true,
+          "cents": 3900,
+          "low": 1900,
+          "high": 5900,
+          "reported": true,
           "est": true
         },
         "sources": [
@@ -911,6 +3240,18 @@
             "date": "2024-02-05",
             "primary": false,
             "note": "\"United states that the cost ranges from $29 to $299 per flight\". Examples: $43-45 short domestic, $272-329 long international"
+          },
+          {
+            "url": "https://simpleflying.com/how-much-cost-upgrade-extra-legroom/",
+            "date": "2026-02-17",
+            "primary": false,
+            "publisher": "Simple Flying"
+          },
+          {
+            "url": "https://www.dailydrop.com/pages/united-economy-plus-guide",
+            "date": "2026-04-09",
+            "primary": false,
+            "publisher": "Daily Drop"
           }
         ],
         "checked": "2026-09-25",
@@ -921,18 +3262,24 @@
             "correct_value": "San Francisco to Los Angeles: $43-$45 a seat ($52 as a bundle). San Francisco to Singapore: $299-$329 a seat. $272 was the BUNDLE price, not the low end of the seat range. The $29-$299 'United states' range is correct, and the article adds that some seats cost more. It was published 2024-02-05 and updated 2024-02-06, a secondary source.",
             "url": "https://onemileatatime.com/guides/united-airlines-economy-plus/",
             "note": "Mixing the bundle price into the range understates the long-haul low end. Subscriptions check out: $599-$799 solo, $799-$999 with one companion, $1,099-$1,299 with up to eight."
-          }
-        ]
+          },
+          "short (confirmed): Simple Flying (17 Feb 2026) states $19-$59 domestic and $70-$130 transcon. Daily Drop gives only the $599 subscription, no per-seat price. Confidence is lowered because Simple Flying cites no source.",
+          "long (confirmed): Simple Flying states '$120 to $200' for transatlantic or transpacific Economy Plus. It is a single secondary source."
+        ],
+        "confidence": "low"
       },
       "AA": {
         "long": {
-          "cents": 2000,
-          "from": true,
+          "cents": 16250,
+          "low": 14200,
+          "high": 18300,
+          "reported": true,
           "est": true
         },
         "short": {
           "cents": 2000,
           "from": true,
+          "reported": true,
           "est": true
         },
         "sources": [
@@ -941,6 +3288,18 @@
             "date": "2024-01-10",
             "primary": false,
             "note": "\"Main Cabin Extra starts at $20\". Examples: Miami to Tampa \"$26 to $28\", Dallas to Seoul Incheon \"$142 to $183\""
+          },
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/american-airlines-main-cabin-extra-vs-preferred-seating/",
+            "date": "2026-08-30",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          },
+          {
+            "url": "https://simpleflying.com/american-airlines-seat-selection-fees-guide/",
+            "date": "2024-08-29",
+            "primary": false,
+            "publisher": "Simple Flying"
           }
         ],
         "checked": "2026-09-25",
@@ -951,8 +3310,570 @@
             "correct_value": "The article says 'all narrow body mainline and regional aircraft that have Viasat and Intelsat connectivity'. It covers every such narrowbody, not only domestic flights. On widebodies: 'In the coming weeks, the airline should also finalize rolling out free Wi-Fi on wide body aircraft with the Viasat system' (new 787-9s and a few newer 787-8s). The airline says Panasonic aircraft will follow but gives 'no timeline'.",
             "url": "https://onemileatatime.com/news/american-airlines-free-wifi/",
             "note": "This is a secondary source dated 2026-01-25. The quoted 'in the coming weeks' is accurate. The Panasonic widebodies (777s and most 787-8s, the transatlantic fleet) had no free wifi date at that point. The 2026-05-26 OMAAT article says Starlink, from early 2027 on 500+ A320-family aircraft, may not even need AAdvantage membership."
+          },
+          "short (confirmed): OMAAT (Jan 2024, modified Feb 2024) quotes American saying MCE 'starts at $20' and a Miami-Tampa $26-28 example; Upgraded Points (30 Aug 2026) says transcon $100+. The aa.com page was not read (403), so the $20 rests on OMAAT quoting it.",
+          "long (confirmed): OMAAT states Dallas-Seoul MCE 'anywhere from $142 to $183'; Upgraded Points and Simple Flying corroborate the order of magnitude. One transpacific observation from 2024, secondary sources only."
+        ],
+        "confidence": "mixed"
+      },
+      "W6": {
+        "long": {
+          "cents": 2281,
+          "low": 1140,
+          "high": 3421,
+          "reported": true,
+          "est": true,
+          "_was": "20 EUR at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 2281,
+          "low": 1140,
+          "high": 3421,
+          "reported": true,
+          "est": true,
+          "_was": "20 EUR at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://camli.com/airlines/wizz-air/seat-selection",
+            "date": "2026-08",
+            "primary": false,
+            "publisher": "Camli"
+          },
+          {
+            "url": "https://flighttribe.co.uk/wizz-air-seat-selection/",
+            "date": "2026-08-30",
+            "primary": false,
+            "publisher": "Flight Tribe"
+          },
+          {
+            "url": "https://www.mrplaneguy.com/post/wizz-air-review",
+            "date": "2026-04-30",
+            "primary": false,
+            "publisher": "Mr Plane Guy"
           }
-        ]
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Camli states EUR 10-30 for extra legroom. Flight Tribe (exit row from about GBP 24) and Mr Plane Guy (paid GBP 20) are consistent with it. Secondary sources only."
+        ],
+        "confidence": "low"
+      },
+      "LO": {
+        "long": {
+          "cents": 7200,
+          "reported": true,
+          "est": true
+        },
+        "short": {
+          "cents": 2900,
+          "reported": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://www.flycoair.com/blog/lot-polish-airlines-seat-selection",
+            "date": "undated",
+            "primary": false,
+            "publisher": "FlyCoAir (travel agency blog)"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "long (confirmed): FlyCoAir states 270 PLN / 60 EUR / 72 USD for a long-haul Extra Space Seat. It is undated and secondary.",
+          "short (confirmed): FlyCoAir states 110 PLN / 25 EUR / 29 USD for short haul and 35 PLN / 8 EUR / 9 USD for domestic. Undated and secondary."
+        ],
+        "confidence": "low"
+      },
+      "DL": {
+        "long": null,
+        "short": {
+          "cents": 5250,
+          "low": 3000,
+          "high": 7500,
+          "reported": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://simpleflying.com/how-much-cost-upgrade-extra-legroom/",
+            "date": "2026-02-17",
+            "primary": false,
+            "publisher": "Simple Flying"
+          },
+          {
+            "url": "https://thriftytraveler.com/reviews/flights/delta-comfort-plus/",
+            "date": "2026-09-23",
+            "primary": false,
+            "publisher": "Thrifty Traveler"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "short (confirmed): Simple Flying states $30-$75 short domestic. Thrifty Traveler (23 Sep 2026) says $50 or more is the norm, with $7 on MSP-ORD. The two agree."
+        ],
+        "confidence": "medium"
+      },
+      "VS": {
+        "long": {
+          "cents": 7289,
+          "low": 6626,
+          "high": 7951,
+          "est": true,
+          "_was": "55 GBP at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 7289,
+          "low": 6626,
+          "high": 7951,
+          "est": true,
+          "_was": "55 GBP at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://flighttribe.co.uk/virgin-atlantic-seat-selection/",
+            "date": "2026-08-30",
+            "primary": false,
+            "publisher": "Flight Tribe"
+          },
+          {
+            "url": "https://www.virginatlantic.com/policies/seating-terms-and-conditions",
+            "date": "as of 2026-09-25",
+            "primary": true,
+            "publisher": "Virgin Atlantic"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Flight Tribe states preferred seats 'can run to £50–£60 or above per sector on busy transatlantic services', and Virgin's terms confirm preferred seats (front of cabin, exit rows) carry a fee. The 'from about GBP 30' summary could not be found in any opened source and was dropped."
+        ],
+        "confidence": "low"
+      },
+      "EY": {
+        "long": {
+          "cents": 12253,
+          "low": 6263,
+          "high": 18244,
+          "reported": true,
+          "est": true,
+          "_was": "450 AED at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 4357,
+          "low": 1634,
+          "high": 7080,
+          "reported": true,
+          "est": true,
+          "_was": "160 AED at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://theexpatflyer.com/review-etihad-economy-space/",
+            "date": "2025-03-17 (updated)",
+            "primary": false,
+            "publisher": "The Expat Flyer"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "long (confirmed): The Expat Flyer (updated 17 Mar 2025) lists exactly these list and 50%-off prices per leg. Secondary source.",
+          "short (confirmed): Same Expat Flyer table: Istanbul 260/140 AED and Mumbai 120/60 AED, list and promotional."
+        ],
+        "confidence": "medium"
+      },
+      "LH": {
+        "long": {
+          "cents": 15400,
+          "seen": true,
+          "est": true
+        },
+        "short": {
+          "cents": 4900,
+          "seen": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://travel-dealz.com/news/lufthansa-allegris-seat-fees/",
+            "date": "2024-12-03",
+            "primary": false,
+            "publisher": "Travel-Dealz"
+          },
+          {
+            "url": "https://www.fondtravels.com/blog/travel-tips/lufthansa-seat-selection",
+            "date": "2025-09-23",
+            "primary": false,
+            "publisher": "Fond Travels (blog)"
+          },
+          {
+            "url": "https://duffel.com/docs/api/v2/seat-maps",
+            "date": "2026-09-25",
+            "primary": true,
+            "publisher": "Lufthansa's own seat map, through Duffel",
+            "note": "JFK to FRA: an extra-legroom seat at $154"
+          },
+          {
+            "url": "https://duffel.com/docs/api/v2/seat-maps",
+            "date": "2026-09-25",
+            "primary": true,
+            "publisher": "Lufthansa's own seat map, through Duffel",
+            "note": "FRA to BCN: an extra-legroom seat at $49"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "long (corrected): The checklist's EUR 50 / 60 / 80 is Travel-Dealz's 'Legroom Seat' row. Its 'Extra Legroom Seat' row is EUR 75 / 90 / 115, and Fondtravels confirms intercontinental Extra Legroom 'From EUR 75'. The lufthansa.com USD figures returned 403, so the verifiable EUR schedule replaces them.",
+          "short (confirmed): Fondtravels states Europe short-haul Extra Legroom 'From EUR 29'. Single low-quality secondary source."
+        ],
+        "confidence": "mixed"
+      },
+      "EI": {
+        "long": {
+          "cents": 12499,
+          "upto": true,
+          "reported": true,
+          "est": true
+        },
+        "short": {
+          "cents": 1937,
+          "from": true,
+          "reported": true,
+          "est": true,
+          "_was": "16.99 EUR at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/aer-lingus-review/",
+            "date": "2026-01-20",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          },
+          {
+            "url": "https://community.ricksteves.com/travel-forum/transportation/aer-lingus-seat-selection",
+            "date": "2025-12-02",
+            "primary": false,
+            "publisher": "Rick Steves Travel Forum"
+          },
+          {
+            "url": "https://irelandpoint.org/blog/aer-lingus-cheap-flights/",
+            "date": "2026-09-03",
+            "primary": false,
+            "publisher": "Ireland Point"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "long (confirmed): Upgraded Points states 'EUR 109.99/GBP 109.99 ($124.99) on transatlantic flights' for the extra-legroom seats behind business. A forum user independently reported $125 per exit-row seat on 2 Dec 2025.",
+          "short (confirmed): Irelandpoint does list Extra Legroom at EUR 16.99, citing Aer Lingus's Europe seat page as updated April 2025. Its EUR 3.99 standard seat conflicts with the EUR 4.99 in the Jan 2026 press, so this is a weak, possibly stale figure."
+        ],
+        "confidence": "mixed"
+      },
+      "FR": {
+        "long": {
+          "cents": 1855,
+          "from": true,
+          "est": true,
+          "_was": "14 GBP at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 1855,
+          "from": true,
+          "est": true,
+          "_was": "14 GBP at the ECB rate of 2026-09-25"
+        },
+        "sources": [
+          {
+            "url": "https://flighttribe.co.uk/ryanair-seat-selection/",
+            "date": "2026-09-21",
+            "primary": false,
+            "publisher": "Flight Tribe"
+          },
+          {
+            "url": "https://travellon.com/ryanair-fees-complete-list",
+            "date": "2026-08-23",
+            "primary": false,
+            "publisher": "Travellon"
+          },
+          {
+            "url": "https://help.ryanair.com/hc/en-us/articles/360017824678-Reserved-Seating",
+            "date": "undated",
+            "primary": true,
+            "publisher": "Ryanair Help Centre (returns 403; not read)"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (corrected): Flight Tribe states 'From GBP 14, up to around GBP 36.50 nearer departure', and Travellon states 'from GBP 14, climbing to around GBP 36'. Both are in GBP, and no readable source gives EUR, so the currency is corrected and confidence lowered to medium."
+        ],
+        "confidence": "medium"
+      },
+      "SN": {
+        "long": {
+          "cents": 12543,
+          "upto": true,
+          "low": 3307,
+          "high": 12543,
+          "_was": "110 EUR at the ECB rate of 2026-09-25"
+        },
+        "short": {
+          "cents": 4900,
+          "seen": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://www.brusselsairlines.com/us/en/extra-services/seat-reservation",
+            "date": "undated",
+            "primary": true,
+            "publisher": "Brussels Airlines (search snippet; page returns 403)"
+          },
+          {
+            "url": "https://www.fondtravels.com/blog/travel-tips/lufthansa-seat-selection",
+            "date": "2025-09-23",
+            "primary": false,
+            "publisher": "Fondtravels (Lufthansa's table)"
+          },
+          {
+            "url": "https://www.brusselsairlines.com/bf/en/extra-services/seat-reservation",
+            "date": "undated",
+            "primary": true,
+            "publisher": "Brussels Airlines (search snippet; page returns 403)"
+          },
+          {
+            "url": "https://duffel.com/docs/api/v2/seat-maps",
+            "date": "2026-09-25",
+            "primary": true,
+            "publisher": "Brussels Airlines's own seat map, through Duffel",
+            "note": "BRU to MAD (SN 3731): an extra-legroom seat at $49"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "short (confirmed): The Brussels page returns 403 and the snippet could not be re-searched (budget exhausted). Fondtravels' Lufthansa table gives Extra Legroom 'From EUR 29' on short haul, which matches. Low confidence.",
+          "long (confirmed): The Brussels page and aviation.direct both return 403, so EUR 110 and 115 were not seen directly. Fondtravels' Lufthansa intercontinental Extra Legroom 'From EUR 75' is consistent with a EUR 29-110 range. Low confidence."
+        ],
+        "confidence": "low"
+      },
+      "B6": {
+        "long": {
+          "cents": 15900,
+          "reported": true,
+          "est": true
+        },
+        "short": {
+          "cents": 6000,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://thriftytraveler.com/airlines/jetblue/basic-economy-guide/",
+            "date": "2025-01-29",
+            "primary": false,
+            "publisher": "Thrifty Traveler"
+          },
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/jetblue-airways-review/",
+            "date": "2026-06-10",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          },
+          {
+            "url": "https://www.jetblue.com/help/seats",
+            "date": "undated",
+            "primary": true,
+            "publisher": "JetBlue"
+          },
+          {
+            "url": "https://thepointsguy.com/airline/jetblue-even-more-space-review-a321/",
+            "date": "2024-03-13",
+            "primary": false,
+            "publisher": "The Points Guy"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "short (confirmed): Thrifty Traveler states 'at least $60 or more each way' from Blue Basic and '$20 cheaper apiece' from Blue, while Upgraded Points states 'starting at $10'. jetblue.com gives no figure and now sells EvenMore as a fare option.",
+          "long (confirmed): TPG (13 Mar 2024) states a '$159 upcharge from a regular Blue fare' on JFK-LHR, A321LR. The single figure is from 2024."
+        ],
+        "confidence": "low"
+      },
+      "OS": {
+        "long": {
+          "cents": 11300,
+          "seen": true,
+          "est": true
+        },
+        "short": {
+          "cents": 4200,
+          "seen": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://www.fondtravels.com/blog/travel-tips/lufthansa-seat-selection",
+            "date": "2025-09-23",
+            "primary": false,
+            "publisher": "Fondtravels (Lufthansa's table)"
+          },
+          {
+            "url": "https://duffel.com/docs/api/v2/seat-maps",
+            "date": "2026-09-25",
+            "primary": true,
+            "publisher": "Austrian's own seat map, through Duffel",
+            "note": "JFK to VIE (OS 36): an extra-legroom seat at $113"
+          },
+          {
+            "url": "https://duffel.com/docs/api/v2/seat-maps",
+            "date": "2026-09-25",
+            "primary": true,
+            "publisher": "Austrian's own seat map, through Duffel",
+            "note": "VIE to CDG (OS 369): an extra-legroom seat at $42"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "short (confirmed): Fondtravels states Lufthansa's 'Extra Legroom: From EUR 29 (domestic)'. It says nothing about Austrian, and austrian.com returns 403. Kept only as a group figure at low confidence."
+        ],
+        "confidence": "low"
+      },
+      "EK": {
+        "long": {
+          "cents": 13000,
+          "low": 5500,
+          "high": 20500,
+          "reported": true,
+          "est": true
+        },
+        "short": {
+          "cents": 13000,
+          "low": 5500,
+          "high": 20500,
+          "reported": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/emirates-review/",
+            "date": "2026-02-13",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Upgraded Points (13 Feb 2026) states 'Extra legroom $55-205'. The Emirates terms page (USD 260 cap) and the $163 traveller report could not be opened, so they are not relied on."
+        ],
+        "confidence": "medium"
+      },
+      "TK": {
+        "long": {
+          "cents": 13650,
+          "low": 2400,
+          "high": 24900,
+          "reported": true,
+          "est": true
+        },
+        "short": {
+          "cents": 13650,
+          "low": 2400,
+          "high": 24900,
+          "reported": true,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/turkish-airlines-review/",
+            "date": "2026-05-16",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Upgraded Points (16 May 2026) states '$24 to $249 for extra legroom seats' internationally and TRY 500-700 domestically. Secondary only."
+        ],
+        "confidence": "low"
+      },
+      "BA": {
+        "long": {
+          "cents": 6626,
+          "from": true,
+          "reported": true,
+          "est": true,
+          "_was": "50 GBP at the ECB rate of 2026-09-25"
+        },
+        "short": null,
+        "sources": [
+          {
+            "url": "https://www.headforpoints.com/2026/09/24/does-british-airways-charge-for-seat-selection-5/",
+            "date": "2026-09-24",
+            "primary": false,
+            "publisher": "Head for Points"
+          },
+          {
+            "url": "https://upgradedpoints.com/travel/airlines/british-airways-review/",
+            "date": "2026-06-16",
+            "primary": false,
+            "publisher": "Upgraded Points"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "long (confirmed): Head for Points states World Traveller exit row GBP 50 ('available from'); Upgraded Points 'Exit Row Seats: starting at $75'. The claim that exit rows stay paid until check-in was not stated in what I read."
+        ],
+        "confidence": "medium"
+      },
+      "WN": {
+        "long": {
+          "cents": 12700,
+          "low": 400,
+          "high": 25000,
+          "est": true
+        },
+        "short": {
+          "cents": 12700,
+          "low": 400,
+          "high": 25000,
+          "est": true
+        },
+        "sources": [
+          {
+            "url": "https://www.southwest.com/html/customer-service/travel-fees.html",
+            "date": "undated (read 2026-09-25)",
+            "primary": true,
+            "publisher": "Southwest Airlines"
+          },
+          {
+            "url": "https://www.southwest.com/customer-enhancements/assigned-seating/",
+            "date": "undated (read 2026-09-25)",
+            "primary": true,
+            "publisher": "Southwest Airlines"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": [
+          "both (confirmed): Southwest's fees page states 'Paid seat upgrades' $4-$250 per segment, per Customer; the assigned-seating page gives no Extra Legroom price. Confirmed as a placeholder range."
+        ],
+        "confidence": "low"
+      },
+      "LX": {
+        "long": {
+          "cents": 11810,
+          "seen": true,
+          "est": true
+        },
+        "short": null,
+        "sources": [
+          {
+            "url": "https://duffel.com/docs/api/v2/seat-maps",
+            "date": "2026-09-25",
+            "primary": true,
+            "publisher": "SWISS's own seat map, through Duffel",
+            "note": "JFK to ZRH (LX 15): an extra-legroom seat at $118.10"
+          }
+        ],
+        "checked": "2026-09-25",
+        "second_check": []
       }
     }
   },
@@ -1003,5 +3924,6 @@
       "note": "Most airlines' pages refuse automated readers; the readable ones (Frontier, TAP) are in 'prices'."
     }
   },
-  "_not_readable": "2026-09-25: the lounge and boarding pages of American, United, British Airways, Lufthansa, Air France, KLM, Iberia, Aer Lingus, Turkish, Icelandair and Wizz refuse automated readers, and the Internet Archive was not reachable from this session, so those airlines stay on the typical price, marked. A person with a browser can read them."
+  "_not_readable": "2026-09-25: the lounge and boarding pages of American, United, British Airways, Lufthansa, Air France, KLM, Iberia, Aer Lingus, Turkish, Icelandair and Wizz refuse automated readers, and the Internet Archive was not reachable from this session, so those airlines stay on the typical price, marked. A person with a browser can read them.",
+  "_method_2026_09_25": "Second pass, 2026-09-25 (per Patrick: the airline pages refuse automated readers or print no price, so find the price another way). Five research agents read the airlines' own pages where they could and dated secondary reports where they could not (The Points Guy, NerdWallet, Upgraded Points, One Mile at a Time, Head for Points, Simple Flying and the like); a second agent opened every source and confirmed, corrected or rejected each figure (163 confirmed, 9 corrected, 17 rejected). 'reported': true marks a figure only a secondary source states; 'seen': true marks the airline's own price read from its seat map through Duffel on sample flights (10 Nov 2026, economy, one way); 'low'/'high' give the range a source states, with 'cents' its midpoint or typical figure. All of these keep the asterisk: they are this airline's usual price, not this flight's. Foreign prices are converted at the ECB reference rate of 2026-09-25 (the dirham and the riyal at their dollar pegs); '_was' keeps the original."
 }

@@ -427,10 +427,20 @@ the typical alternative, marked; everything else falls back to the typical price
 page's flat figure), marked. A price published for one haul never stands in for the other: Air Canada's free wifi is
 within North America, so across the Atlantic the typical pass stands. Wifi free to members of a free loyalty
 programme is $0 on the bill, naming the programme (Delta, United on Starlink, Southwest, Air Canada, Air France,
-KLM in Europe, SAS; JetBlue for everyone). Most airline pages refuse automated readers and the Internet Archive was
-not reachable from the research session, so American, United, BA, Lufthansa, Air France, KLM, Iberia, Aer Lingus,
-Turkish and Icelandair's seat and lounge prices are still the typical ones: a person with a browser can fill them
-in. `tests/test_records.py` runs the page's own pricing under node, and mutants guard each rule.
+KLM in Europe, SAS; JetBlue for everyone). **The second pass** (2026-09-25, per Patrick: the checklist of airline pages
+was "an obnoxious amount" and many pages print no price, so find another source) filled 241 airline-hauls from three
+places, each marked for what it is: the airline's own page where a reader could open it; dated secondary reports
+(The Points Guy, NerdWallet, Upgraded Points, OMAAT, Simple Flying and the like: `reported: true`, basis "price as
+reported"), every figure re-opened by a second agent (163 confirmed, 9 corrected, 17 rejected and left unknown); and the
+airline's own price read off its seat map through Duffel on sample flights (`seen: true`, basis "own price on sample
+flights": BA, Lufthansa, SWISS, Austrian and Brussels on 10 Nov 2026, e.g. $43.90 for a Lufthansa-group seat across the
+Atlantic, $14 in Europe). A range a source states rides as `low`/`high` beside its middle figure and the basis shows
+both ends. Everything but an exact published price keeps the asterisk. An airline that does not sell the thing at all
+(`not_sold`: Delta's, Air France's and nine others' priority boarding, Alaska's Saver seats) shows "not sold" in the
+add-on menu (`notSold` in mock-10); a lounge still falls back to a walk-in lounge. Foreign prices are converted at the
+ECB rate of the day (the dirham and riyal at their pegs) and `_was` keeps the original. The research file's
+`_method_2026_09_25` says all of this. `tests/test_records.py` runs the page's own pricing under node, and mutants guard
+each rule.
 
 **Ride fares were checked against the operators and regulators** (2026-09-25). `ground.json`'s transit fares were
 read from the operators' own pages and converted at the ECB rate of the day (the Paris airport ticket EUR 14, the
@@ -441,12 +451,11 @@ rule forbids: Spain and Italy moved to the upper band, the Netherlands to the hi
 (`ground.py`, with the tariffs in its comment), and `test_records.py` checks the model against Madrid's, Barcelona's
 and Istanbul's official fares. Rideshare prices have no published source anywhere and stay estimates.
 
-**The airline extras checklist** (2026-09-25, per Patrick) is a claude.ai artifact, https://claude.ai/artifact/96dDdGVmSX8aqQSquH9TnU,
-with a `db` collection `rows`: 143 prices the site still guesses (seat choice, extra legroom, wifi, lounge day passes,
-priority boarding for 31 airlines, and the 12 unverified bag-fee rows), each with the airline's own page, what to
-read there, what the site uses now, and the second reader's note. Patrick types the published price into a row
-(`entered`: amount, currency, exact / from / up to, haul or bag piece, note, or not sold); read them back with the
-ArtifactData tool (`list` on `rows`) and write them into `enrichment/addons.json` or `fares.json` with their URL and date.
+**The airline extras checklist is RETIRED** (2026-09-25): https://claude.ai/artifact/96dDdGVmSX8aqQSquH9TnU held 143 rows for
+Patrick to fill by hand; nothing was entered, and the second pass above replaced it. Do not ask him to fill it in. Bag
+fees moved the same day where the airline's own Duffel quote or the research said so: BA Basic's first bag $70 across
+the Atlantic and $60 in Europe (was $85 and $102), the Lufthansa group's Light and Basic in Europe $45.61 then $74.12
+(EUR 40 / 65; was $70), Wizz $98.64 (EUR 86.50 at today's rate), Viva Aerobus $65; each row's `note_2026_09_25` says why.
 
 **Hotel prices are real averages** (2026-09-24, per Patrick): `GET /hotels?near=IATA&date=` or `?q=place&lat=&lon=&date=`
 (outside the door) asks Google Hotels through SerpApi (`live.serp_hotels`, the same plan and counters as the flight
@@ -708,7 +717,10 @@ one-way fare; marks a seller whose flight numbers differ as a codeshare (listed 
 and passes Google's "Go" link on only when it points at https://www.google.com/. The page lists the airline first,
 each agency with how much less it asks, and the agency caveat. Once checked, the bill's ticket group gets a line:
 the airline's own price by default, or, with "Include travel agency prices" ticked (`AGENCIES`, this browser only),
-the cheapest agency as a credit that names it. A difference under a dollar adds no line.
+the cheapest agency as a credit that names it. A difference under a dollar adds no line. **The same call carries
+Google's bag fees for each seller's fare** ("1st checked bag: 35", `adapter.google_bag_prices`), so once a flight is
+checked its bag line uses the fees Google lists with the airline's own fare, after this flight's Duffel quote and
+before the table (`bagLadder`); a range is priced at its top and keeps the asterisk. No extra call is spent.
 
 **A served page never shows made-up results** (per Patrick, 2026-09-21). Anyone gets
 `CONCORDEGO_ANON_SEARCHES` (4) real searches a day, counted per address at `/search`, which
@@ -845,7 +857,7 @@ curve it is meant to be testing is a fixture that tests nothing.
 
 **The test suites are mutation-tested.** `test_scorer.py` catches 12 of 12 seeded faults and
 `validate.py` 10 of 10; `tests/mutate_adapter.py` is an executable runner for the adapters
-and must stay at every mutant caught (104 of 104 on 2026-09-25, the points charts, planner and pool, hotels, DOT records and the measured cancellation rate, the Fixer, the fleet table, the add-on prices, a flight's own Duffel extras, the lounge rules, the meals table and the ride-fare bands among them; it runs `test_points.py`, `test_records.py` and `test_rescue.py` too, and `MUTATE_ONLY=planner` runs just the mutants whose description holds that word) with **zero skips** — a skipped mutant never ran
+and must stay at every mutant caught (111 of 111 on 2026-09-25, the points charts, planner and pool, hotels, DOT records and the measured cancellation rate, the Fixer, the fleet table, the add-on prices, a flight's own Duffel extras, the lounge rules, the meals table and the ride-fare bands among them; it runs `test_points.py`, `test_records.py` and `test_rescue.py` too, and `MUTATE_ONLY=planner` runs just the mutants whose description holds that word) with **zero skips** — a skipped mutant never ran
 and is not a pass. If a change makes a suite pass that should not, the suite has lost a guard. **The runner works in
 a scratch copy outside the checkout** (since 2026-09-24): run in place, Google Drive's sync raced its
 write-and-restore cycle and left two mutants in `par.py` after a run that reported every fault caught. If a SKIP
@@ -994,7 +1006,8 @@ already on and Patrick requested the others. The same New York to London search 
 34 among them, and the lookups priced them: BA Basic Economy a $70 first bag and seats from $62, BA Standard a $90
 second bag, Lufthansa Economy Light a $90 bag and $47.90 for a seat on both flights, SWISS an "EXTRA LEGROOM SEAT" at
 $113. BA names every economy seat just "SEAT" ($62 to $154), so its extra legroom stays on the published or typical
-price; American still quotes nothing (bags "coming soon" on Duffel, its seat map unpriced). The search's supplier wait
+price; American still quotes nothing (bags "coming soon" on Duffel, its seat map unpriced). SWISS, Austrian and Brussels flights
+arrive with Lufthansa (LH) as the offer's owner, so the lookup, keyed on the owner, covers them too. The search's supplier wait
 (20 s) was never the cause: both 20 s and 60 s returned in about 4 s with the same offers. `adapter_samples/duffel-extras-aa-unpriced.json` is that real American reply; `duffel-extras-synthesized.json`
 is built from Duffel's documented shapes and says so.
 

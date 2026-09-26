@@ -180,6 +180,15 @@ def main():
     check("the meals table: every rule served meal, snack, buy or none, with its source and date, and no long-haul floor",
           len(meals) > 50 and not badm, str(badm[:5]))
 
+    # ---- Google's bag sentences with a seller's fare (2026-09-25): the seller check already fetches them
+    gb = adapter.google_bag_prices
+    check("Google's bag sentences: pieces in order, a range at its top and flagged, free pieces 0, carry-on left out, "
+          "nothing parsed is nothing (never a free bag)",
+          gb(["1 free carry-on", "1st checked bag: $35", "2nd checked bag: $45"]) == [{"piece": 1, "cents": 3500, "range": False}, {"piece": 2, "cents": 4500, "range": False}]
+          and gb(["1st checked bag: 99-187"]) == [{"piece": 1, "cents": 18700, "range": True}]
+          and gb(["1 free checked bag", "2nd checked bag: 100"]) == [{"piece": 1, "cents": 0, "range": False}, {"piece": 2, "cents": 10000, "range": False}]
+          and gb(["Carry-on bag: 25"]) == [] and gb(None) == [])
+
     # ---- published add-on prices (enrichment/addons.json, 2026-09-25): every price carries a source; the page gets
     # the prices only; a "from" price and a price in doubt keep their asterisk; the fallback is always marked
     doc = addons.load()
@@ -204,7 +213,8 @@ def main():
         src = open(os.path.join(HERE, "..", "ui", "mock", "mock-10.src.html"), encoding="utf-8").read()
         a, b = src.index("// Published add-on prices"), src.index("const ADDONS = {")
         js = ("const D = {airports:{JFK:{border:'us'}, LAX:{border:'us'}, LHR:{border:'uk'}}}; "
-              "const airName = c => ({DL:'Delta', TP:'TAP', F9:'Frontier', AC:'Air Canada'})[c] || c;\n"
+              "const airName = c => ({DL:'Delta', TP:'TAP', F9:'Frontier', AC:'Air Canada', UA:'United', LH:'Lufthansa'})[c] || c; "
+              "const money = c => '$' + Math.round(c / 100);\n"
               + src[a:b].replace("__ADDONS__", json.dumps(addons.page_table())) + """
 const e = (c, route, mins) => ({carrier:c, operator:c, route, ticket_cents:100000, by:{cheapest:{legs:[{kind:'flight', minutes:mins}]}}});
 const lhr = c => e(c, ['JFK', 'LHR'], 420);
@@ -212,7 +222,18 @@ console.log(JSON.stringify({dl:addonPrice('lounge', lhr('DL'), 6500), tp:addonPr
   f9:addonPrice('priority', e('F9', ['JFK', 'LAX'], 360), 2500), zz:addonPrice('priority', lhr('ZZ'), 2500),
   ac:addonPrice('lounge', lhr('AC'), 6500), ins:insurancePrice(lhr('BA')), short:shortHaul(e('F9', ['JFK', 'LAX'], 360)),
   acwifi:addonPrice('wifi', lhr('AC'), 1900), acwifi_short:addonPrice('wifi', e('AC', ['JFK', 'LAX'], 360), 1900),
-  dlwifi:addonPrice('wifi', lhr('DL'), 1900), b6wifi:addonPrice('wifi', lhr('B6'), 1900)}));""")
+  dlwifi:addonPrice('wifi', lhr('DL'), 1900), b6wifi:addonPrice('wifi', lhr('B6'), 1900), bags:bagsSeq(),
+  ualounge:addonPrice('lounge', lhr('UA'), 6500), ualeg:addonPrice('legroom', lhr('UA'), 7900), lhseat:addonPrice('seat', lhr('LH'), 3000),
+  dlprio:notSold('priority', lhr('DL')), uaprio:notSold('priority', lhr('UA'))}));
+function bagsSeq(){
+  const eb = Object.assign(lhr('AA'), {id:'x1', bag_tiers:[{piece:1, amount_cents:7500}, {piece:2, amount_cents:10000}]}), o = {};
+  o.table = bagLadder(eb);
+  SELLERS.x1 = {airline:{bags:[{piece:1, cents:0, range:false}, {piece:2, cents:9000, range:false}]}}; o.google = bagLadder(eb);
+  SELLERS.x1 = {airline:{bags:[{piece:1, cents:18700, range:true}]}}; o.range = bagLadder(eb);
+  SELLERS.x1 = {airline:{bags:[]}}; o.empty = bagLadder(eb);
+  eb.offer = 'off1'; EXTRAS.off1 = {bags:[{kind:'checked', cents:7000, max:1}]}; SELLERS.x1 = {airline:{bags:[{piece:1, cents:9900, range:false}]}}; o.duffel = bagLadder(eb);
+  return o;
+}""")
         with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as fh:
             fh.write(js)
         r = subprocess.run([node, fh.name], capture_output=True, text=True)
@@ -227,12 +248,30 @@ console.log(JSON.stringify({dl:addonPrice('lounge', lhr('DL'), 6500), tp:addonPr
                   o["tp"]["cents"] == 1000 and o["tp"]["est"] and o["tp"]["basis"].startswith("from TAP"), str(o["tp"]))
             check("a published top price needs no asterisk (Frontier up to $9.99), and a trip inside one border is short-haul",
                   o["f9"]["cents"] == 999 and not o["f9"]["est"] and o["short"], str(o["f9"]))
-            check("a price in doubt keeps its asterisk (Air Canada's lounge page names no currency)", o["ac"]["est"], str(o["ac"]))
+            check("Air Canada's lounge is the top of its published range in Canadian dollars (CAD 79, $56), no asterisk",
+                  o["ac"]["cents"] == 5586 and not o["ac"]["est"] and o["ac"]["basis"].startswith("up to Air Canada"), str(o["ac"]))
+            check("a price only a secondary source states keeps its asterisk and says so (United Club pass $59, as reported)",
+                  o["ualounge"]["cents"] == 5900 and o["ualounge"]["est"] and "as reported" in o["ualounge"]["basis"], str(o["ualounge"]))
+            check("a range a source states shows both ends beside its middle figure, marked (United Economy Plus across "
+                  "the Atlantic, $120-200)", o["ualeg"]["cents"] == 16000 and o["ualeg"]["est"] and "$120–$200" in o["ualeg"]["basis"], str(o["ualeg"]))
+            check("the airline's own price read off its seat map on sample flights says so and keeps the asterisk "
+                  "(Lufthansa $43.90)", o["lhseat"]["cents"] == 4390 and o["lhseat"]["est"] and "sample flights" in o["lhseat"]["basis"], str(o["lhseat"]))
+            check("an airline that does not sell priority boarding on its own reads as not sold (Delta), one that does "
+                  "does not (United)", o["dlprio"] is True and o["uaprio"] is False, str((o["dlprio"], o["uaprio"])))
             check("an airline with no published price takes the typical one, marked", o["zz"]["est"] and o["zz"]["cents"] == 2500, str(o["zz"]))
             check("insurance is the typical share of the ticket (6.5% of $1,000), marked", o["ins"]["cents"] == 6500 and o["ins"]["est"], str(o["ins"]))
             check("a price published for one haul never stands in for the other (Air Canada's free wifi is within North "
                   "America, so across the Atlantic the typical pass stands, marked)",
                   o["acwifi"]["cents"] == 1900 and o["acwifi"]["est"] and o["acwifi_short"]["cents"] == 0, str(o["acwifi"]))
+            bg = o["bags"]
+            check("a flight's bag fees: the table until checked; then Google's listed fees for the airline's own fare (a "
+                  "free first bag left out, a range priced at its top and marked); nothing listed keeps the table; this "
+                  "flight's Duffel quote beats Google's",
+                  bg["table"]["tiers"] == [7500, 10000] and not bg["table"]["own"]
+                  and bg["google"]["tiers"] == [9000] and bg["google"]["google"] and not bg["google"].get("est")
+                  and bg["range"]["tiers"] == [18700] and bg["range"]["est"]
+                  and bg["empty"]["tiers"] == [7500, 10000] and not bg["empty"]["own"]
+                  and bg["duffel"]["tiers"] == [7000] and not bg["duffel"].get("google"), str(bg))
             check("free wifi for members is $0 and says so; free on only part of the fleet keeps its asterisk (Delta), free "
                   "everywhere does not (JetBlue)", o["dlwifi"]["cents"] == 0 and o["dlwifi"]["est"] and "SkyMiles" in o["dlwifi"]["basis"]
                   and o["b6wifi"]["cents"] == 0 and not o["b6wifi"]["est"], str(o["dlwifi"]) + str(o["b6wifi"]))

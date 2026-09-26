@@ -7,7 +7,7 @@ from typing import Any, Dict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PATH = os.path.join(HERE, "enrichment", "addons.json")
-PRICE_KEYS = ("cents", "from", "upto", "est", "free", "not_sold")
+PRICE_KEYS = ("cents", "from", "upto", "est", "free", "not_sold", "low", "high", "reported", "seen")
 
 
 def load() -> Dict[str, Any]:

@@ -30,7 +30,7 @@
       "tiers": [
         {
           "piece": 1,
-          "amount_cents": 8500
+          "amount_cents": 7000
         },
         {
           "piece": 2,
@@ -46,7 +46,7 @@
         "tiers": [
           {
             "piece": 1,
-            "amount_cents": 10200
+            "amount_cents": 6000
           },
           {
             "piece": 2,
@@ -69,7 +69,9 @@
         "verdict": "unverifiable",
         "needs_primary_source": true,
         "includes_carry_on": true
-      }
+      },
+      "checked": "2026-09-25",
+      "note_2026_09_25": "British Airways' own quote through Duffel on 10 Nov 2026: Basic Economy's first bag $70 from JFK and BOS to LHR, $50 LHR to EDI and $60 ZRH to LHR (the higher taken for short haul)"
     },
     "BA:PLUS": {
       "feed_name": "Plus",
@@ -1016,15 +1018,15 @@
         "tiers": [
           {
             "piece": 1,
-            "amount_cents": 7000
+            "amount_cents": 4561
           },
           {
             "piece": 2,
-            "amount_cents": 7000
+            "amount_cents": 7412
           },
           {
             "piece": 3,
-            "amount_cents": 7000
+            "amount_cents": 7412
           }
         ],
         "note": "LH Economy Basic (short-haul): no checked bag; next pieces $70 / $70 / $70 one-way, Short-haul: the group publishes only 'from' prices (EUR30-35 online cross-border, EUR60 at the airport, SWISS's zone table from EUR65 for an extra 23 kg piece online), so EUR65 = USD70 per piece is taken as the high side. Long-haul first bag is the group's fixed Europe-USA/Canada Economy Light fee, USD75. Carry-on is the top of the EUR15-50 secondary range, because the airline states only a EUR20 minimum",
@@ -1034,11 +1036,12 @@
           "https://travel-dealz.com/news/lufthansa-reduces-carry-on/",
           "https://aifly.one/guides/lufthansa-baggage-allowance/"
         ],
-        "checked": "2026-09-24",
+        "checked": "2026-09-25",
         "confidence": "low",
         "verdict": "corrected",
-        "needs_primary_source": true,
-        "includes_carry_on": false
+        "needs_primary_source": false,
+        "includes_carry_on": false,
+        "note_2026_09_25": "The airline's own first-bag quote through Duffel within Europe on 10 Nov 2026 (FRA-BCN $45, ZRH-LHR $45, VIE-CDG $35, BRU-MAD $45), and the group's published EUR 40 first / EUR 65 further bag online ($45.61 / $74.12 at the ECB rate of 25 Sep 2026), taken at the top"
       }
     },
     "LH:CLASSIC": {
@@ -1109,15 +1112,15 @@
         "tiers": [
           {
             "piece": 1,
-            "amount_cents": 7000
+            "amount_cents": 4561
           },
           {
             "piece": 2,
-            "amount_cents": 7000
+            "amount_cents": 7412
           },
           {
             "piece": 3,
-            "amount_cents": 7000
+            "amount_cents": 7412
           }
         ],
         "note": "LX Economy Basic (short-haul): no checked bag; next pieces $70 / $70 / $70 one-way, Europe: only 'from' prices are published (first bag from EUR35 online, extra 23 kg piece from EUR65 on swiss.com, EUR65-90 at check-in), so EUR65 = USD70 per piece is taken. Transatlantic: USD75 for the 1st bag (the same online and at check-in), the discounted online 2nd piece at USD100, and the flat USD200 for further additional bags on Light. Carry-on is the top of the EUR15-50 secondary range, because the group states only a EUR20 minimum",
@@ -1127,10 +1130,12 @@
           "https://travel-dealz.com/news/lufthansa-reduces-carry-on/",
           "https://aifly.one/guides/lufthansa-baggage-allowance/"
         ],
-        "checked": "2026-09-24",
+        "checked": "2026-09-25",
         "confidence": "medium",
         "verdict": "corrected",
-        "includes_carry_on": false
+        "includes_carry_on": false,
+        "note_2026_09_25": "The airline's own first-bag quote through Duffel within Europe on 10 Nov 2026 (FRA-BCN $45, ZRH-LHR $45, VIE-CDG $35, BRU-MAD $45), and the group's published EUR 40 first / EUR 65 further bag online ($45.61 / $74.12 at the ECB rate of 25 Sep 2026), taken at the top",
+        "needs_primary_source": false
       }
     },
     "LX:CLASSIC": {
@@ -1186,15 +1191,15 @@
         "tiers": [
           {
             "piece": 1,
-            "amount_cents": 7000
+            "amount_cents": 4561
           },
           {
             "piece": 2,
-            "amount_cents": 7000
+            "amount_cents": 7412
           },
           {
             "piece": 3,
-            "amount_cents": 7000
+            "amount_cents": 7412
           }
         ],
         "note": "OS Economy Basic (short-haul): no checked bag; next pieces $70 / $70 / $70 one-way, Short-haul: the group publishes only 'from' prices (EUR30-35 online cross-border, EUR60 at the airport), so EUR65 = USD70 per piece is taken as the high side. Long-haul first bag is the group's fixed Europe-USA/Canada Economy Light fee, USD75. Carry-on is the top of the EUR15-50 secondary range, because the group states only a EUR20 minimum",
@@ -1204,11 +1209,12 @@
           "https://www.swiss.com/us/en/prepare/baggage/excess-baggage",
           "https://travel-dealz.com/news/lufthansa-reduces-carry-on/"
         ],
-        "checked": "2026-09-24",
+        "checked": "2026-09-25",
         "confidence": "low",
         "verdict": "corrected",
-        "needs_primary_source": true,
-        "includes_carry_on": false
+        "needs_primary_source": false,
+        "includes_carry_on": false,
+        "note_2026_09_25": "The airline's own first-bag quote through Duffel within Europe on 10 Nov 2026 (FRA-BCN $45, ZRH-LHR $45, VIE-CDG $35, BRU-MAD $45), and the group's published EUR 40 first / EUR 65 further bag online ($45.61 / $74.12 at the ECB rate of 25 Sep 2026), taken at the top"
       }
     },
     "OS:CLASSIC": {
@@ -1258,7 +1264,37 @@
           "piece": 3,
           "amount_cents": 25000
         }
-      ]
+      ],
+      "short_haul": {
+        "includes_checked": 0,
+        "tiers": [
+          {
+            "piece": 1,
+            "amount_cents": 4561
+          },
+          {
+            "piece": 2,
+            "amount_cents": 7412
+          },
+          {
+            "piece": 3,
+            "amount_cents": 7412
+          }
+        ],
+        "note": "LH Economy Basic (short-haul): no checked bag; next pieces $70 / $70 / $70 one-way, Short-haul: the group publishes only 'from' prices (EUR30-35 online cross-border, EUR60 at the airport, SWISS's zone table from EUR65 for an extra 23 kg piece online), so EUR65 = USD70 per piece is taken as the high side. Long-haul first bag is the group's fixed Europe-USA/Canada Economy Light fee, USD75. Carry-on is the top of the EUR15-50 secondary range, because the airline states only a EUR20 minimum",
+        "sources": [
+          "http://web.archive.org/web/20251011012209/https://business.lufthansagroup.com/content/dam/b2b/experts/files/LHG_FBAG_EcoLight_EN.pdf",
+          "https://www.swiss.com/us/en/prepare/baggage/excess-baggage",
+          "https://travel-dealz.com/news/lufthansa-reduces-carry-on/",
+          "https://aifly.one/guides/lufthansa-baggage-allowance/"
+        ],
+        "checked": "2026-09-25",
+        "confidence": "low",
+        "verdict": "corrected",
+        "needs_primary_source": false,
+        "includes_carry_on": false,
+        "note_2026_09_25": "The airline's own first-bag quote through Duffel within Europe on 10 Nov 2026 (FRA-BCN $45, ZRH-LHR $45, VIE-CDG $35, BRU-MAD $45), and the group's published EUR 40 first / EUR 65 further bag online ($45.61 / $74.12 at the ECB rate of 25 Sep 2026), taken at the top"
+      }
     },
     "SN:CLASSIC": {
       "feed_name": "Economy Classic",
@@ -2202,12 +2238,13 @@
         "https://upgradedpoints.com/travel/airlines/allegiant-air-baggage-fees/",
         "https://deeparrival.com/airlines/allegiant-air/baggage-fees/"
       ],
-      "checked": "2026-09-24",
+      "checked": "2026-09-25",
       "confidence": "low",
       "verdict": "confirmed",
       "needs_primary_source": true,
       "includes_carry_on": false,
-      "carry_on_fee_cents": 4100
+      "carry_on_fee_cents": 4100,
+      "note_2026_09_25": "Re-checked: '$20 to $50 each (varies depending on route)' at booking; the $50 top stands"
     },
     "SY:BASE": {
       "feed_name": "Base fare",
@@ -2367,15 +2404,15 @@
       "tiers": [
         {
           "piece": 1,
-          "amount_cents": 9300
+          "amount_cents": 9864
         },
         {
           "piece": 2,
-          "amount_cents": 9300
+          "amount_cents": 9864
         },
         {
           "piece": 3,
-          "amount_cents": 9300
+          "amount_cents": 9864
         }
       ],
       "note": "W6 Basic (short-haul): no checked bag; next pieces $93 / $93 / $93 one-way, 20kg checked bag bought online during booking, at the top of the stated online/call-centre range €13.00-€86.50 (€86.50 = $93), not the airport price. Each of the up to three bags bought online is priced per piece",
@@ -2385,14 +2422,16 @@
         "https://airadvisor.com/en/baggage-allowance/wizz-air",
         "https://aifly.one/guides/wizz-air-baggage-allowance/",
         "https://flighttribe.co.uk/wizz-air-checked-baggage/",
-        "http://web.archive.org/web/20260729145537/https://www.wizzair.com/en-gb/information-and-services/prices-discounts/all-services-fees"
+        "http://web.archive.org/web/20260729145537/https://www.wizzair.com/en-gb/information-and-services/prices-discounts/all-services-fees",
+        "https://baggagepolicies.com/wizz-air-baggage-policy/"
       ],
-      "checked": "2026-09-24",
+      "checked": "2026-09-25",
       "confidence": "low",
       "verdict": "corrected",
       "needs_primary_source": true,
       "includes_carry_on": false,
-      "carry_on_fee_cents": 6500
+      "carry_on_fee_cents": 6500,
+      "note_2026_09_25": "The Wizz group's online range for a 20 kg bag, EUR 13.00 to 86.50 per flight (BaggagePolicies, 18 Aug 2026; a live Flight Tribe booking and Deep Arrival fall inside it), at its top: EUR 86.50 = $98.64 at the ECB rate of 25 Sep 2026"
     },
     "W9:BASIC": {
       "feed_name": "Basic",
@@ -2400,15 +2439,15 @@
       "tiers": [
         {
           "piece": 1,
-          "amount_cents": 9300
+          "amount_cents": 9864
         },
         {
           "piece": 2,
-          "amount_cents": 9300
+          "amount_cents": 9864
         },
         {
           "piece": 3,
-          "amount_cents": 9300
+          "amount_cents": 9864
         }
       ],
       "note": "W9 Basic (short-haul): no checked bag; next pieces $93 / $93 / $93 one-way, The group schedule: 20kg checked bag bought online during booking, at the top of the stated online range €13.00-€86.50 (€86.50 = $93); charged in GBP on UK-origin bookings",
@@ -2416,14 +2455,16 @@
         "https://www.mybaggage.com/shipping/airlines/wizz-air-baggage-allowance/",
         "https://www.sendmybag.com/airlines/wizz-air-baggage-allowance/",
         "https://airadvisor.com/en/baggage-allowance/wizz-air",
-        "https://flighttribe.co.uk/wizz-air-checked-baggage/"
+        "https://flighttribe.co.uk/wizz-air-checked-baggage/",
+        "https://baggagepolicies.com/wizz-air-baggage-policy/"
       ],
-      "checked": "2026-09-24",
+      "checked": "2026-09-25",
       "confidence": "low",
       "verdict": "corrected",
       "needs_primary_source": true,
       "includes_carry_on": false,
-      "carry_on_fee_cents": 6500
+      "carry_on_fee_cents": 6500,
+      "note_2026_09_25": "The Wizz group's online range for a 20 kg bag, EUR 13.00 to 86.50 per flight (BaggagePolicies, 18 Aug 2026; a live Flight Tribe booking and Deep Arrival fall inside it), at its top: EUR 86.50 = $98.64 at the ECB rate of 25 Sep 2026"
     },
     "5W:BASIC": {
       "feed_name": "Basic",
@@ -2750,15 +2791,15 @@
       "tiers": [
         {
           "piece": 1,
-          "amount_cents": 7000
+          "amount_cents": 4561
         },
         {
           "piece": 2,
-          "amount_cents": 7000
+          "amount_cents": 7412
         },
         {
           "piece": 3,
-          "amount_cents": 7000
+          "amount_cents": 7412
         }
       ],
       "note": "VL Economy Basic (short-haul): no checked bag; next pieces $70 / $70 / $70 one-way, Lufthansa Group first-bag prices are published only as 'from' figures (EUR30-35 online cross-border, EUR60 at the airport). EUR65 = USD70 per piece is taken as the high side. Carry-on is the top of the EUR15-50 secondary range, because the group states only a EUR20 minimum",
@@ -2768,12 +2809,13 @@
         "https://travel-dealz.com/news/lufthansa-reduces-carry-on/",
         "https://onemileatatime.com/news/lufthansa-economy-basic-fares-carry-on-bag-not-included/"
       ],
-      "checked": "2026-09-24",
+      "checked": "2026-09-25",
       "confidence": "low",
       "verdict": "corrected",
       "needs_primary_source": true,
       "includes_carry_on": false,
-      "carry_on_fee_cents": 5400
+      "carry_on_fee_cents": 5400,
+      "note_2026_09_25": "Lufthansa Group Economy Light/Basic within Europe, bought online: EUR 40 for the first bag and EUR 65 for each further one ($45.61 and $74.12 at the ECB rate of 25 Sep 2026); Lufthansa's own quote through Duffel for FRA to BCN on 10 Nov 2026 was $45"
     },
     "TK:ECOFLY": {
       "feed_name": "EcoFly",
@@ -3606,15 +3648,15 @@
       "tiers": [
         {
           "piece": 1,
-          "amount_cents": 5600
+          "amount_cents": 6500
         },
         {
           "piece": 2,
-          "amount_cents": 5600
+          "amount_cents": 6500
         },
         {
           "piece": 3,
-          "amount_cents": 5600
+          "amount_cents": 6500
         }
       ],
       "note": "VB Viva Zero (short-haul): no checked bag; next pieces $56 / $56 / $56 one-way, Domestic Mexico, from a Jan 2025 price list: an extra 25 kg bag is MXN 1,010. Adding a checked bag to a Zero fare is carry-on (MXN 406) plus the 25 kg increment (MXN 604), which is also MXN 1,010, so I used 1,010 for every piece. The carry-on is MXN 406",
@@ -3624,12 +3666,13 @@
         "https://www.eluniversal.com.mx/destinos/cuanto-cuesta-documentar-una-maleta-en-vuelos-nacionales/",
         "https://deeparrival.com/airlines/viva-aerobus/baggage-fees/"
       ],
-      "checked": "2026-09-24",
+      "checked": "2026-09-25",
       "confidence": "low",
       "verdict": "unverifiable",
       "needs_primary_source": true,
       "includes_carry_on": false,
-      "carry_on_fee_cents": 2200
+      "carry_on_fee_cents": 2200,
+      "note_2026_09_25": "A 25 kg bag added online: MXN 1,010 within Mexico ($57 at the ECB rate of 25 Sep 2026) and $38 to $65 internationally ($100 to or from New York or Chicago); the international top is taken, as bags lean high"
     },
     "EC:STANDARD": {
       "feed_name": "Standard",
@@ -3703,15 +3746,15 @@
       "tiers": [
         {
           "piece": 1,
-          "amount_cents": 9300
+          "amount_cents": 9864
         },
         {
           "piece": 2,
-          "amount_cents": 9300
+          "amount_cents": 9864
         },
         {
           "piece": 3,
-          "amount_cents": 9300
+          "amount_cents": 9864
         }
       ],
       "note": "W4 (same policy as W6) Basic (short-haul): no checked bag; next pieces $93 / $93 / $93 one-way, 20kg checked bag bought online during booking, at the top of the stated online/call-centre range €13.00-€86.50 (€86.50 = $93), not the airport price. Each of the up to three bags bought online is priced per piece",
@@ -3721,14 +3764,16 @@
         "https://airadvisor.com/en/baggage-allowance/wizz-air",
         "https://aifly.one/guides/wizz-air-baggage-allowance/",
         "https://flighttribe.co.uk/wizz-air-checked-baggage/",
-        "http://web.archive.org/web/20260729145537/https://www.wizzair.com/en-gb/information-and-services/prices-discounts/all-services-fees"
+        "http://web.archive.org/web/20260729145537/https://www.wizzair.com/en-gb/information-and-services/prices-discounts/all-services-fees",
+        "https://baggagepolicies.com/wizz-air-baggage-policy/"
       ],
-      "checked": "2026-09-24",
+      "checked": "2026-09-25",
       "confidence": "low",
       "verdict": "corrected",
       "needs_primary_source": true,
       "includes_carry_on": false,
-      "carry_on_fee_cents": 6500
+      "carry_on_fee_cents": 6500,
+      "note_2026_09_25": "The Wizz group's online range for a 20 kg bag, EUR 13.00 to 86.50 per flight (BaggagePolicies, 18 Aug 2026; a live Flight Tribe booking and Deep Arrival fall inside it), at its top: EUR 86.50 = $98.64 at the ECB rate of 25 Sep 2026"
     }
   },
   "_default_short_haul": {

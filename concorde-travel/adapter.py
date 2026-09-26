@@ -720,6 +720,27 @@ def _fleet_claims(enr: Dict[str, Any], operating: str, equipment: str,
 LEGROOM_SEAT = re.compile(r"extra|legroom|leg room|plus|comfort|space|exit|main cabin extra|preferred plus", re.I)
 
 
+def google_bag_prices(lines: Any) -> List[Dict[str, Any]]:
+    """Google's bag sentences for one booking option ("1st checked bag: 35", "2nd checked bag: 45-60", "1 free
+    checked bag", "1 free carry-on"), as [{piece, cents, range}] for the checked pieces, in dollars (the booking
+    options are asked in USD). A range is priced at its top, as every bag fee here leans high, and says so; a free
+    piece is 0; carry-on sentences are left to the fare's own carry-on field. Nothing parsed is an empty list, never
+    a free bag (2026-09-25: the seller check already fetches these, so the flight's own bag price costs no call)."""
+    out: Dict[int, Dict[str, Any]] = {}
+    for line in lines or []:
+        t = str(line).lower().replace("\u2013", "-").replace(",", "")
+        m = re.search(r"(\d+)(?:st|nd|rd|th) checked bag[^:]*:\s*\$?(\d+(?:\.\d+)?)(?:\s*-\s*\$?(\d+(?:\.\d+)?))?", t)
+        if m:
+            top = float(m.group(3) or m.group(2))
+            out[int(m.group(1))] = {"piece": int(m.group(1)), "cents": int(round(top * 100)), "range": bool(m.group(3))}
+            continue
+        m = re.search(r"(\d+) free checked bags?", t)
+        if m:
+            for i in range(1, int(m.group(1)) + 1):
+                out.setdefault(i, {"piece": i, "cents": 0, "range": False})
+    return [out[k] for k in sorted(out)]
+
+
 def duffel_extras_summary(payload: Dict[str, Any]) -> Dict[str, Any]:
     """One offer's own bag and seat prices, from Duffel's offer-with-services and seat-map replies (live.duffel_extras,
     2026-09-25). Only what the airline PRICED counts: a seat whose available_services is empty is unavailable, never
