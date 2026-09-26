@@ -5778,6 +5778,13 @@ polling the Mac on the VMware network; no admin rights, no settings).
     the MSI lacking the export libraries, and abandoned council drafts
     that kept Ollama generating (and wrote into the next model's draft,
     a bug on the Mac too).
+- THE LAUNCHER checks for a real Python 3.10+: Windows ships a "python"
+  that only opens the Microsoft Store, and `where python` found it. Its
+  "ready" marker now names what setup installs, so adding a dependency
+  (tzdata, here) runs pip once more on an existing setup. Tested in the
+  VM on the real .bat: an old setup re-ran pip once (6 s) and then
+  skipped it; a new setup whose pip failed stopped with its message,
+  exit 1, no marker and no app.
 - Every .pptx export threw on every platform: the title slide's date
   called _venue_stamp() without the format it requires (and that is the
   chat's venue clock, "... in Tokyo"). A plain local date now; the

@@ -41,7 +41,9 @@ set "PIP=%VENV%\Scripts\pip.exe"
 set "READY=%VENV%\concorde-ready"
 if not exist "%SUPPORT%" mkdir "%SUPPORT%"
 
-where python >nul 2>&1
+rem a real Python 3.10+ (6b317): Windows ships a "python" that only opens
+rem the Microsoft Store, and "where python" found that one too
+python -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>&1
 if errorlevel 1 (
   echo ConcordeAI needs Python 3.10 or newer.
   echo Install it from https://www.python.org/downloads/ ^(tick "Add to PATH"^)
@@ -49,11 +51,18 @@ if errorlevel 1 (
   exit /b 1
 )
 
+rem What setup installs. When this line changes, an existing setup runs
+rem pip once more for what's new (6b317: tzdata was added, and a "ready"
+rem marker meant setup never ran again).
+set "DEPS=deps-2 pywebview ddgs psutil tzdata"
+set "HAVE="
+if exist "%READY%" set /p HAVE=<"%READY%"
+
 rem Setup counts as done only once it has worked (6b316): a failed pip
 rem install used to leave a venv behind, and every later run skipped
 rem setup and started an app that could not run.
-if not exist "%READY%" (
-  echo First run: setting up the AI engine. This takes a few minutes...
+if not "%HAVE%"=="%DEPS%" (
+  echo Setting up the AI engine. The first time takes a few minutes...
   if not exist "%PYC%" python -m venv "%VENV%"
   if not exist "%PYC%" goto setupfail
   "%PYC%" -m pip install --upgrade pip
@@ -62,7 +71,7 @@ if not exist "%READY%" (
   if errorlevel 1 goto setupfail
   rem voice input is optional; its engine has no wheel for every PC
   "%PIP%" install faster-whisper
-  echo ok> "%READY%"
+  >"%READY%" echo %DEPS%
 )
 
 rem pythonw has no console; if the app can't start it shows a message

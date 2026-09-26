@@ -3239,9 +3239,14 @@ check("Windows starts: no SIGHUP at import, and a crash is never silent",
       and _hook_on and "SIGHUP" in _crash_txt and "AttributeError" in _crash_txt
       and len(_box) == 1 and "couldn't start" in _box[0][1]
       and _crash in _box[0][1]
-      and 'if not exist "%READY%" (' in _bat
+      and 'if not "%HAVE%"=="%DEPS%" (' in _bat
       and "if errorlevel 1 goto setupfail" in _bat
-      and 'echo ok> "%READY%"' in _bat
+      and '>"%READY%" echo %DEPS%' in _bat
+      # setup reruns when what it installs changes; a Store "python" stub
+      # isn't Python (6b317)
+      and 'set "DEPS=deps-2 pywebview ddgs psutil tzdata"' in _bat
+      and 'python -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"' in _bat
+      and "where python >nul" not in _bat
       and '"%PYC%" -m pip install --upgrade pip' in _bat,
       "%r" % [_sig_err, _sig_calls, sorted(_top_sigs - _WIN_SIGS), _crash_txt[-120:], _box])
 
