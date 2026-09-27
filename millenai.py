@@ -22340,18 +22340,47 @@ let chats=[];
 try{chats=JSON.parse(localStorage.getItem("millen.chats"))||[];}catch(e){}
 let curChat=null;   // every launch starts fresh; history stays in the list
 let chatSaveTimer=null;
+// NOTHING IS SAVED BEFORE THE DISK LIST ARRIVES (6b318, from review). The
+// page starts from the quick-paint copy above (30 chats at most), and a
+// save posts the whole list, so a pin, rename or message in the first
+// moments wrote those 30 over chats.json. Until the disk list is in,
+// saves stay in the page; then what changed meanwhile is laid over it
+// and saved once. Forget bumps chatsGen, so a list read before it can't
+// land after it.
+let chatsLoaded=false,chatsEarly=false,chatsGen=0;
+const chatsSnap=new Map(chats.map(c=>[c.id,JSON.stringify(c)]));
 
 async function loadChatsFromDisk(){
+  const gen=chatsGen;
   try{
-    const server=(await(await fetch("/api/chats")).json()).chats||[];
+    const r=await fetch("/api/chats");
+    if(!r.ok)throw new Error("chats "+r.status);
+    const server=(await r.json()).chats||[];
+    if(gen!==chatsGen)return;
     // the server's list is the truth, empty included (6b310). This used
     // to post the browser's copy back when the server had none, which
     // brought chats erased with Forget back to life, and the copy is
-    // kept per port, so a moved app found an old one.
-    chats=server;
-    if(!server.length){try{localStorage.removeItem("millen.chats");}catch(e){}}
+    // kept per port, so a moved app found an old one. Only what the
+    // person changed before it arrived rides on top: new or edited
+    // chats replace the disk's, and ones they deleted stay deleted.
+    const changed=c=>JSON.stringify(c)!==chatsSnap.get(c.id);
+    if(chatsEarly){
+      const mine=new Map(chats.map(c=>[c.id,c]));
+      const merged=server.filter(c=>mine.has(c.id)||!chatsSnap.has(c.id))
+        .map(c=>{const m=mine.get(c.id);return m&&changed(m)?m:c;});
+      const have=new Set(merged.map(c=>c.id));
+      chats.forEach(c=>{if(!have.has(c.id)&&changed(c))merged.push(c);});
+      merged.sort((a,b)=>(b.ts||0)-(a.ts||0));
+      chats=merged;
+    }else chats=server;
+    chatsLoaded=true;
+    if(!chats.length){try{localStorage.removeItem("millen.chats");}catch(e){}}
     renderChats();
-  }catch(e){}
+    if(chatsEarly){chatsEarly=false;saveChats();}
+  }catch(e){
+    // never fall back to saving the quick-paint copy: ask again
+    if(gen===chatsGen)setTimeout(loadChatsFromDisk,3000);
+  }
 }
 async function pushChatsToDisk(){
   try{
@@ -22751,9 +22780,12 @@ function resetHero(){
   paintSuggest();
 }
 function saveChats(){
-  // write through to disk, coalesced so a burst of messages is one write
-  clearTimeout(chatSaveTimer);
-  chatSaveTimer=setTimeout(pushChatsToDisk,400);
+  // write through to disk, coalesced so a burst of messages is one write;
+  // before the disk list is in, only noted (loadChatsFromDisk saves)
+  if(chatsLoaded){
+    clearTimeout(chatSaveTimer);
+    chatSaveTimer=setTimeout(pushChatsToDisk,400);
+  }else chatsEarly=true;
   // the mirror is a convenience: when browser storage is full or refused
   // it shrinks, and the real list is never touched. This used to cut
   // `chats` itself to 10, and the save queued above then wrote those 10
@@ -25719,6 +25751,7 @@ $("#forget-go").addEventListener("click",async ev=>{
   if(r&&r.ok){
     if(fgScopes().indexOf("chats")>=0){
       chats=[];messages=[];curChat=null;
+      chatsGen++;chatsLoaded=true;chatsEarly=false;   // the disk list is empty now
       try{localStorage.removeItem("millen.chats");}catch(e){}
       renderChats();inner.innerHTML="";resetHero();
     }

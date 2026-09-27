@@ -5688,8 +5688,12 @@ history bore it out: 3 of the last 5 were New York.
   exactly 60: every new chat was erasing his oldest). The app keeps
   1,000, and a pinned chat is never cut. A browser-storage error used
   to trim the page's list to 10 before it was saved to disk; now only
-  the browser's quick-paint copy shrinks. The full chat-storage rebuild
-  (0b) comes with the accounts work.
+  the browser's quick-paint copy shrinks. And nothing is saved until the
+  list on disk has arrived: the page starts from that quick copy (30
+  chats at most), and a pin, rename or message in the first moments
+  used to write those 30 over the file (found by the fix's review;
+  checked in a browser). The full chat-storage rebuild (0b) comes with
+  the accounts work.
 
 ## 6b317 — Windows: the app says PC, and quitting stops Ollama
 Found testing the 445085b nightly in Patrick's Windows 11 ARM VM, driven

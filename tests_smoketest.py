@@ -4397,6 +4397,19 @@ check("chats: a 61st chat no longer erases the oldest; 1,000 kept, pins always",
       and "chats=chats.slice" not in _sv and "chats=" not in _sv.replace("chats.slice", ""),
       "%r" % [_sc61, len(_scb), _scb[-2:]])
 
+# 6b318, from the hotfix's review: the page starts from its 30-chat quick
+# copy, and a save before the disk list arrived wrote those 30 over
+# chats.json. Saves wait for the disk list; early edits ride on top of
+# it (checked in a browser: rename kept, early delete stays deleted,
+# disk-only chats kept, one save, none after a failed load).
+_ld = page[page.index("async function loadChatsFromDisk(){"):page.index("async function pushChatsToDisk(){")]
+check("chats: nothing is saved before the disk list arrives",
+      "if(chatsLoaded){" in _sv and "}else chatsEarly=true;" in _sv
+      and "chatsLoaded=true;" in _ld and "setTimeout(loadChatsFromDisk,3000)" in _ld
+      and "if(gen!==chatsGen)return;" in _ld and "chatsGen++;chatsLoaded=true;" in page
+      and _ld.count("saveChats()") == 1,
+      _ld[:200])
+
 # 6b318, per Patrick: the Beta channel reads "Prerelease" (it carries the
 # RCs too). The stored value stays "beta", so saved choices still match.
 check("Settings: the channel between Stable and Nightly is called Prerelease",
