@@ -5630,7 +5630,7 @@ crash was invisible.
   keeps its checks. Mutation-tested (SIGHUP back, hook removed, no log,
   no box).
 
-## 6b318 — backdrops that don't repeat
+## 6b318 — backdrops that don't repeat, and go dark after dark
 
 Per Patrick: "the background videos always seem to cycle the same ones
 over and over. When there's tons of them it can pick from." There are
@@ -5640,13 +5640,24 @@ showed every other launch. The clip readied for next time also leaned
 New York half the time and only skipped the last six seen, and a launch
 with nothing fresh on disk replayed a random recent clip. His Mac's
 history bore it out: 3 of the last 5 were New York.
-- New York is now one launch in five and waits ten launches to return
-  (the lean itself stays, as he asked for it). The clip readied for
-  next time is one not seen in the last 32; a replay is the cached clip
-  seen longest ago. The picking is two pure functions, skyPick and
-  skyStockPick, and the gauntlet runs 340 launches through them: no
-  clip back within ten launches (it was 20%), New York ~15% (was 42%),
-  47 different clips in 50 launches (was 31).
+- Then, per Patrick: "no need to bias towards nyc anymore - lets favor
+  variety. if possible, use darker videos at night", and "use
+  sunrise/sunset if it helps". The New York lean is gone. The server
+  works out the sun's height where you are (the home area once it has
+  been geocoded, else the time zone's own city from zone.tab, else a
+  longitude from the UTC offset) and tells the page SKY_NIGHT: from
+  about 20 minutes after sunset (-4 degrees) to 20 before sunrise the
+  23 dark clips play (the night passes, the aurora, the deep dives), by
+  day the other 66. Within that: a clip not seen in the last 32, from
+  disk; else the cached one of the right kind seen longest ago; never a
+  wait while anything is cached. The shelf now counts UNSEEN clips and
+  keeps two of each kind (counting spares had stopped at one fresh
+  clip, often of the wrong kind, so a morning replayed a recent one).
+  skyPick and skyStockPick are pure; the gauntlet runs 340 launches,
+  four in ten at night: no clip back within ten launches (was 20%),
+  no clip of the wrong kind, New York at its natural ~6% (was 42%),
+  46 different clips in 50 launches (was 31); the sun is checked
+  against known sunsets, a noon and the midnight sun.
 - A clip half downloaded when the app quit resumes next time (a Range
   request; Apple's CDN answers 206) instead of starting over, so short
   sessions still bring in fresh clips. Partials keep three days.

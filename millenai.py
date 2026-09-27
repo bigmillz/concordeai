@@ -36,6 +36,7 @@ import socket
 import base64
 import hashlib
 import html
+import math
 import secrets
 import struct
 import subprocess
@@ -12077,17 +12078,96 @@ SKY_SOURCES = [
 ]
 
 # Clips that read DARK (Apple's own labels: the Night city passes, the
-# aurora, and the deep-ocean dives). After 7pm local the backdrop picker
-# prefers these; in daylight it avoids them.
-# the five New York clips (N-series aerials + the NY-at-night ISS pass)
-# — the picker leans toward them, per Patrick ("prioritize apple nyc")
-SKY_NYC = [i for i, u in enumerate(SKY_SOURCES)
-           if re.search(r"comp_N\d{3}_|NY_NIGHT", u)]
-
+# aurora, and the deep-ocean dives). After dark the backdrop plays these;
+# in daylight, the rest (6b318). The New York lean is gone, per Patrick
+# ("no need to bias towards nyc anymore - lets favor variety").
 SKY_DARK = [0, 3, 4, 6, 8, 11, 14, 16, 23, 25, 27, 31, 36, 42, 47, 52,
             56, 61, 65, 71, 75, 76, 83]
 
 _sky_lock = threading.Lock()
+
+
+# THE SUN, FOR THE BACKDROP (6b318, per Patrick: "use darker videos at
+# night ... use sunrise/sunset if it helps"). Where: the home area when
+# it has been geocoded, else the time zone's own city (zone.tab), else a
+# longitude from the UTC offset. When: the sun's height right now, from
+# the standard low-precision solar formulas (a small fraction of a degree
+# off), "night" from a little after sunset to a little before sunrise.
+SUN_NIGHT_BELOW = -4.0          # degrees: dusk has mostly gone
+
+
+def _sun_elevation(lat: float, lon: float, t: float = None) -> float:
+    t = time.time() if t is None else t
+    d = t / 86400.0 + 2440587.5 - 2451545.0          # days since J2000
+    g = math.radians((357.529 + 0.98560028 * d) % 360)
+    q = (280.459 + 0.98564736 * d) % 360
+    ecl = math.radians((q + 1.915 * math.sin(g)
+                        + 0.020 * math.sin(2 * g)) % 360)
+    obl = math.radians(23.439 - 0.00000036 * d)
+    ra = math.atan2(math.cos(obl) * math.sin(ecl), math.cos(ecl))
+    dec = math.asin(math.sin(obl) * math.sin(ecl))
+    gmst = (18.697374558 + 24.06570982441908 * d) % 24
+    ha = math.radians(gmst * 15 + lon) - ra
+    la = math.radians(lat)
+    return math.degrees(math.asin(math.sin(la) * math.sin(dec)
+                                  + math.cos(la) * math.cos(dec)
+                                  * math.cos(ha)))
+
+
+def _zone_latlon(tzname: str):
+    """(lat, lon) of a time zone's reference city, from zone.tab."""
+    if not tzname or "/" not in tzname:
+        return None
+    paths = ["/usr/share/zoneinfo/zone.tab", "/var/db/timezone/zoneinfo/zone.tab"]
+    try:
+        import tzdata
+        paths.append(os.path.join(os.path.dirname(tzdata.__file__),
+                                  "zoneinfo", "zone.tab"))
+    except Exception:
+        pass
+    for p in paths:
+        try:
+            with open(p, encoding="utf-8") as fh:
+                for ln in fh:
+                    c = ln.split("\t")
+                    if len(c) >= 3 and c[2].strip() == tzname:
+                        m = re.match(r"([+-])(\d\d)(\d\d)(\d\d)?([+-])(\d{3})"
+                                     r"(\d\d)(\d\d)?$", c[1].strip())
+                        if not m:
+                            return None
+                        la = (int(m.group(2)) + int(m.group(3)) / 60
+                              + int(m.group(4) or 0) / 3600)
+                        lo = (int(m.group(6)) + int(m.group(7)) / 60
+                              + int(m.group(8) or 0) / 3600)
+                        return (la if m.group(1) == "+" else -la,
+                                lo if m.group(5) == "+" else -lo)
+        except OSError:
+            continue
+    return None
+
+
+def _sky_latlon():
+    """Where the sun is measured. No network here: the page waits on it."""
+    home = str(load_prefs(None).get("home_area") or "").strip()
+    if home:
+        g = _geo_cache.get(home.lower())
+        if g:
+            return g["lat"], g["lon"]
+    ll = _zone_latlon(_host_tz())
+    if ll:
+        return ll
+    # no zone name (Windows): the longitude the clock implies, and a
+    # middling northern latitude
+    return 40.0, time.localtime().tm_gmtoff / 240.0
+
+
+def sky_is_night() -> bool:
+    try:
+        lat, lon = _sky_latlon()
+        return _sun_elevation(lat, lon) < SUN_NIGHT_BELOW
+    except Exception:
+        h = time.localtime().tm_hour
+        return h >= 19 or h < 6
 _last_seen = {}          # identity -> last request ts, for the user count
 _sky_jobs = {}          # idx -> {"status": ..., "pct": int}
 
@@ -13181,7 +13261,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                              "1" if (HAS_WEBVIEW and IS_MAC) else "0")
                     .replace("__SKY_N__", str(len(SKY_SOURCES)))
                     .replace("__SKY_DARK__", json.dumps(SKY_DARK))
-                    .replace("__SKY_NYC__", json.dumps(SKY_NYC))
+                    .replace("__SKY_NIGHT__", json.dumps(sky_is_night()))
                     .replace("__USER_NICK__", json.dumps(
                         (str(load_prefs(self._data_base()).get(
                             "user_name") or "").strip().split(" ")[0]
@@ -20043,6 +20123,8 @@ const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 const IS_LOCAL=location.hostname==="127.0.0.1"||location.hostname==="localhost";
 // a Windows PC (6b317): its commands, settings and words differ
 const IS_PC=__IS_PC__;
+// the sun is down where you are (6b318): the backdrop goes dark
+const SKY_NIGHT=__SKY_NIGHT__;
 
 /* ------------------------------------------------------------- state */
 let messages=[], generating=false, abortCtl=null;
@@ -23212,49 +23294,51 @@ const SKY_N=parseInt("__SKY_N__",10)||5;   // injected: len(SKY_SOURCES)
 const skyline=$("#skyline");
 let skyBooted=false;
 // WHICH CLIP (6b318, per Patrick: "the background videos always seem to
-// cycle the same ones over and over"). Half of all launches drew from the
-// FIVE New York clips, and each could come back three launches later, so
-// one of the same five showed every other launch; the clip readied for
-// next time leaned New York half the time too, and a launch with nothing
-// fresh on disk replayed a random recent clip. Now New York is one launch
-// in five and waits ten launches to return, the clip readied for next time
-// is one not seen in the last 32, and a replay is the cached clip seen
-// longest ago. Pure functions, so the gauntlet can run a few hundred
-// launches through them.
-const SKY_NYC_SHARE=0.2,SKY_NYC_GAP=10;
-function skyPick(o){      // {all,hist,onDisk,last,nyc:Set,prepared,rnd}
-  const {all,hist,onDisk,last,nyc,prepared,rnd}=o;
+// cycle the same ones over and over", then "no need to bias towards nyc
+// anymore - lets favor variety. if possible, use darker videos at night"
+// and "use sunrise/sunset if it helps"). Half of all launches had drawn
+// from the five New York clips, each back three launches later; the lean
+// is gone. From a little after sunset to a little before sunrise where
+// you are (SKY_NIGHT, from the server's sun) the dark clips play, by day
+// the rest; within that, a clip not seen in the last 32 launches, from
+// disk when one is there, else the one seen longest ago. The shelf keeps
+// unseen clips of BOTH kinds, so evening and morning start instantly.
+// Pure functions, so the gauntlet can run a few hundred launches.
+function skyPick(o){  // {all,hist,onDisk,last,prepared,rnd,dark:Set,wantDark}
+  const {all,hist,onDisk,last,prepared,rnd,dark,wantDark}=o;
+  let mood=all.filter(x=>dark.has(x)===wantDark);
+  if(!mood.length)mood=all.slice();
   if(prepared>=0&&onDisk.includes(prepared)&&prepared!==last
-     &&all.includes(prepared))return prepared;
-  let pool=all.filter(x=>!hist.includes(x));
-  if(!pool.length)pool=all.filter(x=>x!==last);
-  if(!pool.length)pool=all.slice();
-  const nycAvail=all.filter(x=>nyc.has(x)&&!hist.slice(0,SKY_NYC_GAP).includes(x));
-  if(nycAvail.length&&rnd()<SKY_NYC_SHARE)pool=nycAvail;
+     &&mood.includes(prepared))return prepared;
+  const age=x=>{const k=hist.indexOf(x);return k<0?1e9:k;};
+  const oldest=xs=>{const a=Math.max(...xs.map(age));return xs.filter(x=>age(x)===a);};
+  const pick=xs=>xs[Math.floor(rnd()*xs.length)];
+  const fresh=mood.filter(x=>!hist.includes(x));
+  const freshDisk=fresh.filter(x=>onDisk.includes(x));
+  if(freshDisk.length)return pick(freshDisk);
   // DISK FIRST, ALWAYS (5.3.1, per Patrick: "no background, or takes
-  // forever"): a launch never waits on the network when ANY cached clip
-  // exists; only an empty pantry (a true first run) earns the bar
-  const local=pool.filter(x=>onDisk.includes(x));
-  if(local.length)pool=local;
-  else{
-    const disk=all.filter(x=>onDisk.includes(x)&&x!==last);
-    if(disk.length){
-      const age=x=>{const k=hist.indexOf(x);return k<0?1e9:k;};
-      const oldest=Math.max(...disk.map(age));
-      pool=disk.filter(x=>age(x)===oldest);
-    }
-  }
-  return pool[Math.floor(rnd()*pool.length)];
+  // forever"): never wait while anything is cached. The right kind seen
+  // longest ago, else any cached clip seen longest ago
+  const moodDisk=mood.filter(x=>onDisk.includes(x)&&x!==last);
+  if(moodDisk.length)return pick(oldest(moodDisk));
+  const anyDisk=all.filter(x=>onDisk.includes(x)&&x!==last);
+  if(anyDisk.length)return pick(oldest(anyDisk));
+  // an empty shelf (a first run): this one downloads, with the bar
+  const pool=fresh.length?fresh:mood.filter(x=>x!==last);
+  return pick(pool.length?pool:mood);
 }
-function skyStockPick(o){ // {all,have,playing,hist,failed:Set,nyc:Set,rnd}
-  const {all,have,playing,hist,failed,nyc,rnd}=o;
+function skyStockPick(o){ // {all,have,playing,hist,failed:Set,dark:Set,rnd}
+  const {all,have,playing,hist,failed,dark,rnd}=o;
   const open=x=>!have.includes(x)&&x!==playing&&!failed.has(x);
-  let cand=all.filter(x=>open(x)&&!hist.includes(x));
-  if(!cand.length)cand=all.filter(x=>open(x)&&!hist.slice(0,SKY_NYC_GAP).includes(x));
-  if(!cand.length)return -1;
-  const ny=cand.filter(x=>nyc.has(x)&&!hist.slice(0,SKY_NYC_GAP).includes(x));
-  if(ny.length&&rnd()<SKY_NYC_SHARE)cand=ny;
-  return cand[Math.floor(rnd()*cand.length)];
+  // stock the kind with fewer unseen clips on the shelf, dark or light
+  const unseen=k=>have.filter(x=>dark.has(x)===k&&!hist.includes(x)).length;
+  for(const k of unseen(true)<=unseen(false)?[true,false]:[false,true]){
+    let cand=all.filter(x=>open(x)&&dark.has(x)===k&&!hist.includes(x));
+    if(!cand.length)cand=all.filter(x=>open(x)&&dark.has(x)===k
+                                    &&!hist.slice(0,10).includes(x));
+    if(cand.length)return cand[Math.floor(rnd()*cand.length)];
+  }
+  return -1;
 }
 async function bootSkyline(){
   if(noVideo||!skyline||skyBooted)return;
@@ -23265,10 +23349,6 @@ async function bootSkyline(){
   const last=parseInt(localStorage.getItem("millen.sky")||"-1",10);
   let firstEver=last<0;
   const darkSet=new Set(JSON.parse('__SKY_DARK__'));
-  // THE POOL IS OPEN: all 89 Apple clips are eligible ("getting kinda
-  // stale"). The dark set is only a first-run preference now — the warp
-  // reads best over them — and any clip is fair game after that.
-  const mood=x=>darkSet.has(x)||!firstEver;
   let i;
   // THE WHOLE CATALOG, per Patrick ("i want all the apple ones, but a
   // loading bar for just the current one"): every launch draws from all
@@ -23279,8 +23359,8 @@ async function bootSkyline(){
   let hist=[];
   try{hist=JSON.parse(localStorage.getItem("millen.skyhist"))||[];}
   catch(e){}
-  let all=[];
-  for(let n=0;n<SKY_N;n++)if(mood(n))all.push(n);
+  // every clip is a candidate; skyPick narrows to the time of day
+  let all=[...Array(SKY_N).keys()];
   // a clip already on disk starts instantly and still counts as new to
   // the eye — only reach for a download when the local set is thin
   let onDisk=[];
@@ -23301,17 +23381,17 @@ async function bootSkyline(){
       if(c.length)all=c;
     }catch(e){}
   }
-  const nyc=new Set(JSON.parse('__SKY_NYC__'));
   // PREPARED CITY (5.2, per Patrick: "shows a backdrop, but prepares
   // another for next time — no flip"): last session quietly downloaded
   // tonight's clip after its own backdrop was up. If it's still on
   // disk, that's the pick — instant start, usually no bar at all.
   const prepared=parseInt(localStorage.getItem("millen.skynext")||"-1",10);
   try{localStorage.removeItem("millen.skynext");}catch(e){}
-  // HOME-TEAM LEAN (the N-series aerials + the NY-at-night ISS pass),
-  // now light and spaced: see skyPick
+  // dark after dark (a first run starts dark too: the warp reads best
+  // over those); see skyPick
   i=skyPick({all:all.length?all:[...Array(SKY_N).keys()],hist,onDisk,
-             last,nyc,prepared,rnd:Math.random});
+             last,prepared,rnd:Math.random,dark:darkSet,
+             wantDark:SKY_NIGHT||firstEver});
   hist=[i].concat(hist.filter(x=>x!==i)).slice(0,32);
   localStorage.setItem("millen.skyhist",JSON.stringify(hist));
   localStorage.setItem("millen.sky",i);
@@ -23348,10 +23428,15 @@ async function bootSkyline(){
       // cycles through. The 30-second wait is what this kills: the
       // download happens invisibly NOW, not while the user stares at
       // a loading bar at the next launch.
-      const stocked=spare.length>=PANTRY;
-      // a clip not seen in the last 32, the same light New York lean
-      const n=skyStockPick({all,have,playing:i,hist,failed:skyFailed,nyc,
-                            rnd:Math.random});
+      // stocked = two unseen clips of EACH kind waiting (6b318): counting
+      // spares alone stopped at one fresh clip, often of the wrong kind
+      // for the next launch, and a morning replayed a recent clip
+      const unseenOf=k=>unseen.filter(x=>darkSet.has(x)===k).length;
+      const stocked=spare.length>=PANTRY&&unseenOf(true)>=2
+        &&unseenOf(false)>=2;
+      // a clip not seen in the last 32, of whichever kind is short
+      const n=skyStockPick({all,have,playing:i,hist,failed:skyFailed,
+                            dark:darkSet,rnd:Math.random});
       if(n<0)return;
       let tries=0;
       (function warm(){

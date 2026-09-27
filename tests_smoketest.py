@@ -1466,7 +1466,7 @@ localStorage location matchMedia navigator parseFloat parseInt performance
 requestAnimationFrame setInterval setTimeout window""".split())
 # L is Leaflet, loaded from unpkg before any map mounts; the __X__ names
 # are placeholders the server fills in before the page is sent
-_PAGE_HOST |= {"L", "__IS_PC__", "__JUST_UPDATED__", "__USER_CITY__", "__USER_NICK__"}
+_PAGE_HOST |= {"L", "__SKY_NIGHT__", "__IS_PC__", "__JUST_UPDATED__", "__USER_CITY__", "__USER_NICK__"}
 _undecl = _jsscan.undeclared(_jsscan.page_script(_MILLENAI_SRC))
 _brand = _MILLENAI_SRC.split("the brand chameleon runs on its own gentle clock")[1][:600]
 check("the page has no reference to an undeclared perf",
@@ -4246,30 +4246,44 @@ check("the backdrop: Apple's root for its clips, and a failed clip reports its e
       "%r" % [_held, _retried, _starts, len(_ctx_roots)])
 
 # 6b318, per Patrick: "the background videos always seem to cycle the
-# same ones over and over". Half of all launches drew from the five New
-# York clips (each back three launches later) and the clip readied for
-# next time leaned New York too. 340 launches through the page's own
-# picking functions, a session readying the next clip each time:
-_sk0 = _M.index("const SKY_NYC_SHARE=")
+# same ones over and over", then "no need to bias towards nyc anymore -
+# lets favor variety. if possible, use darker videos at night" and "use
+# sunrise/sunset if it helps". 340 launches through the page's own
+# picking functions, four in ten after dark, each session readying the
+# next clip:
+_sk0 = _M.index("function skyPick(o){")
 _skjs = _M[_sk0:_M.index("async function bootSkyline(){", _sk0)] + r"""
 function rng(seed){let s=seed>>>0;return()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};}
-const NYC=new Set([17,37,66,72,75]),ALL=[...Array(89).keys()],rnd=rng(11);
-let hist=[],disk=[],prepared=-1,last=-1;const shown=[];
+const DARK=new Set(%s),ALL=[...Array(89).keys()],rnd=rng(11);
+let hist=[],disk=[],prepared=-1,last=-1;const shown=[],nights=[];
 for(let L=0;L<340;L++){
-  const i=skyPick({all:ALL,hist,onDisk:disk.slice(),last,nyc:NYC,prepared,rnd});prepared=-1;
+  const night=rnd()<0.4;
+  const i=skyPick({all:ALL,hist,onDisk:disk.slice(),last,prepared,rnd,dark:DARK,wantDark:night});
+  prepared=-1;nights.push(night);
   disk=disk.filter(x=>x!==i).concat([i]);while(disk.length>8)disk.shift();
   hist=[i].concat(hist.filter(x=>x!==i)).slice(0,32);last=i;shown.push(i);
-  let spare=disk.length-1;
-  do{const n=skyStockPick({all:ALL,have:disk.slice(),playing:i,hist,failed:new Set(),nyc:NYC,rnd});
-     if(n<0)break;disk=disk.concat([n]);while(disk.length>8)disk.shift();prepared=n;spare++;}while(spare<5);
+  // as fillPantry: one clip per session, more until five spares with
+  // two unseen of each kind
+  const stocked=()=>{const sp=disk.filter(x=>x!==i),un=sp.filter(x=>!hist.includes(x));
+    return sp.length>=5&&un.filter(x=>DARK.has(x)).length>=2&&un.filter(x=>!DARK.has(x)).length>=2;};
+  do{const n=skyStockPick({all:ALL,have:disk.slice(),playing:i,hist,failed:new Set(),dark:DARK,rnd});
+     if(n<0)break;disk=disk.concat([n]);while(disk.length>8)disk.shift();prepared=n;}while(!stocked());
 }
-const w=shown.slice(40);let rep=0,ny=0;
-w.forEach((x,k)=>{const j=k+40;if(shown.slice(j-10,j).includes(x))rep++;if(NYC.has(x))ny++;});
-// a New York clip seen five launches ago stays out even when the lean
-// comes up (rnd 0), and nothing fresh on disk replays the oldest seen
-const gap=skyPick({all:ALL,hist:[1,2,3,4,17],onDisk:[17,50,2],last:1,nyc:NYC,prepared:-1,rnd:()=>0});
-process.stdout.write(JSON.stringify({rep:rep,ny:ny/w.length,d50:new Set(w.slice(0,50)).size,gap}));
+let rep=0,wrong=0,nyc=0;const NYC=[17,37,66,72,75];
+for(let j=40;j<shown.length;j++){
+  if(shown.slice(j-10,j).includes(shown[j]))rep++;
+  if(DARK.has(shown[j])!==nights[j])wrong++;
+  if(NYC.includes(shown[j]))nyc++;}
+// nothing unseen and nothing of tonight's kind on disk: never a wait,
+// the cached clip seen longest ago
+const nowait=skyPick({all:ALL,hist:[5,9,1],onDisk:[9,1,5],last:5,prepared:-1,rnd:()=>0,dark:DARK,wantDark:true});
+// tonight's kind cached but seen: that one, over a fresh clip of the other kind
+const kind=skyPick({all:ALL,hist:[3,1],onDisk:[3,2,1],last:1,prepared:-1,rnd:()=>0,dark:DARK,wantDark:true});
+// two of tonight's kind cached, both seen: the one seen longest ago
+const oldest=skyPick({all:ALL,hist:[0,1,3],onDisk:[3,0],last:1,prepared:-1,rnd:()=>0,dark:DARK,wantDark:true});
+process.stdout.write(JSON.stringify({rep,wrong,nyc:nyc/300,d50:new Set(shown.slice(40,90)).size,nowait,kind,oldest}));
 """
+_skjs = _skjs.replace("%s", json.dumps([0, 3, 4, 6, 8, 11, 14, 16, 23, 25, 27, 31, 36, 42, 47, 52, 56, 61, 65, 71, 75, 76, 83]))
 try:
     _skf = _os20.path.join(_tf20.mkdtemp(), "sky.js")
     open(_skf, "w").write(_skjs)
@@ -4277,12 +4291,34 @@ try:
                                      timeout=60).stdout)
 except Exception as _e:
     _sko = {"err": repr(_e)}
-check("backdrops: no clip back within ten launches, New York about one in five",
-      _sko.get("rep") == 0 and 0.08 <= _sko.get("ny", 0) <= 0.3 and _sko.get("d50", 0) >= 40
-      and _sko.get("gap") == 50
-      and "i=skyPick({" in page and "const n=skyStockPick({" in page
-      and "Math.random()<0.5)pool=nycAvail" not in page,
+check("backdrops: dark after dark, light by day, no clip back within ten launches",
+      _sko.get("rep") == 0 and _sko.get("wrong", 99) <= 3 and _sko.get("d50", 0) >= 40
+      and _sko.get("nyc", 1) < 0.12 and _sko.get("nowait") == 1 and _sko.get("kind") == 3 and _sko.get("oldest") == 3
+      and "wantDark:SKY_NIGHT||firstEver});" in page and "const n=skyStockPick({" in page
+      and "const stocked=spare.length>=PANTRY&&unseenOf(true)>=2" in page
+      and "__SKY_NYC__" not in _M and "SKY_NYC" not in _M,
       "%r" % _sko)
+
+# the sun, measured: known sunsets and noons, and the city of a time zone
+import calendar as _cal21
+_sun = {"math": math if "math" in dir() else __import__("math"), "time": time, "re": re, "os": _os20}
+_exec_names(_sun, {"SUN_NIGHT_BELOW", "_sun_elevation", "_zone_latlon"})
+def _utc21(s): return _cal21.timegm(time.strptime(s, "%Y-%m-%d %H:%M"))
+_e = _sun["_sun_elevation"]
+_sunv = {"NY sunset": _e(40.7128, -74.006, _utc21("2026-09-26 22:48")),
+         "NY +25 min": _e(40.7128, -74.006, _utc21("2026-09-26 23:13")),
+         "NY noon": _e(40.7128, -74.006, _utc21("2026-09-26 16:50")),
+         "Sydney sunset": _e(-33.87, 151.21, _utc21("2026-12-21 09:05")),
+         "Tromso midnight sun": _e(69.65, 18.96, _utc21("2026-06-21 22:00"))}
+_zll = _sun["_zone_latlon"]("America/New_York")
+check("the backdrop's sun: sunsets, noon and the midnight sun where they belong",
+      -2.0 < _sunv["NY sunset"] < 0.0 and _sunv["NY +25 min"] < _sun["SUN_NIGHT_BELOW"]
+      and _sunv["NY sunset"] > _sun["SUN_NIGHT_BELOW"]          # dusk isn't night yet
+      and 47 < _sunv["NY noon"] < 49 and -2.0 < _sunv["Sydney sunset"] < 0.0
+      and _sunv["Tromso midnight sun"] > 0
+      and (_zll is None or (abs(_zll[0] - 40.71) < 0.1 and abs(_zll[1] + 74.01) < 0.1))
+      and '.replace("__SKY_NIGHT__", json.dumps(sky_is_night()))' in _M,
+      "%r" % [_sunv, _zll])
 
 # ...and a clip half downloaded when the app quit resumes next time
 _rs_dir = _tf20.mkdtemp()
