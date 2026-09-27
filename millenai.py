@@ -7205,12 +7205,66 @@ def _pfile(name: str, base=None) -> str:
     return os.path.join(base or app_dir(), name)
 
 
-def load_prefs(base=None) -> dict:
+class StoreReadError(Exception):
+    """A personal file is there but can't be read (0b L1, 6b322). It is
+    never taken for empty: the route answers 503 and nothing that
+    depends on it is written. Only a file that isn't there yet reads as
+    empty. The argument is the file's name."""
+
+
+# what the page shows for each (0b 5.12, Q11)
+READ_FAIL = {"chats.json": "Couldn\u2019t read your chats. Nothing was changed.",
+             "memory.json": "Couldn\u2019t read your memory. Nothing was changed.",
+             "prefs.json": "Couldn\u2019t read your settings. Nothing was changed."}
+
+
+def _read_json(name: str, base, want):
+    """The file's JSON; None when it isn't there; StoreReadError when it
+    is there and can't be read, or isn't the shape it must be."""
     try:
-        with open(_pfile("prefs.json", base), "r", encoding="utf-8") as f:
+        with open(_pfile(name, base), "r", encoding="utf-8") as f:
             d = json.load(f)
-        return d if isinstance(d, dict) else {}
+    except FileNotFoundError:
+        return None
+    except Exception as exc:
+        raise StoreReadError(name) from exc
+    if not isinstance(d, want):
+        raise StoreReadError(name)
+    return d
+
+
+def _write_json(name: str, data, base, **dump):
+    """Atomic (0b L2): a unique temp file beside it, then os.replace, so a
+    crash leaves the old file or the new one and two saves never rename
+    each other's half-written file into place (the 6b304 prefs lesson)."""
+    p = _pfile(name, base)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p),
+                               prefix="." + name.split(".")[0] + "-",
+                               suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, **dump)
+            f.flush()
+            os.fsync(f.fileno())
+        _replace_into(tmp, p)
     except Exception:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def load_prefs(base=None, strict=False) -> dict:
+    """strict: an unreadable file raises StoreReadError. Every read that
+    feeds a write, and GET /api/prefs, is strict (6b322). The other
+    readers get {} and may use it only where empty means "off" (0b Q11)."""
+    try:
+        return _read_json("prefs.json", base, dict) or {}
+    except StoreReadError:
+        if strict:
+            raise
         return {}
 
 
@@ -7232,24 +7286,12 @@ def _replace_into(tmp: str, dst: str):
 
 
 def store_prefs(d: dict, base=None):
-    """Atomic, with a UNIQUE temp file per save (6b304). Every save used to
-    write prefs.json.tmp, so two at once could rename one another's
-    half-written file into place, or raise when the other had already
-    moved it away. Callers that read-modify-write take _prefs_lock."""
-    p = _pfile("prefs.json", base)
-    os.makedirs(os.path.dirname(p), exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p), prefix=".prefs-",
-                               suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(d, f)
-        _replace_into(tmp, p)
-    except Exception:
-        try:
-            os.remove(tmp)
-        except OSError:
-            pass
-        raise
+    """Atomic, with a UNIQUE temp file per save (6b304). Callers that
+    read-modify-write take _prefs_lock. A file on disk that can't be read
+    is never written over (0b L1, 6b322): every caller read it first, so
+    whatever it holds now was built on an empty read."""
+    _read_json("prefs.json", base, dict)
+    _write_json("prefs.json", d, base)
 
 
 # THE MODELS THIS APP PUT ON DISK (6b306). Auto-clean is on by default
@@ -7289,31 +7331,243 @@ _chats_lock = threading.Lock()
 
 
 def load_chats(base=None) -> list:
-    try:
-        with open(_pfile("chats.json", base), "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data if isinstance(data, list) else []
-    except Exception:
-        return []
+    """The chat list; [] only when the file isn't there yet. Anything
+    else it can't read raises StoreReadError (0b L1, 6b322): a failed
+    read used to look like no chats, and the next save wrote that."""
+    return _read_json("chats.json", base, list) or []
 
 
 # How many chats are kept (6b318). It was 60, and with 60 saved every new
 # chat silently erased the oldest (Patrick was at exactly 60). 1,000 is
 # 0b's figure; a pinned chat is never cut, however old.
 CHATS_KEEP = 1000
+_data_rev = [0]         # moves on every write to the chat store (0b 5.6)
+
+
+def _chat_ts(c) -> float:
+    t = c.get("ts") if isinstance(c, dict) else None
+    return float(t) if isinstance(t, (int, float)) else 0.0
 
 
 def store_chats(items: list, base=None):
-    """Atomic write — a crash mid-save must not corrupt the history. The
-    page sends the list newest first; past CHATS_KEEP only pins stay."""
-    items = items[:CHATS_KEEP] + [c for c in items[CHATS_KEEP:]
-                                  if isinstance(c, dict) and c.get("pin")]
-    p = _pfile("chats.json", base)
-    os.makedirs(os.path.dirname(p), exist_ok=True)
-    tmp = p + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(items, f)
-    os.replace(tmp, p)
+    """Atomic (0b L2), newest first, and the only eviction (0b 5.7): every
+    pinned chat, every chat with a project (kept before Projects exists,
+    so a downgrade can't evict one, R-2-26) and the newest CHATS_KEEP of
+    the rest by ts. Eviction makes no stub; nothing else drops a chat
+    (L3). Fields this build doesn't know are written back as read (L6)."""
+    items = sorted(items, key=_chat_ts, reverse=True)
+    exempt = [isinstance(c, dict) and bool(c.get("pin") or c.get("project"))
+              for c in items]
+    rest = [i for i, e in enumerate(exempt) if not e]
+    drop = set(rest[CHATS_KEEP:])
+    items = [c for i, c in enumerate(items) if i not in drop]
+    _write_json("chats.json", items, base)
+    _data_rev[0] += 1
+
+
+# ------------------------------------------- chat operations (0b 5.3)
+# The page sends small operations and the server writes the turns;
+# nothing replaces the whole list any more (6b322). One lock, one read,
+# one write per batch.
+_CHAT_ID = re.compile(r"c[0-9a-z-]{1,48}")
+_CHAT_LANES = ("ai", "code", "funnel")
+CHAT_UNDO_S = 6.0
+_chat_stubs = {}        # deleted id -> {"at", "chat", "idx"}, 6 s of undo
+_chat_gone = set()      # ids deleted for good in this run
+
+
+def _new_chat_id() -> str:
+    """"c" + 26 random base32 characters (0b 5.3), as the page makes."""
+    return "c" + "".join(secrets.choice("0123456789abcdefghijklmnopqrstuv")
+                         for _ in range(26))
+
+
+def chat_prefix_hash(msgs, n: int) -> str:
+    """SHA-256 of the first n messages' role and text (0b Q1), the same as
+    the page's chatHash(): role, NUL, content, \\x01 for each message,
+    as UTF-8 with any lone surrogate as U+FFFD. Nothing else is hashed,
+    so drafts, sources and unknown fields never break a match."""
+    out = []
+    for m in (msgs or [])[:max(0, n)]:
+        m = m if isinstance(m, dict) else {}
+        r, c = m.get("role"), m.get("content")
+        out.append((r if isinstance(r, str) else "") + "\x00"
+                   + (c if isinstance(c, str) else "") + "\x01")
+    b = ("".join(out).encode("utf-16", "surrogatepass")
+         .decode("utf-16", "replace").encode("utf-8"))
+    return hashlib.sha256(b).hexdigest()
+
+
+def _chat_find(chats, cid):
+    for i, c in enumerate(chats):
+        if isinstance(c, dict) and c.get("id") == cid:
+            return i, c
+    return -1, None
+
+
+def _chat_msgs(c) -> list:
+    m = c.get("messages")
+    if not isinstance(m, list):
+        m = c["messages"] = []
+    return m
+
+
+def _chat_settle(now=None):
+    """Stubs past their undo window are final (0b 5.6)."""
+    now = now or time.time()
+    for cid in [k for k, v in _chat_stubs.items()
+                if now - v["at"] >= CHAT_UNDO_S]:
+        _chat_stubs.pop(cid, None)
+        _chat_gone.add(cid)
+
+
+def _chat_dead(cid) -> bool:
+    return cid in _chat_stubs or cid in _chat_gone
+
+
+def _chat_new(chats, cid, lane, title=None, messages=None):
+    c = {"id": cid, "lane": lane if lane in _CHAT_LANES else "ai",
+         "ts": int(time.time() * 1000), "messages": list(messages or [])}
+    if isinstance(title, str) and title.strip():
+        c["title"] = title.strip()[:80]
+    chats.insert(0, c)
+    return c
+
+
+def _chat_append(chats, cid, after_len, after_hash, msgs, prefix=None,
+                 lane=None, title=None):
+    """msgs onto the chat's stated prefix (0b 5.3, Q2: the stored chat
+    may be longer; the turns go at its end). Returns the chat they
+    landed in. A chat that doesn't match gets a copy holding the page's
+    own content ("‹title› (copy)", Q3), and a deleted id a fresh chat:
+    either way the caller hands the page the new id. prefix is the
+    page's own messages before these, when it sent them."""
+    try:
+        after_len = max(0, int(after_len or 0))
+    except (TypeError, ValueError):
+        after_len = 0
+    after_hash = str(after_hash or "")
+    _, c = _chat_find(chats, cid)
+    ok_prefix = (list(prefix)[:after_len] if isinstance(prefix, list)
+                 and len(prefix) >= after_len
+                 and chat_prefix_hash(prefix, after_len) == after_hash
+                 else [])
+    if c is None:
+        if after_len == 0 and not _chat_dead(cid):
+            c = _chat_new(chats, cid, lane, title)
+        else:
+            c = _chat_new(chats, _new_chat_id(), lane, title, ok_prefix)
+    else:
+        stored = _chat_msgs(c)
+        if not (len(stored) >= after_len
+                and chat_prefix_hash(stored, after_len) == after_hash):
+            t = c.get("title") or "chat"
+            c = _chat_new(chats, _new_chat_id(), c.get("lane"),
+                          t + " (copy)", ok_prefix)
+    _chat_msgs(c).extend(m for m in msgs if isinstance(m, dict))
+    c["ts"] = int(time.time() * 1000)
+    return c
+
+
+def _chat_op(chats, op):
+    """One operation on the list in hand: (reply, changed)."""
+    if not isinstance(op, dict):
+        return {"err": "not an operation"}, False
+    kind, cid = op.get("op"), str(op.get("id") or "")
+    if not _CHAT_ID.fullmatch(cid):
+        return {"err": "bad id"}, False
+    i, c = _chat_find(chats, cid)
+    if kind == "create":
+        if c is not None:
+            return {"ok": True}, False
+        nid = _new_chat_id() if _chat_dead(cid) else cid
+        _chat_new(chats, nid, op.get("lane"), op.get("title"))
+        return ({"ok": True} if nid == cid else {"remap": nid}), True
+    if kind == "append":
+        c2 = _chat_append(chats, cid, op.get("after_len"),
+                          op.get("after_hash"), op.get("msgs") or [],
+                          op.get("base"), op.get("lane"), op.get("title"))
+        out = {"ok": True} if c2.get("id") == cid else {"remap": c2["id"]}
+        out.update(n=len(_chat_msgs(c2)))
+        return out, True
+    if kind == "undelete":
+        st = _chat_stubs.pop(cid, None)
+        if not st or c is not None:
+            return {"err": "gone"}, False
+        chats.insert(min(st["idx"], len(chats)), st["chat"])
+        return {"ok": True}, True
+    if c is None:
+        return {"err": "gone" if _chat_dead(cid) else "no such chat"}, False
+    if kind == "delete":
+        # the removal and the stub in one step (0b 5.6); in This computer
+        # the stub lives here, and a quit inside the window leaves the
+        # chat deleted
+        chats.pop(i)
+        _chat_stubs[cid] = {"at": time.time(), "chat": c, "idx": i}
+        return {"ok": True}, True
+    if kind == "truncate":
+        stored = _chat_msgs(c)
+        try:
+            to = max(0, int(op.get("to_len")))
+        except (TypeError, ValueError):
+            return {"err": "bad length"}, False
+        if not (len(stored) >= to and chat_prefix_hash(stored, to)
+                == str(op.get("prefix_hash") or "")):
+            return {"conflict": len(stored)}, False
+        del stored[to:]
+        c["ts"] = int(time.time() * 1000)
+        return {"ok": True}, True
+    if kind == "set":
+        f, old, new = op.get("field"), op.get("old"), op.get("new")
+        if f not in ("title", "pin", "named", "lane"):
+            return {"err": "bad field"}, False
+        cur = c.get(f)
+        same = (cur == old or (f in ("pin", "named")
+                               and not cur and not old))
+        if not same:
+            return {"conflict": cur}, False
+        if f == "title":
+            if not isinstance(new, str) or not new.strip():
+                return {"err": "bad title"}, False
+            c[f] = new.strip()[:80]
+        elif f == "lane":
+            if new not in _CHAT_LANES:
+                return {"err": "bad lane"}, False
+            c[f] = new
+        else:
+            c[f] = bool(new)
+        return {"ok": True}, True
+    return {"err": "unknown op"}, False
+
+
+def chat_ops(ops, base=None) -> dict:
+    """A batch under one lock, written once (0b Q4): each op's reply (ok,
+    conflict with the current value, remap, or err) and the new
+    data_rev. StoreReadError propagates: nothing is applied."""
+    with _chats_lock:
+        _chat_settle()
+        chats = load_chats(base)
+        replies, changed = [], False
+        for op in (ops if isinstance(ops, list) else [])[:200]:
+            r, ch = _chat_op(chats, op)
+            replies.append(r)
+            changed = changed or ch
+        if changed:
+            store_chats(chats, base)
+        return {"results": replies, "data_rev": _data_rev[0]}
+
+
+def chat_append_turn(cid, after_len, after_hash, msgs, base=None,
+                     prefix=None, lane=None, title=None):
+    """The turn writer's append (0b 5.4): (landed id, length, hash)."""
+    with _chats_lock:
+        _chat_settle()
+        chats = load_chats(base)
+        c = _chat_append(chats, cid, after_len, after_hash, msgs, prefix,
+                         lane, title)
+        store_chats(chats, base)
+        m = _chat_msgs(c)
+        return c["id"], len(m), chat_prefix_hash(m, len(m))
 _memory_lock = threading.Lock()
 
 MEMORY_PROMPT = (
@@ -7328,23 +7582,28 @@ MEMORY_PROMPT = (
 )
 
 
+MEMORY_KEEP = 200       # facts kept (0b 5.2); prompts use the newest 40
+
+
 def _load_memory(base=None) -> list:
-    try:
-        with open(_pfile("memory.json", base), "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return []
+    """The facts; [] only when the file isn't there yet (0b L1)."""
+    return _read_json("memory.json", base, list) or []
 
 
 def _save_memory(items: list, base=None):
-    p = _pfile("memory.json", base)
-    os.makedirs(os.path.dirname(p), exist_ok=True)
-    with open(p, "w", encoding="utf-8") as f:
-        json.dump(items[-60:], f, indent=1)
+    """Atomic (0b L2), the newest MEMORY_KEEP; fields it doesn't know
+    stay on each fact (L6)."""
+    _write_json("memory.json", items[-MEMORY_KEEP:], base, indent=1)
 
 
 def memory_text(base=None) -> str:
-    return "\n".join("- " + i["fact"] for i in _load_memory(base)[-40:])
+    """For a prompt: an unreadable file just adds nothing (no write)."""
+    try:
+        facts = _load_memory(base)[-40:]
+    except StoreReadError:
+        return ""
+    return "\n".join("- " + i["fact"] for i in facts
+                     if isinstance(i, dict) and isinstance(i.get("fact"), str))
 
 
 def _extract_memory(label: str, user_msg: str, base=None, conf=None):
@@ -8750,7 +9009,12 @@ atexit.register(stop_managed_engines)
 
 def _signal_exit(signum, _frame):
     # atexit does NOT run on SIGTERM/SIGHUP — without this, force-quitting
-    # the app leaves multi-GB model servers resident forever
+    # the app leaves multi-GB model servers resident forever. An answer
+    # still streaming is kept as far as it got, first (0b 5.4, 6b322)
+    try:
+        _turns_flush()
+    except Exception:
+        pass
     stop_managed_engines()
     try:
         _drop_instance_note()    # nor would the note naming a dead key go
@@ -12898,6 +13162,124 @@ def _funnel_image(query: str) -> str:
 
 
 
+# ------------------------------------------ the turn writer (0b 5.4)
+# The server saves each question when it arrives and each answer as it
+# ends, from the bytes the stream actually carried (6b322). The page no
+# longer saves turns, so an answer that finishes into a chat nobody is
+# looking at is kept, and a stopped one keeps what was shown.
+_TURN_TAGS = ("RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2"
+              "|STEP|APPROVE")
+# the page's rules, character for character: JS "." stops at a line
+# break, and JS "$" (unlike Python's) only at the very end
+_TURN_FRAME = re.compile("\x00(" + _TURN_TAGS
+                         + "):([^\n\r\u2028\u2029]*?)\x00")
+_TURN_PART = re.compile("\x00(?:" + _TURN_TAGS + "):[^\x00]*\\Z")
+_TURN_RESET = "\x00RESET\x00"
+_TURN_BOLD_SKIP = re.compile(
+    r"^(open|closed|note|heads|tip|hours|today|tonight|monday|tuesday|"
+    r"wednesday|thursday|friday|saturday|sunday|yes|no)\b", re.I)
+_turns_live = {}
+_turns_lock = threading.Lock()
+
+
+def turn_text(raw: str) -> str:
+    """The answer text exactly as the page shows it (0b L5, R-2-22):
+    every frame lifted out, then only what follows the last RESET. The
+    page's parseStream() does the same; one corpus checks both."""
+    t = _TURN_PART.sub("", _TURN_FRAME.sub("", raw))
+    cut = t.rfind(_TURN_RESET)
+    return t[cut + len(_TURN_RESET):] if cut >= 0 else t
+
+
+def turn_record(raw: str, searched: bool = False):
+    """The assistant message the page builds at the end of a stream
+    (content, and drafts, sources, photos, map, places and loc when
+    present), or None: nothing to keep, or an error line (the question
+    stays unanswered, for Try again; 0b Q12)."""
+    drafts, got = [], {}
+    for tag, body in _TURN_FRAME.findall(raw):
+        try:
+            d = json.loads(body)
+        except ValueError:
+            continue
+        if tag == "DRAFT":
+            if isinstance(d, dict) and not any(x.get("m") == d.get("m")
+                                               for x in drafts):
+                drafts.append(d)
+        elif tag in ("SOURCES", "PHOTOS", "MAP", "PLACEHINT", "PLACES2"):
+            got[tag] = d
+        elif tag == "CTX" and isinstance(d, dict):
+            got["CTX"] = d.get("loc") or ""
+    full = turn_text(raw)
+    if not full:
+        good = [x for x in drafts if not str(x.get("t", "")).startswith(
+            "(no answer")]
+        full = str(good[0].get("t", "")) if good else ""
+    places = got.get("PLACES2")
+    pm = re.search(r"\[\[PLACES\]\]\s*(\[[\s\S]*?\])\s*\Z", full)
+    if pm:
+        try:
+            places = json.loads(pm.group(1))[:4]
+        except ValueError:
+            places = None
+    full = re.sub(r"\n?\[\[PLACES\]\][\s\S]*\Z", "", full).strip()
+    if not places and (searched or got.get("PLACEHINT")):
+        bold = [m.strip() for m in re.findall(r"\*\*([^*\n]{3,42})\*\*",
+                                              full)]
+        bold = [re.sub(r"[.,;:!?]+$", "", b) for b in bold]
+        bold = [b for b in bold
+                if re.match(r"[A-Z\u00c0-\u017f]", b)
+                and not b.startswith("$")
+                and not re.search(r"\d\s*(am|pm)", b, re.I)
+                and not _TURN_BOLD_SKIP.match(b)
+                and len(b.split()) <= 5]
+        uniq = list(dict.fromkeys(bold))[:4]
+        places = [{"n": b, "d": "", "h": ""} for b in uniq] or None
+    if not full or full.startswith("\u26a0\ufe0f") or "\n\u26a0\ufe0f" in full:
+        return None
+    rec = {"role": "assistant", "content": full}
+    if drafts:
+        rec["drafts"] = drafts
+    if got.get("SOURCES"):
+        rec["sources"] = got["SOURCES"]
+    if got.get("PHOTOS"):
+        rec["photos"] = got["PHOTOS"]
+    if got.get("MAP"):
+        rec["map"] = got["MAP"]
+    if isinstance(places, list) and places:
+        rec["places"] = places
+        rec["loc"] = got.get("CTX", "")
+    return rec
+
+
+def _turn_finish(t):
+    """Save a turn's answer once: at the stream's end, or at a quit
+    mid-stream (_turns_flush), whichever comes first."""
+    with _turns_lock:
+        if t.get("done"):
+            return
+        t["done"] = True
+        _turns_live.pop(id(t), None)
+    try:
+        rec = turn_record(b"".join(t["wire"]).decode("utf-8", "replace"),
+                          t.get("searched", False))
+        if rec:
+            chat_append_turn(t["id"], t["n"], t["h"], [rec], t["base"])
+    except Exception:
+        pass
+
+
+def _turns_flush():
+    """At a quit: keep every answer still streaming, as far as it got."""
+    with _turns_lock:
+        live = list(_turns_live.values())
+    for t in live:
+        _turn_finish(t)
+
+
+atexit.register(_turns_flush)
+
+
 # the headers a proxy or tunnel adds to what it forwards (see _gate)
 _PROXY_HEADERS = ("X-Forwarded-For", "X-Forwarded-Host", "Forwarded",
                   "X-Real-IP", "Cf-Connecting-Ip", "True-Client-IP")
@@ -12908,6 +13290,49 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
 
     def log_message(self, *args):
         pass
+
+    # NOTHING IS KEPT BY THE WEB VIEW (0b 5.11, 6b322): every response,
+    # the page, JSON, pictures, videos, downloads and errors, is no-store
+    # (it was no-cache, private max-age or public for a week here and
+    # there). Any Cache-Control a route sets is replaced.
+    def send_header(self, keyword, value):
+        if keyword.lower() == "cache-control":
+            return
+        super().send_header(keyword, value)
+
+    def end_headers(self):
+        super().send_header("Cache-Control", "no-store")
+        self._head_sent = True
+        super().end_headers()
+
+    # ONE WRAPPER PER REQUEST (6b322): the thread's leftovers from the
+    # last request are cleared first (0b 5.11: a search's rows or a cloud
+    # answer's provider must never reach the next request on this
+    # thread); a store that can't be read answers 503 with its line
+    # (0b L1); and a chat turn in flight is saved however the request
+    # ends.
+    def _run(self, fn):
+        _tl_search.__dict__.clear()
+        _answered.pop(threading.get_ident(), None)
+        self._turn = None
+        self._head_sent = False
+        try:
+            fn()
+        except StoreReadError as exc:
+            if not self._head_sent:
+                self._send_json({"err": READ_FAIL.get(str(exc),
+                                 "Couldn\u2019t read that. Nothing was changed."),
+                                 "unreadable": str(exc)}, code=503)
+        finally:
+            t, self._turn = self._turn, None
+            if t:
+                _turn_finish(t)
+
+    def do_GET(self):
+        self._run(self._do_GET)
+
+    def do_POST(self):
+        self._run(self._do_POST)
 
     def _gate(self):
         """True = let the request through; False = already answered it.
@@ -13087,7 +13512,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         return None
 
     # ------------------------------------------------------------------ GET
-    def do_GET(self):
+    def _do_GET(self):
         if not self._gate():
             return
         if self.path == "/":
@@ -13395,10 +13820,22 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         out[name]["fastcloud"] = _fl[0].get("name", "")
             self._send_json(out)
         elif self.path == "/api/prefs":
-            self._send_json(load_prefs(self._data_base()))
+            self._send_json(load_prefs(self._data_base(), strict=True))
         elif self.path == "/api/chats":
+            # an unreadable store answers 503, never an empty list (0b L1)
             with _chats_lock:
-                self._send_json({"chats": load_chats(self._data_base())})
+                _cs = load_chats(self._data_base())
+                _rev = _data_rev[0]
+            self._send_json({"chats": _cs, "data_rev": _rev})
+        elif self.path.startswith("/api/chats/one?"):
+            # one chat, as saved: the page adopts it after each answer
+            # (6b322), so the two never hold different turns
+            _id = (urllib.parse.parse_qs(urllib.parse.urlparse(
+                self.path).query).get("id", [""])[0] or "")
+            with _chats_lock:
+                _, _c = _chat_find(load_chats(self._data_base()), _id)
+                _rev = _data_rev[0]
+            self._send_json({"chat": _c, "data_rev": _rev})
         elif self.path.startswith("/api/chats/search"):
             # full-text over the user's own chats (6b269, per Patrick:
             # "search through existing conversations") — titles match
@@ -13498,9 +13935,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         except Exception:
             pass          # client hung up mid-stream — normal for video
 
-    def _send_json(self, obj):
+    def _send_json(self, obj, code=200):
         body = json.dumps(obj).encode("utf-8")
-        self.send_response(200)
+        self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -13596,6 +14033,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         else:
             stats = {"real": False, "gpu_pct": gpu,
                      "mem_pressure": mem_pressure()}
+        # the chat store's change counter rides the 2 s poll (0b 5.6)
+        stats["data_rev"] = _data_rev[0]
         body = json.dumps(stats).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -13604,7 +14043,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     # ----------------------------------------------------------------- POST
-    def do_POST(self):
+    def _do_POST(self):
         if not self._gate():
             return
         if not self._csrf_ok():
@@ -14012,6 +14451,36 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             asked = [str(x)[:160] for x in (d.get("asked") or [])][:20]
             effort = "fast" if d.get("effort") == "fast" else "normal"
             stage = len(picks) + 1
+            # FUNNEL TURNS ARE SAVED HERE (0b 5.5, gap G4; 6b322): the goal
+            # or the latest pick when the request arrives, the summary
+            # when it's done; the page only ever saved them itself, and
+            # never the summary. Each reply carries the chat as saved.
+            _fc = str(d.get("chat_id") or "")
+            _ft = None
+            _fbase = self._data_base()
+            if _fc and _CHAT_ID.fullmatch(_fc):
+                if picks:
+                    _fq = asked[len(picks) - 1] if len(asked) >= len(picks) else ""
+                    _arrive = {"role": "assistant", "content":
+                               (_fq + " \u2192 " if _fq else "") + picks[-1]}
+                else:
+                    _arrive = {"role": "user", "content": "Funnel: " + goal}
+                _ft = list(chat_append_turn(
+                    _fc, d.get("after_len"), d.get("after_hash"), [_arrive],
+                    _fbase, lane="funnel", title=("Funnel: " + goal)[:48]))
+
+            def _fsend(reply):
+                if _ft:
+                    if reply.get("done") and reply.get("summary"):
+                        _ft[:] = chat_append_turn(
+                            _ft[0], _ft[1], _ft[2],
+                            [{"role": "assistant",
+                              "content": str(reply["summary"])}], _fbase)
+                    with _chats_lock:
+                        _, _fcc = _chat_find(load_chats(_fbase), _ft[0])
+                    reply["chat"] = {"id": _ft[0], "messages":
+                                     (_fcc or {}).get("messages", [])}
+                self._send_json(reply)
             if stage > total:
                 # the funnel is spent — summarise the path taken
                 msgs = [{"role": "system",
@@ -14167,7 +14636,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # NEVER hand the picks back as if they were an answer
                 # (6b260, per Patrick) — if no model can weigh in, say
                 # so honestly and point at the fix
-                self._send_json({"done": True, "stage": total,
+                _fsend({"done": True, "stage": total,
                                  "total": total,
                                  "summary": out or (
                                      "I couldn't reach a model to weigh "
@@ -14180,7 +14649,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 return
             st = funnel_stage(goal, reqs, opts, stage, total, picks,
                               want_img, asked, effort=effort)
-            self._send_json({"done": False, "stage": stage,
+            _fsend({"done": False, "stage": stage,
                              "total": total, "q": st["q"],
                              "options": st["options"],
                              "engine": st.get("engine", "")})
@@ -14195,9 +14664,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 base = self._data_base()
                 # the read, the merge and the write under ONE lock (6b304):
                 # every toggle posts on change, so two quick flips raced
-                # and the second write dropped the first's key
+                # and the second write dropped the first's key. A file
+                # it can't read answers 503 and is left as it is (6b322)
                 with _prefs_lock:
-                    cur = load_prefs(base)
+                    cur = load_prefs(base, strict=True)
                     cur.update(d)
                     store_prefs(cur, base)
                 if base is None and "no_limits" in d:
@@ -14207,15 +14677,22 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._send_json({"ok": isinstance(d, dict)})
             return
         if self.path == "/api/chats":
-            n = int(self.headers.get("Content-Length", 0))
+            # GONE (0b 5.3, 6b322): the whole-list save let an outdated
+            # page replace everything; a page this old must reload
+            self._send_json({"err": "this page is out of date; reload it"},
+                            code=410)
+            return
+        if self.path == "/api/chats/ops":
+            n = int(self.headers.get("Content-Length", 0) or 0)
             try:
-                items = json.loads(self.rfile.read(n)).get("chats", [])
+                d = json.loads(self.rfile.read(n)) if n else {}
             except (ValueError, json.JSONDecodeError):
-                items = None
-            if isinstance(items, list):
-                with _chats_lock:
-                    store_chats(items, self._data_base())
-            self._send_json({"ok": isinstance(items, list)})
+                d = {}
+            ops = d.get("ops") if isinstance(d, dict) else None
+            if not isinstance(ops, list):
+                self._send_json({"err": "no ops"}, code=400)
+                return
+            self._send_json(chat_ops(ops, self._data_base()))
             return
         if self.path == "/api/sky/seen":
             # the backdrop now showing, for the history beside the clips
@@ -14296,6 +14773,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     _save_memory([], base)
             if "chats" in scopes:
                 with _chats_lock:
+                    # the undo window's copies go too, and their ids stay
+                    # dead, so a late answer can't bring one back
+                    _chat_gone.update(_chat_stubs)
+                    _chat_stubs.clear()
+                    with _turns_lock:
+                        for _t in _turns_live.values():
+                            _t["done"] = True
+                        _turns_live.clear()
                     store_chats([], base)
             if "prefs" in scopes:
                 # personal keys only — machine config (turbo, update
@@ -14442,6 +14927,32 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             return
 
         messages = list(req_json.get("messages", []))
+        # THE QUESTION IS SAVED ON ARRIVAL (0b 5.4, 6b322), when the page
+        # names its chat: onto the page's own prefix, or into a copy (or
+        # a fresh chat, for a deleted one) whose id goes back in
+        # X-Chat-Id. The answer follows at the stream's end (_run's
+        # finally), or at a quit. Drills and tests name no chat and save
+        # nothing (0b Q12).
+        _cid = str(req_json.get("chat_id") or "")
+        if _cid:
+            _q = messages[-1] if messages else None
+            if (not _CHAT_ID.fullmatch(_cid) or not isinstance(_q, dict)
+                    or _q.get("role") != "user"):
+                self._send_json({"err": "bad chat"}, code=400)
+                return
+            _al = req_json.get("after_len")
+            _ah = req_json.get("after_hash")
+            if _al is None:
+                _al = len(messages) - 1
+                _ah = chat_prefix_hash(messages, _al)
+            _landed, _n, _h = chat_append_turn(
+                _cid, _al, _ah, [_q], self._data_base(),
+                prefix=messages[:-1], lane=req_json.get("lane"),
+                title=str(_q.get("content") or "")[:48])
+            self._turn = {"id": _landed, "n": _n, "h": _h, "wire": [],
+                          "base": self._data_base(), "searched": False}
+            with _turns_lock:
+                _turns_live[id(self._turn)] = self._turn
         # pasted images ride beside the text; vision always routes to
         # LLaVA on Ollama (native /api/chat takes raw base64 per message)
         images = [i for i in (req_json.get("images") or [])
@@ -15387,6 +15898,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-cache")
         self.send_header("X-Accel-Buffering", "no")
         self.send_header("X-Web-Search", "1" if query else "0")
+        if self._turn:
+            self._turn["searched"] = bool(query)
+            self.send_header("X-Chat-Id", self._turn["id"])
         xm_names = list(council)
         if (len(council) > 1 and load_prefs(None).get("turbo")
                 and not cloud_only):     # the bench IS the council here
@@ -15421,6 +15935,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 self.wfile.write(data)
                 self.wfile.flush()
                 last_write[0] = time.time()
+                # what the page was actually sent: the turn is rebuilt
+                # from this, so a stopped answer keeps what was shown
+                if self._turn is not None:
+                    self._turn["wire"].append(data)
 
         def _heartbeat():
             while not hb_stop.wait(5):
@@ -21408,19 +21926,20 @@ function msgActions(div,role,text){
   div.appendChild(bar);
 }
 // TRY AGAIN: drop the last answer and re-ask the same question
+// TRY AGAIN (6b322): the last question is asked again, whether it was
+// answered or its answer failed (the server keeps a question whose
+// answer errored, 0b Q12). The saved chat is cut back to before it with
+// a truncate, which the new question waits for.
 function regenerate(){
   if(generating)return;
-  let i=messages.length-1;
-  while(i>=0&&messages[i].role!=="assistant")i--;
-  if(i<0)return;
-  const q=[...messages.slice(0,i)].reverse().find(m=>m.role==="user");
-  if(!q)return;
-  messages.splice(i,messages.length-i);      // drop the answer
-  const lastU=messages.pop();                 // and its question
-  inner.innerHTML="";
-  messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",
-    m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc));
-  input.value=(lastU&&lastU.content)||q.content;
+  let u=messages.length-1;
+  while(u>=0&&messages[u].role!=="user")u--;
+  if(u<0)return;
+  const q=messages[u],keep=messages.slice(0,u);
+  if(curChat)chatOpWait=chatOps([{op:"truncate",id:curChat,to_len:u,
+    prefix_hash:chatHash(keep,u)}]).catch(()=>{});
+  messages=keep;redrawOpen();
+  input.value=q.content;
   send();
 }
 // EDIT & RESEND: rewind to that question with the text in the composer
@@ -21436,7 +21955,9 @@ function editResend(text){
   input.dispatchEvent(new Event("input"));
   input.focus();
   input.setSelectionRange(input.value.length,input.value.length);
-  persistCurrent();
+  // the saved chat rewinds with it; the resend waits for that
+  if(curChat)chatOpWait=chatOps([{op:"truncate",id:curChat,to_len:i,
+    prefix_hash:chatHash(messages,i)}]).catch(()=>{});
 }
 function addMsg(role,text,drafts,srcs,mapd,ph,places,loc){
   const hero=$("#hero"); if(hero)hero.remove();
@@ -21599,7 +22120,6 @@ async function send(){
       if(!fnAnswer)return;          // stage still building — keep the text
       input.value="";input.style.height="auto";
       addMsg("user",text);
-      messages.push({role:"user",content:text});
       // one line, whatever was typed: the server reads picks back out
       // of "q → label" assistant turns, and $-anchored regex can't
       // cross a newline (_FUNNEL_PICK_RX)
@@ -21658,8 +22178,18 @@ async function send(){
   // PIN the owning chat: loadChat() swaps the global `messages` array
   // mid-flight, so a finished answer was pushed into whichever chat the
   // user switched TO — the original showed only the question (seen live)
-  if(!curChat)curChat="c"+Date.now();
-  const myChat=curChat, myMessages=messages;
+  if(!curChat)curChat=newChatId();
+  let myChat=curChat;
+  const myMessages=messages;
+  // the chat shows in the list at once; the server makes it with the
+  // question (0b 5.4) and the page adopts the saved copy at the end
+  if(!chats.some(x=>x.id===myChat)){
+    chats.unshift({id:myChat,lane:uiMode,title:shown.slice(0,48),
+      ts:Date.now(),messages:[]});
+    renderChats();
+  }
+  const turn={chat_id:myChat,lane:(chats.find(x=>x.id===myChat)||{}).lane||uiMode,
+    after_len:myMessages.length-1,after_hash:chatHash(myMessages,myMessages.length-1)};
   generating=true; document.body.classList.add("gen");
   sendBtn.textContent="■"; sendBtn.classList.add("stop"); sendBtn.title="Stop";
   const aiDiv=addMsg("assistant",""); const body=aiDiv.querySelector(".body");
@@ -21675,19 +22205,29 @@ async function send(){
   lastModels="";
 
   try{
+    // a Try again or Edit & resend rewinds the saved chat first
+    if(chatOpWait){const w=chatOpWait;chatOpWait=null;await w;}
     const resp=await api("/api/chat",{
       method:"POST",headers:{"Content-Type":"application/json"},
       signal:abortCtl.signal,
-      body:JSON.stringify(advOn&&adv
+      body:JSON.stringify(Object.assign(advOn&&adv
         // the custom council (6b248): hand-picked minds, hand-picked pen
-        ?{model:"",models:adv.local||[],tier:"",messages,
+        ?{model:"",models:adv.local||[],tier:"",messages:myMessages,
           auto_web:autoWeb,images:sentImages,docs:sentDocs,agent,
           cloud:adv.cloud||[],compositor:adv.comp||""}
-        :{model,models:council,tier,messages,
+        :{model,models:council,tier,messages:myMessages,
           auto_web:autoWeb,images:sentImages,docs:sentDocs,agent,
           // the Remote agent (6b249) carries the autonomy throttle
-          autonomy:agent==="Remote"?autonomy:undefined}),
+          autonomy:agent==="Remote"?autonomy:undefined},turn)),
     });
+    // the server may land the turns in a copy, or a fresh chat for one
+    // deleted meanwhile: the answer follows it
+    const landed=resp.headers.get("X-Chat-Id");
+    if(landed&&landed!==myChat){
+      chats=chats.filter(x=>!(x.id===myChat&&!(x.messages||[]).length));
+      if(curChat===myChat)curChat=landed;
+      myChat=landed;
+    }
     searched=resp.headers.get("X-Web-Search")==="1";
     lastModels=resp.headers.get("X-Models")||"";
     curHid=resp.headers.get("X-Hurry")||"";   // Answer now (6b257)
@@ -21741,77 +22281,48 @@ async function send(){
       const {done,value}=await reader.read();
       if(done)break;
       raw+=dec.decode(value,{stream:true});
-      // pull progress markers out so they never land in the answer
-      full=raw.replace(/\u0000RUN:(.*?)\u0000/g,(_,j)=>{
+      // pull progress markers out so they never land in the answer;
+      // streamText() also keeps only what follows the last RESET
+      full=streamText(raw,{
+        RUN:j=>{
                 try{const d=JSON.parse(j);
                   if(d.w==="cloud"&&!/cloud/.test(lastModels))
                     lastModels=(lastModels+" cloud").trim();
                   if(d.c!==undefined)setWho("Compositor: "+d.c);
                   else if(d.r)setWho(d.r.length
                     ?"Running\u2026 "+d.r.join(", "):"Running\u2026");
-                }catch(e){}
-                return "";})
-              .replace(/\u0000RUN:[^\u0000]*$/,"")
-              .replace(/\u0000STATUS:(.*?)\u0000/g,(_,t)=>{
-                status=t;if(seenStatus.indexOf(t)<0)seenStatus.push(t);
-                return "";})
-              .replace(/\u0000STATUS:[^\u0000]*$/,"")    // partial marker
-              .replace(/\u0000DRAFT:(.*?)\u0000/g,(_,j)=>{
+                }catch(e){}},
+        STATUS:t=>{status=t;if(seenStatus.indexOf(t)<0)seenStatus.push(t);},
+        DRAFT:j=>{
                  try{const d=JSON.parse(j);
                      if(!drafts.some(x=>x.m===d.m))drafts.push(d);
                      // real drafts arm the Answer-now button (6b257)
                      liveDrafts=drafts.filter(
                        x=>!/^\(no answer/.test(x.t||"")).length;
-                 }catch(e){}
-                 return "";})
-              .replace(/\u0000DRAFT:[^\u0000]*$/,"")
-              .replace(/\u0000SOURCES:(.*?)\u0000/g,(_,j)=>{
-                 try{sources=JSON.parse(j);}catch(e){}
-                 return "";})
-              .replace(/\u0000SOURCES:[^\u0000]*$/,"")
-              .replace(/\u0000PHOTOS:(.*?)\u0000/g,(_,j)=>{
-                 try{photos=JSON.parse(j);}catch(e){}
-                 return "";})
-              .replace(/\u0000PHOTOS:[^\u0000]*$/,"")
-              .replace(/\u0000MAP:(.*?)\u0000/g,(_,j)=>{
-                 try{mapd=JSON.parse(j);}catch(e){}
-                 return "";})
-              .replace(/\u0000MAP:[^\u0000]*$/,"")
-              .replace(/\u0000CTX:(.*?)\u0000/g,(_,j)=>{
-                 try{locCtx=(JSON.parse(j).loc)||"";}catch(e){}
-                 return "";})
-              .replace(/\u0000CTX:[^\u0000]*$/,"")
-              .replace(/\u0000PLACEHINT:(.*?)\u0000/g,(_,j)=>{
-                 try{placeHint=JSON.parse(j);}catch(e){}
-                 return "";})
-              .replace(/\u0000PLACEHINT:[^\u0000]*$/,"")
-              .replace(/\u0000PLACES2:(.*?)\u0000/g,(_,j)=>{
-                 try{places=JSON.parse(j);}catch(e){}
-                 return "";})
-              .replace(/\u0000PLACES2:[^\u0000]*$/,"")
-              .replace(/\u0000STEP:(.*?)\u0000/g,(_,j)=>{
-                 try{addStep(JSON.parse(j));}catch(e){}
-                 return "";})
-              .replace(/\u0000STEP:[^\u0000]*$/,"")
-              // the Remote agent live approval card (6b249)
-              .replace(/\u0000APPROVE:(.*?)\u0000/g,(_,j)=>{
+                 }catch(e){}},
+        SOURCES:j=>{try{sources=JSON.parse(j);}catch(e){}},
+        PHOTOS:j=>{try{photos=JSON.parse(j);}catch(e){}},
+        MAP:j=>{try{mapd=JSON.parse(j);}catch(e){}},
+        CTX:j=>{try{locCtx=(JSON.parse(j).loc)||"";}catch(e){}},
+        PLACEHINT:j=>{try{placeHint=JSON.parse(j);}catch(e){}},
+        PLACES2:j=>{try{places=JSON.parse(j);}catch(e){}},
+        STEP:j=>{try{addStep(JSON.parse(j));}catch(e){}},
+        // the Remote agent live approval card (6b249)
+        APPROVE:j=>{
                  // the whole stream is re-read on every chunk: draw
                  // each approval ONCE (it used to stack ~30 live cards)
                  try{const ad=JSON.parse(j);
                    if(!apSeen.has(ad.jid)){apSeen.add(ad.jid);
-                     showApprove(aiDiv,ad);}}catch(e){}
-                 return "";})
-              .replace(/\u0000APPROVE:[^\u0000]*$/,"");
+                     showApprove(aiDiv,ad);}}catch(e){}}});
       if(drafts.length||(status&&/of \d+/.test(status)))
         paintDrafts(aiDiv,drafts,true,status);
       // the council reports into the SAME tree the searches use
       const mmc=/(\d+)\s*of\s*(\d+)/.exec(status||"");
       if(mmc)addStep({id:"council",l:"Consulting models",
         s:(+mmc[1]>=+mmc[2]?"done":"run"),d:mmc[1]+" of "+mmc[2]});
-      // a merge that collapsed mid-stream sends RESET \u2014 discard
-      // everything streamed before it, keep the replacement answer
-      const cut=full.lastIndexOf("\u0000RESET\u0000");
-      if(cut>=0)full=full.slice(cut+7);
+      // a merge that collapsed mid-stream sends RESET \u2014 everything
+      // streamed before it is gone (streamText), the replacement kept
+      const cut=raw.lastIndexOf("\u0000RESET\u0000");
       tokEst=full.length/4;
       const secs=(performance.now()-t0)/1000;
       lastRate=secs>0.3?tokEst/secs:0;
@@ -21923,7 +22434,6 @@ async function send(){
     if(mapd)rec.map=mapd;
     if(places&&places.length){rec.places=places;rec.loc=locCtx;}
     myMessages.push(rec);
-    persistChat(myChat,myMessages);
     // viewing the owning chat but the live bubble was detached by a
     // switch-away-and-back? paint the finished answer in
     if(curChat===myChat&&!inner.contains(aiDiv)){
@@ -21933,8 +22443,7 @@ async function send(){
         m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc));
     }
   }else{
-    // error or empty: keep it out of the model's context, refresh the dots
-    myMessages.pop();
+    // error or empty: the question stays, for Try again (0b Q12)
     pollEngines();
   }
   if(voiceChat&&full&&!isErr&&!wasAborted){
@@ -21947,6 +22456,12 @@ async function send(){
   sendBtn.textContent="↑";sendBtn.classList.remove("stop");sendBtn.title="Send";
   if(curChat===myChat)autoScroll();
   input.focus();
+  // the chat as saved (the stream has closed, so the answer is on disk)
+  const saved=await syncChat(myChat);
+  if(saved&&!saved.named&&full&&!isErr){
+    const first=(saved.messages||[]).find(m=>m.role==="user");
+    if(first)nameChat(saved,first.content);
+  }
 }
 
 /* ------------------------------------------------------------- greeting */
@@ -22182,60 +22697,141 @@ api("/api/prefs").then(r=>r.json()).then(p=>{
 })();
 
 /* ------------------------------------------------- chats: list + store */
-// Chats are owned by the backend (survives app updates); localStorage is
-// only a fast local mirror so the list paints before the fetch returns.
+// THE SERVER IS THE ONLY WRITER (0b, 6b322). The page sends small
+// operations (create, set, delete, undelete, truncate) and the server
+// writes every turn itself, so an answer finishing in a chat nobody is
+// looking at is kept. The page never replaces the whole list and keeps
+// no copy of it in browser storage; a list the server can't read is
+// never taken for empty: the page says so and asks again.
 let chats=[];
-try{chats=JSON.parse(localStorage.getItem("millen.chats"))||[];}catch(e){}
 let curChat=null;   // every launch starts fresh; history stays in the list
-let chatSaveTimer=null;
-// NOTHING IS SAVED BEFORE THE DISK LIST ARRIVES (6b318, from review). The
-// page starts from the quick-paint copy above (30 chats at most), and a
-// save posts the whole list, so a pin, rename or message in the first
-// moments wrote those 30 over chats.json. Until the disk list is in,
-// saves stay in the page; then what changed meanwhile is laid over it
-// and saved once. Forget bumps chatsGen, so a list read before it can't
-// land after it.
-let chatsLoaded=false,chatsEarly=false,chatsGen=0;
-const chatsSnap=new Map(chats.map(c=>[c.id,JSON.stringify(c)]));
+let dataRev=-1;     // the store's change counter this page last saw
+let chatsLoaded=false,chatsErr="";
+let chatOpWait=null;  // a truncate the next question must follow
 
+// SHA-256 (0b Q1), for the prefix the server checks every write against:
+// each message's role and text only, so extras and unknown fields never
+// break a match. chat_prefix_hash() on the server is its twin; the
+// gauntlet runs both over the same messages.
+const SHA_K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,
+  0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,
+  0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,
+  0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,
+  0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,
+  0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,
+  0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,
+  0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,
+  0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,
+  0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,
+  0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+function sha256hex(bytes){
+  const H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,
+    0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const l=bytes.length,n=((l+9+63)>>6)<<6,m=new Uint8Array(n);
+  m.set(bytes);m[l]=0x80;
+  const dv=new DataView(m.buffer),w=new Int32Array(64);
+  dv.setUint32(n-8,Math.floor(l/536870912));dv.setUint32(n-4,(l*8)>>>0);
+  for(let o=0;o<n;o+=64){
+    for(let i=0;i<16;i++)w[i]=dv.getInt32(o+i*4);
+    for(let i=16;i<64;i++){
+      const x=w[i-15],y=w[i-2];
+      w[i]=(w[i-16]+(((x>>>7)|(x<<25))^((x>>>18)|(x<<14))^(x>>>3))
+        +w[i-7]+(((y>>>17)|(y<<15))^((y>>>19)|(y<<13))^(y>>>10)))|0;
+    }
+    let [a,b,c,d,e,f,g,h]=H;
+    for(let i=0;i<64;i++){
+      const t1=(h+(((e>>>6)|(e<<26))^((e>>>11)|(e<<21))^((e>>>25)|(e<<7)))
+        +((e&f)^(~e&g))+SHA_K[i]+w[i])|0;
+      const t2=((((a>>>2)|(a<<30))^((a>>>13)|(a<<19))^((a>>>22)|(a<<10)))
+        +((a&b)^(a&c)^(b&c)))|0;
+      h=g;g=f;f=e;e=(d+t1)|0;d=c;c=b;b=a;a=(t1+t2)|0;
+    }
+    H[0]=(H[0]+a)|0;H[1]=(H[1]+b)|0;H[2]=(H[2]+c)|0;H[3]=(H[3]+d)|0;
+    H[4]=(H[4]+e)|0;H[5]=(H[5]+f)|0;H[6]=(H[6]+g)|0;H[7]=(H[7]+h)|0;
+  }
+  return H.map(x=>(x>>>0).toString(16).padStart(8,"0")).join("");
+}
+function chatHash(msgs,n){
+  let s="";
+  for(const m of (msgs||[]).slice(0,Math.max(0,n))){
+    s+=(m&&typeof m.role==="string"?m.role:"")+"\u0000"
+      +(m&&typeof m.content==="string"?m.content:"")+"\u0001";
+  }
+  return sha256hex(new TextEncoder().encode(s));
+}
+// THE STREAM'S TEXT (6b322): every frame lifted out (each handed to its
+// handler in `on`), then only what follows the last RESET: what the
+// page shows, and what the server saves (turn_text() is its twin; 0b
+// L5, R-2-22, one corpus checks both)
+const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE";
+const FRAME_RX=new RegExp("\u0000("+FRAME_TAGS+"):(.*?)\u0000","g");
+const FRAME_PART=new RegExp("\u0000(?:"+FRAME_TAGS+"):[^\u0000]*$");
+function streamText(raw,on){
+  const t=raw.replace(FRAME_RX,(_,tag,j)=>{if(on&&on[tag])on[tag](j);return "";})
+    .replace(FRAME_PART,"");
+  const cut=t.lastIndexOf("\u0000RESET\u0000");
+  return cut>=0?t.slice(cut+7):t;
+}
+// "c" + 26 random base32 characters (0b 5.3): two computers, or two
+// tabs, starting a chat in the same millisecond can't collide
+function newChatId(){
+  const a="0123456789abcdefghijklmnopqrstuv",b=new Uint8Array(26);
+  crypto.getRandomValues(b);
+  let s="c";for(const x of b)s+=a[x&31];return s;
+}
+async function chatOps(ops){
+  const r=await api("/api/chats/ops",{method:"POST",
+    headers:{"Content-Type":"application/json"},body:JSON.stringify({ops})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(d.err||("ops "+r.status));
+  if(typeof d.data_rev==="number")dataRev=d.data_rev;
+  return d.results||[];
+}
+const sameMsgs=(a,b)=>(a||[]).length===(b||[]).length
+  &&chatHash(a,(a||[]).length)===chatHash(b,(b||[]).length);
+function redrawOpen(){
+  inner.innerHTML="";
+  if(!messages.length){resetHero();return;}
+  messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",
+    m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc));
+}
 async function loadChatsFromDisk(){
-  const gen=chatsGen;
   try{
     const r=await api("/api/chats");
-    if(!r.ok)throw new Error("chats "+r.status);
-    const server=(await r.json()).chats||[];
-    if(gen!==chatsGen)return;
-    // the server's list is the truth, empty included (6b310). This used
-    // to post the browser's copy back when the server had none, which
-    // brought chats erased with Forget back to life, and the copy is
-    // kept per port, so a moved app found an old one. Only what the
-    // person changed before it arrived rides on top: new or edited
-    // chats replace the disk's, and ones they deleted stay deleted.
-    const changed=c=>JSON.stringify(c)!==chatsSnap.get(c.id);
-    if(chatsEarly){
-      const mine=new Map(chats.map(c=>[c.id,c]));
-      const merged=server.filter(c=>mine.has(c.id)||!chatsSnap.has(c.id))
-        .map(c=>{const m=mine.get(c.id);return m&&changed(m)?m:c;});
-      const have=new Set(merged.map(c=>c.id));
-      chats.forEach(c=>{if(!have.has(c.id)&&changed(c))merged.push(c);});
-      merged.sort((a,b)=>(b.ts||0)-(a.ts||0));
-      chats=merged;
-    }else chats=server;
-    chatsLoaded=true;
-    if(!chats.length){try{localStorage.removeItem("millen.chats");}catch(e){}}
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){
+      // unreadable is never empty (0b L1): say so, change nothing, ask again
+      chatsErr=d.err||"Couldn\u2019t read your chats. Nothing was changed.";
+      renderChats();setTimeout(loadChatsFromDisk,3000);return;
+    }
+    chats=d.chats||[];chatsErr="";chatsLoaded=true;
+    if(typeof d.data_rev==="number")dataRev=d.data_rev;
+    // the open chat follows the store, unless an answer is streaming in
+    const c=curChat&&chats.find(x=>x.id===curChat);
+    if(c&&!generating&&!fnState&&!sameMsgs(c.messages,messages)){
+      messages=(c.messages||[]).slice();redrawOpen();
+    }
     renderChats();
-    if(chatsEarly){chatsEarly=false;saveChats();}
-  }catch(e){
-    // never fall back to saving the quick-paint copy: ask again
-    if(gen===chatsGen)setTimeout(loadChatsFromDisk,3000);
-  }
+  }catch(e){setTimeout(loadChatsFromDisk,3000);}
 }
-async function pushChatsToDisk(){
+// one chat, as the server saved it: adopted after every answer, so the
+// page and the store never hold different turns (6b322). `old` is the
+// id the page asked with, when the server landed the turn elsewhere.
+async function syncChat(id,old){
   try{
-    await api("/api/chats",{method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({chats:chats})});
-  }catch(e){}
+    const r=await api("/api/chats/one?id="+encodeURIComponent(id));
+    if(!r.ok)return null;
+    const d=await r.json(),c=d.chat;
+    if(!c)return null;
+    chats=chats.filter(x=>x.id!==id&&!(old&&old!==id&&x.id===old
+      &&!(x.messages||[]).length));
+    chats.unshift(c);chats.sort((a,b)=>(b.ts||0)-(a.ts||0));
+    if(old&&old!==id&&curChat===old)curChat=id;
+    if(curChat===id&&!generating)messages=(c.messages||[]).slice();
+    if(typeof d.data_rev==="number")dataRev=d.data_rev;
+    renderChats();
+    return c;
+  }catch(e){return null;}
 }
 
 /* ---------------------------------------------------- starter prompts */
@@ -22627,53 +23223,22 @@ function resetHero(){
   inner.innerHTML='<div id="hero"><p class="greet">'+esc(greeting())+'</p></div>';
   paintSuggest();
 }
-function saveChats(){
-  // write through to disk, coalesced so a burst of messages is one write;
-  // before the disk list is in, only noted (loadChatsFromDisk saves)
-  if(chatsLoaded){
-    clearTimeout(chatSaveTimer);
-    chatSaveTimer=setTimeout(pushChatsToDisk,400);
-  }else chatsEarly=true;
-  // the mirror is a convenience: when browser storage is full or refused
-  // it shrinks, and the real list is never touched. This used to cut
-  // `chats` itself to 10, and the save queued above then wrote those 10
-  // to disk (6b318)
-  try{localStorage.setItem("millen.chats",JSON.stringify(chats.slice(0,30)));}
-  catch(e){
-    try{localStorage.setItem("millen.chats",JSON.stringify(chats.slice(0,10)));}
-    catch(e2){try{localStorage.removeItem("millen.chats");}catch(e3){}}
-  }
-}
-function persistChat(id,msgs){
-  // writes into the chat that OWNS these messages — which, after a
-  // mid-answer chat switch, is not necessarily the one on screen
-  if(!msgs.length)return;
-  let c=chats.find(x=>x.id===id);
-  // a chat belongs to the lane it was born in (Chat / Code / Agents) —
-  // legacy records without a lane read as "ai" and live under Chat
-  if(!c){c={id:id,lane:uiMode};chats.unshift(c);}
-  const first=msgs.find(m=>m.role==="user");
-  // show the raw text immediately, then let a small model name it properly
-  if(!c.title)c.title=(first?first.content:"chat").slice(0,48);
-  c.ts=Date.now();c.messages=msgs.slice();
-  chats.sort((a,b)=>b.ts-a.ts);
-  saveChats();renderChats();
-  if(!c.named&&first){c.named=true;nameChat(c,first.content);}
-}
-function persistCurrent(){
-  if(!messages.length)return;
-  if(!curChat)curChat="c"+Date.now();
-  persistChat(curChat,messages);
-}
-
+// NAMING (6b322): a small model names the chat once, through two set
+// operations; each lands only if the field still holds what the page
+// last saw, so a rename made meanwhile wins
 async function nameChat(c,text){
+  if(!c||c.named)return;
+  c.named=true;
   try{
     const r=await api("/api/title",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({text:text})});
     const t=(await r.json()).title;
-    if(t){c.title=t;saveChats();renderChats();}
-    else c.named=false;          // let a later turn try again
+    if(!t){c.named=false;return;}
+    const res=await chatOps([
+      {op:"set",id:c.id,field:"title",old:c.title===undefined?null:c.title,new:t},
+      {op:"set",id:c.id,field:"named",old:false,new:true}]);
+    if(res[0]&&res[0].ok){c.title=t;renderChats();}
   }catch(e){c.named=false;}
 }
 // WHEN was this chat? Real products group by day; a flat wall sorted by
@@ -22724,7 +23289,8 @@ function renderChats(){
     if(b!==last){html+='<div class="cgroup">'+b+'</div>';last=b;}
     html+=row(c);
   });
-  if(!html)html='<div class="cempty">'
+  if(chatsErr)html='<div class="cempty">'+esc(chatsErr)+'</div>';
+  else if(!html)html='<div class="cempty">'
     +(q?"Nothing matches \u201c"+esc(window.chatQ)+"\u201d"
       :uiMode==="code"?"No code chats yet"
       :uiMode==="funnel"?"No funnels yet":"No chats yet")+'</div>';
@@ -22736,8 +23302,11 @@ function renderChats(){
     });
     it.querySelector(".cpin").addEventListener("click",ev=>{
       ev.stopPropagation();
-      const c=chats.find(x=>x.id===id);
-      if(c){c.pin=!c.pin;saveChats();renderChats();}
+      const c=chats.find(x=>x.id===id);if(!c)return;
+      const was=!!c.pin;c.pin=!was;renderChats();
+      chatOps([{op:"set",id,field:"pin",old:was,new:!was}])
+        .then(r=>{if(!(r[0]&&r[0].ok)){c.pin=was;renderChats();}})
+        .catch(()=>{c.pin=was;renderChats();});
     });
     it.addEventListener("dblclick",ev=>{
       ev.stopPropagation();startRename(it,id);
@@ -22752,9 +23321,18 @@ function startRename(it,id){
   const inp=document.createElement("input");
   inp.className="crename";inp.value=c.title||"";
   span.replaceWith(inp);inp.focus();inp.select();
+  let over=false;
   const done=save=>{
-    if(save){const v=inp.value.trim();if(v){c.title=v.slice(0,80);c.named=true;}}
-    saveChats();renderChats();
+    if(over)return;over=true;
+    const v=inp.value.trim().slice(0,80),was=c.title;
+    if(save&&v&&v!==was){
+      c.title=v;c.named=true;
+      chatOps([{op:"set",id,field:"title",old:was===undefined?null:was,new:v},
+               {op:"set",id,field:"named",old:false,new:true}])
+        .then(r=>{if(!(r[0]&&r[0].ok)){c.title=was;renderChats();}})
+        .catch(()=>{c.title=was;renderChats();});
+    }
+    renderChats();
   };
   inp.addEventListener("keydown",e=>{
     e.stopPropagation();
@@ -22764,7 +23342,9 @@ function startRename(it,id){
   inp.addEventListener("blur",()=>done(true));
   inp.addEventListener("click",e=>e.stopPropagation());
 }
-// DELETE with UNDO — nothing irreversible on a single click
+// DELETE with UNDO — nothing irreversible on a single click. The server
+// holds the deleted chat for the same 6 s (0b 5.6, 6b322): Undo brings
+// it back once, and after that, or at a quit, it's gone
 let undoTimer=null,undoStash=null;
 function deleteChat(id){
   const idx=chats.findIndex(c=>c.id===id);
@@ -22772,7 +23352,8 @@ function deleteChat(id){
   undoStash={chat:chats[idx],idx:idx,wasCur:curChat===id};
   chats.splice(idx,1);
   if(curChat===id){curChat=null;messages=[];fnState=null;fnAnswer=null;resetHero();}
-  saveChats();renderChats();
+  renderChats();
+  chatOps([{op:"delete",id}]).catch(()=>loadChatsFromDisk());
   const t=$("#undobar");
   t.querySelector(".ut").textContent='Deleted "'
     +(undoStash.chat.title||"chat").slice(0,40)+'"';
@@ -22780,17 +23361,22 @@ function deleteChat(id){
   clearTimeout(undoTimer);
   undoTimer=setTimeout(()=>{t.hidden=true;undoStash=null;},6000);
 }
-function undoDelete(){
+async function undoDelete(){
   if(!undoStash)return;
-  chats.splice(Math.min(undoStash.idx,chats.length),0,undoStash.chat);
-  const back=undoStash.chat.id, wasCur=undoStash.wasCur;
+  const st=undoStash,back=st.chat.id;
   undoStash=null;$("#undobar").hidden=true;clearTimeout(undoTimer);
-  saveChats();renderChats();
-  if(wasCur)loadChat(back);
+  let ok=false;
+  try{const r=await chatOps([{op:"undelete",id:back}]);ok=!!(r[0]&&r[0].ok);}
+  catch(e){}
+  if(!ok){loadChatsFromDisk();return;}
+  chats.splice(Math.min(st.idx,chats.length),0,st.chat);
+  renderChats();
+  if(st.wasCur)loadChat(back);
 }
 function loadChat(id){
   if(id===curChat)return;
-  persistCurrent();
+  // viewing writes nothing (0b L4, 6b322): switching used to save the
+  // chat being left, and moved its stamp to now
   const c=chats.find(x=>x.id===id);if(!c)return;
   // opening a chat from another lane (⌘K reaches everything) hops the
   // tab with it, so the sidebar context always matches what's on screen
@@ -22857,11 +23443,26 @@ async function fnStep(){
     +(fnState.picks.length+1)+'…</span></div>';
   inner.appendChild(box);autoScroll();
   let d={};
+  // the server saves this stage's turn (the goal, or the pick the page
+  // just showed) and, at the end, the summary (0b 5.5, 6b322); the reply
+  // carries the chat as saved and the page adopts it
+  const fid=fnState.chat,fn=messages.length-1;
   try{
     d=await(await api("/api/funnel",{method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify(fnState)})).json();
+      body:JSON.stringify(Object.assign({},fnState,{chat_id:fid,
+        after_len:fn,after_hash:chatHash(messages,fn)}))})).json();
   }catch(e){d={err:"couldn\u2019t reach the engine"};}
+  if(d.chat&&d.chat.id){
+    const c=chats.find(x=>x.id===fid)||{id:d.chat.id,lane:"funnel"};
+    chats=chats.filter(x=>x!==c&&x.id!==d.chat.id);
+    c.id=d.chat.id;c.messages=d.chat.messages||[];c.ts=Date.now();
+    chats.unshift(c);renderChats();
+    if(fnState&&fnState.chat===fid)fnState.chat=c.id;
+    if(curChat===fid){curChat=c.id;messages=c.messages.slice();}
+    if(!c.named){const g=c.messages.find(m=>m.role==="user");
+      if(g)nameChat(c,g.content);}
+  }
   if(!fnState){box.remove();return;}   // the chat moved on mid-build \u2014
                                        // don't render into it, don't arm
                                        // fnAnswer with a dead closure
@@ -22874,7 +23475,7 @@ async function fnStep(){
     box.querySelector(".who").textContent="Funnel \u00b7 done";
     b.innerHTML='<div class="fpath">'+esc(fnState.picks.join(" \u2192 "))
       +'</div>'+renderMD(d.summary||"");
-    fnState=null;fnAnswer=null;persistCurrent();return;
+    fnState=null;fnAnswer=null;return;
   }
   b.innerHTML='<div class="fstage"><div class="fpath">stage '+d.stage
     +' of '+d.total+(fnState.picks.length?' \u00b7 '
@@ -22897,7 +23498,7 @@ async function fnStep(){
     fnState.asked=(fnState.asked||[]).concat([d.q||""]);
     fnState.picks.push(String(label).slice(0,90));
     messages.push({role:"assistant",content:d.q+" \u2192 "+label});
-    fnAnswer=null;persistCurrent();fnStep();
+    fnAnswer=null;fnStep();
   };
   b.querySelectorAll(".fopt").forEach(el=>{
     el.addEventListener("click",()=>{
@@ -22915,10 +23516,12 @@ $("#fn-go").addEventListener("click",()=>{
     opts:+$("#fn-opts").value,stages:+$("#fn-stages").value,
     images:$("#fn-type").value==="images",picks:[],asked:[],
     effort:eff==="fast"?"fast":"normal"};
-  curChat=null;messages=[];inner.innerHTML="";
+  curChat=newChatId();messages=[];inner.innerHTML="";
   addMsg("user","Funnel: "+goal);
   messages.push({role:"user",content:"Funnel: "+goal});
-  persistCurrent();
+  chats.unshift({id:curChat,lane:"funnel",title:("Funnel: "+goal).slice(0,48),
+    ts:Date.now(),messages:[]});
+  renderChats();
   fnState.chat=curChat;             // the funnel belongs to THIS chat
   fnStep();
 });
@@ -23078,7 +23681,6 @@ document.addEventListener("keydown",e=>{
 /* ----------------------------------------------------------- new chat */
 $("#newchat").addEventListener("click",()=>{
   if(generating&&abortCtl)abortCtl.abort();
-  persistCurrent();
   fnState=null;fnAnswer=null;       // a new chat abandons any funnel
   curChat=null;messages=[];
   resetHero();renderChats();
@@ -23101,6 +23703,10 @@ async function pollStats(){
     const st=await(await api("/api/stats")).json();
     gpu=st.gpu_pct;
     memPct=(st.mem_pressure!=null?st.mem_pressure:st.mem_pct);
+    // the chat store moved (0b 5.6, 6b322): something wrote a turn this
+    // page didn't, so the list is read again (never mid-answer)
+    if(typeof st.data_rev==="number"&&st.data_rev!==dataRev&&chatsLoaded
+       &&!generating)loadChatsFromDisk();
   }catch(e){}
   // a PC with no GPU readings (no NVIDIA card) shows no bar rather
   // than a made-up one (6b317, from the Windows sweep)
@@ -25539,8 +26145,6 @@ $("#forget-go").addEventListener("click",async ev=>{
   if(r&&r.ok){
     if(fgScopes().indexOf("chats")>=0){
       chats=[];messages=[];curChat=null;
-      chatsGen++;chatsLoaded=true;chatsEarly=false;   // the disk list is empty now
-      try{localStorage.removeItem("millen.chats");}catch(e){}
       renderChats();inner.innerHTML="";resetHero();
     }
     b.textContent="Erased";
@@ -26334,7 +26938,8 @@ def _sweep_leftovers() -> int:
     #    6b319, once nothing serves their port
     base = app_dir()
     hour_ago = time.time() - 3600
-    for pat in (".prefs-*.tmp", ".cloud-*.tmp"):
+    for pat in (".prefs-*.tmp", ".cloud-*.tmp", ".chats-*.tmp",
+                ".memory-*.tmp"):
         for pth in glob.glob(os.path.join(base, pat)):
             try:
                 if os.path.getmtime(pth) < hour_ago:

@@ -1877,7 +1877,10 @@ clearTimeout decodeURIComponent devicePixelRatio document
 encodeURIComponent getComputedStyle innerHeight innerWidth isFinite
 localStorage location matchMedia navigator parseFloat parseInt performance
 requestAnimationFrame setInterval setTimeout window
-DOMException Headers IntersectionObserver MutationObserver""".split())
+DOMException Headers IntersectionObserver MutationObserver
+TextEncoder Uint8Array Int32Array crypto RegExp""".split())
+# (6b322) the chat store's prefix hash and random chat ids use the four
+# on the last line; each exists on window in WKWebView, WebView2 and Qt
 # no bare fetch (6b321): the page's one fetch is window.fetch, saved by
 # api(); a bare one would be an undeclared name here as well
 # L is Leaflet, loaded from unpkg before any map mounts; the __X__ names
@@ -2605,8 +2608,9 @@ check("another account's Ollama or MLX engine never gets a prompt",
          _so2_spawned, _eps))
 _lcd = _MILLENAI_SRC.split("async function loadChatsFromDisk(){")[1].split("\n}")[0]
 check("review fixes: chat copy, autonomy, downloads, image label, photos",
-      "pushChatsToDisk" not in _lcd and "chats=server;" in _lcd
-      and 'localStorage.removeItem("millen.chats")' in _lcd
+      # (6b322) there is no browser copy of the chats to re-upload at all
+      "pushChatsToDisk" not in _MILLENAI_SRC and "chats=d.chats||[];" in _lcd
+      and "millen.chats" not in _MILLENAI_SRC
       and "p.remote_autonomy" in _MILLENAI_SRC
       and "JSON.stringify({remote_autonomy:autonomy})" in _MILLENAI_SRC
       and "dlDirect(a)" in _MILLENAI_SRC
@@ -5132,35 +5136,28 @@ check("Settings links the website, in the system browser",
 # 0b's 1,000 and a pinned chat survives any cut. And a browser-storage
 # error no longer trims the page's real list to 10 before it is saved.
 import tempfile as _tf318
-_scn = {"os": os, "json": json}
+_scn = {"os": os, "json": json, "tempfile": tempfile, "time": time, "IS_WIN": False}
 _scn["_pfile"] = lambda name, base=None: os.path.join(base, name)
-_exec_names(_scn, {"CHATS_KEEP", "store_chats", "load_chats"})
+_exec_names(_scn, {"CHATS_KEEP", "store_chats", "load_chats", "_read_json",
+                   "_write_json", "_replace_into", "_chat_ts", "_data_rev",
+                   "StoreReadError"})
 with _tf318.TemporaryDirectory() as _scd:
     _scn["store_chats"]([{"id": "c%d" % i} for i in range(61)], _scd)
     _sc61 = len(_scn["load_chats"](_scd))
-    _big = [{"id": "c%d" % i, "pin": i == 1003} for i in range(1005)]
+    # newest first by ts now (6b322): c0 is the newest
+    _big = [{"id": "c%d" % i, "pin": i == 1003, "ts": 5000 - i} for i in range(1005)]
     _scn["store_chats"](_big, _scd)
     _scb = [c["id"] for c in _scn["load_chats"](_scd)]
-_sv = page[page.index("function saveChats(){"):page.index("function persistChat(")]
 check("chats: a 61st chat no longer erases the oldest; 1,000 kept, pins always",
       _sc61 == 61 and _scn["CHATS_KEEP"] == 1000 and len(_scb) == 1001
       and _scb[:3] == ["c0", "c1", "c2"] and _scb[999] == "c999"
       and _scb[-1] == "c1003" and "c1000" not in _scb
-      and "chats=chats.slice" not in _sv and "chats=" not in _sv.replace("chats.slice", ""),
+      # (6b322) the page has no save of its own left to trim anything
+      and "function saveChats" not in page and "chats=chats.slice" not in page,
       "%r" % [_sc61, len(_scb), _scb[-2:]])
 
-# 6b318, from the hotfix's review: the page starts from its 30-chat quick
-# copy, and a save before the disk list arrived wrote those 30 over
-# chats.json. Saves wait for the disk list; early edits ride on top of
-# it (checked in a browser: rename kept, early delete stays deleted,
-# disk-only chats kept, one save, none after a failed load).
-_ld = page[page.index("async function loadChatsFromDisk(){"):page.index("async function pushChatsToDisk(){")]
-check("chats: nothing is saved before the disk list arrives",
-      "if(chatsLoaded){" in _sv and "}else chatsEarly=true;" in _sv
-      and "chatsLoaded=true;" in _ld and "setTimeout(loadChatsFromDisk,3000)" in _ld
-      and "if(gen!==chatsGen)return;" in _ld and "chatsGen++;chatsLoaded=true;" in page
-      and _ld.count("saveChats()") == 1,
-      _ld[:200])
+# (6b322) the early-save machinery of 6b318 is gone with the page's
+# whole-list saves: see "== chat store (0b) ==" at the end.
 
 # 6b318, per Patrick: the Beta channel reads "Prerelease" (it carries the
 # RCs too). The stored value stays "beta", so saved choices still match.
@@ -5195,6 +5192,362 @@ check("backdrops: a new scene every hour, from disk, faded in, never over an ans
       and "setTimeout(fillPantry,9000);" in _rot
       and "#skyline video.sky-next.in{opacity:1;" in page,
       "%r" % _skc)
+
+print("== chat store (0b) ==")
+# ACCOUNTS STEP 4 (0b, 6b322): the server is the only writer of chats.
+# Reads never pass for empty, writes are atomic, the page sends small
+# operations, and the server writes every turn itself.
+import hashlib as _hl22
+_cs = {"os": os, "json": json, "tempfile": tempfile, "time": time, "re": re,
+       "secrets": __import__("secrets"), "hashlib": _hl22,
+       "threading": __import__("threading"), "IS_WIN": False}
+_cs["_pfile"] = lambda name, base=None: os.path.join(base, name)
+_exec_names(_cs, {"StoreReadError", "READ_FAIL", "_read_json", "_write_json",
+                  "_replace_into", "CHATS_KEEP", "_data_rev", "_chat_ts",
+                  "store_chats", "load_chats", "_CHAT_ID", "_CHAT_LANES",
+                  "CHAT_UNDO_S", "_chat_stubs", "_chat_gone", "_new_chat_id",
+                  "chat_prefix_hash", "_chat_find", "_chat_msgs", "_chat_settle",
+                  "_chat_dead", "_chat_new", "_chat_append", "_chat_op",
+                  "chat_ops", "chat_append_turn", "_chats_lock", "MEMORY_KEEP",
+                  "_load_memory", "_save_memory", "memory_text", "_TURN_TAGS",
+                  "_TURN_FRAME", "_TURN_PART", "_TURN_RESET", "_TURN_BOLD_SKIP",
+                  "turn_text", "turn_record"})
+
+# LOC-8 + LOC-7 (R-2-26, L3, L6): 1,050 chats, the 20 oldest carrying a
+# project and 5 more pinned: eviction keeps all 25 and the newest 1,000
+# of the rest, and makes no stub. A project chat with an unknown nested
+# field keeps both, byte for byte, through append, truncate, set, delete,
+# undelete and a reread.
+with tempfile.TemporaryDirectory() as _cd:
+    _big = [{"id": "c%04d" % i, "ts": 10_000 + i, "messages": []} for i in range(1050)]
+    for _i in range(20):
+        _big[_i]["project"] = "p%d" % _i
+    for _i in range(20, 25):
+        _big[_i]["pin"] = True
+    _odd = {"deep": [1, {"k": "éè \U0001f600"}], "n": None}
+    _big[3]["x"] = _odd
+    _big[3]["messages"] = [{"role": "user", "content": "q", "u": {"keep": 1}}]
+    _cs["store_chats"](_big, _cd)
+    _kept = {c["id"]: c for c in _cs["load_chats"](_cd)}
+    _evict_ok = (len(_kept) == 1025 and all("c%04d" % i in _kept for i in range(25))
+                 and not any("c%04d" % i in _kept for i in range(25, 50))
+                 and not _cs["_chat_stubs"])
+    _h1 = _cs["chat_prefix_hash"](_big[3]["messages"], 1)
+    _r = _cs["chat_ops"]([
+        {"op": "append", "id": "c0003", "after_len": 1, "after_hash": _h1,
+         "msgs": [{"role": "assistant", "content": "a", "extra": [1]}]},
+        {"op": "set", "id": "c0003", "field": "title", "old": None, "new": "T"},
+        {"op": "truncate", "id": "c0003", "to_len": 1, "prefix_hash": _h1},
+        {"op": "delete", "id": "c0003"}, {"op": "undelete", "id": "c0003"}], _cd)
+    _c3 = {c["id"]: c for c in _cs["load_chats"](_cd)}.get("c0003", {})
+    _raw3 = json.dumps(_c3.get("x"), sort_keys=True) == json.dumps(_odd, sort_keys=True)
+    _lost = _cs["chat_ops"]([{"op": "truncate", "id": "c0003", "to_len": 0,
+                             "prefix_hash": "wrong"}], _cd)
+check("LOC-8/LOC-7: 1,000 + pinned + project chats; eviction only evicts; unknown fields survive every op",
+      _evict_ok and [list(x) for x in _r["results"]] == [["ok", "n"], ["ok"], ["ok"], ["ok"], ["ok"]]
+      and _c3.get("project") == "p3" and _raw3 and _c3.get("title") == "T"
+      and _c3.get("messages") == [{"role": "user", "content": "q", "u": {"keep": 1}}]
+      and _lost["results"] == [{"conflict": 1}],
+      "%r" % [_evict_ok, _r, sorted(_c3)])
+
+# the operations' rules (0b 5.3): appends only onto the stated prefix
+# (else a copy with the page's own content), sets only onto the old
+# value, a write to a deleted id gets a fresh one, undo works once
+with tempfile.TemporaryDirectory() as _cd:
+    _o = lambda ops: _cs["chat_ops"](ops, _cd)["results"]
+    _ca = "c" + "a" * 26
+    _m1 = [{"role": "user", "content": "one"}, {"role": "assistant", "content": "two"}]
+    _r1 = _o([{"op": "create", "id": _ca, "lane": "ai", "title": "A"},
+              {"op": "append", "id": _ca, "after_len": 0,
+               "after_hash": _cs["chat_prefix_hash"]([], 0), "msgs": _m1}])
+    # the page's own first turn differs from the stored one: a conflict
+    _mine = [{"role": "user", "content": "uno"}]
+    _r2 = _o([{"op": "append", "id": _ca, "after_len": 1,
+               "after_hash": _cs["chat_prefix_hash"](_mine, 1),
+               "base": _mine, "msgs": [{"role": "user", "content": "fork"}]}])
+    _r3 = _o([{"op": "set", "id": _ca, "field": "title", "old": "A", "new": "B"},
+              {"op": "set", "id": _ca, "field": "title", "old": "A", "new": "C"},
+              {"op": "set", "id": _ca, "field": "pin", "old": False, "new": True}])
+    _r4 = _o([{"op": "delete", "id": _ca}, {"op": "undelete", "id": _ca},
+              {"op": "undelete", "id": _ca}, {"op": "delete", "id": _ca}])
+    _r5 = _o([{"op": "create", "id": _ca}, {"op": "set", "id": "BAD id", "field": "pin"}])
+    _all = _cs["load_chats"](_cd)
+    _copy = [c for c in _all if c.get("title") == "B (copy)" or c.get("title") == "A (copy)"]
+check("chat operations: prefix and old-value rules, conflict copies, fresh ids for deleted chats, one undo",
+      _r1 == [{"ok": True}, {"ok": True, "n": 2}]
+      and "remap" in _r2[0] and _copy and [m["content"] for m in _copy[0]["messages"]] == ["uno", "fork"]
+      and _r3 == [{"ok": True}, {"conflict": "B"}, {"ok": True}]
+      and _r4 == [{"ok": True}, {"ok": True}, {"err": "gone"}, {"ok": True}]
+      and "remap" in _r5[0] and _r5[0]["remap"] != _ca and _r5[1] == {"err": "bad id"},
+      "%r" % [_r1, _r2, _r3, _r4, _r5])
+
+# LOC-7 live: the whole-list save is gone for good (410) and changes
+# nothing; the page keeps no copy of the list and has no save of its own
+_before = open(os.path.join(INST.home, "chats.json"), "rb").read()
+_s410 = req("/api/chats", "POST", {"chats": []})[0]
+check("LOC-7: the whole-list POST /api/chats answers 410 and changes nothing",
+      _s410 == 410 and open(os.path.join(INST.home, "chats.json"), "rb").read() == _before
+      and "millen.chats" not in page and "persistChat" not in page
+      and "persistCurrent" not in page and "pushChatsToDisk" not in page,
+      str(_s410))
+
+# THE PREFIX HASH AND THE STREAM RULE, page and server twins (0b Q1,
+# L5, R-2-22): the same vectors and the same stream corpus through the
+# page's chatHash()/streamText() in node and the server's functions
+_jseg = page[page.index("const SHA_K=["):page.index('// "c" + 26 random base32')]
+_hvec = [[], [{"role": "user", "content": "hi"}],
+         [{"role": "user", "content": "café \U0001f600 日本"},
+          {"role": "assistant", "content": "x" * 55}, {"role": "user", "content": "y" * 64},
+          {"role": "assistant", "content": None, "drafts": [1]}],
+         [{"role": "user", "content": "z" * 1000}, {"role": "assistant", "content": "lone \ud800 half"}]]
+_corpus = ["plain answer", "draft one\x00RESET\x00the real answer",
+           "a\x00STATUS:thinking\x00b\x00RESET\x00c\x00RESET\x00final",
+           'x\x00SOURCES:[{"t":"s"}]\x00y\x00STEP:{"id":1}\x00z',
+           "cut mid-frame \x00STATUS:half", "keep \x00STATUS:line\nbreak\x00 tail",
+           "trailing newline\n", "\x00RESET\x00", "only\x00RESET\x00\x00STATUS:x\x00",
+           'emoji \U0001f600 \x00DRAFT:{"m":"a","t":"d"}\x00 done',
+           "before\x00RESET\x00after \x00MAP:{}\x00 end\n\n", "partial \x00RES"]
+_tmpjs = os.path.join(_SMOKE_TMP, "store22.js")
+with open(_tmpjs, "w", encoding="utf-8") as fh:
+    fh.write(_jseg + "\nconst v=JSON.parse(require('fs').readFileSync(0,'utf8'));"
+             "\nconsole.log(JSON.stringify({h:v.h.map(m=>chatHash(m,m.length)),"
+             "t:v.t.map(r=>streamText(r,{}))}));")
+try:
+    _jo = json.loads(subprocess.run(["node", _tmpjs], input=json.dumps({"h": _hvec, "t": _corpus}),
+                                    capture_output=True, text=True, timeout=60).stdout)
+except Exception as _e:
+    _jo = {"err": repr(_e)}
+_ph = [_cs["chat_prefix_hash"](m, len(m)) for m in _hvec]
+_pt = [_cs["turn_text"](r) for r in _corpus]
+check("the page and the server hash a chat alike and keep the same text after RESET",
+      _jo.get("h") == _ph and _jo.get("t") == _pt
+      and _pt[1] == "the real answer" and _pt[2] == "final" and _pt[4] == "cut mid-frame "
+      and _pt[5] == "keep \x00STATUS:line\nbreak\x00 tail",
+      "%r" % [_jo.get("err"), [a == b for a, b in zip(_jo.get("t") or [], _pt)]])
+
+# what the server saves from a finished stream, as the page builds it
+_tr = _cs["turn_record"]
+_x1 = _tr("hello \x00DRAFT:" + json.dumps({"m": "A", "t": "d1"}) + "\x00world")
+_x2 = _tr("\x00DRAFT:" + json.dumps({"m": "A", "t": "rescued"}) + "\x00")
+_x3 = _tr("⚠️ the engine fell over")
+_x4 = _tr("Go to **Joe's Pizza** and **Lucali**.\n[[PLACES]] " + json.dumps([{"n": "Joe's"}]))
+_x5 = _tr("Try **Katz's Deli** or **Russ & Daughters**.", searched=True)
+check("a saved answer is the page's: drafts kept, an empty one rescued, errors not saved, places read",
+      _x1 == {"role": "assistant", "content": "hello world", "drafts": [{"m": "A", "t": "d1"}]}
+      and _x2["content"] == "rescued" and _x3 is None
+      and _x4["content"] == "Go to **Joe's Pizza** and **Lucali**." and _x4["places"] == [{"n": "Joe's"}]
+      and [p_["n"] for p_ in _x5["places"]] == ["Katz's Deli", "Russ & Daughters"],
+      "%r" % [_x1, _x2, _x3, _x4, _x5])
+
+# ids: "c" + 26 base32, random on both sides (0b 5.3), so two computers
+# starting a chat in the same millisecond can't collide
+_ids = {_cs["_new_chat_id"]() for _ in range(5000)}
+with open(_tmpjs, "w", encoding="utf-8") as fh:
+    fh.write(page[page.index("function newChatId(){"):page.index("async function chatOps(")]
+             + "\nconst s=new Set();for(let i=0;i<5000;i++)s.add(newChatId());"
+             "console.log(JSON.stringify([...s]));")
+try:
+    _jids = set(json.loads(subprocess.run(["node", _tmpjs], capture_output=True, text=True,
+                                          timeout=60).stdout))
+except Exception:
+    _jids = set()
+check("chat ids are random: 5,000 from each side, none repeated, all valid",
+      len(_ids) == 5000 and len(_jids) == 5000 and not (_ids & _jids)
+      and all(re.fullmatch(r"c[0-9a-v]{26}", i) for i in _ids | _jids),
+      "%d %d" % (len(_ids), len(_jids)))
+
+# LOC-1 live: the question is on disk as soon as /api/chat arrives, the
+# answer when the stream ends, and a stopped answer keeps what was shown
+def _chat_open(inst, body):
+    so = socket.create_connection(("127.0.0.1", inst.port), timeout=300)
+    b_ = json.dumps(body).encode()
+    so.sendall(("POST /api/chat HTTP/1.1\r\nHost: 127.0.0.1:%d\r\nCookie: %s\r\n"
+                "X-Api-Token: %s\r\nContent-Type: application/json\r\n"
+                "Content-Length: %d\r\n\r\n" % (inst.port, inst.cookie, inst.token, len(b_))
+                ).encode() + b_)
+    return so
+
+
+def _stream_until(inst, cid, prompt, n=200, tries=2):
+    """Open a saved chat turn and read until n characters of answer have
+    arrived; the socket is returned still open. A turn that ends short
+    (an engine the other copies just moved, answering with an error) is
+    asked again in a fresh chat id, once."""
+    for k in range(tries):
+        c_ = cid if k == 0 else cid[:-1] + "9"
+        so_ = _chat_open(inst, {"chat_id": c_, "lane": "ai", "model": "Llama 3.2 3B",
+                                "models": [], "tier": "", "auto_web": False,
+                                "messages": [{"role": "user", "content": prompt}]})
+        raw_, t0_, txt_ = b"", time.time(), ""
+        while time.time() - t0_ < 180:
+            ch_ = so_.recv(512)
+            if not ch_:
+                break
+            raw_ += ch_
+            txt_ = _cs["turn_text"](raw_.split(b"\r\n\r\n", 1)[-1].decode("utf-8", "ignore"))
+            if len(txt_) > n:
+                return so_, c_, txt_
+        so_.close()
+    return None, cid, txt_
+
+
+def _saved(inst, cid):
+    for c in json.load(open(os.path.join(inst.home, "chats.json"), encoding="utf-8")):
+        if c.get("id") == cid:
+            return c
+    return None
+
+
+_c1 = "c" + "l" * 26
+_so = _chat_open(INST, {"chat_id": _c1, "lane": "ai", "model": "Llama 3.2 3B", "models": [],
+                        "tier": "", "auto_web": False,
+                        "messages": [{"role": "user", "content": "Reply with exactly: pineapple"}]})
+_head = b""
+while b"\r\n\r\n" not in _head:
+    _head += _so.recv(256)
+_on_arrival = _saved(INST, _c1)
+while _so.recv(4096):
+    pass
+_so.close()
+time.sleep(1)
+_done = _saved(INST, _c1) or {}
+_so, _c2, _shown = _stream_until(INST, "c" + "m" * 26,
+                                 "Write a 300-word story about a lighthouse keeper named Ada.")
+if _so:
+    _so.close()       # Stop: the page hangs up mid-answer
+time.sleep(3)
+_part = (_saved(INST, _c2) or {}).get("messages") or []
+_ptxt = _part[1]["content"] if len(_part) > 1 else ""
+check("LOC-1: the question is saved on arrival, the answer at the end, a stopped answer as shown",
+      _on_arrival and [m["role"] for m in _on_arrival["messages"]] == ["user"]
+      and b"X-Chat-Id: " + _c1.encode() in _head
+      and [m["role"] for m in _done.get("messages", [])] == ["user", "assistant"]
+      and "pineapple" in _done["messages"][1]["content"].lower()
+      and len(_ptxt) >= 150 and _shown.strip()[:120] == _ptxt.strip()[:120],
+      "%r" % [bool(_on_arrival), len(_done.get("messages", [])), len(_ptxt), _shown[:60], _ptxt[:60]])
+
+# LOC-3: viewing writes nothing. Reading the list, one chat and a search
+# leaves the file and the change counter alone; switching chats and New
+# chat send nothing
+_st0 = os.stat(os.path.join(INST.home, "chats.json"))
+_rv0 = json.loads(req("/api/stats")[2]).get("data_rev")
+req("/api/chats"); req("/api/chats/one?id=" + _c1); req("/api/chats/search?q=pine")
+_st1 = os.stat(os.path.join(INST.home, "chats.json"))
+_lc = page[page.index("function loadChat(id){"):page.index("function loadChat(id){") + 1200]
+_nc = page[page.index('$("#newchat").addEventListener'):page.index('$("#newchat").addEventListener') + 400]
+check("LOC-3: viewing, switching and New chat write nothing",
+      (_st0.st_mtime_ns, _st0.st_size) == (_st1.st_mtime_ns, _st1.st_size)
+      and json.loads(req("/api/stats")[2]).get("data_rev") == _rv0
+      and "chatOps(" not in _lc.split("\n}")[0] and "api(" not in _lc.split("\n}")[0]
+      and "chatOps(" not in _nc.split("});")[0],
+      "%r" % [_rv0])
+
+# LOC-5: an unreadable chats, memory or settings file answers 503 with its
+# line on every route that reads it, and is left byte for byte; a
+# memorable message can't be written into an unreadable memory
+_lines = {}
+for _fn, _paths in (("chats.json", [("GET", "/api/chats", None), ("GET", "/api/chats/search?q=x", None),
+                                    ("POST", "/api/chats/ops", {"ops": [{"op": "create", "id": "c" + "n" * 26}]}),
+                                    ("POST", "/api/chat", {"chat_id": _c1, "tier": "",
+                                     "messages": [{"role": "user", "content": "x"}]})]),
+                    ("memory.json", [("GET", "/api/memory", None)]),
+                    ("prefs.json", [("GET", "/api/prefs", None), ("POST", "/api/prefs", {"length": 2})])):
+    _fp = os.path.join(INST.home, _fn)
+    _orig = open(_fp, "rb").read() if os.path.exists(_fp) else b"[]" if _fn != "prefs.json" else b"{}"
+    _bad = _orig[:-1] + b"\x00garbage"
+    with open(_fp, "wb") as fh:
+        fh.write(_bad)
+    _got = []
+    for _m, _pth, _d in _paths:
+        _s, _h, _b = req(_pth, _m, _d)
+        _got.append((_s, json.loads(_b).get("err", "") if _b[:1] == b"{" else ""))
+    if _fn == "memory.json":
+        chat({"model": "Llama 3.2 3B", "models": [], "tier": "", "auto_web": False,
+              "messages": [{"role": "user", "content": "My name is Zorblatt and I keep bees."}]})
+        time.sleep(8)
+    _same = open(_fp, "rb").read() == _bad
+    with open(_fp, "wb") as fh:
+        fh.write(_orig)
+    _lines[_fn] = (_got, _same)
+check("LOC-5: an unreadable chats, memory or settings file answers 503, and nothing is written over it",
+      all(_same and all(g[0] == 503 and "Nothing was changed." in g[1] for g in _got)
+          for _got, _same in _lines.values())
+      and "chats" in _lines["chats.json"][0][0][1] and "memory" in _lines["memory.json"][0][0][1]
+      and "settings" in _lines["prefs.json"][0][0][1],
+      "%r" % _lines)
+
+# LOC-9: a funnel through two stages, one answered by card text, then
+# finished: every turn is on disk after each stage, the summary too
+_cf = "c" + "f" * 26
+_fn_log = []
+_fst = {"goal": "pick a houseplant", "reqs": "", "opts": 2, "stages": 2, "images": False,
+        "picks": [], "asked": [], "effort": "fast", "chat_id": _cf}
+_fmsgs = [{"role": "user", "content": "Funnel: pick a houseplant"}]
+for _stage in range(3):
+    _fst.update(after_len=len(_fmsgs) - 1, after_hash=_cs["chat_prefix_hash"](_fmsgs, len(_fmsgs) - 1))
+    _s, _h, _b = req("/api/funnel", "POST", _fst, timeout=600)
+    _fr = json.loads(_b) if _s == 200 else {}
+    _sv22 = [m["content"] for m in ((_saved(INST, _cf) or {}).get("messages") or [])]
+    _fn_log.append((_s, bool(_fr.get("done")), len(_sv22), (_fr.get("chat") or {}).get("id") == _cf))
+    if _fr.get("done") or not _fr.get("options"):
+        break
+    _pick = _fr["options"][0]["label"]
+    _fst["asked"] = _fst["asked"] + [_fr["q"]]
+    _fst["picks"] = _fst["picks"] + [_pick]
+    _fmsgs = list(_fr["chat"]["messages"]) + [{"role": "assistant", "content": _fr["q"] + " → " + _pick}]
+_fsaved = (_saved(INST, _cf) or {}).get("messages") or []
+check("LOC-9: a funnel's goal, picks and summary are all saved, stage by stage",
+      [x[:3] for x in _fn_log] == [(200, False, 1), (200, False, 2), (200, True, 4)]
+      and all(x[3] for x in _fn_log) and (_saved(INST, _cf) or {}).get("lane") == "funnel"
+      and _fsaved[0]["content"] == "Funnel: pick a houseplant"
+      and " → " in _fsaved[1]["content"] and len(_fsaved[3]["content"]) > 20,
+      "%r" % [_fn_log, [m["content"][:40] for m in _fsaved]])
+
+# every response is no-store (0b 5.11): the page, JSON, a clip, an error
+_ns = [req("/")[1].get("Cache-Control"), req("/api/stats")[1].get("Cache-Control"),
+       req("/api/chats")[1].get("Cache-Control"), req("/api/nope")[1].get("Cache-Control"),
+       req("/api/chats", cookie=False)[1].get("Cache-Control")]
+_runsrc = _MILLENAI_SRC[_MILLENAI_SRC.index("    def _run(self, fn):"):][:1400]
+check("every response is no-store, and each request starts with this thread's leftovers cleared",
+      _ns == ["no-store"] * 5 and "_tl_search.__dict__.clear()" in _runsrc
+      and "_answered.pop(threading.get_ident(), None)" in _runsrc
+      and "self._run(self._do_GET)" in _MILLENAI_SRC and "self._run(self._do_POST)" in _MILLENAI_SRC,
+      "%r" % _ns)
+
+# LOC-4 and the quit rules, on a copy of their own: a delete undone once;
+# a delete followed by a quit inside the undo window stays deleted; an
+# answer still streaming at a quit is kept as far as it got
+_cq1, _cq2 = "c" + "g" * 26, "c" + "h" * 26
+
+
+def _seed_q(home):
+    with open(os.path.join(home, "chats.json"), "w") as fh:
+        json.dump([{"id": _cq1, "lane": "ai", "ts": 1, "title": "doomed",
+                    "messages": [{"role": "user", "content": "hi"}]}], fh)
+
+
+INST_Q = Instance(9903, "Q", seed=_seed_q).start()
+def _qr(ops):
+    r_ = urllib.request.Request(INST_Q.base + "/api/chats/ops", method="POST",
+                                data=json.dumps({"ops": ops}).encode(), headers={
+                                    "Cookie": INST_Q.cookie, "X-Api-Token": INST_Q.token,
+                                    "Content-Type": "application/json"})
+    with urllib.request.urlopen(r_, timeout=30) as resp:
+        return json.loads(resp.read())["results"]
+_u1 = _qr([{"op": "delete", "id": _cq1}, {"op": "undelete", "id": _cq1}, {"op": "undelete", "id": _cq1}])
+_qr([{"op": "delete", "id": _cq1}])
+_so, _cq2, _shownq = _stream_until(INST_Q, _cq2,
+                                   "Write a 300-word story about a baker named Tom.", n=150)
+INST_Q.stop()          # the app quits: inside the undo window, mid-answer
+if _so:
+    _so.close()
+_afterq = {c["id"]: c for c in json.load(open(os.path.join(INST_Q.home, "chats.json")))}
+_qm = (_afterq.get(_cq2) or {}).get("messages") or []
+check("LOC-4: a delete undoes once; a quit inside the undo window leaves it deleted, and keeps a streaming answer",
+      _u1 == [{"ok": True}, {"ok": True}, {"err": "gone"}] and _cq1 not in _afterq
+      and len(_qm) == 2 and len(_qm[1]["content"]) >= 100
+      and _shownq.strip()[:100] == _qm[1]["content"].strip()[:100],
+      "%r" % [_u1, sorted(_afterq), len(_qm), _shownq[:120]])
 
 print("== dev isolation ==")
 # 0a item 2 (ISO-16, REM-1) and the plan's two-copy check (6b319): a dev
@@ -5232,7 +5585,7 @@ _cross = (_ireq(INST_B, "/api/chats", "millen_key_%d=%s" % (INST_B.port, INST.ke
           _ireq(INST, "/api/chats", token=INST_B.token)[0])
 check("two copies: B never sees A's chat, not a byte of it, and each refuses the other's key and token",
       _a_chats[0] == 200 and _CANARY_A.encode() in _a_chats[1]
-      and _b_chats == (200, b'{"chats": []}') and not _b_hits
+      and _b_chats[0] == 200 and json.loads(_b_chats[1]).get("chats") == [] and not _b_hits
       and _cross == (403, 403, 403, 403) and INST.key != INST_B.key
       and INST.token != INST_B.token,
       "%r" % [_a_chats[0], _b_chats, _b_hits, _cross])

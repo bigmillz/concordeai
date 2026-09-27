@@ -5630,6 +5630,62 @@ crash was invisible.
   keeps its checks. Mutation-tested (SIGHUP back, hook removed, no log,
   no box).
 
+## 6b322 — chats stop getting lost: the server writes them (accounts step 4)
+The spec's 0b ("stop losing chats"), minus the move to `.v2` files and
+the browser-storage sweep, which are step 5. Before this the page saved
+a question and its answer only when the stream ended and only for the
+chat on screen, replaced the whole list on every save, and a read error
+looked like an empty list that the next save wrote to disk.
+- Reads never pass for empty (0b L1). `chats.json`, `memory.json` and
+  `prefs.json` read as empty only when they aren't there; anything
+  else raises StoreReadError, and every request is wrapped so that
+  answers 503 with "Couldn't read your chats/memory/settings. Nothing
+  was changed." The page shows the line and asks again every 3 s.
+  `store_prefs` won't write over a settings file it can't read, so no
+  caller can save settings built on an empty read.
+- Every write is atomic: a unique temp file, fsync, `os.replace`.
+  Memory keeps 200 facts (prompts still use 40). The chat store keeps
+  every pinned chat, every chat with a `project` field (before Projects
+  exists, so a downgrade can't evict one) and the newest 1,000 of the
+  rest by `ts`; eviction makes no stub. Fields this build doesn't know
+  are written back as read, at every level.
+- The page sends operations to `POST /api/chats/ops`: create, append,
+  truncate, set (title, pin, named, lane) and delete/undelete, each
+  applied only onto the prefix or old value the page saw (SHA-256 of
+  each message's role and text; page and server compute it alike). A
+  mismatch makes a copy "‹title› (copy)" with the page's own content;
+  a write to a deleted chat gets a fresh id. The whole-list
+  `POST /api/chats` answers 410. Chat ids are "c" + 26 random base32.
+- The server writes the turns: the question when `/api/chat` arrives,
+  the answer when the stream ends, from the bytes it actually sent, by
+  the page's own rule (only what follows the last RESET; the page's
+  `streamText()` and the server's `turn_text()` run one corpus). A
+  stopped answer keeps what was shown; an answer still streaming when
+  the app quits is kept as far as it got; an answer that errored isn't
+  saved and its question stays, for Try again. After each answer the
+  page adopts the saved chat, so the two never hold different turns.
+- The Funnel lane is saved the same way: the goal and each pick when
+  they arrive, the summary at the end (it was never saved before).
+- Try again and Edit & resend are truncates the next question waits
+  for. Delete holds the chat on the server for the same 6 s as Undo;
+  undo works once; a quit inside the window leaves it deleted.
+- Viewing writes nothing: switching chats and New chat used to save the
+  chat being left and move its stamp. A change counter (`data_rev`)
+  rides the 2 s stats poll and the page re-reads the list when
+  something else wrote.
+- The page keeps no copy of the chats in browser storage any more.
+- Every response is `Cache-Control: no-store`, and each request starts
+  with the thread's leftovers from the last one cleared.
+- Checked by hand in a browser against a dev copy: a chat saved and
+  named, a follow-up, Try again replacing the answer in place, pin,
+  delete and undo, a write from elsewhere picked up, switching chats
+  leaving the file untouched, a whole funnel with its summary; and on
+  the wire, a stopped answer (251 shown, 252 saved) and a quit mid-answer
+  (202 shown, 202 saved).
+- Gauntlet: LOC-1, 3, 4, 5, 7, 8 and 9 (LOC-6 and ISO-10 are step 5),
+  the operations' rules, page/server hash and stream-rule twins, random
+  ids, no-store and the thread-local reset.
+
 ## 6b323 — a place pin's location test reads the whole address
 Seen in 6b322 and older than it: `/api/geo` returned Nominatim's
 display_name cut to 80 characters, and `mountPlaces` kept a pin only
