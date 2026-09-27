@@ -5652,8 +5652,13 @@ M2 of the sign-in plan.
   "get the app" chip (`/api/downloads`, `download_links`, `#get-app`,
   the download-help veil).
 - `_data_base()` keeps its 17 call sites and returns None (the app's
-  folder) whatever the request carries, so a proxy header plus a
-  forged cookie reads the root and makes no folder. `sweep_all_exports`
+  folder) whatever the request carries, so a forged cookie reads the
+  root and makes no folder.
+- Nothing reaches the app through a proxy (ISO-14): `_gate` refuses any
+  request carrying a forwarding header (`X-Forwarded-For`, `Forwarded`,
+  `X-Real-IP`, `Cf-Connecting-Ip`, `True-Client-IP`,
+  `X-Forwarded-Host`) with 403, key or no key. The window never sends
+  one, so a tunnel pointed at the port again gets nothing. `sweep_all_exports`
   no longer walks `users/`; a leftover `users/` on an old machine is
   never touched by the app.
 - Kept: `_gate` with its Host check, the `millen_key_<port>` cookie and
@@ -5694,8 +5699,9 @@ M2 of the sign-in plan.
   the Account pane (only the local card, no PIN field), the WebView2
   check (a detector with no box, the ARM64 build skipped, and the
   window check before the lock and the port), and seven checks that
-  pinned a removed string. New: one identity (proxy headers plus a forged `millen_user`
-  read the root, get the app and make no `users/`); ISO-18's app half
+  pinned a removed string. New: one identity (a forged `millen_user` reads the root, gets
+  the app and makes no `users/`, and each forwarding header gets 403 on
+  GET, POST and `/` even with the key); ISO-18's app half
   (a scan for every web-version name, and the old routes answer 404
   with no cookie); browser mode gone (a dev copy with the no-webview
   hook and 9903 held exits 4 with the install line, makes no `run/`,

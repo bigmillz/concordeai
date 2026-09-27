@@ -288,31 +288,38 @@ check("second launch can ask this copy forward; nobody else can",
 print("== one identity ==")
 # accounts step 2 (0a 5.8, 6b320): the web version and its per-visitor
 # users/ folders are gone for good, so nothing a request carries picks
-# another folder. Proxy headers plus a forged millen_user read the
-# window's own root, get the app and are the local owner; no users/
-# appears. The proxy headers without the key still get 403.
+# another folder: a forged millen_user reads the window's own root and
+# is the local owner, and no users/ appears. And nothing reaches the app
+# through a proxy (ISO-14): any forwarding header gets 403 on GET, POST
+# and /, key or no key.
 _prox = {"X-Forwarded-For": "1.2.3.4", "Cf-Connecting-Ip": "1.2.3.4"}
 _forged = "millen_user=" + os.urandom(10).hex()
 _rp = ("/api/chats", "/api/prefs", "/api/memory")
 _pl = [req(p) for p in _rp]
-_px = [req(p, cookie=_forged, headers=_prox) for p in _rp]
-_pg = req("/", cookie=_forged, headers=_prox)
-_pm = req("/api/me", cookie=_forged, headers=_prox)
+_px = [req(p, cookie=_forged) for p in _rp]
+_pg = req("/", cookie=_forged)
+_pm = req("/api/me", cookie=_forged)
 _pnk = [req("/", cookie=False, headers=_prox)[0],
         req("/api/chats", cookie=False, headers=_prox)[0],
         req("/api/prefs", "POST", {"length": 3}, cookie=False, headers=_prox)[0]]
+# the same with the key: each proxy header alone, on GET, POST and /
+_pk = [req(p, m, d, headers={hd: "1.2.3.4"})[0]
+       for hd in ("X-Forwarded-For", "Forwarded", "X-Real-IP", "Cf-Connecting-Ip",
+                  "True-Client-IP", "X-Forwarded-Host")
+       for p, m, d in (("/api/chats", "GET", None), ("/api/prefs", "POST", {"length": 3}),
+                       ("/", "GET", None))]
 _dbm = re.search(r"\n    def _data_base\(self\):.*?(?=\n    def |\n    # -)", _MILLENAI_SRC, re.S)
 _dbs = _dbm.group(0) if _dbm else ""
-check("one identity: a proxied request with a forged millen_user reads the root and makes no users/",
+check("one identity: a forged millen_user reads the root and makes no users/; nothing gets in through a proxy",
       [x[0] for x in _px] == [200] * 3 and [x[2] for x in _px] == [x[2] for x in _pl]
       and _CANARY_A.encode() in _px[0][2]
       and _pg[0] == 200 and b'id="skyline"' in _pg[2]
       and b"continue as guest" not in _pg[2].lower()
       and (json.loads(_pm[2]) if _pm[0] == 200 else {}).get("kind") == "owner"
-      and _pnk == [403, 403, 403]
+      and _pnk == [403, 403, 403] and _pk == [403] * 18
       and not os.path.exists(os.path.join(INST.home, "users"))
       and _dbs and "headers" not in _dbs and "makedirs" not in _dbs,
-      "%r" % [[x[0] for x in _px], _pg[0], _pm[2][:60], _pnk,
+      "%r" % [[x[0] for x in _px], _pg[0], _pm[2][:60], _pnk, _pk,
               os.path.exists(os.path.join(INST.home, "users"))])
 s, h, b = req("/api/chats", cookie=K)
 check("local owner sees real chats", b"title" in b)
@@ -1697,10 +1704,12 @@ _WEB_GONE = (r"\bWELCOME_PAGE\b", r"/api/welcome\b", r"/api/guest\b",
              r"\busers_(?:online|total)\b", r'app_dir\(\), "users"', r'"_anon"',
              r'"\.ident"', r"community service", r"\bIS_LOCAL\b",
              r"/api/downloads\b", r"\bdownload_links\b", r'id="get-app"', r"dlhelp",
-             r"(?i:X-Forwarded-For|Cf-Connecting-Ip)",
              r"\(8889, 9889\)", r'webbrowser\.open\("http://127\.0\.0\.1',
              r"(?i:browser mode)")
 _web_left = [p for p in _WEB_GONE if re.search(p, _MILLENAI_SRC)]
+# proxy headers are named once: in the tuple _gate refuses, never read
+_web_left += [h_ for h_ in ("X-Forwarded-For", "Cf-Connecting-Ip")
+              if _MILLENAI_SRC.count(h_) != 1]
 _web_routes = [req("/api/welcome", "POST", {"name": "x", "pin": "88881111"}),
                req("/api/guest", "POST", {}), req("/auth/google"),
                req("/auth/google/callback?code=x&state=y"), req("/api/downloads")]
@@ -4832,12 +4841,11 @@ _nw_env.update(HOME=_fake, USERPROFILE=_fake, LOCALAPPDATA=os.path.join(_fake, "
                MILLENAI_TEST_HOOKS="no-webview",
                PYTHONPATH=os.pathsep.join(p for p in (_nw_shim, os.environ.get("PYTHONPATH")) if p))
 _py = os.environ.get("SMOKE_PY") or sys.executable
-# the stand-in really is the one imported, or the last clause proves nothing
-subprocess.run([_py, "-c", "import webbrowser; webbrowser.open('probe')"],
-               env=_nw_env, capture_output=True, timeout=30)
-_nw_shim_ok = os.path.exists(_nw_log)
-if _nw_shim_ok:
-    os.remove(_nw_log)
+# the stand-in really is the one imported, or the last clause proves
+# nothing; asked by its file, so a miss can't open a real browser
+_nw_which = subprocess.run([_py, "-c", "import webbrowser; print(webbrowser.__file__)"],
+                           env=_nw_env, capture_output=True, text=True, timeout=30).stdout.strip()
+_nw_shim_ok = os.path.realpath(_nw_which) == os.path.realpath(os.path.join(_nw_shim, "webbrowser.py"))
 _hold = socket.socket()
 _hold.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 _hold.bind(("127.0.0.1", 9903))

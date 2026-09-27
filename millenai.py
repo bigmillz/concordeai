@@ -12763,6 +12763,12 @@ def _funnel_image(query: str) -> str:
     return ""
 
 
+
+# the headers a proxy or tunnel adds to what it forwards (see _gate)
+_PROXY_HEADERS = ("X-Forwarded-For", "X-Forwarded-Host", "Forwarded",
+                  "X-Real-IP", "Cf-Connecting-Ip", "True-Client-IP")
+
+
 class StudioHandler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.0"  # lets us stream then close, no chunking
 
@@ -12785,6 +12791,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         overwrite the app's."""
         host = (self.headers.get("Host") or "").strip().lower()
         if host not in ("127.0.0.1:%d" % PORT, "localhost:%d" % PORT):
+            return self._deny()
+        # NOTHING THROUGH A PROXY (6b320, ISO-14). The window talks to us
+        # directly; a request a proxy or tunnel forwarded carries one of
+        # these, and with the web version gone nobody may reach the app
+        # that way, key or no key.
+        if any(self.headers.get(h) for h in _PROXY_HEADERS):
             return self._deny()
         # EVERY cookie of that name: a stray one with a longer Path sorts
         # first and must not shadow the real key. compare_digest on
