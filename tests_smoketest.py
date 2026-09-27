@@ -1546,7 +1546,7 @@ check("query pinwheel css", ".wtspin" in page and "wtspin 1.5s" in page)
 check("LFG removed entirely",
       "lfg" not in page.lower() and "fucking" not in page.lower())
 check("backdrop pantry js", "millen.skynext" in page
-      and "fillPantry" in page and "PANTRY=5" in page)
+      and "fillPantry" in page and "PANTRY=8" in page)
 # 5.3.2 surface: lane-aware sidebar + iconed tabs, AI renamed Chat
 check("lane-aware sidebar js", "laneOK" in page and ".cempty" in page
       and "switchLane" in page)
@@ -4981,23 +4981,33 @@ _sk0 = _M.index("function skyPick(o){")
 _skjs = _M[_sk0:_M.index("async function bootSkyline(){", _sk0)] + r"""
 function rng(seed){let s=seed>>>0;return()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};}
 const DARK=new Set(%s),ALL=[...Array(89).keys()],rnd=rng(11);
-let hist=[],disk=[],prepared=-1,last=-1;const shown=[],nights=[];
+let hist=[],disk=[],prepared=-1,last=-1,part={};const shown=[],nights=[];
+// the shelf as the server keeps it (6b323): eight of each kind, oldest out
+const keep=()=>{for(const k of [true,false]){const m=disk.filter(x=>DARK.has(x)===k);
+  while(m.length>8){const o=m.shift();disk=disk.filter(x=>x!==o);}}};
 for(let L=0;L<340;L++){
   const night=rnd()<0.4;
   const i=skyPick({all:ALL,hist,onDisk:disk.slice(),last,prepared,rnd,dark:DARK,wantDark:night});
   prepared=-1;nights.push(night);
-  disk=disk.filter(x=>x!==i).concat([i]);while(disk.length>8)disk.shift();
+  disk=disk.filter(x=>x!==i).concat([i]);keep();
   hist=[i].concat(hist.filter(x=>x!==i)).slice(0,32);last=i;shown.push(i);
-  // as fillPantry: one clip per session, more until five spares with
-  // two unseen of each kind
-  const stocked=()=>{const sp=disk.filter(x=>x!==i),un=sp.filter(x=>!hist.includes(x));
-    return sp.length>=5&&un.filter(x=>DARK.has(x)).length>=2&&un.filter(x=>!DARK.has(x)).length>=2;};
-  do{const n=skyStockPick({all:ALL,have:disk.slice(),playing:i,hist,failed:new Set(),dark:DARK,rnd});
-     if(n<0)break;disk=disk.concat([n]);while(disk.length>8)disk.shift();prepared=n;}while(!stocked());
+  // as fillPantry, in a SHORT session (6b323: Patrick's real ones): a
+  // third of one clip's download each, a half-done clip finished first,
+  // until eight spares with three unseen of each kind
+  let budget=1/3;
+  while(budget>0){
+    const sp=disk.filter(x=>x!==i),un=sp.filter(x=>!hist.includes(x));
+    if(sp.length>=8&&un.filter(x=>DARK.has(x)).length>=3&&un.filter(x=>!DARK.has(x)).length>=3)break;
+    const n=skyStockPick({all:ALL,have:disk.slice(),playing:i,hist,failed:new Set(),dark:DARK,rnd,
+                          partial:Object.keys(part).map(Number),night});
+    if(n<0)break;
+    const use=Math.min(1-(part[n]||0),budget);budget-=use;part[n]=(part[n]||0)+use;
+    if(part[n]>0.999){delete part[n];disk=disk.concat([n]);keep();prepared=n;}
+  }
 }
 let rep=0,wrong=0,nyc=0;const NYC=[17,37,66,72,75];
 for(let j=40;j<shown.length;j++){
-  if(shown.slice(j-10,j).includes(shown[j]))rep++;
+  if(shown.slice(j-5,j).includes(shown[j]))rep++;
   if(DARK.has(shown[j])!==nights[j])wrong++;
   if(NYC.includes(shown[j]))nyc++;}
 // nothing unseen and nothing of tonight's kind on disk: never a wait,
@@ -5007,7 +5017,9 @@ const nowait=skyPick({all:ALL,hist:[5,9,1],onDisk:[9,1,5],last:5,prepared:-1,rnd
 const kind=skyPick({all:ALL,hist:[3,1],onDisk:[3,2,1],last:1,prepared:-1,rnd:()=>0,dark:DARK,wantDark:true});
 // two of tonight's kind cached, both seen: the one seen longest ago
 const oldest=skyPick({all:ALL,hist:[0,1,3],onDisk:[3,0],last:1,prepared:-1,rnd:()=>0,dark:DARK,wantDark:true});
-process.stdout.write(JSON.stringify({rep,wrong,nyc:nyc/300,d50:new Set(shown.slice(40,90)).size,nowait,kind,oldest}));
+// a half-downloaded clip of the short kind is finished before another
+const half=skyStockPick({all:ALL,have:[],playing:-1,hist:[],failed:new Set(),dark:DARK,rnd:()=>0,partial:[50,8]});
+process.stdout.write(JSON.stringify({rep,wrong,nyc:nyc/300,d50:new Set(shown.slice(40,90)).size,nowait,kind,oldest,half}));
 """
 _skjs = _skjs.replace("%s", json.dumps([0, 3, 4, 6, 8, 11, 14, 16, 23, 25, 27, 31, 36, 42, 47, 52, 56, 61, 65, 71, 75, 76, 83]))
 try:
@@ -5017,13 +5029,30 @@ try:
                                      timeout=60).stdout)
 except Exception as _e:
     _sko = {"err": repr(_e)}
-check("backdrops: dark after dark, light by day, no clip back within ten launches",
-      _sko.get("rep") == 0 and _sko.get("wrong", 99) <= 3 and _sko.get("d50", 0) >= 40
+check("backdrops: dark after dark, light by day, and variety even in short sessions",
+      # (6b323) sessions finish a third of a clip each, as Patrick's do;
+      # the old rules came back within five launches 85 times in 268
+      _sko.get("rep", 99) <= 10 and _sko.get("wrong", 99) <= 3 and _sko.get("d50", 0) >= 15
+      and _sko.get("half") == 50
       and _sko.get("nyc", 1) < 0.12 and _sko.get("nowait") == 1 and _sko.get("kind") == 3 and _sko.get("oldest") == 3
       and "wantDark:SKY_NIGHT||firstEver});" in page and "const n=skyStockPick({" in page
-      and "const stocked=spare.length>=PANTRY&&unseenOf(true)>=2" in page
+      and "const stocked=spare.length>=PANTRY&&unseenOf(true)>=3" in page
       and "__SKY_NYC__" not in _M and "SKY_NYC" not in _M,
       "%r" % _sko)
+
+# (6b323) the shelf keeps eight of EACH kind, and the history of what was
+# seen lives beside the clips, since the window's own copy can come back
+# empty: a clip reported seen is first in the history the page reads
+_seen = req("/api/sky/seen", "POST", {"i": 5})
+_skh = json.loads(req("/api/sky/cached")[2])
+_bad = req("/api/sky/seen", "POST", {"i": 999})
+check("backdrops: eight of each kind kept, and the history kept beside them",
+      json.loads(_seen[2]).get("ok") is True and (_skh.get("hist") or [None])[0] == 5
+      and isinstance(_skh.get("partial"), list) and json.loads(_bad[2]).get("ok") is False
+      and "SKY_KEEP = 8" in _M and "for old in mine[:-SKY_KEEP]:" in _M
+      and "for kind in (True, False):" in _M and "hist=skyHistMerge(sc.hist,hist);" in page
+      and page.count("skySeen(i);") == 2,
+      "%r" % [_seen[2][:40], _skh.get("hist")])
 
 # the sun, measured: known sunsets and noons, and the city of a time zone
 import calendar as _cal21

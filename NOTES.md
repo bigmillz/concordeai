@@ -5742,6 +5742,31 @@ key), and chose to put the single-pin card on the same map.
   and the places map hides; with "Manhattan" it draws. That predates
   this change. Fixed in 6b323.
 
+## 6b323 — backdrops: variety in short sessions, day and night kept apart
+Patrick, 2026-09-27: "still getting the same few background videos.
+earth or sometimes nyc skyline. sometimes jellyfish. never anything
+else." His shelf held 8 clips: 6 night ones (earth from space at night,
+the New York night skyline, jellyfish and other undersea clips) and 2
+daytime ones. A clip is 200-550 MB and arrives at about 5 MB/s, a minute
+each, while the app is open; his sessions are shorter than that.
+- The stocking picked a new random clip every session, so a half
+  downloaded one was left behind (one sat at 22 MB for a day) and short
+  sessions finished nothing. Now a half-done clip is finished first.
+- On a tie between the kinds the stocking always chose the night clips,
+  and one shelf of 8 let them push the day clips out. The shelf now
+  keeps 8 of EACH kind (16 clips, about 4.5 GB), evicts within a kind,
+  and a tie goes by clips on the shelf, then the kind showing now.
+- The history of seen clips lived only in the window's storage, which
+  came back nearly empty on his Mac (two entries), so every clip on the
+  shelf counted as new. It is now also kept beside the clips
+  (sky/hist.json, via POST /api/sky/seen) and merged at launch.
+- Measured with the page's own functions, 400 launches of short
+  sessions (a third of a clip each): a clip back within five daytime
+  launches went from 85 to 5, clips of the wrong kind for the hour
+  from 202 to 0, daytime clips seen from 26 to 56. The gauntlet's
+  simulation now models those short sessions; it used to let every
+  launch finish all its downloads, which is why it passed.
+
 ## 6b321 — an API token, a one-time boot code, media behind the token (accounts step 3)
 Until now the launch cookie was the only credential: anything that got
 it (a copied cookie, a replay from another local port) opened every

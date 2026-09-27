@@ -12484,20 +12484,25 @@ def _sky_fetch(i: int):
             _sky_jobs[i] = {"status": "ready", "pct": 100}
         # THE PANTRY (5.3.1, per Patrick: "preload more in the background
         # and cache them for the future" — the 3.8 no-stockpile rule is
-        # rescinded): keep up to 8 clips (~2 GB ceiling). mtime is
-        # touched on serve, so the playing clip is never the evictee.
-        # Orphans from old catalog hashes get deleted too.
+        # rescinded): SKY_KEEP clips OF EACH KIND, day and night (6b323,
+        # per Patrick: "still getting the same few"). One shelf of 8 let
+        # an evening's night clips push out the daytime ones, and by day
+        # two clips took turns. mtime is touched on serve, so the playing
+        # clip is never the evictee. Orphans from old catalog hashes go.
         try:
-            valid = {os.path.basename(_sky_path(n))
-                     for n in range(len(SKY_SOURCES))}
+            idx = {os.path.basename(_sky_path(n)): n
+                   for n in range(len(SKY_SOURCES))}
             clips = sorted(glob.glob(os.path.join(_sky_dir(), "sky*.mov")),
                            key=os.path.getmtime)
             for p in clips:
-                if os.path.basename(p) not in valid:
+                if os.path.basename(p) not in idx:
                     os.remove(p)
-            clips = [p for p in clips if os.path.basename(p) in valid]
-            for old in clips[:-8]:
-                os.remove(old)
+            dark = set(SKY_DARK)
+            for kind in (True, False):
+                mine = [p for p in clips if os.path.basename(p) in idx
+                        and (idx[os.path.basename(p)] in dark) == kind]
+                for old in mine[:-SKY_KEEP]:
+                    os.remove(old)
             for part in glob.glob(os.path.join(_sky_dir(), "*.dl")):
                 # three days to resume in (6b318)
                 if time.time() - os.path.getmtime(part) > 3 * 86400:
@@ -12515,6 +12520,36 @@ def _sky_fetch(i: int):
                 os.remove(tmp)
             except Exception:
                 pass
+
+
+SKY_KEEP = 8      # clips kept of each kind (6b323): about 4.5 GB in all
+
+
+# WHICH CLIPS WERE SEEN, kept beside them (6b323): the page's own copy
+# lives in the window's storage, which came back empty on Patrick's Mac,
+# and with no history every clip on the shelf counts as new.
+_sky_hist_lock = threading.Lock()
+
+
+def sky_hist() -> list:
+    try:
+        with open(os.path.join(_sky_dir(), "hist.json"), encoding="utf-8") as f:
+            h = json.load(f)
+        return [x for x in h if isinstance(x, int)
+                and 0 <= x < len(SKY_SOURCES)][:32]
+    except (OSError, ValueError, TypeError):
+        return []
+
+
+def sky_seen(i: int):
+    with _sky_hist_lock:
+        h = [i] + [x for x in sky_hist() if x != i]
+        os.makedirs(_sky_dir(), exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=_sky_dir(), prefix=".hist-",
+                                   suffix=".tmp")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(h[:32], f)
+        _replace_into(tmp, os.path.join(_sky_dir(), "hist.json"))
 
 
 def sky_status(i: int, warm: bool = False) -> dict:
@@ -13138,9 +13173,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         elif self.path == "/api/sky/cached":
             # night rides along: the hourly change needs it NOW, not as it
             # was when the page loaded (6b318)
+            # (6b323) the history of what was seen, and the clips half
+            # downloaded, which the shelf finishes before starting another
             self._send_json({"cached": [
                 i for i in range(len(SKY_SOURCES))
-                if os.path.exists(_sky_path(i))], "night": sky_is_night()})
+                if os.path.exists(_sky_path(i))], "night": sky_is_night(),
+                "partial": [i for i in range(len(SKY_SOURCES))
+                            if os.path.exists(_sky_path(i) + ".dl")],
+                "hist": sky_hist()})
         elif self.path.startswith("/api/sky/status"):
             m = re.search(r"[?&]i=(\d+)", self.path)
             self._send_json(sky_status(int(m.group(1)) if m else 0,
@@ -14176,6 +14216,18 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 with _chats_lock:
                     store_chats(items, self._data_base())
             self._send_json({"ok": isinstance(items, list)})
+            return
+        if self.path == "/api/sky/seen":
+            # the backdrop now showing, for the history beside the clips
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                i = int(json.loads(self.rfile.read(n)).get("i"))
+            except (ValueError, TypeError, AttributeError):
+                i = -1
+            ok = 0 <= i < len(SKY_SOURCES)
+            if ok:
+                sky_seen(i)
+            self._send_json({"ok": ok})
             return
         if self.path == "/api/chat/hurry":
             # ANSWER NOW (6b257): flips the per-request Event minted in
@@ -23192,12 +23244,23 @@ function skyPick(o){  // {all,hist,onDisk,last,prepared,rnd,dark:Set,wantDark}
   const pool=fresh.length?fresh:mood.filter(x=>x!==last);
   return pick(pool.length?pool:mood);
 }
-function skyStockPick(o){ // {all,have,playing,hist,failed:Set,dark:Set,rnd}
-  const {all,have,playing,hist,failed,dark,rnd}=o;
+function skyStockPick(o){ // {all,have,playing,hist,failed:Set,dark:Set,rnd,partial,night}
+  const {all,have,playing,hist,failed,dark,rnd}=o,partial=o.partial||[];
   const open=x=>!have.includes(x)&&x!==playing&&!failed.has(x);
-  // stock the kind with fewer unseen clips on the shelf, dark or light
+  const onShelf=k=>have.filter(x=>dark.has(x)===k).length;
+  // a clip half downloaded is finished first, whatever its kind, while
+  // its kind has room (6b323): a short session then still lands one,
+  // instead of starting another and leaving both unfinished
+  const half=partial.filter(x=>open(x)&&onShelf(dark.has(x))<8);
+  if(half.length)return half[0];
+  // then the kind with fewer unseen clips on the shelf; on a tie, fewer
+  // clips at all; then the kind showing now (a tie used to go to the
+  // night clips every time, and a day of short sessions stocked only them)
   const unseen=k=>have.filter(x=>dark.has(x)===k&&!hist.includes(x)).length;
-  for(const k of unseen(true)<=unseen(false)?[true,false]:[false,true]){
+  const score=k=>[unseen(k),onShelf(k),k===!!o.night?0:1];
+  const a=score(true),b=score(false);
+  const darkFirst=a[0]!==b[0]?a[0]<b[0]:a[1]!==b[1]?a[1]<b[1]:a[2]<=b[2];
+  for(const k of darkFirst?[true,false]:[false,true]){
     let cand=all.filter(x=>open(x)&&dark.has(x)===k&&!hist.includes(x));
     if(!cand.length)cand=all.filter(x=>open(x)&&dark.has(x)===k
                                     &&!hist.slice(0,10).includes(x));
@@ -23205,6 +23268,10 @@ function skyStockPick(o){ // {all,have,playing,hist,failed:Set,dark:Set,rnd}
   }
   return -1;
 }
+// the page's history and the server's, newest first (6b323)
+const skyHistMerge=(a,b)=>(a||[]).concat((b||[]).filter(x=>!(a||[]).includes(x))).slice(0,32);
+const skySeen=i=>api("/api/sky/seen",{method:"POST",
+  headers:{"Content-Type":"application/json"},body:JSON.stringify({i})}).catch(()=>{});
 async function bootSkyline(){
   if(noVideo||!skyline||skyBooted)return;
   skyBooted=true;
@@ -23229,7 +23296,11 @@ async function bootSkyline(){
   // a clip already on disk starts instantly and still counts as new to
   // the eye — only reach for a download when the local set is thin
   let onDisk=[];
-  try{onDisk=(await(await api("/api/sky/cached")).json()).cached||[];}
+  try{const sc=await(await api("/api/sky/cached")).json();
+      onDisk=sc.cached||[];
+      // the server keeps the history too (6b323): the window's storage
+      // can come back empty, and then every clip on the shelf is "new"
+      hist=skyHistMerge(sc.hist,hist);}
   catch(e){}
   // a stocked pantry is proof this is a veteran install even when
   // localStorage says otherwise — private-mode WKWebView wiped it on
@@ -23250,6 +23321,7 @@ async function bootSkyline(){
   hist=[i].concat(hist.filter(x=>x!==i)).slice(0,32);
   localStorage.setItem("millen.skyhist",JSON.stringify(hist));
   localStorage.setItem("millen.sky",i);
+  skySeen(i);
   const c=$("#sky-color");
   const bar=$("#skyload"),fill=$("#skyload .fill"),lbl=$("#skyload .lbl");
   c.preload="auto";
@@ -23263,11 +23335,11 @@ async function bootSkyline(){
   // Every future launch then opens instantly from disk and stays
   // varied. The playing backdrop never changes; the server keeps 8 and
   // serializes downloads, so this never fights a user-facing fetch.
-  const PANTRY=5;
+  const PANTRY=8;   // spares on the shelf, of 16 (6b323)
   const skyFailed=new Set();
   function fillPantry(){
     api("/api/sky/cached").then(r=>r.json()).then(c=>{
-      const have=(c.cached||[]);
+      const have=(c.cached||[]),partial=(c.partial||[]);
       const spare=have.filter(x=>x!==i);
       // tomorrow starts decided NOW: a spare the user has never seen
       // beats one from history — maximum variety at zero wait
@@ -23282,15 +23354,15 @@ async function bootSkyline(){
       // cycles through. The 30-second wait is what this kills: the
       // download happens invisibly NOW, not while the user stares at
       // a loading bar at the next launch.
-      // stocked = two unseen clips of EACH kind waiting (6b318): counting
-      // spares alone stopped at one fresh clip, often of the wrong kind
-      // for the next launch, and a morning replayed a recent clip
+      // stocked = three unseen clips of EACH kind waiting (6b318, three
+      // since 6b323): counting spares alone stopped at one fresh clip,
+      // often of the wrong kind, and a morning replayed a recent clip
       const unseenOf=k=>unseen.filter(x=>darkSet.has(x)===k).length;
-      const stocked=spare.length>=PANTRY&&unseenOf(true)>=2
-        &&unseenOf(false)>=2;
+      const stocked=spare.length>=PANTRY&&unseenOf(true)>=3
+        &&unseenOf(false)>=3;
       // a clip not seen in the last 32, of whichever kind is short
       const n=skyStockPick({all,have,playing:i,hist,failed:skyFailed,
-                            dark:darkSet,rnd:Math.random});
+                            dark:darkSet,rnd:Math.random,partial,night:SKY_NIGHT});
       if(n<0)return;
       let tries=0;
       (function warm(){
@@ -23416,6 +23488,7 @@ async function bootSkyline(){
     hist=[i].concat(hist.filter(x=>x!==i)).slice(0,32);
     try{localStorage.setItem("millen.skyhist",JSON.stringify(hist));
         localStorage.setItem("millen.sky",i);}catch(e){}
+    skySeen(i);
     setTimeout(fillPantry,9000);          // restock behind it
   }
 }
