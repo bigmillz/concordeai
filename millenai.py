@@ -7190,13 +7190,22 @@ def load_chats(base=None) -> list:
         return []
 
 
+# How many chats are kept (6b318). It was 60, and with 60 saved every new
+# chat silently erased the oldest (Patrick was at exactly 60). 1,000 is
+# 0b's figure; a pinned chat is never cut, however old.
+CHATS_KEEP = 1000
+
+
 def store_chats(items: list, base=None):
-    """Atomic write — a crash mid-save must not corrupt the history."""
+    """Atomic write — a crash mid-save must not corrupt the history. The
+    page sends the list newest first; past CHATS_KEEP only pins stay."""
+    items = items[:CHATS_KEEP] + [c for c in items[CHATS_KEEP:]
+                                  if isinstance(c, dict) and c.get("pin")]
     p = _pfile("chats.json", base)
     os.makedirs(os.path.dirname(p), exist_ok=True)
     tmp = p + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(items[:60], f)
+        json.dump(items, f)
     os.replace(tmp, p)
 _memory_lock = threading.Lock()
 
@@ -22745,8 +22754,15 @@ function saveChats(){
   // write through to disk, coalesced so a burst of messages is one write
   clearTimeout(chatSaveTimer);
   chatSaveTimer=setTimeout(pushChatsToDisk,400);
+  // the mirror is a convenience: when browser storage is full or refused
+  // it shrinks, and the real list is never touched. This used to cut
+  // `chats` itself to 10, and the save queued above then wrote those 10
+  // to disk (6b318)
   try{localStorage.setItem("millen.chats",JSON.stringify(chats.slice(0,30)));}
-  catch(e){chats=chats.slice(0,10);localStorage.setItem("millen.chats",JSON.stringify(chats));}
+  catch(e){
+    try{localStorage.setItem("millen.chats",JSON.stringify(chats.slice(0,10)));}
+    catch(e2){try{localStorage.removeItem("millen.chats");}catch(e3){}}
+  }
 }
 function persistChat(id,msgs){
   // writes into the chat that OWNS these messages — which, after a

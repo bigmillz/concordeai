@@ -5684,6 +5684,12 @@ history bore it out: 3 of the last 5 were New York.
   it was closed on.
 - The Beta update channel is called Prerelease (per Patrick); it gets
   the betas and the RCs. The saved value is still "beta".
+- Chats are no longer capped at 60 (approved by Patrick, who was at
+  exactly 60: every new chat was erasing his oldest). The app keeps
+  1,000, and a pinned chat is never cut. A browser-storage error used
+  to trim the page's list to 10 before it was saved to disk; now only
+  the browser's quick-paint copy shrinks. The full chat-storage rebuild
+  (0b) comes with the accounts work.
 
 ## 6b317 — Windows: the app says PC, and quitting stops Ollama
 Found testing the 445085b nightly in Patrick's Windows 11 ARM VM, driven

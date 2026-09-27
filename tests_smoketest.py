@@ -4375,6 +4375,28 @@ check("Settings links the website, in the system browser",
       and "#about-site{" in page,
       _foot[:200])
 
+# 6b318, approved by Patrick: chats were capped at 60, so with 60 saved
+# every new chat erased the oldest (he was at exactly 60). The cap is
+# 0b's 1,000 and a pinned chat survives any cut. And a browser-storage
+# error no longer trims the page's real list to 10 before it is saved.
+import tempfile as _tf318
+_scn = {"os": os, "json": json}
+_scn["_pfile"] = lambda name, base=None: os.path.join(base, name)
+_exec_names(_scn, {"CHATS_KEEP", "store_chats", "load_chats"})
+with _tf318.TemporaryDirectory() as _scd:
+    _scn["store_chats"]([{"id": "c%d" % i} for i in range(61)], _scd)
+    _sc61 = len(_scn["load_chats"](_scd))
+    _big = [{"id": "c%d" % i, "pin": i == 1003} for i in range(1005)]
+    _scn["store_chats"](_big, _scd)
+    _scb = [c["id"] for c in _scn["load_chats"](_scd)]
+_sv = page[page.index("function saveChats(){"):page.index("function persistChat(")]
+check("chats: a 61st chat no longer erases the oldest; 1,000 kept, pins always",
+      _sc61 == 61 and _scn["CHATS_KEEP"] == 1000 and len(_scb) == 1001
+      and _scb[:3] == ["c0", "c1", "c2"] and _scb[999] == "c999"
+      and _scb[-1] == "c1003" and "c1000" not in _scb
+      and "chats=chats.slice" not in _sv and "chats=" not in _sv.replace("chats.slice", ""),
+      "%r" % [_sc61, len(_scb), _scb[-2:]])
+
 # 6b318, per Patrick: the Beta channel reads "Prerelease" (it carries the
 # RCs too). The stored value stays "beta", so saved choices still match.
 check("Settings: the channel between Stable and Nightly is called Prerelease",
