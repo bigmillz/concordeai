@@ -1,9 +1,12 @@
-**ConcordeAI 6.0.4 beta 1**
+**ConcordeAI 6.1 beta 1**
 
-The first beta of the 6.0.4 line. Ask for a picture and you get one.
+The first beta of 6.1. It runs on Windows, and it makes more than words.
 
-- **Image generation.** Ask for "an image of a cat" and ConcordeAI paints it instead of describing it. FLUX.1 schnell runs entirely on your Mac once you add it under Settings › Models, in about a minute a picture. Without it, a Gemini key or the free community cloud fills in. Add it from Manage models or from the setup wizard on a new install.
-- **Model downloads tell the truth.** Picking a preset used to sit at 100% doing nothing while the real downloads ran unseen. The bar now counts what you actually started, names what is moving, and the pane keeps you posted until it finishes. The preset matching your disk is marked.
-- **Enable visual effects**, in Settings › About. It replaces performance mode and now switches only the moving backdrop. Spinners, animations and the rest are no longer affected.
-- **Check for updates automatically** is now yours to choose. On, it checks at launch and once a day. Off, nothing checks until you press the button.
-- **A tidier top left.** The settings cog sits beside the new-chat button, and the update badge is a small arrow rather than an oversized pill.
+- **Windows.** The Windows version starts, chats, searches the web, reads answers aloud and takes voice input, on Intel, AMD and ARM PCs. Every model runs through Ollama, which the app installs for you; an ARM PC gets the native ARM build.
+- **Video.** Ask for a short clip and ConcordeAI renders it on your Mac, like pictures. A colour-coded size ladder shows what each quality setting costs before you pick it.
+- **Export to twenty formats.** Ask for "that as a PDF", a Word document, a spreadsheet, slides, a calendar file, CSV and more, and a download box appears.
+- **Models that stay current.** After every app update, newer versions of the models you have are offered, and outdated ones are cleared out. The catalog now runs to September 2026.
+- **The right cloud model for each job**, once a cloud key is added.
+- **Weather that answers.** "What's the weather in Chicago right now" gets live numbers however it's phrased.
+- **Giant models** for 512 GB+ systems, behind their own switch.
+- **Removed:** Contribute (lending your computer to other users) and the free community image cloud.
