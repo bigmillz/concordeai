@@ -3119,11 +3119,11 @@ def weather_snippets(q: str):
                            area["region"][0]["value"])
         # wttr.in names the area of its nearest station: Chicago came back
         # as "Mccormickville, Illinois", and the model, told that, would
-        # not call it Chicago's weather (6b317). A place asked for by name
-        # leads; a zip keeps the area it resolved to.
-        if not loc.endswith(",us"):
-            name = "%s (station: %s)" % (" ".join(
-                w[:1].upper() + w[1:] for w in loc.split()), name)
+        # not call it Chicago's weather (6b317). The place asked for leads,
+        # a zip too: 11221 came back as "Adelphi, New York" (6b318)
+        asked = (loc[:-3] if loc.endswith(",us") else " ".join(
+            w[:1].upper() + w[1:] for w in loc.split()))
+        name = "%s (station: %s)" % (asked, name)
         # SANITY (6b270, judged 2.0: "87°F and sunny right now" at
         # 3:30 AM — a stale daytime observation served as current,
         # above the day's own high). A reading older than two hours
@@ -13412,9 +13412,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 urllib.parse.urlparse(self.path).query).get("q", [""])[0]
             self._send_json(_geocode(q[:120]) or {})
         elif self.path == "/api/sky/cached":
+            # night rides along: the hourly change needs it NOW, not as it
+            # was when the page loaded (6b318)
             self._send_json({"cached": [
                 i for i in range(len(SKY_SOURCES))
-                if os.path.exists(_sky_path(i))]})
+                if os.path.exists(_sky_path(i))], "night": sky_is_night()})
         elif self.path.startswith("/api/sky/status"):
             m = re.search(r"[?&]i=(\d+)", self.path)
             self._send_json(sky_status(int(m.group(1)) if m else 0,
@@ -18158,6 +18160,12 @@ body.novideo #composer-wrap{background:var(--bg);padding-top:14px}
   opacity .9s ease;will-change:transform,opacity}
 /* a new city FADES in — never a hard cut (per Patrick) */
 #skyline video.swapping{opacity:0}
+/* the hourly scene change (6b318): the next clip over the current one,
+   dressed like it, fading in; faster out once #sky-color has taken over */
+#skyline video.sky-next{filter:brightness(.5) saturate(1.15);opacity:0;
+  transition:opacity .6s ease,transform 1.1s cubic-bezier(.22,.61,.36,1)}
+#skyline video.sky-next.in{opacity:1;transition:opacity 3s ease,
+  transform 1.1s cubic-bezier(.22,.61,.36,1)}
 /* thinking: the city steps back so the words own the screen */
 #skyline{transition:filter .9s ease,opacity .9s ease}
 body.gen #skyline{filter:brightness(.62) saturate(.9)}
@@ -18527,6 +18535,11 @@ body.gen #chip-model{color:var(--accent)}
   border-top:1px solid var(--line-soft);background:var(--panel2);
 }
 #about-foot .about-btn{margin-top:0}
+#about-site{align-self:center;color:var(--dim);font-size:13px;
+  text-decoration:none;letter-spacing:.01em}
+#about-site i{font-style:normal;margin-left:4px;opacity:.7}
+#about-site:hover{color:var(--text);text-decoration:underline;
+  text-underline-offset:3px}
 #about-icon{width:100%;height:44px;margin-bottom:10px;display:block}
 #persona-label{
   font-family:var(--mono);font-size:10px;letter-spacing:.12em;
@@ -19898,6 +19911,10 @@ __CODE_ROWS__
     </section>
     </div>
     <div id="about-foot">
+    <!-- the website, per Patrick (6b318); target=_blank opens the system
+         browser in pywebview on the Mac and on Windows -->
+    <a id="about-site" href="https://flyconcordefly.com/#concordeai"
+       target="_blank" rel="noopener">flyconcordefly.com<i>&#8599;</i></a>
     <button class="about-btn primary" id="about-close">Close</button>
     </div>
     </div>
@@ -23538,6 +23555,63 @@ async function bootSkyline(){
     }).catch(hideBar);
   }
   poll();
+  // A NEW SCENE EVERY HOUR (6b318, per Patrick: "can we have the video
+  // fade into another one every hour?"). The next clip is chosen the way
+  // a launch chooses (dark after dark, unseen first) from clips ALREADY
+  // on disk, so it never shows a loading bar; it waits out an answer being
+  // written and skips an hour nobody is looking at. It plays in a layer
+  // above and fades in over three seconds; then #sky-color, which the
+  // brand colour, the warp and the parallax all read, takes the clip over
+  // at the same moment and the layer goes.
+  setInterval(()=>skyRotate(0),SKY_ROTATE_MS);
+  async function skyRotate(tries){
+    if(noVideo||document.hidden||skyline.hidden||c.paused&&c.readyState<2)return;
+    if(generating){if(tries<30)setTimeout(()=>skyRotate(tries+1),60000);return;}
+    let onDisk=[],night=SKY_NIGHT;
+    try{const r=await(await fetch("/api/sky/cached")).json();
+        onDisk=r.cached||[];if(typeof r.night==="boolean")night=r.night;}
+    catch(e){return;}
+    const n=skyPick({all:[...Array(SKY_N).keys()],hist,onDisk,last:i,
+                     prepared:-1,rnd:Math.random,dark:darkSet,wantDark:night});
+    if(n==null||n===i||onDisk.indexOf(n)<0)return;
+    if(!await skyCrossfade(c,n))return;
+    i=n;
+    hist=[i].concat(hist.filter(x=>x!==i)).slice(0,32);
+    try{localStorage.setItem("millen.skyhist",JSON.stringify(hist));
+        localStorage.setItem("millen.sky",i);}catch(e){}
+    setTimeout(fillPantry,9000);          // restock behind it
+  }
+}
+const SKY_ROTATE_MS=60*60*1000;
+function skyCrossfade(c,n){
+  return new Promise(done=>{
+    const nv=document.createElement("video");
+    nv.muted=true;nv.loop=true;nv.playsInline=true;nv.preload="auto";
+    nv.className="sky-next";nv.style.transform=c.style.transform||"";
+    let started=false;
+    const give=setTimeout(()=>{if(!started){nv.remove();done(false);}},20000);
+    nv.addEventListener("canplaythrough",()=>{
+      if(started)return;started=true;clearTimeout(give);
+      c.parentNode.insertBefore(nv,c.nextSibling);
+      const p=nv.play();if(p&&p.catch)p.catch(()=>{});
+      requestAnimationFrame(()=>requestAnimationFrame(()=>nv.classList.add("in")));
+      setTimeout(()=>{
+        // hand over under cover of the layer, at the layer's moment
+        const t=nv.currentTime;
+        c.addEventListener("loadedmetadata",()=>{
+          try{c.currentTime=Math.min(t+.15,Math.max(0,c.duration-.2));}catch(e){}
+        },{once:true});
+        c.addEventListener("canplay",()=>{
+          const q=c.play();if(q&&q.catch)q.catch(()=>{});
+          setTimeout(()=>{nv.classList.remove("in");
+            setTimeout(()=>nv.remove(),700);},250);
+          done(true);
+        },{once:true});
+        c.src=nv.src;
+      },3300);
+    },{once:true});
+    nv.src="/sky/"+n+".mov";
+  });
 }
 bootSkyline();
 

@@ -5658,6 +5658,25 @@ history bore it out: 3 of the last 5 were New York.
   no clip of the wrong kind, New York at its natural ~6% (was 42%),
   46 different clips in 50 launches (was 31); the sun is checked
   against known sunsets, a noon and the midnight sun.
+- A NEW SCENE EVERY HOUR, per Patrick ("can we have the video fade into
+  another one every hour?"): the hour's clip is chosen as a launch
+  chooses (dark after dark, unseen first) but only from clips already on
+  disk, so no loading bar mid-session; it waits out an answer being
+  written and skips an hour the window is hidden. It plays in a layer
+  over the current clip and fades in over 3 s; #sky-color (read by the
+  brand colour, the warp and the parallax) then takes the clip over at
+  the same moment and the layer goes. /api/sky/cached carries "night"
+  so the hour's choice uses the sun as it is then. Checked in a browser:
+  83 faded into 25, #sky-color playing 25 at the layer's time.
+- Why Patrick still saw the same few: his Mac had only just started on
+  9dbd60b; the shelf it inherited was the old New York-heavy eight, and
+  the new rules stocked four never-seen clips within two minutes.
+- Settings links the website (flyconcordefly.com/#concordeai, bottom
+  left of the Settings footer); pywebview opens target=_blank links in
+  the system browser on both platforms.
+- Zip-code weather is labelled with the zip too: 11221 now comes back
+  from wttr.in as "Adelphi, New York", and the model wouldn't call that
+  11221's weather.
 - A clip half downloaded when the app quit resumes next time (a Range
   request; Apple's CDN answers 206) instead of starting over, so short
   sessions still bring in fresh clips. Partials keep three days.

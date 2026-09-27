@@ -3728,6 +3728,7 @@ _wxf["home"] = _wx_feed(30, 13, ask="What's today's weather?", home="Chicago")
 _wxf["no home"] = _wx_feed(30, 13, ask="What's today's weather?")
 _wxf["not a place"] = _wx_feed(30, 13, ask="what's the weather for the game tonight",
                                home="Chicago")
+_wxf["zip"] = _wx_feed(30, 13, ask="whats the weather in 11221")
 check("weather questions name their place, time words left out; the reading's age is real",
       not _wxbad
       and _wxf["fresh day"] and "observed 30 min ago" in _wxf["fresh day"]
@@ -3740,8 +3741,10 @@ check("weather questions name their place, time words left out; the reading's ag
       and _wxf["fresh night"] and ", clear, wind" in _wxf["fresh night"]
       and _wxf["home"] and _wxf["home"].startswith("LIVE WEATHER for Chicago (station:")
       and _wxf["no home"] is None and _wxf["not a place"] is None
-      and len(_wx_urls) == _wx_n + 1
-      and _wx_urls and all(u == "https://wttr.in/Chicago?format=j1" for u in _wx_urls)
+      and _wxf["zip"] and _wxf["zip"].startswith("LIVE WEATHER for 11221 (station: Mccormickville")
+      and len(_wx_urls) == _wx_n + 2
+      and _wx_urls and all(u in ("https://wttr.in/Chicago?format=j1",
+                                 "https://wttr.in/11221%2Cus?format=j1") for u in _wx_urls)
       and 'cur.get("localObsDateTime")' not in _MILLENAI_SRC,
       "%r" % [_wxbad, _wxf])
 
@@ -4362,6 +4365,31 @@ check("backdrops: a clip cut off mid-download resumes where it stopped",
       _after1 == ("error", 3000) and _calls == [None, "bytes=3000-"]
       and _landed == [_full] and _rsn["_sky_jobs"][0]["status"] == "ready",
       "%r" % [_after1, _calls, len(_landed[0]) if _landed else None])
+
+# 6b318, per Patrick: the website linked at the foot of Settings, opened
+# in the system browser (pywebview's default for target=_blank links)
+_foot = page[page.index('<div id="about-foot">'):page.index('id="about-close"')]
+check("Settings links the website, in the system browser",
+      'href="https://flyconcordefly.com/#concordeai"' in _foot
+      and 'target="_blank" rel="noopener"' in _foot
+      and "#about-site{" in page,
+      _foot[:200])
+
+# 6b318, per Patrick: "can we have the video fade into another one every
+# hour?" The hour's clip comes from disk only (never a loading bar), is
+# chosen the way a launch chooses, waits out an answer, and reads the
+# night afresh from the server; the crossfade was checked in a browser
+_skc = json.loads(req("/api/sky/cached", cookie=K)[2])
+_rot = page[page.index("setInterval(()=>skyRotate(0),SKY_ROTATE_MS);"):page.index("function skyCrossfade(c,n){")]
+check("backdrops: a new scene every hour, from disk, faded in, never over an answer",
+      isinstance(_skc.get("night"), bool) and isinstance(_skc.get("cached"), list)
+      and "const SKY_ROTATE_MS=60*60*1000;" in page
+      and "if(n==null||n===i||onDisk.indexOf(n)<0)return;" in _rot
+      and "if(generating){if(tries<30)setTimeout(()=>skyRotate(tries+1),60000);return;}" in _rot
+      and 'if(typeof r.night==="boolean")night=r.night;' in _rot
+      and "setTimeout(fillPantry,9000);" in _rot
+      and "#skyline video.sky-next.in{opacity:1;" in page,
+      "%r" % _skc)
 
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)
