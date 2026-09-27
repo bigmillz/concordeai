@@ -1,12 +1,17 @@
 """MillenAI full-surface smoke test — the Fable-worthiness gate.
 
-Runs against a locally spawned instance with a key (so every gate is
-exercised) and reports a scorecard. Engine tests run REAL models.
+Starts its own copies of the app and reports a scorecard. Engine tests
+run REAL models.   Run:  python3 tests_smoketest.py   (from the repo)
 """
 import json
 import os
 import re
+import shutil
+import signal
+import socket
+import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 import urllib.error
@@ -17,11 +22,185 @@ from collections import Counter
 def _uq(s):
     return urllib.parse.quote(s, safe="")
 
-BASE = "http://127.0.0.1:9894"
-KEY = "smoketestkey123"
-PORT_ = int(BASE.rsplit(":", 1)[1])
+
+# THE GAUNTLET RUNS ITS OWN COPIES (0a item 2, 6b319). It used to target
+# a dev copy on 9894 that read the REAL data folder with a fixed key
+# printed in CLAUDE.md. Each copy now runs with MILLENAI_DEV=1, its own
+# MILLENAI_HOME in a temporary folder, no window, and a random key read
+# from that folder's run/instance.json, on 9901-9903: clear of the
+# desktop app (8889 and its 18890-18898 fallbacks), ConcordeGo (9897),
+# the engines (8884 up by twos) and the old dev ports. SMOKE_KEEP=1 keeps
+# the folders for a post-mortem.
+_SMOKE_TMP = tempfile.mkdtemp(prefix="cai-gauntlet-")
+_INSTANCES = []
+
+
+def _port_open(port):
+    with socket.socket() as so:
+        so.settimeout(0.5)
+        return so.connect_ex(("127.0.0.1", port)) == 0
+
+
+class Instance:
+    """One windowless dev copy of the app in a folder of its own."""
+
+    def __init__(self, port, name, seed=None, env=None):
+        self.port, self.name = port, name
+        self.home = os.path.join(_SMOKE_TMP, name)
+        self.env = dict(os.environ)
+        for k in [k for k in self.env if k.startswith("MILLENAI_")]:
+            del self.env[k]
+        self.env.update(MILLENAI_DEV="1", MILLENAI_HOME=self.home,
+                        MILLENAI_NOWINDOW="1", MILLENAI_PORT=str(port))
+        self.env.update(env or {})
+        self.seed = seed
+        self.proc = self.key = None
+
+    @property
+    def base(self):
+        return "http://127.0.0.1:%d" % self.port
+
+    @property
+    def cookie(self):
+        return "millen_key_%d=%s" % (self.port, self.key)
+
+    def start(self, timeout=180):
+        if _port_open(self.port):
+            sys.exit("gauntlet: port %d is taken; stop whatever holds it "
+                     "(lsof -tnP -iTCP:%d -sTCP:LISTEN)" % (self.port, self.port))
+        os.makedirs(self.home, mode=0o700, exist_ok=True)
+        if self.seed:
+            self.seed(self.home)
+        self.log = open(os.path.join(_SMOKE_TMP, self.name + ".log"), "w")
+        self.proc = subprocess.Popen(
+            [os.environ.get("SMOKE_PY") or sys.executable, "millenai.py"],
+            env=self.env, stdout=self.log, stderr=subprocess.STDOUT,
+            start_new_session=True)
+        _INSTANCES.append(self)
+        note = os.path.join(self.home, "run", "instance.json")
+        end = time.time() + timeout
+        while time.time() < end:
+            if self.proc.poll() is not None:
+                sys.exit("gauntlet: copy %s exited (%s):\n%s"
+                         % (self.name, self.proc.returncode, self.tail()))
+            try:
+                with open(note) as fh:
+                    d = json.load(fh)
+                if d.get("pid") == self.proc.pid:
+                    self.key = d["key"]
+                    r = urllib.request.Request(self.base + "/", headers={
+                        "Cookie": self.cookie})
+                    with urllib.request.urlopen(r, timeout=5) as resp:
+                        if resp.status == 200:
+                            return self
+            except (OSError, ValueError, KeyError, urllib.error.URLError):
+                pass
+            time.sleep(0.5)
+        sys.exit("gauntlet: copy %s never answered:\n%s"
+                 % (self.name, self.tail()))
+
+    def tail(self, n=40):
+        try:
+            self.log.flush()
+            with open(self.log.name, encoding="utf-8", errors="replace") as fh:
+                return "".join(fh.readlines()[-n:])
+        except OSError:
+            return "(no log)"
+
+    def stop(self):
+        if not self.proc or self.proc.poll() is not None:
+            return
+        # SIGTERM to the app alone: it stops the engines it started unless
+        # another copy (the desktop app included) is using them. Signalling
+        # the whole group would kill an engine the desktop app had taken
+        # over mid-answer (review). SIGKILL only if it won't go.
+        self.proc.terminate()
+        try:
+            self.proc.wait(30)
+        except subprocess.TimeoutExpired:
+            self.proc.kill()
+            self.proc.wait(10)
+
+
+def _smoke_cleanup():
+    for inst in _INSTANCES:
+        inst.stop()
+    if os.environ.get("SMOKE_KEEP") != "1":
+        shutil.rmtree(_SMOKE_TMP, ignore_errors=True)
+    else:
+        print("gauntlet folders kept in", _SMOKE_TMP)
+
+
+import atexit as _atexit
+_atexit.register(_smoke_cleanup)
+# the copies run in a session of their own, so a closed terminal or a kill
+# reaches only this script: every catchable stop runs the clean-up above
+for _sn in ("SIGTERM", "SIGHUP", "SIGQUIT"):
+    if hasattr(signal, _sn):
+        signal.signal(getattr(signal, _sn), lambda *_: sys.exit(1))
+
+
+def _bytegrep_file(fp, needle):
+    """True when a file holds needle raw, in base64 or in hex (00 5.7)."""
+    import base64 as _b64
+    n = needle.encode() if isinstance(needle, str) else needle
+    try:
+        with open(fp, "rb") as fh:
+            data = fh.read()
+    except OSError:
+        return False
+    # base64 at each of the three alignments it can sit at inside a
+    # longer encoding: the stable middle of each (review)
+    b64 = [_b64.b64encode(n)[:-4]] + [_b64.b64encode(b"\0" * k + n)[4:-4] for k in (1, 2)]
+    return any(f in data for f in [n, n.hex().encode(), n.hex().upper().encode()] + b64)
+
+
+def _bytegrep(root, needle):
+    """Every file under root that holds needle (see _bytegrep_file)."""
+    return [os.path.join(dp, fn) for dp, _dn, fns in os.walk(root)
+            for fn in fns if _bytegrep_file(os.path.join(dp, fn), needle)]
+
+
+def _canary(tag):
+    return "CANARY-%s-%s" % (tag, os.urandom(6).hex())
+
+
+# copy A starts with one chat, so the checks that read "the owner's
+# chats" have one to read; its title is a canary no other copy may see
+_CANARY_A = _canary("A")
+
+
+def _seed_a(home):
+    with open(os.path.join(home, "chats.json"), "w") as fh:
+        json.dump([{"id": "c1", "title": _CANARY_A, "ts": int(time.time() * 1000),
+                    "messages": [{"role": "user", "content": _CANARY_A}]}], fh)
+    # one backdrop clip already on disk, a stand-in: the checks read its
+    # status and its range serving, never the picture, and no copy
+    # should fetch 400 MB from Apple to find that out
+    import ast as _a
+    import hashlib as _hl
+    _src = open("millenai.py", encoding="utf-8").read()
+    _node = next(n for n in _a.parse(_src).body if isinstance(n, _a.Assign)
+                 and getattr(n.targets[0], "id", "") == "SKY_SOURCES")
+    _h = _hl.sha1(_a.literal_eval(_node.value)[0].encode()).hexdigest()[:10]
+    os.makedirs(os.path.join(home, "sky"), exist_ok=True)
+    with open(os.path.join(home, "sky", "sky-%s.mov" % _h), "wb") as fh:
+        fh.write(os.urandom(65536))
+
+
+# the REAL data folder, for the isolation checks at the end: what sits at
+# its top level before any copy starts
+_REAL_DIR = (os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "MillenAI")
+             if sys.platform == "win32"
+             else os.path.expanduser("~/Library/Application Support/MillenAI"))
+_REAL_TOP = set(os.listdir(_REAL_DIR)) if os.path.isdir(_REAL_DIR) else set()
+
+INST = Instance(9901, "A", seed=_seed_a).start()
+BASE = INST.base
+KEY = INST.key
+PORT_ = INST.port
 # 6b310: the launch key rides a cookie named for the port
-K = "millen_key_%d=%s" % (PORT_, KEY)
+K = INST.cookie
 
 RESULTS = []
 
@@ -124,7 +303,7 @@ s, h, b = req("/api/chats", cookie=K + "; millen_user=" + smoke_uid,
 check("fresh profile sees empty chats", b == b'{"chats": []}')
 s, h, b = req("/api/chats", cookie=K)
 check("local owner sees real chats", b"title" in b)
-_opf = os.path.expanduser("~/Library/Application Support/MillenAI/owner_pin")
+_opf = os.path.join(INST.home, "owner_pin")
 if os.path.exists(_opf):
     own_pin = open(_opf).read().strip()
     s, h, b = req("/api/welcome", "POST", {"name": "anyname", "pin": own_pin},
@@ -3057,9 +3236,12 @@ _resting = all((v.get("cool") or 0) > 0 or v.get("status") != "ok"
                or "resting" in str(v.get("note") or "")
                or "not responding" in str(v.get("note") or "")
                for v in (_cl.get("providers") or {}).values())     if (_cl.get("providers") or {}) else False
+# (6b319) a gauntlet copy holds no keys at all, so its Cloud Only is
+# empty by design
+_nokeys = not _cl.get("configured")
 check("every tier resolves",
       all(t.get("models") for n, t in tiers.items()
-          if not (n == "Cloud Only" and _resting)),
+          if not (n == "Cloud Only" and (_resting or _nokeys))),
       str({n: t.get("models") for n, t in tiers.items()})
       + (" [all providers resting]" if _resting else ""))
 check("Best and Power tiers are gone",
@@ -3082,15 +3264,12 @@ print("== engines (live generations) ==")
 # every live question out to all four cloud providers and rest them for
 # ten minutes — quota burned by a test. Turbo is parked for the whole
 # section and restored at the very end, whatever happens.
-_prefs_gauntlet = json.loads(req("/api/prefs", cookie=K)[2])
-req("/api/prefs", "POST", {"turbo": False}, cookie=K)
-import atexit as _atexit
-_atexit.register(lambda: req("/api/prefs", "POST",
-                             {"turbo": bool(_prefs_gauntlet.get("turbo"))},
-                             cookie=K))
-check("gauntlet never spends cloud quota: turbo parked, dev state private",
-      'cloud-dev-%d.json' in _MILLENAI_SRC
-      and "if PORT not in (8889, 9889):" in _MILLENAI_SRC)
+# (6b319) the copy has its own folder, so it has no keys at all: no
+# provider can be asked, and nothing is parked in the real prefs
+_cl = json.loads(req("/api/cloud", cookie=K)[2])
+check("gauntlet never spends cloud quota: its copy holds no keys",
+      not _cl.get("configured") and not json.loads(req("/api/prefs", cookie=K)[2]).get("turbo")
+      and "cloud-dev-%d.json" not in _MILLENAI_SRC, "%r" % {k: _cl.get(k) for k in ("configured", "active")})
 
 
 def chat(payload, timeout=600):
@@ -3218,7 +3397,8 @@ sys.modules["ctypes"] = _fake_ctypes
 _env_la = os.environ.get("LOCALAPPDATA")
 os.environ["LOCALAPPDATA"] = _hook_dir
 try:
-    _hz = {"sys": _fsys, "os": os, "time": time}
+    _hz = {"sys": _fsys, "os": os, "time": time, "DEV_HOME": None,
+           "_real_app_dir": lambda: os.path.join(os.environ["LOCALAPPDATA"], "MillenAI")}
     exec(_hook_src, _hz)
     _hook_on = _fsys.excepthook is _hz.get("_win_fatal")
     try:
@@ -3878,7 +4058,8 @@ _pw_dir = _tf20.mkdtemp()
 _pw_sys = _t17.SimpleNamespace(stdout=None, stderr=None)
 _pw_os = _t17.SimpleNamespace(path=_os20.path, makedirs=_os20.makedirs, devnull=_os20.devnull,
                               environ={"LOCALAPPDATA": _pw_dir})
-_pw_ns = {"sys": _pw_sys, "os": _pw_os}
+_pw_ns = {"sys": _pw_sys, "os": _pw_os, "DEV_HOME": None,
+          "_real_app_dir": lambda: _os20.path.join(_pw_dir, "MillenAI")}
 exec("if True:\n" + _M[_w0:_w1], _pw_ns)
 try:
     _pw_sys.stderr.write("progress 50%\r"); _pw_sys.stdout.write("hi\n"); _pw_sys.stderr.flush()
@@ -4443,6 +4624,195 @@ check("backdrops: a new scene every hour, from disk, faded in, never over an ans
       and "setTimeout(fillPantry,9000);" in _rot
       and "#skyline video.sky-next.in{opacity:1;" in page,
       "%r" % _skc)
+
+print("== dev isolation ==")
+# 0a item 2 (ISO-16, REM-1) and the plan's two-copy check (6b319): a dev
+# copy lives in its own folder with its own random key, and nothing it
+# does reaches another copy or the real app's folder
+
+
+def _ireq(inst, path, cookie=None):
+    h = {"Cookie": cookie} if cookie else {}
+    try:
+        with urllib.request.urlopen(urllib.request.Request(
+                inst.base + path, headers=h), timeout=30) as resp:
+            return resp.status, resp.read()
+    except urllib.error.HTTPError as e:
+        return e.code, e.read()
+
+
+INST_B = Instance(9902, "B").start()
+_a_chats = _ireq(INST, "/api/chats", INST.cookie)
+_b_chats = _ireq(INST_B, "/api/chats", INST_B.cookie)
+_b_hits = _bytegrep(INST_B.home, _CANARY_A)
+_cross = (_ireq(INST_B, "/api/chats", "millen_key_%d=%s" % (INST_B.port, INST.key))[0],
+          _ireq(INST, "/api/chats", "millen_key_%d=%s" % (INST.port, INST_B.key))[0])
+check("two copies: B never sees A's chat, not a byte of it, and each refuses the other's key",
+      _a_chats[0] == 200 and _CANARY_A.encode() in _a_chats[1]
+      and _b_chats == (200, b'{"chats": []}') and not _b_hits
+      and _cross == (403, 403) and INST.key != INST_B.key,
+      "%r" % [_a_chats[0], _b_chats, _b_hits, _cross])
+
+# each copy's note is private to its user and names its own process
+_notes = []
+for _i in (INST, INST_B):
+    _np = os.path.join(_i.home, "run", "instance.json")
+    _notes.append((oct(os.stat(_np).st_mode & 0o777) if sys.platform != "win32" else "0o600",
+                   json.load(open(_np)).get("pid") == _i.proc.pid))
+check("each copy's run/instance.json is 0600 and names its own process",
+      _notes == [("0o600", True)] * 2, "%r" % _notes)
+
+# the real folder and the real log folder: no canary from either copy in
+# any file (the engines' folders and the backdrop clips are skipped: big,
+# and the app's own), and no new entry at the real folder's top level
+# but the desktop app's own save temps. Read in-process, never printed.
+_REAL_LOGS = (os.path.join(_REAL_DIR, "logs") if sys.platform == "win32"
+              else os.path.expanduser("~/Library/Logs/MillenAI"))
+_real_hits = []
+for _root in (_REAL_DIR, _REAL_LOGS):
+    if not os.path.isdir(_root):
+        continue
+    for _dp, _dn, _fns in os.walk(_root):
+        _dn[:] = [d for d in _dn if not d.startswith("venv") and d not in ("sky", "webkit")]
+        for _fn in _fns:
+            _fp = os.path.join(_dp, _fn)
+            try:
+                if os.path.getsize(_fp) < 20_000_000 and _bytegrep_file(_fp, _CANARY_A):
+                    _real_hits.append(_fp)
+            except OSError:
+                pass
+_real_new = sorted(f for f in set(os.listdir(_REAL_DIR)) - _REAL_TOP
+                   if not re.match(r"^\..*\.tmp$|^.*\.json\.tmp$", f)) if os.path.isdir(_REAL_DIR) else []
+check("the real data folder never sees a gauntlet copy (no canary, no new files)",
+      not _real_hits and not _real_new
+      and '"cloud-dev-%d.json" % PORT' not in _MILLENAI_SRC,
+      "%r" % [len(_real_hits), _real_new])
+
+# a copy's log folder is inside its own folder; the real app's isn't moved
+_ld = {}
+for _dh in (None, "/tmp/devx"):
+    _ln = {"os": os, "sys": sys, "IS_WIN": False, "DEV_HOME": _dh}
+    _exec_names(_ln, {"_real_app_dir", "app_dir", "log_dir"})
+    _ld[_dh] = (_ln["app_dir"](), _ln["log_dir"]())
+check("a dev copy's data and logs live in its own folder; the real app's stay put",
+      _ld["/tmp/devx"] == ("/tmp/devx", "/tmp/devx/logs")
+      and _ld[None] == (_REAL_DIR, os.path.expanduser("~/Library/Logs/MillenAI")),
+      "%r" % _ld)
+
+# one copy per folder: a second on B's folder says so and binds nothing
+_e3 = dict(INST_B.env, MILLENAI_PORT="9903")
+_r3 = subprocess.run([os.environ.get("SMOKE_PY") or sys.executable, "millenai.py"],
+                     env=_e3, capture_output=True, text=True, timeout=120)
+check("a second copy on the same folder exits (code 3) instead of sharing it",
+      _r3.returncode == 3 and "Another copy is using" in _r3.stderr and not _port_open(9903),
+      "%r" % [_r3.returncode, _r3.stderr[-200:]])
+
+# refusals, each launched against a FAKE home directory so that even a
+# broken guard could not reach the real folder: a half-set dev copy, or
+# the test switches on the real app, exits before it binds anything
+_fake = os.path.join(_SMOKE_TMP, "fakehome")
+_fake_real = (os.path.join(_fake, "AppData", "Local", "MillenAI") if sys.platform == "win32"
+              else os.path.join(_fake, "Library", "Application Support", "MillenAI"))
+os.makedirs(_fake_real, exist_ok=True)
+# Each case must give ITS OWN reason, and 9903 is held open meanwhile: a
+# copy that bound before refusing would fail to bind and exit 1, not 2.
+# Dev cases carry MILLENAI_NOWINDOW so a broken guard can't open a window.
+_refusals = []
+_hold = socket.socket()
+_hold.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+_hold.bind(("127.0.0.1", 9903))
+_hold.listen(1)
+try:
+    for _envs, _why in (
+            ({"MILLENAI_DEV": "1", "MILLENAI_NOWINDOW": "1"}, "needs MILLENAI_HOME"),
+            ({"MILLENAI_DEV": "1", "MILLENAI_NOWINDOW": "1", "MILLENAI_HOME": _fake_real},
+             "can't be the real data folder"),
+            ({"MILLENAI_DEV": "1", "MILLENAI_NOWINDOW": "1",
+              "MILLENAI_HOME": os.path.join(_fake_real, "inside")}, "can't be the real data folder"),
+            ({"MILLENAI_DEV": "1", "MILLENAI_NOWINDOW": "1", "MILLENAI_HOME": _fake},
+             "can't be the real data folder"),
+            ({"MILLENAI_NOWINDOW": "1"}, "MILLENAI_NOWINDOW is only for dev copies"),
+            ({"MILLENAI_HOME": os.path.join(_SMOKE_TMP, "C")}, "MILLENAI_HOME is only for dev copies"),
+            # the old dev recipe's leftovers: refused, never the real app
+            ({"MILLENAI_KEY": "x", "MILLENAI_HEADLESS": "1"}, "Unknown setting MILLENAI_HEADLESS, MILLENAI_KEY")):
+        _e = {k: v for k, v in os.environ.items() if not k.upper().startswith("MILLENAI_")}
+        _e.update(HOME=_fake, USERPROFILE=_fake, LOCALAPPDATA=os.path.join(_fake, "AppData", "Local"),
+                  MILLENAI_PORT="9903")
+        _e.update(_envs)
+        try:
+            _r = subprocess.run([os.environ.get("SMOKE_PY") or sys.executable, "millenai.py"],
+                                env=_e, capture_output=True, text=True, timeout=60)
+            _refusals.append((_r.returncode, _why in _r.stderr, _r.stderr.strip()[:70]))
+        except subprocess.TimeoutExpired:
+            _refusals.append(("hung", False, ""))
+finally:
+    _hold.close()
+check("a half-set dev copy, a leftover setting, or a test switch on the real app refuses before it binds",
+      all(rc == 2 and why for rc, why, _m in _refusals)
+      and not os.listdir(_fake_real) and len(_refusals) == 7,
+      "%r" % _refusals)
+
+# the test-only switches reach nothing outside a dev copy (REM-1): the
+# statements themselves, run with and without a dev folder
+# and the port changes nothing: only a dev folder makes a copy not the
+# desktop app (DEFAULT_APP), whatever MILLENAI_PORT says
+_hk = {}
+for _dh in (None, "/tmp/dev"):
+    _hn = {"os": _t17.SimpleNamespace(environ={
+        "MILLENAI_TEST_HOOKS": "no-webview", "MILLENAI_SYNC_URL": "http://127.0.0.1:8799",
+        "MILLENAI_NOWINDOW": "1", "MILLENAI_PORT": "9894"}), "DEV_HOME": _dh}
+    _exec_names(_hn, {"NOWINDOW", "TEST_HOOKS", "SYNC_URL", "DEFAULT_APP"})
+    _hk[_dh] = (_hn["NOWINDOW"], sorted(_hn["TEST_HOOKS"]), _hn["SYNC_URL"], _hn["DEFAULT_APP"])
+check("test hooks, the windowless switch and the sync override live only in a dev copy",
+      _hk[None] == (False, [], "https://sync.millertechnology.net", True)
+      and _hk["/tmp/dev"] == (True, ["no-webview"], "http://127.0.0.1:8799", False)
+      and 'if "no-webview" in TEST_HOOKS:' in _MILLENAI_SRC,
+      "%r" % _hk)
+
+# a dev copy's Windows crash log and pythonw log land in its own folder
+_wdev = tempfile.mkdtemp(dir=_SMOKE_TMP)
+_wsys = _t17.SimpleNamespace(stdout=None, stderr=None)
+_wn = {"sys": _wsys, "os": _t17.SimpleNamespace(path=os.path, makedirs=os.makedirs,
+                                                devnull=os.devnull, environ={}),
+       "DEV_HOME": _wdev, "_real_app_dir": lambda: "/nonexistent/real"}
+exec("if True:\n" + _M[_w0:_w1], _wn)
+_wsys.stdout.write("dev copy line\n"); _wsys.stdout.flush()
+_hsrc = _MILLENAI_SRC[_MILLENAI_SRC.index('if sys.platform == "win32":\n    def _win_fatal'):]
+_hsrc = _hsrc[_hsrc.index("    def _win_fatal"):_hsrc.index("    sys.excepthook = _win_fatal")]
+_wn2 = {"os": os, "time": time, "sys": _t17.SimpleNamespace(stderr=None, __excepthook__=None),
+        "DEV_HOME": _wdev, "_real_app_dir": lambda: "/nonexistent/real"}
+exec("if True:\n" + _hsrc, _wn2)
+_real_ctypes2 = sys.modules.get("ctypes")
+sys.modules["ctypes"] = _t17.SimpleNamespace(windll=_t17.SimpleNamespace(user32=_t17.SimpleNamespace(
+    MessageBoxW=lambda *a: None)))
+try:
+    _wn2["_win_fatal"](KeyboardInterrupt, KeyboardInterrupt(), None)
+finally:
+    sys.modules["ctypes"] = _real_ctypes2
+check("Windows: a dev copy's crash log and pythonw log stay in its own folder",
+      os.path.exists(os.path.join(_wdev, "logs", "app.log"))
+      and os.path.exists(os.path.join(_wdev, "crash.log")),
+      "%r" % sorted(os.listdir(_wdev)))
+
+# leftovers of the old dev recipe refuse, the new names pass, in the
+# guard itself (the spawned case above proves it runs before a bind)
+_gn = {"os": os, "sys": sys}
+_exec_names(_gn, {"_KNOWN_ENV", "_dev_home"})
+_g_ok = _gn["_dev_home"]({"MILLENAI_PORT": "8889", "MILLENAI_TESTBUILD": "1"}, "/r/MillenAI")
+_g_old = _gn["_dev_home"]({"MILLENAI_KEY": "k"}, "/r/MillenAI")
+check("the guard refuses leftover MILLENAI_ names and passes the real ones",
+      _g_ok == (None, None) and _g_old[0] is None and "MILLENAI_KEY" in (_g_old[1] or ""),
+      "%r" % [_g_ok, _g_old])
+
+# REM-1's word list: the fixed key and the old headless switch are gone
+# from the app and every script and note that starts a copy
+_rem1 = {}
+for _fn in ("millenai.py", "ci_smoke.sh", "drill.py", "CLAUDE.md", "DRILL_LOOP.md"):
+    _t = open(_fn, encoding="utf-8").read()
+    _rem1[_fn] = [w for w in ("MILLENAI_KEY", "MILLENAI_HEADLESS", "smoketestkey")
+                  if w in _t]
+check("no fixed key and no MILLENAI_HEADLESS anywhere a copy is started",
+      not any(_rem1.values()), "%r" % _rem1)
 
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)

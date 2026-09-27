@@ -35,17 +35,38 @@ VENV="$HOME/Library/Application Support/MillenAI/venv/bin/python3"
 
 ### Dev server
 
+A dev copy lives in a data folder of its own and never touches the real one
+(0a item 2, 6b319): `MILLENAI_DEV=1` plus `MILLENAI_HOME`. Half-set (either one
+alone, or a `MILLENAI_HOME` that is the real folder, inside it or around it) exits
+with code 2 before binding anything.
+
 ```bash
-MILLENAI_PORT=9894 MILLENAI_KEY=smoketestkey123 MILLENAI_HEADLESS=1 \
+DEVH="$HOME/Library/Application Support/MillenAI-dev"
+MILLENAI_DEV=1 MILLENAI_HOME="$DEVH" MILLENAI_NOWINDOW=1 MILLENAI_PORT=9894 \
   "$VENV" millenai.py > /tmp/dev.log 2>&1 &
+DEVPID=$!
+# wait for THIS copy's note (a killed copy's may still be there) and the port
+KEY=""; for i in $(seq 1 120); do
+  KEY=$(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(d["key"] if d.get("pid")==int(sys.argv[2]) else "")' \
+        "$DEVH/run/instance.json" "$DEVPID" 2>/dev/null)
+  [ -n "$KEY" ] && curl -s -o /dev/null -b "millen_key_9894=$KEY" http://127.0.0.1:9894/ && break
+  sleep 1; done
 ```
 
-`MILLENAI_HEADLESS=1` suppresses the window and `webbrowser.open`. Port convention:
-**8889** desktop app (it moves to **18890–18898** when another login holds 8889),
-**9894** dev; **9897 is ConcordeGo's** and 9889 was the retired hosted instance. Ports
-**8884 and up, by twos, are model engines** (8944 today) — never bind a server there.
-Every request needs the launch key as the cookie `millen_key_<port>` (6b310), so a
-dev instance is started with `MILLENAI_KEY` and curled with `-b 'millen_key_9894=…'`.
+`MILLENAI_NOWINDOW=1` (dev copies only) suppresses the window and the browser. Every
+launch mints its own random key and writes it, with the port and pid, to
+`run/instance.json` (0600) in its folder; there is no fixed key any more. A dev
+copy starts with **no cloud keys** (its own empty `cloud.json`); paste one into its
+Settings if a test needs a provider. One copy per folder: a second one on the same
+`MILLENAI_HOME` exits with code 3. `MILLENAI_TEST_HOOKS` and `MILLENAI_SYNC_URL` are
+honoured only in a dev copy.
+
+Port convention: **8889** desktop app (it moves to **18890–18898** when another login
+holds 8889), **9894** the dev copy, **9895** a windowed dev copy, **9901–9903** the
+gauntlet's own copies; **9897 is ConcordeGo's** and 9889 was the retired hosted
+instance. Ports **8884 and up, by twos, are model engines** (8944 today) — never bind
+a server there. Every request needs the launch key as the cookie `millen_key_<port>`
+(6b310): `-b "millen_key_9894=$KEY"`.
 
 The page is assembled at request time but **the process reads `millenai.py` once at
 import**, so *any edit needs a server restart*. Kill by port, never `pkill -f`:
@@ -60,9 +81,11 @@ while you unknowingly test stale code.
 
 ### Tests — the "gauntlet"
 
-`tests_smoketest.py` is not pytest. It is a linear script of ~81 `check()` call sites (a
-few sit in loops, so the scorecard reads a little higher) run against a **live server it
-does not start**. Start one on 9894 first (above), then:
+`tests_smoketest.py` is not pytest. It is a linear script of `check()` calls. It **starts
+its own copies** (6b319): `MILLENAI_DEV` copies on 9901 (and 9902 for the two-copy
+checks), each in a temporary `MILLENAI_HOME`, windowless, with keys read from their
+`run/instance.json`. It stops them and deletes the folders at the end (`SMOKE_KEEP=1`
+keeps them). Ports 9901–9903 must be free. Then:
 
 ```bash
 cd "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI"
@@ -83,14 +106,14 @@ It asserts against three surfaces, which is why a UI change can fail a test:
 **Running one check:** there is no selector. Assert over the wire instead:
 
 ```bash
-curl -s -b 'millen_key_9894=smoketestkey123' \
+curl -s -b "millen_key_9894=$KEY" \
   'http://127.0.0.1:9894/api/remote/classify?cmd=rm%20-rf%20/'     # {"risk":"danger"}
-curl -s -b 'millen_key_9894=smoketestkey123' http://127.0.0.1:9894/ | grep -c 'barBreathe'
+curl -s -b "millen_key_9894=$KEY" http://127.0.0.1:9894/ | grep -c 'barBreathe'
 ```
 
-A test instance is **not isolated** — it shares `prefs.json`, `chats.json` and the 88xx
-engine ports with the desktop app, so a run can evict the app's resident engines or flip
-its prefs.
+A dev or test copy keeps its data apart from the desktop app's (6b319) but still
+shares the machine: the 88xx engine ports, the Hugging Face cache and Ollama's
+models, so a run can still evict the app's resident engines.
 
 ### Release
 

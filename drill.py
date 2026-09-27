@@ -9,7 +9,10 @@ launching the next batch. This split keeps the graded thing honest —
 the same code never both answers and marks.
 
   usage: python3 drill.py [--batch N] [--seed S] [--modes chat,web,funnel]
-  needs: a live server on 127.0.0.1:9894 (see CLAUDE.md)
+                          [--home DIR]
+  needs: a live dev copy (see CLAUDE.md); its port and key are read from
+         DIR/run/instance.json, DIR defaulting to CAI_DEV_HOME or
+         ~/Library/Application Support/MillenAI-dev
   output: ~/Library/Application Support/MillenAI/drill_runs/<stamp>/
           transcript.jsonl  (one record per drill)
 
@@ -30,10 +33,34 @@ import re
 import time
 import urllib.request
 
-BASE = "http://127.0.0.1:9894"
-# the launch key's cookie is named for the port (6b310)
-K = "millen_key_%s=smoketestkey123" % BASE.rsplit(":", 1)[1]
+# the dev copy to drill (6b319): each copy writes its port and its own
+# random key to run/instance.json in its MILLENAI_HOME; set in main()
+DEV_HOME = os.environ.get("CAI_DEV_HOME") or os.path.expanduser(
+    "~/Library/Application Support/MillenAI-dev")
+BASE = K = None
 NUL = "\x00"
+
+
+def _attach(home):
+    """Point BASE and K at the dev copy living in home."""
+    global BASE, K
+    note = os.path.join(home, "run", "instance.json")
+    try:
+        with open(note) as fh:
+            d = json.load(fh)
+        os.kill(int(d["pid"]), 0)          # a note a killed copy left
+    except (OSError, ValueError, KeyError) as exc:
+        raise SystemExit("drill: no live dev copy in %s (%s); start one "
+                         "(CLAUDE.md, Dev server)" % (home, exc))
+    BASE = "http://127.0.0.1:%d" % d["port"]
+    # the launch key's cookie is named for the port (6b310)
+    K = "millen_key_%d=%s" % (d["port"], d["key"])
+    try:
+        urllib.request.urlopen(urllib.request.Request(
+            BASE + "/api/stats", headers={"Cookie": K}), timeout=10).read()
+    except Exception as exc:
+        raise SystemExit("drill: the dev copy on %s doesn't answer (%s)"
+                         % (BASE, exc))
 
 # ---------------------------------------------------------------- banks
 # Real questions in each register the app actually gets. Grouped by the
@@ -186,7 +213,10 @@ def main():
                     help="questions per lane (funnels capped at bank size)")
     ap.add_argument("--seed", type=int, default=None)
     ap.add_argument("--modes", default="chat,web,messy,funnel")
+    ap.add_argument("--home", default=DEV_HOME,
+                    help="the dev copy's MILLENAI_HOME (its run/instance.json)")
     a = ap.parse_args()
+    _attach(a.home)
     seed = a.seed if a.seed is not None else int(time.time()) % 100000
     rng = random.Random(seed)
     modes = set(a.modes.split(","))

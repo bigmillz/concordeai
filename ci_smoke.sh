@@ -14,21 +14,27 @@ PORT="${SMOKE_PORT:-$("$PY" -c 'import socket;s=socket.socket();s.bind(("127.0.0
 if curl -s -o /dev/null "http://127.0.0.1:$PORT/"; then
   echo "smoke: port $PORT is already in use"; exit 1
 fi
-KEY="ci-smoke-$$"
 "$PY" -W error::SyntaxWarning -m py_compile millenai.py
 echo "compile: ok"
 HOME_DIR="$(mktemp -d)"
 LOG="$HOME_DIR/boot.log"
-HOME="$HOME_DIR" MILLENAI_HEADLESS=1 MILLENAI_PORT="$PORT" MILLENAI_KEY="$KEY" \
-  "$PY" millenai.py >"$LOG" 2>&1 &
+# a dev copy in a folder of its own, no window, its own random key
+# (0a item 2, 6b319): the key is read from its run/instance.json
+DATA="$HOME_DIR/data"
+HOME="$HOME_DIR" MILLENAI_DEV=1 MILLENAI_HOME="$DATA" MILLENAI_NOWINDOW=1 \
+  MILLENAI_PORT="$PORT" "$PY" millenai.py >"$LOG" 2>&1 &
 PID=$!
 disown $PID 2>/dev/null || true
 # the app's children (an engine it started) go first, while their parent
 # can still be named, then the app, then its throwaway home
 trap 'pkill -9 -P $PID 2>/dev/null || true; kill -9 $PID 2>/dev/null || true; rm -rf "$HOME_DIR"' EXIT
 code=000
+KEY=""
 for _ in $(seq 1 90); do
   kill -0 $PID 2>/dev/null || { echo "boot: the app exited"; tail -40 "$LOG"; exit 1; }
+  [ -n "$KEY" ] || KEY=$("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["key"])' \
+                        "$DATA/run/instance.json" 2>/dev/null || true)
+  [ -n "$KEY" ] || { sleep 1; continue; }
   code=$(curl -s -m 5 -o /dev/null -w "%{http_code}" -H "Cookie: millen_key_$PORT=$KEY" \
          "http://127.0.0.1:$PORT/" || true)
   [ "$code" = "200" ] && break

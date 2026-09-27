@@ -1,9 +1,13 @@
 import base64, hashlib, json, os, subprocess, time, urllib.request, urllib.error, tempfile, signal
+import socket
 D=tempfile.mkdtemp()
-env=dict(os.environ, SYNC_DB=os.path.join(D,"t.db"), SYNC_SECRET=os.path.join(D,"s.sec"), SYNC_PORT="8799", SYNC_BIND="127.0.0.1")
+# a free port, never 8799: the accounts harness gives that to its
+# recording proxy (00 5.7)
+_s=socket.socket(); _s.bind(("127.0.0.1",0)); P=str(_s.getsockname()[1]); _s.close()
+env=dict(os.environ, SYNC_DB=os.path.join(D,"t.db"), SYNC_SECRET=os.path.join(D,"s.sec"), SYNC_PORT=P, SYNC_BIND="127.0.0.1")
 srv=subprocess.Popen(["python3","concordeai_sync.py"],env=env)
 time.sleep(1.5)
-B="http://127.0.0.1:8799"
+B="http://127.0.0.1:"+P
 def post(path,obj,expect=200):
     req=urllib.request.Request(B+path,data=json.dumps(obj).encode(),headers={"Content-Type":"application/json"},method="POST")
     try:

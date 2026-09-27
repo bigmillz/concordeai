@@ -5630,6 +5630,53 @@ crash was invisible.
   keeps its checks. Mutation-tested (SIGHUP back, hook removed, no log,
   no box).
 
+## 6b319 — dev and test copies live in their own folder (accounts, step 1)
+Sign-in and sync come first (Patrick, 2026-09-26), and they can't be
+tested while a dev copy shares the real data folder: account tests would
+plant accounts and keys in real data, and run a second sync engine on
+it. This is 0a item 2 and harness step 1 of the accounts specs.
+- A dev or test copy is `MILLENAI_DEV=1` plus a `MILLENAI_HOME` folder,
+  and everything it keeps (chats, prefs, keys, logs, the instance lock)
+  lives there. Either one alone, or a folder that is the real one,
+  inside it or around it, exits with code 2 before anything binds. A
+  second copy on the same folder exits with code 3.
+- Every launch makes its own random key (no more `MILLENAI_KEY`, and no
+  fixed key in CLAUDE.md) and writes port, key and pid to
+  `run/instance.json` (0600) in its folder.
+- `MILLENAI_NOWINDOW` replaces `MILLENAI_HEADLESS`, dev copies only.
+  `MILLENAI_TEST_HOOKS` (first hook: `no-webview`) and
+  `MILLENAI_SYNC_URL` are honoured only in a dev copy, so none of them
+  can reach the app a person opened. The port no longer changes
+  behaviour.
+- A dev copy no longer gets a plaintext `cloud-dev-<port>.json` copy of
+  the real keys; it starts with none. The real app's boot sweep already
+  removes old copies once their port is free and they're an hour old.
+- The gauntlet starts its own copies on 9901 and 9902, each in a
+  temporary folder, and stops and deletes them at the end. New checks:
+  two copies never see each other's chats or keys (a canary chat, with
+  a byte-grep of the other copy's folder), the real folder gains no
+  file and no canary, every half-set launch refuses (run against a fake
+  home directory, so a broken guard couldn't reach the real folder),
+  and the test switches do nothing outside a dev copy.
+- ci_smoke.sh, drill.py, CLAUDE.md and DRILL_LOOP.md start dev copies
+  the new way; sync/selftest.py moved off 8799 (the accounts harness's
+  proxy port).
+- Any other `MILLENAI_` setting is refused too (code 2), so the old dev
+  recipe (fixed key, headless switch) can't quietly start the real app
+  on the real folder. SIGTERM now removes the copy's own
+  `run/instance.json`, so a restart never reads a dead copy's key.
+- A three-lens review (real app, isolation, tests) confirmed 13 findings,
+  all in the tests and tooling; all fixed. The real-folder check now
+  fails on any new file and greps the whole folder and the log folder;
+  each refusal must give its own reason while 9903 is held open (so a
+  copy that bound first would exit 1, not 2); a second copy on one
+  folder exits 3; the Windows crash and pythonw logs follow the dev
+  folder; and the gauntlet stops a copy with SIGTERM to the app alone,
+  so an engine the desktop app took over is never killed mid-answer.
+- Not in this step: the recording proxy on 8799 comes with the first
+  test that needs it (the cloud-switch checks, step 6), and
+  `/?key=` goes with the boot code (step 3).
+
 ## 6b318 — backdrops that don't repeat, and go dark after dark
 
 Per Patrick: "the background videos always seem to cycle the same ones

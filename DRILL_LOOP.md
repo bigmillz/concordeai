@@ -8,8 +8,10 @@ PROTOCOL LIVES HERE, NOT IN THE CONVERSATION.
 
 ## One cycle, six steps
 
-1. **COLLECT** — with a live dev server on 9894 (CLAUDE.md), run
-   `python3 drill.py --batch 6` with a FRESH seed. Transcripts land in
+1. **COLLECT** — with a live dev copy on 9894 (CLAUDE.md; its folder is
+   `~/Library/Application Support/MillenAI-dev`, which drill.py reads
+   the port and key from), run `python3 drill.py --batch 6` with a FRESH
+   seed. Transcripts land in
    `~/Library/Application Support/MillenAI/drill_runs/<stamp>/`.
 2. **JUDGE** — score every record against `drill_rubric.md` (1-5 per
    axis) using a Workflow of parallel judge agents, each taking a
@@ -28,10 +30,12 @@ PROTOCOL LIVES HERE, NOT IN THE CONVERSATION.
    THEN REFRESH THE TEST BUILD (per Patrick, 2026-08-26, the VPN
    flow): a WINDOWED instance on port 9895 — kill the old one
    (`lsof -tnP -iTCP:9895 -sTCP:LISTEN`), relaunch WITHOUT
-   MILLENAI_HEADLESS so the pywebview window pops on his desktop:
-   `MILLENAI_PORT=9895 MILLENAI_KEY=... "$VENV" millenai.py &`.
+   MILLENAI_NOWINDOW so the pywebview window pops on his desktop, in a
+   dev folder of its own (a copy per folder):
+   `MILLENAI_DEV=1 MILLENAI_HOME="$HOME/Library/Application Support/MillenAI-dev-window" MILLENAI_PORT=9895 "$VENV" millenai.py &`.
    That window IS his playground for the accumulated batch; tell him
-   it refreshed. 9894 stays the headless drill/gauntlet server.
+   it refreshed. 9894 stays the windowless drill server; the gauntlet
+   starts its own copies on 9901-9903.
    Version numbers move only when he says cut.
 6. **LOG + LOOP** — append the cycle to `drill_ledger.md` (scores by
    mode, edits landed/reverted, next hypotheses), update the FERRARI

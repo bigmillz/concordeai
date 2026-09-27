@@ -66,6 +66,83 @@ if sys.platform == "win32":
     subprocess.Popen.__init__ = _quiet_popen
 import webbrowser
 
+
+# DEV AND TEST COPIES LIVE IN THEIR OWN FOLDER (0a item 2, 6b319). A dev
+# or test copy used to run on the REAL data folder with a fixed key that
+# CLAUDE.md printed, so while one ran any login on the Mac could read the
+# real chats; and any port but 8889 copied the real API keys into a
+# plaintext cloud-dev-<port>.json. Now MILLENAI_DEV=1 plus a
+# MILLENAI_HOME folder marks a dev copy, and everything it keeps lives in
+# that folder. The port number never changes behaviour. The test-only
+# switches (MILLENAI_NOWINDOW, MILLENAI_TEST_HOOKS, MILLENAI_SYNC_URL) are
+# honoured only in such a copy, so none of them reaches the app a person
+# opened. Anything half-set refuses to start, before it binds or writes.
+def _real_app_dir() -> str:
+    """The real per-user data folder, whatever this launch uses."""
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+        return os.path.join(base, "MillenAI")
+    return os.path.expanduser("~/Library/Application Support/MillenAI")
+
+
+# the settings a launch may carry; any other MILLENAI_ name is a leftover
+# (the old dev copies' fixed key and windowless switch) and is refused,
+# so an old recipe can't quietly start the real app on the real folder
+_KNOWN_ENV = frozenset((
+    "MILLENAI_DEV", "MILLENAI_HOME", "MILLENAI_NOWINDOW", "MILLENAI_TEST_HOOKS",
+    "MILLENAI_SYNC_URL", "MILLENAI_PORT", "MILLENAI_TESTBUILD",
+    "MILLENAI_NO_PACKAGE"))
+
+
+def _dev_home(env, real):
+    """(folder, None) for a dev copy, (None, None) for the real app, or
+    (None, why) when this launch must not start."""
+    odd = sorted(k for k in env
+                 if k.upper().startswith("MILLENAI_") and k.upper() not in _KNOWN_ENV)
+    if odd:
+        return None, ("Unknown setting %s. A dev copy is MILLENAI_DEV=1 plus "
+                      "MILLENAI_HOME (see CLAUDE.md)." % ", ".join(odd))
+    dev = env.get("MILLENAI_DEV", "") == "1"
+    home = env.get("MILLENAI_HOME", "").strip()
+    if not dev:
+        if home:
+            return None, "MILLENAI_HOME is only for dev copies (set MILLENAI_DEV=1 too)."
+        if env.get("MILLENAI_NOWINDOW", ""):
+            return None, ("MILLENAI_NOWINDOW is only for dev copies (set "
+                          "MILLENAI_DEV=1 and MILLENAI_HOME).")
+        return None, None
+    if not home:
+        return None, "MILLENAI_DEV=1 needs MILLENAI_HOME, a folder of its own."
+    h = os.path.realpath(os.path.expanduser(home))
+    r = os.path.realpath(real)
+    hn, rn = os.path.normcase(h), os.path.normcase(r)
+    if sys.platform in ("darwin", "win32"):     # case-insensitive disks
+        hn, rn = hn.lower(), rn.lower()
+    hs, rs = hn.rstrip(os.sep) + os.sep, rn.rstrip(os.sep) + os.sep
+    # the real folder, anything inside it, and anything holding it (a
+    # walk of the dev folder would reach the real one) are all refused
+    if hn == rn or hn.startswith(rs) or rn.startswith(hs):
+        return None, ("MILLENAI_HOME can't be the real data folder, "
+                      "inside it, or around it: %s" % r)
+    return h, None
+
+
+DEV_HOME, _dev_why = _dev_home(os.environ, _real_app_dir())
+if _dev_why:
+    print("\n  %s\n" % _dev_why, file=sys.stderr)
+    sys.exit(2)
+if DEV_HOME:
+    os.makedirs(DEV_HOME, mode=0o700, exist_ok=True)
+# no window and no browser: the gauntlet's instances (0a 5.2)
+NOWINDOW = bool(DEV_HOME) and os.environ.get("MILLENAI_NOWINDOW") == "1"
+# test hooks, named in a comma list; none outside a dev copy (0a 5.14)
+TEST_HOOKS = frozenset(
+    x.strip() for x in os.environ.get("MILLENAI_TEST_HOOKS", "").split(",")
+    if x.strip()) if DEV_HOME else frozenset()
+# the sync server; a dev copy may point at the test one (00 5.7)
+SYNC_URL = ((os.environ.get("MILLENAI_SYNC_URL", "").strip()
+             if DEV_HOME else "") or "https://sync.millertechnology.net")
+
 # A CRASH ON WINDOWS MUST BE SEEN (6b316). The launcher starts us with
 # pythonw, which has no console, so a failure at startup vanished: the
 # Windows build died on its first run for its whole life (a SIGHUP that
@@ -76,9 +153,7 @@ if sys.platform == "win32":
     def _win_fatal(kind, value, tb):
         import traceback
         text = "".join(traceback.format_exception(kind, value, tb))
-        log = os.path.join(os.environ.get("LOCALAPPDATA")
-                           or os.path.expanduser("~"), "MillenAI",
-                           "crash.log")
+        log = os.path.join(DEV_HOME or _real_app_dir(), "crash.log")
         try:
             os.makedirs(os.path.dirname(log), exist_ok=True)
             with open(log, "a", encoding="utf-8") as f:
@@ -106,8 +181,7 @@ if sys.platform == "win32":
     # installed. Both go to a log instead (a fresh one past 5 MB).
     if sys.stdout is None or sys.stderr is None:
         try:
-            _pd = os.path.join(os.environ.get("LOCALAPPDATA")
-                               or os.path.expanduser("~"), "MillenAI", "logs")
+            _pd = os.path.join(DEV_HOME or _real_app_dir(), "logs")
             os.makedirs(_pd, exist_ok=True)
             _pp = os.path.join(_pd, "app.log")
             if os.path.exists(_pp) and os.path.getsize(_pp) > 5_000_000:
@@ -180,6 +254,8 @@ except ImportError:
     HAS_PSUTIL = False
 
 try:
+    if "no-webview" in TEST_HOOKS:          # a dev copy's test hook
+        raise ImportError("blocked by MILLENAI_TEST_HOOKS")
     import webview  # pywebview -> native macOS window (WKWebView)
     HAS_WEBVIEW = True
 except ImportError:
@@ -263,22 +339,22 @@ except Exception:
 # attached; the app then offers a one-click in-place update.
 UPDATE_REPO = "bigmillz/concordeai"
 
-# MILLENAI_PORT: the go-live LaunchAgent runs a second, headless instance
-# beside the desktop app — it must not fight the app for 8889
+# MILLENAI_PORT names the port to try first; a dev copy uses it to pick
+# its own. It changes nothing else (6b319).
 PORT = int(os.environ.get("MILLENAI_PORT", "8889"))
-# the app a person opened, as opposed to a dev, test or hosted instance
-# started on an explicit port. Only this one may move off 8889 (see
-# bind_backend) and only this one holds the single-instance lock.
-DEFAULT_APP = "MILLENAI_PORT" not in os.environ
+# the app a person opened, as opposed to a dev or test copy (MILLENAI_DEV
+# with its own MILLENAI_HOME, above). Only this one moves off a taken
+# port (see bind_backend) and hands a second launch to its window.
+DEFAULT_APP = not DEV_HOME
 # THE WINDOW'S OWN KEY (6b310, per Patrick: "prevent people's questions,
 # answers, and chats from mixing with other users"). The server listens
 # on 127.0.0.1, and every account on the computer can reach 127.0.0.1:
 # before this, another person's login on a shared Mac could read
 # /api/chats with one curl. Each launch mints a key, the window collects
 # it once through /?key=, and every request must carry it (StudioHandler.
-# _gate). MILLENAI_KEY pins it for dev and test instances.
-ACCESS_KEY = (os.environ.get("MILLENAI_KEY", "").strip()
-              or secrets.token_urlsafe(32))
+# _gate). Every launch mints its own, dev and test copies included
+# (6b319): they read it from run/instance.json in their own folder.
+ACCESS_KEY = secrets.token_urlsafe(32)
 # WHAT THE PAGE MAY LOAD (6b310). Browsers send a 127.0.0.1 cookie to
 # EVERY port on 127.0.0.1, so one <img src="http://127.0.0.1:5555/...">,
 # from a web page's og:image or a model's markdown, handed the launch key
@@ -459,15 +535,13 @@ def pc_words(text: str) -> str:
 
 
 def app_dir() -> str:
-    """Per-user data directory (venv, memory, downloaded engines)."""
-    if IS_WIN:
-        base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
-        return os.path.join(base, "MillenAI")
-    return os.path.expanduser("~/Library/Application Support/MillenAI")
+    """Per-user data directory (venv, memory, downloaded engines); a dev
+    copy's own MILLENAI_HOME (6b319)."""
+    return DEV_HOME or _real_app_dir()
 
 
 def log_dir() -> str:
-    return (os.path.join(app_dir(), "logs") if IS_WIN
+    return (os.path.join(app_dir(), "logs") if IS_WIN or DEV_HOME
             else os.path.expanduser("~/Library/Logs/MillenAI"))
 
 
@@ -868,22 +942,10 @@ OLLAMA_TAGS = {l: i["ollama"] for l, i in MODEL_INFO.items() if i["ollama"]}
 # Keep the example on a CURRENT model — it used to name
 # llama-3.3-70b-versatile, which Groq decommissioned 2026-08-16.
 # Nothing is sent anywhere until the Turbo switch in Settings is on.
+# A dev copy has its own, empty until a key is pasted into it: the
+# plaintext cloud-dev-<port>.json copies of the real keys are gone
+# (6b319), and the real app's boot sweep removes old ones.
 CLOUD_FILE = os.path.join(app_dir(), "cloud.json")
-# DEV AND TEST INSTANCES KEEP THEIR OWN PROVIDER STATE (6b293, per
-# Patrick: "why are we hitting quotas when we're not even running
-# queries?" — the gauntlet's instance rested Claude and Kimi, and the
-# real app showed it). Only the desktop app (8889) and the hosted
-# instance (9889) share the real file; every other port works from a
-# private copy seeded with the real keys at boot, so its rests, notes
-# and picks never reach the app a person is looking at.
-if PORT not in (8889, 9889):
-    _CLOUD_DEV = os.path.join(app_dir(), "cloud-dev-%d.json" % PORT)
-    try:
-        shutil.copyfile(CLOUD_FILE, _CLOUD_DEV)
-        os.chmod(_CLOUD_DEV, 0o600)
-    except Exception:
-        pass
-    CLOUD_FILE = _CLOUD_DEV
 
 # WHAT EACH PROVIDER'S KEY LOOKS LIKE (6b234). A half-pasted key and a
 # revoked one both come back "Invalid API Key", and telling them apart by
@@ -8645,6 +8707,10 @@ def _signal_exit(signum, _frame):
     # atexit does NOT run on SIGTERM/SIGHUP — without this, force-quitting
     # the app leaves multi-GB model servers resident forever
     stop_managed_engines()
+    try:
+        _drop_instance_note()    # nor would the note naming a dead key go
+    except Exception:
+        pass
     os._exit(0)
 
 
@@ -13929,7 +13995,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         from PyObjCTools import AppHelper
                         AppHelper.callAfter(
                             lambda: NSApp.activateIgnoringOtherApps_(True))
-                elif os.environ.get("MILLENAI_HEADLESS") != "1":
+                elif not NOWINDOW:
                     webbrowser.open("http://127.0.0.1:%d/?key=%s" % (
                         PORT, urllib.parse.quote(ACCESS_KEY)))
             except Exception:
@@ -16488,13 +16554,15 @@ _INSTANCE_LOCK = []
 INSTANCE_NOTE = os.path.join(app_dir(), "run", "instance.json")
 
 
-def single_instance(wait: float = 15.0) -> bool:
+def single_instance(wait: float = 15.0, dev: bool = False) -> bool:
     """One desktop app per OS user (6b310). A second copy on a fallback
     port would write the same chats.json as the first, and the last
     whole-list save wins. True = this process holds the lock and runs.
     False = another copy runs: it was asked to bring its window forward,
     or the person was told it's open. A copy that is quitting (the swap
-    after an update) answers nothing, so the new one waits for its lock."""
+    after an update) answers nothing, so the new one waits for its lock.
+    A dev copy holds its own folder's lock and, when another copy holds
+    it, just says no (6b319): no hand-off, no wait, no dialog."""
     path = os.path.join(app_dir(), "run", "instance.lock")
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -16519,6 +16587,9 @@ def single_instance(wait: float = 15.0) -> bool:
 
     if _try_lock():
         return True
+    if dev:
+        f.close()
+        return False
     if _hand_off():
         f.close()
         return False
@@ -16539,18 +16610,21 @@ def _write_instance_note():
         fd = os.open(INSTANCE_NOTE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
                      0o600)
         with os.fdopen(fd, "w") as fh:
-            json.dump({"port": PORT, "key": ACCESS_KEY}, fh)
+            json.dump({"port": PORT, "key": ACCESS_KEY,
+                       "pid": os.getpid()}, fh)
     except OSError:
         pass
+    atexit.register(_drop_instance_note)
 
-    def _drop():
-        try:
-            with open(INSTANCE_NOTE) as fh:
-                if json.load(fh).get("key") == ACCESS_KEY:
-                    os.remove(INSTANCE_NOTE)
-        except (OSError, ValueError):
-            pass
-    atexit.register(_drop)
+
+def _drop_instance_note():
+    """Remove the note, if it is still this copy's."""
+    try:
+        with open(INSTANCE_NOTE) as fh:
+            if json.load(fh).get("key") == ACCESS_KEY:
+                os.remove(INSTANCE_NOTE)
+    except (OSError, ValueError):
+        pass
 
 
 _WIN_STATE = {"min": False, "max": False}   # as the window's events say
@@ -26565,8 +26639,9 @@ def _sweep_leftovers() -> int:
                     freed += size
                 except OSError:
                     pass
-    # 4. This app's own temp files from a crash mid-save, and the copies
-    #    of the key file a test instance makes on a port nothing serves
+    # 4. This app's own temp files from a crash mid-save, and the
+    #    plaintext copies of the key file that test instances made before
+    #    6b319, once nothing serves their port
     base = app_dir()
     hour_ago = time.time() - 3600
     for pat in (".prefs-*.tmp", ".cloud-*.tmp"):
@@ -26824,6 +26899,9 @@ def _retire_contribute():
 if __name__ == "__main__":
     if DEFAULT_APP and not single_instance():
         sys.exit(0)
+    if not DEFAULT_APP and not single_instance(dev=True):
+        print("\n  Another copy is using %s.\n" % DEV_HOME, file=sys.stderr)
+        sys.exit(3)
     if DEFAULT_APP:
         # dev and test instances share this data folder: only the app a
         # person opened may change what's in it on its own
@@ -26843,8 +26921,7 @@ if __name__ == "__main__":
             except Exception:
                 pass
         sys.exit(1)
-    if DEFAULT_APP:
-        _write_instance_note()
+    _write_instance_note()      # every copy, in its own folder (6b319)
     threading.Thread(target=start_backend, args=(_server,),
                      daemon=True).start()
     print(f"\n  {APP_NAME} {short_version()}")
@@ -27166,11 +27243,10 @@ if __name__ == "__main__":
         except Exception:
             pass
 
-    if os.environ.get("MILLENAI_HEADLESS") == "1":
-        # go-live service mode: no window, no browser tab — just the server.
-        # A LaunchAgent must never call webbrowser.open (it lands in the
-        # user's face) or pywebview (it needs a WindowServer session).
-        print("  headless — serving, no window. ctrl-c to stop.\n")
+    if NOWINDOW:
+        # a test copy (0a 5.2): no window, no browser tab, just the
+        # server; the harness reads its port and key from run/instance.json
+        print("  no window — serving. ctrl-c to stop.\n")
         try:
             while True:
                 time.sleep(100)
