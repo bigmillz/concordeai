@@ -163,17 +163,6 @@ portable copy (needs Python 3.10+)."
 # consumed — the next build writes its own
 [[ -s RELEASE_NOTES.md ]] && : > RELEASE_NOTES.md
 
-# THE HOSTED WEB UI UPDATES WITH THE CUT (6b248, per Patrick: "going
-# forth always update the web ui too"). The live :9889 self-updates
-# hourly on its own; running its updater here closes the gap so
-# ai.millertechnology.net serves the new build the moment it exists.
-if [[ -x "$HOME/Library/MillenAI-live/update.sh" ]]; then
-  echo "→ updating the hosted web ui"
-  bash "$HOME/Library/MillenAI-live/update.sh" \
-    && echo "  live instance now on the new build" \
-    || echo "  (live update failed — it will catch up on its hourly tick)"
-fi
-
 # THE WEBSITE (flyconcordefly.com). Land on its current tip and regenerate
 # there — never rebase generated content: two syncs that each INSERT the
 # same block at the same anchor replay as two insertions with no conflict,

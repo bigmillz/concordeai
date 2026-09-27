@@ -266,8 +266,7 @@ APP_VERSION = "6.1.0"   # bump here — UI, window, DMG all follow
 # While > 0: every display surface says "beta N", release.sh publishes
 # as a GitHub PRERELEASE, and — because the desktop updater reads
 # /releases/latest, which EXCLUDES prereleases — every stable install
-# stays parked on the last stable. The live :9889 instance follows raw
-# tags and DOES run betas: that's the testbed.
+# stays parked on the last stable.
 # NUMBERED PER LINE (6b286, per Patrick, the macOS way): "6.1 beta 1",
 # "6.1 beta 2"… four or five a line, restarting at 1 with each new
 # version — never the build number ("beta 268"). 0 = not a beta.
@@ -1043,8 +1042,8 @@ def _cloud_all() -> dict:
 # by the leak hunt: 75 of 500 four-thread rounds lost keys, 210 left the
 # file unparseable, and a real cloud.json.corrupt-backup sits in the
 # data dir from August. Now: one re-entrant lock in-process, an flock
-# across processes (the desktop app and the hosted instance share the
-# file), a temp-file + os.replace so no reader ever sees half a file,
+# across processes (belt and braces: one copy per data folder since
+# 6b319), a temp-file + os.replace so no reader ever sees half a file,
 # and a writer that REFUSES to persist over a file it could not parse.
 try:
     import fcntl as _fcntl
@@ -2130,46 +2129,36 @@ def compositor_ladder() -> list:
     return _cloud_ladder("composite", ("claude", "kimi", "gemini", "groq"))
 
 
-def work_ladder(role: str = "work", guest: bool = False) -> list:
+def work_ladder(role: str = "work") -> list:
     """A single answer where quality is the point (6b308): writing,
     resumes, exports, funnel verdicts, the remote agent ("work": Opus
     5.5 at medium), or the Code tab ("code": Sonnet 5 at medium, per
     Patrick). Groq before Gemini, so a free-tier user keeps Gemini
     Flash's small daily quota for council seats; Kimi last until its
     effort values have been tried live."""
-    if guest:
-        # a tunnel guest's question never lands on the owner's
-        # Anthropic bill first, on any lane (found in review, 6b308)
-        order = ("groq", "gemini", "claude") + (("kimi",) if KIMI_TESTED
-                                                else ())
-    else:
-        order = (("claude", "kimi", "groq", "gemini") if KIMI_TESTED
-                 else ("claude", "groq", "gemini", "kimi"))
+    order = (("claude", "kimi", "groq", "gemini") if KIMI_TESTED
+             else ("claude", "groq", "gemini", "kimi"))
     return _cloud_ladder(role, order)
 
 
-def fast_cloud_ladder(guest: bool = False, utility: bool = False) -> list:
+def fast_cloud_ladder(utility: bool = False) -> list:
     """The QUICK answer (6b246; Haiku first since 6b308, per Patrick:
-    "fast haiku"). A tunnel guest gets the free providers first, so a
-    visitor's every question never lands on the owner's Anthropic bill.
-    `utility` is for background jobs (titles, memory, map pins, funnel
-    stages): low effort, never Kimi."""
-    order = (("groq", "gemini", "claude") if guest
-             else ("claude", "groq", "gemini"))
+    "fast haiku"). `utility` is for background jobs (titles, memory, map
+    pins, funnel stages): low effort, never Kimi."""
+    order = ("claude", "groq", "gemini")
     if KIMI_TESTED and not utility:
         order += ("kimi",)
     return _cloud_ladder("utility" if utility else "fast", order)
 
 
-def vision_ladder(tier: str = "", guest: bool = False) -> list:
+def vision_ladder(tier: str = "") -> list:
     """A pasted image, per Patrick (6b308): Haiku on Fast, Opus 5.5 at
     medium on Thinking and Cloud Only, Opus 5.5 at high on Pro, with
     Gemini's Flash line beside it. Only providers whose models were seen
     to read images; the local vision model is the floor."""
     role = {"Pro": "composite", "Thinking": "seat",
             "Cloud Only": "seat"}.get(tier, "fast")
-    order = ("gemini", "claude") if guest else ("claude", "gemini")
-    return _cloud_ladder(role, order, vision=True)
+    return _cloud_ladder(role, ("claude", "gemini"), vision=True)
 
 
 def claude_refusal_conf(c: dict):
@@ -5437,8 +5426,7 @@ def _ffmpeg_convert(src: str, fmt: str, fps: int) -> str:
     return src
 
 
-def generate_image(prompt: str, over: dict = None, sock=None,
-                   paid: bool = True) -> tuple:
+def generate_image(prompt: str, over: dict = None, sock=None) -> tuple:
     """(png path, source) — local FLUX first, a Gemini key second.
     Raises when neither could paint."""
     errs = []
@@ -5477,8 +5465,7 @@ def generate_image(prompt: str, over: dict = None, sock=None,
         finally:
             _render_lock.release()
     gem = (_cloud_all().get("providers") or {}).get("gemini") or {}
-    # `paid` is False for a tunnel guest (6b309): never the owner's key
-    if paid and gem.get("key") and gem.get("status", "ok") == "ok":
+    if gem.get("key") and gem.get("status", "ok") == "ok":
         # newest first, as Google lists them today (6b294, probed live)
         # gemini-2.5-flash-image shuts down 2026-10-02 (6b307)
         for mdl in ("gemini-3.1-flash-lite-image", "gemini-3.1-flash-image"):
@@ -6389,9 +6376,9 @@ def _mermaid_from(text: str) -> str:
 
 
 # ------------------------------------------------------------- delivery
-# Files live under the SAME per-identity base the chats and memory use
-# (_data_base), so the tenancy boundary that already exists covers exports
-# for free: a tunnel guest cannot address the owner's files at all.
+# Files live under the SAME base the chats and memory use (_data_base,
+# the root only since the web version went, 6b320), so whatever folder
+# the profiles bring later covers exports too.
 EXPORT_DIRNAME = "exports"
 _X_ID_RX = re.compile(r"^[A-Za-z0-9_-]{16,48}\.[a-z0-9]{1,5}$")
 
@@ -6545,16 +6532,13 @@ def _sweep_exports(d: str):
 
 
 def sweep_all_exports():
-    """Every identity's export dir, on the janitor's tick."""
+    """The export dir, on the janitor's tick. The web version's users/
+    folders are no longer walked (6b320): a leftover one on an old
+    machine is never touched, let alone deleted, by the app."""
     try:
-        roots = [app_dir()]
-        udir = os.path.join(app_dir(), "users")
-        if os.path.isdir(udir):
-            roots += [os.path.join(udir, u) for u in os.listdir(udir)]
-        for r in roots:
-            d = os.path.join(r, EXPORT_DIRNAME)
-            if os.path.isdir(d):
-                _sweep_exports(d)
+        d = os.path.join(app_dir(), EXPORT_DIRNAME)
+        if os.path.isdir(d):
+            _sweep_exports(d)
     except OSError:
         pass
 
@@ -6841,37 +6825,6 @@ def _build_from_tag(tag):
     return int(nums[-1]) if nums else 0
 
 
-_dl_cache = {"ts": 0, "data": {}}
-
-
-def download_links() -> dict:
-    """Latest installer URLs per platform, cached for an hour."""
-    if time.time() - _dl_cache["ts"] < 3600 and _dl_cache["data"]:
-        return _dl_cache["data"]
-    out = {}
-    try:
-        req = urllib.request.Request(
-            "https://api.github.com/repos/%s/releases/latest" % UPDATE_REPO,
-            headers={"Accept": "application/vnd.github+json",
-                     "User-Agent": "MillenAI"})
-        with urllib.request.urlopen(req, timeout=8) as r:
-            rel = json.loads(r.read().decode("utf-8"))
-        for a in rel.get("assets", []):
-            n = a.get("name", "")
-            u = a.get("browser_download_url", "")
-            if n.endswith(".dmg"):
-                out["mac"] = u
-            elif n.endswith(".msi"):
-                out["win"] = u
-            elif n.endswith("-Windows.zip"):
-                out.setdefault("win_zip", u)
-        out["version"] = (rel.get("name") or "").strip()
-        _dl_cache.update({"ts": time.time(), "data": out})
-    except Exception:
-        pass
-    return out
-
-
 def update_channel() -> str:
     """stable | beta | nightly. The old beta_updates checkbox migrates
     to beta once; a nightly build defaults to the nightly channel."""
@@ -7149,11 +7102,9 @@ def _do_update():
 # bundle identity, which differs between running from source and from the
 # .app, and isn't guaranteed to survive a bundle swap. These files do.
 #
-# MULTI-USER: every function below takes a `base` directory. None means the
-# legacy files in app_dir() — the machine owner's data, what the desktop
-# app uses. Web visitors sign in at the WELCOME page and get their own
-# base under app_dir()/users/<id>/, so nobody ever reads Patrick's chats
-# through the tunnel.
+# Every function below takes a `base` directory. None means the files in
+# app_dir(), the only tenancy since the web version went (6b320); the
+# parameter stays as the seam the profiles use.
 
 
 def _pfile(name: str, base=None) -> str:
@@ -8577,11 +8528,11 @@ def setup_status() -> dict:
 
 
 def _other_millenai_running() -> bool:
-    """Another MillenAI process on this machine — desktop, live service,
-    or a dev instance on any port. Engines are shared by port, so our
-    shutdown must never terminate one a sibling is still using. (Checking
-    only 8889/9889 missed a :9899 instance and knifed the desktop's
-    engine — seen live, twice.)"""
+    """Another MillenAI process on this machine — the desktop app or a
+    dev copy on any port. Engines are shared by port, so our shutdown
+    must never terminate one a sibling is still using. (Checking only
+    fixed ports missed a :9899 instance and knifed the desktop's engine —
+    seen live, twice.)"""
     # THIS USER'S siblings only (6b310): another login's app shares no
     # engine with us any more, and counting it left ours running forever
     try:
@@ -8619,7 +8570,7 @@ def _other_millenai_running() -> bool:
             return True
     except Exception:
         pass
-    for p in (8889, 9889):
+    for p in (8889,):     # 9889, the retired web copy's port, went (6b320)
         if p != PORT and _port_in_use(p) and _listener_is_mine(p) is True:
             return True
     return False
@@ -10527,7 +10478,7 @@ def _cloud_all_down() -> str:
 
 def run_council(labels: list, messages: list, emit, status,
                 reflect: bool = False, peer: bool = False,
-                cloud_only: bool = False, guest: bool = False,
+                cloud_only: bool = False,
                 bench_allow=None, comp: str = "",
                 hurry=None) -> None:
     """Ask each selected model in turn, then stream a merged answer.
@@ -10937,7 +10888,7 @@ def run_council(labels: list, messages: list, emit, status,
     # local-merger floor below still catches everything.
     _hurry_fast = _hurried() and len(good) >= 2
     if _hurry_fast and not _comp_cloud:
-        _fast = fast_cloud_ladder(guest=guest)
+        _fast = fast_cloud_ladder()
         if _fast:
             _ladder = _fast
     def _walk_ladder() -> bool:
@@ -12048,14 +11999,12 @@ def offline_hint(kind: str, err: Exception) -> str:
 
 # ------------------------------------------------------------ skyline cache
 # The Apple aerials CANNOT be streamed straight to a browser: the phobos
-# host is http-only (mixed-content-blocked on the https tunnel, broken TLS
-# cert) and the sylvan AVC files put their moov atom AFTER 370 MB of mdat,
-# so a browser has nothing to play until the entire file arrives — that is
+# host is http-only (broken TLS cert) and the sylvan AVC files put their
+# moov atom AFTER 370 MB of mdat, so a browser has nothing to play until the entire file arrives — that is
 # exactly the "background never loads" bug. So MillenAI serves the skyline
 # itself: download once, remux fast-start IN PURE PYTHON (move moov ahead
 # of mdat, shift every stco/co64 chunk offset by the moov size), cache in
-# app_dir()/sky, and stream same-origin with Range support. One path that
-# works in the app, on the tunnel, and in every browser.
+# app_dir()/sky, and stream same-origin with Range support.
 SKY_SOURCES = [
     # The COMPLETE Apple aerial catalog (89 clips: cities, ISS space
     # flyovers, underwater) from resources-13.tar entries.json — every
@@ -12243,7 +12192,6 @@ def sky_is_night() -> bool:
     except Exception:
         h = time.localtime().tm_hour
         return h >= 19 or h < 6
-_last_seen = {}          # identity -> last request ts, for the user count
 _sky_jobs = {}          # idx -> {"status": ..., "pct": int}
 
 # APPLE'S ROOT, FOR THE BACKDROPS ON WINDOWS (6b317, found in a Windows
@@ -12815,278 +12763,6 @@ def _funnel_image(query: str) -> str:
     return ""
 
 
-# ---------------------------------------------------------------- sign-in
-# Remote visitors (identified by the tunnel's Cf-Connecting-Ip /
-# X-Forwarded-For headers — local requests never carry them) must pick an
-# identity after the key gate: name+PIN, or Google when configured. The
-# identity is a salted hash, the cookie carries it, and all chats, memory
-# and prefs live under app_dir()/users/<id>/. A wrong PIN is simply a
-# different (empty) profile — nobody can open someone else's.
-GOOGLE_OAUTH_FILE = os.path.join(app_dir(), "google_oauth.json")
-_oauth_states = {}         # state -> issued-at, for CSRF protection
-
-
-def google_conf():
-    try:
-        with open(GOOGLE_OAUTH_FILE, "r", encoding="utf-8") as f:
-            d = json.load(f)
-        if d.get("client_id") and d.get("client_secret"):
-            return d
-    except Exception:
-        pass
-    return None
-
-
-def _user_id(kind: str, ident: str) -> str:
-    return hashlib.sha256(("millen:" + kind + ":" + ident)
-                          .encode("utf-8")).hexdigest()[:20]
-
-
-# OWNER ACCESS: the machine's owner can reach their REAL chats/memory
-# remotely — sign in with the PIN stored in app_dir()/owner_pin (any
-# name), and the identity maps to the legacy files instead of a walled
-# web profile. The file is 0600 and never committed; delete it to turn
-# owner access off. Admin endpoints stay owner-only-at-the-machine.
-OWNER_PIN_FILE = os.path.join(app_dir(), "owner_pin")
-
-
-def _write_ident(uid, kind, **extra):
-    """The uid is a one-way hash, so HOW someone signed in (and the
-    email/name to show them) must be stored at mint time or it is gone
-    — the Account pane (6b257) reads this back through /api/me. Never
-    stores a PIN or any secret."""
-    try:
-        d = os.path.join(app_dir(), "users", uid)
-        os.makedirs(d, exist_ok=True)
-        with open(os.path.join(d, ".ident"), "w", encoding="utf-8") as f:
-            json.dump(dict(kind=kind, ts=time.time(), **extra), f)
-    except Exception:
-        pass
-
-
-def owner_uid():
-    try:
-        pin = open(OWNER_PIN_FILE).read().strip()
-        if re.fullmatch(r"\d{8,12}", pin):
-            return _user_id("owner", pin)
-    except Exception:
-        pass
-    return None
-
-
-WELCOME_PAGE = """<!doctype html><html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>MillenAI — sign in</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
-<style>
-html,body{height:100%;margin:0;overflow:hidden}
-body{background:#07080c;color:#ececec;display:flex;align-items:center;
-  justify-content:center;
-  font-family:'Space Grotesk','Helvetica Neue',system-ui,sans-serif}
-/* the same living backdrop the app runs, behind the door */
-#sky{position:fixed;inset:0;z-index:0;overflow:hidden;opacity:0;
-  transition:opacity 2.4s ease}
-#sky.on{opacity:1}
-#sky video{width:100%;height:100%;object-fit:cover;
-  transform:scale(1.06);filter:brightness(.5) saturate(1.1)}
-#veil{position:fixed;inset:0;z-index:1;pointer-events:none;
-  background:radial-gradient(120% 90% at 50% 40%,
-    rgba(7,8,12,.15) 0%,rgba(7,8,12,.72) 60%,rgba(7,8,12,.94) 100%)}
-#motes{position:fixed;inset:0;z-index:2;pointer-events:none}
-.door{position:relative;z-index:3;text-align:center;padding:24px;
-  max-width:430px;width:100%;
-  animation:doorIn 1.5s cubic-bezier(.16,1,.3,1) both}
-@keyframes doorIn{
-  from{opacity:0;transform:translateY(26px) scale(.97);filter:blur(9px)}
-  to{opacity:1;transform:none;filter:blur(0)}}
-.wrap{position:relative;display:inline-block;margin:0 0 10px}
-/* 6b243: the wordmark is Michroma everywhere it appears — the door page
-   was rendering it in the body sans, so the first thing a new user saw
-   was a different logo from the one inside the app. */
-h1{font-family:'Michroma','Space Grotesk',sans-serif;
-  font-size:clamp(30px,6.2vw,52px);letter-spacing:.06em;margin:0;
-  font-weight:400;line-height:1.05;
-  background:linear-gradient(90deg,#f5f6f8,#c8ccd5,#9aa0ac,#e2e5ea,#8f95a1,#d5d8df,#aeb3bd,#c8ccd5,#f5f6f8);
-  background-size:200% 100%;
-  -webkit-background-clip:text;background-clip:text;color:transparent;
-  -webkit-text-fill-color:transparent;
-  animation:rainbow 16s linear infinite}
-/* 6b258, per Patrick: EXTRA extra bold AI. The gradient is clipped to
-   the text so the fill is TRANSPARENT and a currentColor stroke would
-   draw nothing — the AI gets a solid bright silver and the fattening
-   stroke, which also lets it read as its own word against the ramp. */
-h1 b{font-weight:800;-webkit-text-fill-color:#f5f6f8;
-  -webkit-text-stroke:.12em #f5f6f8;animation:none;
-  font-size:.865em;vertical-align:.06em}
-/* the tube's halo — a blurred twin behind the letters */
-.halo{position:absolute;left:0;top:0;z-index:-1;pointer-events:none;
-  filter:blur(20px) saturate(1.5);opacity:.9}
-.halo h1{animation:rainbow 16s linear infinite}
-@keyframes rainbow{from{background-position:0% 50%}
-                   to{background-position:200% 50%}}
-p.tag{font-family:ui-serif,Georgia,serif;font-size:19px;font-weight:400;
-  color:#d9d6cc;margin:6px 0 26px;line-height:1.5}
-.err{color:#e26d5a;min-height:20px;margin:12px 0 0;font-size:13.5px}
-input{background:rgba(18,20,26,.55);border:1px solid rgba(255,255,255,.14);
-  border-radius:14px;color:#ececec;font-size:16px;padding:14px 16px;
-  width:100%;box-sizing:border-box;outline:none;text-align:center;
-  margin-bottom:11px;letter-spacing:.04em;
-  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
-  transition:border-color .25s,box-shadow .25s,background .25s}
-input::placeholder{color:#7e8390}
-input:focus{border-color:rgba(143,157,255,.75);background:rgba(18,20,26,.75);
-  box-shadow:0 0 0 4px rgba(143,157,255,.12),
-             0 10px 40px -12px rgba(143,157,255,.5)}
-button{position:relative;overflow:hidden;background:#ececec;color:#111;
-  border:0;border-radius:14px;font-size:15px;font-weight:700;
-  padding:14px 22px;cursor:pointer;width:100%;letter-spacing:.02em;
-  transition:transform .16s ease,box-shadow .25s ease}
-button:hover{transform:translateY(-1px);
-  box-shadow:0 12px 34px -14px rgba(255,255,255,.75)}
-button:active{transform:translateY(0)}
-/* light sweeps across the button, endlessly */
-button::after{content:"";position:absolute;inset:0;
-  background:linear-gradient(105deg,transparent 38%,
-    rgba(255,255,255,.75) 50%,transparent 62%);
-  transform:translateX(-120%);animation:sweep 4.5s ease-in-out infinite}
-@keyframes sweep{0%,55%{transform:translateX(-120%)}
-                 85%,100%{transform:translateX(120%)}}
-.gbtn{display:__GOOGLE_DISPLAY__;margin-top:13px;
-  background:rgba(18,20,26,.55);color:#ececec;
-  border:1px solid rgba(255,255,255,.14);text-decoration:none;
-  border-radius:14px;font-size:15px;font-weight:600;padding:14px 22px;
-  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
-  transition:border-color .25s,background .25s}
-.gbtn:hover{border-color:rgba(143,157,255,.7);background:rgba(24,27,36,.8)}
-/* the two doors: Google is the bright one, guest the glass one */
-.gbtn.primary{display:__GOOGLE_FLEX__;align-items:center;
-  justify-content:center;gap:10px;width:100%;box-sizing:border-box;
-  background:#ececec;color:#111;font-weight:700;border:0;
-  box-shadow:0 14px 44px -18px rgba(255,255,255,.55)}
-.gbtn.primary:hover{background:#fff;transform:translateY(-1px)}
-button.guest{background:rgba(18,20,26,.55);color:#ececec;
-  border:1px solid rgba(255,255,255,.16);margin-top:12px;
-  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
-button.guest:hover{border-color:rgba(143,157,255,.7);
-  background:rgba(24,27,36,.8);box-shadow:none}
-button.guest::after{display:none}
-.pinlink{display:inline-block;margin-top:18px;cursor:pointer;
-  font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#8a8fa0;
-  letter-spacing:.06em;border-bottom:1px dotted rgba(255,255,255,.25);
-  transition:color .2s}
-.pinlink:hover{color:#c9cede}
-#pinform{margin-top:16px;animation:doorIn .5s cubic-bezier(.16,1,.3,1) both}
-.small{margin-top:20px;font-family:'IBM Plex Mono',monospace;
-  font-size:11px;color:#6e727c;line-height:1.7;letter-spacing:.02em}
-@media(prefers-reduced-motion:reduce){
-  *{animation:none!important;transition:none!important}}
-</style></head><body>
-<div id="sky"><video id="skyv" muted loop playsinline></video></div>
-<div id="veil"></div>
-<canvas id="motes"></canvas>
-<div class="door">
-  <div class="wrap">
-    <div class="halo" aria-hidden="true"><h1>Concorde<b>AI</b></h1></div>
-    <h1>Concorde<b>AI</b></h1>
-  </div>
-  <p class="tag">Your AI. Walk right in.</p>
-  <a class="gbtn primary" href="/auth/google">
-    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.8 6.1C12.3 13.4 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.4 5.8c4.4-4.1 7.2-10.1 7.2-17.5z"/><path fill="#FBBC05" d="M10.4 28.7a14.5 14.5 0 0 1 0-9.4l-7.8-6.1a24 24 0 0 0 0 21.6l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.3-5.6l-7.4-5.8c-2.1 1.4-4.8 2.3-7.9 2.3-6.3 0-11.7-3.9-13.6-9.5l-7.8 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
-    Continue with Google</a>
-  <button class="guest" onclick="guest()">Continue as guest — 24h pass</button>
-  <div class="err" id="e"></div>
-  <a class="pinlink" id="pinlink" onclick="togglePin()">I have a name &amp; PIN</a>
-  <form id="pinform" hidden onsubmit="go();return false">
-    <input id="n" autocomplete="off" maxlength="24" placeholder="your name">
-    <input id="p" type="password" autocomplete="off" maxlength="12"
-           inputmode="numeric" placeholder="PIN (8+ digits)">
-    <button>Continue</button>
-  </form>
-  <div class="small" id="blurb">a guest pass lasts 24 hours in this
-       browser.<br>sign in with Google to keep chats on every device.</div>
-</div>
-<script>
-// DRIFTING MOTES: slow points of light rising through the scene — the
-// calm cousin of the app's warp
-(function(){
-  const c=document.getElementById("motes"),x=c.getContext("2d");
-  let w,h,ps=[];
-  function size(){
-    const d=Math.min(devicePixelRatio||1,2);
-    w=c.width=innerWidth*d;h=c.height=innerHeight*d;
-    c.style.width=innerWidth+"px";c.style.height=innerHeight+"px";
-    ps=Array.from({length:64},()=>({
-      x:Math.random()*w,y:Math.random()*h,
-      r:(Math.random()*1.6+.4)*d,
-      v:(Math.random()*.22+.05)*d,a:Math.random()*.5+.15,
-      t:Math.random()*6.28}));
-  }
-  size();addEventListener("resize",size);
-  (function tick(){
-    requestAnimationFrame(tick);
-    x.clearRect(0,0,w,h);
-    for(const p of ps){
-      p.y-=p.v;p.t+=.008;
-      if(p.y<-6){p.y=h+6;p.x=Math.random()*w;}
-      const tw=p.a*(0.65+0.35*Math.sin(p.t));
-      x.beginPath();x.arc(p.x+Math.sin(p.t)*6,p.y,p.r,0,6.283);
-      x.fillStyle="rgba(200,214,255,"+tw.toFixed(3)+")";x.fill();
-    }
-  })();
-})();
-// the backdrop: whatever clip is already cached, so the door opens on a
-// living scene without ever making a visitor wait for a download
-(async function(){
-  try{
-    const c=await(await fetch("/api/sky/cached")).json();
-    const list=c.cached||[];
-    if(!list.length)return;
-    const i=list[Math.floor(Math.random()*list.length)];
-    const v=document.getElementById("skyv");
-    const start=()=>{const pr=v.play();if(pr&&pr.catch)pr.catch(()=>{});};
-    v.addEventListener("canplaythrough",()=>{
-      document.getElementById("sky").classList.add("on");
-      start();
-      // some browsers refuse muted autoplay until the visitor touches
-      // something — the first interaction starts the motion
-      ["pointerdown","keydown"].forEach(ev=>
-        addEventListener(ev,start,{once:true}));
-    },{once:true});
-    v.src="/sky/"+i+".mov";
-  }catch(e){}
-})();
-function guest(){
-  const e=document.getElementById("e");
-  fetch("/api/guest",{method:"POST"})
-    .then(r=>r.json())
-    .then(d=>{if(d.ok)location.reload();
-              else e.textContent="try again";})
-    .catch(()=>{e.textContent="network error — try again";});
-}
-function togglePin(){
-  const f=document.getElementById("pinform");
-  f.hidden=!f.hidden;
-  if(!f.hidden)document.getElementById("n").focus();
-}
-function go(){
-  const n=document.getElementById("n").value.trim();
-  const p=document.getElementById("p").value.trim();
-  const e=document.getElementById("e");
-  if(n.length<2){e.textContent="pick a name (2+ characters)";return;}
-  if(!/^[0-9]{8,12}$/.test(p)){e.textContent="PIN must be 8-12 digits";return;}
-  fetch("/api/welcome",{method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({name:n,pin:p})})
-    .then(r=>r.json())
-    .then(d=>{if(d.ok)location.reload();
-              else e.textContent=d.err||"try again";})
-    .catch(()=>{e.textContent="network error — try again";});
-}
-</script></body></html>"""
-
-
 class StudioHandler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.0"  # lets us stream then close, no chunking
 
@@ -13147,33 +12823,19 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             pass
         return False
 
-    # ADMIN endpoints act on the HOST MACHINE — trigger downloads, run the
-    # updater, open Finder, speak through the Mac's speakers. Remote
-    # visitors (even with the key) get a flat 403 on all of them; they are
-    # guests in the chat, not operators of the computer.
-    ADMIN_PATHS = ("/api/open-logs", "/api/setup/install",
-                   "/api/model/download", "/api/model/remove",
-                   "/api/image/install", "/api/image/remove",
-                   "/api/studio/install", "/api/studio/remove",
-                   "/api/studio/opts",
-                   "/api/export/reveal",
-                   "/api/model/cleanup", "/api/model/update",
-                   "/api/update/install", "/api/update/download",
-                   "/api/speak", "/api/voice/prepare",
-                   "/api/remote/config", "/api/remote/test",
-                   "/api/remote/approve")
-
     # the three content types a cross-site HTML form can post. Nothing
     # here speaks them, so their presence on a write IS the forgery.
     FORM_CT = ("application/x-www-form-urlencoded", "multipart/form-data",
                "text/plain")
 
     def _csrf_ok(self) -> bool:
-        """Cross-site write protection (6b257). THE OWNER HAS NO COOKIE
-        — they are authenticated by the mere absence of proxy headers —
-        so SameSite protects them from nothing: any page in any browser
-        could POST to 127.0.0.1 and erase a chat history or delete
-        multi-GB weights. Two doors, both closed on writes only:
+        """Cross-site write protection (6b257). The owner's window holds
+        the launch-key cookie, which _gate checks first (6b310); this is
+        the wall behind it. A browser counts every port of 127.0.0.1 as
+        one site, so SameSite alone would let a page on another local
+        port POST here with the cookie riding along and erase a chat
+        history or delete multi-GB weights. Two doors, both closed on
+        writes only:
 
           * ORIGIN, when the browser sends one, must be this same
             server. Browsers attach Origin to every cross-site POST
@@ -13184,8 +12846,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
 
         Native callers — curl, urllib, the gauntlet — send no Origin
         and a JSON content type, so they sail through.
-        Local requests must also arrive addressed to localhost, which
-        is what closes DNS rebinding."""
+        Every write must also arrive addressed to localhost, which is
+        what closes DNS rebinding (_gate checks the same, first)."""
         ct = (self.headers.get("Content-Type") or "").split(";")[0]
         if ct.strip().lower() in self.FORM_CT:
             return False
@@ -13198,12 +12860,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 return False
             if not self._same_host(oh, host):
                 return False
-        if not self._remote():
-            # a local request addressed to anything but this machine is
-            # a rebinding attempt, not the app
-            hn = host.rsplit(":", 1)[0] if ":" in host else host
-            if host and hn not in ("127.0.0.1", "localhost", "[::1]"):
-                return False
+        # a request addressed to anything but this machine is a
+        # rebinding attempt, not the app (unconditional since the web
+        # version went, 6b320: there is no other kind of caller)
+        hn = host.rsplit(":", 1)[0] if ":" in host else host
+        if host and hn not in ("127.0.0.1", "localhost", "[::1]"):
+            return False
         return True
 
     @staticmethod
@@ -13245,53 +12907,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             pass
         return False
 
-    def _admin_gate(self) -> bool:
-        """True = allowed. Answers the request itself when blocked."""
-        if not self._remote():
-            return True
-        if not any(self.path.startswith(p) for p in self.ADMIN_PATHS):
-            return True
-        return self._refuse(403, "owner only")
-
-    # ------------------------------------------------------------ identity
-    def _remote(self) -> bool:
-        """True for requests arriving through the tunnel/proxy. The native
-        app and local browsers talk straight to this server and never
-        carry these headers."""
-        return bool(self.headers.get("Cf-Connecting-Ip")
-                    or self.headers.get("X-Forwarded-For"))
-
-    def _uid(self):
-        m = re.search(r"millen_user=([0-9a-f]{20})",
-                      self.headers.get("Cookie", "") or "")
-        return m.group(1) if m else None
-
     def _data_base(self):
-        """Directory whose chats/memory/prefs this request may touch.
-        None = the legacy files (the machine owner's, desktop app only).
-        A remote request NEVER gets None: signed-in visitors get their own
-        dir, and a cookieless remote fetch gets a throwaway shared pen —
-        the owner's data is unreachable through the tunnel, full stop."""
-        uid = self._uid()
-        if uid:
-            if uid == owner_uid():
-                return None          # the owner's cookie opens the legacy files
-            d = os.path.join(app_dir(), "users", uid)
-            os.makedirs(d, exist_ok=True)
-            return d
-        if self._remote():
-            d = os.path.join(app_dir(), "users", "_anon")
-            os.makedirs(d, exist_ok=True)
-            return d
+        """The data root for this request. None = app_dir()'s own files,
+        the only tenancy there is: the web version's users/<uid> and
+        _anon folders went with it (6b320), so nothing a request carries
+        (a proxy header, a forged cookie) can pick another folder. Kept,
+        with its call sites, as the seam the profiles replace."""
         return None
-
-    def _set_user_cookie(self, uid: str, location="/"):
-        self.send_response(302)
-        self.send_header("Set-Cookie",
-                         "millen_user=%s; Path=/; Max-Age=15552000; "
-                         "HttpOnly; SameSite=Lax" % uid)
-        self.send_header("Location", location)
-        self.end_headers()
 
     # ------------------------------------------------------------------ GET
     def do_GET(self):
@@ -13299,22 +12921,6 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             return
         if self.path == "/" or self.path.startswith("/?"):
             # ("/?key=..." legacy links included — the key is simply ignored)
-            # tunnel visitors must have an identity before the app loads —
-            # this is what keeps the owner's chats out of everyone's hands
-            if self._remote() and not self._uid():
-                body = brand(WELCOME_PAGE.replace(
-                    "__GOOGLE_DISPLAY__",
-                    "inline-block" if google_conf() else "none")
-                    .replace("__GOOGLE_FLEX__",
-                             "inline-flex" if google_conf() else "none")
-                    ).encode("utf-8")
-                self.send_response(200)
-                self.send_header("Content-Type",
-                                 "text/html; charset=utf-8")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-                return
             html = (HTML_CONTENT
                     .replace("__AGENT_ROWS__", build_agent_rows())
                     .replace("__CODE_ROWS__", build_code_rows())
@@ -13349,8 +12955,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         (str(load_prefs(self._data_base()).get(
                             "home_area") or "").split(",")[0].strip()
                          )[:32]))
-                    .replace("__JUST_UPDATED__", json.dumps(
-                        _JUST_UPDATED[0] if not self._remote() else ""))
+                    .replace("__JUST_UPDATED__", json.dumps(_JUST_UPDATED[0]))
                     .replace("__APP_VER_SPEC__", spec_version())
                     .replace("__APP_VER__", short_version()
                              + (" \u00b7 test build" if os.environ.get(
@@ -13383,98 +12988,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Security-Policy", PAGE_CSP)
             self.end_headers()
             self.wfile.write(body)
-        elif self.path == "/auth/google":
-            conf = google_conf()
-            if not conf:
-                self.send_error(404, "Google sign-in not configured")
-                return
-            state = secrets.token_hex(16)
-            now = time.time()
-            for k in [k for k, t in _oauth_states.items() if now - t > 600]:
-                _oauth_states.pop(k, None)
-            _oauth_states[state] = now
-            host = self.headers.get("Host", "")
-            params = urllib.parse.urlencode({
-                "client_id": conf["client_id"],
-                "redirect_uri": "https://%s/auth/google/callback" % host,
-                "response_type": "code",
-                "scope": "openid email",
-                "state": state,
-                "prompt": "select_account",
-            })
-            self.send_response(302)
-            self.send_header(
-                "Location",
-                "https://accounts.google.com/o/oauth2/v2/auth?" + params)
-            self.end_headers()
-        elif self.path.startswith("/auth/google/callback"):
-            conf = google_conf()
-            q = urllib.parse.parse_qs(
-                urllib.parse.urlparse(self.path).query)
-            state = (q.get("state") or [""])[0]
-            code = (q.get("code") or [""])[0]
-            if not (conf and code and _oauth_states.pop(state, None)):
-                self.send_error(403, "sign-in state mismatch — try again")
-                return
-            host = self.headers.get("Host", "")
-            try:
-                # the id_token comes straight from Google over TLS in this
-                # server-to-server exchange, so decoding its payload
-                # without signature verification is sound here
-                body = urllib.parse.urlencode({
-                    "code": code,
-                    "client_id": conf["client_id"],
-                    "client_secret": conf["client_secret"],
-                    "redirect_uri":
-                        "https://%s/auth/google/callback" % host,
-                    "grant_type": "authorization_code",
-                }).encode()
-                with urllib.request.urlopen(urllib.request.Request(
-                        "https://oauth2.googleapis.com/token", data=body),
-                        timeout=15) as r:
-                    tok = json.load(r)
-                payload = tok["id_token"].split(".")[1]
-                payload += "=" * (-len(payload) % 4)
-                claims = json.loads(base64.urlsafe_b64decode(payload))
-                email = (claims.get("email") or "").lower()
-                if not email:
-                    raise ValueError("no email in token")
-            except Exception as exc:
-                self.send_error(502, ("Google sign-in failed: %s"
-                                      % str(exc)[:80]))
-                return
-            _g_uid = _user_id("google", email)
-            _write_ident(_g_uid, "google", email=email)
-            self._set_user_cookie(_g_uid)
         elif self.path.startswith("/api/workspace"):
             # WORKSPACE: point MillenAI at a folder and ask about the
-            # code in it. Owner-at-the-machine ONLY, and READ-ONLY —
-            # a remote visitor must never be able to read the host's
-            # disk, and nothing here writes or executes anything.
-            if self._remote():
-                self._send_json({"ok": False, "err": "owner only"})
-                return
-            q = urllib.parse.parse_qs(
-                urllib.parse.urlparse(self.path).query)
-            if self.path.startswith("/api/workspace/set"):
-                # Explorer's "Copy as path" wraps it in quotes (6b317)
-                root = os.path.expanduser(
-                    (q.get("root", [""])[0]).strip().strip('"'))
-                if not root or not os.path.isdir(root):
-                    self._send_json({"ok": False,
-                                     "err": "that folder doesn't exist"})
-                    return
-                p = load_prefs(None)
-                p["workspace"] = os.path.realpath(root)
-                store_prefs(p)
-                self._send_json({"ok": True, "root": p["workspace"],
-                                 "files": len(_ws_files(p["workspace"]))})
-                return
-            if self.path.startswith("/api/workspace/off"):
-                p = load_prefs(None)
-                p.pop("workspace", None)
-                store_prefs(p)
-                self._send_json({"ok": True})
+            # code in it. READ-ONLY: nothing here writes or executes
+            # anything
+            if (self.path.startswith("/api/workspace/set")
+                    or self.path.startswith("/api/workspace/off")):
+                # choosing or dropping the folder writes prefs, so it is a
+                # POST (6b320); a GET here changes nothing
+                self.send_error(405, "use POST")
                 return
             root = (load_prefs(None).get("workspace") or "")
             self._send_json({"ok": bool(root), "root": root,
@@ -13536,20 +13058,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         elif self.path.startswith("/api/remote/classify"):
             # read-only introspection of the safety classifier (6b249):
             # the UI uses it to preview a command's risk, and the gauntlet
-            # to guard the classifier over the wire. Owner-only, no side
-            # effects — it never touches the server.
-            if self._remote():
-                self._send_json({"err": "owner only"})
-                return
+            # to guard the classifier over the wire. No side effects — it
+            # never touches the server.
             q = urllib.parse.urlparse(self.path).query
             cmd = urllib.parse.parse_qs(q).get("cmd", [""])[0]
             self._send_json({"risk": classify_cmd(cmd)})
         elif self.path == "/api/remote/config":
-            # the SSH connection is OWNER-ONLY and never leaves the host —
-            # a tunnel visitor has no business driving the owner's server
-            if self._remote():
-                self._send_json({"err": "owner only"})
-                return
+            # the SSH connection never leaves the host
             c = remote_conf()
             self._send_json({"host": c.get("host", ""),
                              "user": c.get("user", ""),
@@ -13557,9 +13072,6 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                              "key": c.get("key", ""),
                              "configured": bool(c.get("host"))})
         elif self.path == "/api/cloud":
-            if self._remote():
-                self._send_json({"err": "owner only"})
-                return
             c = cloud_conf()
             d = _cloud_all()
             _now = time.time()
@@ -13586,8 +13098,6 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                              "turbo": bool(load_prefs(None).get("turbo")),
                              "bench": [lbl for lbl, _c in cloud_bench()],
                              "providers": provs})
-        elif self.path == "/api/downloads":
-            self._send_json(download_links())
         elif self.path == "/api/stats":
             self._send_stats()
         elif self.path == "/api/engines":
@@ -13743,40 +13253,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         elif self.path == "/api/memory":
             self._send_json({"facts": _load_memory(self._data_base())})
         elif self.path == "/api/me":
-            # WHO AM I (6b257, the Account pane): the signed-in kind
-            # plus the display facts stored at mint time (.ident) —
-            # the uid itself is a one-way hash and tells nothing.
-            uid = self._uid()
-            if (uid and uid == owner_uid()) \
-                    or (not uid and not self._remote()):
-                self._send_json({"kind": "owner",
-                                 "pin_required": owner_uid() is not None})
-            elif not uid:
-                self._send_json({"kind": "guest", "expires_in": 0})
-            else:
-                d = os.path.join(app_dir(), "users", uid)
-                g = os.path.join(d, ".guest")
-                if os.path.exists(g):
-                    left = max(0, int(86400 - (time.time()
-                                               - os.path.getmtime(g))))
-                    self._send_json({"kind": "guest",
-                                     "expires_in": left})
-                else:
-                    try:
-                        with open(os.path.join(d, ".ident"),
-                                  encoding="utf-8") as f:
-                            ident = json.load(f)
-                    except Exception:
-                        # pre-6b257 profiles have no marker; google and
-                        # pin were always indistinguishable, so nothing
-                        # is lost by saying "profile"
-                        ident = {}
-                    out = {"kind": ident.get("kind", "pin")}
-                    if ident.get("email"):
-                        out["email"] = ident["email"]
-                    if ident.get("name"):
-                        out["name"] = ident["name"]
-                    self._send_json(out)
+            # WHO AM I (6b257, the Account pane). One kind since the web
+            # version's visitor, PIN and Google profiles went (6b320): this
+            # computer's owner. The shape stays for the signed-in account.
+            self._send_json({"kind": "owner"})
         elif self.path == "/api/voice/status":
             with _setup_lock:
                 job = dict(_setup_jobs.get(VOICE_ROW, {}))
@@ -13930,17 +13410,6 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _send_stats(self):
-        # who's around: every profile ever created, and identities seen in
-        # the last 5 minutes (the owner's desktop counts via this very poll)
-        now = time.time()
-        uid = self._uid()
-        _last_seen[uid or "owner"] = now
-        try:
-            total = 1 + len([d for d in os.listdir(
-                os.path.join(app_dir(), "users")) if d != "_anon"])
-        except Exception:
-            total = 1
-        online = sum(1 for t in _last_seen.values() if now - t < 300)
         gpu = gpu_utilization()
         if HAS_PSUTIL:
             vm = psutil.virtual_memory()
@@ -13951,12 +13420,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 "mem_pct": vm.percent,
                 "mem_pressure": mem_pressure(),
                 "gpu_pct": gpu,  # None when ioreg has no accelerator stats
-                "users_online": online, "users_total": total,
             }
         else:
             stats = {"real": False, "gpu_pct": gpu,
-                     "mem_pressure": mem_pressure(),
-                     "users_online": online, "users_total": total}
+                     "mem_pressure": mem_pressure()}
         body = json.dumps(stats).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -13971,12 +13438,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         if not self._csrf_ok():
             self._refuse(403, "cross-site")
             return
-        if not self._admin_gate():
-            return
         if self.path == "/api/window/focus":
-            # a second launch asks this copy to come forward (6b310);
-            # browser mode reopens the tab WITH the key, so a browser
-            # that dropped its session cookie gets back in
+            # a second launch asks this copy to come forward (6b310). It
+            # only ever brings the window forward (6b320): reopening
+            # /?key= in the default browser put the key in its history
+            # and the cookie on every 127.0.0.1 port
             try:
                 self.rfile.read(int(self.headers.get("Content-Length", 0)
                                     or 0))
@@ -13995,52 +13461,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         from PyObjCTools import AppHelper
                         AppHelper.callAfter(
                             lambda: NSApp.activateIgnoringOtherApps_(True))
-                elif not NOWINDOW:
-                    webbrowser.open("http://127.0.0.1:%d/?key=%s" % (
-                        PORT, urllib.parse.quote(ACCESS_KEY)))
             except Exception:
                 pass
             self._send_json({"ok": True})
             return
-        if self.path == "/api/welcome":
-            n = int(self.headers.get("Content-Length", 0))
-            try:
-                d = json.loads(self.rfile.read(n))
-                name = str(d.get("name", "")).strip()
-                pin = str(d.get("pin", "")).strip()
-            except (ValueError, json.JSONDecodeError):
-                name = pin = ""
-            if len(name) < 2 or not re.fullmatch(r"\d{8,12}", pin):
-                self._send_json({"ok": False,
-                                 "err": "name (2+) and an 8-12 digit PIN"})
-                return
-            # the owner PIN (any name) opens the owner's real data; every
-            # other combination gets its own private profile as before
-            own = owner_uid()
-            if own and _user_id("owner", pin) == own:
-                uid = own
-            else:
-                uid = _user_id("pin", name.lower() + ":" + pin)
-                _write_ident(uid, "pin", name=name)
-            body = json.dumps({"ok": True}).encode()
-            self.send_response(200)
-            self.send_header("Set-Cookie",
-                             "millen_user=%s; Path=/; Max-Age=15552000; "
-                             "HttpOnly; SameSite=Lax" % uid)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-            return
         if self.path == "/api/cloud/set":
             # KEY SETUP IN-APP, per Patrick ("no extra user effort"):
             # the owner pastes a key into their own running app; it is
-            # written 0600 next to the other config and never echoed
-            # back. Owner-at-the-machine only — a remote visitor must
-            # never be able to point the host at their endpoint.
-            if self._remote():
-                self._send_json({"ok": False, "err": "owner only"})
-                return
+            # written 0600 next to the other config and never echoed back.
             n2 = int(self.headers.get("Content-Length", 0) or 0)
             try:
                 d = json.loads(self.rfile.read(n2)) if n2 else {}
@@ -14280,34 +13708,37 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                "as soon as it answers." % which.title())
             self._send_json(_ok)
             return
-        if self.path == "/api/guest":
-            # one tap, zero questions: a TEMPORARY pass — the cookie lives
-            # 24 hours, the profile is marked and swept after a week of
-            # silence. Google sign-in remains the way to keep chats.
-            uid = _user_id("guest", secrets.token_hex(12))
+        if self.path in ("/api/workspace/set", "/api/workspace/off"):
+            # the Workspace folder is a pref, so choosing or dropping it
+            # is a POST (6b320; it was a GET, and a GET must change
+            # nothing). The folder is only ever READ.
+            n = int(self.headers.get("Content-Length", 0) or 0)
             try:
-                d = os.path.join(app_dir(), "users", uid)
-                os.makedirs(d, exist_ok=True)
-                open(os.path.join(d, ".guest"), "w").close()
-            except Exception:
-                pass
-            body = json.dumps({"ok": True}).encode()
-            self.send_response(200)
-            self.send_header("Set-Cookie",
-                             "millen_user=%s; Path=/; Max-Age=86400; "
-                             "HttpOnly; SameSite=Lax" % uid)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+                d = json.loads(self.rfile.read(n)) if n else {}
+            except (ValueError, json.JSONDecodeError):
+                d = {}
+            if not isinstance(d, dict):
+                d = {}
+            p = load_prefs(None)
+            if self.path == "/api/workspace/off":
+                p.pop("workspace", None)
+                store_prefs(p)
+                self._send_json({"ok": True})
+                return
+            # Explorer's "Copy as path" wraps it in quotes (6b317)
+            root = os.path.expanduser(
+                str(d.get("root") or "").strip().strip('"'))
+            if not root or not os.path.isdir(root):
+                self._send_json({"ok": False,
+                                 "err": "that folder doesn't exist"})
+                return
+            p["workspace"] = os.path.realpath(root)
+            store_prefs(p)
+            self._send_json({"ok": True, "root": p["workspace"],
+                             "files": len(_ws_files(p["workspace"]))})
             return
         if self.path.startswith("/api/remote/"):
-            # SSH connection + the live approval channel (6b249). All
-            # owner-only: never let a tunnel guest touch the server or
-            # approve a command running on it.
-            if self._remote():
-                self._send_json({"ok": False, "err": "owner only"})
-                return
+            # SSH connection + the live approval channel (6b249)
             n = int(self.headers.get("Content-Length", 0) or 0)
             try:
                 d = json.loads(self.rfile.read(n)) if n else {}
@@ -14392,13 +13823,6 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._send_json({"ok": ok})
             return
         if self.path == "/api/funnel":
-            # funnels spend the OWNER's keys on every stage (6b308): a
-            # tunnel guest gets the answer engine, not a key meter
-            _fu = self._uid()
-            if self._remote() and not (_fu and _fu == owner_uid()):
-                self._send_json({"err": "Funnels run on the owner's "
-                                        "machine only."})
-                return
             n = int(self.headers.get("Content-Length", 0) or 0)
             try:
                 d = json.loads(self.rfile.read(n)) if n else {}
@@ -14623,8 +14047,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             return
         if self.path == "/api/chat/hurry":
             # ANSWER NOW (6b257): flips the per-request Event minted in
-            # /api/chat. NOT admin-gated — a tunnel guest may hurry its
-            # OWN run; the unguessable id is the whole authorization,
+            # /api/chat. The unguessable id is the whole authorization,
             # exactly like the Remote agent's APPROVE jid.
             n = int(self.headers.get("Content-Length", 0) or 0)
             try:
@@ -14663,26 +14086,18 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._send_json({"ok": True})
             return
         if self.path == "/api/logout":
-            # signs the browser out (6b257, Account pane): the cookie
-            # dies and the next load lands on the welcome door. The
-            # desktop owner has no cookie — the client hides the button.
-            body = json.dumps({"ok": True}).encode()
-            self.send_response(200)
-            self.send_header("Set-Cookie",
-                             "millen_user=; Path=/; Max-Age=0; "
-                             "HttpOnly; SameSite=Lax")
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            # a stub until the desktop sign-out (6b320). It signed a
+            # browser out of the web version; now it touches no cookie,
+            # and never the launch key's.
+            self._send_json({"ok": True})
             return
         if self.path == "/api/forget":
             # FORGET ME, scoped (6b257, per Patrick: the droplet-destroy
-            # treatment). The client asks WHAT dies, re-auths, then
-            # demands FORGET ME typed in caps; this end only verifies
-            # and deletes. Owner data needs the PIN when owner access
-            # is configured; a walled web profile is its own
-            # authorization — the cookie IS the identity.
+            # treatment). The client asks WHAT dies, then demands FORGET
+            # ME typed in caps; this end only deletes. The owner PIN and
+            # the web profiles' whole-folder erase went with the web
+            # version (6b320): each store is emptied in place and no
+            # folder is ever removed.
             n = int(self.headers.get("Content-Length", 0) or 0)
             try:
                 d = json.loads(self.rfile.read(n)) if n else {}
@@ -14692,12 +14107,6 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 d = {}          # valid JSON is not always an object
             scopes = set(d.get("scopes") or ["memory"])
             base = self._data_base()
-            if base is None:
-                own = owner_uid()
-                pin = str(d.get("pin", "")).strip()
-                if own and _user_id("owner", pin) != own:
-                    self._send_json({"ok": False, "err": "pin"})
-                    return
             if "memory" in scopes:
                 with _memory_lock:
                     _save_memory([], base)
@@ -14705,27 +14114,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 with _chats_lock:
                     store_chats([], base)
             if "prefs" in scopes:
-                if base is None:
-                    # personal keys only — machine config (turbo,
-                    # update channel) is not "about the user" and must
-                    # survive
-                    p = load_prefs(None)
-                    for k in ("persona", "length", "user_name"):
-                        p.pop(k, None)
-                    store_prefs(p, None)
-                else:
-                    store_prefs({}, base)
-            # ERASE MEANS ERASE: a walled profile's .ident marker holds
-            # the very PII the pane promises to forget (the Google
-            # email, the profile name), so a full three-scope forget
-            # takes the whole directory with it — otherwise /api/me
-            # still greets you by name after "Erase forever" (6b257).
-            if base is not None and {"memory", "chats",
-                                     "prefs"} <= scopes:
-                try:
-                    shutil.rmtree(base, ignore_errors=True)
-                except Exception:
-                    pass
+                # personal keys only — machine config (turbo, update
+                # channel) is not "about the user" and must survive
+                p = load_prefs(base)
+                for k in ("persona", "length", "user_name"):
+                    p.pop(k, None)
+                store_prefs(p, base)
             self._send_json({"ok": True})
             return
         if self.path == "/api/voice/prepare":
@@ -15678,9 +15072,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             messages[-1]["content"] += "\n\n" + THINK_HINT
         # WORKSPACE: the chosen agent reads the user's own folder — the
         # files ride under the question so they can't be mistaken for
-        # instructions, and only ever for the owner at the machine
+        # instructions
         if (agent_name and AGENTS.get(agent_name, {}).get("workspace")
-                and not self._remote() and messages):
+                and messages):
             wsx = workspace_context(prompt)
             if wsx:
                 messages[-1] = dict(messages[-1])
@@ -15911,18 +15305,6 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             hb_stop.set()
             return
 
-        # A TUNNEL GUEST RENDERS NOTHING PAID (6b309): a cloud clip is
-        # about $0.80 on the owner's key, and a local one holds the only
-        # render slot for up to an hour. Pictures still come from this
-        # Mac's own engine or the free community service.
-        _gu = self._uid()
-        _guest = self._remote() and not (_gu and _gu == owner_uid())
-        if vid_subject and _guest:
-            step("video", "Video is owner-only", "done", "")
-            emit("Video is made on the owner\u2019s machine only \u2014 "
-                 "it isn\u2019t available over the web.")
-            hb_stop.set()
-            return
         if vid_subject:
             where = "on this Mac" if video_ready() else "in the cloud"
             step("video", "Making the video", "run", where)
@@ -15981,7 +15363,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # Pollinations gone, no local model and no Gemini key means
             # nothing is sent anywhere, and the label mustn't say it was
             _gem = (_cloud_all().get("providers") or {}).get("gemini") or {}
-            _cloud_img = (not _guest and bool(_gem.get("key"))
+            _cloud_img = (bool(_gem.get("key"))
                           and _gem.get("status", "ok") == "ok")
             where = ("on this Mac" if image_ready() else
                      "in the cloud" if _cloud_img else "")
@@ -15991,8 +15373,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             try:
                 _use, _cnotes = resolve_overrides("image", _ovr, _pnote)
                 path, src = generate_image(img_subject, _use,
-                                           sock=self.connection,
-                                           paid=not _guest)
+                                           sock=self.connection)
                 made = "made on this Mac" if src == "local" \
                     else "made in the cloud"
                 step("image", "Generated the image", "done", made)
@@ -16010,11 +15391,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             except Exception as exc:
                 step("image", "Couldn\u2019t generate the image", "done",
                      str(exc)[:70])
-                if _guest:
-                    # install and key advice is for the owner only
-                    emit("The picture service couldn\u2019t paint this one "
-                         "just now \u2014 try again in a moment.")
-                elif image_ready():
+                if image_ready():
                     emit("The painter on this Mac hit a snag%s \u2014 try "
                          "once more in a moment. (%s)"
                          % (" and the cloud couldn\u2019t step in"
@@ -16097,7 +15474,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         if images and (cloud_only or load_prefs(None).get("turbo")
                        or req_cloud):
             _vis_cloud = vision_ladder("Cloud Only" if cloud_only
-                                       else req_tier, guest=self._remote())
+                                       else req_tier)
             if req_cloud is not None:
                 _vis_cloud = [c for c in _vis_cloud
                               if _provider_of(c) in req_cloud]
@@ -16161,11 +15538,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # SSH. await_approval blocks on the approval channel —
                 # the client answers with POST /api/remote/approve.
                 rconf = remote_conf()
-                if self._remote():
-                    # a tunnel guest must never drive the OWNER's server
-                    emit("The Remote agent runs on the owner's machine "
-                         "only — it isn't available over the web.")
-                elif not rconf.get("host"):
+                if not rconf.get("host"):
                     emit("Set up a server connection first — the ⚙️ next "
                          "to the Remote agent takes host, user and your "
                          "SSH key.")
@@ -16203,7 +15576,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             reflect=(tier == "Thinking"),
                             peer=(tier == "Pro"),
                             bench_allow=req_cloud, comp=req_comp,
-                            hurry=hurry_ev, guest=self._remote())
+                            hurry=hurry_ev)
             else:
                 lbl = route_label or model_name
                 # cloud is a pref, not a tier (Best retired in 5.3).
@@ -16216,17 +15589,17 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # the opt-in; an empty list means none at all.
                 # THE LANE PICKS THE ROLE (6b308): the Code tab answers on
                 # Sonnet 5 at medium, writing/resumes/exports on Opus 5.5
-                # at medium, everything else on the quick ladder (Haiku
-                # first; free providers first for a tunnel guest)
+                # at medium, everything else on the quick ladder, Haiku
+                # first
                 _lane = LANE_ROLE.get(agent_name, "")
                 if images:
                     _fl = []       # pictures went to the vision ladder
                 elif _lane == "code":
-                    _fl = work_ladder("code", guest=self._remote())
+                    _fl = work_ladder("code")
                 elif export_req or _lane == "work":
-                    _fl = work_ladder("work", guest=self._remote())
+                    _fl = work_ladder("work")
                 else:
-                    _fl = fast_cloud_ladder(guest=self._remote())
+                    _fl = fast_cloud_ladder()
                 if req_cloud is not None:
                     _fl = [c for c in _fl
                            if _provider_of(c) in req_cloud]
@@ -16507,8 +15880,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
 
 # Where the app goes when 8889 is taken: far from the engines, whose
 # catalog ports climb by two from 8884 (8944 today, and the next row
-# takes the next even port), from 9889 and from ConcordeGo's 9897. The
-# gauntlet fails if a catalog or retired port ever lands in here.
+# takes the next even port), from ConcordeGo's 9897, from the dev and
+# gauntlet ports (9894, 9895, 9901-9903) and from 9889, the retired web
+# copy's. The gauntlet fails if a catalog or retired port ever lands in
+# here.
 FALLBACK_PORTS = tuple(range(18890, 18899))
 
 
@@ -16700,8 +16075,10 @@ def _fit_window(w, h, min_w, min_h):
 def _webview2_missing() -> bool:
     """Windows without Microsoft's WebView2 Runtime (6b317, from the
     sweep): pywebview fell back to Internet Explorer, which can't run the
-    page, and the window sat dead. Say so and use the browser instead."""
-    if not IS_WIN:
+    page, and the window sat dead. A detector only since 6b320: the
+    message is _window_blocker's. The native ARM64 build draws with Qt
+    and never needs WebView2."""
+    if not IS_WIN or (IS_WIN_ARM and not IS_WIN_EMULATED):
         return False
     try:
         import winreg
@@ -16723,16 +16100,24 @@ def _webview2_missing() -> bool:
                 continue
     except Exception:
         return False          # can't tell: let pywebview try
-    try:
-        import ctypes
-        ctypes.windll.user32.MessageBoxW(
-            None, "%s needs Microsoft's WebView2 Runtime to draw its "
-            "window, and this PC doesn't have it. It's free: search for "
-            "\"WebView2 Runtime\" at microsoft.com.\n\nFor now %s opens "
-            "in your web browser." % (APP_NAME, APP_NAME), APP_NAME, 0x40)
-    except Exception:
-        pass
     return True
+
+
+def _window_blocker() -> str:
+    """Why this launch can't draw its window, or "" (6b320). The browser
+    fallback is gone: a tab of /?key= kept the key in the browser's
+    history and sent the cookie to every 127.0.0.1 port it visited, so a
+    launch that can't open the app's own window says what it needs and
+    stops."""
+    if not HAS_WEBVIEW:
+        return ("%s needs its app window. Install pywebview (the installer "
+                "does this) and start it again." % APP_NAME)
+    if _webview2_missing():
+        return ("%s needs Microsoft's WebView2 Runtime to draw its window, "
+                "and this PC doesn't have it. It's free: search for "
+                "\"WebView2 Runtime\" at microsoft.com, install it, and "
+                "start %s again." % (APP_NAME, APP_NAME))
+    return ""
 
 
 def start_backend(server=None):
@@ -16749,10 +16134,7 @@ HTML_CONTENT = r"""<!DOCTYPE html>
    and the whole page is clipped to nothing, so tagging the root BEFORE the
    first paint is what stops a flash of the normal UI. Performance mode
    opts out here too — rainbowWipe() would skip its half later anyway. */
-if("__WIN_WIPE__"==="1"&&
-   (location.hostname==="127.0.0.1"||location.hostname==="localhost")){
-  // hostname check: remote/tunnel visitors share this server but sit in a
-  // real browser, where a transparent page is a white flash, not a desktop
+if("__WIN_WIPE__"==="1"){
   try{
     document.documentElement.classList.add("winwipe");
   }catch(e){}
@@ -16893,27 +16275,6 @@ body.resizing{cursor:col-resize;user-select:none}
 }
 #models-flag:hover{text-decoration:underline}
 #models-flag[hidden]{display:none}
-/* web visitors only: a quiet outline chip pointing at the real app */
-/* INVERTED: a solid white pill — the one thing on the page that reads
-   like a real call to action */
-#get-app{
-  font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;
-  color:#111;background:#f2f2f2;text-decoration:none;
-  border:none;border-radius:8px;
-  padding:7px 10px;font-weight:700;box-sizing:border-box;width:100%;
-  display:flex;align-items:center;gap:6px;margin-top:6px;
-  box-shadow:0 6px 20px -10px rgba(255,255,255,.55);
-  transition:background .18s,transform .18s,box-shadow .25s;
-}
-#get-app:hover{background:#fff;transform:translateY(-1px);
-  box-shadow:0 10px 26px -10px rgba(255,255,255,.8)}
-#get-app[hidden]{display:none}
-#get-app i{
-  font-style:normal;width:13px;height:13px;flex:none;cursor:help;
-  border:1px solid rgba(0,0,0,.42);border-radius:50%;
-  font-size:9px;line-height:11px;text-align:center;
-  font-family:var(--helv);margin-left:auto;color:#111;
-}
 #update-flag:hover{text-decoration:underline}
 #update-flag[hidden]{display:none}
 /* centred, not baseline-aligned: the version pill is a bordered box, so
@@ -18498,23 +17859,6 @@ body.gen #chip-model{color:var(--accent)}
   border-color:var(--line)}
 .mu-foot .ghost:hover{color:var(--text);border-color:rgba(255,255,255,.25)}
 .mu-foot button:disabled{opacity:.5;cursor:default}
-#dlhelp-veil{position:fixed;inset:0;z-index:61;display:flex;
-  align-items:center;justify-content:center;background:rgba(6,7,10,.72);
-  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
-#dlhelp-veil[hidden]{display:none}
-#dlhelp-card{max-width:430px;margin:24px;padding:26px 26px 20px;
-  background:var(--panel);border:1px solid var(--line);
-  border-radius:var(--radius);text-align:center;
-  animation:doorPop .5s cubic-bezier(.16,1,.3,1) both}
-#dlhelp-card .sh-icon{font-size:30px;margin-bottom:4px}
-#dlhelp-card h2{margin:0 0 10px;font-size:20px}
-#dlhelp-card p{color:var(--dim);font-size:13.5px;line-height:1.75;
-  margin:0;text-align:left}
-#dlhelp-card b{color:var(--text)}
-#dlhelp-card .sh-foot{display:flex;gap:10px;margin-top:20px}
-#dlhelp-card button{flex:1;padding:11px 14px;border-radius:10px;
-  border:none;background:var(--accent);color:#1a1a1a;font-weight:700;
-  font-size:13.5px;cursor:pointer}
 @keyframes doorPop{from{opacity:0;transform:translateY(18px) scale(.97)}
                    to{opacity:1;transform:none}}
 #new-veil,#update-veil,#about-veil{
@@ -18629,14 +17973,14 @@ body.gen #chip-model{color:var(--accent)}
   text-transform:uppercase;color:var(--faint);text-align:left;
   margin:16px 0 6px;
 }
-#persona,#user-name,#forget-pin,#forget-word{
+#persona,#user-name,#forget-word{
   width:100%;resize:none;padding:10px 12px;
   font:13.5px/1.55 var(--helv);color:var(--text);
   background:var(--panel);border:1px solid var(--line);border-radius:10px;
   outline:none;
 }
-#persona:focus,#user-name:focus,#forget-pin:focus,#forget-word:focus{border-color:var(--dim)}
-#persona::placeholder,#user-name::placeholder,#forget-pin::placeholder,#forget-word::placeholder{color:var(--faint)}
+#persona:focus,#user-name:focus,#forget-word:focus{border-color:var(--dim)}
+#persona::placeholder,#user-name::placeholder,#forget-word::placeholder{color:var(--faint)}
 #user-name{margin-bottom:8px}
 /* SETTINGS ROUND 2 (6b257, per Patrick). One quiet line under every
    pane title, in one voice. */
@@ -19564,8 +18908,6 @@ body.gen #chip-model{color:var(--accent)}
          past the sidebar and squeezed the wordmark to nothing. -->
     <div id="models-flag" hidden
          title="More models fit this machine">MODELS AVAILABLE</div>
-    <a id="get-app" hidden target="_blank" rel="noopener">DOWNLOAD NOW<i
-      title="The desktop version runs on your own computer — faster, private, and it works offline.">i</i></a>
   </div>
 
 
@@ -19887,15 +19229,13 @@ __CODE_ROWS__
          identity reads as part of the front matter, not a footnote. -->
     <section class="spane" id="p-account">
       <div class="set-h">Account</div>
-      <p class="tdesc">Who you're signed in as, on this Mac and anywhere
-      else you use MillenAI &mdash; and the exits: sign out, or erase
-      what it knows about you.</p>
+      <p class="tdesc">Who you are on this Mac, and the exit: erase what
+      MillenAI knows about you.</p>
       <div id="acct-card">
         <div id="acct-av">&#128187;</div>
         <div><b id="acct-kind">&mdash;</b>
         <span id="acct-sub"></span></div>
       </div>
-      <button class="about-btn slim" id="acct-logout" hidden>Sign out</button>
       <button class="about-btn danger" id="about-forget">Forget me&hellip;</button>
       <div id="forget-steps" hidden>
         <div id="forget-what">
@@ -19906,9 +19246,6 @@ __CODE_ROWS__
           <label class="fscope"><input type="checkbox" id="fs-prefs">
             <span>Personal settings</span></label>
         </div>
-        <input id="forget-pin" type="password" inputmode="numeric"
-               maxlength="12" placeholder="owner PIN to confirm" hidden
-               autocomplete="off">
         <input id="forget-word" placeholder="type FORGET ME to confirm"
                autocomplete="off" spellcheck="false" autocapitalize="characters">
         <div id="forget-note"></div>
@@ -20042,17 +19379,6 @@ __CODE_ROWS__
   <div id="clean-card">
     <h2>Your models</h2>
     <div id="clean-models" class="mu bare"></div>
-  </div>
-</div>
-
-<div id="dlhelp-veil" hidden>
-  <div id="dlhelp-card">
-    <div class="sh-icon">&#11015;</div>
-    <h2>Downloading&hellip;</h2>
-    <p id="dlhelp-body"></p>
-    <div class="sh-foot">
-      <button id="dlhelp-ok" class="primary">Got it</button>
-    </div>
   </div>
 </div>
 
@@ -20219,10 +19545,6 @@ __CODE_ROWS__
 <script>
 "use strict";
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
-// a tunnel visitor (phone, friend's laptop) BORROWS this machine's
-// models — model management, GPU sharing and install nudges belong to
-// the owner sitting at it, never to the borrower
-const IS_LOCAL=location.hostname==="127.0.0.1"||location.hostname==="localhost";
 // a Windows PC (6b317): its commands, settings and words differ
 const IS_PC=__IS_PC__;
 // the sun is down where you are (6b318): the backdrop goes dark
@@ -20786,7 +20108,7 @@ paintAutonomy();
 // the saved host so a returning user sees their box, key path and all
 async function remoteRefresh(){
   const bar=$("#remote-bar");if(!bar)return;
-  const on=agent==="Remote"&&IS_LOCAL;
+  const on=agent==="Remote";
   bar.hidden=!on;
   if(!on)return;
   try{
@@ -21051,11 +20373,9 @@ function showApprove(host,d){
   card.querySelector(".apbtn.no").addEventListener("click",()=>decide(false));
 }
 /* THE DOWNLOAD BOX (6b295, per Patrick: "a small box with a download link
-   similar to how Claude presents downloads"). On the desktop the click
-   reveals the file in Finder — WKWebView's own download plumbing is off by
-   default and fighting it is not worth it. In a real browser over the
-   tunnel the same box is a plain anchor, where the cookie rides along and
-   the attachment disposition does the work. */
+   similar to how Claude presents downloads"). The click reveals the file
+   in Finder — WKWebView's own download plumbing is off by default and
+   fighting it is not worth it. */
 // what belongs in the answer but not in a clipboard or a spoken line
 function stripTokens(t){
   return String(t||"").replace(/\n*\[\[(?:dl|vid):\{.*?\}\]\]/g,"")
@@ -21090,7 +20410,7 @@ function dlDirect(a){
 // of the user the native way instead: reveal it in Finder.
 document.addEventListener("click",async e=>{
   const a=e.target.closest(".dlbox .dlgo");
-  if(!a||!IS_LOCAL)return;
+  if(!a)return;
   e.preventDefault();
   const box=a.closest(".dlbox"),was=box.getAttribute("data-said")||"";
   try{
@@ -23040,7 +22360,7 @@ $("#undobtn").addEventListener("click",undoDelete);
 /* ------------------------------------------------- workspace picker */
 async function wsRefresh(){
   const bar=$("#ws-bar");if(!bar)return;
-  const on=agent==="Workspace"&&IS_LOCAL;
+  const on=agent==="Workspace";
   bar.hidden=!on;
   if(!on)return;
   try{
@@ -23058,8 +22378,10 @@ $("#ws-set").addEventListener("click",async()=>{
   if(!root)return;
   $("#ws-note").textContent="checking…";
   try{
-    const st=await(await fetch("/api/workspace/set?root="
-      +encodeURIComponent(root))).json();
+    // a POST (6b320): choosing the folder writes a pref
+    const st=await(await fetch("/api/workspace/set",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({root})})).json();
     $("#ws-note").textContent=st.ok
       ?st.files+" readable files indexed"
       :(st.err||"that didn't work");
@@ -23512,16 +22834,6 @@ async function bootSkyline(){
   // every launch until 5.3.6, and the "first run" dark-set preference
   // kept re-picking the same space clips (seen live, per Patrick)
   if(firstEver&&onDisk.length>=2)firstEver=false;
-  // BORROWERS GET THE INSTANT CITY: a tunnel visitor picks from what
-  // the host already has on disk — no download ritual, no blank wall
-  // (seen live: incognito web showed a black void while a 250 MB pull
-  // crawled). The fresh-pick ceremony stays a local-only pleasure.
-  if(!IS_LOCAL){
-    try{
-      const c=(await(await fetch("/api/sky/cached")).json()).cached||[];
-      if(c.length)all=c;
-    }catch(e){}
-  }
   // PREPARED CITY (5.2, per Patrick: "shows a backdrop, but prepares
   // another for next time — no flip"): last session quietly downloaded
   // tonight's clip after its own backdrop was up. If it's still on
@@ -23552,7 +22864,6 @@ async function bootSkyline(){
   const PANTRY=5;
   const skyFailed=new Set();
   function fillPantry(){
-    if(!IS_LOCAL)return;               // visitors never grow the disk
     fetch("/api/sky/cached").then(r=>r.json()).then(c=>{
       const have=(c.cached||[]);
       const spare=have.filter(x=>x!==i);
@@ -24491,12 +23802,6 @@ setupGo.addEventListener("click",async()=>{
   setupTick();
 });
 $("#open-setup").addEventListener("click",()=>{aboutVeil.hidden=true;openSetup();});
-// the ↑ "get more models" chip rode the MODELS meter, which the memory
-// reading replaced (6b254). Settings › Download models and the
-// MODELS AVAILABLE flag both still open the same panel.
-{const mu=$("#models-up");
- if(mu){mu.addEventListener("click",openSetup);
-        if(!IS_LOCAL)mu.hidden=true;}}
 // THE PROVIDER BOARD (6b218, per Patrick): fixed rows —
 // Gemini / Groq / Claude / Kimi K3 — grey until a key is saved, green ✓
 // when its key works, red ✗ with the reason when it doesn't. The rows
@@ -24550,48 +23855,6 @@ $("#ck-save").addEventListener("click",async()=>{
     paintTierAvail();   // a new key may have just switched Cloud Only on
   }catch(e){note.textContent="network error — try again";}
 });
-if(!IS_LOCAL){const b=$("#cloudkey-box");if(b)b.hidden=true;}
-$("#dlhelp-ok").addEventListener("click",()=>{
-  $("#dlhelp-veil").hidden=true;});
-// WEB ONLY: a browser visitor is borrowing someone else's GPU — offer
-// them the real app for their own platform
-(async()=>{
-  if(location.hostname==="127.0.0.1"||location.hostname==="localhost")return;
-  try{
-    const d=await(await fetch("/api/downloads")).json();
-    const ua=navigator.userAgent||"";
-    const win=/Windows|Win64|WOW64/i.test(ua);
-    const mac=/Mac OS X|Macintosh/i.test(ua);
-    const mobile=/iPhone|iPad|Android/i.test(ua);
-    const url=win?(d.win||d.win_zip):(mac?d.mac:null);
-    if(mobile||!url)return;
-    const a=$("#get-app");
-    a.href=url;a.hidden=false;
-    a.firstChild.textContent="DOWNLOAD "+(win?"FOR WINDOWS":"FOR MAC");
-    // FIRST-OPEN HELP: MillenAI is free and unsigned by Apple/Microsoft,
-    // so the OS blocks the first launch. Say so plainly, at the moment
-    // of the download, in the words the dialogs actually use.
-    a.addEventListener("click",()=>{
-      $("#dlhelp-body").innerHTML=win
-        ? "Windows may say <b>&ldquo;Windows protected your PC&rdquo;</b>."
-          +"<br><br>1. Open the downloaded file<br>"
-          +"2. Click <b>More info</b><br>"
-          +"3. Click <b>Run anyway</b><br><br>"
-          +"That happens because MillenAI is free and independent \u2014 "
-          +"it only ever runs on your own computer."
-        : "Mac will say it <b>&ldquo;cannot be opened&rdquo;</b> or "
-          +"<b>&ldquo;Apple could not verify&rdquo;</b> the first time. "
-          +"That is normal for a free app.<br><br>"
-          +"1. Open the downloaded file and drag <b>MillenAI</b> into "
-          +"<b>Applications</b><br>"
-          +"2. Open it once \u2014 Mac will refuse<br>"
-          +"3. Go to <b>System Settings \u25b8 Privacy &amp; Security</b>, "
-          +"scroll down and click <b>Open Anyway</b><br><br>"
-          +"You only do this once.";
-      $("#dlhelp-veil").hidden=false;
-    });
-  }catch(e){}
-})();
 /* the giants box only means something while "no limits" is on: greyed
    and cleared otherwise, so a dim box never reads as a hidden "yes" */
 function paintGiants(nl,gi){
@@ -24844,11 +24107,10 @@ setTimeout(kickWipe,450);
     const st=await(await fetch("/api/setup")).json();
     // auto-open only when the app can't hold a conversation yet
     paintModelsFlag(st);
-    if(st.needs_setup&&IS_LOCAL){
+    if(st.needs_setup){
       // FIRST RUN opens the guided wizard (6b247) — once. A machine
       // that skipped or finished it falls back to the plain download
-      // panel. Remote visitors never see either: they use whatever
-      // the host has.
+      // panel.
       let done=false;
       try{done=!!(await(await fetch("/api/prefs")).json()).wizard_done;}
       catch(e){}
@@ -24969,7 +24231,6 @@ async function openAbout(){
 // opt-out. At most one card per launch, and never during first-run setup.
 const REMIND_GAP=20*60*60*1000;       // "daily", forgiving of launch times
 async function announceModels(){
-  if(!IS_LOCAL)return;
   // the post-update card owns this launch and carries the model
   // offer itself (6b306): one card per launch, as promised above
   if(__JUST_UPDATED__)return;
@@ -25085,8 +24346,7 @@ function rosRow(m,ready){
   // Ollama) used to reach no screen at all
   const going=!ready&&(m.status==="downloading"||m.status==="queued");
   const failed=!ready&&m.status==="error";
-  const act=!IS_LOCAL?""
-    :ready
+  const act=ready
       ?'<span class="rrm" data-l="'+esc(m.label)+'" data-gb="'+m.est_gb
         +'">'+(rosArmedOn("rm:"+m.label)
           ?"really remove? frees "+m.est_gb+" GB":"remove")+'</span>'
@@ -25147,7 +24407,7 @@ function paintRoster(st,cloud){
   host.innerHTML=h;
   paintMgStats();
   // the list follows any download in flight, whoever started it (6b314)
-  if(IS_LOCAL&&miss.some(m=>m.status==="downloading"||m.status==="queued"))
+  if(miss.some(m=>m.status==="downloading"||m.status==="queued"))
     rosTick();
 }
 /* THE INVENTORY (6b258, per Patrick): what is on disk and what it
@@ -25757,39 +25017,21 @@ async function paintUpdatesPane(){
 }
 
 /* ------------------------------------- the Account pane (6b257, per
-   Patrick): who you are, the exits — and FORGET ME with the droplet-
-   destroy treatment: choose what dies, prove it's you (owner PIN when
-   configured), then type the words. Three locks, no accidents. */
+   Patrick): who you are, and FORGET ME with the droplet-destroy
+   treatment: choose what dies, then type the words. No accidents. */
 let acctMe=null;
 async function paintAccount(){
   try{acctMe=await(await fetch("/api/me")).json();}catch(e){acctMe=null;}
   const me=acctMe||{kind:"owner"};
+  // one kind since the web version's visitor profiles went (6b320):
+  // this computer's own
   const K={owner:["💻","This Mac's owner",
-             "local account · everything stays on this machine"],
-           google:["G",me.email||"Google account",
-             "Google account · chats follow you between devices"],
-           guest:["⏳","Guest pass",""],
-           pin:["👤",me.name||"Profile",
-             "name + PIN profile on this hub"]};
+             "local account · everything stays on this machine"]};
   const row=K[me.kind]||K.owner;
   $("#acct-av").textContent=row[0];
   $("#acct-kind").textContent=row[1];
-  let sub=row[2];
-  if(me.kind==="guest"){
-    const h=Math.floor((me.expires_in||0)/3600);
-    const mn=Math.floor(((me.expires_in||0)%3600)/60);
-    sub=(me.expires_in?h+"h "+mn+"m remaining":"expiring")
-      +" · chats vanish when it expires";
-  }
-  $("#acct-sub").textContent=sub;
-  $("#acct-logout").hidden=(me.kind==="owner"&&IS_LOCAL);
-  $("#forget-pin").hidden=!(me.kind==="owner"&&me.pin_required);
+  $("#acct-sub").textContent=row[2];
 }
-$("#acct-logout").addEventListener("click",async()=>{
-  try{await fetch("/api/logout",{method:"POST"});}catch(e){}
-  try{localStorage.removeItem("millen.chats");}catch(e){}
-  location.reload();
-});
 function fgScopes(){
   const s=[];
   if($("#fs-mem").checked)s.push("memory");
@@ -25800,12 +25042,11 @@ function fgScopes(){
 function fgCheck(keepNote){
   const scopes=fgScopes();
   const ok=scopes.length
-    &&$("#forget-word").value.trim()==="FORGET ME"
-    &&($("#forget-pin").hidden||$("#forget-pin").value.trim());
+    &&$("#forget-word").value.trim()==="FORGET ME";
   $("#forget-go").disabled=!ok;
-  // a failure message ("that PIN doesn't match") must survive the
-  // re-validate that follows it, or the only feedback the user gets
-  // is a button that quietly re-enables (6b257)
+  // a failure message ("couldn't erase") must survive the re-validate
+  // that follows it, or the only feedback the user gets is a button
+  // that quietly re-enables (6b257)
   if(keepNote)return;
   $("#forget-note").textContent=scopes.length
     ?"erases: "+scopes.join(", ")+" — this cannot be undone"
@@ -25814,14 +25055,12 @@ function fgCheck(keepNote){
 ["#fs-mem","#fs-chats","#fs-prefs"].forEach(id=>
   $(id).addEventListener("change",fgCheck));
 $("#forget-word").addEventListener("input",fgCheck);
-$("#forget-pin").addEventListener("input",fgCheck);
 $("#forget-go").addEventListener("click",async ev=>{
   const b=ev.currentTarget;b.disabled=true;b.textContent="Erasing…";
   let r={};
   try{r=await(await fetch("/api/forget",{method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({scopes:fgScopes(),
-      pin:$("#forget-pin").value.trim()})})).json();}catch(e){}
+    body:JSON.stringify({scopes:fgScopes()})})).json();}catch(e){}
   if(r&&r.ok){
     if(fgScopes().indexOf("chats")>=0){
       chats=[];messages=[];curChat=null;
@@ -25830,15 +25069,13 @@ $("#forget-go").addEventListener("click",async ev=>{
       renderChats();inner.innerHTML="";resetHero();
     }
     b.textContent="Erased";
-    $("#forget-word").value="";$("#forget-pin").value="";
+    $("#forget-word").value="";
     setTimeout(()=>{$("#forget-steps").hidden=true;
       b.textContent="Erase forever";b.disabled=true;},1600);
   }else{
     b.textContent="Erase forever";
     fgCheck(true);                    // re-enable, keep the message
-    $("#forget-note").textContent=(r&&r.err==="pin")
-      ?"that PIN doesn't match"
-      :"couldn't erase — try again";
+    $("#forget-note").textContent="couldn't erase — try again";
   }
 });
 $("#turbo").addEventListener("change",()=>{
@@ -25957,26 +25194,21 @@ addEventListener("resize",()=>{     // a narrower window fits fewer chips
   if(b&&!b.hidden){b.hidden=true;syncSuggest();}
 });
 
-if(IS_LOCAL){                       // install nudges belong to the owner
-                                    // sitting at the machine, never to
-                                    // a tunnel visitor (who can't run
-                                    // the install — it 403s on them)
-  checkUpdate();                    // ALWAYS on launch — a stale build
+checkUpdate();                      // ALWAYS on launch — a stale build
                                     // was the root of most "X doesn't
                                     // work" reports (seen live, often)
-  // ...and hourly while running (6b257, per Patrick: an app left open
-  // must not fall behind just because nobody clicked Check for
-  // updates). A hidden window skips the poll — the pollEngines idiom —
-  // and settles up on wake if it slept through a tick, so the badge is
-  // waiting by the time anyone is looking.
-  // ...and DAILY while running (6b292, per Patrick: "on startup as well
-  // as daily"). The server answers these automatic calls with nothing
-  // when the switch in About is off; the button there always asks.
-  setInterval(()=>{if(!document.hidden)checkUpdate();},86400000);
-  document.addEventListener("visibilitychange",()=>{
-    if(!document.hidden&&Date.now()-lastUpCheck>86400000)checkUpdate();
-  });
-}
+// ...and hourly while running (6b257, per Patrick: an app left open
+// must not fall behind just because nobody clicked Check for
+// updates). A hidden window skips the poll — the pollEngines idiom —
+// and settles up on wake if it slept through a tick, so the badge is
+// waiting by the time anyone is looking.
+// ...and DAILY while running (6b292, per Patrick: "on startup as well
+// as daily"). The server answers these automatic calls with nothing
+// when the switch in About is off; the button there always asks.
+setInterval(()=>{if(!document.hidden)checkUpdate();},86400000);
+document.addEventListener("visibilitychange",()=>{
+  if(!document.hidden&&Date.now()-lastUpCheck>86400000)checkUpdate();
+});
 
 /* ------------------------------------------------------ ZITO override */
 /* Hold Z, I, T and O together. The chrome falls away and the pipeline is
@@ -26065,7 +25297,7 @@ async function zBuild(){
     +'</span><em>'+esc(a[1])+'</em></div>').join("");
   $("#z-bus").innerHTML=["models "+names.length+" catalogued",
     "loaded "+up.length,"cloud "+keys.length,"chats "+messages.length+" in ctx",
-    "profiles "+(st.users_total||1),"sync locked"]
+    "profiles 1","sync locked"]
     .map(b=>'<div class="ag"><i style="--ac:var(--zf)"></i><span>'+esc(b)
       +'</span></div>').join("");
   $("#z-busn").textContent=up.length?"nominal":"cold";
@@ -26455,23 +25687,6 @@ HTML_CONTENT = pc_words(HTML_CONTENT)
 _mlx_last_use = 0.0
 
 
-def _purge_stale_guests():
-    """Guest passes are temporary: a marked profile untouched for a week
-    is deleted wholesale. Signed-in profiles are never touched."""
-    root = os.path.join(app_dir(), "users")
-    try:
-        for uid in os.listdir(root):
-            d = os.path.join(root, uid)
-            if not os.path.exists(os.path.join(d, ".guest")):
-                continue
-            newest = max((os.path.getmtime(os.path.join(d, f))
-                          for f in os.listdir(d)), default=0)
-            if time.time() - newest > 7 * 86400:
-                shutil.rmtree(d, ignore_errors=True)
-    except Exception:
-        pass
-
-
 def _sweep_hf_carcasses(max_age: float = 1800.0) -> int:
     """Delete abandoned partial downloads (6b304). huggingface_hub names
     each attempt <blob>.<uuid8>.incomplete and never resumes one, so an
@@ -26688,7 +25903,6 @@ def _mlx_janitor():
         time.sleep(60)
         if time.time() - swept[0] > 6 * 3600:
             swept[0] = time.time()
-            _purge_stale_guests()
             sweep_all_exports()
             _sweep_leftovers()
             _auto_cleanup_pass()   # no-op unless the pref is on
@@ -26824,7 +26038,7 @@ def reap_orphan_engines():
     NINE orphans (ppid 1) starved two 12B models into OOM mid-answer.
     At boot, any listener on our engine ports whose parent is init and
     whose command looks like a python server is a corpse — reap it.
-    Engines owned by a living instance (desktop AND the go-live service
+    Engines owned by a living instance (the desktop app and a dev copy
     coexist) have that instance as their parent and are left alone."""
     if IS_WIN:
         return
@@ -26897,6 +26111,24 @@ def _retire_contribute():
 
 
 if __name__ == "__main__":
+    # NO PAGE OUTSIDE THE APP WINDOW (6b320): a launch that can't draw
+    # its window stops here, before the lock, the scrub or any port. Only
+    # a windowless test copy runs without one. Exit 4: 1 is no port, 2 a
+    # refused setting, 3 a folder in use.
+    if not NOWINDOW:
+        _why = _window_blocker()
+        if _why:
+            print("\n  %s\n" % _why, file=sys.stderr)
+            if IS_WIN and DEFAULT_APP:
+                # pythonw has no console to print to; a dev copy only
+                # prints, so a test run never waits on a dialog
+                try:
+                    import ctypes
+                    ctypes.windll.user32.MessageBoxW(None, _why, APP_NAME,
+                                                     0x10)
+                except Exception:
+                    pass
+            sys.exit(4)
     if DEFAULT_APP and not single_instance():
         sys.exit(0)
     if not DEFAULT_APP and not single_instance(dev=True):
@@ -27244,16 +26476,17 @@ if __name__ == "__main__":
             pass
 
     if NOWINDOW:
-        # a test copy (0a 5.2): no window, no browser tab, just the
-        # server; the harness reads its port and key from run/instance.json
+        # a test copy (0a 5.2): no window, just the server; the harness
+        # reads its port and key from run/instance.json
         print("  no window — serving. ctrl-c to stop.\n")
         try:
             while True:
                 time.sleep(100)
         except KeyboardInterrupt:
             print("\n  shutting down. o7\n")
-    elif HAS_WEBVIEW and not _webview2_missing():
-        # Native macOS window (WKWebView). Blocks until the window closes.
+    else:
+        # the native window (WKWebView; WebView2 or Qt on Windows), which
+        # _window_blocker made sure of first. Blocks until it closes.
         _ww, _wh, _mw, _mh = _fit_window(1320, 860, 940, 620)
         window = webview.create_window(
             f"{APP_NAME} {short_version()}"
@@ -27300,12 +26533,3 @@ if __name__ == "__main__":
         webview.start(private_mode=False,
                       storage_path=os.path.join(app_dir(), "webkit"))
         print("  window closed — shutting down. o7\n")
-    else:
-        print("  (browser mode — pip install pywebview for a native window)")
-        time.sleep(0.8)
-        webbrowser.open(url)
-        try:
-            while True:
-                time.sleep(100)
-        except KeyboardInterrupt:
-            print("\n  shutting down. o7\n")

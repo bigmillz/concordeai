@@ -53,7 +53,9 @@ KEY=""; for i in $(seq 1 120); do
   sleep 1; done
 ```
 
-`MILLENAI_NOWINDOW=1` (dev copies only) suppresses the window and the browser. Every
+`MILLENAI_NOWINDOW=1` (dev copies only) runs with no window. Without it a copy needs
+pywebview: a launch that can't open its window prints the install line and exits with
+code 4 before it binds anything (6b320; there is no browser mode). Every
 launch mints its own random key and writes it, with the port and pid, to
 `run/instance.json` (0600) in its folder; there is no fixed key any more. A dev
 copy starts with **no cloud keys** (its own empty `cloud.json`); paste one into its
@@ -123,7 +125,7 @@ models, so a run can still evict the app's resident engines.
 
 Needs `gh`. In order it: bumps `APP_VERSION`/`APP_BUILD` **in `millenai.py`** (the only
 place either is stored), builds the DMG and the Windows zip, commits, pushes, creates a
-GitHub release, then updates the hosted instance. GitHub Actions
+GitHub release. GitHub Actions
 (`.github/workflows/windows-installer.yml`) attaches the x64 MSI a few minutes later.
 
 Two things to internalise:
@@ -212,11 +214,11 @@ action: the agent issues one, waits for the box, reconnects and continues.
 
 ### Identity
 
-The server binds **127.0.0.1 only**; remote access is always a tunnel. Requests carrying
-`Cf-Connecting-Ip`/`X-Forwarded-For` are "remote" and get a different surface: they must
-mint an identity (guest or PIN), see only their own chats, and are refused every
-owner-only endpoint (downloads, updater, TTS, log access). Per-user data is separated by
-`_data_base()`.
+The server binds **127.0.0.1 only** and answers only its own window: `_gate` checks the
+Host and the launch-key cookie on every request. The web version (tunnel visitors, guest
+passes, PIN and Google sign-in, per-visitor `users/` folders, proxy headers) was deleted
+in 6b320, so no request header picks a different folder. `_data_base()` returns None
+(the app folder) and stays as the seam the profiles will use.
 
 ## Traps
 

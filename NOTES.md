@@ -5630,6 +5630,89 @@ crash was invisible.
   keeps its checks. Mutation-tested (SIGHUP back, hook removed, no log,
   no box).
 
+## 6b320 — the web version is gone (accounts step 2)
+Patrick approved deleting the old web version for good on 2026-09-26;
+its hosting was shut down on 2026-09-24. Its code stayed behind the
+launch key since 6b310, but it still made per-visitor `users/` folders
+and still answered keyed requests that carried a proxy header. One
+tenancy (this computer's own folder) has to be the only one before the
+profiles and sign-in arrive. This is 0a items 3 and 8 (5.3 and 5.8) and
+M2 of the sign-in plan.
+- Deleted: the sign-in door (`WELCOME_PAGE`), `/api/welcome`,
+  `/api/guest`, `/auth/google` and its callback, `google_conf`, the
+  owner PIN (`owner_pin`, `owner_uid`), `_user_id`, `_write_ident`,
+  `_uid`, `_set_user_cookie`, the `millen_user` cookie, `_remote()`
+  (the only place `X-Forwarded-For` or `Cf-Connecting-Ip` was read),
+  `ADMIN_PATHS` and `_admin_gate`, the guest ladders (`guest=` on
+  `work_ladder`, `fast_cloud_ladder`, `vision_ladder` and
+  `run_council`, `paid=` on `generate_image`), the chat handler's guest
+  branch and its stale "free community service" comment, the Remote
+  agent's "not over the web" refusal, `_purge_stale_guests`,
+  `_last_seen` and the visitor counts on `/api/stats`, and the web-only
+  "get the app" chip (`/api/downloads`, `download_links`, `#get-app`,
+  the download-help veil).
+- `_data_base()` keeps its 17 call sites and returns None (the app's
+  folder) whatever the request carries, so a proxy header plus a
+  forged cookie reads the root and makes no folder. `sweep_all_exports`
+  no longer walks `users/`; a leftover `users/` on an old machine is
+  never touched by the app.
+- Kept: `_gate` with its Host check, the `millen_key_<port>` cookie and
+  `/?key=` (it goes with the boot code in step 3); `_csrf_ok`, whose
+  Host check now runs on every write; the `/api/me` shape (it answers
+  `{"kind": "owner"}`); the Account pane, which shows only the local
+  card; Forget Me and its three scopes, without the PIN field, and
+  each store is emptied in place (the web profiles' whole-folder erase
+  went); and `/api/logout`, a stub that answers ok and touches no
+  cookie until the desktop sign-out exists.
+- The page: `IS_LOCAL` went. `_gate` only serves the page at
+  127.0.0.1 or localhost, so it was always true in the window and
+  nothing the owner sees changes. The Account pane's description no
+  longer talks about signing in elsewhere or signing out, and the Zito
+  board reads "profiles 1".
+- Browser mode is gone (5.3). A launch without pywebview, or on a PC
+  without the WebView2 Runtime, says what it needs and exits with code
+  4 before it takes the lock, runs the start-up scrub or binds a port.
+  On a PC the desktop app also shows it in a message box, since pythonw
+  has no console. The native ARM64 build draws with Qt, so it skips the
+  WebView2 check. The second-launch hand-off only brings the window
+  forward: it no longer reopens `/?key=` in the default browser, which
+  put the key in the browser's history and the cookie on every
+  127.0.0.1 port. The one `webbrowser.open` left is the PC update's
+  GitHub page.
+- `/api/workspace/set` (and `/api/workspace/off`) are POSTs; a GET
+  answers 405 and changes nothing. The Workspace "Use" button posts.
+- go-live.sh is deleted, release.sh no longer runs the live copy's
+  updater, and the sibling check no longer probes 9889.
+- Gauntlet: 13 checks retired, all of them web-version behaviour: the
+  sign-in door and its styling (3), the guest pass, PIN and fresh
+  profile checks (4), the "no owner_pin" remote PIN (1; its owner-PIN
+  twin never ran), and "remote blocked" on five admin routes (5), which
+  would now run those routes for real. Rewritten in place for the
+  local-only shape: the guest-video check (now the Veo daily cap), the
+  ladder and council pins, the logout stub, the full forget (stores
+  emptied in place, no rmtree, no PIN), the stats (no visitor counts),
+  the Account pane (only the local card, no PIN field), the WebView2
+  check (a detector with no box, the ARM64 build skipped, and the
+  window check before the lock and the port), and seven checks that
+  pinned a removed string. New: one identity (proxy headers plus a forged `millen_user`
+  read the root, get the app and make no `users/`); ISO-18's app half
+  (a scan for every web-version name, and the old routes answer 404
+  with no cookie); browser mode gone (a dev copy with the no-webview
+  hook and 9903 held exits 4 with the install line, makes no `run/`,
+  and a stand-in webbrowser module records nothing); and the Workspace
+  POST (a GET answers 405 and changes nothing). Each new check was run
+  against the step-1 code and fails there. Baseline 293 becomes 284.
+- `SMOKE_NO_REAL=1` leaves the real data folder unread (the one check
+  that byte-greps it says SKIP), for runs by someone who must not open
+  its files.
+- Patrick's own steps, unchanged by this build: delete
+  `~/Library/MillenAI-live`, the four plists in
+  `~/Library/LaunchAgents/disabled/`, the ai.* ingress in the
+  cloudflared config (and its 2026-09-24 backup), the
+  ai.millertechnology.net DNS record and tunnel route, the "MillenAI
+  Web" OAuth client, and the Trash holding `users/`,
+  `google_oauth.json` and `owner_pin`.
+
 ## 6b319 — dev and test copies live in their own folder (accounts, step 1)
 Sign-in and sync come first (Patrick, 2026-09-26), and they can't be
 tested while a dev copy shares the real data folder: account tests would

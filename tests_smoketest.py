@@ -193,7 +193,12 @@ def _seed_a(home):
 _REAL_DIR = (os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "MillenAI")
              if sys.platform == "win32"
              else os.path.expanduser("~/Library/Application Support/MillenAI"))
-_REAL_TOP = set(os.listdir(_REAL_DIR)) if os.path.isdir(_REAL_DIR) else set()
+# SMOKE_NO_REAL=1 (6b320) leaves the real folder wholly unread, for a run
+# by someone (an agent, say) who must not open its files: the one check
+# that byte-greps it is then skipped, and says so, instead of passing
+_NO_REAL = os.environ.get("SMOKE_NO_REAL") == "1"
+_REAL_TOP = (set(os.listdir(_REAL_DIR)) if os.path.isdir(_REAL_DIR) and not _NO_REAL
+             else set())
 
 INST = Instance(9901, "A", seed=_seed_a).start()
 BASE = INST.base
@@ -279,56 +284,38 @@ s, h, b = req("/api/window/focus", "POST", {})
 s2, h2, b2 = req("/api/window/focus", "POST", {}, cookie=False)
 check("second launch can ask this copy forward; nobody else can",
       s == 200 and b'"ok": true' in b and s2 == 403)
-s, h, b = req("/", headers={"X-Forwarded-For": "1.2.3.4"})
-check("remote stranger -> account screen", b"continue as guest" in b.lower()
-      and b"pinform" in b)
 
-print("== identities ==")
-s, h, b = req("/", cookie=K, headers={"X-Forwarded-For": "1.2.3.4"})
-check("remote no-identity -> sign-in", b"continue as guest" in b.lower())
-s, h, b = req("/api/guest", "POST", {}, cookie=K,
-              headers={"X-Forwarded-For": "1.2.3.4"})
-mg = re.search(r"millen_user=([0-9a-f]{20})", str(h))
-check("guest tap mints an identity", s == 200 and mg)
-s, h, b = req("/api/welcome", "POST", {"name": "smoke", "pin": "1234"},
-              cookie=K, headers={"X-Forwarded-For": "1.2.3.4"})
-check("short PIN rejected", b"8-12 digit" in b)
-s, h, b = req("/api/welcome", "POST", {"name": "smoke", "pin": "88881111"},
-              cookie=K, headers={"X-Forwarded-For": "1.2.3.4"})
-m = re.search(r"millen_user=([0-9a-f]{20})", str(h))
-check("8-digit PIN -> identity cookie", s == 200 and m)
-smoke_uid = m.group(1) if m else ""
-s, h, b = req("/api/chats", cookie=K + "; millen_user=" + smoke_uid,
-              headers={"X-Forwarded-For": "1.2.3.4"})
-check("fresh profile sees empty chats", b == b'{"chats": []}')
+print("== one identity ==")
+# accounts step 2 (0a 5.8, 6b320): the web version and its per-visitor
+# users/ folders are gone for good, so nothing a request carries picks
+# another folder. Proxy headers plus a forged millen_user read the
+# window's own root, get the app and are the local owner; no users/
+# appears. The proxy headers without the key still get 403.
+_prox = {"X-Forwarded-For": "1.2.3.4", "Cf-Connecting-Ip": "1.2.3.4"}
+_forged = "millen_user=" + os.urandom(10).hex()
+_rp = ("/api/chats", "/api/prefs", "/api/memory")
+_pl = [req(p) for p in _rp]
+_px = [req(p, cookie=_forged, headers=_prox) for p in _rp]
+_pg = req("/", cookie=_forged, headers=_prox)
+_pm = req("/api/me", cookie=_forged, headers=_prox)
+_pnk = [req("/", cookie=False, headers=_prox)[0],
+        req("/api/chats", cookie=False, headers=_prox)[0],
+        req("/api/prefs", "POST", {"length": 3}, cookie=False, headers=_prox)[0]]
+_dbm = re.search(r"\n    def _data_base\(self\):.*?(?=\n    def |\n    # -)", _MILLENAI_SRC, re.S)
+_dbs = _dbm.group(0) if _dbm else ""
+check("one identity: a proxied request with a forged millen_user reads the root and makes no users/",
+      [x[0] for x in _px] == [200] * 3 and [x[2] for x in _px] == [x[2] for x in _pl]
+      and _CANARY_A.encode() in _px[0][2]
+      and _pg[0] == 200 and b'id="skyline"' in _pg[2]
+      and b"continue as guest" not in _pg[2].lower()
+      and (json.loads(_pm[2]) if _pm[0] == 200 else {}).get("kind") == "owner"
+      and _pnk == [403, 403, 403]
+      and not os.path.exists(os.path.join(INST.home, "users"))
+      and _dbs and "headers" not in _dbs and "makedirs" not in _dbs,
+      "%r" % [[x[0] for x in _px], _pg[0], _pm[2][:60], _pnk,
+              os.path.exists(os.path.join(INST.home, "users"))])
 s, h, b = req("/api/chats", cookie=K)
 check("local owner sees real chats", b"title" in b)
-_opf = os.path.join(INST.home, "owner_pin")
-if os.path.exists(_opf):
-    own_pin = open(_opf).read().strip()
-    s, h, b = req("/api/welcome", "POST", {"name": "anyname", "pin": own_pin},
-                  cookie=K, headers={"X-Forwarded-For": "1.2.3.4"})
-    m2 = re.search(r"millen_user=([0-9a-f]{20})", str(h))
-    s, h, b = req("/api/chats", cookie=K + "; millen_user=" + (m2.group(1) if m2 else ""),
-                  headers={"X-Forwarded-For": "1.2.3.4"})
-    check("owner PIN opens real chats remotely", b"title" in b)
-else:
-    # 6b310: the web version is retired and its owner_pin file went
-    # with it, so no remote PIN may map onto the owner's files
-    _pin = str(10000000 + int.from_bytes(os.urandom(3), "big"))
-    s, h, b = req("/api/welcome", "POST", {"name": "anyname", "pin": _pin},
-                  cookie=K, headers={"X-Forwarded-For": "1.2.3.4"})
-    m2 = re.search(r"millen_user=([0-9a-f]{20})", str(h))
-    s, h, b = req("/api/chats", cookie=K + "; millen_user=" + (m2.group(1) if m2 else ""),
-                  headers={"X-Forwarded-For": "1.2.3.4"})
-    check("no owner_pin: a remote PIN opens only its own empty profile",
-          b == b'{"chats": []}')
-
-print("== admin lockdown ==")
-for p in ("/api/speak", "/api/model/download", "/api/open-logs",
-          "/api/update/install", "/api/voice/prepare"):
-    s, h, b = req(p, "POST", {}, cookie=K, headers={"X-Forwarded-For": "1.2.3.4"})
-    check("remote blocked: " + p, b"owner only" in b)
 s, h, b = req("/api/speak", "POST", {"stop": True}, cookie=K)
 check("local speak allowed", b'"ok": true' in b)
 
@@ -1219,24 +1206,17 @@ check("server output is fenced under an id; redaction keeps config readable",
       # a key block cut off by the output limit is still caught
       and "[private key redacted]" in _rd("x\n-----BEGIN TEST PRIVATE KEY-----\nplaceholder"),
       _js)
-# a tunnel guest never starts a paid render (and never holds the slot)
-s, h, b = req("/api/chat", "POST", {"model": "", "models": [], "tier": "Fast",
-              "auto_web": False, "messages": [{"role": "user",
-              "content": "make a short video of a cat surfing"}]},
-              cookie=K, headers={"X-Forwarded-For": "1.2.3.4"}, timeout=60)
-check("guests: no video, and pictures never on the owner's key",
-      "owner\u2019s machine only".encode() in b
-      and "paid=not _guest" in _MILLENAI_SRC
-      and "if paid and gem.get(\"key\")" in _MILLENAI_SRC
-      and "VEO_DAILY_CAP = 5" in _MILLENAI_SRC and '"VEO_CAP:' in _MILLENAI_SRC,
-      b[:120])
+# a cloud clip is about $0.80, so the cloud makes at most five a day
+# (6b309; the web version's guest refusals went in 6b320)
+check("cloud video stays capped per day",
+      "VEO_DAILY_CAP = 5" in _MILLENAI_SRC and '"VEO_CAP:' in _MILLENAI_SRC
+      and 'if "VEO_CAP:" in str(exc):' in _MILLENAI_SRC)
 _root = os.path.dirname(os.path.abspath(__file__))
 check("harness review fixes: one card per approval, honest verdicts, slot reserved",
       "apSeen.has(ad.jid)" in page and "expired \u2014 nothing ran" in page
       and "no answer \\u2014 nothing ran" in _MILLENAI_SRC
       and "_started[0] = True" in _MILLENAI_SRC and "_give_back()" in _MILLENAI_SRC
       and "and not ag_remote)" in _MILLENAI_SRC
-      and "install and key advice is for the owner only" in _MILLENAI_SRC
       and "_fence_output(out, 2500)" in _MILLENAI_SRC)
 _smoke = open(os.path.join(_root, "ci_smoke.sh")).read()
 check("nightly publishes only after a compile and boot check; turbo.sh gone",
@@ -1365,12 +1345,6 @@ check("AI is extra-extra bold in every wordmark",
       # centered stroke grows the caps, so the AI is scale-compensated
       # to sit flush with CONCORDE's cap line and baseline
       and "font-size:.865em;vertical-align:.06em" in page)
-s, h, b = req("/", headers={"X-Forwarded-For": "1.2.3.4"})
-door = b.decode("utf-8", "replace")
-check("the door's AI is fattened too, against its gradient",
-      "-webkit-text-fill-color:#f5f6f8" in door
-      and "-webkit-text-stroke:.12em #f5f6f8" in door
-      and "Concorde<b>AI</b>" in door)
 # 6b265, per Patrick ("checkbox or similar for auto cleanup"): the
 # Manage panel grows an auto-clean toggle; the sweep removes a model
 # only when a newer generation of its family is ALSO installed, shares
@@ -1383,7 +1357,7 @@ check("auto-cleanup wired end to end",
       and "_auto_cleanup_pass()" in
           _MILLENAI_SRC.split("def _mlx_janitor")[1][:1200]
       and '"/api/model/cleanup"' in _MILLENAI_SRC
-      and _MILLENAI_SRC.count('"/api/model/cleanup"') >= 2  # + ADMIN_PATHS
+      and _MILLENAI_SRC.count('"/api/model/cleanup"') >= 2  # route + page
       and 'id="autoclean-toggle"' in page)
 s, h, b = req("/api/setup", cookie=K, timeout=180)
 check("setup reports the reclaimable set", b'"cleanup"' in b)
@@ -1606,7 +1580,7 @@ check("ledger: seeded per install, downloads recorded",
 check("post-update sweep, endpoints, and the default wired",
       "_UPDATE_LANDED[0] = True" in _MILLENAI_SRC
       and "target=_post_update_cleanup" in _MILLENAI_SRC
-      and '"/api/model/cleanup", "/api/model/update",' in _MILLENAI_SRC
+      and 'self.path == "/api/model/cleanup"' in _MILLENAI_SRC
       and 'self.path == "/api/model/update"' in _MILLENAI_SRC
       and "_app_models_add(label)" in _MILLENAI_SRC.split(
           "def _download_model")[1][:1500]
@@ -1707,6 +1681,38 @@ check("Contribute is gone: no worker, no hub, no UI, and its creds scrubbed",
       and "_retire_contribute()" in _MILLENAI_SRC.split(
           'if __name__ == "__main__":')[-1],
       "%s %s" % (_left, _rc_prefs))
+# ISO-18, app half (accounts step 2, 0a 5.8, 6b320): the web version is
+# deleted for good. The names are word-bounded, so "suggest", the
+# greetings' "welcome" and the Gemini provider's googleapis hosts don't
+# count. The one webbrowser.open left is the update's GitHub page.
+_WEB_GONE = (r"\bWELCOME_PAGE\b", r"/api/welcome\b", r"/api/guest\b",
+             r"(?i:\bguests?\b)", r"\bgoogle_conf\b", r"\bGOOGLE_OAUTH",
+             r"/auth/google", r"google_oauth\.json", r"accounts\.google\.com",
+             r"oauth2\.googleapis\.com", r"Google account",
+             r"(?i:\bowner_pin\b)", r"\bowner_uid\b", r"\bpin_required\b",
+             r"forget-pin", r"\bmillen_user\b", r"\b_remote\b",
+             r"\b_admin_gate\b", r"\bADMIN_PATHS\b", r"\b_uid\b",
+             r"\b_user_id\b", r"\b_write_ident\b", r"\b_set_user_cookie\b",
+             r"\b_purge_stale_guests\b", r"\b_last_seen\b",
+             r"\busers_(?:online|total)\b", r'app_dir\(\), "users"', r'"_anon"',
+             r'"\.ident"', r"community service", r"\bIS_LOCAL\b",
+             r"/api/downloads\b", r"\bdownload_links\b", r'id="get-app"', r"dlhelp",
+             r"(?i:X-Forwarded-For|Cf-Connecting-Ip)",
+             r"\(8889, 9889\)", r'webbrowser\.open\("http://127\.0\.0\.1',
+             r"(?i:browser mode)")
+_web_left = [p for p in _WEB_GONE if re.search(p, _MILLENAI_SRC)]
+_web_routes = [req("/api/welcome", "POST", {"name": "x", "pin": "88881111"}),
+               req("/api/guest", "POST", {}), req("/auth/google"),
+               req("/auth/google/callback?code=x&state=y"), req("/api/downloads")]
+_rel = open("release.sh").read()
+check("ISO-18 app half: no web sign-in, guest, owner-PIN or proxy-identity code; its routes 404 and set no cookie",
+      not _web_left and not os.path.exists("go-live.sh")
+      and "MillenAI-live" not in _rel
+      and _MILLENAI_SRC.count("webbrowser.open(") == 1
+      and 'ok = url.startswith("https://github.com/")' in _MILLENAI_SRC
+      and all(s_ == 404 and not h_.get("Set-Cookie") for s_, h_, _b in _web_routes)
+      and not os.path.exists(os.path.join(INST.home, "users")),
+      "%r" % [_web_left, [r[0] for r in _web_routes]])
 # 6b310, per Patrick: "The absolute most important thing is that we
 # prevent people's questions, answers, and chats from mixing with other
 # users." Four ways they could, in the app as it stood.
@@ -1767,7 +1773,7 @@ _eng = ({i["port"] for i in _pn["MODEL_INFO"].values() if i["port"]}
 _main = _MILLENAI_SRC.split('if __name__ == "__main__":')[-1]
 check("taken port: the window opens the server this app bound",
       _moved and _named_fails and _si_ok
-      and not (set(_pn["FALLBACK_PORTS"]) & (_eng | {8889, 9889, 9894, 9897}))
+      and not (set(_pn["FALLBACK_PORTS"]) & (_eng | {8889, 9889, 9894, 9895, 9897, 9901, 9902, 9903}))
       and "threading.Thread(target=start_backend, daemon=True)" not in _MILLENAI_SRC
       and _main.index("single_instance()") < _main.index("bind_backend()")
       < _main.index("_write_instance_note()") < _main.index("webview.create_window(")
@@ -2526,12 +2532,9 @@ _ord = lambda L: [(c["model"], c["role"]) for c in L]
 check("each task walks its own ladder, in its own order",
       _ord(_cq["fast_cloud_ladder"]())[:3] == [("claude-haiku-4-5-20251001", "fast"),
           ("openai/gpt-oss-120b", "fast"), ("gemini-3.5-flash-lite", "fast")]
-      and [c["name"] for c in _cq["fast_cloud_ladder"](guest=True)] == ["Groq", "Gemini", "Claude"]
       and all(c["name"] != "Kimi K3" for c in _cq["fast_cloud_ladder"](utility=True))
       and _ord(_cq["work_ladder"]("code"))[0] == ("claude-sonnet-5", "code")
       and [c["name"] for c in _cq["work_ladder"]()] == ["Claude", "Groq", "Gemini", "Kimi K3"]
-      # a tunnel guest is free-first on every lane (review, 6b308)
-      and [c["name"] for c in _cq["work_ladder"]("code", guest=True)] == ["Groq", "Gemini", "Claude"]
       and _ord(_cq["compositor_ladder"]())[0] == ("claude-opus-5-5", "composite")
       and _ord(_cq["vision_ladder"]("Pro"))[0] == ("claude-opus-5-5", "composite")
       and [c["name"] for c in _cq["vision_ladder"]("")] == ["Claude", "Gemini"]
@@ -2553,7 +2556,7 @@ check("pictures go in each provider's own format; plain turns stay plain",
       and _om[0] == {"role": "user", "content": "hi"}
       and _om[1]["content"][1]["image_url"]["url"] == "data:image/png;base64,iVBORw0KGgo")
 check("per-task wiring: lanes, vision first, refusals, titles/memory/pins, funnels, remote",
-      "_fl = work_ladder(\"code\", guest=self._remote())" in _MILLENAI_SRC
+      '_fl = work_ladder("code")' in _MILLENAI_SRC
       and "if images and _vis_cloud and _cloud_vision():" in _MILLENAI_SRC
       and "and not _vis_cloud and not _vis_local:" in _MILLENAI_SRC
       and "def _walk_ladder() -> bool:" in _MILLENAI_SRC
@@ -2561,7 +2564,6 @@ check("per-task wiring: lanes, vision first, refusals, titles/memory/pins, funne
       and "make_title(txt, conf=_conf)" in _MILLENAI_SRC
       and "fast_cloud_ladder(utility=True) if effort == \"fast\"" in _MILLENAI_SRC
       and "[cloud_conf()]" not in _MILLENAI_SRC
-      and "Funnels run on the owner's" in _MILLENAI_SRC
       and "ladder = work_ladder(\"work\")" in _MILLENAI_SRC
       and "\"x-goog-api-key\": gem[\"key\"]" in _MILLENAI_SRC
       and 'name="fn-eff" value="fast"' in page and 'name="fn-eff" value="normal" checked' in page
@@ -2653,17 +2655,16 @@ check("leftover sweep: failed downloads go; fresh, complete and foreign files st
                                _p_old, _p_new, _blob, _p_big, _p_big_old, _tmpf, _dev,
                                _mine_dev)])
 _LH["shutil"].rmtree(_lt, ignore_errors=True)
-check("per-task review fixes: guests free-first, titles per request, badge, sweeps",
+check("per-task review fixes: titles per request, badge, sweeps",
       "run_council(council, full_messages, emit, status," in _MILLENAI_SRC
-      and "hurry=hurry_ev, guest=self._remote())" in _MILLENAI_SRC
-      and "_fast = fast_cloud_ladder(guest=guest)" in _MILLENAI_SRC
+      and "hurry=hurry_ev)" in _MILLENAI_SRC
+      and "_fast = fast_cloud_ladder()" in _MILLENAI_SRC
       and "_last_cloud.pop(str(self._data_base()), None)" in _MILLENAI_SRC
       and 'json.dumps({"w": "cloud"})' in _MILLENAI_SRC
       and 'd.w==="cloud"' in page
       and "if images and not cloud_only and not _vis_cloud and not _vis_local:" in _MILLENAI_SRC
       and "if not quiet:        # a title that merely mentions billing" in _MILLENAI_SRC
       and "repos.update(r[0] for r in RETIRED_MODELS.values() if r[0])" in _MILLENAI_SRC
-      and "not (_fu and _fu == owner_uid())" in _MILLENAI_SRC
       and "elif not cloud_only:\n                            run_model(small" in _MILLENAI_SRC
       and "Cloud power is off, so your cloud key can't drive" in _MILLENAI_SRC)
 # 6b308, per Patrick: the MODELS AVAILABLE chip ran 50 px past the
@@ -2673,7 +2674,7 @@ _brow = page[page.index('<div id="brand-row">'):page.index('<div id="models-flag
 check("header chips never overrun the sidebar or hide the wordmark",
       "flex:1 0 100%" not in page
       and _brow.count("<div") == _brow.count("</div>")
-      and page.index('id="get-app"') > page.index('id="models-flag"'))
+      and 'id="get-app"' not in page)      # the web visitors' chip went (6b320)
 # the giants: hidden unless BOTH boxes are ticked, never in "Max" otherwise
 _gz = dict(_LH)
 exec(_MILLENAI_SRC[_MILLENAI_SRC.index("CATALOG = ["):
@@ -2944,8 +2945,7 @@ check("titlebar lockup: accessory + bundled font",
       and len(open("fonts/Michroma-Regular.ttf", "rb").read(8)) == 8
       and "cp -R fonts" in open("build_macos_app.sh").read())
 # 6b257: the app checks for updates BY ITSELF — hourly while open,
-# owner only (a tunnel visitor can't run the install, so never tempt
-# them), skipping hidden windows and settling up on wake; the server
+# skipping hidden windows and settling up on wake; the server
 # answers the hourly pollers from a 15-min cache and only a human
 # click on the Settings button forces a real GitHub hit
 # 6b292: daily, not hourly — and only while the About switch is on
@@ -3038,7 +3038,12 @@ check("settings: descriptions + Account pane + scoped forget",
       and '"/api/me"' in _MILLENAI_SRC
       and '"/api/logout"' in _MILLENAI_SRC
       and '"/api/forget"' in _MILLENAI_SRC
-      and "FORGET ME" in page)
+      and "FORGET ME" in page
+      # one kind of account since the web version went (6b320)
+      and "local account · everything stays on this machine" in page
+      and "chats follow you between devices" not in page
+      and "Guest pass" not in page and 'id="forget-pin"' not in page
+      and all('id="fs-%s"' % k in page for k in ("mem", "chats", "prefs")))
 # 6b259, per Patrick: About leads the rail (it is what people open the
 # panel to see) and Account closes it (the exits belong at the foot).
 # The pane ids and the nav must agree on that order, and the first pane
@@ -3066,7 +3071,7 @@ _rjs = (_MILLENAI_SRC[_esc0:_MILLENAI_SRC.index(";}\n", _esc0) + 3]
                         _MILLENAI_SRC.index("\n}\n", _MILLENAI_SRC.index("function nowLine(st){")) + 3]
         + _MILLENAI_SRC[_ros0:_MILLENAI_SRC.index(
             "\n}\n", _MILLENAI_SRC.index("function rosRow(")) + 3]
-        + 'const IS_LOCAL=true,ADV_USE={"Llama 3.2 3B":"quick"};'
+        + 'const ADV_USE={"Llama 3.2 3B":"quick"};'
         'process.stdout.write(JSON.stringify(['
         'rosRow({label:"DeepSeek V3.1 671B",est_gb:404.5,status:"error",giant:true,'
         'note:"needs 437 GB free on C: to finish, 300 GB free"},false),'
@@ -3110,7 +3115,7 @@ check("giant installs ask twice; long downloads read in hours",
       # the list follows any download in flight (6b314)
       and '<span class="rd rerr" title="\'+esc(m.note)+\'">' in page
       and "function rosTick(){" in page and "manageTick();rosTick();" in page
-      and 'if(IS_LOCAL&&miss.some(m=>m.status==="downloading"||m.status==="queued"))' in page
+      and 'if(miss.some(m=>m.status==="downloading"||m.status==="queued"))' in page
       and 'if(!(r.started||[]).includes(i.dataset.l)){' in page
       and 'const ROS_SKIP=new Set(["Ollama engine","Image generation","Video generation"]);' in page
       and "retry from the list" in page
@@ -3176,13 +3181,12 @@ check("release notes reflow instead of keeping git's wraps",
       "function notesHTML" in page
       and "#up-notes{" in page
       and "pre-wrap" not in page.split("#up-notes{")[1][:260])
-# 6b257: THE OWNER HAS NO COOKIE — they are authenticated by the mere
-# absence of proxy headers, so SameSite protects them from nothing and
-# any web page could POST to 127.0.0.1 and erase their chats or delete
-# multi-GB weights. Writes now demand a same-origin Origin (browsers
-# attach one to every cross-site POST), refuse the three form content
-# types, and refuse a rebinding Host. Native callers — curl, the fleet
-# workers, this gauntlet — send no Origin and sail through.
+# 6b257: a browser counts every port of 127.0.0.1 as one site, so the
+# launch cookie alone doesn't stop a page on another local port from
+# POSTing here to erase chats or delete multi-GB weights. Writes demand
+# a same-origin Origin (browsers attach one to every cross-site POST),
+# refuse the three form content types, and refuse a rebinding Host.
+# Native callers — curl, this gauntlet — send no Origin and sail through.
 s, h, b = req("/api/forget", "POST", {"scopes": []}, cookie=K,
               headers={"Content-Type": "text/plain"})
 check("CSRF: form content type refused", s == 403)
@@ -3195,17 +3199,41 @@ check("CSRF: rebinding Host refused", s == 403)
 s, h, b = req("/api/forget", "POST", {"scopes": []}, cookie=K,
               headers={"Origin": BASE})
 check("CSRF: same-origin write allowed", s == 200)
-s, h, b = req("/api/logout", "POST", cookie=K)
-check("logout clears the cookie", s == 200
-      and "max-age=0" in (h.get("Set-Cookie", "").lower()))
+# accounts step 2 (0a 5.8, header fixes, 6b320): choosing the Workspace
+# folder is a write, so it is a POST; a GET changes nothing
+_wsd = os.path.realpath(tempfile.mkdtemp(dir=_SMOKE_TMP))
+def _ws_root():
+    s_, _h, b_ = req("/api/workspace")
+    return json.loads(b_).get("root") if s_ == 200 else "ERR %s" % s_
+_ws0 = _ws_root()
+_wsg = req("/api/workspace/set?root=" + _uq(_wsd))
+_ws1 = _ws_root()
+_wsp = req("/api/workspace/set", "POST", {"root": _wsd})
+_ws2 = _ws_root()
+_wso = req("/api/workspace/off", "POST", {})
+_ws3 = _ws_root()
+check("Workspace: choosing the folder is a POST; a GET changes nothing",
+      _wsg[0] == 405 and _ws1 == _ws0 != _wsd
+      and _wsp[0] == 200 and _ws2 == _wsd
+      and _wso[0] == 200 and _ws3 == ""
+      and '"/api/workspace/set?root="' not in page,
+      "%r" % [_wsg[0], _ws0, _ws1, _wsp[0], _ws2, _wso[0], _ws3])
+# a stub until the desktop sign-out (6b320): it answers ok and touches
+# no cookie, least of all the launch key's
+s, h, b = req("/api/logout", "POST", {}, cookie=K)
+check("logout is a stub until the desktop sign-out: ok, and no cookie is touched",
+      s == 200 and b'"ok": true' in b and not h.get("Set-Cookie")
+      and req("/api/chats")[0] == 200, h.get("Set-Cookie", ""))
 # a valid-JSON non-object body used to reach .get() and 500 the handler
 s, h, b = req("/api/forget", "POST", [1, 2, 3], cookie=K)
 check("non-dict JSON body survives", s == 200)
-# 6b257: erase means erase — a walled profile's .ident marker holds
-# the very PII the pane promises to forget (the Google email), so a
-# full three-scope forget takes the directory with it
-check("full forget removes the profile marker",
-      'shutil.rmtree(base, ignore_errors=True)' in _MILLENAI_SRC)
+# 6b320: with one tenancy, a full forget empties the three stores in
+# place; the web profiles' whole-folder erase went, so no rmtree waits
+# for base to become a real folder, and no owner PIN is asked
+check("a full forget empties the three stores in place and never removes a folder",
+      "shutil.rmtree(base" not in _MILLENAI_SRC
+      and '"err": "pin"' not in _MILLENAI_SRC
+      and 'for k in ("persona", "length", "user_name"):' in _MILLENAI_SRC)
 # 6b257: removal must not lie — a non-zero `ollama rm` used to report
 # success while the weights stayed, and the MLX path must take the
 # same _engine_lock every other process-table mutation takes
@@ -3248,7 +3276,8 @@ check("Best and Power tiers are gone",
       "Best" not in tiers and "Power" not in tiers, str(list(tiers)))
 s, h, b = req("/api/stats", cookie=K)
 st = json.loads(b)
-check("stats has users + memory", "users_total" in st and "mem_total_gb" in st)
+check("stats has memory and no visitor counts",
+      "mem_total_gb" in st and "users_total" not in st and "users_online" not in st)
 # 6b254: the MODELS meter became a MEMORY reading — pressure on macOS
 # (wired+compressed, what Activity Monitor gauges), used% elsewhere.
 # psutil's used% would have read ~2x higher on a healthy Mac.
@@ -4203,7 +4232,6 @@ check("Windows is offered its update (the zip, or the .msi when installed) and n
       and not _u_mac["available"] and "manual" not in _u_mac
       and 'if self.path == "/api/update/download":' in _M
       and 'ok = url.startswith("https://github.com/")' in _M
-      and '"/api/update/install", "/api/update/download",' in _M
       and "        if not HAS_WEBVIEW:\n            return\n        _JUST_UPDATED[0] = str(last)" in _M,
       "%r" % [_u_new, _u_msi.get("manual"), _u_old.get("available"), _u_mac.get("available")])
 
@@ -4230,7 +4258,7 @@ check("Windows: no console window flashes; ssh reads UTF-8; quoted paths are acc
       and _ssh_kw.get("encoding") == "utf-8" and _ssh_kw.get("errors") == "replace"
       and _sr_out == (0, "\u25cf nginx.service")
       and _sa["_ssh_argv"]({"key": '"C:\\Users\\pat\\.ssh\\id"', "host": "h"})[-2] == "C:\\Users\\pat\\.ssh\\id"
-      and "(q.get(\"root\", [\"\"])[0]).strip().strip('\"'))" in _M,
+      and "str(d.get(\"root\") or \"\").strip().strip('\"'))" in _M,
       "%r" % [_pq_seen, _ssh_kw, _sr_out])
 
 # the page on a PC: its commands, words and behaviour
@@ -4280,7 +4308,9 @@ check("a PC's chip reads CORE I7 / RYZEN 7 / SNAPDRAGON X ELITE, not INTEL64 or 
                                "CORE ULTRA 7", "APPLE SILICON", "ARMV8", "CORE I7"],
       "%r" % _cpus)
 
-# the window fits a laptop's work area; WebView2 missing says so
+# the window fits a laptop's work area; WebView2 missing says so and exits
+# (6b320: the detector shows nothing, _window_blocker words it, and the
+# check runs before the app takes its lock or binds a port)
 class _Rect:
     left = top = 0; right = 1536; bottom = 816        # 1080p at 125%, logical
 def _fit(dpi):
@@ -4299,11 +4329,13 @@ def _fit(dpi):
     return ns["_fit_window"](1320, 860, 940, 620)
 _fw96 = _fit(96)
 _boxes = []
-def _wv2(present):
+_wv_reg = []
+def _wv2(present, arm=False, emulated=False):
     class _K:
         def __enter__(s): return s
         def __exit__(s, *a): return False
     def _open(root, path):
+        _wv_reg.append(path)
         if not present: raise OSError("no key")
         return _K()
     wr = _t17.SimpleNamespace(HKEY_LOCAL_MACHINE=1, HKEY_CURRENT_USER=2, OpenKey=_open,
@@ -4312,18 +4344,38 @@ def _wv2(present):
         MessageBoxW=lambda *a: _boxes.append(a[1]))))
     ns = {"__builtins__": dict(vars(_bi20), __import__=lambda n, g=None, l=None, f=(), lv=0:
                                ({"winreg": wr, "ctypes": ct}.get(n) or _bi20.__import__(n, g, l, f, lv))),
-          "IS_WIN": True, "APP_NAME": "ConcordeAI"}
+          "IS_WIN": True, "IS_WIN_ARM": arm, "IS_WIN_EMULATED": emulated,
+          "APP_NAME": "ConcordeAI"}
     _exec_names(ns, {"_webview2_missing"})
     return ns["_webview2_missing"]()
 _wv_have, _wv_none = _wv2(True), _wv2(False)
-check("Windows: the window fits the screen; no WebView2 means a message and the browser",
+_wv_x64emu = _wv2(False, arm=True, emulated=True)    # x64 build on an ARM PC
+del _wv_reg[:]
+_wv_arm = _wv2(False, arm=True)                      # the native ARM64 (Qt) build
+_wb = {"APP_NAME": "ConcordeAI", "HAS_WEBVIEW": False, "_webview2_missing": lambda: True}
+_exec_names(_wb, {"_window_blocker"})
+_wbf = _wb.get("_window_blocker") or (lambda: None)   # gone = a FAIL, not a crash
+_wb_nopy = _wbf()
+_wb["HAS_WEBVIEW"] = True
+_wb_nowv2 = str(_wbf())
+_wb["_webview2_missing"] = lambda: False
+_wb_fine = _wbf()
+_mn = _M.split('if __name__ == "__main__":')[-1]
+check("Windows: the window fits the screen; no WebView2 means a message and an exit, never the browser",
       _fw96 == (1320, 776, 940, 620) and _wv_have is False and _wv_none is True
-      and len(_boxes) == 1 and "WebView2 Runtime" in _boxes[0]
-      and "elif HAS_WEBVIEW and not _webview2_missing():" in _M
+      and _wv_x64emu is True and _wv_arm is False and not _wv_reg and not _boxes
+      and _wb_nopy == ("ConcordeAI needs its app window. Install pywebview "
+                       "(the installer does this) and start it again.")
+      and "WebView2 Runtime" in _wb_nowv2 and "microsoft.com" in _wb_nowv2
+      and "browser" not in _wb_nowv2 and _wb_fine == ""
+      and -1 < _mn.find("_window_blocker()") < _mn.find("single_instance(")
+      and -1 < _mn.find("sys.exit(4)") < _mn.find("bind_backend()")
+      and "webbrowser" not in _mn
       and 'if not IS_WIN or _WIN_STATE["min"]:' in _M
       and "ctypes.windll.user32.AllowSetForegroundWindow(-1)" in _M
       and "every port it can use is taken" in _M,
-      "%r" % [_fw96, _wv_have, _wv_none, _boxes])
+      "%r" % [_fw96, _wv_have, _wv_none, _wv_x64emu, _wv_arm, _wv_reg, _boxes,
+              _wb_nopy, _wb_nowv2, _wb_fine])
 
 # a service Ollama (SYSTEM) no longer blocks every local model
 class _AD(Exception): pass
@@ -4669,7 +4721,7 @@ check("each copy's run/instance.json is 0600 and names its own process",
 _REAL_LOGS = (os.path.join(_REAL_DIR, "logs") if sys.platform == "win32"
               else os.path.expanduser("~/Library/Logs/MillenAI"))
 _real_hits = []
-for _root in (_REAL_DIR, _REAL_LOGS):
+for _root in (() if _NO_REAL else (_REAL_DIR, _REAL_LOGS)):
     if not os.path.isdir(_root):
         continue
     for _dp, _dn, _fns in os.walk(_root):
@@ -4682,11 +4734,15 @@ for _root in (_REAL_DIR, _REAL_LOGS):
             except OSError:
                 pass
 _real_new = sorted(f for f in set(os.listdir(_REAL_DIR)) - _REAL_TOP
-                   if not re.match(r"^\..*\.tmp$|^.*\.json\.tmp$", f)) if os.path.isdir(_REAL_DIR) else []
-check("the real data folder never sees a gauntlet copy (no canary, no new files)",
-      not _real_hits and not _real_new
-      and '"cloud-dev-%d.json" % PORT' not in _MILLENAI_SRC,
-      "%r" % [len(_real_hits), _real_new])
+                   if not re.match(r"^\..*\.tmp$|^.*\.json\.tmp$", f)) \
+    if os.path.isdir(_REAL_DIR) and not _NO_REAL else []
+if _NO_REAL:
+    print("  SKIP  the real data folder never sees a gauntlet copy (SMOKE_NO_REAL=1)")
+else:
+    check("the real data folder never sees a gauntlet copy (no canary, no new files)",
+          not _real_hits and not _real_new
+          and '"cloud-dev-%d.json" % PORT' not in _MILLENAI_SRC,
+          "%r" % [len(_real_hits), _real_new])
 
 # a copy's log folder is inside its own folder; the real app's isn't moved
 _ld = {}
@@ -4751,6 +4807,57 @@ check("a half-set dev copy, a leftover setting, or a test switch on the real app
       all(rc == 2 and why for rc, why, _m in _refusals)
       and not os.listdir(_fake_real) and len(_refusals) == 7,
       "%r" % _refusals)
+
+# ISO-14, browser mode gone (accounts step 2, 0a 5.3, 6b320): without
+# pywebview the app says what it needs and exits before it binds; it
+# never opens a page in the default browser. A dev copy with the
+# no-webview hook and NO windowless switch takes the shipped app's path.
+# 9903 is held, so a copy that tried to bind would exit 1 instead, and a
+# stand-in webbrowser module (first on PYTHONPATH) records any page it
+# is asked to open. HOME is the fake one, as above.
+_nw_home = os.path.join(_SMOKE_TMP, "nowebview")
+_nw_shim = os.path.join(_SMOKE_TMP, "wbshim")
+_nw_log = os.path.join(_nw_shim, "opened.txt")
+os.makedirs(_nw_shim, exist_ok=True)
+with open(os.path.join(_nw_shim, "webbrowser.py"), "w") as fh:
+    fh.write("import builtins\n"
+             "def _rec(url, *a, **k):\n"
+             "    with builtins.open(%r, 'a') as f:\n"
+             "        f.write(str(url) + '\\n')\n"
+             "    return True\n"
+             "open = open_new = open_new_tab = _rec\n" % _nw_log)
+_nw_env = {k: v for k, v in os.environ.items() if not k.upper().startswith("MILLENAI_")}
+_nw_env.update(HOME=_fake, USERPROFILE=_fake, LOCALAPPDATA=os.path.join(_fake, "AppData", "Local"),
+               MILLENAI_DEV="1", MILLENAI_HOME=_nw_home, MILLENAI_PORT="9903",
+               MILLENAI_TEST_HOOKS="no-webview",
+               PYTHONPATH=os.pathsep.join(p for p in (_nw_shim, os.environ.get("PYTHONPATH")) if p))
+_py = os.environ.get("SMOKE_PY") or sys.executable
+# the stand-in really is the one imported, or the last clause proves nothing
+subprocess.run([_py, "-c", "import webbrowser; webbrowser.open('probe')"],
+               env=_nw_env, capture_output=True, timeout=30)
+_nw_shim_ok = os.path.exists(_nw_log)
+if _nw_shim_ok:
+    os.remove(_nw_log)
+_hold = socket.socket()
+_hold.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+_hold.bind(("127.0.0.1", 9903))
+_hold.listen(1)
+try:
+    _nw = subprocess.run([_py, "millenai.py"], env=_nw_env,
+                         capture_output=True, text=True, timeout=60)
+    _nw_rc, _nw_out = _nw.returncode, _nw.stdout + _nw.stderr
+except subprocess.TimeoutExpired:
+    _nw_rc, _nw_out = "hung", ""
+finally:
+    _hold.close()
+check("browser mode is gone: without pywebview the app says so and exits before it binds",
+      _nw_rc == 4
+      and ("ConcordeAI needs its app window. Install pywebview (the installer "
+           "does this) and start it again.") in _nw_out
+      and "no free port" not in _nw_out and "running on http" not in _nw_out
+      and not os.path.exists(os.path.join(_nw_home, "run"))
+      and _nw_shim_ok and not os.path.exists(_nw_log),
+      "%r" % [_nw_rc, _nw_shim_ok, _nw_out.strip()[-200:]])
 
 # the test-only switches reach nothing outside a dev copy (REM-1): the
 # statements themselves, run with and without a dev folder
