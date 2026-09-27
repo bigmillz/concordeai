@@ -37,13 +37,13 @@ import urllib.request
 # random key to run/instance.json in its MILLENAI_HOME; set in main()
 DEV_HOME = os.environ.get("CAI_DEV_HOME") or os.path.expanduser(
     "~/Library/Application Support/MillenAI-dev")
-BASE = K = None
+BASE = K = TOK = None
 NUL = "\x00"
 
 
 def _attach(home):
     """Point BASE and K at the dev copy living in home."""
-    global BASE, K
+    global BASE, K, TOK
     note = os.path.join(home, "run", "instance.json")
     try:
         with open(note) as fh:
@@ -55,9 +55,15 @@ def _attach(home):
     BASE = "http://127.0.0.1:%d" % d["port"]
     # the launch key's cookie is named for the port (6b310)
     K = "millen_key_%d=%s" % (d["port"], d["key"])
+    # and every /api call carries the API token too (6b321)
+    TOK = d.get("token")
+    if not TOK:
+        raise SystemExit("drill: the dev copy in %s predates the API token; "
+                         "restart it" % home)
     try:
         urllib.request.urlopen(urllib.request.Request(
-            BASE + "/api/stats", headers={"Cookie": K}), timeout=10).read()
+            BASE + "/api/stats", headers={"Cookie": K, "X-Api-Token": TOK}),
+            timeout=10).read()
     except Exception as exc:
         raise SystemExit("drill: the dev copy on %s doesn't answer (%s)"
                          % (BASE, exc))
@@ -133,7 +139,7 @@ FUNNELS = [
 ]
 
 def req(path, data=None, timeout=300):
-    h = {"Cookie": K}
+    h = {"Cookie": K, "X-Api-Token": TOK}
     body = None
     if data is not None:
         body = json.dumps(data).encode()

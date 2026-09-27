@@ -30,11 +30,13 @@ disown $PID 2>/dev/null || true
 trap 'pkill -9 -P $PID 2>/dev/null || true; kill -9 $PID 2>/dev/null || true; rm -rf "$HOME_DIR"' EXIT
 code=000
 KEY=""
+TOKEN=""
 for _ in $(seq 1 90); do
   kill -0 $PID 2>/dev/null || { echo "boot: the app exited"; tail -40 "$LOG"; exit 1; }
-  [ -n "$KEY" ] || KEY=$("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["key"])' \
-                        "$DATA/run/instance.json" 2>/dev/null || true)
-  [ -n "$KEY" ] || { sleep 1; continue; }
+  # the key AND the API token (6b321): every /api call needs both
+  [ -n "$TOKEN" ] || { read -r KEY TOKEN < <("$PY" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["key"], d["token"])' \
+                        "$DATA/run/instance.json" 2>/dev/null) || true; }
+  [ -n "$TOKEN" ] || { sleep 1; continue; }
   code=$(curl -s -m 5 -o /dev/null -w "%{http_code}" -H "Cookie: millen_key_$PORT=$KEY" \
          "http://127.0.0.1:$PORT/" || true)
   [ "$code" = "200" ] && break
@@ -48,6 +50,15 @@ PAGE="$HOME_DIR/page.html"
 curl -sf -m 10 -H "Cookie: millen_key_$PORT=$KEY" "http://127.0.0.1:$PORT/" >"$PAGE"
 LEFT=$(grep -oE '__[A-Z_]{3,}__' "$PAGE" | grep -v '^__MAIN__$' | sort -u || true)
 [ -z "$LEFT" ] || { echo "page: unreplaced template tokens: $LEFT"; exit 1; }
-curl -sf -m 10 -H "Cookie: millen_key_$PORT=$KEY" "http://127.0.0.1:$PORT/api/stats" >/dev/null \
+curl -sf -m 10 -H "Cookie: millen_key_$PORT=$KEY" -H "X-Api-Token: $TOKEN" \
+  "http://127.0.0.1:$PORT/api/stats" >/dev/null \
   || { echo "api: /api/stats failed"; tail -40 "$LOG"; exit 1; }
+# the cookie alone opens the page and nothing under /api (6b321), and
+# the page carries neither the key nor the token
+code=$(curl -s -m 10 -o /dev/null -w "%{http_code}" -H "Cookie: millen_key_$PORT=$KEY" \
+       "http://127.0.0.1:$PORT/api/stats" || true)
+[ "$code" = "403" ] || { echo "api: /api/stats answered $code with the cookie alone"; exit 1; }
+if grep -qF -e "$TOKEN" -e "$KEY" "$PAGE"; then
+  echo "page: carries the key or the token"; exit 1
+fi
 echo "boot: ok (page $(wc -c <"$PAGE" | tr -d ' ') bytes, /api/stats 200)"

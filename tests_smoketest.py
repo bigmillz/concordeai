@@ -54,7 +54,7 @@ class Instance:
                         MILLENAI_NOWINDOW="1", MILLENAI_PORT=str(port))
         self.env.update(env or {})
         self.seed = seed
-        self.proc = self.key = None
+        self.proc = self.key = self.token = self.boot = None
 
     @property
     def base(self):
@@ -63,6 +63,12 @@ class Instance:
     @property
     def cookie(self):
         return "millen_key_%d=%s" % (self.port, self.key)
+
+    @property
+    def headers(self):
+        # the launch cookie and the API token (6b321): what every /api
+        # call needs
+        return {"Cookie": self.cookie, "X-Api-Token": self.token}
 
     def start(self, timeout=180):
         if _port_open(self.port):
@@ -87,7 +93,16 @@ class Instance:
                 with open(note) as fh:
                     d = json.load(fh)
                 if d.get("pid") == self.proc.pid:
-                    self.key = d["key"]
+                    # a note without the token (6b321) isn't this build's:
+                    # keep waiting, and time out saying so
+                    self.key, self.token = d["key"], d["token"]
+                    if "boot-code" in self.env.get("MILLENAI_TEST_HOOKS", ""):
+                        # the dev-only hook's one-time code (6b321)
+                        with open(os.path.join(self.home, "run", "boot.json")) as fh:
+                            self.boot = json.load(fh)["code"]
+                        self.boot_at = time.time()
+                    # the page answers to the cookie alone, and asking
+                    # for it spends no boot code
                     r = urllib.request.Request(self.base + "/", headers={
                         "Cookie": self.cookie})
                     with urllib.request.urlopen(r, timeout=5) as resp:
@@ -170,7 +185,21 @@ def _canary(tag):
 _CANARY_A = _canary("A")
 
 
+# A's pictures and videos (6b321): one of each under a new 128-bit name
+# and one under the old <unix time>-<6 hex> form, each with bytes the
+# media checks compare; the routes must serve both, behind the token
+_T0 = int(time.time())
+_MEDIA_A = {"images": [os.urandom(16).hex() + ".png", "%d-%s.png" % (_T0, os.urandom(3).hex())],
+            "videos": [os.urandom(16).hex() + ".mp4", "%d-%s.mp4" % (_T0, os.urandom(3).hex())]}
+_MEDIA_BYTES = {n: os.urandom(20000) for _v in _MEDIA_A.values() for n in _v}
+
+
 def _seed_a(home):
+    for _sub, _names in _MEDIA_A.items():
+        os.makedirs(os.path.join(home, _sub), exist_ok=True)
+        for _n in _names:
+            with open(os.path.join(home, _sub, _n), "wb") as fh:
+                fh.write(_MEDIA_BYTES[_n])
     with open(os.path.join(home, "chats.json"), "w") as fh:
         json.dump([{"id": "c1", "title": _CANARY_A, "ts": int(time.time() * 1000),
                     "messages": [{"role": "user", "content": _CANARY_A}]}], fh)
@@ -200,12 +229,17 @@ _NO_REAL = os.environ.get("SMOKE_NO_REAL") == "1"
 _REAL_TOP = (set(os.listdir(_REAL_DIR)) if os.path.isdir(_REAL_DIR) and not _NO_REAL
              else set())
 
-INST = Instance(9901, "A", seed=_seed_a).start()
+# A carries the dev-only boot-code hook (6b321): a windowless copy has
+# no window to spend a boot code, so the hook writes one to run/boot.json
+INST = Instance(9901, "A", seed=_seed_a,
+                env={"MILLENAI_TEST_HOOKS": "boot-code"}).start()
 BASE = INST.base
 KEY = INST.key
 PORT_ = INST.port
 # 6b310: the launch key rides a cookie named for the port
 K = INST.cookie
+# 6b321: and every /api call carries the API token
+TOKEN = INST.token
 
 RESULTS = []
 
@@ -219,13 +253,19 @@ def check(name, ok, detail=""):
     print(("  PASS  " if ok else "  FAIL  ") + name + ("  — " + detail if detail and not ok else ""))
 
 
-def req(path, method="GET", data=None, headers=None, cookie=None, timeout=30):
+def req(path, method="GET", data=None, headers=None, cookie=None, timeout=30,
+        token=None):
     h = dict(headers or {})
     # every request carries the launch key (6b310) unless a check is
     # probing the door itself with cookie=False
     if cookie is not False:
         h["Cookie"] = (cookie if cookie and K in cookie
                        else K + ("; " + cookie if cookie else ""))
+    # and the API token (6b321): token=False leaves it off (the page and
+    # /static/ must answer without it), a string sends that one instead;
+    # an explicit X-Api-Token in headers wins
+    if token is not False:
+        h.setdefault("X-Api-Token", token if isinstance(token, str) else TOKEN)
     if data is not None and not isinstance(data, bytes):
         data = json.dumps(data).encode()
         h.setdefault("Content-Type", "application/json")
@@ -253,23 +293,81 @@ check("key but another port's Host -> 403", s == 403)
 s, h, b = req("/api/chats", cookie=False, headers={
     "Cookie": "millen_key_%d=%s" % (PORT_ + 1, KEY)})
 check("another port's cookie name -> 403", s == 403)
-s, h, b = req("/?key=wrong", cookie=False)
-check("wrong key link -> 403", s == 403)
+# ISO-14, THE ONE-TIME BOOT CODE (6b321). First, while A's code is inside
+# its 60 s: no cookie, no token. A wrong guess of the same length is
+# refused and doesn't burn it; the right one trades for the cookie once
+# (302 to /); a second use is refused. Fails if /?boot= is missing, if
+# the code isn't spent, if a wrong guess burns it, or if the cookie loses
+# its flags.
 _o = urllib.request.build_opener(type("NoRedir", (
     urllib.request.HTTPRedirectHandler,), {
         "redirect_request": lambda *a, **k: None}))
-try:
-    _r = _o.open(BASE + "/?key=" + KEY, timeout=10)
-    _st, _hd = _r.status, dict(_r.headers)
-except urllib.error.HTTPError as e:
-    _st, _hd = e.code, dict(e.headers)
-_sc = _hd.get("Set-Cookie", "")
-check("right key link -> 302 + HttpOnly Strict cookie named for the port",
-      _st == 302 and _hd.get("Location") == "/"
+
+
+def _noredir(path, headers=None):
+    try:
+        _r = _o.open(urllib.request.Request(BASE + path, headers=headers or {}), timeout=10)
+        return _r.status, dict(_r.headers)
+    except urllib.error.HTTPError as e:
+        return e.code, dict(e.headers)
+
+
+_bage = round(time.time() - INST.boot_at, 1)
+_bwrong = _noredir("/?boot=" + ("A" if INST.boot[0] != "A" else "B") + INST.boot[1:])
+_bgood = _noredir("/?boot=" + INST.boot)
+_bagain = _noredir("/?boot=" + INST.boot)
+_bempty = _noredir("/?boot=")
+_sc = _bgood[1].get("Set-Cookie", "")
+check("ISO-14: /?boot=<code> sets the port's HttpOnly Strict cookie and goes to /, once",
+      _bwrong[0] == 403 and "Set-Cookie" not in _bwrong[1]
+      and _bgood[0] == 302 and _bgood[1].get("Location") == "/"
       and _sc.startswith("millen_key_%d=%s;" % (PORT_, KEY))
-      and "HttpOnly" in _sc and "SameSite=Strict" in _sc)
-s, h, b = req("/")
-check("with the key -> app", s == 200 and b"id=\"skyline\"" in b)
+      and "HttpOnly" in _sc and "SameSite=Strict" in _sc and "Path=/" in _sc
+      and _bgood[1].get("Cache-Control") == "no-store"
+      and not any(TOKEN in str(v) for v in _bgood[1].values())
+      and _bagain[0] == 403 and "Set-Cookie" not in _bagain[1]
+      and _bempty[0] == 403,
+      "%r" % [_bage, _bwrong[0], _bgood[0], _bgood[1].get("Location"), _sc[:40],
+              _bagain[0], _bempty[0]])
+# the code's 60 s, without a 60 s wait: the real functions on a fake clock
+# (fails if the TTL isn't 60, an expired code still works, a wrong guess
+# burns it, or a code can be used twice)
+_bn = {"secrets": __import__("secrets"), "threading": __import__("threading"), "time": time}
+import ast as _ast0
+_src0 = open("millenai.py", encoding="utf-8").read()
+for _n in _ast0.parse(_src0).body:
+    _nm = getattr(_n, "name", None) or (isinstance(_n, _ast0.Assign) and getattr(_n.targets[0], "id", None))
+    if _nm in ("BOOT_TTL", "_BOOT", "_BOOT_LOCK", "_mint_boot_code", "_take_boot_code"):
+        exec(_ast0.get_source_segment(_src0, _n), _bn)
+_bt = []
+_c1 = _bn["_mint_boot_code"](now=1000.0)
+_bt.append(_bn["_take_boot_code"]("x" * len(_c1), now=1001.0))   # a wrong guess
+_bt.append(_bn["_take_boot_code"](_c1, now=1059.0))              # inside 60 s
+_bt.append(_bn["_take_boot_code"](_c1, now=1059.5))              # spent
+_c2 = _bn["_mint_boot_code"](now=1000.0)
+_bt.append(_bn["_take_boot_code"](_c2, now=1061.0))              # past 60 s
+_bt.append(_bn["_take_boot_code"](_c2, now=1001.0))              # burned
+check("ISO-14: a boot code works once and not after 60 s",
+      _bn.get("BOOT_TTL") == 60.0 and _bt == [False, True, False, False, False]
+      and "_take_boot_code(urllib.parse.unquote(" in _MILLENAI_SRC,
+      "%r" % [_bn.get("BOOT_TTL"), _bt])
+# /?key= is gone: the real key gets 403 and no cookie, with no cookie and
+# with the cookie alone; with the cookie and the token it isn't the page
+# either (fails if the old /?key= branch or the "/?..." page catch-all
+# comes back)
+_kno = _noredir("/?key=" + urllib.parse.quote(KEY))
+_kck = req("/?key=" + urllib.parse.quote(KEY), token=False)
+_kboth = req("/?key=" + urllib.parse.quote(KEY))
+check("ISO-14: /?key= with the real key gets 403 and sets no cookie",
+      _kno[0] == 403 and "Set-Cookie" not in _kno[1]
+      and _kck[0] == 403 and "Set-Cookie" not in _kck[1]
+      and _kboth[0] != 200 and b'id="skyline"' not in _kboth[2]
+      and 'startswith("/?key=")' not in _MILLENAI_SRC,
+      "%r" % [_kno[0], _kck[0], _kboth[0]])
+s, h, b = req("/?key=wrong", cookie=False)
+check("wrong key link -> 403", s == 403)
+s, h, b = req("/", token=False)
+check("with the key -> app (the page needs no token)", s == 200 and b"id=\"skyline\"" in b)
 # 6b310 review: a 127.0.0.1 cookie goes to EVERY port on 127.0.0.1, so
 # the page may load only from itself and https — never plain http
 _csp = h.get("Content-Security-Policy", "")
@@ -280,10 +378,32 @@ check("page CSP: self + https only, so no other local port sees the key",
 s, h, b = req("/api/chats", cookie=False, headers={
     "Cookie": "millen_key_%d=junk; %s" % (PORT_, K)})
 check("a stray same-name cookie can't shadow the key", s == 200)
+# ISO-14, THE TOKEN ON EVERY /api CALL (6b321): the cookie alone, the
+# token alone, a wrong token of the same length, one a character short
+# or long, the token in the query or as a cookie: 403 on a GET and a
+# POST; both: 200. Fails if any
+# /api route answers to the cookie alone or the check isn't exact.
+_wtok = ("A" if TOKEN[0] != "A" else "B") + TOKEN[1:]
+_tk = {}
+for _p, _m, _d in (("/api/chats", "GET", None), ("/api/prefs", "POST", {"length": 3})):
+    _tk[_p] = [req(_p, _m, _d, token=False)[0],
+               req(_p, _m, _d, cookie=False)[0],
+               req(_p, _m, _d, token=_wtok)[0],
+               req(_p, _m, _d, token=TOKEN[:-1])[0],
+               req(_p, _m, _d, token=TOKEN + "A")[0],
+               req(_p + "?token=" + urllib.parse.quote(TOKEN), _m, _d, token=False)[0],
+               req(_p, _m, _d, token=False, cookie="X-Api-Token=" + TOKEN)[0],
+               req(_p, _m, _d)[0]]
+_tkb = req("/api/chats", token=False)[2]
+check("ISO-14: every /api call needs X-Api-Token as well as the cookie",
+      all(v == [403, 403, 403, 403, 403, 403, 403, 200] for v in _tk.values())
+      and b"messages" not in _tkb and _CANARY_A.encode() not in _tkb,
+      "%r" % _tk)
 s, h, b = req("/api/window/focus", "POST", {})
 s2, h2, b2 = req("/api/window/focus", "POST", {}, cookie=False)
-check("second launch can ask this copy forward; nobody else can",
-      s == 200 and b'"ok": true' in b and s2 == 403)
+s3, h3, b3 = req("/api/window/focus", "POST", {}, token=False)
+check("second launch can ask this copy forward with key and token; nobody else can",
+      s == 200 and b'"ok": true' in b and s2 == 403 and s3 == 403, "%r" % [s, s2, s3])
 
 print("== one identity ==")
 # accounts step 2 (0a 5.8, 6b320): the web version and its per-visitor
@@ -334,14 +454,144 @@ if cached:
     i = cached[0]
     s, h, b = req(f"/api/sky/status?i={i}", cookie=K)
     check("cached clip reports ready", b'"ready"' in b)
-    s, h, _ = req(f"/sky/{i}.mov", cookie=K, headers={"Range": "bytes=0-1023"})
+    # the clips answer to the cookie alone (6b321): a <video src> can't
+    # send the token
+    s, h, _ = req(f"/static/sky/{i}.mov", cookie=K, headers={"Range": "bytes=0-1023"},
+                  token=False)
     check("range serving 206", s == 206)
-    s, h, _ = req(f"/sky/{i}.mov", cookie=K, headers={"Range": "bytes=-1024"})
+    s, h, _ = req(f"/static/sky/{i}.mov", cookie=K, headers={"Range": "bytes=-1024"},
+                  token=False)
     check("suffix range 206", s == 206)
-s, h, b = req("/", cookie=K)
+s, h, b = req("/", cookie=K, token=False)
 page = b.decode("utf-8", "replace")
 check("SKY_N injected", re.search(r'parseInt\("\d+",10\)', page))
 check("dark list injected", "darkSet=new Set(JSON.parse('[0, 3, 4" in page)
+
+print("== the cookie alone (ISO-14, 6b321) ==")
+# COOKIE REPLAY: a listener on another port that got the launch cookie
+# replays it, with no token. Every route the handler names, GET and POST,
+# must refuse, but the page at / and the public clips under /static/.
+# The list is read from the handler's own source, so a route added later
+# is covered. POSTs go as text/plain: if the token wall broke, _csrf_ok
+# would still refuse them ("cross-site"), so nothing (an install, a
+# forget) can run; the gate's own body ("own window") tells the walls
+# apart. Fails if any route answers to the cookie alone.
+_hsrc = _MILLENAI_SRC[_MILLENAI_SRC.index("    def do_GET(self):"):
+                      _MILLENAI_SRC.index("\n_INSTANCE_LOCK = []")]
+_routes = sorted({m for m in re.findall(r'"(/[A-Za-z0-9_./-]*)"', _hsrc)
+                  if not m.startswith("//") and m != "/"})
+_routes = [r + "x" if r.endswith("/") else r for r in _routes]
+_media = (["/api/image/" + n for n in _MEDIA_A["images"]]
+          + ["/api/video/" + n for n in _MEDIA_A["videos"]])
+_extra = ["/api/chats", "/api/chats/search?q=a", "/auth/google", "/favicon.ico", "/nope",
+          "/?x=1", "//api/chats", "/static/", "/static/sky/", "/static/x.js",
+          "/api/export/x.csv", "/api/window/focus"]
+_ok_alone = {"/static/vfx/hdr-beacon.mp4"}
+_rg = {}
+for _r in sorted(set(_routes + _media + _extra)):
+    _st, _hd, _bd = req(_r, token=False)
+    if _r in _ok_alone:
+        _rg[_r] = _st in (200, 206)
+    else:
+        _rg[_r] = _st == 403 and _CANARY_A.encode() not in _bd
+_rp = {}
+for _r in sorted(set(_routes + ["/api/chat", "/api/forget", "/api/window/focus"])):
+    _st, _hd, _bd = req(_r, "POST", b"{}", headers={"Content-Type": "text/plain"}, token=False)
+    _rp[_r] = _st == 403 and b"own window" in _bd
+_p0 = req("/", token=False)[0]
+_sky0 = req("/static/sky/0.mov", token=False, headers={"Range": "bytes=0-9"})[0]
+check("ISO-14 cookie replay: the cookie alone opens only / and /static/, every other route 403",
+      len(_routes) > 50 and all(_rg.values()) and all(_rp.values())
+      and _p0 == 200 and _sky0 == 206
+      and "/api/chats" in _routes and "/api/window/focus" in _routes
+      # the one list of what the cookie alone opens, pinned
+      and '_COOKIE_ONLY = re.compile(\n    r"/(?:static/sky/\\d{1,3}\\.mov|static/vfx/hdr-beacon\\.mp4)?")'
+      in _MILLENAI_SRC,
+      "%r" % [len(_routes), [k for k, v in _rg.items() if not v][:8],
+              [k for k, v in _rp.items() if not v][:8], _p0, _sky0])
+# an absolute-form request line (GET http://host/api/chats) or a doubled
+# slash can't slip past: the allowlist is matched whole, not by prefix
+import socket as _sk0
+
+
+def _raw_get(target):
+    with _sk0.create_connection(("127.0.0.1", PORT_), timeout=10) as _c:
+        _c.sendall(("GET %s HTTP/1.1\r\nHost: 127.0.0.1:%d\r\nCookie: %s\r\n"
+                    "Connection: close\r\n\r\n" % (target, PORT_, K)).encode())
+        _buf = b""
+        while True:
+            _d = _c.recv(65536)
+            if not _d:
+                break
+            _buf += _d
+    return _buf
+
+
+_abs = [_raw_get(t) for t in ("http://127.0.0.1:%d/api/chats" % PORT_,
+                              "http://127.0.0.1:%d/" % PORT_, "//api/chats")]
+check("ISO-14: an absolute-form or doubled-slash path gets 403 with the cookie alone",
+      all(x.startswith(b"HTTP/1.0 403") and _CANARY_A.encode() not in x for x in _abs),
+      "%r" % [x[:15] for x in _abs])
+# /static/ SERVES NOTHING PERSONAL (0a section 9): traversal forms, a
+# seeded picture's name and a clip number past the list, with the cookie
+# alone and with the token too: never a chat, never a picture's bytes.
+# /static/sky/999.mov raised IndexError and dropped the connection.
+_trav = ["/static/../api/chats", "/static/sky/../../chats.json", "/static/%2e%2e/chats.json",
+         "/static/sky/..%2fchats.json", "/static//etc/passwd", "/static/sky/999.mov",
+         "/static/images/" + _MEDIA_A["images"][0], "/static/" + _MEDIA_A["images"][0],
+         "/static/vfx/../../chats.json", "/static/sky/0.mov/../../chats.json"]
+_tr = {}
+for _t in _trav:
+    for _tok in (False, None):
+        try:
+            _st, _hd, _bd = req(_t, token=_tok)
+        except Exception as _e:
+            _st, _bd = "dropped: %s" % type(_e).__name__, b""
+        _tr[(_t, _tok is None)] = (_st, _CANARY_A.encode() in _bd
+                                   or any(v[:64] in _bd for v in _MEDIA_BYTES.values()))
+check("ISO-14: /static/ serves nothing personal, and a clip number past the list is a 404",
+      all(st in (403, 404) and not leak for st, leak in _tr.values())
+      and _tr[("/static/sky/999.mov", True)][0] == 404
+      and _tr[("/static/sky/999.mov", False)][0] == 404,
+      "%r" % {k: v for k, v in _tr.items() if v[0] not in (403, 404) or v[1]})
+# ISO-14, MEDIA BEHIND THE TOKEN: each seeded picture and video, the new
+# 128-bit name and the old one, is served whole with cookie and token,
+# and refused with either alone; a video still answers a Range. Fails if
+# a media route loses the token or stops serving the old names.
+_mt = {}
+for _mp in _media:
+    _nm = _mp.rsplit("/", 1)[1]
+    _both = req(_mp)
+    _mt[_nm] = (_both[0], _both[2] == _MEDIA_BYTES[_nm],
+                req(_mp, token=False)[0], req(_mp, cookie=False)[0])
+_vr = req("/api/video/" + _MEDIA_A["videos"][0], headers={"Range": "bytes=0-99"})
+check("ISO-14: pictures and videos, new names and old, need the cookie and the token",
+      all(v == (200, True, 403, 403) for v in _mt.values()) and len(_mt) == 4
+      and _vr[0] == 206 and _vr[2] == _MEDIA_BYTES[_MEDIA_A["videos"][0]][:100],
+      "%r" % [_mt, _vr[0]])
+# THE PAGE HOLDS NO TOKEN, NO KEY AND NOTHING PERSONAL (0a 5.4): with a
+# name and a town set, the page the cookie alone opens carries neither,
+# nor the key or token, and sets no cookie; /api/prefs (behind the
+# token) is where the hero gets them. Fails if __USER_NICK__/CITY or any
+# credential goes back into the HTML.
+_cn, _cc = "Zq" + os.urandom(4).hex(), "Zt" + os.urandom(4).hex()
+_pr0 = json.loads(req("/api/prefs")[2])
+req("/api/prefs", "POST", {"user_name": _cn + " Smith", "home_area": _cc + ", NY"})
+_pg1 = req("/", token=False)
+_pr1 = json.loads(req("/api/prefs")[2])
+req("/api/prefs", "POST", {"user_name": _pr0.get("user_name", ""),
+                           "home_area": _pr0.get("home_area", "")})
+_gb = _MILLENAI_SRC[_MILLENAI_SRC.index('        if self.path == "/"'):
+                    _MILLENAI_SRC.index('        elif self.path.startswith("/api/workspace"):')]
+_pleak = [n for n, v in (("token", TOKEN), ("key", KEY), ("name", _cn), ("town", _cc))
+          if v.encode() in _pg1[2]]
+check("ISO-14: the page carries no token, no key, no name or town, and sets no cookie",
+      _pg1[0] == 200 and b'id="skyline"' in _pg1[2] and not _pleak
+      and "Set-Cookie" not in _pg1[1]
+      and _pr1.get("user_name", "").startswith(_cn) and _pr1.get("home_area", "").startswith(_cc)
+      and "API_TOKEN" not in _gb and "ACCESS_KEY" not in _gb and "load_prefs" not in _gb
+      and "__USER_NICK__" not in _MILLENAI_SRC and "__USER_CITY__" not in _MILLENAI_SRC,
+      "%r" % [_pg1[0], _pleak])
 
 # THE VERSION FACTS, read once: the checks below assert that every
 # surface agrees with the constants, never that the line is some
@@ -437,7 +687,7 @@ except Exception:
     _wn = {}
 check("what's new endpoint answers for this build",
       _wn.get("title", "").startswith(_vwant) and "notes" in _wn
-      and 'fetch("/api/update/whatsnew")' in page
+      and 'api("/api/update/whatsnew")' in page
       and 'prefs.get("last_ident")' in _MILLENAI_SRC
       and "ident = short_version()" in _MILLENAI_SRC)
 # 6b295, per Patrick: export to ~20 formats, routed from plain language,
@@ -824,7 +1074,7 @@ check("one download indicator: the strip alone while busy",
       and '(st.updating?"updating":"downloading")' in page
       # 6b304: the strip reads the cheap busy endpoint and hides the pill
       # itself; it no longer re-reads the full status to drive it
-      and 'fetch("/api/setup/busy")' in page)
+      and 'api("/api/setup/busy")' in page)
 # 6b290, per Patrick ("sitting at 100% doing nothing… idiot proof it"):
 # the bar counts the batch in play, MLX runs two at a time and is judged
 # by bytes, the pane reports live, and the preset on disk is marked
@@ -1386,8 +1636,11 @@ check("prune: retired registry + ladders scrubbed",
       and "elif label in RETIRED_MODELS:" in _MILLENAI_SRC)
 check("wizard has the auto-clean box, no button",
       'id="wiz-ac"' in page and "wiz-clean-now" not in page)
+# the name and town come from /api/prefs behind the token (6b321), not
+# from the page's HTML
 check("hero greets by name and town",
-      "const NICK=" in page and "const CITY=" in page
+      'let NICK="",CITY="";' in page and 'api("/api/prefs").then(r=>r.json()).then(p=>{' in page
+      and "NICK=(String(p.user_name" in page and "CITY=String(p.home_area" in page
       and "__USER_NICK__" not in page and "__USER_CITY__" not in page)
 check("chat search under the tabs",
       'id="chat-q"' in page and "/api/chats/search?q=" in page
@@ -1621,12 +1874,15 @@ _PAGE_HOST = set("""AbortController Array ArrayBuffer Blob Boolean CSS DataView 
 Error Event Float32Array Image JSON Map Math Object Promise Set String
 TextDecoder URL addEventListener cancelAnimationFrame clearInterval
 clearTimeout decodeURIComponent devicePixelRatio document
-encodeURIComponent fetch getComputedStyle innerHeight innerWidth isFinite
+encodeURIComponent getComputedStyle innerHeight innerWidth isFinite
 localStorage location matchMedia navigator parseFloat parseInt performance
-requestAnimationFrame setInterval setTimeout window""".split())
+requestAnimationFrame setInterval setTimeout window
+DOMException Headers IntersectionObserver MutationObserver""".split())
+# no bare fetch (6b321): the page's one fetch is window.fetch, saved by
+# api(); a bare one would be an undeclared name here as well
 # L is Leaflet, loaded from unpkg before any map mounts; the __X__ names
 # are placeholders the server fills in before the page is sent
-_PAGE_HOST |= {"L", "__SKY_NIGHT__", "__IS_PC__", "__JUST_UPDATED__", "__USER_CITY__", "__USER_NICK__"}
+_PAGE_HOST |= {"L", "__SKY_NIGHT__", "__IS_PC__", "__JUST_UPDATED__"}
 _undecl = _jsscan.undeclared(_jsscan.page_script(_MILLENAI_SRC))
 _brand = _MILLENAI_SRC.split("the brand chameleon runs on its own gentle clock")[1][:600]
 check("the page has no reference to an undeclared perf",
@@ -1658,6 +1914,112 @@ for _i, _js in enumerate(_pscripts + [";\n".join(_pscripts)]):
 check("the served page's scripts parse, alone and together",
       _pscripts and sum(map(len, _pscripts)) > 200_000 and not _pbad,
       "%r" % [len(_pscripts), sum(map(len, _pscripts)), _pbad])
+# ONE FETCH (6b321, 0a 5.4): every call the page makes goes through
+# api(), which waits for the token and adds it. Tokenized, so comments
+# and strings don't count: the only `fetch` identifier left is
+# window.fetch, saved for api() (const nFetch=window.fetch.bind(window)),
+# so a bare fetch(, a window.fetch( or an alias (const f=fetch) fails
+# here; so do XMLHttpRequest, EventSource, sendBeacon or WebSocket, a
+# "fetch" string (window["fetch"]), and any element in the served page
+# pointing at /api/ directly (an <img>, <video> or <a> can't carry the
+# token). api( is counted too, so an empty or broken page can't pass.
+_pjs = _jsscan.page_script(_MILLENAI_SRC)
+_ptk = _jsscan.tokenize(_pjs)
+_fi = [i for i, t in enumerate(_ptk) if t == ("i", "fetch")]
+_nats = [w for w in ("XMLHttpRequest", "EventSource", "sendBeacon", "WebSocket")
+         if ("i", w) in _ptk]
+_napi = sum(1 for i, t in enumerate(_ptk[:-1]) if t == ("i", "api") and _ptk[i + 1] == ("p", "("))
+_direct = re.findall(r'(?<![\w-])(?:src|href)\s*=\s*["\'`]/api/', page)
+check("the page's one fetch is api(): no bare fetch, no element pointing at /api/",
+      len(_fi) == 1
+      and _ptk[_fi[0] - 4:_fi[0] + 3] == [("i", "nFetch"), ("p", "="), ("i", "window"),
+                                          ("p", "."), ("i", "fetch"), ("p", "."), ("i", "bind")]
+      and not _nats and _napi >= 100
+      and not re.search(r'["\'`]fetch["\'`]', _pjs)
+      and not re.search(r"(?<![\w.$])fetch\(", page) and not _direct,
+      "%r" % [len(_fi), _nats, _napi, _direct[:3]])
+# THE WRAPPER ITSELF, in node (6b321): its own source, with a stand-in
+# window and bridge. A call made before pywebviewready waits and is sent
+# once the token arrives, with the token and the caller's method, body
+# and Content-Type; the Response comes back untouched (the chat reads
+# its body as a stream). A Stop while waiting rejects AbortError and
+# nothing is sent. Another origin, or a //host URL, never gets the
+# token. A bridge that answers null (a foreign page) sends nothing. On
+# Qt, stubs without the channel aren't asked; once it's up, they are.
+# A picture loads once through api() as a blob: URL, a second element
+# takes the cached URL with no second fetch, and the sweep frees it once
+# nothing shows it. Fails if api() stops waiting, drops the token or the
+# caller's options, wraps the Response, or media refetch per repaint.
+_wsrc = page[page.index("const nFetch=window.fetch.bind(window);"):]
+_wsrc = _wsrc[:_wsrc.index("\n}\n", _wsrc.index("async function apiDownload(")) + 3]
+_wrun = r"""
+const calls=[],L={},revoked=[];let blobs=0;
+globalThis.window=globalThis;
+globalThis.fetch=(u,o)=>{calls.push({u:String(u),o:o||{}});
+  return Promise.resolve({ok:true,marker:7,blob:()=>Promise.resolve({b:1}),body:{getReader(){return 1;}}});};
+globalThis.location={href:"http://127.0.0.1:9/",origin:"http://127.0.0.1:9"};
+globalThis.addEventListener=(n,f)=>{(L[n]=L[n]||[]).push(f);};
+globalThis.document={documentElement:{},body:{appendChild(){}},createElement:()=>({click(){},remove(){}})};
+globalThis.MutationObserver=class{observe(){}};
+URL.createObjectURL=()=>"blob:"+(++blobs);URL.revokeObjectURL=u=>revoked.push(u);
+let ELS=[];const $=()=>null,$$=()=>ELS;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+""" + _wsrc + r"""
+(async()=>{
+  const out={},mode=process.argv[2],tk="T".repeat(43);
+  if(mode==="main"){
+    const ac=new AbortController();
+    const pa=api("/api/chat",{method:"POST",signal:ac.signal});
+    const p=api("/api/chats",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
+    ac.abort();
+    out.abort=await pa.then(()=>"sent",e=>e.name);
+    await sleep(400);out.before=calls.length;
+    window.pywebview={platform:"cocoa",api:{api_token:()=>Promise.resolve(tk)}};
+    (L.pywebviewready||[]).forEach(f=>f());
+    const r=await p;const c=calls[0];
+    out.sent=calls.length;out.url=c.u;out.tok=c.o.headers.get("X-Api-Token");
+    out.ct=c.o.headers.get("Content-Type");out.method=c.o.method;out.body=c.o.body;
+    out.same=r.marker===7&&r.body.getReader()===1;
+    await api("https://example.com/api/x");await api("//evil.test/api/x");
+    out.ext=calls.slice(1).map(x=>!!(x.o.headers&&x.o.headers.get&&x.o.headers.get("X-Api-Token")));
+    const e1={dataset:{apiSrc:"/api/image/a.png"},src:""},e2={dataset:{apiSrc:"/api/image/a.png"},src:""};
+    ELS=[e1];const n0=calls.length;mediaShow(e1);await sleep(50);
+    ELS=[e2];mediaShow(e2);await sleep(50);
+    out.media=[e1.src,e2.src,calls.length-n0,calls[n0].o.headers.get("X-Api-Token")===tk];
+    ELS=[];mediaSweep();out.revoked=revoked;
+  }else if(mode==="null"){
+    window.pywebview={platform:"cocoa",api:{api_token:()=>Promise.resolve(null)}};
+    const p=api("/api/chats");(L.pywebviewready||[]).forEach(f=>f());
+    await sleep(700);out.sent=calls.length;
+  }else{
+    let asked=0;
+    window.pywebview={platform:"qtwebengine",api:{api_token:()=>{asked++;return Promise.resolve(tk);}}};
+    const p=api("/api/chats");await sleep(700);out.early=[asked,calls.length];
+    window.pywebview._QWebChannel={};await p;out.late=[asked,calls.length];
+  }
+  process.stdout.write(JSON.stringify(out));process.exit(0);
+})();
+"""
+_wf = os.path.join(_pdir, "wrap.js")
+open(_wf, "w").write(_wrun)
+_wo = {}
+for _md in ("main", "null", "qt"):
+    try:
+        _wo[_md] = json.loads(subprocess.run(["node", _wf, _md], capture_output=True, text=True,
+                                             timeout=30).stdout or "{}")
+    except Exception as _e:
+        _wo[_md] = {"err": repr(_e)}
+_wm = _wo.get("main", {})
+check("api() waits for the token, sends it with the caller's options, and returns the Response",
+      _wm.get("abort") == "AbortError" and _wm.get("before") == 0 and _wm.get("sent") == 1
+      and _wm.get("url") == "/api/chats" and _wm.get("tok") == "T" * 43
+      and _wm.get("ct") == "application/json" and _wm.get("method") == "POST"
+      and _wm.get("body") == "{}" and _wm.get("same") is True
+      and _wm.get("ext") == [False, False]
+      and _wm.get("media") == ["blob:1", "blob:1", 1, True] and _wm.get("revoked") == ["blob:1"]
+      and _wo.get("null") == {"sent": 0}
+      and _wo.get("qt") == {"early": [0, 0], "late": [1, 1]},
+      "%r" % _wo)
 # 6b310, per Patrick: "we don't need a feature where friends can answer
 # each other's questions." Contribute (and the fleet hub behind it) is
 # gone: no worker, no hub routes, no UI, no invite, and startup scrubs
@@ -1786,7 +2148,13 @@ check("taken port: the window opens the server this app bound",
       and "threading.Thread(target=start_backend, daemon=True)" not in _MILLENAI_SRC
       and _main.index("single_instance()") < _main.index("bind_backend()")
       < _main.index("_write_instance_note()") < _main.index("webview.create_window(")
-      and 'url = f"http://127.0.0.1:{PORT}/?key="' in _main
+      # the window opens a one-time code (6b321), minted after the
+      # engines start and right before the window, never /?key=
+      and 'url = "http://127.0.0.1:%d/?boot=%s" % (PORT, _mint_boot_code())' in _main
+      and _main.index("start_managed_engines()") < _main.index("_mint_boot_code()")
+      < _main.index("webview.create_window(")
+      and "js_api=_WindowBridge() if _BRIDGE_OK else None," in _main
+      and "?key=" not in _main
       and "os.O_WRONLY | os.O_CREAT | os.O_TRUNC,\n                     0o600" in _MILLENAI_SRC,
       "moved=%s named_fails=%s lock=%s calls=%s overlap=%s"
       % (_moved, _named_fails, _si_ok, _si_calls,
@@ -2295,7 +2663,12 @@ _xss = ['![x" onerror="alert(1)](https://nope.invalid/a.png)',
                                    "https://a.example/b.jpg"]},
         {"fn": "mapCard", "arg": {"lat": 1, "lon": '2"></iframe><img src=x onerror=alert(1)>'}},
         {"fn": "mapCard", "arg": {"lat": 40.7, "lon": -73.9, "name": "Here"}},
-        '```flow\nUser\'s app -> "API" (can\'t fail)\n```']
+        '```flow\nUser\'s app -> "API" (can\'t fail)\n```',
+        # 6b321: media behind the token: a 128-bit picture, a video and
+        # a GIF render with data-api-src, never a src pointing at /api/
+        '![new](/api/image/' + "ab" * 16 + '.png)',
+        '[[vid:{"id":"' + "cd" * 16 + '.mp4","t":"a clip"}]]',
+        '[[vid:{"id":"' + "ef" * 16 + '.gif","t":"a gif"}]]']
 try:
     _jsf = os.path.join(_si_dir, "rmd.js")
     open(_jsf, "w").write(_js)
@@ -2347,7 +2720,13 @@ check("an answer can't break out of an attribute and run script",
       and "&#<i" not in "".join(_outs)
       and _outs[10] == "<p>He said &quot;hi&quot; and it&#39;s fine</p>"
       and "<img" not in _outs[11] and 'href="https://collector.example/' in _outs[11]
-      and '<img class="genimg" src="/api/image/123-abc.png"' in _outs[12]
+      and '<img class="genimg" data-api-src="/api/image/123-abc.png"' in _outs[12]
+      and '<img class="genimg" data-api-src="/api/image/%s.png"' % ("ab" * 16) in _outs[18]
+      and '<video class="genvid" controls playsinline preload="metadata" data-api-src="/api/video/%s.mp4"' % ("cd" * 16) in _outs[19]
+      and '<img class="genvid" data-api-src="/api/video/%s.gif"' % ("ef" * 16) in _outs[20]
+      # no element points at /api/ directly, the download box included
+      and not any(re.search(r'(?<![\w-])(?:src|href)="/api/', o) for o in _outs)
+      and 'class="dlgo" data-api-href="/api/export/' in _outs[8]
       and "<img" not in _outs[13]
       and "127.0.0.1" not in _outs[14] and 'src="https://a.example/b.jpg"' in _outs[14]
       and _outs[15] == "" and "<iframe" in _outs[16] and "40.7,-73.9" in _outs[16]
@@ -2993,7 +3372,8 @@ check("sources fold into the disclosure on every path",
 check("no glow oval behind the wordmark",
       "aiglow" not in page and "hdrai" not in page
       and "hdrglow" not in page
-      and req("/vfx/hdr-beacon.mp4", cookie=K)[0] in (200, 206))
+      # under /static/ since 6b321, and the cookie alone opens it
+      and req("/static/vfx/hdr-beacon.mp4", cookie=K, token=False)[0] in (200, 206))
 check("about-name id retired, veil titles distinct",
       'id="about-name"' not in page
       and 'id="new-title"' in page and 'id="up-title"' in page
@@ -4692,36 +5072,224 @@ print("== dev isolation ==")
 # does reaches another copy or the real app's folder
 
 
-def _ireq(inst, path, cookie=None):
-    h = {"Cookie": cookie} if cookie else {}
+def _ireq(inst, path, cookie=None, token=None, method="GET", data=None, headers=None):
+    """A request to one copy: its own cookie and token unless told
+    otherwise (a string sends that one, False sends none)."""
+    h = dict(headers or {})
+    if cookie is not False:
+        h["Cookie"] = cookie or inst.cookie
+    if token is not False:
+        h["X-Api-Token"] = token or inst.token
     try:
         with urllib.request.urlopen(urllib.request.Request(
-                inst.base + path, headers=h), timeout=30) as resp:
+                inst.base + path, data=data, headers=h, method=method), timeout=30) as resp:
             return resp.status, resp.read()
     except urllib.error.HTTPError as e:
         return e.code, e.read()
 
 
-INST_B = Instance(9902, "B").start()
-_a_chats = _ireq(INST, "/api/chats", INST.cookie)
-_b_chats = _ireq(INST_B, "/api/chats", INST_B.cookie)
+# B also carries the boot-code hook: its code is still live when the
+# two-copy boot check below runs
+INST_B = Instance(9902, "B", env={"MILLENAI_TEST_HOOKS": "boot-code"}).start()
+_a_chats = _ireq(INST, "/api/chats")
+_b_chats = _ireq(INST_B, "/api/chats")
 _b_hits = _bytegrep(INST_B.home, _CANARY_A)
+# one credential swapped at a time (6b321): with only the key checked, or
+# only the token, one of these would get in
 _cross = (_ireq(INST_B, "/api/chats", "millen_key_%d=%s" % (INST_B.port, INST.key))[0],
-          _ireq(INST, "/api/chats", "millen_key_%d=%s" % (INST.port, INST_B.key))[0])
-check("two copies: B never sees A's chat, not a byte of it, and each refuses the other's key",
+          _ireq(INST, "/api/chats", "millen_key_%d=%s" % (INST.port, INST_B.key))[0],
+          _ireq(INST_B, "/api/chats", token=INST.token)[0],
+          _ireq(INST, "/api/chats", token=INST_B.token)[0])
+check("two copies: B never sees A's chat, not a byte of it, and each refuses the other's key and token",
       _a_chats[0] == 200 and _CANARY_A.encode() in _a_chats[1]
       and _b_chats == (200, b'{"chats": []}') and not _b_hits
-      and _cross == (403, 403) and INST.key != INST_B.key,
+      and _cross == (403, 403, 403, 403) and INST.key != INST_B.key
+      and INST.token != INST_B.token,
       "%r" % [_a_chats[0], _b_chats, _b_hits, _cross])
 
-# each copy's note is private to its user and names its own process
+# ISO-14, two copies and a boot code (6b321): B's live code is refused
+# by A, then works once on B (the proof it was live), then not again.
+# A's own code was spent at the top, and is long past 60 s by now.
+_ob = urllib.request.build_opener(type("NoRedir", (
+    urllib.request.HTTPRedirectHandler,), {"redirect_request": lambda *a, **k: None}))
+
+
+def _boot_on(inst, code):
+    try:
+        _r = _ob.open(inst.base + "/?boot=" + code, timeout=10)
+        return _r.status, _r.headers.get("Set-Cookie", "")
+    except urllib.error.HTTPError as e:
+        return e.code, e.headers.get("Set-Cookie", "")
+
+
+_bb = [_boot_on(INST, INST_B.boot), _boot_on(INST_B, INST_B.boot), _boot_on(INST_B, INST_B.boot),
+       _boot_on(INST, INST.boot)]
+check("ISO-14: each copy refuses the other's boot code; B's own works once",
+      _bb[0] == (403, "") and _bb[1][0] == 302
+      and _bb[1][1].startswith("millen_key_%d=%s;" % (INST_B.port, INST_B.key))
+      and _bb[2] == (403, "") and _bb[3] == (403, ""),
+      "%r" % [(s, c[:24]) for s, c in _bb])
+
+# a guessed old 24-bit media id (6b321): a neighbour of A's old picture
+# (same second, other 6 hex) is a 404 on A; A's real old id is a 404 on B,
+# never A's bytes; A's cookie with B's token is refused
+_old = _MEDIA_A["images"][1]
+_nb = _old.split("-")[0] + "-" + ("%06x" % ((int(_old.split("-")[1][:6], 16) + 1) % 0xFFFFFF)) + ".png"
+_mg = (_ireq(INST, "/api/image/" + _nb)[0], _ireq(INST_B, "/api/image/" + _old),
+       _ireq(INST, "/api/image/" + _old, token=INST_B.token)[0], _ireq(INST, "/api/image/" + _old)[0])
+check("two copies: a guessed old media id is a 404, and A's pictures never come from B",
+      _mg[0] == 404 and _mg[1][0] == 404 and _MEDIA_BYTES[_old][:64] not in _mg[1][1]
+      and _mg[2] == 403 and _mg[3] == 200,
+      "%r" % [_mg[0], _mg[1][0], _mg[2], _mg[3]])
+
+# each copy's note is private to its user, names its own process, and
+# carries the key and the API token, never the boot code (the hook writes
+# that to boot.json on its own)
 _notes = []
 for _i in (INST, INST_B):
     _np = os.path.join(_i.home, "run", "instance.json")
+    _nd = json.load(open(_np))
     _notes.append((oct(os.stat(_np).st_mode & 0o777) if sys.platform != "win32" else "0o600",
-                   json.load(open(_np)).get("pid") == _i.proc.pid))
-check("each copy's run/instance.json is 0600 and names its own process",
-      _notes == [("0o600", True)] * 2, "%r" % _notes)
+                   _nd.get("pid") == _i.proc.pid, sorted(_nd),
+                   isinstance(_nd.get("token"), str) and len(_nd["token"]) >= 43
+                   and _nd["token"] != _nd.get("key"),
+                   _i.boot not in open(_np).read()))
+check("each copy's run/instance.json is 0600, names its own process and carries its token",
+      _notes == [("0o600", True, ["key", "pid", "port", "token"], True, True)] * 2
+      and INST.token != INST_B.token, "%r" % _notes)
+
+# ISO-16: a copy's token lives only in its own run/instance.json, and
+# never in its log (fails if the token is printed or saved anywhere else)
+_tloc = {}
+for _i in (INST, INST_B):
+    _tloc[_i.name] = ([os.path.relpath(p, _i.home) for p in _bytegrep(_i.home, _i.token)],
+                      _bytegrep_file(_i.log.name, _i.token))
+check("each copy's API token lives only in its run/instance.json",
+      _tloc == {"A": ([os.path.join("run", "instance.json")], False),
+                "B": ([os.path.join("run", "instance.json")], False)}, "%r" % _tloc)
+
+# THE HAND-OFF (6b321): a second launch asks the running copy forward with
+# the key AND the token from run/instance.json; the note without the
+# token, or with B's token, gets nothing. The real function, pointed at a
+# temporary note. Fails if _hand_off stops sending the token or the
+# focus route answers without it.
+_hdir = tempfile.mkdtemp(dir=_SMOKE_TMP)
+_ho = {"os": os, "json": json, "urllib": urllib, "IS_WIN": False,
+       "INSTANCE_NOTE": os.path.join(_hdir, "instance.json")}
+_exec_names(_ho, {"_hand_off"})
+_hres = []
+for _nd in ({"port": PORT_, "key": KEY, "token": TOKEN}, {"port": PORT_, "key": KEY},
+            {"port": PORT_, "key": KEY, "token": INST_B.token}):
+    with open(_ho["INSTANCE_NOTE"], "w") as fh:
+        json.dump(_nd, fh)
+    _hres.append(_ho["_hand_off"]())
+check("ISO-14: a second launch brings the window forward with key and token; without both, nothing",
+      _hres == [True, False, False], "%r" % _hres)
+
+# ISO-14, THE CODE DIES AT 60 S, LIVE: a short copy with the boot-short
+# hook (the same code path, a 2 s life) refuses its own code after 3 s.
+# The fake-clock check above covers the logic; this covers the wiring.
+_S = Instance(9903, "S", env={"MILLENAI_TEST_HOOKS": "boot-code,boot-short"}).start()
+time.sleep(max(0.0, _S.boot_at + 3.0 - time.time()))
+_sx = _boot_on(_S, _S.boot)
+_S.stop()
+check("ISO-14: a boot code past its life gets 403 and no cookie",
+      _sx == (403, "") and not _port_open(9903), "%r" % [_sx])
+
+# ISO-14, MEDIA IDS CAN'T BE GUESSED (6b321): a new picture is named with
+# 128 random bits under its true type, and every place that names a new
+# picture or video uses the one helper. The copy has no models, so the
+# real save function runs against a temporary folder. Fails if any of
+# the four sites goes back to <unix time>-<6 hex>.
+_mid = tempfile.mkdtemp(dir=_SMOKE_TMP)
+_mn = {"os": os, "secrets": __import__("secrets"), "IMAGE_DIR": _mid}
+_exec_names(_mn, {"_media_id", "_write_image_bytes"})
+_mp = [os.path.basename(_mn["_write_image_bytes"](d)) for d in
+       (b"\x89PNG\r\n\x1a\n" + b"0" * 32, b"\xff\xd8\xff" + b"0" * 32,
+        b"RIFF\0\0\0\0WEBP" + b"0" * 32)]
+check("ISO-14: new pictures and videos get a 32-hex random name",
+      [re.fullmatch(r"[0-9a-f]{32}\.(png|jpg|webp)", n) and n[-3:] for n in _mp] == ["png", "jpg", "ebp"]
+      and len(set(_mp)) == 3
+      and _MILLENAI_SRC.count("secrets.token_hex(3)") == 1       # the remote job's unit name
+      and 'unit = "concorde-job-%s" % secrets.token_hex(3)' in _MILLENAI_SRC
+      and _MILLENAI_SRC.count("= _media_id()") == 2
+      and _MILLENAI_SRC.count("os.path.join(VIDEO_DIR, _media_id() + \".mp4\")") == 2
+      and "    return secrets.token_hex(16)\n" in _MILLENAI_SRC,
+      "%r" % _mp)
+
+# THE BRIDGE (6b321): pywebview's js_bridge_call resolves a name one
+# getattr at a time, dunders included, and pastes the reply id into a
+# script, so 'api_token.__func__.__globals__.get' would read this
+# module's globals and a quote in the id would run code in the page.
+# The guard lets through only api_token() with no arguments and a plain
+# id. Run twice: against a recorder, and wrapped around the REAL
+# pywebview function with a stand-in window (its reply must carry the
+# token and nothing else runs). Fails if the guard loosens, is installed
+# after a backend module binds the name, or goes.
+_gd = {"re": re}
+_exec_names(_gd, {"_bridge_guard"})
+_grec = []
+_gg = _gd["_bridge_guard"](lambda *a: _grec.append(a))
+_gcases = [("api_token", [], "0123456"), ("api_token", None, "1.2e-7"),
+           ("api_token.__func__.__globals__.get", ["API_TOKEN"], "1"),
+           ("api_token.__func__.__globals__.__setitem__", ["ACCESS_KEY", "x"], "2"),
+           ("api_token", [], 'x"]=0,alert(1),window["'), ("api_token", ["x"], "3"),
+           ("pywebviewStateUpdate", {"key": "a", "value": 1}, "4"), ("__class__", [], "5")]
+for _c in _gcases:
+    _gg("W", *_c)
+_greal = None
+try:
+    import webview.util as _wvu
+    _wv_orig = _wvu.js_bridge_call
+    _rj = []
+
+    class _FakeWin:
+        _functions = {}
+        _js_api = type("B", (), {"api_token": lambda self: "TOK" * 15})()
+
+        def evaluate_js(self, js):
+            _rj.append(js)
+    _gr = _gd["_bridge_guard"](_wv_orig)
+    _gr(_FakeWin(), "api_token.__func__.__globals__.get", ["x"], "1")
+    _gr(_FakeWin(), "api_token", [], 'q"]=0;alert(1);x["')
+    _gr(_FakeWin(), "api_token", [], "42")
+    for _ in range(50):
+        if _rj:
+            break
+        time.sleep(0.05)
+    time.sleep(0.2)
+    _greal = (len(_rj), "TOK" * 15 in (_rj[0] if _rj else ""), '["42"]' in (_rj[0] if _rj else ""))
+except ImportError:
+    _greal = "no pywebview here"
+_gsrc = _MILLENAI_SRC
+check("the js_api bridge answers only api_token(), with no way into the module or the page",
+      _grec == [("W", "api_token", [], "0123456"), ("W", "api_token", [], "1.2e-7")]
+      and _greal == (1, True, True)
+      and _gsrc.index("_wu.js_bridge_call = _bridge_guard(_wu.js_bridge_call)")
+      < _gsrc.index("from webview.platforms import")
+      and _gsrc.index("    import webview  # pywebview") < _gsrc.index("_wu.js_bridge_call = _bridge_guard("),
+      "%r" % [_grec, _greal])
+
+# THE ONE METHOD (6b321, 0a section 9): the js_api object exposes
+# api_token and nothing else (pywebview publishes every public member),
+# and hands the token over only while the window shows this app's own
+# origin: not another port, not localhost, not the map's site, not a
+# blank page, and not when asking fails
+_wb = {"urllib": urllib, "PORT": 5555, "API_TOKEN": "T" * 43}
+_exec_names(_wb, {"_WindowBridge"})
+_wbr = {}
+for _u in ("http://127.0.0.1:5555/", "http://127.0.0.1:5555/?boot=x", "http://127.0.0.1:5556/",
+           "http://localhost:5555/", "https://127.0.0.1:5555/", "https://www.openstreetmap.org/x",
+           "about:blank", "", None):
+    _wb["_window_url"] = (lambda u=_u: u) if _u is not None else (lambda: 1 / 0)
+    _wbr[_u] = _wb["_WindowBridge"]().api_token()
+check("the window's js_api has one method, and it answers only on the app's own origin",
+      [n for n in dir(_wb["_WindowBridge"]()) if not n.startswith("_")] == ["api_token"]
+      and _wbr == {"http://127.0.0.1:5555/": "T" * 43, "http://127.0.0.1:5555/?boot=x": "T" * 43,
+                   "http://127.0.0.1:5556/": None, "http://localhost:5555/": None,
+                   "https://127.0.0.1:5555/": None, "https://www.openstreetmap.org/x": None,
+                   "about:blank": None, "": None, None: None},
+      "%r" % _wbr)
 
 # the real folder and the real log folder: no canary from either copy in
 # any file (the engines' folders and the backdrop clips are skipped: big,
@@ -4874,14 +5442,18 @@ check("browser mode is gone: without pywebview the app says so and exits before 
 _hk = {}
 for _dh in (None, "/tmp/dev"):
     _hn = {"os": _t17.SimpleNamespace(environ={
-        "MILLENAI_TEST_HOOKS": "no-webview", "MILLENAI_SYNC_URL": "http://127.0.0.1:8799",
+        "MILLENAI_TEST_HOOKS": "no-webview,boot-code,boot-short",
+        "MILLENAI_SYNC_URL": "http://127.0.0.1:8799",
         "MILLENAI_NOWINDOW": "1", "MILLENAI_PORT": "9894"}), "DEV_HOME": _dh}
     _exec_names(_hn, {"NOWINDOW", "TEST_HOOKS", "SYNC_URL", "DEFAULT_APP"})
     _hk[_dh] = (_hn["NOWINDOW"], sorted(_hn["TEST_HOOKS"]), _hn["SYNC_URL"], _hn["DEFAULT_APP"])
 check("test hooks, the windowless switch and the sync override live only in a dev copy",
       _hk[None] == (False, [], "https://sync.millertechnology.net", True)
-      and _hk["/tmp/dev"] == (True, ["no-webview"], "http://127.0.0.1:8799", False)
-      and 'if "no-webview" in TEST_HOOKS:' in _MILLENAI_SRC,
+      and _hk["/tmp/dev"] == (True, ["boot-code", "boot-short", "no-webview"],
+                              "http://127.0.0.1:8799", False)
+      and 'if "no-webview" in TEST_HOOKS:' in _MILLENAI_SRC
+      # the boot code reaches a file only in a windowless dev copy (6b321)
+      and 'if NOWINDOW and "boot-code" in TEST_HOOKS:\n        _write_boot_note()' in _MILLENAI_SRC,
       "%r" % _hk)
 
 # a dev copy's Windows crash log and pythonw log land in its own folder

@@ -45,19 +45,20 @@ DEVH="$HOME/Library/Application Support/MillenAI-dev"
 MILLENAI_DEV=1 MILLENAI_HOME="$DEVH" MILLENAI_NOWINDOW=1 MILLENAI_PORT=9894 \
   "$VENV" millenai.py > /tmp/dev.log 2>&1 &
 DEVPID=$!
-# wait for THIS copy's note (a killed copy's may still be there) and the port
-KEY=""; for i in $(seq 1 120); do
-  KEY=$(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(d["key"] if d.get("pid")==int(sys.argv[2]) else "")' \
+# wait for THIS copy's note (a killed copy's may still be there) and the port;
+# the note holds the launch key and the API token (6b321)
+KEY=""; TOK=""; for i in $(seq 1 120); do
+  read -r KEY TOK < <(python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(d["key"], d["token"]) if d.get("pid")==int(sys.argv[2]) else None' \
         "$DEVH/run/instance.json" "$DEVPID" 2>/dev/null)
-  [ -n "$KEY" ] && curl -s -o /dev/null -b "millen_key_9894=$KEY" http://127.0.0.1:9894/ && break
+  [ -n "$TOK" ] && curl -s -o /dev/null -b "millen_key_9894=$KEY" http://127.0.0.1:9894/ && break
   sleep 1; done
 ```
 
 `MILLENAI_NOWINDOW=1` (dev copies only) runs with no window. Without it a copy needs
 pywebview: a launch that can't open its window prints the install line and exits with
 code 4 before it binds anything (6b320; there is no browser mode). Every
-launch mints its own random key and writes it, with the port and pid, to
-`run/instance.json` (0600) in its folder; there is no fixed key any more. A dev
+launch mints its own random key and API token and writes them, with the port and
+pid, to `run/instance.json` (0600) in its folder; there is no fixed key any more. A dev
 copy starts with **no cloud keys** (its own empty `cloud.json`); paste one into its
 Settings if a test needs a provider. One copy per folder: a second one on the same
 `MILLENAI_HOME` exits with code 3. `MILLENAI_TEST_HOOKS` and `MILLENAI_SYNC_URL` are
@@ -68,7 +69,10 @@ holds 8889), **9894** the dev copy, **9895** a windowed dev copy, **9901–9903*
 gauntlet's own copies; **9897 is ConcordeGo's** and 9889 was the retired hosted
 instance. Ports **8884 and up, by twos, are model engines** (8944 today) — never bind
 a server there. Every request needs the launch key as the cookie `millen_key_<port>`
-(6b310): `-b "millen_key_9894=$KEY"`.
+(6b310): `-b "millen_key_9894=$KEY"`, and every one but the page at `/` and the clips
+under `/static/` needs the API token too (6b321): `-H "X-Api-Token: $TOK"`. The window
+gets its cookie from a one-time `/?boot=<code>` and its token from pywebview's js_api;
+a windowless copy has neither, so native callers read both from `run/instance.json`.
 
 The page is assembled at request time but **the process reads `millenai.py` once at
 import**, so *any edit needs a server restart*. Kill by port, never `pkill -f`:
@@ -108,7 +112,7 @@ It asserts against three surfaces, which is why a UI change can fail a test:
 **Running one check:** there is no selector. Assert over the wire instead:
 
 ```bash
-curl -s -b "millen_key_9894=$KEY" \
+curl -s -b "millen_key_9894=$KEY" -H "X-Api-Token: $TOK" \
   'http://127.0.0.1:9894/api/remote/classify?cmd=rm%20-rf%20/'     # {"risk":"danger"}
 curl -s -b "millen_key_9894=$KEY" http://127.0.0.1:9894/ | grep -c 'barBreathe'
 ```
@@ -215,7 +219,9 @@ action: the agent issues one, waits for the box, reconnects and continues.
 ### Identity
 
 The server binds **127.0.0.1 only** and answers only its own window: `_gate` checks the
-Host and the launch-key cookie on every request. The web version (tunnel visitors, guest
+Host and the launch-key cookie on every request, and the `X-Api-Token` on everything
+but `/` and `/static/` (6b321; all page calls go through the page's one `api()` wrapper,
+and media load through it as `blob:` URLs). The web version (tunnel visitors, guest
 passes, PIN and Google sign-in, per-visitor `users/` folders, proxy headers) was deleted
 in 6b320, so no request header picks a different folder. `_data_base()` returns None
 (the app folder) and stays as the seam the profiles will use.

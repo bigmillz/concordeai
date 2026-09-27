@@ -5630,6 +5630,115 @@ crash was invisible.
   keeps its checks. Mutation-tested (SIGHUP back, hook removed, no log,
   no box).
 
+## 6b321 — an API token, a one-time boot code, media behind the token (accounts step 3)
+Until now the launch cookie was the only credential: anything that got
+it (a copied cookie, a replay from another local port) opened every
+chat, and `/?key=` took the key itself for the whole launch, so any copy
+of that URL was a working key. This is 0a item 4 (5.4), section 9's
+static-file and navigation recommendations, ISO-14, and M3 of the
+sign-in plan.
+- `API_TOKEN` (32 random bytes, `secrets.token_urlsafe(32)`) is made at
+  import beside `ACCESS_KEY`. `_gate` now runs: Host, proxy headers,
+  the boot exchange, the cookie, then `X-Api-Token` (compare_digest on
+  bytes) on everything but what the cookie alone opens.
+- What the cookie alone opens is one allow-list, `_COOKIE_ONLY`: GET of
+  exactly `/` (the page), `/static/sky/<n>.mov` (Apple's public backdrop
+  clips) and `/static/vfx/hdr-beacon.mp4` (the unused HDR beacon, kept
+  as its 6b264 comment asks). A `<video src>` can't send a header and
+  the clips stream by Range, so they can't go through the token. Nothing
+  there is personal. Everything else, every `/api/*` route and any route
+  added later outside `/api`, needs the token as well; allow-listing
+  means an absolute-form or `//api` path can't slip past a prefix test.
+  `/sky/` and `/vfx/` moved under `/static/`; fonts and Leaflet join
+  them when item 7 brings them local. A clip number past the list is a
+  404 (it raised IndexError and dropped the connection).
+- `/?key=` is gone. The window opens `/?boot=<code>`: a one-time code
+  minted just before `create_window` (after the engines start, so they
+  don't eat its 60 s). It sets the same `millen_key_<port>` cookie
+  (HttpOnly, SameSite=Strict, Path=/) and 302s to `/`, once; it dies
+  after one use or 60 s. A wrong guess doesn't burn it, so another local
+  process can't strand the window. A reload of the boot URL with the
+  cookie just goes home. If the window still sits on `/?boot=` after a
+  load (a cold start slower than 60 s), `_boot_heal` loads a fresh code,
+  twice at most. The page is served at exactly `/`: `/?anything` is a
+  403 with the cookie alone.
+- The token reaches the window through pywebview's js_api:
+  `_WindowBridge`, with one public method, `api_token()`, which answers
+  only while the window's URL is `http://127.0.0.1:<port>`. pywebview's
+  own `js_bridge_call` resolves a name one getattr at a time, dunders
+  included, and pastes the reply id into a script unescaped: with any
+  js_api at all, a page (on macOS any frame, the map's OpenStreetMap
+  iframe too) could post `api_token.__func__.__globals__.get` and read
+  or write this module's globals, or run script through the id.
+  `_bridge_guard` wraps it right after `import webview`, before any
+  backend module binds the name, and lets through only `api_token` with
+  no arguments and a plain id. If the guard can't be installed the
+  window opens without js_api (and says so) rather than with the bridge
+  open.
+- The page: one wrapper, `api()`, is the only fetch (the 109 `fetch(`
+  sites became `api(`). It waits for the token (pywebviewready, or the
+  bridge already there; on Qt only once its channel is up), asks again
+  if a reply is lost, adds `X-Api-Token` to same-origin `/api/` calls
+  only, passes everything else through, and returns the Response itself,
+  so the chat's streamed read works. A Stop while waiting aborts as
+  fetch would. It never proceeds without the token: after 20 s it shows
+  "ConcordeAI's window didn't finish starting" and keeps waiting.
+- Media: renderMD writes `data-api-src`, never a src at `/api/`. A
+  MutationObserver loads each picture and video through `api()` as a
+  `blob:` URL, one per path, so the stream's many repaints take the
+  cached URL before they paint (no refetch, no flicker); off-screen ones
+  wait for an IntersectionObserver, as loading=lazy did; blobs nothing
+  shows any more are freed about 20 s later. The download box is a
+  button (an `<a href>` can't carry the token, and a middle-click saved
+  the 403): Finder reveal first on a Mac, else `apiDownload` fetches and
+  saves a `blob:` URL, which on a PC is every save.
+- New pictures and videos are named `secrets.token_hex(16)` (one helper,
+  `_media_id`, at all four sites); old `<unix time>-<6 hex>` names are
+  still served, behind the token.
+- The page carries nothing personal: the hero's first name and home
+  town came from prefs into the HTML (`__USER_NICK__`,
+  `__USER_CITY__`), which the cookie alone opens. They now come from
+  `/api/prefs`; the greeting draws at once and rises in again with the
+  name when it arrives. `SKY_NIGHT` (one bit) stays.
+- `run/instance.json` (0600) carries the token beside the port, key and
+  pid, never the boot code. The second-launch hand-off sends key and
+  token to `/api/window/focus`, which refuses either alone. ci_smoke.sh,
+  drill.py and CLAUDE.md's recipe read and send the token; ci_smoke
+  also checks that the cookie alone gets 403 on `/api/stats` and that
+  the page holds neither the key nor the token.
+- Test hooks (dev copies only): `boot-code` has a windowless copy write
+  a boot code to `run/boot.json` (0600); `boot-short` gives it 2 s.
+- Gauntlet: `req()` sends the token by default (`token=False` for the
+  page, `/static/` and door checks). New: the boot code (a wrong guess,
+  one use, flags, no-store; 60 s on a fake clock and live on a 2 s copy),
+  `/?key=` 403 with and without the cookie, the token on every /api call
+  (cookie alone, token alone, wrong token, token in the query or a
+  cookie), cookie replay over every route the handler names (GET and
+  text/plain POST, 403 with the gate's own body), absolute-form and
+  `//` paths, `/static/` traversal and the clip bound, media old and new
+  behind the token (and Range), the page with a canary name and town set
+  holding neither nor the key or token, the focus route, the two-copy
+  checks with one credential swapped at a time, a boot code refused by
+  the other copy, a guessed old media id, the token only in
+  `run/instance.json`, the hand-off with and without the token, 32-hex
+  media names, the bridge guard (against pywebview's real function), the
+  one-method js_api and its origin check, the one-fetch page gate
+  (tokenized), and `api()` itself in node (waits, headers, abort,
+  streaming Response, Qt, a null bridge, the blob cache). Rewritten:
+  the `/?key=` link check, the focus check, the window-URL pin, the two
+  `fetch(` pins, the renderMD corpus (data-api-src), the hero's name and
+  town, and the clip and beacon paths. Baseline 284 becomes 301. Nine
+  mutations of the server (the token skipped on GETs, a boot code never
+  spent, a wrong guess that burns it, the `/?` page catch-all back, the
+  name in the page, no clip bound, pictures on the cookie alone, a
+  cookie without HttpOnly, a prefix-only token compare) each fail at
+  least one new check.
+- Only a real window can confirm: the token arriving through js_api on
+  WKWebView, WebView2 and Qt; the first calls waiting for the load (the
+  Google Fonts stylesheet is part of it); `blob:` video playback and
+  `blob:` downloads through pywebview's download path; the greeting's
+  second draw; `_boot_heal`.
+
 ## 6b320 — the web version is gone (accounts step 2)
 Patrick approved deleting the old web version for good on 2026-09-26;
 its hosting was shut down on 2026-09-24. Its code stayed behind the

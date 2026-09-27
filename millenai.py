@@ -261,6 +261,43 @@ try:
 except ImportError:
     HAS_WEBVIEW = False
 
+
+def _bridge_guard(real):
+    """pywebview's js_bridge_call, allowed ONE call (6b321): api_token()
+    with no arguments and a plain reply id. pywebview resolves the name
+    one getattr at a time, dunders included, so a page (on macOS any
+    frame, the map's third-party iframe too) that posted
+    'api_token.__func__.__globals__.get' would read or write this
+    module's globals, the key and token among them; and it pastes the
+    reply id into a script unescaped. Everything else is dropped."""
+    def js_bridge_call(window, func_name, param, value_id):
+        if (func_name != "api_token" or param not in (None, [])
+                or not re.fullmatch(r"[0-9A-Za-z_.+-]{0,40}",
+                                    str(value_id))):
+            return None
+        return real(window, func_name, [], value_id)
+    js_bridge_call._guarded = True
+    return js_bridge_call
+
+
+_BRIDGE_OK = False
+if HAS_WEBVIEW:
+    # before any backend module is imported: each binds the name at import
+    # (from webview.util import js_bridge_call), so patch those too
+    try:
+        import webview.util as _wu
+        if not getattr(_wu.js_bridge_call, "_guarded", False):
+            _wu.js_bridge_call = _bridge_guard(_wu.js_bridge_call)
+        for _mn, _mm in list(sys.modules.items()):
+            if (_mn.startswith("webview.platforms.") and _mm is not None
+                    and hasattr(_mm, "js_bridge_call")):
+                _mm.js_bridge_call = _wu.js_bridge_call
+        _BRIDGE_OK = True
+    except Exception:
+        # no guard, no bridge: the window opens without js_api and the
+        # page says it can't start, rather than run with the bridge open
+        pass
+
 APP_VERSION = "6.1.0"   # bump here — UI, window, DMG all follow
 # BETA HOLD (per Patrick): the 6.x line is beta until the kinks are out.
 # While > 0: every display surface says "beta N", release.sh publishes
@@ -350,10 +387,61 @@ DEFAULT_APP = not DEV_HOME
 # on 127.0.0.1, and every account on the computer can reach 127.0.0.1:
 # before this, another person's login on a shared Mac could read
 # /api/chats with one curl. Each launch mints a key, the window collects
-# it once through /?key=, and every request must carry it (StudioHandler.
-# _gate). Every launch mints its own, dev and test copies included
-# (6b319): they read it from run/instance.json in their own folder.
+# it once (through /?boot= since 6b321), and every request must carry
+# it (StudioHandler._gate). Every launch mints its own, dev and test
+# copies included (6b319): they read it from run/instance.json in their
+# own folder.
 ACCESS_KEY = secrets.token_urlsafe(32)
+# THE API TOKEN (6b321, 0a 5.4). The cookie alone used to open every
+# chat, so anything that got hold of it (a copied cookie, a replay from
+# another port) got everything. Every /api call now also needs this
+# X-Api-Token, which the window hands the page through pywebview's
+# js_api (_WindowBridge). It is never in the HTML, a cookie or a URL; a
+# windowless test copy writes it to run/instance.json beside the key.
+API_TOKEN = secrets.token_urlsafe(32)
+# THE ONE-TIME BOOT CODE (6b321). The window's first URL is /?boot=<code>,
+# which trades the code for the cookie once. /?key= took the key itself
+# and worked for the whole launch, so any copy of that URL was a key.
+# Minted just before the window opens (not at import: the engines' start
+# would eat into the 60 s). A wrong guess doesn't burn it, so another
+# local process can't strand the window on a 403.
+BOOT_TTL = 60.0
+_BOOT = {"code": None, "until": 0.0}
+_BOOT_LOCK = threading.Lock()
+
+
+def _mint_boot_code(ttl: float = BOOT_TTL, now: float = None) -> str:
+    code = secrets.token_urlsafe(32)
+    with _BOOT_LOCK:
+        _BOOT.update(code=code, until=(time.monotonic() if now is None
+                                       else now) + ttl)
+    return code
+
+
+def _take_boot_code(code: str, now: float = None) -> bool:
+    """True once, for the live code inside its time. An expired code is
+    burned; a wrong one isn't."""
+    now = time.monotonic() if now is None else now
+    with _BOOT_LOCK:
+        live = _BOOT["code"]
+        if not live:
+            return False
+        if now > _BOOT["until"]:
+            _BOOT["code"] = None
+            return False
+        if not secrets.compare_digest(str(code).encode("utf-8"),
+                                      live.encode("utf-8")):
+            return False
+        _BOOT["code"] = None
+        return True
+
+
+# WHAT THE COOKIE ALONE OPENS (6b321, 0a 5.4 and section 9): the page at
+# exactly "/", and fixed public bytes under /static/ (the backdrop clips
+# and the HDR beacon) that a <video src> fetches with no way to add a
+# header. Nothing here is personal; everything else needs the token too.
+_COOKIE_ONLY = re.compile(
+    r"/(?:static/sky/\d{1,3}\.mov|static/vfx/hdr-beacon\.mp4)?")
 # WHAT THE PAGE MAY LOAD (6b310). Browsers send a 127.0.0.1 cookie to
 # EVERY port on 127.0.0.1, so one <img src="http://127.0.0.1:5555/...">,
 # from a web page's og:image or a model's markdown, handed the launch key
@@ -5262,6 +5350,14 @@ def image_status() -> dict:
     return studio_status("image")
 
 
+def _media_id() -> str:
+    """A new image or video's name (6b321): 128 random bits. It was
+    <unix time>-<6 hex>, 24 bits a second, which a script holding the
+    launch cookie could walk. Old names are still served: the API token
+    guards them now."""
+    return secrets.token_hex(16)
+
+
 def _write_image_bytes(data: bytes) -> str:
     """Save what a cloud painter returned under its TRUE type — Gemini
     sends PNG today, and a JPEG or WebP must not be called .png (a coin
@@ -5270,7 +5366,7 @@ def _write_image_bytes(data: bytes) -> str:
     ext = (".jpg" if data[:2] == b"\xff\xd8"
            else ".webp" if data[:4] == b"RIFF" and data[8:12] == b"WEBP"
            else ".png")
-    iid = "%d-%s" % (int(time.time()), secrets.token_hex(3))
+    iid = _media_id()
     out = os.path.join(IMAGE_DIR, iid + ext)
     with open(out, "wb") as f:
         f.write(data)
@@ -5432,7 +5528,7 @@ def generate_image(prompt: str, over: dict = None, sock=None) -> tuple:
     errs = []
     if image_ready():
         os.makedirs(IMAGE_DIR, exist_ok=True)
-        iid = "%d-%s" % (int(time.time()), secrets.token_hex(3))
+        iid = _media_id()
         out = os.path.join(IMAGE_DIR, iid + ".png")
         # mflux 0.19: a local/third-party model is --model <dir> with
         # --base-model naming the architecture (the old --path is gone)
@@ -6697,8 +6793,7 @@ def _veo_video(prompt: str) -> str:
                 with urllib.request.urlopen(vr, timeout=300) as r:
                     data = r.read()
                 os.makedirs(VIDEO_DIR, exist_ok=True)
-                out = os.path.join(VIDEO_DIR, "%d-%s.mp4" % (
-                    int(time.time()), secrets.token_hex(3)))
+                out = os.path.join(VIDEO_DIR, _media_id() + ".mp4")
                 with open(out, "wb") as f:
                     f.write(data)
                 return out
@@ -6718,8 +6813,7 @@ def generate_video(prompt: str, over: dict = None, sock=None) -> tuple:
     errs = []
     if video_ready():
         os.makedirs(VIDEO_DIR, exist_ok=True)
-        out = os.path.join(VIDEO_DIR, "%d-%s.mp4" % (
-            int(time.time()), secrets.token_hex(3)))
+        out = os.path.join(VIDEO_DIR, _media_id() + ".mp4")
         t = studio_tier("video")
         o = studio_opts("video", over)
         cmd = [os.path.join(STUDIOS["video"]["venv"], "bin", "python3"),
@@ -12779,13 +12873,19 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         """True = let the request through; False = already answered it.
 
         ONLY THIS APP'S OWN WINDOW GETS IN (6b310; the web version's door
-        page is gone with the web version). Two tests, on every request:
+        page is gone with the web version). On every request:
           * addressed to this server's own loopback name and port. A
             DNS-rebinding page arrives under its own hostname, so it
             fails here before anything else is read.
+          * no proxy header (6b320).
           * carrying this launch's ACCESS_KEY as a cookie. The window
-            collects it once through /?key=; another account's process
-            on this computer, or a page on a stray port, never has it.
+            collects it once through /?boot=<one-time code> (6b321);
+            another account's process on this computer, or a page on a
+            stray port, never has it.
+          * and X-Api-Token (6b321) on everything but the page itself and
+            the public clips under /static/ (_COOKIE_ONLY). Allow-listed,
+            not prefix-checked, so a route added outside /api can't skip
+            it and '//api' or absolute-form paths can't slip past.
         The cookie is named for the port because browsers share cookies
         across the ports of one host: a dev instance's key must not
         overwrite the app's."""
@@ -12798,6 +12898,37 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # that way, key or no key.
         if any(self.headers.get(h) for h in _PROXY_HEADERS):
             return self._deny()
+        keyed = self._keyed()
+        if self.command == "GET" and self.path.startswith("/?boot="):
+            # the window's first load trades the one-time code for the
+            # cookie (6b321). Already keyed (a reload of that URL): just
+            # go home, and leave the code alone.
+            if keyed or _take_boot_code(urllib.parse.unquote(
+                    self.path[len("/?boot="):])):
+                self.send_response(302)
+                if not keyed:
+                    self.send_header(
+                        "Set-Cookie", "millen_key_%d=%s; Path=/; HttpOnly; "
+                        "SameSite=Strict" % (PORT, ACCESS_KEY))
+                self.send_header("Location", "/")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+            else:
+                self._deny()
+            return False
+        if not keyed:
+            return self._deny()
+        if self.command == "GET" and _COOKIE_ONLY.fullmatch(self.path):
+            return True
+        # compare_digest on BYTES, as for the cookie
+        if secrets.compare_digest(
+                (self.headers.get("X-Api-Token") or "").encode("utf-8"),
+                API_TOKEN.encode("utf-8")):
+            return True
+        return self._deny()
+
+    def _keyed(self) -> bool:
         # EVERY cookie of that name: a stray one with a longer Path sorts
         # first and must not shadow the real key. compare_digest on
         # BYTES: a str with a non-ASCII character raises TypeError.
@@ -12806,19 +12937,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if secrets.compare_digest(v.encode("utf-8"),
                                       ACCESS_KEY.encode("utf-8")):
                 return True
-        if self.command == "GET" and self.path.startswith("/?key="):
-            if secrets.compare_digest(
-                    urllib.parse.unquote(self.path[len("/?key="):])
-                    .encode("utf-8"), ACCESS_KEY.encode("utf-8")):
-                self.send_response(302)
-                self.send_header(
-                    "Set-Cookie", "millen_key_%d=%s; Path=/; HttpOnly; "
-                    "SameSite=Strict" % (PORT, ACCESS_KEY))
-                self.send_header("Location", "/")
-                self.send_header("Content-Length", "0")
-                self.end_headers()
-                return False
-        return self._deny()
+        return False
 
     def _deny(self) -> bool:
         if self.command == "POST":
@@ -12931,8 +13050,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if not self._gate():
             return
-        if self.path == "/" or self.path.startswith("/?"):
-            # ("/?key=..." legacy links included — the key is simply ignored)
+        if self.path == "/":
+            # exactly "/" (6b321): "/?anything" is no longer the page, so
+            # "/?key=" gets the gate's 403 even with the cookie. The page
+            # carries nothing personal: the name and town for the hero
+            # come from /api/prefs, behind the token.
             html = (HTML_CONTENT
                     .replace("__AGENT_ROWS__", build_agent_rows())
                     .replace("__CODE_ROWS__", build_code_rows())
@@ -12955,18 +13077,6 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     .replace("__SKY_N__", str(len(SKY_SOURCES)))
                     .replace("__SKY_DARK__", json.dumps(SKY_DARK))
                     .replace("__SKY_NIGHT__", json.dumps(sky_is_night()))
-                    .replace("__USER_NICK__", json.dumps(
-                        (str(load_prefs(self._data_base()).get(
-                            "user_name") or "").strip().split(" ")[0]
-                         or "")[:24]))
-                    # the home town for the hero ("how's Tokyo tonight"):
-                    # the first segment of home_area, "Brooklyn, NY" ->
-                    # "Brooklyn"; blank when unset, and the pool skips
-                    # every line that would need it
-                    .replace("__USER_CITY__", json.dumps(
-                        (str(load_prefs(self._data_base()).get(
-                            "home_area") or "").split(",")[0].strip()
-                         )[:32]))
                     .replace("__JUST_UPDATED__", json.dumps(_JUST_UPDATED[0]))
                     .replace("__APP_VER_SPEC__", spec_version())
                     .replace("__APP_VER__", short_version()
@@ -13030,7 +13140,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             m = re.search(r"[?&]i=(\d+)", self.path)
             self._send_json(sky_status(int(m.group(1)) if m else 0,
                                        warm="warm=1" in self.path))
-        elif self.path == "/vfx/hdr-beacon.mp4":
+        elif self.path == "/static/vfx/hdr-beacon.mp4":
             # THE LIGHT SOURCE (6b261, per Patrick: "make AI HDR too").
             # A PQ/BT.2020 clip is the only thing a WKWebView page can
             # paint brighter than SDR white — same 6.7KB asset and same
@@ -13065,7 +13175,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 self.wfile.write(_chunk)
             except Exception:
                 pass
-        elif self.path.startswith("/sky/"):
+        elif self.path.startswith("/static/sky/"):
+            # under /static/ (6b321): a <video src> can't carry the token,
+            # and these are Apple's public clips, streamed by Range
             self._send_sky()
         elif self.path.startswith("/api/remote/classify"):
             # read-only introspection of the safety classifier (6b249):
@@ -13291,8 +13403,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         """Stream a cached skyline clip with Range support — Safari asks
         for dozens of byte ranges while scrubbing a video into playback,
         and a plain 200 would make it re-pull the whole file each time."""
-        m = re.match(r"/sky/(\d+)\.mov$", self.path)
-        p = _sky_path(int(m.group(1))) if m else None
+        m = re.fullmatch(r"/static/sky/(\d{1,3})\.mov", self.path)
+        # a number past the list 404s (it raised IndexError and dropped
+        # the connection, 6b321)
+        p = (_sky_path(int(m.group(1)))
+             if m and int(m.group(1)) < len(SKY_SOURCES) else None)
         if not (p and os.path.exists(p)):
             self.send_error(404)
             return
@@ -15992,16 +16107,33 @@ def single_instance(wait: float = 15.0, dev: bool = False) -> bool:
 
 def _write_instance_note():
     """Where this copy's window lives, for a second launch to find
-    (0600, in this user's own data folder: the key opens the app)."""
+    (0600, in this user's own data folder: the key and the API token
+    open the app). Never the boot code: that is the window's alone."""
     try:
         fd = os.open(INSTANCE_NOTE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
                      0o600)
         with os.fdopen(fd, "w") as fh:
-            json.dump({"port": PORT, "key": ACCESS_KEY,
+            json.dump({"port": PORT, "key": ACCESS_KEY, "token": API_TOKEN,
                        "pid": os.getpid()}, fh)
     except OSError:
         pass
     atexit.register(_drop_instance_note)
+
+
+def _write_boot_note():
+    """The 'boot-code' test hook (6b321, dev copies only): a windowless
+    copy has no window to spend a boot code, so the gauntlet gets one
+    here, 0600 beside the instance note. 'boot-short' makes it live 2 s,
+    so expiry is tested without a 60 s wait."""
+    code = _mint_boot_code(2.0 if "boot-short" in TEST_HOOKS else BOOT_TTL)
+    try:
+        fd = os.open(os.path.join(os.path.dirname(INSTANCE_NOTE),
+                                  "boot.json"),
+                     os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as fh:
+            json.dump({"code": code, "pid": os.getpid()}, fh)
+    except OSError:
+        pass
 
 
 def _drop_instance_note():
@@ -16015,6 +16147,43 @@ def _drop_instance_note():
 
 
 _WIN_STATE = {"min": False, "max": False}   # as the window's events say
+
+
+def _window_url() -> str:
+    return str(webview.windows[0].get_current_url() or "")
+
+
+class _WindowBridge:
+    """The page's js_api (6b321): ONE public method. pywebview exposes
+    every public attribute and walks into public objects, so this holds
+    nothing else: a window handle here would hand the page load_url and
+    evaluate_js."""
+    __slots__ = ()
+
+    def api_token(self):
+        """The API token, only while the window shows this app's own
+        origin (0a section 9): any page the window lands on gets the
+        bridge too. WebView2 keeps the URL as a System.Uri: str() it."""
+        try:
+            u = urllib.parse.urlsplit(_window_url())
+            if (u.scheme, u.hostname, u.port) == ("http", "127.0.0.1", PORT):
+                return API_TOKEN
+        except Exception:
+            pass
+        return None
+
+
+def _boot_heal(window, tries=[0]):
+    """A window that loaded its boot URL too late sits on the 403 for
+    good: the code is spent or past its 60 s. Still on /?boot= after a
+    load means that happened, so try a fresh code, twice at most."""
+    try:
+        if "/?boot=" in _window_url() and tries[0] < 2:
+            tries[0] += 1
+            window.load_url("http://127.0.0.1:%d/?boot=%s"
+                            % (PORT, _mint_boot_code()))
+    except Exception:
+        pass
 
 
 def _hand_off() -> bool:
@@ -16031,10 +16200,13 @@ def _hand_off() -> bool:
         with open(INSTANCE_NOTE) as fh:
             d = json.load(fh)
         port, key = int(d["port"]), str(d["key"])
+        # the route wants the key AND the token (6b321); a note from a
+        # copy before step 3 has none, and that copy ignores the header
         req = urllib.request.Request(
             "http://127.0.0.1:%d/api/window/focus" % port, data=b"{}",
             headers={"Content-Type": "application/json",
-                     "Cookie": "millen_key_%d=%s" % (port, key)})
+                     "Cookie": "millen_key_%d=%s" % (port, key),
+                     "X-Api-Token": str(d.get("token") or "")})
         with urllib.request.urlopen(req, timeout=3) as r:
             return r.status == 200
     except Exception:
@@ -16644,6 +16816,10 @@ input.crename{flex:1;min-width:0;background:rgba(0,0,0,.45);
   font-size:13px;color:var(--text);
   animation:rise .22s ease both}
 #undobar[hidden]{display:none}
+/* no API token (6b321): the page can't reach its server, and says so */
+#apistuck{position:fixed;left:50%;top:26px;transform:translateX(-50%);
+  z-index:90;background:rgba(15,17,23,.92);border:1px solid rgba(255,255,255,.15);
+  border-radius:14px;padding:11px 18px;font-size:13px;color:var(--text)}
 #undobar button{background:none;border:none;color:#8fb8ff;cursor:pointer;
   font:600 13px var(--sans);padding:2px 4px}
 #undobar button:hover{text-decoration:underline}
@@ -18092,6 +18268,7 @@ body.gen #chip-model{color:var(--accent)}
 .dlbox .dlgo{flex:0 0 auto;width:30px;height:30px;border-radius:8px;
   display:flex;align-items:center;justify-content:center;color:var(--dim);
   border:1px solid var(--line);text-decoration:none;
+  background:none;padding:0;cursor:pointer;
   transition:color .15s,border-color .15s,background .15s}
 .dlbox .dlgo:hover{color:var(--text);border-color:var(--dim);
   background:rgba(255,255,255,.05)}
@@ -18481,6 +18658,7 @@ body.gen #chip-model{color:var(--accent)}
 #hero .beta-tag.flyin,#hero .greet.flyin{
   animation:heroRise .7s cubic-bezier(.2,.8,.3,1) .34s both;
 }
+#hero .greet.regreet{animation:heroRise .5s cubic-bezier(.2,.8,.3,1) both}
 @keyframes heroRise{
   from{opacity:0;transform:translateY(9px)}
   to  {opacity:1;transform:translateY(0)}
@@ -19557,6 +19735,118 @@ __CODE_ROWS__
 <script>
 "use strict";
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+/* THE API TOKEN (6b321, 0a 5.4). The cookie alone opens only this page;
+   every /api call also carries X-Api-Token, which the window hands over
+   through pywebview's js_api once the page has loaded (pywebviewready).
+   It is never in the HTML, a cookie or a URL. Calls made before then
+   wait here, and none ever goes out without it. api() is the page's one
+   fetch: the gauntlet fails on any other. */
+const nFetch=window.fetch.bind(window);
+let tokP=null;
+function apiTok(){
+  return tokP||(tokP=new Promise(res=>{
+    const t0=Date.now();let asked=0,said=false,iv=0;
+    // Qt makes the stubs before its channel is up: not ready till then
+    const ready=()=>{const w=window.pywebview;
+      return !!(w&&w.api&&typeof w.api.api_token==="function"
+        &&(w.platform!=="qtwebengine"||w._QWebChannel));};
+    // a reply can be lost (a reload mid-call): ask again after 4 s
+    const ask=()=>{
+      if(!ready()||Date.now()-asked<4000)return;
+      asked=Date.now();
+      Promise.resolve(window.pywebview.api.api_token()).then(t=>{
+        if(typeof t==="string"&&t.length>=32){
+          clearInterval(iv);const n=$("#apistuck");if(n)n.remove();res(t);}
+        else asked=0;},()=>{asked=0;});
+    };
+    addEventListener("pywebviewready",ask);
+    iv=setInterval(()=>{ask();
+      if(!said&&Date.now()-t0>20000){said=true;apiStuck();}},250);
+    ask();
+  }));
+}
+// no token after 20 s: say so, and keep waiting (never go on without it)
+function apiStuck(){
+  if($("#apistuck"))return;
+  const n=document.createElement("div");n.id="apistuck";
+  n.textContent="MillenAI’s window didn’t finish starting. Quit the app and open it again.";
+  document.body.appendChild(n);
+}
+async function api(u,o){
+  o=o||{};
+  const url=new URL(String(u),location.href);
+  if(url.origin!==location.origin||!url.pathname.startsWith("/api/"))return nFetch(u,o);
+  // a Stop while the call still waits for the token aborts as fetch would
+  const sig=o.signal,ab=()=>new DOMException("Aborted","AbortError");
+  if(sig&&sig.aborted)throw ab();
+  const t=await(sig?Promise.race([apiTok(),new Promise((_,no)=>
+    sig.addEventListener("abort",()=>no(ab()),{once:true}))]):apiTok());
+  const h=new Headers(o.headers||{});h.set("X-Api-Token",t);
+  // the Response itself, untouched: the chat reads its body as a stream
+  return nFetch(u,Object.assign({},o,{headers:h}));
+}
+/* MEDIA BEHIND THE TOKEN (6b321). An <img> or <video> can't send a
+   header, so renderMD writes data-api-src and no src, and this loads each
+   through api() as a blob: URL. One blob per path: the stream repaints an
+   answer many times a second, and each new element takes the cached URL
+   before it paints, so nothing refetches or flickers. Off-screen ones
+   wait, as loading=lazy did. Blobs no element shows any more are freed
+   a little later (a chat switched away, cleared or deleted). */
+const mediaC=new Map(),mediaSeen=new Set();
+let mediaSweepT=0;
+function mediaLoad(p){
+  if(mediaC.has(p))return;
+  const e={u:null};mediaC.set(p,e);
+  api(p).then(r=>{if(!r.ok)throw new Error(r.status);return r.blob();}).then(b=>{
+    if(mediaC.get(p)!==e)return;
+    e.u=URL.createObjectURL(b);
+    $$("[data-api-src]").forEach(el=>{if(el.dataset.apiSrc===p)el.src=e.u;});
+  // a failure is kept (no retry every frame) until the sweep drops it
+  }).catch(()=>{e.u=false;});
+}
+const mediaIO=typeof IntersectionObserver==="function"?new IntersectionObserver(es=>
+  es.forEach(x=>{
+    if(x.isIntersecting)mediaLoad(x.target.dataset.apiSrc);
+    if(x.isIntersecting||!x.target.isConnected){
+      mediaIO.unobserve(x.target);mediaSeen.delete(x.target);}
+  }),{rootMargin:"1000px"}):null;
+function mediaShow(el){
+  const e=mediaC.get(el.dataset.apiSrc);
+  if(e){if(e.u&&el.src!==e.u)el.src=e.u;return;}
+  if(mediaIO){mediaSeen.add(el);mediaIO.observe(el);}
+  else mediaLoad(el.dataset.apiSrc);
+}
+function mediaSweep(){
+  mediaSweepT=0;
+  const live=new Set();
+  $$("[data-api-src]").forEach(el=>live.add(el.dataset.apiSrc));
+  mediaC.forEach((e,p)=>{if(!live.has(p)){
+    if(e.u)URL.revokeObjectURL(e.u);mediaC.delete(p);}});
+  mediaSeen.forEach(el=>{if(!el.isConnected){
+    mediaIO.unobserve(el);mediaSeen.delete(el);}});
+}
+new MutationObserver(ms=>{
+  let gone=false;
+  for(const m of ms){
+    if(m.removedNodes.length)gone=true;
+    m.addedNodes.forEach(n=>{
+      if(n.nodeType!==1)return;
+      if(n.matches("[data-api-src]"))mediaShow(n);
+      n.querySelectorAll("[data-api-src]").forEach(mediaShow);
+    });
+  }
+  if(gone&&!mediaSweepT)mediaSweepT=setTimeout(mediaSweep,20000);
+}).observe(document.documentElement,{childList:true,subtree:true});
+/* a download through the token (6b321): an <a href> can't carry it, so
+   fetch, then save a blob: URL. Freed a minute on, not at once: WebKit
+   may still be reading it when the click returns. */
+async function apiDownload(p,nm){
+  const r=await api(p);
+  if(!r.ok)throw new Error("download "+r.status);
+  const u=URL.createObjectURL(await r.blob()),t=document.createElement("a");
+  t.href=u;t.download=nm||"";document.body.appendChild(t);t.click();t.remove();
+  setTimeout(()=>URL.revokeObjectURL(u),60000);
+}
 // a Windows PC (6b317): its commands, settings and words differ
 const IS_PC=__IS_PC__;
 // the sun is down where you are (6b318): the backdrop goes dark
@@ -19606,7 +19896,7 @@ function selectModel(name){
   const st=engineState[name];
   if(st&&st.supported===false)return;         // not runnable on this Mac
   if(st&&!st.up&&st.downloadable&&!st.dl){    // present but not downloaded
-    fetch("/api/model/download",{method:"POST",
+    api("/api/model/download",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({labels:[name]})}).then(pollEngines);
     return;
@@ -19646,7 +19936,7 @@ function setVoice(on){
   if(VOICE_PARKED)on=false;
   voiceChat=on;$("#voicebtn").classList.toggle("on",on);
   localStorage.setItem("millen.voice",on?"1":"0");
-  if(!on)fetch("/api/speak",{method:"POST",
+  if(!on)api("/api/speak",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({stop:true})});
 }
@@ -19693,8 +19983,8 @@ async function showTierPop(el,name){
   let info={},cloudOn=false,ci={};
   try{
     const r2=await Promise.all([
-      (await fetch("/api/tiers")).json(),
-      (await fetch("/api/cloud")).json()]);
+      (await api("/api/tiers")).json(),
+      (await api("/api/cloud")).json()]);
     info=r2[0][name]||{};ci=r2[1]||{};
     cloudOn=!!(ci.configured&&ci.turbo);
   }catch(e){}
@@ -19787,8 +20077,8 @@ async function openAdv(){
   const sel=adv||{local:[],cloud:[],comp:""};
   let st={},cs={};
   try{[st,cs]=await Promise.all([
-    (await fetch("/api/setup")).json(),
-    (await fetch("/api/cloud")).json()]);}catch(e){}
+    (await api("/api/setup")).json(),
+    (await api("/api/cloud")).json()]);}catch(e){}
   const ready=(st.models||[]).filter(m=>m.status==="ready"
     &&m.label.indexOf("Vision")<0);   // LLaVA routes itself on images
   $("#adv-local").innerHTML=ready.map(m=>
@@ -19912,7 +20202,7 @@ advChip();     // a custom council survives the restart (6b248)
 (async function paintAccel(){
   const chip=$("#accel-chip");if(!chip)return;
   let a="";
-  try{a=((await(await fetch("/api/setup")).json()).accel)||"";}catch(e){return;}
+  try{a=((await(await api("/api/setup")).json()).accel)||"";}catch(e){return;}
   if(!a||a==="CPU")return;      // nothing to boast about, so say nothing
   chip.className=a.toLowerCase();
   chip.querySelector("b").textContent=a;
@@ -19928,7 +20218,7 @@ advChip();     // a custom council survives the restart (6b248)
 // re-runs whenever a key is saved and whenever Settings repaints.
 async function paintTierAvail(){
   let info={};
-  try{info=await(await fetch("/api/tiers")).json();}catch(e){return;}
+  try{info=await(await api("/api/tiers")).json();}catch(e){return;}
   tierOff={};
   Object.keys(info).forEach(n=>{if(info[n].available===false)tierOff[n]=1;});
   const em=document.getElementById("engmenu");
@@ -20101,7 +20391,7 @@ function riskCard(t){
 // kept in prefs too (6b310): browser storage is per port, and a moved
 // app would quietly fall back to Auto from a chosen Manual
 let autonomy=localStorage.getItem("millen.autonomy")||"auto";
-fetch("/api/prefs").then(r=>r.json()).then(p=>{
+api("/api/prefs").then(r=>r.json()).then(p=>{
   if(["manual","auto","full"].includes(p.remote_autonomy)){
     autonomy=p.remote_autonomy;paintAutonomy();}}).catch(()=>{});
 function paintAutonomy(){
@@ -20111,7 +20401,7 @@ function paintAutonomy(){
 $$("#autonomy-seg .autoseg").forEach(el=>
   el.addEventListener("click",()=>{
     autonomy=el.dataset.a;localStorage.setItem("millen.autonomy",autonomy);
-    fetch("/api/prefs",{method:"POST",headers:{"Content-Type":"application/json"},
+    api("/api/prefs",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({remote_autonomy:autonomy})}).catch(()=>{});
     paintAutonomy();
   }));
@@ -20124,7 +20414,7 @@ async function remoteRefresh(){
   bar.hidden=!on;
   if(!on)return;
   try{
-    const c=await(await fetch("/api/remote/config")).json();
+    const c=await(await api("/api/remote/config")).json();
     if(c&&!c.err){
       $("#rm-host").value=c.host||"";
       $("#rm-user").value=c.user||"root";
@@ -20148,7 +20438,7 @@ function keyCopyCmd(u,h){
 async function remoteSave(){
   const body={host:$("#rm-host").value.trim(),user:$("#rm-user").value.trim(),
     port:$("#rm-port").value.trim(),key:$("#rm-key").value.trim()};
-  const r=await(await fetch("/api/remote/config",{method:"POST",
+  const r=await(await api("/api/remote/config",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify(body)})).json();
   return r&&r.ok;
@@ -20165,7 +20455,7 @@ if($("#rm-test"))$("#rm-test").addEventListener("click",async()=>{
   note.textContent="saving + connecting…";
   if(!await remoteSave()){note.textContent="couldn't save";return;}
   try{
-    const r=await(await fetch("/api/remote/test",{method:"POST",
+    const r=await(await api("/api/remote/test",{method:"POST",
       headers:{"Content-Type":"application/json"},body:"{}"})).json();
     note.textContent=r.ok?"✓ connected — "+(r.detail||"ready")
       :"✗ "+(r.detail||"couldn't connect")
@@ -20371,7 +20661,7 @@ function showApprove(host,d){
     v.hidden=false;v.textContent=ok?"sending…":"skipped";
     // THE SERVER HAS THE LAST WORD (6b309): a tap after the 10-minute
     // wait ran out used to show "running" while nothing ran
-    fetch("/api/remote/approve",{method:"POST",
+    api("/api/remote/approve",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({jid:d.jid,ok:!!ok})})
       .then(r=>r.json()).then(j=>{
@@ -20399,24 +20689,26 @@ function dlBox(d){
   const nm=esc(d.name||"file"), ext=esc((d.ext||"").toUpperCase().slice(0,4)),
         sz=d.size>=1e6?((d.size/1e6).toFixed(1)+" MB")
                       :(Math.max(1,Math.round(d.size/1000))+" KB"),
-        href="/api/export/"+encodeURIComponent(d.id);
+        ap="/api/export/"+encodeURIComponent(d.id);
   return '<div class="dlbox" data-id="'+esc(d.id)+'">'
     +'<span class="dlext">'+ext+'</span>'
     +'<span class="dlmeta"><b>'+nm+'</b><i>'+esc(d.kind||"file")+" \u00b7 "+sz+'</i></span>'
-    +'<a class="dlgo" href="'+href+'" download="'+nm+'" '
+    // a button, not <a href> (6b321): a plain link can't carry the
+    // token, so a middle-click or "Download Linked File" saved a 403
+    +'<button type="button" class="dlgo" data-api-href="'+ap+'" data-name="'+nm+'" '
     +'title="Save this file">'
     +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
     +'stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">'
     +'<path d="M12 4v11"/><path d="M6.5 10.5L12 16l5.5-5.5"/>'
-    +'<path d="M5 19h14"/></svg></a></div>';
+    +'<path d="M5 19h14"/></svg></button></div>';
 }
 // A navigation to the file made pywebview re-fetch it on its own session,
 // without the launch cookie, and save the 403 text as the file (6b310).
-// A link with a download attribute stays inside the page's session.
+// Since 6b321 even the page's own link lacks the token: fetch it through
+// api() and save a blob: URL. On a PC (no Finder reveal) every save
+// comes here.
 function dlDirect(a){
-  const t=document.createElement("a");
-  t.href=a.getAttribute("href");t.download=a.getAttribute("download")||"";
-  document.body.appendChild(t);t.click();t.remove();
+  apiDownload(a.dataset.apiHref,a.dataset.name).catch(()=>{});
 }
 // the desktop app cannot save through WKWebView, so put the file in front
 // of the user the native way instead: reveal it in Finder.
@@ -20426,7 +20718,7 @@ document.addEventListener("click",async e=>{
   e.preventDefault();
   const box=a.closest(".dlbox"),was=box.getAttribute("data-said")||"";
   try{
-    const r=await(await fetch("/api/export/reveal",{method:"POST",
+    const r=await(await api("/api/export/reveal",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({id:box.dataset.id})})).json();
     box.classList.toggle("done",!!(r&&r.ok));
@@ -20504,8 +20796,10 @@ function renderMD(raw){
   // A remote picture loads with no click, so an answer that a web page
   // talked into ![](https://collector/?q=<your question>) sent the
   // question out the moment it rendered. A remote one is a link now.
+  // No src (6b321): data-api-src, which api() turns into a blob: URL,
+  // since an <img> can't carry the token
   s=s.replace(/!\[([^\]\n]*)\]\((\/api\/image\/[\w.-]+)\)/g,
-    (_,a,u)=>'<img class="genimg" src="'+u+'" alt="'+a+'" loading="lazy">');
+    (_,a,u)=>'<img class="genimg" data-api-src="'+u+'" alt="'+a+'">');
   s=s.replace(/!\[([^\]\n]*)\]\((https?:\/\/[^\s)]+)\)/g,
     (_,a,u)=>'<a href="'+u+'" target="_blank" rel="noopener noreferrer">'
       +(a||"image")+"</a>");
@@ -20557,9 +20851,10 @@ function renderMD(raw){
     if(!v||!v.id)return "";
     const u="/api/video/"+encodeURIComponent(v.id);
     // a GIF or animated WebP in a <video> decodes to nothing in WebKit
+    // data-api-src, not src: loaded through the token (6b321)
     return /\.(gif|webp)$/i.test(v.id)
-      ? '<img class="genvid" src="'+u+'" alt="'+esc(v.t||"")+'" loading="lazy">'
-      : '<video class="genvid" controls playsinline preload="metadata" src="'
+      ? '<img class="genvid" data-api-src="'+u+'" alt="'+esc(v.t||"")+'">'
+      : '<video class="genvid" controls playsinline preload="metadata" data-api-src="'
         +u+'"></video>';});
   s=s.replace(/\u0000THINKOPEN(\d+)\u0000/g,(_,i)=>
     '<details open><summary>◈ reasoning…</summary><div class="think-body">'+esc(thinks[+i]).replace(/\n/g,"<br>")+"</div></details>");
@@ -20681,7 +20976,7 @@ async function mountPlaces(id,places,loc,mapd){
   const pins=[];
   for(const p of places.slice(0,4)){
     try{
-      const g=await(await fetch("/api/geo?q="
+      const g=await(await api("/api/geo?q="
         +encodeURIComponent((p.n||"")+" "+(loc||"")))).json();
       if(g&&typeof g.lat==="number"
          &&(!loc||(g.name||"").toLowerCase().includes(loc.toLowerCase())))
@@ -20889,7 +21184,7 @@ inner.addEventListener("click",e=>{
   const b=e.target.closest&&e.target.closest(".wtnow");
   if(!b||!curHid||hurriedNow)return;
   hurriedNow=true;
-  fetch("/api/chat/hurry",{method:"POST",
+  api("/api/chat/hurry",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({hid:curHid})}).catch(()=>{});
   paintSteps();
@@ -21209,7 +21504,7 @@ async function send(){
     return;
   }
 
-  fetch("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},
+  api("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({stop:true})});
   input.value="";input.style.height="auto";
   const sentImages=pendingImages.slice();
@@ -21247,7 +21542,7 @@ async function send(){
   lastModels="";
 
   try{
-    const resp=await fetch("/api/chat",{
+    const resp=await api("/api/chat",{
       method:"POST",headers:{"Content-Type":"application/json"},
       signal:abortCtl.signal,
       body:JSON.stringify(advOn&&adv
@@ -21510,7 +21805,7 @@ async function send(){
     pollEngines();
   }
   if(voiceChat&&full&&!isErr&&!wasAborted){
-    fetch("/api/speak",{method:"POST",
+    api("/api/speak",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({text:stripTokens(full)})});
   }
@@ -21649,8 +21944,10 @@ function greetOK(g,mo,hr,dw,dm){
   }
   return true;
 }
-const NICK=__USER_NICK__;
-const CITY=__USER_CITY__;
+// the name and town come from /api/prefs, behind the token (6b321): the
+// page itself carries nothing personal. The hero draws at once without
+// them and again, rising in, when they arrive.
+let NICK="",CITY="";
 /* a greeting is drawn only if the app can fill every token it uses */
 function greetFill(t){
   return t.replace(/\{name\}/g,NICK).replace(/\{city\}/g,CITY);
@@ -21688,6 +21985,18 @@ function greeting(){
   return t.indexOf("{")>=0?greetFill(t):persGreet(t);
 }
 (function(){const g=$(".greet");if(g)g.textContent=greeting();})();
+api("/api/prefs").then(r=>r.json()).then(p=>{
+  // "Peter Smith" -> "Peter"; "Brooklyn, NY" -> "Brooklyn"
+  NICK=(String(p.user_name||"").trim().split(" ")[0]||"").slice(0,24);
+  CITY=String(p.home_area||"").split(",")[0].trim().slice(0,32);
+  const g=$("#hero .greet");
+  if(!g||!(NICK||CITY))return;
+  g.textContent=greeting();
+  // mid-wipe the fly-in is already raising it; otherwise rise in again
+  if(g.classList.contains("flyin"))return;
+  g.classList.remove("regreet");void g.offsetWidth;g.classList.add("regreet");
+  g.addEventListener("animationend",()=>g.classList.remove("regreet"),{once:true});
+}).catch(()=>{});
 /* the post-update moment (6b282): a dialog, not a full-screen zoom.
    Notes come from the current release's body — the same text the
    Updates pane shows — so both always agree. */
@@ -21703,7 +22012,7 @@ function greeting(){
   // newer for the models on this Mac — asked AFTER the startup sweep,
   // so the card never offers to free space that is already free.
   await Promise.all([
-    (async()=>{try{const r=await(await fetch("/api/update/whatsnew")).json();
+    (async()=>{try{const r=await(await api("/api/update/whatsnew")).json();
       if(r&&r.notes)notes=r.notes;}catch(e){}})(),
     (async()=>{try{mu=await muFetch(true);}catch(e){}})()]);
   $("#updated-notes").innerHTML=notes?notesHTML(notes)
@@ -21728,7 +22037,7 @@ function greeting(){
       const q=window.chatQ,my=++seq;
       if(q.length>=3){
         try{
-          const r=await(await fetch("/api/chats/search?q="
+          const r=await(await api("/api/chats/search?q="
             +encodeURIComponent(q))).json();
           if(my===seq)window.chatQHits=new Set(r.ids||[]);
         }catch(e){window.chatQHits=null;}
@@ -21759,7 +22068,7 @@ const chatsSnap=new Map(chats.map(c=>[c.id,JSON.stringify(c)]));
 async function loadChatsFromDisk(){
   const gen=chatsGen;
   try{
-    const r=await fetch("/api/chats");
+    const r=await api("/api/chats");
     if(!r.ok)throw new Error("chats "+r.status);
     const server=(await r.json()).chats||[];
     if(gen!==chatsGen)return;
@@ -21790,7 +22099,7 @@ async function loadChatsFromDisk(){
 }
 async function pushChatsToDisk(){
   try{
-    await fetch("/api/chats",{method:"POST",
+    await api("/api/chats",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({chats:chats})});
   }catch(e){}
@@ -22226,7 +22535,7 @@ function persistCurrent(){
 
 async function nameChat(c,text){
   try{
-    const r=await fetch("/api/title",{method:"POST",
+    const r=await api("/api/title",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({text:text})});
     const t=(await r.json()).title;
@@ -22376,7 +22685,7 @@ async function wsRefresh(){
   bar.hidden=!on;
   if(!on)return;
   try{
-    const st=await(await fetch("/api/workspace")).json();
+    const st=await(await api("/api/workspace")).json();
     if(st.ok){
       $("#ws-path").value=st.root;
       $("#ws-note").textContent=st.files+" readable files indexed";
@@ -22391,7 +22700,7 @@ $("#ws-set").addEventListener("click",async()=>{
   $("#ws-note").textContent="checking…";
   try{
     // a POST (6b320): choosing the folder writes a pref
-    const st=await(await fetch("/api/workspace/set",{method:"POST",
+    const st=await(await api("/api/workspace/set",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({root})})).json();
     $("#ws-note").textContent=st.ok
@@ -22416,7 +22725,7 @@ async function fnStep(){
   inner.appendChild(box);autoScroll();
   let d={};
   try{
-    d=await(await fetch("/api/funnel",{method:"POST",
+    d=await(await api("/api/funnel",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify(fnState)})).json();
   }catch(e){d={err:"couldn\u2019t reach the engine"};}
@@ -22483,7 +22792,7 @@ $("#fn-go").addEventListener("click",()=>{
 
 /* the funnel effort is remembered (6b308) */
 (async()=>{try{
-  const pr=await(await fetch("/api/prefs")).json();
+  const pr=await(await api("/api/prefs")).json();
   const r=document.querySelector('input[name="fn-eff"][value="'
     +(pr.funnel_effort==="fast"?"fast":"normal")+'"]');
   if(r)r.checked=true;
@@ -22491,7 +22800,7 @@ $("#fn-go").addEventListener("click",()=>{
 document.querySelectorAll('input[name="fn-eff"]').forEach(r=>
   r.addEventListener("change",()=>{
     if(!r.checked)return;
-    fetch("/api/prefs",{method:"POST",headers:{"Content-Type":"application/json"},
+    api("/api/prefs",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({funnel_effort:r.value})}).catch(()=>{});
   }));
 
@@ -22656,7 +22965,7 @@ let simGpu=12,memPct=null;
 async function pollStats(){
   let gpu;
   try{
-    const st=await(await fetch("/api/stats")).json();
+    const st=await(await api("/api/stats")).json();
     gpu=st.gpu_pct;
     memPct=(st.mem_pressure!=null?st.mem_pressure:st.mem_pct);
   }catch(e){}
@@ -22698,7 +23007,7 @@ $$(".model").forEach(el=>{
 });
 async function pollEngines(){
   try{
-    const r=await fetch("/api/engines"),st=await r.json();
+    const r=await api("/api/engines"),st=await r.json();
     engineState=st;
     $$(".model").forEach(el=>{
       const s=st[el.dataset.model];if(!s)return;
@@ -22760,7 +23069,7 @@ document.addEventListener("visibilitychange",()=>{
 
 /* ------------------------------------------------- NYC skyline backdrop */
 // Apple's ATV aerial loops of New York, served by OUR OWN server from
-// /sky/<i>.mov — the raw CDNs are unusable in a browser (phobos: http-only;
+// /static/sky/<i>.mov — the raw CDNs are unusable in a browser (phobos: http-only;
 // sylvan: moov atom after 370 MB of mdat, nothing plays until the whole
 // file lands). The server downloads once, remuxes fast-start, caches, and
 // streams with Range support. While it downloads, the #skyload bar has
@@ -22839,7 +23148,7 @@ async function bootSkyline(){
   // a clip already on disk starts instantly and still counts as new to
   // the eye — only reach for a download when the local set is thin
   let onDisk=[];
-  try{onDisk=(await(await fetch("/api/sky/cached")).json()).cached||[];}
+  try{onDisk=(await(await api("/api/sky/cached")).json()).cached||[];}
   catch(e){}
   // a stocked pantry is proof this is a veteran install even when
   // localStorage says otherwise — private-mode WKWebView wiped it on
@@ -22876,7 +23185,7 @@ async function bootSkyline(){
   const PANTRY=5;
   const skyFailed=new Set();
   function fillPantry(){
-    fetch("/api/sky/cached").then(r=>r.json()).then(c=>{
+    api("/api/sky/cached").then(r=>r.json()).then(c=>{
       const have=(c.cached||[]);
       const spare=have.filter(x=>x!==i);
       // tomorrow starts decided NOW: a spare the user has never seen
@@ -22904,7 +23213,7 @@ async function bootSkyline(){
       if(n<0)return;
       let tries=0;
       (function warm(){
-        fetch("/api/sky/status?i="+n+"&warm=1").then(r=>r.json()).then(st=>{
+        api("/api/sky/status?i="+n+"&warm=1").then(r=>r.json()).then(st=>{
           if(st.status==="ready"){
             // the freshest clip IS tomorrow's backdrop — never seen,
             // already on disk, instant at next launch
@@ -22943,10 +23252,10 @@ async function bootSkyline(){
       // evicted or hiccuped mid-session: re-warm THIS clip and resume —
       // the backdrop only changes on reload, never on its own
       hideBar();
-      fetch("/api/sky/status?i="+i+"&warm=1").then(()=>{
+      api("/api/sky/status?i="+i+"&warm=1").then(()=>{
         const re=setInterval(async()=>{
-          const st=await(await fetch("/api/sky/status?i="+i)).json();
-          if(st.status==="ready"){clearInterval(re);c.src="/sky/"+i+".mov";
+          const st=await(await api("/api/sky/status?i="+i)).json();
+          if(st.status==="ready"){clearInterval(re);c.src="/static/sky/"+i+".mov";
             const p2=c.play();if(p2&&p2.catch)p2.catch(()=>{});}
           if(st.status==="error"){clearInterval(re);skyline.hidden=true;}
         },1500);
@@ -22974,7 +23283,7 @@ async function bootSkyline(){
     buf();
     setTimeout(reveal,10000);   // 10 seconds, tops — then play with what we have
     c.classList.add("swapping");
-    c.src="/sky/"+i+".mov";
+    c.src="/static/sky/"+i+".mov";
     const pr=c.play(); if(pr&&pr.catch)pr.catch(()=>{});
     const fadeUp=()=>c.classList.remove("swapping");
     c.addEventListener("canplay",fadeUp,{once:true});
@@ -22982,7 +23291,7 @@ async function bootSkyline(){
   }
   let rotations=0;
   function poll(){
-    fetch("/api/sky/status?i="+i).then(r=>r.json()).then(st=>{
+    api("/api/sky/status?i="+i).then(r=>r.json()).then(st=>{
       if(st.status==="ready"){attach();return;}
       if(st.status==="error"){
         // a dead clip rotates to the next; after all fail the backdrop
@@ -23015,7 +23324,7 @@ async function bootSkyline(){
     if(noVideo||document.hidden||skyline.hidden||c.paused&&c.readyState<2)return;
     if(generating){if(tries<30)setTimeout(()=>skyRotate(tries+1),60000);return;}
     let onDisk=[],night=SKY_NIGHT;
-    try{const r=await(await fetch("/api/sky/cached")).json();
+    try{const r=await(await api("/api/sky/cached")).json();
         onDisk=r.cached||[];if(typeof r.night==="boolean")night=r.night;}
     catch(e){return;}
     const n=skyPick({all:[...Array(SKY_N).keys()],hist,onDisk,last:i,
@@ -23057,7 +23366,7 @@ function skyCrossfade(c,n){
         c.src=nv.src;
       },3300);
     },{once:true});
-    nv.src="/sky/"+n+".mov";
+    nv.src="/static/sky/"+n+".mov";
   });
 }
 bootSkyline();
@@ -23353,15 +23662,15 @@ function wavEncode(chunks,srIn){
 
 async function ensureVoice(){
   if(voiceReady)return true;
-  const st=await(await fetch("/api/voice/status")).json();
+  const st=await(await api("/api/voice/status")).json();
   if(!st.supported){input.placeholder=IS_PC
     ?"voice input isn't installed on this PC (its speech engine didn't install)"
     :"voice input needs an Apple silicon Mac";return false;}
   if(st.ready){voiceReady=true;return true;}
-  await fetch("/api/voice/prepare",{method:"POST"});
+  await api("/api/voice/prepare",{method:"POST"});
   input.placeholder="getting the voice engine ("+(st.pct||0)+"%)\u2026 tap the mic again soon";
   if(!voicePoll)voicePoll=setInterval(async()=>{
-    const s2=await(await fetch("/api/voice/status")).json();
+    const s2=await(await api("/api/voice/status")).json();
     if(s2.ready){clearInterval(voicePoll);voicePoll=null;voiceReady=true;
       input.placeholder="voice ready \u2014 tap the mic and talk";}
     else if(s2.note&&!s2.downloading){
@@ -23394,7 +23703,7 @@ async function stopRec(){
   input.placeholder="transcribing\u2026";
   try{
     const wav=wavEncode(recBuf,sr);recBuf=[];
-    const r=await fetch("/api/transcribe",{method:"POST",body:wav});
+    const r=await api("/api/transcribe",{method:"POST",body:wav});
     if(!r.ok)throw new Error("transcribe failed");
     const text=(await r.json()).text;
     input.placeholder="Message MillenAI\u2026";
@@ -23407,7 +23716,7 @@ async function stopRec(){
 
 micBtn.addEventListener("click",async()=>{
   if(recording){stopRec();return;}
-  fetch("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},
+  api("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({stop:true})});   // barge-in: stop any reply audio
   if(!(await ensureVoice()))return;
   try{await startRec();}
@@ -23743,7 +24052,7 @@ async function setupTick(){
   if(setupInFlight)return;
   setupInFlight=true;
   try{
-    const st=await(await fetch("/api/setup")).json();
+    const st=await(await api("/api/setup")).json();
     renderSetup(st);
     pollEngines();
     if(st.busy)wasDownloading=true;
@@ -23766,7 +24075,7 @@ async function dlStripTick(){
   try{
     // 6b304: the cheap endpoint. The full /api/setup walked the disk every
     // 4s for the life of the window just to learn nothing was happening.
-    const st=await(await fetch("/api/setup/busy")).json();
+    const st=await(await api("/api/setup/busy")).json();
     const bg=st.busy&&veil.hidden;
     dlStrip.hidden=!bg;
     if(st.busy){const f=$("#models-flag");if(f){f.style.background="";f.hidden=true;}}
@@ -23808,7 +24117,7 @@ setupGo.addEventListener("click",async()=>{
     closeSetup();runModelUpdate();return;}
   if(setupAllReady&&!(setupManual&&setupGo.dataset.act==="add")){
     closeSetup();return;}
-  await fetch("/api/setup/install",{method:"POST",
+  await api("/api/setup/install",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({plan:setupPlan})});
   setupTick();
@@ -23852,7 +24161,7 @@ $("#ck-save").addEventListener("click",async()=>{
   if(!key){note.textContent="paste a key first";return;}
   note.textContent="testing the key…";
   try{
-    const d=await(await fetch("/api/cloud/set",{method:"POST",
+    const d=await(await api("/api/cloud/set",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({provider:$("#ck-provider").value,key:key})})).json();
     // a rate-limited key still SAVES (it's a good key) — say what
@@ -23862,7 +24171,7 @@ $("#ck-save").addEventListener("click",async()=>{
       $("#ck-key").value="";
       $("#turbo-row").hidden=false;$("#turbo").checked=true;}
     else note.textContent=d.err||"that didn't work";
-    try{const cs2=await(await fetch("/api/cloud")).json();
+    try{const cs2=await(await api("/api/cloud")).json();
         ckBoard(cs2.providers,cs2.active);}catch(e){}
     paintTierAvail();   // a new key may have just switched Cloud Only on
   }catch(e){note.textContent="network error — try again";}
@@ -23882,13 +24191,13 @@ function syncLimits(nlOn,giOn){
   });
 }
 (async()=>{try{
-  const pr=await(await fetch("/api/prefs")).json();
+  const pr=await(await api("/api/prefs")).json();
   syncLimits(pr.no_limits,pr.include_giants);
 }catch(e){}})();
 $("#nolimits").addEventListener("change",async()=>{
   const on=$("#nolimits").checked;
   syncLimits(on,$("#giants").checked);
-  await fetch("/api/prefs",{method:"POST",
+  await api("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify(on?{no_limits:true}
       :{no_limits:false,include_giants:false})});
@@ -23896,7 +24205,7 @@ $("#nolimits").addEventListener("change",async()=>{
 });
 $("#giants").addEventListener("change",async()=>{
   syncLimits($("#nolimits").checked,$("#giants").checked);
-  await fetch("/api/prefs",{method:"POST",
+  await api("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({include_giants:$("#giants").checked})});
   setupTick();
@@ -23928,7 +24237,7 @@ function wizShow(n){
 async function wizPaintPlans(){
   const box=$("#wiz-plans");
   let st={};
-  try{st=await(await fetch("/api/setup")).json();}catch(e){return;}
+  try{st=await(await api("/api/setup")).json();}catch(e){return;}
   const rem=st.plans||{};
   const ss=st.studios||{};
   const wi=$("#wiz-image");
@@ -23952,7 +24261,7 @@ $("#wiz-plans").addEventListener("click",e=>{
     el.classList.toggle("on",el===c));
 });
 $("#wiz-ac").addEventListener("change",async()=>{
-  await fetch("/api/prefs",{method:"POST",
+  await api("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({auto_cleanup:$("#wiz-ac").checked})});
   const s=$("#autoclean-toggle");
@@ -23961,7 +24270,7 @@ $("#wiz-ac").addEventListener("change",async()=>{
 $("#wiz-nl").addEventListener("change",async()=>{
   const on=$("#wiz-nl").checked;
   syncLimits(on,$("#wiz-gi").checked);
-  await fetch("/api/prefs",{method:"POST",
+  await api("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify(on?{no_limits:true}
       :{no_limits:false,include_giants:false})});
@@ -23969,7 +24278,7 @@ $("#wiz-nl").addEventListener("change",async()=>{
 });
 $("#wiz-gi").addEventListener("change",async()=>{
   syncLimits($("#wiz-nl").checked,$("#wiz-gi").checked);
-  await fetch("/api/prefs",{method:"POST",
+  await api("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({include_giants:$("#wiz-gi").checked})});
   wizPaintPlans();
@@ -23977,7 +24286,7 @@ $("#wiz-gi").addEventListener("change",async()=>{
 async function wizPaintProvs(){
   const box=$("#wiz-provs");
   let cs={};
-  try{cs=await(await fetch("/api/cloud")).json();}catch(e){}
+  try{cs=await(await api("/api/cloud")).json();}catch(e){}
   const pv=(cs||{}).providers||{};
   box.innerHTML=WIZ_PROVS.map(([id,label,tag,url])=>{
     const ok=(pv[id]||{}).status==="ok";
@@ -24011,7 +24320,7 @@ $("#wiz-provs").addEventListener("click",async e=>{
   if(!key){note.textContent="paste a key first";return;}
   note.textContent="testing the key…";
   try{
-    const d=await(await fetch("/api/cloud/set",{method:"POST",
+    const d=await(await api("/api/cloud/set",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({provider:p.dataset.p,key:key})})).json();
     if(d.ok){
@@ -24023,15 +24332,15 @@ $("#wiz-provs").addEventListener("click",async e=>{
 });
 function openWizard(){wizVeil.hidden=false;wizShow(1);}
 async function wizFinish(){
-  fetch("/api/prefs",{method:"POST",
+  api("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({wizard_done:true})});
-  await fetch("/api/setup/install",{method:"POST",
+  await api("/api/setup/install",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({plan:wizPlan})});
   for(const [el,k] of [["#wiz-img","image"],["#wiz-vid","video"]])
     if($(el)&&$(el).checked)
-      fetch("/api/studio/install",{method:"POST",
+      api("/api/studio/install",{method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({key:k})});
   wizVeil.hidden=true;
@@ -24045,7 +24354,7 @@ $("#wiz-back").addEventListener("click",()=>{
   if(wizStep>1)wizShow(wizStep-1);
 });
 $("#wiz-skip").addEventListener("click",()=>{
-  fetch("/api/prefs",{method:"POST",
+  api("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({wizard_done:true})});
   wizVeil.hidden=true;
@@ -24074,7 +24383,7 @@ function paintModelsFlag(st){
 (function flagTick(){
   setTimeout(async()=>{
     if(veil.hidden&&dlStrip&&dlStrip.hidden){   // busy: the strip's tick paints
-      try{paintModelsFlag(await(await fetch("/api/setup")).json());}
+      try{paintModelsFlag(await(await api("/api/setup")).json());}
       catch(e){}
     }
     flagTick();
@@ -24116,7 +24425,7 @@ requestAnimationFrame(kickWipe);
 setTimeout(kickWipe,450);
 (async()=>{
   try{
-    const st=await(await fetch("/api/setup")).json();
+    const st=await(await api("/api/setup")).json();
     // auto-open only when the app can't hold a conversation yet
     paintModelsFlag(st);
     if(st.needs_setup){
@@ -24124,7 +24433,7 @@ setTimeout(kickWipe,450);
       // that skipped or finished it falls back to the plain download
       // panel.
       let done=false;
-      try{done=!!(await(await fetch("/api/prefs")).json()).wizard_done;}
+      try{done=!!(await(await api("/api/prefs")).json()).wizard_done;}
       catch(e){}
       if(!done)openWizard();
       else{openSetup();setupManual=false;}
@@ -24179,7 +24488,7 @@ async function openAbout(){
   aboutVeil.hidden=false;
   paintAccount();                    // the Account pane (6b257)
   try{
-    const pr=await(await fetch("/api/prefs")).json();
+    const pr=await(await api("/api/prefs")).json();
     $("#persona").value=pr.persona||"";
     $("#user-name").value=pr.user_name||"";
     const lv=Math.max(1,Math.min(5,+(pr.length||3)));
@@ -24187,8 +24496,8 @@ async function openAbout(){
   }catch(e){}
   try{
     const [m,st]=await Promise.all([
-      (await fetch("/api/memory")).json(),
-      (await fetch("/api/setup")).json()]);
+      (await api("/api/memory")).json(),
+      (await api("/api/setup")).json()]);
     // NO platform line (6b257): it was a pre-rail relic — the about-name
     // id had THREE matches, so the write landed on the new-models veil
     // title, invisible behind announceModels' own rewrite, for several
@@ -24196,13 +24505,13 @@ async function openAbout(){
     // (chip / memory / accel), so the fix is deletion — the 6b245
     // lesson — and the id is retired (distinct new-title / up-title).
     try{
-      const pr2=await(await fetch("/api/prefs")).json();
+      const pr2=await(await api("/api/prefs")).json();
       $("#turbo").checked=!!pr2.turbo;
       if($("#upchan"))$("#upchan").value=pr2.update_channel||(pr2.beta_updates?"beta":"stable");
       $("#autochk-toggle").classList.toggle("on",pr2.auto_update_check!==false);
       $("#autoclean-toggle").classList.toggle("on",pr2.auto_cleanup!==false);   // on by default (6b306)
       try{
-        const cs=await(await fetch("/api/cloud")).json();
+        const cs=await(await api("/api/cloud")).json();
         $("#turbo-row").hidden=!cs.configured;
         // THE KEY BOX IS THE ONLY DOOR (6b245): folding it behind the
         // cloud-power toggle left a FRESH machine's pane empty — the
@@ -24222,13 +24531,13 @@ async function openAbout(){
     const ready=st.models.filter(x=>x.status==="ready").length;
     $("#about-facts").textContent=ready+" / "+st.models.length;
     lastSetup=st;
-    try{lastCloud=await(await fetch("/api/cloud")).json();}catch(e){}
+    try{lastCloud=await(await api("/api/cloud")).json();}catch(e){}
     paintRoster(st,lastCloud);
     paintUpdatesPane();
     // the spec list: one fact per line, so nothing wraps (6b243)
     if(st.accel)$("#spec-accel").textContent=st.accel;
     try{
-      const stt=await(await fetch("/api/stats")).json();
+      const stt=await(await api("/api/stats")).json();
       $("#spec-mem").textContent=stt.mem_total_gb
         ? Math.round(stt.mem_total_gb)+" GB" : "—";
     }catch(e){}
@@ -24248,12 +24557,12 @@ async function announceModels(){
   if(__JUST_UPDATED__)return;
   try{
     const [st,prefs]=await Promise.all([
-      (await fetch("/api/setup")).json(),
-      (await fetch("/api/prefs")).json()]);
+      (await api("/api/setup")).json(),
+      (await api("/api/prefs")).json()]);
     if(st.needs_setup)return;         // the installer owns the screen
     const seen=prefs.seen_models||[];
     const all=st.models.map(m=>m.label);
-    const stamp=extra=>fetch("/api/prefs",{method:"POST",
+    const stamp=extra=>api("/api/prefs",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify(Object.assign({seen_models:all,
         remind_models_ts:Date.now()},extra||{}))});
@@ -24290,12 +24599,12 @@ async function announceModels(){
       $("#new-bar").hidden=false;$("#new-pct").hidden=false;
       $("#new-pct").textContent="starting\u2026";
       $("#new-bg").hidden=false;
-      await fetch("/api/setup/install",{method:"POST",
+      await api("/api/setup/install",{method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({plan:"max"})});
       poll=setInterval(async()=>{
         try{
-          const s=await(await fetch("/api/setup")).json();
+          const s=await(await api("/api/setup")).json();
           $("#new-bar").firstChild.style.width=(s.overall_pct||0)+"%";
           $("#new-pct").textContent=
             s.have_gb+" / "+s.want_gb+" GB \u00b7 "+(s.overall_pct||0)+"%"
@@ -24316,7 +24625,7 @@ $("#settings-btn").addEventListener("click",openAbout);
 $("#persona-save").addEventListener("click",async ev=>{
   const b=ev.currentTarget;
   try{
-    await fetch("/api/prefs",{method:"POST",
+    await api("/api/prefs",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({persona:$("#persona").value.trim(),
         user_name:$("#user-name").value.trim()})});
@@ -24329,7 +24638,7 @@ const lenSlider=$("#len-slider");
 function paintLen(v){$("#len-val").textContent=LEN_NAMES[v]||"Balanced";}
 lenSlider.addEventListener("input",()=>paintLen(+lenSlider.value));
 lenSlider.addEventListener("change",()=>{
-  fetch("/api/prefs",{method:"POST",
+  api("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({length:+lenSlider.value})});
 });
@@ -24384,7 +24693,7 @@ function rosTick(){
   clearTimeout(rosTimer);
   rosTimer=setTimeout(async()=>{
     let st;
-    try{st=await(await fetch("/api/setup")).json();}catch(e){return;}
+    try{st=await(await api("/api/setup")).json();}catch(e){return;}
     lastSetup=st;paintRoster(st,lastCloud);   // it re-arms this tick
   },4000);
 }
@@ -24594,7 +24903,7 @@ function openGear(key){
 }
 async function gearSave(patch){
   try{
-    const r=await(await fetch("/api/studio/opts",{method:"POST",
+    const r=await(await api("/api/studio/opts",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({key:gearKey,set:patch})})).json();
     if(r&&r.opts&&lastSetup&&lastSetup.studios&&lastSetup.studios[gearKey]){
@@ -24646,7 +24955,7 @@ $("#studio-row").addEventListener("click",async e=>{
   }
   if(e.target.closest(".stadd")){
     const b=e.target.closest(".stadd");b.disabled=true;
-    try{await fetch("/api/studio/install",{method:"POST",
+    try{await api("/api/studio/install",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({key:key,tier:stPick[key]||""})});}catch(e2){}
     $("#manage-note").textContent=STUDIO_META[key].title+" \u2014 starting\u2026";
@@ -24663,7 +24972,7 @@ $("#studio-row").addEventListener("click",async e=>{
     }
     r.disabled=true;r.textContent="removing\u2026";
     let out={};
-    try{out=await(await fetch("/api/studio/remove",{method:"POST",
+    try{out=await(await api("/api/studio/remove",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({key:key})})).json();}catch(e2){}
     $("#manage-note").textContent=out.ok
@@ -24681,7 +24990,7 @@ function manageTick(){
   clearTimeout(mgTimer);
   mgTimer=setTimeout(async()=>{
     if($("#manage-box").hidden)return;
-    try{lastSetup=await(await fetch("/api/setup")).json();}catch(e){return;}
+    try{lastSetup=await(await api("/api/setup")).json();}catch(e){return;}
     paintPlans();paintMgStats();paintCleanNote();paintStudios();
     const st=lastSetup;
     if(st.busy){
@@ -24710,7 +25019,7 @@ async function ensureSetup(){
   // be clicked before openAbout's copy lands, and empty cards were the
   // glitch (6b258)
   if(lastSetup)return lastSetup;
-  try{lastSetup=await(await fetch("/api/setup")).json();}catch(e){}
+  try{lastSetup=await(await api("/api/setup")).json();}catch(e){}
   return lastSetup;
 }
 $("#roster-manage").addEventListener("click",async()=>{
@@ -24733,7 +25042,7 @@ function muGB(x){x=+x||0;return (x>=10?Math.round(x):Math.round(x*10)/10)+" GB";
 function muOffers(p){return ((p&&p.updates)||[]).filter(u=>u.new);}
 function muHas(p){return !!(p&&((p.updates||[]).length));}
 async function muFetch(withPlan){
-  const r=await(await fetch("/api/model/update"+(withPlan?"?plan=1":""))).json();
+  const r=await(await api("/api/model/update"+(withPlan?"?plan=1":""))).json();
   if(r.plan)muPlan=r.plan;
   return r;
 }
@@ -24822,7 +25131,7 @@ async function runModelUpdate(){
   try{await muFetch(true);}catch(e){}
   host.dataset.ran="1";
   let st=null;
-  try{st=await(await fetch("/api/model/update",{method:"POST",
+  try{st=await(await api("/api/model/update",{method:"POST",
     headers:{"Content-Type":"application/json"},body:"{}"})).json();}
   catch(e){}
   muShow(host,st);
@@ -24844,7 +25153,7 @@ document.addEventListener("click",async e=>{
   }else if(act==="go"){
     b.disabled=true;
     try{
-      const st=await(await fetch("/api/model/update",{method:"POST",
+      const st=await(await api("/api/model/update",{method:"POST",
         headers:{"Content-Type":"application/json"},body:"{}"})).json();
       muHost.dataset.ran="1";muPaint(muHost,st);
       if(st.state==="running"){if(!muTimer)muTimer=setTimeout(muTick,800);}
@@ -24885,14 +25194,14 @@ $("#autoclean-toggle").addEventListener("click",async()=>{
   t.classList.toggle("on",on);
   if(lastSetup&&lastSetup.cleanup)lastSetup.cleanup.auto=on;
   const w=$("#wiz-ac");if(w)w.checked=on;
-  await fetch("/api/prefs",{method:"POST",
+  await api("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({auto_cleanup:on})});
   if(!on)return;
   // switching it on is a sweep
   $("#autoclean-note").textContent="Clearing out old models…";
   try{
-    await fetch("/api/model/cleanup",{method:"POST",
+    await api("/api/model/cleanup",{method:"POST",
       headers:{"Content-Type":"application/json"},body:"{}"});
   }catch(e){}
   muSettled();
@@ -24909,7 +25218,7 @@ $("#plan-row").addEventListener("click",async e=>{
   }
   $("#manage-note").textContent="starting\u2026";
   let r={};
-  try{r=await(await fetch("/api/setup/install",{method:"POST",
+  try{r=await(await api("/api/setup/install",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({plan:c.dataset.plan})})).json();}
   catch(e2){$("#manage-note").textContent="could not start \u2014 try again";return;}
@@ -24942,12 +25251,12 @@ $("#roster").addEventListener("click",async e=>{
   delete rosArmed[k];
   i.textContent="starting…";
   try{
-    const r=await(await fetch("/api/model/download",{method:"POST",
+    const r=await(await api("/api/model/download",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({labels:[i.dataset.l]})})).json();
     if(!(r.started||[]).includes(i.dataset.l)){
       // already queued elsewhere, or already here: the list says which
-      try{lastSetup=await(await fetch("/api/setup")).json();
+      try{lastSetup=await(await api("/api/setup")).json();
           paintRoster(lastSetup,lastCloud);}catch(e3){}
       return;
     }
@@ -24968,13 +25277,13 @@ $("#roster").addEventListener("click",async e=>{
   delete rosArmed[k];
   r.textContent="removing…";
   let out={};
-  try{out=await(await fetch("/api/model/remove",{method:"POST",
+  try{out=await(await api("/api/model/remove",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({labels:[r.dataset.l]})})).json();}catch(e2){}
   $("#manage-note").textContent=(out.removed&&out.removed.length)
     ?"removed — freed "+out.freed_gb+" GB"
     :"couldn't remove: "+((out.errors||{})[r.dataset.l]||"unknown");
-  try{lastSetup=await(await fetch("/api/setup")).json();
+  try{lastSetup=await(await api("/api/setup")).json();
       paintRoster(lastSetup,lastCloud);paintPlans();}catch(e2){}
 });
 
@@ -25010,7 +25319,7 @@ function notesHTML(md){
 }
 async function paintUpdatesPane(){
   try{
-    const r=await(await fetch("/api/update/check")).json();
+    const r=await(await api("/api/update/check")).json();
     if(r.available)
       $("#up-reldate").textContent=r.latest+" is available";
     else if(r.auto===false)
@@ -25033,7 +25342,7 @@ async function paintUpdatesPane(){
    treatment: choose what dies, then type the words. No accidents. */
 let acctMe=null;
 async function paintAccount(){
-  try{acctMe=await(await fetch("/api/me")).json();}catch(e){acctMe=null;}
+  try{acctMe=await(await api("/api/me")).json();}catch(e){acctMe=null;}
   const me=acctMe||{kind:"owner"};
   // one kind since the web version's visitor profiles went (6b320):
   // this computer's own
@@ -25070,7 +25379,7 @@ $("#forget-word").addEventListener("input",fgCheck);
 $("#forget-go").addEventListener("click",async ev=>{
   const b=ev.currentTarget;b.disabled=true;b.textContent="Erasing…";
   let r={};
-  try{r=await(await fetch("/api/forget",{method:"POST",
+  try{r=await(await api("/api/forget",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({scopes:fgScopes()})})).json();}catch(e){}
   if(r&&r.ok){
@@ -25092,14 +25401,14 @@ $("#forget-go").addEventListener("click",async ev=>{
 });
 $("#turbo").addEventListener("change",()=>{
   $("#cloudkey-box").hidden=!$("#turbo").checked;
-  fetch("/api/prefs",{method:"POST",
+  api("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({turbo:$("#turbo").checked})});
 });
 $("#autochk-toggle").addEventListener("click",async()=>{
   const on=!$("#autochk-toggle").classList.contains("on");
   $("#autochk-toggle").classList.toggle("on",on);
-  await fetch("/api/prefs",{method:"POST",
+  await api("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({auto_update_check:on})});
   if(on)checkUpdate();           // switching it on is a check
@@ -25107,7 +25416,7 @@ $("#autochk-toggle").addEventListener("click",async()=>{
 });
 $("#upchan").addEventListener("change",async()=>{
   const ch=$("#upchan").value;
-  await fetch("/api/prefs",{method:"POST",
+  await api("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({update_channel:ch,beta_updates:ch==="beta"})});
   // switching channels should feel like something happened: re-check
@@ -25121,7 +25430,7 @@ $("#about-check").addEventListener("click",async ev=>{
   b.disabled=true;b.textContent="Checking\u2026";
   try{
     // a human click deserves a real answer, not the 15-min server cache
-    const r=await(await fetch("/api/update/check?force=1")).json();
+    const r=await(await api("/api/update/check?force=1")).json();
     if(!r.configured){b.textContent="Updates not configured";}
     else if(r.available){
       upInfo=r;$("#update-flag").hidden=false;
@@ -25150,7 +25459,7 @@ let upInfo=null,lastUpCheck=0;
 async function checkUpdate(){
   lastUpCheck=Date.now();
   try{
-    const r=await(await fetch("/api/update/check")).json();
+    const r=await(await api("/api/update/check")).json();
     if(r.available){
       upInfo=r;$("#update-flag").hidden=false;
     }
@@ -25176,14 +25485,14 @@ $("#update-flag").addEventListener("click",openUpdate);
 $("#up-later").addEventListener("click",()=>{upVeil.hidden=true;});
 upGo.addEventListener("click",async()=>{
   if(upInfo&&upInfo.manual){
-    await fetch("/api/update/download",{method:"POST"});
+    await api("/api/update/download",{method:"POST"});
     upVeil.hidden=true;return;
   }
   upGo.disabled=true;upGo.textContent="Downloading\u2026";
   upBar.hidden=false;
-  await fetch("/api/update/install",{method:"POST"});
+  await api("/api/update/install",{method:"POST"});
   const poll=setInterval(async()=>{
-    let st;try{st=await(await fetch("/api/update/status")).json();}
+    let st;try{st=await(await api("/api/update/status")).json();}
     catch(e){return;}   // the app is restarting — the fetch will fail
     upBar.querySelector("i").style.width=(st.pct||0)+"%";
     if(st.state==="installing")upGo.textContent="Installing\u2026";
@@ -25250,7 +25559,7 @@ function zSay(html){
 
 /* ---- the board, built from live endpoints ---- */
 async function zBuild(){
-  const gj=async u=>{try{return await(await fetch(u)).json();}catch(e){return{};}};
+  const gj=async u=>{try{return await(await api(u)).json();}catch(e){return{};}};
   const t0=performance.now();
   const eng=await gj("/api/engines");
   const lat=Math.round(performance.now()-t0);
@@ -25531,7 +25840,7 @@ async function zTransmit(){
   const onText=t=>{if(!t)return;ans+=t;paint();};
 
   try{
-    const resp=await fetch("/api/chat",{method:"POST",signal:ctl.signal,
+    const resp=await api("/api/chat",{method:"POST",signal:ctl.signal,
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({model:model,models:council,tier:tier,
         messages:[{role:"user",content:q}],auto_web:true,
@@ -25601,7 +25910,7 @@ function zEngage(){
   zBuild().catch(()=>zSay('board <span class="er">degraded</span>'));
   if(!zRaf)zRaf=requestAnimationFrame(zTick);
   zPoll=setInterval(async()=>{
-    try{zMeters(await(await fetch("/api/stats")).json());}catch(e){}
+    try{zMeters(await(await api("/api/stats")).json());}catch(e){}
   },3000);
   setTimeout(()=>{const b=$("#z-q");if(b)b.focus();},120);
 }
@@ -26166,6 +26475,8 @@ if __name__ == "__main__":
                 pass
         sys.exit(1)
     _write_instance_note()      # every copy, in its own folder (6b319)
+    if NOWINDOW and "boot-code" in TEST_HOOKS:
+        _write_boot_note()
     threading.Thread(target=start_backend, args=(_server,),
                      daemon=True).start()
     print(f"\n  {APP_NAME} {short_version()}")
@@ -26185,8 +26496,6 @@ if __name__ == "__main__":
     if not HAS_PSUTIL:
         print("  (telemetry simulated — pip install psutil for real numbers)")
     print()
-    # the window collects this launch's key once; see StudioHandler._gate
-    url = f"http://127.0.0.1:{PORT}/?key=" + urllib.parse.quote(ACCESS_KEY)
 
     if HAS_WEBVIEW and IS_MAC:
         # WKWebView ships with getUserMedia dead in two separate ways, and
@@ -26500,6 +26809,9 @@ if __name__ == "__main__":
         # the native window (WKWebView; WebView2 or Qt on Windows), which
         # _window_blocker made sure of first. Blocks until it closes.
         _ww, _wh, _mw, _mh = _fit_window(1320, 860, 940, 620)
+        # the window trades a one-time code for the cookie (6b321), minted
+        # here so nothing above eats into its 60 s; see StudioHandler._gate
+        url = "http://127.0.0.1:%d/?boot=%s" % (PORT, _mint_boot_code())
         window = webview.create_window(
             f"{APP_NAME} {short_version()}"
             + (" \u2014 TEST BUILD" if os.environ.get(
@@ -26510,7 +26822,16 @@ if __name__ == "__main__":
             min_size=(_mw, _mh),
             background_color="#0a0a0c",
             text_select=True,   # pywebview blocks selection by default
+            # the page's one way to the API token (6b321); only once the
+            # bridge guard is on
+            js_api=_WindowBridge() if _BRIDGE_OK else None,
         )
+        if not _BRIDGE_OK:
+            print("  (pywebview's bridge couldn't be guarded: no API token)")
+        try:
+            window.events.loaded += lambda: _boot_heal(window)
+        except Exception:
+            pass
         try:
             window.events.minimized += lambda: _WIN_STATE.update(min=True)
             window.events.restored += lambda: _WIN_STATE.update(
