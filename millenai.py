@@ -7256,16 +7256,22 @@ def _write_json(name: str, data, base, **dump):
         raise
 
 
+class _Unread(dict):
+    """The {} a failed settings read hands to a caller that isn't strict:
+    fine to read "off" from, never saved (review of 6b322)."""
+
+
 def load_prefs(base=None, strict=False) -> dict:
-    """strict: an unreadable file raises StoreReadError. Every read that
-    feeds a write, and GET /api/prefs, is strict (6b322). The other
-    readers get {} and may use it only where empty means "off" (0b Q11)."""
+    """strict: an unreadable file raises StoreReadError. GET and POST
+    /api/prefs are strict. The other readers get an empty _Unread and
+    may use it only where empty means "off" (0b Q11); store_prefs
+    refuses to save one, even if the file reads again by then."""
     try:
         return _read_json("prefs.json", base, dict) or {}
     except StoreReadError:
         if strict:
             raise
-        return {}
+        return _Unread()
 
 
 _prefs_lock = threading.RLock()
@@ -7290,6 +7296,8 @@ def store_prefs(d: dict, base=None):
     read-modify-write take _prefs_lock. A file on disk that can't be read
     is never written over (0b L1, 6b322): every caller read it first, so
     whatever it holds now was built on an empty read."""
+    if isinstance(d, _Unread):
+        raise StoreReadError("prefs.json")
     _read_json("prefs.json", base, dict)
     _write_json("prefs.json", d, base)
 
@@ -7464,6 +7472,7 @@ def _chat_append(chats, cid, after_len, after_hash, msgs, prefix=None,
             t = c.get("title") or "chat"
             c = _chat_new(chats, _new_chat_id(), c.get("lane"),
                           t + " (copy)", ok_prefix)
+            c["named"] = True     # the namer leaves "(copy)" alone
     _chat_msgs(c).extend(m for m in msgs if isinstance(m, dict))
     c["ts"] = int(time.time() * 1000)
     return c
@@ -7549,6 +7558,13 @@ def chat_ops(ops, base=None) -> dict:
         chats = load_chats(base)
         replies, changed = [], False
         for op in (ops if isinstance(ops, list) else [])[:200]:
+            # an answer still streaming into this chat is thrown away by
+            # Try again and Edit & resend (review of 6b322). A delete leaves
+            # it streaming: it lands in the undo copy, so Undo brings the
+            # chat back as it was shown
+            if isinstance(op, dict) and op.get("op") == "truncate":
+                changed = _turns_settle(chats, str(op.get("id") or ""),
+                                        keep=False) or changed
             r, ch = _chat_op(chats, op)
             replies.append(r)
             changed = changed or ch
@@ -7559,15 +7575,54 @@ def chat_ops(ops, base=None) -> dict:
 
 def chat_append_turn(cid, after_len, after_hash, msgs, base=None,
                      prefix=None, lane=None, title=None):
-    """The turn writer's append (0b 5.4): (landed id, length, hash)."""
+    """The turn writer's append of what the PAGE sent (0b 5.4): a question
+    or a funnel pick. (landed id, length, hash)."""
     with _chats_lock:
         _chat_settle()
         chats = load_chats(base)
+        # the last answer in this chat, if it's still streaming (a Stop the
+        # server hasn't noticed yet), goes in first, where it belongs
+        _turns_settle(chats, cid, keep=True)
         c = _chat_append(chats, cid, after_len, after_hash, msgs, prefix,
                          lane, title)
         store_chats(chats, base)
         m = _chat_msgs(c)
         return c["id"], len(m), chat_prefix_hash(m, len(m))
+
+
+def _chat_late(chats, cid, n, h, rec) -> bool:
+    """A message the SERVER adds after the fact (an answer's end, a
+    funnel's summary) lands only where it belongs (review of 6b322): in
+    the chat, or in its undo copy so Undo brings it back whole, and only
+    while the chat still holds exactly the turns it followed. Anything
+    else (the chat moved on, was deleted for good, was erased) drops it;
+    it never makes a copy or a fresh chat."""
+    _, c = _chat_find(chats, cid)
+    if c is None and cid in _chat_stubs:
+        c = _chat_stubs[cid]["chat"]
+    if c is None:
+        return None
+    m = _chat_msgs(c)
+    if len(m) != n or chat_prefix_hash(m, n) != h:
+        return None
+    m.append(rec)
+    c["ts"] = int(time.time() * 1000)
+    return c
+
+
+def chat_append_late(cid, n, h, rec, base=None):
+    """_chat_late under the lock, written when the chat is on the list
+    (one in its undo window is held in memory): (id, length, hash)."""
+    with _chats_lock:
+        _chat_settle()
+        chats = load_chats(base)
+        c = _chat_late(chats, cid, n, h, rec)
+        if c is None:
+            return None
+        if _chat_find(chats, cid)[1] is c:
+            store_chats(chats, base)
+        m = _chat_msgs(c)
+        return cid, len(m), chat_prefix_hash(m, len(m))
 _memory_lock = threading.Lock()
 
 MEMORY_PROMPT = (
@@ -13191,11 +13246,12 @@ def turn_text(raw: str) -> str:
     return t[cut + len(_TURN_RESET):] if cut >= 0 else t
 
 
-def turn_record(raw: str, searched: bool = False):
+def turn_record(raw: str, searched: bool = False, aborted: bool = False):
     """The assistant message the page builds at the end of a stream
     (content, and drafts, sources, photos, map, places and loc when
     present), or None: nothing to keep, or an error line (the question
-    stays unanswered, for Try again; 0b Q12)."""
+    stays unanswered, for Try again; 0b Q12). A stopped stream's empty
+    answer isn't rescued from a draft: the page doesn't either."""
     drafts, got = [], {}
     for tag, body in _TURN_FRAME.findall(raw):
         try:
@@ -13211,7 +13267,7 @@ def turn_record(raw: str, searched: bool = False):
         elif tag == "CTX" and isinstance(d, dict):
             got["CTX"] = d.get("loc") or ""
     full = turn_text(raw)
-    if not full:
+    if not full and not aborted:
         good = [x for x in drafts if not str(x.get("t", "")).startswith(
             "(no answer")]
         full = str(good[0].get("t", "")) if good else ""
@@ -13252,25 +13308,60 @@ def turn_record(raw: str, searched: bool = False):
     return rec
 
 
+def _turn_rec(t):
+    return turn_record(b"".join(t["wire"]).decode("utf-8", "replace"),
+                       t.get("searched", False), t.get("aborted", False))
+
+
 def _turn_finish(t):
-    """Save a turn's answer once: at the stream's end, or at a quit
-    mid-stream (_turns_flush), whichever comes first."""
+    """Save a turn's answer once: at the stream's end, at a quit
+    mid-stream (_turns_flush), or when the chat's next question arrives
+    (_turns_settle), whichever comes first."""
     with _turns_lock:
         if t.get("done"):
             return
         t["done"] = True
         _turns_live.pop(id(t), None)
     try:
-        rec = turn_record(b"".join(t["wire"]).decode("utf-8", "replace"),
-                          t.get("searched", False))
+        rec = _turn_rec(t)
         if rec:
-            chat_append_turn(t["id"], t["n"], t["h"], [rec], t["base"])
+            chat_append_late(t["id"], t["n"], t["h"], rec, t["base"])
     except Exception:
         pass
 
 
+def _turns_settle(chats, cid, keep=True) -> bool:
+    """Called under _chats_lock with the list in hand: every answer still
+    streaming into cid is settled now, kept (a Stop the server hasn't
+    noticed yet, before the chat's next question) or thrown away (Try
+    again, Edit & resend). True when the list changed."""
+    with _turns_lock:
+        live = [t for t in _turns_live.values()
+                if t.get("id") == cid and not t.get("done")]
+        for t in live:
+            t["done"] = True
+            _turns_live.pop(id(t), None)
+    changed = False
+    for t in live:
+        if keep:
+            t["aborted"] = True
+            rec = _turn_rec(t)
+            if rec:
+                changed = bool(_chat_late(chats, t["id"], t["n"], t["h"],
+                                          rec)) or changed
+    return changed
+
+
+_turns_flushing = [False]
+
+
 def _turns_flush():
-    """At a quit: keep every answer still streaming, as far as it got."""
+    """At a quit: keep every answer still streaming, as far as it got.
+    Once only: a signal arriving during the atexit flush would otherwise
+    wait on the chat lock its own thread holds (review of 6b322)."""
+    if _turns_flushing[0]:
+        return
+    _turns_flushing[0] = True
     with _turns_lock:
         live = list(_turns_live.values())
     for t in live:
@@ -14087,6 +14178,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 d = {}
             key = str(d.get("key", "")).strip()
             which = str(d.get("provider", "gemini")).strip().lower()
+            # every branch below saves settings too: settings it can't
+            # read refuse the request before a key is touched (review of
+            # 6b322), so "Nothing was changed" stays true
+            _read_json("prefs.json", self._data_base(), dict)
             if which == "off":
                 try:
                     os.remove(CLOUD_FILE)
@@ -14472,14 +14567,19 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             def _fsend(reply):
                 if _ft:
                     if reply.get("done") and reply.get("summary"):
-                        _ft[:] = chat_append_turn(
+                        # a late write: a funnel deleted or erased
+                        # meanwhile doesn't come back as a new chat
+                        _late = chat_append_late(
                             _ft[0], _ft[1], _ft[2],
-                            [{"role": "assistant",
-                              "content": str(reply["summary"])}], _fbase)
+                            {"role": "assistant",
+                             "content": str(reply["summary"])}, _fbase)
+                        if _late:
+                            _ft[:] = _late
                     with _chats_lock:
                         _, _fcc = _chat_find(load_chats(_fbase), _ft[0])
-                    reply["chat"] = {"id": _ft[0], "messages":
-                                     (_fcc or {}).get("messages", [])}
+                    if _fcc:
+                        reply["chat"] = {"id": _ft[0], "title": _fcc.get("title"),
+                                         "messages": _fcc.get("messages", [])}
                 self._send_json(reply)
             if stage > total:
                 # the funnel is spent — summarise the path taken
@@ -14768,6 +14868,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 d = {}          # valid JSON is not always an object
             scopes = set(d.get("scopes") or ["memory"])
             base = self._data_base()
+            if "prefs" in scopes:
+                # settings it can't read refuse the whole request before
+                # anything else is erased (review of 6b322)
+                _read_json("prefs.json", base, dict)
             if "memory" in scopes:
                 with _memory_lock:
                     _save_memory([], base)
@@ -15932,8 +16036,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
 
         def _write(data: bytes):
             with wlock:
-                self.wfile.write(data)
-                self.wfile.flush()
+                try:
+                    self.wfile.write(data)
+                    self.wfile.flush()
+                except OSError:
+                    # the page hung up (Stop, a reload): nothing after this
+                    # was shown, so none of it is rescued (review of 6b322)
+                    if self._turn is not None:
+                        self._turn["aborted"] = True
+                    raise
                 last_write[0] = time.time()
                 # what the page was actually sent: the turn is rebuilt
                 # from this, so a stopped answer keeps what was shown
@@ -21935,9 +22046,13 @@ function regenerate(){
   let u=messages.length-1;
   while(u>=0&&messages[u].role!=="user")u--;
   if(u<0)return;
+  // a funnel's only question is its goal: asking it "again" would throw
+  // away every pick and the summary (review of 6b322), so a funnel is
+  // never rewound here
+  const lc=chats.find(x=>x.id===curChat);
+  if(lc&&lc.lane==="funnel"&&u===0)return;
   const q=messages[u],keep=messages.slice(0,u);
-  if(curChat)chatOpWait=chatOps([{op:"truncate",id:curChat,to_len:u,
-    prefix_hash:chatHash(keep,u)}]).catch(()=>{});
+  if(curChat)chatTrunc={id:curChat,to:u,hash:chatHash(keep,u)};
   messages=keep;redrawOpen();
   input.value=q.content;
   send();
@@ -21955,9 +22070,8 @@ function editResend(text){
   input.dispatchEvent(new Event("input"));
   input.focus();
   input.setSelectionRange(input.value.length,input.value.length);
-  // the saved chat rewinds with it; the resend waits for that
-  if(curChat)chatOpWait=chatOps([{op:"truncate",id:curChat,to_len:i,
-    prefix_hash:chatHash(messages,i)}]).catch(()=>{});
+  // the saved chat rewinds when the edited question is sent, not now
+  if(curChat)chatTrunc={id:curChat,to:i,hash:chatHash(messages,i)};
 }
 function addMsg(role,text,drafts,srcs,mapd,ph,places,loc){
   const hero=$("#hero"); if(hero)hero.remove();
@@ -22206,20 +22320,31 @@ async function send(){
 
   try{
     // a Try again or Edit & resend rewinds the saved chat first
-    if(chatOpWait){const w=chatOpWait;chatOpWait=null;await w;}
+    const tr=chatTrunc;chatTrunc=null;
+    if(tr&&tr.id===myChat)await chatOps([{op:"truncate",id:tr.id,
+      to_len:tr.to,prefix_hash:tr.hash}]).catch(()=>{});
     const resp=await api("/api/chat",{
       method:"POST",headers:{"Content-Type":"application/json"},
       signal:abortCtl.signal,
       body:JSON.stringify(Object.assign(advOn&&adv
         // the custom council (6b248): hand-picked minds, hand-picked pen
-        ?{model:"",models:adv.local||[],tier:"",messages:myMessages,
+        ?{model:"",models:adv.local||[],tier:"",messages:askCtx(myMessages),
           auto_web:autoWeb,images:sentImages,docs:sentDocs,agent,
           cloud:adv.cloud||[],compositor:adv.comp||""}
-        :{model,models:council,tier,messages:myMessages,
+        :{model,models:council,tier,messages:askCtx(myMessages),
           auto_web:autoWeb,images:sentImages,docs:sentDocs,agent,
           // the Remote agent (6b249) carries the autonomy throttle
           autonomy:agent==="Remote"?autonomy:undefined},turn)),
     });
+    // refused before anything was saved (a store it can't read answers
+    // 503): the line is shown as the error it is, and the question leaves
+    // the page's copy too, since the server kept nothing (review of 6b322)
+    if(!resp.ok){
+      const e=await resp.json().catch(()=>({}));
+      if(myMessages[myMessages.length-1]&&myMessages[myMessages.length-1].role==="user")
+        myMessages.pop();
+      throw new Error(e.err||("the app answered "+resp.status));
+    }
     // the server may land the turns in a copy, or a fresh chat for one
     // deleted meanwhile: the answer follows it
     const landed=resp.headers.get("X-Chat-Id");
@@ -22457,7 +22582,7 @@ async function send(){
   if(curChat===myChat)autoScroll();
   input.focus();
   // the chat as saved (the stream has closed, so the answer is on disk)
-  const saved=await syncChat(myChat);
+  const saved=await syncChat(myChat,null,wasAborted?myMessages.length:0);
   if(saved&&!saved.named&&full&&!isErr){
     const first=(saved.messages||[]).find(m=>m.role==="user");
     if(first)nameChat(saved,first.content);
@@ -22707,7 +22832,10 @@ let chats=[];
 let curChat=null;   // every launch starts fresh; history stays in the list
 let dataRev=-1;     // the store's change counter this page last saw
 let chatsLoaded=false,chatsErr="";
-let chatOpWait=null;  // a truncate the next question must follow
+// a rewind the next question carries out first (Try again, Edit &
+// resend): {id,to,hash}. Sent only with that question, so an edit that
+// is abandoned leaves the saved chat as it was (review of 6b322)
+let chatTrunc=null;
 
 // SHA-256 (0b Q1), for the prefix the server checks every write against:
 // each message's role and text only, so extras and unknown fields never
@@ -22787,6 +22915,10 @@ async function chatOps(ops){
   if(typeof d.data_rev==="number")dataRev=d.data_rev;
   return d.results||[];
 }
+// what the model is asked with: a question whose answer failed stays in
+// the chat (0b Q12) but not in the model's context, where two questions
+// in a row break the chat templates that need turns to alternate
+const askCtx=ms=>ms.filter((m,k)=>!(m.role==="user"&&(ms[k+1]||{}).role==="user"));
 const sameMsgs=(a,b)=>(a||[]).length===(b||[]).length
   &&chatHash(a,(a||[]).length)===chatHash(b,(b||[]).length);
 function redrawOpen(){
@@ -22817,12 +22949,16 @@ async function loadChatsFromDisk(){
 // one chat, as the server saved it: adopted after every answer, so the
 // page and the store never hold different turns (6b322). `old` is the
 // id the page asked with, when the server landed the turn elsewhere.
-async function syncChat(id,old){
+async function syncChat(id,old,atLeast){
   try{
     const r=await api("/api/chats/one?id="+encodeURIComponent(id));
     if(!r.ok)return null;
     const d=await r.json(),c=d.chat;
     if(!c)return null;
+    // just after a Stop the server may not have written the stopped
+    // answer yet: a copy shorter than the page's is left for the next
+    // refresh (review of 6b322)
+    if(atLeast&&(c.messages||[]).length<atLeast)return null;
     chats=chats.filter(x=>x.id!==id&&!(old&&old!==id&&x.id===old
       &&!(x.messages||[]).length));
     chats.unshift(c);chats.sort((a,b)=>(b.ts||0)-(a.ts||0));
@@ -23235,10 +23371,12 @@ async function nameChat(c,text){
       body:JSON.stringify({text:text})});
     const t=(await r.json()).title;
     if(!t){c.named=false;return;}
+    // the title first; the chat counts as named only once it landed
     const res=await chatOps([
-      {op:"set",id:c.id,field:"title",old:c.title===undefined?null:c.title,new:t},
-      {op:"set",id:c.id,field:"named",old:false,new:true}]);
-    if(res[0]&&res[0].ok){c.title=t;renderChats();}
+      {op:"set",id:c.id,field:"title",old:c.title===undefined?null:c.title,new:t}]);
+    if(!(res[0]&&res[0].ok)){c.named=false;return;}
+    c.title=t;renderChats();
+    await chatOps([{op:"set",id:c.id,field:"named",old:false,new:true}]);
   }catch(e){c.named=false;}
 }
 // WHEN was this chat? Real products group by day; a flat wall sorted by
@@ -23371,13 +23509,18 @@ async function undoDelete(){
   if(!ok){loadChatsFromDisk();return;}
   chats.splice(Math.min(st.idx,chats.length),0,st.chat);
   renderChats();
+  // the chat as saved: an answer that was streaming when it was deleted
+  // landed in the server's undo copy, not in the page's (review of 6b322)
+  await syncChat(back);
   if(st.wasCur)loadChat(back);
 }
 function loadChat(id){
   if(id===curChat)return;
   // viewing writes nothing (0b L4, 6b322): switching used to save the
-  // chat being left, and moved its stamp to now
+  // chat being left, and moved its stamp to now; a rewind that was
+  // waiting for its question is dropped with the edit
   const c=chats.find(x=>x.id===id);if(!c)return;
+  chatTrunc=null;
   // opening a chat from another lane (⌘K reaches everything) hops the
   // tab with it, so the sidebar context always matches what's on screen
   if((c.lane||"ai")!==uiMode)switchLane(c.lane||"ai");
@@ -23453,10 +23596,14 @@ async function fnStep(){
       body:JSON.stringify(Object.assign({},fnState,{chat_id:fid,
         after_len:fn,after_hash:chatHash(messages,fn)}))})).json();
   }catch(e){d={err:"couldn\u2019t reach the engine"};}
-  if(d.chat&&d.chat.id){
-    const c=chats.find(x=>x.id===fid)||{id:d.chat.id,lane:"funnel"};
+  // adopted only while the page still has the chat: one deleted or
+  // erased mid-stage stays gone (review of 6b322)
+  const fc=chats.find(x=>x.id===fid);
+  if(d.chat&&d.chat.id&&fc){
+    const c=fc;
     chats=chats.filter(x=>x!==c&&x.id!==d.chat.id);
     c.id=d.chat.id;c.messages=d.chat.messages||[];c.ts=Date.now();
+    if(d.chat.title)c.title=d.chat.title;
     chats.unshift(c);renderChats();
     if(fnState&&fnState.chat===fid)fnState.chat=c.id;
     if(curChat===fid){curChat=c.id;messages=c.messages.slice();}
@@ -23681,6 +23828,7 @@ document.addEventListener("keydown",e=>{
 /* ----------------------------------------------------------- new chat */
 $("#newchat").addEventListener("click",()=>{
   if(generating&&abortCtl)abortCtl.abort();
+  chatTrunc=null;
   fnState=null;fnAnswer=null;       // a new chat abandons any funnel
   curChat=null;messages=[];
   resetHero();renderChats();
@@ -27280,6 +27428,25 @@ if __name__ == "__main__":
                          b"initiatedByFrame:type:decisionHandler:",
                 signature=b"v@:@@@q@?")
             objc.classAddMethods(_cocoa.BrowserView.BrowserDelegate, [_sel])
+
+            # CMD+Q (review of 6b322): AppKit's terminate: ends the process
+            # with exit(), which skips Python's atexit, so an answer still
+            # streaming was lost, and the engines and the instance note
+            # were left behind. The app delegate's last word does all three.
+            def _will_terminate(self, note):
+                for _fn in (_turns_flush, stop_managed_engines,
+                            _drop_instance_note):
+                    try:
+                        _fn()
+                    except Exception:
+                        pass
+            try:
+                objc.classAddMethods(_cocoa.BrowserView.AppDelegate, [
+                    objc.selector(_will_terminate,
+                                  selector=b"applicationWillTerminate:",
+                                  signature=b"v@:@")])
+            except Exception:
+                pass
 
             _bv_init = _cocoa.BrowserView.__init__
 

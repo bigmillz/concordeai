@@ -5685,6 +5685,43 @@ looked like an empty list that the next save wrote to disk.
 - Gauntlet: LOC-1, 3, 4, 5, 7, 8 and 9 (LOC-6 and ISO-10 are step 5),
   the operations' rules, page/server hash and stream-rule twins, random
   ids, no-store and the thread-local reset.
+- Three reviews (data loss, server robustness, page and tests) found,
+  and this build fixes:
+  - Try again under a finished funnel's summary truncated the whole
+    funnel to nothing and started "Funnel: Funnel: …". A funnel is never
+    rewound to its goal now, and every rewind (Try again, Edit & resend)
+    is sent with the question it makes room for, so an abandoned edit
+    leaves the saved chat alone.
+  - A stopped answer the server hadn't noticed yet could be saved after
+    the next question, into a "(copy)", or as a draft the page never
+    showed. The server now settles a chat's streaming answer before its
+    next question (and throws it away before a rewind); an answer it
+    adds after the fact lands only where it belongs, in the chat or its
+    undo copy, or not at all, never as a copy or a fresh chat; and a
+    stopped stream's empty answer isn't rescued from a draft.
+  - Deleting a chat mid-answer brought the answer back as an untitled
+    chat; now it lands in the undo copy, and Undo re-reads the chat.
+  - A 503 was streamed in as the answer: it shows as the error it is,
+    and the question leaves the page's copy (nothing was saved).
+  - Cmd+Q ended the process with exit(), skipping atexit: a streaming
+    answer was lost, and the engines and the instance note were left.
+    The app delegate's applicationWillTerminate: now does all three.
+  - Forget and saving a cloud key with unreadable settings changed
+    things before refusing; they now check first. A settings read that
+    failed is marked, so it can never be saved even if the file reads
+    again by then. A signal during the quit's own flush can't deadlock.
+  - The namer renamed "(copy)" chats and gave up after a title conflict;
+    copies are named, and a chat counts as named once its title lands.
+  - A question whose answer failed stays in the chat but not in the
+    model's context, where two questions in a row break templates that
+    need turns to alternate.
+  - Tests that could hang on a closed socket or pass without the thing
+    they name (data_rev missing, memory's own chat failing, a quit
+    outside the undo window, hash lengths away from the padding edges).
+- Not covered by the gauntlet (it has no page driver): the page's own
+  wiring of these calls, checked by hand in a browser instead, and
+  Cmd+Q, checked once on a windowed copy (154 characters shown, 158
+  saved).
 
 ## 6b323 — a place pin's location test reads the whole address
 Seen in 6b322 and older than it: `/api/geo` returned Nominatim's
