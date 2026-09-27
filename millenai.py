@@ -12245,23 +12245,36 @@ def _sky_fetch(i: int):
     tmp = _sky_path(i) + ".dl"
     try:
         os.makedirs(_sky_dir(), exist_ok=True)
-        req = urllib.request.Request(SKY_SOURCES[i],
-                                     headers={"User-Agent": "MillenAI"})
+        have = os.path.getsize(tmp) if os.path.exists(tmp) else 0
+        hdrs = {"User-Agent": "MillenAI"}
+        if have:
+            # PICK UP WHERE A CLOSED SESSION LEFT OFF (6b318, per Patrick:
+            # the same backdrops "over and over"): a clip half downloaded
+            # when the app quit started from zero next time, so a short
+            # session rarely finished a fresh one and the cached clips came
+            # round again
+            hdrs["Range"] = "bytes=%d-" % have
+        req = urllib.request.Request(SKY_SOURCES[i], headers=hdrs)
         with urllib.request.urlopen(req, timeout=60,
-                                    context=_sky_context()) as r, \
-                open(tmp, "wb") as out:
-            total = int(r.headers.get("Content-Length") or 0)
-            got = 0
-            while True:
-                chunk = r.read(1 << 20)
-                if not chunk:
-                    break
-                out.write(chunk)
-                got += len(chunk)
-                with _sky_lock:
-                    _sky_jobs[i] = {
-                        "status": "downloading",
-                        "pct": int(got * 92 / total) if total else 0}
+                                    context=_sky_context()) as r:
+            if have and getattr(r, "status", 200) == 206:
+                total = have + int(r.headers.get("Content-Length") or 0)
+                mode = "ab"
+            else:                     # no range: the whole file, afresh
+                have, mode = 0, "wb"
+                total = int(r.headers.get("Content-Length") or 0)
+            with open(tmp, mode) as out:
+                got = have
+                while True:
+                    chunk = r.read(1 << 20)
+                    if not chunk:
+                        break
+                    out.write(chunk)
+                    got += len(chunk)
+                    with _sky_lock:
+                        _sky_jobs[i] = {
+                            "status": "downloading",
+                            "pct": int(got * 92 / total) if total else 0}
         with _sky_lock:
             _sky_jobs[i] = {"status": "remuxing", "pct": 96}
         _faststart(tmp, _sky_path(i))
@@ -12284,7 +12297,8 @@ def _sky_fetch(i: int):
             for old in clips[:-8]:
                 os.remove(old)
             for part in glob.glob(os.path.join(_sky_dir(), "*.dl")):
-                if time.time() - os.path.getmtime(part) > 86400:
+                # three days to resume in (6b318)
+                if time.time() - os.path.getmtime(part) > 3 * 86400:
                     os.remove(part)
         except Exception:
             pass
@@ -12292,10 +12306,13 @@ def _sky_fetch(i: int):
         with _sky_lock:
             _sky_jobs[i] = {"status": "error", "pct": 0, "t": time.time(),
                             "note": str(exc)[:120]}
-        try:
-            os.remove(tmp)
-        except Exception:
-            pass
+        # a transfer cut short stays, to resume; a refused range, a dead
+        # link or a file that won't remux starts over
+        if isinstance(exc, (urllib.error.HTTPError, ValueError)):
+            try:
+                os.remove(tmp)
+            except Exception:
+                pass
 
 
 def sky_status(i: int, warm: bool = False) -> dict:
@@ -23194,6 +23211,51 @@ document.addEventListener("visibilitychange",()=>{
 const SKY_N=parseInt("__SKY_N__",10)||5;   // injected: len(SKY_SOURCES)
 const skyline=$("#skyline");
 let skyBooted=false;
+// WHICH CLIP (6b318, per Patrick: "the background videos always seem to
+// cycle the same ones over and over"). Half of all launches drew from the
+// FIVE New York clips, and each could come back three launches later, so
+// one of the same five showed every other launch; the clip readied for
+// next time leaned New York half the time too, and a launch with nothing
+// fresh on disk replayed a random recent clip. Now New York is one launch
+// in five and waits ten launches to return, the clip readied for next time
+// is one not seen in the last 32, and a replay is the cached clip seen
+// longest ago. Pure functions, so the gauntlet can run a few hundred
+// launches through them.
+const SKY_NYC_SHARE=0.2,SKY_NYC_GAP=10;
+function skyPick(o){      // {all,hist,onDisk,last,nyc:Set,prepared,rnd}
+  const {all,hist,onDisk,last,nyc,prepared,rnd}=o;
+  if(prepared>=0&&onDisk.includes(prepared)&&prepared!==last
+     &&all.includes(prepared))return prepared;
+  let pool=all.filter(x=>!hist.includes(x));
+  if(!pool.length)pool=all.filter(x=>x!==last);
+  if(!pool.length)pool=all.slice();
+  const nycAvail=all.filter(x=>nyc.has(x)&&!hist.slice(0,SKY_NYC_GAP).includes(x));
+  if(nycAvail.length&&rnd()<SKY_NYC_SHARE)pool=nycAvail;
+  // DISK FIRST, ALWAYS (5.3.1, per Patrick: "no background, or takes
+  // forever"): a launch never waits on the network when ANY cached clip
+  // exists; only an empty pantry (a true first run) earns the bar
+  const local=pool.filter(x=>onDisk.includes(x));
+  if(local.length)pool=local;
+  else{
+    const disk=all.filter(x=>onDisk.includes(x)&&x!==last);
+    if(disk.length){
+      const age=x=>{const k=hist.indexOf(x);return k<0?1e9:k;};
+      const oldest=Math.max(...disk.map(age));
+      pool=disk.filter(x=>age(x)===oldest);
+    }
+  }
+  return pool[Math.floor(rnd()*pool.length)];
+}
+function skyStockPick(o){ // {all,have,playing,hist,failed:Set,nyc:Set,rnd}
+  const {all,have,playing,hist,failed,nyc,rnd}=o;
+  const open=x=>!have.includes(x)&&x!==playing&&!failed.has(x);
+  let cand=all.filter(x=>open(x)&&!hist.includes(x));
+  if(!cand.length)cand=all.filter(x=>open(x)&&!hist.slice(0,SKY_NYC_GAP).includes(x));
+  if(!cand.length)return -1;
+  const ny=cand.filter(x=>nyc.has(x)&&!hist.slice(0,SKY_NYC_GAP).includes(x));
+  if(ny.length&&rnd()<SKY_NYC_SHARE)cand=ny;
+  return cand[Math.floor(rnd()*cand.length)];
+}
 async function bootSkyline(){
   if(noVideo||!skyline||skyBooted)return;
   skyBooted=true;
@@ -23246,32 +23308,10 @@ async function bootSkyline(){
   // disk, that's the pick — instant start, usually no bar at all.
   const prepared=parseInt(localStorage.getItem("millen.skynext")||"-1",10);
   try{localStorage.removeItem("millen.skynext");}catch(e){}
-  if(prepared>=0&&prepared<SKY_N&&onDisk.indexOf(prepared)>=0
-     &&prepared!==last&&mood(prepared)){
-    i=prepared;
-  }else{
-    let pool=all.filter(x=>hist.indexOf(x)<0);
-    if(!pool.length)pool=all.filter(x=>x!==last);
-    if(!pool.length)pool=all.length?all.slice():[...Array(SKY_N).keys()];
-    // HOME-TEAM BIAS: half the launches lean New York (the N-series
-    // aerials + the NY-at-night ISS pass), everything else still rotates.
-    // NYC only dodges the LAST THREE played, not the whole history —
-    // five clips against a 32-deep history would never resurface.
-    const nycAvail=all.filter(x=>nyc.has(x)&&hist.slice(0,3).indexOf(x)<0);
-    if(nycAvail.length&&Math.random()<0.5)pool=nycAvail;
-    // DISK FIRST, ALWAYS (5.3.1, per Patrick: "no background, or takes
-    // forever"): a launch never waits on the network when ANY cached
-    // clip exists. Priorities: fresh-on-disk from the biased pool, then
-    // any disk clip that isn't last night's, and only an empty pantry
-    // (true first run) earns the download bar.
-    const localPool=pool.filter(x=>onDisk.indexOf(x)>=0);
-    if(localPool.length)pool=localPool;
-    else{
-      const diskAny=all.filter(x=>onDisk.indexOf(x)>=0&&x!==last);
-      if(diskAny.length)pool=diskAny;
-    }
-    i=pool[Math.floor(Math.random()*pool.length)];
-  }
+  // HOME-TEAM LEAN (the N-series aerials + the NY-at-night ISS pass),
+  // now light and spaced: see skyPick
+  i=skyPick({all:all.length?all:[...Array(SKY_N).keys()],hist,onDisk,
+             last,nyc,prepared,rnd:Math.random});
   hist=[i].concat(hist.filter(x=>x!==i)).slice(0,32);
   localStorage.setItem("millen.skyhist",JSON.stringify(hist));
   localStorage.setItem("millen.sky",i);
@@ -23309,14 +23349,10 @@ async function bootSkyline(){
       // download happens invisibly NOW, not while the user stares at
       // a loading bar at the next launch.
       const stocked=spare.length>=PANTRY;
-      let cand=all.filter(x=>have.indexOf(x)<0&&x!==i
-        &&hist.slice(0,6).indexOf(x)<0&&!skyFailed.has(x));
-      if(!cand.length)return;
-      // the home-team bias applies to the shelf too — half of what gets
-      // stocked leans New York, so tomorrow does as well
-      const ny=cand.filter(x=>nyc.has(x));
-      if(ny.length&&Math.random()<0.5)cand=ny;
-      const n=cand[Math.floor(Math.random()*cand.length)];
+      // a clip not seen in the last 32, the same light New York lean
+      const n=skyStockPick({all,have,playing:i,hist,failed:skyFailed,nyc,
+                            rnd:Math.random});
+      if(n<0)return;
       let tries=0;
       (function warm(){
         fetch("/api/sky/status?i="+n+"&warm=1").then(r=>r.json()).then(st=>{

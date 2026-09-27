@@ -4245,6 +4245,88 @@ check("the backdrop: Apple's root for its clips, and a failed clip reports its e
       and "context=_sky_context()) as r" in _M,
       "%r" % [_held, _retried, _starts, len(_ctx_roots)])
 
+# 6b318, per Patrick: "the background videos always seem to cycle the
+# same ones over and over". Half of all launches drew from the five New
+# York clips (each back three launches later) and the clip readied for
+# next time leaned New York too. 340 launches through the page's own
+# picking functions, a session readying the next clip each time:
+_sk0 = _M.index("const SKY_NYC_SHARE=")
+_skjs = _M[_sk0:_M.index("async function bootSkyline(){", _sk0)] + r"""
+function rng(seed){let s=seed>>>0;return()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};}
+const NYC=new Set([17,37,66,72,75]),ALL=[...Array(89).keys()],rnd=rng(11);
+let hist=[],disk=[],prepared=-1,last=-1;const shown=[];
+for(let L=0;L<340;L++){
+  const i=skyPick({all:ALL,hist,onDisk:disk.slice(),last,nyc:NYC,prepared,rnd});prepared=-1;
+  disk=disk.filter(x=>x!==i).concat([i]);while(disk.length>8)disk.shift();
+  hist=[i].concat(hist.filter(x=>x!==i)).slice(0,32);last=i;shown.push(i);
+  let spare=disk.length-1;
+  do{const n=skyStockPick({all:ALL,have:disk.slice(),playing:i,hist,failed:new Set(),nyc:NYC,rnd});
+     if(n<0)break;disk=disk.concat([n]);while(disk.length>8)disk.shift();prepared=n;spare++;}while(spare<5);
+}
+const w=shown.slice(40);let rep=0,ny=0;
+w.forEach((x,k)=>{const j=k+40;if(shown.slice(j-10,j).includes(x))rep++;if(NYC.has(x))ny++;});
+// a New York clip seen five launches ago stays out even when the lean
+// comes up (rnd 0), and nothing fresh on disk replays the oldest seen
+const gap=skyPick({all:ALL,hist:[1,2,3,4,17],onDisk:[17,50,2],last:1,nyc:NYC,prepared:-1,rnd:()=>0});
+process.stdout.write(JSON.stringify({rep:rep,ny:ny/w.length,d50:new Set(w.slice(0,50)).size,gap}));
+"""
+try:
+    _skf = _os20.path.join(_tf20.mkdtemp(), "sky.js")
+    open(_skf, "w").write(_skjs)
+    _sko = json.loads(subprocess.run(["node", _skf], capture_output=True, text=True,
+                                     timeout=60).stdout)
+except Exception as _e:
+    _sko = {"err": repr(_e)}
+check("backdrops: no clip back within ten launches, New York about one in five",
+      _sko.get("rep") == 0 and 0.08 <= _sko.get("ny", 0) <= 0.3 and _sko.get("d50", 0) >= 40
+      and _sko.get("gap") == 50
+      and "i=skyPick({" in page and "const n=skyStockPick({" in page
+      and "Math.random()<0.5)pool=nycAvail" not in page,
+      "%r" % _sko)
+
+# ...and a clip half downloaded when the app quit resumes next time
+_rs_dir = _tf20.mkdtemp()
+_full = bytes(range(256)) * 40
+_calls = []
+class _Resp:
+    def __init__(self, body, status, total, cut=False):
+        self.b, self.status, self.cut = _io20.BytesIO(body), status, cut
+        self.headers = {"Content-Length": str(total)}
+    def read(self, n):
+        d = self.b.read(n if not self.cut else 3000)
+        if self.cut and not d: raise OSError("connection reset")
+        if self.cut and self.b.tell() >= 3000: self.cut = "done"
+        return d
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+def _uo(req, timeout=0, context=None):
+    rng_ = req.headers.get("Range")
+    _calls.append(rng_)
+    if len(_calls) == 1:                 # the first session: cut at 3000 bytes
+        r = _Resp(_full[:3000], 200, len(_full)); r.read = (lambda n, _b=_io20.BytesIO(_full[:3000]):
+            _b.read(n) or (_ for _ in ()).throw(OSError("connection reset")))
+        return r
+    if rng_ == "bytes=3000-":
+        return _Resp(_full[3000:], 206, len(_full) - 3000)
+    return _Resp(_full, 200, len(_full))
+_landed = []
+_rsn = {"os": _os20, "time": time, "glob": __import__("glob"), "urllib": __import__("urllib"),
+        "SKY_SOURCES": ["https://x/clip.mov"], "_sky_jobs": {}, "_sky_lock": __import__("threading").Lock(),
+        "_sky_dir": lambda: _rs_dir, "_sky_path": lambda i: _os20.path.join(_rs_dir, "sky-x.mov"),
+        "_sky_context": lambda: None,
+        "_faststart": lambda src, dst: (_landed.append(open(src, "rb").read()), _os20.replace(src, dst))}
+_rsn["urllib"] = _t17.SimpleNamespace(request=_t17.SimpleNamespace(
+    Request=__import__("urllib.request").request.Request, urlopen=_uo), error=__import__("urllib.error").error)
+_exec_names(_rsn, {"_sky_fetch"})
+_rsn["_sky_fetch"](0)
+_dl = _os20.path.join(_rs_dir, "sky-x.mov.dl")
+_after1 = (_rsn["_sky_jobs"][0]["status"], _os20.path.getsize(_dl) if _os20.path.exists(_dl) else 0)
+_rsn["_sky_fetch"](0)
+check("backdrops: a clip cut off mid-download resumes where it stopped",
+      _after1 == ("error", 3000) and _calls == [None, "bytes=3000-"]
+      and _landed == [_full] and _rsn["_sky_jobs"][0]["status"] == "ready",
+      "%r" % [_after1, _calls, len(_landed[0]) if _landed else None])
+
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")

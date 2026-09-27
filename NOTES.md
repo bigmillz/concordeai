@@ -5630,6 +5630,27 @@ crash was invisible.
   keeps its checks. Mutation-tested (SIGHUP back, hook removed, no log,
   no box).
 
+## 6b318 — backdrops that don't repeat
+
+Per Patrick: "the background videos always seem to cycle the same ones
+over and over. When there's tons of them it can pick from." There are
+89 clips; five are New York, and half of all launches drew from those
+five (each allowed back three launches later), so one of the same five
+showed every other launch. The clip readied for next time also leaned
+New York half the time and only skipped the last six seen, and a launch
+with nothing fresh on disk replayed a random recent clip. His Mac's
+history bore it out: 3 of the last 5 were New York.
+- New York is now one launch in five and waits ten launches to return
+  (the lean itself stays, as he asked for it). The clip readied for
+  next time is one not seen in the last 32; a replay is the cached clip
+  seen longest ago. The picking is two pure functions, skyPick and
+  skyStockPick, and the gauntlet runs 340 launches through them: no
+  clip back within ten launches (it was 20%), New York ~15% (was 42%),
+  47 different clips in 50 launches (was 31).
+- A clip half downloaded when the app quit resumes next time (a Range
+  request; Apple's CDN answers 206) instead of starting over, so short
+  sessions still bring in fresh clips. Partials keep three days.
+
 ## 6b317 — Windows: the app says PC, and quitting stops Ollama
 Found testing the 445085b nightly in Patrick's Windows 11 ARM VM, driven
 from the Mac through a small command relay (a PowerShell loop in the VM
