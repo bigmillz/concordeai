@@ -4375,6 +4375,17 @@ check("Settings links the website, in the system browser",
       and "#about-site{" in page,
       _foot[:200])
 
+# 6b318, per Patrick: "whenever settings is re-opened, make sure it goes
+# to the about tab". Reopening resets the rail; a call while it is already
+# open (the palette) leaves the pane alone. Checked in a browser too.
+_oa = page[page.index("async function openAbout(){"):page.index("paintAccount();")]
+check("Settings reopens on About, whatever pane it was closed on",
+      'if(aboutVeil.hidden)settingsPane("p-about");' in _oa
+      and _oa.index("settingsPane") < _oa.index("aboutVeil.hidden=false")
+      and 'b.addEventListener("click",()=>settingsPane(b.dataset.pane))' in page
+      and page.count('.classList.toggle("on",p.id===') == 1,
+      _oa[:300])
+
 # 6b318, per Patrick: "can we have the video fade into another one every
 # hour?" The hour's clip comes from disk only (never a loading bar), is
 # chosen the way a launch chooses, waits out an answer, and reads the

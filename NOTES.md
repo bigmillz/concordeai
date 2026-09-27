@@ -5680,6 +5680,8 @@ history bore it out: 3 of the last 5 were New York.
 - A clip half downloaded when the app quit resumes next time (a Range
   request; Apple's CDN answers 206) instead of starting over, so short
   sessions still bring in fresh clips. Partials keep three days.
+- Settings always opens on About (per Patrick), not on whichever pane
+  it was closed on.
 
 ## 6b317 — Windows: the app says PC, and quitting stops Ollama
 Found testing the 445085b nightly in Patrick's Windows 11 ARM VM, driven

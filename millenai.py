@@ -24768,7 +24768,16 @@ $("#sb-resize").addEventListener("dblclick",()=>setSidebar(300));
 
 /* ---------------------------------------------------------------- about */
 const aboutVeil=$("#about-veil");
+// settings rail: one pane at a time
+function settingsPane(id){
+  $$(".snav").forEach(x=>x.classList.toggle("on",x.dataset.pane===id));
+  $$(".spane").forEach(p=>p.classList.toggle("on",p.id===id));
+  const bd=$("#about-body"); if(bd)bd.scrollTop=0;
+}
 async function openAbout(){
+  // Settings always opens on About (6b318, per Patrick), never on
+  // whichever pane it was closed on
+  if(aboutVeil.hidden)settingsPane("p-about");
   aboutVeil.hidden=false;
   paintAccount();                    // the Account pane (6b257)
   try{
@@ -25815,12 +25824,7 @@ upGo.addEventListener("click",async()=>{
     }
   },700);
 });
-// settings rail: one pane at a time
-$$(".snav").forEach(b=>b.addEventListener("click",()=>{
-  $$(".snav").forEach(x=>x.classList.toggle("on",x===b));
-  $$(".spane").forEach(p=>p.classList.toggle("on",p.id===b.dataset.pane));
-  const bd=$("#about-body"); if(bd)bd.scrollTop=0;
-}));
+$$(".snav").forEach(b=>b.addEventListener("click",()=>settingsPane(b.dataset.pane)));
 
 syncSuggest();                      // starter prompts, if the hero is up
 addEventListener("resize",()=>{     // a narrower window fits fewer chips
