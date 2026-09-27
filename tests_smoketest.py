@@ -3845,7 +3845,7 @@ check("Windows starts: no SIGHUP at import, and a crash is never silent",
       and '>"%READY%" echo %DEPS%' in _bat
       # setup reruns when what it installs changes; a Store "python" stub
       # isn't Python (6b317)
-      and 'set "DEPS=deps-2 pywebview ddgs psutil tzdata"' in _bat
+      and 'set "DEPS=deps-3 pywebview-6.2.1 ddgs psutil tzdata"' in _bat
       and 'python -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"' in _bat
       and "where python >nul" not in _bat
       and '"%PYC%" -m pip install --upgrade pip' in _bat,
@@ -4585,7 +4585,7 @@ check("Windows: the venue clock compares offsets; tzdata comes with setup or on 
       and _vh["_venue_is_host"]("Not/AZone") is True
       and "threading.Thread(target=_ensure_tzdata, daemon=True).start()" in _M
       and "if tzname and where and not _venue_is_host(tzname):" in _M
-      and '"%PIP%" install pywebview ddgs psutil tzdata' in open("build_windows.sh").read()
+      and '"%PIP%" install pywebview==6.2.1 ddgs psutil tzdata' in open("build_windows.sh").read()
       and '"--collect-data", "tzdata"' in open("build_windows_exe.ps1").read(),
       "%r" % [_same, _diff])
 
@@ -5269,6 +5269,25 @@ check("the js_api bridge answers only api_token(), with no way into the module o
       < _gsrc.index("from webview.platforms import")
       and _gsrc.index("    import webview  # pywebview") < _gsrc.index("_wu.js_bridge_call = _bridge_guard("),
       "%r" % [_grec, _greal])
+
+# ONE PYWEBVIEW (6b321): the guard above wraps a pywebview internal, so
+# every installer pins the version it was written and tested against,
+# and this venv runs that version. A pywebview that moved the function
+# would leave the window without its token; a new one must come in on
+# purpose, with this check and the guard updated together.
+import importlib.metadata as _imd
+_pins = {f: re.findall(r"pywebview(?:==|-)([0-9][0-9.]*)", open(f).read())
+         for f in ("build_macos_app.sh", "build_windows.sh", "build_windows_exe.ps1")}
+try:
+    _pwv = _imd.version("pywebview")
+except _imd.PackageNotFoundError:
+    _pwv = None
+check("every installer pins the pywebview the bridge guard is tested against",
+      all(v and set(v) == {"6.2.1"} for v in _pins.values())
+      and _pins["build_macos_app.sh"].count("6.2.1") == 2 and _pwv in ("6.2.1", None)
+      and not re.search(r"install[^\n]*\bpywebview(?![=\w-])", "".join(
+          open(f).read() for f in _pins)),
+      "%r" % [_pins, _pwv])
 
 # THE ONE METHOD (6b321, 0a section 9): the js_api object exposes
 # api_token and nothing else (pywebview publishes every public member),

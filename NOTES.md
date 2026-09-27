@@ -5738,6 +5738,20 @@ sign-in plan.
   Google Fonts stylesheet is part of it); `blob:` video playback and
   `blob:` downloads through pywebview's download path; the greeting's
   second draw; `_boot_heal`.
+- Checked by hand after the build: a windowed dev copy on this Mac
+  (WKWebView) booted through `/?boot=`, got its token over js_api and
+  drew its chats, meters and engine chip with no "didn't finish
+  starting" notice. In a browser with the bridge stood in: nothing ran
+  before the token came, then the chat list loaded, a streamed answer
+  arrived whole, a picture loaded as a `blob:` (and its route gave 403
+  to the cookie alone), and Settings drew About, Models and Account.
+  Still unconfirmed: WebView2 and Qt (the Windows VM), `blob:` video
+  and downloads.
+- pywebview is pinned to 6.2.1 in all three installers (the Windows
+  launcher's setup marker becomes `deps-3`, so a PC reinstalls once).
+  The bridge guard wraps a pywebview internal; a later pywebview that
+  moved it would leave the window without its token, so a new version
+  comes in on purpose, with the guard and its check updated together.
 
 ## 6b320 — the web version is gone (accounts step 2)
 Patrick approved deleting the old web version for good on 2026-09-26;

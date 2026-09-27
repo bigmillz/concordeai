@@ -54,7 +54,9 @@ if errorlevel 1 (
 rem What setup installs. When this line changes, an existing setup runs
 rem pip once more for what's new (6b317: tzdata was added, and a "ready"
 rem marker meant setup never ran again).
-set "DEPS=deps-2 pywebview ddgs psutil tzdata"
+rem pywebview is pinned (6b321): the app guards its js_api bridge, which
+rem was written and tested against this version
+set "DEPS=deps-3 pywebview-6.2.1 ddgs psutil tzdata"
 set "HAVE="
 if exist "%READY%" set /p HAVE=<"%READY%"
 
@@ -67,7 +69,7 @@ if not "%HAVE%"=="%DEPS%" (
   if not exist "%PYC%" goto setupfail
   "%PYC%" -m pip install --upgrade pip
   rem tzdata: Windows has no time-zone database of its own (6b317)
-  "%PIP%" install pywebview ddgs psutil tzdata
+  "%PIP%" install pywebview==6.2.1 ddgs psutil tzdata
   if errorlevel 1 goto setupfail
   rem voice input is optional; its engine has no wheel for every PC
   "%PIP%" install faster-whisper

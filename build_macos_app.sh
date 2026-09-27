@@ -22,7 +22,9 @@ fi
 
 echo "installing dependencies into the venv…"
 "$VENV/bin/pip" install --quiet --upgrade pip
-"$VENV/bin/pip" install --quiet pywebview ddgs psutil mlx-lm mlx-whisper
+# pywebview is pinned (6b321): the app guards its js_api bridge, which
+# was written and tested against this version
+"$VENV/bin/pip" install --quiet pywebview==6.2.1 ddgs psutil mlx-lm mlx-whisper
 # 6b295: the export engines. Their own line with || true — a wheel that
 # fails to fetch must degrade to the in-app on-demand install, never to a
 # build that cannot run.
@@ -100,7 +102,7 @@ if [[ ! -x "$PY" ]] || ! "$PY" -c "import webview" 2>/dev/null; then
   {
     "$BASE" -m venv "$VENV" &&
     "$VENV/bin/pip" install --upgrade pip &&
-    "$VENV/bin/pip" install pywebview ddgs psutil
+    "$VENV/bin/pip" install pywebview==6.2.1 ddgs psutil
   } >> "$LOGDIR/bootstrap.log" 2>&1
   # MLX exists only for Apple silicon; Intel Macs run the models on Ollama,
   # which the app downloads for itself on first use

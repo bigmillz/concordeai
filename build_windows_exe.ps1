@@ -146,7 +146,9 @@ Write-Host "-> installing build dependencies (a few minutes the first time)"
 # tzdata: Windows has no time-zone database of its own. The four export
 # libraries can't be pip-installed on demand inside a frozen app, so they
 # ship in it (6b317, from the Windows sweep).
-$deps = @("pyinstaller", "pywebview", "ddgs", "psutil", "huggingface_hub",
+# pywebview is pinned (6b321): the app guards its js_api bridge, which
+# was written and tested against this version
+$deps = @("pyinstaller", "pywebview==6.2.1", "ddgs", "psutil", "huggingface_hub",
           "tzdata", "reportlab", "openpyxl", "python-docx", "python-pptx")
 if ($isArm) {
   # pythonnet - pywebview's default Windows backend - has no ARM64 wheel, so
