@@ -2762,6 +2762,81 @@ check("maps draw OpenFreeMap's dark style: no key, credited, GL only near the vi
       and "lmapNew(el)" in _jsb("mountPlaces") and "lmapNew(el)" in _jsb("mountPin")
       and ".mapcard>a{" in _MILLENAI_SRC and ".mapcard a{" not in _MILLENAI_SRC,
       _lmap[:80])
+# A PIN'S CITY IS PAST CHARACTER 80 (6b323). /api/geo cut Nominatim's
+# name to 80 characters and mountPlaces kept a pin only when that name
+# held the answer's location, so a detailed address lost its city: Katz's
+# ended "…, Manhattan Community Board 3, Manh" and the places map hid.
+# The test reads the whole name now; a pin from somewhere else still
+# drops, and the 250 km rule (6b247) still hides a spread-out set. The
+# real _geocode answers from a canned Nominatim, and the page's real
+# mountPlaces runs in node on what it returns.
+import io as _io23, types as _ty23
+_NOM = {"katz's delicatessen": (40.7223, -73.9873,
+            "Katz's Delicatessen, 205, East Houston Street, Manhattan Community "
+            "Board 3, Manhattan, New York County, New York, 10002, United States"),
+        "russ & daughters": (40.7226, -73.9882,
+            "Russ & Daughters, 179, East Houston Street, Manhattan Community "
+            "Board 3, Manhattan, New York County, New York, 10002, United States"),
+        "brain": (47.4833, 4.6333, "Brain, Côte-d'Or, Bourgogne-Franche-Comté, "
+                                   "France métropolitaine, 21350, France"),
+        "bettys": (53.9601, -1.0835, "Bettys, 6-8, St Helen's Square, York, "
+                                     "North Yorkshire, England, YO1 8QP, United Kingdom")}
+def _nom_open(url, timeout=0):
+    q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["q"][0]
+    rows = [{"lat": str(la), "lon": str(lo), "display_name": d}
+            for k, (la, lo, d) in _NOM.items() if q.startswith(k)]
+    return _io23.BytesIO(json.dumps(rows).encode())
+_gns = {"json": json, "APP_VERSION": "t", "load_prefs": lambda ident=None: {},
+        "urllib": _ty23.SimpleNamespace(parse=urllib.parse, request=_ty23.SimpleNamespace(
+            Request=lambda url, headers=None: url, urlopen=_nom_open))}
+_exec_names(_gns, {"_geo_cache", "_geocode"})
+_gk = _gns["_geocode"]("Katz's Delicatessen york")
+_pc = [("york", ["Katz's Delicatessen", "Russ & Daughters", "Brain"]),
+       ("New York", ["Katz's Delicatessen"]),
+       ("york", ["Katz's Delicatessen", "Bettys"]),
+       ("york", ["Brain"])]
+_pcases = [{"loc": lc, "places": [{"n": n} for n in ns],
+            "geo": {n + " " + lc: _gns["_geocode"](n + " " + lc) or {} for n in ns}}
+           for lc, ns in _pc]
+_pjs = (_re1.search(r"function esc\(s\)\{.*?;\}\n", _MILLENAI_SRC, _re1.S).group(0)
+        + "let GEO={},EL=null;const document={getElementById:()=>EL};\n"
+        "const leafletReady=async()=>true;\n"
+        "const api=async u=>({json:async()=>GEO[decodeURIComponent("
+        "u.slice(u.indexOf('q=')+2))]||{}});\n"
+        "const L={marker:ll=>({addTo:m=>(m.pins.push(ll),{bindPopup:()=>0})})};\n"
+        "function lmapNew(el){return el.m={pins:[],setView(){},fitBounds(){}};}\n"
+        # _jsb starts at "function", so the async goes back on
+        + "async " + _jsb("mountPlaces")
+        + 'const C=JSON.parse(require("fs").readFileSync(0,"utf8"));'
+        "(async()=>{const out=[];for(const c of C){GEO=c.geo;"
+        "const el={isConnected:true,nomap:false,m:null};"
+        "el.closest=()=>({classList:{add:k=>{if(k==='nomap')el.nomap=true;}}});EL=el;"
+        "await mountPlaces('x',c.places,c.loc,null);"
+        "out.push([el.nomap,el.m?el.m.pins.length:0]);}"
+        "process.stdout.write(JSON.stringify(out));})();")
+try:
+    _pf23 = os.path.join(_si_dir, "places.js")
+    open(_pf23, "w").write(_pjs)
+    _pout = json.loads(subprocess.run(["node", _pf23], input=json.dumps(_pcases),
+                                      capture_output=True, text=True,
+                                      timeout=30).stdout)
+except Exception as _e:
+    _pout = "ERR %s" % _e
+check("a place pin's location test reads the whole address, not its first 80 characters",
+      _gk and set(_gk) == {"lat", "lon", "name", "full"}
+      and _gk["full"] == _NOM["katz's delicatessen"][2]
+      and _gk["name"] == _gk["full"][:80] and "york" not in _gk["name"].lower()
+      # Katz's and Russ & Daughters pin in New York, Brain (France) drops
+      and _pout == [[False, 2], [False, 1],
+                    # York, England matches "york" but sits 5,000 km off
+                    [True, 0],
+                    # nothing in the place: no map
+                    [True, 0]]
+      # the server's own pin test reads it too, and a chat saves the pin only
+      and '(g_.get("full") or "").lower()' in _MILLENAI_SRC
+      and 'for k in ("lat", "lon", "name")' in _MILLENAI_SRC
+      and '"MAP:" + json.dumps(geo)' not in _MILLENAI_SRC,
+      "%r | %r" % (_gk, _pout))
 _cq = dict(_LH, APP_VERSION="t", urllib=__import__("urllib.request"))
 __import__("urllib.error")
 _exec_names(_cq, {"CLOUD_SKIP_IDS", "CLOUD_PICK_ORDER", "_CLAUDE_ID",

@@ -9258,9 +9258,14 @@ def _geocode(q: str):
         with urllib.request.urlopen(req, timeout=6) as r:
             rows = json.load(r)
         if rows:
+            # the name is cut for display; the "is it in <loc>" tests
+            # read `full` (6b323): a detailed address runs past 80
+            # characters before its city — Katz's is "…, Manhattan
+            # Community Board 3, Manh" there, so no pin was in New York
+            full = rows[0].get("display_name") or ""
             out = {"lat": round(float(rows[0]["lat"]), 6),
                    "lon": round(float(rows[0]["lon"]), 6),
-                   "name": (rows[0].get("display_name") or "")[:80]}
+                   "name": full[:80], "full": full}
     except Exception:
         pass
     if len(_geo_cache) > 200:
@@ -14835,7 +14840,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         g_ = _geocode(_loc or _place_terms(query))
                         lt_ = _tl_search.locq.lower()
                         if g_ and (not lt_ or lt_ in
-                                   (g_.get("name") or "").lower()):
+                                   (g_.get("full") or "").lower()):
                             _tl_search.geo = g_
                 elif bookish:
                     pt_ = _place_terms(query).split()
@@ -15570,8 +15575,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             geo = getattr(_tl_search, "geo", None)
             if geo:
                 try:
-                    _write((NUL + "MAP:" + json.dumps(geo) + NUL)
-                           .encode("utf-8"))
+                    # the pin, not the whole geocode: saved chats keep
+                    # what the card reads (6b323)
+                    _write((NUL + "MAP:" + json.dumps(
+                        {k: geo.get(k) for k in ("lat", "lon", "name")})
+                        + NUL).encode("utf-8"))
                 except Exception:
                     pass
             hint = _place_names(getattr(_tl_search, "rows", []) or [],
@@ -21035,8 +21043,10 @@ async function mountPlaces(id,places,loc,mapd){
     try{
       const g=await(await api("/api/geo?q="
         +encodeURIComponent((p.n||"")+" "+(loc||"")))).json();
+      // the WHOLE address (6b323): the 80-character name stops before
+      // the city on a detailed one, and every pin failed this test
       if(g&&typeof g.lat==="number"
-         &&(!loc||(g.name||"").toLowerCase().includes(loc.toLowerCase())))
+         &&(!loc||(g.full||"").toLowerCase().includes(loc.toLowerCase())))
         pins.push({p:p,g:g});
     }catch(e){}
   }

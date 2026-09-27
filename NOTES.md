@@ -5630,6 +5630,53 @@ crash was invisible.
   keeps its checks. Mutation-tested (SIGHUP back, hook removed, no log,
   no box).
 
+## 6b323 — a place pin's location test reads the whole address
+Seen in 6b322 and older than it: `/api/geo` returned Nominatim's
+display_name cut to 80 characters, and `mountPlaces` kept a pin only
+when that name contained the answer's location. A detailed address
+reaches its city after character 80. Katz's is "Katz's Delicatessen,
+205, East Houston Street, Manhattan Community Board 3, Manhattan, New
+York County, New York, 10002, United States" (134 characters, checked
+against Nominatim on 2026-09-27); cut, it ends "…Community Board 3,
+Manh". With "New York", or "york" (what the CTX frame really sends: the
+last word of the place terms), every pin dropped and the map hid.
+- **The fix:** `_geocode` returns `full`, the uncut display_name, beside
+  `name` (still cut to 80, for display). The page's test reads `full`,
+  and so does the server's own MAP-pin test (`lt_ in …` in the chat
+  handler), which had the same bug.
+- **Why the whole name, not Nominatim's address fields:** a display_name
+  runs from the venue out to the country, so the whole name only adds
+  the tail: neighbourhood, city, county, state, country. Everything that
+  pinned before still pins. Matching only the area fields
+  (`addressdetails=1`) would be stricter, but it would drop a pin whose
+  location is its street ("bars on broadway" sends "broadway"), and the
+  key names vary by country.
+- **The junk filter and 6b247 are unchanged:** a pin whose whole name
+  lacks the location still drops, and a set wider than 250 km still
+  hides the map. The cut also favoured the wrong pins, since a short
+  name keeps its city inside 80 characters and a detailed one doesn't.
+  In the gauntlet's canned case (Katz's plus York, England, location
+  "york"), 50cfc77 dropped Katz's and drew England alone; now both
+  match and the 250 km rule hides the pair.
+- **What else reads `name`:** mapCard (the part before the first comma,
+  for the Apple Maps link and the popup), osm_places (the same part,
+  for the venue clock's place) and the fallback pin's popup in
+  mountPlaces. None changed. The MAP frame now sends only lat, lon and
+  name, so saved and synced chats don't gain the whole address.
+  `_geo_cache` holds the new dict in memory only; nothing is on disk.
+- Gauntlet: the real `_geocode` against a canned Nominatim (`name` still
+  80, `full` whole), then the page's real `mountPlaces` in node: Katz's
+  and Russ & Daughters pin for "york" while Brain (France) drops; "New
+  York" pins Katz's; Katz's plus York, England hides; a lone junk pin
+  shows no map. Also the server's test and the MAP frame's three
+  fields. On 50cfc77 it fails the first three cases.
+- Checked by hand: a dev copy's `/api/geo` against live Nominatim
+  returned both fields for Katz's; in the browser pane (Chromium, hidden,
+  so no basemap drew) the page's own addMsg put Katz's and Russ &
+  Daughters on the map for "york"; Katz's plus Bettys (live, Harrogate,
+  "…North Yorkshire…") hid it. Not checked: a real model answer end to
+  end, and WKWebView (the change is one string test in the page).
+
 ## 6b322 — the maps draw again: OpenFreeMap's dark style
 On 2026-09-27 CARTO started answering every tile request with a picture
 reading "API KEY REQUIRED — carto.com/basemaps/apikey", with or without
@@ -5693,7 +5740,7 @@ key), and chose to put the single-pin card on the same map.
   the answer's location. "Katz's Delicatessen" with location "New York"
   comes back as "…, Manhattan Community Board 3, Manh", fails the test,
   and the places map hides; with "Manhattan" it draws. That predates
-  this change.
+  this change. Fixed in 6b323.
 
 ## 6b321 — an API token, a one-time boot code, media behind the token (accounts step 3)
 Until now the launch cookie was the only credential: anything that got
