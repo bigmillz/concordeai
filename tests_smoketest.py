@@ -4375,6 +4375,13 @@ check("Settings links the website, in the system browser",
       and "#about-site{" in page,
       _foot[:200])
 
+# 6b318, per Patrick: the Beta channel reads "Prerelease" (it carries the
+# RCs too). The stored value stays "beta", so saved choices still match.
+check("Settings: the channel between Stable and Nightly is called Prerelease",
+      '<option value="beta">Prerelease</option>' in page
+      and ">Beta</option>" not in page,
+      page[page.index('id="upchan"'):page.index('id="upchan"') + 200])
+
 # 6b318, per Patrick: "whenever settings is re-opened, make sure it goes
 # to the about tab". Reopening resets the rail; a call while it is already
 # open (the palette) leaves the pane alone. Checked in a browser too.

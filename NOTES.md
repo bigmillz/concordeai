@@ -5682,6 +5682,8 @@ history bore it out: 3 of the last 5 were New York.
   sessions still bring in fresh clips. Partials keep three days.
 - Settings always opens on About (per Patrick), not on whichever pane
   it was closed on.
+- The Beta update channel is called Prerelease (per Patrick); it gets
+  the betas and the RCs. The saved value is still "beta".
 
 ## 6b317 — Windows: the app says PC, and quitting stops Ollama
 Found testing the 445085b nightly in Patrick's Windows 11 ARM VM, driven

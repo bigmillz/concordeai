@@ -19781,12 +19781,14 @@ __CODE_ROWS__
       <div id="up-reldate"></div>
       <div id="up-notes" hidden></div>
       <button class="about-btn" id="about-check">Check for updates</button>
-      <!-- 6b285: three channels. Stable is the default; Beta gets
-           the RCs; Nightly follows the rolling "nightly" release that
-           GitHub Actions rebuilds on every push to main. -->
+      <!-- 6b285: three channels. Stable is the default; Prerelease
+           (value "beta", kept for saved prefs; renamed 6b318 per
+           Patrick) gets the betas and RCs; Nightly follows the rolling
+           "nightly" release that GitHub Actions rebuilds on every push
+           to main. -->
       <label id="beta-row"><span>Update channel</span>
         <select id="upchan"><option value="stable">Stable</option>
-          <option value="beta">Beta</option>
+          <option value="beta">Prerelease</option>
           <option value="nightly">Nightly</option></select></label>
       <!-- 6b292, per Patrick: automatic checks are a choice — on, the
            app checks at launch and daily; off, the button above is the
