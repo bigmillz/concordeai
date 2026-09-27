@@ -2639,7 +2639,9 @@ _jsb = lambda nm: _MILLENAI_SRC[_MILLENAI_SRC.index("function %s(" % nm):
 _js = (_re1.search(r"function esc\(s\)\{.*?;\}\n", _MILLENAI_SRC, _re1.S).group(0)
        + _re1.search(r"const HL_KW=.*?;\n", _MILLENAI_SRC, _re1.S).group(0)
        + _jsb("hilite") + _jsb("dlBox") + _jsb("flowDiagram")
-       + _jsb("photoRow") + _jsb("mapCard") + _jsb("renderMD")
+       + _jsb("photoRow")
+       # mapCard mounts its map 40 ms later (6b322); node gets a stub
+       + "let LMAP_SEQ=0;const mountPin=()=>0;\n" + _jsb("mapCard") + _jsb("renderMD")
        + 'const C=JSON.parse(require("fs").readFileSync(0,"utf8"));'
        'process.stdout.write(JSON.stringify(C.map(c=>{try{'
        'return c.fn==="photoRow"?photoRow(c.arg):c.fn==="mapCard"?mapCard(c.arg)'
@@ -2729,13 +2731,37 @@ check("an answer can't break out of an attribute and run script",
       and 'class="dlgo" data-api-href="/api/export/' in _outs[8]
       and "<img" not in _outs[13]
       and "127.0.0.1" not in _outs[14] and 'src="https://a.example/b.jpg"' in _outs[14]
-      and _outs[15] == "" and "<iframe" in _outs[16] and "40.7,-73.9" in _outs[16]
+      and _outs[15] == "" and "<iframe" not in _outs[16]
+      and '<div class="mapcard"><div class="lmap" id="lmap' in _outs[16]
+      and "?ll=40.7,-73.9&q=Here" in _outs[16]
       # visible text escaped once; the data-n attribute keeps one more
       # level on purpose (the browser decodes an attribute once)
       and "<b>User&#39;s app</b>" in _outs[17] and "<b>User&amp;" not in _outs[17]
       and "<span>can&#39;t fail</span>" in _outs[17]
       and "data-id=\"'+esc(c.id)+'\"" in _MILLENAI_SRC,
       "%s | %s" % (_bad[:3], [o[:90] for o in _outs if o.startswith("ERR")][:2]))
+# THE MAP DRAWS (6b322). On 2026-09-27 CARTO began answering every tile
+# with an "API KEY REQUIRED" picture and every map went blank grey. The
+# basemap is OpenFreeMap's dark style (no key, no account, no cap) with
+# the credit it asks for; the single-pin card is the same dark map, not a
+# light openstreetmap.org iframe; and a map holds a WebGL context only
+# while it's near the view, since a page keeps about sixteen.
+_lmap = _MILLENAI_SRC[_MILLENAI_SRC.index("const OFM_STYLE="):
+                      _MILLENAI_SRC.index("async function mountPlaces(")]
+check("maps draw OpenFreeMap's dark style: no key, credited, GL only near the view",
+      "cartocdn" not in _MILLENAI_SRC and "L.tileLayer(" not in _MILLENAI_SRC
+      and "openstreetmap.org/export/embed" not in _MILLENAI_SRC
+      and 'const OFM_STYLE="https://tiles.openfreemap.org/styles/dark";' in _lmap
+      and not re.search(r"api_?key|access_token|[?&]key=", _lmap, re.I)
+      and all(s in _lmap for s in (">OpenFreeMap</a>", ">OpenMapTiles</a>",
+                                    ">OpenStreetMap</a>"))
+      and "maplibre-gl@5.24.0/dist/maplibre-gl.js" in _lmap
+      and "@maplibre/maplibre-gl-leaflet@0.1.4/" in _lmap
+      and "{root:scroller,rootMargin:" in _lmap
+      and "m.removeLayer(m._ofm)" in _lmap
+      and "lmapNew(el)" in _jsb("mountPlaces") and "lmapNew(el)" in _jsb("mountPin")
+      and ".mapcard>a{" in _MILLENAI_SRC and ".mapcard a{" not in _MILLENAI_SRC,
+      _lmap[:80])
 _cq = dict(_LH, APP_VERSION="t", urllib=__import__("urllib.request"))
 __import__("urllib.error")
 _exec_names(_cq, {"CLOUD_SKIP_IDS", "CLOUD_PICK_ORDER", "_CLAUDE_ID",

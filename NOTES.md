@@ -5630,6 +5630,71 @@ crash was invisible.
   keeps its checks. Mutation-tested (SIGHUP back, hook removed, no log,
   no box).
 
+## 6b322 — the maps draw again: OpenFreeMap's dark style
+On 2026-09-27 CARTO started answering every tile request with a picture
+reading "API KEY REQUIRED — carto.com/basemaps/apikey", with or without
+a Referer, so every map in every build was blank grey. Patrick picked
+the replacement from three (OpenFreeMap; CARTO's free key; Stadia's free
+key), and chose to put the single-pin card on the same map.
+- **Why OpenFreeMap:** no key, no account, no cap, commercial use
+  allowed; its one condition is the credit line, "OpenFreeMap ©
+  OpenMapTiles Data from OpenStreetMap". Nothing can leak from the
+  public repo and no quota can run out. Ruled out: CARTO's key (free to
+  5M/month, 1M commercial, but it would sit in the public repo), Stadia
+  (key, non-commercial only, hard stop at 200k tiles; its no-key access
+  from 127.0.0.1 is meant for development only), MapTiler (key, 5k
+  sessions, non-commercial, logo), Esri (the old keyless
+  services.arcgisonline.com tiles have been off-terms for open-source
+  clients since April 2022), and OSM's own tile servers (they want a
+  User-Agent that names the app, which a webview can't send, and they
+  aren't dark).
+- **How:** OpenFreeMap's tiles are vector, so MapLibre GL draws them
+  inside Leaflet through the maplibre-gl-leaflet bridge; the pins,
+  popups, fitBounds and the 250 km coherence rule are unchanged. The
+  scripts are pinned (`leaflet@1.9.4`, `maplibre-gl@5.24.0`,
+  `@maplibre/maplibre-gl-leaflet@0.1.4`) and still come from unpkg; the
+  first map loads about 1 MB of MapLibre, cached after that. When item 7
+  brings Leaflet local, these two come with it.
+- **One GL canvas per map on screen.** A page keeps about sixteen WebGL
+  contexts and drops the oldest past that, so a long chat of place
+  answers would have blanked its early maps. `lmapNew` gives each map
+  its basemap only while it's within 600 px of the chat's view
+  (IntersectionObserver on `#chat-scroll`) and removes it, which frees
+  the context, when it scrolls away or leaves the page; the Leaflet map
+  and its pins stay. Maps that left the page are swept on the next mount.
+- **The single-pin card** (`mapCard`, an answer with a MAP frame and no
+  place list) was a light openstreetmap.org embed iframe; it is now the
+  same dark Leaflet map at zoom 16 with one pin. Open in Maps moved to
+  the top right, clear of the credit line, and its rule is `.mapcard>a`
+  so Leaflet's zoom buttons and credit links don't take the pill style.
+  If the map scripts can't load, the card hides, as the places map does.
+  So does a machine with no WebGL: MapLibre throws, and pins on blank
+  dark aren't a map, so the single-pin card hides and the places module
+  keeps its card rail without the map.
+- The credit line is dark (`.lmap .leaflet-control-attribution`), and
+  `.lmap` isolates its stacking context so Leaflet's 400-1000 z-indexes
+  stay under the pill.
+- Gauntlet: no CARTO, no tile layer, no OSM embed; the style URL, the
+  three credits and the pinned scripts; no key of any kind in the map
+  code; the visibility observer and the layer removal; both mounts go
+  through `lmapNew`. The attribute-escaping check now expects the card's
+  map div and Apple Maps link instead of the iframe.
+- Checked by hand: a dev copy in the browser pane (Chromium) drew both
+  maps dark with the credit line, a new city in about 1.6 s; with twenty
+  maps in one chat only the four or six near the view held a canvas, and
+  clearing the chat freed them all; with MapLibre made to throw, both
+  maps hid as above. In WKWebView (a pywebview window on this Mac, same
+  pinned scripts) MapLibre ran on WebGL2 and the style drew 545 street,
+  building and water features in about 2 s. Not checked: WebView2 and Qt
+  on Windows. A hidden window (or browser pane) draws nothing until
+  shown, since the observer and MapLibre both wait for rendering.
+- Seen, not fixed: `/api/geo` returns Nominatim's name cut to 80
+  characters, and `mountPlaces` keeps a pin only when that name contains
+  the answer's location. "Katz's Delicatessen" with location "New York"
+  comes back as "…, Manhattan Community Board 3, Manh", fails the test,
+  and the places map hides; with "Manhattan" it draws. That predates
+  this change.
+
 ## 6b321 — an API token, a one-time boot code, media behind the token (accounts step 3)
 Until now the launch cookie was the only credential: anything that got
 it (a copied cookie, a replay from another local port) opened every

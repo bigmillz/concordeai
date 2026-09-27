@@ -17684,15 +17684,17 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
 .mapcard{margin:14px 0 2px;border-radius:13px;overflow:hidden;
   border:1px solid rgba(255,255,255,.17);position:relative;
   box-shadow:0 14px 40px -18px rgba(0,0,0,.8)}
-.mapcard iframe{width:100%;height:235px;border:0;display:block;
-  filter:saturate(.92) contrast(1.04)}
-.mapcard a{position:absolute;right:10px;bottom:10px;
+.mapcard .lmap{height:235px;background:#0d0f14}
+.mapcard.nomap{display:none}
+/* top right, clear of the attribution (6b322); ">" so Leaflet's own
+   links (zoom buttons, attribution) don't take the pill style */
+.mapcard>a{position:absolute;right:10px;top:10px;z-index:1;
   background:rgba(10,12,16,.82);color:#ececec;
   font-family:var(--mono);font-size:11px;letter-spacing:.05em;
   padding:6px 11px;border-radius:9px;text-decoration:none;
   border:1px solid rgba(255,255,255,.22);
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
-.mapcard a:hover{background:rgba(24,27,36,.92)}
+.mapcard>a:hover{background:rgba(24,27,36,.92)}
 /* cloud key box in Settings */
 /* SECTIONED SETTINGS — headers, one card language, a real footer */
 .set-sec{padding:14px 0 4px;border-top:1px solid rgba(255,255,255,.07);
@@ -17760,7 +17762,13 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
 .pcard .pd{color:var(--dim);font-size:12px;line-height:1.45;
   font-family:var(--sans)}
 .pcard .ph{font-family:var(--mono);font-size:10.5px;color:#a8d9b2}
-.lmap.leaflet-container{background:#0d0f14;font-family:var(--sans)}
+/* isolate (6b322): Leaflet's panes and controls sit at z-index
+   400-1000; boxed in here, the map card's Open in Maps pill stays on top */
+.lmap.leaflet-container{background:#0d0f14;font-family:var(--sans);
+  isolation:isolate}
+.lmap.leaflet-container .leaflet-control-attribution{
+  background:rgba(6,7,10,.72);color:#8b909b;font-size:10px}
+.lmap.leaflet-container .leaflet-control-attribution a{color:#c3c8d2}
 .lmap .leaflet-popup-content-wrapper,.lmap .leaflet-popup-tip{
   background:#171a21;color:#ececec}
 /* the pulsing caret is retired (6b257) — the stream opens on the
@@ -20940,7 +20948,7 @@ function srcBox(srcs){
 // THE CLAUDE TREATMENT, per Patrick: a place answer renders as a dark
 // multi-pin map with a card rail — the model hands over structured
 // places in a [[PLACES]] trailer, pins geocode through /api/geo, and
-// Leaflet + CARTO dark tiles (keyless) draw the city.
+// Leaflet + OpenFreeMap's dark style (keyless) draw the city.
 let LMAP_SEQ=0;
 function placesModule(places,loc,mapd){
   if(!places||!places.length)return mapCard(mapd);
@@ -20952,20 +20960,69 @@ function placesModule(places,loc,mapd){
   return '<div class="placesmod"><div class="lmap" id="'+id+'"></div>'
     +'<div class="prail">'+cards+'</div></div>';
 }
+// THE BASEMAP (6b322): on 2026-09-27 CARTO started answering every
+// tile with an "API KEY REQUIRED" picture, so every map was blank grey.
+// OpenFreeMap's dark style needs no key and no account, has no cap, and
+// allows commercial use; attribution is the one condition. Its tiles are
+// vector, so MapLibre GL draws them inside Leaflet (the
+// maplibre-gl-leaflet bridge) and the pins, popups and fitBounds stay
+// Leaflet's. All three scripts are pinned.
+const OFM_STYLE="https://tiles.openfreemap.org/styles/dark";
+const OFM_ATTR='<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>'
+  +' &copy; <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a>'
+  +' Data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
 function leafletReady(){
-  if(window.L)return Promise.resolve(true);
   if(!window._lfP){
-    window._lfP=new Promise(res=>{
-      const l=document.createElement("link");l.rel="stylesheet";
-      l.href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      document.head.appendChild(l);
-      const s=document.createElement("script");
-      s.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-      s.onload=()=>res(true);s.onerror=()=>res(false);
-      document.head.appendChild(s);
-    });
+    const css=h=>{const l=document.createElement("link");l.rel="stylesheet";
+      l.href=h;document.head.appendChild(l);};
+    const js=s=>new Promise(res=>{const e=document.createElement("script");
+      e.src=s;e.onload=()=>res(true);e.onerror=()=>res(false);
+      document.head.appendChild(e);});
+    css("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css");
+    css("https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css");
+    // the bridge reads L and maplibregl as it loads, so it goes last
+    window._lfP=Promise.all([
+      js("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"),
+      js("https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js")])
+      .then(ok=>ok[0]&&ok[1]
+        &&js("https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js"))
+      .then(ok=>!!(ok&&window.L&&L.maplibreGL));
   }
   return window._lfP;
+}
+// ONE GL CANVAS PER MAP ON SCREEN (6b322): a page keeps about sixteen
+// WebGL contexts and drops the oldest past that, so a long chat of place
+// answers would blank its early maps. A map takes its basemap as it
+// nears the view and hands it back, context and all, when it scrolls
+// away or leaves the page; the pins stay put either way.
+let lmapIO=null;
+const lmapEls=new Set();
+function lmapBase(m,on){
+  if(on&&!m._ofm){
+    m._ofm=L.maplibreGL({style:OFM_STYLE,attribution:OFM_ATTR});
+    m._ofm.addTo(m);
+  }else if(!on&&m._ofm){m.removeLayer(m._ofm);m._ofm=null;}
+}
+function lmapDrop(el){
+  try{lmapBase(el._lm,false);}catch(e){}
+  if(lmapIO)lmapIO.unobserve(el);
+  lmapEls.delete(el);
+}
+function lmapNew(el){
+  lmapEls.forEach(x=>{if(!x.isConnected)lmapDrop(x);});
+  const m=L.map(el,{scrollWheelZoom:false,attributionControl:true,maxZoom:19});
+  el._lm=m;
+  if(!lmapIO&&typeof IntersectionObserver==="function")
+    lmapIO=new IntersectionObserver(es=>es.forEach(x=>{
+      if(!x.target.isConnected){lmapDrop(x.target);return;}
+      // no WebGL here: pins on blank dark is no map, so hide it
+      try{lmapBase(x.target._lm,x.isIntersecting);}
+      catch(e){const w=x.target.closest(".placesmod,.mapcard");
+        if(w)w.classList.add("nomap");lmapDrop(x.target);}
+    }),{root:scroller,rootMargin:"600px 0px"});
+  if(lmapIO){lmapEls.add(el);lmapIO.observe(el);}
+  else lmapBase(m,true);
+  return m;
 }
 async function mountPlaces(id,places,loc,mapd){
   const el=document.getElementById(id);
@@ -20999,10 +21056,10 @@ async function mountPlaces(id,places,loc,mapd){
       mx=Math.max(mx,km(pins[i],pins[j]));
     if(mx>250){bail();return;}
   }
+  // the geocodes take seconds; the chat may have moved on meanwhile
+  if(!el.isConnected)return;
   try{
-    const m=L.map(id,{scrollWheelZoom:false,attributionControl:true});
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-      {attribution:"&copy; OSM &copy; CARTO",maxZoom:19}).addTo(m);
+    const m=lmapNew(el);
     const pts=[];
     pins.forEach(x=>{
       L.marker([x.g.lat,x.g.lon]).addTo(m)
@@ -21028,13 +21085,27 @@ function mapCard(m){
   // numbers only (6b310): lon went into the src unchecked
   const la=m?+m.lat:NaN,lo=m?+m.lon:NaN;
   if(!isFinite(la)||!isFinite(lo))return "";
-  const d=0.004,bb=(lo-d)+","+(la-d)+","+(lo+d)+","+(la+d);
-  return '<div class="mapcard"><iframe loading="lazy" src='
-    +'"https://www.openstreetmap.org/export/embed.html?bbox='+bb
-    +'&layer=mapnik&marker='+la+','+lo+'"></iframe>'
+  // the same dark map as the places module (6b322, per Patrick), not the
+  // light openstreetmap.org embed it used to be
+  const id="lmap"+(++LMAP_SEQ),nm=(m.name||"").split(",")[0];
+  setTimeout(()=>mountPin(id,la,lo,nm),40);
+  return '<div class="mapcard"><div class="lmap" id="'+id+'"></div>'
     +'<a href="https://maps.apple.com/?ll='+la+','+lo
-    +'&q='+encodeURIComponent((m.name||"").split(",")[0]||"pin")
+    +'&q='+encodeURIComponent(nm||"pin")
     +'" target="_blank" rel="noopener">Open in Maps \u2197</a></div>';
+}
+async function mountPin(id,la,lo,nm){
+  const el=document.getElementById(id);
+  if(!el)return;
+  const ok=await leafletReady();
+  const bail=()=>{const w=el.closest(".mapcard");if(w)w.classList.add("nomap");};
+  if(!ok){bail();return;}
+  if(!el.isConnected)return;
+  try{
+    const m=lmapNew(el).setView([la,lo],16);
+    const mk=L.marker([la,lo]).addTo(m);
+    if(nm)mk.bindPopup("<b>"+esc(nm)+"</b>");
+  }catch(e){bail();}
 }
 // THE WORKING TREE: what it's actually doing, live — a step list with
 // a progress bar, instead of one vague spinner line.
