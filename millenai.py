@@ -464,6 +464,13 @@ class Ctl(str):
     quoted in either can never open a frame of its own: a fake MAP pin,
     a SOURCES row, an APPROVE card, or a RESET that wipes the answer."""
 
+
+class AppText(str):
+    """Words the APP wrote where a model's answer would go (6b325): a
+    provider that's down, one that declined. Settings › Usage counts an
+    answer only when a model's own text reached the page, and these say
+    none did."""
+
 SYSTEM_PROMPT = {
     "role": "system",
     "content": (
@@ -1557,7 +1564,9 @@ def _anthropic_stream(c: dict, messages: list, emit) -> bool:
                 elif d.get("type") == "message_delta":
                     stop = (d.get("delta") or {}).get("stop_reason") or stop
                     if isinstance(d.get("usage"), dict):
-                        u.update(d["usage"])
+                        # a null here must not wipe message_start's count
+                        u.update({k: v for k, v in d["usage"].items()
+                                  if v is not None})
                 elif d.get("type") == "message_start":
                     _mu = (d.get("message") or {}).get("usage")
                     if isinstance(_mu, dict):
@@ -11053,7 +11062,8 @@ def usage_note(model, where, messages, chars, reported=None, t0=None):
             i = _usage_est_in(messages)
         if o is None:
             o = _usage_est(chars)
-        rec = {"t": round(time.time(), 1), "m": str(model or "?")[:80],
+        # t is when the call started, so a long one lands where it began
+        rec = {"t": round(t0 or time.time(), 1), "m": str(model or "?")[:80],
                "w": str(where or "cloud")[:16], "n": 1, "i": i, "o": o}
         if c:
             rec["c"] = min(c, i)
@@ -11204,17 +11214,20 @@ def _usage_backfill():
     old per-answer log (quality.jsonl: ts, tier, model, searched, chars)
     from before this launch becomes one answer and one estimated call,
     output from its length, input unknown (0). The ledger is written
-    whole, so the old log is never read twice."""
+    whole, so the old log is never read twice. Marked done only once the
+    write succeeded, or when there's nothing to import: a write that
+    failed is tried again, and the caller's appends wait for it."""
     if _usage_state["backfilled"]:
         return
-    _usage_state["backfilled"] = True
     if os.path.exists(_pfile(USAGE_FILE)):
+        _usage_state["backfilled"] = True
         return
     try:
         with open(_pfile("quality.jsonl"), "r", encoding="utf-8",
                   errors="replace") as f:
             lines = f.read().splitlines()
-    except OSError:
+    except FileNotFoundError:
+        _usage_state["backfilled"] = True
         return
     recs = []
     for ln in lines:
@@ -11233,6 +11246,7 @@ def _usage_backfill():
     if recs:
         recs.sort(key=lambda r: r["t"])
         _usage_write_all(recs)
+    _usage_state["backfilled"] = True
 
 
 def usage_compact(now=None) -> bool:
@@ -11284,6 +11298,10 @@ def _usage_floor(t: float, unit: str) -> float:
     if unit == "1w":
         return time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday - lt.tm_wday,
                             0, 0, 0, 0, 0, -1))
+    if unit == "6h":
+        # wall-clock hours 0, 6, 12, 18, across a clock change too
+        return time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday,
+                            lt.tm_hour // 6 * 6, 0, 0, 0, 0, -1))
     mid = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 0, 0, 0, 0, 0, -1))
     sec = USAGE_UNITS[unit]
     return mid + (t - mid) // sec * sec
@@ -11297,7 +11315,19 @@ def _usage_next(t: float, unit: str) -> float:
         return time.mktime((lt.tm_year, lt.tm_mon,
                             lt.tm_mday + (7 if unit == "1w" else 1),
                             0, 0, 0, 0, 0, -1))
+    if unit == "6h":
+        # 5, 6 or 7 real hours on the day the clock moves
+        return _usage_floor(t + 7 * 3600, "6h")
     return t + USAGE_UNITS[unit]
+
+
+def _usage_edges(start: float, now: float, unit: str, cap: int) -> list:
+    """The bucket starts from start's bucket up to now, at most cap+1."""
+    edges, b = [], _usage_floor(start, unit)
+    while b <= now and len(edges) <= cap:
+        edges.append(b)
+        b = _usage_next(b, unit)
+    return edges
 
 
 def usage_query(recs: list, rng: str = "all", model: str = "",
@@ -11322,12 +11352,12 @@ def usage_query(recs: list, rng: str = "all", model: str = "",
         # from the first record, and never less than an hour back
         ts = [r["t"] for r in mine if r["t"] <= now]
         start = min(ts + [now - 3600])
+        # the smallest bucket that draws at most 60 bars, counted from
+        # the floored start (the span alone can come out one over)
         unit = next((u for u in ("5m", "1h", "6h", "1d", "1w")
-                     if (now - start) / USAGE_UNITS[u] <= 60), "1mo")
-    edges, b = [], _usage_floor(start, unit)
-    while b <= now and len(edges) < 400:
-        edges.append(b)
-        b = _usage_next(b, unit)
+                     if (now - start) / USAGE_UNITS[u] <= 61
+                     and len(_usage_edges(start, now, u, 61)) <= 60), "1mo")
+    edges = _usage_edges(start, now, unit, 400)
     series = [{"t": e, "i": 0, "c": 0, "o": 0, "n": 0} for e in edges]
     tot = dict.fromkeys(USAGE_SUM_KEYS, 0)
     for r in mine:
@@ -11995,9 +12025,9 @@ def run_cloud_only(messages: list, emit, status, step) -> None:
             return
         if c.get("_stop") == "refusal":
             step("draft", "That provider declined", "done", lbl)
-            emit("☁️ **%s** declined to answer that one. Switch to **Fast**, "
-                 "**Thinking** or **Pro** and this machine will answer it."
-                 % lbl)
+            emit(AppText("☁️ **%s** declined to answer that one. Switch to "
+                         "**Fast**, **Thinking** or **Pro** and this machine "
+                         "will answer it." % lbl))
             return
         step("draft", "That provider dropped out", "done", lbl)
         emit(_cloud_all_down())
@@ -12046,7 +12076,7 @@ def _cloud_all_down() -> str:
                    "and Groq both have free tiers.")
     out.append("Switch to **Fast**, **Thinking** or **Pro** and this "
                "machine will answer it now.")
-    return "\n\n".join(out)
+    return AppText("\n\n".join(out))
 
 
 def run_council(labels: list, messages: list, emit, status,
@@ -13323,13 +13353,13 @@ def run_remote_agent(messages, conf, autonomy, emit, status, step,
     if not driver:
         if (not load_prefs(None).get("turbo")
                 and work_ladder("work")):
-            emit("Cloud power is off, so your cloud key can't drive the "
-                 "remote agent. Turn on **Use cloud power** under "
-                 "**Settings › Cloud power**, or install a coding model "
-                 "in Settings.")
+            emit(AppText("Cloud power is off, so your cloud key can't drive "
+                         "the remote agent. Turn on **Use cloud power** under "
+                         "**Settings › Cloud power**, or install a coding "
+                         "model in Settings."))
             return
-        emit("No model is available to drive the remote agent. Install a "
-             "coding model in Settings, or add a cloud key.")
+        emit(AppText("No model is available to drive the remote agent. "
+                     "Install a coding model in Settings, or add a cloud key."))
         return
     host = conf.get("host", "the server")
     status("connecting to %s" % host)
@@ -13341,11 +13371,11 @@ def run_remote_agent(messages, conf, autonomy, emit, status, step,
                 '"umask 077; mkdir -p ~/.ssh; cat >> ~/.ssh/authorized_keys"'
                 '` in PowerShell' % (_u, host)) if IS_WIN
                else "ssh-copy-id %s@%s`" % (_u, host))
-        emit("**Couldn't connect to %s.**\n\n```\n%s\n```\n\nThis agent "
-             "uses key-based SSH only. Make sure your key is set up "
-             "(`%s) and the host, user and port are right "
-             "in the connection settings."
-             % (host, out.strip()[:400], _cp))
+        emit(AppText("**Couldn't connect to %s.**\n\n```\n%s\n```\n\nThis "
+                     "agent uses key-based SSH only. Make sure your key is "
+                     "set up (`%s) and the host, user and port are right "
+                     "in the connection settings."
+                     % (host, out.strip()[:400], _cp)))
         return
     step("conn", "Connected to " + host, "done", out.strip().split("\n")[0][:60])
     convo = [{"role": "system", "content": REMOTE_SYSTEM}] + list(messages)
@@ -17276,6 +17306,18 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             answer_buf.append(chunk)
             _write(chunk.encode("utf-8"))
 
+        # SETTINGS › USAGE (6b325): the model paths get memit, which notes
+        # that a model's own text reached the page; the app's own lines
+        # (offline_hint, "That engine stopped responding", AppText) go
+        # through emit, so a question that failed isn't counted an answer
+        _model_said = [False]
+
+        def memit(chunk: str):
+            if (chunk and not isinstance(chunk, (Ctl, AppText))
+                    and str(chunk).strip()):
+                _model_said[0] = True
+            emit(chunk)
+
         def step(sid: str, label: str, state: str = "run",
                  detail: str = ""):
             """One node of the live activity tree the UI draws."""
@@ -17501,10 +17543,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         def _cloud_vision() -> bool:
             for _vc in _vis_cloud:
                 status("cloud power \u2014 " + _vc.get("name", "cloud"))
-                if cloud_stream_conf(_vc, full_messages, emit):
+                if cloud_stream_conf(_vc, full_messages, memit):
                     return True
                 _rc = claude_refusal_conf(_vc)
-                if _rc and cloud_stream_conf(_rc, full_messages, emit):
+                if _rc and cloud_stream_conf(_rc, full_messages, memit):
                     return True
             if cloud_only or not _vis_local:
                 emit("The cloud couldn\u2019t read that image just now"
@@ -17549,7 +17591,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          "power**, or switch to Fast, Thinking or Pro and "
                          "the local vision engine will look at it.")
             elif cloud_only:
-                run_cloud_only(full_messages, emit, status, step)
+                run_cloud_only(full_messages, memit, status, step)
             elif ag_remote:
                 # THE REMOTE AGENT (6b249): drive the user's VPS over
                 # SSH. await_approval blocks on the approval channel —
@@ -17585,11 +17627,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             return "expired"
                         return bool(j.get("ok"))
                     run_remote_agent(messages, rconf, autonomy,
-                                     emit, status, step, _await)
+                                     memit, status, step, _await)
             elif TIERS.get(tier, {}).get("research") or ag_research:
-                run_research(council, full_messages, emit, status)
+                run_research(council, full_messages, memit, status)
             elif len(council) > 1:
-                run_council(council, full_messages, emit, status,
+                run_council(council, full_messages, memit, status,
                             reflect=(tier == "Thinking"),
                             peer=(tier == "Pro"),
                             bench_allow=req_cloud, comp=req_comp,
@@ -17643,13 +17685,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         _nm = _fc.get("name", "cloud")
                         status("cloud power \u2014 " + _nm)
                         _run_lbl([_nm])
-                        if cloud_stream_conf(_fc, full_messages, emit):
+                        if cloud_stream_conf(_fc, full_messages, memit):
                             hb_stop.set()
                             return
                         # a refusal gets one more Claude try (6b308)
                         _rc = claude_refusal_conf(_fc)
                         if _rc and cloud_stream_conf(_rc, full_messages,
-                                                     emit):
+                                                     memit):
                             hb_stop.set()
                             return
                     status("cloud power unavailable — running locally")
@@ -17700,10 +17742,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                               "content": REVISE_INSTRUCTION
                               + "QUESTION: " + src_q
                               + "\n\nFIRST DRAFT:\n" + draft[:6000]}],
-                            emit, status, draft,
+                            memit, status, draft,
                             "showing the first draft")
                     else:
-                        _stream_guarded(lbl, full_messages, emit, status,
+                        _stream_guarded(lbl, full_messages, memit, status,
                                         None,
                                         "kept the part before it wandered")
                 else:
@@ -17720,7 +17762,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # collapses into repetition gets cut back to its
                     # coherent prefix instead of streaming the loop
                     _stream_guarded(lbl, full_messages,
-                                    emit, status, None,
+                                    memit, status, None,
                                     "kept the part before it wandered")
         except (BrokenPipeError, ConnectionResetError):
             pass  # user hit Stop — browser closed the connection
@@ -17741,7 +17783,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                 and l != (route_label or model_name)), None)
                     if alt:
                         status(f"retrying on {alt}")
-                        run_model(alt, full_messages, emit)
+                        run_model(alt, full_messages, memit)
                 except Exception:
                     pass
             if not sent[0]:
@@ -17881,8 +17923,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             except Exception:
                 pass
             # Settings › Usage counts answers too (6b325): one per
-            # question that got one, under the model that wrote it
-            if sent[0]:
+            # question a model's own text answered (memit), under the
+            # model that wrote it
+            if _model_said[0]:
                 try:
                     usage_put({"t": round(time.time(), 1), "a": 1, "m": str(
                         (_ans_conf or {}).get("model") or route_label
@@ -20411,7 +20454,10 @@ body.gen #chip-model{color:var(--accent)}
 /* THE SPEC LIST. "6 BETA 238 · M4 PRO" wrapped mid-word in a narrow rail
    and read as debris. Label left, value right, one fact per line — it
    cannot wrap, and there is room for memory and the accelerator too. */
-#set-spec{padding:0 16px 14px;margin-bottom:12px;
+/* (6b325) six rail items in the height five took: 2px less padding a
+   row (.snav) and 8px less under the spec list, so a short About pane
+   (no notes yet) gains no blank space from the Usage row */
+#set-spec{padding:0 16px 14px;margin-bottom:4px;
   border-bottom:1px solid var(--line-soft);
   font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;
   text-transform:uppercase}
@@ -20422,7 +20468,7 @@ body.gen #chip-model{color:var(--accent)}
 .snav{
   display:block;width:100%;text-align:left;background:none;border:none;
   font-family:var(--sans);font-size:12.5px;color:var(--dim);
-  padding:8px 16px;cursor:pointer;border-left:2px solid transparent;
+  padding:6px 16px;cursor:pointer;border-left:2px solid transparent;
   transition:color .13s,background .13s;
 }
 .snav:hover{color:var(--text);background:rgba(255,255,255,.035)}

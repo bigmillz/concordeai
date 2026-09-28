@@ -3153,7 +3153,8 @@ check("leftover sweep: failed downloads go; fresh, complete and foreign files st
                                _mine_dev)])
 _LH["shutil"].rmtree(_lt, ignore_errors=True)
 check("per-task review fixes: titles per request, badge, sweeps",
-      "run_council(council, full_messages, emit, status," in _MILLENAI_SRC
+      # (6b325) the chat hands the council memit, the usage ledger's emit
+      "run_council(council, full_messages, memit, status," in _MILLENAI_SRC
       and "hurry=hurry_ev)" in _MILLENAI_SRC
       and "_fast = fast_cloud_ladder()" in _MILLENAI_SRC
       and "_last_cloud.pop(str(self._data_base()), None)" in _MILLENAI_SRC
@@ -3873,7 +3874,7 @@ _UN = {"USAGE_FILE", "USAGE_RAW_DAYS", "USAGE_HOURLY_DAYS", "USAGE_COMPACT_BYTES
        "_usage_est", "_usage_est_in", "usage_counts", "usage_note", "usage_put",
        "_usage_writer", "_usage_write_all", "usage_flush", "_usage_load", "usage_read",
        "_usage_backfill", "usage_compact", "_usage_floor", "_usage_next", "usage_query",
-       "_replace_into"}
+       "_usage_edges", "_usage_at_exit", "_replace_into"}
 
 
 class _SRE25(Exception):
@@ -3962,9 +3963,13 @@ _uz = _uzns()
 
 
 class _UStream:
-    def __init__(self, lines, body=b""):
+    def __init__(self, lines, body=b"", pause=0.0):
         self._l, self._b = [l if isinstance(l, bytes) else l.encode() for l in lines], body
-    def __iter__(self): return iter(self._l)
+        self._p = pause
+    def __iter__(self):
+        for _l in self._l:
+            time.sleep(self._p)
+            yield _l
     def read(self): return self._b
     def __enter__(self): return self
     def __exit__(self, *a): return False
@@ -3994,13 +3999,15 @@ _uo = {}
 _ab = []
 try:
     __import__("urllib.request").request.urlopen = _u_uo
-    # Ollama: counts on the last line
+    # Ollama: counts on the last line; a slow call is stamped with its
+    # start, not its end
     _uplan.append(_UStream(['{"message":{"content":"hi "},"done":false}\n',
                             '{"message":{"content":"you"},"done":true,'
-                            '"prompt_eval_count":21,"eval_count":7}\n']))
+                            '"prompt_eval_count":21,"eval_count":7}\n'], pause=0.3))
     _o = []
+    _tb = time.time()
     _uz["stream_ollama"]("gemma4:26b", _msgs, _o.append, label="Gemma 4 26B")
-    _uo["ollama"] = (_o, _urecs[-1:])
+    _uo["ollama"] = (_o, _urecs[-1:], _tb)
     # Ollama, abandoned mid-stream: the emit raises, the call still counts
     _uplan.append(_UStream(['{"message":{"content":"abcdefgh"},"done":false}\n',
                             '{"message":{"content":"more"},"done":false}\n']))
@@ -4036,7 +4043,8 @@ try:
             "cache_creation_input_tokens": 0, "output_tokens": 1}}},
         {"type": "content_block_delta", "delta": {"text": "Hello"}},
         {"type": "message_delta", "delta": {"stop_reason": "end_turn"},
-         "usage": {"output_tokens": 12}})))
+         "usage": {"output_tokens": 12, "input_tokens": None,
+                   "cache_read_input_tokens": None}})))
     _o = []
     _uo["claude_ok"] = _uz["_anthropic_stream"](dict(_cl), _msgs, _o.append)
     _uo["claude"] = (_o, _urecs[_n0:])
@@ -4075,6 +4083,24 @@ try:
     _uo["gem_ok"] = _uz["cloud_stream_conf"](dict(_gm), _msgs, lambda t: None)
     _uo["gem"] = (_urecs[_n0:], ["stream_options" in b for b in _usent[_ns0:]],
                   sorted(_uz["_stream_usage_off"]))
+    # the retry is for a 400 naming the flag only: a 500 that names it
+    # is a failure like any other, and the flag stays on
+    _n0 = len(_urecs)
+    _ns0 = len(_usent)
+    _uplan.append(_herr(500, "stream_options: internal error"))
+    _uo["g500"] = (_uz["cloud_stream_conf"](dict(_gq), _msgs, lambda t: None),
+                   len(_usent) - _ns0, sorted(_uz["_stream_usage_off"]))
+    # ... and only before any output: an error after text has gone out
+    # is never answered by asking again
+    class _UBreak(_UStream):
+        def __iter__(self):
+            yield from self._l
+            raise _herr(400, "stream_options")
+    _ns0 = len(_usent)
+    _gout = []
+    _uplan.append(_UBreak(_sse({"choices": [{"delta": {"content": "q" * 300}}]})))
+    _uo["gmid"] = (_uz["cloud_stream_conf"](dict(_gq), _msgs, _gout.append),
+                   len(_usent) - _ns0, len("".join(_gout)), sorted(_uz["_stream_usage_off"]))
     # a key the provider refused: nothing came back, nothing recorded
     _n0 = len(_urecs)
     _uplan.append(_herr(401, "invalid api key"))
@@ -4102,10 +4128,10 @@ def _ukeys(r):
 
 _uok = {}
 try:
-    _o, _r = _uo["ollama"]
+    _o, _r, _tb = _uo["ollama"]
     _uok["ollama"] = (_o == ["hi ", "you"] and len(_r) == 1 and _ukeys(_r[0]) == {
         "m": "Gemma 4 26B", "w": "local", "n": 1, "i": 21, "c": None, "ri": None, "o": 7, "x": None}
-        and isinstance(_r[0].get("d"), int))
+        and _r[0]["d"] >= 550 and _tb - 0.1 <= _r[0]["t"] <= _tb + 0.2)
     _r = _uo["ollama_cut"]
     _uok["ollama_cut"] = (_ab == ["abandoned"] and len(_r) == 1 and _r[0]["x"] == 1
                           and _r[0]["o"] == 2 and _r[0]["i"] > 0)
@@ -4133,6 +4159,8 @@ try:
                                and _off == ["gemini"] and len(_r) == 1 and _r[0]["x"] == 1
                                and _r[0]["w"] == "gemini" and _r[0]["o"] == 75)
     _uok["refused"] = _uo["refused"] == []
+    _uok["retry_guards"] = (_uo["g500"] == (False, 1, ["gemini"])
+                            and _uo["gmid"] == (True, 1, 300, ["gemini"]))
     _t1, _t2, _r = _uo["ct"]
     _uok["cloud_text"] = (_t1 == "Title" and _t2 == "A title" and len(_r) == 2
                           and _ukeys(_r[0]) == {"m": "claude-opus-5-5", "w": "claude", "n": 1,
@@ -4142,7 +4170,7 @@ try:
 except Exception as _e:
     _uok["error"] = repr(_e)
 _ucheck("usage: every model path records one call, exact where counts came back",
-      lambda: (len(_uok) == 11 and all(v is True for v in _uok.values())
+      lambda: (len(_uok) == 12 and all(v is True for v in _uok.values())
       # run_model hands Ollama the catalog name, and the chat logs answers
       and "stream_ollama(target, msgs, _tap, label=label," in _MILLENAI_SRC
       and 'usage_put({"t": round(time.time(), 1), "a": 1, "m": str(' in _MILLENAI_SRC),
@@ -4154,10 +4182,21 @@ _ucheck("usage: every model path records one call, exact where counts came back"
 _ubad = _uzns(usage_put=lambda r: 1 / 0)
 _ubad2 = _uzns()
 del _ubad2["usage_note"]
+_ubad3 = _uzns(usage_note=lambda *a, **k: 1 / 0)
 _ubo = []
 try:
     __import__("urllib.request").request.urlopen = _u_uo
-    for _nsx in (_ubad, _ubad2):
+    # usage_note itself raising: every call site's own guard holds
+    _uplan.append(_UStream([], json.dumps({"content": [{"type": "text", "text": "T1"}],
+                                           "usage": {"input_tokens": 1}}).encode()))
+    _ubo.append(_ubad3["cloud_text"](dict(_cl), _msgs))
+    _uplan.append(_UStream([], json.dumps({"choices": [{"message": {"content": "T2"}}],
+                                           "usage": {"prompt_tokens": 1}}).encode()))
+    _ubo.append(_ubad3["cloud_text"](dict(_gq), _msgs))
+    _uplan.append(_UStream(_sse({"type": "content_block_delta", "delta": {"text": "T3"}},
+                                {"type": "message_delta", "delta": {"stop_reason": "end_turn"}})))
+    _ubo.append(_ubad3["_anthropic_stream"](dict(_cl), _msgs, _ubo.append))
+    for _nsx in (_ubad, _ubad2, _ubad3):
         _uplan.append(_UStream(['{"message":{"content":"ok"},"done":true,'
                                 '"prompt_eval_count":1,"eval_count":1}\n']))
         _nsx["stream_ollama"]("t", _msgs, _ubo.append, label="L")
@@ -4170,7 +4209,7 @@ except Exception as _e:
 finally:
     __import__("urllib.request").request.urlopen = _orig_uo
 _ucheck("usage: a ledger that fails never costs an answer",
-      lambda: (_ubo == ["ok", "ok", True, "ok", "ok", True]), lambda: "%r" % _ubo)
+      lambda: (_ubo == ["T1", "T2", "T3", True] + ["ok", "ok", True] * 3), lambda: "%r" % _ubo)
 
 # 4. the file. A flush appends ASCII JSON lines, 0600; a line a crash cut
 # short stays its own line and is skipped; a file that is more garbage
@@ -4206,6 +4245,28 @@ try:
             _ufile.setdefault("raised", []).append(str(_e))
     os.remove(_up)
     _ufile["missing"] = _un["usage_read"]()
+    # a flush that can't write puts its records back, in order, ahead of
+    # anything queued since
+    os.makedirs(_up)                            # a folder where the file goes
+    _un["_usage_q"].extend([{"t": 1, "m": "R1"}, {"t": 2, "m": "R2"}])
+    try:
+        _un["usage_flush"]()
+        _ufile["flush_raised"] = False
+    except OSError:
+        _ufile["flush_raised"] = True
+    _un["_usage_q"].append({"t": 3, "m": "R3"})
+    _ufile["requeued"] = [r["m"] for r in _un["_usage_q"]]
+    os.rmdir(_up)
+    # the exit hook writes what's queued, and never raises
+    _un["_usage_at_exit"]()
+    _ufile["at_exit"] = ([r["m"] for r in _un["_usage_load"]()], len(_un["_usage_q"]))
+    os.remove(_up)
+    os.makedirs(_up)
+    _un["_usage_q"].append({"t": 4, "m": "R4"})
+    _un["_usage_at_exit"]()
+    _ufile["at_exit_quiet"] = [r["m"] for r in _un["_usage_q"]]
+    os.rmdir(_up)
+    _un["_usage_q"].clear()
 except Exception as _e:
     _ufile["error"] = repr(_e)
 _ucheck("usage: the ledger file appends, survives a torn line, never reads bad as empty",
@@ -4215,7 +4276,11 @@ _ucheck("usage: the ledger file appends, survives a torn line, never reads bad a
       and json.loads(_ufile["lines"][2])["m"] == "B"
       and _ufile.get("read") == ["A", "B", "C"]
       and _ufile.get("raised") == ["usage.jsonl", "usage.jsonl"]
-      and _ufile.get("missing") == []), lambda: "%r" % _ufile)
+      and _ufile.get("missing") == []
+      and _ufile.get("flush_raised") is True and _ufile.get("requeued") == ["R1", "R2", "R3"]
+      and _ufile.get("at_exit") == (["R1", "R2", "R3"], 0)
+      and _ufile.get("at_exit_quiet") == ["R4"]
+      and "\natexit.register(_usage_at_exit)\n" in _MILLENAI_SRC), lambda: "%r" % _ufile)
 
 # 5. roll-ups keep every count. Calls older than 14 days become one line
 # per hour and model, older than 120 days one per local day; the
@@ -4283,6 +4348,13 @@ with open(os.path.join(_uh3, "quality.jsonl"), "w") as _fh:
                           "chars": 999}) + "\n")
 _bf = {}
 try:
+    # the first write fails: nothing is marked done, nothing is lost,
+    # and the next read imports it
+    _real_wa = _un3["_usage_write_all"]
+    _un3["_usage_write_all"] = lambda recs: 1 / 0
+    _bf["failed"] = (_un3["usage_read"](), _un3["_usage_state"]["backfilled"],
+                     os.path.exists(os.path.join(_uh3, "usage.jsonl")))
+    _un3["_usage_write_all"] = _real_wa
     _bf["first"] = _un3["usage_read"]()
     # a call since, then a later launch: the ledger is there, so the old
     # log is left alone (a second pass would write over the new call)
@@ -4295,7 +4367,8 @@ try:
 except Exception as _e:
     _bf["error"] = repr(_e)
 _ucheck("usage: the old answer log is read once, marked estimated",
-      lambda: ([_ukeys(r) | {"q": r.get("q"), "a": r.get("a")} for r in _bf.get("first", [])] == [
+      lambda: (_bf.get("failed") == ([], False, False)
+      and [_ukeys(r) | {"q": r.get("q"), "a": r.get("a")} for r in _bf.get("first", [])] == [
           {"m": "Gemma 4 26B", "w": "local", "n": 1, "i": 0, "c": None, "ri": None, "o": 100,
            "x": 1, "q": 1, "a": 1},
           {"m": "claude-opus-5-5", "w": "cloud", "n": 1, "i": 0, "c": None, "ri": None,
@@ -4311,6 +4384,43 @@ _ucheck("usage: the old answer log is read once, marked estimated",
 # to the totals, and the model filter, cache hit and "—" hold. Fails if
 # a range counts the wrong window, a bucket is misplaced or skipped, or
 # the cache hit counts calls that never report caching.
+import datetime as _dt25
+
+
+# (a string, so the clock-change check below can run it in a subprocess)
+_EXPECT_SRC = r'''
+def _expect_edges(frm, now, unit):
+    """The bucket starts, worked out with datetime rather than the app's
+    own functions: local wall-clock floors; 6 h, days, weeks and months
+    step on the wall clock, 5 min and 1 h by real seconds."""
+    _d = _dt25.datetime.fromtimestamp(frm)
+    _z = dict(second=0, microsecond=0)
+    if unit == "5m":
+        _b = _d.replace(minute=_d.minute // 5 * 5, **_z)
+    elif unit == "1h":
+        _b = _d.replace(minute=0, **_z)
+    elif unit == "6h":
+        _b = _d.replace(hour=_d.hour // 6 * 6, minute=0, **_z)
+    elif unit == "1d":
+        _b = _d.replace(hour=0, minute=0, **_z)
+    elif unit == "1w":
+        _b = (_d - _dt25.timedelta(days=_d.weekday())).replace(hour=0, minute=0, **_z)
+    else:
+        _b = _d.replace(day=1, hour=0, minute=0, **_z)
+    _out = []
+    while _b.timestamp() <= now and len(_out) < 500:
+        _out.append(round(_b.timestamp(), 3))
+        if unit in ("5m", "1h"):
+            _b = _dt25.datetime.fromtimestamp(_b.timestamp() + (300 if unit == "5m" else 3600))
+        elif unit in ("6h", "1d", "1w"):
+            _b = _b + _dt25.timedelta(hours={"6h": 6, "1d": 24, "1w": 168}[unit])
+        else:
+            _b = _b.replace(year=_b.year + _b.month // 12, month=_b.month % 12 + 1)
+    return _out
+'''
+exec(_EXPECT_SRC)
+
+
 _uqn = _uns(_tf25.mkdtemp())
 _Q = _uqn["usage_query"]
 _now = time.time()
@@ -4330,8 +4440,10 @@ try:
         _qres[_rg] = (_d["totals"]["requests"], _d["unit"], len(_d["series"]))
         _S = _d["series"]
         _edges = [s["t"] for s in _S]
-        _cont = all(_uqn["_usage_next"](a, _unit) == b for a, b in zip(_edges, _edges[1:]))
-        _first = _uqn["_usage_floor"](_d["from"], _unit) == _edges[0] and _edges[-1] <= _now
+        _cont = [round(e, 3) for e in _edges] == _expect_edges(_d["from"], _now, _unit)
+        _first = abs(_d["from"] - (_now - {"1h": 3600, "1d": 86400, "1w": 7 * 86400,
+                                          "1m": 30 * 86400, "1y": 365 * 86400,
+                                          "all": 800 * 86400}[_rg])) < 1e-6
         _sums = (sum(s["n"] for s in _S) == _d["totals"]["requests"]
                  and sum(s["i"] + s["c"] for s in _S) == _d["totals"]["input"]
                  and sum(s["o"] for s in _S) == _d["totals"]["output"])
@@ -4355,7 +4467,7 @@ _lt = [time.localtime(t) for t, u in _qres.get("units", [])]
 _ucheck("usage: each range's bars, totals, model filter and cache hit",
       lambda: (len(_qok) == 6 and all(all(x[1:]) for x in _qok)
       and 12 <= _qres["1h"][2] <= 13 and 24 <= _qres["1d"][2] <= 25
-      and 28 <= _qres["1w"][2] <= 29 and 30 <= _qres["1m"][2] <= 31
+      and 28 <= _qres["1w"][2] <= 30 and 30 <= _qres["1m"][2] <= 32
       and 52 <= _qres["1y"][2] <= 54
       # model A: calls 2, 4, 6 (k = 1, 3, 5); every one reports caching
       and _qres["A"] == {"requests": 3, "answers": 1, "input": 1200, "cached": 120,
@@ -4372,6 +4484,112 @@ _ucheck("usage: each range's bars, totals, model filter and cache hit",
       and _lt[4].tm_wday == 0 and _lt[4][3:6] == (0, 0, 0)
       and _lt[5].tm_mday == 1 and _lt[5][3:6] == (0, 0, 0)),
       lambda: "%r | %r" % ([x for x in _qok if not all(x[1:])], _qres))
+
+# 7b. a clock change. In New York (a subprocess with TZ set, whatever
+# zone this machine is in), 1 week across the November fall-back and the
+# March spring-forward, 1 month across each, and 1 year: 6 h bars start
+# at 0, 6, 12 and 18 on the wall clock (one bar is 5 or 7 real hours),
+# every day but the first (which starts at noon) has its midnight bar, days start at midnight (one is 23 or
+# 25 hours), a month is at most 32 bars, and every edge matches the
+# datetime-worked expectation. Fails if 6 h buckets step by real hours
+# (they drift to 1, 7, 13, 19 after the change) or a day bucket does.
+_dst_names = sorted({"USAGE_UNITS", "USAGE_RANGES", "USAGE_SUM_KEYS", "_usage_num",
+                     "_usage_floor", "_usage_next", "_usage_edges", "usage_query"})
+_dst_src = '''
+import ast, json, time, datetime as _dt25
+_src = open("millenai.py", encoding="utf-8").read()
+_ns = {"time": time}
+for _n in ast.parse(_src).body:
+    _nm = getattr(_n, "name", None)
+    if _nm is None and isinstance(_n, ast.Assign):
+        _nm = next((getattr(t, "id", None) for t in _n.targets), None)
+    if _nm in %r:
+        exec(ast.get_source_segment(_src, _n), _ns)
+%s
+def _loc(y, mo, d, h=0, mi=0):
+    return time.mktime((y, mo, d, h, mi, 0, 0, 0, -1))
+_out = {"tz": list(time.tzname)}
+for _k, _rg, _now in (("fall_1w", "1w", _loc(2026, 11, 4, 12)),
+                      ("spring_1w", "1w", _loc(2026, 3, 11, 12)),
+                      ("fall_1m", "1m", _loc(2026, 11, 20, 0, 30)),
+                      ("spring_1m", "1m", _loc(2026, 3, 20, 0, 30)),
+                      ("spring_1y", "1y", _loc(2026, 3, 20, 0, 30))):
+    _d = _ns["usage_query"]([{"t": _now - 60, "m": "A", "n": 1, "i": 1, "o": 1}], _rg, now=_now)
+    _E = [s["t"] for s in _d["series"]]
+    _lt = [time.localtime(e) for e in _E]
+    _out[_k] = {"n": len(_E), "unit": _d["unit"],
+                "match": [round(e, 3) for e in _E] == _expect_edges(_d["from"], _now, _d["unit"]),
+                "hours": sorted({x.tm_hour for x in _lt}), "mins": sorted({x.tm_min for x in _lt}),
+                "gaps": sorted({int(round(b - a)) for a, b in zip(_E, _E[1:])}),
+                "midnights": len({(x.tm_year, x.tm_yday) for x in _lt if x.tm_hour == 0}),
+                "days": len({(x.tm_year, x.tm_yday) for x in _lt}),
+                "edges": _E if _k == "fall_1w" else []}
+print(json.dumps(_out))
+''' % (_dst_names, _EXPECT_SRC)
+try:
+    _dstp = subprocess.run([sys.executable, "-c", _dst_src], capture_output=True, text=True,
+                           timeout=60, env=dict(os.environ, TZ="America/New_York"))
+    _dst = json.loads(_dstp.stdout)
+except Exception as _e:
+    _dst = {"error": repr(_e), "stderr": locals().get("_dstp") and _dstp.stderr[-400:]}
+# the page's ticks in the same zone: every day's midnight bar is a
+# candidate, and every tick sits on one
+_ujs_t = (_MILLENAI_SRC[_MILLENAI_SRC.index("const U_MON="):
+                        _MILLENAI_SRC.index("function uStep(", _MILLENAI_SRC.index("const U_MON="))]
+          + "const S=JSON.parse(require('fs').readFileSync(0,'utf8')).map(t=>({t}));"
+            "const mid=S.map((s,k)=>new Date(s.t*1000).getHours()===0?k:-1).filter(k=>k>=0);"
+            "const tk=uTicks(S,'6h');"
+            "process.stdout.write(JSON.stringify({mid:mid.length,tk,"
+            "onmid:tk.every(k=>mid.includes(k))}));")
+try:
+    _dstn = json.loads(subprocess.run(
+        ["node", "-e", _ujs_t], input=json.dumps((_dst.get("fall_1w") or {}).get("edges") or []),
+        capture_output=True, text=True, timeout=30, env=dict(os.environ, TZ="America/New_York")).stdout)
+except Exception as _e:
+    _dstn = {"error": repr(_e)}
+_ucheck("usage: bars across a clock change stay on the wall clock (New York)",
+      lambda: (_dst["fall_1w"]["unit"] == "6h" and _dst["fall_1w"]["match"]
+      and _dst["fall_1w"]["hours"] == [0, 6, 12, 18] and _dst["fall_1w"]["mins"] == [0]
+      and _dst["fall_1w"]["gaps"] == [21600, 25200]
+      # the first day starts at noon; every other has its midnight bar
+      and _dst["fall_1w"]["midnights"] == _dst["fall_1w"]["days"] - 1 == 7
+      and _dst["spring_1w"]["match"] and _dst["spring_1w"]["hours"] == [0, 6, 12, 18]
+      and _dst["spring_1w"]["gaps"] == [18000, 21600]
+      and _dst["spring_1w"]["midnights"] == _dst["spring_1w"]["days"] - 1 == 7
+      and _dst["fall_1m"]["match"] and _dst["fall_1m"]["hours"] == [0]
+      and _dst["fall_1m"]["gaps"] == [86400, 90000] and 30 <= _dst["fall_1m"]["n"] <= 32
+      and _dst["spring_1m"]["match"] and _dst["spring_1m"]["hours"] == [0]
+      and _dst["spring_1m"]["gaps"] == [82800, 86400] and _dst["spring_1m"]["n"] == 32
+      and _dst["spring_1y"]["match"] and _dst["spring_1y"]["hours"] == [0]
+      and _dstn["mid"] == 7 and _dstn["tk"] and _dstn["onmid"]),
+      lambda: "%r" % [{k: ({kk: vv for kk, vv in v.items() if kk != "edges"}
+                           if isinstance(v, dict) else v) for k, v in _dst.items()}, _dstn])
+
+# 7c. "All time" never draws more than 60 bars, and takes the smallest
+# bucket that fits: swept over first-call ages around each bucket's
+# 60-bar edge, where the span alone says 60 but the floored start adds
+# one. Fails if the unit is picked on the span alone.
+_uall60 = []
+_now = time.time()
+for _base, _unit_prev in ((5 * 3600, "5m"), (60 * 3600, "1h"), (15 * 86400, "6h"),
+                          (60 * 86400, "1d"), (420 * 86400, "1w")):
+    for _k in range(-4, 5):
+        _age = _base + _k * (_base / 97.0)
+        try:
+            _d = _Q([{"t": _now - _age, "m": "A", "n": 1, "i": 1, "o": 1}], "all", now=_now)
+            _order = ["5m", "1h", "6h", "1d", "1w", "1mo"]
+            _prev = _order[_order.index(_d["unit"]) - 1] if _d["unit"] != "5m" else None
+            _uall60.append((round(_age), _d["unit"], len(_d["series"]),
+                            len(_expect_edges(_d["from"], _now, _prev)) if _prev else 0))
+        except Exception as _e:
+            _uall60.append((round(_age), "error", repr(_e), 0))
+_ucheck("usage: All time draws at most 60 bars, in the smallest bucket that fits",
+      lambda: (len(_uall60) == 45 and all(isinstance(n, int) and n <= 60 and (u == "5m" or p > 60)
+                                        for _a, u, n, p in _uall60)
+      # the sweep crosses every bucket boundary
+      and {u for _a, u, n, p in _uall60} == {"5m", "1h", "6h", "1d", "1w", "1mo"}),
+      lambda: "%r" % [x for x in _uall60 if not (isinstance(x[2], int) and x[2] <= 60
+                                                  and (x[1] == "5m" or x[3] > 60))])
 
 # 8. the route, live on copy A: every range answers with the pane's
 # shape; an unknown range is a 400; the model filter narrows it; the
@@ -4415,29 +4633,62 @@ _ucheck("usage: /api/usage answers every range, and the live answers are in it",
 print("  (usage: %d local calls recorded, %d with the engine's own counts)"
       % (len([r for r in _ulines if r.get("w") == "local"]), len(_exact_local)))
 
+# 8b. only a model's own words make an answer. Asked in Cloud Only with
+# no keys, the app answers in its own words (no model can): the page
+# gets text, the old log gets its line, and the ledger counts neither a
+# request nor an answer. The chat's model paths are handed memit, the
+# failure lines go out through emit, and the provider-down text is
+# AppText. Fails if the ledger counts characters sent (as it did), or a
+# model path is handed plain emit again.
+_ua0 = json.loads(req("/api/usage?range=all")[2]).get("totals") or {}
+_uco = chat({"model": "", "models": [], "tier": "Cloud Only", "auto_web": False,
+             "messages": [{"role": "user", "content": "what is a good name for a cat?"}]},
+            timeout=120)
+time.sleep(1)
+_ua1 = json.loads(req("/api/usage?range=all")[2]).get("totals") or {}
+_hsrc25 = _MILLENAI_SRC[_MILLENAI_SRC.index('        if self.path != "/api/chat":'):
+                        _MILLENAI_SRC.index("# Where the app goes when 8889 is taken")]
+_ucheck("usage: a question no model answered is not counted an answer",
+      lambda: (len(_uco) > 40 and "Cloud Only" in _uco
+      and _ua1.get("answers") == _ua0.get("answers") and _ua0.get("answers", 0) >= 1
+      and _ua1.get("requests") == _ua0.get("requests")
+      and "def memit(chunk: str):" in _hsrc25
+      and "if _model_said[0]:\n                try:\n                    usage_put(" in _hsrc25
+      and not re.search(r"(full_messages|parts\.append|_pin_ask)\s*,\s*emit\b", _hsrc25)
+      and _hsrc25.count("full_messages, memit") + _hsrc25.count("full_messages,\n") >= 8
+      and 'emit("\\n" + offline_hint(kind, exc))' in _hsrc25
+      and "return AppText(" in _MILLENAI_SRC.split("def _cloud_all_down")[1][:3000]),
+      lambda: "%r" % [_uco[:80], _ua0, _ua1])
+
 # 9. a ledger that can't be read answers 503 with its line and is left
 # as it was; restored, the route reads again. Fails if a bad file reads
 # as no usage, or the route writes over it.
 _upA = os.path.join(INST.home, "usage.jsonl")
 _uhold = _upA + ".gauntlet"
-_u503 = None
+_u503, _ukept, _umoved, _uerr = None, False, False, ""
 try:
+    # no ledger to set aside (nothing recorded above) is a FAIL, not a
+    # stopped gauntlet
     os.replace(_upA, _uhold)
+    _umoved = True
     with open(_upA, "wb") as _fh:
         _fh.write(b"\xff\xfe\x00 not a ledger \x00\n" * 3)
     _u503 = req("/api/usage?range=all")
     _ukept = open(_upA, "rb").read().startswith(b"\xff\xfe\x00 not a ledger")
+except OSError as _e:
+    _uerr = repr(_e)
 finally:
-    try:
-        os.replace(_uhold, _upA)
-    except OSError:
-        pass
+    if _umoved:
+        try:
+            os.replace(_uhold, _upA)
+        except OSError as _e:
+            _uerr += " restore: %r" % _e
 _uback = req("/api/usage?range=all")[0]
 _ucheck("usage: an unreadable ledger answers 503 and is left alone",
       lambda: (_u503 and _u503[0] == 503
       and json.loads(_u503[2]).get("err") == "Couldn’t read your usage. Nothing was changed."
-      and _ukept and _uback == 200),
-      lambda: "%r" % [_u503 and _u503[:1], _u503 and _u503[2][:120], _uback])
+      and _ukept and _uback == 200 and not _uerr),
+      lambda: "%r" % [_u503 and _u503[:1], _u503 and _u503[2][:120], _uback, _uerr])
 
 # 10. the page: Usage closes the rail, its pane has the six periods in
 # order, the model menu, the four figures, the chart and its legend, and
@@ -4517,6 +4768,86 @@ _ucheck("usage: the pane's number formats and stacked chart (node)",
       and "uChart(d,Math.max(240,plot.clientWidth||400))" in page
       and "esc(uWhen(s.t)" in page),
       lambda: "%r" % {k: v for k, v in _ujo.items() if k != "rects"})
+
+
+# 12. the pane's own code, run in node against canned /api/usage
+# replies on a stand-in DOM: the figures and the model menu from a
+# reply; a chosen model kept when it drops out of the data; the note
+# shown only when something is estimated; an older reply arriving after
+# a newer one ignored (the sequence guard); an empty period and a 503
+# each saying so. Fails if loadUsage paints a stale reply, the menu
+# loses the choice, or the note shows with nothing estimated.
+_us1 = _MILLENAI_SRC.index("const U_MON=")
+_us2 = _MILLENAI_SRC.index('(function(){\n  const rs=$("#us-range");', _us1)
+_pjs12 = (r"""
+class El{constructor(id){this.id=id;this._t="";this.innerHTML="";this.hidden=false;this._v="";
+  this.clientWidth=400;this.cls=new Set();this.kids=[];
+  this.classList={add:c=>this.cls.add(c),remove:c=>this.cls.delete(c),contains:c=>this.cls.has(c)};}
+ get textContent(){return this._t}
+ set textContent(v){this._t=String(v);if(v==="")this.kids=[];}
+ appendChild(o){this.kids.push(o)}
+ get value(){return this._v}
+ set value(v){this._v=this.id==="us-model"?(this.kids.some(o=>o.value===v)?v:""):v;}}
+const ELS={};const el=id=>ELS[id]||(ELS[id]=new El(id));
+const $=s=>el(s.slice(1));
+const document={createElement:()=>({value:"",textContent:""})};
+const aboutVeil={hidden:false};
+const calls=[];
+const api=url=>new Promise(res=>calls.push({url,res}));
+const reply=(i,ok,body)=>calls[i].res({ok,json:async()=>body});
+""" + _MILLENAI_SRC[_MILLENAI_SRC.index("function esc(s){"):
+                    _MILLENAI_SRC.index(";}\n", _MILLENAI_SRC.index("function esc(s){")) + 3]
+          + _MILLENAI_SRC[_us1:_us2] + r"""
+const T0=new Date(2026,8,27,0,0,0).getTime()/1000;
+const base={range:"all",model:"",unit:"1d",from:T0,to:T0+86400,refreshed:T0+86400,
+ totals:{requests:12,answers:3,input:5000,cached:1000,output:700,cache_hit:20},
+ series:[{t:T0,i:4000,c:1000,o:700,n:12}],
+ models:[{id:"A",where:"local",n:8},{id:"B",where:"claude",n:4}],estimated:0,note:""};
+const opts=()=>el("us-model").kids.map(o=>o.value+"|"+o.textContent);
+(async()=>{
+ const out={};el("us-range").value="all";
+ let p=loadUsage();reply(0,true,base);await p;
+ out.first=[$("#us-req").textContent,$("#us-ans").textContent,$("#us-in").textContent,
+  $("#us-cached").textContent,$("#us-out").textContent,$("#us-hit").textContent,opts(),
+  $("#us-note").hidden,$("#us-plot").innerHTML.startsWith('<svg id="us-svg"'),
+  $("#p-usage").classList.contains("busy"),calls[0].url];
+ el("us-model").value="B";
+ p=loadUsage();reply(1,true,Object.assign({},base,{models:[{id:"A",where:"local",n:8}],
+  estimated:1,note:"Estimated from text length: 1 of 12 requests."}));await p;
+ out.kept=[el("us-model").value,opts(),$("#us-note").textContent,$("#us-note").hidden,calls[1].url];
+ const p1=loadUsage(),p2=loadUsage();
+ reply(3,true,Object.assign({},base,{totals:Object.assign({},base.totals,{requests:99})}));await p2;
+ reply(2,true,Object.assign({},base,{totals:Object.assign({},base.totals,{requests:1})}));await p1;
+ out.seq=[$("#us-req").textContent,$("#us-note").hidden];
+ p=loadUsage();reply(4,true,Object.assign({},base,{totals:{requests:0,answers:0,input:0,cached:0,
+  output:0,cache_hit:null},series:[]}));await p;
+ out.empty=[$("#us-plot").innerHTML,$("#us-hit").textContent,$("#us-cached").textContent,$("#us-ans").textContent];
+ p=loadUsage();reply(5,false,{err:"Couldn’t read your usage. Nothing was changed.",unreadable:"usage.jsonl"});await p;
+ out.err=[$("#us-plot").innerHTML,$("#us-req").textContent,$("#us-span").textContent,
+  $("#p-usage").classList.contains("busy")];
+ process.stdout.write(JSON.stringify(out));
+})();
+""")
+_pjf12 = os.path.join(_tf25.mkdtemp(), "pu.js")
+open(_pjf12, "w").write(_pjs12)
+try:
+    _pu = json.loads(subprocess.run(["node", _pjf12], capture_output=True, text=True,
+                                    timeout=30).stdout)
+except Exception as _e:
+    _pu = {"error": repr(_e)}
+_ucheck("usage: the pane paints replies in order, keeps the model, hides an empty note (node)",
+      lambda: (_pu["first"] == ["12", "3 answers", "5.00K", "1.00K cached", "700", "20.0%",
+                              ["|All models", "A|A", "B|B"], True, True, False,
+                              "/api/usage?range=all&model="]
+      and _pu["kept"] == ["B", ["|All models", "A|A", "B|B"],
+                          "Estimated from text length: 1 of 12 requests.", False,
+                          "/api/usage?range=all&model=B"]
+      and _pu["seq"] == ["99", True]
+      and _pu["empty"] == ['<div class="us-empty">Nothing recorded in this period.</div>',
+                           "—", "", "0 answers"]
+      and _pu["err"] == ['<div class="us-empty">Couldn’t read your usage. Nothing was changed.</div>',
+                         "—", "Token Usage", False]),
+      lambda: "%r" % _pu)
 
 
 print("== attached files ==")

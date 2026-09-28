@@ -5649,8 +5649,15 @@ cache hit, and a stacked bar chart of input, cached and output tokens.
   `cloud_text`. Councils, merges, sharpen passes, titles, memory, map
   pins and funnels all go through these, so each call counts once.
   Pictures and video are not counted, nor the key check's 8-token hello.
-  Each `/api/chat` answer also adds an answer record, under the model
-  that wrote it (the same moment quality.jsonl logs).
+  A record is stamped with the time the call started.
+- Each `/api/chat` answer adds an answer record, under the model that
+  wrote it, but only when a model's own text reached the page: the
+  chat's model paths are handed `memit`, which notes that, and the
+  app's own lines (offline_hint, "That engine stopped responding", and
+  `AppText`: the provider-down and declined lines, the remote agent's
+  no-driver and can't-connect lines) go through `emit`. Before the
+  review this counted characters sent, so a failed question was an
+  answer. quality.jsonl still logs every line as before.
 - REQUESTS on the pane means model calls; the line under it says how
   many answers they made. A council question is several requests.
 - Where the counts come from:
@@ -5667,12 +5674,14 @@ cache hit, and a stacked bar chart of input, cached and output tokens.
     `cache_creation_input_tokens`, cached is the cache read; streaming
     takes input from `message_start` and output from `message_delta`
     (message_start's own output count is dropped, so a stream cut off
-    before message_delta is estimated, not taken for exact).
+    before message_delta is estimated, not taken for exact; a null in
+    message_delta never replaces a count).
   - Groq and Gemini's OpenAI layer: asked with
     `stream_options.include_usage`; the usage chunk is read (and
     Groq's `x_groq.usage`). A provider that answers 400 naming
     `stream_options` loses the flag for the rest of the launch and the
     stream is sent again once, so accounting never costs an answer.
+    Only a 400, and only before any text has gone out.
   - Moonshot: `usage` in its last choice, sent unasked (not asked, so
     nothing new is sent to it); its `cached_tokens` is read.
   - Buffered calls (`cloud_text`): the reply's `usage`.
@@ -5689,11 +5698,17 @@ cache hit, and a stacked bar chart of input, cached and output tokens.
 - Backfill: once, when `usage.jsonl` doesn't exist yet, each
   quality.jsonl line from before this launch becomes one answer and one
   estimated call: output from its character count, input 0, the model
-  as logged, "local" when that's a catalog label, else "cloud".
+  as logged, "local" when that's a catalog label, else "cloud". It is
+  marked done only after the ledger is written (or when there is no old
+  log): until then the appends wait on the queue, so a failed write is
+  tried again instead of losing the history. An old log that is there
+  but can't be read keeps the ledger in memory for that launch.
 - Storage: JSONL with short keys (t, s, m, w, n, i, c, ri, o, d, x, a,
   q; the list is in the code). Calls go on a queue that a writer thread
   appends; a chat never waits and every error is swallowed. Appends are
-  under a lock, fsynced, 0600; a line a crash cut short gets a newline
+  under a lock, fsynced, 0600; a flush that can't write puts its
+  records back at the front of the queue; a line a crash cut short gets
+  a newline
   before the next append and is skipped on read. A file that isn't
   there reads as empty; one that can't be opened, isn't ASCII or has
   more bad lines than good (plus one) raises StoreReadError, and the
@@ -5710,28 +5725,48 @@ cache hit, and a stacked bar chart of input, cached and output tokens.
   the four totals, the answers, one bucket per bar (uncached input,
   cached, output, calls), every model in the data (most calls first),
   the bucket size, the window and the note. Unknown range: 400. Buckets
-  are local time: 5 min, 1 hour, 6 hours, 1 day, 1 week (Mondays); All
-  time runs from the first record (at least an hour back) and takes the
-  smallest of those giving at most 60 bars, else calendar months.
+  are local time: 5 min, 1 hour, 6 hours, 1 day, 1 week (Mondays). 6 h,
+  days, weeks and months are wall-clock: bars start at 0, 6, 12 and 18
+  on the day the clock changes too (that bar is 5 or 7 real hours, that
+  day 23 or 25), so 1 month can be 32 bars. All time runs from the
+  first record (at least an hour back) and takes the smallest bucket
+  that draws at most 60 bars counted from the floored start (the span
+  alone came out one over), else calendar months.
+- The ledger lives in app_dir() for now; it moves with the profiles
+  (1a), like chats.json.
 - The page: "Usage" is the last rail item. The pane has "Usage & Stats"
   with the period (default All time, remembered in
   `millen.usage.range`) and model menus, the four cards, the chart
   (SVG drawn by the page, no library; a title per bar), the legend and
   the note. Numbers: 17,883 · 1.36B · 25.12M · 93.5%. It loads on
   open, on a change and every 30 s while open.
+- The rail: six items take the height five did (.snav 6px padding, not
+  8; 4px under the spec list, not 12). Measured in headless Chromium at
+  1100 x 860: with the release notes shown, About ends 4px above the
+  footer and the rail's content is 361px of the card's 521; with no
+  notes (offline)
+  the rail is 48px taller than About, the same as with five items
+  before this build.
 - Checked by hand: a dev copy with a seeded quality.jsonl and a live
   MLX answer, in headless Chromium with the bridge stood in: all time,
-  1 week and 1 hour draw as in the reference.
-- Gauntlet (11 new, the pane-order check extended): the counts of each
+  1 week and 1 hour draw as in the reference. A Cloud Only question
+  with no keys: the page gets the provider-down line, the old log its
+  line, the ledger no answer.
+- Gauntlet (15 new, the pane-order check extended): the counts of each
   provider's shape; each of the five paths against fake engines and
-  providers (reported counts, the MLX and Groq flag, Moonshot not asked,
-  the Gemini fallback, a refused key recording nothing, a cut stream
-  estimated); a failing ledger costing no answer; the file (0600, torn
-  line, bad file not empty); roll-ups keeping every total; the backfill
-  once; every range's buckets, the model filter and cache hit; the live
-  route with this run's local answers recorded exact; the 503; the
-  pane; the formats and chart in node. 21 mutations of the new code
-  each fail at least one of them.
+  providers (reported counts, the start stamp, the MLX and Groq flag,
+  Moonshot not asked, the Gemini fallback and its guards, a refused key
+  recording nothing, a cut stream estimated, message_delta nulls); a
+  failing ledger or usage_note costing no answer; the file (0600, torn
+  line, bad file not empty, the requeue, the exit hook); roll-ups
+  keeping every total; the backfill once and after a failed write;
+  every range's buckets against datetime-worked expectations, the model
+  filter and cache hit; a clock change in New York (subprocess);
+  All time at most 60 bars; the live route with this run's local
+  answers recorded exact; a Cloud Only question with no keys counted as
+  no answer; the 503; the pane markup; the formats and chart, and
+  paintUsage/loadUsage against canned replies, in node. 35 mutations of
+  the new code each fail at least one check run offline.
 - Not verified live: the usage fields of Anthropic, Groq, Gemini and
   Moonshot (fakes only; the gauntlet holds no keys), Ollama (this Mac
   runs MLX), and the pane in WebView2 and Qt.
