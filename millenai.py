@@ -308,13 +308,13 @@ APP_VERSION = "6.1.0"   # bump here — UI, window, DMG all follow
 # "6.1 beta 2"… four or five a line, restarting at 1 with each new
 # version — never the build number ("beta 268"). 0 = not a beta.
 # `./release.sh beta` cuts the next one; a stable cut resets it to 0.
-APP_BETA = 1
+APP_BETA = 0
 # RELEASE CANDIDATE (6b258, per Patrick: "almost there"). >0 renames
 # the label from "beta" to "RC<n>" on every display surface and in the
 # release title, while KEEPING the prerelease hold above — an RC is
 # still not the stable build, so /releases/latest must not offer it.
 # Set back to 0 when 6.1 ships for real (after sign-on + cloud sync).
-APP_RC = 0
+APP_RC = 1
 # CHANNELS (6b285, per Patrick): stable, beta, nightly. A nightly is the
 # single rolling `nightly` release GitHub Actions rebuilds on every push
 # to main; CI stamps this constant with "<run> <sha7>" so the app knows
@@ -363,7 +363,7 @@ def spec_version() -> str:
     commit alone says nightly — no other build carries one — so the
     word goes: "6.0.4 · e6fb576". Betas and RCs already fit."""
     return short_version().replace(" nightly ", " \u00b7 ")
-APP_BUILD = 275               # integer compared against the GitHub release tag
+APP_BUILD = 276               # integer compared against the GitHub release tag
 APP_BUILD_DATE = ""         # ISO date; blank falls back to this file's mtime
 try:                          # feeds the page ETag: an edited source must
     _SRC_MTIME = int(os.path.getmtime(__file__))   # never 304 as "unchanged"
