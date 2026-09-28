@@ -33,9 +33,12 @@ Everything user-generated lives outside the bundle, so updates never
 clobber it:
 
 - `~/Library/Application Support/MillenAI/venv` — private Python env
-- `~/Library/Application Support/MillenAI/memory.json` — long-term memory
+- `~/Library/Application Support/MillenAI/memory.v2.json` — long-term memory
 - `~/Library/Logs/MillenAI/` — engine + bootstrap logs
-- `chats.json` — conversation history (see below)
+- `chats.v2.json` — conversation history (see below); `chats.json` and
+  `memory.json` are the pre-6b324 files older builds read (see 6b324)
+- `profile.json` — legacy_base, the first-write record, the web view
+  clean-up's record
 
 ## Releasing
 
@@ -162,9 +165,9 @@ loops.
 bundle identity — `MillenAI` when launched from the .app but
 `org.python.python` when run from source, and that store is shared with every
 other Python/pywebview app. Relying on it meant history could vanish on an
-update or a launch-method change. The backend now owns `chats.json`
-(atomic writes); localStorage is only a mirror so the sidebar paints
-instantly, and existing localStorage chats are migrated up on first run.
+update or a launch-method change. The backend owns the chats
+(`chats.v2.json` since 6b324, atomic writes); the page keeps no copy in
+browser storage at all (6b322), and nothing personal (6b324).
 
 **Tier and single-model are mutually exclusive.** Picking a tier clears any
 individual model selection and vice versa, so exactly one row is ever
@@ -306,7 +309,7 @@ ACK, be extremely brief" produced `ACK, blue, typically a light blue…`.
 
 ### Memory
 Facts about the user are extracted in the background after each message by
-whichever model just answered, stored in `memory.json`, and folded into the
+whichever model just answered, stored in `memory.v2.json`, and folded into the
 system prompt. Best-effort: failures never break a chat. Clear it from the
 About panel.
 
@@ -5629,6 +5632,157 @@ crash was invisible.
   run as pythonw would, writes the log and shows the box; the launcher
   keeps its checks. Mutation-tested (SIGHUP back, hook removed, no log,
   no box).
+
+## 6b324 — chats in .v2 files, old builds safe, nothing personal in the web view (accounts step 5)
+The rest of the spec's 0b: sections 5.8-5.10, LOC-6 and ISO-10's Phase 0
+parts, with the build-time answers Q5, Q8, Q9, Q10, Q13 and Q16 (M5 of
+the sign-in plan). Before this an older build and this one shared
+`chats.json` and `memory.json`, so going back a version could lose or
+resurrect chats, and the page still kept the tier, Advanced council,
+agents and Remote autonomy in browser storage.
+- **The .v2 files.** "This computer" keeps its chats in `chats.v2.json`
+  (`{"v": 2, "chats": [...], "gone": [...]}`, Q5) and its memory in
+  `memory.v2.json` (a list of facts, as before). `gone` holds the ids
+  deleted for good (the newest 5,000): a late write to one gets a fresh
+  id, and an older build can't bring one back. The 6 s undo stubs stay
+  in memory, as in 6b322; a stub found at a start is final. Top-level
+  fields this build doesn't know are written back as read.
+- **profile.json** (in the data folder) holds `legacy_base` and
+  `written`, the record of which of `chats.v2.json`, `memory.v2.json`
+  and `prefs.json` have had their first write. After it a missing file
+  is a read error (503, nothing written), never empty (0b L1). To start
+  a store over on purpose, remove the file and its name from `written`.
+- **The legacy files only lose entries (L7).** This build never writes
+  anything new into `chats.json` or `memory.json`. Whenever a chat or
+  fact leaves the .v2 files it goes from them too, atomically, and then
+  `legacy_base` is written: a final delete (a timer 6.5 s after the
+  delete, and at a quit), Forget's chats or memory scope and Clear
+  memory (both empty the legacy file outright), the 1,000-chat eviction
+  and the 200-fact trim. A crash between the two leaves only removals.
+- **legacy_base**: sha256 of each legacy file, each legacy chat id with
+  the .v2 id it maps to and a sha256 of the entry itself, and a sha256 of
+  each normalised fact (whitespace collapsed, lower case). The per-chat
+  hash is this build's addition: it tells a chat an older build changed
+  from one this build changed (a Try again here is not an old build's
+  edit).
+- **The downgrade import (Q8)**, whenever a legacy file no longer
+  matches `legacy_base`, always into root: a chat it doesn't list is
+  imported (a fresh id when its own is taken; never one deleted here); a
+  listed chat whose .v2 copy is a strict prefix of the legacy one takes
+  the new turns; a listed chat whose legacy copy adds nothing is left;
+  any other changed listed chat is imported as a new chat with a fresh
+  id; a listed chat deleted here stays deleted; a fact it doesn't list
+  is imported. Anything already in root with the same turns (or fact
+  text) is not imported again, so a crash between the .v2 write and
+  `legacy_base`'s can't duplicate. A rename or pin made only in the old
+  build is not carried over (only turns are), rather than duplicating a
+  chat for it.
+- **`_migrate_61` (Q9)** runs at every start before the server is
+  bound, only in the copy holding the instance lock (a copy that couldn't
+  take it keeps chats and memory shut, 503). Without `legacy_base` it
+  copies `chats.json` and `memory.json` into the .v2 files and writes the
+  first `legacy_base`; it is done only once that is written, so a crash
+  part-way copies again. `chats.v2.json` carries `from_legacy` until
+  this build's first write of its own: if `profile.json` goes missing
+  after the store was used, the legacy files are never recopied over it;
+  `legacy_base` starts empty and the import brings in only what root
+  lacks. A legacy file it can't read stops the migration: chats and
+  memory answer 503 and the next start tries again. Then the boot order:
+  the import, then the legacy files lose every listed entry root no
+  longer holds (this finishes a delete that crashed before its rewrite),
+  then `legacy_base`. After the migration a legacy file that can't be
+  read only waits; nothing in root depends on it.
+- **The six per-person keys (5.10, Q10).** `millen.tier`, `agent`,
+  `codeagent`, `adv`, `advon` and `autonomy` now live in `prefs.json`
+  (`tier`, `agent`, `codeagent`, `adv`, `advon`, `remote_autonomy`) and
+  the page reads and writes them only through `/api/prefs` (writes are
+  queued so two quick changes can't land swapped). At every boot the
+  page's `storeBoot()` posts the ones `prefs.json` lacks to the new
+  `POST /api/prefs/adopt` (only the six, well-formed, only where absent:
+  the server wins) and removes each from browser storage once
+  `prefs.json` holds it; a failed post leaves them for the next boot and
+  they count for that session. Then every key not on the machine
+  allow-list goes (model, council, video, perf, voice, speeds, sky,
+  skyhist, skynext, sbw); the old browser copy of the chats goes with
+  them, and neither the page nor millenai.py names it. The Code tab
+  reopens on `codeagent` from prefs; agent still resets at every boot.
+- **The web view's clean-up (5.10, Q13, Q16)**, one routine with a
+  branch per engine, started by the page (`POST /api/webstore/clean`)
+  once the keys are handled, recorded in `profile.json` under
+  `webstore` and run once:
+  - the first pass: every data type from every site's record but the
+    app's own, and from the app's own (127.0.0.1, localhost) every type
+    but LocalStorage and cookies (the launch cookie; without it the
+    reload gets the 403 page);
+  - once the page says none of the six is left in browser storage, the
+    app's own LocalStorage too, one time, and the page reloads (Q13): a
+    chats copy an old build left under another port goes with it, and
+    the allow-listed conveniences (model picks, sky, sidebar width)
+    reset once;
+  - macOS: `WKWebsiteDataStore` `fetchDataRecordsOfTypes:` and
+    `removeDataOfTypes:forDataRecords:` on the default store (the one
+    pywebview's window uses; its Cocoa backend ignores `storage_path`),
+    on the main thread through `AppHelper.callAfter`. A dev copy's
+    window runs as `org.python.python`, whose store other Python apps
+    share, so a dev copy skips it unless given the `webstore-native`
+    test hook;
+  - Windows x64: `CoreWebView2Profile.ClearBrowsingDataAsync` on the
+    window's WebView2, on its UI thread, with the kinds named (never
+    cookies; local storage only for the one-time pass). pywebview 6.2.1's
+    WinForms backend does honour `storage_path`, so its user-data folder
+    is `app_dir()/webkit`;
+  - Windows ARM64 (Qt): QtWebEngine has no per-origin removal, so the
+    branch works on files at the next start, before the window opens
+    and while no page holds them: everything in `app_dir()/webkit` but
+    `Local Storage` for the first pass (cookies included: this run's
+    launch cookie isn't set yet), `Local Storage` too once the page has
+    asked; the HTTP cache (`cachePath()`, which the storage path doesn't
+    move) is cleared with `clearHttpCache()` on the Qt thread once the
+    window loads.
+  A branch that fails or can't run records nothing and never stands in
+  the window's way; the next boot asks again. At most one reload per
+  run.
+- Gauntlet: new checks: the legacy files (the migration's copies and
+  record; a new chat never reaches `chats.json`; a final delete, the
+  eviction, the trim and a clear each leave the legacy file); the
+  downgrade import (additions, new turns, a fresh id on collision, a
+  diverged chat as a copy, removals and deleted ids never, nothing twice
+  after a crash between the writes, nothing on the next start); first
+  writes, an unreadable legacy file blocking the migration and a lost
+  `profile.json` never recopying; the clean-up's plan and the WebKit,
+  WebView2 and Qt branches (WebKit and WebView2 against stand-ins, Qt on
+  real files) and the dev-copy guard; the route's once-only rule on a
+  live copy (with the `webstore-fake` hook, which records instead of
+  needing a window) with the page and token still answering; the page's
+  own `storeBoot()` in node against a live copy (a failed first post,
+  the next boot, prefs winning, a change after first run coming back
+  from `/api/prefs`, the reload); the adopt route's rules; and LOC-6:
+  the real build 275 (from git, headless, on a fake home) run against a
+  migrated folder lists neither a chat deleted here nor one made here
+  and has no cleared fact; its added chat, its new turns, a chat under
+  an id taken here and its fact are imported by the next start; a chat
+  it cut stays in root; a delete followed by a crash (SIGKILL) is
+  finished by the next start, which imports nothing; and 275 started
+  again shows none of what left root. Updated: LOC-4 (the quit also
+  takes the chat out of `chats.json` and puts its id in `gone`), the
+  checks that read `chats.json` now read `chats.v2.json`, LOC-5 breaks
+  the .v2 files, and the autonomy pin. Mutation-tested: 20 changes to
+  the new code (no chats or memory legacy rewrite, no import, deleted ids back, a
+  double import, no new turns, absent read as empty, an unreadable
+  legacy file migrated as empty, a lost profile recopying, no timer, the
+  keys removed without a 200, no sweep, the browser value winning, adopt
+  overwriting, the purge not recorded, loopback not special, the
+  dev-copy guard gone, cookies in the WebView2 kinds, Qt keeping
+  nothing, WebKit keeping LocalStorage) each fail at least one check.
+- Not verified here (no window may be opened): the three native
+  branches against a real web view. The macOS one needs a windowed run
+  (WKWebView's record names for 127.0.0.1 and localhost are assumed to
+  be those names); the WebView2 one needs the x64 build on Windows and
+  the Qt one the ARM64 build on Windows ARM64; ISO-10's windowed
+  byte-grep of each store for a planted canary (another port's chats
+  copy included) is Patrick's to run. The page's reload after the
+  one-time purge and the first-run flicker (the composer shows Fast
+  until prefs answer) are only seen in a window.
 
 ## 6b322 — chats stop getting lost: the server writes them (accounts step 4)
 The spec's 0b ("stop losing chats"), minus the move to `.v2` files and

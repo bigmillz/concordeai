@@ -231,8 +231,10 @@ _REAL_TOP = (set(os.listdir(_REAL_DIR)) if os.path.isdir(_REAL_DIR) and not _NO_
 
 # A carries the dev-only boot-code hook (6b321): a windowless copy has
 # no window to spend a boot code, so the hook writes one to run/boot.json
+# (6b324) and webstore-fake: the web view's clean-up records what it was
+# asked in run/webstore.json instead of needing a window
 INST = Instance(9901, "A", seed=_seed_a,
-                env={"MILLENAI_TEST_HOOKS": "boot-code"}).start()
+                env={"MILLENAI_TEST_HOOKS": "boot-code,webstore-fake"}).start()
 BASE = INST.base
 KEY = INST.key
 PORT_ = INST.port
@@ -2611,8 +2613,10 @@ check("review fixes: chat copy, autonomy, downloads, image label, photos",
       # (6b322) there is no browser copy of the chats to re-upload at all
       "pushChatsToDisk" not in _MILLENAI_SRC and "chats=d.chats||[];" in _lcd
       and "millen.chats" not in _MILLENAI_SRC
-      and "p.remote_autonomy" in _MILLENAI_SRC
-      and "JSON.stringify({remote_autonomy:autonomy})" in _MILLENAI_SRC
+      # (6b324) autonomy comes from and goes to prefs.json alone
+      and "autonomy=P.remote_autonomy" in _MILLENAI_SRC
+      and "prefSet({remote_autonomy:autonomy})" in _MILLENAI_SRC
+      and 'localStorage.setItem("millen.autonomy"' not in _MILLENAI_SRC
       and "dlDirect(a)" in _MILLENAI_SRC
       and 'window.location.href=a.getAttribute("href")' not in _MILLENAI_SRC
       and '"in the cloud" if _cloud_img else ""' in _MILLENAI_SRC
@@ -5136,11 +5140,34 @@ check("Settings links the website, in the system browser",
 # 0b's 1,000 and a pinned chat survives any cut. And a browser-storage
 # error no longer trims the page's real list to 10 before it is saved.
 import tempfile as _tf318
-_scn = {"os": os, "json": json, "tempfile": tempfile, "time": time, "IS_WIN": False}
+# the names the store needs, step 5's included (6b324: the .v2 files,
+# profile.json, the legacy files and _migrate_61)
+_STORE_NAMES = {"StoreReadError", "READ_FAIL", "_read_json", "_write_json",
+                "_replace_into", "CHATS_KEEP", "_data_rev", "_chat_ts",
+                "store_chats", "load_chats", "_CHAT_ID", "_CHAT_LANES",
+                "CHAT_UNDO_S", "_chat_stubs", "_chat_gone", "_new_chat_id",
+                "chat_prefix_hash", "_chat_find", "_chat_msgs", "_chat_settle",
+                "_chat_dead", "_chat_new", "_chat_append", "_chat_op",
+                "chat_ops", "chat_append_turn", "_chats_lock", "MEMORY_KEEP",
+                "_load_memory", "_save_memory", "memory_text", "_TURN_TAGS",
+                "_TURN_FRAME", "_TURN_PART", "_TURN_RESET", "_TURN_BOLD_SKIP",
+                "turn_text", "turn_record", "_chat_late", "chat_append_late",
+                "_turns_live", "_turns_lock", "_turns_settle", "_turn_rec",
+                "_Unread", "load_prefs", "store_prefs",
+                "CHATS_FILE", "MEMORY_FILE", "LEGACY_CHATS", "LEGACY_MEMORY",
+                "PROFILE_FILE", "_FIRST_WRITE", "_RF_CHATS", "_RF_MEMORY",
+                "_profile_lock", "_written", "_bk", "_was_written",
+                "_mark_written", "_read_json_h", "_STORE_BLOCKED", "_ChatList",
+                "GONE_KEEP", "_write_chats", "_chat_finals", "_chat_finalize",
+                "_memory_lock", "_ent_hash", "_fact_fp", "_msgs_key", "_jcopy",
+                "_legacy_base_of", "_legacy_import_chats", "_profile_legacy_set",
+                "_legacy_sync_chats", "_legacy_sync_memory", "_migrate_61"}
+_scn = {"os": os, "json": json, "tempfile": tempfile, "time": time, "IS_WIN": False,
+        "re": re, "secrets": __import__("secrets"), "hashlib": __import__("hashlib"),
+        "threading": __import__("threading"), "shutil": shutil}
 _scn["_pfile"] = lambda name, base=None: os.path.join(base, name)
-_exec_names(_scn, {"CHATS_KEEP", "store_chats", "load_chats", "_read_json",
-                   "_write_json", "_replace_into", "_chat_ts", "_data_rev",
-                   "StoreReadError"})
+# the whole store (6b324: the .v2 file and its legacy catch-up come along)
+_exec_names(_scn, _STORE_NAMES)
 with _tf318.TemporaryDirectory() as _scd:
     _scn["store_chats"]([{"id": "c%d" % i} for i in range(61)], _scd)
     _sc61 = len(_scn["load_chats"](_scd))
@@ -5202,18 +5229,15 @@ _cs = {"os": os, "json": json, "tempfile": tempfile, "time": time, "re": re,
        "secrets": __import__("secrets"), "hashlib": _hl22,
        "threading": __import__("threading"), "IS_WIN": False}
 _cs["_pfile"] = lambda name, base=None: os.path.join(base, name)
-_exec_names(_cs, {"StoreReadError", "READ_FAIL", "_read_json", "_write_json",
-                  "_replace_into", "CHATS_KEEP", "_data_rev", "_chat_ts",
-                  "store_chats", "load_chats", "_CHAT_ID", "_CHAT_LANES",
-                  "CHAT_UNDO_S", "_chat_stubs", "_chat_gone", "_new_chat_id",
-                  "chat_prefix_hash", "_chat_find", "_chat_msgs", "_chat_settle",
-                  "_chat_dead", "_chat_new", "_chat_append", "_chat_op",
-                  "chat_ops", "chat_append_turn", "_chats_lock", "MEMORY_KEEP",
-                  "_load_memory", "_save_memory", "memory_text", "_TURN_TAGS",
-                  "_TURN_FRAME", "_TURN_PART", "_TURN_RESET", "_TURN_BOLD_SKIP",
-                  "turn_text", "turn_record", "_chat_late", "chat_append_late",
-                  "_turns_live", "_turns_lock", "_turns_settle", "_turn_rec",
-                  "_Unread", "load_prefs", "store_prefs"})
+_cs["shutil"] = shutil
+_exec_names(_cs, _STORE_NAMES)
+
+
+def _v2(home, name="chats.v2.json"):
+    """A copy's chats.v2.json list (or memory.v2.json), as saved."""
+    with open(os.path.join(home, name), encoding="utf-8") as fh:
+        d = json.load(fh)
+    return d["chats"] if name == "chats.v2.json" else d
 
 # LOC-8 + LOC-7 (R-2-26, L3, L6): 1,050 chats, the 20 oldest carrying a
 # project and 5 more pinned: eviction keeps all 25 and the newest 1,000
@@ -5292,10 +5316,10 @@ check("chat operations: prefix and old-value rules, conflict copies, fresh ids f
 
 # LOC-7 live: the whole-list save is gone for good (410) and changes
 # nothing; the page keeps no copy of the list and has no save of its own
-_before = open(os.path.join(INST.home, "chats.json"), "rb").read()
+_before = open(os.path.join(INST.home, "chats.v2.json"), "rb").read()
 _s410 = req("/api/chats", "POST", {"chats": []})[0]
 check("LOC-7: the whole-list POST /api/chats answers 410 and changes nothing",
-      _s410 == 410 and open(os.path.join(INST.home, "chats.json"), "rb").read() == _before
+      _s410 == 410 and open(os.path.join(INST.home, "chats.v2.json"), "rb").read() == _before
       and "millen.chats" not in page and "persistChat" not in page
       and "persistCurrent" not in page and "pushChatsToDisk" not in page,
       str(_s410))
@@ -5406,7 +5430,7 @@ def _stream_until(inst, cid, prompt, n=200, tries=2):
 
 
 def _saved(inst, cid):
-    for c in json.load(open(os.path.join(inst.home, "chats.json"), encoding="utf-8")):
+    for c in _v2(inst.home):
         if c.get("id") == cid:
             return c
     return None
@@ -5459,10 +5483,10 @@ check("LOC-1: the question is saved on arrival, the answer at the end, a stopped
 # LOC-3: viewing writes nothing. Reading the list, one chat and a search
 # leaves the file and the change counter alone; switching chats and New
 # chat send nothing
-_st0 = os.stat(os.path.join(INST.home, "chats.json"))
+_st0 = os.stat(os.path.join(INST.home, "chats.v2.json"))
 _rv0 = json.loads(req("/api/stats")[2]).get("data_rev")
 req("/api/chats"); req("/api/chats/one?id=" + _c1); req("/api/chats/search?q=pine")
-_st1 = os.stat(os.path.join(INST.home, "chats.json"))
+_st1 = os.stat(os.path.join(INST.home, "chats.v2.json"))
 _lc = page[page.index("function loadChat(id){"):page.index("function loadChat(id){") + 1200]
 _nc = page[page.index('$("#newchat").addEventListener'):page.index('$("#newchat").addEventListener') + 400]
 check("LOC-3: viewing, switching and New chat write nothing",
@@ -5476,11 +5500,11 @@ check("LOC-3: viewing, switching and New chat write nothing",
 # line on every route that reads it, and is left byte for byte; a
 # memorable message can't be written into an unreadable memory
 _lines = {}
-for _fn, _paths in (("chats.json", [("GET", "/api/chats", None), ("GET", "/api/chats/search?q=x", None),
+for _fn, _paths in (("chats.v2.json", [("GET", "/api/chats", None), ("GET", "/api/chats/search?q=x", None),
                                     ("POST", "/api/chats/ops", {"ops": [{"op": "create", "id": "c" + "n" * 26}]}),
                                     ("POST", "/api/chat", {"chat_id": _c1, "tier": "",
                                      "messages": [{"role": "user", "content": "x"}]})]),
-                    ("memory.json", [("GET", "/api/memory", None)]),
+                    ("memory.v2.json", [("GET", "/api/memory", None)]),
                     ("prefs.json", [("GET", "/api/prefs", None), ("POST", "/api/prefs", {"length": 2})])):
     _fp = os.path.join(INST.home, _fn)
     _orig = open(_fp, "rb").read() if os.path.exists(_fp) else b"[]" if _fn != "prefs.json" else b"{}"
@@ -5491,7 +5515,7 @@ for _fn, _paths in (("chats.json", [("GET", "/api/chats", None), ("GET", "/api/c
     for _m, _pth, _d in _paths:
         _s, _h, _b = req(_pth, _m, _d)
         _got.append((_s, json.loads(_b).get("err", "") if _b[:1] == b"{" else ""))
-    if _fn == "memory.json":
+    if _fn == "memory.v2.json":
         # an unreadable memory adds nothing to the prompt but never stops
         # the answer, and extraction can't write into it
         _mst = req("/api/chat", "POST", {"model": "Llama 3.2 3B", "models": [], "tier": "",
@@ -5507,8 +5531,8 @@ for _fn, _paths in (("chats.json", [("GET", "/api/chats", None), ("GET", "/api/c
 check("LOC-5: an unreadable chats, memory or settings file answers 503, and nothing is written over it",
       all(_same and all(g[0] in (503, 200) and "Nothing was changed." in g[1] for g in _got)
           for _got, _same in _lines.values())
-      and _lines["memory.json"][0][-1][0] == 200 and _lines["memory.json"][0][0][0] == 503
-      and "chats" in _lines["chats.json"][0][0][1] and "memory" in _lines["memory.json"][0][0][1]
+      and _lines["memory.v2.json"][0][-1][0] == 200 and _lines["memory.v2.json"][0][0][0] == 503
+      and "chats" in _lines["chats.v2.json"][0][0][1] and "memory" in _lines["memory.v2.json"][0][0][1]
       and "settings" in _lines["prefs.json"][0][0][1],
       "%r" % _lines)
 
@@ -5589,14 +5613,14 @@ while _so2.recv(4096):
     pass
 _so2.close()
 time.sleep(1)
-_ids0 = {c["id"] for c in json.load(open(os.path.join(INST.home, "chats.json")))}
+_ids0 = {c["id"] for c in _v2(INST.home)}
 _soy, _cy, _ = _stream_until(INST, _cy, "Write a 300-word story about an owl.", n=120)
 _dy = json.loads(req("/api/chats/ops", "POST", {"ops": [{"op": "delete", "id": _cy}]})[2])["results"]
 if _soy:
     _soy.close()
 time.sleep(3)
 _uy = json.loads(req("/api/chats/ops", "POST", {"ops": [{"op": "undelete", "id": _cy}]})[2])["results"]
-_all = {c["id"]: c for c in json.load(open(os.path.join(INST.home, "chats.json")))}
+_all = {c["id"]: c for c in _v2(INST.home)}
 _xm = [m["role"] for m in (_all.get(_cx) or {}).get("messages", [])]
 _ym = [(m["role"], len(m["content"])) for m in (_all.get(_cy) or {}).get("messages", [])]
 check("review: Stop then ask saves in order with no copy; delete mid-answer then Undo keeps it whole",
@@ -5624,11 +5648,11 @@ check("review: funnel Try again, deferred rewinds, refused requests, Cmd+Q",
 # Forget with unreadable settings refuses before it erases anything
 _pf = os.path.join(INST.home, "prefs.json")
 _porig = open(_pf, "rb").read() if os.path.exists(_pf) else b"{}"
-_cbefore = open(os.path.join(INST.home, "chats.json"), "rb").read()
+_cbefore = open(os.path.join(INST.home, "chats.v2.json"), "rb").read()
 with open(_pf, "wb") as fh:
     fh.write(b"{not json")
 _fg = req("/api/forget", "POST", {"scopes": ["memory", "chats", "prefs"]})[0]
-_cafter = open(os.path.join(INST.home, "chats.json"), "rb").read()
+_cafter = open(os.path.join(INST.home, "chats.v2.json"), "rb").read()
 with open(_pf, "wb") as fh:
     fh.write(_porig)
 check("review: Forget with unreadable settings refuses before erasing anything",
@@ -5672,13 +5696,580 @@ _qr([{"op": "delete", "id": _cq1}])
 INST_Q.stop()          # the app quits: inside the undo window, mid-answer
 if _so:
     _so.close()
-_afterq = {c["id"]: c for c in json.load(open(os.path.join(INST_Q.home, "chats.json")))}
+_afterq = {c["id"]: c for c in _v2(INST_Q.home)}
 _qm = (_afterq.get(_cq2) or {}).get("messages") or []
+# (6b324) the quit makes the delete final on disk too: its id joins
+# gone, and the pre-upgrade chats.json it came from loses it (0b 5.8)
+_legq = [c.get("id") for c in json.load(open(os.path.join(INST_Q.home, "chats.json")))]
+_goneq = json.load(open(os.path.join(INST_Q.home, "chats.v2.json"))).get("gone")
 check("LOC-4: a delete undoes once; a quit inside the undo window leaves it deleted, and keeps a streaming answer",
       _u1 == [{"ok": True}, {"ok": True}, {"err": "gone"}] and _cq1 not in _afterq
+      and _cq1 not in _legq and _goneq == [_cq1]
       and len(_qm) == 2 and len(_qm[1]["content"]) >= 100
       and _shownq.strip()[:100] == _qm[1]["content"].strip()[:100],
-      "%r" % [_u1, sorted(_afterq), len(_qm), _shownq[:120]])
+      "%r" % [_u1, sorted(_afterq), len(_qm), _shownq[:120], _legq, _goneq])
+
+# ACCOUNTS STEP 5 (0b 5.8-5.10, 6b324): "This computer" lives in the .v2
+# files; chats.json and memory.json are what older builds read, and lose
+# (never gain) entries; _migrate_61 and the downgrade import; nothing
+# personal in the web view's own storage.
+def _jl(d, n):
+    with open(os.path.join(d, n), encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def _jw(d, n, x):
+    with open(os.path.join(d, n), "w", encoding="utf-8") as fh:
+        json.dump(x, fh)
+
+
+def _rb(d, n):
+    with open(os.path.join(d, n), "rb") as fh:
+        return fh.read()
+
+
+def _msg(*t):
+    return [{"role": "user" if i % 2 == 0 else "assistant", "content": x} for i, x in enumerate(t)]
+
+
+def _cfresh():
+    """The store's in-memory state as a fresh start has it."""
+    for _k in ("_chat_stubs", "_chat_finals", "_written", "_STORE_BLOCKED"):
+        _cs[_k].clear()
+    _cs["_chat_gone"].clear()
+
+
+# L7 and the migration: the .v2 files are copies with legacy_base and the
+# first-write record; a new chat never reaches chats.json; a final
+# delete, the 1,000 eviction, the 200 trim and a clear each take their
+# entries out of the legacy file, and only then
+with tempfile.TemporaryDirectory() as _ld:
+    _cfresh()
+    _jw(_ld, "chats.json", [{"id": "ck1", "ts": 3, "messages": _msg("keep")},
+                            {"id": "cd1", "ts": 2, "messages": _msg("doomed")},
+                            {"id": "cev", "ts": 1, "messages": _msg("old")}])
+    _jw(_ld, "memory.json", [{"fact": "Fact %d is here" % i, "ts": i} for i in range(60)])
+    _m1 = _cs["_migrate_61"](_ld)
+    _pr = _jl(_ld, "profile.json")
+    _v2c = _jl(_ld, "chats.v2.json")
+    _mig_ok = (_m1 and [c["id"] for c in _v2c["chats"]] == ["ck1", "cd1", "cev"]
+               and "from_legacy" in _v2c and len(_jl(_ld, "memory.v2.json")) == 60
+               and sorted(_pr["written"]) == ["chats.v2.json", "memory.v2.json"]
+               and sorted(_pr["legacy_base"]["ids"]) == ["cd1", "cev", "ck1"]
+               and len(_pr["legacy_base"]["facts"]) == 60)
+    _leg0 = _rb(_ld, "chats.json")
+    _cs["chat_ops"]([{"op": "create", "id": "cnew1"}, {"op": "append", "id": "cnew1", "after_len": 0,
+                      "after_hash": _cs["chat_prefix_hash"]([], 0), "msgs": _msg("new here")},
+                     {"op": "delete", "id": "cd1"}], _ld)
+    _in_window = _rb(_ld, "chats.json") == _leg0 and "from_legacy" not in _jl(_ld, "chats.v2.json")
+    _cs["_chat_finalize"](_ld, now=float("inf"))
+    _after_del = [c["id"] for c in _jl(_ld, "chats.json")]
+    _gone1 = _jl(_ld, "chats.v2.json")["gone"]
+    with _cs["_memory_lock"]:
+        _cs["_save_memory"](_cs["_load_memory"](_ld) + [{"fact": "Newer fact %d" % i, "ts": 100 + i}
+                                                        for i in range(141)], _ld)
+    _mleg = [f["fact"] for f in _jl(_ld, "memory.json")]
+    _big = _cs["load_chats"](_ld)
+    _big += [{"id": "cb%04d" % i, "ts": 10 ** 6 + i, "messages": []} for i in range(1000)]
+    with _cs["_chats_lock"]:
+        _cs["store_chats"](_big, _ld)
+    _after_ev = [c["id"] for c in _jl(_ld, "chats.json")]
+    with _cs["_memory_lock"]:
+        _cs["_save_memory"]([], _ld, erase=True)
+    _mclr = _jl(_ld, "memory.json")
+    _lb = _jl(_ld, "profile.json")["legacy_base"]
+    _lsha = _cs["hashlib"].sha256(_rb(_ld, "chats.json")).hexdigest()
+check("legacy files: .v2 copies, nothing new reaches them, and a final delete, eviction, trim and clear leave them",
+      _mig_ok and _in_window and _after_del == ["ck1", "cev"] and _gone1 == ["cd1"]
+      and len(_mleg) == 59 and "Fact 0 is here" not in _mleg and "Newer fact 0" not in _mleg
+      and _after_ev == [] and _mclr == [] and _lb["chats"] == _lsha and _lb["ids"] == {}
+      and _lb["facts"] == [],
+      "%r" % [_mig_ok, _in_window, _after_del, _gone1, len(_mleg), _after_ev, _mclr])
+
+# THE DOWNGRADE IMPORT (5.8, Q8), with what an older build can do to
+# chats.json and memory.json: add a chat, add one whose id root already
+# uses, extend a listed chat, change one root changed too, cut one out,
+# put back a chat deleted here; add a fact. Then a crash between the .v2
+# write and legacy_base's, and a start that has nothing to import
+with tempfile.TemporaryDirectory() as _ld:
+    _cfresh()
+    _jw(_ld, "chats.json", [{"id": "cg1", "ts": 5, "title": "grow", "messages": _msg("q", "a")},
+                            {"id": "ccut", "ts": 4, "messages": _msg("cut me")},
+                            {"id": "cdiv", "ts": 3, "messages": _msg("q2", "a2")},
+                            {"id": "cdel", "ts": 2, "messages": _msg("deleted here")}])
+    _jw(_ld, "memory.json", [{"fact": "Likes tea", "ts": 1}])
+    _cs["_migrate_61"](_ld)
+    _h1 = _cs["chat_prefix_hash"](_msg("q2"), 1)
+    _cs["chat_ops"]([{"op": "truncate", "id": "cdiv", "to_len": 1, "prefix_hash": _h1},
+                     {"op": "append", "id": "cdiv", "after_len": 1, "after_hash": _h1,
+                      "msgs": [{"role": "assistant", "content": "a2 again"}]},
+                     {"op": "create", "id": "cmine"},
+                     {"op": "append", "id": "cmine", "after_len": 0,
+                      "after_hash": _cs["chat_prefix_hash"]([], 0), "msgs": _msg("mine")},
+                     {"op": "delete", "id": "cdel"}], _ld)
+    _cs["_chat_finalize"](_ld, now=float("inf"))
+    # the older build: the listed chats as it saw them, with its changes
+    _old = {c["id"]: c for c in _jl(_ld, "chats.json")}
+    _old["cg1"]["messages"] += _msg("q3", "a3")
+    _old["cdiv"]["messages"] += _msg("q4")
+    _old.pop("ccut")
+    _oldl = list(_old.values()) + [
+        {"id": "cold", "ts": 9, "title": "from the old build", "messages": _msg("old one")},
+        {"id": "cmine", "ts": 8, "messages": _msg("same id, other chat")},
+        {"id": "cdel", "ts": 7, "messages": _msg("deleted here")}]
+    _jw(_ld, "chats.json", _oldl)
+    _jw(_ld, "memory.json", [{"fact": "Likes tea", "ts": 1}, {"fact": "Owns a  red kayak", "ts": 2}])
+    _prof_before = _rb(_ld, "profile.json")
+    _cfresh()
+    _cs["_migrate_61"](_ld)
+    _got = {c["id"]: [m["content"] for m in c["messages"]] for c in _jl(_ld, "chats.v2.json")["chats"]}
+    _mem = [f["fact"] for f in _jl(_ld, "memory.v2.json")]
+    _fresh = [k for k, v in _got.items() if v == ["same id, other chat"]]
+    _divc = [k for k, v in _got.items() if v == ["q2", "a2", "q4"]]
+    _imp_ok = (_got.get("cg1") == ["q", "a", "q3", "a3"] and _got.get("ccut") == ["cut me"]
+               and _got.get("cdiv") == ["q2", "a2 again"] and len(_divc) == 1 and _divc[0] != "cdiv"
+               and _got.get("cold") == ["old one"] and _got.get("cmine") == ["mine"]
+               and len(_fresh) == 1 and _fresh[0] != "cmine" and "cdel" not in _got
+               and "deleted here" not in json.dumps(_got) and _mem == ["Likes tea", "Owns a  red kayak"]
+               and "cdel" not in [c["id"] for c in _jl(_ld, "chats.json")])
+    # the next start has nothing to import and writes nothing
+    _v2b, _pb = _rb(_ld, "chats.v2.json"), _rb(_ld, "profile.json")
+    _cfresh()
+    _cs["_migrate_61"](_ld)
+    _still = _rb(_ld, "chats.v2.json") == _v2b and _rb(_ld, "profile.json") == _pb
+    # a crash after the import's .v2 write, before legacy_base: the next
+    # start finds what it imported instead of importing it again
+    with open(os.path.join(_ld, "profile.json"), "wb") as fh:
+        fh.write(_prof_before)
+    _cfresh()
+    _cs["_migrate_61"](_ld)
+    _again = sorted(json.dumps(v) for v in {c["id"]: [m["content"] for m in c["messages"]]
+                                           for c in _jl(_ld, "chats.v2.json")["chats"]}.values())
+    _no_dupes = (_again == sorted(json.dumps(v) for v in _got.values())
+                 and [f["fact"] for f in _jl(_ld, "memory.v2.json")] == _mem)
+check("downgrade import (Q8): additions and new turns come in, fresh ids on collision, removals never, and never twice",
+      _imp_ok and _still and _no_dupes, "%r" % [_imp_ok, _still, _no_dupes, _got, _mem])
+
+# L1 and Q9: a root file that has had its first write reads as an error
+# when missing; an unreadable legacy file stops the migration (503) until
+# a start can read it; a profile.json lost after use never recopies the
+# legacy files over newer chats; a copy a crash cut short is made again
+with tempfile.TemporaryDirectory() as _ld:
+    _cfresh()
+    _cs["_migrate_61"](_ld)
+    with _cs["_chats_lock"]:
+        _cs["store_chats"]([{"id": "cz", "ts": 1, "messages": []}], _ld)
+    os.rename(os.path.join(_ld, "chats.v2.json"), os.path.join(_ld, "moved"))
+    _cfresh()
+    try:
+        _cs["load_chats"](_ld)
+        _absent_err = False
+    except _cs["StoreReadError"]:
+        _absent_err = True
+    _cs["store_prefs"]({"x": 1}, _ld)
+    os.remove(os.path.join(_ld, "prefs.json"))
+    try:
+        _cs["load_prefs"](_ld, strict=True)
+        _pabsent = False
+    except _cs["StoreReadError"]:
+        _pabsent = isinstance(_cs["load_prefs"](_ld), _cs["_Unread"])
+with tempfile.TemporaryDirectory() as _ld:
+    _cfresh()
+    _jw(_ld, "chats.json", [{"id": "c1", "ts": 1, "messages": _msg("hi")}])
+    with open(os.path.join(_ld, "memory.json"), "w") as fh:
+        fh.write('[{"fact": "half writ')
+    _blk = _cs["_migrate_61"](_ld)
+    try:
+        _cs["load_chats"](_ld)
+        _blk_read = False
+    except _cs["StoreReadError"] as _e:
+        _blk_read = str(_e) == "chats.v2.json"
+    _blk_files = sorted(os.listdir(_ld))
+    _jw(_ld, "memory.json", [])
+    _unblk = _cs["_migrate_61"](_ld) and [c["id"] for c in _cs["load_chats"](_ld)] == ["c1"]
+with tempfile.TemporaryDirectory() as _ld:
+    _cfresh()
+    _jw(_ld, "chats.json", [{"id": "c1", "ts": 1, "messages": _msg("old")}])
+    _cs["_migrate_61"](_ld)
+    with _cs["_chats_lock"]:
+        _cs["store_chats"](_cs["load_chats"](_ld) + [{"id": "c2", "ts": 2, "messages": _msg("new")}], _ld)
+    os.remove(os.path.join(_ld, "profile.json"))
+    _cfresh()
+    _lost_ok = (_cs["_migrate_61"](_ld)
+                and sorted(c["id"] for c in _cs["load_chats"](_ld)) == ["c1", "c2"])
+    # a crash cut the first copy short: still marked from_legacy, no base
+    os.remove(os.path.join(_ld, "profile.json"))
+    _jw(_ld, "chats.v2.json", {"v": 2, "chats": [], "from_legacy": "x"})
+    _cfresh()
+    _redo = (_cs["_migrate_61"](_ld) and [c["id"] for c in _cs["load_chats"](_ld)] == ["c1"])
+check("first writes, unreadable legacy files and a lost profile.json: never read as empty, never recopied over",
+      _absent_err and _pabsent and _blk is False and _blk_read
+      and _blk_files == ["chats.json", "memory.json"] and _unblk and _lost_ok and _redo,
+      "%r" % [_absent_err, _pabsent, _blk, _blk_read, _blk_files, _unblk, _lost_ok, _redo])
+_cfresh()
+
+# THE WEB VIEW'S CLEAN-UP (5.10, Q13, Q16): one routine, a branch per
+# engine. The plan keeps LocalStorage and cookies on the app's own
+# loopback record only; the WebKit branch driven with a stand-in store;
+# the WebView2 kinds never name cookies; the Qt branch works on files
+_ws = dict(_cs)
+_exec_names(_ws, {"_WEBSTORE_OWN", "_webstore_plan", "_webstore_webkit", "_webstore_keep",
+                  "_webstore_wv2_kinds", "_webstore_wv2_value", "_webstore_qt_sweep",
+                  "_webstore_state", "_webstore_mark", "_webstore_qt_boot", "_QT_CLEAR_CACHE",
+                  "_webstore_native", "webstore_clean", "_webstore_lock", "_webstore_reloaded",
+                  "PREF_SIX", "_pref_six_ok", "prefs_adopt", "_prefs_lock"})
+_pl = _ws["_webstore_plan"](["127.0.0.1", "LOCALHOST", "openstreetmap.org", "127.0.0.1.evil.example"], False)
+_pl2 = _ws["_webstore_plan"](["localhost"], True)
+_plan_ok = (_pl["own"] == ["127.0.0.1", "LOCALHOST"]
+            and _pl["other"] == ["openstreetmap.org", "127.0.0.1.evil.example"]
+            and _pl["keep"] == ["cookies", "local"] and _pl2["keep"] == ["cookies"])
+import types as _types24
+
+
+class _FRec:
+    def __init__(self, n):
+        self.n = n
+
+    def displayName(self):
+        return self.n
+
+
+_WK_TYPES = ["WKWebsiteDataTypeCookies", "WKWebsiteDataTypeLocalStorage", "WKWebsiteDataTypeDiskCache",
+             "WKWebsiteDataTypeIndexedDBDatabases", "WKWebsiteDataTypeSessionStorage"]
+
+
+class _FStore:
+    def __init__(self):
+        self.removed = []
+
+    def fetchDataRecordsOfTypes_completionHandler_(self, types, h):
+        h([_FRec("127.0.0.1"), _FRec("localhost"), _FRec("openstreetmap.org")])
+
+    def removeDataOfTypes_forDataRecords_completionHandler_(self, types, recs, h):
+        self.removed.append((sorted(str(t) for t in types), sorted(r.n for r in recs)))
+        h()
+
+
+_fwk = _types24.ModuleType("WebKit")
+_fwk.WKWebsiteDataStore = type("S", (), {"allWebsiteDataTypes": staticmethod(lambda: list(_WK_TYPES))})
+_fwk.WKWebsiteDataTypeCookies, _fwk.WKWebsiteDataTypeLocalStorage = _WK_TYPES[0], _WK_TYPES[1]
+_real_wk = sys.modules.get("WebKit")
+sys.modules["WebKit"] = _fwk
+try:
+    _fs1, _fs2 = _FStore(), _FStore()
+    _wk1 = _ws["_webstore_webkit"](False, 5, store=_fs1, call=lambda f: f())
+    _wk2 = _ws["_webstore_webkit"](True, 5, store=_fs2, call=lambda f: f())
+finally:
+    if _real_wk is None:
+        sys.modules.pop("WebKit", None)
+    else:
+        sys.modules["WebKit"] = _real_wk
+_wk_ok = (_wk1 and _wk2
+          and sorted(_fs1.removed) == sorted([(sorted(_WK_TYPES), ["openstreetmap.org"]),
+                                               (sorted(_WK_TYPES[2:]), ["127.0.0.1", "localhost"])])
+          and (sorted(_WK_TYPES[1:]), ["127.0.0.1", "localhost"]) in _fs2.removed)
+
+
+class _FK(int):
+    pass
+
+
+for _i, _n in enumerate(["FileSystems", "IndexedDb", "LocalStorage", "WebSql", "CacheStorage",
+                         "AllDomStorage", "Cookies", "AllSite", "DiskCache", "DownloadHistory",
+                         "GeneralAutofill", "PasswordAutosave", "BrowsingHistory", "Settings",
+                         "AllProfile", "ServiceWorkers"]):
+    setattr(_FK, _n, _FK(1 << _i))
+_k0 = _ws["_webstore_wv2_kinds"](_FK, False)
+_k1 = _ws["_webstore_wv2_kinds"](_FK, True)
+_v1 = _ws["_webstore_wv2_value"](_FK, _k1)
+_wv_ok = (_FK.LocalStorage not in _k0 and _FK.LocalStorage in _k1 and len(_k1) == len(_k0) + 1
+          and not {_FK.Cookies, _FK.AllDomStorage, _FK.AllSite, _FK.AllProfile} & set(_k1 + _k0)
+          and type(_v1) is _FK and int(_v1) == sum(int(k) for k in _k1)
+          and not int(_v1) & int(_FK.Cookies))
+with tempfile.TemporaryDirectory() as _qd:
+    _ws["app_dir"] = lambda: _qd
+    _ws["time"] = time
+    _qw = os.path.join(_qd, "webkit")
+    for _n in ("Local Storage", "IndexedDB", "Service Worker", "GPUCache"):
+        os.makedirs(os.path.join(_qw, _n, "leveldb"))
+        with open(os.path.join(_qw, _n, "leveldb", "x.ldb"), "w") as fh:
+            fh.write("CANARY")
+    for _n in ("Cookies", "Cookies-journal"):
+        with open(os.path.join(_qw, _n), "w") as fh:
+            fh.write("millen_key_8889=old")
+    _ws["_webstore_qt_boot"](_qd)
+    _q1 = sorted(os.listdir(_qw))
+    _ws["_webstore_qt_boot"](_qd)                 # nothing asked: nothing more
+    _q2 = sorted(os.listdir(_qw))
+    _ws["_webstore_mark"](_qd, want_local=1)       # the page's call, on Qt
+    _ws["_webstore_qt_boot"](_qd)
+    _q3 = sorted(os.listdir(_qw))
+    _qst = _ws["_webstore_state"](_qd)
+    # the Qt build's route says "later" and runs nothing live
+    _ws["_web_engine"] = lambda: "qt"
+    _ws["TEST_HOOKS"] = frozenset()
+    _natcalls = []
+    _ws["_webstore_native"] = lambda local: _natcalls.append(local) or True
+    _ws["_webstore_mark"](_qd, local=0, want_local=0)
+    _qr1 = _ws["webstore_clean"](True, _qd)
+_qt_ok = (_q1 == ["Local Storage"] and _q2 == _q1 and _q3 == [] and _qst.get("clean")
+          and _qst.get("local") and _qr1.get("later") is True and not _qr1["reload"] and not _natcalls)
+# a dev copy's window leaves a WebKit store (maybe the real app's) alone
+_nat = []
+_ws2 = dict(_ws)
+_exec_names(_ws2, {"_webstore_native"})
+_ws2.update(TEST_HOOKS=frozenset(), _WINDOW=[object()], DEV_HOME="/tmp/dev",
+            _web_engine=lambda: "webkit", _webstore_webkit=lambda local: _nat.append(local) or True)
+_dev_skip = _ws2["_webstore_native"](True) is False and _nat == []
+_ws2["TEST_HOOKS"] = frozenset(["webstore-native"])
+_dev_skip = _dev_skip and _ws2["_webstore_native"](True) is True and _nat == [True]
+check("web view clean-up: loopback keeps LocalStorage and cookies only; WebKit, WebView2 and Qt branches",
+      _plan_ok and _wk_ok and _wv_ok and _qt_ok and _dev_skip,
+      "%r" % [_plan_ok, _wk_ok, _fs1.removed, _fs2.removed, _wv_ok, _qt_ok, _q1, _q2, _q3, _qr1, _dev_skip])
+
+# ...and the route's once-only rule on a live copy (A runs the recorder):
+# the first pass, then the one-time LocalStorage removal once the page
+# says the six keys are safe (it answers reload), then nothing; the page
+# and the token still work after it
+_wc = [json.loads(req("/api/webstore/clean", "POST", d_)[2]) for d_ in
+       ({"local": False}, {"local": False}, {"local": True}, {"local": True})]
+_wsr = json.load(open(os.path.join(INST.home, "run", "webstore.json")))
+_wsp = json.load(open(os.path.join(INST.home, "profile.json"))).get("webstore") or {}
+check("ISO-10: the clean-up runs once, takes LocalStorage once after the keys are safe, and the window still works",
+      _wc == [{"ran": True, "reload": False}, {"ran": False, "reload": False},
+              {"ran": True, "reload": True}, {"ran": False, "reload": False}]
+      and [r_["plan"]["keep"] for r_ in _wsr] == [["cookies", "local"], ["cookies"]]
+      and all(_wsp.get(k_) for k_ in ("clean", "want_local", "local"))
+      and req("/", token=False)[0] == 200 and req("/api/stats")[0] == 200
+      and req("/api/webstore/clean", "POST", {"local": True}, token=False)[0] == 403,
+      "%r" % [_wc, _wsr, _wsp])
+
+# ISO-10's page half: the page's own storeBoot() in node, against copy
+# A. First run with the six keys, a copy of the chats and a stray key in
+# browser storage, and the post failing: the six stay (and count for the
+# session), everything off the allow-list goes. Next boot: the six reach
+# prefs.json and leave browser storage. A stale browser value loses to
+# prefs.json (Q10). A change made after first run comes back from
+# /api/prefs after a restart, and nothing is written to browser storage
+_sbseg = page[page.index("const PREF_OF="):page.index("/* ------------------------------------------------------------- state */")]
+_sbjs = os.path.join(_SMOKE_TMP, "storeboot24.js")
+with open(_sbjs, "w", encoding="utf-8") as fh:
+    fh.write(r"""
+const BASE=%s, HDR=%s;
+const run=JSON.parse(require('fs').readFileSync(0,'utf8'));
+const store=new Map(Object.entries(run.ls));
+globalThis.localStorage={getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,String(v)),
+  removeItem:k=>store.delete(k),key:i=>[...store.keys()][i]??null,get length(){return store.size;}};
+const calls=[];let reloaded=false;
+globalThis.location={reload:()=>{reloaded=true;}};
+async function api(u,o){o=o||{};calls.push([u,o.body||null]);
+  if((run.fail||[]).includes(u))return new Response("{}",{status:500});
+  if(run.fake&&run.fake[u])return new Response(JSON.stringify(run.fake[u]),{status:200});
+  return fetch(BASE+u,Object.assign({},o,{headers:Object.assign({},o.headers||{},HDR)}));}
+let tier="Fast",adv=null,advOn=false,autonomy="auto",tierOff={};
+function setTier(n,q){tier=n;}
+function advChip(){}
+function paintAutonomy(){}
+""" % (json.dumps(INST.base), json.dumps(INST.headers)) + _sbseg + r"""
+storeBoot().then(async()=>{if(run.after)prefSet(run.after);await prefQ;
+  console.log(JSON.stringify({ls:Object.fromEntries(store),tier,adv,advOn,autonomy,reloaded,calls}));});
+""")
+
+
+def _sb(run_):
+    try:
+        return json.loads(subprocess.run(["node", _sbjs], input=json.dumps(run_), capture_output=True,
+                                         text=True, timeout=60).stdout)
+    except Exception as e_:
+        return {"err": repr(e_)}
+
+
+_SIX = {"millen.tier": "Thinking", "millen.adv": json.dumps({"local": ["Llama 3.2 3B"], "cloud": [], "comp": ""}),
+        "millen.advon": "1", "millen.autonomy": "auto", "millen.codeagent": "Workspace", "millen.agent": ""}
+_KEEPS = {"millen.sky": "3", "millen.sbw": "260", "millen.model": "Llama 3.2 3B"}
+_ls0 = dict(_SIX, **_KEEPS)
+_ls0["millen.chats"] = json.dumps([{"id": "c1", "title": _CANARY_A}])
+_ls0["millen.stray"] = "x"
+_sb1 = _sb({"ls": _ls0, "fail": ["/api/prefs/adopt"]})
+_sb2 = _sb({"ls": _sb1.get("ls") or {}})
+try:
+    _pf24 = json.load(open(os.path.join(INST.home, "prefs.json")))
+except (OSError, ValueError):
+    _pf24 = {}
+_sb3 = _sb({"ls": {"millen.tier": "Pro"}, "after": {"tier": "Fast", "adv": {"local": ["Hermes 3 8B"]}}})
+_sb4 = _sb({"ls": {}})
+_sb5 = _sb({"ls": {}, "fake": {"/api/webstore/clean": {"ran": True, "reload": True}}})
+_six_set = re.findall(r'localStorage\.setItem\("millen\.(tier|agent|codeagent|adv|advon|autonomy)"', page)
+check("ISO-10: the six keys move to prefs.json only after a 200, the rest of browser storage is swept, prefs win",
+      _sb1.get("ls") == dict(_SIX, **_KEEPS) and _sb1.get("tier") == "Thinking" and _sb1.get("advOn") is True
+      and ["/api/webstore/clean", '{"local":false}'] in _sb1.get("calls", [])
+      and _sb2.get("ls") == _KEEPS and ["/api/webstore/clean", '{"local":true}'] in _sb2.get("calls", [])
+      and _pf24.get("tier") == "Thinking" and _pf24.get("advon") is True and _pf24.get("codeagent") == "Workspace"
+      and _pf24.get("adv") == {"local": ["Llama 3.2 3B"], "cloud": [], "comp": ""}
+      and _sb3.get("ls") == {} and _sb3.get("tier") == "Thinking"
+      and not any(c_[0] == "/api/prefs/adopt" for c_ in _sb3.get("calls", []))
+      and _sb4.get("tier") == "Fast" and _sb4.get("adv") == {"local": ["Hermes 3 8B"]} and _sb4.get("ls") == {}
+      and _sb5.get("reloaded") is True and not _sb4.get("reloaded")
+      and not _six_set and "millen.chats" not in page and _CANARY_A not in page,
+      "%r" % [_sb1, _sb2, _sb3.get("tier"), _sb4.get("tier"), _sb4.get("adv"), _six_set])
+
+# the adopt route takes only the six, only well-formed, only where
+# prefs.json lacks them, and says which prefs.json holds
+_ad = json.loads(req("/api/prefs/adopt", "POST", {"tier": "Pro", "agent": 7, "bogus": 1,
+                                                  "remote_autonomy": "wild"})[2])
+try:
+    _pf24b = json.load(open(os.path.join(INST.home, "prefs.json")))
+except (OSError, ValueError):
+    _pf24b = {}
+check("the six keys' first-run post takes only missing, well-formed keys (Q10)",
+      _ad.get("took") == [] and _ad["prefs"].get("tier") == "Fast" and "bogus" not in _pf24b
+      and _pf24b.get("remote_autonomy") == "auto" and _pf24b.get("agent") == ""
+      and req("/api/prefs/adopt", "POST", b"[1]", headers={"Content-Type": "application/json"})[0] == 400,
+      "%r" % [_ad])
+
+# LOC-6 (0b 6): an older build run against a Phase 0 folder loses
+# nothing. The real build 275 (6.1 beta 1) runs from git, headless, with
+# HOME at a fake home, so its folder is <fake>/Library/Application
+# Support/MillenAI; this build runs there as a dev copy.
+_L6 = os.path.join(_SMOKE_TMP, "loc6-home")
+_L6D = os.path.join(_L6, "Library", "Application Support", "MillenAI")
+os.makedirs(_L6D)
+_OLDD = os.path.join(_SMOKE_TMP, "old275")
+os.makedirs(_OLDD)
+_old_src = subprocess.run(["git", "show", "v275:millenai.py"], capture_output=True, text=True).stdout
+with open(os.path.join(_OLDD, "millenai.py"), "w", encoding="utf-8") as fh:
+    fh.write(_old_src)
+_jw(_L6D, "chats.json", [{"id": "c6keep", "ts": 3, "title": "kept", "messages": _msg("keep me", "ok")},
+                         {"id": "c6del", "ts": 2, "title": "deleted", "messages": _msg("delete me", "ok")},
+                         {"id": "c6grow", "ts": 1, "title": "grows", "messages": _msg("grow me", "ok")}])
+_jw(_L6D, "memory.json", [{"fact": "Keeps honey bees", "ts": 1}, {"fact": "Likes green tea", "ts": 2}])
+
+
+def _l6_new(name):
+    i_ = Instance(9903, name)
+    i_.home = _L6D
+    i_.env["MILLENAI_HOME"] = _L6D
+    return i_.start()
+
+
+def _l6_req(inst, path, data=None, cookie=None, token=True):
+    h_ = {"Cookie": cookie or inst.cookie}
+    if token:
+        h_["X-Api-Token"] = inst.token
+    if data is not None:
+        data = json.dumps(data).encode()
+        h_["Content-Type"] = "application/json"
+    r_ = urllib.request.Request("http://127.0.0.1:9903" + path, data=data, headers=h_,
+                                method="POST" if data is not None else "GET")
+    try:
+        with urllib.request.urlopen(r_, timeout=60) as resp:
+            return resp.status, json.loads(resp.read() or b"null")
+    except urllib.error.HTTPError as e_:
+        return e_.code, None
+
+
+class _Old:
+    """Build 275 on the fake home: its own key, headless (its switches)."""
+    def __init__(self):
+        self.key = os.urandom(16).hex()
+        env = {k: v for k, v in os.environ.items() if not k.startswith("MILLENAI_")}
+        env.update(HOME=_L6, USERPROFILE=_L6, LOCALAPPDATA=_L6, MILLENAI_PORT="9903",
+                   MILLENAI_KEY=self.key, MILLENAI_HEADLESS="1")
+        self.log = open(os.path.join(_SMOKE_TMP, "old275.log"), "a")
+        self.proc = subprocess.Popen([os.environ.get("SMOKE_PY") or sys.executable, "millenai.py"],
+                                     cwd=_OLDD, env=env, stdout=self.log, stderr=subprocess.STDOUT,
+                                     start_new_session=True)
+        self.cookie = "millen_key_9903=" + self.key
+        end = time.time() + 120
+        while time.time() < end and self.proc.poll() is None:
+            try:
+                if _l6_req(self, "/api/chats", cookie=self.cookie, token=False)[0] == 200:
+                    return
+            except OSError:
+                pass
+            time.sleep(0.5)
+
+    def req(self, path, data=None):
+        return _l6_req(self, path, data, cookie=self.cookie, token=False)
+
+    def stop(self):
+        self.proc.terminate()
+        try:
+            self.proc.wait(30)
+        except subprocess.TimeoutExpired:
+            self.proc.kill()
+            self.proc.wait(10)
+
+
+# 1. the first start of this build migrates; a pre-upgrade chat deleted
+#    here and the facts cleared here leave chats.json and memory.json once
+#    the undo window has passed; a chat made here never reaches them
+_n1 = _l6_new("L6a")
+_mig6 = sorted(c["id"] for c in _v2(_L6D)) == ["c6del", "c6grow", "c6keep"]
+_c6new = "c" + "w" * 26
+_l6_req(_n1, "/api/chats/ops", {"ops": [
+    {"op": "create", "id": _c6new, "lane": "ai"},
+    {"op": "append", "id": _c6new, "after_len": 0, "after_hash": _cs["chat_prefix_hash"]([], 0),
+     "msgs": _msg("made after the upgrade")},
+    {"op": "delete", "id": "c6del"}]})
+_l6_req(_n1, "/api/memory/clear", {})
+time.sleep(_cs["CHAT_UNDO_S"] + 2)
+_leg6a = [c["id"] for c in _jl(_L6D, "chats.json")]
+_n1.stop()
+# 2. build 275: it lists neither the deleted chat nor the new one and has
+#    no facts; it adds a chat, adds turns to a listed one, adds one under
+#    the id this build gave its new chat, and cuts one (its whole-list
+#    save); its own _save_memory adds a fact
+_o1 = _Old()
+_ol = (_o1.req("/api/chats")[1] or {}).get("chats") or []
+_of = (_o1.req("/api/memory")[1] or {}).get("facts")
+_old_sees = sorted(c["id"] for c in _ol)
+for _c in _ol:
+    if _c["id"] == "c6grow":
+        _c["messages"] += _msg("more from the old build", "old answer")
+_ol = [c for c in _ol if c["id"] != "c6keep"] + [
+    {"id": "c6old", "ts": int(time.time() * 1000), "title": "old build's", "messages": _msg("asked in 275")},
+    {"id": _c6new, "ts": int(time.time() * 1000), "title": "clash", "messages": _msg("same id in 275")}]
+_osave = _o1.req("/api/chats", {"chats": _ol})[0]
+_o1.stop()
+_oldns = {"os": os, "json": json, "app_dir": lambda: _L6D}
+_oldtree = _ast.parse(_old_src)
+for _n in _oldtree.body:
+    if getattr(_n, "name", None) in ("_pfile", "_load_memory", "_save_memory"):
+        exec(_ast.get_source_segment(_old_src, _n), _oldns)
+_oldns["_save_memory"](_oldns["_load_memory"]() + [{"fact": "Owns a red kayak", "ts": time.time()}])
+# 3. the next start of this build imports what 275 added, into root
+_n2 = _l6_new("L6b")
+_g6 = {c["id"]: [m["content"] for m in c.get("messages", [])] for c in _v2(_L6D)}
+_mem6 = [f.get("fact") for f in (_l6_req(_n2, "/api/memory")[1] or {}).get("facts", [])]
+_clash = [k for k, v in _g6.items() if v == ["same id in 275"]]
+_lb6 = json.load(open(os.path.join(_L6D, "profile.json")))["legacy_base"]
+_imp6 = (_g6.get("c6grow") == ["grow me", "ok", "more from the old build", "old answer"]
+         and _g6.get("c6old") == ["asked in 275"] and _g6.get("c6keep") == ["keep me", "ok"]
+         and _g6.get(_c6new) == ["made after the upgrade"] and len(_clash) == 1 and _clash[0] != _c6new
+         and "c6del" not in _g6 and _mem6 == ["Owns a red kayak"]
+         and _lb6["chats"] == _cs["hashlib"].sha256(_rb(_L6D, "chats.json")).hexdigest())
+# 4. a delete, then a crash before the undo window ends: chats.json still
+#    holds it; the next start finishes the job and imports nothing
+_l6_req(_n2, "/api/chats/ops", {"ops": [{"op": "delete", "id": "c6old"}]})
+_n2.proc.kill()
+_n2.proc.wait(10)
+_crash_leg = "c6old" in [c["id"] for c in _jl(_L6D, "chats.json")]
+_v2_before = sorted(json.dumps(c, sort_keys=True) for c in _v2(_L6D))
+_n3 = _l6_new("L6c")
+_fin6 = "c6old" not in [c["id"] for c in _jl(_L6D, "chats.json")] and "c6old" not in {c["id"] for c in _v2(_L6D)}
+_same6 = sorted(json.dumps(c, sort_keys=True) for c in _v2(_L6D)) == _v2_before
+_n3.stop()
+# 5. build 275 again: nothing that left root is back
+_o2 = _Old()
+_old_sees2 = sorted(c["id"] for c in ((_o2.req("/api/chats")[1] or {}).get("chats") or []))
+_o2.stop()
+check("LOC-6: build 275 on a Phase 0 folder loses nothing, its additions are imported, what left root stays gone",
+      _mig6 and "c6del" not in _leg6a and _c6new not in _leg6a
+      and _old_sees == ["c6grow", "c6keep"] and _of == [] and _osave == 200 and _imp6
+      and _crash_leg and _fin6 and _same6
+      and _old_sees2 == sorted(["c6grow", _c6new]),
+      "%r" % [_mig6, _leg6a, _old_sees, _of, _osave, _g6, _mem6, _crash_leg, _fin6, _same6, _old_sees2])
 
 print("== dev isolation ==")
 # 0a item 2 (ISO-16, REM-1) and the plan's two-copy check (6b319): a dev

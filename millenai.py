@@ -7205,6 +7205,23 @@ def _pfile(name: str, base=None) -> str:
     return os.path.join(base or app_dir(), name)
 
 
+# THE FILES (0b 5.2, 6b324). "This computer" keeps its chats and memory
+# in the .v2 files. chats.json and memory.json are the pre-Phase-0 files
+# that older builds keep using: this build never writes anything new
+# into them, it only takes out what has left the .v2 files (0b L7, 5.8).
+# profile.json holds legacy_base (what the legacy files held at this
+# build's last look) and the record of which root files have had their
+# first write.
+CHATS_FILE = "chats.v2.json"
+MEMORY_FILE = "memory.v2.json"
+LEGACY_CHATS = "chats.json"
+LEGACY_MEMORY = "memory.json"
+PROFILE_FILE = "profile.json"
+# absent means "not written yet" for these only until their first write
+# (0b 5.2, L1); after it a missing file is a read error, never empty
+_FIRST_WRITE = (CHATS_FILE, MEMORY_FILE, "prefs.json")
+
+
 class StoreReadError(Exception):
     """A personal file is there but can't be read (0b L1, 6b322). It is
     never taken for empty: the route answers 503 and nothing that
@@ -7212,39 +7229,98 @@ class StoreReadError(Exception):
     empty. The argument is the file's name."""
 
 
-# what the page shows for each (0b 5.12, Q11)
-READ_FAIL = {"chats.json": "Couldn\u2019t read your chats. Nothing was changed.",
-             "memory.json": "Couldn\u2019t read your memory. Nothing was changed.",
+# what the page shows for each (0b 5.12, Q11). profile.json and the
+# legacy files are read for the chat store, so they say "chats"
+_RF_CHATS = "Couldn\u2019t read your chats. Nothing was changed."
+_RF_MEMORY = "Couldn\u2019t read your memory. Nothing was changed."
+READ_FAIL = {CHATS_FILE: _RF_CHATS, LEGACY_CHATS: _RF_CHATS,
+             PROFILE_FILE: _RF_CHATS,
+             MEMORY_FILE: _RF_MEMORY, LEGACY_MEMORY: _RF_MEMORY,
              "prefs.json": "Couldn\u2019t read your settings. Nothing was changed."}
+
+_profile_lock = threading.RLock()   # the innermost store lock
+_written = {}           # folder -> the _FIRST_WRITE names it has written
+
+
+def _bk(base) -> str:
+    """One key per data folder (base None is app_dir())."""
+    return os.path.realpath(base or app_dir())
+
+
+def _was_written(name: str, base) -> bool:
+    """profile.json records the first write of each _FIRST_WRITE file.
+    Can't tell (profile.json unreadable): StoreReadError for name."""
+    k = _bk(base)
+    with _profile_lock:
+        if k not in _written:
+            try:
+                p = _read_json(PROFILE_FILE, base, dict) or {}
+            except StoreReadError as exc:
+                raise StoreReadError(name) from exc
+            w = p.get("written")
+            _written[k] = set(x for x in w if isinstance(x, str)) \
+                if isinstance(w, list) else set()
+        return name in _written[k]
+
+
+def _mark_written(name: str, base):
+    """Record a first write. A record that can't be made now is made at
+    the file's next write."""
+    with _profile_lock:
+        try:
+            if _was_written(name, base):
+                return
+            p = _read_json(PROFILE_FILE, base, dict) or {}
+            w = p.get("written")
+            w = [x for x in w if isinstance(x, str)] if isinstance(w, list) else []
+            p["written"] = w + [name]
+            _write_json(PROFILE_FILE, p, base, indent=1)
+            _written[_bk(base)].add(name)
+        except (StoreReadError, OSError):
+            pass
 
 
 def _read_json(name: str, base, want):
-    """The file's JSON; None when it isn't there; StoreReadError when it
-    is there and can't be read, or isn't the shape it must be."""
+    """The file's JSON; None when it isn't there (and, for a root .v2 file
+    or prefs.json, hasn't been written yet); StoreReadError when it is
+    there and can't be read, or isn't the shape it must be."""
+    return _read_json_h(name, base, want)[0]
+
+
+def _read_json_h(name: str, base, want):
+    """(the JSON, sha256 of its bytes), or (None, None) when absent."""
     try:
-        with open(_pfile(name, base), "r", encoding="utf-8") as f:
-            d = json.load(f)
+        with open(_pfile(name, base), "rb") as f:
+            raw = f.read()
     except FileNotFoundError:
-        return None
+        if name in _FIRST_WRITE and _was_written(name, base):
+            raise StoreReadError(name)
+        return None, None
+    except Exception as exc:
+        raise StoreReadError(name) from exc
+    try:
+        d = json.loads(raw.decode("utf-8"))
     except Exception as exc:
         raise StoreReadError(name) from exc
     if not isinstance(d, want):
         raise StoreReadError(name)
-    return d
+    return d, hashlib.sha256(raw).hexdigest()
 
 
-def _write_json(name: str, data, base, **dump):
+def _write_json(name: str, data, base, **dump) -> str:
     """Atomic (0b L2): a unique temp file beside it, then os.replace, so a
     crash leaves the old file or the new one and two saves never rename
-    each other's half-written file into place (the 6b304 prefs lesson)."""
+    each other's half-written file into place (the 6b304 prefs lesson).
+    Returns the sha256 of the bytes written."""
     p = _pfile(name, base)
     os.makedirs(os.path.dirname(p), exist_ok=True)
+    raw = json.dumps(data, **dump).encode("utf-8")
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p),
                                prefix="." + name.split(".")[0] + "-",
                                suffix=".tmp")
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, **dump)
+        with os.fdopen(fd, "wb") as f:
+            f.write(raw)
             f.flush()
             os.fsync(f.fileno())
         _replace_into(tmp, p)
@@ -7254,6 +7330,9 @@ def _write_json(name: str, data, base, **dump):
         except OSError:
             pass
         raise
+    if name in _FIRST_WRITE:
+        _mark_written(name, base)
+    return hashlib.sha256(raw).hexdigest()
 
 
 class _Unread(dict):
@@ -7336,19 +7415,44 @@ def _app_models_seed(prefs: dict, existing: bool):
         prefs["app_models"] = ([*MODEL_INFO, *RETIRED_MODELS]
                                if existing else [])
 _chats_lock = threading.Lock()
+# folders whose store stays shut this run: _migrate_61 couldn't read a
+# file it needs (0b Q9), or this copy doesn't hold the instance lock.
+# Every chat and memory read there raises, so the routes answer 503
+_STORE_BLOCKED = {}
+
+
+class _ChatList(list):
+    """The chat list as read, carrying the rest of chats.v2.json: `gone`,
+    the ids deleted for good (0b Q5: a late write to one gets a fresh
+    id, and the downgrade import never brings one back), and `doc`, the
+    file's other top-level fields, which a write keeps (L6)."""
+    doc = None
+    gone = ()
 
 
 def load_chats(base=None) -> list:
-    """The chat list; [] only when the file isn't there yet. Anything
-    else it can't read raises StoreReadError (0b L1, 6b322): a failed
-    read used to look like no chats, and the next save wrote that."""
-    return _read_json("chats.json", base, list) or []
+    """The chat list; [] only when chats.v2.json hasn't been written yet.
+    Anything else it can't read raises StoreReadError (0b L1, 6b322): a
+    failed read used to look like no chats, and the next save wrote
+    that. The file is {"v": 2, "chats": [...], "gone": [...]} (0b Q5)."""
+    if _STORE_BLOCKED and _bk(base) in _STORE_BLOCKED:
+        raise StoreReadError(CHATS_FILE)
+    d = _read_json(CHATS_FILE, base, dict) or {}
+    ch = d.get("chats", [])
+    if not isinstance(ch, list):
+        raise StoreReadError(CHATS_FILE)
+    out = _ChatList(ch)
+    out.doc = {k: v for k, v in d.items() if k != "chats"}
+    g = d.get("gone")
+    out.gone = [x for x in g if isinstance(x, str)] if isinstance(g, list) else []
+    return out
 
 
 # How many chats are kept (6b318). It was 60, and with 60 saved every new
 # chat silently erased the oldest (Patrick was at exactly 60). 1,000 is
 # 0b's figure; a pinned chat is never cut, however old.
 CHATS_KEEP = 1000
+GONE_KEEP = 5000        # ids deleted for good that chats.v2.json remembers
 _data_rev = [0]         # moves on every write to the chat store (0b 5.6)
 
 
@@ -7357,20 +7461,47 @@ def _chat_ts(c) -> float:
     return float(t) if isinstance(t, (int, float)) else 0.0
 
 
-def store_chats(items: list, base=None):
-    """Atomic (0b L2), newest first, and the only eviction (0b 5.7): every
+def _write_chats(items, base=None):
+    """The write itself: (the list kept, whether eviction dropped any).
+    Atomic (0b L2), newest first, and the only eviction (0b 5.7): every
     pinned chat, every chat with a project (kept before Projects exists,
     so a downgrade can't evict one, R-2-26) and the newest CHATS_KEEP of
     the rest by ts. Eviction makes no stub; nothing else drops a chat
-    (L3). Fields this build doesn't know are written back as read (L6)."""
+    (L3). Fields this build doesn't know are written back as read (L6).
+    Deletes made final since the last write join `gone` here."""
+    fin = _chat_finals.pop(_bk(base), [])
+    doc = getattr(items, "doc", None)
+    doc = dict(doc) if isinstance(doc, dict) else {}
+    gone = list(getattr(items, "gone", None) or [])
+    have = set(gone)
+    gone += [x for x in fin if x not in have]
     items = sorted(items, key=_chat_ts, reverse=True)
     exempt = [isinstance(c, dict) and bool(c.get("pin") or c.get("project"))
               for c in items]
     rest = [i for i, e in enumerate(exempt) if not e]
     drop = set(rest[CHATS_KEEP:])
-    items = [c for i, c in enumerate(items) if i not in drop]
-    _write_json("chats.json", items, base)
+    kept = _ChatList(c for i, c in enumerate(items) if i not in drop)
+    out = {"v": doc.get("v", 2), "chats": kept, "gone": gone[-GONE_KEEP:]}
+    # from_legacy marks _migrate_61's untouched copy (see there): the
+    # first write of this build's own ends that
+    out.update((k, v) for k, v in doc.items()
+               if k not in ("v", "chats", "gone", "from_legacy"))
+    _write_json(CHATS_FILE, out, base)
     _data_rev[0] += 1
+    kept.doc = {k: v for k, v in out.items() if k != "chats"}
+    kept.gone = out["gone"]
+    return kept, bool(drop or fin)
+
+
+def store_chats(items: list, base=None, legacy=False, erase=False):
+    """Write the list (see _write_chats). Whenever a chat left it (a final
+    delete, the 1,000 eviction, or legacy=True for Forget), chats.json
+    is rewritten without it too (0b 5.8, L7); erase=True (Forget) empties
+    chats.json as well. Returns the list kept."""
+    kept, lost = _write_chats(items, base)
+    if lost or legacy or erase:
+        _legacy_sync_chats(kept, base, erase=erase)
+    return kept
 
 
 # ------------------------------------------- chat operations (0b 5.3)
@@ -7380,8 +7511,9 @@ def store_chats(items: list, base=None):
 _CHAT_ID = re.compile(r"c[0-9a-z-]{1,48}")
 _CHAT_LANES = ("ai", "code", "funnel")
 CHAT_UNDO_S = 6.0
-_chat_stubs = {}        # deleted id -> {"at", "chat", "idx"}, 6 s of undo
+_chat_stubs = {}        # deleted id -> {"at", "chat", "idx", "bk"}, 6 s of undo
 _chat_gone = set()      # ids deleted for good in this run
+_chat_finals = {}       # folder -> ids made final, until the next write
 
 
 def _new_chat_id() -> str:
@@ -7421,16 +7553,39 @@ def _chat_msgs(c) -> list:
 
 
 def _chat_settle(now=None):
-    """Stubs past their undo window are final (0b 5.6)."""
+    """Stubs past their undo window are final (0b 5.6). The next write of
+    their folder adds them to `gone` and takes them out of chats.json."""
     now = now or time.time()
     for cid in [k for k, v in _chat_stubs.items()
                 if now - v["at"] >= CHAT_UNDO_S]:
-        _chat_stubs.pop(cid, None)
+        st = _chat_stubs.pop(cid, None) or {}
         _chat_gone.add(cid)
+        _chat_finals.setdefault(st.get("bk"), []).append(cid)
 
 
-def _chat_dead(cid) -> bool:
-    return cid in _chat_stubs or cid in _chat_gone
+def _chat_dead(cid, chats=None) -> bool:
+    return (cid in _chat_stubs or cid in _chat_gone
+            or cid in (getattr(chats, "gone", None) or ()))
+
+
+def _chat_finalize(base=None, now=None):
+    """Make the deletes whose undo window has passed final on disk (0b
+    5.6): the id joins `gone` and chats.json loses the chat (5.8). Run
+    by a timer after each delete, and at a quit with now=inf. It waits
+    for the lock only so long: a signal can arrive while this thread
+    holds it, and the next start finishes the job anyway (5.8)."""
+    if not os.path.isdir(base or app_dir()):
+        return
+    if not _chats_lock.acquire(timeout=10):
+        return
+    try:
+        _chat_settle(now)
+        if _chat_finals.get(_bk(base)):
+            store_chats(load_chats(base), base)
+    except (StoreReadError, OSError):
+        pass
+    finally:
+        _chats_lock.release()
 
 
 def _chat_new(chats, cid, lane, title=None, messages=None):
@@ -7461,7 +7616,7 @@ def _chat_append(chats, cid, after_len, after_hash, msgs, prefix=None,
                  and chat_prefix_hash(prefix, after_len) == after_hash
                  else [])
     if c is None:
-        if after_len == 0 and not _chat_dead(cid):
+        if after_len == 0 and not _chat_dead(cid, chats):
             c = _chat_new(chats, cid, lane, title)
         else:
             c = _chat_new(chats, _new_chat_id(), lane, title, ok_prefix)
@@ -7478,8 +7633,9 @@ def _chat_append(chats, cid, after_len, after_hash, msgs, prefix=None,
     return c
 
 
-def _chat_op(chats, op):
-    """One operation on the list in hand: (reply, changed)."""
+def _chat_op(chats, op, bk=None):
+    """One operation on the list in hand: (reply, changed). bk is the
+    folder's key, for a delete's stub."""
     if not isinstance(op, dict):
         return {"err": "not an operation"}, False
     kind, cid = op.get("op"), str(op.get("id") or "")
@@ -7489,7 +7645,7 @@ def _chat_op(chats, op):
     if kind == "create":
         if c is not None:
             return {"ok": True}, False
-        nid = _new_chat_id() if _chat_dead(cid) else cid
+        nid = _new_chat_id() if _chat_dead(cid, chats) else cid
         _chat_new(chats, nid, op.get("lane"), op.get("title"))
         return ({"ok": True} if nid == cid else {"remap": nid}), True
     if kind == "append":
@@ -7506,13 +7662,13 @@ def _chat_op(chats, op):
         chats.insert(min(st["idx"], len(chats)), st["chat"])
         return {"ok": True}, True
     if c is None:
-        return {"err": "gone" if _chat_dead(cid) else "no such chat"}, False
+        return {"err": "gone" if _chat_dead(cid, chats) else "no such chat"}, False
     if kind == "delete":
         # the removal and the stub in one step (0b 5.6); in This computer
         # the stub lives here, and a quit inside the window leaves the
         # chat deleted
         chats.pop(i)
-        _chat_stubs[cid] = {"at": time.time(), "chat": c, "idx": i}
+        _chat_stubs[cid] = {"at": time.time(), "chat": c, "idx": i, "bk": bk}
         return {"ok": True}, True
     if kind == "truncate":
         stored = _chat_msgs(c)
@@ -7553,10 +7709,12 @@ def chat_ops(ops, base=None) -> dict:
     """A batch under one lock, written once (0b Q4): each op's reply (ok,
     conflict with the current value, remap, or err) and the new
     data_rev. StoreReadError propagates: nothing is applied."""
+    bk = _bk(base)
     with _chats_lock:
         _chat_settle()
         chats = load_chats(base)
-        replies, changed = [], False
+        replies, changed = [], bool(_chat_finals.get(bk))
+        deleted = False
         for op in (ops if isinstance(ops, list) else [])[:200]:
             # an answer still streaming into this chat is thrown away by
             # Try again and Edit & resend (review of 6b322). A delete leaves
@@ -7565,12 +7723,19 @@ def chat_ops(ops, base=None) -> dict:
             if isinstance(op, dict) and op.get("op") == "truncate":
                 changed = _turns_settle(chats, str(op.get("id") or ""),
                                         keep=False) or changed
-            r, ch = _chat_op(chats, op)
+            r, ch = _chat_op(chats, op, bk)
             replies.append(r)
             changed = changed or ch
+            deleted = deleted or (ch and op.get("op") == "delete")
         if changed:
             store_chats(chats, base)
-        return {"results": replies, "data_rev": _data_rev[0]}
+        out = {"results": replies, "data_rev": _data_rev[0]}
+    if deleted:
+        # when the undo window ends, the delete is made final on disk
+        t = threading.Timer(CHAT_UNDO_S + 0.5, _chat_finalize, (base,))
+        t.daemon = True
+        t.start()
+    return out
 
 
 def chat_append_turn(cid, after_len, after_hash, msgs, base=None,
@@ -7641,14 +7806,23 @@ MEMORY_KEEP = 200       # facts kept (0b 5.2); prompts use the newest 40
 
 
 def _load_memory(base=None) -> list:
-    """The facts; [] only when the file isn't there yet (0b L1)."""
-    return _read_json("memory.json", base, list) or []
+    """The facts; [] only when memory.v2.json hasn't been written yet (0b
+    L1)."""
+    if _STORE_BLOCKED and _bk(base) in _STORE_BLOCKED:
+        raise StoreReadError(MEMORY_FILE)
+    return _read_json(MEMORY_FILE, base, list) or []
 
 
-def _save_memory(items: list, base=None):
+def _save_memory(items: list, base=None, legacy=False, erase=False):
     """Atomic (0b L2), the newest MEMORY_KEEP; fields it doesn't know
-    stay on each fact (L6)."""
-    _write_json("memory.json", items[-MEMORY_KEEP:], base, indent=1)
+    stay on each fact (L6). Whenever facts leave (the 200 trim, or
+    legacy=True for a clear), memory.json loses them too (0b 5.8, L7);
+    erase=True (a clear, Forget) empties memory.json as well."""
+    cut = len(items) > MEMORY_KEEP
+    items = list(items[-MEMORY_KEEP:])
+    _write_json(MEMORY_FILE, items, base, indent=1)
+    if cut or legacy or erase:
+        _legacy_sync_memory(items, base, erase=erase)
 
 
 def memory_text(base=None) -> str:
@@ -7659,6 +7833,310 @@ def memory_text(base=None) -> str:
         return ""
     return "\n".join("- " + i["fact"] for i in facts
                      if isinstance(i, dict) and isinstance(i.get("fact"), str))
+
+
+# ------------------------------------ the legacy files (0b 5.8, 5.9, 6b324)
+# chats.json and memory.json are what older builds read. _migrate_61
+# copied every chat and fact in them into the .v2 files, so the legacy
+# files must never hold one that root no longer does (L7): whenever a
+# chat or fact leaves the .v2 files (a final delete, Forget, a memory
+# clear, the 1,000 eviction, the 200 trim) they are rewritten without
+# it, atomically, and then legacy_base is written. A crash between the
+# two leaves only removals, which the import below ignores.
+#
+# legacy_base, in profile.json: {"chats": sha256 of chats.json, "memory":
+# sha256 of memory.json, "ids": {legacy id: {"id": its .v2 id, "h": sha256
+# of the entry}}, "facts": [sha256 of each normalised fact]}. The per-chat
+# "h" is this build's addition: it tells a chat an older build changed
+# from one this build changed, so a Try again here never reads as an
+# older build's edit.
+#
+# THE DOWNGRADE IMPORT (5.8, Q8). When a legacy file no longer matches
+# legacy_base, an older build ran. Into root's .v2 files only, whatever
+# profile is active (I7):
+#   * a chat legacy_base doesn't list was added by it: imported, with a
+#     fresh id where its own is taken or was deleted here (a deleted id
+#     is never brought back: removals never import)
+#   * a listed chat it changed: when the .v2 copy is a strict prefix of
+#     the legacy one, the copy takes the new turns; when the legacy one
+#     adds nothing the copy lacks, nothing happens; anything else is
+#     imported as a new chat with a fresh id. A listed chat deleted here
+#     stays deleted
+#   * a fact whose fingerprint legacy_base doesn't list: imported
+# A chat or fact already in root with the same turns (or text) is never
+# imported twice, so a crash between the .v2 write and legacy_base's
+# makes the next start find it rather than copy it again.
+
+
+def _ent_hash(e) -> str:
+    """One legacy entry, for telling whether an older build changed it."""
+    return hashlib.sha256(json.dumps(e, sort_keys=True, separators=(",", ":"))
+                          .encode("utf-8")).hexdigest()
+
+
+def _fact_fp(f):
+    """A fact's fingerprint: its normalised text (5.8). None: not a fact."""
+    t = f.get("fact") if isinstance(f, dict) else None
+    if not isinstance(t, str) or not t.strip():
+        return None
+    return hashlib.sha256(" ".join(t.split()).lower()
+                          .encode("utf-8", "surrogatepass")).hexdigest()
+
+
+def _msgs_key(c):
+    m = c.get("messages") if isinstance(c, dict) else None
+    m = m if isinstance(m, list) else []
+    return len(m), chat_prefix_hash(m, len(m))
+
+
+def _jcopy(x):
+    return json.loads(json.dumps(x))
+
+
+def _legacy_base_of(lchats, csha, lmem, msha) -> dict:
+    """legacy_base for legacy files whose chats map to themselves."""
+    ids = {}
+    for e in lchats or []:
+        lid = e.get("id") if isinstance(e, dict) else None
+        if isinstance(lid, str) and lid not in ids:
+            ids[lid] = {"id": lid, "h": _ent_hash(e)}
+    return {"chats": csha, "memory": msha, "ids": ids,
+            "facts": [p for p in map(_fact_fp, lmem or []) if p]}
+
+
+def _legacy_import_chats(chats, legacy, ids) -> bool:
+    """The downgrade import's chat half (see above), into the list in
+    hand; ids (legacy id -> {"id", "h"}) gains the new mappings. True
+    when the list changed."""
+    by_id = {c["id"]: c for c in chats
+             if isinstance(c, dict) and isinstance(c.get("id"), str)}
+    have = {}
+    for c in chats:
+        k = _msgs_key(c)
+        if k[0]:
+            have.setdefault(k, c.get("id"))
+    dead = (set(getattr(chats, "gone", None) or ()) | _chat_gone
+            | set(_chat_stubs))
+    changed = False
+    for e in legacy:
+        lid = e.get("id") if isinstance(e, dict) else None
+        if not (isinstance(lid, str) and _CHAT_ID.fullmatch(lid)):
+            continue
+        key = _msgs_key(e)
+        m = ids.get(lid)
+        if not isinstance(m, dict):
+            # added by an older build
+            if lid in dead:
+                continue            # deleted here: it never comes back
+            here = by_id.get(lid)
+            if here is not None and _msgs_key(here) == key:
+                ids[lid] = {"id": lid}
+                continue
+            if key[0] and key in have:
+                ids[lid] = {"id": have[key]}
+                continue
+            nid = lid if here is None else _new_chat_id()
+            c = _jcopy(e)
+            c["id"] = nid
+            chats.append(c)
+            by_id[nid] = c
+            if key[0]:
+                have.setdefault(key, nid)
+            ids[lid] = {"id": nid}
+            changed = True
+            continue
+        if m.get("h") == _ent_hash(e):
+            continue                # untouched by an older build
+        vc = by_id.get(m.get("id"))
+        if vc is None:
+            continue                # deleted here: the removal wins
+        lm = e.get("messages") if isinstance(e.get("messages"), list) else []
+        vm = _chat_msgs(vc)
+        if (len(vm) < len(lm) and chat_prefix_hash(vm, len(vm))
+                == chat_prefix_hash(lm, len(vm))):
+            vm.extend(_jcopy(lm[len(vm):]))
+            vc["ts"] = max(_chat_ts(vc), _chat_ts(e)) or int(time.time() * 1000)
+            changed = True
+        elif (len(lm) <= len(vm) and chat_prefix_hash(lm, len(lm))
+              == chat_prefix_hash(vm, len(lm))):
+            continue                # it adds nothing root lacks
+        elif key[0] and key in have:
+            continue                # imported already
+        else:
+            c = _jcopy(e)
+            c["id"] = _new_chat_id()
+            chats.append(c)
+            by_id[c["id"]] = c
+            if key[0]:
+                have.setdefault(key, c["id"])
+            changed = True
+    return changed
+
+
+def _profile_legacy_set(base, **kv):
+    """Write keys of legacy_base (the last step of every rewrite)."""
+    p = _read_json(PROFILE_FILE, base, dict) or {}
+    lb = p.get("legacy_base") if isinstance(p.get("legacy_base"), dict) else {}
+    lb.update(kv)
+    p["legacy_base"] = lb
+    _write_json(PROFILE_FILE, p, base, indent=1)
+
+
+def _legacy_sync_chats(chats, base=None, erase=False) -> bool:
+    """With chats.v2.json's list in hand, under _chats_lock: the downgrade
+    import (when chats.json changed since legacy_base), then chats.json
+    rewritten without every listed chat root no longer holds (and any
+    chat whose id was deleted here), then legacy_base. erase=True
+    (Forget): chats.json is emptied. A file it can't read is left alone
+    for the next start. True when it finished."""
+    try:
+        with _profile_lock:
+            prof = _read_json(PROFILE_FILE, base, dict) or {}
+            lb = prof.get("legacy_base")
+            if not isinstance(lb, dict):
+                return False        # not migrated: nothing to keep in step
+            legacy, sha = _read_json_h(LEGACY_CHATS, base, list)
+            ids = {k: dict(v) for k, v in (lb.get("ids") or {}).items()
+                   if isinstance(v, dict)} if isinstance(lb.get("ids"), dict) else {}
+            if legacy is None:
+                if lb.get("chats") is not None or ids:
+                    _profile_legacy_set(base, chats=None, ids={})
+                return True
+            if erase:
+                keep = []
+            else:
+                if sha != lb.get("chats") and _legacy_import_chats(chats, legacy, ids):
+                    chats, _ = _write_chats(chats, base)
+                bk = _bk(base)
+                held = {c.get("id") for c in chats if isinstance(c, dict)}
+                held |= {k for k, v in _chat_stubs.items() if v.get("bk") == bk}
+                dead = set(getattr(chats, "gone", None) or ()) | _chat_gone
+                keep = []
+                for e in legacy:
+                    lid = e.get("id") if isinstance(e, dict) else None
+                    m = ids.get(lid) if isinstance(lid, str) else None
+                    if isinstance(m, dict) and m.get("id") not in held:
+                        continue
+                    if m is None and isinstance(lid, str) and lid in dead \
+                            and lid not in held:
+                        continue
+                    keep.append(e)
+            if len(keep) != len(legacy):
+                sha = _write_json(LEGACY_CHATS, keep, base)
+            nids = {}
+            for e in keep:
+                lid = e.get("id") if isinstance(e, dict) else None
+                if isinstance(lid, str) and isinstance(ids.get(lid), dict) \
+                        and lid not in nids:
+                    nids[lid] = {"id": ids[lid].get("id"), "h": _ent_hash(e)}
+            if sha != lb.get("chats") or nids != lb.get("ids"):
+                _profile_legacy_set(base, chats=sha, ids=nids)
+            return True
+    except (StoreReadError, OSError) as exc:
+        print("  (chats.json not brought in step: %s; the next start does it)"
+              % exc)
+        return False
+
+
+def _legacy_sync_memory(items, base=None, erase=False) -> bool:
+    """memory.v2.json's facts in hand, under _memory_lock: the import of
+    facts an older build added, memory.json rewritten without every fact
+    root no longer holds, then legacy_base (see _legacy_sync_chats)."""
+    try:
+        with _profile_lock:
+            prof = _read_json(PROFILE_FILE, base, dict) or {}
+            lb = prof.get("legacy_base")
+            if not isinstance(lb, dict):
+                return False
+            legacy, sha = _read_json_h(LEGACY_MEMORY, base, list)
+            if legacy is None:
+                if lb.get("memory") is not None or lb.get("facts"):
+                    _profile_legacy_set(base, memory=None, facts=[])
+                return True
+            if erase:
+                keep = []
+            else:
+                have = {_fact_fp(f) for f in items} - {None}
+                if sha != lb.get("memory"):
+                    known = set(lb.get("facts") or [])
+                    add = []
+                    for f in legacy:
+                        fp = _fact_fp(f)
+                        if fp and fp not in known and fp not in have:
+                            add.append(_jcopy(f))
+                            have.add(fp)
+                    if add:
+                        items = (list(items) + add)[-MEMORY_KEEP:]
+                        _write_json(MEMORY_FILE, items, base, indent=1)
+                        have = {_fact_fp(f) for f in items} - {None}
+                keep = [f for f in legacy
+                        if _fact_fp(f) is None or _fact_fp(f) in have]
+            if len(keep) != len(legacy):
+                sha = _write_json(LEGACY_MEMORY, keep, base, indent=1)
+            fps = [p for p in map(_fact_fp, keep) if p]
+            if sha != lb.get("memory") or fps != lb.get("facts"):
+                _profile_legacy_set(base, memory=sha, facts=fps)
+            return True
+    except (StoreReadError, OSError) as exc:
+        print("  (memory.json not brought in step: %s; the next start does it)"
+              % exc)
+        return False
+
+
+def _migrate_61(base=None) -> bool:
+    """The one-time upgrade step (0b 5.9), then the boot order (5.8). Run
+    at every start before any route is served, only by the copy holding
+    the instance lock (Q9).
+      * No legacy_base yet: copy chats.json into chats.v2.json and
+        memory.json into memory.v2.json, then write the first
+        legacy_base. Migration is done only once legacy_base is written:
+        .v2 files found without it are copied again, since nothing else
+        writes them before then (chats.v2.json carries "from_legacy"
+        until this build's first write of its own, which tells that
+        copy from a store in use whose profile.json went missing; then
+        legacy_base starts empty and the import below brings in only
+        what root lacks).
+      * Then the downgrade import, then the legacy files lose what root
+        no longer holds (this finishes a delete that crashed before its
+        rewrite), then legacy_base (from 1a, a pending Add step 6 goes
+        first).
+    A file it can't read stops it: the chat and memory routes answer 503
+    and the next start tries again. Old chat ids stay valid; nothing
+    signs in. The browser-store clean-up it starts is the page's first
+    call to /api/webstore/clean (see webstore_clean)."""
+    k = _bk(base)
+    try:
+        with _chats_lock, _memory_lock, _profile_lock:
+            _STORE_BLOCKED.pop(k, None)
+            prof = _read_json(PROFILE_FILE, base, dict) or {}
+            if not isinstance(prof.get("legacy_base"), dict):
+                cur = _read_json(CHATS_FILE, base, dict)
+                lch, csha = _read_json_h(LEGACY_CHATS, base, list)
+                lme, msha = _read_json_h(LEGACY_MEMORY, base, list)
+                if cur is None or "from_legacy" in cur:
+                    _write_json(CHATS_FILE, {"v": 2, "chats": lch or [],
+                                             "gone": [],
+                                             "from_legacy": csha or ""}, base)
+                    _write_json(MEMORY_FILE, (lme or [])[-MEMORY_KEEP:],
+                                base, indent=1)
+                    lb = _legacy_base_of(lch, csha, lme, msha)
+                else:
+                    lb = {"chats": None, "memory": None, "ids": {},
+                          "facts": []}
+                prof = _read_json(PROFILE_FILE, base, dict) or {}
+                prof["legacy_base"] = lb
+                prof.setdefault("migrated_61", int(time.time()))
+                _write_json(PROFILE_FILE, prof, base, indent=1)
+            # a legacy file unreadable now (an older build's crash mid-save)
+            # only waits: nothing in root depends on it any more
+            _legacy_sync_chats(load_chats(base), base)
+            _legacy_sync_memory(_load_memory(base), base)
+        return True
+    except (StoreReadError, OSError) as exc:
+        _STORE_BLOCKED[k] = str(exc)
+        print("  couldn't read %s: chats and memory stay shut until the "
+              "next start" % exc)
+        return False
 
 
 def _extract_memory(label: str, user_msg: str, base=None, conf=None):
@@ -13366,6 +13844,12 @@ def _turns_flush():
         live = list(_turns_live.values())
     for t in live:
         _turn_finish(t)
+    # a delete inside its undo window is final at a quit (0b 5.6): its id
+    # joins gone and chats.json loses it now (the next start would too)
+    try:
+        _chat_finalize(None, now=float("inf"))
+    except Exception:
+        pass
 
 
 atexit.register(_turns_flush)
@@ -14776,6 +15260,21 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     _giants["v"] = bool(d.get("include_giants"))
             self._send_json({"ok": isinstance(d, dict)})
             return
+        if self.path in ("/api/prefs/adopt", "/api/webstore/clean"):
+            # the page's first-run move of its six per-person keys into
+            # prefs.json, and the web view's clean-up (0b 5.10, 6b324)
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                d = json.loads(self.rfile.read(n)) if n else {}
+            except (ValueError, json.JSONDecodeError):
+                d = None
+            if not isinstance(d, dict):
+                self._send_json({"err": "not an object"}, code=400)
+            elif self.path == "/api/prefs/adopt":
+                self._send_json(prefs_adopt(d, self._data_base()))
+            else:
+                self._send_json(webstore_clean(d.get("local") is True))
+            return
         if self.path == "/api/chats":
             # GONE (0b 5.3, 6b322): the whole-list save let an outdated
             # page replace everything; a page this old must reload
@@ -14842,8 +15341,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._send_json({"ok": True})
             return
         if self.path == "/api/memory/clear":
+            # memory.json empties too (0b 5.8, L7): an older build must not
+            # go on using a fact cleared here
             with _memory_lock:
-                _save_memory([], self._data_base())
+                _load_memory(self._data_base())
+                _save_memory([], self._data_base(), erase=True)
             self._send_json({"ok": True})
             return
         if self.path == "/api/logout":
@@ -14868,24 +15370,36 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 d = {}          # valid JSON is not always an object
             scopes = set(d.get("scopes") or ["memory"])
             base = self._data_base()
+            # a store it can't read refuses the whole request before
+            # anything is erased (review of 6b322, 0b L1)
             if "prefs" in scopes:
-                # settings it can't read refuse the whole request before
-                # anything else is erased (review of 6b322)
                 _read_json("prefs.json", base, dict)
             if "memory" in scopes:
+                _load_memory(base)
+            if "chats" in scopes:
+                load_chats(base)
+            # each store is emptied with its legacy file (0b 5.8, L7): an
+            # older build started afterwards shows none of it either
+            if "memory" in scopes:
                 with _memory_lock:
-                    _save_memory([], base)
+                    _save_memory([], base, erase=True)
             if "chats" in scopes:
                 with _chats_lock:
                     # the undo window's copies go too, and their ids stay
                     # dead, so a late answer can't bring one back
                     _chat_gone.update(_chat_stubs)
                     _chat_stubs.clear()
+                    _chat_finals.pop(_bk(base), None)
                     with _turns_lock:
                         for _t in _turns_live.values():
                             _t["done"] = True
                         _turns_live.clear()
-                    store_chats([], base)
+                    # nothing of the chats is left: not even the ids of
+                    # the deleted ones
+                    _cs = load_chats(base)
+                    del _cs[:]
+                    _cs.gone = []
+                    store_chats(_cs, base, erase=True)
             if "prefs" in scopes:
                 # personal keys only — machine config (turbo, update
                 # channel) is not "about the user" and must survive
@@ -16833,6 +17347,369 @@ def _drop_instance_note():
                 os.remove(INSTANCE_NOTE)
     except (OSError, ValueError):
         pass
+
+
+# ------------------------------- the web view's own store (0b 5.10, 6b324)
+# NOTHING PERSONAL STAYS IN THE WEB VIEW (I5). The page moves its six
+# per-person keys into prefs.json and deletes every other key that isn't
+# on its machine allow-list (storeBoot, in the page). This is the native
+# half: ONE routine with a branch per web engine, run once the page has
+# done that (and, from 1a, at every profile switch). It removes every
+# kind of data from every site's record but the app's own, and from the
+# app's own (127.0.0.1 and localhost: every port shares it) every kind
+# but LocalStorage and cookies. The one cookie is the launch cookie
+# millen_key_<port>, which holds nothing personal and dies with the
+# launch; without it the reload that follows gets the 403 page.
+#   0b Q13: once the six keys are in prefs.json, the app's own
+#   LocalStorage goes as well, one time, then the page reloads: a copy of
+#   the chats an old build left under another port (8889, a fallback
+#   port, a dev port) is gone with it. The allow-listed conveniences
+#   (model picks, sky, sidebar width) reset once.
+# profile.json's "webstore" records it: "clean" when the first pass ran,
+# "want_local" when the page said the six keys were safe, "local" when
+# the one-time LocalStorage removal ran.
+_WEBSTORE_OWN = ("127.0.0.1", "localhost", "::1", "[::1]")
+_WINDOW = []            # the app's window, once made
+_webstore_lock = threading.Lock()
+_webstore_reloaded = [False]    # one reload per run, whatever the record says
+_QT_CLEAR_CACHE = [False]
+_webstore_keep = []     # completion blocks PyObjC must keep alive
+
+
+def _web_engine() -> str:
+    """The web engine this build's window runs: WKWebView on a Mac,
+    WebView2 on Windows x64 (and x64 under an ARM PC's emulation), Qt's
+    WebEngine on the native Windows ARM64 build (pythonnet has no ARM64
+    wheel, build_windows_exe.ps1)."""
+    if IS_MAC:
+        return "webkit"
+    if IS_WIN:
+        return "qt" if (IS_WIN_ARM and not IS_WIN_EMULATED) else "webview2"
+    return ""
+
+
+def _webstore_plan(names, local: bool) -> dict:
+    """Which records lose what: "other" loses everything; "own" (the
+    app's own loopback record) keeps what "keep" names: cookies, and
+    LocalStorage unless local."""
+    own = [n for n in names if str(n).strip().lower() in _WEBSTORE_OWN]
+    other = [n for n in names if str(n).strip().lower() not in _WEBSTORE_OWN]
+    return {"own": own, "other": other,
+            "keep": ["cookies"] if local else ["cookies", "local"]}
+
+
+def _webstore_webkit(local: bool, timeout: float = 20.0, store=None,
+                     call=None) -> bool:
+    """macOS: WKWebsiteDataStore fetchDataRecordsOfTypes: and
+    removeDataOfTypes:forDataRecords: on the store pywebview's window
+    uses (defaultDataStore; its Cocoa backend ignores storage_path, so
+    it lives under ~/Library/WebKit, not app_dir()/webkit). Runs on the
+    main thread through AppHelper.callAfter, from any other thread; the
+    completion handlers need the app's run loop, so only once the window
+    runs. store and call are the seams the gauntlet drives it with."""
+    import WebKit
+    if call is None:
+        from PyObjCTools import AppHelper
+        call = AppHelper.callAfter
+    done, res = threading.Event(), {"ok": False}
+
+    def start():
+        try:
+            ds = store or WebKit.WKWebsiteDataStore.defaultDataStore()
+            every = WebKit.WKWebsiteDataStore.allWebsiteDataTypes()
+            keep = {str(WebKit.WKWebsiteDataTypeCookies)}
+            if not local:
+                keep.add(str(WebKit.WKWebsiteDataTypeLocalStorage))
+            own_types = [t for t in every if str(t) not in keep]
+
+            def got(records):
+                try:
+                    recs = list(records or [])
+                    plan = _webstore_plan([str(r.displayName()) for r in recs],
+                                          local)
+                    own = [r for r in recs if str(r.displayName()) in plan["own"]]
+                    other = [r for r in recs
+                             if str(r.displayName()) in plan["other"]]
+                    jobs = [(every, other)] if other else []
+                    if own and own_types:
+                        try:
+                            from Foundation import NSSet
+                            ot = NSSet.setWithArray_(own_types)
+                        except Exception:
+                            ot = set(own_types)
+                        jobs.append((ot, own))
+                    left = [len(jobs)]
+                    if not jobs:
+                        res["ok"] = True
+                        done.set()
+                        return
+
+                    def one():
+                        left[0] -= 1
+                        if left[0] <= 0:
+                            res["ok"] = True
+                            done.set()
+                    _webstore_keep.append(one)
+                    for types, rs in jobs:
+                        ds.removeDataOfTypes_forDataRecords_completionHandler_(
+                            types, rs, one)
+                except Exception:
+                    done.set()
+            _webstore_keep.append(got)
+            ds.fetchDataRecordsOfTypes_completionHandler_(every, got)
+        except Exception:
+            done.set()
+    call(start)
+    done.wait(timeout)
+    return res["ok"]
+
+
+def _webstore_wv2_kinds(K, local: bool):
+    """CoreWebView2BrowsingDataKinds for WebView2's clean-up: every kind
+    but local storage and cookies (all origins at once: WebView2 has no
+    per-site call, and the window loads only from loopback), plus local
+    storage when local. The kinds are named, never numbered."""
+    names = ["FileSystems", "IndexedDb", "WebSql", "CacheStorage",
+             "ServiceWorkers", "DiskCache", "DownloadHistory",
+             "GeneralAutofill", "PasswordAutosave", "BrowsingHistory",
+             "Settings"] + (["LocalStorage"] if local else [])
+    return [getattr(K, n) for n in names if hasattr(K, n)]
+
+
+def _webstore_wv2_value(K, kinds):
+    """The kinds as one flags value of type K. pythonnet 3 keeps .NET
+    enums typed and may not OR them, and a plain int isn't accepted
+    where the enum is expected: OR them, else build K from the bits."""
+    val = None
+    try:
+        import functools
+        import operator
+        val = functools.reduce(operator.or_, kinds)
+    except Exception:
+        val = None
+    if val is None or isinstance(val, int):
+        n = 0
+        for k in kinds:
+            n |= int(k)
+        try:
+            val = K(n)
+        except Exception:
+            import clr
+            from System import Enum
+            val = Enum.ToObject(clr.GetClrType(K), n)
+    return val
+
+
+def _webstore_wv2(window, local: bool, timeout: float = 20.0) -> bool:
+    """Windows x64: CoreWebView2Profile.ClearBrowsingDataAsync on the
+    window's own WebView2 (its user-data folder is app_dir()/webkit:
+    pywebview's WinForms backend honours storage_path), on the window's
+    UI thread. UNVERIFIED here: it needs the x64 build on Windows."""
+    import clr  # noqa: F401  (pythonnet, loaded by pywebview already)
+    from System import Action, Func, Type
+    from System.Threading.Tasks import Task
+    from Microsoft.Web.WebView2.Core import CoreWebView2BrowsingDataKinds as K
+    val = _webstore_wv2_value(K, _webstore_wv2_kinds(K, local))
+    form = window.native
+    done = threading.Event()
+
+    def run():
+        prof = form.browser.webview.CoreWebView2.Profile
+        t = prof.ClearBrowsingDataAsync(val)
+        t.ContinueWith(Action[Task](lambda _t: done.set()))
+    form.Invoke(Func[Type](run))
+    return done.wait(timeout)
+
+
+def _webstore_qt_sweep(folder: str, keep_local: bool) -> list:
+    """The Qt build's store as files (0b Q16: QtWebEngine has no
+    per-origin LocalStorage removal). Everything in the profile's
+    persistent folder goes (cookies, IndexedDB, service workers, caches,
+    session storage...) except "Local Storage" when keep_local. Run
+    before the window opens, so no page holds any of it and the launch
+    cookie of this run isn't set yet."""
+    out = []
+    try:
+        names = sorted(os.listdir(folder))
+    except OSError:
+        return out
+    for n in names:
+        if keep_local and n == "Local Storage":
+            continue
+        p = os.path.join(folder, n)
+        try:
+            if os.path.isdir(p) and not os.path.islink(p):
+                shutil.rmtree(p)
+            else:
+                os.remove(p)
+            out.append(n)
+        except OSError:
+            pass
+    return out
+
+
+def _webstore_state(base=None) -> dict:
+    p = _read_json(PROFILE_FILE, base, dict) or {}
+    w = p.get("webstore")
+    return dict(w) if isinstance(w, dict) else {}
+
+
+def _webstore_mark(base=None, **kv):
+    with _profile_lock:
+        p = _read_json(PROFILE_FILE, base, dict) or {}
+        w = p.get("webstore") if isinstance(p.get("webstore"), dict) else {}
+        w.update(kv)
+        p["webstore"] = w
+        _write_json(PROFILE_FILE, p, base, indent=1)
+
+
+def _webstore_qt_boot(base=None):
+    """The Qt branch, at a start before the window: the first pass, and
+    the one-time LocalStorage removal once the page has asked for it.
+    UNVERIFIED here: it needs the ARM64 build on Windows ARM64."""
+    try:
+        ws = _webstore_state(base)
+        need_clean = not ws.get("clean")
+        need_local = bool(ws.get("want_local")) and not ws.get("local")
+        if not (need_clean or need_local):
+            return
+        _webstore_qt_sweep(os.path.join(app_dir(), "webkit"),
+                           keep_local=not need_local)
+        _QT_CLEAR_CACHE[0] = True       # the HTTP cache, once the view is up
+        now = int(time.time())
+        _webstore_mark(base, clean=ws.get("clean") or now,
+                       **({"local": now} if need_local else {}))
+    except Exception as exc:
+        print("  (web view store not cleaned: %s)" % exc)
+
+
+def _webstore_qt_cache(window):
+    """The Qt profile's HTTP cache (QWebEngineProfile.clearHttpCache; its
+    folder is cachePath(), which setPersistentStoragePath doesn't move),
+    on the Qt main thread through a queued signal."""
+    if not _QT_CLEAR_CACHE[0]:
+        return
+    _QT_CLEAR_CACHE[0] = False
+    try:
+        from qtpy import QtCore
+        prof = window.native.profile
+
+        class _Run(QtCore.QObject):
+            go = QtCore.Signal()
+
+            def __init__(self):
+                super().__init__()
+                self.go.connect(self.do, QtCore.Qt.QueuedConnection)
+
+            @QtCore.Slot()
+            def do(self):
+                prof.clearHttpCache()
+        r = _Run()
+        r.moveToThread(QtCore.QCoreApplication.instance().thread())
+        _webstore_keep.append(r)
+        r.go.emit()
+    except Exception as exc:
+        print("  (web view cache not cleared: %s)" % exc)
+
+
+def _webstore_native(local: bool) -> bool:
+    """The branch for this build's engine. False: it didn't run (no
+    window, an engine without a live branch, or it failed); nothing is
+    recorded and the next boot's page asks again."""
+    if "webstore-fake" in TEST_HOOKS:
+        # a dev copy's stand-in (the gauntlet has no window): records
+        # what the routine was asked, and the plan for a few records
+        rec = {"local": local, "plan": _webstore_plan(
+            ["127.0.0.1", "localhost", "openstreetmap.org"], local)}
+        p = os.path.join(app_dir(), "run", "webstore.json")
+        try:
+            with open(p, encoding="utf-8") as fh:
+                runs = json.load(fh)
+        except (OSError, ValueError):
+            runs = []
+        with open(p, "w", encoding="utf-8") as fh:
+            json.dump(runs + [rec], fh)
+        return True
+    if not _WINDOW:
+        return False
+    eng = _web_engine()
+    try:
+        if eng == "webkit":
+            # a dev copy's window may share the WebKit store of the app a
+            # person uses: it leaves the store alone unless asked
+            if DEV_HOME and "webstore-native" not in TEST_HOOKS:
+                return False
+            return _webstore_webkit(local)
+        if eng == "webview2":
+            return _webstore_wv2(_WINDOW[0], local)
+    except Exception as exc:
+        print("  (web view store not cleaned: %s)" % exc)
+    return False
+
+
+def webstore_clean(local: bool, base=None) -> dict:
+    """POST /api/webstore/clean, the page's call at every boot once the
+    six keys are handled. local: none of the six is left in browser
+    storage (0b Q13). {"reload": true} tells the page to reload (after
+    the one-time LocalStorage removal). A failure changes nothing and
+    never stands in the window's way; the next boot asks again. On Qt
+    the files go at the next start, before the window (_webstore_qt_boot)."""
+    with _webstore_lock:
+        ws = _webstore_state(base)
+        if local and not ws.get("want_local"):
+            _webstore_mark(base, want_local=int(time.time()))
+            ws["want_local"] = 1
+        need_clean = not ws.get("clean")
+        need_local = bool(ws.get("want_local")) and not ws.get("local")
+        if not (need_clean or need_local):
+            return {"ran": False, "reload": False}
+        eng = "fake" if "webstore-fake" in TEST_HOOKS else _web_engine()
+        if eng == "qt":
+            return {"ran": False, "reload": False, "later": True}
+        if not _webstore_native(need_local):
+            return {"ran": False, "reload": False}
+        now = int(time.time())
+        _webstore_mark(base, clean=ws.get("clean") or now,
+                       **({"local": now} if need_local else {}))
+        reload_ = need_local and not _webstore_reloaded[0]
+        _webstore_reloaded[0] = _webstore_reloaded[0] or reload_
+        return {"ran": True, "reload": reload_}
+
+
+# THE SIX PER-PERSON KEYS (0b 5.10, Q10) the page kept in browser storage,
+# as prefs.json holds them: millen.tier, agent, codeagent, adv, advon and
+# autonomy (which keeps 6b310's remote_autonomy)
+PREF_SIX = ("tier", "agent", "codeagent", "adv", "advon", "remote_autonomy")
+
+
+def _pref_six_ok(k, v) -> bool:
+    if k in ("tier", "agent", "codeagent"):
+        return isinstance(v, str) and len(v) <= 60
+    if k == "adv":
+        return v is None or (isinstance(v, dict)
+                             and len(json.dumps(v)) <= 8000)
+    if k == "advon":
+        return isinstance(v, bool)
+    if k == "remote_autonomy":
+        return v in ("manual", "auto", "full")
+    return False
+
+
+def prefs_adopt(d: dict, base=None) -> dict:
+    """POST /api/prefs/adopt: the page's first-run post of the six keys.
+    Only keys prefs.json lacks are taken (Q10: the server wins, as
+    remote_autonomy already did); the reply lists every one of the six
+    prefs.json now holds, and the page removes exactly those from browser
+    storage. An unreadable prefs.json raises (503) and takes nothing."""
+    with _prefs_lock:
+        cur = load_prefs(base, strict=True)
+        add = {k: v for k, v in (d or {}).items()
+               if k in PREF_SIX and k not in cur and _pref_six_ok(k, v)}
+        if add:
+            cur.update(add)
+            store_prefs(cur, base)
+        return {"ok": True, "took": sorted(add),
+                "prefs": {k: cur[k] for k in PREF_SIX if k in cur}}
 
 
 _WIN_STATE = {"min": False, "max": False}   # as the window's events say
@@ -20549,6 +21426,98 @@ const IS_PC=__IS_PC__;
 // the sun is down where you are (6b318): the backdrop goes dark
 const SKY_NIGHT=__SKY_NIGHT__;
 
+/* NOTHING PERSONAL IN BROWSER STORAGE (0b 5.10, I5, 6b324). The six
+   per-person keys live in prefs.json and are read and written through
+   /api/prefs, never browser storage. At every boot, in this order:
+   1. each of the six still in browser storage is posted where prefs.json
+      lacks it (the server wins for a key it holds, Q10) and removed only
+      once prefs.json holds it: a failed post leaves it for the next boot;
+   2. every other key not on the machine allow-list is deleted (the old
+      copy of the chats with them, never named here);
+   3. the web view's native clean-up runs once (/api/webstore/clean), and
+      the page reloads when that took the app's own LocalStorage (Q13). */
+const PREF_OF={"millen.tier":"tier","millen.agent":"agent",
+  "millen.codeagent":"codeagent","millen.adv":"adv","millen.advon":"advon",
+  "millen.autonomy":"remote_autonomy"};
+const KEEP_LS=["millen.model","millen.council","millen.video","millen.perf",
+  "millen.voice","millen.speeds","millen.sky","millen.skyhist",
+  "millen.skynext","millen.sbw"];
+let P={};                        // the six, as prefs.json holds them
+const prefMine=new Set();        // set here before prefs.json answered
+let prefQ=Promise.resolve();
+function prefSet(o){
+  Object.keys(o).forEach(k=>{P[k]=o[k];prefMine.add(k);});
+  const body=JSON.stringify(o);
+  // one at a time, in order: two quick changes can't land swapped
+  prefQ=prefQ.then(()=>api("/api/prefs",{method:"POST",
+    headers:{"Content-Type":"application/json"},body})).catch(()=>{});
+  return prefQ;
+}
+function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
+function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
+function lsKeys(){
+  const a=[];
+  try{for(let i=0;i<localStorage.length;i++)a.push(localStorage.key(i));}catch(e){}
+  return a;
+}
+// a browser value as prefs.json keeps it
+function prefVal(k,v){
+  if(k==="millen.adv"){
+    try{const a=JSON.parse(v);return a&&typeof a==="object"&&!Array.isArray(a)?a:null;}
+    catch(e){return null;}
+  }
+  if(k==="millen.advon")return v==="1";
+  return v;
+}
+async function storeBoot(){
+  let held=null;
+  try{const r=await api("/api/prefs");if(r.ok)held=await r.json();}catch(e){}
+  const send={},pend={};
+  Object.keys(PREF_OF).forEach(k=>{
+    const v=lsGet(k);if(v===null)return;
+    pend[PREF_OF[k]]=prefVal(k,v);
+    if(held&&!(PREF_OF[k] in held))send[PREF_OF[k]]=pend[PREF_OF[k]];
+  });
+  if(held&&Object.keys(send).length){
+    try{
+      const r=await api("/api/prefs/adopt",{method:"POST",
+        headers:{"Content-Type":"application/json"},body:JSON.stringify(send)});
+      const d=r.ok?await r.json():null;
+      held=d&&d.prefs?Object.assign({},held,d.prefs):null;
+    }catch(e){held=null;}
+  }
+  if(held)Object.keys(PREF_OF).forEach(k=>{if(PREF_OF[k] in held)lsDel(k);});
+  lsKeys().forEach(k=>{if(k!==null&&!KEEP_LS.includes(k)&&!(k in PREF_OF))lsDel(k);});
+  // a key whose post failed still counts for this session, read-only
+  const got=Object.assign({},pend,held||{});
+  Object.keys(got).forEach(k=>{if(!prefMine.has(k))P[k]=got[k];});
+  applyPrefs();
+  const left=Object.keys(PREF_OF).some(k=>lsGet(k)!==null);
+  try{
+    const r=await api("/api/webstore/clean",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({local:!!held&&!left})});
+    const d=r.ok?await r.json():{};
+    if(d.reload)location.reload();
+  }catch(e){}
+}
+// the six, as the page uses them (a change made before prefs.json
+// answered stands)
+function applyPrefs(){
+  if(!prefMine.has("adv"))adv=P.adv&&typeof P.adv==="object"?P.adv:null;
+  if(!prefMine.has("advon"))advOn=P.advon===true&&!!adv;
+  if(!prefMine.has("tier")){
+    let t=typeof P.tier==="string"?P.tier:"Fast";
+    if(t==="Smart"||t==="Best")t="Fast";   // merged (1.20) and retired (5.3)
+    if(t==="Power")t="Pro";                // Pro absorbed Power (5.3)
+    if(tierOff[t])t="Fast";
+    tier=t;
+  }
+  if(!prefMine.has("remote_autonomy")
+     &&["manual","auto","full"].includes(P.remote_autonomy))autonomy=P.remote_autonomy;
+  setTier(tier,true);advChip();paintAutonomy();
+}
+
 /* ------------------------------------------------------------- state */
 let messages=[], generating=false, abortCtl=null;
 let model=localStorage.getItem("millen.model")||"Llama 3.2 3B";
@@ -20599,7 +21568,7 @@ function selectModel(name){
     return;
   }
   tier="";                       // an explicit pick overrides any tier
-  localStorage.setItem("millen.tier","");
+  prefSet({tier:""});
   council=[name];
   paintModels();
 }
@@ -20659,19 +21628,20 @@ let agent="";           // declared early: setTier reads it (TDZ!)
 // modes with nothing behind them right now — Cloud Only with no working
 // key. Declared here for the same TDZ reason: setTier reads it at boot.
 let tierOff={};
-let tier=localStorage.getItem("millen.tier")||"Fast";
-if(tier==="Smart")tier="Fast";        // merged tiers (1.20)
-if(tier==="Best")tier="Fast";         // Best retired (5.3)
-if(tier==="Power")tier="Pro";         // Pro absorbed Power (5.3)
-function setTier(name){
+// the saved mode comes from prefs.json (applyPrefs, 6b324)
+let tier="Fast";
+// quiet: the boot's own call, which saves nothing
+function setTier(name,quiet){
   if(tierOff[name])return;       // a mode that can't answer isn't pickable
   // picking a real tier exits the custom council (6b248); the boot call
   // with the stored empty tier keeps it
-  if(name&&advOn){advOn=false;localStorage.setItem("millen.advon","0");}
-  tier=name;localStorage.setItem("millen.tier",name);
+  const o={};
+  if(name&&advOn){advOn=false;o.advon=false;}
+  tier=name;o.tier=name;
   councilManual=false;
-  if(agent){agent="";localStorage.setItem("millen.agent","");
+  if(agent){agent="";o.agent="";
     if(typeof paintAgents==="function")paintAgents();}
+  if(!quiet)prefSet(o);
   if(typeof modeShow==="function")modeShow("ai");
   paintModels();                 // paints both tier and model highlights
 }
@@ -20727,12 +21697,11 @@ async function showTierPop(el,name){
 function hideTierPop(){tierPop.hidden=true;}
 /* ------------------------------------------------- advanced council */
 // 6b248, per Patrick: hand-pick which minds draft and who composites.
-// Stored client-side (millen.adv); the request carries models + cloud
-// + compositor, and the server treats a named cloud list as its own
-// opt-in. Picking any tier exits custom mode.
+// Stored in prefs.json (adv, advon; 6b324); the request carries models
+// + cloud + compositor, and the server treats a named cloud list as its
+// own opt-in. Picking any tier exits custom mode.
 let adv=null;
-try{adv=JSON.parse(localStorage.getItem("millen.adv")||"null");}catch(e){}
-let advOn=localStorage.getItem("millen.advon")==="1"&&!!adv;
+let advOn=false;
 const ADV_USE={
   "Llama 3.2 1B":"instant drafts, the simplest questions",
   "Llama 3.2 3B":"quick everyday answers",
@@ -20827,9 +21796,8 @@ $("#adv-save").addEventListener("click",()=>{
     return;
   }
   adv={local:local,cloud:cloud,comp:$("#adv-comp").value};
-  localStorage.setItem("millen.adv",JSON.stringify(adv));
-  advOn=true;localStorage.setItem("millen.advon","1");
-  tier="";localStorage.setItem("millen.tier","");
+  advOn=true;tier="";
+  prefSet({adv:adv,advon:true,tier:""});
   advChip();
   $("#adv-veil").hidden=true;
 });
@@ -20891,7 +21859,7 @@ document.addEventListener("click",e=>{
   if(em&&!e.target.closest("#engmenu")&&!e.target.closest("#model-chip"))
     em.hidden=true;
 });
-setTier(tier);
+setTier(tier,true);
 advChip();     // a custom council survives the restart (6b248)
 
 // the acceleration lockup next to the engine chip. One fetch at boot —
@@ -20956,7 +21924,7 @@ function switchLane(m){
   modeShow(m);
   const codey=agent==="Coding"||agent==="Workspace"||agent==="Remote";
   if(m==="code"&&!codey)
-    setAgent(localStorage.getItem("millen.codeagent")||"Coding");
+    setAgent(P.codeagent||"Coding");
   else if(m!=="code"&&codey)setAgent("");
 }
 $$("#mode-tabs .ltab").forEach(t=>
@@ -20965,7 +21933,7 @@ $$("#mode-tabs .ltab").forEach(t=>
 /* ------------------------------------------------------------ agents */
 // radio choice: a task specialist (Coding, Resumes…) or the standard
 // model path. Picking a tier or model flips back to Standard.
-agent="";localStorage.setItem("millen.agent","");   // AI is the default view
+agent="";   // AI is the default view
 function paintAgents(){
   $$("#code-wrap .agent").forEach(el=>
     el.classList.toggle("on",(el.dataset.agent||"")===agent));
@@ -20974,10 +21942,10 @@ function paintAgents(){
   else if(chip)paintModels();
 }
 function setAgent(name){
-  agent=name;localStorage.setItem("millen.agent",name);
+  agent=name;
   // the CODE tab reopens on whichever specialist was used last
-  if(name==="Coding"||name==="Workspace")
-    localStorage.setItem("millen.codeagent",name);
+  prefSet(name==="Coding"||name==="Workspace"
+    ?{agent:name,codeagent:name}:{agent:name});
   paintAgents();
   if(typeof wsRefresh==="function")wsRefresh();
   if(typeof remoteRefresh==="function")remoteRefresh();
@@ -21085,24 +22053,20 @@ function riskCard(t){
 /* ------------------------------------------------- remote agent (6b249) */
 // The autonomy throttle: Manual / Auto / Full, stored and sent with the
 // request. The server's classifier decides which commands actually pause.
-// kept in prefs too (6b310): browser storage is per port, and a moved
-// app would quietly fall back to Auto from a chosen Manual
-let autonomy=localStorage.getItem("millen.autonomy")||"auto";
-api("/api/prefs").then(r=>r.json()).then(p=>{
-  if(["manual","auto","full"].includes(p.remote_autonomy)){
-    autonomy=p.remote_autonomy;paintAutonomy();}}).catch(()=>{});
+// kept in prefs.json only (6b310, 6b324): browser storage is per port,
+// and a moved app would quietly fall back to Auto from a chosen Manual
+let autonomy="auto";
 function paintAutonomy(){
   $$("#autonomy-seg .autoseg").forEach(el=>
     el.classList.toggle("on",el.dataset.a===autonomy));
 }
 $$("#autonomy-seg .autoseg").forEach(el=>
   el.addEventListener("click",()=>{
-    autonomy=el.dataset.a;localStorage.setItem("millen.autonomy",autonomy);
-    api("/api/prefs",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({remote_autonomy:autonomy})}).catch(()=>{});
+    autonomy=el.dataset.a;prefSet({remote_autonomy:autonomy});
     paintAutonomy();
   }));
 paintAutonomy();
+storeBoot();         // the six from prefs.json, the sweep, the clean-up
 // the connection bar shows only when the Remote agent is active; it loads
 // the saved host so a returning user sees their box, key path and all
 async function remoteRefresh(){
@@ -27362,6 +28326,16 @@ if __name__ == "__main__":
     if not DEFAULT_APP and not single_instance(dev=True):
         print("\n  Another copy is using %s.\n" % DEV_HOME, file=sys.stderr)
         sys.exit(3)
+    # THE CHAT STORE BEFORE ANY ROUTE (0b 5.9, Q9, 6b324): the one-time
+    # move to the .v2 files and, at every start, the downgrade import and
+    # the legacy files' catch-up, by the copy holding the lock only
+    if _INSTANCE_LOCK:
+        _migrate_61()
+    else:
+        _STORE_BLOCKED[_bk(None)] = "run/instance.lock"
+        print("  no instance lock: chats and memory stay shut this run")
+    if not NOWINDOW and _web_engine() == "qt":
+        _webstore_qt_boot()      # files, while no page holds them (Q16)
     if DEFAULT_APP:
         # dev and test instances share this data folder: only the app a
         # person opened may change what's in it on its own
@@ -27754,6 +28728,12 @@ if __name__ == "__main__":
         )
         if not _BRIDGE_OK:
             print("  (pywebview's bridge couldn't be guarded: no API token)")
+        _WINDOW.append(window)          # the web view's clean-up (6b324)
+        if _web_engine() == "qt":
+            try:
+                window.events.loaded += lambda: _webstore_qt_cache(window)
+            except Exception:
+                pass
         try:
             window.events.loaded += lambda: _boot_heal(window)
         except Exception:
