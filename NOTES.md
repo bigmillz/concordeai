@@ -5633,6 +5633,109 @@ crash was invisible.
   keeps its checks. Mutation-tested (SIGHUP back, hook removed, no log,
   no box).
 
+## 6b325 — Settings › Usage
+Patrick: "in the settings, let's add a tab called usage and show the
+user stats like these. Also allow them to select a time period like one
+hour, one day, one week, one month, one year, all time." His reference
+was a "Usage & Stats" panel: requests, input tokens, output tokens,
+cache hit, and a stacked bar chart of input, cached and output tokens.
+- The app counted no tokens before this. `quality.jsonl` has one thin
+  line per answer (time, tier, model, searched, characters) and is
+  deleted at 2 MB. It stays as it was; the new ledger is `usage.jsonl`
+  in app_dir() (a dev copy's MILLENAI_HOME).
+- One record per model call, written at the five places a prompt leaves
+  for a model: `stream_ollama`, `stream_openai_compat` (MLX),
+  `_anthropic_stream`, `cloud_stream_conf` (Groq, Gemini, Moonshot) and
+  `cloud_text`. Councils, merges, sharpen passes, titles, memory, map
+  pins and funnels all go through these, so each call counts once.
+  Pictures and video are not counted, nor the key check's 8-token hello.
+  Each `/api/chat` answer also adds an answer record, under the model
+  that wrote it (the same moment quality.jsonl logs).
+- REQUESTS on the pane means model calls; the line under it says how
+  many answers they made. A council question is several requests.
+- Where the counts come from:
+  - Ollama: `prompt_eval_count` and `eval_count` on its last line.
+    Ollama counts only the prompt it evaluated, so a prompt it had
+    cached reads low; when it leaves the count out (the whole prompt was
+    cached) input is estimated. No cache figure.
+  - MLX (mlx_lm's server): asked with `stream_options.include_usage`;
+    it sends `prompt_tokens`, `completion_tokens` and
+    `prompt_tokens_details.cached_tokens`. Seen live: a sharpen pass,
+    2,576 in with 1,941 cached. That chunk has `choices: []`, which the
+    old parser (`obj.get("choices", [{}])[0]`) would have raised on.
+  - Anthropic: input is `input_tokens` + `cache_read_input_tokens` +
+    `cache_creation_input_tokens`, cached is the cache read; streaming
+    takes input from `message_start` and output from `message_delta`
+    (message_start's own output count is dropped, so a stream cut off
+    before message_delta is estimated, not taken for exact).
+  - Groq and Gemini's OpenAI layer: asked with
+    `stream_options.include_usage`; the usage chunk is read (and
+    Groq's `x_groq.usage`). A provider that answers 400 naming
+    `stream_options` loses the flag for the rest of the launch and the
+    stream is sent again once, so accounting never costs an answer.
+  - Moonshot: `usage` in its last choice, sent unasked (not asked, so
+    nothing new is sent to it); its `cached_tokens` is read.
+  - Buffered calls (`cloud_text`): the reply's `usage`.
+  - Nothing reported (a server that ignores the flag, a stream cut
+    short, an abandoned council draft): estimated at 4 characters a
+    token from the text sent and received, and marked. A call that fails
+    before anything comes back is not recorded.
+- Cache hit is cached input over the input of the calls that report
+  caching (Anthropic, MLX, OpenAI-shaped replies that carry a cached
+  count, Moonshot); "—" when none in the range did.
+- The pane says in one line when any count in the range is estimated:
+  "Estimated from text length: 3 of 40 requests." or, for backfilled
+  lines, "Estimated from the old answer log (output only): …".
+- Backfill: once, when `usage.jsonl` doesn't exist yet, each
+  quality.jsonl line from before this launch becomes one answer and one
+  estimated call: output from its character count, input 0, the model
+  as logged, "local" when that's a catalog label, else "cloud".
+- Storage: JSONL with short keys (t, s, m, w, n, i, c, ri, o, d, x, a,
+  q; the list is in the code). Calls go on a queue that a writer thread
+  appends; a chat never waits and every error is swallowed. Appends are
+  under a lock, fsynced, 0600; a line a crash cut short gets a newline
+  before the next append and is skipped on read. A file that isn't
+  there reads as empty; one that can't be opened, isn't ASCII or has
+  more bad lines than good (plus one) raises StoreReadError, and the
+  route answers 503 "Couldn't read your usage. Nothing was changed."
+- Retention: at the first write of each launch, and whenever the file
+  passes 1.5 MB (at most hourly), calls older than 14 days roll up into
+  one line per hour, model and place, and after 120 days one per local
+  day; the file is rewritten atomically (unique temp, fsync, replace)
+  and never when it couldn't be read. Totals don't change.
+- The queue is flushed at exit (atexit). A SIGTERM or Cmd+Q skips
+  atexit; the writer runs within milliseconds of each call, so at most
+  the call finishing at that instant is lost.
+- `GET /api/usage?range=1h|1d|1w|1m|1y|all&model=` (behind the token):
+  the four totals, the answers, one bucket per bar (uncached input,
+  cached, output, calls), every model in the data (most calls first),
+  the bucket size, the window and the note. Unknown range: 400. Buckets
+  are local time: 5 min, 1 hour, 6 hours, 1 day, 1 week (Mondays); All
+  time runs from the first record (at least an hour back) and takes the
+  smallest of those giving at most 60 bars, else calendar months.
+- The page: "Usage" is the last rail item. The pane has "Usage & Stats"
+  with the period (default All time, remembered in
+  `millen.usage.range`) and model menus, the four cards, the chart
+  (SVG drawn by the page, no library; a title per bar), the legend and
+  the note. Numbers: 17,883 · 1.36B · 25.12M · 93.5%. It loads on
+  open, on a change and every 30 s while open.
+- Checked by hand: a dev copy with a seeded quality.jsonl and a live
+  MLX answer, in headless Chromium with the bridge stood in: all time,
+  1 week and 1 hour draw as in the reference.
+- Gauntlet (11 new, the pane-order check extended): the counts of each
+  provider's shape; each of the five paths against fake engines and
+  providers (reported counts, the MLX and Groq flag, Moonshot not asked,
+  the Gemini fallback, a refused key recording nothing, a cut stream
+  estimated); a failing ledger costing no answer; the file (0600, torn
+  line, bad file not empty); roll-ups keeping every total; the backfill
+  once; every range's buckets, the model filter and cache hit; the live
+  route with this run's local answers recorded exact; the 503; the
+  pane; the formats and chart in node. 21 mutations of the new code
+  each fail at least one of them.
+- Not verified live: the usage fields of Anthropic, Groq, Gemini and
+  Moonshot (fakes only; the gauntlet holds no keys), Ollama (this Mac
+  runs MLX), and the pane in WebView2 and Qt.
+
 ## 6b324 — chats in .v2 files, old builds safe, nothing personal in the web view (accounts step 5)
 The rest of the spec's 0b: sections 5.8-5.10, LOC-6 and ISO-10's Phase 0
 parts, with the build-time answers Q5, Q8, Q9, Q10, Q13 and Q16 (M5 of

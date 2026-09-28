@@ -3545,10 +3545,10 @@ check("settings: descriptions + Account pane + scoped forget",
 # 6b259, per Patrick: About leads the rail (it is what people open the
 # panel to see) and Account closes it (the exits belong at the foot).
 # The pane ids and the nav must agree on that order, and the first pane
-# is the one that opens.
+# is the one that opens. Usage (6b325) comes last.
 _nav = re.findall(r'data-pane="(p-[a-z]+)"', page)
 _panes = re.findall(r'class="spane[^"]*" id="(p-[a-z]+)"', page)
-_want = ["p-about", "p-account", "p-persona", "p-cloud", "p-models"]
+_want = ["p-about", "p-account", "p-persona", "p-cloud", "p-models", "p-usage"]
 _gtip = page.split('id="giants-row"')[1].split('</label>')[0]
 check("the served page names the giants' real need",
       "Include models for 512 GB+ systems" in page and "128 GB+" not in page
@@ -3857,6 +3857,666 @@ check("unknown place gets helpful no-match answer",
       # its names leaking into the answer means the fence failed
       and "milano" not in t.lower() and "ridgewood" not in t.lower(),
       t[:160])
+
+
+print("== usage (6b325) ==")
+# SETTINGS › USAGE (6b325, per Patrick: "in the settings, let's add a tab
+# called usage and show the user stats like these"). The ledger records
+# one line per model call at the five places a prompt leaves for a
+# model, with the counts the engine or provider sent back, estimated
+# from text length only where none came back; /api/usage turns it into
+# the pane's four figures and bars. These run the real functions.
+import io as _io25, stat as _stat25, tempfile as _tf25, urllib.error as _ue25
+_UN = {"USAGE_FILE", "USAGE_RAW_DAYS", "USAGE_HOURLY_DAYS", "USAGE_COMPACT_BYTES",
+       "USAGE_SUM_KEYS", "USAGE_RANGES", "USAGE_UNITS", "_USAGE_T0", "_usage_q",
+       "_usage_qlock", "_usage_lock", "_usage_wake", "_usage_state", "_usage_num",
+       "_usage_est", "_usage_est_in", "usage_counts", "usage_note", "usage_put",
+       "_usage_writer", "_usage_write_all", "usage_flush", "_usage_load", "usage_read",
+       "_usage_backfill", "usage_compact", "_usage_floor", "_usage_next", "usage_query",
+       "_replace_into"}
+
+
+class _SRE25(Exception):
+    pass
+
+
+def _uns(home, **extra):
+    """The ledger's functions in a namespace of their own, on a folder."""
+    ns = dict(_LH, READ_FAIL={}, StoreReadError=_SRE25, IS_WIN=False,
+              MODEL_ROUTES={"Gemma 4 26B": ("mlx", 1)},
+              _pfile=lambda n, b=None: os.path.join(home, n))
+    _exec_names(ns, _UN)
+    ns.update(extra)
+    return ns
+
+
+def _ucheck(name, ok, detail):
+    """check(), with a failure to even evaluate counted as a FAIL rather
+    than stopping the gauntlet."""
+    try:
+        good = bool(ok())
+    except Exception as _e:
+        good, detail = False, (lambda _e=_e: "raised %r" % _e)
+    try:
+        why = detail() if not good else ""
+    except Exception as _e:
+        why = "detail raised %r" % _e
+    check(name, good, why)
+
+
+# 1. the counts each engine and provider sends back, read into
+# (input incl. cached, cached, output, reports caching). Fails if
+# Anthropic's cache reads are left out of input, OpenAI's or Moonshot's
+# cached field is missed, a count that wasn't sent reads as 0, or a
+# shape nobody sends is taken for counts.
+_uc = _uns(_tf25.mkdtemp())["usage_counts"]
+_ucv = [_uc({"input_tokens": 10, "cache_read_input_tokens": 90,
+             "cache_creation_input_tokens": 5, "output_tokens": 7}),
+        _uc({"prompt_tokens": 100, "completion_tokens": 5,
+             "prompt_tokens_details": {"cached_tokens": 64}}),
+        _uc({"prompt_tokens": 100, "completion_tokens": 5, "cached_tokens": 30}),
+        _uc({"prompt_tokens": 100, "completion_tokens": 5}),
+        _uc({"promptTokenCount": 50, "candidatesTokenCount": 8,
+             "thoughtsTokenCount": 4, "cachedContentTokenCount": 20}),
+        _uc({"prompt_eval_count": 12, "eval_count": 40}),
+        _uc({"eval_count": 40}),
+        _uc({"input_tokens": 10}),
+        _uc({"prompt_tokens": True, "completion_tokens": 3}),
+        _uc({"foo": 1}), _uc(None), _uc("usage")]
+_ucheck("usage: each engine's and provider's counts read right",
+      lambda: (_ucv == [(105, 90, 7, True), (100, 64, 5, True), (100, 30, 5, True),
+               (100, 0, 5, False), (50, 20, 12, True), (12, 0, 40, False),
+               (None, 0, 40, False), (10, 0, None, False), (None, 0, 3, False),
+               None, None, None]), lambda: "%r" % _ucv)
+
+# 2. every path a prompt takes records one call, with the reported
+# counts, run against fake engines and providers (no network). Fails if
+# any of the five paths records nothing, records a guess where counts
+# came back, misses the usage chunk (MLX's comes with no choices, which
+# used to be an IndexError), stops asking MLX/Groq/Gemini for counts,
+# asks Moonshot (which sends them unasked), records a call that failed
+# before anything came back, or loses a stream cut short.
+_urecs = []
+_usent = []
+
+
+def _uzns(**over):
+    """The five paths and the ledger, exec'd afresh (a copied dict would
+    keep the functions reading the old one's globals)."""
+    ns = dict(_cq)
+    _exec_names(ns, _UN | {"_anthropic_turns", "_anthropic_stream", "cloud_text",
+                           "cloud_stream_conf", "_STREAM_USAGE_ASK",
+                           "_stream_usage_off", "stream_ollama",
+                           "stream_openai_compat", "GIANT_CTX", "GIANT_KEEP_ALIVE",
+                           "GIANT_LOAD_TIMEOUT", "OLLAMA_THINK_OFF"})
+    ns.update(usage_put=_urecs.append, _is_provider_error=lambda t: False,
+              _cloud_budget_hit=lambda c: None, _mark_answered=lambda c: None,
+              Ctl=str, NUL="\0", MLX_REPOS={"Gemma 4 26B": "mlx-community/g"},
+              ollama_url=lambda p: "http://127.0.0.1:1" + p,
+              cloud_glitch=lambda c, why: None)
+    ns.update(over)
+    return ns
+
+
+_uz = _uzns()
+
+
+class _UStream:
+    def __init__(self, lines, body=b""):
+        self._l, self._b = [l if isinstance(l, bytes) else l.encode() for l in lines], body
+    def __iter__(self): return iter(self._l)
+    def read(self): return self._b
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+
+
+_uplan = []
+
+
+def _u_uo(req, timeout=None):
+    _usent.append(json.loads(req.data) if req.data else None)
+    nxt = _uplan.pop(0)
+    if isinstance(nxt, Exception):
+        raise nxt
+    return nxt
+
+
+def _sse(*objs):
+    return ["data: " + (o if isinstance(o, str) else json.dumps(o)) + "\n" for o in objs]
+
+
+def _herr(code, body):
+    return _ue25.HTTPError("http://x", code, "err", {}, _io25.BytesIO(body.encode()))
+
+
+_msgs = [{"role": "system", "content": "be brief"}, {"role": "user", "content": "hello there"}]
+_uo = {}
+_ab = []
+try:
+    __import__("urllib.request").request.urlopen = _u_uo
+    # Ollama: counts on the last line
+    _uplan.append(_UStream(['{"message":{"content":"hi "},"done":false}\n',
+                            '{"message":{"content":"you"},"done":true,'
+                            '"prompt_eval_count":21,"eval_count":7}\n']))
+    _o = []
+    _uz["stream_ollama"]("gemma4:26b", _msgs, _o.append, label="Gemma 4 26B")
+    _uo["ollama"] = (_o, _urecs[-1:])
+    # Ollama, abandoned mid-stream: the emit raises, the call still counts
+    _uplan.append(_UStream(['{"message":{"content":"abcdefgh"},"done":false}\n',
+                            '{"message":{"content":"more"},"done":false}\n']))
+    def _stop_emit(t):
+        raise RuntimeError("abandoned")
+    try:
+        _uz["stream_ollama"]("gemma4:26b", _msgs, _stop_emit, label="Gemma 4 26B")
+    except RuntimeError as _e:
+        _ab.append(str(_e))
+    _uo["ollama_cut"] = _urecs[-1:]
+    # MLX: the usage chunk has no choices
+    _n0 = len(_urecs)
+    _uplan.append(_UStream(_sse({"choices": [{"delta": {"content": "Sky "}}]},
+                                {"choices": [{"delta": {"content": "blue."}}]},
+                                {"choices": [], "usage": {
+                                    "prompt_tokens": 50, "completion_tokens": 9,
+                                    "prompt_tokens_details": {"cached_tokens": 32}}},
+                                "[DONE]")))
+    _o = []
+    _uz["stream_openai_compat"](1, "Gemma 4 26B", _msgs, _o.append)
+    _uo["mlx"] = (_o, _urecs[_n0:], _usent[-1].get("stream_options"))
+    # MLX, a server that sends no counts: estimated from the text
+    _n0 = len(_urecs)
+    _uplan.append(_UStream(_sse({"choices": [{"delta": {"content": "x" * 400}}]}, "[DONE]")))
+    _uz["stream_openai_compat"](1, "Gemma 4 26B", _msgs, lambda t: None)
+    _uo["mlx_est"] = _urecs[_n0:]
+    # Anthropic streaming: message_start has the input, message_delta the output
+    _n0 = len(_urecs)
+    _cl = {"base": "https://api.anthropic.com/v1", "key": "k", "model": "claude-opus-5-5"}
+    _uplan.append(_UStream(_sse(
+        {"type": "message_start", "message": {"usage": {
+            "input_tokens": 10, "cache_read_input_tokens": 90,
+            "cache_creation_input_tokens": 0, "output_tokens": 1}}},
+        {"type": "content_block_delta", "delta": {"text": "Hello"}},
+        {"type": "message_delta", "delta": {"stop_reason": "end_turn"},
+         "usage": {"output_tokens": 12}})))
+    _o = []
+    _uo["claude_ok"] = _uz["_anthropic_stream"](dict(_cl), _msgs, _o.append)
+    _uo["claude"] = (_o, _urecs[_n0:])
+    # Anthropic cut off before message_delta: output is a guess, marked so
+    _n0 = len(_urecs)
+    _uplan.append(_UStream(_sse(
+        {"type": "message_start", "message": {"usage": {"input_tokens": 30, "output_tokens": 1}}},
+        {"type": "content_block_delta", "delta": {"text": "y" * 80}})))
+    _uz["_anthropic_stream"](dict(_cl), _msgs, lambda t: None)
+    _uo["claude_cut"] = _urecs[_n0:]
+    # Groq streams: asked for counts, gets them in a last chunk
+    _n0 = len(_urecs)
+    _gq = {"base": "https://api.groq.com/openai/v1", "key": "k", "model": "openai/gpt-oss-120b"}
+    _uplan.append(_UStream(_sse({"choices": [{"delta": {"content": "z" * 300}}]},
+                                {"choices": [], "usage": {"prompt_tokens": 40, "completion_tokens": 75,
+                                                          "prompt_tokens_details": {"cached_tokens": 0}}},
+                                "[DONE]")))
+    _uo["groq_ok"] = _uz["cloud_stream_conf"](dict(_gq), _msgs, lambda t: None)
+    _uo["groq"] = (_urecs[_n0:], _usent[-1].get("stream_options"))
+    # Moonshot: not asked; its last choice carries the counts
+    _n0 = len(_urecs)
+    _km = {"base": "https://api.moonshot.ai/v1", "key": "k", "model": "kimi-k3"}
+    _uplan.append(_UStream(_sse({"choices": [{"delta": {"content": "k" * 300}}]},
+                                {"choices": [{"delta": {}, "usage": {
+                                    "prompt_tokens": 60, "completion_tokens": 70,
+                                    "cached_tokens": 8}}]}, "[DONE]")))
+    _uz["cloud_stream_conf"](dict(_km), _msgs, lambda t: None)
+    _uo["kimi"] = (_urecs[_n0:], "stream_options" in _usent[-1])
+    # Gemini refusing the flag: sent again without it, once, and remembered
+    _n0 = len(_urecs)
+    _gm = {"base": "https://generativelanguage.googleapis.com/v1beta/openai", "key": "k",
+           "model": "gemini-3.8-flash"}
+    _uplan.extend([_herr(400, 'Invalid JSON payload received. Unknown name "stream_options"'),
+                   _UStream(_sse({"choices": [{"delta": {"content": "g" * 300}}]}, "[DONE]"))])
+    _ns0 = len(_usent)
+    _uo["gem_ok"] = _uz["cloud_stream_conf"](dict(_gm), _msgs, lambda t: None)
+    _uo["gem"] = (_urecs[_n0:], ["stream_options" in b for b in _usent[_ns0:]],
+                  sorted(_uz["_stream_usage_off"]))
+    # a key the provider refused: nothing came back, nothing recorded
+    _n0 = len(_urecs)
+    _uplan.append(_herr(401, "invalid api key"))
+    _uz["cloud_stream_conf"](dict(_gq), _msgs, lambda t: None)
+    _uo["refused"] = _urecs[_n0:]
+    # cloud_text, both dialects
+    _n0 = len(_urecs)
+    _uplan.append(_UStream([], json.dumps({"content": [{"type": "text", "text": "Title"}],
+                                           "stop_reason": "end_turn",
+                                           "usage": {"input_tokens": 5, "output_tokens": 3,
+                                                     "cache_read_input_tokens": 0}}).encode()))
+    _uplan.append(_UStream([], json.dumps({"choices": [{"message": {"content": "A title"}}],
+                                           "usage": {"prompt_tokens": 44, "completion_tokens": 4}}).encode()))
+    _uo["ct"] = [_uz["cloud_text"](dict(_cl), _msgs), _uz["cloud_text"](dict(_gq), _msgs),
+                 _urecs[_n0:]]
+except Exception as _e:
+    _uo["error"] = repr(_e)
+finally:
+    __import__("urllib.request").request.urlopen = _orig_uo
+
+
+def _ukeys(r):
+    return {k: r.get(k) for k in ("m", "w", "n", "i", "c", "ri", "o", "x")}
+
+
+_uok = {}
+try:
+    _o, _r = _uo["ollama"]
+    _uok["ollama"] = (_o == ["hi ", "you"] and len(_r) == 1 and _ukeys(_r[0]) == {
+        "m": "Gemma 4 26B", "w": "local", "n": 1, "i": 21, "c": None, "ri": None, "o": 7, "x": None}
+        and isinstance(_r[0].get("d"), int))
+    _r = _uo["ollama_cut"]
+    _uok["ollama_cut"] = (_ab == ["abandoned"] and len(_r) == 1 and _r[0]["x"] == 1
+                          and _r[0]["o"] == 2 and _r[0]["i"] > 0)
+    _o, _r, _so = _uo["mlx"]
+    _uok["mlx"] = (_o == ["Sky ", "blue."] and _so == {"include_usage": True} and len(_r) == 1
+                   and _ukeys(_r[0]) == {"m": "Gemma 4 26B", "w": "local", "n": 1, "i": 50,
+                                         "c": 32, "ri": 50, "o": 9, "x": None})
+    _r = _uo["mlx_est"]
+    _uok["mlx_est"] = len(_r) == 1 and _r[0]["x"] == 1 and _r[0]["o"] == 100 and _r[0]["i"] > 0
+    _o, _r = _uo["claude"]
+    _uok["claude"] = (_uo["claude_ok"] is True and _o == ["Hello"] and len(_r) == 1
+                      and _ukeys(_r[0]) == {"m": "claude-opus-5-5", "w": "claude", "n": 1,
+                                            "i": 100, "c": 90, "ri": 100, "o": 12, "x": None})
+    _r = _uo["claude_cut"]
+    _uok["claude_cut"] = len(_r) == 1 and _r[0]["i"] == 30 and _r[0]["o"] == 20 and _r[0]["x"] == 1
+    _r, _so = _uo["groq"]
+    _uok["groq"] = (_uo["groq_ok"] is True and _so == {"include_usage": True} and len(_r) == 1
+                    and _ukeys(_r[0]) == {"m": "openai/gpt-oss-120b", "w": "groq", "n": 1,
+                                          "i": 40, "c": None, "ri": 40, "o": 75, "x": None})
+    _r, _asked = _uo["kimi"]
+    _uok["kimi"] = (not _asked and len(_r) == 1 and _ukeys(_r[0]) == {
+        "m": "kimi-k3", "w": "kimi", "n": 1, "i": 60, "c": 8, "ri": 60, "o": 70, "x": None})
+    _r, _flags, _off = _uo["gem"]
+    _uok["gemini_fallback"] = (_uo["gem_ok"] is True and _flags == [True, False]
+                               and _off == ["gemini"] and len(_r) == 1 and _r[0]["x"] == 1
+                               and _r[0]["w"] == "gemini" and _r[0]["o"] == 75)
+    _uok["refused"] = _uo["refused"] == []
+    _t1, _t2, _r = _uo["ct"]
+    _uok["cloud_text"] = (_t1 == "Title" and _t2 == "A title" and len(_r) == 2
+                          and _ukeys(_r[0]) == {"m": "claude-opus-5-5", "w": "claude", "n": 1,
+                                                "i": 5, "c": None, "ri": 5, "o": 3, "x": None}
+                          and _ukeys(_r[1]) == {"m": "openai/gpt-oss-120b", "w": "groq", "n": 1,
+                                                "i": 44, "c": None, "ri": None, "o": 4, "x": None})
+except Exception as _e:
+    _uok["error"] = repr(_e)
+_ucheck("usage: every model path records one call, exact where counts came back",
+      lambda: (len(_uok) == 11 and all(v is True for v in _uok.values())
+      # run_model hands Ollama the catalog name, and the chat logs answers
+      and "stream_ollama(target, msgs, _tap, label=label," in _MILLENAI_SRC
+      and 'usage_put({"t": round(time.time(), 1), "a": 1, "m": str(' in _MILLENAI_SRC),
+      lambda: "%r" % [sorted(_uok), {k: v for k, v in _uok.items() if v is not True}])
+
+# 3. accounting never costs an answer: a ledger that raises, or isn't
+# there at all, leaves the stream exactly as it was. Fails if usage_note
+# lets an error through or a call site stops guarding it.
+_ubad = _uzns(usage_put=lambda r: 1 / 0)
+_ubad2 = _uzns()
+del _ubad2["usage_note"]
+_ubo = []
+try:
+    __import__("urllib.request").request.urlopen = _u_uo
+    for _nsx in (_ubad, _ubad2):
+        _uplan.append(_UStream(['{"message":{"content":"ok"},"done":true,'
+                                '"prompt_eval_count":1,"eval_count":1}\n']))
+        _nsx["stream_ollama"]("t", _msgs, _ubo.append, label="L")
+        _uplan.append(_UStream(_sse({"choices": [{"delta": {"content": "ok"}}]}, "[DONE]")))
+        _nsx["stream_openai_compat"](1, "Gemma 4 26B", _msgs, _ubo.append)
+        _uplan.append(_UStream(_sse({"choices": [{"delta": {"content": "ok" * 150}}]}, "[DONE]")))
+        _ubo.append(_nsx["cloud_stream_conf"](dict(_km), _msgs, lambda t: None))
+except Exception as _e:
+    _ubo.append(repr(_e))
+finally:
+    __import__("urllib.request").request.urlopen = _orig_uo
+_ucheck("usage: a ledger that fails never costs an answer",
+      lambda: (_ubo == ["ok", "ok", True, "ok", "ok", True]), lambda: "%r" % _ubo)
+
+# 4. the file. A flush appends ASCII JSON lines, 0600; a line a crash cut
+# short stays its own line and is skipped; a file that is more garbage
+# than records, or not text, raises StoreReadError (the route's 503),
+# never reads as empty; the queue is read too. Fails if any of those
+# goes: a torn line glued to the next record loses that record.
+_uh = _tf25.mkdtemp()
+_un = _uns(_uh)
+_up = os.path.join(_uh, "usage.jsonl")
+_un["_usage_state"]["backfilled"] = True
+_un["_usage_state"]["compacted"] = time.time()
+_ufile = {}
+try:
+    _t = time.time()
+    _un["_usage_q"].extend([{"t": _t, "m": "A", "w": "local", "n": 1, "i": 3, "o": 4}])
+    _un["usage_flush"]()
+    _ufile["mode"] = _stat25.S_IMODE(os.stat(_up).st_mode)
+    with open(_up, "ab") as _fh:
+        _fh.write(b'{"t":17000000')                   # a crash mid-line
+    _un["_usage_q"].append({"t": _t + 1, "m": "B", "w": "claude", "n": 1, "i": 5, "o": 6})
+    _un["usage_flush"]()
+    _ufile["lines"] = open(_up, "rb").read().split(b"\n")
+    _un["_usage_q"].append({"t": _t + 2, "m": "C", "a": 1})   # still queued
+    _ufile["read"] = [r.get("m") for r in _un["usage_read"]()]
+    _un["_usage_q"].clear()
+    for _junk in (b"\xff\xfe garbage\n", b"not json\nnor this\nnor that\n{\"t\":1}\n"):
+        with open(_up, "wb") as _fh:
+            _fh.write(_junk)
+        try:
+            _un["usage_read"]()
+            _ufile.setdefault("raised", []).append(False)
+        except _SRE25 as _e:
+            _ufile.setdefault("raised", []).append(str(_e))
+    os.remove(_up)
+    _ufile["missing"] = _un["usage_read"]()
+except Exception as _e:
+    _ufile["error"] = repr(_e)
+_ucheck("usage: the ledger file appends, survives a torn line, never reads bad as empty",
+      lambda: (_ufile.get("mode") == 0o600
+      and len(_ufile.get("lines", [])) == 4 and _ufile["lines"][1] == b'{"t":17000000'
+      and _ufile["lines"][3] == b""
+      and json.loads(_ufile["lines"][2])["m"] == "B"
+      and _ufile.get("read") == ["A", "B", "C"]
+      and _ufile.get("raised") == ["usage.jsonl", "usage.jsonl"]
+      and _ufile.get("missing") == []), lambda: "%r" % _ufile)
+
+# 5. roll-ups keep every count. Calls older than 14 days become one line
+# per hour and model, older than 120 days one per local day; the
+# all-time totals are the same before and after, a second pass changes
+# nothing, and a file that can't be read is never rewritten. Fails if a
+# roll-up drops or double-counts a field, rolls up recent calls, or
+# rewrites a file it couldn't read.
+_uh2 = _tf25.mkdtemp()
+_un2 = _uns(_uh2)
+_up2 = os.path.join(_uh2, "usage.jsonl")
+_now = time.time()
+_hr = _un2["_usage_floor"](_now - 20 * 86400, "1h")
+_old = [{"t": _now - 86400, "m": "A", "w": "local", "n": 1, "i": 10, "o": 2, "d": 5},
+        {"t": _hr + 60, "m": "A", "w": "local", "n": 1, "i": 7, "c": 3, "ri": 7, "o": 1, "d": 9},
+        {"t": _hr + 120, "m": "A", "w": "local", "n": 1, "i": 5, "o": 1, "x": 1, "d": 1},
+        {"t": _hr + 180, "m": "B", "w": "claude", "n": 1, "i": 4, "o": 1},
+        {"t": _hr + 200, "m": "A", "a": 1},
+        {"t": _now - 200 * 86400, "m": "A", "w": "local", "n": 1, "i": 1, "o": 1, "q": 1, "x": 1, "a": 1},
+        {"t": _now - 200 * 86400 + 5, "m": "A", "w": "local", "n": 1, "i": 2, "o": 2}]
+_ucmp = {}
+try:
+    _un2["_usage_write_all"](_old)
+    _before = _un2["usage_query"](_un2["_usage_load"](), "all", now=_now)["totals"]
+    _ucmp["did"] = _un2["usage_compact"](now=_now)
+    _after_recs = _un2["_usage_load"]()
+    _ucmp["after"] = _un2["usage_query"](_after_recs, "all", now=_now)["totals"]
+    _ucmp["before"] = _before
+    _ucmp["n"] = len(_after_recs)
+    _ucmp["spans"] = sorted((r.get("s", 0), r.get("m", ""), r.get("n", 0)) for r in _after_recs)
+    _ucmp["again"] = _un2["usage_compact"](now=_now)
+    # an old call beside a line that isn't text: rolled up, it would be
+    # rewritten without the line; it can't be read, so it's left alone
+    _badb = (json.dumps({"t": _hr + 30, "m": "A", "w": "local", "n": 1, "i": 1, "o": 1})
+             + "\n\xff\xfe not ours\n").encode("latin-1")
+    with open(_up2, "wb") as _fh:
+        _fh.write(_badb)
+    _ucmp["bad"] = _un2["usage_compact"](now=_now)
+    _ucmp["bad_kept"] = open(_up2, "rb").read() == _badb
+except Exception as _e:
+    _ucmp["error"] = repr(_e)
+_ucheck("usage: roll-ups after 14 and 120 days keep every count",
+      lambda: (_ucmp.get("did") is True and _ucmp.get("before") == _ucmp.get("after")
+      and _ucmp["before"]["requests"] == 6 and _ucmp["before"]["answers"] == 2
+      and _ucmp.get("n") == 5
+      and _ucmp.get("spans") == [(0, "A", 1), (3600, "A", 0), (3600, "A", 2),
+                                 (3600, "B", 1), (86400, "A", 2)]
+      and _ucmp.get("again") is False and _ucmp.get("bad") is False and _ucmp.get("bad_kept")),
+      lambda: "%r" % _ucmp)
+
+# 6. the old answer log comes in once: each line before this launch is
+# one answer and one estimated call (output from its length, input 0),
+# never a line from after the launch, never twice, never over a ledger
+# that's already there. Fails if the backfill repeats, counts the
+# current launch's answers, or passes its guesses off as exact.
+_uh3 = _tf25.mkdtemp()
+_un3 = _uns(_uh3)
+_t0 = _un3["_USAGE_T0"]
+with open(os.path.join(_uh3, "quality.jsonl"), "w") as _fh:
+    _fh.write(json.dumps({"ts": int(_t0 - 7200), "tier": "Fast", "model": "Gemma 4 26B",
+                          "searched": False, "chars": 400}) + "\n")
+    _fh.write("not json\n")
+    _fh.write(json.dumps({"ts": int(_t0 - 3600), "tier": "Cloud Only",
+                          "model": "claude-opus-5-5", "chars": 81}) + "\n")
+    _fh.write(json.dumps({"ts": int(_t0 + 5), "tier": "Fast", "model": "Gemma 4 26B",
+                          "chars": 999}) + "\n")
+_bf = {}
+try:
+    _bf["first"] = _un3["usage_read"]()
+    # a call since, then a later launch: the ledger is there, so the old
+    # log is left alone (a second pass would write over the new call)
+    _un3["_usage_state"]["compacted"] = time.time()
+    _un3["_usage_q"].append({"t": _t0 + 8, "m": "N", "w": "local", "n": 1, "i": 1, "o": 1})
+    _un3["usage_flush"]()
+    _un3["_usage_state"]["backfilled"] = False
+    _bf["second"] = _un3["usage_read"]()
+    _bf["q"] = _un3["usage_query"](_bf["second"], "all", now=_t0 + 10)
+except Exception as _e:
+    _bf["error"] = repr(_e)
+_ucheck("usage: the old answer log is read once, marked estimated",
+      lambda: ([_ukeys(r) | {"q": r.get("q"), "a": r.get("a")} for r in _bf.get("first", [])] == [
+          {"m": "Gemma 4 26B", "w": "local", "n": 1, "i": 0, "c": None, "ri": None, "o": 100,
+           "x": 1, "q": 1, "a": 1},
+          {"m": "claude-opus-5-5", "w": "cloud", "n": 1, "i": 0, "c": None, "ri": None,
+           "o": 21, "x": 1, "q": 1, "a": 1}]
+      and _bf.get("second") == _bf.get("first") + [
+          {"t": _t0 + 8, "m": "N", "w": "local", "n": 1, "i": 1, "o": 1}]
+      and _bf["q"]["note"] == "Estimated from the old answer log (output only): 2 of 3 requests."),
+      lambda: "%r" % _bf)
+
+# 7. the buckets. Each range's bars are consecutive local buckets of its
+# size (5 min, 1 h, 6 h, 1 day, 1 week; all time picks one), every call
+# in the range sits in the bar whose start it follows, the bars add up
+# to the totals, and the model filter, cache hit and "—" hold. Fails if
+# a range counts the wrong window, a bucket is misplaced or skipped, or
+# the cache hit counts calls that never report caching.
+_uqn = _uns(_tf25.mkdtemp())
+_Q = _uqn["usage_query"]
+_now = time.time()
+_ages = [30, 7200, 3 * 86400, 20 * 86400, 200 * 86400, 800 * 86400]
+_qrecs = [{"t": _now - a, "m": "A" if k % 2 else "B", "w": "local", "n": 1,
+           "i": 100 * (k + 1), "c": 10 * (k + 1) if k % 2 else 0,
+           "ri": 100 * (k + 1) if k % 2 else 0, "o": k + 1,
+           "x": 1 if k == 2 else 0} for k, a in enumerate(_ages)]
+_qrecs.append({"t": _now - 60, "m": "A", "a": 1})
+_qrecs.append({"t": _now + 3600, "m": "A", "w": "local", "n": 1, "i": 9, "o": 9})  # a clock ahead
+_qres = {}
+_qok = []
+try:
+    for _rg, _want_n, _unit in (("1h", 1, "5m"), ("1d", 2, "1h"), ("1w", 3, "6h"),
+                                ("1m", 4, "1d"), ("1y", 5, "1w"), ("all", 6, "1mo")):
+        _d = _Q(_qrecs, _rg, now=_now)
+        _qres[_rg] = (_d["totals"]["requests"], _d["unit"], len(_d["series"]))
+        _S = _d["series"]
+        _edges = [s["t"] for s in _S]
+        _cont = all(_uqn["_usage_next"](a, _unit) == b for a, b in zip(_edges, _edges[1:]))
+        _first = _uqn["_usage_floor"](_d["from"], _unit) == _edges[0] and _edges[-1] <= _now
+        _sums = (sum(s["n"] for s in _S) == _d["totals"]["requests"]
+                 and sum(s["i"] + s["c"] for s in _S) == _d["totals"]["input"]
+                 and sum(s["o"] for s in _S) == _d["totals"]["output"])
+        _placed = all(
+            _S[max(j for j, e in enumerate(_edges) if e <= r["t"])]["n"] >= 1
+            for r in _qrecs if r.get("n") and _d["from"] <= r["t"] <= _now)
+        _qok.append((_rg, _d["totals"]["requests"] == _want_n, _d["unit"] == _unit,
+                     _cont, _first, _sums, _placed))
+    _dA = _Q(_qrecs, "all", "A", now=_now)
+    _dB = _Q(_qrecs, "1h", "B", now=_now)
+    _dZ = _Q(_qrecs, "all", "nobody", now=_now)
+    _qres["A"] = _dA["totals"]
+    _qres["B"] = _dB["totals"]
+    _qres["models"] = _dA["models"]
+    _qres["Z"] = (_dZ["totals"], _dZ["note"])
+    _qres["note1w"] = _Q(_qrecs, "1w", now=_now)["note"]
+    _qres["units"] = [(_uqn["_usage_floor"](_now, u), u) for u in ("5m", "1h", "6h", "1d", "1w", "1mo")]
+except Exception as _e:
+    _qres["error"] = repr(_e)
+_lt = [time.localtime(t) for t, u in _qres.get("units", [])]
+_ucheck("usage: each range's bars, totals, model filter and cache hit",
+      lambda: (len(_qok) == 6 and all(all(x[1:]) for x in _qok)
+      and 12 <= _qres["1h"][2] <= 13 and 24 <= _qres["1d"][2] <= 25
+      and 28 <= _qres["1w"][2] <= 29 and 30 <= _qres["1m"][2] <= 31
+      and 52 <= _qres["1y"][2] <= 54
+      # model A: calls 2, 4, 6 (k = 1, 3, 5); every one reports caching
+      and _qres["A"] == {"requests": 3, "answers": 1, "input": 1200, "cached": 120,
+                         "output": 12, "cache_hit": 10.0}
+      and _qres["B"] == {"requests": 1, "answers": 0, "input": 100, "cached": 0,
+                         "output": 1, "cache_hit": None}
+      and [m["id"] for m in _qres["models"]] in (["A", "B"], ["B", "A"])
+      and all(m["n"] == 4 if m["id"] == "A" else m["n"] == 3 for m in _qres["models"])
+      and _qres["Z"] == ({"requests": 0, "answers": 0, "input": 0, "cached": 0, "output": 0,
+                          "cache_hit": None}, "")
+      and _qres["note1w"] == "Estimated from text length: 1 of 3 requests."
+      and _lt[0].tm_min % 5 == 0 and _lt[0].tm_sec == 0 and _lt[1].tm_min == 0
+      and _lt[2].tm_hour % 6 == 0 and _lt[3][3:6] == (0, 0, 0)
+      and _lt[4].tm_wday == 0 and _lt[4][3:6] == (0, 0, 0)
+      and _lt[5].tm_mday == 1 and _lt[5][3:6] == (0, 0, 0)),
+      lambda: "%r | %r" % ([x for x in _qok if not all(x[1:])], _qres))
+
+# 8. the route, live on copy A: every range answers with the pane's
+# shape; an unknown range is a 400; the model filter narrows it; the
+# live answers above are in it, from this computer, with the engine's
+# own counts (MLX and Ollama both report them). Fails if the route is
+# missing, the chat path stops recording, a local answer goes
+# unrecorded or is recorded only as a guess, or the answers go uncounted.
+_ur = {}
+for _rg in ("1h", "1d", "1w", "1m", "1y", "all"):
+    _s, _h, _b = req("/api/usage?range=" + _rg)
+    try:
+        _ur[_rg] = (_s, json.loads(_b))
+    except ValueError:
+        _ur[_rg] = (_s, {})
+_ubad_s = req("/api/usage?range=2h")[0]
+_uall = _ur["all"][1]
+_loc = [m for m in _uall.get("models", []) if m.get("where") == "local"]
+_ufilt = (json.loads(req("/api/usage?range=all&model=" + _uq(_loc[0]["id"]))[2])
+          if _loc else {})
+try:
+    _ulines = [json.loads(l) for l in open(os.path.join(INST.home, "usage.jsonl"))
+               if l.strip()]
+except (OSError, ValueError):
+    _ulines = []
+_exact_local = [r for r in _ulines if r.get("w") == "local" and r.get("n") == 1
+                and r.get("i", 0) > 0 and r.get("o", 0) > 0 and not r.get("x")]
+_ucheck("usage: /api/usage answers every range, and the live answers are in it",
+      lambda: (all(v[0] == 200 and set(v[1]) >= {"totals", "series", "models", "unit", "from", "to",
+                                        "refreshed", "note", "estimated"}
+          and v[1]["range"] == k for k, v in _ur.items())
+      and _ubad_s == 400
+      and _ur["1h"][1]["totals"]["requests"] >= 4 and _ur["1h"][1]["unit"] == "5m"
+      and _ur["1h"][1]["totals"]["answers"] >= 4
+      and _uall["totals"]["requests"] >= _ur["1h"][1]["totals"]["requests"]
+      and _ur["1h"][1]["totals"]["input"] > 0 and _ur["1h"][1]["totals"]["output"] > 0
+      and _loc and _ufilt.get("model") == _loc[0]["id"]
+      and 0 < _ufilt["totals"]["requests"] <= _uall["totals"]["requests"]
+      and _exact_local),
+      lambda: "%r" % [{k: (v[0], v[1].get("totals"), v[1].get("unit")) for k, v in _ur.items()},
+              _ubad_s, _uall.get("models"), len(_ulines), _ulines[-3:]])
+print("  (usage: %d local calls recorded, %d with the engine's own counts)"
+      % (len([r for r in _ulines if r.get("w") == "local"]), len(_exact_local)))
+
+# 9. a ledger that can't be read answers 503 with its line and is left
+# as it was; restored, the route reads again. Fails if a bad file reads
+# as no usage, or the route writes over it.
+_upA = os.path.join(INST.home, "usage.jsonl")
+_uhold = _upA + ".gauntlet"
+_u503 = None
+try:
+    os.replace(_upA, _uhold)
+    with open(_upA, "wb") as _fh:
+        _fh.write(b"\xff\xfe\x00 not a ledger \x00\n" * 3)
+    _u503 = req("/api/usage?range=all")
+    _ukept = open(_upA, "rb").read().startswith(b"\xff\xfe\x00 not a ledger")
+finally:
+    try:
+        os.replace(_uhold, _upA)
+    except OSError:
+        pass
+_uback = req("/api/usage?range=all")[0]
+_ucheck("usage: an unreadable ledger answers 503 and is left alone",
+      lambda: (_u503 and _u503[0] == 503
+      and json.loads(_u503[2]).get("err") == "Couldn’t read your usage. Nothing was changed."
+      and _ukept and _uback == 200),
+      lambda: "%r" % [_u503 and _u503[:1], _u503 and _u503[2][:120], _uback])
+
+# 10. the page: Usage closes the rail, its pane has the six periods in
+# order, the model menu, the four figures, the chart and its legend, and
+# it loads through api() when opened. Fails if the tab, a period, a card
+# or the wiring goes.
+_upane = page.split('<section class="spane" id="p-usage">')[1].split("</section>")[0] \
+    if '<section class="spane" id="p-usage">' in page else ""
+_ucheck("usage: the Settings rail has a Usage pane with the six periods",
+      lambda: ('<button class="snav" data-pane="p-usage">Usage</button>' in page
+      and re.findall(r'<option value="(\w+)"[^>]*>([^<]+)</option>', _upane.split(
+          'id="us-range"')[1].split("</select>")[0] if 'id="us-range"' in _upane else "")
+      == [("1h", "1 hour"), ("1d", "1 day"), ("1w", "1 week"), ("1m", "1 month"),
+          ("1y", "1 year"), ("all", "All time")]
+      and '<option value="all" selected>' in _upane
+      and '<select id="us-model" aria-label="Model"><option value="">All models</option>' in _upane
+      and [re.sub(r"\s+", " ", x) for x in re.findall(r'<div class="us-k">([^<]+)</div>', _upane)]
+      == ["Requests", "Input toks", "Output toks", "Cache hit"]
+      and "Usage &amp; Stats" in _upane and 'id="us-plot"' in _upane
+      and all(x in _upane for x in (">Input</span>", ">Cached</span>", ">Output</span>"))
+      and 'if(id==="p-usage")loadUsage();' in page
+      and 'await api("/api/usage?range="' in page
+      and "USAGE_RANGES" in _MILLENAI_SRC.split('"/api/usage"')[1][:600]),
+      lambda: _upane[:200])
+
+# 11. the numbers as in Patrick's reference, and the chart, run in node:
+# 17,883 · 1.36B · 25.12M · 93.5% · "—"; a stacked bar per bucket (input
+# yellow at the bottom, cached green, output blue), gridlines labelled
+# like "100.00M", dates under round times only, a title per bar. Fails if
+# a format drifts, or a stack is out of order or out of scale.
+_us0 = _MILLENAI_SRC.index("const U_MON=")
+_ujs = (_MILLENAI_SRC[_MILLENAI_SRC.index("function esc(s){"):
+                      _MILLENAI_SRC.index(";}\n", _MILLENAI_SRC.index("function esc(s){")) + 3]
+        + _MILLENAI_SRC[_us0:_MILLENAI_SRC.index("function paintUsage(", _us0)]
+        + r'''
+const T0=new Date(2026,8,28,6,0,0).getTime()/1000;
+const S=[];for(let k=0;k<13;k++)S.push({t:T0+k*300,i:k===12?0:1e6*k,c:k===12?0:2e8,o:k===12?0:5e6,n:k===12?0:2});
+const svg=uChart({series:S,unit:"5m"},400);
+const rects=[...svg.matchAll(/<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" fill="(#\w+)"\/>/g)].map(m=>[+m[1],+m[2],+m[4],m[5]]);
+process.stdout.write(JSON.stringify({
+ f:[uInt(17883),uInt(0),uInt(1234567.4),uTok(1.36e9),uTok(25.12e6),uTok(999),uTok(1000),uTok(999999),uTok(0),
+    uPct(93.456),uPct(null),uPct(0),uPct(undefined)],
+ w:uWhen(new Date(2026,8,10,2,0,0).getTime()/1000),
+ tk:[uTick(T0,"5m"),uTick(new Date(2026,8,10).getTime()/1000,"1d"),uTick(new Date(2026,8,1).getTime()/1000,"1mo")],
+ ticks:uTicks(S,"5m"),steps:[uStep(0),uStep(5),uStep(350e6)],
+ labels:[...svg.matchAll(/text-anchor="end">([^<]+)</g)].map(m=>m[1]),
+ rects:rects,titles:(svg.match(/<title>/g)||[]).length
+}));''')
+_ujf = os.path.join(_tf25.mkdtemp(), "u.js")
+open(_ujf, "w").write(_ujs)
+try:
+    _ujo = json.loads(subprocess.run(["node", _ujf], capture_output=True, text=True,
+                                     timeout=30).stdout)
+except Exception as _e:
+    _ujo = {"error": repr(_e)}
+_urx = _ujo.get("rects") or []
+# bar k has three parts, bottom-up: input (yellow), cached (green), output (blue)
+_ubars = {}
+for _rr in _urx:
+    _ubars.setdefault(_rr[0], []).append(_rr)
+_ustack = list(_ubars.values())
+_ucheck("usage: the pane's number formats and stacked chart (node)",
+      lambda: (_ujo.get("f") == ["17,883", "0", "1,234,567", "1.36B", "25.12M", "999", "1.00K",
+                        "1.00M", "0", "93.5%", "—", "0.0%", "—"]
+      and _ujo.get("w") == "10 Sep at 02:00"
+      and _ujo.get("tk") == ["06:00", "10 Sep", "Sep ’26"]
+      and _ujo.get("ticks") == [0, 3, 6, 9, 12]
+      and _ujo.get("steps") == [1, 2, 200000000]
+      and _ujo.get("labels") == ["0", "100.00M", "200.00M", "300.00M"]
+      # bars 1-11 have all three parts (bar 0 has no input), bar 12 is empty
+      and len(_urx) == 2 + 11 * 3 and _ujo.get("titles") == 12
+      and len(_ustack) == 12 and all(len(b) == 3 for b in _ustack[1:])
+      and all([p[3] for p in b] == ["#e6b422", "#22c08a", "#4d8dff"]
+              and b[0][1] > b[1][1] > b[2][1] for b in _ustack[1:])
+      and _urx[0][3] == "#22c08a" and _urx[1][3] == "#4d8dff"
+      # scale: 2e8 cached on a 3e8 axis is two thirds of the 150 px plot
+      and abs(_urx[0][2] - 100.0) < 0.2
+      and "uChart(d,Math.max(240,plot.clientWidth||400))" in page
+      and "esc(uWhen(s.t)" in page),
+      lambda: "%r" % {k: v for k, v in _ujo.items() if k != "rects"})
 
 
 print("== attached files ==")

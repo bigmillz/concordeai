@@ -1533,6 +1533,10 @@ def _anthropic_stream(c: dict, messages: list, emit) -> bool:
                  "anthropic-version": "2023-06-01",
                  "User-Agent": "MillenAI/%s" % APP_VERSION})
     got, stop = False, ""
+    # the usage ledger (6b325): message_start carries the input counts,
+    # message_delta the output so far; its own output_tokens (1 or so)
+    # would pass a stream cut short for exact, so it's dropped
+    t0, sent, u = time.time(), [0], {}
     try:
         with urllib.request.urlopen(req, timeout=120) as r:
             for raw in r:
@@ -1548,9 +1552,17 @@ def _anthropic_stream(c: dict, messages: list, emit) -> bool:
                     tok = (d.get("delta") or {}).get("text") or ""
                     if tok:
                         got = True
+                        sent[0] += len(tok)
                         emit(tok)
                 elif d.get("type") == "message_delta":
                     stop = (d.get("delta") or {}).get("stop_reason") or stop
+                    if isinstance(d.get("usage"), dict):
+                        u.update(d["usage"])
+                elif d.get("type") == "message_start":
+                    _mu = (d.get("message") or {}).get("usage")
+                    if isinstance(_mu, dict):
+                        u.update({k: v for k, v in _mu.items()
+                                  if k != "output_tokens"})
     except urllib.error.HTTPError as exc:
         if not got:
             cloud_note_failure(c, exc)
@@ -1559,6 +1571,12 @@ def _anthropic_stream(c: dict, messages: list, emit) -> bool:
         if not got:
             cloud_glitch(c, "not responding")
         return got
+    finally:
+        try:
+            usage_note(c.get("model"), _provider_of(c) or "cloud",
+                       messages, sent[0], u, t0)
+        except Exception:
+            pass
     # A REFUSAL IS ABOUT THE QUESTION, NOT THE MODEL (6b307): Opus 5.5
     # runs safety classifiers that can stop a turn, even after text has
     # gone out. Wipe what was shown and let the next rung answer; resting
@@ -1584,6 +1602,7 @@ def cloud_text(c: dict, messages: list, timeout: int = 120,
                timeout_rests: bool = True) -> str:
     """One buffered completion from a SPECIFIC provider conf — the
     council/merge offload path (6b219). Empty string = didn't work."""
+    t0 = time.time()
     try:
         if "anthropic.com" in c.get("base", ""):
             sys_txt = "\n\n".join(m["content"] for m in messages
@@ -1602,6 +1621,14 @@ def cloud_text(c: dict, messages: list, timeout: int = 120,
                          "User-Agent": "MillenAI/%s" % APP_VERSION})
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 d = json.loads(r.read().decode("utf-8", "replace"))
+            try:                               # the usage ledger (6b325)
+                usage_note(c.get("model"), _provider_of(c) or "cloud",
+                           messages, sum(len(b.get("text") or "") for b in
+                                         d.get("content") or []
+                                         if isinstance(b, dict)),
+                           d.get("usage"), t0)
+            except Exception:
+                pass
             c["_stop"] = d.get("stop_reason") or ""
             if d.get("stop_reason") == "refusal":
                 return ""          # partial text of a refused turn: no draft
@@ -1638,6 +1665,12 @@ def cloud_text(c: dict, messages: list, timeout: int = 120,
             d = json.loads(r.read().decode("utf-8", "replace"))
         out = (((d.get("choices") or [{}])[0].get("message") or {})
                .get("content", "") or "")
+        try:                                   # the usage ledger (6b325)
+            usage_note(c.get("model"), _provider_of(c) or "cloud", messages,
+                       len(out) if isinstance(out, str) else 0,
+                       d.get("usage"), t0)
+        except Exception:
+            pass
         if not out.strip() and not quiet:
             # answered, said nothing: still "not working" as far as the
             # council is concerned, so rest it rather than ask again
@@ -2325,6 +2358,15 @@ def cloud_stream(messages: list, emit) -> bool:
     return cloud_stream_conf(cloud_conf(), messages, emit)
 
 
+# THE COUNTS IN A STREAM (6b325). Groq and Gemini put them in a last
+# chunk when asked (stream_options); Moonshot puts them in its last
+# choice unasked. A provider that 400s on the flag loses it for the rest
+# of the launch and the stream is sent again without it, so the usage
+# ledger never costs an answer.
+_STREAM_USAGE_ASK = ("groq", "gemini")
+_stream_usage_off = set()
+
+
 def cloud_stream_conf(c: dict, messages: list, emit) -> bool:
     """Stream from ONE named provider conf. Cloud Only picks its own rung
     off the ladder rather than whichever provider happens to be active."""
@@ -2334,6 +2376,10 @@ def cloud_stream_conf(c: dict, messages: list, emit) -> bool:
         return _anthropic_stream(c, messages, emit)
     body = _openai_body(c, messages, CLOUD_MAX_OUT.get(
         _provider_of(c), 4096), stream=True)
+    _ask = (_provider_of(c) in _STREAM_USAGE_ASK
+            and _provider_of(c) not in _stream_usage_off)
+    if _ask:
+        body["stream_options"] = {"include_usage": True}
     payload = json.dumps(body).encode()
     req = urllib.request.Request(
         c["base"].rstrip("/") + "/chat/completions", data=payload,
@@ -2355,6 +2401,7 @@ def cloud_stream_conf(c: dict, messages: list, emit) -> bool:
         for t in head:
             emit(t)
         head.clear()
+    t0, sent, u = time.time(), [0], {}
     try:
         with urllib.request.urlopen(req, timeout=90) as r:
             for raw in r:
@@ -2369,9 +2416,19 @@ def cloud_stream_conf(c: dict, messages: list, emit) -> bool:
                     tok = (d.get("choices") or [{}])[0].get(
                         "delta", {}).get("content") or ""
                 except Exception:
-                    tok = ""
+                    d, tok = None, ""
+                try:
+                    _cu = (d.get("usage")
+                           or (d.get("x_groq") or {}).get("usage")
+                           or ((d.get("choices") or [{}])[0] or {})
+                           .get("usage"))
+                    if isinstance(_cu, dict):
+                        u = _cu
+                except Exception:
+                    pass
                 if not tok:
                     continue
+                sent[0] += len(tok)
                 if got:
                     emit(tok)
                     continue
@@ -2383,11 +2440,21 @@ def cloud_stream_conf(c: dict, messages: list, emit) -> bool:
                     got = True
                     _flush()
     except urllib.error.HTTPError as exc:
+        if not got and _ask and exc.code == 400 and re.search(
+                r"stream_options|include_usage", _http_body(exc)):
+            _stream_usage_off.add(_provider_of(c))
+            return cloud_stream_conf(c, messages, emit)
         if not got:
             cloud_note_failure(c, exc)
         return got
     except Exception:
         return got
+    finally:
+        try:
+            usage_note(c.get("model"), _provider_of(c) or "cloud",
+                       messages, sent[0], u, t0)
+        except Exception:
+            pass
     if not got and head:
         if _is_provider_error("".join(head)):
             _cloud_budget_hit(c)
@@ -10859,9 +10926,456 @@ def run_search(query: str) -> str:
     return ctx
 
 
+# ------------------------------------------------------------------ usage
+# THE USAGE LEDGER (6b325, per Patrick: "in the settings, let's add a tab
+# called usage and show the user stats"). One record per model call,
+# written at the five places a prompt leaves for a model: stream_ollama
+# and stream_openai_compat (this computer), _anthropic_stream,
+# cloud_stream_conf and cloud_text (the cloud). So a council, its merge,
+# titles, memory, map pins, funnels and the polish passes all count,
+# each call once. Pictures and video don't, nor the key check's 8-token
+# hello. The counts are the ones the engine or provider sent back; where
+# none came back they're estimated from text length (4 characters a
+# token) and the record says so. A chat never waits on it: records go to
+# a queue that a writer thread appends, and every error is swallowed.
+#
+# usage.jsonl, one record per line, short keys:
+#   t  start, unix s        s  a rollup's span in s (absent: one call)
+#   m  model label          w  where: "local", or the provider id
+#   n  model calls          i  input tokens, cached ones included
+#   c  cached input         ri input of the calls that report caching
+#   o  output tokens        d  milliseconds
+#   x  calls estimated      a  answers (one per /api/chat answer)
+#   q  calls from the old answer log (quality.jsonl, estimated)
+# Calls stay one per line for 14 days, then roll up into hours, and after
+# 120 days into local days, so "All time" stays small for years.
+USAGE_FILE = "usage.jsonl"
+READ_FAIL[USAGE_FILE] = "Couldn’t read your usage. Nothing was changed."
+USAGE_RAW_DAYS = 14
+USAGE_HOURLY_DAYS = 120
+USAGE_COMPACT_BYTES = 1_500_000
+USAGE_SUM_KEYS = ("n", "i", "c", "ri", "o", "d", "x", "a", "q")
+# range -> (seconds back, bucket); "all" picks its bucket from the data
+USAGE_RANGES = {"1h": (3600, "5m"), "1d": (86400, "1h"),
+                "1w": (7 * 86400, "6h"), "1m": (30 * 86400, "1d"),
+                "1y": (365 * 86400, "1w"), "all": (0, "")}
+USAGE_UNITS = {"5m": 300, "1h": 3600, "6h": 21600, "1d": 86400,
+               "1w": 604800, "1mo": 2629746}
+_USAGE_T0 = time.time()        # the old log counts only before this launch
+_usage_q = []
+_usage_qlock = threading.Lock()
+_usage_lock = threading.RLock()      # the file: appends, reads, rewrites
+_usage_wake = threading.Event()
+_usage_state = {"thread": None, "backfilled": False, "compacted": 0.0}
+
+
+def _usage_num(v):
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) \
+        and v > 0 else 0
+
+
+def _usage_est(chars) -> int:
+    try:
+        chars = int(chars)
+    except (TypeError, ValueError):
+        return 0
+    return (chars + 3) // 4 if chars > 0 else 0
+
+
+def _usage_est_in(messages) -> int:
+    n = 0
+    for m in messages or []:
+        c = m.get("content") if isinstance(m, dict) else ""
+        if isinstance(c, str):
+            n += len(c)
+        elif isinstance(c, list):
+            n += sum(len(p.get("text") or "") for p in c
+                     if isinstance(p, dict))
+        n += 16            # the role and the template's turn markers
+    return _usage_est(n)
+
+
+def usage_counts(u):
+    """(input, cached, output, reports_caching) from what an engine or a
+    provider sent back, or None when it isn't a shape we know. input
+    includes cached input; input or output is None when that one count
+    wasn't sent."""
+    if not isinstance(u, dict):
+        return None
+
+    def n(k):
+        v = u.get(k)
+        return int(v) if isinstance(v, (int, float)) \
+            and not isinstance(v, bool) and v >= 0 else None
+    if n("input_tokens") is not None \
+            or n("cache_read_input_tokens") is not None:
+        # Anthropic: input_tokens leaves out what was read from the
+        # cache and what was written to it
+        cr, cw = n("cache_read_input_tokens"), \
+            n("cache_creation_input_tokens")
+        return ((n("input_tokens") or 0) + (cr or 0) + (cw or 0), cr or 0,
+                n("output_tokens"), cr is not None)
+    if n("prompt_tokens") is not None or n("completion_tokens") is not None:
+        # OpenAI's shape: MLX, Groq, Gemini's OpenAI layer, Moonshot
+        det = u.get("prompt_tokens_details")
+        c = det.get("cached_tokens") if isinstance(det, dict) else None
+        if c is None:
+            c = u.get("cached_tokens")               # Moonshot's field
+        c = int(c) if isinstance(c, (int, float)) \
+            and not isinstance(c, bool) and c >= 0 else None
+        return n("prompt_tokens"), c or 0, n("completion_tokens"), \
+            c is not None
+    if n("promptTokenCount") is not None \
+            or n("candidatesTokenCount") is not None:
+        # Gemini's own API leaves cachedContentTokenCount out at zero
+        o = n("candidatesTokenCount")
+        if o is not None:
+            o += n("thoughtsTokenCount") or 0
+        return n("promptTokenCount"), n("cachedContentTokenCount") or 0, \
+            o, True
+    if n("eval_count") is not None or n("prompt_eval_count") is not None:
+        # Ollama's last line. prompt_eval_count is what it evaluated,
+        # left out when the whole prompt came from its cache
+        return n("prompt_eval_count"), 0, n("eval_count"), False
+    return None
+
+
+def usage_note(model, where, messages, chars, reported=None, t0=None):
+    """Queue one model call. chars: the text it sent back. Never raises
+    and never touches the disk on the caller's thread."""
+    try:
+        got = usage_counts(reported)
+        if got is None and not chars:
+            return                   # nothing came back, nothing was spent
+        i, c, o, cache = got or (None, 0, None, False)
+        est = i is None or o is None
+        if i is None:
+            i = _usage_est_in(messages)
+        if o is None:
+            o = _usage_est(chars)
+        rec = {"t": round(time.time(), 1), "m": str(model or "?")[:80],
+               "w": str(where or "cloud")[:16], "n": 1, "i": i, "o": o}
+        if c:
+            rec["c"] = min(c, i)
+        if cache:
+            rec["ri"] = i
+        if t0:
+            rec["d"] = int(max(0.0, time.time() - t0) * 1000)
+        if est:
+            rec["x"] = 1
+        usage_put(rec)
+    except Exception:
+        pass
+
+
+def usage_put(rec: dict):
+    with _usage_qlock:
+        _usage_q.append(rec)
+        if len(_usage_q) > 20000:          # a disk that won't take them
+            del _usage_q[:len(_usage_q) - 20000]
+        th = _usage_state["thread"]
+        if th is None or not th.is_alive():
+            th = threading.Thread(target=_usage_writer, name="usage",
+                                  daemon=True)
+            _usage_state["thread"] = th
+            th.start()
+    _usage_wake.set()
+
+
+def _usage_writer():
+    while True:
+        _usage_wake.wait()
+        _usage_wake.clear()
+        try:
+            usage_flush()
+        except Exception:
+            time.sleep(5)
+
+
+def _usage_write_all(recs: list):
+    """The whole file, atomically (0b L2): unique temp, fsync, replace."""
+    p = _pfile(USAGE_FILE)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p), prefix=".usage-",
+                               suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write("".join(json.dumps(r, separators=(",", ":")) + "\n"
+                            for r in recs).encode("ascii"))
+            f.flush()
+            os.fsync(f.fileno())
+        _replace_into(tmp, p)
+    except Exception:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def usage_flush():
+    """Append what's queued. The file lock keeps a rewrite and an append
+    apart; what couldn't be written goes back on the queue."""
+    with _usage_lock:
+        with _usage_qlock:
+            recs = _usage_q[:]
+            del _usage_q[:]
+        if not recs:
+            return
+        p = _pfile(USAGE_FILE)
+        try:
+            _usage_backfill()
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            lead = b""
+            try:
+                if os.path.getsize(p) > 0:
+                    with open(p, "rb") as fr:
+                        fr.seek(-1, 2)
+                        # a line a crash cut short stays a line of its own
+                        lead = b"" if fr.read(1) == b"\n" else b"\n"
+            except FileNotFoundError:
+                pass
+            with os.fdopen(os.open(p, os.O_WRONLY | os.O_APPEND | os.O_CREAT
+                                   | getattr(os, "O_BINARY", 0), 0o600),
+                           "ab") as f:
+                f.write(lead + "".join(
+                    json.dumps(r, separators=(",", ":")) + "\n"
+                    for r in recs).encode("ascii"))
+                f.flush()
+                os.fsync(f.fileno())
+        except Exception:
+            with _usage_qlock:
+                _usage_q[:0] = recs
+            raise
+        # once a launch, and again whenever the file passes the mark
+        if not _usage_state["compacted"] or (
+                os.path.getsize(p) > USAGE_COMPACT_BYTES
+                and time.time() - _usage_state["compacted"] > 3600):
+            usage_compact()
+
+
+def _usage_load() -> list:
+    """The file's records: [] when it isn't there, StoreReadError when it
+    is and can't be read (0b L1). A line a crash cut short is skipped;
+    a file that is more garbage than records is not taken for empty."""
+    try:
+        with open(_pfile(USAGE_FILE), "rb") as f:
+            raw = f.read()
+    except FileNotFoundError:
+        return []
+    except OSError as exc:
+        raise StoreReadError(USAGE_FILE) from exc
+    try:
+        text = raw.decode("ascii")
+    except UnicodeDecodeError as exc:
+        raise StoreReadError(USAGE_FILE) from exc
+    out, bad = [], 0
+    for ln in text.split("\n"):
+        if not ln.strip():
+            continue
+        try:
+            r = json.loads(ln)
+        except ValueError:
+            r = None
+        if isinstance(r, dict) and _usage_num(r.get("t")):
+            out.append(r)
+        else:
+            bad += 1
+    if bad > len(out) + 1:
+        raise StoreReadError(USAGE_FILE)
+    return out
+
+
+def usage_read() -> list:
+    """Every record: the file's, then those still queued."""
+    with _usage_lock:
+        try:
+            _usage_backfill()
+        except Exception:
+            pass
+        recs = _usage_load()
+        with _usage_qlock:
+            recs.extend(dict(r) for r in _usage_q)
+    return recs
+
+
+def _usage_backfill():
+    """Once, the first time this build keeps a ledger: each line of the
+    old per-answer log (quality.jsonl: ts, tier, model, searched, chars)
+    from before this launch becomes one answer and one estimated call,
+    output from its length, input unknown (0). The ledger is written
+    whole, so the old log is never read twice."""
+    if _usage_state["backfilled"]:
+        return
+    _usage_state["backfilled"] = True
+    if os.path.exists(_pfile(USAGE_FILE)):
+        return
+    try:
+        with open(_pfile("quality.jsonl"), "r", encoding="utf-8",
+                  errors="replace") as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return
+    recs = []
+    for ln in lines:
+        try:
+            q = json.loads(ln)
+            t = float(q["ts"])
+        except Exception:
+            continue
+        if not 0 < t < _USAGE_T0:
+            continue
+        m = str(q.get("model") or "?")[:80]
+        recs.append({"t": t, "m": m,
+                     "w": "local" if m in MODEL_ROUTES else "cloud",
+                     "n": 1, "i": 0, "o": _usage_est(q.get("chars")),
+                     "x": 1, "q": 1, "a": 1})
+    if recs:
+        recs.sort(key=lambda r: r["t"])
+        _usage_write_all(recs)
+
+
+def usage_compact(now=None) -> bool:
+    """Roll old calls up (hours after 14 days, local days after 120) and
+    rewrite the file. Never rewrites a file it couldn't read; lines that
+    didn't read are dropped."""
+    now = time.time() if now is None else now
+    with _usage_lock:
+        _usage_state["compacted"] = time.time()
+        try:
+            recs = _usage_load()
+        except StoreReadError:
+            return False
+        keep, agg = [], {}
+        for r in recs:
+            age = now - r["t"]
+            if age < USAGE_RAW_DAYS * 86400:
+                keep.append(r)
+                continue
+            span = 3600 if age < USAGE_HOURLY_DAYS * 86400 else 86400
+            if _usage_num(r.get("s")) >= span:
+                keep.append(r)
+                continue
+            start = _usage_floor(r["t"], "1h" if span == 3600 else "1d")
+            k = (start, span, r.get("m") or "", r.get("w") or "")
+            a = agg.get(k)
+            if a is None:
+                a = agg[k] = {"t": start, "s": span}
+                if k[2]:
+                    a["m"] = k[2]
+                if k[3]:
+                    a["w"] = k[3]
+            for f in USAGE_SUM_KEYS:
+                v = _usage_num(r.get(f))
+                if v:
+                    a[f] = a.get(f, 0) + v
+        if not agg and len(keep) == len(recs):
+            return False
+        _usage_write_all(sorted(keep + list(agg.values()),
+                                key=lambda r: r["t"]))
+        return True
+
+
+def _usage_floor(t: float, unit: str) -> float:
+    """The start of t's bucket, in local time: weeks start on Monday."""
+    lt = time.localtime(t)
+    if unit == "1mo":
+        return time.mktime((lt.tm_year, lt.tm_mon, 1, 0, 0, 0, 0, 0, -1))
+    if unit == "1w":
+        return time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday - lt.tm_wday,
+                            0, 0, 0, 0, 0, -1))
+    mid = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 0, 0, 0, 0, 0, -1))
+    sec = USAGE_UNITS[unit]
+    return mid + (t - mid) // sec * sec
+
+
+def _usage_next(t: float, unit: str) -> float:
+    lt = time.localtime(t)
+    if unit == "1mo":
+        return time.mktime((lt.tm_year, lt.tm_mon + 1, 1, 0, 0, 0, 0, 0, -1))
+    if unit in ("1d", "1w"):
+        return time.mktime((lt.tm_year, lt.tm_mon,
+                            lt.tm_mday + (7 if unit == "1w" else 1),
+                            0, 0, 0, 0, 0, -1))
+    return t + USAGE_UNITS[unit]
+
+
+def usage_query(recs: list, rng: str = "all", model: str = "",
+                now=None) -> dict:
+    """The Usage pane's numbers for one range and model ("" = all): the
+    four totals, one bucket per bar, the models in the data and the
+    estimated line."""
+    import bisect as _bisect
+    now = time.time() if now is None else now
+    back, unit = USAGE_RANGES[rng]
+    models = {}
+    for r in recs:
+        if r.get("m") and _usage_num(r.get("n")):
+            e = models.setdefault(r["m"], {"id": r["m"],
+                                           "where": r.get("w") or "",
+                                           "n": 0})
+            e["n"] += _usage_num(r.get("n"))
+    mine = [r for r in recs if not model or r.get("m") == model]
+    if back:
+        start = now - back
+    else:
+        # from the first record, and never less than an hour back
+        ts = [r["t"] for r in mine if r["t"] <= now]
+        start = min(ts + [now - 3600])
+        unit = next((u for u in ("5m", "1h", "6h", "1d", "1w")
+                     if (now - start) / USAGE_UNITS[u] <= 60), "1mo")
+    edges, b = [], _usage_floor(start, unit)
+    while b <= now and len(edges) < 400:
+        edges.append(b)
+        b = _usage_next(b, unit)
+    series = [{"t": e, "i": 0, "c": 0, "o": 0, "n": 0} for e in edges]
+    tot = dict.fromkeys(USAGE_SUM_KEYS, 0)
+    for r in mine:
+        if not start <= r["t"] <= now:
+            continue
+        for k in USAGE_SUM_KEYS:
+            tot[k] += _usage_num(r.get(k))
+        j = _bisect.bisect_right(edges, r["t"]) - 1
+        if j >= 0:
+            for k in ("i", "c", "o", "n"):
+                series[j][k] += _usage_num(r.get(k))
+    for s in series:
+        s["i"] = max(0, s["i"] - s["c"])       # the bar's uncached input
+    est, old = int(tot["x"]), int(tot["q"])
+    of = "%s of %s requests" % (format(est, ","), format(int(tot["n"]), ","))
+    note = ""
+    if est and old == est:
+        note = "Estimated from the old answer log (output only): %s." % of
+    elif est:
+        note = "Estimated from text length: %s" % of + (
+            ", %s of them from the old answer log (output only)"
+            % format(old, ",") if old else "") + "."
+    return {"range": rng, "model": model, "unit": unit, "from": start,
+            "to": now, "refreshed": now,
+            "totals": {"requests": int(tot["n"]), "answers": int(tot["a"]),
+                       "input": int(tot["i"]), "cached": int(tot["c"]),
+                       "output": int(tot["o"]),
+                       "cache_hit": (round(100.0 * tot["c"] / tot["ri"], 1)
+                                     if tot["ri"] else None)},
+            "series": series,
+            "models": sorted(models.values(), key=lambda e: -e["n"]),
+            "estimated": est, "note": note}
+
+
+def _usage_at_exit():
+    try:
+        usage_flush()
+    except Exception:
+        pass
+
+
+atexit.register(_usage_at_exit)
+
+
 def stream_ollama(tag: str, messages: list, emit,
-                  giant: bool = False) -> None:
-    """Stream NDJSON from Ollama, calling emit(text_chunk) as tokens arrive."""
+                  giant: bool = False, label: str = "") -> None:
+    """Stream NDJSON from Ollama, calling emit(text_chunk) as tokens arrive.
+    label: the catalog name the usage ledger records (6b325)."""
     options = {"temperature": 0.75}
     extra = {}
     if giant:
@@ -10890,22 +11404,33 @@ def stream_ollama(tag: str, messages: list, emit,
         data=payload,
         headers={"Content-Type": "application/json"},
     )
-    # Ollama sends nothing until the model is loaded, so for a giant the
-    # socket timeout has to cover a cold read of 300-400 GB
-    with urllib.request.urlopen(
-            req, timeout=GIANT_LOAD_TIMEOUT if giant else 600) as resp:
-        for raw_line in resp:
-            line = raw_line.decode("utf-8").strip()
-            if not line:
-                continue
-            obj = json.loads(line)
-            if "error" in obj:
-                raise RuntimeError(obj["error"])
-            chunk = obj.get("message", {}).get("content", "")
-            if chunk:
-                emit(chunk)
-            if obj.get("done"):
-                break
+    # the usage ledger (6b325): Ollama's counts ride its last line; a
+    # stream cut short is recorded from what it sent, as an estimate
+    t0, sent, last = time.time(), [0], {}
+    try:
+        # Ollama sends nothing until the model is loaded, so for a giant
+        # the socket timeout has to cover a cold read of 300-400 GB
+        with urllib.request.urlopen(
+                req, timeout=GIANT_LOAD_TIMEOUT if giant else 600) as resp:
+            for raw_line in resp:
+                line = raw_line.decode("utf-8").strip()
+                if not line:
+                    continue
+                obj = json.loads(line)
+                if "error" in obj:
+                    raise RuntimeError(obj["error"])
+                chunk = obj.get("message", {}).get("content", "")
+                if chunk:
+                    sent[0] += len(chunk)
+                    emit(chunk)
+                if obj.get("done"):
+                    last = obj
+                    break
+    finally:
+        try:
+            usage_note(label or tag, "local", messages, sent[0], last, t0)
+        except Exception:
+            pass
 
 
 def stream_openai_compat(port: int, model_label: str, messages: list, emit,
@@ -10933,6 +11458,9 @@ def stream_openai_compat(port: int, model_label: str, messages: list, emit,
         # anyway; we simply stop asking for it. Templates that don't know the
         # flag ignore it, so this is safe to send to every model.
         "chat_template_kwargs": {"enable_thinking": thinking},
+        # the counts for the usage ledger (6b325), in a last chunk with
+        # no choices; a server that doesn't know the flag ignores it
+        "stream_options": {"include_usage": True},
     }).encode("utf-8")
     req = urllib.request.Request(
         f"http://127.0.0.1:{port}/v1/chat/completions",
@@ -10942,59 +11470,74 @@ def stream_openai_compat(port: int, model_label: str, messages: list, emit,
     emitted = False
     in_think = False
     raw_body = []
-    with urllib.request.urlopen(req, timeout=600) as resp:
-        for raw_line in resp:
-            line = raw_line.decode("utf-8", errors="replace")
-            raw_body.append(line)
-            line = line.strip()
-            if not line.startswith("data:"):
-                continue
-            data = line[5:].strip()
-            if data == "[DONE]":
-                break
-            try:
-                obj = json.loads(data)
-            except json.JSONDecodeError:
-                continue
-            choice = obj.get("choices", [{}])[0]
-            delta = choice.get("delta") or {}
-            whole = choice.get("message") or {}
-            # Reasoning models stream their chain of thought in a separate
-            # `reasoning` field — it is *not* `content`. Reading only
-            # `content` meant a model like Gemma 4 appeared to answer with
-            # nothing at all. Wrap it so it lands in the same collapsible
-            # block the UI already renders for DeepSeek R1's <think> tags.
-            think = delta.get("reasoning") or whole.get("reasoning") or ""
-            if think:
-                if not in_think:
-                    in_think = True
-                    emit("<think>")
-                emitted = True
-                emit(think)
-            chunk = delta.get("content", "") or whole.get("content", "")
-            if chunk:
-                if in_think:
-                    in_think = False
-                    emit("</think>")
-                emitted = True
-                emit(chunk)
-    if in_think:                      # ran out of budget still thinking
-        emit("</think>")
+    t0, sent, rep = time.time(), [0], None
+    try:
+        with urllib.request.urlopen(req, timeout=600) as resp:
+            for raw_line in resp:
+                line = raw_line.decode("utf-8", errors="replace")
+                raw_body.append(line)
+                line = line.strip()
+                if not line.startswith("data:"):
+                    continue
+                data = line[5:].strip()
+                if data == "[DONE]":
+                    break
+                try:
+                    obj = json.loads(data)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(obj.get("usage"), dict):
+                    rep = obj["usage"]
+                # the usage chunk's choices are [] (6b325)
+                choice = (obj.get("choices") or [{}])[0] or {}
+                delta = choice.get("delta") or {}
+                whole = choice.get("message") or {}
+                # Reasoning models stream their chain of thought in a separate
+                # `reasoning` field — it is *not* `content`. Reading only
+                # `content` meant a model like Gemma 4 appeared to answer with
+                # nothing at all. Wrap it so it lands in the same collapsible
+                # block the UI already renders for DeepSeek R1's <think> tags.
+                think = delta.get("reasoning") or whole.get("reasoning") or ""
+                if think:
+                    if not in_think:
+                        in_think = True
+                        emit("<think>")
+                    emitted = True
+                    sent[0] += len(think)
+                    emit(think)
+                chunk = delta.get("content", "") or whole.get("content", "")
+                if chunk:
+                    if in_think:
+                        in_think = False
+                        emit("</think>")
+                    emitted = True
+                    sent[0] += len(chunk)
+                    emit(chunk)
+        if in_think:                      # ran out of budget still thinking
+            emit("</think>")
 
-    if not emitted:
-        # server didn't stream — try the body as one plain JSON completion
+        if not emitted:
+            # server didn't stream — try the body as one plain JSON completion
+            try:
+                obj = json.loads("".join(raw_body))
+                if isinstance(obj.get("usage"), dict):
+                    rep = obj["usage"]
+                text = obj["choices"][0]["message"]["content"]
+            except (json.JSONDecodeError, KeyError, IndexError):
+                raise RuntimeError(
+                    "the server answered but sent no usable completion "
+                    f"(first bytes: {''.join(raw_body)[:120]!r})"
+                )
+            if text:
+                sent[0] += len(text)
+                emit(text)
+            else:
+                raise RuntimeError("the server returned an empty completion")
+    finally:
         try:
-            obj = json.loads("".join(raw_body))
-            text = obj["choices"][0]["message"]["content"]
-        except (json.JSONDecodeError, KeyError, IndexError):
-            raise RuntimeError(
-                "the server answered but sent no usable completion "
-                f"(first bytes: {''.join(raw_body)[:120]!r})"
-            )
-        if text:
-            emit(text)
-        else:
-            raise RuntimeError("the server returned an empty completion")
+            usage_note(model_label, "local", messages, sent[0], rep, t0)
+        except Exception:
+            pass
 
 
 END_TOKENS = ("<end_of_turn>", "<|eot_id|>", "<|im_end|>", "</s>",
@@ -11095,7 +11638,7 @@ def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
                 emit(chunk)
 
             if kind == "ollama":
-                stream_ollama(target, msgs, _tap,
+                stream_ollama(target, msgs, _tap, label=label,
                               giant=model_is_giant(label))
             else:
                 # re-read (ensure may have moved the engine off a port
@@ -14403,6 +14946,16 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                              "providers": provs})
         elif self.path == "/api/stats":
             self._send_stats()
+        elif urllib.parse.urlparse(self.path).path == "/api/usage":
+            # Settings › Usage (6b325): ?range=1h|1d|1w|1m|1y|all&model=
+            # A ledger that can't be read answers 503 (StoreReadError)
+            _uq = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            _ur = (_uq.get("range") or ["all"])[0]
+            if _ur not in USAGE_RANGES:
+                self._send_json({"err": "unknown range"}, code=400)
+            else:
+                self._send_json(usage_query(
+                    usage_read(), _ur, (_uq.get("model") or [""])[0][:120]))
         elif self.path == "/api/engines":
             self._send_engines()
         elif self.path == "/api/setup":
@@ -17327,6 +17880,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     }) + "\n")
             except Exception:
                 pass
+            # Settings › Usage counts answers too (6b325): one per
+            # question that got one, under the model that wrote it
+            if sent[0]:
+                try:
+                    usage_put({"t": round(time.time(), 1), "a": 1, "m": str(
+                        (_ans_conf or {}).get("model") or route_label
+                        or model_name or "")[:80]})
+                except Exception:
+                    pass
             plain = prompt[8:] if prompt.lower().startswith("/search") \
                 else prompt
             # the memory pass reads the question. A cloud answer is read by
@@ -19952,6 +20514,49 @@ body.gen #chip-model{color:var(--accent)}
 .fscope{display:flex;gap:6px;align-items:center;font-size:12px;
   color:var(--text)}
 #forget-note{font-size:11px;color:var(--faint);min-height:14px}
+/* SETTINGS › USAGE (6b325, per Patrick's reference): a head with the
+   period and the model, four figures, one stacked bar per bucket. Input
+   yellow, cached green, output blue, as in the reference. */
+.us-head{display:flex;align-items:center;gap:7px;margin-bottom:12px;
+  min-width:0}
+.us-ico{width:18px;height:18px;flex:none;color:#5b8cff}
+.us-title{font-family:var(--sans);font-size:14.5px;font-weight:600;
+  color:#fff;letter-spacing:.01em;margin-right:auto;white-space:nowrap}
+.us-head select{font:inherit;font-size:11.5px;color:var(--text);
+  background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:4px 6px;min-width:0;max-width:122px;cursor:pointer;
+  text-overflow:ellipsis}
+.us-head select:focus-visible{outline:2px solid rgba(255,255,255,.3);
+  outline-offset:1px}
+.us-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;
+  margin-bottom:8px}
+.us-card{background:var(--panel);border:1px solid var(--line);
+  border-radius:10px;padding:10px 12px 9px;min-width:0}
+.us-k{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--faint)}
+.us-v{font-family:var(--sans);font-size:21px;font-weight:600;color:#fff;
+  margin-top:3px;line-height:1.2;font-variant-numeric:tabular-nums;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.us-s{font-size:10.5px;color:var(--faint);min-height:14px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.us-chart{padding:11px 12px 10px}
+#us-span{font-size:12px;color:var(--dim);line-height:1.4}
+#us-fresh{font-size:10.5px;color:var(--faint);margin-top:1px}
+#us-plot{margin-top:8px;min-height:176px}
+#us-svg{display:block}
+#us-svg text{fill:var(--faint);font-family:var(--mono);font-size:9.5px}
+#us-svg .g{stroke:rgba(255,255,255,.07)}
+#us-svg .tk{stroke:rgba(255,255,255,.16)}
+.us-empty{font-size:11.5px;color:var(--faint);text-align:center;
+  padding:74px 8px 0}
+.us-leg{display:flex;gap:14px;font-size:11px;color:var(--dim);
+  margin-top:6px}
+.us-leg i{display:inline-block;width:9px;height:9px;border-radius:2px;
+  margin-right:5px;vertical-align:-1px}
+#us-note{font-size:11.5px;color:var(--faint);line-height:1.5;margin:8px 0 0}
+#us-note[hidden]{display:none}
+#p-usage.busy .us-grid,#p-usage.busy .us-chart{opacity:.6;
+  transition:opacity .2s}
 /* Models: the roster */
 #roster{font-family:var(--mono);font-size:10.8px;line-height:1.9;
   font-variant-numeric:tabular-nums;margin-bottom:4px}
@@ -21142,6 +21747,7 @@ __CODE_ROWS__
         <button class="snav" data-pane="p-persona">Personality</button>
         <button class="snav" data-pane="p-cloud">Cloud power</button>
         <button class="snav" data-pane="p-models">Models</button>
+        <button class="snav" data-pane="p-usage">Usage</button>
       </div>
     </nav>
 
@@ -21280,6 +21886,39 @@ __CODE_ROWS__
         </div>
         <div id="manage-note"></div>
       </div>
+    </section>
+    <!-- USAGE (6b325, per Patrick): every model call this app made, from
+         the usage ledger (usage.jsonl), by period and by model -->
+    <section class="spane" id="p-usage">
+      <div class="us-head">
+        <svg class="us-ico" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 17v-3.5M7.5 17v-6M11.5 17v-4M15.5 17V8.5"/><path d="M3.5 9.5l4-4 4 3 5.5-5.5"/></svg>
+        <span class="us-title">Usage &amp; Stats</span>
+        <select id="us-range" aria-label="Time period">
+          <option value="1h">1 hour</option><option value="1d">1 day</option>
+          <option value="1w">1 week</option><option value="1m">1 month</option>
+          <option value="1y">1 year</option><option value="all" selected>All time</option>
+        </select>
+        <select id="us-model" aria-label="Model"><option value="">All models</option></select>
+      </div>
+      <div class="us-grid">
+        <div class="us-card"><div class="us-k">Requests</div>
+          <div class="us-v" id="us-req">&mdash;</div><div class="us-s" id="us-ans"></div></div>
+        <div class="us-card"><div class="us-k">Input toks</div>
+          <div class="us-v" id="us-in">&mdash;</div><div class="us-s" id="us-cached"></div></div>
+        <div class="us-card"><div class="us-k">Output toks</div>
+          <div class="us-v" id="us-out">&mdash;</div><div class="us-s"></div></div>
+        <div class="us-card"><div class="us-k">Cache hit</div>
+          <div class="us-v" id="us-hit">&mdash;</div><div class="us-s"></div></div>
+      </div>
+      <div class="us-card us-chart">
+        <div id="us-span">Token Usage</div>
+        <div id="us-fresh"></div>
+        <div id="us-plot"></div>
+        <div class="us-leg"><span><i style="background:#e6b422"></i>Input</span>
+          <span><i style="background:#22c08a"></i>Cached</span>
+          <span><i style="background:#4d8dff"></i>Output</span></div>
+      </div>
+      <p id="us-note" hidden></p>
     </section>
     </div>
     <div id="about-foot">
@@ -26575,7 +27214,121 @@ function settingsPane(id){
   $$(".snav").forEach(x=>x.classList.toggle("on",x.dataset.pane===id));
   $$(".spane").forEach(p=>p.classList.toggle("on",p.id===id));
   const bd=$("#about-body"); if(bd)bd.scrollTop=0;
+  if(id==="p-usage")loadUsage();      // fresh numbers on every visit (6b325)
 }
+/* ------------------------------------------------ Settings › Usage (6b325)
+   The four figures and the chart come from /api/usage (the usage
+   ledger). Numbers as in Patrick's reference: 17,883 · 1.36B · 25.12M ·
+   93.5%; "—" where nothing reports it. */
+const U_MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const U_COL={i:"#e6b422",c:"#22c08a",o:"#4d8dff"};
+function uInt(n){return String(Math.round(+n||0)).replace(/\B(?=(\d{3})+(?!\d))/g,",");}
+function uTok(n){
+  n=Math.round(+n||0);const a=Math.abs(n);
+  if(a<1e3)return String(n);
+  let s;
+  if(a<1e6){s=(n/1e3).toFixed(2);if(Math.abs(+s)<1000)return s+"K";}
+  if(a<1e9){s=(n/1e6).toFixed(2);if(Math.abs(+s)<1000)return s+"M";}
+  return (n/1e9).toFixed(2)+"B";
+}
+function uPct(p){return p==null||!isFinite(+p)?"\u2014":(+p).toFixed(1)+"%";}
+function u2(n){return (n<10?"0":"")+n;}
+function uWhen(t){const d=new Date(t*1000);
+  return d.getDate()+" "+U_MON[d.getMonth()]+" at "+u2(d.getHours())+":"+u2(d.getMinutes());}
+function uTick(t,unit){const d=new Date(t*1000);
+  if(unit==="5m"||unit==="1h")return u2(d.getHours())+":"+u2(d.getMinutes());
+  if(unit==="1mo")return U_MON[d.getMonth()]+" \u2019"+String(d.getFullYear()).slice(2);
+  return d.getDate()+" "+U_MON[d.getMonth()];}
+// which bars get a date under them: round times first, at most six
+function uTicks(S,unit){
+  const c=[];
+  S.forEach((s,k)=>{const d=new Date(s.t*1000);
+    if(unit==="5m"?d.getMinutes()%15===0:unit==="1h"?d.getHours()%6===0:
+       unit==="6h"?d.getHours()===0:true)c.push(k);});
+  if(!c.length)S.forEach((s,k)=>c.push(k));
+  const st=Math.max(1,Math.ceil(c.length/6));
+  return c.filter((k,j)=>j%st===0);
+}
+// a gridline step of 1, 2 or 5 x 10^n, three or four lines high
+function uStep(mx){
+  if(!(mx>0))return 1;
+  const raw=mx/3,p=Math.pow(10,Math.floor(Math.log10(raw))),f=raw/p;
+  return Math.max(1,(f<=1?1:f<=2?2:f<=5?5:10)*p);
+}
+function uChart(d,W){
+  const S=d.series||[],H=176,ML=52,MR=6,MT=6,MB=20,iw=W-ML-MR,ih=H-MT-MB,
+        n=Math.max(S.length,1),slot=iw/n,bw=Math.max(1,Math.min(26,slot*.62));
+  let mx=0;S.forEach(s=>{mx=Math.max(mx,s.i+s.c+s.o);});
+  const st=uStep(mx),top=Math.max(st,Math.ceil(mx/st)*st),
+        y=v=>MT+ih-v/top*ih;
+  let g="",t="",b="";
+  for(let k=0;k*st<=top;k++){const yy=y(k*st).toFixed(1);
+    g+='<line class="'+(k?"g":"tk")+'" x1="'+ML+'" x2="'+(W-MR)+'" y1="'+yy+'" y2="'+yy+'"/>'
+     +'<line class="tk" x1="'+(ML-5)+'" x2="'+ML+'" y1="'+yy+'" y2="'+yy+'"/>'
+     +'<text x="'+(ML-8)+'" y="'+yy+'" dy="3" text-anchor="end">'+uTok(k*st)+'</text>';}
+  uTicks(S,d.unit).forEach(k=>{const x=ML+slot*k+slot/2,
+      tx=Math.min(W-MR-18,Math.max(ML+14,x)).toFixed(1);
+    t+='<line class="g" x1="'+x.toFixed(1)+'" x2="'+x.toFixed(1)+'" y1="'+MT+'" y2="'+(MT+ih+4)+'"/>'
+     +'<text x="'+tx+'" y="'+(H-4)+'" text-anchor="middle">'+uTick(S[k].t,d.unit)+'</text>';});
+  S.forEach((s,k)=>{
+    const x=(ML+slot*k+(slot-bw)/2).toFixed(1);let y0=MT+ih,r="";
+    ["i","c","o"].forEach(f=>{if(s[f]>0){const h=Math.max(s[f]/top*ih,.8);y0-=h;
+      r+='<rect x="'+x+'" y="'+y0.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" fill="'+U_COL[f]+'"/>';}});
+    if(r)b+='<g><title>'+esc(uWhen(s.t)+" \u00b7 "+uInt(s.n)+(s.n===1?" request":" requests")
+      +" \u00b7 input "+uTok(s.i+s.c)+" ("+uTok(s.c)+" cached) \u00b7 output "+uTok(s.o))+'</title>'+r+'</g>';});
+  return '<svg id="us-svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+g+t+b+'</svg>';
+}
+function paintUsage(d,err){
+  const T=(d&&d.totals)||{},dash="\u2014";
+  $("#us-req").textContent=d?uInt(T.requests):dash;
+  $("#us-ans").textContent=d?uInt(T.answers)+(T.answers===1?" answer":" answers"):"";
+  $("#us-in").textContent=d?uTok(T.input):dash;
+  $("#us-cached").textContent=d&&T.cached?uTok(T.cached)+" cached":"";
+  $("#us-out").textContent=d?uTok(T.output):dash;
+  $("#us-hit").textContent=d?uPct(T.cache_hit):dash;
+  if(d){                          // the models in the data; the choice stays
+    const sel=$("#us-model"),cur=sel.value,ids=(d.models||[]).map(m=>m.id);
+    if(cur&&!ids.includes(cur))ids.push(cur);
+    sel.textContent="";
+    [""].concat(ids).forEach(v=>{const o=document.createElement("option");
+      o.value=v;o.textContent=v||"All models";sel.appendChild(o);});
+    sel.value=cur;
+  }
+  $("#us-span").textContent=d?"Token Usage: "+uWhen(d.from)+" \u2013 "+uWhen(d.to):"Token Usage";
+  $("#us-fresh").textContent=d?"Data refreshed "+uWhen(d.refreshed):"";
+  const plot=$("#us-plot");
+  if(!d)plot.innerHTML='<div class="us-empty">'+esc(err)+'</div>';
+  else if(!T.requests&&!T.answers)plot.innerHTML='<div class="us-empty">Nothing recorded in this period.</div>';
+  else plot.innerHTML=uChart(d,Math.max(240,plot.clientWidth||400));
+  const note=$("#us-note");note.textContent=d?d.note||"":"";note.hidden=!note.textContent;
+}
+let uSeq=0;
+async function loadUsage(){
+  const pane=$("#p-usage");if(!pane)return;
+  const seq=++uSeq;let d=null,err="";
+  pane.classList.add("busy");
+  try{
+    const r=await api("/api/usage?range="+encodeURIComponent($("#us-range").value)
+      +"&model="+encodeURIComponent($("#us-model").value));
+    const j=await r.json();
+    if(r.ok)d=j;else err=j.err||"Couldn\u2019t read your usage.";
+  }catch(e){err="Couldn\u2019t read your usage.";}
+  if(seq!==uSeq)return;           // a newer choice is already on its way
+  pane.classList.remove("busy");
+  paintUsage(d,err);
+}
+(function(){
+  const rs=$("#us-range");if(!rs)return;
+  let saved="";try{saved=localStorage.getItem("millen.usage.range")||"";}catch(e){}
+  if([...rs.options].some(o=>o.value===saved))rs.value=saved;
+  rs.addEventListener("change",()=>{
+    try{localStorage.setItem("millen.usage.range",rs.value);}catch(e){}
+    loadUsage();});
+  $("#us-model").addEventListener("change",loadUsage);
+  // while the pane is open the figures keep up with the chats
+  setInterval(()=>{if(!aboutVeil.hidden&&!document.hidden
+    &&$("#p-usage").classList.contains("on"))loadUsage();},30000);
+})();
 async function openAbout(){
   // Settings always opens on About (6b318, per Patrick), never on
   // whichever pane it was closed on
