@@ -5160,7 +5160,8 @@ _STORE_NAMES = {"StoreReadError", "READ_FAIL", "_read_json", "_write_json",
                 "_mark_written", "_read_json_h", "_STORE_BLOCKED", "_ChatList",
                 "GONE_KEEP", "_write_chats", "_chat_finals", "_chat_finalize",
                 "_memory_lock", "_ent_hash", "_fact_fp", "_msgs_key", "_jcopy",
-                "_legacy_base_of", "_legacy_import_chats", "_profile_legacy_set",
+                "_legacy_ids_of", "_prefix_related", "_legacy_replace",
+                "_legacy_pending", "_legacy_import_chats", "_profile_legacy_set",
                 "_legacy_sync_chats", "_legacy_sync_memory", "_migrate_61"}
 _scn = {"os": os, "json": json, "tempfile": tempfile, "time": time, "IS_WIN": False,
         "re": re, "secrets": __import__("secrets"), "hashlib": __import__("hashlib"),
@@ -5737,6 +5738,8 @@ def _cfresh():
     for _k in ("_chat_stubs", "_chat_finals", "_written", "_STORE_BLOCKED"):
         _cs[_k].clear()
     _cs["_chat_gone"].clear()
+    for _v in _cs["_legacy_pending"].values():
+        _v.clear()
 
 
 # L7 and the migration: the .v2 files are copies with legacy_base and the
@@ -5850,10 +5853,94 @@ with tempfile.TemporaryDirectory() as _ld:
 check("downgrade import (Q8): additions and new turns come in, fresh ids on collision, removals never, and never twice",
       _imp_ok and _still and _no_dupes, "%r" % [_imp_ok, _still, _no_dupes, _got, _mem])
 
-# L1 and Q9: a root file that has had its first write reads as an error
-# when missing; an unreadable legacy file stops the migration (503) until
-# a start can read it; a profile.json lost after use never recopies the
-# legacy files over newer chats; a copy a crash cut short is made again
+# a chat the old build carried on after this build changed it (review of
+# 6b324): one copy, which takes the old build's later turns, and whose
+# delete here takes the entry out of chats.json
+with tempfile.TemporaryDirectory() as _ld:
+    _cfresh()
+    _jw(_ld, "chats.json", [{"id": "cdv", "ts": 1, "messages": _msg("q", "a")}])
+    _cs["_migrate_61"](_ld)
+    _hq = _cs["chat_prefix_hash"](_msg("q"), 1)
+    _cs["chat_ops"]([{"op": "truncate", "id": "cdv", "to_len": 1, "prefix_hash": _hq},
+                     {"op": "append", "id": "cdv", "after_len": 1, "after_hash": _hq,
+                      "msgs": [{"role": "assistant", "content": "a here"}]}], _ld)
+    for _x in ("q2", "q3", "q4"):
+        _lg = _jl(_ld, "chats.json")
+        _lg[0]["messages"].append({"role": "user", "content": _x})
+        _jw(_ld, "chats.json", _lg)
+        _cfresh()
+        _cs["_migrate_61"](_ld)
+    _dv = {c["id"]: [m["content"] for m in c["messages"]] for c in _cs["load_chats"](_ld)}
+    _dcopies = [k for k in _dv if k != "cdv"]
+    _dv_ok = (_dv.get("cdv") == ["q", "a here"] and len(_dcopies) == 1
+              and _dv[_dcopies[0]] == ["q", "a", "q2", "q3", "q4"])
+    _cs["chat_ops"]([{"op": "delete", "id": _dcopies[0] if _dcopies else "cx"}], _ld)
+    _cs["_chat_finalize"](_ld, now=float("inf"))
+    _dv_ok = _dv_ok and _jl(_ld, "chats.json") == [] and "cdv" in {c["id"] for c in _cs["load_chats"](_ld)}
+check("a chat changed on both sides becomes one copy that follows the old build, and its delete reaches chats.json",
+      _dv_ok, "%r" % [_dv])
+
+# (review of 6b324) a failed write keeps its deletes, and a legacy
+# rewrite that fails is owed: the next write, the timer or the quit pays
+# it. An older build saving between the rewrite's read and its replace
+# (a 6.0.x build takes no instance lock) loses nothing: the rewrite reads
+# again and starts over
+with tempfile.TemporaryDirectory() as _ld:
+    _cfresh()
+    _jw(_ld, "chats.json", [{"id": "cr1", "ts": 2, "messages": _msg("one")},
+                            {"id": "cr2", "ts": 1, "messages": _msg("two")}])
+    _cs["_migrate_61"](_ld)
+    _cs["chat_ops"]([{"op": "delete", "id": "cr1"}], _ld)
+    os.chmod(_ld, 0o500)                         # the next write fails
+    try:
+        _cs["_chat_finalize"](_ld, now=float("inf"))
+    finally:
+        os.chmod(_ld, 0o700)
+    _kept_fin = list(_cs["_chat_finals"].get(_cs["_bk"](_ld), []))
+    _lgood = _rb(_ld, "chats.json")
+    with open(os.path.join(_ld, "chats.json"), "wb") as fh:
+        fh.write(b"[{not json")                  # the rewrite fails now
+    _cs["_chat_finalize"](_ld, now=float("inf"))
+    _owed = _cs["_bk"](_ld) in _cs["_legacy_pending"]["chats"]
+    with open(os.path.join(_ld, "chats.json"), "wb") as fh:
+        fh.write(_lgood)
+    _cs["_chat_finalize"](_ld, now=float("inf"))     # the quit's pass
+    _retry_ok = (_kept_fin == ["cr1"] and _owed and _jl(_ld, "chats.v2.json")["gone"] == ["cr1"]
+                 and [c["id"] for c in _jl(_ld, "chats.json")] == ["cr2"]
+                 and _cs["_bk"](_ld) not in _cs["_legacy_pending"]["chats"])
+    # the race: the old build saves a new chat right after the read
+    _cs["chat_ops"]([{"op": "delete", "id": "cr2"}], _ld)
+    _cs["_chat_settle"](float("inf"))
+    _rjh = _cs["_read_json_h"]
+    _nread = [0]
+
+    def _racy(name, base, want):
+        if name == "chats.json":
+            _nread[0] += 1
+            if _nread[0] == 2:
+                _lg = json.load(open(os.path.join(_ld, "chats.json")))
+                _jw(_ld, "chats.json", _lg + [{"id": "crace", "ts": 9, "messages": _msg("raced in")}])
+        return _rjh(name, base, want)
+    _cs["_read_json_h"] = _racy
+    try:
+        with _cs["_chats_lock"]:
+            _cs["store_chats"](_cs["load_chats"](_ld), _ld)
+    finally:
+        _cs["_read_json_h"] = _rjh
+    _race_ok = ("crace" in {c["id"] for c in _cs["load_chats"](_ld)}
+                and [c["id"] for c in _jl(_ld, "chats.json")] == ["crace"] and _nread[0] >= 3)
+check("a failed write keeps its deletes, a failed legacy rewrite is retried, and an old build's save mid-rewrite is kept",
+      _retry_ok and _race_ok, "%r" % [_kept_fin, _owed, _retry_ok, _nread, _race_ok,
+                                      _jl(_ld, "chats.json") if False else None])
+
+# L1, Q9 and the review of 6b324: a root file that has had its first
+# write reads as an error when missing, and a migrated store is never
+# shut for a whole run. An unreadable chats.json before migration shuts
+# the chats only (memory works) until a start can read it; an unreadable
+# memory.json is set aside with its bytes and memory starts empty. A
+# profile.json lost after use never recopies the legacy files over
+# newer chats, and a chat both hold is mapped (and extended), not copied.
+# A copy a crash cut short is made again
 with tempfile.TemporaryDirectory() as _ld:
     _cfresh()
     _cs["_migrate_61"](_ld)
@@ -5866,6 +5953,9 @@ with tempfile.TemporaryDirectory() as _ld:
         _absent_err = False
     except _cs["StoreReadError"]:
         _absent_err = True
+    # a start with it missing: still no whole-run shutdown, and its own
+    # reads keep failing rather than reading empty
+    _mig_open = _cs["_migrate_61"](_ld) is True and not _cs["_STORE_BLOCKED"]
     _cs["store_prefs"]({"x": 1}, _ld)
     os.remove(os.path.join(_ld, "prefs.json"))
     try:
@@ -5875,37 +5965,60 @@ with tempfile.TemporaryDirectory() as _ld:
         _pabsent = isinstance(_cs["load_prefs"](_ld), _cs["_Unread"])
 with tempfile.TemporaryDirectory() as _ld:
     _cfresh()
-    _jw(_ld, "chats.json", [{"id": "c1", "ts": 1, "messages": _msg("hi")}])
-    with open(os.path.join(_ld, "memory.json"), "w") as fh:
-        fh.write('[{"fact": "half writ')
+    with open(os.path.join(_ld, "chats.json"), "w") as fh:
+        fh.write('[{"id": "c1", "messages": [')
+    _jw(_ld, "memory.json", [{"fact": "Rides a bike", "ts": 1}])
     _blk = _cs["_migrate_61"](_ld)
     try:
         _cs["load_chats"](_ld)
         _blk_read = False
     except _cs["StoreReadError"] as _e:
         _blk_read = str(_e) == "chats.v2.json"
-    _blk_files = sorted(os.listdir(_ld))
-    _jw(_ld, "memory.json", [])
+    try:
+        _mem_open = [f["fact"] for f in _cs["_load_memory"](_ld)] == ["Rides a bike"]
+    except _cs["StoreReadError"]:
+        _mem_open = False
+    _jw(_ld, "chats.json", [{"id": "c1", "ts": 1, "messages": _msg("hi")}])
+    _cfresh()
     _unblk = _cs["_migrate_61"](_ld) and [c["id"] for c in _cs["load_chats"](_ld)] == ["c1"]
 with tempfile.TemporaryDirectory() as _ld:
     _cfresh()
-    _jw(_ld, "chats.json", [{"id": "c1", "ts": 1, "messages": _msg("old")}])
+    _jw(_ld, "chats.json", [{"id": "c1", "ts": 1, "messages": _msg("hi")}])
+    _halfbytes = b'[{"fact": "half writ'
+    with open(os.path.join(_ld, "memory.json"), "wb") as fh:
+        fh.write(_halfbytes)
+    _aside_mig = _cs["_migrate_61"](_ld)
+    _aside = [n for n in os.listdir(_ld) if n.startswith("memory.json.unreadable-")]
+    _aside_ok = (_aside_mig is True and len(_aside) == 1 and _rb(_ld, _aside[0]) == _halfbytes
+                 and not os.path.exists(os.path.join(_ld, "memory.json"))
+                 and _cs["_load_memory"](_ld) == [] and [c["id"] for c in _cs["load_chats"](_ld)] == ["c1"])
+with tempfile.TemporaryDirectory() as _ld:
+    _cfresh()
+    _jw(_ld, "chats.json", [{"id": "c1", "ts": 1, "messages": _msg("old")},
+                            {"id": "c3", "ts": 1, "messages": _msg("three", "a")}])
     _cs["_migrate_61"](_ld)
     with _cs["_chats_lock"]:
         _cs["store_chats"](_cs["load_chats"](_ld) + [{"id": "c2", "ts": 2, "messages": _msg("new")}], _ld)
+    _h3 = _cs["chat_prefix_hash"](_msg("three", "a"), 2)
+    _cs["chat_ops"]([{"op": "append", "id": "c3", "after_len": 2, "after_hash": _h3,
+                      "msgs": [{"role": "user", "content": "more here"}]}], _ld)
+    # an older build adds a turn to c1 while profile.json is lost
+    _jw(_ld, "chats.json", [{"id": "c1", "ts": 1, "messages": _msg("old", "reply")},
+                            {"id": "c3", "ts": 1, "messages": _msg("three", "a")}])
     os.remove(os.path.join(_ld, "profile.json"))
     _cfresh()
-    _lost_ok = (_cs["_migrate_61"](_ld)
-                and sorted(c["id"] for c in _cs["load_chats"](_ld)) == ["c1", "c2"])
+    _lost = {c["id"]: [m["content"] for m in c["messages"]]
+             for c in _cs["load_chats"](_ld)} if _cs["_migrate_61"](_ld) else {}
+    _lost_ok = _lost == {"c1": ["old", "reply"], "c2": ["new"], "c3": ["three", "a", "more here"]}
     # a crash cut the first copy short: still marked from_legacy, no base
     os.remove(os.path.join(_ld, "profile.json"))
     _jw(_ld, "chats.v2.json", {"v": 2, "chats": [], "from_legacy": "x"})
     _cfresh()
-    _redo = (_cs["_migrate_61"](_ld) and [c["id"] for c in _cs["load_chats"](_ld)] == ["c1"])
+    _redo = (_cs["_migrate_61"](_ld) and sorted(c["id"] for c in _cs["load_chats"](_ld)) == ["c1", "c3"])
 check("first writes, unreadable legacy files and a lost profile.json: never read as empty, never recopied over",
-      _absent_err and _pabsent and _blk is False and _blk_read
-      and _blk_files == ["chats.json", "memory.json"] and _unblk and _lost_ok and _redo,
-      "%r" % [_absent_err, _pabsent, _blk, _blk_read, _blk_files, _unblk, _lost_ok, _redo])
+      _absent_err and _mig_open and _pabsent and _blk is False and _blk_read and _mem_open and _unblk
+      and _aside_ok and _lost_ok and _redo,
+      "%r" % [_absent_err, _mig_open, _pabsent, _blk, _blk_read, _mem_open, _unblk, _aside_ok, _lost, _redo])
 _cfresh()
 
 # THE WEB VIEW'S CLEAN-UP (5.10, Q13, Q16): one routine, a branch per
@@ -5997,6 +6110,12 @@ with tempfile.TemporaryDirectory() as _qd:
     for _n in ("Cookies", "Cookies-journal"):
         with open(os.path.join(_qw, _n), "w") as fh:
             fh.write("millen_key_8889=old")
+    # a file something holds: the pass removes the rest and records
+    # nothing, so the next start tries again (review of 6b324)
+    os.chmod(os.path.join(_qw, "GPUCache", "leveldb"), 0o500)
+    _ws["_webstore_qt_boot"](_qd)
+    _q0 = (sorted(os.listdir(_qw)), dict(_ws["_webstore_state"](_qd)))
+    os.chmod(os.path.join(_qw, "GPUCache", "leveldb"), 0o700)
     _ws["_webstore_qt_boot"](_qd)
     _q1 = sorted(os.listdir(_qw))
     _ws["_webstore_qt_boot"](_qd)                 # nothing asked: nothing more
@@ -6012,20 +6131,34 @@ with tempfile.TemporaryDirectory() as _qd:
     _ws["_webstore_native"] = lambda local: _natcalls.append(local) or True
     _ws["_webstore_mark"](_qd, local=0, want_local=0)
     _qr1 = _ws["webstore_clean"](True, _qd)
-_qt_ok = (_q1 == ["Local Storage"] and _q2 == _q1 and _q3 == [] and _qst.get("clean")
-          and _qst.get("local") and _qr1.get("later") is True and not _qr1["reload"] and not _natcalls)
-# a dev copy's window leaves a WebKit store (maybe the real app's) alone
+    # a later boot whose keys aren't safe withdraws the request
+    _qr2 = _ws["webstore_clean"](False, _qd)
+    _qwant = _ws["_webstore_state"](_qd).get("want_local")
+    # WebView2: the purge follows this boot's word only, never an older
+    # boot's request
+    _ws["_web_engine"] = lambda: "webview2"
+    _ws["_webstore_mark"](_qd, local=0, want_local=1, clean=1)
+    _qr3 = _ws["webstore_clean"](False, _qd)
+_qt_ok = (_q0[0] == ["GPUCache", "Local Storage"] and not _q0[1].get("clean")
+          and _q1 == ["Local Storage"] and _q2 == _q1 and _q3 == [] and _qst.get("clean")
+          and _qst.get("local") and _qr1.get("later") is True and not _qr1["reload"]
+          and _qr2 == {"ran": False, "reload": False} and not _qwant
+          and _qr3 == {"ran": False, "reload": False} and not _natcalls)
+# the Mac's store is Python's, shared with other apps (review of 6b324):
+# the WebKit branch runs only in a process that is the app's own bundle
 _nat = []
 _ws2 = dict(_ws)
-_exec_names(_ws2, {"_webstore_native"})
-_ws2.update(TEST_HOOKS=frozenset(), _WINDOW=[object()], DEV_HOME="/tmp/dev",
+_exec_names(_ws2, {"_webstore_native", "APP_BUNDLE_ID", "_webkit_own_store"})
+_own_now = _ws2["_webkit_own_store"]()
+_ws2.update(TEST_HOOKS=frozenset(), _WINDOW=[object()], DEV_HOME=None,
             _web_engine=lambda: "webkit", _webstore_webkit=lambda local: _nat.append(local) or True)
-_dev_skip = _ws2["_webstore_native"](True) is False and _nat == []
-_ws2["TEST_HOOKS"] = frozenset(["webstore-native"])
+_dev_skip = _own_now is False and _ws2["_webstore_native"](True) is False and _nat == []
+_ws2["_webkit_own_store"] = lambda: True
 _dev_skip = _dev_skip and _ws2["_webstore_native"](True) is True and _nat == [True]
 check("web view clean-up: loopback keeps LocalStorage and cookies only; WebKit, WebView2 and Qt branches",
       _plan_ok and _wk_ok and _wv_ok and _qt_ok and _dev_skip,
-      "%r" % [_plan_ok, _wk_ok, _fs1.removed, _fs2.removed, _wv_ok, _qt_ok, _q1, _q2, _q3, _qr1, _dev_skip])
+      "%r" % [_plan_ok, _wk_ok, _fs1.removed, _fs2.removed, _wv_ok, _qt_ok, _q0, _q1, _q2, _q3, _qr1,
+              _qr2, _qwant, _qr3, _dev_skip])
 
 # ...and the route's once-only rule on a live copy (A runs the recorder):
 # the first pass, then the one-time LocalStorage removal once the page
@@ -6066,13 +6199,15 @@ async function api(u,o){o=o||{};calls.push([u,o.body||null]);
   if((run.fail||[]).includes(u))return new Response("{}",{status:500});
   if(run.fake&&run.fake[u])return new Response(JSON.stringify(run.fake[u]),{status:200});
   return fetch(BASE+u,Object.assign({},o,{headers:Object.assign({},o.headers||{},HDR)}));}
-let tier="Fast",adv=null,advOn=false,autonomy="auto",tierOff={};
+let tier="Fast",adv=null,advOn=false,autonomy="auto",tierOff={},council=["Llama 3.2 3B"],uiMode="ai",agent="";
 function setTier(n,q){tier=n;}
 function advChip(){}
 function paintAutonomy(){}
+function paintModels(){}
+function setAgent(n){agent=n;}
 """ % (json.dumps(INST.base), json.dumps(INST.headers)) + _sbseg + r"""
 storeBoot().then(async()=>{if(run.after)prefSet(run.after);await prefQ;
-  console.log(JSON.stringify({ls:Object.fromEntries(store),tier,adv,advOn,autonomy,reloaded,calls}));});
+  console.log(JSON.stringify({ls:Object.fromEntries(store),tier,adv,advOn,autonomy,council,reloaded,calls}));});
 """)
 
 
@@ -6096,6 +6231,11 @@ try:
     _pf24 = json.load(open(os.path.join(INST.home, "prefs.json")))
 except (OSError, ValueError):
     _pf24 = {}
+# (review of 6b324) the post fails with a key prefs.json already holds:
+# prefs.json's value stands, that key leaves browser storage, and the
+# clean-up isn't told the keys are safe
+_sbj3 = _sb({"ls": {"millen.tier": "Pro", "millen.council": json.dumps(["Hermes 3 8B"])},
+             "fail": ["/api/prefs/adopt"]})
 _sb3 = _sb({"ls": {"millen.tier": "Pro"}, "after": {"tier": "Fast", "adv": {"local": ["Hermes 3 8B"]}}})
 _sb4 = _sb({"ls": {}})
 _sb5 = _sb({"ls": {}, "fake": {"/api/webstore/clean": {"ran": True, "reload": True}}})
@@ -6106,12 +6246,76 @@ check("ISO-10: the six keys move to prefs.json only after a 200, the rest of bro
       and _sb2.get("ls") == _KEEPS and ["/api/webstore/clean", '{"local":true}'] in _sb2.get("calls", [])
       and _pf24.get("tier") == "Thinking" and _pf24.get("advon") is True and _pf24.get("codeagent") == "Workspace"
       and _pf24.get("adv") == {"local": ["Llama 3.2 3B"], "cloud": [], "comp": ""}
+      and _pf24.get("model") == "Llama 3.2 3B" and _sb2.get("council") == ["Llama 3.2 3B"]
+      and _sbj3.get("tier") == "Thinking" and _sbj3.get("ls") == {"millen.council": json.dumps(["Hermes 3 8B"])}
+      and ["/api/webstore/clean", '{"local":false}'] in _sbj3.get("calls", [])
       and _sb3.get("ls") == {} and _sb3.get("tier") == "Thinking"
       and not any(c_[0] == "/api/prefs/adopt" for c_ in _sb3.get("calls", []))
       and _sb4.get("tier") == "Fast" and _sb4.get("adv") == {"local": ["Hermes 3 8B"]} and _sb4.get("ls") == {}
       and _sb5.get("reloaded") is True and not _sb4.get("reloaded")
       and not _six_set and "millen.chats" not in page and _CANARY_A not in page,
-      "%r" % [_sb1, _sb2, _sb3.get("tier"), _sb4.get("tier"), _sb4.get("adv"), _six_set])
+      "%r" % [_sb1, _sb2, _sbj3, _sb3.get("tier"), _sb4.get("tier"), _sb4.get("adv"), _six_set])
+
+# (review of 6b324) the page's own setTier, switchLane and setAgent with
+# a /api/prefs that answers only when released: a mode picked before
+# prefs.json answers stands and is saved; the Code tab opened before it
+# answers stays open, lands on the saved specialist, and never saves
+# "Coding" over it. And storeBoot() runs at boot, outside any function,
+# after the boot's quiet setTier
+def _jsfn(src_, head_):
+    i_ = src_.index(head_)
+    return src_[i_:src_.index("\n}\n", i_) + 3]
+
+
+_racejs = os.path.join(_SMOKE_TMP, "race24.js")
+with open(_racejs, "w", encoding="utf-8") as fh:
+    fh.write(r"""
+const run=JSON.parse(require('fs').readFileSync(0,'utf8'));
+const store=new Map();
+globalThis.localStorage={getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,String(v)),
+  removeItem:k=>store.delete(k),key:i=>[...store.keys()][i]??null,get length(){return store.size;}};
+globalThis.location={reload(){}};
+const server=run.server,posts=[];
+let release;const tok=new Promise(r=>release=r);
+async function api(u,o){await tok;
+  if(o&&o.method==="POST"){posts.push([u,o.body]);
+    if(u==="/api/prefs")Object.assign(server,JSON.parse(o.body));
+    return new Response('{"ok":true}');}
+  return new Response(JSON.stringify(server));}
+let adv=null,advOn=false,autonomy="auto",tierOff={},agent="",uiMode="ai",councilManual=false,
+    council=["Llama 3.2 3B"],tier="Fast";
+function paintAgents(){} function paintModels(){} function advChip(){} function paintAutonomy(){}
+function modeShow(w){uiMode=w;}
+""" + _sbseg + _jsfn(page, "function setTier(name,quiet){") + _jsfn(page, "function switchLane(m){")
+             + _jsfn(page, "function setAgent(name,guess){") + r"""
+const boot=storeBoot();
+if(run.click==="tier")setTier("Pro");
+if(run.click==="code")switchLane("code");
+release();
+boot.then(()=>setTimeout(async()=>{await prefQ;
+  console.log(JSON.stringify({uiMode,agent,tier,server,posts}));},50));
+""")
+
+
+def _race(run_):
+    try:
+        return json.loads(subprocess.run(["node", _racejs], input=json.dumps(run_), capture_output=True,
+                                         text=True, timeout=60).stdout)
+    except Exception as e_:
+        return {"err": repr(e_)}
+
+
+_rA = _race({"server": {"tier": "Thinking"}, "click": "tier"})
+_rB = _race({"server": {"tier": "Pro", "codeagent": "Workspace", "agent": ""}, "click": "code"})
+_bootsrc = page[page.index("setTier(tier,true);\nadvChip();"):]
+check("a mode picked, or the Code tab opened, before prefs.json answers stands; storeBoot runs at boot",
+      _rA.get("tier") == "Pro" and _rA.get("server", {}).get("tier") == "Pro"
+      and _rB.get("uiMode") == "code" and _rB.get("agent") == "Workspace"
+      and _rB.get("server", {}).get("codeagent") == "Workspace" and _rB.get("tier") == "Pro"
+      and not any('"codeagent":"Coding"' in (b_ or "") for _u, b_ in _rB.get("posts", []))
+      and "\nstoreBoot();" in _bootsrc and 'if(uiMode==="ai"&&!agent)setTier(tier,true);' in page
+      and 'prefSet({tier:"",model:name,council:[name]});' in page,
+      "%r" % [_rA, _rB])
 
 # the adopt route takes only the six, only well-formed, only where
 # prefs.json lacks them, and says which prefs.json holds
@@ -6121,11 +6325,19 @@ try:
     _pf24b = json.load(open(os.path.join(INST.home, "prefs.json")))
 except (OSError, ValueError):
     _pf24b = {}
+with tempfile.TemporaryDirectory() as _ad2d:
+    _ad2 = _ws["prefs_adopt"]({"remote_autonomy": "wild", "tier": 5, "adv": [1], "council": [1],
+                               "model": "", "advon": "yes", "codeagent": "Workspace", "bogus": 1}, _ad2d)
+    _ad2f = _jl(_ad2d, "prefs.json")
+    _ad3 = _ws["prefs_adopt"]({"codeagent": "Coding", "council": ["Hermes 3 8B"]}, _ad2d)
+    _ad3f = _jl(_ad2d, "prefs.json")
 check("the six keys' first-run post takes only missing, well-formed keys (Q10)",
-      _ad.get("took") == [] and _ad["prefs"].get("tier") == "Fast" and "bogus" not in _pf24b
+      _ad2.get("took") == ["codeagent"] and _ad2f == {"codeagent": "Workspace"}
+      and _ad3.get("took") == ["council"] and _ad3f == {"codeagent": "Workspace", "council": ["Hermes 3 8B"]}
+      and _ad.get("took") == [] and _ad["prefs"].get("tier") == "Fast" and "bogus" not in _pf24b
       and _pf24b.get("remote_autonomy") == "auto" and _pf24b.get("agent") == ""
       and req("/api/prefs/adopt", "POST", b"[1]", headers={"Content-Type": "application/json"})[0] == 400,
-      "%r" % [_ad])
+      "%r" % [_ad, _ad2, _ad2f, _ad3])
 
 # LOC-6 (0b 6): an older build run against a Phase 0 folder loses
 # nothing. The real build 275 (6.1 beta 1) runs from git, headless, with
@@ -6136,7 +6348,8 @@ _L6D = os.path.join(_L6, "Library", "Application Support", "MillenAI")
 os.makedirs(_L6D)
 _OLDD = os.path.join(_SMOKE_TMP, "old275")
 os.makedirs(_OLDD)
-_old_src = subprocess.run(["git", "show", "v275:millenai.py"], capture_output=True, text=True).stdout
+_old_src = subprocess.run(["git", "show", "v275:millenai.py"], capture_output=True, text=True,
+                          check=True).stdout
 with open(os.path.join(_OLDD, "millenai.py"), "w", encoding="utf-8") as fh:
     fh.write(_old_src)
 _jw(_L6D, "chats.json", [{"id": "c6keep", "ts": 3, "title": "kept", "messages": _msg("keep me", "ok")},
@@ -6166,6 +6379,8 @@ def _l6_req(inst, path, data=None, cookie=None, token=True):
             return resp.status, json.loads(resp.read() or b"null")
     except urllib.error.HTTPError as e_:
         return e_.code, None
+    except (urllib.error.URLError, OSError, ValueError):
+        return 0, None          # not answering: the check fails, never hangs
 
 
 class _Old:
@@ -6180,19 +6395,21 @@ class _Old:
                                      cwd=_OLDD, env=env, stdout=self.log, stderr=subprocess.STDOUT,
                                      start_new_session=True)
         self.cookie = "millen_key_9903=" + self.key
+        _INSTANCES.append(self)         # stopped at the end, whatever happens
+        self.up = False
         end = time.time() + 120
         while time.time() < end and self.proc.poll() is None:
-            try:
-                if _l6_req(self, "/api/chats", cookie=self.cookie, token=False)[0] == 200:
-                    return
-            except OSError:
-                pass
+            if _l6_req(self, "/api/chats", cookie=self.cookie, token=False)[0] == 200:
+                self.up = True
+                return
             time.sleep(0.5)
 
     def req(self, path, data=None):
         return _l6_req(self, path, data, cookie=self.cookie, token=False)
 
     def stop(self):
+        if self.proc.poll() is not None:
+            return
         self.proc.terminate()
         try:
             self.proc.wait(30)
@@ -6265,11 +6482,41 @@ _o2 = _Old()
 _old_sees2 = sorted(c["id"] for c in ((_o2.req("/api/chats")[1] or {}).get("chats") or []))
 _o2.stop()
 check("LOC-6: build 275 on a Phase 0 folder loses nothing, its additions are imported, what left root stays gone",
-      _mig6 and "c6del" not in _leg6a and _c6new not in _leg6a
+      _o1.up and _o2.up and _mig6 and "c6del" not in _leg6a and _c6new not in _leg6a
       and _old_sees == ["c6grow", "c6keep"] and _of == [] and _osave == 200 and _imp6
       and _crash_leg and _fin6 and _same6
       and _old_sees2 == sorted(["c6grow", _c6new]),
       "%r" % [_mig6, _leg6a, _old_sees, _of, _osave, _g6, _mem6, _crash_leg, _fin6, _same6, _old_sees2])
+
+# Forget's legacy half (review of 6b324): a store it can't read refuses
+# the whole request before anything is erased, legacy files included;
+# then Forget's chats and memory empty chats.json and memory.json too,
+# so an older build started afterwards shows none of it
+def _seed_fg(home):
+    _jw(home, "chats.json", [{"id": "cfg1", "ts": 1, "messages": _msg("forget me")}])
+    _jw(home, "memory.json", [{"fact": "Collects stamps", "ts": 1}])
+
+
+_fgi = Instance(9903, "FG", seed=_seed_fg).start()
+_fgh = _fgi.home
+_fg_before = {n: _rb(_fgh, n) for n in ("chats.json", "memory.json", "chats.v2.json", "memory.v2.json")}
+_fg_refused = []
+for _bad in ("chats.v2.json", "memory.v2.json"):
+    with open(os.path.join(_fgh, _bad), "wb") as fh:
+        fh.write(b"{broken")
+    _st = _l6_req(_fgi, "/api/forget", {"scopes": ["chats", "memory"]})[0]
+    _same = all(_rb(_fgh, n) == b for n, b in _fg_before.items() if n != _bad)
+    with open(os.path.join(_fgh, _bad), "wb") as fh:
+        fh.write(_fg_before[_bad])
+    _fg_refused.append((_st, _same))
+_fg_ok = _l6_req(_fgi, "/api/forget", {"scopes": ["chats", "memory"]})[0]
+_fg_after = {n: _jl(_fgh, n) for n in ("chats.json", "memory.json", "memory.v2.json")}
+_fg_v2 = _v2(_fgh)
+_fgi.stop()
+check("Forget refuses before erasing when a store can't be read, then empties the legacy files too",
+      _fg_refused == [(503, True), (503, True)] and _fg_ok == 200
+      and _fg_after == {"chats.json": [], "memory.json": [], "memory.v2.json": []} and _fg_v2 == [],
+      "%r" % [_fg_refused, _fg_ok, _fg_after, _fg_v2])
 
 print("== dev isolation ==")
 # 0a item 2 (ISO-16, REM-1) and the plan's two-copy check (6b319): a dev

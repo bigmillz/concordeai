@@ -7192,9 +7192,12 @@ def _do_update():
 # model can reference them across conversations. Extraction runs in the
 # background after each message, using the model that just answered
 # (it's already loaded — no engine thrash).
-# Chats live on disk, not in localStorage: WebKit keys its storage to the
-# bundle identity, which differs between running from source and from the
-# .app, and isn't guaranteed to survive a bundle swap. These files do.
+# Chats live on disk, not in browser storage: WebKit keys its storage to
+# the process's bundle identity, and the app runs as the venv's python3
+# (org.python.python) whether started from source or from the .app, so its
+# WebKit store is Python's, shared with every pywebview app that Python
+# runs, and isn't guaranteed to survive a Python update. These files are
+# the app's own.
 #
 # Every function below takes a `base` directory. None means the files in
 # app_dir(), the only tenancy since the web version went (6b320); the
@@ -7381,6 +7384,16 @@ def store_prefs(d: dict, base=None):
     _write_json("prefs.json", d, base)
 
 
+def _set_turbo(on: bool):
+    """Cloud power on or off, read-modify-written under _prefs_lock (review
+    of 6b324: the key routes wrote it outside the lock, so a toggle
+    posted at the same moment could be lost)."""
+    with _prefs_lock:
+        p = load_prefs(None)
+        p["turbo"] = on
+        store_prefs(p)
+
+
 # THE MODELS THIS APP PUT ON DISK (6b306). Auto-clean is on by default
 # now, and an Ollama tag or a Hugging Face cache pulled for some other
 # tool looks exactly like one of ours. The automatic pass deletes only
@@ -7415,9 +7428,9 @@ def _app_models_seed(prefs: dict, existing: bool):
         prefs["app_models"] = ([*MODEL_INFO, *RETIRED_MODELS]
                                if existing else [])
 _chats_lock = threading.Lock()
-# folders whose store stays shut this run: _migrate_61 couldn't read a
-# file it needs (0b Q9), or this copy doesn't hold the instance lock.
-# Every chat and memory read there raises, so the routes answer 503
+# (folder, "chats" or "memory") shut this run: _migrate_61 couldn't copy
+# that store's legacy file (0b Q9). Its reads raise, so its routes answer
+# 503; the other store is unaffected (review of 6b324)
 _STORE_BLOCKED = {}
 
 
@@ -7435,7 +7448,7 @@ def load_chats(base=None) -> list:
     Anything else it can't read raises StoreReadError (0b L1, 6b322): a
     failed read used to look like no chats, and the next save wrote
     that. The file is {"v": 2, "chats": [...], "gone": [...]} (0b Q5)."""
-    if _STORE_BLOCKED and _bk(base) in _STORE_BLOCKED:
+    if _STORE_BLOCKED and (_bk(base), "chats") in _STORE_BLOCKED:
         raise StoreReadError(CHATS_FILE)
     d = _read_json(CHATS_FILE, base, dict) or {}
     ch = d.get("chats", [])
@@ -7468,8 +7481,10 @@ def _write_chats(items, base=None):
     so a downgrade can't evict one, R-2-26) and the newest CHATS_KEEP of
     the rest by ts. Eviction makes no stub; nothing else drops a chat
     (L3). Fields this build doesn't know are written back as read (L6).
-    Deletes made final since the last write join `gone` here."""
-    fin = _chat_finals.pop(_bk(base), [])
+    Deletes made final since the last write join `gone` here; they
+    leave _chat_finals only once the write has landed (review of 6b324)."""
+    bk = _bk(base)
+    fin = list(_chat_finals.get(bk, []))
     doc = getattr(items, "doc", None)
     doc = dict(doc) if isinstance(doc, dict) else {}
     gone = list(getattr(items, "gone", None) or [])
@@ -7487,10 +7502,21 @@ def _write_chats(items, base=None):
     out.update((k, v) for k, v in doc.items()
                if k not in ("v", "chats", "gone", "from_legacy"))
     _write_json(CHATS_FILE, out, base)
+    if fin:
+        left = [x for x in _chat_finals.get(bk, []) if x not in fin]
+        if left:
+            _chat_finals[bk] = left
+        else:
+            _chat_finals.pop(bk, None)
     _data_rev[0] += 1
     kept.doc = {k: v for k, v in out.items() if k != "chats"}
     kept.gone = out["gone"]
     return kept, bool(drop or fin)
+
+
+# folders whose legacy file still owes a removal (a rewrite that failed):
+# the next write, the delete timer and the quit try again (review of 6b324)
+_legacy_pending = {"chats": set(), "memory": set()}
 
 
 def store_chats(items: list, base=None, legacy=False, erase=False):
@@ -7499,8 +7525,12 @@ def store_chats(items: list, base=None, legacy=False, erase=False):
     is rewritten without it too (0b 5.8, L7); erase=True (Forget) empties
     chats.json as well. Returns the list kept."""
     kept, lost = _write_chats(items, base)
-    if lost or legacy or erase:
-        _legacy_sync_chats(kept, base, erase=erase)
+    bk = _bk(base)
+    if lost or legacy or erase or bk in _legacy_pending["chats"]:
+        if _legacy_sync_chats(kept, base, erase=erase):
+            _legacy_pending["chats"].discard(bk)
+        else:
+            _legacy_pending["chats"].add(bk)
     return kept
 
 
@@ -7580,12 +7610,21 @@ def _chat_finalize(base=None, now=None):
         return
     try:
         _chat_settle(now)
-        if _chat_finals.get(_bk(base)):
+        if _chat_finals.get(_bk(base)) or _bk(base) in _legacy_pending["chats"]:
             store_chats(load_chats(base), base)
     except (StoreReadError, OSError):
         pass
     finally:
         _chats_lock.release()
+    # memory's legacy file, if its last rewrite failed
+    if _bk(base) in _legacy_pending["memory"] and _memory_lock.acquire(timeout=10):
+        try:
+            if _legacy_sync_memory(_load_memory(base), base):
+                _legacy_pending["memory"].discard(_bk(base))
+        except (StoreReadError, OSError):
+            pass
+        finally:
+            _memory_lock.release()
 
 
 def _chat_new(chats, cid, lane, title=None, messages=None):
@@ -7808,7 +7847,7 @@ MEMORY_KEEP = 200       # facts kept (0b 5.2); prompts use the newest 40
 def _load_memory(base=None) -> list:
     """The facts; [] only when memory.v2.json hasn't been written yet (0b
     L1)."""
-    if _STORE_BLOCKED and _bk(base) in _STORE_BLOCKED:
+    if _STORE_BLOCKED and (_bk(base), "memory") in _STORE_BLOCKED:
         raise StoreReadError(MEMORY_FILE)
     return _read_json(MEMORY_FILE, base, list) or []
 
@@ -7821,8 +7860,12 @@ def _save_memory(items: list, base=None, legacy=False, erase=False):
     cut = len(items) > MEMORY_KEEP
     items = list(items[-MEMORY_KEEP:])
     _write_json(MEMORY_FILE, items, base, indent=1)
-    if cut or legacy or erase:
-        _legacy_sync_memory(items, base, erase=erase)
+    bk = _bk(base)
+    if cut or legacy or erase or bk in _legacy_pending["memory"]:
+        if _legacy_sync_memory(items, base, erase=erase):
+            _legacy_pending["memory"].discard(bk)
+        else:
+            _legacy_pending["memory"].add(bk)
 
 
 def memory_text(base=None) -> str:
@@ -7893,15 +7936,20 @@ def _jcopy(x):
     return json.loads(json.dumps(x))
 
 
-def _legacy_base_of(lchats, csha, lmem, msha) -> dict:
-    """legacy_base for legacy files whose chats map to themselves."""
+def _legacy_ids_of(lchats) -> dict:
+    """legacy_base's ids for legacy chats that map to themselves."""
     ids = {}
     for e in lchats or []:
         lid = e.get("id") if isinstance(e, dict) else None
         if isinstance(lid, str) and lid not in ids:
             ids[lid] = {"id": lid, "h": _ent_hash(e)}
-    return {"chats": csha, "memory": msha, "ids": ids,
-            "facts": [p for p in map(_fact_fp, lmem or []) if p]}
+    return ids
+
+
+def _prefix_related(a, b) -> bool:
+    """One message list starts with the other (role and text)."""
+    n = min(len(a), len(b))
+    return chat_prefix_hash(a, n) == chat_prefix_hash(b, n)
 
 
 def _legacy_import_chats(chats, legacy, ids) -> bool:
@@ -7918,31 +7966,53 @@ def _legacy_import_chats(chats, legacy, ids) -> bool:
     dead = (set(getattr(chats, "gone", None) or ()) | _chat_gone
             | set(_chat_stubs))
     changed = False
+
+    def take_turns(vc, e, lm):
+        vm = _chat_msgs(vc)
+        vm.extend(_jcopy(lm[len(vm):]))
+        vc["ts"] = max(_chat_ts(vc), _chat_ts(e)) or int(time.time() * 1000)
+
+    def as_copy(e, key):
+        c = _jcopy(e)
+        c["id"] = _new_chat_id()
+        chats.append(c)
+        by_id[c["id"]] = c
+        if key[0]:
+            have.setdefault(key, c["id"])
+        return c["id"]
+
     for e in legacy:
         lid = e.get("id") if isinstance(e, dict) else None
         if not (isinstance(lid, str) and _CHAT_ID.fullmatch(lid)):
             continue
         key = _msgs_key(e)
+        lm = e.get("messages") if isinstance(e.get("messages"), list) else []
         m = ids.get(lid)
         if not isinstance(m, dict):
-            # added by an older build
+            # added by an older build, or legacy_base lost its list
             if lid in dead:
                 continue            # deleted here: it never comes back
             here = by_id.get(lid)
-            if here is not None and _msgs_key(here) == key:
+            if here is not None and _prefix_related(_chat_msgs(here), lm):
+                # the same chat (a lost profile.json, review of 6b324):
+                # mapped, and it takes any turns root lacks
+                if len(lm) > len(_chat_msgs(here)):
+                    take_turns(here, e, lm)
+                    changed = True
                 ids[lid] = {"id": lid}
                 continue
             if key[0] and key in have:
                 ids[lid] = {"id": have[key]}
                 continue
-            nid = lid if here is None else _new_chat_id()
-            c = _jcopy(e)
-            c["id"] = nid
-            chats.append(c)
-            by_id[nid] = c
-            if key[0]:
-                have.setdefault(key, nid)
-            ids[lid] = {"id": nid}
+            if here is None:
+                c = _jcopy(e)
+                chats.append(c)
+                by_id[lid] = c
+                if key[0]:
+                    have.setdefault(key, lid)
+                ids[lid] = {"id": lid}
+            else:
+                ids[lid] = {"id": as_copy(e, key)}
             changed = True
             continue
         if m.get("h") == _ent_hash(e):
@@ -7950,25 +8020,20 @@ def _legacy_import_chats(chats, legacy, ids) -> bool:
         vc = by_id.get(m.get("id"))
         if vc is None:
             continue                # deleted here: the removal wins
-        lm = e.get("messages") if isinstance(e.get("messages"), list) else []
         vm = _chat_msgs(vc)
-        if (len(vm) < len(lm) and chat_prefix_hash(vm, len(vm))
-                == chat_prefix_hash(lm, len(vm))):
-            vm.extend(_jcopy(lm[len(vm):]))
-            vc["ts"] = max(_chat_ts(vc), _chat_ts(e)) or int(time.time() * 1000)
+        if len(vm) < len(lm) and _prefix_related(vm, lm):
+            take_turns(vc, e, lm)
             changed = True
-        elif (len(lm) <= len(vm) and chat_prefix_hash(lm, len(lm))
-              == chat_prefix_hash(vm, len(lm))):
+        elif len(lm) <= len(vm) and _prefix_related(lm, vm):
             continue                # it adds nothing root lacks
         elif key[0] and key in have:
-            continue                # imported already
+            # imported already: the legacy entry follows that copy
+            m["id"] = have[key]
         else:
-            c = _jcopy(e)
-            c["id"] = _new_chat_id()
-            chats.append(c)
-            by_id[c["id"]] = c
-            if key[0]:
-                have.setdefault(key, c["id"])
+            # a copy, and the legacy entry follows it from now on (review
+            # of 6b324): the old build's next turns land in the copy, and
+            # deleting the copy here takes the entry out of chats.json
+            m["id"] = as_copy(e, key)
             changed = True
     return changed
 
@@ -7982,58 +8047,75 @@ def _profile_legacy_set(base, **kv):
     _write_json(PROFILE_FILE, p, base, indent=1)
 
 
+def _legacy_replace(name, keep, base, sha, **dump):
+    """Write the legacy file only if it is still the one read (sha): an
+    older build running at the same time (a 6.0.x build takes no instance
+    lock) may have saved in between. False: it had; start over."""
+    _, now = _read_json_h(name, base, list)
+    if now != sha:
+        return None
+    return _write_json(name, keep, base, **dump)
+
+
 def _legacy_sync_chats(chats, base=None, erase=False) -> bool:
     """With chats.v2.json's list in hand, under _chats_lock: the downgrade
     import (when chats.json changed since legacy_base), then chats.json
     rewritten without every listed chat root no longer holds (and any
     chat whose id was deleted here), then legacy_base. erase=True
-    (Forget): chats.json is emptied. A file it can't read is left alone
-    for the next start. True when it finished."""
+    (Forget): chats.json is emptied. False when it couldn't finish (a
+    file it can't read): the caller retries later. True also when there
+    is nothing to keep in step (not migrated yet)."""
     try:
         with _profile_lock:
-            prof = _read_json(PROFILE_FILE, base, dict) or {}
-            lb = prof.get("legacy_base")
-            if not isinstance(lb, dict):
-                return False        # not migrated: nothing to keep in step
-            legacy, sha = _read_json_h(LEGACY_CHATS, base, list)
-            ids = {k: dict(v) for k, v in (lb.get("ids") or {}).items()
-                   if isinstance(v, dict)} if isinstance(lb.get("ids"), dict) else {}
-            if legacy is None:
-                if lb.get("chats") is not None or ids:
-                    _profile_legacy_set(base, chats=None, ids={})
-                return True
-            if erase:
-                keep = []
-            else:
-                if sha != lb.get("chats") and _legacy_import_chats(chats, legacy, ids):
+            for _try in range(4):
+                prof = _read_json(PROFILE_FILE, base, dict) or {}
+                lb = prof.get("legacy_base")
+                if not (isinstance(lb, dict) and "ids" in lb):
+                    return True     # chats not migrated: nothing to keep in step
+                legacy, sha = _read_json_h(LEGACY_CHATS, base, list)
+                ids = {k: dict(v) for k, v in lb["ids"].items()
+                       if isinstance(v, dict)} if isinstance(lb["ids"], dict) else {}
+                if legacy is None:
+                    if lb.get("chats") is not None or ids:
+                        _profile_legacy_set(base, chats=None, ids={})
+                    return True
+                if sha != lb.get("chats") and not erase \
+                        and _legacy_import_chats(chats, legacy, ids):
                     chats, _ = _write_chats(chats, base)
-                bk = _bk(base)
-                held = {c.get("id") for c in chats if isinstance(c, dict)}
-                held |= {k for k, v in _chat_stubs.items() if v.get("bk") == bk}
-                dead = set(getattr(chats, "gone", None) or ()) | _chat_gone
-                keep = []
-                for e in legacy:
+                if erase:
+                    keep = []
+                else:
+                    bk = _bk(base)
+                    held = {c.get("id") for c in chats if isinstance(c, dict)}
+                    held |= {k for k, v in _chat_stubs.items() if v.get("bk") == bk}
+                    dead = set(getattr(chats, "gone", None) or ()) | _chat_gone
+                    keep = []
+                    for e in legacy:
+                        lid = e.get("id") if isinstance(e, dict) else None
+                        m = ids.get(lid) if isinstance(lid, str) else None
+                        if isinstance(m, dict) and m.get("id") not in held:
+                            continue
+                        if m is None and isinstance(lid, str) and lid in dead \
+                                and lid not in held:
+                            continue
+                        keep.append(e)
+                if len(keep) != len(legacy):
+                    nsha = _legacy_replace(LEGACY_CHATS, keep, base, sha)
+                    if nsha is None:
+                        continue    # an older build saved meanwhile: again
+                    sha = nsha
+                nids = {}
+                for e in keep:
                     lid = e.get("id") if isinstance(e, dict) else None
-                    m = ids.get(lid) if isinstance(lid, str) else None
-                    if isinstance(m, dict) and m.get("id") not in held:
-                        continue
-                    if m is None and isinstance(lid, str) and lid in dead \
-                            and lid not in held:
-                        continue
-                    keep.append(e)
-            if len(keep) != len(legacy):
-                sha = _write_json(LEGACY_CHATS, keep, base)
-            nids = {}
-            for e in keep:
-                lid = e.get("id") if isinstance(e, dict) else None
-                if isinstance(lid, str) and isinstance(ids.get(lid), dict) \
-                        and lid not in nids:
-                    nids[lid] = {"id": ids[lid].get("id"), "h": _ent_hash(e)}
-            if sha != lb.get("chats") or nids != lb.get("ids"):
-                _profile_legacy_set(base, chats=sha, ids=nids)
-            return True
+                    if isinstance(lid, str) and isinstance(ids.get(lid), dict) \
+                            and lid not in nids:
+                        nids[lid] = {"id": ids[lid].get("id"), "h": _ent_hash(e)}
+                if sha != lb.get("chats") or nids != lb.get("ids"):
+                    _profile_legacy_set(base, chats=sha, ids=nids)
+                return True
+            return False
     except (StoreReadError, OSError) as exc:
-        print("  (chats.json not brought in step: %s; the next start does it)"
+        print("  (chats.json not brought in step: %s; tried again later)"
               % exc)
         return False
 
@@ -8044,41 +8126,47 @@ def _legacy_sync_memory(items, base=None, erase=False) -> bool:
     root no longer holds, then legacy_base (see _legacy_sync_chats)."""
     try:
         with _profile_lock:
-            prof = _read_json(PROFILE_FILE, base, dict) or {}
-            lb = prof.get("legacy_base")
-            if not isinstance(lb, dict):
-                return False
-            legacy, sha = _read_json_h(LEGACY_MEMORY, base, list)
-            if legacy is None:
-                if lb.get("memory") is not None or lb.get("facts"):
-                    _profile_legacy_set(base, memory=None, facts=[])
+            for _try in range(4):
+                prof = _read_json(PROFILE_FILE, base, dict) or {}
+                lb = prof.get("legacy_base")
+                if not (isinstance(lb, dict) and "facts" in lb):
+                    return True
+                legacy, sha = _read_json_h(LEGACY_MEMORY, base, list)
+                if legacy is None:
+                    if lb.get("memory") is not None or lb.get("facts"):
+                        _profile_legacy_set(base, memory=None, facts=[])
+                    return True
+                if erase:
+                    keep = []
+                else:
+                    have = {_fact_fp(f) for f in items} - {None}
+                    if sha != lb.get("memory"):
+                        known = set(lb.get("facts") or [])
+                        add = []
+                        for f in legacy:
+                            fp = _fact_fp(f)
+                            if fp and fp not in known and fp not in have:
+                                add.append(_jcopy(f))
+                                have.add(fp)
+                        if add:
+                            items = (list(items) + add)[-MEMORY_KEEP:]
+                            _write_json(MEMORY_FILE, items, base, indent=1)
+                            have = {_fact_fp(f) for f in items} - {None}
+                    keep = [f for f in legacy
+                            if _fact_fp(f) is None or _fact_fp(f) in have]
+                if len(keep) != len(legacy):
+                    nsha = _legacy_replace(LEGACY_MEMORY, keep, base, sha,
+                                           indent=1)
+                    if nsha is None:
+                        continue
+                    sha = nsha
+                fps = [p for p in map(_fact_fp, keep) if p]
+                if sha != lb.get("memory") or fps != lb.get("facts"):
+                    _profile_legacy_set(base, memory=sha, facts=fps)
                 return True
-            if erase:
-                keep = []
-            else:
-                have = {_fact_fp(f) for f in items} - {None}
-                if sha != lb.get("memory"):
-                    known = set(lb.get("facts") or [])
-                    add = []
-                    for f in legacy:
-                        fp = _fact_fp(f)
-                        if fp and fp not in known and fp not in have:
-                            add.append(_jcopy(f))
-                            have.add(fp)
-                    if add:
-                        items = (list(items) + add)[-MEMORY_KEEP:]
-                        _write_json(MEMORY_FILE, items, base, indent=1)
-                        have = {_fact_fp(f) for f in items} - {None}
-                keep = [f for f in legacy
-                        if _fact_fp(f) is None or _fact_fp(f) in have]
-            if len(keep) != len(legacy):
-                sha = _write_json(LEGACY_MEMORY, keep, base, indent=1)
-            fps = [p for p in map(_fact_fp, keep) if p]
-            if sha != lb.get("memory") or fps != lb.get("facts"):
-                _profile_legacy_set(base, memory=sha, facts=fps)
-            return True
+            return False
     except (StoreReadError, OSError) as exc:
-        print("  (memory.json not brought in step: %s; the next start does it)"
+        print("  (memory.json not brought in step: %s; tried again later)"
               % exc)
         return False
 
@@ -8086,57 +8174,103 @@ def _legacy_sync_memory(items, base=None, erase=False) -> bool:
 def _migrate_61(base=None) -> bool:
     """The one-time upgrade step (0b 5.9), then the boot order (5.8). Run
     at every start before any route is served, only by the copy holding
-    the instance lock (Q9).
-      * No legacy_base yet: copy chats.json into chats.v2.json and
-        memory.json into memory.v2.json, then write the first
-        legacy_base. Migration is done only once legacy_base is written:
-        .v2 files found without it are copied again, since nothing else
-        writes them before then (chats.v2.json carries "from_legacy"
-        until this build's first write of its own, which tells that
-        copy from a store in use whose profile.json went missing; then
-        legacy_base starts empty and the import below brings in only
-        what root lacks).
-      * Then the downgrade import, then the legacy files lose what root
-        no longer holds (this finishes a delete that crashed before its
-        rewrite), then legacy_base (from 1a, a pending Add step 6 goes
-        first).
-    A file it can't read stops it: the chat and memory routes answer 503
-    and the next start tries again. Old chat ids stay valid; nothing
-    signs in. The browser-store clean-up it starts is the page's first
-    call to /api/webstore/clean (see webstore_clean)."""
+    the instance lock (Q9). Chats and memory migrate separately, and a
+    failure shuts only its own store for this run (review of 6b324, past
+    Q9):
+      * chats, until legacy_base has its "ids": copy chats.json into
+        chats.v2.json. chats.v2.json carries "from_legacy" until this
+        build's first write of its own, so a copy a crash cut short is
+        made again, while a store in use whose profile.json went missing
+        is never copied over (legacy_base then starts empty and the
+        import brings in only what root lacks, mapping a chat both hold
+        rather than copying it). A chats.json it can't read shuts the
+        chats (503) until a start can read it.
+      * memory, until legacy_base has its "facts": copy memory.json into
+        memory.v2.json (when that isn't there yet; else legacy_base
+        starts empty, and the import adds only facts root lacks). A
+        memory.json it can't read is set aside as
+        memory.json.unreadable-<time> (older builds already read it as
+        empty) and memory starts empty.
+      * then, for each, the downgrade import, the legacy file losing what
+        root no longer holds (this finishes a delete that crashed before
+        its rewrite), then legacy_base (from 1a, a pending Add step 6
+        goes first). Once migrated, nothing shuts a store for the whole
+        run: a read that fails fails its own request.
+    Old chat ids stay valid; nothing signs in. The browser-store clean-up
+    starts with the page's first call to /api/webstore/clean."""
     k = _bk(base)
-    try:
-        with _chats_lock, _memory_lock, _profile_lock:
-            _STORE_BLOCKED.pop(k, None)
+    ok = True
+    with _chats_lock, _memory_lock, _profile_lock:
+        _STORE_BLOCKED.pop((k, "chats"), None)
+        _STORE_BLOCKED.pop((k, "memory"), None)
+        try:
             prof = _read_json(PROFILE_FILE, base, dict) or {}
-            if not isinstance(prof.get("legacy_base"), dict):
+        except StoreReadError as exc:
+            # nothing can be known: each request's own read decides
+            print("  couldn't read %s: nothing migrated this start" % exc)
+            return False
+        lb = prof.get("legacy_base")
+        lb = lb if isinstance(lb, dict) else {}
+        if "ids" not in lb:
+            try:
                 cur = _read_json(CHATS_FILE, base, dict)
                 lch, csha = _read_json_h(LEGACY_CHATS, base, list)
-                lme, msha = _read_json_h(LEGACY_MEMORY, base, list)
                 if cur is None or "from_legacy" in cur:
                     _write_json(CHATS_FILE, {"v": 2, "chats": lch or [],
                                              "gone": [],
                                              "from_legacy": csha or ""}, base)
+                    _profile_legacy_set(base, chats=csha,
+                                        ids=_legacy_ids_of(lch))
+                else:
+                    _profile_legacy_set(base, chats=None, ids={})
+            except (StoreReadError, OSError) as exc:
+                _STORE_BLOCKED[(k, "chats")] = str(exc)
+                print("  couldn't read %s: chats stay shut until the next "
+                      "start" % exc)
+                ok = False
+        if "facts" not in lb:
+            try:
+                try:
+                    lme, msha = _read_json_h(LEGACY_MEMORY, base, list)
+                except StoreReadError:
+                    aside = _pfile(LEGACY_MEMORY, base) + ".unreadable-%d" \
+                        % int(time.time())
+                    os.replace(_pfile(LEGACY_MEMORY, base), aside)
+                    print("  memory.json couldn't be read: set aside as %s"
+                          % os.path.basename(aside))
+                    lme, msha = None, None
+                if _read_json(MEMORY_FILE, base, list) is None:
                     _write_json(MEMORY_FILE, (lme or [])[-MEMORY_KEEP:],
                                 base, indent=1)
-                    lb = _legacy_base_of(lch, csha, lme, msha)
+                    _profile_legacy_set(base, memory=msha, facts=[
+                        p for p in map(_fact_fp, lme or []) if p])
                 else:
-                    lb = {"chats": None, "memory": None, "ids": {},
-                          "facts": []}
-                prof = _read_json(PROFILE_FILE, base, dict) or {}
-                prof["legacy_base"] = lb
-                prof.setdefault("migrated_61", int(time.time()))
+                    _profile_legacy_set(base, memory=None, facts=[])
+            except (StoreReadError, OSError) as exc:
+                _STORE_BLOCKED[(k, "memory")] = str(exc)
+                print("  couldn't migrate memory (%s): memory stays shut "
+                      "until the next start" % exc)
+                ok = False
+        try:
+            prof = _read_json(PROFILE_FILE, base, dict) or {}
+            if "migrated_61" not in prof and ok:
+                prof["migrated_61"] = int(time.time())
                 _write_json(PROFILE_FILE, prof, base, indent=1)
-            # a legacy file unreadable now (an older build's crash mid-save)
-            # only waits: nothing in root depends on it any more
-            _legacy_sync_chats(load_chats(base), base)
-            _legacy_sync_memory(_load_memory(base), base)
-        return True
-    except (StoreReadError, OSError) as exc:
-        _STORE_BLOCKED[k] = str(exc)
-        print("  couldn't read %s: chats and memory stay shut until the "
-              "next start" % exc)
-        return False
+        except (StoreReadError, OSError):
+            pass
+        # the boot order; a store that can't be read now just waits, and
+        # its requests answer 503 by themselves
+        for kind, sync, load in (("chats", _legacy_sync_chats, load_chats),
+                                 ("memory", _legacy_sync_memory,
+                                  _load_memory)):
+            if (k, kind) in _STORE_BLOCKED:
+                continue
+            try:
+                if not sync(load(base), base):
+                    _legacy_pending[kind].add(k)
+            except StoreReadError:
+                _legacy_pending[kind].add(k)
+    return ok
 
 
 def _extract_memory(label: str, user_msg: str, base=None, conf=None):
@@ -14671,7 +14805,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     os.remove(CLOUD_FILE)
                 except Exception:
                     pass
-                p = load_prefs(None); p["turbo"] = False; store_prefs(p)
+                _set_turbo(False)
                 self._send_json({"ok": True, "off": True})
                 return
             spec = {
@@ -14821,7 +14955,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     if not _saved:
                         self._send_json({"ok": False, "err": _KEY_NOT_SAVED})
                         return
-                    p = load_prefs(None); p["turbo"] = True; store_prefs(p)
+                    _set_turbo(True)
                     self._send_json({
                         "ok": True, "name": name, "model": model,
                         "models": found,
@@ -14890,7 +15024,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             except Exception as exc:
                 self._send_json({"ok": False, "err": str(exc)[:80]})
                 return
-            p = load_prefs(None); p["turbo"] = True; store_prefs(p)
+            _set_turbo(True)
             _ok = {"ok": True, "name": name, "model": model,
                    "models": found}
             if _busy:
@@ -17366,8 +17500,15 @@ def _drop_instance_note():
 #   port, a dev port) is gone with it. The allow-listed conveniences
 #   (model picks, sky, sidebar width) reset once.
 # profile.json's "webstore" records it: "clean" when the first pass ran,
-# "want_local" when the page said the six keys were safe, "local" when
-# the one-time LocalStorage removal ran.
+# "want_local" when the latest boot said the six keys were safe (a later
+# boot that says otherwise withdraws it), "local" when the one-time
+# LocalStorage removal ran.
+# ON macOS NONE OF THIS RUNS YET (review of 6b324): the app runs as the
+# venv's python3, so the default WebKit store is Python's, shared with
+# every pywebview app that Python runs, not ConcordeAI's. Until the
+# window gets a data store of its own (a follow-up), the Mac keeps only
+# the page's sweep: other sites' data, caches and other ports' copies
+# stay where they are.
 _WEBSTORE_OWN = ("127.0.0.1", "localhost", "::1", "[::1]")
 _WINDOW = []            # the app's window, once made
 _webstore_lock = threading.Lock()
@@ -17402,8 +17543,9 @@ def _webstore_webkit(local: bool, timeout: float = 20.0, store=None,
                      call=None) -> bool:
     """macOS: WKWebsiteDataStore fetchDataRecordsOfTypes: and
     removeDataOfTypes:forDataRecords: on the store pywebview's window
-    uses (defaultDataStore; its Cocoa backend ignores storage_path, so
-    it lives under ~/Library/WebKit, not app_dir()/webkit). Runs on the
+    uses (defaultDataStore; its Cocoa backend ignores storage_path).
+    Called only when that store is the app's own (_webkit_own_store,
+    never true yet: today it is Python's shared store). Runs on the
     main thread through AppHelper.callAfter, from any other thread; the
     completion handlers need the app's run loop, so only once the window
     runs. store and call are the seams the gauntlet drives it with."""
@@ -17521,18 +17663,22 @@ def _webstore_wv2(window, local: bool, timeout: float = 20.0) -> bool:
     return done.wait(timeout)
 
 
-def _webstore_qt_sweep(folder: str, keep_local: bool) -> list:
+def _webstore_qt_sweep(folder: str, keep_local: bool):
     """The Qt build's store as files (0b Q16: QtWebEngine has no
     per-origin LocalStorage removal). Everything in the profile's
     persistent folder goes (cookies, IndexedDB, service workers, caches,
     session storage...) except "Local Storage" when keep_local. Run
     before the window opens, so no page holds any of it and the launch
-    cookie of this run isn't set yet."""
-    out = []
+    cookie of this run isn't set yet. (removed, failed): the names gone
+    and those that couldn't all go; a caller records success only when
+    nothing failed."""
+    out, bad = [], []
     try:
         names = sorted(os.listdir(folder))
+    except FileNotFoundError:
+        return out, bad
     except OSError:
-        return out
+        return out, ["."]
     for n in names:
         if keep_local and n == "Local Storage":
             continue
@@ -17544,8 +17690,8 @@ def _webstore_qt_sweep(folder: str, keep_local: bool) -> list:
                 os.remove(p)
             out.append(n)
         except OSError:
-            pass
-    return out
+            bad.append(n)
+    return out, bad
 
 
 def _webstore_state(base=None) -> dict:
@@ -17573,9 +17719,15 @@ def _webstore_qt_boot(base=None):
         need_local = bool(ws.get("want_local")) and not ws.get("local")
         if not (need_clean or need_local):
             return
-        _webstore_qt_sweep(os.path.join(app_dir(), "webkit"),
-                           keep_local=not need_local)
+        _gone, bad = _webstore_qt_sweep(os.path.join(app_dir(), "webkit"),
+                                        keep_local=not need_local)
         _QT_CLEAR_CACHE[0] = True       # the HTTP cache, once the view is up
+        if bad:
+            # something held a file: nothing is recorded, the next start
+            # tries again (review of 6b324)
+            print("  (web view store: couldn't remove %s; next start)"
+                  % ", ".join(bad[:5]))
+            return
         now = int(time.time())
         _webstore_mark(base, clean=ws.get("clean") or now,
                        **({"local": now} if need_local else {}))
@@ -17612,6 +17764,23 @@ def _webstore_qt_cache(window):
         print("  (web view cache not cleared: %s)" % exc)
 
 
+APP_BUNDLE_ID = "com.millen.millenai"      # build_macos_app.sh's
+
+
+def _webkit_own_store() -> bool:
+    """True only when this process is the app's own bundle, so that
+    WKWebsiteDataStore.defaultDataStore() is ConcordeAI's store and no
+    one else's. Never true today: the .app starts the venv's python3,
+    whose bundle is org.python.python. A follow-up gives the window a
+    data store of its own; until then the macOS branch never runs."""
+    try:
+        from Foundation import NSBundle
+        return str(NSBundle.mainBundle().bundleIdentifier() or "") \
+            == APP_BUNDLE_ID
+    except Exception:
+        return False
+
+
 def _webstore_native(local: bool) -> bool:
     """The branch for this build's engine. False: it didn't run (no
     window, an engine without a live branch, or it failed); nothing is
@@ -17635,9 +17804,11 @@ def _webstore_native(local: bool) -> bool:
     eng = _web_engine()
     try:
         if eng == "webkit":
-            # a dev copy's window may share the WebKit store of the app a
-            # person uses: it leaves the store alone unless asked
-            if DEV_HOME and "webstore-native" not in TEST_HOOKS:
+            # NOT PYTHON'S STORE (review of 6b324): the app runs as the
+            # venv's python3, so the default WebKit store is Python's own,
+            # shared with every pywebview app that Python runs. It is left
+            # alone until the app has a store of its own
+            if not _webkit_own_store():
                 return False
             return _webstore_webkit(local)
         if eng == "webview2":
@@ -17656,11 +17827,17 @@ def webstore_clean(local: bool, base=None) -> dict:
     the files go at the next start, before the window (_webstore_qt_boot)."""
     with _webstore_lock:
         ws = _webstore_state(base)
+        # the LocalStorage purge follows THIS boot's word only (review of
+        # 6b324): a later boot whose keys aren't safe withdraws an earlier
+        # boot's request, which the Qt branch would act on at the next start
         if local and not ws.get("want_local"):
             _webstore_mark(base, want_local=int(time.time()))
             ws["want_local"] = 1
+        elif not local and ws.get("want_local") and not ws.get("local"):
+            _webstore_mark(base, want_local=0)
+            ws["want_local"] = 0
         need_clean = not ws.get("clean")
-        need_local = bool(ws.get("want_local")) and not ws.get("local")
+        need_local = local and not ws.get("local")
         if not (need_clean or need_local):
             return {"ran": False, "reload": False}
         eng = "fake" if "webstore-fake" in TEST_HOOKS else _web_engine()
@@ -17678,13 +17855,22 @@ def webstore_clean(local: bool, base=None) -> dict:
 
 # THE SIX PER-PERSON KEYS (0b 5.10, Q10) the page kept in browser storage,
 # as prefs.json holds them: millen.tier, agent, codeagent, adv, advon and
-# autonomy (which keeps 6b310's remote_autonomy)
-PREF_SIX = ("tier", "agent", "codeagent", "adv", "advon", "remote_autonomy")
+# autonomy (which keeps 6b310's remote_autonomy). model and council join
+# them there (review of 6b324: tier "" means "this model", so the model
+# must be kept where the tier is), though their browser keys stay
+# allow-listed
+PREF_SIX = ("tier", "agent", "codeagent", "adv", "advon", "remote_autonomy",
+            "model", "council")
 
 
 def _pref_six_ok(k, v) -> bool:
     if k in ("tier", "agent", "codeagent"):
         return isinstance(v, str) and len(v) <= 60
+    if k == "model":
+        return isinstance(v, str) and 0 < len(v) <= 80
+    if k == "council":
+        return (isinstance(v, list) and 0 < len(v) <= 12
+                and all(isinstance(x, str) and 0 < len(x) <= 80 for x in v))
     if k == "adv":
         return v is None or (isinstance(v, dict)
                              and len(json.dumps(v)) <= 8000)
@@ -21435,16 +21621,21 @@ const SKY_NIGHT=__SKY_NIGHT__;
    2. every other key not on the machine allow-list is deleted (the old
       copy of the chats with them, never named here);
    3. the web view's native clean-up runs once (/api/webstore/clean), and
-      the page reloads when that took the app's own LocalStorage (Q13). */
+      the page reloads when that took the app's own LocalStorage (Q13).
+   The single-model pick (model, council) goes to prefs.json too, beside
+   the tier, so tier "" always has its model back (review of 6b324); its
+   browser keys stay on the allow-list, but prefs.json is what counts. */
 const PREF_OF={"millen.tier":"tier","millen.agent":"agent",
   "millen.codeagent":"codeagent","millen.adv":"adv","millen.advon":"advon",
   "millen.autonomy":"remote_autonomy"};
+const PREF_TOO={"millen.model":"model","millen.council":"council"};
 const KEEP_LS=["millen.model","millen.council","millen.video","millen.perf",
   "millen.voice","millen.speeds","millen.sky","millen.skyhist",
   "millen.skynext","millen.sbw"];
-let P={};                        // the six, as prefs.json holds them
+let P={};                        // the person's settings, as prefs.json holds them
 const prefMine=new Set();        // set here before prefs.json answered
 let prefQ=Promise.resolve();
+let prefsReady=false;            // applyPrefs has run
 function prefSet(o){
   Object.keys(o).forEach(k=>{P[k]=o[k];prefMine.add(k);});
   const body=JSON.stringify(o);
@@ -21462,15 +21653,17 @@ function lsKeys(){
 }
 // a browser value as prefs.json keeps it
 function prefVal(k,v){
-  if(k==="millen.adv"){
-    try{const a=JSON.parse(v);return a&&typeof a==="object"&&!Array.isArray(a)?a:null;}
+  if(k==="millen.adv"||k==="millen.council"){
+    try{const a=JSON.parse(v);
+      if(k==="millen.council")return Array.isArray(a)&&a.length&&a.every(x=>typeof x==="string")?a:null;
+      return a&&typeof a==="object"&&!Array.isArray(a)?a:null;}
     catch(e){return null;}
   }
   if(k==="millen.advon")return v==="1";
   return v;
 }
 async function storeBoot(){
-  let held=null;
+  let held=null;                 // what GET /api/prefs said
   try{const r=await api("/api/prefs");if(r.ok)held=await r.json();}catch(e){}
   const send={},pend={};
   Object.keys(PREF_OF).forEach(k=>{
@@ -21478,34 +21671,48 @@ async function storeBoot(){
     pend[PREF_OF[k]]=prefVal(k,v);
     if(held&&!(PREF_OF[k] in held))send[PREF_OF[k]]=pend[PREF_OF[k]];
   });
+  Object.keys(PREF_TOO).forEach(k=>{
+    const v=lsGet(k);if(v===null||!held||PREF_TOO[k] in held)return;
+    const x=prefVal(k,v);if(x!==null)send[PREF_TOO[k]]=x;
+  });
+  let after=held;                // what prefs.json holds after the post
+  let posted=true;               // the post (if any) came back 200
   if(held&&Object.keys(send).length){
+    posted=false;
     try{
       const r=await api("/api/prefs/adopt",{method:"POST",
         headers:{"Content-Type":"application/json"},body:JSON.stringify(send)});
       const d=r.ok?await r.json():null;
-      held=d&&d.prefs?Object.assign({},held,d.prefs):null;
-    }catch(e){held=null;}
+      if(d&&d.prefs){after=Object.assign({},held,d.prefs);posted=true;}
+    }catch(e){}
   }
-  if(held)Object.keys(PREF_OF).forEach(k=>{if(PREF_OF[k] in held)lsDel(k);});
+  if(after)Object.keys(PREF_OF).forEach(k=>{if(PREF_OF[k] in after)lsDel(k);});
   lsKeys().forEach(k=>{if(k!==null&&!KEEP_LS.includes(k)&&!(k in PREF_OF))lsDel(k);});
-  // a key whose post failed still counts for this session, read-only
-  const got=Object.assign({},pend,held||{});
+  // a key whose post failed still counts for this session, read-only;
+  // what prefs.json already held wins over it
+  const got=Object.assign({},pend,after||{});
   Object.keys(got).forEach(k=>{if(!prefMine.has(k))P[k]=got[k];});
   applyPrefs();
   const left=Object.keys(PREF_OF).some(k=>lsGet(k)!==null);
   try{
     const r=await api("/api/webstore/clean",{method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({local:!!held&&!left})});
+      body:JSON.stringify({local:!!after&&posted&&!left})});
     const d=r.ok?await r.json():{};
     if(d.reload)location.reload();
   }catch(e){}
 }
-// the six, as the page uses them (a change made before prefs.json
-// answered stands)
+// the settings, as the page uses them. A change made before prefs.json
+// answered stands, and a lane opened meanwhile stays open (review of
+// 6b324): outside the AI lane nothing is switched, only repainted
+let codeGuess=false;             // the Code tab opened before prefs came
 function applyPrefs(){
   if(!prefMine.has("adv"))adv=P.adv&&typeof P.adv==="object"?P.adv:null;
   if(!prefMine.has("advon"))advOn=P.advon===true&&!!adv;
+  if(!prefMine.has("council")&&Array.isArray(P.council)&&P.council.length
+     &&P.council.every(x=>typeof x==="string"))council=P.council.slice(0,12);
+  if(!prefMine.has("model")&&typeof P.model==="string"&&P.model
+     &&council[0]!==P.model)council=[P.model];
   if(!prefMine.has("tier")){
     let t=typeof P.tier==="string"?P.tier:"Fast";
     if(t==="Smart"||t==="Best")t="Fast";   // merged (1.20) and retired (5.3)
@@ -21515,7 +21722,18 @@ function applyPrefs(){
   }
   if(!prefMine.has("remote_autonomy")
      &&["manual","auto","full"].includes(P.remote_autonomy))autonomy=P.remote_autonomy;
-  setTier(tier,true);advChip();paintAutonomy();
+  prefsReady=true;
+  if(uiMode==="ai"&&!agent)setTier(tier,true);
+  else{
+    if(tier&&advOn)advOn=false;            // setTier's rule, without its switch
+    paintModels();
+    if(typeof paintAgents==="function")paintAgents();
+  }
+  advChip();paintAutonomy();
+  // the Code tab took "Coding" while it waited: the saved one now
+  if(codeGuess&&uiMode==="code"&&agent==="Coding"
+     &&(P.codeagent==="Workspace"))setAgent(P.codeagent);
+  codeGuess=false;
 }
 
 /* ------------------------------------------------------------- state */
@@ -21568,8 +21786,8 @@ function selectModel(name){
     return;
   }
   tier="";                       // an explicit pick overrides any tier
-  prefSet({tier:""});
   council=[name];
+  prefSet({tier:"",model:name,council:[name]});
   paintModels();
 }
 $$(".model").forEach(el=>el.addEventListener("click",()=>selectModel(el.dataset.model)));
@@ -21923,8 +22141,12 @@ function modeShow(which){
 function switchLane(m){
   modeShow(m);
   const codey=agent==="Coding"||agent==="Workspace"||agent==="Remote";
-  if(m==="code"&&!codey)
-    setAgent(P.codeagent||"Coding");
+  if(m==="code"&&!codey){
+    // before prefs.json answers, the saved specialist isn't known: take
+    // Coding without saving it as the Code tab's (applyPrefs corrects it)
+    if(prefsReady)setAgent(P.codeagent||"Coding");
+    else{codeGuess=true;setAgent("Coding",true);}
+  }
   else if(m!=="code"&&codey)setAgent("");
 }
 $$("#mode-tabs .ltab").forEach(t=>
@@ -21941,10 +22163,11 @@ function paintAgents(){
   if(agent&&chip)chip.textContent=agent+" agent";
   else if(chip)paintModels();
 }
-function setAgent(name){
+// guess: a pick the page made itself, which isn't the Code tab's to keep
+function setAgent(name,guess){
   agent=name;
   // the CODE tab reopens on whichever specialist was used last
-  prefSet(name==="Coding"||name==="Workspace"
+  prefSet(!guess&&(name==="Coding"||name==="Workspace")
     ?{agent:name,codeagent:name}:{agent:name});
   paintAgents();
   if(typeof wsRefresh==="function")wsRefresh();
@@ -28329,12 +28552,13 @@ if __name__ == "__main__":
     # THE CHAT STORE BEFORE ANY ROUTE (0b 5.9, Q9, 6b324): the one-time
     # move to the .v2 files and, at every start, the downgrade import and
     # the legacy files' catch-up, by the copy holding the lock only
+    # A lock file that couldn't even be opened leaves the store as it
+    # was before this step, unmigrated but open (review of 6b324)
     if _INSTANCE_LOCK:
         _migrate_61()
     else:
-        _STORE_BLOCKED[_bk(None)] = "run/instance.lock"
-        print("  no instance lock: chats and memory stay shut this run")
-    if not NOWINDOW and _web_engine() == "qt":
+        print("  no instance lock: the chats aren't migrated this run")
+    if not NOWINDOW and _web_engine() == "qt" and _INSTANCE_LOCK:
         _webstore_qt_boot()      # files, while no page holds them (Q16)
     if DEFAULT_APP:
         # dev and test instances share this data folder: only the app a
