@@ -2631,7 +2631,7 @@ check("review fixes: chat copy, autonomy, downloads, image label, photos",
       and 'if p.startswith("https://")][:3]' in _MILLENAI_SRC
       and 'img.startswith("https://")' in _MILLENAI_SRC
       and "r'(https://[^" in _MILLENAI_SRC and "(https?://[^" not in _MILLENAI_SRC
-      and "A question\n      that needs the web goes, as typed, to a search engine"
+      and "A question that needs the web goes, as typed, to a\n      search engine"
       in _MILLENAI_SRC)
 # (3) NO KEYLESS CLOUD. Pollinations got whole prompts (memory and name
 # included) when cloud power was on without a key, and image
@@ -2643,13 +2643,18 @@ check("Pollinations is gone and the Cloud power copy tells the truth",
       and "_free_cold" not in _MILLENAI_SRC
       and "community cloud" not in _MILLENAI_SRC.lower()
       and "leave this machine\n      only while a key is on" not in _MILLENAI_SRC
-      # (6b326) the one cloud gate's copy (0a 5.5): the key alone no
-      # longer decides, the switch or the Cloud Only tier does
+      # (6b326) the switch decides chats; a saved Gemini key makes
+      # pictures and video either way; the switch never removes a key
       and "only while a key is on" not in _MILLENAI_SRC
-      and ("Your prompts leave this\n      computer whenever a cloud service answers: while Use cloud power is\n"
-           "      on, or when you pick the Cloud Only tier. That includes chats,\n"
-           "      pasted images, and images and videos made with Gemini.") in _MILLENAI_SRC
-      and _MILLENAI_SRC.count("Your prompts leave this computer while this is on, and") == 2)
+      and ("While Use cloud power is\n      on, cloud models answer your chats; the Cloud Only tier does that\n"
+           "      for one question. Pictures and videos made with Gemini go to Google\n"
+           "      whenever a Gemini key is saved, switch on or off. The switch never\n"
+           "      removes a key.") in _MILLENAI_SRC
+      and ('title="Answers come from a cloud service instead of this computer. Your prompts '
+           'leave this computer while this is on, and whenever you pick the Cloud Only tier. '
+           'Pictures and videos use a saved Gemini key either way; keys stay saved when it is '
+           'off."') in _MILLENAI_SRC
+      and '$("#turbo-hint").title=' not in _MILLENAI_SRC)
 # (4) AN ANSWER CAN'T RUN SCRIPT IN THE PAGE. esc() left quotes alone, so
 # ![x" onerror="...](https://...) closed the alt attribute and ran code
 # that could read every chat. The page's OWN renderer runs in node here.
@@ -3080,7 +3085,7 @@ check("per-task wiring: lanes, vision first, refusals, titles/memory/pins, funne
       and "if images and _vis_cloud and _cloud_vision():" in _MILLENAI_SRC
       and "and not _vis_cloud and not _vis_local:" in _MILLENAI_SRC
       and "def _walk_ladder() -> bool:" in _MILLENAI_SRC
-      and "kwargs={\"conf\": _ans_conf}" in _MILLENAI_SRC
+      and "kwargs={\"conf\": _ans_conf, \"cloud_only\": cloud_only}" in _MILLENAI_SRC
       and "make_title(txt, conf=_conf)" in _MILLENAI_SRC
       and "fast_cloud_ladder(utility=True) if effort == \"fast\"" in _MILLENAI_SRC
       and "[cloud_conf()]" not in _MILLENAI_SRC
@@ -3180,7 +3185,8 @@ check("per-task review fixes: titles per request, badge, sweeps",
       "run_council(council, full_messages, memit, status," in _MILLENAI_SRC
       and "hurry=hurry_ev)" in _MILLENAI_SRC
       and "_fast = fast_cloud_ladder()" in _MILLENAI_SRC
-      and "_last_cloud.pop(str(self._data_base()), None)" in _MILLENAI_SRC
+      # (6b326) the ticket is per chat, and a new question voids its own
+      and "_last_cloud.pop((str(self._data_base()), _title_cid), None)" in _MILLENAI_SRC
       and 'json.dumps({"w": "cloud"})' in _MILLENAI_SRC
       and 'd.w==="cloud"' in page
       and "if images and not cloud_only and not _vis_cloud and not _vis_local:" in _MILLENAI_SRC
@@ -5279,13 +5285,17 @@ _spk = {"re": re, "IS_WIN": True, "_say_proc": None,
         "strip_think": lambda t: t, "threading": __import__("threading"),
         "subprocess": _t17.SimpleNamespace(Popen=_SP, PIPE=-1, CREATE_NO_WINDOW=0x08000000)}
 _exec_names(_spk, {"_speak", "_stop_speaking", "_speak_now", "_stop_speaking_now",
-                   "_say_lock", "_say_file", "_say_reap", "run_file", "drop_run_file"})
+                   "_say_lock", "_say_file", "_say_reap", "run_file", "drop_run_file",
+                   "_say_feed", "_say_feeds"})
 _say = "Tadej Pogačar won — it’s 20°C → fine \U0001F642"
 try:
     _spk["_speak"](_say)
     _sp_err = None
 except Exception as _e:
     _sp_err = repr(_e)
+# (6b326) the text is written on a short thread of its own
+for _t in list(_spk.get("_say_feeds") or []):
+    _t.join(5)
 _sp = _spoke[-1] if _spoke else None
 # PowerShell gone before the text arrived: the pipe still closes
 _sp_fail = True
@@ -5293,6 +5303,8 @@ try:
     _spk["_speak"](_say)
 except Exception as _e:
     _sp_err = repr(_e)
+for _t in list(_spk.get("_say_feeds") or []):
+    _t.join(5)
 _sp_fail = False
 check("Windows reads any reply aloud: UTF-8 in, UTF-8 read, the pipe always closed",
       _sp_err is None and _sp is not None and _sp.closed
@@ -5764,18 +5776,21 @@ def _ssh_fake_run(argv, **k):
     _ssh_kw.update(k); return _t17.SimpleNamespace(
         returncode=0, stdout="\u25cf nginx.service\r\n".encode("utf-8"), stderr=b"")
 _sr = {"subprocess": _t17.SimpleNamespace(run=_ssh_fake_run, TimeoutExpired=Exception),
-       "_ssh_config": lambda c: "Host x\n", "os": _os20,
+       "_ssh_config": lambda c: "Host x\n", "os": _os20, "re": re,
        "run_file": lambda *a: "/nonexistent/run/ssh-x.conf", "drop_run_file": lambda p: None,
-       "REMOTE_KNOWN_HOSTS": __file__}
-_exec_names(_sr, {"ssh_run", "_ssh_argv", "_ssh_script", "SSH_ALIAS", "SSH_SHELL"})
+       "REMOTE_KNOWN_HOSTS": __file__, "_remote_resolved": lambda c, again=False: c,
+       "shutil": __import__("shutil")}
+_exec_names(_sr, {"ssh_run", "_ssh_once", "_ssh_argv", "_ssh_script", "SSH_ALIAS", "SSH_SHELL",
+                  "_SSH_RESOLVE_RX", "_SSH_HOSTKEY_RX", "SSH_OWN_SETTINGS", "SSH_KEY_CHANGED"})
 _sr_out = _sr["ssh_run"]({}, "systemctl status nginx")
 _sa = {"os": _os20, "re": re, "IS_WIN": True, "REMOTE_KNOWN_HOSTS": "C:\\A\\kh"}
-_exec_names(_sa, {"_ssh_config", "_ssh_path", "SSH_ALIAS", "_SSH_HOST_RX", "_SSH_USER_RX"})
+_exec_names(_sa, {"_ssh_config", "_ssh_path", "_ssh_quote", "_ssh_port", "_ssh_jump",
+                  "_ssh_fields", "SSH_ALIAS", "_SSH_HOST_RX", "_SSH_USER_RX", "_SSH_JUMP_RX"})
 check("Windows: no console window flashes; ssh reads UTF-8; quoted paths are accepted",
       _pq_seen == [0x08000000, 0x10]
       and isinstance(_ssh_kw.get("input"), bytes) and "encoding" not in _ssh_kw
       and _sr_out == (0, "\u25cf nginx.service\n")
-      and '  IdentityFile "C:/Users/pat/.ssh/id"' in _sa["_ssh_config"](
+      and 'IdentityFile "C:/Users/pat/.ssh/id"' in _sa["_ssh_config"](
           {"key": '"C:\\Users\\pat\\.ssh\\id"', "host": "h"}).split("\n")
       and "str(d.get(\"root\") or \"\").strip().strip('\"'))" in _M,
       "%r" % [_pq_seen, _ssh_kw, _sr_out])
@@ -8003,7 +8018,8 @@ import http.server as _hs26, base64 as _b6426, hashlib as _hl26, stat as _st26
 import threading as _th26, contextlib as _cx26, hmac as _hm26, secrets as _se26
 _PHOSTS26 = ("generativelanguage.googleapis.com", "api.groq.com",
              "api.anthropic.com", "api.moonshot.ai")
-_S26 = {"reqs": [], "late401": {}, "lock": _th26.Lock()}
+_S26 = {"reqs": [], "late401": {}, "t401": [], "bad": set(), "drop": set(),
+        "lock": _th26.Lock()}
 _STUB_TEXT26 = ("A stub provider wrote this reply for the gauntlet. It answers in plain "
                 "sentences so the repetition checks pass, it names no real place, and it "
                 "says nothing about any key. Every sentence here differs from the one "
@@ -8053,9 +8069,15 @@ class _Stub26(_hs26.BaseHTTPRequestHandler):
             _S26["reqs"].append({"m": m, "p": self.path, "k": key})
         p = urllib.parse.urlparse(self.path).path
         host = p.lstrip("/").split("/", 1)[0]
+        if key in _S26["drop"]:       # a provider that can't be reached
+            self.close_connection = True
+            return
+        if key in _S26["bad"]:        # a key the provider rejects
+            return self._out(401, {"error": {"message": "Invalid API Key"}})
         late = _S26["late401"].get(key)
         if late is not None and not p.endswith("/models"):
             time.sleep(late)          # the delayed answer (0a 5.14's hook)
+            _S26["t401"].append(time.time())
             return self._out(401, {"error": {"message": "Invalid API Key"}})
         try:
             d = json.loads(body) if body else {}
@@ -8124,7 +8146,8 @@ _INV26 = {"gemini": _MODELS26[_PHOSTS26[0]], "groq": _MODELS26[_PHOSTS26[1]],
 
 
 # a local sshd for the Remote agent's checks: its own host key and an
-# authorized key made here, this user only, on a port picked now
+# authorized key made here, this user only, on a port picked now, on both
+# loopbacks (the jump-host check reaches it by two names)
 def _free_port26():
     with socket.socket() as so:
         so.bind(("127.0.0.1", 0))
@@ -8134,28 +8157,53 @@ def _free_port26():
 _SSHD26 = None
 _SSHDIR26 = os.path.join(_SMOKE_TMP, "sshd26")
 _SSHPORT26 = _free_port26()
+_SSHCONF26 = os.path.join(_SSHDIR26, "sshd_config")
+
+
+def _sshd_start26():
+    global _SSHD26
+    _SSHD26 = subprocess.Popen(["/usr/sbin/sshd", "-D", "-e", "-f", _SSHCONF26],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    for _i in range(40):
+        if _port_open(_SSHPORT26):
+            break
+        time.sleep(0.25)
+
+
+def _sshd_stop26():
+    if _SSHD26 is not None and _SSHD26.poll() is None:
+        _SSHD26.terminate()
+        _SSHD26.wait(10)
+    for _i in range(40):
+        if not _port_open(_SSHPORT26):
+            break
+        time.sleep(0.1)
+
+
 if sys.platform != "win32" and os.path.exists("/usr/sbin/sshd"):
     os.makedirs(_SSHDIR26, mode=0o700, exist_ok=True)
     for _kn in ("hostkey", "userkey"):
         subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f",
                         os.path.join(_SSHDIR26, _kn)], capture_output=True)
     shutil.copy(os.path.join(_SSHDIR26, "userkey.pub"), os.path.join(_SSHDIR26, "authorized"))
-    with open(os.path.join(_SSHDIR26, "sshd_config"), "w") as fh:
-        fh.write("Port %d\nListenAddress 127.0.0.1\nHostKey %s\nPidFile %s\nUsePAM no\n"
-                 "StrictModes no\nAuthorizedKeysFile %s\nPasswordAuthentication no\n"
-                 "KbdInteractiveAuthentication no\n"
+    with open(_SSHCONF26, "w") as fh:
+        fh.write("Port %d\nListenAddress 127.0.0.1\nListenAddress ::1\nHostKey %s\n"
+                 "PidFile %s\nUsePAM no\nStrictModes no\nAuthorizedKeysFile %s\n"
+                 "PasswordAuthentication no\nKbdInteractiveAuthentication no\n"
                  % (_SSHPORT26, os.path.join(_SSHDIR26, "hostkey"),
                     os.path.join(_SSHDIR26, "sshd.pid"),
                     os.path.join(_SSHDIR26, "authorized")))
-    _SSHD26 = subprocess.Popen(["/usr/sbin/sshd", "-D", "-e", "-f",
-                                os.path.join(_SSHDIR26, "sshd_config")],
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    _atexit.register(lambda: _SSHD26.poll() is None and _SSHD26.terminate())
-    for _i in range(40):
-        if _port_open(_SSHPORT26):
-            break
-        time.sleep(0.25)
+    _sshd_start26()
+    _atexit.register(_sshd_stop26)
 _ME26 = __import__("getpass").getuser()
+# a stand-in for ~/.ssh/config, handed to `ssh -G` by the app's
+# ssh-config hook, so the gauntlet never has ssh read the real one: the
+# alias a setup from an older build used
+_USERCFG26 = os.path.join(_SSHDIR26, "user_ssh_config")
+if _SSHD26 is not None:
+    with open(_USERCFG26, "w") as fh:
+        fh.write("Host concorde-old-alias\n  HostName 127.0.0.1\n  Port %d\n"
+                 "  IdentityFile %s\n" % (_SSHPORT26, os.path.join(_SSHDIR26, "userkey")))
 
 
 def _seed_c26(home):
@@ -8166,9 +8214,16 @@ def _seed_c26(home):
             for pid in _SENT26}}, fh)
     with open(os.path.join(home, "prefs.json"), "w") as fh:
         json.dump({"turbo": False}, fh)
+    # a Remote setup saved by an older build: an alias only ~/.ssh/config
+    # knows, port 22 and no key in the app
     with open(os.path.join(home, "remote.json"), "w") as fh:
-        json.dump({"host": "127.0.0.1", "user": _ME26, "port": str(_SSHPORT26),
-                   "key": os.path.join(_SSHDIR26, "userkey")}, fh)
+        json.dump({"host": "concorde-old-alias", "user": _ME26, "port": "22",
+                   "key": ""}, fh)
+
+
+def _seed_d26(home):
+    with open(os.path.join(home, "prefs.json"), "w") as fh:
+        json.dump({"turbo": False}, fh)
 
 
 # ~/.ssh/known_hosts is compared by digest only, never read into the
@@ -8183,15 +8238,19 @@ def _kh26():
 
 
 _KH0_26 = _kh26()
-_C26 = Instance(9903, "C26", seed=_seed_c26, env={
-    "MILLENAI_TEST_HOOKS": "provider-stub=%s,subprocess-record" % _SURL26,
-    "HTTPS_PROXY": _SURL26, "HTTP_PROXY": _SURL26, "https_proxy": _SURL26,
-    "http_proxy": _SURL26, "NO_PROXY": "127.0.0.1,localhost",
-    "no_proxy": "127.0.0.1,localhost"}).start()
+_ENV26 = {"MILLENAI_TEST_HOOKS": "provider-stub=%s,subprocess-record,no-downloads,ssh-config=%s"
+          % (_SURL26, _USERCFG26),
+          "HTTPS_PROXY": _SURL26, "HTTP_PROXY": _SURL26, "https_proxy": _SURL26,
+          "http_proxy": _SURL26, "NO_PROXY": "127.0.0.1,localhost",
+          "no_proxy": "127.0.0.1,localhost",
+          # an engine these copies start inherits the proxy: it loads its
+          # weights from the cache and asks the Hub nothing
+          "HF_HUB_OFFLINE": "1"}
+_CUR26 = [None]
 
 
 def _cget26(path):
-    s_, b_ = _ireq(_C26, path)
+    s_, b_ = _ireq(_CUR26[0], path)
     try:
         return s_, json.loads(b_)
     except ValueError:
@@ -8199,11 +8258,12 @@ def _cget26(path):
 
 
 def _cpost26(path, body, timeout=120):
-    h_ = {"Cookie": _C26.cookie, "X-Api-Token": _C26.token,
+    i_ = _CUR26[0]
+    h_ = {"Cookie": i_.cookie, "X-Api-Token": i_.token,
           "Content-Type": "application/json"}
     try:
         with urllib.request.urlopen(urllib.request.Request(
-                _C26.base + path, data=json.dumps(body).encode(), headers=h_,
+                i_.base + path, data=json.dumps(body).encode(), headers=h_,
                 method="POST"), timeout=timeout) as r_:
             return r_.status, r_.read()
     except urllib.error.HTTPError as e_:
@@ -8211,126 +8271,231 @@ def _cpost26(path, body, timeout=120):
 
 
 def _cchat26(prompt, **kw):
-    body = {"model": "", "models": [], "tier": "Fast", "auto_web": False,
+    body = {"model": "", "models": [], "tier": "", "auto_web": False,
             "messages": [{"role": "user", "content": prompt}]}
     body.update(kw)
-    s_, b_ = _cpost26("/api/chat", body, timeout=300)
+    s_, b_ = _cpost26("/api/chat", body, timeout=400)
     t_ = b_.decode("utf-8", "replace")
     return s_, re.sub("\x00[A-Z0-9]+:.*?\x00", "", t_, flags=re.S)
 
 
-# KEY-8, Phase 0 part: four sentinel keys saved, cloud power off. The
-# page's start (/api/tiers), opening Settings (/api/cloud), a restart and
-# the same again: the stub sees nothing, not even model
-# discovery or Moonshot's balance. Fails if discovery starts at the first
-# cloud_ok_providers() again, if cloud_balance runs with the switch off,
-# or if any of them reaches a real provider host (a CONNECT).
+def _json26(b):
+    try:
+        return json.loads(b)
+    except (ValueError, TypeError):
+        return {}
+
+
+# KEY-8 (Phase 0, as Patrick set it on 2026-09-28: a saved key is
+# permission to use it): with NO key saved, start, Settings, a restart and
+# the same again reach no provider, keyless cloud included (a CONNECT to a
+# provider host through the proxy would show). Then pictures and video
+# refuse with the no-key line. Fails if anything calls a provider without
+# a key, or the line changes.
+_D26 = Instance(9903, "D26", seed=_seed_d26, env=_ENV26).start()
+_CUR26[0] = _D26
 _n0 = len(_S26["reqs"])
 _k8 = [_cget26("/api/tiers")[0], _cget26("/api/cloud")[0]]
-time.sleep(4)
-_C26.stop()
-_C26.seed = None
-_C26.start()
+time.sleep(3)
+_D26.stop()
+_D26.seed = None
+_D26.start()
 _k8 += [_cget26("/api/tiers")[0], _cget26("/api/cloud")[0]]
-time.sleep(4)
+time.sleep(3)
+_img_nokey = _cchat26("draw a picture of a red bicycle")
+_vid_nokey = _cchat26("make a video of ocean waves at sunset")
 _k8_hits = _preqs26(_n0)
-check("KEY-8 (Phase 0): sentinel keys saved, cloud power off: start, Settings "
-      "and a restart send no request to any provider",
+_D26.stop()
+check("KEY-8: with no key saved, start, Settings and a restart reach no provider",
       _k8 == [200] * 4 and not _k8_hits, "%r" % [_k8, _k8_hits[:3]])
+check("KEY-5: with no Gemini key a picture and a video send nothing and say how to add one",
+      _img_nokey[0] == 200 and _vid_nokey[0] == 200
+      and ("Add a Gemini key in **Settings › Cloud power**, or add image generation "
+           "under **Settings › Models › Manage models**.") in _img_nokey[1]
+      and ("Add a Gemini key in **Settings › Cloud power**, or add video generation "
+           "under **Settings › Models › Manage models**.") in _vid_nokey[1]
+      and "Turn on Use cloud power" not in _img_nokey[1] + _vid_nokey[1],
+      "%r" % [_img_nokey[1][-220:], _vid_nokey[1][-220:]])
 
-# KEY-5, pictures and video: no local studio in a test copy, a sentinel
-# Gemini key saved, cloud power off. Nothing reaches the Gemini stub and
-# the reader is told how to turn it on. Fails if generate_image or Veo
-# ignore the switch (they did: the key alone painted), or if the words
-# change.
+# Four sentinel keys saved, cloud power OFF.
+_C26 = Instance(9903, "C26", seed=_seed_c26, env=_ENV26).start()
+_CUR26[0] = _C26
+# discovery and the balance run on the saved keys whatever the switch
+# says: every provider's /models and Moonshot's /users/me/balance.
+# Fails if they are gated on the switch again.
 _n0 = len(_S26["reqs"])
-_img_off = _cchat26("draw a picture of a red bicycle")
-_vid_off = _cchat26("make a video of ocean waves at sunset")
-_k5_off = _preqs26(_n0)
-check("KEY-5: cloud power off, a Gemini key saved: a picture and a video send nothing and say how",
-      _img_off[0] == 200 and _vid_off[0] == 200 and not _k5_off
-      and "Turn on Use cloud power to make this with Gemini, or install image generation."
-      in _img_off[1]
-      and "Turn on Use cloud power to make this with Gemini, or install video generation."
-      in _vid_off[1],
-      "%r" % [_img_off[1][-200:], _vid_off[1][-200:], _k5_off[:3]])
-
-# Switched on: discovery runs (every provider's /models, once), and a
-# picture, a video and the Fast lane's next question reach the stub.
-# Fails if discovery never runs once the switch opens, or if the gate
-# shut the cloud for good.
-_n0 = len(_S26["reqs"])
-_on = _cpost26("/api/prefs", {"turbo": True})[0]
+_cget26("/api/tiers")
+_bal = _cget26("/api/cloud")[1]
 _disc = set()
 for _i in range(40):
-    _disc = {r["p"].split("/")[1] for r in _preqs26(_n0) if r["p"].endswith("/models")
-             or "/models?" in r["p"]}
+    _disc = {r["p"].split("/")[1] for r in _preqs26(_n0)
+             if urllib.parse.urlparse(r["p"]).path.endswith("/models")}
     if len(_disc) == 4:
         break
     time.sleep(0.25)
-_img_on = _cchat26("draw a picture of a red bicycle")
-_vid_on = _cchat26("make a video of ocean waves at sunset")
+check("KEY-8: keys saved, cloud power off: model discovery reaches every provider "
+      "and Settings shows the Kimi balance",
+      _disc == set(_PHOSTS26)
+      and ((_bal.get("providers") or {}).get("kimi") or {}).get("balance") == "$12.50 left",
+      "%r" % [sorted(_disc), (_bal.get("providers") or {}).get("kimi")])
+
+# ...and no chat question reaches a provider: the Fast lane with an
+# Advanced list, a pasted picture with one, and a council naming cloud
+# voices and a cloud compositor all answer on this computer. Fails if a
+# list, a compositor or a picture opens the gate again.
+_n0 = len(_S26["reqs"])
+_off_fast = _cchat26("what is a lighthouse for?", model="Llama 3.2 3B",
+                     cloud=["claude", "groq", "gemini", "kimi"])
+_off_pic = _cchat26("what is in this picture?", cloud=["claude", "gemini"],
+                    images=["data:image/png;base64," + _b6426.b64encode(_PNG26).decode()])
+_off_council = _cchat26("name two uses of a lighthouse", models=["Llama 3.2 3B", "Llama 3.2 3B"],
+                        cloud=["groq", "claude"], compositor="claude")
+_off_hits = [r for r in _preqs26(_n0) if r["m"] != "GET"]
+check("keys saved, cloud power off: the Fast lane, a pasted picture and a council "
+      "send nothing to a provider",
+      [_off_fast[0], _off_pic[0], _off_council[0]] == [200] * 3
+      and _off_fast[1].strip() and _off_council[1].strip() and not _off_hits
+      and _STUB_TEXT26[:30] not in _off_fast[1] + _off_pic[1] + _off_council[1],
+      "%r" % [_off_hits[:3], _off_fast[1][-120:], _off_pic[1][-120:], _off_council[1][-120:]])
+
+# KEY-5: pictures and video use the saved Gemini key with the switch off
+# (Patrick: "if the user wants to use a paid API key, they enter it").
+# Fails if the switch gates them again.
+_n0 = len(_S26["reqs"])
+_img_off = _cchat26("draw a picture of a red bicycle")
+_vid_off = _cchat26("make a video of ocean waves at sunset")
+_media_paths = [urllib.parse.urlparse(r["p"]).path for r in _preqs26(_n0)]
+check("KEY-5: cloud power off, a Gemini key saved: a picture and a video are made with it",
+      any(p.endswith(":generateContent") for p in _media_paths)
+      and any(p.endswith(":predictLongRunning") for p in _media_paths)
+      and "made in the cloud" in _img_off[1] and "made in the cloud" in _vid_off[1],
+      "%r" % [_img_off[1][-160:], _vid_off[1][-160:], sorted(set(_media_paths))])
+
+# Switched on, the Fast lane reaches the stub (Qwen 3.5 Vision 9B runs
+# on Ollama, so nothing local warms up), in a chat of its own. A title
+# for THAT chat goes to the same provider; one for another chat within
+# the 5 minutes doesn't (the ticket was per user). Fails if the switch
+# no longer opens the lane, or tickets stop being per chat.
+_on = _cpost26("/api/prefs", {"turbo": True})[0]
+_cid26 = "c" + _se26.token_hex(12)
 _n1 = len(_S26["reqs"])
-# Qwen 3.5 Vision 9B runs on Ollama, so nothing local warms up: with the
-# switch on the answer is the stub's, from the Fast lane
-_fast_on = _cchat26("what is a lighthouse for?", tier="", model="Qwen 3.5 Vision 9B")
+_fast_on = _cchat26("what is a lighthouse for?", model="Qwen 3.5 Vision 9B", chat_id=_cid26,
+                    lane="ai")
 _fast_hits = [r for r in _preqs26(_n1) if r["m"] == "POST"]
-_on_paths = [urllib.parse.urlparse(r["p"]).path for r in _preqs26(_n0)]
-check("KEY-5/KEY-8: switched on, discovery runs and pictures, video and the Fast lane reach the stub",
-      _on == 200 and _disc == set(_PHOSTS26)
-      and any(p.endswith(":generateContent") for p in _on_paths)
-      and any(p.endswith(":predictLongRunning") for p in _on_paths)
-      and "made in the cloud" in _img_on[1] and "made in the cloud" in _vid_on[1]
-      and _STUB_TEXT26[:40] in _fast_on[1] and _fast_hits,
-      "%r" % [_on, sorted(_disc), _img_on[1][-160:], _vid_on[1][-160:], _fast_on[1][-160:],
-              len(_fast_hits), sorted(set(_on_paths))])
+time.sleep(1.0)       # the memory pass's own call, done before counting
+_n2 = len(_S26["reqs"])
+_t_mine = _cpost26("/api/title", {"text": "what is a lighthouse for?", "chat_id": _cid26})
+_title_mine = [r for r in _preqs26(_n2) if r["m"] == "POST"]
+_n3 = len(_S26["reqs"])
+_t_other = _cpost26("/api/title", {"text": "what is a lighthouse for?",
+                                   "chat_id": "c" + _se26.token_hex(12)})
+_title_other = [r for r in _preqs26(_n3) if r["m"] == "POST"]
+check("switched on, the Fast lane reaches the stub; its chat's title goes to that provider, "
+      "another chat's doesn't",
+      _on == 200 and _STUB_TEXT26[:40] in _fast_on[1] and _fast_hits
+      and _t_mine[0] == 200 and len(_title_mine) == 1 and _t_other[0] == 200
+      and not _title_other,
+      "%r" % [_on, _fast_on[1][-160:], len(_fast_hits), _t_mine, len(_title_mine),
+              _t_other, len(_title_other)])
 
 # KEY-9's delayed 401 (0a 5.12 item 13): Groq's key answers 401, three
-# seconds late; the key is replaced one second in. The late failure
-# must leave the NEW key saved and working, not marked failed (the old
-# cloud_note_failure read the entry again outside any key check and
-# wrote "key rejected" over the new key).
+# seconds late; the key is replaced one second in, and the stub's 401
+# must leave after that save returned. The new key stays saved and ok
+# (the old cloud_note_failure wrote "key rejected" over it).
 _K2_26 = "gsk_" + _se26.token_hex(26)
 _S26["late401"][_SENT26["groq"]] = 3.0
+_S26["t401"].clear()
 _rep26 = []
-_rt26 = _th26.Thread(target=lambda: (time.sleep(1.0), _rep26.append(_cpost26(
-    "/api/cloud/set", {"provider": "groq", "key": _K2_26}))))
+
+
+def _replace26():
+    time.sleep(1.0)
+    _r = _cpost26("/api/cloud/set", {"provider": "groq", "key": _K2_26})
+    _rep26.append((_r, time.time()))
+
+
+_rt26 = _th26.Thread(target=_replace26)
 _rt26.start()
 _co = _cchat26("name three uses of a lighthouse", tier="Cloud Only")
 _rt26.join(30)
 time.sleep(0.5)
 with open(os.path.join(_C26.home, "cloud.json")) as fh:
     _gq26 = json.load(fh)["providers"].get("groq") or {}
-_late_hit = [r for r in _S26["reqs"] if r["k"] == _SENT26["groq"] and not r["p"].endswith("/models")]
+_late_hit = [r for r in _S26["reqs"] if r["k"] == _SENT26["groq"]
+             and not urllib.parse.urlparse(r["p"]).path.endswith("/models")]
 check("KEY-9: a 401 that lands after the key was replaced leaves the new key saved and working",
-      _rep26 and _rep26[0][0] == 200 and json.loads(_rep26[0][1]).get("ok")
-      and _late_hit and _gq26.get("key") == _K2_26 and _gq26.get("status") == "ok"
+      _rep26 and _rep26[0][0][0] == 200 and _json26(_rep26[0][0][1]).get("ok")
+      and _late_hit and _S26["t401"] and min(_S26["t401"]) > _rep26[0][1]
+      and _gq26.get("key") == _K2_26 and _gq26.get("status") == "ok"
       and "rejected" not in str(_gq26.get("note") or ""),
-      "%r" % [_rep26[:1], len(_late_hit), {k: v for k, v in _gq26.items() if k != "key"},
-              _gq26.get("key") == _K2_26])
+      "%r" % [_rep26[:1], len(_late_hit), _S26["t401"][:2],
+              {k: v for k, v in _gq26.items() if k != "key"}, _gq26.get("key") == _K2_26])
 _S26["late401"].clear()
 
-# THE REMOTE AGENT'S SSH (0a 5.1, G9): /api/remote/test against the local
-# sshd, then a second connection whose host is a canary. ~/.ssh/known_hosts
-# stays byte-identical (or absent); the copy's own remote_known_hosts is
-# 0600 and holds one hashed entry, no host; every recorded ssh command line
-# is `ssh -F <run/ssh-*.conf> concorde-remote <fixed shell>`, and no
-# config is left behind. Fails if the config drops UserKnownHostsFile,
-# HashKnownHosts or GlobalKnownHostsFile's sink, or if a host, user, port,
-# key path or command reaches the command line.
-_rt = (None, b"")
+# A FAILED PASTE NEVER REPLACES A WORKING KEY (from review): with the
+# working Groq key saved, a paste the provider rejects (401) and a paste
+# made while it can't be reached each leave that key saved and ok, and
+# say so. Fails if the failed entry is saved over it again.
+_K3_26, _K4_26 = "gsk_" + _se26.token_hex(26), "gsk_" + _se26.token_hex(26)
+_S26["bad"].add(_K3_26)
+_S26["drop"].add(_K4_26)
+_bad_paste = _json26(_cpost26("/api/cloud/set", {"provider": "groq", "key": _K3_26})[1])
+with open(os.path.join(_C26.home, "cloud.json")) as fh:
+    _gq_a = json.load(fh)["providers"].get("groq") or {}
+_off_paste = _json26(_cpost26("/api/cloud/set", {"provider": "groq", "key": _K4_26})[1])
+with open(os.path.join(_C26.home, "cloud.json")) as fh:
+    _gq_b = json.load(fh)["providers"].get("groq") or {}
+check("a rejected paste and an unreachable one leave the working key saved and in use",
+      not _bad_paste.get("ok") and "unchanged" in str(_bad_paste.get("err"))
+      and not _off_paste.get("ok") and "unchanged" in str(_off_paste.get("err"))
+      and _gq_a.get("key") == _K2_26 and _gq_a.get("status") == "ok"
+      and _gq_b.get("key") == _K2_26 and _gq_b.get("status") == "ok",
+      "%r" % [_bad_paste, _off_paste, _gq_a.get("status"), _gq_b.get("status"),
+              _gq_a.get("key") == _K2_26, _gq_b.get("key") == _K2_26])
+
+# THE REMOTE AGENT'S SSH (0a 5.1, G9), against the local sshd.
+# 1. A setup from an older build (an alias only the user's ssh config
+#    knows, no key in the app) connects: `ssh -G` once, through the
+#    stand-in config, fills in the address, port and key, and remote.json
+#    keeps them. Fails if the migration is gone (-F alone can't find the
+#    alias) or reads the real ~/.ssh/config.
+# 2. The server is rebuilt (a new host key): the test says its identity
+#    changed and offers Forget; Forget removes the old entry; the next
+#    test connects. Fails without the detection, the route or the HMAC
+#    match.
+# 3. Through a jump host (the same sshd, by another name).
+# 4. A host no one can resolve fails with the plain line, host never on a
+#    command line.
+# Throughout: ~/.ssh/known_hosts byte-identical (or absent); the copy's
+# own remote_known_hosts 0600 and hashed; every ssh command line
+# `ssh -F ssh-*.conf concorde-remote <fixed shell>`, the one `ssh -G`
+# excepted; no config left behind.
 _rkh = os.path.join(_C26.home, "remote_known_hosts")
 _hostcan = _canary("host").lower() + ".invalid"
+_rt = _rt_changed = _rt_forget = _rt_again = _rt_jump = _rt_bad = (None, b"")
+_rem_after = {}
 if _SSHD26 is not None:
     _rt = _cpost26("/api/remote/test", {})
-    _cpost26("/api/remote/config", {"host": _hostcan, "user": _ME26,
-                                    "port": str(_SSHPORT26),
+    _rem_after = _cget26("/api/remote/config")[1]
+    _rkh_first = [ln for ln in open(_rkh).read().splitlines() if ln.strip()]
+    # the rebuild
+    _sshd_stop26()
+    os.remove(os.path.join(_SSHDIR26, "hostkey"))
+    os.remove(os.path.join(_SSHDIR26, "hostkey.pub"))
+    subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f",
+                    os.path.join(_SSHDIR26, "hostkey")], capture_output=True)
+    _sshd_start26()
+    _rt_changed = _cpost26("/api/remote/test", {})
+    _rt_forget = _cpost26("/api/remote/forget", {})
+    _rt_again = _cpost26("/api/remote/test", {})
+    # through a jump host
+    _cpost26("/api/remote/config", {"host": "localhost", "user": _ME26, "port": str(_SSHPORT26),
+                                    "key": os.path.join(_SSHDIR26, "userkey"),
+                                    "jump": "%s@127.0.0.1:%d" % (_ME26, _SSHPORT26)})
+    _rt_jump = _cpost26("/api/remote/test", {})
+    _cpost26("/api/remote/config", {"host": _hostcan, "user": _ME26, "port": str(_SSHPORT26),
                                     "key": os.path.join(_SSHDIR26, "userkey")})
-    _rt2 = _cpost26("/api/remote/test", {})
-try:
-    _rtd = json.loads(_rt[1])
-except (ValueError, TypeError):
-    _rtd = {}
+    _rt_bad = _cpost26("/api/remote/test", {})
 try:
     _rkh_lines = [ln for ln in open(_rkh).read().splitlines() if ln.strip()]
     _rkh_mode = _st26.S_IMODE(os.stat(_rkh).st_mode)
@@ -8342,32 +8507,52 @@ try:
         _recs26 = [json.loads(ln) for ln in fh if ln.strip()]
 except OSError:
     pass
-_ssh_recs = [r for r in _recs26 if r and os.path.basename(r[0]) == "ssh"]
+_ssh_all = [r for r in _recs26 if r and os.path.basename(r[0]) == "ssh"]
+_ssh_g = [r for r in _ssh_all if len(r) > 1 and r[1] == "-G"]
+_ssh_recs = [r for r in _ssh_all if r not in _ssh_g]
 _ssh_shape = all(len(r) == 5 and r[1] == "-F" and r[3] == "concorde-remote"
-                 and os.path.dirname(r[2]) == os.path.join(os.path.realpath(_C26.home), "run")
-                 and os.path.basename(r[2]).startswith("ssh-") for r in _ssh_recs)
-_ssh_leak = [r for r in _ssh_recs for w in ("127.0.0.1", str(_SSHPORT26), _ME26, "userkey",
-                                             _hostcan, "__ok__", "whoami")
+                 and r[2].startswith("ssh-") and r[2].endswith(".conf") and "/" not in r[2]
+                 for r in _ssh_recs)
+_ssh_leak = [r for r in _ssh_recs for w in ("127.0.0.1", "localhost", str(_SSHPORT26), _ME26,
+                                             "userkey", _hostcan, "concorde-old-alias",
+                                             "__ok__", "whoami")
              if any(w in x for x in r)]
 _left_cfg = [f for f in os.listdir(os.path.join(_C26.home, "run")) if f.startswith("ssh-")]
+_rd = [_json26(x[1]) for x in (_rt, _rt_changed, _rt_forget, _rt_again, _rt_jump, _rt_bad)]
 if _SSHD26 is None:
     check("the Remote agent's SSH keeps its own host list (SKIP: no /usr/sbin/sshd here)", True)
 else:
-    check("Remote: SSH keeps its own hashed host list, ~/.ssh/known_hosts is untouched, "
-          "and no host or command is on a command line",
-          _rt[0] == 200 and _rtd.get("ok") and _ME26 in (_rtd.get("detail") or "")
-          and _kh26() == _KH0_26
-          and len(_rkh_lines) == 1 and _rkh_lines[0].startswith("|1|")
-          and "127.0.0.1" not in _rkh_lines[0] and _rkh_mode == 0o600
-          and len(_ssh_recs) >= 2 and _ssh_shape and not _ssh_leak and not _left_cfg
-          and _rt2[0] == 200 and not json.loads(_rt2[1]).get("ok"),
-          "%r" % [_rt[0], _rtd, _kh26() == _KH0_26, len(_rkh_lines),
-                  [ln[:3] for ln in _rkh_lines], oct(_rkh_mode or 0), len(_ssh_recs),
-                  _ssh_shape, _ssh_leak[:1], _left_cfg])
+    check("Remote: an old setup's alias is resolved once through ssh -G and kept",
+          _rd[0].get("ok") and _ME26 in (_rd[0].get("detail") or "")
+          and _rem_after.get("host") == "127.0.0.1"
+          and _rem_after.get("port") == str(_SSHPORT26)
+          and _rem_after.get("key") == os.path.join(_SSHDIR26, "userkey")
+          and len(_ssh_g) >= 1 and all("-F" in r and _USERCFG26 in r for r in _ssh_g)
+          and len(_rkh_first) == 1,
+          "%r" % [_rd[0], _rem_after, _ssh_g[:2], len(_rkh_first)])
+    check("Remote: a rebuilt server is named as changed, Forget drops its old key, "
+          "and the next test connects",
+          not _rd[1].get("ok") and _rd[1].get("changed")
+          and "This server's identity changed since ConcordeAI first connected."
+          in (_rd[1].get("detail") or "")
+          and _rd[2].get("removed") == 1 and _rd[3].get("ok"),
+          "%r" % _rd[1:4])
+    check("Remote: through a jump host, and a host no one can resolve fails plainly",
+          _rd[4].get("ok") and not _rd[5].get("ok")
+          and "ConcordeAI connects with its own settings" in (_rd[5].get("detail") or ""),
+          "%r" % _rd[4:6])
+    check("Remote: ~/.ssh/known_hosts untouched, the app's own list hashed and 0600, "
+          "nothing of the connection or command on a command line",
+          _kh26() == _KH0_26
+          and len(_rkh_lines) >= 2 and all(ln.startswith("|1|") for ln in _rkh_lines)
+          and not any(w in "".join(_rkh_lines) for w in ("127.0.0.1", "localhost"))
+          and _rkh_mode == 0o600
+          and len(_ssh_recs) >= 5 and _ssh_shape and not _ssh_leak and not _left_cfg,
+          "%r" % [_kh26() == _KH0_26, len(_rkh_lines), [ln[:3] for ln in _rkh_lines],
+                  oct(_rkh_mode or 0), len(_ssh_recs), _ssh_shape, _ssh_leak[:1], _left_cfg])
 _C26.stop()
 _STUB26.shutdown()
-if _SSHD26 is not None and _SSHD26.poll() is None:
-    _SSHD26.terminate()
+_sshd_stop26()
 
 # ---- the same rules in-process, where each can be turned on its head
 _ns26 = dict(_LH, hmac=_hm26, hashlib=_hl26, IS_WIN=False, _fcntl=None,
@@ -8447,7 +8632,9 @@ check("the failure patch never writes key, base or name",
       and _pv.get("name") == "Groq" and _pv.get("cool") == 5.0, "%r" % _pv)
 
 # cached answer settings are tickets: no key held, the key re-read under
-# the lock, nothing sent once the key is replaced or the provider gone
+# the lock, nothing sent once the key is replaced, emptied, marked failed
+# or the provider gone; and memory re-checks the chat gate (from review:
+# cloud power turned off mid-answer sent the turn anyway)
 _cf26(_new26)
 _ns26["_mark_answered"](dict(_new26, model="openai/gpt-oss-120b"))
 _tk = list(_ns26["_answered"].values())[-1]
@@ -8466,14 +8653,30 @@ _t1 = _ns26["make_title"]("a question about lighthouses", conf=_tk)
 _cf26(dict(_new26, key="REPLACED-KEY"))
 _t2 = _ns26["make_title"]("a question about lighthouses", conf=_tk)
 _ns26["_extract_memory"]("", "I live near the lighthouse at the harbour", None, conf=_tk)
+_cf26(dict(_new26, status="fail"))
+_tfail = _ns26["_ticket_conf"](_tk)
+_cf26(dict(_new26, key=""))
+_tempty = _ns26["_ticket_conf"](_tk)
 _cf26({})
 _gone = _ns26["_ticket_conf"](_tk)
-check("cached answer settings hold no key; a title or memory pass after the key changes makes no call",
+_cf26(_new26)
+_c_before = list(_calls26)
+_ns26["load_prefs"] = lambda b=None: {"turbo": False}
+_ns26["_extract_memory"]("", "I live near the lighthouse at the harbour", None, conf=_tk)
+_mem_off = _calls26[len(_c_before):]
+_ns26["_extract_memory"]("", "I live near the lighthouse at the harbour", None, conf=_tk,
+                         cloud_only=True)
+_mem_co = _calls26[len(_c_before):]
+check("cached answer settings hold no key; after the key changes, empties, fails or goes, "
+      "a title or memory pass makes no call; memory follows the switch",
       "NEW-KEY" not in json.dumps(_tk) and _tk["pid"] == "groq"
       and _tc and _tc["key"] == "NEW-KEY"
-      and _t1 == "Lighthouse uses" and _calls26 == ["NEW-KEY"] and _t2 == ""
-      and _gone is None,
-      "%r" % [_tk, _t1, _t2, _calls26, _gone])
+      and _t1 == "Lighthouse uses" and _c_before == ["NEW-KEY"] and _t2 == ""
+      and _tfail is None and _tempty is None and _gone is None
+      and _mem_off == [] and _mem_co == ["NEW-KEY"]
+      and "if _ans_conf and cloud_allowed(cloud_only)" in _MILLENAI_SRC
+      and 'kwargs={"conf": _ans_conf, "cloud_only": cloud_only},' in _MILLENAI_SRC,
+      "%r" % [_tk, _t1, _t2, _c_before, _tfail, _tempty, _gone, _mem_off, _mem_co])
 
 # the gate itself: off, on, Cloud Only, and unreadable settings; an
 # Advanced list only narrows (the Fast lane and pasted pictures use this)
@@ -8498,62 +8701,126 @@ check("one cloud gate: an Advanced list narrows but never opens it; Cloud Only o
       "%r" % [_off, _onl, _bad])
 
 # the council: a bench list and a named cloud compositor with the switch
-# off make no cloud call; with it on both run (the control)
+# off make no cloud call; with it on both run (the control). And a cloud
+# merge thrown away (too short) leaves no "who answered" behind (from
+# review: the answer got the cloud badge and its title went to that
+# provider)
 _rc26 = dict(_LH)
 _exec_names(_rc26, {"run_council", "_DraftAbandoned", "SYNTH_INSTRUCTION",
                     "PEER_INSTRUCTION"})
 _rc_calls = []
 _GQC = {"base": _GQ26, "name": "Groq", "model": "qwen/qwen3.8-27b", "key": "k"}
+
+
+def _rc_stream26(c, m, e):
+    _rc_calls.append("cloud-merge")
+    _rc26["_answered"][_th26.get_ident()] = {"pid": "groq"}
+    e(_rc26["_merge_text"])
+    return True
+
+
 _rc26.update(Ctl=str, NUL="\0", MERGE_RANK=["L1", "L2"], MODEL_ROUTES={"L1": 1, "L2": 2},
              _looks_degenerate=lambda t: False, _provider_of=lambda c: "groq",
              _stream_guarded=lambda *a, **k: _rc_calls.append("local-merge"),
              claude_refusal_conf=lambda c: None, cloud_bench=lambda: [("Groq", dict(_GQC))],
-             cloud_glitch=lambda c, w: None,
-             cloud_stream_conf=lambda c, m, e: _rc_calls.append("cloud-merge") or (
-                 e(_STUB_TEXT26) or True),
+             cloud_glitch=lambda c, w: None, cloud_stream_conf=_rc_stream26,
              cloud_text=lambda c, m, **k: _rc_calls.append("cloud-seat") or _STUB_TEXT26,
              compositor_ladder=lambda: [dict(_GQC)], fast_cloud_ladder=lambda: [dict(_GQC)],
              merge_pref_label=lambda *a, **k: "L1", model_cached=lambda *a: True,
              model_fits_memory=lambda *a: True, strip_think=lambda t: t,
-             run_model=lambda l, m, cb, **k: cb(_STUB_TEXT26.replace("stub", l)))
+             run_model=lambda l, m, cb, **k: cb(_STUB_TEXT26.replace("stub", l)),
+             _answered={}, _merge_text=_STUB_TEXT26)
 _rc_out = {}
-for _turbo in (False, True):
+for _turbo, _mt in ((False, _STUB_TEXT26), (True, _STUB_TEXT26), ("short", "Too short.")):
     _rc_calls.clear()
-    _rc26["cloud_allowed"] = (lambda on: (lambda cloud_only=False: bool(cloud_only) or on))(_turbo)
+    _rc26["_answered"].clear()
+    _rc26["_merge_text"] = _mt
+    _rc26["cloud_allowed"] = (lambda on: (lambda cloud_only=False: bool(cloud_only) or on))(
+        bool(_turbo))
     try:
         _rc26["run_council"](["L1", "L2"], [{"role": "user", "content": "q"}],
                              lambda t: None, lambda t: None, bench_allow=["groq"], comp="groq")
     except Exception as _e:
         _rc_calls.append("ERR %r" % _e)
-    _rc_out[_turbo] = sorted(set(_rc_calls))
-check("the council: with cloud power off a bench list and a cloud compositor reach no cloud; on, both do",
-      _rc_out[False] == ["local-merge"]
-      and _rc_out[True] == ["cloud-merge", "cloud-seat"],
+    _rc_out[_turbo] = (sorted(set(_rc_calls)), bool(_rc26["_answered"]))
+check("the council: with cloud power off a bench list and a cloud compositor reach no cloud; "
+      "on, both do; a merge thrown away leaves no cloud writer",
+      _rc_out[False] == (["local-merge"], False)
+      and _rc_out[True] == (["cloud-merge", "cloud-seat"], True)
+      and _rc_out["short"] == (["cloud-merge", "cloud-seat", "local-merge"], False),
       "%r" % _rc_out)
 
-# discovery and the balance wait for the gate
+# discovery and the Kimi balance run on a saved key whatever the switch
+# says (Patrick, 2026-09-28): the refresh starts at the first
+# cloud_ok_providers() and the balance asks Moonshot, the switch off
 _dn = dict(_LH)
-_exec_names(_dn, {"_picks_run", "_picks_lock", "_cloud_refresh_once", "cloud_balance",
-                  "_bal_cache"})
+_exec_names(_dn, {"_repaired", "_cloud_repair", "cloud_balance", "_bal_cache"})
 _started26 = []
-_dn.update(threading=_t17.SimpleNamespace(Lock=_th26.Lock, Thread=lambda target, args=(), daemon=True:
-                                          _t17.SimpleNamespace(start=lambda: _started26.append(args))),
+_dn.update(threading=_t17.SimpleNamespace(Thread=lambda target, args=(), daemon=True:
+                                          _t17.SimpleNamespace(start=lambda: _started26.append(
+                                              getattr(target, "__name__", "?")))),
            urllib=_t17.SimpleNamespace(request=_t17.SimpleNamespace(
                Request=lambda *a, **k: _started26.append("BALANCE") or 1,
-               urlopen=lambda *a, **k: 1/0)), APP_VERSION="t")
-_dn["cloud_allowed"] = lambda cloud_only=False: bool(cloud_only)
-_dn["_cloud_refresh_picks"] = lambda cloud_only=False: None
-_dn["_cloud_refresh_once"]()
-_bal_off = _dn["cloud_balance"]("kimi", {"key": "k", "base": "b"})
-_d_off = list(_started26)
-_dn["_cloud_refresh_once"](cloud_only=True)
-_dn["_cloud_refresh_once"](cloud_only=True)
-check("model discovery and the balance wait for the gate, and discovery runs once when it opens",
-      _d_off == [] and _bal_off == "" and _started26 == [(True,)]
-      and "    _cloud_refresh_once()\n    if _repaired[0]:" in _MILLENAI_SRC
-      and "_cloud_refresh_once(cloud_only=True)   # picking the tier opens the gate" in _MILLENAI_SRC
-      and "                if d.get(\"turbo\") is True:\n                    _cloud_refresh_once()" in _MILLENAI_SRC,
-      "%r" % [_d_off, _bal_off, _started26])
+               urlopen=lambda *a, **k: 1/0)), APP_VERSION="t",
+           _cloud_txn=_cx26.nullcontext, _cloud_read_strict=lambda: {"providers": {}},
+           _cloud_write=lambda d: None, QUOTA_COOLDOWN=600.0,
+           cloud_allowed=lambda cloud_only=False: False)
+def _cloud_refresh_picks():
+    pass
+_dn["_cloud_refresh_picks"] = _cloud_refresh_picks
+_dn["_cloud_repair"]()
+_dn["cloud_balance"]("kimi", {"key": "k", "base": "b"})
+_gsrc = "".join(_ast.get_source_segment(_MILLENAI_SRC, n) for n in _ctree.body
+                if getattr(n, "name", "") in ("_cloud_refresh_picks", "_cloud_repair",
+                                              "cloud_balance", "generate_image",
+                                              "generate_video", "_veo_video"))
+check("a saved key is permission: discovery, the balance, pictures and video don't ask the switch",
+      _started26 == ["_cloud_refresh_picks", "BALANCE"] and "cloud_allowed" not in _gsrc
+      and "Turn on Use cloud power to make this" not in _MILLENAI_SRC,
+      "%r" % _started26)
+
+# the pieces of the review fixes that live in routes and the page
+_gl26 = {"re": re}
+_held26, _seen26 = [0], []
+
+
+@_cx26.contextmanager
+def _txn26():
+    _held26[0] += 1
+    try:
+        yield
+    finally:
+        _held26[0] -= 1
+
+
+_exec_names(_gl26, {"cloud_glitch"})
+_gl26.update(_cloud_txn=_txn26, _key_live=lambda c: _seen26.append(("live", _held26[0])) or True,
+             cloud_rest_model=lambda m, s: _seen26.append(("rest", _held26[0])),
+             GLITCH_COOLDOWN=120.0, _provider_of=lambda c: "groq", cloud_cool=lambda *a, **k: None)
+_gl26["cloud_glitch"]({"model": "m", "key": "k"}, "x")
+_ks = _MILLENAI_SRC[_MILLENAI_SRC.index('if self.path == "/api/cloud/set":'):]
+_ks = _ks[:_ks.index("if self.path in (\"/api/workspace/set\"")]
+_sn = {"studio_supported": lambda: True}
+_exec_names(_sn, {"studio_needs"})
+_sn_mac = (_sn["studio_needs"]("image"), _sn["studio_needs"]("video"))
+_sn["studio_supported"] = lambda: False
+_sn_pc = _sn["studio_needs"]("image")
+check("review fixes: the glitch checks and rests under the lock, `off` removes under it, "
+      "revive after the write, titles per chat, the switch shows what saved, the no-key lines",
+      _seen26 == [("live", 1), ("rest", 1)]
+      and "with _cloud_txn():\n                    try:\n                        os.remove(CLOUD_FILE)" in _ks
+      and _ks.index("cloud_revive(found + [model])") > _ks.index('"status": "ok"},\n                                         make_active=True)')
+      and "body:JSON.stringify({text:text,chat_id:c.id})" in _MILLENAI_SRC
+      and "_last_cloud.get((str(self._data_base()), _tcid))" in _MILLENAI_SRC
+      and '$("#turbo").checked=!on;$("#cloudkey-box").hidden=on;' in _MILLENAI_SRC
+      and "Cloud power is off, so these and a cloud compositor sit out." in _MILLENAI_SRC
+      and "and your saved key reads \"\n                        \"pictures now." in _MILLENAI_SRC
+      and _sn_mac == ("Add a Gemini key in **Settings › Cloud power**, or add image "
+                      "generation under **Settings › Models › Manage models**.",
+                      "Add a Gemini key in **Settings › Cloud power**, or add video "
+                      "generation under **Settings › Models › Manage models**.")
+      and _sn_pc.startswith("Making pictures on this computer needs an Apple silicon Mac. Add"),
+      "%r" % [_seen26, _sn_mac, _sn_pc])
 
 # ---- nothing personal on a command line (0a 5.1)
 # read-aloud: `say -f` a 0600 file under run/, gone when the speech ends
@@ -8616,6 +8883,48 @@ check("read-aloud: `say -f` a 0600 file under run/, deleted when speech ends or 
       and _f1_ok and _f1_gone and _stop_ok and _win_ok,
       "%r" % [_p1.args, _f1_ok, _f1_gone, _stop_ok, _killed26[-1:], _win_ok])
 
+# Windows: the text goes to PowerShell on a short thread of its own, so a
+# Stop pressed while PowerShell hasn't read it yet isn't kept waiting on
+# _say_lock (from review). Fails if the write moves back under the lock.
+_wgate = _th26.Event()
+
+
+class _BlockIn26:
+    closed = False
+
+    def write(self, b):
+        _wgate.wait(10)
+
+    def close(self):
+        self.closed = True
+
+
+class _WinP26(_SayP26):
+    def __init__(self, args, **k):
+        super().__init__(args, **k)
+        self.stdin = _BlockIn26()
+
+
+_sy["IS_WIN"] = True
+_sy["subprocess"] = _t17.SimpleNamespace(
+    Popen=_WinP26, PIPE=-1,
+    run=lambda a, **k: (_killed26.append(a), [p_.done.set() for p_ in _spawned26]))
+_exec_names(_sy, {"_say_feed", "_say_feeds"})
+_wsp = _th26.Thread(target=_sy["_speak"], args=(_SAY26,), daemon=True)
+_wsp.start()
+_wsp.join(3)
+_w_t0 = time.time()
+_wst = _th26.Thread(target=_sy["_stop_speaking"], daemon=True)
+_wst.start()
+_wst.join(3)
+_w_fast = not _wst.is_alive() and time.time() - _w_t0 < 2.5
+_wgate.set()
+for _t in list(_sy["_say_feeds"]):
+    _t.join(5)
+check("read-aloud on Windows: the text is written off the lock, so Stop answers at once",
+      not _wsp.is_alive() and _w_fast
+      and _spawned26[-1].stdin.closed, "%r" % [_wsp.is_alive(), _w_fast])
+
 # pictures and video: the prompt and the negative prompt ride one 0600
 # file, gone when the render ends (done, failed or stopped); the fixed
 # runner puts the words back inside the tool's own process
@@ -8668,21 +8977,31 @@ _g_shape = (_gseen[0][0][:2] == ["/v/img/bin/python3", "-c"]
             and _gseen[0][0][4:6] == ["script", "/v/img/bin/mflux-generate"]
             and _gseen[1][0][4:6] == ["module", "m.gen"]
             and "@prompt:prompt" in _gseen[0][0] and "@prompt:neg" in _gseen[1][0])
-# and the runner itself, for real, on a stand-in console script and module
+# and the runner itself, for real, on a stand-in console script and module.
+# It deletes the prompt file once read, the script sees its own folder
+# first on sys.path and the module the working directory (as -m would),
+# and a json.py in the working directory can't stand in for the runner's
+# own imports (from review)
 _rdir = tempfile.mkdtemp(dir=_SMOKE_TMP)
-with open(os.path.join(_rdir, "tool"), "w") as fh:
-    fh.write("import json, sys\njson.dump(sys.argv, open(%r, 'w'))\nsys.exit(3)\n"
+_rbin = os.path.join(_rdir, "bin")
+os.makedirs(_rbin)
+with open(os.path.join(_rbin, "tool"), "w") as fh:
+    fh.write("import json, sys\njson.dump([sys.argv, sys.path[0]], open(%r, 'w'))\nsys.exit(3)\n"
              % os.path.join(_rdir, "script.json"))
 os.makedirs(os.path.join(_rdir, "fmod26"))
 open(os.path.join(_rdir, "fmod26", "__init__.py"), "w").close()
 with open(os.path.join(_rdir, "fmod26", "__main__.py"), "w") as fh:
     fh.write("import json, sys\njson.dump(sys.argv[1:], open(%r, 'w'))\n"
              % os.path.join(_rdir, "mod.json"))
+with open(os.path.join(_rdir, "json.py"), "w") as fh:
+    fh.write("raise SystemExit(99)\n")
 _gi["app_dir"] = lambda: _rdir
-_rc1, _pf1 = _gi["prompt_cmd"](sys.executable, "script", os.path.join(_rdir, "tool"),
+_rc1, _pf1 = _gi["prompt_cmd"](sys.executable, "script", os.path.join(_rbin, "tool"),
                                ["--prompt", "@prompt:prompt", "--steps", "4"],
                                {"prompt": _PC26 + ' "café"'})
 _rr1 = subprocess.run(_rc1, cwd=_rdir, capture_output=True).returncode
+_pf1_gone = not os.path.exists(_pf1)
+os.remove(os.path.join(_rdir, "json.py"))
 _rc2, _pf2 = _gi["prompt_cmd"](sys.executable, "module", "fmod26",
                                ["--prompt", "@prompt:prompt", "--negative-prompt", "@prompt:neg"],
                                {"prompt": _PC26, "neg": _NC26})
@@ -8693,38 +9012,203 @@ try:
 except (OSError, ValueError):
     _rs1 = _rs2 = None
 check("pictures and video: prompt and negative prompt ride a 0600 file, gone after the render; "
-      "the runner hands the tool its words",
+      "the runner reads and deletes it and hands the tool its words and path",
       len(_gseen) == 4 and _g_argv_clean and _g_files and _g_neg and _g_gone and _g_shape
-      and _rr1 == 3 and _rs1 == [os.path.join(_rdir, "tool"), "--prompt", _PC26 + ' "café"',
-                                 "--steps", "4"]
+      and _rr1 == 3 and _pf1_gone and not os.path.exists(_pf2)
+      and _rs1 == [[os.path.join(_rbin, "tool"), "--prompt", _PC26 + ' "café"', "--steps", "4"],
+                   _rbin]
       and _rs2 == ["--prompt", _PC26, "--negative-prompt", _NC26],
-      "%r" % [len(_gseen), _g_argv_clean, _g_files, _g_neg, _g_gone, _g_shape, _rr1, _rs1, _rs2])
+      "%r" % [len(_gseen), _g_argv_clean, _g_files, _g_neg, _g_gone, _g_shape, _rr1,
+              _pf1_gone, _rs1, _rs2])
 
-# the SSH config: every field checked, so a newline or quote can't add a
-# directive (ProxyCommand would run a local command); %-tokens doubled
+# a crash's leftovers go at the next start (the lock holder's sweep), and
+# nothing else under run/
+_sw = {"os": os, "app_dir": lambda: _rdir}
+_exec_names(_sw, {"RUN_FILE_KINDS", "sweep_run_files"})
+os.makedirs(os.path.join(_rdir, "run"), exist_ok=True)
+for _fn in ("ssh-a1.conf", "say-b2.txt", "prompt-c3.json", "instance.json", "instance.lock"):
+    open(os.path.join(_rdir, "run", _fn), "w").close()
+_swn = _sw["sweep_run_files"]()
+check("a start sweeps the prompt, speech and ssh files a crash left under run/, nothing else",
+      _swn == 3 and sorted(os.listdir(os.path.join(_rdir, "run"))) == ["instance.json",
+                                                                       "instance.lock"]
+      and "        _migrate_61()\n        sweep_run_files()" in _MILLENAI_SRC,
+      "%r" % [_swn, sorted(os.listdir(os.path.join(_rdir, "run")))])
+
+# the SSH config: every field checked, so a newline, quote or `${` can't
+# add a directive (ProxyCommand would run a local command); %-tokens and
+# backslashes escaped; DOMAIN\user reaches ssh as one backslash; ports are
+# ASCII 1-65535; the jump host is `[user@]host[:port]` hops. Read back by
+# ssh itself (`ssh -G -F <file>`, the generated file only).
 _sc = {"os": os, "re": re, "IS_WIN": False, "REMOTE_KNOWN_HOSTS": "/A B/100%/remote_known_hosts"}
-_exec_names(_sc, {"_ssh_config", "_ssh_path", "SSH_ALIAS", "_SSH_HOST_RX", "_SSH_USER_RX"})
+_exec_names(_sc, {"_ssh_config", "_ssh_path", "_ssh_quote", "_ssh_port", "_ssh_jump",
+                  "_ssh_fields", "SSH_ALIAS", "_SSH_HOST_RX", "_SSH_USER_RX", "_SSH_JUMP_RX"})
 _scf = _sc["_ssh_config"]
 _bad26 = []
 for _c in ({"host": "h\n  ProxyCommand touch /tmp/x"}, {"host": "-oProxyCommand=x"},
-           {"host": "h", "user": "u\nProxyCommand x"}, {"host": "h", "port": "22 x"},
-           {"host": "h", "port": "0"}, {"host": "h", "key": '/k"\nProxyCommand x'},
-           {"host": "h", "user": "-x"}):
+           {"host": "h", "user": "u\nProxyCommand x"},
+           {"host": "h", "port": "22 x"}, {"host": "h", "port": "0"},
+           {"host": "h", "port": "65536"}, {"host": "h", "port": "٢٢"},
+           {"host": "h", "key": '/k"\nProxyCommand x'}, {"host": "h", "key": "/k/${HOME}"},
+           {"host": "h", "key": "/k/x\\"}, {"host": "h", "user": "-x"},
+           {"host": "h", "jump": "-oProxyCommand=x"}, {"host": "h", "jump": "a b"},
+           {"host": "h", "jump": "u@j:99999"}):
     try:
         _scf(_c)
         _bad26.append(_c)
     except ValueError:
         pass
-_good = _scf({"host": "vps.example.com", "user": "root", "port": "2222",
-              "key": "/keys/my key%h"}).splitlines()
-check("the SSH config refuses fields that could add a directive, and quotes paths",
-      not _bad26 and _good[0] == "Host concorde-remote"
-      and "  HostName vps.example.com" in _good and "  Port 2222" in _good
-      and '  IdentityFile "/keys/my key%%h"' in _good
-      and '  UserKnownHostsFile "/A B/100%%/remote_known_hosts"' in _good
-      and "  GlobalKnownHostsFile /dev/null" in _good and "  HashKnownHosts yes" in _good
-      and "  StrictHostKeyChecking accept-new" in _good and "  BatchMode yes" in _good,
-      "%r" % [_bad26, _good])
+_good = _scf({"host": "vps.example.com", "user": "CORP\\pat", "port": "2222",
+              "key": "/keys/my key%h", "jump": "me@bastion.example:2200,jump2"}).splitlines()
+_sg_ok = None
+if shutil.which("ssh"):
+    _sgf = os.path.join(_rdir, "gen.conf")
+    with open(_sgf, "w") as fh:
+        fh.write("\n".join(_good) + "\n")
+    _sg = subprocess.run(["ssh", "-G", "-F", _sgf, "concorde-remote"], capture_output=True,
+                         text=True).stdout.splitlines()
+    _sg_ok = ("user CORP\\pat" in _sg and "hostname vps.example.com" in _sg
+              and "port 2222" in _sg and "identityfile /keys/my key%%h" in _sg
+              and "userknownhostsfile /A B/100%/remote_known_hosts" in _sg
+              and "proxyjump me@bastion.example:2200,jump2" in _sg
+              and "hashknownhosts yes" in _sg and "identitiesonly yes" in _sg
+              and "serveraliveinterval 30" in _sg)
+check("the SSH config refuses fields that could add a directive, escapes the rest, "
+      "and ssh reads it back as meant",
+      not _bad26 and _good[0] == 'UserKnownHostsFile "/A B/100%%/remote_known_hosts"'
+      and _good.index("Host concorde-remote") > _good.index("HashKnownHosts yes")
+      and _good.index("Host concorde-remote") > _good.index('IdentityFile "/keys/my key%%h"')
+      and "GlobalKnownHostsFile /dev/null" in _good and "StrictHostKeyChecking accept-new" in _good
+      and "BatchMode yes" in _good and "ServerAliveInterval 30" in _good
+      and '  User "CORP\\\\pat"' in _good and "  IdentitiesOnly yes" in _good
+      and "  ProxyJump me@bastion.example:2200,jump2" in _good
+      and _sg_ok is not False,
+      "%r" % [_bad26, _good, _sg_ok])
+
+# the command reaches the server on stdin and runs under any login shell:
+# SSH_SHELL is what sshd hands `$SHELL -c`. Here under zsh, tcsh, bash and
+# dash, and the sh branch with no bash on the PATH, with the review's
+# cases: a heredoc, `exit 7`, a lone `}` line then `cat`, a trailing
+# backslash, and stdin readers (they get nothing). Fails if the old
+# `if …; then` line (csh can't parse it) or the `{ }` framing comes back.
+_shx = {"re": re}
+_exec_names(_shx, {"SSH_SHELL", "_ssh_script"})
+_SHCASES = {"heredoc": ("cat <<'EOF'\nline one\n$HOME stays\nEOF\necho after", 0,
+                        "line one\n$HOME stays\nafter\n"),
+            "exit7": ("echo before; exit 7; echo never", 7, "before\n"),
+            "lonebrace": ("echo a\n}\ncat\necho b", None, "a\n"),
+            # dash keeps the backslash, bash drops it; neither hangs
+            "trailing-bs": ("echo x \\", 0, None),
+            "stdin": ("cat; read v; echo got:$v:done", 0, "got::done\n")}
+_nobash = tempfile.mkdtemp(dir=_SMOKE_TMP)
+for _b in ("sh", "cat"):
+    os.symlink({"sh": "/bin/dash" if os.path.exists("/bin/dash") else "/bin/sh",
+                "cat": shutil.which("cat") or "/bin/cat"}[_b], os.path.join(_nobash, _b))
+_sh_res = {}
+for _shp in ("/bin/zsh", "/bin/tcsh", "/bin/bash", "/bin/dash", "nobash"):
+    _real = "/bin/dash" if _shp == "nobash" else _shp
+    if not os.path.exists(_real):
+        continue
+    _env = dict(os.environ, PATH=_nobash) if _shp == "nobash" else None
+    for _cn, (_code, _rc_want, _out_want) in _SHCASES.items():
+        try:
+            _r = subprocess.run([_real, "-c", _shx["SSH_SHELL"]],
+                                input=_shx["_ssh_script"](_code).encode(),
+                                capture_output=True, timeout=15, env=_env)
+            _ok = ((_r.returncode == _rc_want if _rc_want is not None else _r.returncode != 0)
+                   and (_r.stdout.decode() == _out_want if _out_want is not None
+                        else _r.stdout.decode().startswith("x")))
+        except subprocess.TimeoutExpired:
+            _ok = False
+        _sh_res[(os.path.basename(_shp), _cn)] = _ok
+check("the remote command runs under zsh, tcsh, bash, dash and plain sh, stdin readers get nothing",
+      len(_sh_res) >= 15 and all(_sh_res.values())
+      and "{\\n%s\\n} </dev/null" not in _MILLENAI_SRC,
+      "%r" % {k: v for k, v in _sh_res.items() if not v})
+
+# ssh's output: a bare CR (a progress bar) becomes a line; "not found"
+# only when ssh itself is missing; a name or key failure resolves once
+# and retries, a host-key change gets its line
+_so = {"os": os, "re": re, "subprocess": None}
+_exec_names(_so, {"_ssh_once", "ssh_run", "_ssh_argv", "_ssh_script", "SSH_ALIAS",
+                  "SSH_SHELL", "_SSH_RESOLVE_RX", "_SSH_HOSTKEY_RX", "SSH_OWN_SETTINGS",
+                  "SSH_KEY_CHANGED"})
+_so_calls = []
+
+
+class _SoErr(Exception):
+    pass
+
+
+def _so_run(argv, **k):
+    _so_calls.append((argv, k.get("cwd")))
+    if _so["mode"] == "missing":
+        raise FileNotFoundError(2, "No such file", "x")
+    if _so["mode"] == "resolve" and len(_so_calls) == 1:
+        return _t17.SimpleNamespace(returncode=255, stdout=b"",
+                                    stderr=b"ssh: Could not resolve hostname oldalias\r\n")
+    if _so["mode"] == "hostkey":
+        return _t17.SimpleNamespace(returncode=255, stdout=b"",
+                                    stderr=b"@@@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @@@\n"
+                                           b"Host key verification failed.\r\n")
+    return _t17.SimpleNamespace(returncode=0, stdout=b"10%\r20%\r30%\r\ndone\r\n", stderr=b"")
+
+
+_so.update(subprocess=_t17.SimpleNamespace(run=_so_run, TimeoutExpired=_SoErr),
+           _ssh_config=lambda c: "Host x\n", REMOTE_KNOWN_HOSTS=__file__,
+           run_file=lambda *a: "/r/run/ssh-q.conf", drop_run_file=lambda p: None,
+           shutil=_t17.SimpleNamespace(which=lambda n: "/usr/bin/ssh"),
+           _remote_resolved=lambda c, again=False: dict(c, host="real.example") if again else c)
+_so["mode"] = "ok"
+_so_ok = _so["ssh_run"]({"host": "h"}, "x")
+_so["mode"] = "missing"
+_so_missing_found = _so["ssh_run"]({"host": "h"}, "x")
+_so["shutil"] = _t17.SimpleNamespace(which=lambda n: None)
+_so_missing = _so["ssh_run"]({"host": "h"}, "x")
+_so_calls.clear()
+_so["mode"] = "resolve"
+_so_res = _so["ssh_run"]({"host": "oldalias"}, "x")
+_so_res_calls = len(_so_calls)
+_so["mode"] = "hostkey"
+_so_hk = _so["ssh_run"]({"host": "h"}, "x")
+check("ssh output: CRs become lines; 'not found' only without ssh; a name failure resolves "
+      "and retries once; a changed server says so",
+      _so_ok == (0, "10%\n20%\n30%\ndone\n")
+      and _so_missing_found[1].startswith("ssh failed:")
+      and _so_missing == (-1, "ssh client not found on this machine")
+      and _so_res == (0, "10%\n20%\n30%\ndone\n") and _so_res_calls == 2
+      and _so_calls[0][1] == "/r/run" and _so_calls[0][0][2] == "ssh-q.conf"
+      and _so_hk[0] == 255 and _so_hk[1].endswith(
+          "This server's identity changed since ConcordeAI first connected. "
+          "If you rebuilt it, forget its old key."),
+      "%r" % [_so_ok, _so_missing_found, _so_missing, _so_res, _so_res_calls, _so_hk])
+
+# Forget: the server's hashed entries go (ssh-keygen -H made them, so the
+# HMAC is checked against ssh's own hashing), others stay
+_fk = {"os": os, "re": re, "IS_WIN": False, "base64": _b6426, "hmac": _hm26,
+       "hashlib": _hl26, "tempfile": tempfile, "time": time}
+_fkh = os.path.join(_rdir, "remote_known_hosts")
+_exec_names(_fk, {"ssh_forget_host", "_ssh_fields", "_ssh_port", "_ssh_jump", "_SSH_HOST_RX",
+                  "_SSH_USER_RX", "_SSH_JUMP_RX", "_replace_into"})
+_fk["REMOTE_KNOWN_HOSTS"] = _fkh
+_fk_ok = None
+if shutil.which("ssh-keygen"):
+    subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f",
+                    os.path.join(_rdir, "fk")], capture_output=True)
+    _kl = open(os.path.join(_rdir, "fk.pub")).read().split()[:2]
+    with open(_fkh, "w") as fh:
+        fh.write("[vps.example]:2222 %s %s\nvps.example %s %s\nother.example %s %s\n"
+                 % tuple(_kl * 3))
+    subprocess.run(["ssh-keygen", "-H", "-f", _fkh], capture_output=True)
+    _fk_n = _fk["ssh_forget_host"]({"host": "vps.example", "port": "2222"})
+    _fk_left = [ln for ln in open(_fkh).read().splitlines() if ln.strip()]
+    _fk_n22 = _fk["ssh_forget_host"]({"host": "other.example", "port": "22"})
+    _fk_ok = (_fk_n == 1 and len(_fk_left) == 2 and all(ln.startswith("|1|") for ln in _fk_left)
+              and _fk_n22 == 1)
+check("Forget removes only this server's hashed entry, as ssh hashed it",
+      _fk_ok is not False and 'if self.path == "/api/remote/forget":' in _MILLENAI_SRC
+      and '$("#rm-forget").hidden=!(!r.ok&&r.changed);' in _MILLENAI_SRC,
+      "%r" % _fk_ok)
 
 # THE LINT (0a 5.1): no subprocess call's argument list is built from a
 # name that carries what a person typed or asked for, and no render's

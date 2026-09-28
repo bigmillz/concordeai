@@ -5635,61 +5635,76 @@ crash was invisible.
 
 ## 6b326 — cloud only with the switch, SSH keeps its own host list, nothing personal on command lines (accounts step 6)
 The spec's 0a 5.5 (item 5), the isolation half of 5.12 (item 13), and
-5.1 (item 1) apart from its per-profile parts: M6 of the sign-in plan.
-Before this a saved Gemini key sent picture and video descriptions to
-Google with cloud power off, an Advanced list turned the cloud on by
-itself, every saved key's provider was contacted at every launch, a late
-401 could mark a freshly pasted key failed, `/api/title` kept a whole
-cloud conf (key included) for 5 minutes, and `ps` showed prompts, the
-text being read aloud and the Remote agent's server and commands.
-- **One cloud gate.** `cloud_allowed(cloud_only)`: true while Use cloud
+5.1 (item 1) apart from its per-profile parts: M6 of the sign-in plan,
+reworked the same day to Patrick's rule and three reviews. Before this
+an Advanced list turned the cloud on by itself, a late 401 could mark a
+freshly pasted key failed, a failed paste replaced a working key,
+`/api/title` kept a whole cloud conf (key included) for 5 minutes, and
+`ps` showed prompts, the text being read aloud and the Remote agent's
+server and commands.
+- **Patrick's rule (2026-09-28):** "if the user wants to use a paid API
+  key, they enter it. If they have a free API key, they enter it. If
+  there are cloud services that don't require an API key at all, then
+  those should just run regardless." A saved key is permission to use
+  it. Use cloud power decides one thing: whether chats are answered by
+  cloud models.
+- **The chat gate.** `cloud_allowed(cloud_only)`: true while Use cloud
   power is on, or for a question asked on the Cloud Only tier; settings
-  that can't be read count as off. Every place that sends a prompt,
-  picture or description to a provider asks it:
-  - the Fast lane and pasted pictures, through `gate_ladder(ladder,
-    req_cloud, cloud_only)`: an Advanced run's `cloud: [...]` list only
-    narrows the ladder (`[]` still means none); it used to open it;
+  that can't be read count as off. Everything that is part of answering
+  a chat asks it:
+  - the Fast lane and a pasted picture read in a chat, through
+    `gate_ladder(ladder, req_cloud, cloud_only)`: an Advanced run's
+    `cloud: [...]` list only narrows the ladder (`[]` still means none);
+    it used to open it;
   - the council's cloud bench (a named `bench_allow` engaged it with the
-    switch off) and its merge (a named cloud compositor, or the run's own
-    cloud list, reached the cloud with the switch off; now they only pick
-    which cloud);
-  - Gemini pictures (`generate_image(..., cloud=)`) and Veo
-    (`generate_video(..., cloud=)`), with the check made in the chat
-    handler before anything starts;
-  - the Remote agent's driver, the funnel's stages, verdict and audit,
-    the X-Models header and `/api/title`, which already followed the
-    switch, now read the same function.
-- **When a picture or video can't be made here** (no studio installed)
-  and Gemini may not make it, nothing is sent and the reader is told
-  (`studio_needs`): switch off, "Turn on Use cloud power to make this
-  with Gemini, or install image generation." (video: "…install video
-  generation."); switch on with no working Gemini key, "Add a Gemini key
-  in Settings › Cloud power, or install image generation." Off Apple
-  silicon the line starts "Making pictures on this computer needs an
-  Apple silicon Mac." A Gemini attempt that fails says so and suggests
-  the studio. `_veo_video` now checks for the key before it reserves one
-  of the day's clips (a request with no key used to spend one).
-- **No provider contact while the switch is off.** Model discovery
-  (`_cloud_refresh_picks`) used to start at the first
-  `cloud_ok_providers()` call, which `/api/tiers` makes at page start.
-  It now starts once per launch through `_cloud_refresh_once()`, only
-  under the gate: when the switch is turned on (`POST /api/prefs` with
-  `turbo: true`, or a key save), at the first cloud call after that, or
-  on a Cloud Only question (`run_cloud_only`). The thread checks the gate
-  again before its first request. Moonshot's balance (`cloud_balance`,
-  asked by Settings) answers "" with the switch off. The one exception
-  stays: saving a pasted key tests it, and turns cloud power on.
-- **What now works less with cloud power off (honest, visible):** an
-  Advanced run's named cloud voices and cloud compositor run locally;
-  pictures and video with only a Gemini key say "Turn on Use cloud
-  power…"; picks don't refresh and Settings shows no Kimi balance until
-  the switch is on.
-- **The Cloud power copy** is the spec's: "Optional frontier models.
-  Your prompts leave this computer whenever a cloud service answers:
-  while Use cloud power is on, or when you pick the Cloud Only tier. That
-  includes chats, pasted images, and images and videos made with
-  Gemini." then 6b310's web-search sentence. The switch's hint says the
-  same.
+    switch off) and its merge (a named cloud compositor reached the cloud
+    with the switch off; now it only picks which cloud);
+  - the funnel, the Remote agent's driver, titles, the X-Models header,
+    and the memory pass and place pins, which ask again when the answer
+    ends (from review: cloud power turned off mid-answer still sent the
+    turn).
+- **Not gated: a saved key is used.** Gemini pictures and Veo run
+  whenever a working Gemini key is saved. Model discovery
+  (`_cloud_refresh_picks`) and the Kimi balance run as before this step:
+  discovery once per launch at the first `cloud_ok_providers()` call,
+  the balance when Settings asks. Services that need no key (search,
+  weather, maps, backdrops) are untouched.
+- **When a picture or video can't be made** (no studio installed, no
+  working Gemini key), nothing is sent and the reader is told
+  (`studio_needs`): "Add a Gemini key in Settings › Cloud power, or add
+  image generation under Settings › Models › Manage models." (video the
+  same); off Apple silicon the line starts "Making pictures on this
+  computer needs an Apple silicon Mac." A Gemini attempt that fails says
+  so and names the same place. `_veo_video` checks for the key before it
+  reserves one of the day's clips (a request with no key used to spend
+  one).
+- **What the switch now changes that it didn't:** with it off, an
+  Advanced run's named cloud voices and cloud compositor run locally.
+  The Advanced picker says so ("Cloud power is off, so these and a cloud
+  compositor sit out."), and the vision download message adds, when a
+  Claude or Gemini key is saved, that turning the switch on reads the
+  picture now.
+- **The switch shows what saved:** its change handler waits for
+  `POST /api/prefs`; a failure (unreadable settings, 503) puts the box
+  back and says "Couldn't save that. Cloud power is still off/on."
+- **The Cloud power copy:** "Optional frontier models. While Use cloud
+  power is on, cloud models answer your chats; the Cloud Only tier does
+  that for one question. Pictures and videos made with Gemini go to
+  Google whenever a Gemini key is saved, switch on or off. The switch
+  never removes a key." then 6b310's web-search sentence. The hint:
+  "Answers come from a cloud service instead of this computer. Your
+  prompts leave this computer while this is on, and whenever you pick
+  the Cloud Only tier. Pictures and videos use a saved Gemini key either
+  way; keys stay saved when it is off." The page no longer rewrites it
+  with one provider's name.
+- **A failed paste never replaces a working key** (from review; older
+  than this step). A key that failed its test used to be saved over the
+  provider's entry, so a wrong paste, being offline, a DNS failure or a
+  timeout lost the key that worked. `_cloud_save_failed` keeps a working
+  entry exactly as it was and the reply ends "Your saved Groq key is
+  unchanged and still in use"; a failed paste is recorded only where no
+  working key was. `provider: "off"` removes cloud.json inside the cloud
+  lock, so a writer that had read it first can't write every key back.
 - **Failure writes (5.12).** `cloud_note_failure` is one locked update:
   the read, the decision and the write happen inside one `_cloud_txn`,
   and only while the provider's saved key is the key the failing request
@@ -5699,108 +5714,160 @@ text being read aloud and the Remote agent's server and commands.
   `status`, `note`, `cool`, `dead` and `dead_at`, never `key`, `base` or
   `name`, and nothing when the key has changed. `cloud_cool` takes the
   key (keyword-only) and goes through the same patch; `cloud_glitch`
-  rests a model only while its key is still the saved one. So a 401, 404
-  or 429 that comes back after the key was replaced or removed changes
-  nothing: not the new key's status, not a model's rest, and it can't
-  write the old key back.
-- **Cached answer settings hold no key.** `_answered` and `_last_cloud`
-  hold a ticket, `{pid, fp, model, name}`, not the conf. `/api/title`
-  (`make_title`), the memory pass (`_extract_memory`) and the place pins
-  re-read the key from `cloud.json` under the cloud lock
-  (`_ticket_conf`) and make no call when the provider is gone, its key
-  is no longer the one that answered, or it is marked failed. The pins
-  then use the local model as before; a title falls back to its local
-  model. (Remove per provider and `provider: "off"` answering 410 are
-  the other half of 5.12, not built here.)
-- **The Remote agent's SSH (5.1, G9).** Every call (`ssh_run`, and so
-  `ssh_alive`, `ssh_wait_back`, `ssh_run_long`, the agent and
-  `/api/remote/test`) writes a 0600 config under `run/` (`ssh-*.conf`,
-  deleted when the call returns) and runs `ssh -F <file>
-  concorde-remote <fixed shell>`:
-  - the config holds HostName, User, Port, IdentityFile, BatchMode,
-    `StrictHostKeyChecking accept-new`, ConnectTimeout 12,
-    `UserKnownHostsFile <app_dir>/remote_known_hosts` (created 0600
-    beside remote.json, never synced), `GlobalKnownHostsFile /dev/null`
-    (`NUL` on Windows), `HashKnownHosts yes` and `LogLevel ERROR` (the
-    one-time "Permanently added" line stays out of the command's
-    output; errors still show);
-  - host, user and port are checked against plain patterns and a key
-    path may hold no quote or control character, so a newline can't add
-    a directive (ProxyCommand runs a local command); paths are quoted,
-    `%` doubled, backslashes made forward slashes on Windows;
-  - the fixed shell is `if command -v bash …; then exec bash -s; else
-    exec sh -s; fi`; the command goes on stdin as `{ <command> }
-    </dev/null`, so a command that reads stdin gets nothing and can't eat
-    the rest; stdin and output are bytes (a text pipe on Windows would
-    send CRLF), output decoded as UTF-8 with CRLF made LF;
-  - `-F` replaces `~/.ssh/config`: a host alias defined only there no
-    longer resolves, and options set there (ProxyJump, a different
-    IdentityFile) don't apply. ssh-agent still works;
+  checks the key and rests the model under the lock. The key save revives
+  its models after the write, so an old key's failure landing in between
+  can't rest or retire them. A 401, 404 or 429 that comes back after the
+  key was replaced or removed changes nothing.
+- **Cached answer settings hold no key, and belong to one chat.**
+  `_answered` and `_last_cloud` hold a ticket, `{pid, fp, model, name}`,
+  not the conf. `_last_cloud` is keyed by (user, chat id), and the page
+  sends the chat id with `/api/title` (from review: it was per user, so a
+  funnel or another chat could be titled by this chat's provider).
+  Titles, the memory pass and the place pins re-read the key under the
+  cloud lock (`_ticket_conf`) and make no call when the provider is
+  gone, its key is empty or no longer the one that answered, or it is
+  marked failed. A council merge the app throws away (too short,
+  degenerate) drops its ticket, so the local merger's answer gets no
+  cloud badge, title or memory pass from that provider.
+- **The Remote agent's SSH (5.1, G9).** Every call writes a 0600
+  `run/ssh-*.conf` (deleted when it returns) and runs `ssh -F
+  ssh-*.conf concorde-remote <fixed shell>` in run/: the path is
+  relative because ssh hands it unquoted to the ssh it starts for a jump
+  host, and "Application Support" has a space.
+  - Before the Host block, for every hop: `UserKnownHostsFile
+    <app_dir>/remote_known_hosts` (0600, beside remote.json, never
+    synced), `GlobalKnownHostsFile /dev/null` (`NUL` on Windows),
+    `HashKnownHosts yes`, `StrictHostKeyChecking accept-new`, BatchMode,
+    ConnectTimeout 12, ServerAliveInterval 30, `LogLevel ERROR` (the
+    one-time "Permanently added" line stays out of the output), and the
+    key. In the block: HostName, User, Port, `IdentitiesOnly yes` when a
+    key is set, and an optional ProxyJump (a new field, `[user@]host
+    [:port]` hops).
+  - Fields are checked whole (fullmatch): host, user (DOMAIN\user
+    allowed for Windows OpenSSH servers, written quoted with the
+    backslash doubled), an ASCII port 1-65535, a key path with no quote,
+    control character, `${` or trailing backslash, the jump hops. `%` is
+    doubled in paths. So nothing typed can add a directive (ProxyCommand
+    runs a local command).
+  - The command goes on stdin, as typed. The fixed shell, which any
+    login shell runs (sh, bash, zsh, dash, csh, tcsh): `exec sh -c 'if
+    command -v bash …; then exec bash -c "c=\$(cat); eval \"\$c\"
+    </dev/null"; else c=$(cat); eval "$c" </dev/null; fi'`. The whole
+    command is read first, so a command that reads stdin gets nothing
+    and a lone `}` can't break the framing; the exit status is the
+    command's. Output is bytes, decoded UTF-8; CRLF and a bare CR (a
+    progress bar) become newlines.
+  - **Existing setups keep working with no action.** `-F` replaces
+    `~/.ssh/config`, which the app never reads. A setup that has never
+    been resolved (`resolved` in remote.json), and any connection that
+    fails with "Could not resolve hostname" or "Permission denied
+    (publickey)", runs `ssh -G -l <user> [-p <port>] -- <host>` once: ssh
+    reads its own config and prints the result without connecting. The
+    host is on that one command line for that moment. HostName, User
+    and Port (the app's user, and a port other than 22, go in as the
+    app always sent them, so they still win), ProxyJump (when the app
+    has none) and IdentityFile (only when the app's key is blank, the
+    file exists and it isn't one of ssh's default names, which ssh tries
+    anyway) are saved into remote.json and the call is tried once more.
+    A ProxyCommand from the old config isn't carried over. If it still
+    fails the reply ends "ConcordeAI connects with its own settings; put
+    the server's real address, user, port and key here." ssh-copy-id is
+    no longer offered as the fix for a failure (it stays as the setup
+    hint on a fresh box).
   - `~/.ssh/known_hosts` is never read or written, so each server gets
     one fresh host-key accept on its first connection after this build.
     Entries earlier builds wrote there stay.
+  - **A changed server:** "Host key verification failed" or
+    "IDENTIFICATION HAS CHANGED" adds "This server's identity changed
+    since ConcordeAI first connected. If you rebuilt it, forget its old
+    key." `/api/remote/test` says `changed`, and the connection bar shows
+    **Forget its old key**: `POST /api/remote/forget` removes, from the
+    app's own list only, each `|1|salt|hash` line whose HMAC-SHA1(salt,
+    host) matches (`[host]:port` off port 22), and any plain line naming
+    it. Error text now keeps its tail (ssh's useful line is its last).
+  - "ssh client not found" only when `ssh` itself isn't on the PATH.
 - **Read-aloud (5.1).** On a Mac `say -f <run/say-*.txt>`: the text in a
   0600 file, deleted by a reaper thread when `say` exits and by
-  `_stop_speaking`. `_stop_speaking` now waits for the process to end
-  (5 s, then kill); on Windows it ends the PowerShell tree with `taskkill
-  /PID <pid> /T /F`, SAPI with it (the text still goes to SAPI on stdin).
-  `_speak` and `_stop_speaking` share one lock, so two at once can't
-  both start a voice.
+  `_stop_speaking`. `_stop_speaking` waits for the process to end (5 s,
+  then kill); on Windows it ends the PowerShell tree with `taskkill /PID
+  <pid> /T /F`. On Windows the text still goes to SAPI on stdin, written
+  on a short thread (`_say_feed`), so `_say_lock` covers only the start
+  and a Stop never waits behind PowerShell. `_speak` and `_stop_speaking`
+  share the lock, so two at once can't both start a voice.
 - **Picture and video prompts (5.1).** mflux and the video renderer run
   under `_PROMPT_RUNNER`, a fixed `python -c` script: the command line
   carries `@prompt:prompt` (and `@prompt:neg`), the words sit in a 0600
-  `run/prompt-*.json`, and the runner puts them back in `sys.argv` inside
-  the process before running the console script (`runpy.run_path`) or
-  the module (`runpy.run_module`, as `-m` would). The file is deleted
-  when the render ends: done, failed or stopped. The negative prompt
-  rides the same file.
-- **Test hooks (0a 5.14), dev copies only:** `provider-stub=http://127.0.0.1:<port>`
-  points the four compiled provider addresses (`PROVIDER_BASES`, and
-  `GEMINI_API` for pictures and Veo) at a recording stub, the provider's
-  host becoming the first part of the path so `_provider_of` still reads
-  it; anything but a loopback URL is ignored. `subprocess-record` appends
-  every child's argv to `run/subprocess.jsonl`. The key-save route,
-  Gemini pictures and Veo now read their addresses from those names.
-  (The delayed provider answer is the stub's, in the gauntlet.)
-- Gauntlet (15 new, 7 updated; 347 becomes 362). A copy (9903) runs with the stub as its
-  provider base and its HTTPS proxy, so a request to a real provider
-  host would be recorded as a CONNECT and refused: KEY-8's Phase 0 part
-  (four sentinel keys, switch off, `/api/tiers`, `/api/cloud`, a
-  restart, the same again: zero requests; seconds, not the spec's 10
-  minutes); KEY-5 for pictures and video (switch off: zero requests and
-  the two lines); switched on, discovery reaches all four and a picture,
-  a video and the Fast lane reach the stub; KEY-9's delayed 401 (Groq's
-  401 three seconds late, the key replaced one second in: the new key
-  saved and ok); the Remote agent against a local sshd on a free port
-  (the test connection answers, `~/.ssh/known_hosts` byte-identical by
-  digest, one hashed 0600 entry in `remote_known_hosts`, every recorded
-  ssh command line exactly `ssh -F run/ssh-*.conf concorde-remote
-  <shell>`, no host, user, port, key path or command on it, no config
-  left, a canary host refused with nothing on the command line).
-  In-process: the failure write (a replaced key's 401, 404, 429 and 503,
-  a cool and a glitch change nothing; the saved key's only its own
-  fields), the patch refusing key, base and name, tickets (no key held,
-  a title and a memory pass after the key changes make no call), the
-  gate and `gate_ladder`, the council with the switch off and on,
-  discovery and the balance, read-aloud (the file, its mode, the reaper,
-  the waiting stop, Windows' taskkill), the render prompt files (and the
-  runner itself on a stand-in script and module), the SSH config's field
-  checks, and a lint that no subprocess argument list is built from a
-  name that carries what a person typed and no `--prompt` takes anything
-  but the placeholder. Updated: the cloud.json writer race (rests are
-  key-checked patches), the failure-kind checks, the negative-prompt
-  pin, the Windows speech and SSH checks, the Cloud power copy, and the
-  picture label (with no painter nothing starts, so no label says "in
-  the cloud").
-  25 mutations of the new code each fail at least one check; a late 401
-  alone is caught only with both key checks removed, since the patch
+  `run/prompt-*.json`. The runner drops the working directory from
+  `sys.path` before its own imports (a `json.py` there can't stand in),
+  reads the file and deletes it, puts the words back in `sys.argv`, then
+  runs the console script with its own folder first on `sys.path`
+  (`runpy.run_path`) or the module with the working directory first
+  (`runpy.run_module`, as `-m` would). The app deletes the file again
+  when the render ends: done, failed or stopped.
+- **Leftovers:** at every start the copy holding the instance lock
+  removes `run/ssh-*.conf`, `run/say-*.txt` and `run/prompt-*.json` a
+  crash left (`sweep_run_files`).
+- **Test hooks (0a 5.14), dev copies only:**
+  `provider-stub=http://127.0.0.1:<port>` points the four compiled
+  provider addresses (`PROVIDER_BASES`, and `GEMINI_API` for pictures and
+  Veo) at a recording stub, the provider's host becoming the first part
+  of the path so `_provider_of` still reads it; anything but a loopback
+  URL is ignored. `subprocess-record` appends every child's argv to
+  `run/subprocess.jsonl`. `no-downloads` makes `start_model_downloads` a
+  no-op. `ssh-config=<file>` hands `ssh -G` a stand-in for
+  `~/.ssh/config`, so the gauntlet never has ssh read the real one. The
+  key-save route, Gemini pictures and Veo read their addresses from
+  those names.
+- Gauntlet: 28 new checks and 9 older ones updated; 347 becomes 375.
+  Two copies on 9903 run with the stub as their provider base and
+  HTTPS proxy (a request to a real provider host would be recorded as
+  a CONNECT and refused), the Hub offline for any engine they start:
+  - no key saved: start, Settings and a restart reach no provider;
+    pictures and video give the no-key lines;
+  - four sentinel keys, switch off: discovery reaches all four and
+    Settings shows the Kimi balance; the Fast lane with an Advanced
+    list, a pasted picture and a council naming cloud voices and a cloud
+    compositor send nothing to a provider; a picture and a video are made
+    with the Gemini key;
+  - switched on, the Fast lane reaches the stub, a title for that chat
+    goes to that provider and one for another chat doesn't;
+  - KEY-9's delayed 401 (the stub's 401 sent after the replacing save
+    returned: the new key saved and ok); a rejected paste and an
+    unreachable one each leave the working key saved and ok;
+  - the Remote agent against a local sshd: an old alias setup resolved
+    once through `ssh -G` (the stand-in config) and kept; a rebuilt
+    server named as changed, Forget, then connected; through a jump
+    host; an unresolvable host failing with the plain line;
+    `~/.ssh/known_hosts` byte-identical by digest; the app's list
+    hashed and 0600; every ssh command line `ssh -F ssh-*.conf
+    concorde-remote <shell>` with no host, user, port, key path or
+    command on it; no config left.
+  In-process: the failure write and patch; tickets (a replaced, emptied,
+  failed or removed key, and memory following the switch); the gate and
+  `gate_ladder`; the council off and on, and a thrown-away merge;
+  discovery, balance, pictures and video not asking the switch; the
+  glitch's lock, `off` under the lock, revive after the write, per-chat
+  titles, the switch's revert, the no-key lines; read-aloud (and
+  Windows' writer thread off the lock); the prompt files and the runner
+  for real (deleted once read, its path, a shadowing json.py); the
+  start's sweep; the SSH config's fields read back by `ssh -G -F` (the
+  generated file only); the remote shell under zsh, tcsh, bash, dash and
+  a PATH with no bash (a heredoc, `exit 7`, a lone `}` then `cat`, a
+  trailing backslash, stdin readers); ssh's output (CR, not found, one
+  resolve-and-retry, a changed server); Forget against entries
+  `ssh-keygen -H` hashed; and a lint that no subprocess argument list is
+  built from a name that carries what a person typed and no `--prompt`
+  takes anything but the placeholder. 48 mutations of the reworked code each fail at least one check; a late
+  401 alone is caught only with both key checks removed, since the patch
   and `cloud_note_failure` each check.
-- Not verified here: Windows OpenSSH taking `GlobalKnownHostsFile NUL`
-  and a `-F` file under `%LOCALAPPDATA%` (its permission check), the
-  `taskkill /T` stop of SAPI, and real mflux and video renders through
-  the runner (their venvs live in the real data folder; the runner was
-  run on stand-ins). `say -f` was checked writing to a file (`-o`) with
-  a UTF-8 text, not played aloud.
+- Not verified here: Windows OpenSSH taking `GlobalKnownHostsFile NUL`,
+  a `-F` file under `%LOCALAPPDATA%` (its permission check) and
+  DOMAIN\user against a real Windows server; the `taskkill /T` stop of
+  SAPI; real mflux and video renders through the runner (their venvs
+  live in the real data folder; the runner ran on stand-ins); `ssh -G`
+  against a real `~/.ssh/config` (the gauntlet uses a stand-in).
+  `say -f` was checked writing to a file (`-o`) with a UTF-8 text, not
+  played aloud.
 
 ## 6b325 — Settings › Usage
 Patrick: "in the settings, let's add a tab called usage and show the
