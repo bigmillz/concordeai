@@ -5687,6 +5687,12 @@ server and commands.
 - **The switch shows what saved:** its change handler waits for
   `POST /api/prefs`; a failure (unreadable settings, 503) puts the box
   back and says "Couldn't save that. Cloud power is still off/on."
+- **Saving a key still turns cloud answers on** (`_set_turbo(True)` in
+  the key-save route, unchanged): under Patrick's rule a key saved is
+  permission to use it, and the reply says "cloud answers are on". The
+  key box stays open with the switch off (it used to fold for someone
+  with keys and the switch off), so a key can be pasted or replaced
+  without switching chats to the cloud first.
 - **The Cloud power copy:** "Optional frontier models. While Use cloud
   power is on, cloud models answer your chats; the Cloud Only tier does
   that for one question. Pictures and videos made with Gemini go to
@@ -5703,8 +5709,13 @@ server and commands.
   timeout lost the key that worked. `_cloud_save_failed` keeps a working
   entry exactly as it was and the reply ends "Your saved Groq key is
   unchanged and still in use"; a failed paste is recorded only where no
-  working key was. `provider: "off"` removes cloud.json inside the cloud
-  lock, so a writer that had read it first can't write every key back.
+  working key was. The same key pasted again and failing for anything
+  but the provider rejecting it (no network, a timeout) leaves its entry
+  as it was too; a rejection marks it failed. A key that met only busy
+  answers (every model 5xx) and no model list was never checked: it is
+  saved only through the same rule, and the reply says the provider is
+  busy. `provider: "off"` removes cloud.json inside the cloud lock, so a
+  writer that had read it first can't write every key back.
 - **Failure writes (5.12).** `cloud_note_failure` is one locked update:
   the read, the decision and the write happen inside one `_cloud_txn`,
   and only while the provider's saved key is the key the failing request
@@ -5728,7 +5739,8 @@ server and commands.
   gone, its key is empty or no longer the one that answered, or it is
   marked failed. A council merge the app throws away (too short,
   degenerate) drops its ticket, so the local merger's answer gets no
-  cloud badge, title or memory pass from that provider.
+  cloud badge, title or memory pass from that provider. The cloud badge
+  itself needs no chat id; only the title ticket does.
 - **The Remote agent's SSH (5.1, G9).** Every call writes a 0600
   `run/ssh-*.conf` (deleted when it returns) and runs `ssh -F
   ssh-*.conf concorde-remote <fixed shell>` in run/: the path is
@@ -5740,9 +5752,13 @@ server and commands.
     `HashKnownHosts yes`, `StrictHostKeyChecking accept-new`, BatchMode,
     ConnectTimeout 12, ServerAliveInterval 30, `LogLevel ERROR` (the
     one-time "Permanently added" line stays out of the output), and the
-    key. In the block: HostName, User, Port, `IdentitiesOnly yes` when a
-    key is set, and an optional ProxyJump (a new field, `[user@]host
-    [:port]` hops).
+    key; on a Mac `IgnoreUnknown UseKeychain` and `UseKeychain yes`
+    (keys unlocked from the keychain keep working); an IdentityAgent
+    that ssh's config named (1Password and the like); a `Host <hop>`
+    block with a jump host's own key. In the block: HostName, User,
+    Port, `IdentitiesOnly yes` for a key typed into the app (not one
+    that came from ssh's config), and an optional ProxyJump (a new
+    field, `[user@]host[:port]` hops).
   - Fields are checked whole (fullmatch): host, user (DOMAIN\user
     allowed for Windows OpenSSH servers, written quoted with the
     backslash doubled), an ASCII port 1-65535, a key path with no quote,
@@ -5758,22 +5774,31 @@ server and commands.
     command's. Output is bytes, decoded UTF-8; CRLF and a bare CR (a
     progress bar) become newlines.
   - **Existing setups keep working with no action.** `-F` replaces
-    `~/.ssh/config`, which the app never reads. A setup that has never
-    been resolved (`resolved` in remote.json), and any connection that
-    fails with "Could not resolve hostname" or "Permission denied
-    (publickey)", runs `ssh -G -l <user> [-p <port>] -- <host>` once: ssh
-    reads its own config and prints the result without connecting. The
-    host is on that one command line for that moment. HostName, User
-    and Port (the app's user, and a port other than 22, go in as the
-    app always sent them, so they still win), ProxyJump (when the app
-    has none) and IdentityFile (only when the app's key is blank, the
-    file exists and it isn't one of ssh's default names, which ssh tries
-    anyway) are saved into remote.json and the call is tried once more.
-    A ProxyCommand from the old config isn't carried over. If it still
-    fails the reply ends "ConcordeAI connects with its own settings; put
-    the server's real address, user, port and key here." ssh-copy-id is
-    no longer offered as the fix for a failure (it stays as the setup
-    hint on a fresh box).
+    `~/.ssh/config`, which the app never reads. A setup saved by an
+    older build (no `resolved` in remote.json) runs `ssh -G -l <user>
+    [-p <port>] -- <host>` once: ssh reads its own config and prints the
+    result without connecting; the host is on that one command line for
+    that moment. HostName, User and Port are taken (the app's user, and a
+    port other than 22, go in as the app always sent them, so they still
+    win). A ProxyJump from the config is resolved hop by hop with its
+    own `ssh -G` and saved as `user@hostname:port` (an alias means
+    nothing under -F), with the hop's own key, if the config gives one,
+    in `jump_keys`. Only in this one-time migration, a blank key field
+    takes the config's IdentityFile (when the file exists and isn't one
+    of ssh's default names, which ssh tries anyway), marked `key_src:
+    "config"`. An IdentityAgent comes across (`agent`). All of it is
+    saved into remote.json, but only while the file still holds what
+    was resolved, so an edit made meanwhile stands.
+  - Settings typed into the app are saved `resolved: true`. A
+    connection that fails with "Could not resolve hostname" or
+    "Permission denied (publickey)" resolves again (no key copied) and
+    tries once more; `ssh_run` updates the caller's copy in place, so an
+    agent run resolves at most once and again at most once, not at every
+    command. A ProxyCommand from the old config isn't carried over. If
+    it still fails the reply ends "ConcordeAI connects with its own
+    settings; put the server's real address, user, port and key here."
+    ssh-copy-id is no longer offered as the fix for a failure (it stays
+    as the setup hint on a fresh box).
   - `~/.ssh/known_hosts` is never read or written, so each server gets
     one fresh host-key accept on its first connection after this build.
     Entries earlier builds wrote there stay.
@@ -5782,9 +5807,14 @@ server and commands.
     since ConcordeAI first connected. If you rebuilt it, forget its old
     key." `/api/remote/test` says `changed`, and the connection bar shows
     **Forget its old key**: `POST /api/remote/forget` removes, from the
-    app's own list only, each `|1|salt|hash` line whose HMAC-SHA1(salt,
-    host) matches (`[host]:port` off port 22), and any plain line naming
-    it. Error text now keeps its tail (ssh's useful line is its last).
+    app's own list only, the host ssh named in "Host key for <name> has
+    changed" (a jump host's, when that one changed; without a name, the
+    server and every jump hop): each `|1|salt|hash` line whose
+    HMAC-SHA1(salt, name) matches (`[host]:port` off port 22), and any
+    plain line naming it. A list it can't read or write comes back as a
+    JSON error, and no temp file is left (the same for remote.json's
+    writer). Error text now keeps its tail (ssh's useful line is its
+    last).
   - "ssh client not found" only when `ssh` itself isn't on the PATH.
 - **Read-aloud (5.1).** On a Mac `say -f <run/say-*.txt>`: the text in a
   0600 file, deleted by a reaper thread when `say` exits and by
@@ -5818,7 +5848,7 @@ server and commands.
   `~/.ssh/config`, so the gauntlet never has ssh read the real one. The
   key-save route, Gemini pictures and Veo read their addresses from
   those names.
-- Gauntlet: 28 new checks and 9 older ones updated; 347 becomes 375.
+- Gauntlet: 34 new checks and 9 older ones updated; 347 becomes 381.
   Two copies on 9903 run with the stub as their provider base and
   HTTPS proxy (a request to a real provider host would be recorded as
   a CONNECT and refused), the Hub offline for any engine they start:
@@ -5857,15 +5887,22 @@ server and commands.
   resolve-and-retry, a changed server); Forget against entries
   `ssh-keygen -H` hashed; and a lint that no subprocess argument list is
   built from a name that carries what a person typed and no `--prompt`
-  takes anything but the placeholder. 48 mutations of the reworked code each fail at least one check; a late
-  401 alone is caught only with both key checks removed, since the patch
+  takes anything but the placeholder. Also the verifier's fixes: one
+  run's snapshot resolving once with a mid-run edit standing, ssh -G
+  per hop with jump keys, the key only at migration, the agent and
+  keychain lines, Forget by the named host, JSON errors with no temp
+  file, the same key offline, an unchecked busy key, the open key box,
+  and the badge without a chat id. 65 mutations (48 of the rework, 17
+  of the verifier's fixes) each fail at least one check; a late 401
+  alone is caught only with both key checks removed, since the patch
   and `cloud_note_failure` each check.
 - Not verified here: Windows OpenSSH taking `GlobalKnownHostsFile NUL`,
   a `-F` file under `%LOCALAPPDATA%` (its permission check) and
   DOMAIN\user against a real Windows server; the `taskkill /T` stop of
   SAPI; real mflux and video renders through the runner (their venvs
   live in the real data folder; the runner ran on stand-ins); `ssh -G`
-  against a real `~/.ssh/config` (the gauntlet uses a stand-in).
+  against a real `~/.ssh/config` (the gauntlet uses a stand-in), with
+  a 1Password IdentityAgent or a keychain-unlocked key.
   `say -f` was checked writing to a file (`-o`) with a UTF-8 text, not
   played aloud.
 

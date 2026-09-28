@@ -5781,11 +5781,12 @@ _sr = {"subprocess": _t17.SimpleNamespace(run=_ssh_fake_run, TimeoutExpired=Exce
        "REMOTE_KNOWN_HOSTS": __file__, "_remote_resolved": lambda c, again=False: c,
        "shutil": __import__("shutil")}
 _exec_names(_sr, {"ssh_run", "_ssh_once", "_ssh_argv", "_ssh_script", "SSH_ALIAS", "SSH_SHELL",
-                  "_SSH_RESOLVE_RX", "_SSH_HOSTKEY_RX", "SSH_OWN_SETTINGS", "SSH_KEY_CHANGED"})
+                  "_SSH_RESOLVE_RX", "_SSH_HOSTKEY_RX", "SSH_OWN_SETTINGS", "SSH_KEY_CHANGED",
+                  "_REMOTE_FIELDS", "_SSH_CHANGED_RX", "_SSH_CHANGED"})
 _sr_out = _sr["ssh_run"]({}, "systemctl status nginx")
-_sa = {"os": _os20, "re": re, "IS_WIN": True, "REMOTE_KNOWN_HOSTS": "C:\\A\\kh"}
+_sa = {"os": _os20, "re": re, "IS_WIN": True, "IS_MAC": False, "REMOTE_KNOWN_HOSTS": "C:\\A\\kh"}
 _exec_names(_sa, {"_ssh_config", "_ssh_path", "_ssh_quote", "_ssh_port", "_ssh_jump",
-                  "_ssh_fields", "SSH_ALIAS", "_SSH_HOST_RX", "_SSH_USER_RX", "_SSH_JUMP_RX"})
+                  "_ssh_fields", "_ssh_path_ok", "SSH_ALIAS", "_SSH_HOST_RX", "_SSH_USER_RX", "_SSH_JUMP_RX"})
 check("Windows: no console window flashes; ssh reads UTF-8; quoted paths are accepted",
       _pq_seen == [0x08000000, 0x10]
       and isinstance(_ssh_kw.get("input"), bytes) and "encoding" not in _ssh_kw
@@ -8018,7 +8019,7 @@ import http.server as _hs26, base64 as _b6426, hashlib as _hl26, stat as _st26
 import threading as _th26, contextlib as _cx26, hmac as _hm26, secrets as _se26
 _PHOSTS26 = ("generativelanguage.googleapis.com", "api.groq.com",
              "api.anthropic.com", "api.moonshot.ai")
-_S26 = {"reqs": [], "late401": {}, "t401": [], "bad": set(), "drop": set(),
+_S26 = {"reqs": [], "late401": {}, "t401": [], "bad": set(), "drop": set(), "busy": set(),
         "lock": _th26.Lock()}
 _STUB_TEXT26 = ("A stub provider wrote this reply for the gauntlet. It answers in plain "
                 "sentences so the repetition checks pass, it names no real place, and it "
@@ -8074,6 +8075,8 @@ class _Stub26(_hs26.BaseHTTPRequestHandler):
             return
         if key in _S26["bad"]:        # a key the provider rejects
             return self._out(401, {"error": {"message": "Invalid API Key"}})
+        if key in _S26["busy"]:       # every model busy, no inventory
+            return self._out(503, {"error": {"message": "high demand"}})
         late = _S26["late401"].get(key)
         if late is not None and not p.endswith("/models"):
             time.sleep(late)          # the delayed answer (0a 5.14's hook)
@@ -8202,8 +8205,14 @@ _ME26 = __import__("getpass").getuser()
 _USERCFG26 = os.path.join(_SSHDIR26, "user_ssh_config")
 if _SSHD26 is not None:
     with open(_USERCFG26, "w") as fh:
-        fh.write("Host concorde-old-alias\n  HostName 127.0.0.1\n  Port %d\n"
-                 "  IdentityFile %s\n" % (_SSHPORT26, os.path.join(_SSHDIR26, "userkey")))
+        # the old alias reaches the server through a jump alias, each with
+        # its own key line: under -F neither alias means anything
+        fh.write("Host concorde-old-alias\n  HostName localhost\n  Port %d\n"
+                 "  IdentityFile %s\n  ProxyJump concorde-old-jump\n"
+                 "Host concorde-old-jump\n  HostName 127.0.0.1\n  Port %d\n"
+                 "  IdentityFile %s\n"
+                 % (_SSHPORT26, os.path.join(_SSHDIR26, "userkey"), _SSHPORT26,
+                    os.path.join(_SSHDIR26, "userkey")))
 
 
 def _seed_c26(home):
@@ -8276,7 +8285,7 @@ def _cchat26(prompt, **kw):
     body.update(kw)
     s_, b_ = _cpost26("/api/chat", body, timeout=400)
     t_ = b_.decode("utf-8", "replace")
-    return s_, re.sub("\x00[A-Z0-9]+:.*?\x00", "", t_, flags=re.S)
+    return s_, re.sub("\x00[A-Z0-9]+:.*?\x00", "", t_, flags=re.S), t_
 
 
 def _json26(b):
@@ -8431,6 +8440,10 @@ check("KEY-9: a 401 that lands after the key was replaced leaves the new key sav
       "%r" % [_rep26[:1], len(_late_hit), _S26["t401"][:2],
               {k: v for k, v in _gq26.items() if k != "key"}, _gq26.get("key") == _K2_26])
 _S26["late401"].clear()
+# the answer's cloud badge comes without a chat id too (from review: it
+# rode the per-chat title ticket)
+check("a cloud answer in a chat with no id still carries the cloud badge",
+      '"w": "cloud"' in _co[2], _co[2][-200:])
 
 # A FAILED PASTE NEVER REPLACES A WORKING KEY (from review): with the
 # working Groq key saved, a paste the provider rejects (401) and a paste
@@ -8439,19 +8452,36 @@ _S26["late401"].clear()
 _K3_26, _K4_26 = "gsk_" + _se26.token_hex(26), "gsk_" + _se26.token_hex(26)
 _S26["bad"].add(_K3_26)
 _S26["drop"].add(_K4_26)
+def _groq26():
+    with open(os.path.join(_C26.home, "cloud.json")) as fh:
+        return json.load(fh)["providers"].get("groq") or {}
+
+
 _bad_paste = _json26(_cpost26("/api/cloud/set", {"provider": "groq", "key": _K3_26})[1])
-with open(os.path.join(_C26.home, "cloud.json")) as fh:
-    _gq_a = json.load(fh)["providers"].get("groq") or {}
+_gq_a = _groq26()
 _off_paste = _json26(_cpost26("/api/cloud/set", {"provider": "groq", "key": _K4_26})[1])
-with open(os.path.join(_C26.home, "cloud.json")) as fh:
-    _gq_b = json.load(fh)["providers"].get("groq") or {}
-check("a rejected paste and an unreachable one leave the working key saved and in use",
+_gq_b = _groq26()
+# the SAME working key pasted again while the provider can't be reached
+# (from review: that marked it failed), and a key only busy answers met,
+# with no inventory (it was saved as ok, unchecked, over the working one)
+_S26["drop"].add(_K2_26)
+_same_paste = _json26(_cpost26("/api/cloud/set", {"provider": "groq", "key": _K2_26})[1])
+_S26["drop"].discard(_K2_26)
+_gq_c = _groq26()
+_K5_26 = "gsk_" + _se26.token_hex(26)
+_S26["busy"].add(_K5_26)
+_busy_paste = _json26(_cpost26("/api/cloud/set", {"provider": "groq", "key": _K5_26})[1])
+_gq_d = _groq26()
+check("a rejected paste, an unreachable one, the same key offline and an unchecked busy one "
+      "all leave the working key saved and in use",
       not _bad_paste.get("ok") and "unchanged" in str(_bad_paste.get("err"))
       and not _off_paste.get("ok") and "unchanged" in str(_off_paste.get("err"))
-      and _gq_a.get("key") == _K2_26 and _gq_a.get("status") == "ok"
-      and _gq_b.get("key") == _K2_26 and _gq_b.get("status") == "ok",
-      "%r" % [_bad_paste, _off_paste, _gq_a.get("status"), _gq_b.get("status"),
-              _gq_a.get("key") == _K2_26, _gq_b.get("key") == _K2_26])
+      and not _same_paste.get("ok") and "unchanged" in str(_same_paste.get("err"))
+      and not _busy_paste.get("ok") and "busy" in str(_busy_paste.get("err"))
+      and all(g.get("key") == _K2_26 and g.get("status") == "ok"
+              for g in (_gq_a, _gq_b, _gq_c, _gq_d)),
+      "%r" % [_bad_paste, _off_paste, _same_paste, _busy_paste,
+              [(g.get("status"), g.get("key") == _K2_26) for g in (_gq_a, _gq_b, _gq_c, _gq_d)]])
 
 # THE REMOTE AGENT'S SSH (0a 5.1, G9), against the local sshd.
 # 1. A setup from an older build (an alias only the user's ssh config
@@ -8472,7 +8502,7 @@ check("a rejected paste and an unreachable one leave the working key saved and i
 # excepted; no config left behind.
 _rkh = os.path.join(_C26.home, "remote_known_hosts")
 _hostcan = _canary("host").lower() + ".invalid"
-_rt = _rt_changed = _rt_forget = _rt_again = _rt_jump = _rt_bad = (None, b"")
+_rt = _rt_c1 = _rt_f1 = _rt_c2 = _rt_f2 = _rt_again = _rt_jump = _rt_bad = (None, b"")
 _rem_after = {}
 if _SSHD26 is not None:
     _rt = _cpost26("/api/remote/test", {})
@@ -8485,8 +8515,13 @@ if _SSHD26 is not None:
     subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f",
                     os.path.join(_SSHDIR26, "hostkey")], capture_output=True)
     _sshd_start26()
-    _rt_changed = _cpost26("/api/remote/test", {})
-    _rt_forget = _cpost26("/api/remote/forget", {})
+    # the jump host is met first and named; Forget takes only it; then
+    # the server behind it, the same way (from review: Forget took the
+    # server when it was the jump host that changed)
+    _rt_c1 = _cpost26("/api/remote/test", {})
+    _rt_f1 = _cpost26("/api/remote/forget", {})
+    _rt_c2 = _cpost26("/api/remote/test", {})
+    _rt_f2 = _cpost26("/api/remote/forget", {})
     _rt_again = _cpost26("/api/remote/test", {})
     # through a jump host
     _cpost26("/api/remote/config", {"host": "localhost", "user": _ME26, "port": str(_SSHPORT26),
@@ -8518,29 +8553,36 @@ _ssh_leak = [r for r in _ssh_recs for w in ("127.0.0.1", "localhost", str(_SSHPO
                                              "__ok__", "whoami")
              if any(w in x for x in r)]
 _left_cfg = [f for f in os.listdir(os.path.join(_C26.home, "run")) if f.startswith("ssh-")]
-_rd = [_json26(x[1]) for x in (_rt, _rt_changed, _rt_forget, _rt_again, _rt_jump, _rt_bad)]
+_rd = [_json26(x[1]) for x in (_rt, _rt_c1, _rt_f1, _rt_c2, _rt_f2, _rt_again, _rt_jump,
+                                _rt_bad)]
 if _SSHD26 is None:
     check("the Remote agent's SSH keeps its own host list (SKIP: no /usr/sbin/sshd here)", True)
 else:
-    check("Remote: an old setup's alias is resolved once through ssh -G and kept",
+    check("Remote: an old setup's alias and its jump alias are resolved once through "
+          "ssh -G and kept as addresses",
           _rd[0].get("ok") and _ME26 in (_rd[0].get("detail") or "")
-          and _rem_after.get("host") == "127.0.0.1"
+          and _rem_after.get("host") == "localhost"
           and _rem_after.get("port") == str(_SSHPORT26)
           and _rem_after.get("key") == os.path.join(_SSHDIR26, "userkey")
-          and len(_ssh_g) >= 1 and all("-F" in r and _USERCFG26 in r for r in _ssh_g)
-          and len(_rkh_first) == 1,
-          "%r" % [_rd[0], _rem_after, _ssh_g[:2], len(_rkh_first)])
-    check("Remote: a rebuilt server is named as changed, Forget drops its old key, "
-          "and the next test connects",
+          and _rem_after.get("jump") == "%s@127.0.0.1:%d" % (_ME26, _SSHPORT26)
+          and len(_ssh_g) >= 2 and all("-F" in r and _USERCFG26 in r for r in _ssh_g)
+          and len(_rkh_first) == 2,
+          "%r" % [_rd[0], _rem_after, _ssh_g[:3], len(_rkh_first)])
+    check("Remote: a rebuilt jump host and server are each named as changed, Forget drops "
+          "only the one named, and the next test connects",
           not _rd[1].get("ok") and _rd[1].get("changed")
           and "This server's identity changed since ConcordeAI first connected."
           in (_rd[1].get("detail") or "")
-          and _rd[2].get("removed") == 1 and _rd[3].get("ok"),
-          "%r" % _rd[1:4])
-    check("Remote: through a jump host, and a host no one can resolve fails plainly",
-          _rd[4].get("ok") and not _rd[5].get("ok")
-          and "ConcordeAI connects with its own settings" in (_rd[5].get("detail") or ""),
-          "%r" % _rd[4:6])
+          and "Host key for [127.0.0.1]:%d has changed" % _SSHPORT26 in (_rd[1].get("detail") or "")
+          and _rd[2].get("removed") == 1
+          and _rd[3].get("changed")
+          and "Host key for [localhost]:%d has changed" % _SSHPORT26 in (_rd[3].get("detail") or "")
+          and _rd[4].get("removed") == 1 and _rd[5].get("ok"),
+          "%r" % _rd[1:6])
+    check("Remote: through a typed jump host, and a host no one can resolve fails plainly",
+          _rd[6].get("ok") and not _rd[7].get("ok")
+          and "ConcordeAI connects with its own settings" in (_rd[7].get("detail") or ""),
+          "%r" % _rd[6:8])
     check("Remote: ~/.ssh/known_hosts untouched, the app's own list hashed and 0600, "
           "nothing of the connection or command on a command line",
           _kh26() == _KH0_26
@@ -8812,7 +8854,7 @@ check("review fixes: the glitch checks and rests under the lock, `off` removes u
       and _ks.index("cloud_revive(found + [model])") > _ks.index('"status": "ok"},\n                                         make_active=True)')
       and "body:JSON.stringify({text:text,chat_id:c.id})" in _MILLENAI_SRC
       and "_last_cloud.get((str(self._data_base()), _tcid))" in _MILLENAI_SRC
-      and '$("#turbo").checked=!on;$("#cloudkey-box").hidden=on;' in _MILLENAI_SRC
+      and '$("#turbo").checked=!on;' in _MILLENAI_SRC
       and "Cloud power is off, so these and a cloud compositor sit out." in _MILLENAI_SRC
       and "and your saved key reads \"\n                        \"pictures now." in _MILLENAI_SRC
       and _sn_mac == ("Add a Gemini key in **Settings › Cloud power**, or add image "
@@ -9040,9 +9082,9 @@ check("a start sweeps the prompt, speech and ssh files a crash left under run/, 
 # backslashes escaped; DOMAIN\user reaches ssh as one backslash; ports are
 # ASCII 1-65535; the jump host is `[user@]host[:port]` hops. Read back by
 # ssh itself (`ssh -G -F <file>`, the generated file only).
-_sc = {"os": os, "re": re, "IS_WIN": False, "REMOTE_KNOWN_HOSTS": "/A B/100%/remote_known_hosts"}
+_sc = {"os": os, "re": re, "IS_WIN": False, "IS_MAC": False, "REMOTE_KNOWN_HOSTS": "/A B/100%/remote_known_hosts"}
 _exec_names(_sc, {"_ssh_config", "_ssh_path", "_ssh_quote", "_ssh_port", "_ssh_jump",
-                  "_ssh_fields", "SSH_ALIAS", "_SSH_HOST_RX", "_SSH_USER_RX", "_SSH_JUMP_RX"})
+                  "_ssh_fields", "_ssh_path_ok", "SSH_ALIAS", "_SSH_HOST_RX", "_SSH_USER_RX", "_SSH_JUMP_RX"})
 _scf = _sc["_ssh_config"]
 _bad26 = []
 for _c in ({"host": "h\n  ProxyCommand touch /tmp/x"}, {"host": "-oProxyCommand=x"},
@@ -9132,7 +9174,7 @@ check("the remote command runs under zsh, tcsh, bash, dash and plain sh, stdin r
 _so = {"os": os, "re": re, "subprocess": None}
 _exec_names(_so, {"_ssh_once", "ssh_run", "_ssh_argv", "_ssh_script", "SSH_ALIAS",
                   "SSH_SHELL", "_SSH_RESOLVE_RX", "_SSH_HOSTKEY_RX", "SSH_OWN_SETTINGS",
-                  "SSH_KEY_CHANGED"})
+                  "SSH_KEY_CHANGED", "_REMOTE_FIELDS", "_SSH_CHANGED_RX", "_SSH_CHANGED"})
 _so_calls = []
 
 
@@ -9188,7 +9230,7 @@ check("ssh output: CRs become lines; 'not found' only without ssh; a name failur
 _fk = {"os": os, "re": re, "IS_WIN": False, "base64": _b6426, "hmac": _hm26,
        "hashlib": _hl26, "tempfile": tempfile, "time": time}
 _fkh = os.path.join(_rdir, "remote_known_hosts")
-_exec_names(_fk, {"ssh_forget_host", "_ssh_fields", "_ssh_port", "_ssh_jump", "_SSH_HOST_RX",
+_exec_names(_fk, {"ssh_forget_host", "_ssh_fields", "_ssh_path_ok", "_ssh_port", "_ssh_jump", "_SSH_HOST_RX",
                   "_SSH_USER_RX", "_SSH_JUMP_RX", "_replace_into"})
 _fk["REMOTE_KNOWN_HOSTS"] = _fkh
 _fk_ok = None
@@ -9209,6 +9251,186 @@ check("Forget removes only this server's hashed entry, as ssh hashed it",
       _fk_ok is not False and 'if self.path == "/api/remote/forget":' in _MILLENAI_SRC
       and '$("#rm-forget").hidden=!(!r.ok&&r.changed);' in _MILLENAI_SRC,
       "%r" % _fk_ok)
+
+# ---- the verifier's fixes to the rework
+# one snapshot, three commands: ssh -G at most once, and an edit made in
+# Settings meanwhile stands; a failing name resolves again once per
+# snapshot, and a resolution never saves over an edited file
+_sn26 = {"os": os, "re": re, "json": json}
+_rfile = os.path.join(_rdir, "remote-snap.json")
+_exec_names(_sn26, {"ssh_run", "_remote_resolved", "_REMOTE_FIELDS", "_SSH_RESOLVE_RX",
+                    "_SSH_HOSTKEY_RX", "_SSH_CHANGED_RX", "_SSH_CHANGED", "SSH_OWN_SETTINGS",
+                    "SSH_KEY_CHANGED"})
+_g26, _once26 = [], []
+
+
+def _snap_resolve(conf, migrate=False):
+    _g26.append(migrate)
+    return dict(conf, host="resolved.example")
+
+
+def _snap_read():
+    with open(_rfile) as fh:
+        return json.load(fh)
+
+
+def _snap_save(d):
+    with open(_rfile, "w") as fh:
+        json.dump(d, fh)
+
+
+_sn26.update(_ssh_resolve=_snap_resolve, remote_conf=_snap_read, _remote_save=_snap_save,
+             _ssh_once=lambda c, cmd, t: _once26.append(dict(c)) or _sn26["_once_rv"])
+_sn26["_once_rv"] = (0, "ok\n")
+_snap_save({"host": "old-alias", "user": "u", "port": "22", "key": "", "jump": ""})
+_snap = _snap_read()
+_sn26["ssh_run"](_snap, "a")
+_edit = dict(_snap_read(), port="2222")          # Settings, mid-run
+_snap_save(_edit)
+_sn26["ssh_run"](_snap, "b")
+_sn26["ssh_run"](_snap, "c")
+_g_after3 = list(_g26)
+_disk3 = _snap_read()
+# a failing name: again once per snapshot, and not saved over the edit
+_g26.clear()
+_sn26["_once_rv"] = (255, "ssh: Could not resolve hostname x\n")
+_snap2 = dict(_snap)
+for _i in range(3):
+    _sn26["ssh_run"](_snap2, "d")
+_g_again = list(_g26)
+check("one run's snapshot: ssh -G at most once, a mid-run edit stands, a failing name "
+      "resolves again once and never saves over the edit",
+      _g_after3 == [True] and _snap["host"] == "resolved.example"
+      and _disk3.get("port") == "2222" and _g_again == [False]
+      and _snap_read().get("port") == "2222"
+      and '"resolved": True}' in _MILLENAI_SRC,
+      "%r" % [_g_after3, _snap, _disk3, _g_again, _snap_read()])
+
+# ssh -G, per hop: an alias jump host becomes user@hostname:port with its
+# own key block; a key goes into a blank field only in the one-time
+# migration, marked key_src "config", and then without IdentitiesOnly;
+# IdentityAgent comes across (and is refused when it could add a
+# directive); the keychain lines on a Mac
+_rv = {"os": os, "re": re, "IS_WIN": False, "IS_MAC": True, "REMOTE_KNOWN_HOSTS": "/k/rkh"}
+_exec_names(_rv, {"_ssh_resolve", "_ssh_key_from", "_SSH_DEFAULT_KEYS", "_ssh_config",
+                  "_ssh_path", "_ssh_quote", "_ssh_port", "_ssh_jump", "_ssh_fields", "_ssh_path_ok",
+                  "_ssh_path_ok", "SSH_ALIAS", "_SSH_HOST_RX", "_SSH_USER_RX", "_SSH_JUMP_RX"})
+_kfile = os.path.join(_rdir, "cfg_key")
+open(_kfile, "w").close()
+_GV = {"old-alias": {"hostname": "203.0.113.9", "user": "deploy", "port": "22",
+                     "proxyjump": "bastion-alias", "identityfile": [_kfile],
+                     "identityagent": "~/Library/Group Containers/x/agent.sock"},
+       "bastion-alias": {"hostname": "198.51.100.7", "user": "jumper", "port": "2200",
+                         "identityfile": ["~/.ssh/id_ed25519", _kfile]}}
+_rv["_ssh_g"] = lambda h, user=None, port=None: dict(_GV[h]) if h in _GV else None
+_m1 = _rv["_ssh_resolve"]({"host": "old-alias", "user": "deploy", "port": "22", "key": ""},
+                          migrate=True)
+_m2 = _rv["_ssh_resolve"]({"host": "old-alias", "user": "deploy", "port": "22", "key": ""})
+_cfg1 = _rv["_ssh_config"](_m1).splitlines()
+_cfg_typed = _rv["_ssh_config"]({"host": "h", "key": _kfile}).splitlines()
+_GV["old-alias"]["identityagent"] = "/tmp/${EVIL}"
+_m3 = _rv["_ssh_resolve"]({"host": "old-alias", "user": "deploy", "port": "22", "key": ""})
+check("ssh -G per hop: jump aliases saved as addresses with their keys; a config key only "
+      "at migration, without IdentitiesOnly; the agent and keychain carried",
+      _m1 and _m1["host"] == "203.0.113.9" and _m1["jump"] == "jumper@198.51.100.7:2200"
+      and _m1["jump_keys"] == {"198.51.100.7": _kfile}
+      and _m1["key"] == _kfile and _m1["key_src"] == "config"
+      and _m1["agent"] == os.path.expanduser("~/Library/Group Containers/x/agent.sock")
+      and _m2 and not _m2.get("key") and "key_src" not in _m2
+      and "Host 198.51.100.7" in _cfg1
+      and _cfg1.index("Host 198.51.100.7") < _cfg1.index("Host concorde-remote")
+      and "  IdentitiesOnly yes" not in _cfg1 and "  IdentitiesOnly yes" in _cfg_typed
+      and "IgnoreUnknown UseKeychain" in _cfg1 and "UseKeychain yes" in _cfg1
+      and _cfg1.index("IgnoreUnknown UseKeychain") < _cfg1.index("UseKeychain yes")
+      and any(l.startswith("IdentityAgent ") for l in _cfg1) and _m3 is None,
+      "%r" % [_m1, _m2, _cfg1, _m3])
+
+# Forget by the name ssh gave, hops matched without one, and every error
+# a JSON answer with no temp file left
+_fk2 = {"os": os, "re": re, "IS_WIN": False, "base64": _b6426, "hmac": _hm26,
+        "hashlib": _hl26, "tempfile": tempfile, "time": time}
+_exec_names(_fk2, {"ssh_forget_host", "_ssh_fields", "_ssh_path_ok", "_ssh_port", "_ssh_jump",
+                   "_SSH_HOST_RX", "_SSH_USER_RX", "_SSH_JUMP_RX", "_replace_into",
+                   "drop_run_file"})
+_fkh2 = os.path.join(_rdir, "rkh2")
+_fk2["REMOTE_KNOWN_HOSTS"] = _fkh2
+_f2_ok = None
+if shutil.which("ssh-keygen"):
+    with open(_fkh2, "w") as fh:
+        fh.write("[jump.example]:2200 %s %s\n[srv.example]:2222 %s %s\n" % tuple(_kl * 2))
+    subprocess.run(["ssh-keygen", "-H", "-f", _fkh2], capture_output=True)
+    _n_named = _fk2["ssh_forget_host"]({"host": "srv.example", "port": "2222"},
+                                       "[jump.example]:2200")
+    _left_named = [ln for ln in open(_fkh2).read().splitlines() if ln.strip()]
+    with open(_fkh2, "w") as fh:
+        fh.write("[jump.example]:2200 %s %s\n[srv.example]:2222 %s %s\n" % tuple(_kl * 2))
+    subprocess.run(["ssh-keygen", "-H", "-f", _fkh2], capture_output=True)
+    _n_hops = _fk2["ssh_forget_host"]({"host": "srv.example", "port": "2222",
+                                       "jump": "me@jump.example:2200"})
+    with open(_fkh2, "w") as fh:
+        fh.write("[srv.example]:2222 %s %s\n" % tuple(_kl))
+    subprocess.run(["ssh-keygen", "-H", "-f", _fkh2], capture_output=True)
+
+    def _boom_rep(a, b):
+        raise OSError("read-only")
+    _fk2["_replace_into"] = _boom_rep
+    try:
+        _fk2["ssh_forget_host"]({"host": "srv.example", "port": "2222"})
+        _raised = False
+    except OSError:
+        _raised = True
+    _tmp_left = [f for f in os.listdir(_rdir) if f.startswith(".rkh-")]
+    _f2_ok = (_n_named == 1 and len(_left_named) == 1 and _n_hops == 2 and _raised
+              and not _tmp_left)
+_rs = {"os": os, "json": json, "tempfile": tempfile, "REMOTE_FILE": os.path.join(_rdir, "rj.json")}
+_exec_names(_rs, {"_remote_save", "drop_run_file"})
+_rs["_replace_into"] = lambda a, b: (_ for _ in ()).throw(OSError("read-only"))
+_rs["_remote_save"]({"host": "h"})
+check("Forget takes the host ssh named, or the server and its jump hosts; errors come back "
+      "as JSON and leave no temp file",
+      _f2_ok is not False and not [f for f in os.listdir(_rdir) if f.startswith(".remote-")]
+      and '"err": "couldn\'t update "' in _MILLENAI_SRC
+      and "ssh_forget_host(remote_conf(), _SSH_CHANGED[0])" in _MILLENAI_SRC,
+      "%r" % [_f2_ok, locals().get("_n_named"), locals().get("_left_named"),
+              locals().get("_n_hops"), locals().get("_raised"), locals().get("_tmp_left"),
+              [f for f in os.listdir(_rdir) if f.startswith(".remote-")]])
+
+# a failed paste: which saved entry stands (same key, not a rejection:
+# stands; same key rejected: recorded; another key working: stands; a
+# failed one or none: recorded)
+_sf = dict(_ns26)
+_exec_names(_sf, {"_cloud_save_failed", "_kept_note"})
+_sf["_cloud_txn"] = _cx26.contextmanager(_sf["_cloud_txn"]) \
+    if not hasattr(_sf["_cloud_txn"](), "__enter__") else _sf["_cloud_txn"]
+_FE = {"name": "Groq", "base": _GQ26, "key": "NEW-KEY", "status": "fail", "note": "x"}
+_sfr = []
+for _cur, _ent, _auth in ((_new26, _FE, False), (_new26, _FE, True),
+                          (dict(_new26, key="OTHER"), _FE, False),
+                          (dict(_new26, key="OTHER", status="fail"), _FE, False),
+                          ({}, _FE, False)):
+    if _cur:
+        _cf26(_cur)
+    else:
+        _cf26({})
+        with open(_ns26["CLOUD_FILE"], "w") as fh:
+            json.dump({"providers": {}}, fh)
+    _r = _sf["_cloud_save_failed"]("groq", dict(_ent), auth=_auth)
+    _sfr.append((_r, (json.load(open(_ns26["CLOUD_FILE"]))["providers"].get("groq") or {})
+                 .get("status")))
+check("a failed paste: the same key offline stands, the same key rejected is marked, "
+      "another working key stands, a failed or missing one is replaced",
+      _sfr == [("ok", "ok"), (None, "fail"), ("ok", "ok"), (None, "fail"), (None, "fail")]
+      and _sf["_kept_note"]("Groq", "ok").endswith("unchanged and still in use")
+      and "if _busy and not found:" in _MILLENAI_SRC,
+      "%r" % _sfr)
+
+# the key box stays open with cloud power off, and the badge needs no id
+check("the key box stays open with the switch off; the cloud badge doesn't need a chat id",
+      '$("#cloudkey-box").hidden=false;' in _MILLENAI_SRC
+      and "!pr2.turbo&&cs.configured" not in _MILLENAI_SRC
+      and '$("#cloudkey-box").hidden=!on' not in _MILLENAI_SRC
+      and "            if _ans_conf:\n                # the badge under the answer" in _MILLENAI_SRC,
+      "")
 
 # THE LINT (0a 5.1): no subprocess call's argument list is built from a
 # name that carries what a person typed or asked for, and no render's

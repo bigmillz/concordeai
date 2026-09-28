@@ -1374,26 +1374,35 @@ def _cloud_save_state(which: str, entry: dict, make_active=False) -> bool:
 # wrong paste, a dropped connection or a DNS failure lost the key that
 # worked. Now the working entry stays exactly as it was; a failed paste
 # is recorded only where there was no working key.
-def _cloud_save_failed(which: str, entry: dict) -> bool:
-    """True when the failed entry was recorded; False when the provider's
-    working key was kept (or nothing could be written)."""
+def _cloud_save_failed(which: str, entry: dict, auth: bool = False):
+    """Record a pasted key that failed its test. None when recorded; the
+    kept entry's status ("ok" or "fail") when the saved entry was left as
+    it was: a working key, or the same key failing for a reason that isn't
+    the provider rejecting it (a timeout, no network, a busy provider:
+    that says nothing about the key, from review). "" when nothing could
+    be written."""
     try:
         with _cloud_txn():
             d = _cloud_read_strict()
             cur = (d.get("providers") or {}).get(which)
-            if (isinstance(cur, dict) and cur.get("key")
-                    and cur.get("key") != entry.get("key")
-                    and cur.get("status", "ok") == "ok"):
-                return False
+            if isinstance(cur, dict) and cur.get("key"):
+                same = cur.get("key") == entry.get("key")
+                if ((not same and cur.get("status", "ok") == "ok")
+                        or (same and not auth)):
+                    return cur.get("status", "ok")
             d.setdefault("providers", {})[which] = entry
             _cloud_write(d)
-        return True
+        return None
     except Exception:
-        return False
+        return ""
 
 
-def _kept_note(name: str) -> str:
-    return ". Your saved %s key is unchanged and still in use" % name
+def _kept_note(name: str, kept) -> str:
+    if kept == "ok":
+        return ". Your saved %s key is unchanged and still in use" % name
+    if kept:
+        return ". Your saved %s key is unchanged" % name
+    return ""
 
 
 # A KEY'S FINGERPRINT (0a 5.12 item 13, 6b326): an HMAC under a secret
@@ -13114,6 +13123,7 @@ def remote_conf() -> dict:
 def _remote_save(d: dict):
     """Atomic and 0600 from the first byte (6b326: the connection is saved
     from a Remote run's thread too, when ssh -G resolves it)."""
+    tmp = None
     try:
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(REMOTE_FILE),
                                    prefix=".remote-")
@@ -13121,7 +13131,7 @@ def _remote_save(d: dict):
             json.dump(d, f)
         _replace_into(tmp, REMOTE_FILE)
     except Exception:
-        pass
+        drop_run_file(tmp)
 
 
 # THE REMOTE AGENT'S SSH (0a 5.1, 6b326). The host, user, port and key
@@ -13210,16 +13220,31 @@ def _ssh_fields(conf: dict) -> tuple:
     if not _SSH_USER_RX.fullmatch(user) or user.startswith("-"):
         raise ValueError("the user")
     port = _ssh_port(conf.get("port"))
-    if key and (any(ord(ch) < 32 for ch in key) or '"' in key
-                or "${" in key or key.endswith("\\")):
+    if key and not _ssh_path_ok(key):
         raise ValueError("the key path")
     return host, user, port, key, _ssh_jump(conf.get("jump"))
+
+
+def _ssh_path_ok(p: str) -> bool:
+    """A path ssh may be given in a config value: no quote, control
+    character, `${` or trailing backslash."""
+    return not (any(ord(ch) < 32 for ch in p) or '"' in p or "${" in p
+                or p.endswith("\\"))
 
 
 def _ssh_config(conf: dict) -> str:
     """The -F config for this connection (raises ValueError, see
     _ssh_fields)."""
     host, user, port, key, jump = _ssh_fields(conf)
+    agent = str(conf.get("agent") or "").strip()
+    if agent and not _ssh_path_ok(agent):
+        raise ValueError("the identity agent")
+    jkeys = conf.get("jump_keys") or {}
+    if not isinstance(jkeys, dict) or len(jkeys) > 8 or not all(
+            isinstance(h, str) and _SSH_HOST_RX.fullmatch(h)
+            and not h.startswith("-") and isinstance(k, str) and k
+            and _ssh_path_ok(k) for h, k in jkeys.items()):
+        raise ValueError("a jump host's key")
     lines = [
         # every hop, a jump host included
         "UserKnownHostsFile " + _ssh_path(REMOTE_KNOWN_HOSTS),
@@ -13232,14 +13257,27 @@ def _ssh_config(conf: dict) -> str:
         # the one-time "Permanently added" line stays out of the
         # command's output; errors still show
         "LogLevel ERROR"]
+    if IS_MAC:
+        # a key whose passphrase sits in the macOS keychain keeps working
+        # (it was unlocked through ~/.ssh/config's UseKeychain); an ssh
+        # that doesn't know the word ignores it
+        lines += ["IgnoreUnknown UseKeychain", "UseKeychain yes"]
+    if agent:
+        # an agent ssh's own config named (1Password and the like)
+        lines.append("IdentityAgent " + _ssh_path(agent))
     if key:
-        # a jump host gets the key too; the server takes only it
+        # a jump host gets the key too
         lines.append("IdentityFile " + _ssh_path(key))
+    for h, k in jkeys.items():
+        # a jump host's own key, from ssh's config
+        lines += ["Host " + h, "  IdentityFile " + _ssh_path(k)]
     lines += ["Host " + SSH_ALIAS,
               "  HostName " + host,
               "  User " + _ssh_quote(user),
               "  Port %d" % port]
-    if key:
+    if key and conf.get("key_src") != "config":
+        # the key typed here is the only one offered; one that came from
+        # ssh's config leaves the others (agent, defaults) as they were
         lines.append("  IdentitiesOnly yes")
     if jump:
         lines.append("  ProxyJump " + jump)
@@ -13265,53 +13303,97 @@ SSH_OWN_SETTINGS = ("ConcordeAI connects with its own settings; put the "
                     "server's real address, user, port and key here.")
 SSH_KEY_CHANGED = ("This server's identity changed since ConcordeAI first "
                    "connected. If you rebuilt it, forget its old key.")
+_SSH_CHANGED_RX = re.compile(r"Host key for (\S+) has changed")
+_SSH_CHANGED = [None]       # the host ssh last said changed, for Forget
 
 
-def _ssh_resolve(conf: dict):
+_REMOTE_FIELDS = ("host", "user", "port", "key", "jump")
+
+
+def _ssh_g(host: str, user=None, port=None):
+    """ssh's own reading of its config for one host (`ssh -G`, which
+    doesn't connect): {hostname, user, port, proxyjump, identityagent,
+    identityfile: [...]}, or None. The host is on this command line for
+    that moment only."""
+    argv = ["ssh", "-G"] + (
+        # a dev copy's test hook: a stand-in for ~/.ssh/config, so the
+        # gauntlet never has ssh read the real one
+        ["-F", _SSH_G_CONFIG] if _SSH_G_CONFIG else []) + (
+        ["-l", user] if user else []) + (
+        ["-p", str(port)] if port else []) + ["--", host]
+    p = subprocess.run(argv, capture_output=True, timeout=15)
+    if p.returncode != 0:
+        return None
+    got = {"identityfile": []}
+    for ln in p.stdout.decode("utf-8", "replace").splitlines():
+        k, _, v = ln.strip().partition(" ")
+        k, v = k.lower(), v.strip()
+        if k == "identityfile":
+            got["identityfile"].append(v)
+        elif k in ("hostname", "user", "port", "proxyjump", "identityagent"):
+            got.setdefault(k, v)
+    return got
+
+
+def _ssh_key_from(files) -> str:
+    """The first key ssh's config names that exists, isn't one of ssh's
+    default names (tried anyway) and can go in a config value; ''."""
+    for k in files or []:
+        kp = os.path.expanduser(k)
+        if (os.path.basename(kp) not in _SSH_DEFAULT_KEYS
+                and os.path.isfile(kp) and _ssh_path_ok(kp)):
+            return kp
+    return ""
+
+
+def _ssh_resolve(conf: dict, migrate: bool = False):
     """What ssh's own config (~/.ssh/config, read by ssh, never by the
-    app) makes of this setup: a copy of conf with HostName, User, Port,
-    IdentityFile (only when conf has no key and the file exists and isn't
-    one of ssh's defaults) and ProxyJump filled in, or None. `ssh -G`
-    prints the result without connecting; the host is on its command line
-    for that moment only. User and a port other than 22 go in as the app
-    always sent them, so they win over the config as they did."""
+    app) makes of this setup: a copy of conf with HostName, User and Port
+    filled in, each ProxyJump hop resolved the same way and saved as
+    user@hostname:port (an alias means nothing under -F) with its own key
+    when the config gives it one, and IdentityAgent; or None. User and a
+    port other than 22 go in as the app always sent them, so they win over
+    the config as they did. A key goes into a blank key field only in the
+    one-time `migrate`, marked key_src "config"."""
     try:
         host, user, port, key, jump = _ssh_fields(conf)
-        argv = ["ssh", "-G"] + (
-            # a dev copy's test hook: a stand-in for ~/.ssh/config, so the
-            # gauntlet never has ssh read the real one
-            ["-F", _SSH_G_CONFIG] if _SSH_G_CONFIG else []) + [
-            "-l", user] + (["-p", str(port)] if port != 22 else []) + [
-            "--", host]
-        p = subprocess.run(argv, capture_output=True, timeout=15)
-        if p.returncode != 0:
+        g = _ssh_g(host, user, port if port != 22 else None)
+        if not g:
             return None
-        got = {}
-        keys = []
-        for ln in p.stdout.decode("utf-8", "replace").splitlines():
-            k, _, v = ln.strip().partition(" ")
-            k = k.lower()
-            if k == "identityfile":
-                keys.append(v.strip())
-            elif k in ("hostname", "user", "port", "proxyjump"):
-                got.setdefault(k, v.strip())
         new = dict(conf)
-        if got.get("hostname"):
-            new["host"] = got["hostname"]
-        if got.get("user"):
-            new["user"] = got["user"]
-        if got.get("port"):
-            new["port"] = got["port"]
-        if got.get("proxyjump") and not jump:
-            new["jump"] = got["proxyjump"]
-        if not key:
-            for k in keys:
-                kp = os.path.expanduser(k)
-                if (os.path.basename(kp) not in _SSH_DEFAULT_KEYS
-                        and os.path.isfile(kp)):
-                    new["key"] = kp
-                    break
-        _ssh_fields(new)                # nothing unchecked is kept
+        if g.get("hostname"):
+            new["host"] = g["hostname"]
+        if g.get("user"):
+            new["user"] = g["user"]
+        if g.get("port"):
+            new["port"] = g["port"]
+        pj = g.get("proxyjump") or ""
+        if pj and pj.lower() != "none" and not jump:
+            hops, jkeys = [], {}
+            for hop in pj.split(","):
+                hu, _, hh = hop.strip().rpartition("@")
+                hh, _, hp = hh.partition(":")
+                hg = _ssh_g(hh, hu or None, hp or None)
+                if not hg:
+                    return None
+                hname = hg.get("hostname") or hh
+                hops.append("%s@%s:%s" % (hg.get("user") or hu or user, hname,
+                                          hg.get("port") or hp or "22"))
+                hk = _ssh_key_from(hg.get("identityfile"))
+                if hk:
+                    jkeys[hname] = hk
+            new["jump"] = ",".join(hops)
+            if jkeys:
+                new["jump_keys"] = jkeys
+        if migrate and not key:
+            k = _ssh_key_from(g.get("identityfile"))
+            if k:
+                new["key"], new["key_src"] = k, "config"
+        ag = g.get("identityagent") or ""
+        if (ag and not conf.get("agent") and ag.lower() not in
+                ("none", "ssh_auth_sock") and not ag.startswith("$")):
+            new["agent"] = os.path.expanduser(ag)
+        _ssh_config(new)                # nothing unchecked is kept
         return new
     except Exception:
         return None
@@ -13319,18 +13401,20 @@ def _ssh_resolve(conf: dict):
 
 def _remote_resolved(conf: dict, again: bool = False) -> dict:
     """The setup to connect with: resolved once (a setup saved before this
-    build) or `again` after a name or key failure; saved into remote.json
-    when it is the saved setup. Unchanged when nothing new came back."""
+    build: `migrate`) or `again` after a name or key failure. Saved into
+    remote.json only while the file still holds exactly what was resolved
+    (host, user, port, key, jump), so an edit made meanwhile stands.
+    Settings typed into the app are saved already resolved."""
     if not conf.get("host") or (conf.get("resolved") and not again):
         return conf
-    new = _ssh_resolve(conf) or dict(conf)
+    new = _ssh_resolve(conf, migrate=not again) or dict(conf)
     new["resolved"] = True
     try:
         cur = remote_conf()
-        if cur.get("host") == conf.get("host"):
-            _remote_save(dict(cur, **{k: new[k] for k in
-                                      ("host", "user", "port", "key", "jump",
-                                       "resolved") if k in new}))
+        if all(str(cur.get(k) or "") == str(conf.get(k) or "")
+               for k in _REMOTE_FIELDS):
+            _remote_save(dict(cur, **{k: new[k] for k in _REMOTE_FIELDS + (
+                "resolved", "key_src", "agent", "jump_keys") if k in new}))
     except Exception:
         pass
     return new
@@ -13378,36 +13462,56 @@ def ssh_run(conf: dict, cmd: str, timeout: int = 120):
     failed; the text carries ssh's own words so the UI can guide. A setup
     saved before 6b326 is resolved once through ssh's own config; a name
     or key failure resolves it again and tries once more."""
-    conf = _remote_resolved(conf)
+    # the caller's copy is updated in place, so a run that holds one
+    # snapshot resolves it once, not at every command (from review)
+    new = _remote_resolved(conf)
+    if new is not conf:
+        conf.clear()
+        conf.update(new)
     rc, out = _ssh_once(conf, cmd, timeout)
+    if rc == 255 and _SSH_RESOLVE_RX.search(out) and not conf.get("_again"):
+        new = _remote_resolved(dict(conf), again=True)
+        conf["_again"] = True           # once per snapshot
+        if any(new.get(k) != conf.get(k) for k in _REMOTE_FIELDS):
+            conf.update(new)
+            rc, out = _ssh_once(conf, cmd, timeout)
     if rc == 255 and _SSH_RESOLVE_RX.search(out):
-        new = _remote_resolved(conf, again=True)
-        if {k: new.get(k) for k in ("host", "user", "port", "key", "jump")} != \
-                {k: conf.get(k) for k in ("host", "user", "port", "key", "jump")}:
-            rc, out = _ssh_once(new, cmd, timeout)
-        if rc == 255 and _SSH_RESOLVE_RX.search(out):
-            out = out.rstrip("\n") + "\n" + SSH_OWN_SETTINGS
+        out = out.rstrip("\n") + "\n" + SSH_OWN_SETTINGS
     if rc == 255 and _SSH_HOSTKEY_RX.search(out):
+        # the host ssh names is the one to forget: a jump host's change
+        # names the jump host (from review)
+        m = _SSH_CHANGED_RX.search(out)
+        _SSH_CHANGED[0] = m.group(1) if m else None
         out = out.rstrip("\n") + "\n" + SSH_KEY_CHANGED
     return rc, out
 
 
-def ssh_forget_host(conf: dict) -> int:
-    """Remove this server's entries from remote_known_hosts (the app's
-    own list; ~/.ssh is never touched): each hashed `|1|salt|hash` line
-    whose HMAC-SHA1(salt, name) matches, name being the host, or
-    [host]:port off port 22, and any plain line naming it. The count."""
-    try:
-        host, _user, port, _key, _jump = _ssh_fields(conf)
-    except ValueError:
-        return 0
-    names = {host, host.lower()}
-    if port != 22:
-        names = {"[%s]:%d" % (n, port) for n in names}
+def ssh_forget_host(conf: dict, name=None) -> int:
+    """Remove a server's entries from remote_known_hosts (the app's own
+    list; ~/.ssh is never touched): each hashed `|1|salt|hash` line whose
+    HMAC-SHA1(salt, name) matches, and any plain line naming it. `name` is
+    the host as ssh named it in "Host key for <name> has changed" (a jump
+    host's, when that one changed); without it, the server and every jump
+    hop (`[host]:port` off port 22). The count; raises OSError or
+    ValueError when the list can't be read or written, and leaves no temp
+    file behind."""
+    if name:
+        names = {name, name.lower()}
+    else:
+        host, _user, port, _key, jump = _ssh_fields(conf)
+        targets = [(host, port)]
+        for hop in [h for h in jump.split(",") if h]:
+            hh = hop.rpartition("@")[2]
+            hh, _, hp = hh.partition(":")
+            targets.append((hh, _ssh_port(hp or "22")))
+        names = set()
+        for h, pt in targets:
+            for n in (h, h.lower()):
+                names.add(n if pt == 22 else "[%s]:%d" % (n, pt))
     try:
         with open(REMOTE_KNOWN_HOSTS, encoding="utf-8") as f:
             lines = f.read().splitlines(True)
-    except OSError:
+    except FileNotFoundError:
         return 0
     keep, gone = [], 0
     for ln in lines:
@@ -13431,9 +13535,13 @@ def ssh_forget_host(conf: dict) -> int:
     if gone:
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(REMOTE_KNOWN_HOSTS),
                                    prefix=".rkh-")
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write("".join(keep))
-        _replace_into(tmp, REMOTE_KNOWN_HOSTS)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write("".join(keep))
+            _replace_into(tmp, REMOTE_KNOWN_HOSTS)
+        except BaseException:
+            drop_run_file(tmp)
+            raise
     return gone
 
 
@@ -16271,26 +16379,38 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     hint = (" — the key is the right shape, so this isn't a "
                             "bad paste: it has been revoked or regenerated. "
                             "Issue a fresh one")
-                _kept = not _cloud_save_failed(which, {
+                _kept = _cloud_save_failed(which, {
                     "name": name, "base": base, "key": key, "model": model,
                     "status": "fail",
-                    "note": (detail or ("HTTP %s" % exc.code))[:120]})
+                    "note": (detail or ("HTTP %s" % exc.code))[:120]},
+                    auth=cloud_failure_kind(exc.code, raw or detail) == "auth")
                 self._send_json({"ok": False,
                                  "err": "that key didn't work: %s%s%s"
                                         % (detail or ("HTTP %s"
                                            % exc.code), hint,
-                                           _kept_note(name) if _kept
-                                           else "")})
+                                           _kept_note(name, _kept))})
                 return
             except Exception as exc:
-                _kept = not _cloud_save_failed(which, {
+                _kept = _cloud_save_failed(which, {
                     "name": name, "base": base, "key": key, "model": model,
                     "status": "fail", "note": str(exc)[:80]})
                 self._send_json({"ok": False,
                                  "err": "that key didn't work (%s)%s"
                                         % (str(exc)[:60],
-                                           _kept_note(name) if _kept
-                                           else "")})
+                                           _kept_note(name, _kept))})
+                return
+            if _busy and not found:
+                # every model answered 5xx and discovery found nothing:
+                # the key was never checked (from review), so it is saved
+                # only where it replaces nothing that works
+                _kept = _cloud_save_failed(which, {
+                    "name": name, "base": base, "key": key, "model": model,
+                    "status": "fail",
+                    "note": "%s was busy; the key wasn't checked" % name})
+                self._send_json({"ok": False,
+                                 "err": "couldn't check that key: %s is busy "
+                                        "right now. Try again in a minute%s."
+                                        % (name, _kept_note(name, _kept))})
                 return
             try:
                 # the entry is written fresh, so the persisted retirement
@@ -16379,15 +16499,23 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         "key": str(d.get("key", "")).strip()[:300],
                         # an optional jump host (6b326): -F means ssh no
                         # longer reads a ProxyJump from ~/.ssh/config
-                        "jump": str(d.get("jump", "")).strip()[:300]}
+                        "jump": str(d.get("jump", "")).strip()[:300],
+                        # typed here: never re-read from ssh's config
+                        "resolved": True}
                 _remote_save(conf)
                 self._send_json({"ok": True})
                 return
             if self.path == "/api/remote/forget":
-                # the server's entry in the app's own host-key list, after
-                # a rebuild changed its identity (6b326)
-                self._send_json({"ok": True,
-                                 "removed": ssh_forget_host(remote_conf())})
+                # the entry ssh said changed (or the server's and its jump
+                # hosts') in the app's own host-key list (6b326)
+                try:
+                    _n = ssh_forget_host(remote_conf(), _SSH_CHANGED[0])
+                    _SSH_CHANGED[0] = None
+                    self._send_json({"ok": True, "removed": _n})
+                except Exception as exc:
+                    self._send_json({"ok": False, "err": "couldn't update "
+                                     "ConcordeAI's host list: %s"
+                                     % str(exc)[:120]})
                 return
             if self.path == "/api/remote/test":
                 conf = remote_conf()
@@ -18542,8 +18670,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if _ans_conf and _title_cid:
                 _last_cloud[(str(user_base), _title_cid)] = (
                     _ans_conf, time.time())
+            if _ans_conf:
                 # the badge under the answer says "cloud", whatever the
-                # line-up said up front (a picture Claude read, 6b308)
+                # line-up said up front (a picture Claude read, 6b308);
+                # a chat with no id gets it too (6b326, from review)
                 try:
                     _write((NUL + "RUN:" + json.dumps({"w": "cloud"})
                             + NUL).encode("utf-8"))
@@ -23800,8 +23930,8 @@ if($("#rm-forget"))$("#rm-forget").addEventListener("click",async()=>{
   try{
     const r=await(await api("/api/remote/forget",{method:"POST",
       headers:{"Content-Type":"application/json"},body:"{}"})).json();
-    note.textContent=r.removed
-      ?"Forgot its old key. Test the connection to accept the new one."
+    note.textContent=r.ok===false?(r.err||"couldn't forget it")
+      :r.removed?"Forgot its old key. Test the connection to accept the new one."
       :"No old key was on file for this server.";
     $("#rm-forget").hidden=true;
   }catch(e){note.textContent="network error";}
@@ -28181,13 +28311,11 @@ async function openAbout(){
       try{
         const cs=await(await api("/api/cloud")).json();
         $("#turbo-row").hidden=!cs.configured;
-        // THE KEY BOX IS THE ONLY DOOR (6b245): folding it behind the
-        // cloud-power toggle left a FRESH machine's pane empty — the
-        // toggle hides too when nothing is configured, so there was no
-        // way to paste the first key. Open while the feature is on OR
-        // while there is no key yet; it folds only for someone who has
-        // keys and switched the feature off.
-        $("#cloudkey-box").hidden=!pr2.turbo&&cs.configured;
+        // THE KEY BOX IS THE ONLY DOOR (6b245), and it stays open with
+        // cloud power off (6b326, from review): a saved key is used for
+        // pictures and video whatever the switch says, so a key must be
+        // pasted or replaced without switching chats to the cloud first
+        $("#cloudkey-box").hidden=false;
         if(typeof ckBoard==="function")
           ckBoard(cs.providers,cs.active);
         paintTierAvail();
@@ -29067,7 +29195,7 @@ $("#forget-go").addEventListener("click",async ev=>{
 // showing cloud power on while chats run on this computer
 $("#turbo").addEventListener("change",async()=>{
   const on=$("#turbo").checked,note=$("#turbo-note");
-  $("#cloudkey-box").hidden=!on;note.hidden=true;
+  note.hidden=true;
   let ok=false;
   try{
     const r=await api("/api/prefs",{method:"POST",
@@ -29076,7 +29204,7 @@ $("#turbo").addEventListener("change",async()=>{
     ok=r.ok&&!!(await r.json()).ok;
   }catch(e){}
   if(!ok){
-    $("#turbo").checked=!on;$("#cloudkey-box").hidden=on;
+    $("#turbo").checked=!on;
     note.textContent="Couldn\u2019t save that. Cloud power is still "+(on?"off":"on")+".";
     note.hidden=false;
   }
