@@ -13120,7 +13120,7 @@ def remote_conf() -> dict:
         return {}
 
 
-def _remote_save(d: dict):
+def _remote_save(d: dict) -> bool:
     """Atomic and 0600 from the first byte (6b326: the connection is saved
     from a Remote run's thread too, when ssh -G resolves it)."""
     tmp = None
@@ -13130,8 +13130,10 @@ def _remote_save(d: dict):
         with os.fdopen(fd, "w") as f:
             json.dump(d, f)
         _replace_into(tmp, REMOTE_FILE)
+        return True
     except Exception:
         drop_run_file(tmp)
+        return False
 
 
 # THE REMOTE AGENT'S SSH (0a 5.1, 6b326). The host, user, port and key
@@ -13162,8 +13164,26 @@ SSH_SHELL = ("exec sh -c 'if command -v bash >/dev/null 2>&1; then exec bash"
 _SSH_HOST_RX = re.compile(r"[A-Za-z0-9._:-]{1,253}")
 # DOMAIN\user reaches a Windows OpenSSH server
 _SSH_USER_RX = re.compile(r"(?:[A-Za-z0-9._-]{1,64}\\)?[A-Za-z0-9._@-]{1,80}")
-_SSH_JUMP_RX = re.compile(r"(?:[A-Za-z0-9._-]{1,80}@)?[A-Za-z0-9._-]{1,253}"
-                          r"(?::[0-9]{1,5})?")
+# a hop: [user@]host[:port], the host bare or in brackets (ssh -G prints
+# an address as [203.0.113.5], and IPv6 needs them: [fe80::1]:22)
+_SSH_JUMP_RX = re.compile(r"(?:[A-Za-z0-9._-]{1,80}@)?(?:[A-Za-z0-9._-]{1,253}|"
+                          r"\[[0-9A-Fa-f:.]{2,45}\])(?::[0-9]{1,5})?")
+
+
+def _hop_split(hop: str) -> tuple:
+    """(user, host, port) of one `[user@]host[:port]` hop, the host out of
+    its brackets; '' for what isn't there."""
+    user, _, rest = hop.strip().rpartition("@")
+    if rest.startswith("["):
+        host, _, tail = rest[1:].partition("]")
+        port = tail[1:] if tail.startswith(":") else ""
+    else:
+        host, _, port = rest.partition(":")
+    return user, host, port
+
+
+def _hop_join(user: str, host: str, port) -> str:
+    return "%s@%s:%s" % (user, "[%s]" % host if ":" in host else host, port)
 # ssh's own names for its default keys: `ssh -G` lists them whether or
 # not a config names a key, and they are tried anyway without one
 _SSH_G_CONFIG = _hook_arg("ssh-config")
@@ -13202,8 +13222,11 @@ def _ssh_jump(jump) -> str:
     for h in hops:
         if not _SSH_JUMP_RX.fullmatch(h) or h.startswith("-") or len(hops) > 8:
             raise ValueError("the jump host")
-        if ":" in h:
-            _ssh_port(h.rsplit(":", 1)[1])
+        _u, hh, hp = _hop_split(h)
+        if not hh or hh.startswith("-"):
+            raise ValueError("the jump host")
+        if hp:
+            _ssh_port(hp)
     return ",".join(hops)
 
 
@@ -13310,6 +13333,27 @@ _SSH_CHANGED = [None]       # the host ssh last said changed, for Forget
 _REMOTE_FIELDS = ("host", "user", "port", "key", "jump")
 
 
+def _remote_merge(cur: dict, posted: dict):
+    """What Save (and Test, which saves first) writes: None when the form
+    holds what is saved already, so a resolved setup keeps everything the
+    form doesn't show. Otherwise the form's fields, the IdentityAgent, the
+    jump hosts' keys while the jump is unchanged, the key's source while
+    the key is unchanged, and `resolved` (the person typed it) (from
+    review: a Test used to drop them and mark an unmigrated setup
+    resolved)."""
+    same = lambda k: str(cur.get(k) or "") == str(posted.get(k) or "")
+    if all(same(k) for k in _REMOTE_FIELDS):
+        return None
+    new = dict(posted, resolved=True)
+    if cur.get("agent"):
+        new["agent"] = cur["agent"]
+    if same("jump") and cur.get("jump_keys"):
+        new["jump_keys"] = cur["jump_keys"]
+    if same("key") and cur.get("key_src"):
+        new["key_src"] = cur["key_src"]
+    return new
+
+
 def _ssh_g(host: str, user=None, port=None):
     """ssh's own reading of its config for one host (`ssh -G`, which
     doesn't connect): {hostname, user, port, proxyjump, identityagent,
@@ -13371,14 +13415,14 @@ def _ssh_resolve(conf: dict, migrate: bool = False):
         if pj and pj.lower() != "none" and not jump:
             hops, jkeys = [], {}
             for hop in pj.split(","):
-                hu, _, hh = hop.strip().rpartition("@")
-                hh, _, hp = hh.partition(":")
+                hu, hh, hp = _hop_split(hop)
                 hg = _ssh_g(hh, hu or None, hp or None)
                 if not hg:
                     return None
                 hname = hg.get("hostname") or hh
-                hops.append("%s@%s:%s" % (hg.get("user") or hu or user, hname,
-                                          hg.get("port") or hp or "22"))
+                hname = hname.strip("[]")
+                hops.append(_hop_join(hg.get("user") or hu or user, hname,
+                                      hg.get("port") or hp or "22"))
                 hk = _ssh_key_from(hg.get("identityfile"))
                 if hk:
                     jkeys[hname] = hk
@@ -13479,10 +13523,16 @@ def ssh_run(conf: dict, cmd: str, timeout: int = 120):
         out = out.rstrip("\n") + "\n" + SSH_OWN_SETTINGS
     if rc == 255 and _SSH_HOSTKEY_RX.search(out):
         # the host ssh names is the one to forget: a jump host's change
-        # names the jump host (from review)
-        m = _SSH_CHANGED_RX.search(out)
+        # names the jump host (from review). ssh prints it last, after
+        # anything the server printed; ssh_forget_host takes it only when
+        # it is this server or one of its jump hosts
+        m = None
+        for m in _SSH_CHANGED_RX.finditer(out):
+            pass
         _SSH_CHANGED[0] = m.group(1) if m else None
         out = out.rstrip("\n") + "\n" + SSH_KEY_CHANGED
+    elif rc == 0:
+        _SSH_CHANGED[0] = None
     return rc, out
 
 
@@ -13495,19 +13545,20 @@ def ssh_forget_host(conf: dict, name=None) -> int:
     hop (`[host]:port` off port 22). The count; raises OSError or
     ValueError when the list can't be read or written, and leaves no temp
     file behind."""
-    if name:
-        names = {name, name.lower()}
-    else:
-        host, _user, port, _key, jump = _ssh_fields(conf)
-        targets = [(host, port)]
-        for hop in [h for h in jump.split(",") if h]:
-            hh = hop.rpartition("@")[2]
-            hh, _, hp = hh.partition(":")
-            targets.append((hh, _ssh_port(hp or "22")))
-        names = set()
-        for h, pt in targets:
-            for n in (h, h.lower()):
-                names.add(n if pt == 22 else "[%s]:%d" % (n, pt))
+    host, _user, port, _key, jump = _ssh_fields(conf)
+    targets = [(host, port)]
+    for hop in [h for h in jump.split(",") if h]:
+        _hu, hh, hp = _hop_split(hop)
+        targets.append((hh, _ssh_port(hp or "22")))
+    allowed = set()
+    for h, pt in targets:
+        for n in (h, h.lower()):
+            allowed.add(n if pt == 22 else "[%s]:%d" % (n, pt))
+    # the name ssh gave counts only when it is the server or one of its
+    # jump hosts (from review): the output it was read from also holds
+    # whatever the server printed, and the name is kept process-wide
+    names = {n for n in ((name, name.lower()) if name else ()) if n in allowed}
+    names = names or allowed
     try:
         with open(REMOTE_KNOWN_HOSTS, encoding="utf-8") as f:
             lines = f.read().splitlines(True)
@@ -16383,7 +16434,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     "name": name, "base": base, "key": key, "model": model,
                     "status": "fail",
                     "note": (detail or ("HTTP %s" % exc.code))[:120]},
-                    auth=cloud_failure_kind(exc.code, raw or detail) == "auth")
+                    # a key /models answered for isn't rejected (review)
+                    auth=(cloud_failure_kind(exc.code, raw or detail) == "auth"
+                          and not found))
                 self._send_json({"ok": False,
                                  "err": "that key didn't work: %s%s%s"
                                         % (detail or ("HTTP %s"
@@ -16492,17 +16545,21 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         pass
                     self._send_json({"ok": True, "cleared": True})
                     return
-                conf = {"host": host,
-                        "user": str(d.get("user", "root")).strip()[:80]
-                        or "root",
-                        "port": str(d.get("port", "22")).strip()[:6] or "22",
-                        "key": str(d.get("key", "")).strip()[:300],
-                        # an optional jump host (6b326): -F means ssh no
-                        # longer reads a ProxyJump from ~/.ssh/config
-                        "jump": str(d.get("jump", "")).strip()[:300],
-                        # typed here: never re-read from ssh's config
-                        "resolved": True}
-                _remote_save(conf)
+                posted = {"host": host,
+                          "user": str(d.get("user", "root")).strip()[:80]
+                          or "root",
+                          "port": str(d.get("port", "22")).strip()[:6]
+                          or "22",
+                          "key": str(d.get("key", "")).strip()[:300],
+                          # an optional jump host (6b326): -F means ssh
+                          # no longer reads a ProxyJump from ~/.ssh/config
+                          "jump": str(d.get("jump", "")).strip()[:300]}
+                conf = _remote_merge(remote_conf(), posted)
+                if conf is not None and not _remote_save(conf):
+                    self._send_json({"ok": False, "err": "couldn't save the "
+                                     "connection settings: check that the "
+                                     "ConcordeAI folder isn't read-only"})
+                    return
                 self._send_json({"ok": True})
                 return
             if self.path == "/api/remote/forget":

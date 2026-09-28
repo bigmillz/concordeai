@@ -5711,7 +5711,8 @@ server and commands.
   unchanged and still in use"; a failed paste is recorded only where no
   working key was. The same key pasted again and failing for anything
   but the provider rejecting it (no network, a timeout) leaves its entry
-  as it was too; a rejection marks it failed. A key that met only busy
+  as it was too; a rejection marks it failed (a 403 on a key `/models`
+  just answered for isn't a rejection). A key that met only busy
   answers (every model 5xx) and no model list was never checked: it is
   saved only through the same rule, and the reply says the provider is
   busy. `provider: "off"` removes cloud.json inside the cloud lock, so a
@@ -5789,6 +5790,16 @@ server and commands.
     "config"`. An IdentityAgent comes across (`agent`). All of it is
     saved into remote.json, but only while the file still holds what
     was resolved, so an edit made meanwhile stands.
+  - Save (and Test, which saves first) leaves remote.json untouched when
+    the form holds what is saved already, so a migrated setup keeps its
+    jump keys, agent and key source and an unmigrated one isn't marked
+    resolved before its one-time lookup. A change keeps the agent, the
+    jump keys while the jump is unchanged and the key source while the
+    key is unchanged, and marks the setup `resolved` (typed values are
+    never re-read); a write that fails answers ok:false with the reason.
+    Hops are read as ssh -G prints them, an address in brackets
+    (`root@[203.0.113.5]:2222`), and an IPv6 hop is kept in brackets
+    (`ops@[fe80::1]:22`).
   - Settings typed into the app are saved `resolved: true`. A
     connection that fails with "Could not resolve hostname" or
     "Permission denied (publickey)" resolves again (no key copied) and
@@ -5808,8 +5819,10 @@ server and commands.
     key." `/api/remote/test` says `changed`, and the connection bar shows
     **Forget its old key**: `POST /api/remote/forget` removes, from the
     app's own list only, the host ssh named in "Host key for <name> has
-    changed" (a jump host's, when that one changed; without a name, the
-    server and every jump hop): each `|1|salt|hash` line whose
+    changed" (a jump host's, when that one changed), but only when that
+    name is this server or one of its jump hosts (ssh's lines come with
+    whatever the server printed, and the name is kept process-wide);
+    otherwise the server and every jump hop: each `|1|salt|hash` line whose
     HMAC-SHA1(salt, name) matches (`[host]:port` off port 22), and any
     plain line naming it. A list it can't read or write comes back as a
     JSON error, and no temp file is left (the same for remote.json's
@@ -5848,7 +5861,7 @@ server and commands.
   `~/.ssh/config`, so the gauntlet never has ssh read the real one. The
   key-save route, Gemini pictures and Veo read their addresses from
   those names.
-- Gauntlet: 34 new checks and 9 older ones updated; 347 becomes 381.
+- Gauntlet: 37 new checks and 9 older ones updated; 347 becomes 384.
   Two copies on 9903 run with the stub as their provider base and
   HTTPS proxy (a request to a real provider host would be recorded as
   a CONNECT and refused), the Hub offline for any engine they start:
@@ -5892,10 +5905,18 @@ server and commands.
   per hop with jump keys, the key only at migration, the agent and
   keychain lines, Forget by the named host, JSON errors with no temp
   file, the same key offline, an unchecked busy key, the open key box,
-  and the badge without a chat id. 65 mutations (48 of the rework, 17
-  of the verifier's fixes) each fail at least one check; a late 401
-  alone is caught only with both key checks removed, since the patch
-  and `cloud_note_failure` each check.
+  and the badge without a chat id; and the final review's: Save/Test
+  leaving a migrated file byte for byte (live), the merge's rules, a
+  failed save answering ok:false, bracketed and IPv6 hops (read back
+  by ssh -G), Forget ignoring a name from the server's own output, and
+  a 403 after /models. 75 mutations (48 of the rework, 17 of the
+  verifier's fixes, 10 of the final review's) each fail at least one
+  check; a late 401 alone is caught only with both key checks removed,
+  since the patch and `cloud_note_failure` each check.
+- Not done (left for later, from the final review): a jump host whose
+  own config names a further ProxyJump (the chain beyond the first hop
+  isn't carried), `ssh://user@host:port` ProxyJump URIs, and the
+  Windows local username that `ssh -G` puts in a hop with no user.
 - Not verified here: Windows OpenSSH taking `GlobalKnownHostsFile NUL`,
   a `-F` file under `%LOCALAPPDATA%` (its permission check) and
   DOMAIN\user against a real Windows server; the `taskkill /T` stop of
