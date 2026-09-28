@@ -833,14 +833,19 @@ check("the hot status endpoint is cheap and the idle strip cheaper",
 # cloud.json: four threads resting four providers at once must never
 # lose a key or leave the file unreadable (it did in 71 of 500 rounds)
 _cd = _LH["tempfile"].mkdtemp(); _cf = os.path.join(_cd, "cloud.json")
-_cns = dict(_LH, CLOUD_FILE=_cf, QUOTA_COOLDOWN=600.0, IS_WIN=False)
+_cns = dict(_LH, CLOUD_FILE=_cf, QUOTA_COOLDOWN=600.0, IS_WIN=False,
+            hmac=__import__("hmac"), hashlib=__import__("hashlib"))
 import ast as _ast
 _ctree = _ast.parse(_MILLENAI_SRC)
 exec(_MILLENAI_SRC[_MILLENAI_SRC.index("try:\n    import fcntl as _fcntl"):
                    _MILLENAI_SRC.index("def _cloud_save_state(")], _cns)
+# (6b326) a rest is a key-checked _cloud_patch
 for _n in _ctree.body:
-    if isinstance(_n, _ast.FunctionDef) and _n.name in (
-            "_cloud_all", "_cloud_save_state", "cloud_cool", "_replace_into"):
+    if (isinstance(_n, _ast.FunctionDef) and _n.name in (
+            "_cloud_all", "_cloud_save_state", "cloud_cool", "_replace_into",
+            "_cloud_patch", "_same_key", "_key_fp")) or (
+            isinstance(_n, _ast.Assign) and getattr(_n.targets[0], "id", "")
+            in ("_KEY_FP_SALT", "_FAIL_FIELDS")):
         exec(_ast.get_source_segment(_MILLENAI_SRC, _n), _cns)
 _bad = 0
 for _r in range(60):
@@ -848,7 +853,7 @@ for _r in range(60):
                              for p in "abcd"}, "active": "a"}, open(_cf, "w"))
     _bar = _cns["threading"].Barrier(4)
     def _w(p):
-        _bar.wait(); _cns["cloud_cool"](p, "rest", 60)
+        _bar.wait(); _cns["cloud_cool"](p, "rest", 60, key="K" + p)
     _ts = [_cns["threading"].Thread(target=_w, args=(p,)) for p in "abcd"]
     [x.start() for x in _ts]; [x.join() for x in _ts]
     try:
@@ -940,7 +945,8 @@ check("the gear dialog exists and offers only live controls",
       # both confirmed dead by running the engine: mflux warns that
       # --negative-prompt is ignored, and never reads --lora-style
       and "lora-style" not in page and "lora_style" not in _MILLENAI_SRC
-      and '"--negative-prompt", o["neg"]' in _MILLENAI_SRC
+      # (6b326) its words ride the 0600 prompt file, not the command line
+      and 'args += ["--negative-prompt", "@prompt:neg"]' in _MILLENAI_SRC
       and _MILLENAI_SRC.count('"--negative-prompt"') == 1)
 # 6b299/6b300/6b301, per Patrick: video alongside image, a colour-coded
 # size ladder, both removable, and intent that understands "make the
@@ -2619,11 +2625,13 @@ check("review fixes: chat copy, autonomy, downloads, image label, photos",
       and 'localStorage.setItem("millen.autonomy"' not in _MILLENAI_SRC
       and "dlDirect(a)" in _MILLENAI_SRC
       and 'window.location.href=a.getAttribute("href")' not in _MILLENAI_SRC
-      and '"in the cloud" if _cloud_img else ""' in _MILLENAI_SRC
+      # (6b326) with no painter at all nothing starts, so no label can
+      # say "in the cloud"
+      and "            if not image_ready() and not _cloud_img:\n" in _MILLENAI_SRC
       and 'if p.startswith("https://")][:3]' in _MILLENAI_SRC
       and 'img.startswith("https://")' in _MILLENAI_SRC
       and "r'(https://[^" in _MILLENAI_SRC and "(https?://[^" not in _MILLENAI_SRC
-      and "A question that needs the web goes, as\n      typed, to a search engine"
+      and "A question\n      that needs the web goes, as typed, to a search engine"
       in _MILLENAI_SRC)
 # (3) NO KEYLESS CLOUD. Pollinations got whole prompts (memory and name
 # included) when cloud power was on without a key, and image
@@ -2635,8 +2643,13 @@ check("Pollinations is gone and the Cloud power copy tells the truth",
       and "_free_cold" not in _MILLENAI_SRC
       and "community cloud" not in _MILLENAI_SRC.lower()
       and "leave this machine\n      only while a key is on" not in _MILLENAI_SRC
-      and "Your chats reach a cloud provider\n      only while a key is on"
-      in _MILLENAI_SRC)
+      # (6b326) the one cloud gate's copy (0a 5.5): the key alone no
+      # longer decides, the switch or the Cloud Only tier does
+      and "only while a key is on" not in _MILLENAI_SRC
+      and ("Your prompts leave this\n      computer whenever a cloud service answers: while Use cloud power is\n"
+           "      on, or when you pick the Cloud Only tier. That includes chats,\n"
+           "      pasted images, and images and videos made with Gemini.") in _MILLENAI_SRC
+      and _MILLENAI_SRC.count("Your prompts leave this computer while this is on, and") == 2)
 # (4) AN ANSWER CAN'T RUN SCRIPT IN THE PAGE. esc() left quotes alone, so
 # ![x" onerror="...](https://...) closed the alt attribute and ran code
 # that could read every chat. The page's OWN renderer runs in node here.
@@ -2856,12 +2869,22 @@ _exec_names(_cq, {"CLOUD_SKIP_IDS", "CLOUD_PICK_ORDER", "_CLAUDE_ID",
     "QUOTA_COOLDOWN", "GLITCH_COOLDOWN", "_http_body", "cloud_failure_kind",
     "_NO_CREDIT_RX", "_MODEL_GONE_RX", "cloud_note_failure", "cloud_glitch",
     "_provider_of", "_claude_takes_effort", "_BAD_KEY_RX", "cloud_rest_left",
-    "_img_parts", "_openai_messages"})
+    "_img_parts", "_openai_messages", "_cloud_patch", "_same_key", "_key_fp",
+    "_KEY_FP_SALT", "_FAIL_FIELDS", "_key_live", "cloud_cool"})
 _cooled, _saved = [], []
-_cq.update(_dead_seed=lambda: None,
-           cloud_cool=lambda pid, note, secs=600.0: _cooled.append((pid, note, secs)),
-           _cloud_all=lambda: {"providers": {"groq": {"key": "k"}, "kimi": {"key": "k"},
-                                             "gemini": {"key": "k"}, "claude": {"key": "k"}}},
+# (6b326) a failure is one key-checked _cloud_patch: these stand-ins
+# record each provider's write, and each rest it carries
+_cq_pv = lambda: {"providers": {"groq": {"key": "k"}, "kimi": {"key": "k"},
+                                "gemini": {"key": "k"}, "claude": {"key": "k"}}}
+def _cq_write(d):
+    for _p, _c in (d.get("providers") or {}).items():
+        if _c != {"key": "k"}:
+            _saved.append((_p, _c))
+            if "cool" in _c:
+                _cooled.append((_p, _c.get("note", ""), _c["cool"] - time.time() + 0.5))
+_cq.update(_dead_seed=lambda: None, hmac=__import__("hmac"), hashlib=__import__("hashlib"),
+           _cloud_txn=__import__("contextlib").nullcontext,
+           _cloud_read_strict=_cq_pv, _cloud_all=_cq_pv, _cloud_write=_cq_write,
            _cloud_save_state=lambda pid, cur: _saved.append((pid, cur)))
 _INV = {
  "claude": ["claude-opus-5-5", "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
@@ -2931,17 +2954,17 @@ def _herr(code, body):
         "u", code, "m", {}, __import__("io").BytesIO(body.encode()))
 _nf = _cq["cloud_note_failure"]
 _cooled.clear()
-_nf({"base": "https://api.anthropic.com/v1", "model": "claude-haiku-4-5-20251001"},
+_nf({"base": "https://api.anthropic.com/v1", "model": "claude-haiku-4-5-20251001", "key": "k"},
     _herr(400, '{"message":"This model does not support the effort parameter."}'))
 _n1 = (_cq["cloud_model_alive"]("claude-haiku-4-5-20251001")
        and _cq["cloud_model_resting"]("claude-haiku-4-5-20251001"))
-_nf({"base": _g, "model": "gemini-2.5-pro"},
+_nf({"base": _g, "model": "gemini-2.5-pro", "key": "k"},
     _herr(404, '{"message":"no longer available to new users"}'))
 _n2 = not _cq["cloud_model_alive"]("gemini-2.5-pro")
-_nf({"base": _gr, "model": "qwen/qwen3.8-27b"},
+_nf({"base": _gr, "model": "qwen/qwen3.8-27b", "key": "k"},
     _herr(429, 'Request too large for model `qwen/qwen3.8-27b` on output tokens per minute'))
 _n3 = _cq["cloud_model_resting"]("qwen/qwen3.8-27b") and not _cooled
-_nf({"base": _mo, "model": "kimi-k3"},
+_nf({"base": _mo, "model": "kimi-k3", "key": "k"},
     _herr(429, '{"message":"account is suspended due to insufficient balance"}'))
 _n4 = bool(_cooled) and _cooled[-1][0] == "kimi" and "credit" in _cooled[-1][1] \
     and _cooled[-1][2] >= 3600
@@ -2963,7 +2986,7 @@ _rl = _cq["cloud_rest_left"]("groq", {"key": "k", "status": "ok",
 _cq["_model_rest"].clear()
 _saved.clear()
 for _i in range(2):
-    _nf({"base": _g, "model": "gemini-9-gone"},
+    _nf({"base": _g, "model": "gemini-9-gone", "key": "k"},
         _herr(404, '{"message":"model not found"}'))
 check("review fixes: effort by family, bad-key 400, model-level rest shown, re-stamped",
       _te("claude-opus-5-5") and _te("claude-opus-4-5-20251101")
@@ -5253,9 +5276,10 @@ class _SP:
         return 0
 _sp_fail = False
 _spk = {"re": re, "IS_WIN": True, "_say_proc": None,
-        "strip_think": lambda t: t,
+        "strip_think": lambda t: t, "threading": __import__("threading"),
         "subprocess": _t17.SimpleNamespace(Popen=_SP, PIPE=-1, CREATE_NO_WINDOW=0x08000000)}
-_exec_names(_spk, {"_speak", "_stop_speaking"})
+_exec_names(_spk, {"_speak", "_stop_speaking", "_speak_now", "_stop_speaking_now",
+                   "_say_lock", "_say_file", "_say_reap", "run_file", "drop_run_file"})
 _say = "Tadej Pogačar won — it’s 20°C → fine \U0001F642"
 try:
     _spk["_speak"](_say)
@@ -5735,18 +5759,24 @@ exec(_M[_pq0:_pq1], {"sys": _t17.SimpleNamespace(platform="win32"), "subprocess"
 _FakePopen(["nvidia-smi"]); _FakePopen(["x"], creationflags=0x10)
 _ssh_kw = {}
 def _ssh_fake_run(argv, **k):
-    _ssh_kw.update(k); return _t17.SimpleNamespace(returncode=0, stdout="\u25cf nginx.service", stderr="")
+    # (6b326) bytes both ways: the script goes in on stdin, CRLF from a
+    # Windows ssh comes out as plain newlines
+    _ssh_kw.update(k); return _t17.SimpleNamespace(
+        returncode=0, stdout="\u25cf nginx.service\r\n".encode("utf-8"), stderr=b"")
 _sr = {"subprocess": _t17.SimpleNamespace(run=_ssh_fake_run, TimeoutExpired=Exception),
-       "_ssh_argv": lambda c: ["ssh"], "os": _os20}
-_exec_names(_sr, {"ssh_run"})
+       "_ssh_config": lambda c: "Host x\n", "os": _os20,
+       "run_file": lambda *a: "/nonexistent/run/ssh-x.conf", "drop_run_file": lambda p: None,
+       "REMOTE_KNOWN_HOSTS": __file__}
+_exec_names(_sr, {"ssh_run", "_ssh_argv", "_ssh_script", "SSH_ALIAS", "SSH_SHELL"})
 _sr_out = _sr["ssh_run"]({}, "systemctl status nginx")
-_sa = {"os": _os20}
-_exec_names(_sa, {"_ssh_argv"})
+_sa = {"os": _os20, "re": re, "IS_WIN": True, "REMOTE_KNOWN_HOSTS": "C:\\A\\kh"}
+_exec_names(_sa, {"_ssh_config", "_ssh_path", "SSH_ALIAS", "_SSH_HOST_RX", "_SSH_USER_RX"})
 check("Windows: no console window flashes; ssh reads UTF-8; quoted paths are accepted",
       _pq_seen == [0x08000000, 0x10]
-      and _ssh_kw.get("encoding") == "utf-8" and _ssh_kw.get("errors") == "replace"
-      and _sr_out == (0, "\u25cf nginx.service")
-      and _sa["_ssh_argv"]({"key": '"C:\\Users\\pat\\.ssh\\id"', "host": "h"})[-2] == "C:\\Users\\pat\\.ssh\\id"
+      and isinstance(_ssh_kw.get("input"), bytes) and "encoding" not in _ssh_kw
+      and _sr_out == (0, "\u25cf nginx.service\n")
+      and '  IdentityFile "C:/Users/pat/.ssh/id"' in _sa["_ssh_config"](
+          {"key": '"C:\\Users\\pat\\.ssh\\id"', "host": "h"}).split("\n")
       and "str(d.get(\"root\") or \"\").strip().strip('\"'))" in _M,
       "%r" % [_pq_seen, _ssh_kw, _sr_out])
 
@@ -7962,6 +7992,769 @@ for _fn in ("millenai.py", "ci_smoke.sh", "drill.py", "CLAUDE.md", "DRILL_LOOP.m
                   if w in _t]
 check("no fixed key and no MILLENAI_HEADLESS anywhere a copy is started",
       not any(_rem1.values()), "%r" % _rem1)
+
+print("== accounts step 6: cloud only with the switch, SSH's own host list, nothing personal on command lines ==")
+# 6b326 (0a 5.1, 5.5 and 5.12 item 13; M6 of the sign-in plan). The
+# recording stub below stands in for all four providers (the app's
+# provider-stub hook points their compiled addresses at it) and is also
+# the copy's HTTPS proxy, so a request to a real provider host would be
+# recorded as a CONNECT instead of leaving this computer.
+import http.server as _hs26, base64 as _b6426, hashlib as _hl26, stat as _st26
+import threading as _th26, contextlib as _cx26, hmac as _hm26, secrets as _se26
+_PHOSTS26 = ("generativelanguage.googleapis.com", "api.groq.com",
+             "api.anthropic.com", "api.moonshot.ai")
+_S26 = {"reqs": [], "late401": {}, "lock": _th26.Lock()}
+_STUB_TEXT26 = ("A stub provider wrote this reply for the gauntlet. It answers in plain "
+                "sentences so the repetition checks pass, it names no real place, and it "
+                "says nothing about any key. Every sentence here differs from the one "
+                "before it, and the whole reply runs well past the length that a merge "
+                "needs before it counts as an answer at all.")
+_PNG26 = _b6426.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk"
+                          "YPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==")
+_MODELS26 = {"generativelanguage.googleapis.com": ["gemini-3.8-flash", "gemini-3.5-flash-lite"],
+             "api.groq.com": ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"],
+             "api.anthropic.com": ["claude-opus-5-5", "claude-haiku-4-5-20251001"],
+             "api.moonshot.ai": ["kimi-k3"]}
+
+
+class _Stub26(_hs26.BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+    def do_CONNECT(self):
+        with _S26["lock"]:
+            _S26["reqs"].append({"m": "CONNECT", "p": self.path, "k": ""})
+        self.send_response(403)
+        self.end_headers()
+
+    def do_GET(self):
+        self._any("GET")
+
+    def do_POST(self):
+        self._any("POST")
+
+    def _out(self, code, body, ctype="application/json"):
+        if isinstance(body, (dict, list)):
+            body = json.dumps(body).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _any(self, m):
+        n = int(self.headers.get("Content-Length") or 0)
+        body = self.rfile.read(n) if n else b""
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        key = ((self.headers.get("Authorization") or "").replace("Bearer ", "")
+               or self.headers.get("x-api-key") or self.headers.get("x-goog-api-key")
+               or (q.get("key") or [""])[0])
+        with _S26["lock"]:
+            _S26["reqs"].append({"m": m, "p": self.path, "k": key})
+        p = urllib.parse.urlparse(self.path).path
+        host = p.lstrip("/").split("/", 1)[0]
+        late = _S26["late401"].get(key)
+        if late is not None and not p.endswith("/models"):
+            time.sleep(late)          # the delayed answer (0a 5.14's hook)
+            return self._out(401, {"error": {"message": "Invalid API Key"}})
+        try:
+            d = json.loads(body) if body else {}
+        except ValueError:
+            d = {}
+        if p.endswith("/models"):
+            return self._out(200, {"data": [{"id": i} for i in _MODELS26.get(host, [])]})
+        if p.endswith("/users/me/balance"):
+            return self._out(200, {"data": {"available_balance": 12.5}})
+        if p.endswith(":generateContent"):
+            return self._out(200, {"candidates": [{"content": {"parts": [
+                {"inlineData": {"data": _b6426.b64encode(_PNG26).decode()}}]}}]})
+        if p.endswith(":predictLongRunning"):
+            return self._out(200, {"name": "operations/op26"})
+        if p.endswith("/operations/op26"):
+            return self._out(200, {"done": True, "response": {"generatedSamples": [{"video": {
+                "uri": "http://127.0.0.1:%d/%s/v1beta/files/clip26:download?alt=media"
+                       % (_STUB26.server_address[1], _PHOSTS26[0])}}]}})
+        if "/files/clip26" in p:
+            return self._out(200, b"\0\0\0\x18ftypmp42" + os.urandom(4000), "video/mp4")
+        if p.endswith("/messages"):                # Anthropic
+            if d.get("stream"):
+                ev = [{"type": "message_start", "message": {"usage": {"input_tokens": 9}}},
+                      {"type": "content_block_delta", "delta": {"type": "text_delta",
+                                                                "text": _STUB_TEXT26}},
+                      {"type": "message_delta", "delta": {"stop_reason": "end_turn"},
+                       "usage": {"output_tokens": 60}}]
+                return self._out(200, "".join("data: %s\n\n" % json.dumps(e) for e in ev)
+                                 .encode(), "text/event-stream")
+            return self._out(200, {"content": [{"type": "text", "text": _STUB_TEXT26}],
+                                   "stop_reason": "end_turn",
+                                   "usage": {"input_tokens": 9, "output_tokens": 60}})
+        if p.endswith("/chat/completions"):
+            if d.get("stream"):
+                return self._out(200, ("data: %s\n\ndata: [DONE]\n\n" % json.dumps(
+                    {"choices": [{"delta": {"content": _STUB_TEXT26}}]})).encode(),
+                    "text/event-stream")
+            return self._out(200, {"choices": [{"message": {"content": _STUB_TEXT26}}],
+                                   "usage": {"prompt_tokens": 9, "completion_tokens": 60}})
+        return self._out(404, {"error": {"message": "not found"}})
+
+
+_STUB26 = _hs26.ThreadingHTTPServer(("127.0.0.1", 0), _Stub26)
+_STUB26.daemon_threads = True
+_th26.Thread(target=_STUB26.serve_forever, daemon=True).start()
+_SURL26 = "http://127.0.0.1:%d" % _STUB26.server_address[1]
+
+
+def _preqs26(since=0):
+    """Every request that reached a provider: a stub path under one of
+    the four hosts, or a CONNECT to one of them through the proxy."""
+    with _S26["lock"]:
+        rs = list(_S26["reqs"][since:])
+    return [r for r in rs if any(h in r["p"] for h in _PHOSTS26)]
+
+
+_SENT26 = {pid: _canary("KEY" + pid) for pid in ("gemini", "groq", "claude", "kimi")}
+_BASES26 = {"gemini": _SURL26 + "/generativelanguage.googleapis.com/v1beta/openai",
+            "groq": _SURL26 + "/api.groq.com/openai/v1",
+            "claude": _SURL26 + "/api.anthropic.com/v1",
+            "kimi": _SURL26 + "/api.moonshot.ai/v1"}
+_MOD26 = {"gemini": "gemini-3.8-flash", "groq": "qwen/qwen3.8-27b",
+          "claude": "claude-opus-5-5", "kimi": "kimi-k3"}
+_INV26 = {"gemini": _MODELS26[_PHOSTS26[0]], "groq": _MODELS26[_PHOSTS26[1]],
+          "claude": _MODELS26[_PHOSTS26[2]], "kimi": _MODELS26[_PHOSTS26[3]]}
+
+
+# a local sshd for the Remote agent's checks: its own host key and an
+# authorized key made here, this user only, on a port picked now
+def _free_port26():
+    with socket.socket() as so:
+        so.bind(("127.0.0.1", 0))
+        return so.getsockname()[1]
+
+
+_SSHD26 = None
+_SSHDIR26 = os.path.join(_SMOKE_TMP, "sshd26")
+_SSHPORT26 = _free_port26()
+if sys.platform != "win32" and os.path.exists("/usr/sbin/sshd"):
+    os.makedirs(_SSHDIR26, mode=0o700, exist_ok=True)
+    for _kn in ("hostkey", "userkey"):
+        subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f",
+                        os.path.join(_SSHDIR26, _kn)], capture_output=True)
+    shutil.copy(os.path.join(_SSHDIR26, "userkey.pub"), os.path.join(_SSHDIR26, "authorized"))
+    with open(os.path.join(_SSHDIR26, "sshd_config"), "w") as fh:
+        fh.write("Port %d\nListenAddress 127.0.0.1\nHostKey %s\nPidFile %s\nUsePAM no\n"
+                 "StrictModes no\nAuthorizedKeysFile %s\nPasswordAuthentication no\n"
+                 "KbdInteractiveAuthentication no\n"
+                 % (_SSHPORT26, os.path.join(_SSHDIR26, "hostkey"),
+                    os.path.join(_SSHDIR26, "sshd.pid"),
+                    os.path.join(_SSHDIR26, "authorized")))
+    _SSHD26 = subprocess.Popen(["/usr/sbin/sshd", "-D", "-e", "-f",
+                                os.path.join(_SSHDIR26, "sshd_config")],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    _atexit.register(lambda: _SSHD26.poll() is None and _SSHD26.terminate())
+    for _i in range(40):
+        if _port_open(_SSHPORT26):
+            break
+        time.sleep(0.25)
+_ME26 = __import__("getpass").getuser()
+
+
+def _seed_c26(home):
+    with open(os.path.join(home, "cloud.json"), "w") as fh:
+        json.dump({"active": "claude", "providers": {
+            pid: {"name": pid.title(), "base": _BASES26[pid], "key": _SENT26[pid],
+                  "model": _MOD26[pid], "models": _INV26[pid], "status": "ok"}
+            for pid in _SENT26}}, fh)
+    with open(os.path.join(home, "prefs.json"), "w") as fh:
+        json.dump({"turbo": False}, fh)
+    with open(os.path.join(home, "remote.json"), "w") as fh:
+        json.dump({"host": "127.0.0.1", "user": _ME26, "port": str(_SSHPORT26),
+                   "key": os.path.join(_SSHDIR26, "userkey")}, fh)
+
+
+# ~/.ssh/known_hosts is compared by digest only, never read into the
+# log (the spec's rule for agents): absent before means absent after
+def _kh26():
+    fp = os.path.expanduser("~/.ssh/known_hosts")
+    try:
+        with open(fp, "rb") as fh:
+            return _hl26.sha256(fh.read()).hexdigest()
+    except OSError:
+        return None
+
+
+_KH0_26 = _kh26()
+_C26 = Instance(9903, "C26", seed=_seed_c26, env={
+    "MILLENAI_TEST_HOOKS": "provider-stub=%s,subprocess-record" % _SURL26,
+    "HTTPS_PROXY": _SURL26, "HTTP_PROXY": _SURL26, "https_proxy": _SURL26,
+    "http_proxy": _SURL26, "NO_PROXY": "127.0.0.1,localhost",
+    "no_proxy": "127.0.0.1,localhost"}).start()
+
+
+def _cget26(path):
+    s_, b_ = _ireq(_C26, path)
+    try:
+        return s_, json.loads(b_)
+    except ValueError:
+        return s_, {}
+
+
+def _cpost26(path, body, timeout=120):
+    h_ = {"Cookie": _C26.cookie, "X-Api-Token": _C26.token,
+          "Content-Type": "application/json"}
+    try:
+        with urllib.request.urlopen(urllib.request.Request(
+                _C26.base + path, data=json.dumps(body).encode(), headers=h_,
+                method="POST"), timeout=timeout) as r_:
+            return r_.status, r_.read()
+    except urllib.error.HTTPError as e_:
+        return e_.code, e_.read()
+
+
+def _cchat26(prompt, **kw):
+    body = {"model": "", "models": [], "tier": "Fast", "auto_web": False,
+            "messages": [{"role": "user", "content": prompt}]}
+    body.update(kw)
+    s_, b_ = _cpost26("/api/chat", body, timeout=300)
+    t_ = b_.decode("utf-8", "replace")
+    return s_, re.sub("\x00[A-Z0-9]+:.*?\x00", "", t_, flags=re.S)
+
+
+# KEY-8, Phase 0 part: four sentinel keys saved, cloud power off. The
+# page's start (/api/tiers), opening Settings (/api/cloud), a restart and
+# the same again: the stub sees nothing, not even model
+# discovery or Moonshot's balance. Fails if discovery starts at the first
+# cloud_ok_providers() again, if cloud_balance runs with the switch off,
+# or if any of them reaches a real provider host (a CONNECT).
+_n0 = len(_S26["reqs"])
+_k8 = [_cget26("/api/tiers")[0], _cget26("/api/cloud")[0]]
+time.sleep(4)
+_C26.stop()
+_C26.seed = None
+_C26.start()
+_k8 += [_cget26("/api/tiers")[0], _cget26("/api/cloud")[0]]
+time.sleep(4)
+_k8_hits = _preqs26(_n0)
+check("KEY-8 (Phase 0): sentinel keys saved, cloud power off: start, Settings "
+      "and a restart send no request to any provider",
+      _k8 == [200] * 4 and not _k8_hits, "%r" % [_k8, _k8_hits[:3]])
+
+# KEY-5, pictures and video: no local studio in a test copy, a sentinel
+# Gemini key saved, cloud power off. Nothing reaches the Gemini stub and
+# the reader is told how to turn it on. Fails if generate_image or Veo
+# ignore the switch (they did: the key alone painted), or if the words
+# change.
+_n0 = len(_S26["reqs"])
+_img_off = _cchat26("draw a picture of a red bicycle")
+_vid_off = _cchat26("make a video of ocean waves at sunset")
+_k5_off = _preqs26(_n0)
+check("KEY-5: cloud power off, a Gemini key saved: a picture and a video send nothing and say how",
+      _img_off[0] == 200 and _vid_off[0] == 200 and not _k5_off
+      and "Turn on Use cloud power to make this with Gemini, or install image generation."
+      in _img_off[1]
+      and "Turn on Use cloud power to make this with Gemini, or install video generation."
+      in _vid_off[1],
+      "%r" % [_img_off[1][-200:], _vid_off[1][-200:], _k5_off[:3]])
+
+# Switched on: discovery runs (every provider's /models, once), and a
+# picture, a video and the Fast lane's next question reach the stub.
+# Fails if discovery never runs once the switch opens, or if the gate
+# shut the cloud for good.
+_n0 = len(_S26["reqs"])
+_on = _cpost26("/api/prefs", {"turbo": True})[0]
+_disc = set()
+for _i in range(40):
+    _disc = {r["p"].split("/")[1] for r in _preqs26(_n0) if r["p"].endswith("/models")
+             or "/models?" in r["p"]}
+    if len(_disc) == 4:
+        break
+    time.sleep(0.25)
+_img_on = _cchat26("draw a picture of a red bicycle")
+_vid_on = _cchat26("make a video of ocean waves at sunset")
+_n1 = len(_S26["reqs"])
+# Qwen 3.5 Vision 9B runs on Ollama, so nothing local warms up: with the
+# switch on the answer is the stub's, from the Fast lane
+_fast_on = _cchat26("what is a lighthouse for?", tier="", model="Qwen 3.5 Vision 9B")
+_fast_hits = [r for r in _preqs26(_n1) if r["m"] == "POST"]
+_on_paths = [urllib.parse.urlparse(r["p"]).path for r in _preqs26(_n0)]
+check("KEY-5/KEY-8: switched on, discovery runs and pictures, video and the Fast lane reach the stub",
+      _on == 200 and _disc == set(_PHOSTS26)
+      and any(p.endswith(":generateContent") for p in _on_paths)
+      and any(p.endswith(":predictLongRunning") for p in _on_paths)
+      and "made in the cloud" in _img_on[1] and "made in the cloud" in _vid_on[1]
+      and _STUB_TEXT26[:40] in _fast_on[1] and _fast_hits,
+      "%r" % [_on, sorted(_disc), _img_on[1][-160:], _vid_on[1][-160:], _fast_on[1][-160:],
+              len(_fast_hits), sorted(set(_on_paths))])
+
+# KEY-9's delayed 401 (0a 5.12 item 13): Groq's key answers 401, three
+# seconds late; the key is replaced one second in. The late failure
+# must leave the NEW key saved and working, not marked failed (the old
+# cloud_note_failure read the entry again outside any key check and
+# wrote "key rejected" over the new key).
+_K2_26 = "gsk_" + _se26.token_hex(26)
+_S26["late401"][_SENT26["groq"]] = 3.0
+_rep26 = []
+_rt26 = _th26.Thread(target=lambda: (time.sleep(1.0), _rep26.append(_cpost26(
+    "/api/cloud/set", {"provider": "groq", "key": _K2_26}))))
+_rt26.start()
+_co = _cchat26("name three uses of a lighthouse", tier="Cloud Only")
+_rt26.join(30)
+time.sleep(0.5)
+with open(os.path.join(_C26.home, "cloud.json")) as fh:
+    _gq26 = json.load(fh)["providers"].get("groq") or {}
+_late_hit = [r for r in _S26["reqs"] if r["k"] == _SENT26["groq"] and not r["p"].endswith("/models")]
+check("KEY-9: a 401 that lands after the key was replaced leaves the new key saved and working",
+      _rep26 and _rep26[0][0] == 200 and json.loads(_rep26[0][1]).get("ok")
+      and _late_hit and _gq26.get("key") == _K2_26 and _gq26.get("status") == "ok"
+      and "rejected" not in str(_gq26.get("note") or ""),
+      "%r" % [_rep26[:1], len(_late_hit), {k: v for k, v in _gq26.items() if k != "key"},
+              _gq26.get("key") == _K2_26])
+_S26["late401"].clear()
+
+# THE REMOTE AGENT'S SSH (0a 5.1, G9): /api/remote/test against the local
+# sshd, then a second connection whose host is a canary. ~/.ssh/known_hosts
+# stays byte-identical (or absent); the copy's own remote_known_hosts is
+# 0600 and holds one hashed entry, no host; every recorded ssh command line
+# is `ssh -F <run/ssh-*.conf> concorde-remote <fixed shell>`, and no
+# config is left behind. Fails if the config drops UserKnownHostsFile,
+# HashKnownHosts or GlobalKnownHostsFile's sink, or if a host, user, port,
+# key path or command reaches the command line.
+_rt = (None, b"")
+_rkh = os.path.join(_C26.home, "remote_known_hosts")
+_hostcan = _canary("host").lower() + ".invalid"
+if _SSHD26 is not None:
+    _rt = _cpost26("/api/remote/test", {})
+    _cpost26("/api/remote/config", {"host": _hostcan, "user": _ME26,
+                                    "port": str(_SSHPORT26),
+                                    "key": os.path.join(_SSHDIR26, "userkey")})
+    _rt2 = _cpost26("/api/remote/test", {})
+try:
+    _rtd = json.loads(_rt[1])
+except (ValueError, TypeError):
+    _rtd = {}
+try:
+    _rkh_lines = [ln for ln in open(_rkh).read().splitlines() if ln.strip()]
+    _rkh_mode = _st26.S_IMODE(os.stat(_rkh).st_mode)
+except OSError:
+    _rkh_lines, _rkh_mode = [], None
+_recs26 = []
+try:
+    with open(os.path.join(_C26.home, "run", "subprocess.jsonl")) as fh:
+        _recs26 = [json.loads(ln) for ln in fh if ln.strip()]
+except OSError:
+    pass
+_ssh_recs = [r for r in _recs26 if r and os.path.basename(r[0]) == "ssh"]
+_ssh_shape = all(len(r) == 5 and r[1] == "-F" and r[3] == "concorde-remote"
+                 and os.path.dirname(r[2]) == os.path.join(os.path.realpath(_C26.home), "run")
+                 and os.path.basename(r[2]).startswith("ssh-") for r in _ssh_recs)
+_ssh_leak = [r for r in _ssh_recs for w in ("127.0.0.1", str(_SSHPORT26), _ME26, "userkey",
+                                             _hostcan, "__ok__", "whoami")
+             if any(w in x for x in r)]
+_left_cfg = [f for f in os.listdir(os.path.join(_C26.home, "run")) if f.startswith("ssh-")]
+if _SSHD26 is None:
+    check("the Remote agent's SSH keeps its own host list (SKIP: no /usr/sbin/sshd here)", True)
+else:
+    check("Remote: SSH keeps its own hashed host list, ~/.ssh/known_hosts is untouched, "
+          "and no host or command is on a command line",
+          _rt[0] == 200 and _rtd.get("ok") and _ME26 in (_rtd.get("detail") or "")
+          and _kh26() == _KH0_26
+          and len(_rkh_lines) == 1 and _rkh_lines[0].startswith("|1|")
+          and "127.0.0.1" not in _rkh_lines[0] and _rkh_mode == 0o600
+          and len(_ssh_recs) >= 2 and _ssh_shape and not _ssh_leak and not _left_cfg
+          and _rt2[0] == 200 and not json.loads(_rt2[1]).get("ok"),
+          "%r" % [_rt[0], _rtd, _kh26() == _KH0_26, len(_rkh_lines),
+                  [ln[:3] for ln in _rkh_lines], oct(_rkh_mode or 0), len(_ssh_recs),
+                  _ssh_shape, _ssh_leak[:1], _left_cfg])
+_C26.stop()
+_STUB26.shutdown()
+if _SSHD26 is not None and _SSHD26.poll() is None:
+    _SSHD26.terminate()
+
+# ---- the same rules in-process, where each can be turned on its head
+_ns26 = dict(_LH, hmac=_hm26, hashlib=_hl26, IS_WIN=False, _fcntl=None,
+             QUOTA_COOLDOWN=600.0, GLITCH_COOLDOWN=120.0)
+_cd26 = tempfile.mkdtemp(dir=_SMOKE_TMP)
+_ns26["CLOUD_FILE"] = os.path.join(_cd26, "cloud.json")
+_exec_names(_ns26, {"_cloud_lock", "_cloud_depth", "_cloud_txn", "_cloud_read_strict",
+                    "_cloud_all", "_cloud_write", "_replace_into", "_KEY_FP_SALT", "_key_fp",
+                    "_same_key", "_FAIL_FIELDS", "_cloud_patch", "cloud_cool", "_key_live",
+                    "cloud_glitch", "cloud_note_failure", "cloud_failure_kind", "_QUOTA_RX",
+                    "_BAD_KEY_RX", "_NO_CREDIT_RX", "_MODEL_GONE_RX", "_http_body",
+                    "_provider_of", "cloud_rest_model", "_model_rest", "_model_rest_lock",
+                    "cloud_model_resting", "_dead_models", "_dead_lock", "_dead_when",
+                    "_cloud_ticket", "_ticket_conf", "_mark_answered", "_answered",
+                    "cloud_allowed", "gate_ladder", "make_title", "_extract_memory",
+                    "_clean_title", "TITLE_PROMPT"})
+# (a def's source leaves its decorator behind)
+_ns26["_cloud_txn"] = _cx26.contextmanager(_ns26["_cloud_txn"])
+
+
+def _herr26(code, body):
+    return urllib.error.HTTPError("u", code, "m", {}, __import__("io").BytesIO(body.encode()))
+
+
+def _cf26(entry):
+    with open(_ns26["CLOUD_FILE"], "w") as fh:
+        json.dump({"active": "groq", "providers": {"groq": entry}}, fh)
+    with open(_ns26["CLOUD_FILE"], "rb") as fh:
+        return fh.read()
+
+
+_GQ26 = "https://api.groq.com/openai/v1"
+_new26 = {"name": "Groq", "base": _GQ26, "key": "NEW-KEY", "model": "qwen/qwen3.8-27b",
+          "status": "ok"}
+_old = {"base": _GQ26, "key": "OLD-KEY", "model": "qwen/qwen3.8-27b"}
+_stale_same = _stale_mem = False
+_after = _after2 = {}
+try:
+    _nf26 = _ns26["cloud_note_failure"]
+    _b0 = _cf26(_new26)
+    _nf26(_old, _herr26(401, '{"error":{"message":"Invalid API Key"}}'))
+    _nf26(_old, _herr26(404, '{"error":{"message":"model not found"}}'))
+    _nf26(_old, _herr26(429, "rate limit reached for qwen/qwen3.8-27b"))
+    _nf26(dict(_old, model=""), _herr26(503, "busy"))
+    _ns26["cloud_cool"]("groq", "resting", 60, key="OLD-KEY")
+    _ns26["cloud_glitch"](_old, "not responding")
+    _stale_same = open(_ns26["CLOUD_FILE"], "rb").read() == _b0
+    _stale_mem = (not _ns26["cloud_model_resting"]("qwen/qwen3.8-27b")
+                  and "qwen/qwen3.8-27b" not in _ns26["_dead_models"])
+    # the key it failed with IS the saved one: only the per-computer fields
+    _nf26(dict(_old, key="NEW-KEY"), _herr26(401, '{"error":{"message":"Invalid API Key"}}'))
+    _after = json.load(open(_ns26["CLOUD_FILE"]))["providers"]["groq"]
+    _nf26(dict(_old, key="NEW-KEY"), _herr26(404, '{"error":{"message":"model not found"}}'))
+    _after2 = json.load(open(_ns26["CLOUD_FILE"]))["providers"]["groq"]
+except Exception as _e:
+    _after = {"error": repr(_e)}
+check("a failure is one locked, key-checked update: a replaced key's failure changes nothing, "
+      "the saved key's changes only this computer's fields",
+      _stale_same and _stale_mem
+      and _after["status"] == "fail" and "rejected" in _after["note"]
+      and {k: v for k, v in _after.items() if k not in ("status", "note")} ==
+          {k: v for k, v in _new26.items() if k not in ("status", "note")}
+      and "qwen/qwen3.8-27b" in (_after2.get("dead") or [])
+      and set(_after2) - set(_new26) <= {"note", "dead", "dead_at", "cool"}
+      and _after2["key"] == "NEW-KEY" and _after2["base"] == _GQ26 and _after2["name"] == "Groq",
+      "%r" % [_stale_same, _stale_mem, _after, _after2])
+# the patch writes only what a failure may, whatever it is handed
+_cf26(_new26)
+try:
+    _pw = _ns26["_cloud_patch"]("groq", "NEW-KEY", {"key": "EVIL", "base": "x", "name": "y",
+                                                    "status": "ok", "cool": 5.0})
+    _pv = json.load(open(_ns26["CLOUD_FILE"]))["providers"]["groq"]
+except Exception as _e:
+    _pw, _pv = False, {"error": repr(_e)}
+check("the failure patch never writes key, base or name",
+      _pw and _pv.get("key") == "NEW-KEY" and _pv.get("base") == _GQ26
+      and _pv.get("name") == "Groq" and _pv.get("cool") == 5.0, "%r" % _pv)
+
+# cached answer settings are tickets: no key held, the key re-read under
+# the lock, nothing sent once the key is replaced or the provider gone
+_cf26(_new26)
+_ns26["_mark_answered"](dict(_new26, model="openai/gpt-oss-120b"))
+_tk = list(_ns26["_answered"].values())[-1]
+_tc = _ns26["_ticket_conf"](_tk)
+_calls26 = []
+_ns26.update(cloud_role_model=lambda pid, c, role: "m-utility",
+             cloud_text=lambda c, m, **k: _calls26.append(c.get("key")) or "Lighthouse uses",
+             strip_think=lambda t: t, strip_special=lambda t: t,
+             _looks_degenerate=lambda t: False, ollama_pulled_tags=lambda: set(),
+             MODEL_ROUTES={}, model_cached=lambda *a: False,
+             model_fits_memory=lambda *a: True, slow_giant=lambda l: False,
+             MODEL_MEM_BYTES={}, _engine_up=lambda p: False,
+             run_model=lambda *a, **k: _calls26.append("LOCAL"),
+             MEMORY_PROMPT="facts: ", load_prefs=lambda b=None: {"turbo": True})
+_t1 = _ns26["make_title"]("a question about lighthouses", conf=_tk)
+_cf26(dict(_new26, key="REPLACED-KEY"))
+_t2 = _ns26["make_title"]("a question about lighthouses", conf=_tk)
+_ns26["_extract_memory"]("", "I live near the lighthouse at the harbour", None, conf=_tk)
+_cf26({})
+_gone = _ns26["_ticket_conf"](_tk)
+check("cached answer settings hold no key; a title or memory pass after the key changes makes no call",
+      "NEW-KEY" not in json.dumps(_tk) and _tk["pid"] == "groq"
+      and _tc and _tc["key"] == "NEW-KEY"
+      and _t1 == "Lighthouse uses" and _calls26 == ["NEW-KEY"] and _t2 == ""
+      and _gone is None,
+      "%r" % [_tk, _t1, _t2, _calls26, _gone])
+
+# the gate itself: off, on, Cloud Only, and unreadable settings; an
+# Advanced list only narrows (the Fast lane and pasted pictures use this)
+_L26 = [{"base": _GQ26, "name": "Groq"}, {"base": "https://api.anthropic.com/v1", "name": "Claude"}]
+_gl = _ns26["gate_ladder"]
+_ns26["load_prefs"] = lambda b=None: {"turbo": False}
+_off = (_ns26["cloud_allowed"](), _gl(_L26, ["groq"]), _gl(_L26, None),
+        _ns26["cloud_allowed"](True), [c["name"] for c in _gl(_L26, ["groq"], True)])
+_ns26["load_prefs"] = lambda b=None: {"turbo": True}
+_onl = ([c["name"] for c in _gl(_L26, ["groq"])], _gl(_L26, []), len(_gl(_L26, None)))
+def _boom26(b=None):
+    raise OSError("unreadable")
+_ns26["load_prefs"] = _boom26
+_bad = _ns26["cloud_allowed"]()
+check("one cloud gate: an Advanced list narrows but never opens it; Cloud Only opens it; "
+      "unreadable settings keep it shut",
+      _off == (False, [], [], True, ["Groq"]) and _onl == (["Groq"], [], 2) and _bad is False
+      and "_fl = gate_ladder(_fl, req_cloud)" in _MILLENAI_SRC
+      and "turbo = bool(_fl)\n" in _MILLENAI_SRC
+      and "req_cloud, cloud_only) if images else [])" in _MILLENAI_SRC
+      and "or req_cloud" not in _MILLENAI_SRC,
+      "%r" % [_off, _onl, _bad])
+
+# the council: a bench list and a named cloud compositor with the switch
+# off make no cloud call; with it on both run (the control)
+_rc26 = dict(_LH)
+_exec_names(_rc26, {"run_council", "_DraftAbandoned", "SYNTH_INSTRUCTION",
+                    "PEER_INSTRUCTION"})
+_rc_calls = []
+_GQC = {"base": _GQ26, "name": "Groq", "model": "qwen/qwen3.8-27b", "key": "k"}
+_rc26.update(Ctl=str, NUL="\0", MERGE_RANK=["L1", "L2"], MODEL_ROUTES={"L1": 1, "L2": 2},
+             _looks_degenerate=lambda t: False, _provider_of=lambda c: "groq",
+             _stream_guarded=lambda *a, **k: _rc_calls.append("local-merge"),
+             claude_refusal_conf=lambda c: None, cloud_bench=lambda: [("Groq", dict(_GQC))],
+             cloud_glitch=lambda c, w: None,
+             cloud_stream_conf=lambda c, m, e: _rc_calls.append("cloud-merge") or (
+                 e(_STUB_TEXT26) or True),
+             cloud_text=lambda c, m, **k: _rc_calls.append("cloud-seat") or _STUB_TEXT26,
+             compositor_ladder=lambda: [dict(_GQC)], fast_cloud_ladder=lambda: [dict(_GQC)],
+             merge_pref_label=lambda *a, **k: "L1", model_cached=lambda *a: True,
+             model_fits_memory=lambda *a: True, strip_think=lambda t: t,
+             run_model=lambda l, m, cb, **k: cb(_STUB_TEXT26.replace("stub", l)))
+_rc_out = {}
+for _turbo in (False, True):
+    _rc_calls.clear()
+    _rc26["cloud_allowed"] = (lambda on: (lambda cloud_only=False: bool(cloud_only) or on))(_turbo)
+    try:
+        _rc26["run_council"](["L1", "L2"], [{"role": "user", "content": "q"}],
+                             lambda t: None, lambda t: None, bench_allow=["groq"], comp="groq")
+    except Exception as _e:
+        _rc_calls.append("ERR %r" % _e)
+    _rc_out[_turbo] = sorted(set(_rc_calls))
+check("the council: with cloud power off a bench list and a cloud compositor reach no cloud; on, both do",
+      _rc_out[False] == ["local-merge"]
+      and _rc_out[True] == ["cloud-merge", "cloud-seat"],
+      "%r" % _rc_out)
+
+# discovery and the balance wait for the gate
+_dn = dict(_LH)
+_exec_names(_dn, {"_picks_run", "_picks_lock", "_cloud_refresh_once", "cloud_balance",
+                  "_bal_cache"})
+_started26 = []
+_dn.update(threading=_t17.SimpleNamespace(Lock=_th26.Lock, Thread=lambda target, args=(), daemon=True:
+                                          _t17.SimpleNamespace(start=lambda: _started26.append(args))),
+           urllib=_t17.SimpleNamespace(request=_t17.SimpleNamespace(
+               Request=lambda *a, **k: _started26.append("BALANCE") or 1,
+               urlopen=lambda *a, **k: 1/0)), APP_VERSION="t")
+_dn["cloud_allowed"] = lambda cloud_only=False: bool(cloud_only)
+_dn["_cloud_refresh_picks"] = lambda cloud_only=False: None
+_dn["_cloud_refresh_once"]()
+_bal_off = _dn["cloud_balance"]("kimi", {"key": "k", "base": "b"})
+_d_off = list(_started26)
+_dn["_cloud_refresh_once"](cloud_only=True)
+_dn["_cloud_refresh_once"](cloud_only=True)
+check("model discovery and the balance wait for the gate, and discovery runs once when it opens",
+      _d_off == [] and _bal_off == "" and _started26 == [(True,)]
+      and "    _cloud_refresh_once()\n    if _repaired[0]:" in _MILLENAI_SRC
+      and "_cloud_refresh_once(cloud_only=True)   # picking the tier opens the gate" in _MILLENAI_SRC
+      and "                if d.get(\"turbo\") is True:\n                    _cloud_refresh_once()" in _MILLENAI_SRC,
+      "%r" % [_d_off, _bal_off, _started26])
+
+# ---- nothing personal on a command line (0a 5.1)
+# read-aloud: `say -f` a 0600 file under run/, gone when the speech ends
+# and when it's stopped; the stop waits; on Windows the tree goes
+_run26 = tempfile.mkdtemp(dir=_SMOKE_TMP)
+_spawned26, _killed26 = [], []
+
+
+class _SayP26:
+    def __init__(self, args, **k):
+        self.args, self.pid, self._rc, self.waited = args, 4242, None, 0
+        self.done = _th26.Event()
+        _spawned26.append(self)
+
+    def poll(self):
+        return self._rc
+
+    def wait(self, timeout=None):
+        self.waited += 1
+        self.done.wait(timeout)
+        self._rc = 0
+        return 0
+
+    def terminate(self):
+        _killed26.append("term")
+        self.done.set()
+
+
+_sy = {"re": re, "os": os, "tempfile": tempfile, "threading": _th26, "IS_WIN": False,
+       "_say_proc": None, "strip_think": lambda t: t, "app_dir": lambda: _run26,
+       "subprocess": _t17.SimpleNamespace(Popen=_SayP26, PIPE=-1,
+                                          run=lambda a, **k: _killed26.append(a))}
+_exec_names(_sy, {"_speak", "_speak_now", "_stop_speaking", "_stop_speaking_now", "_say_lock",
+                  "_say_file", "_say_reap", "run_file", "drop_run_file"})
+_SAY26 = _canary("speech") + " — it’s 20°C"
+_sy["_speak"](_SAY26)
+_p1 = _spawned26[-1]
+_f1 = _p1.args[-1]
+_f1_ok = (os.path.exists(_f1) and open(_f1, encoding="utf-8").read() == _SAY26
+          and _st26.S_IMODE(os.stat(_f1).st_mode) == 0o600
+          and os.path.dirname(_f1) == os.path.join(_run26, "run"))
+_p1.done.set()                     # the speech ends by itself
+for _i in range(40):
+    if not os.path.exists(_f1):
+        break
+    time.sleep(0.05)
+_f1_gone = not os.path.exists(_f1)
+_sy["_speak"](_SAY26 + " again")
+_p2 = _spawned26[-1]
+_f2 = _p2.args[-1]
+_sy["_stop_speaking"]()
+_stop_ok = _killed26 == ["term"] and _p2.waited >= 1 and not os.path.exists(_f2)
+_sy["IS_WIN"] = True
+_sy["_say_proc"] = _SayP26(["powershell"])
+_sy["_stop_speaking"]()
+_win_ok = _killed26[-1][:5] == ["taskkill", "/PID", "4242", "/T", "/F"] and _spawned26[-1].waited >= 1
+check("read-aloud: `say -f` a 0600 file under run/, deleted when speech ends or stops; "
+      "the stop waits; Windows ends the whole tree",
+      _p1.args[:2] == ["say", "-f"] and len(_p1.args) == 3 and _SAY26 not in " ".join(_p1.args)
+      and _f1_ok and _f1_gone and _stop_ok and _win_ok,
+      "%r" % [_p1.args, _f1_ok, _f1_gone, _stop_ok, _killed26[-1:], _win_ok])
+
+# pictures and video: the prompt and the negative prompt ride one 0600
+# file, gone when the render ends (done, failed or stopped); the fixed
+# runner puts the words back inside the tool's own process
+_gi = dict(_LH, secrets=_se26)
+_exec_names(_gi, {"generate_image", "generate_video", "prompt_cmd", "_PROMPT_RUNNER",
+                  "run_file", "drop_run_file", "RenderBusy"})
+_gseen, _grc = [], [0]
+
+
+def _fake_render26(cmd, timeout, sock=None):
+    pf = cmd[3]
+    _gseen.append((list(cmd), os.path.exists(pf) and _st26.S_IMODE(os.stat(pf).st_mode),
+                   json.load(open(pf)) if os.path.exists(pf) else None))
+    out = cmd[cmd.index("--output" if "--output" in cmd else "--output-path") + 1]
+    if _grc[0] == 0:
+        open(out, "wb").write(b"x")
+    return _grc[0], "tail", _grc[0] == 9
+
+
+_gdir = tempfile.mkdtemp(dir=_SMOKE_TMP)
+_gi.update(app_dir=lambda: _gdir, image_ready=lambda: True, video_ready=lambda: True,
+           _media_id=lambda: _se26.token_hex(16), IMAGE_DIR=_gdir, VIDEO_DIR=_gdir,
+           studio_tier=lambda k: {"repo": "r", "base": "schnell"},
+           studio_opts=lambda k, o=None: {"fmt": "png" if k == "image" else "mp4", "steps": 4,
+                                          "guidance": 3.5, "seed": 7, "w": 64, "h": 64,
+                                          "frames": 9, "fps": 24, "neg": (o or {}).get("neg", "")},
+           _snap_dir=lambda r: "/snap/" + r, _render_lock=_th26.Lock(),
+           _run_render=_fake_render26, _render_note=lambda *a, **k: None,
+           engine_cfg=lambda k: {"fps": 24}, _ffmpeg_convert=lambda s, f, fps: s,
+           STUDIOS={"image": {"venv": "/v/img"}, "video": {"venv": "/v/vid", "module": "m.gen"}},
+           cloud_allowed=lambda c=False: False, _cloud_all=lambda: {"providers": {}})
+_PC26, _NC26 = _canary("prompt"), _canary("negative")
+_gi["generate_image"](_PC26)
+_gi["generate_video"](_PC26, {"neg": _NC26})
+_grc[0] = 1
+try:
+    _gi["generate_image"](_PC26)
+except Exception:
+    pass
+_grc[0] = 9
+try:
+    _gi["generate_video"](_PC26, {"neg": _NC26})
+except Exception:
+    pass
+_g_argv_clean = all(_PC26 not in " ".join(c) and _NC26 not in " ".join(c) for c, _m, _w in _gseen)
+_g_files = all(m == 0o600 and w and w.get("prompt") == _PC26 for _c, m, w in _gseen)
+_g_neg = [w.get("neg") for _c, _m, w in _gseen[1::2]] == [_NC26, _NC26]
+_g_gone = not [f for f in os.listdir(os.path.join(_gdir, "run")) if f.startswith("prompt-")]
+_g_shape = (_gseen[0][0][:2] == ["/v/img/bin/python3", "-c"]
+            and _gseen[0][0][4:6] == ["script", "/v/img/bin/mflux-generate"]
+            and _gseen[1][0][4:6] == ["module", "m.gen"]
+            and "@prompt:prompt" in _gseen[0][0] and "@prompt:neg" in _gseen[1][0])
+# and the runner itself, for real, on a stand-in console script and module
+_rdir = tempfile.mkdtemp(dir=_SMOKE_TMP)
+with open(os.path.join(_rdir, "tool"), "w") as fh:
+    fh.write("import json, sys\njson.dump(sys.argv, open(%r, 'w'))\nsys.exit(3)\n"
+             % os.path.join(_rdir, "script.json"))
+os.makedirs(os.path.join(_rdir, "fmod26"))
+open(os.path.join(_rdir, "fmod26", "__init__.py"), "w").close()
+with open(os.path.join(_rdir, "fmod26", "__main__.py"), "w") as fh:
+    fh.write("import json, sys\njson.dump(sys.argv[1:], open(%r, 'w'))\n"
+             % os.path.join(_rdir, "mod.json"))
+_gi["app_dir"] = lambda: _rdir
+_rc1, _pf1 = _gi["prompt_cmd"](sys.executable, "script", os.path.join(_rdir, "tool"),
+                               ["--prompt", "@prompt:prompt", "--steps", "4"],
+                               {"prompt": _PC26 + ' "café"'})
+_rr1 = subprocess.run(_rc1, cwd=_rdir, capture_output=True).returncode
+_rc2, _pf2 = _gi["prompt_cmd"](sys.executable, "module", "fmod26",
+                               ["--prompt", "@prompt:prompt", "--negative-prompt", "@prompt:neg"],
+                               {"prompt": _PC26, "neg": _NC26})
+subprocess.run(_rc2, cwd=_rdir, capture_output=True)
+try:
+    _rs1 = json.load(open(os.path.join(_rdir, "script.json")))
+    _rs2 = json.load(open(os.path.join(_rdir, "mod.json")))
+except (OSError, ValueError):
+    _rs1 = _rs2 = None
+check("pictures and video: prompt and negative prompt ride a 0600 file, gone after the render; "
+      "the runner hands the tool its words",
+      len(_gseen) == 4 and _g_argv_clean and _g_files and _g_neg and _g_gone and _g_shape
+      and _rr1 == 3 and _rs1 == [os.path.join(_rdir, "tool"), "--prompt", _PC26 + ' "café"',
+                                 "--steps", "4"]
+      and _rs2 == ["--prompt", _PC26, "--negative-prompt", _NC26],
+      "%r" % [len(_gseen), _g_argv_clean, _g_files, _g_neg, _g_gone, _g_shape, _rr1, _rs1, _rs2])
+
+# the SSH config: every field checked, so a newline or quote can't add a
+# directive (ProxyCommand would run a local command); %-tokens doubled
+_sc = {"os": os, "re": re, "IS_WIN": False, "REMOTE_KNOWN_HOSTS": "/A B/100%/remote_known_hosts"}
+_exec_names(_sc, {"_ssh_config", "_ssh_path", "SSH_ALIAS", "_SSH_HOST_RX", "_SSH_USER_RX"})
+_scf = _sc["_ssh_config"]
+_bad26 = []
+for _c in ({"host": "h\n  ProxyCommand touch /tmp/x"}, {"host": "-oProxyCommand=x"},
+           {"host": "h", "user": "u\nProxyCommand x"}, {"host": "h", "port": "22 x"},
+           {"host": "h", "port": "0"}, {"host": "h", "key": '/k"\nProxyCommand x'},
+           {"host": "h", "user": "-x"}):
+    try:
+        _scf(_c)
+        _bad26.append(_c)
+    except ValueError:
+        pass
+_good = _scf({"host": "vps.example.com", "user": "root", "port": "2222",
+              "key": "/keys/my key%h"}).splitlines()
+check("the SSH config refuses fields that could add a directive, and quotes paths",
+      not _bad26 and _good[0] == "Host concorde-remote"
+      and "  HostName vps.example.com" in _good and "  Port 2222" in _good
+      and '  IdentityFile "/keys/my key%%h"' in _good
+      and '  UserKnownHostsFile "/A B/100%%/remote_known_hosts"' in _good
+      and "  GlobalKnownHostsFile /dev/null" in _good and "  HashKnownHosts yes" in _good
+      and "  StrictHostKeyChecking accept-new" in _good and "  BatchMode yes" in _good,
+      "%r" % [_bad26, _good])
+
+# THE LINT (0a 5.1): no subprocess call's argument list is built from a
+# name that carries what a person typed or asked for, and no render's
+# --prompt is anything but the prompt file's placeholder. The two names
+# allowed are the render runner's own `cmd` (built by prompt_cmd) and the
+# already-open notice's fixed text.
+_LINT_NAMES = {"prompt", "text", "cmd", "plain", "query", "subject", "neg", "vid_subject",
+               "img_subject", "user_msg", "msg", "message", "content", "words", "host", "user"}
+_LINT_OK = {("_run_render", "cmd"), ("_already_open_notice", "msg")}
+_lint = []
+for _fn in _ast.walk(_ctree):
+    if not isinstance(_fn, _ast.FunctionDef):
+        continue
+    for _nd in _ast.walk(_fn):
+        if (isinstance(_nd, _ast.Call) and isinstance(_nd.func, _ast.Attribute)
+                and isinstance(_nd.func.value, _ast.Name) and _nd.func.value.id == "subprocess"
+                and _nd.func.attr in ("run", "Popen", "check_output", "call", "check_call")
+                and _nd.args):
+            _used = {x.id for x in _ast.walk(_nd.args[0]) if isinstance(x, _ast.Name)}
+            for _u in _used & _LINT_NAMES:
+                if (_fn.name, _u) not in _LINT_OK:
+                    _lint.append((_fn.name, _nd.lineno, _u))
+        if isinstance(_nd, _ast.List):
+            _el = _nd.elts
+            for _i, _x in enumerate(_el[:-1]):
+                if (isinstance(_x, _ast.Constant) and _x.value in ("--prompt", "--negative-prompt")
+                        and not (isinstance(_el[_i + 1], _ast.Constant)
+                                 and str(_el[_i + 1].value).startswith("@prompt:"))):
+                    _lint.append((_fn.name, _nd.lineno, _x.value))
+check("lint: nothing a person typed is built into a command line", not _lint, "%r" % _lint)
 
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)

@@ -35,6 +35,7 @@ import signal
 import socket
 import base64
 import hashlib
+import hmac
 import html
 import math
 import secrets
@@ -142,6 +143,37 @@ TEST_HOOKS = frozenset(
 # the sync server; a dev copy may point at the test one (00 5.7)
 SYNC_URL = ((os.environ.get("MILLENAI_SYNC_URL", "").strip()
              if DEV_HOME else "") or "https://sync.millertechnology.net")
+
+
+def _hook_arg(name: str) -> str:
+    """The value of a `name=value` test hook ('' when absent); like every
+    hook, only a dev copy has any (0a 5.14)."""
+    for h in TEST_HOOKS:
+        if h.startswith(name + "="):
+            return h[len(name) + 1:]
+    return ""
+
+
+# A RECORD OF EVERY COMMAND LINE (0a 5.14, 6b326), dev copies only: the
+# `subprocess-record` hook appends each child's argv to
+# run/subprocess.jsonl, so the gauntlet can prove that no prompt, speech
+# or SSH host reaches the process list.
+if "subprocess-record" in TEST_HOOKS:
+    _rec_popen_init = subprocess.Popen.__init__
+
+    def _recording_popen(self, args, *a, **k):
+        try:
+            _rd = os.path.join(DEV_HOME, "run")
+            os.makedirs(_rd, mode=0o700, exist_ok=True)
+            with open(os.path.join(_rd, "subprocess.jsonl"), "a",
+                      encoding="utf-8") as _rf:
+                _rf.write(json.dumps(
+                    [str(x) for x in args] if isinstance(args, (list, tuple))
+                    else [str(args)]) + "\n")
+        except Exception:
+            pass
+        _rec_popen_init(self, args, *a, **k)
+    subprocess.Popen.__init__ = _recording_popen
 
 # A CRASH ON WINDOWS MUST BE SEEN (6b316). The launcher starts us with
 # pythonw, which has no console, so a failure at startup vanished: the
@@ -639,6 +671,33 @@ def log_dir() -> str:
             else os.path.expanduser("~/Library/Logs/MillenAI"))
 
 
+# NOTHING PERSONAL ON A COMMAND LINE (0a 5.1, 6b326). Any login on the
+# computer can read every process's arguments with `ps`, so a prompt, the
+# text being read aloud and the Remote agent's host and commands travel
+# in a file only this user can read (0600, under run/), deleted when the
+# work ends, or on stdin.
+def run_file(prefix: str, text: str, suffix: str = ".txt") -> str:
+    """A new 0600 file under run/ holding `text`; its path."""
+    d = os.path.join(app_dir(), "run")
+    os.makedirs(d, mode=0o700, exist_ok=True)
+    fd, path = tempfile.mkstemp(dir=d, prefix=prefix, suffix=suffix)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
+            f.write(text)
+    except Exception:
+        drop_run_file(path)
+        raise
+    return path
+
+
+def drop_run_file(path):
+    if path:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
 # THE TITLEBAR LOCKUP'S FONT (6b258). The page pulls Michroma from
 # Google, but a native NSTextField in the titlebar cannot — it needs a
 # real font file registered with CoreText. Bundled beside this file
@@ -1041,6 +1100,61 @@ OLLAMA_TAGS = {l: i["ollama"] for l, i in MODEL_INFO.items() if i["ollama"]}
 # (6b319), and the real app's boot sweep removes old ones.
 CLOUD_FILE = os.path.join(app_dir(), "cloud.json")
 
+
+# THE FOUR PROVIDERS' ADDRESSES, IN ONE PLACE (0a 5.14, 6b326). The
+# key-save route, Gemini's pictures and Veo all read them from here. A
+# dev copy's `provider-stub=http://127.0.0.1:<port>` hook points every
+# one at a recording stub on this computer (the provider's host becomes
+# the first part of the path, so _provider_of still reads it); nothing
+# else can move them, so the shipped app always talks to the providers.
+_PROVIDER_STUB = _hook_arg("provider-stub")
+if not re.match(r"^http://127\.0\.0\.1:\d+$", _PROVIDER_STUB):
+    _PROVIDER_STUB = ""
+
+
+def _provider_url(url: str) -> str:
+    return (_PROVIDER_STUB + "/" + url.split("://", 1)[1]
+            if _PROVIDER_STUB else url)
+
+
+PROVIDER_BASES = {
+    pid: _provider_url(u) for pid, u in (
+        ("gemini", "https://generativelanguage.googleapis.com/v1beta/openai"),
+        ("groq", "https://api.groq.com/openai/v1"),
+        ("claude", "https://api.anthropic.com/v1"),
+        ("kimi", "https://api.moonshot.ai/v1"))}
+# Gemini's own API, beside its OpenAI layer: pictures and Veo
+GEMINI_API = _provider_url("https://generativelanguage.googleapis.com/v1beta/")
+
+
+# THE ONE CLOUD GATE (0a 5.5, 6b326). A prompt, a pasted picture, a
+# picture or video description, model discovery and the balance query
+# reach a provider only while Use cloud power is on, or when the question
+# was asked on the Cloud Only tier. An Advanced list (`cloud: [...]`) or a
+# named cloud compositor only narrows that choice; before this they
+# turned the cloud on by themselves, and a saved Gemini key sent picture
+# and video descriptions to Google with the switch off. The one exception
+# is the test call when a key is pasted. Settings that can't be read
+# count as off.
+def cloud_allowed(cloud_only: bool = False) -> bool:
+    if cloud_only:
+        return True
+    try:
+        return bool(load_prefs(None).get("turbo"))
+    except Exception:
+        return False
+
+
+def gate_ladder(ladder: list, req_cloud=None, cloud_only=False) -> list:
+    """A cloud ladder as a question may use it: empty unless the gate is
+    open, then narrowed to an Advanced run's providers (None: no list; []:
+    none at all). The list never opens the gate."""
+    if not cloud_allowed(cloud_only):
+        return []
+    if req_cloud is not None:
+        ladder = [c for c in ladder if _provider_of(c) in req_cloud]
+    return list(ladder)
+
 # WHAT EACH PROVIDER'S KEY LOOKS LIKE (6b234). A half-pasted key and a
 # revoked one both come back "Invalid API Key", and telling them apart by
 # eye is hopeless — the field is a password box.
@@ -1104,7 +1218,8 @@ def _cloud_budget_hit(c: dict):
     try:
         pid = _provider_of(c)
         if pid:
-            cloud_cool(pid, "key out of budget \u2014 resting", 3600.0)
+            cloud_cool(pid, "key out of budget \u2014 resting", 3600.0,
+                       key=c.get("key"))
     except Exception:
         pass
 
@@ -1223,6 +1338,49 @@ def _cloud_save_state(which: str, entry: dict, make_active=False) -> bool:
         return True
     except Exception:
         return False
+
+
+# A KEY'S FINGERPRINT (0a 5.12 item 13, 6b326): an HMAC under a secret
+# made at each launch, kept in memory only. It tells whether the key a
+# request used is still the saved one without holding the key itself.
+_KEY_FP_SALT = secrets.token_bytes(32)
+
+
+def _key_fp(key) -> str:
+    return hmac.new(_KEY_FP_SALT, str(key or "").encode("utf-8"),
+                    hashlib.sha256).hexdigest()
+
+
+def _same_key(saved, used) -> bool:
+    return bool(saved) and bool(used) and hmac.compare_digest(
+        _key_fp(saved), _key_fp(used))
+
+
+# what a failure may change in a provider's entry: this computer's view
+# of it. Never key, base or name.
+_FAIL_FIELDS = ("status", "note", "cool", "dead", "dead_at")
+
+
+def _cloud_patch(pid: str, key, fields: dict, drop=()) -> bool:
+    """ONE LOCKED UPDATE of a provider's per-computer fields, applied only
+    while its saved key is the one the failing request used (6b326).
+    Before this a failure read the entry outside the lock and wrote the
+    whole entry back, key included, so a 401 that came back after the key
+    was replaced marked the new key failed, and a model retirement landing
+    in the same window could put the old key back. True when written."""
+    with _cloud_txn():
+        d = _cloud_read_strict()
+        cur = (d.get("providers") or {}).get(pid)
+        if not isinstance(cur, dict) or not _same_key(cur.get("key"), key):
+            return False
+        for k in drop:
+            if k in _FAIL_FIELDS:
+                cur.pop(k, None)
+        for k, v in fields.items():
+            if k in _FAIL_FIELDS:
+                cur[k] = v
+        _cloud_write(d)
+    return True
 
 
 # WHY A CLOUD CALL FAILED (6b233). cloud_text swallowed every exception
@@ -1347,23 +1505,28 @@ _BAD_KEY_RX = re.compile(
     r"invalid[ _-]api[ _-]key|invalid x-api-key", re.I)
 
 
-def cloud_cool(pid: str, note: str, secs: float = QUOTA_COOLDOWN):
+def cloud_cool(pid: str, note: str, secs: float = QUOTA_COOLDOWN, *, key):
     """Bench a provider WITHOUT marking it failed: status stays ok, so it
-    returns on its own when the window passes."""
+    returns on its own when the window passes. `key` is the key the
+    request used: a provider whose key has changed since is left alone
+    (6b326)."""
     try:
-        # the read and the write inside ONE transaction, or two threads
-        # resting two providers each write back the other's stale entry
-        with _cloud_txn():
-            cur = dict((_cloud_read_strict().get("providers") or {})
-                       .get(pid) or {})
-            if not cur:
-                return
-            cur["status"] = "ok"
-            cur["cool"] = time.time() + secs
-            cur["note"] = note[:120]
-            _cloud_save_state(pid, cur)
+        _cloud_patch(pid, key, {"status": "ok", "cool": time.time() + secs,
+                                "note": note[:120]})
     except Exception:
         pass
+
+
+def _key_live(c: dict) -> bool:
+    """True while the key a conf carries is still its provider's saved
+    one. The in-memory rests ask this first (6b326), so a late failure of
+    a replaced key doesn't bench the new key's model."""
+    try:
+        cur = (_cloud_all().get("providers") or {}).get(_provider_of(c))
+        return isinstance(cur, dict) and _same_key(cur.get("key"),
+                                                   c.get("key"))
+    except Exception:
+        return False
 
 
 def cloud_glitch(c: dict, why: str):
@@ -1372,14 +1535,16 @@ def cloud_glitch(c: dict, why: str):
     council seat on it, and let it come back by itself. Never raises —
     this runs on the answer path. Since 6b307 the MODEL rests and the
     provider's next ranked model stands in; only a conf with no model
-    benches the whole provider."""
+    benches the whole provider. Only while its key is still the saved
+    one (6b326)."""
     try:
         if c.get("model"):
-            cloud_rest_model(c["model"], GLITCH_COOLDOWN)
+            if _key_live(c):
+                cloud_rest_model(c["model"], GLITCH_COOLDOWN)
             return
         pid = _provider_of(c)
         if pid:
-            cloud_cool(pid, why, GLITCH_COOLDOWN)
+            cloud_cool(pid, why, GLITCH_COOLDOWN, key=c.get("key"))
     except Exception:
         pass
 
@@ -1433,74 +1598,78 @@ def cloud_revive(models: list):
 
 def cloud_note_failure(c: dict, exc: Exception):
     """Record a cloud failure so the UI stops reporting a dead key as
-    healthy. Best-effort: never raises into the answer path."""
+    healthy. Best-effort: never raises into the answer path.
+
+    ONE LOCKED, KEY-CHECKED UPDATE (0a 5.12 item 13, 6b326). The read,
+    the decision and the write happen inside one _cloud_txn, and only
+    while the provider's saved key is the key this request used
+    (compare_digest on fingerprints). It writes status, note, cool, dead
+    and dead_at, never key, base or name, so a failure that comes back
+    after the key was replaced or removed changes nothing: not the new
+    key's status, not a model's rest, and it can't write the old key
+    back."""
     try:
         code = getattr(exc, "code", 0)
         model = c.get("model", "")
         body = _http_body(exc)
         kind = cloud_failure_kind(code, body)
-        if kind == "quota" and _NO_CREDIT_RX.search(body):
-            pid = _provider_of(c)
-            if pid:
-                cloud_cool(pid, "out of credit \u2014 top up the account",
-                           3600.0)
+        pid, key = _provider_of(c), c.get("key")
+        if not pid:
             return
-        if kind == "quota":
-            # the key WORKS. When the provider names the model (Groq's
-            # per-model token budgets, Gemini's per-model free quota),
-            # only that model rests (6b307); otherwise the provider does
-            if model and model.lower() in body.lower():
-                cloud_rest_model(model, 300.0)
+        with _cloud_txn():
+            cur = (_cloud_read_strict().get("providers") or {}).get(pid)
+            if not isinstance(cur, dict) or not _same_key(cur.get("key"),
+                                                          key):
                 return
-            pid = _provider_of(c)
-            if pid:
-                cloud_cool(pid, "rate limited — resting")
-            return
-        if kind == "auth":
-            pid = _provider_of(c)
-            if not pid:
+            if kind == "quota" and _NO_CREDIT_RX.search(body):
+                _cloud_patch(pid, key, {
+                    "status": "ok", "cool": time.time() + 3600.0,
+                    "note": "out of credit \u2014 top up the account"})
                 return
-            cur = dict((_cloud_all().get("providers") or {}).get(pid) or {})
-            if not cur or cur.get("status") == "fail":
+            if kind == "quota":
+                # the key WORKS. When the provider names the model (Groq's
+                # per-model token budgets, Gemini's per-model free quota),
+                # only that model rests (6b307); otherwise the provider does
+                if model and model.lower() in body.lower():
+                    cloud_rest_model(model, 300.0)
+                    return
+                _cloud_patch(pid, key, {
+                    "status": "ok", "cool": time.time() + QUOTA_COOLDOWN,
+                    "note": "rate limited \u2014 resting"})
                 return
-            # merge, never replace — the entry still holds the key so the
-            # user can see which provider to re-paste
-            cur["status"] = "fail"
-            cur["note"] = "key rejected (HTTP %d)" % code
-            cur.pop("cool", None)
-            _cloud_save_state(pid, cur)
-        elif kind == "other" and (code not in (400, 404) or (
-                code == 400 and not _MODEL_GONE_RX.search(body))):
-            # a 5xx ("high demand"), or a 400 about the REQUEST: not the
-            # key's fault, so the model rests briefly and the provider's
-            # next ranked model answers (6b307)
-            if model:
-                cloud_rest_model(model, GLITCH_COOLDOWN)
-                return
-            pid = _provider_of(c)
-            if pid:
-                cloud_cool(pid, "not answering (HTTP %d)" % code,
-                           GLITCH_COOLDOWN)
-        elif code in (400, 404) and model:
-            with _dead_lock:
-                _dead_models.add(model)
-                _dead_when[model] = time.time()
-            pid = _provider_of(c)
-            if not pid:
-                return
-            cur = dict((_cloud_all().get("providers") or {}).get(pid) or {})
-            if not cur:
-                return
-            # stamped EVERY time (6b307): an entry already on the list
-            # but unstamped or expired must be retired again on disk
-            dead = [m for m in (cur.get("dead") or []) if m != model]
-            dead.append(model)
-            cur["dead"] = dead[-12:]
-            stamps = dict(cur.get("dead_at") or {})
-            stamps[model] = time.time()
-            cur["dead_at"] = {m: stamps[m] for m in cur["dead"]
-                              if m in stamps}
-            _cloud_save_state(pid, cur)
+            if kind == "auth":
+                if cur.get("status") == "fail":
+                    return
+                # the entry keeps its key, so the user can see which
+                # provider to re-paste
+                _cloud_patch(pid, key, {
+                    "status": "fail",
+                    "note": "key rejected (HTTP %d)" % code}, drop=("cool",))
+            elif kind == "other" and (code not in (400, 404) or (
+                    code == 400 and not _MODEL_GONE_RX.search(body))):
+                # a 5xx ("high demand"), or a 400 about the REQUEST: not
+                # the key's fault, so the model rests briefly and the
+                # provider's next ranked model answers (6b307)
+                if model:
+                    cloud_rest_model(model, GLITCH_COOLDOWN)
+                    return
+                _cloud_patch(pid, key, {
+                    "status": "ok", "cool": time.time() + GLITCH_COOLDOWN,
+                    "note": "not answering (HTTP %d)" % code})
+            elif code in (400, 404) and model:
+                with _dead_lock:
+                    _dead_models.add(model)
+                    _dead_when[model] = time.time()
+                # stamped EVERY time (6b307): an entry already on the list
+                # but unstamped or expired must be retired again on disk
+                dead = [m for m in (cur.get("dead") or []) if m != model]
+                dead.append(model)
+                dead = dead[-12:]
+                stamps = dict(cur.get("dead_at") or {})
+                stamps[model] = time.time()
+                _cloud_patch(pid, key, {
+                    "dead": dead,
+                    "dead_at": {m: stamps[m] for m in dead if m in stamps}})
     except Exception:
         pass
 
@@ -2052,14 +2221,18 @@ def _openai_body(c: dict, messages: list, max_tokens: int,
     return body
 
 
-def _cloud_refresh_picks():
+def _cloud_refresh_picks(cloud_only: bool = False):
     """Re-run model discovery for every healthy provider and upgrade
     stale picks (6b247). A provider's inventory GROWS after the key is
     saved — seen live: a Moonshot account funded after save gained
     kimi-k3, but discovery only ever ran at save time, so the stored
     pick stayed kimi-k2.7-code (a code specialist) in every council
     forever. Runs once per boot on a background thread; any provider
-    that is offline or resting just keeps its pick until next boot."""
+    that is offline or resting just keeps its pick until next boot.
+    Only under the cloud gate (0a 5.5, 6b326): with cloud power off no
+    provider hears from this computer at all."""
+    if not cloud_allowed(cloud_only):
+        return
     try:
         d = _cloud_all()
         updates = {}
@@ -2123,6 +2296,25 @@ def _cloud_refresh_picks():
 
 
 _repaired = [False]
+_picks_run = [False]
+_picks_lock = threading.Lock()
+
+
+def _cloud_refresh_once(cloud_only: bool = False):
+    """Start model discovery once per launch, and only under the cloud
+    gate (0a 5.5, 6b326). It used to start at the first
+    cloud_ok_providers() call, which the page's /api/tiers makes at start,
+    so every saved key's provider was contacted at every launch with cloud
+    power off. Now it waits for the switch (or a Cloud Only question) and
+    runs then."""
+    if _picks_run[0] or not cloud_allowed(cloud_only):
+        return
+    with _picks_lock:
+        if _picks_run[0]:
+            return
+        _picks_run[0] = True
+    threading.Thread(target=_cloud_refresh_picks, args=(cloud_only,),
+                     daemon=True).start()
 
 
 def _cloud_repair():
@@ -2132,13 +2324,13 @@ def _cloud_repair():
     showing a red ✗ until it was re-pasted by hand. A stored note that
     reads like a quota message is exactly that case: put it back to ok
     and let the cooldown decide when it returns."""
+    # the stale-pick refresh runs on its own thread (one network call per
+    # provider, never in front of the first answer), once, and only once
+    # the cloud gate opens (6b326)
+    _cloud_refresh_once()
     if _repaired[0]:
         return
     _repaired[0] = True
-    # stale-pick refresh rides the same once-per-process latch, but on
-    # its own thread — it makes one network call per provider and must
-    # never sit in front of the first answer
-    threading.Thread(target=_cloud_refresh_picks, daemon=True).start()
     try:
         with _cloud_txn():
             d = _cloud_read_strict()
@@ -2319,13 +2511,46 @@ def claude_refusal_conf(c: dict):
 # on this request's thread. Titles, memory and map pins then use THAT
 # provider's quick model, so a chat's words never reach a second
 # company, and a chat answered on this Mac never leaves it.
-_answered = {}
-_last_cloud = {}          # user key -> (conf, time) for /api/title
+#
+# NO KEY IN THEM (0a 5.12 item 13, 6b326): both hold a TICKET, the
+# provider, the model that answered and the key's fingerprint, never the
+# key. /api/title held the whole conf for 5 minutes, so a key removed or
+# replaced in Settings went on being used for titles and memory. Whoever
+# uses a ticket re-reads the key from cloud.json under the cloud lock
+# (_ticket_conf) and makes no call when the provider is gone or its key
+# is no longer the one that answered.
+_answered = {}            # thread -> ticket of the answer it streamed
+_last_cloud = {}          # user key -> (ticket, time) for /api/title
+
+
+def _cloud_ticket(c: dict) -> dict:
+    return {"pid": _provider_of(c), "fp": _key_fp(c.get("key")),
+            "model": str(c.get("model") or ""),
+            "name": str(c.get("name") or "")}
+
+
+def _ticket_conf(t):
+    """The provider's saved conf for a ticket, key re-read under the cloud
+    lock, or None when the provider was removed, its key replaced, or it
+    is marked failed."""
+    if not isinstance(t, dict) or not t.get("pid"):
+        return None
+    try:
+        with _cloud_txn():
+            cur = (_cloud_read_strict().get("providers") or {}).get(t["pid"])
+            if (not isinstance(cur, dict) or not cur.get("key")
+                    or cur.get("status", "ok") != "ok"
+                    or not hmac.compare_digest(_key_fp(cur.get("key")),
+                                               str(t.get("fp") or ""))):
+                return None
+            return dict(cur)
+    except Exception:
+        return None
 
 
 def _mark_answered(c: dict):
     try:
-        _answered[threading.get_ident()] = dict(c)
+        _answered[threading.get_ident()] = _cloud_ticket(c)
     except Exception:
         pass
 
@@ -2339,8 +2564,12 @@ def cloud_balance(pid: str, c: dict) -> str:
     USD on the .ai platform). Anthropic shows cost only to an org ADMIN
     key, Groq and Gemini only in their dashboards — so those rows show
     nothing rather than something invented. Cached 5 minutes; Settings
-    repaints constantly and must not spend a request each time."""
+    repaints constantly and must not spend a request each time. Only
+    under the cloud gate (0a 5.5, 6b326): Settings asked Moonshot at every
+    open, cloud power on or off."""
     if pid != "kimi" or not (c.get("key") and c.get("base")):
+        return ""
+    if not cloud_allowed():
         return ""
     now = time.time()
     hit = _bal_cache.get(pid)
@@ -4426,6 +4655,9 @@ def make_title(text: str, conf=None) -> str:
     loaded, so it costs almost nothing. A chat the cloud answered is
     named by that provider's quick model instead (6b308): a keys-only
     user finally gets titles, and nothing new leaves the Mac."""
+    # `conf` is a ticket (6b326): the key is re-read now, and a provider
+    # removed or re-keyed since the answer gets no call
+    conf = _ticket_conf(conf) if conf else None
     if conf:
         m = cloud_role_model(_provider_of(conf), conf, "utility")
         if m:
@@ -5476,6 +5708,34 @@ def _client_gone(sock) -> bool:
         return True
 
 
+# THE PROMPT FILE (0a 5.1, 6b326). mflux and the video renderer took the
+# prompt, and the video one the negative prompt, as arguments, which
+# `ps` shows to every login. They now run under this fixed runner: it
+# reads a 0600 JSON file under run/, puts each "@prompt:<name>" argument's
+# words back in place inside the process, and runs the tool (the console
+# script, or `python -m <module>`) as it would have run. The file is
+# deleted when the render ends, however it ends.
+_PROMPT_RUNNER = (
+    "import json,runpy,sys\n"
+    "f,kind,tool=sys.argv[1:4]\n"
+    "with open(f,encoding='utf-8') as h:d=json.load(h)\n"
+    "sys.argv=[tool]+[d.get(a[8:],'') if a.startswith('@prompt:') else a"
+    " for a in sys.argv[4:]]\n"
+    "if kind=='module':runpy.run_module(tool,run_name='__main__',"
+    "alter_sys=True)\n"
+    "else:runpy.run_path(tool,run_name='__main__')\n")
+
+
+def prompt_cmd(python: str, kind: str, tool: str, args: list,
+               words: dict) -> tuple:
+    """(argv, prompt file): `tool` ("script": a console script's path,
+    "module": a module name) run by `python` with `args`, whose
+    "@prompt:<name>" entries take words[name] from the file. The caller
+    deletes the file (drop_run_file) when the render ends."""
+    path = run_file("prompt-", json.dumps(words), ".json")
+    return [python, "-c", _PROMPT_RUNNER, path, kind, tool] + list(args), path
+
+
 def _run_render(cmd: list, timeout: float, sock=None) -> tuple:
     """Run a render in its own process group, polling once a second.
     Stops it cleanly when the reader leaves or the clock runs out.
@@ -5598,10 +5858,14 @@ def _ffmpeg_convert(src: str, fmt: str, fps: int) -> str:
     return src
 
 
-def generate_image(prompt: str, over: dict = None, sock=None) -> tuple:
+def generate_image(prompt: str, over: dict = None, sock=None,
+                   cloud=None) -> tuple:
     """(png path, source) — local FLUX first, a Gemini key second.
-    Raises when neither could paint."""
+    Raises when neither could paint. `cloud` is the caller's cloud gate
+    (0a 5.5, 6b326); None asks cloud_allowed()."""
     errs = []
+    if cloud is None:
+        cloud = cloud_allowed()
     if image_ready():
         os.makedirs(IMAGE_DIR, exist_ok=True)
         iid = _media_id()
@@ -5611,17 +5875,23 @@ def generate_image(prompt: str, over: dict = None, sock=None) -> tuple:
         _t = studio_tier("image")
         o = studio_opts("image", over)
         out = os.path.join(IMAGE_DIR, iid + "." + o["fmt"])
-        cmd = [os.path.join(STUDIOS["image"]["venv"], "bin", "mflux-generate"),
-               "--model", _snap_dir(_t["repo"]),
-               "--base-model", _t.get("base", "schnell"),
-               "--prompt", prompt, "--steps", str(o["steps"]),
-               "--guidance", str(o["guidance"]),
-               "--seed", str(o["seed"] or secrets.randbelow(10 ** 6)),
-               "--width", str(o["w"]), "--height", str(o["h"]),
-               "--output", out]
+        # the prompt reaches mflux through a 0600 file (6b326), never
+        # its command line
+        args = ["--model", _snap_dir(_t["repo"]),
+                "--base-model", _t.get("base", "schnell"),
+                "--prompt", "@prompt:prompt", "--steps", str(o["steps"]),
+                "--guidance", str(o["guidance"]),
+                "--seed", str(o["seed"] or secrets.randbelow(10 ** 6)),
+                "--width", str(o["w"]), "--height", str(o["h"]),
+                "--output", out]
         if not _render_lock.acquire(timeout=5):
             raise RenderBusy("already making one \u2014 ask again when it lands")
+        pf = None
         try:
+            _vb = os.path.join(STUDIOS["image"]["venv"], "bin")
+            cmd, pf = prompt_cmd(os.path.join(_vb, "python3"), "script",
+                                 os.path.join(_vb, "mflux-generate"), args,
+                                 {"prompt": prompt})
             _t0 = time.time()
             rc, tail, cut = _run_render(cmd, 900, sock)
             if cut:
@@ -5635,9 +5905,12 @@ def generate_image(prompt: str, over: dict = None, sock=None) -> tuple:
         except Exception as exc:
             errs.append("local: %s" % exc)
         finally:
+            drop_run_file(pf)
             _render_lock.release()
     gem = (_cloud_all().get("providers") or {}).get("gemini") or {}
-    if gem.get("key") and gem.get("status", "ok") == "ok":
+    if not cloud:
+        errs.append("gemini: cloud power is off")
+    elif gem.get("key") and gem.get("status", "ok") == "ok":
         # newest first, as Google lists them today (6b294, probed live)
         # gemini-2.5-flash-image shuts down 2026-10-02 (6b307)
         for mdl in ("gemini-3.1-flash-lite-image", "gemini-3.1-flash-image"):
@@ -5645,8 +5918,7 @@ def generate_image(prompt: str, over: dict = None, sock=None) -> tuple:
                 # the key rides in a header (6b308): in the URL it could
                 # surface in an error message
                 req = urllib.request.Request(
-                    "https://generativelanguage.googleapis.com/v1beta/models/"
-                    "%s:generateContent" % mdl,
+                    GEMINI_API + "models/%s:generateContent" % mdl,
                     data=json.dumps({
                         "contents": [{"parts": [{"text": prompt}]}],
                         "generationConfig": {"responseModalities": ["IMAGE"]}
@@ -6783,6 +7055,11 @@ def _veo_video(prompt: str) -> str:
     running operation: submit, then poll until the file is there.
     A DAILY CAP (6b309): about $0.80 a clip adds up quietly, so after
     VEO_DAILY_CAP clips in a day the cloud stops making video."""
+    # no key, no slot: this check came after the reservation, so a
+    # request with no key spent a clip of the day (6b326)
+    gem = (_cloud_all().get("providers") or {}).get("gemini") or {}
+    if not (gem.get("key") and gem.get("status", "ok") == "ok"):
+        raise RuntimeError("no cloud key that can make video")
     today = time.strftime("%Y-%m-%d")
     # RESERVE THE SLOT FIRST (6b309, review): checking, then counting
     # after the submit let two requests at once both slip under the cap
@@ -6810,11 +7087,8 @@ def _veo_video(prompt: str) -> str:
                     store_prefs(_p)
         except Exception:
             pass
-    gem = (_cloud_all().get("providers") or {}).get("gemini") or {}
-    if not (gem.get("key") and gem.get("status", "ok") == "ok"):
-        raise RuntimeError("no cloud key that can make video")
     key = gem["key"]
-    base = "https://generativelanguage.googleapis.com/v1beta/"
+    base = GEMINI_API
     last = ""
     # standard Veo costs 4x Fast ($3.20 an 8 s clip) and is never a
     # silent fallback (6b308)
@@ -6882,30 +7156,40 @@ def _veo_video(prompt: str) -> str:
     raise RuntimeError(last or "the cloud could not make that video")
 
 
-def generate_video(prompt: str, over: dict = None, sock=None) -> tuple:
+def generate_video(prompt: str, over: dict = None, sock=None,
+                   cloud=None) -> tuple:
     """(mp4 path, source). Local first, then a cloud key. Video has no
     keyless tier — nobody gives it away — so when neither is there the
-    caller says so plainly rather than pretending."""
+    caller says so plainly rather than pretending. `cloud` is the caller's
+    cloud gate (0a 5.5, 6b326); None asks cloud_allowed()."""
     errs = []
+    if cloud is None:
+        cloud = cloud_allowed()
     if video_ready():
         os.makedirs(VIDEO_DIR, exist_ok=True)
         out = os.path.join(VIDEO_DIR, _media_id() + ".mp4")
         t = studio_tier("video")
         o = studio_opts("video", over)
-        cmd = [os.path.join(STUDIOS["video"]["venv"], "bin", "python3"),
-               "-m", STUDIOS["video"]["module"],
-               "--model-dir", _snap_dir(t["repo"]), "--prompt", prompt,
-               "--num-frames", str(o["frames"]),
-               "--width", str(o["w"]), "--height", str(o["h"]),
-               "--steps", str(o["steps"]),
-               "--guide-scale", str(o["guidance"]),
-               "--seed", str(o["seed"] or secrets.randbelow(10 ** 6)),
-               "--output-path", out]
+        # the prompt and the negative prompt reach the renderer through one
+        # 0600 file (6b326), never its command line
+        args = ["--model-dir", _snap_dir(t["repo"]),
+                "--prompt", "@prompt:prompt",
+                "--num-frames", str(o["frames"]),
+                "--width", str(o["w"]), "--height", str(o["h"]),
+                "--steps", str(o["steps"]),
+                "--guide-scale", str(o["guidance"]),
+                "--seed", str(o["seed"] or secrets.randbelow(10 ** 6)),
+                "--output-path", out]
         if o.get("neg"):
-            cmd += ["--negative-prompt", o["neg"]]
+            args += ["--negative-prompt", "@prompt:neg"]
         if not _render_lock.acquire(timeout=5):
             raise RenderBusy("already making one \u2014 ask again when it lands")
+        pf = None
         try:
+            cmd, pf = prompt_cmd(
+                os.path.join(STUDIOS["video"]["venv"], "bin", "python3"),
+                "module", STUDIOS["video"]["module"], args,
+                {"prompt": prompt, "neg": o.get("neg") or ""})
             _vt0 = time.time()
             rc, tail, cut = _run_render(cmd, 3600, sock)
             if cut:
@@ -6924,12 +7208,35 @@ def generate_video(prompt: str, over: dict = None, sock=None) -> tuple:
         except Exception as exc:
             errs.append("local: %s" % str(exc)[:160])
         finally:
+            drop_run_file(pf)
             _render_lock.release()
+    if not cloud:
+        errs.append("cloud: cloud power is off")
+        raise RuntimeError("; ".join(errs))
     try:
         return _veo_video(prompt), "cloud"
     except Exception as exc:
         errs.append("cloud: %s" % str(exc)[:160])
     raise RuntimeError("; ".join(errs) or "no video engine")
+
+
+def studio_needs(kind: str, gate: bool) -> str:
+    """What the reader is told when a picture or video can't be made on
+    this computer and Gemini may not make it (0a 5.5, 6b326): cloud power
+    is off (`gate` False), or it is on with no working Gemini key.
+    Nothing has been sent anywhere."""
+    if studio_supported():
+        what = "image" if kind == "image" else "video"
+        return (("Turn on Use cloud power to make this with Gemini, or "
+                 "install %s generation." if not gate else
+                 "Add a Gemini key in Settings \u203a Cloud power, or "
+                 "install %s generation.") % what)
+    how = ("Turn on Use cloud power to make this with Gemini." if not gate
+           else "Add a Gemini key in Settings \u203a Cloud power to make "
+           "this with Gemini.")
+    if kind == "image":
+        return "Making pictures on this computer needs an Apple silicon Mac. " + how
+    return "Making video on this computer needs an Apple silicon Mac. " + how
 
 
 # ------------------------------------------------------------- updates
@@ -7468,6 +7775,8 @@ def _set_turbo(on: bool):
         p = load_prefs(None)
         p["turbo"] = on
         store_prefs(p)
+    if on:
+        _cloud_refresh_once()      # the gate just opened (6b326)
 
 
 # THE MODELS THIS APP PUT ON DISK (6b306). Auto-clean is on by default
@@ -8354,7 +8663,12 @@ def _extract_memory(label: str, user_msg: str, base=None, conf=None):
         ask = [{"role": "user", "content": MEMORY_PROMPT + user_msg[:2000]}]
         if conf:
             # the provider that answered, on its quick model, quietly: a
-            # background job never rests the reader's next model (6b308)
+            # background job never rests the reader's next model (6b308).
+            # `conf` is the answer's ticket: the key is re-read here, and a
+            # provider removed or re-keyed since gets no call (6b326)
+            conf = _ticket_conf(conf)
+            if not conf:
+                return
             m = cloud_role_model(_provider_of(conf), conf, "utility")
             if not m:
                 return
@@ -8551,8 +8865,17 @@ def _fw_transcribe(audio, gpu: bool) -> str:
     return " ".join(sg.text for sg in segments).strip()
 
 
+_say_lock = threading.RLock()
+
+
 def _speak(text: str):
-    """Read a reply aloud with the system voice; new speech cuts off old."""
+    """Read a reply aloud with the system voice; new speech cuts off old.
+    One at a time (6b326): two at once could both start a voice."""
+    with _say_lock:
+        _speak_now(text)
+
+
+def _speak_now(text: str):
     global _say_proc
     _stop_speaking()
     # Reasoning is for reading, never for listening. The markdown pass below
@@ -8597,17 +8920,64 @@ def _speak(text: str):
             except Exception:
                 pass
     else:
-        _say_proc = subprocess.Popen(["say", text])
+        # the text goes in a 0600 file under run/, not on say's command
+        # line where `ps` shows it (0a 5.1, 6b326); the file goes when the
+        # speech ends or is stopped
+        path = run_file("say-", text)
+        try:
+            _say_proc = subprocess.Popen(["say", "-f", path])
+        except Exception:
+            drop_run_file(path)
+            raise
+        _say_file[0] = path
+        threading.Thread(target=_say_reap, args=(_say_proc, path),
+                         daemon=True).start()
+
+
+_say_file = [None]
+
+
+def _say_reap(proc, path):
+    """Delete the speech file once `say` has finished reading it aloud."""
+    try:
+        proc.wait()
+    except Exception:
+        pass
+    drop_run_file(path)
 
 
 def _stop_speaking():
+    """End the speech and WAIT for it to end (6b326): terminate() alone
+    returned while the voice went on. On Windows the whole PowerShell tree
+    goes (taskkill /T), SAPI with it. Then the speech file is deleted."""
+    with _say_lock:
+        _stop_speaking_now()
+
+
+def _stop_speaking_now():
     global _say_proc
-    if _say_proc and _say_proc.poll() is None:
+    p, _say_proc = _say_proc, None
+    path, _say_file[0] = _say_file[0], None
+    if p is not None and p.poll() is None:
         try:
-            _say_proc.terminate()
+            if IS_WIN:
+                subprocess.run(["taskkill", "/PID", str(p.pid), "/T", "/F"],
+                               capture_output=True, timeout=10,
+                               creationflags=getattr(
+                                   subprocess, "CREATE_NO_WINDOW", 0))
+            else:
+                p.terminate()
         except Exception:
             pass
-    _say_proc = None
+        try:
+            p.wait(5)
+        except Exception:
+            try:
+                p.kill()
+                p.wait(5)
+            except Exception:
+                pass
+    drop_run_file(path)
 
 
 ENGINE_ROW = "Ollama engine"
@@ -11983,6 +12353,7 @@ def run_cloud_only(messages: list, emit, status, step) -> None:
     """CLOUD ONLY: answer entirely off the API keys. One key streams
     straight through; several draft in parallel and the compositor
     ladder writes the final answer. Nothing here loads a local engine."""
+    _cloud_refresh_once(cloud_only=True)   # picking the tier opens the gate
     bench = cloud_bench()
     if not bench:
         emit(_cloud_all_down())
@@ -12163,15 +12534,14 @@ def run_council(labels: list, messages: list, emit, status,
     cloud_threads = []
     # Cloud Only forces the bench on: picking that tier IS the opt-in, so
     # it must not also depend on the separate turbo preference. An
-    # ADVANCED run (6b248) is its own opt-in the same way: a named
-    # bench_allow list engages exactly those providers regardless of the
-    # turbo pref — and an EMPTY list means explicitly none, turbo or not.
+    # ADVANCED run's bench_allow list (6b248) only NARROWS the bench since
+    # 6b326 (0a 5.5): it used to engage the named providers with cloud
+    # power off. An EMPTY list means explicitly none, turbo or not.
     _bench = cloud_bench()
     if bench_allow is not None:
         _bench = [(l, c) for l, c in _bench
                   if _provider_of(c) in bench_allow]
-    if cloud_only or (bool(_bench) and (bench_allow is not None
-                                        or load_prefs(None).get("turbo"))):
+    if cloud_only or (bool(_bench) and cloud_allowed()):
         def _cloud_draft(lbl, conf):
             # WHOLE BODY GUARDED (6b236). status() writes to the client
             # socket, so a reader who closes the tab raises in here \u2014 and
@@ -12514,14 +12884,12 @@ def run_council(labels: list, messages: list, emit, status,
             return
         emit(good[0][1])
         return
-    # the cloud writes the merge only when cloud power is on or the run
-    # named its clouds (6b308): a hurried merge used to reach the cloud
-    # with the switch off
-    _cloud_ok = bool(load_prefs(None).get("turbo")) or bool(bench_allow)
+    # the cloud writes the merge only when cloud power is on (6b326, 0a
+    # 5.5): a named cloud compositor or the run's own cloud list used to
+    # reach the cloud with the switch off; now they only pick WHICH cloud
     if comp in MODEL_ROUTES:
         pass          # the user chose a LOCAL pen — no cloud ladder
-    elif _comp_cloud or (_hurry_fast and _cloud_ok) or \
-            load_prefs(None).get("turbo"):
+    elif cloud_allowed():
         if _walk_ladder():
             return
     run_mark(compositor=merger)
@@ -12700,35 +13068,108 @@ def _remote_save(d: dict):
         pass
 
 
-def _ssh_argv(conf: dict) -> list:
-    """The ssh invocation for this connection, sans the remote command.
-    Key-only (BatchMode), host key auto-accepted on first sight, short
-    connect timeout so a dead host fails fast."""
-    argv = ["ssh", "-o", "BatchMode=yes",
-            "-o", "StrictHostKeyChecking=accept-new",
-            "-o", "ConnectTimeout=12"]
-    port = str(conf.get("port") or "22")
-    if port != "22":
-        argv += ["-p", port]
+# THE REMOTE AGENT'S SSH (0a 5.1, 6b326). The host, user, port and key
+# used to be ssh arguments, the command the last one, so `ps` showed the
+# server and every command, and the first connection wrote the server's
+# name, unhashed, into ~/.ssh/known_hosts, outside the app's folder. Now
+# each call writes a 0600 config under run/ (deleted when it returns)
+# holding the connection under a fixed alias, with the app's own host-key
+# list: remote_known_hosts beside remote.json, hashed, and no system-wide
+# list. The command line is `ssh -F <file> concorde-remote <fixed shell>`;
+# the command goes on stdin, inside one braced group whose stdin is
+# /dev/null, so a command that reads stdin can't eat the rest of the
+# script. ~/.ssh/config is not read (-F replaces it); a key in ssh-agent
+# still works. The first connection to a server is a fresh host-key
+# accept, since ~/.ssh/known_hosts is no longer consulted.
+REMOTE_KNOWN_HOSTS = os.path.join(app_dir(), "remote_known_hosts")
+SSH_ALIAS = "concorde-remote"
+# bash when the server has it (what the login shell usually was), sh
+# otherwise; either reads the script from stdin
+SSH_SHELL = ("if command -v bash >/dev/null 2>&1; then exec bash -s; "
+             "else exec sh -s; fi")
+_SSH_HOST_RX = re.compile(r"^[A-Za-z0-9._:-]{1,253}$")
+_SSH_USER_RX = re.compile(r"^[A-Za-z0-9._@-]{1,80}$")
+
+
+def _ssh_path(p: str) -> str:
+    """A path as an ssh_config value: quoted, % doubled (ssh expands
+    %-tokens in these), forward slashes on Windows (a backslash before a
+    quote or another backslash is an escape there)."""
+    p = os.path.expanduser(p)
+    if IS_WIN:
+        p = p.replace("\\", "/")
+    return '"%s"' % p.replace("%", "%%")
+
+
+def _ssh_config(conf: dict) -> str:
+    """The -F config for this connection, or raise ValueError naming the
+    field ssh can't take. A newline or quote in a field could otherwise
+    add a directive (ProxyCommand runs a local command)."""
+    host = str(conf.get("host") or "").strip()
+    user = str(conf.get("user") or "root").strip()
+    port = str(conf.get("port") or "22").strip()
     # Explorer's "Copy as path" wraps a path in quotes (6b317)
-    key = (conf.get("key") or "").strip().strip('"')
+    key = str(conf.get("key") or "").strip().strip('"')
+    if not _SSH_HOST_RX.match(host) or host.startswith("-"):
+        raise ValueError("the host")
+    if not _SSH_USER_RX.match(user) or user.startswith("-"):
+        raise ValueError("the user")
+    if not port.isdigit() or not 0 < int(port) < 65536:
+        raise ValueError("the port")
+    if key and (any(ord(ch) < 32 for ch in key) or '"' in key):
+        raise ValueError("the key path")
+    lines = ["Host " + SSH_ALIAS,
+             "  HostName " + host,
+             "  User " + user,
+             "  Port %d" % int(port),
+             "  BatchMode yes",
+             "  StrictHostKeyChecking accept-new",
+             "  ConnectTimeout 12",
+             "  UserKnownHostsFile " + _ssh_path(REMOTE_KNOWN_HOSTS),
+             "  GlobalKnownHostsFile " + ("NUL" if IS_WIN else "/dev/null"),
+             "  HashKnownHosts yes",
+             # the one-time "Permanently added" line stays out of the
+             # command's output; errors still show
+             "  LogLevel ERROR"]
     if key:
-        argv += ["-i", os.path.expanduser(key)]
-    argv.append("%s@%s" % (conf.get("user", "root"), conf.get("host", "")))
-    return argv
+        lines.append("  IdentityFile " + _ssh_path(key))
+    return "\n".join(lines) + "\n"
+
+
+def _ssh_argv(cfg_path: str) -> list:
+    """The whole ssh command line: nothing of the connection or the
+    command is on it."""
+    return ["ssh", "-F", cfg_path, SSH_ALIAS, SSH_SHELL]
+
+
+def _ssh_script(cmd: str) -> str:
+    return "{\n%s\n} </dev/null\n" % cmd
 
 
 def ssh_run(conf: dict, cmd: str, timeout: int = 120):
     """(exit_code, combined_output). rc -1 == the connection itself
     failed; the text carries ssh's own words so the UI can guide."""
+    cfg = None
     try:
-        # UTF-8, never strict (6b317, from the Windows sweep): Windows
-        # decoded a server's output as cp1252, so systemctl's "\u25cf" read
-        # as "ssh failed" (exit -1) for a command that had run
-        p = subprocess.run(_ssh_argv(conf) + [cmd],
-                           capture_output=True, encoding="utf-8",
-                           errors="replace", timeout=timeout)
-        out = (p.stdout or "") + (p.stderr or "")
+        try:
+            text = _ssh_config(conf)
+        except ValueError as bad:
+            return -1, ("ssh can't use %s in the connection settings: "
+                        "check it for spaces or odd characters" % bad)
+        if not os.path.exists(REMOTE_KNOWN_HOSTS):
+            # private from the first byte; ssh appends to it
+            os.close(os.open(REMOTE_KNOWN_HOSTS,
+                             os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600))
+        cfg = run_file("ssh-", text, ".conf")
+        # bytes in and out: a text-mode pipe on Windows would turn the
+        # script's newlines into CRLF, which bash reads as part of each
+        # command. UTF-8, never strict (6b317, from the Windows sweep):
+        # Windows decoded a server's output as cp1252, so systemctl's
+        # "\u25cf" read as "ssh failed" (exit -1) for a command that had run
+        p = subprocess.run(_ssh_argv(cfg), input=_ssh_script(cmd).encode(
+            "utf-8"), capture_output=True, timeout=timeout)
+        out = ((p.stdout or b"") + (p.stderr or b"")).decode(
+            "utf-8", "replace").replace("\r\n", "\n")
         return p.returncode, out
     except subprocess.TimeoutExpired:
         return -1, "(command timed out after %ds)" % timeout
@@ -12736,6 +13177,8 @@ def ssh_run(conf: dict, cmd: str, timeout: int = 120):
         return -1, "ssh client not found on this machine"
     except Exception as exc:
         return -1, "ssh failed: %s" % (str(exc)[:200])
+    finally:
+        drop_run_file(cfg)
 
 
 def ssh_alive(conf: dict) -> bool:
@@ -13179,7 +13622,7 @@ def remote_driver():
     # follows the cloud-power switch like every other path (6b308, per
     # Patrick); a step is an intermediate turn, so it drives at the work
     # effort (Opus 5.5 medium), not the final answer's
-    if load_prefs(None).get("turbo"):
+    if cloud_allowed():
         ladder = work_ladder("work")
         if ladder:
             return ("cloud", ladder[0])
@@ -13351,7 +13794,7 @@ def run_remote_agent(messages, conf, autonomy, emit, status, step,
         autonomy = "manual"
     driver = remote_driver()
     if not driver:
-        if (not load_prefs(None).get("turbo")
+        if (not cloud_allowed()
                 and work_ladder("work")):
             emit(AppText("Cloud power is off, so your cloud key can't drive "
                          "the remote agent. Turn on **Use cloud power** under "
@@ -14312,7 +14755,7 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
     # model (Haiku first), 1-2 s a stage; Normal: the work model (Opus
     # 5.5 at medium). Either way a stage that fails the gate below gets
     # one more pass on the work model.
-    if load_prefs(None).get("turbo"):
+    if cloud_allowed():
         for _conf in (fast_cloud_ladder(utility=True) if effort == "fast"
                       else work_ladder("work")):
             raw = cloud_text(_conf, msgs, timeout=60 if effort == "fast"
@@ -14345,7 +14788,7 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
     # covers both, and a failure earns exactly one more walk up the
     # ladder before we accept defeat.
     if ((not out or not _stage_ok(data, asked, opts))
-            and load_prefs(None).get("turbo")):
+            and cloud_allowed()):
         out = []
         for _conf in work_ladder("work"):
             raw2 = cloud_text(_conf, msgs, timeout=120)
@@ -15106,7 +15549,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                              "skipped": skipped, "available": True}
                 # Fast's bubble names the rung that will actually answer
                 # (6b246) — "Cloud Enabled" alone didn't say WHO
-                if name == "Fast" and load_prefs(None).get("turbo"):
+                if name == "Fast" and cloud_allowed():
                     _fl = fast_cloud_ladder()
                     if _fl:
                         out[name]["fastcloud"] = _fl[0].get("name", "")
@@ -15395,21 +15838,19 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # defaults only matter when discovery fails (6b307):
                 # gemini-2.5-flash is closed to new users, and the
                 # claude-sonnet-4-5 snapshot retires from 2026-09-29
-                "gemini": ("Gemini",
-                           "https://generativelanguage.googleapis.com"
-                           "/v1beta/openai", "gemini-3.8-flash"),
+                "gemini": ("Gemini", PROVIDER_BASES["gemini"],
+                           "gemini-3.8-flash"),
                 # the name is the provider, not a model: the seat is
                 # Qwen when Groq lets it, gpt-oss otherwise (6b307)
-                "groq": ("Groq", "https://api.groq.com/openai/v1",
+                "groq": ("Groq", PROVIDER_BASES["groq"],
                          "openai/gpt-oss-120b"),
-                "claude": ("Claude", "https://api.anthropic.com/v1",
+                "claude": ("Claude", PROVIDER_BASES["claude"],
                            "claude-opus-5-5"),
                 # Moonshot's Kimi K3 (6b245, per Patrick): 2.8T-param MoE,
                 # open weights but ~64 H100s to self-host — so it joins as
                 # a provider, not a local row. OpenAI-compatible API; the
                 # default id is a guess the discovery call corrects.
-                "kimi": ("Kimi K3", "https://api.moonshot.ai/v1",
-                         "kimi-k3"),
+                "kimi": ("Kimi K3", PROVIDER_BASES["kimi"], "kimi-k3"),
             }.get(which)
             if not spec or len(key) < 12:
                 self._send_json({"ok": False, "err": "paste a full key"})
@@ -15836,7 +16277,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 out = ""
                 # the verdict is a draft the audit below checks, so it
                 # writes at the work effort; the audit is the final word
-                if load_prefs(None).get("turbo"):
+                if cloud_allowed():
                     for _conf in work_ladder("work"):
                         out = cloud_text(_conf, msgs, timeout=120)
                         if out:
@@ -15865,7 +16306,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # requirement and rewrites what fails. Cloud only —
                 # a 4-bit local auditor would rubber-stamp.
                 try:
-                  if out and load_prefs(None).get("turbo"):
+                  if out and cloud_allowed():
                     _audit = [
                         {"role": "system", "content":
                          "You audit a recommendation against what the "
@@ -15975,6 +16416,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     _no_limits["v"] = bool(d.get("no_limits"))
                 if base is None and "include_giants" in d:
                     _giants["v"] = bool(d.get("include_giants"))
+                if d.get("turbo") is True:
+                    _cloud_refresh_once()   # the gate just opened (6b326)
             self._send_json({"ok": isinstance(d, dict)})
             return
         if self.path in ("/api/prefs/adopt", "/api/webstore/clean"):
@@ -16046,9 +16489,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 txt = ""
             # a chat the cloud just answered is named by that provider's
             # quick model (6b308); anything else stays on this Mac
+            # (a ticket, 6b326: make_title re-reads the key under the lock)
             _lc = _last_cloud.get(str(self._data_base()))
             _conf = (_lc[0] if _lc and time.time() - _lc[1] < 300
-                     and load_prefs(None).get("turbo") else None)
+                     and cloud_allowed() else None)
             self._send_json({"title": make_title(txt, conf=_conf)
                              if txt else ""})
             return
@@ -17237,7 +17681,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._turn["searched"] = bool(query)
             self.send_header("X-Chat-Id", self._turn["id"])
         xm_names = list(council)
-        if (len(council) > 1 and load_prefs(None).get("turbo")
+        if (len(council) > 1 and cloud_allowed()
                 and not cloud_only):     # the bench IS the council here
             xm_names += [lbl for lbl, _c in cloud_bench()]
         xm = ", ".join(xm_names)[:300]
@@ -17362,19 +17806,33 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if vid_subject:
+            # ONE GATE (0a 5.5, 6b326): Veo only while cloud power is on
+            # (or on Cloud Only), and only with a working Gemini key; with
+            # neither that nor video on this Mac nothing is sent anywhere
+            _cgate = cloud_allowed(cloud_only)
+            _gv = (_cloud_all().get("providers") or {}).get("gemini") or {}
+            _cloud_vid = (_cgate and bool(_gv.get("key"))
+                          and _gv.get("status", "ok") == "ok")
+            if not video_ready() and not _cloud_vid:
+                step("video", "Couldn’t make the video", "done",
+                     "nothing was sent")
+                emit(studio_needs("video", _cgate))
+                hb_stop.set()
+                return
             where = "on this Mac" if video_ready() else "in the cloud"
             step("video", "Making the video", "run", where)
-            status("filming \u00b7 " + where)
+            status("filming · " + where)
             try:
                 _use, _cnotes = resolve_overrides("video", _ovr, _pnote)
                 vpath, vsrc = generate_video(vid_subject, _use,
-                                             sock=self.connection)
+                                             sock=self.connection,
+                                             cloud=_cloud_vid)
                 vmade = "made on this Mac" if vsrc == "local" \
                     else "made in the cloud"
                 step("video", "Made the video", "done", vmade)
                 _note = ("" if not (_cnotes + _onotes) else
-                         " \u00b7 " + "; ".join(_cnotes + _onotes))
-                emit("[[vid:%s]]\n\n*%s \u2014 %s%s*"
+                         " · " + "; ".join(_cnotes + _onotes))
+                emit("[[vid:%s]]\n\n*%s — %s%s*"
                      % (json.dumps({"id": os.path.basename(vpath),
                                     "t": vid_subject[:80]},
                                    separators=(",", ":")),
@@ -17385,83 +17843,83 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # busy: say so, and do NOT spend cloud quota on a fallback
                 if str(rb) != "stopped":
                     step("video", "Another render is running", "done", "")
-                    emit("I\u2019m already making one \u2014 ask again when it "
-                         "lands, and I\u2019ll start this straight after.")
+                    emit("I’m already making one — ask again when it "
+                         "lands, and I’ll start this straight after.")
             except Exception as exc:
-                step("video", "Couldn\u2019t make the video", "done",
+                step("video", "Couldn’t make the video", "done",
                      str(exc)[:70])
                 if "VEO_CAP:" in str(exc):
                     # local video exists only on Apple silicon (6b317)
-                    emit("That\u2019s today\u2019s cloud-video limit (%d "
+                    emit("That’s today’s cloud-video limit (%d "
                          "clips, about $0.80 each). It resets tomorrow%s."
                          % (int(load_prefs(None).get("veo_daily_cap",
                                                      VEO_DAILY_CAP) or 0),
-                            "; video made on this Mac isn\u2019t limited"
+                            "; video made on this Mac isn’t limited"
                             if studio_supported() else ""))
                 elif video_ready():
-                    emit("The video engine on this Mac hit a snag and the "
-                         "cloud couldn\u2019t step in \u2014 try once more in a "
-                         "moment. (%s)" % str(exc)[:160])
-                elif studio_supported():
-                    emit("I can\u2019t make video on this Mac yet. Add video "
-                         "generation under **Settings \u203a Models \u203a "
-                         "Manage models**, then ask again. A cloud key under "
-                         "Cloud power also works.")
+                    emit("The video engine on this Mac hit a snag%s — "
+                         "try once more in a moment. (%s)"
+                         % (" and the cloud couldn’t step in"
+                            if _cloud_vid else "", str(exc)[:160]))
                 else:
-                    emit("Making video on this computer needs an Apple "
-                         "silicon Mac; here it needs a cloud key under "
-                         "**Settings \u203a Cloud power**.")
+                    emit("Gemini couldn’t make that video just now "
+                         "— try once more in a moment%s. (%s)"
+                         % (", or install video generation"
+                            if studio_supported() else "", str(exc)[:160]))
             hb_stop.set()
             return
 
         if img_subject:
             # "in the cloud" only when a cloud painter exists (6b310): with
             # Pollinations gone, no local model and no Gemini key means
-            # nothing is sent anywhere, and the label mustn't say it was
+            # nothing is sent anywhere, and the label mustn't say it was.
+            # And only under the one gate (0a 5.5, 6b326): a saved Gemini
+            # key painted with cloud power off
+            _cgate = cloud_allowed(cloud_only)
             _gem = (_cloud_all().get("providers") or {}).get("gemini") or {}
-            _cloud_img = (bool(_gem.get("key"))
+            _cloud_img = (_cgate and bool(_gem.get("key"))
                           and _gem.get("status", "ok") == "ok")
-            where = ("on this Mac" if image_ready() else
-                     "in the cloud" if _cloud_img else "")
-            if where:
-                step("image", "Generating the image", "run", where)
-                status("painting \u00b7 " + where)
+            if not image_ready() and not _cloud_img:
+                step("image", "Couldn’t generate the image", "done",
+                     "nothing was sent")
+                emit(studio_needs("image", _cgate))
+                hb_stop.set()
+                return
+            where = "on this Mac" if image_ready() else "in the cloud"
+            step("image", "Generating the image", "run", where)
+            status("painting · " + where)
             try:
                 _use, _cnotes = resolve_overrides("image", _ovr, _pnote)
                 path, src = generate_image(img_subject, _use,
-                                           sock=self.connection)
+                                           sock=self.connection,
+                                           cloud=_cloud_img)
                 made = "made on this Mac" if src == "local" \
                     else "made in the cloud"
                 step("image", "Generated the image", "done", made)
                 _note = ("" if not (_cnotes + _onotes) else
-                         " \u00b7 " + "; ".join(_cnotes + _onotes))
-                emit("![%s](/api/image/%s)\n\n*%s \u2014 %s%s*"
+                         " · " + "; ".join(_cnotes + _onotes))
+                emit("![%s](/api/image/%s)\n\n*%s — %s%s*"
                      % (img_subject.replace("]", ""), os.path.basename(path),
                         img_subject[:1].upper() + img_subject[1:], made,
                         _note))
             except RenderBusy as rb:
                 if str(rb) != "stopped":
                     step("image", "Another render is running", "done", "")
-                    emit("I\u2019m already making one \u2014 ask again when it "
-                         "lands, and I\u2019ll start this straight after.")
+                    emit("I’m already making one — ask again when it "
+                         "lands, and I’ll start this straight after.")
             except Exception as exc:
-                step("image", "Couldn\u2019t generate the image", "done",
+                step("image", "Couldn’t generate the image", "done",
                      str(exc)[:70])
                 if image_ready():
-                    emit("The painter on this Mac hit a snag%s \u2014 try "
+                    emit("The painter on this Mac hit a snag%s — try "
                          "once more in a moment. (%s)"
-                         % (" and the cloud couldn\u2019t step in"
+                         % (" and the cloud couldn’t step in"
                             if _cloud_img else "", str(exc)[:160]))
-                elif image_supported():
-                    emit("I can\u2019t make pictures on this Mac yet. Add "
-                         "image generation under **Settings \u203a Models \u203a "
-                         "Manage models** \u2014 about %.0f GB, and it runs "
-                         "entirely here \u2014 then ask again. A cloud key "
-                         "under Cloud power also works." % IMAGE_GB)
                 else:
-                    emit("Making pictures on this computer needs an Apple "
-                         "silicon Mac; here it needs a cloud key under "
-                         "**Settings \u203a Cloud power**.")
+                    emit("Gemini couldn’t make that picture just now "
+                         "— try once more in a moment%s. (%s)"
+                         % (", or install image generation"
+                            if image_supported() else "", str(exc)[:160]))
             hb_stop.set()
             return
 
@@ -17529,14 +17987,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # PASTED IMAGES GO TO THE CLOUD WHEN CLOUD POWER IS ON (6b308, per
         # Patrick): Haiku on Fast, Opus 5.5 on Thinking/Pro/Cloud Only,
         # Gemini Flash beside it; the local vision model is the floor.
-        _vis_cloud = []
-        if images and (cloud_only or load_prefs(None).get("turbo")
-                       or req_cloud):
-            _vis_cloud = vision_ladder("Cloud Only" if cloud_only
-                                       else req_tier)
-            if req_cloud is not None:
-                _vis_cloud = [c for c in _vis_cloud
-                              if _provider_of(c) in req_cloud]
+        # Only under the one gate (6b326): an Advanced list alone used to
+        # send the picture with the switch off
+        _vis_cloud = (gate_ladder(vision_ladder("Cloud Only" if cloud_only
+                                                else req_tier),
+                                  req_cloud, cloud_only) if images else [])
         _vis_local = bool(images) and model_cached(
             "Qwen 3.5 Vision 9B", ollama_pulled_tags() or set())
 
@@ -17643,9 +18098,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # old gate needed the ACTIVE provider healthy, so a dead
                 # active key skipped cloud entirely while a perfectly
                 # good second key sat unused. An ADVANCED run's cloud
-                # list narrows the ladder (6b248) — and engages it even
-                # with the turbo pref off, because naming providers IS
-                # the opt-in; an empty list means none at all.
+                # list narrows the ladder (6b248); an empty list means
+                # none at all. Since 6b326 it no longer engages the cloud
+                # with the switch off (0a 5.5).
                 # THE LANE PICKS THE ROLE (6b308): the Code tab answers on
                 # Sonnet 5 at medium, writing/resumes/exports on Opus 5.5
                 # at medium, everything else on the quick ladder, Haiku
@@ -17659,12 +18114,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     _fl = work_ladder("work")
                 else:
                     _fl = fast_cloud_ladder()
-                if req_cloud is not None:
-                    _fl = [c for c in _fl
-                           if _provider_of(c) in req_cloud]
-                turbo = bool(_fl) and bool(
-                    load_prefs(None).get("turbo")
-                    or (req_cloud is not None and req_cloud))
+                # ONE GATE (6b326, 0a 5.5): the Advanced list narrows the
+                # ladder, and no longer turns the cloud on by itself
+                _fl = gate_ladder(_fl, req_cloud)
+                turbo = bool(_fl)
 
                 def _run_lbl(names):
                     try:
@@ -17860,14 +18313,16 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # A cloud answer is pinned by that provider's quick
                     # model instead of loading a big local one (6b308)
                     small = route_label or model_name
-                    _pm = (cloud_role_model(_provider_of(_ans_conf),
-                                            _ans_conf, "utility")
-                           if _ans_conf else "")
+                    # the answer's ticket, its key re-read now (6b326): a
+                    # provider removed or re-keyed since gets no call
+                    _pc = _ticket_conf(_ans_conf) if _ans_conf else None
+                    _pm = (cloud_role_model(_provider_of(_pc), _pc,
+                                            "utility") if _pc else "")
                     if _pm or small:
                         got2 = []
                         if _pm:
                             got2.append(cloud_text(
-                                dict(_ans_conf, model=_pm, role="utility"),
+                                dict(_pc, model=_pm, role="utility"),
                                 _pin_ask, timeout=20, max_tokens=400,
                                 quiet=True))
                         elif not cloud_only:
@@ -21871,14 +22326,15 @@ __CODE_ROWS__
     </section>
     <section class="spane" id="p-cloud">
       <div class="set-h">Cloud power</div>
-      <p class="tdesc">Optional frontier brains. Add a key and cloud
-      drafts blend into your answers. Your chats reach a cloud provider
-      only while a key is on. A question that needs the web goes, as
-      typed, to a search engine; weather and place questions send the
-      place name to weather and map services.</p>
+      <p class="tdesc">Optional frontier models. Your prompts leave this
+      computer whenever a cloud service answers: while Use cloud power is
+      on, or when you pick the Cloud Only tier. That includes chats,
+      pasted images, and images and videos made with Gemini. A question
+      that needs the web goes, as typed, to a search engine; weather and
+      place questions send the place name to weather and map services.</p>
       <label id="turbo-row" hidden><input type="checkbox" id="turbo">
         <span>Use cloud power</span><i class="hint" id="turbo-hint"
-        title="Answers come from a cloud GPU instead of this Mac — much faster, but your prompts leave this computer while it is on.">i</i></label>
+        title="Answers come from a cloud service instead of this Mac — much faster. Your prompts leave this computer while this is on, and whenever you pick the Cloud Only tier.">i</i></label>
       <div id="cloudkey-box">
         <div id="cloudkey-row">
           <select id="ck-provider">
@@ -27419,7 +27875,8 @@ async function openAbout(){
         paintTierAvail();
         if(cs.name)$("#turbo-hint").title=
           "Answers come from "+cs.name+" instead of this Mac \u2014 much "
-          +"faster, but your prompts leave this computer while it is on.";
+          +"faster. Your prompts leave this computer while this is on, and "
+          +"whenever you pick the Cloud Only tier.";
       }catch(e){}
     }catch(e){}
     const ready=st.models.filter(x=>x.status==="ready").length;
