@@ -19525,8 +19525,8 @@ _webstore_keep = []     # completion blocks PyObjC must keep alive
 def _web_engine() -> str:
     """The web engine this build's window runs: WKWebView on a Mac,
     WebView2 on Windows x64 (and x64 under an ARM PC's emulation), Qt's
-    WebEngine on the native Windows ARM64 build (pythonnet has no ARM64
-    wheel, build_windows_exe.ps1)."""
+    WebEngine on the native Windows ARM64 build, through PyQt6 (pythonnet's
+    clr_loader has no ARM64 DLL; 6b328, build_windows_exe.ps1)."""
     if IS_MAC:
         return "webkit"
     if IS_WIN:
@@ -19541,6 +19541,14 @@ def _webview_gui() -> dict:
     whose clr_loader has no ARM64 DLL: the native ARM64 build died at
     start with "Failed to create a .NET runtime (coreclr)"."""
     return {"gui": "qt"} if _web_engine() == "qt" else {}
+
+
+# THE QT BINDING IS PyQt6 (6b328): PySide6 has no QtWebEngine for Windows
+# ARM64, PyQt6-WebEngine does. qtpy reads QT_API at its first import (by
+# pywebview's Qt backend, at webview.start, or _webstore_qt_cache), and a
+# frozen exe has only PyQt6 anyway; this makes the choice explicit.
+if _web_engine() == "qt":
+    os.environ["QT_API"] = "pyqt6"
 
 
 def _webstore_plan(names, local: bool) -> dict:
@@ -19765,7 +19773,9 @@ def _webstore_qt_cache(window):
 
             def __init__(self):
                 super().__init__()
-                self.go.connect(self.do, QtCore.Qt.QueuedConnection)
+                # scoped: PyQt6 has no unscoped enums of its own (6b328)
+                self.go.connect(self.do,
+                                QtCore.Qt.ConnectionType.QueuedConnection)
 
             @QtCore.Slot()
             def do(self):

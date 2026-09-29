@@ -1,0 +1,25 @@
+# The native Windows ARM64 build's Qt (6b328): PyQt6 and its WebEngine,
+# win_arm64 wheels only, every hash checked. build_windows_exe.ps1 installs
+# this with --only-binary=:all: --require-hashes --no-deps --force-reinstall.
+# PySide6's win_arm64 wheels have no QtWebEngine; PyQt6-WebEngine's do.
+# PyQt6 is GPL-3.0 (Patrick accepted this on 2026-09-28; the source is
+# public). Pinned 2026-09-28 to the newest release with win_arm64 wheels:
+# PyQt6 6.11.0 and PyQt6-WebEngine 6.11.0 (cp310-abi3), PyQt6-Qt6 and
+# PyQt6-WebEngine-Qt6 6.11.2 (the same Qt for both), PyQt6-sip 13.12.0
+# (cp311 to cp314; no cp310 win_arm64 wheel), QtPy 2.4.3 (pure Python).
+# QtPy needs packaging, which PyInstaller already installed.
+PyQt6==6.11.0 \
+    --hash=sha256:b6324e3501b19b4292c7a55b1f22e82d3e80e519e383ce4fe79b4a754c6f0288
+PyQt6-Qt6==6.11.2 \
+    --hash=sha256:8c49432936681f325f2925f20ceef35b8fb7599e0c3e63e76d6e50397354ee1f
+PyQt6-sip==13.12.0 \
+    --hash=sha256:80bfce3924414c2d3d293851cf0b12a29f4ad5c8dab5450fa817385f540eb633 \
+    --hash=sha256:543b9b210ca4278ee510f938d4b3d696b587b2b223c6cd1ba819c3cef3b67ea5 \
+    --hash=sha256:2431eef7617f7cd26d22789178a57a688ddbca814fd5215fbe577f4bf45569b8 \
+    --hash=sha256:6815e719d1fd4c71c0d3ed85e7e91b615959d949dac7af6e3f11a29a3a565676
+PyQt6-WebEngine==6.11.0 \
+    --hash=sha256:06c309fa956dd4f197636d949aa5d125cd905f386178eb8884e231c04c5b577c
+PyQt6-WebEngine-Qt6==6.11.2 \
+    --hash=sha256:6ad83c047b6757bfafc5d44d9c9e448fe9a38f7998748265da0ef9094f4f8d2a
+QtPy==2.4.3 \
+    --hash=sha256:72095afe13673e017946cc258b8d5da43314197b741ed2890e563cf384b51aa1

@@ -10398,32 +10398,88 @@ check("6b328: pywebview 6.2.1 asked for qt on Windows loads Qt only, never WinFo
       and _pw8.get("default asked") == ["webview.platforms.winforms"]
       and _pw8.get("net importers") == {"guilib.py": ["webview.platforms.winforms"]},
       "%r" % _pw8)
-# and the ARM64 freeze leaves pythonnet out: --collect-all webview froze it
-# in through the WinForms backend. qtpy installed (pywebview names it only
-# on OpenBSD or with an extra), the Qt backend imported before the freeze,
-# and the finished folder checked for what was left out. x64 keeps clr.
+# THE QT BINDING IS PyQt6 (6b328): PySide6 has no QtWebEngine for Windows
+# ARM64. The module-level QT_API line, run for each kind of machine, sets
+# pyqt6 on native ARM64 only; and the Qt-thread hop uses the scoped enum,
+# which PyQt6 has on its own (unscoped only through qtpy's promotion).
+_qa8 = [n for n in _ctree.body if isinstance(n, _ast.If) and "QT_API" in (_ast.get_source_segment(_MILLENAI_SRC, n) or "")]
+_qe8 = {}
+for _m8, _f8 in {"mac": (1, 0, 0, 0), "x64": (0, 1, 0, 0), "x64 emulated on ARM": (0, 1, 1, 1),
+                 "native ARM64": (0, 1, 1, 0)}.items():
+    _ns8.update(zip(("IS_MAC", "IS_WIN", "IS_WIN_ARM", "IS_WIN_EMULATED"), map(bool, _f8)))
+    _env8 = {"QT_API": "pyside6"}      # inherited: the build overrides it
+    try:
+        exec(_ast.get_source_segment(_MILLENAI_SRC, _qa8[0]), dict(_ns8, os=_tw.SimpleNamespace(environ=_env8)))
+    except Exception as e:
+        _env8["error"] = repr(e)
+    _qe8[_m8] = _env8
+_qc8 = _MILLENAI_SRC[_MILLENAI_SRC.find("def _webstore_qt_cache("):_MILLENAI_SRC.find("APP_BUNDLE_ID = ")]
+check("6b328: QT_API=pyqt6 on the native ARM64 build only, set at import; the Qt hop's enum is scoped",
+      len(_qa8) == 1 and _qe8 == {"mac": {"QT_API": "pyside6"}, "x64": {"QT_API": "pyside6"},
+                                   "x64 emulated on ARM": {"QT_API": "pyside6"},
+                                   "native ARM64": {"QT_API": "pyqt6"}}
+      and "QtCore.Qt.ConnectionType.QueuedConnection" in _qc8 and "Qt.QueuedConnection" not in _qc8
+      and "from qtpy import QtCore" in _qc8,
+      "%r" % [len(_qa8), _qe8])
+# and the ARM64 freeze: PyQt6 and its WebEngine from hash-pinned win_arm64
+# wheels (packaging/qt-arm64-requirements.txt), QT_API for the qtpy hook,
+# the Qt backend imported through PyQt6 before the freeze; the other Qt
+# bindings and pythonnet left out (--collect-all webview froze pythonnet in
+# through the WinForms backend); the finished folder checked for
+# QtWebEngineProcess.exe and its resources and for what was left out. x64
+# is as it was.
 _ps8 = open("build_windows_exe.ps1", encoding="utf-8").read()
+_code8 = "\n".join(l for l in _ps8.splitlines() if l.strip() and not l.lstrip().startswith("#"))
 _a8 = _ps8.find("if ($isArm) {\n  $pyiArgs")
 _e8 = _ps8.find("} else {", _a8) if _a8 >= 0 else -1
 _x8 = _ps8[_e8:_ps8.find("\n}\n", _e8)] if _e8 >= 0 else ""
 _arm8 = _ps8[_a8:_e8] if _e8 >= 0 else ""
 _ex8 = re.findall(r'"--exclude-module",\s*"([\w.]+)"', _arm8)
-_dp8 = _ps8.find('  $deps += @("pyside6", "qtpy")\n} else {')
-_qi8 = _ps8.find('  & $bpy -c "import sys, webview.platforms.qt as q; sys.exit(0 if q.is_webengine else 1)"\n'
+_hi8 = re.findall(r'"--hidden-import",\s*"([\w.]+)"', _arm8)
+_pi8 = _ps8.find("& $bpy -m pip install @deps")
+_py8 = _ps8.find("& $bpy -m PyInstaller")
+_qr8 = _ps8.find("  & $bpy -m pip install --only-binary=:all: --require-hashes --no-deps --force-reinstall"
+                 " -r packaging\\qt-arm64-requirements.txt\n"
+                 '  if ($LASTEXITCODE -ne 0) { throw "PyQt6 did not install')
+_qt8 = _ps8.find('  $env:QT_API = "pyqt6"\n')
+_qi8 = _ps8.find('  & $bpy -c "import sys, qtpy, webview.platforms.qt as q; '
+                 "sys.exit(0 if (q.is_webengine and qtpy.API_NAME == 'PyQt6') else 1)\"\n"
                  '  if ($LASTEXITCODE -ne 0) { throw ')
-_lf8 = _ps8.find('  foreach ($left in @("clr_loader", "pythonnet")) {\n'
+_lf8 = _ps8.find('  foreach ($left in @("clr_loader", "pythonnet", "PySide6")) {\n'
                  '    if (Test-Path "dist\\MillenAI\\_internal\\$left") { throw ')
-check("6b328: build_windows_exe.ps1's ARM64 freeze excludes clr, pythonnet and clr_loader; qtpy in, Qt imported first",
-      sorted(_ex8) == ["clr", "clr_loader", "pythonnet"] and "--exclude-module" not in _x8
-      and '"--hidden-import", "clr"' in _x8 and '"webview.platforms.qt"' in _arm8
+_nd8 = _ps8.find('  foreach ($need in @("PyQt6\\Qt6\\bin\\QtWebEngineProcess.exe", '
+                 '"PyQt6\\Qt6\\resources\\qtwebengine_resources.pak")) {\n'
+                 '    if (-not (Test-Path "dist\\MillenAI\\_internal\\$need")) { throw ')
+_enc8 = lambda i: i > 0 and _ps8.rfind("if ($isArm) {\n", 0, i) == i - len("if ($isArm) {\n")
+_rq8 = open(os.path.join("packaging", "qt-arm64-requirements.txt"), encoding="utf-8").read()
+_rl8 = [l for l in _rq8.replace("\\\n", " ").splitlines() if l.strip() and not l.lstrip().startswith("#")]
+_pins8 = {l.split()[0].split("==")[0]: (l.split()[0].split("==")[1] if "==" in l.split()[0] else "",
+                                       re.findall(r"--hash=sha256:([0-9a-f]{64})\b", l)) for l in _rl8}
+_vs8 = {k: v[0] for k, v in _pins8.items()}
+check("6b328: build_windows_exe.ps1's ARM64 build: hash-pinned PyQt6 WebEngine, QT_API, Qt imported first; "
+      "pythonnet and other Qt bindings out; x64 unchanged",
+      sorted(_ex8) == ["PyQt5", "PySide2", "PySide6", "clr", "clr_loader", "pythonnet", "shiboken6"]
+      and {"webview.platforms.qt", "PyQt6.QtWebEngineWidgets", "PyQt6.QtWebEngineCore"} <= set(_hi8)
+      and "--collect-all\", \"PySide6" not in _ps8 and "pyside6" not in _code8.lower().replace(
+          '"--exclude-module", "pyside6"', "").replace('"clr_loader", "pythonnet", "pyside6"', "")
       and "--exclude-module" not in _ps8.replace(_arm8, "")
-      and 0 < _dp8 < _ps8.find("& $bpy -m pip install @deps")
-      and _ps8.rfind("if ($isArm) {\n", 0, _qi8) == _qi8 - len("if ($isArm) {\n")
-      and _ps8.find("& $bpy -m pip install @deps") < _qi8 < _ps8.find("& $bpy -m PyInstaller")
-      and _ps8.rfind("if ($isArm) {\n", 0, _lf8) == _lf8 - len("if ($isArm) {\n")
-      and _ps8.find("& $bpy -m PyInstaller") < _lf8 < _ps8.find('"--crypto-selftest"')
+      and _x8 == '} else {\n  $pyiArgs += @("--hidden-import", "webview.platforms.edgechromium", "--hidden-import", "clr")'
+      and '} else {\n  $deps += "faster-whisper"\n}\n& $bpy -m pip install @deps | Out-Null\n' in _ps8
+      and _enc8(_qr8) and _pi8 < _qr8 < _qt8 < _qi8 < _py8 and _ps8.find("if ($isArm) {\n", _qr8) > _qi8
+      and _enc8(_lf8) and _py8 < _lf8 < _nd8 < _ps8.find('"--crypto-selftest"')
+      and _code8.count("QT_API") == 1
       and all(ord(c) < 128 for c in _ps8),
-      "%r" % [_ex8, _dp8, _qi8, _lf8, _x8[:120]])
+      "%r" % [_ex8, _hi8, _qr8, _qt8, _qi8, _lf8, _nd8, _x8[:120]])
+check("6b328: packaging/qt-arm64-requirements.txt pins PyQt6, its Qt, sip, WebEngine and QtPy, each hashed; one Qt",
+      _vs8 == {"PyQt6": "6.11.0", "PyQt6-Qt6": "6.11.2", "PyQt6-sip": "13.12.0", "PyQt6-WebEngine": "6.11.0",
+               "PyQt6-WebEngine-Qt6": "6.11.2", "QtPy": "2.4.3"}
+      and all(h for _v, h in _pins8.values()) and len(_pins8["PyQt6-sip"][1]) == 4
+      and len({h for _v, hs in _pins8.values() for h in hs}) == sum(len(hs) for _v, hs in _pins8.values())
+      and _vs8["PyQt6-Qt6"] == _vs8["PyQt6-WebEngine-Qt6"]
+      and _vs8["PyQt6"].rsplit(".", 1)[0] == _vs8["PyQt6-WebEngine"].rsplit(".", 1)[0]
+      == _vs8["PyQt6-Qt6"].rsplit(".", 1)[0]
+      and all(ord(c) < 128 for c in _rq8),
+      "%r" % _pins8)
 # ---- end 6b328
 
 print()

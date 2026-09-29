@@ -229,26 +229,30 @@ $deps = @("pyinstaller", "pywebview==6.2.1", "ddgs", "psutil", "huggingface_hub"
           "tzdata", "reportlab", "openpyxl", "python-docx", "python-pptx")
 if ($isArm) {
   # pythonnet - pywebview's default Windows backend - can't start .NET on
-  # ARM64 (clr_loader ships x86 and amd64 DLLs only), so drive the Qt
-  # backend instead. NB (6b328): PySide6's win_arm64 wheels (6.9.3 to
-  # 6.11.2) carry no QtWebEngine, so the Qt import check below stops the
-  # build until a Qt with WebEngine for ARM64 is chosen.
+  # ARM64 (clr_loader ships x86 and amd64 DLLs only), so the window is
+  # pywebview's Qt backend, on PyQt6 (6b328; below).
   # ctranslate2 has no ARM64 wheel either, so voice input is left out and the
   # app degrades to "voice unavailable" rather than failing to start.
-  # pywebview's Qt backend imports qtpy, which pywebview itself installs
-  # only on OpenBSD or with an extra (6b328): named here, or the Qt import
-  # fails and pywebview falls back to WinForms.
-  $deps += @("pyside6", "qtpy")
 } else {
   $deps += "faster-whisper"
 }
 & $bpy -m pip install @deps | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
-# the ARM64 window is Qt's WebEngine (6b328): it must import here, or the
-# frozen app has no window to open
+# THE ARM64 WINDOW IS PyQt6's WEBENGINE (6b328). PySide6's win_arm64
+# wheels have no QtWebEngine; PyQt6-WebEngine's do. PyQt6 is GPL-3.0
+# (Patrick accepted this on 2026-09-28; the source is public). The pins
+# and their win_arm64 hashes are in packaging\qt-arm64-requirements.txt,
+# with qtpy, which pywebview's Qt backend imports and pywebview installs
+# only on OpenBSD or with an extra. QT_API makes qtpy, and PyInstaller's
+# qtpy hook, take PyQt6 even where an older build left PySide6 in the
+# build venv. The backend must import with WebEngine through PyQt6 here,
+# or the frozen app has no window to open.
 if ($isArm) {
-  & $bpy -c "import sys, webview.platforms.qt as q; sys.exit(0 if q.is_webengine else 1)"
-  if ($LASTEXITCODE -ne 0) { throw "pywebview's Qt backend does not import in $bv (qtpy, and a Qt with WebEngine: see 6b328)" }
+  & $bpy -m pip install --only-binary=:all: --require-hashes --no-deps --force-reinstall -r packaging\qt-arm64-requirements.txt
+  if ($LASTEXITCODE -ne 0) { throw "PyQt6 did not install (hash-pinned win_arm64 wheels, see above)" }
+  $env:QT_API = "pyqt6"
+  & $bpy -c "import sys, qtpy, webview.platforms.qt as q; sys.exit(0 if (q.is_webengine and qtpy.API_NAME == 'PyQt6') else 1)"
+  if ($LASTEXITCODE -ne 0) { throw "pywebview's Qt backend does not import with PyQt6's WebEngine in $bv (6b328)" }
 }
 
 # ------------------------------------------------------------------- build
@@ -275,9 +279,16 @@ if ($crypto) {
 # ARM64 leaves pythonnet out (6b328): pywebview requires it on every
 # Windows, and --collect-all webview froze it in through the WinForms
 # backend, but clr_loader ships x86 and amd64 DLLs only. The app passes
-# gui="qt", and pywebview's Qt path never imports clr.
+# gui="qt", and pywebview's Qt path never imports clr. PyInstaller's own
+# PyQt6.QtWebEngineCore hook collects QtWebEngineProcess.exe, its
+# resources and locales (checked after the build); the other Qt bindings
+# are left out, since a freeze may hold only one.
 if ($isArm) {
-  $pyiArgs += @("--hidden-import", "webview.platforms.qt", "--collect-all", "PySide6",
+  $pyiArgs += @("--hidden-import", "webview.platforms.qt",
+                "--hidden-import", "PyQt6.QtWebEngineWidgets", "--hidden-import", "PyQt6.QtWebEngineCore",
+                "--hidden-import", "PyQt6.QtWebChannel", "--hidden-import", "PyQt6.QtNetwork",
+                "--exclude-module", "PySide6", "--exclude-module", "shiboken6",
+                "--exclude-module", "PySide2", "--exclude-module", "PyQt5",
                 "--exclude-module", "clr", "--exclude-module", "pythonnet",
                 "--exclude-module", "clr_loader")
 } else {
@@ -289,8 +300,11 @@ Write-Host "-> running PyInstaller"
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 if (-not (Test-Path "dist\MillenAI\MillenAI.exe")) { throw "no exe was produced" }
 if ($isArm) {
-  foreach ($left in @("clr_loader", "pythonnet")) {
+  foreach ($left in @("clr_loader", "pythonnet", "PySide6")) {
     if (Test-Path "dist\MillenAI\_internal\$left") { throw "the ARM64 exe carries $left (6b328)" }
+  }
+  foreach ($need in @("PyQt6\Qt6\bin\QtWebEngineProcess.exe", "PyQt6\Qt6\resources\qtwebengine_resources.pak")) {
+    if (-not (Test-Path "dist\MillenAI\_internal\$need")) { throw "the ARM64 exe lacks $need (6b328)" }
   }
 }
 Write-Host "-> built dist\MillenAI\MillenAI.exe"

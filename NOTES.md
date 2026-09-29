@@ -5651,53 +5651,103 @@ had never run before.
 - **The app:** `_webview_gui()` is `{"gui": "qt"}` when `_web_engine()`
   is "qt" and `{}` otherwise; the one `webview.start` call spreads it.
   macOS and x64 (and x64 emulated on an ARM PC) call it as before.
-- **The build (ARM64 only):** `--exclude-module` clr, pythonnet and
-  clr_loader. Checked first against pywebview 6.2.1's source (the PyPI
-  wheel): outside the WinForms, EdgeChromium, MSHTML, win32 and CEF
-  backends nothing imports clr, pythonnet, clr_loader or System, and the
-  only reference to a .NET backend is guilib's `import_winforms`;
-  `platforms/qt.py` imports qtpy and pywebview's own common modules.
-  Also found: pywebview names **QtPy** only on OpenBSD or with an extra,
-  and PySide6 doesn't pull it, so the ARM64 build never had it; the Qt
-  import would have failed and fallen back to WinForms with the same
-  crash. `qtpy` is now in the ARM64 deps, the build venv must import
-  `webview.platforms.qt` with WebEngine before PyInstaller runs, and the
-  build throws if `_internal\clr_loader` or `_internal\pythonnet` is in
-  the finished folder. x64 keeps `--hidden-import clr`.
+- **The .NET three stay out.** Checked first against pywebview 6.2.1's
+  source (the PyPI wheel): outside the WinForms, EdgeChromium, MSHTML,
+  win32 and CEF backends nothing imports clr, pythonnet, clr_loader or
+  System, and the only reference to a .NET backend is guilib's
+  `import_winforms`; `platforms/qt.py` imports qtpy and pywebview's own
+  common modules. So the ARM64 freeze has `--exclude-module` clr,
+  pythonnet and clr_loader, and the build throws if `_internal\clr_loader`
+  or `_internal\pythonnet` is in the finished folder. The build venv is
+  reused, so pythonnet stays installed in it; the exclusions keep it out.
+- **The Qt is PyQt6, not PySide6.** The PySide6-Addons win_arm64 wheels
+  (6.9.3, 6.10.2, 6.11.2, read from PyPI) carry no QtWebEngineWidgets,
+  Qt6WebEngineCore or QtWebEngineProcess (the win_amd64 ones do), so the
+  old ARM64 build could never have drawn its window. PyQt6-WebEngine and
+  PyQt6-WebEngine-Qt6 publish win_arm64 wheels with all three.
+  **PyQt6 is GPL-3.0; Patrick accepted this on 2026-09-28 and the source
+  is public.** (Licensing files are being handled separately.)
+  - `packaging/qt-arm64-requirements.txt` pins, with every win_arm64
+    wheel's sha256 from PyPI's JSON API (checked with a hash-verified
+    `pip download` for win_arm64 cp313, and a dry-run resolve for cp311,
+    cp313 and cp314): PyQt6 6.11.0 and PyQt6-WebEngine 6.11.0 (the
+    newest; cp310-abi3), PyQt6-Qt6 and PyQt6-WebEngine-Qt6 6.11.2 (the
+    newest, and one Qt for both; py3-none), PyQt6-sip 13.12.0 (cp311 to
+    cp314: it has no cp310 win_arm64 wheel, and the ps1 already asks
+    for 3.11 or newer on ARM64), QtPy 2.4.3. pywebview names QtPy only
+    on OpenBSD or with an extra, so the ARM64 build never had it; QtPy's
+    one dependency, packaging, comes with PyInstaller. The ps1 installs
+    the file `--only-binary=:all: --require-hashes --no-deps
+    --force-reinstall` after the other deps, ARM64 only.
+  - `QT_API=pyqt6`: the ps1 sets it before the build venv's import check
+    and PyInstaller (PyInstaller's qtpy hook reads it and leaves the
+    other bindings out), and millenai.py sets it at import on the native
+    ARM64 build only, overriding an inherited value, before anything
+    imports qtpy. The frozen exe holds only PyQt6 anyway.
+  - The build venv must import `webview.platforms.qt` with WebEngine and
+    qtpy on PyQt6 before PyInstaller runs.
+  - PyInstaller: PyInstaller's own hooks (not hooks-contrib's) cover
+    PyQt6's WebEngine: hook-PyQt6.QtWebEngineCore collects
+    QtWebEngineProcess.exe, `resources` and `qtwebengine_locales`
+    (PyInstaller 6.22.3's source). The ARM64 freeze hidden-imports
+    `webview.platforms.qt` and PyQt6's QtWebEngineWidgets,
+    QtWebEngineCore, QtWebChannel and QtNetwork; it excludes PySide6,
+    shiboken6, PySide2 and PyQt5 (a freeze may hold one binding, and
+    an older build venv still has PySide6); `--collect-all PySide6` is
+    gone. After the build it throws unless
+    `_internal\PyQt6\Qt6\bin\QtWebEngineProcess.exe` and
+    `_internal\PyQt6\Qt6\resources\qtwebengine_resources.pak` are
+    there, and if `_internal\PySide6` is.
+  - x64 is unchanged: faster-whisper, `--hidden-import` edgechromium and
+    clr, no exclusions.
+- **The app on PyQt6.** `_webstore_qt_cache` is the only Qt code:
+  `from qtpy import QtCore`, `QtCore.QObject`, `Signal`, `Slot`,
+  `QCoreApplication.instance().thread()` and the profile's
+  `clearHttpCache` all exist through qtpy on PyQt6; its queued
+  connection now names `Qt.ConnectionType.QueuedConnection` (PyQt6 has
+  only scoped enums; the unscoped name worked only through qtpy's
+  promotion). `_QT_CLEAR_CACHE` is a plain flag. Run for real on this
+  Mac with the pinned PyQt6 6.11 (macOS wheels, a scratch venv): the
+  function, from a worker thread, cleared a QWebEngineProfile's cache
+  on the main thread; and pywebview 6.2.1 with `gui="qt"` opened a
+  window (offscreen), loaded, ran JS, answered a `js_api` call, kept its
+  profile in `storage_path`, used `webview.platforms.qt` on PyQt6 and
+  loaded no clr.
 - In the app, the Qt path imports clr nowhere: `_webstore_wv2` and
   `_webstore_wv2_value` run only when the engine is "webview2", and
   nothing calls `webview.screens` (which would initialize pywebview
   unasked) before the window.
-- Gauntlet: 410 checks become 413. The one `webview.start` call,
+- Gauntlet: 410 checks become 415. The one `webview.start` call,
   evaluated with a recording webview on a Mac, x64, x64 emulated on ARM,
   native ARM64 and neither, gets `gui="qt"` on native ARM64 only; the
   installed pywebview (6.2.1), made to think it is on Windows with its
   Qt backend stubbed and clr, pythonnet, clr_loader and the .NET
   backends blocked, loads Qt when asked and asks for none of them, and
   unasked asks for WinForms and raises; an AST scan of the installed
-  package finds only guilib naming WinForms; the ps1's ARM64 branch
-  excludes the three (x64 none), qtpy in the ARM64 deps before pip, the
-  Qt import between pip and PyInstaller, the leftover-folder throw
-  between PyInstaller and the self-test. 19 mutations each fail a
-  check: no gui argument, gui="qt" hard-coded, the helper always,
-  never, on every Windows or "cef", emulated x64 counted as Qt, a second
-  `webview.start`; no exclusions, only clr, clr_loader dropped, the
-  exclusions on x64, qtpy dropped, the Qt import gone or ungated, the
-  folder check gone, a non-ASCII dash; pywebview's initialize ignoring
-  gui, and a copy of 6.2.1 whose qt.py imports clr.
-- **Still blocked: PySide6 has no WebEngine on Windows ARM64.** The
-  PySide6-Addons win_arm64 wheels (6.9.3, 6.10.2, 6.11.2, read from
-  PyPI) carry no QtWebEngineWidgets, Qt6WebEngineCore or
-  QtWebEngineProcess; the win_amd64 ones do. So with this build's deps
-  pywebview's Qt import fails and the ARM64 build now stops at the new
-  import check, instead of shipping an exe that can't open its window.
-  PyQt6-WebEngine and PyQt6-WebEngine-Qt6 do publish win_arm64 wheels
-  (6.11, Qt6WebEngineCore.dll and QtWebEngineProcess.exe inside), and
-  qtpy would take PyQt6; but PyQt6 is GPL or commercial where PySide6 is
-  LGPL, so switching is Patrick's call, not made here.
-- Not verified here: any Windows run. The build venv is reused between
-  builds, so pythonnet stays installed in it; the exclusions are what
-  keep it out of the freeze.
+  package finds only guilib naming WinForms; the QT_API line, run with
+  an inherited `QT_API=pyside6` on each kind of machine, sets pyqt6 on
+  native ARM64 only, and the queued connection is scoped; the ps1's
+  ARM64 freeze excludes the seven (x64 none, x64's lines as they were),
+  the hash-checked install, QT_API, then the PyQt6 import check between
+  pip and PyInstaller, and the folder checks between PyInstaller and the
+  self-test; the requirements file's six pins, every hash distinct, four
+  for sip, one Qt version. 36 mutations each fail a check: no gui
+  argument, gui="qt" hard-coded, the helper always, never, on every
+  Windows or "cef", emulated x64 counted as Qt, a second
+  `webview.start`; QT_API gone, pyside6, on every Windows, or
+  setdefault; the unscoped enum; no exclusions, PySide6 not excluded,
+  only clr of the .NET three, the exclusions on x64, PySide6 back in
+  the deps, faster-whisper gone from x64, no pinned install or no
+  `--require-hashes`, no QT_API or QT_API after the import check, the
+  import check without its binding test or gone, no leftover or
+  WebEngine-helper check, WebEngineWidgets not hidden-imported, a
+  non-ASCII dash; a hash dropped, WebEngine-Qt6 on another Qt, PyQt6
+  unpinned, a sip hash gone, QtPy missing; pywebview's initialize
+  ignoring gui, and a copy of 6.2.1 whose qt.py imports clr.
+- Not verified here: any Windows run (the pinned wheels installing on
+  ARM64 Windows, PyInstaller collecting the WebEngine helper there, the
+  frozen exe opening its window). **Patrick:** rebuild in the VM with
+  `-Arch arm64` under an ARM64 Python 3.11 to 3.14 and install.
 
 ## 6b327 — PyNaCl on every build (accounts step 7)
 The install half of 0a 5.9 and 1c 5.1: M7 of the sign-in plan, with the
