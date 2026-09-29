@@ -259,8 +259,10 @@ that a crash at any named step (`SWITCH_STEPS`, the `crash-at` hook) can't
 break, and every start runs `boot_invariant` first: only what profile.json names
 stays under `accounts/`. Two rules to keep: **nothing under `accounts/` is
 deleted except by `_erase_folder`** (a rename into `accounts/.trash-*` first),
-and **a profile.json that can't be trusted deletes nothing**; profile.json is
-always written before the erase it allows. Account actions happen in the
+and **a profile.json that can't be trusted deletes nothing** of anyone's;
+profile.json is always written before the erase it allows, and root's staged
+originals (`imports/<dir>`, outside the Time Machine exclusion) are erased only
+by a person's recorded choice, else put back. Account actions happen in the
 account window (`/account`, its own token and js_api, strict CSP); the main
 window may only ask for it to open. All of it is behind `ACCOUNTS` (dev copies).
 

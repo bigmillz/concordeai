@@ -5646,57 +5646,80 @@ here is behind ACCOUNTS, which is on in dev and test copies only: the
 app a person opens runs none of it and shows nothing new.
 - **accounts/ (1a 5.1).** `accounts/<32 hex>/` holds account.key (0600),
   `.owner`, the stores, sync/state.json and the media folders. Beside it
-  only `.new-*` (a sign-in being built), `.trash-*` (an erase under way)
-  and `.imported-<dir>/` (root's originals an Add moved). `.owner` is
+  only `.new-*` (a sign-in being built) and `.trash-*` (an erase under
+  way). Root's originals an Add moved are staged in `imports/<dir>/` in
+  the data folder, outside accounts/ and its Time Machine exclusion, so
+  backups keep them (second review, F6). `.owner` is
   HMAC(HKDF-SHA256(rid_key, "cai2/owner"), acct_id|dir), stdlib
   (`_hkdf_sha256`, RFC 5869's first vector checked). In this build only
   a local test profile's key gives K_owner (a stand-in rid_key derived
   from its acct_id, so the same test account signing in again finds a
   folder that verifies), and only with the profiles hook; `owner_check`
-  answers True, False (another account's, or missing) or None (this
-  build can't tell: a real key, one re-keying, one it can't read). M8's
+  answers True, False (a well-formed one that is another account's, or
+  none at all) or None (this build can't tell: a real key, one
+  re-keying, one it can't read, an `.owner` that isn't 64 hex). M8's
   test profiles get a keyring and `.owner` too.
 - **Every delete goes through the trash.** `_erase_folder` is the only
-  way anything under accounts/ is removed: only a layout name directly in
-  accounts/, never a link; account.key is renamed into a fresh
+  way anything under accounts/ or imports/ is removed, always under
+  run/profile.lock: only a layout name directly in one of them, never a
+  link or a Windows junction (any reparse point), its real path exactly
+  that, checked again just before each rename; account.key is renamed into a fresh
   `.trash-<rand>/` first, then the folder beside it, then the trash is
   removed. A crash leaves at most a `.trash-*`, which the next start
   empties; a file Windows holds stays there until then. A cloud.json
   that must go (below) is renamed into a trash the same way.
 - **The boot invariant (1a 5.11),** first in boot, by the copy holding
   the instance lock only, under run/profile.lock: only the folders
-  profile.json names (active or kept) and their `.imported-*` stay.
+  profile.json names (active or kept) stay in accounts/, and in imports/
+  theirs and those on the `putback` list.
   - profile.json missing, unreadable, malformed, or with no `active` at
-    all: nothing is deleted.
+    all: nothing of anyone's is deleted; the trash is emptied and a
+    `.new-*` holding nobody's data goes (so no one is left stuck), and an
+    `imports/<dir>` whose account folder is gone joins the `putback` list
+    when the record can be written.
   - A named folder whose `.owner` fails is erased; one it can't check is
     left and not opened. A kept folder past `erase_after` is erased. The
     active folder with no account.key becomes kept (cause key-missing).
-  - Every other 32-hex folder, `.new-*` and `.imported-*` (none named
-    by `active`, `kept` or the `putback` list) is erased,
+  - Every other 32-hex folder and `.new-*` in accounts/ is erased,
     except a `.new-*` (or folder) whose key is marked `signup: "sent"` or
     holds `rekey_pending` (1c Q2), or a `.new-*` whose key this build
     can't read (it might be one). Names that aren't the layout's (a
     stray file, a link) are left alone.
+  - **Staged units are erased only by a person (second review, F2).** In
+    imports/, a folder on the `erase` list (the person's "Erase them" or
+    "Erase and continue", recorded in the commit) is erased and leaves the
+    list; any other one nobody names joins the `putback` list if it holds
+    a unit and is erased only if it holds none. A readable but stale
+    profile.json (a restore), or the test hook's bare switch, used to
+    erase the Add's units with the account folder; now they come back
+    into root.
+  - A kept folder's synced keys are erased again at every start (a crash
+    can fall between the kept commit and that erase).
   - profile.json is written before the erase it allows, everywhere, so
     a crash between them is finished by the next start.
   - **A lost record stays safe.** profile.json rewritten without
     `active` (deleted by a person or a cleaner) while accounts/ holds
     folders would read as "This computer only" at the second start and
     erase them. A record with no `active` is distrusted; `profile_resume`
-    makes a single account folder (with at most its own `.imported`)
+    makes a single account folder (with at most its own imports/<dir>)
     kept, cause record-lost, which sign-in step 2 and Erase then offer;
-    anything else (two folders, an `.imported-*` or a `.new-*` alone)
+    anything else (two folders, a marked `.new-*`)
     leaves `active` unwritten, no bare switch writes it
     (`_profile_fields`), the invariant deletes nothing, and a sign-in
-    refuses ("undecided") until a person decides.
+    refuses ("undecided") until a person decides. **The two-folder case
+    waits for M15's decide screen**; until then those folders stay,
+    untouched. This rule runs in every build, the shipped app's included
+    (second review: fine, it only ever keeps, and there accounts/ never
+    exists); the gauntlet's "nothing new runs" pin names it.
   - **A folder the invariant drops sends its Add back.** When it erases
     a folder (a failed `.owner`, a removed or deleted account past its 7
-    days, an active folder that vanished) whose `.imported-<dir>` still
+    days, an active folder that vanished) whose `imports/<dir>` still
     holds units (root's originals, not yet uploaded), `putback` gains
     that dir in the same commit and the pending step returns them to
     root: only a person erases unsent work (I12).
   - Boot order: the invariant, "This computer" active, a pending Add
-    step 6 or put-back (`profile_boot_pending`, through root's ctx), M5's
+    step 6 (only for a folder this build can open, F7) or put-back
+    (`profile_boot_pending`, through root's ctx), M5's
     migration and downgrade import, then the profile profile.json names.
 - **Switching.** `_switch_lock` is re-entrant; the protocol holds it
   throughout (`_switching`), and a request that arrives meanwhile waits
@@ -5709,19 +5732,28 @@ app a person opens runs none of it and shows nothing new.
   the review of 6b329), then stops read-aloud, makes deletes final and
   cancels the old ctx; afterwards every account window but the one
   running the switch closes, and a switch to another folder cleans the
-  web store. The lock for switching (sign-in step 0, sign-out step 3) is
+  web store and reloads the main window (second review, S1: it stopped
+  showing the old profile's chats only at its next call's 409, which
+  stays as the backstop). A request takes its profile with `switch_ctx`:
+  the wait and the read are made atomic by reading again when a switch
+  began in between (S4). The lock for switching (sign-in step 0, sign-out step 3) is
   `_hold`: the same profile under a new epoch only the switch holds.
 - **Sign-in, steps 0-7** (`profile_signin`; test profiles only until
   M10): flush and hold; the test keyring (step 1); an account folder
   already here (step 2): the same account whose `.owner` verifies
   resumes, a deleted one stops ("never resumes"), anything else needs
-  "erase and continue" (commit, then the erase, key first, with its
-  `.imported`); only a folder profile.json names is ever offered or
+  "erase and continue" (an Add of that folder's cut short is finished
+  first; then the commit, recording the choice on the `erase` list, then
+  the erase, key first, with its imports/<dir>); only a folder profile.json names is ever offered or
   erased; `.new-*` built with account.key, `.owner` and
   sync/state.json (step 3); Add (step 4); the rename to `<dir>`, then
   profile.json `{active, pending_import}` (step 5: a folder profile.json
-  doesn't name is erased at the next start); root's originals staged
+  doesn't name is erased at the next start; the rename is fsynced
+  first); root's originals staged
   (step 6; a failure is finished at the next start); the switch (step 7).
+  Closing the account window before the commit cancels it (S3: the
+  window's `cancel` Event, checked before steps 5 and 7); what it had
+  built is undone (`.new-*` erased; `signin.undo.*` in the crash matrix).
 - **Add (1a 5.11 step 4, 6), for chats and memory:** nothing is ticked
   by default. Chats move with fresh ids, each recording `root_id`; the
   pictures, clips and exports their messages show move with their
@@ -5729,14 +5761,25 @@ app a person opens runs none of it and shows nothing new.
   moves root's copy away, copied when a chat root keeps still shows it,
   so no two live profiles share a file); memory facts move; name, persona and home area go
   to sync/state.json `pending_settings`, never personal.json. Step 6 moves
-  the originals into `.imported-<dir>/` in units (`units.json`:
+  the originals into `imports/<dir>/` in units (`units.json`:
   `{"v": 1, "units": {uid: {"kind", ...}}}`, a kind this build doesn't
-  know kept as it is for 1h), each chat with the media only it showed (a
-  picture a chat left in root still shows stays in root); the legacy
-  entries go to `legacy/` with the root id each maps to, then root's
-  stores are rewritten (the moved ids join `gone`), then chats.json and
-  memory.json lose them and legacy_base follows; name, persona and home
+  know kept as it is for 1h). In this order (second review, F1): the
+  units; the legacy entries to `legacy/` with the root id each maps to;
+  root's chats rewritten without them (the moved ids join `gone`) with
+  chats.json and legacy_base following; the facts likewise; and only
+  THEN the media, each only when no chat root keeps shows it (compared
+  without case on a Mac or a PC, F9; a picture a chat left in root still
+  shows stays in root), fsynced. The first cut moved the media first, so
+  a step 6 cut short could leave a chat in root with its pictures staged,
+  and "Erase them" then deleted them. A media path from data (a chat, the
+  manifest, a unit map) must be `(images|videos|exports)/[\w-]+.<ext>`
+  (F8: `images/../x` passed a first-part check). Name, persona and home
   area are deleted from root, not staged; then `pending_import` clears.
+  A step 6 cut short is never abandoned: a start finishes it; a sign-out
+  or a kept Erase finishes it first (through an aside root ctx the
+  switch alone holds, `_aside_root`) and changes nothing if it can't
+  (`add-unfinished`); a server sign-out keeps it owed; a unit whose chat
+  or fact root still holds isn't counted on the sheet.
   Every part re-runs safely: a start after a crash finishes it and never
   imports twice. Remote's target and host keys, cloud keys and Workspace
   never move (their Add boxes are M16's).
@@ -5746,13 +5789,16 @@ app a person opens runs none of it and shows nothing new.
   with an Add not finished uploading, nothing happens without the answer
   (`imported`: putback or erase; no default). Then hold, commit
   (profile.json `active: "local"`, and the dir added to the `putback`
-  list when chosen: a list, so a put-back left pending, say by a file
-  Windows holds, is never replaced by the next), the switch,
+  list or, for "Erase them", the `erase` list: lists, so a put-back left
+  pending, say by a file Windows holds, is never replaced by the next,
+  and a crash after the choice still finishes it), the switch,
   the erase (key first, through the trash), and the units put back
   (`_putback`: each chat under its own root id and out of `gone`, its
   media, the facts, the legacy entries back into chats.json and
-  memory.json with legacy_base; a unit of an unknown kind stays, and so
-  does its `putback` entry) or erased. Name, persona and home area never
+  memory.json with legacy_base; the write evicts nothing and the facts
+  merge by time, so the caps never take the chats back out or trim
+  root's newer facts, F3; a unit of an unknown kind stays, and so does
+  its `putback` entry) or erased. Name, persona and home area never
   come back (the spec's rule: their originals were deleted at Add).
 - **`/api/logout` is the desktop sign-out's door:** in a build without
   accounts, or on "This computer", it answers ok as before; signed in,
@@ -5761,10 +5807,12 @@ app a person opens runs none of it and shows nothing new.
   ask for that window, never call an account action (1a 5.9).
 - **The kept state** (`profile_keep`: "signed-out" with a cause,
   "removed", "deleted"; the profiles hook until 1d): streams kept through
-  the account's ctx, then every synced key and the `account` section of
-  its cloud.json go at once (every key for removed or deleted); commit
-  `{active: "local", kept: {dir, reason, cause, erase_after}}`
-  (erase_after 7 days out for removed or deleted). A kept folder is
+  the account's ctx; an Add's step 6 cut short finished or left owed;
+  commit `{active: "local", kept: {dir, reason, cause, erase_after}}`
+  (erase_after 7 days out for removed or deleted), THEN every synced key
+  and the `account` section of its cloud.json go (every key for removed
+  or deleted), written straight into the kept folder; a start does it
+  again (F10: the first cut erased the keys before the commit). A kept folder is
   never opened or served. `profile_kept_erase` is its Erase, with the
   same question when an Add is left.
 - **Time Machine (1a 5.8):** `_accounts_prepare` makes accounts/ 0700 and
@@ -5787,8 +5835,15 @@ app a person opens runs none of it and shows nothing new.
   boot, so after the reload a switch ends in, and an account's page
   neither posts, uses nor removes the six keys builds before 6b324 left
   (`storeBoot`: they were "This computer"'s; they stay for its next
-  boot). The limit: other sites' data (the map's tiles) and caches in
-  Python's store are not cleaned at a switch on a Mac.
+  boot); and an account's page neither reads nor writes root's
+  single-model pick in browser storage (S2: a later root boot could
+  adopt it). The limit: other sites' data (the map's tiles) and caches
+  in Python's store are not cleaned at a switch on a Mac. The security
+  review suggested removing just the records of the app's own
+  third-party hosts (OpenFreeMap, OpenStreetMap, Google Fonts) from the
+  default store; left out, because another pywebview app on the same
+  Python can hold records for the same hosts, and there is no way to
+  tell whose they are (S5).
 - **/api/prefs/adopt takes nothing into an account** (the review of
   6b329): a page drawn for A posting A's leftover browser keys after the
   switch can't put them in B's local.json.
@@ -5836,8 +5891,9 @@ app a person opens runs none of it and shows nothing new.
   `kept-erase` and `info`, and a `video` late writer (the Veo landing);
   `account-headless` (`POST /api/test/account`: a session with a token
   bound exactly as a window's); `crash-at=<step>` (`os._exit(86)` at any
-  of SWITCH_STEPS' 31 names); `delay-switch=<s>`; `account-open=<task>`.
-- Gauntlet: 437 checks become 464 (27 new). New, in `== accounts step 9 ==`:
+  of SWITCH_STEPS' 40 names); `fail-at=<step>` (an OSError there, to
+  reach the undo paths); `delay-switch=<s>`; `account-open=<task>`.
+- Gauntlet: 437 checks become 466 (29 new). New, in `== accounts step 9 ==`:
   - in process: `.owner` and RFC 5869's first HKDF vector; the erase
     (only layout names, never a link, key first, every delete of a
     `.trash-*`); ISO-12's 16 rules on planted folders (profile.json
@@ -5850,22 +5906,27 @@ app a person opens runs none of it and shows nothing new.
     the kept, removed and deleted states, signing in again, adopt, a live
     answer kept, and the review's four: a lost record refusing a
     sign-in, a pending put-back surviving a lost record, a dropped
-    folder's units put back, two put-backs); ISO-13 at each of the 31
+    folder's units put back, two put-backs); ISO-13 at each of the 40
     steps, crashed and restarted; the bridge guard and the three bridges
     (the token never to another window); Time Machine (a real app's
     call, a failure, a dev copy's record); the web store per engine;
     storeBoot and the Account pane in node; the shipped app's gates
-    pinned.
-  - 45 in-process mutations, each caught: 15 of the invariant and the
+    pinned; the second review's 16 rules (F1-F4, F7-F10, durability,
+    S3, S4); the account page's model pick in node (S2); the main
+    window's reload at a switch (S1).
+  - 60 in-process mutations, each caught: 15 of the invariant and the
     erase ("a delete without the trash rename", "the invariant without
     the instance lock", "... without run/profile.lock", "an unreadable
     profile.json deletes", "a record without active counts as This
     computer's", a link followed, the key file not first, an unfinished
-    sign-up erased, ...) and 30 of the protocol (Add, staging, put back,
+    sign-up erased, ...) and 45 of the protocol (Add, staging, put back,
     the kept state, resume, adopt, the live-answer flush, the pending
-    steps at a start, the review's cases). Two protections held in two
-    places are mutated in both (the hook's lock on a test key, the
-    sign-out's commit order with the invariant's own put-back).
+    steps at a start, both reviews' cases). A protection held in more
+    than one place is mutated in all of them (the hook's lock on a test
+    key; the invariant's lock, also taken by the erase; a link refused by
+    the invariant and by the erase; the sign-out's commit order with the
+    invariant's two put-backs; the kept keys at the switch and at a
+    start).
   - live, on copies: the account page's CSP and its static files; the
     headless session (its token only, the main one refused, X-Profile,
     one at a time, the allow-list, closed by a switch, a new token for
@@ -5873,7 +5934,7 @@ app a person opens runs none of it and shows nothing new.
     Machine and the web store as recorded; the two-profile A -> B -> A
     canary test; ISO-7 with real sign-ins and sign-outs; ISO-7b; a
     request arriving during a switch; ISO-12 at a real start; ISO-13
-    with the real `os._exit` at all 31 steps.
+    with the real `os._exit` at all 40 steps.
   - adapted: step 8's stream check (the answer is now kept, as far as it
     had streamed, in the profile that asked, and nowhere else); the
     callers lint's list (the protocol's entries and `account_open` may
@@ -5885,7 +5946,7 @@ app a person opens runs none of it and shows nothing new.
     neighbours); the media-id count takes the hook's Veo stand-in;
     step 7's /api/me comparisons set the dev copy's `window` flag aside
     (and require it); step 7's pane check stubs the new button.
-  - 18 live mutations, run outside the gauntlet (m9work/mutate_live.py:
+  - 20 live mutations, run outside the gauntlet (m9work/mutate_live.py:
     each on a copy of the tree, the step-9 section run on it), each
     caught: the account API accepting the main token, the CSP header
     missing, an inline script allowed, the account X-Profile unchecked,
@@ -5894,12 +5955,18 @@ app a person opens runs none of it and shows nothing new.
     Time Machine exclusion, requests not held during a switch, the
     headless route without its hook, sign-out without the sheet's
     answer, adopt into an account, /api/logout signing out from the main
-    window, the token handed to another window, the invariant not run
-    at a start, a pending Add not finished at a start.
+    window, the token handed to another window, the main window left on
+    the old profile at a switch, an account page writing root's model
+    pick, the invariant not run at a start, a pending Add not finished
+    at a start.
+  - One run of the second review's gauntlet stopped on an IncompleteRead
+    of the page at the no-store check (326 KB of 512 read), the same
+    flake M5's first run hit at the same place; the rerun was green. Not
+    this step's, and not chased here.
 - **A review of the first cut** (read-only) found, fixed here: the Mac
   deadlock in the account bridge (above); a sign-in that could erase
   folders a lost record left undecided, and could drop a kept folder
-  with the active one; a lost record that didn't count `.imported-*`;
+  with the active one; a lost record that didn't count `imports/*`;
   the invariant erasing a dropped folder's Add units; a second put-back
   replacing the first; `/api/logout` signing out from the main window's
   token; a request served under the switch's hold after the wait; media
@@ -5908,6 +5975,28 @@ app a person opens runs none of it and shows nothing new.
   rename waits on Windows; the account routes answering nothing on an
   OSError; a test switch's erase undoing the switch. It found nothing
   that changes the app a person opens.
+- **Second review** (three reviews of 13b7020: regressions and security
+  said ship, erase safety said fix first), fixed in the commit after it,
+  each with a check and a mutation: F1, the step-6 order and the sheet's
+  count (above); F2, staged units erased only by a recorded choice, and
+  put back when nobody names them; F3, a put-back that evicts nothing and
+  merges facts by time; F4, a lost record no longer leaves a stray
+  `.new-*` or the trash, and puts back units whose account is gone; F6,
+  the staging moved out of accounts/ into imports/ so backups keep root's
+  originals; F7, a pending step 6 only for a folder this build can open;
+  F8, media paths from data checked whole; F9, media names compared
+  without case on a Mac or a PC; F10, a damaged `.owner` kept, and kept
+  committed before its keys go; junctions and a real path checked before
+  every rename; the crash matrix grown from 31 to 40 steps (`boot.key`,
+  `signin.2.imported.renamed`, `signin.undo.key` and `.renamed`,
+  `signin.6.media`, `signout.8.imported.renamed`, `putback.chats`,
+  `putback.renamed`, `kept-erase.imported.renamed`, and `kept.keys` in
+  place of `kept.3`); the account's rename and the staged media fsynced;
+  S1-S4 (the main window's reload, the model pick, the window's cancel,
+  the atomic read). S5 left, with its reason (above).
+- **Not fixed, a blocker for M15 (F5):** the sign-out sheet's `unsent` is
+  always 0, since nothing tracks unsent changes until 1d; M15 must not
+  offer sign-out on that number.
 - Checked by hand, windowed on this Mac (a dev copy on 9895 with the
   account-open hook): the account window opened after the main one, its
   page got its token through the eval-free bridge under the strict CSP
