@@ -6072,6 +6072,17 @@ be compared with an earlier one on the same machine.
   WKWebView, WebView2 and Qt (checked in Blink), a whole run over every
   installed model (one model was run for real, to leave the other
   engines alone).
+- **The re-verify** found two things the fixes made: `regenerate()`
+  awaited the benchmark check before anything set `generating`, so Try
+  again clicked twice within the round trip rewound the chat one turn
+  deeper (to_len 0 on [q0, a0, q1, a1]); and a funnel pick refused by a
+  run's 409 abandoned the funnel. Now send(), regenerate() and a funnel
+  pick each take a flag before their first await and look at
+  `generating` again after it (send's check moved to its top, so a
+  funnel's typed answer or goal isn't cleared during a run either); a
+  pick asks /api/bench/running before it changes anything; and a 409
+  on a stage takes the pick back off the page's copy, keeps the funnel,
+  and offers "Send again". The double click is reproduced in node.
 - **Two reviews** (numbers and privacy; regressions), fixed in two
   follow-up commits: every item above marked with a review, each with a
   check and a mutation. Ollama's `think: false` (optional in the

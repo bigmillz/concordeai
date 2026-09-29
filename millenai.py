@@ -30433,9 +30433,15 @@ function msgActions(div,role,text){
 // answer errored, 0b Q12). The saved chat is cut back to before it with
 // a truncate, which the new question waits for.
 async function regenerate(){
-  if(generating)return;
-  // nothing is taken off the page while a benchmark runs (6b331)
-  if(await benchBusyNow())return;
+  if(generating||sendAsking||regenBusy)return;
+  regenBusy=true;                 // taken before the await (6b331)
+  try{
+    // nothing is taken off the page while a benchmark runs (6b331)
+    if(await benchBusyNow()||generating)return;
+    regenNow();
+  }finally{regenBusy=false;}
+}
+function regenNow(){
   let u=messages.length-1;
   while(u>=0&&messages[u].role!=="user")u--;
   if(u<0)return;
@@ -30611,11 +30617,24 @@ function autoScroll(){
 }
 
 
-let sendAsking=false;     // the benchmark check in flight (6b331)
+// THE BENCHMARK CHECK IS AN AWAIT (6b331): a second Enter, or Try again
+// clicked twice, could pass `generating` while the first call waited and
+// act on what it had already changed (re-verify of 6b331: a double Try
+// again rewound the chat one turn deeper). Each takes its flag before
+// its first await, and looks at `generating` again after it.
+let sendAsking=false,regenBusy=false,fnPicking=false;
 async function send(){
   if(sendAsking)return;
+  if((!input.value.trim()&&!pendingImages.length&&!pendingDocs.length)||generating)return;
+  // A BENCHMARK OWNS THE ENGINES (6b331): asked before anything is
+  // cleared (a chat, a funnel's answer or goal), so the text, pictures
+  // and files stay in the composer
+  sendAsking=true;
+  let benchOn=false;
+  try{benchOn=await benchBusyNow();}finally{sendAsking=false;}
+  if(benchOn||generating)return;
   const text=input.value.trim();
-  if((!text&&!pendingImages.length&&!pendingDocs.length)||generating)return;
+  if(!text&&!pendingImages.length&&!pendingDocs.length)return;
 
   // FUNNEL LANE (6b257, per Patrick): a typed answer IS an answer.
   // Mid-funnel (in the funnel's OWN chat), free text answers the
@@ -30666,12 +30685,6 @@ async function send(){
     return;
   }
 
-  // A BENCHMARK OWNS THE ENGINES (6b331): asked before anything is
-  // cleared, so the text, pictures and files stay in the composer
-  sendAsking=true;
-  let benchOn=false;
-  try{benchOn=await benchBusyNow();}finally{sendAsking=false;}
-  if(benchOn)return;
   api("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({stop:true})});
   input.value="";input.style.height="auto";
@@ -31989,7 +32002,7 @@ $("#ws-set").addEventListener("click",async()=>{
 // path and asks the server for the next stage. Every funnel is a chat
 // in the "funnel" lane, so it lands in history like anything else.
 let fnState=null,fnAnswer=null;
-async function fnStep(){
+async function fnStep(pick){
   fnAnswer=null;                    // a new stage voids the old answer path
   const box=document.createElement("div");
   box.className="msg ai";
@@ -32026,6 +32039,27 @@ async function fnStep(){
                                        // don't render into it, don't arm
                                        // fnAnswer with a dead closure
   const b=box.querySelector(".body");
+  // A BENCHMARK REFUSED THE STAGE (6b331): nothing was saved, so the
+  // pick comes back off the page's copy and the funnel stays, with the
+  // line and a way to send it again once the run is over
+  if(d.bench){
+    if(pick){fnState.picks.pop();fnState.asked.pop();messages.pop();}
+    b.innerHTML=esc(d.err)+'<div class="fopts"><button class="fopt">'
+      +'<b>Send again</b></button></div>';
+    b.querySelector(".fopt").addEventListener("click",async()=>{
+      if(!fnState||fnPicking)return;
+      fnPicking=true;
+      let busy=false;
+      try{busy=await benchBusyNow();}finally{fnPicking=false;}
+      if(busy||!fnState)return;
+      box.remove();
+      if(pick){fnState.asked=(fnState.asked||[]).concat([pick.q]);
+        fnState.picks.push(String(pick.label).slice(0,90));
+        messages.push({role:"assistant",content:pick.q+" \u2192 "+pick.label});}
+      fnStep(pick);
+    });
+    return;
+  }
   // an errored stage ABANDONS the funnel (as abandoning always did):
   // the message shows, and the composer falls back to plain chat
   // instead of dead-ending on a stage that will never build (6b257)
@@ -32050,14 +32084,19 @@ async function fnStep(){
   // Patrick: the cards are suggestions, not a menu \u2014 free text must
   // not dead-end the funnel). Both paths land here; the composer's
   // send() calls fnAnswer with whatever the user wrote.
-  fnAnswer=label=>{
-    if(!fnState)return;
+  fnAnswer=async label=>{
+    if(!fnState||fnPicking)return;
+    // a benchmark running: the pick waits, the stage stays (6b331)
+    fnPicking=true;
+    let busy=false;
+    try{busy=await benchBusyNow();}finally{fnPicking=false;}
+    if(busy||!fnState||!fnAnswer)return;
     b.innerHTML='<div class="fpath">stage '+d.stage+' \u00b7 '
       +esc(d.q)+'</div><b>'+esc(label)+'</b>';
     fnState.asked=(fnState.asked||[]).concat([d.q||""]);
     fnState.picks.push(String(label).slice(0,90));
     messages.push({role:"assistant",content:d.q+" \u2192 "+label});
-    fnAnswer=null;fnStep();
+    fnAnswer=null;fnStep({q:d.q||"",label:label});
   };
   b.querySelectorAll(".fopt").forEach(el=>{
     el.addEventListener("click",()=>{

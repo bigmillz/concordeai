@@ -6840,7 +6840,7 @@ check("review: Stop then ask saves in order with no copy; delete mid-answer then
 # an error, and its question leaves the page's copy; a funnel deleted
 # mid-stage isn't brought back; Cmd+Q keeps a streaming answer
 _rg = page[page.index("function regenerate(){"):page.index("function editResend(")]
-_fs = page[page.index("async function fnStep(){"):page.index("async function fnStep(){") + 2600]
+_fs = page[page.index("async function fnStep("):page.index("async function fnStep(") + 2600]
 check("review: funnel Try again, deferred rewinds, refused requests, Cmd+Q",
       'if(lc&&lc.lane==="funnel"&&u===0)return;' in _rg and "chatTrunc={id:curChat" in _rg
       and "chatOps(" not in _rg and page.count("chatTrunc=null;") >= 3
@@ -15047,8 +15047,9 @@ def _bm_pins(src):
           and '        if not _bench["running"]:\n            _spawn_mlx_engine(label)' in src
           and '"mem_total_gb": round(vm.total / 2 ** 30, 1),' in src
           and 'elif self.path == "/api/bench/running":' in src
-          and 'if(benchOn)return;\n  api("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},'
-              '\n    body:JSON.stringify({stop:true})});\n  input.value="";' in src
+          and src.index("  if(benchOn||generating)return;")
+              < src.index('  api("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},'
+                          '\n    body:JSON.stringify({stop:true})});\n  input.value="";')
           and 'try{const r=await api("/api/bench/running");' in src
           and '<div id="bm-busy" hidden></div>' in src
           and '      if(e.bench){\n        chatTrunc=tr;            // nothing was rewound: the next send does it\n'
@@ -15071,9 +15072,20 @@ def _bm_pins(src):
           and 'if(tr&&tr.id===myChat)turn.rewind={op:"truncate",id:tr.id,' in src
           and 'await chatOps([{op:"truncate"' not in src
           and "        chatTrunc=tr;            // nothing was rewound: the next send does it" in src
-          and "async function regenerate(){\n  if(generating)return;\n"
-              "  // nothing is taken off the page while a benchmark runs (6b331)\n"
-              "  if(await benchBusyNow())return;" in src
+          and "    // nothing is taken off the page while a benchmark runs (6b331)\n"
+              "    if(await benchBusyNow()||generating)return;" in src
+          # the re-verify's: each flag taken before the first await, and
+          # `generating` looked at again after it; a funnel kept on a 409
+          and "async function send(){\n  if(sendAsking)return;\n" in src
+          and "  sendAsking=true;\n  let benchOn=false;\n"
+              "  try{benchOn=await benchBusyNow();}finally{sendAsking=false;}\n"
+              "  if(benchOn||generating)return;\n  const text=input.value.trim();" in src
+          and src.index("  if(benchOn||generating)return;") < src.index('if(uiMode==="funnel"&&text&&')
+          and src.count("await benchBusyNow()") == 4
+          and "    if(!fnState||fnPicking)return;\n    // a benchmark running: the pick waits, the stage stays (6b331)\n"
+              "    fnPicking=true;\n" in src
+          and "  if(d.bench){\n    if(pick){fnState.picks.pop();fnState.asked.pop();messages.pop();}" in src
+          and src.index("  if(d.bench){\n    if(pick)") < src.index("  if(d.err){b.innerHTML=esc(d.err);fnState=null;")
           and "        with _engine_lock:\n            _stop_other_mlx(\"\")\n        self._unload()" in src
           and '  paintBench(d);\n  bmErr="";' in src)
     return ok, []
@@ -15185,6 +15197,41 @@ def _bm_restore(src):
     return ok, [a, b, c, calls]
 
 
+def _bm_regen(src):
+    """Try again clicked twice, 2 ms apart, while the benchmark check is in
+    flight (the re-verify's repro): one rewind, to the last question,
+    and one send; and a second Enter while send() waits sends once."""
+    a = src.index("async function regenerate(){")
+    b = src.index("// EDIT & RESEND", a)
+    s0 = src.index("let sendAsking=false,regenBusy=false,fnPicking=false;")
+    js = src[s0:src.index("\n", s0)] + "\n" + src[a:b] + r"""
+let generating=false,messages,chats=[{id:"c1",lane:"ai"}],curChat="c1",chatTrunc=null,sent=0;
+const input={value:""};
+function chatHash(m,n){return "h"+n;}
+function redrawOpen(){}
+function send(){sent++;}
+function benchBusyNow(){return new Promise(r=>setTimeout(()=>r(false),20));}
+(async()=>{
+  messages=[{role:"user",content:"q0"},{role:"assistant",content:"a0"},
+            {role:"user",content:"q1"},{role:"assistant",content:"a1"}];
+  const p1=regenerate();await new Promise(r=>setTimeout(r,2));const p2=regenerate();
+  await p1;await p2;await new Promise(r=>setTimeout(r,50));
+  const one={to:chatTrunc&&chatTrunc.to,sent,left:messages.length,input:input.value};
+  // after both settle a third click works as before
+  chatTrunc=null;sent=0;await regenerate();
+  console.log(JSON.stringify({one,again:{to:chatTrunc&&chatTrunc.to,sent}}));
+})();
+"""
+    f = os.path.join(tempfile.mkdtemp(), "rg.js")
+    with open(f, "w", encoding="utf-8") as fh:
+        fh.write(js)
+    o = json.loads(subprocess.run(["node", f], capture_output=True, text=True,
+                                  timeout=30).stdout or "null")
+    ok = (o == {"one": {"to": 2, "sent": 1, "left": 2, "input": "q1"},
+                "again": {"to": 0, "sent": 1}})
+    return ok, o
+
+
 def _bm_node(src):
     """The pane's rows, run in node: the headline and its change (grey
     inside 3%), estimated for a cut model and never compared, rows matched
@@ -15251,12 +15298,14 @@ _BM_CHECKS = [
     ("benchmark: the real engines' code against stubs: only 127.0.0.1, MLX offline, the fixed test sent, figures right; "
      "Ollama's unload goes out after a Stop and waits for the runner; 45 s keep-alive; the engines' versions", _bm_net),
     ("benchmark: pinned where it meets the app: run_model gated, the chat's hold and release, the janitor, the routes, "
-     "a download's engine held back, GB as sold, the composer kept", _bm_pins),
+     "a download's engine held back, GB as sold, the composer kept, send's and the funnel's guards, a funnel kept on a 409",
+     _bm_pins),
     ("benchmark: Stop and the time limit cut an HTTP/1.0 no-length MLX call (stream and load) within a second", _bm_cut),
     ("benchmark: the next model's memory base waits for the last one's memory to come back", _bm_settle),
     ("benchmark: every model Ollama holds is unloaded before the first test, and the pane says so", _bm_clear),
     ("benchmark: a failure naming a path keeps no home folder, on the pane or in the file", _bm_scrub),
     ("benchmark: loaded again means a one-token answer came back; Stop during it says so", _bm_restore),
+    ("benchmark: Try again clicked twice during the check rewinds once, to the last question (node)", _bm_regen),
     ("benchmark: the rows in node: headline and change (grey within 3%), estimated never compared, rows matched by engine and timing, versions", _bm_node),
 ]
 
@@ -15359,7 +15408,7 @@ _BM_MUT = [
     ("a cut model not marked estimated", "    if(bmEst(r))top+=", "    if(false)top+="),
     ("noise shown as a change", 'p>=BM_NOISE?" up":p<=-BM_NOISE?" dn":""', 'p>=.05?" up":p<=-.05?" dn":""'),
     ("rows compared by name alone", "o.label===r.label\n  &&o.engine===r.engine&&o.src===r.src&&", "o.label===r.label\n  &&"),
-    ("the composer cleared during a run", "  if(benchOn)return;\n", ""),
+    ("the composer cleared during a run", "  if(benchOn||generating)return;\n", ""),
     ("the attachments lost on a refusal", "          pendingImages=sentImages;pendingDocs=sentDocs;paintChips();}", "          }"),
     ("the rail's memory in decimal GB", '"mem_total_gb": round(vm.total / 2 ** 30, 1),', '"mem_total_gb": round(vm.total / 1e9, 1),'),
     # the second review's fixes
@@ -15370,7 +15419,16 @@ _BM_MUT = [
     ("the rewind sent before the question", 'if(tr&&tr.id===myChat)turn.rewind={op:"truncate",id:tr.id,',
      'if(tr&&tr.id===myChat)await chatOps([{op:"truncate",id:tr.id,'),
     ("the rewind lost on a refusal", "        chatTrunc=tr;            // nothing was rewound: the next send does it\n", ""),
-    ("Try again during a run", "  // nothing is taken off the page while a benchmark runs (6b331)\n  if(await benchBusyNow())return;", ""),
+    ("Try again during a run", "    if(await benchBusyNow()||generating)return;\n", ""),
+    # the re-verify's
+    ("send's flag taken after its await", "async function send(){\n  if(sendAsking)return;\n", "async function send(){\n"),
+    ("send not looking at generating again", "  if(benchOn||generating)return;", "  if(benchOn)return;"),
+    ("a funnel's typed answer cleared during a run", "  if(benchOn||generating)return;\n  const text=input.value.trim();",
+     "  const text=input.value.trim();"),
+    ("a funnel pick not asked first", "    try{busy=await benchBusyNow();}finally{fnPicking=false;}\n    if(busy||!fnState||!fnAnswer)return;",
+     "    if(!fnState||!fnAnswer)return;"),
+    ("a funnel dropped on a benchmark's 409", "  if(d.bench){\n    if(pick){", "  if(false){\n    if(pick){"),
+    ("Try again clicked twice", "  if(generating||sendAsking||regenBusy)return;\n  regenBusy=true;", "  if(generating)return;"),
     ("an Ollama row beside an MLX engine", '        with _engine_lock:\n            _stop_other_mlx("")\n        self._unload()', "        self._unload()"),
     ("a refused start's line kept", '  paintBench(d);\n  bmErr="";', "  paintBench(d);"),
 ]
