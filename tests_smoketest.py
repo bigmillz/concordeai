@@ -14498,7 +14498,7 @@ def _bm_ns(src, **over):
         "_retire_engine": lambda l: None, "model_fits_memory": lambda l: True,
         "model_is_giant": lambda l: False, "giants_on": lambda: False,
         "slow_giant": lambda l: False, "ollama_url": lambda p: "http://127.0.0.1:1" + p,
-        "_mlx_last_use": 0.0})
+        "_mlx_last_use": 0.0, "_setup_jobs": {}, "_setup_lock": _t31.Lock()})
     gate, sect = _bm_slices(src)
     exec(gate, ns)
     exec(sect, ns)
@@ -14559,18 +14559,19 @@ def _bm_mem(src):
               dict(base, swapout=4096))
     warn = bm(base, {"used": 30 * G, "level": 2, "comp": G}, dict(base))
     comp = bm(base, {"used": 30 * G, "level": 1, "comp": G + 600 * M}, dict(base))
-    swap = bm(base, {"used": 30 * G, "level": 1, "comp": G}, dict(base, swapout=4096 + 8 * M))
+    swap = bm(base, {"used": 30 * G, "level": 1, "comp": G}, dict(base, swapout=4096 + 100 * M))
+    page = bm(base, {"used": 30 * G, "level": 1, "comp": G}, dict(base, swapout=4096 + 16384))
     pcb = {"used": 8 * G, "total": 16 * G, "pct": 50.0, "swap": 100 * M}
     pc = bm(pcb, {"used": 15 * G, "pct": 91.0}, dict(pcb, swap=400 * M))
     pcok = bm(pcb, {"used": 12 * G, "pct": 80.0}, dict(pcb, swap=200 * M))
     ok = (calm["mem_rise"] == int(9.5 * G) and not calm["pressured"] and not calm["swapped"]
           and calm["pressure_pct"] == 41.0 and calm["mem_total"] == 48 * G
           and warn["pressured"] and not warn["swapped"]
-          and comp["pressured"] and swap["swapped"] and swap["swap_mb"] == 8
-          and not swap["pressured"]
+          and comp["pressured"] and swap["swapped"] and swap["swap_mb"] == 100
+          and not swap["pressured"] and not page["swapped"] and page["swap_mb"] == 0
           and pc["pressured"] and pc["swapped"] and pc["swap_mb"] == 300
           and not pcok["pressured"] and not pcok["swapped"])
-    return ok, [calm, warn, comp, swap, pc, pcok]
+    return ok, [calm, warn, comp, swap, page, pc, pcok]
 
 
 def _bm_skip(src):
@@ -14584,9 +14585,9 @@ def _bm_skip(src):
              w("GPT-OSS 120B", False, 40e9, T), w("Gemma 4 26B", False, 18e9, T),
              w("Qwen 3.6 35B MoE", False, 18e9, T)]
     want = [None, "Skipped: the largest models are off (Settings \u203a Models).",
-            "Skipped: it needs about 64 GB of memory; this computer has 48 GB.",
-            "Skipped: it needs about 26 GB free; 18 GB is free now.",
-            "Skipped: it needs about 26 GB free; 18 GB is free now."]
+            "Skipped: it needs about 60 GB, more than a model may use on this computer (80% of 48 GB).",
+            "Skipped: it needs about 24 GB free; 17 GB is free now.",
+            "Skipped: it needs about 24 GB free; 17 GB is free now."]
     # the MLX engine: another copy's engine, an owner it can't read, a
     # model that doesn't fit, one that does; a giant on Ollama
     seen = []
@@ -14695,7 +14696,8 @@ def _bm_worker(src):
           and run["restore"] == "P is loaded again, as it was before the benchmark."
           and len(hist) == 1 and hist[0]["id"] == run["id"] and hist[0]["test"] == "b1"
           and [m["status"] for m in hist[0]["models"]] == ["done", "failed", "skipped", "done"]
-          and "tok" not in hist[0]["models"][0] and hist[0]["hw"]["line"] == "Test machine")
+          and "tok" not in hist[0]["models"][0] and hist[0]["hw"]["line"] == "Test machine"
+          and set(hist[0].get("versions") or {}) == {"mlx_lm", "ollama"})
     return ok, [run, log[:12], hist[:1]]
 
 
@@ -14724,11 +14726,19 @@ def _bm_gate(src):
     fin = _bm_wait(ns)
     h3 = ns["bench_hold"]()
     ns["bench_release"]()
+    ns["_setup_jobs"]["Gemma 4 26B"] = {"status": "downloading", "note": ""}
+    s4 = ns["bench_start"]()
+    ns["_setup_jobs"]["Gemma 4 26B"] = {"status": "queued", "note": ""}
+    s5 = ns["bench_start"]()
+    ns["_setup_jobs"]["Gemma 4 26B"] = {"status": "done", "note": ""}
+    s6 = ns["bench_start"]()
+    fin2 = _bm_wait(ns)
     ok = (h1 is True and s1 == (False, ns["BENCH_ANSWERING"]) and guarded_while_chat == "ran"
+          and s4 == s5 == (False, ns["BENCH_DOWNLOADING"]) and s6[0] is True and fin2
           and s2[0] is True and s3 == (False, "A benchmark is already running.")
           and h2 is False and g2 == ns["BENCH_BUSY"] and calls == [(1,)]
           and fin and h3 is True and ns["_bench_busy"]["n"] == 0)
-    return ok, [h1, s1, s2[0], s3, h2, g2, fin, h3, ns["_bench_busy"]]
+    return ok, [h1, s1, s2[0], s3, h2, g2, fin, h3, s4, s5, s6[0], ns["_bench_busy"]]
 
 
 def _bm_stop(src):
@@ -14788,8 +14798,12 @@ def _bm_history(src):
 
 
 class _BmStub(_hs31.BaseHTTPRequestHandler):
-    """A stand-in for mlx_lm's server and for Ollama, on one port."""
+    """A stand-in for mlx_lm's server and for Ollama, on one port. Its
+    /api/ps lists a model for two more looks after keep_alive 0, as a
+    runner that is still exiting does."""
     seen = []
+    loaded = set()
+    leaving = {}
 
     def log_message(self, *a):
         pass
@@ -14808,12 +14822,40 @@ class _BmStub(_hs31.BaseHTTPRequestHandler):
 
     def do_GET(self):
         self.seen.append(("GET", self.path, None))
-        self._out({"models": [{"name": "o:1", "model": "o:1", "size": 3000,
-                               "size_vram": 1500}]})
+        if self.path == "/api/version":
+            self._out({"version": "0.12.9"})
+            return
+        now = sorted(self.loaded)
+        for m in list(self.leaving):
+            self.leaving[m] -= 1
+            if self.leaving[m] <= 0:
+                del self.leaving[m]
+                self.loaded.discard(m)
+        self._out({"models": [{"name": m, "model": m, "size": 3000, "size_vram": 1500}
+                              for m in now]})
 
     def do_POST(self):
         b = self._body()
         self.seen.append(("POST", self.path, b))
+        if b.get("model") in ("slow", "slowload"):
+            # mlx_lm's shape: HTTP/1.0, no Content-Length, slow
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.end_headers()
+                if b.get("model") == "slowload" or not b.get("stream"):
+                    time.sleep(3)
+                    self.wfile.write(b'{"choices": [{"message": {"content": "Hi"}}]}')
+                    return
+                for i in range(150):
+                    self.wfile.write(b"data: " + json.dumps(
+                        {"choices": [{"delta": {"content": "s%d " % i}}]}).encode() + b"\n\n")
+                    self.wfile.flush()
+                    time.sleep(0.02)
+                self.wfile.write(b"data: [DONE]\n\n")
+            except OSError:
+                pass
+            return
         if self.path == "/v1/chat/completions" and not b.get("stream"):
             self._out({"choices": [{"message": {"content": "Hi"}}],
                        "usage": {"prompt_tokens": 9, "completion_tokens": 1}})
@@ -14832,6 +14874,10 @@ class _BmStub(_hs31.BaseHTTPRequestHandler):
                                           "prompt_tokens_details": {"cached_tokens": 10}}}
             ).encode() + b"\n\ndata: [DONE]\n\n")
         elif self.path == "/api/generate":
+            if "prompt" in b:
+                self.loaded.add(b.get("model"))
+            elif b.get("keep_alive") == 0 and b.get("model") in self.loaded:
+                self.leaving[b.get("model")] = 2
             self._out({"done": True, "load_duration": 1234000000} if "prompt" in b else {})
         elif self.path == "/api/chat":
             self.send_response(200)
@@ -14862,7 +14908,7 @@ def _bm_net(src):
     srv = _BmSrv(("127.0.0.1", 0), _BmStub)
     port = srv.server_address[1]
     _t31.Thread(target=srv.serve_forever, daemon=True).start()
-    _BmStub.seen = []
+    _BmStub.seen, _BmStub.loaded, _BmStub.leaving = [], set(), {}
     conns, spawned = [], []
     real = socket.socket.connect
 
@@ -14891,7 +14937,10 @@ def _bm_net(src):
         orw.update(ol)
         on = ns["bench_numbers"](orw)
         oi = o.info()
+        # Stop pressed: the unload still goes out, and waits for the runner
+        ns["_bench_stop"].set()
         o.close(False)
+        vers = ns["_bench_versions"]()
         try:
             for _ in ns["_bench_http"]("http://10.255.255.1:9/x", {}):
                 pass
@@ -14908,6 +14957,9 @@ def _bm_net(src):
     oll_body = next((b for p, b in posts if p == "/api/chat"), {})
     unloads = [b for p, b in posts if p == "/api/generate" and b.get("keep_alive") == 0]
     load = next((b for p, b in posts if p == "/api/generate" and "prompt" in b), {})
+    last_un = max(i for i, x in enumerate(_BmStub.seen)
+                  if x[0] == "POST" and x[2].get("keep_alive") == 0)
+    ps_after = [x for x in _BmStub.seen[last_un + 1:] if x[1] == "/api/ps"]
     P = ns["BENCH_PROMPT"]
     ok = (conns and all(c == ("127.0.0.1", port) for c in conns)
           and spawned == [("M", True)]
@@ -14923,13 +14975,56 @@ def _bm_net(src):
                                           "num_ctx": 4096}
           and oll_body.get("messages") == [{"role": "user", "content": P}]
           and load.get("options") == {"num_ctx": 4096} and load.get("prompt") == ""
-          and len(unloads) == 2
+          and load.get("keep_alive") == "45s" and oll_body.get("keep_alive") == "45s"
+          and "think" not in oll_body
+          and len(unloads) == 2 and len(ps_after) >= 3 and "o:1" not in _BmStub.loaded
+          and vers.get("ollama") == "0.12.9" and "mlx_lm" in vers
           and on["src"] == "engine" and on["gen_tps"] == 64.0 and on["prompt_tps"] == 2000.0
           and on["load_s"] == 1.23 and oi == {"gpu_size": 3000, "gpu_vram": 1500}
           and far == "the benchmark talks only to this computer"
           and ("10.255.255.1", 9) not in conns
           and 950 <= len(P.split()) * 1.2 <= 1150)
-    return ok, [sorted(set(conns)), spawned, mn, on, oi, far, len(unloads), len(P.split())]
+    return ok, [sorted(set(conns)), spawned, mn, on, oi, far, len(unloads), len(ps_after),
+                sorted(_BmStub.loaded), vers, len(P.split())]
+
+
+def _bm_cut(src):
+    """Stop and the time limit cut an MLX call answered the way mlx_lm
+    0.31 answers (HTTP/1.0, no length: http.client drops conn.sock), in
+    the stream and in the one-token load call, within a second."""
+    srv = _BmSrv(("127.0.0.1", 0), _BmStub)
+    port = srv.server_address[1]
+    _t31.Thread(target=srv.serve_forever, daemon=True).start()
+    out = []
+    try:
+        ns = _bm_ns(src, MODEL_ROUTES={"M": ("mlx", port)}, MLX_REPOS={"M": "slow"},
+                    _port_in_use=lambda p: True)
+        ns["_bench"]["running"] = True
+        m = ns["_BenchMLX"]("M")
+
+        def timed(fn, after, fire):
+            _t31.Timer(after, fire).start()
+            t0 = time.time()
+            try:
+                r = fn()
+                what = ("returned", r.get("chunks"))
+            except Exception as e_:
+                what = (type(e_).__name__,)
+            return what + (round(time.time() - t0, 2),)
+        out.append(timed(lambda: m.run(lambda: None, lambda n: None), 0.4, ns["bench_stop"]))
+        ns["_bench_stop"].clear()
+        ns["_bench_live"]["capped"] = False
+        out.append(timed(lambda: m.run(lambda: None, lambda n: None), 0.4, ns["_bench_capped"]))
+        ns["_bench_live"]["capped"] = False
+        ns["MLX_REPOS"]["M"] = "slowload"
+        out.append(timed(m.load, 0.3, ns["bench_stop"]))
+    finally:
+        srv.shutdown()
+        srv.server_close()
+    ok = (out[0][0] == "BenchStopped" and out[0][-1] < 1.5
+          and out[1][0] == "returned" and 5 <= out[1][1] < 150 and out[1][-1] < 1.5
+          and out[2][0] == "BenchStopped" and out[2][-1] < 1.5)
+    return ok, out
 
 
 def _bm_pins(src):
@@ -14947,21 +15042,222 @@ def _bm_pins(src):
           and 'env=(dict(os.environ, HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1")\n             if offline else None)' in src
           and 'elif self.path == "/api/bench":\n            # the hardware benchmark (6b331): the run and the saved runs\n            self._send_json(bench_status())' in src
           and 'if self.path in ("/api/bench/start", "/api/bench/stop"):' in src
-          and "urlopen" not in _bm_slices(src)[1] and "https://" not in _bm_slices(src)[1])
+          and "urlopen" not in _bm_slices(src)[1] and "https://" not in _bm_slices(src)[1]
+          # the review's fixes where they meet the app and the page
+          and '        if not _bench["running"]:\n            _spawn_mlx_engine(label)' in src
+          and '"mem_total_gb": round(vm.total / 2 ** 30, 1),' in src
+          and 'elif self.path == "/api/bench/running":' in src
+          and 'if(benchOn)return;\n  api("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},'
+              '\n    body:JSON.stringify({stop:true})});\n  input.value="";' in src
+          and 'try{const r=await api("/api/bench/running");' in src
+          and '<div id="bm-busy" hidden></div>' in src
+          and '      if(e.bench){\n        chatTrunc=tr;            // nothing was rewound: the next send does it\n'
+              '        if(!input.value)input.value=text;\n'
+              '        if(!pendingImages.length&&!pendingDocs.length){\n'
+              '          pendingImages=sentImages;pendingDocs=sentDocs;paintChips();}\n'
+              '        if(madeChat){chats=chats.filter(x=>x.id!==myChat);renderChats();}\n      }' in src
+          and 'return runs.some(y=>y.id!==x.id&&uWhen(y.t)===w)?w+":"+u2(new Date(x.t*1000).getSeconds()):w;' in src
+          and 'if(old&&on(old)!==on(shown))bits.push("This run: measured on "' in src
+          and '"Speeds are tokens a second. MLX is timed by the app; Ollama reports its own. "\n'
+              '      +"Memory is the rise in memory in use while the model loaded and wrote.");' in src
+          # the second review's: the funnel held, the rewind after the hold,
+          # MLX engines stopped before an Ollama row, a refused start said once
+          and '            if not bench_hold():\n                self._send_json({"err": BENCH_BUSY, '
+              '"bench": True}, code=409)\n                return\n            self._bench_held = True\n'
+              '            goal = str(d.get("goal", "")).strip()[:300]' in src
+          and src.index('        self._bench_held = True\n\n        messages = list(req_json')
+              < src.index('        _rw = req_json.get("rewind")')
+              < src.index('            _landed, _n, _h = chat_append_turn(')
+          and 'if(tr&&tr.id===myChat)turn.rewind={op:"truncate",id:tr.id,' in src
+          and 'await chatOps([{op:"truncate"' not in src
+          and "        chatTrunc=tr;            // nothing was rewound: the next send does it" in src
+          and "async function regenerate(){\n  if(generating)return;\n"
+              "  // nothing is taken off the page while a benchmark runs (6b331)\n"
+              "  if(await benchBusyNow())return;" in src
+          and "        with _engine_lock:\n            _stop_other_mlx(\"\")\n        self._unload()" in src
+          and '  paintBench(d);\n  bmErr="";' in src)
     return ok, []
+
+
+class _BmMemEng(_BmEng):
+    """A stand-in whose memory comes back late after close, as Metal's
+    wired memory does after the process exits."""
+    mem = None
+
+    def load(self):
+        self.mem["used"] += 5 << 30
+        return {"load_s": 1.0}
+
+    def close(self, keep):
+        self.log.append(("close", self.label, keep))
+        if not keep:
+            self.mem["leaving"] = [2 << 30, 2 << 30, 1 << 30]
+
+
+def _bm_settle(src):
+    """After a model's engine goes, the next model's memory base and fit
+    are taken once memory stops coming back (the release comes in three
+    parts here, after close has returned)."""
+    d = tempfile.mkdtemp()
+    G = 1 << 30
+    mem = {"used": 30 * G, "leaving": []}
+    _BmMemEng.mem, _BmMemEng.log = mem, []
+
+    def avail():
+        if mem["leaving"]:
+            mem["used"] -= mem["leaving"].pop(0)
+        return 48 * G - mem["used"]
+    ns = _bm_ns(src, app_dir=lambda: d, BENCH_SETTLE_STEP=0.01,
+                MODEL_ROUTES={"A": ("mlx", 1), "B": ("mlx", 2)},
+                SUPPORTED={"A": True, "B": True}, MODEL_MEM_BYTES={"A": 1, "B": 2})
+    ns["_bench_engine"] = lambda l: _BmMemEng(l, "ok")
+    ns["_bench_avail"] = avail
+    ns["_bench_vm"] = lambda: {"used": mem["used"], "total": 48 * G, "pct": 20.0,
+                               "level": 1, "comp": G, "swapout": 0, "swap": 0}
+    ns["bench_start"]()
+    fin = _bm_wait(ns)
+    rows = {r["label"]: r for r in ns["_bench"]["run"]["models"]}
+    ok = (fin and rows["B"].get("mem_base") == 30 * G and rows["B"].get("mem_rise") == 5 * G
+          and mem["used"] == 30 * G and not mem["leaving"])
+    return ok, [fin, rows["B"].get("mem_base"), rows["B"].get("mem_rise"), mem]
+
+
+def _bm_clear(src):
+    """Every model Ollama holds is unloaded once, before the first test,
+    and the pane says they load again on the next question."""
+    d = tempfile.mkdtemp()
+    unl = []
+    ns = _bm_ns(src, app_dir=lambda: d)
+    ns.update(bench_plan=lambda: ([], ""), _ollama_loaded=lambda: ["qwen3.5:9b", "llama3.2:3b"],
+              _ollama_unload=lambda tag, wait=True: unl.append(tag))
+    ns["bench_start"]()
+    fin = _bm_wait(ns)
+    run = ns["_bench"]["run"]
+    ok = (fin and unl == ["qwen3.5:9b", "llama3.2:3b"]
+          and run["restore"] == "Ollama loads qwen3.5:9b and llama3.2:3b again on the next "
+                                "question that uses them.")
+    return ok, [unl, run.get("restore")]
+
+
+def _bm_scrub(src):
+    """A failure that names a path keeps no home folder, on the pane or
+    in benchmarks.jsonl."""
+    d = tempfile.mkdtemp()
+    home = os.path.expanduser("~")
+
+    class _E(_BmEng):
+        def run(self, on_first, on_tok):
+            raise RuntimeError("the engine answered 500: can't open %s/.cache/hf/x" % home)
+    _E.log = []
+    ns = _bm_ns(src, app_dir=lambda: d, MODEL_ROUTES={"A": ("mlx", 1)},
+                SUPPORTED={"A": True}, MODEL_MEM_BYTES={"A": 1})
+    ns["_bench_engine"] = lambda l: _E(l, "ok")
+    ns["bench_start"]()
+    fin = _bm_wait(ns)
+    note = ns["_bench"]["run"]["models"][0].get("note")
+    raw = open(os.path.join(d, "benchmarks.jsonl"), encoding="utf-8").read()
+    ok = (fin and note == "Failed: the engine answered 500: can't open ~/.cache/hf/x."
+          and home not in raw and "~/.cache/hf/x" in raw)
+    return ok, [note]
+
+
+def _bm_restore(src):
+    """Loaded again means a one-token answer came back, not the port
+    opening; Stop during it says it will load on the next question."""
+    calls = []
+    ns = _bm_ns(src, MODEL_ROUTES={"P": ("mlx", 7)}, MLX_REPOS={"P": "org/p"},
+                _port_in_use=lambda p: True)
+    ns["_bench_json"] = lambda url, body=None, timeout=60.0, method="POST", force=False: \
+        calls.append((url, body.get("max_tokens"))) or {}
+    rows = [{"label": "P", "status": "failed"}]
+    a = ns["_bench_restore"]("P", rows, False)
+    ns["_bench_stop"].set()
+    b = ns["_bench_restore"]("P", rows, False)
+    ns["_bench_stop"].clear()
+
+    def boom(*a_, **k_):
+        raise RuntimeError("no answer")
+    ns["_bench_json"] = boom
+    c = ns["_bench_restore"]("P", rows, False)
+    ok = (a == "P is loaded again, as it was before the benchmark."
+          and calls == [("http://127.0.0.1:7/v1/chat/completions", 1)]
+          and b == c == "P will load again on your next question.")
+    return ok, [a, b, c, calls]
+
+
+def _bm_node(src):
+    """The pane's rows, run in node: the headline and its change (grey
+    inside 3%), estimated for a cut model and never compared, rows matched
+    by model, engine and timing, the versions line, the formats."""
+    js = src[src.index("/* -------------------------------- Settings › Usage › Benchmark (6b331)"):]
+    js = js[:js.index('(function(){\n  const go=$("#bm-go")')]
+    js += r"""
+const out=[];
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);}
+function uInt(n){return String(Math.round(+n||0)).replace(/\B(?=(\d{3})+(?!\d))/g,",");}
+function uWhen(t){return "T"+t;}
+function u2(n){return (n<10?"0":"")+n;}
+const r={label:"Llama 3.2 1B",engine:"MLX",src:"measured",status:"done",gen_tps:212.44,prompt_tps:3120.2,ttft_s:0.314,
+  load_s:1.93,mem_rise:1.5*1073741824,mem_peak:21.25*1073741824,mem_total:48*1073741824,
+  pressured:true,swapped:true,swap_mb:120};
+out.push(bmRow(r,false,{gen_tps:200},256));
+out.push(bmRow({label:"Big",engine:"MLX",status:"skipped",note:"Skipped: it needs <b>"},false,null,256));
+out.push(bmRow({label:"Now",engine:"Ollama",status:"writing",tok:128},true,null,256));
+out.push(String(bmFrac({cur:1,models:[{status:"done"},{status:"writing",tok:128},{status:"waiting"}]},256)));
+out.push(bmTps(3120.2)+"|"+bmTps(9.87)+"|"+bmS(0.314)+"|"+bmS(1.93,1)+"|"+bmS(123.4)+"|"+bmGB(null));
+out.push(bmRow(Object.assign({},r,{gen_tps:202}),false,{gen_tps:200},256));
+out.push(bmRow(Object.assign({},r,{capped:true,est:true,gen_tps:9}),false,{gen_tps:200},256));
+out.push(bmRow(r,false,{gen_tps:100,capped:true},256));
+const old={models:[{label:"Llama 3.2 1B",engine:"Ollama",src:"engine",status:"done",gen_tps:1},
+  {label:"Llama 3.2 1B",engine:"MLX",src:"measured",status:"done",gen_tps:2}]};
+out.push(JSON.stringify(bmMatch(old,r)));
+out.push(bmVer({mlx_lm:"0.31.3",ollama:"0.12.9"})+"|"+bmVer({mlx_lm:"0.31.3"})+"|"+bmVer(null));
+console.log(JSON.stringify(out));
+"""
+    f = os.path.join(tempfile.mkdtemp(), "bm.js")
+    with open(f, "w", encoding="utf-8") as fh:
+        fh.write(js)
+    o = json.loads(subprocess.run(["node", f], capture_output=True, text=True,
+                                  timeout=30).stdout or "null")
+    D = "·"
+    ok = (isinstance(o, list) and len(o) == 10
+          and '<span class="bm-v">212.4<small>tok/s</small></span>' in o[0]
+          and '>+6.2%</span>' in o[0] and 'class="bm-d up"' in o[0]
+          and ("reads 3,120 tok/s %s first token 0.31 s %s load 1.9 s" % (D, D)) in o[0]
+          and ("memory +1.5 GB %s in use at peak 21.3 of 48 GB" % D) in o[0]
+          and '<span class="bm-f">memory pressure</span>' in o[0]
+          and '<span class="bm-f sw">swapped 120 MB</span>' in o[0]
+          and "Skipped: it needs &lt;b&gt;" in o[1] and "bm-v" not in o[1]
+          and "writing, 128 of 256 tokens" in o[2] and 'style="width:50%"' in o[2]
+          and abs(float(o[3]) - (1 + 0.4 + 0.6 * 0.5) / 3) < 1e-9
+          and o[4] == "3,120|9.9|0.31 s|1.9 s|123 s|—"
+          and 'class="bm-d" title="Was 200.0 tok/s">+1.0%</span>' in o[5]
+          and ">estimated</span>" in o[6] and "%" not in o[6].split("tok/s")[1].split("</div>")[0]
+          and "%</span>" not in o[7] and ">estimated<" not in o[7]
+          and json.loads(o[8]).get("gen_tps") == 2
+          and o[9] == "mlx_lm 0.31.3 %s Ollama 0.12.9|mlx_lm 0.31.3|" % D)
+    return ok, o
 
 
 _BM_CHECKS = [
     ("benchmark: the figures from known timings (MLX measured, cached prompt, Ollama's own, a cut stream, junk)", _bm_numbers),
-    ("benchmark: memory rise, pressure (kernel level or compressor; 90% elsewhere) and swap flags", _bm_mem),
+    ("benchmark: memory rise, pressure (kernel level or compressor; 90% elsewhere) and swap flags (not for a page or two)", _bm_mem),
     ("benchmark: skip notes from the app's fit rule; another copy's engine, an unreadable owner, a giant on Ollama", _bm_skip),
     ("benchmark: installed local models only, smallest first, the loaded engine last; the one-model dev hook", _bm_plan),
     ("benchmark: a run on stand-in engines: a failure and a skip noted, the prior engine left loaded, the run saved", _bm_worker),
-    ("benchmark: no start while an answer is written; while a run goes chats and model calls are refused", _bm_gate),
+    ("benchmark: no start while an answer is written or a download runs; while a run goes chats and model calls are refused", _bm_gate),
     ("benchmark: Stop ends the run within a second; the rest don't run; saved as stopped", _bm_stop),
     ("benchmark: benchmarks.jsonl is 0600, torn and stray lines skipped, newest first, the oldest dropped", _bm_history),
-    ("benchmark: the real engines' code against stubs: only 127.0.0.1, MLX offline, the fixed test sent, figures right", _bm_net),
-    ("benchmark: pinned where it meets the app: run_model gated, the chat's hold and release, the janitor, the routes", _bm_pins),
+    ("benchmark: the real engines' code against stubs: only 127.0.0.1, MLX offline, the fixed test sent, figures right; "
+     "Ollama's unload goes out after a Stop and waits for the runner; 45 s keep-alive; the engines' versions", _bm_net),
+    ("benchmark: pinned where it meets the app: run_model gated, the chat's hold and release, the janitor, the routes, "
+     "a download's engine held back, GB as sold, the composer kept", _bm_pins),
+    ("benchmark: Stop and the time limit cut an HTTP/1.0 no-length MLX call (stream and load) within a second", _bm_cut),
+    ("benchmark: the next model's memory base waits for the last one's memory to come back", _bm_settle),
+    ("benchmark: every model Ollama holds is unloaded before the first test, and the pane says so", _bm_clear),
+    ("benchmark: a failure naming a path keeps no home folder, on the pane or in the file", _bm_scrub),
+    ("benchmark: loaded again means a one-token answer came back; Stop during it says so", _bm_restore),
+    ("benchmark: the rows in node: headline and change (grey within 3%), estimated never compared, rows matched by engine and timing, versions", _bm_node),
 ]
 
 
@@ -15006,15 +15302,16 @@ _BM_MUT = [
     ("time to first token from the last token", "    ttft = (t_first - t_send if", "    ttft = (t_last - t_send if"),
     ("a stream with no usage chunk not marked estimated", "            out[\"est\"] = bool(comp)", "            out[\"est\"] = False"),
     ("the kernel's warning level not pressure", "(p.get(\"level\") or 0) >= 2", "(p.get(\"level\") or 0) >= 4"),
-    ("pages swapped out not swapping", "out[\"swapped\"] = bool((so or 0) > 0 or", "out[\"swapped\"] = bool("),
+    ("pages swapped out not swapping", "out[\"swapped\"] = bool((so or 0) >= _BENCH_SWAPOUT_MB << 20\n                          or",
+     "out[\"swapped\"] = bool(\n                          "),
     ("the whole-machine rule dropped from the skip note", "if total and need > total * 0.8:\n        return (\"Skipped",
      "if total and need > total * 8:\n        return (\"Skipped"),
     ("another copy's engine tested", "        if _port_in_use(port):\n            # the desktop app",
      "        if False:\n            # the desktop app"),
     ("a partial download planned", "and model_cached(l, pulled or set())]", "]"),
     ("the loaded engine not tested last", "        labels.remove(prev)\n        labels.append(prev)", "        pass"),
-    ("the prior engine stopped after its test", "            eng.close(keep and ok and not _bench_stop.is_set())",
-     "            eng.close(False)"),
+    ("the prior engine stopped after its test", "        kept = keep and ok and not _bench_stop.is_set()",
+     "        kept = False"),
     ("a chat counted while a run goes", "        if _bench[\"running\"]:\n            return False\n        _bench_busy[\"n\"] += 1",
      "        _bench_busy[\"n\"] += 1"),
     ("a run started while an answer is written", "        if _bench_busy[\"n\"]:\n            return False, BENCH_ANSWERING\n", ""),
@@ -15038,6 +15335,44 @@ _BM_MUT = [
     ("the janitor under a run", 'if _mlx_procs and _mlx_last_use and not _bench["running"] and', 'if _mlx_procs and _mlx_last_use and'),
     ("the offline switch ignored", 'env=(dict(os.environ, HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1")\n             if offline else None)',
      'env=None'),
+    # the first review's fixes
+    ("a Stop refuses the clean-up unload", "        if _bench_stop.is_set() and not force:\n            raise BenchStopped()",
+     "        if _bench_stop.is_set():\n            raise BenchStopped()"),
+    ("Ollama kept for 10 minutes", 'BENCH_KEEP_ALIVE = "45s"', 'BENCH_KEEP_ALIVE = "10m"'),
+    ("the next model measured while the last one's memory comes back",
+     "            _bench_settle()      # the next model's base and fit, measured clean", "            pass"),
+    ("the settle doesn't watch the memory", "        if now is None or now <= floor:\n            break\n        floor = now",
+     "        break"),
+    ("an Ollama unload not waited for", "    while wait and tag in _ollama_loaded() and", "    while False and tag in _ollama_loaded() and"),
+    ("a run started while a download runs", "        if _bench_downloading():\n            return False, BENCH_DOWNLOADING\n", ""),
+    ("a finished download's engine started mid-run", '        if not _bench["running"]:\n            _spawn_mlx_engine(label)',
+     "        if True:\n            _spawn_mlx_engine(label)"),
+    ("Ollama's models left loaded at the start", "        for tag in was:\n            _ollama_unload(tag)",
+     "        for tag in []:\n            _ollama_unload(tag)"),
+    ("one page out counts as swapping", "_BENCH_SWAPOUT_MB = 64", "_BENCH_SWAPOUT_MB = 0"),
+    ("the home folder kept in a note", "    if len(home) > 1:\n        v = re.sub(", "    if False:\n        v = re.sub("),
+    ("loaded again when the port opens", '                    _bench_json("http://127.0.0.1:%d/v1/chat/completions"\n                                % port',
+     '                    (lambda *a, **k: {})("http://127.0.0.1:%d/v1/chat/completions"\n                                % port'),
+    ("Stop ignored while restoring", "while started and time.monotonic() < end and not _bench_stop.is_set():",
+     "while started and time.monotonic() < end:"),
+    ("the engines' versions not kept", '                "versions": run.get("versions") or {},\n', ""),
+    ("a cut model not marked estimated", "    if(bmEst(r))top+=", "    if(false)top+="),
+    ("noise shown as a change", 'p>=BM_NOISE?" up":p<=-BM_NOISE?" dn":""', 'p>=.05?" up":p<=-.05?" dn":""'),
+    ("rows compared by name alone", "o.label===r.label\n  &&o.engine===r.engine&&o.src===r.src&&", "o.label===r.label\n  &&"),
+    ("the composer cleared during a run", "  if(benchOn)return;\n", ""),
+    ("the attachments lost on a refusal", "          pendingImages=sentImages;pendingDocs=sentDocs;paintChips();}", "          }"),
+    ("the rail's memory in decimal GB", '"mem_total_gb": round(vm.total / 2 ** 30, 1),', '"mem_total_gb": round(vm.total / 1e9, 1),'),
+    # the second review's fixes
+    ("Stop looks for conn.sock, which HTTP/1.0 took", '            _bench_live["sock"] = conn.sock\n', ""),
+    ("the funnel not held", '            if not bench_hold():\n                self._send_json({"err": BENCH_BUSY, "bench": True}, code=409)\n'
+     '                return\n            self._bench_held = True\n            goal =',
+     '            goal ='),
+    ("the rewind sent before the question", 'if(tr&&tr.id===myChat)turn.rewind={op:"truncate",id:tr.id,',
+     'if(tr&&tr.id===myChat)await chatOps([{op:"truncate",id:tr.id,'),
+    ("the rewind lost on a refusal", "        chatTrunc=tr;            // nothing was rewound: the next send does it\n", ""),
+    ("Try again during a run", "  // nothing is taken off the page while a benchmark runs (6b331)\n  if(await benchBusyNow())return;", ""),
+    ("an Ollama row beside an MLX engine", '        with _engine_lock:\n            _stop_other_mlx("")\n        self._unload()', "        self._unload()"),
+    ("a refused start's line kept", '  paintBench(d);\n  bmErr="";', "  paintBench(d);"),
 ]
 _bmm = []
 for _d31, _o31, _n31 in _BM_MUT:
@@ -15082,16 +15417,19 @@ _bt = [_ireq(_BM, "/api/bench", token=False)[0],
        _ireq(_BM, "/api/bench/stop", method="POST", token=False, data=b"{}",
              headers={"Content-Type": "application/json"})[0],
        _ireq(_BM, "/api/bench", token="x" * 43)[0],
+       _ireq(_BM, "/api/bench/running", token=False)[0],
        _ireq(_BM, "/api/bench", cookie="millen_key_9903=" + "y" * 43)[0]]
 _bi = _bmq("/api/bench")
 check("benchmark (live): the routes answer only with the launch key and the API token",
-      _bt == [403, 403, 403, 403, 403] and _bi[0] == 200 and _bi[1].get("running") is False
+      _bt == [403] * 6 and _bi[0] == 200 and _bi[1].get("running") is False
       and _bi[1].get("installed") == ["Llama 3.2 1B", "Llama 3.2 3B", "GPT-OSS 120B"]
       and _bi[1].get("hw") and not os.path.exists(os.path.join(_BM.home, "benchmarks.jsonl")),
       "%r" % [_bt, _bi])
 # a run to the end, with a second start and a chat while it goes
 _bs1 = _bmq("/api/bench/start", "POST", {})
 _bs2 = _bmq("/api/bench/start", "POST", {})
+_brn = _bmq("/api/bench/running")
+_bfun = _bmq("/api/funnel", "POST", {"goal": "g331", "chat_id": "cfun331"})
 _bc = _bmq("/api/chat", "POST", {"chat_id": "cbench331", "model": "Llama 3.2 1B", "models": [],
                                   "tier": "", "messages": [{"role": "user", "content": "q331"}]})
 _bdone = _bm_until(lambda d_: d_.get("running") is False)
@@ -15106,14 +15444,17 @@ check("benchmark (live): a run on the stand-in engine gives the known figures an
       and _brows.get("Llama 3.2 3B", {}).get("gen_tps") == 50.0
       and _brows["Llama 3.2 3B"].get("src") == "engine" and _brows["Llama 3.2 3B"].get("load_s") == 1.5
       and _brows.get("GPT-OSS 120B", {}).get("status") == "skipped"
-      and "64 GB" in _brows["GPT-OSS 120B"].get("note", "")
+      and "(80% of 48 GB)" in _brows["GPT-OSS 120B"].get("note", "")
       and all(isinstance(r.get("mem_rise"), int) for l_, r in _brows.items() if l_ != "GPT-OSS 120B"),
       "%r" % [_bs1, _brun])
-check("benchmark (live): while it runs a second start and a chat are refused, and the question isn't saved",
+check("benchmark (live): while it runs a second start, a chat and a funnel are refused, and nothing is saved",
       _bs2 == (409, {"err": "A benchmark is already running."})
       and _bc[0] == 409 and _bc[1].get("err", "").startswith("A hardware benchmark is running.")
+      and _bc[1].get("bench") is True
+      and _brn == (200, {"running": True, "err": _bc[1].get("err")})
+      and _bfun[0] == 409 and _bfun[1].get("bench") is True and "cfun331" not in json.dumps(_bchats)
       and "cbench331" not in json.dumps(_bchats) and "q331" not in json.dumps(_bchats),
-      "%r" % [_bs2, _bc])
+      "%r" % [_bs2, _bc, _brn, _bfun])
 # Stop in the middle of the first model
 _bs3 = _bmq("/api/bench/start", "POST", {})
 _bmid = _bm_until(lambda d_: ((d_.get("run") or {}).get("models") or [{}])[0].get("tok", 0) >= 5, 15)
@@ -15144,31 +15485,6 @@ _BM.stop()
 # the pane: the section, its controls, and the page script's rows and
 # figures against canned replies, in node
 _bpg = page
-_bjs = _MILLENAI_SRC[_MILLENAI_SRC.index("/* -------------------------------- Settings \u203a Usage \u203a Benchmark (6b331)"):]
-_bjs = _bjs[:_bjs.index("(function(){\n  const go=$(\"#bm-go\")")]
-_bnode = r"""
-const out=[];
-function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);}
-function uInt(n){return String(Math.round(+n||0)).replace(/\B(?=(\d{3})+(?!\d))/g,",");}
-function uWhen(t){return "T"+t;}
-const r={label:"Llama 3.2 1B",engine:"MLX",status:"done",gen_tps:212.44,prompt_tps:3120.2,ttft_s:0.314,
-  load_s:1.93,mem_rise:1.5*1073741824,mem_peak:21.25*1073741824,mem_total:48*1073741824,
-  pressured:true,swapped:true,swap_mb:120};
-out.push(bmRow(r,false,{gen_tps:200},256));
-out.push(bmRow({label:"Big",engine:"MLX",status:"skipped",note:"Skipped: it needs <b>"},false,null,256));
-out.push(bmRow({label:"Now",engine:"Ollama",status:"writing",tok:128},true,null,256));
-out.push(String(bmFrac({cur:1,models:[{status:"done"},{status:"writing",tok:128},{status:"waiting"}]},256)));
-out.push(bmTps(3120.2)+"|"+bmTps(9.87)+"|"+bmS(0.314)+"|"+bmS(1.93,1)+"|"+bmS(123.4)+"|"+bmGB(null));
-console.log(JSON.stringify(out));
-"""
-_bnf = os.path.join(tempfile.mkdtemp(), "bm.js")
-with open(_bnf, "w", encoding="utf-8") as _fh31:
-    _fh31.write(_bjs + _bnode)
-try:
-    _bno = json.loads(subprocess.run(["node", _bnf], capture_output=True, text=True,
-                                     timeout=30).stdout or "null")
-except Exception as _e31:
-    _bno = repr(_e31)
 check("benchmark: the pane's section, controls and hardware line are on the page",
       'id="bm-go">Run benchmark</button>' in _bpg and 'id="bm-stop" hidden>Stop</button>' in _bpg
       and 'id="bm-hw"' in _bpg and 'id="bm-show"' in _bpg and 'id="bm-cmp"' in _bpg
@@ -15177,19 +15493,6 @@ check("benchmark: the pane's section, controls and hardware line are on the page
       and 'if(id==="p-usage")loadBench();' in _bpg
       and 'api("/api/bench")' in _bpg and "fetch(\"/api/bench" not in _bpg,
       "")
-check("benchmark: the rows in node: the headline speed and its change, the line under it, memory and flags, a skip, the live row",
-      isinstance(_bno, list) and len(_bno) == 5
-      and '<span class="bm-v">212.4<small>tok/s</small></span>' in _bno[0]
-      and '>+6.2%</span>' in _bno[0] and 'class="bm-d up"' in _bno[0]
-      and "reads 3,120 tok/s \u00b7 first token 0.31 s \u00b7 load 1.9 s" in _bno[0]
-      and "memory +1.5 GB \u00b7 peak 21.3 of 48 GB" in _bno[0]
-      and '<span class="bm-f">memory pressure</span>' in _bno[0]
-      and '<span class="bm-f sw">swapped 120 MB</span>' in _bno[0]
-      and "Skipped: it needs &lt;b&gt;" in _bno[1] and "bm-v" not in _bno[1]
-      and "writing, 128 of 256 tokens" in _bno[2] and 'style="width:50%"' in _bno[2]
-      and abs(float(_bno[3]) - (1 + 0.4 + 0.6 * 0.5) / 3) < 1e-9
-      and _bno[4] == "3,120|9.9|0.31 s|1.9 s|123 s|\u2014",
-      "%r" % (_bno,))
 # ---- end 6b331
 # ==== 6b331 benchmark: end ====
 

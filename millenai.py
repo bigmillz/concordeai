@@ -5118,7 +5118,10 @@ def _download_model(label: str):
         with _setup_lock:
             _setup_jobs[label] = {"status": "done", "note": ""}
         _app_models_add(label)
-        _spawn_mlx_engine(label)
+        # not beside a benchmark's model (review of 6b331): the next
+        # question starts it instead
+        if not _bench["running"]:
+            _spawn_mlx_engine(label)
     except Exception as exc:
         with _setup_lock:
             _setup_jobs[label] = {"status": "error", "note": str(exc)[:200]}
@@ -15707,6 +15710,9 @@ BENCH_CTX = 4096            # Ollama's context, the same on every machine
 BENCH_LOAD_CAP = 300.0      # a load that takes longer fails the model
 BENCH_RUN_CAP = 120.0       # a slow model stops here; figures from what came
 BENCH_KEEP = 100            # runs kept in the file
+BENCH_KEEP_ALIVE = "45s"    # the app's own Ollama keep-alive (stream_ollama)
+BENCH_SETTLE_S = 8.0        # the longest wait for memory to come back
+BENCH_SETTLE_STEP = 0.5
 BENCH_SHOW = 20             # runs the pane can pick from
 BENCH_PASSAGE = (
     "Along sheltered estuaries on both sides of the North Atlantic, people "
@@ -15789,7 +15795,7 @@ BENCH_FIELDS = ("label", "engine", "status", "note", "gen_tps", "prompt_tps",
                 "mem_base", "mem_peak", "mem_total", "mem_rise",
                 "pressure_pct", "pressure_level", "pressured", "swapped",
                 "swap_mb", "gpu_size", "gpu_vram")
-_bench_live = {"conn": None, "capped": False}
+_bench_live = {"conn": None, "sock": None, "capped": False}
 _bench_stop = threading.Event()
 _bench_file_lock = threading.Lock()
 _bench_hw = {}
@@ -15922,6 +15928,7 @@ def _bench_fold(acc: dict, s: dict):
 
 _BENCH_COMP_MB = 512        # the compressor growing this much is pressure
 _BENCH_SWAP_MB = 256        # swap in use growing this much is swapping
+_BENCH_SWAPOUT_MB = 64      # pages swapped out: less is noise (a page is 16 KB)
 
 
 def bench_mem(base: dict, peak: dict, end: dict) -> dict:
@@ -15929,8 +15936,8 @@ def bench_mem(base: dict, peak: dict, end: dict) -> dict:
     the peak in use less the level just before the load: the model's
     weights, its cache and its engine. Pressure: on a Mac the kernel's
     level reached warning (2) or the compressor grew by 512 MB; elsewhere
-    memory in use reached 90%. Swapped: pages were swapped out (Mac) or
-    the swap in use grew by 256 MB."""
+    memory in use reached 90%. Swapped: 64 MB or more swapped out (Mac)
+    or the swap in use grew by 256 MB; less shows nothing."""
     b, p, e = base or {}, peak or {}, end or {}
     out = {"mem_base": b.get("used"), "mem_peak": p.get("used"),
            "mem_total": b.get("total") or e.get("total"),
@@ -15949,8 +15956,10 @@ def bench_mem(base: dict, peak: dict, end: dict) -> dict:
           else None)
     sw = ((e.get("swap") or 0) - b["swap"]
           if b.get("swap") is not None and e.get("swap") is not None else None)
-    out["swap_mb"] = round(max(so or 0, sw or 0, 0) / (1 << 20))
-    out["swapped"] = bool((so or 0) > 0 or (sw or 0) >= _BENCH_SWAP_MB << 20)
+    out["swapped"] = bool((so or 0) >= _BENCH_SWAPOUT_MB << 20
+                          or (sw or 0) >= _BENCH_SWAP_MB << 20)
+    out["swap_mb"] = (round(max(so or 0, sw or 0) / (1 << 20))
+                      if out["swapped"] else 0)
     return out
 
 
@@ -15969,11 +15978,12 @@ def _bench_skip_why(label: str, fits: bool, avail, total):
                 "Models).")
     need = MODEL_MEM_BYTES.get(label, 0)
     if total and need > total * 0.8:
-        return ("Skipped: it needs about %d GB of memory; this computer "
-                "has %d GB." % (round(need / 1e9), round(total / 2 ** 30)))
+        return ("Skipped: it needs about %d GB, more than a model may use "
+                "on this computer (80%% of %d GB)."
+                % (round(need / 2 ** 30), round(total / 2 ** 30)))
     want = need * (1.3 if "MoE" in label else 1.5)
     return ("Skipped: it needs about %d GB free; %d GB is free now."
-            % (round(want / 1e9), round((avail or 0) / 1e9)))
+            % (round(want / 2 ** 30), round((avail or 0) / 2 ** 30)))
 
 
 def _bench_fit(label: str):
@@ -15988,9 +15998,14 @@ def _bench_fit(label: str):
 # ----------------------------------------------- the engines (6b331)
 def _bench_cut():
     """Close the engine call in flight (Stop, or the time limit): its
-    socket is shut, so a read blocked in another thread returns now."""
-    c = _bench_live.get("conn")
-    s = getattr(c, "sock", None)
+    socket is shut, so a read blocked in another thread returns now. The
+    socket kept when the request went out, not conn.sock (review of
+    6b331): mlx_lm answers in HTTP/1.0 with no length, and http.client
+    then hands the socket to the response and sets conn.sock to None, so
+    a Stop found nothing to shut and the model wrote to the end."""
+    s = _bench_live.get("sock")
+    if s is None:
+        s = getattr(_bench_live.get("conn"), "sock", None)
     if s is not None:
         try:
             s.shutdown(socket.SHUT_RDWR)
@@ -16003,21 +16018,30 @@ def _bench_capped():
     _bench_cut()
 
 
-def _bench_http(url: str, body=None, timeout: float = 60.0, method="POST"):
+def _bench_http(url: str, body=None, timeout: float = 60.0, method="POST",
+                force: bool = False):
     """The lines of one engine call. Only 127.0.0.1: the benchmark never
     talks to anything but this computer's own engines. The connection is
-    kept in _bench_live so Stop can cut it."""
+    kept in _bench_live so Stop can cut it. force: the clean-up calls (an
+    unload, a look at what's loaded) that must go out after a Stop too;
+    Stop neither refuses nor cuts them (review of 6b331: a stopped run
+    left the Ollama model under test loaded for its keep-alive)."""
     u = urllib.parse.urlsplit(url)
     if u.scheme != "http" or u.hostname != "127.0.0.1" or not u.port:
         raise RuntimeError("the benchmark talks only to this computer")
     conn = http.client.HTTPConnection("127.0.0.1", u.port, timeout=timeout)
-    _bench_live["conn"] = conn
+    if not force:
+        _bench_live["conn"] = conn
     try:
-        if _bench_stop.is_set():
+        if _bench_stop.is_set() and not force:
             raise BenchStopped()
         conn.request(method, u.path or "/",
                      body=None if body is None else json.dumps(body).encode(),
                      headers={"Content-Type": "application/json"})
+        if not force:
+            _bench_live["sock"] = conn.sock
+            if _bench_stop.is_set() or _bench_live["capped"]:
+                _bench_cut()             # pressed while the request went out
         resp = conn.getresponse()
         if resp.status != 200:
             txt = resp.read(300).decode("utf-8", "replace")
@@ -16033,19 +16057,70 @@ def _bench_http(url: str, body=None, timeout: float = 60.0, method="POST"):
                 break
             yield line
     except (OSError, http.client.HTTPException) as exc:
+        if force:
+            raise
         if _bench_stop.is_set():
             raise BenchStopped() from exc
         if not _bench_live["capped"]:
             raise
     finally:
-        _bench_live["conn"] = None
+        if not force:
+            _bench_live["conn"] = _bench_live["sock"] = None
         conn.close()
-    if _bench_stop.is_set():
+    if _bench_stop.is_set() and not force:
         raise BenchStopped()
 
 
-def _bench_json(url, body=None, timeout=60.0, method="POST"):
-    return json.loads(b"".join(_bench_http(url, body, timeout, method)) or b"{}")
+def _bench_json(url, body=None, timeout=60.0, method="POST", force=False):
+    return json.loads(b"".join(_bench_http(url, body, timeout, method, force))
+                      or b"{}")
+
+
+def _bench_avail():
+    """Bytes of memory available now, or None."""
+    return psutil.virtual_memory().available if HAS_PSUTIL else None
+
+
+def _bench_settle():
+    """Wait for memory to stop coming back after an engine went (review
+    of 6b331). Metal hands wired memory back after the process exits
+    (6b239), and Ollama's runner exits after keep_alive 0 has answered:
+    the next model's fit check and memory base were taken while the last
+    one was still leaving. As _stop_other_mlx does: watch available
+    memory until it stops climbing, capped."""
+    floor = _bench_avail()
+    if floor is None:
+        return
+    end = time.monotonic() + BENCH_SETTLE_S
+    while time.monotonic() < end:
+        time.sleep(BENCH_SETTLE_STEP)
+        now = _bench_avail()
+        if now is None or now <= floor:
+            break
+        floor = now
+
+
+def _ollama_loaded() -> list:
+    """The models Ollama has in memory now ([] when it can't say)."""
+    try:
+        return [m.get("name") or m.get("model") for m in _bench_json(
+            ollama_url("/api/ps"), None, 10, "GET", True).get("models") or []]
+    except Exception:
+        return []
+
+
+def _ollama_unload(tag: str, wait: bool = True):
+    """keep_alive 0 for tag, sent even after a Stop, then (wait) until
+    /api/ps no longer lists it: the call answers before the runner
+    exits."""
+    try:
+        _bench_json(ollama_url("/api/generate"),
+                    {"model": tag, "keep_alive": 0}, 60, "POST", True)
+    except Exception:
+        return
+    end = time.monotonic() + 15
+    while wait and tag in _ollama_loaded() and time.monotonic() < end:
+        time.sleep(0.25)
 
 
 class _BenchMLX:
@@ -16151,18 +16226,16 @@ class _BenchOllama:
         self.label, self.tag, self.ps = label, MODEL_ROUTES[label][1], {}
 
     def _unload(self):
-        try:
-            _bench_json(ollama_url("/api/generate"),
-                        {"model": self.tag, "keep_alive": 0}, 60)
-        except BenchStopped:
-            raise
-        except Exception:
-            pass
+        _ollama_unload(self.tag)
 
     def prepare(self):
         if slow_giant(self.label):
             return ("Skipped: a model this size loads from disk for many "
                     "minutes on Ollama.")
+        # no MLX engine of this copy beside it (review of 6b331): the one
+        # loaded before is tested last, so it was still resident here
+        with _engine_lock:
+            _stop_other_mlx("")
         self._unload()
         return _bench_fit(self.label)
 
@@ -16171,7 +16244,7 @@ class _BenchOllama:
         # an empty prompt loads the model and answers nothing
         r = _bench_json(ollama_url("/api/generate"), {
             "model": self.tag, "prompt": "", "stream": False,
-            "keep_alive": "10m", "options": {"num_ctx": BENCH_CTX}},
+            "keep_alive": BENCH_KEEP_ALIVE, "options": {"num_ctx": BENCH_CTX}},
             BENCH_LOAD_CAP)
         out = {"load_s": time.monotonic() - t0}
         if _bench_pos(r.get("load_duration")):
@@ -16190,7 +16263,11 @@ class _BenchOllama:
 
     def run(self, on_first, on_tok):
         raw = {"chunks": 0, "t_first": None, "t_last": None}
-        body = {"model": self.tag, "stream": True, "keep_alive": "10m",
+        # no "think": the app found Ollama rejects it for models that
+        # don't think (OLLAMA_THINK_OFF), so thinking is left as each
+        # model's template has it
+        body = {"model": self.tag, "stream": True,
+                "keep_alive": BENCH_KEEP_ALIVE,
                 "messages": [{"role": "user", "content": BENCH_PROMPT}],
                 "options": {"temperature": 0, "seed": BENCH_SEED,
                             "num_predict": BENCH_MAX_TOKENS,
@@ -16351,7 +16428,7 @@ def _bench_one(row: dict, keep: bool):
     except BenchStopped:
         why = "Stopped."
     except Exception as exc:
-        why = "Failed: %s." % str(exc).strip().rstrip(".")[:160]
+        why = "Failed: %s." % _bench_why(exc)
     if why:
         _bench_set(row, status=("skipped" if why.startswith("Skipped")
                                 else "stopped" if why == "Stopped."
@@ -16389,18 +16466,20 @@ def _bench_one(row: dict, keep: bool):
     except BenchStopped:
         _bench_set(row, status="stopped", note="Stopped.")
     except Exception as exc:
-        _bench_set(row, status="failed",
-                   note="Failed: %s." % str(exc).strip().rstrip(".")[:160])
+        _bench_set(row, status="failed", note="Failed: %s." % _bench_why(exc))
     finally:
         done.set()
         smp.join(3)
         end = _bench_vm()
         _bench_fold(acc, end)
         _bench_set(row, **bench_mem(base, acc, end))
+        kept = keep and ok and not _bench_stop.is_set()
         try:
-            eng.close(keep and ok and not _bench_stop.is_set())
+            eng.close(kept)
         except Exception:
             pass
+        if not kept:
+            _bench_settle()      # the next model's base and fit, measured clean
 
 
 def _bench_restore(prev: str, rows: list, stopped: bool) -> str:
@@ -16415,14 +16494,22 @@ def _bench_restore(prev: str, rows: list, stopped: bool) -> str:
         try:
             with _engine_lock:
                 _stop_other_mlx(prev)
-                if _spawn_mlx_engine(prev, offline=True):
-                    port = MODEL_ROUTES[prev][1]
-                    end = time.monotonic() + 120
-                    while time.monotonic() < end:
-                        if _port_in_use(port) and _listener_is_mine(port) is True:
-                            return ("%s is loaded again, as it was before the "
-                                    "benchmark." % prev)
-                        time.sleep(0.5)
+                started = _spawn_mlx_engine(prev, offline=True)
+            port = MODEL_ROUTES[prev][1]
+            end = time.monotonic() + 120
+            while started and time.monotonic() < end and not _bench_stop.is_set():
+                if _port_in_use(port) and _listener_is_mine(port) is True:
+                    # mlx_lm loads after its port opens: ready is a
+                    # one-token answer (review of 6b331); Stop cuts it
+                    _bench_json("http://127.0.0.1:%d/v1/chat/completions"
+                                % port, {"model": MLX_REPOS[prev],
+                                         "max_tokens": 1, "stream": False,
+                                         "messages": [{"role": "user",
+                                                       "content": "Hello"}]},
+                                timeout=max(5.0, end - time.monotonic()))
+                    return ("%s is loaded again, as it was before the "
+                            "benchmark." % prev)
+                time.sleep(0.5)
         except Exception:
             pass
     return "%s will load again on your next question." % prev
@@ -16435,7 +16522,16 @@ def _bench_worker(run: dict):
         labels, prev = bench_plan()
         rows = [{"label": l, "engine": "", "status": "waiting", "note": "",
                  "tok": 0} for l in labels]
+        vers = _bench_versions()
+        # every model Ollama holds goes first (review of 6b331), so no
+        # model is measured beside another's weights
+        was = [] if "bench-fake" in TEST_HOOKS else _ollama_loaded()
+        for tag in was:
+            _ollama_unload(tag)
+        if was:
+            _bench_settle()
         with _bench_lock:
+            run["versions"] = vers
             run["models"] = rows
             if not rows:
                 run["note"] = "No local models are installed on this computer."
@@ -16448,14 +16544,18 @@ def _bench_worker(run: dict):
         _bench_set(run, cur=-1)
         stopped = _bench_stop.is_set()
         rest = _bench_restore(prev, rows, stopped)
+        names = [t for t in was if t]
+        if names:
+            rest = (rest + " " if rest else "") + (
+                "Ollama loads %s again on the next question that uses %s."
+                % (" and ".join(names), "it" if len(names) == 1 else "them"))
         with _bench_lock:
             run["restore"] = rest
             run["state"] = "stopped" if stopped else "done"
     except Exception as exc:
         with _bench_lock:
             run["state"] = "failed"
-            run["note"] = "The benchmark stopped: %s." % (
-                str(exc).strip().rstrip(".")[:160] or type(exc).__name__)
+            run["note"] = "The benchmark stopped: %s." % _bench_why(exc)
     finally:
         _mlx_last_use = time.time()     # a restored engine gets its 5 min
         with _bench_lock:
@@ -16474,14 +16574,68 @@ def _bench_worker(run: dict):
             _bench["running"] = False
 
 
+def _bench_scrub(v):
+    """A note with the home folder written as ~ (review of 6b331): an
+    engine's error can name a path, and a path names the person."""
+    if not isinstance(v, str):
+        return v
+    home = os.path.expanduser("~").rstrip("/\\")
+    if len(home) > 1:
+        v = re.sub(re.escape(home), "~", v,
+                   flags=re.I if IS_WIN or IS_MAC else 0)
+    return v
+
+
+def _bench_why(exc) -> str:
+    """An error as a row's note: one line, no home folder, no final stop."""
+    t = " ".join(str(exc).split()).rstrip(".")[:160]
+    return _bench_scrub(t) or type(exc).__name__
+
+
+def _bench_versions() -> dict:
+    """The engines' versions, kept with each run: a new mlx_lm or Ollama
+    can move the figures as much as new hardware."""
+    if "bench-fake" in TEST_HOOKS:
+        return {"mlx_lm": "fake", "ollama": "fake"}
+    out = {"mlx_lm": None, "ollama": None}
+    try:
+        import importlib.metadata as _im
+        out["mlx_lm"] = _im.version("mlx-lm")
+    except Exception:
+        pass
+    try:
+        out["ollama"] = _bench_json(ollama_url("/api/version"), None, 3,
+                                    "GET", True).get("version")
+    except Exception:
+        pass
+    return out
+
+
 def _bench_record(run: dict) -> dict:
+    """The run as the history keeps it: the row fields BENCH_FIELDS names,
+    every text with the home folder written as ~."""
     with _bench_lock:
         return {"v": 1, "id": run["id"], "t": run["t"], "end": run.get("end"),
                 "test": BENCH_TEST, "state": run.get("state"),
                 "hw": run.get("hw"), "app": run.get("app"),
-                "restore": run.get("restore") or "", "note": run.get("note") or "",
-                "models": [{k: r.get(k) for k in BENCH_FIELDS if k in r}
-                           for r in run.get("models") or []]}
+                "versions": run.get("versions") or {},
+                "restore": _bench_scrub(run.get("restore") or ""),
+                "note": _bench_scrub(run.get("note") or ""),
+                "models": [{k: _bench_scrub(r.get(k)) for k in BENCH_FIELDS
+                            if k in r} for r in run.get("models") or []]}
+
+
+BENCH_DOWNLOADING = ("A download is running. Run the benchmark when it has "
+                     "finished.")
+
+
+def _bench_downloading() -> bool:
+    """A model, engine or studio download going or queued (review of
+    6b331): a finished MLX download starts its engine, which would sit
+    beside the model under test."""
+    with _setup_lock:
+        return any(j.get("status") in ("downloading", "queued")
+                   for j in _setup_jobs.values())
 
 
 def bench_start() -> tuple:
@@ -16492,12 +16646,15 @@ def bench_start() -> tuple:
             return False, "A benchmark is already running."
         if _bench_busy["n"]:
             return False, BENCH_ANSWERING
+        if _bench_downloading():
+            return False, BENCH_DOWNLOADING
         _bench["running"] = True
         _bench_stop.clear()
         run = {"id": secrets.token_hex(6), "t": time.time(), "end": None,
                "test": BENCH_TEST, "state": "running", "cur": -1,
                "models": [], "restore": "", "note": "", "saved": False,
-               "hw": {}, "app": "%s (%s)" % (APP_VERSION, APP_BUILD)}
+               "hw": {}, "versions": {},
+               "app": "%s (%s)" % (APP_VERSION, APP_BUILD)}
         _bench["run"] = run
     try:
         hw = bench_hardware()
@@ -20522,6 +20679,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json(usage_query(
                     usage_read(self.ctx), _ur,
                     (_uq.get("model") or [""])[0][:120]))
+        elif self.path == "/api/bench/running":
+            # the composer asks before it clears itself (review of 6b331)
+            self._send_json({"running": bool(_bench["running"]),
+                             "err": BENCH_BUSY if _bench["running"] else ""})
         elif self.path == "/api/bench":
             # the hardware benchmark (6b331): the run and the saved runs
             self._send_json(bench_status())
@@ -20893,8 +21054,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             vm = psutil.virtual_memory()
             stats = {
                 "real": True,
-                "mem_used_gb": round(vm.used / 1e9, 1),
-                "mem_total_gb": round(vm.total / 1e9, 1),
+                # GB as memory is sold, 2^30 (review of 6b331): the rail
+                # read 52 GB beside the benchmark's 48 on a 48 GB Mac
+                "mem_used_gb": round(vm.used / 2 ** 30, 1),
+                "mem_total_gb": round(vm.total / 2 ** 30, 1),
                 "mem_pct": vm.percent,
                 "mem_pressure": mem_pressure(),
                 "gpu_pct": gpu,  # None when ioreg has no accelerator stats
@@ -21431,6 +21594,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 d = json.loads(self.rfile.read(n)) if n else {}
             except (ValueError, json.JSONDecodeError):
                 d = {}
+            # held like a chat (review of 6b331): no benchmark starts mid-
+            # stage, and none refuses its model call halfway through
+            if not bench_hold():
+                self._send_json({"err": BENCH_BUSY, "bench": True}, code=409)
+                return
+            self._bench_held = True
             goal = str(d.get("goal", "")).strip()[:300]
             if not goal:
                 self._send_json({"err": "name the decision first"})
@@ -22006,6 +22175,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # finally), or at a quit. Drills and tests name no chat and save
         # nothing (0b Q12).
         _cid = str(req_json.get("chat_id") or "")
+        # A TRY AGAIN OR EDIT & RESEND REWINDS HERE, after the benchmark's
+        # hold (review of 6b331): the page sent the rewind first, and a
+        # question then refused left the saved chat one turn short
+        _rw = req_json.get("rewind")
+        if (_cid and isinstance(_rw, dict) and _rw.get("op") == "truncate"
+                and _rw.get("id") == _cid):
+            chat_ops([{"op": "truncate", "id": _cid,
+                       "to_len": _rw.get("to_len"),
+                       "prefix_hash": _rw.get("prefix_hash")}], self.ctx)
         if _cid:
             _q = messages[-1] if messages else None
             if (not _CHAT_ID.fullmatch(_cid) or not isinstance(_q, dict)
@@ -26860,6 +27038,8 @@ body.gen #chip-model{color:var(--accent)}
 .bm-row .pbar-track{height:2px;margin-top:6px}
 #bm-note{font-size:11.5px;color:var(--faint);line-height:1.5;margin:8px 0 0}
 #bm-note[hidden]{display:none}
+#bm-busy{font-size:12px;color:var(--dim);line-height:1.5;padding:0 16px 8px}
+#bm-busy[hidden]{display:none}
 /* Models: the roster */
 #roster{font-family:var(--mono);font-size:10.8px;line-height:1.9;
   font-variant-numeric:tabular-nums;margin-bottom:4px}
@@ -27915,6 +28095,8 @@ __CODE_ROWS__
          composer's width without having to restate it -->
     <div id="suggest" hidden></div>
     <div id="imgchips" hidden></div>
+    <!-- a benchmark is running: said here, the composer kept (6b331) -->
+    <div id="bm-busy" hidden></div>
     <div id="composer">
 
       <input type="file" id="fpick" multiple hidden
@@ -30250,8 +30432,10 @@ function msgActions(div,role,text){
 // answered or its answer failed (the server keeps a question whose
 // answer errored, 0b Q12). The saved chat is cut back to before it with
 // a truncate, which the new question waits for.
-function regenerate(){
+async function regenerate(){
   if(generating)return;
+  // nothing is taken off the page while a benchmark runs (6b331)
+  if(await benchBusyNow())return;
   let u=messages.length-1;
   while(u>=0&&messages[u].role!=="user")u--;
   if(u<0)return;
@@ -30427,7 +30611,9 @@ function autoScroll(){
 }
 
 
+let sendAsking=false;     // the benchmark check in flight (6b331)
 async function send(){
+  if(sendAsking)return;
   const text=input.value.trim();
   if((!text&&!pendingImages.length&&!pendingDocs.length)||generating)return;
 
@@ -30480,6 +30666,12 @@ async function send(){
     return;
   }
 
+  // A BENCHMARK OWNS THE ENGINES (6b331): asked before anything is
+  // cleared, so the text, pictures and files stay in the composer
+  sendAsking=true;
+  let benchOn=false;
+  try{benchOn=await benchBusyNow();}finally{sendAsking=false;}
+  if(benchOn)return;
   api("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({stop:true})});
   input.value="";input.style.height="auto";
@@ -30506,7 +30698,8 @@ async function send(){
   const myMessages=messages;
   // the chat shows in the list at once; the server makes it with the
   // question (0b 5.4) and the page adopts the saved copy at the end
-  if(!chats.some(x=>x.id===myChat)){
+  const madeChat=!chats.some(x=>x.id===myChat);
+  if(madeChat){
     chats.unshift({id:myChat,lane:uiMode,title:shown.slice(0,48),
       ts:Date.now(),messages:[]});
     renderChats();
@@ -30528,10 +30721,11 @@ async function send(){
   lastModels="";
 
   try{
-    // a Try again or Edit & resend rewinds the saved chat first
+    // a Try again or Edit & resend rewinds the saved chat: the server
+    // does it with the question, once no benchmark can refuse it (6b331)
     const tr=chatTrunc;chatTrunc=null;
-    if(tr&&tr.id===myChat)await chatOps([{op:"truncate",id:tr.id,
-      to_len:tr.to,prefix_hash:tr.hash}]).catch(()=>{});
+    if(tr&&tr.id===myChat)turn.rewind={op:"truncate",id:tr.id,
+      to_len:tr.to,prefix_hash:tr.hash};
     const resp=await api("/api/chat",{
       method:"POST",headers:{"Content-Type":"application/json"},
       signal:abortCtl.signal,
@@ -30552,6 +30746,15 @@ async function send(){
       const e=await resp.json().catch(()=>({}));
       if(myMessages[myMessages.length-1]&&myMessages[myMessages.length-1].role==="user")
         myMessages.pop();
+      // a benchmark started meanwhile (6b331): what was typed and
+      // attached goes back, and a chat this send made leaves the list
+      if(e.bench){
+        chatTrunc=tr;            // nothing was rewound: the next send does it
+        if(!input.value)input.value=text;
+        if(!pendingImages.length&&!pendingDocs.length){
+          pendingImages=sentImages;pendingDocs=sentDocs;paintChips();}
+        if(madeChat){chats=chats.filter(x=>x.id!==myChat);renderChats();}
+      }
       throw new Error(e.err||("the app answered "+resp.status));
     }
     // the server may land the turns in a copy, or a fresh chat for one
@@ -33749,15 +33952,28 @@ function bmFrac(run,max){
       :({checking:.02,loading:.1,reading:.35}[r.status]||0);});
   return Math.min(1,k/n);
 }
+// run-to-run noise measured about 0.5%: a change inside 3% is not news
+const BM_NOISE=3;
+function bmEst(r){return !!(r&&(r.capped||r.est));}
+// the row of an earlier run that measured the same thing: the same
+// model on the same engine, timed the same way
+function bmMatch(old,r){return old&&(old.models||[]).find(o=>o.label===r.label
+  &&o.engine===r.engine&&o.src===r.src&&o.status==="done");}
+// "mlx_lm 0.31.3 · Ollama 0.12.1"
+function bmVer(v){v=v||{};return [v.mlx_lm?"mlx_lm "+v.mlx_lm:"",v.ollama?"Ollama "+v.ollama:""]
+  .filter(Boolean).join(" · ");}
 function bmRow(r,cur,old,max){
   const done=r.status==="done";
   let top='<span class="bm-n">'+esc(r.label)+'</span>'
     +(r.engine?'<span class="bm-e">'+esc(r.engine)+'</span>':"");
   if(done){
     top+='<span class="bm-v">'+bmGen(r.gen_tps)+'<small>tok/s</small></span>';
-    if(old&&old.gen_tps>0&&r.gen_tps>0){
+    // a model cut at the time limit is estimated, and never compared
+    // (review of 6b331); a change inside run-to-run noise stays grey
+    if(bmEst(r))top+='<span class="bm-d" title="Cut at the time limit: counted from what arrived">estimated</span>';
+    else if(old&&!bmEst(old)&&old.gen_tps>0&&r.gen_tps>0){
       const p=(r.gen_tps-old.gen_tps)/old.gen_tps*100;
-      top+='<span class="bm-d'+(p>=.05?" up":p<=-.05?" dn":"")+'" title="'
+      top+='<span class="bm-d'+(p>=BM_NOISE?" up":p<=-BM_NOISE?" dn":"")+'" title="'
         +esc("Was "+bmGen(old.gen_tps)+" tok/s")+'">'+(p<0?"−":"+")
         +Math.abs(p).toFixed(1)+"%</span>";}
   }
@@ -33774,7 +33990,7 @@ function bmRow(r,cur,old,max){
   // the share on the graphics card (Ollama), and the two flags
   if(r.mem_rise!=null&&!cur&&r.status!=="skipped"){
     mem="memory +"+bmGB(r.mem_rise)+(r.mem_peak!=null&&r.mem_total
-      ?" · peak "+(r.mem_peak/BM_GIB).toFixed(1)+" of "+Math.round(r.mem_total/BM_GIB)+" GB":"");
+      ?" · in use at peak "+(r.mem_peak/BM_GIB).toFixed(1)+" of "+Math.round(r.mem_total/BM_GIB)+" GB":"");
     if(r.gpu_size)mem+=" · "+Math.round(100*(r.gpu_vram||0)/r.gpu_size)+"% on the GPU";
     mem=esc(mem);
     if(r.pressured)mem+=' · <span class="bm-f">memory pressure</span>';
@@ -33808,7 +34024,10 @@ function paintBench(d){
   const shown=runs.find(x=>x.id===bmShow)||null;
   const same=runs.filter(x=>shown&&x.id!==shown.id&&x.test===shown.test&&x.t<shown.t);
   if(!same.some(x=>x.id===bmCmp))bmCmp="";
-  const lbl=x=>(going&&x.id===d.run.id?"Now":uWhen(x.t))+(x.state==="stopped"?" (stopped)":"");
+  // two runs in one minute get their seconds (review of 6b331)
+  const when=x=>{const w=uWhen(x.t);
+    return runs.some(y=>y.id!==x.id&&uWhen(y.t)===w)?w+":"+u2(new Date(x.t*1000).getSeconds()):w;};
+  const lbl=x=>(going&&x.id===d.run.id?"Now":when(x))+(x.state==="stopped"?" (stopped)":"");
   show.textContent="";cmp.textContent="";
   runs.forEach(x=>{const o=document.createElement("option");o.value=x.id;o.textContent=lbl(x);show.appendChild(o);});
   [{id:"",t:0}].concat(same).forEach(x=>{const o=document.createElement("option");o.value=x.id;
@@ -33819,7 +34038,7 @@ function paintBench(d){
   const list=$("#bm-list");
   if(shown&&(shown.models||[]).length){
     list.innerHTML=shown.models.map((r,i)=>bmRow(r,going&&shown===d.run&&i===shown.cur,
-      old&&(old.models||[]).find(o=>o.label===r.label&&o.status==="done"),max)).join("");
+      bmMatch(old,r),max)).join("");
     list.hidden=false;
   }else{list.innerHTML="";list.hidden=true;}
   const bits=[];
@@ -33827,10 +34046,14 @@ function paintBench(d){
   if(shown&&!going){
     if(shown.note)bits.push(shown.note);
     if(shown.restore)bits.push(shown.restore);
-    if(shown.hw&&shown.hw.line&&d&&shown.hw.line!==d.hw)bits.push("Measured on "+shown.hw.line+".");
+    // what each run was measured on and with, when they differ
+    const on=x=>[(x.hw&&x.hw.line)||"",bmVer(x.versions)].filter(Boolean).join(" · ");
+    if(old&&on(old)!==on(shown))bits.push("This run: measured on "+on(shown)
+      +". The run compared: measured on "+on(old)+".");
+    else if(shown.hw&&shown.hw.line&&d&&shown.hw.line!==d.hw)bits.push("Measured on "+on(shown)+".");
     if((shown.models||[]).some(r=>r.status==="done"))bits.push(
-      "Speeds are tokens a second: MLX’s measured here, Ollama’s its own. "
-      +"Memory is how far memory in use rose while the model loaded and wrote.");
+      "Speeds are tokens a second. MLX is timed by the app; Ollama reports its own. "
+      +"Memory is the rise in memory in use while the model loaded and wrote.");
   }
   if(!shown&&d&&!going){
     const n=(d.installed||[]).length;
@@ -33839,12 +34062,26 @@ function paintBench(d){
   }
   const note=$("#bm-note");note.textContent=bits.join(" ");note.hidden=!bits.length;
 }
+// the composer's check before a send: true (and said above the composer)
+// while a benchmark runs; a failed check lets the send go, and the
+// server's 409 still refuses it
+let bmBusyT=0;
+async function benchBusyNow(){
+  let j=null;
+  try{const r=await api("/api/bench/running");if(r.ok)j=await r.json();}catch(e){}
+  const n=$("#bm-busy");
+  if(!j||!j.running){if(n)n.hidden=true;return false;}
+  if(n){n.textContent=j.err;n.hidden=false;clearTimeout(bmBusyT);
+    bmBusyT=setTimeout(()=>{n.hidden=true;},8000);}
+  return true;
+}
 async function loadBench(){
   if(!$("#bm"))return;
   const seq=++bmSeq;let d=null;
   try{const r=await api("/api/bench");if(r.ok)d=await r.json();}catch(e){}
   if(seq!==bmSeq)return;
   paintBench(d);
+  bmErr="";                     // said once; the next paint drops it
   clearTimeout(bmT);
   if(d&&d.running&&!aboutVeil.hidden&&$("#p-usage").classList.contains("on"))
     bmT=setTimeout(loadBench,1000);

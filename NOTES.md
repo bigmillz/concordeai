@@ -5863,9 +5863,10 @@ be compared with an earlier one on the same machine.
   downloaded. Smallest first; the MLX model this copy had loaded goes
   last. Before each model the other MLX engines of this copy are
   stopped, then the app's own admission rule decides:
-  `model_fits_memory` false is a skip with the reason ("it needs about
-  26 GB free; 18 GB is free now", "it needs about 64 GB of memory; this
-  computer has 48 GB", "the largest models are off"). Also skipped: a
+  `model_fits_memory` false is a skip with the reason, in GB as sold
+  (2^30): "it needs about 24 GB free; 17 GB is free now", "it needs
+  about 60 GB, more than a model may use on this computer (80% of 48
+  GB)", "the largest models are off". Also skipped: a
   giant on Ollama (it loads for many minutes), and an MLX model whose
   port another copy of ConcordeAI is serving (the desktop app and a dev
   copy share the engine ports; one never stops the other's engine).
@@ -5900,8 +5901,9 @@ be compared with an earlier one on the same machine.
     (`kern.memorystatus_vm_pressure_level`) reached warning, or the
     compressor grew by 512 MB; mem_pressure() (the sidebar's figure) is
     kept with each model. Elsewhere, memory in use reached 90%.
-    *Swapped*: pages swapped out (vm_stat's Swapouts) on a Mac, the swap
-    in use grown by 256 MB elsewhere.
+    *Swapped*: 64 MB or more swapped out (vm_stat's Swapouts) on a Mac,
+    the swap in use grown by 256 MB elsewhere; less shows nothing (one
+    16 KB page out used to raise the flag).
   - A model still writing at 2 minutes is cut there; its figures come
     from what arrived (tokens counted as chunks, marked estimated) and
     its row says so. A load over 5 minutes fails the model.
@@ -5912,7 +5914,10 @@ be compared with an earlier one on the same machine.
   gpu_inventory when the build has it (it is on the gpu-fit branch, not
   main yet; `_bench_gpus` looks it up by name and falls back to
   nvidia-smi), else "no graphics card in use". Each run keeps its line;
-  the pane says "Measured on …" when an old run's differs.
+  the pane says "Measured on …" when an old run's differs. Each run also
+  keeps the engines' versions (mlx-lm's package version, Ollama's
+  `/api/version`): when the run shown and the run compared differ in
+  hardware or versions, the foot line names both.
 - **One thing at a time.** A run never starts while an answer is being
   written: each `/api/chat` request (held in `_run` until the request
   ends) and each `run_model` call (the `_bench_guarded` decorator:
@@ -5921,21 +5926,54 @@ be compared with an earlier one on the same machine.
   Run the benchmark when it has finished."). While a run goes, chats are
   **refused, not queued**: `/api/chat` answers 409 "A hardware benchmark
   is running. Ask again when it finishes, or stop it in Settings ›
-  Usage." before the question is saved (the page shows the line and
-  drops the question, as for any refused send), and `run_model` raises
-  the same line for background calls. A run takes minutes; a question
+  Usage." before the question is saved, and `run_model` raises the
+  same line for background calls. The page asks `GET
+  /api/bench/running` before it clears the composer, so the text,
+  pictures and files stay where they were and the line shows above the
+  composer; if a run starts between that look and the send, the 409
+  puts them back and takes a chat this send made out of the list. A Try
+  again or Edit & resend no longer rewinds the saved chat before
+  asking: the rewind rides in the /api/chat body and the server applies
+  it after the hold, so a refused question loses nothing (and the page
+  keeps the rewind for the next send). `/api/funnel` is held and
+  refused the same way. A run takes minutes; a question
   that waited that long without a word would look like a hang. The MLX
   janitor leaves the engines alone during a run.
 - **Stop** cuts the engine call in flight (its socket is shut from the
   route's thread, so a blocked read returns at once), stops the model
   being tested, and marks the rest "not run". Measured: under a second.
+  The socket is the one kept when the request went out: mlx_lm answers
+  in HTTP/1.0 with no length, and http.client then hands the socket to
+  the response and sets `conn.sock` to None (the first cut shut
+  nothing, and the model wrote to the end). The clean-up calls (an
+  unload, a look at `/api/ps`) go out after a Stop too.
 - **Afterwards**: the model that was loaded before was tested last and
   is left loaded ("Llama 3.2 3B is loaded again, as it was before the
   benchmark."). If it was skipped or failed, it is started again; after
   a Stop, or if that fails, the line says it "will load again on your
   next question". With nothing loaded before, the last engine is
-  stopped. Ollama models are unloaded after their test and load again
-  on the next question, as they do after 45 s anyway.
+  stopped. "Loaded again" means a one-token answer came back (mlx_lm
+  loads after its port opens), and a Stop during it says "will load
+  again". Every model Ollama holds is unloaded once, before the first
+  test, and the line names them ("Ollama loads qwen3.5:9b again on the
+  next question that uses it"); each Ollama model under test is
+  unloaded after it (`keep_alive` 0, then `/api/ps` watched until the
+  runner has gone) and held with the app's own 45 s keep-alive while
+  it runs. MLX engines of this copy are stopped before an Ollama row
+  too.
+- **Memory comes back before the next model.** After each engine goes,
+  the next model's fit check and memory base wait until available
+  memory stops climbing (`_bench_settle`, _stop_other_mlx's rule, 8 s
+  at most): Metal hands wired memory back after the process exits
+  (6b239), and `_retire_engine` pops the handle, so `_stop_other_mlx`
+  had nothing left to wait for.
+- **No run during a download**: a model, engine or studio download
+  going or queued refuses the start ("A download is running. …"), and
+  an MLX download that finishes during a run doesn't start its engine
+  beside the model under test.
+- **No home folder in the file**: a failure's note is one line with the
+  home folder written as `~`, and every text `_bench_record` saves is
+  scrubbed the same way.
 - **Nothing leaves the computer.** Every engine call goes through
   `_bench_http`, which refuses any address but 127.0.0.1 before
   connecting. An MLX engine the benchmark starts has `HF_HUB_OFFLINE=1`
@@ -5968,12 +6006,22 @@ be compared with an earlier one on the same machine.
   a card with one row a model: name, engine, writes in tok/s (white,
   the headline) and its change against the run picked in "Compare
   with…" (green up, red down), a line with reads, first token and load,
-  a line with memory (+rise, the peak of total, Ollama's GPU share) and
-  the flags (amber "memory pressure", red "swapped 120 MB"). The model
+  a line with memory ("memory +2.0 GB · in use at peak 21.3 of 48 GB",
+  Ollama's GPU share) and the flags (amber "memory pressure", red
+  "swapped 120 MB"). A change inside 3% stays grey (two runs of the
+  same model a minute apart differed by 0.5%); a model cut at the time
+  limit says "estimated" and is never compared; rows are compared only
+  with the same model on the same engine timed the same way. Two runs
+  in one minute get their seconds in the picker. The model
   under test shows its step ("writing, 143 of 256 tokens") and a 2px
   breathing bar. A skip or failure shows its note. Two small selects
   pick the run and the one to compare with (same test only). The foot
-  line says what the figures are and what was reloaded. No dead space:
+  line: "Speeds are tokens a second. MLX is timed by the app; Ollama
+  reports its own. Memory is the rise in memory in use while the model
+  loaded and wrote.", then what was reloaded. A refused start's line
+  shows once. `/api/stats` gives memory in GB as sold (2^30), so the
+  Settings rail says 48 GB like the benchmark, not 52 (its only reader
+  is the rail's spec list). No dead space:
   the section ends at its last line, and the Usage pane scrolls in the
   card's body as before.
 - Dev-only hooks: `bench-fake` (a stand-in engine with known timings:
@@ -6020,6 +6068,11 @@ be compared with an earlier one on the same machine.
   WKWebView, WebView2 and Qt (checked in Blink), a whole run over every
   installed model (one model was run for real, to leave the other
   engines alone).
+- **Two reviews** (numbers and privacy; regressions), fixed in two
+  follow-up commits: every item above marked with a review, each with a
+  check and a mutation. Ollama's `think: false` (optional in the
+  review) is not sent: the app found Ollama rejects "think" for models
+  that don't think (OLLAMA_THINK_OFF).
 - **Patrick:** nothing to do. Worth a look: whether chats should wait
   for the run instead of being refused.
 
