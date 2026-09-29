@@ -232,9 +232,9 @@ before) or a folder under `accounts/` (only local test profiles until accounts e
 Every personal read and write goes through the active profile's `ProfileCtx`:
 
 - A request takes `current_ctx()` once, in `StudioHandler._run`, as `self.ctx`, and
-  binds it to its thread. Threads start only through `ctx_thread`/`ctx_timer`, which
-  carry the starter's ctx; deep code reads it with `bound_ctx()`. Nothing else asks
-  which profile is active.
+  binds it to its thread. Threads start only through `ctx_thread`/`ctx_timer` (pools:
+  `ctx_executor`), which carry the starter's ctx; deep code reads it with
+  `bound_ctx()`. Nothing else asks which profile is active.
 - A write under a ctx that is no longer active raises `StaleProfile` (an `OSError`)
   and creates nothing. Personal files are written only by the profile section
   (`# ==== profile: begin/end ====`: `ctx.write`, `write_bytes`, `update_json`,
@@ -243,8 +243,11 @@ Every personal read and write goes through the active profile's `ProfileCtx`:
 - Settings: `machine_prefs()`, `user_prefs(ctx)` (synced) and `profile_local(ctx)`,
   with the sets `MACHINE`, `SYNCED_SETTINGS` and `PROFILE_LOCAL`. Reading a key
   through the wrong one raises `PrefScopeError`. `POST /api/prefs` is `split_prefs`.
-- A module-level container that changes is a `profile_cache(...)` (emptied at every
-  switch) or named in `MACHINE_STATE`.
+- A module-level container that changes is a `profile_cache(...)` or named in
+  `MACHINE_STATE`. A profile cache is scoped to the active profile's epoch: a thread
+  of a profile that is no longer active reads and writes a scratch copy.
+- A broad `except` around a profile write lets `StaleProfile` through first, or the
+  write is dropped on purpose (never a fallback to a cloud key or an error message).
 - The page sends `X-Profile`; a stale page gets 409 and reloads once.
 
 The gauntlet lints all of this (container, write/makedirs, ctx argument, callers);

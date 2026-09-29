@@ -5673,7 +5673,10 @@ changes. Accounts, the switch protocol and the account window are M9.
     and the janitor's export sweep (each removal epoch-checked).
     Everything else uses the ctx it was given, or `bound_ctx()`: the ctx
     of the request, or of whoever started the thread. `ctx_thread` and
-    `ctx_timer` are the only way the file starts a thread (31 sites); a
+    `ctx_timer` are the only way the file starts a thread (31 sites), and
+    `ctx_executor` the only thread pool (the closure check's, whose
+    workers now carry the request's ctx; the first cut had a bare
+    ThreadPoolExecutor there, which this entry wrongly left out); a
     thread with no ctx has none, and reads no keys and no settings.
 - **profile.json** gains 1a's fields beside M5's (`legacy_base`,
   `written`, `migrated_61`, `webstore` are left exactly as they are):
@@ -5826,7 +5829,8 @@ changes. Accounts, the switch protocol and the account window are M9.
   settle 1a 5.1's. `lend`/`lend_pick` are named in `PROFILE_LOCAL` for
   1g; nothing sets them yet. ISO-7b's windowed and Windows parts wait for
   real account folders; its no-server half is below.
-- Gauntlet: 415 checks become 434 (19 new). Older checks were adapted
+- Gauntlet: 415 checks become 437 (22 new, three of them from the
+  reviews below). Older checks were adapted
   in 43 places: their exec namespaces (a bound ctx, the accessors, the
   profile sections) and source pins that named the old code; no
   assertion was loosened. New, in `== accounts step 8 ==`:
@@ -5882,6 +5886,111 @@ changes. Accounts, the switch protocol and the account window are M9.
   holds a file); a real window's reload on 409 (node only); real mflux,
   video and Veo renders landing through `adopt` (stand-ins); an account
   folder with the M9 layout (none exists yet).
+- **Three reviews** of the first cut (leaks, locks and races,
+  regressions for "This computer"; the third found no change for "This
+  computer"), fixed in the same build:
+  - **Caches are scoped to the epoch.** A switch emptied every profile
+    cache, but nothing stopped a thread of the old profile refilling one
+    after it: a delete that took the chat lock after the switch left the
+    chat in the undo stubs, and B's own undelete of that id wrote A's
+    chat into B's chats.v2.json; the retirements latch, model rests, the
+    repair latch, the host ssh named, the search, results and geocode
+    caches and the home area's time zone could all be refilled the same
+    way. `profile_cache` now returns an `_EpochCache`: it looks like the
+    dict, list or set it was declared as, but every access goes to the
+    copy of the profile active now, started from the declared value the
+    first time after each switch. A thread working for a profile that
+    is no longer active (it outlived the switch) gets a scratch copy
+    nobody keeps; a thread with no profile (machine work, the usage
+    writer) uses the active one. A thread-local stays one (each request
+    has a thread of its own and `_run` clears it; documented at
+    `profile_cache`). On top: the chat store checks its profile under
+    `_chats_lock` before it reads or holds anything (`_chat_live`), an
+    undo stub is undeleted or appended to only by its own folder, and
+    the retirements and repair latches are never set by a thread with
+    no profile (it would read no cloud.json and latch having read
+    nothing). The `reset` argument is gone.
+  - **The switch** takes a switch lock for its whole length and reads
+    the old profile under it: two switches at once each cancelled the
+    same profile, so one profile was never cancelled and `erase_old`
+    could erase the wrong folder. It writes the old profile's queued
+    usage records to its ledger first (a record made after that, for the
+    old profile, is dropped), then holds read-aloud's lock and the chat
+    store's across the epoch move, so no speech or chat write of the old
+    profile straddles it. `_speak` checks, under its lock, that the
+    thread's profile is still active, so a late /api/speak doesn't read
+    A's answer aloud in B's session.
+  - **Nothing stale falls back or retries.** A local picture finished
+    after a switch raised StaleProfile, which `generate_image`'s generic
+    handler took for a local failure: the old profile's saved Gemini key
+    was then used for two paid calls. `generate_image`,
+    `generate_video`, the Veo download, `_ssh_once`, `_cloud_save_state`,
+    `_cloud_save_failed`, `_remote_save` and the routes that save a key,
+    clear a key or a Remote server, forget a host or make an export now
+    let StaleProfile through (a 409, or the end of a stream) instead of
+    "the folder is read-only" or a fallback. The Veo poll stops once its
+    profile is cancelled. A cancelled stream's `finally` sends no "Answer
+    written", no badge and no place pins (which could call the old
+    profile's key), and makes no export, log line or memory pass. A
+    lint holds it: a `try` around a profile write whose broad handler
+    comes before any `except StaleProfile` fails, unless its function
+    only drops the write (a named list: the cloud rest and failure
+    writers, the store's catch-ups, the memory pass, and the like).
+  - **`ctx.adopt` never deletes a finished file it couldn't move.** On
+    Windows a reader (an antivirus) can hold a finished clip past
+    `_replace_into`'s retries; it used to be deleted. Now a copy is
+    tried, then the original goes; if that fails too, the file stays in
+    run/ and the error names where. Only StaleProfile deletes it. (The
+    next start's sweep of `stage-*` would still clear it.)
+  - `split_prefs` writes the profile's keys first and the machine's last,
+    after one more epoch check, so a 409 means nothing changed.
+  - `current_ctx()` reads `_PROFILE["ctx"]` without the lock (one atomic
+    read): a request's start waited behind any personal write, 1.96 s
+    measured behind a slow Windows replace.
+  - One failed flock no longer turns `run/profile.lock` off for the
+    whole run; only a `run/` that can't be made does. The next write
+    tries the flock again.
+  - `_pfile` refuses `MACHINE_ROOT` for a profile's own files
+    (`PERSONAL_NAMES`: the chat, memory, settings, cloud, Remote and
+    usage files, the logs and the media folders): the machine's root
+    skips the epoch check, so no personal write may go through it.
+  - **The lints, widened.** Writes: pathlib; a writing function of os,
+    shutil, tempfile, io, codecs, zipfile, tarfile, sqlite3 imported bare
+    or taken as a value; `os.open` with any flags but `O_RDONLY`; zip,
+    tar, gzip and codecs opened to write; `shutil.make_archive`, sqlite3,
+    and a library's `.save()`. Threads: `from threading import`, a Thread
+    subclass, ThreadPoolExecutor and ProcessPoolExecutor outside the
+    profile section. Containers: a class attribute or a mutable default
+    that is mutated, an annotated module-level container, a
+    SimpleNamespace or a queue, and a module container written through a
+    local alias. ctx arguments: `MACHINE_ROOT` as a store's ctx, a
+    ctx-taking function taken as a value (a thread's target and a
+    timer's function may be named; their args must carry the ctx).
+    Callers: `current_ctx` taken as a value, `_PROFILE` read outside the
+    section, a `MACHINE_IO` function handed a profile's path. 25 more
+    planted sites, each caught (43 in all). Not covered, and said so: a
+    file written by a child process (`subprocess.run(["cp", ...])`) and a
+    cache kept in a closure.
+  - New machine writers named: `_run_render` (its log's temporary file),
+    `ex_doc`, `ex_slides` and `ex_archive` (they write through a library
+    into a stage file). `_boot_heal`'s mutable default counter became
+    `_BOOT_HEALS` (machine state).
+  - Gauntlet: two more in-process checks: 17 cases from the reviews (a
+    late delete from A's thread and from a thread with no profile, a
+    foreign undo stub, a cache refilled by A's thread, the latch,
+    read-aloud, two switches at once, current_ctx behind a write, one
+    flock failure, `MACHINE_ROOT` refused, adopt's copy and keep, the
+    settings order, a stale picture with no paid fallback, the Veo poll,
+    stale key and Remote saves, the usage queue at a switch, a pool's
+    workers), and 17 mutations of the fixes, each caught; live, a late
+    writer into every cache after the switch, and no "Answer written"
+    or place pins after it on the stopped stream.
+- **For M9** (from the reviews): a switch should flush the live turns
+  first, as a quit does, so A's partial answer isn't dropped; and
+  `/api/prefs/adopt` could copy A's leftover browser keys into B's
+  local.json when a page drawn for A posts them after a switch (the page
+  reloads on the 409 first today, but the sign-in flow should clear the
+  browser store before B's page boots).
 - **Patrick:** nothing. "This computer" works as before.
 
 ## 6b328 — the ARM64 build opens its window with Qt

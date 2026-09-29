@@ -296,7 +296,9 @@ _bi329.profile_cache = lambda name, obj, reset=None: obj
 # and threads start through ctx_thread/ctx_timer, which carry the
 # starter's ctx; a slice without the profile sections gets plain threads
 import threading as _th329
-_bi329.ctx_thread = lambda target, ctx=None, **kw: _th329.Thread(target=target, **kw)
+_bi329.ctx_thread = (lambda target, ctx=None, bind=True, **kw:
+                     _th329.Thread(target=target, **kw))
+_bi329.ctx_executor = lambda n: __import__("concurrent.futures").futures.ThreadPoolExecutor(n)
 
 
 def _ctx_timer329(interval, fn, args=(), ctx=None):
@@ -327,7 +329,7 @@ def _prof_in(ns):
     # the real modules while the sections run (a check's stand-in
     # threading has no RLock); the check's own come back after
     for _m in ("os", "json", "threading", "contextlib", "secrets", "tempfile",
-               "hashlib", "time", "re", "shutil", "functools"):
+               "hashlib", "time", "re", "shutil", "functools", "copy"):
         ns[_m] = __import__(_m)
     ns.setdefault("IS_WIN", False)
     ns.setdefault("TEST_HOOKS", frozenset())
@@ -3335,7 +3337,7 @@ check("per-task review fixes: titles per request, badge, sweeps",
       and "if images and not cloud_only and not _vis_cloud and not _vis_local:" in _MILLENAI_SRC
       and "if not quiet:        # a title that merely mentions billing" in _MILLENAI_SRC
       and "repos.update(r[0] for r in RETIRED_MODELS.values() if r[0])" in _MILLENAI_SRC
-      and "elif not cloud_only:\n                            run_model(small" in _MILLENAI_SRC
+      and "elif not cloud_only:\n                                run_model(small" in _MILLENAI_SRC
       and "Cloud power is off, so your cloud key can't drive" in _MILLENAI_SRC)
 # 6b308, per Patrick: the MODELS AVAILABLE chip ran 50 px past the
 # sidebar and squeezed the wordmark to nothing (its full-width rule was
@@ -4827,7 +4829,7 @@ _ucheck("usage: a question no model answered is not counted an answer",
       and _ua1.get("answers") == _ua0.get("answers") and _ua0.get("answers", 0) >= 1
       and _ua1.get("requests") == _ua0.get("requests")
       and "def memit(chunk: str):" in _hsrc25
-      and "if _model_said[0]:\n                try:\n                    usage_put(" in _hsrc25
+      and "if _model_said[0] and not _gone:\n                try:\n                    usage_put(" in _hsrc25
       and not re.search(r"(full_messages|parts\.append|_pin_ask)\s*,\s*emit\b", _hsrc25)
       and _hsrc25.count("full_messages, memit") + _hsrc25.count("full_messages,\n") >= 8
       and 'emit("\\n" + offline_hint(kind, exc))' in _hsrc25
@@ -6348,7 +6350,9 @@ _STORE_NAMES = {"StoreReadError", "READ_FAIL", "_read_json", "_write_json",
                 "_memory_lock", "_ent_hash", "_fact_fp", "_msgs_key", "_jcopy",
                 "_legacy_ids_of", "_prefix_related", "_legacy_replace",
                 "_legacy_pending", "_legacy_import_chats", "_profile_legacy_set",
-                "_legacy_sync_chats", "_legacy_sync_memory", "_migrate_61"}
+                "_legacy_sync_chats", "_legacy_sync_memory", "_migrate_61",
+                # (6b329) the chat store checks its profile under the lock
+                "_chat_live", "_chat_finalize_held"}
 _scn = {"os": os, "json": json, "tempfile": tempfile, "time": time, "IS_WIN": False,
         "re": re, "secrets": __import__("secrets"), "hashlib": __import__("hashlib"),
         "threading": __import__("threading"), "shutil": shutil}
@@ -8990,6 +8994,8 @@ check("the council: with cloud power off a bench list and a cloud compositor rea
 # says (Patrick, 2026-09-28): the refresh starts at the first
 # cloud_ok_providers() and the balance asks Moonshot, the switch off
 _dn = dict(_LH, hmac=__import__("hmac"))
+# (6b329) the repair and the refresh run for a profile: one bound here
+_prof_ns(_dn, tempfile.mkdtemp(dir=_SMOKE_TMP))
 # (6b329) the balance is cached per profile, provider and key fingerprint
 _exec_names(_dn, {"_repaired", "_cloud_repair", "cloud_balance", "_bal_cache", "_key_fp",
                   "_KEY_FP_SALT"})
@@ -9637,7 +9643,8 @@ check("the key box stays open with the switch off; the cloud badge doesn't need 
       '$("#cloudkey-box").hidden=false;' in _MILLENAI_SRC
       and "!pr2.turbo&&cs.configured" not in _MILLENAI_SRC
       and '$("#cloudkey-box").hidden=!on' not in _MILLENAI_SRC
-      and "            if _ans_conf:\n                # the badge under the answer" in _MILLENAI_SRC,
+      and "            if _ans_conf and not _gone:\n                # the badge under the answer"
+      in _MILLENAI_SRC,
       "")
 
 # ---- the final verifier's fixes
@@ -10679,11 +10686,13 @@ def _owners8(tree):
 
 
 _CONT8 = {"dict", "list", "set", "defaultdict", "OrderedDict", "deque", "Counter",
-          "local", "WeakValueDictionary", "WeakKeyDictionary", "bytearray"}
+          "local", "WeakValueDictionary", "WeakKeyDictionary", "bytearray",
+          "SimpleNamespace", "Queue", "LifoQueue", "PriorityQueue", "SimpleQueue"}
 _MUTS8 = {"append", "extend", "insert", "pop", "popitem", "remove", "clear", "update",
           "setdefault", "add", "discard", "sort", "reverse", "appendleft", "extendleft",
           "popleft", "rotate", "difference_update", "intersection_update",
-          "symmetric_difference_update", "__setitem__", "__delitem__"}
+          "symmetric_difference_update", "__setitem__", "__delitem__", "put",
+          "put_nowait", "get_nowait"}
 
 
 def _lit8(tree, name):
@@ -10692,95 +10701,183 @@ def _lit8(tree, name):
     return _a8.literal_eval(n.value.args[0])
 
 
+def _is_cont8(v):
+    return isinstance(v, (_a8.Dict, _a8.List, _a8.Set, _a8.DictComp, _a8.ListComp,
+                          _a8.SetComp)) or (
+        isinstance(v, _a8.Call) and (getattr(v.func, "attr", None)
+                                     or getattr(v.func, "id", "")) in _CONT8)
+
+
+def _base8(t):
+    while isinstance(t, (_a8.Subscript, _a8.Attribute)):
+        t = t.value
+    return t
+
+
 def _container_lint8(src):
-    """A module-level container that is mutated anywhere is declared: a
-    profile_cache(...) where it is made, or named in MACHINE_STATE (which
-    names only containers that exist, and no profile cache)."""
+    """A container that outlives a call and is mutated anywhere is
+    declared: a module-level one is a profile_cache(...) where it is made
+    or named in MACHINE_STATE (which names only containers that exist,
+    none of them a profile cache). A class attribute or a mutable default
+    argument that is mutated is refused outright: it can't be declared,
+    and nothing here needs one. A local alias of a module container
+    (`c = _cache; c[k] = v`) counts as the container."""
     tree = _a8.parse(src)
-    conts, prof = {}, set()
+    conts, prof, bad = {}, set(), []
     for n in tree.body:
+        tg, v = [], None
         if isinstance(n, _a8.Assign):
-            for t in n.targets:
-                if not isinstance(t, _a8.Name):
-                    continue
-                v = n.value
-                if isinstance(v, _a8.Call) and getattr(v.func, "id", "") == "profile_cache":
-                    prof.add(t.id)
-                    conts[t.id] = n.lineno
-                elif isinstance(v, (_a8.Dict, _a8.List, _a8.Set, _a8.DictComp, _a8.ListComp,
-                                    _a8.SetComp)) or (
-                        isinstance(v, _a8.Call) and (getattr(v.func, "attr", None)
-                                                     or getattr(v.func, "id", "")) in _CONT8):
-                    conts[t.id] = n.lineno
-    mut = set()
-    for node in _a8.walk(tree):
-        tg = []
-        if isinstance(node, (_a8.Assign, _a8.AugAssign, _a8.AnnAssign)):
-            tg = node.targets if isinstance(node, _a8.Assign) else [node.target]
-        elif isinstance(node, _a8.Delete):
-            tg = node.targets
+            tg, v = n.targets, n.value
+        elif isinstance(n, _a8.AnnAssign) and n.value is not None:
+            tg, v = [n.target], n.value
         for t in tg:
-            b = t
-            while isinstance(b, (_a8.Subscript, _a8.Attribute)):
-                b = b.value
-            if isinstance(b, _a8.Name) and b is not t:
-                mut.add(b.id)
-            if isinstance(node, _a8.AugAssign) and isinstance(t, _a8.Name):
-                mut.add(t.id)
-        if isinstance(node, _a8.Call) and isinstance(node.func, _a8.Attribute) \
-                and node.func.attr in _MUTS8:
-            b = node.func.value
-            while isinstance(b, (_a8.Subscript, _a8.Attribute)):
-                b = b.value
-            if isinstance(b, _a8.Name):
-                mut.add(b.id)
-        if isinstance(node, _a8.Global):
-            mut.update(node.names)
+            if not isinstance(t, _a8.Name):
+                continue
+            if isinstance(v, _a8.Call) and getattr(v.func, "id", "") == "profile_cache":
+                prof.add(t.id)
+                conts[t.id] = n.lineno
+            elif _is_cont8(v):
+                conts[t.id] = n.lineno
+    mut = set()
+    alias = {}                         # (function node id, local) -> module name
+
+    def _mutated(name_node, fn):
+        if isinstance(name_node, _a8.Name):
+            mut.add(alias.get((fn, name_node.id), name_node.id))
+    for fn in [n for n in _a8.walk(tree) if isinstance(n, (_a8.FunctionDef,
+                                                           _a8.AsyncFunctionDef))] + [tree]:
+        for node in _a8.walk(fn):
+            if isinstance(node, _a8.Assign) and isinstance(node.value, _a8.Name) \
+                    and node.value.id in conts:
+                for t in node.targets:
+                    if isinstance(t, _a8.Name):
+                        alias[(id(fn), t.id)] = node.value.id
+    for fn in [n for n in _a8.walk(tree) if isinstance(n, (_a8.FunctionDef,
+                                                           _a8.AsyncFunctionDef))] + [tree]:
+        f = id(fn)
+        for node in _a8.walk(fn):
+            tg = []
+            if isinstance(node, (_a8.Assign, _a8.AugAssign, _a8.AnnAssign)):
+                tg = node.targets if isinstance(node, _a8.Assign) else [node.target]
+            elif isinstance(node, _a8.Delete):
+                tg = node.targets
+            for t in tg:
+                b = _base8(t)
+                if b is not t:
+                    _mutated(b, f)
+                if isinstance(node, _a8.AugAssign) and isinstance(t, _a8.Name):
+                    _mutated(t, f)
+            if isinstance(node, _a8.Call) and isinstance(node.func, _a8.Attribute) \
+                    and node.func.attr in _MUTS8:
+                _mutated(_base8(node.func.value), f)
+            if isinstance(node, _a8.Global):
+                mut.update(node.names)
     ms = set(_lit8(tree, "MACHINE_STATE"))
-    bad = ["undeclared " + nm for nm in sorted(conts) if nm in mut and nm not in prof
-           and nm not in ms]
+    bad += ["undeclared " + nm for nm in sorted(conts) if nm in mut and nm not in prof
+            and nm not in ms]
     bad += ["MACHINE_STATE names a missing " + nm for nm in sorted(ms - set(conts))]
     bad += ["both " + nm for nm in sorted(ms & prof)]
-    return bad, len(prof), len(ms)
+    # class attributes that are containers and get mutated
+    for c in [n for n in _a8.walk(tree) if isinstance(n, _a8.ClassDef)]:
+        for st in c.body:
+            if isinstance(st, (_a8.Assign, _a8.AnnAssign)) and _is_cont8(st.value):
+                for t in (st.targets if isinstance(st, _a8.Assign) else [st.target]):
+                    nm = getattr(t, "id", None)
+                    for node in _a8.walk(tree):
+                        tgt = None
+                        if isinstance(node, (_a8.Assign, _a8.AugAssign, _a8.Delete)):
+                            for t2 in (node.targets if hasattr(node, "targets")
+                                       else [node.target]):
+                                b = t2
+                                while isinstance(b, _a8.Subscript):
+                                    b = b.value
+                                if b is not t2:
+                                    tgt = b
+                        if isinstance(node, _a8.Call) and isinstance(node.func, _a8.Attribute) \
+                                and node.func.attr in _MUTS8:
+                            tgt = node.func.value
+                        if isinstance(tgt, _a8.Attribute) and tgt.attr == nm:
+                            bad.append("class attribute %s.%s is mutated" % (c.name, nm))
+                            break
+    # mutable default arguments that are mutated in their function
+    for fn in [n for n in _a8.walk(tree) if isinstance(n, (_a8.FunctionDef,
+                                                           _a8.AsyncFunctionDef))]:
+        args = fn.args.args[len(fn.args.args) - len(fn.args.defaults):]
+        for a, dv in list(zip(args, fn.args.defaults)) + [
+                (a, dv) for a, dv in zip(fn.args.kwonlyargs, fn.args.kw_defaults) if dv]:
+            if not _is_cont8(dv):
+                continue
+            for node in _a8.walk(fn):
+                b = None
+                if isinstance(node, (_a8.Assign, _a8.AugAssign, _a8.Delete)):
+                    for t2 in (node.targets if hasattr(node, "targets") else [node.target]):
+                        if _base8(t2) is not t2:
+                            b = _base8(t2)
+                if isinstance(node, _a8.Call) and isinstance(node.func, _a8.Attribute) \
+                        and node.func.attr in _MUTS8:
+                    b = _base8(node.func.value)
+                if isinstance(b, _a8.Name) and b.id == a.arg:
+                    bad.append("mutable default %s of %s is mutated" % (a.arg, fn.name))
+                    break
+    return sorted(set(bad)), len(prof), len(ms)
 
 
-_WCALLS8 = {"os.makedirs", "os.mkdir", "os.replace", "os.rename", "os.remove", "os.unlink",
-            "os.rmdir", "os.removedirs", "os.link", "os.symlink", "os.truncate", "os.chmod",
-            "os.fchmod", "tempfile.mkstemp", "tempfile.mkdtemp",
-            "tempfile.NamedTemporaryFile", "shutil.rmtree", "shutil.move", "shutil.copy",
-            "shutil.copy2", "shutil.copyfile", "shutil.copytree", "shutil.copyfileobj"}
+_WCALLS8 = {"os.makedirs", "os.mkdir", "os.replace", "os.rename", "os.renames", "os.remove",
+            "os.unlink", "os.rmdir", "os.removedirs", "os.link", "os.symlink", "os.truncate",
+            "os.chmod", "os.fchmod", "os.mkfifo", "os.mknod", "tempfile.mkstemp",
+            "tempfile.mkdtemp", "tempfile.NamedTemporaryFile", "tempfile.TemporaryFile",
+            "tempfile.SpooledTemporaryFile", "tempfile.TemporaryDirectory",
+            "sqlite3.connect", "shutil.make_archive", "shutil.unpack_archive"}
+# the shutil calls that write nothing
+_SHUTIL_RO8 = {"shutil.which", "shutil.disk_usage", "shutil.get_terminal_size"}
 _CTXN8 = {"bound_ctx", "current_ctx", "bind_ctx", "ProfileCtx", "user_prefs", "profile_local",
           "user_prefs_update", "profile_local_update", "_cloud_file", "_known_hosts_path",
           "image_dir", "video_dir", "export_dir", "ctx"}
+# modules whose writing names may not be imported bare, and pathlib at all
+_NOFROM8 = {"os", "shutil", "tempfile", "io", "codecs", "zipfile", "tarfile", "sqlite3",
+            "threading", "_thread", "concurrent.futures", "concurrent", "pathlib",
+            "multiprocessing"}
+
+
+def _mode8(call, pos):
+    m = call.args[pos] if len(call.args) > pos else None
+    for k in call.keywords:
+        if k.arg == "mode":
+            m = k.value
+    return m
 
 
 def _wkind8(call):
-    nm = _a8.unparse(call.func)
+    f = call.func
+    nm = _a8.unparse(f)
     if nm in _WCALLS8:
+        return nm
+    if nm.startswith("shutil.") and nm not in _SHUTIL_RO8:
         return nm
     if nm == "os.open":
         fl = _a8.unparse(call.args[1]) if len(call.args) > 1 else ""
-        return nm if any(w in fl for w in ("O_WRONLY", "O_RDWR", "O_CREAT", "O_APPEND",
-                                           "O_TRUNC")) else None
-    if nm in ("open", "io.open", "builtins.open", "os.fdopen"):
-        mode = call.args[1] if len(call.args) > 1 else None
-        for k in call.keywords:
-            if k.arg == "mode":
-                mode = k.value
-        if nm == "os.fdopen":
-            return None       # the fd came from a call the lint already saw
+        return None if fl in ("os.O_RDONLY", "") else "os.open(%s)" % fl
+    if isinstance(f, _a8.Attribute) and f.attr == "save":
+        return "a library's .save()"
+    if nm in ("open", "io.open", "builtins.open", "codecs.open", "zipfile.ZipFile",
+              "tarfile.open", "gzip.open", "bz2.open", "lzma.open"):
+        pos = 1
+        mode = _mode8(call, pos)
         if mode is None:
             return None
         if not isinstance(mode, _a8.Constant):
-            return "open(?)"
-        return "open(%s)" % mode.value if any(c in str(mode.value) for c in "wax+") else None
+            return "%s(?)" % nm
+        return "%s(%s)" % (nm, mode.value) if any(c in str(mode.value) for c in "wax+") \
+            else None
     return None
 
 
 def _write_lint8(src):
     """Every write, replace, delete or folder made outside the profile
     section sits in a function MACHINE_IO names; a MACHINE_IO function
-    never touches a ctx, and every name it lists writes something."""
+    never touches a ctx, and every name it lists writes something. No
+    writing function is imported bare or taken as a value (an alias would
+    hide it), and pathlib isn't used."""
     lo, hi = _sect8(src, "profile")
     tree = _a8.parse(src)
     mio = set(_lit8(tree, "MACHINE_IO"))
@@ -10788,6 +10885,7 @@ def _write_lint8(src):
     for owner, node in _owners8(tree):
         if lo <= node.lineno <= hi:
             continue
+        funcs = {id(c.func) for c in _a8.walk(node) if isinstance(c, _a8.Call)}
         for ch in _a8.walk(node):
             if isinstance(ch, _a8.Call):
                 k = _wkind8(ch)
@@ -10797,6 +10895,16 @@ def _write_lint8(src):
                         used.add(owner)
                     else:
                         bad.append("%s in %s (line %d)" % (k, owner, ch.lineno))
+            if isinstance(ch, _a8.Attribute) and id(ch) not in funcs \
+                    and isinstance(ch.value, _a8.Name) and (
+                    _a8.unparse(ch) in _WCALLS8 or (ch.value.id == "shutil"
+                                                    and _a8.unparse(ch) not in _SHUTIL_RO8)):
+                bad.append("%s taken as a value in %s (line %d)" % (
+                    _a8.unparse(ch), owner, ch.lineno))
+            if isinstance(ch, _a8.ImportFrom) and (ch.module or "") in _NOFROM8:
+                bad.append("from %s import in %s (line %d)" % (ch.module, owner, ch.lineno))
+            if isinstance(ch, _a8.Import) and any(a.name == "pathlib" for a in ch.names):
+                bad.append("pathlib in %s (line %d)" % (owner, ch.lineno))
             if owner in mio and (isinstance(ch, _a8.Name) and ch.id in _CTXN8
                                  or isinstance(ch, _a8.arg) and ch.arg == "ctx"):
                 bad.append("MACHINE_IO %s touches a ctx (line %d)" % (owner, ch.lineno))
@@ -10808,14 +10916,16 @@ _CTXF8 = ("load_chats", "store_chats", "_write_chats", "chat_ops", "chat_append_
           "chat_append_late", "_load_memory", "_save_memory", "memory_text",
           "_extract_memory", "run_export", "_write_image_bytes", "generate_image",
           "generate_video", "_veo_video", "_cloud_save_state", "_chat_finalize",
-          "_migrate_61", "_legacy_sync_chats", "_legacy_sync_memory", "user_prefs",
-          "profile_local", "user_prefs_update", "profile_local_update", "prefs_adopt",
-          "split_prefs", "prefs_view", "_media_land", "_sweep_exports", "_set_turbo")
+          "_chat_finalize_held", "_migrate_61", "_legacy_sync_chats", "_legacy_sync_memory",
+          "user_prefs", "profile_local", "user_prefs_update", "profile_local_update",
+          "prefs_adopt", "split_prefs", "prefs_view", "_media_land", "_sweep_exports",
+          "_set_turbo", "_chat_live")
 
 
 def _ctxarg8(src):
     """1a 5.3's AST check: every call of these passes its ctx argument,
-    and never as a constant; each still takes one."""
+    never a constant or the machine's root; each still takes one, with no
+    default; none is taken as a value (an alias would skip the check)."""
     tree = _a8.parse(src)
     where = {}
     for n in _a8.walk(tree):
@@ -10828,14 +10938,34 @@ def _ctxarg8(src):
     bad = ["%s takes no ctx" % f for f in _CTXF8 if f not in where or where[f][0] is None]
     bad += ["%s's ctx has a default" % f for f, w in where.items() if w[2]]
     n = 0
+    funcs = {id(c.func) for c in _a8.walk(tree) if isinstance(c, _a8.Call)}
+    # a thread's target or a timer's function may be named: its args are
+    # checked as a call's would be (the ctx must be among them)
     for c in _a8.walk(tree):
+        if isinstance(c, _a8.Call) and getattr(c.func, "id", None) in ("ctx_thread",
+                                                                      "ctx_timer"):
+            fn_ = (next((k.value for k in c.keywords if k.arg == "target"), None)
+                   if c.func.id == "ctx_thread" else (c.args[1] if len(c.args) > 1 else None))
+            if isinstance(fn_, _a8.Name) and fn_.id in where:
+                funcs.add(id(fn_))
+                a_ = (next((k.value for k in c.keywords if k.arg == "args"), None)
+                      if c.func.id == "ctx_thread" else (c.args[2] if len(c.args) > 2 else None))
+                pos = where[fn_.id][0]
+                el = a_.elts if isinstance(a_, _a8.Tuple) else []
+                if len(el) <= pos or isinstance(el[pos], _a8.Constant):
+                    bad.append("%s started without its ctx (line %d)" % (fn_.id, c.lineno))
+    for c in _a8.walk(tree):
+        if isinstance(c, _a8.Name) and c.id in where and id(c) not in funcs \
+                and isinstance(c.ctx, _a8.Load):
+            bad.append("%s taken as a value (line %d)" % (c.id, c.lineno))
         if isinstance(c, _a8.Call) and isinstance(c.func, _a8.Name) and c.func.id in where:
             n += 1
             pos, kw, _d = where[c.func.id]
             arg = c.args[pos] if pos is not None and len(c.args) > pos else next(
                 (k.value for k in c.keywords if k.arg == kw), None)
             if arg is None or isinstance(arg, _a8.Constant) or any(
-                    isinstance(a, _a8.Starred) for a in c.args):
+                    isinstance(a, _a8.Starred) for a in c.args) or (
+                    isinstance(arg, _a8.Name) and arg.id == "MACHINE_ROOT"):
                 bad.append("%s without its ctx (line %d)" % (c.func.id, c.lineno))
     return bad, n
 
@@ -10845,26 +10975,76 @@ def _ctxarg8(src):
 # epoch-checked) and the quit's flush
 _CUR_OK8 = {"StudioHandler._run", "profile_resume", "profile_switch", "test_profile_op",
             "sweep_all_exports", "_turns_flush"}
+# a stale write that is simply dropped: these may catch it broadly
+_STALE_DROP8 = {"_cloud_budget_hit", "cloud_cool", "cloud_glitch", "cloud_note_failure",
+                "cloud_text", "_cloud_refresh_picks", "_cloud_repair", "_mark_written",
+                "_chat_finalize_held", "_legacy_sync_memory", "_migrate_61", "_extract_memory",
+                "_app_models_add", "_offers_set", "usage_note", "run_council", "_turn_finish",
+                "maybe_version_splash", "_retire_contribute", "test_profile_op", "_media_land",
+                "_sweep_exports", "_remote_resolved", "_veo_video"}
+_WRITERS8 = {"_media_land", "_write_image_bytes", "run_export", "generate_image",
+             "generate_video", "_veo_video", "_cloud_save_state", "_remote_save", "_cloud_write",
+             "_cloud_write_to", "_write_raw", "_write_json", "store_chats", "_save_memory",
+             "chat_ops", "chat_append_turn", "chat_append_late", "profile_local_update",
+             "user_prefs_update", "machine_prefs_update", "split_prefs", "_set_turbo",
+             "usage_put", "ssh_forget_host", "_cloud_patch", "cloud_cool", "cloud_note_failure",
+             "cloud_glitch", "_cloud_save_failed"}
+_WATTR8 = {"adopt", "write_bytes", "write", "update_json", "append", "remove"}
+_WOBJ8 = {"ctx", "base", "self.ctx", "user_base", "bound_ctx()"}
 
 
 def _callers8(src):
-    """current_ctx only where a profile is taken; load_prefs/store_prefs
-    only in the profile section; no raw thread outside it; every literal
-    key read through an accessor is one of its set's."""
+    """current_ctx only where a profile is taken (never as a value);
+    _PROFILE only in the section; load_prefs/store_prefs only in the
+    section; no thread, pool or Thread subclass outside it; no MACHINE_IO
+    function handed a profile's path; a broad handler around a profile
+    write lets StaleProfile through unless the owner just drops it; every
+    literal key read through an accessor is one of its set's."""
     lo, hi = _sect8(src, "profile")
     tree = _a8.parse(src)
     ns = {"threading": _t8, "os": os, "json": json,
           "contextlib": __import__("contextlib"), "functools": __import__("functools"),
           "re": re, "time": time, "secrets": __import__("secrets"),
-          "tempfile": tempfile, "hashlib": _h8, "shutil": shutil}
+          "tempfile": tempfile, "hashlib": _h8, "shutil": shutil, "copy": __import__("copy")}
     exec(src[src.index("# ==== profile: begin ===="):src.index("# ==== profile: end ====")],
          ns)
     cls = ns["pref_class"]
+    mio = set(_lit8(tree, "MACHINE_IO"))
     acc = {"machine_prefs": "machine", "user_prefs": "synced", "profile_local": "local"}
     bad, keys = [], 0
+    for c in _a8.walk(tree):
+        if isinstance(c, _a8.ClassDef) and not lo <= c.lineno <= hi and any(
+                "Thread" in _a8.unparse(b) for b in c.bases):
+            bad.append("a Thread subclass %s (line %d)" % (c.name, c.lineno))
     for owner, node in _owners8(tree):
         inside = lo <= node.lineno <= hi
+        funcs = {id(c.func) for c in _a8.walk(node) if isinstance(c, _a8.Call)}
         for c in _a8.walk(node):
+            if isinstance(c, (_a8.Name, _a8.Attribute)) and not inside:
+                nm = c.id if isinstance(c, _a8.Name) else c.attr
+                if nm in ("ThreadPoolExecutor", "ProcessPoolExecutor", "start_new_thread"):
+                    bad.append("%s in %s (line %d)" % (nm, owner, c.lineno))
+                if isinstance(c, _a8.Name) and nm == "_PROFILE":
+                    bad.append("_PROFILE read in %s (line %d)" % (owner, c.lineno))
+                if isinstance(c, _a8.Name) and nm == "current_ctx" and id(c) not in funcs:
+                    bad.append("current_ctx taken as a value in %s (line %d)" % (owner, c.lineno))
+            if isinstance(c, _a8.Try) and not inside and owner not in _STALE_DROP8:
+                calls = set()
+                for st in c.body:
+                    for cc in _a8.walk(st):
+                        if isinstance(cc, _a8.Call):
+                            f = cc.func
+                            if isinstance(f, _a8.Name) and f.id in _WRITERS8:
+                                calls.add(f.id)
+                            if isinstance(f, _a8.Attribute) and f.attr in _WATTR8 \
+                                    and _a8.unparse(f.value) in _WOBJ8:
+                                calls.add(_a8.unparse(f))
+                hn = [_a8.unparse(h.type) if h.type else "bare" for h in c.handlers]
+                broad = [i for i, x in enumerate(hn) if x in ("bare", "Exception", "BaseException")
+                         or "Exception" in x or "OSError" in x]
+                if calls and broad and not any("StaleProfile" in x for x in hn[:broad[0]]):
+                    bad.append("a broad handler around %s swallows StaleProfile in %s (line %d)"
+                               % (sorted(calls)[0], owner, c.lineno))
             if not isinstance(c, _a8.Call):
                 continue
             fid = getattr(c.func, "id", None)
@@ -10875,6 +11055,12 @@ def _callers8(src):
             if _a8.unparse(c.func) in ("threading.Thread", "threading.Timer",
                                        "_thread.start_new_thread") and not inside:
                 bad.append("a raw thread in %s (line %d)" % (owner, c.lineno))
+            if fid in mio and any(isinstance(x, _a8.Name) and x.id in _CTXN8 | {"base", "user_base"}
+                                  or isinstance(x, _a8.Attribute) and x.attr in ("path", "dir")
+                                  and _a8.unparse(x.value) != "os"
+                                  for a in c.args for x in _a8.walk(a)):
+                bad.append("MACHINE_IO %s handed a profile's path in %s (line %d)"
+                           % (fid, owner, c.lineno))
             if isinstance(c.func, _a8.Attribute) and c.func.attr in ("get", "pop", "setdefault") \
                     and isinstance(c.func.value, _a8.Call) \
                     and getattr(c.func.value.func, "id", None) in acc \
@@ -10915,8 +11101,7 @@ _LM8 = [
      "\n\ndef memory_text(base) -> str:", "\n\n_leak8 = {}\n\n\ndef _leak8_put(k, v):\n"
      "    _leak8[k] = v\n\n\ndef memory_text(base) -> str:"),
     ("container", "the search cache undeclared",
-     '_search_cache = profile_cache(\n    "_search_cache", {"query": "", "data": "", "timestamp": 0.0},\n'
-     '    reset=lambda d: (d.clear(), d.update(query="", data="", timestamp=0.0)))',
+     '_search_cache = profile_cache(\n    "_search_cache", {"query": "", "data": "", "timestamp": 0.0})',
      '_search_cache = {"query": "", "data": "", "timestamp": 0.0}'),
     ("container", "a stale MACHINE_STATE name", '    "_cloud_depth", ', '    "_cloud_depth", "_gone8", '),
     ("container", "a profile cache also named machine state", '    "_cloud_depth", ',
@@ -10955,6 +11140,46 @@ _LM8 = [
      "        return str(user_prefs(bound_ctx()).get(\"home_area\") or \"\").strip()",
      "        return str(profile_local(bound_ctx()).get(\"home_area\") or \"\").strip()"),
 ]
+# (review of 6b329) the ways a write, a thread or a cache could hide
+_AN8 = "\n\ndef memory_text(base) -> str:"
+for _k8, _d8, _c8 in (
+        ("write", "a pathlib write", "\n\ndef _p8(p):\n    import pathlib\n    pathlib.Path(p).write_text('x')\n"),
+        ("write", "os.replace imported bare", "\n\nfrom os import replace as _rp8\n\ndef _p8(a, b):\n    _rp8(a, b)\n"),
+        ("write", "os.replace taken as a value", "\n\ndef _p8(a, b):\n    f = os.replace\n    f(a, b)\n"),
+        ("write", "os.open with flags in a variable",
+         "\n\ndef _p8(p):\n    fl = os.O_WRONLY | os.O_CREAT\n    os.close(os.open(p, fl))\n"),
+        ("write", "a zip written", "\n\ndef _p8(p):\n    import zipfile\n    zipfile.ZipFile(p, 'w').close()\n"),
+        ("write", "codecs.open to write", "\n\ndef _p8(p):\n    import codecs\n    codecs.open(p, 'w').close()\n"),
+        ("write", "shutil.make_archive", "\n\ndef _p8(p):\n    shutil.make_archive(p, 'zip', '.')\n"),
+        ("write", "sqlite", "\n\ndef _p8(p):\n    import sqlite3\n    sqlite3.connect(p)\n"),
+        ("write", "a library's .save()", "\n\ndef _p8(doc, p):\n    doc.save(p)\n"),
+        ("write", "Thread imported bare", "\n\nfrom threading import Thread as _T8\n"),
+        ("callers", "a thread pool", "\n\ndef _p8(f):\n    import concurrent.futures as cf\n"
+         "    cf.ThreadPoolExecutor(1).submit(f)\n"),
+        ("callers", "a Thread subclass", "\n\nclass _W8(threading.Thread):\n    pass\n"),
+        ("callers", "current_ctx taken as a value", "\n\ndef _p8():\n    f = current_ctx\n    return f()\n"),
+        ("callers", "_PROFILE read outside the section", "\n\ndef _p8():\n    return _PROFILE['ctx']\n"),
+        ("callers", "a MACHINE_IO writer handed a profile's path",
+         "\n\ndef _p8(ctx):\n    _render_note(ctx.path('images', 'x.png'), {})\n"),
+        ("callers", "a broad handler swallowing a stale write",
+         "\n\ndef _p8(ctx, x):\n    try:\n        ctx.write_bytes('images/x', x)\n"
+         "    except Exception:\n        return 'fallback'\n"),
+        ("container", "a class attribute cache", "\n\nclass _C8:\n    cache = {}\n\n\ndef _p8(k, v):\n"
+         "    _C8.cache[k] = v\n"),
+        ("container", "an annotated module cache", "\n\n_c8: dict = {}\n\n\ndef _p8(k, v):\n    _c8[k] = v\n"),
+        ("container", "a mutable default used as a cache", "\n\ndef _p8(k, v, _c={}):\n    _c[k] = v\n"),
+        ("container", "a cache written through an alias", "\n\n_c8 = {}\n\n\ndef _p8(k, v):\n    c = _c8\n"
+         "    c[k] = v\n"),
+        ("container", "a SimpleNamespace cache", "\n\nimport types as _ty8\n_c8 = _ty8.SimpleNamespace()\n\n\n"
+         "def _p8(v):\n    _c8.last = v\n"),
+        ("container", "a queue cache", "\n\nimport queue as _q8\n_c8 = _q8.Queue()\n\n\ndef _p8(v):\n"
+         "    _c8.put(v)\n"),
+        ("ctx-arg", "the machine's root as a chat store's ctx",
+         "\n\ndef _p8():\n    store_chats(load_chats(MACHINE_ROOT), MACHINE_ROOT)\n"),
+        ("ctx-arg", "load_chats taken as a value", "\n\ndef _p8():\n    f = load_chats\n    return f(None)\n"),
+        ("ctx-arg", "a store thread started without its ctx",
+         "\n\ndef _p8():\n    ctx_thread(target=_extract_memory, args=('m', 'q', None)).start()\n")):
+    _LM8.append((_k8, _d8, _AN8, _c8 + _AN8))
 _lm8 = []
 for _k8, _d8, _o8, _n8 in _LM8:
     try:
@@ -11000,9 +11225,11 @@ def _pm8(src_prof=None, hooks=frozenset()):
     d = tempfile.mkdtemp(dir=_SMOKE_TMP)
     ns = {"TEST_HOOKS": hooks, "IS_WIN": False, "app_dir": lambda: d,
           "_hook_arg": lambda n: "", "_stop_speaking": lambda: None,
-          "_chat_finalize": lambda base, now=None: None}
+          "_chat_finalize": lambda base, now=None: None,
+          "_chat_finalize_held": lambda base, now=None: None, "usage_flush": lambda: None,
+          "_say_lock": _t8.RLock(), "_chats_lock": _t8.Lock()}
     for m in ("os", "json", "threading", "contextlib", "secrets", "tempfile", "hashlib",
-              "time", "re", "shutil", "functools"):
+              "time", "re", "shutil", "functools", "copy"):
         ns[m] = __import__(m)
     exec(_prof_sect("profile caches") + "\n" + (src_prof or _prof_sect("profile")), ns)
     ns["_INSTANCE_HELD"][0] = True
@@ -11030,7 +11257,7 @@ def _pm8_run(src_prof=None):
         os.path.isdir(B.dir) and oct(os.stat(os.path.join(B.dir, "account.key")).st_mode)[-3:]
         == "600" and json.load(open(os.path.join(B.dir, "account.key"))).get("test") is True)
     c1 = ns["profile_cache"]("t8", {})
-    c2 = ns["profile_cache"]("t8b", [None], reset=lambda c: c.__setitem__(0, None))
+    c2 = ns["profile_cache"]("t8b", [None])
     c1["k"] = "A-data"
     c2[0] = "A-data"
     stage = ns["stage_path"](".md")
@@ -11166,7 +11393,7 @@ def _pm8_run(src_prof=None):
     open(os.path.join(d3, "chats.v2.json"), "w").write('{"v": 2, "chats": []}')
     ns3["app_dir"] = lambda: d3
     for m in ("os", "json", "threading", "contextlib", "secrets", "tempfile", "hashlib",
-              "time", "re", "shutil", "functools"):
+              "time", "re", "shutil", "functools", "copy"):
         ns3[m] = __import__(m)
     exec(_prof_sect("profile caches") + "\n" + (src_prof or _prof_sect("profile")), ns3)
     ns3["_INSTANCE_HELD"][0] = True
@@ -11194,8 +11421,6 @@ _PM8 = [
     ("the profile's folder made again", "        if not os.path.isdir(base.dir):\n"
      "            raise StaleProfile(\"the profile's folder is gone; not written\")",
      "        os.makedirs(base.dir, exist_ok=True)"),
-    ("caches kept at a switch", "        _profile_caches_clear()\n        _written.clear()",
-     "        _written.clear()"),
     ("the old ctx not cancelled", "        old.cancel.set()\n", ""),
     ("a wrong-set read quiet", "        if pref_class(k) != self.cls:\n            raise PrefScopeError",
      "        if False:\n            raise PrefScopeError"),
@@ -11212,8 +11437,8 @@ _PM8 = [
     ("an unknown key taken", "        if c is None or k == \"studio_opts.*.neg\" or (",
      "        if k == \"studio_opts.*.neg\" or ("),
     ("a thread without its starter's ctx",
-     "    c = ctx if ctx is not None else getattr(_tl_ctx, \"ctx\", None)\n    return threading.Thread(",
-     "    c = ctx\n    return threading.Thread("),
+     "    c = ctx if ctx is not None else (\n        getattr(_tl_ctx, \"ctx\", None) if bind else None)\n",
+     "    c = ctx\n"),
     ("a test key opened without the hook", "    if \"profiles\" not in TEST_HOOKS:\n        return False\n",
      ""),
     ("the test profile made without the hook",
@@ -11280,12 +11505,15 @@ _exec8(_bl8, {"_bal_cache", "cloud_balance", "_key_fp", "_KEY_FP_SALT"})
 _kc8 = {"key": "k", "base": "https://api.moonshot.ai/v1"}
 _bA8, _bB8 = (_bl8["ProfileCtx"]("local", _SMOKE_TMP),
               _bl8["ProfileCtx"]("test", _SMOKE_TMP, "b" * 32))
+_bl8["_PROFILE"]["ctx"] = _bA8
 _bl8["bind_ctx"](_bA8)
 _v1 = (_bl8["cloud_balance"]("kimi", _kc8), _bl8["cloud_balance"]("kimi", _kc8))
+_bl8["_PROFILE"]["ctx"] = _bB8
 _bl8["bind_ctx"](_bB8)
 _v2 = _bl8["cloud_balance"]("kimi", _kc8)
 _v3 = _bl8["cloud_balance"]("kimi", dict(_kc8, key="k2"))
 _bl8["_profile_caches_clear"]()
+_bl8["_PROFILE"]["ctx"] = _bA8
 _bl8["bind_ctx"](_bA8)
 _v4 = _bl8["cloud_balance"]("kimi", _kc8)
 _bl8["bind_ctx"](None)
@@ -11364,6 +11592,413 @@ check("ISO-9: each request starts with the thread's search state cleared, bound 
       and getattr(_r9["_tl_ctx"], "ctx", None) is None
       and 'protocol_version = "HTTP/1.0"' in _S8, "%r" % [_seen9, _after9])
 
+
+# ---- the three reviews of 6b329: late cache writes, races and fallbacks
+# Each rule below is run on a source (the real one, then mutated ones): a
+# namespace gets that source's profile sections and the named functions.
+_RVMODS8 = ("os", "json", "threading", "contextlib", "secrets", "tempfile", "hashlib",
+            "time", "re", "shutil", "functools", "copy")
+
+
+def _rvns8(src, names, **extra):
+    d = tempfile.mkdtemp(dir=_SMOKE_TMP)
+    ns = {"TEST_HOOKS": frozenset({"profiles"}), "IS_WIN": False, "IS_MAC": False,
+          "app_dir": lambda: d, "_hook_arg": lambda n: ""}
+    for m in _RVMODS8:
+        ns[m] = __import__(m)
+    exec(src[src.index("# ==== profile caches: begin ===="):
+             src.index("# ==== profile caches: end ====")], ns)
+    exec(src[src.index("# ==== profile: begin ===="):src.index("# ==== profile: end ====")], ns)
+    for n_ in _a8.parse(src).body:
+        nm_ = getattr(n_, "name", None)
+        if nm_ is None and isinstance(n_, _a8.Assign):
+            nm_ = next((getattr(t, "id", None) for t in n_.targets), None)
+        if nm_ in names:
+            exec(_a8.get_source_segment(src, n_), ns)
+    for k_, v_ in (("usage_flush", lambda: None), ("_stop_speaking", lambda: None),
+                   ("_say_lock", _t8.RLock()), ("_chats_lock", _t8.Lock()),
+                   ("_chat_finalize_held", lambda base, now=None: None)):
+        ns.setdefault(k_, v_)
+    ns.update(extra)
+    ns["_INSTANCE_HELD"][0] = True
+    return ns, d
+
+
+def _rv_raises8(exc, fn, *a, **k):
+    try:
+        fn(*a, **k)
+        return False
+    except exc:
+        return True
+    except Exception:
+        return False
+
+
+def _rv8_run(src):
+    r = {}
+    # 1. a delete that takes the chat lock after the switch leaves nothing
+    #    B can bring back: from a thread of A, and from one with no profile
+    for how in ("A's thread", "a thread with no profile"):
+        ns, d = _rvns8(src, _STORE_NAMES | {"_new_chat_id"})
+        ns["_legacy_sync_chats"] = lambda *a, **k: True
+        ns["ctx_timer"] = lambda *a, **k: type("T", (), {"start": lambda s: None})()
+        A = ns["profile_boot"]()
+        cid = "c" + "a" * 26
+        ns["chat_ops"]([{"op": "create", "id": cid, "lane": "ai", "title": "A8"}], A)
+        ns["chat_append_turn"](cid, 0, ns["chat_prefix_hash"]([], 0),
+                               [{"role": "user", "content": "A's secret"}], A)
+        B = ns["test_profile_create"]()
+        ev, res = _t8.Event(), {}
+
+        def _a():
+            ev.wait(5)
+            try:
+                res["a"] = ns["chat_ops"]([{"op": "delete", "id": cid}], A)
+            except Exception as e_:
+                res["a"] = type(e_).__name__
+        t_ = ns["ctx_thread"](target=_a, daemon=True,
+                              **({"ctx": A} if how == "A's thread" else {"bind": False}))
+        t_.start()
+        ns["profile_switch"](B)
+        ev.set()
+        t_.join(10)
+        und = ns["chat_ops"]([{"op": "undelete", "id": cid}], B)
+        bf = os.path.join(B.dir, "chats.v2.json")
+        r["ISO-8: a late delete from %s leaves B nothing to undelete" % how] = (
+            res.get("a") == "StaleProfile" and und["results"] == [{"err": "gone"}]
+            and "A's secret" not in (open(bf).read() if os.path.exists(bf) else "")
+            and len(ns["_chat_stubs"]) == 0)
+    # 2. an undo stub is only its own folder's
+    ns["_chat_stubs"][cid] = {"at": time.time(), "idx": 0, "bk": ns["_bk"](A),
+                              "chat": {"id": cid, "messages": []}}
+    und2 = ns["chat_ops"]([{"op": "undelete", "id": cid}], B)
+    late2 = ns["_chat_late"]([], cid, 0, ns["chat_prefix_hash"]([], 0),
+                             {"role": "assistant", "content": "x"}, ns["_bk"](B))
+    r["an undo stub of another folder is neither undeleted nor appended to"] = (
+        und2["results"] == [{"err": "gone"}] and late2 is None)
+    # 3. a cache refilled by A's late thread: B still reads its own
+    ns, d = _rvns8(src, {"CLOUD_NAME", "_cloud_file", "_cloud_all", "_dead_models",
+                         "_dead_lock", "_dead_loaded", "_dead_seed", "_dead_when", "DEAD_TTL",
+                         "cloud_model_alive"})
+    A = ns["profile_boot"]()
+    json.dump({"providers": {"groq": {"key": "x", "dead": ["A-only"],
+                                      "dead_at": {"A-only": time.time() - 60}}}},
+              open(os.path.join(d, "cloud.json"), "w"))
+    B = ns["test_profile_create"]()
+    json.dump({"providers": {"groq": {"key": "y", "dead": ["B-only"],
+                                      "dead_at": {"B-only": time.time() - 60}}}},
+              open(os.path.join(B.dir, "cloud.json"), "w"))
+    go = _t8.Event()
+
+    def _late():
+        go.wait(5)
+        ns["cloud_model_alive"]("anything")
+        ns["_cache_fill"]("late8")
+    t_ = ns["ctx_thread"](target=_late, ctx=A, daemon=True)
+    t_.start()
+    ns["profile_switch"](B)
+    go.set()
+    t_.join(10)
+    ns["bind_ctx"](B)
+    r["ISO-8: A's thread refilling caches after the switch: B reads its own, none of A's"] = (
+        ns["cloud_model_alive"]("A-only") is True and ns["cloud_model_alive"]("B-only") is False
+        and "late8" not in json.dumps([repr(o) for o in ns["_PROFILE_CACHES"].values()]))
+    ns["bind_ctx"](None)
+    ns["profile_switch"](ns["ProfileCtx"]("local", d))
+    ns["_dead_seed"]()
+    unb = ns["_dead_loaded"][0]
+    ns["bind_ctx"](ns["current_ctx"]())
+    r["the retirements latch isn't set by a thread with no profile"] = (
+        unb is False and ns["cloud_model_alive"]("A-only") is False)
+    ns["bind_ctx"](None)
+    # 4. read-aloud: a reply for a profile no longer active isn't read out
+    said = []
+    ns, d = _rvns8(src, {"_speak"}, _speak_now=said.append, _say_lock=_t8.RLock())
+    A = ns["profile_boot"]()
+    B = ns["test_profile_create"]()
+    ns["bind_ctx"](A)
+    ns["_speak"]("A1")
+    ns["profile_switch"](B)
+    ns["_speak"]("A2")
+    ns["bind_ctx"](B)
+    ns["_speak"]("B1")
+    ns["bind_ctx"](None)
+    r["read-aloud: after the switch A's reply is not read out; B's is"] = said == ["A1", "B1"]
+    # 5. two switches at once: each cancels and erases the profile it replaced
+    ns, d = _rvns8(src, set(), _chat_finalize_held=lambda base, now=None: time.sleep(0.2))
+    ns["profile_boot"]()
+    T0 = ns["test_profile_create"]()
+    ns["profile_switch"](T0)
+    B, C = ns["test_profile_create"](), ns["test_profile_create"]()
+    ts_ = [ns["ctx_thread"](target=ns["profile_switch"], args=(x,),
+                            kwargs={"erase_old": True}, bind=False, daemon=True) for x in (B, C)]
+    [x.start() for x in ts_]
+    [x.join(15) for x in ts_]
+    fin = ns["current_ctx"]()
+    mid = C if fin is B else B
+    r["two switches at once: every replaced profile is cancelled and erased, the last kept"] = (
+        fin in (B, C) and T0.cancel.is_set() and mid.cancel.is_set() and not fin.cancel.is_set()
+        and not os.path.exists(T0.dir) and not os.path.exists(mid.dir)
+        and os.path.isdir(fin.dir))
+    # 6. current_ctx never waits behind a write
+    ns, d = _rvns8(src, set())
+    ns["profile_boot"]()
+    got, hold = [], _t8.Event()
+
+    def _holder():
+        with ns["_profile_lock"]:
+            hold.set()
+            time.sleep(1.5)
+    h_ = _t8.Thread(target=_holder, daemon=True)
+    h_.start()
+    hold.wait(5)
+    t0 = time.time()
+    q_ = _t8.Thread(target=lambda: got.append(ns["current_ctx"]()), daemon=True)
+    q_.start()
+    q_.join(0.5)
+    r["a request's current_ctx doesn't wait behind a write"] = bool(got) and time.time() - t0 < 0.5
+    h_.join(5)
+    # 7. one flock failure doesn't turn the flock off for the run
+    import types as _ty8
+    calls = []
+
+    def _flock(fd, op):
+        calls.append(op)
+        if len(calls) == 1:
+            raise OSError("busy")
+    fake = _ty8.ModuleType("fcntl")
+    fake.flock, fake.LOCK_EX, fake.LOCK_UN = _flock, 2, 8
+    real_f = sys.modules.get("fcntl")
+    sys.modules["fcntl"] = fake
+    try:
+        ns, d = _rvns8(src, set())
+        root = ns["profile_boot"]()
+        root.write("x8.json", {})
+        root.write("y8.json", {})
+    finally:
+        if real_f is not None:
+            sys.modules["fcntl"] = real_f
+    r["one failed flock: the next write takes it again"] = (
+        not ns["_PFL"]["bad"] and calls.count(2) >= 2)
+    # 8. MACHINE_ROOT never reaches a profile's file
+    NP = ns["NoProfile"]
+    r["the machine's root refuses a profile's files"] = (
+        _rv_raises8(NP, ns["_pfile"], "chats.v2.json", ns["MACHINE_ROOT"])
+        and _rv_raises8(NP, ns["_pfile"], "images/a.png", ns["MACHINE_ROOT"])
+        and _rv_raises8(NP, ns["_pfile"], "cloud.json", ns["MACHINE_ROOT"])
+        and ns["_pfile"]("prefs.json", ns["MACHINE_ROOT"]).endswith("prefs.json"))
+    # 9. adopt keeps a finished file that couldn't be moved
+    ns, d = _rvns8(src, set())
+    root = ns["profile_boot"]()
+    src1 = os.path.join(d, "stage-a8.mp4")
+    open(src1, "wb").write(b"clip")
+
+    def _busy(a, b):
+        raise PermissionError(13, "in use")
+    ns["_replace_into"] = _busy
+    p1 = root.adopt(src1, "videos/a8.mp4")
+    ok1 = open(p1, "rb").read() == b"clip" and not os.path.exists(src1)
+    src2 = os.path.join(d, "stage-b8.mp4")
+    open(src2, "wb").write(b"clip2")
+    ns["shutil"] = _ty8.SimpleNamespace(copyfile=lambda a, b: (_ for _ in ()).throw(
+        OSError("disk")), rmtree=shutil.rmtree)
+    try:
+        root.adopt(src2, "videos/b8.mp4")
+        msg = ""
+    except OSError as e_:
+        msg = str(e_)
+    r["adopt: a file that couldn't be moved is copied, or left where it is, never deleted"] = (
+        ok1 and os.path.exists(src2) and src2 in msg
+        and not os.path.exists(os.path.join(d, "videos", "b8.mp4")))
+    # 10. the profile's settings first, the machine's last
+    ns, d = _rvns8(src, set())
+    A = ns["profile_boot"]()
+    B = ns["test_profile_create"]()
+    ns["profile_switch"](B)
+    ns["profile_switch"](ns["ProfileCtx"]("local", d))
+    r["a stale settings post changes nothing, the machine's keys included"] = (
+        _rv_raises8(ns["StaleProfile"], ns["split_prefs"], B,
+                    {"persona": "p", "no_limits": True})
+        and not os.path.exists(os.path.join(d, "prefs.json")))
+    # 11. a stale picture never falls back to a paid key
+    net = []
+    ns, d = _rvns8(src, {"generate_image", "_media_land", "IMAGE_SUB", "RenderBusy",
+                         "_write_image_bytes", "drop_run_file", "_media_id"},
+                   image_ready=lambda: True, studio_tier=lambda k: {"repo": "r"},
+                   studio_opts=lambda k, o=None: {"fmt": "png", "steps": 1, "guidance": 1,
+                                                  "seed": 1, "w": 8, "h": 8},
+                   _snap_dir=lambda r_: "/x", _render_lock=_t8.Lock(), _render_note=lambda *a: None,
+                   STUDIOS={"image": {"venv": "/v"}},
+                   prompt_cmd=lambda *a: (["x"], None),
+                   GEMINI_API="http://127.0.0.1:1/", APP_VERSION="t",
+                   _cloud_all=lambda: {"providers": {"gemini": {"key": "PAID", "status": "ok"}}})
+    ns["urllib"] = _ty8.SimpleNamespace(request=_ty8.SimpleNamespace(
+        Request=lambda *a, **k: net.append(a) or 1,
+        urlopen=lambda *a, **k: net.append(a) or (_ for _ in ()).throw(OSError("net"))))
+    A = ns["profile_boot"]()
+
+    def _render(cmd, timeout, sock=None):
+        ns["profile_switch"](ns["test_profile_create"]())
+        return 0, "", False
+    ns["_run_render"] = _render
+    orig_stage = ns["stage_path"]
+
+    def _stage(suffix=""):
+        p_ = orig_stage(suffix)
+        open(p_, "wb").write(b"png")
+        return p_
+    ns["stage_path"] = _stage
+    r["a picture finished after the switch is dropped; no paid fallback"] = (
+        _rv_raises8(ns["StaleProfile"], ns["generate_image"], A, "a cat") and net == [])
+    # 12. the Veo poll stops when its profile does
+    polls = []
+    ns, d = _rvns8(src, {"_veo_video", "VEO_DAILY_CAP", "VIDEO_SUB", "_media_id"},
+                   _cloud_all=lambda: {"providers": {"gemini": {"key": "k", "status": "ok"}}},
+                   profile_local_update=lambda c, f: None, GEMINI_API="http://x/",
+                   APP_VERSION="t")
+    A = ns["profile_boot"]()
+
+    class _R8:
+        def __init__(self, b):
+            self.b = b
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return self.b
+
+    def _open(req, timeout=0):
+        if "predictLongRunning" in str(req):
+            return _R8(b'{"name": "op"}')
+        polls.append(1)
+        if len(polls) == 1:
+            A.cancel.set()
+        return _R8(b'{"done": false}')
+    ns["urllib"] = _ty8.SimpleNamespace(request=_ty8.SimpleNamespace(
+        Request=lambda u, **k: u, urlopen=_open))
+    ns["time"] = _ty8.SimpleNamespace(sleep=lambda s: None, strftime=time.strftime,
+                                      time=time.time)
+    r["the Veo poll stops once its profile is cancelled"] = (
+        _rv_raises8(ns["StaleProfile"], ns["_veo_video"], A, "a clip") and len(polls) <= 2)
+    # 13. a stale save is a 409, not "the folder is read-only"
+    ns, d = _rvns8(src, {"_cloud_save_state", "_cloud_txn", "_cloud_lock", "_cloud_depth",
+                         "_cloud_read_strict", "_cloud_all", "_cloud_file", "CLOUD_NAME",
+                         "_cloud_write_to", "_hook_delay", "_remote_save", "REMOTE_NAME"},
+                   _fcntl=None)
+    ns["_cloud_txn"] = __import__("contextlib").contextmanager(ns["_cloud_txn"])
+    A = ns["profile_boot"]()
+    ns["profile_switch"](ns["test_profile_create"]())
+    ns["bind_ctx"](A)
+    r["a cloud key or Remote save after the switch raises StaleProfile (a 409)"] = (
+        _rv_raises8(ns["StaleProfile"], ns["_cloud_save_state"], A, "groq",
+                    {"key": "k", "status": "ok"})
+        and _rv_raises8(ns["StaleProfile"], ns["_remote_save"], {"host": "h"}))
+    ns["bind_ctx"](None)
+    # 14. the usage queue: A's records are written at the switch, later ones dropped
+    ns, d = _rvns8(src, set(_UN) | {"USAGE_FILE", "QUALITY_FILE", "MODEL_ROUTES"},
+                   READ_FAIL={}, MODEL_ROUTES={})
+    A = ns["profile_boot"]()
+    ns["_usage_state"]["backfilled"] = True
+    ns["bind_ctx"](A)
+    ns["usage_put"]({"t": 1.0, "m": "before8", "n": 1})
+    B = ns["test_profile_create"]()
+    ns["profile_switch"](B)
+    ns["usage_put"]({"t": 2.0, "m": "after8", "n": 1})
+    ns["bind_ctx"](None)
+    ns["usage_flush"]()
+    ua = open(os.path.join(d, "usage.jsonl")).read() if os.path.exists(
+        os.path.join(d, "usage.jsonl")) else ""
+    ub = open(os.path.join(B.dir, "usage.jsonl")).read() if os.path.exists(
+        os.path.join(B.dir, "usage.jsonl")) else ""
+    r["usage: A's queued records land in A's ledger at the switch; later ones nowhere"] = (
+        "before8" in ua and "after8" not in ua + ub)
+    # 15. a pool's workers carry the starter's ctx
+    ns, d = _rvns8(src, set())
+    A = ns["profile_boot"]()
+    ns["bind_ctx"](A)
+    ex = ns["ctx_executor"](2)
+    got = list(ex.map(lambda _i: ns["bound_ctx"](), range(3)))
+    ex.shutdown()
+    ns["bind_ctx"](None)
+    r["a thread pool's workers carry the starting thread's ctx"] = got == [A, A, A]
+    return r
+
+
+try:
+    _rv8 = _rv8_run(_S8)
+except Exception as e_:
+    import traceback as _tbr8
+    _rv8 = {"raised": "%r %s" % (e_, _tbr8.format_exc()[-800:])}
+check("profiles, the reviews' cases (%d): late cache writes, overlapping switches, "
+      "read-aloud, stale fallbacks, adopt, flock, settings order, Veo, usage, pools" % len(_rv8),
+      len(_rv8) >= 17 and all(v is True for v in _rv8.values()),
+      "%r" % {k: v for k, v in _rv8.items() if v is not True})
+_RVM8 = [
+    ("caches not scoped to the epoch", "        if mine is not None and mine is not act:\n"
+     "            return copy.deepcopy(self._blank)\n", ""),
+    ("the chat store not checking its profile", "        _chat_live(base)\n        _chat_settle()\n"
+     "        chats = load_chats(base)\n        replies", "        _chat_settle()\n"
+     "        chats = load_chats(base)\n        replies"),
+    ("an undo stub of any folder", "        if not st or c is not None or st.get(\"bk\") != bk:",
+     "        if not st or c is not None:"),
+    ("a late append into any folder's stub", "    if st and (bk is None or st.get(\"bk\") == bk):",
+     "    if st:"),
+    ("the latch set with no profile", "    if _dead_loaded[0] or getattr(_tl_ctx, \"ctx\", None) is None:",
+     "    if _dead_loaded[0]:"),
+    ("read-aloud without the check", "        if c is not None and not c.alive():\n            return\n"
+     "        _speak_now(text)", "        _speak_now(text)"),
+    ("no switch lock", "    with _switch_lock:\n        old = current_ctx()",
+     "    if True:\n        old = current_ctx()"),
+    ("current_ctx under the lock", "    c = _PROFILE[\"ctx\"]      # one read",
+     "    with _profile_lock:\n        c = _PROFILE[\"ctx\"]\n    c = c      # one read"),
+    ("one flock failure turns it off", "                # this write goes under the in-process lock alone; the\n"
+     "                # next one tries the flock again (review of 6b329: one\n"
+     "                # failure used to turn it off for the whole run)\n                pass",
+     "                _PFL[\"bad\"] = True\n                _PFL[\"f\"] = None"),
+    ("the machine's root reaching a profile's file",
+     "        if name.replace(\"\\\\\", \"/\").split(\"/\")[0] in PERSONAL_NAMES:",
+     "        if False:"),
+    ("adopt deleting on any failure", "        except StaleProfile:\n            _unlink_quiet(src)\n            raise",
+     "        except BaseException:\n            _unlink_quiet(src)\n            raise"),
+    ("the machine's keys written first", "    if by[\"synced\"]:\n        user_prefs_update(ctx, apply(by[\"synced\"]))",
+     "    if by[\"machine\"]:\n        machine_prefs_update(apply(by[\"machine\"]))\n"
+     "    if by[\"synced\"]:\n        user_prefs_update(ctx, apply(by[\"synced\"]))"),
+    ("a stale picture falling back to Gemini", "            if rc == 0 and os.path.exists(out):\n"
+     "                _render_note(out, o, time.time() - _t0)\n"
+     "                return _media_land(ctx, IMAGE_SUB, out), \"local\"\n"
+     "            errs.append(\"local: \" + tail[-200:].strip())\n        except RenderBusy:\n"
+     "            raise\n        except StaleProfile:\n            raise\n",
+     "            if rc == 0 and os.path.exists(out):\n"
+     "                _render_note(out, o, time.time() - _t0)\n"
+     "                return _media_land(ctx, IMAGE_SUB, out), \"local\"\n"
+     "            errs.append(\"local: \" + tail[-200:].strip())\n        except RenderBusy:\n"
+     "            raise\n"),
+    ("the Veo poll ignoring cancel", "                if ctx.cancel.is_set():\n"
+     "                    raise StaleProfile(\"the profile changed\")\n", ""),
+    ("a stale cloud save read as a failure", "            _cloud_write_to(ctx, d)\n        return True\n"
+     "    except StaleProfile:\n        raise\n", "            _cloud_write_to(ctx, d)\n        return True\n"),
+    ("usage not flushed at the switch", "        try:\n            usage_flush()\n        except Exception:\n"
+     "            pass\n        with _say_lock:", "        with _say_lock:"),
+    ("a pool without the ctx", "        max_workers=max_workers, initializer=bind_ctx,\n"
+     "        initargs=(getattr(_tl_ctx, \"ctx\", None),))", "        max_workers=max_workers)"),
+]
+_rvm8 = []
+for _d8, _o8, _n8 in _RVM8:
+    if _S8.count(_o8) != 1:
+        _rvm8.append((_d8, "anchor %d" % _S8.count(_o8)))
+        continue
+    try:
+        _res8 = _rv8_run(_S8.replace(_o8, _n8))
+        _rvm8.append((_d8, not all(v is True for v in _res8.values())))
+    except Exception:
+        _rvm8.append((_d8, True))
+check("profiles, the reviews' cases: each fix bites (%d mutations, each caught)" % len(_RVM8),
+      all(ok is True for _d, ok in _rvm8), "%r" % [x for x in _rvm8 if x[1] is not True])
+
 # ---- live, no-server form: "This computer" (A) and a local test profile (B)
 _P8 = Instance(9903, "P8", env={"MILLENAI_TEST_HOOKS": "profiles"}).start()
 
@@ -11413,6 +12048,8 @@ _q8("/api/chats/ops", {"ops": [{"op": "create", "id": "c" + "a" * 26, "lane": "a
 _B8 = _hook8(op="create")["name"]
 _can8A = {k: _canary("A8-" + k) for k in _KINDS8}
 _late8 = [_hook8(op="late", kind=k, text=_can8A[k], delay=3)["id"] for k in _KINDS8]
+# and a late writer into every cache (review of 6b329)
+_latec8 = _hook8(op="late", kind="cache", text=_canary("cache8"), delay=3)["id"]
 _sw8 = _hook8(op="switch", to=_B8)
 _rootsnap8 = _snap8(_P8.home)
 # a page drawn for A: its calls get 409 and change nothing
@@ -11422,6 +12059,9 @@ _x3 = _q8("/api/prefs", {"length": 4}, headers={"X-Profile": _sw8["tag"]})
 time.sleep(4.5)
 _st8 = _hook8(op="status")
 _bdir8 = os.path.join(_P8.home, "accounts", _B8)
+check("ISO-8: A's late writer into every cache, after the switch, leaves B's caches empty",
+      _st8["late"].get(_latec8) == "ok" and _st8["dirty"] == [], "%r" % [_st8["late"].get(_latec8),
+                                                                       _st8["dirty"]])
 check("ISO-7: writes started under A and landing after the switch to B are refused: nothing in "
       "A changes, nothing reaches B, and A's page gets 409 profile-changed",
       [_st8["late"].get(j) for j in _late8] == ["StaleProfile"] * len(_KINDS8)
@@ -11571,6 +12211,7 @@ try:
             break
         _raw8 += _c8
     _mid8 = len(_raw8)
+    _pre8 = _raw8
     _B8c = _hook8(op="create")["name"]
     _hook8(op="switch", to=_B8c)
     _t18 = time.time()
@@ -11589,6 +12230,7 @@ _saved8 = [c for c in _q8("/api/chats")[1]["chats"] if c.get("id") == _cid8]
 _answered8 = _saved8 and [m for m in _saved8[0].get("messages", []) if m.get("role") == "assistant"]
 check("emit stops a stream once its profile isn't the active one; the answer is saved nowhere",
       _mid8 > 200 and _took8 < 20 and not _answered8
+      and b"Answer written" not in _raw8[len(_pre8):] and b"PLACES2" not in _raw8[len(_pre8):]
       and "            if user_base.cancel.is_set():\n                raise StaleProfile(" in _S8,
       "%r" % [_mid8, round(_took8, 1), _saved8])
 _P8.stop()

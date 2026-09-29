@@ -44,6 +44,7 @@ import subprocess
 import sys
 import tarfile
 import contextlib
+import copy
 import functools
 import tempfile
 import threading
@@ -86,7 +87,7 @@ MACHINE_STATE = frozenset((
     "_INSTANCE_LOCK", "_BOOT", "_CHROME", "_WINDOW", "_WIN_STATE",
     "_JUST_UPDATED", "_UPDATE_LANDED", "_update", "_chk_cache",
     "_whatsnew_cache", "_webstore_keep", "_webstore_reloaded",
-    "_QT_CLEAR_CACHE", "_RELOCATED",
+    "_QT_CLEAR_CACHE", "_RELOCATED", "_BOOT_HEALS",
     # models, engines, hardware and installs
     "MODEL_ROUTES", "OLLAMA_PORT", "_MANAGED_BIN_DIR_FOUND", "_MINE_CACHE",
     "_CLEANUP_LAST_ERRORS", "_accel_cache", "_gpu_cache", "_vram",
@@ -107,30 +108,117 @@ _PROFILE_CACHES = {}
 _CACHE_BLANK = {}
 
 
-def profile_cache(name: str, obj, reset=None):
-    """Declare obj personal; reset(obj) empties it (default obj.clear(),
-    or a thread-local's own attributes). obj as declared is its empty
-    state (the ISO-8 hook compares against a copy)."""
-    _PROFILE_CACHES[name] = (obj, reset)
-    if not isinstance(obj, threading.local):
-        _CACHE_BLANK[name] = json.loads(json.dumps(
-            obj if not isinstance(obj, set) else sorted(obj)))
-    return obj
+class _EpochCache:
+    """A profile cache, scoped to one activation of one profile (1a 5.4,
+    review of 6b329). It looks like the dict, list or set it was declared
+    as, but every access goes to the copy of the profile active now: the
+    first access after a switch starts from the declared (empty) value, so
+    nothing an earlier activation left can be read. A thread working for a
+    profile that is no longer active (a request or job that outlived the
+    switch) gets a scratch copy nobody keeps, so its late writes land
+    nowhere. A thread with no profile (machine work) uses the active one."""
+    __slots__ = ("_name", "_blank", "_obj", "_ep", "_lk")
+
+    def __init__(self, name, blank):
+        self._name, self._blank = name, blank
+        self._obj, self._ep = copy.deepcopy(blank), None
+        self._lk = threading.Lock()
+
+    def _cur(self):
+        g = globals()
+        p, tl = g.get("_PROFILE"), g.get("_tl_ctx")
+        act = p["ctx"] if p else None
+        mine = getattr(tl, "ctx", None) if tl is not None else None
+        if mine is not None and mine is not act:
+            return copy.deepcopy(self._blank)
+        ep = act.epoch if act is not None else None
+        if self._ep != ep:
+            with self._lk:
+                if self._ep != ep:
+                    self._obj, self._ep = copy.deepcopy(self._blank), ep
+        return self._obj
+
+    def _clear(self):
+        with self._lk:
+            self._obj = copy.deepcopy(self._blank)
+
+    def __getattr__(self, a):
+        return getattr(self._cur(), a)
+
+    def __getitem__(self, k):
+        return self._cur()[k]
+
+    def __setitem__(self, k, v):
+        self._cur()[k] = v
+
+    def __delitem__(self, k):
+        del self._cur()[k]
+
+    def __contains__(self, k):
+        return k in self._cur()
+
+    def __iter__(self):
+        return iter(self._cur())
+
+    def __len__(self):
+        return len(self._cur())
+
+    def __bool__(self):
+        return bool(self._cur())
+
+    def __eq__(self, o):
+        return self._cur() == (o._cur() if isinstance(o, _EpochCache) else o)
+
+    def __ne__(self, o):
+        return not self == o
+
+    __hash__ = None
+
+    def __repr__(self):
+        return "<profile cache %s %r>" % (self._name, self._cur())
+
+
+def _epoch_op(op, rev=False):
+    def f(self, o):
+        o = o._cur() if isinstance(o, _EpochCache) else o
+        return op(o, self._cur()) if rev else op(self._cur(), o)
+    return f
+
+
+for _n, _op in (("or", lambda a, b: a | b), ("and", lambda a, b: a & b),
+                ("sub", lambda a, b: a - b), ("xor", lambda a, b: a ^ b),
+                ("add", lambda a, b: a + b)):
+    setattr(_EpochCache, "__%s__" % _n, _epoch_op(_op))
+    setattr(_EpochCache, "__r%s__" % _n, _epoch_op(_op, True))
+del _n, _op
+
+
+def profile_cache(name: str, obj):
+    """Declare obj personal: it becomes an _EpochCache whose empty state
+    is obj as declared. A thread-local stays as it is: each request runs
+    on a thread of its own (HTTP/1.0, one per connection) and
+    StudioHandler._run clears it first, and a thread that outlives a
+    switch is the only one that can read what it holds."""
+    if isinstance(obj, threading.local):
+        _PROFILE_CACHES[name] = obj
+        return obj
+    c = _EpochCache(name, obj)
+    _PROFILE_CACHES[name] = c
+    _CACHE_BLANK[name] = obj
+    return c
 
 
 def _profile_caches_clear() -> int:
+    """Empty every profile cache now (a switch moves the epoch, which does
+    it anyway). A thread-local is cleared for the calling thread only
+    (see profile_cache)."""
     n = 0
-    for obj, reset in list(_PROFILE_CACHES.values()):
-        try:
-            if reset is not None:
-                reset(obj)
-            elif isinstance(obj, threading.local):
-                obj.__dict__.clear()
-            else:
-                obj.clear()
-            n += 1
-        except Exception:
-            pass
+    for obj in list(_PROFILE_CACHES.values()):
+        if isinstance(obj, threading.local):
+            obj.__dict__.clear()
+        else:
+            obj._clear()
+        n += 1
     return n
 # ==== profile caches: end ====
 
@@ -1665,6 +1753,8 @@ def _cloud_save_state(ctx, which: str, entry: dict, make_active=False) -> bool:
                     d["active"] = which
             _cloud_write_to(ctx, d)
         return True
+    except StaleProfile:
+        raise
     except Exception:
         return False
     finally:
@@ -1695,6 +1785,8 @@ def _cloud_save_failed(which: str, entry: dict, auth: bool = False):
             d.setdefault("providers", {})[which] = entry
             _cloud_write(d)
         return None
+    except StaleProfile:
+        raise
     except Exception:
         return ""
 
@@ -1783,17 +1875,17 @@ def _provider_of(c: dict) -> str:
     return ""
 
 
-_dead_loaded = profile_cache(
-    "_dead_loaded", [False],
-    reset=lambda c: c.__setitem__(slice(None), [False]))
+_dead_loaded = profile_cache("_dead_loaded", [False])
 
 
 def _dead_seed():
     """Retirements persist, or every launch re-donates a council seat to
     a model the provider has already withdrawn. Cleared for a provider
     whenever its key is re-saved — that re-runs model discovery, and is
-    exactly the gesture that means "try again"."""
-    if _dead_loaded[0]:
+    exactly the gesture that means "try again". Only a thread working for
+    a profile reads them: one with none would set the latch having read
+    nothing (review of 6b329)."""
+    if _dead_loaded[0] or getattr(_tl_ctx, "ctx", None) is None:
         return
     _dead_loaded[0] = True
     try:
@@ -2664,9 +2756,7 @@ def _cloud_refresh_picks():
         pass
 
 
-_repaired = profile_cache(
-    "_repaired", [False],
-    reset=lambda c: c.__setitem__(slice(None), [False]))
+_repaired = profile_cache("_repaired", [False])
 
 
 def _cloud_repair():
@@ -2675,8 +2765,9 @@ def _cloud_repair():
     free-tier quota — which resets by itself — left a perfectly good key
     showing a red ✗ until it was re-pasted by hand. A stored note that
     reads like a quota message is exactly that case: put it back to ok
-    and let the cooldown decide when it returns."""
-    if _repaired[0]:
+    and let the cooldown decide when it returns. Per profile, like the
+    file it repairs; never from a thread with none (review of 6b329)."""
+    if _repaired[0] or getattr(_tl_ctx, "ctx", None) is None:
         return
     _repaired[0] = True
     # stale-pick refresh rides the same once-per-process latch, but on
@@ -4046,8 +4137,7 @@ def weather_snippets(q: str):
 
 
 _search_cache = profile_cache(
-    "_search_cache", {"query": "", "data": "", "timestamp": 0.0},
-    reset=lambda d: (d.clear(), d.update(query="", data="", timestamp=0.0)))
+    "_search_cache", {"query": "", "data": "", "timestamp": 0.0})
 _search_lock = threading.Lock()
 
 # Auto-search: local models have a training cutoff and no clock, so anything
@@ -6318,6 +6408,8 @@ def generate_image(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
             errs.append("local: " + tail[-200:].strip())
         except RenderBusy:
             raise
+        except StaleProfile:
+            raise
         except Exception as exc:
             errs.append("local: %s" % exc)
         finally:
@@ -6349,6 +6441,8 @@ def generate_image(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
                         return _write_image_bytes(
                             ctx, base64.b64decode(inl["data"])), "gemini"
                 errs.append("gemini: no image in the reply")
+            except StaleProfile:
+                raise
             except Exception as exc:
                 errs.append("gemini: %s" % str(exc)[:120])
     # no keyless fallback (6b310): Pollinations got the description with
@@ -7545,6 +7639,10 @@ def _veo_video(ctx, prompt: str) -> str:
         try:
             for _ in range(90):               # up to ~7 minutes
                 time.sleep(5)
+                # the profile that asked is no longer active: stop polling
+                # (review of 6b329); the clip would land nowhere anyway
+                if ctx.cancel.is_set():
+                    raise StaleProfile("the profile changed")
                 pr = urllib.request.Request(base + name + "?key=" + key,
                                             headers={"User-Agent": "MillenAI"})
                 with urllib.request.urlopen(pr, timeout=30) as r:
@@ -7575,6 +7673,8 @@ def _veo_video(ctx, prompt: str) -> str:
                 return ctx.path(name)
             else:
                 last = "timed out waiting for the render"
+        except StaleProfile:
+            raise
         except Exception as exc:
             last = str(exc)[:160]
         break
@@ -7628,6 +7728,8 @@ def generate_video(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
             errs.append("local: " + tail[-200:].strip())
         except RenderBusy:
             raise
+        except StaleProfile:
+            raise
         except Exception as exc:
             errs.append("local: %s" % str(exc)[:160])
         finally:
@@ -7635,6 +7737,8 @@ def generate_video(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
             _render_lock.release()
     try:
         return _veo_video(ctx, prompt), "cloud"
+    except StaleProfile:
+        raise
     except Exception as exc:
         errs.append("cloud: %s" % str(exc)[:160])
     raise RuntimeError("; ".join(errs) or "no video engine")
@@ -8029,8 +8133,13 @@ def _pfile(name: str, base) -> str:
     """A personal or machine file's path. base is a ProfileCtx, or
     MACHINE_ROOT for the machine's own files in the data folder. A
     missing base is a bug, never "the data folder" (6b329): that was how
-    a write reached the wrong profile."""
-    if isinstance(base, (ProfileCtx, _MachineRoot)):
+    a write reached the wrong profile. A personal file is never the
+    machine's (review of 6b329): MACHINE_ROOT skips the epoch check."""
+    if isinstance(base, ProfileCtx):
+        return os.path.join(base.dir, name)
+    if isinstance(base, _MachineRoot):
+        if name.replace("\\", "/").split("/")[0] in PERSONAL_NAMES:
+            raise NoProfile("%s is a profile's, not the machine's" % name)
         return os.path.join(base.dir, name)
     raise NoProfile("no profile for %s" % name)
 
@@ -8056,6 +8165,12 @@ LOCAL_FILE = "local.json"
 # an account folder's first-write record (1a 5.2; root's is profile.json)
 STATE_FILE = "sync/state.json"
 ACCOUNTS_DIR = "accounts"
+# a profile's own files and folders: never reached through MACHINE_ROOT
+PERSONAL_NAMES = frozenset((
+    CHATS_FILE, MEMORY_FILE, LEGACY_CHATS, LEGACY_MEMORY, PERSONAL_FILE,
+    LOCAL_FILE, QUALITY_FILE, "usage.jsonl", "cloud.json", "remote.json",
+    "remote_known_hosts", "images", "videos", "exports", "sync",
+    "account.key"))
 # absent means "not written yet" for these only until their first write
 # (0b 5.2, L1); after it a missing file is a read error, never empty
 _FIRST_WRITE = (CHATS_FILE, MEMORY_FILE, "prefs.json", PERSONAL_FILE,
@@ -8182,14 +8297,30 @@ class ProfileCtx:
         """Move a file made in run/ (stage_path) into this profile as
         name: a render, a download or an export lands whole, and only
         while this profile is active. Stale: src is deleted and
-        StaleProfile raised, so nothing reaches either profile."""
+        StaleProfile raised, so nothing reaches either profile. Any other
+        failure leaves src where it is."""
         try:
             with _profile_write(self):
                 p = _pfile(name, self)
                 _ensure_parent(p, self)
-                _replace_into(src, p)
+                try:
+                    _replace_into(src, p)
+                except OSError:
+                    # a reader holding it (Windows, an antivirus): a copy,
+                    # then the original goes; a finished render is never
+                    # deleted because it couldn't be moved (review of
+                    # 6b329). If that fails too, src stays in run/ and the
+                    # error says where
+                    try:
+                        shutil.copyfile(src, p)
+                    except OSError as exc:
+                        _unlink_quiet(p)
+                        raise OSError("couldn't move %s into the profile (%s); "
+                                      "it is still at %s" % (
+                                          os.path.basename(src), exc, src)) from exc
+                    _unlink_quiet(src)
                 return p
-        except BaseException:
+        except StaleProfile:
             _unlink_quiet(src)
             raise
 
@@ -8223,12 +8354,17 @@ def _profile_flock():
     with _profile_lock:
         first = _PFL["depth"] == 0
         locked = False
-        if first and not _PFL["bad"]:
+        if first and not _PFL["bad"] and _PFL["f"] is None:
             try:
-                if _PFL["f"] is None:
-                    d = os.path.join(app_dir(), "run")
-                    os.makedirs(d, mode=0o700, exist_ok=True)
-                    _PFL["f"] = open(os.path.join(d, "profile.lock"), "a+")
+                d = os.path.join(app_dir(), "run")
+                os.makedirs(d, mode=0o700, exist_ok=True)
+                _PFL["f"] = open(os.path.join(d, "profile.lock"), "a+")
+            except OSError:
+                # a folder where run/ can't be made: the in-process lock
+                # alone for this run (single_instance already let it run)
+                _PFL["bad"] = True
+        if first and _PFL["f"] is not None:
+            try:
                 if IS_WIN:
                     import msvcrt
                     _PFL["f"].seek(0)
@@ -8238,9 +8374,10 @@ def _profile_flock():
                     fcntl.flock(_PFL["f"].fileno(), fcntl.LOCK_EX)
                 locked = True
             except (OSError, ImportError):
-                # a folder where run/ can't be made: the in-process lock
-                # alone (single_instance already let this copy run)
-                _PFL["bad"] = True
+                # this write goes under the in-process lock alone; the
+                # next one tries the flock again (review of 6b329: one
+                # failure used to turn it off for the whole run)
+                pass
         _PFL["depth"] += 1
         try:
             yield
@@ -8462,9 +8599,8 @@ def current_ctx() -> ProfileCtx:
     """The active profile. Only a request's start, the boot, a switch and
     the test hooks ask (the gauntlet's AST check): everything else uses
     the ctx it was given or captured."""
-    with _profile_lock:
-        c = _PROFILE["ctx"]
-    if c is None:
+    c = _PROFILE["ctx"]      # one read: no lock, so a request never
+    if c is None:            # waits behind a write (review of 6b329)
         raise NoProfile("no profile is active yet")
     return c
 
@@ -8496,12 +8632,24 @@ def _ctx_wrap(fn, ctx):
     return run
 
 
-def ctx_thread(target, ctx=None, **kw):
+def ctx_thread(target, ctx=None, bind=True, **kw):
     """threading.Thread(target=..., **kw) whose target runs on ctx, or on
     the starting thread's own ctx (none for machine work started at
-    boot). The only way this file starts a thread (the gauntlet's lint)."""
-    c = ctx if ctx is not None else getattr(_tl_ctx, "ctx", None)
+    boot); bind=False: on none, for machine work that serves every
+    profile (the usage writer). The only way this file starts a thread
+    (the gauntlet's lint)."""
+    c = ctx if ctx is not None else (
+        getattr(_tl_ctx, "ctx", None) if bind else None)
     return threading.Thread(target=_ctx_wrap(target, c), **kw)
+
+
+def ctx_executor(max_workers: int):
+    """A thread pool whose workers run on the starting thread's ctx (the
+    only pool this file makes; the gauntlet's lint)."""
+    import concurrent.futures as _cf
+    return _cf.ThreadPoolExecutor(
+        max_workers=max_workers, initializer=bind_ctx,
+        initargs=(getattr(_tl_ctx, "ctx", None),))
 
 
 def ctx_timer(interval, fn, args=(), ctx=None):
@@ -8811,12 +8959,17 @@ def split_prefs(ctx, incoming: dict, old=None) -> dict:
                     view[k] = v
                     changed.append(k)
         return fn
-    if by["machine"]:
-        machine_prefs_update(apply(by["machine"]))
+    # the profile's own keys first, the machine's last: a switch landing
+    # between them refuses the profile's write, and the 409 means nothing
+    # changed (review of 6b329)
     if by["synced"]:
         user_prefs_update(ctx, apply(by["synced"]))
     if by["local"]:
         profile_local_update(ctx, apply(by["local"]))
+    if by["machine"]:
+        if isinstance(ctx, ProfileCtx):
+            ctx.check()
+        machine_prefs_update(apply(by["machine"]))
     return {"ok": True, "changed": sorted(changed), "conflict": conflict,
             "ignored": sorted(ignored)}
 
@@ -8910,33 +9063,53 @@ def profile_resume() -> ProfileCtx:
     return ctx
 
 
+_switch_lock = threading.Lock()     # one switch at a time (review of 6b329)
+
+
 def profile_switch(ctx_new, erase_old=False) -> ProfileCtx:
     """The bare switch (M8; the full protocol with its steps is M9): only
-    the copy holding the instance lock. Stops read-aloud, makes the old
-    profile's finished deletes final, cancels the old ctx (streams and
-    background jobs watch it), empties every profile_cache, and moves
-    the epoch, all under the profile lock, so no write of the old
-    profile lands after it. erase_old (a test profile only): its folder
-    goes too. The new ctx."""
+    the copy holding the instance lock, one at a time. Under the switch
+    lock: the old profile's queued usage records are written to its
+    ledger (any made after that are dropped); then, holding read-aloud's
+    lock and the chat store's across the epoch move, the speech stops,
+    the old profile's finished deletes are made final, the old ctx is
+    cancelled (streams and jobs watch it) and the epoch moves, so no
+    speech, chat write or cache of the old profile lands after it (each
+    profile cache starts empty for the new epoch). erase_old (a test
+    profile only): its folder goes too. The new ctx."""
     if not _INSTANCE_HELD[0]:
         raise NoProfile("profile changes need the instance lock")
-    try:
-        _stop_speaking()
-    except Exception:
-        pass
-    old = current_ctx()
-    try:
-        _chat_finalize(old, now=float("inf"))
-    except Exception:
-        pass
-    with _profile_lock, _profile_flock():
-        old.cancel.set()
-        _PROFILE["ctx"] = ctx_new
-        _profile_caches_clear()
-        _written.clear()
-        _profile_json_update(lambda q: _profile_fields(q, ctx_new))
-        if erase_old and old.kind == "test":
-            shutil.rmtree(old.dir, ignore_errors=True)
+    with _switch_lock:
+        old = current_ctx()
+        if old is ctx_new:
+            return ctx_new
+        try:
+            usage_flush()
+        except Exception:
+            pass
+        with _say_lock:
+            try:
+                _stop_speaking()
+            except Exception:
+                pass
+            got = _chats_lock.acquire(timeout=30)
+            try:
+                if got:
+                    try:
+                        _chat_finalize_held(old, now=float("inf"))
+                    except Exception:
+                        pass
+                with _profile_lock, _profile_flock():
+                    old.cancel.set()
+                    _PROFILE["ctx"] = ctx_new
+                    _profile_caches_clear()
+                    _written.clear()
+                    _profile_json_update(lambda q: _profile_fields(q, ctx_new))
+                    if erase_old and old.kind == "test":
+                        shutil.rmtree(old.dir, ignore_errors=True)
+            finally:
+                if got:
+                    _chats_lock.release()
     return ctx_new
 
 
@@ -8979,32 +9152,26 @@ _TEST_LATE = {}     # id -> "pending", "ok" or the error's name
 def _cache_dirty() -> list:
     """The profile caches not in their empty state (for ISO-8)."""
     out = []
-    for name, (obj, reset) in _PROFILE_CACHES.items():
+    for name, obj in _PROFILE_CACHES.items():
         if isinstance(obj, threading.local):
             continue
-        blank = _CACHE_BLANK.get(name)
-        cur = sorted(obj, key=repr) if isinstance(obj, set) else obj
-        try:
-            same = (json.dumps(cur, sort_keys=True, default=repr)
-                    == json.dumps(blank, sort_keys=True, default=repr))
-        except Exception:
-            same = False
-        if not same:
+        if obj._cur() != _CACHE_BLANK.get(name):
             out.append(name)
     return sorted(out)
 
 
 def _cache_fill(tag: str):
     """A canary in every profile cache (for ISO-8)."""
-    for name, (obj, reset) in _PROFILE_CACHES.items():
-        if isinstance(obj, threading.local):
-            obj.canary = tag
-        elif isinstance(obj, dict):
-            obj["canary-" + tag] = tag
-        elif isinstance(obj, list):
-            obj.append(tag)
-        elif isinstance(obj, set):
-            obj.add(tag)
+    for name, obj in _PROFILE_CACHES.items():
+        cur = obj if isinstance(obj, threading.local) else obj._cur()
+        if isinstance(cur, threading.local):
+            cur.canary = tag
+        elif isinstance(cur, dict):
+            cur["canary-" + tag] = tag
+        elif isinstance(cur, list):
+            cur.append(tag)
+        elif isinstance(cur, set):
+            cur.add(tag)
 
 
 def test_profile_op(d: dict) -> dict:
@@ -9062,6 +9229,8 @@ def test_profile_op(d: dict) -> dict:
                         "persona", text))
                 elif kind == "quality":
                     ctx.append(QUALITY_FILE, (text + "\n").encode())
+                elif kind == "cache":
+                    _cache_fill(text)
                 elif kind == "remote":
                     if not _remote_save({"host": text, "user": "u"}):
                         raise StaleProfile("not saved")
@@ -9106,6 +9275,10 @@ MACHINE_IO = frozenset((
     "_download_model", "studio_remove", "_remove_models",
     "_sweep_hf_carcasses", "_rm_hf_repo", "reap_orphan_engines",
     "_sweep_leftovers", "_crypto_record_write", "_crypto_pip",
+    # the render's own log, a temporary file the render writes into
+    "_run_render",
+    # the export formats that write through a library (docx, pptx, zip)
+    "ex_doc", "ex_slides", "ex_archive",
     # the backdrops, the updater, the web view's store, retired files
     "_sky_fetch", "_faststart", "sky_seen", "_do_update",
     "_webstore_qt_sweep", "_webstore_native", "_retire_contribute",
@@ -9344,11 +9517,7 @@ def _chat_finalize(base, now=None):
     if not _chats_lock.acquire(timeout=10):
         return
     try:
-        _chat_settle(now)
-        if _chat_finals.get(_bk(base)) or _bk(base) in _legacy_pending["chats"]:
-            store_chats(load_chats(base), base)
-    except (StoreReadError, OSError):
-        pass
+        _chat_finalize_held(base, now)
     finally:
         _chats_lock.release()
     # memory's legacy file, if its last rewrite failed
@@ -9360,6 +9529,17 @@ def _chat_finalize(base, now=None):
             pass
         finally:
             _memory_lock.release()
+
+
+def _chat_finalize_held(base, now=None):
+    """_chat_finalize's chat half, with _chats_lock already held (a
+    switch holds it across the epoch move)."""
+    try:
+        _chat_settle(now)
+        if _chat_finals.get(_bk(base)) or _bk(base) in _legacy_pending["chats"]:
+            store_chats(load_chats(base), base)
+    except (StoreReadError, OSError):
+        pass
 
 
 def _chat_new(chats, cid, lane, title=None, messages=None):
@@ -9430,9 +9610,12 @@ def _chat_op(chats, op, bk=None):
         out.update(n=len(_chat_msgs(c2)))
         return out, True
     if kind == "undelete":
-        st = _chat_stubs.pop(cid, None)
-        if not st or c is not None:
+        # only this folder's own stub (review of 6b329): an id alone could
+        # bring another profile's chat back
+        st = _chat_stubs.get(cid)
+        if not st or c is not None or st.get("bk") != bk:
             return {"err": "gone"}, False
+        _chat_stubs.pop(cid, None)
         chats.insert(min(st["idx"], len(chats)), st["chat"])
         return {"ok": True}, True
     if c is None:
@@ -9485,6 +9668,7 @@ def chat_ops(ops, base) -> dict:
     data_rev. StoreReadError propagates: nothing is applied."""
     bk = _bk(base)
     with _chats_lock:
+        _chat_live(base)
         _chat_settle()
         chats = load_chats(base)
         replies, changed = [], bool(_chat_finals.get(bk))
@@ -9515,6 +9699,7 @@ def chat_append_turn(cid, after_len, after_hash, msgs, base,
     """The turn writer's append of what the PAGE sent (0b 5.4): a question
     or a funnel pick. (landed id, length, hash)."""
     with _chats_lock:
+        _chat_live(base)
         _chat_settle()
         chats = load_chats(base)
         # the last answer in this chat, if it's still streaming (a Stop the
@@ -9527,7 +9712,16 @@ def chat_append_turn(cid, after_len, after_hash, msgs, base,
         return c["id"], len(m), chat_prefix_hash(m, len(m))
 
 
-def _chat_late(chats, cid, n, h, rec) -> bool:
+def _chat_live(base):
+    """Under _chats_lock, before anything is read or held in memory: a
+    profile that is no longer the active one gets nothing (review of
+    6b329: a delete that took the lock after a switch left its chat in
+    the undo stubs)."""
+    if isinstance(base, ProfileCtx):
+        base.check()
+
+
+def _chat_late(chats, cid, n, h, rec, bk=None) -> bool:
     """A message the SERVER adds after the fact (an answer's end, a
     funnel's summary) lands only where it belongs (review of 6b322): in
     the chat, or in its undo copy so Undo brings it back whole, and only
@@ -9535,8 +9729,9 @@ def _chat_late(chats, cid, n, h, rec) -> bool:
     else (the chat moved on, was deleted for good, was erased) drops it;
     it never makes a copy or a fresh chat."""
     _, c = _chat_find(chats, cid)
-    if c is None and cid in _chat_stubs:
-        c = _chat_stubs[cid]["chat"]
+    st = _chat_stubs.get(cid) if c is None else None
+    if st and (bk is None or st.get("bk") == bk):
+        c = st["chat"]
     if c is None:
         return None
     m = _chat_msgs(c)
@@ -9551,9 +9746,10 @@ def chat_append_late(cid, n, h, rec, base):
     """_chat_late under the lock, written when the chat is on the list
     (one in its undo window is held in memory): (id, length, hash)."""
     with _chats_lock:
+        _chat_live(base)
         _chat_settle()
         chats = load_chats(base)
-        c = _chat_late(chats, cid, n, h, rec)
+        c = _chat_late(chats, cid, n, h, rec, _bk(base))
         if c is None:
             return None
         if _chat_find(chats, cid)[1] is c:
@@ -9992,13 +10188,13 @@ def _migrate_61(base) -> bool:
             pass
         # the boot order; a store that can't be read now just waits, and
         # its requests answer 503 by themselves
-        for kind, sync, load in (("chats", _legacy_sync_chats, load_chats),
-                                 ("memory", _legacy_sync_memory,
-                                  _load_memory)):
+        for kind in ("chats", "memory"):
             if (k, kind) in _STORE_BLOCKED:
                 continue
             try:
-                if not sync(load(base), base):
+                if not (_legacy_sync_chats(load_chats(base), base)
+                        if kind == "chats" else
+                        _legacy_sync_memory(_load_memory(base), base)):
                     _legacy_pending[kind].add(k)
             except StoreReadError:
                 _legacy_pending[kind].add(k)
@@ -10231,6 +10427,12 @@ def _speak(text: str):
     """Read a reply aloud with the system voice; new speech cuts off old.
     One at a time (6b326): two at once could both start a voice."""
     with _say_lock:
+        # a reply for a profile that is no longer active is not read out
+        # (review of 6b329): a switch holds this lock while it moves the
+        # epoch, so the check and the voice can't straddle it
+        c = getattr(_tl_ctx, "ctx", None)
+        if c is not None and not c.alive():
+            return
         _speak_now(text)
 
 
@@ -12160,9 +12362,7 @@ def _tz_of(lat, lon) -> str:
     return tz
 
 
-_HOME_TZ = profile_cache(
-    "_HOME_TZ", {"key": None, "tz": "", "place": ""},
-    reset=lambda d: (d.clear(), d.update(key=None, tz="", place="")))
+_HOME_TZ = profile_cache("_HOME_TZ", {"key": None, "tz": "", "place": ""})
 
 
 def _home_tz():
@@ -12867,7 +13067,7 @@ def closure_notices(query: str) -> str:
                     return "- %s: %s" % (name, t[:110])
             return ""
         found = []
-        ex = _cf.ThreadPoolExecutor(max_workers=4)
+        ex = ctx_executor(4)
         try:
             futs = [ex.submit(_probe, n) for n in names]
             for f in _cf.as_completed(futs, timeout=12):
@@ -12957,8 +13157,7 @@ _usage_qlock = threading.Lock()
 _usage_lock = threading.RLock()      # the file: appends, reads, rewrites
 _usage_wake = threading.Event()
 _usage_state = profile_cache(
-    "_usage_state", {"backfilled": False, "compacted": 0.0},
-    reset=lambda d: (d.clear(), d.update(backfilled=False, compacted=0.0)))
+    "_usage_state", {"backfilled": False, "compacted": 0.0})
 _usage_thread = {"t": None}          # the writer: the machine's
 
 
@@ -13076,8 +13275,8 @@ def usage_put(rec: dict):
             del _usage_q[:len(_usage_q) - 20000]
         th = _usage_thread["t"]
         if th is None or not th.is_alive():
-            th = ctx_thread(target=_usage_writer, name="usage",
-                                  daemon=True)
+            th = ctx_thread(target=_usage_writer, bind=False, name="usage",
+                            daemon=True)
             _usage_thread["t"] = th
             th.start()
     _usage_wake.set()
@@ -14690,6 +14889,8 @@ def _remote_save(d: dict) -> bool:
         _write_raw(REMOTE_NAME, json.dumps(d).encode("utf-8"), bound_ctx(),
                    mode=0o600)
         return True
+    except StaleProfile:
+        raise
     except Exception:
         return False
 
@@ -14893,9 +15094,7 @@ SSH_KEY_CHANGED = ("This server's identity changed since ConcordeAI first "
                    "connected. If you rebuilt it, forget its old key.")
 _SSH_CHANGED_RX = re.compile(r"Host key for (\S+) has changed")
 # the host ssh last said changed, for Forget
-_SSH_CHANGED = profile_cache(
-    "_SSH_CHANGED", [None],
-    reset=lambda c: c.__setitem__(slice(None), [None]))
+_SSH_CHANGED = profile_cache("_SSH_CHANGED", [None])
 
 
 _REMOTE_FIELDS = ("host", "user", "port", "key", "jump")
@@ -15056,6 +15255,8 @@ def _ssh_once(conf: dict, cmd: str, timeout: int):
         out = ((p.stdout or b"") + (p.stderr or b"")).decode(
             "utf-8", "replace").replace("\r\n", "\n").replace("\r", "\n")
         return p.returncode, out
+    except StaleProfile:
+        raise
     except subprocess.TimeoutExpired:
         return -1, "(command timed out after %ds)" % timeout
     except FileNotFoundError as exc:
@@ -16950,7 +17151,7 @@ def _turns_settle(chats, cid, keep=True) -> bool:
             rec = _turn_rec(t)
             if rec:
                 changed = bool(_chat_late(chats, t["id"], t["n"], t["h"],
-                                          rec)) or changed
+                                          rec, _bk(t["base"]))) or changed
     return changed
 
 
@@ -17867,6 +18068,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 with _cloud_txn():
                     try:
                         self.ctx.remove(CLOUD_NAME)
+                    except StaleProfile:
+                        raise
                     except OSError:
                         pass
                 _set_turbo(self.ctx, False)
@@ -18100,6 +18303,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     self._send_json({"ok": False, "err": _KEY_NOT_SAVED})
                     return
                 cloud_revive(found + [model])
+            except StaleProfile:
+                raise
             except Exception as exc:
                 self._send_json({"ok": False, "err": str(exc)[:80]})
                 return
@@ -18161,6 +18366,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 if not host:
                     try:
                         self.ctx.remove(REMOTE_NAME)
+                    except StaleProfile:
+                        raise
                     except Exception:
                         pass
                     self._send_json({"ok": True, "cleared": True})
@@ -18189,6 +18396,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     _n = ssh_forget_host(remote_conf(), _SSH_CHANGED[0])
                     _SSH_CHANGED[0] = None
                     self._send_json({"ok": True, "removed": _n})
+                except StaleProfile:
+                    raise
                 except Exception as exc:
                     self._send_json({"ok": False, "err": "couldn't update "
                                      "ConcordeAI's host list: %s"
@@ -19892,6 +20101,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 emit("Here it is \u2014 **%s**, %s.\n\n[[dl:%s]]"
                      % (info["name"], _x_size(info["size"]),
                         json.dumps(info, separators=(",", ":"))))
+            except StaleProfile:
+                raise
             except Exception as exc:
                 step("export", "Couldn\u2019t write the file", "done",
                      str(exc)[:70])
@@ -19937,6 +20148,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     step("video", "Another render is running", "done", "")
                     emit("I\u2019m already making one \u2014 ask again when it "
                          "lands, and I\u2019ll start this straight after.")
+            except StaleProfile:
+                raise
             except Exception as exc:
                 step("video", "Couldn\u2019t make the video", "done",
                      str(exc)[:70])
@@ -19998,6 +20211,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     step("image", "Another render is running", "done", "")
                     emit("I\u2019m already making one \u2014 ask again when it "
                          "lands, and I\u2019ll start this straight after.")
+            except StaleProfile:
+                raise
             except Exception as exc:
                 step("image", "Couldn\u2019t generate the image", "done",
                      str(exc)[:70])
@@ -20352,10 +20567,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # which provider wrote this answer, if any (6b308): titles,
             # memory and map pins go back to it and nowhere else
             _ans_conf = _answered.pop(threading.get_ident(), None)
-            if _ans_conf and _title_cid:
+            # the profile this answer was for is no longer the active one
+            # (review of 6b329): no badge, no place pins (a call on its
+            # key), no export, no log lines, no memory pass
+            _gone = user_base.cancel.is_set()
+            if _ans_conf and _title_cid and not _gone:
                 _last_cloud[(user_base.name, _title_cid)] = (
                     _ans_conf, time.time())
-            if _ans_conf:
+            if _ans_conf and not _gone:
                 # the badge under the answer says "cloud", whatever the
                 # line-up said up front (a picture Claude read, 6b308);
                 # a chat with no id gets it too (6b326, from review)
@@ -20369,93 +20588,94 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # bold names either — both seen live). A tiny model reads
             # the finished answer and names the venues. Cheap, and it
             # only runs for place-shaped questions that searched.
-            try:
-                if sent[0]:
-                    step("draft", "Answer written", "done",
-                         "%d chars" % sent[0])
-                    step("polish", "Sharpened", "done", "")
-                # OSM already named the venues and knows where they are,
-                # so the local extraction pass is pure cost — pin them
-                # straight from the structured rows, mentioning only the
-                # ones the answer actually talked about.
-                _osmr = getattr(_tl_search, "osm", None) or []
-                if _osmr and sent[0] > 60 and not images:
-                    _ans = "".join(answer_buf).lower()
-                    _named = [p for p in _osmr if p["n"].lower() in _ans]
-                    _pick = (_named or _osmr)[:4]
-                    step("places", "Pinned the places", "done",
-                         "%d from OpenStreetMap" % len(_pick))
-                    try:
-                        _write((NUL + "PLACES2:" + json.dumps(
-                            [{"n": p["n"],
-                              "d": p["d"],
-                              "h": (p["h"] + (" · open now" if p.get("open")
-                                              else "")) if p["h"] else ""}
-                             for p in _pick]) + NUL).encode("utf-8"))
-                        if _pick and _pick[0].get("lat"):
-                            _write((NUL + "MAP:" + json.dumps(
-                                {"lat": _pick[0]["lat"],
-                                 "lon": _pick[0]["lon"],
-                                 "name": _pick[0]["n"]}) + NUL)
-                                .encode("utf-8"))
-                    except Exception:
-                        pass
-                elif (query and sent[0] > 120
-                        and (placey or bookish) and not images
-                        and (_ans_conf or not cloud_only)):
-                    step("places", "Finding the places", "run", "")
-                    ans = "".join(answer_buf)[-2400:]
-                    _pin_ask = [
-                        {"role": "user", "content":
-                         "From the text below, list the real venue "
-                         "names it recommends (bars, restaurants, "
-                         "cafes, shops). Output ONLY a JSON array of "
-                         "strings, max 4, nothing else. If there are "
-                         "none, output [].\n\nTEXT:\n" + ans}]
-                    # the model that JUST answered is already resident —
-                    # reaching for the 1B would swap engines and evict it.
-                    # A cloud answer is pinned by that provider's quick
-                    # model instead of loading a big local one (6b308)
-                    small = route_label or model_name
-                    # the answer's ticket, its key re-read now (6b326): a
-                    # provider removed or re-keyed since gets no call
-                    # and the chat gate again, now (6b326, from review)
-                    _pc = (_ticket_conf(_ans_conf)
-                           if _ans_conf and cloud_allowed(cloud_only)
-                           else None)
-                    _pm = (cloud_role_model(_provider_of(_pc), _pc,
-                                            "utility") if _pc else "")
-                    if _pm or small:
-                        got2 = []
-                        if _pm:
-                            got2.append(cloud_text(
-                                dict(_pc, model=_pm, role="utility"),
-                                _pin_ask, timeout=20, max_tokens=400,
-                                quiet=True))
-                        elif not cloud_only:
-                            run_model(small, _pin_ask, got2.append)
-                        raw2 = strip_think("".join(got2))
-                        m2 = re.search(r"\[[^\[\]]*\]", raw2, re.S)
-                        names = []
-                        if m2:
-                            try:
-                                names = [str(x)[:42] for x in
-                                         json.loads(m2.group(0))
-                                         if isinstance(x, str)][:4]
-                            except Exception:
-                                names = []
-                        low = ans.lower()
-                        names = [x for x in names
-                                 if 2 < len(x) < 42 and x.lower() in low]
-                        step("places", "Found the places", "done",
-                             "%d pinned" % len(names))
-                        if names:
+            if not _gone:
+                try:
+                    if sent[0]:
+                        step("draft", "Answer written", "done",
+                             "%d chars" % sent[0])
+                        step("polish", "Sharpened", "done", "")
+                    # OSM already named the venues and knows where they are,
+                    # so the local extraction pass is pure cost — pin them
+                    # straight from the structured rows, mentioning only the
+                    # ones the answer actually talked about.
+                    _osmr = getattr(_tl_search, "osm", None) or []
+                    if _osmr and sent[0] > 60 and not images:
+                        _ans = "".join(answer_buf).lower()
+                        _named = [p for p in _osmr if p["n"].lower() in _ans]
+                        _pick = (_named or _osmr)[:4]
+                        step("places", "Pinned the places", "done",
+                             "%d from OpenStreetMap" % len(_pick))
+                        try:
                             _write((NUL + "PLACES2:" + json.dumps(
-                                [{"n": x, "d": "", "h": ""} for x in names])
-                                + NUL).encode("utf-8"))
-            except Exception:
-                pass
-            if export_req and export_req["lane"] == "draft":
+                                [{"n": p["n"],
+                                  "d": p["d"],
+                                  "h": (p["h"] + (" · open now" if p.get("open")
+                                                  else "")) if p["h"] else ""}
+                                 for p in _pick]) + NUL).encode("utf-8"))
+                            if _pick and _pick[0].get("lat"):
+                                _write((NUL + "MAP:" + json.dumps(
+                                    {"lat": _pick[0]["lat"],
+                                     "lon": _pick[0]["lon"],
+                                     "name": _pick[0]["n"]}) + NUL)
+                                    .encode("utf-8"))
+                        except Exception:
+                            pass
+                    elif (query and sent[0] > 120
+                            and (placey or bookish) and not images
+                            and (_ans_conf or not cloud_only)):
+                        step("places", "Finding the places", "run", "")
+                        ans = "".join(answer_buf)[-2400:]
+                        _pin_ask = [
+                            {"role": "user", "content":
+                             "From the text below, list the real venue "
+                             "names it recommends (bars, restaurants, "
+                             "cafes, shops). Output ONLY a JSON array of "
+                             "strings, max 4, nothing else. If there are "
+                             "none, output [].\n\nTEXT:\n" + ans}]
+                        # the model that JUST answered is already resident —
+                        # reaching for the 1B would swap engines and evict it.
+                        # A cloud answer is pinned by that provider's quick
+                        # model instead of loading a big local one (6b308)
+                        small = route_label or model_name
+                        # the answer's ticket, its key re-read now (6b326): a
+                        # provider removed or re-keyed since gets no call
+                        # and the chat gate again, now (6b326, from review)
+                        _pc = (_ticket_conf(_ans_conf)
+                               if _ans_conf and cloud_allowed(cloud_only)
+                               else None)
+                        _pm = (cloud_role_model(_provider_of(_pc), _pc,
+                                                "utility") if _pc else "")
+                        if _pm or small:
+                            got2 = []
+                            if _pm:
+                                got2.append(cloud_text(
+                                    dict(_pc, model=_pm, role="utility"),
+                                    _pin_ask, timeout=20, max_tokens=400,
+                                    quiet=True))
+                            elif not cloud_only:
+                                run_model(small, _pin_ask, got2.append)
+                            raw2 = strip_think("".join(got2))
+                            m2 = re.search(r"\[[^\[\]]*\]", raw2, re.S)
+                            names = []
+                            if m2:
+                                try:
+                                    names = [str(x)[:42] for x in
+                                             json.loads(m2.group(0))
+                                             if isinstance(x, str)][:4]
+                                except Exception:
+                                    names = []
+                            low = ans.lower()
+                            names = [x for x in names
+                                     if 2 < len(x) < 42 and x.lower() in low]
+                            step("places", "Found the places", "done",
+                                 "%d pinned" % len(names))
+                            if names:
+                                _write((NUL + "PLACES2:" + json.dumps(
+                                    [{"n": x, "d": "", "h": ""} for x in names])
+                                    + NUL).encode("utf-8"))
+                except Exception:
+                    pass
+            if export_req and export_req["lane"] == "draft" and not _gone:
                 _txt = x_clean("".join(answer_buf))
                 _ext = export_req["ext"] or _SHAPE_FMT.get(
                     _export_shape(_txt), "md")
@@ -20465,6 +20685,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                        export_req.get("filename", ""))
                     emit("\n\n[[dl:%s]]" % json.dumps(
                         _info, separators=(",", ":")))
+                except StaleProfile:
+                    pass
                 except Exception as _exc:
                     emit("\n\nI wrote the answer but couldn\u2019t package "
                          "it: %s." % str(_exc)[:200])
@@ -20473,6 +20695,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # better" has numbers instead of vibes (grep-able JSONL)
             # (in the asking profile, 1a 5.7)
             try:
+                if _gone:
+                    raise StaleProfile("the profile changed")
                 qpath = user_base.path(QUALITY_FILE)
                 if os.path.exists(qpath) and \
                         os.path.getsize(qpath) > 2_000_000:
@@ -20482,16 +20706,20 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     "model": route_label or model_name,
                     "searched": bool(query), "chars": sent[0],
                 }) + "\n").encode("utf-8"), mode=0o644)
+            except StaleProfile:
+                pass            # a stale line lands nowhere, as it should
             except Exception:
                 pass
             # Settings › Usage counts answers too (6b325): one per
             # question a model's own text answered (memit), under the
             # model that wrote it
-            if _model_said[0]:
+            if _model_said[0] and not _gone:
                 try:
                     usage_put({"t": round(time.time(), 1), "a": 1, "m": str(
                         (_ans_conf or {}).get("model") or route_label
                         or model_name or "")[:80]})
+                except StaleProfile:
+                    pass
                 except Exception:
                     pass
             plain = prompt[8:] if prompt.lower().startswith("/search") \
@@ -20500,7 +20728,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # that same provider's quick model, so a keys-only user builds
             # memory too and the words reach no second company (6b308); a
             # local answer stays local, and Cloud Only never runs locally
-            if plain and len(plain) > 12 and (_ans_conf or not cloud_only):
+            if (plain and len(plain) > 12 and (_ans_conf or not cloud_only)
+                    and not _gone):
                 ctx_thread(
                     target=_extract_memory,
                     args=(route_label or (council[0] if council else ""),
@@ -21113,13 +21342,16 @@ class _WindowBridge:
         return None
 
 
-def _boot_heal(window, tries=[0]):
+_BOOT_HEALS = [0]          # fresh boot codes the window was given
+
+
+def _boot_heal(window):
     """A window that loaded its boot URL too late sits on the 403 for
     good: the code is spent or past its 60 s. Still on /?boot= after a
     load means that happened, so try a fresh code, twice at most."""
     try:
-        if "/?boot=" in _window_url() and tries[0] < 2:
-            tries[0] += 1
+        if "/?boot=" in _window_url() and _BOOT_HEALS[0] < 2:
+            _BOOT_HEALS[0] += 1
             window.load_url("http://127.0.0.1:%d/?boot=%s"
                             % (PORT, _mint_boot_code()))
     except Exception:
