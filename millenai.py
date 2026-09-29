@@ -96,7 +96,7 @@ MACHINE_STATE = frozenset((
     "EXPORT_KIND",
     # the backdrops, the search proxy, provider quirks, locks' depth
     "_sky_jobs", "_sky_tls", "_SEARCH_PROXY", "_stream_usage_off",
-    "_cloud_depth",
+    "_cloud_depth", "_usage_thread",
     # read-aloud's process and file: _stop_speaking empties them at every
     # switch, before the epoch moves; the quit's own turn flush
     "_say_feeds", "_say_file", "_turns_flushing",
@@ -1783,7 +1783,9 @@ def _provider_of(c: dict) -> str:
     return ""
 
 
-_dead_loaded = profile_cache("_dead_loaded", [False], reset=lambda c: c.__setitem__(0, False))
+_dead_loaded = profile_cache(
+    "_dead_loaded", [False],
+    reset=lambda c: c.__setitem__(slice(None), [False]))
 
 
 def _dead_seed():
@@ -2406,7 +2408,8 @@ def cloud_candidates(pid: str, ids, role: str = "seat",
 # in 2.7s. Benching the whole provider for that took gpt-oss (the Fast
 # tier's first rung) down with Qwen. Now the model rests and the next
 # ranked model from the same provider takes its place.
-_model_rest = profile_cache("_model_rest", {})          # model id -> unix time it may be asked again
+# model id -> unix time it may be asked again
+_model_rest = profile_cache("_model_rest", {})
 _model_rest_lock = threading.Lock()
 
 
@@ -2661,7 +2664,9 @@ def _cloud_refresh_picks():
         pass
 
 
-_repaired = profile_cache("_repaired", [False], reset=lambda c: c.__setitem__(0, False))
+_repaired = profile_cache(
+    "_repaired", [False],
+    reset=lambda c: c.__setitem__(slice(None), [False]))
 
 
 def _cloud_repair():
@@ -2867,7 +2872,8 @@ def claude_refusal_conf(c: dict):
 # (_ticket_conf) and makes no call when the provider is gone or its key
 # is no longer the one that answered.
 _answered = profile_cache("_answered", {})            # thread -> ticket of the answer it streamed
-_last_cloud = profile_cache("_last_cloud", {})          # (user key, chat id) -> (ticket, time), /api/title
+# (user key, chat id) -> (ticket, time), /api/title
+_last_cloud = profile_cache("_last_cloud", {})
 
 
 def _cloud_ticket(c: dict) -> dict:
@@ -2902,7 +2908,10 @@ def _mark_answered(c: dict):
         pass
 
 
-_bal_cache = profile_cache("_bal_cache", {})   # pid -> (expires_ts, text)
+# (profile, pid, key fingerprint) -> (expires_ts, text): a balance is
+# never shown for another profile's key, or for a key since replaced
+# (1a 5.4); emptied at every switch too
+_bal_cache = profile_cache("_bal_cache", {})
 
 
 def cloud_balance(pid: str, c: dict) -> str:
@@ -2915,7 +2924,9 @@ def cloud_balance(pid: str, c: dict) -> str:
     if pid != "kimi" or not (c.get("key") and c.get("base")):
         return ""
     now = time.time()
-    hit = _bal_cache.get(pid)
+    ck = (getattr(getattr(_tl_ctx, "ctx", None), "name", ""), pid,
+          _key_fp(c.get("key")))
+    hit = _bal_cache.get(ck)
     if hit and hit[0] > now:
         return hit[1]
     text = ""
@@ -2930,7 +2941,7 @@ def cloud_balance(pid: str, c: dict) -> str:
             text = "$%.2f left" % avail
     except Exception:
         text = ""                 # a balance is a nicety, never a blocker
-    _bal_cache[pid] = (now + 300, text)
+    _bal_cache[ck] = (now + 300, text)
     return text
 
 
@@ -4034,7 +4045,9 @@ def weather_snippets(q: str):
         return None
 
 
-_search_cache = profile_cache("_search_cache", {"query": "", "data": "", "timestamp": 0.0}, reset=lambda d: (d.clear(), d.update(query="", data="", timestamp=0.0)))
+_search_cache = profile_cache(
+    "_search_cache", {"query": "", "data": "", "timestamp": 0.0},
+    reset=lambda d: (d.clear(), d.update(query="", data="", timestamp=0.0)))
 _search_lock = threading.Lock()
 
 # Auto-search: local models have a training cutoff and no clock, so anything
@@ -9049,6 +9062,15 @@ def test_profile_op(d: dict) -> dict:
                         "persona", text))
                 elif kind == "quality":
                     ctx.append(QUALITY_FILE, (text + "\n").encode())
+                elif kind == "remote":
+                    if not _remote_save({"host": text, "user": "u"}):
+                        raise StaleProfile("not saved")
+                elif kind == "usage":
+                    usage_put({"t": round(time.time(), 1), "m": text, "w": "local",
+                               "n": 1, "i": 1, "o": 1})
+                    usage_flush()
+                    if not any(r.get("m") == text for r in usage_read(ctx)):
+                        raise StaleProfile("not recorded")
                 else:
                     raise ValueError(kind)
                 _TEST_LATE[jid] = "ok"
@@ -9252,9 +9274,11 @@ def store_chats(items: list, base, legacy=False, erase=False):
 _CHAT_ID = re.compile(r"c[0-9a-z-]{1,48}")
 _CHAT_LANES = ("ai", "code", "funnel")
 CHAT_UNDO_S = 6.0
-_chat_stubs = profile_cache("_chat_stubs", {})        # deleted id -> {"at", "chat", "idx", "bk"}, 6 s of undo
+# deleted id -> {"at", "chat", "idx", "bk"}, 6 s of undo
+_chat_stubs = profile_cache("_chat_stubs", {})
 _chat_gone = profile_cache("_chat_gone", set())      # ids deleted for good in this run
-_chat_finals = profile_cache("_chat_finals", {})       # folder -> ids made final, until the next write
+# folder -> ids made final, until the next write
+_chat_finals = profile_cache("_chat_finals", {})
 
 
 def _new_chat_id() -> str:
@@ -12136,7 +12160,9 @@ def _tz_of(lat, lon) -> str:
     return tz
 
 
-_HOME_TZ = profile_cache("_HOME_TZ", {"key": None, "tz": "", "place": ""}, reset=lambda d: d.update(key=None, tz="", place=""))
+_HOME_TZ = profile_cache(
+    "_HOME_TZ", {"key": None, "tz": "", "place": ""},
+    reset=lambda d: (d.clear(), d.update(key=None, tz="", place="")))
 
 
 def _home_tz():
@@ -12931,8 +12957,9 @@ _usage_qlock = threading.Lock()
 _usage_lock = threading.RLock()      # the file: appends, reads, rewrites
 _usage_wake = threading.Event()
 _usage_state = profile_cache(
-    "_usage_state", {"thread": None, "backfilled": False, "compacted": 0.0},
-    reset=lambda d: d.update(backfilled=False, compacted=0.0))
+    "_usage_state", {"backfilled": False, "compacted": 0.0},
+    reset=lambda d: (d.clear(), d.update(backfilled=False, compacted=0.0)))
+_usage_thread = {"t": None}          # the writer: the machine's
 
 
 class _URec(dict):
@@ -13047,11 +13074,11 @@ def usage_put(rec: dict):
         _usage_q.append(rec)
         if len(_usage_q) > 20000:          # a disk that won't take them
             del _usage_q[:len(_usage_q) - 20000]
-        th = _usage_state["thread"]
+        th = _usage_thread["t"]
         if th is None or not th.is_alive():
             th = ctx_thread(target=_usage_writer, name="usage",
                                   daemon=True)
-            _usage_state["thread"] = th
+            _usage_thread["t"] = th
             th.start()
     _usage_wake.set()
 
@@ -14865,7 +14892,10 @@ SSH_OWN_SETTINGS = ("ConcordeAI connects with its own settings; put the "
 SSH_KEY_CHANGED = ("This server's identity changed since ConcordeAI first "
                    "connected. If you rebuilt it, forget its old key.")
 _SSH_CHANGED_RX = re.compile(r"Host key for (\S+) has changed")
-_SSH_CHANGED = profile_cache("_SSH_CHANGED", [None], reset=lambda c: c.__setitem__(0, None))       # the host ssh last said changed, for Forget
+# the host ssh last said changed, for Forget
+_SSH_CHANGED = profile_cache(
+    "_SSH_CHANGED", [None],
+    reset=lambda c: c.__setitem__(slice(None), [None]))
 
 
 _REMOTE_FIELDS = ("host", "user", "port", "key", "jump")

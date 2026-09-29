@@ -4047,7 +4047,8 @@ _UN = {"USAGE_FILE", "USAGE_RAW_DAYS", "USAGE_HOURLY_DAYS", "USAGE_COMPACT_BYTES
        "_usage_est", "_usage_est_in", "usage_counts", "usage_note", "usage_put",
        "_usage_writer", "_usage_write_all", "usage_flush", "_usage_load", "usage_read",
        "_usage_backfill", "usage_compact", "_usage_floor", "_usage_next", "usage_query",
-       "_usage_edges", "_usage_at_exit", "_replace_into", "_usage_flush_one", "_URec"}
+       "_usage_edges", "_usage_at_exit", "_replace_into", "_usage_flush_one", "_URec",
+       "_usage_thread"}
 
 
 class _SRE25(Exception):
@@ -8988,8 +8989,10 @@ check("the council: with cloud power off a bench list and a cloud compositor rea
 # discovery and the Kimi balance run on a saved key whatever the switch
 # says (Patrick, 2026-09-28): the refresh starts at the first
 # cloud_ok_providers() and the balance asks Moonshot, the switch off
-_dn = dict(_LH)
-_exec_names(_dn, {"_repaired", "_cloud_repair", "cloud_balance", "_bal_cache"})
+_dn = dict(_LH, hmac=__import__("hmac"))
+# (6b329) the balance is cached per profile, provider and key fingerprint
+_exec_names(_dn, {"_repaired", "_cloud_repair", "cloud_balance", "_bal_cache", "_key_fp",
+                  "_KEY_FP_SALT"})
 _started26 = []
 _dn.update(threading=_t17.SimpleNamespace(Thread=lambda target, args=(), daemon=True:
                                           _t17.SimpleNamespace(start=lambda: _started26.append(
@@ -10620,6 +10623,977 @@ check("6b328: packaging/qt-arm64-requirements.txt pins PyQt6, its Qt, sip, WebEn
       and all(ord(c) < 128 for c in _rq8),
       "%r" % _pins8)
 # ---- end 6b328
+
+# ==== m8 profiles: begin ====
+print("== accounts step 8: profiles core (6b329) ==")
+# ONE PERSON'S DATA NEVER REACHES ANOTHER'S PROFILE (1a 5.2-5.7, M8 of the
+# sign-in plan). Every personal read and write goes through the ctx of the
+# profile it belongs to, and a write under a ctx that is no longer active
+# lands nowhere. A missed site is a cross-profile leak, so the lints below
+# are the guard, and each is shown to bite. The live checks are the
+# no-server form: "This computer" is A, a local test profile is B.
+import ast as _a8
+import hashlib as _h8
+import threading as _t8
+
+_S8 = _MILLENAI_SRC
+_T8 = _a8.parse(_S8)
+
+
+def _exec8(ns, names):
+    """The named top-level definitions, with the profile sections."""
+    _prof_in(ns)
+    for n_ in _T8.body:
+        nm_ = getattr(n_, "name", None)
+        if nm_ is None and isinstance(n_, _a8.Assign):
+            nm_ = next((getattr(t, "id", None) for t in n_.targets), None)
+        if nm_ in names:
+            exec(_a8.get_source_segment(_S8, n_), ns)
+
+
+def _jsfn8(src_, head_):
+    i_ = src_.index(head_)
+    return src_[i_:src_.index("\n}\n", i_) + 3]
+
+
+def _sect8(src, tag):
+    a = src.index("# ==== %s: begin ====" % tag)
+    b = src.index("# ==== %s: end ====" % tag)
+    return src.count("\n", 0, a) + 1, src.count("\n", 0, b) + 1
+
+
+def _owners8(tree):
+    """(owner, node): a module function, a class's method ("Class.method"),
+    or "<module>" for module-level statements."""
+    for top in tree.body:
+        if isinstance(top, (_a8.FunctionDef, _a8.AsyncFunctionDef)):
+            yield top.name, top
+        elif isinstance(top, _a8.ClassDef):
+            for m in top.body:
+                if isinstance(m, (_a8.FunctionDef, _a8.AsyncFunctionDef)):
+                    yield top.name + "." + m.name, m
+                else:
+                    yield top.name, m
+        else:
+            yield "<module>", top
+
+
+_CONT8 = {"dict", "list", "set", "defaultdict", "OrderedDict", "deque", "Counter",
+          "local", "WeakValueDictionary", "WeakKeyDictionary", "bytearray"}
+_MUTS8 = {"append", "extend", "insert", "pop", "popitem", "remove", "clear", "update",
+          "setdefault", "add", "discard", "sort", "reverse", "appendleft", "extendleft",
+          "popleft", "rotate", "difference_update", "intersection_update",
+          "symmetric_difference_update", "__setitem__", "__delitem__"}
+
+
+def _lit8(tree, name):
+    n = next(n for n in tree.body if isinstance(n, _a8.Assign)
+             and getattr(n.targets[0], "id", "") == name)
+    return _a8.literal_eval(n.value.args[0])
+
+
+def _container_lint8(src):
+    """A module-level container that is mutated anywhere is declared: a
+    profile_cache(...) where it is made, or named in MACHINE_STATE (which
+    names only containers that exist, and no profile cache)."""
+    tree = _a8.parse(src)
+    conts, prof = {}, set()
+    for n in tree.body:
+        if isinstance(n, _a8.Assign):
+            for t in n.targets:
+                if not isinstance(t, _a8.Name):
+                    continue
+                v = n.value
+                if isinstance(v, _a8.Call) and getattr(v.func, "id", "") == "profile_cache":
+                    prof.add(t.id)
+                    conts[t.id] = n.lineno
+                elif isinstance(v, (_a8.Dict, _a8.List, _a8.Set, _a8.DictComp, _a8.ListComp,
+                                    _a8.SetComp)) or (
+                        isinstance(v, _a8.Call) and (getattr(v.func, "attr", None)
+                                                     or getattr(v.func, "id", "")) in _CONT8):
+                    conts[t.id] = n.lineno
+    mut = set()
+    for node in _a8.walk(tree):
+        tg = []
+        if isinstance(node, (_a8.Assign, _a8.AugAssign, _a8.AnnAssign)):
+            tg = node.targets if isinstance(node, _a8.Assign) else [node.target]
+        elif isinstance(node, _a8.Delete):
+            tg = node.targets
+        for t in tg:
+            b = t
+            while isinstance(b, (_a8.Subscript, _a8.Attribute)):
+                b = b.value
+            if isinstance(b, _a8.Name) and b is not t:
+                mut.add(b.id)
+            if isinstance(node, _a8.AugAssign) and isinstance(t, _a8.Name):
+                mut.add(t.id)
+        if isinstance(node, _a8.Call) and isinstance(node.func, _a8.Attribute) \
+                and node.func.attr in _MUTS8:
+            b = node.func.value
+            while isinstance(b, (_a8.Subscript, _a8.Attribute)):
+                b = b.value
+            if isinstance(b, _a8.Name):
+                mut.add(b.id)
+        if isinstance(node, _a8.Global):
+            mut.update(node.names)
+    ms = set(_lit8(tree, "MACHINE_STATE"))
+    bad = ["undeclared " + nm for nm in sorted(conts) if nm in mut and nm not in prof
+           and nm not in ms]
+    bad += ["MACHINE_STATE names a missing " + nm for nm in sorted(ms - set(conts))]
+    bad += ["both " + nm for nm in sorted(ms & prof)]
+    return bad, len(prof), len(ms)
+
+
+_WCALLS8 = {"os.makedirs", "os.mkdir", "os.replace", "os.rename", "os.remove", "os.unlink",
+            "os.rmdir", "os.removedirs", "os.link", "os.symlink", "os.truncate", "os.chmod",
+            "os.fchmod", "tempfile.mkstemp", "tempfile.mkdtemp",
+            "tempfile.NamedTemporaryFile", "shutil.rmtree", "shutil.move", "shutil.copy",
+            "shutil.copy2", "shutil.copyfile", "shutil.copytree", "shutil.copyfileobj"}
+_CTXN8 = {"bound_ctx", "current_ctx", "bind_ctx", "ProfileCtx", "user_prefs", "profile_local",
+          "user_prefs_update", "profile_local_update", "_cloud_file", "_known_hosts_path",
+          "image_dir", "video_dir", "export_dir", "ctx"}
+
+
+def _wkind8(call):
+    nm = _a8.unparse(call.func)
+    if nm in _WCALLS8:
+        return nm
+    if nm == "os.open":
+        fl = _a8.unparse(call.args[1]) if len(call.args) > 1 else ""
+        return nm if any(w in fl for w in ("O_WRONLY", "O_RDWR", "O_CREAT", "O_APPEND",
+                                           "O_TRUNC")) else None
+    if nm in ("open", "io.open", "builtins.open", "os.fdopen"):
+        mode = call.args[1] if len(call.args) > 1 else None
+        for k in call.keywords:
+            if k.arg == "mode":
+                mode = k.value
+        if nm == "os.fdopen":
+            return None       # the fd came from a call the lint already saw
+        if mode is None:
+            return None
+        if not isinstance(mode, _a8.Constant):
+            return "open(?)"
+        return "open(%s)" % mode.value if any(c in str(mode.value) for c in "wax+") else None
+    return None
+
+
+def _write_lint8(src):
+    """Every write, replace, delete or folder made outside the profile
+    section sits in a function MACHINE_IO names; a MACHINE_IO function
+    never touches a ctx, and every name it lists writes something."""
+    lo, hi = _sect8(src, "profile")
+    tree = _a8.parse(src)
+    mio = set(_lit8(tree, "MACHINE_IO"))
+    bad, used, n = [], set(), 0
+    for owner, node in _owners8(tree):
+        if lo <= node.lineno <= hi:
+            continue
+        for ch in _a8.walk(node):
+            if isinstance(ch, _a8.Call):
+                k = _wkind8(ch)
+                if k:
+                    n += 1
+                    if owner in mio:
+                        used.add(owner)
+                    else:
+                        bad.append("%s in %s (line %d)" % (k, owner, ch.lineno))
+            if owner in mio and (isinstance(ch, _a8.Name) and ch.id in _CTXN8
+                                 or isinstance(ch, _a8.arg) and ch.arg == "ctx"):
+                bad.append("MACHINE_IO %s touches a ctx (line %d)" % (owner, ch.lineno))
+    bad += ["MACHINE_IO names %s, which writes nothing" % x for x in sorted(mio - used)]
+    return bad, n, len(mio)
+
+
+_CTXF8 = ("load_chats", "store_chats", "_write_chats", "chat_ops", "chat_append_turn",
+          "chat_append_late", "_load_memory", "_save_memory", "memory_text",
+          "_extract_memory", "run_export", "_write_image_bytes", "generate_image",
+          "generate_video", "_veo_video", "_cloud_save_state", "_chat_finalize",
+          "_migrate_61", "_legacy_sync_chats", "_legacy_sync_memory", "user_prefs",
+          "profile_local", "user_prefs_update", "profile_local_update", "prefs_adopt",
+          "split_prefs", "prefs_view", "_media_land", "_sweep_exports", "_set_turbo")
+
+
+def _ctxarg8(src):
+    """1a 5.3's AST check: every call of these passes its ctx argument,
+    and never as a constant; each still takes one."""
+    tree = _a8.parse(src)
+    where = {}
+    for n in _a8.walk(tree):
+        if isinstance(n, _a8.FunctionDef) and n.name in _CTXF8 and n.name not in where:
+            names = [a.arg for a in n.args.args]
+            p = next((i for i, a in enumerate(names) if a in ("ctx", "base")), None)
+            dflt = len(names) - len(n.args.defaults)
+            where[n.name] = (p, names[p] if p is not None else None,
+                             p is not None and p >= dflt)
+    bad = ["%s takes no ctx" % f for f in _CTXF8 if f not in where or where[f][0] is None]
+    bad += ["%s's ctx has a default" % f for f, w in where.items() if w[2]]
+    n = 0
+    for c in _a8.walk(tree):
+        if isinstance(c, _a8.Call) and isinstance(c.func, _a8.Name) and c.func.id in where:
+            n += 1
+            pos, kw, _d = where[c.func.id]
+            arg = c.args[pos] if pos is not None and len(c.args) > pos else next(
+                (k.value for k in c.keywords if k.arg == kw), None)
+            if arg is None or isinstance(arg, _a8.Constant) or any(
+                    isinstance(a, _a8.Starred) for a in c.args):
+                bad.append("%s without its ctx (line %d)" % (c.func.id, c.lineno))
+    return bad, n
+
+
+# who may ask which profile is active: a request's start, the boot and
+# the switch, the test hooks, the janitor's export sweep (each removal
+# epoch-checked) and the quit's flush
+_CUR_OK8 = {"StudioHandler._run", "profile_resume", "profile_switch", "test_profile_op",
+            "sweep_all_exports", "_turns_flush"}
+
+
+def _callers8(src):
+    """current_ctx only where a profile is taken; load_prefs/store_prefs
+    only in the profile section; no raw thread outside it; every literal
+    key read through an accessor is one of its set's."""
+    lo, hi = _sect8(src, "profile")
+    tree = _a8.parse(src)
+    ns = {"threading": _t8, "os": os, "json": json,
+          "contextlib": __import__("contextlib"), "functools": __import__("functools"),
+          "re": re, "time": time, "secrets": __import__("secrets"),
+          "tempfile": tempfile, "hashlib": _h8, "shutil": shutil}
+    exec(src[src.index("# ==== profile: begin ===="):src.index("# ==== profile: end ====")],
+         ns)
+    cls = ns["pref_class"]
+    acc = {"machine_prefs": "machine", "user_prefs": "synced", "profile_local": "local"}
+    bad, keys = [], 0
+    for owner, node in _owners8(tree):
+        inside = lo <= node.lineno <= hi
+        for c in _a8.walk(node):
+            if not isinstance(c, _a8.Call):
+                continue
+            fid = getattr(c.func, "id", None)
+            if fid == "current_ctx" and owner not in _CUR_OK8:
+                bad.append("current_ctx in %s (line %d)" % (owner, c.lineno))
+            if fid in ("load_prefs", "store_prefs") and not inside:
+                bad.append("%s in %s (line %d)" % (fid, owner, c.lineno))
+            if _a8.unparse(c.func) in ("threading.Thread", "threading.Timer",
+                                       "_thread.start_new_thread") and not inside:
+                bad.append("a raw thread in %s (line %d)" % (owner, c.lineno))
+            if isinstance(c.func, _a8.Attribute) and c.func.attr in ("get", "pop", "setdefault") \
+                    and isinstance(c.func.value, _a8.Call) \
+                    and getattr(c.func.value.func, "id", None) in acc \
+                    and c.args and isinstance(c.args[0], _a8.Constant):
+                keys += 1
+                if cls(c.args[0].value) != acc[c.func.value.func.id]:
+                    bad.append("%s read through %s (line %d)" % (
+                        c.args[0].value, c.func.value.func.id, c.lineno))
+    return bad, keys
+
+
+def _lints8(src):
+    out = {}
+    for nm, fn in (("container", _container_lint8), ("write", _write_lint8),
+                   ("ctx-arg", _ctxarg8), ("callers", _callers8)):
+        try:
+            out[nm] = fn(src)
+        except Exception as e_:
+            out[nm] = (["raised %r" % e_],)
+    return out
+
+
+_L8 = _lints8(_S8)
+check("profiles: the container, write/makedirs, ctx-argument and caller lints pass",
+      all(not v[0] for v in _L8.values()) and _L8["container"][1] >= 20
+      and _L8["ctx-arg"][1] >= 80 and _L8["write"][1] >= 60 and _L8["callers"][1] >= 15,
+      "%r" % {k: v[0][:6] for k, v in _L8.items()})
+
+
+def _mut8(src, old, new):
+    assert src.count(old) >= 1, old[:60]
+    return src.replace(old, new, 1)
+
+
+# each lint bites: a planted site of each kind fails the lint that guards it
+_LM8 = [
+    ("container", "a new module-level cache that is written",
+     "\n\ndef memory_text(base) -> str:", "\n\n_leak8 = {}\n\n\ndef _leak8_put(k, v):\n"
+     "    _leak8[k] = v\n\n\ndef memory_text(base) -> str:"),
+    ("container", "the search cache undeclared",
+     '_search_cache = profile_cache(\n    "_search_cache", {"query": "", "data": "", "timestamp": 0.0},\n'
+     '    reset=lambda d: (d.clear(), d.update(query="", data="", timestamp=0.0)))',
+     '_search_cache = {"query": "", "data": "", "timestamp": 0.0}'),
+    ("container", "a stale MACHINE_STATE name", '    "_cloud_depth", ', '    "_cloud_depth", "_gone8", '),
+    ("container", "a profile cache also named machine state", '    "_cloud_depth", ',
+     '    "_cloud_depth", "_search_cache", '),
+    ("write", "os.makedirs outside the profile module",
+     "    try:\n        facts = _load_memory(base)[-40:]",
+     "    os.makedirs(\"x8\", exist_ok=True)\n    try:\n        facts = _load_memory(base)[-40:]"),
+    ("write", "an open-for-write in a reader",
+     "    try:\n        facts = _load_memory(base)[-40:]",
+     "    open(\"x8\", \"w\").close()\n    try:\n        facts = _load_memory(base)[-40:]"),
+    ("write", "os.replace outside the profile module",
+     "    try:\n        facts = _load_memory(base)[-40:]",
+     "    os.replace(\"a8\", \"b8\")\n    try:\n        facts = _load_memory(base)[-40:]"),
+    ("write", "shutil in a request handler",
+     "        if self.path == \"/api/test/profile\"",
+     "        shutil.rmtree(\"x8\", ignore_errors=True)\n        if self.path == \"/api/test/profile\""),
+    ("write", "a MACHINE_IO function that reads the profile",
+     "def drop_run_file(path):\n", "def drop_run_file(path):\n    bound_ctx()\n"),
+    ("write", "a MACHINE_IO name that writes nothing", '    "_cloud_txn",\n', '    "_cloud_txn", "memory_text",\n'),
+    ("ctx-arg", "load_chats(None)", "_cs = load_chats(self.ctx)", "_cs = load_chats(None)"),
+    ("ctx-arg", "a store call with its ctx left out",
+     "            _save_memory(items, base)\n", "            _save_memory(items)\n"),
+    ("ctx-arg", "a ctx with a default", "def run_export(text: str, ext: str, title: str, base,",
+     "def run_export(text: str, ext: str, title: str, base=None,"),
+    ("callers", "background code asking for the active profile",
+     "        if not facts or (getattr(base, \"cancel\", None)",
+     "        base = current_ctx()\n        if not facts or (getattr(base, \"cancel\", None)"),
+    ("callers", "a raw thread", "        ctx_thread(\n                    target=_extract_memory,",
+     "        threading.Thread(\n                    target=_extract_memory,"),
+    ("callers", "load_prefs outside the accessors", "    offers = machine_prefs().get(\"model_offers\")",
+     "    offers = load_prefs(None).get(\"model_offers\")"),
+    ("callers", "a personal key read as the machine's",
+     "        return bool(profile_local(bound_ctx()).get(\"turbo\"))",
+     "        return bool(machine_prefs().get(\"turbo\"))"),
+    ("callers", "home_area read through the wrong set",
+     "        return str(user_prefs(bound_ctx()).get(\"home_area\") or \"\").strip()",
+     "        return str(profile_local(bound_ctx()).get(\"home_area\") or \"\").strip()"),
+]
+_lm8 = []
+for _k8, _d8, _o8, _n8 in _LM8:
+    try:
+        _r8 = _lints8(_mut8(_S8, _o8, _n8))[_k8][0]
+        _lm8.append((_d8, bool(_r8) and not any(str(x).startswith("raised") for x in _r8)))
+    except AssertionError as e_:
+        _lm8.append((_d8, "anchor missing: %s" % e_))
+check("profiles: each lint bites (%d planted sites, each caught)" % len(_LM8),
+      all(ok is True for _d, ok in _lm8), "%r" % [x for x in _lm8 if x[1] is not True])
+
+
+# every settings key the page posts is one a set names: an unnamed key
+# would be dropped by split_prefs, and a feature would quietly stop saving
+def _bal8(s_, i_):
+    d_ = 0
+    for j_ in range(i_, len(s_)):
+        d_ += {"(": 1, ")": -1}.get(s_[j_], 0)
+        if d_ == 0:
+            return s_[i_ + 1:j_]
+    return ""
+
+
+_pk8 = set()
+for _m8 in re.finditer(r'api\("/api/prefs",\{method:"POST"', _S8):
+    _k8 = _S8.index("JSON.stringify(", _m8.start()) + len("JSON.stringify")
+    _pk8 |= set(re.findall(r"([a-z_]+):", _bal8(_S8, _k8)))
+for _m8 in re.finditer(r"(?<![\w.])(?:prefSet|stamp)\(", _S8):
+    _pk8 |= set(re.findall(r"([a-z_]+):", _bal8(_S8, _m8.end() - 1)))
+_stt8 = _S8[_S8.index("function setTier(name,quiet){"):]
+_pk8 |= set(re.findall(r"\bo\.([a-z_]+)=", _stt8[:_stt8.index("\n}\n")]))
+_pc8 = {}
+_prof_in(_pc8)
+_un8 = sorted(k for k in _pk8 if _pc8["pref_class"](k) is None)
+check("the settings split names every key the page saves (%d)" % len(_pk8),
+      len(_pk8) >= 23 and not _un8
+      and {"tier", "agent", "advon", "persona", "turbo", "wizard_done", "remind_models_off"} <= _pk8,
+      "%r" % [_un8, sorted(_pk8)])
+
+# ---- the profile module itself, run on temporary folders
+def _pm8(src_prof=None, hooks=frozenset()):
+    """A fresh namespace with the profile sections (src_prof: a mutated
+    profile section) on a temporary data folder: "This computer" active."""
+    d = tempfile.mkdtemp(dir=_SMOKE_TMP)
+    ns = {"TEST_HOOKS": hooks, "IS_WIN": False, "app_dir": lambda: d,
+          "_hook_arg": lambda n: "", "_stop_speaking": lambda: None,
+          "_chat_finalize": lambda base, now=None: None}
+    for m in ("os", "json", "threading", "contextlib", "secrets", "tempfile", "hashlib",
+              "time", "re", "shutil", "functools"):
+        ns[m] = __import__(m)
+    exec(_prof_sect("profile caches") + "\n" + (src_prof or _prof_sect("profile")), ns)
+    ns["_INSTANCE_HELD"][0] = True
+    root = ns["profile_boot"]()
+    return ns, d, root
+
+
+def _pm8_run(src_prof=None):
+    """The module's rules, each a named result (True when it holds)."""
+    r = {}
+    ns, d, root = _pm8(src_prof, hooks=frozenset({"profiles"}))
+    SP, PSE = ns["StaleProfile"], ns["PrefScopeError"]
+
+    def raises(exc, fn, *a, **k):
+        try:
+            fn(*a, **k)
+            return False
+        except exc:
+            return True
+        except Exception:
+            return False
+    # a switch: the old ctx is cancelled, its writes refused and nothing made
+    B = ns["test_profile_create"]()
+    r["test profile folder, 0600 key"] = (
+        os.path.isdir(B.dir) and oct(os.stat(os.path.join(B.dir, "account.key")).st_mode)[-3:]
+        == "600" and json.load(open(os.path.join(B.dir, "account.key"))).get("test") is True)
+    c1 = ns["profile_cache"]("t8", {})
+    c2 = ns["profile_cache"]("t8b", [None], reset=lambda c: c.__setitem__(0, None))
+    c1["k"] = "A-data"
+    c2[0] = "A-data"
+    stage = ns["stage_path"](".md")
+    open(stage, "w").write("late")
+    st0 = ns["_PROFILE"]["stale"]
+    ns["profile_switch"](B)
+    r["a switch cancels the old ctx"] = root.cancel.is_set() and not B.cancel.is_set()
+    r["a switch empties every profile cache"] = c1 == {} and c2 == [None]
+    r["a stale write is refused and makes nothing"] = (
+        raises(SP, root.write, "late8.json", {"x": 1})
+        and raises(SP, root.write_bytes, "images/late8.png", b"x")
+        and raises(SP, root.append, "quality.jsonl", b"x\n")
+        and raises(SP, root.update_json, "prefs.json", lambda v: {"x": 1})
+        and raises(SP, root.adopt, stage, "exports/late8.md")
+        and not os.path.exists(os.path.join(d, "late8.json"))
+        and not os.path.exists(os.path.join(d, "images"))
+        and not os.path.exists(os.path.join(d, "exports"))
+        and not os.path.exists(stage)
+        and ns["_PROFILE"]["stale"] == st0 + 5)
+    r["a stale settings write is refused"] = raises(
+        SP, ns["user_prefs_update"], root, lambda v: v.__setitem__("persona", "late")) \
+        and not os.path.exists(os.path.join(d, "prefs.json"))
+    # the split: each set in its own file, compare-and-set, unknown ignored
+    out = ns["split_prefs"](B, {"persona": "B persona", "tier": "Fast", "no_limits": True,
+                                "bogus8": 1, "length": 9})
+    jl = lambda *p: json.load(open(os.path.join(*p)))
+    r["an account's keys go to personal.json, local.json and the machine's prefs.json"] = (
+        out["changed"] == ["no_limits", "persona", "tier"]
+        and out["ignored"] == ["bogus8", "length"]
+        and jl(B.dir, "personal.json") == {"persona": "B persona"}
+        and jl(B.dir, "local.json") == {"tier": "Fast"}
+        and jl(d, "prefs.json") == {"no_limits": True}
+        and jl(B.dir, "sync", "state.json")["written"] == ["personal.json", "local.json"])
+    r["an unchanged value writes nothing"] = ns["split_prefs"](
+        B, {"persona": "B persona", "tier": "Fast"})["changed"] == []
+    cas = ns["split_prefs"](B, {"persona": "mine"}, {"persona": "what I saw"})
+    r["compare-and-set: a key changed underneath isn't written"] = (
+        cas["conflict"] == {"persona": "B persona"} and cas["changed"] == []
+        and jl(B.dir, "personal.json") == {"persona": "B persona"})
+    v = ns["prefs_view"](B)
+    r["an account's view: the machine's keys, then its own"] = v == {
+        "no_limits": True, "persona": "B persona", "tier": "Fast"}
+    r["a key read through the wrong set is loud"] = (
+        raises(PSE, lambda: ns["user_prefs"](B).get("turbo"))
+        and raises(PSE, lambda: ns["machine_prefs"]().get("persona"))
+        and raises(PSE, lambda: ns["profile_local"](B).get("no_limits")))
+    # back to "This computer", erasing B: B's late write makes no folder
+    late = B
+    ns["profile_switch"](ns["ProfileCtx"]("local", d), erase_old=True)
+    root2 = ns["current_ctx"]()
+    r["an erased profile's late write doesn't bring its folder back"] = (
+        not os.path.exists(late.dir) and raises(SP, late.write, "chats.v2.json", {})
+        and not os.path.exists(late.dir))
+    gone = ns["ProfileCtx"]("test", os.path.join(d, "accounts", "0" * 32), "0" * 32)
+    ns["_PROFILE"]["ctx"] = gone        # active, but its folder isn't there
+    r["an active profile whose folder is gone makes none"] = (
+        raises(SP, gone.write, "chats.v2.json", {}) and not os.path.exists(gone.dir))
+    ns["_PROFILE"]["ctx"] = root2
+    # "This computer": everything in prefs.json, as before; the Studio's
+    # negative prompt is the profile's, its other fields the machine's
+    ns["split_prefs"](root2, {"persona": "A", "tier": "Pro", "wizard_done": True})
+    ns["machine_prefs_update"](lambda m: m.__setitem__("studio_opts", {"image": {"steps": 6}}))
+    ns["profile_local_update"](root2, lambda l: l.__setitem__("studio_opts.*.neg",
+                                                               {"image": "blurry"}))
+    ns["machine_prefs_update"](lambda m: m["studio_opts"]["image"].__setitem__("steps", 8))
+    pj = jl(d, "prefs.json")
+    r["This computer keeps every set in prefs.json, the negative prompt beside the Studio's fields"] = (
+        pj.get("persona") == "A" and pj.get("tier") == "Pro" and pj.get("wizard_done") is True
+        and pj.get("no_limits") is True
+        and pj.get("studio_opts") == {"image": {"steps": 8, "neg": "blurry"}}
+        and ns["machine_prefs"]().get("studio_opts") == {"image": {"steps": 8}}
+        and ns["profile_local"](root2).get("studio_opts.*.neg") == {"image": "blurry"}
+        and ns["prefs_view"](root2) == pj)
+    # KEY-2 and the three sets
+    SY, PL, MA = ns["SYNCED_SETTINGS"], ns["PROFILE_LOCAL"], ns["MACHINE"]
+    act = {"turbo", "tier", "model", "council", "agent", "codeagent", "adv", "advon",
+           "remote_autonomy", "workspace", "lend", "lend_pick", "veo_day", "veo_count",
+           "veo_daily_cap", "cloud_only", "bench", "ag_remote", "no_limits", "include_giants"}
+    r["the three sets are disjoint, and no personal key is a machine family's"] = (
+        not (SY & PL) and not (SY & MA) and not (PL & MA)
+        and not [k for k in SY | PL if "." not in k and k.startswith(ns["MACHINE_PREFIXES"])]
+        and all(ns["pref_class"](k) == "synced" for k in SY)
+        and all(ns["pref_class"](k) == "local" for k in PL)
+        and all(ns["pref_class"](k) == "machine" for k in MA))
+    vals = []
+    for k, (kind, arg) in ns["SYNCED_ALLOWED"].items():
+        vals += [(k, x) for x in (arg if kind == "one of" else
+                                  ("", "turbo", "Cloud Only", "x" * arg))]
+    fresh = ns["test_profile_create"]()
+    ns["profile_switch"](fresh)
+    bad_in = [(k, x) for k, x in vals if not ns["synced_value_ok"](k, x)]
+    for k, x in vals:
+        ns["split_prefs"](fresh, {k: x})
+    r["KEY-2: no synced key spends, acts or turns anything on, for every allowed value"] = (
+        set(ns["SYNCED_ALLOWED"]) == set(SY) and not (SY & act) and not bad_in
+        and not os.path.exists(os.path.join(fresh.dir, "local.json"))
+        and not (set(ns["prefs_view"](fresh)) & act - {"no_limits"})
+        and not [k for k, x in (("length", 7), ("length", "3"), ("polish", "yes"),
+                                ("funnel_effort", "max"), ("user_name", "x" * 81), ("persona", 5))
+                 if ns["synced_value_ok"](k, x)])
+    # a thread carries the ctx of whoever started it, and looks up nothing
+    got = []
+
+    def _who():
+        try:
+            got.append(ns["bound_ctx"]())
+        except ns["NoProfile"]:
+            got.append("none")
+    ns["bind_ctx"](None)
+    t2 = ns["ctx_thread"](target=_who, daemon=True)
+    t2.start()
+    t2.join(5)
+    ns["bind_ctx"](fresh)
+    t3 = ns["ctx_thread"](target=_who, daemon=True)
+    t3.start()
+    t3.join(5)
+    t4 = ns["ctx_thread"](target=_who, ctx=root, daemon=True)
+    t4.start()
+    t4.join(5)
+    ns["bind_ctx"](None)
+    r["a thread carries its starter's ctx, or the one it was handed; one with none has none"] = (
+        got == ["none", fresh, root])
+    # the local test profile opens only with the hook; a missing base is a bug
+    ns2, d2, _r2 = _pm8(src_prof)
+    r["no hook: no test profile, and a test key file isn't opened"] = (
+        raises(ns2["NoProfile"], ns2["test_profile_create"])
+        and not ns2["_test_profile_ok"](fresh.dir) and ns["_test_profile_ok"](fresh.dir))
+    r["a file with no profile named is refused, not the data folder"] = raises(
+        ns["NoProfile"], ns["_pfile"], "chats.v2.json", None)
+    # boot: the root files that exist are recorded as written
+    ns3 = {"TEST_HOOKS": frozenset(), "IS_WIN": False, "_hook_arg": lambda n: ""}
+    d3 = tempfile.mkdtemp(dir=_SMOKE_TMP)
+    open(os.path.join(d3, "chats.v2.json"), "w").write('{"v": 2, "chats": []}')
+    ns3["app_dir"] = lambda: d3
+    for m in ("os", "json", "threading", "contextlib", "secrets", "tempfile", "hashlib",
+              "time", "re", "shutil", "functools"):
+        ns3[m] = __import__(m)
+    exec(_prof_sect("profile caches") + "\n" + (src_prof or _prof_sect("profile")), ns3)
+    ns3["_INSTANCE_HELD"][0] = True
+    ns3["profile_boot"]()
+    os.remove(os.path.join(d3, "chats.v2.json"))
+    r["boot records the root files that exist as written"] = raises(
+        ns3["StoreReadError"], ns3["_read_json"], "chats.v2.json", ns3["current_ctx"](), dict)
+    return r
+
+
+try:
+    _pr8 = _pm8_run()
+except Exception as e_:
+    import traceback as _tb8
+    _pr8 = {"raised": "%r %s" % (e_, _tb8.format_exc()[-600:])}
+check("profiles: the module's rules on temporary folders (%d)" % len(_pr8),
+      _pr8 and all(v is True for v in _pr8.values()) and len(_pr8) >= 19,
+      "%r" % {k: v for k, v in _pr8.items() if v is not True})
+
+# ... and each rule bites: a mutation of the module fails at least one
+_PS8 = _prof_sect("profile")
+_PM8 = [
+    ("no epoch check", "    with _profile_lock, _profile_flock():\n        base.check()\n        yield",
+     "    with _profile_lock, _profile_flock():\n        yield"),
+    ("the profile's folder made again", "        if not os.path.isdir(base.dir):\n"
+     "            raise StaleProfile(\"the profile's folder is gone; not written\")",
+     "        os.makedirs(base.dir, exist_ok=True)"),
+    ("caches kept at a switch", "        _profile_caches_clear()\n        _written.clear()",
+     "        _written.clear()"),
+    ("the old ctx not cancelled", "        old.cancel.set()\n", ""),
+    ("a wrong-set read quiet", "        if pref_class(k) != self.cls:\n            raise PrefScopeError",
+     "        if False:\n            raise PrefScopeError"),
+    ("an unchanged key written", "                if k not in view or view[k] != v:",
+     "                if True:"),
+    ("compare-and-set ignored", "                if isinstance(old, dict) and k in old \\\n",
+     "                if False and isinstance(old, dict) and k in old \\\n"),
+    ("an account's settings in prefs.json", "    if cls == \"machine\" or ctx.root:",
+     "    if True:"),
+    ("the negative prompt dropped by a machine write", "        if cls == \"machine\" and was:",
+     "        if False:"),
+    ("any synced value", "    rule = SYNCED_ALLOWED.get(k)\n    if rule is None:\n        return False",
+     "    return True"),
+    ("an unknown key taken", "        if c is None or k == \"studio_opts.*.neg\" or (",
+     "        if k == \"studio_opts.*.neg\" or ("),
+    ("a thread without its starter's ctx",
+     "    c = ctx if ctx is not None else getattr(_tl_ctx, \"ctx\", None)\n    return threading.Thread(",
+     "    c = ctx\n    return threading.Thread("),
+    ("a test key opened without the hook", "    if \"profiles\" not in TEST_HOOKS:\n        return False\n",
+     ""),
+    ("the test profile made without the hook",
+     "    if \"profiles\" not in TEST_HOOKS:\n        raise NoProfile(\"the profiles hook is off\")\n", ""),
+    ("None as the data folder", "    raise NoProfile(\"no profile for %s\" % name)",
+     "    return os.path.join(app_dir(), name)"),
+    ("boot records nothing", "                _mark_written(n, MACHINE_ROOT)", "                pass"),
+    ("an account's first writes recorded in profile.json",
+     "    if isinstance(base, ProfileCtx) and not base.root:\n        return STATE_FILE",
+     "    if False:\n        return STATE_FILE"),
+    ("a stale write not counted", "            _PROFILE[\"stale\"] += 1\n", ""),
+]
+_pm8r = []
+for _d8, _o8, _n8 in _PM8:
+    try:
+        _src8 = _mut8(_PS8, _o8, _n8)
+    except AssertionError as e_:
+        _pm8r.append((_d8, "anchor missing: %s" % e_))
+        continue
+    try:
+        _res8 = _pm8_run(_src8)
+        _pm8r.append((_d8, not all(v is True for v in _res8.values())))
+    except Exception:
+        _pm8r.append((_d8, True))         # the module broke: caught too
+check("profiles: each rule bites (%d mutations of the module, each caught)" % len(_PM8),
+      all(ok is True for _d, ok in _pm8r), "%r" % [x for x in _pm8r if x[1] is not True])
+
+# ISO-8's search half: B asking A's last question is a cache miss
+_sq8 = {"HAS_SEARCH": True, "_search_lock": _t8.Lock(), "_stash_sources": lambda rows: None}
+_prof_in(_sq8)
+_sq8["_tl_search"] = _t8.local()
+_ddg8 = []
+_sq8["_ddg_text"] = lambda q, n: _ddg8.append(q) or [{"title": "t", "body": "A's answer"}]
+_exec8(_sq8, {"_search_cache", "run_search"})
+_sq8["run_search"]("A's question")
+_sq8["run_search"]("A's question")
+_hit8 = len(_ddg8)
+_sq8["_profile_caches_clear"]()
+_sq8["run_search"]("A's question")
+check("ISO-8: after a switch the search cache is empty, and the same question is a miss",
+      _hit8 == 1 and len(_ddg8) == 2
+      and '_search_cache = profile_cache(\n    "_search_cache", ' in _S8,
+      "%r" % [_hit8, _ddg8])
+
+# the Kimi balance is cached per profile, provider and key: B never sees
+# A's figure, and a switch empties the cache
+_bl8 = {"APP_VERSION": "t", "hmac": __import__("hmac")}
+_bal8 = []
+
+
+class _BR8:
+    def __init__(self, v):
+        self.v = v
+
+    def read(self):
+        return json.dumps({"data": {"available_balance": self.v}}).encode()
+
+
+_bl8["urllib"] = type(sys)("u8")
+_bl8["urllib"].request = type(sys)("u8r")
+_bl8["urllib"].request.Request = lambda url, headers=None: url
+_bl8["urllib"].request.urlopen = lambda r, timeout=0: (_bal8.append(1), _BR8(len(_bal8)))[1]
+_exec8(_bl8, {"_bal_cache", "cloud_balance", "_key_fp", "_KEY_FP_SALT"})
+_kc8 = {"key": "k", "base": "https://api.moonshot.ai/v1"}
+_bA8, _bB8 = (_bl8["ProfileCtx"]("local", _SMOKE_TMP),
+              _bl8["ProfileCtx"]("test", _SMOKE_TMP, "b" * 32))
+_bl8["bind_ctx"](_bA8)
+_v1 = (_bl8["cloud_balance"]("kimi", _kc8), _bl8["cloud_balance"]("kimi", _kc8))
+_bl8["bind_ctx"](_bB8)
+_v2 = _bl8["cloud_balance"]("kimi", _kc8)
+_v3 = _bl8["cloud_balance"]("kimi", dict(_kc8, key="k2"))
+_bl8["_profile_caches_clear"]()
+_bl8["bind_ctx"](_bA8)
+_v4 = _bl8["cloud_balance"]("kimi", _kc8)
+_bl8["bind_ctx"](None)
+check("the balance cache: per profile, provider and key, and emptied at a switch",
+      _v1 == ("$1.00 left", "$1.00 left") and _v2 == "$2.00 left" and _v3 == "$3.00 left"
+      and _v4 == "$4.00 left", "%r" % [_v1, _v2, _v3, _v4])
+
+# each per-profile file resolves through the ctx the thread works for:
+# cloud.json, remote.json, remote_known_hosts, pictures, videos, exports
+_pf8 = {"IS_WIN": False}
+_exec8(_pf8, {"CLOUD_NAME", "_cloud_file", "_cloud_all", "REMOTE_NAME", "remote_conf",
+              "KNOWN_HOSTS_NAME", "_known_hosts_path", "IMAGE_SUB", "image_dir", "VIDEO_SUB",
+              "video_dir", "EXPORT_DIRNAME", "export_dir"})
+_pfA8, _pfB8 = tempfile.mkdtemp(dir=_SMOKE_TMP), tempfile.mkdtemp(dir=_SMOKE_TMP)
+for _d8, _t8x in ((_pfA8, "A"), (_pfB8, "B")):
+    json.dump({"providers": {"groq": {"key": "key-" + _t8x}}, "active": "groq"},
+              open(os.path.join(_d8, "cloud.json"), "w"))
+    json.dump({"host": "host-" + _t8x}, open(os.path.join(_d8, "remote.json"), "w"))
+_cA8 = _pf8["ProfileCtx"]("local", _pfA8)
+_cB8 = _pf8["ProfileCtx"]("test", _pfB8, "b" * 32)
+
+
+def _files8(c):
+    """A raise is a result, never a crash of the gauntlet (6b327's lesson)."""
+    _pf8["bind_ctx"](c)
+    try:
+        return (_pf8["_cloud_all"]()["providers"].get("groq", {}).get("key"),
+                _pf8["remote_conf"]().get("host"), _pf8["_known_hosts_path"](),
+                _pf8["image_dir"](c), _pf8["video_dir"](c), _pf8["export_dir"](c))
+    except Exception as e_:
+        return ("raised %r" % e_,)
+    finally:
+        _pf8["bind_ctx"](None)
+
+
+_fa8, _fb8 = _files8(_cA8), _files8(_cB8)
+_pf8["bind_ctx"](None)
+_fn8 = _pf8["_cloud_all"]()
+check("each profile's cloud.json, remote.json, host keys and media folders are its own; a thread "
+      "with no profile reads no keys",
+      _fa8 == ("key-A", "host-A", os.path.join(_pfA8, "remote_known_hosts"),
+               os.path.join(_pfA8, "images"), os.path.join(_pfA8, "videos"),
+               os.path.join(_pfA8, "exports"))
+      and _fb8 == ("key-B", "host-B", os.path.join(_pfB8, "remote_known_hosts"),
+                   os.path.join(_pfB8, "images"), os.path.join(_pfB8, "videos"),
+                   os.path.join(_pfB8, "exports"))
+      and _fn8 == {"providers": {}, "active": ""}, "%r" % [_fa8, _fb8, _fn8])
+
+# ISO-9: a request starts with no thread-local search state and its own ctx
+class _SRE9(Exception):
+    pass
+
+
+_r9 = {"_tl_search": _t8.local(), "_answered": {}, "StoreReadError": _SRE9,
+       "READ_FAIL": {}, "_turn_finish": lambda t: None}
+_prof_in(_r9)
+_r9ctx = _r9["ProfileCtx"]("local", tempfile.mkdtemp(dir=_SMOKE_TMP))
+_r9["_PROFILE"]["ctx"] = _r9ctx
+_run9 = _a8.get_source_segment(_S8, next(
+    m for c in _a8.parse(_S8).body if isinstance(c, _a8.ClassDef) and c.name == "StudioHandler"
+    for m in c.body if isinstance(m, _a8.FunctionDef) and m.name == "_run"))
+exec("class _H9:\n" + "\n".join("    " + l if l else l for l in _run9.split("\n"))
+     + "\n    def _profile_changed(self, drain=True):\n        self.said = 409\n"
+     + "    def _send_json(self, obj, code=200):\n        self.said = code\n", _r9)
+_r9["_tl_search"].rows = ["A's row"]
+_seen9 = []
+_h9 = _r9["_H9"]()
+try:
+    _h9._run(lambda: _seen9.append((dict(_r9["_tl_search"].__dict__), _r9["bound_ctx"]())))
+except Exception as e_:
+    _seen9.append(repr(e_))
+_after9 = getattr(_r9["_tl_search"], "rows", None)
+check("ISO-9: each request starts with the thread's search state cleared, bound to the ctx it "
+      "took, unbound when it ends; the server keeps no connection alive across requests",
+      _seen9 == [({}, _r9ctx)] and _after9 is None and _h9.ctx is _r9ctx
+      and getattr(_r9["_tl_ctx"], "ctx", None) is None
+      and 'protocol_version = "HTTP/1.0"' in _S8, "%r" % [_seen9, _after9])
+
+# ---- live, no-server form: "This computer" (A) and a local test profile (B)
+_P8 = Instance(9903, "P8", env={"MILLENAI_TEST_HOOKS": "profiles"}).start()
+
+
+def _q8(path, data=None, headers=None, method=None, raw=False):
+    h = dict(_P8.headers)
+    h.update(headers or {})
+    body = None
+    if data is not None:
+        body = data if isinstance(data, bytes) else json.dumps(data).encode()
+        h.setdefault("Content-Type", "application/json")
+    r_ = urllib.request.Request(_P8.base + path, data=body, headers=h,
+                                method=method or ("POST" if body is not None else "GET"))
+    try:
+        with urllib.request.urlopen(r_, timeout=60) as resp:
+            out = resp.status, dict(resp.headers), resp.read()
+    except urllib.error.HTTPError as e_:
+        out = e_.code, dict(e_.headers), e_.read()
+    return out if raw else (out[0], json.loads(out[2] or b"null") if out[2][:1] in b"{[" else out[2])
+
+
+def _hook8(**d):
+    return _q8("/api/test/profile", d)[1]
+
+
+def _snap8(folder):
+    """Every file under folder, with its bytes' digest (run/ left out)."""
+    out = {}
+    for dp, dn, fn in os.walk(folder):
+        dn[:] = [x for x in dn if not (dp == folder and x in ("run", "accounts", "logs"))]
+        for f in fn:
+            p = os.path.join(dp, f)
+            out[os.path.relpath(p, folder)] = _h8.sha256(open(p, "rb").read()).hexdigest()
+    return out
+
+
+_KINDS8 = ("memory", "chat", "export", "image", "cloud", "prefs", "quality", "usage", "remote")
+# the hook is dev-only: the gauntlet's own copy A has no such route
+check("profiles: the test-profile route exists only with the profiles hook",
+      req("/api/test/profile", "POST", {"op": "status"})[0] in (403, 404)
+      and _hook8(op="status").get("kind") == "local",
+      "%r" % [req("/api/test/profile", "POST", {"op": "status"})[0]])
+_A8 = _hook8(op="status")["tag"]
+_q8("/api/prefs", {"persona": "A persona", "length": 2, "tier": "Fast"})
+_q8("/api/chats/ops", {"ops": [{"op": "create", "id": "c" + "a" * 26, "lane": "ai",
+                                "title": "A chat"}]})
+_B8 = _hook8(op="create")["name"]
+_can8A = {k: _canary("A8-" + k) for k in _KINDS8}
+_late8 = [_hook8(op="late", kind=k, text=_can8A[k], delay=3)["id"] for k in _KINDS8]
+_sw8 = _hook8(op="switch", to=_B8)
+_rootsnap8 = _snap8(_P8.home)
+# a page drawn for A: its calls get 409 and change nothing
+_x1 = _q8("/api/prefs", {"length": 5}, headers={"X-Profile": _A8}, raw=True)
+_x2 = _q8("/api/chats", headers={"X-Profile": _A8}, raw=True)
+_x3 = _q8("/api/prefs", {"length": 4}, headers={"X-Profile": _sw8["tag"]})
+time.sleep(4.5)
+_st8 = _hook8(op="status")
+_bdir8 = os.path.join(_P8.home, "accounts", _B8)
+check("ISO-7: writes started under A and landing after the switch to B are refused: nothing in "
+      "A changes, nothing reaches B, and A's page gets 409 profile-changed",
+      [_st8["late"].get(j) for j in _late8] == ["StaleProfile"] * len(_KINDS8)
+      and _snap8(_P8.home) == _rootsnap8
+      and not [k for k, c in _can8A.items() if _bytegrep(_P8.home, c)]
+      and _x1[0] == 409 and _x1[1].get("X-Profile") == "changed" and _x2[0] == 409
+      and b"profile-changed" in _x1[2]
+      and _x3[0] == 200 and json.load(open(os.path.join(_bdir8, "personal.json"))) == {"length": 4}
+      and json.load(open(os.path.join(_P8.home, "prefs.json"))).get("length") == 2,
+      "%r" % [[_st8["late"].get(j) for j in _late8], _x1[:2], _x2[0], _x3,
+              sorted(set(_snap8(_P8.home).items()) ^ set(_rootsnap8.items()))[:6]])
+# B works as a profile of its own: its writes land in its folder only
+_can8B = {k: _canary("B8-" + k) for k in _KINDS8}
+_now8 = [_hook8(op="late", kind=k, text=_can8B[k], delay=0)["id"] for k in _KINDS8]
+time.sleep(1.5)
+_st8b = _hook8(op="status")
+_bhas8 = [k for k, c in _can8B.items() if not _bytegrep(_bdir8, c)]
+_bout8 = [k for k, c in _can8B.items()
+          if [p for p in _bytegrep(_P8.home, c) if not p.startswith(_bdir8 + os.sep)]]
+_q8("/api/prefs", {"persona": "B persona", "tier": "Pro", "wizard_done": True})
+_pv8 = _q8("/api/prefs")[1]
+_ch8 = _q8("/api/chats")[1]
+_mem8 = _q8("/api/memory")[1]
+_img8 = [f for f in os.listdir(os.path.join(_bdir8, "images"))]
+_ex8b = [f for f in os.listdir(os.path.join(_bdir8, "exports")) if not f.endswith(".meta")]
+_imgget8 = _q8("/api/image/" + _img8[0], raw=True)[0] if _img8 else None
+_exget8 = _q8("/api/export/" + _ex8b[0], raw=True)[0] if _ex8b else None
+check("per profile: B's chats, memory, settings, cloud keys, pictures, exports and answer log "
+      "land in B's folder and are what B's routes show; A's stay A's",
+      [_st8b["late"].get(j) for j in _now8] == ["ok"] * len(_KINDS8)
+      and _bhas8 == [] and _bout8 == []
+      and _pv8.get("persona") == "B persona" and _pv8.get("tier") == "Pro"
+      and _pv8.get("length") == 4 and "A persona" not in json.dumps(_pv8)
+      and [c.get("title") for c in _ch8["chats"]] == [_can8B["chat"]]
+      and [f.get("fact") for f in _mem8["facts"]] == [_can8B["memory"]]
+      and json.load(open(os.path.join(_bdir8, "local.json"))) == {"tier": "Pro"}
+      and json.load(open(os.path.join(_P8.home, "prefs.json"))).get("tier") == "Fast"
+      and json.load(open(os.path.join(_P8.home, "prefs.json"))).get("wizard_done") is True
+      and _imgget8 == 200 and _exget8 == 200,
+      "%r" % [[_st8b["late"].get(j) for j in _now8], _bhas8, _bout8, _pv8, _ch8, _mem8,
+              _img8, _ex8b, _imgget8, _exget8])
+# the Studio's negative prompt is the profile's; its other fields the machine's
+_negB8 = _canary("negB8")
+_so8b = _q8("/api/studio/opts", {"key": "image", "set": {"neg": _negB8, "steps": 6}})[1]
+_lj8 = json.load(open(os.path.join(_bdir8, "local.json")))
+_rj8 = json.load(open(os.path.join(_P8.home, "prefs.json")))
+check("the Studio's negative prompt goes to B's local.json, its steps to the machine's prefs.json",
+      (_so8b.get("saved") or {}).get("neg") == _negB8
+      and _lj8.get("studio_opts") == {"image": {"neg": _negB8}}
+      and (_rj8.get("studio_opts") or {}).get("image", {}).get("steps") == 6
+      and _negB8 not in json.dumps(_rj8),
+      "%r" % [_so8b, _lj8, _rj8.get("studio_opts")])
+# ISO-8: every declared cache filled, then a switch back to A empties them all
+_fill8 = _hook8(op="fill", tag=_canary("fill8"))["dirty"]
+_imgA8 = _q8("/api/image/" + _img8[0], raw=True)[0] if _img8 else None
+_late8b = [_hook8(op="late", kind=k, text=_canary("B8late-" + k), delay=3)["id"] for k in _KINDS8]
+_back8 = _hook8(op="switch", to="local", erase=True)
+_st8c = _hook8(op="status")
+_imgB8 = _q8("/api/image/" + _img8[0], raw=True)[0] if _img8 else None
+_soA8 = _q8("/api/studio/opts", {"key": "image", "set": {}})[1]
+check("ISO-8: a switch empties every profile cache (%d filled)" % len(_fill8),
+      len(_fill8) >= 20 and _st8c["dirty"] == [] and _imgA8 == 200 and _imgB8 == 404
+      and "neg" not in (_soA8.get("saved") or {}) and (_soA8.get("saved") or {}).get("steps") == 6,
+      "%r" % [len(_fill8), _st8c["dirty"], _imgA8, _imgB8, _soA8])
+time.sleep(4.5)
+_st8d = _hook8(op="status")
+_pvA8 = _q8("/api/prefs")[1]
+check("ISO-7: B's late writes after B is erased land nowhere and don't bring B's folder back; "
+      "A reads as it was",
+      [_st8d["late"].get(j) for j in _late8b] == ["StaleProfile"] * len(_KINDS8)
+      and not os.path.exists(_bdir8)
+      and _pvA8.get("persona") == "A persona" and _pvA8.get("length") == 2
+      and [c.get("title") for c in _q8("/api/chats")[1]["chats"]] == ["A chat"],
+      "%r" % [[_st8d["late"].get(j) for j in _late8b], os.path.exists(_bdir8), _pvA8])
+
+# the page: drawn for its profile, the header on every /api call, a 409
+# reloads once, and a second one within 10 s says so instead of looping
+_pg8 = _q8("/", raw=True)
+_tag8 = _hook8(op="status")["tag"]
+check("X-Profile: the page carries its profile's tag and nothing else of it",
+      _pg8[0] == 200 and ('const PROFILE="%s";' % _tag8).encode() in _pg8[2]
+      and b"__PROFILE__" not in _pg8[2] and _tag8.startswith("local."),
+      "%r" % [_pg8[0], _tag8])
+_pgt8 = _pg8[2].decode("utf-8", "replace")
+_api8js = os.path.join(_SMOKE_TMP, "api8.js")
+with open(_api8js, "w", encoding="utf-8") as fh:
+    fh.write(r"""
+const store=new Map(),els=[],sent=[];let reloads=0;
+globalThis.sessionStorage={getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,String(v))};
+globalThis.location={href:"http://127.0.0.1:1/",origin:"http://127.0.0.1:1",reload(){reloads++;}};
+globalThis.document={createElement:()=>({}),body:{appendChild:e=>els.push(e)}};
+const $=q=>els.find(e=>"#"+e.id===q)||null;
+let status=409,mark="changed";
+const nFetch=async(u,o)=>{const x=o&&o.headers&&o.headers.get?o.headers.get("X-Profile"):null;
+  if(x!==null)sent.push(x);
+  return new Response("{}",{status,headers:mark?{"X-Profile":mark}:{}});};
+const apiTok=async()=>"t".repeat(40);
+""" + _jsfn8(_pgt8, 'const PROFILE="').split("\n")[0] + "\n"
+             + _jsfn8(_pgt8, "function profileChanged(){") + _jsfn8(_pgt8, "async function api(u,o){") + r"""
+(async()=>{
+  await api("/api/chats");const r1=reloads;
+  await api("/api/chats");const r2=reloads,n2=els.length;
+  store.clear();mark="";await api("/api/prefs");const r3=reloads;
+  status=200;mark="changed";await api("/api/prefs");const r4=reloads;
+  await api("https://example.com/x");
+  console.log(JSON.stringify({r1,r2,n2,r3,r4,sent,notice:els.map(e=>e.textContent)}));
+})();
+""")
+try:
+    _o8 = json.loads(subprocess.run(["node", _api8js], capture_output=True, text=True,
+                                    timeout=30).stdout)
+except Exception as e_:
+    _o8 = {"err": repr(e_)}
+check("X-Profile: api() sends the page's tag, a 409 profile-changed reloads once, a second within "
+      "10 s shows a line instead of looping; nothing else reloads",
+      _o8.get("r1") == 1 and _o8.get("r2") == 1 and _o8.get("n2") == 1
+      and _o8.get("r3") == 1 and _o8.get("r4") == 1
+      and _o8.get("sent") == [_tag8] * 4
+      and _o8.get("notice") == ["The profile changed. Reload this window to continue."],
+      "%r" % _o8)
+_etag8 = _q8("/", raw=True, headers={"If-None-Match": _pg8[1].get("ETag", "")})[0]
+_B8b = _hook8(op="create")["name"]
+_hook8(op="switch", to=_B8b)
+_etag8b = _q8("/", raw=True, headers={"If-None-Match": _pg8[1].get("ETag", "")})
+check("X-Profile: the page's ETag names its profile, so a reload after a switch never gets the "
+      "old page from a 304",
+      _etag8 == 304 and _etag8b[0] == 200 and _tag8.encode() not in _etag8b[2],
+      "%r" % [_etag8, _etag8b[0]])
+_hook8(op="switch", to="local", erase=True)
+
+# a stream for a profile that stopped being the active one stops, and its
+# answer is saved nowhere
+_so8, _cid8, _txt8 = None, "c" + "s" * 26, ""
+try:
+    _so8 = socket.create_connection(("127.0.0.1", _P8.port), timeout=200)
+    _b8 = json.dumps({"chat_id": _cid8, "lane": "ai", "model": "Llama 3.2 3B", "models": [],
+                      "tier": "", "auto_web": False,
+                      "messages": [{"role": "user", "content":
+                                    "Write a 300-word story about a lighthouse keeper."}]}).encode()
+    _so8.sendall(("POST /api/chat HTTP/1.1\r\nHost: 127.0.0.1:%d\r\nCookie: %s\r\n"
+                  "X-Api-Token: %s\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n"
+                  % (_P8.port, _P8.cookie, _P8.token, len(_b8))).encode() + _b8)
+    _raw8, _t08 = b"", time.time()
+    while time.time() - _t08 < 180 and len(_raw8.split(b"\r\n\r\n", 1)[-1]) < 400:
+        _c8 = _so8.recv(512)
+        if not _c8:
+            break
+        _raw8 += _c8
+    _mid8 = len(_raw8)
+    _B8c = _hook8(op="create")["name"]
+    _hook8(op="switch", to=_B8c)
+    _t18 = time.time()
+    while time.time() - _t18 < 60:
+        _c8 = _so8.recv(4096)
+        if not _c8:
+            break
+        _raw8 += _c8
+    _took8 = time.time() - _t18
+finally:
+    if _so8:
+        _so8.close()
+time.sleep(1)
+_hook8(op="switch", to="local")
+_saved8 = [c for c in _q8("/api/chats")[1]["chats"] if c.get("id") == _cid8]
+_answered8 = _saved8 and [m for m in _saved8[0].get("messages", []) if m.get("role") == "assistant"]
+check("emit stops a stream once its profile isn't the active one; the answer is saved nowhere",
+      _mid8 > 200 and _took8 < 20 and not _answered8
+      and "            if user_base.cancel.is_set():\n                raise StaleProfile(" in _S8,
+      "%r" % [_mid8, round(_took8, 1), _saved8])
+_P8.stop()
+# ==== m8 profiles: end ====
+
 
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)

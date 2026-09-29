@@ -5633,6 +5633,257 @@ crash was invisible.
   keeps its checks. Mutation-tested (SIGHUP back, hook removed, no log,
   no box).
 
+## 6b329 — profiles core (accounts step 8)
+The spec's 1a 5.2-5.7, §8 steps 1-4 and the X-Profile half of step 5: M8
+of the sign-in plan. Before this every personal file sat at a fixed place
+in the data folder and every cache and thread read "the" settings, so the
+first account would have shared chats, memory, keys, pictures and caches
+with "This computer". Now one profile is active per process, every
+personal read and write goes through that profile's ctx, and a write made
+for a profile that is no longer active lands nowhere. "This computer"
+behaves as before: its files, their names and their shapes are unchanged
+(prefs.json keeps every setting, as it did), and nothing a person sees
+changes. Accounts, the switch protocol and the account window are M9.
+- **The profile section** (`# ==== profile: begin/end ====`), the only
+  code that writes a personal file:
+  - `ProfileCtx{epoch, kind, dir, name, acct_id, cancel}`: "This computer"
+    (kind `local`, the data folder) or a local test profile (kind `test`,
+    `accounts/<32 hex>/`). The epoch is 64 random bits per activation;
+    `tag` is `<local|dir>.<epoch>`.
+  - `_PROFILE` holds the active ctx under `_profile_lock` (the store's
+    existing innermost RLock) plus a flock on `run/profile.lock`
+    (`msvcrt.locking` on Windows), taken by every profile write and every
+    switch, once per outermost write.
+  - `ctx.read`, `write`, `write_bytes`, `update_json` (read, change and
+    write in one lock), `append` (the logs), `adopt` (a file made in run/
+    moved in whole) and `remove`. Each holds the lock and the flock from
+    the epoch check to the rename, so a switch can't land between them. A
+    stale epoch raises `StaleProfile` (an OSError: every writer that
+    already treats a failed write as "not saved" drops it the same way),
+    writes nothing and is counted. A write never makes the profile's own
+    folder, only a subfolder of one that exists, so a late write for an
+    erased profile can't bring it back.
+  - `_pfile(name, base)` takes a ctx or `MACHINE_ROOT` (the machine's own
+    files in the data folder); a missing base raises `NoProfile` instead
+    of meaning "the data folder", which is how a write would reach the
+    wrong profile.
+  - `current_ctx()` is asked only by a request's start
+    (`StudioHandler._run`, which binds the ctx to its thread as
+    `self.ctx`), the boot, the switch, the test hooks, the quit's flush
+    and the janitor's export sweep (each removal epoch-checked).
+    Everything else uses the ctx it was given, or `bound_ctx()`: the ctx
+    of the request, or of whoever started the thread. `ctx_thread` and
+    `ctx_timer` are the only way the file starts a thread (31 sites); a
+    thread with no ctx has none, and reads no keys and no settings.
+- **profile.json** gains 1a's fields beside M5's (`legacy_base`,
+  `written`, `migrated_61`, `webstore` are left exactly as they are):
+  `active` ("local" or the folder's name), `kept` (null), `epoch` and
+  `pending_import` (false). At every start the copy holding the instance
+  lock records the root files that exist in `written` (each has been
+  written; a lost profile.json no longer makes one read as empty), then
+  "This computer" is made active, `_migrate_61` runs through its ctx (the
+  boot order is root's, I7), then `profile_resume`. An account folder
+  keeps its first-write record in `sync/state.json`. A name this build
+  can't open (an account a later build made) is left in profile.json and
+  "This computer" runs.
+- **The settings split (5.6).** `SYNCED_SETTINGS` (user_name, persona,
+  length, home_area, funnel_effort, polish), `PROFILE_LOCAL` (turbo, tier,
+  model, council, agent, codeagent, adv, advon, remote_autonomy, workspace,
+  the Veo counters and cap, lend, lend_pick, `studio_opts.*.neg`) and
+  `MACHINE` (app_models, model_offers, no_limits, include_giants,
+  auto_cleanup, the Studio's tier picks and fields, the update keys,
+  wizard_done, and the `studio_`, `last_`, `seen_`, `remind_`, retired
+  `contrib_`/`fleet_` families). "This computer" keeps all three in
+  prefs.json; an account keeps the first in personal.json and the second
+  in local.json, and reads the machine's from prefs.json.
+  - Read through `machine_prefs()`, `user_prefs(ctx)` or
+    `profile_local(ctx)`; each hands back only its set's keys, and reading
+    another set's key through it raises `PrefScopeError`, so a missorted
+    reader is loud instead of quietly getting None where it used to get a
+    value. Written through `machine_prefs_update(fn)`,
+    `user_prefs_update(ctx, fn)` and `profile_local_update(ctx, fn)`: only
+    that set's keys change, the rest of the file is written back as read,
+    and a file that can't be read is left alone (503).
+  - All 35 `load_prefs` and 15 `store_prefs` call sites are sorted:
+    home_area (5 readers, now `home_area()`), polish, persona, name and
+    length read the asking profile's; turbo, workspace, the Veo counters,
+    the six per-person keys (`/api/prefs/adopt`) and Forget's settings
+    scope are the profile's own; the models, updates, studios and the
+    version record are the machine's.
+  - `POST /api/prefs` is `split_prefs`: each key to its own place, only
+    keys whose value changes are written (`changed` lists them), and with
+    `_old` ({key: the value the page last saw}) a key changed underneath
+    is a conflict and isn't written. A key no set names, and a synced
+    value outside its allowed set (`SYNCED_ALLOWED`: text up to the page's
+    own lengths, length 1-5, funnel_effort fast/normal, polish a bool), is
+    ignored and listed. The page needs no change: it already sends only
+    what changed. GET is the whole prefs.json for "This computer", as
+    before, and the three merged for an account.
+  - The Studio's negative prompt is split by field (G1):
+    `studio_save_opts` writes `neg` to the profile and the other fields to
+    the machine, and `studio_prefs` reads each from its own place, so B's
+    renders never use A's text.
+- **Per-profile files (5.5, 5.7).** Pictures, videos and exports are
+  `image_dir(ctx)`, `video_dir(ctx)` and `export_dir(ctx)`, and the routes
+  serve only the active profile's. A render, a converted clip and an
+  export are made in `run/` (`stage_path`, swept at the next start like
+  the other run files) and moved in with `ctx.adopt`, with the render's
+  `.render.json`; Gemini pictures and Veo clips go through
+  `ctx.write_bytes`. cloud.json (readers keep every field they don't use),
+  remote.json and remote_known_hosts resolve through the thread's ctx
+  (`_cloud_file`, `remote_conf`, `_known_hosts_path`); cloud.json's lock
+  file moved to `run/cloud.lock`, so nothing but a profile's own files is
+  made in its folder. quality.jsonl is appended through the asking
+  profile's ctx. **usage.jsonl (6b325) is per profile too**: each record
+  carries the ctx of the thread that made the model call, the writer
+  appends each profile's records to its own ledger, and records for a
+  profile that isn't active any more (or for none) are dropped;
+  `/api/usage` reads the active profile's.
+- **Caches (5.4).** A module-level container that holds anything personal
+  is declared where it is made with `profile_cache(name, obj, reset)` and
+  emptied at every switch: the plan's list (`_dead_models`, `_dead_when`,
+  `_model_rest`, `_repaired`, `_answered`, `_last_cloud`, `_bal_cache`,
+  `_search_cache`, `_results_cache`, `_geo_cache`, `_OSM_CACHE`,
+  `_TZ_CACHE`, `_HOME_TZ`, `_remote_jobs`, `_hurry_jobs`) and, beyond it:
+  `_tl_search` (also reset at each request, 0b), `_SSH_CHANGED` (the host
+  ssh last named as changed), `_dead_loaded` (the retirements are
+  re-read from the new profile's cloud.json), `_chat_stubs`, `_chat_gone`
+  and `_chat_finals` (the undo window's copies; the switch first makes the
+  old profile's pending deletes final, as a quit does), `_turns_live`
+  (answers still streaming), `_usage_q` and `_usage_state`. `_bal_cache`
+  is keyed by (profile, provider, key fingerprint), and `_last_cloud` by
+  the profile's name. Every other module-level container that changes is
+  named in `MACHINE_STATE` (57: engines, models, installs, the updater,
+  the window, flags keyed by folder). The key-fingerprint salt (M6) is
+  per launch and holds nothing personal, so it stays the machine's: a
+  ticket or a failure from the old profile is refused by the epoch check
+  on its write, not by the salt.
+- **Background work (5.3).** Every thread carries its starter's ctx. The
+  memory pass checks `ctx.cancel` before its model call and before its
+  write; the turn writer, titles, exports, pictures, Veo, the cloud-state
+  writes, Remote's saves and the usage writer all write through the ctx
+  they were started with. `emit` raises `StaleProfile` once its profile's
+  ctx is cancelled, so a stream for a profile that stopped being active
+  stops, and its answer is saved nowhere. The switch stops read-aloud
+  (`_stop_speaking` has waited for the process since 6b326) before the
+  epoch moves.
+- **X-Profile (4.5).** The page is drawn with `const PROFILE="<tag>"`
+  (`__PROFILE__`), `api()` sends it as `X-Profile` on every /api call, and
+  `_gate` answers a mismatch with 409 `{"err": "profile-changed"}` and an
+  `X-Profile: changed` header (a POST's body drained), changing nothing; a
+  route that hits a stale write answers the same. The page reloads on it
+  once; a second 409 within 10 s (sessionStorage `millen.p409`, a time,
+  nothing personal, and not in the allow-list sweep, which is
+  localStorage's) shows "The profile changed. Reload this window to
+  continue." instead of reloading again. The page's ETag now includes the
+  tag, or a reload after a switch could get a 304 and the old tag, and
+  loop. Native callers (the gauntlet, ci_smoke, drill) send no X-Profile
+  and act on the profile active when their request starts.
+- **Fail closed.** A switch or a new test profile needs the instance
+  lock (`single_instance` still fails open for the app itself); a thread
+  with no ctx reads no cloud keys, no Remote server and cloud power as
+  off; a personal file with no ctx named is an error.
+- **Test hooks (5.13), dev copies only.** `profiles`:
+  `POST /api/test/profile` with `op` `create` (a local test profile:
+  `accounts/<32 hex>/` with a 0600 `account.key` of random test values
+  and `test: true`, `sync/state.json` and its media folders), `switch`
+  (`to` "local" or a test profile; `erase` drops the old test profile's
+  folder), `status` (the tag, stale writes counted, caches not empty),
+  `fill` (a canary in every profile cache) and `late` (one of the real
+  writers, started under the active profile after `delay` seconds). The
+  bare switch (`profile_switch`) is what M9's protocol builds on: it
+  stops read-aloud, makes the old profile's deletes final, cancels the
+  old ctx, empties every profile cache, moves the epoch and records it,
+  under the lock. A dev copy with the hook resumes the test profile
+  profile.json names; without the hook a test key file is never opened.
+  `delay-<name>=<seconds>` slows the memory write, a picture write, a Veo
+  download, an export or a cloud-state write.
+- **Lints** (the gauntlet's, each run on the source): every module-level
+  container that is mutated is a `profile_cache` or in `MACHINE_STATE`
+  (which names only containers that exist, none of them a profile
+  cache); every write, replace, delete or folder made outside the profile
+  section is in a function `MACHINE_IO` names, no `MACHINE_IO` function
+  touches a ctx, and each name in it writes something; every call of the
+  30 ctx-taking functions (the chat and memory stores, exports, pictures,
+  videos, cloud state, the settings accessors and more) passes its ctx
+  and never a constant, and none of them has a default; `current_ctx`
+  only where a profile is taken, `load_prefs`/`store_prefs` only in the
+  section, no raw thread outside it, and every literal key read through
+  an accessor is one of its set's. 1a 9 suggested a `machine_write()`
+  helper so the write lint needs no list; the 37 machine writers
+  (engines, downloads, installs, the updater, the backdrops, run/ files)
+  are named in `MACHINE_IO` instead, each linted to touch no ctx, which
+  guards the same thing without rewriting code the gauntlet already
+  covers.
+- The plan's "Workspace GET that writes" has been a POST since 6b320
+  (`/api/workspace/set`, `/off`); both now write through
+  `profile_local_update`.
+- Deferred to M9 (the plan's order): the `accounts/<dir>` layout with
+  `.owner`, the sign-in and sign-out steps, the kept state, the boot
+  invariant, the Time Machine exclusion, the browser-store clean-up at a
+  switch, `/api/logout`, the account window. The account folder's store
+  names are this build's (`chats.v2.json`, `memory.v2.json`) until M9/M13
+  settle 1a 5.1's. `lend`/`lend_pick` are named in `PROFILE_LOCAL` for
+  1g; nothing sets them yet. ISO-7b's windowed and Windows parts wait for
+  real account folders; its no-server half is below.
+- Gauntlet: 415 checks become 434 (19 new). Older checks were adapted
+  in 43 places: their exec namespaces (a bound ctx, the accessors, the
+  profile sections) and source pins that named the old code; no
+  assertion was loosened. New, in `== accounts step 8 ==`:
+  - the lints on the source, and each shown to bite: 18 planted sites (a
+    written module-level cache, the search cache undeclared, a stale or
+    doubled MACHINE_STATE name, makedirs, an open-for-write, a replace and
+    shutil outside the section, a MACHINE_IO function reading the profile
+    or writing nothing, `load_chats(None)`, a store call without its ctx,
+    a ctx with a default, background code asking for the active profile,
+    a raw thread, `load_prefs` outside the accessors, turbo read as the
+    machine's, home_area through the wrong set) each fail the lint that
+    guards them;
+  - every settings key the page saves (23) is named by a set;
+  - the profile module on temporary folders (19 rules: a switch cancels
+    the old ctx and empties every cache; a stale write of each kind is
+    refused, counted and makes nothing; a stale settings write too; the
+    split into personal.json, local.json and the machine's prefs.json;
+    unchanged keys unwritten; compare-and-set; an account's view; a
+    wrong-set read raises; an erased profile's late write and an active
+    profile with no folder make none; "This computer" in one prefs.json
+    with the negative prompt beside the Studio's fields; the three sets
+    and KEY-2 over every allowed value; a thread's ctx; the hook gate; no
+    base refused; boot's `written`), and 18 mutations of the module, each
+    caught;
+  - ISO-8's search half (the same question after a switch is a miss), the
+    balance cache per profile and key, each profile's cloud.json,
+    remote.json, host keys and media folders through the thread's ctx,
+    and ISO-9 (`_run` clears the thread's search state and binds its ctx,
+    unbinding at the end; HTTP/1.0, so no connection outlives a request);
+  - live on a copy with the hook, "This computer" as A and a test profile
+    as B: ISO-7 both ways (nine real writers, memory, a chat, an export, a
+    picture, cloud.json, settings, the answer log, the usage ledger and
+    remote.json, started under one profile and landing after the switch:
+    all refused, A byte-identical, no canary anywhere, a page drawn for A
+    gets 409 with its marker; after B is erased its late writes don't
+    bring the folder back); the same nine landing in B while B is active,
+    and B's routes showing only B's; the Studio's negative prompt in B's
+    local.json and its steps in the machine's prefs.json; ISO-8 with a
+    canary in all 23 caches, all empty after the switch, and a picture's
+    route answering 404 in the other profile; the page's tag, and `api()`
+    in node (the header, one reload, the notice, no loop); the ETag; a
+    streamed answer stopped by the switch and saved nowhere.
+  - 18 live mutations (the X-Profile check, the 409's marker, emit's
+    cancel, the ETag, the hook's gate, a request binding no ctx, the
+    page's reload guard, header and 409 handling, a usage record without
+    its profile, cloud.json, remote.json and the host-key list from the
+    data folder, the balance cache unkeyed, the negative prompt read as
+    the machine's, pictures served from the data folder, GET /api/prefs
+    from the data folder, an export written straight into the profile)
+    each fail at least one check (18 of 18; the four first caught by a crash were rerun after the checks were made to record a raise, and each now fails its check).
+- Not verified here: Windows (`msvcrt.locking` on run/profile.lock, the
+  staged renames across `run/` and a profile folder while an antivirus
+  holds a file); a real window's reload on 409 (node only); real mflux,
+  video and Veo renders landing through `adopt` (stand-ins); an account
+  folder with the M9 layout (none exists yet).
+- **Patrick:** nothing. "This computer" works as before.
+
 ## 6b328 — the ARM64 build opens its window with Qt
 Proven in Patrick's Windows 11 ARM64 VM: the installed native ARM64 build
 (`build_windows_exe.ps1 -Arch arm64`) said "ConcordeAI couldn't start.
