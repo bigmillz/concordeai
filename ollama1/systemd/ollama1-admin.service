@@ -1,5 +1,6 @@
 [Unit]
 Description=ollama1 admin panel (behind Cloudflare Access)
+Requires=ollama1-nft.service
 After=network-online.target ollama1-nft.service
 Wants=network-online.target
 
@@ -14,6 +15,7 @@ StateDirectory=ollama1-admin
 StateDirectoryMode=0700
 Restart=always
 RestartSec=2
+LimitCORE=0
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes

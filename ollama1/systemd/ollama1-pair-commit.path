@@ -1,11 +1,11 @@
-# The gateway (unprivileged) drops a code-checked pairing request here; root
-# checks the code again and adds the key to /etc/ollama1/devices.json.
+# The gateway (unprivileged, never told the code) drops each pairing request
+# here; root checks the code, answers in /run/ollama1/pair-result and, on
+# success, adds the key to /etc/ollama1/devices.json.
 [Unit]
 Description=ollama1: watch for pairing requests
 
 [Path]
 PathExistsGlob=/run/ollama1/pair-spool/*.req
-PathExistsGlob=/run/ollama1/pair-spool/*.burn
 Unit=ollama1-pair-commit.service
 
 [Install]

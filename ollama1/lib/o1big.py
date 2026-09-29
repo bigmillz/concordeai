@@ -44,5 +44,20 @@ def render(text, on="█", off=" ", scale=2):
     for ch in text.upper():
         g = FONT.get(ch, FONT["-"])
         for i in range(5):
-            rows[i] += "".join((on if c == "#" else off) * scale for c in g) + off * scale
+            rows[i] += "".join((on if c == "#" else off) * scale for c in g[i]) + off * scale
     return rows
+
+
+def render_code(code, width, on="█"):
+    """The pairing code (XXXX-XXXX-XXXX) as large as the width allows: one
+    line at double width, one line at single width, or one group per line."""
+    for scale in (2, 1):
+        rows = render(code, on=on, scale=scale)
+        if len(rows[0]) <= width:
+            return rows
+    out = []
+    for i, group in enumerate(code.split("-")):
+        if i:
+            out.append("")
+        out += render(group, on=on, scale=2 if 4 * 12 <= width else 1)
+    return out

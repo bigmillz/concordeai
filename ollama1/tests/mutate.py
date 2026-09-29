@@ -20,9 +20,9 @@ MUTANTS = [
     ("sig: timestamp skew not checked", "lib/o1auth.py",
      "if abs(now - ts) > self.skew:", "if False:", ["test_gateway"]),
     ("sig: nonce replay not checked", "lib/o1auth.py",
-     'if not self.nonces.check_and_add(dev_id + ":" + nonce, now):', "if False:", ["test_gateway"]),
+     'if not self.nonces.check_and_add(dev_id + ":" + pre["nonce"], self.clock()):', "if False:", ["test_gateway"]),
     ("sig: signature not verified", "lib/o1auth.py",
-     'if not ed25519_verify(dev["public_key"], msg, sig):', "if False:", ["test_gateway", "test_vectors"]),
+     'if not ed25519_verify(dev["public_key"], msg, pre["sig"]):', "if False:", ["test_gateway", "test_vectors"]),
     ("sig: unpaired device accepted", "lib/o1auth.py",
      "dev = self.devices().get(dev_id)",
      "dev = self.devices().get(dev_id) or next(iter(self.devices().values()), None)", ["test_gateway"]),
@@ -57,18 +57,57 @@ MUTANTS = [
      "clean = {k: v for k, v in opts.items() if k in SAMPLING_OPTIONS}", "clean = dict(opts)", ["test_gateway"]),
     ("gpu: cloud models allowed", "lib/o1ollama.py",
      'if entry.get("remote_model") or entry.get("remote_host"):', "if False:", ["test_gateway"]),
-    ("pair: wrong-code limit gone", "bin/ollama1-gateway", "if left <= 0:", "if False:", ["test_gateway"]),
+    ("pair: wrong-code limit gone", "lib/o1pair.py", "        if left <= 0:", "        if False:", ["test_gateway"]),
     ("pair: rate limit gone", "bin/ollama1-gateway",
-     'if now - st["last_try"] < PAIR_MIN_INTERVAL:', "if False:", ["test_gateway"]),
-    ("pair: window reusable after a success", "bin/ollama1-gateway",
-     'if st["used"] or st["failures"] >= PAIR_MAX_FAILURES:', 'if st["failures"] >= PAIR_MAX_FAILURES:',
+     'if now - gw.pair["last_try"] < PAIR_MIN_INTERVAL:', "if False:", ["test_gateway"]),
+    ("pair: window reusable after a success", "lib/o1pair.py",
+     '    close_window(w["id"])  # one success closes the window', "    pass", ["test_gateway"]),
+    ("pair: root step skips the code", "lib/o1pair.py",
+     'if not check_pair_mac(w["code"], name, pub_b64, ts, nonce, mac):', "if False:", ["test_gateway"]),
+    ("pair: nonce reuse accepted", "lib/o1pair.py", 'if nonce in w.get("nonces", []):', "if False:",
      ["test_gateway"]),
-    ("pair: gateway skips the code", "bin/ollama1-gateway",
-     'if not check_pair_mac(w["code"], name, pub_b64, ts, nonce, mac):', "if False:", ["test_gateway"]),
-    ("pair: root commit skips the code", "lib/o1pair.py",
-     'if not check_pair_mac(w["code"], name, pub_b64, ts, nonce, mac):', "if False:", ["test_gateway"]),
-    ("pair: window never expires", "lib/o1pair.py",
-     'if float(w["expires_at"]) <= now or not w["id"] or not w["code"]:', "if False:", ["test_gateway"]),
+    ("pair: window never expires", [
+        ("lib/o1pair.py", 'if float(w["expires_at"]) <= now or not w["id"] or not w["code"]:', "if False:"),
+        ("lib/o1pair.py", 'and w["expires_at"] > now:', ":")], ["test_gateway"]),
+    ("pair: allowed on the LAN listener", "bin/ollama1-gateway",
+     '            if lan:\n                raise GatewayError(403, "pair_closed"',
+     '            if False:\n                raise GatewayError(403, "pair_closed"', ["test_gateway"]),
+    ("F1: gateway errors keep the connection open", "bin/ollama1-gateway",
+     '                self.send_header("Connection", "close")\n                self.close_connection = True\n',
+     "                pass\n", ["test_gateway"]),
+    ("F1: panel errors keep the connection open", "bin/ollama1-admin",
+     '                self.send_header("Connection", "close")\n                self.close_connection = True\n',
+     "                pass\n", ["test_admin"]),
+    ("F3: body read before the signature headers", "bin/ollama1-gateway",
+     "                    pre = gw.verifier.precheck(method, self.path, self.headers)\n"
+     "                    body = self.read_body(max_body)\n",
+     "                    body = self.read_body(max_body)\n"
+     "                    pre = gw.verifier.precheck(method, self.path, self.headers)\n", ["test_gateway"]),
+    ("F3: no cap on requests in flight", "bin/ollama1-gateway",
+     "if not gw.inflight.acquire(blocking=False):", "if False:", ["test_gateway"]),
+    ("F5: exception mid-stream breaks the stream", "bin/ollama1-gateway",
+     "            except Exception as e:\n                # e.g. Ollama restarting",
+     "            except ZeroDivisionError as e:\n                # e.g. Ollama restarting", ["test_gateway"]),
+    ("KV: models kept across devices", "bin/ollama1-gateway",
+     "if self.last_device is not None and self.last_device != dev_id:", "if False:", ["test_gateway"]),
+    ("dash: pairing code drawn blank", "lib/o1big.py", "for c in g[i])", "for c in g)", ["test_big"]),
+    ("setup: no mkfs after a crash before it", "lib/setuplib.sh",
+     '  if [ -z "$t" ]; then\n    run mkfs.ext4', '  if false; then\n    run mkfs.ext4', ["test_setuplib"]),
+    ("setup: a mirror on the disks is wiped again", "lib/setuplib.sh",
+     '      [ -n "$line" ] && md_line_is_ours "$line" && echo "$dev"', "      true", ["test_setuplib"]),
+    ("setup: fstab line without a UUID", [
+        ("lib/setuplib.sh", '  [[ "$line" =~ ^UUID=[0-9A-Fa-f-]{8,}[[:space:]] ]] || die', "  true || die"),
+        ("lib/setuplib.sh", '  [ -n "$uuid" ] || die "no filesystem UUID on $md; fstab left as it was"', "  true")],
+     ["test_setuplib"]),
+    ("setup: unparseable free space accepted", "lib/setuplib.sh",
+     "  case \"$n\" in ''|*[!0-9]*) return 1 ;; esac", "  true", ["test_setuplib"]),
+    ("setup: unexpected signature wiped", "lib/setuplib.sh",
+     """    case " $* " in *" $t "*) ;; *) echo "$dev carries '$t'"; bad=1 ;; esac""",
+     """    case " $* " in *) ;; esac""", ["test_setuplib"]),
+    ("setup: fstab/crypttab/swap users ignored", "lib/setuplib.sh", "  return $found", "  return 1",
+     ["test_setuplib"]),
+    ("setup: wrong serial wiped", "lib/setuplib.sh",
+     '    serial_is "$d2" "$s2" || die', '    true || die', ["test_setuplib"]),
     ("stateless: request body written to disk", "bin/ollama1-gateway",
      "            name, entry = gw.local_model(obj.get(\"model\"))\n",
      "            name, entry = gw.local_model(obj.get(\"model\"))\n"
@@ -101,6 +140,17 @@ MUTANTS = [
      'tf.extractall(dest, filter="data")', 'tf.extractall(dest, filter="fully_trusted")', ["test_updater"]),
     ("updater: missing checksum line accepted", "bin/ollama1-update-ollama",
      "            if not want:\n", "            if False:\n", ["test_updater"]),
+    ("cf: duplicate CNAMEs kept", "bin/ollama1-cf-access", "        for r in extra:", "        for r in []:",
+     ["test_cloudflare"]),
+    ("cf: a new CNAME on every run", "bin/ollama1-cf-access", "        if not cnames:", "        if True:",
+     ["test_cloudflare"]),
+    ("cf: API token saved to disk", "bin/ollama1-cf-access", "    del token\n",
+     "    open(os.path.join(Paths.etc, 'cf-token'), 'w').write(token)\n    del token\n", ["test_cloudflare"]),
+    ("cf: tunnel credential readable by all", "bin/ollama1-cf-access",
+     "write_json_atomic(creds_path, creds, mode=0o600)", "write_json_atomic(creds_path, creds, mode=0o644)",
+     ["test_cloudflare"]),
+    ("cf: a new tunnel on every run", "bin/ollama1-cf-access", "    if found:\n", "    if False:\n",
+     ["test_cloudflare"]),
 ]
 
 
@@ -108,7 +158,12 @@ def main():
     only = sys.argv[1] if len(sys.argv) > 1 else ""
     survived = []
     ran = 0
-    for name, rel, old, new, tests in MUTANTS:
+    for m in MUTANTS:
+        if len(m) == 3:
+            name, rel, tests = m
+            old = new = None
+        else:
+            name, rel, old, new, tests = m
         if only and only not in name:
             continue
         ran += 1
@@ -116,13 +171,19 @@ def main():
         try:
             for d in ("lib", "bin", "config", "systemd"):
                 shutil.copytree(os.path.join(KIT, d), os.path.join(work, d))
-            path = os.path.join(work, rel)
-            src = open(path).read()
-            if src.count(old) != 1:
-                print("BROKEN  %-50s  (the original text appears %d times)" % (name, src.count(old)))
+            edits = rel if isinstance(rel, list) else [(rel, old, new)]
+            broken = False
+            for erel, eold, enew in edits:
+                path = os.path.join(work, erel)
+                src = open(path).read()
+                if src.count(eold) != 1:
+                    print("BROKEN  %-50s  (the original text appears %d times)" % (name, src.count(eold)))
+                    broken = True
+                    break
+                open(path, "w").write(src.replace(eold, enew))
+            if broken:
                 survived.append(name)
                 continue
-            open(path, "w").write(src.replace(old, new))
             env = dict(os.environ, OLLAMA1_TEST_LIB=os.path.join(work, "lib"),
                        OLLAMA1_TEST_BIN=os.path.join(work, "bin"), PYTHONWARNINGS="ignore")
             env.pop("OLLAMA1_PREFIX", None)

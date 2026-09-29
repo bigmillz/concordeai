@@ -161,6 +161,8 @@ class TestDynamic(unittest.TestCase):
         for root, _dirs, files in os.walk(U.PREFIX):
             for fn in files:
                 fp = os.path.join(root, fn)
+                if not os.path.isfile(fp):
+                    continue
                 try:
                     blob = open(fp, "rb").read()
                 except OSError:

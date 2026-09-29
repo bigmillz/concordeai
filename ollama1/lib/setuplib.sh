@@ -1,0 +1,242 @@
+# shellcheck shell=bash
+# ollama1 setup: the disk steps, as functions, so tests/test_setuplib.py can
+# run them against fake mdadm/blkid/lsblk/... and check what would be wiped.
+# Sourced by setup.sh, which defines run, ok, note, die and later. Kept to
+# bash 3.2 so the tests also run on a Mac.
+#
+# Rules these functions keep:
+#   - a disk is found by its serial and wiped only through its
+#     /dev/disk/by-id/...<serial> path, after an exact serial check;
+#   - nothing is wiped that fstab, crypttab or swap uses, or that carries a
+#     signature other than the ones this machine is known to have;
+#   - a mirror already on the disks is assembled, never wiped;
+#   - a filesystem is made whenever the target has none (a crash between
+#     mdadm --create and mkfs is picked up on the next run);
+#   - fstab never gets a line without a real UUID.
+
+: "${FSTAB:=/etc/fstab}"
+: "${CRYPTTAB:=/etc/crypttab}"
+: "${SWAPS:=/proc/swaps}"
+: "${MDADM_CONF:=/etc/mdadm/mdadm.conf}"
+: "${STATE_DIR:=/var/lib/ollama1}"
+: "${BYID:=/dev/disk/by-id}"
+: "${MD_DEV:=/dev/md/o1data}"
+: "${MD_NAME:=ollama1:data}"
+
+disk_by_serial() { # serial -> /dev/<disk> (whole disk), empty if absent
+  local d n ser
+  for d in /sys/block/*; do
+    n=${d##*/}
+    case $n in loop*|ram*|dm-*|md*|sr*|zram*) continue ;; esac
+    ser=$(lsblk -dno SERIAL "/dev/$n" 2>/dev/null | tr -d '[:space:]')
+    if [ "$ser" = "$1" ]; then echo "/dev/$n"; return 0; fi
+  done
+  return 0
+}
+
+serial_is() { [ "$(lsblk -dno SERIAL "$1" 2>/dev/null | tr -d '[:space:]')" = "$2" ]; }
+
+byid_for() { # disk serial -> the /dev/disk/by-id path of that whole disk
+  local disk=$1 serial=$2 f
+  for f in "$BYID"/*_"$serial"; do
+    [ -e "$f" ] || continue
+    case "$f" in *-part*) continue ;; esac
+    if [ "$(readlink -f "$f")" = "$(readlink -f "$disk")" ]; then echo "$f"; return 0; fi
+  done
+  return 1
+}
+
+disk_desc() { lsblk -dno MODEL,SIZE "$1" 2>/dev/null | sed 's/  */ /g;s/^ //'; }
+disk_of() { # a block device -> its whole disk /dev/<name>
+  local pk
+  pk=$(lsblk -no PKNAME "$1" 2>/dev/null | head -n1 | tr -d '[:space:]')
+  if [ -n "$pk" ]; then echo "/dev/$pk"; else echo "$1"; fi
+}
+devs_of() { lsblk -lnpo NAME "$1" 2>/dev/null; }        # the disk and its partitions
+first_part() { lsblk -lnpo NAME,TYPE "$1" | awk '$2=="part"{print $1; exit}'; }
+dev_busy() { # true if the kernel holds the device (mounted, even lazily; md member; LVM)
+  python3 -c 'import os,sys; os.close(os.open(sys.argv[1], os.O_RDONLY | os.O_EXCL))' "$1" 2>/dev/null && return 1
+  return 0
+}
+probe() { blkid -p -o value -s "$2" "$1" 2>/dev/null || true; }   # device key -> value, bypassing the cache
+fs_type() { probe "$1" TYPE; }
+
+vg_free_extents() { # free extents in ubuntu-vg as a plain integer, or fail
+  local n
+  n=$(vgs --noheadings -o vg_free_count ubuntu-vg 2>/dev/null | tr -d '[:space:]')
+  case "$n" in ''|*[!0-9]*) return 1 ;; esac
+  echo "$n"
+}
+
+set_fstab() { # mountpoint "UUID=<uuid> <mountpoint> ..." : replaces that mountpoint's active line
+  local mnt=$1 line=$2 tmp
+  [[ "$line" =~ ^UUID=[0-9A-Fa-f-]{8,}[[:space:]] ]] || die "refusing to write an fstab line without a UUID: '$line'"
+  tmp="$FSTAB.ollama1.new"
+  awk -v m="$mnt" '!($2 == m && $0 !~ /^[[:space:]]*#/)' "$FSTAB" >"$tmp"
+  printf '%s\n' "$line" >>"$tmp"
+  mv "$tmp" "$FSTAB"
+  command -v systemctl >/dev/null 2>&1 && systemctl daemon-reload 2>/dev/null || true
+}
+
+referenced() { # disk -> true (and prints what) if fstab, crypttab or swap uses it or a partition
+  local disk=$1 dev key val found=1 ids=()
+  for dev in $(devs_of "$disk"); do
+    ids+=("$dev" "/dev/${dev##*/}")
+    for key in UUID PARTUUID LABEL PARTLABEL; do
+      val=$(probe "$dev" "$key")
+      [ -n "$val" ] && ids+=("$key=$val" "/dev/disk/by-$(printf '%s' "$key" | tr '[:upper:]' '[:lower:]')/$val")
+    done
+  done
+  for f in "$FSTAB" "$CRYPTTAB"; do
+    [ -f "$f" ] || continue
+    for val in "${ids[@]}"; do
+      if grep -vE '^[[:space:]]*(#|$)' "$f" | awk '{print $1; print $2}' | grep -qxF -- "$val"; then
+        echo "$f uses $val"; found=0
+      fi
+    done
+  done
+  if [ -f "$SWAPS" ]; then
+    for dev in $(devs_of "$disk"); do
+      if awk 'NR>1{print $1}' "$SWAPS" | grep -qxF -- "$dev"; then echo "swap is on $dev"; found=0; fi
+    done
+  fi
+  return $found
+}
+
+signatures_ok() { # disk allowed-types... -> true if every signature on it is expected
+  local disk=$1 dev t bad=0
+  shift
+  for dev in $(devs_of "$disk"); do
+    t=$(fs_type "$dev")
+    [ -z "$t" ] && continue
+    case " $* " in *" $t "*) ;; *) echo "$dev carries '$t'"; bad=1 ;; esac
+  done
+  return $bad
+}
+
+md_saved_uuid() { cat "$STATE_DIR/raid.uuid" 2>/dev/null || true; }
+
+md_line_is_ours() { # an "ARRAY ..." line from mdadm -> true if it is the ollama1 mirror
+  local line=$1 saved
+  saved=$(md_saved_uuid)
+  [[ " $line " == *" name=$MD_NAME "* ]] && return 0
+  [ -n "$saved" ] && [[ " $line " == *" UUID=$saved "* ]] && return 0
+  return 1
+}
+
+raid_find() { # the running mirror's device, if assembled
+  local line
+  while IFS= read -r line; do
+    case "$line" in ARRAY*) md_line_is_ours "$line" && { echo "$line" | awk '{print $2}'; return 0; } ;; esac
+  done < <(mdadm --detail --scan 2>/dev/null || true)
+  return 0
+}
+
+raid_members_on_disk() { # the partitions of our mirror found on these disks (not assembled)
+  local disk dev line
+  for disk in "$@"; do
+    for dev in $(devs_of "$disk"); do
+      line=$(mdadm --examine --brief "$dev" 2>/dev/null | grep '^ARRAY' | head -n1 || true)
+      [ -n "$line" ] && md_line_is_ours "$line" && echo "$dev"
+    done
+  done
+  return 0
+}
+
+wait_for() { local _; for _ in $(seq 1 50); do [ -e "$1" ] && return 0; sleep 0.2; done; return 1; }
+
+# The models disk. $1 disk, $2 serial.
+models_step() {
+  local disk=$1 serial=$2 part byid uuid
+  part=$(first_part "$disk")
+  if [ -n "$part" ] && [ "$(probe "$part" LABEL)" = "o1models" ]; then
+    note "found an earlier o1models filesystem on $part; keeping it"
+  else
+    serial_is "$disk" "$serial" || die "serial check failed for $disk (expected $serial)"
+    byid=$(byid_for "$disk" "$serial") || die "no /dev/disk/by-id path for $serial"
+    for part in $(devs_of "$disk"); do
+      findmnt -S "$part" >/dev/null 2>&1 && die "$part is mounted; not wiping"
+    done
+    dev_busy "$disk" && die "$disk is in use; not wiping"
+    referenced "$disk" && die "$disk is still used by fstab, crypttab or swap; not wiping"
+    signatures_ok "$disk" ext4 || die "$disk carries something setup doesn't expect (above); not wiping"
+    run wipefs -a "$byid"
+    run sgdisk --zap-all "$byid"
+    run sgdisk -n1:1MiB:0 -t1:8300 -c1:ollama1-models "$byid"
+    partprobe "$byid" 2>/dev/null || true
+    udevadm settle 2>/dev/null || true
+    wait_for "$byid-part1" || die "no partition appeared on $byid"
+    part="$byid-part1"
+    run mkfs.ext4 -F -q -L o1models -m 1 "$part"
+  fi
+  [ -n "$(fs_type "$part")" ] || run mkfs.ext4 -F -q -L o1models -m 1 "$part"
+  uuid=$(probe "$part" UUID)
+  [ -n "$uuid" ] || die "no filesystem UUID on $part; fstab left as it was"
+  mkdir -p "${MODELS_MNT:-/srv/models}"
+  set_fstab "${MODELS_MNT:-/srv/models}" "UUID=$uuid ${MODELS_MNT:-/srv/models} ext4 defaults,noatime,nofail,x-systemd.device-timeout=30s 0 2"
+  mountpoint -q "${MODELS_MNT:-/srv/models}" || run mount "${MODELS_MNT:-/srv/models}"
+}
+
+# The mirror. $1 $2 disks, $3 $4 their serials. The caller has made sure
+# /home no longer lives on either.
+raid_step() {
+  local d1=$1 d2=$2 s1=$3 s2=$4 md members b1 b2 b d p t uuid
+  md=$(raid_find)
+  if [ -z "$md" ]; then
+    members=()
+    while IFS= read -r p; do [ -n "$p" ] && members+=("$p"); done < <(raid_members_on_disk "$d1" "$d2")
+    if [ "${#members[@]}" -gt 0 ]; then
+      note "the mirror is already on the disks (${members[*]}); assembling it, nothing is wiped"
+      run mdadm --assemble --run "$MD_DEV" "${members[@]}"
+      md=$MD_DEV
+    fi
+  fi
+  if [ -z "$md" ]; then
+    serial_is "$d1" "$s1" || die "serial check failed for $d1 (expected $s1)"
+    serial_is "$d2" "$s2" || die "serial check failed for $d2 (expected $s2)"
+    b1=$(byid_for "$d1" "$s1") || die "no /dev/disk/by-id path for $s1"
+    b2=$(byid_for "$d2" "$s2") || die "no /dev/disk/by-id path for $s2"
+    for d in "$d1" "$d2"; do
+      for p in $(devs_of "$d"); do findmnt -S "$p" >/dev/null 2>&1 && die "$p is mounted; not wiping"; done
+      referenced "$d" && die "$d is still used by fstab, crypttab or swap; not wiping"
+      signatures_ok "$d" ext4 || die "$d carries something setup doesn't expect (above); not wiping"
+    done
+    for b in "$b1" "$b2"; do
+      run wipefs -a "$b"
+      run sgdisk --zap-all "$b"
+      # 100 MiB left free at the end, so a slightly smaller replacement disk fits
+      run sgdisk -n1:1MiB:-100MiB -t1:FD00 -c1:ollama1-data "$b"
+    done
+    partprobe "$b1" "$b2" 2>/dev/null || true
+    udevadm settle 2>/dev/null || true
+    wait_for "$b1-part1" || die "no partition appeared on $b1"
+    wait_for "$b2-part1" || die "no partition appeared on $b2"
+    run mdadm --create "$MD_DEV" --run --level=1 --raid-devices=2 --metadata=1.2 \
+      --bitmap=internal --homehost="${MD_NAME%%:*}" --name="${MD_NAME#*:}" "$b1-part1" "$b2-part1"
+    udevadm settle 2>/dev/null || true
+    md=$MD_DEV
+  fi
+  mkdir -p "$STATE_DIR"
+  mdadm --detail --export "$md" 2>/dev/null | sed -n 's/^MD_UUID=//p' >"$STATE_DIR/raid.uuid" || true
+  t=$(fs_type "$md")
+  if [ -z "$t" ]; then
+    run mkfs.ext4 -F -q -L o1data -m 0 -E lazy_itable_init=1,lazy_journal_init=1 "$md"
+  elif [ "$t" != ext4 ]; then
+    die "$md holds '$t', not ext4; not touching it"
+  fi
+  touch "$MDADM_CONF"
+  local saved conf_line pats
+  saved=$(md_saved_uuid)
+  conf_line=$(mdadm --detail --brief "$md")
+  pats=(-e "name=$MD_NAME")
+  [ -n "$saved" ] && pats+=(-e "UUID=$saved")
+  grep -v "${pats[@]}" "$MDADM_CONF" >"$MDADM_CONF.new" || true
+  printf '%s\n' "$conf_line" >>"$MDADM_CONF.new"
+  mv "$MDADM_CONF.new" "$MDADM_CONF"
+  run update-initramfs -u
+  uuid=$(probe "$md" UUID)
+  [ -n "$uuid" ] || die "no filesystem UUID on $md; fstab left as it was"
+  mkdir -p "${DATA_MNT:-/srv/data}"
+  set_fstab "${DATA_MNT:-/srv/data}" "UUID=$uuid ${DATA_MNT:-/srv/data} ext4 defaults,noatime,nofail,x-systemd.device-timeout=30s 0 2"
+  mountpoint -q "${DATA_MNT:-/srv/data}" || run mount "${DATA_MNT:-/srv/data}"
+}

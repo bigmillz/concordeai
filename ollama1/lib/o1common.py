@@ -24,10 +24,13 @@ class Paths:
     config = p("/etc/ollama1/config.json")
     devices = p("/etc/ollama1/devices.json")
     allow = p("/etc/ollama1/models.allow")
+    tunnel_creds = p("/etc/cloudflared/ollama1.json")
     run = p("/run/ollama1")
     pair_dir = p("/run/ollama1/pair")
     window = p("/run/ollama1/pair/window.json")
+    pair_public = p("/run/ollama1/pair-public.json")
     spool = p("/run/ollama1/pair-spool")
+    pair_result = p("/run/ollama1/pair-result")
     stats_dir = p("/run/ollama1/stats")
     stats = p("/run/ollama1/stats/gateway.json")
     pull_status = p("/run/ollama1/stats/pull.json")
@@ -55,12 +58,13 @@ DEFAULTS = {
     "admin_aud": "",                 # Access application AUD tag (admin host)
     "admin_email": "",
     "service_token_client_id": "",   # optional: pin the one service token
+    "tunnel_id": "",                 # the ollama1 tunnel (not secret; its credential is separate)
     "lan_mode": False,
     "lan_bind": "192.168.86.10",     # br0 (setup.sh writes the real one)
     "lan_cidr": "192.168.86.0/24",
     "gateway_port": 8431,
     "admin_port": 8432,
-    "ttyd_port": 8433,
+    "ttyd_socket": "/run/ollama1/ttyd/ttyd.sock",
     "tunnel_metrics_port": 8439,
     "ollama_url": "http://127.0.0.1:11434",
     "num_ctx_default": 8192,
@@ -69,7 +73,8 @@ DEFAULTS = {
     "vram_total_bytes": 0,           # 0 = read from amdgpu sysfs
     "queue_max": 8,
     "queue_wait_s": 300,
-    "max_body_mib": 64,
+    "max_body_mib": 32,              # read only after the headers authenticate
+    "max_inflight": 16,              # requests being handled at once
     # Tests only: a local fake JWKS. Refused unless allow_insecure_certs_url.
     "certs_url": "",
     "allow_insecure_certs_url": False,

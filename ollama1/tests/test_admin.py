@@ -37,7 +37,8 @@ def setUpModule():
     cfg.update({"access_team_domain": U.TEAM, "gateway_aud": U.GW_AUD, "admin_aud": U.ADMIN_AUD,
                 "admin_email": U.ADMIN_EMAIL, "admin_port": U.free_port(),
                 "ollama_url": "http://127.0.0.1:%d" % A["stub"].port, "certs_url": A["jwks"].url,
-                "allow_insecure_certs_url": True, "tunnel_metrics_port": U.free_port()})
+                "allow_insecure_certs_url": True, "tunnel_metrics_port": U.free_port(),
+                "ttyd_socket": os.path.join(U.PREFIX, "run/ollama1/ttyd.sock")})
     A["cfg"] = cfg
     A["panel"], A["srv"], A["stop"] = A["mod"].serve(cfg, runner=lambda u: (A["started"].append(u) or (True, "")))
     A["port"] = cfg["admin_port"]
@@ -199,6 +200,93 @@ class TestActions(unittest.TestCase):
             o1pair.close_window()
         self.assertEqual(post({"action": "pair"})[0], 202)
         self.assertEqual(A["started"], ["ollama1-pair-window.service"])
+
+
+class FakeTtyd:
+    """ttyd on a UNIX socket, sending its own (weaker) framing headers."""
+
+    def __init__(self, path):
+        import socketserver
+        from http.server import BaseHTTPRequestHandler
+
+        class H(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def address_string(self):
+                return "unix"
+
+            def do_GET(self):
+                raw = b"<html>ttyd page</html>"
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html")
+                self.send_header("X-Frame-Options", "SAMEORIGIN")
+                self.send_header("Content-Length", str(len(raw)))
+                self.end_headers()
+                self.wfile.write(raw)
+
+        if os.path.exists(path):
+            os.unlink(path)
+        self.path = path
+        self.srv = socketserver.ThreadingUnixStreamServer(path, H)
+        import threading
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.srv.shutdown()
+        self.srv.server_close()
+        os.unlink(self.path)
+
+
+class TestTerminalProxy(unittest.TestCase):
+    def test_proxied_over_unix_socket_with_frame_headers(self):
+        t = FakeTtyd(A["cfg"]["ttyd_socket"])
+        try:
+            st, data, r = get("/term/")
+        finally:
+            t.close()
+        self.assertEqual(st, 200)
+        self.assertIn(b"ttyd page", data)
+        self.assertEqual(r.getheader("X-Frame-Options"), "DENY")
+        self.assertIn("frame-ancestors 'none'", r.getheader("Content-Security-Policy"))
+
+    def test_websocket_needs_same_origin(self):
+        h = {"Cf-Access-Jwt-Assertion": admin_jwt(), "Upgrade": "websocket", "Connection": "Upgrade",
+             "Origin": "https://evil.example"}
+        st, _, _ = U.request(A["port"], "GET", "/term/ws", b"", h, host=ADMIN_HOST)
+        self.assertEqual(st, 403)
+
+    def test_no_ttyd_tcp_port(self):
+        unit = open(os.path.join(U.KIT, "systemd", "ollama1-ttyd.service")).read()
+        self.assertIn("--interface /run/ollama1/ttyd/ttyd.sock", unit)
+        self.assertNotIn("--port", unit)
+        tmp = open(os.path.join(U.KIT, "config", "ollama1.tmpfiles")).read()
+        self.assertRegex(tmp, r"d /run/ollama1/ttyd\s+0750 root\s+o1admin")
+
+
+class TestPanelConnections(unittest.TestCase):
+    def test_errors_close_the_connection(self):
+        import socket
+        inner = ("GET /api/state HTTP/1.1\r\nHost: %s\r\nCf-Access-Jwt-Assertion: %s\r\n\r\n"
+                 % (ADMIN_HOST, admin_jwt())).encode()
+        for head in ("POST /api/action HTTP/1.1\r\nHost: %s\r\nContent-Length: %d\r\n\r\n" % (ADMIN_HOST, len(inner)),
+                     "POST /api/action HTTP/1.1\r\nHost: %s\r\nCf-Access-Jwt-Assertion: %s\r\n"
+                     "Content-Length: 999999\r\n\r\n" % (ADMIN_HOST, admin_jwt())):
+            s = socket.create_connection(("127.0.0.1", A["port"]))
+            s.sendall(head.encode() + inner)
+            s.settimeout(3)
+            data = b""
+            try:
+                while True:
+                    b = s.recv(65536)
+                    if not b:
+                        break
+                    data += b
+            except socket.timeout:
+                pass
+            s.close()
+            self.assertEqual(data.count(b"HTTP/1.1 "), 1, head[:40])
+            self.assertIn(b"Connection: close", data)
 
 
 class TestPolkitMatchesPanel(unittest.TestCase):

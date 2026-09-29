@@ -31,7 +31,7 @@ SKEW = 60
 NONCE_RE = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 DEVICE_RE = re.compile(r"^[0-9a-f]{16}$")
 CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"  # Crockford base32
-CODE_LEN = 8
+CODE_LEN = 12   # 60 bits, shown as XXXX-XXXX-XXXX
 PAIR_MAX_FAILURES = 5
 PAIR_MIN_INTERVAL = 2.0
 
@@ -91,7 +91,10 @@ class RequestVerifier:
         self.start_time = int(clock()) if start_time is None else start_time
         self.nonces = NonceCache()
 
-    def verify(self, method, path, headers, body):
+    def precheck(self, method, path, headers):
+        """Everything that needs no body: header shapes, a paired device, a
+        fresh timestamp. Runs before the body is read, so a stranger can't
+        make the gateway read megabytes."""
         dev_id = headers.get("X-O1-Device", "")
         ts_s = headers.get("X-O1-Timestamp", "")
         nonce = headers.get("X-O1-Nonce", "")
@@ -117,12 +120,22 @@ class RequestVerifier:
             sig = b64url_decode(sig_s)
         except ValueError:
             raise AuthError("bad_signature", "signature does not verify")
-        msg = canonical_request(method, path, body_hash(body), ts, nonce, dev_id)
-        if not ed25519_verify(dev["public_key"], msg, sig):
+        return {"method": method, "path": path, "dev_id": dev_id, "dev": dev, "ts": ts,
+                "nonce": nonce, "sig": sig}
+
+    def complete(self, pre, body):
+        """The signature over the body, then the nonce (only after the
+        signature is valid, so a stranger can't fill the nonce cache)."""
+        dev_id, dev = pre["dev_id"], pre["dev"]
+        msg = canonical_request(pre["method"], pre["path"], body_hash(body), pre["ts"], pre["nonce"], dev_id)
+        if not ed25519_verify(dev["public_key"], msg, pre["sig"]):
             raise AuthError("bad_signature", "signature does not verify")
-        if not self.nonces.check_and_add(dev_id + ":" + nonce, now):
+        if not self.nonces.check_and_add(dev_id + ":" + pre["nonce"], self.clock()):
             raise AuthError("replay", "nonce already used")
         return dev_id, dev
+
+    def verify(self, method, path, headers, body):
+        return self.complete(self.precheck(method, path, headers), body)
 
 
 # ---- pairing -----------------------------------------------------------
@@ -139,7 +152,7 @@ def normalize_code(code):
 
 def format_code(code):
     c = normalize_code(code)
-    return c[:4] + "-" + c[4:]
+    return "-".join(c[i:i + 4] for i in range(0, len(c), 4))
 
 
 def pair_key(code):

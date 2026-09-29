@@ -49,7 +49,8 @@ def wait_window(w, headless):
         print("Pairing window open for 5 minutes. In ConcordeAI, choose")
         print("Desktop > Pair and type this code:")
         print()
-        for row in o1big.render(code):
+        width = __import__("shutil").get_terminal_size((100, 30)).columns - 4
+        for row in o1big.render_code(code, width):
             print("   " + row)
         print()
         print("   %s" % code)

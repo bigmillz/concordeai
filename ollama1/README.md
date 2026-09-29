@@ -45,7 +45,7 @@ The request-signing and pairing rules the app follows are in
 | Ollama | 127.0.0.1:11434 only, ROCm build, in `/opt/ollama` |
 | Gateway | 127.0.0.1:8431, user `o1gw` |
 | Admin panel | 127.0.0.1:8432, user `o1admin` |
-| Web terminal (ttyd + `login`) | 127.0.0.1:8433, reached only through the panel |
+| Web terminal (ttyd + `login`) | a UNIX socket in `/run/ollama1/ttyd` (root and the panel's user only), reached only through the panel |
 | Dashboard | tty1 (the monitor), user `o1dash`. Also `ollama1-top` over SSH |
 | Settings | `/etc/ollama1/`: `config.json` (root-only), `devices.json`, `models.allow` |
 | Setup log | `/var/log/ollama1-setup.log` |
@@ -63,11 +63,14 @@ The request-signing and pairing rules the app follows are in
    Setup refuses to turn passwords off until `~/.ssh/authorized_keys` holds
    a key other than `claude-setup@concordeai` (the key used to build this
    kit). Without one it keeps passwords on and tells you what to do.
-2. **Cloudflare Zero Trust.** Open dash.cloudflare.com > **Zero Trust** once.
-   If it asks, pick a team name (for example `concorde`) and the **Free**
-   plan. Cloudflare may ask for a card for the $0 plan.
-3. **Keep your Mac's browser handy.** Cloudflare asks you to approve the
-   tunnel once.
+2. **Make one Cloudflare API token** (see [The API token](#the-api-token)).
+   It is the only thing you do in the Cloudflare dashboard. Setup does the
+   tunnel, the DNS records and Access with it.
+3. **Zero Trust must exist once.** If this Cloudflare account has never
+   opened Zero Trust, setup stops and says so. The fix is one visit:
+   dash.cloudflare.com > **Zero Trust** (left sidebar) > pick a team name
+   (for example `concorde`) > choose the **Free** plan > **Proceed**.
+   Cloudflare may ask for a card for the $0 plan.
 
 ## Run it
 
@@ -79,6 +82,10 @@ cd /                                          # not inside /home: /home is about
 bash ~/concordeai/ollama1/setup.sh --plan     # optional: shows the plan, changes nothing
 sudo bash ~/concordeai/ollama1/setup.sh
 ```
+
+Setup starts itself inside **tmux** (session `ollama1-setup`), so a dropped
+SSH connection can't stop it halfway. If you get disconnected, log in again
+and run `sudo tmux attach -t ollama1-setup`. (`--no-tmux` turns this off.)
 
 Setup prints its plan and a table of the disks with their serials and
 models. It stops unless you type `yes`. Here is what it does, in order.
@@ -93,37 +100,64 @@ Every step skips what is already done, so it is safe to run again.
    It then runs `update-grub` and checks that every `set timeout=` in
    `/boot/grub/grub.cfg` is 5. That includes the recordfail path, which is
    what made it wait 30 seconds on this LVM machine.
-2. It installs packages: ttyd, python3-nacl, mdadm, nftables, zstd, and
-   cloudflared from Cloudflare's apt repository. It checks that repository
-   key's fingerprint first.
-3. It grows the root volume into the free space. This happens online.
+2. It installs packages: ttyd, python3-nacl, mdadm, nftables, zstd, tmux,
+   and cloudflared from Cloudflare's apt repository. That repository's key
+   must have the pinned fingerprint, and only that one key is kept.
+3. It grows the root volume into the free space (online). It reads the free
+   space as a count of extents and stops loudly if it can't.
 4. It moves `/home` onto the root filesystem:
-   - It copies `/home` and checks the copy file by file. It also checks that
-     `authorized_keys` is intact.
-   - Only then does it stop mounting the old disk.
-   - If a login still has the old `/home` open, it detaches it, and the
-     mirror step waits.
-5. It wipes the models disk and mounts it at `/srv/models` (by UUID, noatime).
-6. It wipes both 8 TB disks, builds the RAID1 mirror and mounts it at
+   - Anything already sitting in the root filesystem's own `/home` (hidden
+     under the old mount) is moved aside to `/home.pre-ollama1-<date>`, not
+     deleted.
+   - It copies `/home`, checks the copy file by file (and that
+     `authorized_keys` is intact), then copies once more right before the
+     switch. Only writes in the few seconds after that last copy would be
+     missed, which is why you run setup from `cd /`, not from your home
+     folder.
+   - Only then does it stop mounting the old disk. If a login still has the
+     old `/home` open, it detaches it, and the mirror step waits.
+5. It wipes the models disk and mounts it at `/srv/models` (by UUID,
+   noatime). An earlier `o1models` filesystem is kept, never wiped.
+6. It builds the RAID1 mirror of both 8 TB disks and mounts it at
    `/srv/data`. The first sync takes many hours in the background; the mirror
-   is usable meanwhile (`cat /proc/mdstat`).
+   is usable meanwhile (`cat /proc/mdstat`). The safety rules for both disk
+   steps are:
+   - a disk is found by its serial, checked again exactly, and wiped only
+     through its `/dev/disk/by-id/…<serial>` path;
+   - it stops if fstab, crypttab or swap still uses the disk, or if it
+     carries anything other than the ext4 filesystems this machine has now;
+   - a mirror already on the disks (from an earlier run) is reassembled,
+     never wiped;
+   - a filesystem is made whenever the array has none, so a stop between
+     building the array and formatting it is picked up next time;
+   - fstab never gets a line without a UUID.
 7. It creates the service users.
 8. It installs the kit to `/usr/local/lib/ollama1`, along with the systemd
-   units, the polkit rule and the local port guard.
-9. It asks for the admin email: the only address allowed into the admin
-   panel. The email is stored root-only on the desktop.
-10. It installs Ollama from its GitHub release (the linux-amd64 archive plus
-    the ROCm component). Each file must match the release's `sha256sum.txt`.
-11. It sets up the firewall: nothing comes in except SSH from 192.168.86.0/24.
-12. It sets up SSH:
+   units, the polkit rule and the local port guard. It asks for the admin
+   email: the only address allowed into the admin panel. The email is stored
+   root-only on the desktop.
+9. It sets up the firewall: nothing comes in except SSH from 192.168.86.0/24.
+10. It sets up SSH:
     - no root login;
     - only `pmiller` can log in, and only from the LAN;
-    - passwords are off, provided a key of your own is there.
-13. It turns on automatic security updates, cloudflared updates and the
+    - passwords go off once it has shown you the comment and fingerprint of
+      each key it counts as yours and you type `yes`.
+
+    **Keep that session open** and check a NEW login from another terminal
+    on the Mac before closing it. If your SSH agent offers several keys
+    first, name yours:
+    `ssh -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 pmiller@192.168.86.10`.
+11. It installs Ollama from its GitHub release (the linux-amd64 archive plus
+    the ROCm component). Each file must match the release's `sha256sum.txt`.
+    The firewall and SSH are done before this long download.
+12. It turns on automatic security updates, cloudflared updates and the
     weekly Ollama update.
-14. It starts the services: the gateway, the panel, the terminal and the
+13. It starts the services: the gateway, the panel, the terminal and the
     dashboard on the monitor.
-15. It sets up the Cloudflare Tunnel and Access (see below).
+14. It sets up Cloudflare with the API token you paste: the tunnel, the DNS
+    records and Access (see below).
+15. It checks what listens on the network: nothing but sshd may listen
+    beyond loopback (plus the gateway on br0, in LAN mode).
 16. It asks whether to remove the setup key `claude-setup@concordeai`. It only
     asks if a key of your own is present, and it removes nothing unless you
     type `yes`. You can also pass `--remove-setup-key`. Your own key(s) always
@@ -138,99 +172,143 @@ When it finishes, it lists anything still to do.
 
 ## Cloudflare
 
-### The tunnel (setup does this)
+Setup offers three choices when it gets there:
 
-Setup runs `cloudflared tunnel login` and waits:
+- **1 (the default): paste one API token.** Setup does everything through
+  Cloudflare's API.
+- **2: no API token.** `cloudflared tunnel login` in a browser for the
+  tunnel and DNS, and Access clicked in the dashboard. This is the
+  fallback, described at the end of this section.
+- **3: later.** Run `sudo bash .../setup.sh` again when you're ready.
 
-1. It prints a link. Open it in your Mac's browser.
-2. Log in to Cloudflare, click **flyconcordefly.com**, then **Authorize**.
-3. Go back to the terminal. It carries on by itself.
+Nothing reaches the desktop from outside until this step is done: the
+tunnel only starts once Access is in place.
 
-Setup then does the following:
+### The API token
 
-- It creates the tunnel `ollama1` (`cloudflared tunnel create ollama1`).
-- It moves the tunnel's credential to `/etc/cloudflared/ollama1.json` (root-only).
-- It points both hostnames at the tunnel (`cloudflared tunnel route dns`).
-- It writes `/etc/ollama1/cloudflared.yml`, which has these ingress rules:
-  - the app hostname goes to the gateway;
-  - the admin hostname goes to the panel;
-  - everything else gets a 404.
+This is the only thing to click in Cloudflare:
 
-  cloudflared also checks the Access token itself, before anything reaches
-  the desktop's services.
+1. Go to dash.cloudflare.com > **My Profile > API Tokens > Create Token >
+   Create Custom Token**. Name it `ollama1 setup`.
+2. Add exactly these permissions:
 
-The tunnel only starts once Access is set up, so nothing is reachable from
-outside before then.
+   | Scope | Permission | Level |
+   |---|---|---|
+   | Account | Cloudflare Tunnel | Edit |
+   | Account | Access: Apps and Policies | Edit |
+   | Account | Access: Service Tokens | Edit |
+   | Account | Access: Organizations, Identity Providers, and Groups | Read |
+   | Zone | DNS | Edit |
+   | Zone | Zone | Read |
 
-### Access: pick one way
+3. Set **Zone Resources** to **Include > Specific zone > flyconcordefly.com**.
+4. Set **TTL** so the token ends tomorrow (a 1-day expiry). It is needed
+   for a few minutes only.
+5. Click **Continue to summary > Create Token**, and copy the token.
+6. In setup, choose **1** and paste it. It isn't shown as you paste.
+7. When setup is done, **delete the token**: My Profile > API Tokens > the
+   token's **...** menu > **Delete**.
 
-Setup asks when it gets there:
+How setup treats the token:
 
-- **1** runs the API helper.
-- **2** takes the values you copy from the dashboard.
-- **3** leaves Access for later. Run `sudo bash .../setup.sh` again when
-  you're ready.
+- It is read with `read -s`: never echoed, never in the shell history or
+  the setup log.
+- It goes to `ollama1-cf-access` over a pipe, never as a command-line
+  argument or an environment variable, and setup clears it right after.
+- The helper keeps it in memory only and drops it when done.
+- `tests/test_cloudflare.py` checks that it never lands in a file, a log
+  or the output.
 
-#### Access in the dashboard (click by click)
+With the token, `ollama1-cf-access` does the following. Each step reuses
+what already exists, so running setup again changes nothing that's
+already right.
 
-In dash.cloudflare.com, go to **Zero Trust**. The dashboard's wording moves
-around a little from time to time; the pieces are the same.
+1. It finds the zone `flyconcordefly.com`, the account that owns it, and
+   the Zero Trust team domain.
+2. **Tunnel `ollama1`.** This is a *locally-managed* tunnel (`config_src:
+   local`). Its routes, and cloudflared's own Access check, are in
+   `/etc/ollama1/cloudflared.yml` on the desktop, not in the dashboard.
+   - The tunnel's credential is written to `/etc/cloudflared/ollama1.json`
+     (root, 0600).
+   - If that file is ever lost, a rerun rebuilds it for the same tunnel.
+3. **DNS.** One proxied CNAME for each of `ollama1` and `ollama1-admin`,
+   pointing to `<tunnel id>.cfargotunnel.com`.
+   - A wrong target is corrected, and duplicate CNAMEs are removed.
+   - If another type of record (for example an A record) already uses one
+     of the names, it stops and tells you. It never deletes records it
+     didn't make.
+4. **Access.**
+   - The service token `ollama1-app`.
+   - The policies `ollama1 admin - Patrick only` (your email) and
+     `ollama1 app - service token`.
+   - One self-hosted application per hostname. The app hostname answers a
+     bad token with a plain 401, not a login page.
+
+   Access logs you in with a one-time code sent to your email; that login
+   method exists in every Zero Trust account.
+5. It writes the team domain, both AUD tags, your email, the service token's
+   Client ID and the tunnel id to `/etc/ollama1/config.json` (root, 0600).
+6. It shows the service token's **Client ID and Client Secret once**, for
+   ConcordeAI, straight on the terminal (not through the setup log). Copy
+   them then: the secret is saved nowhere, in the repo or on the desktop.
+   - Running it again doesn't show the secret again.
+   - To make a new secret, run
+     `sudo ollama1-cf-access --rotate-service-token`. After that the app
+     needs the new secret.
+
+You can run the helper on its own at any time: `sudo ollama1-cf-access`.
+It asks for a token.
+
+### Without an API token (fallback)
+
+Choose **2** in setup.
+
+**The tunnel.** `cloudflared tunnel login` prints a link:
+
+1. Open the link on your Mac.
+2. Pick **flyconcordefly.com** and click **Authorize**.
+
+Setup then creates the tunnel, puts its credential in
+`/etc/cloudflared/ollama1.json` (0600), and runs `cloudflared tunnel route
+dns` for both names. The login leaves `/root/.cloudflared/cert.pem`
+(root-only).
+
+**Access, clicked in dash.cloudflare.com > Zero Trust.** The wording moves
+around a little from time to time.
 
 1. **Login method.** Go to **Settings > Authentication > Login methods**.
-   **One-time PIN** is there by default: Access emails you a code. Keep it.
+   **One-time PIN** is there by default. Keep it.
 2. **Service token.** Go to **Access > Service auth > Service Tokens >
    Create Service Token**.
    - Name: `ollama1-app`. Duration: 1 year.
    - Click **Generate token**.
    - Copy the **Client ID** and the **Client Secret** now. The secret is
-     shown only once, and ConcordeAI will need both.
+     shown once.
 3. **Admin application.** Go to **Access > Applications > Add an application
    > Self-hosted**.
-   - Application name: `ollama1 admin`. Session duration: 24 hours.
-   - Public hostname: subdomain `ollama1-admin`, domain `flyconcordefly.com`.
-   - Policies: **Create new policy**.
+   - Name: `ollama1 admin`. Session duration: 24 hours.
+   - Public hostname: `ollama1-admin`.`flyconcordefly.com`.
+   - **Create new policy**:
      - Name: `ollama1 admin - Patrick only`
      - Action: **Allow**
      - Include: **Emails**, your email
-   - Login methods: One-time PIN.
    - Save.
 4. **App application.** Go to **Add an application > Self-hosted** again.
-   - Application name: `ollama1 app`. Hostname: `ollama1.flyconcordefly.com`.
+   - Name: `ollama1 app`. Hostname: `ollama1.flyconcordefly.com`.
    - Policy:
      - Name: `ollama1 app - service token`
      - Action: **Service Auth**
      - Include: **Service Token**, `ollama1-app`
-   - Under the application's settings, turn on **Return 401 response for
-     service auth policies**. This makes a bad or missing token get a plain
-     401 instead of a login page.
+   - In the application's settings, turn on **Return 401 response for
+     service auth policies**.
    - Save.
 5. **Copy four values:**
-   - the **Application Audience (AUD) Tag** of each application (open the
-     application; it's on its overview / basic information);
-   - your **team domain**, like `concorde.cloudflareaccess.com`, from
-     **Settings**;
+   - each application's **Application Audience (AUD) Tag**;
+   - the **team domain** (like `concorde.cloudflareaccess.com`, under
+     **Settings**);
    - the service token's **Client ID**.
-6. Run setup again and choose **2**. Paste the values when it asks.
 
-#### Access through the API helper
-
-`sudo ollama1-cf-access`, or choose **1** in setup, does steps 2 to 5 for
-you. It needs an API token, which it asks for, uses once and never stores:
-
-1. Go to dash.cloudflare.com > **My Profile > API Tokens > Create Token >
-   Create Custom Token**.
-2. Give it these permissions:
-   - Account: **Access: Apps and Policies**, Edit
-   - Account: **Access: Service Tokens**, Edit
-   - Account: **Access: Organizations, Identity Providers, and Groups**, Read
-   - Zone: **Zone**, Read, for **Specific zone: flyconcordefly.com**
-3. Create it and copy it. Paste it when the helper asks. The helper prints
-   the service token's Client ID and Secret once, for the app.
-4. Delete the API token in the dashboard afterwards.
-
-Neither way puts anything in this repo. The values live in
-`/etc/ollama1/config.json` (root-only, 0600), and the tunnel credential in
-`/etc/cloudflared/ollama1.json` (0600).
+   Type them when setup asks.
 
 ## After setup
 
@@ -241,9 +319,12 @@ Neither way puts anything in this repo. The values live in
     to `~/.ssh/authorized_keys`.
 - **Pairing a device:** at the desktop, run `sudo ollama1-pair`, or click
   **Open pairing window** in the panel. The code shows, large, on the
-  monitor and in that terminal for 5 minutes. Type it into ConcordeAI.
+  monitor and in that terminal for 5 minutes: 12 characters, like
+  `7K4M-2QXD-9FHT`. Type it into ConcordeAI.
   - One device pairs per window.
   - 5 wrong codes close the window.
+  - Pairing works only through the tunnel, never on the LAN listener.
+  - The gateway never sees the code: a root step checks it and adds the key.
   - To list devices: `sudo ollama1-pair --list`.
   - To remove one: `sudo ollama1-pair --remove ID`, or use the panel.
 - **Models:** none are installed. Choose them first. For each one:
@@ -282,13 +363,14 @@ Neither way puts anything in this repo. The values live in
 
 | Rule | Where |
 |---|---|
-| Only Patrick's devices | The Access service token (checked by cloudflared and again by the gateway, pinned to the one token's Client ID), plus an Ed25519 signature from a key in `devices.json`. Keys are added only by a root step that re-checks the pairing code shown at the desktop |
+| Only Patrick's devices | The Access service token (checked by cloudflared and again by the gateway, pinned to the one token's Client ID), plus an Ed25519 signature from a key in `devices.json`. Keys are added only by a root step that checks the pairing code shown at the desktop; the gateway never sees the code |
+| Before the body | Access and the signature headers (a paired device, a fresh timestamp) are checked before any body is read; at most 16 requests are handled at once; bodies are capped at 32 MiB (8 KiB for pairing). Any error closes the connection, so a leftover body can't pass as the next request on a connection cloudflared reuses |
 | Replay, old requests | 60 s timestamp window, nonces remembered for 2 minutes, anything signed before the gateway last started is refused |
-| Nothing mixes, nothing kept | One request at a time on the GPU. No history; bodies are never written or logged (`tests/test_stateless.py` checks the source and does a live check with markers). Ollama keeps weights loaded, not conversations |
+| Nothing mixes, nothing kept | One request at a time on the GPU. When the next request comes from a different paired device, every loaded model is unloaded first, so not even Ollama's prompt cache is shared (the cost: one reload when the device changes). No history; bodies are never written or logged (`tests/test_stateless.py` checks the source and does a live check with markers); Ollama and the gateway run with no core dumps and no swap, and Ollama at its normal log level (its debug levels could print prompts) |
 | GPU only | Fit estimate before loading, `/api/ps` must show 100% VRAM after. Options that change placement (`num_gpu`, etc.) are stripped. Ollama cloud models are refused |
 | No model management from outside | The gateway passes on chat, generate, embed, tags, ps, show, version. Pull/delete/create/copy/push are 404. The panel can pull only allow-listed models |
 | Admin only | Panel: Access JWT with your email on every request. Actions need a CSRF token, same-origin and JSON. It can only *start* fixed systemd units (polkit rule), never run a command |
-| Local users | `ollama1-nft` lets only the kit's users (and root) connect to Ollama, the gateway, the panel and the terminal |
+| Local users | `ollama1-nft` lets only the kit's users (and root) connect to Ollama, the gateway and the panel, on any of the machine's own addresses; the services won't start without it. The terminal has no TCP port at all |
 | Services | Dedicated no-shell users, `NoNewPrivileges`, `ProtectSystem=strict`, `PrivateTmp`, empty capability sets. Secrets are handed in with `LoadCredential=`, so they stay root-only on disk |
 
 ## Updates
@@ -342,7 +424,7 @@ The firewall is set so it can't cut the Pi off:
 ```bash
 cd ollama1/tests
 python3 -m unittest discover -s .      # ~20 s; stub Ollama, fake Access certs, all on 127.0.0.1
-python3 mutate.py                      # ~5 min; breaks each protection on purpose, expects a failing test
+python3 mutate.py                      # ~7 min; breaks each of 57 protections on purpose, expects a failing test
 python3 gen_vectors.py                 # regenerates PROTOCOL.md's test vectors
 ```
 
@@ -357,4 +439,12 @@ Ed25519 (the desktop uses PyNaCl). They cover:
 - admin authentication and CSRF, and the match between the polkit rule and
   the panel;
 - the updater's checksum refusals;
+- setup's disk steps against fake disk tools: what gets wiped, the
+  reassembly of an existing mirror, the filesystem after a crash, fstab
+  lines without a UUID;
+- request smuggling after errors, nothing read before authentication, the
+  device-switch unload;
+- the Cloudflare helper against a fake Cloudflare API: reruns change
+  nothing, no duplicate DNS records, and the API token is never written
+  anywhere;
 - that the repo holds no personal data.

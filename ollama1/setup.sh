@@ -6,11 +6,14 @@
 #   sudo ./setup.sh --skip-cloudflare  everything except the tunnel and Access
 #   sudo ./setup.sh --remove-setup-key also take claude-setup@concordeai out of
 #                                    ~pmiller/.ssh/authorized_keys (your own key stays)
+#   sudo ./setup.sh --no-tmux        don't wrap the run in a tmux session
 #   ./setup.sh --plan                show what it would do; changes nothing
 #
-# Every step checks what is already done and skips it, so after a stop (a
-# reboot it asks for, a failed download) just run it again. Everything it
-# prints also goes to /var/log/ollama1-setup.log (root-only).
+# It runs itself inside tmux (session "ollama1-setup"), so a dropped SSH
+# connection can't stop it halfway: log in again and `sudo tmux attach -t
+# ollama1-setup`. Every step checks what is already done and skips it, so
+# after a stop just run it again. Everything it prints also goes to
+# /var/log/ollama1-setup.log (root-only); secrets are never printed there.
 #
 # Nothing personal is stored in this script or the repo: the admin email,
 # Cloudflare IDs and the tunnel credential are asked for or created here, on
@@ -38,16 +41,19 @@ GW_HOST=ollama1.flyconcordefly.com
 ADMIN_HOST=ollama1-admin.flyconcordefly.com
 LIBDIR=/usr/local/lib/ollama1
 LOG=/var/log/ollama1-setup.log
+TMUX_SESSION=ollama1-setup
 
 PLAN_ONLY=0
 SKIP_CF=0
 REMOVE_SETUP_KEY=0
+NO_TMUX=0
 for a in "$@"; do
   case "$a" in
     --plan) PLAN_ONLY=1 ;;
     --skip-cloudflare) SKIP_CF=1 ;;
     --remove-setup-key) REMOVE_SETUP_KEY=1 ;;
-    -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
+    --no-tmux) NO_TMUX=1 ;;
+    -h|--help) sed -n '2,21p' "$0"; exit 0 ;;
     *) echo "unknown option: $a"; exit 2 ;;
   esac
 done
@@ -73,32 +79,14 @@ ask_yes() { # prompt -> true only if the answer is exactly "yes"
 }
 
 # ---- disks ----------------------------------------------------------------
-disk_by_serial() { # serial -> /dev/<disk> (whole disk), empty if absent
-  local d n ser
-  for d in /sys/block/*; do
-    n=${d##*/}
-    case $n in loop*|ram*|dm-*|md*|sr*|zram*) continue ;; esac
-    ser=$(lsblk -dno SERIAL "/dev/$n" 2>/dev/null | tr -d '[:space:]')
-    if [ "$ser" = "$1" ]; then echo "/dev/$n"; return 0; fi
-  done
-  return 0
-}
-disk_desc() { lsblk -dno MODEL,SIZE "$1" 2>/dev/null | sed 's/  */ /g;s/^ //'; }
-disk_of() { # a block device -> its whole disk /dev/<name>
-  local src=$1 pk
-  pk=$(lsblk -no PKNAME "$src" 2>/dev/null | head -n1 | tr -d '[:space:]')
-  if [ -n "$pk" ]; then echo "/dev/$pk"; else echo "$src"; fi
-}
-first_part() { lsblk -lnpo NAME,TYPE "$1" | awk '$2=="part"{print $1; exit}'; }
-dev_busy() { # true if the kernel holds the device (mounted, even lazily; md member; LVM)
-  python3 -c 'import os,sys; os.close(os.open(sys.argv[1], os.O_RDONLY | os.O_EXCL))' "$1" 2>/dev/null && return 1
-  return 0
-}
+# shellcheck source=lib/setuplib.sh
+. "$KIT/lib/setuplib.sh"
+
 root_disk() {
   local src pv
   src=$(findmnt -no SOURCE /)
   pv=$(pvs --noheadings -o pv_name 2>/dev/null | tr -d ' ' | head -n1 || true)
-  if [ -n "$pv" ] && lsblk -no NAME "$src" >/dev/null 2>&1 && [[ "$src" == /dev/mapper/* || "$src" == /dev/dm-* ]]; then
+  if [ -n "$pv" ] && [[ "$src" == /dev/mapper/* || "$src" == /dev/dm-* ]]; then
     disk_of "$pv"
   else
     disk_of "$src"
@@ -111,10 +99,9 @@ HDD1=$(disk_by_serial "$HDD1_SERIAL")
 HDD2=$(disk_by_serial "$HDD2_SERIAL")
 
 home_on_own_disk() { findmnt -n --target /home -o TARGET 2>/dev/null | grep -qx /home; }
+home_in_fstab() { awk '$0 !~ /^[[:space:]]*#/ && $2 == "/home"' /etc/fstab | grep -q .; }
 models_done() { mountpoint -q /srv/models && [ "$(disk_of "$(findmnt -no SOURCE /srv/models)")" = "$MODELS_DISK" ]; }
-raid_array() { mdadm --detail --scan 2>/dev/null | awk '/name=ollama1:data/{print $2; exit}'; }
-raid_done() { mountpoint -q /srv/data && [ -n "$(raid_array)" ]; }
-vg_free() { vgs --noheadings --units g -o vg_free ubuntu-vg 2>/dev/null | tr -d ' g' | cut -d. -f1; }
+raid_done() { mountpoint -q /srv/data && [ -n "$(raid_find)" ]; }
 
 # ---- the plan --------------------------------------------------------------
 show_disks() {
@@ -134,18 +121,18 @@ print_plan() {
 
    $(state '[ "$(hostname)" = "$NEW_HOSTNAME" ]')  1. Host name $NEW_HOSTNAME, time zone $TIMEZONE, boot menu shown for 5 s
    $(state 'command -v cloudflared && command -v ttyd && python3 -c "import nacl"')  2. Packages: ttyd, python3-nacl, mdadm, nftables, zstd, cloudflared (Cloudflare's apt repo, key checked)
-   $(state '[ "${VGFREE:-1}" = 0 ]')  3. Grow the root volume into the free space on the OS disk (online)
-   $(state '! home_on_own_disk')  4. Copy /home onto the root filesystem, check it (SSH keys included), stop mounting the old disk
+   $(state '[ "$(vg_free_extents)" = 0 ]')  3. Grow the root volume into the free space on the OS disk (online)
+   $(state '! home_on_own_disk && ! home_in_fstab')  4. Copy /home onto the root filesystem, check it (SSH keys included), stop mounting the old disk
    $(state models_done)  5. Models disk: wipe, ext4, mount at /srv/models (noatime)
    $(state raid_done)  6. Mirror: wipe both 8 TB disks, RAID1, ext4, mount at /srv/data (resync runs in the background)
    $(state 'id o1gw && id o1admin && id o1dash && id ollama')  7. Service users (ollama, o1gw, o1admin, o1dash, cloudflared), no shells
    $(state '[ -x $LIBDIR/bin/ollama1-gateway ]')  8. Install the gateway, admin panel, dashboard, pairing tool, updater, units, polkit rule
-   $(state '[ -L /opt/ollama/current ]')  9. Ollama (ROCm build) from GitHub, checksums verified; GPU only; local only
-   $(state 'ufw status | grep -q "Status: active"') 10. Firewall: nothing in except SSH from $HOME_LAN; bridged LAN traffic (the Pi) untouched
-   $(state '[ -f /etc/ssh/sshd_config.d/10-ollama1.conf ]') 11. SSH: passwords off, only $ADMIN_USER with a key, no root (only if a key of your own is there)
+   $(state 'ufw status | grep -q "Status: active"')  9. Firewall: nothing in except SSH from $HOME_LAN; bridged LAN traffic (the Pi) untouched
+   $(state '[ -f /etc/ssh/sshd_config.d/10-ollama1.conf ]') 10. SSH: passwords off, only $ADMIN_USER with a key, no root (after you confirm your key)
+   $(state '[ -L /opt/ollama/current ]') 11. Ollama (ROCm build) from GitHub, checksums verified; GPU only; local only
    $(state '[ -f /etc/apt/apt.conf.d/52ollama1-unattended-upgrades ]') 12. Automatic security updates (+ cloudflared), reboot at 04:00 when needed; weekly Ollama update
    $(state 'systemctl is-active ollama1-dash') 13. Services: gateway, admin panel, web terminal, dashboard on the screen, timers
-   $(state 'systemctl is-active ollama1-tunnel') 14. Cloudflare Tunnel ($GW_HOST, $ADMIN_HOST) and Access
+   $(state 'systemctl is-active ollama1-tunnel') 14. Cloudflare with one API token: tunnel, DNS for $GW_HOST and $ADMIN_HOST, Access
          15. Only if you say so: remove the setup key $CLAUDE_KEY from authorized_keys
 
    Not touched: the network settings (netplan, br0), anything in /home besides the move.
@@ -154,7 +141,6 @@ EOF
 }
 
 # ---- preflight --------------------------------------------------------------
-VGFREE=$(vg_free || echo "?")
 if [ "$PLAN_ONLY" = 1 ]; then
   print_plan
   exit 0
@@ -173,6 +159,24 @@ if [ "${OLLAMA1_RELOCATED:-}" != 1 ]; then
 fi
 cd /
 
+# Run inside tmux, so a dropped SSH connection can't kill it mid-step.
+if [ "$NO_TMUX" = 0 ] && [ -z "${TMUX:-}" ] && [ -z "${STY:-}" ]; then
+  if command -v tmux >/dev/null 2>&1; then
+    if tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+      echo "Setup is already running in tmux. Reattach with:  sudo tmux attach -t $TMUX_SESSION"
+      exit 1
+    fi
+    echo "Starting setup inside tmux (session $TMUX_SESSION), so a dropped connection can't stop it."
+    echo "If you get disconnected, log in again and run:  sudo tmux attach -t $TMUX_SESSION"
+    sleep 2
+    inner="OLLAMA1_RELOCATED=1 bash $(printf '%q' "$KIT/setup.sh")"
+    for a in "$@"; do inner+=" $(printf '%q' "$a")"; done
+    inner+="; echo; read -r -p 'Setup has finished. Press Enter to close this tmux session. ' _"
+    exec tmux new-session -s "$TMUX_SESSION" -c / "$inner"
+  fi
+  echo "tmux is not installed; running without it (a dropped connection would stop setup)."
+fi
+
 touch "$LOG"; chmod 600 "$LOG"
 exec > >(tee -a "$LOG") 2>&1
 printf '\n===== ollama1 setup %s =====\n' "$(date -Is)"
@@ -180,13 +184,16 @@ printf '\n===== ollama1 setup %s =====\n' "$(date -Is)"
 # shellcheck source=/dev/null
 . /etc/os-release
 [ "${VERSION_ID:-}" = "26.04" ] || die "this kit is for Ubuntu 26.04; this is ${PRETTY_NAME:-unknown}"
-for f in lib/o1common.py bin/ollama1-gateway systemd/ollama.service config/50-ollama1.rules; do
+for f in lib/o1common.py lib/setuplib.sh bin/ollama1-gateway systemd/ollama.service config/50-ollama1.rules; do
   [ -f "$KIT/$f" ] || die "the kit is incomplete: $f is missing"
 done
 [ -n "$OS_DISK" ] || die "no disk with serial $OS_SERIAL (the OS disk)"
 [ -n "$MODELS_DISK" ] || die "no disk with serial $MODELS_SERIAL (the models disk)"
 [ -n "$HDD1" ] || die "no disk with serial $HDD1_SERIAL"
 [ -n "$HDD2" ] || die "no disk with serial $HDD2_SERIAL"
+for pair in "$HDD1:$HDD1_SERIAL" "$HDD2:$HDD2_SERIAL" "$MODELS_DISK:$MODELS_SERIAL"; do
+  serial_is "${pair%%:*}" "${pair#*:}" || die "serial check failed for ${pair%%:*}; refusing to touch any disk"
+done
 [ "$(root_disk)" = "$OS_DISK" ] || die "/ is not on the disk with serial $OS_SERIAL; refusing to touch any disk"
 for d in "$MODELS_DISK" "$HDD1" "$HDD2"; do
   [ "$d" != "$OS_DISK" ] || die "$d is the OS disk"
@@ -202,7 +209,8 @@ echo
 if [ "${#WIPES[@]}" -gt 0 ]; then
   printf '%sThese disks will be ERASED. Everything on them is lost:%s\n' "$R$B" "$N"
   for w in "${WIPES[@]}"; do printf '   %s\n' "$w"; done
-  printf '(/home is copied off %s first, and the copy is checked before that disk is touched.)\n' "$HDD1"
+  printf '(/home is copied off %s first, and the copy is checked before that disk is touched.\n' "$HDD1"
+  printf ' A mirror already on the 8 TB disks is reassembled, never wiped.)\n'
 fi
 ask_yes "Type yes to go ahead: " || { echo "Nothing changed."; exit 1; }
 
@@ -246,30 +254,42 @@ ok "boot menu: 5 s, also after a failed boot ($(grep -cE 'set timeout=5([^0-9]|$
 # ---- 2. packages ----------------------------------------------------------------
 step "Packages"
 export DEBIAN_FRONTEND=noninteractive
-if [ ! -f /usr/share/keyrings/cloudflare-main.gpg ] || ! gpg --show-keys --with-colons /usr/share/keyrings/cloudflare-main.gpg 2>/dev/null | grep -q "^fpr:::::::::$CF_KEY_FPR:"; then
-  tmpk=$(mktemp)
-  run curl -fsSL --proto '=https' "$CF_KEY_URL" -o "$tmpk"
-  fpr=$(gpg --show-keys --with-colons "$tmpk" 2>/dev/null | awk -F: '/^fpr/{print $10; exit}')
-  [ "$fpr" = "$CF_KEY_FPR" ] || { rm -f "$tmpk"; die "Cloudflare's apt key has fingerprint '$fpr', expected $CF_KEY_FPR. If Cloudflare rotated it, check https://pkg.cloudflare.com and update CF_KEY_FPR."; }
-  install -m 0644 "$tmpk" /usr/share/keyrings/cloudflare-main.gpg
-  rm -f "$tmpk"
+KEYRING=/usr/share/keyrings/cloudflare-main.gpg
+key_ok() { # exactly one key, the pinned one
+  local f=$1
+  [ "$(gpg --show-keys --with-colons "$f" 2>/dev/null | grep -c '^pub:')" = 1 ] || return 1
+  [ "$(gpg --show-keys --with-colons "$f" 2>/dev/null | awk -F: '/^fpr/{print $10; exit}')" = "$CF_KEY_FPR" ]
+}
+if [ ! -f "$KEYRING" ] || ! key_ok "$KEYRING"; then
+  tmpd=$(mktemp -d)
+  run curl -fsSL --proto '=https' "$CF_KEY_URL" -o "$tmpd/key"
+  fpr=$(gpg --show-keys --with-colons "$tmpd/key" 2>/dev/null | awk -F: '/^fpr/{print $10; exit}')
+  [ "$fpr" = "$CF_KEY_FPR" ] || { rm -rf "$tmpd"; die "Cloudflare's apt key has fingerprint '$fpr', expected $CF_KEY_FPR. If Cloudflare rotated it, check https://pkg.cloudflare.com and update CF_KEY_FPR."; }
+  # Keep only the pinned key, whatever else the download carried.
+  gpg --homedir "$tmpd" --batch --quiet --import "$tmpd/key" 2>/dev/null
+  gpg --homedir "$tmpd" --batch --export --export-options export-minimal "$CF_KEY_FPR" >"$tmpd/only"
+  key_ok "$tmpd/only" || { rm -rf "$tmpd"; die "could not isolate Cloudflare's apt key $CF_KEY_FPR"; }
+  install -m 0644 "$tmpd/only" "$KEYRING"
+  rm -rf "$tmpd"
 fi
-ok "Cloudflare apt key $CF_KEY_FPR"
-echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main" >/etc/apt/sources.list.d/cloudflared.list
+ok "Cloudflare apt key $CF_KEY_FPR (only that key)"
+echo "deb [signed-by=$KEYRING] https://pkg.cloudflare.com/cloudflared any main" >/etc/apt/sources.list.d/cloudflared.list
 run apt-get update -q
-run apt-get install -y -q ttyd python3-nacl mdadm rsync zstd nftables ufw gdisk parted curl gnupg unattended-upgrades cloudflared
-# ttyd must never listen on its own; only ollama1-ttyd (127.0.0.1, login) may run.
+run apt-get install -y -q ttyd python3-nacl mdadm rsync zstd nftables ufw gdisk parted curl gnupg unattended-upgrades tmux cloudflared
+# ttyd must never listen on its own; only ollama1-ttyd (a UNIX socket, login) may run.
 systemctl disable --now ttyd.service >/dev/null 2>&1 || true
 python3 -c 'import nacl.signing' || die "python3-nacl did not install"
 ok "ttyd $(ttyd --version 2>&1 | awk '{print $NF}'), cloudflared $(cloudflared --version 2>&1 | awk '{print $3}'), PyNaCl"
 
 # ---- 3. root volume -----------------------------------------------------------
 step "Root volume"
-VGFREE=$(vg_free)
-if [ "${VGFREE:-0}" -gt 0 ]; then
+free_ext=$(vg_free_extents) || die "couldn't read the free space in ubuntu-vg (vgs -o vg_free_count ubuntu-vg)"
+if [ "$free_ext" -gt 0 ]; then
   run lvextend -r -l +100%FREE /dev/ubuntu-vg/ubuntu-lv
+  free_ext=$(vg_free_extents) || die "couldn't read the free space in ubuntu-vg after growing it"
+  [ "$free_ext" = 0 ] || die "ubuntu-vg still has $free_ext free extents after lvextend"
 fi
-ok "/ is $(df -h --output=size / | tail -n1 | tr -d ' ') ($(df -h --output=avail / | tail -n1 | tr -d ' ') free)"
+ok "/ is $(df -h --output=size / | tail -n1 | tr -d ' ') ($(df -h --output=avail / | tail -n1 | tr -d ' ') free); no free space left in ubuntu-vg"
 
 # ---- 4. /home onto the root filesystem -------------------------------------------
 step "/home onto the root filesystem"
@@ -278,22 +298,42 @@ if home_on_own_disk; then
   src=$(findmnt -no SOURCE /home)
   hdisk=$(disk_of "$src")
   [ "$hdisk" = "$HDD1" ] || [ "$hdisk" = "$HDD2" ] || die "/home is on $hdisk, not one of the 8 TB disks; not moving it"
-  need=$(du -sxm /home | cut -f1)
+  # du warns (and exits non-zero) on anything unreadable; the total still counts
+  need=$( { du -sxm /home 2>/dev/null || true; } | awk '{print $1}' | tail -n1)
   avail=$(df -m --output=avail / | tail -n1 | tr -d ' ')
-  [ "$need" -lt $((avail - 1024)) ] || die "/home needs ${need} MB and / has ${avail} MB free"
+  [ "${need:-0}" -lt $((avail - 1024)) ] || die "/home needs ${need} MB and / has ${avail} MB free"
   keysum=""
   [ -f "$KEYS" ] && keysum=$(sha256sum "$KEYS" | cut -d' ' -f1)
   ROOTVIEW=/run/ollama1-rootfs
   mkdir -p "$ROOTVIEW"
   mountpoint -q "$ROOTVIEW" || mount --bind / "$ROOTVIEW"   # / alone: the real /home folder under the mount
   mkdir -p "$ROOTVIEW/home"
-  run rsync -aHAX --numeric-ids --delete --exclude=/lost+found /home/ "$ROOTVIEW/home/"
-  diffs=$(rsync -aHAXn --numeric-ids --delete --checksum --itemize-changes --exclude=/lost+found /home/ "$ROOTVIEW/home/")
-  [ -z "$diffs" ] || { umount "$ROOTVIEW"; die "the copy of /home differs from the original: $diffs"; }
+  # Whatever already sits in the root filesystem's own /home (hidden under
+  # the mount) is set aside, not deleted. A copy from an earlier run is
+  # recognised by its marker and simply brought up to date.
+  if [ ! -f /var/lib/ollama1/home-copy-started ] && [ -n "$(ls -A "$ROOTVIEW/home" 2>/dev/null)" ]; then
+    aside="/home.pre-ollama1-$(date +%Y%m%d-%H%M%S)"
+    run mv "$ROOTVIEW/home" "$ROOTVIEW$aside"
+    mkdir -p "$ROOTVIEW/home"
+    note "what was already under the root's own /home is now in $aside"
+  fi
+  mkdir -p /var/lib/ollama1; touch /var/lib/ollama1/home-copy-started
+  home_sync() {
+    rsync -aHAX --numeric-ids --delete --exclude=/lost+found /home/ "$ROOTVIEW/home/"
+    local diffs
+    diffs=$(rsync -aHAXn --numeric-ids --delete --checksum --itemize-changes --exclude=/lost+found /home/ "$ROOTVIEW/home/")
+    [ -z "$diffs" ] || { umount "$ROOTVIEW"; die "the copy of /home differs from the original: $diffs"; }
+  }
+  printf '   $ rsync /home -> root filesystem, then compare\n'
+  home_sync
   if [ -n "$keysum" ]; then
     [ "$(sha256sum "$ROOTVIEW$KEYS" | cut -d' ' -f1)" = "$keysum" ] || { umount "$ROOTVIEW"; die "authorized_keys did not copy intact"; }
     ok "copy checked, file by file; $KEYS intact ($(grep -cvE '^[[:space:]]*(#|$)' "$KEYS") key(s))"
   fi
+  # Once more, right before the switch, so anything written meanwhile is in.
+  # Writes to the old /home after this point (seconds) are not copied.
+  printf '   $ rsync /home again, then compare\n'
+  home_sync
   umount "$ROOTVIEW"; rmdir "$ROOTVIEW"
   cp -a /etc/fstab "/etc/fstab.before-ollama1-$(date +%Y%m%d-%H%M%S)"
   awk -v d="$(date +%F)" '
@@ -313,7 +353,7 @@ if home_on_own_disk; then
   fi
   [ -f "$KEYS" ] || [ -z "$keysum" ] || die "authorized_keys is missing after the move; the old disk is untouched, see /etc/fstab.before-ollama1-*"
 else
-  grep -qE '^[^#][^[:space:]]*[[:space:]]+/home[[:space:]]' /etc/fstab && die "/etc/fstab still mounts /home but it isn't mounted; look at it before continuing"
+  home_in_fstab && die "/etc/fstab still mounts /home but it isn't mounted; look at it before continuing"
   ok "/home is on the root filesystem"
 fi
 
@@ -342,37 +382,11 @@ ok "ollama, o1gw, o1admin, o1dash, cloudflared (all /usr/sbin/nologin)"
 
 # ---- 6. models disk ---------------------------------------------------------------
 step "Models disk ($MODELS_SERIAL)"
-set_fstab() { # mountpoint line
-  awk -v m="$1" '!($2 == m && $0 !~ /^[[:space:]]*#/)' /etc/fstab >/etc/fstab.ollama1.new
-  printf '%s\n' "$2" >>/etc/fstab.ollama1.new
-  mv /etc/fstab.ollama1.new /etc/fstab
-  systemctl daemon-reload
-}
 if models_done; then
   ok "/srv/models already on $MODELS_DISK"
 else
-  [ "$(lsblk -dno SERIAL "$MODELS_DISK" | tr -d '[:space:]')" = "$MODELS_SERIAL" ] || die "serial check failed for $MODELS_DISK"
-  part=$(first_part "$MODELS_DISK")
-  if [ -n "$part" ] && [ "$(blkid -s LABEL -o value "$part" 2>/dev/null)" = "o1models" ]; then
-    note "found an earlier o1models filesystem; keeping it"
-  else
-    for p in $(lsblk -lnpo NAME "$MODELS_DISK"); do
-      if findmnt -S "$p" >/dev/null; then die "$p is mounted; not wiping"; fi
-    done
-    dev_busy "$MODELS_DISK" && die "$MODELS_DISK is in use; not wiping"
-    run wipefs -a "$MODELS_DISK"
-    run sgdisk --zap-all "$MODELS_DISK"
-    run sgdisk -n1:1MiB:0 -t1:8300 -c1:ollama1-models "$MODELS_DISK"
-    partprobe "$MODELS_DISK" || true; udevadm settle
-    part=$(first_part "$MODELS_DISK")
-    [ -n "$part" ] || die "no partition appeared on $MODELS_DISK"
-    run mkfs.ext4 -F -q -L o1models -m 1 "$part"
-  fi
-  uuid=$(blkid -s UUID -o value "$part")
-  mkdir -p /srv/models
-  set_fstab /srv/models "UUID=$uuid /srv/models ext4 defaults,noatime,nofail,x-systemd.device-timeout=30s 0 2"
-  run mount /srv/models
-  ok "/srv/models: $(df -h --output=size /srv/models | tail -n1 | tr -d ' ') on $part"
+  models_step "$MODELS_DISK" "$MODELS_SERIAL"
+  ok "/srv/models: $(df -h --output=size /srv/models | tail -n1 | tr -d ' ')"
 fi
 chown ollama:ollama /srv/models; chmod 0750 /srv/models
 
@@ -380,46 +394,20 @@ chown ollama:ollama /srv/models; chmod 0750 /srv/models
 step "Mirror ($HDD1_SERIAL + $HDD2_SERIAL)"
 RAID_PENDING=0
 if raid_done; then
-  ok "/srv/data already on $(raid_array)"
+  ok "/srv/data already on $(raid_find)"
 elif home_on_own_disk; then
   die "/home is still mounted from an 8 TB disk; not wiping"
-elif grep -qE '^[^#][^[:space:]]*[[:space:]]+/home[[:space:]]' /etc/fstab; then
-  die "/etc/fstab still mounts /home from an 8 TB disk; not wiping"
-elif dev_busy "$HDD1" || dev_busy "$HDD2"; then
+elif home_in_fstab; then
+  die "/etc/fstab still mounts /home; not wiping"
+elif [ -z "$(raid_find)" ] && [ -z "$(raid_members_on_disk "$HDD1" "$HDD2")" ] && { dev_busy "$HDD1" || dev_busy "$HDD2"; }; then
   RAID_PENDING=1
   note "an 8 TB disk is still held by an earlier login that had /home open (the old /home)."
   note "Log out of every SSH session (or reboot), log in again and run setup.sh again: it continues here."
   later "Build the mirror: log out of every session (or reboot), then run sudo ./setup.sh again"
 else
-  md=$(raid_array)
-  if [ -z "$md" ]; then
-    for d in "$HDD1" "$HDD2"; do
-      [ -n "$(lsblk -dno SERIAL "$d")" ] || die "serial check failed for $d"
-      for p in $(lsblk -lnpo NAME "$d"); do findmnt -S "$p" >/dev/null && die "$p is mounted; not wiping"; done
-      run wipefs -a "$d"
-      run sgdisk --zap-all "$d"
-      # leave 100 MiB free at the end, so a replacement disk a little smaller still fits
-      run sgdisk -n1:1MiB:-100MiB -t1:FD00 -c1:ollama1-data "$d"
-    done
-    partprobe "$HDD1" "$HDD2" || true; udevadm settle
-    p1=$(first_part "$HDD1"); p2=$(first_part "$HDD2")
-    [ -n "$p1" ] && [ -n "$p2" ] || die "partitions did not appear on the 8 TB disks"
-    run mdadm --create /dev/md/o1data --run --level=1 --raid-devices=2 --metadata=1.2 \
-      --bitmap=internal --homehost="$NEW_HOSTNAME" --name=data "$p1" "$p2"
-    udevadm settle
-    md=/dev/md/o1data
-    run mkfs.ext4 -F -q -L o1data -m 0 -E lazy_itable_init=1,lazy_journal_init=1 "$md"
-  fi
-  touch /etc/mdadm/mdadm.conf
-  sed -i '/name=ollama1:data/d' /etc/mdadm/mdadm.conf
-  mdadm --detail --brief "$md" >>/etc/mdadm/mdadm.conf
-  run update-initramfs -u
-  uuid=$(blkid -s UUID -o value "$md")
-  mkdir -p /srv/data
-  set_fstab /srv/data "UUID=$uuid /srv/data ext4 defaults,noatime,nofail,x-systemd.device-timeout=30s 0 2"
-  run mount /srv/data
+  raid_step "$HDD1" "$HDD2" "$HDD1_SERIAL" "$HDD2_SERIAL"
   install -d -m 0700 /srv/data/backups
-  ok "/srv/data: $(df -h --output=size /srv/data | tail -n1 | tr -d ' '), RAID1; first sync runs in the background (cat /proc/mdstat)"
+  ok "/srv/data: $(df -h --output=size /srv/data | tail -n1 | tr -d ' '), RAID1; the first sync runs in the background (cat /proc/mdstat)"
 fi
 
 # ---- 8. the kit -------------------------------------------------------------------------
@@ -494,26 +482,7 @@ fi
 systemctl daemon-reload
 ok "kit in $LIBDIR; settings in /etc/ollama1 (config.json root-only)"
 
-# ---- 9. Ollama ------------------------------------------------------------------
-step "Ollama (verified download, ROCm build)"
-run systemctl enable --now ollama1-nft.service
-if ! "$LIBDIR/bin/ollama1-update-ollama" --no-restart; then
-  [ -L /opt/ollama/current ] || die "could not install Ollama (see above); nothing is running yet. Run setup.sh again."
-  note "the update check failed; keeping the installed version"
-fi
-run systemctl enable ollama.service
-run systemctl restart ollama.service
-for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:11434/api/version >/dev/null 2>&1 && break; sleep 1; done
-curl -fsS http://127.0.0.1:11434/api/version >/dev/null || die "Ollama did not start: journalctl -u ollama"
-gpuline=$(journalctl -u ollama -b --no-pager -o cat 2>/dev/null | grep -i 'inference compute' | tail -n1 || true)
-if echo "$gpuline" | grep -qi 'rocm'; then
-  ok "Ollama $(curl -fsS http://127.0.0.1:11434/api/version | python3 -c 'import json,sys;print(json.load(sys.stdin)["version"])') sees the GPU: ${gpuline#*msg=}"
-else
-  note "Ollama did not report a ROCm GPU yet: ${gpuline:-no 'inference compute' line}. The gateway refuses anything not 100% on the GPU, so nothing runs on the CPU. Check: journalctl -u ollama | grep -i -E 'rocm|amdgpu|gfx'"
-  later "Ollama didn't report the GPU at setup time; check journalctl -u ollama"
-fi
-
-# ---- 10. firewall ----------------------------------------------------------------------
+# ---- 9. firewall ----------------------------------------------------------------------
 step "Firewall"
 ufw default deny incoming >/dev/null
 ufw default allow outgoing >/dev/null
@@ -537,20 +506,42 @@ for k in net.bridge.bridge-nf-call-iptables net.bridge.bridge-nf-call-ip6tables;
 done
 ok "incoming: SSH from $HOME_LAN only; bridge netfilter off$([ "$LANIF" = br0 ] && echo '; br0 to br0 routed traffic allowed')"
 
-# ---- 11. SSH --------------------------------------------------------------------------------
+# ---- 10. SSH --------------------------------------------------------------------------------
 step "SSH"
+KEY_RE='^[[:space:]]*(ssh-(ed25519|rsa)|ecdsa-sha2-|sk-(ssh-ed25519|ecdsa-sha2))'
 # Keys of your own = key lines in authorized_keys other than the setup key.
 own_keys() {
   [ -f "$KEYS" ] || { echo 0; return; }
-  grep -E '^[[:space:]]*(ssh-(ed25519|rsa)|ecdsa-sha2-|sk-(ssh-ed25519|ecdsa-sha2))' "$KEYS" | grep -vcF "$CLAUDE_KEY" || true
+  grep -E "$KEY_RE" "$KEYS" | grep -vcF "$CLAUDE_KEY" || true
+}
+show_own_keys() { # comment and fingerprint of every key counted as yours
+  local line tmp
+  tmp=$(mktemp)
+  grep -E "$KEY_RE" "$KEYS" | grep -vF "$CLAUDE_KEY" | while IFS= read -r line; do
+    printf '%s\n' "$line" >"$tmp"
+    printf '      %s\n' "$(ssh-keygen -lf "$tmp" 2>/dev/null || echo "(unreadable key line)")"
+  done
+  rm -f "$tmp"
 }
 OWN_KEYS=$(own_keys)
+PW_OFF=0
+if [ "$OWN_KEYS" -gt 0 ]; then
+  if [ -f /etc/ssh/sshd_config.d/10-ollama1.conf ] && grep -qx 'PasswordAuthentication no' /etc/ssh/sshd_config.d/10-ollama1.conf; then
+    PW_OFF=1   # confirmed on an earlier run
+  else
+    printf '   These keys in %s count as yours:\n' "$KEYS"
+    show_own_keys
+    printf '   After this step only these keys (and the setup key, until you remove it) can log in.\n'
+    printf '   Keep this session open until a NEW login with your key has worked.\n'
+    if ask_yes "   Are these your keys? Type yes to turn password login off: "; then PW_OFF=1; fi
+  fi
+fi
 DROPIN=/etc/ssh/sshd_config.d/10-ollama1.conf
 CLOUDINIT=/etc/ssh/sshd_config.d/50-cloud-init.conf
-if [ "$OWN_KEYS" -gt 0 ]; then
+if [ "$PW_OFF" = 1 ]; then
   pw=$'PasswordAuthentication no\nKbdInteractiveAuthentication no\nAuthenticationMethods publickey'
 else
-  pw=$'# Password login stays on until '"$KEYS"$'\n# holds a key of your own (besides '"$CLAUDE_KEY"$'). Run setup.sh again after adding it.'
+  pw=$'# Password login stays on until '"$KEYS"$'\n# holds a key of your own (besides '"$CLAUDE_KEY"$') and you confirm it. Run setup.sh again.'
 fi
 new=$(mktemp)
 awk -v pw="$pw" '{ if ($0 == "@PASSWORD_LINES@") print pw; else print }' "$KIT/config/10-ollama1-sshd.conf.in" >"$new"
@@ -566,7 +557,7 @@ install -m 0644 "$new" "$DROPIN"; rm -f "$new"
 # value it reads, so ours already wins. The cloud-init file's
 # "PasswordAuthentication yes" is commented out too, so nobody reading it is
 # misled and nothing depends on file order alone (a copy stays in /root).
-if [ "$OWN_KEYS" -gt 0 ] && [ -f "$CLOUDINIT" ] && grep -qiE '^[[:space:]]*PasswordAuthentication[[:space:]]+yes' "$CLOUDINIT"; then
+if [ "$PW_OFF" = 1 ] && [ -f "$CLOUDINIT" ] && grep -qiE '^[[:space:]]*PasswordAuthentication[[:space:]]+yes' "$CLOUDINIT"; then
   [ -f /root/50-cloud-init.conf.before-ollama1 ] || cp -a "$CLOUDINIT" /root/50-cloud-init.conf.before-ollama1
   sed -i -E 's/^([[:space:]]*PasswordAuthentication[[:space:]]+yes.*)$/# ollama1: password login is off (10-ollama1.conf)\n# \1/I' "$CLOUDINIT"
 fi
@@ -576,7 +567,7 @@ if ! sshd -t; then
 fi
 # What sshd will actually do for pmiller coming from the LAN:
 eff=$(sshd -T -C "user=$ADMIN_USER,host=mac.lan,addr=192.168.86.20,laddr=${LANIP:-192.168.86.10},lport=22" 2>/dev/null || true)
-want_pw=yes; [ "$OWN_KEYS" -gt 0 ] && want_pw=no
+want_pw=yes; [ "$PW_OFF" = 1 ] && want_pw=no
 if ! echo "$eff" | grep -qx "permitrootlogin no" || ! echo "$eff" | grep -qx "passwordauthentication $want_pw" \
    || { [ "$want_pw" = no ] && ! echo "$eff" | grep -qx "kbdinteractiveauthentication no"; }; then
   restore_ssh; rm -rf "$bak"
@@ -584,12 +575,37 @@ if ! echo "$eff" | grep -qx "permitrootlogin no" || ! echo "$eff" | grep -qx "pa
 fi
 rm -rf "$bak"
 systemctl try-reload-or-restart ssh.service
-if [ "$OWN_KEYS" -gt 0 ]; then
-  ok "passwords off: only $ADMIN_USER, from $HOME_LAN, with a key ($OWN_KEYS key(s) of your own); no root login"
+if [ "$PW_OFF" = 1 ]; then
+  ok "passwords off: only $ADMIN_USER, from $HOME_LAN, with a key; no root login"
+  note "Keep this session open. From your Mac, open a NEW terminal and check: ssh $ADMIN_USER@${LANIP:-192.168.86.10}"
+  note "If your agent offers several keys, name yours: ssh -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 $ADMIN_USER@${LANIP:-192.168.86.10}"
+  later "Before closing this session: check a NEW SSH login with your key works"
+elif [ "$OWN_KEYS" -gt 0 ]; then
+  note "no root login; only $ADMIN_USER from $HOME_LAN. Password login stays ON (you didn't confirm the keys)"
+  later "Confirm your SSH key: run sudo ./setup.sh again and answer yes at the SSH step"
 else
   note "no root login; only $ADMIN_USER from $HOME_LAN. Password login stays ON: $KEYS has no key of your own"
   note "(on your Mac: ssh-copy-id $ADMIN_USER@${LANIP:-192.168.86.10}, then run setup.sh again)"
   later "Add your Mac's SSH key (ssh-copy-id), then run sudo ./setup.sh again: it switches passwords off"
+fi
+
+# ---- 11. Ollama ------------------------------------------------------------------
+step "Ollama (verified download, ROCm build)"
+run systemctl enable --now ollama1-nft.service
+if ! "$LIBDIR/bin/ollama1-update-ollama" --no-restart; then
+  [ -L /opt/ollama/current ] || die "could not install Ollama (see above); nothing is running yet. Run setup.sh again."
+  note "the update check failed; keeping the installed version"
+fi
+run systemctl enable ollama.service
+run systemctl restart ollama.service
+for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:11434/api/version >/dev/null 2>&1 && break; sleep 1; done
+curl -fsS http://127.0.0.1:11434/api/version >/dev/null || die "Ollama did not start: journalctl -u ollama"
+gpuline=$(journalctl -u ollama -b --no-pager -o cat 2>/dev/null | grep -i 'inference compute' | tail -n1 || true)
+if echo "$gpuline" | grep -qi 'rocm'; then
+  ok "Ollama $(curl -fsS http://127.0.0.1:11434/api/version | python3 -c 'import json,sys;print(json.load(sys.stdin)["version"])') sees the GPU: ${gpuline#*msg=}"
+else
+  note "Ollama did not report a ROCm GPU yet: ${gpuline:-no 'inference compute' line}. The gateway refuses anything not 100% on the GPU, so nothing runs on the CPU. Check: journalctl -u ollama | grep -i -E 'rocm|amdgpu|gfx'"
+  later "Ollama didn't report the GPU at setup time; check journalctl -u ollama"
 fi
 
 # ---- 12. updates ------------------------------------------------------------------------------
@@ -620,10 +636,23 @@ done
 # ---- 14. Cloudflare -------------------------------------------------------------------------
 step "Cloudflare Tunnel and Access"
 cfg_has() { python3 -c 'import json,sys; c=json.load(open("/etc/ollama1/config.json")); sys.exit(0 if all(c.get(k) for k in sys.argv[1:]) else 1)' "$@"; }
-if [ "$SKIP_CF" = 1 ]; then
-  note "skipped (--skip-cloudflare)"
-  later "Cloudflare: run sudo ./setup.sh again without --skip-cloudflare"
-else
+cfg_set() { # key value
+  python3 - "$1" "$2" <<'PY'
+import json, os, sys
+p = "/etc/ollama1/config.json"
+c = json.load(open(p))
+c[sys.argv[1]] = sys.argv[2]
+fd = os.open(p + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+with os.fdopen(fd, "w") as f: json.dump(c, f, indent=1, sort_keys=True)
+os.replace(p + ".tmp", p)
+PY
+}
+cf_ready() { cfg_has access_team_domain gateway_aud admin_aud admin_email tunnel_id && [ -s /etc/cloudflared/ollama1.json ]; }
+
+# The fallback, without an API token: cloudflared logs in through a browser
+# for the tunnel and DNS; Access is clicked in the dashboard (README) and
+# its values typed in here.
+cf_by_browser() {
   export HOME=/root
   if [ ! -f /root/.cloudflared/cert.pem ]; then
     cat <<EOF
@@ -637,6 +666,7 @@ EOF
     run cloudflared tunnel login
   fi
   chmod 600 /root/.cloudflared/cert.pem
+  local tid h
   tid=$(cloudflared tunnel list -o json 2>/dev/null | python3 -c 'import json,sys
 for t in json.load(sys.stdin) or []:
     if t.get("name") == "ollama1" and not t.get("deleted_at", "").startswith("2"): print(t["id"]); break' || true)
@@ -648,7 +678,7 @@ for t in json.load(sys.stdin) or []:
   fi
   [ -n "$tid" ] || die "could not create or find the tunnel ollama1"
   install -d -m 0755 /etc/cloudflared
-  if [ ! -f /etc/cloudflared/ollama1.json ]; then
+  if [ ! -s /etc/cloudflared/ollama1.json ]; then
     if [ -f "/root/.cloudflared/$tid.json" ]; then
       install -m 0600 "/root/.cloudflared/$tid.json" /etc/cloudflared/ollama1.json
       rm -f "/root/.cloudflared/$tid.json"
@@ -656,40 +686,27 @@ for t in json.load(sys.stdin) or []:
       run cloudflared tunnel token --cred-file /etc/cloudflared/ollama1.json ollama1
     fi
   fi
-  chown root:root /etc/cloudflared/ollama1.json; chmod 0600 /etc/cloudflared/ollama1.json
-  ok "tunnel ollama1 ($tid); credential root-only in /etc/cloudflared/ollama1.json"
+  cfg_set tunnel_id "$tid"
   for h in "$GW_HOST" "$ADMIN_HOST"; do
     if cloudflared tunnel route dns ollama1 "$h"; then ok "DNS $h -> tunnel"; else
       note "DNS for $h not set (a record may already exist). In the dashboard: DNS > $h > CNAME $tid.cfargotunnel.com, proxied"
       later "Check the DNS record for $h (CNAME to $tid.cfargotunnel.com)"
     fi
   done
-
-  if ! cfg_has access_team_domain gateway_aud admin_aud admin_email; then
-    cat <<EOF
-
-   Cloudflare Access protects both names. Choose one:
-     1  Use the API helper now (paste a Cloudflare API token; it is not saved)
-     2  I did it in the dashboard (README: "Access in the dashboard"); ask me for the values
-     3  Later (the tunnel stays off until Access is set up)
-EOF
-    printf '   1, 2 or 3: '
-    read -r choice </dev/tty
-    case "$choice" in
-      1) "$LIBDIR/bin/ollama1-cf-access" || note "the API helper stopped; run sudo ollama1-cf-access later" ;;
-      2)
-        printf '   Team domain (like yourteam.cloudflareaccess.com): '; read -r team </dev/tty
-        printf '   AUD tag of the %s application: ' "$ADMIN_HOST"; read -r aaud </dev/tty
-        printf '   AUD tag of the %s application: ' "$GW_HOST"; read -r gaud </dev/tty
-        printf '   Service token Client ID (ends in .access): '; read -r cid </dev/tty
-        python3 - "$team" "$aaud" "$gaud" "$cid" <<'PY'
+  if ! cfg_has access_team_domain gateway_aud admin_aud; then
+    printf '\n   Now set up Access in the dashboard (README: "Without an API token"), then type the values.\n'
+    printf '   Team domain (like yourteam.cloudflareaccess.com): '; read -r team </dev/tty
+    printf '   AUD tag of the %s application: ' "$ADMIN_HOST"; read -r aaud </dev/tty
+    printf '   AUD tag of the %s application: ' "$GW_HOST"; read -r gaud </dev/tty
+    printf '   Service token Client ID (ends in .access): '; read -r cid </dev/tty
+    python3 - "$team" "$aaud" "$gaud" "$cid" <<'PY'
 import json, os, re, sys
 team, aaud, gaud, cid = [a.strip() for a in sys.argv[1:]]
 team = re.sub(r"^https?://", "", team).rstrip("/")
 if not re.match(r"^[a-z0-9-]+\.cloudflareaccess\.com$", team): sys.exit("team domain should look like yourteam.cloudflareaccess.com")
 for v in (aaud, gaud):
     if not re.match(r"^[0-9a-f]{64}$", v): sys.exit("an AUD tag is 64 hex characters")
-if cid and not cid.endswith(".access"): sys.exit("a service token Client ID ends in .access")
+if not cid.endswith(".access"): sys.exit("the service token Client ID is required; it ends in .access")
 p = "/etc/ollama1/config.json"
 c = json.load(open(p))
 c.update(access_team_domain=team, admin_aud=aaud, gateway_aud=gaud, service_token_client_id=cid)
@@ -697,19 +714,62 @@ fd = os.open(p + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
 with os.fdopen(fd, "w") as f: json.dump(c, f, indent=1, sort_keys=True)
 os.replace(p + ".tmp", p)
 PY
-        ;;
-      *) note "Access later" ;;
+  fi
+}
+
+# The default: one API token does the tunnel, DNS and Access. It is read
+# with read -s (not echoed, not in any history, not in the setup log), goes
+# to the helper on a pipe (printf is a shell builtin, so it never shows in a
+# process list or a command line), and is cleared here straight after.
+cf_by_token() {
+  local CF_TOKEN=""
+  read -r -s -p "   Cloudflare API token (not shown): " CF_TOKEN </dev/tty
+  echo
+  if [ -z "$CF_TOKEN" ]; then note "no token given"; return 0; fi
+  if printf '%s\n' "$CF_TOKEN" | "$LIBDIR/bin/ollama1-cf-access" --token-stdin; then
+    ok "Cloudflare set up through the API"
+  else
+    note "the API setup stopped (see above); fix it and run setup.sh again, or choose 2"
+  fi
+  CF_TOKEN=""
+  later "Delete the Cloudflare API token now: dash.cloudflare.com > My Profile > API Tokens"
+}
+
+if [ "$SKIP_CF" = 1 ]; then
+  note "skipped (--skip-cloudflare)"
+  later "Cloudflare: run sudo ./setup.sh again without --skip-cloudflare"
+else
+  if cf_ready; then
+    ok "already set up; to check or redo it through the API: sudo ollama1-cf-access"
+  else
+    cat <<EOF
+
+   Cloudflare: the tunnel, the two DNS names and Access. Choose one:
+     1  Paste one Cloudflare API token and setup does all of it (recommended).
+        Make the token first: README, "The API token" (6 permissions, 1-day TTL).
+     2  No API token: log in with cloudflared in a browser, and click Access
+        together in the dashboard (README, "Without an API token")
+     3  Later (nothing is reachable from outside until this is done)
+EOF
+    printf '   1, 2 or 3 [1]: '
+    read -r choice </dev/tty
+    case "${choice:-1}" in
+      1) cf_by_token ;;
+      2) cf_by_browser ;;
+      *) note "Cloudflare later" ;;
     esac
   fi
-  if cfg_has access_team_domain gateway_aud admin_aud admin_email; then
-    read -r TEAM GAUD AAUD < <(python3 -c 'import json, re
+  if cf_ready; then
+    chown root:root /etc/cloudflared/ollama1.json; chmod 0600 /etc/cloudflared/ollama1.json
+    read -r TID TEAM GAUD AAUD < <(python3 -c 'import json, re
 c = json.load(open("/etc/ollama1/config.json"))
-vals = [c["access_team_domain"].split(".")[0], c["gateway_aud"], c["admin_aud"]]
-assert all(re.match(r"^[A-Za-z0-9-]+$", v) for v in vals), "unexpected characters in the Access settings"
+vals = [c["tunnel_id"], c["access_team_domain"].split(".")[0], c["gateway_aud"], c["admin_aud"]]
+assert all(re.match(r"^[A-Za-z0-9-]+$", v) for v in vals), "unexpected characters in the Cloudflare settings"
 print(*vals)')
-    sed -e "s/@TUNNEL_ID@/$tid/" -e "s/@TEAM_NAME@/$TEAM/g" -e "s/@GATEWAY_AUD@/$GAUD/" -e "s/@ADMIN_AUD@/$AAUD/" \
+    sed -e "s/@TUNNEL_ID@/$TID/" -e "s/@TEAM_NAME@/$TEAM/g" -e "s/@GATEWAY_AUD@/$GAUD/" -e "s/@ADMIN_AUD@/$AAUD/" \
       "$KIT/config/cloudflared.yml.in" >/etc/ollama1/cloudflared.yml
     chown root:cloudflared /etc/ollama1/cloudflared.yml; chmod 0640 /etc/ollama1/cloudflared.yml
+    ok "tunnel $TID; credential root-only in /etc/cloudflared/ollama1.json"
     run systemctl enable ollama1-tunnel.service
     run systemctl restart ollama1-tunnel.service ollama1-gateway.service ollama1-admin.service
     for _ in $(seq 1 20); do curl -fsS http://127.0.0.1:8439/ready >/dev/null 2>&1 && break; sleep 1; done
@@ -717,9 +777,37 @@ print(*vals)')
       note "tunnel not connected yet: journalctl -u ollama1-tunnel"; later "Tunnel did not connect: journalctl -u ollama1-tunnel"
     fi
   else
-    note "Access is not set up, so the tunnel stays off (nothing is reachable from outside)"
-    later "Cloudflare Access: sudo ollama1-cf-access, or the dashboard steps in the README; then sudo ./setup.sh"
+    note "Cloudflare is not fully set up, so the tunnel stays off (nothing is reachable from outside)"
+    later "Cloudflare: run sudo ./setup.sh again and paste an API token (or run: sudo ollama1-cf-access)"
   fi
+fi
+
+# ---- listeners -----------------------------------------------------------------------------
+step "What listens on the network"
+# Only sshd may listen beyond loopback (plus the gateway on br0 in LAN mode).
+lan_on=0
+python3 -c 'import json,sys; sys.exit(0 if json.load(open("/etc/ollama1/config.json")).get("lan_mode") else 1)' && lan_on=1
+exposed_listeners() {
+  local addr proc
+  ss -Hltnp 2>/dev/null | awk '{print $4 "  " $6}' | while read -r addr proc; do
+    case "$addr" in
+      127.*|"[::1]":*|"[::ffff:127."*) continue ;;
+      *:22) continue ;;
+    esac
+    if [ "$lan_on" = 1 ] && [ "$addr" = "${LANIP:-x}:8431" ]; then continue; fi
+    printf '%s %s\n' "$addr" "$proc"
+  done
+}
+exposed=$(exposed_listeners)
+if [ -z "$exposed" ]; then
+  ok "nothing listens beyond loopback except sshd$([ "$lan_on" = 1 ] && echo ' and the LAN-mode gateway')"
+else
+  printf '%s\n' "$exposed" | sed 's/^/      /'
+  if printf '%s\n' "$exposed" | grep -qE 'ollama|ttyd|cloudflared|python3'; then
+    die "one of ollama1's services listens beyond loopback (above); the firewall blocks it, but it must not"
+  fi
+  note "other programs listen beyond loopback (above). The firewall blocks them from outside."
+  later "Look at the listeners setup listed under 'What listens on the network'"
 fi
 
 # ---- 15. the setup key (only when asked) ----------------------------------------------------
@@ -739,7 +827,7 @@ remove_setup_key() {
   [ "$(grep -cF "$CLAUDE_KEY" "$tmp" || true)" -eq 0 ] || { rm -f "$tmp"; die "could not take the setup key out of $KEYS"; }
   [ "$(grep -E '^[[:space:]]*(ssh-(ed25519|rsa)|ecdsa-sha2-|sk-(ssh-ed25519|ecdsa-sha2))' "$tmp" | grep -vcF "$CLAUDE_KEY" || true)" -eq "$own" ] \
     || { rm -f "$tmp"; die "removing the setup key would also have changed your own keys; nothing changed"; }
-  chown --reference="$KEYS" "$tmp"; chmod --reference="$KEYS" "$tmp"
+  chown "$(stat -c %u:%g "$KEYS")" "$tmp"; chmod "$(stat -c %a "$KEYS")" "$tmp"
   mv "$tmp" "$KEYS"
   ok "removed the setup key ($CLAUDE_KEY); your $own key(s) stay. A copy of the old file is in /root."
 }
@@ -766,6 +854,12 @@ cat <<EOF
   Models:   none installed; add names to /etc/ollama1/models.allow, then Pull in the panel
   Panel:    https://$ADMIN_HOST
 EOF
+if [ "${PW_OFF:-0}" = 1 ]; then
+  printf '\n  %sBefore you close this session:%s open a NEW terminal on your Mac and log in with
+' "$Y$B" "$N"
+  printf '  your key (ssh %s@%s). If your agent offers several keys first, name yours:\n' "$ADMIN_USER" "${LANIP:-192.168.86.10}"
+  printf '    ssh -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 %s@%s\n' "$ADMIN_USER" "${LANIP:-192.168.86.10}"
+fi
 if [ "${#LATER[@]}" -gt 0 ]; then
   printf '\n%sStill to do:%s\n' "$Y$B" "$N"
   for l in "${LATER[@]}"; do printf '  - %s\n' "$l"; done

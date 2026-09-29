@@ -26,14 +26,18 @@ provider comes later and follows `ollama1/PROTOCOL.md`. How to run it is in
   rebuilding the whole PKCS#1 block; Ed25519 uses PyNaCl on the desktop
   (`cryptography` elsewhere), never a pure-Python fallback.
 - **Pairing only at the desktop.** `sudo ollama1-pair` or the panel's button
-  opens a 5-minute window. An 8-character Crockford code shows on tty1 and
-  in that terminal, never in the panel. The app sends its public key plus
+  opens a 5-minute window. A 12-character (60-bit) Crockford code shows on
+  tty1 and in that terminal, never in the panel. The app sends its public key plus
   HMAC(sha256(code), …), and gets a proof back.
   - Limits: one success per window, 5 wrong codes close it, one attempt
     every 2 s.
-  - The gateway (unprivileged) can only drop a request in a spool. A root
-    path unit re-checks the code and writes `devices.json`, so a compromised
-    gateway still can't add a key.
+  - The gateway never sees the code (second commit, review F7). It checks
+    the request's shape and pace, drops it in a spool and relays the
+    answer. A root path unit checks the MAC, counts wrong codes, refuses
+    reused nonces, writes `devices.json` and computes the proof. A
+    compromised gateway can't add a key or learn the code.
+  - Refused on the LAN listener (F2): LAN mode is plain HTTP, and a sniffed
+    MAC could be brute-forced offline.
   - No invite/share/join exists anywhere, per Patrick's rule.
 - **Stateless.** Bodies live in memory for one request. Journal lines and
   the stats file carry counts, timings, model and device names.
@@ -100,19 +104,91 @@ provider comes later and follows `ollama1/PROTOCOL.md`. How to run it is in
   - Ollama: weekly. Base + ROCm archives must match `sha256sum.txt`, and
     GitHub's asset digest when present. Unpacked with `filter="data"`; a
     health check with rollback; the previous version is kept.
-- Tested on the Mac: 114 unit tests (incl. shellcheck, polkit rule in node), 38 mutants all killed (`tests/mutate.py`).
-  Tested on the desktop as pmiller without sudo:
-  - the same suite;
-  - a user-mode trial on 127.0.0.1:18431-18439 with a stub Ollama and fake
-    Access certs, reading the real amdgpu sysfs and br0;
-  - the curses dashboard in a pty;
-  - `systemd-analyze verify` of the units;
-  - `setup.sh --plan`.
+- **Cloudflare with one API token** (second commit). The token is pasted at
+  setup's prompt; `cloudflared tunnel login` plus dashboard clicks are only
+  the fallback. `ollama1-cf-access` then does everything, reusing whatever
+  already exists:
+  - finds the zone and its account, and the team domain; with no Zero Trust
+    organization it names the one dashboard click needed;
+  - creates a **locally-managed** tunnel through the API (`config_src:
+    local`), so routes and cloudflared's Access check stay in
+    `/etc/ollama1/cloudflared.yml`. The credential JSON is built from the
+    tunnel's token endpoint, so a lost `/etc/cloudflared/ollama1.json` is
+    rebuilt for the same tunnel;
+  - makes one proxied CNAME per hostname: wrong targets fixed, duplicates
+    removed, and it stops (deleting nothing) if a record of another type
+    uses the name;
+  - sets up the Access apps, policies and service token, whose secret is
+    printed once and saved nowhere.
 
-  The scratch folder was removed afterwards. Not run for real until Patrick
-  runs setup:
-  - the root steps (disks, RAID, ufw, sshd, polkit, nft);
-  - ttyd behind the panel, tty1 as a service;
+  The token: `read -s` in setup, piped with the `printf` builtin (never
+  argv or env), held in memory only by the helper, and a reminder to delete
+  it (1-day TTL recommended). `tests/test_cloudflare.py` runs the helper
+  against a fake Cloudflare API: reruns make no writes, no duplicate DNS,
+  and the token appears in no file, temp file or output. There are 5 more
+  mutants.
+- **Review fixes (second commit).**
+  - Gateway and panel:
+    - Every error response closes the connection, so an unread body can't
+      pass as the next request on a connection cloudflared reuses (F1).
+    - Access and the signature headers are checked before the body is read.
+    - Requests in flight are capped at 16, and bodies at 32 MiB (F3).
+    - An exception after the stream has started ends it with an error line,
+      not a 500 in mid-chunk (F5).
+  - Port guard and units:
+    - The port guard matches `fib daddr type local`, and the services
+      `Requires=` it.
+    - ttyd listens on a UNIX socket that only root and the panel's user can
+      open, with no TCP port (F6).
+    - `LimitCORE=0` and `MemorySwapMax=0` on Ollama and the gateway;
+      `OLLAMA_DEBUG=0` (F9).
+    - `/term/` pages get `X-Frame-Options: DENY` and a frame-ancestors CSP.
+  - Secrets:
+    - The service-token secret goes to /dev/tty, never through setup's
+      tee'd log (F4).
+    - The repo scan now covers every added line in the branch, with 64-hex,
+      32-hex and UUID patterns and case-insensitive email TLDs (F8).
+  - Nothing mixes: when consecutive jobs come from different paired
+    devices, every loaded model is unloaded first. No prompt cache is
+    shared; the cost is one reload per device switch.
+  - setup.sh:
+    - The disk steps moved into `lib/setuplib.sh`, tested with fake disk
+      tools in `tests/test_setuplib.py`.
+    - It makes a filesystem whenever the array has none, and never writes
+      an fstab line without a UUID.
+    - It checks `mdadm --examine` before any wipe and reassembles a mirror
+      already on the disks.
+    - It refuses unexpected signatures and disks still used by
+      fstab/crypttab/swap, and wipes only through `/dev/disk/by-id` after
+      exact serial checks.
+    - It reads free space as extents (`vg_free_count`) and stops loudly if
+      it can't.
+    - No `MaxAuthTries 4`. It shows each "own" key's comment and
+      fingerprint and wants a typed yes before turning passwords off. It
+      tells Patrick to keep the session open and test a new login.
+    - It runs inside tmux. Firewall and SSH come before the Ollama
+      download.
+    - For the `/home` move: the root's own `/home` is set aside, not
+      deleted; there is a final re-sync before the switch; `du` warnings
+      are tolerated.
+    - Only the pinned Cloudflare apt key is kept.
+    - It checks with `ss` that only sshd listens beyond loopback.
+    - Choice 2 requires the Client ID.
+- Found while testing the 12-character codes: `o1big.render` iterated a
+  glyph's rows instead of the row's pixels, so the big pairing code came out
+  blank in the first commit; only the small `XXXX-XXXX-XXXX` line was
+  readable. It is fixed, and `test_big.py` plus a mutant watch it.
+- Tested on the Mac: 167 unit tests (incl. shellcheck, the polkit rule in
+  node, the setup disk steps against fake mdadm/blkid/lsblk). All 58
+  mutants are caught (`tests/mutate.py`). On the desktop (as pmiller, no
+  sudo): the same suite under bash 5.3, the user-mode trial, the dashboard
+  at 120x40 and 80x25, and `setup.sh --plan`.
+
+  The first commit's desktop run also covered `systemd-analyze verify`.
+
+  Not run for real until Patrick runs setup:
+  - the root steps;
+  - ttyd on its socket behind the panel, tty1 as a service;
   - cloudflared, and Ollama on ROCm.
 
 ---

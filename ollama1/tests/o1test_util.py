@@ -30,7 +30,7 @@ if not os.environ.get("OLLAMA1_PREFIX"):
     os.environ["OLLAMA1_PREFIX"] = _prefix
     atexit.register(shutil.rmtree, _prefix, True)
 PREFIX = os.environ["OLLAMA1_PREFIX"]
-for d in ("etc/ollama1", "run/ollama1/pair", "run/ollama1/pair-spool", "run/ollama1/stats",
+for d in ("etc/ollama1", "run/ollama1/pair", "run/ollama1/pair-spool", "run/ollama1/pair-result", "run/ollama1/stats",
           "var/lib/ollama1-gateway", "var/lib/ollama1", "var/lib/ollama1-admin", "srv/models",
           "opt/ollama/versions"):
     os.makedirs(os.path.join(PREFIX, d), exist_ok=True)

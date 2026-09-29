@@ -16,6 +16,17 @@ Stateless: request and response bodies live only in memory for the length
 of one request. Nothing here writes them to disk or to a log. The stats
 file and the journal hold counts, timings, model names and device names.
 
+Nothing mixes: one job on the GPU at a time, and when the next job is from
+a different paired device, every loaded model is unloaded first, so not
+even Ollama's prompt cache is shared between devices.
+
+Before the body: Access and the signature headers are checked before any
+body is read, at most 16 requests are handled at once, and every error
+closes the connection (cloudflared reuses connections).
+
+Pairing: the gateway never sees the code; it hands requests to a root step
+(ollama1-pair --commit) and relays its answer. Never on the LAN listener.
+
 GPU only: a model whose weights plus context can't fit in VRAM is refused
 before it loads, and after it loads /api/ps must show it 100% in VRAM; if
 any of it landed on the CPU it is unloaded and the request gets an error.
@@ -24,6 +35,7 @@ import datetime
 import ipaddress
 import json
 import os
+import secrets
 import sys
 import threading
 import time
@@ -33,14 +45,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
 
 import o1crypto  # noqa: E402
-from o1auth import (AuthError, NonceCache, PAIR_MAX_FAILURES, PAIR_MIN_INTERVAL,  # noqa: E402
-                    RequestVerifier, SKEW, check_pair_mac, device_id_for,
-                    pair_proof, parse_pair_request)
+from o1auth import AuthError, PAIR_MIN_INTERVAL, RequestVerifier, SKEW, parse_pair_request  # noqa: E402
 from o1common import Paths, load_config, read_json, safe_label, valid_model_name, write_json_atomic  # noqa: E402
-from o1crypto import b64url_encode  # noqa: E402
 from o1jwt import AccessVerifier, JWTError  # noqa: E402
 import o1ollama  # noqa: E402
-from o1pair import DeviceStore, read_window, spool_burn, spool_request  # noqa: E402
+from o1pair import DeviceStore, read_public, spool_request, wait_result  # noqa: E402
 import o1stats  # noqa: E402
 
 VERSION = "1"
@@ -263,8 +272,9 @@ class Gateway:
         self.slot = Slot(self.stats, int(cfg["queue_max"]))
         self.base = cfg["ollama_url"]
         self.pair_lock = threading.Lock()
-        self.pair = {"window": None, "failures": 0, "used": False, "last_try": 0.0}
-        self.pair_nonces = NonceCache()
+        self.pair = {"last_try": 0.0}
+        self.inflight = threading.BoundedSemaphore(int(cfg.get("max_inflight") or 16))
+        self.last_device = None   # whose request last ran on the GPU (see switch_device)
         self.tags = {}
         self.tags_at = 0.0
         self.info = {}
@@ -368,6 +378,23 @@ class Gateway:
             except OSError:
                 pass
 
+    def switch_device(self, dev_id):
+        """Nothing is shared between devices, not even Ollama's prompt
+        cache: when the GPU's next job belongs to a different paired device
+        than the last one, every loaded model is unloaded first. The cost is
+        one reload when the device changes. Called with the GPU slot held."""
+        if self.last_device is not None and self.last_device != dev_id:
+            try:
+                st, data = o1ollama.call(self.base, "GET", "/api/ps", timeout=10)
+                names = [m.get("name") or m.get("model") for m in (data or {}).get("models", []) or []]
+            except OSError:
+                names = []
+            for name in names:
+                if name:
+                    self.unload(name)
+            log("device-switch", model=",".join(n for n in names if n) or "-")
+        self.last_device = dev_id
+
     def ensure_on_gpu(self, name, share=None):
         if share is None:
             share = self.gpu_share(name)
@@ -429,6 +456,12 @@ def make_handler(gw, lan=False):
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(raw)))
             self.send_header("Cache-Control", "no-store")
+            if status >= 400:
+                # An error may leave a request body unread on this connection;
+                # cloudflared reuses connections, so never read past it as
+                # the next request (request smuggling). Close instead.
+                self.send_header("Connection", "close")
+                self.close_connection = True
             for k, v in (extra_headers or {}).items():
                 self.send_header(k, v)
             self.end_headers()
@@ -451,29 +484,35 @@ def make_handler(gw, lan=False):
         def do_DELETE(self):
             self.handle_any("DELETE")
 
-        def read_body(self):
+        def read_body(self, limit):
             if self.headers.get("Transfer-Encoding"):
                 raise GatewayError(411, "bad_request", "send a Content-Length")
             try:
                 n = int(self.headers.get("Content-Length") or 0)
             except ValueError:
                 raise GatewayError(400, "bad_request", "bad Content-Length")
-            if n < 0 or n > max_body:
+            if n < 0 or n > limit:
                 raise GatewayError(413, "too_large", "body too large")
             return self.rfile.read(n) if n else b""
 
         def handle_any(self, method):
             t0 = time.monotonic()
+            if not gw.inflight.acquire(blocking=False):
+                self.close_connection = True
+                return self.fail(GatewayError(503, "busy", "too many requests at once"))
             try:
+                # Nothing below reads the body until the headers have passed
+                # Access and the header half of the signature check.
                 if len(self.path) > 2048:
                     raise GatewayError(414, "bad_request", "path too long")
-                body = self.read_body()
                 gw.check_access(self.headers, lan, self.client_address[0])
                 route = self.path.split("?", 1)[0]
                 if route == "/v1/pair" and method == "POST":
-                    return self.handle_pair(body)
+                    return self.handle_pair()
                 try:
-                    dev_id, dev = gw.verifier.verify(method, self.path, self.headers, body)
+                    pre = gw.verifier.precheck(method, self.path, self.headers)
+                    body = self.read_body(max_body)
+                    dev_id, dev = gw.verifier.complete(pre, body)
                 except AuthError as e:
                     gw.stats.auth_failure(e.code)
                     log("auth-fail", reason=e.code)
@@ -483,7 +522,7 @@ def make_handler(gw, lan=False):
                 try:
                     self.fail(e)
                 except OSError:
-                    pass
+                    self.close_connection = True
             except (BrokenPipeError, ConnectionResetError):
                 self.close_connection = True
             except Exception as e:  # never echo request content
@@ -491,61 +530,50 @@ def make_handler(gw, lan=False):
                 try:
                     self.fail(GatewayError(500, "internal", "internal error"))
                 except OSError:
-                    pass
+                    self.close_connection = True
+            finally:
+                gw.inflight.release()
 
         # -- pairing (POST /v1/pair) -------------------------------------
-        def handle_pair(self, body):
+        def handle_pair(self):
+            """The gateway never sees the code: it checks the request's
+            shape and pace, hands it to the root step, and relays the answer."""
+            if lan:
+                raise GatewayError(403, "pair_closed", "pairing works only through the tunnel, not on the LAN")
+            body = self.read_body(8192)
             now = gw.clock()
-            w = read_window(Paths.window, now)
-            st = gw.pair
+            pub = read_public(now)
+            if not pub:
+                raise GatewayError(403, "pair_closed", "no pairing window is open at the desktop")
             with gw.pair_lock:
-                if not w:
-                    raise GatewayError(403, "pair_closed", "no pairing window is open at the desktop")
-                if st["window"] != w["id"]:
-                    st.update(window=w["id"], failures=0, used=False)
-                if st["used"] or st["failures"] >= PAIR_MAX_FAILURES:
-                    raise GatewayError(403, "pair_closed", "this pairing window is closed")
-                if now - st["last_try"] < PAIR_MIN_INTERVAL:
-                    st["last_try"] = now
+                if now - gw.pair["last_try"] < PAIR_MIN_INTERVAL:
+                    gw.pair["last_try"] = now
                     raise GatewayError(429, "rate_limited", "wait a moment and try again")
-                st["last_try"] = now
-                try:
-                    obj = json.loads(body.decode("utf-8"))
-                except (ValueError, UnicodeDecodeError):
-                    raise GatewayError(400, "bad_request", "body must be JSON")
-                try:
-                    name, pub, pub_b64, ts, nonce, mac = parse_pair_request(obj)
-                except AuthError as e:
-                    raise GatewayError(e.status, e.code, str(e))
-                if abs(now - ts) > SKEW:
-                    raise GatewayError(401, "clock_skew", "timestamp is more than %d s off" % SKEW)
-                if not gw.pair_nonces.check_and_add(nonce, now):
-                    raise GatewayError(401, "replay", "nonce already used")
-                if not check_pair_mac(w["code"], name, pub_b64, ts, nonce, mac):
-                    st["failures"] += 1
-                    left = PAIR_MAX_FAILURES - st["failures"]
-                    log("pair-fail", attempts_left=left)
-                    if left <= 0:
-                        spool_burn(w["id"])
-                        raise GatewayError(403, "pair_closed",
-                                           "too many wrong codes; the window is closed")
-                    raise GatewayError(401, "wrong_code", "wrong code", attempts_left=left)
-                st["used"] = True
-                dev_id = device_id_for(pub)
-                spool_request(w["id"], obj)
-                code = w["code"]
-            deadline = time.monotonic() + 10
-            while time.monotonic() < deadline:
-                d = gw.devices().get(dev_id)
-                if d and d["public_key"] == pub:
+                gw.pair["last_try"] = now
+            try:
+                obj = json.loads(body.decode("utf-8"))
+                parse_pair_request(obj)
+            except (ValueError, UnicodeDecodeError):
+                raise GatewayError(400, "bad_request", "body must be JSON")
+            except AuthError as e:
+                raise GatewayError(e.status, e.code, str(e))
+            if abs(now - obj["timestamp"]) > SKEW:
+                raise GatewayError(401, "clock_skew", "timestamp is more than %d s off" % SKEW)
+            req_id = secrets.token_hex(8)
+            spool_request(req_id, pub["id"], obj)
+            res = wait_result(req_id)
+            if res is None:
+                raise GatewayError(503, "pair_not_saved",
+                                   "the desktop did not answer; open a new window and retry")
+            status, out = res
+            out = dict(out, server_time=int(gw.clock()))
+            if status == 200:
+                with gw.stats.lock:
                     gw.stats.totals["pairings"] += 1
-                    log("pair-ok", device=name, id=dev_id)
-                    return self.send_json(200, {
-                        "device_id": dev_id, "name": name, "server_time": int(gw.clock()),
-                        "proof": b64url_encode(pair_proof(code, dev_id, pub_b64, nonce))})
-                time.sleep(0.2)
-            raise GatewayError(503, "pair_not_saved",
-                               "the desktop did not save the pairing; open a new window and retry")
+                log("pair-ok", device=out.get("name", ""), id=out.get("device_id", ""))
+            else:
+                log("pair-fail", reason=out.get("code", ""), attempts_left=out.get("attempts_left", "-"))
+            self.send_json(status, out)
 
         # -- signed routes ------------------------------------------------
         def route(self, method, route, body, dev_id, dev, t0):
@@ -609,6 +637,7 @@ def make_handler(gw, lan=False):
                     raise GatewayError(503, "busy", "the desktop is busy; try again shortly")
                 if got == "timeout":
                     raise GatewayError(503, "busy", "waited too long in the queue")
+                gw.switch_device(dev_id)
                 if kind in ("chat", "generate"):
                     gw.warm_load(name, n_ctx)
                     gw.ensure_on_gpu(name)
@@ -627,6 +656,17 @@ def make_handler(gw, lan=False):
             except (BrokenPipeError, ConnectionResetError):
                 rec["status"], rec["code"] = 499, "client_gone"
                 self.close_connection = True
+            except Exception as e:
+                # e.g. Ollama restarting mid-queue. Once the 200 and chunked
+                # headers are out, an HTTP error can't follow: end the stream
+                # with an error line instead, and close.
+                log("error", kind=type(e).__name__)
+                err = GatewayError(502, "ollama", "Ollama is not answering")
+                rec["status"], rec["code"] = 502, "ollama"
+                if headers_sent:
+                    self.stream_error(err)
+                else:
+                    raise err
             finally:
                 if got == "ok":
                     gw.slot.release()
@@ -658,7 +698,8 @@ def make_handler(gw, lan=False):
                 self.chunk(json.dumps(line).encode("utf-8") + b"\n")
                 self.end_chunks()
             except OSError:
-                self.close_connection = True
+                pass
+            self.close_connection = True
 
         def relay_stream(self, kind, fwd, rec):
             conn = o1ollama.connect(gw.base, timeout=600)
@@ -730,8 +771,7 @@ def stats_loop(gw, stop):
                 gw.stats.loaded = []
         try:
             snap = gw.stats.snapshot()
-            w = read_window(Paths.window)
-            snap["pairing_open"] = bool(w)
+            snap["pairing_open"] = bool(read_public())
             write_json_atomic(Paths.stats, snap, mode=0o640, group="o1view")
             if n % 60 == 0:
                 write_json_atomic(Paths.counters, gw.stats.counters(), mode=0o600)

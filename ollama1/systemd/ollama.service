@@ -5,8 +5,9 @@
 # HSA_OVERRIDE_GFX_VERSION is not needed and not set.
 [Unit]
 Description=Ollama (ollama1: GPU only, local only)
+Requires=ollama1-nft.service
 After=network-online.target ollama1-nft.service
-Wants=network-online.target ollama1-nft.service
+Wants=network-online.target
 RequiresMountsFor=/srv/models
 
 [Service]
@@ -29,8 +30,13 @@ Environment=OLLAMA_KEEP_ALIVE=30m
 # gateway whatever this Ollama version does with the next line.
 Environment=OLLAMA_NOHISTORY=1
 Environment=OLLAMA_NO_CLOUD=1
+# INFO logging only: Ollama's debug levels (1, 2) can print prompts. Never raise it.
+Environment=OLLAMA_DEBUG=0
 Restart=always
 RestartSec=3
+# Nothing a request carried may reach the disk: no core dumps, no swap.
+LimitCORE=0
+MemorySwapMax=0
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes

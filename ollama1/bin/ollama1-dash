@@ -166,7 +166,7 @@ def plain(st):
     if w:
         left = int(w["expires_at"] - time.time())
         lines += [("", ""), ("PAIRING WINDOW OPEN   %d:%02d left" % (left // 60, left % 60), "h")]
-        lines += [("  " + r, "") for r in o1big.render(format_code(w["code"]), on="#")]
+        lines += [("  " + r, "") for r in o1big.render_code(format_code(w["code"]), 100, on="#")]
     return "\n".join(t for t, _ in lines)
 
 
@@ -185,9 +185,9 @@ def draw(scr, st, console):
     win = st.get("pairing")
     if win:
         code = format_code(win["code"])
-        rows = o1big.render(code)
+        rows = o1big.render_code(code, w - 8)
         left = max(0, int(win["expires_at"] - time.time()))
-        bw = max(len(rows[0]) + 6, 44)
+        bw = max(max(len(r) for r in rows) + 6, 44)
         bh = len(rows) + 7
         y0, x0 = max(0, (h - bh) // 2), max(0, (w - bw) // 2)
         try:

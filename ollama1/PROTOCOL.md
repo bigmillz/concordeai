@@ -27,13 +27,22 @@ success.
   and the gateway checks that JWT (signature against the team's certs,
   issuer, AUD tag, expiry, and the service token's client id).
 - Bodies are JSON (`Content-Type: application/json`) with a
-  `Content-Length`. Chunked request bodies are refused (411).
+  `Content-Length`. Chunked request bodies are refused (411). Signed calls
+  may send up to 32 MiB, `/v1/pair` up to 8 KiB (413 otherwise). The body
+  is only read after the Access check and the signature headers (a paired
+  device, a fresh timestamp) pass.
+- Every error response carries `Connection: close` and ends the connection.
+  Open a new one for the next request.
+- At most 16 requests are handled at once; beyond that the answer is 503
+  `busy`.
 - Store the client secret and the device's private key in the macOS
   Keychain. Never in a file, a log or a sync payload.
 
 LAN mode (off unless Patrick turns it on at the desktop) also accepts
 `http://192.168.86.10:8431` (the desktop's address on br0) from 192.168.86.0/24 without Access headers.
 Signatures are still required. Traffic on the LAN is then unencrypted.
+Pairing (`/v1/pair`) is refused on the LAN listener: it works only through
+the tunnel, so a pairing request is never sent in the clear.
 
 ## 2. Device key
 
@@ -48,8 +57,9 @@ Signatures are still required. Traffic on the LAN is then unencrypted.
 
 Patrick opens a window at the desktop (`sudo ollama1-pair`, or the admin
 panel's button). For five minutes the desktop's screen and that terminal
-show a code like `7K4M-2QXD`: 8 characters of Crockford base32
-(`0-9 A-Z` without `I L O U`). The app asks Patrick to type it.
+show a code like `7K4M-2QXD-9FHT`: 12 characters (60 bits) of Crockford
+base32 (`0-9 A-Z` without `I L O U`), in groups of four. The app asks Patrick
+to type it.
 
 Normalize the code: uppercase, drop `-` and spaces, then `O`→`0`,
 `I`→`1`, `L`→`1`.
@@ -84,7 +94,8 @@ Responses:
 | 429 | `rate_limited` | Less than 2 s since the last attempt. Wait and retry |
 | 401 | `clock_skew` / `replay` | Timestamp off by more than 60 s / nonce reused |
 | 400 | `bad_request` | Malformed field |
-| 503 | `pair_not_saved` | The desktop didn't save it. Open a new window |
+| 503 | `pair_not_saved` | The desktop didn't answer in 10 s. Open a new window |
+| 403 | `pair_closed` | Also: the request came in on the LAN listener |
 
 On 200 the app must check `proof` before trusting the pairing. It proves
 the desktop knows the code too:
@@ -97,7 +108,10 @@ Compare in constant time, and check that `device_id` matches the one you
 derived. If either check fails, discard the pairing.
 
 The window allows 5 wrong codes, then closes. One success also closes it.
-Wrong codes are also spaced: at most one attempt every 2 seconds.
+Wrong codes are also spaced: at most one attempt every 2 seconds. The
+gateway never sees the code: it passes the request to a root-only step on
+the desktop that checks the MAC, counts wrong codes, refuses a reused
+nonce, adds the key and computes `proof`.
 
 ## 4. Signed requests
 
@@ -175,6 +189,11 @@ Request shaping (so every request stands alone and stays on the GPU):
 - `options.num_ctx` is honored between 512 and the model's maximum;
   the default is 8192.
 - The desktop keeps no chat history. Send the whole conversation each time.
+- Nothing is shared between devices, not even Ollama's prompt cache: when a
+  request comes from a different paired device than the one before it, the
+  desktop unloads every loaded model first. Expect one model reload (a few
+  seconds) when you switch devices. `prompt_eval_count` and
+  `prompt_eval_duration` stay in the answers.
 
 GPU only:
 
@@ -246,24 +265,24 @@ as JSON escapes.
     }
   ],
   "pairing": {
-    "code_shown": "7K4M-2QXD",
-    "code_normalized": "7K4M2QXD",
-    "key_hex": "74c22b20844324ea9775953885072dcc7b0d1064535319323c9b245c40598571",
+    "code_shown": "7K4M-2QXD-9FHT",
+    "code_normalized": "7K4M2QXD9FHT",
+    "key_hex": "0cb34d68726b5dfa6196ddb20f2f9c3ea864b821b235bb545692bd0138e3502e",
     "name": "Patrick's MacBook Pro",
     "public_key_b64url": "A6EHv_POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg",
     "timestamp": 1790000100,
     "nonce": "EBESExQVFhcYGRobHB0eHw",
     "message_utf8": "ollama1-pair-v1\nPatrick's MacBook Pro\nA6EHv_POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg\n1790000100\nEBESExQVFhcYGRobHB0eHw",
-    "mac_b64url": "oImksT5X8j7lkb9ktfVI-eNXwv4LX8aMYMiZdiisyJw",
+    "mac_b64url": "zytUgalW6zDLx2taZpTve4SqP5iaJKGNkwpOvPDoioc",
     "request_json": {
       "name": "Patrick's MacBook Pro",
       "public_key": "A6EHv_POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg",
       "timestamp": 1790000100,
       "nonce": "EBESExQVFhcYGRobHB0eHw",
-      "mac": "oImksT5X8j7lkb9ktfVI-eNXwv4LX8aMYMiZdiisyJw"
+      "mac": "zytUgalW6zDLx2taZpTve4SqP5iaJKGNkwpOvPDoioc"
     },
     "response_device_id": "56475aa75463474c",
-    "proof_b64url": "dmXg_fJMsH3M9RmZI7EpV0U9atLkPujn8Y7E_zh_130"
+    "proof_b64url": "F_m7YSSE-XjggeJ1cJjieXKyDA-ZcpnHyV4vr20K6aQ"
   }
 }
 ```
@@ -280,5 +299,5 @@ A checklist for the app's implementation:
 1. Derive `device_id` from the vector seed → `56475aa75463474c`.
 2. Rebuild both canonical strings and signatures byte for byte.
 3. Rebuild the pairing `key_hex`, `mac_b64url` and `proof_b64url`.
-4. Accept `7k4m2qxd` and `7K4M-2QXD` as the same code.
+4. Accept `7k4m2qxd9fht` and `7K4M-2QXD-9FHT` as the same code.
 5. Refuse a pairing response whose `proof` doesn't match.

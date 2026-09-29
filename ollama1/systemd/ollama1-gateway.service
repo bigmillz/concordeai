@@ -1,12 +1,13 @@
 [Unit]
 Description=ollama1 gateway (Access + signed requests, GPU only)
+Requires=ollama1-nft.service
 After=ollama.service ollama1-nft.service network-online.target
 Wants=ollama.service network-online.target
 
 [Service]
 User=o1gw
 Group=o1gw
-SupplementaryGroups=o1pair o1view
+SupplementaryGroups=o1view
 ExecStart=/usr/local/lib/ollama1/bin/ollama1-gateway
 # config.json stays root-only (0600); systemd hands this service a copy.
 LoadCredential=config.json:/etc/ollama1/config.json
@@ -15,6 +16,9 @@ StateDirectory=ollama1-gateway
 StateDirectoryMode=0700
 Restart=always
 RestartSec=2
+# Nothing a request carried may reach the disk: no core dumps, no swap.
+LimitCORE=0
+MemorySwapMax=0
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
