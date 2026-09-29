@@ -1,0 +1,218 @@
+#!/usr/bin/python3
+"""ollama1-helper: the fixed, root-owned actions behind the admin panel.
+
+It is never run by the panel directly. The panel may only *start* a fixed
+set of systemd units (see polkit/50-ollama1.rules); each unit runs one verb
+here as root:
+
+  update-now       apt upgrade, then the verified Ollama updater
+  restart          restart Ollama, the gateway, the terminal, the dashboard, the tunnel
+  pull HASH        pull the allow-listed model whose name hashes to HASH
+  rmmodel HASH     remove the installed model whose name hashes to HASH
+  rmdevice ID      unpair a device
+  lan on|off       LAN mode for the gateway (off by default)
+  backup           nightly copy of settings and the model list to /srv/data
+
+Arguments are hashes and ids, checked here against root-owned lists, so a
+unit instance name can never smuggle in a command or a model that isn't
+on the allow-list.
+"""
+import datetime
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tarfile
+import time
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
+
+import o1ollama  # noqa: E402
+import o1pair  # noqa: E402
+from o1common import (Paths, load_config, name_hash, read_allow_list, read_json,  # noqa: E402
+                      write_json_atomic)
+
+OLLAMA = "http://127.0.0.1:11434"
+HERE = os.path.dirname(os.path.realpath(__file__))
+SERVICES = ["ollama.service", "ollama1-gateway.service", "ollama1-ttyd.service",
+            "ollama1-dash.service", "ollama1-tunnel.service"]
+
+
+def record(verb, result, detail=""):
+    st = read_json(Paths.helper_status, {}) or {}
+    st[verb] = {"at": int(time.time()), "result": result, "detail": str(detail)[:200]}
+    write_json_atomic(Paths.helper_status, st, mode=0o644)
+    print("%s: %s %s" % (verb, result, detail), flush=True)
+
+
+def run(cmd, env=None):
+    print("+ " + " ".join(cmd), flush=True)
+    return subprocess.run(cmd, env=env).returncode
+
+
+def update_now():
+    env = dict(os.environ, DEBIAN_FRONTEND="noninteractive")
+    rc = run(["apt-get", "update"], env)
+    if rc == 0:
+        rc = run(["apt-get", "-y", "-o", "Dpkg::Options::=--force-confdef",
+                  "-o", "Dpkg::Options::=--force-confold", "upgrade"], env)
+    apt = "ok" if rc == 0 else "failed"
+    rc2 = run([os.path.join(HERE, "ollama1-update-ollama")])
+    record("update-now", "ok" if rc == 0 and rc2 == 0 else "failed",
+           "apt %s, ollama %s" % (apt, "ok" if rc2 == 0 else "failed"))
+    return 0 if rc == 0 and rc2 == 0 else 1
+
+
+def restart():
+    units = [u for u in SERVICES
+             if subprocess.run(["systemctl", "is-enabled", "--quiet", u]).returncode == 0]
+    rc = run(["systemctl", "restart"] + units)
+    record("restart", "ok" if rc == 0 else "failed", " ".join(units))
+    return rc
+
+
+def pull_status(**kw):
+    write_json_atomic(Paths.pull_status, dict(kw, at=int(time.time())), mode=0o640, group="o1view")
+
+
+def pull(h):
+    names = [n for n in read_allow_list() if name_hash(n) == h]
+    if len(names) != 1:
+        record("pull", "refused", "not on the allow-list")
+        return 2
+    name = names[0]
+    pull_status(model=name, status="starting", completed=0, total=0, done=False)
+    conn = o1ollama.connect(OLLAMA, timeout=3600)
+    try:
+        conn.request("POST", "/api/pull", body=json.dumps({"model": name, "stream": True}).encode(),
+                     headers={"Content-Type": "application/json"})
+        r = conn.getresponse()
+        last = 0.0
+        err = None
+        while True:
+            line = r.readline()
+            if not line:
+                break
+            try:
+                obj = json.loads(line)
+            except ValueError:
+                continue
+            if obj.get("error"):
+                err = str(obj["error"])[:200]
+            if time.time() - last > 1 or obj.get("status") == "success":
+                pull_status(model=name, status=str(obj.get("status", ""))[:60],
+                            completed=int(obj.get("completed") or 0), total=int(obj.get("total") or 0),
+                            done=obj.get("status") == "success")
+                last = time.time()
+        ok = r.status == 200 and not err
+    finally:
+        conn.close()
+    pull_status(model=name, status="done" if ok else "failed: %s" % (err or ""), done=True,
+                completed=0, total=0)
+    record("pull", "ok" if ok else "failed", name)
+    return 0 if ok else 1
+
+
+def rmmodel(h):
+    st, data = o1ollama.call(OLLAMA, "GET", "/api/tags")
+    names = [m["name"] for m in (data or {}).get("models", []) if name_hash(m.get("name", "")) == h]
+    if len(names) != 1:
+        record("rmmodel", "refused", "no such installed model")
+        return 2
+    conn = o1ollama.connect(OLLAMA, timeout=120)
+    try:
+        conn.request("DELETE", "/api/delete", body=json.dumps({"model": names[0]}).encode(),
+                     headers={"Content-Type": "application/json"})
+        ok = conn.getresponse().status == 200
+    finally:
+        conn.close()
+    record("rmmodel", "ok" if ok else "failed", names[0])
+    return 0 if ok else 1
+
+
+def rmdevice(dev_id):
+    if not re.match(r"^[0-9a-f]{16}$", dev_id):
+        record("rmdevice", "refused", "bad id")
+        return 2
+    ok = o1pair.remove_device(dev_id)
+    record("rmdevice", "ok" if ok else "failed", dev_id)
+    return 0 if ok else 1
+
+
+def lan(mode):
+    if mode not in ("on", "off"):
+        return 2
+    cfg_path = Paths.config
+    cfg = read_json(cfg_path, {}) or {}
+    c = load_config(cfg_path)
+    cfg["lan_mode"] = mode == "on"
+    write_json_atomic(cfg_path, cfg, mode=0o600)
+    rule = ["from", c["lan_cidr"], "to", c["lan_bind"], "port", str(c["gateway_port"]), "proto", "tcp"]
+    if mode == "on":
+        run(["ufw", "allow"] + rule)
+    else:
+        run(["ufw", "delete", "allow"] + rule)
+    rc = run(["systemctl", "restart", "ollama1-gateway.service"])
+    record("lan", "ok" if rc == 0 else "failed", mode)
+    return rc
+
+
+def backup():
+    if not os.path.ismount(Paths.data):
+        record("backup", "skipped", "/srv/data is not mounted")
+        return 0
+    root = os.path.join(Paths.data, "backups", "ollama1")
+    os.makedirs(root, mode=0o700, exist_ok=True)
+    os.chmod(os.path.join(Paths.data, "backups"), 0o700)
+    day = datetime.date.today().isoformat()
+    dest = os.path.join(root, day)
+    tmp = dest + ".tmp"
+    shutil.rmtree(tmp, ignore_errors=True)
+    os.makedirs(tmp, mode=0o700)
+    with tarfile.open(os.path.join(tmp, "settings.tar.gz"), "w:gz") as tf:
+        for path in ("/etc/ollama1", "/etc/cloudflared", "/etc/ssh/sshd_config.d/10-ollama1.conf",
+                     "/etc/apt/apt.conf.d/52ollama1-unattended-upgrades",
+                     "/etc/default/grub.d/99-ollama1.cfg"):
+            if os.path.exists(path):
+                tf.add(path)
+    st, data = o1ollama.call(OLLAMA, "GET", "/api/tags")
+    models = [{"name": m.get("name"), "digest": m.get("digest"), "size": m.get("size")}
+              for m in (data or {}).get("models", [])] if st == 200 else []
+    with open(os.path.join(tmp, "models.json"), "w") as f:
+        json.dump({"models": models, "allow_list": read_allow_list()}, f, indent=1)
+    shutil.rmtree(dest, ignore_errors=True)
+    os.rename(tmp, dest)
+    days = sorted(d for d in os.listdir(root) if re.match(r"^\d{4}-\d{2}-\d{2}$", d))
+    for old in days[:-30]:
+        shutil.rmtree(os.path.join(root, old), ignore_errors=True)
+    record("backup", "ok", dest)
+    return 0
+
+
+def main():
+    if os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
+        sys.exit("ollama1-helper runs as root, from its systemd units")
+    os.umask(0o027)
+    args = sys.argv[1:]
+    verbs = {
+        ("update-now", 0): lambda: update_now(),
+        ("restart", 0): lambda: restart(),
+        ("reboot", 0): lambda: run(["systemctl", "reboot"]),
+        ("backup", 0): lambda: backup(),
+        ("pull", 1): lambda: pull(args[1]),
+        ("rmmodel", 1): lambda: rmmodel(args[1]),
+        ("rmdevice", 1): lambda: rmdevice(args[1]),
+        ("lan", 1): lambda: lan(args[1]),
+    }
+    if not args or (args[0], len(args) - 1) not in verbs:
+        sys.exit("usage: ollama1-helper update-now|restart|reboot|backup|pull HASH|rmmodel HASH|"
+                 "rmdevice ID|lan on|off")
+    if len(args) == 2 and not re.match(r"^[0-9a-z]{2,64}$", args[1]):
+        sys.exit("bad argument")
+    sys.exit(verbs[(args[0], len(args) - 1)]() or 0)
+
+
+if __name__ == "__main__":
+    main()

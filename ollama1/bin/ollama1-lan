@@ -1,0 +1,19 @@
+#!/bin/bash
+# ollama1-lan on|off|status: LAN mode for the gateway. Off by default.
+# On: the gateway also answers on the home network (br0, port 8431) without
+# Cloudflare Access. Device signatures are still required; traffic on the
+# LAN is plain HTTP.
+set -euo pipefail
+here="$(dirname "$(readlink -f "$0")")"
+case "${1:-status}" in
+  on|off)
+    [ "$(id -u)" -eq 0 ] || { echo "run it with sudo"; exit 1; }
+    exec "$here/ollama1-helper" lan "$1" ;;
+  status)
+    if [ -r /etc/ollama1/config.json ]; then
+      python3 -c 'import json;print("LAN mode:", "on" if json.load(open("/etc/ollama1/config.json")).get("lan_mode") else "off")'
+    else
+      echo "run it with sudo to read the setting"
+    fi ;;
+  *) echo "usage: ollama1-lan on|off|status"; exit 2 ;;
+esac

@@ -1,0 +1,7 @@
+[Unit]
+Description=ollama1: unpair a device
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-helper rmdevice %i
+TimeoutStartSec=2min

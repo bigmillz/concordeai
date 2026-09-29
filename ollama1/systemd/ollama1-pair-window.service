@@ -1,0 +1,6 @@
+[Unit]
+Description=ollama1: open a 5-minute pairing window (code on the desktop's screen)
+
+[Service]
+Type=exec
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-pair --headless

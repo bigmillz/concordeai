@@ -1,0 +1,42 @@
+[Unit]
+Description=ollama1 gateway (Access + signed requests, GPU only)
+After=ollama.service ollama1-nft.service network-online.target
+Wants=ollama.service network-online.target
+
+[Service]
+User=o1gw
+Group=o1gw
+SupplementaryGroups=o1pair o1view
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-gateway
+# config.json stays root-only (0600); systemd hands this service a copy.
+LoadCredential=config.json:/etc/ollama1/config.json
+Environment=PYTHONDONTWRITEBYTECODE=1
+StateDirectory=ollama1-gateway
+StateDirectoryMode=0700
+Restart=always
+RestartSec=2
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0027
+PrivateDevices=yes
+MemoryDenyWriteExecute=yes
+ReadWritePaths=/run/ollama1/stats /run/ollama1/pair-spool
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

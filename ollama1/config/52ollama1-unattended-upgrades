@@ -1,0 +1,10 @@
+// ollama1: security updates (from 50unattended-upgrades) plus cloudflared
+// from Cloudflare's apt repository, and a reboot at 04:00 New York time
+// when an update needs one.
+Unattended-Upgrade::Origins-Pattern {
+        "origin=cloudflared,codename=any";
+};
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-WithUsers "true";
+Unattended-Upgrade::Automatic-Reboot-Time "04:00";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";

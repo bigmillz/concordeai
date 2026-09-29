@@ -1,0 +1,7 @@
+[Unit]
+Description=ollama1: LAN mode on
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-helper lan on
+TimeoutStartSec=2min

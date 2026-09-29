@@ -1,0 +1,18 @@
+# ollama1 local port guard, loaded by ollama1-nft.service. setup.sh fills
+# in the numeric user ids. ufw handles traffic from outside; this handles
+# connections made on this machine:
+#   11434 (Ollama)       root, ollama, the gateway, the admin panel
+#   8433  (ttyd)         root, the admin panel (it proxies /term/)
+#   8431, 8432           root, cloudflared (gateway, panel)
+# Everyone else (pmiller included, without sudo) gets a TCP reset.
+table inet ollama1
+delete table inet ollama1
+table inet ollama1 {
+    chain output {
+        type filter hook output priority filter; policy accept;
+        ip daddr 127.0.0.1 tcp dport 11434 meta skuid != { 0, @UID_OLLAMA@, @UID_O1GW@, @UID_O1ADMIN@ } counter reject with tcp reset
+        ip daddr 127.0.0.1 tcp dport 8433 meta skuid != { 0, @UID_O1ADMIN@ } counter reject with tcp reset
+        ip daddr 127.0.0.1 tcp dport { 8431, 8432 } meta skuid != { 0, @UID_CLOUDFLARED@ } counter reject with tcp reset
+        ip6 daddr ::1 tcp dport { 8431, 8432, 8433, 11434 } counter reject with tcp reset
+    }
+}

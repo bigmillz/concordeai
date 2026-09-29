@@ -1,0 +1,15 @@
+# The admin panel's web terminal. ttyd runs `login`, so it asks for a Linux
+# user and password like any console. It listens on 127.0.0.1 only, and
+# ollama1-nft lets only the panel's user (and root) connect to it.
+[Unit]
+Description=ollama1 web terminal (ttyd + login, 127.0.0.1 only)
+After=network.target ollama1-nft.service
+Wants=ollama1-nft.service
+
+[Service]
+ExecStart=/usr/bin/ttyd --interface 127.0.0.1 --port 8433 --base-path /term --writable --check-origin --max-clients 2 -t titleFixed=ollama1 /bin/login
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

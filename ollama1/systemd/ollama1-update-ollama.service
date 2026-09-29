@@ -1,0 +1,9 @@
+[Unit]
+Description=ollama1: update Ollama from its verified GitHub release
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-update-ollama
+TimeoutStartSec=2h

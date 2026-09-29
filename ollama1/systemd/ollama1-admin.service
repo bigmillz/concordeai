@@ -1,0 +1,40 @@
+[Unit]
+Description=ollama1 admin panel (behind Cloudflare Access)
+After=network-online.target ollama1-nft.service
+Wants=network-online.target
+
+[Service]
+User=o1admin
+Group=o1admin
+SupplementaryGroups=o1view
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-admin
+LoadCredential=config.json:/etc/ollama1/config.json
+Environment=PYTHONDONTWRITEBYTECODE=1
+StateDirectory=ollama1-admin
+StateDirectoryMode=0700
+Restart=always
+RestartSec=2
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0027
+PrivateDevices=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

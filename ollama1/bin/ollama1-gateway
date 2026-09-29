@@ -1,0 +1,787 @@
+#!/usr/bin/python3
+"""ollama1-gateway: the only door from the outside to Ollama on this desktop.
+
+Listens on 127.0.0.1:8431; cloudflared forwards ollama1.flyconcordefly.com
+to it. Every request must carry:
+  1. a valid Cloudflare Access JWT for the app's Access application
+     (Cf-Access-Jwt-Assertion; the service token's), and
+  2. an Ed25519 signature from a device paired at the desktop (PROTOCOL.md).
+LAN mode (off by default) adds a second listener on the LAN address where
+the JWT is not required; signatures still are.
+
+Only chat, generate, embeddings, the model list, ps, show and version are
+passed on. Pull, delete, create, copy, push and blobs are not reachable.
+
+Stateless: request and response bodies live only in memory for the length
+of one request. Nothing here writes them to disk or to a log. The stats
+file and the journal hold counts, timings, model names and device names.
+
+GPU only: a model whose weights plus context can't fit in VRAM is refused
+before it loads, and after it loads /api/ps must show it 100% in VRAM; if
+any of it landed on the CPU it is unloaded and the request gets an error.
+"""
+import datetime
+import ipaddress
+import json
+import os
+import sys
+import threading
+import time
+from collections import deque
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
+
+import o1crypto  # noqa: E402
+from o1auth import (AuthError, NonceCache, PAIR_MAX_FAILURES, PAIR_MIN_INTERVAL,  # noqa: E402
+                    RequestVerifier, SKEW, check_pair_mac, device_id_for,
+                    pair_proof, parse_pair_request)
+from o1common import Paths, load_config, read_json, safe_label, valid_model_name, write_json_atomic  # noqa: E402
+from o1crypto import b64url_encode  # noqa: E402
+from o1jwt import AccessVerifier, JWTError  # noqa: E402
+import o1ollama  # noqa: E402
+from o1pair import DeviceStore, read_window, spool_burn, spool_request  # noqa: E402
+import o1stats  # noqa: E402
+
+VERSION = "1"
+
+# Top-level fields and options passed on to Ollama. Anything else is dropped.
+# Options that change how a model loads (num_gpu, main_gpu, low_vram,
+# use_mmap, num_batch, num_thread...) are never passed: they could push
+# layers onto the CPU after the GPU check.
+FIELDS = {
+    "chat": {"model", "messages", "tools", "format", "options", "stream", "think",
+             "logprobs", "top_logprobs"},
+    "generate": {"model", "prompt", "suffix", "images", "format", "options", "system",
+                 "template", "stream", "raw", "context", "think", "logprobs", "top_logprobs"},
+    "embed": {"model", "input", "truncate", "options", "dimensions"},
+    "embeddings": {"model", "prompt", "options"},
+}
+SAMPLING_OPTIONS = {
+    "temperature", "top_k", "top_p", "min_p", "typical_p", "repeat_last_n",
+    "repeat_penalty", "presence_penalty", "frequency_penalty", "seed", "stop",
+    "num_predict", "num_keep", "penalize_newline", "mirostat", "mirostat_tau",
+    "mirostat_eta", "tfs_z",
+}
+NEVER = ("/api/pull", "/api/push", "/api/delete", "/api/create", "/api/copy", "/api/blobs")
+
+
+def log(event, **fields):
+    """Journal line: an event name and counts/names only."""
+    parts = [event] + ["%s=%s" % (k, safe_label(v, 64).replace(" ", "_")) for k, v in fields.items()]
+    print(" ".join(parts), flush=True)
+
+
+class GatewayError(Exception):
+    def __init__(self, status, code, message, **extra):
+        super().__init__(message)
+        self.status = status
+        self.code = code
+        self.extra = extra
+
+
+# ---- counts-only statistics ------------------------------------------------
+
+class Stats:
+    def __init__(self, clock=time.time):
+        self.clock = clock
+        self.lock = threading.Lock()
+        self.started = clock()
+        self.active = 0
+        self.queued = 0
+        self.token_times = deque(maxlen=20000)
+        self.minutes = deque(maxlen=24 * 60)   # [minute, tokens, eval_ns, requests, errors]
+        self.day = self._today()
+        self.requests_today = 0
+        self.totals = {"requests": 0, "tokens": 0, "errors": 0, "auth_failures": 0,
+                       "refused_gpu": 0, "pairings": 0}
+        self.auth_fail = {}
+        self.devices = {}      # id -> {"name", "last_seen", "active"}
+        self.recent = deque(maxlen=200)
+        self.loaded = []
+        self.ollama_version = ""
+        self._load_counters()
+
+    def _today(self):
+        return datetime.date.fromtimestamp(self.clock()).isoformat()
+
+    def _load_counters(self):
+        c = read_json(Paths.counters, {}) or {}
+        if isinstance(c, dict):
+            if c.get("day") == self.day:
+                self.requests_today = int(c.get("requests_today", 0))
+            for k in self.totals:
+                try:
+                    self.totals[k] = int((c.get("totals") or {}).get(k, 0))
+                except (TypeError, ValueError):
+                    pass
+            now_min = int(self.clock() // 60)
+            for m in c.get("minutes", []):
+                if isinstance(m, list) and len(m) == 5 and now_min - m[0] < 24 * 60:
+                    self.minutes.append([int(x) for x in m])
+
+    def _bucket(self):
+        m = int(self.clock() // 60)
+        if not self.minutes or self.minutes[-1][0] != m:
+            self.minutes.append([m, 0, 0, 0, 0])
+        return self.minutes[-1]
+
+    def _roll_day(self):
+        d = self._today()
+        if d != self.day:
+            self.day = d
+            self.requests_today = 0
+
+    def auth_failure(self, code):
+        with self.lock:
+            self.totals["auth_failures"] += 1
+            self.auth_fail[code] = self.auth_fail.get(code, 0) + 1
+
+    def begin(self, dev_id, name):
+        with self.lock:
+            self._roll_day()
+            self.requests_today += 1
+            self.totals["requests"] += 1
+            self._bucket()[3] += 1
+            d = self.devices.setdefault(dev_id, {"name": name, "last_seen": 0, "active": 0})
+            d["name"] = name
+            d["last_seen"] = self.clock()
+            d["active"] += 1
+
+    def end(self, dev_id, record):
+        with self.lock:
+            d = self.devices.get(dev_id)
+            if d:
+                d["active"] = max(0, d["active"] - 1)
+                d["last_seen"] = self.clock()
+            if record.get("status", 200) >= 400:
+                self.totals["errors"] += 1
+                self._bucket()[4] += 1
+            if record.get("code") == "gpu_fit" or record.get("code") == "gpu_spill":
+                self.totals["refused_gpu"] += 1
+            self.recent.append(record)
+
+    def token(self, n=1):
+        now = self.clock()
+        with self.lock:
+            for _ in range(n):
+                self.token_times.append(now)
+
+    def eval_done(self, eval_count, eval_ns):
+        with self.lock:
+            b = self._bucket()
+            b[1] += int(eval_count or 0)
+            b[2] += int(eval_ns or 0)
+            self.totals["tokens"] += int(eval_count or 0)
+
+    def _rate(self, minutes):
+        now_min = int(self.clock() // 60)
+        tok = ns = 0
+        for m, t, e, _r, _x in self.minutes:
+            if now_min - m < minutes:
+                tok += t
+                ns += e
+        return round(tok / (ns / 1e9), 1) if ns else 0.0
+
+    def snapshot(self):
+        with self.lock:
+            self._roll_day()
+            now = self.clock()
+            cur = sum(1 for t in self.token_times if now - t <= 5) / 5.0
+            return {
+                "version": VERSION,
+                "time": int(now),
+                "started": int(self.started),
+                "active": self.active,
+                "queued": self.queued,
+                "requests_today": self.requests_today,
+                "totals": dict(self.totals),
+                "auth_failures": dict(self.auth_fail),
+                "tps": {"current": round(cur, 1), "1h": self._rate(60), "24h": self._rate(1440)},
+                "per_minute": [list(m) for m in list(self.minutes)[-60:]],
+                "devices": [{"id": k, "name": v["name"], "last_seen": int(v["last_seen"]),
+                             "active": v["active"],
+                             "connected": v["active"] > 0 or now - v["last_seen"] < 120}
+                            for k, v in self.devices.items()],
+                "recent": list(self.recent)[-50:],
+                "loaded": list(self.loaded),
+                "ollama_version": self.ollama_version,
+            }
+
+    def counters(self):
+        with self.lock:
+            return {"day": self.day, "requests_today": self.requests_today,
+                    "totals": dict(self.totals), "minutes": [list(m) for m in self.minutes]}
+
+
+class Slot:
+    """One model job on the GPU at a time; a short queue behind it."""
+
+    def __init__(self, stats, max_waiting):
+        self.cond = threading.Condition()
+        self.busy = False
+        self.stats = stats
+        self.max_waiting = max_waiting
+
+    def acquire(self, timeout):
+        with self.cond:
+            if self.busy and self.stats.queued >= self.max_waiting:
+                return "full"
+            self.stats.queued += 1
+            try:
+                end = time.monotonic() + timeout
+                while self.busy:
+                    rem = end - time.monotonic()
+                    if rem <= 0:
+                        return "timeout"
+                    self.cond.wait(rem)
+                self.busy = True
+                self.stats.active += 1
+                return "ok"
+            finally:
+                self.stats.queued -= 1
+
+    def release(self):
+        with self.cond:
+            self.busy = False
+            self.stats.active = max(0, self.stats.active - 1)
+            self.cond.notify()
+
+
+# ---- the gateway -----------------------------------------------------------
+
+class Gateway:
+    def __init__(self, cfg, clock=time.time):
+        self.cfg = cfg
+        self.clock = clock
+        self.devices = DeviceStore()
+        self.verifier = RequestVerifier(self.devices, clock)
+        self.access = AccessVerifier(cfg["access_team_domain"], cfg["gateway_aud"],
+                                     cfg.get("certs_url") or "",
+                                     bool(cfg.get("allow_insecure_certs_url")), clock=clock)
+        self.stats = Stats(clock)
+        self.slot = Slot(self.stats, int(cfg["queue_max"]))
+        self.base = cfg["ollama_url"]
+        self.pair_lock = threading.Lock()
+        self.pair = {"window": None, "failures": 0, "used": False, "last_try": 0.0}
+        self.pair_nonces = NonceCache()
+        self.tags = {}
+        self.tags_at = 0.0
+        self.info = {}
+        self.lan_net = ipaddress.ip_network(cfg["lan_cidr"], strict=False)
+
+    # -- Access ---------------------------------------------------------
+    def check_access(self, headers, lan, client_ip):
+        if lan:
+            if not self.cfg.get("lan_mode"):
+                raise GatewayError(403, "access", "LAN mode is off")
+            try:
+                if ipaddress.ip_address(client_ip) not in self.lan_net:
+                    raise GatewayError(403, "access", "not from the home network")
+            except ValueError:
+                raise GatewayError(403, "access", "not from the home network")
+            return
+        host = (headers.get("Host") or "").split(":")[0].lower()
+        if host != self.cfg["hostname_gateway"].lower():
+            raise GatewayError(403, "access", "wrong host")
+        token = headers.get("Cf-Access-Jwt-Assertion")
+        if not token:
+            raise GatewayError(403, "access", "Cloudflare Access token missing")
+        try:
+            claims = self.access.verify(token)
+        except JWTError as e:
+            raise GatewayError(403, "access", "Cloudflare Access token rejected: %s" % e)
+        want = (self.cfg.get("service_token_client_id") or "").strip()
+        if want and claims.get("common_name") != want:
+            raise GatewayError(403, "access", "not the paired service token")
+
+    # -- Ollama ---------------------------------------------------------
+    def refresh_tags(self, force=False):
+        if not force and self.clock() - self.tags_at < 20 and self.tags:
+            return self.tags
+        st, data = o1ollama.call(self.base, "GET", "/api/tags", timeout=10)
+        if st != 200 or not isinstance(data, dict):
+            raise GatewayError(502, "ollama", "Ollama is not answering")
+        tags = {}
+        for m in data.get("models", []) or []:
+            if isinstance(m, dict) and not o1ollama.is_remote(m) and m.get("name"):
+                tags[m["name"]] = m
+        self.tags = tags
+        self.tags_at = self.clock()
+        return tags
+
+    def local_model(self, name):
+        if not valid_model_name(name):
+            raise GatewayError(400, "bad_model", "model name is missing or malformed")
+        for force in (False, True):
+            for k, m in self.refresh_tags(force).items():
+                if o1ollama.same_model(k, name):
+                    return k, m
+        raise GatewayError(404, "no_model", "model is not installed on this desktop")
+
+    def model_info(self, name, entry):
+        key = (name, entry.get("digest"))
+        if key not in self.info:
+            st, data = o1ollama.call(self.base, "POST", "/api/show", {"model": name}, timeout=30)
+            if st != 200 or not isinstance(data, dict):
+                raise GatewayError(502, "ollama", "Ollama could not describe the model")
+            self.info[key] = {"model_info": data.get("model_info") or {},
+                              "capabilities": data.get("capabilities") or []}
+        return self.info[key]
+
+    def vram_total(self):
+        v = int(self.cfg.get("vram_total_bytes") or 0)
+        return v or o1stats.gpu_vram_total()
+
+    def fit_check(self, name, entry, n_ctx):
+        info = self.model_info(name, entry)
+        need, kv = o1ollama.fit_estimate(int(entry.get("size") or 0), info["model_info"], n_ctx)
+        total = self.vram_total()
+        if not total:
+            return  # no VRAM figure: the /api/ps check after loading still applies
+        budget = total - int(self.cfg["vram_reserve_mib"]) * (1 << 20)
+        if need > budget:
+            raise GatewayError(
+                507, "gpu_fit",
+                "model does not fit in VRAM at num_ctx %d: needs about %.1f GiB, %.1f GiB available"
+                % (n_ctx, need / 2**30, budget / 2**30),
+                need_bytes=need, budget_bytes=budget)
+
+    def gpu_share(self, name):
+        st, data = o1ollama.call(self.base, "GET", "/api/ps", timeout=10)
+        if st != 200 or not isinstance(data, dict):
+            raise GatewayError(502, "ollama", "Ollama is not answering")
+        for m in data.get("models", []) or []:
+            if o1ollama.same_model(m.get("name") or m.get("model"), name):
+                size = int(m.get("size") or 0)
+                vram = int(m.get("size_vram") or 0)
+                return (vram / size) if size else 0.0
+        return None
+
+    def unload(self, name):
+        for path, body in (("/api/generate", {"model": name, "keep_alive": 0}),
+                           ("/api/embed", {"model": name, "input": [], "keep_alive": 0})):
+            try:
+                st, _ = o1ollama.call(self.base, "POST", path, body, timeout=60)
+                if st == 200:
+                    return
+            except OSError:
+                pass
+
+    def ensure_on_gpu(self, name, share=None):
+        if share is None:
+            share = self.gpu_share(name)
+        if share is None:
+            raise GatewayError(502, "ollama", "model did not load")
+        if share < 1.0:
+            self.unload(name)
+            log("gpu-spill", model=name, gpu_pct=int(share * 100))
+            raise GatewayError(
+                507, "gpu_spill",
+                "model did not fit entirely in VRAM (%d%% on GPU); it was unloaded" % int(share * 100))
+
+    def warm_load(self, name, n_ctx):
+        st, data = o1ollama.call(self.base, "POST", "/api/generate",
+                                 {"model": name, "prompt": "", "stream": False,
+                                  "options": {"num_ctx": n_ctx}}, timeout=600)
+        if st != 200:
+            msg = (data or {}).get("error") if isinstance(data, dict) else None
+            raise GatewayError(400 if st < 500 else 502, "ollama",
+                               "Ollama refused to load the model: %s" % safe_label(msg or st, 200))
+
+    # -- request shaping ------------------------------------------------
+    def shape(self, kind, obj, model_name, entry):
+        if not isinstance(obj, dict):
+            raise GatewayError(400, "bad_request", "body must be a JSON object")
+        out = {k: v for k, v in obj.items() if k in FIELDS[kind]}
+        out["model"] = model_name
+        opts = obj.get("options") if isinstance(obj.get("options"), dict) else {}
+        clean = {k: v for k, v in opts.items() if k in SAMPLING_OPTIONS}
+        n_ctx = None
+        if kind in ("chat", "generate"):
+            info = self.model_info(model_name, entry)
+            cmax = o1ollama.context_max(info["model_info"]) or int(self.cfg["num_ctx_max"])
+            want = opts.get("num_ctx", self.cfg["num_ctx_default"])
+            if not isinstance(want, int) or isinstance(want, bool):
+                raise GatewayError(400, "bad_request", "options.num_ctx must be an integer")
+            n_ctx = max(512, min(want, cmax, int(self.cfg["num_ctx_max"])))
+            clean["num_ctx"] = n_ctx
+            out["stream"] = obj.get("stream", True) is not False
+        out["options"] = clean
+        return out, n_ctx
+
+
+def make_handler(gw, lan=False):
+    cfg = gw.cfg
+    max_body = int(cfg["max_body_mib"]) << 20
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+        server_version = "ollama1"
+        sys_version = ""
+
+        def log_message(self, fmt, *args):  # the default logs request lines; we log our own
+            pass
+
+        def send_json(self, status, obj, extra_headers=None):
+            raw = json.dumps(obj).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(raw)))
+            self.send_header("Cache-Control", "no-store")
+            for k, v in (extra_headers or {}).items():
+                self.send_header(k, v)
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def fail(self, e):
+            body = {"error": str(e), "code": e.code, "server_time": int(gw.clock())}
+            body.update(getattr(e, "extra", {}) or {})
+            self.send_json(e.status, body)
+
+        def do_GET(self):
+            self.handle_any("GET")
+
+        def do_POST(self):
+            self.handle_any("POST")
+
+        def do_PUT(self):
+            self.handle_any("PUT")
+
+        def do_DELETE(self):
+            self.handle_any("DELETE")
+
+        def read_body(self):
+            if self.headers.get("Transfer-Encoding"):
+                raise GatewayError(411, "bad_request", "send a Content-Length")
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                raise GatewayError(400, "bad_request", "bad Content-Length")
+            if n < 0 or n > max_body:
+                raise GatewayError(413, "too_large", "body too large")
+            return self.rfile.read(n) if n else b""
+
+        def handle_any(self, method):
+            t0 = time.monotonic()
+            try:
+                if len(self.path) > 2048:
+                    raise GatewayError(414, "bad_request", "path too long")
+                body = self.read_body()
+                gw.check_access(self.headers, lan, self.client_address[0])
+                route = self.path.split("?", 1)[0]
+                if route == "/v1/pair" and method == "POST":
+                    return self.handle_pair(body)
+                try:
+                    dev_id, dev = gw.verifier.verify(method, self.path, self.headers, body)
+                except AuthError as e:
+                    gw.stats.auth_failure(e.code)
+                    log("auth-fail", reason=e.code)
+                    raise GatewayError(e.status, e.code, str(e))
+                self.route(method, route, body, dev_id, dev, t0)
+            except GatewayError as e:
+                try:
+                    self.fail(e)
+                except OSError:
+                    pass
+            except (BrokenPipeError, ConnectionResetError):
+                self.close_connection = True
+            except Exception as e:  # never echo request content
+                log("error", kind=type(e).__name__)
+                try:
+                    self.fail(GatewayError(500, "internal", "internal error"))
+                except OSError:
+                    pass
+
+        # -- pairing (POST /v1/pair) -------------------------------------
+        def handle_pair(self, body):
+            now = gw.clock()
+            w = read_window(Paths.window, now)
+            st = gw.pair
+            with gw.pair_lock:
+                if not w:
+                    raise GatewayError(403, "pair_closed", "no pairing window is open at the desktop")
+                if st["window"] != w["id"]:
+                    st.update(window=w["id"], failures=0, used=False)
+                if st["used"] or st["failures"] >= PAIR_MAX_FAILURES:
+                    raise GatewayError(403, "pair_closed", "this pairing window is closed")
+                if now - st["last_try"] < PAIR_MIN_INTERVAL:
+                    st["last_try"] = now
+                    raise GatewayError(429, "rate_limited", "wait a moment and try again")
+                st["last_try"] = now
+                try:
+                    obj = json.loads(body.decode("utf-8"))
+                except (ValueError, UnicodeDecodeError):
+                    raise GatewayError(400, "bad_request", "body must be JSON")
+                try:
+                    name, pub, pub_b64, ts, nonce, mac = parse_pair_request(obj)
+                except AuthError as e:
+                    raise GatewayError(e.status, e.code, str(e))
+                if abs(now - ts) > SKEW:
+                    raise GatewayError(401, "clock_skew", "timestamp is more than %d s off" % SKEW)
+                if not gw.pair_nonces.check_and_add(nonce, now):
+                    raise GatewayError(401, "replay", "nonce already used")
+                if not check_pair_mac(w["code"], name, pub_b64, ts, nonce, mac):
+                    st["failures"] += 1
+                    left = PAIR_MAX_FAILURES - st["failures"]
+                    log("pair-fail", attempts_left=left)
+                    if left <= 0:
+                        spool_burn(w["id"])
+                        raise GatewayError(403, "pair_closed",
+                                           "too many wrong codes; the window is closed")
+                    raise GatewayError(401, "wrong_code", "wrong code", attempts_left=left)
+                st["used"] = True
+                dev_id = device_id_for(pub)
+                spool_request(w["id"], obj)
+                code = w["code"]
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                d = gw.devices().get(dev_id)
+                if d and d["public_key"] == pub:
+                    gw.stats.totals["pairings"] += 1
+                    log("pair-ok", device=name, id=dev_id)
+                    return self.send_json(200, {
+                        "device_id": dev_id, "name": name, "server_time": int(gw.clock()),
+                        "proof": b64url_encode(pair_proof(code, dev_id, pub_b64, nonce))})
+                time.sleep(0.2)
+            raise GatewayError(503, "pair_not_saved",
+                               "the desktop did not save the pairing; open a new window and retry")
+
+        # -- signed routes ------------------------------------------------
+        def route(self, method, route, body, dev_id, dev, t0):
+            if any(route.startswith(p) for p in NEVER):
+                raise GatewayError(404, "not_found", "not available through the gateway")
+            if method == "GET" and route == "/v1/whoami":
+                return self.send_json(200, {"device_id": dev_id, "name": dev["name"],
+                                            "server_time": int(gw.clock())})
+            if method == "GET" and route == "/api/tags":
+                models = [{k: m.get(k) for k in ("name", "model", "size", "digest", "details",
+                                                 "modified_at")}
+                          for m in gw.refresh_tags(force=True).values()]
+                return self.send_json(200, {"models": models})
+            if method == "GET" and route == "/api/ps":
+                st, data = o1ollama.call(gw.base, "GET", "/api/ps", timeout=10)
+                keep = ("name", "model", "size", "size_vram", "context_length", "expires_at",
+                        "details", "digest")
+                models = [{k: m.get(k) for k in keep} for m in (data or {}).get("models", []) or []]
+                return self.send_json(200, {"models": models})
+            if method == "GET" and route == "/api/version":
+                st, data = o1ollama.call(gw.base, "GET", "/api/version", timeout=10)
+                return self.send_json(200, {"version": (data or {}).get("version", "")})
+            if method == "POST" and route == "/api/show":
+                obj = self.json_body(body)
+                name, _entry = gw.local_model(obj.get("model"))
+                st, data = o1ollama.call(gw.base, "POST", "/api/show", {"model": name}, timeout=30)
+                return self.send_json(st if st else 502, data if isinstance(data, dict) else {})
+            kinds = {"/api/chat": "chat", "/api/generate": "generate",
+                     "/api/embed": "embed", "/api/embeddings": "embeddings"}
+            if method == "POST" and route in kinds:
+                return self.model_job(kinds[route], self.json_body(body), dev_id, dev, t0)
+            raise GatewayError(404, "not_found", "not available through the gateway")
+
+        def json_body(self, body):
+            try:
+                obj = json.loads(body.decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                raise GatewayError(400, "bad_request", "body must be JSON")
+            if not isinstance(obj, dict):
+                raise GatewayError(400, "bad_request", "body must be a JSON object")
+            return obj
+
+        def model_job(self, kind, obj, dev_id, dev, t0):
+            name, entry = gw.local_model(obj.get("model"))
+            fwd, n_ctx = gw.shape(kind, obj, name, entry)
+            gw.fit_check(name, entry, n_ctx or 2048)
+            streaming = bool(fwd.get("stream")) and kind in ("chat", "generate")
+            rec = {"t": int(gw.clock()), "device": dev["name"], "model": name, "kind": kind,
+                   "status": 200, "ms": 0, "tokens": 0, "prompt_tokens": 0}
+            gw.stats.begin(dev_id, dev["name"])
+            headers_sent = False
+            got = None
+            try:
+                if gw.slot.busy and gw.stats.queued >= gw.slot.max_waiting:
+                    raise GatewayError(503, "busy", "the desktop is busy; try again shortly")
+                if streaming:
+                    self.start_stream()
+                    headers_sent = True
+                got = gw.slot.acquire(float(cfg["queue_wait_s"]))
+                if got == "full":
+                    raise GatewayError(503, "busy", "the desktop is busy; try again shortly")
+                if got == "timeout":
+                    raise GatewayError(503, "busy", "waited too long in the queue")
+                if kind in ("chat", "generate"):
+                    gw.warm_load(name, n_ctx)
+                    gw.ensure_on_gpu(name)
+                    if streaming:
+                        self.relay_stream(kind, fwd, rec)
+                    else:
+                        self.relay_whole(kind, fwd, rec, check_after=False)
+                else:
+                    self.relay_whole(kind, fwd, rec, check_after=True)
+            except GatewayError as e:
+                rec["status"], rec["code"] = e.status, e.code
+                if headers_sent:
+                    self.stream_error(e)
+                else:
+                    raise
+            except (BrokenPipeError, ConnectionResetError):
+                rec["status"], rec["code"] = 499, "client_gone"
+                self.close_connection = True
+            finally:
+                if got == "ok":
+                    gw.slot.release()
+                rec["ms"] = int((time.monotonic() - t0) * 1000)
+                gw.stats.end(dev_id, rec)
+                log("req", device=dev["name"], model=name, kind=kind, status=rec["status"],
+                    ms=rec["ms"], tokens=rec["tokens"], prompt_tokens=rec["prompt_tokens"])
+
+        def start_stream(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/x-ndjson")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.send_header("Cache-Control", "no-cache, no-store, no-transform")
+            self.send_header("X-Accel-Buffering", "no")
+            self.end_headers()
+
+        def chunk(self, data):
+            self.wfile.write(b"%x\r\n%s\r\n" % (len(data), data))
+            self.wfile.flush()
+
+        def end_chunks(self):
+            self.wfile.write(b"0\r\n\r\n")
+            self.wfile.flush()
+
+        def stream_error(self, e):
+            try:
+                line = {"error": str(e), "code": e.code, "done": True}
+                line.update(getattr(e, "extra", {}) or {})
+                self.chunk(json.dumps(line).encode("utf-8") + b"\n")
+                self.end_chunks()
+            except OSError:
+                self.close_connection = True
+
+        def relay_stream(self, kind, fwd, rec):
+            conn = o1ollama.connect(gw.base, timeout=600)
+            try:
+                conn.request("POST", "/api/" + kind, body=json.dumps(fwd).encode("utf-8"),
+                             headers={"Content-Type": "application/json"})
+                r = conn.getresponse()
+                if r.status != 200:
+                    data = r.read(1 << 20)
+                    try:
+                        msg = json.loads(data.decode("utf-8")).get("error", "")
+                    except (ValueError, AttributeError, UnicodeDecodeError):
+                        msg = ""
+                    raise GatewayError(r.status, "ollama", "Ollama: %s" % safe_label(msg or r.status, 200))
+                while True:
+                    line = r.readline(16 << 20)
+                    if not line:
+                        break
+                    self.chunk(line)
+                    try:
+                        obj = json.loads(line)
+                    except ValueError:
+                        continue
+                    piece = (obj.get("message") or {}).get("content") if kind == "chat" else obj.get("response")
+                    if piece:
+                        gw.stats.token()
+                    if obj.get("done"):
+                        rec["tokens"] = int(obj.get("eval_count") or 0)
+                        rec["prompt_tokens"] = int(obj.get("prompt_eval_count") or 0)
+                        gw.stats.eval_done(obj.get("eval_count"), obj.get("eval_duration"))
+                    if obj.get("error"):
+                        rec["status"], rec["code"] = 502, "ollama"
+                self.end_chunks()
+            finally:
+                conn.close()
+
+        def relay_whole(self, kind, fwd, rec, check_after):
+            st, data = o1ollama.call(gw.base, "POST", "/api/" + kind, fwd, timeout=600)
+            if st != 200 or not isinstance(data, dict):
+                msg = data.get("error") if isinstance(data, dict) else ""
+                raise GatewayError(st if st >= 400 else 502, "ollama",
+                                   "Ollama: %s" % safe_label(msg or st, 200))
+            if check_after:
+                gw.ensure_on_gpu(fwd["model"])
+            rec["tokens"] = int(data.get("eval_count") or 0)
+            rec["prompt_tokens"] = int(data.get("prompt_eval_count") or 0)
+            if data.get("eval_count"):
+                gw.stats.eval_done(data.get("eval_count"), data.get("eval_duration"))
+            self.send_json(200, data)
+
+    return Handler
+
+
+def stats_loop(gw, stop):
+    """Once a second: the counts-only snapshot for the dashboard and panel.
+    Every 5 s: which models are loaded. Every 60 s: the day's counters."""
+    n = 0
+    while not stop.is_set():
+        if n % 5 == 0:
+            try:
+                st, data = o1ollama.call(gw.base, "GET", "/api/ps", timeout=5)
+                gw.stats.loaded = [
+                    {k: m.get(k) for k in ("name", "size", "size_vram", "context_length", "expires_at")}
+                    for m in (data or {}).get("models", []) or []] if st == 200 else []
+                if not gw.stats.ollama_version or n % 300 == 0:
+                    st, v = o1ollama.call(gw.base, "GET", "/api/version", timeout=5)
+                    gw.stats.ollama_version = (v or {}).get("version", "") if st == 200 else ""
+            except OSError:
+                gw.stats.loaded = []
+        try:
+            snap = gw.stats.snapshot()
+            w = read_window(Paths.window)
+            snap["pairing_open"] = bool(w)
+            write_json_atomic(Paths.stats, snap, mode=0o640, group="o1view")
+            if n % 60 == 0:
+                write_json_atomic(Paths.counters, gw.stats.counters(), mode=0o600)
+        except OSError:
+            pass
+        n += 1
+        stop.wait(1.0)
+
+
+def serve(cfg, stop=None):
+    if not o1crypto.available():
+        log("fatal", reason="no_ed25519_backend_install_python3-nacl")
+        sys.exit(1)
+    gw = Gateway(cfg)
+    if not gw.access.configured:
+        log("warning", reason="access_not_configured_all_tunnel_requests_refused")
+    servers = [ThreadingHTTPServer(("127.0.0.1", int(cfg["gateway_port"])), make_handler(gw))]
+    if cfg.get("lan_mode"):
+        servers.append(ThreadingHTTPServer((cfg["lan_bind"], int(cfg["gateway_port"])),
+                                           make_handler(gw, lan=True)))
+    stop = stop or threading.Event()
+    threading.Thread(target=stats_loop, args=(gw, stop), daemon=True).start()
+    for s in servers:
+        s.daemon_threads = True
+        threading.Thread(target=s.serve_forever, daemon=True).start()
+    log("started", port=cfg["gateway_port"], lan=bool(cfg.get("lan_mode")),
+        crypto=o1crypto.BACKEND, access=gw.access.configured)
+    return gw, servers, stop
+
+
+def main():
+    import argparse
+    import signal
+    ap = argparse.ArgumentParser(description="ollama1 gateway")
+    ap.add_argument("--config", help="config file (default: systemd credential or /etc/ollama1/config.json)")
+    args = ap.parse_args()
+    cfg = load_config(args.config)
+    _gw, servers, stop = serve(cfg)
+    done = threading.Event()
+    signal.signal(signal.SIGTERM, lambda *_: done.set())
+    signal.signal(signal.SIGINT, lambda *_: done.set())
+    done.wait()
+    stop.set()
+    for s in servers:
+        s.shutdown()
+    try:
+        write_json_atomic(Paths.counters, _gw.stats.counters(), mode=0o600)
+    except OSError:
+        pass
+
+
+if __name__ == "__main__":
+    main()

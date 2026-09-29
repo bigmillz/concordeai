@@ -1,0 +1,113 @@
+#!/usr/bin/python3
+"""ollama1-pair: pair a device with this desktop. Runs as root.
+
+  sudo ollama1-pair              open a 5-minute window, show the code, wait
+  sudo ollama1-pair --list       paired devices
+  sudo ollama1-pair --remove ID  unpair a device
+  sudo ollama1-pair --close      close an open window now
+
+Used by systemd (not for typing):
+  ollama1-pair --headless        open a window without a terminal (admin panel button)
+  ollama1-pair --commit          move a code-checked request into devices.json
+
+Pairing happens only here, at the desktop. There is no invite, share or
+join: the code is shown on this screen and in this terminal, never sent
+anywhere, and the window closes after one device pairs, after 5 wrong
+codes, or after 5 minutes.
+"""
+import argparse
+import os
+import sys
+import time
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
+
+import o1big  # noqa: E402
+import o1pair  # noqa: E402
+from o1auth import format_code  # noqa: E402
+
+
+def need_root():
+    if os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
+        sys.exit("ollama1-pair: run it with sudo")
+
+
+def show_list():
+    devs = o1pair.devices_list()
+    if not devs:
+        print("No paired devices.")
+        return
+    for d in devs:
+        print("%-16s  %-40s  paired %s" % (d["id"], d["name"], d["paired_at"]))
+
+
+def wait_window(w, headless):
+    before = set(o1pair.load_devices())
+    code = format_code(w["code"])
+    if not headless:
+        print()
+        print("Pairing window open for 5 minutes. In ConcordeAI, choose")
+        print("Desktop > Pair and type this code:")
+        print()
+        for row in o1big.render(code):
+            print("   " + row)
+        print()
+        print("   %s" % code)
+        print()
+        print("The code is also on the desktop's screen. Ctrl+C closes the window.")
+    try:
+        while True:
+            now = time.time()
+            cur = o1pair.read_window(now=now)
+            if cur is None or cur.get("id") != w["id"]:
+                added = [d for d in o1pair.load_devices().items() if d[0] not in before]
+                if added:
+                    dev_id, d = added[0]
+                    print("\nPaired: %s (%s). The window is closed." % (d["name"], dev_id))
+                    return 0
+                if now >= w["expires_at"]:
+                    o1pair.close_window(w["id"])
+                    print("\nThe window expired. Nothing was paired.")
+                    return 1
+                print("\nThe window was closed. Nothing was paired.")
+                return 1
+            if not headless:
+                left = int(w["expires_at"] - now)
+                sys.stdout.write("\r   %d:%02d left " % (left // 60, left % 60))
+                sys.stdout.flush()
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        o1pair.close_window(w["id"])
+        print("\nWindow closed. Nothing was paired.")
+        return 1
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Pair a device with this desktop (at the desktop only).")
+    g = ap.add_mutually_exclusive_group()
+    g.add_argument("--list", action="store_true")
+    g.add_argument("--remove", metavar="ID")
+    g.add_argument("--close", action="store_true")
+    g.add_argument("--commit", action="store_true", help=argparse.SUPPRESS)
+    g.add_argument("--headless", action="store_true", help=argparse.SUPPRESS)
+    a = ap.parse_args()
+    need_root()
+    os.umask(0o027)
+    if a.list:
+        return show_list()
+    if a.remove:
+        ok = o1pair.remove_device(a.remove.strip().lower())
+        print("Removed." if ok else "No device with that id.")
+        return 0 if ok else 1
+    if a.close:
+        print("Closed." if o1pair.close_window() else "No window was open.")
+        return 0
+    if a.commit:
+        o1pair.commit_spool()
+        return 0
+    w = o1pair.open_window()
+    return wait_window(w, a.headless)
+
+
+if __name__ == "__main__":
+    sys.exit(main() or 0)

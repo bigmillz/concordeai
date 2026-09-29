@@ -1,0 +1,7 @@
+[Unit]
+Description=ollama1: apply updates now (apt, then Ollama)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-helper update-now
+TimeoutStartSec=2h

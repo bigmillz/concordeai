@@ -1,0 +1,7 @@
+[Unit]
+Description=ollama1: restart the ollama1 services
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-helper restart
+TimeoutStartSec=5min

@@ -1,0 +1,39 @@
+[Unit]
+Description=ollama1 Cloudflare Tunnel
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/ollama1/cloudflared.yml
+ConditionPathExists=/etc/cloudflared/ollama1.json
+
+[Service]
+User=cloudflared
+Group=cloudflared
+# The tunnel credential stays root-only (0600); systemd hands this service a copy.
+LoadCredential=tunnel.json:/etc/cloudflared/ollama1.json
+ExecStart=/usr/bin/cloudflared --no-autoupdate --config /etc/ollama1/cloudflared.yml tunnel run --credentials-file %d/tunnel.json
+Restart=always
+RestartSec=5
+TimeoutStartSec=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0027
+PrivateDevices=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

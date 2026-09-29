@@ -1,0 +1,181 @@
+#!/usr/bin/env python3
+"""A stand-in for Ollama's HTTP API, enough for the gateway, the panel and
+the dashboard. Models are fake; answers contain a marker built from the
+prompt so tests can prove the marker never reaches a file or a log.
+
+    python3 stub_ollama.py PORT        # standalone (user-mode trial on the desktop)
+"""
+import json
+import sys
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+GIB = 1 << 30
+
+
+def llama_info(layers=32, emb=4096, heads=32, kv=8, ctx=131072):
+    return {"general.architecture": "llama", "llama.block_count": layers,
+            "llama.embedding_length": emb, "llama.attention.head_count": heads,
+            "llama.attention.head_count_kv": kv, "llama.context_length": ctx}
+
+
+DEFAULT_MODELS = {
+    # fits: 5 GiB weights + small KV
+    "small:8b": {"size": 5 * GIB, "info": llama_info()},
+    # can't fit in 16 GiB: 20 GiB weights
+    "huge:70b": {"size": 20 * GIB, "info": llama_info(layers=80, emb=8192, heads=64)},
+    # the estimate says it fits, but Ollama puts part of it on the CPU
+    "sneaky:14b": {"size": 9 * GIB, "info": llama_info(layers=40, emb=5120, heads=40), "spill": True},
+    "embed:small": {"size": GIB // 2, "info": {"general.architecture": "bert",
+                                               "bert.block_count": 12, "bert.embedding_length": 768,
+                                               "bert.attention.head_count": 12},
+                    "embedding": True},
+    "embed:spill": {"size": GIB // 2, "info": {"general.architecture": "bert"},
+                    "embedding": True, "spill": True},
+}
+CLOUD = {"name": "gpt-oss:120b-cloud", "model": "gpt-oss:120b-cloud", "size": 384,
+         "remote_model": "gpt-oss:120b", "remote_host": "https://ollama.com:443", "digest": "c1"}
+# a remote model whose name doesn't say so: only the remote_* fields give it away
+CLOUD2 = {"name": "plain:latest", "model": "plain:latest", "size": 384,
+          "remote_model": "plain", "remote_host": "https://ollama.com:443", "digest": "c2"}
+
+
+class Stub:
+    def __init__(self, port, models=None):
+        self.models = dict(models or DEFAULT_MODELS)
+        self.loaded = {}
+        self.calls = []
+        self.lock = threading.Lock()
+        self.tokens = 6
+        self.delay = 0.0
+        stub = self
+
+        class H(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
+            def log_message(self, *a):
+                pass
+
+            def js(self, status, obj):
+                raw = json.dumps(obj).encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(raw)))
+                self.end_headers()
+                self.wfile.write(raw)
+
+            def do_GET(self):
+                with stub.lock:
+                    stub.calls.append(("GET", self.path, None))
+                if self.path == "/api/tags":
+                    ms = [{"name": n, "model": n, "size": m["size"], "digest": "d-" + n,
+                           "details": {"family": "x"}, "modified_at": "2026-09-29T00:00:00Z"}
+                          for n, m in stub.models.items()]
+                    return self.js(200, {"models": ms + [CLOUD, CLOUD2]})
+                if self.path == "/api/ps":
+                    return self.js(200, {"models": list(stub.loaded.values())})
+                if self.path == "/api/version":
+                    return self.js(200, {"version": "0.34.4"})
+                self.js(404, {"error": "not found"})
+
+            def do_DELETE(self):
+                with stub.lock:
+                    stub.calls.append(("DELETE", self.path, None))
+                self.js(200, {})
+
+            def do_POST(self):
+                n = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(n) or b"{}")
+                with stub.lock:
+                    stub.calls.append(("POST", self.path, body))
+                name = body.get("model")
+                m = stub.models.get(name)
+                if self.path in ("/api/pull", "/api/delete", "/api/create", "/api/copy", "/api/push"):
+                    return self.js(200, {"status": "success"})
+                if m is None:
+                    return self.js(404, {"error": "model '%s' not found" % name})
+                if self.path == "/api/show":
+                    caps = ["embedding"] if m.get("embedding") else ["completion"]
+                    return self.js(200, {"model_info": m["info"], "capabilities": caps,
+                                         "details": {"family": "x"}})
+                if body.get("keep_alive") == 0:
+                    stub.loaded.pop(name, None)
+                    return self.js(200, {"model": name, "done": True, "done_reason": "unload"})
+                ctx = (body.get("options") or {}).get("num_ctx", 4096)
+                share = 0.6 if m.get("spill") else 1.0
+                stub.loaded[name] = {"name": name, "model": name, "size": m["size"],
+                                     "size_vram": int(m["size"] * share), "context_length": ctx,
+                                     "expires_at": "2026-09-29T23:00:00Z"}
+                if self.path == "/api/embed":
+                    if not m.get("embedding"):
+                        return self.js(400, {"error": "does not support embeddings"})
+                    return self.js(200, {"model": name, "embeddings": [[0.1, 0.2, 0.3]]})
+                if self.path == "/api/embeddings":
+                    return self.js(200, {"embedding": [0.1, 0.2, 0.3]})
+                if m.get("embedding"):
+                    return self.js(400, {"error": "\"%s\" does not support generate" % name})
+                if self.path == "/api/generate":
+                    prompt = body.get("prompt", "")
+                    if not prompt:
+                        return self.js(200, {"model": name, "response": "", "done": True,
+                                             "done_reason": "load"})
+                    text = "ANSWER-" + prompt[-12:]
+                elif self.path == "/api/chat":
+                    msgs = body.get("messages") or []
+                    text = "ANSWER-" + (msgs[-1].get("content", "")[-12:] if msgs else "")
+                else:
+                    return self.js(404, {"error": "not found"})
+                pieces = [text] + ["t%d" % i for i in range(stub.tokens - 1)]
+                final = {"model": name, "done": True, "done_reason": "stop",
+                         "eval_count": len(pieces), "eval_duration": len(pieces) * 20_000_000,
+                         "prompt_eval_count": 7, "total_duration": 1}
+                if body.get("stream", True) is False:
+                    out = dict(final)
+                    if self.path == "/api/chat":
+                        out["message"] = {"role": "assistant", "content": "".join(pieces)}
+                    else:
+                        out["response"] = "".join(pieces)
+                    return self.js(200, out)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/x-ndjson")
+                self.send_header("Transfer-Encoding", "chunked")
+                self.end_headers()
+                for piece in pieces:
+                    if self.path == "/api/chat":
+                        line = {"model": name, "message": {"role": "assistant", "content": piece},
+                                "done": False}
+                    else:
+                        line = {"model": name, "response": piece, "done": False}
+                    self.chunk(json.dumps(line).encode() + b"\n")
+                    if stub.delay:
+                        time.sleep(stub.delay)
+                if self.path == "/api/chat":
+                    final["message"] = {"role": "assistant", "content": ""}
+                else:
+                    final["response"] = ""
+                self.chunk(json.dumps(final).encode() + b"\n")
+                self.wfile.write(b"0\r\n\r\n")
+
+            def chunk(self, data):
+                self.wfile.write(b"%x\r\n%s\r\n" % (len(data), data))
+                self.wfile.flush()
+
+        self.port = port
+        self.srv = ThreadingHTTPServer(("127.0.0.1", port), H)
+        self.srv.daemon_threads = True
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+
+    def paths(self):
+        with self.lock:
+            return [c[1] for c in self.calls]
+
+    def close(self):
+        self.srv.shutdown()
+
+
+if __name__ == "__main__":
+    Stub(int(sys.argv[1]))
+    print("stub ollama on 127.0.0.1:%s" % sys.argv[1], flush=True)
+    while True:
+        time.sleep(3600)

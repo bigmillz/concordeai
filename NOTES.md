@@ -9,6 +9,114 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b333 — ollama1: a private model server on Patrick's desktop (host kit)
+The spare Linux desktop (Ryzen 9 5950X, 64 GB, RX 6900 XT 16 GB, Ubuntu
+26.04) becomes **ollama1**, a model server for ConcordeAI that only
+Patrick's paired devices can use. This build is the desktop side only,
+all of it in `ollama1/`; `millenai.py` is untouched. The app's "Desktop · …"
+provider comes later and follows `ollama1/PROTOCOL.md`. How to run it is in
+`ollama1/README.md`.
+- **Two locks on every request.** Cloudflare Access (a service token; the
+  gateway re-checks the `Cf-Access-Jwt-Assertion` RS256 JWT against the
+  team's certs, the AUD tag, and the one token's Client ID) and an Ed25519
+  signature over method, path, body hash, timestamp, nonce and device id.
+  There is a 60 s skew window and nonces are remembered for 2 minutes. After
+  a restart, anything signed before the start is refused, so the in-memory
+  nonce cache can't be sidestepped. RSA is checked in pure stdlib by
+  rebuilding the whole PKCS#1 block; Ed25519 uses PyNaCl on the desktop
+  (`cryptography` elsewhere), never a pure-Python fallback.
+- **Pairing only at the desktop.** `sudo ollama1-pair` or the panel's button
+  opens a 5-minute window. An 8-character Crockford code shows on tty1 and
+  in that terminal, never in the panel. The app sends its public key plus
+  HMAC(sha256(code), …), and gets a proof back.
+  - Limits: one success per window, 5 wrong codes close it, one attempt
+    every 2 s.
+  - The gateway (unprivileged) can only drop a request in a spool. A root
+    path unit re-checks the code and writes `devices.json`, so a compromised
+    gateway still can't add a key.
+  - No invite/share/join exists anywhere, per Patrick's rule.
+- **Stateless.** Bodies live in memory for one request. Journal lines and
+  the stats file carry counts, timings, model and device names.
+  `test_stateless.py` checks the source (AST: no writes, no log fields from
+  body variables, the default request log silenced) and sends marker prompts
+  through a live gateway, then greps every file and all output for them.
+- **GPU only.** Before a load, weights + f16 KV cache for the requested
+  num_ctx + a margin must fit in VRAM less 768 MiB. After the load,
+  `/api/ps` must show `size_vram == size`; otherwise the model is unloaded
+  and the request gets `gpu_spill`.
+  - Sampling options only: `num_gpu`, `main_gpu`, `use_mmap` and the like
+    are stripped, since they could push layers to the CPU after the check.
+    `keep_alive` is dropped too.
+  - Ollama cloud models (`remote_host`/`remote_model`, `-cloud` tags) are
+    hidden and refused.
+  - One job on the GPU at a time, a queue of 8.
+  - Streaming sends 200 early (Cloudflare's 100 s first-byte limit), so
+    later failures arrive as a final NDJSON `{"error","code"}` line.
+- **Admin panel** (stdlib HTTP + vanilla JS, strict CSP with nonces):
+  - Access JWT whose email equals the configured admin email, on every
+    request. Actions need a CSRF token, Origin, JSON and same-origin.
+  - Buttons only `systemctl start` fixed units. Polkit lets `o1admin` start
+    exactly those, plus `ollama1-{pull,rmmodel}@<12 hex>` /
+    `ollama1-rmdevice@<16 hex>`. The root helper maps a hash back to an
+    allow-listed or installed model.
+  - `/term/` proxies ttyd (127.0.0.1, `login`), with the WebSocket relayed
+    by hand.
+  - Services run with `NoNewPrivileges`, so sudo could never work for the
+    panel; polkit is the only way.
+- **Local port guard** (`ollama1-nft`, an nft `output` chain on `meta
+  skuid`). Only root, `ollama`, the gateway and the panel reach 11434; only
+  the panel reaches ttyd; only cloudflared reaches 8431/8432. Without it,
+  any local user (pmiller included) could talk to Ollama directly.
+- **Disks by serial, never by name.** The fstab comment already had sda/sdb
+  swapped. `/home` is copied onto / through a bind mount of / (the real
+  folder under the mount point) and checked with rsync `--checksum` plus
+  the authorized_keys hash. Only then is fstab edited.
+  - If a login still holds the old `/home`, it is lazily unmounted, and the
+    mirror waits until an `O_EXCL` open of both 8 TB disks succeeds (i.e.
+    after a re-login).
+  - The mirror is RAID1 on partitions that stop 100 MiB short of the end,
+    so a slightly smaller replacement disk fits.
+- **GRUB 30 s** was `GRUB_RECORDFAIL_TIMEOUT`, through the EFI
+  `recordfail_broken` path (GRUB can't write its env on LVM). The drop-in
+  sets it and `GRUB_TIMEOUT` to 5 with the menu visible. Setup fails unless
+  every `set timeout=` in grub.cfg is 5.
+- **Network: the bridge is Patrick's.** `br0` over enp39s0 and enp38s0 is at
+  192.168.86.10 and carries the Pi. Setup never touches netplan.
+  - Bridge netfilter is kept off with a sysctl drop-in (systemd re-applies
+    it if `br_netfilter` loads), plus `ufw route allow in on br0 out on br0`.
+  - SSH is allowed in on br0 from 192.168.86.0/24.
+- **SSH.**
+  - The drop-in is `10-ollama1.conf`, read before `50-cloud-init.conf`.
+    Its `PasswordAuthentication yes` is also commented out.
+  - Validated with `sshd -t` and `sshd -T -C`; the previous files are
+    restored on failure.
+  - Passwords go off only if authorized_keys holds a key other than
+    `claude-setup@concordeai`. That setup key is removed only with
+    `--remove-setup-key` or a typed `yes`.
+- **Updates.**
+  - unattended-upgrades: security + cloudflared (`origin=cloudflared,
+    codename=any`). The Cloudflare apt key's fingerprint is pinned. Reboot
+    at 04:00 America/New_York.
+  - Ollama: weekly. Base + ROCm archives must match `sha256sum.txt`, and
+    GitHub's asset digest when present. Unpacked with `filter="data"`; a
+    health check with rollback; the previous version is kept.
+- Tested on the Mac: 114 unit tests (incl. shellcheck, polkit rule in node), 38 mutants all killed (`tests/mutate.py`).
+  Tested on the desktop as pmiller without sudo:
+  - the same suite;
+  - a user-mode trial on 127.0.0.1:18431-18439 with a stub Ollama and fake
+    Access certs, reading the real amdgpu sysfs and br0;
+  - the curses dashboard in a pty;
+  - `systemd-analyze verify` of the units;
+  - `setup.sh --plan`.
+
+  The scratch folder was removed afterwards. Not run for real until Patrick
+  runs setup:
+  - the root steps (disks, RAID, ufw, sshd, polkit, nft);
+  - ttyd behind the panel, tty1 as a service;
+  - cloudflared, and Ollama on ROCm.
+
+---
+
 ## Layout
 
 | File | What it is |

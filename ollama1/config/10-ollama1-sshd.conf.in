@@ -1,0 +1,9 @@
+# ollama1 (setup.sh). sshd uses the first value it reads, and this file is
+# read before 50-cloud-init.conf, so these win.
+PermitRootLogin no
+AllowUsers pmiller@192.168.86.0/24
+PubkeyAuthentication yes
+MaxAuthTries 4
+LoginGraceTime 30
+X11Forwarding no
+@PASSWORD_LINES@

@@ -1,0 +1,7 @@
+[Unit]
+Description=ollama1: copy settings and the model list to /srv/data
+RequiresMountsFor=/srv/data
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-helper backup

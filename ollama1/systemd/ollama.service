@@ -1,0 +1,55 @@
+# ollama1: Ollama, GPU only, reachable only from this machine (127.0.0.1).
+# Installed and updated by ollama1-update-ollama (verified GitHub release,
+# ROCm build) into /opt/ollama/versions/<tag>; /opt/ollama/current points
+# at the one in use. The RX 6900 XT is gfx1030, which ROCm supports as is:
+# HSA_OVERRIDE_GFX_VERSION is not needed and not set.
+[Unit]
+Description=Ollama (ollama1: GPU only, local only)
+After=network-online.target ollama1-nft.service
+Wants=network-online.target ollama1-nft.service
+RequiresMountsFor=/srv/models
+
+[Service]
+User=ollama
+Group=ollama
+SupplementaryGroups=render video
+ExecStart=/opt/ollama/current/bin/ollama serve
+Environment=HOME=/var/lib/ollama
+Environment=OLLAMA_HOST=127.0.0.1:11434
+Environment=OLLAMA_MODELS=/srv/models
+# 16 GB of VRAM: one request at a time per model, at most two models
+# resident (e.g. a chat model and a small embedding model), 8k context
+# unless a request asks for more (the gateway checks that it fits).
+Environment=OLLAMA_NUM_PARALLEL=1
+Environment=OLLAMA_MAX_LOADED_MODELS=2
+Environment=OLLAMA_MAX_QUEUE=16
+Environment=OLLAMA_CONTEXT_LENGTH=8192
+Environment=OLLAMA_KEEP_ALIVE=30m
+# Weights only; no chat history anywhere. Cloud models are refused by the
+# gateway whatever this Ollama version does with the next line.
+Environment=OLLAMA_NOHISTORY=1
+Environment=OLLAMA_NO_CLOUD=1
+Restart=always
+RestartSec=3
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+# ProtectClock= is left out: it adds a device allow-list that would hide /dev/kfd.
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0027
+ReadWritePaths=/srv/models /var/lib/ollama
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

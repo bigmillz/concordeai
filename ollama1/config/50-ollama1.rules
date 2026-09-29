@@ -1,0 +1,37 @@
+// ollama1: the admin panel's user (o1admin) may START these systemd units,
+// and do nothing else through polkit. Each unit runs one fixed verb of the
+// root-owned /usr/local/lib/ollama1/bin/ollama1-helper. Template units take
+// only a hex hash (a model on the allow-list / an installed model) or a
+// 16-hex device id, which the helper checks again.
+polkit.addRule(function(action, subject) {
+    if (subject.user !== "o1admin") {
+        return polkit.Result.NOT_HANDLED;
+    }
+    if (action.id !== "org.freedesktop.systemd1.manage-units") {
+        return polkit.Result.NO;
+    }
+    var unit = action.lookup("unit");
+    var verb = action.lookup("verb");
+    if (verb !== "start") {
+        return polkit.Result.NO;
+    }
+    var fixed = [
+        "ollama1-update-now.service",
+        "ollama1-restart.service",
+        "ollama1-reboot.service",
+        "ollama1-pair-window.service",
+        "ollama1-lan-on.service",
+        "ollama1-lan-off.service",
+        "ollama1-backup.service"
+    ];
+    if (fixed.indexOf(unit) >= 0) {
+        return polkit.Result.YES;
+    }
+    if (/^ollama1-(pull|rmmodel)@[0-9a-f]{12}\.service$/.test(unit)) {
+        return polkit.Result.YES;
+    }
+    if (/^ollama1-rmdevice@[0-9a-f]{16}\.service$/.test(unit)) {
+        return polkit.Result.YES;
+    }
+    return polkit.Result.NO;
+});

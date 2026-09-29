@@ -1,0 +1,6 @@
+[Unit]
+Description=ollama1: save a checked pairing request
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-pair --commit

@@ -1,0 +1,7 @@
+[Unit]
+Description=ollama1: remove a model
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-helper rmmodel %i
+TimeoutStartSec=10min

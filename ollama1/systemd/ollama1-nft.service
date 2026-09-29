@@ -1,0 +1,13 @@
+[Unit]
+Description=ollama1 local port guard (who may connect to Ollama, the terminal, the gateway)
+After=nftables.service ufw.service
+Before=ollama.service ollama1-gateway.service ollama1-admin.service ollama1-ttyd.service ollama1-tunnel.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/ollama1/ollama1.nft
+ExecStop=-/usr/sbin/nft delete table inet ollama1
+
+[Install]
+WantedBy=multi-user.target

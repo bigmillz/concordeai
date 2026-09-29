@@ -1,0 +1,24 @@
+# ollama1 Cloudflare Tunnel (written by setup.sh). No ports are open at
+# home: cloudflared connects out to Cloudflare. The credential file is not
+# here; systemd passes it in (ollama1-tunnel.service).
+tunnel: @TUNNEL_ID@
+metrics: 127.0.0.1:8439
+no-autoupdate: true
+ingress:
+  - hostname: ollama1.flyconcordefly.com
+    service: http://127.0.0.1:8431
+    originRequest:
+      connectTimeout: 10s
+      access:
+        required: true
+        teamName: @TEAM_NAME@
+        audTag: ["@GATEWAY_AUD@"]
+  - hostname: ollama1-admin.flyconcordefly.com
+    service: http://127.0.0.1:8432
+    originRequest:
+      connectTimeout: 10s
+      access:
+        required: true
+        teamName: @TEAM_NAME@
+        audTag: ["@ADMIN_AUD@"]
+  - service: http_status:404

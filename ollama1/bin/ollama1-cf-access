@@ -1,0 +1,171 @@
+#!/usr/bin/python3
+"""ollama1-cf-access: set up Cloudflare Access for ollama1 through the API.
+
+Optional: README.md has the same steps as clicks in the dashboard.
+
+  sudo ollama1-cf-access
+
+It asks for a Cloudflare API token (typed, not echoed), and uses it for this
+run only: the token is never written anywhere and is dropped when the script
+ends. Make the token at dash.cloudflare.com > My Profile > API Tokens >
+Create Token > Custom token with:
+  Account  Access: Apps and Policies        Edit
+  Account  Access: Service Tokens           Edit
+  Account  Access: Organizations, Identity Providers, and Groups   Read
+  Zone     Zone   Read   (Include: Specific zone: flyconcordefly.com)
+Delete the token in the dashboard afterwards.
+
+What it creates (or brings back in line if they already exist):
+  - service token "ollama1-app" (the app's key to the gateway hostname)
+  - policy "ollama1 admin - Patrick only": allow, email = the admin email
+  - policy "ollama1 app - service token": service auth, that token only
+  - Access application for ollama1-admin.flyconcordefly.com
+  - Access application for ollama1.flyconcordefly.com (401, not a login page)
+and writes the team domain, both AUD tags, the admin email and the service
+token's client id into /etc/ollama1/config.json (root-only). The service
+token's secret is printed once for the app and not stored on the desktop.
+"""
+import getpass
+import json
+import os
+import sys
+import urllib.error
+import urllib.request
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
+
+from o1common import Paths, load_config, read_json, write_json_atomic  # noqa: E402
+
+API = "https://api.cloudflare.com/client/v4"
+TOKEN_NAME = "ollama1-app"
+POL_ADMIN = "ollama1 admin - Patrick only"
+POL_APP = "ollama1 app - service token"
+
+
+class CF:
+    def __init__(self, token):
+        self._token = token
+
+    def forget(self):
+        self._token = None
+
+    def call(self, method, path, body=None):
+        data = None if body is None else json.dumps(body).encode()
+        req = urllib.request.Request(API + path, data=data, method=method, headers={
+            "Authorization": "Bearer " + self._token, "Content-Type": "application/json",
+            "User-Agent": "ollama1-cf-access"})
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                out = json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            try:
+                out = json.loads(e.read())
+            except ValueError:
+                out = {"success": False, "errors": [{"message": "HTTP %d" % e.code}]}
+        if not out.get("success"):
+            msgs = "; ".join(str(x.get("message")) for x in out.get("errors") or []) or "failed"
+            raise SystemExit("Cloudflare said no to %s %s: %s" % (method, path.split("?")[0], msgs))
+        return out.get("result")
+
+
+def ask(prompt, default=""):
+    v = input("%s%s: " % (prompt, " [%s]" % default if default else "")).strip()
+    return v or default
+
+
+def main():
+    if os.geteuid() != 0:
+        sys.exit("run it with sudo: it writes /etc/ollama1/config.json")
+    cfg = load_config(Paths.config)
+    raw = read_json(Paths.config, {}) or {}
+    admin = ask("Admin email (the only one allowed into ollama1-admin)", cfg.get("admin_email", ""))
+    if "@" not in admin:
+        sys.exit("that isn't an email address")
+    print("\nPaste a Cloudflare API token (see the top of this script for its permissions).")
+    print("It is used for this run only and never saved.")
+    cf = CF(getpass.getpass("API token: ").strip())
+    try:
+        accounts = cf.call("GET", "/accounts?per_page=50") or []
+        if not accounts:
+            sys.exit("the token can't see any account")
+        if len(accounts) == 1:
+            acct = accounts[0]
+        else:
+            for i, a in enumerate(accounts):
+                print("  %d. %s" % (i + 1, a["name"]))
+            acct = accounts[int(ask("Which account", "1")) - 1]
+        a = "/accounts/%s/access" % acct["id"]
+        org = cf.call("GET", a + "/organizations")
+        team = (org or {}).get("auth_domain")
+        if not team:
+            sys.exit("This account has no Zero Trust organization yet. Open dash.cloudflare.com > "
+                     "Zero Trust once, pick a team name and the Free plan, then run this again.")
+        print("Zero Trust team domain: %s" % team)
+
+        # service token
+        tokens = cf.call("GET", a + "/service_tokens?per_page=100") or []
+        tok = next((t for t in tokens if t.get("name") == TOKEN_NAME), None)
+        secret = None
+        if tok is None:
+            tok = cf.call("POST", a + "/service_tokens", {"name": TOKEN_NAME, "duration": "8760h"})
+            secret = tok.get("client_secret")
+            print("Created service token %s." % TOKEN_NAME)
+        elif ask("Service token %s exists. Rotate its secret now? Rotating breaks the app until "
+                 "it gets the new one (y/N)" % TOKEN_NAME, "n").lower().startswith("y"):
+            tok = dict(tok, **cf.call("POST", a + "/service_tokens/%s/rotate" % tok["id"]))
+            secret = tok.get("client_secret")
+            print("Rotated.")
+        client_id = tok["client_id"]
+
+        # reusable policies
+        pols = cf.call("GET", a + "/policies?per_page=100") or []
+
+        def policy(name, decision, include):
+            body = {"name": name, "decision": decision, "include": include, "exclude": [], "require": []}
+            cur = next((p for p in pols if p.get("name") == name), None)
+            if cur:
+                return cf.call("PUT", a + "/policies/%s" % cur["id"], body)["id"]
+            return cf.call("POST", a + "/policies", body)["id"]
+
+        pid_admin = policy(POL_ADMIN, "allow", [{"email": {"email": admin}}])
+        pid_app = policy(POL_APP, "non_identity", [{"service_token": {"token_id": tok["id"]}}])
+
+        apps = cf.call("GET", a + "/apps?per_page=100") or []
+
+        def app(name, domain, pid, extra):
+            body = {"name": name, "domain": domain, "type": "self_hosted", "session_duration": "24h",
+                    "app_launcher_visible": False, "http_only_cookie_attribute": True,
+                    "same_site_cookie_attribute": "lax",
+                    "policies": [{"id": pid, "precedence": 1}]}
+            body.update(extra)
+            cur = next((x for x in apps if x.get("domain") == domain), None)
+            res = cf.call("PUT", a + "/apps/%s" % cur["id"], body) if cur else cf.call("POST", a + "/apps", body)
+            return res["aud"]
+
+        admin_aud = app("ollama1 admin", cfg["hostname_admin"], pid_admin, {})
+        gw_aud = app("ollama1 app", cfg["hostname_gateway"], pid_app, {"service_auth_401_redirect": True})
+    finally:
+        cf.forget()
+        del cf
+
+    raw.update({"access_team_domain": team, "admin_aud": admin_aud, "gateway_aud": gw_aud,
+                "admin_email": admin, "service_token_client_id": client_id})
+    os.makedirs(Paths.etc, exist_ok=True)
+    write_json_atomic(Paths.config, raw, mode=0o600)
+    print("\nSaved to %s (root-only):" % Paths.config)
+    print("  team domain      %s" % team)
+    print("  admin AUD        %s..." % admin_aud[:12])
+    print("  app AUD          %s..." % gw_aud[:12])
+    print("  service token    %s" % client_id)
+    if secret:
+        print("\nThe app's service token. Copy both lines now; the secret is shown once and is")
+        print("not saved on this desktop. ConcordeAI will ask for them when you add the desktop:")
+        print("  CF-Access-Client-Id:     %s" % client_id)
+        print("  CF-Access-Client-Secret: %s" % secret)
+    print("\nThe API token is gone from memory. Delete it in the Cloudflare dashboard too.")
+    print("Restart the services so they read the new settings:")
+    print("  sudo systemctl restart ollama1-gateway ollama1-admin ollama1-tunnel")
+
+
+if __name__ == "__main__":
+    main()

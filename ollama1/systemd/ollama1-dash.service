@@ -1,0 +1,41 @@
+# The console dashboard on tty1 instead of a login prompt. It runs as
+# o1dash (no shell, no password), ignores every key, and systemd restarts
+# it if it ever exits. Other consoles (Alt+F2...) still ask for a login.
+[Unit]
+Description=ollama1 console dashboard on tty1
+After=systemd-user-sessions.service plymouth-quit-wait.service getty-pre.target
+Conflicts=getty@tty1.service autovt@tty1.service
+Before=getty.target
+
+[Service]
+User=o1dash
+Group=o1dash
+SupplementaryGroups=o1view o1pair
+ExecStartPre=+/usr/bin/chown o1dash:tty /dev/tty1
+ExecStartPre=+/usr/bin/chmod 0620 /dev/tty1
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-dash --console
+StandardInput=tty-force
+StandardOutput=tty
+StandardError=journal
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+Environment=TERM=linux
+Environment=PYTHONDONTWRITEBYTECODE=1
+Restart=always
+RestartSec=1
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+CapabilityBoundingSet=
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

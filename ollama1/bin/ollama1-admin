@@ -1,0 +1,574 @@
+#!/usr/bin/python3
+"""ollama1-admin: the web admin panel, at ollama1-admin.flyconcordefly.com.
+
+Bound to 127.0.0.1:8432; only cloudflared reaches it. Every request must
+carry a valid Cloudflare Access JWT for the admin application whose email
+is the configured admin email. Actions also need the CSRF token from the
+page, a same-origin Origin header and a JSON body.
+
+The panel can't run commands. Each button starts one fixed systemd unit;
+polkit (50-ollama1.rules) lets this panel's user start those units and
+nothing else. Units that take an argument get a hash or a device id,
+which the root helper checks against its own lists.
+
+/term/ is a proxy to ttyd (127.0.0.1:8433) running `login`: a terminal
+that still asks for Patrick's Linux password.
+"""
+import collections
+import hashlib
+import hmac
+import html
+import http.client
+import json
+import os
+import re
+import secrets
+import socket
+import subprocess
+import sys
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
+
+import o1ollama  # noqa: E402
+import o1pair  # noqa: E402
+import o1stats  # noqa: E402
+from o1common import (Paths, load_config, name_hash, read_allow_list, read_json,  # noqa: E402
+                      write_json_atomic)
+from o1jwt import AccessVerifier, JWTError  # noqa: E402
+
+FIXED_UNITS = {
+    "update": "ollama1-update-now.service",
+    "restart": "ollama1-restart.service",
+    "reboot": "ollama1-reboot.service",
+    "pair": "ollama1-pair-window.service",
+    "lan-on": "ollama1-lan-on.service",
+    "lan-off": "ollama1-lan-off.service",
+    "backup": "ollama1-backup.service",
+}
+TEMPLATE_UNITS = {
+    "remove-device": "ollama1-rmdevice@%s.service",
+    "pull": "ollama1-pull@%s.service",
+    "remove-model": "ollama1-rmmodel@%s.service",
+}
+HOP = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te",
+       "trailers", "transfer-encoding", "upgrade", "host", "content-length"}
+
+
+def log(event, **fields):
+    print(" ".join([event] + ["%s=%s" % (k, str(v).replace(" ", "_")[:64]) for k, v in fields.items()]),
+          flush=True)
+
+
+def start_unit(unit):
+    """The only way the panel acts: `systemctl start` of a named unit."""
+    r = subprocess.run(["systemctl", "start", "--no-block", unit], capture_output=True, text=True,
+                       timeout=15)
+    return r.returncode == 0, (r.stderr or "").strip()[:200]
+
+
+class Panel:
+    def __init__(self, cfg, runner=start_unit, clock=time.time):
+        self.cfg = cfg
+        self.runner = runner
+        self.clock = clock
+        self.access = AccessVerifier(cfg["access_team_domain"], cfg["admin_aud"],
+                                     cfg.get("certs_url") or "",
+                                     bool(cfg.get("allow_insecure_certs_url")), clock=clock)
+        self.secret = secrets.token_bytes(32)
+        self.origin = "https://" + cfg["hostname_admin"].lower()
+        self.cpu = o1stats.CPU()
+        self.cpu.sample()
+        self.history = collections.deque(maxlen=24 * 360)
+        h = read_json(Paths.history, {}) or {}
+        for row in h.get("rows", []) if isinstance(h, dict) else []:
+            if isinstance(row, list) and len(row) == 7 and self.clock() - row[0] < 86400:
+                self.history.append(row)
+        self.state_cache = (0, None)
+        self.lock = threading.Lock()
+
+    # -- auth -----------------------------------------------------------
+    def identify(self, headers):
+        """The admin's email, or raises JWTError."""
+        want = (self.cfg.get("admin_email") or "").strip().lower()
+        if not want or not self.access.configured:
+            raise JWTError("admin access is not configured")
+        host = (headers.get("Host") or "").split(":")[0].lower()
+        if host != self.cfg["hostname_admin"].lower():
+            raise JWTError("wrong host")
+        claims = self.access.verify(headers.get("Cf-Access-Jwt-Assertion") or "")
+        email = str(claims.get("email") or "").strip().lower()
+        if not email or not hmac.compare_digest(email.encode(), want.encode()):
+            raise JWTError("not the admin")
+        return email
+
+    def csrf(self, email):
+        return hmac.new(self.secret, b"csrf\n" + email.encode(), hashlib.sha256).hexdigest()
+
+    def check_csrf(self, headers, email):
+        if (headers.get("Content-Type") or "").split(";")[0].strip() != "application/json":
+            return "JSON only"
+        if (headers.get("Origin") or "").lower() != self.origin:
+            return "cross-origin request"
+        sfs = headers.get("Sec-Fetch-Site")
+        if sfs and sfs != "same-origin":
+            return "cross-site request"
+        tok = headers.get("X-O1-CSRF") or ""
+        if not hmac.compare_digest(tok.encode(), self.csrf(email).encode()):
+            return "bad CSRF token"
+        return None
+
+    # -- data -----------------------------------------------------------
+    def state(self):
+        now = self.clock()
+        with self.lock:
+            if self.state_cache[1] is not None and now - self.state_cache[0] < 1.5:
+                return self.state_cache[1]
+            st = o1stats.collect(self.cpu, int(self.cfg["tunnel_metrics_port"]))
+            st["pairing_open"] = bool((st.get("gateway") or {}).get("pairing_open")) or \
+                bool(o1pair.read_window())
+            st["lan_mode"] = bool(self.cfg.get("lan_mode"))
+            self.state_cache = (now, st)
+            return st
+
+    def sample(self):
+        st = self.state()
+        g = st.get("gpu") or {}
+        gw = st.get("gateway") or {}
+        temps = g.get("temps") or {}
+        row = [int(self.clock()), (gw.get("tps") or {}).get("current", 0), g.get("busy_pct"),
+               round((g.get("vram_used") or 0) / 2**30, 2), temps.get("junction", temps.get("edge")),
+               g.get("power_w"), gw.get("active", 0)]
+        self.history.append(row)
+
+    def save_history(self):
+        write_json_atomic(Paths.history, {"rows": list(self.history)}, mode=0o600)
+
+    def models(self):
+        installed = []
+        try:
+            st, data = o1ollama.call(self.cfg["ollama_url"], "GET", "/api/tags", timeout=5)
+            for m in (data or {}).get("models", []) if st == 200 else []:
+                if not o1ollama.is_remote(m):
+                    installed.append({"name": m["name"], "size": m.get("size"), "hash": name_hash(m["name"]),
+                                      "modified_at": m.get("modified_at")})
+        except OSError:
+            pass
+        names = {m["name"] for m in installed}
+        allow = [{"name": n, "hash": name_hash(n), "installed": n in names or (n + ":latest") in names}
+                 for n in read_allow_list()]
+        return {"installed": installed, "allow": allow, "pull": read_json(Paths.pull_status)}
+
+    def action(self, obj):
+        act = obj.get("action")
+        arg = obj.get("arg")
+        if not isinstance(act, str) or not (arg is None or isinstance(arg, str)):
+            return 400, "unknown action"
+        if act in FIXED_UNITS:
+            if act == "reboot" and obj.get("confirm") != "reboot":
+                return 400, "confirm the reboot"
+            unit = FIXED_UNITS[act]
+        elif act == "remove-device":
+            ids = {d["id"] for d in o1pair.devices_list()}
+            if not isinstance(arg, str) or not re.match(r"^[0-9a-f]{16}$", arg) or arg not in ids:
+                return 400, "no such device"
+            unit = TEMPLATE_UNITS[act] % arg
+        elif act == "pull":
+            allowed = {name_hash(n): n for n in read_allow_list()}
+            if arg not in allowed:
+                return 403, "not on the allow-list"
+            unit = TEMPLATE_UNITS[act] % arg
+        elif act == "remove-model":
+            names = {m["hash"]: m["name"] for m in self.models()["installed"]}
+            if arg not in names or obj.get("confirm") != names[arg]:
+                return 400, "no such model, or not confirmed"
+            unit = TEMPLATE_UNITS[act] % arg
+        else:
+            return 400, "unknown action"
+        ok, err = self.runner(unit)
+        log("action", action=act, unit=unit, ok=ok)
+        return (202, "started") if ok else (500, "could not start %s: %s" % (unit, err))
+
+    def logs(self):
+        gw = o1stats.gateway_snapshot() or {}
+        return {"recent": gw.get("recent", []), "per_minute": gw.get("per_minute", []),
+                "totals": gw.get("totals", {}), "auth_failures": gw.get("auth_failures", {}),
+                "actions": read_json(Paths.helper_status, {}) or {},
+                "ollama_update": read_json(Paths.update_status, {}) or {}}
+
+
+def make_handler(panel):
+    cfg = panel.cfg
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+        server_version = "ollama1-admin"
+        sys_version = ""
+
+        def log_message(self, fmt, *args):
+            pass
+
+        def send(self, status, body, ctype="application/json", extra=None):
+            raw = body if isinstance(body, bytes) else (
+                json.dumps(body).encode() if ctype == "application/json" else body.encode())
+            self.send_response(status)
+            self.send_header("Content-Type", ctype + ("; charset=utf-8" if ctype.startswith("text/") else ""))
+            self.send_header("Content-Length", str(len(raw)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Referrer-Policy", "no-referrer")
+            for k, v in (extra or {}).items():
+                self.send_header(k, v)
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def auth(self):
+            try:
+                return panel.identify(self.headers)
+            except JWTError as e:
+                log("denied", reason=str(e))
+                self.send(403, "Not allowed.\n", "text/plain")
+                return None
+
+        def do_GET(self):
+            email = self.auth()
+            if email is None:
+                return
+            path = self.path.split("?", 1)[0]
+            if path == "/term" or path.startswith("/term/"):
+                return self.proxy_term(email)
+            if path == "/":
+                nonce = secrets.token_urlsafe(16)
+                page = PAGE.replace("{{CSRF}}", panel.csrf(email)).replace("{{NONCE}}", nonce) \
+                    .replace("{{EMAIL}}", html.escape(email)).replace("{{HOST}}", html.escape(cfg["hostname_gateway"]))
+                csp = ("default-src 'none'; script-src 'nonce-%s'; style-src 'nonce-%s'; "
+                       "connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; "
+                       "base-uri 'none'; form-action 'none'" % (nonce, nonce))
+                return self.send(200, page, "text/html", {"Content-Security-Policy": csp})
+            if path == "/api/state":
+                return self.send(200, panel.state())
+            if path == "/api/history":
+                return self.send(200, {"rows": list(panel.history),
+                                       "fields": ["t", "tps", "gpu_busy", "vram_gib", "gpu_temp",
+                                                  "power_w", "active"]})
+            if path == "/api/devices":
+                return self.send(200, {"devices": o1pair.devices_list()})
+            if path == "/api/models":
+                return self.send(200, panel.models())
+            if path == "/api/logs":
+                return self.send(200, panel.logs())
+            self.send(404, {"error": "not found"})
+
+        def do_POST(self):
+            email = self.auth()
+            if email is None:
+                return
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                n = -1
+            if n < 0 or n > 4096:
+                return self.send(413, {"error": "too large"})
+            body = self.rfile.read(n)
+            if self.path.split("?", 1)[0] != "/api/action":
+                return self.send(404, {"error": "not found"})
+            bad = panel.check_csrf(self.headers, email)
+            if bad:
+                log("csrf-refused", reason=bad)
+                return self.send(403, {"error": bad})
+            try:
+                obj = json.loads(body.decode())
+                assert isinstance(obj, dict)
+            except (ValueError, AssertionError, UnicodeDecodeError):
+                return self.send(400, {"error": "bad JSON"})
+            try:
+                status, msg = panel.action(obj)
+            except Exception as e:
+                log("action-error", kind=type(e).__name__)
+                status, msg = 500, "internal error"
+            self.send(status, {"result": msg})
+
+        # -- the web terminal (ttyd) -----------------------------------
+        def proxy_term(self, email):
+            upgrade = (self.headers.get("Upgrade") or "").lower() == "websocket"
+            if upgrade and (self.headers.get("Origin") or "").lower() != panel.origin:
+                return self.send(403, "Not allowed.\n", "text/plain")
+            port = int(cfg["ttyd_port"])
+            if not upgrade:
+                conn = http.client.HTTPConnection("127.0.0.1", port, timeout=30)
+                try:
+                    hdrs = {k: v for k, v in self.headers.items()
+                            if k.lower() not in HOP and not k.lower().startswith("cf-")}
+                    hdrs["Host"] = self.headers.get("Host", "")
+                    conn.request("GET", self.path, headers=hdrs)
+                    r = conn.getresponse()
+                    data = r.read()
+                    self.send_response(r.status)
+                    for k, v in r.getheaders():
+                        if k.lower() not in HOP:
+                            self.send_header(k, v)
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                except OSError:
+                    self.send(502, "The terminal service is not running.\n", "text/plain")
+                finally:
+                    conn.close()
+                return
+            try:
+                up = socket.create_connection(("127.0.0.1", port), timeout=10)
+            except OSError:
+                return self.send(502, "The terminal service is not running.\n", "text/plain")
+            lines = ["GET %s HTTP/1.1" % self.path]
+            for k, v in self.headers.items():
+                if not k.lower().startswith("cf-"):
+                    lines.append("%s: %s" % (k, v))
+            up.sendall(("\r\n".join(lines) + "\r\n\r\n").encode("latin-1"))
+            up.settimeout(None)
+            self.connection.settimeout(None)
+            log("terminal-open")
+            self.close_connection = True
+
+            def pump_up():
+                try:
+                    while True:
+                        b = self.rfile.read1(65536)
+                        if not b:
+                            break
+                        up.sendall(b)
+                except OSError:
+                    pass
+                finally:
+                    try:
+                        up.shutdown(socket.SHUT_WR)
+                    except OSError:
+                        pass
+
+            t = threading.Thread(target=pump_up, daemon=True)
+            t.start()
+            try:
+                while True:
+                    b = up.recv(65536)
+                    if not b:
+                        break
+                    self.wfile.write(b)
+            except OSError:
+                pass
+            finally:
+                up.close()
+                log("terminal-closed")
+
+    return Handler
+
+
+def sampler(panel, stop):
+    n = 0
+    while not stop.is_set():
+        try:
+            panel.sample()
+            if n % 30 == 0:
+                panel.save_history()
+        except Exception as e:
+            log("sample-error", kind=type(e).__name__)
+        n += 1
+        stop.wait(10)
+
+
+def serve(cfg, runner=start_unit):
+    panel = Panel(cfg, runner)
+    if not panel.access.configured or not cfg.get("admin_email"):
+        log("warning", reason="admin_access_not_configured_all_requests_refused")
+    srv = ThreadingHTTPServer(("127.0.0.1", int(cfg["admin_port"])), make_handler(panel))
+    srv.daemon_threads = True
+    stop = threading.Event()
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    threading.Thread(target=sampler, args=(panel, stop), daemon=True).start()
+    log("started", port=cfg["admin_port"])
+    return panel, srv, stop
+
+
+PAGE = r"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf" content="{{CSRF}}">
+<title>ollama1 admin</title>
+<style nonce="{{NONCE}}">
+:root{--bg:#f6f6f4;--card:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#8a8984;--line:#e4e3de;
+--grid:#ecebe6;--series:#2a78d6;--good:#008300;--warn:#b86e00;--bad:#c62f2f;--btn:#fff;--btnline:#cfcec8}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121211;--card:#1a1a19;--ink:#fff;
+--ink2:#c3c2b7;--muted:#8d8c85;--line:#2d2d2b;--grid:#262624;--series:#3987e5;--good:#3fae3f;--warn:#e0a030;
+--bad:#e66767;--btn:#222220;--btnline:#3a3a37}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
+font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line)}
+header h1{font-size:16px;margin:0;font-weight:600}header .who{color:var(--ink2);font-size:13px}
+main{max-width:1180px;margin:0 auto;padding:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:12px;min-width:0}
+.card h2{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink2);margin:0 0 10px;font-weight:600}
+.big{font-size:26px;font-weight:600;font-variant-numeric:tabular-nums}.sub{color:var(--ink2);font-size:13px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;font-variant-numeric:tabular-nums}.kv dt{color:var(--ink2)}.kv dd{margin:0}
+.ok{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--grid);font-size:13px}th{color:var(--ink2);font-weight:500}
+button{background:var(--btn);color:var(--ink);border:1px solid var(--btnline);border-radius:6px;padding:6px 11px;font:inherit;cursor:pointer}
+button:hover{border-color:var(--ink2)}button.danger{color:var(--bad)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.chart{position:relative}.chart svg{width:100%;height:150px;display:block}
+.chart .tip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:6px;
+padding:4px 8px;font-size:12px;display:none;white-space:nowrap}.tip b{font-size:13px}
+.seg button.on{border-color:var(--series);color:var(--series)}
+#msg{min-height:20px;color:var(--ink2);font-size:13px;margin-top:8px}
+.note{color:var(--muted);font-size:12px}.between{justify-content:space-between}.mt{margin-top:10px}
+@media (max-width:600px){main{padding:10px}header{padding:12px}}
+</style></head><body>
+<header><h1>ollama1</h1><span class="who">{{EMAIL}}</span></header>
+<main>
+<div class="grid">
+ <div class="card"><h2>Tokens per second</h2><div class="big" id="tps">-</div><div class="sub" id="tpsavg"></div></div>
+ <div class="card"><h2>Requests</h2><div class="big" id="req">-</div><div class="sub" id="reqsub"></div></div>
+ <div class="card"><h2>GPU</h2><div class="big" id="gpu">-</div><div class="sub" id="gpusub"></div></div>
+ <div class="card"><h2>Service</h2><dl class="kv" id="svc"></dl></div>
+</div>
+<div class="card"><div class="row between"><h2>History</h2>
+ <div class="row seg"><button data-range="3600" class="on">1 h</button><button data-range="86400">24 h</button></div></div>
+ <div class="charts" id="charts"></div></div>
+<div class="grid">
+ <div class="card"><h2>Loaded models</h2><table id="loaded"></table></div>
+ <div class="card"><h2>System</h2><dl class="kv" id="sys"></dl></div>
+</div>
+<div class="card"><h2>Models</h2><table id="models"></table>
+ <p class="note">Only models on the allow-list (/etc/ollama1/models.allow, edited at the desktop) can be pulled.</p><div id="pull" class="sub"></div></div>
+<div class="grid">
+ <div class="card"><h2>Paired devices</h2><table id="devices"></table>
+  <div class="row mt"><button data-act="pair">Open pairing window</button></div>
+  <p class="note">The code appears on the desktop's screen only.</p></div>
+ <div class="card"><h2>Actions</h2><div class="row">
+  <button data-act="update">Apply updates now</button><button data-act="restart">Restart services</button>
+  <button data-act="backup">Back up now</button><button data-act="lan" id="lanbtn">LAN mode</button>
+  <button data-act="reboot" class="danger">Reboot</button></div>
+  <div class="row mt"><a href="/term/" target="_blank" rel="noopener"><button>Open terminal</button></a></div>
+  <div id="msg"></div><dl class="kv mt" id="acts"></dl></div>
+</div>
+<div class="card"><h2>Log (counts only)</h2><table id="log"></table></div>
+</main>
+<script nonce="{{NONCE}}">
+"use strict";
+const CSRF=document.querySelector('meta[name=csrf]').content;
+const $=id=>document.getElementById(id);
+const el=(t,txt,cls)=>{const e=document.createElement(t);if(txt!==undefined)e.textContent=txt;if(cls)e.className=cls;return e;};
+const gib=b=>b==null?'?':(b/1073741824).toFixed(1)+' GiB';
+const tib=b=>b==null?'?':(b>=1099511627776?(b/1099511627776).toFixed(1)+' TiB':gib(b));
+const ago=t=>{if(!t)return 'never';const s=Date.now()/1000-t;return s<90?Math.round(s)+' s ago':s<5400?Math.round(s/60)+' min ago':s<172800?Math.round(s/3600)+' h ago':Math.round(s/86400)+' d ago';};
+const dur=s=>{if(s==null)return '?';const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return d?d+'d '+h+'h':h+'h '+m+'m';};
+function kv(dl,pairs){dl.replaceChildren();for(const [k,v,c] of pairs){dl.append(el('dt',k));dl.append(el('dd',v,c||''));}}
+function table(t,head,rows){t.replaceChildren();const tr=el('tr');head.forEach(h=>tr.append(el('th',h)));t.append(tr);
+ if(!rows.length){const r=el('tr'),td=el('td','None','note');td.colSpan=head.length;r.append(td);t.append(r);}
+ rows.forEach(cells=>{const r=el('tr');cells.forEach(c=>{const td=el('td');if(c instanceof Node)td.append(c);else td.textContent=c;r.append(td);});t.append(r);});}
+async function api(p){const r=await fetch(p,{credentials:'same-origin'});if(!r.ok)throw new Error(r.status);return r.json();}
+async function act(action,arg,confirm){const m=$('msg');m.textContent='Starting '+action+'...';
+ try{const r=await fetch('/api/action',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-O1-CSRF':CSRF},
+ body:JSON.stringify({action,arg,confirm})});const j=await r.json();m.textContent=action+': '+j.result;}catch(e){m.textContent=action+': failed ('+e.message+')';}
+ setTimeout(refreshSlow,1500);}
+let lan=false;
+document.querySelectorAll('button[data-act]').forEach(b=>b.addEventListener('click',()=>{const a=b.dataset.act;
+ if(a==='reboot'){if(confirm('Reboot the desktop now?'))act('reboot',null,'reboot');return;}
+ if(a==='lan'){if(confirm(lan?'Turn LAN mode off?':'Turn LAN mode on? The gateway will also answer on the home network without Cloudflare Access (signatures still required, traffic unencrypted).'))act(lan?'lan-off':'lan-on');return;}
+ if(a==='update'&&!confirm('Apply all pending updates and update Ollama now?'))return;
+ if(a==='restart'&&!confirm('Restart Ollama, the gateway, the terminal and the tunnel? Running requests end.'))return;
+ act(a);}));
+async function refreshFast(){let s;try{s=await api('/api/state');}catch(e){return;}
+ const gw=s.gateway||{},t=gw.tps||{},g=s.gpu||{},tun=s.tunnel||{},up=s.updates||{},ou=up.ollama||{};
+ $('tps').textContent=(t.current??0).toFixed(1);$('tpsavg').textContent='1 h '+(t['1h']??0)+'  ·  24 h '+(t['24h']??0);
+ $('req').textContent=(gw.active||0)+' active';$('reqsub').textContent=(gw.queued||0)+' queued  ·  '+(gw.requests_today||0)+' today  ·  '+((gw.totals||{}).refused_gpu||0)+' refused for GPU';
+ $('gpu').textContent=(g.busy_pct??'?')+'% busy';const temps=Object.entries(g.temps||{}).map(([k,v])=>k+' '+Math.round(v)+'°C').join('  ');
+ $('gpusub').textContent='VRAM '+gib(g.vram_used)+' of '+gib(g.vram_total)+'  ·  '+temps+'  ·  '+(g.power_w??'?')+' W  ·  fan '+(g.fan_rpm??'?')+' rpm';
+ lan=!!s.lan_mode;$('lanbtn').textContent=lan?'LAN mode: on':'LAN mode: off';
+ kv($('svc'),[['Tunnel',tun.up?'connected ('+tun.connections+')':'down',tun.up?'ok':'bad'],
+  ['Gateway',gw.time&&!gw.stale?'running':'not running',gw.time&&!gw.stale?'ok':'bad'],
+  ['Ollama',gw.ollama_version||'?'],['Pairing window',s.pairing_open?'open':'closed',s.pairing_open?'warn':''],
+  ['Reboot required',up.reboot_required?'yes':'no',up.reboot_required?'warn':''],
+  ['Security updates',up.last_unattended?'last ran '+ago(up.last_unattended):'never'],
+  ['Ollama updater',(ou.result||'not run')+' '+(ou.version||'')+(ou.last_run?', '+ago(ou.last_run):''),ou.result==='failed'?'bad':''],
+  ['Next Ollama check',up.next_ollama_update||'?']]);
+ const vt=g.vram_total||0;table($('loaded'),['Model','Size','On GPU','Context'],(gw.loaded||[]).map(m=>{const sh=m.size?m.size_vram/m.size:0;
+  return [m.name,gib(m.size),sh>=1?'100%':Math.round(sh*100)+'%',String(m.context_length??'?')];}));
+ if(vt){const r=el('tr'),td=el('td','VRAM headroom '+gib(vt-(g.vram_used||0)),'note');td.colSpan=4;r.append(td);$('loaded').append(r);}
+ const mem=s.memory||{},pairs=[['Uptime',dur(s.uptime)],['CPU',(s.cpu_pct??'?')+'%  ·  load '+(s.load||[]).map(x=>x.toFixed(2)).join(' ')],
+  ['Memory',gib(mem.used)+' of '+gib(mem.total)]];
+ const net=s.network;if(net){pairs.push([net.name,(net.address||'no address')+'  ·  '+(net.state==='up'?'up':net.state),net.state==='up'?'':'bad']);
+  (net.ports||[]).forEach(p=>pairs.push(['  '+p.name,(p.carrier?'link'+(p.speed_mbps?' '+p.speed_mbps+' Mb/s':''):'no link')+(p.name==='enp38s0'?'  ·  Pi port':'')]));}
+ (s.disks||[]).forEach(d=>pairs.push([d.mount,d.mounted?tib(d.used)+' of '+tib(d.total)+' ('+Math.round(100*d.used/d.total)+'%)':'not mounted',d.mounted?'':'bad']));
+ (s.raid||[]).forEach(a=>pairs.push([a.name,a.level+' ['+a.members+'] '+(a.healthy?'healthy':'DEGRADED')+(a.action?'  ·  '+a.action+' '+a.progress+'%'+(a.finish?' ('+a.finish+' left)':''):''),a.healthy?'ok':'bad']));
+ if(!(s.raid||[]).length)pairs.push(['RAID','no array','warn']);kv($('sys'),pairs);}
+async function refreshSlow(){try{const d=await api('/api/devices');table($('devices'),['Name','Id','Paired',''],d.devices.map(x=>{
+  const b=el('button','Remove','danger');b.addEventListener('click',()=>{if(confirm('Unpair '+x.name+'? It will need to pair again at the desktop.'))act('remove-device',x.id);});
+  return [x.name,x.id,(x.paired_at||'').slice(0,16).replace('T',' '),b];}));}catch(e){}
+ try{const m=await api('/api/models');const rows=[];const allowed=new Set(m.allow.map(a=>a.name));
+  m.installed.forEach(x=>{const b=el('button','Remove','danger');b.addEventListener('click',()=>{const c=prompt('Type the model name to remove it: '+x.name);if(c===x.name)act('remove-model',x.hash,c);});
+   rows.push([x.name,gib(x.size),allowed.has(x.name)?'allow-listed':'installed by hand',b]);});
+  m.allow.filter(a=>!a.installed).forEach(a=>{const b=el('button','Pull');b.addEventListener('click',()=>act('pull',a.hash));rows.push([a.name,'-','allow-listed, not installed',b]);});
+  table($('models'),['Model','Size','',''],rows);const p=m.pull;
+  $('pull').textContent=p&&p.model?('Pull '+p.model+': '+p.status+(p.total?' '+Math.round(100*p.completed/p.total)+'%':'')):'';}catch(e){}
+ try{const l=await api('/api/logs');const acts=[];for(const [k,v] of Object.entries(l.actions||{}))acts.push([k,v.result+', '+ago(v.at),v.result==='failed'?'bad':'']);kv($('acts'),acts);
+  table($('log'),['Time','Device','Model','Kind','Status','ms','Tokens in','Tokens out'],(l.recent||[]).slice().reverse().slice(0,40).map(r=>
+   [new Date(r.t*1000).toLocaleTimeString(),r.device,r.model,r.kind,String(r.status),String(r.ms),String(r.prompt_tokens),String(r.tokens)]));}catch(e){}}
+// --- history charts: one series each, one axis each, crosshair + tooltip ---
+let range=3600,hist={rows:[]};
+const CH=[['Tokens per second',1,v=>v.toFixed(1)],['GPU busy (%)',2,v=>Math.round(v)+'%'],['VRAM used (GiB)',3,v=>v.toFixed(1)+' GiB'],
+ ['GPU temperature (°C)',4,v=>Math.round(v)+'°C'],['GPU power (W)',5,v=>Math.round(v)+' W']];
+const NS='http://www.w3.org/2000/svg';const sv=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
+function draw(){const box=$('charts');box.replaceChildren();const now=Date.now()/1000,rows=hist.rows.filter(r=>r[0]>=now-range);
+ for(const [title,ix,fmt] of CH){const wrap=el('div',undefined,'chart');wrap.append(el('div',title,'sub'));
+  const W=360,H=150,L=38,R=8,T=8,B=20;const svg=sv('svg',{viewBox:'0 0 '+W+' '+H,preserveAspectRatio:'none',role:'img','aria-label':title});
+  const pts=rows.filter(r=>r[ix]!=null).map(r=>[r[0],r[ix]]);let max=Math.max(1,...pts.map(p=>p[1]));
+  const nice=Math.pow(10,Math.floor(Math.log10(max)));max=Math.ceil(max/nice)*nice;
+  const x=t=>L+(t-(now-range))/range*(W-L-R),y=v=>T+(1-v/max)*(H-T-B);
+  for(let i=0;i<=2;i++){const v=max*i/2;svg.append(sv('line',{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:'var(--grid)','stroke-width':1}));
+   const tx=sv('text',{x:L-4,y:y(v)+4,'text-anchor':'end','font-size':10,fill:'var(--muted)'});tx.textContent=Number.isInteger(v)?v:v.toFixed(1);svg.append(tx);}
+  const lab=range===3600?['-60 min','-30 min','now']:['-24 h','-12 h','now'];[0,.5,1].forEach((f,i)=>{const tx=sv('text',{x:L+f*(W-L-R),y:H-5,'text-anchor':i===0?'start':i===2?'end':'middle','font-size':10,fill:'var(--muted)'});tx.textContent=lab[i];svg.append(tx);});
+  if(pts.length>1){let d='';let prev=null;for(const p of pts){d+=(prev&&p[0]-prev>60?'M':(d?'L':'M'))+x(p[0]).toFixed(1)+' '+y(p[1]).toFixed(1);prev=p[0];}
+   svg.append(sv('path',{d,fill:'none',stroke:'var(--series)','stroke-width':2,'stroke-linejoin':'round','vector-effect':'non-scaling-stroke'}));}
+  else{const tx=sv('text',{x:W/2,y:H/2,'text-anchor':'middle','font-size':11,fill:'var(--muted)'});tx.textContent='No data yet';svg.append(tx);}
+  const hair=sv('line',{y1:T,y2:H-B,stroke:'var(--ink2)','stroke-width':1,visibility:'hidden','vector-effect':'non-scaling-stroke'});svg.append(hair);
+  const tip=el('div',undefined,'tip');wrap.append(svg,tip);
+  svg.addEventListener('pointermove',e=>{if(!pts.length)return;const r=svg.getBoundingClientRect();const t=(now-range)+((e.clientX-r.left)/r.width*W-L)/(W-L-R)*range;
+   let best=pts[0];for(const p of pts)if(Math.abs(p[0]-t)<Math.abs(best[0]-t))best=p;const px=x(best[0]);hair.setAttribute('x1',px);hair.setAttribute('x2',px);hair.setAttribute('visibility','visible');
+   tip.replaceChildren(el('b',fmt(best[1])),document.createTextNode('  '+new Date(best[0]*1000).toLocaleTimeString()));tip.style.display='block';
+   const left=px/W*r.width;tip.style.left=Math.min(left+8,r.width-tip.offsetWidth)+'px';tip.style.top='18px';});
+  svg.addEventListener('pointerleave',()=>{hair.setAttribute('visibility','hidden');tip.style.display='none';});
+  box.append(wrap);}}
+document.querySelectorAll('button[data-range]').forEach(b=>b.addEventListener('click',()=>{range=+b.dataset.range;
+ document.querySelectorAll('button[data-range]').forEach(x=>x.classList.toggle('on',x===b));draw();}));
+async function refreshHist(){try{hist=await api('/api/history');draw();}catch(e){}}
+refreshFast();refreshSlow();refreshHist();setInterval(refreshFast,2000);setInterval(refreshSlow,10000);setInterval(refreshHist,30000);
+</script></body></html>
+"""
+
+
+def main():
+    import argparse
+    import signal
+    ap = argparse.ArgumentParser(description="ollama1 admin panel")
+    ap.add_argument("--config")
+    a = ap.parse_args()
+    cfg = load_config(a.config)
+    panel, srv, stop = serve(cfg)
+    done = threading.Event()
+    signal.signal(signal.SIGTERM, lambda *_: done.set())
+    signal.signal(signal.SIGINT, lambda *_: done.set())
+    done.wait()
+    stop.set()
+    srv.shutdown()
+    try:
+        panel.save_history()
+    except OSError:
+        pass
+
+
+if __name__ == "__main__":
+    main()
