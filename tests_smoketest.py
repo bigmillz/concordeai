@@ -12786,10 +12786,10 @@ _IVM9 = [
      "    act, kept, pb = p.get(\"active\"), p.get(\"kept\"), p.get(\"putback\")",
      "    if not isinstance(p, dict):\n        return None\n"
      "    act, kept, pb = p.get(\"active\", \"local\"), p.get(\"kept\"), p.get(\"putback\")"),
-    ("a lost record not made kept", "            dirs = _account_dirs() if \"active\" not in q else []",
-     "            dirs = []"),
+    ("a lost record not made kept", "            und = _undecided() if \"active\" not in q else []",
+     "            und = []"),
     ("a switch writing active over a lost record",
-     "    if \"active\" not in p and ctx.root and _account_dirs():", "    if False:"),
+     "    if \"active\" not in p and ctx.root and _undecided():", "    if False:"),
     ("an unfinished sign-up erased", "            if name.startswith(\".new-\") and _key_marked(path):",
      "            if False:"),
     ("a key this build can't read taken for none",
@@ -12965,7 +12965,7 @@ def _proto9(src=None):
         and len(_jr9(d, "memory.json") or []) == 2
         and os.path.isfile(os.path.join(d, "images", cn["img_name"]))
         and os.path.isfile(os.path.join(d, "exports", cn["exp_name"][:-3] + ".meta"))
-        and _acc9(d) == [] and _jr9(d, "profile.json").get("putback") is None)
+        and _acc9(d) == [] and not _jr9(d, "profile.json").get("putback"))
     r["settings Add moved never come back"] = "persona" not in (_jr9(d, "prefs.json") or {})
     # a start after the put-back imports nothing twice
     ns2, _ = _ns9(src, d=d)
@@ -13078,7 +13078,66 @@ def _proto9(src=None):
     got = [m.get("content") for m in ns["load_chats"](ns["current_ctx"]())[0]["messages"]]
     r["a switch keeps the old profile's streaming answer as far as it got, in its own chat"] = (
         got == ["q", "Half an answer"] and t.get("done") is True)
+    # -- (review) a lost record with two folders: a sign-in refuses and nothing is erased,
+    # then or at the next start
+    ns, d = _ns9(src)
+    _boot9(ns)
+    made = sorted(ns["test_profile_create"]().name for _ in range(2))
+    json.dump({"written": []}, open(os.path.join(d, "profile.json"), "w"))
+    ns2, _ = _ns9(src, d=d)
+    _boot9(ns2)
+    si = ns2["profile_signin"](None, {"erase_existing": True})
+    ns3, _ = _ns9(src, d=d)
+    _boot9(ns3)
+    r["a lost record with two folders: sign-in refuses, nothing is erased then or later"] = (
+        si.get("err") == "undecided" and _acc9(d) == made)
+    # -- (review) a put-back that couldn't finish, then the record lost: the units stay
+    ns, d = _ns9(src)
+    _seed9(d, "S1")
+    _boot9(ns)
+    ns["profile_signin"](None, {"add": {"chats": "all"}})
+    _real_pb = ns["_putback"]
+    ns["_putback"] = lambda R, name: False          # a file Windows holds, say
+    ns["profile_signout"](None, {"imported": "putback"})
+    ns["_putback"] = _real_pb
+    json.dump({"written": []}, open(os.path.join(d, "profile.json"), "w"))
+    for _k in range(2):
+        nsk, _ = _ns9(src, d=d)
+        _boot9(nsk)
+    r["a put-back left pending when the record is lost: its units are kept"] = (
+        len([x for x in _acc9(d) if x.startswith(".imported-")]) == 1)
+    # -- (review) the invariant erasing a folder sends its Add's units back to root
+    ns, d = _ns9(src)
+    _seed9(d, "S2")
+    _boot9(ns)
+    ns["profile_signin"](None, {"add": {"chats": "all"}})
+    ns["profile_keep"](None, "removed", "notice")
+    _pj9(d, kept=dict(_jr9(d, "profile.json")["kept"], erase_after=time.time() - 1))
+    ns2, _ = _ns9(src, d=d)
+    _boot9(ns2)
+    r["a removed folder erased after its 7 days sends its Add's units back into root"] = (
+        _acc9(d) == [] and _ids9((_jr9(d, "chats.v2.json") or {}).get("chats")) == sorted(_CID9)
+        and not _jr9(d, "profile.json").get("putback"))
+    # -- (review) two put-backs pending: both come back
+    ns, d = _ns9(src)
+    _seed9(d, "S3")
+    _boot9(ns)
+    ns["profile_signin"](None, {"add": {"chats": [_CID9[0]]}})
+    _real_pb = ns["_putback"]
+    ns["_putback"] = lambda R, name: False
+    ns["profile_signout"](None, {"imported": "putback"})
+    ns["_putback"] = _real_pb
+    ns["profile_signin"](None, {"add": {"chats": [_CID9[1]]}})
+    ns["profile_signout"](None, {"imported": "putback"})
+    pb_mid = list(_jr9(d, "profile.json").get("putback") or [])
+    ns4, _ = _ns9(src, d=d)
+    _boot9(ns4)
+    r["two put-backs pending: neither replaces the other, and a start finishes both"] = (
+        len(pb_mid) == 1 and _acc9(d) == []
+        and _ids9((_jr9(d, "chats.v2.json") or {}).get("chats")) == sorted(_CID9)
+        and not _jr9(d, "profile.json").get("putback"))
     return r
+
 
 
 def _segs9_named(src, names):
@@ -13256,18 +13315,21 @@ _PRM9 = [
     ("a pending step 6 not finished at a start", "                _add_stage(root, act)\n",
      "                pass\n"),
     ("a pending put-back not finished at a start",
-     "                out[\"putback\"] = _putback_finish(root, n[\"putback\"])",
-     "                out[\"putback\"] = False"),
+     "                out[\"putback\"] = _putback_finish(root, pb) or out[\"putback\"]",
+     "                pass"),
     ("the put-back not recorded before the erase",
-     "            putback=name if choice == \"putback\" else q.get(\"putback\")))\n"
-     "        _crash_point(\"signout.7\")",
-     "            putback=q.get(\"putback\")))\n        _crash_point(\"signout.7\")"),
+     "            if choice == \"putback\":\n                _pb_add(q, name)\n"
+     "        _profile_json_update(_commit)\n        _crash_point(\"signout.7\")",
+     "            pass\n        _profile_json_update(_commit)\n        _crash_point(\"signout.7\")"),
     ("the account erased before the commit",
-     "        _profile_json_update(lambda q: q.update(\n            active=\"local\", kept=None, "
-     "pending_import=False,\n            putback=name if choice",
-     "        _erase_folder(H.dir, step=\"signout.8\")\n"
-     "        _profile_json_update(lambda q: q.update(\n            active=\"local\", kept=None, "
-     "pending_import=False,\n            putback=name if choice"),
+     "        # 7. commit\n        def _commit(q):\n            q.update(active=\"local\", kept=None, "
+     "pending_import=False)",
+     "        # 7. commit\n        _erase_folder(H.dir, step=\"signout.8\")\n        def _commit(q):\n"
+     "            q.update(active=\"local\", kept=None, pending_import=False)",
+     # (a second protection holds the units: the invariant sends a dropped
+     # folder's .imported back to root; with both off, a crash loses them)
+     "            if _imported_count(name)[\"units\"]:\n                _pb_add(q, name)",
+     "            if False:\n                _pb_add(q, name)"),
     ("sign-out without the sheet's question",
      "        if info[\"imported\"][\"units\"] and choice is None:", "        if False:"),
     ("put back ignoring gone", "            if rid in gone:\n", "            if False:\n"),
@@ -13291,6 +13353,19 @@ _PRM9 = [
      "        if imp[\"units\"] and choice is None:\n            return {\"need\": \"imported\", "
      "\"imported\": imp}", "        if False:\n            return {}"),
 ]
+# (the review's cases)
+_PRM9 += [
+    ("a lost record's folders offered to a sign-in",
+     "            if _named(p0) is None and _undecided():", "            if False:"),
+    ("a lost record's .imported taken for nothing",
+     "                      if _ACCT_NAME_RX.fullmatch(n) and not n.startswith(\".trash-\")",
+     "                      if _DIR_RX.fullmatch(n)"),
+    ("a folder the invariant drops takes its Add's units with it",
+     "            if _imported_count(name)[\"units\"]:\n                _pb_add(q, name)",
+     "            if False:\n                _pb_add(q, name)"),
+    ("one put-back replacing another",
+     "    q[\"putback\"] = pb + ([name] if name not in pb else [])", "    q[\"putback\"] = [name]"),
+]
 _prm9 = _mrun9(lambda s_: dict(_proto9(s_), **_crash9(s_)), _PRM9)
 check("the switch protocol: each protection bites (%d mutations, each caught)" % len(_PRM9),
       all(ok is True for _d, ok in _prm9), "%r" % [x for x in _prm9 if x[1] is not True])
@@ -13313,7 +13388,7 @@ def _guard9(src=None, accounts=True):
             return True
     g["_WindowBridgeAcct"], g["_AccountBridge"] = _Main, _Acct
     replies, calls = [], []
-    g["_bridge_reply"] = lambda w, n, v, i: replies.append((n, v, i))
+    g["_bridge_reply"] = lambda w, n, i: replies.append((n, i))
     gg = g["_bridge_guard"](lambda *a: calls.append(a[1:]))
 
     class W:
@@ -13338,14 +13413,16 @@ check("the bridge: the main window may ask open_account(task) for an allow-liste
       "account window gets its token and close (answered without eval), and nothing crosses; "
       "a build without accounts answers api_token alone",
       _gc9 == [("api_token", [], "1"), ("open_account", ["signin"], "2")]
-      and _gr9 == [("account_token", "ACCT-TOKEN", "7"), ("account_close", True, "8")]
+      and _gr9 == [("account_token", "7"), ("account_close", "8")]
       and _gc9off == [("api_token", [], "1")] and _gr9off == [],
       "%r" % [_gc9, _gr9, _gc9off, _gr9off])
 _ab9 = {"urllib": urllib, "PORT": 5555, "_ACCT": {"token": "AT" * 20, "window": None},
         "_ACCT_LOCK": _t9.RLock(), "ctx_thread": lambda **k: type("T", (), {"start": lambda s: None})(),
         "account_open": lambda t: {"opened": t}, "ACCOUNT_TASKS": ("signin", "status"),
         "API_TOKEN": "T" * 43, "_window_url": lambda: "http://127.0.0.1:5555/"}
-for code_ in _segs9_named(_S9, {"_WindowBridge", "_WindowBridgeAcct", "_AccountBridge"}):
+_ab9["account_close"] = lambda: None
+for code_ in _segs9_named(_S9, {"_WindowBridge", "_WindowBridgeAcct", "_AccountBridge",
+                                "_account_token_for"}):
     exec(code_, _ab9)
 _abr9 = {}
 for _u9 in ("http://127.0.0.1:5555/account", "http://127.0.0.1:5555/", "http://127.0.0.1:5556/account",
@@ -13353,6 +13430,11 @@ for _u9 in ("http://127.0.0.1:5555/account", "http://127.0.0.1:5555/", "http://1
     _ab9["_ACCT"]["window"] = (type("W", (), {"get_current_url": lambda s, u=_u9: u})()
                                if _u9 else None)
     _abr9[_u9] = _ab9["_AccountBridge"]().account_token()
+# (review) a window that isn't the account window (one still closing while a
+# new one opened) never gets the token
+_ab9["_ACCT"]["window"] = type("W", (), {"get_current_url": lambda s: "http://127.0.0.1:5555/account"})()
+_abr9["another window"] = _ab9["_account_token_for"](
+    type("W", (), {"get_current_url": lambda s: "http://127.0.0.1:5555/account"})())
 _pub9 = lambda o: sorted(n for n in dir(o) if not n.startswith("_"))
 check("the bridges: the account window's has account_token and account_close only, and hands "
       "the token only while it shows this app's /account; the main one adds open_account with "
@@ -13362,7 +13444,7 @@ check("the bridges: the account window's has account_token and account_close onl
       and _pub9(_ab9["_WindowBridge"]()) == ["api_token"]
       and _abr9 == {"http://127.0.0.1:5555/account": "AT" * 20, "http://127.0.0.1:5555/": None,
                     "http://127.0.0.1:5556/account": None, "https://127.0.0.1:5555/account": None,
-                    "http://localhost:5555/account": None, None: None}
+                    "http://localhost:5555/account": None, None: None, "another window": None}
       and _ab9["_WindowBridgeAcct"]().open_account("x") == {"err": "task"}
       and _ab9["_WindowBridgeAcct"]().open_account("signin") == {"opened": "signin"},
       "%r" % _abr9)
@@ -13664,18 +13746,35 @@ check("ISO-11 (no server): Esc, Enter and the close box move nothing; the defaul
       and not os.path.exists(os.path.join(_P9.home, "accounts", _co9["dir"], "remote.json")),
       "%r" % [_e1, _e2, _e3, sorted(set(_after_cancel.items()) ^ set(_r0.items()))[:4],
               _d4, sorted(set(_after_default.items()) ^ set(_r0.items()))[:4], _bempty9, _co9])
-_lo9 = _q9(_P9, "/api/logout", {})[1]
-_lo9b = _q9(_P9, "/api/logout", {"imported": "putback"})[1]
+_lo9 = _q9(_P9, "/api/logout", {"imported": "erase"})[1]
+_los9 = _q9(_P9, "/api/test/account", {"op": "status"})[1]
+_lok9 = _hk9(_P9, op="status")["kind"]
+_ah9b = {"X-Profile": _los9.get("tag") or ""}
+_lo9m = _q9(_P9, "/api/account/signout", {}, headers=_ah9b)[0]
+_lo9a = _q9(_P9, "/api/account/signout", {}, headers=_ah9b, token=_los9.get("token"))[1]
+_lo9b = _q9(_P9, "/api/account/signout", {"imported": "putback"}, headers=_ah9b,
+            token=_los9.get("token"))[1]
 _lo9c = _q9(_P9, "/api/logout", {})[1]
-check("/api/logout is the desktop sign-out: it asks when an Add hasn't finished uploading, puts "
-      "back on the answer, and on This computer does nothing",
-      _lo9.get("need") == "imported" and _lo9b.get("ok") is True and _lo9c == {"ok": True}
+check("/api/logout, the desktop sign-out: from the main window it only opens the account "
+      "window at the sign-out sheet (it signs nothing out, whatever it is sent); the sheet asks "
+      "when an Add hasn't finished uploading and puts back on the answer; on This computer it "
+      "does nothing",
+      _lo9 == {"ok": True, "account_window": "signout"} and _los9.get("task") == "signout"
+      and _lok9 == "test" and _lo9m == 403
+      and _lo9a.get("need") == "imported" and _lo9b.get("ok") is True and _lo9c == {"ok": True}
       and _hk9(_P9, op="status")["kind"] == "local" and _acc9(_P9.home) == []
       and len((_jr9(_P9.home, "chats.v2.json") or {}).get("chats") or []) == 3,
-      "%r" % [_lo9, _lo9b, _lo9c])
+      "%r" % [_lo9, _los9.get("task"), _lok9, _lo9m, _lo9a, _lo9b, _lo9c])
+_q9(_P9, "/api/test/account", {"op": "close"})
 # Time Machine and the web store, as the copy recorded them
-_tmr9 = [json.loads(x) for x in open(os.path.join(_P9.home, "run", "tmutil.jsonl"))]
-_wsr9l = json.load(open(os.path.join(_P9.home, "run", "webstore.json")))
+try:
+    _tmr9 = [json.loads(x) for x in open(os.path.join(_P9.home, "run", "tmutil.jsonl"))]
+except OSError:
+    _tmr9 = []
+try:
+    _wsr9l = json.load(open(os.path.join(_P9.home, "run", "webstore.json")))
+except (OSError, ValueError):
+    _wsr9l = []
 check("accounts/ was excluded from Time Machine (recorded, never run in a test) once, before "
       "its first file; the web store was cleaned at every switch to another folder",
       len(_tmr9) == 1 and _tmr9[0]["argv"] == [
@@ -13850,10 +13949,13 @@ def _crashrun9(name, hooks, op=None, data=None, boot=False):
                              env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                              start_new_session=True)
         try:
-            return p.wait(60)
+            return p.wait(20)
         except subprocess.TimeoutExpired:
+            # it started instead of dying at the step: stopped, and its
+            # port freed, before the check's own start
             p.kill()
-            return "hung"
+            p.wait(30)
+            return "no crash"
     i_.start()
     try:
         _hk9(i_, **dict(data or {}, op=op))
@@ -13938,7 +14040,7 @@ check("without ACCOUNTS (the shipped app) nothing new runs or shows: no boot inv
       "step, no /account page or /api/account route, /api/logout the old ok, /api/me as before, "
       "the one-method bridge, no web-store work at a switch, no sign-in without the test hook",
       "ACCOUNTS = bool(DEV_HOME)\n" in _S9
-      and "    if ACCOUNTS and _INSTANCE_LOCK:\n        _bi = boot_invariant()" in _main9
+      and "    if ACCOUNTS and _INSTANCE_LOCK:\n        try:\n            _bi = boot_invariant()" in _main9
       and "        if ACCOUNTS:\n            # a pending Add step 6 or put-back" in _main9
       and _main9.count("boot_invariant(") == 1 and _main9.count("profile_boot_pending(") == 1
       and "        if ACCOUNTS and self.command == \"GET\" and self.path.startswith(\n"

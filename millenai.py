@@ -721,8 +721,7 @@ def _bridge_guard(real):
             return real(window, func_name, [param[0]], value_id)
         if (func_name in ("account_token", "account_close")
                 and param in (None, []) and isinstance(api, g["_AccountBridge"])):
-            return g["_bridge_reply"](window, func_name,
-                                      getattr(api, func_name)(), value_id)
+            return g["_bridge_reply"](window, func_name, value_id)
         return None
     js_bridge_call._guarded = True
     return js_bridge_call
@@ -9041,7 +9040,7 @@ def _profile_json_update(fn):
 
 
 def _profile_fields(p: dict, ctx) -> dict:
-    if "active" not in p and ctx.root and _account_dirs():
+    if "active" not in p and ctx.root and _undecided():
         # a lost record with folders under accounts/ (see profile_resume):
         # "active" stays unwritten until a person decides, so no switch
         # makes them read as unnamed (M9)
@@ -9099,16 +9098,19 @@ def profile_resume() -> ProfileCtx:
             return profile_switch(ProfileCtx(ok[0], folder, act, ok[1]))
     try:
         def _f(q):
-            dirs = _account_dirs() if "active" not in q else []
-            if dirs:
+            und = _undecided() if "active" not in q else []
+            if und:
                 # THE RECORD WAS LOST (M9): profile.json went (or was never
                 # this build's) while accounts/ holds folders. Nothing may
                 # read as "not named" and be erased at the next start: one
-                # folder becomes kept (sign-in step 2 decides), and with
-                # more than one, "active" stays unwritten, so the invariant
-                # keeps deleting nothing until a person decides
+                # account folder (with at most its own .imported) becomes
+                # kept, which sign-in step 2 and Erase then offer; anything
+                # else leaves "active" unwritten, so the invariant deletes
+                # nothing and sign-in refuses until a person decides
                 q["epoch"] = ctx.epoch
-                if len(dirs) == 1 and not q.get("kept"):
+                dirs = [x for x in und if _DIR_RX.fullmatch(x)]
+                if (len(dirs) == 1 and not q.get("kept") and set(und)
+                        <= {dirs[0], ".imported-" + dirs[0]}):
                     q.update(active="local", pending_import=False, kept={
                         "dir": dirs[0], "reason": "signed-out",
                         "cause": "record-lost", "erase_after": None})
@@ -9178,7 +9180,11 @@ def profile_switch(ctx_new, erase_old=False) -> ProfileCtx:
                     _written.clear()
                     _profile_json_update(lambda q: _profile_fields(q, ctx_new))
                     if erase_old and old.kind == "test":
-                        _erase_folder(old.dir, step="test")
+                        try:
+                            _erase_folder(old.dir, step="test")
+                        except (OSError, ValueError) as exc:
+                            print("  (the test profile goes at the next "
+                                  "start: %s)" % exc)
             finally:
                 if got:
                     _chats_lock.release()
@@ -9294,12 +9300,12 @@ def _accounts_prepare() -> str:
 def _rename_retry(src: str, dst: str):
     """os.rename, waiting out a reader on Windows (an antivirus holding a
     file), as _replace_into does for files."""
-    for n in range(20):
+    for n in range(100):             # up to 5 s: a virus scan of a new folder
         try:
             os.rename(src, dst)
             return
         except PermissionError:
-            if not IS_WIN or n == 19:
+            if not IS_WIN or n == 99:
                 raise
             time.sleep(0.05)
 
@@ -9555,23 +9561,27 @@ def _hold(old):
 
 
 def _named(p):
-    """The folders profile.json names: {"active", "kept", "putback"}, or
-    None when it can't be trusted (unreadable, missing, malformed, or with
-    no "active" at all: a record lost and remade), in which case nothing
-    is deleted."""
+    """The folders profile.json names: {"active", "kept", "putback"} (a
+    list: every .imported-<dir> whose units wait to go back into root),
+    or None when it can't be trusted (unreadable, missing, malformed, or
+    with no "active" at all: a record lost and remade), in which case
+    nothing is deleted."""
     if not isinstance(p, dict) or "active" not in p:
         return None
     act, kept, pb = p.get("active"), p.get("kept"), p.get("putback")
+    if pb is None:
+        pb = []
     if not (act == "local" or (isinstance(act, str) and _DIR_RX.fullmatch(act))):
         return None
     if kept is not None and not (
             isinstance(kept, dict) and isinstance(kept.get("dir"), str)
             and _DIR_RX.fullmatch(kept["dir"]) and kept.get("reason") in KEPT_REASONS):
         return None
-    if pb is not None and not (isinstance(pb, str) and _DIR_RX.fullmatch(pb)):
+    if not (isinstance(pb, list) and all(isinstance(x, str) and _DIR_RX.fullmatch(x)
+                                         for x in pb)):
         return None
     return {"active": None if act == "local" else act,
-            "kept": kept["dir"] if kept else None, "putback": pb}
+            "kept": kept["dir"] if kept else None, "putback": list(pb)}
 
 
 def _named_set(n) -> set:
@@ -9579,9 +9589,19 @@ def _named_set(n) -> set:
     for d in (n["active"], n["kept"]):
         if d:
             out |= {d, ".imported-" + d}
-    if n["putback"]:
-        out.add(".imported-" + n["putback"])
+    out.update(".imported-" + x for x in n["putback"])
     return out
+
+
+def _pb_add(q: dict, name: str):
+    """profile.json's putback list with name in it (once)."""
+    pb = q.get("putback") if isinstance(q.get("putback"), list) else []
+    q["putback"] = pb + ([name] if name not in pb else [])
+
+
+def _pb_drop(q: dict, name: str):
+    pb = q.get("putback") if isinstance(q.get("putback"), list) else []
+    q["putback"] = [x for x in pb if x != name]
 
 
 def _key_marked(folder: str) -> bool:
@@ -9630,19 +9650,26 @@ def boot_invariant(now: float = None) -> dict:
             out["why"] = "profile.json can't be read: nothing deleted"
             out["kept"] = sorted(os.listdir(root))
             return out
-        # the named folders' own rules; each commit comes before its erase
+        # the named folders' own rules; each commit comes before its erase.
+        # A folder that goes with units still in its .imported-<dir> (root's
+        # originals, not yet uploaded) sends them back: putback is set in
+        # the same commit, and the pending step returns them to root (I12:
+        # only a person erases unsent work)
+        def _lost(q, name):
+            if _imported_count(name)["units"]:
+                _pb_add(q, name)
         drop = []
         act, kept = n["active"], n["kept"]
         if act:
             f = os.path.join(root, act)
             ok = owner_check(f, act) if os.path.isdir(f) else None
             if not os.path.isdir(f):
-                _profile_json_update(lambda q: q.update(active="local",
-                                                        pending_import=False))
+                _profile_json_update(lambda q: (q.update(
+                    active="local", pending_import=False), _lost(q, act)))
                 act = None
             elif ok is False:
-                _profile_json_update(lambda q: q.update(active="local",
-                                                        pending_import=False))
+                _profile_json_update(lambda q: (q.update(
+                    active="local", pending_import=False), _lost(q, act)))
                 drop.append(act)
                 act = None
             elif _read_key(f)[0] == "missing" and not kept:
@@ -9657,10 +9684,12 @@ def boot_invariant(now: float = None) -> dict:
             ea = (p.get("kept") or {}).get("erase_after")
             past = isinstance(ea, (int, float)) and now >= ea
             if not os.path.isdir(f):
-                _profile_json_update(lambda q: q.update(kept=None))
+                _profile_json_update(lambda q: (q.update(kept=None),
+                                                _lost(q, kept)))
                 kept = None
             elif past or owner_check(f, kept) is False:
-                _profile_json_update(lambda q: q.update(kept=None))
+                _profile_json_update(lambda q: (q.update(kept=None),
+                                                _lost(q, kept)))
                 drop.append(kept)
                 kept = None
         n = _named(_read_json(PROFILE_FILE, MACHINE_ROOT, dict)) or n
@@ -9712,10 +9741,10 @@ def profile_boot_pending(root) -> dict:
             except (StoreReadError, OSError) as exc:
                 print("  (the Add's last step waits: %s)" % exc)
             _crash_point("boot.step6")
-        if n["putback"]:
+        for pb in n["putback"]:
             try:
-                out["putback"] = _putback_finish(root, n["putback"])
-            except (StoreReadError, OSError) as exc:
+                out["putback"] = _putback_finish(root, pb) or out["putback"]
+            except (StoreReadError, OSError, ValueError) as exc:
                 print("  (putting the chats back waits: %s)" % exc)
     finally:
         bind_ctx(prev)
@@ -9800,10 +9829,20 @@ def _add_build(H, newp: str, add: dict) -> dict:
         _write_file_raw(os.path.join(newp, CHATS_FILE), json.dumps(
             {"v": 2, "chats": out, "gone": []}).encode("utf-8"))
         written.append(CHATS_FILE)
+        # linked where step 6 moves root's copy away (no second copy on
+        # disk); copied where a chat root keeps still shows it, so no two
+        # live profiles share a file
+        still = set()
+        for c in load_chats(H):
+            if isinstance(c, dict) and c.get("id") not in man["chats"]:
+                still.update(_chat_media(c))
         for rel in man["media"]:
             for f in _with_sidecar(rel):
                 if os.path.isfile(H.path(f)):
-                    _link_or_copy(H.path(f), os.path.join(newp, f))
+                    if rel in still:
+                        shutil.copyfile(H.path(f), os.path.join(newp, f))
+                    else:
+                        _link_or_copy(H.path(f), os.path.join(newp, f))
     if add["memory"]:
         facts = [_jcopy(f) for f in _load_memory(H) if _fact_fp(f)]
         man["facts"] = [_fact_fp(f) for f in facts]
@@ -10073,7 +10112,7 @@ def _putback_finish(R, name: str) -> bool:
     .imported-<name> (commit first, erase after, as everywhere)."""
     if not _putback(R, name):
         return False
-    _profile_json_update(lambda q: q.__setitem__("putback", None))
+    _profile_json_update(lambda q: _pb_drop(q, name))
     _erase_folder(_imported_path(name), step="putback")
     return True
 
@@ -10098,25 +10137,34 @@ def _imported_count(name: str) -> dict:
 # ------------------------------------------------ sign-in (1a 5.11)
 def _account_dirs() -> list:
     """The 32-hex folders under accounts/, named or not."""
+    return [n for n in _undecided() if _DIR_RX.fullmatch(n)]
+
+
+def _undecided() -> list:
+    """Everything of the layout under accounts/ but the trash: the 32-hex
+    folders, .imported-* (root's originals) and .new-*. What a lost
+    record would leave with no one deciding."""
+    root = _accounts_root()
     try:
-        return sorted(n for n in os.listdir(_accounts_root())
-                      if _DIR_RX.fullmatch(n)
-                      and os.path.isdir(os.path.join(_accounts_root(), n)))
+        return sorted(n for n in os.listdir(root)
+                      if _ACCT_NAME_RX.fullmatch(n) and not n.startswith(".trash-")
+                      and os.path.isdir(os.path.join(root, n))
+                      and not os.path.islink(os.path.join(root, n)))
     except OSError:
         return []
 
 
 def _existing_folder(p):
-    """(name, kept dict or None) of an account folder already here:
-    the one profile.json names, active or kept, or (when its record
-    can't be trusted) any on disk. None when there is none."""
+    """(name, kept dict or None) of the account folder profile.json
+    names, active or kept; None when there is none. Only a named folder
+    is ever offered for erasing: one no record names is the invariant's,
+    and folders a lost record left are nobody's to erase here."""
     n = _named(p)
     if n and n["active"]:
         return n["active"], None
     if n and n["kept"]:
         return n["kept"], p.get("kept")
-    dirs = _account_dirs()
-    return (dirs[0], None) if dirs else None
+    return None
 
 
 def profile_signin(req_ctx, opts=None) -> dict:
@@ -10150,7 +10198,15 @@ def profile_signin(req_ctx, opts=None) -> dict:
         try:
             # 1. unlock in memory [1c]: the test keyring
             key = _test_key_new(opts.get("acct_id"))
-            # 2. an account folder already here, active or kept
+            # 2. an account folder already here, active or kept. With a
+            # record that can't be trusted and folders under accounts/,
+            # nothing goes ahead: no folder is offered or erased that the
+            # record doesn't name (a lost record, see profile_resume)
+            p0 = _read_json(PROFILE_FILE, MACHINE_ROOT, dict) or {}
+            if _named(p0) is None and _undecided():
+                return {"err": "undecided",
+                        "folders": len([x for x in _undecided()
+                                        if _DIR_RX.fullmatch(x)])}
             for _n in range(16):
                 p = _read_json(PROFILE_FILE, MACHINE_ROOT, dict) or {}
                 ex = _existing_folder(p)
@@ -10176,9 +10232,14 @@ def profile_signin(req_ctx, opts=None) -> dict:
                             "imported": _imported_count(xname)}
                 # erased, key file first, with its .imported (whose chats
                 # never come back into root this way: ISO-23)
-                _profile_json_update(lambda q: q.update(
-                    active="local", kept=None, pending_import=False,
-                    putback=None if q.get("putback") == xname else q.get("putback")))
+                def _forget(q, x=xname):
+                    # only the folder being erased leaves the record
+                    if q.get("active") == x:
+                        q.update(active="local", pending_import=False)
+                    if isinstance(q.get("kept"), dict) and q["kept"].get("dir") == x:
+                        q["kept"] = None
+                    _pb_drop(q, x)
+                _profile_json_update(_forget)
                 _crash_point("signin.2.commit")
                 _erase_folder(xf, step="signin.2")
                 if os.path.lexists(_imported_path(xname)):
@@ -10285,9 +10346,11 @@ def profile_signout(req_ctx, opts=None) -> dict:
         # 4. final upload [1d]; 5. stop sync [1d] and lending [1g] (read-
         # aloud and the ctx were stopped by the hold); 6. /v2/logout [1b]
         # 7. commit
-        _profile_json_update(lambda q: q.update(
-            active="local", kept=None, pending_import=False,
-            putback=name if choice == "putback" else q.get("putback")))
+        def _commit(q):
+            q.update(active="local", kept=None, pending_import=False)
+            if choice == "putback":
+                _pb_add(q, name)
+        _profile_json_update(_commit)
         _crash_point("signout.7")
         R = profile_switch(ProfileCtx("local", app_dir()))
         # 8. erase, key file first; the browser store was cleaned by the
@@ -10395,8 +10458,11 @@ def profile_kept_erase(req_ctx, opts=None) -> dict:
         imp = _imported_count(name)
         if imp["units"] and choice is None:
             return {"need": "imported", "imported": imp}
-        _profile_json_update(lambda q: q.update(
-            kept=None, putback=name if choice == "putback" else q.get("putback")))
+        def _commit(q):
+            q["kept"] = None
+            if choice == "putback":
+                _pb_add(q, name)
+        _profile_json_update(_commit)
         _crash_point("kept-erase.commit")
         try:
             _erase_folder(os.path.join(_accounts_root(), name), step="kept-erase")
@@ -18535,8 +18601,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         self._turn = None
         self._head_sent = False
         # a switch under way (M9): wait for it, then work for the profile
-        # it leaves active (the page's old X-Profile then gets 409)
-        switch_wait()
+        # it leaves active (the page's old X-Profile then gets 409). One
+        # that outlasts the wait is not served under the switch's hold
+        if not switch_wait():
+            self.ctx = None
+            self._send_json({"err": "The profile is changing. Try again in "
+                             "a moment."}, code=503)
+            return
         self.ctx = current_ctx()
         bind_ctx(self.ctx)
         try:
@@ -19460,8 +19531,16 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     try:
                         out = (profile_signin if self.path.endswith("signin")
                                else profile_signout)(self.ctx, d)
-                    except NoProfile as exc:
-                        out = {"err": str(exc)}
+                    except (NoProfile, ValueError) as exc:
+                        out = {"err": str(exc)[:160]}
+                    except StaleProfile:
+                        raise
+                    except OSError as exc:
+                        # the window gets an answer (a Windows rename that
+                        # failed, a disk that refused); the protocol's own
+                        # order left nothing half done that a start can't finish
+                        out = {"err": "couldn't finish: %s" % (
+                            exc.strerror or exc.__class__.__name__)}
                 finally:
                     with _ACCT_LOCK:
                         _ACCT["running"] = False
@@ -20252,20 +20331,20 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._send_json({"ok": True})
             return
         if self.path == "/api/logout":
-            # THE DESKTOP SIGN-OUT (M9, 1a 5.11 steps 1-9). It signed a
-            # browser out of the web version once (6b320: it touches no
-            # cookie, and never the launch key's). In a build without
-            # accounts, or on "This computer", it does nothing, as before.
-            # {"imported": "putback"|"erase"} answers the sheet's question
-            # when an Add hasn't finished uploading; without it nothing
-            # happens.
+            # THE DESKTOP SIGN-OUT (M9, 1a 5.11). It signed a browser out of
+            # the web version once (6b320: it touches no cookie, and never
+            # the launch key's). In a build without accounts, or on "This
+            # computer", it does nothing, as before. Signed in, it opens the
+            # account window at the sign-out sheet: the main window may ask
+            # for that window, never sign out itself (1a 5.9); the sheet's
+            # answers and the sign-out run there (/api/account/signout).
+            # A windowless copy gets the headless session instead.
             if not ACCOUNTS or self.ctx.root:
                 self._send_json({"ok": True})
                 return
-            try:
-                self._send_json(profile_signout(self.ctx, self._json_body()))
-            except NoProfile as exc:
-                self._send_json({"err": str(exc)}, code=409)
+            _r = account_open("signout", headless=NOWINDOW)
+            self._send_json({"ok": "err" not in _r, "account_window": "signout",
+                             **({"err": _r["err"]} if "err" in _r else {})})
             return
         if self.path == "/api/forget":
             # FORGET ME, scoped (6b257, per Patrick: the droplet-destroy
@@ -23001,21 +23080,30 @@ class _AccountBridge:
 
     def account_token(self):
         """The window's token, only while it shows this app's /account."""
-        try:
-            with _ACCT_LOCK:
-                w = _ACCT["window"]
-            u = urllib.parse.urlsplit(str(w.get_current_url() or "")) \
-                if w is not None else None
-            if u and (u.scheme, u.hostname, u.port, u.path) == (
-                    "http", "127.0.0.1", PORT, "/account"):
-                return _ACCT["token"]
-        except Exception:
-            pass
-        return None
+        return _account_token_for(_ACCT["window"])
 
     def account_close(self):
-        ctx_thread(target=account_close, bind=False, daemon=True).start()
+        account_close()
         return True
+
+
+def _account_token_for(window):
+    """The account token, only to the account window itself (never a
+    window closing while a new one opened) and only while it shows this
+    app's /account. Asks the window its URL, which on macOS waits for the
+    UI thread: never call it there (_bridge_reply runs it on a thread)."""
+    try:
+        with _ACCT_LOCK:
+            if window is None or window is not _ACCT["window"]:
+                return None
+            tok = _ACCT["token"]
+        u = urllib.parse.urlsplit(str(window.get_current_url() or ""))
+        if (u.scheme, u.hostname, u.port, u.path) == (
+                "http", "127.0.0.1", PORT, "/account"):
+            return tok
+    except Exception:
+        pass
+    return None
 
 
 class _WindowBridgeAcct(_WindowBridge):
@@ -23030,14 +23118,23 @@ class _WindowBridgeAcct(_WindowBridge):
         return account_open(task)
 
 
-def _bridge_reply(window, name: str, value, value_id: str):
-    """pywebview's reply to a js_api call, without its eval wrapper (the
-    account page's CSP allows none): the callback pywebview's own
-    _checkValue registered, called with the JSON as pywebview would."""
-    js = "window.pywebview._returnValuesCallbacks[%s][%s]({value: %s})" % (
-        json.dumps(name), json.dumps(str(value_id)),
-        json.dumps(json.dumps(value)))
-    ctx_thread(target=lambda: window.run_js(js), bind=False, daemon=True).start()
+def _bridge_reply(window, name: str, value_id: str):
+    """The account window's two calls, answered as pywebview answers but
+    without its eval wrapper (the account page's CSP allows none): the
+    callback pywebview's own _checkValue registered, called with the JSON.
+    On its own thread, as pywebview runs a js_api call: on macOS the
+    bridge arrives on the UI thread, and asking a window its URL there
+    (account_token) would wait on that same thread for good."""
+    def run():
+        if name == "account_token":
+            value = _account_token_for(window)
+        else:
+            account_close()
+            value = True
+        window.run_js("window.pywebview._returnValuesCallbacks[%s][%s]({value: %s})"
+                      % (json.dumps(name), json.dumps(str(value_id)),
+                         json.dumps(json.dumps(value))))
+    ctx_thread(target=run, bind=False, daemon=True).start()
 
 
 ACCOUNT_HTML = """<!doctype html>
@@ -27017,7 +27114,7 @@ async function storeBoot(){
       if(d&&d.prefs){after=Object.assign({},held,d.prefs);posted=true;}
     }catch(e){}
   }
-  if(after)Object.keys(PREF_OF).forEach(k=>{if(PREF_OF[k] in after)lsDel(k);});
+  if(after&&rootPage)Object.keys(PREF_OF).forEach(k=>{if(PREF_OF[k] in after)lsDel(k);});
   lsKeys().forEach(k=>{if(k!==null&&!KEEP_LS.includes(k)&&!(k in PREF_OF))lsDel(k);});
   // a key whose post failed still counts for this session, read-only;
   // what prefs.json already held wins over it
@@ -34063,16 +34160,24 @@ if __name__ == "__main__":
     # run/profile.lock, before anything reads a profile. Only a build with
     # accounts runs it; the shipped app leaves accounts/ as it finds it
     if ACCOUNTS and _INSTANCE_LOCK:
-        _bi = boot_invariant()
-        if _bi["erased"] or _bi["why"]:
-            print("  accounts/: erased %d%s" % (
-                len(_bi["erased"]), (", " + _bi["why"]) if _bi["why"] else ""))
+        try:
+            _bi = boot_invariant()
+            if _bi["erased"] or _bi["why"]:
+                print("  accounts/: erased %d%s" % (
+                    len(_bi["erased"]), (", " + _bi["why"]) if _bi["why"] else ""))
+        except (StoreReadError, OSError, ValueError) as _exc:
+            # each of its erases came after its commit: what it did stands,
+            # and the next start carries on
+            print("  (accounts/ not put in order this start: %s)" % _exc)
     _root = profile_boot()
     if _INSTANCE_LOCK:
         if ACCOUNTS:
             # a pending Add step 6 or put-back, through a root ctx, before
             # the downgrade import (1a 9's boot order)
-            profile_boot_pending(_root)
+            try:
+                profile_boot_pending(_root)
+            except (StoreReadError, OSError, ValueError) as _exc:
+                print("  (a pending account step waits: %s)" % _exc)
         _migrate_61(_root)
         sweep_run_files()      # a crash's leftover prompt, speech, ssh files
     else:
