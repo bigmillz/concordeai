@@ -567,7 +567,9 @@ _pk = [req(p, m, d, headers={hd: "1.2.3.4"})[0]
 # (6b329) the seam is the profile ctx now: a request takes current_ctx()
 # once, at its start, and nothing it carries picks the folder
 _dbm = re.search(r"\ndef current_ctx\(\).*?(?=\n\n\ndef )", _MILLENAI_SRC, re.S)
-_dbs = (_dbm.group(0) if _dbm and "        self.ctx = current_ctx()\n"
+# (6b330) through switch_ctx, which waits out a switch and reads it once
+_dbs = (_dbm.group(0) if _dbm and "        self.ctx = switch_ctx()\n"
+        in _MILLENAI_SRC and "        c = current_ctx()\n        if _SWITCH[\"idle\"].is_set():"
         in _MILLENAI_SRC and "_data_base" not in _MILLENAI_SRC else "")
 check("one identity: a forged millen_user reads the root and makes no users/; nothing gets in through a proxy",
       [x[0] for x in _px] == [200] * 3 and [x[2] for x in _px] == [x[2] for x in _pl]
@@ -11004,7 +11006,7 @@ _CUR_OK8 = {"StudioHandler._run", "profile_resume", "profile_switch", "test_prof
             # profile its request took is still the active one, and the
             # account window binding its token to the profile at open
             "profile_signin", "profile_signout", "profile_keep", "profile_kept_erase",
-            "account_open"}
+            "account_open", "switch_ctx"}
 # a stale write that is simply dropped: these may catch it broadly
 _STALE_DROP8 = {"_cloud_budget_hit", "cloud_cool", "cloud_glitch", "cloud_note_failure",
                 "cloud_text", "_cloud_refresh_picks", "_cloud_repair", "_mark_written",
@@ -12448,7 +12450,7 @@ def _ns9(src=None, d=None, hooks=("profiles",), crash=None, spy=None):
 
         def _rec(kind, p, fn):
             def w(*a, **k):
-                if "accounts" in str(a[0]).replace("\\", "/").split("/"):
+                if {"accounts", "imports"} & set(str(a[0]).replace("\\", "/").split("/")):
                     spy.append((kind, str(a[0]), str(a[1]) if len(a) > 1 else "",
                                 ns["_PFL"]["depth"] > 0))
                 return fn(*a, **k)
@@ -12514,6 +12516,20 @@ def _acc9(d):
         return []
 
 
+def _imps9(d):
+    try:
+        return sorted(os.listdir(os.path.join(d, "imports")))
+    except OSError:
+        return []
+
+
+def _impunits9(d, kind="chat-"):
+    """The staged chat (or fact) ids in every imports/<dir>."""
+    return sorted(k[len(kind):] for x in _imps9(d) if re.fullmatch(r"[0-9a-f]{32}", x)
+                  for k in ((_jr9(d, "imports", x, "units.json") or {}).get("units") or {})
+                  if k.startswith(kind))
+
+
 # ---- .owner and the stdlib HKDF (1a 5.1, 7.2)
 _on9, _od9 = _ns9()
 _hk9 = _on9["_hkdf_sha256"](bytes.fromhex("0b" * 22), bytes.fromhex("f0f1f2f3f4f5f6f7f8f9"), 42,
@@ -12527,6 +12543,8 @@ open(_okf9, "w").write("0" * 64)
 _ow9["another account's"] = _on9["owner_check"](_B9.dir)
 os.remove(_okf9)
 _ow9["missing"] = _on9["owner_check"](_B9.dir)
+open(_okf9, "w").write("zz not an owner")
+_ow9["damaged (not 64 hex)"] = _on9["owner_check"](_B9.dir)
 open(_okf9, "w").write(_good9)
 _ow9["renamed folder"] = _on9["owner_check"](_B9.dir, "f" * 32)
 _k9 = json.load(open(os.path.join(_B9.dir, "account.key")))
@@ -12544,6 +12562,7 @@ check(".owner: HMAC(HKDF(rid_key, 'cai2/owner'), acct_id|dir) verifies its own f
       _hk9.hex() == ("3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf"
                      "34007208d5b887185865")
       and _ow9 == {"verifies": True, "another account's": False, "missing": False,
+                   "damaged (not 64 hex)": None,
                    "renamed folder": False, "hook off": None, "re-key pending": None,
                    "a real key": None, "an unreadable key": None}
       and oct(os.stat(os.path.join(_od9, "accounts")).st_mode)[-3:] == "700",
@@ -12582,7 +12601,8 @@ def _erase9(src=None):
         ok and not os.path.exists(B.dir) and dels
         and all("/.trash-" in x[1].replace("\\", "/") for x in dels))
     r["account.key is renamed out first"] = (
-        len(ren) == 2 and ren[0][1].endswith("account.key") and ren[1][1] == B.dir
+        len(ren) == 2 and ren[0][1].endswith("account.key")
+        and os.path.realpath(ren[1][1]) == os.path.realpath(B.dir)
         and "/.trash-" in ren[0][2].replace("\\", "/"))
     # a crash after the rename leaves only a .trash-*, which the next start empties
     C = ns["test_profile_create"]()
@@ -12621,12 +12641,19 @@ def _world9(ns, d):
     ns["profile_boot"]()
     A = ns["test_profile_create"]()          # the active one
     S = ns["test_profile_create"]()          # an account folder nobody names
+    w = {"A": A.name, "S": S.name}
     root = os.path.join(d, "accounts")
     for nm in (A.name, S.name):
-        os.makedirs(os.path.join(root, ".imported-" + nm, "units"))
+        os.makedirs(os.path.join(d, "imports", nm, "units"))
         json.dump({"v": 1, "units": {"chat-x": {"kind": "chat"}}},
-                  open(os.path.join(root, ".imported-" + nm, "units.json"), "w"))
-    w = {"A": A.name, "S": S.name}
+                  open(os.path.join(d, "imports", nm, "units.json"), "w"))
+    # an imports/ folder of nobody's, and one holding no unit
+    w["orphan"] = secrets.token_hex(16)
+    os.makedirs(os.path.join(d, "imports", w["orphan"], "units"))
+    json.dump({"v": 1, "units": {"chat-y": {"kind": "chat"}}},
+              open(os.path.join(d, "imports", w["orphan"], "units.json"), "w"))
+    w["empty"] = secrets.token_hex(16)
+    os.makedirs(os.path.join(d, "imports", w["empty"]))
     for tag, extra in (("new", {}), ("sent", {"signup": "sent"}),
                        ("rekey", {"rekey_pending": {"kv": 2}})):
         w[tag] = ".new-" + secrets.token_hex(12)
@@ -12659,9 +12686,13 @@ def _inv9(src=None):
     out, ctx = _boot9(ns)
     left = _acc9(d)
     r["only what profile.json names, the unfinished sign-up and re-keys, and what isn't ours"] = (
-        sorted(left) == sorted([w["A"], ".imported-" + w["A"], w["sent"], w["rekey"],
+        sorted(left) == sorted([w["A"], w["sent"], w["rekey"],
                                 w["newbad"], w["rk"], "notes.txt", w["link"]])
         and os.path.exists(os.path.join(w["outside"], "keep.txt")))
+    # imports/: the named folder's stays; staged units nobody names go back
+    # into root (never erased); a folder holding none is erased
+    r["imports/: the named one stays, units nobody names are put back, an empty one goes"] = (
+        _imps9(d) == [w["A"]] and not (_jr9(d, "profile.json") or {}).get("putback"))
     r["the named folder opens"] = ctx.name == w["A"] and ctx.kind == "test"
     dels = [x for x in sp if x[0] in ("remove", "unlink", "rmdir", "rmtree")]
     r["every delete is of a .trash-* and every rename into one, under run/profile.lock"] = (
@@ -12710,20 +12741,29 @@ def _inv9(src=None):
     r["an active folder whose key file is gone becomes kept"] = (
         _acc9(d) == [B.name] and ctx.root and kp["active"] == "local"
         and (kp["kept"] or {}).get("dir") == B.name and kp["kept"]["cause"] == "key-missing")
-    # profile.json that can't be trusted: nothing is deleted
+    # profile.json that can't be trusted: nothing of anyone's is deleted,
+    # only the trash and a .new-* holding nobody's data (review of 6b330:
+    # no one left stuck); staged units whose account is gone are put back
+    # when the record can be written
     for why, how in (("unreadable", b"{not json"), ("missing", None),
                      ("malformed", b'{"active": 5}'), ("without active", b'{"written": []}')):
         ns, d = _ns9(src)
         w = _world9(ns, d)
         before = _acc9(d)
+        ibefore = _imps9(d)
         pj = os.path.join(d, "profile.json")
         if how is None:
             os.remove(pj)
         else:
             open(pj, "wb").write(how)
         out = ns["boot_invariant"]()
-        r["profile.json %s: nothing is deleted" % why] = (
-            _acc9(d) == before and out["erased"] == [] and bool(out["why"]))
+        pjd = _jr9(d, "profile.json") if why in ("missing", "without active") else None
+        r["profile.json %s: nothing of anyone's is deleted" % why] = (
+            _acc9(d) == sorted(set(before) - {w["trash"], w["new"]})
+            and sorted(out["erased"]) == sorted(["accounts/" + w["trash"], "accounts/" + w["new"]])
+            and _imps9(d) == ibefore and bool(out["why"])
+            and (pjd is None or sorted((pjd or {}).get("putback") or [])
+                 == sorted([w["orphan"], w["empty"]])))
     # a lost record (no "active") with folders: the next starts delete nothing
     for n_dirs in (1, 2):
         ns, d = _ns9(src)
@@ -12769,23 +12809,27 @@ check("ISO-12: the boot invariant keeps only what profile.json names (and an unf
 # each protection bites
 _IVM9 = [
     ("a delete without the trash rename",
-     "        _rename_retry(path, os.path.join(trash, name))\n        _crash_point(step + \".renamed\")\n"
-     "    shutil.rmtree(trash, ignore_errors=True)",
-     "        shutil.rmtree(path, ignore_errors=True)\n    shutil.rmtree(trash, ignore_errors=True)"),
+     "            _rename_retry(path, os.path.join(trash, name))\n            _crash_point(step + \".renamed\")\n"
+     "        shutil.rmtree(trash, ignore_errors=True)",
+     "            shutil.rmtree(path, ignore_errors=True)\n        shutil.rmtree(trash, ignore_errors=True)"),
     ("the invariant without the instance lock",
      "    if not _INSTANCE_HELD[0]:\n        out[\"why\"] = \"no instance lock\"\n        return out\n", ""),
     ("the invariant without run/profile.lock",
-     "    now = time.time() if now is None else now\n    with _profile_lock, _profile_flock():",
-     "    now = time.time() if now is None else now\n    with _profile_lock:"),
+     "    with _profile_lock, _profile_flock():\n        if not os.path.isdir(root) and not os.path.isdir(iroot):",
+     "    with _profile_lock:\n        if not os.path.isdir(root) and not os.path.isdir(iroot):",
+     # and the erase's own (every delete under the lock)
+     "    with _profile_lock, _profile_flock():    # every delete under the lock",
+     "    with _profile_lock:    # every delete under the lock"),
     ("an unreadable profile.json deletes",
      "        n = _named(p)\n        if n is None:\n            out[\"why\"]",
-     "        n = _named(p) or {\"active\": None, \"kept\": None, \"putback\": None}\n"
+     "        n = _named(p) or {\"active\": None, \"kept\": None, \"putback\": [], "
+     "\"erase\": []}\n"
      "        if n is None:\n            out[\"why\"]"),
     ("a record without active counts as This computer's",
      "    if not isinstance(p, dict) or \"active\" not in p:\n        return None\n"
-     "    act, kept, pb = p.get(\"active\"), p.get(\"kept\"), p.get(\"putback\")",
+     "    act, kept = p.get(\"active\"), p.get(\"kept\")",
      "    if not isinstance(p, dict):\n        return None\n"
-     "    act, kept, pb = p.get(\"active\", \"local\"), p.get(\"kept\"), p.get(\"putback\")"),
+     "    act, kept = p.get(\"active\", \"local\"), p.get(\"kept\")"),
     ("a lost record not made kept", "            und = _undecided() if \"active\" not in q else []",
      "            und = []"),
     ("a switch writing active over a lost record",
@@ -12801,12 +12845,14 @@ _IVM9 = [
      "            past = isinstance(ea, (int, float)) and now >= ea", "            past = False"),
     ("an active folder with no key left active",
      "            elif _read_key(f)[0] == \"missing\" and not kept:", "            elif False:"),
-    ("a link followed", "            if name in keep or not _ACCT_NAME_RX.fullmatch(name) \\\n"
-     "                    or os.path.islink(path) or not os.path.isdir(path):",
-     "            if name in keep or not _ACCT_NAME_RX.fullmatch(name):",
-     # and the erase's own refusal of a link
-     "            != root or not _ACCT_NAME_RX.fullmatch(name) or os.path.islink(path)):",
-     "            != root or not _ACCT_NAME_RX.fullmatch(name)):"),
+    ("a link followed", "            if name in keep_acc or not _ACCT_NAME_RX.fullmatch(name) \\\n"
+     "                    or _reparse(path) or not os.path.isdir(path):",
+     "            if name in keep_acc or not _ACCT_NAME_RX.fullmatch(name) \\\n"
+     "                    or not os.path.isdir(path):",
+     # and the erase's own refusal of a link, and of a real path elsewhere
+     "            if _reparse(path) or (os.path.lexists(path) and os.path.realpath(path)\n"
+     "                                  != os.path.join(rp, name)):",
+     "            if False:"),
     ("the key file not first", "        if os.path.lexists(key):\n", "        if False:\n"),
 ]
 
@@ -12899,7 +12945,7 @@ def _proto9(src=None):
                                               "settings": ["persona", "user_name", "home_area"]}})
     B = ns["current_ctx"]()
     acc = os.path.join(d, "accounts", out.get("dir") or "x")
-    imp = os.path.join(d, "accounts", ".imported-" + (out.get("dir") or "x"))
+    imp = os.path.join(d, "imports", out.get("dir") or "x")
     bc = (_jr9(acc, "chats.v2.json") or {}).get("chats") or []
     st = _jr9(acc, "sync", "state.json") or {}
     r["sign-in lands in the new account (kind test)"] = (
@@ -12930,12 +12976,14 @@ def _proto9(src=None):
         and not os.path.exists(os.path.join(d, "images", cn["img_name"]))
         and not os.path.exists(os.path.join(d, "videos", cn["vid_name"]))
         and not [p for p in (_bytegrep(d, cn["c1"]) + _bytegrep(d, cn["f1"]))
-                 if not p.startswith(os.path.join(d, "accounts") + os.sep)])
+                 if not p.startswith((os.path.join(d, "accounts") + os.sep,
+                                      os.path.join(d, "imports") + os.sep))])
     r["step 6: name, persona and home area leave root; the rest of its settings stay"] = (
         not {"persona", "user_name", "home_area"} & set(rp) and rp.get("tier") == "Pro"
         and rp.get("wizard_done") is True)
     u = (_jr9(imp, "units.json") or {}).get("units") or {}
-    r["step 6: .imported holds a unit per chat and fact, the legacy entries with the root id "
+    r["step 6: imports/<dir> (outside accounts/, so backups keep it) holds a unit per chat "
+      "and fact, the legacy entries with the root id "
       "each maps to, and the media"] = (
         sorted(k for k in u if k.startswith("chat-")) == ["chat-" + c for c in sorted(_CID9)]
         and len([k for k in u if k.startswith("fact-")]) == 2
@@ -12965,7 +13013,7 @@ def _proto9(src=None):
         and len(_jr9(d, "memory.json") or []) == 2
         and os.path.isfile(os.path.join(d, "images", cn["img_name"]))
         and os.path.isfile(os.path.join(d, "exports", cn["exp_name"][:-3] + ".meta"))
-        and _acc9(d) == [] and not _jr9(d, "profile.json").get("putback"))
+        and _acc9(d) == [] and _imps9(d) == [] and not _jr9(d, "profile.json").get("putback"))
     r["settings Add moved never come back"] = "persona" not in (_jr9(d, "prefs.json") or {})
     # a start after the put-back imports nothing twice
     ns2, _ = _ns9(src, d=d)
@@ -12993,7 +13041,7 @@ def _proto9(src=None):
         and not os.path.exists(os.path.join(d, "exports", cn["exp_name"])))
     so = ns["profile_signout"](None, {"imported": "erase"})
     r["Erase them: the units go with the account; the rest of root stays"] = (
-        so.get("ok") is True and _acc9(d) == []
+        so.get("ok") is True and _acc9(d) == [] and _imps9(d) == []
         and _ids9((_jr9(d, "chats.v2.json") or {}).get("chats")) == sorted(_CID9[1:]))
     # -- the kept state, and signing in again
     ns, d = _ns9(src)
@@ -13045,7 +13093,7 @@ def _proto9(src=None):
     q = ns["profile_kept_erase"](None, {})
     ke = ns["profile_kept_erase"](None, {"imported": "putback"})
     r["Erase on a kept folder with an Add left asks first; put back returns the chats"] = (
-        q.get("need") == "imported" and ke.get("ok") is True and _acc9(d) == []
+        q.get("need") == "imported" and ke.get("ok") is True and _acc9(d) == [] and _imps9(d) == []
         and _ids9((_jr9(d, "chats.v2.json") or {}).get("chats")) == sorted(_CID9))
     # -- adopt: an account takes none of the browser's keys
     ns, d = _ns9(src)
@@ -13104,8 +13152,9 @@ def _proto9(src=None):
     for _k in range(2):
         nsk, _ = _ns9(src, d=d)
         _boot9(nsk)
-    r["a put-back left pending when the record is lost: its units are kept"] = (
-        len([x for x in _acc9(d) if x.startswith(".imported-")]) == 1)
+    r["a put-back left pending when the record is lost: its units come back into root"] = (
+        _acc9(d) == [] and _imps9(d) == []
+        and _ids9((_jr9(d, "chats.v2.json") or {}).get("chats")) == sorted(_CID9))
     # -- (review) the invariant erasing a folder sends its Add's units back to root
     ns, d = _ns9(src)
     _seed9(d, "S2")
@@ -13116,7 +13165,7 @@ def _proto9(src=None):
     ns2, _ = _ns9(src, d=d)
     _boot9(ns2)
     r["a removed folder erased after its 7 days sends its Add's units back into root"] = (
-        _acc9(d) == [] and _ids9((_jr9(d, "chats.v2.json") or {}).get("chats")) == sorted(_CID9)
+        _acc9(d) == [] and _imps9(d) == [] and _ids9((_jr9(d, "chats.v2.json") or {}).get("chats")) == sorted(_CID9)
         and not _jr9(d, "profile.json").get("putback"))
     # -- (review) two put-backs pending: both come back
     ns, d = _ns9(src)
@@ -13133,7 +13182,7 @@ def _proto9(src=None):
     ns4, _ = _ns9(src, d=d)
     _boot9(ns4)
     r["two put-backs pending: neither replaces the other, and a start finishes both"] = (
-        len(pb_mid) == 1 and _acc9(d) == []
+        len(pb_mid) == 1 and _acc9(d) == [] and _imps9(d) == []
         and _ids9((_jr9(d, "chats.v2.json") or {}).get("chats")) == sorted(_CID9)
         and not _jr9(d, "profile.json").get("putback"))
     return r
@@ -13168,10 +13217,20 @@ def _state9(d):
     return pj, root, accs
 
 
+def _plan9(step):
+    """(setup, op, answer) for a named step: what is set up, which
+    protocol runs with the crash, and the sheet's answer."""
+    kind = step.split(".")[0]
+    kind = {"putback": "signout"}.get(kind, kind)
+    ans = "erase" if step.endswith(".imported.renamed") else "putback"
+    return kind, ans
+
+
 def _crash9(src=None):
     """For every named step: set up, crash there, start again, and check
     that nothing of one profile is anywhere but its own place, that
-    nothing of root's was lost, and that no .new-* or .trash-* is left."""
+    nothing of root's was lost (unless the person chose to erase it), and
+    that no .new-* or .trash-* is left."""
     src = src or _S9
     r = {}
     steps = _lit8b(src, "SWITCH_STEPS")
@@ -13179,22 +13238,25 @@ def _crash9(src=None):
         ns, d = _ns9(src)
         cn = _seed9(d, "X9")
         _boot9(ns)
-        kind = step.split(".")[0]
+        kind, ans = _plan9(step)
         canB = _canary("B9")
+
+        def _cp(s_, _c=step):
+            if s_ == _c:
+                raise _Crash9(s_)
+            if _c.startswith("signin.undo") and s_ == "signin.4":
+                raise OSError("fail-at")       # the undo path
         try:
             if kind == "boot":
                 # a crash inside a start: a stale folder in the invariant's
                 # erase, or right after a pending Add step 6
                 ns["profile_signin"](None, {"add": {"chats": "all", "memory": True}})
-                B = ns["current_ctx"]()
-                if step == "boot.renamed":
-                    S = ns["test_profile_create"]()
-                    ns2, _ = _ns9(src, d=d, crash=step)
-                    _boot9(ns2)
+                if step in ("boot.key", "boot.renamed"):
+                    ns["test_profile_create"]()
                 else:
                     _pj9(d, pending_import=True)
-                    ns2, _ = _ns9(src, d=d, crash=step)
-                    _boot9(ns2)
+                ns2, _ = _ns9(src, d=d, crash=step)
+                _boot9(ns2)
                 r[step] = "no crash"
                 continue
             if kind in ("signout", "kept", "kept-erase"):
@@ -13206,60 +13268,63 @@ def _crash9(src=None):
                           open(B.path("cloud.json"), "w"))
                 if kind == "kept-erase":
                     ns["profile_keep"](None, "signed-out", "t")
-            ns["_crash_point"] = (lambda s_, _c=step: (_ for _ in ()).throw(_Crash9(s_))
-                                  if s_ == _c else None)
+            if step.startswith("signin.2"):
+                # a kept folder of another account, with an Add of the
+                # facts staged, is there to erase
+                ns["profile_signin"](None, {"add": {"memory": True}})
+                Bk = ns["current_ctx"]()
+                ns["chat_ops"]([{"op": "create", "id": "c" + "b" * 26, "lane": "ai",
+                                 "title": canB}], Bk)
+                ns["profile_keep"](None, "signed-out", "t")
+            ns["_crash_point"] = _cp
             if kind == "signin":
-                if step.startswith("signin.2"):
-                    # a kept folder of another account is there to erase
-                    ns["_crash_point"] = lambda s_: None
-                    ns["profile_signin"](None, {})
-                    Bk = ns["current_ctx"]()
-                    ns["chat_ops"]([{"op": "create", "id": "c" + "b" * 26, "lane": "ai",
-                                     "title": canB}], Bk)
-                    ns["profile_keep"](None, "signed-out", "t")
-                    ns["_crash_point"] = (lambda s_, _c=step: (_ for _ in ()).throw(
-                        _Crash9(s_)) if s_ == _c else None)
-                ns["profile_signin"](None, {"add": {"chats": "all", "memory": True,
-                                                    "settings": ["persona"]},
-                                            "erase_existing": True})
+                try:
+                    ns["profile_signin"](None, {"add": {"chats": "all", "memory": True,
+                                                        "settings": ["persona"]},
+                                                "erase_existing": True})
+                except OSError:
+                    pass
             elif kind == "signout":
-                ns["profile_signout"](None, {"imported": "putback"})
+                ns["profile_signout"](None, {"imported": ans})
             elif kind == "kept":
                 ns["profile_keep"](None, "signed-out", "t")
             elif kind == "kept-erase":
-                ns["profile_kept_erase"](None, {"imported": "putback"})
+                ns["profile_kept_erase"](None, {"imported": ans})
             r[step] = "no crash"
             continue
         except _Crash9:
             pass
         ns3, _ = _ns9(src, d=d)
         _o, ctx = _boot9(ns3)
-        pj, root, accs = _state9(d)
-        left = _acc9(d)
-        stray = [x for x in left if x.startswith((".new-", ".trash-"))]
-        named = {pj.get("active"), (pj.get("kept") or {}).get("dir")} - {None, "local"}
-        # every root chat is in exactly one place: root, or the one account
-        # (its copy) with root's original staged or still in root
-        acc_roots = sorted(c.get("root_id") for a in accs.values()
-                           for c in (a or {}).get("chats") or [] if c.get("root_id"))
-        imps = sorted(k[5:] for x in left if x.startswith(".imported-")
-                      for k in ((_jr9(d, "accounts", x, "units.json") or {}).get("units") or {})
-                      if k.startswith("chat-"))
-        whole = sorted(_CID9) == sorted(set(root) | set(imps)) and not set(root) & set(imps)
-        lost_ok = (sorted(set(root) | set(acc_roots)) == sorted(_CID9)) or whole
-        # B's canary: only inside B's own folder, and only while it is named
-        bplaces = [p for p in _bytegrep(d, canB)
-                   if not any(p.startswith(os.path.join(d, "accounts", n) + os.sep)
-                              for n in named)]
-        r[step] = (not stray and set(accs) <= named and len(accs) <= 1 and not bplaces
-                   and lost_ok and (ctx.root or ctx.name in named)
-                   and not (pj.get("pending_import") and not ctx.root)
-                   # a start finishes a put-back it finds
-                   and not pj.get("putback"))
-        if r[step] is not True:
-            r[step] = [stray, sorted(accs), sorted(named), bplaces[:2], root, acc_roots, imps,
-                       pj.get("active"), pj.get("kept"), pj.get("putback")]
+        r[step] = _after9(d, ctx.root, None if ctx.root else ctx.name, canB,
+                          chosen_erase=ans == "erase" and kind != "signin")
     return r
+
+
+def _after9(d, is_root, cur, canB, chosen_erase=False):
+    """The state a start left, after a crash: True, or what is wrong."""
+    pj, root, accs = _state9(d)
+    left = _acc9(d)
+    stray = [x for x in left if x.startswith((".new-", ".trash-"))] + \
+        [x for x in _imps9(d) if x.startswith(".trash-")]
+    named = {pj.get("active"), (pj.get("kept") or {}).get("dir")} - {None, "local"}
+    acc_roots = sorted(c.get("root_id") for a in accs.values()
+                       for c in (a or {}).get("chats") or [] if c.get("root_id"))
+    imps = _impunits9(d)
+    whole = sorted(_CID9) == sorted(set(root) | set(imps)) and not set(root) & set(imps)
+    lost_ok = ((sorted(set(root) | set(acc_roots)) == sorted(_CID9)) or whole
+               or (chosen_erase and set(root) <= set(_CID9)))
+    bplaces = [p for p in _bytegrep(d, canB)
+               if not any(p.startswith(os.path.join(d, "accounts", n) + os.sep)
+                          for n in named)]
+    ok = (not stray and set(accs) <= named and len(accs) <= 1 and not bplaces
+          and lost_ok and (is_root or cur in named)
+          and not (pj.get("pending_import") and not is_root)
+          # a start finishes a put-back and an erase it finds
+          and not pj.get("putback") and not pj.get("erase"))
+    return True if ok else [stray, sorted(accs), sorted(named), bplaces[:2], root, acc_roots,
+                            imps, pj.get("active"), pj.get("kept"), pj.get("putback"),
+                            pj.get("erase")]
 
 
 def _lit8b(src, name):
@@ -13276,7 +13341,8 @@ check("ISO-13 (in process): a crash at each of the %d named steps of sign-in (Ad
       % len(_cr9), _cr9 and all(v is True for v in _cr9.values()),
       "%r" % {k: v for k, v in _cr9.items() if v is not True})
 _srcsteps9 = set(re.findall(r'_crash_point\("([a-z0-9.-]+)"\)', _S9))
-_dynsteps9 = {"%s.%s" % (a, b) for a in re.findall(r'_erase_folder\(.*step="([a-z0-9.-]+)"', _S9)
+_dynsteps9 = {"%s.%s" % (a, b) for a in re.findall(r'step="([a-z0-9.-]+)"', _S9)
+              + re.findall(r'_imported_erase\(\w+, "([a-z0-9.-]+)"\)', _S9)
               for b in ("key", "renamed")}
 check("ISO-13: every named step is a crash point the code reaches, and every crash point in the "
       "switch protocol is named",
@@ -13310,34 +13376,48 @@ _PRM9 = [
     ("name, persona and home area left in root",
      "        user_prefs_update(H, lambda v: [v.pop(k, None) for k in sk])", "        pass"),
     ("a shared picture moved out from under a chat root keeps",
-     "                if not isinstance(rel, str) or rel in still or \\\n",
-     "                if not isinstance(rel, str) or \\\n"),
-    ("a pending step 6 not finished at a start", "                _add_stage(root, act)\n",
-     "                pass\n"),
+     "                if _mkey(rel) in still:\n                    continue\n",
+     "                if False:\n                    continue\n"),
+    ("a pending step 6 not finished at a start", "                    _add_stage(root, tgt)\n",
+     "                    pass\n"),
     ("a pending put-back not finished at a start",
      "                out[\"putback\"] = _putback_finish(root, pb) or out[\"putback\"]",
      "                pass"),
     ("the put-back not recorded before the erase",
-     "            if choice == \"putback\":\n                _pb_add(q, name)\n"
-     "        _profile_json_update(_commit)\n        _crash_point(\"signout.7\")",
-     "            pass\n        _profile_json_update(_commit)\n        _crash_point(\"signout.7\")"),
+     "                _pb_add(q, name)\n            elif choice == \"erase\" and has_imp:\n"
+     "                _er_add(q, name)\n        _profile_json_update(_commit)\n"
+     "        _crash_point(\"signout.7\")",
+     "                pass\n            elif choice == \"erase\" and has_imp:\n"
+     "                _er_add(q, name)\n        _profile_json_update(_commit)\n"
+     "        _crash_point(\"signout.7\")",
+     # (a start's F2 rule puts back what nobody names: both off)
+     "            elif name.startswith(\".trash-\") or not _unit_total(name):",
+     "            elif True:"),
     ("the account erased before the commit",
-     "        # 7. commit\n        def _commit(q):\n            q.update(active=\"local\", kept=None, "
-     "pending_import=False)",
-     "        # 7. commit\n        _erase_folder(H.dir, step=\"signout.8\")\n        def _commit(q):\n"
+     "        has_imp = os.path.lexists(_imported_path(name))\n\n        def _commit(q):\n"
      "            q.update(active=\"local\", kept=None, pending_import=False)",
-     # (a second protection holds the units: the invariant sends a dropped
-     # folder's .imported back to root; with both off, a crash loses them)
-     "            if _imported_count(name)[\"units\"]:\n                _pb_add(q, name)",
-     "            if False:\n                _pb_add(q, name)"),
+     "        _erase_folder(H.dir, step=\"signout.8\")\n"
+     "        has_imp = os.path.lexists(_imported_path(name))\n\n        def _commit(q):\n"
+     "            q.update(active=\"local\", kept=None, pending_import=False)",
+     # three protections hold the units: this order, the invariant's put-back
+     # of a dropped folder's Add, and its put-back of what nobody names
+     "            if _unit_total(name):\n                _pb_add(q, name)",
+     "            if False:\n                _pb_add(q, name)",
+     "            elif name.startswith(\".trash-\") or not _unit_total(name):",
+     "            elif True:"),
     ("sign-out without the sheet's question",
      "        if info[\"imported\"][\"units\"] and choice is None:", "        if False:"),
     ("put back ignoring gone", "            if rid in gone:\n", "            if False:\n"),
     ("the legacy entries not put back", "        _putback_legacy_chats(R, imp)\n", ""),
-    ("synced keys kept in a kept folder", "            _kept_keys(H, reason != \"signed-out\")",
-     "            pass"),
-    ("a removal keeping its keys", "            _kept_keys(H, reason != \"signed-out\")",
-     "            _kept_keys(H, False)"),
+    ("synced keys kept in a kept folder",
+     "            _kept_keys_raw(H.dir, reason != \"signed-out\")", "            pass",
+     "                    _kept_keys_raw(f, kd.get(\"reason\") != \"signed-out\")",
+     "                    pass"),
+    ("a removal keeping its keys",
+     "            _kept_keys_raw(H.dir, reason != \"signed-out\")",
+     "            _kept_keys_raw(H.dir, False)",
+     "                    _kept_keys_raw(f, kd.get(\"reason\") != \"signed-out\")",
+     "                    _kept_keys_raw(f, False)"),
     ("another account resuming a kept folder",
      "                if same and owner_check(xf, xname) is True:",
      "                if owner_check(xf, xname) is True:"),
@@ -13357,16 +13437,292 @@ _PRM9 = [
 _PRM9 += [
     ("a lost record's folders offered to a sign-in",
      "            if _named(p0) is None and _undecided():", "            if False:"),
-    ("a lost record's .imported taken for nothing",
-     "                      if _ACCT_NAME_RX.fullmatch(n) and not n.startswith(\".trash-\")",
-     "                      if _DIR_RX.fullmatch(n)"),
     ("a folder the invariant drops takes its Add's units with it",
-     "            if _imported_count(name)[\"units\"]:\n                _pb_add(q, name)",
-     "            if False:\n                _pb_add(q, name)"),
+     "            if _unit_total(name):\n                _pb_add(q, name)",
+     "            if False:\n                _pb_add(q, name)",
+     "            elif name.startswith(\".trash-\") or not _unit_total(name):",
+     "            elif True:"),
     ("one put-back replacing another",
-     "    q[\"putback\"] = pb + ([name] if name not in pb else [])", "    q[\"putback\"] = [name]"),
+     "    q[key] = v + ([name] if name not in v else [])", "    q[key] = [name]"),
 ]
-_prm9 = _mrun9(lambda s_: dict(_proto9(s_), **_crash9(s_)), _PRM9)
+# ---- the erase-safety review of 6b330: each finding, a rule
+def _review9(src=None):
+    src = src or _S9
+    r = {}
+    # F1: a step 6 cut short (a disk refusing, again and again) never
+    # leaves a chat in root with its media staged, the cut units don't
+    # count, and a sign-out that can't finish it changes nothing
+    ns, d = _ns9(src)
+    cn = _seed9(d, "F1")
+    _boot9(ns)
+    real_cp = ns["_crash_point"]
+
+    def _fail(s_):
+        if s_ == "signin.6.legacy":
+            raise OSError("refused")
+    ns["_crash_point"] = _fail
+    out = ns["profile_signin"](None, {"add": {"chats": [_CID9[0]]}})
+    B = ns["current_ctx"]()
+    rc = _ids9((_jr9(d, "chats.v2.json") or {}).get("chats"))
+    cnt = ns["_imported_count"](B.name)
+    so = ns["profile_signout"](None, {"imported": "erase"})
+    r["F1: a step 6 cut short: root keeps the chat and its media, the cut units don't count, "
+      "and a sign-out that can't finish it changes nothing"] = (
+        out.get("ok") is True and _CID9[0] in rc and cnt["units"] == 0
+        and os.path.isfile(os.path.join(d, "exports", cn["exp_name"]))
+        and so.get("err") == "add-unfinished" and ns["current_ctx"]().name == B.name
+        and _jr9(d, "profile.json").get("pending_import") is True)
+    ns["_crash_point"] = real_cp
+    so = ns["profile_signout"](None, {"imported": "erase"})
+    rc = _ids9((_jr9(d, "chats.v2.json") or {}).get("chats"))
+    r["F1: the next sign-out finishes step 6 first; Erase then takes only what moved, and a "
+      "picture another root chat shows stays"] = (
+        so.get("ok") is True and _CID9[0] not in rc and _CID9[2] in rc
+        and os.path.isfile(os.path.join(d, "images", cn["img_name"]))
+        and not os.path.exists(os.path.join(d, "exports", cn["exp_name"]))
+        and _acc9(d) == [] and _imps9(d) == [] and not _jr9(d, "profile.json").get("erase"))
+    # F2: a readable but stale profile.json (a restore), or the hook's bare
+    # switch, leaves staged units nobody names: they go back into root
+    for why in ("a restored profile.json", "a bare switch"):
+        ns, d = _ns9(src)
+        _seed9(d, "F2")
+        _boot9(ns)
+        stale = open(os.path.join(d, "profile.json")).read()
+        ns["profile_signin"](None, {"add": {"chats": "all", "memory": True}})
+        if why == "a bare switch":
+            ns["test_profile_op"]({"op": "switch", "to": "local"})
+        else:
+            open(os.path.join(d, "profile.json"), "w").write(stale)
+        ns2, _ = _ns9(src, d=d)
+        _boot9(ns2)
+        r["F2: after %s, staged units nobody names come back into root" % why] = (
+            _ids9((_jr9(d, "chats.v2.json") or {}).get("chats")) == sorted(_CID9)
+            and len(_jr9(d, "memory.v2.json") or []) == 2 and _imps9(d) == [])
+    # F2: "Erase them" is recorded in the commit: a crash right after it
+    # still erases, and only that choice ever erases staged units
+    ns, d = _ns9(src, crash="signout.7")
+    _seed9(d, "F2e")
+    _boot9(ns)
+    ns["profile_signin"](None, {"add": {"chats": "all"}})
+    try:
+        ns["profile_signout"](None, {"imported": "erase"})
+    except _Crash9:
+        pass
+    mid = list(_jr9(d, "profile.json").get("erase") or [])
+    ns2, _ = _ns9(src, d=d)
+    _boot9(ns2)
+    r["F2: Erase them, recorded in the commit, is finished by the next start after a crash"] = (
+        len(mid) == 1 and _imps9(d) == [] and _acc9(d) == []
+        and _ids9((_jr9(d, "chats.v2.json") or {}).get("chats")) == []
+        and not _jr9(d, "profile.json").get("erase"))
+    # F3: a put-back evicts nothing, and facts merge by time
+    ns, d = _ns9(src)
+    _seed9(d, "F3")
+    _boot9(ns)
+    ns["CHATS_KEEP"] = 3
+    ns["MEMORY_KEEP"] = 3
+    ns["profile_signin"](None, {"add": {"chats": [_CID9[0], _CID9[1]], "memory": True}})
+    ns["profile_keep"](None, "signed-out", "expired")
+    R = ns["current_ctx"]()
+    ch = ns["load_chats"](R)
+    for i in range(2):
+        ch.append({"id": ns["_new_chat_id"](), "lane": "ai", "ts": 10 ** 13 + i,
+                   "title": "new%d" % i, "messages": [{"role": "user", "content": "hi"}]})
+    ns["store_chats"](ch, R)
+    with ns["_memory_lock"]:
+        ns["_save_memory"]([{"fact": "root-new-%d" % i, "ts": time.time() + i}
+                            for i in range(3)], R)
+    ns["profile_kept_erase"](None, {"imported": "putback"})
+    ids = _ids9((_jr9(d, "chats.v2.json") or {}).get("chats"))
+    facts = [f["fact"] for f in _jr9(d, "memory.v2.json") or []]
+    r["F3: a put-back evicts nothing and never trims root's newer facts"] = (
+        len(ids) == 5 and {_CID9[0], _CID9[1]} <= set(ids)
+        and facts == ["root-new-0", "root-new-1", "root-new-2"])
+    # F4: a crash left a .new-*, then the record was lost: nobody is stuck
+    ns, d = _ns9(src, crash="signin.4")
+    _seed9(d, "F4")
+    _boot9(ns)
+    try:
+        ns["profile_signin"](None, {"add": {"chats": "all"}})
+    except _Crash9:
+        pass
+    os.remove(os.path.join(d, "profile.json"))
+    ns2, _ = _ns9(src, d=d)
+    _boot9(ns2)
+    si = ns2["profile_signin"](None, {})
+    r["F4: after a crash and a lost record, the .new-* goes and a sign-in works"] = (
+        si.get("ok") is True and not [x for x in _acc9(d) if x.startswith(".new-")])
+    # F7: a pending step 6 of a folder this build can't open waits
+    ns, d = _ns9(src)
+    _seed9(d, "F7")
+    _boot9(ns)
+    ns["profile_signin"](None, {"add": {"chats": "all"}})
+    _pj9(d, pending_import=True)
+    before = _ids9((_jr9(d, "chats.v2.json") or {}).get("chats"))
+    ns2, _ = _ns9(src, d=d, hooks=())
+    staged = []
+    ns2["_add_stage"] = lambda R, n: staged.append(n)
+    _boot9(ns2)
+    r["F7: a pending step 6 runs only for a folder this build can open"] = staged == []
+    # F8: a media path from data names images/, videos/ or exports/ only
+    ns, d = _ns9(src)
+    _boot9(ns)
+    R = ns["current_ctx"]()
+    X = secrets.token_hex(16)
+    imp = os.path.join(d, "imports", X)
+    os.makedirs(os.path.join(imp, "units"))
+    os.makedirs(os.path.join(imp, "media", "images"))
+    open(os.path.join(imp, "media", "evil.txt"), "w").write("x")
+    json.dump({"id": "c" + "e" * 26, "lane": "ai", "ts": 1, "messages": []},
+              open(os.path.join(imp, "units", "chat-c" + "e" * 26 + ".json"), "w"))
+    json.dump({"v": 1, "units": {"chat-c" + "e" * 26: {
+        "kind": "chat", "root_id": "c" + "e" * 26, "media": ["images/../evil.txt"]}}},
+        open(os.path.join(imp, "units.json"), "w"))
+    ns["_putback"](R, X)
+    r["F8: a unit's media path can't reach outside the media folders"] = (
+        not os.path.exists(os.path.join(d, "evil.txt"))
+        and not ns["_media_ok"]("images/../prefs.json") and ns["_media_ok"]("images/a-1.png"))
+    # F9: two spellings of one picture are one file on a Mac or a PC
+    ns, d = _ns9(src)
+    ns["IS_MAC"] = True
+    cn = _seed9(d, "F9")
+    lc = _jr9(d, "chats.json")
+    lc[2]["messages"][1]["content"] = "again ![p](/api/image/%s)" % cn["img_name"].upper() \
+        .replace(".PNG", ".png")
+    json.dump(lc, open(os.path.join(d, "chats.json"), "w"))
+    _boot9(ns)
+    ns["profile_signin"](None, {"add": {"chats": [_CID9[0]]}})
+    r["F9: a picture a root chat shows under another case stays in root"] = os.path.isfile(
+        os.path.join(d, "images", cn["img_name"]))
+    # F10: commit before the keys: a crash between them still erases them
+    ns, d = _ns9(src, crash="kept.4")
+    _boot9(ns)
+    ns["profile_signin"](None, {})
+    B = ns["current_ctx"]()
+    json.dump({"providers": {"groq": {"key": "SYNCED9", "sync": True}}, "active": "groq"},
+              open(B.path("cloud.json"), "w"))
+    try:
+        ns["profile_keep"](None, "signed-out", "t")
+    except _Crash9:
+        pass
+    mid = (_jr9(d, "profile.json").get("kept") or {}).get("dir")
+    ns2, _ = _ns9(src, d=d)
+    _boot9(ns2)
+    r["F10: kept is committed before the synced keys go, and a start finishes the keys"] = (
+        mid == B.name and (_jr9(B.dir, "cloud.json") or {}).get("providers") == {})
+    # F10: a damaged .owner (not 64 hex) is "can't tell": kept, never erased
+    ns, d = _ns9(src)
+    ns["profile_boot"]()
+    B = ns["test_profile_create"]()
+    open(os.path.join(B.dir, ".owner"), "w").write("damaged")
+    _pj9(d, active=B.name, kept=None)
+    ns2, _ = _ns9(src, d=d)
+    _o, c2 = _boot9(ns2)
+    r["F10: an active folder with a damaged .owner is kept, not opened"] = (
+        _acc9(d) == [B.name] and c2.root)
+    # durability: the rename to the account and the staged media are fsynced
+    ns, d = _ns9(src)
+    _seed9(d, "D9")
+    _boot9(ns)
+    synced = []
+    ns["_fsync_dir"] = lambda p: synced.append(os.path.relpath(p, d))
+    ns["profile_signin"](None, {"add": {"chats": "all"}})
+    r["durability: the folder's rename and the media moves are fsynced before what relies on "
+      "them"] = "accounts" in synced and os.path.join("images") in synced
+    # S3: the account window closed before the commit: nothing goes ahead
+    ns, d = _ns9(src)
+    _seed9(d, "S3")
+    _boot9(ns)
+    before = _tree9(d)
+    ev = _t9.Event()
+    ev.set()
+    c1 = ns["profile_signin"](None, {"add": {"chats": "all"}}, ev)
+    after = {k: v for k, v in _tree9(d).items() if k != "profile.json"}
+    ns["profile_signin"](None, {})
+    c2 = ns["profile_signout"](None, {}, ev)
+    r["S3: a sign-in or sign-out whose window closed stops before its commit"] = (
+        c1.get("err") == "cancelled" and after == {k: v for k, v in before.items()
+                                                    if k != "profile.json"}
+        and c2.get("err") == "cancelled" and not ns["current_ctx"]().root)
+    # S4: a switch that begins between the wait and the read: read again
+    ns, d = _ns9(src)
+    root = ns["profile_boot"]()
+    H2 = ns["ProfileCtx"]("local", d)
+    calls = []
+
+    def _cur():
+        calls.append(1)
+        if len(calls) == 1:
+            ns["_SWITCH"]["idle"].clear()
+
+            def _done():
+                ns["_PROFILE"]["ctx"] = H2
+                ns["_SWITCH"]["idle"].set()
+            _t9.Timer(0.2, _done).start()
+            return root
+        return ns["_PROFILE"]["ctx"]
+    ns["current_ctx"] = _cur
+    got = ns["switch_ctx"](5)
+    r["S4: a request's profile is read again when a switch began meanwhile"] = got is H2
+    return r
+
+
+_rv9 = _review9()
+check("the erase-safety review's cases (F1-F4, F7-F10, durability, S3, S4): %d rules" % len(_rv9),
+      all(v is True for v in _rv9.values()), "%r" % {k: v for k, v in _rv9.items() if v is not True})
+_PRM9 += [
+    ("F1: media staged before the chats leave root",
+     "    media = [x for x in man.get(\"media\") or [] if _media_ok(x)]\n    if media:",
+     "    media = [x for x in man.get(\"media\") or [] if _media_ok(x)]\n    if False:",
+     "    d = _units(imp)\n    if ids:",
+     "    d = _units(imp)\n    for rel in [x for x in man.get(\"media\") or [] if _media_ok(x)]:\n"
+     "        for f in _with_sidecar(rel):\n            if os.path.isfile(H.path(f)):\n"
+     "                os.makedirs(os.path.dirname(os.path.join(imp, \"media\", f)), exist_ok=True)\n"
+     "                os.rename(H.path(f), os.path.join(imp, \"media\", f))\n    if ids:"),
+    ("F1: units root still holds counted",
+     "        if (v.get(\"kind\") == \"chat\" and v.get(\"root_id\") in rids) or (",
+     "        if False and (v.get(\"kind\") == \"chat\" and v.get(\"root_id\") in rids) or ("),
+    ("F1: a partial step 6 abandoned at sign-out",
+     "        if not _finish_step6_aside(name):\n            return {\"err\": \"add-unfinished\"}",
+     "        if False:\n            return {\"err\": \"add-unfinished\"}"),
+    ("F2: unnamed staged units erased",
+     "            elif name.startswith(\".trash-\") or not _unit_total(name):",
+     "            elif True:"),
+    ("F2: the erase list ignored at a start",
+     "        for x in n[\"erase\"]:\n            if os.path.lexists(os.path.join(iroot, x)):",
+     "        for x in []:\n            if os.path.lexists(os.path.join(iroot, x)):"),
+    ("F3: a put-back write that evicts", "            store_chats(chats, R, evict=False)",
+     "            store_chats(chats, R)"),
+    ("F3: restored facts appended at the newest end",
+     "            _save_memory(sorted(facts + add, key=_fact_ts), R)",
+     "            _save_memory(facts + add, R)"),
+    ("F4: nobody's .new-* kept under a lost record",
+     "                    if name.startswith(\".trash-\") or (\n"
+     "                            name.startswith(\".new-\") and not _key_marked(path)):",
+     "                    if name.startswith(\".trash-\"):"),
+    ("F7: a pending step 6 of a folder this build can't open",
+     "            if os.path.isdir(f) and _account_openable(f, tgt):",
+     "            if os.path.isdir(f):"),
+    ("F8: a media path from data unchecked",
+     "    return isinstance(rel, str) and bool(_MEDIA_REL_RX.fullmatch(rel))",
+     "    return isinstance(rel, str)"),
+    ("F9: media names compared with case on a Mac",
+     "    return rel.casefold() if (IS_WIN or globals().get(\"IS_MAC\")) else rel",
+     "    return rel"),
+    ("F10: a damaged .owner taken for another's",
+     "    if not re.fullmatch(r\"[0-9a-f]{64}\", have):\n        return None\n", ""),
+    ("F10: a kept folder's keys not finished at a start",
+     "                try:\n                    _kept_keys_raw(f, kd.get(\"reason\") != \"signed-out\")",
+     "                try:\n                    pass"),
+    ("durability: the account's rename not fsynced", "            _fsync_dir(aroot)\n", ""),
+    ("S3: a closed window's switch goes ahead",
+     "    return cancel is not None and cancel.is_set()", "    return False"),
+    ("S4: the request's profile not read again",
+     "        c = current_ctx()\n        if _SWITCH[\"idle\"].is_set():\n            return c",
+     "        c = current_ctx()\n        if True:\n            return c"),
+]
+
+_prm9 = _mrun9(lambda s_: dict(_proto9(s_), **_crash9(s_), **_review9(s_)), _PRM9)
 check("the switch protocol: each protection bites (%d mutations, each caught)" % len(_PRM9),
       all(ok is True for _d, ok in _prm9), "%r" % [x for x in _prm9 if x[1] is not True])
 
@@ -13775,13 +14131,49 @@ try:
     _wsr9l = json.load(open(os.path.join(_P9.home, "run", "webstore.json")))
 except (OSError, ValueError):
     _wsr9l = []
+try:
+    _rl9 = open(os.path.join(_P9.home, "run", "reloads.jsonl")).read().splitlines()
+except OSError:
+    _rl9 = []
 check("accounts/ was excluded from Time Machine (recorded, never run in a test) once, before "
-      "its first file; the web store was cleaned at every switch to another folder",
+      "its first file; the web store was cleaned, and the main window reloaded (review of "
+      "6b330), at every switch to another folder",
       len(_tmr9) == 1 and _tmr9[0]["argv"] == [
           "tmutil", "addexclusion", os.path.join(os.path.realpath(_P9.home), "accounts")]
       and _tmr9[0]["held"] == []
-      and len([w for w in _wsr9l if w.get("local") is False]) >= 8,
-      "%r" % [_tmr9, len(_wsr9l)])
+      and len([w for w in _wsr9l if w.get("local") is False]) >= 8
+      and len(_rl9) == len([w for w in _wsr9l if w.get("local") is False]),
+      "%r" % [_tmr9, len(_wsr9l), len(_rl9)])
+# (review of 6b330) an account's page neither reads nor writes root's
+# single-model pick in browser storage, so root can't adopt it later
+_pmjs9 = os.path.join(_SMOKE_TMP, "pickmodel9.js")
+_pmseg9 = _S9[_S9.index("const ROOT_LS="):_S9.index("function paintModels(){")] \
+    + _S9[_S9.index("function paintModels(){"):_S9.index("\n}\n", _S9.index("function paintModels(){")) + 3]
+with open(_pmjs9, "w", encoding="utf-8") as fh:
+    fh.write(r"""
+const run=JSON.parse(require('fs').readFileSync(0,'utf8'));
+const PROFILE=run.profile;const store=new Map(Object.entries(run.ls));const sets=[];
+globalThis.localStorage={getItem:k=>store.has(k)?store.get(k):null,
+  setItem:(k,v)=>{sets.push(k);store.set(k,String(v));}};
+const $=()=>({textContent:""}),$$=()=>[];let tier="";
+""" + _pmseg9 + r"""
+paintModels();console.log(JSON.stringify({model,council,sets}));
+""")
+_pmr9 = {}
+for _p9 in ("local.1", "a" * 32 + ".1"):
+    try:
+        _pmr9[_p9[:5]] = json.loads(subprocess.run(
+            ["node", _pmjs9], input=json.dumps({"profile": _p9, "ls": {
+                "millen.model": "Hermes 3 8B", "millen.council": json.dumps(["Hermes 3 8B"])}}),
+            capture_output=True, text=True, timeout=30).stdout)
+    except Exception as e_:
+        _pmr9[_p9[:5]] = {"err": repr(e_)}
+check("an account's page neither reads nor writes This computer's model pick in browser storage "
+      "(review of 6b330: a later root boot could adopt it)",
+      _pmr9["local"].get("model") == "Hermes 3 8B" and _pmr9["local"].get("sets")
+      == ["millen.model", "millen.council"]
+      and _pmr9["aaaaa"].get("model") == "Llama 3.2 3B" and _pmr9["aaaaa"].get("sets") == [],
+      "%r" % _pmr9)
 
 # ---- two profiles, A -> B -> A, with canaries: B never sees A, and A comes back as it was
 _cA9 = {k: _canary("A9-" + k) for k in ("chat", "memory", "persona", "image", "export", "cloud",
@@ -13970,7 +14362,7 @@ def _crashrun9(name, hooks, op=None, data=None, boot=False):
 
 def _iso13(step):
     """One step: set up, crash there for real, start, check (as _crash9)."""
-    kind = step.split(".")[0]
+    kind, ans = _plan9(step)
     nm = "X13-" + step.replace(".", "_")
     home = os.path.join(_SMOKE_TMP, nm)
     os.makedirs(home, mode=0o700)
@@ -13979,17 +14371,19 @@ def _iso13(step):
     i_ = Instance(9903, nm, env={"MILLENAI_TEST_HOOKS": "profiles"}).start()
     if kind in ("signout", "kept", "kept-erase", "boot") or step.startswith("signin.2"):
         _hk9(i_, op="signin", add={"chats": "all", "memory": True} if not step.startswith(
-            "signin.2") else {})
+            "signin.2") else {"memory": True})
         _hk9(i_, op="late", kind="chat", text=canB, delay=0)
         time.sleep(0.8)
         if kind == "kept-erase" or step.startswith("signin.2"):
             _hk9(i_, op="keep", reason="signed-out", cause="t")
-        if step == "boot.renamed":
+        if step in ("boot.key", "boot.renamed"):
             _hk9(i_, op="create")
     i_.stop()
     if step == "boot.step6":
         _pj9(home, pending_import=True)
     hooks = "profiles,crash-at=" + step
+    if step.startswith("signin.undo"):
+        hooks += ",fail-at=signin.4"
     if kind == "boot":
         code = _crashrun9(nm, hooks, boot=True)
     elif kind == "signin":
@@ -13997,31 +14391,17 @@ def _iso13(step):
                                                         "settings": ["persona"]},
                                                 "erase_existing": True})
     elif kind == "signout":
-        code = _crashrun9(nm, hooks, "signout", {"imported": "putback"})
+        code = _crashrun9(nm, hooks, "signout", {"imported": ans})
     elif kind == "kept":
         code = _crashrun9(nm, hooks, "keep", {"reason": "signed-out", "cause": "t"})
     else:
-        code = _crashrun9(nm, hooks, "kept-erase", {"imported": "putback"})
+        code = _crashrun9(nm, hooks, "kept-erase", {"imported": ans})
     j_ = Instance(9903, nm, env={"MILLENAI_TEST_HOOKS": "profiles"}).start()
     st = _hk9(j_, op="status")
     j_.stop()
-    pj, root, accs = _state9(home)
-    left = _acc9(home)
-    named = {pj.get("active"), (pj.get("kept") or {}).get("dir")} - {None, "local"}
-    acc_roots = sorted(c.get("root_id") for a in accs.values()
-                       for c in (a or {}).get("chats") or [] if c.get("root_id"))
-    imps = sorted(k[5:] for x in left if x.startswith(".imported-")
-                  for k in ((_jr9(home, "accounts", x, "units.json") or {}).get("units") or {})
-                  if k.startswith("chat-"))
-    whole = sorted(_CID9) == sorted(set(root) | set(imps)) and not set(root) & set(imps)
-    bplaces = [p for p in _bytegrep(home, canB)
-               if not any(p.startswith(os.path.join(home, "accounts", n) + os.sep) for n in named)]
-    ok = (code == 86 and not [x for x in left if x.startswith((".new-", ".trash-"))]
-          and set(accs) <= named and len(accs) <= 1 and not bplaces
-          and (sorted(set(root) | set(acc_roots)) == sorted(_CID9) or whole)
-          and (st.get("kind") == "local" or st.get("dir") in named)
-          and not pj.get("putback") and not (pj.get("pending_import") and st.get("kind") != "local"))
-    return ok or [code, left, sorted(named), bplaces[:1], root, acc_roots, imps, st.get("dir")]
+    ok = _after9(home, st.get("kind") == "local", st.get("dir"), canB,
+                 chosen_erase=ans == "erase" and kind != "signin")
+    return True if (code == 86 and ok is True) else [code, ok]
 
 
 _i13 = {s_: _iso13(s_) for s_ in _lit8b(_S9, "SWITCH_STEPS")}
@@ -14053,7 +14433,12 @@ check("without ACCOUNTS (the shipped app) nothing new runs or shows: no boot inv
       and "        if ACCOUNTS:\n            # the account window never outlives the main one" in _main9
       and "    if not ACCOUNTS:\n        return {\"err\": \"off\"}" in _S9
       and '    if "profiles" not in TEST_HOOKS:\n        raise NoProfile("accounts need 1c' in _S9
-      and 'if self.path == "/api/test/account" and "account-headless" in TEST_HOOKS:' in _S9,
+      and 'if self.path == "/api/test/account" and "account-headless" in TEST_HOOKS:' in _S9
+      # the one account rule every build runs, the shipped app's included:
+      # a lost record's folders are kept (it only ever keeps; there,
+      # accounts/ never exists), pinned so it stays keep-only
+      and "            und = _undecided() if \"active\" not in q else []" in _S9
+      and "    if \"active\" not in p and ctx.root and _undecided():" in _S9,
       "pins")
 # ==== m9 accounts: end ====
 

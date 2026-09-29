@@ -8252,7 +8252,7 @@ READ_FAIL = {CHATS_FILE: _RF_CHATS, LEGACY_CHATS: _RF_CHATS,
 
 _profile_lock = threading.RLock()   # the innermost lock: taken last
 # the active profile: {"ctx": ProfileCtx, "stale": writes refused}
-_PROFILE = {"ctx": None, "stale": 0}
+_PROFILE = {"ctx": None, "stale": 0, "aside": None}
 _written = {}           # folder -> the _FIRST_WRITE names it has written
 _tl_ctx = threading.local()         # the ctx this thread works for
 
@@ -8302,8 +8302,10 @@ class ProfileCtx:
         return _PROFILE["ctx"] is self
 
     def check(self):
-        """StaleProfile unless this is still the active profile."""
-        if _PROFILE["ctx"] is not self:
+        """StaleProfile unless this is still the active profile (or the
+        root ctx a switch holds aside while an account is still active:
+        _aside_root, M9)."""
+        if _PROFILE["ctx"] is not self and _PROFILE.get("aside") is not self:
             _PROFILE["stale"] += 1
             raise StaleProfile("the profile changed; not written")
 
@@ -9103,14 +9105,17 @@ def profile_resume() -> ProfileCtx:
                 # THE RECORD WAS LOST (M9): profile.json went (or was never
                 # this build's) while accounts/ holds folders. Nothing may
                 # read as "not named" and be erased at the next start: one
-                # account folder (with at most its own .imported) becomes
+                # account folder (with at most its own imports/<dir>) becomes
                 # kept, which sign-in step 2 and Erase then offer; anything
                 # else leaves "active" unwritten, so the invariant deletes
-                # nothing and sign-in refuses until a person decides
+                # nothing of anyone's and sign-in refuses until a person
+                # decides (M15's screen). This runs in every build, the
+                # shipped app's included: it only ever keeps (review of
+                # 6b330), and there accounts/ never exists
                 q["epoch"] = ctx.epoch
                 dirs = [x for x in und if _DIR_RX.fullmatch(x)]
                 if (len(dirs) == 1 and not q.get("kept") and set(und)
-                        <= {dirs[0], ".imported-" + dirs[0]}):
+                        <= {dirs[0], "imports/" + dirs[0]}):
                     q.update(active="local", pending_import=False, kept={
                         "dir": dirs[0], "reason": "signed-out",
                         "cause": "record-lost", "erase_after": None})
@@ -9220,38 +9225,53 @@ def test_profile_create() -> ProfileCtx:
 # (M9, 6b330) An account's folder is accounts/<32 hex>/: account.key
 # (1c writes the real one; a local test profile's holds test values),
 # .owner, its stores, sync/state.json and its media. Beside it only
-# .new-* (a sign-in being built), .trash-* (an erase under way) and
-# .imported-<dir>/ (root's originals an Add moved). The boot invariant
-# keeps exactly what profile.json names. ONE RULE ABOVE ALL: a folder is
-# only ever deleted by renaming it into accounts/.trash-<rand> first
+# .new-* (a sign-in being built) and .trash-* (an erase under way).
+# accounts/ is excluded from Time Machine, so root's originals an Add
+# moved are staged OUTSIDE it (review of 6b330), in imports/<dir>/ under
+# the data folder, which backups keep. The boot invariant keeps exactly
+# what profile.json names. ONE RULE ABOVE ALL: a folder is only ever
+# deleted by renaming it into a .trash-<rand> beside it first
 # (_erase_folder), so no delete can land on a path it wasn't meant for,
-# and an erase a crash cut short is finished by the next start.
+# and an erase a crash cut short is finished by the next start. And
+# staged units (root's own chats and facts) are erased only by a
+# person's recorded choice ("Erase them", "Erase and continue"); a
+# folder of them nobody names goes back into root.
 ACCOUNT_KEY = "account.key"
 OWNER_FILE = ".owner"
 IMPORTED_UNITS = "units.json"
+IMPORTS_DIR = "imports"
 _DIR_RX = re.compile(r"[0-9a-f]{32}")
-_ACCT_NAME_RX = re.compile(
-    r"[0-9a-f]{32}|\.(?:new|trash)-[0-9a-f]{24}|\.imported-[0-9a-f]{32}")
+_ACCT_NAME_RX = re.compile(r"[0-9a-f]{32}|\.(?:new|trash)-[0-9a-f]{24}")
+_IMP_NAME_RX = re.compile(r"[0-9a-f]{32}|\.trash-[0-9a-f]{24}")
+# a media path as a chat or a unit map names it: never anything else
+_MEDIA_REL_RX = re.compile(r"(?:images|videos|exports)/[\w-]+\.[a-z0-9]{1,5}")
 KEPT_REASONS = ("signed-out", "removed", "deleted")
 KEPT_ERASE_S = 7 * 86400          # removed or deleted: erased 7 days on
 # what Add may move from name, persona and home area (1a 5.11 step 4)
 ADD_SETTINGS = ("user_name", "persona", "home_area")
 # every named step a crash can be injected at (the crash-at hook, 1a 5.13)
 SWITCH_STEPS = (
-    "signin.0", "signin.2.commit", "signin.2.key", "signin.2.renamed", "signin.2",
-    "signin.3", "signin.4", "signin.5.renamed", "signin.5", "signin.6.units",
-    "signin.6.legacy", "signin.6.chats", "signin.6.memory", "signin.6",
-    "signin.7",
+    "signin.0", "signin.2.commit", "signin.2.key", "signin.2.renamed",
+    "signin.2.imported.renamed", "signin.2", "signin.3", "signin.4",
+    "signin.undo.key", "signin.undo.renamed", "signin.5.renamed", "signin.5",
+    "signin.6.units", "signin.6.legacy", "signin.6.chats", "signin.6.memory",
+    "signin.6.media", "signin.6", "signin.7",
     "signout.3", "signout.7", "signout.8.key", "signout.8.renamed",
-    "signout.8.putback", "signout.8",
-    "kept.1", "kept.3", "kept.4", "kept.5",
-    "kept-erase.commit", "kept-erase.key", "kept-erase.renamed", "kept-erase",
-    "boot.renamed", "boot.step6")
+    "signout.8.putback", "putback.chats", "putback.renamed",
+    "signout.8.imported.renamed", "signout.8",
+    "kept.1", "kept.4", "kept.keys", "kept.5",
+    "kept-erase.commit", "kept-erase.key", "kept-erase.renamed",
+    "kept-erase.imported.renamed", "kept-erase",
+    "boot.key", "boot.renamed", "boot.step6")
 _TM = {"done": None}               # accounts/ excluded from Time Machine this run
 
 
 def _accounts_root() -> str:
     return os.path.join(app_dir(), ACCOUNTS_DIR)
+
+
+def _imports_root() -> str:
+    return os.path.join(app_dir(), IMPORTS_DIR)
 
 
 def _tm_exclude(path: str):
@@ -9261,7 +9281,8 @@ def _tm_exclude(path: str):
     a backup. macOS only, once per run, and a failure only logs: it never
     stands in the boot's way. A dev or test copy never runs tmutil (no
     test may exclude a real folder): it records the command it would run
-    in run/tmutil.jsonl, with what accounts/ held at that moment."""
+    in run/tmutil.jsonl, with what accounts/ held at that moment.
+    imports/ (root's staged originals) is never excluded."""
     if _TM["done"] == path:
         return
     _TM["done"] = path
@@ -9297,6 +9318,14 @@ def _accounts_prepare() -> str:
     return root
 
 
+def _imports_prepare() -> str:
+    """imports/, 0700, and in the backups like the rest of root."""
+    root = _imports_root()
+    if not os.path.isdir(root):
+        os.makedirs(root, mode=0o700, exist_ok=True)
+    return root
+
+
 def _rename_retry(src: str, dst: str):
     """os.rename, waiting out a reader on Windows (an antivirus holding a
     file), as _replace_into does for files."""
@@ -9310,34 +9339,81 @@ def _rename_retry(src: str, dst: str):
             time.sleep(0.05)
 
 
-def _erase_folder(path: str, step: str = "erase") -> bool:
-    """THE ONLY WAY A FOLDER UNDER accounts/ IS DELETED (M9). Only a
-    direct child of accounts/ with one of the layout's names, never a
-    link. account.key goes first (1a 5.11 step 8), renamed into a fresh
-    accounts/.trash-<rand>/; then the folder is renamed in beside it;
-    then the trash is removed. A crash leaves at most a .trash-* the
-    next start removes; a file Windows holds stays in the trash until
-    then. True when nothing is left."""
-    root = os.path.realpath(_accounts_root())
-    name = os.path.basename(os.path.normpath(path))
-    if (os.path.realpath(os.path.dirname(os.path.abspath(os.path.normpath(path))))
-            != root or not _ACCT_NAME_RX.fullmatch(name) or os.path.islink(path)):
-        raise ValueError("not an account folder: %r" % name)
-    if not os.path.lexists(path):
+def _fsync_dir(path: str):
+    """A rename made durable before the commit that relies on it: the
+    folder's own entry fsynced. Best effort; Windows has no such call."""
+    if IS_WIN:
+        return
+    try:
+        fd = os.open(path, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
+def _reparse(path: str) -> bool:
+    """A link of any kind: a symlink, or on Windows a junction or any
+    other reparse point (os.path.islink misses a junction)."""
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return False
+    if os.path.islink(path):
         return True
-    if name.startswith(".trash-"):
-        trash = path
-    else:
-        trash = os.path.join(root, ".trash-" + secrets.token_hex(12))
-        os.mkdir(trash, 0o700)
-        key = os.path.join(path, ACCOUNT_KEY)
-        if os.path.lexists(key):
-            _rename_retry(key, os.path.join(trash, ACCOUNT_KEY))
-            _crash_point(step + ".key")
-        _rename_retry(path, os.path.join(trash, name))
-        _crash_point(step + ".renamed")
-    shutil.rmtree(trash, ignore_errors=True)
-    return not os.path.lexists(trash)
+    return bool(getattr(st, "st_file_attributes", 0) & 0x400)
+
+
+def _layout_child(path: str):
+    """(parent, name) when path is a folder directly in accounts/ or
+    imports/ with one of the layout's names and not a link, whose real
+    path is exactly that; else ValueError."""
+    name = os.path.basename(os.path.normpath(path))
+    for parent, rx in ((_accounts_root(), _ACCT_NAME_RX),
+                       (_imports_root(), _IMP_NAME_RX)):
+        rp = os.path.realpath(parent)
+        if (os.path.realpath(os.path.dirname(os.path.abspath(os.path.normpath(path))))
+                == rp and rx.fullmatch(name)):
+            if _reparse(path) or (os.path.lexists(path) and os.path.realpath(path)
+                                  != os.path.join(rp, name)):
+                break
+            return rp, name
+    raise ValueError("not an account folder: %r" % name)
+
+
+def _erase_folder(path: str, step: str = "erase") -> bool:
+    """THE ONLY WAY A FOLDER UNDER accounts/ OR imports/ IS DELETED (M9).
+    Only a direct child with one of the layout's names, never a link or a
+    junction, checked again just before each rename. account.key goes
+    first (1a 5.11 step 8), renamed into a fresh .trash-<rand>/ beside the
+    folder; then the folder is renamed in beside it; then the trash is
+    removed. A crash leaves at most a .trash-* the next start removes; a
+    file Windows holds stays in the trash until then. True when nothing
+    is left."""
+    root, name = _layout_child(path)
+    path = os.path.join(root, name)
+    with _profile_lock, _profile_flock():    # every delete under the lock
+        if not os.path.lexists(path):
+            return True
+        if name.startswith(".trash-"):
+            trash = path
+        else:
+            trash = os.path.join(root, ".trash-" + secrets.token_hex(12))
+            os.mkdir(trash, 0o700)
+            key = os.path.join(path, ACCOUNT_KEY)
+            if os.path.lexists(key):
+                _layout_child(path)             # nothing swapped in meanwhile
+                _rename_retry(key, os.path.join(trash, ACCOUNT_KEY))
+                _crash_point(step + ".key")
+            _layout_child(path)
+            _rename_retry(path, os.path.join(trash, name))
+            _crash_point(step + ".renamed")
+        shutil.rmtree(trash, ignore_errors=True)
+        return not os.path.lexists(trash)
 
 
 def _trash_file(path: str):
@@ -9355,9 +9431,13 @@ def _crash_point(step: str):
     """The crash-at=<step> test hook (1a 5.13, dev copies only): the
     process dies here as a power cut would, with no finally and no
     atexit, so ISO-13 can prove a restart leaves no one's data with
-    another. Every name is in SWITCH_STEPS."""
+    another. Every name is in SWITCH_STEPS. fail-at=<step> raises an
+    OSError there instead (a disk that refuses), to reach the undo
+    paths."""
     if _hook_arg("crash-at") == step:
         os._exit(86)
+    if _hook_arg("fail-at") == step:
+        raise OSError("fail-at hook: %s" % step)
 
 
 # ------------------------------------------------ .owner (1a 5.1)
@@ -9421,9 +9501,10 @@ def _owner_mac(K: bytes, acct_id: str, name: str) -> str:
 
 def owner_check(folder: str, name: str = None):
     """.owner, checked every time a folder opens (1a 5.1): True (it
-    verifies with this keyring), False (it doesn't, or it's missing: a
-    folder this account doesn't own), None (this build can't tell: no
-    keyring it can read, or one waiting on a re-key, which 1c resolves)."""
+    verifies with this keyring), False (a well-formed one that doesn't,
+    or none at all: a folder this account doesn't own), None (this build
+    can't tell: no keyring it can read, one waiting on a re-key, which 1c
+    resolves, or an .owner that isn't 64 hex: damaged, not another's)."""
     name = name or os.path.basename(os.path.normpath(folder))
     st, k = _read_key(folder)
     if st != "ok" or k.get("rekey_pending"):
@@ -9436,10 +9517,10 @@ def owner_check(folder: str, name: str = None):
             have = f.read().decode("ascii").strip()
     except FileNotFoundError:
         return False
-    except OSError:
+    except (OSError, UnicodeDecodeError):
         return None
-    except UnicodeDecodeError:
-        return False
+    if not re.fullmatch(r"[0-9a-f]{64}", have):
+        return None
     import hmac as _hm
     return _hm.compare_digest(have.encode("ascii"), _owner_mac(
         K, str(k.get("acct_id")), name).encode("ascii"))
@@ -9447,7 +9528,7 @@ def owner_check(folder: str, name: str = None):
 
 def _write_file_raw(path: str, raw: bytes, mode=0o600):
     """A file in a folder that isn't a live profile (a sign-in's .new-*,
-    an .imported-*): unique temp, fsync, replace."""
+    an imports/<dir>): unique temp, fsync, replace."""
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".w-",
                                suffix=".tmp")
     try:
@@ -9464,7 +9545,7 @@ def _write_file_raw(path: str, raw: bytes, mode=0o600):
 
 
 def _read_file_json(path: str, want=dict, default=None):
-    """A JSON file outside any ctx (an .imported-* or a .new-*): default
+    """A JSON file outside any ctx (an imports/<dir> or a .new-*): default
     when absent, StoreReadError when it can't be read."""
     try:
         with open(path, "rb") as f:
@@ -9535,6 +9616,22 @@ def switch_wait(timeout: float = 60.0) -> bool:
     return ev.is_set() or ev.wait(timeout)
 
 
+def switch_ctx(timeout: float = 60.0):
+    """The profile a request works for, taken while no switch runs: the
+    wait and the read are made atomic by reading again when a switch
+    began in between (review of 6b330). None: a switch outlasted the
+    wait (the request is refused, never served under its hold)."""
+    end = time.monotonic() + timeout
+    while True:
+        if not switch_wait(max(0.0, end - time.monotonic())):
+            return None
+        c = current_ctx()
+        if _SWITCH["idle"].is_set():
+            return c
+        if time.monotonic() >= end:
+            return None
+
+
 @contextlib.contextmanager
 def _switching():
     """One switch protocol at a time, with new requests held at their
@@ -9560,48 +9657,83 @@ def _hold(old):
     return profile_switch(ProfileCtx(old.kind, old.dir, old.name, old.acct_id))
 
 
+@contextlib.contextmanager
+def _aside_root():
+    """A root ctx for the switch alone while an account is still active
+    (review of 6b330: a sign-out or a server sign-out finishes an Add's
+    step 6 first, through root, instead of abandoning it). Only under the
+    switch lock: requests are held, and the old root ctxs were cancelled,
+    so nothing but the switch writes through it."""
+    R0 = ProfileCtx("local", app_dir())
+    with _profile_lock:
+        _PROFILE["aside"] = R0
+    prev = bind_ctx(R0)
+    try:
+        yield R0
+    finally:
+        bind_ctx(prev)
+        with _profile_lock:
+            _PROFILE["aside"] = None
+        R0.cancel.set()
+
+
+def _dirlist(p, key: str) -> list:
+    v = p.get(key) if isinstance(p, dict) else None
+    return [x for x in v if isinstance(x, str) and _DIR_RX.fullmatch(x)] \
+        if isinstance(v, list) else []
+
+
 def _named(p):
-    """The folders profile.json names: {"active", "kept", "putback"} (a
-    list: every .imported-<dir> whose units wait to go back into root),
-    or None when it can't be trusted (unreadable, missing, malformed, or
-    with no "active" at all: a record lost and remade), in which case
-    nothing is deleted."""
+    """The folders profile.json names: {"active", "kept", "putback",
+    "erase"}; putback lists the imports/<dir> whose units wait to go back
+    into root, erase those a person chose to erase ("Erase them", "Erase
+    and continue"). None when it can't be trusted (unreadable, missing,
+    malformed, or with no "active" at all: a record lost and remade), in
+    which case nothing but the trash and nobody's .new-* is deleted."""
     if not isinstance(p, dict) or "active" not in p:
         return None
-    act, kept, pb = p.get("active"), p.get("kept"), p.get("putback")
-    if pb is None:
-        pb = []
+    act, kept = p.get("active"), p.get("kept")
     if not (act == "local" or (isinstance(act, str) and _DIR_RX.fullmatch(act))):
         return None
     if kept is not None and not (
             isinstance(kept, dict) and isinstance(kept.get("dir"), str)
             and _DIR_RX.fullmatch(kept["dir"]) and kept.get("reason") in KEPT_REASONS):
         return None
-    if not (isinstance(pb, list) and all(isinstance(x, str) and _DIR_RX.fullmatch(x)
-                                         for x in pb)):
-        return None
+    for key in ("putback", "erase"):
+        v = p.get(key)
+        if v is not None and not (isinstance(v, list) and len(_dirlist(p, key)) == len(v)):
+            return None
     return {"active": None if act == "local" else act,
-            "kept": kept["dir"] if kept else None, "putback": list(pb)}
+            "kept": kept["dir"] if kept else None,
+            "putback": _dirlist(p, "putback"), "erase": _dirlist(p, "erase")}
 
 
-def _named_set(n) -> set:
-    out = set()
-    for d in (n["active"], n["kept"]):
-        if d:
-            out |= {d, ".imported-" + d}
-    out.update(".imported-" + x for x in n["putback"])
-    return out
+def _list_add(q: dict, key: str, name: str):
+    v = q.get(key) if isinstance(q.get(key), list) else []
+    q[key] = v + ([name] if name not in v else [])
+
+
+def _list_drop(q: dict, key: str, name: str):
+    v = q.get(key) if isinstance(q.get(key), list) else []
+    q[key] = [x for x in v if x != name]
 
 
 def _pb_add(q: dict, name: str):
     """profile.json's putback list with name in it (once)."""
-    pb = q.get("putback") if isinstance(q.get("putback"), list) else []
-    q["putback"] = pb + ([name] if name not in pb else [])
+    _list_add(q, "putback", name)
+    _list_drop(q, "erase", name)
 
 
 def _pb_drop(q: dict, name: str):
-    pb = q.get("putback") if isinstance(q.get("putback"), list) else []
-    q["putback"] = [x for x in pb if x != name]
+    _list_drop(q, "putback", name)
+
+
+def _er_add(q: dict, name: str):
+    """profile.json's erase list: a person's recorded choice to erase
+    imports/<name>, so a crash after it still finishes it, and nothing
+    else ever erases staged units."""
+    _list_add(q, "erase", name)
+    _list_drop(q, "putback", name)
 
 
 def _key_marked(folder: str) -> bool:
@@ -9614,21 +9746,70 @@ def _key_marked(folder: str) -> bool:
     return st == "ok" and (k.get("signup") == "sent" or bool(k.get("rekey_pending")))
 
 
+def _kept_keys_raw(folder: str, every: bool):
+    """Entering the kept state: every synced key and the whole `account`
+    section of the folder's cloud.json go at once (every key for a
+    removal or a deletion). Written straight into the kept folder (it is
+    no profile's now); a cloud.json that can't be read goes whole, into
+    the trash, since its synced keys can't be picked out. Idempotent: a
+    start does it again for a kept folder, in case a crash came between
+    the commit and this."""
+    p = os.path.join(folder, "cloud.json")
+    if not os.path.exists(p):
+        return
+    try:
+        d = _read_file_json(p, dict, None)
+    except StoreReadError:
+        _trash_file(p)
+        return
+    if d is None:
+        return
+    pv = d.get("providers") if isinstance(d.get("providers"), dict) else {}
+    keep = {} if every else {k: v for k, v in pv.items()
+                             if not (isinstance(v, dict) and v.get("sync") is True)}
+    if keep != pv or "account" in d or (every and d.get("active")):
+        d["providers"] = keep
+        d.pop("account", None)
+        if every:
+            d["active"] = ""
+        _write_file_raw(p, json.dumps(d).encode("utf-8"))
+
+
+def _unit_total(name: str) -> int:
+    """Every unit an imports/<name> holds (one that can't be read counts:
+    it is kept, never erased for it)."""
+    try:
+        return len(_units(_imported_path(name))["units"])
+    except StoreReadError:
+        return 1
+
+
 def boot_invariant(now: float = None) -> dict:
     """THE BOOT INVARIANT (1a 5.11), first in boot, by the copy holding
     the instance lock only, under run/profile.lock. Only the folders
-    profile.json names (active or kept, never both) and their
-    .imported-<dir> may exist under accounts/:
-      * profile.json missing, unreadable or malformed: nothing is
-        deleted (every folder counts as kept);
+    profile.json names (active or kept, never both) may be in accounts/,
+    and only theirs and the put-back list's in imports/:
+      * profile.json missing, unreadable, malformed or without "active":
+        nothing is deleted but the trash and a .new-* holding nobody's
+        data (review of 6b330: no one is left stuck); an imports/<dir>
+        whose account folder is gone goes on the put-back list when the
+        record can be written;
       * a named folder whose .owner fails is erased; one this build
-        can't check (no keyring it reads, a re-key pending) is left;
-      * a kept folder past erase_after is erased;
-      * the active folder with no account.key becomes kept (sign-in
-        step 2 decides later);
-      * every other 32-hex folder, .new-* and .imported-* is erased,
-        except a .new-* holding an unfinished sign-up or re-key (1c Q2);
-        .trash-* is emptied; any other name is left alone.
+        can't check (no keyring it reads, a re-key pending, a damaged
+        .owner) is left; a kept folder past erase_after is erased; the
+        active folder with no account.key becomes kept (sign-in step 2
+        decides later). A folder that goes sends its Add's units back to
+        root (putback in the same commit);
+      * a kept folder's synced keys go, again, in case a crash came
+        between the commit and that;
+      * every other 32-hex folder and .new-* in accounts/ is erased,
+        except a .new-* (or folder) holding an unfinished sign-up or
+        re-key (1c Q2);
+      * in imports/: a folder on the erase list (a person's choice) is
+        erased; any other one nobody names goes on the put-back list if
+        it holds a unit (I12: staged units are only ever erased by a
+        person), and is erased if it holds none;
+      * .trash-* is emptied; any other name is left alone.
     profile.json is always written before the erase it allows, so a
     crash between them is finished by the next start. {erased, kept,
     why}."""
@@ -9636,27 +9817,49 @@ def boot_invariant(now: float = None) -> dict:
     if not _INSTANCE_HELD[0]:
         out["why"] = "no instance lock"
         return out
-    root = _accounts_root()
+    root, iroot = _accounts_root(), _imports_root()
     now = time.time() if now is None else now
+
+    def _gone(path, step="boot"):
+        try:
+            _erase_folder(path, step=step)
+            out["erased"].append(os.path.relpath(path, app_dir()))
+        except (OSError, ValueError) as exc:
+            print("  (%s not erased: %s; next start)" % (os.path.basename(path), exc))
     with _profile_lock, _profile_flock():
-        if not os.path.isdir(root):
+        if not os.path.isdir(root) and not os.path.isdir(iroot):
             return out
+        readable = True
         try:
             p = _read_json(PROFILE_FILE, MACHINE_ROOT, dict)
         except StoreReadError:
-            p = None
+            p, readable = None, False
         n = _named(p)
         if n is None:
-            out["why"] = "profile.json can't be read: nothing deleted"
-            out["kept"] = sorted(os.listdir(root))
+            out["why"] = "profile.json can't be trusted: nothing of anyone's deleted"
+            for base, rx in ((root, _ACCT_NAME_RX), (iroot, _IMP_NAME_RX)):
+                for name in sorted(os.listdir(base)) if os.path.isdir(base) else []:
+                    path = os.path.join(base, name)
+                    if not rx.fullmatch(name) or _reparse(path) or not os.path.isdir(path):
+                        continue
+                    if name.startswith(".trash-") or (
+                            name.startswith(".new-") and not _key_marked(path)):
+                        _gone(path)
+                    else:
+                        out["kept"].append(name)
+            orphans = [x for x in (sorted(os.listdir(iroot)) if os.path.isdir(iroot) else [])
+                       if _DIR_RX.fullmatch(x) and not os.path.isdir(os.path.join(root, x))
+                       and not _reparse(os.path.join(iroot, x))]
+            if orphans and readable:
+                def _back(q):
+                    for x in orphans:
+                        if x not in _dirlist(q, "putback"):
+                            _list_add(q, "putback", x)
+                _profile_json_update(_back)
             return out
-        # the named folders' own rules; each commit comes before its erase.
-        # A folder that goes with units still in its .imported-<dir> (root's
-        # originals, not yet uploaded) sends them back: putback is set in
-        # the same commit, and the pending step returns them to root (I12:
-        # only a person erases unsent work)
+
         def _lost(q, name):
-            if _imported_count(name)["units"]:
+            if _unit_total(name):
                 _pb_add(q, name)
         drop = []
         act, kept = n["active"], n["kept"]
@@ -9675,29 +9878,35 @@ def boot_invariant(now: float = None) -> dict:
             elif _read_key(f)[0] == "missing" and not kept:
                 # the key can't be read (1a 5.11): kept, never erased here
                 _profile_json_update(lambda q: q.update(
-                    active="local", pending_import=False, kept={
+                    active="local", kept={
                         "dir": act, "reason": "signed-out",
                         "cause": "key-missing", "erase_after": None}))
                 kept, act = act, None
         if kept:
             f = os.path.join(root, kept)
-            ea = (p.get("kept") or {}).get("erase_after")
+            kd = (_read_json(PROFILE_FILE, MACHINE_ROOT, dict) or {}).get("kept") or {}
+            ea = kd.get("erase_after")
             past = isinstance(ea, (int, float)) and now >= ea
             if not os.path.isdir(f):
-                _profile_json_update(lambda q: (q.update(kept=None),
+                _profile_json_update(lambda q: (q.update(kept=None, pending_import=False),
                                                 _lost(q, kept)))
                 kept = None
             elif past or owner_check(f, kept) is False:
-                _profile_json_update(lambda q: (q.update(kept=None),
+                _profile_json_update(lambda q: (q.update(kept=None, pending_import=False),
                                                 _lost(q, kept)))
                 drop.append(kept)
                 kept = None
+            else:
+                try:
+                    _kept_keys_raw(f, kd.get("reason") != "signed-out")
+                except (OSError, StoreReadError) as exc:
+                    print("  (a kept folder's keys wait: %s)" % exc)
         n = _named(_read_json(PROFILE_FILE, MACHINE_ROOT, dict)) or n
-        keep = _named_set(n)
-        for name in sorted(os.listdir(root)):
+        keep_acc = {x for x in (n["active"], n["kept"]) if x}
+        for name in sorted(os.listdir(root)) if os.path.isdir(root) else []:
             path = os.path.join(root, name)
-            if name in keep or not _ACCT_NAME_RX.fullmatch(name) \
-                    or os.path.islink(path) or not os.path.isdir(path):
+            if name in keep_acc or not _ACCT_NAME_RX.fullmatch(name) \
+                    or _reparse(path) or not os.path.isdir(path):
                 if _ACCT_NAME_RX.fullmatch(name):
                     out["kept"].append(name)
                 continue
@@ -9708,18 +9917,39 @@ def boot_invariant(now: float = None) -> dict:
                     and _read_key(path)[0] == "ok" and _key_marked(path):
                 out["kept"].append(name)
                 continue
-            try:
-                _erase_folder(path, step="boot")
-                out["erased"].append(name)
-            except (OSError, ValueError) as exc:
-                print("  (accounts/%s not erased: %s; next start)" % (name, exc))
+            _gone(path)
+        # imports/: the person's erase list, then anything nobody names
+        for x in n["erase"]:
+            if os.path.lexists(os.path.join(iroot, x)):
+                _gone(os.path.join(iroot, x))
+            if not os.path.lexists(os.path.join(iroot, x)):
+                _profile_json_update(lambda q, x=x: _list_drop(q, "erase", x))
+        keep_imp = keep_acc | set(n["putback"])
+        back = []
+        for name in sorted(os.listdir(iroot)) if os.path.isdir(iroot) else []:
+            path = os.path.join(iroot, name)
+            if not _IMP_NAME_RX.fullmatch(name) or _reparse(path) \
+                    or not os.path.isdir(path) or name in n["erase"]:
+                continue
+            if name in keep_imp:
+                out["kept"].append("imports/" + name)
+            elif name.startswith(".trash-") or not _unit_total(name):
+                _gone(path)
+            else:
+                back.append(name)
+                out["kept"].append("imports/" + name)
+        if back:
+            _profile_json_update(lambda q: [_pb_add(q, x) for x in back])
     return out
 
 
 def profile_boot_pending(root) -> dict:
     """At a start, after the invariant and before the downgrade import,
-    through root's ctx (1a 9's boot order): a pending Add step 6, then a
-    pending put-back from a sign-out. {"step6", "putback"}."""
+    through root's ctx (1a 9's boot order): a pending Add step 6 of the
+    active or kept folder (only one this build can open: review of
+    6b330), then every pending put-back (read even from a record that
+    can't otherwise be trusted: putting back loses nothing).
+    {"step6", "putback"}."""
     out = {"step6": False, "putback": False}
     if not _INSTANCE_HELD[0]:
         return out
@@ -9728,20 +9958,19 @@ def profile_boot_pending(root) -> dict:
     except StoreReadError:
         return out
     n = _named(p)
-    if n is None:
-        return out
     prev = bind_ctx(root)
     try:
-        act = n["active"]
-        if p.get("pending_import") is True and act \
-                and os.path.isdir(os.path.join(_accounts_root(), act)):
-            try:
-                _add_stage(root, act)
-                out["step6"] = True
-            except (StoreReadError, OSError) as exc:
-                print("  (the Add's last step waits: %s)" % exc)
-            _crash_point("boot.step6")
-        for pb in n["putback"]:
+        tgt = (n["active"] or n["kept"]) if n else None
+        if p.get("pending_import") is True and tgt:
+            f = os.path.join(_accounts_root(), tgt)
+            if os.path.isdir(f) and _account_openable(f, tgt):
+                try:
+                    _add_stage(root, tgt)
+                    out["step6"] = True
+                except (StoreReadError, OSError, ValueError) as exc:
+                    print("  (the Add's last step waits: %s)" % exc)
+                _crash_point("boot.step6")
+        for pb in _dirlist(p, "putback"):
             try:
                 out["putback"] = _putback_finish(root, pb) or out["putback"]
             except (StoreReadError, OSError, ValueError) as exc:
@@ -9789,6 +10018,19 @@ def _chat_media(c) -> list:
     return sorted(out)
 
 
+def _media_ok(rel) -> bool:
+    """A media path from data (a chat, a manifest, a unit map) names a
+    file in images/, videos/ or exports/ and nothing else (review of
+    6b330: `images/../prefs.json` passed a first-part check)."""
+    return isinstance(rel, str) and bool(_MEDIA_REL_RX.fullmatch(rel))
+
+
+def _mkey(rel: str) -> str:
+    """How two media names compare on this disk: without case on a Mac
+    and on Windows, where IMG.png and img.png are one file."""
+    return rel.casefold() if (IS_WIN or globals().get("IS_MAC")) else rel
+
+
 def _with_sidecar(rel: str) -> list:
     """A media file and what travels with it: a render's .render.json, an
     export's .meta."""
@@ -9824,7 +10066,8 @@ def _add_build(H, newp: str, add: dict) -> dict:
             out.append(nc)
             man["chats"].append(c["id"])
             for rel in _chat_media(c):
-                if rel not in man["media"] and os.path.isfile(H.path(rel)):
+                if _media_ok(rel) and rel not in man["media"] \
+                        and os.path.isfile(H.path(rel)):
                     man["media"].append(rel)
         _write_file_raw(os.path.join(newp, CHATS_FILE), json.dumps(
             {"v": 2, "chats": out, "gone": []}).encode("utf-8"))
@@ -9835,11 +10078,11 @@ def _add_build(H, newp: str, add: dict) -> dict:
         still = set()
         for c in load_chats(H):
             if isinstance(c, dict) and c.get("id") not in man["chats"]:
-                still.update(_chat_media(c))
+                still.update(_mkey(x) for x in _chat_media(c))
         for rel in man["media"]:
             for f in _with_sidecar(rel):
                 if os.path.isfile(H.path(f)):
-                    if rel in still:
+                    if _mkey(rel) in still:
                         shutil.copyfile(H.path(f), os.path.join(newp, f))
                     else:
                         _link_or_copy(H.path(f), os.path.join(newp, f))
@@ -9865,11 +10108,13 @@ def _add_build(H, newp: str, add: dict) -> dict:
 
 
 def _imported_path(name: str) -> str:
-    return os.path.join(_accounts_root(), ".imported-" + name)
+    """imports/<name>: root's originals an Add to account <name> moved,
+    outside accounts/ so backups keep them (review of 6b330)."""
+    return os.path.join(_imports_root(), name)
 
 
 def _units(imp: str) -> dict:
-    """The .imported-<dir>/units.json unit map: {"v": 1, "units": {uid:
+    """The imports/<dir>/units.json unit map: {"v": 1, "units": {uid:
     {"kind", ...}}}. Kind-extensible: a kind this build doesn't know (1h's
     projects) is kept as it is and never put back or dropped by it."""
     d = _read_file_json(os.path.join(imp, IMPORTED_UNITS), dict, None) or {}
@@ -9895,21 +10140,25 @@ def _merge_file_list(path: str, items: list, key):
 
 
 def _add_stage(H, name: str):
-    """Sign-in step 6, through a root ctx (the switch's hold, or the
-    boot's): the originals of what was added move into
-    accounts/.imported-<name>/, in units: each chat with the media only
-    it showed, each memory fact. The legacy files lose the moved entries
-    (legacy/ first, then the rewrite, then legacy_base). Name, persona and
-    home area are deleted from root, not staged. Then pending_import is
-    cleared. Every part can run again after a crash: what is staged
-    already is skipped, and nothing is ever re-imported."""
+    """Sign-in step 6, through a root ctx (the switch's hold, the boot's,
+    or the aside one a sign-out finishes it with): the originals of what
+    was added move into imports/<name>/, in units, each chat with the
+    media only it showed, each memory fact. In this order (review of
+    6b330): the units, the legacy entries (legacy/ first, then the
+    rewrite, then legacy_base), root's chats rewritten without them, the
+    facts the same way, and only THEN the media, once no chat root keeps
+    can show them, so a step 6 cut short never leaves a chat in root
+    with its pictures staged. Name, persona and home area are deleted
+    from root, not staged. Then pending_import is cleared. Every part can
+    run again after a crash: what is staged already is skipped, and
+    nothing is ever re-imported."""
     folder = os.path.join(_accounts_root(), name)
     man = (_read_file_json(os.path.join(folder, STATE_FILE), dict, {}) or {}).get("add")
     man = man if isinstance(man, dict) else {}
     ids = [x for x in man.get("chats") or [] if isinstance(x, str)]
     fps = set(x for x in man.get("facts") or [] if isinstance(x, str))
     imp = _imported_path(name)
-    _accounts_prepare()
+    _imports_prepare()
     for sub in ("", "units", "legacy", "media"):
         os.makedirs(os.path.join(imp, sub), mode=0o700, exist_ok=True)
     d = _units(imp)
@@ -9923,23 +10172,8 @@ def _add_stage(H, name: str):
                     _write_file_raw(os.path.join(imp, "units", uid + ".json"),
                                     json.dumps(c).encode("utf-8"))
                     d["units"][uid] = {"kind": "chat", "root_id": c["id"],
-                                       "media": _chat_media(c)}
+                                       "media": [x for x in _chat_media(c) if _media_ok(x)]}
             _units_write(imp, d)
-            # the media, unless a chat root keeps still shows it
-            still = set()
-            for c in chats:
-                if isinstance(c, dict) and c.get("id") not in idset:
-                    still.update(_chat_media(c))
-            for rel in man.get("media") or []:
-                if not isinstance(rel, str) or rel in still or \
-                        rel.split("/")[0] not in ("images", "videos", "exports"):
-                    continue
-                for f in _with_sidecar(rel):
-                    if os.path.isfile(H.path(f)):
-                        dst = os.path.join(imp, "media", f)
-                        os.makedirs(os.path.dirname(dst), mode=0o700, exist_ok=True)
-                        with _profile_write(H):
-                            _rename_retry(H.path(f), dst)
             _crash_point("signin.6.units")
             _stage_legacy_chats(H, imp, idset)
             _crash_point("signin.6.legacy")
@@ -9966,6 +10200,29 @@ def _add_stage(H, name: str):
             if len(rest) != len(facts):
                 _save_memory(rest, H, legacy=True)
             _crash_point("signin.6.memory")
+    media = [x for x in man.get("media") or [] if _media_ok(x)]
+    if media:
+        with _chats_lock:
+            still = set()
+            for c in load_chats(H):
+                if isinstance(c, dict):
+                    still.update(_mkey(x) for x in _chat_media(c))
+            moved = False
+            for rel in media:
+                if _mkey(rel) in still:
+                    continue
+                for f in _with_sidecar(rel):
+                    if os.path.isfile(H.path(f)):
+                        dst = os.path.join(imp, "media", f)
+                        os.makedirs(os.path.dirname(dst), mode=0o700, exist_ok=True)
+                        with _profile_write(H):
+                            _rename_retry(H.path(f), dst)
+                        moved = True
+            if moved:
+                for sub in ("images", "videos", "exports"):
+                    _fsync_dir(H.path(sub))
+                    _fsync_dir(os.path.join(imp, "media", sub))
+        _crash_point("signin.6.media")
     sk = [k for k in man.get("settings") or [] if k in ADD_SETTINGS]
     if sk:
         user_prefs_update(H, lambda v: [v.pop(k, None) for k in sk])
@@ -9974,7 +10231,7 @@ def _add_stage(H, name: str):
 
 def _stage_legacy_chats(H, imp: str, ids: set):
     """The legacy chats.json entries that map to the moved chats, copied
-    into .imported-<dir>/legacy/ with the root id each maps to, before
+    into imports/<dir>/legacy/ with the root id each maps to, before
     the rewrite takes them out (1a 5.11 step 6)."""
     lb = (_read_json(PROFILE_FILE, H, dict) or {}).get("legacy_base")
     idmap = lb.get("ids") if isinstance(lb, dict) and isinstance(lb.get("ids"), dict) else {}
@@ -9999,13 +10256,20 @@ def _stage_legacy_memory(H, imp: str, fps: set):
 
 
 # ------------------------------------ Put them back (1a 5.11 step 8)
+def _fact_ts(f) -> float:
+    t = f.get("ts") if isinstance(f, dict) else None
+    return float(t) if isinstance(t, (int, float)) else 0.0
+
+
 def _putback(R, name: str) -> bool:
-    """Every unit left in .imported-<name> back into root, whole: a chat
+    """Every unit left in imports/<name> back into root, whole: a chat
     under its own root id (out of `gone`), with its media; a memory fact;
     their legacy entries back into chats.json and memory.json, and
-    legacy_base with them. Runs again safely after a crash. False while
-    a unit of a kind this build doesn't know is left (it stays for a
-    build that does)."""
+    legacy_base with them. The write evicts nothing (review of 6b330:
+    the 1,000-chat cap took chats back out, root's own too), and the facts
+    are merged by time, so root's newer ones are never the ones the cap
+    trims. Runs again safely after a crash. False while a unit of a kind
+    this build doesn't know is left (it stays for a build that does)."""
     imp = _imported_path(name)
     if not os.path.isdir(imp):
         return True
@@ -10030,6 +10294,8 @@ def _putback(R, name: str) -> bool:
                 gone = [x for x in gone if x != rid]
                 changed = True
             for rel in u.get("media") or []:
+                if not _media_ok(rel):
+                    continue
                 for f in _with_sidecar(rel):
                     src = os.path.join(imp, "media", f)
                     if os.path.isfile(src) and not os.path.exists(R.path(f)):
@@ -10039,8 +10305,9 @@ def _putback(R, name: str) -> bool:
             _crash_point("signout.8.putback")
         if changed:
             chats.gone = gone
-            store_chats(chats, R)
+            store_chats(chats, R, evict=False)
         _putback_legacy_chats(R, imp)
+    _crash_point("putback.chats")
     with _memory_lock:
         facts = _load_memory(R)
         haveh = {_fact_fp(f) for f in facts}
@@ -10053,7 +10320,7 @@ def _putback(R, name: str) -> bool:
                 add.append(f)
                 haveh.add(u.get("fp"))
         if add:
-            _save_memory(facts + add, R)
+            _save_memory(sorted(facts + add, key=_fact_ts), R)
         _putback_legacy_memory(R, imp)
     return not unknown
 
@@ -10108,8 +10375,9 @@ def _putback_legacy_memory(R, imp: str):
 
 
 def _putback_finish(R, name: str) -> bool:
-    """Put back, then clear profile.json's putback, then erase the empty
-    .imported-<name> (commit first, erase after, as everywhere)."""
+    """Put back, then drop name from profile.json's putback list, then
+    erase the emptied imports/<name> (commit first, erase after, as
+    everywhere)."""
     if not _putback(R, name):
         return False
     _profile_json_update(lambda q: _pb_drop(q, name))
@@ -10117,9 +10385,19 @@ def _putback_finish(R, name: str) -> bool:
     return True
 
 
+def _imported_erase(name: str, step: str):
+    """A person's recorded "Erase them": imports/<name> goes, then leaves
+    the erase list."""
+    if os.path.lexists(_imported_path(name)):
+        _erase_folder(_imported_path(name), step=step)
+    _profile_json_update(lambda q: _list_drop(q, "erase", name))
+
+
 def _imported_count(name: str) -> dict:
-    """What an .imported-<name> still holds, by kind (the sign-out and
-    Erase sheets' question, 1a 5.11 step 2)."""
+    """What an imports/<name> holds that root doesn't (the sign-out and
+    Erase sheets' question, 1a 5.11 step 2), by kind. A unit whose chat or
+    fact root still holds (a step 6 cut short) isn't counted: erasing it
+    loses nothing (review of 6b330)."""
     imp = _imported_path(name)
     if not os.path.isdir(imp):
         return {"units": 0, "kinds": {}}
@@ -10127,11 +10405,24 @@ def _imported_count(name: str) -> dict:
         u = _units(imp)["units"]
     except StoreReadError:
         return {"units": 1, "kinds": {"unreadable": 1}}
+    try:
+        rc = (_read_file_json(os.path.join(app_dir(), CHATS_FILE), dict, {}) or {}).get("chats")
+        rids = {c.get("id") for c in rc if isinstance(c, dict)} if isinstance(rc, list) else set()
+        rfps = {_fact_fp(f) for f in _read_file_json(os.path.join(app_dir(), MEMORY_FILE),
+                                                    list, []) or []}
+    except StoreReadError:
+        rids, rfps = set(), set()
     k = {}
+    n = 0
     for v in u.values():
-        kd = str((v or {}).get("kind"))
+        v = v if isinstance(v, dict) else {}
+        if (v.get("kind") == "chat" and v.get("root_id") in rids) or (
+                v.get("kind") == "memory" and v.get("fp") in rfps):
+            continue
+        kd = str(v.get("kind"))
         k[kd] = k.get(kd, 0) + 1
-    return {"units": len(u), "kinds": k}
+        n += 1
+    return {"units": n, "kinds": k}
 
 
 # ------------------------------------------------ sign-in (1a 5.11)
@@ -10141,17 +10432,21 @@ def _account_dirs() -> list:
 
 
 def _undecided() -> list:
-    """Everything of the layout under accounts/ but the trash: the 32-hex
-    folders, .imported-* (root's originals) and .new-*. What a lost
-    record would leave with no one deciding."""
-    root = _accounts_root()
-    try:
-        return sorted(n for n in os.listdir(root)
-                      if _ACCT_NAME_RX.fullmatch(n) and not n.startswith(".trash-")
-                      and os.path.isdir(os.path.join(root, n))
-                      and not os.path.islink(os.path.join(root, n)))
-    except OSError:
-        return []
+    """What a lost record would leave with no one deciding: the 32-hex
+    folders and .new-* in accounts/, and each imports/<dir> as
+    "imports/<dir>"; never the trash."""
+    out = []
+    for base, rx, pre in ((_accounts_root(), _ACCT_NAME_RX, ""),
+                          (_imports_root(), _IMP_NAME_RX, "imports/")):
+        try:
+            names = os.listdir(base)
+        except OSError:
+            continue
+        out += [pre + n for n in names
+                if rx.fullmatch(n) and not n.startswith(".trash-")
+                and os.path.isdir(os.path.join(base, n))
+                and not _reparse(os.path.join(base, n))]
+    return sorted(out)
 
 
 def _existing_folder(p):
@@ -10167,12 +10462,19 @@ def _existing_folder(p):
     return None
 
 
-def profile_signin(req_ctx, opts=None) -> dict:
+def _cancelled(cancel) -> bool:
+    """The account window the switch runs from was closed (review of
+    6b330): before the commit, nothing goes ahead."""
+    return cancel is not None and cancel.is_set()
+
+
+def profile_signin(req_ctx, opts=None, cancel=None) -> dict:
     """Sign-in, steps 0-7 (1a 5.11). The 1b/1c/1d steps are no-ops until
     they exist; the keyring is a local test profile's (the profiles hook),
     so this runs only in a dev copy with it. opts: {"add": {chats,
     memory, settings} (nothing by default), "acct_id": (the same test
     account again), "erase_existing": (the answer to step 2's offer)}.
+    cancel: the account window's closing, checked before the commit.
     A crash at any step leaves either "This computer" as it was, or the
     account committed and the rest finished at the next start."""
     if not _INSTANCE_HELD[0]:
@@ -10220,30 +10522,38 @@ def profile_signin(req_ctx, opts=None) -> dict:
                     return {"stop": "deleted"}
                 if same and owner_check(xf, xname) is True:
                     _profile_json_update(lambda q: q.update(
-                        active=xname, kept=None, pending_import=False))
+                        active=xname, kept=None))
                     acct = ProfileCtx("test", xf, xname, key["acct_id"])
                     bind_ctx(prev)
                     prev = None
                     profile_switch(acct)
                     return {"ok": True, "resumed": True, "dir": xname,
                             "tag": acct.tag, "reload": True}
+                # an Add of that folder's cut short is finished first,
+                # through root, so what the offer counts is whole
+                if p.get("pending_import") is True and os.path.isdir(xf) \
+                        and _account_openable(xf, xname):
+                    _add_stage(H, xname)
                 if opts.get("erase_existing") is not True:
                     return {"need": "erase-existing",
                             "imported": _imported_count(xname)}
-                # erased, key file first, with its .imported (whose chats
-                # never come back into root this way: ISO-23)
+                # erased, key file first, with its staged units (the
+                # person's choice, recorded first; those chats never come
+                # back into root this way: ISO-23)
                 def _forget(q, x=xname):
                     # only the folder being erased leaves the record
                     if q.get("active") == x:
                         q.update(active="local", pending_import=False)
                     if isinstance(q.get("kept"), dict) and q["kept"].get("dir") == x:
-                        q["kept"] = None
-                    _pb_drop(q, x)
+                        q.update(kept=None, pending_import=False)
+                    if os.path.lexists(_imported_path(x)):
+                        _er_add(q, x)
+                    else:
+                        _pb_drop(q, x)
                 _profile_json_update(_forget)
                 _crash_point("signin.2.commit")
                 _erase_folder(xf, step="signin.2")
-                if os.path.lexists(_imported_path(xname)):
-                    _erase_folder(_imported_path(xname), step="signin.2.imported")
+                _imported_erase(xname, "signin.2.imported")
             _crash_point("signin.2")
             # 3. the folder, built beside the others as .new-*
             aroot = _accounts_prepare()
@@ -10254,22 +10564,27 @@ def profile_signin(req_ctx, opts=None) -> dict:
             # 4. Add: exactly what was ticked, copied in with fresh ids
             man = _add_build(H, newp, add)
             _crash_point("signin.4")
-            # 5. commit: the rename, then profile.json (a folder profile.json
-            # doesn't name is erased by the next start)
+            if _cancelled(cancel):
+                raise _Cancelled()
+            # 5. commit: the rename (made durable), then profile.json (a
+            # folder profile.json doesn't name is erased at the next start)
             final = os.path.join(aroot, name)
             _rename_retry(newp, final)
             newp = None
+            _fsync_dir(aroot)
             _crash_point("signin.5.renamed")
             added = any(man[k] for k in ("chats", "facts", "media", "settings"))
             _profile_json_update(lambda q: q.update(
                 active=name, kept=None, pending_import=added))
             _crash_point("signin.5")
-        except Exception:
+        except (Exception, _Cancelled) as exc:
             if newp and os.path.lexists(newp):
                 try:
                     _erase_folder(newp, step="signin.undo")
                 except (OSError, ValueError):
                     pass
+            if isinstance(exc, _Cancelled):
+                return {"err": "cancelled"}
             raise
         finally:
             if prev is not None:
@@ -10280,7 +10595,7 @@ def profile_signin(req_ctx, opts=None) -> dict:
             prev = bind_ctx(H)
             try:
                 _add_stage(H, name)
-            except (StoreReadError, OSError) as exc:
+            except (StoreReadError, OSError, ValueError) as exc:
                 print("  (the Add's last step waits for the next start: %s)" % exc)
             finally:
                 bind_ctx(prev)
@@ -10293,18 +10608,24 @@ def profile_signin(req_ctx, opts=None) -> dict:
                 "added": {k: len(v) for k, v in man.items()}}
 
 
+class _Cancelled(Exception):
+    """The account window closed before the commit (review of 6b330)."""
+
+
 # ------------------------------------------------ sign-out (1a 5.11)
 def signout_info(ctx) -> dict:
     """The sign-out sheet's data (1a 5.11 step 2; the words are 1e's):
-    unsent changes (none without 1d), answers still streaming, settings
-    waiting in pending_settings, the media not in the account (all of it
-    until Phase 2), an Add not finished uploading, and whether the Kit
-    was saved."""
+    unsent changes (none without 1d: a placeholder, and a blocker for
+    offering sign-out in M15), answers still streaming, settings waiting
+    in pending_settings, the media not in the account (all of it until
+    Phase 2), an Add not finished uploading, and whether the Kit was
+    saved."""
     if ctx.root:
         return {"signed_in": False}
     st = _read_file_json(os.path.join(ctx.dir, STATE_FILE), dict, {}) or {}
     ps = st.get("pending_settings")
     _k = _read_key(ctx.dir)[1] or {}
+
     def n(sub):
         try:
             return len([x for x in os.listdir(ctx.path(sub))
@@ -10320,11 +10641,28 @@ def signout_info(ctx) -> dict:
             "only_computer": None}
 
 
-def profile_signout(req_ctx, opts=None) -> dict:
+def _finish_step6_aside(name: str) -> bool:
+    """An Add's step 6 the account being left still owes, finished through
+    an aside root ctx (review of 6b330: never abandoned silently). True
+    when nothing is owed now."""
+    p = _read_json(PROFILE_FILE, MACHINE_ROOT, dict) or {}
+    if p.get("pending_import") is not True:
+        return True
+    try:
+        with _aside_root() as R0:
+            _add_stage(R0, name)
+        return True
+    except (StoreReadError, OSError, ValueError) as exc:
+        print("  (the Add's last step couldn't finish: %s)" % exc)
+        return False
+
+
+def profile_signout(req_ctx, opts=None, cancel=None) -> dict:
     """Sign-out chosen by the person, steps 1-9 (1a 5.11). opts:
     {"imported": "putback" | "erase"}, the answer the sheet needs when an
     Add hasn't finished uploading (no default: without it nothing
-    happens). Steps 4-6 are 1b/1d's and no-ops until they exist."""
+    happens), recorded in the commit. Steps 4-6 are 1b/1d's and no-ops
+    until they exist. cancel: the account window's closing."""
     if not _INSTANCE_HELD[0]:
         raise NoProfile("profile changes need the instance lock")
     opts = opts if isinstance(opts, dict) else {}
@@ -10343,18 +10681,30 @@ def profile_signout(req_ctx, opts=None) -> dict:
         # 1 and 3. flush the page and lock for switching
         H = _hold(old)
         _crash_point("signout.3")
+        # an Add's step 6 cut short is finished first; failing that,
+        # nothing happens (the sheet says why)
+        if not _finish_step6_aside(name):
+            return {"err": "add-unfinished"}
+        if choice is None and _imported_count(name)["units"]:
+            return {"need": "imported", "info": signout_info(H)}
+        if _cancelled(cancel):
+            return {"err": "cancelled"}
         # 4. final upload [1d]; 5. stop sync [1d] and lending [1g] (read-
         # aloud and the ctx were stopped by the hold); 6. /v2/logout [1b]
-        # 7. commit
+        # 7. commit, with the sheet's answer
+        has_imp = os.path.lexists(_imported_path(name))
+
         def _commit(q):
             q.update(active="local", kept=None, pending_import=False)
             if choice == "putback":
                 _pb_add(q, name)
+            elif choice == "erase" and has_imp:
+                _er_add(q, name)
         _profile_json_update(_commit)
         _crash_point("signout.7")
         R = profile_switch(ProfileCtx("local", app_dir()))
         # 8. erase, key file first; the browser store was cleaned by the
-        # switch; the .imported units as the sheet said
+        # switch; the staged units as the sheet said
         try:
             _erase_folder(H.dir, step="signout.8")
         except (OSError, ValueError) as exc:
@@ -10363,9 +10713,9 @@ def profile_signout(req_ctx, opts=None) -> dict:
         try:
             if choice == "putback":
                 _putback_finish(R, name)
-            elif os.path.lexists(_imported_path(name)):
-                _erase_folder(_imported_path(name), step="signout.8.imported")
-        except (StoreReadError, OSError) as exc:
+            elif choice == "erase" and has_imp:
+                _imported_erase(name, "signout.8.imported")
+        except (StoreReadError, OSError, ValueError) as exc:
             print("  (the rest of the sign-out waits for the next start: %s)" % exc)
         finally:
             bind_ctx(prev)
@@ -10375,36 +10725,13 @@ def profile_signout(req_ctx, opts=None) -> dict:
 
 
 # ------------------------------------ signed out by the server (1a 5.11)
-def _kept_keys(H, every: bool):
-    """Entering the kept state: every synced key and the whole `account`
-    section of its cloud.json go at once (every key for a removal or a
-    deletion). A cloud.json that can't be read goes whole: its synced keys
-    can't be picked out of it."""
-    p = H.path("cloud.json")
-    if not os.path.exists(p):
-        return
-    try:
-        with _cloud_txn():
-            d = _cloud_read_strict()
-            pv = d.get("providers") if isinstance(d.get("providers"), dict) else {}
-            keep = {} if every else {k: v for k, v in pv.items()
-                                     if not (isinstance(v, dict) and v.get("sync") is True)}
-            if keep != pv or "account" in d:
-                d["providers"] = keep
-                d.pop("account", None)
-                if every:
-                    d["active"] = ""
-                _cloud_write_to(H, d)
-    except (ValueError, StoreReadError):
-        _trash_file(p)
-
-
 def profile_keep(req_ctx, reason: str = "signed-out", cause: str = "") -> dict:
     """The kept state (1a 5.11): a sign-out by the server (reason
     "signed-out", cause saying why), a verified removal notice ("removed")
     or deletion proof ("deleted"); 1d drives it, the profiles hook until
     then. The folder, state.json and the push queue stay; it is never
-    served or synced while kept."""
+    served or synced while kept. An Add's step 6 cut short is finished
+    first, or stays owed (pending_import) for the next start."""
     if not _INSTANCE_HELD[0]:
         raise NoProfile("profile changes need the instance lock")
     if reason not in KEPT_REASONS:
@@ -10419,20 +10746,20 @@ def profile_keep(req_ctx, reason: str = "signed-out", cause: str = "") -> dict:
         # account's ctx, read-aloud stopped, lending [1g]; 2. sync [1d]
         H = _hold(old)
         _crash_point("kept.1")
-        # 3. keep the folder; synced keys (all, for removed or deleted) go
-        prev = bind_ctx(H)
-        try:
-            _kept_keys(H, reason != "signed-out")
-        finally:
-            bind_ctx(prev)
-        _crash_point("kept.3")
-        # 4. commit
+        owed = not _finish_step6_aside(old.name)
+        # 4. commit first (review of 6b330), then 3's key erasure: a crash
+        # between them is finished by the next start
         kept = {"dir": old.name, "reason": reason, "cause": str(cause or "")[:60],
                 "erase_after": (time.time() + KEPT_ERASE_S)
                 if reason in ("removed", "deleted") else None}
         _profile_json_update(lambda q: q.update(active="local", kept=kept,
-                                                pending_import=False))
+                                                pending_import=owed))
         _crash_point("kept.4")
+        try:
+            _kept_keys_raw(H.dir, reason != "signed-out")
+        except (OSError, StoreReadError) as exc:
+            print("  (the kept folder's keys go at the next start: %s)" % exc)
+        _crash_point("kept.keys")
         R = profile_switch(ProfileCtx("local", app_dir()))
         _crash_point("kept.5")
         # 5. the page reloads
@@ -10441,7 +10768,8 @@ def profile_keep(req_ctx, reason: str = "signed-out", cause: str = "") -> dict:
 
 def profile_kept_erase(req_ctx, opts=None) -> dict:
     """[Erase] on a kept, removed or deleted folder: with a non-empty
-    .imported-<dir>, step 2's question first. Commit, then erase."""
+    imports/<dir>, step 2's question first, the answer recorded in the
+    commit. Commit, then erase."""
     if not _INSTANCE_HELD[0]:
         raise NoProfile("profile changes need the instance lock")
     opts = opts if isinstance(opts, dict) else {}
@@ -10452,30 +10780,44 @@ def profile_kept_erase(req_ctx, opts=None) -> dict:
             raise StaleProfile("the profile changed")
         p = _read_json(PROFILE_FILE, MACHINE_ROOT, dict) or {}
         n = _named(p)
-        if not (n and n["kept"]):
+        if not (n and n["kept"] and cur.root):
             return {"err": "nothing kept"}
         name = n["kept"]
+        f = os.path.join(_accounts_root(), name)
+        if p.get("pending_import") is True and os.path.isdir(f) \
+                and _account_openable(f, name):
+            prev = bind_ctx(cur)
+            try:
+                _add_stage(cur, name)
+            except (StoreReadError, OSError, ValueError):
+                return {"err": "add-unfinished"}
+            finally:
+                bind_ctx(prev)
         imp = _imported_count(name)
         if imp["units"] and choice is None:
             return {"need": "imported", "imported": imp}
+        has_imp = os.path.lexists(_imported_path(name))
+
         def _commit(q):
-            q["kept"] = None
+            q.update(kept=None, pending_import=False)
             if choice == "putback":
                 _pb_add(q, name)
+            elif has_imp:
+                _er_add(q, name)
         _profile_json_update(_commit)
         _crash_point("kept-erase.commit")
         try:
-            _erase_folder(os.path.join(_accounts_root(), name), step="kept-erase")
+            _erase_folder(f, step="kept-erase")
         except (OSError, ValueError) as exc:
             print("  (the kept folder goes at the next start: %s)" % exc)
-        if choice == "putback" and cur.root:
-            prev = bind_ctx(cur)
-            try:
+        prev = bind_ctx(cur)
+        try:
+            if choice == "putback":
                 _putback_finish(cur, name)
-            finally:
-                bind_ctx(prev)
-        elif os.path.lexists(_imported_path(name)) and choice != "putback":
-            _erase_folder(_imported_path(name), step="kept-erase.imported")
+            elif has_imp:
+                _imported_erase(name, "kept-erase.imported")
+        finally:
+            bind_ctx(prev)
         _crash_point("kept-erase")
         return {"ok": True}
 
@@ -10641,6 +10983,8 @@ MACHINE_IO = frozenset((
     # the backdrops, the updater, the web view's store, retired files
     "_sky_fetch", "_faststart", "sky_seen", "_do_update",
     "_webstore_qt_sweep", "_webstore_native", "_retire_contribute",
+    # a dev copy's record of the main window's reload at a switch (M9)
+    "_main_reload",
 ))
 # ==== profile: end ====
 
@@ -10739,7 +11083,7 @@ def _chat_ts(c) -> float:
     return float(t) if isinstance(t, (int, float)) else 0.0
 
 
-def _write_chats(items, base):
+def _write_chats(items, base, evict=True):
     """The write itself: (the list kept, whether eviction dropped any).
     Atomic (0b L2), newest first, and the only eviction (0b 5.7): every
     pinned chat, every chat with a project (kept before Projects exists,
@@ -10759,7 +11103,8 @@ def _write_chats(items, base):
     exempt = [isinstance(c, dict) and bool(c.get("pin") or c.get("project"))
               for c in items]
     rest = [i for i, e in enumerate(exempt) if not e]
-    drop = set(rest[CHATS_KEEP:])
+    # evict=False: a put-back (M9) brings chats back whole, whatever the cap
+    drop = set(rest[CHATS_KEEP:]) if evict else set()
     kept = _ChatList(c for i, c in enumerate(items) if i not in drop)
     out = {"v": doc.get("v", 2), "chats": kept, "gone": gone[-GONE_KEEP:]}
     # from_legacy marks _migrate_61's untouched copy (see there): the
@@ -10784,12 +11129,12 @@ def _write_chats(items, base):
 _legacy_pending = {"chats": set(), "memory": set()}
 
 
-def store_chats(items: list, base, legacy=False, erase=False):
+def store_chats(items: list, base, legacy=False, erase=False, evict=True):
     """Write the list (see _write_chats). Whenever a chat left it (a final
     delete, the 1,000 eviction, or legacy=True for Forget), chats.json
     is rewritten without it too (0b 5.8, L7); erase=True (Forget) empties
     chats.json as well. Returns the list kept."""
-    kept, lost = _write_chats(items, base)
+    kept, lost = _write_chats(items, base, evict)
     bk = _bk(base)
     if lost or legacy or erase or bk in _legacy_pending["chats"]:
         if _legacy_sync_chats(kept, base, erase=erase):
@@ -18603,12 +18948,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # a switch under way (M9): wait for it, then work for the profile
         # it leaves active (the page's old X-Profile then gets 409). One
         # that outlasts the wait is not served under the switch's hold
-        if not switch_wait():
-            self.ctx = None
+        self.ctx = switch_ctx()
+        if self.ctx is None:
             self._send_json({"err": "The profile is changing. Try again in "
                              "a moment."}, code=503)
             return
-        self.ctx = current_ctx()
         bind_ctx(self.ctx)
         try:
             fn()
@@ -19527,10 +19871,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if self.path in ("/api/account/signin", "/api/account/signout"):
                 with _ACCT_LOCK:
                     _ACCT["running"] = True
+                    _cancel = _ACCT["cancel"]
                 try:
                     try:
                         out = (profile_signin if self.path.endswith("signin")
-                               else profile_signout)(self.ctx, d)
+                               else profile_signout)(self.ctx, d, _cancel)
                     except (NoProfile, ValueError) as exc:
                         out = {"err": str(exc)[:160]}
                     except StaleProfile:
@@ -22912,7 +23257,7 @@ ACCOUNT_STATIC = ("/account", "/account.css", "/account.js")
 # running: a switch run from it is under way; calls: account calls the
 # gate let through this run (the windowed check reads it)
 _ACCT = {"token": None, "tag": None, "task": None, "window": None,
-         "running": False, "calls": 0}
+         "running": False, "calls": 0, "cancel": None}
 _ACCT_LOCK = threading.RLock()
 _ACCT_BOOT = {"code": None, "until": 0.0}
 
@@ -22961,8 +23306,10 @@ def account_open(task: str, headless: bool = False) -> dict:
                     pass
             return {"open": True, "task": _ACCT["task"]}
         ctx = current_ctx()
+        # cancel: set when the window closes; a switch it runs checks it
+        # before its commit (review of 6b330)
         _ACCT.update(token=secrets.token_urlsafe(32), tag=ctx.tag, task=task,
-                     window=None, running=False)
+                     window=None, running=False, cancel=threading.Event())
         tok = _ACCT["token"]
     if headless:
         return {"ok": True, "token": tok, "tag": ctx.tag, "task": task}
@@ -23007,6 +23354,8 @@ def _account_closing(w):
     hadn't committed moves). Never stands in the way of the close."""
     with _ACCT_LOCK:
         if _ACCT["window"] is w:
+            if _ACCT["cancel"] is not None:
+                _ACCT["cancel"].set()
             _ACCT.update(token=None, tag=None, task=None, window=None,
                          running=False)
 
@@ -23019,6 +23368,8 @@ def account_close(keep_running: bool = False) -> bool:
         if not _ACCT["token"] or (keep_running and _ACCT["running"]):
             return False
         w = _ACCT["window"]
+        if _ACCT["cancel"] is not None:
+            _ACCT["cancel"].set()
         _ACCT.update(token=None, tag=None, task=None, window=None, running=False)
     if w is not None:
         try:
@@ -23064,10 +23415,36 @@ def _webstore_switch():
 
 def _after_switch(ctx_new, moved: bool):
     """What every switch does once the epoch has moved: the account
-    windows (1a 5.9); and, to another folder, the web view's store."""
+    windows (1a 5.9); and, to another folder, the web view's store and
+    the main window, reloaded so it stops showing the old profile's chats
+    (review of 6b330; the 409 at its next call stays as the backstop)."""
     _account_on_switch(ctx_new)
     if moved and ACCOUNTS:
         _webstore_switch()
+        _main_reload()
+
+
+def _main_reload():
+    """The main window loads the page again, on a thread of its own (a
+    window call can wait on the UI thread)."""
+    if "webstore-fake" in TEST_HOOKS:
+        # a dev copy's stand-in (no window): records the reload
+        try:
+            with open(os.path.join(app_dir(), "run", "reloads.jsonl"), "a") as fh:
+                fh.write("%s\n" % json.dumps({"at": time.time()}))
+        except OSError:
+            pass
+        return
+    if not _WINDOW:
+        return
+    w = _WINDOW[0]
+
+    def run():
+        try:
+            w.load_url("http://127.0.0.1:%d/" % PORT)
+        except Exception:
+            pass
+    ctx_thread(target=run, bind=False, daemon=True).start()
 
 
 class _AccountBridge:
@@ -27166,7 +27543,11 @@ function applyPrefs(){
 
 /* ------------------------------------------------------------- state */
 let messages=[], generating=false, abortCtl=null;
-let model=localStorage.getItem("millen.model")||"Llama 3.2 3B";
+// (M9) the single-model pick in browser storage is "This computer"'s: an
+// account's page neither reads nor writes it (prefs.json holds each
+// profile's own), so a later root boot can't adopt an account's pick
+const ROOT_LS=PROFILE.startsWith("local.");
+let model=(ROOT_LS&&localStorage.getItem("millen.model"))||"Llama 3.2 3B";
 // VISUAL EFFECTS (6b292, per Patrick): the old "performance mode"
 // switched off spinners, halos, theatre and telemetry too. Now it is ONE
 // thing — the moving backdrop — and lives in Settings › About. The old
@@ -27188,13 +27569,15 @@ let uiMode="ai";
 /* ------------------------------------------------------- model picker */
 // council[0] is the active model and, in combine mode, also the merger
 let council=[];
-try{council=JSON.parse(localStorage.getItem("millen.council"))||[];}catch(e){}
+try{council=(ROOT_LS&&JSON.parse(localStorage.getItem("millen.council")))||[];}catch(e){}
 if(!council.length)council=[model];
 
 function paintModels(){
   model=council[0];
-  localStorage.setItem("millen.model",model);
-  localStorage.setItem("millen.council",JSON.stringify(council));
+  if(ROOT_LS){
+    localStorage.setItem("millen.model",model);
+    localStorage.setItem("millen.council",JSON.stringify(council));
+  }
   const manual=!tier;            // no tier selected => one model is driving
   $$(".model").forEach(el=>{
     if(!el.dataset.model)return;  // rows without a model manage themselves
