@@ -253,6 +253,17 @@ Every personal read and write goes through the active profile's `ProfileCtx`:
 The gauntlet lints all of this (container, write/makedirs, ctx argument, callers);
 a new write, cache, thread or settings read has to fit these rules or it fails.
 
+Switching (6b330) runs a fixed protocol (`profile_signin`, `profile_signout`,
+`profile_keep`, `profile_kept_erase`; local test profiles until real accounts)
+that a crash at any named step (`SWITCH_STEPS`, the `crash-at` hook) can't
+break, and every start runs `boot_invariant` first: only what profile.json names
+stays under `accounts/`. Two rules to keep: **nothing under `accounts/` is
+deleted except by `_erase_folder`** (a rename into `accounts/.trash-*` first),
+and **a profile.json that can't be trusted deletes nothing**; profile.json is
+always written before the erase it allows. Account actions happen in the
+account window (`/account`, its own token and js_api, strict CSP); the main
+window may only ask for it to open. All of it is behind `ACCOUNTS` (dev copies).
+
 ## Traps
 
 These are the ones that have bitten repeatedly. Most are invisible from the code.
