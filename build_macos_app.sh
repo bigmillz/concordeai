@@ -35,8 +35,10 @@ echo "installing dependencies into the venv…"
 # own call, wheels only, every hash checked. Not fatal: the app fetches
 # the same pins itself at its next start.
 python3 packaging/crypto_reqs.py millenai.py crypto-requirements.txt
+# --force-reinstall: --require-hashes checks only what it downloads, so a
+# copy already in this long-lived venv is fetched and checked again
 "$VENV/bin/pip" install --quiet --only-binary=:all: --require-hashes --no-deps \
-  -r crypto-requirements.txt \
+  --force-reinstall -r crypto-requirements.txt \
   || echo "  ! PyNaCl didn't install here; the app installs it at its next start"
 PY="$VENV/bin/python3"
 echo "app will run on: $PY"

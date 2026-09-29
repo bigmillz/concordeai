@@ -6272,7 +6272,10 @@ check("Settings: the channel between Stable and Nightly is called Prerelease",
 # 6b318, per Patrick: "whenever settings is re-opened, make sure it goes
 # to the about tab". Reopening resets the rail; a call while it is already
 # open (the palette) leaves the pane alone. Checked in a browser too.
-_oa = page[page.index("async function openAbout(){"):page.index("paintAccount();")]
+# (6b327: the stats poll calls paintAccount() too, earlier in the page;
+# the slice ends at openAbout's own call)
+_oa0 = page.index("async function openAbout(){")
+_oa = page[_oa0:page.index("paintAccount();", _oa0)]
 check("Settings reopens on About, whatever pane it was closed on",
       'if(aboutVeil.hidden)settingsPane("p-about");' in _oa
       and _oa.index("settingsPane") < _oa.index("aboutVeil.hidden=false")
@@ -7991,12 +7994,16 @@ for _dh in (None, "/tmp/dev"):
         "MILLENAI_TEST_HOOKS": "no-webview,boot-code,boot-short",
         "MILLENAI_SYNC_URL": "http://127.0.0.1:8799",
         "MILLENAI_NOWINDOW": "1", "MILLENAI_PORT": "9894"}), "DEV_HOME": _dh}
-    _exec_names(_hn, {"NOWINDOW", "TEST_HOOKS", "SYNC_URL", "DEFAULT_APP"})
-    _hk[_dh] = (_hn["NOWINDOW"], sorted(_hn["TEST_HOOKS"]), _hn["SYNC_URL"], _hn["DEFAULT_APP"])
-check("test hooks, the windowless switch and the sync override live only in a dev copy",
-      _hk[None] == (False, [], "https://sync.millertechnology.net", True)
+    _exec_names(_hn, {"NOWINDOW", "TEST_HOOKS", "SYNC_PROD", "SYNC_URL", "DEFAULT_APP",
+                      "ACCOUNTS"})
+    _hk[_dh] = (_hn["NOWINDOW"], sorted(_hn["TEST_HOOKS"]), _hn["SYNC_URL"], _hn["DEFAULT_APP"],
+                _hn.get("ACCOUNTS"))
+# ACCOUNTS (6b327, review): the account screens' flag, off without a
+# dev folder, on with one
+check("test hooks, the windowless switch, the sync override and ACCOUNTS live only in a dev copy",
+      _hk[None] == (False, [], "https://sync.millertechnology.net", True, False)
       and _hk["/tmp/dev"] == (True, ["boot-code", "boot-short", "no-webview"],
-                              "http://127.0.0.1:8799", False)
+                              "http://127.0.0.1:8799", False, True)
       and 'if "no-webview" in TEST_HOOKS:' in _MILLENAI_SRC
       # the boot code reaches a file only in a windowless dev copy (6b321)
       and 'if NOWINDOW and "boot-code" in TEST_HOOKS:\n        _write_boot_note()' in _MILLENAI_SRC,
@@ -9770,36 +9777,96 @@ check("install pins: pynacl alone where cffi is loaded, or on Windows where it's
       _p_all7 == _cr7["crypto_reqs"]() and _p_loaded7 == _p_win7
       == _cr7["crypto_reqs"](only=("pynacl",)), "%r" % [_p_loaded7[:40], _p_win7[:40]])
 
-# no account action without the gate: every user of SYNC_URL asks it
+# no account action without the gate (review of 6b327): SYNC_URL is read
+# only by accounts_gate and _sync_url (which asks the gate), assigned
+# once, and the sync host's name appears only in SYNC_PROD. The walk
+# covers every function and class body, nested or not.
+_SYNC_OK = {"accounts_gate", "_sync_url"}
+
+
 def _sync_lint(src):
     tree = _ast.parse(src)
     bad = []
-    for fn in _ast.walk(tree):
-        if isinstance(fn, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
-            uses = any(isinstance(x, _ast.Name) and x.id == "SYNC_URL" for x in _ast.walk(fn))
-            gated = any(isinstance(x, _ast.Call) and getattr(x.func, "id", "") == "accounts_gate"
-                        for x in _ast.walk(fn))
-            if uses and not gated:
-                bad.append(fn.name)
-    for st in tree.body:
-        if not isinstance(st, (_ast.FunctionDef, _ast.AsyncFunctionDef, _ast.ClassDef)):
-            if any(isinstance(x, _ast.Name) and x.id == "SYNC_URL"
-                   and isinstance(x.ctx, _ast.Load) for x in _ast.walk(st)):
-                bad.append("module line %d" % st.lineno)
-    return bad
+
+    def walk(node, where):
+        for ch in _ast.iter_child_nodes(node):
+            w = ch.name if isinstance(ch, (_ast.FunctionDef, _ast.AsyncFunctionDef,
+                                           _ast.ClassDef)) else where
+            if isinstance(ch, _ast.Name) and ch.id == "SYNC_URL":
+                ok = (w in _SYNC_OK and isinstance(ch.ctx, _ast.Load)) or (
+                    w is None and isinstance(ch.ctx, _ast.Store))
+                if not ok:
+                    bad.append("%s:%d" % (w or "module", ch.lineno))
+            if (isinstance(ch, _ast.Constant) and isinstance(ch.value, str)
+                    and "sync.millertechnology.net" in ch.value):
+                bad.append("host:%s:%d" % (w or "module", ch.lineno))
+            walk(ch, w)
+    walk(tree, None)
+    stores = [n for n in _ast.walk(tree) if isinstance(n, _ast.Name) and n.id == "SYNC_URL"
+              and isinstance(n.ctx, _ast.Store)]
+    prod = [n for n in tree.body if isinstance(n, _ast.Assign)
+            and getattr(n.targets[0], "id", "") == "SYNC_PROD"]
+    if len(stores) != 1:
+        bad.append("SYNC_URL assigned %d times" % len(stores))
+    # the one place the host may be named: SYNC_PROD's own value
+    return [b for b in bad if not (b.startswith("host:module:") and prod
+                                   and int(b.rsplit(":", 1)[1]) == prod[0].lineno)]
 
 
-check("lint: nothing reaches SYNC_URL without accounts_gate (and the lint catches one)",
-      _sync_lint(_MILLENAI_SRC) == []
-      and _sync_lint(_MILLENAI_SRC + "\n\ndef _x7():\n    return SYNC_URL\n") == ["_x7"],
-      "%r" % _sync_lint(_MILLENAI_SRC))
+_pl7 = {
+    "a function": "\n\ndef _x7():\n    return SYNC_URL\n",
+    "a class's method": "\n\nclass _K7:\n    def go(self):\n        return SYNC_URL + '/v2'\n",
+    "a class body": "\n\nclass _K8:\n    U = SYNC_URL\n",
+    "a module line": "\n\n_U7 = SYNC_URL\n",
+    "the host literal": "\n\ndef _y7():\n    return 'https://sync.millertechnology.net/v2'\n",
+    "a second assignment": "\n\nSYNC_URL = 'http://x'\n",
+}
+_plb7 = {k: _sync_lint(_MILLENAI_SRC + v) for k, v in _pl7.items()}
+check("lint: only accounts_gate and _sync_url read SYNC_URL; the host is named once (the lint catches each plant)",
+      _sync_lint(_MILLENAI_SRC) == [] and all(_plb7.values()),
+      "%r" % [_sync_lint(_MILLENAI_SRC), _plb7])
 
-# A, with PyNaCl: crypto ready on /api/stats, accounts on in a dev copy
+# the gate, in-process: accounts need the flag, a test sync server in a
+# dev copy, and PyNaCl; _sync_url answers only through it
+_gt7 = {}
+_exec_names(_gt7, {"CRYPTO_MISSING", "ACCOUNT_OFF", "accounts_gate", "_sync_url"})
+
+
+def _gate7(accounts, dev, url, st):
+    _gt7.update(ACCOUNTS=accounts, DEV_HOME=dev, SYNC_URL=url,
+                SYNC_PROD="https://sync.millertechnology.net",
+                crypto_status=lambda: {"ok": st == "ready", "state": st, "note": ""})
+    return _gt7["accounts_gate"](), _gt7["_sync_url"]()
+
+
+_G7 = [_gate7(False, None, "https://sync.millertechnology.net", "ready"),
+       _gate7(True, "/d", "https://sync.millertechnology.net", "ready"),
+       _gate7(True, "/d", "http://127.0.0.1:8798", "ready"),
+       _gate7(True, "/d", "http://127.0.0.1:8798", "missing"),
+       _gate7(True, "/d", "http://127.0.0.1:8798", "installing"),
+       _gate7(True, None, "https://sync.millertechnology.net", "ready")]
+_AO7 = _gt7.get("ACCOUNT_OFF", {})
+check("accounts_gate: off without the flag, off in a dev copy on the real sync server, off without PyNaCl",
+      _G7 == [((False, ""), None), ((False, "prod-sync"), None),
+              ((True, ""), "http://127.0.0.1:8798"), ((False, "crypto"), None),
+              ((False, "installing"), None),
+              ((True, ""), "https://sync.millertechnology.net")]
+      # an action refused says the spec's sentence (1c 5.16); the pane,
+      # which sent nothing, says it plainly
+      and _AO7.get("crypto") == ("Couldn't set up encryption. Accounts need it, and nothing was sent.",
+                                 "Encryption isn't set up, so accounts are off.")
+      and _AO7.get("installing", ("", ""))[1] == "Setting up encryption."
+      and _AO7.get("prod-sync", ("", ""))[1] == "This dev copy has no test sync server (MILLENAI_SYNC_URL), so accounts are off."
+      and not any("sent" in v[1] or "Try again" in v[1] for v in _AO7.values()),
+      "%r" % [_G7, _AO7])
+
+# A, with PyNaCl but no MILLENAI_SYNC_URL: crypto ready on /api/stats,
+# accounts off because a dev copy never uses the real sync server
 _st7a = json.loads(req("/api/stats")[2]).get("crypto")
 _me7a = json.loads(req("/api/me")[2])
-check("A: /api/stats says crypto ready; accounts on (a dev copy, PyNaCl ready)",
+check("A: /api/stats says crypto ready; accounts off in a dev copy with no test sync server",
       _st7a == {"ok": True, "state": "ready", "note": ""}
-      and _me7a == {"kind": "owner", "accounts": {"on": True, "note": ""}},
+      and _me7a == {"kind": "owner", "accounts": {"on": False, "note": "This dev copy has no test sync server (MILLENAI_SYNC_URL), so accounts are off."}},
       "%r" % [_st7a, _me7a])
 
 # CRY-4: nacl blocked (PyNaCl IS importable here, the hook blocks it), the
@@ -9846,30 +9913,44 @@ _run7[0] = False
 check("CRY-4: nacl blocked, accounts stay off and say why",
       _st7n == {"ok": False, "state": "missing", "note": "nacl blocked by MILLENAI_TEST_HOOKS"}
       and _me7n == {"kind": "owner", "accounts": {
-          "on": False, "note": "Couldn't set up encryption. Accounts need it, and nothing was sent."}}
+          "on": False, "note": "Encryption isn't set up, so accounts are off."}}
       and 'id="acct-crypto" hidden' in _pg7n and not _pip7n,
       "%r" % [_st7n, _me7n, _pip7n])
 check("CRY-4: no socket opens to the sync host (the listener counts one, ours)",
       _hits_n7 == 0 and len(_hits7) == 1, "%r" % [_hits_n7, len(_hits7)])
-# the Account pane paints the note, run in node
+# the Account pane paints the note, run in node, and the 2 s stats poll
+# repaints it once PyNaCl's state moves (an install finishing)
 _pa7 = _MILLENAI_SRC.find("async function paintAccount(){")
 _pajs7 = _MILLENAI_SRC[_pa7:_MILLENAI_SRC.index("\n}\n", _pa7) + 3] if _pa7 > 0 else ""
+_cm7 = _MILLENAI_SRC.find("function cryptoMoved(st){")
+_cmjs7 = _MILLENAI_SRC[_cm7:_MILLENAI_SRC.index("\n}\n", _cm7) + 3] if _cm7 > 0 else ""
 _pjs7 = ("const E={};const $=s=>E[s]||(E[s]={textContent:'',hidden:true});let acctMe=null;"
-         "let ME=null;const api=async()=>({json:async()=>ME});" + _pajs7 +
-         "(async()=>{const out=[];for(const m of JSON.parse(require('fs').readFileSync(0,'utf8'))){"
+         "let cryptoSeen=null;let ME=null;const api=async()=>({json:async()=>ME});"
+         + _pajs7 + _cmjs7 +
+         "(async()=>{const out=[];const inp=JSON.parse(require('fs').readFileSync(0,'utf8'));"
+         "for(const m of inp.me){"
          "ME=m;E['#acct-crypto']={textContent:'x',hidden:false};await paintAccount();"
          "out.push([E['#acct-crypto'].textContent,E['#acct-crypto'].hidden]);}"
+         "out.push(inp.states.map(x=>cryptoMoved(x===null?{}:{crypto:{state:x}})));"
          "process.stdout.write(JSON.stringify(out));})();")
+_me7on = {"kind": "owner", "accounts": {"on": True, "note": ""}}
 try:
     _pjf7 = os.path.join(_SMOKE_TMP, "acct7.js")
     open(_pjf7, "w").write(_pjs7)
-    _po7 = json.loads(subprocess.run(["node", _pjf7], input=json.dumps([_me7n, _me7a, {"kind": "owner"}]),
-                                     capture_output=True, text=True, timeout=30).stdout)
+    _po7 = json.loads(subprocess.run(
+        ["node", _pjf7], input=json.dumps({
+            "me": [_me7n, _me7a, _me7on, {"kind": "owner"}],
+            "states": ["missing", "installing", None, "installing", "ready", "ready"]}),
+        capture_output=True, text=True, timeout=30).stdout)
 except Exception as _e7:
     _po7 = ["ERR %r" % _e7]
-check("CRY-4: the Account pane says \"Couldn't set up encryption…\", and nothing when ready",
-      _po7 == [["Couldn't set up encryption. Accounts need it, and nothing was sent.", False],
-               ["", True], ["", True]], "%r" % _po7)
+check("CRY-4: the Account pane says encryption isn't set up, nothing when on; it repaints when the install ends",
+      _po7 == [["Encryption isn't set up, so accounts are off.", False],
+               ["This dev copy has no test sync server (MILLENAI_SYNC_URL), so accounts are off.", False],
+               ["", True], ["", True],
+               [False, True, False, False, True, False]]
+      and "    if(cryptoMoved(st))paintAccount();\n  }catch(e){}" in _MILLENAI_SRC
+      and "let simGpu=12,memPct=null,cryptoSeen=null;" in _MILLENAI_SRC, "%r" % _po7)
 
 # THE INSTALL, for real, into throwaway venvs: C's venv inside its own
 # folder installs from the pinned wheels; D's wheel folder holds a
@@ -9930,12 +10011,26 @@ def _pips7(inst):
 
 
 _C7 = _icopy7("C7", None, _wh7)
+# a test sync server named (nothing listens there; nothing asks it), so
+# accounts can turn on once PyNaCl is ready
+_C7.env["MILLENAI_SYNC_URL"] = "http://127.0.0.1:9"
 _cpy7 = _venv7(os.path.join(_C7.home, "venv"))
 _C7.py = _cpy7
 _C7.start()
 _st7c = _await7(_C7)
+_me7c = json.loads(_ireq(_C7, "/api/me")[1])
 _pip7c = _pips7(_C7)
 _C7.stop()
+
+
+def _rec7(inst):
+    try:
+        return json.load(open(os.path.join(inst.home, "crypto-install.json")))
+    except (OSError, ValueError):
+        return None
+
+
+_rc7c = _rec7(_C7)
 _mods7c = _vmods7(_cpy7)
 _ver7c = subprocess.run([_cpy7, "-c", "import nacl,cffi,pycparser;print(nacl.__version__,"
                          "cffi.__version__,pycparser.__version__)"],
@@ -9947,8 +10042,16 @@ check("install: a copy's own venv gets the pins, hash-checked, and crypto turns 
       and _a7[1:4] == ["-m", "pip", "install"]
       and os.path.realpath(_a7[0]) == os.path.realpath(_cpy7)
       and {"--only-binary=:all:", "--require-hashes", "--no-deps"} <= set(_a7)
-      and "-r" in _a7 and not os.path.exists(_a7[_a7.index("-r") + 1]),
-      "%r" % [_st7c, _ver7c, _pip7c])
+      and "--timeout 15 --retries 1" in " ".join(_a7)
+      and "-r" in _a7 and not os.path.exists(_a7[_a7.index("-r") + 1])
+      # the attempt is recorded for this build and Python, and accounts
+      # turn on (a dev copy with a test sync server, PyNaCl ready)
+      and isinstance(_rc7c, dict) and _rc7c.get("ok") is True
+      and str(_rc7c.get("key", "")).split(" ")[1:] == [
+          subprocess.run([_cpy7, "-c", "import sys;print(sys.version.split()[0])"],
+                         capture_output=True, text=True, env=_env7).stdout.strip()]
+      and _me7c == {"kind": "owner", "accounts": {"on": True, "note": ""}},
+      "%r" % [_st7c, _ver7c, _pip7c, _rc7c, _me7c])
 _ok7s = subprocess.run([_cpy7, "millenai.py", "--crypto-selftest",
                         os.path.join(_SMOKE_TMP, "self7.json")],
                        env=dict(_env7, MILLENAI_DEV="1",
@@ -9966,10 +10069,30 @@ _D7.start()
 _st7d = _await7(_D7)
 _D7.stop()
 _mods7d = _vmods7(_dpy7)
+_rc7d = _rec7(_D7)
 check("install: a wheel that doesn't match its pinned hash installs nothing",
       _st7d.get("ok") is False and _st7d.get("state") == "error"
       and "HASH" in _st7d.get("note", "").upper()
-      and _mods7d == "[False, False, False]", "%r" % [_st7d, _mods7d])
+      and _mods7d == "[False, False, False]"
+      and isinstance(_rc7d, dict) and _rc7d.get("ok") is False, "%r" % [_st7d, _mods7d, _rc7d])
+# ONE FETCH, NOT ONE PER LAUNCH (review): the next start runs no pip and
+# says when it tries again; three days on, it tries once more
+_D7.start()
+time.sleep(4)
+_st7d2 = json.loads(_ireq(_D7, "/api/stats")[1]).get("crypto")
+_D7.stop()
+_n7d2 = len(_pips7(_D7))
+if isinstance(_rc7d, dict):
+    _rc7d["at"] -= 4 * 86400
+    json.dump(_rc7d, open(os.path.join(_D7.home, "crypto-install.json"), "w"))
+_D7.start()
+_st7d3 = _await7(_D7)
+_D7.stop()
+_n7d3 = len(_pips7(_D7))
+check("install: a failure isn't retried at the next start, only three days later",
+      _n7d2 == 1 and _st7d2.get("state") == "error" and "tries again" in _st7d2.get("note", "")
+      and _n7d3 == 2 and _st7d3.get("state") == "error",
+      "%r" % [_n7d2, _st7d2, _n7d3, _st7d3])
 
 _E7 = _icopy7("E7", None, _wh7)
 _epy7 = _venv7(os.path.join(_SMOKE_TMP, "shared7-venv"))
@@ -9983,7 +10106,8 @@ _mods7e = _vmods7(_epy7)
 check("install: a dev copy on a venv outside its folder (the shared one) installs nothing",
       _st7e == {"ok": False, "state": "missing",
                 "note": "nacl won't import (ModuleNotFoundError); the venv isn't this copy's own"}
-      and _pip7e == [] and _mods7e == "[False, False, False]", "%r" % [_st7e, _pip7e, _mods7e])
+      and _pip7e == [] and _mods7e == "[False, False, False]"
+      and _rec7(_E7) is None, "%r" % [_st7e, _pip7e, _mods7e])
 _no7s = subprocess.run([_epy7, "millenai.py", "--crypto-selftest"],
                        env=dict(_env7, MILLENAI_DEV="1",
                                 MILLENAI_HOME=os.path.join(_SMOKE_TMP, "self7-home")),
@@ -9993,6 +10117,33 @@ check("--crypto-selftest: exit 0 with the answers, 1 without PyNaCl, before anyt
       and _no7s.returncode == 1 and json.loads(_no7s.stdout or "{}").get("state") == "missing"
       and not os.path.exists(os.path.join(_SMOKE_TMP, "self7-home")),
       "%r" % [_ok7s.returncode, _self7, _no7s.returncode, _no7s.stdout[-200:]])
+
+# when to try, in-process: a new build or Python tries; a success never
+# re-runs for the same one; a failure waits three days
+_st7 = {"time": time, "APP_BUILD": 999, "sys": sys}
+_exec_names(_st7, {"CRYPTO_RETRY_S", "_crypto_key", "_crypto_should_try", "_pip_why"})
+_k7 = _st7["_crypto_key"]() if "_crypto_key" in _st7 else ""
+_T7 = 1_800_000_000
+_sh7 = [_st7["_crypto_should_try"](r, _k7, _T7)[0] for r in (
+    None, {"key": "998 " + sys.version.split()[0], "ok": True, "at": _T7},
+    {"key": _k7, "ok": True, "at": _T7 - 99 * 86400},
+    {"key": _k7, "ok": False, "at": _T7 - 2 * 86400},
+    {"key": _k7, "ok": False, "at": _T7 - 3 * 86400},
+    {"key": "999 3.0.0", "ok": False, "at": _T7})] if _k7 else []
+_pw7 = [_st7["_pip_why"](x) for x in (
+    "ERROR: Could not find a version that satisfies the requirement pynacl==1.6.2 (from versions: none)",
+    "WARNING: Retrying ... NewConnectionError('<pip._vendor...>: Failed to establish a new connection')",
+    "ERROR: THESE PACKAGES DO NOT MATCH THE HASHES FROM THE REQUIREMENTS FILE.")] if _k7 else []
+check("install: tried once per build and Python (a failure again after 3 days); offline reads as offline",
+      _k7 == "999 " + sys.version.split()[0]
+      and _sh7 == [True, True, False, False, True, True]
+      and _pw7 == ["couldn't reach PyPI (or it has no wheel for this Python)",
+                   "couldn't reach PyPI",
+                   "ERROR: THESE PACKAGES DO NOT MATCH THE HASHES FROM THE REQUIREMENTS FILE."],
+      "%r" % [_k7, _sh7, _pw7])
+check("install: only the copy holding the instance lock starts it",
+      _MILLENAI_SRC.count("target=_ensure_crypto_deps") == 1
+      and "    if _INSTANCE_LOCK:\n        threading.Thread(target=_ensure_crypto_deps" in _MILLENAI_SRC)
 
 # the builds: every one installs the pins hash-checked; the frozen exe
 # carries _cffi_backend on x64 and ARM64 and must pass its self-test
@@ -10011,19 +10162,33 @@ check("build_windows.sh: deps-4 names PyNaCl; the .bat installs the hashed pins 
       and 'packaging/crypto_reqs.py millenai.py "$STAGE/crypto-requirements.txt"' in _bw7)
 _lau7 = _bm7.split("<<'LAUNCH'")[1] if "<<'LAUNCH'" in _bm7 else ""
 check("build_macos_app.sh: the build venv and the first-run launcher install the hashed pins",
-      ('"$VENV/bin/pip" install --quiet %s \\\n  -r crypto-requirements.txt' % _HP7) in _bm7
+      ('"$VENV/bin/pip" install --quiet %s \\\n  --force-reinstall -r crypto-requirements.txt' % _HP7) in _bm7
       and ('"$VENV/bin/pip" install %s \\\n    -r "$DIR/../Resources/crypto-requirements.txt"'
            % _HP7) in _lau7
       and 'cp crypto-requirements.txt "$APP/Contents/Resources/"' in _bm7)
 _arm7 = _ps7.find("if ($isArm) {\n  $pyiArgs")
-_hid7 = _ps7.find('$pyiArgs += @("--hidden-import", "_cffi_backend"')
-check("build_windows_exe.ps1: hashed pins, _cffi_backend for x64 and ARM64, the exe's self-test",
-      ("-m pip install %s -r crypto-requirements.txt" % _HP7) in _ps7
+_hid7 = _ps7.find('$pyiArgs += @("--hidden-import", "_cffi_backend", "--collect-submodules", "nacl")')
+check("build_windows_exe.ps1: hashed pins fetched afresh, _cffi_backend and nacl for x64 and ARM64, the self-test",
+      ("-m pip install %s --force-reinstall -r crypto-requirements.txt" % _HP7) in _ps7
       and 'throw "PyNaCl did not install' in _ps7
       and 0 < _hid7 < _arm7
       and '"--crypto-selftest"' in _ps7 and 'if ($p.ExitCode -ne 0) { throw "the exe failed its crypto self-test' in _ps7
       and _ps7.index('"--crypto-selftest"') < _ps7.index("MILLENAI_NO_PACKAGE")
       and all(ord(c) < 128 for c in _ps7), "%r" % [_hid7, _arm7])
+# -Arch (6b327): a param() block as the first statement, only that
+# architecture when asked, x64 first otherwise, the choice printed; the
+# build venv made again when another interpreter made it; a per-user
+# Inno Setup found
+_code7 = "\n".join(l for l in _ps7.splitlines() if l.strip() and not l.lstrip().startswith("#"))
+check("build_windows_exe.ps1: -Arch x64|arm64 picks that Python or stops; a per-user Inno Setup is found",
+      _code7.startswith('param(\n  [ValidateSet("x64", "arm64")]\n  [string]$Arch\n)')
+      and '  if ($Arch -eq "x64") { return $x64 }\n  if ($Arch -eq "arm64") { return $arm }\n'
+          '  if ($x64) { return $x64 }\n  return $arm\n' in _ps7
+      and 'throw "no $Arch Python interpreter found"' in _ps7
+      and "$Arch =" not in _ps7
+      and '-> building with: {0} ({1}){2}' in _ps7
+      and 'if ("$bvId" -ne "$pyId") {' in _ps7
+      and '"$env:LOCALAPPDATA\\Programs\\Inno Setup 6\\ISCC.exe"' in _ps7)
 check("CI: the frozen exe's self-test; the nightly installs the pins and the smoke asserts crypto",
       _wi7.find("crypto self-test of the frozen exe") > _wi7.find("build_windows_exe.ps1")
       and _wi7.find("crypto self-test of the frozen exe") < _wi7.find("locate WiX")

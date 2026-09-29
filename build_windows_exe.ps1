@@ -17,13 +17,24 @@
 # use for a shareable build. The script prefers x64 automatically when both
 # are installed, and tells you which it picked.
 #
+# Both Pythons installed (an ARM VM, say)? -Arch picks one:
+#   powershell -ExecutionPolicy Bypass -File build_windows_exe.ps1 -Arch arm64
+# -Arch x64 or -Arch arm64 takes only an interpreter of that architecture
+# and stops if there is none; with no -Arch it prefers x64, as before.
+#
 # KEEP THIS FILE PURE ASCII. Windows PowerShell 5.1 reads a .ps1 with no BOM
 # as the ANSI codepage, not UTF-8. A UTF-8 em-dash arrives as three CP1252
 # characters, the last of which is U+201D - a curly double quote, which
 # PowerShell honours as a string delimiter. One dash in a comment silently
 # desyncs the quoting for the rest of the file.
+param(
+  [ValidateSet("x64", "arm64")]
+  [string]$Arch
+)
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
+# $Arch keeps its ValidateSet: never assign it (an assignment is validated
+# too). PowerShell's -eq ignores case, so -Arch ARM64 works as well.
 
 # ---------------------------------------------------------------- preflight
 # Windows ships a stub python.exe under WindowsApps that only prints an advert
@@ -70,10 +81,12 @@ function Find-Python {
   }
 
   # Prefer x64 - it is the build an NVIDIA machine can actually run - but
-  # fall back to ARM64 rather than claiming nothing is installed.
+  # fall back to ARM64 rather than claiming nothing is installed. With
+  # -Arch, only that architecture will do (6b327).
   $seen = @{}
   $script:PyReport = @()
-  $armFallback = $null
+  $x64 = $null
+  $arm = $null
   foreach ($exe in $cands) {
     if (-not (Test-Path $exe)) { continue }
     $key = $exe.ToLower()
@@ -82,13 +95,25 @@ function Find-Python {
     $arch = Get-PyArch $exe
     if (-not $arch) { continue }
     $script:PyReport += ("    {0,-8} {1}" -f $arch, $exe)
-    if ($arch -match 'AMD64|x86_64') { return $exe }
-    if (-not $armFallback -and $arch -match 'ARM64|aarch64') { $armFallback = $exe }
+    if (-not $x64 -and $arch -match 'AMD64|x86_64') { $x64 = $exe }
+    if (-not $arm -and $arch -match 'ARM64|aarch64') { $arm = $exe }
   }
-  return $armFallback
+  if ($Arch -eq "x64") { return $x64 }
+  if ($Arch -eq "arm64") { return $arm }
+  if ($x64) { return $x64 }
+  return $arm
 }
 
 $py = Find-Python
+if (-not $py -and $Arch) {
+  Write-Host ""
+  Write-Host "  No $Arch Python found. Interpreters found:" -ForegroundColor Yellow
+  if ($script:PyReport) { $script:PyReport | ForEach-Object { Write-Host $_ } }
+  else { Write-Host "    (none)" }
+  Write-Host "  Install the $Arch build from https://www.python.org/downloads/windows/"
+  Write-Host "  (for arm64, Python 3.11 or newer: 3.10 has no ARM64 cffi wheel)."
+  throw "no $Arch Python interpreter found"
+}
 if (-not $py) {
   Write-Host ""
   Write-Host "  Python is not installed." -ForegroundColor Yellow
@@ -117,6 +142,8 @@ if ($script:PyReport -and $script:PyReport.Count -gt 1) {
 
 $arch = & $py -c "import platform;print(platform.machine())"
 Write-Host "python architecture: $arch"
+Write-Host ("-> building with: {0} ({1}){2}" -f $py, $arch,
+            $(if ($Arch) { " as asked by -Arch $Arch" } else { "" }))
 $isArm = $arch -match 'ARM64|aarch64'
 if ($isArm) {
   Write-Host ""
@@ -136,6 +163,17 @@ Write-Host "version: $ver"
 
 # ------------------------------------------------------------------- venv
 $bv = ".build-venv"
+# the build venv is kept between builds; one made by another Python (the
+# other architecture, after -Arch, or another version) would freeze the
+# wrong interpreter in, so it is made again (6b327)
+$pyId = & $py -c "import platform,sys;print(platform.machine(), sys.version.split()[0])"
+if (Test-Path "$bv\Scripts\python.exe") {
+  $bvId = & "$bv\Scripts\python.exe" -c "import platform,sys;print(platform.machine(), sys.version.split()[0])"
+  if ("$bvId" -ne "$pyId") {
+    Write-Host "-> $bv was made by $bvId, not $pyId; making it again"
+    Remove-Item -Recurse -Force $bv
+  }
+}
 if (-not (Test-Path "$bv\Scripts\python.exe")) {
   Write-Host "-> creating build venv"
   & $py -m venv $bv
@@ -157,7 +195,10 @@ if ($LASTEXITCODE -eq 3) {
 } elseif ($LASTEXITCODE -ne 0) {
   throw "could not read CRYPTO_REQS from millenai.py"
 } else {
-  & $bpy -m pip install --only-binary=:all: --require-hashes --no-deps -r crypto-requirements.txt
+  # --force-reinstall: --require-hashes checks only what it downloads, and
+  # .build-venv lives between builds, so the pins are fetched and checked
+  # every time rather than trusted from the last build
+  & $bpy -m pip install --only-binary=:all: --require-hashes --no-deps --force-reinstall -r crypto-requirements.txt
   if ($LASTEXITCODE -ne 0) { throw "PyNaCl did not install (hash-pinned wheels, see above)" }
 }
 # tzdata: Windows has no time-zone database of its own. The four export
@@ -232,7 +273,9 @@ if ($env:MILLENAI_NO_PACKAGE -eq "1") {
 }
 $iscc = @(
   "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
-  "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+  "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+  # a per-user Inno install (winget without admin) lands here (6b327)
+  "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
 ) | Where-Object { Test-Path $_ } | Select-Object -First 1
 
 $suffix   = if ($isArm) { "arm64" } else { "x64" }

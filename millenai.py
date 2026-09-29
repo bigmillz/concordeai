@@ -180,9 +180,11 @@ class cai_crypto:
              "7f1b0b4aa6440bf3a82f4eda7e39ae64c6708c54c216cb96b72e1213b4522f8c9ba4"
              "0db5d945b11b69b982c1bb9e3f3fac2bc369488f76b2383565d3fff921f9664c9763"
              "7da9768812f615c68b13b52ec0875924c1c7987947deafd8780acf49")
-    # Argon2id at libsodium's floor (1 pass, 8 KiB), so it costs nothing:
-    # the answer PyNaCl 1.6.2 gave on 2026-09-28
-    A2_OUT = "c2e7d20a2b529cce5149d8aecdb8e9689ccbeb358c806fdbf8788c49d1c92411"
+    # Argon2id, 3 passes over 8 KiB (cheap; 3 passes reach the
+    # data-independent/dependent switch a 1-pass run never does):
+    # checked independently on 2026-09-28, by libsodium and by a
+    # pure-Python Argon2 written from RFC 9106
+    A2_OUT = "57b5c24165fda0ff11a19a4599c274f209d5d675e3bbfc571270e5966b009299"
 
     @classmethod
     def _answers(cls):
@@ -217,7 +219,7 @@ class cai_crypto:
             return False
         except ne.CryptoError:
             pass
-        return a2.kdf(32, b"password", b"somesalt16bytes!", opslimit=1,
+        return a2.kdf(32, b"password", b"somesalt16bytes!", opslimit=3,
                       memlimit=8192) == h(cls.A2_OUT)
 
     @classmethod
@@ -356,8 +358,9 @@ TEST_HOOKS = frozenset(
     x.strip() for x in os.environ.get("MILLENAI_TEST_HOOKS", "").split(",")
     if x.strip()) if DEV_HOME else frozenset()
 # the sync server; a dev copy may point at the test one (00 5.7)
+SYNC_PROD = "https://sync.millertechnology.net"
 SYNC_URL = ((os.environ.get("MILLENAI_SYNC_URL", "").strip()
-             if DEV_HOME else "") or "https://sync.millertechnology.net")
+             if DEV_HOME else "") or SYNC_PROD)
 # the account screens' build flag (sign-in plan): on in dev and test
 # copies, off in the app a person opened until the sign-in beta (M17)
 ACCOUNTS = bool(DEV_HOME)
@@ -11188,6 +11191,67 @@ def _ensure_tzdata():
 _crypto_install = {"state": "idle", "note": ""}
 CRYPTO_MISSING = ("Couldn't set up encryption. Accounts need it, and "
                   "nothing was sent.")
+# ONE FETCH, NOT ONE PER LAUNCH (review of 6b327): each attempt is
+# recorded in crypto-install.json, keyed on this build and this Python.
+# A failure is retried when either changes, or 3 days later; a success
+# never re-runs for the same key.
+CRYPTO_RECORD = "crypto-install.json"
+CRYPTO_RETRY_S = 3 * 86400
+
+
+def _crypto_key() -> str:
+    return "%s %s" % (APP_BUILD, sys.version.split()[0])
+
+
+def _crypto_should_try(rec, key: str, now: float):
+    """(try now?, why not). rec is the last attempt's record, or None."""
+    if not isinstance(rec, dict) or rec.get("key") != key:
+        return True, ""
+    if rec.get("ok"):
+        return False, "installed once for this build and Python"
+    at = rec.get("at") if isinstance(rec.get("at"), (int, float)) else 0
+    if now - at >= CRYPTO_RETRY_S:
+        return True, ""
+    return False, "%s (tries again %s)" % (
+        rec.get("note") or "the last install failed",
+        time.strftime("%Y-%m-%d", time.localtime(at + CRYPTO_RETRY_S)))
+
+
+def _crypto_record_read():
+    try:
+        with open(os.path.join(app_dir(), CRYPTO_RECORD), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def _crypto_record_write(rec: dict):
+    d = app_dir()
+    try:
+        os.makedirs(d, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=d, prefix=".crypto-install-",
+                                   suffix=".tmp")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(rec, f)
+        _replace_into(tmp, os.path.join(d, CRYPTO_RECORD))
+    except OSError:
+        pass
+
+
+def _pip_why(out: str) -> str:
+    """pip's failure as one line; offline reads as offline (review)."""
+    lines = [x.strip() for x in (out or "").splitlines() if x.strip()]
+    low = (out or "").lower()
+    if any(k in low for k in ("newconnectionerror", "failed to establish",
+                              "name resolution", "nodename nor servname",
+                              "getaddrinfo failed", "connecttimeout",
+                              "read timed out", "network is unreachable",
+                              "connection refused", "connectionerror")):
+        return "couldn't reach PyPI"
+    if "(from versions: none)" in low:
+        return "couldn't reach PyPI (or it has no wheel for this Python)"
+    first = [x for x in lines if x.startswith("ERROR")]
+    return ((first or lines or ["pip failed"])[0])[:200]
 
 
 def _inside(path: str, folder: str) -> bool:
@@ -11229,6 +11293,7 @@ def _crypto_pip(python: str, reqs: str, extra=()):
             f.write(reqs)
         r = subprocess.run([python, "-m", "pip", "install", "--quiet",
                             "--disable-pip-version-check", "--no-input",
+                            "--timeout", "15", "--retries", "1",
                             "--only-binary=:all:", "--require-hashes",
                             "--no-deps"] + list(extra) + ["-r", path],
                            capture_output=True, text=True, timeout=600,
@@ -11242,10 +11307,7 @@ def _crypto_pip(python: str, reqs: str, extra=()):
         except OSError:
             pass
     if r.returncode != 0:
-        lines = [x.strip() for x in (r.stderr or r.stdout or "").splitlines()
-                 if x.strip()]
-        first = [x for x in lines if x.startswith("ERROR")]
-        return False, ((first or lines or ["pip failed"])[0])[:200]
+        return False, _pip_why((r.stderr or "") + "\n" + (r.stdout or ""))
     return True, ""
 
 
@@ -11259,6 +11321,12 @@ def _ensure_crypto_deps():
     if why:
         _crypto_install.update(state="skipped", note=why)
         print("  (encryption unavailable: %s)" % cai_crypto.status()[2])
+        return
+    key = _crypto_key()
+    go, why = _crypto_should_try(_crypto_record_read(), key, time.time())
+    if not go:
+        _crypto_install.update(state="failed", note=why)
+        print("  (encryption unavailable: %s)" % why)
         return
     _crypto_install.update(state="installing", note="")
     wheels = _hook_arg("crypto-wheels")   # a dev copy's local wheel folder
@@ -11274,6 +11342,9 @@ def _ensure_crypto_deps():
         _crypto_install.update(state="failed",
                                note=why or cai_crypto.status()[2])
         print("  (encryption unavailable: %s)" % _crypto_install["note"])
+    _crypto_record_write({"key": key, "ok": _crypto_install["state"] == "done",
+                          "at": int(time.time()),
+                          "note": _crypto_install["note"]})
 
 
 def crypto_status() -> dict:
@@ -11289,19 +11360,42 @@ def crypto_status() -> dict:
     return {"ok": ok, "state": state, "note": why}
 
 
+# why accounts are off: what an account action says, and what the
+# Account pane says (the pane is passive: it sent nothing, review)
+ACCOUNT_OFF = {
+    "prod-sync": ("A dev copy doesn't use the real sync server, and "
+                  "nothing was sent. Set MILLENAI_SYNC_URL.",
+                  "This dev copy has no test sync server "
+                  "(MILLENAI_SYNC_URL), so accounts are off."),
+    "installing": ("Setting up encryption. Try again in a minute.",
+                   "Setting up encryption."),
+    "crypto": (CRYPTO_MISSING,
+               "Encryption isn't set up, so accounts are off."),
+}
+
+
 def accounts_gate():
-    """(True, '') when an account action may go ahead, else (False, what
-    to say). Every account action asks this before it opens any socket to
-    SYNC_URL (CRY-4): no PyNaCl, no accounts, and no plaintext fallback.
-    The gauntlet holds every user of SYNC_URL to it."""
+    """(True, '') when an account action may go ahead, else (False, why):
+    '' in a build without accounts, else a key of ACCOUNT_OFF. Every
+    account action asks this before any socket opens to the sync server
+    (CRY-4): no PyNaCl, no accounts, no plaintext fallback. A dev copy
+    never reaches the real server: its accounts need MILLENAI_SYNC_URL
+    (review of 6b327)."""
     if not ACCOUNTS:
         return False, ""
+    if DEV_HOME and SYNC_URL == SYNC_PROD:
+        return False, "prod-sync"
     st = crypto_status()
     if st["ok"]:
         return True, ""
-    if st["state"] == "installing":
-        return False, "Setting up encryption. Try again in a minute."
-    return False, CRYPTO_MISSING
+    return False, "installing" if st["state"] == "installing" else "crypto"
+
+
+def _sync_url():
+    """The sync server's address, for an account action accounts_gate()
+    allows, else None. The only reader of SYNC_URL (the gauntlet's lint)."""
+    ok, _why = accounts_gate()
+    return SYNC_URL if ok else None
 
 
 def _host_tz() -> str:
@@ -16362,9 +16456,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # computer's owner. The shape stays for the signed-in account.
             # `accounts` (6b327): on only in a build with the account
             # screens and with PyNaCl ready; the note says why not (CRY-4)
-            _aon, _anote = accounts_gate()
-            self._send_json({"kind": "owner",
-                             "accounts": {"on": _aon, "note": _anote}})
+            _aon, _awhy = accounts_gate()
+            self._send_json({"kind": "owner", "accounts": {
+                "on": _aon, "note": ACCOUNT_OFF[_awhy][1] if _awhy else ""}})
         elif self.path == "/api/voice/status":
             with _setup_lock:
                 job = dict(_setup_jobs.get(VOICE_ROW, {}))
@@ -27037,7 +27131,14 @@ function paintMeter(el,pct){
   f.style.width=Math.max(0,Math.min(100,pct))+"%";
   f.classList.toggle("hot",pct>=80);
 }
-let simGpu=12,memPct=null;
+let simGpu=12,memPct=null,cryptoSeen=null;
+// PyNaCl's state moved (an install finished, 6b327): true once per move
+function cryptoMoved(st){
+  const cs=st&&st.crypto&&st.crypto.state;
+  if(!cs)return false;
+  const moved=cryptoSeen!==null&&cs!==cryptoSeen;
+  cryptoSeen=cs;return moved;
+}
 async function pollStats(){
   let gpu;
   try{
@@ -27048,6 +27149,8 @@ async function pollStats(){
     // page didn't, so the list is read again (never mid-answer)
     if(typeof st.data_rev==="number"&&st.data_rev!==dataRev&&chatsLoaded
        &&!generating)loadChatsFromDisk();
+    // the Account pane follows the install (6b327)
+    if(cryptoMoved(st))paintAccount();
   }catch(e){}
   // a PC with no GPU readings (no NVIDIA card) shows no bar rather
   // than a made-up one (6b317, from the Windows sweep)
@@ -29563,7 +29666,7 @@ async function paintAccount(){
   $("#acct-kind").textContent=row[1];
   $("#acct-sub").textContent=row[2];
   // why accounts are off in a build that has them (6b327, CRY-4):
-  // "Couldn't set up encryption…" when PyNaCl isn't ready
+  // "Encryption isn't set up, so accounts are off." without PyNaCl
   const an=(me.accounts&&me.accounts.note)||"",ac=$("#acct-crypto");
   ac.textContent=an;ac.hidden=!an;
 }
@@ -30728,8 +30831,11 @@ if __name__ == "__main__":
     threading.Thread(target=_mlx_janitor, daemon=True).start()
     threading.Thread(target=_warm_studio_cache, daemon=True).start()
     threading.Thread(target=_ensure_tzdata, daemon=True).start()
-    # PyNaCl, or one hash-checked install of it (0a 5.9, 6b327)
-    threading.Thread(target=_ensure_crypto_deps, daemon=True).start()
+    # PyNaCl, or one hash-checked install of it (0a 5.9, 6b327); only
+    # by the copy holding the instance lock (single_instance can let a
+    # copy run without it), so two copies never pip into one venv
+    if _INSTANCE_LOCK:
+        threading.Thread(target=_ensure_crypto_deps, daemon=True).start()
     start_managed_engines()
     if not HAS_SEARCH:
         print("  (web search disabled — pip install ddgs to enable)")
