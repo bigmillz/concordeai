@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 bigmillz. ConcordeAI is free software under the GNU
+# General Public License, version 3 or later; see LICENSE.
 """
 MillenAI — single-file local LLM cockpit.
 
