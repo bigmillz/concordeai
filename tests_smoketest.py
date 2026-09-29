@@ -624,8 +624,12 @@ _media = (["/api/image/" + n for n in _MEDIA_A["images"]]
           + ["/api/video/" + n for n in _MEDIA_A["videos"]])
 _extra = ["/api/chats", "/api/chats/search?q=a", "/auth/google", "/favicon.ico", "/nope",
           "/?x=1", "//api/chats", "/static/", "/static/sky/", "/static/x.js",
-          "/api/export/x.csv", "/api/window/focus"]
-_ok_alone = {"/static/vfx/hdr-beacon.mp4"}
+          "/api/export/x.csv", "/api/window/focus", "/account.js", "/account?x=1",
+          "/account/", "/account.cssx", "/api/account/session"]
+# (6b330) and, in a build with the account window (every dev copy), its
+# page and two static files: nothing personal, and a <script src> can't
+# send a header (the page's calls carry the account window's own token)
+_ok_alone = {"/static/vfx/hdr-beacon.mp4", "/account", "/account.css", "/account.js"}
 _rg = {}
 for _r in sorted(set(_routes + _media + _extra)):
     _st, _hd, _bd = req(_r, token=False)
@@ -645,7 +649,8 @@ check("ISO-14 cookie replay: the cookie alone opens only / and /static/, every o
       and "/api/chats" in _routes and "/api/window/focus" in _routes
       # the one list of what the cookie alone opens, pinned
       and '_COOKIE_ONLY = re.compile(\n    r"/(?:static/sky/\\d{1,3}\\.mov|static/vfx/hdr-beacon\\.mp4)?")'
-      in _MILLENAI_SRC,
+      in _MILLENAI_SRC
+      and 'ACCOUNT_STATIC = ("/account", "/account.css", "/account.js")' in _MILLENAI_SRC,
       "%r" % [len(_routes), [k for k, v in _rg.items() if not v][:8],
               [k for k, v in _rp.items() if not v][:8], _p0, _sky0])
 # an absolute-form request line (GET http://host/api/chats) or a doubled
@@ -2307,7 +2312,10 @@ check("taken port: the window opens the server this app bound",
       and 'url = "http://127.0.0.1:%d/?boot=%s" % (PORT, _mint_boot_code())' in _main
       and _main.index("start_managed_engines()") < _main.index("_mint_boot_code()")
       < _main.index("webview.create_window(")
-      and "js_api=_WindowBridge() if _BRIDGE_OK else None," in _main
+      # (6b330) the account-window build adds open_account; without
+      # ACCOUNTS (the app a person opens) it is the one-method bridge
+      and "js_api=((_WindowBridgeAcct() if ACCOUNTS else _WindowBridge())\n"
+          "                    if _BRIDGE_OK else None)," in _main
       and "?key=" not in _main
       and "os.O_WRONLY | os.O_CREAT | os.O_TRUNC,\n                     0o600" in _MILLENAI_SRC,
       "moved=%s named_fails=%s lock=%s calls=%s overlap=%s"
@@ -7385,6 +7393,7 @@ with open(_sbjs, "w", encoding="utf-8") as fh:
     fh.write(r"""
 const BASE=%s, HDR=%s;
 const run=JSON.parse(require('fs').readFileSync(0,'utf8'));
+const PROFILE="local.test";      // (6b330) storeBoot reads which profile it was drawn for
 const store=new Map(Object.entries(run.ls));
 globalThis.localStorage={getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,String(v)),
   removeItem:k=>store.delete(k),key:i=>[...store.keys()][i]??null,get length(){return store.size;}};
@@ -7466,6 +7475,7 @@ _racejs = os.path.join(_SMOKE_TMP, "race24.js")
 with open(_racejs, "w", encoding="utf-8") as fh:
     fh.write(r"""
 const run=JSON.parse(require('fs').readFileSync(0,'utf8'));
+const PROFILE="local.test";      // (6b330) storeBoot reads which profile it was drawn for
 const store=new Map();
 globalThis.localStorage={getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,String(v)),
   removeItem:k=>store.delete(k),key:i=>[...store.keys()][i]??null,get length(){return store.size;}};
@@ -7864,8 +7874,9 @@ check("ISO-14: new pictures and videos get a 32-hex random name",
       and len(set(_mp)) == 3
       and _MILLENAI_SRC.count("secrets.token_hex(3)") == 1       # the remote job's unit name
       and 'unit = "concorde-job-%s" % secrets.token_hex(3)' in _MILLENAI_SRC
-      # (6b329) the four: a cloud picture, a render landing, a Veo clip, the def
-      and _MILLENAI_SRC.count("_media_id()") == 4
+      # (6b329) the four: a cloud picture, a render landing, a Veo clip, the def;
+      # (6b330) and the profiles hook's stand-in for the Veo landing
+      and _MILLENAI_SRC.count("_media_id()") == 5
       and "    iid = _media_id()\n" in _MILLENAI_SRC
       and '    name = IMAGE_SUB + "/" + _media_id() + ext\n' in _MILLENAI_SRC
       and 'name = VIDEO_SUB + "/" + _media_id() + ".mp4"\n' in _MILLENAI_SRC
@@ -10044,10 +10055,22 @@ check("accounts_gate: off without the flag, off in a dev copy on the real sync s
 # A, with PyNaCl but no MILLENAI_SYNC_URL: crypto ready on /api/stats,
 # accounts off because a dev copy never uses the real sync server
 _st7a = json.loads(req("/api/stats")[2]).get("crypto")
-_me7a = json.loads(req("/api/me")[2])
+def _nowin7(d):
+    """(6b330) a dev copy is a build with the account window, so /api/me
+    carries accounts.window: true; the shipped app's reply has no such
+    key (step 9 pins it). The rest is compared as before."""
+    if not (isinstance(d, dict) and isinstance(d.get("accounts"), dict)):
+        return d, None
+    a = dict(d["accounts"])
+    w = a.pop("window", None)
+    return dict(d, accounts=a), w
+
+
+_me7a, _mw7a = _nowin7(json.loads(req("/api/me")[2]))
 check("A: /api/stats says crypto ready; accounts off in a dev copy with no test sync server",
       _st7a == {"ok": True, "state": "ready", "note": ""}
-      and _me7a == {"kind": "owner", "accounts": {"on": False, "note": "This dev copy has no test sync server (MILLENAI_SYNC_URL), so accounts are off."}},
+      and _me7a == {"kind": "owner", "accounts": {"on": False, "note": "This dev copy has no test sync server (MILLENAI_SYNC_URL), so accounts are off."}}
+      and _mw7a is True,
       "%r" % [_st7a, _me7a])
 
 # CRY-4: nacl blocked (PyNaCl IS importable here, the hook blocks it), the
@@ -10077,7 +10100,7 @@ _N7 = Instance(9903, "N7", env={
     "HF_HUB_OFFLINE": "1"}).start()
 time.sleep(2)
 _st7n = json.loads(_ireq(_N7, "/api/stats")[1]).get("crypto")
-_me7n = json.loads(_ireq(_N7, "/api/me")[1])
+_me7n, _mw7n = _nowin7(json.loads(_ireq(_N7, "/api/me")[1]))
 _pg7n = _ireq(_N7, "/", token=False)[1].decode("utf-8", "replace")
 for _p7 in ("/api/stats", "/api/me", "/api/prefs", "/api/chats"):
     _ireq(_N7, _p7)
@@ -10093,7 +10116,7 @@ time.sleep(0.5)
 _run7[0] = False
 check("CRY-4: nacl blocked, accounts stay off and say why",
       _st7n == {"ok": False, "state": "missing", "note": "nacl blocked by MILLENAI_TEST_HOOKS"}
-      and _me7n == {"kind": "owner", "accounts": {
+      and _mw7n is True and _me7n == {"kind": "owner", "accounts": {
           "on": False, "note": "Encryption isn't set up, so accounts are off."}}
       and 'id="acct-crypto" hidden' in _pg7n and not _pip7n,
       "%r" % [_st7n, _me7n, _pip7n])
@@ -10106,6 +10129,8 @@ _pajs7 = _MILLENAI_SRC[_pa7:_MILLENAI_SRC.index("\n}\n", _pa7) + 3] if _pa7 > 0 
 _cm7 = _MILLENAI_SRC.find("function cryptoMoved(st){")
 _cmjs7 = _MILLENAI_SRC[_cm7:_MILLENAI_SRC.index("\n}\n", _cm7) + 3] if _cm7 > 0 else ""
 _pjs7 = ("const E={};const $=s=>E[s]||(E[s]={textContent:'',hidden:true});let acctMe=null;"
+         # (6b330) the pane's account-window button, drawn by its own check in step 9
+         "function acctWinButton(){}"
          "let cryptoSeen=null;let ME=null;const api=async()=>({json:async()=>ME});"
          + _pajs7 + _cmjs7 +
          "(async()=>{const out=[];const inp=JSON.parse(require('fs').readFileSync(0,'utf8'));"
@@ -10199,7 +10224,7 @@ _cpy7 = _venv7(os.path.join(_C7.home, "venv"))
 _C7.py = _cpy7
 _C7.start()
 _st7c = _await7(_C7)
-_me7c = json.loads(_ireq(_C7, "/api/me")[1])
+_me7c, _mw7c = _nowin7(json.loads(_ireq(_C7, "/api/me")[1]))
 _pip7c = _pips7(_C7)
 _C7.stop()
 
@@ -10231,7 +10256,7 @@ check("install: a copy's own venv gets the pins, hash-checked, and crypto turns 
       and str(_rc7c.get("key", "")).split(" ")[1:] == [
           subprocess.run([_cpy7, "-c", "import sys;print(sys.version.split()[0])"],
                          capture_output=True, text=True, env=_env7).stdout.strip()]
-      and _me7c == {"kind": "owner", "accounts": {"on": True, "note": ""}},
+      and _me7c == {"kind": "owner", "accounts": {"on": True, "note": ""}} and _mw7c is True,
       "%r" % [_st7c, _ver7c, _pip7c, _rc7c, _me7c])
 _ok7s = subprocess.run([_cpy7, "millenai.py", "--crypto-selftest",
                         os.path.join(_SMOKE_TMP, "self7.json")],
@@ -10974,7 +10999,12 @@ def _ctxarg8(src):
 # the switch, the test hooks, the janitor's export sweep (each removal
 # epoch-checked) and the quit's flush
 _CUR_OK8 = {"StudioHandler._run", "profile_resume", "profile_switch", "test_profile_op",
-            "sweep_all_exports", "_turns_flush"}
+            "sweep_all_exports", "_turns_flush",
+            # (6b330) the switch protocol's entries, each checking that the
+            # profile its request took is still the active one, and the
+            # account window binding its token to the profile at open
+            "profile_signin", "profile_signout", "profile_keep", "profile_kept_erase",
+            "account_open"}
 # a stale write that is simply dropped: these may catch it broadly
 _STALE_DROP8 = {"_cloud_budget_hit", "cloud_cool", "cloud_glitch", "cloud_note_failure",
                 "cloud_text", "_cloud_refresh_picks", "_cloud_repair", "_mark_written",
@@ -11439,8 +11469,15 @@ _PM8 = [
     ("a thread without its starter's ctx",
      "    c = ctx if ctx is not None else (\n        getattr(_tl_ctx, \"ctx\", None) if bind else None)\n",
      "    c = ctx\n"),
-    ("a test key opened without the hook", "    if \"profiles\" not in TEST_HOOKS:\n        return False\n",
-     ""),
+    ("a test key opened without the hook",
+     "    if st != \"ok\" or k.get(\"test\") is not True or \"profiles\" not in TEST_HOOKS:\n"
+     "        return None\n    if owner_check(folder, name) is not True:",
+     "    if st != \"ok\" or k.get(\"test\") is not True:\n"
+     "        return None\n    if owner_check(folder, name) is not True:",
+     # (6b330) and .owner's key, the hook's second lock on a test key
+     "    if not (isinstance(k, dict) and k.get(\"test\") is True\n"
+     "            and \"profiles\" in TEST_HOOKS):",
+     "    if not (isinstance(k, dict) and k.get(\"test\") is True):"),
     ("the test profile made without the hook",
      "    if \"profiles\" not in TEST_HOOKS:\n        raise NoProfile(\"the profiles hook is off\")\n", ""),
     ("None as the data folder", "    raise NoProfile(\"no profile for %s\" % name)",
@@ -11452,9 +11489,12 @@ _PM8 = [
     ("a stale write not counted", "            _PROFILE[\"stale\"] += 1\n", ""),
 ]
 _pm8r = []
-for _d8, _o8, _n8 in _PM8:
+for _e8 in _PM8:
+    _d8, _o8, _n8 = _e8[:3]
     try:
         _src8 = _mut8(_PS8, _o8, _n8)
+        if len(_e8) > 3:          # a second site the same protection holds
+            _src8 = _mut8(_src8, _e8[3], _e8[4])
     except AssertionError as e_:
         _pm8r.append((_d8, "anchor missing: %s" % e_))
         continue
@@ -11962,9 +12002,12 @@ def _rv8_run(src):
                    READ_FAIL={}, MODEL_ROUTES={})
     A = ns["profile_boot"]()
     ns["_usage_state"]["backfilled"] = True
+    # (6b330) no background writer: only the switch may flush, so the
+    # check can't pass by the writer thread winning a race
+    ns["_usage_thread"]["t"] = type("_T", (), {"is_alive": lambda self: True})()
+    B = ns["test_profile_create"]()
     ns["bind_ctx"](A)
     ns["usage_put"]({"t": 1.0, "m": "before8", "n": 1})
-    B = ns["test_profile_create"]()
     ns["profile_switch"](B)
     ns["usage_put"]({"t": 2.0, "m": "after8", "n": 1})
     ns["bind_ctx"](None)
@@ -12041,7 +12084,7 @@ _RVM8 = [
     ("a stale cloud save read as a failure", "            _cloud_write_to(ctx, d)\n        return True\n"
      "    except StaleProfile:\n        raise\n", "            _cloud_write_to(ctx, d)\n        return True\n"),
     ("usage not flushed at the switch", "        try:\n            usage_flush()\n        except Exception:\n"
-     "            pass\n        with _say_lock:", "        with _say_lock:"),
+     "            pass\n        try:\n            _turns_flush_ctx(old)", "        try:\n            _turns_flush_ctx(old)"),
     ("the cache armed for a profile read before the switch",
      "            if (p[\"ctx\"] if p else None) is not act:\n                return copy.deepcopy(self._blank)\n", ""),
     # (the single read of (epoch, object) and the re-check under the lock
@@ -12306,13 +12349,1611 @@ time.sleep(1)
 _hook8(op="switch", to="local")
 _saved8 = [c for c in _q8("/api/chats")[1]["chats"] if c.get("id") == _cid8]
 _answered8 = _saved8 and [m for m in _saved8[0].get("messages", []) if m.get("role") == "assistant"]
-check("emit stops a stream once its profile isn't the active one; the answer is saved nowhere",
-      _mid8 > 200 and _took8 < 20 and not _answered8
+# (6b330, M9) the switch keeps the answer as far as it had streamed, in
+# the chat of the profile that asked, as a quit keeps it; the next
+# profile never gets it
+_body8 = re.sub("\x00[^\x00]*\x00", "",
+                _raw8.split(b"\r\n\r\n", 1)[-1].decode("utf-8", "replace"))
+_inB8 = _bytegrep(os.path.join(_P8.home, "accounts", _B8c), _cid8)
+check("emit stops a stream once its profile isn't the active one; the answer is kept in its own "
+      "profile as far as it had streamed at the switch, and nowhere else",
+      _mid8 > 200 and _took8 < 20 and _answered8 and len(_answered8) == 1
+      and _answered8[0].get("content", "")[:30] in _body8
+      and len(_answered8[0].get("content", "")) < len(_body8) + 1 and not _inB8
       and b"Answer written" not in _raw8[len(_pre8):] and b"PLACES2" not in _raw8[len(_pre8):]
       and "            if user_base.cancel.is_set():\n                raise StaleProfile(" in _S8,
-      "%r" % [_mid8, round(_took8, 1), _saved8])
+      "%r" % [_mid8, round(_took8, 1), _saved8, _inB8])
 _P8.stop()
 # ==== m8 profiles: end ====
+
+
+# ==== m9 accounts: begin ====
+print("== accounts step 9: switching, the boot invariant, the account window (6b330) ==")
+# ONE PERSON'S DATA NEVER REACHES ANOTHER'S, ACROSS A SWITCH OR A CRASH
+# (1a 5.1, 5.8, 5.9, 5.11-5.13; M9 of the sign-in plan). The sign-in and
+# sign-out protocol, the kept state, Add with its staging and put-back,
+# the boot invariant, the Time Machine exclusion, the web store at a
+# switch and the account window. The biggest risk is the boot invariant
+# erasing a folder it wasn't meant to, so every delete goes through a
+# rename into accounts/.trash-*, an unreadable profile.json deletes
+# nothing, and a crash at every named step is restarted and checked.
+import ast as _a9
+import hashlib as _h9
+import threading as _t9
+import secrets
+
+_S9 = _MILLENAI_SRC
+_T9 = _a9.parse(_S9)
+_MODS9 = ("os", "json", "threading", "contextlib", "secrets", "tempfile", "hashlib",
+          "time", "re", "shutil", "functools", "copy")
+# the chat store, the legacy files, the turn writer and cloud.json come along
+_NAMES9 = set(_STORE_NAMES) | {"_turn_finish", "_turns_flush_ctx", "turns_live_count",
+                               "_cloud_txn", "_cloud_read_strict", "_cloud_write_to",
+                               "_cloud_all", "_cloud_file", "_cloud_lock", "_cloud_depth",
+                               "CLOUD_NAME"}
+
+
+class _Crash9(BaseException):
+    """A crash, in process: no `except Exception` sees it, as none sees
+    os._exit (a finally still runs; the live checks below use the real
+    os._exit)."""
+
+
+_SEGC9 = {}
+
+
+def _seg9(src, n_):
+    """A top-level definition's source with its decorators (a
+    contextmanager without its decorator is a bare generator)."""
+    decs = getattr(n_, "decorator_list", None) or []
+    if not decs:
+        return _a9.get_source_segment(src, n_)
+    lines = src.splitlines(True)
+    return "".join(lines[min(x.lineno for x in decs) - 1:n_.end_lineno])
+
+
+def _segs9(src):
+    """The code _ns9 runs for src, compiled once per source (a parse of
+    the whole file is slow, and the mutation checks make many namespaces)."""
+    k_ = _h9.sha256(src.encode("utf-8")).hexdigest()
+    if k_ not in _SEGC9:
+        out = [src[src.index("# ==== profile caches: begin ===="):
+                   src.index("# ==== profile caches: end ====")],
+               src[src.index("# ==== profile: begin ===="):src.index("# ==== profile: end ====")]]
+        for n_ in _a9.parse(src).body:
+            nm_ = getattr(n_, "name", None)
+            if nm_ is None and isinstance(n_, _a9.Assign):
+                nm_ = next((getattr(t, "id", None) for t in n_.targets), None)
+            if nm_ in _NAMES9:
+                out.append(_seg9(src, n_))
+        _SEGC9.clear()
+        _SEGC9[k_] = [compile(c_, "<m9>", "exec") for c_ in out]
+    return _SEGC9[k_]
+
+
+def _ns9(src=None, d=None, hooks=("profiles",), crash=None, spy=None):
+    """A namespace with src's profile sections and the store on folder d
+    (a fresh one by default): the instance lock held, nothing booted.
+    crash: the step _crash_point raises at. spy: a list every delete,
+    rename and rmtree under accounts/ is recorded in, with whether the
+    profile flock was held."""
+    src = src or _S9
+    d = d or tempfile.mkdtemp(dir=_SMOKE_TMP)
+    ns = {"TEST_HOOKS": frozenset(hooks), "IS_WIN": False, "IS_MAC": False,
+          "app_dir": lambda: d, "_hook_arg": lambda n: "", "_fcntl": None}
+    for m in _MODS9:
+        ns[m] = __import__(m)
+    if spy is not None:
+        _os9, _sh9 = __import__("os"), __import__("shutil")
+
+        def _rec(kind, p, fn):
+            def w(*a, **k):
+                if "accounts" in str(a[0]).replace("\\", "/").split("/"):
+                    spy.append((kind, str(a[0]), str(a[1]) if len(a) > 1 else "",
+                                ns["_PFL"]["depth"] > 0))
+                return fn(*a, **k)
+            return w
+
+        class _OsSpy:
+            def __getattr__(self, a):
+                return getattr(_os9, a)
+        _o = _OsSpy()
+        for nm in ("remove", "unlink", "rmdir", "rename", "replace"):
+            setattr(_o, nm, _rec(nm, None, getattr(_os9, nm)))
+        _s = type("_ShSpy", (), {"__getattr__": lambda self, a: getattr(_sh9, a)})()
+        _s.rmtree = _rec("rmtree", None, _sh9.rmtree)
+        ns["os"], ns["shutil"] = _o, _s
+    for code_ in _segs9(src):
+        exec(code_, ns)
+    for k_, v_ in (("usage_flush", lambda: None), ("_stop_speaking", lambda: None),
+                   ("_say_lock", _t9.RLock()), ("_after_switch", lambda c, m: None)):
+        ns.setdefault(k_, v_)
+    ns["READ_FAIL"] = {}
+    if crash:
+        def _cp(step, _c=crash):
+            if step == _c:
+                raise _Crash9(step)
+        ns["_crash_point"] = _cp
+    ns["_INSTANCE_HELD"][0] = True
+    return ns, d
+
+
+def _boot9(ns):
+    """A start's order, as the app's main: the invariant, "This computer",
+    the pending steps, M5's migration, then the profile profile.json names."""
+    out = ns["boot_invariant"]()
+    root = ns["profile_boot"]()
+    ns["profile_boot_pending"](root)
+    ns["_migrate_61"](root)
+    return out, ns["profile_resume"]()
+
+
+def _jr9(*p):
+    try:
+        with open(os.path.join(*p), "rb") as fh:
+            return json.loads(fh.read().decode("utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def _tree9(d):
+    """Every file under d (run/ left out) with its bytes' digest."""
+    out = {}
+    for dp, dn, fn in os.walk(d):
+        dn[:] = [x for x in dn if not (dp == d and x == "run")]
+        for f in fn:
+            p = os.path.join(dp, f)
+            out[os.path.relpath(p, d)] = _h9.sha256(open(p, "rb").read()).hexdigest()
+    return out
+
+
+def _acc9(d):
+    try:
+        return sorted(os.listdir(os.path.join(d, "accounts")))
+    except OSError:
+        return []
+
+
+# ---- .owner and the stdlib HKDF (1a 5.1, 7.2)
+_on9, _od9 = _ns9()
+_hk9 = _on9["_hkdf_sha256"](bytes.fromhex("0b" * 22), bytes.fromhex("f0f1f2f3f4f5f6f7f8f9"), 42,
+                            bytes.fromhex("000102030405060708090a0b0c"))
+_on9["profile_boot"]()
+_B9 = _on9["test_profile_create"]()
+_ow9 = {"verifies": _on9["owner_check"](_B9.dir)}
+_okf9 = os.path.join(_B9.dir, ".owner")
+_good9 = open(_okf9).read()
+open(_okf9, "w").write("0" * 64)
+_ow9["another account's"] = _on9["owner_check"](_B9.dir)
+os.remove(_okf9)
+_ow9["missing"] = _on9["owner_check"](_B9.dir)
+open(_okf9, "w").write(_good9)
+_ow9["renamed folder"] = _on9["owner_check"](_B9.dir, "f" * 32)
+_k9 = json.load(open(os.path.join(_B9.dir, "account.key")))
+_on9["TEST_HOOKS"] = frozenset()
+_ow9["hook off"] = _on9["owner_check"](_B9.dir)
+_on9["TEST_HOOKS"] = frozenset({"profiles"})
+json.dump(dict(_k9, rekey_pending={"x": 1}), open(os.path.join(_B9.dir, "account.key"), "w"))
+_ow9["re-key pending"] = _on9["owner_check"](_B9.dir)
+json.dump({k: v for k, v in _k9.items() if k != "test"}, open(os.path.join(_B9.dir, "account.key"), "w"))
+_ow9["a real key"] = _on9["owner_check"](_B9.dir)
+open(os.path.join(_B9.dir, "account.key"), "wb").write(b"\x01DPAPI\x00")
+_ow9["an unreadable key"] = _on9["owner_check"](_B9.dir)
+check(".owner: HMAC(HKDF(rid_key, 'cai2/owner'), acct_id|dir) verifies its own folder only; "
+      "missing or another's fails; a real, re-keying, unreadable or hook-less key can't be told",
+      _hk9.hex() == ("3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf"
+                     "34007208d5b887185865")
+      and _ow9 == {"verifies": True, "another account's": False, "missing": False,
+                   "renamed folder": False, "hook off": None, "re-key pending": None,
+                   "a real key": None, "an unreadable key": None}
+      and oct(os.stat(os.path.join(_od9, "accounts")).st_mode)[-3:] == "700",
+      "%r" % [_hk9.hex(), _ow9])
+
+
+# ---- the erase: through the trash, key file first, nothing else (the absolute rule)
+def _erase9(src=None):
+    """The erase's rules, each a named result."""
+    r = {}
+    sp = []
+    ns, d = _ns9(src, spy=sp)
+    ns["profile_boot"]()
+    B = ns["test_profile_create"]()
+    open(os.path.join(B.dir, "chats.v2.json"), "w").write('{"v":2,"chats":[],"gone":[]}')
+    outside = tempfile.mkdtemp(dir=_SMOKE_TMP)
+    open(os.path.join(outside, "keep.txt"), "w").write("keep")
+    root = os.path.join(d, "accounts")
+    link = os.path.join(root, "e" * 32)
+    os.symlink(outside, link)
+    ref = []
+    for bad in (outside, link, os.path.join(root, "notes"), os.path.join(root, ".."),
+                os.path.join(d, "images")):
+        try:
+            ns["_erase_folder"](bad)
+            ref.append(False)
+        except ValueError:
+            ref.append(True)
+    r["only a layout name directly in accounts/, never a link"] = all(ref) and os.path.exists(
+        os.path.join(outside, "keep.txt"))
+    del sp[:]
+    ok = ns["_erase_folder"](B.dir, step="t")
+    dels = [x for x in sp if x[0] in ("remove", "unlink", "rmdir", "rmtree")]
+    ren = [x for x in sp if x[0] == "rename"]
+    r["gone, and every delete is of a .trash-*"] = (
+        ok and not os.path.exists(B.dir) and dels
+        and all("/.trash-" in x[1].replace("\\", "/") for x in dels))
+    r["account.key is renamed out first"] = (
+        len(ren) == 2 and ren[0][1].endswith("account.key") and ren[1][1] == B.dir
+        and "/.trash-" in ren[0][2].replace("\\", "/"))
+    # a crash after the rename leaves only a .trash-*, which the next start empties
+    C = ns["test_profile_create"]()
+    ns2, _ = _ns9(src, d=d, crash="x.renamed")
+    try:
+        ns2["_erase_folder"](C.dir, step="x")
+        r["a crash after the rename leaves only the trash"] = False
+    except _Crash9:
+        left = _acc9(d)
+        r["a crash after the rename leaves only the trash"] = (
+            C.name not in left and any(x.startswith(".trash-") for x in left))
+    return r
+
+
+_er9 = _erase9()
+check("the erase: only a layout folder directly in accounts/ (never a link), key file first, "
+      "every delete of a .trash-* (%d rules)" % len(_er9),
+      all(v is True for v in _er9.values()), "%r" % _er9)
+
+# ---- ISO-12: the boot invariant, on planted folders
+def _key9(folder, **extra):
+    k = {"test": True, "acct_id": secrets.token_hex(16), "device_id": "d", "origin": "o"}
+    k.update(extra)
+    os.makedirs(folder, exist_ok=True)
+    json.dump(k, open(os.path.join(folder, "account.key"), "w"))
+
+
+def _pj9(d, **kv):
+    p = _jr9(d, "profile.json") or {}
+    p.update(kv)
+    json.dump(p, open(os.path.join(d, "profile.json"), "w"))
+
+
+def _world9(ns, d):
+    """accounts/ as a crash, a bug or a later build could leave it."""
+    ns["profile_boot"]()
+    A = ns["test_profile_create"]()          # the active one
+    S = ns["test_profile_create"]()          # an account folder nobody names
+    root = os.path.join(d, "accounts")
+    for nm in (A.name, S.name):
+        os.makedirs(os.path.join(root, ".imported-" + nm, "units"))
+        json.dump({"v": 1, "units": {"chat-x": {"kind": "chat"}}},
+                  open(os.path.join(root, ".imported-" + nm, "units.json"), "w"))
+    w = {"A": A.name, "S": S.name}
+    for tag, extra in (("new", {}), ("sent", {"signup": "sent"}),
+                       ("rekey", {"rekey_pending": {"kv": 2}})):
+        w[tag] = ".new-" + secrets.token_hex(12)
+        _key9(os.path.join(root, w[tag]), **extra)
+    w["newbad"] = ".new-" + secrets.token_hex(12)
+    os.makedirs(os.path.join(root, w["newbad"]))
+    open(os.path.join(root, w["newbad"], "account.key"), "wb").write(b"\x01DPAPI\x00")
+    w["trash"] = ".trash-" + secrets.token_hex(12)
+    os.makedirs(os.path.join(root, w["trash"], "x"))
+    open(os.path.join(root, w["trash"], "x", "f"), "w").write("left by a crash")
+    w["rk"] = secrets.token_hex(16)                  # an unnamed re-key in progress
+    _key9(os.path.join(root, w["rk"]), rekey_pending={"kv": 3})
+    open(os.path.join(root, "notes.txt"), "w").write("not ours")
+    outside = tempfile.mkdtemp(dir=_SMOKE_TMP)
+    open(os.path.join(outside, "keep.txt"), "w").write("keep")
+    w["link"] = "c" * 32
+    os.symlink(outside, os.path.join(root, w["link"]))
+    w["outside"] = outside
+    _pj9(d, active=A.name, kept=None, pending_import=False)
+    return w
+
+
+def _inv9(src=None):
+    """The invariant's rules, each a named result."""
+    r = {}
+    sp = []
+    ns, d = _ns9(src, spy=sp)
+    w = _world9(ns, d)
+    del sp[:]
+    out, ctx = _boot9(ns)
+    left = _acc9(d)
+    r["only what profile.json names, the unfinished sign-up and re-keys, and what isn't ours"] = (
+        sorted(left) == sorted([w["A"], ".imported-" + w["A"], w["sent"], w["rekey"],
+                                w["newbad"], w["rk"], "notes.txt", w["link"]])
+        and os.path.exists(os.path.join(w["outside"], "keep.txt")))
+    r["the named folder opens"] = ctx.name == w["A"] and ctx.kind == "test"
+    dels = [x for x in sp if x[0] in ("remove", "unlink", "rmdir", "rmtree")]
+    r["every delete is of a .trash-* and every rename into one, under run/profile.lock"] = (
+        bool(dels) and all(x[3] and "/.trash-" in (x[2] if x[0] in ("rename", "replace")
+                                                   else x[1]).replace("\\", "/") for x in sp))
+    # a wrong .owner on the active folder: erased, and "This computer" runs
+    ns, d = _ns9(src)
+    ns["profile_boot"]()
+    B = ns["test_profile_create"]()
+    open(os.path.join(B.dir, ".owner"), "w").write("0" * 64)
+    _pj9(d, active=B.name, kept=None)
+    out, ctx = _boot9(ns)
+    r["an active folder whose .owner fails is erased, never opened"] = (
+        _acc9(d) == [] and ctx.root and _jr9(d, "profile.json")["active"] == "local")
+    # kept: a wrong .owner, and past erase_after
+    for why, tamper in (("its .owner fails", "owner"), ("past erase_after", "late")):
+        ns, d = _ns9(src)
+        ns["profile_boot"]()
+        B = ns["test_profile_create"]()
+        if tamper == "owner":
+            os.remove(os.path.join(B.dir, ".owner"))
+            _pj9(d, active="local", kept={"dir": B.name, "reason": "signed-out",
+                                          "cause": "t", "erase_after": None})
+        else:
+            _pj9(d, active="local", kept={"dir": B.name, "reason": "removed", "cause": "t",
+                                          "erase_after": time.time() - 1})
+        _boot9(ns)
+        r["a kept folder whose " + why + " is erased"] = (
+            _acc9(d) == [] and _jr9(d, "profile.json")["kept"] is None)
+    ns, d = _ns9(src)
+    ns["profile_boot"]()
+    B = ns["test_profile_create"]()
+    _pj9(d, active="local", kept={"dir": B.name, "reason": "removed", "cause": "t",
+                                  "erase_after": time.time() + 3600})
+    _o, ctx = _boot9(ns)
+    r["a kept folder inside its 7 days stays, and is never opened"] = (
+        _acc9(d) == [B.name] and ctx.root)
+    # the active folder's key file gone: kept, never erased
+    ns, d = _ns9(src)
+    ns["profile_boot"]()
+    B = ns["test_profile_create"]()
+    os.remove(os.path.join(B.dir, "account.key"))
+    _pj9(d, active=B.name, kept=None)
+    _o, ctx = _boot9(ns)
+    kp = _jr9(d, "profile.json")
+    r["an active folder whose key file is gone becomes kept"] = (
+        _acc9(d) == [B.name] and ctx.root and kp["active"] == "local"
+        and (kp["kept"] or {}).get("dir") == B.name and kp["kept"]["cause"] == "key-missing")
+    # profile.json that can't be trusted: nothing is deleted
+    for why, how in (("unreadable", b"{not json"), ("missing", None),
+                     ("malformed", b'{"active": 5}'), ("without active", b'{"written": []}')):
+        ns, d = _ns9(src)
+        w = _world9(ns, d)
+        before = _acc9(d)
+        pj = os.path.join(d, "profile.json")
+        if how is None:
+            os.remove(pj)
+        else:
+            open(pj, "wb").write(how)
+        out = ns["boot_invariant"]()
+        r["profile.json %s: nothing is deleted" % why] = (
+            _acc9(d) == before and out["erased"] == [] and bool(out["why"]))
+    # a lost record (no "active") with folders: the next starts delete nothing
+    for n_dirs in (1, 2):
+        ns, d = _ns9(src)
+        ns["profile_boot"]()
+        made = [ns["test_profile_create"]().name for _ in range(n_dirs)]
+        json.dump({"written": []}, open(os.path.join(d, "profile.json"), "w"))
+        _boot9(ns)
+        ns2, _ = _ns9(src, d=d)
+        _o, c2 = _boot9(ns2)
+        # a bare switch (the hold of a sign-in the person then cancels) and a start
+        ns2["profile_switch"](ns2["ProfileCtx"]("local", d))
+        ns3, _ = _ns9(src, d=d)
+        _boot9(ns3)
+        kp = _jr9(d, "profile.json") or {}
+        r["a lost record with %d folder(s): kept through restarts and switches" % n_dirs] = (
+            _acc9(d) == sorted(made) and c2.root
+            and ((kp.get("kept") or {}).get("dir") == made[0] if n_dirs == 1
+                 else "active" not in kp))
+    # no instance lock: nothing at all
+    ns, d = _ns9(src)
+    w = _world9(ns, d)
+    before = _acc9(d)
+    ns["_INSTANCE_HELD"][0] = False
+    out = ns["boot_invariant"]()
+    r["without the instance lock nothing is touched"] = _acc9(d) == before and out["erased"] == []
+    # the hook off (a build that can't check .owner): a named test folder is kept
+    ns, d = _ns9(src)
+    ns["profile_boot"]()
+    B = ns["test_profile_create"]()
+    _pj9(d, active=B.name, kept=None)
+    ns2, _ = _ns9(src, d=d, hooks=())
+    _o, ctx = _boot9(ns2)
+    r["a folder this build can't check is kept, not opened"] = _acc9(d) == [B.name] and ctx.root
+    return r
+
+
+_iv9 = _inv9()
+check("ISO-12: the boot invariant keeps only what profile.json names (and an unfinished "
+      "sign-up or re-key), erases a failing .owner or an expired kept folder through the trash, "
+      "and deletes nothing when profile.json can't be trusted (%d rules)" % len(_iv9),
+      all(v is True for v in _iv9.values()), "%r" % {k: v for k, v in _iv9.items() if v is not True})
+
+# each protection bites
+_IVM9 = [
+    ("a delete without the trash rename",
+     "        _rename_retry(path, os.path.join(trash, name))\n        _crash_point(step + \".renamed\")\n"
+     "    shutil.rmtree(trash, ignore_errors=True)",
+     "        shutil.rmtree(path, ignore_errors=True)\n    shutil.rmtree(trash, ignore_errors=True)"),
+    ("the invariant without the instance lock",
+     "    if not _INSTANCE_HELD[0]:\n        out[\"why\"] = \"no instance lock\"\n        return out\n", ""),
+    ("the invariant without run/profile.lock",
+     "    now = time.time() if now is None else now\n    with _profile_lock, _profile_flock():",
+     "    now = time.time() if now is None else now\n    with _profile_lock:"),
+    ("an unreadable profile.json deletes",
+     "        n = _named(p)\n        if n is None:\n            out[\"why\"]",
+     "        n = _named(p) or {\"active\": None, \"kept\": None, \"putback\": None}\n"
+     "        if n is None:\n            out[\"why\"]"),
+    ("a record without active counts as This computer's",
+     "    if not isinstance(p, dict) or \"active\" not in p:\n        return None\n"
+     "    act, kept, pb = p.get(\"active\"), p.get(\"kept\"), p.get(\"putback\")",
+     "    if not isinstance(p, dict):\n        return None\n"
+     "    act, kept, pb = p.get(\"active\", \"local\"), p.get(\"kept\"), p.get(\"putback\")"),
+    ("a lost record not made kept", "            dirs = _account_dirs() if \"active\" not in q else []",
+     "            dirs = []"),
+    ("a switch writing active over a lost record",
+     "    if \"active\" not in p and ctx.root and _account_dirs():", "    if False:"),
+    ("an unfinished sign-up erased", "            if name.startswith(\".new-\") and _key_marked(path):",
+     "            if False:"),
+    ("a key this build can't read taken for none",
+     "    if st == \"unreadable\":\n        return True\n", ""),
+    ("a failing .owner kept (active)", "            elif ok is False:", "            elif False:"),
+    ("a failing .owner kept (kept)", "            elif past or owner_check(f, kept) is False:",
+     "            elif past:"),
+    ("a kept folder past erase_after kept",
+     "            past = isinstance(ea, (int, float)) and now >= ea", "            past = False"),
+    ("an active folder with no key left active",
+     "            elif _read_key(f)[0] == \"missing\" and not kept:", "            elif False:"),
+    ("a link followed", "            if name in keep or not _ACCT_NAME_RX.fullmatch(name) \\\n"
+     "                    or os.path.islink(path) or not os.path.isdir(path):",
+     "            if name in keep or not _ACCT_NAME_RX.fullmatch(name):",
+     # and the erase's own refusal of a link
+     "            != root or not _ACCT_NAME_RX.fullmatch(name) or os.path.islink(path)):",
+     "            != root or not _ACCT_NAME_RX.fullmatch(name)):"),
+    ("the key file not first", "        if os.path.lexists(key):\n", "        if False:\n"),
+]
+
+
+def _mrun9(fn, muts):
+    """Each mutation (description, old, new[, old2, new2]: a protection
+    held in two places goes in both) applied to the source; True when
+    fn's rules catch it."""
+    out = []
+    for m_ in muts:
+        d_, pairs = m_[0], list(zip(m_[1::2], m_[2::2]))
+        s_ = _S9
+        bad_ = [o_ for o_, _n in pairs if s_.count(o_) != 1]
+        if bad_:
+            out.append((d_, "anchor %d" % s_.count(bad_[0])))
+            continue
+        for o_, n_ in pairs:
+            s_ = s_.replace(o_, n_)
+        try:
+            res = fn(s_)
+            out.append((d_, not all(v is True for v in res.values())))
+        except _Crash9:
+            out.append((d_, True))
+        except Exception:
+            out.append((d_, True))        # the module broke: caught too
+    return out
+
+
+_ivm9 = _mrun9(lambda s_: dict(_inv9(s_), **_erase9(s_)), _IVM9)
+check("ISO-12: each protection of the invariant and the erase bites (%d mutations, each caught)"
+      % len(_IVM9), all(ok is True for _d, ok in _ivm9), "%r" % [x for x in _ivm9 if x[1] is not True])
+
+# ---- the switch protocol in process: Add, staging, put back, the kept state
+_CID9 = ["c" + ch * 26 for ch in "123"]
+
+
+def _seed9(d, tag):
+    """A root as an older build left it: chats.json and memory.json (the
+    migration copies them in and records legacy_base), settings, a Remote
+    target with its host keys, and a picture, a clip and an export the
+    chats show, with their sidecars. The canaries, by name."""
+    cn = {k: _canary("%s-%s" % (tag, k)) for k in ("c1", "c2", "c3", "f1", "f2", "persona",
+                                                     "img", "vid", "exp", "remote")}
+    img, vid, exp = secrets.token_hex(16) + ".png", secrets.token_hex(16) + ".mp4", \
+        secrets.token_urlsafe(18) + ".md"
+    for sub in ("images", "videos", "exports"):
+        os.makedirs(os.path.join(d, sub), exist_ok=True)
+    open(os.path.join(d, "images", img), "w").write(cn["img"])
+    open(os.path.join(d, "images", img[:-4] + ".render.json"), "w").write('{"prompt":"%s"}' % cn["img"])
+    open(os.path.join(d, "videos", vid), "w").write(cn["vid"])
+    open(os.path.join(d, "exports", exp), "w").write(cn["exp"])
+    open(os.path.join(d, "exports", exp[:-3] + ".meta"), "w").write('{"name":"x.md"}')
+    chats = [
+        {"id": _CID9[0], "lane": "ai", "ts": 3, "title": "one", "messages": [
+            {"role": "user", "content": "q " + cn["c1"]},
+            {"role": "assistant", "content": "![p](/api/image/%s)\n\n[[dl:%s]]" % (
+                img, json.dumps({"id": exp, "name": "x.md"}))}]},
+        {"id": _CID9[1], "lane": "ai", "ts": 2, "title": "two", "messages": [
+            {"role": "user", "content": "q " + cn["c2"]},
+            {"role": "assistant", "content": "[[vid:%s]]" % json.dumps({"id": vid})}]},
+        {"id": _CID9[2], "lane": "ai", "ts": 1, "title": "three", "messages": [
+            {"role": "user", "content": "q " + cn["c3"]},
+            {"role": "assistant", "content": "again ![p](/api/image/%s)" % img}]}]
+    json.dump(chats, open(os.path.join(d, "chats.json"), "w"))
+    json.dump([{"fact": cn["f1"], "ts": 1}, {"fact": cn["f2"], "ts": 2}],
+              open(os.path.join(d, "memory.json"), "w"))
+    json.dump({"persona": cn["persona"], "user_name": "Ann", "home_area": "Boston",
+               "tier": "Pro", "wizard_done": True}, open(os.path.join(d, "prefs.json"), "w"))
+    json.dump({"host": cn["remote"], "user": "u"}, open(os.path.join(d, "remote.json"), "w"))
+    open(os.path.join(d, "remote_known_hosts"), "w").write("|1|x= ssh-ed25519 AAAA " + cn["remote"])
+    cn.update(img_name=img, vid_name=vid, exp_name=exp)
+    return cn
+
+
+def _ids9(chats):
+    return sorted(c.get("id") for c in chats or [] if isinstance(c, dict))
+
+
+def _proto9(src=None):
+    """The protocol's rules, each a named result."""
+    src = src or _S9
+    r = {}
+    # -- sign-in with everything ticked
+    ns, d = _ns9(src)
+    cn = _seed9(d, "A9")
+    _boot9(ns)
+    before = _tree9(d)
+    rm0 = {k: before[k] for k in ("remote.json", "remote_known_hosts")}
+    out = ns["profile_signin"](None, {"add": {"chats": "all", "memory": True,
+                                              "settings": ["persona", "user_name", "home_area"]}})
+    B = ns["current_ctx"]()
+    acc = os.path.join(d, "accounts", out.get("dir") or "x")
+    imp = os.path.join(d, "accounts", ".imported-" + (out.get("dir") or "x"))
+    bc = (_jr9(acc, "chats.v2.json") or {}).get("chats") or []
+    st = _jr9(acc, "sync", "state.json") or {}
+    r["sign-in lands in the new account (kind test)"] = (
+        out.get("ok") is True and B.kind == "test" and B.name == out["dir"]
+        and _jr9(d, "profile.json")["active"] == out["dir"]
+        and _jr9(d, "profile.json")["pending_import"] is False)
+    r["Add: every chat moves with a fresh id and records its root id"] = (
+        sorted(c.get("root_id") for c in bc) == sorted(_CID9)
+        and not set(_ids9(bc)) & set(_CID9) and len(set(_ids9(bc))) == 3)
+    r["Add: the pictures, clip and export the chats show move with their sidecars"] = all(
+        os.path.isfile(os.path.join(acc, p)) for p in (
+            "images/" + cn["img_name"], "images/" + cn["img_name"][:-4] + ".render.json",
+            "videos/" + cn["vid_name"], "exports/" + cn["exp_name"],
+            "exports/" + cn["exp_name"][:-3] + ".meta"))
+    r["Add: memory moves; name, persona and home area wait in pending_settings, never "
+      "personal.json"] = (
+        sorted(f["fact"] for f in _jr9(acc, "memory.v2.json") or []) == sorted([cn["f1"], cn["f2"]])
+        and st.get("pending_settings") == {"persona": cn["persona"], "user_name": "Ann",
+                                           "home_area": "Boston"}
+        and not os.path.exists(os.path.join(acc, "personal.json")))
+    rc = _jr9(d, "chats.v2.json") or {}
+    lc = _jr9(d, "chats.json")
+    rp = _jr9(d, "prefs.json") or {}
+    r["step 6: root keeps no copy (chats, their legacy entries, memory, media), and the ids "
+      "stay dead"] = (
+        rc.get("chats") == [] and set(_CID9) <= set(rc.get("gone") or [])
+        and lc == [] and _jr9(d, "memory.v2.json") == [] and _jr9(d, "memory.json") == []
+        and not os.path.exists(os.path.join(d, "images", cn["img_name"]))
+        and not os.path.exists(os.path.join(d, "videos", cn["vid_name"]))
+        and not [p for p in (_bytegrep(d, cn["c1"]) + _bytegrep(d, cn["f1"]))
+                 if not p.startswith(os.path.join(d, "accounts") + os.sep)])
+    r["step 6: name, persona and home area leave root; the rest of its settings stay"] = (
+        not {"persona", "user_name", "home_area"} & set(rp) and rp.get("tier") == "Pro"
+        and rp.get("wizard_done") is True)
+    u = (_jr9(imp, "units.json") or {}).get("units") or {}
+    r["step 6: .imported holds a unit per chat and fact, the legacy entries with the root id "
+      "each maps to, and the media"] = (
+        sorted(k for k in u if k.startswith("chat-")) == ["chat-" + c for c in sorted(_CID9)]
+        and len([k for k in u if k.startswith("fact-")]) == 2
+        and sorted(x["maps_to"] for x in _jr9(imp, "legacy", "chats.json") or []) == sorted(_CID9)
+        and len(_jr9(imp, "legacy", "memory.json") or []) == 2
+        and os.path.isfile(os.path.join(imp, "media", "images", cn["img_name"])))
+    r["Remote's target and host keys never move"] = (
+        {k: _tree9(d)[k] for k in rm0} == rm0
+        and not os.path.exists(os.path.join(acc, "remote.json")))
+    r["the account's own routes read only its folder"] = (
+        [c["root_id"] for c in ns["load_chats"](B)] and ns["prefs_view"](B).get("persona") is None)
+    # -- sign-out, with the sheet's question
+    need = ns["profile_signout"](None, {})
+    r["sign-out with an Add not uploaded asks, and changes nothing"] = (
+        need.get("need") == "imported" and ns["current_ctx"]() is B and os.path.isdir(acc))
+    so = ns["profile_signout"](None, {"imported": "putback"})
+    R = ns["current_ctx"]()
+    rc = _jr9(d, "chats.v2.json") or {}
+    lb = (_jr9(d, "profile.json") or {}).get("legacy_base") or {}
+    r["Put them back: every chat under its root id, out of gone, with its media; the legacy "
+      "entries and legacy_base with them; nothing of the account left"] = (
+        so.get("ok") is True and R.root and _ids9(rc.get("chats")) == sorted(_CID9)
+        and not set(_CID9) & set(rc.get("gone") or [])
+        and _ids9(_jr9(d, "chats.json")) == sorted(_CID9)
+        and {k: v.get("id") for k, v in (lb.get("ids") or {}).items()} == {c: c for c in _CID9}
+        and sorted(f["fact"] for f in _jr9(d, "memory.v2.json")) == sorted([cn["f1"], cn["f2"]])
+        and len(_jr9(d, "memory.json") or []) == 2
+        and os.path.isfile(os.path.join(d, "images", cn["img_name"]))
+        and os.path.isfile(os.path.join(d, "exports", cn["exp_name"][:-3] + ".meta"))
+        and _acc9(d) == [] and _jr9(d, "profile.json").get("putback") is None)
+    r["settings Add moved never come back"] = "persona" not in (_jr9(d, "prefs.json") or {})
+    # a start after the put-back imports nothing twice
+    ns2, _ = _ns9(src, d=d)
+    _boot9(ns2)
+    r["the next start imports nothing twice"] = (
+        _ids9((_jr9(d, "chats.v2.json") or {}).get("chats")) == sorted(_CID9)
+        and len(_jr9(d, "memory.v2.json")) == 2)
+    # -- nothing ticked: nothing moves; one chat: a picture another chat shows stays
+    ns, d = _ns9(src)
+    cn = _seed9(d, "D9")
+    _boot9(ns)
+    before = _tree9(d)
+    ns["profile_signin"](None, {})
+    after = _tree9(d)
+    r["the default (nothing ticked) moves nothing: root is byte-identical but profile.json"] = (
+        {k: v for k, v in after.items() if not k.startswith("accounts" + os.sep)
+         and k != "profile.json"} == {k: v for k, v in before.items() if k != "profile.json"}
+        and (_jr9(d, "profile.json") or {}).get("pending_import") is False)
+    ns["profile_signout"](None, {})
+    ns["profile_signin"](None, {"add": {"chats": [_CID9[0]]}})
+    r["a picture a chat left in root still shows stays in root (and is in the account)"] = (
+        os.path.isfile(os.path.join(d, "images", cn["img_name"]))
+        and os.path.isfile(os.path.join(d, "accounts", ns["current_ctx"]().name, "images",
+                                        cn["img_name"]))
+        and not os.path.exists(os.path.join(d, "exports", cn["exp_name"])))
+    so = ns["profile_signout"](None, {"imported": "erase"})
+    r["Erase them: the units go with the account; the rest of root stays"] = (
+        so.get("ok") is True and _acc9(d) == []
+        and _ids9((_jr9(d, "chats.v2.json") or {}).get("chats")) == sorted(_CID9[1:]))
+    # -- the kept state, and signing in again
+    ns, d = _ns9(src)
+    _boot9(ns)
+    o1 = ns["profile_signin"](None, {})
+    B = ns["current_ctx"]()
+    json.dump({"providers": {"groq": {"key": "SYNCED9", "sync": True},
+                             "kimi": {"key": "LOCAL9"}}, "active": "groq",
+               "account": {"published": ["x"]}}, open(B.path("cloud.json"), "w"))
+    ns["chat_ops"]([{"op": "create", "id": "c" + "b" * 26, "lane": "ai", "title": "B9"}], B)
+    kp = ns["profile_keep"](None, "signed-out", "session")
+    cj = _jr9(B.dir, "cloud.json") or {}
+    pj = _jr9(d, "profile.json")
+    r["kept (signed out by the server): the folder stays unserved; synced keys and the account "
+      "section go at once, keys added here stay"] = (
+        kp.get("ok") is True and ns["current_ctx"]().root and os.path.isdir(B.dir)
+        and pj["active"] == "local" and pj["kept"]["dir"] == B.name
+        and pj["kept"]["reason"] == "signed-out" and pj["kept"]["cause"] == "session"
+        and pj["kept"]["erase_after"] is None
+        and cj.get("providers") == {"kimi": {"key": "LOCAL9"}} and "account" not in cj
+        and ns["load_chats"](ns["current_ctx"]()) == [])
+    other = ns["profile_signin"](None, {})
+    r["another account signing in is offered the erase first, and nothing happens without it"] = (
+        other.get("need") == "erase-existing" and os.path.isdir(B.dir))
+    again = ns["profile_signin"](None, {"acct_id": B.acct_id})
+    C = ns["current_ctx"]()
+    r["the same account signing in again resumes its kept folder"] = (
+        again.get("resumed") is True and C.name == B.name
+        and [c["title"] for c in ns["load_chats"](C)] == ["B9"]
+        and _jr9(d, "profile.json")["kept"] is None)
+    ns["profile_keep"](None, "deleted", "proof")
+    pj = _jr9(d, "profile.json")
+    r["a deletion proof keeps it 7 days with every key gone, and the same account never "
+      "resumes it"] = (
+        pj["kept"]["reason"] == "deleted" and pj["kept"]["erase_after"] > time.time() + 6 * 86400
+        and (_jr9(B.dir, "cloud.json") or {}).get("providers") == {}
+        and ns["profile_signin"](None, {"acct_id": B.acct_id}).get("stop") == "deleted"
+        and ns["current_ctx"]().root)
+    er = ns["profile_signin"](None, {"erase_existing": True})
+    r["erase and continue: the old folder goes, key file first, through the trash"] = (
+        er.get("ok") is True and not os.path.exists(B.dir)
+        and _acc9(d) == [ns["current_ctx"]().name])
+    # -- the kept Erase, with the sheet's question
+    ns, d = _ns9(src)
+    cn = _seed9(d, "K9")
+    _boot9(ns)
+    ns["profile_signin"](None, {"add": {"chats": "all"}})
+    ns["profile_keep"](None, "removed", "notice")
+    q = ns["profile_kept_erase"](None, {})
+    ke = ns["profile_kept_erase"](None, {"imported": "putback"})
+    r["Erase on a kept folder with an Add left asks first; put back returns the chats"] = (
+        q.get("need") == "imported" and ke.get("ok") is True and _acc9(d) == []
+        and _ids9((_jr9(d, "chats.v2.json") or {}).get("chats")) == sorted(_CID9))
+    # -- adopt: an account takes none of the browser's keys
+    ns, d = _ns9(src)
+    _boot9(ns)
+    ns["profile_signin"](None, {})
+    B = ns["current_ctx"]()
+    ns2 = dict(ns)
+    ns2.update({"_pref_six_ok": lambda k, v: True, "PREF_SIX": ("tier", "agent")})
+    for code_ in [c for c in _segs9_named(src, {"prefs_adopt", "PREF_SIX", "_pref_six_ok"})]:
+        exec(code_, ns2)
+    ad = ns2["prefs_adopt"]({"tier": "Pro", "agent": "x"}, B)
+    r["/api/prefs/adopt takes nothing into an account"] = (
+        ad.get("took") == [] and not os.path.exists(B.path("local.json")))
+    # -- a live answer is kept, as far as it got, at the switch (as a quit keeps it)
+    ns, d = _ns9(src)
+    _boot9(ns)
+    A = ns["current_ctx"]()
+    ns["bind_ctx"](A)
+    cid = "c" + "s" * 26
+    ns["chat_ops"]([{"op": "append", "id": cid, "after_len": 0, "after_hash":
+                     ns["chat_prefix_hash"]([], 0), "msgs": [{"role": "user", "content": "q"}],
+                     "lane": "ai"}], A)
+    msgs = ns["load_chats"](A)[0]["messages"]
+    t = {"id": cid, "n": 1, "h": ns["chat_prefix_hash"](msgs, 1),
+         "wire": [b"Half an answer"], "base": A, "searched": False}
+    ns["_turns_live"][id(t)] = t
+    ns["bind_ctx"](None)
+    ns["profile_signin"](None, {})
+    ns["profile_signout"](None, {})
+    got = [m.get("content") for m in ns["load_chats"](ns["current_ctx"]())[0]["messages"]]
+    r["a switch keeps the old profile's streaming answer as far as it got, in its own chat"] = (
+        got == ["q", "Half an answer"] and t.get("done") is True)
+    return r
+
+
+def _segs9_named(src, names):
+    out = []
+    for n_ in _a9.parse(src).body:
+        nm_ = getattr(n_, "name", None)
+        if nm_ is None and isinstance(n_, _a9.Assign):
+            nm_ = next((getattr(t, "id", None) for t in n_.targets), None)
+        if nm_ in names:
+            out.append(_seg9(src, n_))
+    return out
+
+
+_pr9 = _proto9()
+check("the switch protocol (no server): sign-in with Add and its staging, Put them back and Erase "
+      "them, the kept, removed and deleted states, signing in again, adopt, a live answer kept "
+      "(%d rules)" % len(_pr9), all(v is True for v in _pr9.values()),
+      "%r" % {k: v for k, v in _pr9.items() if v is not True})
+
+# ---- ISO-13 in process: a crash at every named step, then a start
+def _state9(d):
+    """What a start left: profile.json's active, kept and putback; the
+    folders under accounts/; root's chats and facts; each account's."""
+    pj = _jr9(d, "profile.json") or {}
+    root = sorted(c["id"] for c in (_jr9(d, "chats.v2.json") or {}).get("chats") or [])
+    accs = {n: _jr9(d, "accounts", n, "chats.v2.json") for n in _acc9(d)
+            if re.fullmatch(r"[0-9a-f]{32}", n)}
+    return pj, root, accs
+
+
+def _crash9(src=None):
+    """For every named step: set up, crash there, start again, and check
+    that nothing of one profile is anywhere but its own place, that
+    nothing of root's was lost, and that no .new-* or .trash-* is left."""
+    src = src or _S9
+    r = {}
+    steps = _lit8b(src, "SWITCH_STEPS")
+    for step in steps:
+        ns, d = _ns9(src)
+        cn = _seed9(d, "X9")
+        _boot9(ns)
+        kind = step.split(".")[0]
+        canB = _canary("B9")
+        try:
+            if kind == "boot":
+                # a crash inside a start: a stale folder in the invariant's
+                # erase, or right after a pending Add step 6
+                ns["profile_signin"](None, {"add": {"chats": "all", "memory": True}})
+                B = ns["current_ctx"]()
+                if step == "boot.renamed":
+                    S = ns["test_profile_create"]()
+                    ns2, _ = _ns9(src, d=d, crash=step)
+                    _boot9(ns2)
+                else:
+                    _pj9(d, pending_import=True)
+                    ns2, _ = _ns9(src, d=d, crash=step)
+                    _boot9(ns2)
+                r[step] = "no crash"
+                continue
+            if kind in ("signout", "kept", "kept-erase"):
+                ns["profile_signin"](None, {"add": {"chats": "all", "memory": True}})
+                B = ns["current_ctx"]()
+                ns["chat_ops"]([{"op": "create", "id": "c" + "b" * 26, "lane": "ai",
+                                 "title": canB}], B)
+                json.dump({"providers": {"groq": {"key": canB, "sync": True}}, "active": "groq"},
+                          open(B.path("cloud.json"), "w"))
+                if kind == "kept-erase":
+                    ns["profile_keep"](None, "signed-out", "t")
+            ns["_crash_point"] = (lambda s_, _c=step: (_ for _ in ()).throw(_Crash9(s_))
+                                  if s_ == _c else None)
+            if kind == "signin":
+                if step.startswith("signin.2"):
+                    # a kept folder of another account is there to erase
+                    ns["_crash_point"] = lambda s_: None
+                    ns["profile_signin"](None, {})
+                    Bk = ns["current_ctx"]()
+                    ns["chat_ops"]([{"op": "create", "id": "c" + "b" * 26, "lane": "ai",
+                                     "title": canB}], Bk)
+                    ns["profile_keep"](None, "signed-out", "t")
+                    ns["_crash_point"] = (lambda s_, _c=step: (_ for _ in ()).throw(
+                        _Crash9(s_)) if s_ == _c else None)
+                ns["profile_signin"](None, {"add": {"chats": "all", "memory": True,
+                                                    "settings": ["persona"]},
+                                            "erase_existing": True})
+            elif kind == "signout":
+                ns["profile_signout"](None, {"imported": "putback"})
+            elif kind == "kept":
+                ns["profile_keep"](None, "signed-out", "t")
+            elif kind == "kept-erase":
+                ns["profile_kept_erase"](None, {"imported": "putback"})
+            r[step] = "no crash"
+            continue
+        except _Crash9:
+            pass
+        ns3, _ = _ns9(src, d=d)
+        _o, ctx = _boot9(ns3)
+        pj, root, accs = _state9(d)
+        left = _acc9(d)
+        stray = [x for x in left if x.startswith((".new-", ".trash-"))]
+        named = {pj.get("active"), (pj.get("kept") or {}).get("dir")} - {None, "local"}
+        # every root chat is in exactly one place: root, or the one account
+        # (its copy) with root's original staged or still in root
+        acc_roots = sorted(c.get("root_id") for a in accs.values()
+                           for c in (a or {}).get("chats") or [] if c.get("root_id"))
+        imps = sorted(k[5:] for x in left if x.startswith(".imported-")
+                      for k in ((_jr9(d, "accounts", x, "units.json") or {}).get("units") or {})
+                      if k.startswith("chat-"))
+        whole = sorted(_CID9) == sorted(set(root) | set(imps)) and not set(root) & set(imps)
+        lost_ok = (sorted(set(root) | set(acc_roots)) == sorted(_CID9)) or whole
+        # B's canary: only inside B's own folder, and only while it is named
+        bplaces = [p for p in _bytegrep(d, canB)
+                   if not any(p.startswith(os.path.join(d, "accounts", n) + os.sep)
+                              for n in named)]
+        r[step] = (not stray and set(accs) <= named and len(accs) <= 1 and not bplaces
+                   and lost_ok and (ctx.root or ctx.name in named)
+                   and not (pj.get("pending_import") and not ctx.root)
+                   # a start finishes a put-back it finds
+                   and not pj.get("putback"))
+        if r[step] is not True:
+            r[step] = [stray, sorted(accs), sorted(named), bplaces[:2], root, acc_roots, imps,
+                       pj.get("active"), pj.get("kept"), pj.get("putback")]
+    return r
+
+
+def _lit8b(src, name):
+    for n_ in _a9.parse(src).body:
+        if isinstance(n_, _a9.Assign) and getattr(n_.targets[0], "id", "") == name:
+            return _a9.literal_eval(n_.value)
+    return ()
+
+
+_cr9 = _crash9()
+check("ISO-13 (in process): a crash at each of the %d named steps of sign-in (Add included), "
+      "sign-out, the kept and removed states, their Erase and the boot, then a start: no one's "
+      "data anywhere but their own, nothing of root's lost, no .new-* or .trash-* left"
+      % len(_cr9), _cr9 and all(v is True for v in _cr9.values()),
+      "%r" % {k: v for k, v in _cr9.items() if v is not True})
+_srcsteps9 = set(re.findall(r'_crash_point\("([a-z0-9.-]+)"\)', _S9))
+_dynsteps9 = {"%s.%s" % (a, b) for a in re.findall(r'_erase_folder\(.*step="([a-z0-9.-]+)"', _S9)
+              for b in ("key", "renamed")}
+check("ISO-13: every named step is a crash point the code reaches, and every crash point in the "
+      "switch protocol is named",
+      set(_lit8b(_S9, "SWITCH_STEPS")) <= (_srcsteps9 | _dynsteps9)
+      and {s for s in _srcsteps9 if s.split(".")[0] in ("signin", "signout", "kept", "kept-erase",
+                                                         "boot")} <= set(_lit8b(_S9, "SWITCH_STEPS")),
+      "%r" % [set(_lit8b(_S9, "SWITCH_STEPS")) - (_srcsteps9 | _dynsteps9),
+              {s for s in _srcsteps9 if s.split(".")[0] in ("signin", "signout", "kept")}
+              - set(_lit8b(_S9, "SWITCH_STEPS"))])
+
+# ---- each protection of the protocol bites
+_PRM9 = [
+    ("an Add that moves what wasn't ticked", "    ch = a.get(\"chats\")\n",
+     "    ch = a.get(\"chats\", \"all\")\n"),
+    ("a moved chat keeping its root id", "            nc[\"id\"] = _new_chat_id()\n", ""),
+    ("no root id recorded", "            nc[\"root_id\"] = c[\"id\"]\n", ""),
+    ("media left behind", "                    _link_or_copy(H.path(f), os.path.join(newp, f))",
+     "                    pass"),
+    ("pending_settings in personal.json",
+     "    if pend:\n        st[\"pending_settings\"] = pend\n",
+     "    if pend:\n        _write_file_raw(os.path.join(newp, PERSONAL_FILE), "
+     "json.dumps(pend).encode(\"utf-8\"))\n"),
+    ("root keeping a copy of the moved chats",
+     "                store_chats(keep, H, legacy=True)", "                pass"),
+    ("the moved ids not kept dead",
+     "            keep.gone = list(chats.gone) + [i for i in ids if i not in chats.gone]",
+     "            keep.gone = list(chats.gone)"),
+    ("the legacy entries not staged", "            _stage_legacy_chats(H, imp, idset)\n", ""),
+    ("the moved facts left in root", "                _save_memory(rest, H, legacy=True)",
+     "                pass"),
+    ("name, persona and home area left in root",
+     "        user_prefs_update(H, lambda v: [v.pop(k, None) for k in sk])", "        pass"),
+    ("a shared picture moved out from under a chat root keeps",
+     "                if not isinstance(rel, str) or rel in still or \\\n",
+     "                if not isinstance(rel, str) or \\\n"),
+    ("a pending step 6 not finished at a start", "                _add_stage(root, act)\n",
+     "                pass\n"),
+    ("a pending put-back not finished at a start",
+     "                out[\"putback\"] = _putback_finish(root, n[\"putback\"])",
+     "                out[\"putback\"] = False"),
+    ("the put-back not recorded before the erase",
+     "            putback=name if choice == \"putback\" else q.get(\"putback\")))\n"
+     "        _crash_point(\"signout.7\")",
+     "            putback=q.get(\"putback\")))\n        _crash_point(\"signout.7\")"),
+    ("the account erased before the commit",
+     "        _profile_json_update(lambda q: q.update(\n            active=\"local\", kept=None, "
+     "pending_import=False,\n            putback=name if choice",
+     "        _erase_folder(H.dir, step=\"signout.8\")\n"
+     "        _profile_json_update(lambda q: q.update(\n            active=\"local\", kept=None, "
+     "pending_import=False,\n            putback=name if choice"),
+    ("sign-out without the sheet's question",
+     "        if info[\"imported\"][\"units\"] and choice is None:", "        if False:"),
+    ("put back ignoring gone", "            if rid in gone:\n", "            if False:\n"),
+    ("the legacy entries not put back", "        _putback_legacy_chats(R, imp)\n", ""),
+    ("synced keys kept in a kept folder", "            _kept_keys(H, reason != \"signed-out\")",
+     "            pass"),
+    ("a removal keeping its keys", "            _kept_keys(H, reason != \"signed-out\")",
+     "            _kept_keys(H, False)"),
+    ("another account resuming a kept folder",
+     "                if same and owner_check(xf, xname) is True:",
+     "                if owner_check(xf, xname) is True:"),
+    ("a deleted account resumed", "                if same and xkept and xkept.get(\"reason\") == "
+     "\"deleted\":", "                if False:"),
+    ("an existing folder erased without the answer",
+     "                if opts.get(\"erase_existing\") is not True:", "                if False:"),
+    ("adopt into an account", "    if not ctx.root:\n        # AN ACCOUNT ADOPTS NOTHING",
+     "    if False:\n        # AN ACCOUNT ADOPTS NOTHING"),
+    ("live answers not kept at a switch", "        try:\n            _turns_flush_ctx(old)\n"
+     "        except Exception:\n", "        try:\n            pass\n        except Exception:\n"),
+    ("the kept Erase without the question",
+     "        if imp[\"units\"] and choice is None:\n            return {\"need\": \"imported\", "
+     "\"imported\": imp}", "        if False:\n            return {}"),
+]
+_prm9 = _mrun9(lambda s_: dict(_proto9(s_), **_crash9(s_)), _PRM9)
+check("the switch protocol: each protection bites (%d mutations, each caught)" % len(_PRM9),
+      all(ok is True for _d, ok in _prm9), "%r" % [x for x in _prm9 if x[1] is not True])
+
+# ---- the account window's bridge (1a 5.9): one door per window
+def _guard9(src=None, accounts=True):
+    src = src or _S9
+    g = {"re": re, "json": json, "ACCOUNTS": accounts}
+    for code_ in _segs9_named(src, {"_bridge_guard", "ACCOUNT_TASKS"}):
+        exec(code_, g)
+
+    class _Main:
+        pass
+
+    class _Acct:
+        def account_token(self):
+            return "ACCT-TOKEN"
+
+        def account_close(self):
+            return True
+    g["_WindowBridgeAcct"], g["_AccountBridge"] = _Main, _Acct
+    replies, calls = [], []
+    g["_bridge_reply"] = lambda w, n, v, i: replies.append((n, v, i))
+    gg = g["_bridge_guard"](lambda *a: calls.append(a[1:]))
+
+    class W:
+        def __init__(self, api):
+            self._js_api = api
+    mw, aw, pw = W(_Main()), W(_Acct()), W(object())
+    for w, f, p, i in ((mw, "api_token", [], "1"), (mw, "open_account", ["signin"], "2"),
+                       (mw, "open_account", ["nope"], "3"), (mw, "open_account", [], "4"),
+                       (mw, "open_account", ["signin", "x"], "5"), (mw, "account_token", [], "6"),
+                       (aw, "account_token", [], "7"), (aw, "account_close", None, "8"),
+                       (aw, "open_account", ["signin"], "9"), (aw, "account_token", ["x"], "10"),
+                       (pw, "account_token", [], "11"), (aw, "account_token.__func__", [], "12"),
+                       (aw, "account_token", [], 'x"]=0;alert(1);y["'),
+                       (mw, "open_account", ["signin"], "a\"b")):
+        gg(w, f, p, i)
+    return calls, replies
+
+
+_gc9, _gr9 = _guard9()
+_gc9off, _gr9off = _guard9(accounts=False)
+check("the bridge: the main window may ask open_account(task) for an allow-listed task, the "
+      "account window gets its token and close (answered without eval), and nothing crosses; "
+      "a build without accounts answers api_token alone",
+      _gc9 == [("api_token", [], "1"), ("open_account", ["signin"], "2")]
+      and _gr9 == [("account_token", "ACCT-TOKEN", "7"), ("account_close", True, "8")]
+      and _gc9off == [("api_token", [], "1")] and _gr9off == [],
+      "%r" % [_gc9, _gr9, _gc9off, _gr9off])
+_ab9 = {"urllib": urllib, "PORT": 5555, "_ACCT": {"token": "AT" * 20, "window": None},
+        "_ACCT_LOCK": _t9.RLock(), "ctx_thread": lambda **k: type("T", (), {"start": lambda s: None})(),
+        "account_open": lambda t: {"opened": t}, "ACCOUNT_TASKS": ("signin", "status"),
+        "API_TOKEN": "T" * 43, "_window_url": lambda: "http://127.0.0.1:5555/"}
+for code_ in _segs9_named(_S9, {"_WindowBridge", "_WindowBridgeAcct", "_AccountBridge"}):
+    exec(code_, _ab9)
+_abr9 = {}
+for _u9 in ("http://127.0.0.1:5555/account", "http://127.0.0.1:5555/", "http://127.0.0.1:5556/account",
+            "https://127.0.0.1:5555/account", "http://localhost:5555/account", None):
+    _ab9["_ACCT"]["window"] = (type("W", (), {"get_current_url": lambda s, u=_u9: u})()
+                               if _u9 else None)
+    _abr9[_u9] = _ab9["_AccountBridge"]().account_token()
+_pub9 = lambda o: sorted(n for n in dir(o) if not n.startswith("_"))
+check("the bridges: the account window's has account_token and account_close only, and hands "
+      "the token only while it shows this app's /account; the main one adds open_account with "
+      "the allow-list; the shipped main bridge is unchanged",
+      _pub9(_ab9["_AccountBridge"]()) == ["account_close", "account_token"]
+      and _pub9(_ab9["_WindowBridgeAcct"]()) == ["api_token", "open_account"]
+      and _pub9(_ab9["_WindowBridge"]()) == ["api_token"]
+      and _abr9 == {"http://127.0.0.1:5555/account": "AT" * 20, "http://127.0.0.1:5555/": None,
+                    "http://127.0.0.1:5556/account": None, "https://127.0.0.1:5555/account": None,
+                    "http://localhost:5555/account": None, None: None}
+      and _ab9["_WindowBridgeAcct"]().open_account("x") == {"err": "task"}
+      and _ab9["_WindowBridgeAcct"]().open_account("signin") == {"opened": "signin"},
+      "%r" % _abr9)
+
+# ---- Time Machine: before the first write into accounts/, and never failing the boot
+_tm9 = []
+for _real9, _mac9, _ret9 in ((False, True, None), (True, True, 0), (True, True, "boom"),
+                             (True, False, 0)):
+    _tn9, _td9 = _ns9()
+    _tn9["DEFAULT_APP"], _tn9["IS_MAC"] = _real9, _mac9
+    _runs9 = []
+
+    def _fake_run9(argv, _r=_ret9, _l=_runs9, **k):
+        _l.append((list(argv), sorted(os.listdir(argv[-1])) if os.path.isdir(argv[-1]) else None))
+        if _r == "boom":
+            raise OSError("tmutil missing")
+        return type("R", (), {"returncode": _r})()
+    _tn9["subprocess"] = type("S", (), {"run": staticmethod(_fake_run9)})
+    _tn9["profile_boot"]()
+    try:
+        _tn9["test_profile_create"]()
+        _tn9["test_profile_create"]()
+        _ok9 = True
+    except Exception as e_:
+        _ok9 = repr(e_)
+    _rec9 = [json.loads(x) for x in open(os.path.join(_td9, "run", "tmutil.jsonl"))] \
+        if os.path.exists(os.path.join(_td9, "run", "tmutil.jsonl")) else []
+    _tm9.append((_ok9, _runs9, _rec9))
+_acc_p9 = lambda d_: os.path.join(d_, "accounts")
+check("Time Machine: accounts/ gets tmutil addexclusion (sticky) before anything is in it, once "
+      "a run; a dev copy records it and never runs tmutil; a failure never stops a start",
+      _tm9[0][0] is True and _tm9[0][1] == [] and len(_tm9[0][2]) == 1
+      and _tm9[0][2][0]["argv"][:2] == ["tmutil", "addexclusion"] and _tm9[0][2][0]["held"] == []
+      and _tm9[1][0] is True and len(_tm9[1][1]) == 1 and _tm9[1][1][0][0][:2] == ["tmutil", "addexclusion"]
+      and _tm9[1][1][0][0][2].endswith(os.sep + "accounts") and _tm9[1][1][0][1] == []
+      and _tm9[1][2] == [] and _tm9[2][0] is True and len(_tm9[2][1]) == 1
+      and _tm9[3][0] is True and _tm9[3][1] == [] and "-p" not in _S9[_S9.index("def _tm_exclude"):
+                                                              _S9.index("def _accounts_prepare")],
+      "%r" % _tm9)
+
+# ---- the web store at a switch, per engine (1a 5.12)
+_wsg9 = {"TEST_HOOKS": frozenset(), "_webstore_lock": _t9.Lock(), "_QT_CLEAR_CACHE": [False],
+         "_WINDOW": [], "_webstore_marks": []}
+_wsg9["_webstore_mark"] = lambda **kv: _wsg9["_webstore_marks"].append(kv)
+_wsg9["_webstore_qt_cache"] = lambda w: None
+_wsg9["_webstore_native"] = lambda local: _wsg9["_webstore_marks"].append({"native": local})
+_wsg9["ctx_thread"] = lambda target, args=(), **k: type("T", (), {
+    "start": lambda s: target(*args)})()
+for code_ in _segs9_named(_S9, {"_webstore_switch"}):
+    exec(code_, _wsg9)
+_wsr9 = {}
+for _eng9 in ("qt", "webview2", "webkit"):
+    _wsg9["_web_engine"] = lambda e=_eng9: e
+    del _wsg9["_webstore_marks"][:]
+    _wsg9["_QT_CLEAR_CACHE"][0] = False
+    _wsg9["_webstore_switch"]()
+    _wsr9[_eng9] = (list(_wsg9["_webstore_marks"]), _wsg9["_QT_CLEAR_CACHE"][0])
+check("the web store at a switch: WebView2 clears now (all but LocalStorage and cookies); Qt "
+      "removes its files at the next start and its HTTP cache now; macOS asks the routine, "
+      "whose WebKit branch leaves Python's shared store alone",
+      _wsr9 == {"qt": ([{"clean": 0}], True), "webview2": ([{"native": False}], False),
+                "webkit": ([{"native": False}], False)}
+      and "if not _webkit_own_store():\n                return False" in _S9,
+      "%r" % _wsr9)
+
+# ---- the page: storeBoot adopts nothing for an account; the pane's button only with the window
+_sb9js = os.path.join(_SMOKE_TMP, "storeboot9.js")
+_pg9 = _S9[_S9.index("const PREF_OF="):_S9.index("/* ------------------------------------------------------------- state */")]
+with open(_sb9js, "w", encoding="utf-8") as fh:
+    fh.write(r"""
+const run=JSON.parse(require('fs').readFileSync(0,'utf8'));
+const PROFILE=run.profile;
+const store=new Map(Object.entries(run.ls));
+globalThis.localStorage={getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,String(v)),
+  removeItem:k=>store.delete(k),key:i=>[...store.keys()][i]??null,get length(){return store.size;}};
+const calls=[];globalThis.location={reload:()=>{}};
+async function api(u,o){o=o||{};calls.push([u,o.body||null]);
+  if(u==="/api/prefs")return new Response("{}",{status:200});
+  if(u==="/api/prefs/adopt")return new Response(JSON.stringify({ok:true,took:[],prefs:JSON.parse(o.body)}),{status:200});
+  return new Response("{}",{status:200});}
+let tier="Fast",adv=null,advOn=false,autonomy="auto",tierOff={},council=["Llama 3.2 3B"],uiMode="ai",agent="";
+function setTier(n,q){tier=n;}
+function advChip(){}
+function paintAutonomy(){}
+function paintModels(){}
+function setAgent(n){agent=n;}
+""" + _pg9 + r"""
+storeBoot().then(()=>console.log(JSON.stringify({ls:Object.fromEntries(store),tier,calls})));
+""")
+_sbr9 = {}
+for _p9 in ("local.0123", "a" * 32 + ".0123"):
+    try:
+        _sbr9[_p9[:5]] = json.loads(subprocess.run(
+            ["node", _sb9js], input=json.dumps({"profile": _p9, "ls": {"millen.tier": "Thinking",
+                                                                        "millen.sky": "2"}}),
+            capture_output=True, text=True, timeout=30).stdout)
+    except Exception as e_:
+        _sbr9[_p9[:5]] = {"err": repr(e_)}
+check("adopt (from the review of 6b329): a page drawn for an account neither posts nor uses the "
+      "browser's leftover keys, and leaves them for This computer; This computer's page still "
+      "adopts them",
+      _sbr9["local"].get("tier") == "Thinking" and _sbr9["local"].get("ls") == {"millen.sky": "2"}
+      and any(c[0] == "/api/prefs/adopt" for c in _sbr9["local"].get("calls", []))
+      and _sbr9["aaaaa"].get("tier") == "Fast"
+      and _sbr9["aaaaa"].get("ls") == {"millen.tier": "Thinking", "millen.sky": "2"}
+      and not any(c[0] == "/api/prefs/adopt" for c in _sbr9["aaaaa"].get("calls", [])),
+      "%r" % _sbr9)
+_pa9 = _S9[_S9.index("async function paintAccount(){"):_S9.index("function fgScopes(){")]
+_pa9js = os.path.join(_SMOKE_TMP, "pane9.js")
+with open(_pa9js, "w", encoding="utf-8") as fh:
+    fh.write(r"""
+const els={};const made=[];let opened=[];
+globalThis.window={pywebview:{api:{open_account:t=>opened.push(t)}}};
+globalThis.document={getElementById:id=>els[id]||null,createElement:t=>{const e={tag:t,
+  addEventListener:(k,f)=>{e["on"+k]=f;},remove:()=>{delete els[e.id];}};made.push(e);return e;}};
+const acctCrypto={textContent:"",hidden:true,parentNode:{insertBefore:(e,x)=>{els[e.id]=e;}}};
+const $=s=>s==="#acct-crypto"?acctCrypto:{textContent:""};
+let ME=null;let acctMe=null;const api=async()=>({json:async()=>ME});
+""" + _pa9 + r"""
+(async()=>{const out=[];
+for(const m of JSON.parse(require('fs').readFileSync(0,'utf8'))){ME=m;await paintAccount();
+  const b=els["acct-window"];out.push(b?[b.textContent,b.type]:null);if(b)b.onclick();}
+console.log(JSON.stringify({out,opened}));})();
+""")
+try:
+    _pn9 = json.loads(subprocess.run(["node", _pa9js], input=json.dumps([
+        {"kind": "owner", "accounts": {"on": False, "note": ""}},
+        {"kind": "owner", "accounts": {"on": False, "note": "x", "window": True}},
+        {"kind": "owner", "accounts": {"on": True, "note": ""}}]),
+        capture_output=True, text=True, timeout=30).stdout)
+except Exception as e_:
+    _pn9 = {"err": repr(e_)}
+check("the Account pane: 'Open the account window' only when the build says it has one (the "
+      "shipped app's /api/me doesn't), and it asks open_account('status')",
+      _pn9.get("out") == [None, ["Open the account window", "button"], None]
+      and _pn9.get("opened") == ["status"]
+      and '            if ACCOUNTS:\n                # (M9) a build with the account window says so' in _S9,
+      "%r" % _pn9)
+
+# ---- live, no-server form: "This computer" is A, local test accounts are B
+def _q9(inst, path, data=None, headers=None, token=True, raw=False, cookie=True):
+    h = {}
+    if cookie:
+        h["Cookie"] = inst.cookie
+    if token is True:
+        h["X-Api-Token"] = inst.token
+    elif token:
+        h["X-Api-Token"] = token
+    h.update(headers or {})
+    body = None
+    if data is not None:
+        body = json.dumps(data).encode()
+        h["Content-Type"] = "application/json"
+    r_ = urllib.request.Request(inst.base + path, data=body, headers=h,
+                                method="POST" if body is not None else "GET")
+    try:
+        with urllib.request.urlopen(r_, timeout=60) as resp:
+            out = resp.status, dict(resp.headers), resp.read()
+    except urllib.error.HTTPError as e_:
+        out = e_.code, dict(e_.headers), e_.read()
+    if raw:
+        return out
+    try:
+        return out[0], json.loads(out[2] or b"null")
+    except ValueError:
+        return out[0], out[2]
+
+
+def _hk9(inst, **d):
+    return _q9(inst, "/api/test/profile", d)[1]
+
+
+def _root9(home):
+    """root as a person would compare it: every file but run/, accounts/ and
+    logs/, profile.json left out, and prefs.json without the MACHINE keys."""
+    out = {}
+    for dp, dn, fn in os.walk(home):
+        dn[:] = [x for x in dn if not (dp == home and x in ("run", "accounts", "logs"))]
+        for f in fn:
+            p = os.path.join(dp, f)
+            rel = os.path.relpath(p, home)
+            if rel == "profile.json":
+                continue
+            if rel == "prefs.json":
+                d_ = _jr9(p) or {}
+                d_ = {k: v for k, v in d_.items() if _pc9(k) != "machine"}
+                out[rel] = json.dumps(d_, sort_keys=True)
+                continue
+            out[rel] = _h9.sha256(open(p, "rb").read()).hexdigest()
+    return out
+
+
+_pc9 = {}
+_prof_in(_pc9)
+_pc9 = _pc9["pref_class"]
+
+_P9 = Instance(9903, "P9", seed=lambda h: _seed9(h, "L9"),
+               env={"MILLENAI_TEST_HOOKS": "profiles,account-headless,webstore-fake"}).start()
+_A9 = _hk9(_P9, op="status")["tag"]
+# ---- the account window's page and its CSP
+_ap9 = {p: _q9(_P9, p, token=False, raw=True) for p in ("/account", "/account.css", "/account.js")}
+_apt9 = _ap9["/account"][2].decode("utf-8", "replace")
+_apjs9 = _ap9["/account.js"][2].decode("utf-8", "replace")
+check("the account window's page: /account, /account.css and /account.js with the cookie alone, "
+      "each under the strict CSP; no inline script or style, no form, no handler attribute; "
+      "the script builds with textContent only; the rest of the gate stands",
+      all(v[0] == 200 and v[1].get("Content-Security-Policy") ==
+          "default-src 'self'; img-src 'self'; form-action 'none'; base-uri 'none'; "
+          "frame-ancestors 'none'; object-src 'none'" and v[1].get("X-Content-Type-Options")
+          == "nosniff" and v[1].get("Cache-Control") == "no-store" for v in _ap9.values())
+      and not re.search(r"<script(?![^>]*\bsrc=)", _apt9) and "<style" not in _apt9
+      and not re.search(r"\sstyle=|\son[a-z]+=|<form|javascript:", _apt9, re.I)
+      and "innerHTML" not in _apjs9 and "insertAdjacentHTML" not in _apjs9
+      and "eval(" not in _apjs9 and "new Function" not in _apjs9 and ".textContent" in _apjs9
+      and _q9(_P9, "/account", token=False, cookie=False, raw=True)[0] == 403
+      and _q9(_P9, "/account?x=1", token=False, raw=True)[0] == 403
+      and _q9(_P9, "/account?boot=wrong", token=False, cookie=False, raw=True)[0] == 403,
+      "%r" % [{k: (v[0], v[1].get("Content-Security-Policy")) for k, v in _ap9.items()}])
+# ---- the headless session: its own token, bound to the profile, refused the main one
+_hs9 = _q9(_P9, "/api/test/account", {"op": "open", "task": "signin"})[1]
+_ah9 = {"X-Profile": _hs9.get("tag", "")}
+_s1 = _q9(_P9, "/api/account/session", headers=_ah9, token=_hs9.get("token"))
+_s2 = _q9(_P9, "/api/account/session", headers=_ah9)
+_s3 = _q9(_P9, "/api/chats", token=_hs9.get("token"))
+_s4 = _q9(_P9, "/api/account/session", headers={"X-Profile": _A9 + "x"}, token=_hs9.get("token"),
+          raw=True)
+_s5 = _q9(_P9, "/api/account/session", headers=_ah9, token=_hs9.get("token"))
+_hs9b = _q9(_P9, "/api/test/account", {"op": "open", "task": "status"})[1]
+_hs9c = _q9(_P9, "/api/test/account", {"op": "open", "task": "export"})[1]
+_hs9d = _q9(_P9, "/api/test/account", {"op": "open", "task": "nope"})[1]
+check("the account API takes the account window's token only, bound to the profile it opened "
+      "for: the main token is refused there and its own everywhere else; a moved profile gets "
+      "409 and the session closes; one window at a time; only allow-listed tasks",
+      _hs9.get("ok") is True and _hs9.get("tag") == _A9 and _hs9.get("token") != _P9.token
+      and _s1[0] == 200 and _s1[1].get("task") == "signin" and _s1[1].get("tag") == _A9
+      and _s2[0] == 403 and _s3[0] == 403
+      and _s4[0] == 409 and _s4[1].get("X-Profile") == "changed" and _s5[0] == 403
+      and _hs9b.get("ok") is True and _hs9c.get("open") is True and _hs9c.get("task") == "status"
+      and _hs9d.get("err") == "task",
+      "%r" % [_hs9, _s1, _s2[0], _s3[0], _s4[:2], _s5[0], _hs9b, _hs9c, _hs9d])
+# a bare switch closes it; a switch it runs gives it a new token for the new profile
+_tok9 = _hs9b.get("token")
+_Bx9 = _hk9(_P9, op="create")["name"]
+_hk9(_P9, op="switch", to=_Bx9)
+_hk9(_P9, op="switch", to="local", erase=True)
+_c1 = _q9(_P9, "/api/account/session", headers={"X-Profile": _hs9b.get("tag", "")}, token=_tok9)
+_A9 = _hk9(_P9, op="status")["tag"]
+_hs9e = _q9(_P9, "/api/test/account", {"op": "open", "task": "signin"})[1]
+_rs9 = _q9(_P9, "/api/account/signin", {}, headers={"X-Profile": _hs9e.get("tag", "")},
+           token=_hs9e.get("token"))[1]
+_st9 = _q9(_P9, "/api/test/account", {"op": "status"})[1]
+_c2 = _q9(_P9, "/api/account/session", headers={"X-Profile": _hs9e.get("tag", "")},
+          token=_hs9e.get("token"))
+_c3 = _q9(_P9, "/api/account/session", headers={"X-Profile": _st9.get("tag") or ""},
+          token=_st9.get("token"))
+_so9 = _q9(_P9, "/api/account/signout", {}, headers={"X-Profile": _st9.get("tag") or ""},
+           token=_st9.get("token"))[1]
+check("a switch closes every account window but the one running it, which gets a new token bound "
+      "to the new profile (1a 5.9)",
+      _c1[0] == 403 and _rs9.get("ok") is True and _st9.get("open") is True
+      and _st9.get("tag") == _rs9.get("tag") == _rs9.get("account_tag")
+      and _st9.get("token") != _hs9e.get("token") and _c2[0] == 403 and _c3[0] == 200
+      and _c3[1].get("profile") == {"kind": "test", "signed_in": True}
+      and _so9.get("ok") is True and _hk9(_P9, op="status")["kind"] == "local",
+      "%r" % [_c1[0], _rs9, _st9, _c2[0], _c3, _so9])
+_q9(_P9, "/api/test/account", {"op": "close"})
+
+# ---- ISO-11's no-server parts: Esc, Enter, close and the default move nothing; chats-only
+# leaves Remote's target and host keys byte-identical
+_r0 = _root9(_P9.home)
+_i1 = _q9(_P9, "/api/test/account", {"op": "open", "task": "signin"})[1]
+_e1 = _q9(_P9, "/api/account/cancel", {"key": "Escape"}, headers={"X-Profile": _i1["tag"]},
+          token=_i1["token"])[1]
+_i2 = _q9(_P9, "/api/test/account", {"op": "open", "task": "signin"})[1]
+_e2 = _q9(_P9, "/api/account/cancel", {"key": "Enter"}, headers={"X-Profile": _i2["tag"]},
+          token=_i2["token"])[1]
+_i3 = _q9(_P9, "/api/test/account", {"op": "open", "task": "signin"})[1]
+_e3 = _q9(_P9, "/api/test/account", {"op": "close"})[1]
+_after_cancel = _root9(_P9.home)
+_accs_cancel = _acc9(_P9.home)
+_i4 = _q9(_P9, "/api/test/account", {"op": "open", "task": "signin"})[1]
+_d4 = _q9(_P9, "/api/account/signin", {}, headers={"X-Profile": _i4["tag"]}, token=_i4["token"])[1]
+_after_default = _root9(_P9.home)
+_bdir9 = os.path.join(_P9.home, "accounts", _d4.get("dir") or "x")
+_bempty9 = (_jr9(_bdir9, "chats.v2.json"), _jr9(_bdir9, "memory.v2.json"),
+            (_jr9(_bdir9, "sync", "state.json") or {}).get("pending_settings"))
+_hk9(_P9, op="signout")
+_q9(_P9, "/api/test/account", {"op": "close"})
+_rk0 = {k: _r0[k] for k in ("remote.json", "remote_known_hosts")}
+_co9 = _hk9(_P9, op="signin", add={"chats": "all"})
+_after_chats = _root9(_P9.home)
+check("ISO-11 (no server): Esc, Enter and the close box move nothing; the default (nothing "
+      "ticked) moves nothing; chats only leaves remote.json and remote_known_hosts byte-identical",
+      _e1.get("closed") and _e2.get("closed") and _e3.get("closed") is True
+      and _after_cancel == _r0 and _accs_cancel == []
+      and _d4.get("ok") is True and _after_default == _r0 and _bempty9 == (None, None, None)
+      and _co9.get("ok") is True and _co9["added"]["chats"] == 3
+      and {k: _after_chats.get(k) for k in _rk0} == _rk0
+      and not os.path.exists(os.path.join(_P9.home, "accounts", _co9["dir"], "remote.json")),
+      "%r" % [_e1, _e2, _e3, sorted(set(_after_cancel.items()) ^ set(_r0.items()))[:4],
+              _d4, sorted(set(_after_default.items()) ^ set(_r0.items()))[:4], _bempty9, _co9])
+_lo9 = _q9(_P9, "/api/logout", {})[1]
+_lo9b = _q9(_P9, "/api/logout", {"imported": "putback"})[1]
+_lo9c = _q9(_P9, "/api/logout", {})[1]
+check("/api/logout is the desktop sign-out: it asks when an Add hasn't finished uploading, puts "
+      "back on the answer, and on This computer does nothing",
+      _lo9.get("need") == "imported" and _lo9b.get("ok") is True and _lo9c == {"ok": True}
+      and _hk9(_P9, op="status")["kind"] == "local" and _acc9(_P9.home) == []
+      and len((_jr9(_P9.home, "chats.v2.json") or {}).get("chats") or []) == 3,
+      "%r" % [_lo9, _lo9b, _lo9c])
+# Time Machine and the web store, as the copy recorded them
+_tmr9 = [json.loads(x) for x in open(os.path.join(_P9.home, "run", "tmutil.jsonl"))]
+_wsr9l = json.load(open(os.path.join(_P9.home, "run", "webstore.json")))
+check("accounts/ was excluded from Time Machine (recorded, never run in a test) once, before "
+      "its first file; the web store was cleaned at every switch to another folder",
+      len(_tmr9) == 1 and _tmr9[0]["argv"] == [
+          "tmutil", "addexclusion", os.path.join(os.path.realpath(_P9.home), "accounts")]
+      and _tmr9[0]["held"] == []
+      and len([w for w in _wsr9l if w.get("local") is False]) >= 8,
+      "%r" % [_tmr9, len(_wsr9l)])
+
+# ---- two profiles, A -> B -> A, with canaries: B never sees A, and A comes back as it was
+_cA9 = {k: _canary("A9-" + k) for k in ("chat", "memory", "persona", "image", "export", "cloud",
+                                        "quality", "usage", "remote")}
+_q9(_P9, "/api/prefs", {"persona": _cA9["persona"], "tier": "Fast"})
+_lateA9 = {k: _hk9(_P9, op="late", kind=k, text=_cA9[k], delay=0)["id"]
+           for k in ("chat", "memory", "image", "export", "cloud", "quality", "usage", "remote")}
+time.sleep(1.5)
+_imgA9 = [f for f in os.listdir(os.path.join(_P9.home, "images")) if f.endswith(".png")]
+_expA9 = [f for f in os.listdir(os.path.join(_P9.home, "exports")) if not f.endswith(".meta")]
+_hk9(_P9, op="fill", tag=_cA9["chat"] + "-cache")
+_rootA9 = _root9(_P9.home)
+_sinB9 = _hk9(_P9, op="signin")
+_stB9 = _hk9(_P9, op="status")
+_seenB9 = {p: _q9(_P9, p, raw=True) for p in (
+    "/api/chats", "/api/memory", "/api/prefs", "/api/usage", "/api/cloud", "/api/remote/config",
+    "/api/me", "/api/stats")}
+_mediaB9 = [_q9(_P9, "/api/image/" + f, raw=True)[0] for f in _imgA9] + \
+    [_q9(_P9, "/api/export/" + f, raw=True)[0] for f in _expA9]
+_leakB9 = [(p, k) for p, v in _seenB9.items() for k, c in _cA9.items() if c.encode() in v[2]]
+# B works, then signs out: nothing of B stays
+_cB9 = _canary("B9")
+_hk9(_P9, op="late", kind="chat", text=_cB9, delay=0)
+_hk9(_P9, op="late", kind="image", text=_cB9, delay=0)
+time.sleep(1.2)
+_bdirB9 = os.path.join(_P9.home, "accounts", _sinB9.get("dir") or "x")
+_inB9 = bool(_bytegrep(_bdirB9, _cB9))
+_sout9 = _hk9(_P9, op="signout")
+_rootA9b = _root9(_P9.home)
+check("two profiles, A -> B -> A: B's GETs, media ids, exports and caches show nothing of A's; "
+      "B's data goes with B; root comes back byte-identical but for profile.json, run/ and the "
+      "machine's keys",
+      _sinB9.get("ok") is True and all(v[0] == 200 for v in _seenB9.values()) and not _leakB9
+      and _mediaB9 and all(c == 404 for c in _mediaB9) and _stB9.get("dirty") == []
+      and [c.get("title") for c in json.loads(_seenB9["/api/chats"][2])["chats"]] == []
+      and _inB9 and _sout9.get("ok") is True and not _bytegrep(_P9.home, _cB9)
+      and _rootA9b == _rootA9
+      and all(_q9(_P9, "/api/image/" + f, raw=True)[0] == 200 for f in _imgA9),
+      "%r" % [_sinB9, {p: v[0] for p, v in _seenB9.items()}, _leakB9, _mediaB9, _stB9.get("dirty"),
+              _inB9, _sout9, sorted(set(_rootA9b.items()) ^ set(_rootA9.items()))[:4]])
+
+# ---- ISO-7 with real switches: writes started under one profile and landing after the
+# sign-in or sign-out land nowhere
+_KN9 = ("memory", "chat", "export", "image", "cloud", "prefs", "quality", "usage", "remote")
+_cn7 = {k: _canary("A7-" + k) for k in _KN9}
+_rootA7 = _root9(_P9.home)
+_l7 = [_hk9(_P9, op="late", kind=k, text=_cn7[k], delay=3)["id"] for k in _KN9]
+_s7 = _hk9(_P9, op="signin")
+_x7 = _q9(_P9, "/api/prefs", {"length": 5}, headers={"X-Profile": _A9}, raw=True)
+time.sleep(4)
+_st7 = _hk9(_P9, op="status")
+_b7 = os.path.join(_P9.home, "accounts", _s7.get("dir") or "x")
+_ok7a = ([_st7["late"].get(j) for j in _l7] == ["StaleProfile"] * len(_KN9)
+         and _root9(_P9.home) == _rootA7 and not [k for k, c in _cn7.items() if _bytegrep(_P9.home, c)]
+         and _x7[0] == 409)
+_cn7b = {k: _canary("B7-" + k) for k in _KN9}
+_l7b = [_hk9(_P9, op="late", kind=k, text=_cn7b[k], delay=3)["id"] for k in _KN9]
+_o7 = _hk9(_P9, op="signout")
+time.sleep(4)
+_st7b = _hk9(_P9, op="status")
+check("ISO-7 (real switches): writes started under A and landing after the sign-in are refused, "
+      "A unchanged and nothing in B; B's landing after the sign-out are refused and don't bring "
+      "B's folder back",
+      _s7.get("ok") is True and _ok7a and _o7.get("ok") is True
+      and [_st7b["late"].get(j) for j in _l7b] == ["StaleProfile"] * len(_KN9)
+      and not os.path.exists(_b7) and not [k for k, c in _cn7b.items() if _bytegrep(_P9.home, c)],
+      "%r" % [[_st7["late"].get(j) for j in _l7], _x7[0], [_st7b["late"].get(j) for j in _l7b],
+              os.path.exists(_b7)])
+
+# ---- ISO-7b: slow writers (a Veo clip landing, a picture, a cloud-state write) started
+# under account A, landing after A is signed out and B signed in
+_P9.stop()
+_P9b = Instance(9903, "P9b", env={"MILLENAI_TEST_HOOKS": "profiles,delay-veo-download=4,"
+                                  "delay-image-write=4,delay-cloud-write=4,delay-switch=2"}).start()
+# a request that arrives while a switch runs waits for it, then works for the
+# profile it leaves (1a 5.11: from the lock for switching on, nothing of the
+# old profile is read or written)
+_mid9 = {}
+_th9 = _t9.Thread(target=lambda: _mid9.update(s=_hk9(_P9b, op="signin")))
+_th9.start()
+time.sleep(0.7)
+_mid9["during"] = _hk9(_P9b, op="status")
+_th9.join(30)
+_hk9(_P9b, op="signout")
+check("a request that arrives during a switch waits for it and works for the new profile",
+      (_mid9.get("s") or {}).get("ok") is True
+      and _mid9["during"].get("dir") == _mid9["s"].get("dir") and _mid9["during"]["kind"] == "test",
+      "%r" % _mid9)
+_s7bA = _hk9(_P9b, op="signin")
+_cn7x = {k: _canary("A7b-" + k) for k in ("video", "image", "cloud")}
+_l7x = [_hk9(_P9b, op="late", kind=k, text=_cn7x[k], delay=0)["id"] for k in _cn7x]
+time.sleep(0.5)
+_hk9(_P9b, op="signout")
+_s7bB = _hk9(_P9b, op="signin")
+time.sleep(6)
+_st7x = _hk9(_P9b, op="status")
+_adir7 = os.path.join(_P9b.home, "accounts", _s7bA.get("dir") or "x")
+_bdir7 = os.path.join(_P9b.home, "accounts", _s7bB.get("dir") or "y")
+check("ISO-7b: a Veo clip, a picture and a cloud-state write started under account A and landing "
+      "after A signs out and B signs in: A's folder never comes back, B's gets nothing, B's "
+      "cloud.json holds no key of A's",
+      _s7bA.get("ok") is True and _s7bB.get("ok") is True
+      and [_st7x["late"].get(j) for j in _l7x] == ["StaleProfile"] * 3
+      and not os.path.exists(_adir7) and os.path.isdir(_bdir7)
+      and not [k for k, c in _cn7x.items() if _bytegrep(_P9b.home, c)],
+      "%r" % [_s7bA, _s7bB, [_st7x["late"].get(j) for j in _l7x], os.path.exists(_adir7)])
+_P9b.stop()
+
+
+# ---- ISO-12 live: a planted accounts/ at a real start
+def _plant12(home):
+    _seed9(home, "P12")
+    os.makedirs(os.path.join(home, "accounts"))
+    keep, gone = [], []
+    for nm, extra, named in ((secrets.token_hex(16), {}, True), (secrets.token_hex(16), {}, False),
+                             (".new-" + secrets.token_hex(12), {}, False),
+                             (".new-" + secrets.token_hex(12), {"signup": "sent"}, False)):
+        f = os.path.join(home, "accounts", nm)
+        a = secrets.token_hex(16)
+        _key9(f, acct_id=a, rid_key=_h9.sha256(("cai-test-rid|" + a).encode()).hexdigest(),
+              **extra)
+        (keep if named or extra else gone).append(nm)
+        if _DIR_RX9.fullmatch(nm):
+            import hmac as _hm9
+            K = _hm9.new(b"\0" * 32, bytes.fromhex(_h9.sha256(("cai-test-rid|" + a)
+                                                                .encode()).hexdigest()),
+                         "sha256").digest()
+            K = _hm9.new(K, b"cai2/owner\x01", "sha256").digest()
+            open(os.path.join(f, ".owner"), "w").write(
+                _hm9.new(K, ("%s|%s" % (a, nm)).encode(), "sha256").hexdigest())
+        if named:
+            json.dump({"active": nm, "kept": None, "pending_import": False},
+                      open(os.path.join(home, "profile.json"), "w"))
+            json.dump({"v": 2, "chats": [{"id": "c" + "k" * 26, "lane": "ai", "ts": 1,
+                                          "title": "kept-" + nm, "messages": []}], "gone": []},
+                      open(os.path.join(f, "chats.v2.json"), "w"))
+    os.makedirs(os.path.join(home, "accounts", ".trash-" + secrets.token_hex(12), "x"))
+    _PL12.update(keep=keep, gone=gone)
+
+
+_PL12 = {}
+_DIR_RX9 = re.compile(r"[0-9a-f]{32}")
+_P12 = Instance(9903, "P12", seed=_plant12, env={"MILLENAI_TEST_HOOKS": "profiles"}).start()
+_l12 = _acc9(_P12.home)
+_st12 = _hk9(_P12, op="status")
+_ch12 = [c.get("title") for c in _q9(_P12, "/api/chats")[1].get("chats", [])]
+# this copy has no account-headless hook: the headless session's route isn't there
+_nh12 = _q9(_P12, "/api/test/account", {"op": "open", "task": "signin"})[0]
+check("ISO-12 (live): at a real start only the folders profile.json names and an unfinished "
+      "sign-up are left; the named one is served, nothing of the others",
+      sorted(_l12) == sorted(_PL12["keep"]) and _st12.get("dir") == _PL12["keep"][0]
+      and _ch12 == ["kept-" + _PL12["keep"][0]] and _nh12 in (403, 404),
+      "%r" % [_l12, _PL12, _st12, _ch12, _nh12])
+_P12.stop()
+
+
+# ---- ISO-13 live: the real os._exit at every named step, then a real start
+def _crashrun9(name, hooks, op=None, data=None, boot=False):
+    """Start a copy with the crash hook; for a boot step it dies starting,
+    else it dies inside op. The exit code (86: the hook fired)."""
+    i_ = Instance(9903, name, env={"MILLENAI_TEST_HOOKS": hooks})
+    if boot:
+        env = dict(i_.env)
+        p = subprocess.Popen([i_.py or os.environ.get("SMOKE_PY") or sys.executable, "millenai.py"],
+                             env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             start_new_session=True)
+        try:
+            return p.wait(60)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            return "hung"
+    i_.start()
+    try:
+        _hk9(i_, **dict(data or {}, op=op))
+    except Exception:
+        pass
+    try:
+        return i_.proc.wait(30)
+    except subprocess.TimeoutExpired:
+        i_.stop()
+        return "no crash"
+
+
+def _iso13(step):
+    """One step: set up, crash there for real, start, check (as _crash9)."""
+    kind = step.split(".")[0]
+    nm = "X13-" + step.replace(".", "_")
+    home = os.path.join(_SMOKE_TMP, nm)
+    os.makedirs(home, mode=0o700)
+    cn = _seed9(home, "X13")
+    canB = _canary("B13")
+    i_ = Instance(9903, nm, env={"MILLENAI_TEST_HOOKS": "profiles"}).start()
+    if kind in ("signout", "kept", "kept-erase", "boot") or step.startswith("signin.2"):
+        _hk9(i_, op="signin", add={"chats": "all", "memory": True} if not step.startswith(
+            "signin.2") else {})
+        _hk9(i_, op="late", kind="chat", text=canB, delay=0)
+        time.sleep(0.8)
+        if kind == "kept-erase" or step.startswith("signin.2"):
+            _hk9(i_, op="keep", reason="signed-out", cause="t")
+        if step == "boot.renamed":
+            _hk9(i_, op="create")
+    i_.stop()
+    if step == "boot.step6":
+        _pj9(home, pending_import=True)
+    hooks = "profiles,crash-at=" + step
+    if kind == "boot":
+        code = _crashrun9(nm, hooks, boot=True)
+    elif kind == "signin":
+        code = _crashrun9(nm, hooks, "signin", {"add": {"chats": "all", "memory": True,
+                                                        "settings": ["persona"]},
+                                                "erase_existing": True})
+    elif kind == "signout":
+        code = _crashrun9(nm, hooks, "signout", {"imported": "putback"})
+    elif kind == "kept":
+        code = _crashrun9(nm, hooks, "keep", {"reason": "signed-out", "cause": "t"})
+    else:
+        code = _crashrun9(nm, hooks, "kept-erase", {"imported": "putback"})
+    j_ = Instance(9903, nm, env={"MILLENAI_TEST_HOOKS": "profiles"}).start()
+    st = _hk9(j_, op="status")
+    j_.stop()
+    pj, root, accs = _state9(home)
+    left = _acc9(home)
+    named = {pj.get("active"), (pj.get("kept") or {}).get("dir")} - {None, "local"}
+    acc_roots = sorted(c.get("root_id") for a in accs.values()
+                       for c in (a or {}).get("chats") or [] if c.get("root_id"))
+    imps = sorted(k[5:] for x in left if x.startswith(".imported-")
+                  for k in ((_jr9(home, "accounts", x, "units.json") or {}).get("units") or {})
+                  if k.startswith("chat-"))
+    whole = sorted(_CID9) == sorted(set(root) | set(imps)) and not set(root) & set(imps)
+    bplaces = [p for p in _bytegrep(home, canB)
+               if not any(p.startswith(os.path.join(home, "accounts", n) + os.sep) for n in named)]
+    ok = (code == 86 and not [x for x in left if x.startswith((".new-", ".trash-"))]
+          and set(accs) <= named and len(accs) <= 1 and not bplaces
+          and (sorted(set(root) | set(acc_roots)) == sorted(_CID9) or whole)
+          and (st.get("kind") == "local" or st.get("dir") in named)
+          and not pj.get("putback") and not (pj.get("pending_import") and st.get("kind") != "local"))
+    return ok or [code, left, sorted(named), bplaces[:1], root, acc_roots, imps, st.get("dir")]
+
+
+_i13 = {s_: _iso13(s_) for s_ in _lit8b(_S9, "SWITCH_STEPS")}
+check("ISO-13 (live): the process killed (os._exit) at each of the %d named steps, then started "
+      "again: no one's data anywhere but their own, nothing of root's lost, no .new-* or .trash-* "
+      "left, a pending Add or put-back finished" % len(_i13),
+      len(_i13) >= 30 and all(v is True for v in _i13.values()),
+      "%r" % {k: v for k, v in _i13.items() if v is not True})
+
+
+# ---- the app a person opens (ACCOUNTS off) shows and does nothing new
+_main9 = _S9[_S9.index('if __name__ == "__main__":\n    # NO PAGE OUTSIDE'):]
+_gate9 = _S9[_S9.index("    def _gate(self):"):_S9.index("    def _profile_changed(self")]
+_lo9s = _S9[_S9.index('        if self.path == "/api/logout":'):_S9.index('        if self.path == "/api/forget":')]
+check("without ACCOUNTS (the shipped app) nothing new runs or shows: no boot invariant or pending "
+      "step, no /account page or /api/account route, /api/logout the old ok, /api/me as before, "
+      "the one-method bridge, no web-store work at a switch, no sign-in without the test hook",
+      "ACCOUNTS = bool(DEV_HOME)\n" in _S9
+      and "    if ACCOUNTS and _INSTANCE_LOCK:\n        _bi = boot_invariant()" in _main9
+      and "        if ACCOUNTS:\n            # a pending Add step 6 or put-back" in _main9
+      and _main9.count("boot_invariant(") == 1 and _main9.count("profile_boot_pending(") == 1
+      and "        if ACCOUNTS and self.command == \"GET\" and self.path.startswith(\n"
+          "                \"/account?boot=\"):" in _gate9
+      and "        if ACCOUNTS and self.command == \"GET\" and self.path in ACCOUNT_STATIC:" in _gate9
+      and "            if not (ACCOUNTS and tok and secrets.compare_digest(" in _gate9
+      and "        elif ACCOUNTS and self.path in ACCOUNT_STATIC:" in _S9
+      and "            if not ACCOUNTS or self.ctx.root:\n                self._send_json({\"ok\": True})" in _lo9s
+      and "    if moved and ACCOUNTS:\n        _webstore_switch()" in _S9
+      and "        if ACCOUNTS:\n            # the account window never outlives the main one" in _main9
+      and "    if not ACCOUNTS:\n        return {\"err\": \"off\"}" in _S9
+      and '    if "profiles" not in TEST_HOOKS:\n        raise NoProfile("accounts need 1c' in _S9
+      and 'if self.path == "/api/test/account" and "account-headless" in TEST_HOOKS:' in _S9,
+      "pins")
+# ==== m9 accounts: end ====
 
 
 print()
