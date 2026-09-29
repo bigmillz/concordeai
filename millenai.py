@@ -53,6 +53,7 @@ import tempfile
 import threading
 import time
 import unicodedata
+import http.client
 import http.server
 import socketserver
 import urllib.request
@@ -98,6 +99,9 @@ MACHINE_STATE = frozenset((
     "_modup_hist", "_setup_jobs", "_studio_bytes_cache", "_fw_cuda",
     "_crypto_install", "_export_install", "_giants", "_no_limits",
     "EXPORT_KIND",
+    # the hardware benchmark (6b331): its run, the engine call in flight,
+    # the count of answers being written, the hardware line
+    "_bench", "_bench_busy", "_bench_live", "_bench_hw",
     # the backdrops, the search proxy, provider quirks, locks' depth
     "_sky_jobs", "_sky_tls", "_SEARCH_PROXY", "_stream_usage_off",
     "_cloud_depth", "_usage_thread",
@@ -4852,7 +4856,11 @@ def _dir_bytes_real(path: str) -> int:
     return total
 
 
-def _spawn_mlx_engine(label: str) -> bool:
+def _spawn_mlx_engine(label: str, offline: bool = False) -> bool:
+    """offline (the benchmark, 6b331): the engine may not ask the Hugging
+    Face Hub anything. Loading a cached model otherwise checks the Hub
+    for a newer revision, a network call the benchmark promises not to
+    make; offline it reads the cache alone and can never download."""
     kind, port = MODEL_ROUTES[label]
     if kind != "mlx" or _port_in_use(port) or not _has_mlx():
         return False
@@ -4864,6 +4872,8 @@ def _spawn_mlx_engine(label: str) -> bool:
         [sys.executable, "-m", "mlx_lm", "server",
          "--model", MLX_REPOS[label], "--port", str(port)],
         stdout=log, stderr=log,
+        env=(dict(os.environ, HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1")
+             if offline else None),
     )
     _managed_procs.append(proc)
     _mlx_procs[label] = proc
@@ -10985,6 +10995,8 @@ MACHINE_IO = frozenset((
     "_webstore_qt_sweep", "_webstore_native", "_retire_contribute",
     # a dev copy's record of the main window's reload at a switch (M9)
     "_main_reload",
+    # the hardware benchmark's history, benchmarks.jsonl (6b331)
+    "_bench_save",
 ))
 # ==== profile: end ====
 
@@ -15530,6 +15542,51 @@ class _DraftAbandoned(Exception):
     """Raised from a council draft's emit once the council moved on."""
 
 
+# ONE THING AT A TIME ON THE ENGINES (6b331). A benchmark swaps every
+# local model through memory, so it never starts while an answer is being
+# written, and while it runs chats are REFUSED (409, the line below), not
+# queued: a run takes minutes, and a question that waited that long with
+# no word would look like a hang. Each /api/chat request and each local
+# model call (run_model: chats, titles, memory, verifying a download) is
+# counted while it runs; the benchmark starts only at zero.
+BENCH_BUSY = ("A hardware benchmark is running. Ask again when it "
+              "finishes, or stop it in Settings › Usage.")
+BENCH_ANSWERING = ("An answer is being written. Run the benchmark when it "
+                   "has finished.")
+_bench = {"running": False, "run": None}
+_bench_busy = {"n": 0}
+_bench_lock = threading.Lock()
+
+
+def bench_hold() -> bool:
+    """A chat or a local model call starts: False while a benchmark runs
+    (the caller refuses), else counted until bench_release()."""
+    with _bench_lock:
+        if _bench["running"]:
+            return False
+        _bench_busy["n"] += 1
+        return True
+
+
+def bench_release():
+    with _bench_lock:
+        _bench_busy["n"] = max(0, _bench_busy["n"] - 1)
+
+
+def _bench_guarded(fn):
+    """run_model under bench_hold: refused while a benchmark runs."""
+    @functools.wraps(fn)
+    def guarded(*a, **k):
+        if not bench_hold():
+            raise RuntimeError(BENCH_BUSY)
+        try:
+            return fn(*a, **k)
+        finally:
+            bench_release()
+    return guarded
+
+
+@_bench_guarded
 def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
     """Stream one model's answer, handling engine startup and templates."""
     # NO 70B fallback: an unknown label used to route to llama3.3:70b on
@@ -15625,6 +15682,1036 @@ def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
                     # the missing ingredient.
                     _need_engine(label, timeout=45.0)
             time.sleep(1.5 * attempts)
+
+
+# ================================================ the hardware benchmark
+# SETTINGS › USAGE › BENCHMARK (6b331, per Patrick: "build the
+# benchmark"). One button runs the SAME fixed test on every local model
+# installed on this computer, one model at a time: read a fixed passage
+# of about 1,000 tokens, then write a fixed answer, 256 tokens at most,
+# temperature 0 and a fixed seed. Per model: generation speed (the
+# headline), prompt-reading speed, time to first token, load time, the
+# memory the model took and whether the machine came under memory
+# pressure or swapped. Cloud models are out (their speed isn't this
+# computer's). Nothing leaves the computer: every call goes to an engine
+# on 127.0.0.1, an MLX engine it starts may not ask the Hub anything, and
+# no model is ever downloaded. The history is the MACHINE's, not a
+# person's: benchmarks.jsonl in the data folder, written only by
+# _bench_save (MACHINE_IO), shown to every profile. How each number is
+# measured is in bench_numbers and NOTES 6b331.
+BENCH_FILE = "benchmarks.jsonl"
+BENCH_TEST = "b1"           # the fixed test; a new passage is a new name
+BENCH_MAX_TOKENS = 256
+BENCH_SEED = 42
+BENCH_CTX = 4096            # Ollama's context, the same on every machine
+BENCH_LOAD_CAP = 300.0      # a load that takes longer fails the model
+BENCH_RUN_CAP = 120.0       # a slow model stops here; figures from what came
+BENCH_KEEP = 100            # runs kept in the file
+BENCH_SHOW = 20             # runs the pane can pick from
+BENCH_PASSAGE = (
+    "Along sheltered estuaries on both sides of the North Atlantic, people "
+    "once ground grain with the sea. A tide mill is a watermill that takes "
+    "its power from the rise and fall of the tide rather than from a river. "
+    "The idea is old: the remains of a tide mill from the seventh century "
+    "have been excavated on the coast of Northern Ireland, and by the late "
+    "Middle Ages there were hundreds of them along the shores of Britain, "
+    "France, Spain, Portugal and the Low Countries. A few survive in "
+    "working order today, kept by local trusts that open them to visitors "
+    "on days when the tide is right.\n\n"
+    "The principle is simple. A tide mill needs a basin that can hold "
+    "water, usually a natural inlet or creek closed off by an embankment "
+    "called a dam or causeway. In the dam are one or more sluice gates that "
+    "open inward, toward the basin. As the tide comes in, the pressure of "
+    "the rising sea pushes the gates open and the basin fills. When the "
+    "tide turns and begins to fall, the water in the basin tries to flow "
+    "back out, and the same pressure now pushes the gates shut. The basin "
+    "is left holding a large volume of water at the level of high tide, "
+    "while the sea outside keeps dropping.\n\n"
+    "Then the miller waits. For the first hour or two after high water "
+    "there is not enough difference in level between the basin and the sea "
+    "to turn a wheel with any force. Once the outside level has fallen far "
+    "enough, the miller opens a separate channel, the mill race, which "
+    "leads the stored water through the mill and back to the sea. The "
+    "falling water drives a wheel, and the wheel drives the millstones "
+    "through a set of gears. Milling can then go on for several hours, "
+    "until the sea begins to rise again and the difference in level "
+    "becomes too small to be useful. On a coast with two tides a day this "
+    "gives two working periods in every twenty-four hours, but they arrive "
+    "about fifty minutes later each day, following the moon rather than "
+    "the sun. A tide miller's working hours therefore moved around the "
+    "clock, and mills were often worked through the night.\n\n"
+    "The wheels themselves varied. Many early mills used a horizontal "
+    "wheel set low in the race, with paddles that the water struck "
+    "directly. Later mills more often used a vertical undershot or "
+    "breastshot wheel, where the water meets the wheel near its bottom or "
+    "at about the height of its axle. The head of water in a tide mill is "
+    "small, rarely more than a few metres, so the wheels were built wide to "
+    "make use of a large volume of water moving slowly. Some larger mills "
+    "had several wheels side by side, each driving its own pair of stones, "
+    "so that the miller could match the number of stones at work to the "
+    "water left in the basin.\n\n"
+    "Inside, a tide mill looks much like any other watermill. Grain is "
+    "lifted to an upper floor and fed through a hopper into the eye of the "
+    "upper stone, the runner, which turns just above the fixed bed stone. "
+    "Grooves cut into the faces of the stones, known as the dress, carry "
+    "the meal outward to the edge, where it falls into a casing and down a "
+    "chute to be bagged. The gap between the stones sets how fine the "
+    "flour is, and the miller adjusted it with a device called a tentering "
+    "gear, often by feel, rubbing the meal between finger and thumb.\n\n"
+    "Tide mills had real advantages. The tide does not fail in a dry summer "
+    "the way a small river can, and a basin of salt water does not freeze "
+    "as readily as a mill pond. The times of the tides can be predicted "
+    "years ahead, so a miller always knew when power would be available. "
+    "Against this, the working hours were awkward, the basin tended to "
+    "silt up and had to be dredged, and storms could breach the dam. The "
+    "dam and gates were costly to build and to keep in repair, and the "
+    "energy a basin could store was fixed by its area and by the local "
+    "tidal range. Where the range was small, a mill could do little "
+    "work.\n\n"
+    "From the nineteenth century onward, steam engines and later electric "
+    "motors made milling possible anywhere and at any hour, and most tide "
+    "mills closed. Some became houses or warehouses; many simply decayed. "
+    "The idea behind them has not gone away. Modern tidal power stations, "
+    "such as the barrage across the Rance estuary in Brittany, work on the "
+    "same principle of trapping water behind a barrier and releasing it "
+    "through turbines once the level outside has changed, only on a far "
+    "larger scale, and with the output fed into the electricity grid "
+    "instead of turning a pair of millstones.")
+BENCH_TASK = (
+    "Using only the passage above, explain step by step how a tide mill "
+    "works, for someone who has never seen one. Then list its advantages "
+    "and its drawbacks. Write at least 400 words.")
+BENCH_PROMPT = BENCH_PASSAGE + "\n\n" + BENCH_TASK
+# the fields of a model's row the history keeps
+BENCH_FIELDS = ("label", "engine", "status", "note", "gen_tps", "prompt_tps",
+                "ttft_s", "load_s", "gen_tokens", "prompt_tokens",
+                "cached_tokens", "src", "load_src", "est", "capped",
+                "mem_base", "mem_peak", "mem_total", "mem_rise",
+                "pressure_pct", "pressure_level", "pressured", "swapped",
+                "swap_mb", "gpu_size", "gpu_vram")
+_bench_live = {"conn": None, "capped": False}
+_bench_stop = threading.Event()
+_bench_file_lock = threading.Lock()
+_bench_hw = {}
+
+
+class BenchStopped(Exception):
+    """Stop was pressed while a model loaded or wrote."""
+
+
+# ------------------------------------------------ the numbers (6b331)
+def _bench_int(v):
+    return v if isinstance(v, int) and not isinstance(v, bool) and v >= 0 else None
+
+
+def _bench_pos(v):
+    return (float(v) if isinstance(v, (int, float)) and not isinstance(v, bool)
+            and v > 0 else None)
+
+
+def bench_numbers(raw: dict) -> dict:
+    """One model's figures from its raw timings (seconds on one clock).
+
+    The engine's own timings when it reports them (Ollama's last line:
+    eval_count/eval_duration, prompt_eval_count/prompt_eval_duration,
+    load_duration, all in nanoseconds), src "engine". Otherwise measured
+    here (MLX's OpenAI-shaped stream), src "measured":
+      time to first token  t_first - t_send: the request leaves, the first
+                           written token (text or reasoning) arrives
+      reading speed        (prompt_tokens - cached_tokens) / time to first
+                           token; the first token's own step is inside
+                           that time (about one token in a thousand)
+      writing speed        (completion_tokens - 1) / (t_last - t_first):
+                           the tokens after the first, over the time they
+                           took; the counts are the engine's usage chunk
+      load time            the engine started to the first one-token
+                           answer back (MLX loads after its port opens)
+    With no usage chunk (a stream cut at the time limit) the written
+    tokens are the chunks counted, and est is True. Time to first token
+    is always measured here (Ollama reports no such figure)."""
+    out = {"src": "measured", "est": False, "capped": bool(raw.get("capped"))}
+    t_send, t_first, t_last = (raw.get("t_send"), raw.get("t_first"),
+                               raw.get("t_last"))
+    ttft = (t_first - t_send if isinstance(t_send, (int, float))
+            and isinstance(t_first, (int, float)) and t_first >= t_send
+            else None)
+    out["ttft_s"] = round(ttft, 3) if ttft is not None else None
+    ec, ed = _bench_int(raw.get("eval_count")), _bench_pos(raw.get("eval_duration"))
+    pc, pd = (_bench_int(raw.get("prompt_eval_count")),
+              _bench_pos(raw.get("prompt_eval_duration")))
+    gen = rd = None
+    if ec and ed:
+        out["src"] = "engine"
+        gen = ec / (ed / 1e9)
+        rd = pc / (pd / 1e9) if pc and pd else None
+        out.update(gen_tokens=ec, prompt_tokens=pc, cached_tokens=0)
+    else:
+        u = raw.get("usage") if isinstance(raw.get("usage"), dict) else {}
+        comp = _bench_int(u.get("completion_tokens"))
+        if not comp:
+            comp = _bench_int(raw.get("chunks"))
+            out["est"] = bool(comp)
+        pt = _bench_int(u.get("prompt_tokens")) or pc
+        det = u.get("prompt_tokens_details")
+        cached = _bench_int((det if isinstance(det, dict) else {}).get(
+            "cached_tokens")) or 0
+        span = (t_last - t_first if isinstance(t_last, (int, float))
+                and t_first is not None else None)
+        if comp and comp >= 2 and span and span > 0:
+            gen = (comp - 1) / span
+        if pt and ttft and pt > cached:
+            rd = (pt - cached) / ttft
+        out.update(gen_tokens=comp, prompt_tokens=pt, cached_tokens=cached)
+    out["gen_tps"] = round(gen, 1) if gen else None
+    out["prompt_tps"] = round(rd, 1) if rd else None
+    ld = _bench_pos(raw.get("load_duration"))
+    if ld:
+        out.update(load_s=round(ld / 1e9, 2), load_src="engine")
+    else:
+        ls = raw.get("load_s")
+        out.update(load_s=(round(ls, 2) if isinstance(ls, (int, float))
+                           and ls >= 0 else None), load_src="measured")
+    return out
+
+
+def _bench_vm() -> dict:
+    """One memory sample: in use (total less available), the pressure the
+    sidebar meter shows (mem_pressure), and on a Mac the kernel's pressure
+    level (1 normal, 2 warning, 4 critical), the compressor and the pages
+    swapped out; elsewhere the swap in use."""
+    s = {"used": None, "total": None, "pct": None, "level": None,
+         "comp": None, "swapout": None, "swap": None}
+    try:
+        s["pct"] = mem_pressure()
+    except Exception:
+        pass
+    if HAS_PSUTIL:
+        try:
+            vm = psutil.virtual_memory()
+            s["total"], s["used"] = vm.total, vm.total - vm.available
+            s["swap"] = psutil.swap_memory().used
+        except Exception:
+            pass
+    if IS_MAC:
+        try:
+            out = subprocess.run(["vm_stat"], capture_output=True, text=True,
+                                 timeout=3).stdout
+            pg = re.search(r"page size of (\d+)", out)
+            page = int(pg.group(1)) if pg else 4096
+            m = re.search(r"Pages occupied by compressor:\s+(\d+)", out)
+            if m:
+                s["comp"] = int(m.group(1)) * page
+            m = re.search(r"Swapouts:\s+(\d+)", out)
+            if m:
+                s["swapout"] = int(m.group(1)) * page
+            lv = subprocess.run(
+                ["sysctl", "-n", "kern.memorystatus_vm_pressure_level"],
+                capture_output=True, text=True, timeout=3).stdout.strip()
+            s["level"] = int(lv) if lv.isdigit() else None
+        except Exception:
+            pass
+    return s
+
+
+def _bench_fold(acc: dict, s: dict):
+    """The highest of each figure seen during one model's test."""
+    for k in ("used", "pct", "level", "comp"):
+        if s.get(k) is not None:
+            acc[k] = s[k] if acc.get(k) is None else max(acc[k], s[k])
+
+
+_BENCH_COMP_MB = 512        # the compressor growing this much is pressure
+_BENCH_SWAP_MB = 256        # swap in use growing this much is swapping
+
+
+def bench_mem(base: dict, peak: dict, end: dict) -> dict:
+    """What the memory did while one model loaded and wrote. mem_rise is
+    the peak in use less the level just before the load: the model's
+    weights, its cache and its engine. Pressure: on a Mac the kernel's
+    level reached warning (2) or the compressor grew by 512 MB; elsewhere
+    memory in use reached 90%. Swapped: pages were swapped out (Mac) or
+    the swap in use grew by 256 MB."""
+    b, p, e = base or {}, peak or {}, end or {}
+    out = {"mem_base": b.get("used"), "mem_peak": p.get("used"),
+           "mem_total": b.get("total") or e.get("total"),
+           "pressure_pct": p.get("pct"), "pressure_level": p.get("level")}
+    out["mem_rise"] = (max(0, p["used"] - b["used"])
+                       if p.get("used") is not None and b.get("used") is not None
+                       else None)
+    comp_up = ((p.get("comp") or 0) - b["comp"]) if b.get("comp") is not None else 0
+    if p.get("level") is not None or b.get("comp") is not None:
+        out["pressured"] = bool((p.get("level") or 0) >= 2
+                                or comp_up >= _BENCH_COMP_MB << 20)
+    else:
+        out["pressured"] = bool(p.get("pct") is not None and p["pct"] >= 90)
+    so = ((e.get("swapout") or 0) - b["swapout"]
+          if b.get("swapout") is not None and e.get("swapout") is not None
+          else None)
+    sw = ((e.get("swap") or 0) - b["swap"]
+          if b.get("swap") is not None and e.get("swap") is not None else None)
+    out["swap_mb"] = round(max(so or 0, sw or 0, 0) / (1 << 20))
+    out["swapped"] = bool((so or 0) > 0 or (sw or 0) >= _BENCH_SWAP_MB << 20)
+    return out
+
+
+def _bench_sampler(stop, acc):
+    while not stop.wait(1.0):
+        _bench_fold(acc, _bench_vm())
+
+
+def _bench_skip_why(label: str, fits: bool, avail, total):
+    """None when the model fits (model_fits_memory, the rule every answer
+    obeys), else the note its row shows."""
+    if fits:
+        return None
+    if model_is_giant(label) and not giants_on():
+        return ("Skipped: the largest models are off (Settings › "
+                "Models).")
+    need = MODEL_MEM_BYTES.get(label, 0)
+    if total and need > total * 0.8:
+        return ("Skipped: it needs about %d GB of memory; this computer "
+                "has %d GB." % (round(need / 1e9), round(total / 2 ** 30)))
+    want = need * (1.3 if "MoE" in label else 1.5)
+    return ("Skipped: it needs about %d GB free; %d GB is free now."
+            % (round(want / 1e9), round((avail or 0) / 1e9)))
+
+
+def _bench_fit(label: str):
+    """The skip note for a model that doesn't fit right now, or None."""
+    avail = total = None
+    if HAS_PSUTIL:
+        vm = psutil.virtual_memory()
+        avail, total = max(vm.available, vm.total - vm.used), vm.total
+    return _bench_skip_why(label, model_fits_memory(label), avail, total)
+
+
+# ----------------------------------------------- the engines (6b331)
+def _bench_cut():
+    """Close the engine call in flight (Stop, or the time limit): its
+    socket is shut, so a read blocked in another thread returns now."""
+    c = _bench_live.get("conn")
+    s = getattr(c, "sock", None)
+    if s is not None:
+        try:
+            s.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+
+
+def _bench_capped():
+    _bench_live["capped"] = True
+    _bench_cut()
+
+
+def _bench_http(url: str, body=None, timeout: float = 60.0, method="POST"):
+    """The lines of one engine call. Only 127.0.0.1: the benchmark never
+    talks to anything but this computer's own engines. The connection is
+    kept in _bench_live so Stop can cut it."""
+    u = urllib.parse.urlsplit(url)
+    if u.scheme != "http" or u.hostname != "127.0.0.1" or not u.port:
+        raise RuntimeError("the benchmark talks only to this computer")
+    conn = http.client.HTTPConnection("127.0.0.1", u.port, timeout=timeout)
+    _bench_live["conn"] = conn
+    try:
+        if _bench_stop.is_set():
+            raise BenchStopped()
+        conn.request(method, u.path or "/",
+                     body=None if body is None else json.dumps(body).encode(),
+                     headers={"Content-Type": "application/json"})
+        resp = conn.getresponse()
+        if resp.status != 200:
+            txt = resp.read(300).decode("utf-8", "replace")
+            try:
+                txt = json.loads(txt).get("error") or txt
+            except (ValueError, AttributeError):
+                pass
+            raise RuntimeError("the engine answered %d: %s" % (
+                resp.status, str(txt).strip()[:160]))
+        while True:
+            line = resp.readline()
+            if not line:
+                break
+            yield line
+    except (OSError, http.client.HTTPException) as exc:
+        if _bench_stop.is_set():
+            raise BenchStopped() from exc
+        if not _bench_live["capped"]:
+            raise
+    finally:
+        _bench_live["conn"] = None
+        conn.close()
+    if _bench_stop.is_set():
+        raise BenchStopped()
+
+
+def _bench_json(url, body=None, timeout=60.0, method="POST"):
+    return json.loads(b"".join(_bench_http(url, body, timeout, method)) or b"{}")
+
+
+class _BenchMLX:
+    """An MLX engine (mlx_lm's server), started for the test on its own:
+    the other engines this copy runs are stopped first, and it is
+    stopped after unless it is the one that was loaded before."""
+    kind, name = "mlx", "MLX"
+
+    def __init__(self, label):
+        self.label, self.proc = label, None
+
+    def prepare(self):
+        with _engine_lock:
+            _stop_other_mlx("")
+        try:
+            port = _own_engine_port(self.label)
+        except RuntimeError:
+            return "Skipped: couldn't tell who runs its engine."
+        if _port_in_use(port):
+            # the desktop app and a dev copy share the engine ports: one
+            # copy never stops or times another's engine
+            return ("Skipped: another copy of ConcordeAI is running this "
+                    "model.")
+        return _bench_fit(self.label)
+
+    def load(self):
+        t0 = time.monotonic()
+        with _engine_lock:
+            if not _spawn_mlx_engine(self.label, offline=True):
+                raise RuntimeError("its engine didn't start")
+            self.proc = _mlx_procs.get(self.label)
+        port = MODEL_ROUTES[self.label][1]
+        end = t0 + BENCH_LOAD_CAP
+        while not (_port_in_use(port) and _listener_is_mine(port) is True):
+            if _bench_stop.is_set():
+                raise BenchStopped()
+            if self.proc is not None and self.proc.poll() is not None:
+                raise RuntimeError("its engine stopped while loading")
+            if time.monotonic() > end:
+                raise RuntimeError("it didn't load within %d minutes"
+                                   % (BENCH_LOAD_CAP // 60))
+            time.sleep(0.25)
+        # mlx_lm loads the weights after its port opens: the load is over
+        # when a one-token answer comes back (it also warms the kernels)
+        _bench_json("http://127.0.0.1:%d/v1/chat/completions" % port, {
+            "model": MLX_REPOS[self.label], "max_tokens": 1,
+            "temperature": 0.0, "stream": False,
+            "messages": [{"role": "user", "content": "Hello"}]},
+            timeout=max(5.0, end - time.monotonic()))
+        return {"load_s": time.monotonic() - t0}
+
+    def run(self, on_first, on_tok):
+        port = MODEL_ROUTES[self.label][1]
+        raw = {"chunks": 0, "usage": None, "t_first": None, "t_last": None}
+        body = {"model": MLX_REPOS[self.label],
+                "messages": [{"role": "user", "content": BENCH_PROMPT}],
+                "max_tokens": BENCH_MAX_TOKENS, "temperature": 0.0,
+                "seed": BENCH_SEED, "stream": True,
+                "stream_options": {"include_usage": True},
+                "chat_template_kwargs": {"enable_thinking": False}}
+        raw["t_send"] = time.monotonic()
+        for line in _bench_http("http://127.0.0.1:%d/v1/chat/completions"
+                                % port, body, BENCH_RUN_CAP + 30):
+            line = line.decode("utf-8", "replace").strip()
+            if not line.startswith("data:"):
+                continue
+            data = line[5:].strip()
+            if data == "[DONE]":
+                break
+            try:
+                obj = json.loads(data)
+            except ValueError:
+                continue
+            if isinstance(obj.get("usage"), dict):
+                raw["usage"] = obj["usage"]
+            ch = (obj.get("choices") or [{}])[0] or {}
+            d = ch.get("delta") or {}
+            if (d.get("content") or "") + (d.get("reasoning") or ""):
+                now = time.monotonic()
+                if raw["t_first"] is None:
+                    raw["t_first"] = now
+                    on_first()
+                raw["t_last"] = now
+                raw["chunks"] += 1
+                on_tok(raw["chunks"])
+        return raw
+
+    def info(self):
+        return {}
+
+    def close(self, keep: bool):
+        if not keep:
+            with _engine_lock:
+                _retire_engine(self.label)
+
+
+class _BenchOllama:
+    """A model on Ollama: unloaded first, so the load is a cold one, then
+    loaded on its own (Ollama's load_duration), asked, and unloaded."""
+    kind, name = "ollama", "Ollama"
+
+    def __init__(self, label):
+        self.label, self.tag, self.ps = label, MODEL_ROUTES[label][1], {}
+
+    def _unload(self):
+        try:
+            _bench_json(ollama_url("/api/generate"),
+                        {"model": self.tag, "keep_alive": 0}, 60)
+        except BenchStopped:
+            raise
+        except Exception:
+            pass
+
+    def prepare(self):
+        if slow_giant(self.label):
+            return ("Skipped: a model this size loads from disk for many "
+                    "minutes on Ollama.")
+        self._unload()
+        return _bench_fit(self.label)
+
+    def load(self):
+        t0 = time.monotonic()
+        # an empty prompt loads the model and answers nothing
+        r = _bench_json(ollama_url("/api/generate"), {
+            "model": self.tag, "prompt": "", "stream": False,
+            "keep_alive": "10m", "options": {"num_ctx": BENCH_CTX}},
+            BENCH_LOAD_CAP)
+        out = {"load_s": time.monotonic() - t0}
+        if _bench_pos(r.get("load_duration")):
+            out["load_duration"] = r["load_duration"]
+        try:
+            for m in _bench_json(ollama_url("/api/ps"), None, 10,
+                                 "GET").get("models") or []:
+                if m.get("name") == self.tag or m.get("model") == self.tag:
+                    self.ps = {"gpu_size": _bench_int(m.get("size")),
+                               "gpu_vram": _bench_int(m.get("size_vram"))}
+        except BenchStopped:
+            raise
+        except Exception:
+            pass
+        return out
+
+    def run(self, on_first, on_tok):
+        raw = {"chunks": 0, "t_first": None, "t_last": None}
+        body = {"model": self.tag, "stream": True, "keep_alive": "10m",
+                "messages": [{"role": "user", "content": BENCH_PROMPT}],
+                "options": {"temperature": 0, "seed": BENCH_SEED,
+                            "num_predict": BENCH_MAX_TOKENS,
+                            "num_ctx": BENCH_CTX}}
+        raw["t_send"] = time.monotonic()
+        for line in _bench_http(ollama_url("/api/chat"), body,
+                                BENCH_RUN_CAP + 30):
+            try:
+                obj = json.loads(line)
+            except ValueError:
+                continue
+            if obj.get("error"):
+                raise RuntimeError(str(obj["error"])[:160])
+            m = obj.get("message") or {}
+            if (m.get("content") or "") + (m.get("thinking") or ""):
+                now = time.monotonic()
+                if raw["t_first"] is None:
+                    raw["t_first"] = now
+                    on_first()
+                raw["t_last"] = now
+                raw["chunks"] += 1
+                on_tok(raw["chunks"])
+            if obj.get("done"):
+                for k in ("eval_count", "eval_duration", "prompt_eval_count",
+                          "prompt_eval_duration"):
+                    raw[k] = obj.get(k)
+                break
+        return raw
+
+    def info(self):
+        return dict(self.ps)
+
+    def close(self, keep: bool):
+        self._unload()
+
+
+# THE STAND-IN ENGINE (hook bench-fake, dev copies only): three models
+# with known timings, so the gauntlet checks the figures, a skip, Stop,
+# the chat refusal and the history without loading a model. It waits
+# bench-pace seconds (0.01 by default) per token so a Stop can land.
+_BENCH_FAKE = {
+    "Llama 3.2 1B": {"load_s": 2.0, "raw": {
+        "t_send": 10.0, "t_first": 10.5, "t_last": 16.875, "chunks": 256,
+        "usage": {"prompt_tokens": 1000, "completion_tokens": 256,
+                  "prompt_tokens_details": {"cached_tokens": 0}}}},
+    "Llama 3.2 3B": {"ollama": True, "raw": {
+        "t_send": 0.0, "t_first": 0.3, "t_last": 5.5, "chunks": 256,
+        "load_duration": 1.5e9, "prompt_eval_count": 1000,
+        "prompt_eval_duration": 2.5e8, "eval_count": 256,
+        "eval_duration": 5.12e9}},
+    "GPT-OSS 120B": {"skip": True},
+}
+
+
+class _BenchFake:
+    def __init__(self, label):
+        self.label, self.spec = label, _BENCH_FAKE[label]
+        self.kind = "ollama" if self.spec.get("ollama") else "mlx"
+        self.name = "Ollama" if self.spec.get("ollama") else "MLX"
+        try:
+            self.pace = float(_hook_arg("bench-pace") or 0.01)
+        except ValueError:
+            self.pace = 0.01
+
+    def _wait(self, n):
+        for _ in range(n):
+            if _bench_stop.wait(self.pace):
+                raise BenchStopped()
+
+    def prepare(self):
+        return _bench_skip_why(self.label, not self.spec.get("skip"),
+                               8e9, 48 << 30)
+
+    def load(self):
+        self._wait(20)
+        return {"load_s": self.spec.get("load_s")}
+
+    def run(self, on_first, on_tok):
+        raw = copy.deepcopy(self.spec["raw"])
+        self._wait(5)
+        on_first()
+        for i in range(raw["chunks"]):
+            self._wait(1)
+            on_tok(i + 1)
+        return raw
+
+    def info(self):
+        return ({"gpu_size": 2_600_000_000, "gpu_vram": 2_600_000_000}
+                if self.kind == "ollama" else {})
+
+    def close(self, keep):
+        pass
+
+
+def _bench_engine(label: str):
+    if "bench-fake" in TEST_HOOKS:
+        return _BenchFake(label)
+    if MODEL_ROUTES[label][0] == "mlx":
+        return _BenchMLX(label)
+    return _BenchOllama(label)
+
+
+def _bench_mlx_resident() -> str:
+    """The MLX model this copy has loaded now, or ''."""
+    for label, proc in list(_mlx_procs.items()):
+        if proc.poll() is None:
+            return label
+    return ""
+
+
+def bench_plan(start_ollama: bool = True) -> tuple:
+    """(labels in test order, the MLX model loaded now or ''). Every
+    local model on this computer: smallest first, the one loaded now
+    last, so it is the one left loaded. Never a cloud model, never one
+    that isn't fully downloaded."""
+    if "bench-fake" in TEST_HOOKS:
+        labels, prev = list(_BENCH_FAKE), ""
+    else:
+        pulled = ollama_pulled_tags()
+        if pulled is None and start_ollama and any(
+                r[0] == "ollama" for r in MODEL_ROUTES.values()):
+            # a start, never a download (_spawn_ollama_serve fetches nothing)
+            try:
+                if _spawn_ollama_serve():
+                    for _ in range(30):
+                        pulled = ollama_pulled_tags()
+                        if pulled is not None:
+                            break
+                        time.sleep(0.5)
+            except Exception:
+                pulled = None
+        labels = [l for l in MODEL_ROUTES if SUPPORTED.get(l)
+                  and model_cached(l, pulled or set())]
+        prev = _bench_mlx_resident()
+    only = _hook_arg("bench-only")        # a dev copy's one-model run
+    if only:
+        labels = [l for l in labels if l == only]
+    labels.sort(key=lambda l: (MODEL_MEM_BYTES.get(l, 0), l))
+    if prev in labels:
+        labels.remove(prev)
+        labels.append(prev)
+    return labels, prev
+
+
+def _bench_set(row: dict, **kw):
+    with _bench_lock:
+        row.update(kw)
+
+
+def _bench_one(row: dict, keep: bool):
+    """Test one model; its row gets the figures, or skipped/failed/
+    stopped and a note."""
+    eng = _bench_engine(row["label"])
+    _bench_live["capped"] = False
+    _bench_set(row, engine=eng.name, status="checking")
+    try:
+        why = eng.prepare()
+    except BenchStopped:
+        why = "Stopped."
+    except Exception as exc:
+        why = "Failed: %s." % str(exc).strip().rstrip(".")[:160]
+    if why:
+        _bench_set(row, status=("skipped" if why.startswith("Skipped")
+                                else "stopped" if why == "Stopped."
+                                else "failed"), note=why)
+        return
+    base = _bench_vm()
+    acc = dict(base)
+    done = threading.Event()
+    smp = ctx_thread(target=_bench_sampler, args=(done, acc), bind=False,
+                     daemon=True)
+    smp.start()
+    ok = False
+    try:
+        _bench_set(row, status="loading")
+        load = eng.load()
+        _bench_set(row, status="reading")
+        _bench_live["capped"] = False
+        cap = ctx_timer(BENCH_RUN_CAP, _bench_capped)
+        cap.start()
+        try:
+            raw = eng.run(lambda: _bench_set(row, status="writing"),
+                          lambda n: _bench_set(row, tok=n))
+        finally:
+            cap.cancel()
+        raw.update(load)
+        raw["capped"] = _bench_live["capped"]
+        _bench_live["capped"] = False
+        nums = bench_numbers(raw)
+        nums.update(eng.info())
+        if nums["capped"]:
+            nums["note"] = ("Stopped at the %d-minute limit after %d tokens."
+                            % (BENCH_RUN_CAP // 60, nums.get("gen_tokens") or 0))
+        _bench_set(row, status="done", **nums)
+        ok = True
+    except BenchStopped:
+        _bench_set(row, status="stopped", note="Stopped.")
+    except Exception as exc:
+        _bench_set(row, status="failed",
+                   note="Failed: %s." % str(exc).strip().rstrip(".")[:160])
+    finally:
+        done.set()
+        smp.join(3)
+        end = _bench_vm()
+        _bench_fold(acc, end)
+        _bench_set(row, **bench_mem(base, acc, end))
+        try:
+            eng.close(keep and ok and not _bench_stop.is_set())
+        except Exception:
+            pass
+
+
+def _bench_restore(prev: str, rows: list, stopped: bool) -> str:
+    """Leave the engine that was loaded before loaded again, or say
+    plainly that it loads on the next question."""
+    if not prev or "bench-fake" in TEST_HOOKS:
+        return ""
+    last = rows[-1] if rows else {}
+    if last.get("label") == prev and last.get("status") == "done":
+        return "%s is loaded again, as it was before the benchmark." % prev
+    if not stopped:
+        try:
+            with _engine_lock:
+                _stop_other_mlx(prev)
+                if _spawn_mlx_engine(prev, offline=True):
+                    port = MODEL_ROUTES[prev][1]
+                    end = time.monotonic() + 120
+                    while time.monotonic() < end:
+                        if _port_in_use(port) and _listener_is_mine(port) is True:
+                            return ("%s is loaded again, as it was before the "
+                                    "benchmark." % prev)
+                        time.sleep(0.5)
+        except Exception:
+            pass
+    return "%s will load again on your next question." % prev
+
+
+def _bench_worker(run: dict):
+    global _mlx_last_use
+    rows = []
+    try:
+        labels, prev = bench_plan()
+        rows = [{"label": l, "engine": "", "status": "waiting", "note": "",
+                 "tok": 0} for l in labels]
+        with _bench_lock:
+            run["models"] = rows
+            if not rows:
+                run["note"] = "No local models are installed on this computer."
+        for i, row in enumerate(rows):
+            if _bench_stop.is_set():
+                _bench_set(row, status="not run")
+                continue
+            _bench_set(run, cur=i)
+            _bench_one(row, keep=row["label"] == prev)
+        _bench_set(run, cur=-1)
+        stopped = _bench_stop.is_set()
+        rest = _bench_restore(prev, rows, stopped)
+        with _bench_lock:
+            run["restore"] = rest
+            run["state"] = "stopped" if stopped else "done"
+    except Exception as exc:
+        with _bench_lock:
+            run["state"] = "failed"
+            run["note"] = "The benchmark stopped: %s." % (
+                str(exc).strip().rstrip(".")[:160] or type(exc).__name__)
+    finally:
+        _mlx_last_use = time.time()     # a restored engine gets its 5 min
+        with _bench_lock:
+            run["end"] = time.time()
+            run["cur"] = -1
+        try:
+            _bench_save(_bench_record(run))
+            saved = True
+        except Exception:
+            saved = False
+        with _bench_lock:
+            run["saved"] = saved
+            if not saved:
+                run["note"] = ((run.get("note") or "")
+                               + " This run couldn't be saved.").strip()
+            _bench["running"] = False
+
+
+def _bench_record(run: dict) -> dict:
+    with _bench_lock:
+        return {"v": 1, "id": run["id"], "t": run["t"], "end": run.get("end"),
+                "test": BENCH_TEST, "state": run.get("state"),
+                "hw": run.get("hw"), "app": run.get("app"),
+                "restore": run.get("restore") or "", "note": run.get("note") or "",
+                "models": [{k: r.get(k) for k in BENCH_FIELDS if k in r}
+                           for r in run.get("models") or []]}
+
+
+def bench_start() -> tuple:
+    """(True, the run) or (False, why). Never while an answer is being
+    written or another run is going."""
+    with _bench_lock:
+        if _bench["running"]:
+            return False, "A benchmark is already running."
+        if _bench_busy["n"]:
+            return False, BENCH_ANSWERING
+        _bench["running"] = True
+        _bench_stop.clear()
+        run = {"id": secrets.token_hex(6), "t": time.time(), "end": None,
+               "test": BENCH_TEST, "state": "running", "cur": -1,
+               "models": [], "restore": "", "note": "", "saved": False,
+               "hw": {}, "app": "%s (%s)" % (APP_VERSION, APP_BUILD)}
+        _bench["run"] = run
+    try:
+        hw = bench_hardware()
+        with _bench_lock:
+            run["hw"] = hw
+        ctx_thread(target=_bench_worker, args=(run,), bind=False,
+                   daemon=True).start()
+    except Exception:
+        with _bench_lock:
+            _bench["running"] = False
+            run["state"] = "failed"
+        return False, "The benchmark couldn't start."
+    return True, run
+
+
+def bench_stop() -> bool:
+    """Stop a run: the engine call in flight is cut now, the model being
+    tested is stopped, and nothing after it runs. True when one was
+    running."""
+    with _bench_lock:
+        running = _bench["running"]
+    if running:
+        _bench_stop.set()
+        _bench_cut()
+    return running
+
+
+def _bench_path() -> str:
+    return os.path.join(app_dir(), BENCH_FILE)
+
+
+def bench_history(limit=BENCH_SHOW) -> list:
+    """The saved runs, newest first. A line a crash cut short, or any
+    line that isn't a run, is skipped; no file is no runs."""
+    try:
+        with open(_bench_path(), "rb") as f:
+            data = f.read()
+    except OSError:
+        return []
+    runs = []
+    for ln in data.splitlines():
+        try:
+            r = json.loads(ln)
+        except ValueError:
+            continue
+        if isinstance(r, dict) and isinstance(r.get("models"), list) \
+                and isinstance(r.get("t"), (int, float)):
+            runs.append(r)
+    runs.sort(key=lambda r: -r["t"])
+    return runs if limit is None else runs[:limit]
+
+
+def _bench_save(rec: dict):
+    """One run onto benchmarks.jsonl, the machine's file in the data
+    folder: appended, fsynced, 0600. Past BENCH_KEEP runs the oldest go,
+    in one atomic rewrite."""
+    p = _bench_path()
+    line = (json.dumps(rec, separators=(",", ":")) + "\n").encode("ascii")
+    with _bench_file_lock:
+        try:
+            with open(p, "rb") as f:
+                f.seek(0, 2)
+                if f.tell():
+                    f.seek(-1, 2)
+                    if f.read(1) != b"\n":
+                        line = b"\n" + line      # after a torn last line
+        except OSError:
+            pass
+        fd = os.open(p, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+        try:
+            os.write(fd, line)
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        runs = bench_history(None)
+        if len(runs) > BENCH_KEEP:
+            fd, tmp = tempfile.mkstemp(dir=app_dir(), prefix=".benchmarks-",
+                                       suffix=".tmp")
+            try:
+                with os.fdopen(fd, "wb") as f:
+                    for r in reversed(runs[:BENCH_KEEP]):
+                        f.write((json.dumps(r, separators=(",", ":"))
+                                 + "\n").encode("ascii"))
+                    f.flush()
+                    os.fsync(f.fileno())
+                _replace_into(tmp, p)
+            except BaseException:
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
+                raise
+
+
+# ------------------------------------------- the hardware line (6b331)
+def _bench_cpu() -> str:
+    """The processor's name as its maker writes it, trimmed."""
+    brand = ""
+    try:
+        if IS_WIN:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                                r"HARDWARE\DESCRIPTION\System"
+                                r"\CentralProcessor\0") as k:
+                brand = str(winreg.QueryValueEx(k, "ProcessorNameString")[0])
+        elif IS_MAC:
+            brand = subprocess.run(
+                ["sysctl", "-n", "machdep.cpu.brand_string"],
+                capture_output=True, text=True, timeout=3).stdout
+        else:
+            with open("/proc/cpuinfo", encoding="utf-8") as f:
+                m = re.search(r"model name\s*:\s*(.+)", f.read())
+                brand = m.group(1) if m else ""
+    except Exception:
+        pass
+    b = re.sub(r"\((?:R|TM)\)|\bCPU\b|\b(?:Processor|processor)\b"
+               r"|\d+(?:st|nd|rd|th) Gen\b|\d+-Core\b|w/ Radeon.*$",
+               " ", brand.split("@")[0])
+    b = " ".join(b.split())
+    if b.startswith("Apple "):
+        b = b[6:]
+    return b or platform.processor() or "This computer"
+
+
+def _bench_gpus() -> list:
+    """[(name, bytes)] of the graphics cards models run on: 6b315's
+    gpu_inventory when this build has it, else nvidia-smi."""
+    inv = globals().get("gpu_inventory")
+    if inv:
+        try:
+            return [(n, b) for _v, n, b in inv().get("cards") or []]
+        except Exception:
+            pass
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name,memory.total",
+             "--format=csv,noheader,nounits"], capture_output=True,
+            text=True, timeout=4,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout
+        cards = []
+        for ln in out.splitlines():
+            name, _c, mb = ln.rpartition(",")
+            if name.strip() and mb.strip().isdigit():
+                cards.append((name.strip(), int(mb) << 20))
+        return cards
+    except Exception:
+        return []
+
+
+def bench_hardware() -> dict:
+    """The hardware a run was measured on, and its line for the pane:
+    "M4 Pro · 48 GB · 20-core GPU", or on a PC the processor, the memory
+    and each kind of graphics card with its memory."""
+    if _bench_hw:
+        return dict(_bench_hw)
+    mem = psutil.virtual_memory().total if HAS_PSUTIL else 0
+    if not mem and IS_MAC:
+        try:
+            mem = int(subprocess.run(["sysctl", "-n", "hw.memsize"],
+                                     capture_output=True, text=True,
+                                     timeout=3).stdout.strip())
+        except (OSError, ValueError, subprocess.SubprocessError):
+            mem = 0
+    hw = {"cpu": _bench_cpu(), "mem": mem, "gpus": [], "gpu_cores": None}
+    parts = [hw["cpu"]] + (["%d GB" % round(mem / 2 ** 30)] if mem else [])
+    if IS_MAC:
+        try:
+            out = subprocess.run(
+                ["ioreg", "-r", "-d", "1", "-w", "0", "-c", "IOAccelerator",
+                 "-a"], capture_output=True, timeout=3).stdout
+            for dev in plistlib.loads(out):
+                if dev.get("gpu-core-count"):
+                    hw["gpu_cores"] = int(dev["gpu-core-count"])
+                    break
+        except Exception:
+            pass
+        if hw["gpu_cores"]:
+            parts.append("%d-core GPU" % hw["gpu_cores"])
+    else:
+        cards = _bench_gpus()
+        hw["gpus"] = [[n, b] for n, b in cards]
+        seen = []
+        for n, b in cards:
+            nm = " ".join(n.replace("NVIDIA", "").replace("GeForce", "")
+                          .split())
+            key = "%s %d GB" % (nm, round(b / 2 ** 30))
+            seen.append(key)
+        for key in dict.fromkeys(seen):
+            k = seen.count(key)
+            parts.append(("%d × %s" % (k, key)) if k > 1 else key)
+        if not cards:
+            parts.append("no graphics card in use")
+    hw["line"] = " · ".join(parts)
+    _bench_hw.update(hw)
+    return dict(hw)
+
+
+def bench_status() -> dict:
+    """GET /api/bench: the hardware line, the run (going, or the last one
+    this launch), the saved runs, and when idle the models a run would
+    test."""
+    with _bench_lock:
+        running = _bench["running"]
+        run = json.loads(json.dumps(_bench["run"])) if _bench["run"] else None
+    out = {"hw": bench_hardware().get("line", ""), "running": running,
+           "run": run, "history": bench_history(),
+           "test": {"name": BENCH_TEST, "max_tokens": BENCH_MAX_TOKENS,
+                    "cap_s": BENCH_RUN_CAP}}
+    if not running:
+        try:
+            out["installed"] = bench_plan(start_ollama=False)[0]
+        except Exception:
+            out["installed"] = []
+    return out
 
 
 # The merge is where the final answer's VOICE gets written, so the style
@@ -18945,6 +20032,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         _answered.pop(threading.get_ident(), None)
         self._turn = None
         self._head_sent = False
+        self._bench_held = False       # an /api/chat counted (6b331)
         # a switch under way (M9): wait for it, then work for the profile
         # it leaves active (the page's old X-Profile then gets 409). One
         # that outlasts the wait is not served under the switch's hold
@@ -18968,6 +20056,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             t, self._turn = self._turn, None
             if t:
                 _turn_finish(t)
+            if self._bench_held:
+                self._bench_held = False
+                bench_release()
             bind_ctx(None)
 
     def do_GET(self):
@@ -19431,6 +20522,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json(usage_query(
                     usage_read(self.ctx), _ur,
                     (_uq.get("model") or [""])[0][:120]))
+        elif self.path == "/api/bench":
+            # the hardware benchmark (6b331): the run and the saved runs
+            self._send_json(bench_status())
         elif self.path == "/api/engines":
             self._send_engines()
         elif self.path == "/api/setup":
@@ -20870,6 +21964,21 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                  _gb_of(l) for l in removed), 1),
                              "errors": errors})
             return
+        if self.path in ("/api/bench/start", "/api/bench/stop"):
+            # the hardware benchmark (6b331). A start is refused (409)
+            # while an answer is being written or a run is going
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            if n:
+                self.rfile.read(n)
+            if self.path == "/api/bench/stop":
+                self._send_json({"ok": True, "stopped": bench_stop()})
+                return
+            ok, got = bench_start()
+            if ok:
+                self._send_json({"ok": True, "id": got["id"]})
+            else:
+                self._send_json({"err": got}, code=409)
+            return
         if self.path != "/api/chat":
             self.send_error(404)
             return
@@ -20880,6 +21989,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         except (ValueError, json.JSONDecodeError):
             self.send_error(400)
             return
+        # A BENCHMARK OWNS THE ENGINES (6b331): the question is refused
+        # before anything is saved, and the page shows the line. Counted
+        # from here to the end of the request (_run), so no benchmark
+        # starts while this answer is being written.
+        if not bench_hold():
+            self._send_json({"err": BENCH_BUSY, "bench": True}, code=409)
+            return
+        self._bench_held = True
 
         messages = list(req_json.get("messages", []))
         # THE QUESTION IS SAVED ON ARRIVAL (0b 5.4, 6b322), when the page
@@ -25690,6 +26807,59 @@ body.gen #chip-model{color:var(--accent)}
 #us-note[hidden]{display:none}
 #p-usage.busy .us-grid,#p-usage.busy .us-chart{opacity:.6;
   transition:opacity .2s}
+/* SETTINGS › USAGE › BENCHMARK (6b331): the pane's own head, card and
+   type. Writes (tokens a second while writing) is the headline number;
+   the model being tested gets the 2px breathing bar and the run the 3px
+   one (the progress aesthetic, 6b253) */
+.bm{margin-top:18px;padding-top:14px;border-top:1px solid var(--line-soft)}
+.bm-head{margin-bottom:6px}
+.bm-btn{font:500 12px var(--helv);color:var(--text);background:none;
+  border:1px solid var(--line);border-radius:8px;padding:5px 11px;
+  cursor:pointer;white-space:nowrap;flex:none}
+.bm-btn:hover{background:var(--panel);border-color:var(--dim)}
+.bm-btn:disabled{opacity:.5;cursor:default}
+.bm-btn:focus-visible{outline:2px solid rgba(255,255,255,.3);outline-offset:1px}
+.bm-btn[hidden]{display:none}
+#bm-hw{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;
+  color:var(--dim)}
+.bm-desc{font-size:11.5px;color:var(--faint);line-height:1.5;margin:4px 0 10px}
+#bm-prog{margin:0 0 10px}
+#bm-prog[hidden]{display:none}
+#bm-prog .pbar-track{height:3px}
+#bm-status{font-size:11px;color:var(--dim);margin-top:5px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.bm-pick{display:flex;gap:7px;margin-bottom:8px;min-width:0}
+.bm-pick[hidden]{display:none}
+.bm-pick select{font:inherit;font-size:11.5px;color:var(--text);
+  background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:4px 6px;min-width:0;max-width:180px;cursor:pointer;
+  text-overflow:ellipsis}
+.bm-pick select:focus-visible{outline:2px solid rgba(255,255,255,.3);
+  outline-offset:1px}
+.bm-list{padding:2px 12px}
+.bm-list[hidden]{display:none}
+.bm-row{padding:8px 0;border-top:1px solid var(--line-soft)}
+.bm-row:first-child{border-top:none}
+.bm-l{display:flex;align-items:baseline;gap:7px;min-width:0}
+.bm-n{font-size:12.5px;color:var(--text);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.bm-e{font-family:var(--mono);font-size:9px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--faint);flex:none}
+.bm-v{margin-left:auto;font-family:var(--sans);font-size:15px;
+  font-weight:600;color:#fff;font-variant-numeric:tabular-nums;
+  white-space:nowrap;flex:none}
+.bm-v small{font-size:10.5px;font-weight:400;color:var(--faint);
+  margin-left:3px}
+.bm-d{font-family:var(--mono);font-size:10px;flex:none;color:var(--faint)}
+.bm-d.up{color:#57c98e}
+.bm-d.dn{color:#e5605c}
+.bm-s{font-family:var(--mono);font-size:10.3px;color:var(--faint);
+  margin-top:2px;line-height:1.5;font-variant-numeric:tabular-nums}
+.bm-f{color:#e6b422}
+.bm-f.sw{color:#e26d5a}
+.bm-row .pbar-track{height:2px;margin-top:6px}
+#bm-note{font-size:11.5px;color:var(--faint);line-height:1.5;margin:8px 0 0}
+#bm-note[hidden]{display:none}
 /* Models: the roster */
 #roster{font-family:var(--mono);font-size:10.8px;line-height:1.9;
   font-variant-numeric:tabular-nums;margin-bottom:4px}
@@ -27059,6 +28229,27 @@ __CODE_ROWS__
           <span><i style="background:#4d8dff"></i>Output</span></div>
       </div>
       <p id="us-note" hidden></p>
+      <!-- BENCHMARK (6b331, per Patrick): the same fixed test on every
+           local model here, one at a time. The runs are the machine's
+           (benchmarks.jsonl), not a person's -->
+      <div class="bm" id="bm">
+        <div class="us-head bm-head">
+          <svg class="us-ico" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.2 14.5a7.3 7.3 0 1 1 13.6 0"/><path d="M10 11.2l3.6-3.9"/><circle cx="10" cy="11.6" r="1.1"/></svg>
+          <span class="us-title">Benchmark</span>
+          <button class="bm-btn" id="bm-go">Run benchmark</button>
+          <button class="bm-btn" id="bm-stop" hidden>Stop</button>
+        </div>
+        <div id="bm-hw">&mdash;</div>
+        <div class="bm-desc">The same test on each model installed here: read a passage of about 1,000 tokens, then write 256. About a minute a model. Questions asked during a run are turned away. Results stay on this computer.</div>
+        <div id="bm-prog" hidden><div class="pbar-track"><div class="pbar-fill" id="bm-fill"></div></div>
+          <div id="bm-status"></div></div>
+        <div class="bm-pick" id="bm-pick" hidden>
+          <select id="bm-show" aria-label="Run"></select>
+          <select id="bm-cmp" aria-label="Compare with"></select>
+        </div>
+        <div class="us-card bm-list" id="bm-list" hidden></div>
+        <p id="bm-note" hidden></p>
+      </div>
     </section>
     </div>
     <div id="about-foot">
@@ -32416,6 +33607,7 @@ function settingsPane(id){
   $$(".spane").forEach(p=>p.classList.toggle("on",p.id===id));
   const bd=$("#about-body"); if(bd)bd.scrollTop=0;
   if(id==="p-usage")loadUsage();      // fresh numbers on every visit (6b325)
+  if(id==="p-usage")loadBench();      // and the benchmark's runs (6b331)
 }
 /* ------------------------------------------------ Settings › Usage (6b325)
    The four figures and the chart come from /api/usage (the usage
@@ -32529,6 +33721,150 @@ async function loadUsage(){
   // while the pane is open the figures keep up with the chats
   setInterval(()=>{if(!aboutVeil.hidden&&!document.hidden
     &&$("#p-usage").classList.contains("on"))loadUsage();},30000);
+})();
+/* -------------------------------- Settings › Usage › Benchmark (6b331)
+   /api/bench: the hardware line, the run going (read each second while
+   the pane is open) and the saved runs. Writes, tokens a second while
+   writing, is the headline; reads, first token, load and memory go on
+   the line under it. A run can be compared with an earlier one of the
+   same test on this computer. */
+const BM_STEP={checking:"checking memory",loading:"loading",
+  reading:"reading the passage",writing:"writing"};
+const BM_GIB=1073741824;
+let bmSeq=0,bmT=0,bmErr="",bmShow="",bmCmp="";
+function bmTps(v){if(v==null||!isFinite(+v))return "—";v=+v;
+  return v>=100?uInt(v):v.toFixed(1);}
+// the headline keeps its decimal at any speed
+function bmGen(v){return v==null||!isFinite(+v)?"—":(+v).toFixed(1);}
+function bmS(v,d){if(v==null||!isFinite(+v))return "—";v=+v;
+  return (v<10?v.toFixed(d==null?2:d):v<100?v.toFixed(1):String(Math.round(v)))+" s";}
+function bmGB(b){return b==null||!isFinite(+b)?"—":(b/BM_GIB).toFixed(1)+" GB";}
+// how far a run has got, 0-1: the models before, and the one on the go
+function bmFrac(run,max){
+  const M=run.models||[],n=M.length;if(!n)return 0;
+  let k=0;
+  M.forEach((r,i)=>{
+    if(i!==run.cur){if(!["waiting","checking","loading","reading","writing"].includes(r.status))k+=1;return;}
+    k+=r.status==="writing"?.4+.6*Math.min(1,(r.tok||0)/max)
+      :({checking:.02,loading:.1,reading:.35}[r.status]||0);});
+  return Math.min(1,k/n);
+}
+function bmRow(r,cur,old,max){
+  const done=r.status==="done";
+  let top='<span class="bm-n">'+esc(r.label)+'</span>'
+    +(r.engine?'<span class="bm-e">'+esc(r.engine)+'</span>':"");
+  if(done){
+    top+='<span class="bm-v">'+bmGen(r.gen_tps)+'<small>tok/s</small></span>';
+    if(old&&old.gen_tps>0&&r.gen_tps>0){
+      const p=(r.gen_tps-old.gen_tps)/old.gen_tps*100;
+      top+='<span class="bm-d'+(p>=.05?" up":p<=-.05?" dn":"")+'" title="'
+        +esc("Was "+bmGen(old.gen_tps)+" tok/s")+'">'+(p<0?"−":"+")
+        +Math.abs(p).toFixed(1)+"%</span>";}
+  }
+  let sub="",mem="";
+  if(done){
+    sub="reads "+bmTps(r.prompt_tps)+" tok/s · first token "+bmS(r.ttft_s)
+      +" · load "+bmS(r.load_s,1);
+    if(r.note)sub+="<br>"+esc(r.note);
+  }else if(cur){
+    sub=esc((BM_STEP[r.status]||r.status)+(r.status==="writing"
+      ?", "+uInt(r.tok||0)+" of "+uInt(max)+" tokens":""));
+  }else sub=esc(r.status==="waiting"?"waiting":r.note||r.status);
+  // memory: how far it rose while the model loaded and wrote, the peak,
+  // the share on the graphics card (Ollama), and the two flags
+  if(r.mem_rise!=null&&!cur&&r.status!=="skipped"){
+    mem="memory +"+bmGB(r.mem_rise)+(r.mem_peak!=null&&r.mem_total
+      ?" · peak "+(r.mem_peak/BM_GIB).toFixed(1)+" of "+Math.round(r.mem_total/BM_GIB)+" GB":"");
+    if(r.gpu_size)mem+=" · "+Math.round(100*(r.gpu_vram||0)/r.gpu_size)+"% on the GPU";
+    mem=esc(mem);
+    if(r.pressured)mem+=' · <span class="bm-f">memory pressure</span>';
+    if(r.swapped)mem+=' · <span class="bm-f sw">swapped'
+      +(r.swap_mb?" "+uInt(r.swap_mb)+" MB":"")+"</span>";
+  }
+  let h='<div class="bm-row"><div class="bm-l">'+top+'</div><div class="bm-s">'+sub+"</div>";
+  if(mem)h+='<div class="bm-s">'+mem+"</div>";
+  if(cur)h+='<div class="pbar-track"><div class="pbar-fill" style="width:'
+    +(r.status==="writing"?Math.round(100*Math.min(1,(r.tok||0)/max)):r.status==="reading"?4:1)
+    +'%"></div></div>';
+  return h+"</div>";
+}
+function paintBench(d){
+  $("#bm-hw").textContent=d?d.hw||"":"—";
+  const max=(d&&d.test&&d.test.max_tokens)||256,going=!!(d&&d.running&&d.run);
+  $("#bm-go").hidden=going;$("#bm-stop").hidden=!going;
+  const prog=$("#bm-prog");prog.hidden=!going;
+  if(going){
+    const run=d.run,M=run.models||[],r=M[run.cur];
+    $("#bm-fill").style.width=Math.round(100*bmFrac(run,max))+"%";
+    $("#bm-status").textContent=r?"Model "+(run.cur+1)+" of "+M.length+" · "+r.label
+      :M.length?"Finishing":"Listing the models on this computer";
+  }
+  // the runs: the one going (or one this launch couldn't save), then the saved
+  let runs=(d&&d.history)||[];
+  if(d&&d.run&&(going||(d.run.end&&!d.run.saved)))runs=[d.run].concat(runs.filter(x=>x.id!==d.run.id));
+  const pick=$("#bm-pick"),show=$("#bm-show"),cmp=$("#bm-cmp");
+  if(going)bmShow=d.run.id;
+  if(!runs.some(x=>x.id===bmShow))bmShow=runs.length?runs[0].id:"";
+  const shown=runs.find(x=>x.id===bmShow)||null;
+  const same=runs.filter(x=>shown&&x.id!==shown.id&&x.test===shown.test&&x.t<shown.t);
+  if(!same.some(x=>x.id===bmCmp))bmCmp="";
+  const lbl=x=>(going&&x.id===d.run.id?"Now":uWhen(x.t))+(x.state==="stopped"?" (stopped)":"");
+  show.textContent="";cmp.textContent="";
+  runs.forEach(x=>{const o=document.createElement("option");o.value=x.id;o.textContent=lbl(x);show.appendChild(o);});
+  [{id:"",t:0}].concat(same).forEach(x=>{const o=document.createElement("option");o.value=x.id;
+    o.textContent=x.id?"vs "+lbl(x):"Compare with…";cmp.appendChild(o);});
+  show.value=bmShow;cmp.value=bmCmp;cmp.disabled=!same.length;
+  pick.hidden=!runs.length;
+  const old=runs.find(x=>x.id===bmCmp);
+  const list=$("#bm-list");
+  if(shown&&(shown.models||[]).length){
+    list.innerHTML=shown.models.map((r,i)=>bmRow(r,going&&shown===d.run&&i===shown.cur,
+      old&&(old.models||[]).find(o=>o.label===r.label&&o.status==="done"),max)).join("");
+    list.hidden=false;
+  }else{list.innerHTML="";list.hidden=true;}
+  const bits=[];
+  if(bmErr)bits.push(bmErr);
+  if(shown&&!going){
+    if(shown.note)bits.push(shown.note);
+    if(shown.restore)bits.push(shown.restore);
+    if(shown.hw&&shown.hw.line&&d&&shown.hw.line!==d.hw)bits.push("Measured on "+shown.hw.line+".");
+    if((shown.models||[]).some(r=>r.status==="done"))bits.push(
+      "Speeds are tokens a second: MLX’s measured here, Ollama’s its own. "
+      +"Memory is how far memory in use rose while the model loaded and wrote.");
+  }
+  if(!shown&&d&&!going){
+    const n=(d.installed||[]).length;
+    bits.push(n?n+(n===1?" model":" models")+" installed here: about "+n
+      +(n===1?" minute.":" minutes."):"No local models are installed on this computer.");
+  }
+  const note=$("#bm-note");note.textContent=bits.join(" ");note.hidden=!bits.length;
+}
+async function loadBench(){
+  if(!$("#bm"))return;
+  const seq=++bmSeq;let d=null;
+  try{const r=await api("/api/bench");if(r.ok)d=await r.json();}catch(e){}
+  if(seq!==bmSeq)return;
+  paintBench(d);
+  clearTimeout(bmT);
+  if(d&&d.running&&!aboutVeil.hidden&&$("#p-usage").classList.contains("on"))
+    bmT=setTimeout(loadBench,1000);
+}
+async function benchPost(path){
+  let j={},ok=false;
+  try{const r=await api(path,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
+    ok=r.ok;j=await r.json().catch(()=>({}));}catch(e){}
+  return ok?"":(j.err||"The benchmark couldn’t start.");
+}
+(function(){
+  const go=$("#bm-go");if(!go)return;
+  go.addEventListener("click",async()=>{
+    go.disabled=true;bmErr=await benchPost("/api/bench/start");bmShow="";bmCmp="";
+    go.disabled=false;loadBench();});
+  $("#bm-stop").addEventListener("click",async()=>{
+    const b=$("#bm-stop");b.disabled=true;await benchPost("/api/bench/stop");
+    b.disabled=false;loadBench();});
+  $("#bm-show").addEventListener("change",e=>{bmShow=e.target.value;bmCmp="";loadBench();});
+  $("#bm-cmp").addEventListener("change",e=>{bmCmp=e.target.value;loadBench();});
 })();
 async function openAbout(){
   // Settings always opens on About (6b318, per Patrick), never on
@@ -34304,10 +35640,12 @@ def _mlx_janitor():
             _sweep_leftovers()
             _auto_cleanup_pass()   # no-op unless the pref is on
         try:
-            if _mlx_procs and _mlx_last_use and \
+            # never under a running benchmark (6b331): it owns the engines
+            if _mlx_procs and _mlx_last_use and not _bench["running"] and \
                     time.time() - _mlx_last_use > 300:
                 with _engine_lock:
-                    if time.time() - _mlx_last_use > 300:
+                    if time.time() - _mlx_last_use > 300 and \
+                            not _bench["running"]:
                         _stop_other_mlx("")   # no keeper: stop them all
         except Exception:
             pass

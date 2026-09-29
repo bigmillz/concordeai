@@ -5842,6 +5842,187 @@ crash was invisible.
   keeps its checks. Mutation-tested (SIGHUP back, hook removed, no log,
   no box).
 
+## 6b331 — hardware benchmark in Settings › Usage
+Patrick: "build the benchmark". A Benchmark section at the foot of
+Settings › Usage: one button runs the same fixed test on every local
+model installed on this computer and keeps each run, so a later run can
+be compared with an earlier one on the same machine.
+- **The test** (`BENCH_TEST = "b1"`): a fixed passage about tide mills,
+  821 words, 971-991 tokens with the task by the Llama, Qwen and Gemma
+  tokenizers in the HF cache (about 1,000 with each chat template), then
+  a fixed task ("explain step by step … at least 400 words") capped at
+  256 tokens, temperature 0, seed 42 (MLX takes `seed`; Ollama
+  `options.seed`), thinking off where the template knows the flag. The
+  answer is always longer than 256 tokens, so every model writes the
+  same number. Ollama runs with `num_ctx` 4096 (its own default depends
+  on the GPU). A new passage or task must get a new BENCH_TEST name: runs
+  are compared only within one.
+- **What runs:** every model in MODEL_ROUTES that SUPPORTED allows and
+  model_cached says is fully on disk (the same test the tiers use), so
+  never a cloud model and never a partial download; nothing is ever
+  downloaded. Smallest first; the MLX model this copy had loaded goes
+  last. Before each model the other MLX engines of this copy are
+  stopped, then the app's own admission rule decides:
+  `model_fits_memory` false is a skip with the reason ("it needs about
+  26 GB free; 18 GB is free now", "it needs about 64 GB of memory; this
+  computer has 48 GB", "the largest models are off"). Also skipped: a
+  giant on Ollama (it loads for many minutes), and an MLX model whose
+  port another copy of ConcordeAI is serving (the desktop app and a dev
+  copy share the engine ports; one never stops the other's engine).
+- **How each number is measured** (bench_numbers):
+  - *Writes* (the headline), tokens a second while writing.
+    Ollama: `eval_count / eval_duration` from its last line. MLX:
+    `(completion_tokens - 1) / (last token - first token)`, the counts
+    from the usage chunk (`stream_options.include_usage`), the times on
+    time.monotonic as each chunk arrives.
+  - *Reads*, prompt tokens a second. Ollama: `prompt_eval_count /
+    prompt_eval_duration`. MLX: `(prompt_tokens - cached_tokens) / time
+    to first token`; the first token's own step is inside that time
+    (about 1 part in 1,000 of the work).
+  - *First token*: the request sent to the first token (text or
+    reasoning) back, measured here for both engines (Ollama has no such
+    figure). It includes reading the passage.
+  - *Load*: MLX, the engine process started to its first one-token
+    answer back (mlx_lm 0.31 loads the weights after its port opens, so
+    the port alone would say "ready" too early; the one-token answer
+    also warms the kernels, so the reading figure isn't the first run).
+    Ollama: the model is unloaded first (`keep_alive: 0`) so the load is
+    cold, then loaded with an empty prompt; its `load_duration`, or the
+    wall time of that call when it reports none.
+  - *Memory*: sampled once a second while the model loads and writes.
+    The figure is the rise in memory in use (total less available)
+    from just before the load to the peak: weights, cache and engine.
+    Engine RSS is useless for MLX (Metal memory reads ~0, see
+    reap_orphan_engines). On Ollama `/api/ps` adds its own size and the
+    share on the graphics card ("62% on the GPU" means part runs on the
+    CPU).
+  - *Memory pressure*: on a Mac, the kernel's level
+    (`kern.memorystatus_vm_pressure_level`) reached warning, or the
+    compressor grew by 512 MB; mem_pressure() (the sidebar's figure) is
+    kept with each model. Elsewhere, memory in use reached 90%.
+    *Swapped*: pages swapped out (vm_stat's Swapouts) on a Mac, the swap
+    in use grown by 256 MB elsewhere.
+  - A model still writing at 2 minutes is cut there; its figures come
+    from what arrived (tokens counted as chunks, marked estimated) and
+    its row says so. A load over 5 minutes fails the model.
+- **The hardware line**: "M4 Pro · 48 GB · 20-core GPU" (sysctl's brand,
+  memory in GiB as sold, `gpu-core-count` from IOAccelerator). On a PC
+  the processor as its maker writes it, the memory, and each kind of
+  card with its memory ("2 × RTX 3090 24 GB"), from 6b315's
+  gpu_inventory when the build has it (it is on the gpu-fit branch, not
+  main yet; `_bench_gpus` looks it up by name and falls back to
+  nvidia-smi), else "no graphics card in use". Each run keeps its line;
+  the pane says "Measured on …" when an old run's differs.
+- **One thing at a time.** A run never starts while an answer is being
+  written: each `/api/chat` request (held in `_run` until the request
+  ends) and each `run_model` call (the `_bench_guarded` decorator:
+  chats, titles, memory, a download's check) is counted, and the start
+  is refused while the count isn't zero ("An answer is being written.
+  Run the benchmark when it has finished."). While a run goes, chats are
+  **refused, not queued**: `/api/chat` answers 409 "A hardware benchmark
+  is running. Ask again when it finishes, or stop it in Settings ›
+  Usage." before the question is saved (the page shows the line and
+  drops the question, as for any refused send), and `run_model` raises
+  the same line for background calls. A run takes minutes; a question
+  that waited that long without a word would look like a hang. The MLX
+  janitor leaves the engines alone during a run.
+- **Stop** cuts the engine call in flight (its socket is shut from the
+  route's thread, so a blocked read returns at once), stops the model
+  being tested, and marks the rest "not run". Measured: under a second.
+- **Afterwards**: the model that was loaded before was tested last and
+  is left loaded ("Llama 3.2 3B is loaded again, as it was before the
+  benchmark."). If it was skipped or failed, it is started again; after
+  a Stop, or if that fails, the line says it "will load again on your
+  next question". With nothing loaded before, the last engine is
+  stopped. Ollama models are unloaded after their test and load again
+  on the next question, as they do after 45 s anyway.
+- **Nothing leaves the computer.** Every engine call goes through
+  `_bench_http`, which refuses any address but 127.0.0.1 before
+  connecting. An MLX engine the benchmark starts has `HF_HUB_OFFLINE=1`
+  (`_spawn_mlx_engine(offline=True)`): loading a cached model otherwise
+  asks the Hub for a newer revision. No leaderboard, no telemetry. The
+  benchmark's calls are not in the usage ledger (they aren't a person's
+  and have no profile).
+- **The history is the machine's.** `benchmarks.jsonl` in the data
+  folder (MACHINE_ROOT's, beside prefs.json; never in a profile's
+  folder), written only by `_bench_save`, which is named in MACHINE_IO:
+  one JSON line a run, appended, fsynced, 0600; past 100 runs the oldest
+  go in one atomic rewrite. A torn last line is closed before the next
+  append and skipped on read. Every profile sees the same runs. Why the
+  machine's: a run measures this computer, not what a person asked;
+  nothing in it names a person, and a second profile on the same Mac
+  should compare against the same history. The module state (`_bench`,
+  `_bench_busy`, `_bench_live`, `_bench_hw`) is in MACHINE_STATE; the
+  worker and its memory sampler are `ctx_thread(bind=False)` threads,
+  and nothing in it touches a ctx, so the step 8 lints pass unchanged.
+- **Routes** (all behind `_gate`: the launch key and the API token; the
+  page calls them through `api()`): `GET /api/bench` (the hardware line,
+  the run going or the last one this launch, the saved runs newest
+  first, and when idle the models a run would test), `POST
+  /api/bench/start` (409 with the reason when refused), `POST
+  /api/bench/stop`. The page reads `/api/bench` each second while a run
+  goes and the pane is open (the usual polling pattern), not otherwise.
+- **The pane**: "Benchmark" with the Usage head's icon style, Run
+  benchmark / Stop, the hardware line, one line on what the test is, a
+  3px breathing bar for the run and "Model 2 of 5 · Llama 3.2 3B", then
+  a card with one row a model: name, engine, writes in tok/s (white,
+  the headline) and its change against the run picked in "Compare
+  with…" (green up, red down), a line with reads, first token and load,
+  a line with memory (+rise, the peak of total, Ollama's GPU share) and
+  the flags (amber "memory pressure", red "swapped 120 MB"). The model
+  under test shows its step ("writing, 143 of 256 tokens") and a 2px
+  breathing bar. A skip or failure shows its note. Two small selects
+  pick the run and the one to compare with (same test only). The foot
+  line says what the figures are and what was reloaded. No dead space:
+  the section ends at its last line, and the Usage pane scrolls in the
+  card's body as before.
+- Dev-only hooks: `bench-fake` (a stand-in engine with known timings:
+  Llama 3.2 1B MLX-shaped at 40.0 tok/s, 2,000 reading, 0.5 s first
+  token, 2.0 s load; Llama 3.2 3B Ollama-shaped at 50.0, 4,000, 0.3 s,
+  1.5 s; GPT-OSS 120B skipped), `bench-pace=<s>` (its wait per token, so
+  Stop can land) and `bench-only=<label>` (one model, for a real run in
+  a dev copy).
+- Gauntlet (19 new): the figures from known timings (MLX, a cached
+  prompt, Ollama's own, a cut stream, junk values); memory rise and both
+  flags on Mac- and PC-shaped samples; the skip notes and the MLX and
+  Ollama engines' own skips; the plan (installed only, a partial
+  download out, smallest first, the loaded engine last, the one-model
+  hook); a whole run on recording stand-ins (a failure and a skip noted,
+  the prior engine kept, the rest stopped, the run saved without its
+  live fields); the gate both ways; Stop under a second; the file (0600,
+  torn and stray lines, newest first, trimming, no temp left); the real
+  MLX and Ollama code against stub servers with every `connect`
+  recorded (only 127.0.0.1, offline spawn, the fixed test and its
+  parameters sent, the figures through, a far address refused before
+  connecting); source pins where it meets the app; the profile lints,
+  with the writer and the state each shown required; live on a copy of
+  its own with `bench-fake` (routes 403 without the key or token, the
+  known figures, a second start and a chat refused with the question
+  unsaved, Stop mid-model, both runs in a 0600 benchmarks.jsonl read
+  back after a restart); the pane's markup, and its rows and formats in
+  node. 29 mutations of the protections (the formulas, the flags, the
+  skip rules, the order, the gate, Stop, the loopback guard, the offline
+  spawn, the sampling parameters, the file, the chat's hold and release,
+  the janitor) each fail at least one check.
+- Measured here (M4 Pro, 48 GB, 20-core GPU; a dev copy on 9903 with
+  `bench-only=Llama 3.2 1B`, no other engine running), two runs a
+  minute apart: writes 249.6 and 250.9 tok/s (256 tokens), reads 2,374
+  and 2,976 tok/s (1,018 prompt tokens, 30 of them the chat template's
+  prefix cached by the one-token load answer), first token 0.42 and
+  0.33 s, load 3.6 and 2.0 s (the second from a warm file cache),
+  memory +1.8 and +2.0 GB, no pressure, no swap. About 5 s a run for
+  this model. The engine was stopped after each run (nothing was loaded
+  before), and its log shows only the two local requests.
+- Not verified: Ollama's timings on a real engine (this Mac runs its
+  models on MLX; the Ollama path ran against a stub that speaks its
+  shapes), Windows and NVIDIA (the hardware line's PC branch, the swap
+  rule from the page file, `/api/ps`'s GPU share), the pane in
+  WKWebView, WebView2 and Qt (checked in Blink), a whole run over every
+  installed model (one model was run for real, to leave the other
+  engines alone).
+- **Patrick:** nothing to do. Worth a look: whether chats should wait
+  for the run instead of being refused.
+
 ## 6b330 — switching, the boot invariant and the account window (accounts step 9)
 The spec's 1a 5.1, 5.8, 5.9 and 5.11-5.13 with §8 steps 5-6 and 8 (not
 7, sharing): M9 of the sign-in plan, and the items 6b329 left for it.
