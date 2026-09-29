@@ -2531,7 +2531,7 @@ finally:
     __import__("urllib.request").request.urlopen = _orig_uo
 check("a giant on Ollama: fixed context, stays loaded, an hour to load",
       _so_out == ["hi"] * 4 and len(_so_seen) == 4
-      and _so_seen[3][0]["keep_alive"] == "30m" and _so_seen[3][1] == 600
+      and _so_seen[3][0]["keep_alive"] == "30m" and _so_seen[3][1] == 3600
       and _so_seen[3][0]["options"] == {"temperature": 0.75, "num_ctx": 32768}
       and "think" not in _so_seen[3][0]
       and "think" not in _so_seen[0][0]
@@ -2652,7 +2652,7 @@ check("a 400 GB pull: bytes across layers; a giant stops before the drive fills"
       and "if _sg and len(council) > 1:\n                council = _sg[:1]" in _MILLENAI_SRC
       and 'labels = sorted(labels, key=lambda l: MODEL_INFO[l]["gb"])' in _wk
       and "_keep_awake(True)" in _wk and "_keep_awake(False)" in _wk
-      and "why = _ollama_too_old(MODEL_ROUTES[label][1], have, ours)" in _wk
+      and "why = _ollama_too_old(MODEL_ROUTES[label][1], have, stage)" in _wk
       and "_stage_engine_update()" in _wk
       and "_disk_free_for" not in _smd
       and 'pct = (job["done_b"] // 1_000_000, job.get("phase", ""))' in _MILLENAI_SRC
@@ -2742,7 +2742,7 @@ def _pc(ram_gib, smi="", adapters=(), ours=False, used_gb=6, cm=True):
     _exec_names(z, {"_DISPLAY_CLASS", "_DISPLAY_GUID", "_AMD_IGPU", "_BIG_IGPU",
                     "_INTEL_DGPU", "_nvidia_cards", "_present_display_keys",
                     "_windows_adapters", "gpu_inventory", "_igpu_in_use",
-                    "gpu_vram_bytes", "gpu_room_bytes", "machine_budget_bytes",
+                    "_gpu_pool", "gpu_vram_bytes", "gpu_room_bytes", "machine_budget_bytes",
                     "giant_fits_here", "GIANT_GB", "model_is_giant", "slow_giant",
                     "BASELINE_RAM", "_ram_part", "_mem_factor",
                     "model_fits_machine", "model_fits_memory"})
@@ -2759,6 +2759,11 @@ def _pc(ram_gib, smi="", adapters=(), ours=False, used_gb=6, cm=True):
                 sys.modules[m] = v
     return z
 _pcf = {"nl": False, "gi": False}
+_q480 = _plat["windows"]["MODEL_INFO"]["Qwen 3 Coder 480B"]
+_q480_need = max(_q480["gb"] * 1e9 * 1.05, _q480["mem"] + 6e9)
+# DeepSeek V3.1 671B: there the 1.05x file is the larger (424.7 GB)
+_ds671 = _plat["windows"]["MODEL_INFO"]["DeepSeek V3.1 671B"]
+_ds_need = max(_ds671["gb"] * 1e9 * 1.05, _ds671["mem"] + 6e9)
 _AMDP = "Advanced Micro Devices, Inc."
 _smi2 = "NVIDIA RTX PRO 6000 Blackwell, 97887\n" * 2
 _strix = [("AMD Radeon(TM) 8060S Graphics", _AMDP, 96 * _GB, True)]
@@ -2786,10 +2791,18 @@ _pcs = {
                            ("Intel(R) Arc(TM) 140V GPU (16GB)", "Intel Corporation", 8 * _GB, True)]),
     "tie": _pc(64, "NVIDIA GeForce RTX 4090, 24564\n",
                [("AMD Radeon RX 7900 XTX", _AMDP, 24564 << 20, True)]),
+    # (port review) two vendors are two pools, never one: the bigger counts
+    "3090+w7900": _pc(64, "NVIDIA GeForce RTX 3090, 24576\n",
+                      [("AMD Radeon PRO W7900", _AMDP, 48 * _GB, True)]),
+    "a770m+32": _pc(32, "", [("Intel(R) Arc(TM) A770M Graphics", "Intel Corporation",
+                              16 * _GB, True)]),
     "cpu+32": _pc(32),
     "cpu+280": _pc(280), "cpu+290": _pc(290),
     # (port) exactly 1.05x Qwen 3 Coder 480B's 290.1 GB, and a MB under
-    "cpu+edge": _pc(290.1e9 * 1.05 / _GB), "cpu+edge-": _pc((290.1e9 * 1.05 - 1e6) / _GB),
+    # (port review) the row's own memory estimate and Windows' 6 GB, when
+    # that is more than 1.05x the file (Qwen 3 Coder 480B: 305 + 6 GB)
+    "cpu+edge": _pc(_q480_need / _GB), "cpu+edge-": _pc((_q480_need - 1e6) / _GB),
+    "cpu+ds": _pc(_ds_need / _GB), "cpu+ds-": _pc((_ds_need - 1e6) / _GB),
     # a 4 GB AMD card is under the 6 GB floor; with the configuration
     # manager unreadable a moved card's two keys still count once
     "rx6400+16": _pc(16, "", [("AMD Radeon RX 6400", _AMDP, 4 * _GB, True)]),
@@ -2810,7 +2823,10 @@ check("the GPU inventory: every card present, integrated graphics set aside",
       and round(_pcs["strix+ours"]["gpu_vram_bytes"]() / _GB) == 96
       and _pcs["strix+theirs"]["gpu_vram_bytes"]() == 0
       and _inv["arc+32"] == (16, "Intel", 0, 1)            # A770 yes, 140V no
-      and _inv["tie"][1] == "NVIDIA"
+      and _inv["tie"][:2] == (24, "NVIDIA")
+      and _inv["3090+w7900"] == (48, "AMD", 0, 2)
+      and _pcs["3090+w7900"]["gpu_room_bytes"]() == 47 * _GB
+      and _inv["a770m+32"] == (16, "Intel", 0, 1)
       and _inv["cpu+32"] == (0, "", 0, 0)
       and _inv["rx6400+16"] == (0, "", 0, 0) and _inv["7700xt+16/nocm"] == (12, "AMD", 0, 1),
       "%r" % _inv)
@@ -2837,10 +2853,27 @@ _offer_bad = [(k, l) for k, z in _pcs.items() for l in _plat["windows"]["MODEL_I
               and not z["model_fits_memory"](l)]
 check("every model a PC is offered is one it will run",
       not _offer_bad, "%r" % _offer_bad[:6])
+# (6b331) the benchmark's hardware line reads gpu_inventory by name: the
+# real one, on simulated PCs, feeds _bench_gpus and bench_hardware
+def _bench_line(k):
+    z = dict(_LH, IS_MAC=False, HAS_PSUTIL=True, _bench_hw={},
+             psutil=_pcs[k]["psutil"], _bench_cpu=lambda: "CPU",
+             gpu_inventory=_pcs[k]["gpu_inventory"])
+    _exec_names(z, {"_bench_gpus", "bench_hardware"})
+    z["gpu_inventory"] = _pcs[k]["gpu_inventory"]
+    return z["bench_hardware"]()
+_bl = {k: _bench_line(k) for k in ("2xpro6000+128", "3090+w7900", "strix+ours", "cpu+32")}
+check("the benchmark's hardware line comes from the GPU inventory",
+      _bl["2xpro6000+128"]["line"] == "CPU · 128 GB · 2 × RTX PRO 6000 Blackwell 96 GB"
+      and _bl["2xpro6000+128"]["gpus"] == [["NVIDIA RTX PRO 6000 Blackwell", 97887 << 20]] * 2
+      and _bl["3090+w7900"]["line"] == "CPU · 64 GB · RTX 3090 24 GB · AMD Radeon PRO W7900 48 GB"
+      and _bl["strix+ours"]["line"].endswith("no graphics card in use")   # shared memory: no card
+      and _bl["cpu+32"]["line"] == "CPU · 32 GB · no graphics card in use",
+      "%r" % {k: v["line"] for k, v in _bl.items()})
 _pcf.update(nl=True, gi=True)
 _gw = {k: tuple(_fm(k, g) for g in ("Qwen 3 Coder 480B", "DeepSeek V3.1 671B"))
        for k in ("4090+128", "2xpro6000+128", "pro6000+512", "cpu+32",
-                 "cpu+280", "cpu+290", "cpu+edge", "cpu+edge-")}
+                 "cpu+280", "cpu+290", "cpu+edge", "cpu+edge-", "cpu+ds", "cpu+ds-")}
 _slow = {k: tuple(_pcs[k]["slow_giant"](g) for g in ("Qwen 3 Coder 480B", "DeepSeek V3.1 671B"))
          for k in ("pro6000+512", "4xpro6000+256")}
 _adm = (_pcs["4090+128"]["model_fits_memory"]("DeepSeek V3.1 671B"),
@@ -2853,6 +2886,8 @@ check("the Windows giants are for workstations only, whatever the boxes say",
       # 280 GiB is 300.6 GB, under 1.05 x 290.1; 290 GiB is 311.4 GB
       and _gw["cpu+280"][0] is False and _gw["cpu+290"][0] is True
       and _gw["cpu+edge"][0] is True and _gw["cpu+edge-"][0] is False
+      and _gw["cpu+ds"] == (True, True) and _gw["cpu+ds-"] == (True, False)
+      and _ds_need > _ds671["mem"] + 6e9 and _q480_need > _q480["gb"] * 1.05e9
       and _slow["pro6000+512"] == (True, True)
       and _slow["4xpro6000+256"] == (False, True)  # the 480B fits 4 cards
       and _adm == (False, True), "%r" % [_gw, _slow, _adm])
@@ -2898,8 +2933,9 @@ check("the download endpoint won't start a giant a PC can't hold",
       and "DeepSeek V3.1 671B" not in _ep["_setup_jobs"],
       "%r" % [_ep_r, _ep_started, _ep["_setup_jobs"]])
 # the version floor: a user's own old Ollama gets a note saying what to
-# do; the app's own old Ollama fetches its successor for the next start
-def _worker_run(ours):
+# do; the app's own old Ollama fetches its successor for the next start,
+# and (review of the port) the note says what the fetch really did
+def _worker_run(ours, stage="staging"):
     z = dict(_LH, MODEL_INFO=_plat["windows"]["MODEL_INFO"],
              MODEL_ROUTES=_plat["windows"]["MODEL_ROUTES"],
              OLLAMA_REQUIRES=_pn["OLLAMA_REQUIRES"],
@@ -2909,8 +2945,8 @@ def _worker_run(ours):
              _managed_serve=lambda: object() if ours else None,
              _keep_awake=lambda on: None, _app_models_add=lambda l: None,
              _pull_ollama_model=lambda l, t: _wr_pulled.append(t),
-             _stage_engine_update=lambda: _wr_staged.append(1))
-    _exec_names(z, {"_ollama_too_old", "_ollama_install_worker"})
+             _stage_engine_update=lambda: _wr_staged.append(1) or stage)
+    _exec_names(z, {"_STAGE_SAY", "_ollama_too_old", "_ollama_install_worker"})
     z["_ollama_install_worker"](["Qwen 3.8 27B", "Llama 3.2 3B"])
     return {l: (j["status"], j.get("note", "")) for l, j in z["_setup_jobs"].items()}
 _wr_pulled, _wr_staged = [], []
@@ -2918,123 +2954,305 @@ _w_theirs = _worker_run(False)
 _w_theirs_pull, _w_theirs_staged = list(_wr_pulled), list(_wr_staged)
 _wr_pulled[:], _wr_staged[:] = [], []
 _w_ours = _worker_run(True)
+_w_ours_pull, _w_ours_staged = list(_wr_pulled), list(_wr_staged)
+_w_say = {st: _worker_run(True, st)["Qwen 3.8 27B"][1]
+          for st in ("staged", "sibling", "offline", "arm64", "released", "current", "theirs")}
 check("an old Ollama: the user's gets a note, the app's fetches a newer one",
       _w_theirs["Qwen 3.8 27B"][0] == "error"
       and "needs Ollama 0.32.12 or newer; this computer has 0.28.1" in _w_theirs["Qwen 3.8 27B"][1]
       and _w_theirs["Llama 3.2 3B"][0] == "done" and _w_theirs_pull == ["llama3.2:3b"]
       and not _w_theirs_staged
-      and "quit and reopen ConcordeAI" in _w_ours["Qwen 3.8 27B"][1]
-      and _wr_staged == [1] and _wr_pulled == ["llama3.2:3b"],
-      "%r" % [_w_theirs, _w_ours, _wr_staged])
-# _managed_serve: live, on our port, from our folder; and the staged
-# engine swaps in only while none of ours is running
+      and "is downloading: in a few minutes quit and reopen" in _w_ours["Qwen 3.8 27B"][1]
+      and _w_ours_staged == [1] and _w_ours_pull == ["llama3.2:3b"]
+      # (review of the port) each outcome says what it is
+      and "is ready: quit and reopen" in _w_say["staged"]
+      and "close every ConcordeAI window" in _w_say["sibling"]
+      and "check the internet connection" in _w_say["offline"]
+      and "native ARM64 engine is downloading" in _w_say["arm64"]
+      and "try again tomorrow" in _w_say["released"]
+      and "on this computer: quit and reopen" in _w_say["current"]
+      and "Update Ollama (ollama.com/download)" in _w_say["theirs"]
+      and not any("is downloading" in _w_say[k] for k in ("staged", "sibling", "offline",
+                                                        "released", "current", "theirs")),
+      "%r" % [_w_theirs, _w_ours, _w_say])
+# _managed_serve: live, on our port, from our folder
 _ms = dict(_LH, _MANAGED_BIN_DIR="/x/bin", OLLAMA_PORT=[11434])
 class _FP:
     def __init__(self, path, port, alive=True):
         self.args, self._cai_port, self._alive = [path, "serve"], port, alive
     def poll(self): return None if self._alive else 1
+    def wait(self, t=None): return 0
 _exec_names(_ms, {"_managed_serve"})
 _own = []
 for _procs in ([_FP("/usr/local/bin/ollama", 11434)], [_FP("/x/bin/ollama", 11434, False)],
                [_FP("/x/bin/ollama", 5555)], [_FP("/x/bin/ollama", 11434)]):
     _ms["_managed_procs"] = _procs
     _own.append(_ms["_managed_serve"]() is not None)
-# (ported onto main, after 6b330) the swap follows 6b317's native-engine
-# swap: a swap cut short is undone first, it waits while another copy
-# runs, and on an ARM64 PC only an ARM64 engine goes in
-def _swap_world(arm=False, staged_pe=0xAA64):
+# THE ENGINE WORLD (review of the port): real folders; an "engine" is a
+# file holding its version ("broken" when it doesn't run)
+def _eng_file(path, ver):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    open(path, "w").write(ver)
+def _eng_ver(path):
+    try:
+        t = open(path).read()
+    except OSError:
+        return ()
+    m = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", t.strip())
+    return tuple(int(x) for x in m.groups()) if m else ()
+_ENG_NAMES = {"_STAGED_DIR", "_STAGED_OK", "_STAGE_LOCK", "_SWAP_LOCK", "_SWAP_TRIAL",
+              "_UPDATE_NOTE", "_stage_last", "_STAGE_SAY", "_engine_exe", "_is_managed",
+              "_today", "_update_note", "_update_note_set", "_ollama_needed",
+              "_stage_engine_update", "_fetch_engine_update", "_rollback_engine",
+              "_apply_staged_engine", "_prove_engine"}
+def _eng_world(cur="0.28.1", staged="0.34.4", nested=False, arm=False, pe=0xAA64,
+               sib=False, serve=False):
     d = __import__("tempfile").mkdtemp()
     b = os.path.join(d, "bin")
-    os.makedirs(b); open(os.path.join(b, "old"), "w").close()
-    open(os.path.join(b, "ollama"), "w").close()
-    os.makedirs(b + ".new"); open(os.path.join(b + ".new", "new"), "w").close()
-    open(os.path.join(b + ".new", "ollama"), "w").close()
-    open(os.path.join(b + ".new", "concorde-complete"), "w").close()
-    z = dict(_LH, _MANAGED_BIN_DIR=b, _STAGED_DIR=b + ".new",
-             _STAGED_OK=os.path.join(b + ".new", "concorde-complete"),
-             _managed_serve=lambda: object(), IS_WIN=False, IS_WIN_ARM=arm,
-             _pe_machine=lambda path: staged_pe,
-             _other_millenai_running=lambda: False)
-    _exec_names(z, {"_apply_staged_engine"})
-    return z, b
-def _swapped(b):
-    return (os.path.exists(os.path.join(b, "new"))
-            and not os.path.exists(os.path.join(b, "old"))
-            and not os.path.exists(b + ".new") and not os.path.exists(b + ".old")
-            and not os.path.exists(os.path.join(b, "concorde-complete")))
-_sz, _sbin = _swap_world()
-_sz["_apply_staged_engine"]()
-_swap_busy = os.path.exists(os.path.join(_sbin, "old"))
-_sz["_managed_serve"] = lambda: None
-_sz["_other_millenai_running"] = lambda: True
-_sz["_apply_staged_engine"]()
-_swap_sib = os.path.exists(os.path.join(_sbin, "old")) and os.path.exists(_sbin + ".new")
-_sz["_other_millenai_running"] = lambda: False
-_sz["_apply_staged_engine"]()
-_swap_done = _swapped(_sbin)
-# cut short between its renames: bin.old holds the engine, bin is empty
-_sz, _sbin = _swap_world()
-_sz["_managed_serve"] = lambda: None
-os.replace(_sbin, _sbin + ".old"); os.makedirs(_sbin)
-_sz["_other_millenai_running"] = lambda: True     # no swap now: undo only
-_sz["_apply_staged_engine"]()
-_swap_cut = (os.path.exists(os.path.join(_sbin, "old"))
-             and not os.path.exists(_sbin + ".old") and os.path.exists(_sbin + ".new"))
-# an ARM64 PC: a staged engine that isn't ARM64 is dropped, never put in
-_sz, _sbin = _swap_world(arm=True, staged_pe=0x8664)
-_sz["_managed_serve"] = lambda: None
-_sz["_apply_staged_engine"]()
-_swap_arm_bad = (os.path.exists(os.path.join(_sbin, "old"))
-                 and not os.path.exists(_sbin + ".new"))
-_sz, _sbin = _swap_world(arm=True, staged_pe=0xAA64)
-_sz["_managed_serve"] = lambda: None
-_sz["_apply_staged_engine"]()
-_swap_arm_ok = _swapped(_sbin)
-# the fetch: only the app's own engine, only when too old, never beside
-# 6b317's native engine, never with another copy running; on no profile
-def _stage_world(bin_path, ver, arm=False, wrong=False, sib=False):
-    d = __import__("tempfile").mkdtemp()
-    b = os.path.join(d, "bin")
-    log = {"dl": [], "threads": []}
+    log = {"spawn": 0, "stop": 0, "dl": [], "threads": []}
     class _Th:
-        def __init__(self, target=None, daemon=None, **k): self.t = target
-        def start(self): self.t()
-    def _dl(dest, row="Ollama engine"):
-        log["dl"].append(row)
-        os.makedirs(dest, exist_ok=True)
-        open(os.path.join(dest, "ollama"), "w").close()
-    z = dict(_LH, _MANAGED_BIN_DIR=b, _STAGED_DIR=b + ".new",
-             _STAGED_OK=os.path.join(b + ".new", "concorde-complete"),
-             _staging={"on": False}, OLLAMA_REQUIRES=_pn["OLLAMA_REQUIRES"],
+        def __init__(self, target=None, args=(), **k): self.t, self.a = target, args
+        def start(self): self.t(*self.a)
+    z = dict(_LH, _MANAGED_BIN_DIR=b, IS_WIN=False, IS_WIN_ARM=arm,
+             OLLAMA_REQUIRES=_pn["OLLAMA_REQUIRES"],
+             MODEL_ROUTES=_plat["windows"]["MODEL_ROUTES"],
+             SUPPORTED=_plat["windows"]["SUPPORTED"],
+             _bin_version=_eng_ver, _pe_machine=lambda p: pe,
+             _other_millenai_running=lambda: log.get("sib", sib),
+             _managed_serve=lambda: object() if log.get("serve", serve) else None,
+             _wrong_arch_engine=lambda: False, _ENGINE_ARM_DONE=os.path.join(d, "none"),
              _ENGINE_DL_LOCK=__import__("threading").Lock(),
-             _ollama_bin=lambda: bin_path(b), _bin_version=lambda p: ver,
-             IS_WIN_ARM=arm, _wrong_arch_engine=lambda: wrong,
-             _ENGINE_ARM_DONE=os.path.join(d, "nothing"),
-             _other_millenai_running=lambda: sib,
-             _download_ollama_binary=_dl)
-    _exec_names(z, {"_ollama_needed", "_is_managed", "_stage_engine_update"})
-    z["threading"] = _types.SimpleNamespace(Thread=lambda target=None, **k: (
-        log["threads"].append(k.get("daemon")), _Th(target=target))[1])
-    z["ctx_thread"] = lambda target, ctx=None, bind=True, **k: (
-        log["threads"].append(("bind", bind)), _Th(target=target))[1]
-    z["_stage_engine_update"]()
-    return log, os.path.exists(z["_STAGED_OK"]), z["_staging"]["on"]
-_ours = lambda b: os.path.join(b, "ollama")
-_theirs = lambda b: "/usr/local/bin/ollama"
-_stg = {"old": _stage_world(_ours, (0, 28, 1)),
-        "new": _stage_world(_ours, (0, 40, 0)),
-        "theirs": _stage_world(_theirs, (0, 1, 0)),
-        "arm-wrong": _stage_world(_ours, (0, 28, 1), arm=True, wrong=True),
-        "sibling": _stage_world(_ours, (0, 28, 1), sib=True)}
-_stg_ok = (_stg["old"] == ({"dl": [None], "threads": [("bind", False)]}, True, False)
-           and all(v == ({"dl": [], "threads": []}, False, False)
-                   for k, v in _stg.items() if k != "old"))
+             OLLAMA_ZIP_URL="https://x/ollama-windows-amd64.zip",
+             OLLAMA_TGZ_URL="https://x/ollama-darwin.tgz",
+             _release_sha256=lambda url: "f" * 64,
+             _stop_proc=lambda p: log.__setitem__("stop", log["stop"] + 1),
+             _spawn_ollama_serve=lambda: log.__setitem__("spawn", log["spawn"] + 1))
+    z["_ollama_bin"] = lambda: z["_engine_exe"](b)
+    _exec_names(z, _ENG_NAMES)
+    z["ctx_thread"] = lambda target, ctx=None, bind=True, args=(), **k: (
+        log["threads"].append(bind), _Th(target=target, args=args))[1]
+    if cur:
+        _eng_file(os.path.join(b, "ollama"), cur)
+    if staged is not None:
+        _eng_file(os.path.join(b + ".new", "ollama", "ollama") if nested
+                  else os.path.join(b + ".new", "ollama"), staged)
+        open(os.path.join(b + ".new", "concorde-complete"), "w").close()
+    return z, b, log
+def _bv(b):
+    e = _eng_world.__globals__  # noqa: the module's helpers, for reading
+    for p in (os.path.join(b, "ollama"), os.path.join(b, "ollama", "ollama")):
+        if os.path.isfile(p):
+            return ".".join(map(str, _eng_ver(p)))
+    return ""
+_sw = {}
+# ours is running: nothing moves; another copy open: nothing moves
+_z, _b, _l = _eng_world(serve=True); _z["_apply_staged_engine"]()
+_sw["busy"] = (_bv(_b), os.path.exists(_b + ".new"))
+_z, _b, _l = _eng_world(sib=True); _z["_apply_staged_engine"]()
+_sw["sibling"] = (_bv(_b), os.path.exists(_b + ".new"))
+# the swap: the new engine in, the old one KEPT until the new one answers
+_z, _b, _l = _eng_world(); _z["_apply_staged_engine"]()
+_sw["swap"] = (_bv(_b), _bv(_b + ".old"), open(_z["_SWAP_TRIAL"]).read(),
+               os.path.exists(_b + ".new"), os.path.exists(os.path.join(_b, "concorde-complete")))
+# ...it answers: the old one goes
+_z["_engine_answers"] = lambda port: True
+_ok_p = _z["_prove_engine"](_FP(_b, 1), 1, 5)
+_sw["proven"] = (_ok_p, _bv(_b), os.path.exists(_b + ".old"), os.path.exists(_z["_SWAP_TRIAL"]),
+                 _l["spawn"], _l["stop"])
+# ...it dies: stopped, the old one back and started, today's noted
+_z, _b, _l = _eng_world(); _z["_apply_staged_engine"]()
+_z["_engine_answers"] = lambda port: False
+_ok_p = _z["_prove_engine"](_FP(_b, 1, alive=False), 1, 5)
+_sw["died"] = (_ok_p, _bv(_b), os.path.exists(_b + ".old"), os.path.exists(_b + ".failed"),
+               os.path.exists(_z["_SWAP_TRIAL"]), _l["spawn"], _l["stop"],
+               _z["_update_note"]().get("latest"))
+# ...never seen answering (the app quit or crashed): put back at the next start
+_z, _b, _l = _eng_world(); _z["_apply_staged_engine"]()
+_z["_apply_staged_engine"]()
+_sw["unproven"] = (_bv(_b), os.path.exists(_b + ".old"), os.path.exists(_z["_SWAP_TRIAL"]))
+# the reviewer's probe: the engine one folder down goes in and is found
+_z, _b, _l = _eng_world(nested=True); _z["_apply_staged_engine"]()
+_sw["nested"] = (_bv(_b), _z["_engine_exe"](_b) == os.path.join(_b, "ollama", "ollama"))
+# a staged folder with no engine, or one that doesn't run: dropped, bin kept
+_z, _b, _l = _eng_world(staged="broken"); _z["_apply_staged_engine"]()
+_sw["broken"] = (_bv(_b), os.path.exists(_b + ".new"), os.path.exists(_b + ".old"))
+_z, _b, _l = _eng_world()
+os.remove(os.path.join(_b + ".new", "ollama")); _z["_apply_staged_engine"]()
+_sw["empty"] = (_bv(_b), os.path.exists(_b + ".new"), os.path.exists(_b + ".old"))
+# cut short between the renames: bin.old has the engine, bin is empty
+_z, _b, _l = _eng_world(sib=True)
+os.replace(_b, _b + ".old"); os.makedirs(_b); _z["_apply_staged_engine"]()
+_sw["cut"] = (_bv(_b), os.path.exists(_b + ".old"), os.path.exists(_b + ".new"))
+# an ARM64 PC: only an ARM64 engine goes in
+_z, _b, _l = _eng_world(arm=True, pe=0x8664); _z["_apply_staged_engine"]()
+_sw["arm x64"] = (_bv(_b), os.path.exists(_b + ".new"))
+_z, _b, _l = _eng_world(arm=True, pe=0xAA64); _z["_apply_staged_engine"]()
+_sw["arm arm64"] = _bv(_b)
+# a fetch writing bin.new, or another swap: this one does nothing
+_z, _b, _l = _eng_world(); _z["_STAGE_LOCK"].acquire(); _z["_apply_staged_engine"]()
+_sw["fetching"] = _bv(_b); _z["_STAGE_LOCK"].release()
+_z, _b, _l = _eng_world(); _z["_SWAP_LOCK"].acquire(); _z["_apply_staged_engine"]()
+_sw["swap held"] = _bv(_b); _z["_SWAP_LOCK"].release()
+check("the engine update: swapped only when it runs, the old one kept until it answers",
+      _own == [False, False, False, True]
+      and _sw["busy"] == ("0.28.1", True) and _sw["sibling"] == ("0.28.1", True)
+      and _sw["swap"] == ("0.34.4", "0.28.1", "0.34.4", False, False)
+      and _sw["proven"] == (True, "0.34.4", False, False, 0, 0)
+      and _sw["died"] == (False, "0.28.1", False, False, False, 1, 1, [0, 34, 4])
+      and _sw["unproven"] == ("0.28.1", False, False)
+      and _sw["nested"] == ("0.34.4", True)
+      and _sw["broken"] == ("0.28.1", False, False) and _sw["empty"] == ("0.28.1", False, False)
+      and _sw["cut"] == ("0.28.1", False, True)
+      and _sw["arm x64"] == ("0.28.1", False) and _sw["arm arm64"] == "0.34.4"
+      and _sw["fetching"] == "0.28.1" and _sw["swap held"] == "0.28.1"
+      and "    if os.path.exists(_SWAP_TRIAL):\n        # an engine swapped in" in _MILLENAI_SRC
+      and "_MANAGED_BIN_DIR_FOUND" not in _MILLENAI_SRC,
+      "%r" % _sw)
+# THE FETCH (review of the port): its own lock, never the install lock;
+# marked ready only when it runs and is new enough; each outcome says so
+def _fetch_world(got="0.34.4", nested=False, fail=None, gate=None, **kw):
+    z, b, log = _eng_world(staged=None, **kw)
+    def _dl(dest, row="Ollama engine", sha256=None):
+        log["dl"].append((row, sha256))
+        log["install lock free"] = z["_ENGINE_DL_LOCK"].acquire(blocking=False)
+        if log["install lock free"]:
+            z["_ENGINE_DL_LOCK"].release()
+        if gate:
+            gate.wait(5)
+        if fail:
+            raise OSError(fail)
+        if got is not None:
+            _eng_file(os.path.join(dest, "ollama", "ollama") if nested
+                      else os.path.join(dest, "ollama"), got)
+    z["_download_ollama_binary"] = _dl
+    return z, b, log
+_ft = {}
+_z, _b, _l = _fetch_world()
+_ft["ok"] = (_z["_stage_engine_update"](), open(_z["_STAGED_OK"]).read(), _l["dl"],
+             _l["threads"], _l["install lock free"], _z["_STAGE_LOCK"].locked(),
+             _z["_stage_engine_update"]())
+_z, _b, _l = _fetch_world(nested=True)
+_ft["nested"] = (_z["_stage_engine_update"](), os.path.exists(_z["_STAGED_OK"]))
+# today's newest isn't newer, or isn't enough: dropped, and not fetched again today
+_z, _b, _l = _fetch_world(got="0.28.1")
+_ft["same"] = (_z["_stage_engine_update"](), os.path.exists(_b + ".new"),
+               _z["_update_note"]().get("latest"), _z["_stage_engine_update"](), len(_l["dl"]))
+_z, _b, _l = _fetch_world(got="0.30.0")
+_ft["short"] = (_z["_stage_engine_update"](), os.path.exists(_b + ".new"),
+                _z["_stage_engine_update"](), len(_l["dl"]))
+# offline, or an archive with no engine: nothing kept, "offline" for a minute
+_z, _b, _l = _fetch_world(fail="no route to host")
+_ft["offline"] = (_z["_stage_engine_update"](), os.path.exists(_b + ".new"),
+                  _z["_stage_engine_update"](), len(_l["dl"]), _z["_STAGE_LOCK"].locked())
+_z, _b, _l = _fetch_world(got=None)
+_ft["no engine"] = (_z["_stage_engine_update"](), os.path.exists(_b + ".new"),
+                    _z["_stage_engine_update"](), _z["_update_note"]())
+_z, _b, _l = _fetch_world(got="broken")
+_ft["no run"] = (_z["_stage_engine_update"](), os.path.exists(_b + ".new"),
+                 _z["_stage_engine_update"](), _z["_update_note"]())
+# the other outcomes, none of them a fetch
+_z, _b, _l = _fetch_world(cur="0.40.0"); _ft["current"] = (_z["_stage_engine_update"](), _l["dl"])
+_z, _b, _l = _fetch_world(sib=True); _ft["sibling"] = (_z["_stage_engine_update"](), _l["dl"],
+                                                        _z["_STAGE_LOCK"].locked())
+_z, _b, _l = _fetch_world(); _z["_wrong_arch_engine"] = lambda: True; _z["IS_WIN_ARM"] = True
+_ft["arm64"] = (_z["_stage_engine_update"](), _l["dl"])
+_z, _b, _l = _fetch_world(); _z["_ollama_bin"] = lambda: "/usr/local/bin/ollama"
+_ft["theirs"] = (_z["_stage_engine_update"](), _l["dl"])
+_z, _b, _l = _fetch_world(arm=True, pe=0x8664)
+_ft["arm x64"] = (_z["_stage_engine_update"](), os.path.exists(_b + ".new"))
+check("the engine fetch: its own lock, checked before it counts, and it says what it did",
+      _ft["ok"] == ("staging", "0.34.4", [(None, "f" * 64)], [False], True, False, "staged")
+      and _ft["nested"] == ("staging", True)
+      and _ft["same"] == ("staging", False, [0, 28, 1], "released", 1)
+      and _ft["short"] == ("staging", False, "released", 1)
+      and _ft["offline"] == ("staging", False, "offline", 1, False)
+      and _ft["no engine"] == ("staging", False, "offline", {})
+      and _ft["no run"] == ("staging", False, "offline", {})
+      and _ft["current"] == ("current", []) and _ft["sibling"] == ("sibling", [], False)
+      and _ft["arm64"] == ("arm64", []) and _ft["theirs"] == ("theirs", [])
+      and _ft["arm x64"] == ("staging", False),
+      "%r" % _ft)
+# F3 of the review: two at once. Two callers of the fetch start ONE
+# download; two swaps at once make one swap
+import threading as _th315
+_gate = _th315.Event()
+_z, _b, _l = _fetch_world(gate=_gate)
+_z["ctx_thread"] = lambda target, ctx=None, bind=True, args=(), **k: _th315.Thread(
+    target=target, args=args, daemon=True)
+_res = []
+_ts = [_th315.Thread(target=lambda: _res.append(_z["_stage_engine_update"]())) for _ in range(4)]
+[t.start() for t in _ts]; [t.join(5) for t in _ts]
+_mid = (sorted(_res), len(_l["dl"]))
+_gate.set()
+for _ in range(50):
+    if not _z["_STAGE_LOCK"].locked():
+        break
+    time.sleep(0.05)
+_race_fetch = (_mid, os.path.exists(_z["_STAGED_OK"]), _z["_stage_engine_update"]())
+_z, _b, _l = _eng_world()
+_n_sw = []
+def _slow_sib():
+    _n_sw.append(1); time.sleep(0.3); return False
+_z["_other_millenai_running"] = _slow_sib
+_ts = [_th315.Thread(target=_z["_apply_staged_engine"]) for _ in range(4)]
+[t.start() for t in _ts]; [t.join(5) for t in _ts]
+_race_swap = (len(_n_sw), _bv(_b), _bv(_b + ".old"))
+check("two at once: one engine download, one swap",
+      _race_fetch == ((["staging"] * 4, 1), True, "staged")
+      and _race_swap == (1, "0.34.4", "0.28.1"),
+      "%r" % [_race_fetch, _race_swap])
+# the archive must match the release's own checksum before it's unpacked
+import io as _io315, tarfile as _tar315, hashlib as _hl315
+_tb = _io315.BytesIO()
+with _tar315.open(fileobj=_tb, mode="w:gz") as _tf:
+    _ti = _tar315.TarInfo("ollama/ollama"); _data = b"0.34.4"; _ti.size = len(_data)
+    _tf.addfile(_ti, _io315.BytesIO(_data))
+_tgz = _tb.getvalue()
+class _Resp(_io315.BytesIO):
+    headers = {"Content-Length": str(len(_tgz))}
+    def __enter__(self): return self
+    def __exit__(self, *a): self.close()
+def _dl_world():
+    d = __import__("tempfile").mkdtemp()
+    z = dict(_LH, IS_WIN=False, OLLAMA_TGZ_URL="https://x/ollama-darwin.tgz",
+             OLLAMA_ZIP_URL="https://x/z.zip", ENGINE_ROW="Ollama engine",
+             _MANAGED_BIN_DIR=os.path.join(d, "bin"), _setup_lock=_th315.RLock(),
+             _setup_jobs={}, hashlib=_hl315, tarfile=_tar315,
+             urllib=_types.SimpleNamespace(request=_types.SimpleNamespace(
+                 Request=lambda *a, **k: None, urlopen=lambda *a, **k: _Resp(_tgz))))
+    _exec_names(z, {"_engine_exe", "_download_ollama_binary"})
+    return z, d
+_z, _d = _dl_world()
+_dest = os.path.join(_d, "bin.new")
+_z["_download_ollama_binary"](_dest, row=None, sha256=_hl315.sha256(_tgz).hexdigest())
+_dl_ok = _z["_engine_exe"](_dest) == os.path.join(_dest, "ollama", "ollama")
+_z, _d = _dl_world()
+_dest = os.path.join(_d, "bin.new")
+try:
+    _z["_download_ollama_binary"](_dest, row=None, sha256="0" * 64)
+    _dl_bad = "unpacked"
+except RuntimeError as _e:
+    _dl_bad = (str(_e), sorted(os.listdir(_dest)))
+# (F4) the engine a computer needs follows the models IT runs on Ollama
+_need = {}
+for _k in ("apple", "windows", "intel"):
+    _nz = dict(_LH, OLLAMA_REQUIRES=_pn["OLLAMA_REQUIRES"],
+               MODEL_ROUTES=_plat[_k]["MODEL_ROUTES"], SUPPORTED=_plat[_k]["SUPPORTED"])
+    _exec_names(_nz, {"_ollama_needed"})
+    _need[_k] = _nz["_ollama_needed"]()
+_nz["SUPPORTED"] = dict(_plat["intel"]["SUPPORTED"], **{"Qwen 3.8 27B": False})
+_need["intel, no 3.8"] = _nz["_ollama_needed"]()
+check("the engine download is checked against the release, and sized to this computer",
+      _dl_ok and _dl_bad == ("the engine download doesn't match the release's checksum", [])
+      and _need["apple"] == (0, 17, 1)          # only its MLX-less Vision row
+      and _need["windows"] == (0, 32, 12) and _need["intel"] == (0, 32, 12)
+      and _need["intel, no 3.8"] == (0, 30, 5),
+      "%r" % [_dl_ok, _dl_bad, _need])
 _stream_src = _MILLENAI_SRC[_MILLENAI_SRC.index("def stream_ollama("):
                             _MILLENAI_SRC.index("def stream_openai_compat(")]
 check("the app's own Ollama updates between runs, never under a running one",
-      _own == [False, False, False, True] and _swap_busy and _swap_done
-      and _swap_sib and _swap_cut and _swap_arm_bad and _swap_arm_ok and _stg_ok
-      and "ctx_thread(target=_stage_engine_update, bind=False, daemon=True)" in _MILLENAI_SRC
+      "ctx_thread(target=_stage_engine_update, bind=False, daemon=True)" in _MILLENAI_SRC
+      and "ctx_thread(target=_fetch_engine_update, args=(have, need),\n                   bind=False" in _MILLENAI_SRC
       and "_refresh_managed_ollama" not in _MILLENAI_SRC
       and "    _apply_staged_engine()\n    b = _ollama_bin()" in _MILLENAI_SRC
       and 'env["OLLAMA_IGPU_ENABLE"] = "1"' in _MILLENAI_SRC
@@ -3042,9 +3260,7 @@ check("the app's own Ollama updates between runs, never under a running one",
       and _pn["OLLAMA_BYTES"]["gpt-oss:120b"] == 65_369_818_941
       and _plat["windows"]["MODEL_INFO"]["GPT-OSS 120B"]["gb"] == 65.4
       and _plat["apple"]["MODEL_INFO"]["GPT-OSS 120B"]["gb"] == 61.0
-      and _plat["apple"]["MODEL_INFO"]["GPT-OSS 120B"]["mem"] == 64e9,
-      "%r" % [_own, _swap_busy, _swap_sib, _swap_done, _swap_cut, _swap_arm_bad,
-              _swap_arm_ok, _stg])
+      and _plat["apple"]["MODEL_INFO"]["GPT-OSS 120B"]["mem"] == 64e9)
 check("(i) tips show at once, not after the browser's title delay",
       "#tip{position:fixed" in _MILLENAI_SRC and "QUICK TIPS (6b312" in _MILLENAI_SRC
       and "el.dataset.tip=el.title;el.removeAttribute(\"title\")" in _MILLENAI_SRC
@@ -3120,6 +3336,7 @@ _so = {"OLLAMA_PORT": [11434], "_port_in_use": lambda p: True,
        "_managed_procs": [], "os": os, "print": lambda *a, **k: None,
        "gpu_inventory": lambda: {"igpu": 0},
        "_apply_staged_engine": lambda: None,
+       "_SWAP_TRIAL": os.path.join(_si_dir, "no-bin.trial"),
        "subprocess": type("S", (), {"Popen": staticmethod(
            lambda *a, **k: _spawned.append(k.get("env", {})) or
            type("P", (), {"pid": 1})())})}
@@ -3131,8 +3348,20 @@ _so_ig = dict(_so, gpu_inventory=lambda: {"igpu": 96 << 30}, OLLAMA_PORT=[11434]
 _exec_names(_so_ig, {"_spawn_ollama_serve"})
 _so_ig["_spawn_ollama_serve"]()
 _ig_env = dict(_spawned.pop())
+# an engine swapped in at this start: its first run is watched (port review)
+_proved = []
+_so_tr = dict(_so, OLLAMA_PORT=[11434], _managed_procs=[], _RELOCATED=set(),
+              _SWAP_TRIAL=os.path.join(_si_dir, "bin.trial"),
+              _prove_engine=lambda p, port: _proved.append(port))
+open(_so_tr["_SWAP_TRIAL"], "w").write("0.34.4")
+_exec_names(_so_tr, {"_spawn_ollama_serve"})
+_so_tr["ctx_thread"] = lambda target, ctx=None, bind=True, args=(), **k: _types.SimpleNamespace(
+    start=lambda: target(*args) if not bind else None)
+_so_tr["_spawn_ollama_serve"]()
+_spawned.pop()
+os.remove(_so_tr["_SWAP_TRIAL"])
 check("a Strix Halo's Ollama may use its integrated GPU; others unchanged",
-      _ig_env.get("OLLAMA_IGPU_ENABLE") == "1"
+      _ig_env.get("OLLAMA_IGPU_ENABLE") == "1" and _proved == [54321]
       and _spawned[-1].get("OLLAMA_IGPU_ENABLE") == os.environ.get("OLLAMA_IGPU_ENABLE"),
       "%r" % sorted(_ig_env)[:5])
 _so2 = dict(_so, _listener_is_mine=lambda p: None, OLLAMA_PORT=[11434],

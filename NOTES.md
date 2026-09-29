@@ -5940,8 +5940,10 @@ hardware. Built, then reviewed (5 reviewers, 2 skeptics per finding:
   to nvidia-smi): a dict, cached, never raising:
   `{"cards": [(vendor, name, bytes), ...], "vram": int, "vendor": str,
   "igpu": int}`. `cards` holds the discrete cards Ollama runs on, vendor
-  "NVIDIA", "AMD" or "Intel", bytes the card's memory; `vram` is their
-  sum; `vendor` the one the chip names ("" for none); `igpu` a Ryzen AI
+  "NVIDIA", "AMD" or "Intel", bytes the card's memory; `vram` is one
+  vendor's cards summed, the vendor with the most (the review of the
+  port: two vendors are two pools); `vendor` the one with the most
+  graphics memory, NVIDIA on a tie ("" for none); `igpu` a Ryzen AI
   Max's shared graphics memory, or 0, which is NOT in `cards` or `vram`
   (gpu_vram_bytes adds it only while our own Ollama runs). A Mac reports
   `{"cards": [], "vram": 0, "vendor": "", "igpu": 0}`.
@@ -5957,24 +5959,88 @@ hardware. Built, then reviewed (5 reviewers, 2 skeptics per finding:
     nor stages while another copy of the app runs, on an ARM64 PC only an
     ARM64 engine goes in, and no update is staged while the native engine
     is on its way (it is the latest one).
-  - Profiles (6b329): `_gpus` (the GPU inventory) and `_staging` are
-    MACHINE_STATE (the gone `_vram` left it); `_stage_engine_update` and
-    `_apply_staged_engine` are MACHINE_IO; both background starts go
-    through `ctx_thread(..., bind=False)`, machine work on no profile.
+  - Profiles (6b329): `_gpus` (the GPU inventory) and `_stage_last` are
+    MACHINE_STATE (the gone `_vram` left it); the engine update's writers
+    (`_fetch_engine_update`, `_apply_staged_engine`, `_rollback_engine`,
+    `_prove_engine`, `_update_note_set`) are MACHINE_IO; its background
+    starts go through `ctx_thread(..., bind=False)`, machine work on no
+    profile.
     Nothing here reads a personal setting: "no limits" and the giants box
     are the machine's (`machine_prefs`), as main already reads them.
   - Gauntlet: the branch's 9 checks, adapted (the per-platform catalog
     copies, main's `_engine_world` for the ARM64 swap, a doubled keyword
     in the giants check's namespace); the swap and stage checks gained the
     cut-short, sibling, ARM64 and "no update beside the native engine"
-    cases. 466 checks become 475.
-  - Gauntlet additions from the port: a PC at exactly 1.05x Qwen 3 Coder
-    480B's file (offered) and 1 MB under (not), a 4 GB AMD card (under
-    the 6 GB floor), and a moved card counted once when the configuration
-    manager can't be read. 47 mutations of the fit rule, the 1.05x gate,
-    the registry parse, the Strix Halo setting and the ported swap: 45
-    caught; the 2 missed are equivalent (a "Properties" key and an NVIDIA
-    driver record can't be counted anyway: neither matches AMD or Intel).
+    cases (d817a21: 466 checks became 475). Also a 4 GB AMD card (under
+    the 6 GB floor) and a moved card counted once when the configuration
+    manager can't be read.
+- REVIEW OF THE PORT (d817a21, the same day; fixed in the next commit):
+  - F1: the background fetch held the engine-download lock for its whole
+    1.5 GB, so every model install sat "queued" behind it. It writes
+    bin.new, not bin: it has its own lock (`_STAGE_LOCK`), claimed with
+    a non-blocking acquire, which is the check-and-set (the `_staging`
+    flag is gone).
+  - F2: nothing checked the staged engine. The reviewer's probe: a zip
+    with the binary one folder down swapped in NO engine, deleted
+    bin.old, and didn't recover. Now:
+    - `_engine_exe` finds the binary at the top of an engine folder or
+      one folder down; `_ollama_bin` and the update use it, and the
+      `_MANAGED_BIN_DIR_FOUND` list (written, never read) is gone.
+    - The fetch checks the archive against the release's
+      sha256sum.txt (as the ollama1 kit does) before unpacking, and marks
+      it ready only when the engine runs (`--version`), is newer than
+      the one in use and at least what the models need (ARM64 on an
+      ARM64 PC). Otherwise it is deleted; a release that is no newer or
+      not enough is noted with the day (`bin.update.json`) and not
+      fetched again that day.
+    - The swap probes the staged engine's version on every platform
+      first, and keeps bin.old: `bin.trial` marks the new engine until it
+      answers /api/version once (`_prove_engine`, started with our
+      Ollama); then bin.old goes. If it dies or stays silent 90 s it is
+      stopped, the old engine is put back and started, and that version
+      is noted for the day. One never seen answering (the app quit or
+      crashed first) is put back at the next start.
+  - F3: two fetches at once, and swaps unlocked: one fetch (the lock
+    above), and the swap takes `_SWAP_LOCK` without waiting (a second
+    caller returns) and does nothing while a fetch writes bin.new. Race
+    checks: four callers start one download, four swaps make one.
+  - F4: the engine needed was the whole catalog's newest (0.32.12), so an
+    Apple-silicon Mac fetched an engine for models it runs on MLX. It is
+    now the newest a model THIS computer runs on Ollama asks for.
+    DECISION: Apple silicon stays in, by that rule only: its one Ollama
+    row with a floor is the MLX-less Qwen 3.5 Vision 9B (0.17.1), so an
+    Apple-silicon Mac fetches only when its own engine is older than that
+    and the Vision row would fail. Everything else there is unchanged
+    (the fit rule never applied to Apple silicon).
+  - F5: the row said "a newer engine is downloading" when nothing was.
+    `_stage_engine_update` returns what happened and the note follows it:
+    downloading, ready (restart), another window open (close every
+    ConcordeAI window and reopen), couldn't download (the connection),
+    the native ARM64 engine on its way, today's newest release not
+    enough (tomorrow), or already on disk (restart).
+  - F6: two vendors' cards are two pools, never added (the largest
+    counts, and the 1 GiB per card is for its cards); Intel's laptop Arc
+    cards (A370M-A770M) count, 6 GB floor kept; the giants' gate also
+    needs the row's own estimate plus Windows' 6 GB (Qwen 3 Coder 480B:
+    311 GB, not 304.6); a big model gets the hour-long first-byte
+    timeout a giant gets.
+  - The benchmark (6b331, landed first) reads `gpu_inventory` by name: a
+    check runs the real `_bench_gpus` and `bench_hardware` on simulated
+    PCs through it (two RTX PRO 6000s, an NVIDIA and an AMD card, a CPU
+    box). A Ryzen AI Max's shared memory is no card, so its line says "no
+    graphics card in use" (the benchmark's wording, left as it is).
+  - Gauntlet: on main with the benchmark (which brought its own checks),
+    the port's checks go from 9 to 14 (the engine update's checks
+    rebuilt on real folders: the swap and its proof, roll-back and
+    next-start roll-back, the nested binary, a binary that doesn't run,
+    the fetch's outcomes, the checksum on a real archive, the races, and
+    the engine each platform needs). 79 mutations of the fit rule,
+    the gate, the registry, vendors, the Strix Halo setting, big models
+    and F1-F5: 78 caught; the one
+    missed is equivalent (MLX rows counted in the engine floor: an MLX
+    route names a port, never a tag with a floor). The first round's two
+    equivalents (a "Properties" key, an NVIDIA driver record) are not
+    rerun.
   - Not verified here: Windows itself (the registry and
     CM_Locate_DevNodeW run on fakes; in Patrick's ARM VM the Snapdragon's
     Adreno should read as no card, since it is neither AMD nor Intel), a

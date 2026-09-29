@@ -93,8 +93,10 @@ MACHINE_STATE = frozenset((
     "_whatsnew_cache", "_webstore_keep", "_webstore_reloaded",
     "_QT_CLEAR_CACHE", "_RELOCATED", "_BOOT_HEALS",
     # models, engines, hardware and installs
-    "MODEL_ROUTES", "OLLAMA_PORT", "_MANAGED_BIN_DIR_FOUND", "_MINE_CACHE",
-    "_CLEANUP_LAST_ERRORS", "_accel_cache", "_gpu_cache", "_gpus", "_staging",
+    "MODEL_ROUTES", "OLLAMA_PORT", "_MINE_CACHE",
+    "_CLEANUP_LAST_ERRORS", "_accel_cache", "_gpu_cache",
+    # 6b315: the graphics cards, and when the engine update last failed
+    "_gpus", "_stage_last",
     "_dl_hist", "_job_watch", "_managed_procs", "_mlx_procs", "_modup",
     "_modup_hist", "_setup_jobs", "_studio_bytes_cache", "_fw_cuda",
     "_crypto_install", "_export_install", "_giants", "_no_limits",
@@ -1410,9 +1412,11 @@ _AMD_IGPU = re.compile(
 # Ryzen AI Max ("Strix Halo") parts, whose shared memory is set in the
 # BIOS or AMD's software (VGM) and can reach 96 GB or more
 _BIG_IGPU = re.compile(r"Radeon\W*(?:\(TM\)\s*)?80[4-6]0S", re.I)
-# Intel's discrete cards (A380-A770, B570/B580, Pro A60); the integrated
-# "Intel(R) Arc(TM) Graphics" and "Arc 140V" have no model number here
-_INTEL_DGPU = re.compile(r"Arc\W*(?:\(TM\)\s*)?(?:Pro\s+)?[AB]\d{2,3}\b", re.I)
+# Intel's discrete cards (A380-A770, B570/B580, Pro A60, and the laptop
+# A370M-A770M, review of the port); the integrated "Intel(R) Arc(TM)
+# Graphics" and "Arc 140V" have no model number here, and an integrated
+# part that has one reports far under the 6 GB floor
+_INTEL_DGPU = re.compile(r"Arc\W*(?:\(TM\)\s*)?(?:Pro\s+)?[AB]\d{2,3}M?\b", re.I)
 
 
 def _nvidia_cards() -> list:
@@ -1524,9 +1528,11 @@ def gpu_inventory() -> dict:
     It used to read ONE NVIDIA card: two or four cards counted as one,
     and AMD cards on Windows didn't count at all.
       cards  [(vendor, name, bytes)] of discrete cards Ollama runs on
-      vram   their memory, summed
-      vendor "NVIDIA", "AMD", "Intel" or "" (NVIDIA wins a tie, then
-             the vendor with the most memory: the same every launch)
+      vram   the memory of one vendor's cards, summed: the vendor with
+             the most (review of the port: an NVIDIA card and an AMD
+             card don't make one pool a model can split across)
+      vendor "NVIDIA", "AMD", "Intel" or "": the vendor with the most
+             graphics memory, NVIDIA on a tie (the same every launch)
       igpu   bytes of an AMD Ryzen AI Max's shared graphics memory, or
              0. Ollama uses it only with OLLAMA_IGPU_ENABLE, so it
              counts only while our own Ollama runs (gpu_room_bytes)
@@ -1567,8 +1573,9 @@ def gpu_inventory() -> dict:
         by[v] = by.get(v, 0) + b
     if igpu:
         by["AMD"] = by.get("AMD", 0) + igpu
-    inv = {"cards": cards, "vram": sum(c[2] for c in cards),
-           "vendor": (max(by, key=lambda v: (v == "NVIDIA", by[v]))
+    inv = {"cards": cards, "vram": max(
+               [sum(c[2] for c in cards if c[0] == v) for v in by] or [0]),
+           "vendor": (max(by, key=lambda v: (by[v], v == "NVIDIA"))
                       if by else ""),
            "igpu": igpu}
     _gpus.update(v=inv, ts=now)
@@ -1585,18 +1592,31 @@ def _igpu_in_use() -> bool:
         return False
 
 
-def gpu_vram_bytes():
-    """Graphics memory across every card local models can use, or 0."""
+def _gpu_pool() -> tuple:
+    """(bytes, cards) of the largest single vendor's graphics memory,
+    a Ryzen AI Max's shared memory counted with AMD while our own Ollama
+    runs. Vendors are never added together (review of the port)."""
     inv = gpu_inventory()
-    return inv["vram"] + (inv["igpu"] if _igpu_in_use() else 0)
+    per = {}
+    for v, _n, b in inv["cards"]:
+        got = per.get(v, (0, 0))
+        per[v] = (got[0] + b, got[1] + 1)
+    if inv["igpu"] and _igpu_in_use():
+        got = per.get("AMD", (0, 0))
+        per["AMD"] = (got[0] + inv["igpu"], got[1] + 1)
+    return max(per.values(), default=(0, 0))
+
+
+def gpu_vram_bytes():
+    """Graphics memory local models can use, one vendor's, or 0."""
+    return _gpu_pool()[0]
 
 
 def gpu_room_bytes():
     """What models can fill on the graphics cards: their memory less
     about 1 GiB each for the driver, the display and Ollama's buffers."""
-    inv = gpu_inventory()
-    n = len(inv["cards"]) + (1 if inv["igpu"] and _igpu_in_use() else 0)
-    return max(0, gpu_vram_bytes() - n * (1 << 30))
+    b, n = _gpu_pool()
+    return max(0, b - n * (1 << 30))
 
 
 def machine_budget_bytes(moe: bool = False):
@@ -1639,7 +1659,10 @@ def giant_fits_here(label: str) -> bool:
     if not HAS_PSUTIL:
         return False
     have = psutil.virtual_memory().total + gpu_vram_bytes()
-    return have >= MODEL_INFO[label]["gb"] * 1e9 * 1.05
+    # and the row's own estimate of what it holds while answering, beside
+    # what Windows and this app hold (review of the port)
+    return have >= max(MODEL_INFO[label]["gb"] * 1e9 * 1.05,
+                       MODEL_INFO[label]["mem"] + BASELINE_RAM)
 
 
 _no_limits = {"v": None}
@@ -5069,12 +5092,30 @@ OLLAMA_ZIP_URL = ("https://github.com/ollama/ollama/releases/latest/download/"
                   + ("ollama-windows-arm64.zip" if IS_WIN_ARM
                      else "ollama-windows-amd64.zip"))
 _MANAGED_BIN_DIR = os.path.join(app_dir(), "bin")
-_MANAGED_BIN_DIR_FOUND = []   # nested location inside the win zip
+
+
+def _engine_exe(folder: str):
+    """The Ollama binary in an engine folder: at its top, or one folder
+    down (an archive that nests it; review of the port: 6b315's swap put
+    such a folder in and then found no engine), or None."""
+    exe = "ollama.exe" if IS_WIN else "ollama"
+    top = os.path.join(folder, exe)
+    if os.path.isfile(top):
+        return top
+    try:
+        subs = sorted(os.listdir(folder))
+    except OSError:
+        return None
+    for sub in subs:
+        p = os.path.join(folder, sub, exe)
+        if os.path.isfile(p):
+            return p
+    return None
 
 
 def _ollama_bin():
     exe = "ollama.exe" if IS_WIN else "ollama"
-    cands = [shutil.which("ollama"), os.path.join(_MANAGED_BIN_DIR, exe)]
+    cands = [shutil.which("ollama"), _engine_exe(_MANAGED_BIN_DIR)]
     if IS_WIN:
         cands.append(os.path.join(
             os.environ.get("LOCALAPPDATA", ""), "Programs", "Ollama", exe))
@@ -5313,6 +5354,11 @@ def _spawn_ollama_serve() -> bool:
     ))
     OLLAMA_PORT[0] = port
     _managed_procs[-1]._cai_port = port
+    if os.path.exists(_SWAP_TRIAL):
+        # an engine swapped in at this start: the old one goes only once
+        # this one answers (review of the port)
+        ctx_thread(target=_prove_engine, args=(_managed_procs[-1], port),
+                   bind=False, daemon=True).start()
     if port != 11434:
         _RELOCATED.add(port)
         try:                       # the boot reaper's note (see reap)
@@ -11327,7 +11373,8 @@ MACHINE_IO = frozenset((
     "_spawn_ollama_serve", "_stage_native_engine", "_spawn_mlx_engine",
     # 6b315: the app's own Ollama fetched beside it (bin.new), swapped in
     # at the next start
-    "_stage_engine_update", "_apply_staged_engine",
+    "_fetch_engine_update", "_apply_staged_engine", "_rollback_engine",
+    "_prove_engine", "_update_note_set",
     "_download_model", "studio_remove", "_remove_models",
     "_sweep_hf_carcasses", "_rm_hf_repo", "reap_orphan_engines",
     "_sweep_leftovers", "_crypto_record_write", "_crypto_pip",
@@ -12617,9 +12664,11 @@ def _stop_speaking_now():
 ENGINE_ROW = "Ollama engine"
 
 
-def _download_ollama_binary(dest=None, row=ENGINE_ROW):
+def _download_ollama_binary(dest=None, row=ENGINE_ROW, sha256=None):
     """Fetch the signed universal Ollama CLI into `dest` (the engine
-    folder), with progress on `row`'s job when there is one."""
+    folder), with progress on `row`'s job when there is one. `sha256`:
+    the archive must match it (the update's fetch), or nothing is
+    unpacked."""
     dest = dest or _MANAGED_BIN_DIR
     os.makedirs(dest, exist_ok=True)
     url = OLLAMA_ZIP_URL if IS_WIN else OLLAMA_TGZ_URL
@@ -12627,6 +12676,7 @@ def _download_ollama_binary(dest=None, row=ENGINE_ROW):
                        "ollama.zip.part" if IS_WIN else "ollama.tgz.part")
     req = urllib.request.Request(url,
                                  headers={"User-Agent": "MillenAI/1.0"})
+    digest = hashlib.sha256()
     with urllib.request.urlopen(req, timeout=60) as r, open(tmp, "wb") as f:
         total = int(r.headers.get("Content-Length") or 150_000_000)
         done = 0
@@ -12635,22 +12685,23 @@ def _download_ollama_binary(dest=None, row=ENGINE_ROW):
             if not chunk:
                 break
             f.write(chunk)
+            digest.update(chunk)
             done += len(chunk)
             with _setup_lock:
                 job = _setup_jobs.get(row) if row else None
                 if job is not None:
                     job["pct"] = min(99, int(done / total * 100))
+    if sha256 and digest.hexdigest() != sha256:
+        os.remove(tmp)
+        raise RuntimeError("the engine download doesn't match the "
+                           "release's checksum")
     if IS_WIN:
         import zipfile
         with zipfile.ZipFile(tmp) as z:
             z.extractall(dest)
         os.remove(tmp)
-        # the zip nests the binary under bin/ or ollama/ depending on build
-        if not os.path.exists(os.path.join(dest, "ollama.exe")):
-            for root, _d, files in os.walk(dest):
-                if "ollama.exe" in files:
-                    _MANAGED_BIN_DIR_FOUND.append(root)
-                    break
+        # a zip that nests the binary a folder down is found there by
+        # _engine_exe (the list that recorded it was never read)
         return
     with tarfile.open(tmp) as t:
         try:
@@ -12658,7 +12709,7 @@ def _download_ollama_binary(dest=None, row=ENGINE_ROW):
         except TypeError:  # python < 3.12 has no filter kwarg
             t.extractall(dest)
     os.remove(tmp)
-    os.chmod(os.path.join(dest, "ollama"), 0o755)
+    os.chmod(_engine_exe(dest) or os.path.join(dest, "ollama"), 0o755)
 
 
 _ENGINE_DL_LOCK = threading.Lock()   # one engine download at a time
@@ -12842,14 +12893,34 @@ def _managed_serve():
 # the model runner orphaned, holding the folder locked (review), so the
 # new copy is fetched beside it in the background and swapped in at the
 # next start, before anything runs from the folder.
+# REVIEW OF THE PORT: the fetch has its own lock (it held the engine
+# download lock for 1.5 GB, and every model install waited "queued"
+# behind it); nothing is marked ready unless the archive matched the
+# release's sha256sum.txt and the engine in it runs and is new enough;
+# the swapped-in engine must answer once before the old one is deleted,
+# or it is put back; and each step says what happened, for the row.
 _STAGED_DIR = _MANAGED_BIN_DIR + ".new"
 _STAGED_OK = os.path.join(_STAGED_DIR, "concorde-complete")
-_staging = {"on": False}
+_STAGE_LOCK = threading.Lock()    # one fetch: taken, never waited for
+_SWAP_LOCK = threading.Lock()     # one swap or roll-back at a time
+# an engine swapped in and not yet seen answering (its version inside)
+_SWAP_TRIAL = _MANAGED_BIN_DIR + ".trial"
+# {"day": "YYYY-MM-DD", "latest": [x, y, z]}: today's newest release was
+# fetched and isn't enough (or didn't start here); not fetched again today
+_UPDATE_NOTE = _MANAGED_BIN_DIR + ".update.json"
+_stage_last = {"err_at": 0.0}     # when the last fetch failed
+OLLAMA_SUMS_URL = ("https://github.com/ollama/ollama/releases/latest/"
+                   "download/sha256sum.txt")
 
 
 def _ollama_needed() -> tuple:
-    """The newest Ollama any catalog model asks for."""
-    return max(OLLAMA_REQUIRES.values(), default=())
+    """The newest Ollama a model THIS computer runs on Ollama asks for
+    (review of the port: the whole catalog's newest had an Apple-silicon
+    Mac, whose only Ollama rows are the MLX-less ones, fetch an engine for
+    models it runs on MLX)."""
+    return max((OLLAMA_REQUIRES[t] for l, (k, t) in MODEL_ROUTES.items()
+                if k == "ollama" and SUPPORTED.get(l)
+                and t in OLLAMA_REQUIRES), default=())
 
 
 def _bin_version(path: str) -> tuple:
@@ -12869,94 +12940,296 @@ def _is_managed(path) -> bool:
         os.path.abspath(_MANAGED_BIN_DIR) + os.sep)
 
 
-def _stage_engine_update():
-    """In the background: when the app's own Ollama is older than a
-    catalog model needs, fetch the latest beside it. Machine work: it
-    reads no settings and runs on no profile (ported onto 6b329)."""
-    if _staging["on"] or os.path.exists(_STAGED_OK):
-        return
-    b = _ollama_bin()
-    if not _is_managed(b):
-        return                   # a user's own Ollama is theirs to update
-    if IS_WIN_ARM and (_wrong_arch_engine()
-                       or os.path.exists(_ENGINE_ARM_DONE)):
-        return                   # 6b317's native engine is the latest one
-    have = _bin_version(b)
-    if not have or have >= _ollama_needed():
-        return
-    if _other_millenai_running():
-        return                   # one copy stages, as 6b317's does
-    _staging["on"] = True
-
-    def run():
-        try:
-            with _ENGINE_DL_LOCK:
-                shutil.rmtree(_STAGED_DIR, ignore_errors=True)
-                _download_ollama_binary(_STAGED_DIR, row=None)
-                with open(_STAGED_OK, "w") as f:
-                    f.write("ok")
-        except Exception:
-            shutil.rmtree(_STAGED_DIR, ignore_errors=True)
-        finally:
-            _staging["on"] = False
-    ctx_thread(target=run, bind=False, daemon=True).start()
+def _today() -> str:
+    return time.strftime("%Y-%m-%d")
 
 
-def _apply_staged_engine():
-    """At start, before our Ollama runs: swap in a fetched update. If the
-    folder can't move (an old runner still holds it), keep the old one
-    and try again next time. As 6b317's native-engine swap does: a swap
-    cut short between its two renames is undone first, it waits while
-    another copy of the app runs, and on an ARM64 PC only an ARM64
-    engine goes in."""
-    exe = "ollama.exe" if IS_WIN else "ollama"
-    old = _MANAGED_BIN_DIR + ".old"
-    if (not os.path.exists(os.path.join(_MANAGED_BIN_DIR, exe))
-            and os.path.exists(os.path.join(old, exe))):
-        shutil.rmtree(_MANAGED_BIN_DIR, ignore_errors=True)
-        try:
-            os.replace(old, _MANAGED_BIN_DIR)
-        except OSError:
-            return
-    if not os.path.exists(_STAGED_OK) or _managed_serve() is not None:
-        return
-    if IS_WIN_ARM and _pe_machine(os.path.join(_STAGED_DIR, exe)) != 0xAA64:
-        shutil.rmtree(_STAGED_DIR, ignore_errors=True)
-        return
-    if _other_millenai_running():
-        return
-    shutil.rmtree(old, ignore_errors=True)
+def _update_note() -> dict:
     try:
-        if os.path.exists(_MANAGED_BIN_DIR):
-            os.replace(_MANAGED_BIN_DIR, old)
-    except OSError:
-        return
+        with open(_UPDATE_NOTE, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _update_note_set(latest: tuple):
+    """Today's newest engine was fetched and won't do: not again today."""
     try:
-        os.replace(_STAGED_DIR, _MANAGED_BIN_DIR)
-    except OSError:
-        try:
-            os.replace(old, _MANAGED_BIN_DIR)
-        except OSError:
-            pass
-        return
-    shutil.rmtree(old, ignore_errors=True)
-    try:
-        os.remove(os.path.join(_MANAGED_BIN_DIR, "concorde-complete"))
+        with open(_UPDATE_NOTE, "w", encoding="utf-8") as f:
+            json.dump({"day": _today(), "latest": list(latest)}, f)
     except OSError:
         pass
 
 
-def _ollama_too_old(tag: str, have: tuple, ours: bool = False) -> str:
-    """Why this Ollama can't pull `tag`, or "" when it can. `ours`: the
-    Ollama running is the app's own, which updates itself."""
+def _release_sha256(url: str) -> str:
+    """The release's own SHA-256 for the archive at `url` (its
+    sha256sum.txt, as the ollama1 kit checks), or an error."""
+    name = url.rsplit("/", 1)[-1]
+    req = urllib.request.Request(OLLAMA_SUMS_URL,
+                                 headers={"User-Agent": "MillenAI/1.0"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        text = r.read(1 << 20).decode("utf-8", "replace")
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) == 2 and len(parts[0]) == 64:
+            n = parts[1].lstrip("*")
+            if (n[2:] if n.startswith("./") else n) == name:
+                return parts[0].lower()
+    raise RuntimeError("%s is not in the release's sha256sum.txt" % name)
+
+
+def _stage_engine_update() -> str:
+    """When the app's own Ollama is older than a model this computer runs
+    on Ollama needs, fetch the latest beside it, in the background. Machine
+    work: it reads no settings and runs on no profile. Apple silicon too,
+    but only for the rows it runs on Ollama (the MLX-less ones). Returns
+    what happened, which the model row's note follows (review of the
+    port: it said "downloading" when nothing was):
+      theirs    the Ollama in use is the user's own
+      current   the engine on disk is new enough
+      arm64     6b317's native ARM64 engine is on its way (the latest)
+      staged    a newer engine is ready for the next start
+      released  today's newest release isn't enough either
+      offline   the last fetch failed less than a minute ago
+      sibling   another copy of the app is open: it neither fetches nor
+                swaps (6b317's rule)
+      staging   a newer engine is downloading"""
+    b = _ollama_bin()
+    if not _is_managed(b):
+        return "theirs"
+    if IS_WIN_ARM and (_wrong_arch_engine()
+                       or os.path.exists(_ENGINE_ARM_DONE)):
+        return "arm64"
+    have, need = _bin_version(b), _ollama_needed()
+    if not have or have >= need:
+        return "current"
+    if os.path.exists(_STAGED_OK):
+        return "staged"
+    note = _update_note()
+    if (note.get("day") == _today()
+            and tuple(note.get("latest") or ()) < need):
+        return "released"
+    if time.time() - _stage_last["err_at"] < 60:
+        return "offline"
+    if not _STAGE_LOCK.acquire(blocking=False):
+        return "staging"
+    try:
+        if os.path.exists(_STAGED_OK):          # finished meanwhile
+            _STAGE_LOCK.release()
+            return "staged"
+        if _other_millenai_running():
+            _STAGE_LOCK.release()
+            return "sibling"
+        ctx_thread(target=_fetch_engine_update, args=(have, need),
+                   bind=False, daemon=True).start()
+    except Exception:
+        _STAGE_LOCK.release()
+        raise
+    return "staging"
+
+
+def _fetch_engine_update(have: tuple, need: tuple):
+    """The fetch, holding _STAGE_LOCK (taken by _stage_engine_update),
+    which it lets go at the end. Marked ready only when the archive
+    matches the release's checksum and the engine in it (at the top or
+    one folder down) runs, is newer than the one in use and is at least
+    what the models need; on an ARM64 PC it must be ARM64 too."""
+    try:
+        shutil.rmtree(_STAGED_DIR, ignore_errors=True)
+        url = OLLAMA_ZIP_URL if IS_WIN else OLLAMA_TGZ_URL
+        _download_ollama_binary(_STAGED_DIR, row=None,
+                                sha256=_release_sha256(url))
+        exe = _engine_exe(_STAGED_DIR)
+        got = _bin_version(exe) if exe else ()
+        if IS_WIN_ARM and exe and _pe_machine(exe) != 0xAA64:
+            got = ()
+        if not got:
+            raise RuntimeError("the download holds no working engine")
+        if got <= have or got < need:
+            shutil.rmtree(_STAGED_DIR, ignore_errors=True)
+            _update_note_set(got)
+            return
+        with open(_STAGED_OK, "w", encoding="utf-8") as f:
+            f.write(".".join(map(str, got)))
+    except Exception:
+        shutil.rmtree(_STAGED_DIR, ignore_errors=True)
+        _stage_last["err_at"] = time.time()
+    finally:
+        _STAGE_LOCK.release()
+
+
+def _rollback_engine() -> bool:
+    """Put back the engine a swap replaced (the caller holds _SWAP_LOCK).
+    The one that didn't start here is noted, so today's release isn't
+    fetched again today."""
+    old = _MANAGED_BIN_DIR + ".old"
+    if not _engine_exe(old):
+        try:
+            os.remove(_SWAP_TRIAL)
+        except OSError:
+            pass
+        return False
+    try:
+        with open(_SWAP_TRIAL, encoding="utf-8") as f:
+            bad = tuple(int(x) for x in re.findall(r"\d+", f.read())[:3])
+    except (OSError, ValueError):
+        bad = ()
+    gone = _MANAGED_BIN_DIR + ".failed"
+    shutil.rmtree(gone, ignore_errors=True)
+    try:
+        if os.path.exists(_MANAGED_BIN_DIR):
+            os.replace(_MANAGED_BIN_DIR, gone)
+        os.replace(old, _MANAGED_BIN_DIR)
+    except OSError:
+        return False                 # still held: the next start tries
+    shutil.rmtree(gone, ignore_errors=True)
+    try:
+        os.remove(_SWAP_TRIAL)
+    except OSError:
+        pass
+    if bad:
+        _update_note_set(bad)
+    return True
+
+
+def _apply_staged_engine():
+    """At start, before our Ollama runs: settle the last swap, then swap
+    in a fetched update. One at a time (a second caller returns at once),
+    never while the fetch writes. As 6b317's native-engine swap does: a
+    swap cut short between its two renames is undone, it waits while
+    another copy of the app runs, and on an ARM64 PC only an ARM64 engine
+    goes in. The old engine stays in bin.old until the new one has
+    answered once (_prove_engine); one never seen answering is put back
+    at the next start."""
+    if not _SWAP_LOCK.acquire(blocking=False):
+        return
+    try:
+        old = _MANAGED_BIN_DIR + ".old"
+        if _engine_exe(_MANAGED_BIN_DIR) is None and _engine_exe(old):
+            shutil.rmtree(_MANAGED_BIN_DIR, ignore_errors=True)
+            try:
+                os.replace(old, _MANAGED_BIN_DIR)
+            except OSError:
+                return
+            try:
+                os.remove(_SWAP_TRIAL)
+            except OSError:
+                pass
+        if os.path.exists(_SWAP_TRIAL) and _managed_serve() is None:
+            _rollback_engine()       # it never answered: the old one back
+            return
+        if not os.path.exists(_SWAP_TRIAL) and os.path.exists(old):
+            shutil.rmtree(old, ignore_errors=True)    # a proven swap's
+        if not os.path.exists(_STAGED_OK) or _managed_serve() is not None:
+            return
+        if not _STAGE_LOCK.acquire(blocking=False):
+            return                   # a fetch is writing bin.new
+        try:
+            staged = _engine_exe(_STAGED_DIR)
+            ver = _bin_version(staged) if staged else ()
+            if not ver or (IS_WIN_ARM and _pe_machine(staged) != 0xAA64):
+                shutil.rmtree(_STAGED_DIR, ignore_errors=True)
+                return
+            if _other_millenai_running():
+                return
+            shutil.rmtree(old, ignore_errors=True)
+            try:
+                if os.path.exists(_MANAGED_BIN_DIR):
+                    os.replace(_MANAGED_BIN_DIR, old)
+            except OSError:
+                return
+            try:
+                os.replace(_STAGED_DIR, _MANAGED_BIN_DIR)
+            except OSError:
+                try:
+                    os.replace(old, _MANAGED_BIN_DIR)
+                except OSError:
+                    pass
+                return
+            try:
+                os.remove(os.path.join(_MANAGED_BIN_DIR, "concorde-complete"))
+            except OSError:
+                pass
+            try:
+                with open(_SWAP_TRIAL, "w", encoding="utf-8") as f:
+                    f.write(".".join(map(str, ver)))
+            except OSError:
+                pass
+        finally:
+            _STAGE_LOCK.release()
+    finally:
+        _SWAP_LOCK.release()
+
+
+def _engine_answers(port: int) -> bool:
+    try:
+        with urllib.request.urlopen(
+                "http://127.0.0.1:%d/api/version" % port, timeout=2) as r:
+            return bool(json.loads(r.read().decode("utf-8")).get("version"))
+    except Exception:
+        return False
+
+
+def _prove_engine(proc, port: int, wait: float = 90.0) -> bool:
+    """A swapped-in engine's first start: once it answers, the old one
+    goes; if it dies or stays silent, it is stopped and the old one put
+    back, and started."""
+    end = time.time() + wait
+    while time.time() < end:
+        if proc.poll() is not None:
+            break
+        if _engine_answers(port):
+            with _SWAP_LOCK:
+                try:
+                    os.remove(_SWAP_TRIAL)
+                except OSError:
+                    pass
+                shutil.rmtree(_MANAGED_BIN_DIR + ".old", ignore_errors=True)
+            return True
+        time.sleep(1)
+    try:
+        _stop_proc(proc)
+        proc.wait(10)
+    except Exception:
+        pass
+    with _SWAP_LOCK:
+        back = _rollback_engine()
+    if back:
+        _spawn_ollama_serve()
+    return False
+
+
+_STAGE_SAY = {
+    "staging": "A newer engine is downloading: in a few minutes quit and "
+               "reopen ConcordeAI, then press retry",
+    "staged": "A newer engine is ready: quit and reopen ConcordeAI, then "
+              "press retry",
+    "current": "A newer engine is on this computer: quit and reopen "
+               "ConcordeAI, then press retry",
+    "arm64": "The native ARM64 engine is downloading: in a few minutes quit "
+             "and reopen ConcordeAI, then press retry",
+    "sibling": "Another ConcordeAI window is open, so the engine can't "
+               "update: close every ConcordeAI window, reopen it, and in a "
+               "few minutes quit and reopen once more, then press retry",
+    "offline": "A newer engine couldn't be downloaded: check the internet "
+               "connection, then press retry",
+    "released": "Ollama's newest release is older than that; try again "
+                "tomorrow",
+}
+
+
+def _ollama_too_old(tag: str, have: tuple, stage=None) -> str:
+    """Why this Ollama can't pull `tag`, or "" when it can. `stage`: what
+    _stage_engine_update said for the app's own Ollama (None for a user's
+    own, which is theirs to update)."""
     need = OLLAMA_REQUIRES.get(tag)
     if not need or not have or have >= need:
         return ""
     v = (".".join(map(str, need)), ".".join(map(str, have)))
-    if ours:
-        return ("needs Ollama %s or newer (the app's engine is %s). A "
-                "newer engine is downloading: in a few minutes quit and "
-                "reopen ConcordeAI, then press retry" % v)
+    if stage in _STAGE_SAY:
+        return ("needs Ollama %s or newer (the app's engine is %s). " % v
+                + _STAGE_SAY[stage])
     return ("needs Ollama %s or newer; this computer has %s. Update "
             "Ollama (ollama.com/download), then press retry" % v)
 
@@ -13042,10 +13315,12 @@ def _ollama_install_worker(labels: list):
     # The copy this app downloaded updates itself; a user's own gets a
     # note on the model's row saying what to do.
     have = _ollama_version()
-    ours = _managed_serve() is not None
-    if ours and any(_ollama_too_old(MODEL_ROUTES[l][1], have)
-                    for l in labels):
-        _stage_engine_update()
+    stage = None
+    if (_managed_serve() is not None
+            and any(_ollama_too_old(MODEL_ROUTES[l][1], have)
+                    for l in labels)):
+        stage = _stage_engine_update()     # the note says what it did
+        stage = None if stage == "theirs" else stage
     _keep_awake(True)
     try:
         for label in labels:
@@ -13053,7 +13328,7 @@ def _ollama_install_worker(labels: list):
                 _setup_jobs[label] = {"status": "downloading", "note": "",
                                       "pct": 0}
             try:
-                why = _ollama_too_old(MODEL_ROUTES[label][1], have, ours)
+                why = _ollama_too_old(MODEL_ROUTES[label][1], have, stage)
                 if why:
                     raise RuntimeError(why)
                 _pull_ollama_model(label, MODEL_ROUTES[label][1])
@@ -15843,7 +16118,8 @@ def stream_ollama(tag: str, messages: list, emit,
         # Ollama sends nothing until the model is loaded, so for a giant
         # the socket timeout has to cover a cold read of 300-400 GB
         with urllib.request.urlopen(
-                req, timeout=GIANT_LOAD_TIMEOUT if giant else 600) as resp:
+                req, timeout=GIANT_LOAD_TIMEOUT if (giant or big)
+                else 600) as resp:
             for raw_line in resp:
                 line = raw_line.decode("utf-8").strip()
                 if not line:
