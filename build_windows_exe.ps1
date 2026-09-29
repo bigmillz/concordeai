@@ -143,6 +143,23 @@ if (-not (Test-Path "$bv\Scripts\python.exe")) {
 $bpy = "$bv\Scripts\python.exe"
 Write-Host "-> installing build dependencies (a few minutes the first time)"
 & $bpy -m pip install --upgrade pip | Out-Null
+# PyNaCl for accounts (6b327): the hash-pinned wheels from CRYPTO_REQS in
+# millenai.py (cffi and pycparser with it), in their own pip call before
+# the rest, so the pinned cffi is the one that gets frozen in. Both x64
+# and ARM64 have wheels. A build without them stops here: accounts would
+# be off for everyone who installed it. A release from before 6b327 has
+# no pins (exit 3) and builds as it did.
+$crypto = $true
+& $bpy packaging\crypto_reqs.py millenai.py crypto-requirements.txt
+if ($LASTEXITCODE -eq 3) {
+  Write-Host "  no CRYPTO_REQS in millenai.py (a release from before 6b327): no PyNaCl"
+  $crypto = $false
+} elseif ($LASTEXITCODE -ne 0) {
+  throw "could not read CRYPTO_REQS from millenai.py"
+} else {
+  & $bpy -m pip install --only-binary=:all: --require-hashes --no-deps -r crypto-requirements.txt
+  if ($LASTEXITCODE -ne 0) { throw "PyNaCl did not install (hash-pinned wheels, see above)" }
+}
 # tzdata: Windows has no time-zone database of its own. The four export
 # libraries can't be pip-installed on demand inside a frozen app, so they
 # ship in it (6b317, from the Windows sweep).
@@ -176,6 +193,12 @@ $pyiArgs = @(
   "--collect-all", "webview",
   "--collect-data", "tzdata"
 )
+# PyNaCl's libsodium module loads _cffi_backend from C, where PyInstaller
+# cannot see the import (6b327): named here for x64 and ARM64 alike, or
+# the exe imports nacl and fails its self-test below
+if ($crypto) {
+  $pyiArgs += @("--hidden-import", "_cffi_backend", "--collect-submodules", "nacl")
+}
 # pywebview resolves its backend dynamically, so PyInstaller cannot see it
 if ($isArm) {
   $pyiArgs += @("--hidden-import", "webview.platforms.qt", "--collect-all", "PySide6")
@@ -188,6 +211,19 @@ Write-Host "-> running PyInstaller"
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 if (-not (Test-Path "dist\MillenAI\MillenAI.exe")) { throw "no exe was produced" }
 Write-Host "-> built dist\MillenAI\MillenAI.exe"
+
+# THE CRYPTO SELF-TEST (0a 5.9, 6b327): the exe runs cai_crypto's
+# known-answer test and exits 0 only when libsodium answered right. It
+# runs before any window, port or data folder. An exe that fails it is
+# never packaged.
+if ($crypto) {
+  $st = Join-Path (Get-Location) "crypto-selftest.json"
+  if (Test-Path $st) { Remove-Item $st }
+  $p = Start-Process -FilePath "dist\MillenAI\MillenAI.exe" `
+         -ArgumentList @("--crypto-selftest", ('"' + $st + '"')) -Wait -PassThru
+  if (Test-Path $st) { Write-Host ("crypto self-test: " + (Get-Content -Raw $st)) }
+  if ($p.ExitCode -ne 0) { throw "the exe failed its crypto self-test (exit $($p.ExitCode)): accounts would be off" }
+}
 
 # --------------------------------------------------------------- installer
 if ($env:MILLENAI_NO_PACKAGE -eq "1") {
@@ -242,7 +278,7 @@ Filename: "{app}\MillenAI.exe"; Description: "Launch ConcordeAI"; Flags: nowait 
   $zip = "ConcordeAI-$ver-Windows-exe-$suffix.zip"
   if (Test-Path $zip) { Remove-Item $zip }
   # the unzipped folder should carry the brand people downloaded, not
-  # the internal name — stage a renamed copy just for the archive
+  # the internal name - stage a renamed copy just for the archive
   if (Test-Path "dist\ConcordeAI") { Remove-Item -Recurse -Force "dist\ConcordeAI" }
   Copy-Item -Recurse "dist\MillenAI" "dist\ConcordeAI"
   Compress-Archive -Path "dist\ConcordeAI" -DestinationPath $zip

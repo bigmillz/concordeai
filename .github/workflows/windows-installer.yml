@@ -58,6 +58,22 @@ jobs:
           MILLENAI_NO_PACKAGE: "1"   # CI wraps dist/ itself — skip the zip/Inno step
         run: powershell -ExecutionPolicy Bypass -File build_windows_exe.ps1
 
+      # 6b327: the frozen exe's own crypto self-test (cai_crypto's
+      # known-answer test through the bundled libsodium). The build script
+      # runs it too; this step shows the result in the log and fails the
+      # job on its own. A tag from before 6b327 has nothing to test.
+      - name: crypto self-test of the frozen exe
+        shell: powershell
+        run: |
+          if (-not (Select-String -Path millenai.py -Pattern '^CRYPTO_REQS = ' -Quiet)) {
+            Write-Host "no CRYPTO_REQS in this tag's millenai.py: nothing to test"; exit 0 }
+          $st = Join-Path (Get-Location) "crypto-selftest.json"
+          if (Test-Path $st) { Remove-Item $st }
+          $p = Start-Process -FilePath "dist\MillenAI\MillenAI.exe" `
+                 -ArgumentList @("--crypto-selftest", ('"' + $st + '"')) -Wait -PassThru
+          if (Test-Path $st) { Get-Content -Raw $st }
+          if ($p.ExitCode -ne 0) { throw "crypto self-test failed (exit $($p.ExitCode))" }
+
       - name: locate WiX (install if the runner image dropped it)
         id: wix
         shell: powershell

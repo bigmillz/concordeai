@@ -30,6 +30,14 @@ echo "installing dependencies into the venv…"
 # build that cannot run.
 "$VENV/bin/pip" install --quiet --only-binary=:all: \
   reportlab openpyxl python-docx python-pptx || true
+# 6b327: PyNaCl for accounts, the hash-pinned wheels (cffi and pycparser
+# with it) written out from CRYPTO_REQS in millenai.py, the one list. Its
+# own call, wheels only, every hash checked. Not fatal: the app fetches
+# the same pins itself at its next start.
+python3 packaging/crypto_reqs.py millenai.py crypto-requirements.txt
+"$VENV/bin/pip" install --quiet --only-binary=:all: --require-hashes --no-deps \
+  -r crypto-requirements.txt \
+  || echo "  ! PyNaCl didn't install here; the app installs it at its next start"
 PY="$VENV/bin/python3"
 echo "app will run on: $PY"
 
@@ -46,6 +54,8 @@ rm -rf "$APP" Concorde.app MillenAI.app "MillenAI Beta 2.app"   # drop old-brand
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cp millenai.py "$APP/Contents/Resources/"
+# the launcher's first run installs these pins (6b327)
+cp crypto-requirements.txt "$APP/Contents/Resources/"
 [[ -f MillenAI.icns ]] && cp MillenAI.icns "$APP/Contents/Resources/"
 # the titlebar lockup is a native NSTextField and cannot pull Michroma
 # from Google the way the page does — it needs the real file (6b258)
@@ -104,6 +114,10 @@ if [[ ! -x "$PY" ]] || ! "$PY" -c "import webview" 2>/dev/null; then
     "$VENV/bin/pip" install --upgrade pip &&
     "$VENV/bin/pip" install pywebview==6.2.1 ddgs psutil
   } >> "$LOGDIR/bootstrap.log" 2>&1
+  # PyNaCl for accounts (6b327): hash-pinned wheels only. Not fatal; the
+  # app tries the same pins again when it starts
+  "$VENV/bin/pip" install --only-binary=:all: --require-hashes --no-deps \
+    -r "$DIR/../Resources/crypto-requirements.txt" >> "$LOGDIR/bootstrap.log" 2>&1 || true
   # MLX exists only for Apple silicon; Intel Macs run the models on Ollama,
   # which the app downloads for itself on first use
   if [[ "$(uname -m)" == "arm64" ]]; then

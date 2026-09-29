@@ -44,8 +44,11 @@ def _port_open(port):
 class Instance:
     """One windowless dev copy of the app in a folder of its own."""
 
-    def __init__(self, port, name, seed=None, env=None):
+    def __init__(self, port, name, seed=None, env=None, py=None):
         self.port, self.name = port, name
+        # the Python it runs on (6b327: a throwaway venv, for the PyNaCl
+        # install checks); SMOKE_PY or this script's by default
+        self.py = py
         self.home = os.path.join(_SMOKE_TMP, name)
         self.env = dict(os.environ)
         for k in [k for k in self.env if k.startswith("MILLENAI_")]:
@@ -79,7 +82,7 @@ class Instance:
             self.seed(self.home)
         self.log = open(os.path.join(_SMOKE_TMP, self.name + ".log"), "w")
         self.proc = subprocess.Popen(
-            [os.environ.get("SMOKE_PY") or sys.executable, "millenai.py"],
+            [self.py or os.environ.get("SMOKE_PY") or sys.executable, "millenai.py"],
             env=self.env, stdout=self.log, stderr=subprocess.STDOUT,
             start_new_session=True)
         _INSTANCES.append(self)
@@ -228,6 +231,41 @@ _REAL_DIR = (os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("
 _NO_REAL = os.environ.get("SMOKE_NO_REAL") == "1"
 _REAL_TOP = (set(os.listdir(_REAL_DIR)) if os.path.isdir(_REAL_DIR) and not _NO_REAL
              else set())
+
+# PYNACL FOR THE COPIES (6b327, accounts step 7). A copy's crypto is
+# ready only when its Python imports PyNaCl, and a dev copy never
+# installs it into the venv it runs on (that's the app's own venv). When
+# the gauntlet's Python can't import nacl, the pins in CRYPTO_REQS are
+# installed, hash-checked, into a folder of this run's own and put on
+# PYTHONPATH for every copy. SMOKE_CRYPTO_WHEELS names a folder of the
+# pinned wheels, so a run needn't reach PyPI (the install checks at the
+# end use it too; without it they fetch the pins, through pip's cache).
+_SMOKE_PY = os.environ.get("SMOKE_PY") or sys.executable
+_CRY_WHEELS = os.environ.get("SMOKE_CRYPTO_WHEELS", "")
+_CRY_REQF = os.path.join(_SMOKE_TMP, "crypto-requirements.txt")
+subprocess.run([sys.executable, "packaging/crypto_reqs.py", "millenai.py", _CRY_REQF],
+               check=True)
+
+
+def _cry_pip_args(*extra):
+    return (["-m", "pip", "install", "--quiet", "--disable-pip-version-check",
+             "--only-binary=:all:", "--require-hashes", "--no-deps"]
+            + (["--no-index", "--find-links", _CRY_WHEELS] if _CRY_WHEELS else [])
+            + list(extra) + ["-r", _CRY_REQF])
+
+
+def _py_has_nacl(py, env=None):
+    return subprocess.run([py, "-c", "import nacl.bindings"], env=env,
+                          capture_output=True).returncode == 0
+
+
+_CRY_SITE = ""
+if not _py_has_nacl(_SMOKE_PY):
+    _CRY_SITE = os.path.join(_SMOKE_TMP, "crypto-site")
+    subprocess.run([_SMOKE_PY] + _cry_pip_args("--target", _CRY_SITE), check=True)
+    os.environ["PYTHONPATH"] = os.pathsep.join(
+        [_CRY_SITE] + [x for x in os.environ.get("PYTHONPATH", "").split(os.pathsep) if x])
+    sys.path.insert(0, _CRY_SITE)
 
 # A carries the dev-only boot-code hook (6b321): a windowless copy has
 # no window to spend a boot code, so the hook writes one to run/boot.json
@@ -4973,8 +5011,8 @@ check("Windows starts: no SIGHUP at import, and a crash is never silent",
       and "if errorlevel 1 goto setupfail" in _bat
       and '>"%READY%" echo %DEPS%' in _bat
       # setup reruns when what it installs changes; a Store "python" stub
-      # isn't Python (6b317)
-      and 'set "DEPS=deps-3 pywebview-6.2.1 ddgs psutil tzdata"' in _bat
+      # isn't Python (6b317); PyNaCl joined the list in 6b327
+      and 'set "DEPS=deps-4 pywebview-6.2.1 ddgs psutil tzdata pynacl-1.6.2"' in _bat
       and 'python -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"' in _bat
       and "where python >nul" not in _bat
       and '"%PYC%" -m pip install --upgrade pip' in _bat,
@@ -9602,6 +9640,396 @@ for _fn in _ast.walk(_ctree):
                                  and str(_el[_i + 1].value).startswith("@prompt:"))):
                     _lint.append((_fn.name, _nd.lineno, _x.value))
 check("lint: nothing a person typed is built into a command line", not _lint, "%r" % _lint)
+
+print("== accounts step 7: PyNaCl on every build (6b327) ==")
+# 0a 5.9's install half and 1c 5.1. The pins, the known-answer test, the
+# install (hash-checked, the app's own venv only), CRY-4 with nacl
+# blocked, the frozen build's self-test and the build scripts.
+import types as _t7
+_cr7 = {}
+_exec_names(_cr7, {"CRYPTO_REQS", "crypto_reqs"})
+_cr7.setdefault("re", re)
+_req7 = _cr7.get("CRYPTO_REQS", "")
+_lines7 = _cr7["crypto_reqs"]().splitlines() if "crypto_reqs" in _cr7 else []
+_pins7 = [ln.split(" --hash")[0].strip() for ln in _lines7]
+_nh7 = [ln.count("--hash=sha256:") for ln in _lines7]
+_hx7 = re.findall(r"--hash=sha256:(\S+)", _req7)
+check("CRYPTO_REQS pins PyNaCl, cffi and pycparser by version, marker and every wheel's sha256",
+      _pins7 == ['pynacl==1.6.2', 'cffi==2.0.0 ; python_version < "3.10"',
+                 'cffi==2.1.1 ; python_version >= "3.10"',
+                 'pycparser==2.23 ; python_version < "3.10"',
+                 'pycparser==3.0 ; python_version >= "3.10"']
+      and _nh7 == [4, 4, 29, 1, 1] and len(set(_hx7)) == 39
+      and all(re.fullmatch(r"[0-9a-f]{64}", x) for x in _hx7)
+      # the Windows zip, where cffi is already loaded: pynacl's pin alone
+      and _cr7["crypto_reqs"](only=("pynacl",)).splitlines() == _lines7[:1],
+      "%r" % [_pins7, _nh7, len(set(_hx7))])
+_gen7 = subprocess.run([sys.executable, "packaging/crypto_reqs.py", "millenai.py"],
+                       capture_output=True, text=True)
+_old7 = subprocess.run([sys.executable, "packaging/crypto_reqs.py", os.devnull],
+                       capture_output=True, text=True)
+check("the builds' crypto-requirements.txt is CRYPTO_REQS, read and never imported",
+      _gen7.returncode == 0 and _gen7.stdout == _req7 and _old7.returncode == 3,
+      "%r" % [_gen7.returncode, _gen7.stderr[-200:], _old7.returncode])
+
+# cai_crypto on its own: the delimited section exec'd with nothing else
+_cb7 = _MILLENAI_SRC.find("# ==== cai_crypto: begin ====")
+_ce7 = _MILLENAI_SRC.find("# ==== cai_crypto: end ====")
+_sec7 = _MILLENAI_SRC[_cb7:_ce7] if 0 < _cb7 < _ce7 else ""
+_ns7 = {"__name__": "cai_crypto_alone"}
+try:
+    exec(_sec7, _ns7)
+except Exception as _e7:
+    _ns7["_err"] = repr(_e7)
+_cc7 = _ns7.get("cai_crypto")
+import nacl.bindings as _nb7
+import nacl.pwhash.argon2id as _na7
+
+
+def _kat7(mod, name, fn):
+    """cai_crypto's verdict with one libsodium call replaced."""
+    _orig = getattr(mod, name)
+    setattr(mod, name, fn)
+    _cc7.reset()
+    try:
+        return _cc7.status()
+    finally:
+        setattr(mod, name, _orig)
+        _cc7.reset()
+
+
+if _cc7:
+    _base7 = (_cc7.reset(), _cc7.status())[1]
+    _pt7 = bytes.fromhex(_cc7.XC_PT)
+    _bad7 = {
+        "x25519 wrong": _kat7(_nb7, "crypto_scalarmult", lambda a, b: b"\0" * 32),
+        "x25519 throws": _kat7(_nb7, "crypto_scalarmult", lambda a, b: 1 / 0),
+        "ed25519 key wrong": _kat7(_nb7, "crypto_sign_seed_keypair",
+                                   lambda s: (b"\1" * 32, b"\1" * 64)),
+        "a forged signature accepted": _kat7(_nb7, "crypto_sign_open", lambda sm, pk: sm[64:]),
+        "xchacha wrong": _kat7(_nb7, "crypto_aead_xchacha20poly1305_ietf_encrypt",
+                               lambda m, a, n, k: b"\0" * (len(m) + 16)),
+        "a tampered box opened": _kat7(_nb7, "crypto_aead_xchacha20poly1305_ietf_decrypt",
+                                       lambda c, a, n, k: _pt7),
+        "argon2id wrong": _kat7(_na7, "kdf", lambda *a, **k: b"\0" * 32),
+    }
+    _cc7.blocked = True
+    _cc7.reset()
+    _blk7 = _cc7.status()
+    _cc7.blocked = False
+    _cc7.reset()
+else:
+    _base7, _bad7, _blk7 = None, {}, None
+check("cai_crypto: the known answers pass with PyNaCl, standalone",
+      _base7 == (True, "ready", "") and _cc7.available() is True
+      and "import nacl" not in _sec7.split("def _answers")[0],
+      "%r" % [_base7, _ns7.get("_err")])
+check("cai_crypto: a wrong answer or an accepted forgery anywhere means not ready",
+      len(_bad7) == 7 and all(v[0] is False and v[1] == "error" for v in _bad7.values())
+      and _blk7 == (False, "missing", "nacl blocked by MILLENAI_TEST_HOOKS"),
+      "%r" % [_bad7, _blk7])
+check("cai_crypto has no network code and logs nothing",
+      _sec7 and not re.search(r"\b(socket|urllib|http|requests|print|open|log)\s*[.(]", _sec7),
+      _sec7[:80])
+
+# the install guard, in-process: only a venv inside this copy's own folder
+_ig7 = {"os": os, "re": re, "IS_MAC": sys.platform == "darwin",
+        "IS_WIN": sys.platform == "win32"}
+_exec_names(_ig7, {"CRYPTO_REQS", "crypto_reqs", "_inside", "_crypto_install_blocker",
+                   "_crypto_pins"})
+_home7 = os.path.join(_SMOKE_TMP, "guard-home")
+os.makedirs(os.path.join(_home7, "venv"), exist_ok=True)
+_realv7 = os.path.join(_REAL_DIR, "venv")
+
+
+def _guard7(prefix, base, home, frozen=False):
+    _ig7["sys"] = _t7.SimpleNamespace(prefix=prefix, base_prefix=base, modules={},
+                                      **({"frozen": True} if frozen else {}))
+    _ig7["app_dir"] = lambda: home
+    return _ig7["_crypto_install_blocker"]()
+
+
+_g7 = [_guard7(_realv7, "/usr", _REAL_DIR),                      # the app on its venv
+       _guard7(_realv7, "/usr", _home7),                         # a dev copy on it
+       _guard7(os.path.join(_home7, "venv"), "/usr", _home7),    # its own venv
+       _guard7(_realv7, _realv7, _REAL_DIR),                     # not a venv
+       _guard7(_realv7, "/usr", _REAL_DIR, frozen=True),         # frozen
+       _guard7(_home7 + "-other/venv", "/usr", _home7)]          # a name-prefix neighbour
+check("install guard: only the app's own venv, never the shared one from a dev copy",
+      _g7 == ["", "the venv isn't this copy's own", "", "not running in a venv",
+              "not included in this build", "the venv isn't this copy's own"], "%r" % _g7)
+_ig7["sys"] = _t7.SimpleNamespace(modules={})
+_ig7["IS_WIN"] = False
+_p_all7 = _ig7["_crypto_pins"]()
+_ig7["sys"] = _t7.SimpleNamespace(modules={"_cffi_backend": object()})
+_p_loaded7 = _ig7["_crypto_pins"]()
+_ig7["sys"] = _t7.SimpleNamespace(modules={})
+_ig7["IS_WIN"] = True                  # cffi is on this Python's path
+_p_win7 = _ig7["_crypto_pins"]()
+check("install pins: pynacl alone where cffi is loaded, or on Windows where it's installed",
+      _p_all7 == _cr7["crypto_reqs"]() and _p_loaded7 == _p_win7
+      == _cr7["crypto_reqs"](only=("pynacl",)), "%r" % [_p_loaded7[:40], _p_win7[:40]])
+
+# no account action without the gate: every user of SYNC_URL asks it
+def _sync_lint(src):
+    tree = _ast.parse(src)
+    bad = []
+    for fn in _ast.walk(tree):
+        if isinstance(fn, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+            uses = any(isinstance(x, _ast.Name) and x.id == "SYNC_URL" for x in _ast.walk(fn))
+            gated = any(isinstance(x, _ast.Call) and getattr(x.func, "id", "") == "accounts_gate"
+                        for x in _ast.walk(fn))
+            if uses and not gated:
+                bad.append(fn.name)
+    for st in tree.body:
+        if not isinstance(st, (_ast.FunctionDef, _ast.AsyncFunctionDef, _ast.ClassDef)):
+            if any(isinstance(x, _ast.Name) and x.id == "SYNC_URL"
+                   and isinstance(x.ctx, _ast.Load) for x in _ast.walk(st)):
+                bad.append("module line %d" % st.lineno)
+    return bad
+
+
+check("lint: nothing reaches SYNC_URL without accounts_gate (and the lint catches one)",
+      _sync_lint(_MILLENAI_SRC) == []
+      and _sync_lint(_MILLENAI_SRC + "\n\ndef _x7():\n    return SYNC_URL\n") == ["_x7"],
+      "%r" % _sync_lint(_MILLENAI_SRC))
+
+# A, with PyNaCl: crypto ready on /api/stats, accounts on in a dev copy
+_st7a = json.loads(req("/api/stats")[2]).get("crypto")
+_me7a = json.loads(req("/api/me")[2])
+check("A: /api/stats says crypto ready; accounts on (a dev copy, PyNaCl ready)",
+      _st7a == {"ok": True, "state": "ready", "note": ""}
+      and _me7a == {"kind": "owner", "accounts": {"on": True, "note": ""}},
+      "%r" % [_st7a, _me7a])
+
+# CRY-4: nacl blocked (PyNaCl IS importable here, the hook blocks it), the
+# sync host a listener that counts connections
+_lsn7 = socket.socket()
+_lsn7.bind(("127.0.0.1", 0))
+_lsn7.listen(8)
+_lsn7.settimeout(0.2)
+_hits7, _run7 = [], [True]
+
+
+def _accept7():
+    while _run7[0]:
+        try:
+            _c, _ = _lsn7.accept()
+            _hits7.append(1)
+            _c.close()
+        except OSError:
+            pass
+
+
+import threading as _th7
+_th7.Thread(target=_accept7, daemon=True).start()
+_N7 = Instance(9903, "N7", env={
+    "MILLENAI_TEST_HOOKS": "no-nacl,subprocess-record,no-downloads",
+    "MILLENAI_SYNC_URL": "http://127.0.0.1:%d" % _lsn7.getsockname()[1],
+    "HF_HUB_OFFLINE": "1"}).start()
+time.sleep(2)
+_st7n = json.loads(_ireq(_N7, "/api/stats")[1]).get("crypto")
+_me7n = json.loads(_ireq(_N7, "/api/me")[1])
+_pg7n = _ireq(_N7, "/", token=False)[1].decode("utf-8", "replace")
+for _p7 in ("/api/stats", "/api/me", "/api/prefs", "/api/chats"):
+    _ireq(_N7, _p7)
+time.sleep(3)
+_rec7n = os.path.join(_N7.home, "run", "subprocess.jsonl")
+_pip7n = [ln for ln in (open(_rec7n).read().splitlines() if os.path.exists(_rec7n) else [])
+          if '"pip"' in ln]
+_N7.stop()
+_hits_n7 = len(_hits7)
+with socket.create_connection(_lsn7.getsockname(), timeout=2):
+    pass                               # the listener counts (positive control)
+time.sleep(0.5)
+_run7[0] = False
+check("CRY-4: nacl blocked, accounts stay off and say why",
+      _st7n == {"ok": False, "state": "missing", "note": "nacl blocked by MILLENAI_TEST_HOOKS"}
+      and _me7n == {"kind": "owner", "accounts": {
+          "on": False, "note": "Couldn't set up encryption. Accounts need it, and nothing was sent."}}
+      and 'id="acct-crypto" hidden' in _pg7n and not _pip7n,
+      "%r" % [_st7n, _me7n, _pip7n])
+check("CRY-4: no socket opens to the sync host (the listener counts one, ours)",
+      _hits_n7 == 0 and len(_hits7) == 1, "%r" % [_hits_n7, len(_hits7)])
+# the Account pane paints the note, run in node
+_pa7 = _MILLENAI_SRC.find("async function paintAccount(){")
+_pajs7 = _MILLENAI_SRC[_pa7:_MILLENAI_SRC.index("\n}\n", _pa7) + 3] if _pa7 > 0 else ""
+_pjs7 = ("const E={};const $=s=>E[s]||(E[s]={textContent:'',hidden:true});let acctMe=null;"
+         "let ME=null;const api=async()=>({json:async()=>ME});" + _pajs7 +
+         "(async()=>{const out=[];for(const m of JSON.parse(require('fs').readFileSync(0,'utf8'))){"
+         "ME=m;E['#acct-crypto']={textContent:'x',hidden:false};await paintAccount();"
+         "out.push([E['#acct-crypto'].textContent,E['#acct-crypto'].hidden]);}"
+         "process.stdout.write(JSON.stringify(out));})();")
+try:
+    _pjf7 = os.path.join(_SMOKE_TMP, "acct7.js")
+    open(_pjf7, "w").write(_pjs7)
+    _po7 = json.loads(subprocess.run(["node", _pjf7], input=json.dumps([_me7n, _me7a, {"kind": "owner"}]),
+                                     capture_output=True, text=True, timeout=30).stdout)
+except Exception as _e7:
+    _po7 = ["ERR %r" % _e7]
+check("CRY-4: the Account pane says \"Couldn't set up encryption…\", and nothing when ready",
+      _po7 == [["Couldn't set up encryption. Accounts need it, and nothing was sent.", False],
+               ["", True], ["", True]], "%r" % _po7)
+
+# THE INSTALL, for real, into throwaway venvs: C's venv inside its own
+# folder installs from the pinned wheels; D's wheel folder holds a
+# tampered pynacl and pip refuses everything; E runs on a venv outside
+# its folder (as a dev copy on the app's shared venv would) and installs
+# nothing. None of them sees this run's PYTHONPATH.
+_wh7 = os.path.join(_SMOKE_TMP, "wheels7")
+subprocess.run([_SMOKE_PY, "-m", "pip", "download", "--quiet", "--disable-pip-version-check",
+                "--only-binary=:all:", "--require-hashes", "--no-deps", "-d", _wh7]
+               + (["--no-index", "--find-links", _CRY_WHEELS] if _CRY_WHEELS else [])
+               + ["-r", _CRY_REQF])    # a failed download fails the install checks below
+_whbad7 = os.path.join(_SMOKE_TMP, "wheels7-bad")
+os.makedirs(_wh7, exist_ok=True)
+shutil.copytree(_wh7, _whbad7)
+for _f7 in os.listdir(_whbad7):
+    if _f7.startswith("pynacl-"):
+        with open(os.path.join(_whbad7, _f7), "ab") as _fh7:
+            _fh7.write(b"\0")          # one byte on the end: another sha256
+_env7 = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+
+
+def _venv7(path):
+    subprocess.run([_SMOKE_PY, "-m", "venv", path], check=True, env=_env7)
+    return os.path.join(path, "Scripts" if sys.platform == "win32" else "bin",
+                        "python.exe" if sys.platform == "win32" else "python3")
+
+
+def _vmods7(py):
+    return subprocess.run([py, "-c", "import importlib.util as u;print([bool(u.find_spec(m)) "
+                           "for m in ('nacl','cffi','pycparser')])"],
+                          capture_output=True, text=True, env=_env7).stdout.strip()
+
+
+def _icopy7(name, py, wheels):
+    i_ = Instance(9903, name, py=py, env={
+        "MILLENAI_TEST_HOOKS": "crypto-wheels=%s,subprocess-record,no-downloads" % wheels,
+        "HF_HUB_OFFLINE": "1"})
+    i_.env.pop("PYTHONPATH", None)
+    return i_
+
+
+def _await7(inst, secs=240):
+    """/api/stats' crypto once the install has ended: ready or error."""
+    end = time.time() + secs
+    st = {}
+    while time.time() < end:
+        st = json.loads(_ireq(inst, "/api/stats")[1]).get("crypto") or {}
+        if st.get("ok") or st.get("state") == "error":
+            break
+        time.sleep(1)
+    return st
+
+
+def _pips7(inst):
+    fp = os.path.join(inst.home, "run", "subprocess.jsonl")
+    return [json.loads(ln) for ln in (open(fp).read().splitlines() if os.path.exists(fp) else [])
+            if '"pip"' in ln]
+
+
+_C7 = _icopy7("C7", None, _wh7)
+_cpy7 = _venv7(os.path.join(_C7.home, "venv"))
+_C7.py = _cpy7
+_C7.start()
+_st7c = _await7(_C7)
+_pip7c = _pips7(_C7)
+_C7.stop()
+_mods7c = _vmods7(_cpy7)
+_ver7c = subprocess.run([_cpy7, "-c", "import nacl,cffi,pycparser;print(nacl.__version__,"
+                         "cffi.__version__,pycparser.__version__)"],
+                        capture_output=True, text=True, env=_env7).stdout.split()
+_a7 = _pip7c[0] if len(_pip7c) == 1 else []
+check("install: a copy's own venv gets the pins, hash-checked, and crypto turns ready",
+      _st7c == {"ok": True, "state": "ready", "note": ""}
+      and _ver7c[:2] == ["1.6.2", "2.1.1"] and _ver7c[2:3] in (["3.0"], ["3.00"])
+      and _a7[1:4] == ["-m", "pip", "install"]
+      and os.path.realpath(_a7[0]) == os.path.realpath(_cpy7)
+      and {"--only-binary=:all:", "--require-hashes", "--no-deps"} <= set(_a7)
+      and "-r" in _a7 and not os.path.exists(_a7[_a7.index("-r") + 1]),
+      "%r" % [_st7c, _ver7c, _pip7c])
+_ok7s = subprocess.run([_cpy7, "millenai.py", "--crypto-selftest",
+                        os.path.join(_SMOKE_TMP, "self7.json")],
+                       env=dict(_env7, MILLENAI_DEV="1",
+                                MILLENAI_HOME=os.path.join(_SMOKE_TMP, "self7-home")),
+                       capture_output=True, text=True, timeout=60)
+try:
+    _self7 = json.load(open(os.path.join(_SMOKE_TMP, "self7.json")))
+except (OSError, ValueError):
+    _self7 = {}
+
+_D7 = _icopy7("D7", None, _whbad7)
+_dpy7 = _venv7(os.path.join(_D7.home, "venv"))
+_D7.py = _dpy7
+_D7.start()
+_st7d = _await7(_D7)
+_D7.stop()
+_mods7d = _vmods7(_dpy7)
+check("install: a wheel that doesn't match its pinned hash installs nothing",
+      _st7d.get("ok") is False and _st7d.get("state") == "error"
+      and "HASH" in _st7d.get("note", "").upper()
+      and _mods7d == "[False, False, False]", "%r" % [_st7d, _mods7d])
+
+_E7 = _icopy7("E7", None, _wh7)
+_epy7 = _venv7(os.path.join(_SMOKE_TMP, "shared7-venv"))
+_E7.py = _epy7
+_E7.start()
+time.sleep(4)
+_st7e = json.loads(_ireq(_E7, "/api/stats")[1]).get("crypto")
+_pip7e = _pips7(_E7)
+_E7.stop()
+_mods7e = _vmods7(_epy7)
+check("install: a dev copy on a venv outside its folder (the shared one) installs nothing",
+      _st7e == {"ok": False, "state": "missing",
+                "note": "nacl won't import (ModuleNotFoundError); the venv isn't this copy's own"}
+      and _pip7e == [] and _mods7e == "[False, False, False]", "%r" % [_st7e, _pip7e, _mods7e])
+_no7s = subprocess.run([_epy7, "millenai.py", "--crypto-selftest"],
+                       env=dict(_env7, MILLENAI_DEV="1",
+                                MILLENAI_HOME=os.path.join(_SMOKE_TMP, "self7-home")),
+                       capture_output=True, text=True, timeout=60)
+check("--crypto-selftest: exit 0 with the answers, 1 without PyNaCl, before anything else runs",
+      _ok7s.returncode == 0 and _self7.get("ok") is True and _self7.get("nacl") == "1.6.2"
+      and _no7s.returncode == 1 and json.loads(_no7s.stdout or "{}").get("state") == "missing"
+      and not os.path.exists(os.path.join(_SMOKE_TMP, "self7-home")),
+      "%r" % [_ok7s.returncode, _self7, _no7s.returncode, _no7s.stdout[-200:]])
+
+# the builds: every one installs the pins hash-checked; the frozen exe
+# carries _cffi_backend on x64 and ARM64 and must pass its self-test
+_bw7 = open("build_windows.sh", encoding="utf-8").read()
+_bm7 = open("build_macos_app.sh", encoding="utf-8").read()
+_ps7 = open("build_windows_exe.ps1", encoding="utf-8").read()
+_wi7 = open(".github/workflows/windows-installer.yml", encoding="utf-8").read()
+_nw7 = open(".github/workflows/nightly.yml", encoding="utf-8").read()
+_cs7 = open("ci_smoke.sh", encoding="utf-8").read()
+_HP7 = "--only-binary=:all: --require-hashes --no-deps"
+_bat7 = _bw7.split("<<'BAT'")[1].split("\nBAT\n")[0] if "<<'BAT'" in _bw7 else ""
+check("build_windows.sh: deps-4 names PyNaCl; the .bat installs the hashed pins before pywebview",
+      'set "DEPS=deps-4 pywebview-6.2.1 ddgs psutil tzdata pynacl-1.6.2"' in _bat7
+      and ('"%%PIP%%" install %s -r "%%~dp0crypto-requirements.txt"' % _HP7) in _bat7
+      and _bat7.index("crypto-requirements.txt") < _bat7.index('install pywebview==')
+      and 'packaging/crypto_reqs.py millenai.py "$STAGE/crypto-requirements.txt"' in _bw7)
+_lau7 = _bm7.split("<<'LAUNCH'")[1] if "<<'LAUNCH'" in _bm7 else ""
+check("build_macos_app.sh: the build venv and the first-run launcher install the hashed pins",
+      ('"$VENV/bin/pip" install --quiet %s \\\n  -r crypto-requirements.txt' % _HP7) in _bm7
+      and ('"$VENV/bin/pip" install %s \\\n    -r "$DIR/../Resources/crypto-requirements.txt"'
+           % _HP7) in _lau7
+      and 'cp crypto-requirements.txt "$APP/Contents/Resources/"' in _bm7)
+_arm7 = _ps7.find("if ($isArm) {\n  $pyiArgs")
+_hid7 = _ps7.find('$pyiArgs += @("--hidden-import", "_cffi_backend"')
+check("build_windows_exe.ps1: hashed pins, _cffi_backend for x64 and ARM64, the exe's self-test",
+      ("-m pip install %s -r crypto-requirements.txt" % _HP7) in _ps7
+      and 'throw "PyNaCl did not install' in _ps7
+      and 0 < _hid7 < _arm7
+      and '"--crypto-selftest"' in _ps7 and 'if ($p.ExitCode -ne 0) { throw "the exe failed its crypto self-test' in _ps7
+      and _ps7.index('"--crypto-selftest"') < _ps7.index("MILLENAI_NO_PACKAGE")
+      and all(ord(c) < 128 for c in _ps7), "%r" % [_hid7, _arm7])
+check("CI: the frozen exe's self-test; the nightly installs the pins and the smoke asserts crypto",
+      _wi7.find("crypto self-test of the frozen exe") > _wi7.find("build_windows_exe.ps1")
+      and _wi7.find("crypto self-test of the frozen exe") < _wi7.find("locate WiX")
+      and '"--crypto-selftest"' in _wi7
+      and 0 < _nw7.find("--require-hashes --no-deps -r crypto-requirements.txt") < _nw7.find("./ci_smoke.sh")
+      and 'c.get("ok") is True and c.get("state") == "ready"' in _cs7)
 
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)

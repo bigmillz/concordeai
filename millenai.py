@@ -68,6 +68,221 @@ if sys.platform == "win32":
 import webbrowser
 
 
+# PYNACL ON EVERY BUILD (0a 5.9 install half, 1c 5.1; accounts step 7,
+# 6b327). Accounts encrypt on this computer with libsodium, through
+# PyNaCl. CRYPTO_REQS is the one list: the app installs from it
+# (_ensure_crypto_deps) and the build scripts write it out as
+# crypto-requirements.txt (packaging/crypto_reqs.py), for
+#   pip install --only-binary=:all: --require-hashes --no-deps -r ...
+# Every wheel is pinned by the sha256 PyPI lists, checked against the
+# downloaded files on 2026-09-28:
+#   pynacl 1.6.2, cp38-abi3: macOS universal2, Windows x64, ARM64 and
+#     32-bit. One wheel covers every CPython from 3.8 on (3.15 too).
+#   cffi 2.0.0 for Python 3.9 (the Command Line Tools' Python): macOS
+#     x86_64 and arm64, Windows x64 and 32-bit. No Windows ARM64 wheel.
+#   cffi 2.1.1 for 3.10 to 3.15: macOS x86_64 and arm64, Windows x64
+#     and 32-bit, and Windows ARM64 from 3.11 (3.10 has no ARM64 wheel).
+#   pycparser 2.23 (3.9) and 3.0 (3.10 on), pure Python.
+# Not covered: free-threaded builds (3.14t), Linux, Python 3.8 and
+# older, Windows ARM64 on Python 3.9 or 3.10.
+CRYPTO_REQS = r"""pynacl==1.6.2 \
+    --hash=sha256:c949ea47e4206af7c8f604b8278093b674f7c79ed0d4719cc836902bf4517465 \
+    --hash=sha256:5811c72b473b2f38f7e2a3dc4f8642e3a3e9b5e7317266e4ced1fba85cae41aa \
+    --hash=sha256:62985f233210dee6548c223301b6c25440852e13d59a8b81490203c3227c5ba0 \
+    --hash=sha256:834a43af110f743a754448463e8fd61259cd4ab5bbedcf70f9dabad1d28a394c
+cffi==2.0.0 ; python_version < "3.10" \
+    --hash=sha256:fe562eb1a64e67dd297ccc4f5addea2501664954f2692b69a76449ec7913ecbf \
+    --hash=sha256:de8dad4425a6ca6e4e5e297b27b5c824ecc7581910bf9aee86cb6835e6812aa7 \
+    --hash=sha256:2081580ebb843f759b9f617314a24ed5738c51d2aee65d31e02f6f7a2b97707a \
+    --hash=sha256:b882b3df248017dba09d6b16defe9b5c407fe32fc7c65a9c69798e6175601be9
+cffi==2.1.1 ; python_version >= "3.10" \
+    --hash=sha256:baed1e86cc735622097354b9d1281406caf42ff42a886d29faa8e8d1630333be \
+    --hash=sha256:ca82be1a1d406ecfe1d25dc16cb33488e5a16bf4438c9fb590484ea29d92478b \
+    --hash=sha256:7ce713ace7c0e4520535b42b77eaa742c16dab813978064913e5a3cf82973b41 \
+    --hash=sha256:a48d62ab9d6f4f98c983223a547af44be6ca3691074c31cecced6facd3ba2dc1 \
+    --hash=sha256:c8d2c9fd1f2d16f780d15127abb050d13d1a76c03a4bd87d7e4980e45e511e12 \
+    --hash=sha256:398aff33cee2767e3e781d2554c54bd0dff386bb437581e0d8011fde1a942ec1 \
+    --hash=sha256:f8ec5e643a9a937f64e1999eb9f75d072263751912dc5cd06d3c85f8f44be7c3 \
+    --hash=sha256:42f6930c31dc7f50732c9ae793c2786c7b6b044195967bbdde40bb9be81c4cc0 \
+    --hash=sha256:c7659f22557c5a0bc4855cd635f55edec690cc008a40768527762cb9fb263455 \
+    --hash=sha256:c8c69575568085ba0b1b10c0249d779a214aea6f6522e949a0fc9fb0fcb449d0 \
+    --hash=sha256:f81b3b8f3d4e343550fa4baa0e479bba9f2d29ce9c2e9b51d1ce1718d7442fcf \
+    --hash=sha256:046bfc24911b37851ee1b51aab8bffe713d89c68c6a057b09484ce9fd5f69b4e \
+    --hash=sha256:f53e442b08449d42821fa4a4fba000095af9f62742a500f978a9f557ec44339a \
+    --hash=sha256:7bde5e4cc5c10140859842b9d383af292b22639a4dffb725314baf45968cef80 \
+    --hash=sha256:9d2055050ea716bd38b7f7f1579c275386646b4894c155a3e2f3cd62ed41b7c6 \
+    --hash=sha256:19ee6127ee34de7d83ce3d371ebc5ed91addbdcc39f9ab15ce4eb35a4e534971 \
+    --hash=sha256:334644fbac4eff73d985a17a91226df55d0f394160c4cfb880e084c8f7161cac \
+    --hash=sha256:1aa5645c30469b09530c4ebca77ebf8f17618293c58f8549cb1a543a50236e7d \
+    --hash=sha256:63bbfd5ded17c4840ac07cd8f1c21ba9d9708141f840b324f422f41b207e3973 \
+    --hash=sha256:d28630f5854ab07ab1fd4aba756de52326c82e6be15d414b12793f1975048b54 \
+    --hash=sha256:661c298b4821edebead0c91edd2b00374d67ad7c5a1f7a91d4442633b79d6a72 \
+    --hash=sha256:1a18a57b58cfb21fc28d72e876acf10eaed67a1ed96226f92af4df681d571c4c \
+    --hash=sha256:3222ba5d678f80a030e6afbcc33dc1ae5cb45facabb61cee2c7016b8432fde48 \
+    --hash=sha256:ab36d55f9ed2d067327667c2fea18dda018eb628dd6347aa01dda6cf1f5d3836 \
+    --hash=sha256:fb92203a88b3d3053034db775110081c49d28be6551923805e039924093761e4 \
+    --hash=sha256:2ae64be792b8966f2c69538199728b290e34726562896df1e5dc8ffd8d8188e8 \
+    --hash=sha256:4f42141fc14250de6dde5ee7ea4432be017252d91f19c5ad043c084cea629cac \
+    --hash=sha256:e6e8cff14d6fb0be70a09c0bdc58096f501952d04624ebf867e0e56da2df8960 \
+    --hash=sha256:27350daa11d4f10c540e6e89dada4c54feb7256ad03e9a4dc075ebad7ba360d1
+pycparser==2.23 ; python_version < "3.10" \
+    --hash=sha256:e5c6e8d3fbad53479cab09ac03729e0a9faf2bee3db8208a550daf5af81a5934
+pycparser==3.0 ; python_version >= "3.10" \
+    --hash=sha256:b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992
+"""
+
+
+def crypto_reqs(only=()):
+    """CRYPTO_REQS as a requirements file, or just the pins of the
+    packages named in `only` (the Windows zip, where cffi is loaded)."""
+    out = []
+    for line in CRYPTO_REQS.replace("\\\n", " ").splitlines():
+        name = re.match(r"\s*([A-Za-z0-9_.-]*)", line).group(1).lower()
+        if name and (not only or name in only):
+            out.append(" ".join(line.split()))
+    return "\n".join(out) + "\n"
+
+
+# ==== cai_crypto: begin ====
+# CLIENT CRYPTO (1c 5.1). A self-contained section: it needs only the
+# standard library and PyNaCl, and the gauntlet execs it on its own.
+# It imports nacl lazily, has no network code and logs nothing. This
+# step holds the import and a known-answer test; the primitives come
+# with M10. available() is False, and accounts stay off, until a real
+# libsodium has given the known answers below: a build that imports
+# nacl but can't load it (no _cffi_backend in a frozen exe) or answers
+# wrong never counts as ready. There is no plaintext fallback.
+import threading as _cc_threading
+
+
+class cai_crypto:
+    blocked = False           # the no-nacl test hook, dev copies only
+    _lock = _cc_threading.Lock()
+    _seen = None              # (ok, state, why) once checked
+    # Ed25519, RFC 8032 section 7.1, TEST 1 (the empty message)
+    ED_SEED = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
+    ED_PUB = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+    ED_SIG = ("e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555"
+              "fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b")
+    # X25519, RFC 7748 section 5.2, the first vector
+    X_SCALAR = "a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4"
+    X_U = "e6db6867583030db3594c1a424b15f7c726624ec26b3353b10a903a6d0ab1c4c"
+    X_OUT = "c3da55379de9c6908e94ea4df28d084f32eccf03491c71f754b4075577a28552"
+    # XChaCha20-Poly1305-IETF, draft-irtf-cfrg-xchacha-03 appendix A.3.1
+    XC_KEY = "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f"
+    XC_NONCE = "404142434445464748494a4b4c4d4e4f5051525354555657"
+    XC_AD = "50515253c0c1c2c3c4c5c6c7"
+    XC_PT = ("4c616469657320616e642047656e746c656d656e206f662074686520636c61737320"
+             "6f66202739393a204966204920636f756c64206f6666657220796f75206f6e6c7920"
+             "6f6e652074697020666f7220746865206675747572652c2073756e73637265656e20"
+             "776f756c642062652069742e")
+    XC_CT = ("bd6d179d3e83d43b9576579493c0e939572a1700252bfaccbed2902c21396cbb731c"
+             "7f1b0b4aa6440bf3a82f4eda7e39ae64c6708c54c216cb96b72e1213b4522f8c9ba4"
+             "0db5d945b11b69b982c1bb9e3f3fac2bc369488f76b2383565d3fff921f9664c9763"
+             "7da9768812f615c68b13b52ec0875924c1c7987947deafd8780acf49")
+    # Argon2id at libsodium's floor (1 pass, 8 KiB), so it costs nothing:
+    # the answer PyNaCl 1.6.2 gave on 2026-09-28
+    A2_OUT = "c2e7d20a2b529cce5149d8aecdb8e9689ccbeb358c806fdbf8788c49d1c92411"
+
+    @classmethod
+    def _answers(cls):
+        """True only when libsodium gives every known answer and refuses
+        every tampered input."""
+        import nacl.bindings as nb
+        import nacl.exceptions as ne
+        import nacl.pwhash.argon2id as a2
+        h = bytes.fromhex
+        pk, sk = nb.crypto_sign_seed_keypair(h(cls.ED_SEED))
+        signed = nb.crypto_sign(b"", sk)
+        if pk != h(cls.ED_PUB) or signed[:64] != h(cls.ED_SIG):
+            return False
+        if nb.crypto_sign_open(signed, pk) != b"":
+            return False
+        try:
+            nb.crypto_sign_open(bytes([signed[0] ^ 1]) + signed[1:], pk)
+            return False
+        except ne.CryptoError:
+            pass
+        if nb.crypto_scalarmult(h(cls.X_SCALAR), h(cls.X_U)) != h(cls.X_OUT):
+            return False
+        args = (h(cls.XC_AD), h(cls.XC_NONCE), h(cls.XC_KEY))
+        ct = nb.crypto_aead_xchacha20poly1305_ietf_encrypt(h(cls.XC_PT), *args)
+        if ct != h(cls.XC_CT):
+            return False
+        if nb.crypto_aead_xchacha20poly1305_ietf_decrypt(ct, *args) != h(cls.XC_PT):
+            return False
+        try:
+            nb.crypto_aead_xchacha20poly1305_ietf_decrypt(
+                ct[:-1] + bytes([ct[-1] ^ 1]), *args)
+            return False
+        except ne.CryptoError:
+            pass
+        return a2.kdf(32, b"password", b"somesalt16bytes!", opslimit=1,
+                      memlimit=8192) == h(cls.A2_OUT)
+
+    @classmethod
+    def _check(cls):
+        if cls.blocked:
+            return False, "missing", "nacl blocked by MILLENAI_TEST_HOOKS"
+        try:
+            import nacl.bindings  # noqa: F401
+        except Exception as exc:        # not installed, or cffi can't load
+            return False, "missing", "nacl won't import (%s)" % type(exc).__name__
+        try:
+            ok = cls._answers()
+        except Exception as exc:
+            return False, "error", "known-answer test failed (%s)" % type(exc).__name__
+        if not ok:
+            return False, "error", "known-answer test failed"
+        return True, "ready", ""
+
+    @classmethod
+    def status(cls):
+        """(ok, state, why): state is ready, missing or error. Checked
+        once, then remembered until reset()."""
+        with cls._lock:
+            if cls._seen is None:
+                cls._seen = cls._check()
+            return cls._seen
+
+    @classmethod
+    def available(cls) -> bool:
+        """True once PyNaCl has passed the known-answer test."""
+        return cls.status()[0]
+
+    @classmethod
+    def reset(cls):
+        """Check again at the next call (after an install)."""
+        with cls._lock:
+            cls._seen = None
+# ==== cai_crypto: end ====
+
+
+# THE FROZEN BUILD'S CRYPTO SELF-TEST (0a 5.9): `MillenAI.exe
+# --crypto-selftest out.json` writes cai_crypto's result and exits 0
+# only when it passed, before anything else runs (no window, no port,
+# no data folder). build_windows_exe.ps1 and CI run it on every exe, so
+# an x64 or ARM64 build without _cffi_backend fails there, not silently
+# on someone's PC.
+if __name__ == "__main__" and sys.argv[1:2] == ["--crypto-selftest"]:
+    _st = cai_crypto.status()
+    _res = {"ok": _st[0], "state": _st[1], "why": _st[2],
+            "python": platform.python_version(), "machine": platform.machine(),
+            "frozen": bool(getattr(sys, "frozen", False))}
+    try:
+        import nacl, cffi   # noqa: E401
+        _res.update(nacl=nacl.__version__, cffi=cffi.__version__)
+    except Exception:
+        pass
+    _txt = json.dumps(_res)
+    if len(sys.argv) > 2:
+        with open(sys.argv[2], "w", encoding="utf-8") as _fh:
+            _fh.write(_txt)
+    elif sys.stdout is not None:
+        print(_txt)
+    sys.exit(0 if _st[0] else 1)
+
+
 # DEV AND TEST COPIES LIVE IN THEIR OWN FOLDER (0a item 2, 6b319). A dev
 # or test copy used to run on the REAL data folder with a fixed key that
 # CLAUDE.md printed, so while one ran any login on the Mac could read the
@@ -143,6 +358,11 @@ TEST_HOOKS = frozenset(
 # the sync server; a dev copy may point at the test one (00 5.7)
 SYNC_URL = ((os.environ.get("MILLENAI_SYNC_URL", "").strip()
              if DEV_HOME else "") or "https://sync.millertechnology.net")
+# the account screens' build flag (sign-in plan): on in dev and test
+# copies, off in the app a person opened until the sign-in beta (M17)
+ACCOUNTS = bool(DEV_HOME)
+# `import nacl` blocked, as if PyNaCl weren't there (0a 5.14, CRY-4)
+cai_crypto.blocked = "no-nacl" in TEST_HOOKS
 
 
 def _hook_arg(name: str) -> str:
@@ -10956,6 +11176,134 @@ def _ensure_tzdata():
         pass
 
 
+# PYNACL FOR A SETUP THAT HASN'T GOT IT (0a 5.9, 6b327). The launchers
+# install CRYPTO_REQS on a first run; a setup from before this build
+# fetches the pins once, in the background, at its next start. Its own
+# pip call: wheels only, every hash checked, no unpinned dependency. It
+# installs only into the app's own venv. A frozen build never installs
+# (it carries PyNaCl, or its self-test failed the build), nor does a
+# system or Homebrew Python, nor a venv outside this copy's data folder:
+# a dev or test copy runs on the real app's venv, which its
+# MILLENAI_HOME can never hold, so it never installs into it.
+_crypto_install = {"state": "idle", "note": ""}
+CRYPTO_MISSING = ("Couldn't set up encryption. Accounts need it, and "
+                  "nothing was sent.")
+
+
+def _inside(path: str, folder: str) -> bool:
+    p = os.path.normcase(os.path.realpath(path))
+    f = os.path.normcase(os.path.realpath(folder))
+    if IS_MAC or IS_WIN:                # case-insensitive disks
+        p, f = p.lower(), f.lower()
+    return p == f or p.startswith(f.rstrip(os.sep) + os.sep)
+
+
+def _crypto_install_blocker() -> str:
+    """Why this copy may not pip-install PyNaCl ('' when it may)."""
+    if getattr(sys, "frozen", False):
+        return "not included in this build"
+    if sys.prefix == getattr(sys, "base_prefix", sys.prefix):
+        return "not running in a venv"
+    if not _inside(sys.prefix, app_dir()):
+        return "the venv isn't this copy's own"
+    return ""
+
+
+def _crypto_pins() -> str:
+    """What to install. A loaded cffi can't be swapped under a running
+    process, and on Windows pythonnet loads it when the window opens, so
+    where cffi is already there (the Windows zip) only pynacl's pin goes."""
+    import importlib.util
+    if "_cffi_backend" in sys.modules or (
+            IS_WIN and importlib.util.find_spec("_cffi_backend") is not None):
+        return crypto_reqs(only=("pynacl",))
+    return crypto_reqs()
+
+
+def _crypto_pip(python: str, reqs: str, extra=()):
+    """pip-install a requirements text with `python`: wheels only, every
+    hash checked, no dependency beyond the pins. (ok, why)."""
+    fd, path = tempfile.mkstemp(prefix="crypto-req-", suffix=".txt")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(reqs)
+        r = subprocess.run([python, "-m", "pip", "install", "--quiet",
+                            "--disable-pip-version-check", "--no-input",
+                            "--only-binary=:all:", "--require-hashes",
+                            "--no-deps"] + list(extra) + ["-r", path],
+                           capture_output=True, text=True, timeout=600,
+                           creationflags=getattr(subprocess,
+                                                 "CREATE_NO_WINDOW", 0))
+    except Exception as exc:
+        return False, "pip didn't run (%s)" % type(exc).__name__
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+    if r.returncode != 0:
+        lines = [x.strip() for x in (r.stderr or r.stdout or "").splitlines()
+                 if x.strip()]
+        first = [x for x in lines if x.startswith("ERROR")]
+        return False, ((first or lines or ["pip failed"])[0])[:200]
+    return True, ""
+
+
+def _ensure_crypto_deps():
+    """At every start, on a thread of its own: PyNaCl ready, or one
+    install of the pins, or a clear reason on /api/stats. Never blocks
+    the boot; while it isn't ready accounts stay off."""
+    if cai_crypto.blocked or cai_crypto.available():
+        return
+    why = _crypto_install_blocker()
+    if why:
+        _crypto_install.update(state="skipped", note=why)
+        print("  (encryption unavailable: %s)" % cai_crypto.status()[2])
+        return
+    _crypto_install.update(state="installing", note="")
+    wheels = _hook_arg("crypto-wheels")   # a dev copy's local wheel folder
+    ok, why = _crypto_pip(sys.executable, _crypto_pins(),
+                          ["--no-index", "--find-links", wheels] if wheels
+                          else ())
+    import importlib
+    importlib.invalidate_caches()
+    cai_crypto.reset()
+    if ok and cai_crypto.available():
+        _crypto_install.update(state="done", note="")
+    else:
+        _crypto_install.update(state="failed",
+                               note=why or cai_crypto.status()[2])
+        print("  (encryption unavailable: %s)" % _crypto_install["note"])
+
+
+def crypto_status() -> dict:
+    """/api/stats' `crypto`: ok, and state ready, installing, missing or
+    error, with a short note."""
+    if _crypto_install["state"] == "installing":
+        return {"ok": False, "state": "installing", "note": ""}
+    ok, state, why = cai_crypto.status()
+    if not ok and _crypto_install["state"] == "failed":
+        state, why = "error", _crypto_install["note"]
+    elif not ok and _crypto_install["state"] == "skipped" and state == "missing":
+        why = "%s; %s" % (why, _crypto_install["note"])
+    return {"ok": ok, "state": state, "note": why}
+
+
+def accounts_gate():
+    """(True, '') when an account action may go ahead, else (False, what
+    to say). Every account action asks this before it opens any socket to
+    SYNC_URL (CRY-4): no PyNaCl, no accounts, and no plaintext fallback.
+    The gauntlet holds every user of SYNC_URL to it."""
+    if not ACCOUNTS:
+        return False, ""
+    st = crypto_status()
+    if st["ok"]:
+        return True, ""
+    if st["state"] == "installing":
+        return False, "Setting up encryption. Try again in a minute."
+    return False, CRYPTO_MISSING
+
+
 def _host_tz() -> str:
     try:
         return os.path.basename(os.path.realpath("/etc/localtime")) and \
@@ -16012,7 +16360,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # WHO AM I (6b257, the Account pane). One kind since the web
             # version's visitor, PIN and Google profiles went (6b320): this
             # computer's owner. The shape stays for the signed-in account.
-            self._send_json({"kind": "owner"})
+            # `accounts` (6b327): on only in a build with the account
+            # screens and with PyNaCl ready; the note says why not (CRY-4)
+            _aon, _anote = accounts_gate()
+            self._send_json({"kind": "owner",
+                             "accounts": {"on": _aon, "note": _anote}})
         elif self.path == "/api/voice/status":
             with _setup_lock:
                 job = dict(_setup_jobs.get(VOICE_ROW, {}))
@@ -16185,6 +16537,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                      "mem_pressure": mem_pressure()}
         # the chat store's change counter rides the 2 s poll (0b 5.6)
         stats["data_rev"] = _data_rev[0]
+        # PyNaCl's state (6b327): accounts need it, CI asserts it
+        stats["crypto"] = crypto_status()
         body = json.dumps(stats).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -21489,6 +21843,8 @@ body.gen #chip-model{color:var(--accent)}
   justify-content:center;font-size:14px}
 #acct-kind{display:block;font-size:13px;font-weight:600}
 #acct-sub{font-size:11px;color:var(--faint)}
+#acct-crypto{font-size:12px;color:var(--faint);margin:10px 0 0}
+#acct-crypto[hidden]{display:none}
 #forget-steps{margin-top:10px;display:flex;flex-direction:column;gap:8px}
 /* the [hidden] trap (the wizard's own lesson, see #wiz-foot): any
    element that declares display needs its own [hidden] rule */
@@ -22779,6 +23135,7 @@ __CODE_ROWS__
         <div><b id="acct-kind">&mdash;</b>
         <span id="acct-sub"></span></div>
       </div>
+      <p id="acct-crypto" hidden></p>
       <button class="about-btn danger" id="about-forget">Forget me&hellip;</button>
       <div id="forget-steps" hidden>
         <div id="forget-what">
@@ -29205,6 +29562,10 @@ async function paintAccount(){
   $("#acct-av").textContent=row[0];
   $("#acct-kind").textContent=row[1];
   $("#acct-sub").textContent=row[2];
+  // why accounts are off in a build that has them (6b327, CRY-4):
+  // "Couldn't set up encryption…" when PyNaCl isn't ready
+  const an=(me.accounts&&me.accounts.note)||"",ac=$("#acct-crypto");
+  ac.textContent=an;ac.hidden=!an;
 }
 function fgScopes(){
   const s=[];
@@ -30367,6 +30728,8 @@ if __name__ == "__main__":
     threading.Thread(target=_mlx_janitor, daemon=True).start()
     threading.Thread(target=_warm_studio_cache, daemon=True).start()
     threading.Thread(target=_ensure_tzdata, daemon=True).start()
+    # PyNaCl, or one hash-checked install of it (0a 5.9, 6b327)
+    threading.Thread(target=_ensure_crypto_deps, daemon=True).start()
     start_managed_engines()
     if not HAS_SEARCH:
         print("  (web search disabled — pip install ddgs to enable)")

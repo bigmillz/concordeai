@@ -25,6 +25,8 @@ STAGE="build-win/ConcordeAI"
 rm -rf build-win
 mkdir -p "$STAGE"
 cp millenai.py "$STAGE/"
+# the hash-pinned PyNaCl wheels, written out from CRYPTO_REQS (6b327)
+python3 packaging/crypto_reqs.py millenai.py "$STAGE/crypto-requirements.txt"
 
 # cmd.exe is unforgiving about bare LF in a .bat, so every line the launcher
 # and readme emit is converted to CRLF on the way out.
@@ -56,7 +58,7 @@ rem pip once more for what's new (6b317: tzdata was added, and a "ready"
 rem marker meant setup never ran again).
 rem pywebview is pinned (6b321): the app guards its js_api bridge, which
 rem was written and tested against this version
-set "DEPS=deps-3 pywebview-6.2.1 ddgs psutil tzdata"
+set "DEPS=deps-4 pywebview-6.2.1 ddgs psutil tzdata pynacl-1.6.2"
 set "HAVE="
 if exist "%READY%" set /p HAVE=<"%READY%"
 
@@ -68,6 +70,10 @@ if not "%HAVE%"=="%DEPS%" (
   if not exist "%PYC%" python -m venv "%VENV%"
   if not exist "%PYC%" goto setupfail
   "%PYC%" -m pip install --upgrade pip
+  rem PyNaCl for accounts, 6b327: hash-pinned wheels from the app's own
+  rem list, cffi and pycparser with it, first, so the pinned cffi is the
+  rem one pywebview finds. Not fatal: the app tries again when it starts.
+  "%PIP%" install --only-binary=:all: --require-hashes --no-deps -r "%~dp0crypto-requirements.txt"
   rem tzdata: Windows has no time-zone database of its own (6b317)
   "%PIP%" install pywebview==6.2.1 ddgs psutil tzdata
   if errorlevel 1 goto setupfail

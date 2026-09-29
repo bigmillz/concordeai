@@ -5633,6 +5633,153 @@ crash was invisible.
   keeps its checks. Mutation-tested (SIGHUP back, hook removed, no log,
   no box).
 
+## 6b327 — PyNaCl on every build (accounts step 7)
+The install half of 0a 5.9 and 1c 5.1: M7 of the sign-in plan. Patrick
+approved the dependency and the one-time PyPI fetch on 2026-09-28.
+Accounts will encrypt on this computer with libsodium through PyNaCl;
+this step puts PyNaCl on every build and every existing setup, proves
+it works, and keeps accounts off wherever it doesn't. No account screen
+exists yet, and signed updates (the other half of 5.9) wait for the
+offline release key.
+- **One list, `CRYPTO_REQS`,** in millenai.py: a pip requirements text
+  with every wheel's sha256, as PyPI's JSON API listed it, each checked
+  against the downloaded file (39 wheels, 0 mismatches):
+  - pynacl 1.6.2, the four cp38-abi3 wheels: macOS universal2, Windows
+    x64, ARM64 and 32-bit. One wheel covers every CPython from 3.8 on.
+  - cffi 2.0.0 for Python 3.9 (the Command Line Tools' Python the Mac
+    launcher can fall back to): macOS x86_64 and arm64, Windows x64 and
+    32-bit.
+  - cffi 2.1.1 for 3.10 to 3.15 (it already has cp315 wheels, so the
+    plan's 3.15 risk is covered for crypto): macOS x86_64 and arm64,
+    Windows x64 and 32-bit, Windows ARM64 from 3.11.
+  - pycparser 2.23 (3.9) and 3.0 (3.10 on), by marker.
+  - No wheel, so no crypto: Windows ARM64 on Python 3.9 or 3.10,
+    free-threaded builds (3.14t), Linux, Python 3.8 and older. pip
+    resolved every other macOS arm64/x86_64 and Windows x64/ARM64 pair
+    from 3.9 to 3.15 against the pins (`pip download --platform`, 3.9
+    with the system Python 3.9).
+  `crypto_reqs(only=...)` renders it; `packaging/crypto_reqs.py` reads
+  the literal out of millenai.py with `ast` (never imports it) and
+  writes `crypto-requirements.txt` for the build scripts. It exits 3 on
+  a millenai.py without the list (an old tag in the Windows workflow).
+- **`cai_crypto`**, a delimited section near the top of millenai.py
+  (`# ==== cai_crypto: begin/end ====`), stdlib plus a lazy nacl
+  import, no network code, no logging; the gauntlet execs it alone. M10
+  fills in the primitives. `available()` runs a known-answer test once
+  and remembers it until `reset()`: Ed25519 (RFC 8032 7.1 TEST 1: key,
+  signature, verify, a flipped bit refused), X25519 (RFC 7748 5.2),
+  XChaCha20-Poly1305-IETF (draft-irtf-cfrg-xchacha-03 A.3.1: seal, open,
+  a flipped tag refused) and Argon2id at libsodium's floor (1 pass,
+  8 KiB, PyNaCl 1.6.2's answer). Importing nacl isn't enough: a frozen
+  build without `_cffi_backend`, or a libsodium that answers wrong,
+  never counts as ready. `status()` is (ok, state, why): ready, missing
+  or error.
+- **`_ensure_crypto_deps()`**, beside `_ensure_tzdata`, on a thread at
+  every start: ready, or one install of the pins, or a reason. Its own
+  pip call, `python -m pip install --only-binary=:all: --require-hashes
+  --no-deps -r <temp file>`, then a fresh known-answer test. It installs
+  only into a venv inside this copy's own data folder (`_inside(sys.prefix,
+  app_dir())`): the app's venv qualifies, a frozen build, a system or
+  Homebrew Python and any other venv don't. That rule is the dev-copy
+  guard: a dev or test copy runs on the real app's venv, which its
+  MILLENAI_HOME can never hold, so it never installs into it (it says
+  "the venv isn't this copy's own"). Where cffi is already loaded, or on
+  Windows installed at all (pythonnet loads it when the window opens and
+  a loaded .pyd can't be replaced), only pynacl's pin goes: the Windows
+  zip case.
+- **`/api/stats` carries `crypto`:** `{ok, state, note}`, state ready,
+  installing, missing or error.
+- **Accounts stay off without it (CRY-4).** `ACCOUNTS` (the plan's build
+  flag) is on in dev copies only, until M17. `accounts_gate()` answers
+  (ok, what to say); every account action must ask it before it opens a
+  socket to SYNC_URL, and a gauntlet lint holds every user of SYNC_URL to
+  it. `/api/me` gains `accounts: {on, note}`. With PyNaCl missing or
+  failing, in a build with accounts, Settings › Account shows "Couldn't
+  set up encryption. Accounts need it, and nothing was sent." (while an
+  install runs: "Setting up encryption. Try again in a minute."). The
+  app a person opens has no accounts yet, so it shows nothing.
+- **Test hooks, dev copies only:** `no-nacl` (nacl counts as missing,
+  CRY-4) and `crypto-wheels=<dir>` (the install reads the pinned wheels
+  from a local folder, `--no-index`).
+- **The builds:**
+  - build_macos_app.sh: the build venv gets the hashed pins (not fatal;
+    the app fetches them at its next start), the bundle carries
+    crypto-requirements.txt, and the first-run launcher installs it
+    after pywebview.
+  - build_windows.sh: `deps-3` becomes `deps-4 … pynacl-1.6.2`, so every
+    existing zip setup runs pip once more; the .bat installs the hashed
+    pins from `%~dp0crypto-requirements.txt` before pywebview (so the
+    pinned cffi is the one pywebview finds), not fatal. The zip carries
+    the file.
+  - build_windows_exe.ps1: the hashed pins in their own pip call before
+    `$deps` (fatal: an installer without crypto would leave accounts off
+    for everyone), `--hidden-import _cffi_backend --collect-submodules
+    nacl` for x64 and ARM64 alike, then **the exe's own self-test**:
+    `MillenAI.exe --crypto-selftest <file>` runs before anything else
+    (no window, port or data folder), writes cai_crypto's result as JSON
+    and exits 0 only when it passed; the build throws otherwise. Also:
+    the file's one non-ASCII character (an em-dash in a comment, which
+    its own header warns about) is now ASCII.
+  - windows-installer.yml runs the same self-test as its own step after
+    the build, before WiX. nightly.yml installs the pins into the CI
+    Python before the boot check, and ci_smoke.sh now asserts `crypto`
+    ready on /api/stats (a Python without PyNaCl fails it; the script
+    says how to install the pins).
+- **The gauntlet** installs the pins, hash-checked, into a folder of the
+  run's own and puts it on PYTHONPATH when its Python has no nacl
+  (`SMOKE_CRYPTO_WHEELS=<dir>` keeps that off PyPI). It never installs
+  into the app's venv.
+- Gauntlet: 384 checks become 404 (20 new; 6b316's launcher check
+  now expects deps-4). In-process: the pins (versions, markers, 39
+  distinct hashes, pynacl alone for the zip), the build helper's
+  output equal to the list, cai_crypto exec'd alone passing,
+  seven single-call failures (wrong X25519, a throw, wrong Ed25519 key,
+  an accepted forgery, wrong XChaCha, a tampered box opened, wrong
+  Argon2id) each "error", the hook "missing", no network or log in the
+  section; the install guard (the app on its venv, a dev copy on it,
+  its own venv, not a venv, frozen, a name-prefix neighbour); the pins
+  by case; the SYNC_URL lint and the lint catching a planted user.
+  Live: A ready with accounts on; CRY-4 on a copy with `no-nacl` and
+  SYNC_URL pointed at a counting listener (missing, accounts off with
+  the sentence, no pip, zero connections, then one, the gauntlet's own,
+  as the control); the Account pane's paint run in node (the sentence
+  shown, hidden when ready); three throwaway venvs: one inside its
+  copy's folder installs from the pinned wheels (1.6.2, 2.1.1, 3.0, the
+  pip argv with `--only-binary=:all: --require-hashes --no-deps`, the
+  temp file gone), one with a pynacl wheel one byte longer installs
+  nothing (pip's hash error on /api/stats), one outside its copy's
+  folder (the shared-venv case) installs nothing and runs no pip;
+  `--crypto-selftest` exit 0 and 1, with no data folder made; and the
+  build scripts and workflows. 22 mutations each fail at least one
+  check: no --require-hashes in the app's pip call, the .bat, the ps1
+  or the Mac launcher; pynacl's hashes gone; the known-answer test
+  skipped whole, from the forgery checks on, or its Argon2id answer;
+  the install guard's folder rule gone, and with the venv rule; the
+  hidden import dropped, and moved to x64 only; the ps1's self-test
+  throw and the CI step gone; the gate ignoring crypto; the no-nacl
+  hook ignored; /api/stats without crypto; the pane not painting;
+  deps-3 kept; the smoke's assertion and the nightly's install gone;
+  all three pins on Windows. Two first slipped through (a check that
+  found the throw's text but not its condition, and one fooled by
+  find() returning -1) and were tightened.
+- Verified by hand: the pins installed and passed the known-answer test
+  on Python 3.14 arm64 (the app's venv Python, into a scratch folder),
+  3.9 arm64 with the Command Line Tools' pip 21.2.4, and 3.9 x86_64
+  under Rosetta; the zip built with crypto-requirements.txt in it;
+  ci_smoke.sh green with PyNaCl and red without it.
+- Not verified here: any Windows run (the .bat's pip line, the frozen
+  x64 exe's self-test in CI, the ARM64 frozen build with Qt, the zip on
+  a PC with pythonnet's cffi loaded); build_macos_app.sh end to end (it
+  installs into the real venv) and the launcher's first run on a fresh
+  Mac; an Intel Mac and macOS 11 for real.
+- **Patrick:** build and install-test the ARM64 Inno build in the VM
+  (`build_windows_exe.ps1` under the ARM64 Python; it now stops if the
+  exe's crypto self-test fails, and prints the JSON either way). The
+  first start of this build on each computer installs PyNaCl into the
+  app's venv once, from PyPI, hash-checked.
+- Still open (plan risk): pythonnet below 3.15 means Windows zip users
+  on Python 3.15 can't start the app at all; its own task.
+
 ## 6b326 — cloud only with the switch, SSH keeps its own host list, nothing personal on command lines (accounts step 6)
 The spec's 0a 5.5 (item 5), the isolation half of 5.12 (item 13), and
 5.1 (item 1) apart from its per-profile parts: M6 of the sign-in plan,

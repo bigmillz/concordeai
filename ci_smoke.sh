@@ -50,9 +50,15 @@ PAGE="$HOME_DIR/page.html"
 curl -sf -m 10 -H "Cookie: millen_key_$PORT=$KEY" "http://127.0.0.1:$PORT/" >"$PAGE"
 LEFT=$(grep -oE '__[A-Z_]{3,}__' "$PAGE" | grep -v '^__MAIN__$' | sort -u || true)
 [ -z "$LEFT" ] || { echo "page: unreplaced template tokens: $LEFT"; exit 1; }
-curl -sf -m 10 -H "Cookie: millen_key_$PORT=$KEY" -H "X-Api-Token: $TOKEN" \
-  "http://127.0.0.1:$PORT/api/stats" >/dev/null \
+STATS="$(curl -sf -m 10 -H "Cookie: millen_key_$PORT=$KEY" -H "X-Api-Token: $TOKEN" \
+  "http://127.0.0.1:$PORT/api/stats")" \
   || { echo "api: /api/stats failed"; tail -40 "$LOG"; exit 1; }
+# PyNaCl passed its known-answer test (6b327): accounts need it. A Python
+# without it fails here; install CRYPTO_REQS as the nightly does:
+#   python3 packaging/crypto_reqs.py millenai.py crypto-requirements.txt
+#   python3 -m pip install --only-binary=:all: --require-hashes --no-deps -r crypto-requirements.txt
+CRYPTO="$("$PY" -c 'import json,sys; c=json.load(sys.stdin).get("crypto"); print(json.dumps(c)); sys.exit(0 if isinstance(c, dict) and c.get("ok") is True and c.get("state") == "ready" else 1)' <<<"$STATS")" \
+  || { echo "api: crypto isn't ready: $CRYPTO"; exit 1; }
 # the cookie alone opens the page and nothing under /api (6b321), and
 # the page carries neither the key nor the token
 code=$(curl -s -m 10 -o /dev/null -w "%{http_code}" -H "Cookie: millen_key_$PORT=$KEY" \
@@ -61,4 +67,4 @@ code=$(curl -s -m 10 -o /dev/null -w "%{http_code}" -H "Cookie: millen_key_$PORT
 if grep -qF -e "$TOKEN" -e "$KEY" "$PAGE"; then
   echo "page: carries the key or the token"; exit 1
 fi
-echo "boot: ok (page $(wc -c <"$PAGE" | tr -d ' ') bytes, /api/stats 200)"
+echo "boot: ok (page $(wc -c <"$PAGE" | tr -d ' ') bytes, /api/stats 200, crypto ready)"

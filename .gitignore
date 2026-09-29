@@ -35,3 +35,6 @@ icon_preview.png
 
 # drill transcripts live in ~/Library/Application Support/MillenAI/drill_runs
 drill_runs/
+# generated from CRYPTO_REQS by the build scripts (6b327)
+crypto-requirements.txt
+crypto-selftest.json
