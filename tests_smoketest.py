@@ -287,6 +287,100 @@ RESULTS = []
 # checks assert against the source directly
 _MILLENAI_SRC = open("millenai.py").read()
 
+# (6b329) every personal module-level container in millenai.py is declared
+# profile_cache(...) where it is made. The checks that exec a slice of the
+# source get it as a builtin, so a slice doesn't need the profile
+# sections; _exec_names brings the real one.
+import builtins as _bi329
+_bi329.profile_cache = lambda name, obj, reset=None: obj
+# and threads start through ctx_thread/ctx_timer, which carry the
+# starter's ctx; a slice without the profile sections gets plain threads
+import threading as _th329
+_bi329.ctx_thread = lambda target, ctx=None, **kw: _th329.Thread(target=target, **kw)
+
+
+def _ctx_timer329(interval, fn, args=(), ctx=None):
+    t = _th329.Timer(interval, fn, args)
+    t.daemon = True
+    return t
+
+
+_bi329.ctx_timer = _ctx_timer329
+
+
+# THE PROFILE SECTIONS COME ALONG (6b329). A function exec'd from the
+# source may use a ctx, the profile's write primitives and the cache
+# declarations, so a namespace gets millenai.py's two profile sections
+# first (_exec_names does it for every one); whatever the check put in
+# the namespace itself (a stub _pfile, its own StoreReadError, IS_WIN)
+# wins over them.
+def _prof_sect(tag):
+    return _MILLENAI_SRC[_MILLENAI_SRC.index("# ==== %s: begin ====" % tag):
+                         _MILLENAI_SRC.index("# ==== %s: end ====" % tag)]
+
+
+_PROF_SRC = _prof_sect("profile caches") + "\n" + _prof_sect("profile")
+
+
+def _prof_in(ns):
+    _mine = dict(ns)
+    # the real modules while the sections run (a check's stand-in
+    # threading has no RLock); the check's own come back after
+    for _m in ("os", "json", "threading", "contextlib", "secrets", "tempfile",
+               "hashlib", "time", "re", "shutil", "functools"):
+        ns[_m] = __import__(_m)
+    ns.setdefault("IS_WIN", False)
+    ns.setdefault("TEST_HOOKS", frozenset())
+    ns.setdefault("_hook_arg", lambda name: "")
+    exec(_PROF_SRC, ns)
+    for _m in ("os", "json", "threading", "contextlib", "secrets", "tempfile",
+               "hashlib", "time", "re", "shutil"):
+        ns.pop(_m, None)
+    ns.update(_mine)
+    for _m in ("os", "json", "threading", "contextlib", "secrets", "tempfile",
+               "hashlib", "time", "re", "shutil"):
+        ns.setdefault(_m, __import__(_m))
+
+
+def _prof_ns(ns, d):
+    """ns with the profile sections and a "This computer" ctx on folder d,
+    active and bound to this thread (threads started with ns's ctx_thread
+    carry it). The ctx."""
+    _prof_in(ns)
+    ns["app_dir"] = lambda: d
+    c = ns["ProfileCtx"]("local", d)
+    ns["_PROFILE"]["ctx"] = c
+    ns["bind_ctx"](c)
+    return c
+
+
+def _pref_stubs(ns, keep_ctx=False):
+    """(6b329) the settings accessors (machine_prefs, user_prefs(ctx),
+    profile_local(ctx) and their updates) as stand-ins that read and write
+    through the namespace's own load_prefs/store_prefs stubs, looked up at
+    each call, as the code did before the split. keep_ctx: a real ctx is
+    bound (_prof_ns), so bound_ctx stays. Returns ns."""
+    def _load():
+        return dict(ns["load_prefs"](None))
+
+    def _upd(fn):
+        d = _load()
+        fn(d)
+        if ns.get("store_prefs"):
+            ns["store_prefs"](d, None)
+        return d
+    ns.update(machine_prefs=lambda strict=False: _load(),
+              user_prefs=lambda ctx=None, strict=False: _load(),
+              profile_local=lambda ctx=None, strict=False: _load(),
+              machine_prefs_update=_upd,
+              user_prefs_update=lambda ctx, fn: _upd(fn),
+              profile_local_update=lambda ctx, fn: _upd(fn),
+              STUDIO_NEG="neg",
+              home_area=lambda: str(_load().get("home_area") or "").strip())
+    if not keep_ctx:
+        ns.update(bound_ctx=lambda: None, NoProfile=RuntimeError)
+    return ns
+
 
 def check(name, ok, detail=""):
     RESULTS.append((name, bool(ok), detail))
@@ -468,8 +562,11 @@ _pk = [req(p, m, d, headers={hd: "1.2.3.4"})[0]
                   "True-Client-IP", "X-Forwarded-Host")
        for p, m, d in (("/api/chats", "GET", None), ("/api/prefs", "POST", {"length": 3}),
                        ("/", "GET", None))]
-_dbm = re.search(r"\n    def _data_base\(self\):.*?(?=\n    def |\n    # -)", _MILLENAI_SRC, re.S)
-_dbs = _dbm.group(0) if _dbm else ""
+# (6b329) the seam is the profile ctx now: a request takes current_ctx()
+# once, at its start, and nothing it carries picks the folder
+_dbm = re.search(r"\ndef current_ctx\(\).*?(?=\n\n\ndef )", _MILLENAI_SRC, re.S)
+_dbs = (_dbm.group(0) if _dbm and "        self.ctx = current_ctx()\n"
+        in _MILLENAI_SRC and "_data_base" not in _MILLENAI_SRC else "")
 check("one identity: a forged millen_user reads the root and makes no users/; nothing gets in through a proxy",
       [x[0] for x in _px] == [200] * 3 and [x[2] for x in _px] == [x[2] for x in _pl]
       and _CANARY_A.encode() in _px[0][2]
@@ -813,7 +910,7 @@ check("export delivery: octet-stream, attachment, nosniff, per-identity",
       and "X-Content-Type-Options" in _MILLENAI_SRC
       and "_x_disposition(nm)" in _MILLENAI_SRC
       and "export_dir(base)" in _MILLENAI_SRC
-      and "self._data_base()" in _MILLENAI_SRC
+      and "            base = self.ctx\n" in _MILLENAI_SRC
       and "filename*=UTF-8''" in _MILLENAI_SRC)
 # the box, and the token that must never reach a clipboard
 check("download box: placeholder-safe, stripped from copy and speak",
@@ -871,8 +968,10 @@ check("the hot status endpoint is cheap and the idle strip cheaper",
 # cloud.json: four threads resting four providers at once must never
 # lose a key or leave the file unreadable (it did in 71 of 500 rounds)
 _cd = _LH["tempfile"].mkdtemp(); _cf = os.path.join(_cd, "cloud.json")
-_cns = dict(_LH, CLOUD_FILE=_cf, QUOTA_COOLDOWN=600.0, IS_WIN=False,
+_cns = dict(_LH, QUOTA_COOLDOWN=600.0, IS_WIN=False,
             hmac=__import__("hmac"), hashlib=__import__("hashlib"))
+# (6b329) cloud.json is the profile's: a ctx on _cd, carried into the threads
+_prof_ns(_cns, _cd)
 import ast as _ast
 _ctree = _ast.parse(_MILLENAI_SRC)
 exec(_MILLENAI_SRC[_MILLENAI_SRC.index("try:\n    import fcntl as _fcntl"):
@@ -881,9 +980,9 @@ exec(_MILLENAI_SRC[_MILLENAI_SRC.index("try:\n    import fcntl as _fcntl"):
 for _n in _ctree.body:
     if (isinstance(_n, _ast.FunctionDef) and _n.name in (
             "_cloud_all", "_cloud_save_state", "cloud_cool", "_replace_into",
-            "_cloud_patch", "_same_key", "_key_fp")) or (
+            "_cloud_patch", "_same_key", "_key_fp", "_cloud_file")) or (
             isinstance(_n, _ast.Assign) and getattr(_n.targets[0], "id", "")
-            in ("_KEY_FP_SALT", "_FAIL_FIELDS")):
+            in ("_KEY_FP_SALT", "_FAIL_FIELDS", "CLOUD_NAME")):
         exec(_ast.get_source_segment(_MILLENAI_SRC, _n), _cns)
 _bad = 0
 for _r in range(60):
@@ -892,7 +991,7 @@ for _r in range(60):
     _bar = _cns["threading"].Barrier(4)
     def _w(p):
         _bar.wait(); _cns["cloud_cool"](p, "rest", 60, key="K" + p)
-    _ts = [_cns["threading"].Thread(target=_w, args=(p,)) for p in "abcd"]
+    _ts = [_cns["ctx_thread"](target=_w, args=(p,)) for p in "abcd"]
     [x.start() for x in _ts]; [x.join() for x in _ts]
     try:
         # every key kept AND every rest landed: a write that silently
@@ -937,6 +1036,7 @@ _GNS.update(
         "video": {"w": 640, "h": 384, "steps": 20, "frames": 33}}[k],
     _snap_dir=lambda r: "/nonexistent",
     load_prefs=lambda b=None: {}, store_prefs=lambda d, b=None: None)
+_pref_stubs(_GNS)
 try:
     # ONE dict for globals and locals: split them and the module's own
     # helpers resolve against the wrong namespace
@@ -1746,6 +1846,7 @@ _mns.update(
         <= _MD["fit"],
     load_prefs=lambda base=None: dict(_MD["prefs"]),
     store_prefs=lambda d, base=None: _MD.update(prefs=dict(d)))
+_pref_stubs(_mns)
 
 
 def _fake_remove(want):
@@ -1901,6 +2002,7 @@ check("update status answers", s == 200 and b'"state"' in b, b[:80])
 # two boxes. Run for real against the inventories his keys returned on
 # 2026-09-22.
 def _exec_names(ns, names):
+    _prof_in(ns)
     for _n in _ctree.body:
         nm = getattr(_n, "name", None)
         if nm is None and isinstance(_n, _ast.Assign):
@@ -1924,7 +2026,7 @@ encodeURIComponent getComputedStyle innerHeight innerWidth isFinite
 localStorage location matchMedia navigator parseFloat parseInt performance
 requestAnimationFrame setInterval setTimeout window
 DOMException Headers IntersectionObserver MutationObserver
-TextEncoder Uint8Array Int32Array crypto RegExp""".split())
+TextEncoder Uint8Array Int32Array crypto RegExp sessionStorage""".split())
 # (6b322) the chat store's prefix hash and random chat ids use the four
 # on the last line; each exists on window in WKWebView, WebView2 and Qt
 # no bare fetch (6b321): the page's one fetch is window.fetch, saved by
@@ -2083,6 +2185,7 @@ for _fn in ("fleet_key", "fleet_workers.json", "contrib_ledger.json"):
 _rc.update(app_dir=lambda: _rc_dir, _prefs_lock=__import__("threading").RLock(),
            load_prefs=lambda b=None: dict(_rc_prefs),
            store_prefs=lambda d, b=None: (_rc_prefs.clear(), _rc_prefs.update(d)))
+_pref_stubs(_rc)
 _exec_names(_rc, {"_retire_contribute"})
 _rc["_retire_contribute"]()
 _GONE = ("_contrib_loop", "contrib_apply", "fleet_run", "fleet_pick",
@@ -2853,6 +2956,7 @@ def _nom_open(url, timeout=0):
 _gns = {"json": json, "APP_VERSION": "t", "load_prefs": lambda ident=None: {},
         "urllib": _ty23.SimpleNamespace(parse=urllib.parse, request=_ty23.SimpleNamespace(
             Request=lambda url, headers=None: url, urlopen=_nom_open))}
+_pref_stubs(_gns)
 _exec_names(_gns, {"_geo_cache", "_geocode"})
 _gk = _gns["_geocode"]("Katz's Delicatessen york")
 _pc = [("york", ["Katz's Delicatessen", "Russ & Daughters", "Brain"]),
@@ -3224,7 +3328,8 @@ check("per-task review fixes: titles per request, badge, sweeps",
       and "hurry=hurry_ev)" in _MILLENAI_SRC
       and "_fast = fast_cloud_ladder()" in _MILLENAI_SRC
       # (6b326) the ticket is per chat, and a new question voids its own
-      and "_last_cloud.pop((str(self._data_base()), _title_cid), None)" in _MILLENAI_SRC
+      # (6b329) keyed by the profile's name, and emptied at a switch
+      and "_last_cloud.pop((self.ctx.name, _title_cid), None)" in _MILLENAI_SRC
       and 'json.dumps({"w": "cloud"})' in _MILLENAI_SRC
       and 'd.w==="cloud"' in page
       and "if images and not cloud_only and not _vis_cloud and not _vis_local:" in _MILLENAI_SRC
@@ -3253,6 +3358,7 @@ _gz.update(MODEL_MEM_BYTES={l: i["mem"] for l, i in _gz["MODEL_INFO"].items()},
            no_limits=lambda: _GP["no_limits"],
            load_prefs=lambda base=None: dict(_GP),
            _starter_labels=lambda: [], MODEL_ROUTES={})
+_pref_stubs(_gz)
 _exec_names(_gz, {"GIANT_GB", "_giants", "giants_on", "model_is_giant",
                   "model_fits_machine", "plan_labels", "_plan_labels",
                   "_family_of", "_gen_of"})
@@ -3941,7 +4047,7 @@ _UN = {"USAGE_FILE", "USAGE_RAW_DAYS", "USAGE_HOURLY_DAYS", "USAGE_COMPACT_BYTES
        "_usage_est", "_usage_est_in", "usage_counts", "usage_note", "usage_put",
        "_usage_writer", "_usage_write_all", "usage_flush", "_usage_load", "usage_read",
        "_usage_backfill", "usage_compact", "_usage_floor", "_usage_next", "usage_query",
-       "_usage_edges", "_usage_at_exit", "_replace_into"}
+       "_usage_edges", "_usage_at_exit", "_replace_into", "_usage_flush_one", "_URec"}
 
 
 class _SRE25(Exception):
@@ -5490,6 +5596,7 @@ def _wx_feed(age_min, sun_hour, desc="Sunny", ask="what's the weather in Chicago
           "_venue_now": lambda tz="": _tm18.localtime(),
           "_tl_search": _t17.SimpleNamespace(), "_geocode": lambda q: None,
           "load_prefs": lambda ident=None: {"home_area": home}}
+    _pref_stubs(ns)
     _exec_names(ns, _WXN | {"weather_snippets"})
     return ns["weather_snippets"](ask)
 _wxf = {"fresh day": _wx_feed(30, 13), "stale": _wx_feed(180, 13),
@@ -5703,7 +5810,10 @@ class _NoFchmod:
         return getattr(_os20, n)
 _cw = {"os": _NoFchmod(), "tempfile": _tf20, "json": json, "IS_WIN": True, "time": time,
        "CLOUD_FILE": _os20.path.join(_cw_dir, "cloud.json")}
-_exec_names(_cw, {"_cloud_write", "_replace_into"})
+# (6b329) the profile's cloud.json, through the profile's writer
+_prof_ns(_cw, _cw_dir)
+_exec_names(_cw, {"_cloud_write", "_cloud_write_to", "CLOUD_NAME", "_hook_delay",
+                  "_replace_into"})
 try:
     _cw["_cloud_write"]({"providers": {"groq": {"key": "k"}}})
     _cw_ok = json.load(open(_cw["CLOUD_FILE"])) == {"providers": {"groq": {"key": "k"}}}
@@ -5712,12 +5822,12 @@ except Exception as _e:
 _cw_left = [f for f in _os20.listdir(_cw_dir) if f.endswith(".tmp")]
 import contextlib as _cl20
 _css = {"_cloud_txn": _cl20.nullcontext, "_cloud_read_strict": lambda: {},
-        "_cloud_write": lambda d: None}
+        "_cloud_write_to": lambda c, d: None}
 _exec_names(_css, {"_cloud_save_state"})
-_css_ok = _css["_cloud_save_state"]("groq", {"status": "ok"})
-def _css_boom(d): raise AttributeError("module 'os' has no attribute 'fchmod'")
-_css["_cloud_write"] = _css_boom
-_css_bad = _css["_cloud_save_state"]("groq", {"status": "ok"})
+_css_ok = _css["_cloud_save_state"](None, "groq", {"status": "ok"})
+def _css_boom(c, d): raise AttributeError("module 'os' has no attribute 'fchmod'")
+_css["_cloud_write_to"] = _css_boom
+_css_bad = _css["_cloud_save_state"](None, "groq", {"status": "ok"})
 check("Windows: a cloud key is saved without os.fchmod, and a failed save isn't called saved",
       _cw_ok is True and not _cw_left and _css_ok is True and _css_bad is False
       and _M.count('self._send_json({"ok": False, "err": _KEY_NOT_SAVED})') == 2,
@@ -5743,7 +5853,7 @@ except PermissionError:
     _rp_mac = "raised"
 check("Windows: settings and cloud writes wait out a reader instead of failing",
       _rp_win == 3 and _rp_mac == "raised"
-      and "        _replace_into(tmp, p)" in _M and "        _replace_into(tmp, CLOUD_FILE)" in _M,
+      and "        _replace_into(tmp, p)" in _M and "    _write_raw(CLOUD_NAME, " in _M,
       "%r" % [_rp_win, _rp_mac])
 
 # the venue's clock on Windows: offsets, not /etc/localtime; tzdata installs
@@ -5757,7 +5867,7 @@ check("Windows: the venue clock compares offsets; tzdata comes with setup or on 
       _vh["_venue_is_host"](_same) is True
       and _vh["_venue_is_host"](_diff) is False
       and _vh["_venue_is_host"]("Not/AZone") is True
-      and "threading.Thread(target=_ensure_tzdata, daemon=True).start()" in _M
+      and "ctx_thread(target=_ensure_tzdata, daemon=True).start()" in _M
       and "if tzname and where and not _venue_is_host(tzname):" in _M
       and '"%PIP%" install pywebview==6.2.1 ddgs psutil tzdata' in open("build_windows.sh").read()
       and '"--collect-data", "tzdata"' in open("build_windows_exe.ps1").read(),
@@ -5816,13 +5926,13 @@ def _ssh_fake_run(argv, **k):
 _sr = {"subprocess": _t17.SimpleNamespace(run=_ssh_fake_run, TimeoutExpired=Exception),
        "_ssh_config": lambda c: "Host x\n", "os": _os20, "re": re,
        "run_file": lambda *a: "/nonexistent/run/ssh-x.conf", "drop_run_file": lambda p: None,
-       "REMOTE_KNOWN_HOSTS": __file__, "_remote_resolved": lambda c, again=False: c,
+       "REMOTE_KNOWN_HOSTS": __file__, "_known_hosts_path": lambda: __file__, "_remote_resolved": lambda c, again=False: c,
        "shutil": __import__("shutil")}
 _exec_names(_sr, {"ssh_run", "_ssh_once", "_ssh_argv", "_ssh_script", "SSH_ALIAS", "SSH_SHELL",
                   "_SSH_RESOLVE_RX", "_SSH_HOSTKEY_RX", "SSH_OWN_SETTINGS", "SSH_KEY_CHANGED",
                   "_REMOTE_FIELDS", "_SSH_CHANGED_RX", "_SSH_CHANGED"})
 _sr_out = _sr["ssh_run"]({}, "systemctl status nginx")
-_sa = {"os": _os20, "re": re, "IS_WIN": True, "IS_MAC": False, "REMOTE_KNOWN_HOSTS": "C:\\A\\kh"}
+_sa = {"os": _os20, "re": re, "IS_WIN": True, "IS_MAC": False, "REMOTE_KNOWN_HOSTS": "C:\\A\\kh", "_known_hosts_path": lambda: "C:\\A\\kh"}
 _exec_names(_sa, {"_ssh_config", "_ssh_path", "_ssh_quote", "_ssh_port", "_ssh_jump", "_hop_split", "_hop_join",
                   "_ssh_fields", "_ssh_path_ok", "SSH_ALIAS", "_SSH_HOST_RX", "_SSH_USER_RX", "_SSH_JUMP_RX"})
 check("Windows: no console window flashes; ssh reads UTF-8; quoted paths are accepted",
@@ -6241,7 +6351,7 @@ _STORE_NAMES = {"StoreReadError", "READ_FAIL", "_read_json", "_write_json",
 _scn = {"os": os, "json": json, "tempfile": tempfile, "time": time, "IS_WIN": False,
         "re": re, "secrets": __import__("secrets"), "hashlib": __import__("hashlib"),
         "threading": __import__("threading"), "shutil": shutil}
-_scn["_pfile"] = lambda name, base=None: os.path.join(base, name)
+_scn["_pfile"] = lambda name, base=None: os.path.join(getattr(base, "dir", base), name)
 # the whole store (6b324: the .v2 file and its legacy catch-up come along)
 _exec_names(_scn, _STORE_NAMES)
 with _tf318.TemporaryDirectory() as _scd:
@@ -6307,7 +6417,9 @@ import hashlib as _hl22
 _cs = {"os": os, "json": json, "tempfile": tempfile, "time": time, "re": re,
        "secrets": __import__("secrets"), "hashlib": _hl22,
        "threading": __import__("threading"), "IS_WIN": False}
-_cs["_pfile"] = lambda name, base=None: os.path.join(base, name)
+_cs["_pfile"] = lambda name, base=None: os.path.join(getattr(base, "dir", base), name)
+# (6b329) a profile write takes run/profile.lock under app_dir()
+_cs["app_dir"] = (lambda _d=tempfile.mkdtemp(dir=_SMOKE_TMP): _d)
 _cs["shutil"] = shutil
 _exec_names(_cs, _STORE_NAMES)
 
@@ -7404,10 +7516,13 @@ try:
 except (OSError, ValueError):
     _pf24b = {}
 with tempfile.TemporaryDirectory() as _ad2d:
+    # (6b329) the six are PROFILE_LOCAL: "This computer"'s ctx on the folder
+    _ad2c = _ws["ProfileCtx"]("local", _ad2d)
+    _ws["_PROFILE"]["ctx"] = _ad2c
     _ad2 = _ws["prefs_adopt"]({"remote_autonomy": "wild", "tier": 5, "adv": [1], "council": [1],
-                               "model": "", "advon": "yes", "codeagent": "Workspace", "bogus": 1}, _ad2d)
+                               "model": "", "advon": "yes", "codeagent": "Workspace", "bogus": 1}, _ad2c)
     _ad2f = _jl(_ad2d, "prefs.json")
-    _ad3 = _ws["prefs_adopt"]({"codeagent": "Coding", "council": ["Hermes 3 8B"]}, _ad2d)
+    _ad3 = _ws["prefs_adopt"]({"codeagent": "Coding", "council": ["Hermes 3 8B"]}, _ad2c)
     _ad3f = _jl(_ad2d, "prefs.json")
 check("the six keys' first-run post takes only missing, well-formed keys (Q10)",
       _ad2.get("took") == ["codeagent"] and _ad2f == {"codeagent": "Workspace"}
@@ -7733,8 +7848,10 @@ check("ISO-14: a boot code past its life gets 403 and no cookie",
 # the four sites goes back to <unix time>-<6 hex>.
 _mid = tempfile.mkdtemp(dir=_SMOKE_TMP)
 _mn = {"os": os, "secrets": __import__("secrets"), "IMAGE_DIR": _mid}
-_exec_names(_mn, {"_media_id", "_write_image_bytes"})
-_mp = [os.path.basename(_mn["_write_image_bytes"](d)) for d in
+_exec_names(_mn, {"_media_id", "_write_image_bytes", "IMAGE_SUB"})
+# (6b329) a picture lands in the profile that asked: a ctx on the folder
+_mnc = _prof_ns(_mn, _mid)
+_mp = [os.path.basename(_mn["_write_image_bytes"](_mnc, d)) for d in
        (b"\x89PNG\r\n\x1a\n" + b"0" * 32, b"\xff\xd8\xff" + b"0" * 32,
         b"RIFF\0\0\0\0WEBP" + b"0" * 32)]
 check("ISO-14: new pictures and videos get a 32-hex random name",
@@ -7742,8 +7859,11 @@ check("ISO-14: new pictures and videos get a 32-hex random name",
       and len(set(_mp)) == 3
       and _MILLENAI_SRC.count("secrets.token_hex(3)") == 1       # the remote job's unit name
       and 'unit = "concorde-job-%s" % secrets.token_hex(3)' in _MILLENAI_SRC
-      and _MILLENAI_SRC.count("= _media_id()") == 2
-      and _MILLENAI_SRC.count("os.path.join(VIDEO_DIR, _media_id() + \".mp4\")") == 2
+      # (6b329) the four: a cloud picture, a render landing, a Veo clip, the def
+      and _MILLENAI_SRC.count("_media_id()") == 4
+      and "    iid = _media_id()\n" in _MILLENAI_SRC
+      and '    name = IMAGE_SUB + "/" + _media_id() + ext\n' in _MILLENAI_SRC
+      and 'name = VIDEO_SUB + "/" + _media_id() + ".mp4"\n' in _MILLENAI_SRC
       and "    return secrets.token_hex(16)\n" in _MILLENAI_SRC,
       "%r" % _mp)
 
@@ -8679,7 +8799,10 @@ _exec_names(_ns26, {"_cloud_lock", "_cloud_depth", "_cloud_txn", "_cloud_read_st
                     "cloud_model_resting", "_dead_models", "_dead_lock", "_dead_when",
                     "_cloud_ticket", "_ticket_conf", "_mark_answered", "_answered",
                     "cloud_allowed", "gate_ladder", "make_title", "_extract_memory",
-                    "_clean_title", "TITLE_PROMPT"})
+                    "_clean_title", "TITLE_PROMPT", "CLOUD_NAME", "_cloud_file",
+                    "_cloud_write_to"})
+# (6b329) cloud.json is the profile's: a ctx on _cd26, bound here
+_prof_ns(_ns26, _cd26)
 # (a def's source leaves its decorator behind)
 _ns26["_cloud_txn"] = _cx26.contextmanager(_ns26["_cloud_txn"])
 
@@ -8760,6 +8883,7 @@ _ns26.update(cloud_role_model=lambda pid, c, role: "m-utility",
              MODEL_MEM_BYTES={}, _engine_up=lambda p: False,
              run_model=lambda *a, **k: _calls26.append("LOCAL"),
              MEMORY_PROMPT="facts: ", load_prefs=lambda b=None: {"turbo": True})
+_pref_stubs(_ns26, keep_ctx=True)
 _t1 = _ns26["make_title"]("a question about lighthouses", conf=_tk)
 _cf26(dict(_new26, key="REPLACED-KEY"))
 _t2 = _ns26["make_title"]("a question about lighthouses", conf=_tk)
@@ -8919,10 +9043,10 @@ _sn_pc = _sn["studio_needs"]("image")
 check("review fixes: the glitch checks and rests under the lock, `off` removes under it, "
       "revive after the write, titles per chat, the switch shows what saved, the no-key lines",
       _seen26 == [("live", 1), ("rest", 1)]
-      and "with _cloud_txn():\n                    try:\n                        os.remove(CLOUD_FILE)" in _ks
+      and "with _cloud_txn():\n                    try:\n                        self.ctx.remove(CLOUD_NAME)" in _ks
       and _ks.index("cloud_revive(found + [model])") > _ks.index('"status": "ok"},\n                                         make_active=True)')
       and "body:JSON.stringify({text:text,chat_id:c.id})" in _MILLENAI_SRC
-      and "_last_cloud.get((str(self._data_base()), _tcid))" in _MILLENAI_SRC
+      and "_last_cloud.get((self.ctx.name, _tcid))" in _MILLENAI_SRC
       and '$("#turbo").checked=!on;' in _MILLENAI_SRC
       and "Cloud power is off, so these and a cloud compositor sit out." in _MILLENAI_SRC
       and "and your saved key reads \"\n                        \"pictures now." in _MILLENAI_SRC
@@ -9041,7 +9165,8 @@ check("read-aloud on Windows: the text is written off the lock, so Stop answers 
 # runner puts the words back inside the tool's own process
 _gi = dict(_LH, secrets=_se26)
 _exec_names(_gi, {"generate_image", "generate_video", "prompt_cmd", "_PROMPT_RUNNER",
-                  "run_file", "drop_run_file", "RenderBusy"})
+                  "run_file", "drop_run_file", "RenderBusy", "_media_land", "IMAGE_SUB",
+                  "VIDEO_SUB"})
 _gseen, _grc = [], [0]
 
 
@@ -9067,17 +9192,19 @@ _gi.update(app_dir=lambda: _gdir, image_ready=lambda: True, video_ready=lambda: 
            engine_cfg=lambda k: {"fps": 24}, _ffmpeg_convert=lambda s, f, fps: s,
            STUDIOS={"image": {"venv": "/v/img"}, "video": {"venv": "/v/vid", "module": "m.gen"}},
            cloud_allowed=lambda c=False: False, _cloud_all=lambda: {"providers": {}})
+# (6b329) renders are made in run/ and land in the asking profile's folder
+_gctx = _prof_ns(_gi, _gdir)
 _PC26, _NC26 = _canary("prompt"), _canary("negative")
-_gi["generate_image"](_PC26)
-_gi["generate_video"](_PC26, {"neg": _NC26})
+_gi["generate_image"](_gctx, _PC26)
+_gi["generate_video"](_gctx, _PC26, {"neg": _NC26})
 _grc[0] = 1
 try:
-    _gi["generate_image"](_PC26)
+    _gi["generate_image"](_gctx, _PC26)
 except Exception:
     pass
 _grc[0] = 9
 try:
-    _gi["generate_video"](_PC26, {"neg": _NC26})
+    _gi["generate_video"](_gctx, _PC26, {"neg": _NC26})
 except Exception:
     pass
 _g_argv_clean = all(_PC26 not in " ".join(c) and _NC26 not in " ".join(c) for c, _m, _w in _gseen)
@@ -9143,7 +9270,7 @@ _swn = _sw["sweep_run_files"]()
 check("a start sweeps the prompt, speech and ssh files a crash left under run/, nothing else",
       _swn == 3 and sorted(os.listdir(os.path.join(_rdir, "run"))) == ["instance.json",
                                                                        "instance.lock"]
-      and "        _migrate_61()\n        sweep_run_files()" in _MILLENAI_SRC,
+      and "        _migrate_61(_root)\n        sweep_run_files()" in _MILLENAI_SRC,
       "%r" % [_swn, sorted(os.listdir(os.path.join(_rdir, "run")))])
 
 # the SSH config: every field checked, so a newline, quote or `${` can't
@@ -9151,7 +9278,7 @@ check("a start sweeps the prompt, speech and ssh files a crash left under run/, 
 # backslashes escaped; DOMAIN\user reaches ssh as one backslash; ports are
 # ASCII 1-65535; the jump host is `[user@]host[:port]` hops. Read back by
 # ssh itself (`ssh -G -F <file>`, the generated file only).
-_sc = {"os": os, "re": re, "IS_WIN": False, "IS_MAC": False, "REMOTE_KNOWN_HOSTS": "/A B/100%/remote_known_hosts"}
+_sc = {"os": os, "re": re, "IS_WIN": False, "IS_MAC": False, "REMOTE_KNOWN_HOSTS": "/A B/100%/remote_known_hosts", "_known_hosts_path": lambda: "/A B/100%/remote_known_hosts"}
 _exec_names(_sc, {"_ssh_config", "_ssh_path", "_ssh_quote", "_ssh_port", "_ssh_jump", "_hop_split", "_hop_join",
                   "_ssh_fields", "_ssh_path_ok", "SSH_ALIAS", "_SSH_HOST_RX", "_SSH_USER_RX", "_SSH_JUMP_RX"})
 _scf = _sc["_ssh_config"]
@@ -9267,6 +9394,7 @@ def _so_run(argv, **k):
 
 _so.update(subprocess=_t17.SimpleNamespace(run=_so_run, TimeoutExpired=_SoErr),
            _ssh_config=lambda c: "Host x\n", REMOTE_KNOWN_HOSTS=__file__,
+           _known_hosts_path=lambda: __file__,
            run_file=lambda *a: "/r/run/ssh-q.conf", drop_run_file=lambda p: None,
            shutil=_t17.SimpleNamespace(which=lambda n: "/usr/bin/ssh"),
            _remote_resolved=lambda c, again=False: dict(c, host="real.example") if again else c)
@@ -9300,7 +9428,10 @@ _fk = {"os": os, "re": re, "IS_WIN": False, "base64": _b6426, "hmac": _hm26,
        "hashlib": _hl26, "tempfile": tempfile, "time": time}
 _fkh = os.path.join(_rdir, "remote_known_hosts")
 _exec_names(_fk, {"ssh_forget_host", "_ssh_fields", "_ssh_path_ok", "_ssh_port", "_ssh_jump", "_hop_split", "_hop_join", "_SSH_HOST_RX",
-                  "_SSH_USER_RX", "_SSH_JUMP_RX", "_replace_into"})
+                  "_SSH_USER_RX", "_SSH_JUMP_RX", "_replace_into", "KNOWN_HOSTS_NAME",
+                  "_known_hosts_path"})
+# (6b329) the list is the profile's: a ctx on the folder that holds it
+_prof_ns(_fk, _rdir)
 _fk["REMOTE_KNOWN_HOSTS"] = _fkh
 _fk_ok = None
 if shutil.which("ssh-keygen"):
@@ -9380,7 +9511,7 @@ check("one run's snapshot: ssh -G at most once, a mid-run edit stands, a failing
 # migration, marked key_src "config", and then without IdentitiesOnly;
 # IdentityAgent comes across (and is refused when it could add a
 # directive); the keychain lines on a Mac
-_rv = {"os": os, "re": re, "IS_WIN": False, "IS_MAC": True, "REMOTE_KNOWN_HOSTS": "/k/rkh"}
+_rv = {"os": os, "re": re, "IS_WIN": False, "IS_MAC": True, "REMOTE_KNOWN_HOSTS": "/k/rkh", "_known_hosts_path": lambda: "/k/rkh"}
 _exec_names(_rv, {"_ssh_resolve", "_ssh_key_from", "_SSH_DEFAULT_KEYS", "_ssh_config",
                   "_ssh_path", "_ssh_quote", "_ssh_port", "_ssh_jump", "_hop_split", "_hop_join", "_ssh_fields", "_ssh_path_ok",
                   "_ssh_path_ok", "SSH_ALIAS", "_SSH_HOST_RX", "_SSH_USER_RX", "_SSH_JUMP_RX"})
@@ -9421,7 +9552,10 @@ _fk2 = {"os": os, "re": re, "IS_WIN": False, "base64": _b6426, "hmac": _hm26,
 _exec_names(_fk2, {"ssh_forget_host", "_ssh_fields", "_ssh_path_ok", "_ssh_port", "_ssh_jump", "_hop_split", "_hop_join",
                    "_SSH_HOST_RX", "_SSH_USER_RX", "_SSH_JUMP_RX", "_replace_into",
                    "drop_run_file"})
-_fkh2 = os.path.join(_rdir, "rkh2")
+_rdir2 = tempfile.mkdtemp(dir=_SMOKE_TMP)
+_fkh2 = os.path.join(_rdir2, "remote_known_hosts")
+_exec_names(_fk2, {"KNOWN_HOSTS_NAME", "_known_hosts_path"})
+_prof_ns(_fk2, _rdir2)
 _fk2["REMOTE_KNOWN_HOSTS"] = _fkh2
 _f2_ok = None
 if shutil.which("ssh-keygen"):
@@ -9449,11 +9583,12 @@ if shutil.which("ssh-keygen"):
         _raised = False
     except OSError:
         _raised = True
-    _tmp_left = [f for f in os.listdir(_rdir) if f.startswith(".rkh-")]
+    _tmp_left = [f for f in os.listdir(_rdir2) if f.startswith((".rkh-", ".remote_known_hosts-"))]
     _f2_ok = (_n_named == 1 and len(_left_named) == 1 and _n_hops == 2 and _raised
               and not _tmp_left)
 _rs = {"os": os, "json": json, "tempfile": tempfile, "REMOTE_FILE": os.path.join(_rdir, "rj.json")}
-_exec_names(_rs, {"_remote_save", "drop_run_file"})
+_exec_names(_rs, {"_remote_save", "drop_run_file", "REMOTE_NAME"})
+_prof_ns(_rs, _rdir)        # (6b329) remote.json is the profile's
 _rs["_replace_into"] = lambda a, b: (_ for _ in ()).throw(OSError("read-only"))
 _rs["_remote_save"]({"host": "h"})
 check("Forget takes the host ssh named, or the server and its jump hosts; errors come back "
@@ -9520,7 +9655,8 @@ _m_old = _mg["_remote_merge"](_OLD, {"host": "old-alias", "user": "deploy", "por
 _m_port = _mg["_remote_merge"](_MIG, dict(_FORM, port="2201"))
 _m_key = _mg["_remote_merge"](_MIG, dict(_FORM, key="/k/other", jump="me@j2:22"))
 _rs2 = {"os": os, "json": json, "tempfile": tempfile, "REMOTE_FILE": os.path.join(_rdir, "rj2.json")}
-_exec_names(_rs2, {"_remote_save", "drop_run_file", "_replace_into"})
+_exec_names(_rs2, {"_remote_save", "drop_run_file", "_replace_into", "REMOTE_NAME"})
+_prof_ns(_rs2, tempfile.mkdtemp(dir=_SMOKE_TMP))
 _rs2["IS_WIN"], _rs2["time"] = False, time
 _save_ok = _rs2["_remote_save"]({"host": "h"})
 _rs2["_replace_into"] = lambda a, b: (_ for _ in ()).throw(OSError("read-only"))
@@ -9538,7 +9674,7 @@ check("Save/Test leaves a saved setup alone when the form is unchanged, keeps wh
       "%r" % [_m_same, _m_old, _m_port, _m_key, _save_ok, _save_bad])
 
 # hops as ssh -G prints them: an address in brackets, IPv6 kept in them
-_hp = {"os": os, "re": re, "IS_WIN": False, "IS_MAC": False, "REMOTE_KNOWN_HOSTS": "/k/rkh"}
+_hp = {"os": os, "re": re, "IS_WIN": False, "IS_MAC": False, "REMOTE_KNOWN_HOSTS": "/k/rkh", "_known_hosts_path": lambda: "/k/rkh"}
 _exec_names(_hp, {"_ssh_resolve", "_ssh_key_from", "_SSH_DEFAULT_KEYS", "_ssh_config",
                   "_ssh_path", "_ssh_quote", "_ssh_port", "_ssh_jump", "_hop_split", "_hop_join", "_ssh_fields",
                   "_ssh_path_ok", "_hop_split", "_hop_join", "SSH_ALIAS", "_SSH_HOST_RX",
@@ -9592,7 +9728,10 @@ _fk3 = {"os": os, "re": re, "IS_WIN": False, "base64": _b6426, "hmac": _hm26,
         "hashlib": _hl26, "tempfile": tempfile, "time": time}
 _exec_names(_fk3, {"ssh_forget_host", "_ssh_fields", "_ssh_path_ok", "_ssh_port", "_ssh_jump", "_hop_split", "_hop_join", "_SSH_HOST_RX", "_SSH_USER_RX", "_SSH_JUMP_RX",
                    "_replace_into", "drop_run_file"})
-_fkh3 = os.path.join(_rdir, "rkh3")
+_rdir3 = tempfile.mkdtemp(dir=_SMOKE_TMP)
+_fkh3 = os.path.join(_rdir3, "remote_known_hosts")
+_exec_names(_fk3, {"KNOWN_HOSTS_NAME", "_known_hosts_path"})
+_prof_ns(_fk3, _rdir3)
 _fk3["REMOTE_KNOWN_HOSTS"] = _fkh3
 _hz_ok = None
 if shutil.which("ssh-keygen"):
@@ -10198,7 +10337,7 @@ check("install: tried once per build and Python (a failure again after 3 days); 
       "%r" % [_k7, _sh7, _shok7, _pw7])
 check("install: only the copy holding the instance lock starts it",
       _MILLENAI_SRC.count("target=_ensure_crypto_deps") == 1
-      and "    if _INSTANCE_LOCK:\n        threading.Thread(target=_ensure_crypto_deps" in _MILLENAI_SRC)
+      and "    if _INSTANCE_LOCK:\n        ctx_thread(target=_ensure_crypto_deps" in _MILLENAI_SRC)
 
 # the builds: every one installs the pins hash-checked; the frozen exe
 # carries _cffi_backend on x64 and ARM64 and must pass its self-test

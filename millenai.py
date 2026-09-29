@@ -44,6 +44,7 @@ import subprocess
 import sys
 import tarfile
 import contextlib
+import functools
 import tempfile
 import threading
 import time
@@ -66,6 +67,72 @@ if sys.platform == "win32":
         _popen_init(self, *a, **k)
     subprocess.Popen.__init__ = _quiet_popen
 import webbrowser
+
+
+# ==== profile caches: begin ====
+# MODULE-LEVEL STATE IS DECLARED (1a 5.4). A container that holds anything
+# a person asked, read, saved or was answered is a profile_cache, declared
+# where it is made: emptied at every switch, so the next profile never
+# reads the last one's (ISO-8). Every other module-level container that
+# changes is named in MACHINE_STATE: it holds nothing of a person's. The
+# gauntlet's container lint fails a module-level container that is
+# mutated anywhere and declared neither way.
+MACHINE_STATE = frozenset((
+    # the profile machinery itself, and flags keyed by folder, not person
+    "_PROFILE", "_PROFILE_CACHES", "_CACHE_BLANK", "_PFL", "_tl_ctx",
+    "_written", "_STORE_BLOCKED", "_legacy_pending", "_data_rev",
+    "_TEST_LATE", "READ_FAIL", "_INSTANCE_HELD",
+    # the instance, the window, the boot code, the updater
+    "_INSTANCE_LOCK", "_BOOT", "_CHROME", "_WINDOW", "_WIN_STATE",
+    "_JUST_UPDATED", "_UPDATE_LANDED", "_update", "_chk_cache",
+    "_whatsnew_cache", "_webstore_keep", "_webstore_reloaded",
+    "_QT_CLEAR_CACHE", "_RELOCATED",
+    # models, engines, hardware and installs
+    "MODEL_ROUTES", "OLLAMA_PORT", "_MANAGED_BIN_DIR_FOUND", "_MINE_CACHE",
+    "_CLEANUP_LAST_ERRORS", "_accel_cache", "_gpu_cache", "_vram",
+    "_dl_hist", "_job_watch", "_managed_procs", "_mlx_procs", "_modup",
+    "_modup_hist", "_setup_jobs", "_studio_bytes_cache", "_fw_cuda",
+    "_crypto_install", "_export_install", "_giants", "_no_limits",
+    "EXPORT_KIND",
+    # the backdrops, the search proxy, provider quirks, locks' depth
+    "_sky_jobs", "_sky_tls", "_SEARCH_PROXY", "_stream_usage_off",
+    "_cloud_depth",
+    # read-aloud's process and file: _stop_speaking empties them at every
+    # switch, before the epoch moves; the quit's own turn flush
+    "_say_feeds", "_say_file", "_turns_flushing",
+))
+_PROFILE_CACHES = {}
+
+
+_CACHE_BLANK = {}
+
+
+def profile_cache(name: str, obj, reset=None):
+    """Declare obj personal; reset(obj) empties it (default obj.clear(),
+    or a thread-local's own attributes). obj as declared is its empty
+    state (the ISO-8 hook compares against a copy)."""
+    _PROFILE_CACHES[name] = (obj, reset)
+    if not isinstance(obj, threading.local):
+        _CACHE_BLANK[name] = json.loads(json.dumps(
+            obj if not isinstance(obj, set) else sorted(obj)))
+    return obj
+
+
+def _profile_caches_clear() -> int:
+    n = 0
+    for obj, reset in list(_PROFILE_CACHES.values()):
+        try:
+            if reset is not None:
+                reset(obj)
+            elif isinstance(obj, threading.local):
+                obj.__dict__.clear()
+            else:
+                obj.clear()
+            n += 1
+        except Exception:
+            pass
+    return n
+# ==== profile caches: end ====
 
 
 # PYNACL ON EVERY BUILD (0a 5.9 install half, 1c 5.1; accounts step 7,
@@ -925,7 +992,8 @@ def drop_run_file(path):
             pass
 
 
-RUN_FILE_KINDS = (("ssh-", ".conf"), ("say-", ".txt"), ("prompt-", ".json"))
+RUN_FILE_KINDS = (("ssh-", ".conf"), ("say-", ".txt"), ("prompt-", ".json"),
+                  ("stage-", ""))
 
 
 def sweep_run_files() -> int:
@@ -1207,7 +1275,7 @@ def no_limits() -> bool:
         # cached as False, so "no limits" was off after every restart
         # while its box still showed ticked
         try:
-            _no_limits["v"] = bool(load_prefs(None).get("no_limits"))
+            _no_limits["v"] = bool(machine_prefs().get("no_limits"))
         except Exception:
             return False
     return bool(_no_limits["v"])
@@ -1222,7 +1290,7 @@ def giants_on() -> bool:
         return False
     if _giants["v"] is None:
         try:
-            _giants["v"] = bool(load_prefs(None).get("include_giants"))
+            _giants["v"] = bool(machine_prefs().get("include_giants"))
         except Exception:
             return False           # see no_limits: a failed read isn't an answer
     return bool(_giants["v"])
@@ -1350,7 +1418,15 @@ OLLAMA_TAGS = {l: i["ollama"] for l, i in MODEL_INFO.items() if i["ollama"]}
 # A dev copy has its own, empty until a key is pasted into it: the
 # plaintext cloud-dev-<port>.json copies of the real keys are gone
 # (6b319), and the real app's boot sweep removes old ones.
-CLOUD_FILE = os.path.join(app_dir(), "cloud.json")
+# EACH PROFILE HAS ITS OWN (1a 5.7, 6b329): the keys, picks, rests and
+# the provider choice belong to the profile the thread works for.
+# Readers keep every field they don't use (3.1.3's shape fits later).
+CLOUD_NAME = "cloud.json"
+
+
+def _cloud_file() -> str:
+    """cloud.json of the profile this thread works for."""
+    return _pfile(CLOUD_NAME, bound_ctx())
 
 
 # THE FOUR PROVIDERS' ADDRESSES, IN ONE PLACE (0a 5.14, 6b326). The
@@ -1396,7 +1472,9 @@ def cloud_allowed(cloud_only: bool = False) -> bool:
     if cloud_only:
         return True
     try:
-        return bool(load_prefs(None).get("turbo"))
+        # the thread's own profile's switch (6b329): a thread with none
+        # counts as off
+        return bool(profile_local(bound_ctx()).get("turbo"))
     except Exception:
         return False
 
@@ -1485,7 +1563,7 @@ def _cloud_all() -> dict:
     Legacy single-provider files are wrapped on read — the provider id
     is inferred from the base URL."""
     try:
-        with open(CLOUD_FILE) as f:
+        with open(_cloud_file()) as f:
             c = json.load(f)
     except Exception:
         return {"providers": {}, "active": ""}
@@ -1527,7 +1605,12 @@ def _cloud_txn():
         try:
             if _cloud_depth[0] == 1 and _fcntl is not None:
                 try:
-                    lf = open(CLOUD_FILE + ".lock", "a")
+                    # run/, not the profile (6b329): nothing is made in a
+                    # profile's folder but its own files
+                    os.makedirs(os.path.join(app_dir(), "run"), mode=0o700,
+                                exist_ok=True)
+                    lf = open(os.path.join(app_dir(), "run", "cloud.lock"),
+                              "a")
                     _fcntl.flock(lf, _fcntl.LOCK_EX)
                 except OSError:
                     lf = None
@@ -1544,45 +1627,35 @@ def _cloud_txn():
 def _cloud_read_strict() -> dict:
     """Like _cloud_all, but RAISES when the file exists and cannot be
     parsed, so a writer never mistakes a damaged file for an empty one."""
-    if not os.path.exists(CLOUD_FILE):
+    if not os.path.exists(_cloud_file()):
         return {"providers": {}, "active": ""}
-    with open(CLOUD_FILE) as f:
+    with open(_cloud_file()) as f:
         json.load(f)            # raises on damage; the value is re-read below
     return _cloud_all()
 
 
 def _cloud_write(d: dict):
     """Write the whole state atomically: a sibling temp file, fsynced,
-    then os.replace — readers see the old file or the new one, never half."""
-    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(CLOUD_FILE) or ".",
-                               prefix=".cloud-", suffix=".tmp")
-    try:
-        # os.fchmod only exists on Windows from Python 3.13 (6b317, from
-        # the Windows sweep): on 3.10-3.12 it raised, the fd never closed,
-        # and no cloud key could ever be saved. Windows' own ACL on
-        # %LOCALAPPDATA% keeps the file private there.
-        if not IS_WIN:
-            os.fchmod(fd, 0o600)
-        with os.fdopen(fd, "w") as f:
-            json.dump(d, f)
-            f.flush()
-            os.fsync(f.fileno())
-        _replace_into(tmp, CLOUD_FILE)
-    except Exception:
-        try:
-            os.remove(tmp)
-        except OSError:
-            pass
-        raise
+    then os.replace — readers see the old file or the new one, never half.
+    0600 (_write_raw skips os.fchmod on Windows, where it only exists from
+    Python 3.13, 6b317; Windows' own ACL on %LOCALAPPDATA% keeps the file
+    private there). Into the thread's own profile, epoch-checked."""
+    _cloud_write_to(bound_ctx(), d)
+
+
+def _cloud_write_to(ctx, d: dict):
+    _hook_delay("cloud-write")
+    _write_raw(CLOUD_NAME, json.dumps(d).encode("utf-8"), ctx, mode=0o600)
 
 
 _KEY_NOT_SAVED = ("the key works, but this computer couldn't save it "
                   "\u2014 check that the ConcordeAI folder isn't read-only")
 
 
-def _cloud_save_state(which: str, entry: dict, make_active=False) -> bool:
+def _cloud_save_state(ctx, which: str, entry: dict, make_active=False) -> bool:
     """False when the state couldn't be written (the key-save route says
-    so rather than "saved", 6b317)."""
+    so rather than "saved", 6b317). Into ctx's cloud.json only (1a 5.3)."""
+    prev = bind_ctx(ctx)
     try:
         with _cloud_txn():
             d = _cloud_read_strict()
@@ -1590,10 +1663,12 @@ def _cloud_save_state(which: str, entry: dict, make_active=False) -> bool:
             if make_active or not d.get("active"):
                 if entry.get("status") == "ok":
                     d["active"] = which
-            _cloud_write(d)
+            _cloud_write_to(ctx, d)
         return True
     except Exception:
         return False
+    finally:
+        bind_ctx(prev)
 
 
 # A FAILED PASTE NEVER REPLACES A WORKING KEY (6b326, from review). A
@@ -1689,7 +1764,7 @@ def _cloud_patch(pid: str, key, fields: dict, drop=()) -> bool:
 #             provider's other models carry on. Since 6b307 a 400 counts
 #             only when it says the model is gone, and a retirement
 #             lasts a day.
-_dead_models = set()
+_dead_models = profile_cache("_dead_models", set())
 _dead_lock = threading.Lock()
 
 
@@ -1708,7 +1783,7 @@ def _provider_of(c: dict) -> str:
     return ""
 
 
-_dead_loaded = [False]
+_dead_loaded = profile_cache("_dead_loaded", [False], reset=lambda c: c.__setitem__(0, False))
 
 
 def _dead_seed():
@@ -1860,7 +1935,7 @@ _MODEL_GONE_RX = re.compile(
 DEAD_TTL = 24 * 3600.0
 
 
-_dead_when = {}          # model -> when it was retired (6b307)
+_dead_when = profile_cache("_dead_when", {})          # model -> when it was retired (6b307)
 
 
 def cloud_model_alive(model: str) -> bool:
@@ -2331,7 +2406,7 @@ def cloud_candidates(pid: str, ids, role: str = "seat",
 # in 2.7s. Benching the whole provider for that took gpt-oss (the Fast
 # tier's first rung) down with Qwen. Now the model rests and the next
 # ranked model from the same provider takes its place.
-_model_rest = {}          # model id -> unix time it may be asked again
+_model_rest = profile_cache("_model_rest", {})          # model id -> unix time it may be asked again
 _model_rest_lock = threading.Lock()
 
 
@@ -2586,7 +2661,7 @@ def _cloud_refresh_picks():
         pass
 
 
-_repaired = [False]
+_repaired = profile_cache("_repaired", [False], reset=lambda c: c.__setitem__(0, False))
 
 
 def _cloud_repair():
@@ -2602,7 +2677,7 @@ def _cloud_repair():
     # stale-pick refresh rides the same once-per-process latch, but on
     # its own thread — it makes one network call per provider and must
     # never sit in front of the first answer
-    threading.Thread(target=_cloud_refresh_picks, daemon=True).start()
+    ctx_thread(target=_cloud_refresh_picks, daemon=True).start()
     try:
         with _cloud_txn():
             d = _cloud_read_strict()
@@ -2791,8 +2866,8 @@ def claude_refusal_conf(c: dict):
 # uses a ticket re-reads the key from cloud.json under the cloud lock
 # (_ticket_conf) and makes no call when the provider is gone or its key
 # is no longer the one that answered.
-_answered = {}            # thread -> ticket of the answer it streamed
-_last_cloud = {}          # (user key, chat id) -> (ticket, time), /api/title
+_answered = profile_cache("_answered", {})            # thread -> ticket of the answer it streamed
+_last_cloud = profile_cache("_last_cloud", {})          # (user key, chat id) -> (ticket, time), /api/title
 
 
 def _cloud_ticket(c: dict) -> dict:
@@ -2827,7 +2902,7 @@ def _mark_answered(c: dict):
         pass
 
 
-_bal_cache = {}   # pid -> (expires_ts, text)
+_bal_cache = profile_cache("_bal_cache", {})   # pid -> (expires_ts, text)
 
 
 def cloud_balance(pid: str, c: dict) -> str:
@@ -3784,7 +3859,7 @@ def weather_snippets(q: str):
     loc = weather_place(q)
     if loc == WX_HERE:
         # "what's the weather", "near me": the home area, when one is set
-        loc = str(load_prefs(None).get("home_area") or "").strip()
+        loc = home_area()
     if not loc or len(loc) > 60:
         return None
     # weekday names on every forecast line — a Friday "this weekend"
@@ -3959,7 +4034,7 @@ def weather_snippets(q: str):
         return None
 
 
-_search_cache = {"query": "", "data": "", "timestamp": 0.0}
+_search_cache = profile_cache("_search_cache", {"query": "", "data": "", "timestamp": 0.0}, reset=lambda d: (d.clear(), d.update(query="", data="", timestamp=0.0)))
 _search_lock = threading.Lock()
 
 # Auto-search: local models have a training cutoff and no clock, so anything
@@ -4862,7 +4937,7 @@ def start_managed_engines():
         if _wrong_arch_engine() and not os.path.exists(_ENGINE_ARM_DONE):
             # an ARM64 PC got the x64 engine before 6b317: fetch the
             # native one while the x64 one serves
-            threading.Thread(target=_stage_native_engine,
+            ctx_thread(target=_stage_native_engine,
                              daemon=True).start()
     _spawn_ollama_serve()
 
@@ -5053,7 +5128,7 @@ def studio_supported() -> bool:
 
 
 def studio_tier_id(key: str) -> str:
-    want = str(load_prefs(None).get("studio_" + key) or "").strip()
+    want = str(machine_prefs().get("studio_" + key) or "").strip()
     ids = [t["id"] for t in STUDIOS[key]["tiers"]]
     return want if want in ids else ids[0]
 
@@ -5184,8 +5259,19 @@ def _num(v, fallback):
 
 
 def studio_prefs(key: str) -> dict:
-    d = load_prefs(None).get("studio_opts") or {}
-    return dict(d.get(key) or {}) if isinstance(d, dict) else {}
+    """The saved settings for one studio: the machine's fields, and the
+    negative prompt of the profile this thread works for (1a 5.6, G1:
+    B's renders never use A's text)."""
+    d = machine_prefs().get("studio_opts") or {}
+    out = dict(d.get(key) or {}) if isinstance(d, dict) else {}
+    try:
+        neg = (profile_local(bound_ctx()).get("studio_opts.*.neg")
+               or {}).get(key)
+    except NoProfile:
+        neg = None
+    if neg is not None:
+        out[STUDIO_NEG] = neg
+    return out
 
 
 def studio_opts(key: str, over: dict = None) -> dict:
@@ -5239,24 +5325,42 @@ def studio_opts(key: str, over: dict = None) -> dict:
 def studio_save_opts(key: str, patch: dict) -> dict:
     """Merge one change into the saved settings, under the prefs lock —
     generations now write prefs too (the time calibration), so an
-    unlocked read-modify-write here would lose whichever landed first."""
-    with _prefs_lock:
-        pr = load_prefs(None)
-        allopt = dict(pr.get("studio_opts") or {})
+    unlocked read-modify-write here would lose whichever landed first.
+    Each field goes to its own place (1a 5.6, G1): the negative prompt to
+    the profile, the rest to the machine."""
+    patch = patch if isinstance(patch, dict) else {}
+    ctx = bound_ctx()
+
+    def _mach(view):
+        allopt = dict(view.get("studio_opts") or {})
         cur = dict(allopt.get(key) or {})
         if patch.get("_reset"):
             cur = {}
         else:
-            for k, v in (patch or {}).items():
-                if k.startswith("_"):
+            for k, v in patch.items():
+                if k.startswith("_") or k == STUDIO_NEG:
                     continue
                 if v in (None, ""):
                     cur.pop(k, None)
                 else:
                     cur[k] = v
         allopt[key] = cur
-        pr["studio_opts"] = allopt
-        store_prefs(pr)
+        view["studio_opts"] = allopt
+
+    def _loc(view):
+        neg = dict(view.get("studio_opts.*.neg") or {})
+        if patch.get("_reset") or patch.get(STUDIO_NEG) in (None, ""):
+            neg.pop(key, None)
+        else:
+            neg[key] = patch[STUDIO_NEG]
+        if neg:
+            view["studio_opts.*.neg"] = neg
+        else:
+            view.pop("studio_opts.*.neg", None)
+    with _prefs_lock:
+        machine_prefs_update(_mach)
+        if patch.get("_reset") or STUDIO_NEG in patch:
+            profile_local_update(ctx, _loc)
     return studio_opts(key)
 
 
@@ -5575,10 +5679,7 @@ def start_studio_install(key: str, tid: str = "") -> bool:
     tid = tid or studio_tier_id(key)
     if tid not in [t["id"] for t in STUDIOS[key]["tiers"]]:
         return False
-    with _prefs_lock:
-        pr = load_prefs(None)
-        pr["studio_" + key] = tid
-        store_prefs(pr)
+    machine_prefs_update(lambda v: v.__setitem__("studio_" + key, tid))
     if studio_ready(key, tid):
         return False
     row = STUDIOS[key]["row"]
@@ -5587,7 +5688,7 @@ def start_studio_install(key: str, tid: str = "") -> bool:
             return False
         _setup_jobs[row] = {"status": "queued", "note": "", "pct": 0}
     _reset_dl_window()
-    threading.Thread(target=_studio_install_worker, args=(key, tid),
+    ctx_thread(target=_studio_install_worker, args=(key, tid),
                      daemon=True).start()
     return True
 
@@ -5646,7 +5747,11 @@ IMAGE_ROW = "Image generation"
 IMAGE_REPO = "dhairyashil/FLUX.1-schnell-mflux-4bit"
 IMAGE_GB = 9.6
 IMAGE_VENV = os.path.join(app_dir(), "venv-image")
-IMAGE_DIR = os.path.join(app_dir(), "images")
+IMAGE_SUB = "images"      # a profile's pictures (1a 5.5): image_dir(ctx)
+
+
+def image_dir(ctx) -> str:
+    return ctx.path(IMAGE_SUB)
 _IMG_VERBS = r"(?:generate|create|make|draw|paint|render|produce|design|illustrate|sketch)"
 _IMG_NOUNS = (r"(?:image|picture|photo(?:graph)?|illustration|drawing|painting|"
               r"logo|poster|sketch|artwork|icon|wallpaper|portrait|banner)s?")
@@ -5936,19 +6041,36 @@ def _media_id() -> str:
     return secrets.token_hex(16)
 
 
-def _write_image_bytes(data: bytes) -> str:
+def _write_image_bytes(ctx, data: bytes) -> str:
     """Save what a cloud painter returned under its TRUE type — Gemini
     sends PNG today, and a JPEG or WebP must not be called .png (a coin
-    toss in WebKit) — so the route can serve an honest Content-Type."""
-    os.makedirs(IMAGE_DIR, exist_ok=True)
+    toss in WebKit) — so the route can serve an honest Content-Type. In
+    the profile that asked (1a 5.3): after a switch, nothing lands."""
     ext = (".jpg" if data[:2] == b"\xff\xd8"
            else ".webp" if data[:4] == b"RIFF" and data[8:12] == b"WEBP"
            else ".png")
+    name = IMAGE_SUB + "/" + _media_id() + ext
+    _hook_delay("image-write")
+    ctx.write_bytes(name, data)
+    return ctx.path(name)
+
+
+def _media_land(ctx, sub: str, path: str) -> str:
+    """A finished render made in run/ (stage_path), and the .render.json
+    beside it, moved into ctx's pictures or videos under a new name. After
+    a switch neither lands and both are deleted (1a 5.3). The path."""
+    note = os.path.splitext(path)[0] + ".render.json"
     iid = _media_id()
-    out = os.path.join(IMAGE_DIR, iid + ext)
-    with open(out, "wb") as f:
-        f.write(data)
-    return out
+    try:
+        final = ctx.adopt(path, sub + "/" + iid + os.path.splitext(path)[1])
+        if os.path.exists(note):
+            try:
+                ctx.adopt(note, sub + "/" + iid + ".render.json")
+            except OSError:
+                pass
+        return final
+    finally:
+        drop_run_file(note)
 
 
 # ONE RENDER AT A TIME, AND A RENDER THAT CAN BE STOPPED (6b304). Both
@@ -6074,8 +6196,8 @@ def _render_note(path: str, opts: dict, secs: float = 0.0):
 
 def render_note(key: str, fname: str) -> dict:
     """The settings a previous render used, or {}."""
-    base = IMAGE_DIR if key == "image" else VIDEO_DIR
     try:
+        base = bound_ctx().path(IMAGE_SUB if key == "image" else VIDEO_SUB)
         with open(os.path.join(base,
                                os.path.splitext(fname)[0] + ".render.json")) as f:
             d = json.load(f)
@@ -6144,20 +6266,18 @@ def _ffmpeg_convert(src: str, fmt: str, fps: int) -> str:
     return src
 
 
-def generate_image(prompt: str, over: dict = None, sock=None) -> tuple:
+def generate_image(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
     """(png path, source) — local FLUX first, a Gemini key second.
     Raises when neither could paint. A saved Gemini key is permission to
-    paint with it, whatever Use cloud power says (Patrick, 6b326)."""
+    paint with it, whatever Use cloud power says (Patrick, 6b326). The
+    picture is made in run/ and lands in ctx's pictures (1a 5.3)."""
     errs = []
     if image_ready():
-        os.makedirs(IMAGE_DIR, exist_ok=True)
-        iid = _media_id()
-        out = os.path.join(IMAGE_DIR, iid + ".png")
         # mflux 0.19: a local/third-party model is --model <dir> with
         # --base-model naming the architecture (the old --path is gone)
         _t = studio_tier("image")
         o = studio_opts("image", over)
-        out = os.path.join(IMAGE_DIR, iid + "." + o["fmt"])
+        out = stage_path("." + o["fmt"])
         # the prompt reaches mflux through a 0600 file (6b326), never
         # its command line
         args = ["--model", _snap_dir(_t["repo"]),
@@ -6181,7 +6301,7 @@ def generate_image(prompt: str, over: dict = None, sock=None) -> tuple:
                 raise RenderBusy("stopped")
             if rc == 0 and os.path.exists(out):
                 _render_note(out, o, time.time() - _t0)
-                return out, "local"
+                return _media_land(ctx, IMAGE_SUB, out), "local"
             errs.append("local: " + tail[-200:].strip())
         except RenderBusy:
             raise
@@ -6213,7 +6333,8 @@ def generate_image(prompt: str, over: dict = None, sock=None) -> tuple:
                              .get("content") or {}).get("parts") or []:
                     inl = part.get("inlineData") or part.get("inline_data") or {}
                     if inl.get("data"):
-                        return _write_image_bytes(base64.b64decode(inl["data"])), "gemini"
+                        return _write_image_bytes(
+                            ctx, base64.b64decode(inl["data"])), "gemini"
                 errs.append("gemini: no image in the reply")
             except Exception as exc:
                 errs.append("gemini: %s" % str(exc)[:120])
@@ -6351,7 +6472,7 @@ def ensure_export_deps(block_s: float = 0.0) -> bool:
     if _export_deps_ok():
         return True
     if _export_install["state"] not in ("installing",):
-        threading.Thread(target=_install_export_deps_worker,
+        ctx_thread(target=_install_export_deps_worker,
                          daemon=True).start()
     if block_s > 0:
         end = time.time() + block_s
@@ -7101,17 +7222,15 @@ def _mermaid_from(text: str) -> str:
 
 
 # ------------------------------------------------------------- delivery
-# Files live under the SAME base the chats and memory use (_data_base,
-# the root only since the web version went, 6b320), so whatever folder
-# the profiles bring later covers exports too.
+# Files live in the profile that asked (1a 5.5, 6b329): made in run/ and
+# moved into its exports/ whole, only while it is the active one.
 EXPORT_DIRNAME = "exports"
 _X_ID_RX = re.compile(r"^[A-Za-z0-9_-]{16,48}\.[a-z0-9]{1,5}$")
 
 
-def export_dir(base=None) -> str:
-    d = os.path.join(base or app_dir(), EXPORT_DIRNAME)
-    os.makedirs(d, exist_ok=True)
-    return d
+def export_dir(ctx) -> str:
+    """ctx's exports folder, for reading."""
+    return ctx.path(EXPORT_DIRNAME)
 
 
 def export_name(want: str, ext: str, title: str = "") -> str:
@@ -7137,7 +7256,7 @@ def _x_disposition(name: str) -> str:
     return out
 
 
-def run_export(text: str, ext: str, title: str = "", base=None,
+def run_export(text: str, ext: str, title: str, base,
                want_name: str = "") -> dict:
     """Write one export and describe it. Raises with a sentence a person can
     act on — never a traceback."""
@@ -7157,37 +7276,44 @@ def run_export(text: str, ext: str, title: str = "", base=None,
         raise RuntimeError(
             "the document engines are still installing (about 70 MB, once) "
             "— ask again in a minute")
-    d = export_dir(base)
     token = secrets.token_urlsafe(16)
     suffix = "csv" if ext == "anki" else ext
-    path = os.path.join(d, "%s.%s" % (token, suffix))
-    if kind == "table":
-        ex_table(text, ext, path)
-    elif kind == "doc":
-        ex_doc(text, ext, path, title)
-    elif kind == "slides":
-        ex_slides(text, ext, path, title)
-    elif kind == "calendar":
-        ex_calendar(text, ext, path, title)
-    elif kind == "cards":
-        ex_cards(text, ext, path)
-    elif kind == "archive":
-        ex_archive(text, ext, path)
-    else:
-        ex_text(text, ext, path)
-    size = os.path.getsize(path)
-    if size > EXPORT_MAX_BYTES:
-        os.remove(path)
-        raise RuntimeError("that came out larger than the %d MB limit"
-                           % (EXPORT_MAX_BYTES // 1_000_000))
+    # written in run/, then moved into the profile whole (1a 5.3): an
+    # export that finishes after a switch lands nowhere
+    path = stage_path("." + suffix)
+    try:
+        if kind == "table":
+            ex_table(text, ext, path)
+        elif kind == "doc":
+            ex_doc(text, ext, path, title)
+        elif kind == "slides":
+            ex_slides(text, ext, path, title)
+        elif kind == "calendar":
+            ex_calendar(text, ext, path, title)
+        elif kind == "cards":
+            ex_cards(text, ext, path)
+        elif kind == "archive":
+            ex_archive(text, ext, path)
+        else:
+            ex_text(text, ext, path)
+        size = os.path.getsize(path)
+        if size > EXPORT_MAX_BYTES:
+            raise RuntimeError("that came out larger than the %d MB limit"
+                               % (EXPORT_MAX_BYTES // 1_000_000))
+        _hook_delay("export")
+        base.adopt(path, "%s/%s.%s" % (EXPORT_DIRNAME, token, suffix))
+    finally:
+        drop_run_file(path)
     name = export_name(want_name, ext, title)
     try:
-        with open(os.path.join(d, token + ".meta"), "w") as f:
-            json.dump({"name": name, "ext": ext, "ts": time.time(),
-                       "size": size}, f)
+        base.write("%s/%s.meta" % (EXPORT_DIRNAME, token),
+                   {"name": name, "ext": ext, "ts": time.time(),
+                    "size": size})
+    except StaleProfile:
+        raise
     except OSError:
         pass
-    _sweep_exports(d)
+    _sweep_exports(base)
     return {"id": "%s.%s" % (token, suffix), "name": name, "ext": ext,
             "size": size, "kind": EXPORT_KIND[ext][1]}
 
@@ -7230,26 +7356,26 @@ def _x_size(n: int) -> str:
     return ("%.1f MB" % (n / 1e6)) if n >= 1e6 else ("%d KB" % max(1, n // 1000))
 
 
-def _sweep_exports(d: str):
+def _sweep_exports(ctx):
     """Newest EXPORT_KEEP_N per identity, nothing past the TTL. Exports are
     cover letters and budgets — they should not pile up forever."""
+    d = export_dir(ctx)
     try:
         cut = time.time() - EXPORT_TTL_H * 3600
         files = []
         for nm in os.listdir(d):
             if nm.endswith(".meta"):
                 continue
-            p = os.path.join(d, nm)
             try:
-                files.append((os.path.getmtime(p), p))
+                files.append((os.path.getmtime(os.path.join(d, nm)), nm))
             except OSError:
                 pass
         files.sort(reverse=True)
-        for i, (mt, p) in enumerate(files):
+        for i, (mt, nm) in enumerate(files):
             if i >= EXPORT_KEEP_N or mt < cut:
-                for q in (p, os.path.splitext(p)[0] + ".meta"):
+                for q in (nm, os.path.splitext(nm)[0] + ".meta"):
                     try:
-                        os.remove(q)
+                        ctx.remove(EXPORT_DIRNAME + "/" + q)
                     except OSError:
                         pass
     except OSError:
@@ -7257,14 +7383,15 @@ def _sweep_exports(d: str):
 
 
 def sweep_all_exports():
-    """The export dir, on the janitor's tick. The web version's users/
-    folders are no longer walked (6b320): a leftover one on an old
-    machine is never touched, let alone deleted, by the app."""
+    """The active profile's exports, on the janitor's tick. The web
+    version's users/ folders are no longer walked (6b320): a leftover one
+    on an old machine is never touched, let alone deleted, by the app.
+    Each removal is epoch-checked, so a switch mid-sweep stops it."""
     try:
-        d = os.path.join(app_dir(), EXPORT_DIRNAME)
-        if os.path.isdir(d):
-            _sweep_exports(d)
-    except OSError:
+        ctx = current_ctx()
+        if os.path.isdir(export_dir(ctx)):
+            _sweep_exports(ctx)
+    except (OSError, NoProfile):
         pass
 
 
@@ -7281,7 +7408,11 @@ def reveal_in_finder(path: str) -> bool:
         return False
 
 
-VIDEO_DIR = os.path.join(app_dir(), "videos")
+VIDEO_SUB = "videos"      # a profile's videos (1a 5.5): video_dir(ctx)
+
+
+def video_dir(ctx) -> str:
+    return ctx.path(VIDEO_SUB)
 _VID_VERBS = (r"(?:generate|create|make|render|produce|animate|shoot|film|"
               r"put\s+together)")
 _VID_NOUNS = (r"(?:video|clip|animation|movie|short|reel|gif|"
@@ -7331,7 +7462,7 @@ def video_ready() -> bool:
 VEO_DAILY_CAP = 5        # cloud clips a day (6b309); pref veo_daily_cap
 
 
-def _veo_video(prompt: str) -> str:
+def _veo_video(ctx, prompt: str) -> str:
     """Google's Veo, via the key the user already added. It is a long
     running operation: submit, then poll until the file is there.
     A DAILY CAP (6b309): about $0.80 a clip adds up quietly, so after
@@ -7344,8 +7475,8 @@ def _veo_video(prompt: str) -> str:
     today = time.strftime("%Y-%m-%d")
     # RESERVE THE SLOT FIRST (6b309, review): checking, then counting
     # after the submit let two requests at once both slip under the cap
-    with _prefs_lock:
-        _pr = load_prefs(None)
+
+    def _reserve(_pr):
         _cap = int(_pr.get("veo_daily_cap", VEO_DAILY_CAP) or 0)
         if _pr.get("veo_day") != today:
             _pr["veo_day"], _pr["veo_count"] = today, 0
@@ -7353,19 +7484,19 @@ def _veo_video(prompt: str) -> str:
             raise RuntimeError("VEO_CAP: today's cloud-video limit of %d "
                                "clips (about $0.80 each) is reached" % _cap)
         _pr["veo_count"] = int(_pr.get("veo_count", 0)) + 1
-        store_prefs(_pr)
+    # the counters are this profile's own (1a 5.6)
+    profile_local_update(ctx, _reserve)
     _started = [False]
 
     def _give_back():
         # no render started, so nothing is billed: the slot goes back
         if _started[0]:
             return
+        def _back(_p):
+            if _p.get("veo_day") == today and int(_p.get("veo_count", 0)):
+                _p["veo_count"] = int(_p["veo_count"]) - 1
         try:
-            with _prefs_lock:
-                _p = load_prefs(None)
-                if _p.get("veo_day") == today and int(_p.get("veo_count", 0)):
-                    _p["veo_count"] = int(_p["veo_count"]) - 1
-                    store_prefs(_p)
+            profile_local_update(ctx, _back)
         except Exception:
             pass
     key = gem["key"]
@@ -7423,11 +7554,12 @@ def _veo_video(prompt: str) -> str:
                     headers={"User-Agent": "MillenAI"})
                 with urllib.request.urlopen(vr, timeout=300) as r:
                     data = r.read()
-                os.makedirs(VIDEO_DIR, exist_ok=True)
-                out = os.path.join(VIDEO_DIR, _media_id() + ".mp4")
-                with open(out, "wb") as f:
-                    f.write(data)
-                return out
+                # the clip lands in the profile that asked, or nowhere
+                # (1a 5.3): a switch during the render drops it
+                _hook_delay("veo-download")
+                name = VIDEO_SUB + "/" + _media_id() + ".mp4"
+                ctx.write_bytes(name, data)
+                return ctx.path(name)
             else:
                 last = "timed out waiting for the render"
         except Exception as exc:
@@ -7437,15 +7569,15 @@ def _veo_video(prompt: str) -> str:
     raise RuntimeError(last or "the cloud could not make that video")
 
 
-def generate_video(prompt: str, over: dict = None, sock=None) -> tuple:
+def generate_video(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
     """(mp4 path, source). Local first, then a cloud key. Video has no
     keyless tier — nobody gives it away — so when neither is there the
     caller says so plainly rather than pretending. A saved Gemini key is
-    permission to use it, whatever Use cloud power says (6b326)."""
+    permission to use it, whatever Use cloud power says (6b326). Made in
+    run/, landed in ctx's videos (1a 5.3)."""
     errs = []
     if video_ready():
-        os.makedirs(VIDEO_DIR, exist_ok=True)
-        out = os.path.join(VIDEO_DIR, _media_id() + ".mp4")
+        out = stage_path(".mp4")
         t = studio_tier("video")
         o = studio_opts("video", over)
         # the prompt and the negative prompt reach the renderer through one
@@ -7476,10 +7608,10 @@ def generate_video(prompt: str, over: dict = None, sock=None) -> tuple:
                 cfg = engine_cfg("video")
                 native = cfg.get("fps") or 24
                 _render_note(out, o, time.time() - _vt0)
-                return _ffmpeg_convert(
+                return _media_land(ctx, VIDEO_SUB, _ffmpeg_convert(
                     out, o["fmt"],
                     0 if (o["fmt"] == "mp4" and o["fps"] == native)
-                    else o["fps"]), "local"
+                    else o["fps"])), "local"
             errs.append("local: " + tail[-200:].strip())
         except RenderBusy:
             raise
@@ -7489,7 +7621,7 @@ def generate_video(prompt: str, over: dict = None, sock=None) -> tuple:
             drop_run_file(pf)
             _render_lock.release()
     try:
-        return _veo_video(prompt), "cloud"
+        return _veo_video(ctx, prompt), "cloud"
     except Exception as exc:
         errs.append("cloud: %s" % str(exc)[:160])
     raise RuntimeError("; ".join(errs) or "no video engine")
@@ -7576,7 +7708,7 @@ def _build_from_tag(tag):
 def update_channel() -> str:
     """stable | beta | nightly. The old beta_updates checkbox migrates
     to beta once; a nightly build defaults to the nightly channel."""
-    pr = load_prefs(None)
+    pr = machine_prefs()
     ch = str(pr.get("update_channel") or "").strip().lower()
     if ch in ("stable", "beta", "nightly"):
         return ch
@@ -7635,7 +7767,7 @@ def check_update(force=False):
     # AUTOMATIC CHECKS ARE A CHOICE (6b292, per Patrick): with the About
     # switch off, only the button (force) reaches GitHub — the launch and
     # daily calls get an honest "off", uncached.
-    if not force and load_prefs(None).get("auto_update_check") is False:
+    if not force and machine_prefs().get("auto_update_check") is False:
         return {"configured": True, "available": False, "auto": False,
                 "note": "automatic checks are off"}
     if not UPDATE_REPO:
@@ -7835,7 +7967,7 @@ def _do_update():
         os.chmod(script, 0o755)
         subprocess.Popen(["/bin/zsh", script], start_new_session=True)
         _update["state"] = "restarting"
-        threading.Timer(1.5, lambda: os._exit(0)).start()
+        ctx_timer(1.5, lambda: os._exit(0)).start()
     except Exception as exc:
         _update.update(state="error", note=str(exc)[:180])
 
@@ -7853,13 +7985,41 @@ def _do_update():
 # runs, and isn't guaranteed to survive a Python update. These files are
 # the app's own.
 #
-# Every function below takes a `base` directory. None means the files in
-# app_dir(), the only tenancy since the web version went (6b320); the
-# parameter stays as the seam the profiles use.
+# Every function below takes a `base`: the ProfileCtx the files belong
+# to (6b329; it was a folder, None meaning app_dir()).
 
 
-def _pfile(name: str, base=None) -> str:
-    return os.path.join(base or app_dir(), name)
+# ==== profile: begin ====
+# PROFILES (1a 5.2-5.7, accounts step 8, 6b329). One profile is active per
+# process: "This computer" (the data folder itself, laid out as before)
+# or one folder under accounts/ (a local test profile until accounts
+# exist). Each activation carries a random 64-bit epoch. Every personal
+# read and write goes through the ctx of the profile it belongs to:
+#   * a request takes current_ctx() once, at its start (StudioHandler._run),
+#     and binds it to its thread;
+#   * a background job runs on the ctx of whoever started it: ctx_thread
+#     and ctx_timer carry the starting thread's ctx into the new thread,
+#     and bound_ctx() reads it back. Nothing but a request's start, the
+#     boot and a switch asks which profile is active (the gauntlet's
+#     AST check);
+#   * a write under a ctx that is no longer the active one raises
+#     StaleProfile, writes nothing and creates nothing (no file, no
+#     folder), and is counted.
+# This section is the only code that writes a personal file, makes a
+# folder or replaces a file for a profile. Machine files (models,
+# engines, run/, logs, the backdrops, the updater) are written by the
+# functions MACHINE_IO names, which never touch a ctx. The gauntlet
+# lints both, and every module-level container is declared a
+# profile_cache (personal: emptied at every switch) or MACHINE_STATE.
+
+def _pfile(name: str, base) -> str:
+    """A personal or machine file's path. base is a ProfileCtx, or
+    MACHINE_ROOT for the machine's own files in the data folder. A
+    missing base is a bug, never "the data folder" (6b329): that was how
+    a write reached the wrong profile."""
+    if isinstance(base, (ProfileCtx, _MachineRoot)):
+        return os.path.join(base.dir, name)
+    raise NoProfile("no profile for %s" % name)
 
 
 # THE FILES (0b 5.2, 6b324). "This computer" keeps its chats and memory
@@ -7867,16 +8027,26 @@ def _pfile(name: str, base=None) -> str:
 # that older builds keep using: this build never writes anything new
 # into them, it only takes out what has left the .v2 files (0b L7, 5.8).
 # profile.json holds legacy_base (what the legacy files held at this
-# build's last look) and the record of which root files have had their
-# first write.
+# build's last look), the record of which root files have had their
+# first write, and (6b329) which profile is active and its epoch.
 CHATS_FILE = "chats.v2.json"
 MEMORY_FILE = "memory.v2.json"
 LEGACY_CHATS = "chats.json"
 LEGACY_MEMORY = "memory.json"
 PROFILE_FILE = "profile.json"
+# an account folder's settings (1a 5.6): the synced ones, and the ones
+# that stay with this profile on this computer. "This computer" keeps
+# both in prefs.json, as before
+PERSONAL_FILE = "personal.json"
+QUALITY_FILE = "quality.jsonl"   # one line per answer (1a 5.7: per profile)
+LOCAL_FILE = "local.json"
+# an account folder's first-write record (1a 5.2; root's is profile.json)
+STATE_FILE = "sync/state.json"
+ACCOUNTS_DIR = "accounts"
 # absent means "not written yet" for these only until their first write
 # (0b 5.2, L1); after it a missing file is a read error, never empty
-_FIRST_WRITE = (CHATS_FILE, MEMORY_FILE, "prefs.json")
+_FIRST_WRITE = (CHATS_FILE, MEMORY_FILE, "prefs.json", PERSONAL_FILE,
+                LOCAL_FILE)
 
 
 class StoreReadError(Exception):
@@ -7886,32 +8056,248 @@ class StoreReadError(Exception):
     empty. The argument is the file's name."""
 
 
+class StaleProfile(OSError):
+    """A write under a profile that is no longer the active one (1a 5.2).
+    Nothing was written or created. An OSError, so every writer that
+    already treats a failed write as "not saved" drops it the same way."""
+
+
+class NoProfile(RuntimeError):
+    """Personal work with no ctx: a thread nobody gave one, or a call
+    that passed none. A bug, and it fails closed."""
+
+
 # what the page shows for each (0b 5.12, Q11). profile.json and the
 # legacy files are read for the chat store, so they say "chats"
-_RF_CHATS = "Couldn\u2019t read your chats. Nothing was changed."
-_RF_MEMORY = "Couldn\u2019t read your memory. Nothing was changed."
+_RF_CHATS = "Couldn’t read your chats. Nothing was changed."
+_RF_MEMORY = "Couldn’t read your memory. Nothing was changed."
+_RF_PREFS = "Couldn’t read your settings. Nothing was changed."
 READ_FAIL = {CHATS_FILE: _RF_CHATS, LEGACY_CHATS: _RF_CHATS,
-             PROFILE_FILE: _RF_CHATS,
+             PROFILE_FILE: _RF_CHATS, STATE_FILE: _RF_CHATS,
              MEMORY_FILE: _RF_MEMORY, LEGACY_MEMORY: _RF_MEMORY,
-             "prefs.json": "Couldn\u2019t read your settings. Nothing was changed."}
+             "prefs.json": _RF_PREFS, PERSONAL_FILE: _RF_PREFS,
+             LOCAL_FILE: _RF_PREFS}
 
-_profile_lock = threading.RLock()   # the innermost store lock
+_profile_lock = threading.RLock()   # the innermost lock: taken last
+# the active profile: {"ctx": ProfileCtx, "stale": writes refused}
+_PROFILE = {"ctx": None, "stale": 0}
 _written = {}           # folder -> the _FIRST_WRITE names it has written
+_tl_ctx = threading.local()         # the ctx this thread works for
+
+
+class _MachineRoot:
+    """The data folder as the machine's: prefs.json's MACHINE keys and
+    the other machine files. Never epoch-checked; never personal."""
+    kind = "machine"
+
+    @property
+    def dir(self):
+        return app_dir()
+
+
+MACHINE_ROOT = _MachineRoot()
+
+
+class ProfileCtx:
+    """One activation of one profile (1a 5.2): kind "local" ("This
+    computer", the data folder) or "test" (a local test profile under
+    accounts/, dev copies only; "account" from M9). The epoch is random
+    per activation and names it on the wire (X-Profile). cancel is set
+    when the profile stops being the active one: streams and background
+    jobs watch it."""
+    __slots__ = ("epoch", "kind", "dir", "name", "acct_id", "cancel")
+
+    def __init__(self, kind: str, folder: str, name: str = "local",
+                 acct_id=None):
+        self.epoch = secrets.token_hex(8)
+        self.kind, self.dir, self.name = kind, folder, name
+        self.acct_id = acct_id
+        self.cancel = threading.Event()
+
+    def __repr__(self):
+        return "<profile %s.%s>" % (self.name, self.epoch[:4])
+
+    @property
+    def tag(self) -> str:
+        """"<dir|local>.<epoch>": the page's __PROFILE__ and X-Profile."""
+        return "%s.%s" % (self.name, self.epoch)
+
+    @property
+    def root(self) -> bool:
+        return self.kind == "local"
+
+    def alive(self) -> bool:
+        return _PROFILE["ctx"] is self
+
+    def check(self):
+        """StaleProfile unless this is still the active profile."""
+        if _PROFILE["ctx"] is not self:
+            _PROFILE["stale"] += 1
+            raise StaleProfile("the profile changed; not written")
+
+    def path(self, *parts) -> str:
+        """A path in this profile's folder, for READING (listings, the
+        media routes). Writes go through the methods below."""
+        return os.path.join(self.dir, *parts)
+
+    def read(self, name: str, want=dict):
+        return _read_json(name, self, want)
+
+    def write(self, name: str, data, **dump) -> str:
+        return _write_json(name, data, self, **dump)
+
+    def write_bytes(self, name: str, raw: bytes, mode=None) -> str:
+        return _write_raw(name, raw, self, mode=mode)
+
+    def update_json(self, name: str, fn, want=dict, **dump):
+        """The read, fn(value) and the write inside one lock (1a 5.2).
+        fn gets the file's value (None when absent) and returns the new
+        one, or None to write nothing. Returns what fn returned."""
+        with _profile_lock:
+            self.check()
+            new = fn(_read_json(name, self, want))
+            if new is not None:
+                _write_json(name, new, self, **dump)
+            return new
+
+    def append(self, name: str, raw: bytes, mode=0o600):
+        """raw added at the end of a log in this profile (quality.jsonl,
+        usage.jsonl), fsynced."""
+        _append_raw(name, raw, self, mode)
+
+    def adopt(self, src: str, name: str) -> str:
+        """Move a file made in run/ (stage_path) into this profile as
+        name: a render, a download or an export lands whole, and only
+        while this profile is active. Stale: src is deleted and
+        StaleProfile raised, so nothing reaches either profile."""
+        try:
+            with _profile_write(self):
+                p = _pfile(name, self)
+                _ensure_parent(p, self)
+                _replace_into(src, p)
+                return p
+        except BaseException:
+            _unlink_quiet(src)
+            raise
+
+    def remove(self, name: str) -> bool:
+        """Delete one file of this profile (an expired export, a render's
+        leftovers). False when it wasn't there."""
+        with _profile_write(self):
+            try:
+                os.remove(_pfile(name, self))
+                return True
+            except FileNotFoundError:
+                return False
+
+
+def _unlink_quiet(p):
+    try:
+        os.remove(p)
+    except OSError:
+        pass
+
+
+# RUN/PROFILE.LOCK (1a 5.1). Every profile write and every switch holds
+# it, beside the in-process lock, so nothing else writing this folder can
+# interleave. Taken once per outermost write (a depth count: flock and
+# msvcrt both release on the first unlock).
+_PFL = {"f": None, "depth": 0, "bad": False}
+
+
+@contextlib.contextmanager
+def _profile_flock():
+    with _profile_lock:
+        first = _PFL["depth"] == 0
+        locked = False
+        if first and not _PFL["bad"]:
+            try:
+                if _PFL["f"] is None:
+                    d = os.path.join(app_dir(), "run")
+                    os.makedirs(d, mode=0o700, exist_ok=True)
+                    _PFL["f"] = open(os.path.join(d, "profile.lock"), "a+")
+                if IS_WIN:
+                    import msvcrt
+                    _PFL["f"].seek(0)
+                    msvcrt.locking(_PFL["f"].fileno(), msvcrt.LK_LOCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(_PFL["f"].fileno(), fcntl.LOCK_EX)
+                locked = True
+            except (OSError, ImportError):
+                # a folder where run/ can't be made: the in-process lock
+                # alone (single_instance already let this copy run)
+                _PFL["bad"] = True
+        _PFL["depth"] += 1
+        try:
+            yield
+        finally:
+            _PFL["depth"] -= 1
+            if locked:
+                try:
+                    if IS_WIN:
+                        import msvcrt
+                        _PFL["f"].seek(0)
+                        msvcrt.locking(_PFL["f"].fileno(), msvcrt.LK_UNLCK, 1)
+                    else:
+                        import fcntl
+                        fcntl.flock(_PFL["f"].fileno(), fcntl.LOCK_UN)
+                except (OSError, ImportError):
+                    pass
+
+
+@contextlib.contextmanager
+def _profile_write(base):
+    """Around every write: for a profile, the lock, the flock and the
+    epoch check, held until the file is in place, so a switch can't
+    slip between the check and the replace. A machine file (or a test's
+    plain folder) has no epoch."""
+    if not isinstance(base, ProfileCtx):
+        yield
+        return
+    with _profile_lock, _profile_flock():
+        base.check()
+        yield
+
+
+def _ensure_parent(p: str, base):
+    """The file's folder. A profile's own folder is never made here: one
+    that is gone stays gone (a late write for an erased profile creates
+    nothing, ISO-7); only a subfolder of a live one (images/, sync/)."""
+    d = os.path.dirname(p)
+    if isinstance(base, ProfileCtx):
+        if not os.path.isdir(base.dir):
+            raise StaleProfile("the profile's folder is gone; not written")
+        if os.path.normcase(os.path.realpath(d)) != os.path.normcase(
+                os.path.realpath(base.dir)):
+            os.makedirs(d, exist_ok=True)
+        return
+    os.makedirs(d, exist_ok=True)
 
 
 def _bk(base) -> str:
-    """One key per data folder (base None is app_dir())."""
+    """One key per data folder."""
+    if isinstance(base, (ProfileCtx, _MachineRoot)):
+        base = base.dir
     return os.path.realpath(base or app_dir())
 
 
+def _written_file(base) -> str:
+    """Where a folder records its first writes: profile.json for "This
+    computer", sync/state.json for an account folder (1a 5.2)."""
+    if isinstance(base, ProfileCtx) and not base.root:
+        return STATE_FILE
+    return PROFILE_FILE
+
+
 def _was_written(name: str, base) -> bool:
-    """profile.json records the first write of each _FIRST_WRITE file.
-    Can't tell (profile.json unreadable): StoreReadError for name."""
+    """The first-write record of each _FIRST_WRITE file.
+    Can't tell (the record unreadable): StoreReadError for name."""
     k = _bk(base)
     with _profile_lock:
         if k not in _written:
             try:
-                p = _read_json(PROFILE_FILE, base, dict) or {}
+                p = _read_json(_written_file(base), base, dict) or {}
             except StoreReadError as exc:
                 raise StoreReadError(name) from exc
             w = p.get("written")
@@ -7927,20 +8313,21 @@ def _mark_written(name: str, base):
         try:
             if _was_written(name, base):
                 return
-            p = _read_json(PROFILE_FILE, base, dict) or {}
+            wf = _written_file(base)
+            p = _read_json(wf, base, dict) or {}
             w = p.get("written")
             w = [x for x in w if isinstance(x, str)] if isinstance(w, list) else []
             p["written"] = w + [name]
-            _write_json(PROFILE_FILE, p, base, indent=1)
+            _write_json(wf, p, base, indent=1)
             _written[_bk(base)].add(name)
         except (StoreReadError, OSError):
             pass
 
 
 def _read_json(name: str, base, want):
-    """The file's JSON; None when it isn't there (and, for a root .v2 file
-    or prefs.json, hasn't been written yet); StoreReadError when it is
-    there and can't be read, or isn't the shape it must be."""
+    """The file's JSON; None when it isn't there (and, for a _FIRST_WRITE
+    file, hasn't been written yet); StoreReadError when it is there and
+    can't be read, or isn't the shape it must be."""
     return _read_json_h(name, base, want)[0]
 
 
@@ -7968,49 +8355,48 @@ def _write_json(name: str, data, base, **dump) -> str:
     """Atomic (0b L2): a unique temp file beside it, then os.replace, so a
     crash leaves the old file or the new one and two saves never rename
     each other's half-written file into place (the 6b304 prefs lesson).
-    Returns the sha256 of the bytes written."""
-    p = _pfile(name, base)
-    os.makedirs(os.path.dirname(p), exist_ok=True)
-    raw = json.dumps(data, **dump).encode("utf-8")
-    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p),
-                               prefix="." + name.split(".")[0] + "-",
-                               suffix=".tmp")
-    try:
-        with os.fdopen(fd, "wb") as f:
-            f.write(raw)
-            f.flush()
-            os.fsync(f.fileno())
-        _replace_into(tmp, p)
-    except Exception:
+    Under a profile, epoch-checked (1a 5.2). Returns the sha256 of the
+    bytes written."""
+    return _write_raw(name, json.dumps(data, **dump).encode("utf-8"), base)
+
+
+def _write_raw(name: str, raw: bytes, base, mode=None) -> str:
+    with _profile_write(base):
+        p = _pfile(name, base)
+        _ensure_parent(p, base)
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p),
+                                   prefix="." + os.path.basename(name).split(".")[0] + "-",
+                                   suffix=".tmp")
         try:
-            os.remove(tmp)
-        except OSError:
-            pass
-        raise
-    if name in _FIRST_WRITE:
-        _mark_written(name, base)
+            if mode is not None and not IS_WIN:
+                os.fchmod(fd, mode)
+            with os.fdopen(fd, "wb") as f:
+                f.write(raw)
+                f.flush()
+                os.fsync(f.fileno())
+            _replace_into(tmp, p)
+        except BaseException:
+            _unlink_quiet(tmp)
+            raise
+        if name in _FIRST_WRITE:
+            _mark_written(name, base)
     return hashlib.sha256(raw).hexdigest()
 
 
-class _Unread(dict):
-    """The {} a failed settings read hands to a caller that isn't strict:
-    fine to read "off" from, never saved (review of 6b322)."""
-
-
-def load_prefs(base=None, strict=False) -> dict:
-    """strict: an unreadable file raises StoreReadError. GET and POST
-    /api/prefs are strict. The other readers get an empty _Unread and
-    may use it only where empty means "off" (0b Q11); store_prefs
-    refuses to save one, even if the file reads again by then."""
-    try:
-        return _read_json("prefs.json", base, dict) or {}
-    except StoreReadError:
-        if strict:
-            raise
-        return _Unread()
-
-
-_prefs_lock = threading.RLock()
+def _append_raw(name: str, raw: bytes, base, mode=0o600):
+    """raw at the end of a log, fsynced; under a profile, epoch-checked."""
+    with _profile_write(base):
+        p = _pfile(name, base)
+        _ensure_parent(p, base)
+        fd = os.open(p, os.O_WRONLY | os.O_CREAT | os.O_APPEND
+                     | getattr(os, "O_BINARY", 0), mode)
+        try:
+            view = memoryview(raw)
+            while view:
+                view = view[os.write(fd, view):]
+            os.fsync(fd)
+        finally:
+            os.close(fd)
 
 
 def _replace_into(tmp: str, dst: str):
@@ -8027,7 +8413,206 @@ def _replace_into(tmp: str, dst: str):
             time.sleep(0.05)
 
 
-def store_prefs(d: dict, base=None):
+def _set_aside(name: str, base, suffix: str) -> str:
+    """Rename a personal file that can't be read out of the way, bytes
+    kept (_migrate_61's memory.json). The new name."""
+    with _profile_write(base):
+        src = _pfile(name, base)
+        dst = src + suffix
+        os.replace(src, dst)
+        return os.path.basename(dst)
+
+
+def stage_path(suffix: str = "") -> str:
+    """A new name under run/ (nothing made yet) for a render, a download
+    or an export to be made at; ctx.adopt moves it into the profile when
+    it's whole. A crash's leftovers go at the next start
+    (sweep_run_files)."""
+    d = os.path.join(app_dir(), "run")
+    os.makedirs(d, mode=0o700, exist_ok=True)
+    return os.path.join(d, "stage-" + secrets.token_hex(12) + suffix)
+
+
+def _hook_delay(name: str):
+    """The `delay-<name>=<seconds>` test hook (1a 5.13, dev copies only):
+    a slow writer, for the stale-write checks."""
+    v = _hook_arg("delay-" + name)
+    if v:
+        try:
+            time.sleep(min(float(v), 60.0))
+        except ValueError:
+            pass
+
+
+# ------------------------------------------------ the context, captured
+def current_ctx() -> ProfileCtx:
+    """The active profile. Only a request's start, the boot, a switch and
+    the test hooks ask (the gauntlet's AST check): everything else uses
+    the ctx it was given or captured."""
+    with _profile_lock:
+        c = _PROFILE["ctx"]
+    if c is None:
+        raise NoProfile("no profile is active yet")
+    return c
+
+
+def bound_ctx() -> ProfileCtx:
+    """The ctx this thread works for: its request's, or the one its
+    starter handed it (ctx_thread). Never "whatever is active now"."""
+    c = getattr(_tl_ctx, "ctx", None)
+    if c is None:
+        raise NoProfile("this thread has no profile")
+    return c
+
+
+def bind_ctx(ctx):
+    """Bind ctx to this thread (None unbinds); the previous binding."""
+    old = getattr(_tl_ctx, "ctx", None)
+    _tl_ctx.ctx = ctx
+    return old
+
+
+def _ctx_wrap(fn, ctx):
+    @functools.wraps(fn)
+    def run(*a, **k):
+        prev = bind_ctx(ctx)
+        try:
+            return fn(*a, **k)
+        finally:
+            bind_ctx(prev)
+    return run
+
+
+def ctx_thread(target, ctx=None, **kw):
+    """threading.Thread(target=..., **kw) whose target runs on ctx, or on
+    the starting thread's own ctx (none for machine work started at
+    boot). The only way this file starts a thread (the gauntlet's lint)."""
+    c = ctx if ctx is not None else getattr(_tl_ctx, "ctx", None)
+    return threading.Thread(target=_ctx_wrap(target, c), **kw)
+
+
+def ctx_timer(interval, fn, args=(), ctx=None):
+    c = ctx if ctx is not None else getattr(_tl_ctx, "ctx", None)
+    t = threading.Timer(interval, _ctx_wrap(fn, c), args)
+    t.daemon = True
+    return t
+
+
+# ------------------------------------------- the settings split (1a 5.6)
+# Section 3's table in three sets. SYNCED_SETTINGS describe the person and
+# ride with an account (none spends money or acts on a server);
+# PROFILE_LOCAL are this profile's own on this computer and never sync;
+# MACHINE is the hardware's. "This computer" keeps all three in
+# prefs.json, as before; an account keeps SYNCED_SETTINGS in personal.json
+# and PROFILE_LOCAL in local.json, and reads MACHINE from prefs.json.
+SYNCED_SETTINGS = frozenset((
+    "user_name", "persona", "length", "home_area", "funnel_effort", "polish"))
+PROFILE_LOCAL = frozenset((
+    "turbo", "tier", "model", "council", "agent", "codeagent", "adv", "advon",
+    "remote_autonomy", "workspace", "veo_day", "veo_count", "veo_daily_cap",
+    "lend", "lend_pick", "studio_opts.*.neg"))
+MACHINE = frozenset((
+    "app_models", "model_offers", "no_limits", "include_giants",
+    "auto_cleanup", "studio_image", "studio_video", "studio_opts",
+    "update_channel", "beta_updates", "auto_update_check", "last_ident",
+    "last_version", "wizard_done", "seen_models", "remind_models_ts",
+    "remind_models_off"))
+# whole families of machine keys: studio_* (the negative prompt, which
+# PROFILE_LOCAL names by path, apart), last_*, seen_*, remind_*, and the
+# retired Contribute keys the boot sweep removes
+MACHINE_PREFIXES = ("studio_", "last_", "seen_", "remind_", "contrib_",
+                    "fleet_")
+# the Studio's negative prompt: text the person typed, so it is theirs
+STUDIO_NEG = "neg"
+
+# KEY-2: every value a synced key may hold. None of them turns on the
+# cloud, cloud-only, the bench or the Remote agent, and no key here is a
+# spending or action setting (the three-set test and KEY-2 check both).
+SYNCED_ALLOWED = {
+    "user_name": ("text", 80),
+    "persona": ("text", 2000),
+    "home_area": ("text", 200),
+    "length": ("one of", (1, 2, 3, 4, 5)),
+    "funnel_effort": ("one of", ("fast", "normal")),
+    "polish": ("one of", (True, False)),
+}
+
+
+def synced_value_ok(k: str, v) -> bool:
+    rule = SYNCED_ALLOWED.get(k)
+    if rule is None:
+        return False
+    kind, arg = rule
+    if kind == "text":
+        return isinstance(v, str) and len(v) <= arg
+    return any(v == a and type(v) is type(a) for a in arg)
+
+
+def pref_class(k: str):
+    """"synced", "local", "machine", or None for a key no set names."""
+    if not isinstance(k, str):
+        return None
+    if k in SYNCED_SETTINGS:
+        return "synced"
+    if k in PROFILE_LOCAL:
+        return "local"
+    if k in MACHINE or k.startswith(MACHINE_PREFIXES):
+        return "machine"
+    return None
+
+
+class PrefScopeError(KeyError):
+    """A settings key read through the wrong accessor: a sorting bug,
+    loud rather than an empty value (6b329)."""
+
+
+class _Scoped(dict):
+    """One set's keys as a profile holds them. Reading a key of another
+    set raises PrefScopeError, so a missorted reader can't quietly get
+    None where "This computer" used to get a value. unread: the file
+    couldn't be read (0b Q11: fine to read "off" from, never saved)."""
+    cls = None
+    unread = False
+
+    def _ok(self, k):
+        if pref_class(k) != self.cls:
+            raise PrefScopeError("%s is not a %s setting" % (k, self.cls))
+
+    def get(self, k, default=None):
+        self._ok(k)
+        return dict.get(self, k, default)
+
+    def __getitem__(self, k):
+        self._ok(k)
+        return dict.__getitem__(self, k)
+
+    def __contains__(self, k):
+        self._ok(k)
+        return dict.__contains__(self, k)
+
+
+class _Unread(dict):
+    """The {} a failed settings read hands to a caller that isn't strict:
+    fine to read "off" from, never saved (review of 6b322)."""
+
+
+def load_prefs(base, strict=False) -> dict:
+    """prefs.json as it is. strict: an unreadable file raises
+    StoreReadError; otherwise an empty _Unread, which store_prefs refuses
+    to save. Only the accessors below call it (6b329): the rest of the
+    app asks machine_prefs, user_prefs(ctx) or profile_local(ctx)."""
+    try:
+        return _read_json("prefs.json", base, dict) or {}
+    except StoreReadError:
+        if strict:
+            raise
+        return _Unread()
+
+
+_prefs_lock = threading.RLock()
+
+
+def store_prefs(d: dict, base):
     """Atomic, with a UNIQUE temp file per save (6b304). Callers that
     read-modify-write take _prefs_lock. A file on disk that can't be read
     is never written over (0b L1, 6b322): every caller read it first, so
@@ -8038,14 +8623,489 @@ def store_prefs(d: dict, base=None):
     _write_json("prefs.json", d, base)
 
 
-def _set_turbo(on: bool):
-    """Cloud power on or off, read-modify-written under _prefs_lock (review
-    of 6b324: the key routes wrote it outside the lock, so a toggle
-    posted at the same moment could be lost)."""
+def _neg_of(opts) -> dict:
+    """{studio key: its negative prompt} from a studio_opts value."""
+    out = {}
+    if isinstance(opts, dict):
+        for k, v in opts.items():
+            if isinstance(v, dict) and STUDIO_NEG in v:
+                out[k] = v[STUDIO_NEG]
+    return out
+
+
+def _scope(cls: str, src: dict, unread=False) -> _Scoped:
+    s = _Scoped()
+    s.cls, s.unread = cls, unread
+    for k, v in (src or {}).items():
+        if pref_class(k) == cls:
+            dict.__setitem__(s, k, v)
+    if cls == "machine" and isinstance(s.get("studio_opts"), dict):
+        dict.__setitem__(s, "studio_opts", {
+            k: {f: x for f, x in v.items() if f != STUDIO_NEG}
+            if isinstance(v, dict) else v
+            for k, v in s["studio_opts"].items()})
+    if cls == "local":
+        neg = _neg_of((src or {}).get("studio_opts"))
+        if neg:
+            dict.__setitem__(s, "studio_opts.*.neg", neg)
+    return s
+
+
+def _pref_home(ctx, cls: str):
+    """(base, file) where cls lives for ctx."""
+    if cls == "machine" or ctx.root:
+        return (MACHINE_ROOT if cls == "machine" else ctx), "prefs.json"
+    return ctx, (PERSONAL_FILE if cls == "synced" else LOCAL_FILE)
+
+
+def _pref_read(base, name: str, strict: bool):
+    try:
+        return _read_json(name, base, dict) or {}, False
+    except StoreReadError:
+        if strict:
+            raise
+        return {}, True
+
+
+def machine_prefs(strict=False) -> _Scoped:
+    """The machine's settings (MACHINE), from the data folder's
+    prefs.json whatever profile is active."""
+    d, bad = _pref_read(MACHINE_ROOT, "prefs.json", strict)
+    return _scope("machine", d, bad)
+
+
+def user_prefs(ctx, strict=False) -> _Scoped:
+    """ctx's SYNCED_SETTINGS."""
+    base, name = _pref_home(ctx, "synced")
+    d, bad = _pref_read(base, name, strict)
+    return _scope("synced", d, bad)
+
+
+def profile_local(ctx, strict=False) -> _Scoped:
+    """ctx's PROFILE_LOCAL settings; "studio_opts.*.neg" is {studio key:
+    negative prompt}."""
+    base, name = _pref_home(ctx, "local")
+    d, bad = _pref_read(base, name, strict)
+    return _scope("local", d, bad)
+
+
+def _prefs_rmw(ctx, cls: str, fn):
+    """Read-modify-write one set's keys where they live for ctx, under
+    _prefs_lock (and, for a profile, the epoch check): fn gets a plain
+    dict of that set's keys and changes it in place; only those keys
+    change in the file, the others are written back as read. An
+    unreadable file raises StoreReadError and is left alone."""
+    base, name = _pref_home(ctx, cls)
     with _prefs_lock:
-        p = load_prefs(None)
-        p["turbo"] = on
-        store_prefs(p)
+        if isinstance(base, ProfileCtx):
+            base.check()
+        cur = _read_json(name, base, dict) or {}
+        view = dict(_scope(cls, cur))
+        before = json.dumps(view, sort_keys=True, default=str)
+        fn(view)
+        if json.dumps(view, sort_keys=True, default=str) == before:
+            return view
+        neg = view.pop("studio_opts.*.neg", None) if cls == "local" else None
+        out = {k: v for k, v in cur.items() if pref_class(k) != cls}
+        for k, v in view.items():
+            if pref_class(k) == cls:
+                out[k] = v
+        # studio_opts is shared by path (1a 5.6): the machine's fields and
+        # the profile's negative prompt. "This computer" keeps both in one
+        # value, so each side writes back the other's part as it was
+        was = _neg_of(cur.get("studio_opts"))
+        if cls == "machine" and was:
+            so = out.get("studio_opts")
+            so = {k: dict(v) if isinstance(v, dict) else {}
+                  for k, v in so.items()} if isinstance(so, dict) else {}
+            for k, v in was.items():
+                so.setdefault(k, {})[STUDIO_NEG] = v
+            out["studio_opts"] = so
+        elif cls == "local" and (neg or was):
+            so = out.get("studio_opts")
+            so = {k: {f: x for f, x in v.items() if f != STUDIO_NEG}
+                  if isinstance(v, dict) else {}
+                  for k, v in so.items()} if isinstance(so, dict) else {}
+            for k, v in (neg or {}).items():
+                so.setdefault(k, {})[STUDIO_NEG] = v
+            if so:
+                out["studio_opts"] = so
+            else:
+                out.pop("studio_opts", None)
+        # read strictly above, so nothing here was built on an empty read
+        _write_json(name, out, base)
+        return view
+
+
+def machine_prefs_update(fn):
+    """fn(dict of the MACHINE keys) changes them in place."""
+    return _prefs_rmw(None, "machine", fn)
+
+
+def user_prefs_update(ctx, fn):
+    return _prefs_rmw(ctx, "synced", fn)
+
+
+def profile_local_update(ctx, fn):
+    return _prefs_rmw(ctx, "local", fn)
+
+
+def prefs_view(ctx, strict=True) -> dict:
+    """GET /api/prefs: what the page reads, for ctx. "This computer": the
+    whole prefs.json, as before. An account: the machine's keys, then its
+    own two files."""
+    if ctx.root:
+        return load_prefs(ctx, strict=strict)
+    out = dict(machine_prefs(strict))
+    out.update(user_prefs(ctx, strict))
+    loc = dict(profile_local(ctx, strict))
+    neg = loc.pop("studio_opts.*.neg", None)
+    out.update(loc)
+    if neg:
+        so = dict(out.get("studio_opts") or {})
+        for k, v in neg.items():
+            so[k] = dict(so.get(k) or {}, **{STUDIO_NEG: v})
+        out["studio_opts"] = so
+    return out
+
+
+def split_prefs(ctx, incoming: dict, old=None) -> dict:
+    """POST /api/prefs (1a 5.6, 4.7): each key to its own place, as
+    compare-and-set. Only keys whose value changes are written. With
+    old ({key: the value the page last saw}), a key whose saved value is
+    no longer that one is a conflict and isn't written. A key no set
+    names, and a synced value outside its allowed set (KEY-2), is
+    ignored. {"ok", "changed", "conflict", "ignored"}."""
+    by = {"synced": {}, "local": {}, "machine": {}}
+    ignored = []
+    for k, v in (incoming or {}).items():
+        c = pref_class(k)
+        if c is None or k == "studio_opts.*.neg" or (
+                c == "synced" and not synced_value_ok(k, v)):
+            ignored.append(k)
+        else:
+            by[c][k] = v
+    changed, conflict = [], {}
+
+    def apply(want):
+        def fn(view):
+            for k, v in want.items():
+                if isinstance(old, dict) and k in old \
+                        and view.get(k) != old[k]:
+                    conflict[k] = view.get(k)
+                    continue
+                if k not in view or view[k] != v:
+                    view[k] = v
+                    changed.append(k)
+        return fn
+    if by["machine"]:
+        machine_prefs_update(apply(by["machine"]))
+    if by["synced"]:
+        user_prefs_update(ctx, apply(by["synced"]))
+    if by["local"]:
+        profile_local_update(ctx, apply(by["local"]))
+    return {"ok": True, "changed": sorted(changed), "conflict": conflict,
+            "ignored": sorted(ignored)}
+
+
+# ------------------------------------------------ boot and the switch
+# profile.json (1a 5.1): {"active": "local"|"<dir>", "kept": null|{...},
+# "epoch": "<64-bit hex>", "pending_import": bool, "legacy_base": {...}
+# (0b, 6b324), "written": [...]} plus migrated_61 and webstore (6b324).
+# 1a's fields are written here; M5's are left exactly as they are.
+_INSTANCE_HELD = [False]      # this process holds run/instance.lock
+
+
+def _profile_json_update(fn):
+    """Read-modify-write root's profile.json (the machine's record of the
+    active profile; not epoch-checked, since it is what a switch moves)."""
+    with _profile_lock, _profile_flock():
+        p = _read_json(PROFILE_FILE, MACHINE_ROOT, dict) or {}
+        fn(p)
+        _write_json(PROFILE_FILE, p, MACHINE_ROOT, indent=1)
+        return p
+
+
+def _profile_fields(p: dict, ctx) -> dict:
+    p["active"] = "local" if ctx.root else ctx.name
+    p.setdefault("kept", None)
+    p["epoch"] = ctx.epoch
+    p.setdefault("pending_import", False)
+    return p
+
+
+def _test_profile_ok(folder: str) -> bool:
+    """A local test profile's folder, which only a dev copy with the
+    profiles hook opens (1a 9: a build without the hook refuses a key
+    file carrying test:true)."""
+    if "profiles" not in TEST_HOOKS:
+        return False
+    try:
+        with open(os.path.join(folder, "account.key"), "rb") as f:
+            k = json.loads(f.read().decode("utf-8"))
+        return isinstance(k, dict) and k.get("test") is True
+    except Exception:
+        return False
+
+
+def profile_boot() -> ProfileCtx:
+    """At every start, before anything is read: "This computer" becomes
+    the active profile with a new epoch, so the boot order (_migrate_61,
+    the downgrade import) runs through a root ctx (1a 5.1, I7). The copy
+    holding the instance lock seeds `written` with the root files that
+    exist (each has been written)."""
+    ctx = ProfileCtx("local", app_dir())
+    with _profile_lock:
+        _PROFILE["ctx"] = ctx
+    if _INSTANCE_HELD[0]:
+        for n in _FIRST_WRITE:
+            if os.path.exists(os.path.join(app_dir(), n)):
+                _mark_written(n, MACHINE_ROOT)
+    return ctx
+
+
+def profile_resume() -> ProfileCtx:
+    """After the boot order, before any route: the profile profile.json
+    names. M8 opens only a local test profile, in a dev copy with the
+    profiles hook; any other name (an account a later build made) is left
+    in profile.json as it is and "This computer" runs. The lock holder
+    records the epoch."""
+    ctx = current_ctx()
+    if not _INSTANCE_HELD[0]:
+        return ctx
+    try:
+        p = _read_json(PROFILE_FILE, MACHINE_ROOT, dict) or {}
+    except StoreReadError:
+        p = {}
+    act = p.get("active")
+    if isinstance(act, str) and re.fullmatch(r"[0-9a-f]{32}", act):
+        folder = os.path.join(app_dir(), ACCOUNTS_DIR, act)
+        if _test_profile_ok(folder):
+            return profile_switch(ProfileCtx("test", folder, act))
+    try:
+        def _f(q):
+            if q.get("active") not in (None, "local"):
+                # a name this build can't open: left as it is
+                q["epoch"] = ctx.epoch
+                q.setdefault("kept", None)
+                q.setdefault("pending_import", False)
+            else:
+                _profile_fields(q, ctx)
+        _profile_json_update(_f)
+    except (StoreReadError, OSError) as exc:
+        print("  profile.json not updated: %s" % exc)
+    return ctx
+
+
+def profile_switch(ctx_new, erase_old=False) -> ProfileCtx:
+    """The bare switch (M8; the full protocol with its steps is M9): only
+    the copy holding the instance lock. Stops read-aloud, makes the old
+    profile's finished deletes final, cancels the old ctx (streams and
+    background jobs watch it), empties every profile_cache, and moves
+    the epoch, all under the profile lock, so no write of the old
+    profile lands after it. erase_old (a test profile only): its folder
+    goes too. The new ctx."""
+    if not _INSTANCE_HELD[0]:
+        raise NoProfile("profile changes need the instance lock")
+    try:
+        _stop_speaking()
+    except Exception:
+        pass
+    old = current_ctx()
+    try:
+        _chat_finalize(old, now=float("inf"))
+    except Exception:
+        pass
+    with _profile_lock, _profile_flock():
+        old.cancel.set()
+        _PROFILE["ctx"] = ctx_new
+        _profile_caches_clear()
+        _written.clear()
+        _profile_json_update(lambda q: _profile_fields(q, ctx_new))
+        if erase_old and old.kind == "test":
+            shutil.rmtree(old.dir, ignore_errors=True)
+    return ctx_new
+
+
+def test_profile_create() -> ProfileCtx:
+    """The local-test-profile hook (1a 5.13): a folder under accounts/
+    with an account.key holding random test values and test:true, its
+    sync/state.json and media folders. Not active until switched to."""
+    if "profiles" not in TEST_HOOKS:
+        raise NoProfile("the profiles hook is off")
+    if not _INSTANCE_HELD[0]:
+        raise NoProfile("profile changes need the instance lock")
+    name = secrets.token_hex(16)
+    folder = os.path.join(app_dir(), ACCOUNTS_DIR, name)
+    with _profile_lock, _profile_flock():
+        os.makedirs(os.path.dirname(folder), mode=0o700, exist_ok=True)
+        os.mkdir(folder, 0o700)
+        os.mkdir(os.path.join(folder, "sync"), 0o700)
+        for sub in ("images", "videos", "exports"):
+            os.makedirs(os.path.join(folder, sub), mode=0o700)
+        os.chmod(os.path.dirname(folder), 0o700)
+        fd = os.open(os.path.join(folder, "account.key"),
+                     os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as f:
+            json.dump({"test": True, "acct_id": secrets.token_hex(16),
+                       "device_id": secrets.token_hex(16),
+                       "origin": secrets.token_hex(16)}, f)
+        with open(os.path.join(folder, STATE_FILE), "w") as f:
+            json.dump({"written": []}, f)
+    return ProfileCtx("test", folder, name)
+
+
+# ------------------------------------------------ the test hooks (1a 5.13)
+# `profiles` (dev copies only): make a local test profile, switch to it and
+# back, and start the real writers late under the profile active now, so
+# the gauntlet can prove a write after a switch lands nowhere (ISO-7) and
+# a switch empties every cache (ISO-8). No route exists without the hook.
+_TEST_LATE = {}     # id -> "pending", "ok" or the error's name
+
+
+def _cache_dirty() -> list:
+    """The profile caches not in their empty state (for ISO-8)."""
+    out = []
+    for name, (obj, reset) in _PROFILE_CACHES.items():
+        if isinstance(obj, threading.local):
+            continue
+        blank = _CACHE_BLANK.get(name)
+        cur = sorted(obj, key=repr) if isinstance(obj, set) else obj
+        try:
+            same = (json.dumps(cur, sort_keys=True, default=repr)
+                    == json.dumps(blank, sort_keys=True, default=repr))
+        except Exception:
+            same = False
+        if not same:
+            out.append(name)
+    return sorted(out)
+
+
+def _cache_fill(tag: str):
+    """A canary in every profile cache (for ISO-8)."""
+    for name, (obj, reset) in _PROFILE_CACHES.items():
+        if isinstance(obj, threading.local):
+            obj.canary = tag
+        elif isinstance(obj, dict):
+            obj["canary-" + tag] = tag
+        elif isinstance(obj, list):
+            obj.append(tag)
+        elif isinstance(obj, set):
+            obj.add(tag)
+
+
+def test_profile_op(d: dict) -> dict:
+    """POST /api/test/profile, with the profiles hook only."""
+    op = d.get("op")
+    if op == "status":
+        c = current_ctx()
+        return {"tag": c.tag, "kind": c.kind, "stale": _PROFILE["stale"],
+                "dirty": _cache_dirty(), "late": dict(_TEST_LATE)}
+    if op == "create":
+        return {"name": test_profile_create().name}
+    if op == "switch":
+        to = str(d.get("to") or "")
+        if to == "local":
+            new = ProfileCtx("local", app_dir())
+        elif re.fullmatch(r"[0-9a-f]{32}", to) and _test_profile_ok(
+                os.path.join(app_dir(), ACCOUNTS_DIR, to)):
+            new = ProfileCtx("test", os.path.join(app_dir(), ACCOUNTS_DIR, to),
+                             to)
+        else:
+            return {"err": "no such profile"}
+        return {"tag": profile_switch(new, erase_old=bool(d.get("erase"))).tag}
+    if op == "fill":
+        _cache_fill(str(d.get("tag") or "x")[:40])
+        return {"dirty": _cache_dirty()}
+    if op == "late":
+        ctx = current_ctx()
+        kind, text = str(d.get("kind") or ""), str(d.get("text") or "")[:200]
+        delay = min(float(d.get("delay") or 0), 30.0)
+        jid = secrets.token_hex(6)
+        _TEST_LATE[jid] = "pending"
+
+        def run():
+            time.sleep(delay)
+            try:
+                if kind == "memory":
+                    with _memory_lock:
+                        items = _load_memory(ctx)
+                        _save_memory(items + [{"fact": text,
+                                               "ts": time.time()}], ctx)
+                elif kind == "chat":
+                    chat_ops([{"op": "create", "id": _new_chat_id(),
+                               "lane": "ai", "title": text}], ctx)
+                elif kind == "export":
+                    run_export(text, "md", "late", ctx)
+                elif kind == "image":
+                    _write_image_bytes(ctx, b"\x89PNG\r\n\x1a\n" + text.encode())
+                elif kind == "cloud":
+                    if not _cloud_save_state(ctx, "groq", {
+                            "name": "Groq", "key": text, "status": "ok",
+                            "base": "https://api.groq.com/openai/v1"}):
+                        raise StaleProfile("not saved")
+                elif kind == "prefs":
+                    user_prefs_update(ctx, lambda v: v.__setitem__(
+                        "persona", text))
+                elif kind == "quality":
+                    ctx.append(QUALITY_FILE, (text + "\n").encode())
+                else:
+                    raise ValueError(kind)
+                _TEST_LATE[jid] = "ok"
+            except BaseException as exc:
+                _TEST_LATE[jid] = type(exc).__name__
+        ctx_thread(target=run, ctx=ctx, daemon=True).start()
+        return {"id": jid}
+    return {"err": "unknown op"}
+
+
+# ---------------------------------------------- the machine's own files
+# The functions that write, create, replace or delete files that belong
+# to no profile. Each touches only machine paths (models, engines and
+# their installers, run/, logs, sky/, the updater, crypto-install.json,
+# the web view's store) and never a ctx; the gauntlet's write lint fails
+# a write anywhere else outside this section.
+MACHINE_IO = frozenset((
+    # import time: the dev folder, the crash log and the logs, the
+    # subprocess recorder (a dev copy's hook)
+    "<module>",
+    # run/ notes, locks and the instance lock
+    "run_file", "drop_run_file", "sweep_run_files", "single_instance",
+    "_write_instance_note", "_write_boot_note", "_drop_instance_note",
+    "_cloud_txn",
+    # writers into a run/ stage file (stage_path): a render's note, the
+    # clip's conversions and the export formats. What they make reaches a
+    # profile only through ctx.adopt
+    "_render_note", "_ffmpeg_convert", "ex_table", "ex_calendar", "ex_cards",
+    "ex_text",
+    # engines, models and their installs
+    "_settle_engine_dir", "_studio_install_worker", "_download_ollama_binary",
+    "_spawn_ollama_serve", "_stage_native_engine", "_spawn_mlx_engine",
+    "_download_model", "studio_remove", "_remove_models",
+    "_sweep_hf_carcasses", "_rm_hf_repo", "reap_orphan_engines",
+    "_sweep_leftovers", "_crypto_record_write", "_crypto_pip",
+    # the backdrops, the updater, the web view's store, retired files
+    "_sky_fetch", "_faststart", "sky_seen", "_do_update",
+    "_webstore_qt_sweep", "_webstore_native", "_retire_contribute",
+))
+# ==== profile: end ====
+
+
+def _set_turbo(ctx, on: bool):
+    """Cloud power on or off for ctx's profile, read-modify-written under
+    _prefs_lock (review of 6b324: the key routes wrote it outside the
+    lock, so a toggle posted at the same moment could be lost)."""
+    profile_local_update(ctx, lambda p: p.__setitem__("turbo", on))
+
+
+def home_area() -> str:
+    """The home area of the profile this thread works for (1a 5.2: it
+    was read from root prefs whatever profile asked); '' when unset or
+    when the thread has no profile."""
+    try:
+        return str(user_prefs(bound_ctx()).get("home_area") or "").strip()
+    except NoProfile:
+        return ""
 
 
 # THE MODELS THIS APP PUT ON DISK (6b306). Auto-clean is on by default
@@ -8055,23 +9115,20 @@ def _set_turbo(on: bool):
 # every model it knows (the app was the only thing offering them); a
 # brand-new install starts empty and records each download as it lands.
 def _app_models() -> set:
-    v = load_prefs(None).get("app_models")
+    v = machine_prefs().get("app_models")
     return set(v) if isinstance(v, list) else set()
 
 
 def _app_models_add(label: str):
+    def _add(p):
+        have = p.get("app_models")
+        # not seeded yet (a dev instance before the real app's first
+        # run): creating it here would stop that run vouching for
+        # the models already installed
+        if isinstance(have, list) and label not in have:
+            p["app_models"] = have + [label]
     try:
-        with _prefs_lock:
-            p = load_prefs(None)
-            have = p.get("app_models")
-            # not seeded yet (a dev instance before the real app's first
-            # run): creating it here would stop that run vouching for
-            # the models already installed
-            if not isinstance(have, list):
-                return
-            if label not in have:
-                p["app_models"] = have + [label]
-                store_prefs(p)
+        machine_prefs_update(_add)
     except Exception:
         pass
 
@@ -8097,7 +9154,7 @@ class _ChatList(list):
     gone = ()
 
 
-def load_chats(base=None) -> list:
+def load_chats(base) -> list:
     """The chat list; [] only when chats.v2.json hasn't been written yet.
     Anything else it can't read raises StoreReadError (0b L1, 6b322): a
     failed read used to look like no chats, and the next save wrote
@@ -8128,7 +9185,7 @@ def _chat_ts(c) -> float:
     return float(t) if isinstance(t, (int, float)) else 0.0
 
 
-def _write_chats(items, base=None):
+def _write_chats(items, base):
     """The write itself: (the list kept, whether eviction dropped any).
     Atomic (0b L2), newest first, and the only eviction (0b 5.7): every
     pinned chat, every chat with a project (kept before Projects exists,
@@ -8173,7 +9230,7 @@ def _write_chats(items, base=None):
 _legacy_pending = {"chats": set(), "memory": set()}
 
 
-def store_chats(items: list, base=None, legacy=False, erase=False):
+def store_chats(items: list, base, legacy=False, erase=False):
     """Write the list (see _write_chats). Whenever a chat left it (a final
     delete, the 1,000 eviction, or legacy=True for Forget), chats.json
     is rewritten without it too (0b 5.8, L7); erase=True (Forget) empties
@@ -8195,9 +9252,9 @@ def store_chats(items: list, base=None, legacy=False, erase=False):
 _CHAT_ID = re.compile(r"c[0-9a-z-]{1,48}")
 _CHAT_LANES = ("ai", "code", "funnel")
 CHAT_UNDO_S = 6.0
-_chat_stubs = {}        # deleted id -> {"at", "chat", "idx", "bk"}, 6 s of undo
-_chat_gone = set()      # ids deleted for good in this run
-_chat_finals = {}       # folder -> ids made final, until the next write
+_chat_stubs = profile_cache("_chat_stubs", {})        # deleted id -> {"at", "chat", "idx", "bk"}, 6 s of undo
+_chat_gone = profile_cache("_chat_gone", set())      # ids deleted for good in this run
+_chat_finals = profile_cache("_chat_finals", {})       # folder -> ids made final, until the next write
 
 
 def _new_chat_id() -> str:
@@ -8252,13 +9309,13 @@ def _chat_dead(cid, chats=None) -> bool:
             or cid in (getattr(chats, "gone", None) or ()))
 
 
-def _chat_finalize(base=None, now=None):
+def _chat_finalize(base, now=None):
     """Make the deletes whose undo window has passed final on disk (0b
     5.6): the id joins `gone` and chats.json loses the chat (5.8). Run
     by a timer after each delete, and at a quit with now=inf. It waits
     for the lock only so long: a signal can arrive while this thread
     holds it, and the next start finishes the job anyway (5.8)."""
-    if not os.path.isdir(base or app_dir()):
+    if not os.path.isdir(_bk(base)):
         return
     if not _chats_lock.acquire(timeout=10):
         return
@@ -8398,7 +9455,7 @@ def _chat_op(chats, op, bk=None):
     return {"err": "unknown op"}, False
 
 
-def chat_ops(ops, base=None) -> dict:
+def chat_ops(ops, base) -> dict:
     """A batch under one lock, written once (0b Q4): each op's reply (ok,
     conflict with the current value, remap, or err) and the new
     data_rev. StoreReadError propagates: nothing is applied."""
@@ -8425,13 +9482,11 @@ def chat_ops(ops, base=None) -> dict:
         out = {"results": replies, "data_rev": _data_rev[0]}
     if deleted:
         # when the undo window ends, the delete is made final on disk
-        t = threading.Timer(CHAT_UNDO_S + 0.5, _chat_finalize, (base,))
-        t.daemon = True
-        t.start()
+        ctx_timer(CHAT_UNDO_S + 0.5, _chat_finalize, (base,)).start()
     return out
 
 
-def chat_append_turn(cid, after_len, after_hash, msgs, base=None,
+def chat_append_turn(cid, after_len, after_hash, msgs, base,
                      prefix=None, lane=None, title=None):
     """The turn writer's append of what the PAGE sent (0b 5.4): a question
     or a funnel pick. (landed id, length, hash)."""
@@ -8468,7 +9523,7 @@ def _chat_late(chats, cid, n, h, rec) -> bool:
     return c
 
 
-def chat_append_late(cid, n, h, rec, base=None):
+def chat_append_late(cid, n, h, rec, base):
     """_chat_late under the lock, written when the chat is on the list
     (one in its undo window is held in memory): (id, length, hash)."""
     with _chats_lock:
@@ -8498,7 +9553,7 @@ MEMORY_PROMPT = (
 MEMORY_KEEP = 200       # facts kept (0b 5.2); prompts use the newest 40
 
 
-def _load_memory(base=None) -> list:
+def _load_memory(base) -> list:
     """The facts; [] only when memory.v2.json hasn't been written yet (0b
     L1)."""
     if _STORE_BLOCKED and (_bk(base), "memory") in _STORE_BLOCKED:
@@ -8506,7 +9561,7 @@ def _load_memory(base=None) -> list:
     return _read_json(MEMORY_FILE, base, list) or []
 
 
-def _save_memory(items: list, base=None, legacy=False, erase=False):
+def _save_memory(items: list, base, legacy=False, erase=False):
     """Atomic (0b L2), the newest MEMORY_KEEP; fields it doesn't know
     stay on each fact (L6). Whenever facts leave (the 200 trim, or
     legacy=True for a clear), memory.json loses them too (0b 5.8, L7);
@@ -8522,7 +9577,7 @@ def _save_memory(items: list, base=None, legacy=False, erase=False):
             _legacy_pending["memory"].add(bk)
 
 
-def memory_text(base=None) -> str:
+def memory_text(base) -> str:
     """For a prompt: an unreadable file just adds nothing (no write)."""
     try:
         facts = _load_memory(base)[-40:]
@@ -8711,7 +9766,7 @@ def _legacy_replace(name, keep, base, sha, **dump):
     return _write_json(name, keep, base, **dump)
 
 
-def _legacy_sync_chats(chats, base=None, erase=False) -> bool:
+def _legacy_sync_chats(chats, base, erase=False) -> bool:
     """With chats.v2.json's list in hand, under _chats_lock: the downgrade
     import (when chats.json changed since legacy_base), then chats.json
     rewritten without every listed chat root no longer holds (and any
@@ -8774,7 +9829,7 @@ def _legacy_sync_chats(chats, base=None, erase=False) -> bool:
         return False
 
 
-def _legacy_sync_memory(items, base=None, erase=False) -> bool:
+def _legacy_sync_memory(items, base, erase=False) -> bool:
     """memory.v2.json's facts in hand, under _memory_lock: the import of
     facts an older build added, memory.json rewritten without every fact
     root no longer holds, then legacy_base (see _legacy_sync_chats)."""
@@ -8825,7 +9880,7 @@ def _legacy_sync_memory(items, base=None, erase=False) -> bool:
         return False
 
 
-def _migrate_61(base=None) -> bool:
+def _migrate_61(base) -> bool:
     """The one-time upgrade step (0b 5.9), then the boot order (5.8). Run
     at every start before any route is served, only by the copy holding
     the instance lock (Q9). Chats and memory migrate separately, and a
@@ -8887,11 +9942,10 @@ def _migrate_61(base=None) -> bool:
                 try:
                     lme, msha = _read_json_h(LEGACY_MEMORY, base, list)
                 except StoreReadError:
-                    aside = _pfile(LEGACY_MEMORY, base) + ".unreadable-%d" \
-                        % int(time.time())
-                    os.replace(_pfile(LEGACY_MEMORY, base), aside)
+                    aside = _set_aside(LEGACY_MEMORY, base,
+                                       ".unreadable-%d" % int(time.time()))
                     print("  memory.json couldn't be read: set aside as %s"
-                          % os.path.basename(aside))
+                          % aside)
                     lme, msha = None, None
                 if _read_json(MEMORY_FILE, base, list) is None:
                     _write_json(MEMORY_FILE, (lme or [])[-MEMORY_KEEP:],
@@ -8927,9 +9981,14 @@ def _migrate_61(base=None) -> bool:
     return ok
 
 
-def _extract_memory(label: str, user_msg: str, base=None, conf=None,
+def _extract_memory(label: str, user_msg: str, base, conf=None,
                     cloud_only: bool = False):
+    """The memory pass, on its own thread, for the profile that asked
+    (base, its ctx): it stops once that profile isn't the active one, and
+    its write is refused if the switch lands meanwhile (1a 5.3)."""
     try:
+        if getattr(base, "cancel", None) and base.cancel.is_set():
+            return
         ask = [{"role": "user", "content": MEMORY_PROMPT + user_msg[:2000]}]
         # the chat gate again, now (6b326, from review): cloud power turned
         # off while the answer streamed sends nothing more to the provider
@@ -8982,8 +10041,10 @@ def _extract_memory(label: str, user_msg: str, base=None, conf=None,
             return True
 
         facts = [f for f in facts if grounded(f)]
-        if not facts:
+        if not facts or (getattr(base, "cancel", None)
+                         and base.cancel.is_set()):
             return
+        _hook_delay("memory")
         with _memory_lock:
             items = _load_memory(base)
             known = {i["fact"].lower() for i in items}
@@ -9089,7 +10150,7 @@ def _prepare_voice():
             with _setup_lock:
                 _setup_jobs[VOICE_ROW] = {"status": "error",
                                           "note": str(exc)[:200], "pct": 0}
-    threading.Thread(target=work, daemon=True).start()
+    ctx_thread(target=work, daemon=True).start()
 
 
 def _transcribe_wav(wav_bytes: bytes) -> str:
@@ -9187,7 +10248,7 @@ def _speak_now(text: str):
         # the write can block until PowerShell reads it: on its own short
         # thread (6b326, from review), so _say_lock covers only the start
         # and a Stop is never kept waiting behind it
-        _t = threading.Thread(target=_say_feed, args=(_say_proc, text),
+        _t = ctx_thread(target=_say_feed, args=(_say_proc, text),
                               daemon=True)
         _t.start()
         _say_feeds[:] = [x for x in _say_feeds if x.is_alive()] + [_t]
@@ -9202,7 +10263,7 @@ def _speak_now(text: str):
             drop_run_file(path)
             raise
         _say_file[0] = path
-        threading.Thread(target=_say_reap, args=(_say_proc, path),
+        ctx_thread(target=_say_reap, args=(_say_proc, path),
                          daemon=True).start()
 
 
@@ -9605,7 +10666,7 @@ def start_model_downloads(labels=None) -> list:
         if kind == "mlx":
             with _setup_lock:
                 _setup_jobs[label] = {"status": "queued", "note": ""}
-            threading.Thread(target=_download_model, args=(label,),
+            ctx_thread(target=_download_model, args=(label,),
                              daemon=True).start()
         else:
             with _setup_lock:
@@ -9614,7 +10675,7 @@ def start_model_downloads(labels=None) -> list:
             ollama_batch.append(label)
         started.append(label)
     if ollama_batch:
-        threading.Thread(target=_ollama_install_worker,
+        ctx_thread(target=_ollama_install_worker,
                          args=(ollama_batch,), daemon=True).start()
     return started
 
@@ -9731,7 +10792,7 @@ def model_updates(pulled=None) -> list:
         pulled = ollama_pulled_tags() or set()
     have = {l for l in MODEL_INFO
             if SUPPORTED.get(l) and model_cached(l, pulled)}
-    offers = load_prefs(None).get("model_offers")
+    offers = machine_prefs().get("model_offers")
     offers = offers if isinstance(offers, list) else []
     out = []
     for old in RETIRED_MODELS:
@@ -9756,16 +10817,15 @@ def _offers_set(add=(), drop=()):
     """Retired models swept before their replacement was installed
     (6b306). The weights are gone; the offer to install what replaces
     them stays until it is taken."""
+    def _set(p):
+        cur = p.get("model_offers")
+        cur = list(cur) if isinstance(cur, list) else []
+        nxt = [l for l in cur if l not in drop]
+        nxt += [l for l in add if l not in nxt]
+        if nxt != cur:
+            p["model_offers"] = nxt
     try:
-        with _prefs_lock:
-            p = load_prefs(None)
-            cur = p.get("model_offers")
-            cur = list(cur) if isinstance(cur, list) else []
-            nxt = [l for l in cur if l not in drop]
-            nxt += [l for l in add if l not in nxt]
-            if nxt != cur:
-                p["model_offers"] = nxt
-                store_prefs(p)
+        machine_prefs_update(_set)
     except Exception:
         pass
 
@@ -9814,7 +10874,7 @@ def _cleanup_stat(pulled=None) -> dict:
 def auto_cleanup_on() -> bool:
     """On unless the user switched it off (6b306, per Patrick: "make
     sure that's enabled by default")."""
-    return load_prefs(None).get("auto_cleanup") is not False
+    return machine_prefs().get("auto_cleanup") is not False
 
 
 def _remove_models(want: list) -> tuple:
@@ -9985,7 +11045,7 @@ def start_model_update() -> dict:
         del _modup_hist[:]
         snap = dict(_modup)
     if plan:
-        threading.Thread(target=_model_update_worker, args=(plan, news),
+        ctx_thread(target=_model_update_worker, args=(plan, news),
                          daemon=True).start()
     return snap
 
@@ -10562,7 +11622,7 @@ def gpu_utilization():
     return pct
 
 
-_results_cache = {}        # query -> (fetched_at, [result dicts])
+_results_cache = profile_cache("_results_cache", {})        # query -> (fetched_at, [result dicts])
 _RESULTS_TTL = 300.0
 
 
@@ -10710,7 +11770,7 @@ def _search_proxy():
             rest = head.split(b"\r\n\r\n", 1)[1]
             if rest:
                 up.sendall(rest)
-            threading.Thread(target=pipe, args=(up, c), daemon=True).start()
+            ctx_thread(target=pipe, args=(up, c), daemon=True).start()
             pipe(c, up)
         except Exception:
             try:
@@ -10736,8 +11796,8 @@ def _search_proxy():
                 c, _a = srv.accept()
             except OSError:
                 return
-            threading.Thread(target=handle, args=(c,), daemon=True).start()
-    threading.Thread(target=serve, daemon=True).start()
+            ctx_thread(target=handle, args=(c,), daemon=True).start()
+    ctx_thread(target=serve, daemon=True).start()
     _SEARCH_PROXY["url"] = "http://%s:%s@127.0.0.1:%d" % (
         user, pw, srv.getsockname()[1])
     return _SEARCH_PROXY["url"]
@@ -10797,7 +11857,7 @@ def _fetch_pages(urls: list, cap: int = 1600, meta: list = None) -> list:
         except Exception:
             pass
     for i, u in enumerate(urls):
-        t = threading.Thread(target=grab, args=(i, u), daemon=True)
+        t = ctx_thread(target=grab, args=(i, u), daemon=True)
         t.start()
         threads.append(t)
     for t in threads:
@@ -10843,7 +11903,10 @@ def workspace_context(question: str, budget: int = 14000) -> str:
     Ranks files by name and content hits, then pastes the best few whole
     (small ones) or their most relevant window (large ones).
     """
-    root = (load_prefs(None).get("workspace") or "")
+    try:
+        root = (profile_local(bound_ctx()).get("workspace") or "")
+    except NoProfile:
+        root = ""
     if not root:
         return ""
     words = [w for w in re.findall(r"[A-Za-z_][A-Za-z0-9_]{2,}",
@@ -10890,7 +11953,7 @@ def workspace_context(question: str, budget: int = 14000) -> str:
             + "\n\n".join(parts))
 
 
-_geo_cache = {}
+_geo_cache = profile_cache("_geo_cache", {})
 
 
 def _geocode(q: str):
@@ -10906,7 +11969,7 @@ def _geocode(q: str):
     # home area first; if that finds nothing — "paris" + Brooklyn —
     # the bare name still geocodes as itself, so world queries are
     # untouched.
-    _home = str(load_prefs(None).get("home_area") or "").strip()
+    _home = home_area()
     if _home and "," not in q and not any(ch.isdigit() for ch in q):
         biased = _geocode("%s, %s" % (q, _home.lower()))
         if biased:
@@ -10969,7 +12032,7 @@ _OSM_KINDS = (
      r"delis?|food ?(?:store|market))\b",
      "supermarket|convenience|greengrocer|deli"),
 )
-_OSM_CACHE = {}
+_OSM_CACHE = profile_cache("_OSM_CACHE", {})
 _OSM_TTL = 1800.0
 
 
@@ -11044,7 +12107,7 @@ def _oh_open_now(spec: str, now=None) -> bool:
     return False
 
 
-_TZ_CACHE = {}
+_TZ_CACHE = profile_cache("_TZ_CACHE", {})
 
 
 def _tz_of(lat, lon) -> str:
@@ -11073,13 +12136,13 @@ def _tz_of(lat, lon) -> str:
     return tz
 
 
-_HOME_TZ = {"key": None, "tz": "", "place": ""}
+_HOME_TZ = profile_cache("_HOME_TZ", {"key": None, "tz": "", "place": ""}, reset=lambda d: d.update(key=None, tz="", place=""))
 
 
 def _home_tz():
     """(tz, place) for the owner's home_area — the default clock for
     every local-intent question (6b275). Geocoded once per setting."""
-    home = str(load_prefs(None).get("home_area") or "").strip()
+    home = home_area()
     if not home:
         return "", ""
     if _HOME_TZ["key"] != home:
@@ -11682,7 +12745,7 @@ def place_search(query: str) -> tuple:
 # the last structured hits THIS thread's search produced — the chat
 # handler turns them into a clickable sources row under the answer.
 # Thread-local because ThreadingTCPServer runs one thread per request.
-_tl_search = threading.local()
+_tl_search = profile_cache("_tl_search", threading.local())
 
 
 _SITE_WORDS = re.compile(
@@ -11764,7 +12827,7 @@ def closure_notices(query: str) -> str:
         if not names:
             return ""
         loc = (getattr(_tl_search, "tz_place", "") or
-               str(load_prefs(None).get("home_area") or "").split(",")[0])
+               home_area().split(",")[0])
         import concurrent.futures as _cf
         def _probe(name):
             key = next((w for w in re.findall(r"[a-z]{4,}", name.lower())
@@ -11860,11 +12923,21 @@ USAGE_RANGES = {"1h": (3600, "5m"), "1d": (86400, "1h"),
 USAGE_UNITS = {"5m": 300, "1h": 3600, "6h": 21600, "1d": 86400,
                "1w": 604800, "1mo": 2629746}
 _USAGE_T0 = time.time()        # the old log counts only before this launch
-_usage_q = []
+# THE LEDGER IS PER PROFILE (1a 5.7, 6b329): each record carries the
+# ctx of the thread that made the call, and lands in that profile's
+# usage.jsonl, or nowhere once that profile isn't the active one
+_usage_q = profile_cache("_usage_q", [])
 _usage_qlock = threading.Lock()
 _usage_lock = threading.RLock()      # the file: appends, reads, rewrites
 _usage_wake = threading.Event()
-_usage_state = {"thread": None, "backfilled": False, "compacted": 0.0}
+_usage_state = profile_cache(
+    "_usage_state", {"thread": None, "backfilled": False, "compacted": 0.0},
+    reset=lambda d: d.update(backfilled=False, compacted=0.0))
+
+
+class _URec(dict):
+    """A queued record and the profile it belongs to."""
+    ctx = None
 
 
 def _usage_num(v):
@@ -11968,13 +13041,15 @@ def usage_note(model, where, messages, chars, reported=None, t0=None):
 
 
 def usage_put(rec: dict):
+    rec = _URec(rec)
+    rec.ctx = getattr(_tl_ctx, "ctx", None)
     with _usage_qlock:
         _usage_q.append(rec)
         if len(_usage_q) > 20000:          # a disk that won't take them
             del _usage_q[:len(_usage_q) - 20000]
         th = _usage_state["thread"]
         if th is None or not th.is_alive():
-            th = threading.Thread(target=_usage_writer, name="usage",
+            th = ctx_thread(target=_usage_writer, name="usage",
                                   daemon=True)
             _usage_state["thread"] = th
             th.start()
@@ -11991,74 +13066,70 @@ def _usage_writer():
             time.sleep(5)
 
 
-def _usage_write_all(recs: list):
+def _usage_write_all(recs: list, base=None):
     """The whole file, atomically (0b L2): unique temp, fsync, replace."""
-    p = _pfile(USAGE_FILE)
-    os.makedirs(os.path.dirname(p), exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p), prefix=".usage-",
-                               suffix=".tmp")
-    try:
-        with os.fdopen(fd, "wb") as f:
-            f.write("".join(json.dumps(r, separators=(",", ":")) + "\n"
-                            for r in recs).encode("ascii"))
-            f.flush()
-            os.fsync(f.fileno())
-        _replace_into(tmp, p)
-    except Exception:
-        try:
-            os.remove(tmp)
-        except OSError:
-            pass
-        raise
+    _write_raw(USAGE_FILE, "".join(json.dumps(r, separators=(",", ":"))
+                                   + "\n" for r in recs).encode("ascii"), base)
 
 
 def usage_flush():
-    """Append what's queued. The file lock keeps a rewrite and an append
-    apart; what couldn't be written goes back on the queue."""
+    """Append what's queued, each record into its own profile's ledger
+    (6b329). The file lock keeps a rewrite and an append apart; what
+    couldn't be written goes back on the queue. Records of a profile
+    that is no longer active, or of no profile, are dropped."""
     with _usage_lock:
         with _usage_qlock:
             recs = _usage_q[:]
             del _usage_q[:]
         if not recs:
             return
-        p = _pfile(USAGE_FILE)
-        try:
-            _usage_backfill()
-            os.makedirs(os.path.dirname(p), exist_ok=True)
-            lead = b""
+        groups = {}
+        for r in recs:
+            c = getattr(r, "ctx", None)
+            groups.setdefault(id(c), (c, []))[1].append(r)
+        back, err = [], None
+        for base, rs in groups.values():
             try:
-                if os.path.getsize(p) > 0:
-                    with open(p, "rb") as fr:
-                        fr.seek(-1, 2)
-                        # a line a crash cut short stays a line of its own
-                        lead = b"" if fr.read(1) == b"\n" else b"\n"
-            except FileNotFoundError:
-                pass
-            with os.fdopen(os.open(p, os.O_WRONLY | os.O_APPEND | os.O_CREAT
-                                   | getattr(os, "O_BINARY", 0), 0o600),
-                           "ab") as f:
-                f.write(lead + "".join(
-                    json.dumps(r, separators=(",", ":")) + "\n"
-                    for r in recs).encode("ascii"))
-                f.flush()
-                os.fsync(f.fileno())
-        except Exception:
+                _usage_flush_one(rs, base)
+            except (StaleProfile, NoProfile):
+                continue
+            except Exception as exc:
+                back.extend(rs)
+                err = exc
+        if back:
             with _usage_qlock:
-                _usage_q[:0] = recs
-            raise
-        # once a launch, and again whenever the file passes the mark
-        if not _usage_state["compacted"] or (
-                os.path.getsize(p) > USAGE_COMPACT_BYTES
-                and time.time() - _usage_state["compacted"] > 3600):
-            usage_compact()
+                _usage_q[:0] = back
+            raise err
 
 
-def _usage_load() -> list:
+def _usage_flush_one(recs: list, base):
+    p = _pfile(USAGE_FILE, base)
+    _usage_backfill(base)
+    lead = b""
+    try:
+        if os.path.getsize(p) > 0:
+            with open(p, "rb") as fr:
+                fr.seek(-1, 2)
+                # a line a crash cut short stays a line of its own
+                lead = b"" if fr.read(1) == b"\n" else b"\n"
+    except FileNotFoundError:
+        pass
+    _append_raw(USAGE_FILE, lead + "".join(
+        json.dumps(r, separators=(",", ":")) + "\n"
+        for r in recs).encode("ascii"), base, 0o600)
+    # once a launch, and again whenever the file passes the mark
+    if not _usage_state["compacted"] or (
+            os.path.getsize(p) > USAGE_COMPACT_BYTES
+            and time.time() - _usage_state["compacted"] > 3600):
+        usage_compact(base=base)
+
+
+def _usage_load(base=None) -> list:
     """The file's records: [] when it isn't there, StoreReadError when it
     is and can't be read (0b L1). A line a crash cut short is skipped;
     a file that is more garbage than records is not taken for empty."""
     try:
-        with open(_pfile(USAGE_FILE), "rb") as f:
+        with open(_pfile(USAGE_FILE, base), "rb") as f:
             raw = f.read()
     except FileNotFoundError:
         return []
@@ -12085,20 +13156,21 @@ def _usage_load() -> list:
     return out
 
 
-def usage_read() -> list:
-    """Every record: the file's, then those still queued."""
+def usage_read(base=None) -> list:
+    """Every record of base's ledger: the file's, then its queued ones."""
     with _usage_lock:
         try:
-            _usage_backfill()
+            _usage_backfill(base)
         except Exception:
             pass
-        recs = _usage_load()
+        recs = _usage_load(base)
         with _usage_qlock:
-            recs.extend(dict(r) for r in _usage_q)
+            recs.extend(dict(r) for r in _usage_q
+                        if getattr(r, "ctx", None) is base)
     return recs
 
 
-def _usage_backfill():
+def _usage_backfill(base=None):
     """Once, the first time this build keeps a ledger: each line of the
     old per-answer log (quality.jsonl: ts, tier, model, searched, chars)
     from before this launch becomes one answer and one estimated call,
@@ -12108,11 +13180,11 @@ def _usage_backfill():
     failed is tried again, and the caller's appends wait for it."""
     if _usage_state["backfilled"]:
         return
-    if os.path.exists(_pfile(USAGE_FILE)):
+    if os.path.exists(_pfile(USAGE_FILE, base)):
         _usage_state["backfilled"] = True
         return
     try:
-        with open(_pfile("quality.jsonl"), "r", encoding="utf-8",
+        with open(_pfile(QUALITY_FILE, base), "r", encoding="utf-8",
                   errors="replace") as f:
             lines = f.read().splitlines()
     except FileNotFoundError:
@@ -12134,11 +13206,11 @@ def _usage_backfill():
                      "x": 1, "q": 1, "a": 1})
     if recs:
         recs.sort(key=lambda r: r["t"])
-        _usage_write_all(recs)
+        _usage_write_all(recs, base)
     _usage_state["backfilled"] = True
 
 
-def usage_compact(now=None) -> bool:
+def usage_compact(now=None, base=None) -> bool:
     """Roll old calls up (hours after 14 days, local days after 120) and
     rewrite the file. Never rewrites a file it couldn't read; lines that
     didn't read are dropped."""
@@ -12146,7 +13218,7 @@ def usage_compact(now=None) -> bool:
     with _usage_lock:
         _usage_state["compacted"] = time.time()
         try:
-            recs = _usage_load()
+            recs = _usage_load(base)
         except StoreReadError:
             return False
         keep, agg = [], {}
@@ -12175,7 +13247,7 @@ def usage_compact(now=None) -> bool:
         if not agg and len(keep) == len(recs):
             return False
         _usage_write_all(sorted(keep + list(agg.values()),
-                                key=lambda r: r["t"]))
+                                key=lambda r: r["t"]), base)
         return True
 
 
@@ -13101,7 +14173,7 @@ def run_council(labels: list, messages: list, emit, status,
                 except Exception:
                     pass
         for _lbl, _c in _bench:
-            _th = threading.Thread(target=_cloud_draft,
+            _th = ctx_thread(target=_cloud_draft,
                                    args=(_lbl, _c), daemon=True)
             _th.start()
             cloud_threads.append(_th)
@@ -13160,7 +14232,7 @@ def run_council(labels: list, messages: list, emit, status,
                 pass
             except Exception as exc:      # noqa: BLE001 — recorded below
                 _e.append(exc)
-        _lt = threading.Thread(target=_draft_local, daemon=True)
+        _lt = ctx_thread(target=_draft_local, daemon=True)
         _lt.start()
         # joined in slices so a mid-generation Answer-now cuts the wait
         # short; the straggler branch below already keeps a usable
@@ -13520,7 +14592,7 @@ def run_research(labels: list, messages: list, emit, status) -> None:
         text = _page_text(s["url"])
         if len(text) > 300:
             s["body"] = text
-    threads = [threading.Thread(target=_enrich, args=(s,))
+    threads = [ctx_thread(target=_enrich, args=(s,))
                for s in sources[:5]]
     for t_ in threads:
         t_.start()
@@ -13557,9 +14629,11 @@ def run_research(labels: list, messages: list, emit, status) -> None:
 # no password prompt can ever hang the loop, and a keyless box fails with
 # a clean "set up an SSH key" nudge instead. The app never invents a
 # target and never handles a secret — the user configures their own host.
-REMOTE_FILE = os.path.join(app_dir(), "remote.json")
+# remote.json and remote_known_hosts belong to the profile (1a 5.7): the
+# server, its user and key, and the host keys ssh learned
+REMOTE_NAME = "remote.json"
 REMOTE_CAP = 40                 # hard ceiling on commands per run
-_remote_jobs = {}               # jid -> {"gate": Event, "ok": bool}
+_remote_jobs = profile_cache("_remote_jobs", {})               # jid -> {"gate": Event, "ok": bool}
 _remote_lock = threading.Lock()
 
 # ANSWER NOW (6b257, per Patrick — "take a clue from Gemini"): each
@@ -13568,13 +14642,14 @@ _remote_lock = threading.Lock()
 # sets the Event; run_council checks it between waits and trades the
 # rest of the council for the fastest compositor. Same trust model as
 # the APPROVE jid above: the id IS the authorization.
-_hurry_jobs = {}                # hid -> threading.Event
+_hurry_jobs = profile_cache("_hurry_jobs", {})                # hid -> threading.Event
 _hurry_lock = threading.Lock()
 
 
 def remote_conf() -> dict:
+    """The thread's profile's Remote server ({} when none, or no profile)."""
     try:
-        with open(REMOTE_FILE) as f:
+        with open(_pfile(REMOTE_NAME, bound_ctx())) as f:
             return json.load(f)
     except Exception:
         return {}
@@ -13582,17 +14657,13 @@ def remote_conf() -> dict:
 
 def _remote_save(d: dict) -> bool:
     """Atomic and 0600 from the first byte (6b326: the connection is saved
-    from a Remote run's thread too, when ssh -G resolves it)."""
-    tmp = None
+    from a Remote run's thread too, when ssh -G resolves it), into the
+    thread's own profile (6b329)."""
     try:
-        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(REMOTE_FILE),
-                                   prefix=".remote-")
-        with os.fdopen(fd, "w") as f:
-            json.dump(d, f)
-        _replace_into(tmp, REMOTE_FILE)
+        _write_raw(REMOTE_NAME, json.dumps(d).encode("utf-8"), bound_ctx(),
+                   mode=0o600)
         return True
     except Exception:
-        drop_run_file(tmp)
         return False
 
 
@@ -13612,7 +14683,14 @@ def _remote_save(d: dict) -> bool:
 # build is resolved once with `ssh -G` (ssh reads its own config there,
 # the host is on that one command line) and the answer saved into
 # remote.json; so is one whose connection fails for a name or a key.
-REMOTE_KNOWN_HOSTS = os.path.join(app_dir(), "remote_known_hosts")
+KNOWN_HOSTS_NAME = "remote_known_hosts"
+
+
+def _known_hosts_path() -> str:
+    """The thread's profile's own host-key list (1a 5.7, G9)."""
+    return _pfile(KNOWN_HOSTS_NAME, bound_ctx())
+
+
 SSH_ALIAS = "concorde-remote"
 # the login shell runs this, whatever it is (sh, bash, zsh, dash, csh,
 # tcsh all take it): sh reads the whole command from stdin, then bash
@@ -13730,7 +14808,7 @@ def _ssh_config(conf: dict) -> str:
         raise ValueError("a jump host's key")
     lines = [
         # every hop, a jump host included
-        "UserKnownHostsFile " + _ssh_path(REMOTE_KNOWN_HOSTS),
+        "UserKnownHostsFile " + _ssh_path(_known_hosts_path()),
         "GlobalKnownHostsFile " + ("NUL" if IS_WIN else "/dev/null"),
         "HashKnownHosts yes",
         "StrictHostKeyChecking accept-new",
@@ -13787,7 +14865,7 @@ SSH_OWN_SETTINGS = ("ConcordeAI connects with its own settings; put the "
 SSH_KEY_CHANGED = ("This server's identity changed since ConcordeAI first "
                    "connected. If you rebuilt it, forget its old key.")
 _SSH_CHANGED_RX = re.compile(r"Host key for (\S+) has changed")
-_SSH_CHANGED = [None]       # the host ssh last said changed, for Forget
+_SSH_CHANGED = profile_cache("_SSH_CHANGED", [None], reset=lambda c: c.__setitem__(0, None))       # the host ssh last said changed, for Forget
 
 
 _REMOTE_FIELDS = ("host", "user", "port", "key", "jump")
@@ -13932,10 +15010,9 @@ def _ssh_once(conf: dict, cmd: str, timeout: int):
         except ValueError as bad:
             return -1, ("ssh can't use %s in the connection settings: "
                         "check it for spaces or odd characters" % bad)
-        if not os.path.exists(REMOTE_KNOWN_HOSTS):
+        if not os.path.exists(_known_hosts_path()):
             # private from the first byte; ssh appends to it
-            os.close(os.open(REMOTE_KNOWN_HOSTS,
-                             os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600))
+            bound_ctx().append(KNOWN_HOSTS_NAME, b"", mode=0o600)
         cfg = run_file("ssh-", text, ".conf")
         # bytes in and out: a text-mode pipe on Windows would turn the
         # script's newlines into CRLF, which bash reads as part of each
@@ -14020,7 +15097,7 @@ def ssh_forget_host(conf: dict, name=None) -> int:
     names = {n for n in ((name, name.lower()) if name else ()) if n in allowed}
     names = names or allowed
     try:
-        with open(REMOTE_KNOWN_HOSTS, encoding="utf-8") as f:
+        with open(_known_hosts_path(), encoding="utf-8") as f:
             lines = f.read().splitlines(True)
     except FileNotFoundError:
         return 0
@@ -14044,15 +15121,8 @@ def ssh_forget_host(conf: dict, name=None) -> int:
         else:
             keep.append(ln)
     if gone:
-        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(REMOTE_KNOWN_HOSTS),
-                                   prefix=".rkh-")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write("".join(keep))
-            _replace_into(tmp, REMOTE_KNOWN_HOSTS)
-        except BaseException:
-            drop_run_file(tmp)
-            raise
+        _write_raw(KNOWN_HOSTS_NAME, "".join(keep).encode("utf-8"),
+                   bound_ctx(), mode=0o600)
     return gone
 
 
@@ -15092,7 +16162,7 @@ def _zone_latlon(tzname: str):
 
 def _sky_latlon():
     """Where the sun is measured. No network here: the page waits on it."""
-    home = str(load_prefs(None).get("home_area") or "").strip()
+    home = home_area()
     if home:
         g = _geo_cache.get(home.lower())
         if g:
@@ -15397,7 +16467,7 @@ def sky_status(i: int, warm: bool = False) -> dict:
         if warm and busy:
             return {"status": "busy", "pct": 0}
         _sky_jobs[i] = {"status": "downloading", "pct": 0}
-    threading.Thread(target=_sky_fetch, args=(i,), daemon=True).start()
+    ctx_thread(target=_sky_fetch, args=(i,), daemon=True).start()
     return {"status": "downloading", "pct": 0}
 
 
@@ -15735,7 +16805,7 @@ _TURN_RESET = "\x00RESET\x00"
 _TURN_BOLD_SKIP = re.compile(
     r"^(open|closed|note|heads|tip|hours|today|tonight|monday|tuesday|"
     r"wednesday|thursday|friday|saturday|sunday|yes|no)\b", re.I)
-_turns_live = {}
+_turns_live = profile_cache("_turns_live", {})
 _turns_lock = threading.Lock()
 
 
@@ -15869,9 +16939,10 @@ def _turns_flush():
     for t in live:
         _turn_finish(t)
     # a delete inside its undo window is final at a quit (0b 5.6): its id
-    # joins gone and chats.json loses it now (the next start would too)
+    # joins gone and chats.json loses it now (the next start would too),
+    # in the profile active at the quit (6b329)
     try:
-        _chat_finalize(None, now=float("inf"))
+        _chat_finalize(current_ctx(), now=float("inf"))
     except Exception:
         pass
 
@@ -15909,12 +16980,16 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
     # answer's provider must never reach the next request on this
     # thread); a store that can't be read answers 503 with its line
     # (0b L1); and a chat turn in flight is saved however the request
-    # ends.
+    # ends. THE PROFILE IS TAKEN ONCE, HERE (1a 5.2, 6b329): the request
+    # and every thread it starts work for this ctx to the end, and a
+    # write after a switch is refused (409 when nothing was sent yet).
     def _run(self, fn):
         _tl_search.__dict__.clear()
         _answered.pop(threading.get_ident(), None)
         self._turn = None
         self._head_sent = False
+        self.ctx = current_ctx()
+        bind_ctx(self.ctx)
         try:
             fn()
         except StoreReadError as exc:
@@ -15922,10 +16997,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"err": READ_FAIL.get(str(exc),
                                  "Couldn\u2019t read that. Nothing was changed."),
                                  "unreadable": str(exc)}, code=503)
+        except StaleProfile:
+            if not self._head_sent:
+                self._profile_changed(drain=False)
         finally:
             t, self._turn = self._turn, None
             if t:
                 _turn_finish(t)
+            bind_ctx(None)
 
     def do_GET(self):
         self._run(self._do_GET)
@@ -15986,11 +17065,46 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         if self.command == "GET" and _COOKIE_ONLY.fullmatch(self.path):
             return True
         # compare_digest on BYTES, as for the cookie
-        if secrets.compare_digest(
+        if not secrets.compare_digest(
                 (self.headers.get("X-Api-Token") or "").encode("utf-8"),
                 API_TOKEN.encode("utf-8")):
-            return True
-        return self._deny()
+            return self._deny()
+        # X-PROFILE (1a 5.2, 4.5; 6b329): the page names the profile it
+        # was drawn for. After a switch its calls get 409 and change
+        # nothing, and the page reloads. Native callers (the gauntlet,
+        # ci_smoke) send none and act on the profile active at their
+        # start, like any request.
+        xp = self.headers.get("X-Profile")
+        if xp is not None and not secrets.compare_digest(
+                xp.encode("utf-8", "replace"),
+                self.ctx.tag.encode("utf-8")):
+            return self._profile_changed()
+        return True
+
+    def _profile_changed(self, drain=True) -> bool:
+        """409 profile-changed (1a 5.2): nothing was done. At the gate a
+        POST's body is drained first (see _refuse); a route that already
+        read it passes drain=False. The page reloads on it."""
+        try:
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            while drain and n > 0 and self.command == "POST":
+                chunk = self.rfile.read(min(n, 65536))
+                if not chunk:
+                    break
+                n -= len(chunk)
+        except Exception:
+            pass
+        body = json.dumps({"err": "profile-changed"}).encode()
+        try:
+            self.send_response(409)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("X-Profile", "changed")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except Exception:
+            pass
+        return False
 
     def _keyed(self) -> bool:
         # EVERY cookie of that name: a stray one with a longer Path sorts
@@ -16102,14 +17216,6 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             pass
         return False
 
-    def _data_base(self):
-        """The data root for this request. None = app_dir()'s own files,
-        the only tenancy there is: the web version's users/<uid> and
-        _anon folders went with it (6b320), so nothing a request carries
-        (a proxy header, a forged cookie) can pick another folder. Kept,
-        with its call sites, as the seam the profiles replace."""
-        return None
-
     # ------------------------------------------------------------------ GET
     def _do_GET(self):
         if not self._gate():
@@ -16141,6 +17247,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     .replace("__SKY_N__", str(len(SKY_SOURCES)))
                     .replace("__SKY_DARK__", json.dumps(SKY_DARK))
                     .replace("__SKY_NIGHT__", json.dumps(sky_is_night()))
+                    .replace("__PROFILE__", self.ctx.tag)
                     .replace("__JUST_UPDATED__", json.dumps(_JUST_UPDATED[0]))
                     .replace("__APP_VER_SPEC__", spec_version())
                     .replace("__APP_VER__", short_version()
@@ -16158,7 +17265,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # rule, so a build-only ETag told WKWebView "unchanged"
             # while the page had changed for days — Patrick's test
             # window kept re-serving a cached weeks-old UI off 304s.
-            etag = '"b%d-%d"' % (APP_BUILD, _SRC_MTIME)
+            # (6b329) and the profile: a page drawn for another profile
+            # is never "unchanged", or a reload after a switch would get
+            # a 304 and the old __PROFILE__, and reload again
+            etag = '"b%d-%d-%s"' % (APP_BUILD, _SRC_MTIME, self.ctx.tag)
             if self.headers.get("If-None-Match") == etag:
                 self.send_response(304)
                 self.send_header("ETag", etag)
@@ -16184,7 +17294,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # POST (6b320); a GET here changes nothing
                 self.send_error(405, "use POST")
                 return
-            root = (load_prefs(None).get("workspace") or "")
+            root = (profile_local(self.ctx).get("workspace") or "")
             self._send_json({"ok": bool(root), "root": root,
                              "files": len(_ws_files(root)) if root else 0})
             return
@@ -16289,7 +17399,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                              "name": (c or {}).get("name", ""),
                              "model": (c or {}).get("model", ""),
                              "active": d.get("active", ""),
-                             "turbo": bool(load_prefs(None).get("turbo")),
+                             "turbo": bool(profile_local(self.ctx).get("turbo")),
                              "bench": [lbl for lbl, _c in cloud_bench()],
                              "providers": provs})
         elif self.path == "/api/stats":
@@ -16303,7 +17413,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"err": "unknown range"}, code=400)
             else:
                 self._send_json(usage_query(
-                    usage_read(), _ur, (_uq.get("model") or [""])[0][:120]))
+                    usage_read(self.ctx), _ur,
+                    (_uq.get("model") or [""])[0][:120]))
         elif self.path == "/api/engines":
             self._send_engines()
         elif self.path == "/api/setup":
@@ -16333,7 +17444,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # against the app itself; this closes it and costs nothing.
             iid = urllib.parse.unquote(self.path[len("/api/export/"):]
                                        .split("?")[0])
-            base = self._data_base()
+            base = self.ctx
             pth = os.path.join(export_dir(base), iid)
             if not _X_ID_RX.match(iid) or not os.path.exists(pth):
                 self.send_error(404)
@@ -16357,7 +17468,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         elif self.path.startswith("/api/video/") and self.path.endswith(
                 (".mp4", ".gif", ".webm")):
             vid = self.path[len("/api/video/"):]
-            pth = os.path.join(VIDEO_DIR, vid)
+            pth = os.path.join(video_dir(self.ctx), vid)
             if not re.fullmatch(r"[\w-]+\.(mp4|gif|webm)", vid) \
                     or not os.path.exists(pth):
                 self.send_error(404)
@@ -16390,7 +17501,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         elif self.path.startswith("/api/image/") and self.path.endswith(
                 (".png", ".jpg", ".webp")):
             iid = self.path[len("/api/image/"):]
-            pth = os.path.join(IMAGE_DIR, iid)
+            pth = os.path.join(image_dir(self.ctx), iid)
             if not re.fullmatch(r"[\w-]+\.(png|jpg|webp)", iid) or not os.path.exists(pth):
                 self.send_error(404)
                 return
@@ -16430,11 +17541,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         out[name]["fastcloud"] = _fl[0].get("name", "")
             self._send_json(out)
         elif self.path == "/api/prefs":
-            self._send_json(load_prefs(self._data_base(), strict=True))
+            self._send_json(prefs_view(self.ctx))
         elif self.path == "/api/chats":
             # an unreadable store answers 503, never an empty list (0b L1)
             with _chats_lock:
-                _cs = load_chats(self._data_base())
+                _cs = load_chats(self.ctx)
                 _rev = _data_rev[0]
             self._send_json({"chats": _cs, "data_rev": _rev})
         elif self.path.startswith("/api/chats/one?"):
@@ -16443,7 +17554,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             _id = (urllib.parse.parse_qs(urllib.parse.urlparse(
                 self.path).query).get("id", [""])[0] or "")
             with _chats_lock:
-                _, _c = _chat_find(load_chats(self._data_base()), _id)
+                _, _c = _chat_find(load_chats(self.ctx), _id)
                 _rev = _data_rev[0]
             self._send_json({"chat": _c, "data_rev": _rev})
         elif self.path.startswith("/api/chats/search"):
@@ -16456,7 +17567,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             hits = []
             if _q:
                 with _chats_lock:
-                    _cs = load_chats(self._data_base())
+                    _cs = load_chats(self.ctx)
                 for c in _cs:
                     try:
                         if _q in str(c.get("title", "")).lower() or any(
@@ -16467,7 +17578,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         continue
             self._send_json({"ids": hits})
         elif self.path == "/api/memory":
-            self._send_json({"facts": _load_memory(self._data_base())})
+            self._send_json({"facts": _load_memory(self.ctx)})
         elif self.path == "/api/me":
             # WHO AM I (6b257, the Account pane). One kind since the web
             # version's visitor, PIN and Google profiles went (6b320): this
@@ -16665,6 +17776,19 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         if not self._csrf_ok():
             self._refuse(403, "cross-site")
             return
+        if self.path == "/api/test/profile" and "profiles" in TEST_HOOKS:
+            # the local-test-profile hook (1a 5.13), dev copies only
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                d = json.loads(self.rfile.read(n)) if n else {}
+            except (ValueError, json.JSONDecodeError):
+                d = {}
+            try:
+                self._send_json(test_profile_op(d if isinstance(d, dict)
+                                                else {}))
+            except NoProfile as exc:
+                self._send_json({"err": str(exc)}, code=409)
+            return
         if self.path == "/api/window/focus":
             # a second launch asks this copy to come forward (6b310). It
             # only ever brings the window forward (6b320): reopening
@@ -16706,16 +17830,16 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # every branch below saves settings too: settings it can't
             # read refuse the request before a key is touched (review of
             # 6b322), so "Nothing was changed" stays true
-            _read_json("prefs.json", self._data_base(), dict)
+            profile_local(self.ctx, strict=True)
             if which == "off":
                 # inside the cloud lock (6b326): a writer that had read the
                 # file first would otherwise write every key back
                 with _cloud_txn():
                     try:
-                        os.remove(CLOUD_FILE)
+                        self.ctx.remove(CLOUD_NAME)
                     except OSError:
                         pass
-                _set_turbo(False)
+                _set_turbo(self.ctx, False)
                 self._send_json({"ok": True, "off": True})
                 return
             spec = {
@@ -16847,7 +17971,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # an account with no money is saved too, but says so
                     # and sits out an hour, not ten minutes (6b307)
                     _broke = bool(_NO_CREDIT_RX.search(raw or detail))
-                    _saved = _cloud_save_state(which, {"name": name, "base": base,
+                    _saved = _cloud_save_state(self.ctx, which, {"name": name, "base": base,
                                               "key": key, "model": model,
                                               "models": found,
                                               "status": "ok",
@@ -16863,7 +17987,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     if not _saved:
                         self._send_json({"ok": False, "err": _KEY_NOT_SAVED})
                         return
-                    _set_turbo(True)
+                    _set_turbo(self.ctx, True)
                     self._send_json({
                         "ok": True, "name": name, "model": model,
                         "models": found,
@@ -16938,7 +18062,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # discovered models stay benched. AFTER the write (6b326):
                 # a failure of the old key landing before it could rest or
                 # retire the new key's models again
-                if not _cloud_save_state(which, {"name": name, "base": base,
+                if not _cloud_save_state(self.ctx, which, {"name": name, "base": base,
                                                  "key": key, "model": model,
                                                  "models": found,
                                                  "status": "ok"},
@@ -16949,7 +18073,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             except Exception as exc:
                 self._send_json({"ok": False, "err": str(exc)[:80]})
                 return
-            _set_turbo(True)
+            _set_turbo(self.ctx, True)
             _ok = {"ok": True, "name": name, "model": model,
                    "models": found}
             if _busy:
@@ -16968,10 +18092,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 d = {}
             if not isinstance(d, dict):
                 d = {}
-            p = load_prefs(None)
             if self.path == "/api/workspace/off":
-                p.pop("workspace", None)
-                store_prefs(p)
+                profile_local_update(self.ctx,
+                                     lambda p: p.pop("workspace", None))
                 self._send_json({"ok": True})
                 return
             # Explorer's "Copy as path" wraps it in quotes (6b317)
@@ -16981,10 +18104,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"ok": False,
                                  "err": "that folder doesn't exist"})
                 return
-            p["workspace"] = os.path.realpath(root)
-            store_prefs(p)
-            self._send_json({"ok": True, "root": p["workspace"],
-                             "files": len(_ws_files(p["workspace"]))})
+            root = os.path.realpath(root)
+            profile_local_update(self.ctx,
+                                 lambda p: p.__setitem__("workspace", root))
+            self._send_json({"ok": True, "root": root,
+                             "files": len(_ws_files(root))})
             return
         if self.path.startswith("/api/remote/"):
             # SSH connection + the live approval channel (6b249)
@@ -17006,7 +18130,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 host = str(d.get("host", "")).strip()[:200]
                 if not host:
                     try:
-                        os.remove(REMOTE_FILE)
+                        self.ctx.remove(REMOTE_NAME)
                     except Exception:
                         pass
                     self._send_json({"ok": True, "cleared": True})
@@ -17079,7 +18203,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             return
         if self.path == "/api/update/install":
             if _update["state"] in ("idle", "error"):
-                threading.Thread(target=_do_update, daemon=True).start()
+                ctx_thread(target=_do_update, daemon=True).start()
             self._send_json({"ok": True})
             return
         if self.path == "/api/update/download":
@@ -17118,7 +18242,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # never the summary. Each reply carries the chat as saved.
             _fc = str(d.get("chat_id") or "")
             _ft = None
-            _fbase = self._data_base()
+            _fbase = self.ctx
             if _fc and _CHAT_ID.fullmatch(_fc):
                 if picks:
                     _fq = asked[len(picks) - 1] if len(asked) >= len(picks) else ""
@@ -17326,21 +18450,24 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 d = json.loads(self.rfile.read(n))
             except (ValueError, json.JSONDecodeError):
                 d = None
-            if isinstance(d, dict):
-                base = self._data_base()
-                # the read, the merge and the write under ONE lock (6b304):
-                # every toggle posts on change, so two quick flips raced
-                # and the second write dropped the first's key. A file
-                # it can't read answers 503 and is left as it is (6b322)
-                with _prefs_lock:
-                    cur = load_prefs(base, strict=True)
-                    cur.update(d)
-                    store_prefs(cur, base)
-                if base is None and "no_limits" in d:
-                    _no_limits["v"] = bool(d.get("no_limits"))
-                if base is None and "include_giants" in d:
-                    _giants["v"] = bool(d.get("include_giants"))
-            self._send_json({"ok": isinstance(d, dict)})
+            if not isinstance(d, dict):
+                self._send_json({"ok": False})
+                return
+            # each key to its own place, compare-and-set (1a 5.6, 6b329):
+            # the machine's to prefs.json, the person's and this
+            # profile's to the active profile's files (prefs.json for
+            # "This computer", as before). The read, the check and the
+            # write of each under ONE lock (6b304: every toggle posts on
+            # change, so two quick flips raced). A file it can't read
+            # answers 503 and is left as it is (6b322). "_old" (optional)
+            # holds the values the page last saw.
+            old = d.pop("_old", None)
+            out = split_prefs(self.ctx, d, old)
+            if "no_limits" in d:
+                _no_limits["v"] = bool(d.get("no_limits"))
+            if "include_giants" in d:
+                _giants["v"] = bool(d.get("include_giants"))
+            self._send_json(out)
             return
         if self.path in ("/api/prefs/adopt", "/api/webstore/clean"):
             # the page's first-run move of its six per-person keys into
@@ -17353,7 +18480,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if not isinstance(d, dict):
                 self._send_json({"err": "not an object"}, code=400)
             elif self.path == "/api/prefs/adopt":
-                self._send_json(prefs_adopt(d, self._data_base()))
+                self._send_json(prefs_adopt(d, self.ctx))
             else:
                 self._send_json(webstore_clean(d.get("local") is True))
             return
@@ -17373,7 +18500,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if not isinstance(ops, list):
                 self._send_json({"err": "no ops"}, code=400)
                 return
-            self._send_json(chat_ops(ops, self._data_base()))
+            self._send_json(chat_ops(ops, self.ctx))
             return
         if self.path == "/api/sky/seen":
             # the backdrop now showing, for the history beside the clips
@@ -17415,7 +18542,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # quick model (6b308); anything else stays on this Mac. The
             # ticket is THIS chat's (6b326), and make_title re-reads its
             # key under the lock
-            _lc = (_last_cloud.get((str(self._data_base()), _tcid))
+            _lc = (_last_cloud.get((self.ctx.name, _tcid))
                    if _tcid else None)
             _conf = (_lc[0] if _lc and time.time() - _lc[1] < 300
                      and cloud_allowed() else None)
@@ -17431,8 +18558,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # memory.json empties too (0b 5.8, L7): an older build must not
             # go on using a fact cleared here
             with _memory_lock:
-                _load_memory(self._data_base())
-                _save_memory([], self._data_base(), erase=True)
+                _load_memory(self.ctx)
+                _save_memory([], self.ctx, erase=True)
             self._send_json({"ok": True})
             return
         if self.path == "/api/logout":
@@ -17456,11 +18583,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if not isinstance(d, dict):
                 d = {}          # valid JSON is not always an object
             scopes = set(d.get("scopes") or ["memory"])
-            base = self._data_base()
+            base = self.ctx
             # a store it can't read refuses the whole request before
             # anything is erased (review of 6b322, 0b L1)
             if "prefs" in scopes:
-                _read_json("prefs.json", base, dict)
+                user_prefs(base, strict=True)
             if "memory" in scopes:
                 _load_memory(base)
             if "chats" in scopes:
@@ -17490,10 +18617,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if "prefs" in scopes:
                 # personal keys only — machine config (turbo, update
                 # channel) is not "about the user" and must survive
-                p = load_prefs(base)
-                for k in ("persona", "length", "user_name"):
-                    p.pop(k, None)
-                store_prefs(p, base)
+                def _forget(p):
+                    for k in ("persona", "length", "user_name"):
+                        p.pop(k, None)
+                user_prefs_update(base, _forget)
             self._send_json({"ok": True})
             return
         if self.path == "/api/voice/prepare":
@@ -17530,7 +18657,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 iid = (json.loads(self.rfile.read(n)) or {}).get("id", "")
             except (ValueError, json.JSONDecodeError):
                 iid = ""
-            pth = os.path.join(export_dir(self._data_base()), str(iid))
+            pth = os.path.join(export_dir(self.ctx), str(iid))
             ok = bool(_X_ID_RX.match(str(iid))) and os.path.exists(pth) \
                 and reveal_in_finder(pth)
             self._send_json({"ok": ok})
@@ -17651,11 +18778,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 _al = len(messages) - 1
                 _ah = chat_prefix_hash(messages, _al)
             _landed, _n, _h = chat_append_turn(
-                _cid, _al, _ah, [_q], self._data_base(),
+                _cid, _al, _ah, [_q], self.ctx,
                 prefix=messages[:-1], lane=req_json.get("lane"),
                 title=str(_q.get("content") or "")[:48])
             self._turn = {"id": _landed, "n": _n, "h": _h, "wire": [],
-                          "base": self._data_base(), "searched": False}
+                          "base": self.ctx, "searched": False}
             with _turns_lock:
                 _turns_live[id(self._turn)] = self._turn
         # pasted images ride beside the text; vision always routes to
@@ -17673,7 +18800,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # chat (6b326, from review): it was per user, so a funnel or a
         # second chat could be titled by another chat's provider
         _title_cid = str((self._turn or {}).get("id") or "")
-        _last_cloud.pop((str(self._data_base()), _title_cid), None)
+        _last_cloud.pop((self.ctx.name, _title_cid), None)
         for _k in [k for k, v in list(_last_cloud.items())
                    if time.time() - v[1] > 300]:
             _last_cloud.pop(_k, None)
@@ -17935,7 +19062,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 with _engine_lock:
                     ensure_mlx_engine(_lbl)
                     _mlx_last_use = time.time()
-            threading.Thread(target=_prewarm, daemon=True).start()
+            ctx_thread(target=_prewarm, daemon=True).start()
 
         # "/search …" forces a lookup; otherwise auto-search decides.
         bookish = False
@@ -18486,7 +19613,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 messages[-1] = dict(messages[-1])
                 messages[-1]["content"] = (
                     wsx + "\n\nQUESTION: " + str(messages[-1]["content"]))
-        user_base = self._data_base()      # whose memory/persona this is
+        user_base = self.ctx      # whose memory/persona this is
         mem = memory_text(user_base)
         if mem:
             dated_system["content"] += (
@@ -18513,7 +19640,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 "not an engineer') overrides anything remembered.")
         # standing preferences the user wrote themselves (About panel) — they
         # outrank remembered facts, which are extracted guesses
-        _prefs = load_prefs(user_base)
+        _prefs = user_prefs(user_base)
         user_name = str(_prefs.get("user_name") or "").strip()[:80]
         if user_name:
             dated_system["content"] += (
@@ -18666,13 +19793,18 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                .encode("utf-8"))
                     except Exception:
                         return
-        threading.Thread(target=_heartbeat, daemon=True).start()
+        ctx_thread(target=_heartbeat, daemon=True).start()
 
         sent = [0]
 
         answer_buf = []
 
         def emit(chunk: str):
+            # an answer for a profile that is no longer the active one
+            # stops here (1a 5.3): nothing more reaches the page, and its
+            # turn and ledger writes are refused
+            if user_base.cancel.is_set():
+                raise StaleProfile("the profile changed")
             if not isinstance(chunk, Ctl):
                 # model text can't open a frame (see Ctl)
                 chunk = strip_special(chunk).replace(NUL, "")
@@ -18724,7 +19856,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                  EXPORT_KIND.get(ext, ("", ext))[1])
             status("writing the %s" % EXPORT_KIND.get(ext, ("", ext))[1])
             try:
-                info = run_export(src, ext, ttl, self._data_base(),
+                info = run_export(src, ext, ttl, self.ctx,
                                   export_req.get("filename", ""))
                 step("export", "Wrote the file", "done", info["name"])
                 emit("Here it is \u2014 **%s**, %s.\n\n[[dl:%s]]"
@@ -18755,7 +19887,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             status("filming \u00b7 " + where)
             try:
                 _use, _cnotes = resolve_overrides("video", _ovr, _pnote)
-                vpath, vsrc = generate_video(vid_subject, _use,
+                vpath, vsrc = generate_video(user_base, vid_subject, _use,
                                              sock=self.connection)
                 vmade = "made on this Mac" if vsrc == "local" \
                     else "made in the cloud"
@@ -18782,8 +19914,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # local video exists only on Apple silicon (6b317)
                     emit("That\u2019s today\u2019s cloud-video limit (%d "
                          "clips, about $0.80 each). It resets tomorrow%s."
-                         % (int(load_prefs(None).get("veo_daily_cap",
-                                                     VEO_DAILY_CAP) or 0),
+                         % (int(profile_local(user_base).get(
+                             "veo_daily_cap", VEO_DAILY_CAP) or 0),
                             "; video made on this Mac isn\u2019t limited"
                             if studio_supported() else ""))
                 elif video_ready():
@@ -18820,7 +19952,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             status("painting \u00b7 " + where)
             try:
                 _use, _cnotes = resolve_overrides("image", _ovr, _pnote)
-                path, src = generate_image(img_subject, _use,
+                path, src = generate_image(user_base, img_subject, _use,
                                            sock=self.connection)
                 made = "made on this Mac" if src == "local" \
                     else "made in the cloud"
@@ -19095,7 +20227,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # message so the reviser can check names against data.
                 # a giant on Ollama writes once (6b314): the draft-and-
                 # rewrite pass doubles a few-words-a-second answer
-                polish = (load_prefs(None).get("polish", True)
+                polish = (user_prefs(user_base).get("polish", True)
                           and not images and (not query or bookish)
                           and _is_substantive(prompt)
                           and not slow_giant(lbl))
@@ -19191,7 +20323,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # memory and map pins go back to it and nowhere else
             _ans_conf = _answered.pop(threading.get_ident(), None)
             if _ans_conf and _title_cid:
-                _last_cloud[(str(user_base), _title_cid)] = (
+                _last_cloud[(user_base.name, _title_cid)] = (
                     _ans_conf, time.time())
             if _ans_conf:
                 # the badge under the answer says "cloud", whatever the
@@ -19299,7 +20431,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     _export_shape(_txt), "md")
                 try:
                     _info = run_export(_txt, _ext, x_title(prompt, _txt),
-                                       self._data_base(),
+                                       self.ctx,
                                        export_req.get("filename", ""))
                     emit("\n\n[[dl:%s]]" % json.dumps(
                         _info, separators=(",", ":")))
@@ -19309,17 +20441,17 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             hb_stop.set()
             # the quality ledger: one line per answer, so "make it
             # better" has numbers instead of vibes (grep-able JSONL)
+            # (in the asking profile, 1a 5.7)
             try:
-                qpath = os.path.join(app_dir(), "quality.jsonl")
+                qpath = user_base.path(QUALITY_FILE)
                 if os.path.exists(qpath) and \
                         os.path.getsize(qpath) > 2_000_000:
-                    os.remove(qpath)
-                with open(qpath, "a", encoding="utf-8") as qf:
-                    qf.write(json.dumps({
-                        "ts": int(time.time()), "tier": tier,
-                        "model": route_label or model_name,
-                        "searched": bool(query), "chars": sent[0],
-                    }) + "\n")
+                    user_base.remove(QUALITY_FILE)
+                user_base.append(QUALITY_FILE, (json.dumps({
+                    "ts": int(time.time()), "tier": tier,
+                    "model": route_label or model_name,
+                    "searched": bool(query), "chars": sent[0],
+                }) + "\n").encode("utf-8"), mode=0o644)
             except Exception:
                 pass
             # Settings › Usage counts answers too (6b325): one per
@@ -19339,7 +20471,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # memory too and the words reach no second company (6b308); a
             # local answer stays local, and Cloud Only never runs locally
             if plain and len(plain) > 12 and (_ans_conf or not cloud_only):
-                threading.Thread(
+                ctx_thread(
                     target=_extract_memory,
                     args=(route_label or (council[0] if council else ""),
                           plain, user_base),
@@ -19716,13 +20848,13 @@ def _webstore_qt_sweep(folder: str, keep_local: bool):
     return out, bad
 
 
-def _webstore_state(base=None) -> dict:
+def _webstore_state(base=MACHINE_ROOT) -> dict:
     p = _read_json(PROFILE_FILE, base, dict) or {}
     w = p.get("webstore")
     return dict(w) if isinstance(w, dict) else {}
 
 
-def _webstore_mark(base=None, **kv):
+def _webstore_mark(base=MACHINE_ROOT, **kv):
     with _profile_lock:
         p = _read_json(PROFILE_FILE, base, dict) or {}
         w = p.get("webstore") if isinstance(p.get("webstore"), dict) else {}
@@ -19731,7 +20863,7 @@ def _webstore_mark(base=None, **kv):
         _write_json(PROFILE_FILE, p, base, indent=1)
 
 
-def _webstore_qt_boot(base=None):
+def _webstore_qt_boot(base=MACHINE_ROOT):
     """The Qt branch, at a start before the window: the first pass, and
     the one-time LocalStorage removal once the page has asked for it.
     UNVERIFIED here: it needs the ARM64 build on Windows ARM64."""
@@ -19842,7 +20974,7 @@ def _webstore_native(local: bool) -> bool:
     return False
 
 
-def webstore_clean(local: bool, base=None) -> dict:
+def webstore_clean(local: bool, base=MACHINE_ROOT) -> dict:
     """POST /api/webstore/clean, the page's call at every boot once the
     six keys are handled. local: none of the six is left in browser
     storage (0b Q13). {"reload": true} tells the page to reload (after
@@ -19905,21 +21037,23 @@ def _pref_six_ok(k, v) -> bool:
     return False
 
 
-def prefs_adopt(d: dict, base=None) -> dict:
+def prefs_adopt(d: dict, ctx) -> dict:
     """POST /api/prefs/adopt: the page's first-run post of the six keys.
-    Only keys prefs.json lacks are taken (Q10: the server wins, as
+    Only keys the profile lacks are taken (Q10: the server wins, as
     remote_autonomy already did); the reply lists every one of the six
-    prefs.json now holds, and the page removes exactly those from browser
-    storage. An unreadable prefs.json raises (503) and takes nothing."""
-    with _prefs_lock:
-        cur = load_prefs(base, strict=True)
-        add = {k: v for k, v in (d or {}).items()
-               if k in PREF_SIX and k not in cur and _pref_six_ok(k, v)}
-        if add:
-            cur.update(add)
-            store_prefs(cur, base)
-        return {"ok": True, "took": sorted(add),
-                "prefs": {k: cur[k] for k in PREF_SIX if k in cur}}
+    the profile now holds, and the page removes exactly those from browser
+    storage. An unreadable file raises (503) and takes nothing. They are
+    PROFILE_LOCAL (1a 5.6): prefs.json for "This computer"."""
+    took = []
+
+    def _take(cur):
+        for k, v in (d or {}).items():
+            if k in PREF_SIX and k not in cur and _pref_six_ok(k, v):
+                cur[k] = v
+                took.append(k)
+    cur = profile_local_update(ctx, _take)
+    return {"ok": True, "took": sorted(took),
+            "prefs": {k: cur[k] for k in PREF_SIX if k in cur}}
 
 
 _WIN_STATE = {"min": False, "max": False}   # as the window's events say
@@ -20593,7 +21727,7 @@ input.crename{flex:1;min-width:0;background:rgba(0,0,0,.45);
   animation:rise .22s ease both}
 #undobar[hidden]{display:none}
 /* no API token (6b321): the page can't reach its server, and says so */
-#apistuck{position:fixed;left:50%;top:26px;transform:translateX(-50%);
+#apistuck,#profstuck{position:fixed;left:50%;top:26px;transform:translateX(-50%);
   z-index:90;background:rgba(15,17,23,.92);border:1px solid rgba(255,255,255,.15);
   border-radius:14px;padding:11px 18px;font-size:13px;color:var(--text)}
 #undobar button{background:none;border:none;color:#8fb8ff;cursor:pointer;
@@ -23642,6 +24776,25 @@ function apiTok(){
     ask();
   }));
 }
+/* THE PROFILE THIS PAGE WAS DRAWN FOR (1a 5.2, 4.5; 6b329). Every /api
+   call names it in X-Profile. After a switch the server answers 409 and
+   changes nothing, and the page reloads to draw the profile now active.
+   A second 409 within 10 s of a reload doesn't reload again: the page
+   says so, so it can never loop. */
+const PROFILE="__PROFILE__";
+function profileChanged(){
+  let last=0;
+  try{last=+sessionStorage.getItem("millen.p409")||0;}catch(e){}
+  if(Date.now()-last<10000){
+    if(!$("#profstuck")){const n=document.createElement("div");
+      n.id="profstuck";
+      n.textContent="The profile changed. Reload this window to continue.";
+      document.body.appendChild(n);}
+    return;
+  }
+  try{sessionStorage.setItem("millen.p409",String(Date.now()));}catch(e){}
+  location.reload();
+}
 // no token after 20 s: say so, and keep waiting (never go on without it)
 function apiStuck(){
   if($("#apistuck"))return;
@@ -23659,8 +24812,11 @@ async function api(u,o){
   const t=await(sig?Promise.race([apiTok(),new Promise((_,no)=>
     sig.addEventListener("abort",()=>no(ab()),{once:true}))]):apiTok());
   const h=new Headers(o.headers||{});h.set("X-Api-Token",t);
+  h.set("X-Profile",PROFILE);
   // the Response itself, untouched: the chat reads its body as a stream
-  return nFetch(u,Object.assign({},o,{headers:h}));
+  const r=await nFetch(u,Object.assign({},o,{headers:h}));
+  if(r.status===409&&r.headers.get("X-Profile")==="changed")profileChanged();
+  return r;
 }
 /* MEDIA BEHIND THE TOKEN (6b321). An <img> or <video> can't send a
    header, so renderMD writes data-api-src and no src, and this loads each
@@ -30694,18 +31850,20 @@ def maybe_version_splash():
         # app: they may show the moment but never move the record
         real = not os.environ.get("MILLENAI_TESTBUILD") and DEFAULT_APP
         ident = short_version()
-        with _prefs_lock:
-            prefs = load_prefs()
+        _last = []
+
+        def _stamp(prefs):
             last = prefs.get("last_ident") or prefs.get("last_version")
+            _last.append(last)
             if real and "app_models" not in prefs:
                 _app_models_seed(prefs, existing=last is not None)
-                store_prefs(prefs)
-            if last == ident:
-                return
-            if real:
+            if real and last != ident:
                 prefs["last_ident"] = ident
                 prefs["last_version"] = APP_VERSION
-                store_prefs(prefs)
+        machine_prefs_update(_stamp)
+        last = _last[0]
+        if last == ident:
+            return
         if last is None:
             return          # fresh install gets the boot wipe, not this
         if real:
@@ -30779,15 +31937,12 @@ def reap_orphan_engines():
 def _retire_contribute():
     """Contribute is gone (6b310): drop its hub credentials and switches
     from prefs, and its key, worker list and ledger files. Idempotent."""
+    def _drop(p):
+        for k in [k for k in p if k.startswith("contrib_")
+                  or k in ("fleet_auto", "seen_share")]:
+            p.pop(k, None)
     try:
-        with _prefs_lock:
-            p = load_prefs(None)
-            gone = [k for k in p if k.startswith("contrib_")
-                    or k in ("fleet_auto", "seen_share")]
-            if gone:
-                for k in gone:
-                    p.pop(k, None)
-                store_prefs(p)
+        machine_prefs_update(_drop)
     except Exception:
         pass
     for fn in ("fleet_key", "fleet_workers.json", "contrib_ledger.json"):
@@ -30826,11 +31981,17 @@ if __name__ == "__main__":
     # the legacy files' catch-up, by the copy holding the lock only
     # A lock file that couldn't even be opened leaves the store as it
     # was before this step, unmigrated but open (review of 6b324)
+    # THE PROFILE (1a 5.2, 6b329): "This computer" first, with a new
+    # epoch, so the boot order runs through a root ctx; then the profile
+    # profile.json names (a local test profile, dev copies only)
+    _INSTANCE_HELD[0] = bool(_INSTANCE_LOCK)
+    _root = profile_boot()
     if _INSTANCE_LOCK:
-        _migrate_61()
+        _migrate_61(_root)
         sweep_run_files()      # a crash's leftover prompt, speech, ssh files
     else:
         print("  no instance lock: the chats aren't migrated this run")
+    profile_resume()
     if not NOWINDOW and _web_engine() == "qt" and _INSTANCE_LOCK:
         _webstore_qt_boot()      # files, while no page holds them (Q16)
     if DEFAULT_APP:
@@ -30855,24 +32016,24 @@ if __name__ == "__main__":
     _write_instance_note()      # every copy, in its own folder (6b319)
     if NOWINDOW and "boot-code" in TEST_HOOKS:
         _write_boot_note()
-    threading.Thread(target=start_backend, args=(_server,),
+    ctx_thread(target=start_backend, args=(_server,),
                      daemon=True).start()
     print(f"\n  {APP_NAME} {short_version()}")
     print(f"  running on http://127.0.0.1:{PORT}")
     reap_orphan_engines()
     maybe_version_splash()
     if _UPDATE_LANDED[0]:
-        threading.Thread(target=_post_update_cleanup, daemon=True).start()
+        ctx_thread(target=_post_update_cleanup, daemon=True).start()
     else:
         _SWEEP_DONE.set()
-    threading.Thread(target=_mlx_janitor, daemon=True).start()
-    threading.Thread(target=_warm_studio_cache, daemon=True).start()
-    threading.Thread(target=_ensure_tzdata, daemon=True).start()
+    ctx_thread(target=_mlx_janitor, daemon=True).start()
+    ctx_thread(target=_warm_studio_cache, daemon=True).start()
+    ctx_thread(target=_ensure_tzdata, daemon=True).start()
     # PyNaCl, or one hash-checked install of it (0a 5.9, 6b327); only
     # by the copy holding the instance lock (single_instance can let a
     # copy run without it), so two copies never pip into one venv
     if _INSTANCE_LOCK:
-        threading.Thread(target=_ensure_crypto_deps, daemon=True).start()
+        ctx_thread(target=_ensure_crypto_deps, daemon=True).start()
     start_managed_engines()
     if not HAS_SEARCH:
         print("  (web search disabled — pip install ddgs to enable)")
