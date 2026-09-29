@@ -82,16 +82,7 @@ ask_yes() { # prompt -> true only if the answer is exactly "yes"
 # shellcheck source=lib/setuplib.sh
 . "$KIT/lib/setuplib.sh"
 
-root_disk() {
-  local src pv
-  src=$(findmnt -no SOURCE /)
-  pv=$(pvs --noheadings -o pv_name 2>/dev/null | tr -d ' ' | head -n1 || true)
-  if [ -n "$pv" ] && [[ "$src" == /dev/mapper/* || "$src" == /dev/dm-* ]]; then
-    disk_of "$pv"
-  else
-    disk_of "$src"
-  fi
-}
+root_disk() { disk_of "$(findmnt -no SOURCE /)"; }   # lsblk -s follows / through LVM to its own disk
 
 OS_DISK=$(disk_by_serial "$OS_SERIAL")
 MODELS_DISK=$(disk_by_serial "$MODELS_SERIAL")

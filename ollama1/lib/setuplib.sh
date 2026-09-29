@@ -51,10 +51,12 @@ byid_for() { # disk serial -> the /dev/disk/by-id path of that whole disk
 }
 
 disk_desc() { lsblk -dno MODEL,SIZE "$1" 2>/dev/null | sed 's/  */ /g;s/^ //'; }
-disk_of() { # a block device -> its whole disk /dev/<name>
-  local pk
-  pk=$(lsblk -no PKNAME "$1" 2>/dev/null | head -n1 | tr -d '[:space:]')
-  if [ -n "$pk" ]; then echo "/dev/$pk"; else echo "$1"; fi
+disk_of() { # a block device (partition, LVM volume, md array, disk) -> its whole disk /dev/<name>
+  # Walk UP the device tree (-s) and take the first "disk". "lsblk -no PKNAME <part>" also lists the
+  # partition's children, so on an LVM partition its first line is the partition itself (26.04, util-linux 2.41).
+  local d
+  d=$(lsblk -lsnpo NAME,TYPE "$1" 2>/dev/null | awk '$2=="disk"{print $1; exit}')
+  if [ -n "$d" ]; then echo "$d"; else echo "$1"; fi
 }
 devs_of() { lsblk -lnpo NAME "$1" 2>/dev/null; }        # the disk and its partitions
 first_part() { lsblk -lnpo NAME,TYPE "$1" | awk '$2=="part"{print $1; exit}'; }
