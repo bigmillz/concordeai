@@ -6016,6 +6016,18 @@ app a person opens runs none of it and shows nothing new.
   a way to decide folders a lost record left (a sign-in refuses until
   then; none can occur without a person or a cleaner removing
   profile.json); a per-window WebKit store on the Mac.
+- Left by the re-review (all later, M13-M15), with repros in
+  scratchpad/m9rev/v2: (1) put-back's `evict=False` only defers the cap to
+  the next write (s2), and put-back facts are trimmed at once; mark
+  put-back chats exempt until touched, or keep the unit until the chat
+  survives a write, or have the sheet count what the cap drops; (2) an
+  owed step 6 for a KEPT folder later pulls chats the person kept using
+  on This computer into imports/ (s7, nothing lost, but hidden): cancel
+  the owed step 6 and put back what was staged instead; (3) a step 6 that
+  always fails (EXDEV from a linked images/) leaves sign-out answering
+  add-unfinished forever: fall back to copy, fsync, unlink on EXDEV;
+  (4) a build that can't handle a unit kind (pre-1h seeing project
+  units) can't finish an orphan put-back, which keeps sign-in undecided.
 - **Patrick:** nothing for the app a person opens (it is unchanged). The
   windowed account window on Windows x64 (WebView2) and ARM64 (Qt) is
   run in the VM with m9work/account_window_check.py (scratchpad): the
