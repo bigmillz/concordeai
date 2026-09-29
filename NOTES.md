@@ -5754,7 +5754,8 @@ changes. Accounts, the switch protocol and the account window are M9.
   and `_chat_finals` (the undo window's copies; the switch first makes the
   old profile's pending deletes final, as a quit does), `_turns_live`
   (answers still streaming), `_usage_q` and `_usage_state`. `_bal_cache`
-  is keyed by (profile, provider, key fingerprint), and `_last_cloud` by
+  is keyed by (provider, key fingerprint) and, like every profile cache,
+  scoped to the profile, and `_last_cloud` by
   the profile's name. Every other module-level container that changes is
   named in `MACHINE_STATE` (57: engines, models, installs, the updater,
   the window, flags keyed by folder). The key-fingerprint salt (M6) is
@@ -5880,7 +5881,12 @@ changes. Accounts, the switch protocol and the account window are M9.
     data folder, the balance cache unkeyed, the negative prompt read as
     the machine's, pictures served from the data folder, GET /api/prefs
     from the data folder, an export written straight into the profile)
-    each fail at least one check (18 of 18; the four first caught by a crash were rerun after the checks were made to record a raise, and each now fails its check).
+    each fail at least one check (18 of 18; the four first caught by a
+    crash were rerun after the checks were made to record a raise, and
+    each now fails its check). Rerun after the reviews' fixes: 17 of 18.
+    The one missed, the balance cache keyed without the profile, is
+    covered by the epoch scoping, so the profile was taken out of that
+    key.
 - Not verified here: Windows (`msvcrt.locking` on run/profile.lock, the
   staged renames across `run/` and a profile folder while an antivirus
   holds a file); a real window's reload on 409 (node only); real mflux,
@@ -5909,7 +5915,13 @@ changes. Accounts, the switch protocol and the account window are M9.
     undo stub is undeleted or appended to only by its own folder, and
     the retirements and repair latches are never set by a thread with
     no profile (it would read no cloud.json and latch having read
-    nothing). The `reset` argument is gone.
+    nothing). The `reset` argument is gone. The cache keeps (epoch,
+    object) as one pair, read once, and arms a new epoch only after
+    re-reading the active profile under its lock (re-verify: a thread of
+    A that read "A is active" just before a switch, resuming after B had
+    started using the cache, re-armed it for A's epoch; B could then get
+    A's object or lose its own undo stub). `_clear()` resets the epoch
+    too.
   - **The switch** takes a switch lock for its whole length and reads
     the old profile under it: two switches at once each cancelled the
     same profile, so one profile was never cancelled and `erase_old`
@@ -5940,8 +5952,15 @@ changes. Accounts, the switch protocol and the account window are M9.
     Windows a reader (an antivirus) can hold a finished clip past
     `_replace_into`'s retries; it used to be deleted. Now a copy is
     tried, then the original goes; if that fails too, the file stays in
-    run/ and the error names where. Only StaleProfile deletes it. (The
-    next start's sweep of `stage-*` would still clear it.)
+    run/ and `NotLanded` says where, relative to the data folder (no
+    user name in the chat): "couldn't save it into ConcordeAI's folder
+    (...); it is kept at run/stage-... until the app next starts" (the
+    next start's sweep of `stage-*` clears it). Only StaleProfile
+    deletes it. `run_export` keeps its stage file in that case (its
+    `finally` used to delete what the message said was kept), and a
+    picture or clip that finished but couldn't be saved is never made
+    again elsewhere: `NotLanded` passes the local branch's handler, so
+    no Gemini call follows.
   - `split_prefs` writes the profile's keys first and the machine's last,
     after one more epoch check, so a 409 means nothing changed.
   - `current_ctx()` reads `_PROFILE["ctx"]` without the lock (one atomic
@@ -5975,14 +5994,18 @@ changes. Accounts, the switch protocol and the account window are M9.
     `ex_doc`, `ex_slides` and `ex_archive` (they write through a library
     into a stage file). `_boot_heal`'s mutable default counter became
     `_BOOT_HEALS` (machine state).
-  - Gauntlet: two more in-process checks: 17 cases from the reviews (a
+  - Gauntlet: two more in-process checks: cases from the reviews (a
     late delete from A's thread and from a thread with no profile, a
     foreign undo stub, a cache refilled by A's thread, the latch,
     read-aloud, two switches at once, current_ctx behind a write, one
     flock failure, `MACHINE_ROOT` refused, adopt's copy and keep, the
     settings order, a stale picture with no paid fallback, the Veo poll,
     stale key and Remote saves, the usage queue at a switch, a pool's
-    workers), and 17 mutations of the fixes, each caught; live, a late
+    workers, and from the re-verify the cache race, an export kept where
+    its message says, a picture that couldn't be saved made nowhere
+    else), 20 cases in all, and 22 mutations of the fixes, each caught
+    (the single read of the pair and the re-check each close the race
+    alone, so the mutation reverts both); live, a late
     writer into every cache after the switch, and no "Answer written"
     or place pins after it on the stopped stream.
 - **For M9** (from the reviews): a switch should flush the live turns

@@ -11807,9 +11807,61 @@ def _rv8_run(src):
         msg = ""
     except OSError as e_:
         msg = str(e_)
-    r["adopt: a file that couldn't be moved is copied, or left where it is, never deleted"] = (
-        ok1 and os.path.exists(src2) and src2 in msg
+    r["adopt: a file that couldn't be moved is copied, or left where it is, never deleted, "
+      "and the message names it relative to the data folder"] = (
+        ok1 and os.path.exists(src2) and "stage-b8.mp4" in msg and d not in msg
         and not os.path.exists(os.path.join(d, "videos", "b8.mp4")))
+    # an export that couldn't be saved keeps its file where the message says
+    ns, d = _rvns8(src, {"run_export", "EXPORT_KIND", "EXPORT_DIRNAME", "EXPORT_MAX_BYTES",
+                         "EXPORT_NEEDS_DEPS", "x_clean", "_X_SENTINEL", "export_name",
+                         "ex_text", "_sweep_exports", "export_dir", "EXPORT_KEEP_N",
+                         "EXPORT_TTL_H", "drop_run_file", "_hook_delay", "x_strip_md"},
+                   ensure_export_deps=lambda block_s=0: True, _export_install={})
+    root = ns["profile_boot"]()
+    ns["_replace_into"] = _busy
+    ns["shutil"] = _ty8.SimpleNamespace(copyfile=lambda a, b: (_ for _ in ()).throw(
+        OSError("disk")), rmtree=shutil.rmtree)
+    try:
+        ns["run_export"]("hello", "md", "t", root)
+        emsg = ""
+    except OSError as e_:
+        emsg = str(e_)
+    left = [f for f in os.listdir(os.path.join(d, "run")) if f.startswith("stage-")]
+    r["an export that couldn't be saved is kept where its message says"] = (
+        len(left) == 1 and ("run/" + left[0]) in emsg.replace(os.sep, "/") and d not in emsg)
+    # the cache race: a thread of A that read "A is active" just before the
+    # switch, and resumes after B has started using the cache, never takes
+    # B's copy over (re-verify of 6b329)
+    ns, d = _rvns8(src, set())
+    exec('_race8 = profile_cache("_race8", {})', ns)
+    A = ns["profile_boot"]()
+    B = ns["test_profile_create"]()
+    paused, go = _t8.Event(), _t8.Event()
+
+    class _P8(dict):
+        def __getitem__(self, k):
+            v = dict.__getitem__(self, k)
+            if k == "ctx" and _t8.current_thread().name == "A-late8" and not paused.is_set():
+                paused.set()
+                go.wait(5)
+            return v
+    ns["_PROFILE"] = _P8(ns["_PROFILE"])
+
+    def _alate():
+        ns["bind_ctx"](A)
+        ns["_race8"]["cA"] = "A's text"
+    ta = _t8.Thread(target=_alate, name="A-late8", daemon=True)
+    ta.start()
+    paused.wait(5)
+    ns["profile_switch"](B)
+    ns["bind_ctx"](B)
+    ns["_race8"]["cB"] = "B's own"
+    go.set()
+    ta.join(5)
+    seen = dict(ns["_race8"].items())
+    ns["bind_ctx"](None)
+    r["the cache race: A's late thread neither takes over nor wipes B's copy"] = seen == {
+        "cB": "B's own"}
     # 10. the profile's settings first, the machine's last
     ns, d = _rvns8(src, set())
     A = ns["profile_boot"]()
@@ -11850,6 +11902,13 @@ def _rv8_run(src):
     ns["stage_path"] = _stage
     r["a picture finished after the switch is dropped; no paid fallback"] = (
         _rv_raises8(ns["StaleProfile"], ns["generate_image"], A, "a cat") and net == [])
+    A2 = ns["current_ctx"]()
+    ns["_run_render"] = lambda cmd, timeout, sock=None: (0, "", False)
+    ns["_replace_into"] = lambda a, b: (_ for _ in ()).throw(PermissionError(13, "in use"))
+    ns["shutil"] = _ty8.SimpleNamespace(copyfile=lambda a, b: (_ for _ in ()).throw(
+        OSError("disk")), rmtree=shutil.rmtree)
+    r["a picture that couldn't be saved is kept, never made again with a paid key"] = (
+        _rv_raises8(ns["NotLanded"], ns["generate_image"], A2, "a dog") and net == [])
     # 12. the Veo poll stops when its profile does
     polls = []
     ns, d = _rvns8(src, {"_veo_video", "VEO_DAILY_CAP", "VIDEO_SUB", "_media_id"},
@@ -11970,12 +12029,12 @@ _RVM8 = [
     ("a stale picture falling back to Gemini", "            if rc == 0 and os.path.exists(out):\n"
      "                _render_note(out, o, time.time() - _t0)\n"
      "                return _media_land(ctx, IMAGE_SUB, out), \"local\"\n"
-     "            errs.append(\"local: \" + tail[-200:].strip())\n        except RenderBusy:\n"
+     "            errs.append(\"local: \" + tail[-200:].strip())\n        except (RenderBusy, NotLanded):\n"
      "            raise\n        except StaleProfile:\n            raise\n",
      "            if rc == 0 and os.path.exists(out):\n"
      "                _render_note(out, o, time.time() - _t0)\n"
      "                return _media_land(ctx, IMAGE_SUB, out), \"local\"\n"
-     "            errs.append(\"local: \" + tail[-200:].strip())\n        except RenderBusy:\n"
+     "            errs.append(\"local: \" + tail[-200:].strip())\n        except (RenderBusy, NotLanded):\n"
      "            raise\n"),
     ("the Veo poll ignoring cancel", "                if ctx.cancel.is_set():\n"
      "                    raise StaleProfile(\"the profile changed\")\n", ""),
@@ -11983,6 +12042,25 @@ _RVM8 = [
      "    except StaleProfile:\n        raise\n", "            _cloud_write_to(ctx, d)\n        return True\n"),
     ("usage not flushed at the switch", "        try:\n            usage_flush()\n        except Exception:\n"
      "            pass\n        with _say_lock:", "        with _say_lock:"),
+    ("the cache armed for a profile read before the switch",
+     "            if (p[\"ctx\"] if p else None) is not act:\n                return copy.deepcopy(self._blank)\n", ""),
+    # (the single read of (epoch, object) and the re-check under the lock
+    # each close the race; this reverts both to the first cut's code)
+    ("the first cut's cache arming", "        st = self._state                   # one read: the epoch and its\n"
+     "        if st[0] == ep:                    # object always go together\n            return st[1]\n"
+     "        with self._lk:\n",
+     "        if self._state[0] == ep:\n            return self._state[1]\n"
+     "        with self._lk:\n            self._state = (ep, copy.deepcopy(self._blank))\n"
+     "            return self._state[1]\n"),
+    ("an unsaved export's file deleted anyway", "        if not kept:\n            drop_run_file(path)",
+     "        drop_run_file(path)"),
+    ("the full path in the message", "                                os.path.relpath(src, app_dir()))) from exc",
+     "                                src)) from exc"),
+    ("a picture that couldn't be saved made again with Gemini",
+     "        except (RenderBusy, NotLanded):\n            raise\n        except StaleProfile:\n            raise\n"
+     "        except Exception as exc:\n            errs.append(\"local: %s\" % exc)",
+     "        except RenderBusy:\n            raise\n        except StaleProfile:\n            raise\n"
+     "        except Exception as exc:\n            errs.append(\"local: %s\" % exc)"),
     ("a pool without the ctx", "        max_workers=max_workers, initializer=bind_ctx,\n"
      "        initargs=(getattr(_tl_ctx, \"ctx\", None),))", "        max_workers=max_workers)"),
 ]

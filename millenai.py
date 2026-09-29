@@ -117,11 +117,12 @@ class _EpochCache:
     profile that is no longer active (a request or job that outlived the
     switch) gets a scratch copy nobody keeps, so its late writes land
     nowhere. A thread with no profile (machine work) uses the active one."""
-    __slots__ = ("_name", "_blank", "_obj", "_ep", "_lk")
+    __slots__ = ("_name", "_blank", "_state", "_lk")
+    _UNARMED = object()      # an epoch no profile has: the next access arms
 
     def __init__(self, name, blank):
         self._name, self._blank = name, blank
-        self._obj, self._ep = copy.deepcopy(blank), None
+        self._state = (self._UNARMED, copy.deepcopy(blank))   # (epoch, obj)
         self._lk = threading.Lock()
 
     def _cur(self):
@@ -132,15 +133,24 @@ class _EpochCache:
         if mine is not None and mine is not act:
             return copy.deepcopy(self._blank)
         ep = act.epoch if act is not None else None
-        if self._ep != ep:
-            with self._lk:
-                if self._ep != ep:
-                    self._obj, self._ep = copy.deepcopy(self._blank), ep
-        return self._obj
+        st = self._state                   # one read: the epoch and its
+        if st[0] == ep:                    # object always go together
+            return st[1]
+        with self._lk:
+            # a switch may have landed since `act` was read (review of
+            # 6b329): arm only for the profile active now, never for one
+            # read before the switch, whose thread gets a scratch copy
+            if (p["ctx"] if p else None) is not act:
+                return copy.deepcopy(self._blank)
+            st = self._state
+            if st[0] != ep:
+                st = (ep, copy.deepcopy(self._blank))
+                self._state = st
+            return st[1]
 
     def _clear(self):
         with self._lk:
-            self._obj = copy.deepcopy(self._blank)
+            self._state = (self._UNARMED, copy.deepcopy(self._blank))
 
     def __getattr__(self, a):
         return getattr(self._cur(), a)
@@ -2999,9 +3009,9 @@ def _mark_answered(c: dict):
         pass
 
 
-# (profile, pid, key fingerprint) -> (expires_ts, text): a balance is
-# never shown for another profile's key, or for a key since replaced
-# (1a 5.4); emptied at every switch too
+# (pid, key fingerprint) -> (expires_ts, text): a balance is never shown
+# for a key since replaced; scoped to the profile like every profile
+# cache (1a 5.4)
 _bal_cache = profile_cache("_bal_cache", {})
 
 
@@ -3015,8 +3025,7 @@ def cloud_balance(pid: str, c: dict) -> str:
     if pid != "kimi" or not (c.get("key") and c.get("base")):
         return ""
     now = time.time()
-    ck = (getattr(getattr(_tl_ctx, "ctx", None), "name", ""), pid,
-          _key_fp(c.get("key")))
+    ck = (pid, _key_fp(c.get("key")))
     hit = _bal_cache.get(ck)
     if hit and hit[0] > now:
         return hit[1]
@@ -6406,7 +6415,7 @@ def generate_image(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
                 _render_note(out, o, time.time() - _t0)
                 return _media_land(ctx, IMAGE_SUB, out), "local"
             errs.append("local: " + tail[-200:].strip())
-        except RenderBusy:
+        except (RenderBusy, NotLanded):
             raise
         except StaleProfile:
             raise
@@ -7388,6 +7397,7 @@ def run_export(text: str, ext: str, title: str, base,
     # written in run/, then moved into the profile whole (1a 5.3): an
     # export that finishes after a switch lands nowhere
     path = stage_path("." + suffix)
+    kept = False
     try:
         if kind == "table":
             ex_table(text, ext, path)
@@ -7408,9 +7418,14 @@ def run_export(text: str, ext: str, title: str, base,
             raise RuntimeError("that came out larger than the %d MB limit"
                                % (EXPORT_MAX_BYTES // 1_000_000))
         _hook_delay("export")
-        base.adopt(path, "%s/%s.%s" % (EXPORT_DIRNAME, token, suffix))
+        try:
+            base.adopt(path, "%s/%s.%s" % (EXPORT_DIRNAME, token, suffix))
+        except NotLanded:
+            kept = True         # adopt kept it in run/, and says so
+            raise
     finally:
-        drop_run_file(path)
+        if not kept:
+            drop_run_file(path)
     name = export_name(want_name, ext, title)
     try:
         base.write("%s/%s.meta" % (EXPORT_DIRNAME, token),
@@ -7726,7 +7741,7 @@ def generate_video(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
                     0 if (o["fmt"] == "mp4" and o["fps"] == native)
                     else o["fps"])), "local"
             errs.append("local: " + tail[-200:].strip())
-        except RenderBusy:
+        except (RenderBusy, NotLanded):
             raise
         except StaleProfile:
             raise
@@ -8190,6 +8205,12 @@ class StaleProfile(OSError):
     already treats a failed write as "not saved" drops it the same way."""
 
 
+class NotLanded(OSError):
+    """A finished file that couldn't be moved into its profile: it is
+    kept in run/ and the message says where (never a reason to make it
+    again elsewhere, or with a paid key)."""
+
+
 class NoProfile(RuntimeError):
     """Personal work with no ctx: a thread nobody gave one, or a call
     that passed none. A bug, and it fails closed."""
@@ -8309,15 +8330,18 @@ class ProfileCtx:
                     # a reader holding it (Windows, an antivirus): a copy,
                     # then the original goes; a finished render is never
                     # deleted because it couldn't be moved (review of
-                    # 6b329). If that fails too, src stays in run/ and the
-                    # error says where
+                    # 6b329). If that fails too, src stays in run/ (until
+                    # the next start) and the error says where, relative to
+                    # the data folder: no user name reaches the chat
                     try:
                         shutil.copyfile(src, p)
                     except OSError as exc:
                         _unlink_quiet(p)
-                        raise OSError("couldn't move %s into the profile (%s); "
-                                      "it is still at %s" % (
-                                          os.path.basename(src), exc, src)) from exc
+                        raise NotLanded(
+                            "couldn't save it into ConcordeAI's folder (%s); "
+                            "it is kept at %s until the app next starts" % (
+                                exc.strerror or exc.__class__.__name__,
+                                os.path.relpath(src, app_dir()))) from exc
                     _unlink_quiet(src)
                 return p
         except StaleProfile:
