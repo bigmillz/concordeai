@@ -86,6 +86,8 @@ sudo bash ~/concordeai/ollama1/setup.sh
 Setup starts itself inside **tmux** (session `ollama1-setup`), so a dropped
 SSH connection can't stop it halfway. If you get disconnected, log in again
 and run `sudo tmux attach -t ollama1-setup`. (`--no-tmux` turns this off.)
+Only one setup runs at a time (a lock), and when the tmux session ends the
+command you typed reports setup's exit status.
 
 Setup prints its plan and a table of the disks with their serials and
 models. It stops unless you type `yes`. Here is what it does, in order.
@@ -128,8 +130,13 @@ Every step skips what is already done, so it is safe to run again.
      carries anything other than the ext4 filesystems this machine has now;
    - a mirror already on the disks (from an earlier run) is reassembled,
      never wiped;
-   - a filesystem is made whenever the array has none, so a stop between
-     building the array and formatting it is picked up next time;
+   - a filesystem is made only on an array or partition that setup itself
+     just created (it leaves a marker until the format is done), so a stop
+     between building the array and formatting it is picked up next time;
+   - a mirror or partition setup didn't create that has no readable
+     filesystem is never formatted: setup stops and says how to check it
+     (`mke2fs -n` lists the backup superblocks, `e2fsck -b <backup>`
+     repairs). A read error from `blkid` also stops it;
    - fstab never gets a line without a UUID.
 7. It creates the service users.
 8. It installs the kit to `/usr/local/lib/ollama1`, along with the systemd
@@ -233,12 +240,13 @@ already right.
    - If that file is ever lost, a rerun rebuilds it for the same tunnel.
 3. **DNS.** One proxied CNAME for each of `ollama1` and `ollama1-admin`,
    pointing to `<tunnel id>.cfargotunnel.com`.
-   - A wrong target is corrected, and duplicate CNAMEs are removed.
-   - If another type of record (for example an A record) already uses one
-     of the names, it stops and tells you. It never deletes records it
-     didn't make.
+   - A wrong target is corrected and duplicate CNAMEs are removed, but only
+     for CNAMEs that point at a tunnel or that it made itself.
+   - Any other record on those names (an A record, or a CNAME somewhere
+     else) makes it stop and name the record. It never changes or deletes
+     records it didn't make.
 4. **Access.**
-   - The service token `ollama1-app`.
+   - The service token `ollama1-app`, which never expires.
    - The policies `ollama1 admin - Patrick only` (your email) and
      `ollama1 app - service token`.
    - One self-hosted application per hostname. The app hostname answers a
@@ -249,8 +257,11 @@ already right.
 5. It writes the team domain, both AUD tags, your email, the service token's
    Client ID and the tunnel id to `/etc/ollama1/config.json` (root, 0600).
 6. It shows the service token's **Client ID and Client Secret once**, for
-   ConcordeAI, straight on the terminal (not through the setup log). Copy
-   them then: the secret is saved nowhere, in the repo or on the desktop.
+   ConcordeAI, straight on the terminal (not through the setup log), the
+   moment the token is made, so a later failure can't lose it. Copy them
+   then: the secret is saved nowhere, in the repo or on the desktop. If a
+   run stops before it could show the secret, the next run makes a new
+   secret by itself.
    - Running it again doesn't show the secret again.
    - To make a new secret, run
      `sudo ollama1-cf-access --rotate-service-token`. After that the app
@@ -280,7 +291,7 @@ around a little from time to time.
    **One-time PIN** is there by default. Keep it.
 2. **Service token.** Go to **Access > Service auth > Service Tokens >
    Create Service Token**.
-   - Name: `ollama1-app`. Duration: 1 year.
+   - Name: `ollama1-app`. Duration: **Non-expiring**.
    - Click **Generate token**.
    - Copy the **Client ID** and the **Client Secret** now. The secret is
      shown once.

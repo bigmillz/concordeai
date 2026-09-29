@@ -27,15 +27,18 @@ nothing that is already right):
      the desktop. Its credential is written to /etc/cloudflared/ollama1.json
      (root, 0600), rebuilt from the tunnel's token if the file is missing
   4. DNS: one proxied CNAME per hostname to <tunnel id>.cfargotunnel.com;
-     extra CNAMEs for the same name are removed; any other record type on
-     those names stops it (it won't delete records it didn't make)
-  5. Access: service token "ollama1-app", policies "ollama1 admin - Patrick
+     only CNAMEs pointing at a tunnel or made by this helper are fixed or
+     deduplicated; any other record on those names stops it (it never
+     changes or deletes records it didn't make)
+  5. Access: service token "ollama1-app" (never expires), policies "ollama1 admin - Patrick
      only" (email) and "ollama1 app - service token", and one self-hosted
      application per hostname
   6. writes the team domain, both AUD tags, the admin email, the service
      token's Client ID and the tunnel id to /etc/ollama1/config.json (0600)
-The service token's Client Secret is printed once, when it is created or
-rotated, and saved nowhere.
+The service token's Client Secret is shown once on the terminal (never
+stdout, so never setup's log), the moment it is created or rotated, and
+saved nowhere. If a run stops before showing it, the next run rotates it.
+Redirects are never followed, so the token only ever goes to the API.
 """
 import argparse
 import base64
@@ -67,6 +70,17 @@ class Stop(Exception):
     pass
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Never follow a redirect: the Authorization header must only ever go
+    to api.cloudflare.com."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(req.full_url, code, "redirect refused: %s" % newurl, headers, fp)
+
+
+OPENER = urllib.request.build_opener(NoRedirect)
+
+
 class CF:
     def __init__(self, token, base):
         self._token = token
@@ -81,7 +95,7 @@ class CF:
             "Authorization": "Bearer " + self._token, "Content-Type": "application/json",
             "User-Agent": "ollama1-cf-access"})
         try:
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with OPENER.open(req, timeout=30) as r:
                 out = json.loads(r.read())
         except urllib.error.HTTPError as e:
             if ok404 and e.code == 404:
@@ -151,6 +165,15 @@ def tunnel_step(cf, acct, creds_path):
     return tid
 
 
+DNS_COMMENT = "ollama1 tunnel (ollama1-cf-access)"
+
+
+def _ours(r):
+    """A CNAME this kit may change: one pointing at a tunnel, or one it made."""
+    return (str(r.get("content") or "").endswith(".cfargotunnel.com")
+            or "ollama1 tunnel" in str(r.get("comment") or ""))
+
+
 def dns_step(cf, zone_id, hosts, tid):
     target = "%s.cfargotunnel.com" % tid
     for host in hosts:
@@ -161,8 +184,13 @@ def dns_step(cf, zone_id, hosts, tid):
             raise Stop("%s already has %s record(s); remove them in the dashboard (DNS > Records) "
                        "and run this again" % (host, ", ".join(sorted({r["type"] for r in others}))))
         cnames = [r for r in recs if r.get("type") == "CNAME"]
+        foreign = [r for r in cnames if not _ours(r)]
+        if foreign:
+            r = foreign[0]
+            raise Stop("%s has a CNAME to %s that setup didn't make; it won't change it. Remove it in "
+                       "the dashboard (DNS > Records) and run this again" % (host, r.get("content")))
         body = {"type": "CNAME", "name": host, "content": target, "proxied": True, "ttl": 1,
-                "comment": "ollama1 tunnel (ollama1-cf-access)"}
+                "comment": DNS_COMMENT}
         if not cnames:
             cf.call("POST", "/zones/%s/dns_records" % zone_id, body)
             say("DNS %s -> %s (created, proxied)" % (host, target))
@@ -178,24 +206,46 @@ def dns_step(cf, zone_id, hosts, tid):
             say("DNS %s -> %s (already right)" % (host, target))
 
 
-def access_step(cf, acct, cfg, admin, interactive, rotate):
+def _cf_state():
+    return read_json(os.path.join(Paths.state, "cf-state.json"), {}) or {}
+
+
+def _save_cf_state(st):
+    os.makedirs(Paths.state, exist_ok=True)
+    write_json_atomic(os.path.join(Paths.state, "cf-state.json"), st, mode=0o600)
+
+
+def access_step(cf, acct, cfg, admin, interactive, rotate, test_mode=False):
     a = "/accounts/%s/access" % acct
     tokens = cf.call("GET", a + "/service_tokens" + q(per_page=100)) or []
     tok = next((t for t in tokens if t.get("name") == TOKEN_NAME), None)
-    secret = None
+    st = _cf_state()
+    # If an earlier run created or rotated the token but never got to show
+    # its secret, nobody has it: rotate now without asking.
+    unshown = st.get("secret_unshown") == TOKEN_NAME
     if tok is None:
-        tok = cf.call("POST", a + "/service_tokens", {"name": TOKEN_NAME, "duration": "8760h"})
-        secret = tok.get("client_secret")
-        say("created service token %s" % TOKEN_NAME)
+        _save_cf_state(dict(st, secret_unshown=TOKEN_NAME))
+        tok = cf.call("POST", a + "/service_tokens", {"name": TOKEN_NAME, "duration": "forever"})
+        say("created service token %s (never expires)" % TOKEN_NAME)
+        if show_secret(tok["client_id"], tok.get("client_secret"), test_mode):
+            _save_cf_state(dict(_cf_state(), secret_unshown=None))
     else:
+        if tok.get("expires_at") and not str(tok.get("expires_at")).startswith("0001"):
+            say("note: service token %s expires %s; rotate it before then "
+                "(sudo ollama1-cf-access --rotate-service-token)" % (TOKEN_NAME, tok["expires_at"]))
+        if unshown:
+            say("an earlier run made the service token but never showed its secret; making a new one")
+            rotate = True
         if rotate is None:
             ans = ask_tty("Service token %s exists. Rotate its secret (the app then needs the new "
                           "one)? y/N" % TOKEN_NAME, "n", interactive)
             rotate = ans.lower().startswith("y")
         if rotate:
+            _save_cf_state(dict(st, secret_unshown=TOKEN_NAME))
             tok = dict(tok, **cf.call("POST", a + "/service_tokens/%s/rotate" % tok["id"]))
-            secret = tok.get("client_secret")
             say("rotated the secret of %s" % TOKEN_NAME)
+            if show_secret(tok["client_id"], tok.get("client_secret"), test_mode):
+                _save_cf_state(dict(_cf_state(), secret_unshown=None))
         else:
             say("service token %s exists (secret unchanged)" % TOKEN_NAME)
 
@@ -233,11 +283,12 @@ def access_step(cf, acct, cfg, admin, interactive, rotate):
 
     admin_aud = app("ollama1 admin", cfg["hostname_admin"], pid_admin, {})
     gw_aud = app("ollama1 app", cfg["hostname_gateway"], pid_app, {"service_auth_401_redirect": True})
-    return tok["client_id"], secret, admin_aud, gw_aud
+    return tok["client_id"], admin_aud, gw_aud
 
 
 def show_secret(client_id, secret, test_mode):
-    """Straight to the terminal: never stdout, so never setup's log (tee)."""
+    """Straight to the terminal, the moment the token is made: never stdout,
+    so never setup's log (tee). True if it was shown."""
     tty = os.environ.get("OLLAMA1_TTY") if test_mode and os.environ.get("OLLAMA1_TTY") else "/dev/tty"
     try:
         with open(tty, "w") as t:
@@ -247,9 +298,11 @@ def show_secret(client_id, secret, test_mode):
                     "  CF-Access-Client-Id:     %s\n"
                     "  CF-Access-Client-Secret: %s\n\n" % (client_id, secret))
         say("The service token's Client ID and Secret were shown on the terminal (not logged).")
+        return True
     except OSError:
-        say("No terminal to show the service token's secret on. Run this at a terminal to make a")
-        say("new one: sudo ollama1-cf-access --rotate-service-token")
+        say("No terminal to show the service token's secret on. The next run at a terminal")
+        say("makes a new one by itself.")
+        return False
 
 
 def main():
@@ -295,7 +348,7 @@ def main():
         say("Zero Trust team domain %s" % team)
         tid = tunnel_step(cf, acct, Paths.tunnel_creds)
         dns_step(cf, zone_id, [cfg["hostname_gateway"], cfg["hostname_admin"]], tid)
-        client_id, secret, admin_aud, gw_aud = access_step(cf, acct, cfg, admin, interactive, rotate)
+        client_id, admin_aud, gw_aud = access_step(cf, acct, cfg, admin, interactive, rotate, test_mode)
     except Stop as e:
         say("\nSTOPPED: %s" % e)
         return 1
@@ -309,8 +362,6 @@ def main():
     write_json_atomic(Paths.config, raw, mode=0o600)
     say("\nSaved to %s (root-only): team domain, both AUD tags, the admin email," % Paths.config)
     say("the service token's Client ID and the tunnel id.")
-    if secret:
-        show_secret(client_id, secret, test_mode)
     say("\nThe API token is gone from memory. Delete it in the dashboard now:")
     say("  dash.cloudflare.com > My Profile > API Tokens > ... > Delete")
     return 0

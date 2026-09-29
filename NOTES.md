@@ -178,11 +178,36 @@ provider comes later and follows `ollama1/PROTOCOL.md`. How to run it is in
   glyph's rows instead of the row's pixels, so the big pairing code came out
   blank in the first commit; only the small `XXXX-XXXX-XXXX` line was
   readable. It is fixed, and `test_big.py` plus a mutant watch it.
-- Tested on the Mac: 167 unit tests (incl. shellcheck, the polkit rule in
-  node, the setup disk steps against fake mdadm/blkid/lsblk). All 58
+- **Re-review fixes (third commit).**
+  - Disks:
+    - mkfs only on an array or partition this run created (a
+      `*.mkfs-pending` marker in /var/lib/ollama1, cleared after the
+      format). A found or reassembled one without a readable filesystem
+      stops setup with the `mke2fs -n` / `e2fsck -b` hint.
+    - Any `blkid -p` exit other than 0 or 2 stops setup.
+  - Setup run:
+    - The lock is taken before the kit is copied to /var/tmp; `--no-tmux`
+      keeps it, the tmux run takes it over.
+    - The exit status comes back out of tmux.
+    - The final listener check judges by systemd unit (cgroup), not program
+      name.
+    - The gateway's user is taken out of `o1pair` on existing installs
+      (`SupplementaryGroups=` only adds groups), and setup stops if it is
+      still there.
+  - Gateway: the device switch fails closed. After unloading, `/api/ps`
+    must show nothing loaded, or the request gets 503 and the last device
+    stays as it was.
+  - cf-access:
+    - The service token is created with `duration: forever`.
+    - Its secret is shown on the tty the moment it's made. A state flag
+      makes the next run rotate it if it was never shown.
+    - Only CNAMEs pointing at a tunnel, or made by the helper, are changed.
+    - Redirects are never followed.
+- Tested on the Mac: 182 unit tests (incl. shellcheck, the polkit rule in
+  node, the setup disk steps against fake mdadm/blkid/lsblk). All 67
   mutants are caught (`tests/mutate.py`). On the desktop (as pmiller, no
-  sudo): the same suite under bash 5.3, the user-mode trial, the dashboard
-  at 120x40 and 80x25, and `setup.sh --plan`.
+  sudo): the suite under bash 5.3, `setup.sh --plan`, and (second commit)
+  the user-mode trial and the dashboard at 120x40 and 80x25.
 
   The first commit's desktop run also covered `systemd-analyze verify`.
 

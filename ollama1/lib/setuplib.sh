@@ -10,8 +10,12 @@
 #   - nothing is wiped that fstab, crypttab or swap uses, or that carries a
 #     signature other than the ones this machine is known to have;
 #   - a mirror already on the disks is assembled, never wiped;
-#   - a filesystem is made whenever the target has none (a crash between
-#     mdadm --create and mkfs is picked up on the next run);
+#   - a filesystem is made only on a partition or array this script has
+#     just created (a marker in $STATE_DIR says so, so a crash between
+#     mdadm --create and mkfs is picked up on the next run). A found or
+#     reassembled one without a readable filesystem stops setup instead:
+#     that may be damage, and mkfs would destroy what's left;
+#   - a disk blkid can't read (any exit status but 0 or 2) stops setup;
 #   - fstab never gets a line without a real UUID.
 
 : "${FSTAB:=/etc/fstab}"
@@ -58,8 +62,21 @@ dev_busy() { # true if the kernel holds the device (mounted, even lazily; md mem
   python3 -c 'import os,sys; os.close(os.open(sys.argv[1], os.O_RDONLY | os.O_EXCL))' "$1" 2>/dev/null && return 1
   return 0
 }
-probe() { blkid -p -o value -s "$2" "$1" 2>/dev/null || true; }   # device key -> value, bypassing the cache
+probe() { # device key -> value, bypassing blkid's cache. Exit 2 = no such value;
+  # anything else (a read error, say) is reported and fails.
+  local out rc=0
+  out=$(blkid -p -o value -s "$2" "$1" 2>/dev/null) || rc=$?
+  case $rc in
+    0) printf '%s\n' "$out" ;;
+    2) ;;
+    *) echo "blkid could not read $1 (exit $rc)" >&2; return 3 ;;
+  esac
+}
 fs_type() { probe "$1" TYPE; }
+BLKID_FAIL="blkid could not read a disk (above); a read error may mean a failing disk. Nothing was changed"
+fsck_hint() { # device -> why setup won't format it, and what to try
+  die "$1 has no readable filesystem, and setup didn't create it, so it won't format it (that could destroy data). If it is damaged: 'mke2fs -n $1' lists the backup superblocks (it changes nothing), then 'e2fsck -b <backup> $1'. If it really is empty and should be formatted, run: sudo touch $2 and run setup again"
+}
 
 vg_free_extents() { # free extents in ubuntu-vg as a plain integer, or fail
   local n
@@ -83,7 +100,7 @@ referenced() { # disk -> true (and prints what) if fstab, crypttab or swap uses 
   for dev in $(devs_of "$disk"); do
     ids+=("$dev" "/dev/${dev##*/}")
     for key in UUID PARTUUID LABEL PARTLABEL; do
-      val=$(probe "$dev" "$key")
+      val=$(probe "$dev" "$key") || die "$BLKID_FAIL"
       [ -n "$val" ] && ids+=("$key=$val" "/dev/disk/by-$(printf '%s' "$key" | tr '[:upper:]' '[:lower:]')/$val")
     done
   done
@@ -107,7 +124,7 @@ signatures_ok() { # disk allowed-types... -> true if every signature on it is ex
   local disk=$1 dev t bad=0
   shift
   for dev in $(devs_of "$disk"); do
-    t=$(fs_type "$dev")
+    t=$(fs_type "$dev") || die "$BLKID_FAIL"
     [ -z "$t" ] && continue
     case " $* " in *" $t "*) ;; *) echo "$dev carries '$t'"; bad=1 ;; esac
   done
@@ -149,7 +166,9 @@ wait_for() { local _; for _ in $(seq 1 50); do [ -e "$1" ] && return 0; sleep 0.
 models_step() {
   local disk=$1 serial=$2 part byid uuid
   part=$(first_part "$disk")
-  if [ -n "$part" ] && [ "$(probe "$part" LABEL)" = "o1models" ]; then
+  local label=""
+  [ -n "$part" ] && { label=$(probe "$part" LABEL) || die "$BLKID_FAIL"; }
+  if [ "$label" = "o1models" ]; then
     note "found an earlier o1models filesystem on $part; keeping it"
   else
     serial_is "$disk" "$serial" || die "serial check failed for $disk (expected $serial)"
@@ -160,6 +179,7 @@ models_step() {
     dev_busy "$disk" && die "$disk is in use; not wiping"
     referenced "$disk" && die "$disk is still used by fstab, crypttab or swap; not wiping"
     signatures_ok "$disk" ext4 || die "$disk carries something setup doesn't expect (above); not wiping"
+    mkdir -p "$STATE_DIR"; touch "$STATE_DIR/models.mkfs-pending"
     run wipefs -a "$byid"
     run sgdisk --zap-all "$byid"
     run sgdisk -n1:1MiB:0 -t1:8300 -c1:ollama1-models "$byid"
@@ -167,10 +187,17 @@ models_step() {
     udevadm settle 2>/dev/null || true
     wait_for "$byid-part1" || die "no partition appeared on $byid"
     part="$byid-part1"
-    run mkfs.ext4 -F -q -L o1models -m 1 "$part"
   fi
-  [ -n "$(fs_type "$part")" ] || run mkfs.ext4 -F -q -L o1models -m 1 "$part"
-  uuid=$(probe "$part" UUID)
+  local t
+  t=$(fs_type "$part") || die "$BLKID_FAIL"
+  if [ -z "$t" ]; then
+    [ -f "$STATE_DIR/models.mkfs-pending" ] || fsck_hint "$part" "$STATE_DIR/models.mkfs-pending"
+    run mkfs.ext4 -F -q -L o1models -m 1 "$part"
+  elif [ "$t" != ext4 ]; then
+    die "$part holds '$t', not ext4; not touching it"
+  fi
+  rm -f "$STATE_DIR/models.mkfs-pending"
+  uuid=$(probe "$part" UUID) || die "$BLKID_FAIL"
   [ -n "$uuid" ] || die "no filesystem UUID on $part; fstab left as it was"
   mkdir -p "${MODELS_MNT:-/srv/models}"
   set_fstab "${MODELS_MNT:-/srv/models}" "UUID=$uuid ${MODELS_MNT:-/srv/models} ext4 defaults,noatime,nofail,x-systemd.device-timeout=30s 0 2"
@@ -211,6 +238,7 @@ raid_step() {
     udevadm settle 2>/dev/null || true
     wait_for "$b1-part1" || die "no partition appeared on $b1"
     wait_for "$b2-part1" || die "no partition appeared on $b2"
+    mkdir -p "$STATE_DIR"; touch "$STATE_DIR/raid.mkfs-pending"   # this run makes the array, so it may format it
     run mdadm --create "$MD_DEV" --run --level=1 --raid-devices=2 --metadata=1.2 \
       --bitmap=internal --homehost="${MD_NAME%%:*}" --name="${MD_NAME#*:}" "$b1-part1" "$b2-part1"
     udevadm settle 2>/dev/null || true
@@ -218,12 +246,14 @@ raid_step() {
   fi
   mkdir -p "$STATE_DIR"
   mdadm --detail --export "$md" 2>/dev/null | sed -n 's/^MD_UUID=//p' >"$STATE_DIR/raid.uuid" || true
-  t=$(fs_type "$md")
+  t=$(fs_type "$md") || die "$BLKID_FAIL"
   if [ -z "$t" ]; then
+    [ -f "$STATE_DIR/raid.mkfs-pending" ] || fsck_hint "$md" "$STATE_DIR/raid.mkfs-pending"
     run mkfs.ext4 -F -q -L o1data -m 0 -E lazy_itable_init=1,lazy_journal_init=1 "$md"
   elif [ "$t" != ext4 ]; then
     die "$md holds '$t', not ext4; not touching it"
   fi
+  rm -f "$STATE_DIR/raid.mkfs-pending"
   touch "$MDADM_CONF"
   local saved conf_line pats
   saved=$(md_saved_uuid)
@@ -234,7 +264,7 @@ raid_step() {
   printf '%s\n' "$conf_line" >>"$MDADM_CONF.new"
   mv "$MDADM_CONF.new" "$MDADM_CONF"
   run update-initramfs -u
-  uuid=$(probe "$md" UUID)
+  uuid=$(probe "$md" UUID) || die "$BLKID_FAIL"
   [ -n "$uuid" ] || die "no filesystem UUID on $md; fstab left as it was"
   mkdir -p "${DATA_MNT:-/srv/data}"
   set_fstab "${DATA_MNT:-/srv/data}" "UUID=$uuid ${DATA_MNT:-/srv/data} ext4 defaults,noatime,nofail,x-systemd.device-timeout=30s 0 2"

@@ -119,13 +119,57 @@ class TestRaid(unittest.TestCase):
         self.assertTrue(lines[0].startswith("UUID=00000000-"))
 
     def test_rerun_after_crash_between_create_and_mkfs(self):
-        # the array exists and is running, but has no filesystem
+        # the array exists and is running, but has no filesystem; the run
+        # that created it left its marker
         self.sb.state["md_detail"] = ["ARRAY %s metadata=1.2 name=ollama1:data UUID=x" % self.md]
         self.sb.state["blkid"][self.md] = {}
+        os.makedirs(os.path.join(self.sb.dir, "state"), exist_ok=True)
+        open(os.path.join(self.sb.dir, "state", "raid.mkfs-pending"), "w").close()
         self.assertEqual(self.sb.run(self.call), 0, self.sb.out)
         self.assertEqual(self.sb.log("wipefs"), [])
         self.assertEqual(len(self.sb.log("mkfs.ext4")), 1)
         self.assertTrue(self.data_lines()[0].startswith("UUID=00000000-"))
+
+    def test_found_array_without_filesystem_is_never_formatted(self):
+        """No marker: setup didn't make this array, so an unreadable
+        filesystem may be damage. Stop with the e2fsck hint, never mkfs."""
+        self.sb.state["md_detail"] = ["ARRAY %s metadata=1.2 name=ollama1:data UUID=x" % self.md]
+        self.sb.state["blkid"][self.md] = {}
+        before = self.sb.fstab_text()
+        self.assertEqual(self.sb.run(self.call), 1)
+        self.assertEqual(self.sb.log("mkfs.ext4"), [])
+        self.assertEqual(self.sb.log("wipefs"), [])
+        self.assertIn("e2fsck -b", self.sb.out)
+        self.assertIn("mke2fs -n", self.sb.out)
+        self.assertEqual(self.sb.fstab_text(), before)
+
+    def test_reassembled_array_without_filesystem_is_never_formatted(self):
+        p1, p2 = self.sb.sda + "1", self.sb.sdb + "1"
+        self.sb.state["devs"] = {self.sb.sda: [self.sb.sda, p1], self.sb.sdb: [self.sb.sdb, p2]}
+        self.sb.state["blkid"] = {p1: {"TYPE": "linux_raid_member"}, p2: {"TYPE": "linux_raid_member"}}
+        line = "ARRAY /dev/md/data metadata=1.2 UUID=aaaa1111:bbbb2222:cccc3333:dddd4444 name=ollama1:data"
+        self.sb.state["md_examine"] = {p1: line, p2: line}
+        self.assertEqual(self.sb.run(self.call), 1)
+        self.assertEqual(self.sb.log("mkfs.ext4"), [])
+        self.assertEqual(self.sb.log("wipefs"), [])
+
+    def test_blkid_read_error_stops(self):
+        self.sb.state["md_detail"] = ["ARRAY %s metadata=1.2 name=ollama1:data UUID=x" % self.md]
+        self.sb.state["blkid_fail"] = [self.md]
+        os.makedirs(os.path.join(self.sb.dir, "state"), exist_ok=True)
+        open(os.path.join(self.sb.dir, "state", "raid.mkfs-pending"), "w").close()
+        self.assertEqual(self.sb.run(self.call), 1)
+        self.assertIn("blkid could not read", self.sb.out)
+        self.assertEqual(self.sb.log("mkfs.ext4"), [])
+
+    def test_blkid_read_error_on_a_disk_stops_before_wiping(self):
+        self.sb.state["blkid_fail"] = [self.sb.sdb]
+        self.assertEqual(self.sb.run(self.call), 1)
+        self.assertEqual(self.sb.log("wipefs"), [])
+
+    def test_marker_cleared_after_mkfs(self):
+        self.assertEqual(self.sb.run(self.call), 0, self.sb.out)
+        self.assertFalse(os.path.exists(os.path.join(self.sb.dir, "state", "raid.mkfs-pending")))
 
     def test_existing_filesystem_is_kept(self):
         self.sb.state["md_detail"] = ["ARRAY %s metadata=1.2 name=ollama1:data UUID=x" % self.md]
@@ -222,6 +266,14 @@ class TestModels(unittest.TestCase):
         self.assertEqual(self.sb.log("wipefs"), [])
         self.assertEqual(self.sb.log("mkfs.ext4"), [])
         self.assertIn("UUID=" + fu("1"), self.sb.fstab_text())
+
+    def test_partition_without_filesystem_not_made_here_stops(self):
+        part = self.sb.nvme + "p1"
+        self.sb.state["devs"][self.sb.nvme] = [self.sb.nvme, part]
+        self.sb.state["blkid"] = {part: {"LABEL": "o1models"}}   # label but no readable fs
+        self.assertEqual(self.sb.run(self.call), 1)
+        self.assertEqual(self.sb.log("mkfs.ext4"), [])
+        self.assertIn("e2fsck -b", self.sb.out)
 
     def test_unexpected_signature(self):
         self.sb.state["blkid"][self.sb.nvme] = {"TYPE": "LVM2_member"}

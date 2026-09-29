@@ -24,6 +24,7 @@ GW = "ollama1.flyconcordefly.com"
 ADMIN = "ollama1-admin.flyconcordefly.com"
 CREDS = os.path.join(U.PREFIX, "etc/cloudflared/ollama1.json")
 CONFIG = os.path.join(U.PREFIX, "etc/ollama1/config.json")
+CF_STATE = os.path.join(U.PREFIX, "var/lib/ollama1/cf-state.json")
 
 
 class FakeCF:
@@ -38,6 +39,12 @@ class FakeCF:
             def _go(self, method):
                 n = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(n)) if n else None
+                if outer.redirect_to:
+                    self.send_response(302)
+                    self.send_header("Location", outer.redirect_to)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
                 if self.headers.get("Authorization") != "Bearer " + outer.token:
                     return self.reply(403, {"success": False, "errors": [{"code": 9109, "message": "Invalid access token"}]})
                 u = urlsplit(self.path)
@@ -45,7 +52,10 @@ class FakeCF:
                 qs = {k: v[0] for k, v in parse_qs(u.query).items()}
                 with outer.lock:
                     outer.calls.append((method, path))
-                    st, res = outer.route(method, path, qs, body)
+                    if (method, path.rsplit("/", 1)[-1]) == outer.fail_on:
+                        st, res = 500, "simulated failure"
+                    else:
+                        st, res = outer.route(method, path, qs, body)
                 self.reply(st, {"success": st < 400, "errors": [] if st < 400 else [{"message": str(res)}],
                                 "result": res if st < 400 else None})
 
@@ -88,6 +98,8 @@ class FakeCF:
         self.policies = {}
         self.apps = {}
         self.calls = []
+        self.fail_on = None
+        self.redirect_to = None
 
     def nid(self):
         return uuid.uuid4().hex
@@ -129,6 +141,7 @@ class FakeCF:
         if p == S:
             if m == "GET":
                 return 200, [{k: v for k, v in t.items() if k != "client_secret"} for t in self.stokens.values()]
+            self.token_duration = b.get("duration")
             t = {"id": self.nid(), "name": b["name"], "client_id": self.nid() + ".access",
                  "client_secret": "svc-" + self.nid()}
             self.stokens[t["id"]] = t
@@ -178,7 +191,7 @@ def tearDownModule():
 class TestCloudflareHelper(unittest.TestCase):
     def setUp(self):
         CF.reset()
-        for f in (CREDS, CONFIG):
+        for f in (CREDS, CONFIG, CF_STATE):
             if os.path.exists(f):
                 os.unlink(f)
         os.makedirs(os.path.dirname(CONFIG), exist_ok=True)
@@ -189,11 +202,11 @@ class TestCloudflareHelper(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def run_helper(self, token=TOKEN, extra=()):
+    def run_helper(self, token=TOKEN, extra=(), tty_ok=True):
         self.tty = os.path.join(self.tmp, "tty")
         open(self.tty, "w").close()
         env = dict(os.environ, OLLAMA1_PREFIX=U.PREFIX, OLLAMA1_CF_API=CF.url, TMPDIR=self.tmp,
-                   OLLAMA1_TTY=self.tty)
+                   OLLAMA1_TTY=self.tty if tty_ok else os.path.join(self.tmp, "no-such-dir", "tty"))
         r = subprocess.run([sys.executable, os.path.join(U.BIN, "ollama1-cf-access"), "--token-stdin",
                             "--no-prompt"] + list(extra), input=token + "\n", env=env,
                            capture_output=True, text=True, timeout=60)
@@ -257,8 +270,10 @@ class TestCloudflareHelper(unittest.TestCase):
         self.assertEqual(len(CF.tunnels), 1)
 
     def test_dns_fixed_and_deduplicated(self):
-        CF.dns["x1"] = {"id": "x1", "type": "CNAME", "name": GW, "content": "old.example.com", "proxied": False}
-        CF.dns["x2"] = {"id": "x2", "type": "CNAME", "name": GW, "content": "other.example.com", "proxied": True}
+        CF.dns["x1"] = {"id": "x1", "type": "CNAME", "name": GW, "content": "old-tunnel.cfargotunnel.com",
+                        "proxied": False}
+        CF.dns["x2"] = {"id": "x2", "type": "CNAME", "name": GW, "content": "somewhere.example.com",
+                        "proxied": True, "comment": "ollama1 tunnel (ollama1-cf-access)"}
         self.assertEqual(self.run_helper(), 0, self.out)
         tid = next(iter(CF.tunnels))
         recs = [r for r in CF.dns.values() if r["name"] == GW]
@@ -266,6 +281,64 @@ class TestCloudflareHelper(unittest.TestCase):
         self.assertEqual((recs[0]["content"], recs[0]["proxied"]), (tid + ".cfargotunnel.com", True))
         self.assertEqual(self.run_helper(), 0)
         self.assertEqual(len(CF.dns), 2)
+
+    def test_foreign_cname_is_not_touched(self):
+        CF.dns["c1"] = {"id": "c1", "type": "CNAME", "name": ADMIN, "content": "shop.example.net", "proxied": True}
+        self.assertEqual(self.run_helper(), 1)
+        self.assertIn("shop.example.net", self.out)
+        self.assertEqual(CF.dns["c1"]["content"], "shop.example.net")
+        self.assertFalse([c for c in CF.calls if c[0] in ("PATCH", "DELETE")])
+
+    def test_token_never_expires(self):
+        self.assertEqual(self.run_helper(), 0, self.out)
+        self.assertEqual(CF.token_duration, "forever")
+
+    def test_secret_shown_even_if_a_later_step_fails(self):
+        CF.fail_on = ("POST", "policies")
+        self.assertEqual(self.run_helper(), 1)
+        tok = next(iter(CF.stokens.values()))
+        self.assertEqual(self.shown.count(tok["client_secret"]), 1)
+        self.assertNotIn(tok["client_secret"], self.out)
+        self.assertFalse(json.load(open(CF_STATE)).get("secret_unshown"))
+        CF.fail_on = None
+        self.assertEqual(self.run_helper(), 0, self.out)   # the rerun keeps that token and secret
+        self.assertEqual(next(iter(CF.stokens.values()))["client_secret"], tok["client_secret"])
+
+    def test_unshown_secret_is_rotated_next_run(self):
+        # a run that made the token but had no terminal to show it on
+        self.assertEqual(self.run_helper(tty_ok=False), 0, self.out)
+        old = next(iter(CF.stokens.values()))["client_secret"]
+        self.assertEqual(json.load(open(CF_STATE))["secret_unshown"], "ollama1-app")
+        self.assertEqual(self.run_helper(), 0, self.out)   # --no-prompt, yet it rotates
+        new = next(iter(CF.stokens.values()))["client_secret"]
+        self.assertNotEqual(old, new)
+        self.assertEqual(self.shown.count(new), 1)
+        self.assertFalse(json.load(open(CF_STATE)).get("secret_unshown"))
+
+    def test_redirects_are_not_followed(self):
+        seen = []
+
+        class Grab(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                seen.append(self.headers.get("Authorization"))
+                self.send_response(200)
+                self.send_header("Content-Length", "2")
+                self.end_headers()
+                self.wfile.write(b"{}")
+        port = U.free_port()
+        srv = ThreadingHTTPServer(("127.0.0.1", port), Grab)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        CF.redirect_to = "http://127.0.0.1:%d/steal" % port
+        try:
+            self.assertEqual(self.run_helper(), 1)
+        finally:
+            CF.redirect_to = None
+            srv.shutdown()
+        self.assertEqual(seen, [])
+        self.assertIn("HTTP 302", self.out)
 
     def test_foreign_record_stops_it(self):
         CF.dns["a1"] = {"id": "a1", "type": "A", "name": ADMIN, "content": "203.0.113.9", "proxied": True}

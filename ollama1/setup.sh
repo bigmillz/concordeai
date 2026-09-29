@@ -147,6 +147,23 @@ if [ "$PLAN_ONLY" = 1 ]; then
 fi
 [ "$(id -u)" -eq 0 ] || { echo "Run it with sudo:  sudo $0"; exit 1; }
 
+# One setup at a time. The lock is taken before anything else, including
+# the copy of the kit to /var/tmp; fd 9 (and so the lock) survives the
+# exec below. --no-tmux runs keep it to the end.
+LOCK=/run/ollama1-setup.lock
+STATUS_FILE=/run/ollama1-setup.status
+if [ "${OLLAMA1_LOCKED:-}" != 1 ]; then
+  exec 9>"$LOCK"
+  if ! flock -w "${OLLAMA1_LOCK_WAIT:-0}" 9; then
+    echo "Setup is already running."
+    if tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+      echo "Reattach with:  sudo tmux attach -t $TMUX_SESSION"
+    fi
+    exit 1
+  fi
+  export OLLAMA1_LOCKED=1
+fi
+
 # Run from the root filesystem, not /home: /home is about to move.
 if [ "${OLLAMA1_RELOCATED:-}" != 1 ]; then
   case "$KIT" in
@@ -159,7 +176,8 @@ if [ "${OLLAMA1_RELOCATED:-}" != 1 ]; then
 fi
 cd /
 
-# Run inside tmux, so a dropped SSH connection can't kill it mid-step.
+# Run inside tmux, so a dropped SSH connection can't kill it mid-step. The
+# run inside tmux takes the lock over; its exit status comes back here.
 if [ "$NO_TMUX" = 0 ] && [ -z "${TMUX:-}" ] && [ -z "${STY:-}" ]; then
   if command -v tmux >/dev/null 2>&1; then
     if tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
@@ -169,10 +187,23 @@ if [ "$NO_TMUX" = 0 ] && [ -z "${TMUX:-}" ] && [ -z "${STY:-}" ]; then
     echo "Starting setup inside tmux (session $TMUX_SESSION), so a dropped connection can't stop it."
     echo "If you get disconnected, log in again and run:  sudo tmux attach -t $TMUX_SESSION"
     sleep 2
-    inner="OLLAMA1_RELOCATED=1 bash $(printf '%q' "$KIT/setup.sh")"
+    rm -f "$STATUS_FILE"
+    inner="OLLAMA1_LOCKED=0 OLLAMA1_LOCK_WAIT=15 OLLAMA1_RELOCATED=1 bash $(printf '%q' "$KIT/setup.sh")"
     for a in "$@"; do inner+=" $(printf '%q' "$a")"; done
-    inner+="; echo; read -r -p 'Setup has finished. Press Enter to close this tmux session. ' _"
-    exec tmux new-session -s "$TMUX_SESSION" -c / "$inner"
+    inner+="; echo \$? >$STATUS_FILE; read -r -p 'Setup has finished. Press Enter to close this tmux session. ' _"
+    flock -u 9; exec 9>&-
+    tmux new-session -s "$TMUX_SESSION" -c / "$inner" || true
+    if tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+      echo "Setup is still running in tmux. Reattach with:  sudo tmux attach -t $TMUX_SESSION"
+      exit 0
+    fi
+    if [ -s "$STATUS_FILE" ]; then
+      rc=$(cat "$STATUS_FILE")
+      echo "Setup finished with exit status $rc. Log: $LOG"
+      exit "$rc"
+    fi
+    echo "Setup's tmux session ended without reporting a status. Log: $LOG"
+    exit 1
   fi
   echo "tmux is not installed; running without it (a dropped connection would stop setup)."
 fi
@@ -373,7 +404,11 @@ ensure_user o1admin /nonexistent
 ensure_user o1dash /nonexistent
 ensure_user cloudflared /nonexistent
 usermod -aG render,video ollama
-usermod -aG o1pair,o1view o1gw
+usermod -aG o1view o1gw
+# The gateway must never read the pairing window (it holds the code).
+# SupplementaryGroups= in its unit only adds groups, so an /etc/group
+# membership from an older kit is taken away here.
+gpasswd -d o1gw o1pair >/dev/null 2>&1 || true
 usermod -aG o1view o1admin
 usermod -aG o1view,o1pair o1dash
 usermod -aG o1view "$ADMIN_USER"
@@ -632,6 +667,10 @@ sleep 2
 for s in ollama ollama1-gateway ollama1-admin ollama1-ttyd ollama1-dash; do
   if systemctl is-active --quiet "$s"; then ok "$s running"; else note "$s is not running: journalctl -u $s"; later "$s did not start: journalctl -u $s"; fi
 done
+if id -nG o1gw | tr ' ' '\n' | grep -qx o1pair; then
+  die "the gateway's user o1gw is in the o1pair group, so it could read the pairing code; remove it (gpasswd -d o1gw o1pair) and run setup again"
+fi
+ok "the gateway's user can't read the pairing window (o1gw: $(id -nG o1gw))"
 
 # ---- 14. Cloudflare -------------------------------------------------------------------------
 step "Cloudflare Tunnel and Access"
@@ -787,15 +826,21 @@ step "What listens on the network"
 # Only sshd may listen beyond loopback (plus the gateway on br0 in LAN mode).
 lan_on=0
 python3 -c 'import json,sys; sys.exit(0 if json.load(open("/etc/ollama1/config.json")).get("lan_mode") else 1)' && lan_on=1
-exposed_listeners() {
-  local addr proc
+unit_of_pid() { # pid -> the systemd unit it runs in (from its cgroup), or "-"
+  local u
+  u=$(sed -n 's#^0::.*/\([^/]*\.service\)$#\1#p' "/proc/$1/cgroup" 2>/dev/null | head -n1)
+  echo "${u:--}"
+}
+exposed_listeners() { # "address unit" for every TCP listener beyond loopback, except sshd's
+  local addr proc pid
   ss -Hltnp 2>/dev/null | awk '{print $4 "  " $6}' | while read -r addr proc; do
     case "$addr" in
       127.*|"[::1]":*|"[::ffff:127."*) continue ;;
       *:22) continue ;;
     esac
     if [ "$lan_on" = 1 ] && [ "$addr" = "${LANIP:-x}:8431" ]; then continue; fi
-    printf '%s %s\n' "$addr" "$proc"
+    pid=$(printf '%s' "$proc" | sed -n 's/.*pid=\([0-9]*\).*/\1/p' | head -n1)
+    printf '%s %s\n' "$addr" "$( [ -n "$pid" ] && unit_of_pid "$pid" || echo - )"
   done
 }
 exposed=$(exposed_listeners)
@@ -803,7 +848,9 @@ if [ -z "$exposed" ]; then
   ok "nothing listens beyond loopback except sshd$([ "$lan_on" = 1 ] && echo ' and the LAN-mode gateway')"
 else
   printf '%s\n' "$exposed" | sed 's/^/      /'
-  if printf '%s\n' "$exposed" | grep -qE 'ollama|ttyd|cloudflared|python3'; then
+  # Only ollama1's own services are an error here (judged by their systemd
+  # unit, not by program name); anything else is reported.
+  if printf '%s\n' "$exposed" | awk '{print $2}' | grep -qE '^(ollama|ollama1-[a-z0-9@-]+)\.service$'; then
     die "one of ollama1's services listens beyond loopback (above); the firewall blocks it, but it must not"
   fi
   note "other programs listen beyond loopback (above). The firewall blocks them from outside."

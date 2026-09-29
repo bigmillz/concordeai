@@ -48,7 +48,9 @@ def main():
         key = args[args.index("-s") + 1]
         dev = args[-1]
         val = s["blkid"].get(dev, {}).get(key)
-        if val:
+        if dev in s.get("blkid_fail", []):
+            rc = 4          # e.g. an I/O error while probing
+        elif val:
             out = val
         else:
             rc = 2

@@ -628,6 +628,72 @@ class TestDeviceSwitch(unittest.TestCase):
         first_unload = G["stub"].calls[n:].index(unl[0])
         self.assertLess(first_unload, first_chat)
 
+    def patched(self, fn):
+        mod = G["mod"]
+        real = mod.o1ollama.call
+
+        def wrapper(base, method, path, obj=None, timeout=30):
+            return fn(real, base, method, path, obj, timeout)
+        mod.o1ollama.call = wrapper
+        return real
+
+    def test_switch_fails_closed_when_ps_fails(self):
+        self.chat(G["dev"])
+        gw, mod = G["gw"], G["mod"]
+
+        def flaky(real, base, method, path, obj, timeout):
+            if path == "/api/ps":
+                raise ConnectionResetError("Ollama busy/restarting")
+            return real(base, method, path, obj, timeout)
+        real = self.patched(flaky)
+        try:
+            n = len(G["stub"].calls)
+            st, data, _ = self.chat(self.other)
+        finally:
+            mod.o1ollama.call = real
+        self.assertEqual(st, 503)
+        self.assertEqual(json.loads(data)["code"], "busy")
+        self.assertEqual(gw.last_device, G["dev"].id)        # unchanged
+        self.assertEqual([c for c in G["stub"].calls[n:] if c[1] == "/api/chat"], [])
+        st, _, _ = self.chat(self.other)                      # Ollama back: works
+        self.assertEqual(st, 200)
+        self.assertEqual(gw.last_device, self.other.id)
+
+    def test_switch_fails_closed_when_unload_does_not_take(self):
+        self.chat(G["dev"])
+        gw, mod = G["gw"], G["mod"]
+
+        def stuck(real, base, method, path, obj, timeout):
+            if isinstance(obj, dict) and obj.get("keep_alive") == 0:
+                return 500, {"error": "no"}                   # the unload fails
+            return real(base, method, path, obj, timeout)
+        real = self.patched(stuck)
+        try:
+            st, data, _ = self.chat(self.other)
+        finally:
+            mod.o1ollama.call = real
+        self.assertEqual(st, 503)
+        self.assertIn("small:8b", G["stub"].loaded)
+        self.assertEqual(gw.last_device, G["dev"].id)
+
+    def test_switch_streaming_refusal_is_in_band(self):
+        self.chat(G["dev"])
+        mod = G["mod"]
+
+        def flaky(real, base, method, path, obj, timeout):
+            if path == "/api/ps":
+                raise ConnectionResetError("x")
+            return real(base, method, path, obj, timeout)
+        real = self.patched(flaky)
+        try:
+            st, data, _ = call("POST", "/api/chat", {"model": "small:8b",
+                                                     "messages": [{"role": "user", "content": "x"}]},
+                               dev=self.other)
+        finally:
+            mod.o1ollama.call = real
+        self.assertEqual(st, 200)
+        self.assertEqual(U.ndjson(data)[-1]["code"], "busy")
+
 
 class TestLanMode(unittest.TestCase):
     """The LAN listener skips the Access JWT only when LAN mode is on and

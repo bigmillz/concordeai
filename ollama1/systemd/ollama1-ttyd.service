@@ -3,7 +3,7 @@
 # UNIX socket in /run/ollama1/ttyd (root:o1admin 0750), so only root and the
 # panel's user can reach it.
 [Unit]
-Description=ollama1 web terminal (ttyd + login, 127.0.0.1 only)
+Description=ollama1 web terminal (ttyd + login, on a UNIX socket only the admin panel can open)
 Requires=ollama1-nft.service
 After=network.target ollama1-nft.service
 

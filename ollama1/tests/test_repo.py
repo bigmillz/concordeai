@@ -178,6 +178,20 @@ class TestUnits(unittest.TestCase):
 
     def test_gateway_not_in_pairing_group(self):
         self.assertNotIn("o1pair", self.unit("ollama1-gateway.service"))
+        setup = open(os.path.join(U.KIT, "setup.sh")).read()
+        for line in setup.splitlines():
+            if re.match(r"\s*(usermod|gpasswd|adduser)\b", line) and "o1gw" in line:
+                self.assertFalse("o1pair" in line and "-d" not in line, line)
+        self.assertRegex(setup, r"gpasswd -d o1gw o1pair")
+        self.assertRegex(setup, r"id -nG o1gw .*grep -qx o1pair")
+
+    def test_setup_locks_before_relocating(self):
+        setup = open(os.path.join(U.KIT, "setup.sh")).read()
+        self.assertLess(setup.index('flock -w'), setup.index("dest=/var/tmp/ollama1-kit"))
+        self.assertIn("echo \\$? >$STATUS_FILE", setup)
+        tmux_block = setup[setup.index('if [ "$NO_TMUX" = 0 ]'):setup.index('touch "$LOG"')]
+        self.assertIn("flock -u 9", tmux_block)                        # handed over only for tmux
+        self.assertEqual(setup.count("flock -u 9"), 1)                 # --no-tmux keeps it
 
     def test_sshd_keeps_default_maxauthtries(self):
         t = open(os.path.join(U.KIT, "config", "10-ollama1-sshd.conf.in")).read()

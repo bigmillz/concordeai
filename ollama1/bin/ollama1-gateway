@@ -378,21 +378,40 @@ class Gateway:
             except OSError:
                 pass
 
+    def loaded_names(self):
+        st, data = o1ollama.call(self.base, "GET", "/api/ps", timeout=10)
+        if st != 200 or not isinstance(data, dict):
+            raise ValueError("Ollama's /api/ps did not answer")
+        return [m.get("name") or m.get("model") for m in data.get("models", []) or []
+                if m.get("name") or m.get("model")]
+
     def switch_device(self, dev_id):
         """Nothing is shared between devices, not even Ollama's prompt
         cache: when the GPU's next job belongs to a different paired device
-        than the last one, every loaded model is unloaded first. The cost is
-        one reload when the device changes. Called with the GPU slot held."""
-        if self.last_device is not None and self.last_device != dev_id:
+        than the last one, every loaded model is unloaded first, and /api/ps
+        must then show nothing loaded. If that can't be confirmed, the job
+        is refused (503) and the last device stays as it was, so the next
+        attempt tries again. Fails closed. The cost is one reload when the
+        device changes. Called with the GPU slot held."""
+        if self.last_device is None or self.last_device == dev_id:
+            self.last_device = dev_id
+            return
+        cleared = False
+        names = []
+        for _attempt in range(2):
             try:
-                st, data = o1ollama.call(self.base, "GET", "/api/ps", timeout=10)
-                names = [m.get("name") or m.get("model") for m in (data or {}).get("models", []) or []]
-            except OSError:
-                names = []
-            for name in names:
-                if name:
+                names = self.loaded_names()
+                for name in names:
                     self.unload(name)
-            log("device-switch", model=",".join(n for n in names if n) or "-")
+                if not self.loaded_names():
+                    cleared = True
+                    break
+            except (OSError, ValueError):
+                pass
+        if not cleared:
+            log("device-switch", reason="unload_unconfirmed")
+            raise GatewayError(503, "busy", "the desktop could not clear the previous device's model; try again")
+        log("device-switch", model=",".join(names) or "-")
         self.last_device = dev_id
 
     def ensure_on_gpu(self, name, share=None):
