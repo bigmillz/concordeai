@@ -73,6 +73,9 @@ jobs:
                  -ArgumentList @("--crypto-selftest", ('"' + $st + '"')) -Wait -PassThru
           if (Test-Path $st) { Get-Content -Raw $st }
           if ($p.ExitCode -ne 0) { throw "crypto self-test failed (exit $($p.ExitCode))" }
+          # this job builds x64: the exe's own platform, not the OS's machine
+          $plat = (Get-Content -Raw $st | ConvertFrom-Json).platform
+          if ($plat -ne "win-amd64") { throw "the exe was built for $plat, not win-amd64" }
 
       - name: locate WiX (install if the runner image dropped it)
         id: wix

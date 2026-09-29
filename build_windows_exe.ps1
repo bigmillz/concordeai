@@ -28,22 +28,41 @@
 # PowerShell honours as a string delimiter. One dash in a comment silently
 # desyncs the quoting for the rest of the file.
 param(
+  [Alias("Arch")]
   [ValidateSet("x64", "arm64")]
-  [string]$Arch
+  [string]$Want
 )
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
-# $Arch keeps its ValidateSet: never assign it (an assignment is validated
-# too). PowerShell's -eq ignores case, so -Arch ARM64 works as well.
+# -Arch is an alias of $Want. PowerShell's variable names ignore case, so
+# a parameter named Arch WAS the $arch this script sets to the
+# interpreter's machine (AMD64 is outside the set, and the build threw).
+# No variable may share the parameter's name in any case, and $Want keeps
+# its ValidateSet, so it is never assigned either. -eq ignores case, so
+# -Arch ARM64 works as well.
 
 # ---------------------------------------------------------------- preflight
 # Windows ships a stub python.exe under WindowsApps that only prints an advert
 # for the Microsoft Store. It is on PATH even when Python is not installed, so
 # resolve a real interpreter rather than trusting the name.
+#
+# THE INTERPRETER'S ARCHITECTURE IS ITS BUILD PLATFORM (6b327, found in
+# the ARM64 VM): platform.machine() reports the OS's machine, so on
+# Windows on ARM an x64 Python under emulation says ARM64 too. The build
+# picked the x64 Python for -Arch arm64 and made an "arm64" installer
+# holding an x64 app; "prefer x64" had never worked on an ARM box.
+# sysconfig.get_platform() names what the interpreter was built for:
+# win-amd64 is x64, win-arm64 is arm64, win32 is x86 (never built).
 function Get-PyArch([string]$exe) {
   try {
-    $a = & $exe -c "import platform;print(platform.machine())" 2>$null
-    if ($LASTEXITCODE -eq 0) { return ("" + $a).Trim() }
+    $a = & $exe -c "import sysconfig;print(sysconfig.get_platform())" 2>$null
+    if ($LASTEXITCODE -eq 0) {
+      $plat = ("" + $a).Trim().ToLower()
+      if ($plat -eq "win-amd64") { return "x64" }
+      if ($plat -eq "win-arm64") { return "arm64" }
+      if ($plat -eq "win32") { return "x86" }
+      return $plat
+    }
   } catch { }
   return $null
 }
@@ -95,24 +114,24 @@ function Find-Python {
     $arch = Get-PyArch $exe
     if (-not $arch) { continue }
     $script:PyReport += ("    {0,-8} {1}" -f $arch, $exe)
-    if (-not $x64 -and $arch -match 'AMD64|x86_64') { $x64 = $exe }
-    if (-not $arm -and $arch -match 'ARM64|aarch64') { $arm = $exe }
+    if (-not $x64 -and $arch -eq "x64") { $x64 = $exe }
+    if (-not $arm -and $arch -eq "arm64") { $arm = $exe }
   }
-  if ($Arch -eq "x64") { return $x64 }
-  if ($Arch -eq "arm64") { return $arm }
+  if ($Want -eq "x64") { return $x64 }
+  if ($Want -eq "arm64") { return $arm }
   if ($x64) { return $x64 }
   return $arm
 }
 
 $py = Find-Python
-if (-not $py -and $Arch) {
+if (-not $py -and $Want) {
   Write-Host ""
-  Write-Host "  No $Arch Python found. Interpreters found:" -ForegroundColor Yellow
+  Write-Host "  No $Want Python found. Interpreters found:" -ForegroundColor Yellow
   if ($script:PyReport) { $script:PyReport | ForEach-Object { Write-Host $_ } }
   else { Write-Host "    (none)" }
-  Write-Host "  Install the $Arch build from https://www.python.org/downloads/windows/"
+  Write-Host "  Install the $Want build from https://www.python.org/downloads/windows/"
   Write-Host "  (for arm64, Python 3.11 or newer: 3.10 has no ARM64 cffi wheel)."
-  throw "no $Arch Python interpreter found"
+  throw "no $Want Python interpreter found"
 }
 if (-not $py) {
   Write-Host ""
@@ -140,11 +159,11 @@ if ($script:PyReport -and $script:PyReport.Count -gt 1) {
   $script:PyReport | ForEach-Object { Write-Host $_ }
 }
 
-$arch = & $py -c "import platform;print(platform.machine())"
+$arch = Get-PyArch $py
 Write-Host "python architecture: $arch"
 Write-Host ("-> building with: {0} ({1}){2}" -f $py, $arch,
-            $(if ($Arch) { " as asked by -Arch $Arch" } else { "" }))
-$isArm = $arch -match 'ARM64|aarch64'
+            $(if ($Want) { " as asked by -Arch $Want" } else { "" }))
+$isArm = $arch -eq "arm64"
 if ($isArm) {
   Write-Host ""
   Write-Host "  Building an ARM64 exe." -ForegroundColor Yellow
@@ -154,8 +173,8 @@ if ($isArm) {
   Write-Host "  also no CUDA on Windows-on-ARM, so this build is CPU-only."
   Write-Host "  For an NVIDIA machine, rerun this under the x64 python.org build."
   Write-Host ""
-} elseif ($arch -notmatch 'AMD64|x86_64') {
-  throw "unrecognised architecture: $arch"
+} elseif ($arch -ne "x64") {
+  throw "unrecognised architecture: $arch (a 64-bit x64 or ARM64 Python builds the exe)"
 }
 
 $ver = (Select-String -Path millenai.py -Pattern 'APP_VERSION = "([^"]+)"').Matches[0].Groups[1].Value
@@ -166,9 +185,9 @@ $bv = ".build-venv"
 # the build venv is kept between builds; one made by another Python (the
 # other architecture, after -Arch, or another version) would freeze the
 # wrong interpreter in, so it is made again (6b327)
-$pyId = & $py -c "import platform,sys;print(platform.machine(), sys.version.split()[0])"
+$pyId = & $py -c "import sysconfig,sys;print(sysconfig.get_platform(), sys.version.split()[0])"
 if (Test-Path "$bv\Scripts\python.exe") {
-  $bvId = & "$bv\Scripts\python.exe" -c "import platform,sys;print(platform.machine(), sys.version.split()[0])"
+  $bvId = & "$bv\Scripts\python.exe" -c "import sysconfig,sys;print(sysconfig.get_platform(), sys.version.split()[0])"
   if ("$bvId" -ne "$pyId") {
     Write-Host "-> $bv was made by $bvId, not $pyId; making it again"
     Remove-Item -Recurse -Force $bv
@@ -264,6 +283,11 @@ if ($crypto) {
          -ArgumentList @("--crypto-selftest", ('"' + $st + '"')) -Wait -PassThru
   if (Test-Path $st) { Write-Host ("crypto self-test: " + (Get-Content -Raw $st)) }
   if ($p.ExitCode -ne 0) { throw "the exe failed its crypto self-test (exit $($p.ExitCode)): accounts would be off" }
+  # and it was built for the architecture chosen: the exe's own
+  # sysconfig platform, never platform.machine() (the OS's machine)
+  $wantPlat = if ($isArm) { "win-arm64" } else { "win-amd64" }
+  $gotPlat = (Get-Content -Raw $st | ConvertFrom-Json).platform
+  if ($gotPlat -ne $wantPlat) { throw "the exe was built for $gotPlat, not $wantPlat" }
 }
 
 # --------------------------------------------------------------- installer

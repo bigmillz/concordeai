@@ -270,6 +270,10 @@ if __name__ == "__main__" and sys.argv[1:2] == ["--crypto-selftest"]:
     _st = cai_crypto.status()
     _res = {"ok": _st[0], "state": _st[1], "why": _st[2],
             "python": platform.python_version(), "machine": platform.machine(),
+            # what this interpreter (or frozen exe) was built for;
+            # "machine" is the OS's, and says ARM64 for an emulated x64
+            # build on Windows on ARM (6b327, from the VM)
+            "platform": sysconfig.get_platform(),
             "frozen": bool(getattr(sys, "frozen", False))}
     try:
         import nacl, cffi   # noqa: E401
@@ -4472,8 +4476,10 @@ OLLAMA_TGZ_URL = "https://ollama.com/download/ollama-darwin.tgz"
 #
 # On Windows-on-ARM the app itself normally runs as *emulated x64*, because
 # pythonnet (pywebview's backend) and ctranslate2 (faster-whisper) publish
-# win_amd64 wheels only. So `platform.machine()` reports the architecture of
-# this process, not of the machine, and would send an ARM laptop after the
+# win_amd64 wheels only. (This note used to say `platform.machine()` reports
+# this process's architecture; measured in the ARM64 VM, it reports the
+# machine's, which is what this function wants. An x64 process is still
+# told AMD64 by some calls, which would send an ARM laptop after the
 # 1.5 GB CUDA build it can never use. Ollama is a separate process talked to
 # over HTTP, so it should always be the *native* build — emulated UI, native
 # inference.
@@ -11204,16 +11210,21 @@ def _crypto_key() -> str:
 
 
 def _crypto_should_try(rec, key: str, now: float):
-    """(try now?, why not). rec is the last attempt's record, or None."""
+    """(try now?, why not). rec is the last attempt's record, or None.
+    Only reached while PyNaCl isn't ready, so a recorded success counts
+    like a failure: it waits 3 days too (re-verify of 6b327). A time that
+    isn't a finite number between 0 and now counts as expired."""
     if not isinstance(rec, dict) or rec.get("key") != key:
         return True, ""
-    if rec.get("ok"):
-        return False, "installed once for this build and Python"
-    at = rec.get("at") if isinstance(rec.get("at"), (int, float)) else 0
+    at = rec.get("at")
+    if (isinstance(at, bool) or not isinstance(at, (int, float))
+            or not math.isfinite(at) or not 0 <= at <= now):
+        return True, ""
     if now - at >= CRYPTO_RETRY_S:
         return True, ""
     return False, "%s (tries again %s)" % (
-        rec.get("note") or "the last install failed",
+        ("installed, but it doesn't load now" if rec.get("ok")
+         else rec.get("note") or "the last install failed"),
         time.strftime("%Y-%m-%d", time.localtime(at + CRYPTO_RETRY_S)))
 
 
@@ -11383,8 +11394,15 @@ def accounts_gate():
     (review of 6b327)."""
     if not ACCOUNTS:
         return False, ""
-    if DEV_HOME and SYNC_URL == SYNC_PROD:
-        return False, "prod-sync"
+    if DEV_HOME:
+        # by host name, so a trailing slash, capitals, :443, http:// or a
+        # trailing dot can't pass for another server; unparseable refuses
+        try:
+            host = (urllib.parse.urlsplit(SYNC_URL).hostname or "").rstrip(".")
+        except ValueError:
+            host = None
+        if host is None or host == urllib.parse.urlsplit(SYNC_PROD).hostname:
+            return False, "prod-sync"
     st = crypto_status()
     if st["ok"]:
         return True, ""

@@ -9777,40 +9777,57 @@ check("install pins: pynacl alone where cffi is loaded, or on Windows where it's
       _p_all7 == _cr7["crypto_reqs"]() and _p_loaded7 == _p_win7
       == _cr7["crypto_reqs"](only=("pynacl",)), "%r" % [_p_loaded7[:40], _p_win7[:40]])
 
-# no account action without the gate (review of 6b327): SYNC_URL is read
-# only by accounts_gate and _sync_url (which asks the gate), assigned
-# once, and the sync host's name appears only in SYNC_PROD. The walk
-# covers every function and class body, nested or not.
+# no account action without the gate (review and re-verify of 6b327):
+# SYNC_URL is read only by accounts_gate and _sync_url (which asks the
+# gate), each a top-level function defined once; it is assigned once, at
+# module level. SYNC_PROD is read only in that assignment and in
+# accounts_gate, and assigned once; the sync host is named only in
+# SYNC_PROD's value. A def, class or lambda nested anywhere gets no pass.
 _SYNC_OK = {"accounts_gate", "_sync_url"}
 
 
 def _sync_lint(src):
     tree = _ast.parse(src)
     bad = []
+    fdefs = (_ast.FunctionDef, _ast.AsyncFunctionDef)
+    top = [n.name for n in tree.body if isinstance(n, fdefs)]
+    for nm in sorted(_SYNC_OK):
+        if top.count(nm) != 1:
+            bad.append("%s: %d top-level definitions" % (nm, top.count(nm)))
+    stores = {"SYNC_URL": 0, "SYNC_PROD": 0}
+
+    def assigns(st, name):
+        return (isinstance(st, _ast.Assign) and len(st.targets) == 1
+                and getattr(st.targets[0], "id", "") == name)
 
     def walk(node, where):
         for ch in _ast.iter_child_nodes(node):
-            w = ch.name if isinstance(ch, (_ast.FunctionDef, _ast.AsyncFunctionDef,
-                                           _ast.ClassDef)) else where
-            if isinstance(ch, _ast.Name) and ch.id == "SYNC_URL":
-                ok = (w in _SYNC_OK and isinstance(ch.ctx, _ast.Load)) or (
-                    w is None and isinstance(ch.ctx, _ast.Store))
+            if node is tree:
+                w = (ch.name if isinstance(ch, fdefs)
+                     else "class " + ch.name if isinstance(ch, _ast.ClassDef)
+                     else "=SYNC_URL" if assigns(ch, "SYNC_URL")
+                     else "=SYNC_PROD" if assigns(ch, "SYNC_PROD") else "module")
+            elif isinstance(ch, fdefs + (_ast.ClassDef, _ast.Lambda)):
+                w = "nested in %s" % where
+            else:
+                w = where
+            if isinstance(ch, _ast.Name) and ch.id in stores:
+                if isinstance(ch.ctx, _ast.Store):
+                    stores[ch.id] += 1
+                    ok = w == "=" + ch.id
+                elif ch.id == "SYNC_URL":
+                    ok = w in _SYNC_OK
+                else:
+                    ok = w in ("=SYNC_URL", "accounts_gate")
                 if not ok:
-                    bad.append("%s:%d" % (w or "module", ch.lineno))
+                    bad.append("%s in %s:%d" % (ch.id, w, ch.lineno))
             if (isinstance(ch, _ast.Constant) and isinstance(ch.value, str)
-                    and "sync.millertechnology.net" in ch.value):
-                bad.append("host:%s:%d" % (w or "module", ch.lineno))
+                    and "sync.millertechnology.net" in ch.value and w != "=SYNC_PROD"):
+                bad.append("host in %s:%d" % (w, ch.lineno))
             walk(ch, w)
     walk(tree, None)
-    stores = [n for n in _ast.walk(tree) if isinstance(n, _ast.Name) and n.id == "SYNC_URL"
-              and isinstance(n.ctx, _ast.Store)]
-    prod = [n for n in tree.body if isinstance(n, _ast.Assign)
-            and getattr(n.targets[0], "id", "") == "SYNC_PROD"]
-    if len(stores) != 1:
-        bad.append("SYNC_URL assigned %d times" % len(stores))
-    # the one place the host may be named: SYNC_PROD's own value
-    return [b for b in bad if not (b.startswith("host:module:") and prod
-                                   and int(b.rsplit(":", 1)[1]) == prod[0].lineno)]
+    bad += ["%s assigned %d times" % kv for kv in stores.items() if kv[1] != 1]
+    return bad
 
 
 _pl7 = {
@@ -9820,15 +9837,22 @@ _pl7 = {
     "a module line": "\n\n_U7 = SYNC_URL\n",
     "the host literal": "\n\ndef _y7():\n    return 'https://sync.millertechnology.net/v2'\n",
     "a second assignment": "\n\nSYNC_URL = 'http://x'\n",
+    "a nested accounts_gate": "\n\ndef _z7():\n    def accounts_gate():\n        return SYNC_URL\n",
+    "a method named _sync_url": "\n\nclass _K9:\n    def _sync_url(self):\n        return SYNC_URL\n",
+    "a second top-level accounts_gate": "\n\ndef accounts_gate():\n    return True, ''\n",
+    "a lambda inside accounts_gate's name": "\n\naccounts_gate2 = lambda: SYNC_URL\n",
+    "SYNC_PROD read elsewhere": "\n\ndef _p7():\n    return SYNC_PROD\n",
+    "SYNC_PROD reassigned": "\n\nSYNC_PROD = 'http://127.0.0.1:1'\n",
+    "a global write": "\n\ndef _w7():\n    global SYNC_URL\n    SYNC_URL = 'http://x'\n",
 }
 _plb7 = {k: _sync_lint(_MILLENAI_SRC + v) for k, v in _pl7.items()}
-check("lint: only accounts_gate and _sync_url read SYNC_URL; the host is named once (the lint catches each plant)",
+check("lint: only top-level accounts_gate and _sync_url read SYNC_URL, SYNC_PROD only there and in SYNC_URL's line; the lint catches 13 plants",
       _sync_lint(_MILLENAI_SRC) == [] and all(_plb7.values()),
       "%r" % [_sync_lint(_MILLENAI_SRC), _plb7])
 
 # the gate, in-process: accounts need the flag, a test sync server in a
 # dev copy, and PyNaCl; _sync_url answers only through it
-_gt7 = {}
+_gt7 = {"urllib": urllib}
 _exec_names(_gt7, {"CRYPTO_MISSING", "ACCOUNT_OFF", "accounts_gate", "_sync_url"})
 
 
@@ -9845,12 +9869,20 @@ _G7 = [_gate7(False, None, "https://sync.millertechnology.net", "ready"),
        _gate7(True, "/d", "http://127.0.0.1:8798", "missing"),
        _gate7(True, "/d", "http://127.0.0.1:8798", "installing"),
        _gate7(True, None, "https://sync.millertechnology.net", "ready")]
+# the production check is by host name (re-verify): none of these may
+# pass for a test server; a URL that won't parse refuses too
+_GV7 = [_gate7(True, "/d", u, "ready")[0][1] for u in (
+    "https://sync.millertechnology.net/", "HTTPS://SYNC.MILLERTECHNOLOGY.NET",
+    "https://sync.millertechnology.net:443", "http://sync.millertechnology.net",
+    "https://sync.millertechnology.net.", "https://me@Sync.MillerTechnology.net/v2",
+    "http://[::1", "https://sync.millertechnology.net.example.com")]
 _AO7 = _gt7.get("ACCOUNT_OFF", {})
 check("accounts_gate: off without the flag, off in a dev copy on the real sync server, off without PyNaCl",
       _G7 == [((False, ""), None), ((False, "prod-sync"), None),
               ((True, ""), "http://127.0.0.1:8798"), ((False, "crypto"), None),
               ((False, "installing"), None),
               ((True, ""), "https://sync.millertechnology.net")]
+      and _GV7 == ["prod-sync"] * 7 + [""]
       # an action refused says the spec's sentence (1c 5.16); the pane,
       # which sent nothing, says it plainly
       and _AO7.get("crypto") == ("Couldn't set up encryption. Accounts need it, and nothing was sent.",
@@ -9858,7 +9890,7 @@ check("accounts_gate: off without the flag, off in a dev copy on the real sync s
       and _AO7.get("installing", ("", ""))[1] == "Setting up encryption."
       and _AO7.get("prod-sync", ("", ""))[1] == "This dev copy has no test sync server (MILLENAI_SYNC_URL), so accounts are off."
       and not any("sent" in v[1] or "Try again" in v[1] for v in _AO7.values()),
-      "%r" % [_G7, _AO7])
+      "%r" % [_G7, _GV7, _AO7])
 
 # A, with PyNaCl but no MILLENAI_SYNC_URL: crypto ready on /api/stats,
 # accounts off because a dev copy never uses the real sync server
@@ -10112,35 +10144,58 @@ _no7s = subprocess.run([_epy7, "millenai.py", "--crypto-selftest"],
                        env=dict(_env7, MILLENAI_DEV="1",
                                 MILLENAI_HOME=os.path.join(_SMOKE_TMP, "self7-home")),
                        capture_output=True, text=True, timeout=60)
-check("--crypto-selftest: exit 0 with the answers, 1 without PyNaCl, before anything else runs",
+_plat7 = subprocess.run([_cpy7, "-c", "import sysconfig;print(sysconfig.get_platform())"],
+                        capture_output=True, text=True, env=_env7).stdout.strip()
+check("--crypto-selftest: exit 0 with the answers and its build platform, 1 without PyNaCl, before anything else runs",
       _ok7s.returncode == 0 and _self7.get("ok") is True and _self7.get("nacl") == "1.6.2"
+      and _plat7 and _self7.get("platform") == _plat7
       and _no7s.returncode == 1 and json.loads(_no7s.stdout or "{}").get("state") == "missing"
       and not os.path.exists(os.path.join(_SMOKE_TMP, "self7-home")),
       "%r" % [_ok7s.returncode, _self7, _no7s.returncode, _no7s.stdout[-200:]])
 
-# when to try, in-process: a new build or Python tries; a success never
-# re-runs for the same one; a failure waits three days
-_st7 = {"time": time, "APP_BUILD": 999, "sys": sys}
+# when to try, in-process: a new build or Python tries; otherwise any
+# record, success or failure, waits three days (a success is only read
+# while PyNaCl isn't ready); a time that isn't a finite number between 0
+# and now counts as expired (re-verify)
+_st7 = {"time": time, "math": __import__("math"), "APP_BUILD": 999, "sys": sys}
 _exec_names(_st7, {"CRYPTO_RETRY_S", "_crypto_key", "_crypto_should_try", "_pip_why"})
 _k7 = _st7["_crypto_key"]() if "_crypto_key" in _st7 else ""
 _T7 = 1_800_000_000
-_sh7 = [_st7["_crypto_should_try"](r, _k7, _T7)[0] for r in (
+def _try7(r):
+    """_crypto_should_try's verdict, or "raises" (a bad time must not throw)."""
+    try:
+        return _st7["_crypto_should_try"](r, _k7, _T7)[0]
+    except Exception as e:
+        return "raises %s" % type(e).__name__
+
+
+_sh7 = [_try7(r) for r in (
     None, {"key": "998 " + sys.version.split()[0], "ok": True, "at": _T7},
     {"key": _k7, "ok": True, "at": _T7 - 99 * 86400},
+    {"key": _k7, "ok": True, "at": _T7 - 86400},
     {"key": _k7, "ok": False, "at": _T7 - 2 * 86400},
     {"key": _k7, "ok": False, "at": _T7 - 3 * 86400},
-    {"key": "999 3.0.0", "ok": False, "at": _T7})] if _k7 else []
+    {"key": "999 3.0.0", "ok": False, "at": _T7},
+    {"key": _k7, "ok": False, "at": _T7 + 86400},
+    {"key": _k7, "ok": False, "at": float("nan")},
+    {"key": _k7, "ok": False, "at": float("inf")},
+    {"key": _k7, "ok": False, "at": "1799999999"},
+    {"key": _k7, "ok": False, "at": True},
+    {"key": _k7, "ok": False, "at": -5})] if _k7 else []
+_shok7 = (_st7["_crypto_should_try"]({"key": _k7, "ok": True, "at": _T7 - 86400}, _k7, _T7)[1]
+          if _k7 else "")
 _pw7 = [_st7["_pip_why"](x) for x in (
     "ERROR: Could not find a version that satisfies the requirement pynacl==1.6.2 (from versions: none)",
     "WARNING: Retrying ... NewConnectionError('<pip._vendor...>: Failed to establish a new connection')",
     "ERROR: THESE PACKAGES DO NOT MATCH THE HASHES FROM THE REQUIREMENTS FILE.")] if _k7 else []
 check("install: tried once per build and Python (a failure again after 3 days); offline reads as offline",
       _k7 == "999 " + sys.version.split()[0]
-      and _sh7 == [True, True, False, False, True, True]
+      and _sh7 == [True, True, True, False, False, True, True, True, True, True, True, True, True]
+      and _shok7.startswith("installed, but it doesn't load now (tries again ")
       and _pw7 == ["couldn't reach PyPI (or it has no wheel for this Python)",
                    "couldn't reach PyPI",
                    "ERROR: THESE PACKAGES DO NOT MATCH THE HASHES FROM THE REQUIREMENTS FILE."],
-      "%r" % [_k7, _sh7, _pw7])
+      "%r" % [_k7, _sh7, _shok7, _pw7])
 check("install: only the copy holding the instance lock starts it",
       _MILLENAI_SRC.count("target=_ensure_crypto_deps") == 1
       and "    if _INSTANCE_LOCK:\n        threading.Thread(target=_ensure_crypto_deps" in _MILLENAI_SRC)
@@ -10178,17 +10233,50 @@ check("build_windows_exe.ps1: hashed pins fetched afresh, _cffi_backend and nacl
 # -Arch (6b327): a param() block as the first statement, only that
 # architecture when asked, x64 first otherwise, the choice printed; the
 # build venv made again when another interpreter made it; a per-user
-# Inno Setup found
+# Inno Setup found. PowerShell's variable names ignore case (re-verify):
+# a parameter named Arch WAS the script's own $arch, so the parameter is
+# $Want (alias -Arch), and nothing in the code, in any case, assigns it
+# or loops over it.
 _code7 = "\n".join(l for l in _ps7.splitlines() if l.strip() and not l.lstrip().startswith("#"))
-check("build_windows_exe.ps1: -Arch x64|arm64 picks that Python or stops; a per-user Inno Setup is found",
-      _code7.startswith('param(\n  [ValidateSet("x64", "arm64")]\n  [string]$Arch\n)')
-      and '  if ($Arch -eq "x64") { return $x64 }\n  if ($Arch -eq "arm64") { return $arm }\n'
+_pm7 = re.match(r'param\(\n  \[Alias\("Arch"\)\]\n  \[ValidateSet\("x64", "arm64"\)\]\n'
+                r'  \[string\]\$(\w+)\n\)', _code7)
+_pn7 = _pm7.group(1) if _pm7 else "Arch"
+_pa7s = [m.group(0) for m in re.finditer(
+    r"(?i)(\$%s\b\s*(=(?!=)|\+=|-=)|foreach\s*\(\s*\$%s\b|\[ref\]\s*\$%s\b)"
+    % ((re.escape(_pn7),) * 3), _code7)]
+check("build_windows_exe.ps1: -Arch x64|arm64 picks that Python or stops, no variable shares the parameter's name; per-user Inno",
+      _pm7 is not None and _pn7 == "Want" and _pa7s == []
+      and not re.search(r"(?i)\$arch\b", _code7.split("\n)", 1)[0])
+      and '  if ($Want -eq "x64") { return $x64 }\n  if ($Want -eq "arm64") { return $arm }\n'
           '  if ($x64) { return $x64 }\n  return $arm\n' in _ps7
-      and 'throw "no $Arch Python interpreter found"' in _ps7
-      and "$Arch =" not in _ps7
+      and 'throw "no $Want Python interpreter found"' in _ps7
       and '-> building with: {0} ({1}){2}' in _ps7
       and 'if ("$bvId" -ne "$pyId") {' in _ps7
-      and '"$env:LOCALAPPDATA\\Programs\\Inno Setup 6\\ISCC.exe"' in _ps7)
+      and '"$env:LOCALAPPDATA\\Programs\\Inno Setup 6\\ISCC.exe"' in _ps7,
+      "%r" % [_pn7, _pa7s])
+# AN INTERPRETER'S ARCHITECTURE IS ITS BUILD PLATFORM (6b327, from the
+# ARM64 VM): platform.machine() is the OS's machine, ARM64 for an x64
+# Python emulated on Windows on ARM, which made an "arm64" installer of
+# an x64 app. The ps1's code never calls it; every decision (Get-PyArch,
+# the chosen interpreter, the build venv's identity) reads
+# sysconfig.get_platform(), and the exe's self-test must report the
+# platform chosen, here and in CI.
+_gpa7 = _ps7[_ps7.find("function Get-PyArch"):_ps7.find("function Find-Python")]
+check("build_windows_exe.ps1: architecture from sysconfig.get_platform(), never platform.machine(); the exe's platform checked",
+      "platform.machine" not in _code7
+      and 'import sysconfig;print(sysconfig.get_platform())' in _gpa7
+      and 'if ($plat -eq "win-amd64") { return "x64" }' in _gpa7
+      and 'if ($plat -eq "win-arm64") { return "arm64" }' in _gpa7
+      and 'if ($plat -eq "win32") { return "x86" }' in _gpa7
+      and "$arch = Get-PyArch $py\n" in _ps7 and '$isArm = $arch -eq "arm64"\n' in _ps7
+      and '} elseif ($arch -ne "x64") {' in _ps7
+      and _ps7.count("import sysconfig,sys;print(sysconfig.get_platform(), sys.version.split()[0])") == 2
+      and '$wantPlat = if ($isArm) { "win-arm64" } else { "win-amd64" }' in _ps7
+      and 'if ($gotPlat -ne $wantPlat) { throw' in _ps7
+      and 'if ($plat -ne "win-amd64") { throw' in _wi7
+      and "platform.machine" not in "\n".join(
+          l for l in _wi7.splitlines() if not l.lstrip().startswith("#")),
+      _gpa7[:200])
 check("CI: the frozen exe's self-test; the nightly installs the pins and the smoke asserts crypto",
       _wi7.find("crypto self-test of the frozen exe") > _wi7.find("build_windows_exe.ps1")
       and _wi7.find("crypto self-test of the frozen exe") < _wi7.find("locate WiX")

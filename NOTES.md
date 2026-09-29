@@ -5634,13 +5634,14 @@ crash was invisible.
   no box).
 
 ## 6b327 — PyNaCl on every build (accounts step 7)
-The install half of 0a 5.9 and 1c 5.1: M7 of the sign-in plan, with
-the fixes from its two reviews. Patrick approved the dependency and the
-one-time PyPI fetch on 2026-09-28. Accounts will encrypt on this
-computer with libsodium through PyNaCl; this step puts PyNaCl on every
-build and every existing setup, proves it works, and keeps accounts off
-wherever it doesn't. No account screen or account call exists yet, and
-signed updates (the other half of 5.9) wait for the offline release key.
+The install half of 0a 5.9 and 1c 5.1: M7 of the sign-in plan, with the
+fixes from its two reviews and a re-verify. Patrick approved the
+dependency and the one-time PyPI fetch on 2026-09-28. Accounts will
+encrypt on this computer with libsodium through PyNaCl; this step puts
+PyNaCl on every build and every existing setup, proves it works, and
+keeps accounts off wherever it doesn't. No account screen or account
+call exists yet, and signed updates (the other half of 5.9) wait for the
+offline release key.
 - **One list, `CRYPTO_REQS`,** in millenai.py: a pip requirements text
   with every wheel's sha256, as PyPI's JSON API listed it, each checked
   against the downloaded file (39 wheels, 0 mismatches):
@@ -5699,13 +5700,15 @@ signed updates (the other half of 5.9) wait for the offline release key.
   replaced), only pynacl's pin goes: the Windows zip case.
 - **One fetch, not one per launch (review).** Each attempt is written to
   `crypto-install.json` in the data folder: `{key: "<APP_BUILD> <Python
-  version>", ok, at, note}`. A success never runs again for the same
-  key; a failure runs again when the build or the Python changes, or 3
-  days later, and until then /api/stats says what failed and the date it
-  tries again. Offline reads as offline: a connection error is
-  "couldn't reach PyPI", and pip's "(from versions: none)" is "couldn't
-  reach PyPI (or it has no wheel for this Python)", not a packaging
-  fault.
+  version>", ok, at, note}`. The record is read only while PyNaCl
+  doesn't load, so a recorded success counts like a failure (re-verify).
+  A new build or Python runs at once; otherwise 3 days after the
+  attempt, and until then /api/stats says what failed and the date it
+  tries again. An `at` that isn't a finite number between 0 and now (a
+  clock set back, a hand-edited file) counts as expired. Offline reads
+  as offline: a connection error is "couldn't reach PyPI", and pip's
+  "(from versions: none)" is "couldn't reach PyPI (or it has no wheel
+  for this Python)", not a packaging fault.
 - **`/api/stats` carries `crypto`:** `{ok, state, note}`, state ready,
   installing, missing or error.
 - **Accounts stay off without it (CRY-4).** `ACCOUNTS` (the plan's build
@@ -5715,15 +5718,22 @@ signed updates (the other half of 5.9) wait for the offline release key.
   sync server. `/api/me` gains `accounts: {on, note}`.
   - **A dev copy never uses the real sync server (review).** SYNC_URL
     falls back to production, so the gate refuses in a dev copy whose
-    SYNC_URL is `SYNC_PROD`: accounts in a dev copy need
-    MILLENAI_SYNC_URL. Chosen over "ACCOUNTS only when MILLENAI_SYNC_URL
-    is set" because it keeps ACCOUNTS the plain build flag the plan
-    names, and the refusal says why instead of the screens silently
-    missing.
+    SYNC_URL names the production host: accounts in a dev copy need
+    MILLENAI_SYNC_URL. The check is by host name
+    (`urlsplit(...).hostname`, a trailing dot dropped; re-verify), so a
+    trailing slash, capitals, :443, http:// or a user@ can't pass for
+    another server, and a URL that won't parse refuses too. Chosen over
+    "ACCOUNTS only when MILLENAI_SYNC_URL is set" because it keeps
+    ACCOUNTS the plain build flag the plan names, and the refusal says
+    why instead of the screens silently missing.
   - **`_sync_url()`** returns SYNC_URL only when the gate allows, else
     None. The gauntlet lints that only `accounts_gate` and `_sync_url`
-    read SYNC_URL, that it is assigned once, and that the host's name
-    appears only in `SYNC_PROD`, walking every function and class body.
+    read SYNC_URL, each a top-level function defined once (a nested def,
+    a method or a lambda of that name gets no pass); that SYNC_URL and
+    SYNC_PROD are each assigned once; that SYNC_PROD is read only in
+    SYNC_URL's assignment and in `accounts_gate`; and that the host's
+    name appears only in `SYNC_PROD`'s value. It walks every function
+    and class body.
   - **The pane is passive (review):** it sent nothing, so it doesn't
     say so. Settings › Account shows "Encryption isn't set up, so
     accounts are off.", "Setting up encryption." while an install runs,
@@ -5758,28 +5768,58 @@ signed updates (the other half of 5.9) wait for the offline release key.
     then **the exe's own self-test**: `MillenAI.exe --crypto-selftest
     <file>` runs before anything else (no window, port or data folder),
     writes cai_crypto's result as JSON and exits 0 only when it passed;
-    the build throws otherwise.
-  - build_windows_exe.ps1 also: **`-Arch x64|arm64`** (a `param()`
-    block, ValidateSet, never assigned since an assignment is validated
-    too) takes only an interpreter of that architecture and stops with
-    the list it found when there is none; with no `-Arch` it prefers x64
+    the build throws otherwise. The JSON carries `platform`
+    (`sysconfig.get_platform()`, what the exe was built for; `machine` is
+    the OS's), and the build throws unless it is win-arm64 for an ARM64
+    build and win-amd64 for x64.
+  - build_windows_exe.ps1 also: **`-Arch x64|arm64`** takes only an
+    interpreter of that architecture and stops with the list it found
+    when there is none. The parameter is `$Want`, with `-Arch` as its
+    alias (re-verify, the blocker): PowerShell's variable names ignore
+    case, so a parameter named `$Arch` was the script's own `$arch`,
+    which it sets to the interpreter's machine; `AMD64` is outside the
+    ValidateSet, so every x64 build (CI's included) threw, and Find-Python
+    compared against the last candidate's machine. No variable may share
+    the parameter's name in any case, and `$Want` is never assigned
+    (an assignment is validated too); with no `-Arch` it prefers x64
     as before. It prints the interpreter and architecture it chose.
-    `.build-venv` is made again when a different interpreter (machine
+    **An interpreter's architecture is its build platform** (re-verify,
+    found in the ARM64 VM): `platform.machine()` reports the OS's machine,
+    so on Windows on ARM an x64 Python under emulation says ARM64 as well.
+    The build took the x64 Python for `-Arch arm64` and made
+    "ConcordeAI-6.1.0-Setup-arm64.exe" holding an x64 app, and "prefer
+    x64" had never worked on an ARM box. Get-PyArch, the chosen
+    interpreter and the build venv's identity now read
+    `sysconfig.get_platform()`: win-amd64 is x64, win-arm64 is arm64,
+    win32 is x86 (refused). The "interpreters found" list shows that.
+    `.build-venv` is made again when a different interpreter (platform
     and version) made it, so switching `-Arch` can't freeze the old
     one in. ISCC is also looked for in `%LOCALAPPDATA%\Programs\Inno
     Setup 6` (a per-user install). The file's one non-ASCII character
     (an em-dash in a comment, which its own header warns about) is now
     ASCII.
   - windows-installer.yml runs the same self-test as its own step after
-    the build, before WiX. nightly.yml installs the pins into the CI
-    Python before the boot check, and ci_smoke.sh now asserts `crypto`
-    ready on /api/stats (a Python without PyNaCl fails it; the script
-    says how to install the pins).
+    the build, before WiX, and requires `platform` win-amd64.
+    nightly.yml installs the pins into the CI Python before the boot
+    check, and ci_smoke.sh now asserts `crypto` ready on /api/stats (a
+    Python without PyNaCl fails it; the script says how to install the
+    pins).
+- **The same mistake elsewhere (checked, re-verify):** the .bat and the
+  zip pick no architecture. In millenai.py, `IS_WIN_ARM`
+  (`_win_native_machine`: the registry, then `platform.machine()`) wants
+  the machine's architecture, to fetch the native ARM64 Ollama under an
+  emulated app, so `platform.machine()` is right there; `IS_WIN_EMULATED`
+  already reads `sysconfig.get_platform()`, and so do the update offer's
+  "native ARM64 install" and the web engine's Qt choice, through it.
+  The comment above `_win_native_machine` said `platform.machine()`
+  reports the process's architecture; it now says what the VM measured.
+  `IS_ARM` is macOS only (under Rosetta `platform.machine()` says x86_64,
+  the process's, which is what MLX needs). No behaviour changed there.
 - **The gauntlet** installs the pins, hash-checked, into a folder of the
   run's own and puts it on PYTHONPATH when its Python has no nacl
   (`SMOKE_CRYPTO_WHEELS=<dir>` keeps that off PyPI). It never installs
   into the app's venv.
-- Gauntlet: 384 checks become 409 (25 new; 6b316's launcher check now
+- Gauntlet: 384 checks become 410 (26 new; 6b316's launcher check now
   expects deps-4, REM-1's pins ACCOUNTS, and 6b318's Settings check
   slices to openAbout's own paintAccount call, since the stats poll now
   makes one earlier in the page). In-process: the pins
@@ -5812,8 +5852,9 @@ signed updates (the other half of 5.9) wait for the offline release key.
   more), one outside its copy's folder (the shared-venv case) installs
   nothing, runs no pip and records nothing; `--crypto-selftest` exit 0
   and 1, with no data folder made; the build scripts and workflows,
-  `-Arch`, the build venv's remake and the per-user ISCC by source.
-  46 mutations each fail at least one check: no --require-hashes in
+  `-Arch` (the parameter's name never assigned or looped over, in any
+  case), the build venv's remake and the per-user ISCC by source.
+  64 mutations each fail at least one check: no --require-hashes in
   the app's pip call, the .bat, the ps1 or the Mac launcher; pynacl's
   hashes gone; the known-answer test skipped whole, from the forgery
   checks on, or its Argon2id answer, and Argon2id back to 1 pass; the
@@ -5830,7 +5871,18 @@ signed updates (the other half of 5.9) wait for the offline release key.
   the smoke's assertion and the nightly's install gone; all three pins
   on Windows; --force-reinstall gone from the ps1 or the Mac build
   venv; -Arch ignored, no param block, no per-user ISCC, the build venv
-  kept across interpreters. Three of the first round first slipped
+  kept across interpreters; and from the re-verify: the parameter
+  named Arch again, a lower-case $want assigned, a loop over $WANT;
+  production compared as a string, an unparseable URL allowed, the
+  trailing dot kept; a success never retried, any time accepted, a
+  future time accepted; SYNC_PROD read outside the gate, a nested
+  reader named accounts_gate; platform.machine() back in Get-PyArch,
+  for the chosen Python or for the build venv's identity; win-arm64
+  unmapped; the exe's platform unchecked in the ps1 or in CI; the
+  self-test JSON without platform. One of those first crashed the
+  check instead of failing it (a NaN time made the function raise);
+  the check now records a raise as a result. Three of the first round
+  first slipped
   through (a check that found the throw's text but not its condition,
   one fooled by find() returning -1, and a mutation that didn't apply)
   and were tightened.
