@@ -2297,7 +2297,7 @@ _pn = {}
 for _x in _ast0.parse(_MILLENAI_SRC).body:
     if isinstance(_x, _ast0.Assign) and any(getattr(_tg, "id", "") in (
             "CATALOG", "MODEL_INFO", "RETIRED_MODELS", "FALLBACK_PORTS",
-            "WINDOWS_ONLY")
+            "WINDOWS_ONLY", "OLLAMA_BYTES", "OLLAMA_REQUIRES", "MOE_ROWS")
             for _tg in _x.targets):
         exec(_ast0.get_source_segment(_MILLENAI_SRC, _x), _pn)
 _eng = ({i["port"] for i in _pn["MODEL_INFO"].values() if i["port"]}
@@ -2335,17 +2335,28 @@ check("taken port: the window opens the server this app bound",
 _PLAT = {"apple": (True, False), "windows": (False, True),
          "intel": (False, False)}
 _plat = {}
+import copy as _copy
 for _k, (_arm, _win) in _PLAT.items():
-    _pz = dict(MODEL_INFO=_pn["MODEL_INFO"], WINDOWS_ONLY=_pn["WINDOWS_ONLY"],
-               IS_ARM=_arm, IS_WIN=_win)
+    # each platform sizes its own copy: an Ollama route takes Ollama's
+    # file size (6b315), which must not leak into the other platforms
+    _pz = dict(MODEL_INFO=_copy.deepcopy(_pn["MODEL_INFO"]),
+               WINDOWS_ONLY=_pn["WINDOWS_ONLY"],
+               OLLAMA_BYTES=_pn["OLLAMA_BYTES"], IS_ARM=_arm, IS_WIN=_win,
+               gpu_room_bytes=lambda: 0, giant_fits_here=lambda l: True)
     exec(_MILLENAI_SRC[_MILLENAI_SRC.index("# a model is usable here"):
                        _MILLENAI_SRC.index("MLX_REPOS = {l: i")], _pz)
-    _pz["MODEL_MEM_BYTES"] = {l: i["mem"] for l, i in _pn["MODEL_INFO"].items()}
+    _pz["MODEL_MEM_BYTES"] = {l: i["mem"] for l, i in _pz["MODEL_INFO"].items()}
     _exec_names(_pz, {"GIANT_GB", "model_is_giant", "slow_giant",
                       "GIANT_CTX", "giant_blurb"})
     _plat[_k] = _pz
 _gl, _gt = _plat["apple"]["giant_blurb"]()
 _wl, _wt = _plat["windows"]["giant_blurb"]()
+# a Windows PC that can't hold them says so (6b315)
+_plat["windows"]["giant_fits_here"] = lambda l: l == "Qwen 3 Coder 480B"
+_wl2, _wt2 = _plat["windows"]["giant_blurb"]()
+_plat["windows"]["giant_fits_here"] = lambda l: False
+_wl3, _wt3 = _plat["windows"]["giant_blurb"]()
+_plat["windows"]["giant_fits_here"] = lambda l: True
 _il, _it = _plat["intel"]["giant_blurb"]()
 _WG = ("DeepSeek V3.1 671B", "Qwen 3 Coder 480B")
 _MG = ("GLM 5.3", "DeepSeek V3.2 671B")
@@ -2392,10 +2403,16 @@ check("giants box says what they need, from the catalog, per platform",
       and _gt == ("DeepSeek V3.2 671B and GLM 5.3. Each needs 512 GB or "
                   "more of memory (390\u2013430 GB in use) and a "
                   "378\u2013418 GB download.")
-      # Windows: its two Ollama giants, 404.5 rounds to 405
+      # Windows: its two Ollama giants, 404.5 rounds to 405, and the
+      # truth about speed (6b315: workstation-only)
       and _wt == ("Qwen 3 Coder 480B and DeepSeek V3.1 671B. They need "
                   "384\u2013512 GB or more of memory (305\u2013417 GB in use) "
-                  "and a 290\u2013405 GB download.")
+                  "and a 290\u2013405 GB download. For workstations: with one "
+                  "graphics card most of the model runs from system RAM, at "
+                  "roughly 5\u201312 tokens a second; it is fast only when it "
+                  "all fits in graphics memory (three to five 96 GB cards).")
+      and _wt2 == _wt + " This computer can't hold DeepSeek V3.1 671B."
+      and _wt3 == _wt + " This computer can't hold them."
       # an Intel Mac runs none: all four, and where they do run
       and all(n in _it for n in _WG + _MG)
       and _it.endswith("they run on Apple silicon Macs and on Windows.")
@@ -2508,10 +2525,15 @@ try:
                           _so_out.append, giant=True)
     _soz["stream_ollama"]("llama3.2:3b", [{"role": "user", "content": "x"}],
                           _so_out.append)
+    _soz["stream_ollama"]("gpt-oss:120b", [{"role": "user", "content": "x"}],
+                          _so_out.append, big=True)
 finally:
     __import__("urllib.request").request.urlopen = _orig_uo
 check("a giant on Ollama: fixed context, stays loaded, an hour to load",
-      _so_out == ["hi", "hi", "hi"] and len(_so_seen) == 3
+      _so_out == ["hi"] * 4 and len(_so_seen) == 4
+      and _so_seen[3][0]["keep_alive"] == "30m" and _so_seen[3][1] == 600
+      and _so_seen[3][0]["options"] == {"temperature": 0.75, "num_ctx": 32768}
+      and "think" not in _so_seen[3][0]
       and "think" not in _so_seen[0][0]
       and _so_seen[1][0].get("think") is False
       and _so_seen[0][0]["keep_alive"] == "30m"
@@ -2521,7 +2543,8 @@ check("a giant on Ollama: fixed context, stays loaded, an hour to load",
       and "think" not in _so_seen[2][0]
       and _so_seen[2][0]["options"] == {"temperature": 0.75}
       and _so_seen[2][1] == 600
-      and "giant=model_is_giant(label))" in _MILLENAI_SRC
+      and "giant=model_is_giant(label),\n" in _MILLENAI_SRC
+      and "> BIG_MODEL_BYTES)" in _MILLENAI_SRC
       and "except (TimeoutError, socket.timeout):" in _MILLENAI_SRC,
       "%r" % _so_seen)
 # 6b314: a 404 GB pull. Progress is bytes across every layer (the old
@@ -2629,13 +2652,399 @@ check("a 400 GB pull: bytes across layers; a giant stops before the drive fills"
       and "if _sg and len(council) > 1:\n                council = _sg[:1]" in _MILLENAI_SRC
       and 'labels = sorted(labels, key=lambda l: MODEL_INFO[l]["gb"])' in _wk
       and "_keep_awake(True)" in _wk and "_keep_awake(False)" in _wk
-      and "GIANT_OLLAMA_MIN" in _wk
+      and "why = _ollama_too_old(MODEL_ROUTES[label][1], have, ours)" in _wk
+      and "_stage_engine_update()" in _wk
       and "_disk_free_for" not in _smd
       and 'pct = (job["done_b"] // 1_000_000, job.get("phase", ""))' in _MILLENAI_SRC
       and "limit = max(600, MLX_EST_BYTES.get(label, 0) / 1e8)" in _MILLENAI_SRC
       and "ETA_CAP_MIN = 72 * 60" in _MILLENAI_SRC
       and "min(999," not in _MILLENAI_SRC,
       "%r" % [_p_ok, _pj, _p_short, _p_full, _p_small, _p_done, _p_prealloc, _dirs])
+# 6b315, per Patrick: "are there any that we can use that would benefit
+# from a high-end GPU and not just be on the CPU?", then "go with your
+# recommendations, keep the giants workstation-only". The GPU inventory,
+# the fit rules and the workstation gate, run for real on simulated PCs:
+# fake nvidia-smi output, fake Windows registry and configuration
+# manager, and RAM as a real PC reports it (GiB).
+import types as _types
+_GB = 1 << 30
+_DISP = "{4d36e968-e325-11ce-bfc1-08002be10318}"
+def _fake_win(adapters, cm=True):
+    """adapters: [(DriverDesc, ProviderName, qwMemorySize, present)].
+    Returns fake winreg and ctypes modules: the display class keys, the
+    Enum\\PCI keys naming them, and CM_Locate_DevNodeW answering 0
+    (present) only for present devices."""
+    cls = {"%04d" % i: a for i, a in enumerate(adapters)}
+    pci = {("VEN_%04d" % i, "INST"): ("%s\\%04d" % (_DISP, i), a[3])
+           for i, a in enumerate(adapters)}
+    wr = _types.ModuleType("winreg")
+    wr.HKEY_LOCAL_MACHINE = ("HKLM",)
+    def OpenKey(parent, sub):
+        path = (parent if isinstance(parent, tuple) else ()) + tuple(sub.split("\\"))
+        return path
+    def _children(path):
+        tail = path[1:]
+        if tail and tail[-1] == "PCI":
+            return [d for d, _i in pci]
+        if len(tail) >= 2 and tail[-2] == "PCI":
+            return ["INST"]
+        if tail and tail[-1].startswith("{4d36e968"):
+            return list(cls) + ["Properties"]
+        return []
+    def EnumKey(path, i):
+        ch = _children(path)
+        if i >= len(ch):
+            raise OSError("no more")
+        return ch[i]
+    def QueryValueEx(path, name):
+        tail = path[1:]
+        if len(tail) >= 3 and tail[-3] == "PCI" and name == "Driver":
+            return (pci[(tail[-2], tail[-1])][0], 1)
+        if tail and tail[-1] in cls:
+            d, pv, m, _p = cls[tail[-1]]
+            v = {"DriverDesc": d, "ProviderName": pv,
+                 "HardwareInformation.qwMemorySize": m}.get(name)
+            if v is None:
+                raise OSError("missing")
+            return (v, 11)
+        raise OSError("missing")
+    wr.OpenKey, wr.EnumKey, wr.QueryValueEx = OpenKey, EnumKey, QueryValueEx
+    ct = _types.ModuleType("ctypes")
+    ct.c_uint32 = lambda: _types.SimpleNamespace(value=0)
+    ct.byref = lambda x: x
+    def locate(_node, inst, _flags):
+        _pci, dev, i = inst.split("\\")
+        return 0 if pci[(dev, i)][1] else 13      # CR_NO_SUCH_DEVNODE
+    ct.windll = _types.SimpleNamespace(cfgmgr32=_types.SimpleNamespace(
+        CM_Locate_DevNodeW=locate) if cm else None)
+    return wr, ct
+class _FakeVM:
+    def __init__(self, total, avail):
+        self.total, self.available, self.used = total, avail, total - avail
+def _pc(ram_gib, smi="", adapters=(), ours=False, used_gb=6, cm=True):
+    """A namespace running the real inventory, budget and gate code on a
+    simulated PC; `ours`: the app's own Ollama is the one running."""
+    total = ram_gib * _GB
+    z = dict(_LH, IS_MAC=False, IS_ARM=False, IS_WIN=True, HAS_PSUTIL=True,
+             psutil=_types.SimpleNamespace(virtual_memory=lambda: _FakeVM(
+                 total, total - used_gb * 1e9)),
+             subprocess=_types.SimpleNamespace(
+                 run=lambda *a, **k: _types.SimpleNamespace(stdout=smi, returncode=0)),
+             _gpus={"v": None, "ts": 0.0},
+             MODEL_INFO=_plat["windows"]["MODEL_INFO"],
+             MODEL_ROUTES=_plat["windows"]["MODEL_ROUTES"],
+             SUPPORTED=_plat["windows"]["SUPPORTED"],
+             MODEL_MEM_BYTES=_plat["windows"]["MODEL_MEM_BYTES"],
+             WINDOWS_ONLY=_pn["WINDOWS_ONLY"], MOE_ROWS=_pn["MOE_ROWS"],
+             no_limits=lambda: _pcf["nl"], giants_on=lambda: _pcf["gi"],
+             _mem_available=lambda: None, _engine_up=lambda p: False,
+             _managed_serve=lambda: object() if ours else None)
+    _exec_names(z, {"_DISPLAY_CLASS", "_DISPLAY_GUID", "_AMD_IGPU", "_BIG_IGPU",
+                    "_INTEL_DGPU", "_nvidia_cards", "_present_display_keys",
+                    "_windows_adapters", "gpu_inventory", "_igpu_in_use",
+                    "gpu_vram_bytes", "gpu_room_bytes", "machine_budget_bytes",
+                    "giant_fits_here", "GIANT_GB", "model_is_giant", "slow_giant",
+                    "BASELINE_RAM", "_ram_part", "_mem_factor",
+                    "model_fits_machine", "model_fits_memory"})
+    wr, ct = _fake_win(list(adapters), cm)
+    _saved = {m: sys.modules.get(m) for m in ("winreg", "ctypes")}
+    sys.modules["winreg"], sys.modules["ctypes"] = wr, ct
+    try:
+        z["_inv"] = z["gpu_inventory"]()
+    finally:
+        for m, v in _saved.items():
+            if v is None:
+                sys.modules.pop(m, None)
+            else:
+                sys.modules[m] = v
+    return z
+_pcf = {"nl": False, "gi": False}
+_AMDP = "Advanced Micro Devices, Inc."
+_smi2 = "NVIDIA RTX PRO 6000 Blackwell, 97887\n" * 2
+_strix = [("AMD Radeon(TM) 8060S Graphics", _AMDP, 96 * _GB, True)]
+_pcs = {
+    "5090+64": _pc(64, "NVIDIA GeForce RTX 5090, 32607\n",
+                   [("NVIDIA GeForce RTX 5090", "NVIDIA", 32 * _GB, True),
+                    ("Microsoft Basic Display Adapter", "Microsoft", 0, True)]),
+    "4090+16": _pc(16, "NVIDIA GeForce RTX 4090, 24564\n"),
+    "pro6000+64": _pc(64, "NVIDIA RTX PRO 6000 Blackwell, 97887\n"),
+    "2xpro6000+128": _pc(128, _smi2),
+    "4xpro6000+256": _pc(256, _smi2 * 2),
+    "pro6000+512": _pc(512, "NVIDIA RTX PRO 6000 Blackwell, 97887\n"),
+    "4090+128": _pc(128, "NVIDIA GeForce RTX 4090, 24564\n"),
+    # a 7700 XT moved to another slot: Windows kept the old key too
+    "7700xt+16": _pc(16, "", [("AMD Radeon RX 7700 XT", _AMDP, 12 * _GB, True),
+                              ("AMD Radeon RX 7700 XT", _AMDP, 12 * _GB, False)]),
+    "xtx+64": _pc(64, "", [("AMD Radeon RX 7900 XTX", _AMDP, 24 * _GB, True),
+                           ("AMD Radeon(TM) Graphics", _AMDP, _GB // 2, True)]),
+    # a Ryzen AI 300 laptop with 16 GB of shared graphics memory: Ollama
+    # skips that integrated GPU, so it's a 32 GB CPU box
+    "890m+32": _pc(32, "", [("AMD Radeon(TM) 890M Graphics", _AMDP, 16 * _GB, True)]),
+    "strix+ours": _pc(32, "", _strix, ours=True),
+    "strix+theirs": _pc(32, "", _strix, ours=False),
+    "arc+32": _pc(32, "", [("Intel(R) Arc(TM) A770 Graphics", "Intel Corporation", 16 * _GB, True),
+                           ("Intel(R) Arc(TM) 140V GPU (16GB)", "Intel Corporation", 8 * _GB, True)]),
+    "tie": _pc(64, "NVIDIA GeForce RTX 4090, 24564\n",
+               [("AMD Radeon RX 7900 XTX", _AMDP, 24564 << 20, True)]),
+    "cpu+32": _pc(32),
+    "cpu+280": _pc(280), "cpu+290": _pc(290),
+    # (port) exactly 1.05x Qwen 3 Coder 480B's 290.1 GB, and a MB under
+    "cpu+edge": _pc(290.1e9 * 1.05 / _GB), "cpu+edge-": _pc((290.1e9 * 1.05 - 1e6) / _GB),
+    # a 4 GB AMD card is under the 6 GB floor; with the configuration
+    # manager unreadable a moved card's two keys still count once
+    "rx6400+16": _pc(16, "", [("AMD Radeon RX 6400", _AMDP, 4 * _GB, True)]),
+    "7700xt+16/nocm": _pc(16, "", [("AMD Radeon RX 7700 XT", _AMDP, 12 * _GB, True),
+                                   ("AMD Radeon RX 7700 XT", _AMDP, 12 * _GB, False)], cm=False),
+}
+_inv = {k: (round(z["_inv"]["vram"] / _GB), z["_inv"]["vendor"],
+            round(z["_inv"]["igpu"] / _GB), len(z["_inv"]["cards"]))
+        for k, z in _pcs.items()}
+_room1 = _pcs["5090+64"]["gpu_room_bytes"]() == 32607 * (1 << 20) - _GB
+check("the GPU inventory: every card present, integrated graphics set aside",
+      _inv["5090+64"] == (32, "NVIDIA", 0, 1) and _room1
+      and _inv["2xpro6000+128"][0] == 191 and _inv["4xpro6000+256"][0] == 382
+      and _inv["7700xt+16"] == (12, "AMD", 0, 1)          # the gone key: no
+      and _inv["xtx+64"] == (24, "AMD", 0, 1)
+      and _inv["890m+32"] == (0, "", 0, 0)
+      and _inv["strix+ours"] == (0, "AMD", 96, 0)
+      and round(_pcs["strix+ours"]["gpu_vram_bytes"]() / _GB) == 96
+      and _pcs["strix+theirs"]["gpu_vram_bytes"]() == 0
+      and _inv["arc+32"] == (16, "Intel", 0, 1)            # A770 yes, 140V no
+      and _inv["tie"][1] == "NVIDIA"
+      and _inv["cpu+32"] == (0, "", 0, 0)
+      and _inv["rx6400+16"] == (0, "", 0, 0) and _inv["7700xt+16/nocm"] == (12, "AMD", 0, 1),
+      "%r" % _inv)
+_pcf.update(nl=False, gi=False)
+_fm = lambda k, l: _pcs[k]["model_fits_machine"](l)
+_Q27, _G120, _Q35 = "Qwen 3.8 27B", "GPT-OSS 120B", "Qwen 3.6 35B MoE"
+_fit = {k: (_fm(k, _Q27), _fm(k, _G120)) for k in _pcs}
+check("big graphics cards get the big models; a CPU box doesn't",
+      _fit["5090+64"] == (True, True)          # the 120B's experts go to RAM
+      and _fit["4090+16"][0]                   # all on the card: RAM no cap
+      and _fit["pro6000+64"] == (True, True)
+      and _fit["xtx+64"] == (True, True)
+      and _fit["strix+ours"] == (True, True)   # 96 GB of graphics memory
+      and _fit["strix+theirs"] == (False, False)
+      and _fit["7700xt+16"] == (False, False)  # one 12 GB card, not two
+      and _fit["890m+32"] == _fit["cpu+32"] == (False, False)
+      and not _fm("cpu+32", _Q35) and _fm("cpu+32", "Gemma 4 26B")
+      and _pcs["pro6000+64"]["model_fits_memory"](_G120)
+      and not _pcs["cpu+32"]["model_fits_memory"](_G120), "%r" % _fit)
+# THE INVARIANT (review): whatever the list offers on a PC, the run-time
+# check admits with 6 GB in use
+_offer_bad = [(k, l) for k, z in _pcs.items() for l in _plat["windows"]["MODEL_INFO"]
+              if _plat["windows"]["SUPPORTED"].get(l) and z["model_fits_machine"](l)
+              and not z["model_fits_memory"](l)]
+check("every model a PC is offered is one it will run",
+      not _offer_bad, "%r" % _offer_bad[:6])
+_pcf.update(nl=True, gi=True)
+_gw = {k: tuple(_fm(k, g) for g in ("Qwen 3 Coder 480B", "DeepSeek V3.1 671B"))
+       for k in ("4090+128", "2xpro6000+128", "pro6000+512", "cpu+32",
+                 "cpu+280", "cpu+290", "cpu+edge", "cpu+edge-")}
+_slow = {k: tuple(_pcs[k]["slow_giant"](g) for g in ("Qwen 3 Coder 480B", "DeepSeek V3.1 671B"))
+         for k in ("pro6000+512", "4xpro6000+256")}
+_adm = (_pcs["4090+128"]["model_fits_memory"]("DeepSeek V3.1 671B"),
+        _pcs["pro6000+512"]["model_fits_memory"]("DeepSeek V3.1 671B"))
+_pcf.update(nl=False, gi=False)
+check("the Windows giants are for workstations only, whatever the boxes say",
+      _gw["4090+128"] == (False, False) and _gw["cpu+32"] == (False, False)
+      and _gw["2xpro6000+128"] == (True, False)   # 343 GB holds only the 480B
+      and _gw["pro6000+512"] == (True, True)
+      # 280 GiB is 300.6 GB, under 1.05 x 290.1; 290 GiB is 311.4 GB
+      and _gw["cpu+280"][0] is False and _gw["cpu+290"][0] is True
+      and _gw["cpu+edge"][0] is True and _gw["cpu+edge-"][0] is False
+      and _slow["pro6000+512"] == (True, True)
+      and _slow["4xpro6000+256"] == (False, True)  # the 480B fits 4 cards
+      and _adm == (False, True), "%r" % [_gw, _slow, _adm])
+# presets pick by the catalog size, as on a Mac (an Ollama file size had
+# pushed Ministral 3 14B past the 8.5 GB "everyday" line on a PC)
+_pz2 = dict(_LH, MODEL_INFO=_plat["windows"]["MODEL_INFO"],
+            SUPPORTED=_plat["windows"]["SUPPORTED"],
+            MODEL_MEM_BYTES=_plat["windows"]["MODEL_MEM_BYTES"],
+            MODEL_ROUTES=_plat["windows"]["MODEL_ROUTES"],
+            model_fits_machine=lambda l: True, giants_on=lambda: _pcf["gi"],
+            giant_fits_here=lambda l: _pcf.get("fit", True))
+# (main, 6b317) plan_labels is one per download over _plan_labels
+_exec_names(_pz2, {"GIANT_GB", "model_is_giant", "plan_labels", "_plan_labels",
+                   "_family_of", "_gen_of", "_starter_labels"})
+_pz2.update(no_limits=lambda: False, HAS_PSUTIL=False)
+_pro = _pz2["plan_labels"]("pro")
+_pcf.update(gi=True, fit=False)
+_all_small = _pz2["plan_labels"]("all")
+_pcf.update(gi=True, fit=True)
+_all_big = _pz2["plan_labels"]("all")
+_pcf.update(gi=False, fit=True)
+check("presets pick by catalog size; 'all' lists giants only where they fit",
+      _pro[:1] == ["Ministral 3 14B"]
+      and not set(_WG) & set(_all_small) and set(_WG) <= set(_all_big),
+      "%r" % [_pro, sorted(set(_WG) & set(_all_small))])
+# the download endpoint never starts a giant a PC can't hold, and leaves
+# no job behind (the progress bar would wait for it forever)
+_ep = dict(_LH, MODEL_INFO=_plat["windows"]["MODEL_INFO"],
+           MODEL_ROUTES=_plat["windows"]["MODEL_ROUTES"],
+           SUPPORTED=_plat["windows"]["SUPPORTED"],
+           _setup_lock=__import__("threading").RLock(), _setup_jobs={},
+           ollama_pulled_tags=lambda: set(), model_cached=lambda l, pulled=None: False,
+           STARTER_LABELS=[], _download_model=lambda l: None,
+           giant_fits_here=lambda l: l not in _WG,
+           _ollama_install_worker=lambda b: _ep_started.append(list(b)))
+_ep_started = []
+_exec_names(_ep, {"start_model_downloads"})
+_ep_r = _ep["start_model_downloads"](["DeepSeek V3.1 671B", "Llama 3.2 3B"])
+import time as _tm1
+_tm1.sleep(0.2)
+check("the download endpoint won't start a giant a PC can't hold",
+      _ep_r == ["Llama 3.2 3B"] and _ep_started == [["Llama 3.2 3B"]]
+      and "DeepSeek V3.1 671B" not in _ep["_setup_jobs"],
+      "%r" % [_ep_r, _ep_started, _ep["_setup_jobs"]])
+# the version floor: a user's own old Ollama gets a note saying what to
+# do; the app's own old Ollama fetches its successor for the next start
+def _worker_run(ours):
+    z = dict(_LH, MODEL_INFO=_plat["windows"]["MODEL_INFO"],
+             MODEL_ROUTES=_plat["windows"]["MODEL_ROUTES"],
+             OLLAMA_REQUIRES=_pn["OLLAMA_REQUIRES"],
+             _setup_lock=__import__("threading").RLock(), _setup_jobs={},
+             ENGINE_ROW="Ollama engine", _ensure_ollama_ready=lambda: True,
+             _ollama_version=lambda: (0, 28, 1),
+             _managed_serve=lambda: object() if ours else None,
+             _keep_awake=lambda on: None, _app_models_add=lambda l: None,
+             _pull_ollama_model=lambda l, t: _wr_pulled.append(t),
+             _stage_engine_update=lambda: _wr_staged.append(1))
+    _exec_names(z, {"_ollama_too_old", "_ollama_install_worker"})
+    z["_ollama_install_worker"](["Qwen 3.8 27B", "Llama 3.2 3B"])
+    return {l: (j["status"], j.get("note", "")) for l, j in z["_setup_jobs"].items()}
+_wr_pulled, _wr_staged = [], []
+_w_theirs = _worker_run(False)
+_w_theirs_pull, _w_theirs_staged = list(_wr_pulled), list(_wr_staged)
+_wr_pulled[:], _wr_staged[:] = [], []
+_w_ours = _worker_run(True)
+check("an old Ollama: the user's gets a note, the app's fetches a newer one",
+      _w_theirs["Qwen 3.8 27B"][0] == "error"
+      and "needs Ollama 0.32.12 or newer; this computer has 0.28.1" in _w_theirs["Qwen 3.8 27B"][1]
+      and _w_theirs["Llama 3.2 3B"][0] == "done" and _w_theirs_pull == ["llama3.2:3b"]
+      and not _w_theirs_staged
+      and "quit and reopen ConcordeAI" in _w_ours["Qwen 3.8 27B"][1]
+      and _wr_staged == [1] and _wr_pulled == ["llama3.2:3b"],
+      "%r" % [_w_theirs, _w_ours, _wr_staged])
+# _managed_serve: live, on our port, from our folder; and the staged
+# engine swaps in only while none of ours is running
+_ms = dict(_LH, _MANAGED_BIN_DIR="/x/bin", OLLAMA_PORT=[11434])
+class _FP:
+    def __init__(self, path, port, alive=True):
+        self.args, self._cai_port, self._alive = [path, "serve"], port, alive
+    def poll(self): return None if self._alive else 1
+_exec_names(_ms, {"_managed_serve"})
+_own = []
+for _procs in ([_FP("/usr/local/bin/ollama", 11434)], [_FP("/x/bin/ollama", 11434, False)],
+               [_FP("/x/bin/ollama", 5555)], [_FP("/x/bin/ollama", 11434)]):
+    _ms["_managed_procs"] = _procs
+    _own.append(_ms["_managed_serve"]() is not None)
+# (ported onto main, after 6b330) the swap follows 6b317's native-engine
+# swap: a swap cut short is undone first, it waits while another copy
+# runs, and on an ARM64 PC only an ARM64 engine goes in
+def _swap_world(arm=False, staged_pe=0xAA64):
+    d = __import__("tempfile").mkdtemp()
+    b = os.path.join(d, "bin")
+    os.makedirs(b); open(os.path.join(b, "old"), "w").close()
+    open(os.path.join(b, "ollama"), "w").close()
+    os.makedirs(b + ".new"); open(os.path.join(b + ".new", "new"), "w").close()
+    open(os.path.join(b + ".new", "ollama"), "w").close()
+    open(os.path.join(b + ".new", "concorde-complete"), "w").close()
+    z = dict(_LH, _MANAGED_BIN_DIR=b, _STAGED_DIR=b + ".new",
+             _STAGED_OK=os.path.join(b + ".new", "concorde-complete"),
+             _managed_serve=lambda: object(), IS_WIN=False, IS_WIN_ARM=arm,
+             _pe_machine=lambda path: staged_pe,
+             _other_millenai_running=lambda: False)
+    _exec_names(z, {"_apply_staged_engine"})
+    return z, b
+def _swapped(b):
+    return (os.path.exists(os.path.join(b, "new"))
+            and not os.path.exists(os.path.join(b, "old"))
+            and not os.path.exists(b + ".new") and not os.path.exists(b + ".old")
+            and not os.path.exists(os.path.join(b, "concorde-complete")))
+_sz, _sbin = _swap_world()
+_sz["_apply_staged_engine"]()
+_swap_busy = os.path.exists(os.path.join(_sbin, "old"))
+_sz["_managed_serve"] = lambda: None
+_sz["_other_millenai_running"] = lambda: True
+_sz["_apply_staged_engine"]()
+_swap_sib = os.path.exists(os.path.join(_sbin, "old")) and os.path.exists(_sbin + ".new")
+_sz["_other_millenai_running"] = lambda: False
+_sz["_apply_staged_engine"]()
+_swap_done = _swapped(_sbin)
+# cut short between its renames: bin.old holds the engine, bin is empty
+_sz, _sbin = _swap_world()
+_sz["_managed_serve"] = lambda: None
+os.replace(_sbin, _sbin + ".old"); os.makedirs(_sbin)
+_sz["_other_millenai_running"] = lambda: True     # no swap now: undo only
+_sz["_apply_staged_engine"]()
+_swap_cut = (os.path.exists(os.path.join(_sbin, "old"))
+             and not os.path.exists(_sbin + ".old") and os.path.exists(_sbin + ".new"))
+# an ARM64 PC: a staged engine that isn't ARM64 is dropped, never put in
+_sz, _sbin = _swap_world(arm=True, staged_pe=0x8664)
+_sz["_managed_serve"] = lambda: None
+_sz["_apply_staged_engine"]()
+_swap_arm_bad = (os.path.exists(os.path.join(_sbin, "old"))
+                 and not os.path.exists(_sbin + ".new"))
+_sz, _sbin = _swap_world(arm=True, staged_pe=0xAA64)
+_sz["_managed_serve"] = lambda: None
+_sz["_apply_staged_engine"]()
+_swap_arm_ok = _swapped(_sbin)
+# the fetch: only the app's own engine, only when too old, never beside
+# 6b317's native engine, never with another copy running; on no profile
+def _stage_world(bin_path, ver, arm=False, wrong=False, sib=False):
+    d = __import__("tempfile").mkdtemp()
+    b = os.path.join(d, "bin")
+    log = {"dl": [], "threads": []}
+    class _Th:
+        def __init__(self, target=None, daemon=None, **k): self.t = target
+        def start(self): self.t()
+    def _dl(dest, row="Ollama engine"):
+        log["dl"].append(row)
+        os.makedirs(dest, exist_ok=True)
+        open(os.path.join(dest, "ollama"), "w").close()
+    z = dict(_LH, _MANAGED_BIN_DIR=b, _STAGED_DIR=b + ".new",
+             _STAGED_OK=os.path.join(b + ".new", "concorde-complete"),
+             _staging={"on": False}, OLLAMA_REQUIRES=_pn["OLLAMA_REQUIRES"],
+             _ENGINE_DL_LOCK=__import__("threading").Lock(),
+             _ollama_bin=lambda: bin_path(b), _bin_version=lambda p: ver,
+             IS_WIN_ARM=arm, _wrong_arch_engine=lambda: wrong,
+             _ENGINE_ARM_DONE=os.path.join(d, "nothing"),
+             _other_millenai_running=lambda: sib,
+             _download_ollama_binary=_dl)
+    _exec_names(z, {"_ollama_needed", "_is_managed", "_stage_engine_update"})
+    z["threading"] = _types.SimpleNamespace(Thread=lambda target=None, **k: (
+        log["threads"].append(k.get("daemon")), _Th(target=target))[1])
+    z["ctx_thread"] = lambda target, ctx=None, bind=True, **k: (
+        log["threads"].append(("bind", bind)), _Th(target=target))[1]
+    z["_stage_engine_update"]()
+    return log, os.path.exists(z["_STAGED_OK"]), z["_staging"]["on"]
+_ours = lambda b: os.path.join(b, "ollama")
+_theirs = lambda b: "/usr/local/bin/ollama"
+_stg = {"old": _stage_world(_ours, (0, 28, 1)),
+        "new": _stage_world(_ours, (0, 40, 0)),
+        "theirs": _stage_world(_theirs, (0, 1, 0)),
+        "arm-wrong": _stage_world(_ours, (0, 28, 1), arm=True, wrong=True),
+        "sibling": _stage_world(_ours, (0, 28, 1), sib=True)}
+_stg_ok = (_stg["old"] == ({"dl": [None], "threads": [("bind", False)]}, True, False)
+           and all(v == ({"dl": [], "threads": []}, False, False)
+                   for k, v in _stg.items() if k != "old"))
+_stream_src = _MILLENAI_SRC[_MILLENAI_SRC.index("def stream_ollama("):
+                            _MILLENAI_SRC.index("def stream_openai_compat(")]
+check("the app's own Ollama updates between runs, never under a running one",
+      _own == [False, False, False, True] and _swap_busy and _swap_done
+      and _swap_sib and _swap_cut and _swap_arm_bad and _swap_arm_ok and _stg_ok
+      and "ctx_thread(target=_stage_engine_update, bind=False, daemon=True)" in _MILLENAI_SRC
+      and "_refresh_managed_ollama" not in _MILLENAI_SRC
+      and "    _apply_staged_engine()\n    b = _ollama_bin()" in _MILLENAI_SRC
+      and 'env["OLLAMA_IGPU_ENABLE"] = "1"' in _MILLENAI_SRC
+      and '"num_gpu"' not in _stream_src
+      and _pn["OLLAMA_BYTES"]["gpt-oss:120b"] == 65_369_818_941
+      and _plat["windows"]["MODEL_INFO"]["GPT-OSS 120B"]["gb"] == 65.4
+      and _plat["apple"]["MODEL_INFO"]["GPT-OSS 120B"]["gb"] == 61.0
+      and _plat["apple"]["MODEL_INFO"]["GPT-OSS 120B"]["mem"] == 64e9,
+      "%r" % [_own, _swap_busy, _swap_sib, _swap_done, _swap_cut, _swap_arm_bad,
+              _swap_arm_ok, _stg])
 check("(i) tips show at once, not after the browser's title delay",
       "#tip{position:fixed" in _MILLENAI_SRC and "QUICK TIPS (6b312" in _MILLENAI_SRC
       and "el.dataset.tip=el.title;el.removeAttribute(\"title\")" in _MILLENAI_SRC
@@ -2709,11 +3118,23 @@ _so = {"OLLAMA_PORT": [11434], "_port_in_use": lambda p: True,
        "_ollama_bin": lambda: "/bin/true", "log_dir": lambda: _si_dir,
        "app_dir": lambda: _si_dir, "_RELOCATED": set(),
        "_managed_procs": [], "os": os, "print": lambda *a, **k: None,
+       "gpu_inventory": lambda: {"igpu": 0},
+       "_apply_staged_engine": lambda: None,
        "subprocess": type("S", (), {"Popen": staticmethod(
            lambda *a, **k: _spawned.append(k.get("env", {})) or
            type("P", (), {"pid": 1})())})}
 _exec_names(_so, {"_spawn_ollama_serve"})
 _so["_spawn_ollama_serve"]()
+# a Ryzen AI Max: Ollama is told to use its integrated GPU (6b315)
+_so_ig = dict(_so, gpu_inventory=lambda: {"igpu": 96 << 30}, OLLAMA_PORT=[11434],
+              _managed_procs=[], _RELOCATED=set())
+_exec_names(_so_ig, {"_spawn_ollama_serve"})
+_so_ig["_spawn_ollama_serve"]()
+_ig_env = dict(_spawned.pop())
+check("a Strix Halo's Ollama may use its integrated GPU; others unchanged",
+      _ig_env.get("OLLAMA_IGPU_ENABLE") == "1"
+      and _spawned[-1].get("OLLAMA_IGPU_ENABLE") == os.environ.get("OLLAMA_IGPU_ENABLE"),
+      "%r" % sorted(_ig_env)[:5])
 _so2 = dict(_so, _listener_is_mine=lambda p: None, OLLAMA_PORT=[11434],
             _managed_procs=[])
 _exec_names(_so2, {"_spawn_ollama_serve"})
@@ -3166,7 +3587,9 @@ check("review fixes: refusals wipe and hand over, honest Cloud Only, synced boxe
       and "cloud_text(conf, messages, timeout=70,\n" in _MILLENAI_SRC
       and "timeout_rests=False" in _MILLENAI_SRC
       and "_busy = True" in _MILLENAI_SRC
-      and "if model_is_giant(label) and not giants_on():\n        return False\n    if no_limits():" in _MILLENAI_SRC
+      # 6b315: the workstation gate sits between the giants box and "no
+      # limits", in both the offer and the run-time check
+      and _MILLENAI_SRC.count("if model_is_giant(label) and not giants_on():\n        return False\n    if not giant_fits_here(label):") == 2
       and _MILLENAI_SRC.count("        except Exception:\n            return False") >= 2
       and "function syncLimits" in page and "out of credit · top up the account" in page)
 # 6b308, per Patrick ("selecting the ideal model for different tasks …
@@ -3366,10 +3789,11 @@ exec(_MILLENAI_SRC[_MILLENAI_SRC.index("MODEL_INFO = {c[0]"):
 _GP = {"no_limits": False, "include_giants": False}
 _gz.update(MODEL_MEM_BYTES={l: i["mem"] for l, i in _gz["MODEL_INFO"].items()},
            SUPPORTED={l: True for l in _gz["MODEL_INFO"]},
-           machine_budget_bytes=lambda: 40e9,
+           machine_budget_bytes=lambda moe=False: 40e9,
+           giant_fits_here=lambda l: True, MODEL_ROUTES={}, IS_ARM=True,
            no_limits=lambda: _GP["no_limits"],
            load_prefs=lambda base=None: dict(_GP),
-           _starter_labels=lambda: [], MODEL_ROUTES={})
+           _starter_labels=lambda: [])
 _pref_stubs(_gz)
 _exec_names(_gz, {"GIANT_GB", "_giants", "giants_on", "model_is_giant",
                   "model_fits_machine", "plan_labels", "_plan_labels",
@@ -5270,8 +5694,11 @@ def _fake_pull(label, tag):
 _db.update(MODEL_INFO={"Llama 3.2 3B": {"gb": 1.8}}, ENGINE_ROW="Ollama engine",
            _ensure_ollama_ready=lambda: True, _keep_awake=lambda on: None,
            model_is_giant=lambda l: False, _pull_ollama_model=_fake_pull,
-           _app_models_add=lambda l: None)
-_exec_names(_db, {"_ollama_install_worker"})
+           _app_models_add=lambda l: None,
+           # (6b315) the worker asks every model's Ollama floor now
+           _ollama_version=lambda: (0, 40, 0), _managed_serve=lambda: None,
+           OLLAMA_REQUIRES={}, _stage_engine_update=lambda: None)
+_exec_names(_db, {"_ollama_install_worker", "_ollama_too_old"})
 _db["_ollama_install_worker"](["Llama 3.2 3B"])
 _db["model_cached"] = lambda l, p=None: True
 _hw2 = _db["_downloaded_bytes"](set())
@@ -5679,7 +6106,10 @@ def _engine_world(get=0xAA64, sibling=False, locked=False):
           "shutil": _sh19, "threading": _t17.SimpleNamespace(Thread=_Th),
           "IS_WIN_ARM": True, "_MANAGED_BIN_DIR": _os19.path.join(root, "bin"),
           "_download_ollama_binary": _dl,
-          "_other_millenai_running": lambda: sibling}
+          "_other_millenai_running": lambda: sibling,
+          # 6b315's update check starts at every launch too (its own check)
+          "_stage_engine_update": lambda: log.__setitem__(
+              "upd", log.get("upd", 0) + 1)}
     ns["_spawn_ollama_serve"] = lambda: log["spawned"].append(
         ns["_pe_machine"](_os19.path.join(ns["_MANAGED_BIN_DIR"], "ollama.exe")))
     _exec_names(ns, {"_pe_machine", "_wrong_arch_engine", "_ENGINE_ARM_STAGE",
@@ -5695,6 +6125,7 @@ _ns, _lg, _rt, _ls = _engine_world()
 _ns["start_managed_engines"](); _a = (_ls(), list(_lg["spawned"]))
 _ns["start_managed_engines"](); _b = (_ls(), list(_lg["spawned"]), _lg["fetches"])
 _ew["normal"] = (_a, _b)
+_ew["update checks"] = _lg.get("upd")      # 6b315's, once per launch
 _ok_normal = (_a == (["bin", "bin.arm64"], [0x8664])
               and _b == (["bin"], [0x8664, 0xAA64], 1))
 # quit mid-download: the x64 engine is untouched; the next launch refetches
@@ -5753,6 +6184,7 @@ _ew["bad stage"] = (_ls(), _ns["_wrong_arch_engine"]())
 _oks.append(_ew["bad stage"] == (["bin"], True))
 check("ARM64 PCs get the native engine without ever being left with none",
       _ok_normal and _ok_quit and _ok_wrong and _ok_cut and all(_oks)
+      and _ew["update checks"] == 2
       and "def _replace_engine_native" not in _MILLENAI_SRC,
       "%r" % _ew)
 

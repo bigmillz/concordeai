@@ -5866,6 +5866,120 @@ MLX, I don't think there's much of a purpose" on a Mac.
   with the answer timer's `let etaTxt`: a SyntaxError that would have
   killed the whole page, and nothing parsed the page before.
 
+## 6b315 — Big graphics cards get big models; the giants are for workstations
+Per Patrick: "are there any that we can use that would benefit from a
+high-end GPU and not just be on the CPU? A few words per second is
+going to be useless to anybody", then "go with your recommendations,
+keep the giants workstation-only". Research (4 sweeps, a synthesis and
+a fact-check, all sourced) found no 400 GB model runs at GPU speed on a
+one-card PC, and that the fast answer is already in the catalog: Qwen
+3.8 27B (~130 tok/s on an RTX 5090 through Ollama, measured on Windows;
+on Qwen's own tables it matches the 120B class) and GPT-OSS 120B (~200
+tok/s on a 96 GB RTX PRO 6000). What was missing was the app seeing the
+hardware. Built, then reviewed (5 reviewers, 2 skeptics per finding:
+19 confirmed) and rebuilt:
+- gpu_inventory: every NVIDIA card summed (it read the largest only);
+  AMD and Intel Arc (A/B series) cards on Windows from the display
+  drivers' registry records (qwMemorySize; WMI stops at 4 GB), counting
+  only adapters PRESENT now (each PCI device's Driver key, checked with
+  CM_Locate_DevNodeW), since Windows keeps a removed card's key and a
+  slot move counted one card twice. AMD integrated graphics (780M,
+  890M, Vega, "Radeon Graphics") and Intel's integrated Arc are left
+  out: Ollama skips them. A Ryzen AI Max ("Strix Halo", 8040S-8060S)
+  counts only while our own Ollama runs, started with
+  OLLAMA_IGPU_ENABLE=1; a user's own Ollama may leave it idle. The
+  vendor label breaks ties the same way every launch (NVIDIA, then the
+  most memory).
+- ONE RULE OFFERS AND ADMITS. The list had offered, and made first-run
+  flagships of, models the run-time check then always refused (a 32 GB
+  PC's Qwen 3.6 35B MoE; GPT-OSS 120B beside a 24 GB card in a 64 GB
+  PC). Now, on a PC or an Intel Mac, a model is offered only when the
+  part of it in system RAM (_ram_part: what doesn't fit on the cards,
+  less 1 GiB per card), with its headroom (_mem_factor: 1.5, or 1.3 for
+  any MOE_ROWS model on Ollama), fits beside 6 GB for Windows and the
+  app, the same sum model_fits_memory makes. A model that fits on the
+  cards is offered whatever the RAM (a 96 GB card in a 64 GB PC was
+  denied GPT-OSS 120B). The gauntlet asserts every offered model is
+  admitted on every simulated PC. Apple silicon is unchanged.
+- Big models (over 30 GB) get num_ctx 32768 and a 30-minute keep-alive:
+  with 47 GiB or more of graphics memory Ollama picks a 256k context
+  that pushes a 65-81 GB model off the card, and 45 s meant a reload
+  from disk for every question. num_gpu is never sent (it would turn off
+  the split that keeps attention on the card and the experts in RAM).
+- OLLAMA_BYTES: an Ollama route shows and downloads Ollama's own file
+  (GPT-OSS 120B is 65.4 GB there, not the MLX 61), keeping the row's
+  allowance above it; presets still pick by the catalog size (cat_gb),
+  or Ministral 3 14B's 9.1 GB file pushed it off the 8.5 GB "everyday"
+  line on a PC. GPT-OSS 120B's mem stays 64 (a first cut raised it to
+  70, which made it unusable on every 96 GB Mac).
+- OLLAMA_REQUIRES: the registry's minimum Ollama per tag (Qwen 3.8 27B
+  0.32.12, Gemma 4 0.30, Qwen 3.6 0.30, Qwen 3.5 0.17.1; the giants
+  0.13.5). An Ollama older than a year refused the starters. A user's
+  own Ollama gets a note on the model's row. The app's own copy updates
+  BETWEEN RUNS: a newer one is fetched beside it in the background
+  (bin.new) and swapped in at the next start, before anything runs from
+  the folder. The first cut stopped the running Ollama to swap it, which
+  cut off downloads and chats and, on Windows, orphaned the model runner
+  holding the folder locked. One lock covers every engine download.
+- THE GIANTS ARE FOR WORKSTATIONS: offered, admitted, listed in 'all'
+  and downloadable only where RAM plus graphics memory holds 1.05x the
+  file (Ollama loads without mmap on Windows), whatever the two boxes
+  say. The tooltip says it: "with one graphics card most of the model
+  runs from system RAM, at roughly 5-12 tokens a second; it is fast only
+  when it all fits in graphics memory (three to five 96 GB cards)", and
+  "This computer can't hold them" where it can't. slow_giant is relative
+  to the machine: on four 96 GB cards Qwen 3 Coder 480B fits.
+- The AMD chip's tooltip no longer says ROCm: the app's Ollama reaches
+  AMD through Vulkan.
+- Not added: Qwen 3.5 122B (no better than Qwen 3.8 27B), Nemotron 3
+  Super (Ollama ships an evaluation-only license), Qwen 3.8 Flash-Next
+  (its license needs a separate agreement for an "AI Work Assistant"
+  business: Patrick's call).
+- gpu_inventory()'s shape, which other code reads by name (the
+  benchmark's _bench_gpus, 6b331, uses it when it exists and falls back
+  to nvidia-smi): a dict, cached, never raising:
+  `{"cards": [(vendor, name, bytes), ...], "vram": int, "vendor": str,
+  "igpu": int}`. `cards` holds the discrete cards Ollama runs on, vendor
+  "NVIDIA", "AMD" or "Intel", bytes the card's memory; `vram` is their
+  sum; `vendor` the one the chip names ("" for none); `igpu` a Ryzen AI
+  Max's shared graphics memory, or 0, which is NOT in `cards` or `vram`
+  (gpu_vram_bytes adds it only while our own Ollama runs). A Mac reports
+  `{"cards": [], "vram": 0, "vendor": "", "igpu": 0}`.
+- Ported onto main 2026-09-29 (after 6b330). The branch sat 53 commits
+  back; what changed in the port:
+  - Main (6b317) already had the engine-download lock and
+    `_download_ollama_binary(dest, row)`: the update stage passes
+    `row=None` (the branch's `progress=False`). `stream_ollama` takes
+    `big` beside 6b325's `label`, and run_model passes both.
+  - 6b317's native ARM64 engine swap (bin.arm64 -> bin) and this update
+    swap (bin.new -> bin) now follow the same rules: a swap cut short
+    between its two renames is undone first (bin.old back), neither swaps
+    nor stages while another copy of the app runs, on an ARM64 PC only an
+    ARM64 engine goes in, and no update is staged while the native engine
+    is on its way (it is the latest one).
+  - Profiles (6b329): `_gpus` (the GPU inventory) and `_staging` are
+    MACHINE_STATE (the gone `_vram` left it); `_stage_engine_update` and
+    `_apply_staged_engine` are MACHINE_IO; both background starts go
+    through `ctx_thread(..., bind=False)`, machine work on no profile.
+    Nothing here reads a personal setting: "no limits" and the giants box
+    are the machine's (`machine_prefs`), as main already reads them.
+  - Gauntlet: the branch's 9 checks, adapted (the per-platform catalog
+    copies, main's `_engine_world` for the ARM64 swap, a doubled keyword
+    in the giants check's namespace); the swap and stage checks gained the
+    cut-short, sibling, ARM64 and "no update beside the native engine"
+    cases. 466 checks become 475.
+  - Gauntlet additions from the port: a PC at exactly 1.05x Qwen 3 Coder
+    480B's file (offered) and 1 MB under (not), a 4 GB AMD card (under
+    the 6 GB floor), and a moved card counted once when the configuration
+    manager can't be read. 47 mutations of the fit rule, the 1.05x gate,
+    the registry parse, the Strix Halo setting and the ported swap: 45
+    caught; the 2 missed are equivalent (a "Properties" key and an NVIDIA
+    driver record can't be counted anyway: neither matches AMD or Intel).
+  - Not verified here: Windows itself (the registry and
+    CM_Locate_DevNodeW run on fakes; in Patrick's ARM VM the Snapdragon's
+    Adreno should read as no card, since it is neither AMD nor Intel), a
+    real Strix Halo, and a real engine update end to end.
+
 ## 6b316 — The Windows build starts
 Patrick, testing the nightly in a Windows 11 ARM VM: "it installed a
 bunch of stuff and now it does nothing in Windows." Run with a console,

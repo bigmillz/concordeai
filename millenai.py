@@ -94,7 +94,7 @@ MACHINE_STATE = frozenset((
     "_QT_CLEAR_CACHE", "_RELOCATED", "_BOOT_HEALS",
     # models, engines, hardware and installs
     "MODEL_ROUTES", "OLLAMA_PORT", "_MANAGED_BIN_DIR_FOUND", "_MINE_CACHE",
-    "_CLEANUP_LAST_ERRORS", "_accel_cache", "_gpu_cache", "_vram",
+    "_CLEANUP_LAST_ERRORS", "_accel_cache", "_gpu_cache", "_gpus", "_staging",
     "_dl_hist", "_job_watch", "_managed_procs", "_mlx_procs", "_modup",
     "_modup_hist", "_setup_jobs", "_studio_bytes_cache", "_fw_cuda",
     "_crypto_install", "_export_install", "_giants", "_no_limits",
@@ -1232,6 +1232,50 @@ CATALOG = [
 
 WINDOWS_ONLY = {"DeepSeek V3.1 671B", "Qwen 3 Coder 480B"}
 
+# WHAT OLLAMA ACTUALLY DOWNLOADS (6b315): the gb column is the MLX build
+# a Mac gets; Ollama's GGUF differs (GPT-OSS 120B is 65.4 GB there, not
+# 61). Registry manifests summed on 2026-09-26. A row on an Ollama route
+# is sized from here, and its mem keeps the same allowance above it.
+# Which model a preset picks still goes by the catalog size (cat_gb):
+# the "everyday" line and the ties were tuned to it.
+OLLAMA_BYTES = {
+    "deepseek-r1:8b": 5_225_376_047,
+    "deepseek-v3.1:671b": 404_494_157_743,
+    "gemma4:12b": 7_556_508_396,
+    "gemma4:26b": 18_604_148_513,
+    "gpt-oss:120b": 65_369_818_941,
+    "gpt-oss:20b": 13_793_441_244,
+    "hermes3:8b": 4_661_227_243,
+    "llama3.2:1b": 1_321_098_329,
+    "llama3.2:3b": 2_019_393_189,
+    "ministral-3:14b": 9_082_537_546,
+    "qwen3-coder:480b": 290_058_836_445,
+    "qwen3.5:9b": 6_594_474_711,
+    "qwen3.6:35b": 22_621_314_381,
+    "qwen3.8:27b": 17_741_872_154,
+}
+
+# THE OLDEST OLLAMA EACH TAG RUNS ON (6b315): the registry's "requires"
+# for each tag, checked 2026-09-26, and 0.13.5 for the two giants, whose
+# renderers arrived then. An Ollama the app downloaded itself is updated
+# when it's too old; a user's own Ollama gets a note saying what to do.
+OLLAMA_REQUIRES = {
+    "deepseek-v3.1:671b": (0, 13, 5),
+    "gemma4:12b": (0, 30, 5),
+    "gemma4:26b": (0, 30, 0),
+    "qwen3-coder:480b": (0, 13, 5),
+    "qwen3.5:9b": (0, 17, 1),
+    "qwen3.6:35b": (0, 30, 0),
+    "qwen3.8:27b": (0, 32, 12),
+}
+
+# Mixture-of-experts rows: only a few billion parameters work per token,
+# so on a PC the experts can sit in system RAM while the rest stays on
+# the graphics card, at a usable speed (6b315)
+MOE_ROWS = {"Gemma 4 26B", "GPT-OSS 20B", "Qwen 3.6 35B MoE", "GPT-OSS 120B",
+            "GLM 5.3", "DeepSeek V3.2 671B", "DeepSeek V3.1 671B",
+            "Qwen 3 Coder 480B"}
+
 # PRUNED, NOT FORGOTTEN (6b269, per Patrick: "what models can we prune
 # that are basically redundant or outdated"). Six rows left the
 # catalog — each superseded or duplicated by a better row that stays:
@@ -1349,29 +1393,213 @@ def hw_class(mem_gb: float) -> str:
     return "titan"
 
 
-_vram = {"b": None}
+_gpus = {"v": None, "ts": 0.0}
+
+# Windows keeps every display adapter's driver record here, with its real
+# memory size (HardwareInformation.qwMemorySize), for any vendor
+_DISPLAY_CLASS = (r"SYSTEM\CurrentControlSet\Control\Class"
+                  r"\{4d36e968-e325-11ce-bfc1-08002be10318}")
+_DISPLAY_GUID = "{4d36e968-e325-11ce-bfc1-08002be10318}"
+# AMD integrated graphics: "Radeon(TM) Graphics", the 7x0M/8x0M laptop
+# parts, Vega, and the Ryzen AI Max 80x0S. A discrete card's name has
+# RX, PRO or AI PRO after "Radeon", so it never matches.
+_AMD_IGPU = re.compile(
+    r"Radeon\W*(?:\(TM\)\s*)?(?:Graphics\b|\d{3,4}M\b|80[4-6]0S\b|Vega\b)",
+    re.I)
+# the AMD integrated GPUs Ollama can use at graphics-card speed: the
+# Ryzen AI Max ("Strix Halo") parts, whose shared memory is set in the
+# BIOS or AMD's software (VGM) and can reach 96 GB or more
+_BIG_IGPU = re.compile(r"Radeon\W*(?:\(TM\)\s*)?80[4-6]0S", re.I)
+# Intel's discrete cards (A380-A770, B570/B580, Pro A60); the integrated
+# "Intel(R) Arc(TM) Graphics" and "Arc 140V" have no model number here
+_INTEL_DGPU = re.compile(r"Arc\W*(?:\(TM\)\s*)?(?:Pro\s+)?[AB]\d{2,3}\b", re.I)
+
+
+def _nvidia_cards() -> list:
+    """[(name, bytes)] for every NVIDIA card nvidia-smi reports."""
+    out = subprocess.run(
+        ["nvidia-smi", "--query-gpu=name,memory.total",
+         "--format=csv,noheader,nounits"],
+        capture_output=True, text=True, timeout=4,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout
+    cards = []
+    for line in out.splitlines():
+        name, _, mb = line.rpartition(",")
+        if mb.strip().isdigit():
+            cards.append((name.strip(), int(mb.strip()) * 1024 * 1024))
+    return cards
+
+
+def _present_display_keys():
+    """The display-class subkeys ("0000", "0001"...) of adapters that are
+    present right now, or None when that can't be read. Windows keeps a
+    removed card's driver key, memory size and all, so counting every
+    key counted a card twice after a slot move or a swap (6b315, from
+    review). Each PCI device names its driver key; the configuration
+    manager answers only for devices that are present."""
+    import winreg
+    import ctypes
+    locate = ctypes.windll.cfgmgr32.CM_Locate_DevNodeW
+    found = set()
+    enum = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                          r"SYSTEM\CurrentControlSet\Enum\PCI")
+    i = 0
+    while True:
+        try:
+            dev = winreg.EnumKey(enum, i)
+        except OSError:
+            break
+        i += 1
+        try:
+            dk = winreg.OpenKey(enum, dev)
+        except OSError:
+            continue
+        j = 0
+        while True:
+            try:
+                inst = winreg.EnumKey(dk, j)
+            except OSError:
+                break
+            j += 1
+            try:
+                drv = str(winreg.QueryValueEx(winreg.OpenKey(dk, inst),
+                                              "Driver")[0])
+            except OSError:
+                continue
+            if not drv.lower().startswith(_DISPLAY_GUID):
+                continue
+            node = ctypes.c_uint32()
+            if locate(ctypes.byref(node), "PCI\\%s\\%s" % (dev, inst),
+                      0) == 0:                # CR_SUCCESS: present
+                found.add(drv.rsplit("\\", 1)[-1])
+    return found
+
+
+def _windows_adapters() -> list:
+    """[(name, provider, bytes)] for the display adapters present, from
+    their drivers' registry records, which name the card and give its
+    real memory for any vendor (the WMI AdapterRAM field stops at 4 GB)."""
+    import winreg
+    try:
+        present = _present_display_keys()
+    except Exception:
+        present = None
+    out = []
+    root = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, _DISPLAY_CLASS)
+    i = 0
+    while True:
+        try:
+            sub = winreg.EnumKey(root, i)
+        except OSError:
+            break
+        i += 1
+        if not sub.isdigit():
+            continue                        # "Properties" and the like
+        if present is not None and sub not in present:
+            continue                        # a card that's gone
+        try:
+            k = winreg.OpenKey(root, sub)
+        except OSError:
+            continue
+
+        def val(n):
+            try:
+                return winreg.QueryValueEx(k, n)[0]
+            except OSError:
+                return None
+        mem = val("HardwareInformation.qwMemorySize")
+        if not isinstance(mem, int):
+            mem = 0
+        row = (str(val("DriverDesc") or ""), str(val("ProviderName") or ""),
+               mem)
+        if present is None and row in out:
+            continue          # can't tell present from gone: count once
+        out.append(row)
+    return out
+
+
+def gpu_inventory() -> dict:
+    """The graphics memory local models can use (6b315, per Patrick: a
+    few words a second on the CPU "is going to be useless to anybody").
+    It used to read ONE NVIDIA card: two or four cards counted as one,
+    and AMD cards on Windows didn't count at all.
+      cards  [(vendor, name, bytes)] of discrete cards Ollama runs on
+      vram   their memory, summed
+      vendor "NVIDIA", "AMD", "Intel" or "" (NVIDIA wins a tie, then
+             the vendor with the most memory: the same every launch)
+      igpu   bytes of an AMD Ryzen AI Max's shared graphics memory, or
+             0. Ollama uses it only with OLLAMA_IGPU_ENABLE, so it
+             counts only while our own Ollama runs (gpu_room_bytes)
+    Other integrated graphics (Radeon 780M/890M, Intel Arc 140V) are
+    left out: Ollama skips them and runs on the CPU. Cached; a failed
+    read is retried after a minute. Macs report nothing: Apple silicon
+    shares one pool."""
+    now = time.time()
+    if _gpus["v"] is not None and (_gpus["v"]["cards"] or _gpus["v"]["igpu"]
+                                   or now - _gpus["ts"] < 60):
+        return _gpus["v"]
+    cards, igpu = [], 0
+    if not IS_MAC:
+        try:
+            cards += [("NVIDIA", n, b) for n, b in _nvidia_cards()]
+        except Exception:
+            pass
+        if IS_WIN:
+            try:
+                for name, prov, mem in _windows_adapters():
+                    if "nvidia" in (name + prov).lower():
+                        continue            # counted by nvidia-smi above
+                    amd = ("amd" in prov.lower() or "advanced micro" in
+                           prov.lower() or "radeon" in name.lower())
+                    if amd and _AMD_IGPU.search(name):
+                        if _BIG_IGPU.search(name) and mem >= 8 << 30:
+                            igpu = max(igpu, mem)
+                        continue            # integrated: Ollama skips it
+                    if amd and mem >= 6 << 30:
+                        cards.append(("AMD", name, mem))
+                    elif (_INTEL_DGPU.search(name) and "intel" in
+                          (name + prov).lower() and mem >= 6 << 30):
+                        cards.append(("Intel", name, mem))
+            except Exception:
+                pass
+    by = {}
+    for v, _n, b in cards:
+        by[v] = by.get(v, 0) + b
+    if igpu:
+        by["AMD"] = by.get("AMD", 0) + igpu
+    inv = {"cards": cards, "vram": sum(c[2] for c in cards),
+           "vendor": (max(by, key=lambda v: (v == "NVIDIA", by[v]))
+                      if by else ""),
+           "igpu": igpu}
+    _gpus.update(v=inv, ts=now)
+    return inv
+
+
+def _igpu_in_use() -> bool:
+    """A Ryzen AI Max's graphics memory runs models only in an Ollama
+    started with OLLAMA_IGPU_ENABLE, which is ours; a user's own Ollama
+    may leave it idle and run on the CPU (6b315, from review)."""
+    try:
+        return _managed_serve() is not None
+    except Exception:           # at import, before the engines exist
+        return False
 
 
 def gpu_vram_bytes():
-    """Total VRAM on a discrete NVIDIA GPU, or 0. Cached — nvidia-smi is
-    slow enough that per-model calls would be felt."""
-    if _vram["b"] is not None:
-        return _vram["b"]
-    _vram["b"] = 0
-    if not IS_MAC:
-        try:
-            out = subprocess.run(
-                ["nvidia-smi", "--query-gpu=memory.total",
-                 "--format=csv,noheader,nounits"],
-                capture_output=True, text=True, timeout=4).stdout
-            mb = max(int(x) for x in out.split() if x.strip().isdigit())
-            _vram["b"] = mb * 1024 * 1024
-        except Exception:
-            _vram["b"] = 0
-    return _vram["b"]
+    """Graphics memory across every card local models can use, or 0."""
+    inv = gpu_inventory()
+    return inv["vram"] + (inv["igpu"] if _igpu_in_use() else 0)
 
 
-def machine_budget_bytes():
+def gpu_room_bytes():
+    """What models can fill on the graphics cards: their memory less
+    about 1 GiB each for the driver, the display and Ollama's buffers."""
+    inv = gpu_inventory()
+    n = len(inv["cards"]) + (1 if inv["igpu"] and _igpu_in_use() else 0)
+    return max(0, gpu_vram_bytes() - n * (1 << 30))
+
+
+def machine_budget_bytes(moe: bool = False):
     """What this machine can hold resident and still be FAST.
 
     Apple silicon shares one pool, so 75% of total memory is the real
@@ -1380,14 +1608,38 @@ def machine_budget_bytes():
     would offer a 120B to a 24 GB 3090, which technically runs and then
     crawls at a token a second with most layers spilled to CPU. Budget
     the card, plus a modest spill allowance, and cap by system RAM.
-    None when psutil is missing — then nothing is hidden."""
+    None when psutil is missing — then nothing is hidden.
+
+    6b315: a model that fits on the graphics cards runs there at full
+    speed whatever the system RAM (a 96 GB card in a 64 GB PC was denied
+    GPT-OSS 120B by the RAM cap), and a mixture-of-experts model (`moe`)
+    runs at a usable speed with the cards full and its experts in RAM,
+    so it may use both. Ollama loads without mmap on Windows, so the
+    part in RAM has to fit in RAM."""
     if not HAS_PSUTIL:
         return None
     ram = int(psutil.virtual_memory().total * 0.75)
     vram = gpu_vram_bytes()
     if vram:
-        return int(min(ram, vram * 1.25))
+        room = gpu_room_bytes()
+        budget = max(room, int(min(ram, vram * 1.25)))
+        if moe:
+            budget = max(budget, room + ram)
+        return budget
     return ram
+
+
+def giant_fits_here(label: str) -> bool:
+    """A Windows giant is for WORKSTATIONS (6b315, per Patrick: "keep the
+    giants workstation-only"). Ollama loads it without mmap, so system
+    RAM and graphics memory together must hold the whole file, with 5%
+    to spare. Anything smaller never sees it, whatever the boxes say."""
+    if label not in WINDOWS_ONLY:
+        return True
+    if not HAS_PSUTIL:
+        return False
+    have = psutil.virtual_memory().total + gpu_vram_bytes()
+    return have >= MODEL_INFO[label]["gb"] * 1e9 * 1.05
 
 
 _no_limits = {"v": None}
@@ -1433,13 +1685,18 @@ def model_is_giant(label: str) -> bool:
 GIANT_CTX = 32768           # Ollama would pick 256k with a big GPU (+67 GB)
 GIANT_KEEP_ALIVE = "30m"    # a pause must not throw away a 400 GB load
 GIANT_LOAD_TIMEOUT = 3600   # Ollama sends nothing until the load is done
+BIG_MODEL_BYTES = 30e9      # over this, a fixed context and a long keep-alive
 # giants whose Ollama template thinks by default; the others reject "think"
 OLLAMA_THINK_OFF = {"deepseek-v3.1:671b"}
 
 
 def slow_giant(label: str) -> bool:
+    """A giant on Ollama that doesn't fit on the graphics cards, so most of
+    it runs from system RAM (6b315: on 3-5 workstation cards it doesn't,
+    and it is as quick as any model)."""
     return (model_is_giant(label)
-            and MODEL_ROUTES.get(label, ("",))[0] == "ollama")
+            and MODEL_ROUTES.get(label, ("",))[0] == "ollama"
+            and MODEL_MEM_BYTES.get(label, 0) > gpu_room_bytes())
 
 
 _html_escape = html.escape   # do_GET's page builder names a local `html`
@@ -1485,25 +1742,78 @@ def giant_blurb() -> tuple:
     if not here:
         tip += (" None of them runs on this computer: they run on "
                 "Apple silicon Macs and on Windows.")
+    elif any(l in WINDOWS_ONLY for l in g):
+        # WORKSTATION-ONLY, AND HONEST ABOUT SPEED (6b315, per Patrick: a
+        # few words a second "is going to be useless to anybody")
+        tip += (" For workstations: with one graphics card most of the "
+                "model runs from system RAM, at roughly 5\u201312 tokens a "
+                "second; it is fast only when it all fits in graphics "
+                "memory (three to five 96 GB cards).")
+        short = [l for l in g if not giant_fits_here(l)]
+        if short:
+            tip += (" This computer can't hold %s." % (
+                "them" if len(short) == len(g) else " or ".join(short)))
     return ("Include models for %d GB+ systems" % tier, tip)
 
 
 def model_fits_machine(label: str) -> bool:
     if model_is_giant(label) and not giants_on():
         return False
+    if not giant_fits_here(label):
+        return False               # a workstation's model, never a PC's
     if no_limits():
         # Patrick's "disobey the limits" switch: every supported model is
         # offered. The runtime admission check still referees actual RAM.
         return SUPPORTED.get(label, False)
-    budget = machine_budget_bytes()
+    budget = machine_budget_bytes(moe=label in MOE_ROWS)
     need = MODEL_MEM_BYTES.get(label)
     if budget is None or need is None:
         return True
-    return need <= budget
+    if need > budget:
+        return False
+    if (MODEL_ROUTES.get(label, ("",))[0] == "ollama" and not IS_ARM
+            and HAS_PSUTIL):
+        # OFFER WHAT WILL RUN (6b315, from review): the list offered, and
+        # made first-run flagships of, models that model_fits_memory then
+        # refused on every ordinary day. On a PC (and an Intel Mac) the
+        # same rule now decides both: the part in system RAM, with its
+        # headroom, must fit beside what the OS and this app hold.
+        part = _ram_part(label)
+        return (part == 0 or part * _mem_factor(label)
+                <= psutil.virtual_memory().total - BASELINE_RAM)
+    return True
+
+
+BASELINE_RAM = 6e9      # what Windows and this app hold on a working PC
+
+
+def _ram_part(label: str) -> int:
+    """The bytes of a model that land in system RAM. On a PC an Ollama
+    model fills the graphics cards first (6b315)."""
+    need = MODEL_MEM_BYTES.get(label, 0)
+    if MODEL_ROUTES.get(label, ("",))[0] == "ollama" and not IS_MAC:
+        need = max(0, need - gpu_room_bytes())
+    return need
+
+
+def _mem_factor(label: str) -> float:
+    """Headroom for the KV cache and activations while a model answers:
+    1.5, or 1.3 for a mixture of experts. MLX rows keep the rule the
+    Macs were tuned on (the label says MoE); on Ollama every MOE_ROWS
+    model counts, GPT-OSS and Gemma 4 26B included."""
+    if "MoE" in label:
+        return 1.3
+    if (label in MOE_ROWS
+            and MODEL_ROUTES.get(label, ("",))[0] == "ollama"):
+        return 1.3
+    return 1.5
 
 MODEL_INFO = {c[0]: dict(icon=c[1], size=c[2], group=c[3], mlx=c[4],
                          ollama=c[5], port=c[6],
-                         mem=int(c[7] * 1e9), gb=c[8], star=c[9])
+                         mem=int(c[7] * 1e9), gb=c[8], star=c[9],
+                         # the catalog's size, which the picks are tuned
+                         # to; gb becomes Ollama's file on an Ollama route
+                         cat_gb=c[8])
               for c in CATALOG}
 
 # a model is usable here if it has an engine this computer can actually
@@ -1523,6 +1833,15 @@ for _l, _i in MODEL_INFO.items():
         MODEL_ROUTES[_l] = ("mlx", _i["port"])
     elif _i["ollama"]:
         MODEL_ROUTES[_l] = ("ollama", _i["ollama"])
+
+# an Ollama route downloads Ollama's file (6b315): size the row from it,
+# keeping the same allowance above the file for the KV cache and buffers
+for _l, (_k, _t) in MODEL_ROUTES.items():
+    if _k == "ollama" and _t in OLLAMA_BYTES:
+        _i = MODEL_INFO[_l]
+        _extra = max(0, _i["mem"] - int(_i["gb"] * 1e9))
+        _i["gb"] = round(OLLAMA_BYTES[_t] / 1e9, 1)
+        _i["mem"] = max(_i["mem"], OLLAMA_BYTES[_t] + _extra)
 
 MLX_REPOS = {l: i["mlx"] for l, i in MODEL_INFO.items() if i["mlx"]}
 MLX_EST_BYTES = {l: int(i["gb"] * 1e9) for l, i in MODEL_INFO.items()}
@@ -3559,17 +3878,19 @@ def _starter_labels() -> list:
         if label and label in fits and label not in picks:
             picks.append(label)
 
-    by_size = sorted(fits, key=lambda l: -MODEL_INFO[l]["gb"])
+    by_size = sorted(fits, key=lambda l: -MODEL_INFO[l]["cat_gb"])
     if no_limits() and HAS_PSUTIL:
         # unlocked, not unhinged: the flagship stays within what RAM can
         # plausibly page (~1.6x memory = a 70B on 48GB, never the 235B)
-        cap = psutil.virtual_memory().total
+        # 6b315: plus what the graphics cards hold, or ticking the box
+        # took GPT-OSS 120B away from a 96 GB card in a 64 GB PC
+        cap = psutil.virtual_memory().total + gpu_room_bytes()
         sized = [l for l in by_size
                  if MODEL_MEM_BYTES.get(l, 0) <= cap]
         by_size = sized or by_size
     add(next((l for l in by_size), None))                      # flagship
     add(next((l for l in by_size if l.startswith("Gemma 4")), None))
-    add(next((l for l in by_size if MODEL_INFO[l]["gb"] <= 8.5
+    add(next((l for l in by_size if MODEL_INFO[l]["cat_gb"] <= 8.5
               and "Vision" not in l), None))                   # everyday
     add("Llama 3.2 3B")
     add("Llama 3.2 1B")
@@ -3644,7 +3965,7 @@ def _plan_labels(plan: str) -> list:
     fits = [l for l in MODEL_INFO
             if SUPPORTED.get(l) and model_fits_machine(l)]
     if plan == "min":
-        small = sorted(fits, key=lambda l: MODEL_INFO[l]["gb"])
+        small = sorted(fits, key=lambda l: MODEL_INFO[l]["cat_gb"])
         picks = [l for l in ("Llama 3.2 1B", "Llama 3.2 3B") if l in fits]
         return picks or small[:2]
     if plan == "rec":
@@ -3659,7 +3980,7 @@ def _plan_labels(plan: str) -> list:
         for _fam, ls in groups.items():
             # newest generation first, then the largest of that
             # generation: the best of the family, exactly once
-            ls.sort(key=lambda l: (_gen_of(l), MODEL_INFO[l]["gb"]),
+            ls.sort(key=lambda l: (_gen_of(l), MODEL_INFO[l]["cat_gb"]),
                     reverse=True)
             picks.append(ls[0])
         # a quick model earns its disk however big the rest are
@@ -3673,15 +3994,16 @@ def _plan_labels(plan: str) -> list:
         # every model there is, bar the giants unless opted in (6b307):
         # on a 48 GB Mac "Max" offered 926 GB, 796 of it two models
         return [l for l in MODEL_INFO if SUPPORTED.get(l)
-                and (giants_on() or not model_is_giant(l))]
+                and (giants_on() or not model_is_giant(l))
+                and giant_fits_here(l)]
     if plan == "basic":
         # the smallest capable brain: ~1 GB, instant town
-        small = sorted(fits, key=lambda l: MODEL_INFO[l]["gb"])
+        small = sorted(fits, key=lambda l: MODEL_INFO[l]["cat_gb"])
         return small[:1]
     if plan == "pro":
         # one strong everyday model plus the quick pair — ~10 GB
-        mids = sorted((l for l in fits if MODEL_INFO[l]["gb"] <= 8.5),
-                      key=lambda l: -MODEL_INFO[l]["gb"])
+        mids = sorted((l for l in fits if MODEL_INFO[l]["cat_gb"] <= 8.5),
+                      key=lambda l: -MODEL_INFO[l]["cat_gb"])
         picks = mids[:1]
         for extra in ("Llama 3.2 3B", "Llama 3.2 1B"):
             if extra in fits and extra not in picks:
@@ -3815,6 +4137,8 @@ def model_fits_memory(label: str) -> bool:
     # and every fallback ask this before starting a model
     if model_is_giant(label) and not giants_on():
         return False
+    if not giant_fits_here(label):
+        return False               # "no limits" can't make a PC a workstation
     if no_limits():
         # "disobey the limits": admission stands down entirely — a 70B on
         # a 48GB Mac swaps hard, and that is the explicit ask
@@ -3833,6 +4157,12 @@ def model_fits_memory(label: str) -> bool:
     kind, target = MODEL_ROUTES.get(label, (None, None))
     if kind == "mlx" and _engine_up(target):
         return True  # already resident and serving
+    if kind == "ollama" and not IS_MAC:
+        # the part on the graphics cards costs no system RAM (6b315): an
+        # 85 GB model on a 96 GB card was refused on a 128 GB PC
+        need = _ram_part(label)
+        if need == 0:
+            return True
     # Real footprints run above the estimate — a "44 GB" 70B was measured at
     # 49.7 GB and got OOM-killed — so demand real headroom, and never allow a
     # model that needs most of the machine even when RAM looks free.
@@ -3844,8 +4174,7 @@ def model_fits_memory(label: str) -> bool:
     # machine. Admission must survive the whole reply, not just the load.
     # MoE models get 1.3x — only a few billion parameters activate per
     # token, so their runtime overhead is a fraction of a dense model's.
-    factor = 1.3 if "MoE" in label else 1.5
-    return need * factor < avail
+    return need * _mem_factor(label) < avail
 
 # THE PLACE A WEATHER QUESTION NAMES (6b317, found asking a Windows VM
 # "what's the weather in Chicago right now"): the place was everything
@@ -4965,15 +5294,21 @@ def _spawn_ollama_serve() -> bool:
         if mine is None:
             return False             # can't tell: never spawn a duplicate
         port = _free_port()
+    _apply_staged_engine()
     b = _ollama_bin()
     if not b:
         return False
     logdir = log_dir()
     os.makedirs(logdir, exist_ok=True)
     log = open(os.path.join(logdir, "managed-ollama.log"), "ab")
+    env = dict(os.environ, OLLAMA_HOST="127.0.0.1:%d" % port)
+    if gpu_inventory()["igpu"]:
+        # a Ryzen AI Max's graphics are "integrated", and Ollama leaves
+        # an integrated GPU unused unless told to (6b315): without this
+        # a Strix Halo ran every model on its CPU
+        env["OLLAMA_IGPU_ENABLE"] = "1"
     _managed_procs.append(subprocess.Popen(
-        [b, "serve"], stdout=log, stderr=log,
-        env=dict(os.environ, OLLAMA_HOST="127.0.0.1:%d" % port),
+        [b, "serve"], stdout=log, stderr=log, env=env,
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     ))
     OLLAMA_PORT[0] = port
@@ -5085,6 +5420,10 @@ def start_managed_engines():
             ctx_thread(target=_stage_native_engine,
                              daemon=True).start()
     _spawn_ollama_serve()
+    # the app's own Ollama, if too old for a catalog model, fetches its
+    # successor in the background for the next start (6b315); machine
+    # work, on no profile
+    ctx_thread(target=_stage_engine_update, bind=False, daemon=True).start()
 
 
 # ------------------------------------------------------- first-run setup
@@ -10986,6 +11325,9 @@ MACHINE_IO = frozenset((
     # engines, models and their installs
     "_settle_engine_dir", "_studio_install_worker", "_download_ollama_binary",
     "_spawn_ollama_serve", "_stage_native_engine", "_spawn_mlx_engine",
+    # 6b315: the app's own Ollama fetched beside it (bin.new), swapped in
+    # at the next start
+    "_stage_engine_update", "_apply_staged_engine",
     "_download_model", "studio_remove", "_remove_models",
     "_sweep_hf_carcasses", "_rm_hf_repo", "reap_orphan_engines",
     "_sweep_leftovers", "_crypto_record_write", "_crypto_pip",
@@ -12319,13 +12661,14 @@ def _download_ollama_binary(dest=None, row=ENGINE_ROW):
     os.chmod(os.path.join(dest, "ollama"), 0o755)
 
 
-_ENGINE_DL_LOCK = threading.Lock()
+_ENGINE_DL_LOCK = threading.Lock()   # one engine download at a time
 
 
 def _ensure_ollama_ready() -> bool:
     """Binary on disk + server answering. Downloads the engine if needed."""
     # one download at a time: two install batches both finding no engine
-    # wrote the same .part file
+    # wrote the same .part file (6b317), and 6b315's background update
+    # takes the same lock
     with _ENGINE_DL_LOCK:
         if _ollama_bin() is None:
             with _setup_lock:
@@ -12467,12 +12810,6 @@ def _giant_room(layers: dict, where):
     return where, ""
 
 
-# Ollama versions the giants need (6b314): Qwen 3 Coder 480B's manifest
-# has no template and relies on the built-in renderer; DeepSeek V3.1
-# got its renderer and tool parsing in 0.13.5.
-GIANT_OLLAMA_MIN = (0, 13, 5)
-
-
 def _ollama_version() -> tuple:
     """The running Ollama's version as a tuple, or () when unknown."""
     try:
@@ -12482,6 +12819,146 @@ def _ollama_version() -> tuple:
         return tuple(int(x) for x in re.findall(r"\d+", v)[:3])
     except Exception:
         return ()
+
+
+def _managed_serve():
+    """The `ollama serve` this app started from the copy it downloaded,
+    when that is the Ollama in use; None otherwise."""
+    for p in list(_managed_procs):
+        try:
+            if (p.poll() is None
+                    and getattr(p, "_cai_port", None) == OLLAMA_PORT[0]
+                    and os.path.abspath(p.args[0]).startswith(
+                        os.path.abspath(_MANAGED_BIN_DIR) + os.sep)):
+                return p
+        except Exception:
+            pass
+    return None
+
+
+# THE APP'S OWN OLLAMA UPDATES BETWEEN RUNS (6b315). It was fetched once
+# and never updated, and newer models refuse an old one. Stopping it to
+# swap it would cut off downloads and chats, and on Windows it leaves
+# the model runner orphaned, holding the folder locked (review), so the
+# new copy is fetched beside it in the background and swapped in at the
+# next start, before anything runs from the folder.
+_STAGED_DIR = _MANAGED_BIN_DIR + ".new"
+_STAGED_OK = os.path.join(_STAGED_DIR, "concorde-complete")
+_staging = {"on": False}
+
+
+def _ollama_needed() -> tuple:
+    """The newest Ollama any catalog model asks for."""
+    return max(OLLAMA_REQUIRES.values(), default=())
+
+
+def _bin_version(path: str) -> tuple:
+    """An Ollama binary's own version, without a server."""
+    try:
+        out = subprocess.run(
+            [path, "--version"], capture_output=True, text=True, timeout=20,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        v = re.findall(r"(\d+)\.(\d+)\.(\d+)", out.stdout + out.stderr)
+        return tuple(int(x) for x in v[-1]) if v else ()
+    except Exception:
+        return ()
+
+
+def _is_managed(path) -> bool:
+    return bool(path) and os.path.abspath(path).startswith(
+        os.path.abspath(_MANAGED_BIN_DIR) + os.sep)
+
+
+def _stage_engine_update():
+    """In the background: when the app's own Ollama is older than a
+    catalog model needs, fetch the latest beside it. Machine work: it
+    reads no settings and runs on no profile (ported onto 6b329)."""
+    if _staging["on"] or os.path.exists(_STAGED_OK):
+        return
+    b = _ollama_bin()
+    if not _is_managed(b):
+        return                   # a user's own Ollama is theirs to update
+    if IS_WIN_ARM and (_wrong_arch_engine()
+                       or os.path.exists(_ENGINE_ARM_DONE)):
+        return                   # 6b317's native engine is the latest one
+    have = _bin_version(b)
+    if not have or have >= _ollama_needed():
+        return
+    if _other_millenai_running():
+        return                   # one copy stages, as 6b317's does
+    _staging["on"] = True
+
+    def run():
+        try:
+            with _ENGINE_DL_LOCK:
+                shutil.rmtree(_STAGED_DIR, ignore_errors=True)
+                _download_ollama_binary(_STAGED_DIR, row=None)
+                with open(_STAGED_OK, "w") as f:
+                    f.write("ok")
+        except Exception:
+            shutil.rmtree(_STAGED_DIR, ignore_errors=True)
+        finally:
+            _staging["on"] = False
+    ctx_thread(target=run, bind=False, daemon=True).start()
+
+
+def _apply_staged_engine():
+    """At start, before our Ollama runs: swap in a fetched update. If the
+    folder can't move (an old runner still holds it), keep the old one
+    and try again next time. As 6b317's native-engine swap does: a swap
+    cut short between its two renames is undone first, it waits while
+    another copy of the app runs, and on an ARM64 PC only an ARM64
+    engine goes in."""
+    exe = "ollama.exe" if IS_WIN else "ollama"
+    old = _MANAGED_BIN_DIR + ".old"
+    if (not os.path.exists(os.path.join(_MANAGED_BIN_DIR, exe))
+            and os.path.exists(os.path.join(old, exe))):
+        shutil.rmtree(_MANAGED_BIN_DIR, ignore_errors=True)
+        try:
+            os.replace(old, _MANAGED_BIN_DIR)
+        except OSError:
+            return
+    if not os.path.exists(_STAGED_OK) or _managed_serve() is not None:
+        return
+    if IS_WIN_ARM and _pe_machine(os.path.join(_STAGED_DIR, exe)) != 0xAA64:
+        shutil.rmtree(_STAGED_DIR, ignore_errors=True)
+        return
+    if _other_millenai_running():
+        return
+    shutil.rmtree(old, ignore_errors=True)
+    try:
+        if os.path.exists(_MANAGED_BIN_DIR):
+            os.replace(_MANAGED_BIN_DIR, old)
+    except OSError:
+        return
+    try:
+        os.replace(_STAGED_DIR, _MANAGED_BIN_DIR)
+    except OSError:
+        try:
+            os.replace(old, _MANAGED_BIN_DIR)
+        except OSError:
+            pass
+        return
+    shutil.rmtree(old, ignore_errors=True)
+    try:
+        os.remove(os.path.join(_MANAGED_BIN_DIR, "concorde-complete"))
+    except OSError:
+        pass
+
+
+def _ollama_too_old(tag: str, have: tuple, ours: bool = False) -> str:
+    """Why this Ollama can't pull `tag`, or "" when it can. `ours`: the
+    Ollama running is the app's own, which updates itself."""
+    need = OLLAMA_REQUIRES.get(tag)
+    if not need or not have or have >= need:
+        return ""
+    v = (".".join(map(str, need)), ".".join(map(str, have)))
+    if ours:
+        return ("needs Ollama %s or newer (the app's engine is %s). A "
+                "newer engine is downloading: in a few minutes quit and "
+                "reopen ConcordeAI, then press retry" % v)
+    return ("needs Ollama %s or newer; this computer has %s. Update "
+            "Ollama (ollama.com/download), then press retry" % v)
 
 
 def _keep_awake(on: bool):
@@ -12560,6 +13037,15 @@ def _ollama_install_worker(labels: list):
                 _setup_jobs[l] = {"status": "error",
                                   "note": "engine unavailable", "pct": 0}
         return
+    # NEW MODELS NEED A NEW OLLAMA (6b315): Qwen 3.8 27B wants 0.32.12
+    # and Gemma 4 0.30, and an Ollama installed a year ago refuses them.
+    # The copy this app downloaded updates itself; a user's own gets a
+    # note on the model's row saying what to do.
+    have = _ollama_version()
+    ours = _managed_serve() is not None
+    if ours and any(_ollama_too_old(MODEL_ROUTES[l][1], have)
+                    for l in labels):
+        _stage_engine_update()
     _keep_awake(True)
     try:
         for label in labels:
@@ -12567,14 +13053,9 @@ def _ollama_install_worker(labels: list):
                 _setup_jobs[label] = {"status": "downloading", "note": "",
                                       "pct": 0}
             try:
-                if model_is_giant(label):
-                    have = _ollama_version()
-                    if have and have < GIANT_OLLAMA_MIN:
-                        raise RuntimeError(
-                            "needs Ollama %s or newer (this computer has "
-                            "%s) — update Ollama, then press Retry" % (
-                                ".".join(map(str, GIANT_OLLAMA_MIN)),
-                                ".".join(map(str, have))))
+                why = _ollama_too_old(MODEL_ROUTES[label][1], have, ours)
+                if why:
+                    raise RuntimeError(why)
                 _pull_ollama_model(label, MODEL_ROUTES[label][1])
                 with _setup_lock:
                     # the size stays with the finished job: dropping it
@@ -12600,6 +13081,11 @@ def start_model_downloads(labels=None) -> list:
     pulled = ollama_pulled_tags() or set()
     for label in (labels if labels is not None else STARTER_LABELS):
         if not SUPPORTED.get(label):
+            continue
+        if not giant_fits_here(label):
+            # a workstation's model (6b315): the list never offers it
+            # here, and the endpoint doesn't start it either (no job,
+            # or the progress bar would wait for it forever)
             continue
         kind, _target = MODEL_ROUTES[label]
         if model_cached(label, pulled):
@@ -13482,6 +13968,8 @@ def accel_name() -> str:
     name = "CPU"
     if IS_MAC and IS_ARM and _has_mlx():
         name = "MLX"
+    elif gpu_inventory()["vendor"]:
+        name = gpu_inventory()["vendor"]     # AMD on Windows too (6b315)
     elif _gpu_nvidia() is not None:
         name = "NVIDIA"
     elif _gpu_amd():
@@ -15309,15 +15797,22 @@ atexit.register(_usage_at_exit)
 
 
 def stream_ollama(tag: str, messages: list, emit,
-                  giant: bool = False, label: str = "") -> None:
+                  giant: bool = False, big: bool = False,
+                  label: str = "") -> None:
     """Stream NDJSON from Ollama, calling emit(text_chunk) as tokens arrive.
+    `big` is any model over BIG_MODEL_BYTES, `giant` one over GIANT_GB;
     label: the catalog name the usage ledger records (6b325)."""
     options = {"temperature": 0.75}
     extra = {}
-    if giant:
-        # a fixed context (6b314): left alone, Ollama sizes it from the
-        # GPU and a big card gets 256k, which adds ~67 GB to Qwen 3 Coder
+    if giant or big:
+        # a fixed context (6b314, 6b315 for every big model): left alone,
+        # Ollama sizes it from the GPU memory, and 47 GiB or more gets
+        # 256k, whose cache pushes a 65-81 GB model off the card (and adds
+        # ~67 GB to Qwen 3 Coder). num_gpu is never sent: that would turn
+        # off the split that keeps attention on the card and the experts
+        # in RAM.
         options["num_ctx"] = GIANT_CTX
+    if giant:
         if tag in OLLAMA_THINK_OFF:
             # Ollama turns thinking ON when a request doesn't say, and
             # the hidden reasoning would cost minutes at CPU speed
@@ -15330,9 +15825,10 @@ def stream_ollama(tag: str, messages: list, emit,
         # unload fast after use: Ollama's default keep-alive left LLaVA
         # resident at 8.6 GB GPU for 5 minutes after every glance at an
         # image — the llama-server runner ate cores "even when closed".
-        # A giant stays 30 minutes: Ollama on Windows+CUDA reads all of
-        # it from disk on every load (no mmap), which takes minutes.
-        "keep_alive": GIANT_KEEP_ALIVE if giant else "45s",
+        # A big model stays 30 minutes: Ollama on Windows+CUDA reads all
+        # of it from disk on every load (no mmap), a minute for 65 GB and
+        # far longer for a giant.
+        "keep_alive": GIANT_KEEP_ALIVE if (giant or big) else "45s",
         "options": options,
     }).encode("utf-8")
     req = urllib.request.Request(
@@ -15620,7 +16116,9 @@ def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
 
             if kind == "ollama":
                 stream_ollama(target, msgs, _tap, label=label,
-                              giant=model_is_giant(label))
+                              giant=model_is_giant(label),
+                              big=MODEL_MEM_BYTES.get(label, 0)
+                              > BIG_MODEL_BYTES)
             else:
                 # re-read (ensure may have moved the engine off a port
                 # another account holds) and check the listener afresh,
@@ -29120,8 +29618,8 @@ const ADV_USE={
   "GPT-OSS 120B":"frontier-class open reasoning",
   "GLM 5.3":"the largest open model \u2014 512 GB Macs",
   "DeepSeek V3.2 671B":"frontier open model \u2014 512 GB Macs",
-  "DeepSeek V3.1 671B":"frontier open model \u2014 512 GB PCs, slow on CPU",
-  "Qwen 3 Coder 480B":"frontier open coder \u2014 384 GB+ PCs, slow on CPU",
+  "DeepSeek V3.1 671B":"frontier open model \u2014 workstations; slow unless it fits in GPU memory",
+  "Qwen 3 Coder 480B":"frontier open coder \u2014 workstations; slow unless it fits in GPU memory",
 };
 const ADV_CLOUD={
   gemini:["Gemini","fast frontier drafts · free tier"],
@@ -29281,7 +29779,8 @@ advChip();     // a custom council survives the restart (6b248)
   chip.querySelector("b").textContent=a;
   chip.title=a==="MLX"
     ?"Local models run on Apple Silicon through MLX"
-    :a==="AMD"?"Local models run on your AMD GPU through ROCm"
+    :a==="AMD"?"Local models run on your AMD GPU"
+    :a==="Intel"?"Local models run on your Intel Arc GPU"
     :"Local models run on your NVIDIA GPU through CUDA";
   chip.hidden=false;
 })();
