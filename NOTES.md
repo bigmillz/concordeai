@@ -5744,10 +5744,13 @@ had never run before.
   non-ASCII dash; a hash dropped, WebEngine-Qt6 on another Qt, PyQt6
   unpinned, a sip hash gone, QtPy missing; pywebview's initialize
   ignoring gui, and a copy of 6.2.1 whose qt.py imports clr.
-- Not verified here: any Windows run (the pinned wheels installing on
-  ARM64 Windows, PyInstaller collecting the WebEngine helper there, the
-  frozen exe opening its window). **Patrick:** rebuild in the VM with
-  `-Arch arm64` under an ARM64 Python 3.11 to 3.14 and install.
+- Verified on Patrick's Windows 11 ARM64 VM (2026-09-29): `-Arch arm64`
+  under Python 3.13.15 ARM64 built ConcordeAI-6.1.0-Setup-arm64.exe
+  (134 MB). It installed per user, the crypto self-test said win-arm64,
+  and the app opened its window (QtWebEngineProcess running, no
+  crash.log entry). The first native ARM64 window this app has shown.
+- Before an ARM64 installer is handed to anyone: PyQt6 is GPL-3.0, so the
+  repo needs a GPL-3.0 LICENSE (Patrick's call, pending).
 
 ## 6b327 — PyNaCl on every build (accounts step 7)
 The install half of 0a 5.9 and 1c 5.1: M7 of the sign-in plan, with the
