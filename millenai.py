@@ -20305,9 +20305,12 @@ input.crename{flex:1;min-width:0;background:rgba(0,0,0,.45);
   border:1px solid rgba(255,255,255,.07);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
   -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
-  border-radius:14px;padding:10px 12px 9px;
+  border-radius:14px;padding:9px 12px 12px;
   font-family:var(--mono);
 }
+/* even frame (per Patrick): the chip name's letters sit 12px below the
+   top edge (9px padding + the line's own space above the capitals), the
+   last bar 12px above the bottom, and 12px in from each side */
 /* compact meters (5.3, per Patrick: "smaller… alignment is off") —
    labels centered against the ↑ chip instead of hanging off baseline */
 #telemetry .t-head{
