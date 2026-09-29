@@ -5633,6 +5633,72 @@ crash was invisible.
   keeps its checks. Mutation-tested (SIGHUP back, hook removed, no log,
   no box).
 
+## 6b328 — the ARM64 build opens its window with Qt
+Proven in Patrick's Windows 11 ARM64 VM: the installed native ARM64 build
+(`build_windows_exe.ps1 -Arch arm64`) said "ConcordeAI couldn't start.
+RuntimeError: Failed to create a .NET runtime (coreclr)". crash.log:
+`webview.start` → `guilib.initialize` → `import_winforms` → `import clr`
+→ clr_loader loading `_internal\clr_loader\ffi\dlls\amd64\ClrLoader.dll`
+(0xc1, the wrong architecture). Not a regression: the frozen ARM64 build
+had never run before.
+- **Why.** `_web_engine()` says "qt" there, but `webview.start` was never
+  told. pywebview 6.2.1's `guilib.initialize` on Windows tries only
+  WinForms unless `gui` (or `PYWEBVIEW_GUI`) is "qt"; with it, Qt first
+  and WinForms as the fallback. And pywebview requires pythonnet on every
+  Windows, so pip put it (and clr_loader, which ships x86 and amd64 DLLs
+  only) in the ARM64 build venv, and `--collect-all webview` froze it in
+  through the WinForms backend.
+- **The app:** `_webview_gui()` is `{"gui": "qt"}` when `_web_engine()`
+  is "qt" and `{}` otherwise; the one `webview.start` call spreads it.
+  macOS and x64 (and x64 emulated on an ARM PC) call it as before.
+- **The build (ARM64 only):** `--exclude-module` clr, pythonnet and
+  clr_loader. Checked first against pywebview 6.2.1's source (the PyPI
+  wheel): outside the WinForms, EdgeChromium, MSHTML, win32 and CEF
+  backends nothing imports clr, pythonnet, clr_loader or System, and the
+  only reference to a .NET backend is guilib's `import_winforms`;
+  `platforms/qt.py` imports qtpy and pywebview's own common modules.
+  Also found: pywebview names **QtPy** only on OpenBSD or with an extra,
+  and PySide6 doesn't pull it, so the ARM64 build never had it; the Qt
+  import would have failed and fallen back to WinForms with the same
+  crash. `qtpy` is now in the ARM64 deps, the build venv must import
+  `webview.platforms.qt` with WebEngine before PyInstaller runs, and the
+  build throws if `_internal\clr_loader` or `_internal\pythonnet` is in
+  the finished folder. x64 keeps `--hidden-import clr`.
+- In the app, the Qt path imports clr nowhere: `_webstore_wv2` and
+  `_webstore_wv2_value` run only when the engine is "webview2", and
+  nothing calls `webview.screens` (which would initialize pywebview
+  unasked) before the window.
+- Gauntlet: 410 checks become 413. The one `webview.start` call,
+  evaluated with a recording webview on a Mac, x64, x64 emulated on ARM,
+  native ARM64 and neither, gets `gui="qt"` on native ARM64 only; the
+  installed pywebview (6.2.1), made to think it is on Windows with its
+  Qt backend stubbed and clr, pythonnet, clr_loader and the .NET
+  backends blocked, loads Qt when asked and asks for none of them, and
+  unasked asks for WinForms and raises; an AST scan of the installed
+  package finds only guilib naming WinForms; the ps1's ARM64 branch
+  excludes the three (x64 none), qtpy in the ARM64 deps before pip, the
+  Qt import between pip and PyInstaller, the leftover-folder throw
+  between PyInstaller and the self-test. 19 mutations each fail a
+  check: no gui argument, gui="qt" hard-coded, the helper always,
+  never, on every Windows or "cef", emulated x64 counted as Qt, a second
+  `webview.start`; no exclusions, only clr, clr_loader dropped, the
+  exclusions on x64, qtpy dropped, the Qt import gone or ungated, the
+  folder check gone, a non-ASCII dash; pywebview's initialize ignoring
+  gui, and a copy of 6.2.1 whose qt.py imports clr.
+- **Still blocked: PySide6 has no WebEngine on Windows ARM64.** The
+  PySide6-Addons win_arm64 wheels (6.9.3, 6.10.2, 6.11.2, read from
+  PyPI) carry no QtWebEngineWidgets, Qt6WebEngineCore or
+  QtWebEngineProcess; the win_amd64 ones do. So with this build's deps
+  pywebview's Qt import fails and the ARM64 build now stops at the new
+  import check, instead of shipping an exe that can't open its window.
+  PyQt6-WebEngine and PyQt6-WebEngine-Qt6 do publish win_arm64 wheels
+  (6.11, Qt6WebEngineCore.dll and QtWebEngineProcess.exe inside), and
+  qtpy would take PyQt6; but PyQt6 is GPL or commercial where PySide6 is
+  LGPL, so switching is Patrick's call, not made here.
+- Not verified here: any Windows run. The build venv is reused between
+  builds, so pythonnet stays installed in it; the exclusions are what
+  keep it out of the freeze.
+
 ## 6b327 — PyNaCl on every build (accounts step 7)
 The install half of 0a 5.9 and 1c 5.1: M7 of the sign-in plan, with the
 fixes from its two reviews and a re-verify. Patrick approved the

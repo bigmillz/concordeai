@@ -19534,6 +19534,15 @@ def _web_engine() -> str:
     return ""
 
 
+def _webview_gui() -> dict:
+    """webview.start's gui argument (6b328): "qt" when the window is Qt's,
+    nothing anywhere else, so macOS and x64 pick their backend as before.
+    Unasked, pywebview 6.2.1 on Windows tries only WinForms (pythonnet),
+    whose clr_loader has no ARM64 DLL: the native ARM64 build died at
+    start with "Failed to create a .NET runtime (coreclr)"."""
+    return {"gui": "qt"} if _web_engine() == "qt" else {}
+
+
 def _webstore_plan(names, local: bool) -> dict:
     """Which records lose what: "other" loses everything; "own" (the
     app's own loopback record) keeps what "keep" names: cookies, and
@@ -31252,6 +31261,8 @@ if __name__ == "__main__":
             webview.settings["ALLOW_DOWNLOADS"] = True   # chain never runs
         except Exception:
             pass
+        # gui="qt" on the native ARM64 build only (6b328)
         webview.start(private_mode=False,
-                      storage_path=os.path.join(app_dir(), "webkit"))
+                      storage_path=os.path.join(app_dir(), "webkit"),
+                      **_webview_gui())
         print("  window closed — shutting down. o7\n")

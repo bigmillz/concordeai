@@ -228,16 +228,28 @@ if ($LASTEXITCODE -eq 3) {
 $deps = @("pyinstaller", "pywebview==6.2.1", "ddgs", "psutil", "huggingface_hub",
           "tzdata", "reportlab", "openpyxl", "python-docx", "python-pptx")
 if ($isArm) {
-  # pythonnet - pywebview's default Windows backend - has no ARM64 wheel, so
-  # drive the Qt backend instead; PySide6 and QtWebEngine do ship one.
+  # pythonnet - pywebview's default Windows backend - can't start .NET on
+  # ARM64 (clr_loader ships x86 and amd64 DLLs only), so drive the Qt
+  # backend instead. NB (6b328): PySide6's win_arm64 wheels (6.9.3 to
+  # 6.11.2) carry no QtWebEngine, so the Qt import check below stops the
+  # build until a Qt with WebEngine for ARM64 is chosen.
   # ctranslate2 has no ARM64 wheel either, so voice input is left out and the
   # app degrades to "voice unavailable" rather than failing to start.
-  $deps += "pyside6"
+  # pywebview's Qt backend imports qtpy, which pywebview itself installs
+  # only on OpenBSD or with an extra (6b328): named here, or the Qt import
+  # fails and pywebview falls back to WinForms.
+  $deps += @("pyside6", "qtpy")
 } else {
   $deps += "faster-whisper"
 }
 & $bpy -m pip install @deps | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
+# the ARM64 window is Qt's WebEngine (6b328): it must import here, or the
+# frozen app has no window to open
+if ($isArm) {
+  & $bpy -c "import sys, webview.platforms.qt as q; sys.exit(0 if q.is_webengine else 1)"
+  if ($LASTEXITCODE -ne 0) { throw "pywebview's Qt backend does not import in $bv (qtpy, and a Qt with WebEngine: see 6b328)" }
+}
 
 # ------------------------------------------------------------------- build
 if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
@@ -259,9 +271,15 @@ $pyiArgs = @(
 if ($crypto) {
   $pyiArgs += @("--hidden-import", "_cffi_backend", "--collect-submodules", "nacl")
 }
-# pywebview resolves its backend dynamically, so PyInstaller cannot see it
+# pywebview resolves its backend dynamically, so PyInstaller cannot see it.
+# ARM64 leaves pythonnet out (6b328): pywebview requires it on every
+# Windows, and --collect-all webview froze it in through the WinForms
+# backend, but clr_loader ships x86 and amd64 DLLs only. The app passes
+# gui="qt", and pywebview's Qt path never imports clr.
 if ($isArm) {
-  $pyiArgs += @("--hidden-import", "webview.platforms.qt", "--collect-all", "PySide6")
+  $pyiArgs += @("--hidden-import", "webview.platforms.qt", "--collect-all", "PySide6",
+                "--exclude-module", "clr", "--exclude-module", "pythonnet",
+                "--exclude-module", "clr_loader")
 } else {
   $pyiArgs += @("--hidden-import", "webview.platforms.edgechromium", "--hidden-import", "clr")
 }
@@ -270,6 +288,11 @@ Write-Host "-> running PyInstaller"
 & $bpy -m PyInstaller @pyiArgs
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 if (-not (Test-Path "dist\MillenAI\MillenAI.exe")) { throw "no exe was produced" }
+if ($isArm) {
+  foreach ($left in @("clr_loader", "pythonnet")) {
+    if (Test-Path "dist\MillenAI\_internal\$left") { throw "the ARM64 exe carries $left (6b328)" }
+  }
+}
 Write-Host "-> built dist\MillenAI\MillenAI.exe"
 
 # THE CRYPTO SELF-TEST (0a 5.9, 6b327): the exe runs cai_crypto's

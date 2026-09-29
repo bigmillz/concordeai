@@ -10284,6 +10284,148 @@ check("CI: the frozen exe's self-test; the nightly installs the pins and the smo
       and 0 < _nw7.find("--require-hashes --no-deps -r crypto-requirements.txt") < _nw7.find("./ci_smoke.sh")
       and 'c.get("ok") is True and c.get("state") == "ready"' in _cs7)
 
+# ---- 6b328: THE ARM64 BUILD OPENS ITS WINDOW WITH QT. Unasked, pywebview
+# 6.2.1 on Windows tries only WinForms, whose clr_loader has no ARM64 DLL:
+# the native ARM64 exe died at start ("Failed to create a .NET runtime").
+# webview.start gets gui="qt" exactly when _web_engine() is "qt": the one
+# call in the source, evaluated with a recording webview for each kind of
+# machine.
+_ns8 = {}
+_exec_names(_ns8, {"_web_engine", "_webview_gui"})
+_st8 = [n for n in _ast.walk(_ctree) if isinstance(n, _ast.Call)
+        and isinstance(n.func, _ast.Attribute) and n.func.attr == "start"
+        and isinstance(n.func.value, _ast.Name) and n.func.value.id == "webview"]
+_seg8 = _ast.get_source_segment(_MILLENAI_SRC, _st8[0]) if len(_st8) == 1 else ""
+_got8 = {}
+for _m8, _f8 in {"mac": (1, 0, 0, 0), "x64": (0, 1, 0, 0), "x64 emulated on ARM": (0, 1, 1, 1),
+                 "native ARM64": (0, 1, 1, 0), "other": (0, 0, 0, 0)}.items():
+    _ns8.update(zip(("IS_MAC", "IS_WIN", "IS_WIN_ARM", "IS_WIN_EMULATED"), map(bool, _f8)))
+    _kw8 = []
+    try:
+        eval(_seg8, dict(_ns8, os=os, app_dir=lambda: "/d",
+                         webview=_tw.SimpleNamespace(start=lambda **k: _kw8.append(k))))
+    except Exception as e:
+        _kw8.append(repr(e))
+    _got8[_m8] = (_ns8["_web_engine"](), _kw8)
+check("6b328: webview.start gets gui=\"qt\" exactly when _web_engine() is qt (the native ARM64 build)",
+      len(_st8) == 1 and all(
+          len(k) == 1 and isinstance(k[0], dict)
+          and k[0].get("private_mode") is False and k[0].get("storage_path") == os.path.join("/d", "webkit")
+          and (k[0].get("gui") == "qt") == (e == "qt") and ("gui" in k[0]) == (e == "qt")
+          for e, k in _got8.values())
+      and [m for m, (e, _k) in _got8.items() if e == "qt"] == ["native ARM64"],
+      "%r" % [len(_st8), _got8])
+# the installed pywebview (the pin, 6.2.1): asked for qt on Windows it
+# loads only its Qt backend, no WinForms, no clr; unasked it goes to
+# WinForms. And nothing in pywebview but guilib's import_winforms names
+# a .NET backend or pythonnet, and the Qt backend imports none of them,
+# which is what lets the ARM64 build leave pythonnet out.
+_NET8 = ("clr", "pythonnet", "clr_loader", "webview.platforms.winforms",
+         "webview.platforms.edgechromium", "webview.platforms.mshtml", "webview.platforms.win32")
+_asked8, _pw8 = [], {}
+try:
+    import importlib.metadata as _im8
+    import logging as _lg8
+    import webview as _wv8
+    import webview.platforms as _wvp8
+    _gl8 = sys.modules["webview.guilib"]
+
+    class _Net8:
+        def find_spec(self, name, path=None, target=None):
+            if name.split(".")[0] in ("clr", "pythonnet", "clr_loader") or name in _NET8:
+                _asked8.append(name)
+                raise ImportError("blocked by the gauntlet: " + name)
+            return None
+    _fq8 = _tw.ModuleType("webview.platforms.qt")
+    _fq8.setup_app = lambda: None
+    _fq8.renderer = "qtwebengine"
+    _sv8 = (_gl8.platform, _gl8.guilib, _gl8.forced_gui_, sys.modules.get("webview.platforms.qt"),
+            getattr(_wvp8, "qt", None), {k: os.environ.pop(k) for k in ("PYWEBVIEW_GUI", "KDE_FULL_SESSION")
+                                         if k in os.environ})
+    _lg8.getLogger("pywebview").disabled = True
+    _nf8 = _Net8()
+    sys.meta_path.insert(0, _nf8)
+    try:
+        _gl8.platform = _tw.SimpleNamespace(system=lambda: "Windows")
+        sys.modules["webview.platforms.qt"] = _fq8
+        _wvp8.qt = _fq8
+        _pw8["qt"] = _gl8.initialize("qt") is _fq8
+        _pw8["qt asked"] = list(_asked8)
+        try:
+            _gl8.initialize(None)
+            _pw8["default"] = "no error"
+        except Exception as e:
+            _pw8["default"] = type(e).__name__
+        _pw8["default asked"] = list(_asked8)
+    finally:
+        sys.meta_path.remove(_nf8)
+        _lg8.getLogger("pywebview").disabled = False
+        _gl8.platform, _gl8.guilib, _gl8.forced_gui_ = _sv8[:3]
+        if _sv8[3] is None:
+            sys.modules.pop("webview.platforms.qt", None)
+        else:
+            sys.modules["webview.platforms.qt"] = _sv8[3]
+        if _sv8[4] is None:
+            if getattr(_wvp8, "qt", None) is _fq8:
+                del _wvp8.qt
+        else:
+            _wvp8.qt = _sv8[4]
+        os.environ.update(_sv8[5])
+    _pw8["version"] = _im8.version("pywebview")
+    _wd8 = os.path.dirname(_wv8.__file__)
+    _names8 = {}
+    for _r8, _ds8, _fs8 in os.walk(_wd8):
+        for _fn8 in _fs8:
+            _rel8 = os.path.relpath(os.path.join(_r8, _fn8), _wd8).replace(os.sep, "/")
+            if (not _fn8.endswith(".py") or _rel8.startswith("platforms/android/")
+                    or _rel8 in ("platforms/winforms.py", "platforms/edgechromium.py",
+                                 "platforms/mshtml.py", "platforms/win32.py", "platforms/cef.py")):
+                continue
+            for _n8 in _ast.walk(_ast.parse(open(os.path.join(_r8, _fn8), encoding="utf-8").read())):
+                _mods8 = ([a.name for a in _n8.names] if isinstance(_n8, _ast.Import)
+                          else [_n8.module or ""] + ["%s.%s" % (_n8.module, a.name) for a in _n8.names]
+                          if isinstance(_n8, _ast.ImportFrom) else [])
+                for _mm8 in _mods8:
+                    if (_mm8.split(".")[0] in ("clr", "pythonnet", "clr_loader", "System") or _mm8 in _NET8
+                            or _mm8.split(".")[-1] in ("winforms", "edgechromium", "mshtml", "win32")):
+                        _names8.setdefault(_rel8, []).append(_mm8)
+    _pw8["net importers"] = _names8
+except Exception as e:
+    _pw8["error"] = repr(e)
+check("6b328: pywebview 6.2.1 asked for qt on Windows loads Qt only, never WinForms or clr; unasked it goes to WinForms",
+      _pw8.get("version") == "6.2.1" and _pw8.get("qt") is True and _pw8.get("qt asked") == []
+      and _pw8.get("default") == "WebViewException"
+      and _pw8.get("default asked") == ["webview.platforms.winforms"]
+      and _pw8.get("net importers") == {"guilib.py": ["webview.platforms.winforms"]},
+      "%r" % _pw8)
+# and the ARM64 freeze leaves pythonnet out: --collect-all webview froze it
+# in through the WinForms backend. qtpy installed (pywebview names it only
+# on OpenBSD or with an extra), the Qt backend imported before the freeze,
+# and the finished folder checked for what was left out. x64 keeps clr.
+_ps8 = open("build_windows_exe.ps1", encoding="utf-8").read()
+_a8 = _ps8.find("if ($isArm) {\n  $pyiArgs")
+_e8 = _ps8.find("} else {", _a8) if _a8 >= 0 else -1
+_x8 = _ps8[_e8:_ps8.find("\n}\n", _e8)] if _e8 >= 0 else ""
+_arm8 = _ps8[_a8:_e8] if _e8 >= 0 else ""
+_ex8 = re.findall(r'"--exclude-module",\s*"([\w.]+)"', _arm8)
+_dp8 = _ps8.find('  $deps += @("pyside6", "qtpy")\n} else {')
+_qi8 = _ps8.find('  & $bpy -c "import sys, webview.platforms.qt as q; sys.exit(0 if q.is_webengine else 1)"\n'
+                 '  if ($LASTEXITCODE -ne 0) { throw ')
+_lf8 = _ps8.find('  foreach ($left in @("clr_loader", "pythonnet")) {\n'
+                 '    if (Test-Path "dist\\MillenAI\\_internal\\$left") { throw ')
+check("6b328: build_windows_exe.ps1's ARM64 freeze excludes clr, pythonnet and clr_loader; qtpy in, Qt imported first",
+      sorted(_ex8) == ["clr", "clr_loader", "pythonnet"] and "--exclude-module" not in _x8
+      and '"--hidden-import", "clr"' in _x8 and '"webview.platforms.qt"' in _arm8
+      and "--exclude-module" not in _ps8.replace(_arm8, "")
+      and 0 < _dp8 < _ps8.find("& $bpy -m pip install @deps")
+      and _ps8.rfind("if ($isArm) {\n", 0, _qi8) == _qi8 - len("if ($isArm) {\n")
+      and _ps8.find("& $bpy -m pip install @deps") < _qi8 < _ps8.find("& $bpy -m PyInstaller")
+      and _ps8.rfind("if ($isArm) {\n", 0, _lf8) == _lf8 - len("if ($isArm) {\n")
+      and _ps8.find("& $bpy -m PyInstaller") < _lf8 < _ps8.find('"--crypto-selftest"')
+      and all(ord(c) < 128 for c in _ps8),
+      "%r" % [_ex8, _dp8, _qi8, _lf8, _x8[:120]])
+# ---- end 6b328
+
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
