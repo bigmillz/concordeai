@@ -38,3 +38,7 @@ drill_runs/
 # generated from CRYPTO_REQS by the build scripts (6b327)
 crypto-requirements.txt
 crypto-selftest.json
+# ConcordeVPN client files (links, QR codes, Shadowrocket profiles) hold
+# server passwords and belong to the private VPN repo, never this public one
+v23-*
+*.shadowrocket.conf
