@@ -6060,7 +6060,11 @@ be compared with an earlier one on the same machine.
   0.33 s, load 3.6 and 2.0 s (the second from a warm file cache),
   memory +1.8 and +2.0 GB, no pressure, no swap. About 5 s a run for
   this model. The engine was stopped after each run (nothing was loaded
-  before), and its log shows only the two local requests.
+  before), and its log shows only the two local requests. A third run
+  after the review fixes, with other agents' gauntlets busy on the same
+  Mac: 238.0 tok/s (−5.1%, shown red), reads 2,774, first token
+  0.36 s, load 4.0 s, +2.2 GB. So 3% separates a quiet machine's runs,
+  not a busy one's.
 - Not verified: Ollama's timings on a real engine (this Mac runs its
   models on MLX; the Ollama path ran against a stub that speaks its
   shapes), Windows and NVIDIA (the hardware line's PC branch, the swap
