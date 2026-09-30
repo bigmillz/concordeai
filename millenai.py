@@ -107,6 +107,9 @@ MACHINE_STATE = frozenset((
     # the backdrops, the search proxy, provider quirks, locks' depth
     "_sky_jobs", "_sky_tls", "_SEARCH_PROXY", "_stream_usage_off",
     "_cloud_depth", "_usage_thread",
+    # (6b339, per Patrick: server first) the first-word deadline of the
+    # call in flight on this thread: a number of seconds, nothing personal
+    "_srv_first",
     # read-aloud's process and file: _stop_speaking empties them at every
     # switch, before the epoch moves; the quit's own turn flush
     "_say_feeds", "_say_file", "_turns_flushing",

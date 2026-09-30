@@ -4105,7 +4105,7 @@ _LH["shutil"].rmtree(_lt, ignore_errors=True)
 check("per-task review fixes: titles per request, badge, sweeps",
       # (6b325) the chat hands the council memit, the usage ledger's emit
       "run_council(council, full_messages, memit, status," in _MILLENAI_SRC
-      and "hurry=hurry_ev)" in _MILLENAI_SRC
+      and "hurry=hurry_ev," in _MILLENAI_SRC        # then the seat deadline (6b339)
       and "_fast = fast_cloud_ladder()" in _MILLENAI_SRC
       # (6b326) the ticket is per chat, and a new question voids its own
       # (6b329) keyed by the profile's name, and emptied at a switch
@@ -10370,7 +10370,8 @@ _rc26.update(Ctl=str, NUL="\0", MERGE_RANK=["L1", "L2"], MODEL_ROUTES={"L1": 1, 
              model_fits_memory=lambda *a: True, strip_think=lambda t: t,
              run_model=lambda l, m, cb, **k: cb(_STUB_TEXT26.replace("stub", l)),
              _answered={}, _merge_text=_STUB_TEXT26,
-             server_label=lambda l: False)       # (6b334) no server model here
+             server_label=lambda l: False,       # (6b334) no server model here
+             server_first_deadline=lambda s: __import__("contextlib").nullcontext())   # (6b339)
 _rc_out = {}
 for _turbo, _mt in ((False, _STUB_TEXT26), (True, _STUB_TEXT26), ("short", "Too short.")):
     _rc_calls.clear()
@@ -20725,7 +20726,9 @@ check("server only (live): a picture goes to a model of the same server, cloud p
       "%r" % [_scI[1][:160], [c[2]["model"] for c in _stI]])
 # "<name> Only" makes no picture or video, asks no model to word one and runs no agent (rules review of
 # 6b339): said in one line each, and nothing is asked of the server, of this Mac or of the cloud
-_nstP, _nlgP = len(_o1("/stub")["calls"]), len(_o1("/log")["log"])
+# (only a request to a model counts: the server's own status check before a chat is not one)
+_mdl = lambda cs: [c for c in cs if (c[1] if isinstance(c, (list, tuple)) else c.get("path")) in ("/api/chat", "/api/generate")]
+_nstP, _nlgP = len(_mdl(_o1("/stub")["calls"])), len(_mdl(_o1("/log")["log"]))
 _ulP = len([r_ for r_ in _ul34() if r_.get("w") == "local"])
 _scPic = _svchat(text="draw me a red bicycle 339", tier=_so_tier, models=["Llama 3.2 3B"])
 _scVid = _svchat(text="make a short video of a dog on a beach 339", tier=_so_tier, models=["Llama 3.2 3B"])
@@ -20735,10 +20738,11 @@ check("server only (live): \"<name> Only\" makes no picture or video and runs no
       "reached the server or any model of this Mac",
       _scPic[1].strip() == "\u26a0\ufe0f %s Only can\u2019t make pictures or videos, and nothing was made." % _SVN
       and _scVid[1].strip() == "\u26a0\ufe0f %s Only can\u2019t make pictures or videos, and nothing was made." % _SVN
-      and _scAg[1].strip() == "\u26a0\ufe0f %s Only can\u2019t run the Coding agent, and nothing was run." % _SVN
-      and len(_o1("/stub")["calls"]) == _nstP and len(_o1("/log")["log"]) == _nlgP
+      and _scAg[1].strip().startswith("\u26a0\ufe0f %s Only can\u2019t run the Coding agent, and nothing was run." % _SVN)
+      and len(_mdl(_o1("/stub")["calls"])) == _nstP and len(_mdl(_o1("/log")["log"])) == _nlgP
       and len([r_ for r_ in _ul34() if r_.get("w") == "local"]) == _ulP,
-      "%r" % [_scPic[1][:160], _scVid[1][:160], _scAg[1][:160], len(_o1("/stub")["calls"]) - _nstP])
+      "%r" % [_scPic[1][:160], _scVid[1][:160], _scAg[1][:160],
+       [c[1] for c in _o1("/stub")["calls"][-8:]], len(_mdl(_o1("/stub")["calls"])) - _nstP])
 # Advanced (6b337): a hand-picked council of the server's models drafts in turn on that server. The second
 # model spills when it loads (the stub's "sneaky"), so its draft is absent and the first is the answer,
 # with no merge (a merge could be this machine's own Gemma, which is the council's rule, not the server's);
