@@ -242,7 +242,8 @@ class TestStabilityTest(unittest.TestCase):
         # timeout(1) isn't on every machine the tests run on
         self.fake("timeout", 'secs=$1; shift; "$@" & pid=$!; (sleep "$secs"; kill $pid 2>/dev/null) & wait $pid; exit 124')
         self.fake("curl", 'case "$*" in *api/tags*) echo \'{"models":[{"name":"gemma4:12b"}]}\'; exit 0;; '
-                  '*api/generate*) [ -z "${FAKE_NO_ANSWER:-}" ] || exit 22;; esac; exit 0')
+                  '*api/generate*) [ -z "${FAKE_NO_ANSWER:-}" ] || exit 22;; '
+                  '*api/ps*) echo "{\\"models\\":[{\\"name\\":\\"gemma4:12b\\",\\"size\\":9000000000,\\"size_vram\\":${FAKE_VRAM:-9000000000}}]}";; esac; exit 0')
         # journalctl: a hardware-error line appears from the Nth call on
         self.fake("journalctl", 'n=$(cat "%s" 2>/dev/null || echo 0); n=$((n+1)); echo $n > "%s"; '
                   'if [ -n "${FAKE_MCE_AFTER:-}" ] && [ "$n" -ge "$FAKE_MCE_AFTER" ]; then '
@@ -338,6 +339,19 @@ class TestStabilityTest(unittest.TestCase):
         self.assertIn("result cpu ABORTED", rec)
         self.assertIn("max_cpu_c=96", rec)
         self.assertNotIn("result memory", rec)
+
+    def test_a_model_running_on_the_cpu_fails_the_gpu_phase(self):
+        """Ollama once started before the driver was ready and ran everything
+        on the CPU; the gpu load then 'passed' while the card sat idle."""
+        code, out = self.run_script("--phases", "gpu", "--seconds", "3", env={"FAKE_VRAM": "0"})
+        self.assertEqual(code, 1, out)
+        self.assertIn("ran the model on the CPU", out)
+        self.assertIn("result gpu FAIL", self.record())
+        code, out = self.run_script("--phases", "all", "--seconds", "3", env={"FAKE_VRAM": "0"})
+        self.assertEqual(code, 1, out)
+        self.assertIn("ran the model on the CPU", out)
+        code, out = self.run_script("--phases", "gpu", "--seconds", "3")          # on the card: passes
+        self.assertEqual(code, 0, out)
 
     def test_a_hot_graphics_card_aborts_the_phase(self):
         chip = os.path.join(self.dir, "hwmon", "hwmon1")

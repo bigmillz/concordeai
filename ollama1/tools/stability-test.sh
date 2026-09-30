@@ -171,7 +171,10 @@ gpu_load() { # answers questions nonstop for $1 seconds; one line in $GPU_OK per
       else
         body="{\"model\":\"$1\",\"prompt\":\"Count from 1 to 300 in words.\",\"stream\":false,\"keep_alive\":\"10m\",\"options\":{\"num_ctx\":8192,\"num_predict\":500}}"
       fi
-      curl -fsS -m 300 "$0/api/generate" -d "$body" >/dev/null 2>&1 && echo ok >> "$2"
+      if curl -fsS -m 300 "$0/api/generate" -d "$body" >/dev/null 2>&1; then
+        echo ok >> "$2"
+        curl -fsS -m 10 "$0/api/ps" > "$2.ps" 2>/dev/null    # where the model is loaded: see the check below
+      fi
     done' "$OLLAMA_URL" "$MODEL" "$GPU_OK" >/dev/null 2>&1
 }
 any_alive() { local p; for p in "$@"; do kill -0 "$p" 2>/dev/null && return 0; done; return 1; }
@@ -212,7 +215,14 @@ run_phase() {
   case "$name" in gpu|all)
     if [ "$verdict" = OK ] && [ ! -s "$GPU_OK" ]; then verdict="FAIL"; why="Ollama gave no answer during the phase"; fi ;;
   esac
-  rm -f "$GPU_OK"
+  case "$name" in gpu|all)
+    # The load only tests the card if Ollama really put the model on it. After a reboot
+    # Ollama once started before the driver was ready and ran everything on the CPU.
+    if [ "$verdict" = OK ] && ! grep -o '"size_vram":[0-9]*' "$GPU_OK.ps" 2>/dev/null | grep -qv ':0$'; then
+      verdict="FAIL"; why="Ollama ran the model on the CPU, so the graphics card wasn't tested (restart Ollama and check the driver)"
+    fi ;;
+  esac
+  rm -f "$GPU_OK" "$GPU_OK.ps"
   say "   $verdict${why:+: $why}   (max cpu ${maxc:-?} C, gpu ${maxg:-?} C)"
   add_result "result $name $verdict max_cpu_c=${maxc:-?} max_gpu_c=${maxg:-?}${why:+ note=\"$why\"}"
   [ "$verdict" = OK ]
