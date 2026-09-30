@@ -194,6 +194,16 @@ class TestStabilityTest(unittest.TestCase):
         self.assertEqual(code, 0, out)         # the fake curl answers, so the loop records answers
         self.assertIn("result gpu OK", self.record())
 
+    def test_gpu_load_alternates_reading_and_writing(self):
+        """A short question alone leaves the card part-idle (decoding leans on
+        memory speed); reading a long prompt is the compute-heavy half."""
+        with open(self.SCRIPT) as f:
+            src = f.read()
+        self.assertIn("head -n 320", src)                    # the long prompt, about 5800 tokens
+        self.assertIn("n % 2", src)                          # alternated, not one or the other
+        self.assertRegex(src, r'num_ctx\\":8192,\\"num_predict\\":8\}')    # read a lot, say little
+        self.assertRegex(src, r'num_ctx\\":8192,\\"num_predict\\":500\}')  # say a lot
+
     def test_a_gpu_phase_with_no_answers_fails(self):
         code, out = self.run_script("--phases", "gpu", "--seconds", "3", env={"FAKE_NO_ANSWER": "1"})
         self.assertEqual(code, 1, out)

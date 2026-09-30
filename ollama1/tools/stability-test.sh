@@ -7,7 +7,8 @@
 #
 #   cpu      every core, floating-point maths, results checked
 #   memory   about 60% of the free memory, written and read back, checked
-#   gpu      the graphics card, answering questions nonstop (Ollama)
+#   gpu      the graphics card, reading long prompts and writing long answers
+#            nonstop (Ollama), which loads its compute and its memory both
 #   all      all three at once (the combination that crashed it)
 #
 #   sudo bash stability-test.sh                 four phases, 5 minutes each
@@ -157,10 +158,20 @@ start_loads() { # start_loads PHASE SECONDS : sets LOADS (pids)
   esac
 }
 gpu_load() { # answers questions nonstop for $1 seconds; one line in $GPU_OK per answer
+  # Alternates two kinds of work: a long prompt to read (about 4000 tokens, few
+  # words back) which is compute-heavy, and a short prompt with a long answer,
+  # which leans on memory speed. Either alone leaves the card part-idle.
   timeout "$1" bash -c '
+    long=$(yes "The quick brown fox jumps over the lazy dog near the old stone bridge." | head -n 320 | tr "\n" " ")
+    n=0
     while :; do
-      curl -fsS -m 300 "$0/api/generate" -d "{\"model\":\"$1\",\"prompt\":\"Count from 1 to 300 in words.\",\"stream\":false,\"keep_alive\":\"10m\",\"options\":{\"num_predict\":500}}" \
-        >/dev/null 2>&1 && echo ok >> "$2"
+      n=$((n + 1))
+      if [ $((n % 2)) -eq 1 ]; then
+        body="{\"model\":\"$1\",\"prompt\":\"Say ok after reading: $long\",\"stream\":false,\"keep_alive\":\"10m\",\"options\":{\"num_ctx\":8192,\"num_predict\":8}}"
+      else
+        body="{\"model\":\"$1\",\"prompt\":\"Count from 1 to 300 in words.\",\"stream\":false,\"keep_alive\":\"10m\",\"options\":{\"num_ctx\":8192,\"num_predict\":500}}"
+      fi
+      curl -fsS -m 300 "$0/api/generate" -d "$body" >/dev/null 2>&1 && echo ok >> "$2"
     done' "$OLLAMA_URL" "$MODEL" "$GPU_OK" >/dev/null 2>&1
 }
 any_alive() { local p; for p in "$@"; do kill -0 "$p" 2>/dev/null && return 0; done; return 1; }
