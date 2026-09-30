@@ -135,7 +135,10 @@ fi
 WANT_GPU=0
 for p in "${PHASE_LIST[@]}"; do case "$p" in gpu|all) WANT_GPU=1 ;; esac; done
 if [ "$WANT_GPU" -eq 1 ]; then
-  if ! curl -fsS -m 10 "$OLLAMA_URL/api/tags" 2>/dev/null | grep -q "\"name\":\"$MODEL\""; then
+  # the answer is read whole, then searched: `curl | grep -q` under pipefail
+  # fails when grep stops at the first match and curl gets SIGPIPE on a long list
+  tags=$(curl -fsS -m 10 "$OLLAMA_URL/api/tags" 2>/dev/null) || tags=""
+  if ! grep -q "\"name\":\"$MODEL\"" <<<"$tags"; then
     say "Ollama isn't answering, or $MODEL isn't installed. Pick an installed one with --model, or run --phases cpu,memory."
     exit 1
   fi
@@ -219,7 +222,8 @@ run_phase() {
   case "$name" in gpu|all)
     # The load only tests the card if Ollama really put the model on it. After a reboot
     # Ollama once started before the driver was ready and ran everything on the CPU.
-    if [ "$verdict" = OK ] && ! grep -o '"size_vram":[0-9]*' "$GPU_OK.ps" 2>/dev/null | grep -qv ':0$'; then
+    on_card=$(grep -o '"size_vram":[0-9]*' "$GPU_OK.ps" 2>/dev/null | grep -vc ':0$' || true)
+    if [ "$verdict" = OK ] && [ "${on_card:-0}" -eq 0 ]; then
       verdict="FAIL"; why="Ollama ran the model on the CPU, so the graphics card wasn't tested (restart Ollama and check the driver)"
     fi ;;
   esac
