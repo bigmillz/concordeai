@@ -339,14 +339,51 @@ around a little from time to time.
   - The gateway never sees the code: a root step checks it and adds the key.
   - To list devices: `sudo ollama1-pair --list`.
   - To remove one: `sudo ollama1-pair --remove ID`, or use the panel.
-- **Models:** none are installed. Choose them first. For each one:
-  1. Add its name to the allow-list at the desktop:
-     `sudo nano /etc/ollama1/models.allow` (one name per line, e.g. `qwen3:14b`).
-  2. Click **Pull** in the panel.
+- **Models:** none are installed. Choose them first. The allow-list,
+  `/etc/ollama1/models.allow`, decides what may be installed (one name per
+  line, e.g. `qwen3:14b`), and `ollama1-models` makes the installed models
+  match it:
 
-  The panel can't pull anything that isn't on the list. On the desktop,
-  `sudo ollama list` shows what's installed. Ollama only answers root and
-  the kit's services.
+  ```bash
+  sudo ollama1-models add qwen3:14b          # on the list, then offers to download it
+  sudo ollama1-models add gpt-oss:120b ram   # the same, allowed to use system memory
+  sudo ollama1-models status                 # what a sync would do; changes nothing
+  sudo ollama1-models sync                   # that preview, then (typed yes) exactly that
+  sudo ollama1-models remove qwen3:14b       # off the list, and deleted
+  ```
+
+  - **A sync** lists what it will do, with sizes: **Remove** (installed,
+    not on the list), **Download** (on the list, not installed) and
+    **Update** (the registry has a newer version). Then the total to
+    download, the space freed, and the disk space now and after.
+    - Nothing happens until you type `yes`, and then it does exactly what
+      it listed: removals first (so their space is there), then downloads
+      and updates, with a bar for the model and one for the whole sync
+      ("about 12 min left", from a smoothed rate). Each download is tried 3
+      times. A summary follows.
+    - **Removal only ever touches installed models that are not on the
+      allow-list.** Each one is checked against the list again right before
+      it's deleted: a model put back on the list meanwhile is kept, and one
+      taken off the list isn't downloaded.
+    - An update is found without downloading anything: the registry's
+      manifest for the tag is compared with the installed one (Ollama keeps
+      the manifest byte for byte, and its digest is what `ollama list`
+      shows). Sizes count only layers that aren't on the disk already.
+    - A model the registry doesn't know (a typo) or can't be checked
+      (offline) is listed with a `?` and left alone: never removed.
+    - A sync that would leave under 2 GiB free is refused.
+    - Ollama's `cloud` entries aren't models on this disk: a sync leaves them
+      alone, and the gateway never serves them.
+    - One sync at a time. The desktop won't sleep during one.
+  - **In the panel**, **Update model library** shows the same preview.
+    **Apply these N changes** then starts a root unit that recomputes the
+    plan and carries it out only if it is still the one you saw; if the
+    list or the registry changed, it refuses and shows the new preview
+    instead. A preview is good for 30 minutes. Progress shows in the panel.
+  - The panel's **Pull** and **Remove** buttons still work for one model.
+    The panel can't add to the list: that stays at the desktop.
+  - On the desktop, `sudo ollama list` shows what's installed. Ollama only
+    answers root and the kit's services.
 
   **Models that may use system memory.** Every model runs entirely on the
   GPU unless its line in the allow-list ends in `ram`:

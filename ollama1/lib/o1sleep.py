@@ -37,8 +37,13 @@ def _active_units(patterns):
     return [line.split()[0] for line in r.stdout.splitlines() if line.strip()]
 
 
+def library_lock():
+    return os.path.join(Paths.run, "library", "sync.lock")
+
+
 def setup_running(lock=None):
-    """True if setup.sh holds its lock (it keeps fd 9 on it)."""
+    """True if setup.sh holds its lock (it keeps fd 9 on it); with another
+    lock file, true if anything holds that one."""
     lock = lock or SETUP_LOCK
     try:
         fd = os.open(lock, os.O_RDONLY)
@@ -65,6 +70,9 @@ def busy_reasons(active_units=_active_units, setup_lock=None):
             reasons.append(why)
     if setup_running(setup_lock):
         reasons.append("setup.sh is running")
+    lib_why = dict(BUSY_UNITS)["ollama1-models-sync.service"]
+    if lib_why not in reasons and setup_running(library_lock()):   # sudo ollama1-models sync
+        reasons.append(lib_why)
     return reasons
 
 

@@ -240,6 +240,60 @@ class TestActions(unittest.TestCase):
         self.assertEqual(A["started"], ["ollama1-pair-window.service"])
 
 
+class TestLibraryActions(unittest.TestCase):
+    """Update model library: the preview unit, then the sync unit only for
+    the preview the panel showed (confirmed, fresh, with something to do)."""
+
+    def setUp(self):
+        A["started"].clear()
+        import o1library
+        self.L = o1library
+        os.makedirs(o1library.library_dir(), exist_ok=True)
+        self.addCleanup(lambda: os.path.exists(o1library.preview_file()) and os.unlink(o1library.preview_file()))
+
+    def preview(self, **kw):
+        p = {"download": [{"name": "a:1b", "bytes": 10}], "update": [], "remove": [{"name": "z:1b", "bytes": 5}],
+             "unknown": [], "allow_errors": [], "installed": ["z:1b"], "enough_space": True,
+             "totals": {"download_bytes": 10, "update_bytes": 0, "freed_bytes": 5, "free_now": 100, "free_after": 95},
+             "made_at": int(time.time())}
+        p.update(kw)
+        p["id"] = self.L.plan_id(p)
+        self.L.write_preview(p)
+        return p
+
+    def test_preview_unit(self):
+        self.assertEqual(post({"action": "library-preview"})[0], 202)
+        self.assertEqual(A["started"], ["ollama1-models-preview.service"])
+
+    def test_sync_only_the_shown_preview(self):
+        self.assertEqual(post({"action": "library-sync", "arg": "0" * 16, "confirm": "0" * 16})[0], 409)
+        p = self.preview()
+        self.assertEqual(post({"action": "library-sync", "arg": p["id"]})[0], 409)             # not confirmed
+        self.assertEqual(post({"action": "library-sync", "arg": "f" * 16, "confirm": "f" * 16})[0], 409)
+        self.assertEqual(post({"action": "library-sync", "arg": p["id"], "confirm": "yes"})[0], 409)
+        self.assertEqual(A["started"], [])
+        self.assertEqual(post({"action": "library-sync", "arg": p["id"], "confirm": p["id"]})[0], 202)
+        self.assertEqual(A["started"], ["ollama1-models-sync.service"])
+
+    def test_sync_refused_when_stale_full_or_empty(self):
+        for kw in ({"made_at": int(time.time()) - 3600}, {"enough_space": False},
+                   {"download": [], "remove": []}):
+            A["started"].clear()
+            p = self.preview(**kw)
+            st, data, _ = post({"action": "library-sync", "arg": p["id"], "confirm": p["id"]})
+            self.assertEqual(st, 409, kw)
+            self.assertEqual(A["started"], [], kw)
+
+    def test_library_endpoint(self):
+        p = self.preview()
+        st, data, _ = get("/api/library")
+        self.assertEqual(st, 200)
+        self.assertEqual(json.loads(data)["preview"]["id"], p["id"])
+        st, page, _ = get("/")
+        self.assertIn(b"Update model library", page)
+        self.assertIn(b"removes installed models that aren't on the allow-list (nothing else)", page)
+
+
 class FakeTtyd:
     """ttyd on a UNIX socket, sending its own (weaker) framing headers."""
 

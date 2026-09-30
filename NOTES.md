@@ -503,6 +503,32 @@ provider comes later and follows `ollama1/PROTOCOL.md`. How to run it is in
     - Which fonts Ubuntu's console-setup ships with braille is unknown: the
       picker adapts.
   - Render cost on the Mac: about 1-2 ms for 240x67.
+- **Model library sync** (`sudo ollama1-models sync|status|add NAME [ram]|remove NAME`,
+  and the panel's **Update model library**): makes the installed models
+  match the allow-list.
+  - The preview lists Remove / Download / Update with sizes (only layers
+    not on disk yet), the total, the space freed and the disk free after.
+    A typed `yes` does exactly that plan: removals first, then pulls with a
+    bar per model and one overall ("about N min left" from a smoothed
+    rate), 3 tries each, then a summary.
+  - **Removal only ever touches installed models that are not on the
+    list**; each is re-checked against the list just before its delete. A
+    randomized test (60 libraries and lists, with `:latest`, bad lines and
+    `ram` flags) proves nothing listed is ever deleted and the deletes equal
+    the preview. Ollama cloud entries are left alone.
+  - Updates without downloading: the registry manifest's sha256 is compared
+    with the installed digest. Ollama writes the pulled manifest byte for
+    byte and lists its sha256 as the digest (checked in the v0.34.4
+    source). A model the registry can't confirm is shown with `?`, never
+    removed.
+  - The panel runs two fixed units (polkit updated):
+    `ollama1-models-preview.service` writes the preview, and
+    `ollama1-models-sync.service` recomputes it and proceeds only if it is
+    the same plan the panel showed (fresh, confirmed with its id). Otherwise
+    it refuses and shows the new preview. Progress goes to
+    `/run/ollama1/library/sync.json`.
+  - One sync at a time (a lock), and sleep is refused while one runs, from
+    the panel or the CLI.
 - Tested on the Mac: 199 unit tests (incl. shellcheck, the polkit rule in
   node, the setup disk steps against fake mdadm/blkid/lsblk, the guide's
   file and config references). All 75 mutants are caught

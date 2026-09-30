@@ -32,6 +32,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
 
+import o1library  # noqa: E402
 import o1ollama  # noqa: E402
 import o1pair  # noqa: E402
 import o1sleep  # noqa: E402
@@ -49,6 +50,8 @@ FIXED_UNITS = {
     "lan-on": "ollama1-lan-on.service",
     "lan-off": "ollama1-lan-off.service",
     "backup": "ollama1-backup.service",
+    "library-preview": "ollama1-models-preview.service",
+    "library-sync": "ollama1-models-sync.service",
 }
 TEMPLATE_UNITS = {
     "remove-device": "ollama1-rmdevice@%s.service",
@@ -185,6 +188,25 @@ class Panel:
         return {"installed": installed, "allow": allow, "allow_errors": errors,
                 "pull": read_json(Paths.pull_status)}
 
+    def library(self):
+        return {"preview": o1library.read_preview(), "sync": read_json(o1library.status_file())}
+
+    def library_sync_refusal(self, arg, confirm):
+        """The sync unit carries out the preview the panel showed; start it
+        only for that preview, confirmed, fresh, and with something to do."""
+        p = o1library.read_preview()
+        if p is None:
+            return 409, "no current preview: press Update model library again"
+        if arg != p["id"] or confirm != p["id"]:
+            return 409, "the preview changed: look at it again"
+        if not p.get("enough_space", False):
+            return 409, "not enough disk space for this"
+        if o1library.nothing_to_do(p):
+            return 409, "nothing to do"
+        if o1sleep.setup_running(o1library.lock_file()):
+            return 409, "a sync is already running"
+        return None
+
     def action(self, obj):
         act = obj.get("action")
         arg = obj.get("arg")
@@ -193,6 +215,10 @@ class Panel:
         if act in FIXED_UNITS:
             if act == "reboot" and obj.get("confirm") != "reboot":
                 return 400, "confirm the reboot"
+            if act == "library-sync":
+                bad = self.library_sync_refusal(arg, obj.get("confirm"))
+                if bad:
+                    return bad
             if act == "sleep":
                 if obj.get("confirm") != "sleep":
                     return 400, "confirm the sleep"
@@ -293,6 +319,8 @@ def make_handler(panel):
                 return self.send(200, {"devices": o1pair.devices_list()})
             if path == "/api/models":
                 return self.send(200, panel.models())
+            if path == "/api/library":
+                return self.send(200, panel.library())
             if path == "/api/logs":
                 return self.send(200, panel.logs())
             self.send(404, {"error": "not found"})
@@ -465,7 +493,8 @@ button:hover{border-color:var(--ink2)}button.danger{color:var(--bad)}
 padding:4px 8px;font-size:12px;display:none;white-space:nowrap}.tip b{font-size:13px}
 .seg button.on{border-color:var(--series);color:var(--series)}
 #msg{min-height:20px;color:var(--ink2);font-size:13px;margin-top:8px}
-.note{color:var(--muted);font-size:12px}.between{justify-content:space-between}.mt{margin-top:10px}
+.note{color:var(--muted);font-size:12px}
+.bar{height:8px;background:var(--grid);border-radius:4px;overflow:hidden;margin:4px 0 8px}.bar i{display:block;height:100%;background:var(--series)}.between{justify-content:space-between}.mt{margin-top:10px}
 @media (max-width:600px){main{padding:10px}header{padding:12px}}
 </style></head><body>
 <header><h1>ollama1</h1><span class="who">{{EMAIL}}</span></header>
@@ -484,7 +513,9 @@ padding:4px 8px;font-size:12px;display:none;white-space:nowrap}.tip b{font-size:
  <div class="card"><h2>System</h2><dl class="kv" id="sys"></dl></div>
 </div>
 <div class="card"><h2>Models</h2><table id="models"></table>
- <p class="note">Only models on the allow-list (/etc/ollama1/models.allow, edited at the desktop) can be pulled. A model marked <code>ram</code> there may use system memory when it doesn't fit in VRAM (slower); every other model runs on the GPU only.</p><div id="pull" class="sub"></div></div>
+ <div class="row mt"><button id="libbtn">Update model library</button><span class="sub" id="libmsg"></span></div>
+ <div id="lib"></div>
+ <p class="note">Update model library shows what it would change first: it downloads models on the allow-list that aren't installed, updates the ones with a newer version, and removes installed models that aren't on the allow-list (nothing else). Only models on the allow-list (/etc/ollama1/models.allow, or <code>sudo ollama1-models add NAME</code> at the desktop) can be pulled. A model marked <code>ram</code> there may use system memory when it doesn't fit in VRAM (slower); every other model runs on the GPU only.</p><div id="pull" class="sub"></div></div>
 <div class="grid">
  <div class="card"><h2>Paired devices</h2><table id="devices"></table>
   <div class="row mt"><button data-act="pair">Open pairing window</button></div>
@@ -566,6 +597,34 @@ async function refreshSlow(){try{const d=await api('/api/devices');table($('devi
  try{const l=await api('/api/logs');const acts=[];for(const [k,v] of Object.entries(l.actions||{}))acts.push([k,v.result+', '+ago(v.at),v.result==='failed'?'bad':'']);kv($('acts'),acts);
   table($('log'),['Time','Device','Model','Kind','Status','ms','Tokens in','Tokens out'],(l.recent||[]).slice().reverse().slice(0,40).map(r=>
    [new Date(r.t*1000).toLocaleTimeString(),r.device,r.model,r.kind,String(r.status),String(r.ms),String(r.prompt_tokens),String(r.tokens)]));}catch(e){}}
+// --- model library: preview, then exactly that ---
+let libWant=0;
+$('libbtn').addEventListener('click',()=>{libWant=Date.now()/1000-2;act('library-preview');$('libmsg').textContent='Checking the registry...';});
+function bar(f){const b=el('div',undefined,'bar'),i=el('i');i.style.width=Math.round(Math.max(0,Math.min(1,f))*100)+'%';b.append(i);return b;}
+function eta(s){if(s==null)return '';return s<60?'less than a minute left':'about '+Math.ceil(s/60)+' min left';}
+async function refreshLib(){let l;try{l=await api('/api/library');}catch(e){return;}
+ const box=$('lib'),p=l.preview,sy=l.sync||{};box.replaceChildren();$('libbtn').disabled=sy.state==='running';
+ if(sy.state==='running'){const e=sy.event||{};$('libmsg').textContent='Syncing...';
+  if(e.phase!=='remove'&&e.model_total!=null){box.append(el('div',(e.phase==='update'?'Updating ':'Downloading ')+e.index+' of '+e.count+': '+e.name+'  ·  '+gib(e.model_done)+' of '+gib(e.model_total)+(e.attempt>1?' (try '+e.attempt+' of 3)':''),'sub'),bar(e.model_total?e.model_done/e.model_total:0),
+   el('div','All: '+Math.round(100*(e.overall||0))+'%'+(e.eta!=null?'  ·  '+eta(e.eta):''),'sub'),bar(e.overall||0));}
+  (sy.log||[]).forEach(x=>box.append(el('div',x,'note')));return;}
+ if(sy.state==='done'&&sy.summary&&!libWant){const s=sy.summary;$('libmsg').textContent=sy.message||('Done '+ago(sy.at)+': removed '+(s.removed||[]).length+', downloaded '+(s.downloaded||[]).length+', updated '+(s.updated||[]).length+((s.failed||[]).length?', failed '+s.failed.length:''));
+  (s.failed||[]).forEach(f=>box.append(el('div','failed: '+f.name+' ('+f.error+')','bad')));return;}
+ if(sy.state==='failed'||sy.state==='changed'||sy.state==='refused')$('libmsg').textContent=sy.message||sy.state;
+ if(libWant&&(!p||p.made_at<libWant)){$('libmsg').textContent=sy.state==='failed'&&sy.at>=libWant?'Could not check: '+sy.message:'Checking the registry...';return;}
+ if(!p)return;
+ if(libWant){$('libmsg').textContent='';}
+ const rows=[];p.remove.forEach(x=>rows.push(['Remove',x.name,gib(x.bytes)]));p.download.forEach(x=>rows.push(['Download',x.name,gib(x.bytes)]));
+ p.update.forEach(x=>rows.push(['Update',x.name,gib(x.bytes)]));(p.unknown||[]).forEach(x=>rows.push(['?',x.name,x.why]));
+ const t=el('table');table(t,['','Model','Size'],rows);box.append(t);const tt=p.totals;
+ box.append(el('div','Download '+gib(tt.download_bytes+tt.update_bytes)+'  ·  free '+gib(tt.freed_bytes)+'  ·  disk free now '+tib(tt.free_now)+', after '+tib(tt.free_after),'sub'));
+ const n=p.remove.length+p.download.length+p.update.length;
+ if(!n){box.append(el('div','Nothing to change: the library matches the allow-list.','sub'));return;}
+ if(!p.enough_space){box.append(el('div','Not enough disk space for this.','bad'));return;}
+ const go=el('button','Apply these '+n+' changes');go.className='mt';go.addEventListener('click',()=>{
+  if(confirm('Remove '+p.remove.length+', download '+p.download.length+', update '+p.update.length+' model(s), exactly as listed?')){libWant=0;act('library-sync',p.id,p.id);}});
+ box.append(go);}
+setInterval(refreshLib,2000);refreshLib();
 // --- history charts: one series each, one axis each, crosshair + tooltip ---
 let range=3600,hist={rows:[]};
 const CH=[['Tokens per second',1,v=>v.toFixed(1)],['GPU busy (%)',2,v=>Math.round(v)+'%'],['VRAM used (GiB)',3,v=>v.toFixed(1)+' GiB'],

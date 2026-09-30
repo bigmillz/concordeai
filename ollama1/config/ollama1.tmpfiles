@@ -4,4 +4,5 @@ d /run/ollama1/pair         0750 root  o1pair  -
 d /run/ollama1/pair-spool   0700 o1gw  root    -
 d /run/ollama1/pair-result  0750 root  o1gw    -
 d /run/ollama1/stats        2750 o1gw  o1view  -
+d /run/ollama1/library      0750 root  o1view  -
 d /run/ollama1/ttyd         0750 root  o1admin -

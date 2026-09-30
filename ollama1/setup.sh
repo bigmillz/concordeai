@@ -457,6 +457,7 @@ install -m 0755 "$KIT"/bin/* "$LIBDIR/bin/"
 ln -sfn "$LIBDIR/bin/ollama1-pair" /usr/local/sbin/ollama1-pair
 ln -sfn "$LIBDIR/bin/ollama1-cf-access" /usr/local/sbin/ollama1-cf-access
 ln -sfn "$LIBDIR/bin/ollama1-lan" /usr/local/sbin/ollama1-lan
+ln -sfn "$LIBDIR/bin/ollama1-models" /usr/local/sbin/ollama1-models
 ln -sfn "$LIBDIR/bin/ollama1-dash" /usr/local/bin/ollama1-top
 ln -sfn /opt/ollama/current/bin/ollama /usr/local/bin/ollama
 install -m 0644 "$KIT"/systemd/* /etc/systemd/system/
@@ -939,7 +940,8 @@ cat <<EOF
   Screen:   the dashboard is on the desktop's monitor (tty1)
   SSH:      ollama1-top     (the same dashboard in a terminal)
   Pair:     sudo ollama1-pair
-  Models:   none installed; add names to /etc/ollama1/models.allow, then Pull in the panel
+  Models:   sudo ollama1-models add qwen3:14b   (then: sudo ollama1-models sync, or the panel's
+            Update model library button)
   Panel:    https://$ADMIN_HOST
 EOF
 if [ "${PW_OFF:-0}" = 1 ]; then

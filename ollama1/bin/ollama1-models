@@ -1,0 +1,270 @@
+#!/usr/bin/python3
+"""ollama1-models: make the installed models match the allow-list.
+
+  sudo ollama1-models status           what a sync would do (changes nothing)
+  sudo ollama1-models sync             the same preview, then (after you type
+                                       yes) exactly that: remove, download, update
+  sudo ollama1-models add NAME [ram]   put a model on the allow-list, then offer
+                                       to download it
+  sudo ollama1-models remove NAME      take it off the allow-list and delete it
+
+A sync removes only installed models that are NOT on the allow-list
+(/etc/ollama1/models.allow). An update is found by comparing the registry's
+manifest with the installed one; nothing is downloaded to check.
+
+The admin panel's "Update model library" button runs the same code through
+two fixed units: ollama1-models-preview.service (status --panel) and
+ollama1-models-sync.service (sync --panel), which carries out the preview
+the panel showed, and refuses if the library has changed since.
+"""
+import os
+import sys
+import time
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
+
+import o1library as L  # noqa: E402
+from o1common import fmt_bytes, safe_label  # noqa: E402
+
+USAGE = __doc__.split("\n\n")[1]
+
+
+def say(*a):
+    print(*a, flush=True)
+
+
+def ask(prompt):
+    try:
+        return input(prompt).strip()
+    except EOFError:
+        return ""
+
+
+def gib(n):
+    return "?" if n is None else fmt_bytes(n)
+
+
+def show_plan(p):
+    rows = ([("Remove", x) for x in p["remove"]] + [("Download", x) for x in p["download"]]
+            + [("Update", x) for x in p["update"]])
+    for e in p["allow_errors"]:
+        say("  ! allow-list line %d ignored (%s): %s" % (e["line"], e["reason"], e["text"]))
+    for x in p["unknown"]:
+        say("  ? %-40s %s" % (safe_label(x["name"], 40), x["why"]))
+    if not rows:
+        say("The library matches the allow-list: nothing to download, update or remove.")
+        return
+    say("")
+    for verb, x in rows:
+        say("  %-9s %-40s %10s" % (verb, safe_label(x["name"], 40), gib(x["bytes"])))
+    t = p["totals"]
+    say("")
+    say("  To download: %s (%d new, %d updated)   Freed: %s (%d removed)"
+        % (fmt_bytes(t["download_bytes"] + t["update_bytes"]), len(p["download"]), len(p["update"]),
+           fmt_bytes(t["freed_bytes"]), len(p["remove"])))
+    say("  Disk free now: %s   after: %s" % (gib(t["free_now"]), gib(t["free_after"])))
+    if not p["enough_space"]:
+        say("  Not enough disk space: take something off the allow-list first.")
+
+
+def bar(frac, width=30):
+    n = int(round(max(0.0, min(1.0, frac)) * width))
+    return "[" + "#" * n + "-" * (width - n) + "]"
+
+
+class Printer:
+    """Two progress bars (this model, everything) in a terminal; one line per
+    step otherwise (the journal, when the panel runs it)."""
+
+    def __init__(self, tty):
+        self.tty = tty
+        self.drawn = False
+        self.last_line = 0.0
+
+    def __call__(self, ev):
+        if ev.get("error"):
+            self.clear()
+            say("  %s %s: attempt %s failed: %s" % (ev["phase"], ev["name"], ev.get("attempt"), ev["error"]))
+            return
+        if ev["phase"] == "remove":
+            self.clear()
+            say("  removed %s" % ev["name"])
+            return
+        mfrac = ev["model_done"] / float(ev["model_total"]) if ev.get("model_total") else 0.0
+        l1 = "  %s %d/%d %-32s %s %3d%%  %s" % (ev["phase"], ev["index"], ev["count"], safe_label(ev["name"], 32),
+                                              bar(mfrac, 24), 100 * mfrac, fmt_bytes(ev["model_total"]))
+        l2 = "  all%s %s %3d%%  %s" % (" " * 38, bar(ev["overall"], 24), 100 * ev["overall"], L.eta_text(ev["eta"]))
+        if self.tty:
+            if self.drawn:
+                sys.stdout.write("\033[1A\r\033[2K")
+            sys.stdout.write("\r\033[2K" + l1 + "\n\033[2K" + l2)
+            sys.stdout.flush()
+            self.drawn = True
+        elif time.monotonic() - self.last_line > 30:
+            self.last_line = time.monotonic()
+            say(l1.strip() + " | " + l2.strip())
+
+    def clear(self):
+        if self.tty and self.drawn:
+            sys.stdout.write("\n")
+            self.drawn = False
+
+
+def show_summary(s):
+    say("")
+    say("Done. Removed %d, downloaded %d, updated %d, failed %d."
+        % (len(s["removed"]), len(s["downloaded"]), len(s["updated"]), len(s["failed"])))
+    for f in s["failed"]:
+        say("  failed: %s (%s)" % (f["name"], f["error"]))
+    if s["skipped"]:
+        say("  left alone (the allow-list changed meanwhile): %s" % ", ".join(s["skipped"]))
+
+
+def panel_report():
+    """Progress to /run/ollama1/library/sync.json for the panel (at most ~2/s)."""
+    state = {"last": 0.0, "log": []}
+
+    def report(ev):
+        if ev.get("error") or ev["phase"] == "remove":
+            state["log"] = (state["log"] + ["%s %s%s" % (ev["phase"], ev["name"],
+                                                          ": " + ev["error"] if ev.get("error") else "")])[-20:]
+        elif time.monotonic() - state["last"] < 0.5:
+            return
+        state["last"] = time.monotonic()
+        L.write_status({"state": "running", "event": ev, "log": state["log"]})
+    return report
+
+
+def cmd_status(args):
+    panel = "--panel" in args
+    p = L.plan()
+    if panel:
+        L.write_preview(p)
+        L.write_status({"state": "previewed", "id": p["id"]})
+        say("preview %s written" % p["id"])
+        return 0
+    show_plan(p)
+    return 0
+
+
+def cmd_sync(args):
+    panel = "--panel" in args
+    with L.Lock():
+        if panel:
+            want = L.read_preview()
+            p = L.plan()
+            if want is None or want["id"] != p["id"]:
+                L.write_preview(p)
+                L.write_status({"state": "changed", "id": p["id"],
+                                "message": "The library changed since the preview (or it expired). "
+                                           "Look at the new preview and try again."})
+                say("refused: the plan differs from the preview the panel showed")
+                return 1
+            if not p["enough_space"]:
+                L.write_status({"state": "refused", "message": "not enough disk space"})
+                return 1
+            if L.nothing_to_do(p):
+                L.write_status({"state": "done", "summary": {}, "message": "nothing to do"})
+                return 0
+            L.write_status({"state": "running", "id": p["id"]})
+            s = L.execute(p, report=panel_report())
+            show_summary(s)
+            L.write_status({"state": "done", "id": p["id"], "summary": s})
+            return 0 if not s["failed"] else 1
+        say("Checking the registry for each model on the allow-list...")
+        p = L.plan()
+        show_plan(p)
+        if L.nothing_to_do(p):
+            return 0
+        if not p["enough_space"]:
+            return 1
+        say("")
+        if ask("Type yes to do exactly this: ") != "yes":
+            say("Nothing changed.")
+            return 1
+        pr = Printer(sys.stdout.isatty())
+        s = L.execute(p, report=pr)
+        pr.clear()
+        show_summary(s)
+        return 0 if not s["failed"] else 1
+
+
+def cmd_add(args):
+    if not args or len(args) > 2 or (len(args) == 2 and args[1] != "ram"):
+        sys.exit("usage: ollama1-models add NAME [ram]")
+    name, ram = args[0], len(args) == 2
+    try:
+        what = L.allow_add(name, ram)
+    except ValueError as e:
+        sys.exit(str(e))
+    say("%s: %s%s" % (name, what, " (may use system memory)" if ram else ""))
+    manifest, _ = L.remote_manifest(name)
+    if manifest is None:
+        say("The registry doesn't know %s (or can't be reached). Check the spelling; "
+            "`sudo ollama1-models remove %s` takes it off again." % (name, name))
+        return 1
+    if any(L.listed(m["name"], [name]) for m in L.installed_models()):
+        say("It's already installed.")
+        return 0
+    size = L.to_fetch(manifest)
+    if ask("Download it now (%s)? [y/N] " % fmt_bytes(size)).lower() not in ("y", "yes"):
+        say("Later: sudo ollama1-models sync")
+        return 0
+    with L.Lock():
+        pr = Printer(sys.stdout.isatty())
+        s = L.execute({"remove": [], "update": [], "download": [{"name": name, "bytes": size}]}, report=pr)
+        pr.clear()
+        show_summary(s)
+    return 0 if not s["failed"] else 1
+
+
+def cmd_remove(args):
+    if len(args) != 1:
+        sys.exit("usage: ollama1-models remove NAME")
+    name = args[0]
+    on_list = L.listed(name, L.allowed_names())
+    inst = [m for m in L.installed_models() if L.listed(m["name"], [name])]
+    if not on_list and not inst:
+        sys.exit("%s is neither on the allow-list nor installed" % name)
+    what = []
+    if on_list:
+        what.append("take %s off the allow-list" % name)
+    if inst:
+        what.append("delete it (%s)" % fmt_bytes(inst[0].get("size")))
+    if ask("This will %s. Type yes: " % " and ".join(what)) != "yes":
+        say("Nothing changed.")
+        return 1
+    with L.Lock():
+        if on_list:
+            L.allow_remove(name)
+            say("off the allow-list")
+        for m in inst:
+            # now it's off the list, so this is what a sync would do anyway
+            if L.listed(m["name"], L.allowed_names()):
+                continue
+            say("deleted %s" % m["name"] if L.delete_one(m["name"]) else "could not delete %s" % m["name"])
+    return 0
+
+
+def main():
+    args = sys.argv[1:]
+    if not args or args[0] in ("-h", "--help", "help"):
+        say(USAGE)
+        return 0
+    if os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
+        sys.exit("run it with sudo")
+    cmds = {"status": cmd_status, "sync": cmd_sync, "add": cmd_add, "remove": cmd_remove}
+    if args[0] not in cmds:
+        sys.exit(USAGE)
+    try:
+        return cmds[args[0]](args[1:])
+    except RuntimeError as e:
+        if "--panel" in args:
+            L.write_status({"state": "failed", "message": str(e)[:200]})
+        sys.exit(str(e))
+    except KeyboardInterrupt:
+        sys.exit("\nstopped. What finished stays; a half-done download resumes on the next sync.")
+
+
+if __name__ == "__main__":
+    sys.exit(main())

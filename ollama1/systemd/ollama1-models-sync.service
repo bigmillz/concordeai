@@ -1,0 +1,9 @@
+[Unit]
+Description=ollama1: sync the model library to the allow-list (exactly the panel's preview)
+After=ollama.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-models sync --panel
+TimeoutStartSec=12h

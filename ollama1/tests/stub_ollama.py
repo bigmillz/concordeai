@@ -49,12 +49,17 @@ CLOUD2 = {"name": "plain:latest", "model": "plain:latest", "size": 384,
 
 class Stub:
     def __init__(self, port, models=None):
-        self.models = dict(models or DEFAULT_MODELS)
+        self.models = dict(DEFAULT_MODELS if models is None else models)
         self.loaded = {}
         self.calls = []
         self.lock = threading.Lock()
         self.tokens = 6
         self.delay = 0.0
+        # pulls: name -> [(digest, size, already on disk)], the digest the
+        # model gets once pulled, and how many pulls fail before one works
+        self.pull_layers = {}
+        self.pull_digest = {}
+        self.pull_fail = 0
         stub = self
 
         class H(BaseHTTPRequestHandler):
@@ -75,7 +80,7 @@ class Stub:
                 with stub.lock:
                     stub.calls.append(("GET", self.path, None))
                 if self.path == "/api/tags":
-                    ms = [{"name": n, "model": n, "size": m["size"], "digest": "d-" + n,
+                    ms = [{"name": n, "model": n, "size": m["size"], "digest": m.get("digest", "d-" + n),
                            "details": {"family": "x"}, "modified_at": "2026-09-29T00:00:00Z"}
                           for n, m in stub.models.items()]
                     return self.js(200, {"models": ms + [CLOUD, CLOUD2]})
@@ -86,9 +91,46 @@ class Stub:
                 self.js(404, {"error": "not found"})
 
             def do_DELETE(self):
+                n = int(self.headers.get("Content-Length") or 0)
+                try:
+                    body = json.loads(self.rfile.read(n) or b"{}")
+                except ValueError:
+                    body = {}
                 with stub.lock:
-                    stub.calls.append(("DELETE", self.path, None))
+                    stub.calls.append(("DELETE", self.path, body))
+                    gone = stub.models.pop(body.get("model"), None) if self.path == "/api/delete" else None
+                if self.path == "/api/delete" and gone is None:
+                    return self.js(404, {"error": "model not found"})
                 self.js(200, {})
+
+            def pull(self, name, body):
+                with stub.lock:
+                    fail = stub.pull_fail > 0
+                    if fail:
+                        stub.pull_fail -= 1
+                if body.get("stream", True) is False:
+                    return self.js(500 if fail else 200, {"error": "boom"} if fail else {"status": "success"})
+                self.send_response(200)
+                self.send_header("Content-Type", "application/x-ndjson")
+                self.send_header("Transfer-Encoding", "chunked")
+                self.end_headers()
+                self.chunk(b'{"status":"pulling manifest"}\n')
+                if fail:
+                    self.chunk(b'{"error":"connection reset"}\n')
+                    self.wfile.write(b"0\r\n\r\n")
+                    return
+                layers = stub.pull_layers.get(name) or [("sha256:" + "0" * 64, 1000, False)]
+                for digest, size, cached in layers:
+                    steps = [size] if cached else [size // 4, size // 2, size]
+                    for done in [0] + steps if not cached else steps:
+                        self.chunk(json.dumps({"status": "pulling " + digest[7:19], "digest": digest,
+                                               "total": size, "completed": done}).encode() + b"\n")
+                self.chunk(b'{"status":"verifying sha256 digest"}\n')
+                self.chunk(b'{"status":"success"}\n')
+                self.wfile.write(b"0\r\n\r\n")
+                with stub.lock:
+                    stub.models[name] = {"size": sum(x[1] for x in layers), "info": llama_info(),
+                                         "digest": stub.pull_digest.get(name, "d-" + name)}
 
             def do_POST(self):
                 n = int(self.headers.get("Content-Length") or 0)
@@ -97,7 +139,9 @@ class Stub:
                     stub.calls.append(("POST", self.path, body))
                 name = body.get("model")
                 m = stub.models.get(name)
-                if self.path in ("/api/pull", "/api/delete", "/api/create", "/api/copy", "/api/push"):
+                if self.path == "/api/pull":
+                    return self.pull(name, body)
+                if self.path in ("/api/delete", "/api/create", "/api/copy", "/api/push"):
                     return self.js(200, {"status": "success"})
                 if m is None:
                     return self.js(404, {"error": "model '%s' not found" % name})
