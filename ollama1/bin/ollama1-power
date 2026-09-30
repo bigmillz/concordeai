@@ -43,7 +43,12 @@ def need_root():
 
 
 def money(v, sym):
-    return "-" if v is None else "%s%.2f" % (sym, v)
+    """Whole cents, always two digits; under half a cent says so, not $0.00."""
+    if v is None:
+        return "-"
+    if v > 0 and round(v, 2) == 0:
+        return "<%s0.01" % sym
+    return "%s%s" % (sym, format(v, ",.2f"))
 
 
 def cmd_status(args):

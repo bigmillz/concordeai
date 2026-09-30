@@ -379,6 +379,38 @@ class TestPowerPanel(unittest.TestCase):
         self.assertEqual(post_path("/api/elsewhere", b"{}")[0], 404)
 
 
+class TestMoneyFormat(unittest.TestCase):
+    """Dollar amounts on the power card: whole cents, always two digits (a
+    panel once showed $0.0062 and $0.482); under half a cent says so."""
+    def panel_money(self):
+        with open(os.path.join(U.BIN, "ollama1-admin")) as f:
+            src = f.read()
+        m = re.search(r"^const money=.*?^(?=const TIERN)", src, re.S | re.M)
+        self.assertTrue(m, "the panel's money() is gone")
+        return m.group(0)
+
+    @unittest.skipUnless(__import__("shutil").which("node"), "node not installed")
+    def test_panel_money_is_whole_cents(self):
+        import subprocess
+        js = self.panel_money() + "console.log(JSON.stringify([" + ",".join(
+            "money(%s,'%s')" % (v, sym) for v, sym in [
+                ("null", "$"), ("0", "$"), ("0.004", "$"), ("0.0049", "$"), ("0.005", "$"), ("0.0123", "$"),
+                ("0.482", "$"), ("0.987", "$"), ("12.3456", "$"), ("1234.5", "$"), ("7", "$"), ("3.1", "\u20ac"),
+                ("-2.5", "$")]) + "]));"
+        r = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=30)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(r.stdout), ["-", "$0.00", "<$0.01", "<$0.01", "$0.01", "$0.01",
+                                                "$0.48", "$0.99", "$12.35", "$1,234.50", "$7.00", "\u20ac3.10", "-$2.50"])
+
+    def test_no_money_is_formatted_any_other_way(self):
+        with open(os.path.join(U.BIN, "ollama1-admin")) as f:
+            src = f.read()
+        self.assertNotIn("toFixed(4)", self.panel_money())
+        # every cost goes through money(); the per-token figure is per million so cents mean something
+        self.assertIn("Cost per 1 million tokens: '+money(m.cost_per_1k_tokens*1000,sym)", src)
+        self.assertNotIn("Cost per 1,000 tokens", src)
+
+
 class FakeTtyd:
     """ttyd on a UNIX socket, sending its own (weaker) framing headers."""
 

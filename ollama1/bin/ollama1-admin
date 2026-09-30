@@ -723,7 +723,8 @@ async function refreshLib(){let l;try{l=await api('/api/library');}catch(e){retu
 setInterval(refreshLib,2000);refreshLib();
 // --- power and cost ---
 let pw=null,edit=null,seasonIx=0;
-const money=(v,sym)=>v==null?'-':sym+(Math.abs(v)<0.01?v.toFixed(4):Math.abs(v)<1?v.toFixed(3):v.toFixed(2));
+// money is whole cents, always two digits; an amount under half a cent says so instead of showing $0.00
+const money=(v,sym)=>{if(v==null)return '-';const c=Math.round(Math.abs(v)*100);if(v>0&&c===0)return '<'+sym+'0.01';return (v<0?'-':'')+sym+(c/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});};
 const TIERN={on:'On-peak',mid:'Mid-peak',off:'Off-peak',discount:'Discount',flat:'Flat'};
 function pchart(series){const svg=$('pchart');svg.replaceChildren();const W=360,H=90,now=Date.now()/1000;
  const pts=(series||[]).filter(p=>p[0]>=now-3600&&p[1]!=null);if(pts.length<2){const t=sv('text',{x:W/2,y:H/2,'text-anchor':'middle','font-size':11,fill:'var(--muted)'});t.textContent='No data yet';svg.append(t);return;}
@@ -745,7 +746,7 @@ function renderPower(){const s=pw,sym=s.symbol,live=s.live;
  table($('ptable'),['','Energy','Cost'].concat(s.mode==='tou'?['By tier']:[],['Unknown']),rows);
  if(s.since&&s.since>Date.now()/1000-30*86400){const r=el('tr'),td=el('td','Measured since '+new Date(s.since*1000).toLocaleString()+'. Unknown = time with no reading (the desktop off, or the sampler stopped); it is never counted as zero.','note');td.colSpan=5;r.append(td);$('ptable').append(r);}
  const p=s.projection;$('pproj').textContent=p?'Next 30 days: about '+p.kwh.toFixed(0)+' kWh'+(p.cost!=null?', about '+money(p.cost,sym):'')+' (the average of each hour of the week over the last '+p.basis_days+' days, at '+Math.round(p.avg_w)+' W on average)':'Next 30 days: not enough data yet.';
- const m=s.windows['1m'];$('ptok').textContent=m.cost_per_1k_tokens!=null?'Cost per 1,000 tokens: '+money(m.cost_per_1k_tokens,sym)+' (all electricity in the last 30 days over '+m.tokens.toLocaleString()+' tokens generated)':'';}
+ const m=s.windows['1m'];$('ptok').textContent=m.cost_per_1k_tokens!=null?'Cost per 1 million tokens: '+money(m.cost_per_1k_tokens*1000,sym)+' (all electricity in the last 30 days over '+m.tokens.toLocaleString()+' tokens generated)':'';}
 function editorFrom(s){edit=JSON.parse(JSON.stringify(s));seasonIx=0;drawEditor();}
 function inp(type,val,on,attrs){const e=document.createElement('input');e.type=type;if(type==='checkbox')e.checked=!!val;else e.value=val??'';for(const k in attrs||{})e.setAttribute(k,attrs[k]);e.addEventListener('change',()=>on(type==='checkbox'?e.checked:e.value));return e;}
 function drawEditor(){const s=edit,o=pw.options;$('pcur').value=s.currency;

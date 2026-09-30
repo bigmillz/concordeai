@@ -766,6 +766,18 @@ class TestCLI(unittest.TestCase):
         for d in ("etc/ollama1", "var/lib/ollama1-admin", "var/lib/ollama1/energy", "run/ollama1/power"):
             os.makedirs(os.path.join(self.pre, d))
 
+    def test_cli_money_is_whole_cents(self):
+        import importlib.machinery
+        import importlib.util
+        loader = importlib.machinery.SourceFileLoader("o1power_cli", os.path.join(U.BIN, "ollama1-power"))
+        spec = importlib.util.spec_from_loader("o1power_cli", loader)
+        mod = importlib.util.module_from_spec(spec)
+        loader.exec_module(mod)
+        cases = [(None, "-"), (0, "$0.00"), (0.004, "<$0.01"), (0.0123, "$0.01"), (0.482, "$0.48"),
+                 (12.3456, "$12.35"), (1234.5, "$1,234.50"), (7, "$7.00")]
+        for v, want in cases:
+            self.assertEqual(mod.money(v, "$"), want, v)
+
     def cli(self, *args):
         env = dict(os.environ, OLLAMA1_PREFIX=self.pre)
         return subprocess.run([sys.executable, os.path.join(U.BIN, "ollama1-power")] + list(args),
