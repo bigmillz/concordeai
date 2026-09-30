@@ -153,6 +153,13 @@ def frame(st, now=None):
         datetime.datetime.fromtimestamp(last).strftime("%d %b %H:%M") if last else "never",
         "YES" + ((" (" + ", ".join(up.get("reboot_pkgs")[:3]) + ")") if up.get("reboot_pkgs") else "")
         if up.get("reboot_required") else "no"), "warn" if up.get("reboot_required") else ""))
+    sl = up.get("sleep") or {}
+    rc = sl.get("resume_check") or {}
+    L.append(("SLEEP      last sleep %s   last wake %s%s" % (
+        ago(sl.get("last_sleep"), now) if sl.get("last_sleep") else "never",
+        ago(sl.get("last_wake"), now) if sl.get("last_wake") else "never",
+        ("   after waking: " + ("ok" if rc.get("ok") else "PROBLEM")) if rc else ""),
+        "" if rc.get("ok", True) else "bad"))
     L.append(("           Ollama updater: %s %s %s   next check %s" % (
         oll.get("result", "not run"), oll.get("version", ""),
         ago(oll.get("last_run"), now) if oll.get("last_run") else "",

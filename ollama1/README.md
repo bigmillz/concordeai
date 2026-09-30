@@ -464,6 +464,23 @@ around a little from time to time.
   - models from the allow-list;
   - a counts-only log;
   - **Open terminal**, which asks for your Linux user and password.
+- **Sleep.** The panel's **Sleep** button (next to Reboot) suspends the
+  desktop. Its power button does the same.
+  - To wake it, press the power button again. Holding the button down
+    still forces it off.
+  - While it sleeps it can't be reached, and anything plugged into its
+    second network port (the Pi) loses its connection.
+  - Sleep is refused while a model download or library sync, an update, or
+    setup.sh is running. It is allowed during the mirror's first sync,
+    which pauses and carries on after waking.
+  - After every wake a check runs. Ollama must answer (`/api/version`,
+    `/api/ps`) and the GPU must report through sysfs; if not, Ollama and
+    the tunnel restart.
+  - The dashboard and the panel show the last sleep and wake times, and the
+    result of that check.
+  - **Untested until Patrick tries it by hand.** AMD GPU compute (ROCm)
+    after a suspend is a known weak spot.
+  - Automatic idle sleep and Wake-on-LAN are on hold.
 - **LAN mode** is off by default. With it on, the gateway also answers on
   `http://192.168.86.10:8431` from the home LAN, without Access. Signatures
   are still required, and traffic on the LAN is unencrypted. To change it:

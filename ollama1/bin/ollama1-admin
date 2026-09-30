@@ -34,6 +34,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..
 
 import o1ollama  # noqa: E402
 import o1pair  # noqa: E402
+import o1sleep  # noqa: E402
 import o1stats  # noqa: E402
 from o1common import (Paths, load_config, name_hash, parse_allow_list, read_allow_list, read_json,  # noqa: E402
                       write_json_atomic)
@@ -43,6 +44,7 @@ FIXED_UNITS = {
     "update": "ollama1-update-now.service",
     "restart": "ollama1-restart.service",
     "reboot": "ollama1-reboot.service",
+    "sleep": "ollama1-sleep.service",
     "pair": "ollama1-pair-window.service",
     "lan-on": "ollama1-lan-on.service",
     "lan-off": "ollama1-lan-off.service",
@@ -105,6 +107,7 @@ class Panel:
             if isinstance(row, list) and len(row) == 7 and self.clock() - row[0] < 86400:
                 self.history.append(row)
         self.state_cache = (0, None)
+        self.busy = o1sleep.busy_reasons
         self.lock = threading.Lock()
 
     # -- auth -----------------------------------------------------------
@@ -190,6 +193,12 @@ class Panel:
         if act in FIXED_UNITS:
             if act == "reboot" and obj.get("confirm") != "reboot":
                 return 400, "confirm the reboot"
+            if act == "sleep":
+                if obj.get("confirm") != "sleep":
+                    return 400, "confirm the sleep"
+                reasons = self.busy()
+                if reasons:
+                    return 409, "not now: " + "; ".join(reasons)
             unit = FIXED_UNITS[act]
         elif act == "remove-device":
             ids = {d["id"] for d in o1pair.devices_list()}
@@ -483,7 +492,7 @@ padding:4px 8px;font-size:12px;display:none;white-space:nowrap}.tip b{font-size:
  <div class="card"><h2>Actions</h2><div class="row">
   <button data-act="update">Apply updates now</button><button data-act="restart">Restart services</button>
   <button data-act="backup">Back up now</button><button data-act="lan" id="lanbtn">LAN mode</button>
-  <button data-act="reboot" class="danger">Reboot</button></div>
+  <button data-act="sleep">Sleep</button><button data-act="reboot" class="danger">Reboot</button></div>
   <div class="row mt"><a href="/term/" target="_blank" rel="noopener"><button>Open terminal</button></a></div>
   <div id="msg"></div><dl class="kv mt" id="acts"></dl></div>
 </div>
@@ -510,11 +519,16 @@ async function act(action,arg,confirm){const m=$('msg');m.textContent='Starting 
 let lan=false;
 document.querySelectorAll('button[data-act]').forEach(b=>b.addEventListener('click',()=>{const a=b.dataset.act;
  if(a==='reboot'){if(confirm('Reboot the desktop now?'))act('reboot',null,'reboot');return;}
+ if(a==='sleep'){let t='The desktop will sleep. Press its power button to wake it. While it sleeps it can\'t be reached, and anything plugged into its second network port loses its connection.';
+  if((lastState.raid||[]).some(r=>r.action))t+=' The mirror\'s sync pauses while it sleeps and carries on after it wakes.';
+  if(confirm(t))act('sleep',null,'sleep');return;}
  if(a==='lan'){if(confirm(lan?'Turn LAN mode off?':'Turn LAN mode on? The gateway will also answer on the home network without Cloudflare Access (signatures still required, traffic unencrypted).'))act(lan?'lan-off':'lan-on');return;}
  if(a==='update'&&!confirm('Apply all pending updates and update Ollama now?'))return;
  if(a==='restart'&&!confirm('Restart Ollama, the gateway, the terminal and the tunnel? Running requests end.'))return;
  act(a);}));
+let lastState={};
 async function refreshFast(){let s;try{s=await api('/api/state');}catch(e){return;}
+ lastState=s;
  const gw=s.gateway||{},t=gw.tps||{},g=s.gpu||{},tun=s.tunnel||{},up=s.updates||{},ou=up.ollama||{};
  $('tps').textContent=(t.current??0).toFixed(1);$('tpsavg').textContent='1 h '+(t['1h']??0)+'  ·  24 h '+(t['24h']??0);
  $('req').textContent=(gw.active||0)+' active';$('reqsub').textContent=(gw.queued||0)+' queued  ·  '+(gw.requests_today||0)+' today  ·  '+((gw.totals||{}).refused_gpu||0)+' refused for GPU';
@@ -525,6 +539,7 @@ async function refreshFast(){let s;try{s=await api('/api/state');}catch(e){retur
   ['Gateway',gw.time&&!gw.stale?'running':'not running',gw.time&&!gw.stale?'ok':'bad'],
   ['Ollama',gw.ollama_version||'?'],['Pairing window',s.pairing_open?'open':'closed',s.pairing_open?'warn':''],
   ['Reboot required',up.reboot_required?'yes':'no',up.reboot_required?'warn':''],
+  ['Last sleep / wake',((up.sleep||{}).last_sleep?ago(up.sleep.last_sleep):'never')+' / '+((up.sleep||{}).last_wake?ago(up.sleep.last_wake):'never')+(((up.sleep||{}).resume_check||{}).detail?' ('+up.sleep.resume_check.detail+')':''),((up.sleep||{}).resume_check||{}).ok===false?'bad':''],
   ['Security updates',up.last_unattended?'last ran '+ago(up.last_unattended):'never'],
   ['Ollama updater',(ou.result||'not run')+' '+(ou.version||'')+(ou.last_run?', '+ago(ou.last_run):''),ou.result==='failed'?'bad':''],
   ['Next Ollama check',up.next_ollama_update||'?']]);

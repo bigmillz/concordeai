@@ -1,0 +1,14 @@
+#!/bin/sh
+# ollama1 (installed as /usr/lib/systemd/system-sleep/ollama1 by setup.sh).
+# systemd-sleep runs it with "pre" before sleeping and "post" after waking.
+# It records the times (shown on the dashboard and the admin panel) and,
+# after waking, starts the health check without holding up the resume:
+# Ollama and the GPU must answer, else Ollama and the tunnel restart.
+HELPER=${OLLAMA1_HELPER:-/usr/local/lib/ollama1/bin/ollama1-helper}
+case "$1" in
+  pre) "$HELPER" stamp sleep ;;
+  post)
+    "$HELPER" stamp wake
+    systemctl start --no-block ollama1-resume-check.service ;;
+esac
+exit 0

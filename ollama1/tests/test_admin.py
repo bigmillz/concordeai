@@ -156,6 +156,30 @@ class TestActions(unittest.TestCase):
         self.assertEqual(post({"action": "reboot", "confirm": "reboot"})[0], 202)
         self.assertEqual(A["started"], ["ollama1-reboot.service"])
 
+    def test_sleep(self):
+        panel = A["panel"]
+        panel.busy = lambda: []
+        try:
+            self.assertEqual(post({"action": "sleep"})[0], 400)                     # needs the confirm
+            self.assertEqual(post({"action": "sleep", "confirm": "sleep"})[0], 202)
+            self.assertEqual(A["started"], ["ollama1-sleep.service"])
+            A["started"].clear()
+            panel.busy = lambda: ["a model is being downloaded"]
+            st, data, _ = post({"action": "sleep", "confirm": "sleep"})
+            self.assertEqual(st, 409)
+            self.assertIn("a model is being downloaded", json.loads(data)["result"])
+            self.assertEqual(A["started"], [])
+            self.assertEqual(post({"action": "sleep", "arg": "now", "confirm": "sleep"})[0], 409)
+        finally:
+            import o1sleep
+            panel.busy = o1sleep.busy_reasons
+
+    def test_sleep_confirmation_text(self):
+        st, page, _ = get("/")
+        self.assertIn(b"The desktop will sleep. Press its power button to wake it. While it sleeps it can\\'t be "
+                      b"reached, and anything plugged into its second network port loses its connection.", page)
+        self.assertIn(b"sync pauses while it sleeps", page)
+
     def test_unknown_action(self):
         for bad in ({"action": "shell", "arg": "id"}, {"action": "restart; id"}, {"action": ["x"]}):
             self.assertEqual(post(bad)[0], 400)

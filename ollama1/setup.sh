@@ -462,6 +462,16 @@ ln -sfn /opt/ollama/current/bin/ollama /usr/local/bin/ollama
 install -m 0644 "$KIT"/systemd/* /etc/systemd/system/
 install -d -m 0750 -g polkitd /etc/polkit-1/rules.d 2>/dev/null || install -d -m 0755 /etc/polkit-1/rules.d
 install -m 0644 "$KIT/config/50-ollama1.rules" /etc/polkit-1/rules.d/50-ollama1.rules
+# The power button sleeps instead of shutting down (pressing it again wakes
+# it). HUP makes logind re-read its config; a restart would end sessions.
+install -d -m 0755 /etc/systemd/logind.conf.d
+if ! cmp -s "$KIT/config/logind-ollama1.conf" /etc/systemd/logind.conf.d/ollama1.conf; then
+  install -m 0644 "$KIT/config/logind-ollama1.conf" /etc/systemd/logind.conf.d/ollama1.conf
+  systemctl kill -s HUP systemd-logind
+fi
+# After waking: record the time and check Ollama and the GPU.
+install -d -m 0755 /usr/lib/systemd/system-sleep
+install -m 0755 "$KIT/config/ollama1-sleep-hook" /usr/lib/systemd/system-sleep/ollama1
 install -m 0644 "$KIT/config/ollama1.tmpfiles" /etc/tmpfiles.d/ollama1.conf
 systemd-tmpfiles --create /etc/tmpfiles.d/ollama1.conf
 install -m 0644 "$KIT/config/60-ollama1-bridge.conf" /etc/sysctl.d/60-ollama1-bridge.conf

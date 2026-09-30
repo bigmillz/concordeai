@@ -19,6 +19,7 @@ polkit.addRule(function(action, subject) {
         "ollama1-update-now.service",
         "ollama1-restart.service",
         "ollama1-reboot.service",
+        "ollama1-sleep.service",
         "ollama1-pair-window.service",
         "ollama1-lan-on.service",
         "ollama1-lan-off.service",

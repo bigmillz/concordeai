@@ -450,6 +450,26 @@ provider comes later and follows `ollama1/PROTOCOL.md`. How to run it is in
   - The request is the third PROTOCOL vector.
   - Also fixed: the ±61 s skew tests could round to 60 s and pass (the
     one-off flake seen earlier); they use 62 now.
+- **Sleep** (automatic idle sleep and Wake-on-LAN are on hold):
+  - The panel's Sleep button is a fixed action: `ollama1-sleep.service`,
+    which runs `ollama1-helper sleep` (no arguments) and is allowed by the
+    polkit rule. It has the confirmation Patrick worded; while the mirror
+    resyncs, a note says the sync pauses.
+  - `o1sleep.busy_reasons()` refuses it while any of these is active:
+    `ollama1-pull@*`, `ollama1-models-sync`, `ollama1-update-now`,
+    `ollama1-update-ollama`, `apt-daily(-upgrade)`, or setup.sh's lock. The
+    panel checks first (409 with the reasons); the helper checks again
+    before `systemctl suspend`. A RAID resync is allowed.
+  - The power button suspends: `/etc/systemd/logind.conf.d/ollama1.conf`
+    has `HandlePowerKey=suspend` and `HandlePowerKeyLongPress=poweroff`.
+    Setup reloads logind with `kill -s HUP`, never a restart.
+  - `/usr/lib/systemd/system-sleep/ollama1` stamps the sleep and wake
+    times, then starts `ollama1-resume-check` without blocking. The check:
+    Ollama's `/api/version` and `/api/ps`, and amdgpu's VRAM and busy
+    figures. If either fails, Ollama and the tunnel restart and it is
+    logged.
+  - The dashboard and panel show the last sleep and wake.
+  - Untested on the hardware; Patrick tries it by hand.
 - Tested on the Mac: 199 unit tests (incl. shellcheck, the polkit rule in
   node, the setup disk steps against fake mdadm/blkid/lsblk, the guide's
   file and config references). All 75 mutants are caught

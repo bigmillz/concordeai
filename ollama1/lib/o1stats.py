@@ -293,10 +293,16 @@ def next_timer(unit="ollama1-update-ollama.timer"):
     return v
 
 
+def sleep_record():
+    """Last sleep / wake and the check after waking (o1sleep writes it)."""
+    st = read_json(os.path.join(Paths.state, "sleep.json"), {})
+    return st if isinstance(st, dict) else {}
+
+
 def updates():
     out = {"last_unattended": None, "reboot_required": os.path.exists(Paths.reboot_required),
            "reboot_pkgs": [], "ollama": read_json(Paths.update_status, {}) or {},
-           "next_ollama_update": next_timer()}
+           "next_ollama_update": next_timer(), "sleep": sleep_record()}
     try:
         out["last_unattended"] = int(os.stat(Paths.u_stamp).st_mtime)
     except OSError:

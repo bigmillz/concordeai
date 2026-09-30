@@ -30,6 +30,7 @@ import time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
 
 import o1ollama  # noqa: E402
+import o1sleep  # noqa: E402
 import o1pair  # noqa: E402
 from o1common import (Paths, load_config, name_hash, read_allow_list, read_json,  # noqa: E402
                       write_json_atomic)
@@ -191,6 +192,24 @@ def backup():
     return 0
 
 
+def sleep():
+    """Suspend, unless something that must not be cut off is running."""
+    reasons = o1sleep.busy_reasons()
+    if reasons:
+        record("sleep", "refused", "not now: " + "; ".join(reasons))
+        return 1
+    record("sleep", "ok", "suspending")
+    return run(["systemctl", "suspend"])
+
+
+def stamp(which):
+    """From the system-sleep hook: when the desktop went to sleep / woke."""
+    if which not in ("sleep", "wake"):
+        return 2
+    o1sleep.record(**{"last_" + which: int(time.time())})
+    return 0
+
+
 def main():
     if os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
         sys.exit("ollama1-helper runs as root, from its systemd units")
@@ -200,6 +219,9 @@ def main():
         ("update-now", 0): lambda: update_now(),
         ("restart", 0): lambda: restart(),
         ("reboot", 0): lambda: run(["systemctl", "reboot"]),
+        ("sleep", 0): lambda: sleep(),
+        ("resume-check", 0): lambda: (0 if o1sleep.resume_check()["resume_check"]["ok"] else 1),
+        ("stamp", 1): lambda: stamp(args[1]),
         ("backup", 0): lambda: backup(),
         ("pull", 1): lambda: pull(args[1]),
         ("rmmodel", 1): lambda: rmmodel(args[1]),
@@ -207,8 +229,8 @@ def main():
         ("lan", 1): lambda: lan(args[1]),
     }
     if not args or (args[0], len(args) - 1) not in verbs:
-        sys.exit("usage: ollama1-helper update-now|restart|reboot|backup|pull HASH|rmmodel HASH|"
-                 "rmdevice ID|lan on|off")
+        sys.exit("usage: ollama1-helper update-now|restart|reboot|sleep|resume-check|backup|pull HASH|"
+                 "rmmodel HASH|rmdevice ID|lan on|off|stamp sleep|wake")
     if len(args) == 2 and not re.match(r"^[0-9a-z]{2,64}$", args[1]):
         sys.exit("bad argument")
     sys.exit(verbs[(args[0], len(args) - 1)]() or 0)

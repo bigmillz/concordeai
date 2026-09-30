@@ -1,0 +1,7 @@
+[Unit]
+Description=ollama1: sleep (suspend), unless a pull, sync, update or setup is running
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-helper sleep
+TimeoutStartSec=2min
