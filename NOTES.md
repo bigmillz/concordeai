@@ -9,6 +9,161 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b334 — your own servers: the app side (part 1)
+Patrick (2026-09-29): let the app use a private Ollama server the person
+owns, starting with his desktop "ollama1" at
+https://ollama1.flyconcordefly.com (Cloudflare Tunnel behind Access; the
+kit is 6b333). This is the app side, against `ollama1/PROTOCOL.md`.
+- **Settings › Your servers** (between Models and Usage). One card per
+  server: its name and host, a status line ("Paired · reachable · 142 ms ·
+  Ollama 0.34.4", "Not paired · reachable", or what went wrong), its
+  models, and Test, Pair (again) and Remove (a second click within 6 s
+  removes it and its key). Below, Add a server: the https address, a name
+  ("Desktop" by default; names are unique in a profile and never contain
+  "·"), and the Access Client ID and Secret (both or neither).
+  Screenshots of a dev copy: `scratchpad/servers-pane.png`,
+  `scratchpad/servers-menu.png`.
+- **Pairing** (PROTOCOL.md 3): the person types the code the server's
+  screen shows (`sudo ollama1-pair`). The app makes a new Ed25519 key
+  (PyNaCl, `cai_crypto.available()` first), sends the public half and the
+  code's HMAC with a fresh nonce, and checks the server's `device_id` and
+  `proof` in constant time before saving anything. A wrong code says how
+  many tries are left; no window, a closed one, a replay and a lost save
+  each have their line. A 429 (tries 2 s apart) is waited out once, a
+  clock_skew is retried once with the server's clock. Pairing again
+  replaces the key only once the new pairing is proven.
+- **Storage.** `servers.json` in the profile's folder (0600 from the first
+  byte, through `_write_raw`), named in `PERSONAL_NAMES`: the address, the
+  Access token and this profile's device key (the seed). In memory the
+  token and the seed are `_Secret` (repr/str/format say `<redacted>`,
+  `json.dumps` refuses it, it can't be pickled; M10's `cai_crypto`
+  redaction isn't merged, so this is the small local equivalent). The page
+  gets `_srv_public` only: never the token or the seed. PROTOCOL.md says
+  "the macOS Keychain"; the brief for this build said "stored like cloud
+  keys", so it is a 0600 file like cloud.json. Moving both to the Keychain
+  is a follow-up (it would also cover Windows' Credential Manager).
+- **Requests** (PROTOCOL.md 1, 4): http.client, no redirects followed, a
+  new connection each time, `User-Agent: ConcordeAI/<version>`, the Access
+  headers when saved, and the four X-O1 headers over the exact bytes sent.
+  A chat sends what local Ollama would get: the model, each turn's role,
+  text and pictures, `stream: true` and the temperature. No keep_alive.
+  A clock_skew or replay refusal is signed again once.
+- **Errors, in one line each** (`_srv_fail`): offline (refused, timed out,
+  DNS, or Cloudflare's 502/503/52x with no gateway code), TLS, Access
+  (a redirect, Cloudflare's 403 page, or the gateway's `access`), pairing
+  lost (401/403 `unpaired`, `bad_signature`, `unsigned`: "Desktop no longer
+  accepts this computer: the pairing was lost. Pair again in Settings ›
+  Your servers."), busy (409/429/503 `busy`), `gpu_fit`, `gpu_spill` and
+  the coming `ram_pressure`, a model not installed (404), and anything else
+  with the gateway's own words. A failure after the 200 is the stream's
+  last NDJSON line and ends the answer. The device switch's reload needs
+  nothing from the app: the stream just starts later, and the step says
+  "asking Desktop" while it waits.
+- **Models.** A paired server's `/api/tags` fills the engine menu (below
+  Advanced): "Desktop · qwen3:14b", a 🖥️ and "your server"; a model with
+  `placement: "gpu+ram"` says "yours · card + memory, slower", and the
+  pane lists it as "card + memory, slower". A server that doesn't send
+  `placement` (the gateway on main today) reads "unknown" and gets no
+  note. `gpu_pct` from `/api/ps` is kept. Names with "embed" are left out
+  of the picker. The list is checked when the pane opens, at start, and
+  when the menu opens with a list over a minute old.
+- **Routing, kept small for the gpu-fit-2 and benchmark rebases.**
+  `run_model` sends a server label (`"<name> · <model>"`, which no catalog
+  label is) to `server_stream` before anything else; the `/api/chat`
+  model filter accepts a label of one of the profile's servers; one
+  server model sets `_srv_lbl`, skips the MODEL_ROUTES substring match and
+  the pre-warm, and gets its own branch (`server_answer`) after Cloud
+  Only, Remote and research, **before the Fast lane's cloud ladder** and
+  the council. `run_council` keeps a hand-picked server model instead of
+  skipping it as "not downloaded".
+- **Policy.** A paired server is permission to use it: nothing in the
+  section asks `cloud_allowed`, and the gauntlet pins that it never names
+  the cloud gate, the ladders or the tiers. Cloud Only's line-up is the
+  key bench, so a server model is never in it; no tier resolves to one; a
+  council has one only when it is ticked in Advanced (it is not added to
+  councils on its own). Nothing falls back: `server_answer` catches every
+  failure and says it, so the handler's catch-all never tries the smallest
+  local model, and there is no cloud rung. The answer's badge names the
+  server ("Desktop"), and a server model's name ("gpt-oss") no longer
+  reads as "cloud".
+- **The benchmark (6b331):** a chat on one server model is not refused
+  during a benchmark and takes no hold (it uses none of this computer's
+  engines), and `_bench_guarded` lets a server label through. A council,
+  a tier or a picture still takes the hold as before. The memory pass
+  after a server answer goes to the same server model; a title uses a
+  local model as before (refused during a run, as for any chat).
+- **Usage:** each call is one ledger record under its label with
+  `w: "server"`, counted from Ollama's last line; the answer record is
+  under the label too.
+- **Profiles:** `servers.json` and `_srv_seen` (the last check, the
+  clock offset) are the profile's; B sees none of A's servers and a label
+  of A's answers "That server isn't in Settings › Your servers any more."
+  in B without a request leaving.
+- **Hook for the benchmark's later step:** `server_models(ctx)` gives the
+  labels, and `server_stream` returns Ollama's last line (eval_count,
+  eval_duration, prompt_eval_*). Server models are not benchmarked yet.
+- **Test hook** (dev copies only): `server-http-loopback` lets an address
+  be `http://127.0.0.1:<port>`; everything else must be https.
+- Left for part 2: the SSH installer, the SSH-tunnel reach mode (the
+  gateway's `access: "none"`), and LAN mode.
+- Gauntlet: 491 checks become 517 (26 new). New, in `== your own servers (6b334) ==`:
+  - in process, the section exec'd alone on the real profile sections and
+    cai_crypto: PROTOCOL.md's vectors read from the file and rebuilt byte
+    for byte (device id, both signatures, pairing key, MAC, proof, the
+    code's spellings); pairing against a stand-in that checks the MAC as
+    the spec writes it (no window, a wrong code, a tampered proof and
+    another device's id refused with nothing saved, a rate limit waited
+    out, fresh nonces, 0600, re-pair, remove); the secrets (redacted,
+    refused by JSON and pickle, in no reply or error); the stream (signed
+    and verified by the spec's check, only the chat sent, the ledger, an
+    error line, one retry for replay and clock skew, a second refusal
+    said, a gone server and any other failure said with no other model);
+    each refusal's reading; the real transport against a listener (the
+    Access headers, a verifying signature, the User-Agent) and a closed
+    port read as offline; addresses, names, tokens; placement; labels,
+    the one-model rule, no cloud gate in the section, profile B; source
+    pins where it meets run_model, the council, the benchmark and
+    /api/chat; the pane's cards and menu rows in node; the benchmark's
+    guard. 35 mutations, each caught.
+  - live: the REAL gateway (`ollama1/bin/ollama1-gateway`) on its stub
+    Ollama, with its pairing step on a thread (as the root path unit
+    runs), behind a stand-in for Access that wants the service token and
+    adds a real RS256 JWT, and a copy of the app on 9903: a wrong token
+    turned away; no window, a wrong code, the right one (typed in lower
+    case with a space) pairing exactly this device; a signed chat streamed
+    with cloud power off, carrying only the chat, in the ledger as server;
+    a replay refused by the gateway, no nonce repeated; busy, gpu_fit and a
+    replay signed again; Cloud Only and the tiers never seat it; a server
+    chat during a benchmark answers while a local one gets 409; the device
+    removed at the desktop says "pair again", pairing again works; the
+    stand-in down says offline with cloud power on and nothing else
+    answers; profile B sees none of it; the secret and the seed in no /api
+    reply, no log and no file but servers.json; still paired after a
+    restart; remove deletes the key.
+  - adapted (nothing loosened): the rail and pane order and the
+    description count gain Your servers; the benchmark's chat-hold pin and
+    its "chat not held" mutation follow the hold under the server-only
+    test; `_bm_ns` names `server_label`.
+- Not verified here: a real Cloudflare Tunnel and Access in front (the
+  stand-in plays Access; the redirect and 403 pages Cloudflare sends are
+  modelled on its documented behaviour), TLS to the real host, the
+  `placement` field from the real gateway (the other agent's change; read
+  from canned replies here), the ROCm desktop itself, WKWebView and
+  WebView2 (the pane was checked in headless Chrome and Blink), Windows.
+- **Patrick, once setup has finished on the desktop:**
+  1. Keep the Access service token's Client ID and Client Secret that
+     setup showed once.
+  2. ConcordeAI › Settings › Your servers › Add a server: address
+     `https://ollama1.flyconcordefly.com`, name Desktop, the Client ID and
+     Secret. Add. The card should read "Not paired · reachable".
+  3. At the desktop (or over SSH): `sudo ollama1-pair`. A 12-character
+     code shows on the monitor and in that terminal for 5 minutes.
+  4. Type it into the card and press Pair. The card turns "Paired ·
+     reachable" with the models.
+  5. Pick "Desktop · <model>" in the composer's engine menu.
+
+---
+
 ## 6b335 — the model offer says what will change, and how long is left
 Per Patrick, with a screenshot of "More models available" mid-download:
 "we should have time remaining here too, and a details box before
@@ -107,6 +262,8 @@ installed and its engine running.
   the byte counting, the loading state and the card's whole lifecycle
   (queued, downloading, finishing, loading, done, failed, and Patrick's
   stuck case) in node.
+
+---
 
 ## 6b333 — ollama1: a private model server on Patrick's desktop (host kit)
 The spare Linux desktop (Ryzen 9 5950X, 64 GB, RX 6900 XT 16 GB, Ubuntu

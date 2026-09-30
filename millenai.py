@@ -8636,7 +8636,7 @@ PERSONAL_NAMES = frozenset((
     CHATS_FILE, MEMORY_FILE, LEGACY_CHATS, LEGACY_MEMORY, PERSONAL_FILE,
     LOCAL_FILE, QUALITY_FILE, "usage.jsonl", "cloud.json", "remote.json",
     "remote_known_hosts", "images", "videos", "exports", "sync",
-    "account.key"))
+    "account.key", "servers.json"))
 # absent means "not written yet" for these only until their first write
 # (0b 5.2, L1); after it a missing file is a read error, never empty
 _FIRST_WRITE = (CHATS_FILE, MEMORY_FILE, "prefs.json", PERSONAL_FILE,
@@ -16390,6 +16390,809 @@ def _usage_at_exit():
 atexit.register(_usage_at_exit)
 
 
+# ==== servers: begin ====
+# YOUR OWN SERVERS (6b334, per Patrick, 2026-09-29). A model server the
+# person owns answers chats with its own Ollama models: first Patrick's
+# desktop "ollama1", at https://ollama1.flyconcordefly.com behind a
+# Cloudflare Tunnel and Access. The rules are ollama1/PROTOCOL.md's:
+# every request carries the Access service token (when one is saved)
+# and an Ed25519 signature from a key this computer made and paired AT
+# THE SERVER, with the code the server's own screen shows.
+#   * There is no way to share a server or to accept anyone else's. A
+#     server is added by its address and paired from this computer only.
+#   * Each profile has its own servers.json (0600, beside cloud.json):
+#     the address, the Access token and this profile's device key. In
+#     memory the secret and the key are _Secret, whose repr, str and
+#     format are redacted and which JSON refuses, so they can't reach the
+#     page, a log or an error's text by accident.
+#   * A paired server is permission to use it. It is the person's own
+#     machine, so it is NOT behind Use cloud power. No tier, Cloud Only
+#     line-up or cloud ladder ever seats it; a council has it only when
+#     it is picked by hand (Advanced).
+#   * A failure is said in one line (offline, busy, pairing lost...).
+#     Nothing falls back to the cloud or to another model.
+#   * A request carries what Ollama on this computer would get for the
+#     same chat: the model, the messages (role, content, pictures) and
+#     the temperature.
+# The benchmark's later step (server models are not benchmarked yet)
+# takes its rows from server_models(ctx) and runs each through
+# server_stream, whose return value is Ollama's last line (eval_count,
+# eval_duration, prompt_eval_count, prompt_eval_duration).
+SERVERS_NAME = "servers.json"
+SERVER_SEP = " \u00b7 "         # "<server> · <model>": no catalog label has it
+SERVER_MAX = 8
+SRV_CONNECT_S = 12              # to connect and for a whole short answer
+SRV_READ_S = 600                # a streamed answer may wait its turn and a load
+_SRV_ID_RX = re.compile(r"[0-9a-f]{8}")
+_SRV_LABEL_RX = re.compile(r"[\w.:/+-]{1,120}")
+_SRV_HOST_RX = re.compile(r"(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+                          r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*")
+_SRV_TOKEN_RX = re.compile(r"[\x21-\x7e]{1,256}")
+_O1_CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+_srv_lock = threading.RLock()
+# per server id: the last check (reachable, models, latency) and the
+# offset to the server's clock; a profile's own, emptied at a switch
+_srv_seen = profile_cache("_srv_seen", {})
+
+SRV_GONE = ("That server isn\u2019t in Settings \u203a Your servers any more. "
+            "Pick another model.")
+SRV_PAIR_LOST = ("%s no longer accepts this computer: the pairing was lost. "
+                 "Pair again in Settings \u203a Your servers.")
+SRV_NO_CRYPTO = ("Your servers need encryption, which isn\u2019t set up on "
+                 "this computer yet. Nothing was sent.")
+
+
+class _Secret:
+    """A secret in memory (an Access token, a device key's seed). Its
+    repr, str and format say <redacted>, json.dumps refuses it and it
+    can't be pickled; reveal() is called only where the value is used."""
+    __slots__ = ("_v",)
+
+    def __init__(self, v=""):
+        object.__setattr__(self, "_v", str(v or ""))
+
+    def reveal(self) -> str:
+        return self._v
+
+    def __bool__(self):
+        return bool(self._v)
+
+    def __repr__(self):
+        return "<redacted>"
+
+    __str__ = __repr__
+
+    def __format__(self, spec):
+        return "<redacted>"
+
+    def __reduce__(self):
+        raise TypeError("a secret isn't serialized")
+
+    def __eq__(self, other):
+        return isinstance(other, _Secret) and hmac.compare_digest(
+            self._v.encode("utf-8"), other._v.encode("utf-8"))
+
+    __hash__ = None
+
+
+# ---- the protocol's primitives (PROTOCOL.md 2-4; its vectors are the
+# gauntlet's)
+def o1_b64u(b: bytes) -> str:
+    return base64.urlsafe_b64encode(b).rstrip(b"=").decode("ascii")
+
+
+def o1_unb64u(s: str) -> bytes:
+    s = str(s or "")
+    return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
+
+
+def o1_nonce() -> str:
+    return o1_b64u(secrets.token_bytes(16))
+
+
+def o1_device_id(pub: bytes) -> str:
+    return hashlib.sha256(pub).hexdigest()[:16]
+
+
+def o1_public(seed: bytes) -> bytes:
+    import nacl.bindings as nb
+    return nb.crypto_sign_seed_keypair(seed)[0]
+
+
+def o1_canonical(method: str, path: str, body: bytes, ts, nonce: str,
+                 device_id: str) -> bytes:
+    return "\n".join(("ollama1-req-v1", method.upper(), path,
+                      hashlib.sha256(body).hexdigest(), str(int(ts)), nonce,
+                      device_id)).encode("utf-8")
+
+
+def o1_headers(seed: bytes, device_id: str, method: str, path: str,
+               body: bytes, ts, nonce: str) -> dict:
+    """The four signature headers over exactly these bytes."""
+    import nacl.bindings as nb
+    sk = nb.crypto_sign_seed_keypair(seed)[1]
+    msg = o1_canonical(method, path, body, ts, nonce, device_id)
+    return {"X-O1-Device": device_id, "X-O1-Timestamp": str(int(ts)),
+            "X-O1-Nonce": nonce,
+            "X-O1-Signature": o1_b64u(nb.crypto_sign(msg, sk)[:64])}
+
+
+def o1_code(code) -> str:
+    """The pairing code as the server checks it: upper case, no dashes or
+    spaces, O->0, I and L->1; '' unless that is 12 Crockford characters."""
+    c = re.sub(r"[\s-]", "", str(code or "").upper())
+    c = c.replace("O", "0").replace("I", "1").replace("L", "1")
+    return c if len(c) == 12 and all(ch in _O1_CROCKFORD for ch in c) else ""
+
+
+def o1_pair_key(code: str) -> bytes:
+    return hashlib.sha256(b"ollama1-pair-key-v1\n" + code.encode("ascii")).digest()
+
+
+def o1_pair_mac(key: bytes, name: str, pub: str, ts, nonce: str) -> bytes:
+    msg = "ollama1-pair-v1\n%s\n%s\n%d\n%s" % (name, pub, int(ts), nonce)
+    return hmac.new(key, msg.encode("utf-8"), hashlib.sha256).digest()
+
+
+def o1_pair_proof(key: bytes, device_id: str, pub: str, nonce: str) -> bytes:
+    msg = "ollama1-pair-ok-v1\n%s\n%s\n%s" % (device_id, pub, nonce)
+    return hmac.new(key, msg.encode("utf-8"), hashlib.sha256).digest()
+
+
+# ---- the profile's servers.json
+_SRV_PLAIN = ("id", "name", "url", "device_id", "public_key", "device_name",
+              "paired_at", "added_at")
+_SRV_SECRET = ("access_id", "access_secret", "seed")
+
+
+def _srv_read(ctx) -> list:
+    """ctx's servers, secrets wrapped; [] when it has none.
+    StoreReadError when the file is there and can't be read."""
+    d = _read_json(SERVERS_NAME, ctx, dict) or {}
+    out = []
+    for s in (d.get("servers") or [])[:SERVER_MAX]:
+        if not isinstance(s, dict) or not _SRV_ID_RX.fullmatch(str(s.get("id") or "")):
+            continue
+        e = {k: s.get(k) for k in _SRV_PLAIN}
+        e["name"], e["url"] = str(e["name"] or ""), str(e["url"] or "")
+        for k in _SRV_SECRET:
+            e[k] = _Secret(s.get(k))
+        out.append(e)
+    return out
+
+
+def _srv_update(ctx, fn):
+    """fn(entries) changes ctx's list in place and returns the reply; the
+    list is written (0600 from the first byte, into ctx only) when the
+    reply says ok. Read, change and write happen under one lock."""
+    with _srv_lock:
+        entries = _srv_read(ctx)
+        out = fn(entries)
+        if out.get("ok"):
+            rows = []
+            for e in entries:
+                r = {k: e.get(k) for k in _SRV_PLAIN if e.get(k) is not None}
+                for k in _SRV_SECRET:
+                    if e.get(k):
+                        r[k] = e[k].reveal()
+                rows.append(r)
+            _write_raw(SERVERS_NAME, json.dumps({"v": 1, "servers": rows})
+                       .encode("utf-8"), ctx, mode=0o600)
+        return out
+
+
+def _srv_find(entries: list, sid: str):
+    return next((e for e in entries if e["id"] == sid), None)
+
+
+def _srv_paired(e) -> bool:
+    return bool(e["seed"] and e.get("device_id"))
+
+
+def server_label(label) -> bool:
+    """Shaped like "<server> · <model>" (a catalog label never is)."""
+    return (isinstance(label, str) and SERVER_SEP in label
+            and label not in MODEL_ROUTES)
+
+
+def server_pick(label, ctx):
+    """(entry, model) for a label of one of ctx's servers, else (None, '')."""
+    if not server_label(label):
+        return None, ""
+    for e in _srv_read(ctx):
+        p = e["name"] + SERVER_SEP
+        if label.startswith(p) and _SRV_LABEL_RX.fullmatch(label[len(p):]):
+            return e, label[len(p):]
+    return None, ""
+
+
+def server_only_request(req: dict, ctx) -> bool:
+    """A chat that uses nothing but ctx's servers' models: no tier, no
+    picture, no agent. It never touches this computer's engines, so a
+    benchmark running here doesn't turn it away (6b334)."""
+    if req.get("tier") or req.get("images") or req.get("agent"):
+        return False
+    picks = [m for m in (req.get("models") or []) if isinstance(m, str)]
+    picks = picks or [str(req.get("model") or "")]
+    if len(picks) != 1:
+        return False        # a council merges, and its merger may be local
+    try:
+        return all(server_pick(m, ctx)[0] is not None for m in picks)
+    except (StoreReadError, NoProfile):
+        return False
+
+
+def server_models(ctx) -> list:
+    """Every model label of ctx's paired servers, from the last check."""
+    out = []
+    for e in _srv_read(ctx):
+        if _srv_paired(e):
+            out += [m["label"] for m in (_srv_seen.get(e["id"]) or {}).get("models") or []]
+    return out
+
+
+# ---- addresses, names, tokens
+def _srv_loopback_ok(u) -> bool:
+    """http:// to 127.0.0.1: a dev copy's `server-http-loopback` hook only
+    (the gauntlet's stand-in gateway). Everything else is https."""
+    return "server-http-loopback" in TEST_HOOKS and u.hostname == "127.0.0.1"
+
+
+def _srv_url(raw) -> tuple:
+    """(the normalised address, '') or ('', why)."""
+    s = str(raw or "").strip()
+    if s and "://" not in s:
+        s = "https://" + s
+    try:
+        u = urllib.parse.urlsplit(s)
+        port = u.port
+    except ValueError:
+        return "", "That isn\u2019t a web address."
+    host = u.hostname or ""
+    if not (u.scheme == "https" or (u.scheme == "http" and _srv_loopback_ok(u))):
+        return "", "The address has to start with https://."
+    if (not _SRV_HOST_RX.fullmatch(host) or u.username or u.password
+            or u.query or u.fragment or u.path not in ("", "/")):
+        return "", ("Type the server\u2019s address only, like "
+                    "https://ollama1.example.com.")
+    return "%s://%s%s" % (u.scheme, host.lower(), ":%d" % port if port else ""), ""
+
+
+def _srv_name(raw) -> str:
+    """1 to 40 printable characters, without the label's separator."""
+    n = " ".join("".join(ch for ch in str(raw or "") if ch.isprintable())
+                 .replace("\u00b7", " ").split())[:40].strip()
+    return n
+
+
+def _srv_token(aid, asec) -> tuple:
+    """(id, secret, '') or ('', '', why): both parts or neither."""
+    aid, asec = str(aid or "").strip(), str(asec or "").strip()
+    if bool(aid) != bool(asec):
+        return "", "", ("An Access token has two parts: the Client ID and "
+                        "the Client Secret. Paste both, or neither.")
+    if aid and not (_SRV_TOKEN_RX.fullmatch(aid) and _SRV_TOKEN_RX.fullmatch(asec)):
+        return "", "", "That Access token has characters a token never has."
+    return aid, asec, ""
+
+
+def _srv_device_name() -> str:
+    """How this computer shows at the server: its own name."""
+    n = ""
+    if IS_MAC:
+        try:
+            n = subprocess.run(["scutil", "--get", "ComputerName"],
+                               capture_output=True, text=True,
+                               timeout=3).stdout.strip()
+        except Exception:
+            n = ""
+    n = n or platform.node().split(".")[0]
+    n = " ".join("".join(ch for ch in n if ch.isprintable()).split())[:40].strip()
+    return n or "ConcordeAI"
+
+
+# ---- the wire
+class ServerError(RuntimeError):
+    """A server that refused or didn't answer, as one line for the reader
+    (its str). kind: offline, tls, access, auth, clock, replay, busy,
+    fit, missing, server, gone, unpaired, crypto."""
+
+    def __init__(self, kind: str, text: str, code: str = ""):
+        RuntimeError.__init__(self, text)
+        self.kind, self.code = kind, code
+
+
+def _srv_conn(e, timeout: float):
+    import http.client as _hc
+    u = urllib.parse.urlsplit(e["url"])
+    if u.scheme == "https":
+        import ssl as _ssl
+        return _hc.HTTPSConnection(u.hostname, u.port or 443, timeout=timeout,
+                                   context=_ssl.create_default_context())
+    if not _srv_loopback_ok(u):
+        raise ServerError("tls", "%s\u2019s address isn\u2019t https, so "
+                          "nothing was sent." % e["name"])
+    return _hc.HTTPConnection(u.hostname, u.port or 80, timeout=timeout)
+
+
+def _srv_skew(e) -> float:
+    return float((_srv_seen.get(e["id"]) or {}).get("skew") or 0.0)
+
+
+def _srv_note_skew(e, js: dict) -> float:
+    """The offset to the server's clock from an error's server_time."""
+    try:
+        skew = float(js.get("server_time")) - time.time()
+    except (TypeError, ValueError):
+        skew = _srv_skew(e)
+    if abs(skew) < 86400:
+        _srv_seen.setdefault(e["id"], {})["skew"] = skew
+    return _srv_skew(e)
+
+
+def _srv_send(e, method: str, path: str, body: bytes = b"", signed=True,
+              timeout: float = SRV_CONNECT_S, skew: float = 0.0):
+    """One request to server e: (connection, response). The response is
+    open; the caller reads it and closes the connection. A new connection
+    each time: the gateway closes one after every error."""
+    import http.client as _hc
+    import ssl as _ssl
+    h = {"User-Agent": "ConcordeAI/%s" % APP_VERSION,
+         "Accept": "application/json, application/x-ndjson"}
+    if method == "POST":
+        h["Content-Type"] = "application/json"
+        h["Content-Length"] = str(len(body))
+    if e["access_id"] and e["access_secret"]:
+        h["CF-Access-Client-Id"] = e["access_id"].reveal()
+        h["CF-Access-Client-Secret"] = e["access_secret"].reveal()
+    if signed:
+        h.update(o1_headers(o1_unb64u(e["seed"].reveal()), e["device_id"],
+                            method, path, body, int(time.time() + skew),
+                            o1_nonce()))
+    conn = _srv_conn(e, timeout)
+    try:
+        conn.request(method, path, body=body if method == "POST" else None,
+                     headers=h)
+        return conn, conn.getresponse()
+    except _ssl.SSLError:
+        conn.close()
+        raise ServerError("tls", "%s\u2019s certificate didn\u2019t check "
+                          "out, so nothing more was sent." % e["name"]) from None
+    except (OSError, _hc.HTTPException):
+        conn.close()
+        raise ServerError("offline", "%s didn\u2019t answer. It may be off, "
+                          "asleep or offline. Nothing was sent anywhere "
+                          "else." % e["name"]) from None
+
+
+def _srv_js(raw: bytes) -> dict:
+    try:
+        d = json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
+def _srv_fail(e, status: int, js: dict, model: str = "") -> ServerError:
+    """What a refusal means, in one line (PROTOCOL.md 3-5)."""
+    name, code = e["name"], str(js.get("code") or "")
+    detail = " ".join("".join(ch for ch in str(js.get("error") or "")
+                              if ch.isprintable()).split())[:160]
+    if status in (301, 302, 303, 307, 308) or code == "access" \
+            or (status == 403 and not code):
+        return ServerError("access", "Cloudflare Access turned the request "
+                           "away before it reached %s. Check the Access token "
+                           "in Settings \u203a Your servers." % name, code)
+    if code in ("unpaired", "bad_signature", "unsigned") or (
+            status == 401 and code not in ("clock_skew", "replay")):
+        return ServerError("auth", SRV_PAIR_LOST % name, code)
+    if code == "clock_skew":
+        return ServerError("clock", "%s\u2019s clock and this computer\u2019s "
+                           "are more than a minute apart, so it refused the "
+                           "request. Check the time on both." % name, code)
+    if code == "replay":
+        return ServerError("replay", "%s refused a repeated request. Ask "
+                           "again." % name, code)
+    if code == "busy" or status in (409, 429) or (status == 503 and code):
+        return ServerError("busy", "%s is busy with other requests. Try "
+                           "again in a moment." % name, code or "busy")
+    if code == "gpu_fit":
+        return ServerError("fit", "%s doesn\u2019t fit in %s\u2019s graphics "
+                           "memory." % (model or "That model", name), code)
+    if code in ("gpu_spill", "ram_pressure"):
+        return ServerError("fit", "%s couldn\u2019t keep %s in its memory, "
+                           "so it stopped." % (name, model or "the model"), code)
+    if status == 404 and model:
+        return ServerError("missing", "%s isn\u2019t installed on %s."
+                           % (model, name), code)
+    if not code and (status == 502 or status == 503 or 520 <= status <= 530):
+        return ServerError("offline", "%s didn\u2019t answer. It may be off, "
+                           "asleep or offline. Nothing was sent anywhere "
+                           "else." % name, code)
+    return ServerError("server", "%s answered with an error%s." % (
+        name, (": " + detail) if detail else " (HTTP %d)" % status), code)
+
+
+def _srv_json(e, method: str, path: str, obj=None, signed=True,
+              timeout: float = SRV_CONNECT_S) -> tuple:
+    """A whole-answer call: (status, the JSON object). A clock_skew or
+    replay refusal is signed again once, with the server's clock and a
+    fresh nonce (PROTOCOL.md 4)."""
+    body = b"" if obj is None else json.dumps(
+        obj, separators=(",", ":")).encode("utf-8")
+    skew = _srv_skew(e)
+    for attempt in (0, 1):
+        conn, resp = _srv_send(e, method, path, body, signed, timeout, skew)
+        try:
+            raw = resp.read(4 << 20)
+        except OSError:
+            raw = b""
+        finally:
+            conn.close()
+        js = _srv_js(raw)
+        if (attempt == 0 and signed and resp.status == 401
+                and js.get("code") in ("clock_skew", "replay")):
+            skew = _srv_note_skew(e, js)
+            continue
+        return resp.status, js
+    return resp.status, js
+
+
+def _srv_messages(messages: list) -> list:
+    """What Ollama here would get: each turn's role, text and pictures."""
+    out = []
+    for m in messages or []:
+        if not isinstance(m, dict) or m.get("role") not in (
+                "system", "user", "assistant", "tool"):
+            continue
+        t = {"role": m["role"], "content": str(m.get("content") or "")}
+        if isinstance(m.get("images"), list) and m["images"]:
+            t["images"] = [str(x) for x in m["images"]]
+        out.append(t)
+    return out
+
+
+def server_stream(label: str, messages: list, emit) -> dict:
+    """Stream one answer from the thread's profile's server model `label`,
+    signed, calling emit(text) as it arrives. Ollama's last line comes
+    back (the benchmark's hook). ServerError says why it couldn't."""
+    e, model = server_pick(label, bound_ctx())
+    if e is None:
+        raise ServerError("gone", SRV_GONE)
+    if not _srv_paired(e):
+        raise ServerError("unpaired", "%s isn\u2019t paired with this "
+                          "computer. Pair it in Settings \u203a Your servers."
+                          % e["name"])
+    if not cai_crypto.available():
+        raise ServerError("crypto", SRV_NO_CRYPTO)
+    import http.client as _hc
+    body = json.dumps({"model": model, "messages": _srv_messages(messages),
+                       "stream": True, "options": {"temperature": 0.75}},
+                      separators=(",", ":")).encode("utf-8")
+    t0, sent, last = time.time(), [0], {}
+    try:
+        skew = _srv_skew(e)
+        for attempt in (0, 1):
+            conn, resp = _srv_send(e, "POST", "/api/chat", body, True,
+                                   SRV_CONNECT_S, skew)
+            if resp.status == 200:
+                break
+            try:
+                raw = resp.read(1 << 20)
+            except OSError:
+                raw = b""
+            finally:
+                conn.close()
+            js = _srv_js(raw)
+            if attempt == 0 and resp.status == 401 and js.get("code") in (
+                    "clock_skew", "replay"):
+                skew = _srv_note_skew(e, js)
+                continue
+            raise _srv_fail(e, resp.status, js, model)
+        try:
+            if conn.sock is not None:
+                conn.sock.settimeout(SRV_READ_S)
+            while True:
+                try:
+                    line = resp.readline(1 << 22)
+                except (OSError, _hc.HTTPException):
+                    raise ServerError("offline", "%s stopped answering "
+                                      "partway through." % e["name"]) from None
+                if not line:
+                    raise ServerError("offline", "%s stopped answering "
+                                      "partway through." % e["name"])
+                if not line.strip():
+                    continue
+                obj = _srv_js(line)
+                if obj.get("error"):
+                    # a failure after the 200 is the stream's last line
+                    raise _srv_fail(e, 0, obj, model)
+                chunk = str((obj.get("message") or {}).get("content") or "")
+                if chunk:
+                    sent[0] += len(chunk)
+                    emit(chunk)
+                if obj.get("done"):
+                    last = obj
+                    return last
+        finally:
+            conn.close()
+    finally:
+        usage_note(label, "server", messages, sent[0], last, t0)
+
+
+def server_answer(label: str, messages: list, memit, emit, status, step):
+    """A chat on one server model (the /api/chat branch): streamed and
+    guarded like a local model, and a failure said in one line."""
+    name = label.split(SERVER_SEP, 1)[0]
+    step("draft", "Writing the answer", "run", label)
+    status("asking " + name)
+    emit(Ctl(NUL + "RUN:" + json.dumps({"r": [label], "w": "server",
+                                        "s": name}) + NUL))
+    said = [False]
+
+    def _m(chunk):
+        if chunk and not isinstance(chunk, Ctl):
+            said[0] = True
+        memit(chunk)
+    try:
+        _stream_guarded(label, messages, _m, status, None,
+                        "kept the part before it wandered")
+    except ServerError as se:
+        emit(AppText(("\n\n" if said[0] else "") + "\u26a0\ufe0f " + str(se)))
+    except StoreReadError:
+        emit(AppText("\u26a0\ufe0f Couldn\u2019t read your servers. Nothing "
+                     "was sent."))
+    except (StaleProfile, BrokenPipeError, ConnectionResetError):
+        raise
+    except Exception as exc:
+        # anything else is said too: the handler's catch-all would try
+        # another model, and a pick of your own server never falls back
+        emit(AppText(("\n\n" if said[0] else "") + "\u26a0\ufe0f %s couldn\u2019t "
+                     "answer (%s). Nothing was sent anywhere else."
+                     % (name, type(exc).__name__)))
+
+
+# ---- what the pane does
+def _srv_models(e, js: dict, ps=None) -> list:
+    """The server's chat models for the picker: name, label, where it runs
+    (placement "gpu" or "gpu+ram"; "unknown" from a server that doesn't
+    say) and its share on the card while loaded."""
+    loaded = {}
+    for m in (ps or {}).get("models") or []:
+        if isinstance(m, dict):
+            loaded[str(m.get("name") or m.get("model") or "")] = m
+    out = []
+    for m in (js.get("models") or [])[:200]:
+        if not isinstance(m, dict):
+            continue
+        n = str(m.get("name") or m.get("model") or "")
+        if not _SRV_LABEL_RX.fullmatch(n) or "embed" in n.lower():
+            continue
+        lm = loaded.get(n) or {}
+        pl = m.get("placement") or lm.get("placement")
+        pct = m.get("gpu_pct") if m.get("gpu_pct") is not None else lm.get("gpu_pct")
+        out.append({"name": n, "label": e["name"] + SERVER_SEP + n,
+                    "placement": pl if pl in ("gpu", "gpu+ram") else "unknown",
+                    "gpu_pct": (int(pct) if isinstance(pct, (int, float))
+                                and not isinstance(pct, bool)
+                                and 0 <= pct <= 100 else None),
+                    "loaded": n in loaded,
+                    "size": (int(m["size"]) if isinstance(m.get("size"), int)
+                             and not isinstance(m.get("size"), bool) else 0)})
+    return sorted(out, key=lambda x: x["name"])
+
+
+def server_check(e) -> dict:
+    """Test the connection: whoami (signed when paired; unsigned it proves
+    the address and the Access token), then the models, what's loaded and
+    Ollama's version. Remembered for the pane and the picker."""
+    seen = {"at": time.time(), "reachable": False, "auth": False,
+            "latency_ms": None, "models": [], "version": "", "err": "",
+            "kind": ""}
+    paired = _srv_paired(e)
+    try:
+        if paired and not cai_crypto.available():
+            raise ServerError("crypto", SRV_NO_CRYPTO)
+        t = time.monotonic()
+        st, js = _srv_json(e, "GET", "/v1/whoami", signed=paired)
+        seen["latency_ms"] = int((time.monotonic() - t) * 1000)
+        if st == 200 and paired:
+            seen["reachable"] = seen["auth"] = True
+            st2, tags = _srv_json(e, "GET", "/api/tags")
+            if st2 != 200:
+                raise _srv_fail(e, st2, tags)
+            st3, ps = _srv_json(e, "GET", "/api/ps")
+            seen["models"] = _srv_models(e, tags, ps if st3 == 200 else {})
+            st4, ver = _srv_json(e, "GET", "/api/version")
+            seen["version"] = (str(ver.get("version") or "")[:24]
+                               if st4 == 200 else "")
+        elif not paired and st == 401 and js.get("code") == "unsigned":
+            seen["reachable"] = True         # through Access; not paired yet
+        else:
+            raise _srv_fail(e, st, js)
+    except ServerError as se:
+        seen["err"], seen["kind"] = str(se), se.kind
+        seen["reachable"] = se.kind not in ("offline", "tls", "crypto")
+    prev = _srv_seen.get(e["id"]) or {}
+    if "skew" in prev:
+        seen["skew"] = prev["skew"]
+    _srv_seen[e["id"]] = seen
+    return seen
+
+
+def _srv_public(e) -> dict:
+    """What the page may know of a server: never the token or the key."""
+    s = _srv_seen.get(e["id"]) or {}
+    return {"id": e["id"], "name": e["name"], "url": e["url"],
+            "host": urllib.parse.urlsplit(e["url"]).hostname or "",
+            "access": bool(e["access_id"] and e["access_secret"]),
+            "paired": _srv_paired(e), "paired_at": e.get("paired_at"),
+            "device_name": str(e.get("device_name") or ""),
+            "device_id": str(e.get("device_id") or ""),
+            "status": {k: s.get(k) for k in ("at", "reachable", "auth",
+                                             "latency_ms", "version", "err",
+                                             "kind")},
+            "models": list(s.get("models") or [])}
+
+
+def servers_view(ctx, refresh=False) -> dict:
+    entries = _srv_read(ctx)
+    if refresh:
+        for e in entries:
+            server_check(e)
+    return {"servers": [_srv_public(e) for e in entries],
+            "crypto": cai_crypto.available(), "max": SERVER_MAX}
+
+
+def server_add(ctx, d: dict) -> dict:
+    url, why = _srv_url(d.get("url"))
+    if why:
+        return {"err": why}
+    name = _srv_name(d.get("name")) or "Desktop"
+    aid, asec, why = _srv_token(d.get("access_id"), d.get("access_secret"))
+    if why:
+        return {"err": why}
+
+    def fn(entries):
+        if len(entries) >= SERVER_MAX:
+            return {"err": "That\u2019s %d servers, the most this keeps."
+                    % SERVER_MAX}
+        if any(x["url"] == url for x in entries):
+            return {"err": "That address is already in your servers."}
+        taken = {x["name"].lower() for x in entries}
+        nm, n = name, 2
+        while nm.lower() in taken:
+            nm, n = "%s %d" % (name[:37], n), n + 1
+        e = {"id": secrets.token_hex(4), "name": nm, "url": url,
+             "added_at": int(time.time()), "access_id": _Secret(aid),
+             "access_secret": _Secret(asec), "seed": _Secret("")}
+        entries.append(e)
+        return {"ok": True, "id": e["id"]}
+    out = _srv_update(ctx, fn)
+    if out.get("ok"):
+        e = _srv_find(_srv_read(ctx), out["id"])
+        if e:
+            server_check(e)
+            out["server"] = _srv_public(e)
+    return out
+
+
+def server_set_access(ctx, sid: str, d: dict) -> dict:
+    aid, asec, why = _srv_token(d.get("access_id"), d.get("access_secret"))
+    if why:
+        return {"err": why}
+
+    def fn(entries):
+        e = _srv_find(entries, sid)
+        if e is None:
+            return {"err": SRV_GONE}
+        e["access_id"], e["access_secret"] = _Secret(aid), _Secret(asec)
+        return {"ok": True}
+    return _srv_update(ctx, fn)
+
+
+def server_remove(ctx, sid: str) -> dict:
+    """The server and this profile's key for it go; the server keeps
+    listing this computer until it is removed there too."""
+    def fn(entries):
+        n = len(entries)
+        entries[:] = [e for e in entries if e["id"] != sid]
+        return {"ok": True} if len(entries) < n else {"err": SRV_GONE}
+    out = _srv_update(ctx, fn)
+    _srv_seen.pop(sid, None)
+    return out
+
+
+_PAIR_WHY = {
+    "pair_closed": ("%s has no pairing window open. Open one at the server "
+                    "(sudo ollama1-pair, or its admin panel) and type the "
+                    "new code."),
+    "rate_limited": "%s wants two seconds between tries. Try again.",
+    "pair_not_saved": ("%s didn\u2019t finish saving the pairing. Open a new "
+                       "window at the server and try again."),
+    "replay": "%s saw that request before. Try again.",
+    "bad_request": "%s couldn\u2019t read the pairing request.",
+}
+
+
+def server_pair(ctx, sid: str, code) -> dict:
+    """Pair with the code the server's screen shows (PROTOCOL.md 3): a new
+    device key made here, its public half and the code's HMAC sent, the
+    server's proof checked, and only then the key saved. A new pairing
+    replaces the key an older one made."""
+    e = _srv_find(_srv_read(ctx), sid)
+    if e is None:
+        return {"err": SRV_GONE}
+    norm = o1_code(code)
+    if not norm:
+        return {"err": "A pairing code is 12 letters and digits, like "
+                       "7K4M-2QXD-9FHT."}
+    if not cai_crypto.available():
+        return {"err": SRV_NO_CRYPTO}
+    seed = secrets.token_bytes(32)
+    pub = o1_b64u(o1_public(seed))
+    dev_id = o1_device_id(o1_unb64u(pub))
+    dname = _srv_device_name()
+    key = o1_pair_key(norm)
+    skew = _srv_skew(e)
+    try:
+        for attempt in (0, 1):
+            ts, nonce = int(time.time() + skew), o1_nonce()
+            st, js = _srv_json(e, "POST", "/v1/pair", {
+                "name": dname, "public_key": pub, "timestamp": ts,
+                "nonce": nonce,
+                "mac": o1_b64u(o1_pair_mac(key, dname, pub, ts, nonce))},
+                signed=False, timeout=20)
+            c = js.get("code")
+            if attempt == 0 and st == 429 and c == "rate_limited":
+                time.sleep(2.2)
+                continue
+            if attempt == 0 and st == 401 and c == "clock_skew":
+                skew = _srv_note_skew(e, js)
+                continue
+            break
+    except ServerError as se:
+        return {"err": str(se)}
+    if st != 200:
+        c = str(js.get("code") or "")
+        if c == "wrong_code":
+            left = js.get("attempts_left")
+            return {"err": "That code is wrong." + (
+                " %d more tr%s before the server closes the window." % (
+                    left, "y" if left == 1 else "ies")
+                if isinstance(left, int) and not isinstance(left, bool) else "")}
+        if c in _PAIR_WHY:
+            return {"err": _PAIR_WHY[c] % e["name"]}
+        return {"err": str(_srv_fail(e, st, js))}
+    proof = str(js.get("proof") or "")
+    try:
+        got = o1_unb64u(proof)
+    except (ValueError, TypeError):
+        got = b""
+    if not (hmac.compare_digest(str(js.get("device_id") or ""), dev_id)
+            and hmac.compare_digest(got, o1_pair_proof(key, dev_id, pub, nonce))):
+        return {"err": "%s\u2019s answer didn\u2019t prove it knows the code, "
+                       "so the pairing was discarded. Nothing was saved."
+                       % e["name"]}
+
+    def fn(entries):
+        x = _srv_find(entries, sid)
+        if x is None:
+            return {"err": SRV_GONE}
+        x.update(seed=_Secret(o1_b64u(seed)), device_id=dev_id,
+                 public_key=pub, device_name=dname,
+                 paired_at=int(time.time()))
+        return {"ok": True}
+    out = _srv_update(ctx, fn)
+    if out.get("ok"):
+        e = _srv_find(_srv_read(ctx), sid)
+        if e:
+            server_check(e)
+            out["server"] = _srv_public(e)
+    return out
+# ==== servers: end ====
+
+
 def stream_ollama(tag: str, messages: list, emit,
                   giant: bool = False, big: bool = False,
                   label: str = "") -> None:
@@ -16671,6 +17474,9 @@ def _bench_guarded(fn):
     """run_model under bench_hold: refused while a benchmark runs."""
     @functools.wraps(fn)
     def guarded(*a, **k):
+        if a and server_label(a[0]):
+            # your own server's model (6b334): not this computer's engines
+            return fn(*a, **k)
         if not bench_hold():
             raise RuntimeError(BENCH_BUSY)
         try:
@@ -16687,6 +17493,9 @@ def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
     # Ollama — a 40 GB model on a 48 GB Mac. Its runner got OOM-killed,
     # Ollama respawned it, repeat forever ("llama-server won't stop
     # starting", seen live). Fall back to the SMALLEST cached model.
+    if server_label(label):
+        # a model on the person's own server (6b334), never a fallback
+        return server_stream(label, messages, emit)
     if label not in MODEL_ROUTES:
         pulled = ollama_pulled_tags() or set()
         label = next((l for l in reversed(MERGE_RANK)
@@ -18325,7 +19134,9 @@ def run_council(labels: list, messages: list, emit, status,
     # aren't on disk) or too big for current free RAM (OOM-killed mid-load)
     usable, skipped = [], []
     for l in labels:
-        if not model_cached(l):
+        if server_label(l):
+            usable.append(l)        # your own server's (6b334): it says
+        elif not model_cached(l):   # for itself whether it can answer
             skipped.append((l, "not downloaded"))
         elif not model_fits_memory(l):
             skipped.append((l, "low memory"))
@@ -21732,6 +22543,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                              "key": c.get("key", ""),
                              "jump": c.get("jump", ""),
                              "configured": bool(c.get("host"))})
+        elif urllib.parse.urlparse(self.path).path == "/api/servers":
+            # Settings › Your servers (6b334): this profile's servers,
+            # never a token or a key; ?refresh=1 checks each one first
+            _sq = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            self._send_json(servers_view(
+                self.ctx, (_sq.get("refresh") or [""])[0] == "1"))
         elif self.path == "/api/cloud":
             c = cloud_conf()
             d = _cloud_all()
@@ -22274,6 +23091,33 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             except Exception:
                 pass
             self._send_json({"ok": True})
+            return
+        if self.path.startswith("/api/servers/"):
+            # Settings › Your servers (6b334): add, pair, test, a new
+            # Access token, remove. A reply carries the server's public
+            # view only, never the token or the key
+            d = self._json_body()
+            sid, op = str(d.get("id") or ""), self.path[len("/api/servers/"):]
+            if op == "add":
+                out = server_add(self.ctx, d)
+            elif op not in ("pair", "test", "access", "remove"):
+                self.send_error(404)
+                return
+            elif not _SRV_ID_RX.fullmatch(sid):
+                out = {"err": SRV_GONE}
+            elif op == "pair":
+                out = server_pair(self.ctx, sid, d.get("code"))
+            elif op == "access":
+                out = server_set_access(self.ctx, sid, d)
+            elif op == "remove":
+                out = server_remove(self.ctx, sid)
+            else:
+                _se = _srv_find(_srv_read(self.ctx), sid)
+                out = {"err": SRV_GONE}
+                if _se is not None:
+                    server_check(_se)
+                    out = {"ok": True, "server": _srv_public(_se)}
+            self._send_json(out)
             return
         if self.path == "/api/cloud/set":
             # KEY SETUP IN-APP, per Patrick ("no extra user effort"):
@@ -23273,11 +24117,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # A BENCHMARK OWNS THE ENGINES (6b331): the question is refused
         # before anything is saved, and the page shows the line. Counted
         # from here to the end of the request (_run), so no benchmark
-        # starts while this answer is being written.
-        if not bench_hold():
-            self._send_json({"err": BENCH_BUSY, "bench": True}, code=409)
-            return
-        self._bench_held = True
+        # starts while this answer is being written. A chat on one model
+        # of your own server (6b334) uses none of this computer's engines,
+        # so a benchmark neither turns it away nor waits for it.
+        if not server_only_request(req_json, self.ctx):
+            if not bench_hold():
+                self._send_json({"err": BENCH_BUSY, "bench": True}, code=409)
+                return
+            self._bench_held = True
 
         messages = list(req_json.get("messages", []))
         # THE QUESTION IS SAVED ON ARRIVAL (0b 5.4, 6b322), when the page
@@ -23354,7 +24201,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             council = resolve_tier(tier)
         else:
             council = [m for m in req_json.get("models", [])
-                       if m in MODEL_ROUTES and SUPPORTED.get(m)]
+                       if (m in MODEL_ROUTES and SUPPORTED.get(m))
+                       or server_pick(m, self.ctx)[0] is not None]
             # a giant on Ollama picked WITH others answers alone (6b314):
             # a council gives each drafter 120 s, and a cold 400 GB load
             # alone takes minutes, so its draft was always abandoned
@@ -23551,7 +24399,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # the model routing is settled by here — resolve it NOW, before
         # the search, so the engine can warm while the network works
         route, route_label = None, None
-        for label, target in MODEL_ROUTES.items():
+        # ONE MODEL OF YOUR OWN SERVER (6b334): it answers, whatever Use
+        # cloud power says, and a failure is said, never covered by a
+        # local or cloud model. A label of a server removed since lands
+        # here too, and says so.
+        _srv_lbl = (council[0] if len(council) == 1 and not cloud_only
+                    and server_label(council[0]) else "")
+        if _srv_lbl:
+            route, route_label = (None, None), _srv_lbl
+        for label, target in ({} if _srv_lbl else MODEL_ROUTES).items():
             if label in model_name:
                 route, route_label = target, label
                 break
@@ -24692,6 +25548,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                      memit, status, step, _await)
             elif TIERS.get(tier, {}).get("research") or ag_research:
                 run_research(council, full_messages, memit, status)
+            elif _srv_lbl:
+                server_answer(_srv_lbl, full_messages, memit, emit, status,
+                              step)
             elif len(council) > 1:
                 run_council(council, full_messages, memit, status,
                             reflect=(tier == "Thinking"),
@@ -28572,6 +29431,45 @@ body.gen #chip-model{color:var(--accent)}
 .engrow .edsc{font-size:11px;color:var(--faint);margin-left:auto;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   max-width:150px}
+/* your own servers' models in the engine menu (6b334) */
+.engrow.srvrow .enm{font-weight:500}
+.engrow.srvrow .edsc{max-width:190px}
+.engrow.srvrow.off{cursor:default}
+/* Settings › Your servers (6b334): one card per server, the add form */
+#srv-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.srv{padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.045);
+  border:1px solid rgba(255,255,255,.08)}
+.srv-top{display:flex;align-items:baseline;gap:8px;min-width:0}
+.srv-top b{font-size:13px;font-weight:600;color:var(--text);flex:none}
+.srv-host{font-family:var(--mono);font-size:10.5px;color:var(--faint);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srv-st{font-size:11.5px;color:var(--dim);margin-top:3px;line-height:1.45}
+.srv.ok .srv-st{color:#9fd8b4}
+.srv.warn .srv-st{color:#d9c08a}
+.srv.bad .srv-st{color:#e8907e}
+.srv-ms{margin-top:7px;display:flex;flex-direction:column;gap:2px}
+.srv-m{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+.srv-m i{font-style:normal;color:var(--faint)}
+.srv-pair{display:flex;gap:8px;align-items:center;margin-top:9px}
+.srv-pair .about-btn.slim,.srv-acts .about-btn.slim{margin-top:0}
+.srv .about-btn.slim,#srv-add .about-btn.slim{width:auto;flex:none}
+.srv-hint{font-size:11px;color:var(--faint);margin-top:5px;line-height:1.45}
+.srv-acts{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+.srv-msg,#srv-note{font-size:11px;color:var(--faint);margin-top:6px;
+  line-height:1.45}
+.srv-msg:empty,#srv-note:empty{display:none}
+.srv-none{font-size:11.5px;color:var(--faint);margin:0}
+#srv-add{padding:10px 12px;border-radius:12px;
+  border:1px dashed rgba(255,255,255,.13)}
+.srv-h{font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--faint);margin-bottom:8px}
+.srv-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#srv-url,#srv-name{grid-column:1 / -1}
+.srv-grid input,.srv-code{background:rgba(18,20,26,.7);color:var(--text);
+  border:1px solid rgba(255,255,255,.12);border-radius:8px;font-size:12px;
+  padding:6px 9px;outline:none;min-width:0;font-family:var(--helv)}
+.srv-code{flex:1;font-family:var(--mono);letter-spacing:.08em}
+.srv-grid input:focus,.srv-code:focus{border-color:rgba(143,157,255,.6)}
 /* a diagonal band of light that travels across the window */
 /* What made this read as a ribbon dragged over the window: evenly spaced
    colour stops at uniform opacity, a light blur, and hard rectangular ends
@@ -29364,6 +30262,7 @@ __CODE_ROWS__
         <button class="snav" data-pane="p-persona">Personality</button>
         <button class="snav" data-pane="p-cloud">Cloud power</button>
         <button class="snav" data-pane="p-models">Models</button>
+        <button class="snav" data-pane="p-servers">Your servers</button>
         <button class="snav" data-pane="p-usage">Usage</button>
       </div>
     </nav>
@@ -29506,6 +30405,34 @@ __CODE_ROWS__
           <button class="about-btn slim" id="clean-now" hidden>Update</button>
         </div>
         <div id="manage-note"></div>
+      </div>
+    </section>
+    <!-- YOUR SERVERS (6b334, per Patrick): model servers the person owns,
+         each paired at the server itself. Nothing here shares a server or
+         uses anyone else's, and the Access token and the device key never
+         reach the page: /api/servers answers with the public view only -->
+    <section class="spane" id="p-servers">
+      <div class="set-h">Your servers</div>
+      <p class="tdesc">Model servers you own, such as a desktop running
+      ollama1. Each is paired with this computer at the server, with the
+      code its screen shows. Their models answer when you pick them in the
+      engine menu, whether or not Use cloud power is on. A server that
+      can&rsquo;t answer says so; no other model answers in its place.</p>
+      <div id="srv-list"></div>
+      <div id="srv-add">
+        <div class="srv-h">Add a server</div>
+        <div class="srv-grid">
+          <input id="srv-url" type="text" autocomplete="off" spellcheck="false"
+                 placeholder="https://ollama1.example.com" aria-label="Address">
+          <input id="srv-name" type="text" maxlength="40" autocomplete="off"
+                 spellcheck="false" placeholder="Name: Desktop" aria-label="Name">
+          <input id="srv-aid" type="password" autocomplete="off"
+                 placeholder="Access Client ID (optional)" aria-label="Access Client ID">
+          <input id="srv-asec" type="password" autocomplete="off"
+                 placeholder="Access Client Secret (optional)" aria-label="Access Client Secret">
+        </div>
+        <button class="about-btn slim" id="srv-add-go">Add</button>
+        <div id="srv-note"></div>
       </div>
     </section>
     <!-- USAGE (6b325, per Patrick): every model call this app made, from
@@ -30061,6 +30988,12 @@ let combine=false;   // superseded by tiers
 let voiceChat=localStorage.getItem("millen.voice")==="1";
 let statsTimer=null;   // telemetry poll handle (paused while hidden)
 let lastModels="";  // line-up the backend actually used
+// Settings › Your servers (6b334): this profile's servers as
+// /api/servers says (no token, no key), when they were last checked,
+// a Remove clicked once, a Pair again opened
+let srvList=[],srvAt=0;
+const srvArmed={},srvPairOpen={};
+const SRV_SEP=" \u00b7 ";
 let councilManual=false;
 // declared up here: setCombine() runs during boot and reads it, which would
 // hit the temporal dead zone if it were declared further down
@@ -30278,12 +31211,21 @@ async function openAdv(){
     (await api("/api/cloud")).json()]);}catch(e){}
   const ready=(st.models||[]).filter(m=>m.status==="ready"
     &&m.label.indexOf("Vision")<0);   // LLaVA routes itself on images
-  $("#adv-local").innerHTML=ready.map(m=>
+  // your own servers' models join only when ticked here (6b334)
+  const srvPicks=[];
+  srvList.filter(s=>s.paired).forEach(s=>(s.models||[]).forEach(m=>
+    srvPicks.push({label:m.label,use:"your server"+(srvWhere(m)?" \u00b7 "+srvWhere(m):"")})));
+  $("#adv-local").innerHTML=(ready.map(m=>
     '<label class="advrow"><input type="checkbox" data-l="'
     +esc(m.label)+'"'+(sel.local.indexOf(m.label)>=0?" checked":"")+'>'
     +'<span class="an"><b>'+esc(m.label)+'</b>'
     +'<span class="au">'+esc(ADV_USE[m.label]||"capable generalist")
     +'</span></span></label>').join("")
+    +srvPicks.map(m=>
+    '<label class="advrow"><input type="checkbox" data-l="'
+    +esc(m.label)+'"'+(sel.local.indexOf(m.label)>=0?" checked":"")+'>'
+    +'<span class="an"><b>'+esc(m.label)+'</b>'
+    +'<span class="au">'+esc(m.use)+'</span></span></label>').join(""))
     ||'<p class="advp">no local models installed yet</p>';
   const pv=(cs||{}).providers||{};
   $("#adv-cloud").innerHTML=Object.keys(ADV_CLOUD).map(id=>{
@@ -30362,7 +31304,9 @@ function openEngMenu(){
   +'<div class="engdiv"></div>'
   +'<div class="engrow'+(advOn?" on":"")+'" data-t="__adv__">'
   +'<span class="eico">⚙️</span><span class="enm">Advanced</span>'
-  +'<span class="edsc">hand-pick models &amp; compositor</span></div>';
+  +'<span class="edsc">hand-pick models &amp; compositor</span></div>'
+  // your own servers' models (6b334)
+  +srvMenuRows();
   engMenu.hidden=false;
   const r=$("#model-chip").getBoundingClientRect();
   engMenu.style.left=Math.round(r.left)+"px";
@@ -30370,6 +31314,12 @@ function openEngMenu(){
   engMenu.style.top=below?Math.round(r.bottom+8)+"px"
     :Math.round(r.top-engMenu.offsetHeight-8)+"px";
   engMenu.querySelectorAll(".engrow").forEach(el=>{
+    if(el.dataset.none)return;
+    if(el.dataset.s){
+      el.addEventListener("click",ev=>{
+        ev.stopPropagation();pickServerModel(el.dataset.s);engMenu.hidden=true;});
+      return;
+    }
     if(el.dataset.t!=="__adv__"){
       el.addEventListener("mouseenter",()=>showTierPop(el,el.dataset.t));
       el.addEventListener("mouseleave",hideTierPop);
@@ -30388,7 +31338,12 @@ function openEngMenu(){
 }
 $("#model-chip").addEventListener("click",ev=>{
   ev.stopPropagation();hideTierPop();
-  if(engMenu.hidden)openEngMenu();else engMenu.hidden=true;
+  if(engMenu.hidden){
+    openEngMenu();
+    // a server's model list older than a minute is checked again (6b334)
+    if(srvList.some(s=>s.paired)&&Date.now()-srvAt>60000){
+      srvAt=Date.now();loadServers(true);}
+  }else engMenu.hidden=true;
 });
 document.addEventListener("click",e=>{
   hideTierPop();
@@ -31861,6 +32816,7 @@ async function send(){
   abortCtl=new AbortController();
   let full="",t0=performance.now(),tokEst=0,lastRate=0,wasAborted=false,searched=false,status=null,drafts=[],sources=null,photos=null,mapd=null,locCtx="",places=null,placeHint=null;
   const seenStatus=[];
+  let srvWho="";         // the server that answered, if one did (6b334)
   lastModels="";
 
   try{
@@ -31968,6 +32924,7 @@ async function send(){
                 try{const d=JSON.parse(j);
                   if(d.w==="cloud"&&!/cloud/.test(lastModels))
                     lastModels=(lastModels+" cloud").trim();
+                  if(d.w==="server")srvWho=String(d.s||"");
                   if(d.c!==undefined)setWho("Compositor: "+d.c);
                   else if(d.r)setWho(d.r.length
                     ?"Running\u2026 "+d.r.join(", "):"Running\u2026");
@@ -32101,8 +33058,11 @@ async function send(){
   }
   if(full&&!isErr){
     const meta=document.createElement("div");meta.className="meta";
-    const where=/cloud|gemini|groq|claude|gpt|openai/i
-      .test(lastModels)?"cloud":"this Mac";
+    // a server model's name is its own, not a provider's (6b334):
+    // "Desktop · gpt-oss:20b" never reads as the cloud
+    const where=srvWho||(/cloud|gemini|groq|claude|gpt|openai/i
+      .test(lastModels.replace(/[^,]*\u00b7[^,]*/g,m=>/ cloud$/.test(m)?" cloud":""))
+      ?"cloud":"this Mac");
     meta.innerHTML='<span class="wbadge">'+esc(where)+'</span>'
       +"<b>"+lastRate.toFixed(1)+" tok/s</b> · ~"+Math.round(tokEst)
       +" tokens · "+secs.toFixed(1)+"s";
@@ -34708,6 +35668,167 @@ function ckBoard(provs,active){
   }).join("");
 }
 ckBoard(null,"");
+/* ------------------------------------------ Settings › Your servers (6b334)
+   Model servers the person owns (ollama1). /api/servers gives each one's
+   name, address, pairing, last check and models; never the Access token
+   or the device key, which stay in the profile's servers.json. */
+function srvWhere(m){
+  return m&&m.placement==="gpu+ram"?"card + memory, slower":"";
+}
+function srvStatus(s){
+  const st=s.status||{};
+  if(!s.paired)return st.err?"Not paired \u00b7 "+st.err
+    :st.reachable?"Not paired \u00b7 reachable":"Not paired";
+  if(st.err)return "Paired \u00b7 "+st.err;
+  if(!st.at)return "Paired \u00b7 not checked yet";
+  return "Paired \u00b7 reachable"
+    +(st.latency_ms!=null?" \u00b7 "+st.latency_ms+" ms":"")
+    +(st.version?" \u00b7 Ollama "+st.version:"");
+}
+function srvCard(s){
+  const st=s.status||{};
+  const cls=!s.paired?(st.err?" warn":""):st.err?(st.kind==="auth"?" bad":" warn")
+    :st.at?" ok":"";
+  const ms=(s.models||[]).map(m=>'<div class="srv-m">'+esc(m.name)
+    +(srvWhere(m)?' <i>\u00b7 '+esc(srvWhere(m))+'</i>':"")
+    +(m.loaded?' <i>\u00b7 loaded</i>':"")+'</div>').join("");
+  const pairing=!s.paired||srvPairOpen[s.id];
+  const armed=srvArmed[s.id]&&Date.now()-srvArmed[s.id]<6000;
+  return '<div class="srv'+cls+'" data-id="'+esc(s.id)+'">'
+    +'<div class="srv-top"><b>'+esc(s.name)+'</b><span class="srv-host">'
+    +esc(s.host)+'</span></div>'
+    +'<div class="srv-st">'+esc(srvStatus(s))+'</div>'
+    +(s.paired&&ms?'<div class="srv-ms">'+ms+'</div>'
+      :s.paired&&st.at&&!st.err?'<div class="srv-ms"><div class="srv-m">'
+        +'no chat models installed</div></div>':"")
+    +(pairing?'<div class="srv-pair"><input class="srv-code" maxlength="20" '
+        +'placeholder="XXXX-XXXX-XXXX" aria-label="Pairing code" '
+        +'autocomplete="off" spellcheck="false" autocapitalize="characters">'
+        +'<button class="about-btn slim" data-a="pair">Pair</button></div>'
+        +'<div class="srv-hint">Open a pairing window at the server (sudo '
+        +'ollama1-pair, or its admin panel), then type the code its screen '
+        +'shows.</div>':"")
+    +'<div class="srv-acts"><button class="about-btn slim" data-a="test">Test</button>'
+    +(s.paired&&!srvPairOpen[s.id]
+      ?'<button class="about-btn slim" data-a="repair">Pair again</button>':"")
+    +'<button class="about-btn slim danger" data-a="rm">'
+    +(armed?"Remove it and its key? Click again":"Remove")+'</button></div>'
+    +'<div class="srv-msg"></div></div>';
+}
+function paintServers(){
+  const box=$("#srv-list");if(!box)return;
+  box.innerHTML=srvList.map(srvCard).join("")
+    ||'<p class="srv-none">No servers yet.</p>';
+}
+async function loadServers(refresh){
+  try{
+    const d=await(await api("/api/servers"+(refresh?"?refresh=1":""))).json();
+    srvList=Array.isArray(d.servers)?d.servers:[];
+    if(refresh)srvAt=Date.now();
+  }catch(e){return;}
+  paintServers();
+  paintEngMenuServers();
+}
+async function srvPost(op,body){
+  return await(await api("/api/servers/"+op,{method:"POST",
+    headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();
+}
+function srvMsg(id,t){
+  const el=document.querySelector('#srv-list .srv[data-id="'+id+'"] .srv-msg');
+  if(el)el.textContent=t||"";
+}
+function srvPut(s){
+  const i=srvList.findIndex(x=>x.id===s.id);
+  if(i>=0)srvList[i]=s;else srvList.push(s);
+}
+$("#srv-list").addEventListener("keydown",ev=>{
+  if(ev.key!=="Enter"||!ev.target.classList.contains("srv-code"))return;
+  const b=ev.target.closest(".srv").querySelector('button[data-a="pair"]');
+  if(b)b.click();
+});
+$("#srv-list").addEventListener("click",async ev=>{
+  const b=ev.target.closest("button[data-a]");if(!b)return;
+  const card=b.closest(".srv"),id=card.dataset.id,a=b.dataset.a;
+  const s=srvList.find(x=>x.id===id);if(!s)return;
+  if(a==="repair"){
+    srvPairOpen[id]=true;paintServers();
+    const c=document.querySelector('#srv-list .srv[data-id="'+id+'"] .srv-code');
+    if(c)c.focus();
+    return;
+  }
+  if(a==="rm"&&!(srvArmed[id]&&Date.now()-srvArmed[id]<6000)){
+    srvArmed[id]=Date.now();paintServers();
+    setTimeout(paintServers,6100);
+    return;
+  }
+  delete srvArmed[id];
+  b.disabled=true;
+  srvMsg(id,a==="pair"?"Pairing\u2026":a==="rm"?"Removing\u2026":"Checking\u2026");
+  let d={};
+  try{
+    d=await srvPost(a==="rm"?"remove":a,a==="pair"
+      ?{id:id,code:(card.querySelector(".srv-code")||{}).value||""}:{id:id});
+  }catch(e){d={err:"Couldn\u2019t reach the app. Try again."};}
+  b.disabled=false;
+  if(a==="rm"&&d.ok){
+    srvList=srvList.filter(x=>x.id!==id);
+    // a pick of its models goes back to Fast
+    if(!tier&&council.some(l=>l.indexOf(s.name+SRV_SEP)===0))setTier("Fast");
+  }
+  if(d.server){srvPut(d.server);if(a==="pair")delete srvPairOpen[id];}
+  paintServers();
+  srvMsg(id,d.err||(a==="pair"&&d.ok?"Paired.":""));
+  paintEngMenuServers();
+});
+$("#srv-add-go").addEventListener("click",async()=>{
+  const note=$("#srv-note");
+  if(!$("#srv-url").value.trim()){note.textContent="Type the server\u2019s address first.";return;}
+  note.textContent="Adding\u2026";
+  let d={};
+  try{d=await srvPost("add",{url:$("#srv-url").value.trim(),
+    name:$("#srv-name").value.trim(),access_id:$("#srv-aid").value.trim(),
+    access_secret:$("#srv-asec").value.trim()});}
+  catch(e){d={err:"Couldn\u2019t reach the app. Try again."};}
+  if(d.err){note.textContent=d.err;return;}
+  ["#srv-url","#srv-name","#srv-aid","#srv-asec"].forEach(k=>{$(k).value="";});
+  if(d.server)srvPut(d.server);
+  note.textContent="Added. Pair it next.";
+  paintServers();
+});
+// the engine menu's rows: each paired server's models, marked as yours
+function srvMenuRows(){
+  const rows=[];
+  srvList.filter(s=>s.paired).forEach(s=>{
+    const ms=s.models||[];
+    if(!ms.length){
+      rows.push('<div class="engrow srvrow off" data-none="1"><span class="eico">'
+        +'\ud83d\udda5\ufe0f</span><span class="enm">'+esc(s.name)+'</span>'
+        +'<span class="edsc">'+((s.status||{}).err?"not answering":"no models listed")
+        +'</span></div>');
+      return;
+    }
+    ms.forEach(m=>rows.push('<div class="engrow srvrow'
+      +(!tier&&!advOn&&!agent&&council[0]===m.label?" on":"")
+      +'" data-s="'+esc(m.label)+'" title="Runs on your server '+esc(s.name)
+      +', not in the cloud"><span class="eico">\ud83d\udda5\ufe0f</span>'
+      +'<span class="enm">'+esc(m.label)+'</span><span class="edsc">'
+      +esc(srvWhere(m)?"yours \u00b7 "+srvWhere(m):"your server")+'</span></div>'));
+  });
+  return rows.length?'<div class="engdiv"></div>'+rows.join(""):"";
+}
+function paintEngMenuServers(){
+  const em=document.getElementById("engmenu");
+  if(em&&!em.hidden)openEngMenu();
+}
+function pickServerModel(label){
+  tier="";advOn=false;councilManual=false;
+  if(agent){agent="";if(typeof paintAgents==="function")paintAgents();}
+  council=[label];
+  prefSet({tier:"",model:label,council:[label],advon:false,agent:""});
+  if(typeof modeShow==="function")modeShow("ai");
+  paintModels();
+}
+loadServers(false).then(()=>{if(srvList.some(s=>s.paired))loadServers(true);});
 $("#ck-save").addEventListener("click",async()=>{
   const note=$("#ck-note"),key=$("#ck-key").value.trim();
   if(!key){note.textContent="paste a key first";return;}
@@ -35034,6 +36155,7 @@ function settingsPane(id){
   const bd=$("#about-body"); if(bd)bd.scrollTop=0;
   if(id==="p-usage")loadUsage();      // fresh numbers on every visit (6b325)
   if(id==="p-usage")loadBench();      // and the benchmark's runs (6b331)
+  if(id==="p-servers")loadServers(true);   // each server checked (6b334)
 }
 /* ------------------------------------------------ Settings › Usage (6b325)
    The four figures and the chart come from /api/usage (the usage

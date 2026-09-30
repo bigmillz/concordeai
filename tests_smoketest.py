@@ -4176,7 +4176,8 @@ check("giants: never in a preset; an Ollama giant is never seated for you",
       and "and not slow_giant(l)]" in _mt_src
       and _MILLENAI_SRC.count("and not slow_giant(l)\n                                and model_cached(l)") == 1
       and "and _is_substantive(prompt)\n                          and not slow_giant(lbl))" in _MILLENAI_SRC
-      and "if m in MODEL_ROUTES and SUPPORTED.get(m)]" in _MILLENAI_SRC
+      # (6b334) or a model of one of the profile's own servers
+      and "if (m in MODEL_ROUTES and SUPPORTED.get(m))\n                       or server_pick(m, self.ctx)[0] is not None]" in _MILLENAI_SRC
       and 'step("draft", "Loading the model, then writing",' in _MILLENAI_SRC,
       "%r" % [_rec3, _max3b])
 check("cloud wiring: ranked everywhere, no 6-id cap, no 4096 wall, one render try",
@@ -4485,7 +4486,7 @@ check("settings: descriptions + Account pane + scoped forget",
       # moment another dialog grew a description (6b303)
       (page.split('id="about-veil"')[1].split('id="gear-veil"')[0]
        if 'id="gear-veil"' in page
-       else page.split('id="about-veil"')[1]).count('class="tdesc"') == 4
+       else page.split('id="about-veil"')[1]).count('class="tdesc"') == 5
       and 'data-pane="p-account"' in page
       and '"/api/me"' in _MILLENAI_SRC
       and '"/api/logout"' in _MILLENAI_SRC
@@ -4499,10 +4500,11 @@ check("settings: descriptions + Account pane + scoped forget",
 # 6b259, per Patrick: About leads the rail (it is what people open the
 # panel to see) and Account closes it (the exits belong at the foot).
 # The pane ids and the nav must agree on that order, and the first pane
-# is the one that opens. Usage (6b325) comes last.
+# is the one that opens. Usage (6b325) comes last, Your servers (6b334)
+# just before it.
 _nav = re.findall(r'data-pane="(p-[a-z]+)"', page)
 _panes = re.findall(r'class="spane[^"]*" id="(p-[a-z]+)"', page)
-_want = ["p-about", "p-account", "p-persona", "p-cloud", "p-models", "p-usage"]
+_want = ["p-about", "p-account", "p-persona", "p-cloud", "p-models", "p-servers", "p-usage"]
 _gtip = page.split('id="giants-row"')[1].split('</label>')[0]
 check("the served page names the giants' real need",
       "Include models for 512 GB+ systems" in page and "128 GB+" not in page
@@ -10360,7 +10362,8 @@ _rc26.update(Ctl=str, NUL="\0", MERGE_RANK=["L1", "L2"], MODEL_ROUTES={"L1": 1, 
              merge_pref_label=lambda *a, **k: "L1", model_cached=lambda *a: True,
              model_fits_memory=lambda *a: True, strip_think=lambda t: t,
              run_model=lambda l, m, cb, **k: cb(_STUB_TEXT26.replace("stub", l)),
-             _answered={}, _merge_text=_STUB_TEXT26)
+             _answered={}, _merge_text=_STUB_TEXT26,
+             server_label=lambda l: False)       # (6b334) no server model here
 _rc_out = {}
 for _turbo, _mt in ((False, _STUB_TEXT26), (True, _STUB_TEXT26), ("short", "Too short.")):
     _rc_calls.clear()
@@ -15876,7 +15879,9 @@ def _bm_ns(src, **over):
         "_retire_engine": lambda l: None, "model_fits_memory": lambda l: True,
         "model_is_giant": lambda l: False, "giants_on": lambda: False,
         "slow_giant": lambda l: False, "ollama_url": lambda p: "http://127.0.0.1:1" + p,
-        "_mlx_last_use": 0.0, "_setup_jobs": {}, "_setup_lock": _t31.Lock()})
+        "_mlx_last_use": 0.0, "_setup_jobs": {}, "_setup_lock": _t31.Lock(),
+        # (6b334) a server model passes the guard; none is one here
+        "server_label": lambda l: False})
     gate, sect = _bm_slices(src)
     exec(gate, ns)
     exec(sect, ns)
@@ -16410,8 +16415,9 @@ def _bm_pins(src):
     run_model under the gate, the chat's hold and its release, the
     janitor held off, the offline spawn, the routes."""
     ok = ("@_bench_guarded\ndef run_model(" in src
-          and '        if not bench_hold():\n            self._send_json({"err": BENCH_BUSY, '
-              '"bench": True}, code=409)\n            return\n        self._bench_held = True\n\n'
+          and '        if not server_only_request(req_json, self.ctx):\n'
+              '            if not bench_hold():\n                self._send_json({"err": BENCH_BUSY, '
+              '"bench": True}, code=409)\n                return\n            self._bench_held = True\n\n'
               '        messages = list(req_json.get("messages", []))' in src
           and "            if self._bench_held:\n                self._bench_held = False\n"
               "                bench_release()\n            bind_ctx(None)" in src
@@ -16444,7 +16450,7 @@ def _bm_pins(src):
           and '            if not bench_hold():\n                self._send_json({"err": BENCH_BUSY, '
               '"bench": True}, code=409)\n                return\n            self._bench_held = True\n'
               '            goal = str(d.get("goal", "")).strip()[:300]' in src
-          and src.index('        self._bench_held = True\n\n        messages = list(req_json')
+          and src.index('            self._bench_held = True\n\n        messages = list(req_json')
               < src.index('        _rw = req_json.get("rewind")')
               < src.index('            _landed, _n, _h = chat_append_turn(')
           and 'if(tr&&tr.id===myChat)turn.rewind={op:"truncate",id:tr.id,' in src
@@ -16755,8 +16761,8 @@ _BM_MUT = [
     ("a torn last line left open", "                        line = b\"\\n\" + line      # after a torn last line", "                        pass"),
     ("the history oldest first", "    runs.sort(key=lambda r: -r[\"t\"])", "    runs.sort(key=lambda r: r[\"t\"])"),
     ("the history never trimmed", "        if len(runs) > BENCH_KEEP:", "        if False:"),
-    ("the chat not held", '        if not bench_hold():\n            self._send_json({"err": BENCH_BUSY, "bench": True}, code=409)',
-     '        if False:\n            self._send_json({"err": BENCH_BUSY, "bench": True}, code=409)'),
+    ("the chat not held", '            if not bench_hold():\n                self._send_json({"err": BENCH_BUSY, "bench": True}, code=409)\n                return\n            self._bench_held = True\n\n        messages',
+     '            if False:\n                self._send_json({"err": BENCH_BUSY, "bench": True}, code=409)\n                return\n            self._bench_held = True\n\n        messages'),
     ("the chat's hold never released", "            if self._bench_held:\n                self._bench_held = False\n                bench_release()",
      "            if self._bench_held:\n                self._bench_held = False"),
     ("the janitor under a run", 'if _mlx_procs and _mlx_last_use and not _bench["running"] and', 'if _mlx_procs and _mlx_last_use and'),
@@ -16931,6 +16937,1208 @@ check("benchmark: the pane's section, controls and hardware line are on the page
       "")
 # ---- end 6b331
 # ==== 6b331 benchmark: end ====
+
+
+# ==== 6b334 your own servers: begin ====
+print("== your own servers (6b334) ==")
+# Settings › Your servers: a model server the person owns (ollama1),
+# reached with the Access token and requests signed by a key paired at
+# the server. In process: the servers section exec'd alone, on the real
+# profile sections and cai_crypto, with PROTOCOL.md's own vectors and a
+# stand-in transport; 34 mutations each caught. Live: the REAL gateway
+# (ollama1/bin/ollama1-gateway) on its stub Ollama, behind a stand-in
+# for Cloudflare Access, and a copy of the app of its own.
+import base64 as _b34
+import hashlib as _h34
+import hmac as _hm34
+import pickle as _pk34
+import stat as _st34
+import threading as _t34
+
+
+def _sv_sect(src, tag):
+    return src[src.index("# ==== %s: begin ====" % tag):src.index("# ==== %s: end ====" % tag)]
+
+
+def _sv_b64u(b):
+    return _b34.urlsafe_b64encode(b).rstrip(b"=").decode()
+
+
+def _sv_unb64u(s):
+    return _b34.urlsafe_b64decode(s + "=" * (-len(s) % 4))
+
+
+# the vectors, read from PROTOCOL.md itself
+_SVP = open("ollama1/PROTOCOL.md", encoding="utf-8").read()
+_SVV = json.loads(_SVP.split("<!-- vectors:begin -->")[1].split("<!-- vectors:end -->")[0]
+                  .strip().strip("`").replace("json\n", "", 1))
+
+
+class _SvResp:
+    def __init__(self, status, obj=None, lines=None):
+        self.status = status
+        self.body = b"" if obj is None else json.dumps(obj).encode()
+        self.lines = [(json.dumps(x) + "\n").encode() if not isinstance(x, bytes) else x
+                      for x in (lines or [])]
+
+    def read(self, n=-1):
+        return self.body
+
+    def readline(self, n=-1):
+        return self.lines.pop(0) if self.lines else b""
+
+
+class _SvConn:
+    sock = None
+
+    def close(self):
+        pass
+
+
+def _sv_ns(src, hooks=("server-http-loopback",)):
+    """The servers section of src, alone, on a temporary "This computer"."""
+    d = tempfile.mkdtemp(dir=_SMOKE_TMP)
+    ns = {}
+    ctx = _prof_ns(ns, d)
+    import platform as _pf34
+    ns.update({"re": re, "json": json, "time": time, "hmac": _hm34, "hashlib": _h34,
+               "base64": _b34, "secrets": __import__("secrets"), "urllib": urllib,
+               "threading": _t34, "subprocess": subprocess, "platform": _pf34,
+               "IS_MAC": False, "TEST_HOOKS": frozenset(hooks), "APP_VERSION": "9.9",
+               "MODEL_ROUTES": {"Llama 3.2 3B": ("mlx", 8888)}, "NUL": "\0",
+               "_USAGE": [], "_RAN": []})
+    exec(_sv_sect(src, "cai_crypto"), ns)
+
+    class Ctl(str):
+        pass
+
+    class AppText(str):
+        pass
+    ns.update(Ctl=Ctl, AppText=AppText,
+              usage_note=lambda *a, **k: ns["_USAGE"].append(a))
+    # the app's paths into a server model: run_model and the guarded stream
+    ns["run_model"] = lambda label, msgs, emit: (
+        ns["server_stream"](label, msgs, emit) if ns["server_label"](label)
+        else ns["_RAN"].append(label))
+    ns["_stream_guarded"] = lambda label, msgs, emit, status, fb, note: ns["run_model"](
+        label, msgs, emit)
+    exec(_sv_sect(src, "servers"), ns)
+    return ns, ctx, d
+
+
+def _sv_fake(ns, script):
+    """_srv_send answers from script (a list of callables or responses);
+    every request is recorded with its body and headers."""
+    sent = []
+
+    def send(e, method, path, body=b"", signed=True, timeout=12, skew=0.0):
+        h = {}
+        if e["access_id"] and e["access_secret"]:
+            h["CF-Access-Client-Id"] = e["access_id"].reveal()
+        if signed:
+            h.update(ns["o1_headers"](ns["o1_unb64u"](e["seed"].reveal()), e["device_id"],
+                                      method, path, body, int(time.time() + skew), ns["o1_nonce"]()))
+        rec = {"method": method, "path": path, "body": body, "h": h, "signed": signed}
+        sent.append(rec)
+        nxt = script.pop(0) if script else _SvResp(500, {"error": "no script"})
+        r = nxt(rec) if callable(nxt) else nxt
+        return _SvConn(), r
+    ns["_srv_send"] = send
+    return sent
+
+
+def _sv_verify(pub, rec):
+    """The server's check, written here from PROTOCOL.md 4 (not the app's)."""
+    import nacl.bindings as _nb
+    h = rec["h"]
+    msg = "\n".join(("ollama1-req-v1", rec["method"], rec["path"],
+                     _h34.sha256(rec["body"]).hexdigest(), h["X-O1-Timestamp"],
+                     h["X-O1-Nonce"], h["X-O1-Device"])).encode()
+    try:
+        return _nb.crypto_sign_open(_sv_unb64u(h["X-O1-Signature"]) + msg, pub) == msg \
+            and h["X-O1-Device"] == _h34.sha256(pub).hexdigest()[:16]
+    except Exception:
+        return False
+
+
+_SV_CODE = "7K4M2QXD9FHT"
+
+
+def _sv_pair_server(code=_SV_CODE, tamper=None, dev=None):
+    """A stand-in /v1/pair: checks the MAC as PROTOCOL.md 3 writes it."""
+    def f(rec):
+        b = json.loads(rec["body"])
+        key = _h34.sha256(b"ollama1-pair-key-v1\n" + code.encode()).digest()
+        msg = "ollama1-pair-v1\n%s\n%s\n%d\n%s" % (b["name"], b["public_key"], b["timestamp"],
+                                                  b["nonce"])
+        if not _hm34.compare_digest(_sv_unb64u(b["mac"]),
+                                    _hm34.new(key, msg.encode(), _h34.sha256).digest()):
+            return _SvResp(401, {"error": "wrong code", "code": "wrong_code", "attempts_left": 4})
+        did = _h34.sha256(_sv_unb64u(b["public_key"])).hexdigest()[:16]
+        proof = _hm34.new(key, ("ollama1-pair-ok-v1\n%s\n%s\n%s" % (
+            did, b["public_key"], b["nonce"])).encode(), _h34.sha256).digest()
+        if tamper:
+            proof = bytes(32)
+        # dev: the answer names another device (its proof is still ours)
+        return _SvResp(200, {"device_id": dev or did, "name": b["name"], "server_time": int(time.time()),
+                             "proof": _sv_b64u(proof)})
+    return f
+
+
+def _sv_unsigned(rec):
+    return _SvResp(401, {"error": "unsigned", "code": "unsigned", "server_time": 1})
+
+
+def _sv_paired(ns, ctx, name="Desktop", url="https://ollama1.example.com"):
+    """Add a server and pair it through the stand-ins: the entry."""
+    sent = _sv_fake(ns, [_sv_unsigned])
+    a = ns["server_add"](ctx, {"url": url, "name": name, "access_id": "id34.access",
+                               "access_secret": "SECRET34-" + "x" * 20})
+    sent = _sv_fake(ns, [_sv_pair_server(), _SvResp(200, {"device_id": "x"}),
+                         _SvResp(200, {"models": [{"name": "small:8b"}]}),
+                         _SvResp(200, {"models": []}), _SvResp(200, {"version": "0.1"})])
+    p = ns["server_pair"](ctx, a["id"], "7k4m-2qxd-9fht")
+    return a, p, sent
+
+
+# ---- the checks, each a function of the source (the mutations re-run them)
+def _svc_vectors(src):
+    ns, ctx, d = _sv_ns(src)
+    v = _SVV
+    seed = bytes.fromhex(v["device"]["seed_hex"])
+    pub = ns["o1_public"](seed)
+    got = {"pub": ns["o1_b64u"](pub) == v["device"]["public_key_b64url"],
+           "id": ns["o1_device_id"](pub) == v["device"]["device_id"]}
+    for i, r in enumerate(v["requests"]):
+        body = r["body_utf8"].encode()
+        got["canon%d" % i] = ns["o1_canonical"](r["method"], r["path"], body, r["timestamp"],
+                                                r["nonce"], v["device"]["device_id"]).decode() \
+            == r["canonical_utf8"]
+        got["headers%d" % i] = ns["o1_headers"](seed, v["device"]["device_id"], r["method"],
+                                                r["path"], body, r["timestamp"], r["nonce"]) \
+            == r["headers"]
+    p = v["pairing"]
+    norm = ns["o1_code"](p["code_shown"])
+    key = ns["o1_pair_key"](norm)
+    got["code"] = (norm == p["code_normalized"] == ns["o1_code"]("7k4m2qxd9fht")
+                   == ns["o1_code"](" 7K4M 2QXD-9FHT ")
+                   and ns["o1_code"]("7K4M-2QXD-9FH0") == ns["o1_code"]("7K4M-2QXD-9FHO")
+                   and ns["o1_code"]("7K4M-2QXD-9F1T") == ns["o1_code"]("7K4M-2QXD-9FLT")
+                   == ns["o1_code"]("7K4M-2QXD-9FIT")
+                   and ns["o1_code"]("7K4M-2QXD-9FHU") == "" and ns["o1_code"]("7K4M-2QXD") == "")
+    got["key"] = key.hex() == p["key_hex"]
+    got["mac"] = ns["o1_b64u"](ns["o1_pair_mac"](key, p["name"], p["public_key_b64url"],
+                                                 p["timestamp"], p["nonce"])) == p["mac_b64url"]
+    got["proof"] = ns["o1_b64u"](ns["o1_pair_proof"](key, p["response_device_id"],
+                                                     p["public_key_b64url"], p["nonce"])) \
+        == p["proof_b64url"]
+    n1, n2 = ns["o1_nonce"](), ns["o1_nonce"]()
+    got["nonce"] = n1 != n2 and re.fullmatch(r"[A-Za-z0-9_-]{16,64}", n1) is not None
+    return all(got.values()), got
+
+
+def _svc_pairing(src):
+    ns, ctx, d = _sv_ns(src)
+    out = {}
+    _sv_fake(ns, [_sv_unsigned])
+    a = ns["server_add"](ctx, {"url": "ollama1.example.com/", "name": "Desktop",
+                               "access_id": "id34.access", "access_secret": "SECRET34-" + "x" * 20})
+    out["added"] = a.get("ok") and a["server"]["url"] == "https://ollama1.example.com" \
+        and a["server"]["status"]["reachable"] is True and a["server"]["paired"] is False
+    sid = a["id"]
+    # no window, a wrong code, a malformed code
+    s1 = _sv_fake(ns, [_SvResp(403, {"error": "closed", "code": "pair_closed"})])
+    out["closed"] = "no pairing window open" in ns["server_pair"](ctx, sid, _SV_CODE).get("err", "")
+    s2 = _sv_fake(ns, [_sv_pair_server("ZZZZZZZZZZZZ")])
+    w = ns["server_pair"](ctx, sid, _SV_CODE)
+    out["wrong"] = w.get("err") == "That code is wrong. 4 more tries before the server closes the window."
+    out["malformed"] = "12 letters" in ns["server_pair"](ctx, sid, "abc").get("err", "")
+    out["unsent"] = not s1[0]["signed"] and not s2[0]["signed"] and len(s2) == 1
+    # a tampered proof, and another device's id: discarded, nothing saved
+    _sv_fake(ns, [_sv_pair_server(tamper=True)])
+    t = ns["server_pair"](ctx, sid, _SV_CODE)
+    _sv_fake(ns, [_sv_pair_server(dev="0" * 16)])
+    t2 = ns["server_pair"](ctx, sid, _SV_CODE)
+    e0 = ns["_srv_read"](ctx)[0]
+    out["proof"] = ("didn’t prove" in t.get("err", "") and "didn’t prove" in t2.get("err", "")
+                    and not e0["seed"] and not e0.get("device_id"))
+    # rate limited once (two seconds), then the right code: paired, and
+    # every attempt had a fresh nonce
+    _sl = []
+    ns["time"] = type("T", (), {"time": staticmethod(time.time), "monotonic": staticmethod(time.monotonic),
+                                "sleep": staticmethod(lambda s: _sl.append(s))})
+    s3 = _sv_fake(ns, [_SvResp(429, {"code": "rate_limited"}), _sv_pair_server(),
+                       _SvResp(200, {"device_id": "x"}),
+                       _SvResp(200, {"models": [{"name": "small:8b", "placement": "gpu"}]}),
+                       _SvResp(200, {"models": []}), _SvResp(200, {"version": "0.34.4"})])
+    ok = ns["server_pair"](ctx, sid, "7k4m-2qxd-9fht")
+    ns["time"] = time
+    e1 = ns["_srv_read"](ctx)[0]
+    pub = _sv_unb64u(e1["public_key"])
+    nonces = [json.loads(r["body"])["nonce"] for r in s2 + s3[:2]]
+    out["paired"] = (ok.get("ok") and ok["server"]["paired"] and _sl and _sl[0] >= 2
+                     and e1["device_id"] == _h34.sha256(pub).hexdigest()[:16]
+                     and len(set(nonces)) == len(nonces)
+                     and _sv_verify(pub, s3[2]) and s3[2]["path"] == "/v1/whoami"
+                     and ok["server"]["models"][0]["label"] == "Desktop · small:8b")
+    out["0600"] = _st34.S_IMODE(os.stat(os.path.join(d, "servers.json")).st_mode) == 0o600
+    # a new pairing replaces the key
+    old = e1["seed"].reveal()
+    _sv_fake(ns, [_sv_pair_server(), _SvResp(500, {})])
+    ns["server_pair"](ctx, sid, _SV_CODE)
+    out["repair"] = ns["_srv_read"](ctx)[0]["seed"].reveal() not in ("", old)
+    # remove: the entry and the key go
+    rm = ns["server_remove"](ctx, sid)
+    raw = open(os.path.join(d, "servers.json")).read()
+    out["removed"] = rm.get("ok") and json.loads(raw)["servers"] == [] and old not in raw
+    return all(out.values()), out
+
+
+def _svc_secrets(src):
+    ns, ctx, d = _sv_ns(src)
+    out = {}
+    S = ns["_Secret"]("hush-34")
+    out["redacted"] = (repr(S) == str(S) == "%s" % S == "{}".format(S) == f"{S}" == "<redacted>"
+                       and "hush" not in repr({"k": S}) and S.reveal() == "hush-34")
+    try:
+        json.dumps({"k": S})
+        out["json"] = False
+    except TypeError:
+        out["json"] = True
+    try:
+        _pk34.dumps(S)
+        out["pickle"] = False
+    except Exception:
+        out["pickle"] = True
+    a, p, sent = _sv_paired(ns, ctx)
+    e = ns["_srv_read"](ctx)[0]
+    seed, secret = e["seed"].reveal(), e["access_secret"].reveal()
+    views = json.dumps([a, p, ns["servers_view"](ctx), ns["_srv_public"](e)])
+    out["views"] = (bool(seed) and secret.startswith("SECRET34") and seed not in views
+                    and secret not in views and "id34.access" not in views
+                    and set(ns["_srv_public"](e)) == {"id", "name", "url", "host", "access", "paired",
+                                                     "paired_at", "device_name", "device_id",
+                                                     "status", "models"})
+    out["entry repr"] = seed not in repr(e) and secret not in repr(e)
+    out["error text"] = all(secret not in str(ns["_srv_fail"](e, st, {"error": "x"}))
+                            for st in (403, 401, 500, 530))
+    return all(out.values()), out
+
+
+def _svc_stream(src):
+    ns, ctx, d = _sv_ns(src)
+    _sv_paired(ns, ctx)
+    e = ns["_srv_read"](ctx)[0]
+    pub = _sv_unb64u(e["public_key"])
+    out = {}
+    lines = [{"message": {"content": "Hel"}, "done": False},
+             {"message": {"content": "lo"}, "done": False},
+             {"message": {"content": ""}, "done": True, "eval_count": 2, "prompt_eval_count": 9}]
+    sent = _sv_fake(ns, [_SvResp(200, lines=lines)])
+    got = []
+    msgs = [{"role": "system", "content": "sys"},
+            {"role": "user", "content": "hi", "image_urls": ["data:x"], "drafts": [1]},
+            {"role": "junk", "content": "no"}, "not a turn"]
+    last = ns["run_model"]("Desktop · small:8b", msgs, got.append)
+    body = json.loads(sent[0]["body"])
+    out["streamed"] = "".join(got) == "Hello" and last.get("eval_count") == 2
+    out["signed"] = _sv_verify(pub, sent[0]) and sent[0]["path"] == "/api/chat"
+    out["only the chat"] = (set(body) == {"model", "messages", "stream", "options"}
+                            and body["model"] == "small:8b" and body["stream"] is True
+                            and body["messages"] == [{"role": "system", "content": "sys"},
+                                                     {"role": "user", "content": "hi"}]
+                            and body["options"] == {"temperature": 0.75})
+    u = ns["_USAGE"][-1]
+    out["ledger"] = u[0] == "Desktop · small:8b" and u[1] == "server" and u[3] == 5
+    # a failure after the 200 is the stream's last line: it ends the answer
+    _sv_fake(ns, [_SvResp(200, lines=[{"message": {"content": "part"}},
+                                      {"error": "spilled", "code": "gpu_spill", "done": True},
+                                      {"message": {"content": "never"}}])])
+    said, st, steps = [], [], []
+    ns["server_answer"]("Desktop · small:8b", msgs, said.append, said.append, st.append,
+                        lambda *a: steps.append(a))
+    text = "".join(x for x in said if not isinstance(x, ns["Ctl"]))
+    out["error line ends it"] = (text.startswith("part\n\n⚠️ Desktop couldn’t keep")
+                                 and "never" not in text
+                                 and any('"w": "server"' in x for x in said if isinstance(x, ns["Ctl"])))
+    # replay and clock_skew are signed again once, with a fresh nonce and
+    # the server's clock; a second refusal is said
+    s2 = _sv_fake(ns, [_SvResp(401, {"code": "replay", "server_time": int(time.time())}),
+                       _SvResp(200, lines=lines)])
+    g2 = []
+    ns["server_stream"]("Desktop · small:8b", msgs, g2.append)
+    s3 = _sv_fake(ns, [_SvResp(401, {"code": "clock_skew", "server_time": int(time.time()) + 300}),
+                       _SvResp(200, lines=lines)])
+    ns["server_stream"]("Desktop · small:8b", msgs, [].append)
+    out["retry once"] = ("".join(g2) == "Hello" and len(s2) == 2
+                         and s2[0]["h"]["X-O1-Nonce"] != s2[1]["h"]["X-O1-Nonce"]
+                         and abs(int(s3[1]["h"]["X-O1-Timestamp"]) - time.time() - 300) < 5
+                         and _sv_verify(pub, s3[1]))
+    _sv_fake(ns, [_SvResp(401, {"code": "replay"}), _SvResp(401, {"code": "replay"}),
+                  _SvResp(200, lines=lines)])
+    try:
+        ns["server_stream"]("Desktop · small:8b", msgs, [].append)
+        out["twice said"] = False
+    except ns["ServerError"] as se:
+        out["twice said"] = se.kind == "replay"
+    # any other failure is said too, never passed on to try another model
+    _ss = ns["server_stream"]
+
+    def _boom(*a):
+        raise ValueError("x")
+    ns["server_stream"] = _boom
+    said = []
+    ns["server_answer"]("Desktop \u00b7 small:8b", msgs, said.append, said.append, [].append,
+                        lambda *a: None)
+    ns["server_stream"] = _ss
+    out["catch-all"] = "".join(x for x in said if not isinstance(x, ns["Ctl"])) == (
+        "\u26a0\ufe0f Desktop couldn\u2019t answer (ValueError). Nothing was sent anywhere else.")
+    # a server removed, or not paired: said, nothing sent, no other model
+    ns["_RAN"].clear()
+    s4 = _sv_fake(ns, [])
+    said = []
+    ns["server_answer"]("Gone · small:8b", msgs, said.append, said.append, [].append,
+                        lambda *a: None)
+    out["gone"] = (not s4 and not ns["_RAN"]
+                   and "".join(x for x in said if not isinstance(x, ns["Ctl"]))
+                   == "⚠️ " + ns["SRV_GONE"])
+    return all(out.values()), out
+
+
+def _svc_fail(src):
+    ns, ctx, d = _sv_ns(src)
+    e = {"name": "Desktop"}
+    k = lambda st, js, m="": ns["_srv_fail"](e, st, js, m).kind
+    table = [((302, {}), "access"), ((403, {}), "access"), ((403, {"code": "access"}), "access"),
+             ((403, {"code": "unpaired"}), "auth"), ((401, {"code": "bad_signature"}), "auth"),
+             ((401, {"code": "unsigned"}), "auth"), ((401, {}), "auth"),
+             ((503, {"code": "busy"}), "busy"), ((409, {}), "busy"), ((0, {"code": "busy"}), "busy"),
+             ((507, {"code": "gpu_fit"}), "fit"), ((0, {"code": "gpu_spill"}), "fit"),
+             ((507, {"code": "ram_pressure"}), "fit"), ((404, {}, "x:1b"), "missing"),
+             ((530, {}), "offline"), ((502, {}), "offline"), ((503, {}), "offline"),
+             ((401, {"code": "clock_skew"}), "clock"), ((401, {"code": "replay"}), "replay"),
+             ((0, {"error": "boom", "code": "ollama"}), "server")]
+    got = {repr(a): k(*a) for a, _w in table}
+    ok = all(got[repr(a)] == w for a, w in table)
+    msg = str(ns["_srv_fail"](e, 403, {"code": "unpaired"}))
+    ok = ok and msg == ("Desktop no longer accepts this computer: the pairing was lost. "
+                        "Pair again in Settings › Your servers.")
+    # the real transport: the Access token, a signature over the exact
+    # bytes, the app's own User-Agent
+    import nacl.bindings as _nb34
+    seed = bytes(range(32))
+    pub = _nb34.crypto_sign_seed_keypair(seed)[0]
+    S = ns["_Secret"]
+    ent = {"id": "0badc0de", "name": "Desktop", "url": "http://127.0.0.1:%d" % _sv_capture(),
+           "access_id": S("cid34.access"), "access_secret": S("csec34"),
+           "seed": S(_sv_b64u(seed)), "device_id": _h34.sha256(pub).hexdigest()[:16]}
+    st_, js_ = ns["_srv_json"](ent, "POST", "/api/show", {"model": "small:8b"})
+    m_, p_, h_, b_ = _SVCAP["last"]
+    hl = {k.lower(): v for k, v in h_.items()}
+    wire = (st_ == 401 and js_.get("code") == "unsigned" and m_ == "POST" and p_ == "/api/show"
+            and hl.get("cf-access-client-id") == "cid34.access"
+            and hl.get("cf-access-client-secret") == "csec34"
+            and hl.get("user-agent", "").startswith("ConcordeAI/")
+            and _sv_verify(pub, {"method": "POST", "path": "/api/show", "body": b_,
+                                 "h": {k: hl.get(k.lower(), "") for k in (
+                                     "X-O1-Device", "X-O1-Timestamp", "X-O1-Nonce",
+                                     "X-O1-Signature")}}))
+    ok = ok and wire
+    # nothing answering: offline, said
+    port = _sv_free_port()
+    try:
+        ns["_srv_send"]({"id": "0badc0de", "name": "Desktop", "url": "http://127.0.0.1:%d" % port,
+                         "access_id": ns["_Secret"](""), "access_secret": ns["_Secret"](""),
+                         "seed": ns["_Secret"](""), "device_id": ""}, "GET", "/v1/whoami",
+                        signed=False, timeout=3)
+        off = "answered"
+    except ns["ServerError"] as se:
+        off = se.kind + ":" + str(se)
+    ok = ok and off.startswith("offline:Desktop didn’t answer.")
+    return ok, [got, off, wire]
+
+
+_SVCAP = {"srv": None, "last": None}
+
+
+def _sv_capture():
+    """A listener on 127.0.0.1 that records one request and answers 401
+    unsigned, as the gateway does: the real transport's headers."""
+    if _SVCAP["srv"] is None:
+        from http.server import BaseHTTPRequestHandler as _BH, ThreadingHTTPServer as _TS
+
+        class _H(_BH):
+            def log_message(self, *a):
+                pass
+
+            def _any(self):
+                n_ = int(self.headers.get("Content-Length") or 0)
+                _SVCAP["last"] = (self.command, self.path, dict(self.headers.items()),
+                                  self.rfile.read(n_) if n_ else b"")
+                raw_ = json.dumps({"error": "x", "code": "unsigned", "server_time": 1}).encode()
+                self.send_response(401)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(raw_)))
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.wfile.write(raw_)
+            do_GET = do_POST = _any
+        _SVCAP["srv"] = _TS(("127.0.0.1", 0), _H)
+        _SVCAP["srv"].daemon_threads = True
+        _t34.Thread(target=_SVCAP["srv"].serve_forever, daemon=True).start()
+    return _SVCAP["srv"].server_address[1]
+
+
+def _sv_free_port():
+    s_ = socket.socket()
+    s_.bind(("127.0.0.1", 0))
+    p_ = s_.getsockname()[1]
+    s_.close()
+    return p_
+
+
+def _svc_input(src):
+    ns, ctx, d = _sv_ns(src, hooks=())
+    U = ns["_srv_url"]
+    got = {
+        "https": U("https://Ollama1.flyconcordefly.com/") == ("https://ollama1.flyconcordefly.com", ""),
+        "bare": U("ollama1.example.com") == ("https://ollama1.example.com", ""),
+        "port": U("https://a.example.com:8443") == ("https://a.example.com:8443", ""),
+        "http": U("http://ollama1.example.com")[0] == "" and U("http://127.0.0.1:9")[0] == "",
+        "userinfo": U("https://me:pw@a.example.com")[0] == "",
+        "path": U("https://a.example.com/api")[0] == "" and U("https://a.example.com/?x=1")[0] == "",
+        "junk": U("https://a b.com")[0] == "" and U("")[0] == "" and U("ftp://a.com")[0] == "",
+        "name": ns["_srv_name"]("  Desk·top\n ") == "Desk top" and len(ns["_srv_name"]("x" * 90)) == 40,
+        "token": ns["_srv_token"]("a", "")[2] != "" and ns["_srv_token"]("", "")[:2] == ("", "")
+        and ns["_srv_token"]("a b", "c")[2] != "" and ns["_srv_token"]("i.access", "s")[:2] == ("i.access", "s"),
+    }
+    ns2, ctx2, d2 = _sv_ns(src)
+    got["loopback hook"] = ns2["_srv_url"]("http://127.0.0.1:9")[0] == "http://127.0.0.1:9" \
+        and ns2["_srv_url"]("http://localhost:9")[0] == ""
+    # names are unique in a profile; the same address once; at most 8
+    _sv_fake(ns2, [_sv_unsigned] * 20)
+    a1 = ns2["server_add"](ctx2, {"url": "https://a.example.com"})
+    a2 = ns2["server_add"](ctx2, {"url": "https://b.example.com"})
+    a3 = ns2["server_add"](ctx2, {"url": "https://a.example.com", "name": "Other"})
+    got["names"] = (a1["server"]["name"] == "Desktop" and a2["server"]["name"] == "Desktop 2"
+                    and "already" in a3.get("err", ""))
+    return all(got.values()), got
+
+
+def _svc_models(src):
+    ns, ctx, d = _sv_ns(src)
+    e = {"name": "Desktop"}
+    m = ns["_srv_models"](e, {"models": [
+        {"name": "qwen3:14b", "placement": "gpu", "size": 9},
+        {"name": "gpt-oss:120b", "placement": "gpu+ram"},
+        {"name": "old:7b"}, {"name": "nomic-embed-text"}, {"name": "bad name!"},
+        {"name": "x:1b", "placement": "cpu"}]},
+        {"models": [{"name": "gpt-oss:120b", "placement": "gpu+ram", "gpu_pct": 25}]})
+    want = [("gpt-oss:120b", "gpu+ram", 25, True), ("old:7b", "unknown", None, False),
+            ("qwen3:14b", "gpu", None, False), ("x:1b", "unknown", None, False)]
+    got = [(x["name"], x["placement"], x["gpu_pct"], x["loaded"]) for x in m]
+    return got == want and m[0]["label"] == "Desktop · gpt-oss:120b", got
+
+
+def _svc_policy(src):
+    ns, ctx, d = _sv_ns(src)
+    _sv_paired(ns, ctx)
+    L = "Desktop · small:8b"
+    sor = lambda r: ns["server_only_request"](r, ctx)
+    got = {
+        "label": ns["server_label"](L) and not ns["server_label"]("Llama 3.2 3B")
+        and not ns["server_label"](None),
+        "pick": ns["server_pick"](L, ctx)[1] == "small:8b"
+        and ns["server_pick"]("Laptop · small:8b", ctx)[0] is None
+        and ns["server_pick"]("Desktop · ", ctx)[0] is None,
+        "only": sor({"model": L, "models": [L]}) and sor({"model": "", "models": [L]}),
+        "not only": not any(sor(r) for r in (
+            {"model": L, "tier": "Fast"}, {"model": L, "models": [L, "Llama 3.2 3B"]},
+            {"model": L, "models": [L, L]}, {"model": L, "images": ["x"]},
+            {"model": L, "agent": "Coding"}, {"model": "Llama 3.2 3B"},
+            {"model": "Laptop · small:8b"})),
+        # the section never asks about cloud power, the ladders or tiers
+        "no gate": not re.search(r"cloud_allowed|gate_ladder|\bturbo\b|cloud_bench|resolve_tier|TIERS",
+                                 _sv_sect(src, "servers")),
+    }
+    # another profile sees none of it
+    dB = os.path.join(d, "accounts", "b" * 32)
+    os.makedirs(dB)
+    B = ns["ProfileCtx"]("test", dB, "b" * 32)
+    got["profile B"] = (ns["_srv_read"](B) == [] and ns["server_pick"](L, B)[0] is None
+                        and not ns["server_only_request"]({"model": L}, B)
+                        and not os.path.exists(os.path.join(dB, "servers.json")))
+    # servers.json is a profile's own, never the machine's
+    try:
+        ns["_pfile"]("servers.json", ns["MACHINE_ROOT"])
+        got["personal"] = False
+    except ns["NoProfile"]:
+        got["personal"] = True
+    return all(got.values()), got
+
+
+def _svc_pins(src):
+    """Where the servers meet the app, pinned in the source."""
+    rm = src[src.index("def run_model(label: str"):]
+    ch = src[src.index('        if self.path != "/api/chat":'):]
+    got = {
+        "run_model": rm.index("if server_label(label):\n        # a model on the person's own server "
+                              "(6b334), never a fallback\n        return server_stream(label, messages, emit)")
+        < rm.index("if label not in MODEL_ROUTES:"),
+        "guard": "        if a and server_label(a[0]):\n            # your own server's model (6b334): "
+                 "not this computer's engines\n            return fn(*a, **k)\n        if not bench_hold():" in src,
+        "council keeps it": "        if server_label(l):\n            usable.append(l)" in src,
+        "picks": "                       or server_pick(m, self.ctx)[0] is not None]" in ch,
+        "one server model": "        _srv_lbl = (council[0] if len(council) == 1 and not cloud_only\n"
+                            "                    and server_label(council[0]) else \"\")" in ch
+        and "        for label, target in ({} if _srv_lbl else MODEL_ROUTES).items():" in ch
+        and "        if route is None and not cloud_only:" in ch,
+        # before the Fast lane's cloud ladder and the council: not behind
+        # cloud power, never a council unless picked
+        "branch first": ch.index("            elif _srv_lbl:\n                server_answer(_srv_lbl,")
+        < ch.index("            elif len(council) > 1:") < ch.index("_fl = gate_ladder(_fl, req_cloud)")
+        and ch.index("            elif cloud_only:") < ch.index("            elif _srv_lbl:"),
+        "hold": "        if not server_only_request(req_json, self.ctx):\n            if not bench_hold():" in ch,
+        "personal": '"account.key", "servers.json"))' in src,
+        "routes": 'self._send_json(servers_view(\n                self.ctx, (_sq.get("refresh") or [""])[0] == "1"))' in src
+        and 'if self.path.startswith("/api/servers/"):' in src,
+        "cloud only bench": "            council = [lbl for lbl, _c in cloud_bench()]" in ch,
+    }
+    return all(got.values()), got
+
+
+def _svc_page(src):
+    """The pane's cards and the engine menu's rows, run in node."""
+    i0 = src.index("function esc(s){")
+    js = (src[i0:src.index(";}\n", i0) + 3]
+          + 'const SRV_SEP=" \\u00b7 ";const srvArmed={},srvPairOpen={};'
+          + 'let tier="",advOn=false,agent="",council=["Desktop \\u00b7 gpt-oss:120b"];'
+          + src[src.index("function srvWhere(m){"):src.index("function paintServers(){")]
+          + src[src.index("function srvMenuRows(){"):src.index("function paintEngMenuServers(){")]
+          + "let srvList=[{id:'a1b2c3d4',name:'Desktop',host:'ollama1.example.com',paired:true,"
+          + "status:{at:1,reachable:true,auth:true,latency_ms:42,version:'0.34.4'},models:["
+          + "{name:'gpt-oss:120b',label:'Desktop \\u00b7 gpt-oss:120b',placement:'gpu+ram',loaded:true},"
+          + "{name:'qwen3:14b',label:'Desktop \\u00b7 qwen3:14b',placement:'gpu'},"
+          + "{name:'old:7b',label:'Desktop \\u00b7 old:7b',placement:'unknown'}]},"
+          + "{id:'e5f6a7b8',name:'Studio',host:'s.example.com',paired:false,status:{at:1,"
+          + "reachable:false,err:'Studio didn\\u2019t answer.',kind:'offline'},models:[]},"
+          + "{id:'c9d0e1f2',name:'Lost',host:'l.example.com',paired:true,status:{at:1,reachable:true,"
+          + "err:'pairing lost',kind:'auth'},models:[]}];"
+          + "process.stdout.write(JSON.stringify([srvCard(srvList[0]),srvCard(srvList[1]),"
+          + "srvCard(srvList[2]),srvMenuRows()]));")
+    open(os.path.join(_si_dir, "srv34.js"), "w").write(js)
+    try:
+        o = json.loads(subprocess.run(["node", os.path.join(_si_dir, "srv34.js")],
+                                      capture_output=True, text=True, timeout=30).stdout)
+    except Exception as e_:
+        return False, "node: %r" % e_
+    wh = re.search(r"const where=srvWho\|\|\(/cloud\|gemini\|groq\|claude\|gpt\|openai/i\n"
+                   r"      \.test\(lastModels\.replace\((/\[\^,\]\*\\u00b7\[\^,\]\*/g),", src)
+    got = {
+        "card ok": 'class="srv ok"' in o[0] and "Paired · reachable · 42 ms · Ollama 0.34.4" in o[0]
+        and "gpt-oss:120b <i>· card + memory, slower</i> <i>· loaded</i>" in o[0]
+        and "qwen3:14b</div>" in o[0] and "old:7b</div>" in o[0]
+        and 'data-a="repair">Pair again' in o[0] and 'class="srv-code"' not in o[0],
+        "card unpaired": 'class="srv warn"' in o[1] and 'class="srv-code"' in o[1]
+        and "sudo ollama1-pair" in o[1] and "Not paired · Studio didn’t answer." in o[1],
+        "card lost": 'class="srv bad"' in o[2],
+        "menu": o[3].count('" data-s="') == 3
+        and '<span class="enm">Lost</span><span class="edsc">not answering</span>' in o[3] and 'data-s="Desktop · qwen3:14b"' in o[3]
+        and "yours · card + memory, slower" in o[3] and o[3].count(">your server<") == 2
+        and 'class="engrow srvrow on" data-s="Desktop · gpt-oss:120b"' in o[3]
+        and "not in the cloud" in o[3] and "Studio" not in o[3],
+        "badge": bool(wh) and not re.search(r"cloud|gemini|groq|claude|gpt|openai",
+                                            re.sub(r"[^,]*·[^,]*", "", "Desktop · gpt-oss:20b"), re.I),
+        "pane": 'data-pane="p-servers">Your servers</button>' in src
+        and 'if(id==="p-servers")loadServers(true);' in src and 'api("/api/servers' in src
+        and 'fetch("/api/servers' not in src,
+    }
+    return all(got.values()), [got, o]
+
+
+_SV_CHECKS = [("servers: PROTOCOL.md's vectors, rebuilt byte for byte (device id, both signatures, "
+               "the pairing key, MAC and proof, the code's spellings)", _svc_vectors),
+              ("servers: pairing (no window, a wrong code, a tampered proof and another device's id "
+               "refused and nothing saved, a rate limit waited out, fresh nonces, 0600, re-pair, remove)",
+               _svc_pairing),
+              ("servers: the Access secret and the device key never reach a reply, a repr or an error",
+               _svc_secrets),
+              ("servers: a signed chat streams, carries only the chat, is counted under the server, "
+               "ends on an error line, retries a replay or clock skew once, and a gone server is said",
+               _svc_stream),
+              ("servers: each refusal read the way PROTOCOL.md means it; nothing answering is offline",
+               _svc_fail),
+              ("servers: addresses, names and Access tokens checked", _svc_input),
+              ("servers: placement read, unknown when the server doesn't say; embeddings left out",
+               _svc_models),
+              ("servers: labels, a one-model chat, no cloud gate, and profile B sees none of A's",
+               _svc_policy),
+              ("servers: where they meet run_model, the council, the benchmark and /api/chat", _svc_pins),
+              ("servers: the pane's cards and the engine menu's rows (node)", _svc_page)]
+
+
+def _sv_run(src):
+    out = []
+    for name, fn in _SV_CHECKS:
+        try:
+            ok, det = fn(src)
+        except Exception as e_:
+            ok, det = False, "raised %r" % e_
+        out.append((name, bool(ok), det))
+    return out
+
+
+for _n34, _o34, _d34 in _sv_run(_MILLENAI_SRC):
+    check(_n34, _o34, "%r" % (_d34,))
+
+# the benchmark's guard lets a server model through while a run goes
+_bg34 = _bm_ns(_MILLENAI_SRC, TEST_HOOKS=frozenset({"bench-fake"}),
+               server_label=lambda l: isinstance(l, str) and " · " in l)
+_bg34["_bench"]["running"] = True
+_gd34 = _bg34["_bench_guarded"](lambda *a: "ran")
+try:
+    _gl34 = _gd34("Llama 3.2 3B")
+except RuntimeError as e_:
+    _gl34 = str(e_)
+_gs34 = _gd34("Desktop · small:8b")
+_bg34["_bench"]["running"] = False
+check("servers: a benchmark refuses local model calls but not a server model's",
+      _gl34.startswith("A hardware benchmark is running.") and _gs34 == "ran", "%r" % [_gl34, _gs34])
+
+# ---- the mutations: each fails at least one check above
+_SV_MUT = [
+    ("the body hash left out of the canonical string", 'hashlib.sha256(body).hexdigest(), str(int(ts)), nonce,',
+     'str(int(ts)), nonce,'),
+    ("a 32-character device id", "return hashlib.sha256(pub).hexdigest()[:16]", "return hashlib.sha256(pub).hexdigest()[:32]"),
+    ("the timestamp out of the MAC", 'msg = "ollama1-pair-v1\\n%s\\n%s\\n%d\\n%s" % (name, pub, int(ts), nonce)',
+     'msg = "ollama1-pair-v1\\n%s\\n%s\\n%s" % (name, pub, nonce)'),
+    ("O not read as 0", 'c = c.replace("O", "0").replace("I", "1")', 'c = c.replace("I", "1")'),
+    ("a code of any length", "return c if len(c) == 12 and all(", "return c if all("),
+    ("the proof not checked", "            and hmac.compare_digest(got, o1_pair_proof(key, dev_id, pub, nonce))):",
+     "            and True):"),
+    ("the device id not compared", 'if not (hmac.compare_digest(str(js.get("device_id") or ""), dev_id)',
+     'if not (True'),
+    ("one nonce for every attempt", '            ts, nonce = int(time.time() + skew), o1_nonce()',
+     '            ts, nonce = int(time.time() + skew), "n" * 22'),
+    ("no wait on a rate limit", '            if attempt == 0 and st == 429 and c == "rate_limited":\n                time.sleep(2.2)\n                continue\n', ""),
+    ("the secret's repr", '    def __repr__(self):\n        return "<redacted>"', '    def __repr__(self):\n        return self._v'),
+    ("a secret pickled", '    def __reduce__(self):\n        raise TypeError("a secret isn\'t serialized")',
+     '    def __reduce__(self):\n        return (str, (self._v,))\n\n    def __json__(self):\n        return self._v'),
+    ("the page told the token", '            "access": bool(e["access_id"] and e["access_secret"]),',
+     '            "access": e["access_secret"].reveal(),'),
+    ("the Access token not sent", '        h["CF-Access-Client-Id"] = e["access_id"].reveal()\n', ""),
+    ("unpaired read as a server error", 'if code in ("unpaired", "bad_signature", "unsigned") or (',
+     'if code in ("bad_signature", "unsigned") and ('),
+    ("busy not recognised", 'if code == "busy" or status in (409, 429) or (status == 503 and code):',
+     'if code == "busyx":'),
+    ("a dead tunnel read as an error", 'if not code and (status == 502 or status == 503 or 520 <= status <= 530):',
+     'if False:'),
+    ("a refused connection raised raw", '    except (OSError, _hc.HTTPException):\n        conn.close()\n        raise ServerError("offline",',
+     '    except (_hc.HTTPException,):\n        conn.close()\n        raise ServerError("offline",'),
+    ("no retry after a replay", '            if attempt == 0 and resp.status == 401 and js.get("code") in (\n                    "clock_skew", "replay"):',
+     '            if attempt == 0 and resp.status == 401 and js.get("code") in (\n                    "clock_skew",):'),
+    ("the server's clock ignored", "        skew = float(js.get(\"server_time\")) - time.time()", "        skew = 0.0"),
+    ("retried forever", "        for attempt in (0, 1):\n            conn, resp = _srv_send(e, \"POST\", \"/api/chat\"",
+     "        for attempt in (0, 0, 0):\n            conn, resp = _srv_send(e, \"POST\", \"/api/chat\""),
+    ("an error line read as text", '                if obj.get("error"):\n                    # a failure after the 200 is the stream\'s last line\n                    raise _srv_fail(e, 0, obj, model)',
+     '                if False:\n                    raise _srv_fail(e, 0, obj, model)'),
+    ("the whole turn sent", '        t = {"role": m["role"], "content": str(m.get("content") or "")}', '        t = dict(m)'),
+    ("keep_alive sent", '"stream": True, "options": {"temperature": 0.75}},',
+     '"stream": True, "keep_alive": "45s", "options": {"temperature": 0.75}},'),
+    ("counted as local", 'usage_note(label, "server", messages, sent[0], last, t0)', 'usage_note(label, "local", messages, sent[0], last, t0)'),
+    ("a guess for an unknown placement", '"placement": pl if pl in ("gpu", "gpu+ram") else "unknown",', '"placement": pl if pl in ("gpu", "gpu+ram") else "gpu",'),
+    ("embeddings offered", ' or "embed" in n.lower():', ':'),
+    ("http anywhere", '    return "server-http-loopback" in TEST_HOOKS and u.hostname == "127.0.0.1"', '    return True'),
+    ("a council called server-only", "    if len(picks) != 1:\n        return False", "    if False:\n        return False"),
+    ("a failure passed to the catch-all", "    except (StaleProfile, BrokenPipeError, ConnectionResetError):\n        raise\n    except Exception as exc:",
+     "    except (StaleProfile, BrokenPipeError, ConnectionResetError):\n        raise\n    except ZeroDivisionError as exc:"),
+    ("server_answer swallows a gone server", "    except ServerError as se:\n        emit(AppText(", "    except ServerError as se:\n        (lambda *a: None)(AppText("),
+    ("servers.json the machine's", '"account.key", "servers.json"))', '"account.key"))'),
+    ("the branch after the cloud ladder", "            elif _srv_lbl:\n                server_answer(_srv_lbl,", "            elif False:\n                server_answer(_srv_lbl,"),
+    ("run_model not routing a server label", "    if server_label(label):\n        # a model on the person's own server (6b334), never a fallback\n        return server_stream(label, messages, emit)\n",
+     ""),
+    ("the menu row not marked yours", '+esc(srvWhere(m)?"yours \\u00b7 "+srvWhere(m):"your server")', '+esc(srvWhere(m))'),
+    ("the card without the note", 'return m&&m.placement==="gpu+ram"?"card + memory, slower":"";', 'return "";'),
+]
+_svm = []
+for _d34, _o34, _nw34 in _SV_MUT:
+    if _MILLENAI_SRC.count(_o34) < 1:
+        _svm.append((_d34, "anchor missing"))
+        continue
+    _r34 = _sv_run(_MILLENAI_SRC.replace(_o34, _nw34, 1))
+    _svm.append((_d34, [n for n, o, _x in _r34 if not o][:1] or "MISSED"))
+check("servers: %d mutations of the servers code, each caught by a check above" % len(_SV_MUT),
+      all(isinstance(v, list) for _d, v in _svm), "%r" % [x for x in _svm if not isinstance(x[1], list)])
+
+# ---- live: the real gateway, a stand-in for Access, a copy of its own
+_O1_HARNESS_SRC = r'''"""The gauntlet's ollama1 (6b334): the REAL gateway (ollama1/bin/ollama1-gateway)
+on its stub Ollama, behind a stand-in for Cloudflare Access, all on 127.0.0.1.
+
+    python3 o1harness.py <ollama1 kit> <control port> <front port> <client id> <client secret>
+
+The front port is what the app is given as the server's address. It plays
+Access: a request without the service token gets Cloudflare's 403 page; one
+with it goes to the gateway with a fresh Access JWT and the gateway's host
+name, and the answer is streamed back. The control port (JSON) opens a
+pairing window, unpairs every device, answers the next request with a
+canned reply, replays the last chat, takes the front down and up, and shows
+what arrived (header names, nonces, bodies) and what the stub Ollama got.
+The pairing window's root step runs on a thread, as ollama1's path unit
+does at the desktop."""
+import http.client
+import importlib.machinery
+import importlib.util
+import json
+import os
+import sys
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+KIT = os.path.abspath(sys.argv[1])
+sys.path.insert(0, os.path.join(KIT, "tests"))
+import o1test_util as U  # noqa: E402  (sets OLLAMA1_PREFIX first)
+import o1pair  # noqa: E402
+from o1common import DEFAULTS  # noqa: E402
+from stub_ollama import Stub  # noqa: E402
+
+CTL, FRONT, CID, CSECRET = int(sys.argv[2]), int(sys.argv[3]), sys.argv[4], sys.argv[5]
+loader = importlib.machinery.SourceFileLoader("o1gateway", os.path.join(KIT, "bin", "ollama1-gateway"))
+spec = importlib.util.spec_from_loader("o1gateway", loader)
+GW = importlib.util.module_from_spec(spec)
+loader.exec_module(GW)
+
+KEY = U.RSAKey("kid-1")
+JWKS = U.FakeJWKS([KEY])
+STUB = Stub(U.free_port())
+cfg = dict(DEFAULTS)
+cfg.update({"access_team_domain": U.TEAM, "gateway_aud": U.GW_AUD, "admin_aud": U.ADMIN_AUD,
+            "admin_email": U.ADMIN_EMAIL, "service_token_client_id": U.CLIENT_ID,
+            "gateway_port": U.free_port(), "ollama_url": "http://127.0.0.1:%d" % STUB.port,
+            "certs_url": JWKS.url, "allow_insecure_certs_url": True,
+            "vram_total_bytes": 16 * (1 << 30), "queue_wait_s": 20})
+U.write_devices([])
+GWO, GWS, GWSTOP = GW.serve(cfg)
+GPORT = cfg["gateway_port"]
+time.sleep(1.1)     # signatures must be dated after the gateway started
+
+STATE = {"log": [], "next": [], "tamper_proof": False, "last_chat": None}
+LOCK = threading.Lock()
+
+
+def committer():    # stands in for ollama1-pair-commit.path (root)
+    while True:
+        try:
+            o1pair.commit_spool(log=lambda *_: None)
+        except Exception:
+            pass
+        time.sleep(0.05)
+
+
+threading.Thread(target=committer, daemon=True).start()
+
+
+class Front(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.0"
+
+    def log_message(self, *a):
+        pass
+
+    def _any(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        body = self.rfile.read(n) if n else b""
+        ok = (self.headers.get("CF-Access-Client-Id") == CID
+              and self.headers.get("CF-Access-Client-Secret") == CSECRET)
+        rec = {"method": self.command, "path": self.path, "access": ok,
+               "headers": sorted(self.headers.keys()),
+               "nonce": self.headers.get("X-O1-Nonce"),
+               "ua": self.headers.get("User-Agent"),
+               "body": body.decode("utf-8", "replace")}
+        with LOCK:
+            STATE["log"].append(rec)
+            i = next((i for i, c in enumerate(STATE["next"])
+                      if c.get("path") in (None, self.path)), None)
+            canned = STATE["next"].pop(i) if i is not None else None
+        if not ok:
+            raw = b"<html><body>Forbidden. You don't have permission to view this.</body></html>"
+            self.send_response(403)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+            return
+        if canned:
+            raw = json.dumps(canned.get("body") or {}).encode()
+            self.send_response(int(canned.get("status") or 503))
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+            return
+        h = {k: v for k, v in self.headers.items()
+             if k.lower() not in ("host", "cf-access-client-id", "cf-access-client-secret",
+                                  "connection", "content-length")}
+        if self.path == "/api/chat":
+            with LOCK:
+                STATE["last_chat"] = (dict(h), body)
+        self.forward(h, body)
+
+    def forward(self, h, body):
+        h["Cf-Access-Jwt-Assertion"] = U.make_jwt(KEY, U.claims())
+        h["Host"] = cfg["hostname_gateway"]
+        if self.command == "POST":
+            h["Content-Length"] = str(len(body))
+        c = http.client.HTTPConnection("127.0.0.1", GPORT, timeout=120)
+        c.request(self.command, self.path, body=body if self.command == "POST" else None, headers=h)
+        r = c.getresponse()
+        data = r.read() if r.status != 200 or self.path != "/api/chat" else None
+        if data is not None and self.path == "/v1/pair" and r.status == 200 and STATE["tamper_proof"]:
+            d = json.loads(data)
+            d["proof"] = U.b64u(bytes(32))
+            data = json.dumps(d).encode()
+            STATE["tamper_proof"] = False
+        self.send_response(r.status)
+        self.send_header("Content-Type", r.getheader("Content-Type") or "application/json")
+        if data is not None:
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        else:
+            self.end_headers()
+            while True:
+                piece = r.read1(65536)
+                if not piece:
+                    break
+                self.wfile.write(piece)
+                self.wfile.flush()
+        c.close()
+
+    do_GET = do_POST = _any
+
+
+FRONT_SRV = {"s": None}
+
+
+def front_up():
+    s = ThreadingHTTPServer(("127.0.0.1", FRONT), Front)
+    s.daemon_threads = True
+    threading.Thread(target=s.serve_forever, daemon=True).start()
+    FRONT_SRV["s"] = s
+
+
+def front_down():
+    s = FRONT_SRV["s"]
+    if s:
+        s.shutdown()
+        s.server_close()
+        FRONT_SRV["s"] = None
+
+
+class Ctl(BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+    def reply(self, obj):
+        raw = json.dumps(obj).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(raw)))
+        self.end_headers()
+        self.wfile.write(raw)
+
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        d = json.loads(self.rfile.read(n) or b"{}")
+        p = self.path
+        if p == "/open":
+            w = o1pair.open_window()
+            GWO.pair["last_try"] = 0.0
+            return self.reply({"code": w["code"]})
+        if p == "/close":
+            o1pair.close_window()
+            return self.reply({"ok": True})
+        if p == "/unpair":
+            U.write_devices([])
+            time.sleep(1.1)     # the device list is re-read when its mtime moves
+            return self.reply({"ok": True})
+        if p == "/next":
+            with LOCK:
+                STATE["next"].append(d)
+            return self.reply({"ok": True})
+        if p == "/tamper-proof":
+            STATE["tamper_proof"] = True
+            return self.reply({"ok": True})
+        if p == "/replay":
+            h, body = STATE["last_chat"]
+            h = dict(h)
+            h["Cf-Access-Jwt-Assertion"] = U.make_jwt(KEY, U.claims())
+            h["Host"] = cfg["hostname_gateway"]
+            h["Content-Length"] = str(len(body))
+            c = http.client.HTTPConnection("127.0.0.1", GPORT, timeout=30)
+            c.request("POST", "/api/chat", body=body, headers=h)
+            r = c.getresponse()
+            out = r.read().decode("utf-8", "replace")
+            c.close()
+            return self.reply({"status": r.status, "body": out})
+        if p == "/down":
+            front_down()
+            return self.reply({"ok": True})
+        if p == "/up":
+            front_up()
+            return self.reply({"ok": True})
+        if p == "/delay":
+            STUB.delay = float(d.get("s") or 0)
+            return self.reply({"ok": True})
+        self.send_error(404)
+
+    def do_GET(self):
+        if self.path == "/log":
+            with LOCK:
+                return self.reply({"log": STATE["log"]})
+        if self.path == "/stub":
+            with STUB.lock:
+                calls = [[m, pth, b] for m, pth, b in STUB.calls]
+            return self.reply({"calls": calls})
+        if self.path == "/devices":
+            return self.reply({"devices": [{"id": k, "name": v.get("name")}
+                                           for k, v in o1pair.load_devices().items()]})
+        self.send_error(404)
+
+
+front_up()
+ctl = ThreadingHTTPServer(("127.0.0.1", CTL), Ctl)
+ctl.daemon_threads = True
+print("ready", flush=True)
+ctl.serve_forever()
+'''
+_o1h_path = os.path.join(_SMOKE_TMP, "o1harness.py")
+open(_o1h_path, "w").write(_O1_HARNESS_SRC)
+_O1CTL, _O1FRONT = _sv_free_port(), _sv_free_port()
+_O1CID = "0123456789abcdef.access"          # the stand-in's Access client id (o1test_util's)
+_O1SEC = _canary("AccessSecret")
+_o1log = open(os.path.join(_SMOKE_TMP, "o1harness.log"), "w")
+_o1proc = subprocess.Popen([_SMOKE_PY, _o1h_path, os.path.abspath("ollama1"), str(_O1CTL),
+                            str(_O1FRONT), _O1CID, _O1SEC], stdout=_o1log,
+                           stderr=subprocess.STDOUT, start_new_session=True)
+_atexit.register(lambda: _o1proc.poll() is None and _o1proc.kill())
+
+
+def _o1(path, d=None):
+    r_ = urllib.request.Request("http://127.0.0.1:%d%s" % (_O1CTL, path),
+                                data=None if d is None else json.dumps(d).encode(),
+                                method="GET" if d is None else "POST")
+    with urllib.request.urlopen(r_, timeout=60) as resp:
+        return json.loads(resp.read())
+
+
+_o1up = False
+for _i34 in range(240):
+    try:
+        _o1("/log")
+        _o1up = True
+        break
+    except Exception:
+        if _o1proc.poll() is not None:
+            break
+        time.sleep(0.5)
+_SV = Instance(9903, "SRV", env={"MILLENAI_TEST_HOOKS":
+                                 "server-http-loopback,profiles,bench-fake,bench-pace=0.05"}).start()
+_SVREPLIES = []
+
+
+def _svq(path, method="GET", data=None):
+    s_, b_ = _ireq(_SV, path, method=method,
+                   data=None if data is None else json.dumps(data).encode(),
+                   headers={"Content-Type": "application/json"} if data is not None else None)
+    _SVREPLIES.append(b_)
+    try:
+        return s_, json.loads(b_ or b"{}")
+    except ValueError:
+        return s_, b_
+
+
+_SVL = "Desktop \u00b7 small:8b"
+_SVLJ = json.dumps(_SVL)[1:-1]           # as it reads inside a frame's JSON
+
+
+def _svchat(label=_SVL, text="hello server", tier="", models=None):
+    s_, b_ = _svq("/api/chat", "POST", {"model": label if not tier else "",
+                                        "models": [label] if models is None else models,
+                                        "tier": tier, "auto_web": False,
+                                        "messages": [{"role": "user", "content": text}]})
+    b_ = b_ if isinstance(b_, bytes) else json.dumps(b_).encode()
+    t_ = b_.decode("utf-8", "replace")
+    frames = re.findall("\0([A-Z0-9]+):?([^\0]*)\0", t_)
+    return s_, re.sub("\0[^\0]*\0", "", t_), frames
+
+
+check("servers (live): the real gateway starts on its stub Ollama behind the Access stand-in",
+      _o1up, _o1log.name)
+# an address with the wrong Access token: turned away at "Access"
+_sa0 = _svq("/api/servers/add", "POST", {"url": "http://127.0.0.1:%d" % _O1FRONT, "name": "Desktop",
+                                          "access_id": _O1CID, "access_secret": "wrong-secret"})
+_sid34 = (_sa0[1].get("server") or {}).get("id", "")
+_sa1 = _svq("/api/servers/access", "POST", {"id": _sid34, "access_id": _O1CID, "access_secret": _O1SEC})
+_st1 = _svq("/api/servers/test", "POST", {"id": _sid34})
+check("servers (live): a wrong Access token is turned away, the right one reaches the gateway unpaired",
+      (_sa0[1].get("server") or {}).get("status", {}).get("kind") == "access"
+      and _sa1[1] == {"ok": True}
+      and (_st1[1].get("server") or {}).get("status", {}).get("reachable") is True
+      and _st1[1]["server"]["paired"] is False and not _st1[1]["server"]["status"].get("err"),
+      "%r" % [_sa0, _sa1, _st1])
+# pairing: no window, a wrong code, then the right one (inside the 2 s the
+# gateway spaces tries by: the app waits it out)
+_sp0 = _svq("/api/servers/pair", "POST", {"id": _sid34, "code": "7K4M-2QXD-9FHT"})
+_code34 = _o1("/open", {})["code"]
+_sp1 = _svq("/api/servers/pair", "POST", {"id": _sid34, "code": "ZZZZ-ZZZZ-ZZZZ"})
+_sp2 = _svq("/api/servers/pair", "POST", {"id": _sid34, "code": _code34[:4].lower() + "-"
+                                          + _code34[4:8] + " " + _code34[8:]})
+_sfile34 = os.path.join(_SV.home, "servers.json")
+_srow34 = (json.load(open(_sfile34))["servers"] or [{}])[0] if os.path.exists(_sfile34) else {}
+_devs34 = _o1("/devices")["devices"]
+check("servers (live): pairing through the real gateway: no window and a wrong code said, the right code "
+      "pairs this device and no other, servers.json 0600",
+      "no pairing window open" in _sp0[1].get("err", "")
+      and _sp1[1].get("err", "").startswith("That code is wrong. 4 more tries")
+      and _sp2[1].get("ok") is True and _sp2[1]["server"]["paired"] is True
+      and _sp2[1]["server"]["status"].get("auth") is True
+      and [x["label"] for x in _sp2[1]["server"]["models"]] == [
+          "Desktop · huge:70b", "Desktop · small:8b", "Desktop · sneaky:14b"]
+      and all(x["placement"] == "unknown" for x in _sp2[1]["server"]["models"])
+      and [d_["id"] for d_ in _devs34] == [_srow34.get("device_id")]
+      and _st34.S_IMODE(os.stat(_sfile34).st_mode) == 0o600,
+      "%r" % [_sp0, _sp1, _sp2, _devs34])
+# a signed chat, streamed end to end, with Use cloud power off
+_svq("/api/prefs", "POST", {"turbo": False})
+_sc1 = _svchat(text="stream me please 334")
+_stub34 = [c for c in _o1("/stub")["calls"] if c[1] == "/api/chat"]
+_log34 = _o1("/log")["log"]
+_chat34 = [r for r in _log34 if r["path"] == "/api/chat"]
+_usage34 = [json.loads(x) for x in open(os.path.join(_SV.home, "usage.jsonl"))] \
+    if os.path.exists(os.path.join(_SV.home, "usage.jsonl")) else []
+check("servers (live): a signed chat streams end to end with Use cloud power off, and carries only the chat",
+      _sc1[0] == 200 and "ANSWER-e please 334" in _sc1[1] and "⚠" not in _sc1[1]
+      and ("RUN", json.dumps({"r": [_SVL], "w": "server", "s": "Desktop"})) in _sc1[2]
+      and all(_SVLJ in f[1] for f in _sc1[2] if f[0] == "RUN")
+      and _chat34 and _chat34[-1]["access"] and "X-O1-Signature" in _chat34[-1]["headers"]
+      and set(json.loads(_chat34[-1]["body"])) == {"model", "messages", "stream", "options"}
+      and _stub34 and [m["role"] for m in _stub34[-1][2]["messages"]] == ["system", "user"]
+      and _stub34[-1][2]["messages"][-1]["content"] == "stream me please 334"
+      and _chat34[-1]["ua"].startswith("ConcordeAI/"),
+      "%r" % [_sc1[:2], _chat34[-1:] and _chat34[-1]["headers"], _stub34[-1:]])
+check("servers (live): the usage ledger counts the call under the server's label, marked server",
+      any(r.get("m") == _SVL and r.get("w") == "server" and r.get("o") for r in _usage34)
+      and any(r.get("m") == _SVL and r.get("a") for r in _usage34), "%r" % _usage34[-3:])
+# replay: the chat the app sent, sent again, is refused; the app's nonces never repeat
+_rp34 = _o1("/replay", {})
+_n34 = [r["nonce"] for r in _log34 if r.get("nonce")]
+check("servers (live): a replayed request is refused by the gateway, and no nonce of the app's repeats",
+      _rp34["status"] == 401 and '"replay"' in _rp34["body"] and len(_n34) >= 5
+      and len(set(_n34)) == len(_n34), "%r" % [_rp34, len(_n34)])
+# busy, and a replay refusal the app signs again
+_o1("/next", {"path": "/api/chat", "status": 503,
+              "body": {"error": "queue full", "code": "busy", "server_time": int(time.time())}})
+_sc2 = _svchat(text="busy?")
+_o1("/next", {"path": "/api/chat", "status": 401,
+              "body": {"error": "nonce reused", "code": "replay", "server_time": int(time.time())}})
+_sc3 = _svchat(text="again 334")
+_o1("/next", {"path": "/api/chat", "status": 507, "body": {"error": "no fit", "code": "gpu_fit"}})
+_sc4 = _svchat(text="fit?")
+check("servers (live): busy and a model that doesn't fit are said; a replay refusal is signed again once",
+      _sc2[1].strip() == "⚠️ Desktop is busy with other requests. Try again in a moment."
+      and "ANSWER-again 334" in _sc3[1] and "⚠" not in _sc3[1]
+      and _sc4[1].strip() == "⚠️ small:8b doesn’t fit in Desktop’s graphics memory.",
+      "%r" % [_sc2[1], _sc3[1], _sc4[1]])
+# Cloud Only never seats a server model; no tier lists one
+_nlog34 = len(_o1("/log")["log"])
+_sc5 = _svchat(tier="Cloud Only", models=[_SVL])
+_tiers34 = _svq("/api/tiers")[1]
+check("servers (live): Cloud Only and the tiers never seat a server model",
+      len([r for r in _o1("/log")["log"][_nlog34:] if r["path"] == "/api/chat"]) == 0
+      and _SVL not in json.dumps(_tiers34) and "Desktop" not in json.dumps(_tiers34)
+      and "ANSWER" not in _sc5[1], "%r" % [_sc5[1][:200], _tiers34])
+# a benchmark running here doesn't turn a server chat away
+_bs34 = _svq("/api/bench/start", "POST", {})
+_sc6 = _svchat(text="during bench 334")
+_scL = _svq("/api/chat", "POST", {"model": "Llama 3.2 3B", "models": ["Llama 3.2 3B"], "tier": "",
+                                   "messages": [{"role": "user", "content": "local during bench"}]})
+_svq("/api/bench/stop", "POST", {})
+for _i34 in range(200):
+    if not _svq("/api/bench")[1].get("running"):
+        break
+    time.sleep(0.1)
+check("servers (live): during a benchmark a server chat answers, a local one is refused",
+      _bs34[0] == 200 and "ANSWER-ng bench 334" in _sc6[1] and _scL[0] == 409
+      and _scL[1].get("bench") is True, "%r" % [_bs34, _sc6[1][:120], _scL])
+# the pairing lost at the server: "pair again"
+_o1("/unpair", {})
+_sc7 = _svchat(text="after unpair")
+_st7 = _svq("/api/servers/test", "POST", {"id": _sid34})[1].get("server") or {}
+check("servers (live): a device removed at the server (401/403) says the pairing was lost, pair again",
+      _sc7[1].strip() == ("⚠️ Desktop no longer accepts this computer: the pairing was "
+                          "lost. Pair again in Settings › Your servers.")
+      and _st7.get("status", {}).get("kind") == "auth" and _st7["status"]["reachable"] is True,
+      "%r" % [_sc7[1], _st7.get("status")])
+_code34b = _o1("/open", {})["code"]
+_sp3 = _svq("/api/servers/pair", "POST", {"id": _sid34, "code": _code34b})
+_sc8 = _svchat(text="paired again 334")
+# offline, with Use cloud power on: said, and nothing else answers
+_svq("/api/prefs", "POST", {"turbo": True})
+_o1("/down", {})
+_sc9 = _svchat(text="anyone there")
+_st9 = _svq("/api/servers/test", "POST", {"id": _sid34})[1].get("server") or {}
+_o1("/up", {})
+_svq("/api/prefs", "POST", {"turbo": False})
+check("servers (live): pair again works; offline is said, with cloud power on, and no other model answers",
+      _sp3[1].get("ok") is True and "ANSWER-ed again 334" in _sc8[1]
+      and _sc9[1].strip() == ("⚠️ Desktop didn’t answer. It may be off, asleep or "
+                              "offline. Nothing was sent anywhere else.")
+      and [f for f in _sc9[2] if f[0] == "RUN"]
+      and all(_SVLJ in f[1] for f in _sc9[2] if f[0] == "RUN")
+      and _st9.get("status", {}).get("kind") == "offline" and _st9["status"]["reachable"] is False,
+      "%r" % [_sp3, _sc8[1][:80], _sc9, _st9.get("status")])
+# profile isolation: B sees none of A's servers and can't use their labels
+_pB34 = _svq("/api/test/profile", "POST", {"op": "create"})[1].get("name", "")
+_svq("/api/test/profile", "POST", {"op": "switch", "to": _pB34})
+_vB34 = _svq("/api/servers")[1]
+_nlogB = len(_o1("/log")["log"])
+_scB = _svchat(text="from B")
+_tB34 = _svq("/api/servers/test", "POST", {"id": _sid34})[1]
+_rmB34 = _svq("/api/servers/remove", "POST", {"id": _sid34})[1]
+_svq("/api/test/profile", "POST", {"op": "switch", "to": "local"})
+_vA34 = _svq("/api/servers")[1]
+check("servers (live): a server added in one profile is invisible and unusable in another",
+      _pB34 and _vB34.get("servers") == [] and _tB34.get("err") and _rmB34.get("err")
+      and _scB[1].strip() == "⚠️ That server isn’t in Settings › Your servers any "
+                             "more. Pick another model."
+      and len(_o1("/log")["log"]) == _nlogB
+      and not os.path.exists(os.path.join(_SV.home, "accounts", _pB34, "servers.json"))
+      and [s_["id"] for s_ in _vA34.get("servers") or []] == [_sid34]
+      and _vA34["servers"][0]["paired"] is True,
+      "%r" % [_vB34, _scB[1], _tB34, _rmB34, _vA34])
+# the Access secret and the device key: in servers.json only
+_rowA = json.load(open(_sfile34))["servers"][0]
+_seed34 = _rowA.get("seed", "")
+_SV.stop()
+_hits34 = [p for n_ in (_O1SEC, _seed34) for p in _bytegrep(_SV.home, n_)]
+_loghits = [n_ for n_ in (_O1SEC, _seed34) if n_ in open(os.path.join(_SMOKE_TMP, "SRV.log"),
+                                                          errors="replace").read()]
+check("servers (live): the Access secret and the device key are in no /api reply, no log and no file "
+      "but servers.json",
+      len(_seed34) == 43 and not any(_O1SEC.encode() in b_ or _seed34.encode() in b_
+                                     for b_ in _SVREPLIES)
+      and sorted(set(_hits34)) == [_sfile34] and not _loghits and len(_SVREPLIES) > 25,
+      "%r" % [sorted(set(_hits34)), _loghits])
+_SV.start()
+_vR34 = _svq("/api/servers")[1].get("servers") or [{}]
+_rm34 = _svq("/api/servers/remove", "POST", {"id": _sid34})
+check("servers (live): after a restart the server is still paired; removing it deletes its key",
+      _vR34[0].get("paired") is True and _rm34[1] == {"ok": True} and _svq("/api/servers")[1].get("servers") == []
+      and _seed34 not in open(_sfile34).read(), "%r" % [_vR34, _rm34])
+_SV.stop()
+_o1proc.kill()
+# ---- end 6b334
+# ==== 6b334 your own servers: end ====
 
 
 print()
