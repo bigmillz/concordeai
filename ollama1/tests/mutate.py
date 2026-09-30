@@ -254,9 +254,10 @@ MUTANTS = [
     ("cf: a new tunnel on every run", "bin/ollama1-cf-access", "    if found:\n", "    if False:\n",
      ["test_cloudflare"]),
     ("library: listed models removed", "lib/o1library.py",
-     '        if not listed(m["name"], allowed):', "        if True:", ["test_library"]),
+     '        if not kept(m["name"], allowed, protected):', "        if True:", ["test_library"]),
     ("library: removal not re-checked at sync time", "lib/o1library.py",
-     "        if listed(name, allowed):   # back on the list since the preview: keep it", "        if False:",
+     "        if list_broken or kept(name, allowed, protected):   # back on the list (or a bad line names it): keep it",
+     "        if False:",
      ["test_library"]),
     ("library: delisted model still fetched", "lib/o1library.py",
      '        if listed(item["name"], allowed):', "        if True:", ["test_library"]),
@@ -323,9 +324,10 @@ MUTANTS = [
     ("power: the plug ignored", "lib/o1power.py", "        if self.plug:\n            try:",
      "        if False:\n            try:", ["test_power"]),
     ("power: plug beyond the LAN", "lib/o1power.py",
-     "    if ip.is_loopback or ip.is_unspecified or ip.is_multicast or not (ip.is_private or ip.is_link_local):",
+     "    if not any(ip in n for n in LAN_NETS if n.version == ip.version):",
      "    if False:", ["test_power"]),
-    ("power: plug redirects followed", "lib/o1power.py", "    handlers = [_NoRedirect()]", "    handlers = []",
+    ("power: plug redirects followed", "lib/o1power.py", "    handlers = [_NoRedirect(), _DeadlineHTTPHandler(deadline)]",
+     "    handlers = [_DeadlineHTTPHandler(deadline)]",
      ["test_power"]),
     ("power: unknown time shown as none", "lib/o1power.py",
      '"unknown_h": round(max(0, span - known) / 3600.0, 2)', '"unknown_h": 0', ["test_power"]),
@@ -337,13 +339,84 @@ MUTANTS = [
     ("power: Kasa cipher wrong", "lib/o1power.py", "        out.append(key ^ b)\n        key = b",
      "        out.append(key ^ b)\n        key = key ^ b", ["test_power"]),
     ("power: price file readable by all", "lib/o1power.py",
-     "    write_json_atomic(tariff_file(), clean, mode=0o600)", "    write_json_atomic(tariff_file(), clean, mode=0o644)",
-     ["test_power", "test_admin"]),
+     '    write_json_atomic(tariff_file(), clean, mode=0o640, group="o1view")',
+     '    write_json_atomic(tariff_file(), clean, mode=0o644, group="o1view")',
+     ["test_power", "test_admin", "test_rootfiles"]),
     ("admin: big bodies on every action", "bin/ollama1-admin",
      '(65536 if path == "/api/power/schedule" else 4096)', "65536", ["test_admin"]),
     ("admin: prices saved unchecked", "bin/ollama1-admin",
      "        clean, errs = o1tariff.validate(obj)\n        if errs:",
      "        clean, errs = obj, []\n        if errs:", ["test_admin"]),
+    ("root files: mode set by path", "lib/o1common.py",
+     "            os.fchmod(f.fileno(), mode)", "            os.chmod(tmp, mode)", ["test_rootfiles"]),
+    ("root files: symlinks followed on read", "lib/o1common.py",
+     "os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK", "os.O_RDONLY | os.O_NONBLOCK", ["test_rootfiles"]),
+    ("root files: panel request read unsafely", "lib/o1power.py",
+     "    s = read_json_safe(request_file(), max_bytes=MAX_SCHEDULE_BYTES)",
+     "    s = read_json(request_file())", ["test_rootfiles"]),
+    ("root files: tariff read unsafely", "lib/o1power.py",
+     "        s = read_json_safe(tariff_file(), max_bytes=MAX_SCHEDULE_BYTES)",
+     "        s = read_json(tariff_file())", ["test_rootfiles"]),
+    ("root files: pairing spool read unsafely", "lib/o1pair.py",
+     "        req = read_json_safe(fp, max_bytes=8192)", "        req = read_json(fp, max_bytes=8192)",
+     ["test_rootfiles"]),
+    ("power: IPv4-mapped addresses not unwrapped", "lib/o1power.py",
+     "    if ip.version == 6 and ip.ipv4_mapped is not None:", "    if False:", ["test_power"]),
+    ("power: link-local plugs allowed", "lib/o1power.py",
+     '"192.168.0.0/16", "fc00::/7"))', '"192.168.0.0/16", "fc00::/7", "169.254.0.0/16"))',
+     ["test_power", "test_rootfiles"]),
+    ("power: Shelly Gen1 answers any auth", "lib/o1power.py",
+     "        handlers.append(urllib.request.HTTPBasicAuthHandler(mgr) if auth == \"basic\"\n"
+     "                        else urllib.request.HTTPDigestAuthHandler(mgr))",
+     "        handlers += [urllib.request.HTTPBasicAuthHandler(mgr), urllib.request.HTTPDigestAuthHandler(mgr)]",
+     ["test_power"]),
+    ("power: any plug error kills the sampler", "lib/o1power.py",
+     "            except Exception:\n                self.plug_state = {",
+     "            except ZeroDivisionError:\n                self.plug_state = {", ["test_power"]),
+    ("power: no overall plug deadline", "lib/o1power.py",
+     "        left = self.deadline - time.monotonic()", "        left = PLUG_DEADLINE_S", ["test_power"]),
+    ("power: plug reply shape unchecked", "lib/o1power.py",
+     "    if not isinstance(v, dict):\n        raise PlugError(\"the %s reply isn't in the expected shape\" % what)",
+     "    pass", ["test_power"]),
+    ("library: a bad line doesn't protect its model", "lib/o1library.py",
+     "    low = [p.lower() for p in protected]\n    return listed(name.lower(), low)",
+     "    return False", ["test_library"]),
+    ("library: removals planned despite a broken list", "lib/o1library.py",
+     '            (blocked if errors else remove).append(', '            remove.append(', ["test_library"]),
+    ("library: removals run despite a broken list", "lib/o1library.py",
+     "        if list_broken or kept(name, allowed, protected):", "        if kept(name, allowed, protected):",
+     ["test_library"]),
+    ("library: no disk figure passes", "lib/o1library.py",
+     '"enough_space": after is not None and after >= MIN_FREE,', '"enough_space": after is None or after >= MIN_FREE,',
+     ["test_library"]),
+    ("library: shared blobs counted as freed", "lib/o1library.py",
+     "    return sum(s for d, s in gone.items() if d not in keep)", "    return sum(gone.values())",
+     ["test_library"]),
+    ("library: manifests unchecked", "lib/o1library.py",
+     "    if not valid_manifest(m):\n        return None, None", "    if False:\n        return None, None",
+     ["test_library"]),
+    ("library: registry redirects followed", "lib/o1library.py",
+     "    opener = urllib.request.build_opener(_NoRedirect())", "    opener = urllib.request.build_opener()",
+     ["test_library"]),
+    ("setup-safety: RAM part above MemoryHigh", "bin/ollama1-gateway",
+     "            ram_part = min(ram_part, high)", "            ram_part = min(ram_part, cap - (1 << 30)) if cap else ram_part",
+     ["test_gateway"]),
+    ("setup-safety: inhibitor never let go", "lib/o1sleep.py",
+     "                os.killpg(self.p.pid, signal.SIGTERM)", "                pass", ["test_sleep"]),
+    ("setup-safety: RAM test ignores a hangup", "tools/ram_model_test.py",
+     "    raise SystemExit(128 + signum)", "    return None", ["test_tools"]),
+    ("setup-safety: RAM test signals not caught", "tools/ram_model_test.py",
+     "        signal.signal(sig, exit_on_signal)", "        pass", ["test_tools"]),
+    ("setup-safety: swap off carries on after a failed swapoff", "tools/encrypted-swap.sh",
+     '    swapoff "$MAPPER" || die "swapoff $MAPPER failed (not enough free memory to take its pages back?). Nothing was changed; free some memory and try again."',
+     '    swapoff "$MAPPER" || true', ["test_tools"]),
+    ("setup-safety: swap volume without room", "tools/encrypted-swap.sh",
+     '    [ "$free" -ge "$need" ] || die', '    true || die', ["test_tools"]),
+    ("setup-safety: swap may hold up the boot", "tools/encrypted-swap.sh",
+     "swap,cipher=aes-xts-plain64,size=512,nofail", "swap,cipher=aes-xts-plain64,size=512", ["test_tools"]),
+    ("setup-safety: swap not finished on a re-run", "tools/encrypted-swap.sh",
+     "  if lv_exists; then\n    echo \"volume $LVDEV: already there\"",
+     "  if false; then\n    echo \"volume $LVDEV: already there\"", ["test_tools"]),
 ]
 
 
@@ -362,7 +435,7 @@ def main():
         ran += 1
         work = tempfile.mkdtemp(prefix="o1mut-")
         try:
-            for d in ("lib", "bin", "config", "systemd"):
+            for d in ("lib", "bin", "config", "systemd", "tools"):
                 shutil.copytree(os.path.join(KIT, d), os.path.join(work, d))
             edits = rel if isinstance(rel, list) else [(rel, old, new)]
             broken = False
@@ -378,10 +451,16 @@ def main():
                 survived.append(name)
                 continue
             env = dict(os.environ, OLLAMA1_TEST_LIB=os.path.join(work, "lib"),
-                       OLLAMA1_TEST_BIN=os.path.join(work, "bin"), PYTHONWARNINGS="ignore")
+                       OLLAMA1_TEST_BIN=os.path.join(work, "bin"), OLLAMA1_TEST_TOOLS=os.path.join(work, "tools"),
+                       PYTHONWARNINGS="ignore")
             env.pop("OLLAMA1_PREFIX", None)
-            r = subprocess.run([sys.executable, "-m", "unittest"] + tests, cwd=HERE, env=env,
-                               capture_output=True, text=True, timeout=600)
+            try:
+                r = subprocess.run([sys.executable, "-m", "unittest"] + tests, cwd=HERE, env=env,
+                                   capture_output=True, text=True, timeout=300)
+            except subprocess.TimeoutExpired:
+                # e.g. root blocking on a planted FIFO: the tests hang instead of passing
+                print("killed  %s  (the tests hung)" % name)
+                continue
             if r.returncode == 0:
                 print("SURVIVED %-50s  (%s still pass)" % (name, " ".join(tests)))
                 survived.append(name)

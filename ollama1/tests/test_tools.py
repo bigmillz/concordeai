@@ -2,10 +2,12 @@
 and a real Ollama) and the encrypted-swap switch (static checks)."""
 import importlib.machinery
 import importlib.util
+import json
 import os
 import re
 import shutil
 import subprocess
+import tempfile
 import unittest
 
 import o1test_util as U
@@ -14,7 +16,7 @@ GIB = 1 << 30
 
 
 def load_tool():
-    path = os.path.join(U.KIT, "tools", "ram_model_test.py")
+    path = os.path.join(U.TOOLS, "ram_model_test.py")
     loader = importlib.machinery.SourceFileLoader("ram_model_test", path)
     spec = importlib.util.spec_from_loader("ram_model_test", loader)
     mod = importlib.util.module_from_spec(spec)
@@ -75,7 +77,7 @@ class TestRamModelTool(unittest.TestCase):
         self.assertIn("skipped: encrypted swap is off", rows)
 
     def test_wrapper(self):
-        path = os.path.join(U.KIT, "tools", "ram-model-test.sh")
+        path = os.path.join(U.TOOLS, "ram-model-test.sh")
         self.assertEqual(subprocess.run(["bash", "-n", path]).returncode, 0)
         sc = shutil.which("shellcheck")
         if sc:
@@ -83,7 +85,7 @@ class TestRamModelTool(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stdout)
 
     def test_safety_lines(self):
-        src = open(os.path.join(U.KIT, "tools", "ram_model_test.py")).read()
+        src = open(os.path.join(U.TOOLS, "ram_model_test.py")).read()
         self.assertIn('raise RuntimeError("the memory cap didn\'t take; not loading")', src)
         self.assertIn('"systemctl", "kill", "--signal=KILL", UNIT', src)     # the watchdog
         self.assertIn("avail < 1.5 * GIB", src)
@@ -92,34 +94,159 @@ class TestRamModelTool(unittest.TestCase):
         self.assertLess(src.index('tty.readline().strip() != "yes"'), src.index("results.append(measure("))
 
 
+class TestRamTestCleansUp(unittest.TestCase):
+    def test_hangup_and_term_leave_through_the_cleanup(self):
+        src = open(os.path.join(U.TOOLS, "ram_model_test.py")).read()
+        self.assertIn("for sig in (signal.SIGHUP, signal.SIGTERM):\n        signal.signal(sig, exit_on_signal)", src)
+        with self.assertRaises(SystemExit) as e:
+            T.exit_on_signal(1, None)
+        self.assertEqual(e.exception.code, 129)
+        # the handlers are set before anything is changed
+        main = src[src.index("def main():"):]
+        self.assertLess(main.index("signal.signal(sig, exit_on_signal)"), main.index("results = []"))
+
+    def test_runs_in_tmux(self):
+        sh = open(os.path.join(U.TOOLS, "ram-model-test.sh")).read()
+        self.assertIn("exec tmux new-session -A -s ollama1-ramtest", sh)
+        self.assertLess(sh.index("exec tmux new-session"), sh.index('python3 -u "$HERE/ram_model_test.py"'))
+
+    def test_setup_removes_a_left_drop_in_before_restarting_ollama(self):
+        setup = open(os.path.join(U.KIT, "setup.sh")).read()
+        rm = setup.index("rm -f /run/systemd/system/ollama.service.d/50-ollama1-ramtest.conf")
+        self.assertLess(rm, setup.index("run systemctl restart ollama.service"))
+        self.assertIn('systemctl kill -s HUP systemd-logind || note', setup)
+
+
 class TestEncryptedSwap(unittest.TestCase):
     def src(self):
-        return open(os.path.join(U.KIT, "tools", "encrypted-swap.sh")).read()
+        return open(os.path.join(U.TOOLS, "encrypted-swap.sh")).read()
 
     def test_lint(self):
-        path = os.path.join(U.KIT, "tools", "encrypted-swap.sh")
+        path = os.path.join(U.TOOLS, "encrypted-swap.sh")
         self.assertEqual(subprocess.run(["bash", "-n", path]).returncode, 0)
         sc = shutil.which("shellcheck")
         if sc:
             r = subprocess.run([sc, path], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stdout)
 
-    def test_random_key_every_boot(self):
+    def test_random_key_every_boot_on_a_volume(self):
         s = self.src()
-        self.assertIn('"$NAME" "$FILE" >>"$CRYPTTAB"', s)
-        self.assertRegex(s, r"/dev/urandom swap,cipher=aes-xts-plain64,size=256")
+        self.assertIn('"$NAME" "$LVDEV" >>"$CRYPTTAB"', s)
+        self.assertRegex(s, r"/dev/urandom swap,cipher=aes-xts-plain64,size=512,nofail")
+        self.assertIn("LVDEV=/dev/$VG/$LV", s)
+        self.assertNotIn("fallocate", s)             # no swap file, so no loop device
 
     def test_ollama_may_not_swap_by_default(self):
         self.assertNotIn("MemorySwapMax", self.src().replace("MemorySwapMax=0", ""))
         unit = open(os.path.join(U.KIT, "systemd", "ollama.service")).read()
         self.assertIn("\nMemorySwapMax=0\n", unit)
 
-    def test_undo(self):
-        s = self.src()
-        off = s[s.index("off() {"):s.index("case \"${1:-status}\"")]
-        for step in ("swapoff \"$MAPPER\"", "systemd-cryptsetup@$NAME.service", '"$CRYPTTAB.new"', '"$FSTAB.new"',
-                     'rm -f "$FILE"', 'swapon "$PLAIN"'):
-            self.assertIn(step, off)
+
+class TestEncryptedSwapRuns(unittest.TestCase):
+    """The script itself, against fake LVM/systemd/swap tools."""
+
+    def setUp(self):
+        self.r = tempfile.mkdtemp(prefix="o1swap-")
+        self.addCleanup(shutil.rmtree, self.r, True)
+        os.makedirs(os.path.join(self.r, "etc"))
+        self.bin = os.path.join(self.r, "bin")
+        os.makedirs(self.bin)
+        for t in ("vgs", "lvs", "lvcreate", "lvremove", "systemctl", "swapon", "swapoff", "mkswap"):
+            os.symlink(os.path.join(U.HERE, "fakeswap.py"), os.path.join(self.bin, t))
+        self.fstab_before = "UUID=x / ext4 defaults 0 1\n/swap.img none swap sw 0 0\n"
+        with open(os.path.join(self.r, "etc/fstab"), "w") as f:
+            f.write(self.fstab_before)
+        with open(os.path.join(self.r, "proc-swaps"), "w") as f:
+            f.write("/swap.img file 8388604 0 -2\n")
+        open(os.path.join(self.r, "swap.img"), "w").close()
+        self.fake({"vg_free": 100 << 30})
+
+    def fake(self, s=None, **kw):
+        path = os.path.join(self.r, "fake.json")
+        if s is None:
+            s = json.load(open(path))
+        s.update(kw)
+        with open(path, "w") as f:
+            json.dump(s, f)
+        return s
+
+    def run_it(self, *args):
+        env = dict(os.environ, O1_SWAP_TESTROOT=self.r, PATH=self.bin + os.pathsep + os.environ["PATH"])
+        return subprocess.run(["bash", os.path.join(U.TOOLS, "encrypted-swap.sh")] + list(args),
+                              capture_output=True, text=True, env=env, stdin=subprocess.DEVNULL, timeout=60)
+
+    def read(self, rel):
+        p = os.path.join(self.r, rel)
+        return open(p).read() if os.path.exists(p) else ""
+
+    def test_on_then_off(self):
+        r = self.run_it("on", "32G")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        log = self.fake()["log"]
+        self.assertIn("lvcreate --yes --wipesignatures y -L 32G -n ollama1swap ubuntu-vg", log)
+        self.assertIn("ollama1swap /dev/ubuntu-vg/ollama1swap /dev/urandom swap,cipher=aes-xts-plain64,size=512,nofail",
+                      self.read("etc/crypttab"))
+        fstab = self.read("etc/fstab")
+        self.assertIn("/dev/mapper/ollama1swap none swap sw,nofail,pri=10 0 0", fstab)
+        self.assertIn("# /swap.img none swap sw 0 0", fstab)
+        self.assertEqual(self.read("proc-swaps"), "/dev/mapper/ollama1swap partition 1 0 -2\n")
+        self.assertIn("still holds whatever was swapped", r.stdout)
+        # again: nothing new
+        r = self.run_it("on", "32G")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual([x for x in self.read("etc/crypttab").splitlines() if x.startswith("ollama1swap ")].__len__(), 1)
+        self.assertEqual(sum(1 for x in self.fake()["log"] if x.startswith("lvcreate")), 1)
+        r = self.run_it("off")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.read("etc/fstab"), self.fstab_before)
+        self.assertNotIn("ollama1swap", self.read("etc/crypttab"))
+        self.assertFalse(self.fake()["lv"])
+        self.assertEqual(self.read("proc-swaps"), "/swap.img partition 1 0 -2\n")
+        self.assertIn("Encrypted swap removed.", r.stdout)
+
+    def test_no_room_changes_nothing(self):
+        self.fake(vg_free=0)
+        r = self.run_it("on", "32G")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("ubuntu-vg has 0 GiB free", r.stdout)
+        self.assertEqual(self.read("etc/fstab"), self.fstab_before)
+        self.assertEqual(self.read("etc/crypttab"), "")
+        self.assertFalse([x for x in self.fake()["log"] if x.startswith("lvcreate")])
+
+    def test_a_half_done_run_is_finished(self):
+        self.fake(fail=["swapon"])
+        r = self.run_it("on", "32G")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("Run it again to finish", r.stdout)
+        self.fake(fail=[])
+        r = self.run_it("on", "32G")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual(sum(1 for x in self.fake()["log"] if x.startswith("lvcreate")), 1)
+        self.assertIn("/dev/mapper/ollama1swap", self.read("proc-swaps"))
+        self.assertEqual(self.read("etc/fstab").count("/dev/mapper/ollama1swap"), 1)
+
+    def test_off_stops_if_swapoff_fails(self):
+        self.assertEqual(self.run_it("on", "32G").returncode, 0)
+        crypttab, fstab = self.read("etc/crypttab"), self.read("etc/fstab")
+        self.fake(fail=["swapoff"])
+        r = self.run_it("off")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("Nothing was changed", r.stdout)
+        self.assertNotIn("removed", r.stdout)
+        self.assertEqual((self.read("etc/crypttab"), self.read("etc/fstab")), (crypttab, fstab))
+        self.assertTrue(self.fake()["lv"])
+
+    def test_off_restores_only_what_on_changed(self):
+        # the plain swap was already commented out by hand: off leaves it that way
+        hand = "UUID=x / ext4 defaults 0 1\n#/swap.img none swap sw 0 0\n"
+        with open(os.path.join(self.r, "etc/fstab"), "w") as f:
+            f.write(hand)
+        with open(os.path.join(self.r, "proc-swaps"), "w") as f:
+            f.write("")
+        self.assertEqual(self.run_it("on", "8G").returncode, 0)
+        self.assertEqual(self.run_it("off").returncode, 0)
+        self.assertEqual(self.read("etc/fstab"), hand)
+        self.assertEqual(self.read("proc-swaps"), "")
 
     def test_setup_flags(self):
         setup = open(os.path.join(U.KIT, "setup.sh")).read()

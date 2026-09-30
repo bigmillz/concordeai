@@ -134,7 +134,14 @@ def day_set(days):
 
 def validate(s):
     """(clean schedule, [errors]). Strict: unknown keys are errors, so a typo
-    can't silently change what something costs."""
+    can't silently change what something costs. Never raises."""
+    try:
+        return _validate(s)
+    except Exception:
+        return None, ["the schedule couldn't be read (unexpected values)"]
+
+
+def _validate(s):
     errs = []
     if not isinstance(s, dict):
         return None, ["the schedule must be a JSON object"]
@@ -149,7 +156,7 @@ def validate(s):
     cur = out.get("currency")
     if not (isinstance(cur, str) and re.match(r"^[A-Z]{3}$", cur)):
         errs.append("currency must be a 3-letter code like USD")
-    if out.get("mode") not in ("flat", "tou"):
+    if not isinstance(out.get("mode"), str) or out["mode"] not in ("flat", "tou"):
         errs.append('mode must be "flat" or "tou"')
     if not _rate(out.get("flat_rate")):
         errs.append("flat_rate must be a price per kWh between 0 and %g, or null" % MAX_RATE)
@@ -176,7 +183,8 @@ def validate(s):
         h = dict(DEFAULT["holidays"], **h)
         if not isinstance(h["enabled"], bool) or not isinstance(h["observed"], bool):
             errs.append("holidays.enabled and holidays.observed must be true or false")
-        if not isinstance(h["names"], list) or any(n not in HOLIDAY_NAMES for n in h["names"]):
+        if not isinstance(h["names"], list) or any(not isinstance(n, str) or n not in HOLIDAY_NAMES
+                                                   for n in h["names"]):
             errs.append("holidays.names may only hold: " + ", ".join(HOLIDAY_NAMES))
         if not isinstance(h["extra"], list) or len(h["extra"]) > 100 or any(
                 not (isinstance(d, str) and DATE.match(d)) for d in h["extra"]):
@@ -223,7 +231,7 @@ def validate(s):
             if not isinstance(w, dict) or set(w) != {"tier", "days", "start", "end"}:
                 errs.append("%s: needs exactly tier, days, start and end" % ww)
                 continue
-            if w["tier"] not in TIERS:
+            if not isinstance(w["tier"], str) or w["tier"] not in TIERS:
                 errs.append("%s: tier must be on, mid, off or discount" % ww)
             else:
                 used.add(w["tier"])

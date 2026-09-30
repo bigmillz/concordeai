@@ -213,6 +213,16 @@ if [ "$NO_TMUX" = 0 ] && [ -z "${TMUX:-}" ] && [ -z "${STY:-}" ]; then
 fi
 
 touch "$LOG"; chmod 600 "$LOG"
+
+# While setup runs, neither a sleep request nor the power button may suspend
+# the desktop (a logind inhibitor, held by a child in its own session and
+# ended with setup, however setup ends).
+if command -v systemd-inhibit >/dev/null 2>&1 && command -v setsid >/dev/null 2>&1; then
+  setsid systemd-inhibit --what=sleep:handle-power-key --mode=block --who=ollama1 \
+    --why="setup.sh is running" sleep infinity </dev/null >/dev/null 2>&1 &
+  INHIBIT_PID=$!
+  trap 'kill -TERM -- "-$INHIBIT_PID" 2>/dev/null || kill "$INHIBIT_PID" 2>/dev/null || true' EXIT
+fi
 exec > >(tee -a "$LOG") 2>&1
 printf '\n===== ollama1 setup %s =====\n' "$(date -Is)"
 
@@ -469,7 +479,7 @@ install -m 0644 "$KIT/config/50-ollama1.rules" /etc/polkit-1/rules.d/50-ollama1.
 install -d -m 0755 /etc/systemd/logind.conf.d
 if ! cmp -s "$KIT/config/logind-ollama1.conf" /etc/systemd/logind.conf.d/ollama1.conf; then
   install -m 0644 "$KIT/config/logind-ollama1.conf" /etc/systemd/logind.conf.d/ollama1.conf
-  systemctl kill -s HUP systemd-logind
+  systemctl kill -s HUP systemd-logind || note "couldn't ask logind to re-read its settings; the power button change takes effect after a reboot"
 fi
 # After waking: record the time and check Ollama and the GPU.
 install -d -m 0755 /usr/lib/systemd/system-sleep
@@ -665,6 +675,9 @@ os.replace(p + ".tmp", p)
 PY
 }
 cfg_set_num ollama_memory_max_bytes "$mem_max"
+cfg_set_num ollama_memory_high_bytes "$mem_high"
+# a controlled RAM test that was cut off may have left its runtime drop-in
+rm -f /run/systemd/system/ollama.service.d/50-ollama1-ramtest.conf
 systemctl daemon-reload
 ok "Ollama's memory cap: MemoryMax $((mem_max >> 30)) GiB, MemoryHigh $((mem_high >> 30)) GiB, no swap"
 if ! "$LIBDIR/bin/ollama1-update-ollama" --no-restart; then

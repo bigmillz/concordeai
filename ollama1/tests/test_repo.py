@@ -195,6 +195,7 @@ class TestUnits(unittest.TestCase):
         self.assertIn(r"MemoryMax=%s\nMemoryHigh=%s\nMemorySwapMax=0", setup)
         self.assertIn('systemctl show -p MemoryMax --value ollama.service)" = "$mem_max"', setup)
         self.assertIn("cfg_set_num ollama_memory_max_bytes", setup)
+        self.assertIn("cfg_set_num ollama_memory_high_bytes", setup)
 
     def test_gateway_protected_from_the_oom_killer(self):
         self.assertIn("\nOOMScoreAdjust=-500\n", self.unit("ollama1-gateway.service"))

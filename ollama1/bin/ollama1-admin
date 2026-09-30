@@ -55,6 +55,7 @@ FIXED_UNITS = {
     "backup": "ollama1-backup.service",
     "library-preview": "ollama1-models-preview.service",
     "library-sync": "ollama1-models-sync.service",
+    "power-apply": "ollama1-power-apply.service",
 }
 TEMPLATE_UNITS = {
     "remove-device": "ollama1-rmdevice@%s.service",
@@ -220,12 +221,18 @@ class Panel:
         return val
 
     def save_schedule(self, obj):
+        """Checked here for the answer, then handed to root: the panel leaves
+        it in its own folder and starts the fixed apply unit, which checks it
+        again and writes root's tariff file."""
         clean, errs = o1tariff.validate(obj)
         if errs:
             return 400, {"errors": errs}
-        o1power.save_schedule(clean)
-        log("power-schedule", mode=clean["mode"], seasons=len(clean["seasons"]))
-        return 200, {"ok": True, "schedule_id": o1tariff.schedule_id(clean)}
+        write_json_atomic(o1power.request_file(), clean, mode=0o600)
+        ok, err = self.runner(FIXED_UNITS["power-apply"])
+        log("power-schedule", mode=clean["mode"], seasons=len(clean["seasons"]), ok=ok)
+        if not ok:
+            return 500, {"errors": ["could not start the apply step: %s" % err]}
+        return 202, {"ok": True, "schedule_id": o1tariff.schedule_id(clean)}
 
     def library(self):
         return {"preview": o1library.read_preview(), "sync": read_json(o1library.status_file())}
@@ -700,15 +707,18 @@ async function refreshLib(){let l;try{l=await api('/api/library');}catch(e){retu
  if(libWant&&(!p||p.made_at<libWant)){$('libmsg').textContent=sy.state==='failed'&&sy.at>=libWant?'Could not check: '+sy.message:'Checking the registry...';return;}
  if(!p)return;
  if(libWant){$('libmsg').textContent='';}
+ (p.allow_errors||[]).forEach(e=>box.append(el('div','Allow-list line '+e.line+' ignored ('+e.reason+'): '+e.text,'bad')));
+ if((p.removals_blocked||[]).length)box.append(el('div','Not removing '+p.removals_blocked.map(x=>x.name).join(', ')+' while the allow-list has a line it can\'t read. Fix it at the desktop first.','warn'));
  const rows=[];p.remove.forEach(x=>rows.push(['Remove',x.name,gib(x.bytes)]));p.download.forEach(x=>rows.push(['Download',x.name,gib(x.bytes)]));
  p.update.forEach(x=>rows.push(['Update',x.name,gib(x.bytes)]));(p.unknown||[]).forEach(x=>rows.push(['?',x.name,x.why]));
  const t=el('table');table(t,['','Model','Size'],rows);box.append(t);const tt=p.totals;
  box.append(el('div','Download '+gib(tt.download_bytes+tt.update_bytes)+'  ·  free '+gib(tt.freed_bytes)+'  ·  disk free now '+tib(tt.free_now)+', after '+tib(tt.free_after),'sub'));
  const n=p.remove.length+p.download.length+p.update.length;
  if(!n){box.append(el('div','Nothing to change: the library matches the allow-list.','sub'));return;}
- if(!p.enough_space){box.append(el('div','Not enough disk space for this.','bad'));return;}
+ if(!p.enough_space){box.append(el('div',tt.free_now==null?'Can\'t read the free disk space, so nothing will be done.':'Not enough disk space for this.','bad'));return;}
  const go=el('button','Apply these '+n+' changes');go.className='mt';go.addEventListener('click',()=>{
-  if(confirm('Remove '+p.remove.length+', download '+p.download.length+', update '+p.update.length+' model(s), exactly as listed?')){libWant=0;act('library-sync',p.id,p.id);}});
+  const warn=(p.allow_errors||[]).length?'\n\nThe allow-list has '+p.allow_errors.length+' line(s) it can\'t read; models they name are kept.':'';
+  if(confirm('Remove '+p.remove.length+', download '+p.download.length+', update '+p.update.length+' model(s), exactly as listed?'+(p.remove.length?'\n\nRemoving: '+p.remove.map(x=>x.name).join(', '):'')+warn)){libWant=0;act('library-sync',p.id,p.id);}});
  box.append(go);}
 setInterval(refreshLib,2000);refreshLib();
 // --- power and cost ---
@@ -775,7 +785,7 @@ function readEditor(){const s=edit;s.currency=$('pcur').value.trim().toUpperCase
  s.holidays.extra=$('pholx').value.split(/[\s,]+/).filter(Boolean);return s;}
 async function saveSchedule(obj){$('pmsg').textContent='Saving...';$('perr').replaceChildren();
  try{const r=await fetch('/api/power/schedule',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-O1-CSRF':CSRF},body:JSON.stringify(obj)});
-  const j=await r.json();if(r.ok){$('pmsg').textContent='Saved.';edit=null;await refreshPower(true);}
+  const j=await r.json();if(r.ok){$('pmsg').textContent='Saved.';edit=null;await new Promise(z=>setTimeout(z,1500));pw=null;await refreshPower(true);}
   else{$('pmsg').textContent='Not saved:';(j.errors||[j.error||'failed']).forEach(e=>$('perr').append(el('li',e)));}}catch(e){$('pmsg').textContent='Not saved ('+e.message+')';}}
 document.querySelectorAll('input[name=pmode]').forEach(r=>r.addEventListener('change',()=>{readEditor();drawEditor();}));
 $('psave').addEventListener('click',()=>saveSchedule(readEditor()));

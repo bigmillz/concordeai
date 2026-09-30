@@ -567,6 +567,56 @@ provider comes later and follows `ollama1/PROTOCOL.md`. How to run it is in
     windows; saved with CSRF and checked strictly server-side), imported and
     exported as JSON, or set with `sudo ollama1-power set-schedule
     FILE.json`.
+- **Review fixes (security and setup safety, after the power commit).**
+  - Root never follows a planted symlink or blocks on a FIFO. Files it
+    writes get their mode and group through the open file, never by path.
+    Files it reads from someone else's folder (the panel's schedule
+    request, the pairing spool, the tariff) are opened with `O_NOFOLLOW`,
+    checked as regular and bounded in size.
+  - The tariff moved to root's `/var/lib/ollama1/tariff.json` (0640, group
+    o1view). The panel checks a schedule, leaves it in its own folder and
+    starts the fixed `ollama1-power-apply.service`, which reads it safely,
+    checks it again and writes root's file.
+  - Plugs:
+    - only 10/8, 172.16/12, 192.168/16 and fc00::/7 are allowed, with
+      `::ffff:` unwrapped and link-local refused, in the validator and the
+      unit alike;
+    - Shelly Gen1 uses Basic only, and Gen2+ Digest only;
+    - each reading has a 3 s overall deadline, even against a plug that
+      trickles bytes;
+    - replies are shape-checked, and errors are fixed text, never the
+      plug's bytes. Any exception falls back to the estimate.
+  - The price checker never raises (fuzzed).
+  - The power unit dropped `CAP_DAC_OVERRIDE` and `CAP_FOWNER`, and gained
+    `SystemCallFilter`, `ProtectProc` and `MemoryMax`. The library units
+    are sandboxed.
+  - Registry manifests:
+    - no redirects;
+    - at most 1 MiB;
+    - every digest must be `sha256:` plus 64 hex characters, with sizes
+      bounded.
+  - The utility-name scan uses whole-word matching over more US utilities
+    and covers NOTES.md.
+  - A model named on ANY allow-list line, parsed or not and in any case,
+    is never removed, and nothing is removed while the list has a bad line
+    (the preview and the panel show them). This was reproduced: a
+    `gpt-oss:120b  RAM` typo would have removed 65 GB.
+  - An unreadable disk-free figure now refuses the sync. "Freed" counts
+    only blobs no kept model shares.
+  - Encrypted swap:
+    - it is now an LVM volume (`ubuntu-vg/ollama1swap`), not a file on a
+      loop device, and needs that free space in the volume group;
+    - crypttab uses `size=512` and `nofail`;
+    - a re-run finishes a half-done `on`, and `off` stops if swapoff
+      fails;
+    - `off` restores `/swap.img` only if `on` commented it out;
+    - `on` offers to zero the old `/swap.img`.
+  - The RAM test turns SIGHUP and SIGTERM into a clean exit, runs in tmux,
+    and setup.sh removes any drop-in it left behind.
+  - Setup, library syncs and pulls, and updates hold a logind inhibitor
+    (sleep and the power button).
+  - The gateway's RAM budget is capped at MemoryHigh, and logind's HUP
+    failing is only a note.
 - Tested on the Mac: 354 unit tests (incl. shellcheck, the polkit rule in
   node, the setup disk steps against fake mdadm/blkid/lsblk, the guide's
   file and config references, fake Ollama registry and smart plugs). All

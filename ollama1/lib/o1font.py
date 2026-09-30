@@ -12,7 +12,6 @@ from the unit's ExecStartPre=+). It writes /run/ollama1/dash-font.json.
 """
 import glob
 import gzip
-import json
 import os
 import struct
 import subprocess
@@ -142,8 +141,6 @@ def set_font(tty, sys_root="/sys", state=STATE):
         else:
             result["error"] = (r.stderr or r.stdout).strip()[:200]
     os.makedirs(os.path.dirname(state), exist_ok=True)
-    with open(state + ".tmp", "w") as f:
-        json.dump(result, f)
-    os.chmod(state + ".tmp", 0o644)
-    os.replace(state + ".tmp", state)
+    from o1common import write_json_atomic
+    write_json_atomic(state, result, mode=0o644)
     return result

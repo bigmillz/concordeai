@@ -186,3 +186,46 @@ class TestResumeCheck(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestInhibitor(unittest.TestCase):
+    """Long jobs hold a logind inhibitor for sleep and the power button, and
+    let it go when they end."""
+
+    def test_held_then_released(self):
+        import o1sleep
+        import tempfile
+        import time
+        d = tempfile.mkdtemp(prefix="o1inh-")
+        self.addCleanup(shutil.rmtree, d, True)
+        fake = os.path.join(d, "systemd-inhibit")
+        log = os.path.join(d, "args")
+        with open(fake, "w") as f:
+            f.write('#!/bin/sh\necho "$$ $*" >"%s"\nexec sleep 300\n' % log)
+        os.chmod(fake, 0o755)
+        with o1sleep.Inhibit("the model library is being synced", exe=fake) as inh:
+            for _ in range(50):
+                if os.path.exists(log) and os.path.getsize(log):
+                    break
+                time.sleep(0.05)
+            pid, args = open(log).read().split(" ", 1)
+            self.assertIn("--what=sleep:handle-power-key", args)
+            self.assertIn("--mode=block", args)
+            self.assertIn("--why=the model library is being synced", args)
+            self.assertIsNone(inh.p.poll())
+        self.assertIsNotNone(inh.p.poll())                 # gone with the job
+        with self.assertRaises(ProcessLookupError):
+            os.kill(int(pid), 0)
+
+    def test_where_it_is_held(self):
+        def src(*p):
+            with open(os.path.join(U.KIT, *p)) as f:
+                return f.read()
+        self.assertIn('held("updates are being applied", update_now)', src("bin", "ollama1-helper"))
+        self.assertIn('held("a model is being downloaded", pull, args[1])', src("bin", "ollama1-helper"))
+        self.assertIn('with L.Lock(), o1sleep.Inhibit("the model library is being synced"):', src("bin", "ollama1-models"))
+        self.assertIn('with o1sleep.Inhibit("Ollama is being updated"):', src("bin", "ollama1-update-ollama"))
+        setup = src("setup.sh")
+        self.assertIn("setsid systemd-inhibit --what=sleep:handle-power-key --mode=block", setup)
+        self.assertIn("trap 'kill -TERM -- \"-$INHIBIT_PID\"", setup)
+        self.assertLess(setup.index("systemd-inhibit --what"), setup.index('step "'))

@@ -27,7 +27,7 @@ import time
 
 from o1auth import (AuthError, PAIR_MAX_FAILURES, SKEW, check_pair_mac, device_id_for,
                     generate_code, pair_proof, parse_pair_request)
-from o1common import Paths, read_json, write_json_atomic
+from o1common import Paths, read_json, read_json_safe, write_json_atomic
 from o1crypto import b64url_encode
 
 WINDOW_SECONDS = 300
@@ -203,7 +203,7 @@ def commit_spool(spool=None, devices_path=None, now=None, log=print):
                 _unlink(fp)
             continue
         req_id = fn[:-4]
-        req = read_json(fp, max_bytes=8192)
+        req = read_json_safe(fp, max_bytes=8192)     # the gateway's folder: no symlinks, no FIFOs
         _unlink(fp)
         if not isinstance(req, dict) or not all(c in "0123456789abcdef" for c in req_id) or len(req_id) != 16:
             continue

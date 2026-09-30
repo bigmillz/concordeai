@@ -126,11 +126,11 @@ class Stub:
                         self.chunk(json.dumps({"status": "pulling " + digest[7:19], "digest": digest,
                                                "total": size, "completed": done}).encode() + b"\n")
                 self.chunk(b'{"status":"verifying sha256 digest"}\n')
-                self.chunk(b'{"status":"success"}\n')
-                self.wfile.write(b"0\r\n\r\n")
-                with stub.lock:
+                with stub.lock:     # installed before "success", as Ollama does (and no race with the next test)
                     stub.models[name] = {"size": sum(x[1] for x in layers), "info": llama_info(),
                                          "digest": stub.pull_digest.get(name, "d-" + name)}
+                self.chunk(b'{"status":"success"}\n')
+                self.wfile.write(b"0\r\n\r\n")
 
             def do_POST(self):
                 n = int(self.headers.get("Content-Length") or 0)

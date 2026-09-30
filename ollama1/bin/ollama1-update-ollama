@@ -28,6 +28,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
 
+import o1sleep  # noqa: E402
 from o1common import Paths, load_config, write_json_atomic  # noqa: E402
 
 API = "https://api.github.com/repos/ollama/ollama/releases/latest"
@@ -237,4 +238,6 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    with o1sleep.Inhibit("Ollama is being updated"):
+        rc = main()
+    sys.exit(rc)

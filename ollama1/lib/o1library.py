@@ -20,15 +20,18 @@ registry (manifests only). Nothing here is reachable through the gateway.
 """
 import fcntl
 import hashlib
+import http.client
 import json
 import math
 import os
+import re
 import time
 import urllib.error
 import urllib.request
 
 import o1ollama
-from o1common import Paths, load_config, parse_allow_list, read_json, valid_model_name, write_json_atomic
+from o1common import (Paths, load_config, parse_allow_list, read_json, read_json_safe, valid_model_name,
+                      write_json_atomic)
 
 OLLAMA = "http://127.0.0.1:11434"
 REGISTRY = "https://registry.ollama.ai"
@@ -74,50 +77,97 @@ def split_name(name):
     return "registry.ollama.ai", base if "/" in base else "library/" + base, tag
 
 
+DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+MAX_MANIFEST = 1 << 20
+MAX_LAYERS = 256
+MAX_LAYER_BYTES = 4 << 40          # 4 TiB: anything bigger is a broken manifest
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *a, **kw):
+        return None
+
+
+def valid_manifest(m):
+    """A manifest whose layers and config all have sha256 digests and sane
+    sizes (a digest becomes a file name under /srv/models/blobs)."""
+    if not isinstance(m, dict):
+        return False
+    items = m.get("layers")
+    if not isinstance(items, list) or len(items) > MAX_LAYERS:
+        return False
+    items = items + ([m["config"]] if m.get("config") is not None else [])
+    for layer in items:
+        if not isinstance(layer, dict) or not isinstance(layer.get("digest"), str) \
+                or not DIGEST_RE.match(layer["digest"]):
+            return False
+        size = layer.get("size", 0)
+        if isinstance(size, bool) or not isinstance(size, int) or not 0 <= size <= MAX_LAYER_BYTES:
+            return False
+    return True
+
+
 def remote_manifest(name, timeout=20):
     """(manifest, sha256 hex of its bytes) from the registry, or (None, None).
     Ollama stores a pulled manifest byte for byte and lists its sha256 as the
-    model's digest, so the two compare directly."""
+    model's digest, so the two compare directly. HTTPS to the model's own
+    registry only, no redirects, at most 1 MiB, and the manifest must be
+    well-formed."""
     host, repo, tag = split_name(name)
     base = registry_base() if host == "registry.ollama.ai" else "https://" + host
     req = urllib.request.Request("%s/v2/%s/manifests/%s" % (base, repo, tag),
                                  headers={"Accept": MANIFEST_ACCEPT, "User-Agent": "ollama1-models"})
+    opener = urllib.request.build_opener(_NoRedirect())
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            raw = r.read(4 << 20)
+        with opener.open(req, timeout=timeout) as r:
+            raw = r.read(MAX_MANIFEST + 1)
     except urllib.error.HTTPError as e:
         e.close()
         return None, None
-    except (urllib.error.URLError, OSError, ValueError):
+    except (urllib.error.URLError, OSError, ValueError, http.client.HTTPException):
+        return None, None
+    if len(raw) > MAX_MANIFEST:
         return None, None
     try:
         m = json.loads(raw)
-    except ValueError:
+    except (ValueError, UnicodeDecodeError):
         return None, None
-    if not isinstance(m, dict):
+    if not valid_manifest(m):
         return None, None
     return m, hashlib.sha256(raw).hexdigest()
 
 
 def layers(manifest):
-    """{digest: size} of a manifest's layers and config."""
+    """{digest: size} of a manifest's layers and config (valid digests only)."""
     out = {}
-    for layer in list((manifest or {}).get("layers") or []) + [(manifest or {}).get("config") or {}]:
-        if isinstance(layer, dict) and isinstance(layer.get("digest"), str):
-            try:
-                out[layer["digest"]] = max(0, int(layer.get("size") or 0))
-            except (TypeError, ValueError):
-                out[layer["digest"]] = 0
+    if not isinstance(manifest, dict):
+        return out
+    items = manifest.get("layers") if isinstance(manifest.get("layers"), list) else []
+    for layer in items + [manifest.get("config")]:
+        if isinstance(layer, dict) and isinstance(layer.get("digest"), str) and DIGEST_RE.match(layer["digest"]):
+            size = layer.get("size", 0)
+            ok = isinstance(size, int) and not isinstance(size, bool) and 0 <= size <= MAX_LAYER_BYTES
+            out[layer["digest"]] = size if ok else 0
     return out
 
 
 def have_blob(digest):
+    if not DIGEST_RE.match(digest or ""):
+        return False
     return os.path.exists(os.path.join(Paths.models, "blobs", digest.replace(":", "-")))
 
 
 def to_fetch(manifest):
     """Bytes of the layers not on disk yet (a shared layer is counted once)."""
     return sum(s for d, s in layers(manifest).items() if not have_blob(d))
+
+
+def local_manifest(name):
+    """The installed manifest of a model (read as root: no symlinks followed)."""
+    host, repo, tag = split_name(name)
+    if ".." in repo or ".." in tag or ".." in host:
+        return None
+    return read_json_safe(os.path.join(Paths.models, "manifests", host, repo, tag), max_bytes=MAX_MANIFEST)
 
 
 def installed_models(base=None):
@@ -132,6 +182,31 @@ def installed_models(base=None):
 
 def listed(name, allowed):
     return any(o1ollama.same_model(name, a) for a in allowed)
+
+
+def protected_names(allow_path=None):
+    """The first word of EVERY non-comment line of the allow-list, parsed
+    or not: a model named on a line with a typo ("gpt-oss:120b RAM") is
+    still never removed."""
+    out = []
+    try:
+        with open(allow_path or Paths.allow, "r", encoding="utf-8", errors="replace") as f:
+            for raw in f.read(1 << 20).splitlines():
+                text = raw.split("#", 1)[0].strip()
+                if text:
+                    out.append(text.split()[0])
+    except OSError:
+        pass
+    return out
+
+
+def kept(name, allowed, protected):
+    """True if an installed model must stay: on the list, or named on any
+    line of it (compared without case)."""
+    if listed(name, allowed):
+        return True
+    low = [p.lower() for p in protected]
+    return listed(name.lower(), low)
 
 
 def allowed_names(allow_path=None):
@@ -150,15 +225,16 @@ def plan(base=None, allow_path=None, manifest_fn=None):
     manifest_fn = manifest_fn or remote_manifest
     entries, errors = parse_allow_list(allow_path)
     allowed = [e["name"] for e in entries]
+    protected = protected_names(allow_path)
     installed = installed_models(base)
-    download, update, remove, unknown = [], [], [], []
+    download, update, remove, unknown, blocked = [], [], [], [], []
     for m in installed:
-        if not listed(m["name"], allowed):
+        if not kept(m["name"], allowed, protected):
             try:
                 size = max(0, int(m.get("size") or 0))
             except (TypeError, ValueError):
                 size = 0
-            remove.append({"name": m["name"], "bytes": size})
+            (blocked if errors else remove).append({"name": m["name"], "bytes": size})
     for name in allowed:
         local = next((m for m in installed if o1ollama.same_model(m["name"], name)), None)
         manifest, digest = manifest_fn(name)
@@ -176,16 +252,31 @@ def plan(base=None, allow_path=None, manifest_fn=None):
     free = disk_free()
     down_b = sum(x["bytes"] for x in download)
     up_b = sum(x["bytes"] for x in update)
-    freed = sum(x["bytes"] for x in remove)
+    freed = freed_bytes([x["name"] for x in remove], [m["name"] for m in installed])
     after = (free + freed - down_b - up_b) if free is not None else None
     p = {"download": download, "update": update, "remove": remove, "unknown": unknown,
-         "allow_errors": errors, "installed": sorted(m["name"] for m in installed),
+         "removals_blocked": blocked, "allow_errors": errors, "installed": sorted(m["name"] for m in installed),
          "totals": {"download_bytes": down_b, "update_bytes": up_b, "freed_bytes": freed,
                     "free_now": free, "free_after": after},
-         "enough_space": after is None or after >= MIN_FREE,
+         # no disk figure is a refusal, not a pass
+         "enough_space": after is not None and after >= MIN_FREE,
          "made_at": int(time.time())}
     p["id"] = plan_id(p)
     return p
+
+
+def freed_bytes(removed, installed):
+    """Space the removals give back: the blobs of the removed models that no
+    kept model also uses. A manifest that can't be read counts nothing
+    (so the figure errs low, never high)."""
+    keep = set()
+    for n in installed:
+        if n not in removed:
+            keep.update(layers(local_manifest(n)))
+    gone = {}
+    for n in removed:
+        gone.update(layers(local_manifest(n)))
+    return sum(s for d, s in gone.items() if d not in keep)
 
 
 def plan_id(p):
@@ -354,9 +445,11 @@ def execute(p, base=None, allow_path=None, report=None, tries=TRIES, sleep=time.
     report = report or (lambda e: None)
     summary = {"removed": [], "downloaded": [], "updated": [], "failed": [], "skipped": []}
     allowed = allowed_names(allow_path)
+    protected = protected_names(allow_path)
+    list_broken = bool(parse_allow_list(allow_path)[1])
     for item in p["remove"]:
         name = item["name"]
-        if listed(name, allowed):   # back on the list since the preview: keep it
+        if list_broken or kept(name, allowed, protected):   # back on the list (or a bad line names it): keep it
             summary["skipped"].append(name)
             continue
         if delete_one(name, base):
@@ -399,12 +492,20 @@ def execute(p, base=None, allow_path=None, report=None, tries=TRIES, sleep=time.
 # ---- the allow-list -----------------------------------------------------------
 
 def _write_allow(lines, allow_path):
+    import tempfile
     path = allow_path or Paths.allow
-    tmp = path + ".o1new"
-    with open(tmp, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines).rstrip("\n") + "\n")
-    os.chmod(tmp, 0o644)
-    os.replace(tmp, path)
+    fd, tmp = tempfile.mkstemp(prefix=".models.allow-", dir=os.path.dirname(path))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines).rstrip("\n") + "\n")
+            os.fchmod(f.fileno(), 0o644)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def _read_lines(allow_path):

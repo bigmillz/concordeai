@@ -365,6 +365,13 @@ around a little from time to time.
       allow-list.** Each one is checked against the list again right before
       it's deleted: a model put back on the list meanwhile is kept, and one
       taken off the list isn't downloaded.
+    - **A line the allow-list can't read never costs a model.** A model
+      named on any line (say `gpt-oss:120b  RAM`, where the flag is
+      misspelt) is never removed, in any letter case. While any line is
+      bad, a sync removes nothing at all; the preview and the panel's
+      confirmation show the bad lines.
+    - If the free disk space can't be read, the sync is refused. "Freed"
+      counts only the files no kept model shares.
     - An update is found without downloading anything: the registry's
       manifest for the tag is compared with the installed one (Ollama keeps
       the manifest byte for byte, and its digest is what `ollama list`
@@ -466,22 +473,39 @@ around a little from time to time.
       machine;
     - load time, time to first token, and tokens/s.
 
+    It starts itself in tmux (session `ollama1-ramtest`), so a dropped SSH
+    connection can't stop it halfway; if the connection drops, `sudo tmux
+    attach -t ollama1-ramtest`. If it is stopped anyway (hangup, `kill`),
+    it still removes its runtime settings and restarts Ollama normally, and
+    setup.sh removes them too.
+
     Options: `--model`, `--ctx`, `--ncmoe`, and `--configs norepack,gateway`
     (`gateway` = what the gateway sends today; it is expected to hit the
     cap). Results: the terminal, `/var/log/ollama1-ram-test.log` and
     `/var/log/ollama1-ram-test.json`.
   - **Encrypted swap (opt-in, undoable):**
     `sudo ./setup.sh --encrypted-swap 32G`.
-    - It makes `/swap-ollama1.img`, opened at every boot as plain dm-crypt
-      with a new random key (`/etc/crypttab`: `/dev/urandom
-      swap,cipher=aes-xts-plain64,size=256`).
+    - It makes an LVM volume, `ubuntu-vg/ollama1swap`, opened at every boot
+      as plain dm-crypt with a new random key (`/etc/crypttab`:
+      `/dev/urandom swap,cipher=aes-xts-plain64,size=512,nofail`, i.e.
+      AES-256 in XTS; `nofail` so it never holds up a boot). A volume, not
+      a swap file: dm-crypt over a file goes through a loop device, which
+      can stall under memory pressure.
+    - **It needs that much free space in `ubuntu-vg`.** setup.sh gives all
+      of the volume group's free space to `/`, and `/` can't shrink while
+      it's mounted, so on a desktop set up that way it stops with the
+      numbers and changes nothing.
     - The key lives only in kernel memory, so after a reboot nothing written
       there can be read.
     - It replaces the plain, unencrypted `/swap.img`, which is switched off
-      and kept on disk.
+      and kept on disk. **That file still holds whatever was swapped to it
+      before**: `on` offers to overwrite it with zeros (type `wipe`).
+    - If a run stops half way, running it again finishes it.
     - It does not let Ollama swap: only the test's `swap` configuration
       does, for the length of the test.
-    - Undo: `sudo ./setup.sh --remove-encrypted-swap`.
+    - Undo: `sudo ./setup.sh --remove-encrypted-swap`. It stops, changing
+      nothing, if the swap can't be taken back in (not enough free memory),
+      and it puts `/swap.img` back in fstab only if `on` took it out.
 - **Dashboard:** it fills the desktop's monitor (tty1), and `ollama1-top` shows
   it over SSH (`q` quits, `--ascii` for plain terminals, `--once` for one
   text frame). It updates every second, and its charts cover the last 5
@@ -538,6 +562,11 @@ around a little from time to time.
   - Sleep is refused while a model download or library sync, an update, or
     setup.sh is running. It is allowed during the mirror's first sync,
     which pauses and carries on after waking.
+  - During setup.sh, a model download or library sync, and updates, the
+    power button does nothing at all: each holds a logind inhibitor
+    (`sleep` and `handle-power-key`, mode block) until it ends, so the
+    button can't suspend the desktop mid-job. Holding the button down
+    still forces it off. `systemd-inhibit --list` shows who holds one.
   - After every wake a check runs. Ollama must answer (`/api/version`,
     `/api/ps`) and the GPU must report through sysfs; if not, Ollama and
     the tunnel restart.
@@ -562,8 +591,11 @@ sampler, `ollama1-power.service`, takes a reading every 10 seconds.
 **Where the watts come from.** A smart plug is best: it measures the
 whole desktop at the wall. Without one, the kit estimates.
 
-- **Smart plug**, on the home LAN only (its address must be a private IP,
-  and the sampler's unit can't reach anything else). The login, if the
+- **Smart plug**, on the home LAN only: its address must be an IP in
+  10/8, 172.16/12, 192.168/16 or fc00::/7 (not link-local), and the
+  sampler's unit can't reach anything else. Shelly Gen1 logs in with HTTP
+  Basic only, Gen2+ with Digest only. Each reading has 3 seconds in all;
+  a plug that doesn't answer properly means the estimate is used. The login, if the
   plug has one, is kept in `/etc/ollama1/power-plug.json`, readable by root
   only.
 
@@ -594,8 +626,11 @@ day's totals go to `days.csv`. Nothing about a request is kept but its
 token count.
 
 **Prices.** The default is a flat rate with no price set, so there are no
-costs until you set one. Set prices in the panel (**Prices**), or from a
-file:
+costs until you set one. They are kept in `/var/lib/ollama1/tariff.json`
+(root's, readable by the panel). Set them in the panel (**Prices**: the
+panel checks them, leaves them in its own folder and starts
+`ollama1-power-apply.service`, which reads that file without following a
+link, checks it again and writes root's), or from a file:
 
 ```bash
 sudo ollama1-power set-schedule prices.json                     # checked first; nothing changes on an error

@@ -41,6 +41,7 @@ import argparse
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 import threading
@@ -326,7 +327,16 @@ def table(results):
     return "\n".join(rows)
 
 
+def exit_on_signal(signum, frame):
+    """SIGHUP (the SSH connection dropped) or SIGTERM: leave through the
+    normal way out, so the finally: below removes the runtime drop-in and
+    restarts Ollama with its own settings."""
+    raise SystemExit(128 + signum)
+
+
 def main():
+    for sig in (signal.SIGHUP, signal.SIGTERM):
+        signal.signal(sig, exit_on_signal)
     ap = argparse.ArgumentParser(description="Measure a big 'ram' model under a memory cap.")
     ap.add_argument("--model", default="gpt-oss:120b")
     ap.add_argument("--ctx", type=int, default=4096)

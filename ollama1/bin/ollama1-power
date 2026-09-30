@@ -9,6 +9,8 @@
   sudo ollama1-power set-plug none           back to the estimate
   sudo ollama1-power test-plug               one reading from the plug
   sudo ollama1-power set-schedule FILE.json  prices: flat or time-of-use (checked first)
+  ollama1-power apply-request                (root, ollama1-power-apply.service) apply the
+                                             schedule the panel saved
   sudo ollama1-power export-schedule [--preset NAME] [FILE.json]
                                              the prices in use (or a preset's shape
                                              with them), as JSON
@@ -16,7 +18,9 @@
   ollama1-power run                          the sampler (ollama1-power.service)
 
 The plug's login is kept in /etc/ollama1/power-plug.json (root only). The
-schedule is also editable in the admin panel, which saves the same file.
+schedule lives in /var/lib/ollama1/tariff.json (root's, readable by the
+panel). The panel edits it too: it leaves the new schedule in its own
+folder and starts ollama1-power-apply.service, which checks and applies it.
 """
 import getpass
 import json
@@ -28,7 +32,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..
 
 import o1power as P  # noqa: E402
 import o1tariff as T  # noqa: E402
-from o1common import load_config, read_json, write_json_atomic  # noqa: E402
+from o1common import load_config, read_json_safe, write_json_atomic  # noqa: E402
 
 USAGE = __doc__.split("\n\n")[1]
 
@@ -95,7 +99,7 @@ def cmd_set_plug(args):
 
 def cmd_test_plug(args):
     need_root()
-    cfg = read_json(P.plug_file())
+    cfg = read_json_safe(P.plug_file(), max_bytes=4096)
     if not isinstance(cfg, dict):
         sys.exit("no plug set (sudo ollama1-power set-plug ...)")
     try:
@@ -120,7 +124,7 @@ def cmd_set_schedule(args):
         for e in errs:
             print("  - " + e)
         return 1
-    P.save_schedule(clean, owner="o1admin")
+    P.save_schedule(clean)
     t = T.Tariff(clean)
     print("Saved (%s)." % ("flat rate" if clean["mode"] == "flat" else "time-of-use, %d season(s)" % len(clean["seasons"])))
     print("Now: %s" % t.badge(time.time())["text"])
@@ -153,6 +157,13 @@ def cmd_presets(args):
     return 0
 
 
+def cmd_apply(args):
+    need_root()
+    ok, errs = P.apply_request()
+    print("applied" if ok else "not applied: " + "; ".join(errs))
+    return 0 if ok else 1
+
+
 def cmd_run(args):
     need_root()
     P.run(load_config())
@@ -166,7 +177,7 @@ def main():
         return 0
     cmds = {"status": cmd_status, "set-plug": cmd_set_plug, "test-plug": cmd_test_plug,
             "set-schedule": cmd_set_schedule, "export-schedule": cmd_export, "presets": cmd_presets,
-            "run": cmd_run}
+            "apply-request": cmd_apply, "run": cmd_run}
     if args[0] not in cmds:
         sys.exit(USAGE)
     return cmds[args[0]](args[1:])

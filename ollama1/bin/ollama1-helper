@@ -210,20 +210,26 @@ def stamp(which):
     return 0
 
 
+def held(why, fn, *a):
+    """Run a long job with sleep and the power button held off."""
+    with o1sleep.Inhibit(why):
+        return fn(*a)
+
+
 def main():
     if os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
         sys.exit("ollama1-helper runs as root, from its systemd units")
     os.umask(0o027)
     args = sys.argv[1:]
     verbs = {
-        ("update-now", 0): lambda: update_now(),
+        ("update-now", 0): lambda: held("updates are being applied", update_now),
         ("restart", 0): lambda: restart(),
         ("reboot", 0): lambda: run(["systemctl", "reboot"]),
         ("sleep", 0): lambda: sleep(),
         ("resume-check", 0): lambda: (0 if o1sleep.resume_check()["resume_check"]["ok"] else 1),
         ("stamp", 1): lambda: stamp(args[1]),
         ("backup", 0): lambda: backup(),
-        ("pull", 1): lambda: pull(args[1]),
+        ("pull", 1): lambda: held("a model is being downloaded", pull, args[1]),
         ("rmmodel", 1): lambda: rmmodel(args[1]),
         ("rmdevice", 1): lambda: rmdevice(args[1]),
         ("lan", 1): lambda: lan(args[1]),

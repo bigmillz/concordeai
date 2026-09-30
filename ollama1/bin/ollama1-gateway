@@ -423,10 +423,12 @@ class Gateway:
         margin = max(8 << 30, int(mi.get("MemTotal", 0) * 0.12), int(self.cfg.get("ram_margin_gib") or 8) << 30)
         ram_part = avail - margin
         cap = int(self.cfg.get("ollama_memory_max_bytes") or 0)
-        if cap:
-            # Ollama's own MemoryMax (set by setup.sh): the part in system
-            # memory must fit under it, with 1 GiB for Ollama itself.
-            ram_part = min(ram_part, cap - (1 << 30))
+        high = int(self.cfg.get("ollama_memory_high_bytes") or 0) or (cap - (2 << 30) if cap else 0)
+        if high:
+            # Ollama's MemoryHigh (setup.sh: 2 GiB under its MemoryMax): above
+            # it the kernel throttles and reclaims Ollama, so the part in
+            # system memory must fit under it, not just under the hard cap.
+            ram_part = min(ram_part, high)
         return max(0, vram + max(0, ram_part))
 
     def fit_check(self, name, entry, n_ctx, ram=False, explicit=True):

@@ -23,6 +23,15 @@ LOG=/var/log/ollama1-ram-test.log
 case "${1:-}" in -h|--help) exec python3 "$HERE/ram_model_test.py" --help ;; esac
 [ "$(id -u)" -eq 0 ] || { echo "Run it with sudo."; exit 1; }
 { command -v python3 && command -v systemctl; } >/dev/null || { echo "needs python3 and systemd"; exit 1; }
+# In tmux, so a dropped SSH connection can't stop it halfway (reattach:
+# sudo tmux attach -t ollama1-ramtest). Without tmux it still cleans up on a
+# hangup, but a terminal of its own is the way to run it.
+if [ -z "${TMUX:-}" ] && [ "${O1_NO_TMUX:-}" != 1 ] && [ -t 0 ] && command -v tmux >/dev/null; then
+  echo "Starting in tmux (session ollama1-ramtest). If the connection drops: sudo tmux attach -t ollama1-ramtest"
+  exec tmux new-session -A -s ollama1-ramtest \
+    "O1_NO_TMUX=1 bash '$HERE/ram-model-test.sh' $(printf '%q ' "$@"); echo; read -r -p 'Finished. Press Enter to close. ' _"
+fi
+[ -n "${TMUX:-}" ] || [ "${O1_NO_TMUX:-}" = 1 ] || echo "Note: tmux isn't available; if this SSH session drops, the test stops (and cleans up)."
 touch "$LOG"; chmod 600 "$LOG"
 python3 -u "$HERE/ram_model_test.py" "$@" 2>&1 | tee -a "$LOG"
 exit "${PIPESTATUS[0]}"

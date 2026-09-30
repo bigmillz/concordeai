@@ -76,6 +76,7 @@ DEFAULTS = {
     "num_ctx_default_ram": 8192,     # 'ram' models: stepped down to 4096/2048 if needed to fit
     "ram_margin_gib": 8,             # RAM kept free for the OS: at least 8 GiB or 12% of RAM
     "ollama_memory_max_bytes": 0,    # ollama.service's MemoryMax (setup.sh writes it); 0 = unknown
+    "ollama_memory_high_bytes": 0,   # its MemoryHigh (setup.sh writes it); 0 = MemoryMax less 2 GiB
     # True only when ollama.service runs llama-server with LLAMA_ARG_REPACK=false
     # (see tools/ram-model-test.sh); until then a 'ram' model must fit in RAM alone.
     "ollama_no_repack": False,
@@ -129,23 +130,53 @@ def read_json(path, default=None, max_bytes=4 << 20):
         return default
 
 
+def read_json_safe(path, default=None, max_bytes=1 << 20):
+    """read_json for root reading a file someone else could have placed:
+    never follows a symlink in the last component, never blocks on a FIFO
+    or device, and reads only a regular file of at most max_bytes."""
+    import stat
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0))
+    except OSError:
+        return default
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_size > max_bytes:
+            return default
+        with os.fdopen(fd, "rb") as f:
+            fd = None
+            raw = f.read(max_bytes + 1)
+        if len(raw) > max_bytes:
+            return default
+        return json.loads(raw.decode("utf-8"))
+    except (OSError, ValueError, UnicodeDecodeError):
+        return default
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
 def write_json_atomic(path, obj, mode=0o640, group=None):
     """Write counts/state JSON atomically. Only ever called with numbers,
-    names and ids, never with request or response content."""
+    names and ids, never with request or response content.
+
+    Mode and group are set on the open file (fchmod/fchown), never by path,
+    so a symlink planted in the folder can't redirect them; the rename
+    replaces a planted symlink at `path` instead of writing through it."""
     d = os.path.dirname(path)
     fd, tmp = tempfile.mkstemp(prefix=".tmp-", dir=d)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(obj, f, separators=(",", ":"), sort_keys=True)
             f.flush()
+            os.fchmod(f.fileno(), mode)
+            if group is not None:
+                try:
+                    import grp
+                    os.fchown(f.fileno(), -1, grp.getgrnam(group).gr_gid)
+                except (KeyError, PermissionError, ImportError):
+                    pass
             os.fsync(f.fileno())
-        os.chmod(tmp, mode)
-        if group is not None:
-            try:
-                import grp
-                os.chown(tmp, -1, grp.getgrnam(group).gr_gid)
-            except (KeyError, PermissionError, ImportError):
-                pass
         os.replace(tmp, path)
     except BaseException:
         try:

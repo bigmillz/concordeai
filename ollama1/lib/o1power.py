@@ -20,6 +20,7 @@ stores says anything about a request beyond the token count.
 """
 import datetime
 import glob
+import http.client
 import ipaddress
 import json
 import os
@@ -33,7 +34,7 @@ import urllib.request
 
 import o1stats
 import o1tariff
-from o1common import Paths, read_json, write_json_atomic
+from o1common import Paths, read_json, read_json_safe, write_json_atomic
 
 PLUG_TYPES = {
     "shelly1": "Shelly Gen1 (e.g. Plug S): GET /status",
@@ -61,34 +62,75 @@ def plug_file():
 
 
 def tariff_file():
-    """The price schedule. The panel saves it (as o1admin, so not in the
-    root-only config.json: it isn't secret); root's CLI writes it too."""
-    return os.path.join(Paths.admin_state, "tariff.json")
+    """The price schedule: root's file (root:o1view 0640 in root's own
+    /var/lib/ollama1), readable by the panel. Only root writes it: the CLI,
+    or ollama1-power-apply.service on the panel's behalf."""
+    return os.path.join(Paths.state, "tariff.json")
 
 
-def load_schedule():
-    s = read_json(tariff_file())
-    if isinstance(s, dict):
-        clean, errs = o1tariff.validate(s)
-        if not errs:
-            return clean
+def request_file():
+    """Where the panel (o1admin) leaves a schedule for root to apply. Root
+    only reads it (no symlinks, regular file, bounded) and deletes it."""
+    return os.path.join(Paths.admin_state, "tariff-request.json")
+
+
+def apply_result_file():
+    return os.path.join(run_dir(), "apply.json")
+
+
+MAX_SCHEDULE_BYTES = 65536
+
+
+def default_schedule():
     return json.loads(json.dumps(o1tariff.DEFAULT))
 
 
-def save_schedule(s, owner=None):
+def load_schedule():
+    """The schedule in use; the default if the file is missing, not a
+    regular file, too big or invalid. Never raises."""
+    try:
+        s = read_json_safe(tariff_file(), max_bytes=MAX_SCHEDULE_BYTES)
+        if isinstance(s, dict):
+            clean, errs = o1tariff.validate(s)
+            if not errs:
+                return clean
+    except Exception:
+        pass
+    return default_schedule()
+
+
+def save_schedule(s):
+    """Root only: check, then write root's tariff file."""
     clean, errs = o1tariff.validate(s)
     if errs:
         raise ValueError("; ".join(errs))
     os.makedirs(os.path.dirname(tariff_file()), exist_ok=True)
-    write_json_atomic(tariff_file(), clean, mode=0o600)
-    if owner:
-        import pwd
-        try:
-            pw = pwd.getpwnam(owner)
-            os.chown(tariff_file(), pw.pw_uid, pw.pw_gid)
-        except (KeyError, PermissionError):
-            pass
+    write_json_atomic(tariff_file(), clean, mode=0o640, group="o1view")
     return clean
+
+
+def apply_request():
+    """Root, for the panel: apply the schedule it left in its own folder.
+    Returns (ok, errors). The request is read without following a symlink
+    and deleted afterwards (unlink never follows one)."""
+    s = read_json_safe(request_file(), max_bytes=MAX_SCHEDULE_BYTES)
+    try:
+        os.unlink(request_file())
+    except OSError:
+        pass
+    if not isinstance(s, dict):
+        errs = ["no readable request (it must be a regular JSON file of at most 64 KiB)"]
+    else:
+        errs = o1tariff.validate(s)[1]
+        if not errs:
+            save_schedule(s)
+    try:
+        os.makedirs(run_dir(), exist_ok=True)
+        write_json_atomic(apply_result_file(), {"ok": not errs, "errors": errs[:20], "at": int(time.time())},
+                          mode=0o640, group="o1view")
+    except OSError:
+        pass
+    return not errs, errs
 
 
 # ---- smart plugs -----------------------------------------------------------------
@@ -97,24 +139,34 @@ class PlugError(Exception):
     pass
 
 
+LAN_NETS = tuple(ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7"))
+
+
 def lan_ip(host):
-    """The host as a private LAN address, or PlugError. Only an IP literal:
-    a name could resolve anywhere."""
+    """The host as a private LAN address, or PlugError. Only an IP literal
+    (a name could resolve anywhere), and only in 10/8, 172.16/12,
+    192.168/16 or fc00::/7 (an IPv4-mapped IPv6 address counts as its IPv4
+    one). Link-local is refused."""
     try:
         ip = ipaddress.ip_address(str(host).strip("[]"))
     except ValueError:
         raise PlugError("the plug's address must be its LAN IP, e.g. 192.168.86.40")
-    if ip.is_loopback or ip.is_unspecified or ip.is_multicast or not (ip.is_private or ip.is_link_local):
-        raise PlugError("%s isn't a private LAN address" % ip)
+    if ip.version == 6 and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    if not any(ip in n for n in LAN_NETS if n.version == ip.version):
+        raise PlugError("%s isn't a private LAN address (10/8, 172.16/12, 192.168/16 or fc00::/7)" % ip)
     return str(ip)
 
 
 def validate_plug(cfg):
-    if not isinstance(cfg, dict) or cfg.get("type") not in PLUG_TYPES:
+    if not isinstance(cfg, dict) or not isinstance(cfg.get("type"), str) or cfg["type"] not in PLUG_TYPES:
         raise PlugError("plug type must be one of: " + ", ".join(PLUG_TYPES))
     for k in cfg:
         if k not in ("type", "host", "user", "password"):
-            raise PlugError("unknown plug setting %r" % k)
+            raise PlugError("unknown plug setting")
+    for k in ("user", "password"):
+        if cfg.get(k) is not None and not isinstance(cfg[k], str):
+            raise PlugError("the plug's %s must be text" % k)
     out = {"type": cfg["type"], "host": lan_ip(cfg.get("host"))}
     if cfg.get("user") or cfg.get("password"):
         if cfg["type"] == "kasa":
@@ -125,39 +177,45 @@ def validate_plug(cfg):
 
 
 def _num(v):
-    if isinstance(v, bool) or not isinstance(v, (int, float)):
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or v != v:
         raise PlugError("the plug's reply has no power figure")
     if not 0 <= v <= MAX_PLUG_W:
-        raise PlugError("the plug reported %r W" % v)
+        raise PlugError("the plug reported a power figure out of range")
     return float(v)
 
 
+def _dict(v, what):
+    if not isinstance(v, dict):
+        raise PlugError("the %s reply isn't in the expected shape" % what)
+    return v
+
+
 def parse_shelly1(obj):
-    meters = (obj or {}).get("meters") or (obj or {}).get("emeters")
-    if not isinstance(meters, list) or not meters:
+    obj = _dict(obj, "Shelly")
+    meters = obj.get("meters") or obj.get("emeters")
+    if not isinstance(meters, list) or not meters or len(meters) > 16:
         raise PlugError("no meters in the Shelly reply")
-    return _num(sum(_num(m.get("power")) for m in meters if isinstance(m, dict)))
+    return _num(sum(_num(_dict(m, "Shelly").get("power")) for m in meters))
 
 
 def parse_shelly2(obj):
-    return _num((obj or {}).get("apower"))
+    return _num(_dict(obj, "Shelly").get("apower"))
 
 
 def parse_tasmota(obj):
-    try:
-        p = obj["StatusSNS"]["ENERGY"]["Power"]
-    except (KeyError, TypeError):
-        raise PlugError("no StatusSNS.ENERGY.Power in the Tasmota reply")
-    return _num(sum(p) if isinstance(p, list) else p)
+    energy = _dict(_dict(_dict(obj, "Tasmota").get("StatusSNS"), "Tasmota").get("ENERGY"), "Tasmota")
+    p = energy.get("Power")
+    if isinstance(p, list):
+        if not p or len(p) > 16:
+            raise PlugError("the Tasmota reply has no power figure")
+        return _num(sum(_num(x) for x in p))
+    return _num(p)
 
 
 def parse_kasa(obj):
-    try:
-        rt = obj["emeter"]["get_realtime"]
-    except (KeyError, TypeError):
-        raise PlugError("no emeter reading in the Kasa reply")
+    rt = _dict(_dict(_dict(obj, "Kasa").get("emeter"), "Kasa").get("get_realtime"), "Kasa")
     if rt.get("err_code"):
-        raise PlugError("the Kasa plug answered error %r" % rt.get("err_code"))
+        raise PlugError("the Kasa plug answered with an error")
     if "power_mw" in rt:           # newer hardware versions report milliwatts
         mw = rt["power_mw"]
         if isinstance(mw, bool) or not isinstance(mw, (int, float)):
@@ -182,32 +240,109 @@ def kasa_decrypt(data):
     return bytes(out)
 
 
+PLUG_DEADLINE_S = 3.0      # the whole reading, however slowly the plug answers
+MAX_REPLY = 1 << 16
+
+
+class _DeadlineSocket(socket.socket):
+    """A socket whose every send and receive shares one overall deadline, so
+    a plug that trickles bytes can't hold the sampler."""
+    deadline = 0.0
+
+    def _left(self):
+        left = self.deadline - time.monotonic()
+        if left <= 0:
+            raise socket.timeout("deadline")
+        self.settimeout(left)
+
+    def recv(self, *a, **kw):
+        self._left()
+        return super().recv(*a, **kw)
+
+    def recv_into(self, *a, **kw):
+        self._left()
+        return super().recv_into(*a, **kw)
+
+    def send(self, *a, **kw):
+        self._left()
+        return super().send(*a, **kw)
+
+    def sendall(self, *a, **kw):
+        self._left()
+        return super().sendall(*a, **kw)
+
+
+def _connect(host, port, deadline):
+    fam = socket.AF_INET6 if ":" in host else socket.AF_INET
+    s = _DeadlineSocket(fam, socket.SOCK_STREAM)
+    s.deadline = deadline
+    try:
+        s._left()
+        s.connect((host, port))
+    except BaseException:
+        s.close()
+        raise
+    return s
+
+
+class _DeadlineHTTPConnection(http.client.HTTPConnection):
+    def __init__(self, host, deadline=0.0, **kw):
+        kw.pop("timeout", None)
+        super().__init__(host, **kw)
+        self.deadline = deadline
+
+    def connect(self):
+        self.sock = _connect(self.host, self.port, self.deadline)
+
+
+class _DeadlineHTTPHandler(urllib.request.HTTPHandler):
+    def __init__(self, deadline):
+        super().__init__()
+        self.deadline = deadline
+
+    def http_open(self, req):
+        return self.do_open(lambda host, **kw: _DeadlineHTTPConnection(host, deadline=self.deadline, **kw), req)
+
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *a, **kw):
         return None
 
 
-def _http_json(url, user=None, password=None, timeout=2.0):
-    handlers = [_NoRedirect()]
-    if user is not None:
+def _http_json(url, user=None, password=None, auth=None, deadline=None):
+    """GET a plug's JSON: no redirects, one overall deadline, at most 64 KiB.
+    auth: "basic" (Shelly Gen1) or "digest" (Shelly Gen2+), each only."""
+    deadline = deadline or time.monotonic() + PLUG_DEADLINE_S
+    handlers = [_NoRedirect(), _DeadlineHTTPHandler(deadline)]
+    if user is not None and auth:
         mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
         mgr.add_password(None, url, user, password or "")
-        handlers += [urllib.request.HTTPBasicAuthHandler(mgr), urllib.request.HTTPDigestAuthHandler(mgr)]
+        handlers.append(urllib.request.HTTPBasicAuthHandler(mgr) if auth == "basic"
+                        else urllib.request.HTTPDigestAuthHandler(mgr))
     opener = urllib.request.build_opener(*handlers)
     try:
-        with opener.open(urllib.request.Request(url, headers={"User-Agent": "ollama1-power"}), timeout=timeout) as r:
-            return json.loads(r.read(1 << 16).decode("utf-8"))
+        with opener.open(urllib.request.Request(url, headers={"User-Agent": "ollama1-power"})) as r:
+            raw = r.read(MAX_REPLY + 1)
     except urllib.error.HTTPError as e:
         e.close()
-        raise PlugError("the plug answered HTTP %d%s" % (e.code, " (check the login)" if e.code == 401 else ""))
-    except (urllib.error.URLError, OSError, ValueError) as e:
-        raise PlugError("the plug didn't answer: %s" % (getattr(e, "reason", None) or e))
+        code = e.code if isinstance(e.code, int) else 0
+        raise PlugError("the plug answered HTTP %d%s" % (code, " (check the login)" if code == 401 else ""))
+    except (urllib.error.URLError, OSError, http.client.HTTPException, ValueError):
+        raise PlugError("the plug didn't answer in time")
+    if len(raw) > MAX_REPLY:
+        raise PlugError("the plug's reply is too long")
+    try:
+        return json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        raise PlugError("the plug's reply isn't JSON")
 
 
-def _kasa_query(host, port=9999, timeout=2.0):
+def _kasa_query(host, port=9999, deadline=None):
+    deadline = deadline or time.monotonic() + PLUG_DEADLINE_S
     msg = json.dumps({"emeter": {"get_realtime": {}}}).encode()
     try:
-        with socket.create_connection((host, port), timeout=timeout) as s:
+        s = _connect(host, port, deadline)
+        with s:
             s.sendall(struct.pack(">I", len(msg)) + kasa_encrypt(msg))
             head = b""
             while len(head) < 4:
@@ -216,7 +351,7 @@ def _kasa_query(host, port=9999, timeout=2.0):
                     raise PlugError("the Kasa plug closed the connection")
                 head += chunk
             n = struct.unpack(">I", head)[0]
-            if n > 1 << 16:
+            if n > MAX_REPLY:
                 raise PlugError("the Kasa reply is too long")
             data = b""
             while len(data) < n:
@@ -224,8 +359,8 @@ def _kasa_query(host, port=9999, timeout=2.0):
                 if not chunk:
                     break
                 data += chunk
-    except OSError as e:
-        raise PlugError("the Kasa plug didn't answer: %s" % e)
+    except OSError:
+        raise PlugError("the Kasa plug didn't answer in time")
     try:
         return json.loads(kasa_decrypt(data).decode("utf-8"))
     except (ValueError, UnicodeDecodeError):
@@ -233,26 +368,28 @@ def _kasa_query(host, port=9999, timeout=2.0):
                         "this doesn't speak)")
 
 
-def read_plug(cfg, timeout=2.0, http_port=80, kasa_port=9999, check=lan_ip):
-    """Watts from a validated plug config. Raises PlugError. (Tests pass
-    their own `check` and ports to reach fake plugs on 127.0.0.1.)"""
+def read_plug(cfg, timeout=PLUG_DEADLINE_S, http_port=80, kasa_port=9999, check=lan_ip):
+    """Watts from a validated plug config, within `timeout` seconds overall.
+    Raises PlugError. (Tests pass their own `check` and ports to reach fake
+    plugs on 127.0.0.1.)"""
     host = check(cfg["host"])
+    deadline = time.monotonic() + timeout
     h = "[%s]" % host if ":" in host else host
     base = "http://%s:%d" % (h, http_port)
     user, pw = cfg.get("user"), cfg.get("password")
     t = cfg["type"]
-    if t == "shelly1":
-        return parse_shelly1(_http_json(base + "/status", user, pw, timeout))
-    if t == "shelly2":
-        return parse_shelly2(_http_json(base + "/rpc/Switch.GetStatus?id=0", user, pw, timeout))
+    if t == "shelly1":      # Gen1: HTTP Basic only
+        return parse_shelly1(_http_json(base + "/status", user, pw, "basic", deadline))
+    if t == "shelly2":      # Gen2+: HTTP Digest only
+        return parse_shelly2(_http_json(base + "/rpc/Switch.GetStatus?id=0", user, pw, "digest", deadline))
     if t == "tasmota":
         q = {"cmnd": "Status 8"}
         if user is not None:
             q.update(user=user, password=pw or "")   # Tasmota's own API takes the login this way
         return parse_tasmota(_http_json(base + "/cm?" + urllib.parse.urlencode(q, quote_via=urllib.parse.quote),
-                                        timeout=timeout))
+                                        deadline=deadline))
     if t == "kasa":
-        return parse_kasa(_kasa_query(host, kasa_port, timeout))
+        return parse_kasa(_kasa_query(host, kasa_port, deadline))
     raise PlugError("unknown plug type")
 
 
@@ -590,7 +727,11 @@ class Sampler:
                 self.plug_state = {"configured": True, "ok": True, "type": self.plug["type"]}
                 return w, "plug", parts
             except PlugError as e:
+                # PlugError messages are fixed text: never the plug's own bytes
                 self.plug_state = {"configured": True, "ok": False, "type": self.plug["type"], "error": str(e)[:160]}
+            except Exception:
+                self.plug_state = {"configured": True, "ok": False, "type": self.plug["type"],
+                                   "error": "the plug's reply couldn't be read"}
         return est, "est", parts
 
     def tick(self):
@@ -627,17 +768,22 @@ def run(cfg, stop=None):
     """The service loop."""
     import o1sleep
     plug = None
-    p = read_json(plug_file())
+    p = read_json_safe(plug_file(), max_bytes=4096)
     if isinstance(p, dict):
         try:
             plug = validate_plug(p)
-        except PlugError as e:
-            print("power: plug config ignored: %s" % e, flush=True)
+        except PlugError:
+            print("power: /etc/ollama1/power-plug.json ignored (not a valid plug setting)", flush=True)
     os.makedirs(run_dir(), exist_ok=True)
     s = Sampler(cfg, plug=plug, sleep_rec=o1sleep.last)
     last_flush = 0.0
     while not (stop and stop.is_set()):
-        live = s.tick()
+        try:
+            live = s.tick()
+        except Exception as e:           # one bad reading must never stop the sampler
+            print("power: reading failed (%s)" % type(e).__name__, flush=True)
+            time.sleep(TICK_S)
+            continue
         write_json_atomic(os.path.join(run_dir(), "now.json"), live, mode=0o640, group="o1view")
         now = time.time()
         if now - last_flush >= 60:
@@ -648,7 +794,7 @@ def run(cfg, stop=None):
             try:
                 write_json_atomic(os.path.join(run_dir(), "summary.json"), compact(summary(now, live=live)),
                                   mode=0o640, group="o1view")
-            except (ValueError, OSError) as e:
-                print("power: summary failed: %s" % e, flush=True)
+            except Exception as e:
+                print("power: summary failed (%s)" % type(e).__name__, flush=True)
             prune(now)
         time.sleep(TICK_S - (time.time() % TICK_S))

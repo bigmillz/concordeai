@@ -37,6 +37,44 @@ def _active_units(patterns):
     return [line.split()[0] for line in r.stdout.splitlines() if line.strip()]
 
 
+class Inhibit:
+    """Hold a logind inhibitor (sleep and the power button, mode block) while
+    a long job runs: a model pull or library sync, updates. The holder runs
+    in its own session and is ended with the job. A no-op where
+    systemd-inhibit isn't there, when not root, and in tests."""
+
+    def __init__(self, why, exe=None):
+        self.why = why
+        self.exe = exe
+        self.p = None
+
+    def __enter__(self):
+        import shutil
+        exe = self.exe or shutil.which("systemd-inhibit")
+        if exe and (self.exe or (os.geteuid() == 0 and not os.environ.get("OLLAMA1_PREFIX"))):
+            try:
+                self.p = subprocess.Popen([exe, "--what=sleep:handle-power-key", "--mode=block", "--who=ollama1",
+                                           "--why=" + self.why, "sleep", "infinity"],
+                                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                          stderr=subprocess.DEVNULL, start_new_session=True)
+            except OSError:
+                self.p = None
+        return self
+
+    def __exit__(self, *a):
+        if self.p is not None:
+            import signal
+            try:
+                os.killpg(self.p.pid, signal.SIGTERM)
+            except OSError:
+                pass
+            try:
+                self.p.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+        return False
+
+
 def library_lock():
     return os.path.join(Paths.run, "library", "sync.lock")
 

@@ -838,9 +838,13 @@ class TestRamModels(unittest.TestCase):
         vram = 16 * self.GIB - (768 << 20)
         self.gw.cfg["ollama_memory_max_bytes"] = 40 * self.GIB
         try:
-            self.assertEqual(self.gw.budget(True), vram + 39 * self.GIB)
+            # MemoryHigh, 2 GiB under MemoryMax, is the limit for the RAM part
+            self.assertEqual(self.gw.budget(True), vram + 38 * self.GIB)
+            self.gw.cfg["ollama_memory_high_bytes"] = 35 * self.GIB
+            self.assertEqual(self.gw.budget(True), vram + 35 * self.GIB)
         finally:
             self.gw.cfg["ollama_memory_max_bytes"] = 0
+            self.gw.cfg["ollama_memory_high_bytes"] = 0
 
     def test_resident_size_counts_compute_buffers(self):
         import o1ollama

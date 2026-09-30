@@ -24,6 +24,7 @@ import time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
 
 import o1library as L  # noqa: E402
+import o1sleep  # noqa: E402
 from o1common import fmt_bytes, safe_label  # noqa: E402
 
 USAGE = __doc__.split("\n\n")[1]
@@ -49,6 +50,10 @@ def show_plan(p):
             + [("Update", x) for x in p["update"]])
     for e in p["allow_errors"]:
         say("  ! allow-list line %d ignored (%s): %s" % (e["line"], e["reason"], e["text"]))
+    if p.get("removals_blocked"):
+        say("  ! Not removing %s while the allow-list has a line it can't read: fix the line(s) above"
+            " (a model named on any line is never removed)."
+            % ", ".join(safe_label(x["name"], 40) for x in p["removals_blocked"]))
     for x in p["unknown"]:
         say("  ? %-40s %s" % (safe_label(x["name"], 40), x["why"]))
     if not rows:
@@ -64,7 +69,10 @@ def show_plan(p):
            fmt_bytes(t["freed_bytes"]), len(p["remove"])))
     say("  Disk free now: %s   after: %s" % (gib(t["free_now"]), gib(t["free_after"])))
     if not p["enough_space"]:
-        say("  Not enough disk space: take something off the allow-list first.")
+        if t["free_now"] is None:
+            say("  Can't read the free space on /srv/models, so nothing will be done.")
+        else:
+            say("  Not enough disk space: take something off the allow-list first.")
 
 
 def bar(frac, width=30):
@@ -149,7 +157,7 @@ def cmd_status(args):
 
 def cmd_sync(args):
     panel = "--panel" in args
-    with L.Lock():
+    with L.Lock(), o1sleep.Inhibit("the model library is being synced"):
         if panel:
             want = L.read_preview()
             p = L.plan()
@@ -210,7 +218,7 @@ def cmd_add(args):
     if ask("Download it now (%s)? [y/N] " % fmt_bytes(size)).lower() not in ("y", "yes"):
         say("Later: sudo ollama1-models sync")
         return 0
-    with L.Lock():
+    with L.Lock(), o1sleep.Inhibit("a model is being downloaded"):
         pr = Printer(sys.stdout.isatty())
         s = L.execute({"remove": [], "update": [], "download": [{"name": name, "bytes": size}]}, report=pr)
         pr.clear()

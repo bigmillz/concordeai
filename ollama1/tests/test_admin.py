@@ -311,8 +311,10 @@ class TestPowerPanel(unittest.TestCase):
     def setUp(self):
         import o1power
         self.P = o1power
-        self.addCleanup(lambda: os.path.exists(o1power.tariff_file()) and os.unlink(o1power.tariff_file()))
+        for f in (o1power.tariff_file(), o1power.request_file()):
+            self.addCleanup(lambda f=f: os.path.exists(f) and os.unlink(f))
         A["panel"].power_cache = (0, None, None)
+        A["started"].clear()
 
     def good(self):
         return {"currency": "USD", "mode": "tou", "flat_rate": None, "timezone": "America/New_York",
@@ -340,10 +342,16 @@ class TestPowerPanel(unittest.TestCase):
         self.assertEqual(post_path("/api/power/schedule", raw, tok="0" * 64)[0], 403)
         self.assertEqual(post_path("/api/power/schedule", raw, origin="https://evil.example")[0], 403)
         self.assertEqual(post_path("/api/power/schedule", raw, ctype="text/plain")[0], 403)
-        self.assertFalse(os.path.exists(self.P.tariff_file()))
+        self.assertFalse(os.path.exists(self.P.request_file()))
+        self.assertEqual(A["started"], [])
         st, data, _ = post_path("/api/power/schedule", raw)
-        self.assertEqual(st, 200, data)
-        self.assertEqual(oct(os.stat(self.P.tariff_file()).st_mode & 0o777), "0o600")
+        self.assertEqual(st, 202, data)
+        # the panel only leaves a request in its own folder and starts the fixed apply unit
+        self.assertEqual(A["started"], ["ollama1-power-apply.service"])
+        self.assertFalse(os.path.exists(self.P.tariff_file()))
+        self.assertEqual(oct(os.stat(self.P.request_file()).st_mode & 0o777), "0o600")
+        self.assertEqual(self.P.apply_request(), (True, []))          # what the unit runs, as root
+        self.assertEqual(oct(os.stat(self.P.tariff_file()).st_mode & 0o777), "0o640")
         s = json.loads(get("/api/power")[1])
         self.assertEqual(s["schedule"]["mode"], "tou")
         self.assertIn(s["badge"]["tier"], ("on", "off", "discount"))
@@ -359,7 +367,8 @@ class TestPowerPanel(unittest.TestCase):
         errs = json.loads(data)["errors"]
         self.assertTrue(any("same time" in e for e in errs))
         self.assertTrue(any("discount price" in e for e in errs))
-        self.assertFalse(os.path.exists(self.P.tariff_file()))
+        self.assertFalse(os.path.exists(self.P.request_file()))
+        self.assertEqual(A["started"], [])
         self.assertEqual(post_path("/api/power/schedule", b"[1,2]")[0], 400)
         self.assertEqual(post_path("/api/power/schedule", b"not json")[0], 400)
 

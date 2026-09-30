@@ -443,6 +443,21 @@ class TestSampler(unittest.TestCase):
         finally:
             P.read_plug = real
 
+    def test_any_plug_failure_falls_back_quietly(self):
+        real = P.read_plug
+
+        def boom(cfg, **kw):
+            raise ValueError("\x00EVIL-MARKER raw plug bytes")
+        P.read_plug = boom
+        try:
+            s, clock = self.sampler(plug={"type": "kasa", "host": "192.168.86.40"})
+            live = s.tick()
+        finally:
+            P.read_plug = real
+        self.assertEqual(live["src"], "est")
+        self.assertEqual(live["plug"]["error"], "the plug's reply couldn't be read")
+        self.assertNotIn("EVIL", json.dumps(live))
+
     def test_gap_unknown_and_sleep_counted(self):
         rec = {}
         s, clock = self.sampler(sleep_rec=lambda: rec)
@@ -499,6 +514,7 @@ class FakePlugHTTP:
         self.user, self.password = "admin", "plug-pass"
         self.auth = None                 # None / "basic" / "digest"
         self.redirect = False
+        self.override = None
         self.calls = []
         plug = self
 
@@ -533,6 +549,9 @@ class FakePlugHTTP:
 
             def do_GET(self):
                 plug.calls.append((self.path, self.headers.get("Authorization")))
+                if plug.override is not None:
+                    raw = plug.override if isinstance(plug.override, str) else plug.override
+                    return self.reply(200, raw)
                 if plug.redirect and not self.path.startswith("/rpc/"):
                     loc = "http://127.0.0.1:%d/rpc/Switch.GetStatus?id=0" % plug.port
                     return self.reply(302, {}, {"Location": loc})
@@ -619,10 +638,13 @@ class TestPlugs(unittest.TestCase):
         self.assertEqual(P.kasa_decrypt(P.kasa_encrypt(msg)), msg)
 
     def test_lan_only(self):
-        for ok in ("192.168.86.40", "10.0.0.7", "172.16.5.4", "169.254.3.3", "fe80::1", "fd00::5"):
+        for ok in ("192.168.86.40", "10.0.0.7", "172.16.5.4", "172.31.255.1", "fd00::5"):
             self.assertTrue(P.lan_ip(ok), ok)
+        self.assertEqual(P.lan_ip("::ffff:192.168.86.40"), "192.168.86.40")
         for bad in ("8.8.8.8", "127.0.0.1", "0.0.0.0", "224.0.0.1", "plug.local", "192.168.1.5.nip.io",
-                    "http://192.168.1.5", "", None, "::1", "2001:4860::8888"):
+                    "http://192.168.1.5", "", None, "::1", "2001:4860::8888",
+                    "169.254.3.3", "169.254.169.254", "fe80::1", "::ffff:8.8.8.8", "::ffff:127.0.0.1",
+                    "100.64.0.1", "172.32.0.1", "192.0.0.8", "198.18.0.1", "::ffff:169.254.169.254"):
             with self.assertRaises(P.PlugError, msg=bad):
                 P.lan_ip(bad)
         with self.assertRaises(P.PlugError):
@@ -653,12 +675,76 @@ class TestPlugs(unittest.TestCase):
         self.assertEqual(rd({"type": "shelly2", "user": "admin", "password": "plug-pass"}), 187.3)
         with self.assertRaises(P.PlugError):
             rd({"type": "shelly2", "user": "admin", "password": "wrong"})
+        # each generation gets only its own scheme: Gen1 never answers a Digest
+        # challenge, and Gen2 never sends a password in Basic
+        with self.assertRaises(P.PlugError):
+            rd({"type": "shelly1", "user": "admin", "password": "plug-pass"})
+        f.auth = "basic"
+        n = len(f.calls)
+        with self.assertRaises(P.PlugError):
+            rd({"type": "shelly2", "user": "admin", "password": "plug-pass"})
+        self.assertTrue(all(not (a or "").startswith("Basic") for _, a in f.calls[n:]))
         f.auth = None
         f.redirect = True
         n = len(f.calls)
         with self.assertRaises(P.PlugError):
             rd({"type": "shelly1"})
         self.assertEqual(len(f.calls), n + 1)          # the redirect wasn't followed
+
+    def test_hostile_replies(self):
+        f = FakePlugHTTP()
+        self.addCleanup(f.close)
+        rd = lambda cfg: P.read_plug(dict(cfg, host="127.0.0.1"), http_port=f.port, check=same)  # noqa: E731
+        for body in ([1, 2], "EVIL-MARKER", {"apower": "EVIL-MARKER"}, {"apower": float("inf")},
+                     {"meters": "EVIL-MARKER"}, {"StatusSNS": ["EVIL-MARKER"]}):
+            f.override = body
+            for t in ("shelly1", "shelly2", "tasmota"):
+                with self.assertRaises(P.PlugError) as e:
+                    rd({"type": t})
+                self.assertNotIn("EVIL", str(e.exception))
+        f.override = None
+        for bad in ([1], "x", {"emeter": []}, {"emeter": {"get_realtime": "EVIL"}},
+                    {"emeter": {"get_realtime": {"err_code": "EVIL-MARKER"}}}):
+            with self.assertRaises(P.PlugError) as e:
+                P.parse_kasa(bad)
+            self.assertNotIn("EVIL", str(e.exception))
+
+    def test_a_trickling_plug_is_cut_off(self):
+        import time as _t
+        srv = socket.socket()
+        srv.bind(("127.0.0.1", 0))
+        srv.listen(4)
+        self.addCleanup(srv.close)
+        stop = threading.Event()
+        self.addCleanup(stop.set)
+
+        start = _t.monotonic()
+
+        def drip():
+            while not stop.is_set():
+                try:
+                    c, _ = srv.accept()
+                except OSError:
+                    return
+                def one(c=c):
+                    with c:
+                        try:
+                            c.recv(4096)
+                            for b in b"HTTP/1.1 200 OK\r\nX-Slow: " + b"a" * 10000:
+                                if stop.is_set() or _t.monotonic() - start > 12:
+                                    return
+                                c.send(bytes([b]))
+                                _t.sleep(0.2)
+                        except OSError:
+                            pass
+                threading.Thread(target=one, daemon=True).start()
+        threading.Thread(target=drip, daemon=True).start()
+        port = srv.getsockname()[1]
+        for t in ("shelly2", "kasa"):
+            t0 = _t.monotonic()
+            with self.assertRaises(P.PlugError):
+                P.read_plug({"type": t, "host": "127.0.0.1"}, timeout=1.5, http_port=port, kasa_port=port, check=same)
+            self.assertLess(_t.monotonic() - t0, 3.0, t)
 
     def test_kasa_plug(self):
         k = FakeKasa({"emeter": {"get_realtime": {"voltage_mv": 121000, "power_mw": 95500, "err_code": 0}}})
@@ -693,8 +779,8 @@ class TestCLI(unittest.TestCase):
         r = self.cli("set-schedule", path)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("time-of-use, 2 season(s)", r.stdout)
-        saved = os.path.join(self.pre, "var/lib/ollama1-admin/tariff.json")
-        self.assertEqual(oct(os.stat(saved).st_mode & 0o777), "0o600")
+        saved = os.path.join(self.pre, "var/lib/ollama1/tariff.json")
+        self.assertEqual(oct(os.stat(saved).st_mode & 0o777), "0o640")
         r = self.cli("export-schedule")
         self.assertEqual(json.loads(r.stdout)["seasons"], good["seasons"])
         # a bad file changes nothing
@@ -736,22 +822,38 @@ class TestNoUtilityInRepo(unittest.TestCase):
     """The kit ships generic shapes only: no utility's name or schedule."""
 
     def test_no_utility_names(self):
-        # split, so this list doesn't match itself
-        names = ["du" + "ke", "con " + "ed", "pg" + "&e", "sdg" + "&e", "x" + "cel en", "domin" + "ion en",
-                 "georgia " + "power", "fp" + "l ", "enter" + "gy", "amer" + "en", "southern california " + "edison"]
+        import re
+        # split, so this list doesn't match itself; whole words only
+        names = ["du" + "ke", "con " + "ed", "con" + "ed", "con " + "edison", "ps" + "eg", "ps" + "e&g",
+                 "national " + "grid", "ever" + "source", "ny" + "seg", "central " + "hudson", "fp" + "l",
+                 "domin" + "ion", "pg" + "&e", "sdg" + "&e", "x" + "cel", "georgia " + "power",
+                 "enter" + "gy", "amer" + "en", "southern california " + "edison", "so" + "cal edison",
+                 "com" + "ed", "pep" + "co", "bg" + "&e", "ap" + "pco", "appalachian " + "power",
+                 "tampa " + "electric", "orange and " + "rockland", "o&" + "r", "rg" + "&e", "jcp" + "&l",
+                 "pp" + "l electric", "pec" + "o", "ever" + "gy", "we " + "energies", "consumers " + "energy",
+                 "dte " + "energy", "l" + "ipa", "pse" + "g long island", "ai" + "g&e", "salt river " + "project"]
+        pat = re.compile(r"(?<![a-z0-9])(" + "|".join(re.escape(n) for n in names) + r")(?![a-z0-9])")
         hits = []
-        for root in (U.KIT, os.path.join(os.path.dirname(U.KIT), "docs")):
+        repo = os.path.dirname(U.KIT)
+        paths = [os.path.join(repo, "NOTES.md")]
+        for root in (U.KIT, os.path.join(repo, "docs")):
             for dp, _, files in os.walk(root):
-                if "__pycache__" in dp:
-                    continue
-                for fn in files:
-                    try:
-                        with open(os.path.join(dp, fn), encoding="utf-8") as fh:
-                            text = fh.read().lower()
-                    except (OSError, UnicodeDecodeError):
-                        continue
-                    hits += ["%s: %s" % (fn, n) for n in names if n in text]
+                if "__pycache__" not in dp:
+                    paths += [os.path.join(dp, fn) for fn in files]
+        for path in paths:
+            try:
+                with open(path, encoding="utf-8") as fh:
+                    text = fh.read().lower()
+            except (OSError, UnicodeDecodeError):
+                continue
+            hits += ["%s: %s" % (os.path.basename(path), m.group(1)) for m in pat.finditer(text)]
         self.assertEqual(hits, [])
+
+    def test_the_scan_would_notice(self):
+        import re
+        pat = re.compile(r"(?<![a-z0-9])(" + "du" + "ke|national " + "grid)(?![a-z0-9])")
+        self.assertTrue(pat.search(("Our " + "Du" + "ke Energy bill").lower()))
+        self.assertFalse(pat.search("the " + "du" + "kes"))            # whole words only
 
 
 if __name__ == "__main__":

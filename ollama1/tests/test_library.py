@@ -45,6 +45,7 @@ def manifest_for(name, version="v1", size=1000):
 class FakeRegistry:
     def __init__(self):
         self.manifests = {}   # (repo, tag) -> bytes
+        self.redirect = None  # (from path, to path)
         self.calls = []
         reg = self
 
@@ -54,6 +55,12 @@ class FakeRegistry:
 
             def do_GET(self):
                 reg.calls.append(("GET", self.path, self.headers.get("Accept")))
+                if reg.redirect and self.path == reg.redirect[0]:
+                    self.send_response(302)
+                    self.send_header("Location", reg.url + reg.redirect[1])
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
                 parts = self.path.split("/manifests/")
                 key = (parts[0][len("/v2/"):], parts[1]) if len(parts) == 2 else None
                 raw = reg.manifests.get(key)
@@ -118,11 +125,13 @@ class Base(unittest.TestCase):
         self.stub.pull_fail = 0
         self.reg.manifests.clear()
         self.reg.calls.clear()
+        self.reg.redirect = None
         self.dir = tempfile.mkdtemp(prefix="o1lib-")
         self.addCleanup(shutil.rmtree, self.dir, True)
         self.allow = os.path.join(self.dir, "models.allow")
         blobs = os.path.join(Paths.models, "blobs")
         shutil.rmtree(blobs, True)
+        shutil.rmtree(os.path.join(Paths.models, "manifests"), True)
         os.makedirs(blobs)
 
     def write_allow(self, text):
@@ -130,9 +139,15 @@ class Base(unittest.TestCase):
             f.write(text)
 
     def install(self, name, version="v1", size=1000, blobs=True):
-        """An installed model whose digest matches that version's manifest."""
+        """An installed model whose digest matches that version's manifest
+        (which is written where Ollama keeps it)."""
         raw = manifest_for(name, version, size)
         self.stub.models[name] = {"size": size + 110, "info": llama_info(), "digest": hashlib.sha256(raw).hexdigest()}
+        host, repo, tag = L.split_name(name)
+        mdir = os.path.join(Paths.models, "manifests", host, repo)
+        os.makedirs(mdir, exist_ok=True)
+        with open(os.path.join(mdir, tag), "wb") as f:
+            f.write(raw)
         if blobs:
             for d in L.layers(json.loads(raw)):
                 open(os.path.join(Paths.models, "blobs", d.replace(":", "-")), "w").close()
@@ -167,9 +182,11 @@ class TestPlan(Base):
         # the new layer only: the license and config blobs are already here
         self.assertEqual([x["bytes"] for x in p["update"]], [5000])
         self.assertEqual([x["bytes"] for x in p["download"]], [5000 + 100])
-        self.assertEqual(p["totals"]["freed_bytes"], 2 * 1110)
+        # freed: each removed model's own weights and config; the license
+        # layer is shared with kept models, so it frees nothing
+        self.assertEqual(p["totals"]["freed_bytes"], 2 * 1100)
         self.assertEqual(p["totals"]["free_after"],
-                         p["totals"]["free_now"] + 2220 - 5000 - 5100)
+                         p["totals"]["free_now"] + 2200 - 5000 - 5100)
         self.assertTrue(p["enough_space"])
 
     def test_cloud_stubs_never_removed(self):
@@ -241,6 +258,96 @@ class TestPlan(Base):
         self.assertNotEqual(p1["id"], self.plan()["id"])
 
 
+class TestAllowListTypos(Base):
+    """A line the allow-list can't read never costs a model: whatever it
+    names stays, and while any line is bad nothing is removed at all."""
+
+    def test_model_on_a_bad_line_is_kept(self):
+        self.write_allow("keep:1b\ngpt-oss:120b  RAM\n")
+        self.reg.publish("keep:1b")
+        self.install("keep:1b")
+        self.install("gpt-oss:120b", size=65000)
+        self.install("extra:3b")
+        p = self.plan()
+        self.assertEqual(p["remove"], [])
+        self.assertEqual([x["name"] for x in p["removals_blocked"]], ["extra:3b"])
+        self.assertEqual(len(p["allow_errors"]), 1)
+        self.run_plan(p)
+        self.assertEqual(self.deleted(), [])
+        self.assertIn("gpt-oss:120b", self.stub.models)
+
+    def test_named_on_a_bad_line_even_once_fixed_elsewhere(self):
+        # the bad line is the only mention; the rest of the list is fine after a fix
+        self.write_allow("keep:1b\n")
+        self.reg.publish("keep:1b")
+        self.install("keep:1b")
+        self.install("gpt-oss:120b")
+        p = self.plan()
+        self.assertEqual([x["name"] for x in p["remove"]], ["gpt-oss:120b"])
+        # a typo'd line appears before the sync runs: the removal is skipped
+        self.write_allow("keep:1b\ngpt-oss:120b turbo\n")
+        s = self.run_plan(p)
+        self.assertEqual(self.deleted(), [])
+        self.assertEqual(s["skipped"], ["gpt-oss:120b"])
+        # an unrelated bad line is enough: no removals while the list is broken
+        self.write_allow("keep:1b\nother:1b turbo\n")
+        s = self.run_plan(p)
+        self.assertEqual(self.deleted(), [])
+        self.assertEqual(s["skipped"], ["gpt-oss:120b"])
+
+    def test_case_doesnt_matter(self):
+        self.write_allow("GPT-OSS:120B\n")
+        self.install("gpt-oss:120b")
+        p = L.plan(base=self.base, allow_path=self.allow, manifest_fn=lambda n: (None, None))
+        self.assertEqual(p["remove"], [])
+
+    def test_no_disk_figure_is_a_refusal(self):
+        self.write_allow("a:1b\n")
+        self.reg.publish("a:1b")
+        real = L.disk_free
+        L.disk_free = lambda: None
+        try:
+            p = self.plan()
+        finally:
+            L.disk_free = real
+        self.assertFalse(p["enough_space"])
+
+
+class TestRegistryHygiene(Base):
+    def test_bad_manifests_are_unknown(self):
+        self.write_allow("a:1b\n")
+        good = json.loads(manifest_for("a:1b"))
+        bad_ones = []
+        m = json.loads(json.dumps(good))
+        m["layers"][0]["digest"] = "sha256:../../../../etc/passwd"
+        bad_ones.append(m)
+        m = json.loads(json.dumps(good))
+        m["layers"][0]["size"] = -1
+        bad_ones.append(m)
+        m = json.loads(json.dumps(good))
+        m["layers"] = m["layers"] * 200
+        bad_ones.append(m)
+        m = json.loads(json.dumps(good))
+        m["config"]["digest"] = "md5:abc"
+        bad_ones.append(m)
+        bad_ones.append(["not", "a", "manifest"])
+        for bad in bad_ones:
+            self.reg.manifests[("library/a", "1b")] = json.dumps(bad).encode()
+            self.assertEqual(L.remote_manifest("a:1b"), (None, None), bad if isinstance(bad, list) else "")
+            p = self.plan()
+            self.assertEqual([x["name"] for x in p["unknown"]], ["a:1b"])
+            self.assertEqual(p["download"], [])
+        self.reg.manifests[("library/a", "1b")] = b" " * (L.MAX_MANIFEST + 10) + json.dumps(good).encode()
+        self.assertEqual(L.remote_manifest("a:1b"), (None, None))
+        self.assertFalse(L.have_blob("sha256:../../x"))
+
+    def test_no_redirects(self):
+        self.reg.publish("a:1b")
+        self.reg.redirect = ("/v2/library/b/manifests/1b", "/v2/library/a/manifests/1b")
+        self.assertEqual(L.remote_manifest("b:1b"), (None, None))
+        self.assertEqual([c[1] for c in self.reg.calls], ["/v2/library/b/manifests/1b"])
+
+
 class TestExecute(Base):
     def test_does_exactly_the_preview(self):
         self.write_allow("keep:1b\nold:7b\nnew:4b\n")
@@ -269,7 +376,7 @@ class TestExecute(Base):
         and exactly the unlisted ones are gone."""
         rnd = random.Random(6333)
         pool = ["m%d:%s" % (i, t) for i in range(8) for t in ("1b", "latest")] + ["plain%d" % i for i in range(4)]
-        for case in range(60):
+        for case in range(80):
             self.setUp()
             installed = rnd.sample(pool, rnd.randint(0, 8))
             listed = rnd.sample(pool, rnd.randint(0, 8))
@@ -285,13 +392,16 @@ class TestExecute(Base):
             for n in full:
                 self.install(n, rnd.choice(["v1", "v2"]))
             valid = L.allowed_names(self.allow)
+            broken = bool(L.parse_allow_list(self.allow)[1])
             p = self.plan()
             self.run_plan(p)
             gone = self.deleted()
             for n in gone:
                 self.assertIn(n, full, case)
                 self.assertFalse(L.listed(n, valid), (case, n))
-            self.assertEqual(sorted(gone), sorted(n for n in full if not L.listed(n, valid)), case)
+                self.assertFalse(L.listed(n, listed), (case, n))       # not even on a bad line
+            want = [] if broken else [n for n in full if not L.listed(n, valid)]
+            self.assertEqual(sorted(gone), sorted(want), case)
             for n in full:
                 if L.listed(n, valid):
                     self.assertIn(n, self.stub.models, (case, n))
