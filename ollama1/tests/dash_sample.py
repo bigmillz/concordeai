@@ -78,6 +78,8 @@ def sample(now=None, pairing=False, marker=None):
                     "sleep": {"last_sleep": int(now) - 86400, "last_wake": int(now) - 80000,
                               "resume_check": {"ok": True, "detail": "Ollama and the GPU answered"}}},
         "pairing": {"id": "x", "code": "7K4M2QXD9FHT", "expires_at": now + 200} if pairing else None,
+        "power": {"watts": 312.4, "src": "plug", "kwh_24h": 3.54, "cost_24h": 0.61, "symbol": "$",
+                  "badge": "on-peak until 19:00", "price": 0.3},
         "series": series,
     }
     return st

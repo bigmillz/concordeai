@@ -458,6 +458,7 @@ ln -sfn "$LIBDIR/bin/ollama1-pair" /usr/local/sbin/ollama1-pair
 ln -sfn "$LIBDIR/bin/ollama1-cf-access" /usr/local/sbin/ollama1-cf-access
 ln -sfn "$LIBDIR/bin/ollama1-lan" /usr/local/sbin/ollama1-lan
 ln -sfn "$LIBDIR/bin/ollama1-models" /usr/local/sbin/ollama1-models
+ln -sfn "$LIBDIR/bin/ollama1-power" /usr/local/sbin/ollama1-power
 ln -sfn "$LIBDIR/bin/ollama1-dash" /usr/local/bin/ollama1-top
 ln -sfn /opt/ollama/current/bin/ollama /usr/local/bin/ollama
 install -m 0644 "$KIT"/systemd/* /etc/systemd/system/
@@ -697,6 +698,8 @@ ok "Ollama: weekly, $(systemctl show -P NextElapseUSecRealtime ollama1-update-ol
 # ---- 13. services ------------------------------------------------------------------------------
 step "Services"
 run systemctl enable --now ollama1-pair-commit.path ollama1-backup.timer
+run systemctl enable ollama1-power.service
+run systemctl restart ollama1-power.service
 run systemctl restart ollama1-nft.service
 run systemctl enable ollama1-gateway.service ollama1-admin.service ollama1-ttyd.service
 run systemctl restart ollama1-gateway.service ollama1-admin.service ollama1-ttyd.service
@@ -705,7 +708,7 @@ run systemctl enable ollama1-dash.service
 systemctl stop getty@tty1.service >/dev/null 2>&1 || true
 run systemctl restart ollama1-dash.service
 sleep 2
-for s in ollama ollama1-gateway ollama1-admin ollama1-ttyd ollama1-dash; do
+for s in ollama ollama1-gateway ollama1-admin ollama1-ttyd ollama1-dash ollama1-power; do
   if systemctl is-active --quiet "$s"; then ok "$s running"; else note "$s is not running: journalctl -u $s"; later "$s did not start: journalctl -u $s"; fi
 done
 if id -nG o1gw | tr ' ' '\n' | grep -qx o1pair; then

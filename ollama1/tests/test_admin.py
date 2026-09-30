@@ -294,6 +294,82 @@ class TestLibraryActions(unittest.TestCase):
         self.assertIn(b"removes installed models that aren't on the allow-list (nothing else)", page)
 
 
+def post_path(path, raw, tok="auto", origin=ORIGIN, ctype="application/json"):
+    h = {"Content-Type": ctype, "Cf-Access-Jwt-Assertion": admin_jwt()}
+    if origin:
+        h["Origin"] = origin
+    if tok == "auto":
+        tok = csrf()
+    if tok:
+        h["X-O1-CSRF"] = tok
+    return U.request(A["port"], "POST", path, raw, h, host=ADMIN_HOST)
+
+
+class TestPowerPanel(unittest.TestCase):
+    """Power and cost: the numbers, and saving prices (CSRF, strict checks)."""
+
+    def setUp(self):
+        import o1power
+        self.P = o1power
+        self.addCleanup(lambda: os.path.exists(o1power.tariff_file()) and os.unlink(o1power.tariff_file()))
+        A["panel"].power_cache = (0, None, None)
+
+    def good(self):
+        return {"currency": "USD", "mode": "tou", "flat_rate": None, "timezone": "America/New_York",
+                "tiers": {"on": 0.3, "off": 0.1, "discount": 0.05, "mid": None}, "weekends_off_peak": True,
+                "holidays": {"enabled": True, "names": ["thanksgiving"], "observed": True, "extra": []},
+                "seasons": [{"name": "All year", "from": "01-01", "to": "12-31",
+                             "windows": [{"tier": "on", "days": "weekdays", "start": "16:00", "end": "21:00"},
+                                         {"tier": "discount", "days": "every day", "start": "01:00", "end": "05:00"}]}]}
+
+    def test_power_summary(self):
+        st, data, _ = get("/api/power")
+        self.assertEqual(st, 200)
+        s = json.loads(data)
+        self.assertEqual(set(s["windows"]), {"1h", "1d", "1w", "1m"})
+        self.assertEqual(s["schedule"]["mode"], "flat")
+        self.assertIn("weekdays-4pm-9pm", s["options"]["presets"])
+        self.assertIn("thanksgiving", s["options"]["holiday_names"])
+        st, page, _ = get("/")
+        for want in (b"Power and cost", b"typical, verify against your bill", b"Import JSON", b"Export JSON"):
+            self.assertIn(want, page)
+
+    def test_save_needs_csrf_and_same_origin(self):
+        raw = json.dumps(self.good()).encode()
+        self.assertEqual(post_path("/api/power/schedule", raw, tok=None)[0], 403)
+        self.assertEqual(post_path("/api/power/schedule", raw, tok="0" * 64)[0], 403)
+        self.assertEqual(post_path("/api/power/schedule", raw, origin="https://evil.example")[0], 403)
+        self.assertEqual(post_path("/api/power/schedule", raw, ctype="text/plain")[0], 403)
+        self.assertFalse(os.path.exists(self.P.tariff_file()))
+        st, data, _ = post_path("/api/power/schedule", raw)
+        self.assertEqual(st, 200, data)
+        self.assertEqual(oct(os.stat(self.P.tariff_file()).st_mode & 0o777), "0o600")
+        s = json.loads(get("/api/power")[1])
+        self.assertEqual(s["schedule"]["mode"], "tou")
+        self.assertIn(s["badge"]["tier"], ("on", "off", "discount"))
+        st, data, _ = get("/api/power/schedule.json")
+        self.assertEqual(json.loads(data)["tiers"]["on"], 0.3)
+
+    def test_bad_schedule_refused_with_reasons(self):
+        bad = self.good()
+        bad["seasons"][0]["windows"][0]["end"] = "16:00"
+        bad["tiers"]["discount"] = None
+        st, data, _ = post_path("/api/power/schedule", json.dumps(bad).encode())
+        self.assertEqual(st, 400)
+        errs = json.loads(data)["errors"]
+        self.assertTrue(any("same time" in e for e in errs))
+        self.assertTrue(any("discount price" in e for e in errs))
+        self.assertFalse(os.path.exists(self.P.tariff_file()))
+        self.assertEqual(post_path("/api/power/schedule", b"[1,2]")[0], 400)
+        self.assertEqual(post_path("/api/power/schedule", b"not json")[0], 400)
+
+    def test_size_limits(self):
+        big = json.dumps(dict(self.good(), note="x" * 70000)).encode()
+        self.assertEqual(post_path("/api/power/schedule", big)[0], 413)
+        self.assertEqual(post_path("/api/action", json.dumps({"action": "restart", "pad": "x" * 5000}).encode())[0], 413)
+        self.assertEqual(post_path("/api/elsewhere", b"{}")[0], 404)
+
+
 class FakeTtyd:
     """ttyd on a UNIX socket, sending its own (weaker) framing headers."""
 

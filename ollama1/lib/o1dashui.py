@@ -477,6 +477,20 @@ def panel_health(c, x, y, w, h, st, now):
              "ok" if ((up.get("sleep") or {}).get("resume_check") or {}).get("ok") else "bad")]
            if (up.get("sleep") or {}).get("resume_check") else []),
     ]
+    pw = st.get("power")
+    if pw:
+        badge = pw.get("badge") or ""
+        line = [("power ", "dim"),
+                ("%s W" % num(pw.get("watts"), "%.0f") if pw.get("watts") is not None else "no reading",
+                 "value" if pw.get("watts") is not None else "warn"),
+                (" (plug)" if pw.get("src") == "plug" else " (estimate)" if pw.get("src") else "", "dim"),
+                ("  24 h ", "dim"), ("%s kWh" % num(pw.get("kwh_24h"), "%.2f"), "value")]
+        if pw.get("cost_24h") is not None:
+            line.append(("  %s%.2f" % (pw.get("symbol") or "$", pw["cost_24h"]), "value"))
+        if badge:
+            line.append(("  " + badge, "bad" if badge.startswith("on-peak") else
+                         "warn" if badge.startswith("mid-peak") else "ok"))
+        lines.insert(0, line)
     _lines(c, ix, iy, iw, lines[: max(0, ih)])
 
 

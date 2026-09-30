@@ -86,6 +86,10 @@ DEFAULTS = {
     "queue_wait_s": 300,
     "max_body_mib": 32,              # read only after the headers authenticate
     "max_inflight": 16,              # requests being handled at once
+    # power estimate (used when no smart plug answers): (GPU + CPU + baseline) / PSU efficiency
+    "power_baseline_w": 40,          # motherboard, RAM, disks, fans
+    "power_psu_efficiency": 0.9,
+    "power_sleep_w": 3,              # counted while the desktop sleeps
     # Tests only: a local fake JWKS. Refused unless allow_insecure_certs_url.
     "certs_url": "",
     "allow_insecure_certs_url": False,

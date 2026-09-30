@@ -1,0 +1,176 @@
+#!/usr/bin/python3
+"""ollama1-power: what the desktop draws, and what the electricity costs.
+
+  sudo ollama1-power status                  live watts, the last hour/day/week/month
+  sudo ollama1-power set-plug TYPE IP [--user NAME]
+                                             use a smart plug on the LAN (asks for
+                                             the password if --user); TYPE is one of
+                                             shelly1, shelly2, kasa, tasmota
+  sudo ollama1-power set-plug none           back to the estimate
+  sudo ollama1-power test-plug               one reading from the plug
+  sudo ollama1-power set-schedule FILE.json  prices: flat or time-of-use (checked first)
+  sudo ollama1-power export-schedule [--preset NAME] [FILE.json]
+                                             the prices in use (or a preset's shape
+                                             with them), as JSON
+  ollama1-power presets                      generic time-of-use shapes to start from
+  ollama1-power run                          the sampler (ollama1-power.service)
+
+The plug's login is kept in /etc/ollama1/power-plug.json (root only). The
+schedule is also editable in the admin panel, which saves the same file.
+"""
+import getpass
+import json
+import os
+import sys
+import time
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
+
+import o1power as P  # noqa: E402
+import o1tariff as T  # noqa: E402
+from o1common import load_config, read_json, write_json_atomic  # noqa: E402
+
+USAGE = __doc__.split("\n\n")[1]
+
+
+def need_root():
+    if os.geteuid() != 0 and not os.environ.get("OLLAMA1_PREFIX"):
+        sys.exit("run it with sudo")
+
+
+def money(v, sym):
+    return "-" if v is None else "%s%.2f" % (sym, v)
+
+
+def cmd_status(args):
+    need_root()                     # the schedule is readable by root and the panel only
+    s = P.summary()
+    live = s.get("live")
+    if live:
+        print("Now:  %.0f W (%s)" % (live["watts"], "smart plug" if live["src"] == "plug" else "estimate"))
+        if live.get("plug", {}).get("configured") and not live["plug"].get("ok"):
+            print("      the plug isn't answering: %s" % live["plug"].get("error"))
+    else:
+        print("Now:  no reading (is ollama1-power.service running?)")
+    b = s["badge"]
+    print("Rate: %s%s" % (b["text"], "" if b["price"] is None else ", %s%.4f/kWh" % (s["symbol"], b["price"])))
+    if not s["priced"]:
+        print("      no price set: sudo ollama1-power set-schedule FILE.json, or the panel")
+    for k, label in (("1h", "Last hour"), ("1d", "Last 24 h"), ("1w", "Last 7 days"), ("1m", "Last 30 days")):
+        w = s["windows"][k]
+        extra = "  (%.1f h unknown)" % w["unknown_h"] if w["unknown_h"] >= 0.1 else ""
+        print("%-13s %8.3f kWh  %9s%s" % (label, w["kwh"], money(w["cost"], s["symbol"]), extra))
+    p = s["projection"]
+    if p:
+        print("Next 30 days  %8.1f kWh  %9s  (at the average of the last %.1f days' hours)"
+              % (p["kwh"], money(p["cost"], s["symbol"]), p["basis_days"]))
+    return 0
+
+
+def cmd_set_plug(args):
+    need_root()
+    if args == ["none"]:
+        try:
+            os.unlink(P.plug_file())
+        except FileNotFoundError:
+            pass
+        print("No plug: the estimate is used. Restart: sudo systemctl restart ollama1-power")
+        return 0
+    if len(args) not in (2, 4) or (len(args) == 4 and args[2] != "--user"):
+        sys.exit("usage: ollama1-power set-plug shelly1|shelly2|kasa|tasmota IP [--user NAME]")
+    cfg = {"type": args[0], "host": args[1]}
+    if len(args) == 4:
+        cfg["user"] = args[3]
+        cfg["password"] = getpass.getpass("Password for %s (not shown): " % args[3])
+    try:
+        cfg = P.validate_plug(cfg)
+        w = P.read_plug(cfg)
+    except P.PlugError as e:
+        sys.exit("Not saved: %s" % e)
+    os.makedirs(os.path.dirname(P.plug_file()), exist_ok=True)
+    write_json_atomic(P.plug_file(), cfg, mode=0o600)
+    print("Saved. The plug reads %.1f W now. Restart the sampler: sudo systemctl restart ollama1-power" % w)
+    return 0
+
+
+def cmd_test_plug(args):
+    need_root()
+    cfg = read_json(P.plug_file())
+    if not isinstance(cfg, dict):
+        sys.exit("no plug set (sudo ollama1-power set-plug ...)")
+    try:
+        print("%.1f W" % P.read_plug(P.validate_plug(cfg)))
+    except P.PlugError as e:
+        sys.exit(str(e))
+    return 0
+
+
+def cmd_set_schedule(args):
+    need_root()
+    if len(args) != 1:
+        sys.exit("usage: ollama1-power set-schedule FILE.json")
+    try:
+        with open(args[0], encoding="utf-8") as f:
+            s = json.load(f)
+    except (OSError, ValueError) as e:
+        sys.exit("can't read %s: %s" % (args[0], e))
+    clean, errs = T.validate(s)
+    if errs:
+        print("Not saved. Fix these first:")
+        for e in errs:
+            print("  - " + e)
+        return 1
+    P.save_schedule(clean, owner="o1admin")
+    t = T.Tariff(clean)
+    print("Saved (%s)." % ("flat rate" if clean["mode"] == "flat" else "time-of-use, %d season(s)" % len(clean["seasons"])))
+    print("Now: %s" % t.badge(time.time())["text"])
+    return 0
+
+
+def cmd_export(args):
+    need_root()
+    s = P.load_schedule()
+    if args[:1] == ["--preset"]:
+        if len(args) < 2 or args[1] not in T.PRESETS:
+            sys.exit("presets: " + ", ".join(T.PRESETS))
+        s = T.preset(args[1], s)
+        args = args[2:]
+    text = json.dumps(s, indent=2) + "\n"
+    if args:
+        with open(args[0], "w", encoding="utf-8") as f:
+            f.write(text)
+        print("written to %s" % args[0])
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
+def cmd_presets(args):
+    for k, (label, a, b) in T.PRESETS.items():
+        print("%-18s %s (typical; verify against your bill)" % (k, label))
+    print("\nStart from one: sudo ollama1-power export-schedule --preset NAME prices.json,")
+    print("put in your prices, then: sudo ollama1-power set-schedule prices.json")
+    return 0
+
+
+def cmd_run(args):
+    need_root()
+    P.run(load_config())
+    return 0
+
+
+def main():
+    args = sys.argv[1:]
+    if not args or args[0] in ("-h", "--help", "help"):
+        print(USAGE)
+        return 0
+    cmds = {"status": cmd_status, "set-plug": cmd_set_plug, "test-plug": cmd_test_plug,
+            "set-schedule": cmd_set_schedule, "export-schedule": cmd_export, "presets": cmd_presets,
+            "run": cmd_run}
+    if args[0] not in cmds:
+        sys.exit(USAGE)
+    return cmds[args[0]](args[1:])
+
+
+if __name__ == "__main__":
+    sys.exit(main())

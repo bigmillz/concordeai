@@ -551,6 +551,120 @@ around a little from time to time.
   are still required, and traffic on the LAN is unencrypted. To change it:
   `sudo ollama1-lan on|off`, or use the panel.
 
+## Power and electricity cost
+
+The panel's **Power and cost** card shows what the desktop draws now (with
+an hour's chart), the energy and cost over the last hour, 24 hours, 7 days
+and 30 days, a 30-day projection, and the electricity cost per 1,000 tokens.
+The console dashboard's Health panel has a one-line version. A root
+sampler, `ollama1-power.service`, takes a reading every 10 seconds.
+
+**Where the watts come from.** A smart plug is best: it measures the
+whole desktop at the wall. Without one, the kit estimates.
+
+- **Smart plug**, on the home LAN only (its address must be a private IP,
+  and the sampler's unit can't reach anything else). The login, if the
+  plug has one, is kept in `/etc/ollama1/power-plug.json`, readable by root
+  only.
+
+  ```bash
+  sudo ollama1-power set-plug shelly2 192.168.86.40               # Shelly Plus / Pro / Gen3
+  sudo ollama1-power set-plug shelly1 192.168.86.40 --user admin  # Shelly Gen1 (Plug S), asks the password
+  sudo ollama1-power set-plug kasa 192.168.86.41                  # TP-Link Kasa HS110 / KP115
+  sudo ollama1-power set-plug tasmota 192.168.86.42               # Tasmota
+  sudo ollama1-power set-plug none                                 # back to the estimate
+  ```
+
+  It reads the plug once before saving. Newer Kasa firmware encrypts its
+  local protocol differently and isn't supported. If the plug stops
+  answering, the estimate takes over and the panel says why.
+- **The estimate**: GPU power (amdgpu's own reading) plus CPU package power
+  (the RAPL energy counter; its wraparound is handled) plus 40 W for
+  everything else, divided by 90% power-supply efficiency. It is always
+  labelled "estimate". `power_baseline_w` and `power_psu_efficiency` in
+  config.json change the 40 W and the 90%.
+- **Asleep** counts as 3 W, for the time between the sleep and wake stamps.
+- **Any other gap is unknown**, never zero: the table shows the unknown
+  hours, and the totals leave them out.
+
+**What's kept**: energy per minute in `/var/lib/ollama1/energy/`
+(`m-YYYY-MM-DD.csv`, by UTC day: the minute, Wh, the source, the seconds
+measured, and the tokens generated in it), for 400 days. After that, each
+day's totals go to `days.csv`. Nothing about a request is kept but its
+token count.
+
+**Prices.** The default is a flat rate with no price set, so there are no
+costs until you set one. Set prices in the panel (**Prices**), or from a
+file:
+
+```bash
+sudo ollama1-power set-schedule prices.json                     # checked first; nothing changes on an error
+sudo ollama1-power export-schedule prices.json                  # the prices in use
+sudo ollama1-power export-schedule --preset weekdays-4pm-9pm prices.json
+sudo ollama1-power status
+```
+
+The panel's **Export JSON** and **Import JSON** use the same file. A
+time-of-use schedule looks like this (made-up prices and times; take
+yours from your bill):
+
+```json
+{
+  "currency": "USD",
+  "mode": "tou",
+  "flat_rate": null,
+  "timezone": "America/New_York",
+  "tiers": {"on": 0.30, "mid": null, "off": 0.11, "discount": 0.07},
+  "weekends_off_peak": true,
+  "holidays": {"enabled": true, "observed": true,
+               "names": ["new_year", "memorial", "independence", "labor", "thanksgiving", "christmas"],
+               "extra": ["2026-12-24"]},
+  "seasons": [
+    {"name": "Summer", "from": "06-01", "to": "09-30",
+     "windows": [{"tier": "on", "days": "weekdays", "start": "16:00", "end": "21:00"},
+                 {"tier": "discount", "days": "every day", "start": "00:00", "end": "05:00"}]},
+    {"name": "Winter", "from": "10-01", "to": "05-31",
+     "windows": [{"tier": "on", "days": "weekdays", "start": "07:00", "end": "10:00"},
+                 {"tier": "on", "days": "weekdays", "start": "17:00", "end": "20:00"},
+                 {"tier": "discount", "days": "every day", "start": "00:00", "end": "05:00"}]}
+  ]
+}
+```
+
+- `mode` is `"flat"` (then `flat_rate` is the price per kWh) or `"tou"`.
+- Tiers: `on`, `mid`, `off` and `discount`, each a price per kWh, or
+  `null` when unused. Time-of-use needs a price for off-peak and for every
+  tier a window uses.
+- `days`: `"weekdays"`, `"weekends"`, `"every day"`, or a list such as
+  `["mon", "wed", "fri"]`. `start` and `end` are `HH:MM` in the schedule's
+  time zone, daylight saving included. `"24:00"` means midnight.
+- A window that ends at or before its start runs past midnight. It belongs
+  to the day, and the season, it starts on.
+- **Where windows overlap, the most specific wins**: the one on fewer days,
+  then the shorter one. Time no window covers is off-peak.
+- `weekends_off_peak`: on Saturdays and Sundays only off-peak and discount
+  windows apply, so a weekend discount still counts.
+- Holidays count as weekends. `names` picks from the US federal holidays
+  (`new_year`, `mlk`, `presidents`, `memorial`, `juneteenth`,
+  `independence`, `labor`, `columbus`, `veterans`, `thanksgiving`,
+  `christmas`), plus `day_after_thanksgiving`. `observed` moves one that
+  falls on a Saturday to Friday, and one on a Sunday to Monday. `extra`
+  adds dates.
+- Seasons use `MM-DD` dates, may wrap the new year, and must not overlap.
+  A day in no season is off-peak all day.
+- The panel's presets ("4-9 pm weekdays", "2-7 pm weekdays", "8 am-8 pm
+  weekdays") are generic shapes, not any utility's schedule. They are
+  typical: verify against your bill.
+
+**How the money is worked out.** Each minute's energy is priced at that
+minute's tier, so a window that starts at 19:00 splits the costs at 19:00
+exactly. The table splits kWh and cost by tier, and the badge says what
+applies now ("on-peak until 21:00"). The 30-day projection takes the
+average power in each hour of the week over the last 28 days, and prices
+each future minute at its tier. Cost per 1,000 tokens is all the
+electricity over the last 30 days divided by the tokens generated then, so
+idle time is included.
+
 ## The rules, and where they're enforced
 
 | Rule | Where |

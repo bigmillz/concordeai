@@ -13,6 +13,7 @@ import urllib.request
 from collections import deque
 
 import o1stats
+from o1common import Paths, read_json
 from o1stats import PROC, SYS
 
 HISTORY = 3600
@@ -200,6 +201,7 @@ class Sampler:
             "tunnel": self._slow("tunnel", 10, self._tunnel) or {},
             "updates": self._slow("updates", 30, o1stats.updates) or {},
             "pairing": o1stats.pairing_window(),
+            "power": self._slow("power", 5, power_state),
         }
         tot = mem.get("total") or 0
         vals = {
@@ -217,6 +219,19 @@ class Sampler:
             self.series[k].append(v)
         st["series"] = {k: list(v) for k, v in self.series.items()}
         return st
+
+
+def power_state():
+    """The power sampler's live watts and its once-a-minute summary (kWh,
+    cost and the price tier now). Counts only."""
+    live = read_json(os.path.join(Paths.run, "power", "now.json")) or {}
+    summ = read_json(os.path.join(Paths.run, "power", "summary.json")) or {}
+    if not live and not summ:
+        return None
+    fresh = time.time() - (live.get("t") or 0) < 60
+    return {"watts": live.get("watts") if fresh else None, "src": live.get("src") if fresh else None,
+            "kwh_24h": summ.get("kwh_24h"), "cost_24h": summ.get("cost_24h"), "symbol": summ.get("symbol", "$"),
+            "badge": summ.get("badge"), "price": summ.get("price")}
 
 
 def font_state(path="/run/ollama1/dash-font.json"):

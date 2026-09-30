@@ -1,0 +1,42 @@
+# Power and electricity cost: reads a smart plug on the LAN (or estimates
+# from GPU + CPU power) every 10 s and keeps energy per minute. Root only
+# because the CPU's RAPL energy counter is root-only; it may reach the LAN
+# (the plug) and nothing else.
+[Unit]
+Description=ollama1 power sampler (smart plug or estimate)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-power run
+Environment=PYTHONDONTWRITEBYTECODE=1
+Restart=always
+RestartSec=5
+LimitCORE=0
+Nice=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/ollama1/energy /run/ollama1/power
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE CAP_CHOWN CAP_FOWNER
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+UMask=0027
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 169.254.0.0/16 fc00::/7 fe80::/10
+
+[Install]
+WantedBy=multi-user.target

@@ -529,6 +529,44 @@ provider comes later and follows `ollama1/PROTOCOL.md`. How to run it is in
     `/run/ollama1/library/sync.json`.
   - One sync at a time (a lock), and sleep is refused while one runs, from
     the panel or the CLI.
+- **Power and electricity cost** (`ollama1-power.service`, `sudo ollama1-power`,
+  the panel's **Power and cost** card, a line on the dashboard).
+  - Watts come from a smart plug on the LAN if there is one: Shelly Gen1
+    `/status`, Shelly Gen2+ `/rpc/Switch.GetStatus` (digest login), Kasa's
+    local protocol, or Tasmota `Status 8`. The plug must have a private IP.
+    Redirects aren't followed, the unit may reach only private ranges
+    (`IPAddressDeny=any`), and the login sits in `/etc/ollama1/power-plug.json`
+    (0600).
+  - Otherwise an estimate, always labelled as one: (amdgpu power + RAPL CPU
+    package power, wraparound handled, + 40 W) / 90%.
+  - Sleep counts 3 W from the sleep/wake stamps. Every other gap is unknown,
+    shown as unknown hours and never counted as zero.
+  - Energy is stored per minute (Wh, source, seconds measured, tokens) in
+    `/var/lib/ollama1/energy/` for 400 days, then as daily totals.
+    Intervals are split at minute boundaries.
+  - Prices: flat, or time-of-use tiers (on / mid / off / discount) by season
+    (date ranges, may wrap the year), with several windows each. A window
+    applies on weekdays, weekends, every day or chosen days, and may run past
+    midnight, belonging to its start day. The most specific window wins
+    (fewer days, then shorter); uncovered time is off-peak. Weekends allow
+    only off-peak and discount windows. US federal holidays (plus the day
+    after Thanksgiving) are computed with observed dates, and the list is
+    editable, with extra dates allowed. Everything is in the schedule's time
+    zone with DST: default America/New_York.
+  - Each minute is priced at its own tier. The panel shows 1 h / 24 h / 7 d
+    / 30 d kWh and cost split by tier, a badge ("on-peak until 21:00"), a
+    30-day projection from the per-hour-of-week average, and cost per 1,000
+    tokens.
+  - The repo's default is a flat rate with no price. The only presets are
+    generic weekday on-peak windows (4-9 pm, 2-7 pm, 8 am-8 pm), marked
+    "typical, verify against your bill". No utility's schedule or prices
+    are in the repo, and a test checks for utility names.
+  - The schedule lives in `/var/lib/ollama1-admin/tariff.json` (0600), not
+    config.json: the panel runs as o1admin and must be able to save it, and
+    it isn't secret. It is edited in the panel (a tab per season, rows of
+    windows; saved with CSRF and checked strictly server-side), imported and
+    exported as JSON, or set with `sudo ollama1-power set-schedule
+    FILE.json`.
 - Tested on the Mac: 199 unit tests (incl. shellcheck, the polkit rule in
   node, the setup disk steps against fake mdadm/blkid/lsblk, the guide's
   file and config references). All 75 mutants are caught
