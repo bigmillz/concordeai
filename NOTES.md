@@ -9,6 +9,31 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b336 — the engine menu fits the window
+Patrick (2026-09-30), with a screenshot of the engine menu listing
+twelve of his server's models: "This box doesn't fit on the screen. Can
+we make it scroll or go outside of the main window?" It opened upward
+from the composer chip and ran off the top of the window, past the
+titlebar, because `openEngMenu` only chose above or below and never
+capped the height.
+
+A page can't draw outside its window (the menu is HTML in the webview),
+so it scrolls:
+- It opens below the chip when the whole list fits there. Otherwise it
+  opens on the side with more room, `max-height` is capped at that room
+  (8 px gap to the chip, 10 px from the window edge, never under 120 px),
+  and `#engmenu` scrolls (`overflow-y:auto`, `overscroll-behavior:contain`).
+- On open, the chosen row is scrolled into view. A repaint while it's
+  open (a server's model list refreshing) keeps the scroll position.
+- Scrolling closes a mode's hover bubble, which would otherwise float
+  away from its row. A window resize refits an open menu.
+- `left` is clamped to the window too.
+
+Checked on a copy of the served page at 1000×640 with twelve fake
+server models: the menu ran from 10 px to 8 px above the chip, scrolled
+to the last row (hit-tested with `elementFromPoint`), picked it, and on
+reopening showed it. Gauntlet pins in the servers page check.
+
 ## 6b334 — your own servers: the app side (part 1)
 Patrick (2026-09-29): let the app use a private Ollama server the person
 owns, starting with his desktop "ollama1" at

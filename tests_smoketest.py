@@ -17903,6 +17903,17 @@ def _svc_gpu(src):
                     and "#accel-chip.nvidia,.srv-chip.nvidia{--ac:#76b900}" in src
                     and ".srv-chip.intel{--ac:#3d8fe0}" in src and ".srv-chip.off{opacity:.45}" in src
                     and "  paintEngMenuServers();\n  paintSrvChips();\n}" in src)
+    # a long engine menu fits the window and scrolls (6b336): capped to the
+    # roomier side, kept on screen, its scroll kept across a repaint, its
+    # bubble closed on scroll, refitted on resize
+    out["menufit"] = ("overflow-y:auto;overscroll-behavior:contain}\n#engmenu[hidden]{display:none}" in src
+                      and "const below=roomB>=h||(roomA<h&&roomB>=roomA);" in src
+                      and 'if(h>room)engMenu.style.maxHeight=Math.floor(room)+"px";' in src
+                      and ":Math.round(Math.max(EDGE,r.top-GAP-hh))+\"px\";" in src
+                      and "const keep=engMenu.hidden?-1:engMenu.scrollTop;" in src
+                      and "if(keep>=0)engMenu.scrollTop=keep;" in src
+                      and 'engMenu.addEventListener("scroll",()=>hideTierPop(),{passive:true});' in src
+                      and 'addEventListener("resize",()=>{if(!engMenu.hidden){hideTierPop();openEngMenu();}});' in src)
     return all(out.values()), [out, o]
 
 

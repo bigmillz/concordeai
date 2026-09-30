@@ -29681,7 +29681,10 @@ body.gen #chip-model{color:var(--accent)}
   background:rgba(6,7,10,.92);border:1px solid rgba(255,255,255,.12);
   -webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px);
   border-radius:14px;padding:6px;
-  box-shadow:0 18px 50px -20px rgba(0,0,0,.9)}
+  box-shadow:0 18px 50px -20px rgba(0,0,0,.9);
+  /* a long list (a server's models) scrolls inside the window instead
+     of running off its top (6b336, per Patrick) */
+  overflow-y:auto;overscroll-behavior:contain}
 #engmenu[hidden]{display:none}
 .engrow{display:flex;align-items:center;gap:9px;padding:8px 10px;
   border-radius:9px;cursor:pointer;font-size:13px;color:var(--dim)}
@@ -31575,7 +31578,9 @@ const AGENT_META=JSON.parse('__AGENT_META__');
 const engMenu=document.createElement("div");
 engMenu.id="engmenu";engMenu.hidden=true;
 document.body.appendChild(engMenu);
+engMenu.addEventListener("scroll",()=>hideTierPop(),{passive:true});   // its bubble would float off its row
 function openEngMenu(){
+  const keep=engMenu.hidden?-1:engMenu.scrollTop;   // a repaint keeps the scroll
   engMenu.innerHTML=Object.keys(TIER_META).map(n=>{
     const m=TIER_META[n];
     return '<div class="engrow'+(tier===n&&!advOn?" on":"")
@@ -31593,11 +31598,23 @@ function openEngMenu(){
   // your own servers' models (6b334)
   +srvMenuRows();
   engMenu.hidden=false;
-  const r=$("#model-chip").getBoundingClientRect();
-  engMenu.style.left=Math.round(r.left)+"px";
-  const below=innerHeight-r.bottom>engMenu.offsetHeight+16;
-  engMenu.style.top=below?Math.round(r.bottom+8)+"px"
-    :Math.round(r.top-engMenu.offsetHeight-8)+"px";
+  // fit the window (6b336): open on the side with room; when neither
+  // side holds the whole list, take the roomier one and scroll
+  engMenu.style.maxHeight="";
+  const r=$("#model-chip").getBoundingClientRect(),GAP=8,EDGE=10;
+  const h=engMenu.offsetHeight;
+  const roomB=innerHeight-r.bottom-GAP-EDGE,roomA=r.top-GAP-EDGE;
+  const below=roomB>=h||(roomA<h&&roomB>=roomA);
+  const room=Math.max(120,below?roomB:roomA);
+  if(h>room)engMenu.style.maxHeight=Math.floor(room)+"px";
+  const hh=Math.min(h,room);
+  engMenu.style.left=Math.round(Math.max(EDGE,
+    Math.min(r.left,innerWidth-engMenu.offsetWidth-EDGE)))+"px";
+  engMenu.style.top=below?Math.round(r.bottom+GAP)+"px"
+    :Math.round(Math.max(EDGE,r.top-GAP-hh))+"px";
+  if(keep>=0)engMenu.scrollTop=keep;
+  else{const on=engMenu.querySelector(".engrow.on");
+    if(on&&h>room)on.scrollIntoView({block:"nearest"});}
   engMenu.querySelectorAll(".engrow").forEach(el=>{
     if(el.dataset.none)return;
     if(el.dataset.s){
@@ -31630,6 +31647,8 @@ $("#model-chip").addEventListener("click",ev=>{
       srvAt=Date.now();loadServers(true);}
   }else engMenu.hidden=true;
 });
+// a resize refits an open menu to the new window
+addEventListener("resize",()=>{if(!engMenu.hidden){hideTierPop();openEngMenu();}});
 document.addEventListener("click",e=>{
   hideTierPop();
   const em=document.getElementById("engmenu");
