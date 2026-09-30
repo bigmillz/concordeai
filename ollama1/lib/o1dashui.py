@@ -579,8 +579,8 @@ def render(st, width, height, glyphs="blocks", range_s=300, page=0):
         elif p == 1:
             _column(c, 0, y0, W, H, [(panel_gpu, 0.55, "r"), (panel_memory, 0.45, "r")], st, range_s, now)
         else:
-            _column(c, 0, y0, W, H, [(panel_cpu, 0.4, "r"), (panel_disks, 0.3, "r"), (panel_network, 0.3, "r")],
-                    st, range_s, now)
+            _column(c, 0, y0, W, H, [(panel_cpu, 0.34, "r"), (panel_disks, 0.22, "r"), (panel_network, 0.22, "r"),
+                                     (panel_health, 0.22, "n")], st, range_s, now)
     keys = " t range: %s" % rng + ("   p page %d/%d" % (page % pages + 1, pages) if pages > 1 else "")
     keys += "   counts, sizes and times only" if width >= 80 else ""
     c.put(0, height - 1, keys.ljust(width)[:width], "footer")

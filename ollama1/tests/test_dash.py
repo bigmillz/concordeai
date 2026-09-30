@@ -93,7 +93,8 @@ class TestRender(unittest.TestCase):
     def test_80x25_pages_cover_everything(self):
         st = dash_sample.sample()
         text = "".join(o1dashui.render(st, 80, 25, "blocks", 300, p).text() for p in range(3))
-        for title in ("Tokens per second", "Requests", "Loaded models", "GPU", "Memory", "CPU", "Disks", "Network"):
+        for title in ("Tokens per second", "Requests", "Loaded models", "GPU", "Memory", "CPU", "Disks", "Network",
+                      "Health", "power 312 W (plug)"):
             self.assertIn(title, text)
 
     def test_pairing_overlay(self):
