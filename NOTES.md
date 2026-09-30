@@ -613,6 +613,14 @@ provider comes later and follows `ollama1/PROTOCOL.md`. How to run it is in
     - `on` offers to zero the old `/swap.img`.
   - The RAM test turns SIGHUP and SIGTERM into a clean exit, runs in tmux,
     and setup.sh removes any drop-in it left behind.
+  - The RAM test runs only `norepack` and `norepack-moe` by default. `swap`
+    runs only with `--configs swap`, and it is refused up front, with the
+    reason, unless the encrypted swap is on. On the desktop ubuntu-vg has
+    no free space, so for now there's no swap. It is revisited only if both
+    no-repack configurations fail.
+  - `setup.sh --vg-reserve SIZE`: when growing `/`, leave that much free in
+    ubuntu-vg (for a future `--encrypted-swap`). Default 0, so the current
+    behaviour is unchanged; it has no effect once `/` has been grown.
   - Setup, library syncs and pulls, and updates hold a logind inhibitor
     (sleep and the power button).
   - The gateway's RAM budget is capped at MemoryHigh, and logind's HUP

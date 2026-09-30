@@ -44,7 +44,7 @@ class TestRamModelTool(unittest.TestCase):
         self.assertIn("MemorySwapMax=%d" % (32 * GIB), sw)
         self.assertNotIn("LLAMA_ARG_REPACK", sw)
         self.assertEqual(T.CONFIGS["swap"]["options"], {"use_mmap": False})
-        self.assertEqual(T.DEFAULT_CONFIGS, ["norepack", "norepack-moe", "swap"])
+        self.assertEqual(T.DEFAULT_CONFIGS, ["norepack", "norepack-moe"])
 
     def test_buffer_lines(self):
         journal = ("load_tensors:        ROCm0 model buffer size =  3120.25 MiB\n"
@@ -115,6 +115,21 @@ class TestRamTestCleansUp(unittest.TestCase):
         rm = setup.index("rm -f /run/systemd/system/ollama.service.d/50-ollama1-ramtest.conf")
         self.assertLess(rm, setup.index("run systemctl restart ollama.service"))
         self.assertIn('systemctl kill -s HUP systemd-logind || note', setup)
+
+
+class TestRamTestSwapConfig(unittest.TestCase):
+    def test_default_is_no_repack_only(self):
+        self.assertEqual(T.DEFAULT_CONFIGS, ["norepack", "norepack-moe"])
+
+    def test_swap_refused_clearly(self):
+        self.assertIsNone(T.swap_refusal(["norepack"], 0, 0))
+        self.assertIsNone(T.swap_refusal(["swap"], 32 << 30, None))            # encrypted swap is on
+        self.assertIn("no free space", T.swap_refusal(["swap"], 0, 0))
+        self.assertIn("vgs ubuntu-vg", T.swap_refusal(["swap"], 0, 0))
+        self.assertIn("is off", T.swap_refusal(["swap"], 0, 64 << 30))
+        src = open(os.path.join(U.TOOLS, "ram_model_test.py")).read()
+        main = src[src.index("def main():"):]
+        self.assertLess(main.index("swap_refusal("), main.index('Type yes to start'))
 
 
 class TestEncryptedSwap(unittest.TestCase):

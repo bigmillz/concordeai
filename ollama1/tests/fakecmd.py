@@ -87,7 +87,10 @@ def main():
     elif cmd == "mount":
         s.setdefault("mounted", []).append(args[-1])
     elif cmd == "vgs":
-        out = s.get("vgs", "  451190 ")
+        if "vg_extent_size" in args:
+            out = s.get("vgs_extent", "  4194304 ")
+        else:
+            out = s.get("vgs", "  451190 ")
     save(s)
     if out:
         print(out)

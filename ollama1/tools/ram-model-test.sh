@@ -3,7 +3,8 @@
 # in several configurations, each under a hard memory cap on Ollama.
 #
 #   sudo bash ram-model-test.sh                  gpt-oss:120b, num_ctx 4096,
-#                                                configurations norepack, norepack-moe, swap
+#                                                configurations norepack, norepack-moe
+#   sudo bash ram-model-test.sh --configs swap   only with the encrypted swap on
 #   sudo bash ram-model-test.sh --ncmoe 30 --configs norepack-moe
 #   sudo bash ram-model-test.sh --help
 #

@@ -87,6 +87,19 @@ vg_free_extents() { # free extents in ubuntu-vg as a plain integer, or fail
   echo "$n"
 }
 
+vg_extent_bytes() { # ubuntu-vg's extent size in bytes, or fail
+  local n
+  n=$(vgs --noheadings --units b --nosuffix -o vg_extent_size ubuntu-vg 2>/dev/null | tr -d '[:space:]')
+  case "$n" in ''|*[!0-9]*|0) return 1 ;; esac
+  echo "$n"
+}
+
+vg_keep_extents() { # GiB -> extents of ubuntu-vg to leave free (rounded up), or fail
+  local e
+  e=$(vg_extent_bytes) || return 1
+  echo $(( (${1:-0} * 1073741824 + e - 1) / e ))
+}
+
 set_fstab() { # mountpoint "UUID=<uuid> <mountpoint> ..." : replaces that mountpoint's active line
   local mnt=$1 line=$2 tmp
   [[ "$line" =~ ^UUID=[0-9A-Fa-f-]{8,}[[:space:]] ]] || die "refusing to write an fstab line without a UUID: '$line'"

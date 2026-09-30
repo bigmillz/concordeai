@@ -6,7 +6,7 @@ worst case is an Ollama restart, never a frozen desktop.
 Run through ram-model-test.sh (it checks root and passes the arguments):
 
     sudo bash ram-model-test.sh [--model gpt-oss:120b] [--ctx 4096] [--ncmoe 29]
-                                [--configs norepack,norepack-moe,swap]
+                                [--configs norepack,norepack-moe]
 
 What Ollama 0.34/0.35 offers (from its llm/llama_server.go and llama.cpp's
 common/arg.cpp, which Ollama builds llama-server from):
@@ -26,8 +26,9 @@ Configurations (all at the same num_ctx, each after an Ollama restart):
   norepack-moe  repack off, mmap on, every layer on the GPU except the
                 experts of the first N layers (--ncmoe), placement fixed
   swap          Ollama's defaults (repack on, mmap off), but Ollama may use
-                the encrypted swap (setup.sh --encrypted-swap); skipped if
-                that isn't on
+                the encrypted swap (setup.sh --encrypted-swap). Only with
+                --configs swap; refused unless the encrypted swap is on
+                (which needs free space in ubuntu-vg). Not in the default list
   gateway       what the gateway sends a 'ram' model today (repack on,
                 mmap off), expected to hit the cap; not in the default list
 
@@ -78,7 +79,7 @@ CONFIGS = {
     "gateway": {"title": "what the gateway sends today (repack on, mmap off)",
                 "env": {}, "options": {"use_mmap": False}},
 }
-DEFAULT_CONFIGS = ["norepack", "norepack-moe", "swap"]
+DEFAULT_CONFIGS = ["norepack", "norepack-moe"]
 
 
 def say(msg=""):
@@ -176,6 +177,27 @@ def encrypted_swap_bytes():
     except (OSError, ValueError):
         pass
     return 0
+
+
+def vg_free_bytes(vg="ubuntu-vg"):
+    try:
+        r = subprocess.run(["vgs", "--noheadings", "--units", "b", "--nosuffix", "-o", "vg_free", vg],
+                           capture_output=True, text=True, timeout=15)
+        return int(r.stdout.strip()) if r.returncode == 0 else None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def swap_refusal(names, swap_bytes, vg_free):
+    """Why the swap configuration can't run, or None."""
+    if "swap" not in names or swap_bytes:
+        return None
+    if vg_free == 0:
+        return ("the swap configuration needs the encrypted swap, and ubuntu-vg has no free space for it "
+                "(vgs ubuntu-vg: VFree 0; setup gave it all to /). Run without --configs swap.")
+    return ("the swap configuration needs the encrypted swap, which is off. Turn it on first "
+            "(sudo ./setup.sh --encrypted-swap 32G; it needs 32G free in ubuntu-vg, see vgs ubuntu-vg), "
+            "or run without --configs swap.")
 
 
 def wait_ollama(timeout=90):
@@ -354,6 +376,9 @@ def main():
     mi = o1stats.meminfo()
     mem_max, mem_high = memory_cap(mi.get("MemTotal", 0))
     swap_bytes = encrypted_swap_bytes()
+    why = swap_refusal(names, swap_bytes, vg_free_bytes() if "swap" in names and not swap_bytes else None)
+    if why:
+        sys.exit("Not started: " + why)
     try:
         tags = http("/api/tags").get("models", [])
     except (OSError, ValueError):

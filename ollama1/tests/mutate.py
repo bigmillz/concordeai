@@ -417,6 +417,15 @@ MUTANTS = [
     ("setup-safety: swap not finished on a re-run", "tools/encrypted-swap.sh",
      "  if lv_exists; then\n    echo \"volume $LVDEV: already there\"",
      "  if false; then\n    echo \"volume $LVDEV: already there\"", ["test_tools"]),
+    ("setup-safety: swap back in the default RAM test", "tools/ram_model_test.py",
+     'DEFAULT_CONFIGS = ["norepack", "norepack-moe"]', 'DEFAULT_CONFIGS = ["norepack", "norepack-moe", "swap"]',
+     ["test_tools"]),
+    ("setup-safety: swap config runs without the encrypted swap", "tools/ram_model_test.py",
+     '    if "swap" not in names or swap_bytes:\n        return None', '    if True:\n        return None',
+     ["test_tools"]),
+    ("setup-safety: VG reserve not rounded up", "lib/setuplib.sh",
+     "  echo $(( (${1:-0} * 1073741824 + e - 1) / e ))", "  echo $(( ${1:-0} * 1073741824 / e ))",
+     ["test_setuplib"]),
 ]
 
 

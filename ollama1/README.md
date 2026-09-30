@@ -454,7 +454,11 @@ around a little from time to time.
     sudo bash ~/concordeai/ollama1/tools/ram-model-test.sh
     ```
 
-    It measures gpt-oss:120b at num_ctx 4096 in each configuration. Each
+    It measures gpt-oss:120b at num_ctx 4096 in the `norepack` and
+    `norepack-moe` configurations (the default). `swap` runs only when asked
+    for (`--configs swap`), and only with the encrypted swap on; otherwise
+    it refuses before starting and says why. Swap is to be revisited only if
+    both no-repack configurations fail. Each
     runs under a runtime memory cap (RAM less 8 GiB), with a watchdog that
     kills Ollama if the machine drops under 1.5 GiB free. Worst case: an
     Ollama restart. At the end Ollama goes back to its normal settings.
@@ -463,7 +467,7 @@ around a little from time to time.
     |---|---|---|
     | `norepack` | `LLAMA_ARG_REPACK=false`, mmap on, llama.cpp places the layers | do file-backed weights fit under the cap, and how fast is it? |
     | `norepack-moe` | the same, plus every layer on the GPU except the experts of the first N (`--ncmoe`, default 29 of 36), automatic placement off | how much faster with the GPU full? |
-    | `swap` | Ollama's defaults, but Ollama may use the encrypted swap (needs `--encrypted-swap`; skipped otherwise) | does swap carry the repack buffer, and at what speed? |
+    | `swap` (only with `--configs swap`) | Ollama's defaults, but Ollama may use the encrypted swap (needs `--encrypted-swap`; refused otherwise) | does swap carry the repack buffer, and at what speed? |
 
     For each configuration it records:
     - whether the model loaded, was OOM-killed, or was stopped by the
@@ -491,10 +495,15 @@ around a little from time to time.
       AES-256 in XTS; `nofail` so it never holds up a boot). A volume, not
       a swap file: dm-crypt over a file goes through a loop device, which
       can stall under memory pressure.
-    - **It needs that much free space in `ubuntu-vg`.** setup.sh gives all
-      of the volume group's free space to `/`, and `/` can't shrink while
-      it's mounted, so on a desktop set up that way it stops with the
-      numbers and changes nothing.
+    - **It needs that much free space in `ubuntu-vg`.** Check with
+      `sudo vgs ubuntu-vg`: the `VFree` column is what's left. By default
+      setup.sh gives all of the volume group's free space to `/`, and `/`
+      can't shrink while it's mounted, so on a desktop set up that way
+      (VFree `0`) it stops with the numbers and changes nothing.
+    - For a new install that should have room for it, run setup the first
+      time with `sudo ./setup.sh --vg-reserve 64G`: when it grows `/` it
+      leaves that much free in `ubuntu-vg` (default `0`, so nothing
+      changes unless asked). It has no effect once `/` has been grown.
     - The key lives only in kernel memory, so after a reboot nothing written
       there can be read.
     - It replaces the plain, unencrypted `/swap.img`, which is switched off

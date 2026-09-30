@@ -10,6 +10,8 @@
 #   sudo ./setup.sh --encrypted-swap 32G   opt in: encrypted swap (random key each boot),
 #                                    replacing the plain /swap.img; nothing else runs
 #   sudo ./setup.sh --remove-encrypted-swap  undo that
+#   sudo ./setup.sh --vg-reserve 64G  when growing / the first time, leave 64G free
+#                                    in ubuntu-vg (e.g. for --encrypted-swap); default 0
 #   ./setup.sh --plan                show what it would do; changes nothing
 #
 # It runs itself inside tmux (session "ollama1-setup"), so a dropped SSH
@@ -52,18 +54,24 @@ REMOVE_SETUP_KEY=0
 NO_TMUX=0
 SWAP_ACTION=""
 SWAP_SIZE=""
+VG_RESERVE_GIB=0
 prev=""
 for a in "$@"; do
   if [ "$prev" = --encrypted-swap ]; then SWAP_SIZE=$a; prev=""; continue; fi
+  if [ "$prev" = --vg-reserve ]; then
+    [[ "$a" =~ ^[0-9]+G$ ]] || { echo "--vg-reserve takes a size in GiB, like 64G"; exit 2; }
+    VG_RESERVE_GIB=${a%G}; prev=""; continue
+  fi
   prev=$a
   case "$a" in
     --encrypted-swap) SWAP_ACTION=on ;;
     --remove-encrypted-swap) SWAP_ACTION=off ;;
+    --vg-reserve) ;;
     --plan) PLAN_ONLY=1 ;;
     --skip-cloudflare) SKIP_CF=1 ;;
     --remove-setup-key) REMOVE_SETUP_KEY=1 ;;
     --no-tmux) NO_TMUX=1 ;;
-    -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
     *) echo "unknown option: $a"; exit 2 ;;
   esac
 done
@@ -122,7 +130,7 @@ print_plan() {
 
    $(state '[ "$(hostname)" = "$NEW_HOSTNAME" ]')  1. Host name $NEW_HOSTNAME, time zone $TIMEZONE, boot menu shown for 5 s
    $(state 'command -v cloudflared && command -v ttyd && python3 -c "import nacl"')  2. Packages: ttyd, python3-nacl, mdadm, nftables, zstd, cloudflared (Cloudflare's apt repo, key checked)
-   $(state '[ "$(vg_free_extents)" = 0 ]')  3. Grow the root volume into the free space on the OS disk (online)
+   $(state '[ "$(vg_free_extents)" -le "$(vg_keep_extents "$VG_RESERVE_GIB")" ]')  3. Grow the root volume into the free space on the OS disk (online)
    $(state '! home_on_own_disk && ! home_in_fstab')  4. Copy /home onto the root filesystem, check it (SSH keys included), stop mounting the old disk
    $(state models_done)  5. Models disk: wipe, ext4, mount at /srv/models (noatime)
    $(state raid_done)  6. Mirror: wipe both 8 TB disks, RAID1, ext4, mount at /srv/data (resync runs in the background)
@@ -329,12 +337,14 @@ ok "ttyd $(ttyd --version 2>&1 | awk '{print $NF}'), cloudflared $(cloudflared -
 # ---- 3. root volume -----------------------------------------------------------
 step "Root volume"
 free_ext=$(vg_free_extents) || die "couldn't read the free space in ubuntu-vg (vgs -o vg_free_count ubuntu-vg)"
-if [ "$free_ext" -gt 0 ]; then
-  run lvextend -r -l +100%FREE /dev/ubuntu-vg/ubuntu-lv
+ext_bytes=$(vg_extent_bytes) || die "couldn't read ubuntu-vg's extent size (vgs -o vg_extent_size ubuntu-vg)"
+keep_ext=$(vg_keep_extents "$VG_RESERVE_GIB") || die "couldn't work out the --vg-reserve extents"
+if [ "$free_ext" -gt "$keep_ext" ]; then
+  run lvextend -r -l "+$((free_ext - keep_ext))" /dev/ubuntu-vg/ubuntu-lv
   free_ext=$(vg_free_extents) || die "couldn't read the free space in ubuntu-vg after growing it"
-  [ "$free_ext" = 0 ] || die "ubuntu-vg still has $free_ext free extents after lvextend"
+  [ "$free_ext" = "$keep_ext" ] || die "ubuntu-vg has $free_ext free extents after lvextend, not $keep_ext"
 fi
-ok "/ is $(df -h --output=size / | tail -n1 | tr -d ' ') ($(df -h --output=avail / | tail -n1 | tr -d ' ') free); no free space left in ubuntu-vg"
+ok "/ is $(df -h --output=size / | tail -n1 | tr -d ' ') ($(df -h --output=avail / | tail -n1 | tr -d ' ') free); $((free_ext * ext_bytes >> 30)) GiB left free in ubuntu-vg"
 
 # ---- 4. /home onto the root filesystem -------------------------------------------
 step "/home onto the root filesystem"

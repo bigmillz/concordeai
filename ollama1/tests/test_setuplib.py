@@ -299,6 +299,25 @@ class TestVgFree(unittest.TestCase):
             self.assertEqual(self.sb.run('n=$(vg_free_extents) || die "unreadable"; echo "N=$n"'), 1, bad)
             self.assertIn("DIE: unreadable", self.sb.out)
 
+    def test_reserve_extents(self):
+        # 4 MiB extents: 64 GiB is 16384 of them; a part-extent rounds up
+        for gib, want in ((0, 0), (64, 16384), (1, 256)):
+            self.assertEqual(self.sb.run('n=$(vg_keep_extents %d) || die "bad"; echo "K=$n"' % gib), 0)
+            self.assertIn("K=%d" % want, self.sb.out)
+        self.sb.state["vgs_extent"] = "  3000000 "
+        self.assertEqual(self.sb.run('n=$(vg_keep_extents 1) || die "bad"; echo "K=$n"'), 0)
+        self.assertIn("K=358", self.sb.out)                     # 1073741824 / 3000000 = 357.9
+        for bad in ("", "0", "4m"):
+            self.sb.state["vgs_extent"] = bad
+            self.assertEqual(self.sb.run('n=$(vg_keep_extents 1) || die "bad"; echo "K=$n"'), 1, bad)
+
+    def test_setup_grows_root_only_past_the_reserve(self):
+        setup = open(os.path.join(U.KIT, "setup.sh")).read()
+        self.assertIn('run lvextend -r -l "+$((free_ext - keep_ext))" /dev/ubuntu-vg/ubuntu-lv', setup)
+        self.assertIn('if [ "$free_ext" -gt "$keep_ext" ]; then', setup)
+        self.assertIn("VG_RESERVE_GIB=0\n", setup)                       # default: no reserve
+        self.assertNotIn("+100%FREE", setup)
+
 
 if __name__ == "__main__":
     unittest.main()
