@@ -30,6 +30,12 @@ success.
   an SSH tunnel; see `docs/your-own-server.md`) takes the same requests
   at the tunnel's local end, e.g. `http://127.0.0.1:8431`, without the two
   Access headers. Everything else here is the same, signatures included.
+  Because a web page in the user's browser can reach that local port too,
+  such a server refuses (403 `access`) any request whose `Host` isn't
+  `127.0.0.1` or `localhost` (with or without the port), any request with
+  an `Origin` header, and any POST without `Content-Type:
+  application/json`. It won't start with `"access": "none"` while a
+  Cloudflare tunnel is configured.
 - Bodies are JSON (`Content-Type: application/json`) with a
   `Content-Length`. Chunked request bodies are refused (411). Signed calls
   may send up to 32 MiB, `/v1/pair` up to 8 KiB (413 otherwise). The body

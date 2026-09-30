@@ -35,6 +35,7 @@ import datetime
 import ipaddress
 import json
 import os
+import re
 import secrets
 import sys
 import threading
@@ -285,7 +286,7 @@ class Gateway:
         self.lan_net = ipaddress.ip_network(cfg["lan_cidr"], strict=False)
 
     # -- Access ---------------------------------------------------------
-    def check_access(self, headers, lan, client_ip):
+    def check_access(self, headers, lan, client_ip, method="GET"):
         if lan:
             if not self.cfg.get("lan_mode"):
                 raise GatewayError(403, "access", "LAN mode is off")
@@ -296,7 +297,21 @@ class Gateway:
                 raise GatewayError(403, "access", "not from the home network")
             return
         if self.cfg.get("access") == "none":
-            return  # no Cloudflare in front (e.g. an SSH tunnel); signatures still required
+            # No Cloudflare in front: the way in is an SSH tunnel to this
+            # loopback port. A web page in the user's browser can reach the
+            # tunnel's local end too, so refuse anything a browser would add:
+            # a Host that isn't loopback (DNS rebinding), an Origin, and
+            # POSTs without a JSON content type (CORS "simple" requests).
+            # Signatures are still required after this.
+            host = (headers.get("Host") or "").strip().lower()
+            if not re.match(r"^(127\.0\.0\.1|localhost)(:[0-9]{1,5})?$", host):
+                raise GatewayError(403, "access", "Host must be 127.0.0.1 or localhost")
+            if headers.get("Origin") is not None:
+                raise GatewayError(403, "access", "requests from web pages are refused")
+            if method == "POST" and (headers.get("Content-Type") or "").split(";")[0].strip().lower() \
+                    != "application/json":
+                raise GatewayError(403, "access", "POST needs Content-Type: application/json")
+            return
         host = (headers.get("Host") or "").split(":")[0].lower()
         if host != self.cfg["hostname_gateway"].lower():
             raise GatewayError(403, "access", "wrong host")
@@ -408,11 +423,17 @@ class Gateway:
         machine with a 'ram' model. Unloads what's in the way and confirms
         it through /api/ps, or refuses (503)."""
         try:
-            loaded = self.loaded_names()
+            loaded = self.loaded_models()
         except (OSError, ValueError):
             raise GatewayError(503, "busy", "Ollama is not answering; try again")
-        victims = [n for n in loaded if not o1ollama.same_model(n, name)
-                   and (ram or self.is_ram_model(n))]
+
+        def in_ram(m):
+            # flagged now, or partly in system memory whatever the flag says
+            # (e.g. the flag was removed while the model stayed loaded)
+            n = m.get("name") or m.get("model")
+            return self.is_ram_model(n) or int(m.get("size_vram") or 0) < int(m.get("size") or 0)
+        victims = [m.get("name") or m.get("model") for m in loaded
+                   if not o1ollama.same_model(m.get("name") or m.get("model"), name) and (ram or in_ram(m))]
         if not victims:
             return
         for v in victims:
@@ -463,12 +484,14 @@ class Gateway:
             except OSError:
                 pass
 
-    def loaded_names(self):
+    def loaded_models(self):
         st, data = o1ollama.call(self.base, "GET", "/api/ps", timeout=10)
         if st != 200 or not isinstance(data, dict):
             raise ValueError("Ollama's /api/ps did not answer")
-        return [m.get("name") or m.get("model") for m in data.get("models", []) or []
-                if m.get("name") or m.get("model")]
+        return [m for m in data.get("models", []) or [] if m.get("name") or m.get("model")]
+
+    def loaded_names(self):
+        return [m.get("name") or m.get("model") for m in self.loaded_models()]
 
     def switch_device(self, dev_id):
         """Nothing is shared between devices, not even Ollama's prompt
@@ -610,7 +633,7 @@ def make_handler(gw, lan=False):
                 # Access and the header half of the signature check.
                 if len(self.path) > 2048:
                     raise GatewayError(414, "bad_request", "path too long")
-                gw.check_access(self.headers, lan, self.client_address[0])
+                gw.check_access(self.headers, lan, self.client_address[0], method)
                 route = self.path.split("?", 1)[0]
                 if route == "/v1/pair" and method == "POST":
                     return self.handle_pair()
@@ -904,8 +927,13 @@ def serve(cfg, stop=None):
     if not o1crypto.available():
         log("fatal", reason="no_ed25519_backend_install_python3-nacl")
         sys.exit(1)
+    if cfg.get("access") == "none" and cfg.get("tunnel_id"):
+        # A Cloudflare tunnel forwards to this same loopback port; with no
+        # Access check, anyone reaching the hostname would skip Cloudflare.
+        log("fatal", reason="access_none_with_a_cloudflare_tunnel_configured")
+        sys.exit(1)
     gw = Gateway(cfg)
-    if not gw.access.configured:
+    if not gw.access.configured and cfg.get("access") != "none":
         log("warning", reason="access_not_configured_all_tunnel_requests_refused")
     servers = [ThreadingHTTPServer(("127.0.0.1", int(cfg["gateway_port"])), make_handler(gw))]
     if cfg.get("lan_mode"):

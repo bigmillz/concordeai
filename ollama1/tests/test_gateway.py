@@ -854,7 +854,8 @@ class TestAccessNone(unittest.TestCase):
             gw.check_access({"Host": "127.0.0.1:8431"}, False, "127.0.0.1")   # no JWT needed
             st, _, _ = call("GET", "/v1/whoami", jwt_token=None, headers={"Host": "127.0.0.1:8431"})
             self.assertEqual(st, 200)
-            st, _, _ = call("GET", "/v1/whoami", jwt_token=None, dev=False)     # signatures still needed
+            st, _, _ = call("GET", "/v1/whoami", jwt_token=None, dev=False,
+                            headers={"Host": "127.0.0.1:8431"})                  # signatures still needed
             self.assertEqual(st, 401)
             with self.assertRaises(mod.GatewayError):
                 gw.check_access({}, True, "192.168.86.20")                       # LAN mode still off
@@ -862,6 +863,111 @@ class TestAccessNone(unittest.TestCase):
             gw.cfg["access"] = "cloudflare"
         with self.assertRaises(mod.GatewayError):
             gw.check_access({"Host": "127.0.0.1:8431"}, False, "127.0.0.1")
+
+
+class TestAccessNoneBrowserGuards(unittest.TestCase):
+    """In SSH-tunnel mode a web page in the user's browser can reach the
+    tunnel's local end. It must not be able to burn pairing attempts or
+    rebind DNS onto the port (from probe_none_pair.py)."""
+
+    def setUp(self):
+        G["gw"].cfg["access"] = "none"
+        G["mod"].PAIR_MIN_INTERVAL = 0.0
+        G["gw"].pair["last_try"] = 0.0
+        self.w = o1pair.open_window()
+        self.stop = threading.Event()
+
+        def committer():  # the root step, answering quickly
+            while not self.stop.is_set():
+                o1pair.commit_spool(log=lambda *_: None)
+                time.sleep(0.05)
+        self.th = threading.Thread(target=committer, daemon=True)
+        self.th.start()
+        self.body = json.dumps({"name": "x", "public_key": U.b64u(os.urandom(32)), "timestamp": int(time.time()),
+                                "nonce": "A" * 22, "mac": U.b64u(os.urandom(32))}).encode()
+
+    def tearDown(self):
+        self.stop.set()
+        self.th.join()
+        G["gw"].cfg["access"] = "cloudflare"
+        o1pair.close_window()
+
+    def results(self):
+        return len(os.listdir(os.path.join(U.PREFIX, "run/ollama1/pair-result")))
+
+    def pair(self, headers, host):
+        n = self.results()
+        st, data, _ = U.request(G["port"], "POST", "/v1/pair", self.body, headers, host=host)
+        return st, self.results() - n   # 1 if the request reached the root pairing step
+
+    def test_the_probe_is_refused(self):
+        st, spooled = self.pair({"Content-Type": "text/plain", "Origin": "https://evil.example"},
+                                "attacker.example:8431")
+        self.assertEqual((st, spooled), (403, 0))
+
+    def test_each_guard_on_its_own(self):
+        ok = {"Content-Type": "application/json"}
+        self.assertEqual(self.pair(ok, "attacker.example:8431"), (403, 0))              # DNS rebinding
+        self.assertEqual(self.pair(dict(ok, Origin="null"), "127.0.0.1:8431"), (403, 0))  # any Origin
+        self.assertEqual(self.pair({"Content-Type": "text/plain"}, "localhost:8431"), (403, 0))
+        self.assertEqual(self.pair({}, "localhost"), (403, 0))
+        for host in ("127.0.0.1", "127.0.0.1:8431", "localhost", "LOCALHOST:18431"):
+            G["gw"].pair["last_try"] = 0.0
+            o1pair.open_window()                     # a fresh window each time (wrong codes add up)
+            self.body = json.dumps(dict(json.loads(self.body), nonce=U.b64u(os.urandom(16)))).encode()
+            st, reached = self.pair(ok, host)
+            self.assertEqual((st, reached), (401, 1), host)   # reached the pairing step: wrong code
+
+    def test_typos_fail_closed(self):
+        gw, mod = G["gw"], G["mod"]
+        for v in ("None", "NONE", "off", "", "none ", None, False, 0):
+            gw.cfg["access"] = v
+            with self.assertRaises(mod.GatewayError, msg=repr(v)):
+                gw.check_access({"Host": "127.0.0.1:8431"}, False, "127.0.0.1", "GET")
+
+    def test_refuses_to_start_next_to_a_tunnel(self):
+        cfg = dict(G["cfg"], access="none", tunnel_id="t-1", gateway_port=U.free_port())
+        with self.assertRaises(SystemExit):
+            G["mod"].serve(cfg)
+
+
+class TestMakeRoomSpilled(unittest.TestCase):
+    """A model partly in system memory is unloaded before a GPU-only job,
+    even after its 'ram' flag was removed (from probe_ram.py)."""
+
+    def setUp(self):
+        from o1common import Paths as P
+        self.allow = P.allow
+        mem = {"MemTotal": 62 << 30, "MemAvailable": 58 << 30, "SwapTotal": 8 << 30, "SwapFree": 8 << 30}
+        G["gw"].meminfo = lambda: dict(mem)
+        G["gw"].stats.loaded = []
+        G["stub"].loaded.clear()
+
+    def tearDown(self):
+        import o1stats
+        G["gw"].meminfo = o1stats.meminfo
+        if os.path.exists(self.allow):
+            os.unlink(self.allow)
+        G["stub"].loaded.clear()
+
+    def chat(self, m):
+        return call("POST", "/api/chat", {"model": m, "messages": [{"role": "user", "content": "x"}],
+                                          "stream": False})
+
+    def test_flag_removed_while_loaded(self):
+        with open(self.allow, "w") as f:
+            f.write("moe:120b ram\nsmall:8b\n")
+        self.assertEqual(self.chat("moe:120b")[0], 200)
+        with open(self.allow, "w") as f:
+            f.write("moe:120b\nsmall:8b\n")            # the flag is dropped
+        t = time.time() + 5
+        os.utime(self.allow, (t, t))
+        n = len(G["stub"].calls)
+        self.assertEqual(self.chat("small:8b")[0], 200)
+        unl = [c[2]["model"] for c in G["stub"].calls[n:] if (c[2] or {}).get("keep_alive") == 0]
+        self.assertEqual(unl, ["moe:120b"])
+        st, data, _ = call("GET", "/api/ps")
+        self.assertEqual([m["name"] for m in json.loads(data)["models"]], ["small:8b"])
 
 
 class TestLanMode(unittest.TestCase):

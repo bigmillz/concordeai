@@ -237,6 +237,19 @@ provider comes later and follows `ollama1/PROTOCOL.md`. How to run it is in
 
   setup.sh stays Patrick's machine only; the guide says so and gives manual
   steps until the app's "Add a server".
+- **Follow-ups to the review of 6dcd842.**
+  - In `access: none` the tunnel's local port is reachable from any web
+    page in the browser. The gateway now requires a loopback `Host`
+    (127.0.0.1 or localhost, with or without the port), refuses any
+    `Origin`, and needs `Content-Type: application/json` on POST. That
+    stops pairing attempts being burned from a page, and DNS rebinding.
+  - The gateway won't start with `access: none` while `tunnel_id` is set.
+  - `make_room` also unloads any loaded model with `size_vram < size`
+    before a GPU-only job, so a model whose `ram` flag was removed while
+    loaded doesn't stay beside it.
+  - The gateway gets `OOMScoreAdjust=-500`.
+  - probe_none_pair.py and probe_ram.py are now tests, with mutants.
+  - Suite: 205 tests; 80 mutants, all caught.
 - Tested on the Mac: 199 unit tests (incl. shellcheck, the polkit rule in
   node, the setup disk steps against fake mdadm/blkid/lsblk, the guide's
   file and config references). All 75 mutants are caught

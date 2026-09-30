@@ -126,7 +126,10 @@ All commands run on the server.
    ```
 
    - `"access": "none"`: no Cloudflare in front. The gateway still listens
-     on `127.0.0.1` only, and the SSH tunnel is the way in.
+     on `127.0.0.1` only, and the SSH tunnel is the way in. It answers only
+     requests addressed to `127.0.0.1` or `localhost` without an `Origin`
+     header, so a web page in your browser can't use the tunnel. It refuses
+     to start if a Cloudflare tunnel is also configured (`tunnel_id`).
    - `"ollama_rocm"`: `true` on an AMD GPU, `false` on NVIDIA or without a
      GPU.
    - If VRAM isn't detected automatically (the dashboard shows "GPU not

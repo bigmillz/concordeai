@@ -19,6 +19,8 @@ RestartSec=2
 # Nothing a request carried may reach the disk: no core dumps, no swap.
 LimitCORE=0
 MemorySwapMax=0
+# Under memory pressure (a big 'ram' model), the kernel picks something else first.
+OOMScoreAdjust=-500
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes

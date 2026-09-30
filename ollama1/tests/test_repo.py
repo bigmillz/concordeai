@@ -184,6 +184,9 @@ class TestUnits(unittest.TestCase):
             self.assertIn("\nLimitCORE=0\n", t, u)
             self.assertIn("\nMemorySwapMax=0\n", t, u)
 
+    def test_gateway_protected_from_the_oom_killer(self):
+        self.assertIn("\nOOMScoreAdjust=-500\n", self.unit("ollama1-gateway.service"))
+
     def test_ollama_never_logs_prompts(self):
         t = self.unit("ollama.service")
         self.assertIn("Environment=OLLAMA_DEBUG=0", t)
