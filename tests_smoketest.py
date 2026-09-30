@@ -18430,14 +18430,16 @@ def _soc_pins(src):
         # no local rescue for a server pick
         "no local rescue": "            if not sent[0] and not cloud_only and not _srv_lbl:" in ch,
         # memory pass: the same server's model, and none after a refusal
-        "memory pass": "                    and not _gone and not _so_fail):\n                ctx_thread(\n"
+        "memory pass": "                    and not _gone and not _so_fail\n"
+                       "                    and not (_srv_lbl and not _model_said[0])):\n                ctx_thread(\n"
                        "                    target=_extract_memory,\n"
                        "                    args=(route_label or (council[0] if council else \"\"),"
         in ch,
-        "export title": "                    if len(src) > 200 and not _srv_only else \"\")" in ch,
-        "title ticket": "            if _srv_only and _title_cid and not _gone:\n"
+        "export title": "                    if len(src) > 200 and not (_srv_only or _srv_lbl) else \"\")" in ch,
+        "title ticket": "            if (_srv_only or _srv_lbl) and _title_cid and not _gone:\n"
                         "                _srv_only_chats[(user_base.name, _title_cid)] = (\n"
-                        "                    \"\" if _so_fail else _srv_lbl, time.time())" in ch
+                        "                    _srv_lbl if _model_said[0] and not _so_fail else \"\",\n"
+                        "                    time.time())" in ch
         and "        _srv_only_chats.pop((self.ctx.name, _title_cid), None)   # 6b337" in ch,
         "title by the server": tit.index("make_title(txt, server=_so[0])") < tit.index("make_title(txt, conf=_conf)")
         and "_so = (_srv_only_chats.get((self.ctx.name, _tcid))" in tit,
@@ -18843,12 +18845,12 @@ _SO_MUT = [
     ("the refusal not handed on", 'step, refuse=_so_fail)', 'step)'),
     ("a local rescue for a server pick", '            if not sent[0] and not cloud_only and not _srv_lbl:',
      '            if not sent[0] and not cloud_only:'),
-    ("a memory pass after a refusal", '                    and not _gone and not _so_fail):', '                    and not _gone):'),
+    ("a memory pass after a refusal", '                    and not _gone and not _so_fail\n', '                    and not _gone\n'),
     ("a title by a local model", 'make_title(txt, server=_so[0])', 'make_title(txt, conf=_conf)'),
-    ("no title ticket", '            if _srv_only and _title_cid and not _gone:', '            if False:'),
+    ("no title ticket", '            if (_srv_only or _srv_lbl) and _title_cid and not _gone:', '            if False:'),
     ("a title that falls to a local model", '            return _clean_title("".join(parts))\n        except Exception:\n            return ""',
      '            return _clean_title("".join(parts))\n        except Exception:\n            pass'),
-    ("an export titled by a local model", 'if len(src) > 200 and not _srv_only else ""', 'if len(src) > 200 else ""'),
+    ("an export titled by a local model", 'if len(src) > 200 and not (_srv_only or _srv_lbl) else ""', 'if len(src) > 200 else ""'),
     ("no tiers row", 'out.update(server_only_tiers(self.ctx))', 'pass'),
     ("web search touched", '        bookish = False\n        placey = False\n',
      '        bookish = False\n        placey = _srv_only and False\n'),
@@ -19570,6 +19572,63 @@ _P2_CHECKS = [
 ]
 
 
+
+def _p3c_spill(src):
+    """The gateway's gpu_spill at 0% on the card is not a spill: the card wasn't in use (a server that started
+    before its graphics driver was ready ran the model on its CPU). A partial spill keeps its words."""
+    ns, ctx, d = _sv_ns(src)
+    e = {"name": "Ollama1"}
+    f = lambda code, err, m="gemma4:12b": ns["_srv_fail"](e, 507, {"code": code, "error": err}, m)
+    zero = f("gpu_spill", "model did not fit entirely in VRAM (0% on GPU); it was unloaded")
+    got = {
+        "zero": str(zero) == "Ollama1’s graphics card isn’t in use right now, so the model would have run on its CPU. "
+                             "It stopped." and zero.kind == "fit" and zero.code == "gpu_spill",
+        "partial": str(f("gpu_spill", "model did not fit entirely in VRAM (45% on GPU); it was unloaded"))
+        == "Ollama1 couldn’t keep gemma4:12b in its memory, so it stopped.",
+        # 10% and 100% are not 0%
+        "not 10%": str(f("gpu_spill", "model did not fit entirely in VRAM (10% on GPU); it was unloaded")).startswith("Ollama1 couldn’t keep")
+        and str(f("gpu_spill", "x (100% on GPU) y")).startswith("Ollama1 couldn’t keep"),
+        "no figure": str(f("gpu_spill", "")).startswith("Ollama1 couldn’t keep"),
+        "ram pressure": str(f("ram_pressure", "(0% on GPU)")).startswith("Ollama1 couldn’t keep"),
+    }
+    return all(got.values()), got
+
+
+def _p3c_quiet(src):
+    """A turn on a plain server pick keeps this Mac's graphics card quiet (6b339, Patrick: "When I picked this model on
+    Olama 1, it maxed out the GPU on my MacBook, and the GPU on the server was 0%"): the chat's title goes to the same
+    server or to none, never a local model; a server pick that got no answer asks the server no more (no memory pass);
+    an export's title isn't written by a local model; no pre-warm; no local rescue."""
+    ch = src[src.index('        if self.path != "/api/chat":'):]
+    tit = src[src.index('        if self.path == "/api/title":'):]
+    tit = tit[:tit.index('        if self.path == "/api/open-logs":')]
+    got = {
+        "title ticket": "            if (_srv_only or _srv_lbl) and _title_cid and not _gone:\n"
+                        "                _srv_only_chats[(user_base.name, _title_cid)] = (\n"
+                        "                    _srv_lbl if _model_said[0] and not _so_fail else \"\",\n"
+                        "                    time.time())" in ch,
+        "title from the ticket": tit.index("make_title(txt, server=_so[0])") < tit.index("make_title(txt, conf=_conf)")
+        and "            if _so and time.time() - _so[1] < 300:" in tit,
+        "no memory pass without an answer": "                    and not _gone and not _so_fail\n"
+                                            "                    and not (_srv_lbl and not _model_said[0])):\n" in ch,
+        "export title": "                    if len(src) > 200 and not (_srv_only or _srv_lbl) else \"\")" in ch,
+        # no pre-warm, no local route, no rescue for a server pick
+        "no pre-warm": "        if _srv_lbl:\n            route, route_label = (None, None), _srv_lbl\n" in ch
+        and "        if route[0] == \"mlx\" and route_label and not _no_text_model:" in ch,
+        "no rescue": "            if not sent[0] and not cloud_only and not _srv_lbl:" in ch,
+        # the place-pin pass reads a MODEL's answer, never the app's own error line (which could be 120 characters)
+        "no pins from an error": "                    elif (query and sent[0] > 120 and _model_said[0]\n" in ch,
+    }
+    return all(got.values()), got
+
+
+_P2_CHECKS += [
+    ("a server's gpu_spill at 0% on the card says the card isn't in use; a partial spill keeps its words", _p3c_spill),
+    ("a plain server pick keeps this Mac quiet: its title by the same server or none, no memory pass without an "
+     "answer, no export title, no pre-warm, no local rescue (pinned)", _p3c_quiet),
+]
+
+
 def _p2_run(src):
     out = []
     for name, fn in _P2_CHECKS:
@@ -19653,6 +19712,14 @@ _P2_MUT = [
     ("the tiers' list without seats", '                    chosen = [x["label"] for x in resolve_tier_seats(name, self.ctx)]', '                    chosen = resolve_tier(name)'),
     ("servers not refreshed before a mode", '        if tier in TIERS:\n            try:\n                server_refresh_modes(self.ctx)', '        if tier in TIERS:\n            try:\n                pass'),
     ("no route for the switch", '            elif op == "prefer":\n                out = server_set_prefer(self.ctx, sid, d.get("on"))\n', ''),
+    ("a graphics card at 0% read as a spill", '    if code == "gpu_spill" and re.search(r"\\(0% on GPU\\)", detail):',
+     '    if False:'),
+    ("a partial spill read as no card", 'r"\\(0% on GPU\\)"', 'r"0% on GPU"'),
+    ("the title of a plain server pick by a local model", '            if (_srv_only or _srv_lbl) and _title_cid and not _gone:\n                _srv_only_chats[',
+     '            if _srv_only and _title_cid and not _gone:\n                _srv_only_chats['),
+    ("a title after an answer that never came", '                    _srv_lbl if _model_said[0] and not _so_fail else "",', '                    _srv_lbl,'),
+    ("place pins asked of an error line", '                    elif (query and sent[0] > 120 and _model_said[0]\n', '                    elif (query and sent[0] > 120\n'),
+    ("a memory pass for a server pick that got no answer", '                    and not (_srv_lbl and not _model_said[0])):', '                    ):'),
     ("a fallback answer badged as the server", '                  else if(d.w==="local"){srvWho="";if(d.m)lastModels=String(d.m);}', ''),
 ]
 _p2m = []
@@ -19983,10 +20050,10 @@ _SVLJ = json.dumps(_SVL)[1:-1]           # as it reads inside a frame's JSON
 _SVH = {}                                # the last chat's headers
 
 
-def _svchat(label=_SVL, text="hello server", tier="", models=None, images=None, chat_id=""):
+def _svchat(label=_SVL, text="hello server", tier="", models=None, images=None, chat_id="", web=False):
     body = {"model": label if not tier and models is None else "",
             "models": [label] if models is None else models,
-            "tier": tier, "auto_web": False,
+            "tier": tier, "auto_web": bool(web),
             "messages": [{"role": "user", "content": text}]}
     if images:
         body["images"] = images
@@ -20092,6 +20159,47 @@ check("servers (live): busy and a model that doesn't fit are said; a replay refu
       and "ANSWER-again 334" in _sc3[1] and "⚠" not in _sc3[1]
       and _sc4[1].strip() == "⚠️ small:8b doesn’t fit in %s’s graphics memory." % _SVN,
       "%r" % [_sc2[1], _sc3[1], _sc4[1]])
+# ---- a plain server pick keeps this Mac quiet (6b339): Patrick's hotels question with web search on, then a
+# server that can't run the model. Nothing runs on a model of this Mac (no usage record of a local call),
+# the title and the memory pass go to the same server, and a turn that got no answer asks the server once
+def _ul34():
+    p_ = os.path.join(_SV.home, "usage.jsonl")
+    return [json.loads(x_) for x_ in open(p_)] if os.path.exists(p_) else []
+
+
+_HOTELS = "What are some good hotels in Buenos Aires that would accept my Chase hotel credits?"
+_ul0 = len([r_ for r_ in _ul34() if r_.get("w") == "local"])
+_nstW, _nlgW = len(_o1("/stub")["calls"]), len(_o1("/log")["log"])
+_scW = _svchat(text=_HOTELS, chat_id="c" + os.urandom(6).hex(), web=True)
+_cidW = _SVH.get("X-Chat-Id") or ""
+time.sleep(2.5)
+_ttW = _svq("/api/title", "POST", {"text": _HOTELS, "chat_id": _cidW})
+time.sleep(2.0)
+_stW = [c[2]["model"] for c in _o1("/stub")["calls"][_nstW:] if c[1] == "/api/chat"]
+_ulW = [r_ for r_ in _ul34() if r_.get("w") == "local"]
+# a server that can't run it (Patrick's gateway after a reboot: the model on its CPU, 0% on the card)
+_o1("/next", {"path": "/api/chat", "status": 507, "body": {
+    "error": "model did not fit entirely in VRAM (0% on GPU); it was unloaded", "code": "gpu_spill"}})
+_nlgF = len(_o1("/log")["log"])
+_scF = _svchat(text=_HOTELS, chat_id="c" + os.urandom(6).hex(), web=True)
+_cidF = _SVH.get("X-Chat-Id") or ""
+time.sleep(2.5)
+_ttF = _svq("/api/title", "POST", {"text": _HOTELS, "chat_id": _cidF})
+time.sleep(2.0)
+_lgF = [r_ for r_ in _o1("/log")["log"][_nlgF:] if r_["path"] == "/api/chat"]
+_ulF = [r_ for r_ in _ul34() if r_.get("w") == "local"]
+check("servers (live): a plain server pick with web search on keeps this Mac quiet: its title and memory pass "
+      "go to the same server and no model of this Mac is called",
+      _scW[0] == 200 and "ANSWER-" in _scW[1] and _stW and set(_stW) == {"small:8b"}
+      and any(str(c_).startswith("Summarise") for c_ in
+              [str(c[2]["messages"][-1]["content"]) for c in _o1("/stub")["calls"][_nstW:] if c[1] == "/api/chat"])
+      and len(_ulW) == _ul0, "%r" % [_scW[1][:120], _stW, _ttW, _ulW[-2:]])
+check("servers (live): a server pick the server couldn't run is said in words about the card, asks the "
+      "server once, titles nothing, and loads nothing on this Mac",
+      _scF[1].strip() == ("⚠️ %s’s graphics card isn’t in use right now, so the model "
+                          "would have run on its CPU. It stopped." % _SVN)
+      and len(_lgF) == 1 and _ttF[1].get("title") == "" and len(_ulF) == len(_ulW),
+      "%r" % [_scF[1][:200], len(_lgF), _ttF, len(_ulF), len(_ulW)])
 # Cloud Only never seats a server model; no tier lists one
 _nlog34 = len(_o1("/log")["log"])
 _sc5 = _svchat(tier="Cloud Only", models=[_SVL])

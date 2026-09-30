@@ -17017,6 +17017,13 @@ def _srv_fail(e, status: int, js: dict, model: str = "") -> ServerError:
     if code == "gpu_fit":
         return ServerError("fit", "%s doesn\u2019t fit in %s\u2019s graphics "
                            "memory." % (model or "That model", name), code)
+    if code == "gpu_spill" and re.search(r"\(0% on GPU\)", detail):
+        # 0% is not a spill: the card wasn't in use at all (a server that
+        # started before its graphics driver was ready ran the model on
+        # its CPU, 6b339). Partial spills keep the old words below.
+        return ServerError("fit", "%s\u2019s graphics card isn\u2019t in use "
+                           "right now, so the model would have run on its "
+                           "CPU. It stopped." % name, code)
     if code in ("gpu_spill", "ram_pressure"):
         return ServerError("fit", "%s couldn\u2019t keep %s in its memory, "
                            "so it stopped." % (name, model or "the model"), code)
@@ -26636,7 +26643,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 ext = blks[0][0] if blks else "md"
             ttl = next((b[2] for b in x_blocks(src) if b[0] == "h"), "") \
                 or (make_title(src[:600])
-                    if len(src) > 200 and not _srv_only else "")
+                    if len(src) > 200 and not (_srv_only or _srv_lbl) else "")
             step("export", "Writing the file", "run",
                  EXPORT_KIND.get(ext, ("", ext))[1])
             status("writing the %s" % EXPORT_KIND.get(ext, ("", ext))[1])
@@ -27142,11 +27149,16 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if _ans_conf and _title_cid and not _gone:
                 _last_cloud[(user_base.name, _title_cid)] = (
                     _ans_conf, time.time())
-            # "<server> Only" (6b337): the chat's title goes to that
-            # server's model, or to none when there was nothing to run on
-            if _srv_only and _title_cid and not _gone:
+            # A chat on a server's model (6b337 "<server> Only", and any
+            # plain pick, 6b339): its title is written by that server's
+            # model, or by none when the answer never came; never by a
+            # model on this Mac, whose graphics card the person kept quiet
+            # by choosing the server (Patrick's Buenos Aires hotels chat
+            # ran a local title model after a failed server answer)
+            if (_srv_only or _srv_lbl) and _title_cid and not _gone:
                 _srv_only_chats[(user_base.name, _title_cid)] = (
-                    "" if _so_fail else _srv_lbl, time.time())
+                    _srv_lbl if _model_said[0] and not _so_fail else "",
+                    time.time())
             if _ans_conf and not _gone:
                 # the badge under the answer says "cloud", whatever the
                 # line-up said up front (a picture Claude read, 6b308);
@@ -27193,7 +27205,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                     .encode("utf-8"))
                         except Exception:
                             pass
-                    elif (query and sent[0] > 120
+                    elif (query and sent[0] > 120 and _model_said[0]
                             and (placey or bookish) and not images
                             and (_ans_conf or not cloud_only)):
                         step("places", "Finding the places", "run", "")
@@ -27301,8 +27313,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # that same provider's quick model, so a keys-only user builds
             # memory too and the words reach no second company (6b308); a
             # local answer stays local, and Cloud Only never runs locally
+            # (and none for a server pick that got no answer, 6b339: it only
+            # asked the server again, a second and third request for one
+            # failed turn)
             if (plain and len(plain) > 12 and (_ans_conf or not cloud_only)
-                    and not _gone and not _so_fail):
+                    and not _gone and not _so_fail
+                    and not (_srv_lbl and not _model_said[0])):
                 ctx_thread(
                     target=_extract_memory,
                     args=(route_label or (council[0] if council else ""),

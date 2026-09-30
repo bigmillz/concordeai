@@ -285,6 +285,45 @@ so here falling back IS allowed.
   node; nothing was looked at on screen), a funnel against a real server
   (the stage and verdict run against stand-ins), and the parallel drafts'
   timing on a loaded machine (asserted with generous margins).
+- **A plain server pick keeps this Mac's card quiet** (Patrick, the same
+  day, of gemma4:12b on his server asked about hotels in Buenos Aires with
+  web search on, which failed: "When I picked this model on Olama 1, it
+  maxed out the GPU on my MacBook, and the GPU on the server was 0%.").
+  The server half was the gateway's (Ollama started before the graphics
+  driver and ran the model on its CPU; the gateway refused it, `gpu_spill`
+  at 0%). The app half, audited call by call for a plain pick with search
+  on: the SEARCH PATH (the query, weather, OpenStreetMap places, the page
+  text, the photos, the ranking) calls no model at all, it is network and
+  string work; the pre-warm is skipped for a server pick (route `(None,
+  None)`); the local rescue is off for one; the place-pin pass and the
+  memory pass already ran on the SAME server model. What did run on the
+  Mac: **the chat's title** (`/api/title` -> `make_title` picks a capable
+  local model and loads it, which after a failed server answer is exactly a
+  big MLX engine on the Mac's GPU) and **an export's title**. Both now go to
+  the same server or to none: the title ticket (6b337's, per chat) is set
+  for every server pick, to the server's model when it answered and to
+  nothing when it didn't; an export's title isn't written by a model for a
+  server pick. Also fixed: a server pick that got no answer no longer asks
+  the server a second time for the memory pass (a failed turn sent the
+  chat and the memory pass, so the gateway saw the model loaded and refused
+  again a few seconds later; a third request I could not account for from
+  the code, it may be a menu or pane status check), and the place-pin pass
+  reads a model's answer, never the app's own error line. Left alone and
+  said: the image refiner (`_refine_with_model`) rewrites a picture's
+  prompt with a model that is ALREADY resident on the Mac (it never loads
+  one), for a picture asked of a server pick, which 6b334 lets make
+  pictures on this Mac anyway; the benchmark; a local engine that some other
+  chat or the Settings pane started. Retries: a server chat is signed again
+  once on a replay or clock-skew refusal, and a collapsed answer (repetition)
+  is asked once more with a nudge; nothing else repeats. "<name> Only"
+  keeps its rule (nothing on this Mac). The text for `gpu_spill` at 0% on
+  the card is "<name>'s graphics card isn't in use right now, so the model
+  would have run on its CPU. It stopped." (a partial spill keeps "couldn't
+  keep X in its memory"), because 0% is not a spill. Checks: the text and its
+  partial, the title and memory pins with mutations, and a live run on the
+  real gateway: Patrick's question with search on (every call on the one
+  server model, no usage record of a local call) and the refused run (one
+  request, nothing titled, nothing local).
 
 ## 6b338 — dictation hotkey
 Patrick (2026-09-30): "Similar to Claude's add a hotkey for Apple D or
