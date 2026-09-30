@@ -18160,6 +18160,11 @@ def _soc_pick(src):
         and pk([M("a:70b", "gpu+ram"), M("b:7b", "unknown")]) == ("b:7b", "smallest")
         and pk([M("only:latest", "unknown")]) == ("only:latest", "smallest"),
         "none": pk([]) is None and pk(None) is None,
+        # (rules review) the role filter holds in BOTH branches: a model that may not take a general
+        # question is never picked, even as the smallest
+        "role filter": pk([M("bge-m3:567m"), M("llama-guard3:8b"), M("qwen3-coder:30b")]) is None
+        and pk([M("bge-m3:567m", "unknown", 1), M("x:70b", "gpu+ram", 40)]) == ("x:70b", "smallest")
+        and pk([M("nomic-embed-text:335m", "gpu+ram", 1), M("llama-guard3:8b", "unknown", 2)]) is None,
         # /api/tags' "gpu" is the owner's policy, not a measurement: with the card's size
         # known, the weights plus the gateway's margin must fit in it
         "too big for the card": pkv([M("huge:70b", size=20 * GIB), M("mid:14b", size=9 * GIB)], 16 * GIB)
@@ -18201,13 +18206,24 @@ def _soc_state(src):
     s0 = st()
     got["paired, placement unknown: the smallest"] = (
         s0["ok"] and s0["how"] == "smallest" and s0["label"] == "Pat’s Lab · small:8b"
-        and "running with what it has" in s0["note"] and "fits its card whole" in s0["note"])
+        and "doesn\u2019t say where its models run" in s0["note"] and "may use system memory" in s0["note"]
+        and s0["placement"] == "unknown")
     _so_seen(ns, e, [M("qwen3:14b"), M("gpt-oss:20b"), M("big:70b", "gpu+ram")])
     s1 = st()
     got["fits"] = (s1["ok"] and s1["how"] == "fits" and s1["model"] == "gpt-oss:20b"
                    and s1["label"] == "Pat’s Lab · gpt-oss:20b"
                    and s1["note"] == "The strongest model on Pat’s Lab that fits its card, answering "
                                      "alone. Nothing runs on this computer or in the cloud.")
+    # a guard, a classifier or an embedding model is never the pick, however small, in either branch; with
+    # nothing else the server "lists no models for general questions"
+    _so_seen(ns, e, [M("bge-m3:567m", sz=1 << 29), M("llama-guard3:8b", "unknown", 2 << 30)])
+    sg = st()
+    got["no guard or embedding"] = (not sg["ok"] and sg["why"] == "Pat\u2019s Lab lists no models for general questions.")
+    _so_seen(ns, e, [M("bge-m3:567m", "unknown", 1 << 28), M("huge:70b", "gpu+ram", 40 << 30)])
+    sg2 = st()
+    got["smallest, but a chat model"] = sg2["ok"] and sg2["model"] == "huge:70b" and sg2["how"] == "smallest"
+    # the gpu+ram smallest says "with what it has"; the unknown-placement one says it may use system memory
+    got["smallest, said"] = ("running with what it has" in sg2["note"] and "may use system memory" not in sg2["note"])
     # the card's size, when the gateway says it, rules out what can't fit it
     _so_seen(ns, e, [M("qwen3:14b", sz=9 << 30), M("huge:70b", sz=20 << 30)],
              gpu={"vendor": "amd", "name": "Card", "vram_bytes": 16 << 30})
@@ -18431,11 +18447,13 @@ def _soc_pins(src):
         "no local rescue": "            if not sent[0] and not cloud_only and not _srv_lbl:" in ch,
         # memory pass: the same server's model, and none after a refusal
         "memory pass": "                    and not _gone and not _so_fail\n"
-                       "                    and not (_srv_lbl and not _model_said[0])):\n                ctx_thread(\n"
+                       "                    and not (_srv_lbl and not _model_said[0])\n"
+                       "                    and not (server_label(_ml)\n"
+                       "                             and server_label_down(user_base, _ml))):\n                ctx_thread(\n"
                        "                    target=_extract_memory,\n"
                        "                    args=(route_label or (council[0] if council else \"\"),"
         in ch,
-        "export title": "                    if len(src) > 200 and not (_srv_only or _srv_lbl) else \"\")" in ch,
+        "export title": "                    and not (_srv_only or _srv_lbl or _seat_fb) else \"\")" in ch,
         "title ticket": "            if (_srv_only or _srv_lbl) and _title_cid and not _gone:\n"
                         "                _srv_only_chats[(user_base.name, _title_cid)] = (\n"
                         "                    _srv_lbl if _model_said[0] and not _so_fail else \"\",\n"
@@ -18471,7 +18489,7 @@ _SO_PRE = ('const SRV_SEP=" \\u00b7 ";'
            "const calls=[];function setTier(n){calls.push('setTier:'+n);tier=n;}"
            "function prefSet(o){calls.push('pref:'+JSON.stringify(o));}"
            "function paintModels(){calls.push('paint');}function advChip(){calls.push('chip');}"
-           "function advPrune(){}")
+           "function advPrune(){}let tierInfo={};")
 
 
 def _soc_page(src):
@@ -18486,6 +18504,9 @@ def _soc_page(src):
           + "const out={};tier='srv:a1b2c3d4';"
           + "out.shown=[tierShown('srv:a1b2c3d4'),tierShown('srv:b1b2c3d4'),"
           + "tierShown('srv:zzzzzzzz'),tierShown('Fast'),tierShown('')];out.label=tierLabel();"
+          # a mode routed to a server says so (6b339)
+          + "tierInfo={Fast:{models:['Desk \\u00b7 gpt-oss:20b','Gemma 4 26B']},Thinking:{models:['A \\u00b7 x','B \\u00b7 y','A \\u00b7 z']},"
+          + "Pro:{models:['Gemma 4 26B']}};out.seats=[tierShown('Fast'),tierShown('Thinking'),tierShown('Pro'),tierShown('Cloud Only')];tierInfo={};"
           + "tierOff={'srv:old':1,Fast:0};srvSyncOff();out.off=Object.keys(tierOff).sort();"
           + "out.is=[isSrvMode('srv:x'),isSrvMode('Fast'),isSrvMode(''),isSrvMode(null)];"
           # still there (on, or merely off): nothing happens
@@ -18517,6 +18538,9 @@ def _soc_page(src):
         "early": o["early"] == [],
         "refresh": o["refresh"] == [["paint"], ["Fast"], "Lab · x:8b"],
         "chip paints": '  $("#chip-model").textContent=tierLabel();' in src,
+        "chip names a seat": o["seats"] == ["Fast \u00b7 Desk gpt-oss:20b", "Thinking \u00b7 A + B \u00d73", "Pro", "Cloud Only"]
+        and "  tierOff={};tierInfo=info;" in src and "  if(typeof paintModels===\"function\")paintModels();     // the chip names the seat" in src
+        and "  if(typeof paintTierAvail===\"function\")paintTierAvail();   // a seat may have moved" in src,
         # a saved mode survives a start whose server is off; only its removal drops it
         "prefs": '    if(tierOff[t]&&!isSrvMode(t))t="Fast";' in src
         and "  srvModeGone();advPrune();\n  advChip();paintAutonomy();" in src
@@ -18545,7 +18569,7 @@ def _soc_menu(src):
     i0 = src.index("function esc(s){")
     js = (src[i0:src.index(";}\n", i0) + 3] + _SO_PRE
           + src[src.index("function srvWhere(m){"):src.index("function srvStatus(s){")]
-          + src[src.index("function flyPlace("):src.index("function paintEngMenuServers(){")]
+          + src[src.index("function flyClick("):src.index("function paintEngMenuServers(){")]
           + "const GBM=(n,p)=>({name:n,label:'Desk <b>&\" \\u00b7 '+n,placement:p||'gpu'});"
           + "let srvList=[{id:'a1b2c3d4',name:'Desk <b>&\"',paired:true,status:{at:1,reachable:true},"
           + "models:[GBM('gpt-oss:20b'),GBM('qwen3:14b'),GBM('big:70b','gpu+ram')],"
@@ -18561,6 +18585,9 @@ def _soc_menu(src):
           + "advOn=true;out.advOn=srvMenuRows();out.subAdv=srvSubRows(srvList[0]);advOn=false;"
           + "out.subErr=srvSubRows(srvList[1]);out.subNone=srvSubRows(srvList[2]);"
           + "const M=(l,r)=>({left:l,right:r});"
+          # a click on the row a hover opened keeps it open (6b339, UX review)
+          + "out.click=[flyClick('a',false,false,'a'),flyClick('a',false,true,'a'),flyClick('a',true,false,'a'),"
+          + "flyClick('a',false,false,'b'),flyClick('',true,false,'a'),flyClick('a',true,true,'a')];"
           + "out.fly=[flyPlace(M(100,350),{top:200},260,300,1200,800),"      # to the right
           + "flyPlace(M(800,1050),{top:200},260,300,1200,800),"               # no room: to the left
           + "flyPlace(M(100,350),{top:200},260,2000,1200,800),"               # too tall: capped
@@ -18607,6 +18634,7 @@ def _soc_menu(src):
         and 'data-none="1"><span class="edsc">no models listed</span>' in o["subNone"]
         and "data-s=" not in o["subErr"] + o["subNone"],
         # placed beside the menu, inside the window, capped when long
+        "click after a hover": o["click"] == ["close", "pin", "open", "open", "open", "open"],
         "to the right": fly[0] == {"left": 354, "top": 200, "maxH": 0},
         "to the left": fly[1] == {"left": 536, "top": 200, "maxH": 0},
         "capped": fly[2]["maxH"] == 780 and fly[2]["top"] == 10,
@@ -18643,7 +18671,9 @@ def _soc_flyout(src):
         and o["s2"] == [True, True] and o["e3"] is False,
         "closes together": o["s3"] == [True, True, ""],
         # a click opens it, a second click closes it; hovering opens it after a pause
-        "click": "        if(engSubId===el.dataset.sv&&!engSub.hidden)closeEngSub();\n"
+        "click": "        const a=flyClick(engSubId,engSub.hidden,engSubByHover,el.dataset.sv);\n"
+                 "        if(a===\"close\")closeEngSub();\n"
+                 "        else if(a===\"pin\")engSubByHover=false;   // a hover opened it; the click keeps it\n"
                  "        else openEngSub(el.dataset.sv,false,false);" in src,
         "hover": "        engSubTimer=setTimeout(()=>{\n          if(!engMenu.hidden)openEngSub(el.dataset.sv,false,true);},300);" in src
         and "      el.addEventListener(\"mouseleave\",()=>clearTimeout(engSubTimer));" in src
@@ -18716,7 +18746,13 @@ def _soc_adv(src):
           # all there: nothing is written
           + "calls.length=0;adv={local:['Llama 3.2 3B','Lab \\u00b7 any:1b'],cloud:[],comp:''};advPrune();out.p3=calls.slice();"
           # the servers aren't known yet: nothing is decided
-          + "calls.length=0;srvLoaded=false;adv={local:['Old \\u00b7 x:8b'],cloud:[],comp:''};advPrune();out.p4=calls.slice();"
+          + "calls.length=0;srvLoaded=false;adv={local:['Old \\u00b7 x:8b'],cloud:[],comp:''};advPrune();out.p4=calls.slice();srvLoaded=true;"
+          # a pick the server has dropped (paired, listing, without it): shown greyed, tickable; not sent; a council of ghosts falls back
+          + "adv={local:['Desk <b> \\u00b7 qwen3:14b','Desk <b> \\u00b7 dropped:7b','Lab \\u00b7 any:1b'],cloud:[],comp:''};"
+          + "out.ghost=[advGhost('Desk <b> \\u00b7 dropped:7b'),advGhost('Desk <b> \\u00b7 qwen3:14b'),advGhost('Lab \\u00b7 any:1b'),advGhost('Quiet \\u00b7 x:1b'),advGhost('Llama 3.2 3B'),advGhost('Old \\u00b7 x')];"
+          + "out.send=advSendList();out.ghostRows=advServerRows({local:adv.local});"
+          + "out.kept2=advKept(adv.local,['Desk <b> \\u00b7 qwen3:14b']);"
+          + "adv={local:['Desk <b> \\u00b7 dropped:7b'],cloud:[],comp:''};out.onlyGhosts=advSendList();"
           + "process.stdout.write(JSON.stringify(out));")
     try:
         o = _so_node("so37a.js", js)
@@ -18745,6 +18781,16 @@ def _soc_adv(src):
         "emptied": o["p2"][0] is None and o["p2"][2] is False
         and o["p2"][1] == ['pref:{"adv":null,"advon":false}', "setTier:Fast", "chip"],
         "untouched": o["p3"] == [] and o["p4"] == [],
+        # (UX review) a pick whose server is paired and listing but no longer has it: shown greyed as "no longer
+        # on <name>", still tickable so it can be removed, never sent; a server that is off isn't judged
+        "ghosts": o["ghost"] == [True, False, False, False, False, False]
+        and o["send"] == ["Desk <b> \u00b7 qwen3:14b", "Lab \u00b7 any:1b"] and o["onlyGhosts"] == []
+        and '<label class="advrow off"><input type="checkbox" data-l="Desk &lt;b&gt; \u00b7 dropped:7b" checked>' in o["ghostRows"]
+        and ">no longer on Desk &lt;b&gt;</span>" in o["ghostRows"]
+        and o["kept2"] == ["Lab \u00b7 any:1b"],
+        "ghost send": "  const advList=advOn&&adv?advSendList():[];\n  const advGhostOnly=!!(advOn&&adv&&!advList.length&&(adv.local||[]).length);" in src
+        and '        :{model:advGhostOnly?"":model,models:advGhostOnly?[]:council,\n          tier:advGhostOnly?"Fast":tier,' in src
+        and "so Fast answered.</div>\");" in src,
         # the save keeps what is not listed right now; the dialog is built from the groups
         "wired": "    +advServerRows(sel))\n    ||'<p class=\"advp\">no local models installed yet</p>';" in src
         and "  const comps=advCompList(pv,ready);" in src
@@ -18850,7 +18896,7 @@ _SO_MUT = [
     ("no title ticket", '            if (_srv_only or _srv_lbl) and _title_cid and not _gone:', '            if False:'),
     ("a title that falls to a local model", '            return _clean_title("".join(parts))\n        except Exception:\n            return ""',
      '            return _clean_title("".join(parts))\n        except Exception:\n            pass'),
-    ("an export titled by a local model", 'if len(src) > 200 and not (_srv_only or _srv_lbl) else ""', 'if len(src) > 200 else ""'),
+    ("an export titled by a local model", '                    and not (_srv_only or _srv_lbl or _seat_fb) else ""', '                    else ""'),
     ("no tiers row", 'out.update(server_only_tiers(self.ctx))', 'pass'),
     ("web search touched", '        bookish = False\n        placey = False\n',
      '        bookish = False\n        placey = _srv_only and False\n'),
@@ -18879,6 +18925,8 @@ _SO_MUT = [
     ("Escape closing everything at once", "  if(!engSub.hidden){closeEngSub();return true;}",
      "  if(!engSub.hidden){closeEngMenus();return true;}"),
     ("no click to open the flyout", "        else openEngSub(el.dataset.sv,false,false);", "        else{}"),
+    ("a click after a hover closing the flyout", '  return byHover?"pin":"close";', '  return "close";'),
+    ("a hover's flyout not kept by the click", '        else if(a==="pin")engSubByHover=false;   // a hover opened it; the click keeps it\n', ''),
     ("a repaint closing the flyout", "  if(engSubId)openEngSub(engSubId,true,engSubByHover);\n  else engSub.hidden=true;",
      "  engSub.hidden=true;"),
     ("the flyout's scroll lost on a repaint", "  const keep=keepScroll&&!engSub.hidden?engSub.scrollTop:-1;",
@@ -18905,6 +18953,12 @@ _SO_MUT = [
     ("a server's models not grouped", "'<div class=\"advgrp\"><b>'", "'<div class=\"advrow\"><b>'"),
     ("an unpaired server's models in Advanced", "  const gs=srvList.filter(s=>s.paired);\n  return gs.map(s=>{",
      "  const gs=srvList;\n  return gs.map(s=>{"),
+    ("the chip not naming a seat", '    if(!sv.length)return t;', '    return t;'),
+    ("a ghost pick sent", 'function advSendList(){return ((adv&&adv.local)||[]).filter(l=>!advGhost(l));}', 'function advSendList(){return ((adv&&adv.local)||[]);}'),
+    ("a guard or embedding model picked by Only", '          and srv_role_ok(m["name"], "all")]', '          ]'),
+    ("a ghost pick not shown", '    const ghosts=sel.local.filter(l=>advGhost(l)&&', '    const ghosts=[].filter(l=>advGhost(l)&&'),
+    ("a council of ghosts not falling back", '  const advGhostOnly=!!(advOn&&adv&&!advList.length&&(adv.local||[]).length);', '  const advGhostOnly=false;'),
+    ("an off server's pick called a ghost", '  return !!s&&(s.models||[]).length>0&&!(s.status||{}).err\n', '  return !!s\n'),
     ("a server's model offered as compositor", "m=>/^Gemma/.test(m.label)&&m.label.indexOf(SRV_SEP)<0)",
      "m=>/^Gemma/.test(m.label))"),
     ("the picks of an off server dropped at save", "  return (prev||[]).filter(l=>shown.indexOf(l)<0",
@@ -19057,9 +19111,12 @@ def _p2c_cands(src):
     ns["_srv_seen"].pop(e["id"], None)
     got["never checked"] = cn() == []
     _so_seen(ns, e, models, gpu={"vendor": "amd", "name": "C", "vram_bytes": 16 * GIB_})
-    # no figure for the card: the placement is all there is
+    # no figure for the card: for a model chosen FOR the person the owner's policy alone is not enough (rules
+    # review); a pick the person made, or "<name> Only", keeps the looser rule
     _so_seen(ns, e, models, gpu=None)
-    got["no card figure"] = "big:70b" in cn() and "spill:30b" not in cn()
+    got["no card figure"] = (cn() == [] and ns["_srv_fits"](models[0], None) is True
+                             and ns["_srv_fits"](models[0], None, True) is False
+                             and ns["_srv_fits"](models[3], None) is False)
     _so_seen(ns, e, models, gpu={"vendor": "amd", "name": "C", "vram_bytes": 16 * GIB_})
     # an unpaired server has no mode
     _sv_fake(ns, [_sv_unsigned])
@@ -19104,6 +19161,9 @@ def _p2c_cands(src):
     return all(got.values()), got
 
 
+_P2_GPU = {"vendor": "amd", "name": "Card", "vram_bytes": 16 * GIB_}
+
+
 def _p2_seat_ns(src, servers, local, tiers=None):
     """resolve_tier_seats and resolve_agent_seat exec'd with a small catalog, a ladder and what is
     installed locally (`local`), over the servers of p2 ns."""
@@ -19128,6 +19188,7 @@ def _p2_seat_ns(src, servers, local, tiers=None):
               AGENTS={"Coding": {"picks": ["Qwen 3.8 27B", "GPT-OSS 20B", "Gemma 4 26B"]}},
               resolve_agent=lambda n: (next((l for l in ["Qwen 3.8 27B", "GPT-OSS 20B", "Gemma 4 26B"] if l in local), None),
                                        {"picks": ["Qwen 3.8 27B", "GPT-OSS 20B", "Gemma 4 26B"]}))
+
     def tier_ready(name):
         t = tiers[name]
         base = [l for l in t["picks"] if l in local]
@@ -19135,54 +19196,61 @@ def _p2_seat_ns(src, servers, local, tiers=None):
             base += [l for l in rank if l in local and l not in base]
         return base or [l for l in rank if l in local]
     ns["_tier_ready"] = tier_ready
-    for fn in ("_label_params", "_seat_insert", "resolve_tier_seats", "resolve_agent_seat"):
+    for fn in ("_label_params", "resolve_tier_seats", "resolve_agent_seat"):
         exec(_p2_fn(src, fn), ns)
     exec("_TIER_ROLE = {'Fast': 'fast', 'Thinking': 'think', 'Pro': 'all'}\n_AGENT_ROLE = {'Coding': 'code'}", ns)
     return ns, ctx, ents
 
 
 def _p2c_seats(src):
-    """A model the ladder names that the server also has is the server's copy; one the catalog doesn't know takes the seat
-    its size earns; the counts stay; the local copy is the fallback behind each."""
-    ns, ctx, ents = _p2_seat_ns(src, [("Desk", "https://desk.example.com", [
+    """SERVER FIRST: the server's best suitable models fill a mode's seats before this Mac's, strongest first; its
+    copy of a local pick replaces it; what the server can't fill is the tier's own local picks, in order; the
+    counts stay; the local copy is the fallback behind each."""
+    D = [("Desk", "https://desk.example.com", [
         _m("gpt-oss:20b", size=13 * GIB_), _m("mistral-small:24b", size=14 * GIB_), _m("qwen3-coder:30b", size=12 * GIB_),
         _m("nomic-embed-text:335m", size=GIB_), _m("llama-guard3:8b", size=5 * GIB_), _m("llava:13b", size=8 * GIB_),
-        _m("deepseek-r1:14b", size=9 * GIB_), _m("hog:70b", "gpu+ram", 40 * GIB_)], {})],
-        local={"Gemma 4 26B", "GPT-OSS 20B", "Qwen 3.5 9B", "Llama 3.2 3B"})
+        _m("deepseek-r1:14b", size=9 * GIB_), _m("hog:70b", "gpu+ram", 40 * GIB_)], {})]
+    LOCAL = {"Gemma 4 26B", "GPT-OSS 20B", "Qwen 3.5 9B", "Llama 3.2 3B"}
+    ns, ctx, ents = _p2_seat_ns(src, D, local=LOCAL)
     seats = lambda t: [(s["label"], s["fb"]) for s in ns["resolve_tier_seats"](t, ctx)]
-    th = seats("Thinking")
-    pro = seats("Pro")
+    th, pro, fast = seats("Thinking"), seats("Pro"), seats("Fast")
     got = {
-        # the ladder's own pick, the server has it: the server's copy, this Mac's behind it
-        "matched": ("Desk · gpt-oss:20b", "GPT-OSS 20B") in th and ("Desk · gpt-oss:20b", "GPT-OSS 20B") in pro,
-        # a model the catalog doesn't know, by its size against the ladder: 24B sits after Gemma 26B and before GPT-OSS 20B
-        "by size": [l for l, _ in th] == ["Gemma 4 26B", "Desk · mistral-small:24b", "Desk · gpt-oss:20b"],
-        # Fast stays one model, Thinking three; Pro takes everything that fits
-        "counts": len(seats("Fast")) == 1 and len(th) == 3 and len(pro) > 3,
-        "fast": seats("Fast") == [("Gemma 4 26B", "")],
+        # the server's own models first, although this Mac holds a 26B Gemma (Patrick's rule)
+        "server first": [l for l, _ in th] == ["Desk · mistral-small:24b", "Desk · gpt-oss:20b", "Desk · deepseek-r1:14b"],
+        "fast": fast == [("Desk · mistral-small:24b", "Gemma 4 26B")],
+        # the server's copy of a local pick replaces it (its local copy is what answers if the server doesn't)
+        "copy": dict(th)["Desk · gpt-oss:20b"] == "GPT-OSS 20B" and dict(pro)["Desk · gpt-oss:20b"] == "GPT-OSS 20B",
+        "counts": len(fast) == 1 and len(th) == 3 and len(pro) > 3,
         # never a coder, an embedding, a guard or a picture reader; a distill only in Thinking and Pro; never gpu+ram
-        "families": all(not any(w in l for w in ("coder", "embed", "guard", "llava", "hog")) for l, _ in th + pro + seats("Fast"))
-        and "Desk · deepseek-r1:14b" in [l for l, _ in pro] and "Desk · deepseek-r1:14b" not in [l for l, _ in seats("Fast")],
-        # the fallback behind a server seat: its own local copy, else the mode's first local seat
-        "fallback": dict(pro).get("Desk · mistral-small:24b") == "Gemma 4 26B" and dict(pro).get("Desk · gpt-oss:20b") == "GPT-OSS 20B",
-        # Cloud Only has none
+        "families": all(not any(w in l for w in ("coder", "embed", "guard", "llava", "hog")) for l, _ in th + pro + fast)
+        and "Desk · deepseek-r1:14b" in [l for l, _ in pro] and "Desk · deepseek-r1:14b" not in [l for l, _ in fast],
+        "fallback": dict(pro)["Desk · mistral-small:24b"] == "Gemma 4 26B",
+        # what the server can't fill: this Mac's own picks in their normal order, none twice
+        "locals fill the rest": pro[3:] == [("Gemma 4 26B", ""), ("Qwen 3.5 9B", ""), ("Llama 3.2 3B", "")]
+        and sum(1 for l, _ in pro if l == "GPT-OSS 20B" or l.endswith("gpt-oss:20b")) == 1,
         "cloud only": seats("Cloud Only") == [],
     }
+    # a server with two suitable models for three seats: two of its, then this Mac's best
+    n2, c2, e2 = _p2_seat_ns(src, [("Desk", "https://desk.example.com", [
+        _m("gpt-oss:20b", size=13 * GIB_), _m("mistral-small:24b", size=14 * GIB_)], {})], local=LOCAL)
+    got["partly filled"] = [(s["label"], s["fb"]) for s in n2["resolve_tier_seats"]("Thinking", c2)] == [
+        ("Desk · mistral-small:24b", "Gemma 4 26B"), ("Desk · gpt-oss:20b", "GPT-OSS 20B"), ("Gemma 4 26B", "")]
     # the switch off: this computer's answer, as before; a server that isn't answering too
-    cn0 = [(s["label"], s["fb"]) for s in ns["resolve_tier_seats"]("Thinking", ctx)]
-    ns["server_set_prefer"](ctx, ents["Desk"]["id"], False)
-    off = seats("Thinking")
     base = [(l, "") for l in ns["_tier_ready"]("Thinking")[:3]]
-    got["switch off"] = off == base and cn0 != base
+    ns["server_set_prefer"](ctx, ents["Desk"]["id"], False)
+    got["switch off"] = seats("Thinking") == base and th != base
     ns["server_set_prefer"](ctx, ents["Desk"]["id"], True)
     _so_seen(ns, ents["Desk"], [_m("gpt-oss:20b", size=13 * GIB_)], reachable=False, err="down")
     got["unreachable"] = seats("Thinking") == base
     # only gpu+ram models: never auto-routed
     _so_seen(ns, ents["Desk"], [_m("gpt-oss:20b", "gpu+ram", 13 * GIB_), _m("mistral-small:24b", "unknown", 14 * GIB_)])
     got["gpu+ram never"] = seats("Thinking") == base and seats("Pro") == [(l, "") for l in ns["_tier_ready"]("Pro")]
-    # a server model that isn't installed here still takes the ladder's seat (nothing local to fall back to)
+    # a card whose size the gateway didn't report: the owner's policy alone is not enough to route for the person
+    _so_seen(ns, ents["Desk"], [_m("gpt-oss:20b", size=13 * GIB_)], gpu=None)
+    got["no card figure"] = seats("Thinking") == base
     _so_seen(ns, ents["Desk"], [_m("gpt-oss:20b", size=13 * GIB_)])
-    ns2, ctx2, e2 = _p2_seat_ns(src, [("Desk", "https://desk.example.com", [_m("gpt-oss:20b", size=13 * GIB_)], {})], local=set())
+    # a server model that isn't installed here still takes the seat (nothing local to fall back to)
+    ns2, ctx2, e2b = _p2_seat_ns(src, [("Desk", "https://desk.example.com", [_m("gpt-oss:20b", size=13 * GIB_)], {})], local=set())
     s2 = ns2["resolve_tier_seats"]("Fast", ctx2)
     got["not installed here"] = [(s["label"], s["fb"]) for s in s2] == [("Desk · gpt-oss:20b", "")]
     # another profile's servers never seat anything
@@ -19205,9 +19273,10 @@ def _p2c_seats(src):
 
 
 def _p2c_first(src):
-    """A mode's server seat: asked first; before its first word a failure falls to this Mac's copy
-    (RESET, a status line, the badge); after one it stops there; never another server, never the cloud."""
-    ns, ctx, ents = _p2_ns(src, [("Desk", "https://desk.example.com", [_m("small:8b")], {}),
+    """A mode's server seat: asked first within a first-word deadline; before its first word a failure falls to this
+    Mac's copy (RESET, status, badge) and marks the server down; after one it stops there; Fast's second pass runs on
+    the same server and a failure in it keeps the first draft; never another server, never the cloud."""
+    ns, ctx, ents = _p2_ns(src, [("Desk", "https://desk.example.com", [_m("small:8b", size=5 * GIB_)], {}),
                                  ("Lab", "https://lab.example.com", [_m("lab:70b", server="Lab")], {})])
     L = "Desk · small:8b"
     ns["_DraftAbandoned"] = Exception
@@ -19217,47 +19286,112 @@ def _p2c_first(src):
         hit.append(a)
         raise AssertionError("the cloud was asked")
     ns.update(cloud_text=poison, cloud_stream_conf=poison)
-    ran = []
-    ns["run_model"] = lambda label, msgs, emit: (ran.append(label), ns["server_stream"](label, msgs, emit)
-                                                 if ns["server_label"](label) else emit("LOCAL ANSWER"))[-1]
-    ns["_stream_guarded"] = lambda label, msgs, emit, status, fb, note: ns["run_model"](label, msgs, emit, )
-    exec(_p2_fn(src, "server_first_answer"), ns)
-    lines = [_SvResp(200, lines=[{"message": {"content": "Hel"}, "done": False},
-                                 {"message": {"content": "lo"}, "done": True}])]
+    ran, dl = [], []
 
-    def run(script, fb="Gemma 4 26B"):
+    def run_model(label, msgs, emit, thinking=False):
+        ran.append(label)
+        dl.append(getattr(ns["_srv_first"], "s", "unset"))
+        if ns["server_label"](label):
+            return ns["server_stream"](label, msgs, emit)
+        emit("LOCAL ANSWER")
+    ns["run_model"] = run_model
+    ns["_stream_guarded"] = lambda label, msgs, emit, status, fb, note: run_model(label, msgs, emit)
+    ns.update(strip_think=lambda x: x, _looks_degenerate=lambda t: False)
+    exec(_p2_fn(src, "server_first_answer"), ns)
+    lines = lambda *txt: _SvResp(200, lines=[{"message": {"content": x}, "done": i == len(txt) - 1} for i, x in enumerate(txt)])
+
+    def run(script, fb="Gemma 4 26B", polish=None, first_s=60.0):
         said, frames, st = [], [], []
         ran.clear()
+        dl.clear()
         sent = _sv_fake(ns, list(script))
-        ok = ns["server_first_answer"](L, fb, [{"role": "user", "content": "hi"}], said.append,
-                                       lambda c: (frames if isinstance(c, ns["Ctl"]) else said).append(c), st.append,
-                                       lambda *a: None)
-        return ok, "".join(x for x in said if not isinstance(x, ns["Ctl"])), frames, st, sent
-    ok, t, fr, st, sent = run([lines[0]])
-    got = {"served": ok is True and t == "Hello" and [f for f in fr if "RESET" in f] == []
-           and any('"w": "server"' in f and '"s": "Desk"' in f for f in fr) and ran == [L]}
+        res = ns["server_first_answer"](L, fb, [{"role": "user", "content": "hi"}], said.append,
+                                        lambda c: (frames if isinstance(c, ns["Ctl"]) else said).append(c), st.append,
+                                        lambda *a: None, first_s=first_s, polish=polish)
+        return res, "".join(x for x in said if not isinstance(x, ns["Ctl"])), frames, st, sent
+    fresh = lambda: _so_seen(ns, ents["Desk"], [_m("small:8b", size=5 * GIB_)], gpu=dict(_P2_GPU))
+    res, t, fr, st, sent = run([lines("Hel", "lo")], first_s=30)
+    got = {"served": res == "server" and t == "Hello" and [f for f in fr if "RESET" in f] == []
+           and any('"w": "server"' in f and '"s": "Desk"' in f for f in fr) and ran == [L],
+           # the first-word deadline is in force for the call (a pick the person made has none)
+           "deadline in force": dl == [30] and getattr(ns["_srv_first"], "s", None) is None
+           and not ns["server_label_down"](ctx, L)}
     # the server is down before it sends a word: this Mac's copy answers, the page is told to drop what it has
-    ok, t, fr, st, sent = run([_SvResp(503, {"code": "busy"})])
-    got["falls back"] = (ok is True and t == "LOCAL ANSWER" and ran == [L, "Gemma 4 26B"]
+    res, t, fr, st, sent = run([_SvResp(503, {"code": "busy"})])
+    got["falls back"] = (res == "fallback" and t == "LOCAL ANSWER" and ran == [L, "Gemma 4 26B"]
                          and any("RESET" in f for f in fr) and fr.index([f for f in fr if "RESET" in f][0])
                          < fr.index([f for f in fr if '"w": "local"' in f][0])
                          and any('"m": "Gemma 4 26B"' in f for f in fr)
                          and any("Desk didn’t answer, so Gemma 4 26B answers here" in x for x in st))
+    # and the server is marked down: skipped by the modes and funnels for a minute, its memory and pin passes not asked,
+    # until a check that succeeds clears it
+    got["marked down"] = (ns["server_label_down"](ctx, L) and [m["label"] for m in ns["server_mode_candidates"](ctx)] == ["Lab · lab:70b"]
+                          and not ns["server_label_down"](ctx, "Lab · lab:70b"))
+    # a mark lasts a minute, then the server is asked again
+    ns["_srv_seen"][ents["Desk"]["id"]]["at"] = time.time() - 3600
+    got["mark ages"] = not ns["server_label_down"](ctx, L)
+    ns["_srv_seen"][ents["Desk"]["id"]]["at"] = time.time()
+    fresh()
+    got["cleared by a check"] = not ns["server_label_down"](ctx, L) and len(ns["server_mode_candidates"](ctx)) == 2
     # an error line before any word (the stream's last line): the same
-    ok, t, fr, st, sent = run([_SvResp(200, lines=[{"error": "out of memory", "code": "gpu_spill"}])])
-    got["error line"] = ok is True and t == "LOCAL ANSWER" and any("RESET" in f for f in fr)
+    res, t, fr, st, sent = run([_SvResp(200, lines=[{"error": "out of memory", "code": "gpu_spill"}])])
+    got["error line"] = res == "fallback" and t == "LOCAL ANSWER" and any("RESET" in f for f in fr)
+    fresh()
     # after a word: one answer, cut there and said; no second answer, no RESET
-    ok, t, fr, st, sent = run([_SvResp(200, lines=[{"message": {"content": "Hel"}, "done": False},
-                                                   {"error": "out of memory", "code": "gpu_spill"}])])
-    got["after a word"] = (ok is False and t.startswith("Hel") and "⚠️" in t and "LOCAL ANSWER" not in t
+    res, t, fr, st, sent = run([_SvResp(200, lines=[{"message": {"content": "Hel"}, "done": False},
+                                                    {"error": "out of memory", "code": "gpu_spill"}])])
+    got["after a word"] = (res == "failed" and t.startswith("Hel") and "⚠️" in t and "LOCAL ANSWER" not in t
                            and ran == [L] and not any("RESET" in f for f in fr))
+    fresh()
     # nothing behind it: said
-    ok, t, fr, st, sent = run([_SvResp(503, {"code": "busy"})], fb="")
-    got["no copy"] = ok is False and t.startswith("⚠️ Desk is busy") and ran == [L]
+    res, t, fr, st, sent = run([_SvResp(503, {"code": "busy"})], fb="")
+    got["no copy"] = res == "failed" and t.startswith("⚠️ Desk is busy") and ran == [L]
+    fresh()
     # never another server, never the cloud: every request went to Desk's gateway, the cloud was never asked
-    ok, t, fr, st, sent = run([_SvResp(503, {"code": "busy"})])
-    got["no cross"] = (all(r["server"] == "Desk" for r in sent) and len(sent) == 1 and not hit
+    res, t, fr, st, sent = run([_SvResp(503, {"code": "busy"})])
+    got["no cross"] = (all(r_["server"] == "Desk" for r_ in sent) and len(sent) == 1 and not hit
                        and "Lab · lab:70b" not in ran)
+    fresh()
+    # Fast's second pass, on the same server, inside the same deadline
+    pol = lambda d: [{"role": "user", "content": "REVISE " + d}]
+    res, t, fr, st, sent = run([lines("Dra", "ft"), lines("Bet", "ter")], polish=pol, first_s=30)
+    got["polish"] = (res == "server" and t == "Better" and ran == [L, L] and dl == [30, 30]
+                     and "REVISE Draft" in json.loads(sent[1]["body"])["messages"][-1]["content"]
+                     and all(r_["server"] == "Desk" for r_ in sent) and not any("RESET" in f for f in fr))
+    fresh()
+    # the server fails during the second pass: the first draft stands, nothing alarming
+    res, t, fr, st, sent = run([lines("Draft"), _SvResp(503, {"code": "busy"})], polish=pol)
+    got["polish fails"] = res == "server" and t == "Draft" and "⚠" not in t and not any("RESET" in f for f in fr)
+    fresh()
+    res, t, fr, st, sent = run([lines("Draft"), _SvResp(200, lines=[{"message": {"content": "Bet"}, "done": False},
+                                                                     {"error": "x", "code": "gpu_spill"}])], polish=pol)
+    got["polish fails midway"] = (res == "server" and t.endswith("Draft") and "⚠" not in t
+                                  and any("RESET" in f for f in fr))
+    fresh()
+    # the draft itself fails before a word: this Mac's copy
+    res, t, fr, st, sent = run([_SvResp(503, {"code": "busy"})], polish=pol)
+    got["polish draft fails"] = res == "fallback" and t == "LOCAL ANSWER" and any("RESET" in f for f in fr)
+    fresh()
+    # a real socket: a seat gives up on a first word at its deadline, a pick the person made waits as long as SRV_FIRST_S
+    ns2, ctx2, d2 = _sv_ns(src)
+    srv = _sv_stall_server(first_line=False, hold=4.0)
+    _sv_paired(ns2, ctx2, url="http://127.0.0.1:%d" % srv.server_address[1])
+    ns2["_srv_send"] = ns2["_srv_send_real"]
+    ns2.update(SRV_FIRST_S=2, SRV_IDLE_S=2)
+    res2 = {}
+    for key, dlin in (("seat", 1), ("pick", None)):
+        t0 = time.monotonic()
+        try:
+            with ns2["server_first_deadline"](dlin):
+                ns2["server_stream"]("Desktop · small:8b", [{"role": "user", "content": "q"}], [].append)
+            r_ = "answered"
+        except ns2["ServerError"] as se:
+            r_ = str(se)
+        res2[key] = (r_, round(time.monotonic() - t0, 1))
+    srv.shutdown()
+    got["first-word deadline"] = (res2["seat"][0] == "Desktop sent nothing for 1 seconds, so the answer stopped there." and res2["seat"][1] < 1.9
+                                  and res2["pick"][0] == "Desktop sent nothing for 2 seconds, so the answer stopped there."
+                                  and res2["pick"][1] >= 1.9)
     return all(got.values()), got
 
 
@@ -19265,9 +19399,27 @@ class _RcCtl(str):
     pass
 
 
+_RC_DL = _t34.local()
+
+
+class _RcDeadline:
+    """server_first_deadline's stand-in: what the deadline in force is, for the thread."""
+
+    def __init__(self, s):
+        self.s = s
+
+    def __enter__(self):
+        self.p = getattr(_RC_DL, "s", "unset")
+        _RC_DL.s = self.s
+        return self
+
+    def __exit__(self, *a):
+        _RC_DL.s = self.p
+
+
 def _p2_council(src, run_model, **over):
     rc = _p2_fn(src, "run_council", "\n\n\nRESEARCH_PLAN = (")
-    calls = []
+    calls, downs = [], []
     ns = {"threading": _t34, "time": time, "json": json, "NUL": "\0", "re": re, "Ctl": _RcCtl,
           "strip_think": lambda x: x, "_looks_degenerate": lambda t: False,
           "model_cached": lambda l, p=None: True, "model_fits_memory": lambda l: True,
@@ -19276,28 +19428,33 @@ def _p2_council(src, run_model, **over):
           "ctx_thread": lambda target, ctx=None, bind=True, **kw: _t34.Thread(target=target, **kw),
           "_DraftAbandoned": type("_DraftAbandoned", (Exception,), {}), "MERGE_RANK": [], "merge_pref_label": lambda: "",
           "MODEL_ROUTES": {}, "MODEL_INFO": {}, "run_model": run_model,
-          "_stream_guarded": lambda label, msgs, emit, status, fb, note: calls.append(("merge", label)) or emit("MERGED"),
+          "_stream_guarded": lambda label, msgs, emit, status, fb, note: calls.append(("merge", label, getattr(_RC_DL, "s", "unset"))) or emit("MERGED"),
           "compositor_ladder": lambda: [], "fast_cloud_ladder": lambda: [], "claude_refusal_conf": lambda c: None,
           "SYNTH_INSTRUCTION": "S", "PEER_INSTRUCTION": "P", "cloud_stream_conf": lambda *a: False,
           "_answered": {}, "cloud_glitch": lambda *a: None, "cloud_text": lambda *a, **k: "",
           "server_copy": lambda *a, **k: None, "server_mode_candidates": lambda c: [], "server_speeds": lambda c: {},
-          "bound_ctx": lambda: None, "ServerError": type("ServerError", (RuntimeError,), {})}
+          "bound_ctx": lambda: None, "ServerError": type("ServerError", (RuntimeError,), {}),
+          "server_first_deadline": _RcDeadline, "server_mark_down": lambda ctx, name, why: downs.append((name, why))}
     ns.update(over)
     exec(rc, ns)
+    ns["_downs"] = downs
     return ns, calls
 
 
 def _p2c_council(src):
-    """Server drafts run beside this computer's and the cloud's, one at a time on each server; a failed draft is
-    absent; the merge runs on the server when the merger is a model it has; a pen named in Advanced stays."""
-    T = {}
+    """Server drafts run beside this computer's and the cloud's, one at a time on each server, each inside a mode's
+    first-word deadline; a failed draft is absent and marks its server down; peer review, reflection and a server
+    merge carry the same deadline; the merge runs on the server when the merger is a model it has; a pen named in
+    Advanced stays."""
+    T, R = {}, []
     lock = _t34.Lock()
 
     def rm(label, msgs, emit, thinking=False):
         t0 = time.time()
+        R.append((label, getattr(_RC_DL, "s", "unset"), "P" if str(msgs[-1].get("content", "")).startswith("P") else "d"))
         time.sleep(0.4)
         if label == "Desk · bad":
-            raise RuntimeError("boom")
+            raise ns["ServerError"]("Desk didn’t answer.")
         with lock:
             T[label] = (t0, time.time())
         emit("answer from " + label + " " * 3)
@@ -19305,9 +19462,10 @@ def _p2c_council(src):
     out, frames, stat = [], [], []
     t0 = time.time()
     ns["run_council"](["Desk · a", "Desk · b", "Lab · c", "Llama", "Gemma"], [{"role": "user", "content": "q"}],
-                      lambda c: (frames if isinstance(c, _RcCtl) else out).append(c), stat.append)
+                      lambda c: (frames if isinstance(c, _RcCtl) else out).append(c), stat.append, srv_first_s=60.0)
     wall = time.time() - t0
     ov = lambda x, y: T[x][0] < T[y][1] and T[y][0] < T[x][1]
+    drafts = {l: dlv for l, dlv, k in R if k == "d"}
     got = {
         # a server's models in turn (it has one card); this Mac's in turn; the two loops and the other server beside them
         "one at a time per server": T["Desk · b"][0] >= T["Desk · a"][1] - 0.02,
@@ -19316,22 +19474,48 @@ def _p2c_council(src):
         "wall": wall < 1.6,          # serial would be 2.0 s and more
         "merged": "MERGED" in out and calls and calls[-1][0] == "merge",
         "drafts shown": len([f for f in frames if '"DRAFT' in f or "DRAFT:" in f]) == 5,
+        # a mode's server seats give up on a first word early; this Mac's own drafts have no such deadline
+        "deadline for seats": drafts["Desk · a"] == 60.0 and drafts["Lab · c"] == 60.0 and drafts["Llama"] is None
+        and drafts["Gemma"] is None,
+        # (merge on this Mac's first answered model here: no deadline for it)
+        "merge deadline": calls[-1][2] in (60.0, None),
     }
-    # a failed draft is absent, the rest merge
+    # an explicit council (Advanced) keeps the long wait
+    R.clear()
+    ns, calls = _p2_council(src, rm)
+    ns["run_council"](["Desk · a", "Llama"], [{"role": "user", "content": "q"}], lambda c: None, [].append)
+    got["explicit: long wait"] = {l: dlv for l, dlv, k in R}["Desk · a"] is None
+    # a failed draft is absent, the rest merge, and its server is marked down
+    R.clear()
     ns, calls = _p2_council(src, rm)
     frames = []
     out = []
     ns["run_council"](["Desk · a", "Desk · bad", "Llama"], [{"role": "user", "content": "q"}],
-                      lambda c: (frames if isinstance(c, _RcCtl) else out).append(c), [].append)
-    got["absent"] = any("Desk \\u00b7 bad" in f and "no answer" in f for f in frames) and "MERGED" in out
-    # the merge on the server: Gemma is the merger, the server has its copy, this Mac's behind it
+                      lambda c: (frames if isinstance(c, _RcCtl) else out).append(c), [].append, srv_first_s=60.0)
+    got["absent, marked down"] = (any("Desk \\u00b7 bad" in f and "no answer" in f for f in frames) and "MERGED" in out
+                                  and ns["_downs"] == [("Desk", "Desk didn’t answer.")])
+    # peer review and reflection on a server's models carry the deadline; on this Mac's they are as they were
+    R.clear()
+    ns, calls = _p2_council(src, rm)
+    ns["run_council"](["Desk · a", "Lab · c", "Llama"], [{"role": "user", "content": "q"}], lambda c: None, [].append,
+                      peer=True, srv_first_s=60.0)
+    pr = {l: dlv for l, dlv, k in R if k == "P"}
+    got["peer review"] = pr.get("Desk · a") == 60.0 and pr.get("Lab · c") == 60.0 and pr.get("Llama") == "unset"
+    R.clear()
+    ns, calls = _p2_council(src, rm, merge_pref_label=lambda: "Desk · a", MERGE_RANK=["Desk · a"])
+    ns["run_council"](["Desk · a", "Lab · c"], [{"role": "user", "content": "q"}], lambda c: None, [].append,
+                      reflect=True, srv_first_s=60.0)
+    rf = [dlv for l, dlv, k in R if l == "Desk · a" and k == "d"]
+    got["reflection"] = 60.0 in rf[1:] and len(rf) >= 2
+    # the merge on the server: Gemma is the merger, the server has its copy, this Mac's behind it, inside the deadline
     info = {"Gemma 4 26B": {"ollama": "gemma4:26b", "size": "26B"}}
     cand = [{"name": "gemma4:26b", "label": "Desk · gemma4:26b", "params": 26.0, "server": "Desk"}]
     sc = lambda tag, cands, speeds=None: cands[0] if tag == "gemma4:26b" else None
-    ns, calls = _p2_council(src, rm, merge_pref_label=lambda: "Gemma 4 26B", MODEL_ROUTES={"Gemma 4 26B": ("ollama", "gemma4:26b")},
-                            MODEL_INFO=info, server_copy=sc, server_mode_candidates=lambda c: cand, MERGE_RANK=["Gemma 4 26B"])
-    ns["run_council"](["Desk · a", "Llama"], [{"role": "user", "content": "q"}], lambda c: None, [].append)
-    got["merge on the server"] = calls == [("merge", "Desk · gemma4:26b")]
+    kw = dict(merge_pref_label=lambda: "Gemma 4 26B", MODEL_ROUTES={"Gemma 4 26B": ("ollama", "gemma4:26b")},
+              MODEL_INFO=info, server_copy=sc, server_mode_candidates=lambda c: cand, MERGE_RANK=["Gemma 4 26B"])
+    ns, calls = _p2_council(src, rm, **kw)
+    ns["run_council"](["Desk · a", "Llama"], [{"role": "user", "content": "q"}], lambda c: None, [].append, srv_first_s=60.0)
+    got["merge on the server"] = calls == [("merge", "Desk · gemma4:26b", 60.0)]
     # the server doesn't write it: this Mac's copy does
     seen = []
 
@@ -19340,21 +19524,17 @@ def _p2c_council(src):
         if label.startswith("Desk"):
             raise RuntimeError("down")
         emit("LOCAL MERGE")
-    ns, calls = _p2_council(src, rm, merge_pref_label=lambda: "Gemma 4 26B", MODEL_ROUTES={"Gemma 4 26B": ("ollama", "gemma4:26b")},
-                            MODEL_INFO=info, server_copy=sc, server_mode_candidates=lambda c: cand, MERGE_RANK=["Gemma 4 26B"],
-                            _stream_guarded=sg)
+    ns, calls = _p2_council(src, rm, _stream_guarded=sg, **kw)
     out = []
     ns["run_council"](["Desk · a", "Llama"], [{"role": "user", "content": "q"}],
                       lambda c: None if isinstance(c, _RcCtl) else out.append(c), [].append)
     got["merge falls back"] = seen == ["Desk · gemma4:26b", "Gemma 4 26B"] and "LOCAL MERGE" in out
-    # a pen the person named in Advanced stays as named; with no local copy the best draft ships
-    ns, calls = _p2_council(src, rm, merge_pref_label=lambda: "Gemma 4 26B", MODEL_ROUTES={"Gemma 4 26B": ("ollama", "gemma4:26b")},
-                            MODEL_INFO=info, server_copy=sc, server_mode_candidates=lambda c: cand, MERGE_RANK=["Gemma 4 26B"])
+    # a pen named in Advanced stays as named; with no local copy the best draft ships
+    ns, calls = _p2_council(src, rm, **kw)
     ns["run_council"](["Desk · a", "Llama"], [{"role": "user", "content": "q"}], lambda c: None, [].append, comp="Gemma 4 26B")
-    got["named pen"] = calls == [("merge", "Gemma 4 26B")]
-    ns, calls = _p2_council(src, rm, merge_pref_label=lambda: "Gemma 4 26B", MODEL_ROUTES={"Gemma 4 26B": ("ollama", "gemma4:26b")},
-                            MODEL_INFO=info, server_copy=sc, server_mode_candidates=lambda c: cand, MERGE_RANK=["Gemma 4 26B"],
-                            model_cached=lambda l, p=None: l != "Gemma 4 26B", _stream_guarded=sg)
+    got["named pen"] = [c[:2] for c in calls] == [("merge", "Gemma 4 26B")]
+    kw2 = dict(kw, model_cached=lambda l, p=None: l != "Gemma 4 26B", _stream_guarded=sg)
+    ns, calls = _p2_council(src, rm, **kw2)
     seen.clear()
     out = []
     ns["run_council"](["Desk · a", "Llama"], [{"role": "user", "content": "q"}],
@@ -19365,11 +19545,12 @@ def _p2c_council(src):
 
 def _p2_funnel(src, servers, cloud_ok=True, local=("Gemma 4 26B",), gate_fail=False):
     ns, ctx, ents = _p2_ns(src, servers)
-    calls = []
+    calls, dls = [], []
     ok_json = json.dumps({"q": "Which way?", "options": [{"label": "A", "why": "x"}, {"label": "B", "why": "y"}]})
 
     def run_model(label, msgs, emit, thinking=False):
         calls.append(("model", label))
+        dls.append(getattr(ns["_srv_first"], "s", "unset"))
         if label in ns.get("_down", ()):
             raise RuntimeError("down")
         emit("{}" if gate_fail and label.startswith("Desk") else ok_json)
@@ -19383,13 +19564,15 @@ def _p2_funnel(src, servers, cloud_ok=True, local=("Gemma 4 26B",), gate_fail=Fa
               model_cached=lambda l, p=None: l in local, model_fits_memory=lambda l: True,
               _stage_ok=lambda data, asked, opts: bool(data.get("options")))
     exec(_p2_fn(src, "funnel_stage"), ns)
+    ns["_dls"] = dls
     return ns, ctx, ents, calls
 
 
 def _p2c_funnel(src):
-    """A funnel: cloud first when ticked and allowed, then the server (the same chooser as the modes), then this Mac;
-    with the box unticked no cloud model is asked anywhere; fast and normal pick differently; a server that fails
-    falls to this Mac; never a coder, an embedding, a guard model or one that needs system memory."""
+    """A funnel: cloud first when ticked and allowed, then the server (the same chooser as the modes, inside a first-word
+    deadline), then this Mac; with the box unticked no cloud model is asked in a stage, the retry or the verdict; a server
+    that fails is marked down and skipped; a recovered server is asked for again; never a coder, an embedding, a guard
+    model or one that needs system memory."""
     models = [_m("qwen3:14b", size=9 * GIB_), _m("gpt-oss:20b", size=13 * GIB_), _m("gemma3:12b", size=8 * GIB_),
               _m("qwen3-coder:30b", size=12 * GIB_), _m("nomic-embed-text:335m", size=GIB_), _m("llama-guard3:8b", size=5 * GIB_),
               _m("deepseek-r1:14b", size=9 * GIB_), _m("hog:70b", "gpu+ram", 40 * GIB_), _m("mistral-small:24b", "gpu+ram", 14 * GIB_)]
@@ -19416,22 +19599,28 @@ def _p2c_funnel(src):
     ns, ctx, ents, calls = _p2_funnel(src, S, cloud_ok=False)
     r = ns["funnel_stage"](*args, effort="normal", cloud=True)
     got["ticked, no cloud"] = calls == [("model", "Desk · gpt-oss:20b")]
-    # effort: fast a quick 7-15B instruction model, normal the strongest general one that fits the card whole
+    # effort: fast a quick 7-15B instruction model (30 s to a first word), normal the strongest general one (60 s)
     ns, ctx, ents, calls = _p2_funnel(src, S)
     ns["funnel_stage"](*args, effort="fast", cloud=False)
     ns["funnel_stage"](*args, effort="normal", cloud=False)
     got["fast != normal"] = [c[1] for c in calls] == ["Desk · qwen3:14b", "Desk · gpt-oss:20b"]
+    got["deadlines"] = ns["_dls"] == [30, 60] and getattr(ns["_srv_first"], "s", None) is None
     # a coder, an embedding, a guard model, a distill and gpu+ram models are never picked, at any effort
     picks = {ns["server_funnel_pick"](ctx, e)["name"] for e in ("fast", "normal")}
     got["families"] = picks <= {"qwen3:14b", "gpt-oss:20b", "gemma3:12b"} and not any(
         w in n for n in picks for w in ("coder", "embed", "guard", "r1", "hog", "mistral-small"))
-    # a server that fails is skipped: this Mac next, with its engine said
+    # a server that fails is skipped: this Mac next, with its engine said; and marked down, so the next stage skips it
     ns, ctx, ents, calls = _p2_funnel(src, S)
     ns["_down"] = {"Desk · gpt-oss:20b"}
     r = ns["funnel_stage"](*args, effort="normal", cloud=False)
     got["server fails"] = calls == [("model", "Desk · gpt-oss:20b"), ("model", "Gemma 4 26B")] and r["engine"] == "local:Gemma 4 26B"
-    # no server: this Mac, as before
+    calls.clear()
+    r = ns["funnel_stage"](*args, effort="normal", cloud=False)
+    got["marked down"] = (calls == [("model", "Gemma 4 26B")] and ns["server_label_down"](ctx, "Desk · gpt-oss:20b")
+                          and ns["server_funnel_pick"](ctx, "normal") is None)
+    # no server: this Mac, as before, and no ledger read
     ns, ctx, ents, calls = _p2_funnel(src, [], local=("Gemma 4 26B",))
+    ns["usage_read"] = lambda c: (_ for _ in ()).throw(AssertionError("the ledger was read"))
     r = ns["funnel_stage"](*args, effort="normal", cloud=False)
     got["no server"] = calls == [("model", "Gemma 4 26B")] and r["engine"] == "local:Gemma 4 26B"
     # the switch off: no server either
@@ -19439,36 +19628,54 @@ def _p2c_funnel(src):
     ns["server_set_prefer"](ctx, ents["Desk"]["id"], False)
     ns["funnel_stage"](*args, effort="normal", cloud=False)
     got["switch off"] = calls == [("model", "Gemma 4 26B")]
+    # before a stage a server last checked over a minute ago is asked again (5 s at most): a recovered one is used
+    ns, ctx, ents, calls = _p2_funnel(src, S)
+    asked = []
+    ns["server_check"] = lambda ent, limit=15.0: (asked.append((ent["name"], limit)),
+                                                  _so_seen(ns, ent, models, gpu=dict(_P2_GPU)))[-1]
+    _so_seen(ns, ents["Desk"], models, at=time.time() - 3600, reachable=False, err="down", gpu=dict(_P2_GPU))
+    ns["funnel_stage"](*args, effort="normal", cloud=False)
+    got["refreshed"] = asked == [("Desk", 5.0)] and calls == [("model", "Desk · gpt-oss:20b")]
     # the verdict and the endpoint: the same chooser, no cloud when unticked, the audit only with cloud
     ch = src[src.index('        if self.path == "/api/funnel":'):]
     ch = ch[:ch.index('        if self.path == "/api/prefs":')]
     got["endpoint"] = (
-        '            use_cloud = d.get("cloud") is not False and cloud_allowed()\n' in ch
+        '            use_cloud = (d.get("cloud") is not False and _saved_cloud\n                         and cloud_allowed())\n' in ch
+        and '                _saved_cloud = (user_prefs(self.ctx).get("funnel_cloud", True)\n                                is not False)' in ch
+        and "                _saved_cloud = False\n" in ch
         and "                if use_cloud:\n                    for _conf in work_ladder(\"work\"):" in ch
-        and '                        _sp = server_funnel_pick(self.ctx, "normal")' in ch
+        and '                        server_refresh_modes(self.ctx)\n                        _sp = server_funnel_pick(self.ctx, "normal")' in ch
+        and "                            with server_first_deadline(60):\n                                run_model(_sp[\"label\"], msgs, _sparts.append)" in ch
+        and "                            server_mark_down(self.ctx, _sp[\"server\"], str(_exc))" in ch
         and "                  if out and use_cloud:\n                    _audit = [" in ch
         and ch.index("if use_cloud:\n                    for _conf in work_ladder") < ch.index("server_funnel_pick(self.ctx")
         < ch.index("lbl = next((l for l in MERGE_RANK")
-        and "cloud_allowed()" not in ch.replace('d.get("cloud") is not False and cloud_allowed()', "")
+        and "cloud_allowed()" not in ch.replace("and cloud_allowed())", "")
         and '                              cloud=use_cloud)' in ch and '"total": total, "engine": _eng,' in ch)
     return all(got.values()), got
 
 
 def _p2c_funpage(src):
-    """"Include cloud models" under the effort pair: where it sits, what it sends, when it is greyed (node); the
-    preference's type check."""
-    i0 = src.index("let fnCloudOn=true;")
-    i1 = src.index("fnCloudLoad();\n/* the funnel effort is remembered")
+    """"Include cloud models" under the effort pair: where it sits, what it sends, when it is greyed and what it says,
+    that a late answer doesn't flip it back, the preference's type check (node)."""
+    i0 = src.index("let fnCloudOn=true,")
+    i1 = src.index('$("#fn-cloud").addEventListener("change"')
     js = ("const els={};const mk=()=>({disabled:false,checked:true,title:'',classList:{on:false,toggle(c,v){this.on=!!v;}}});"
           "els['#fn-cloud']=mk();els['#fn-cloud-row']=mk();const $=s=>els[s];"
-          + src[i0:src.index("async function fnCloudLoad(){")]
-          + "const out={};"
-          "fnCloudPaint({configured:true,turbo:true});out.ok=[els['#fn-cloud'].disabled,els['#fn-cloud'].checked,els['#fn-cloud-row'].classList.on,els['#fn-cloud-row'].title];"
-          "fnCloudOn=false;fnCloudPaint({configured:true,turbo:true});out.off=[els['#fn-cloud'].disabled,els['#fn-cloud'].checked];"
-          "fnCloudOn=true;fnCloudPaint({configured:false,turbo:true});out.nokey=[els['#fn-cloud'].disabled,els['#fn-cloud'].checked,els['#fn-cloud-row'].classList.on,els['#fn-cloud-row'].title];"
-          "fnCloudPaint({configured:true,turbo:false});out.power=[els['#fn-cloud'].disabled,els['#fn-cloud'].checked];"
-          "fnCloudPaint(null);out.none=[els['#fn-cloud'].disabled,els['#fn-cloud'].checked];"
-          "process.stdout.write(JSON.stringify([out,fnCloudOn]));")
+          "let prefs={funnel_cloud:false},cloud={configured:true,turbo:true};"
+          "async function api(u){return {json:async()=>u==='/api/prefs'?prefs:cloud};}"
+          + src[i0:i1]
+          + "const out={};const R=()=>[els['#fn-cloud'].disabled,els['#fn-cloud'].checked,els['#fn-cloud-row'].classList.on,els['#fn-cloud-row'].title];"
+          "fnCloudPaint({configured:true,turbo:true});out.ok=R();"
+          "fnCloudOn=false;fnCloudPaint({configured:true,turbo:true});out.off=R();"
+          "fnCloudOn=true;fnCloudPaint({configured:false,turbo:true});out.nokey=R();"
+          "fnCloudPaint({configured:true,turbo:false});out.power=R();"
+          "fnCloudPaint(null);out.none=R();"
+          "(async()=>{"
+          # untouched: the saved OFF is read; touched: what the page holds wins over a late answer
+          "fnCloudOn=true;await fnCloudLoad();out.loaded=[fnCloudOn,fnCloudLoaded,els['#fn-cloud'].checked];"
+          "fnCloudOn=true;fnCloudTouched=true;prefs={funnel_cloud:false};await fnCloudLoad();out.touched=[fnCloudOn,els['#fn-cloud'].checked];"
+          "process.stdout.write(JSON.stringify([out,fnCloudOn]));})();")
     try:
         o, kept = _so_node("fn39.js", js)
     except Exception as e_:
@@ -19478,11 +19685,13 @@ def _p2c_funpage(src):
     ok = ns["synced_value_ok"]
     html = src[src.index('<div id="fn-effort" class="fseg"'):src.index('<button class="about-btn slim" id="fn-go">')]
     got = {
-        "greyed with no cloud": o["nokey"] == [True, False, True, "no cloud keys saved"] and o["power"] == [True, False]
-        and o["none"] == [True, False],
-        "ticked with cloud": o["ok"][0] is False and o["ok"][1] is True and o["ok"][2] is False and o["off"] == [False, False],
-        # the saved choice is kept while there is no cloud to include
-        "kept": kept is True,
+        # each reason in its own words
+        "greyed with no cloud": o["nokey"] == [True, False, True, "no cloud keys saved"]
+        and o["power"] == [True, False, True, "cloud power is off (Settings › Cloud power)"]
+        and o["none"][:2] == [True, False] and o["none"][3] == "no cloud keys saved",
+        "ticked with cloud": o["ok"][0] is False and o["ok"][1] is True and o["ok"][2] is False and o["off"][:2] == [False, False],
+        # the saved choice is read once; after the person touches the box a late answer can't flip it back
+        "no race": o["loaded"] == [False, True, False] and o["touched"] == [True, True],
         "type check": ok("funnel_cloud", True) and ok("funnel_cloud", False) and not ok("funnel_cloud", "yes")
         and not ok("funnel_cloud", 1) and not ok("funnel_cloud", None) and ok("funnel_effort", "fast"),
         "in the synced set": '    "user_name", "persona", "length", "home_area", "funnel_effort",\n    "funnel_cloud", "polish"))' in src,
@@ -19490,11 +19699,13 @@ def _p2c_funpage(src):
         "placement": html.index('</div>\n    <!-- 6b339') > html.index('name="fn-eff" value="normal"')
         and html.index('id="fn-cloud"') < html.index("</label>", html.index('id="fn-cloud"'))
         and ">Include cloud models</span>" in html and "checked" in html[html.index('id="fn-cloud"'):html.index("<span>Include")],
-        "sent": "        cloud:fnCloudOn,\n        after_len:fn,after_hash:chatHash(messages,fn)}))})).json();" in src,
+        # sent only once the page has read the saved choice (the server reads it too)
+        "sent": "        cloud:fnCloudLoaded?fnCloudOn:undefined,\n        after_len:fn,after_hash:chatHash(messages,fn)}))})).json();" in src,
         "saved": '  api("/api/prefs",{method:"POST",headers:{"Content-Type":"application/json"},\n'
                  '    body:JSON.stringify({funnel_cloud:fnCloudOn})}).catch(()=>{});' in src
-        and "    fnCloudOn=pr.funnel_cloud!==false;\n" in src,
-        "repainted": "  if(typeof fnCloudLoad===\"function\")fnCloudLoad();\n}\npaintTierAvail();" in src,
+        and "  fnCloudTouched=true;\n  fnCloudOn=$(\"#fn-cloud\").checked;" in src
+        and "    if(!fnCloudTouched)fnCloudOn=pr.funnel_cloud!==false;\n    fnCloudLoaded=true;" in src,
+        "repainted": "  if(typeof fnCloudLoad===\"function\")fnCloudLoad();\n" in src,
         "style": "#funnel-wrap .fchk input{width:auto;height:auto;padding:0;border:0;" in src
         and "#funnel-wrap .fchk.off{opacity:.45;cursor:default}" in src,
     }
@@ -19509,48 +19720,137 @@ def _p2c_pins(src):
     sect = src[src.index("# ==== servers: begin ===="):src.index("# ==== servers: end ====")]
     got = {
         "seats": "            _seats = resolve_tier_seats(tier, self.ctx)\n            council = [x[\"label\"] for x in _seats]\n" in ch
-        and "        if tier in TIERS:\n            try:\n                server_refresh_modes(self.ctx)" in ch
-        and "            _seat_fb = {x[\"label\"]: x[\"fb\"] for x in _seats if server_label(x[\"label\"])}" in ch
-        and "                server_refresh_modes(self.ctx)" in ch,
+        and "                # Cloud Only never contacts the server (6b339, rules review)\n                if not cloud_only:\n"
+            "                    server_refresh_modes(self.ctx)" in ch
+        and "        if tier in TIERS:\n            try:\n" in ch,
         "agent": "            ag_label, ag, _ag_fb = resolve_agent_seat(agent_name, self.ctx)" in ch
-        and "                    _seat_fb = ({ag_label: _ag_fb} if server_label(ag_label)\n                                else {})" in ch,
+        and "                    _seat_fb = ({ag_label: _ag_fb} if server_label(ag_label)\n                                else {})" in ch
+        and "                if agent_name in _AGENT_ROLE and not cloud_only:\n                    server_refresh_modes(self.ctx)" in ch,
         "not an explicit pick": "        _srv_seat = bool(_srv_lbl) and _srv_lbl in _seat_fb\n        if _srv_seat:\n            _srv_lbl = \"\"" in ch
         and "        _srv_lbl = (council[0] if len(council) == 1 and not cloud_only\n                    and server_label(council[0]) else \"\")" in ch,
         # Fast asks the cloud first (when it is on), then the server, then this Mac
         "after the cloud ladder": ch.index('status("cloud power unavailable — running locally")')
         < ch.index("                if lbl in _seat_fb:\n                    # a mode's server seat")
         < ch.index("                _run_lbl([lbl])\n"),
-        "fallback call": "                    server_first_answer(lbl, _seat_fb[lbl], full_messages,\n                                        memit, emit, status, step)\n"
-                         "                    hb_stop.set()\n                    return" in ch,
+        "fallback call": "                    _seat_res[0] = server_first_answer(\n                        lbl, _seat_fb[lbl], full_messages, memit, emit,\n"
+                         "                        status, step,\n                        first_s=30.0 if tier == \"Fast\" else 60.0,\n"
+                         "                        polish=_revise if _pol else None)\n                    hb_stop.set()\n                    return" in ch
+        and "                    _pol = (user_prefs(user_base).get(\"polish\", True)\n                            and not images and (not query or bookish)\n"
+            "                            and _is_substantive(prompt))" in ch
+        and "REVISE_INSTRUCTION + \"QUESTION: \" + _sq" in ch,
         # a picture in a mode goes to the vision ladder, not a server seat
         "picture": "            if _seat_fb:\n                # a mode's server seat doesn't read it (6b339)" in ch
         and ch.index("            if _seat_fb:\n                # a mode's server seat") < ch.index("            # a picture sent to your own server's model stays on that"),
         "tiers": "                    chosen = [x[\"label\"] for x in resolve_tier_seats(name, self.ctx)]" in src,
-        # the ladder: a server's copy by its whole tag; only what the candidates allow
-        "copy by tag": '        srv = server_copy(tag, cands, speeds) if tag and l not in BLEND_EXCLUDE else None' in tr
-        and "        cands = [m for m in server_mode_candidates(ctx) if srv_role_ok(m[\"name\"], role)]" in tr.replace("            ", "        ")
+        # the ladder: the server's best suitable models first, by the chooser, then this Mac's own picks
+        "server first": "    for m in srv_rank(cands, role, \"normal\", speeds):\n        if len(seats) >= count:\n            break\n" in tr
+        and "        if _srv_tag_key((MODEL_INFO.get(l) or {}).get(\"ollama\")) in taken:\n            continue\n" in tr
+        and "            st[\"fb\"] = local_tag.get(st.pop(\"tag\", \"\"), \"\") or first_local" in tr
+        and "            cands = [m for m in server_mode_candidates(ctx) if srv_role_ok(m[\"name\"], role)]" in tr
         and "    speeds = server_speeds(ctx)" in tr,
-        "by size": "            _seat_insert(seats, {\"label\": m[\"label\"], \"fb\": \"\", \"params\": m.get(\"params\")})" in tr
-        and "            if sp is not None and sp < p:" in src,
         "no gate in the section": not re.search(r"cloud_allowed|gate_ladder|\bturbo\b|cloud_bench|resolve_tier|TIERS", sect),
-        "fits": "            if _srv_fits(m, vram):\n                out.append(dict(m, server=e[\"name\"]" in sect
-        and '        if not _srv_paired(e) or e.get("prefer") is not False' not in sect
-        and '        if not _srv_paired(e) or e.get("prefer") is False:\n            continue' in sect,
-        # the council: servers beside this Mac, one thread per server, the same caps
+        "fits": "            if _srv_fits(m, vram, True):\n                out.append(dict(m, server=e[\"name\"]" in sect
+        and '        if not _srv_paired(e) or e.get("prefer") is False:\n            continue' in sect
+        and "    if need_vram and not vram:\n        return False\n" in sect,
+        # the council: servers beside this Mac, one thread per server, the same caps; deadlines for a mode's seats
         "council": "    _groups = {}\n    for _l in labels:\n        if server_label(_l):\n            _groups.setdefault(_l.split(SERVER_SEP, 1)[0], []).append(_l)" in rc
         and "        _gt = ctx_thread(target=_run_group, args=(_g,), daemon=True)" in rc
         and "            _draft_one(_j, _lbl, _local_deadline, True)" in rc
         and "        _gt.join(timeout=max(1.0, _local_deadline - time.time() + 20))" in rc
-        and "    LOCAL_CAP = 120.0" in rc and "        _jd = time.time() + min(LOCAL_CAP, max(15.0, _left))" in rc,
+        and "    LOCAL_CAP = 120.0" in rc and "        _jd = time.time() + min(LOCAL_CAP, max(15.0, _left))" in rc
+        and "                with server_first_deadline(srv_first_s if server_label(_lbl)\n                                           else None):" in rc
+        and "hurry=None, srv_first_s=None) -> None:" in rc
+        and "                            srv_first_s=(60.0 if _seat_fb else None))" in ch,
+        "council caps": "                _capped(label, lambda _l=label, _p=parts: run_model(" in rc
+        and "            _capped(merger, lambda: run_model(merger, [" in rc
+        and "        with server_first_deadline(srv_first_s if server_label(merger)\n                                   else None):" in rc
+        and "            if on_server:\n                server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0]," in rc
+        and "                server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0],\n                                 str(_err[0]))" in rc,
         "merge on the server": "    if merger in MODEL_ROUTES and comp not in MODEL_ROUTES:" in rc
         and "                # the server didn't write it: this computer's copy does" in rc,
         "page badge": '                  else if(d.w==="local"){srvWho="";if(d.m)lastModels=String(d.m);}' in src,
+        "settings switch": ('    +(s.paired?\'<label class="srv-pref"><input type="checkbox" data-a="prefer"\'' in src
+                            and '  try{d=await srvPost("prefer",{id:id,on:c.checked});}' in src
+                            and 'elif op not in ("pair", "test", "access", "remove", "prefer"):' in src
+                            and "                out = server_set_prefer(self.ctx, sid, d.get(\"on\"))" in src),
+        # a server that failed this turn isn't asked by the memory pass or the place pins; the seat's title
+        "no asking a failed server": "            _ml = route_label or (council[0] if council else \"\")\n" in ch
+        and "                    and not (server_label(_ml)\n                             and server_label_down(user_base, _ml))):" in ch
+        and "                            and not (server_label(route_label or model_name)\n                                     and server_label_down(\n"
+            "                                         user_base, route_label or model_name))):" in ch,
+        "seat title": "            elif _seat_fb and _title_cid and not _gone:\n" in ch
+        and "                _seat_t = server_seat_title(\n                    council, _seat_fb, _seat_res[0], _model_said[0],\n"
+            "                    bool(_ans_conf), lambda l: server_label_down(user_base, l))\n                if _seat_t is not None:\n" in ch
+        and "                    and not (_srv_only or _srv_lbl or _seat_fb) else \"\")" in ch,
+        "funnel refresh": "        server_refresh_modes(bound_ctx())\n        srv = server_funnel_pick(bound_ctx(), effort)" in src
+        and "            with server_first_deadline(30 if effort == \"fast\" else 60):\n                run_model(srv[\"label\"], msgs, parts.append)" in src
+        and "            server_mark_down(bound_ctx(), srv[\"server\"], str(exc))" in src
+        and "    cands = server_mode_candidates(ctx)\n    if not cands:\n        return None           # no server, no ledger read\n" in sect,
     }
-    got["settings switch"] = ('    +(s.paired?\'<label class="srv-pref"><input type="checkbox" data-a="prefer"\'' in src
-                              and '  try{d=await srvPost("prefer",{id:id,on:c.checked});}' in src
-                              and 'elif op not in ("pair", "test", "access", "remove", "prefer"):' in src
-                              and "                out = server_set_prefer(self.ctx, sid, d.get(\"on\"))" in src)
     return all(got.values()), got
+
+
+def _p4c_rules(src):
+    """The rules review (6b339): "<name> Only" makes no picture or video and asks no model to word one, runs no agent;
+    Cloud Only never contacts the server; a seat's title is the server's or none; the agent switch off in the page."""
+    ch = src[src.index('        if self.path != "/api/chat":'):]
+    ns, ctx, d = _sv_ns(src)
+    # image_followup exec'd with a stand-in for the model that words a refinement: refine=False never asks it
+    asked = []
+    fns = {"re": re, "_IMG_NEWTOPIC": re.compile(r"^\\b$"), "image_intent": lambda t: None, "video_intent": lambda t: None,
+           "export_intent": lambda *a: None, "_IMG_CHANGE": re.compile(r"(?P<rest>.*)"), "_subject_words": lambda s_: set(),
+           "_IMG_LEADIN": re.compile(r"^$"), "_refine_with_model": lambda prev, said: asked.append(said) or "a bluer cat"}
+    exec(_p2_fn(src, "image_followup"), fns)
+    r1 = fns["image_followup"]("make it bluer", "a red cat", refine=False)
+    n1 = len(asked)
+    r2 = fns["image_followup"]("make it bluer", "a red cat")
+    t = ns["server_seat_title"]
+    down = lambda l: l == "B · y"
+    S = {"A · x": "L", "B · y": "L"}
+    got = {
+        "no refine for Only": n1 == 0 and r1 != "a bluer cat" and len(asked) == 1 and r2 == "a bluer cat"
+        and "    said = _refine_with_model(prev_subject, t) if refine else \"\"" in src
+        and "refine=not srv_only_tier(tier))" in ch,
+        # "<name> Only" makes no picture or video (said, one line, nothing made, before the benchmark hold)
+        "no pictures": "        if _srv_only and (img_subject or vid_subject):\n" in ch
+        and "            emit(AppText(\"\\u26a0\\ufe0f %s Only can\\u2019t make pictures or \"\n                         \"videos, and nothing was made.\"" in ch
+        and ch.index("        if _srv_only and (img_subject or vid_subject):\n")
+        < ch.index("        if (img_subject or vid_subject or export_req) and not self._bench_held:"),
+        # and no agent: refused, the agent not resolved, nothing run
+        "no agents": "        if agent_name and srv_only_tier(tier):\n" in ch
+        and "            _so_fail = (\"%s Only can\\u2019t run the %s agent, and nothing \"\n                        \"was run.\" % (_so_c0.split(SERVER_SEP, 1)[0]\n" in ch
+        and "            agent_name = \"\"\n        ag_system, ag_research, ag_remote = \"\", False, False" in ch,
+        # a seat's chat is titled by the server that answered, or by none; never by this Mac
+        "seat title": t(["A · x"], {"A · x": "L"}, "server", True, False, down) == "A · x"
+        and t(["A · x"], {"A · x": "L"}, "fallback", True, False, down) == ""
+        and t(["A · x"], {"A · x": "L"}, "failed", False, False, down) == ""
+        and t(["A · x"], {"A · x": "L"}, "", True, False, down) is None
+        and t(["A · x"], {"A · x": "L"}, "server", True, True, down) is None
+        and t(["A · x", "L1"], {"A · x": "L"}, "", True, False, down) == "A · x"
+        and t(["B · y", "A · x"], S, "", True, False, down) == "A · x"
+        and t(["B · y"] * 2, S, "", True, False, down) == ""
+        and t(["A · x", "L1"], {"A · x": "L"}, "", False, False, down) == ""
+        and t(["L1"], {}, "", True, False, down) is None,
+    }
+    # setAgent turns an Only pick off (node)
+    i0 = src.index("function setAgent(name,guess){")
+    fn = src[i0:src.index("\n}\n", i0) + 3]
+    js = ("let tier='srv:a1b2c3d4',agent='';const po=[];const calls=[];function isSrvMode(t){return t.indexOf('srv:')===0;}"
+          "function prefSet(o){po.push(JSON.stringify(o));}function paintAgents(){}function paintModels(){calls.push('paint');}"
+          + fn + "const out={};setAgent('Coding');out.a=[tier,agent,po.slice()];po.length=0;"
+          "tier='Pro';setAgent('Coding');out.b=[tier,po.slice()];po.length=0;"
+          "tier='srv:a1b2c3d4';setAgent('');out.c=[tier,po.slice()];po.length=0;setAgent('Workspace',true);out.d=[tier,po.slice()];"
+          "process.stdout.write(JSON.stringify(out));")
+    try:
+        o = _so_node("sa39.js", js)
+    except Exception as e_:
+        return False, "node: %r" % e_
+    got["agent turns Only off"] = (o["a"][0] == "Fast" and o["a"][1] == "Coding"
+                                   and json.loads(o["a"][2][0]) == {"agent": "Coding", "codeagent": "Coding", "tier": "Fast"}
+                                   and o["b"][0] == "Pro" and "tier" not in json.loads(o["b"][1][0])
+                                   and o["c"][0] == "srv:a1b2c3d4" and "tier" not in json.loads(o["c"][1][0])
+                                   and o["d"][0] == "Fast")
+    return all(got.values()), [got, o]
 
 
 _P2_CHECKS = [
@@ -19558,12 +19858,14 @@ _P2_CHECKS = [
      "the modes and for each funnel effort, the measured speed", _p2c_roles),
     ("your server first: only a paired server that is on and answering, only models that fit the card whole; never "
      "gpu+ram or an unknown placement; the switch; profile B sees none", _p2c_cands),
-    ("your server first: a ladder pick the server has is its copy, an unknown model takes the seat its size earns, "
-     "the counts stay, nothing local is the fallback only when there is nothing, the Code lane prefers a coder", _p2c_seats),
-    ("your server first: a server seat falls to this Mac's copy before its first word (RESET, status, badge), is "
-     "said after one, and never goes to another server or the cloud", _p2c_first),
-    ("your server first: a council's server drafts run beside this Mac's, one at a time on each server, a failed "
-     "draft is absent, the merge runs on the server and falls back to this Mac's copy", _p2c_council),
+    ("your server first: the server's best suitable models fill a mode's seats before this Mac's, its copy of a local "
+     "pick replaces it, the tier's local picks fill the rest, the counts stay, the Code lane prefers a coder", _p2c_seats),
+    ("your server first: a server seat has a first-word deadline, falls to this Mac's copy before its first word "
+     "(RESET, status, badge) and marks the server down, is said after one, keeps Fast's first draft if the second pass "
+     "fails, and never goes to another server or the cloud", _p2c_first),
+    ("your server first: a council's server drafts run beside this Mac's, one at a time on each server, inside the "
+     "seat deadline; a failed draft is absent and marks its server down; peer review, reflection and the merge carry the "
+     "deadline; the merge runs on the server and falls back to this Mac's copy", _p2c_council),
     ("funnels: cloud first when ticked and allowed, then the server, then this Mac; unticked, no cloud model is "
      "asked in a stage, the retry or the verdict; effort and role rules; a failing server falls to this Mac", _p2c_funnel),
     ("funnels: 'Include cloud models' under the effort radios: placement, what it sends, greyed with no cloud, kept "
@@ -19610,8 +19912,8 @@ def _p3c_quiet(src):
         "title from the ticket": tit.index("make_title(txt, server=_so[0])") < tit.index("make_title(txt, conf=_conf)")
         and "            if _so and time.time() - _so[1] < 300:" in tit,
         "no memory pass without an answer": "                    and not _gone and not _so_fail\n"
-                                            "                    and not (_srv_lbl and not _model_said[0])):\n" in ch,
-        "export title": "                    if len(src) > 200 and not (_srv_only or _srv_lbl) else \"\")" in ch,
+                                            "                    and not (_srv_lbl and not _model_said[0])\n" in ch,
+        "export title": "                    and not (_srv_only or _srv_lbl or _seat_fb) else \"\")" in ch,
         # no pre-warm, no local route, no rescue for a server pick
         "no pre-warm": "        if _srv_lbl:\n            route, route_label = (None, None), _srv_lbl\n" in ch
         and "        if route[0] == \"mlx\" and route_label and not _no_text_model:" in ch,
@@ -19623,6 +19925,8 @@ def _p3c_quiet(src):
 
 
 _P2_CHECKS += [
+    ("the rules review: \"<name> Only\" makes no picture or video, asks no model to word one and runs no agent; a seat's "
+     "title is the server's or none; choosing an agent turns an Only pick off (node)", _p4c_rules),
     ("a server's gpu_spill at 0% on the card says the card isn't in use; a partial spill keeps its words", _p3c_spill),
     ("a plain server pick keeps this Mac quiet: its title by the same server or none, no memory pass without an "
      "answer, no export title, no pre-warm, no local rescue (pinned)", _p3c_quiet),
@@ -19655,8 +19959,6 @@ _P2_MUT = [
     ("speed ignored", '                k = (0, 0 if sp else 1, -(sp or 0.0), -p)', '                k = (0, 1, 0, -p)'),
     ("normal by name", '        return (lead, p is None, -(p or 0.0), -(sp or 0.0), m["label"])', '        return (lead, m["label"])'),
     ("the Code lane without its coder", '        lead = 0 if role != "code" or _srv_flags(m["name"])["coder"] else 1', '        lead = 0'),
-    ("a model that spills, or one too big, used", '            if _srv_fits(m, vram):\n                out.append(dict(m, server=e["name"]',
-     '            if True:\n                out.append(dict(m, server=e["name"]'),
     ("a server that was turned off used", '        if not _srv_paired(e) or e.get("prefer") is False:\n            continue',
      '        if not _srv_paired(e):\n            continue'),
     ("the switch off by default", '        if not _srv_paired(e) or e.get("prefer") is False:\n            continue',
@@ -19669,17 +19971,9 @@ _P2_MUT = [
     ("latest not the bare name", '    return t[:-len(":latest")] if t.endswith(":latest") else t', '    return t'),
     ("the switch takes any value", '    if not isinstance(on, bool):\n        return {"err": "Say on or off."}\n', ''),
     ("the switch not saved", '        e["prefer"] = on\n        return {"ok": True}', '        return {"ok": True}'),
-    ("the ladder's copies ignored", '        srv = server_copy(tag, cands, speeds) if tag and l not in BLEND_EXCLUDE else None', '        srv = None'),
-    ("models the catalog lacks not seated", '    for m in srv_rank([m for m in cands if _srv_tag_key(m["name"]) not in known],', '    for m in srv_rank([],'),
-    ("a model seated by the end of the ladder", '            if sp is not None and sp < p:', '            if False:'),
-    ("the count not kept", '    return seats[:count]', '    return seats'),
-    ("no local copy behind a server seat", '            st["fb"] = first_local', '            st["fb"] = ""'),
     ("a coding agent without a server's coder", '        if top and _srv_flags(top[0]["name"])["coder"]:', '        if False:'),
-    ("a server seat with no fallback", '    if not fallback:\n        emit(AppText("\\u26a0\\ufe0f " + why))\n        return False',
-     '    if True:\n        emit(AppText("\\u26a0\\ufe0f " + why))\n        return False'),
     ("a fallback that doesn't reset the page", '    emit(Ctl(NUL + "RESET" + NUL))\n    emit(Ctl(NUL + "RUN:" + json.dumps({"r": [fallback]',
      '    emit(Ctl(NUL + "RUN:" + json.dumps({"r": [fallback]'),
-    ("a second answer after a word", '    if shown[0]:\n        emit(AppText("\\n\\n\\u26a0\\ufe0f " + why))\n        return False\n', ''),
     ("the fallback's badge", '{"r": [fallback], "w": "local",', '{"r": [fallback], "w": "server",'),
     ("servers draft in turn with this Mac", '        _gt.start()\n        _gthreads.append(_gt)', '        _gt.start()\n        _gt.join()\n        _gthreads.append(_gt)'),
     ("a server's models at once", '            _draft_one(_j, _lbl, _local_deadline, True)',
@@ -19696,21 +19990,18 @@ _P2_MUT = [
     ("a verdict asking the cloud unticked", '                if use_cloud:\n                    for _conf in work_ladder("work"):',
      '                if cloud_allowed():\n                    for _conf in work_ladder("work"):'),
     ("the audit asking the cloud unticked", '                  if out and use_cloud:\n                    _audit = [', '                  if out and cloud_allowed():\n                    _audit = ['),
-    ("the flag not read", '            use_cloud = d.get("cloud") is not False and cloud_allowed()', '            use_cloud = cloud_allowed()'),
     ("the flag not passed to a stage", '                              cloud=use_cloud)', '                              cloud=True)'),
     ("the verdict skipping the server", '                        _sp = server_funnel_pick(self.ctx, "normal")', '                        _sp = None'),
     ("the speed of estimated calls counted", 'if (r.get("w") == "server" and not r.get("x") and not r.get("s")', 'if (r.get("w") == "server" and not r.get("s")'),
     ("a two-token call counted", '                    and o >= 30 and d > 0):', '                    and o >= 1 and d > 0):'),
     ("the box never greyed", '  cb.disabled=!ok;row.classList.toggle("off",!ok);', '  cb.disabled=false;row.classList.toggle("off",false);'),
     ("the box ticked with no cloud", '  cb.checked=ok&&fnCloudOn;', '  cb.checked=fnCloudOn;'),
-    ("the flag not sent", '        cloud:fnCloudOn,\n        after_len:fn', '        after_len:fn'),
     ("the flag not typed", '    "funnel_cloud": ("one of", (True, False)),', '    "funnel_cloud": ("text", 10),'),
     ("the box not remembered", '    body:JSON.stringify({funnel_cloud:fnCloudOn})}).catch(()=>{});', '    body:JSON.stringify({})}).catch(()=>{});'),
     ("a picture read by a server seat", '            if _seat_fb:\n                # a mode\'s server seat doesn\'t read it', '            if False:\n                # a mode\'s server seat doesn\'t read it'),
     ("a mode's seat an explicit pick", '        if _srv_seat:\n            _srv_lbl = ""', '        if False:\n            _srv_lbl = ""'),
     ("no fallback call", '                if lbl in _seat_fb:\n                    # a mode\'s server seat (6b339)', '                if False:\n                    # a mode\'s server seat (6b339)'),
     ("the tiers' list without seats", '                    chosen = [x["label"] for x in resolve_tier_seats(name, self.ctx)]', '                    chosen = resolve_tier(name)'),
-    ("servers not refreshed before a mode", '        if tier in TIERS:\n            try:\n                server_refresh_modes(self.ctx)', '        if tier in TIERS:\n            try:\n                pass'),
     ("no route for the switch", '            elif op == "prefer":\n                out = server_set_prefer(self.ctx, sid, d.get("on"))\n', ''),
     ("a graphics card at 0% read as a spill", '    if code == "gpu_spill" and re.search(r"\\(0% on GPU\\)", detail):',
      '    if False:'),
@@ -19719,7 +20010,58 @@ _P2_MUT = [
      '            if _srv_only and _title_cid and not _gone:\n                _srv_only_chats['),
     ("a title after an answer that never came", '                    _srv_lbl if _model_said[0] and not _so_fail else "",', '                    _srv_lbl,'),
     ("place pins asked of an error line", '                    elif (query and sent[0] > 120 and _model_said[0]\n', '                    elif (query and sent[0] > 120\n'),
-    ("a memory pass for a server pick that got no answer", '                    and not (_srv_lbl and not _model_said[0])):', '                    ):'),
+    ("a model that spills, one too big or with no card figure used", '            if _srv_fits(m, vram, True):\n                out.append(dict(m, server=e["name"]',
+     '            if True:\n                out.append(dict(m, server=e["name"]'),
+    ("a card figure not required for a mode", '    if need_vram and not vram:\n        return False\n', ''),
+    ("a server's models not seated first", '    for m in srv_rank(cands, role, "normal", speeds):\n        if len(seats) >= count:',
+     '    for m in []:\n        if len(seats) >= count:'),
+    ("the count not kept", '    for m in srv_rank(cands, role, "normal", speeds):\n        if len(seats) >= count:\n            break\n',
+     '    for m in srv_rank(cands, role, "normal", speeds):\n        if False:\n            break\n'),
+    ("a model seated twice", '        if _srv_tag_key((MODEL_INFO.get(l) or {}).get("ollama")) in taken:\n            continue\n', ''),
+    ("no local copy behind a server seat", '            st["fb"] = local_tag.get(st.pop("tag", ""), "") or first_local', '            st["fb"] = ""'),
+    ("a server seat with no fallback", '    if not fallback:\n        emit(AppText("\\u26a0\\ufe0f " + why))\n        return "failed"',
+     '    if True:\n        emit(AppText("\\u26a0\\ufe0f " + why))\n        return "failed"'),
+    ("a second answer after a word", '    if shown[0]:\n        emit(AppText("\\n\\n\\u26a0\\ufe0f " + why))\n        return "failed"\n', ''),
+    ("a server not marked down", '    try:\n        server_mark_down(bound_ctx(), name, why)\n    except NoProfile:\n        pass\n', ''),
+    ("a mark that never ages", '    return bool(s.get("err")) and time.time() - float(s.get("at") or 0) < SRV_DOWN_S', '    return bool(s.get("err"))'),
+    ("a seat with no first-word deadline", '        with server_first_deadline(first_s):\n            _stream_guarded(label, messages, _m, status, None,',
+     '        if True:\n            _stream_guarded(label, messages, _m, status, None,'),
+    ("the deadline not applied", '            _first = getattr(_srv_first, "s", None) or SRV_FIRST_S', '            _first = SRV_FIRST_S'),
+    ("no second pass on the server", '        if draft and not _looks_degenerate(draft):', '        if False:'),
+    ("a failing second pass said loudly", '            except ServerError:\n                # the draft stands, and nothing alarming is said',
+     '            except ZeroDivisionError:\n                # the draft stands, and nothing alarming is said'),
+    ("a failed second pass leaving its partial", '                if shown[0]:\n                    emit(Ctl(NUL + "RESET" + NUL))\n                memit(draft)', '                memit(draft)'),
+    ("a funnel not refreshing the servers", '        server_refresh_modes(bound_ctx())\n        srv = server_funnel_pick(bound_ctx(), effort)', '        srv = server_funnel_pick(bound_ctx(), effort)'),
+    ("a funnel's server with no deadline", '            with server_first_deadline(30 if effort == "fast" else 60):\n                run_model(srv["label"]',
+     '            if True:\n                run_model(srv["label"]'),
+    ("a funnel's failing server not marked down", '            server_mark_down(bound_ctx(), srv["server"], str(exc))', '            pass'),
+    ("the ledger read with no server", '    if not cands:\n        return None           # no server, no ledger read\n', ''),
+    ("a council's peer review uncapped", '                _capped(label, lambda _l=label, _p=parts: run_model(', '                (lambda f: f())(lambda _l=label, _p=parts: run_model('),
+    ("a council's reflection uncapped", '            _capped(merger, lambda: run_model(merger, [', '            (lambda f: f())(lambda: run_model(merger, ['),
+    ("a server merge with no deadline", '        with server_first_deadline(srv_first_s if server_label(merger)\n                                   else None):', '        if True:'),
+    ("a seat's draft with no deadline", '                with server_first_deadline(srv_first_s if server_label(_lbl)\n                                           else None):', '                if True:'),
+    ("a failed server draft not marked down", '                _srv_errs.append(str(_err[0]))     # said if none answers\n                server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0],\n                                 str(_err[0]))',
+     '                _srv_errs.append(str(_err[0]))     # said if none answers'),
+    ("the saved OFF not counted", 'd.get("cloud") is not False and _saved_cloud\n                         and cloud_allowed())', 'd.get("cloud") is not False\n                         and cloud_allowed())'),
+    ("the flag read from the page only", '            use_cloud = (d.get("cloud") is not False and _saved_cloud\n                         and cloud_allowed())', '            use_cloud = cloud_allowed()'),
+    ("the flag not sent", '        cloud:fnCloudLoaded?fnCloudOn:undefined,\n        after_len:fn', '        after_len:fn'),
+    ("a late answer flipping the box back", '    if(!fnCloudTouched)fnCloudOn=pr.funnel_cloud!==false;', '    fnCloudOn=pr.funnel_cloud!==false;'),
+    ("the box's two reasons as one", '    :!(cs&&cs.configured)?"no cloud keys saved"\n    :"cloud power is off (Settings \\u203a Cloud power)";', '    :"no cloud keys saved";'),
+    ("Cloud Only contacting the server", '                if not cloud_only:\n                    server_refresh_modes(self.ctx)', '                if True:\n                    server_refresh_modes(self.ctx)'),
+    ("servers not refreshed before a mode", '                if not cloud_only:\n                    server_refresh_modes(self.ctx)', '                if not cloud_only:\n                    pass'),
+    ("an agent that may not asking the server", '                if agent_name in _AGENT_ROLE and not cloud_only:', '                if True:'),
+    ("a memory pass asking a server that just failed", '                    and not (server_label(_ml)\n                             and server_label_down(user_base, _ml))):', '                    ):'),
+    ("place pins asking a server that just failed", '                            and not (server_label(route_label or model_name)\n                                     and server_label_down(\n                                         user_base, route_label or model_name))):', '                            ):'),
+    ("a memory pass for a server pick that got no answer", '                    and not (_srv_lbl and not _model_said[0])\n', '                    and True\n'),
+    ("a seat's chat titled by a model of this Mac", '            elif _seat_fb and _title_cid and not _gone:', '            elif False:'),
+    ("a seat's title after a fallback", '        return council[0] if res == "server" else ""', '        return council[0]'),
+    ("a seat's title when nothing asked the server", '        if not res:\n            return None\n', ''),
+    ("a seat's title over a cloud answer", '    if not seat_fb or cloud_answered:\n        return None', '    if not seat_fb:\n        return None'),
+    ("Only making pictures", '        if _srv_only and (img_subject or vid_subject):', '        if False:'),
+    ("Only wording a prompt with a model", '    said = _refine_with_model(prev_subject, t) if refine else ""', '    said = _refine_with_model(prev_subject, t)'),
+    ("Only running an agent", '        if agent_name and srv_only_tier(tier):', '        if False:'),
+    ("Only's agent not cleared", '            agent_name = ""\n        ag_system, ag_research, ag_remote = "", False, False', '        ag_system, ag_research, ag_remote = "", False, False'),
+    ("an agent leaving Only on", '  if(name&&isSrvMode(tier)){tier="Fast";po.tier="Fast";}\n', ''),
     ("a fallback answer badged as the server", '                  else if(d.w==="local"){srvWho="";if(d.m)lastModels=String(d.m);}', ''),
 ]
 _p2m = []
@@ -20050,7 +20392,7 @@ _SVLJ = json.dumps(_SVL)[1:-1]           # as it reads inside a frame's JSON
 _SVH = {}                                # the last chat's headers
 
 
-def _svchat(label=_SVL, text="hello server", tier="", models=None, images=None, chat_id="", web=False):
+def _svchat(label=_SVL, text="hello server", tier="", models=None, images=None, chat_id="", web=False, agent=""):
     body = {"model": label if not tier and models is None else "",
             "models": [label] if models is None else models,
             "tier": tier, "auto_web": bool(web),
@@ -20059,6 +20401,8 @@ def _svchat(label=_SVL, text="hello server", tier="", models=None, images=None, 
         body["images"] = images
     if chat_id:
         body["chat_id"] = chat_id
+    if agent:
+        body["agent"] = agent
     r_ = urllib.request.Request(_SV.base + "/api/chat", data=json.dumps(body).encode(),
                                 headers=dict(_SV.headers, **{"Content-Type": "application/json"}),
                                 method="POST")
@@ -20379,6 +20723,22 @@ check("server only (live): a picture goes to a model of the same server, cloud p
       and _stI[0][2]["model"] in [m["name"] for m in (_so_l2.get("models") or [])]
       and _stI[0][2]["messages"][-1].get("images") == ["iVBORw0KGgoAAAANSUhEUg=="],
       "%r" % [_scI[1][:160], [c[2]["model"] for c in _stI]])
+# "<name> Only" makes no picture or video, asks no model to word one and runs no agent (rules review of
+# 6b339): said in one line each, and nothing is asked of the server, of this Mac or of the cloud
+_nstP, _nlgP = len(_o1("/stub")["calls"]), len(_o1("/log")["log"])
+_ulP = len([r_ for r_ in _ul34() if r_.get("w") == "local"])
+_scPic = _svchat(text="draw me a red bicycle 339", tier=_so_tier, models=["Llama 3.2 3B"])
+_scVid = _svchat(text="make a short video of a dog on a beach 339", tier=_so_tier, models=["Llama 3.2 3B"])
+_scAg = _svchat(text="fix my script please 339", tier=_so_tier, models=["Llama 3.2 3B"], agent="Coding")
+time.sleep(1.5)
+check("server only (live): \"<name> Only\" makes no picture or video and runs no agent: one line each, and nothing "
+      "reached the server or any model of this Mac",
+      _scPic[1].strip() == "\u26a0\ufe0f %s Only can\u2019t make pictures or videos, and nothing was made." % _SVN
+      and _scVid[1].strip() == "\u26a0\ufe0f %s Only can\u2019t make pictures or videos, and nothing was made." % _SVN
+      and _scAg[1].strip() == "\u26a0\ufe0f %s Only can\u2019t run the Coding agent, and nothing was run." % _SVN
+      and len(_o1("/stub")["calls"]) == _nstP and len(_o1("/log")["log"]) == _nlgP
+      and len([r_ for r_ in _ul34() if r_.get("w") == "local"]) == _ulP,
+      "%r" % [_scPic[1][:160], _scVid[1][:160], _scAg[1][:160], len(_o1("/stub")["calls"]) - _nstP])
 # Advanced (6b337): a hand-picked council of the server's models drafts in turn on that server. The second
 # model spills when it loads (the stub's "sneaky"), so its draft is absent and the first is the answer,
 # with no merge (a merge could be this machine's own Gemma, which is the council's rule, not the server's);

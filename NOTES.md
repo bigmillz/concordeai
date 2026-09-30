@@ -181,25 +181,32 @@ so here falling back IS allowed.
   ago is asked again, 5 s at most, side by side (`server_refresh_modes`);
   one found down less than a minute ago is left alone, so a server that is
   off costs one wait a minute, not one a question.
-- **The ladder** (`resolve_tier_seats`, `resolve_agent_seat`). A seat is
-  {label, fb, params}: the model (a server's "<name> · <tag>" or a local
-  one) and `fb`, what answers in its place before its first word. Two
-  rules put a server model on the ladder. (1) A ladder pick the server
-  also has is the server's copy: the catalog row's Ollama tag (`MODEL_INFO
-  [label]["ollama"]`) against the server's listed tags, whole, ":latest" as
-  the bare name; the MLX and the Ollama build of a model are one model
-  here, so "GPT-OSS 20B" matches `gpt-oss:20b` whichever engine this Mac
-  runs it on. Its fb is the local copy when it is installed. (2) A server
-  model the catalog doesn't know takes the seat its parameter size earns
-  against the ladder's own sizes (before the first seat that is smaller),
-  if it suits the seat. Its fb is the mode's first local seat. The counts
-  stay: Fast one, Thinking three, Pro every model that fits (the council's
-  12). Interpretation, stated plainly: per-pick substitution and ranking by
-  size, as the brief says, so a STRONGER local pick still outranks a weaker
-  server model; the server wins wherever it has the same model and where
-  its model is the stronger. If Patrick wants "any server model first",
-  it is one line (partition the seats), at the cost of a 3B on the server
-  beating a local 26B.
+- **The ladder: SERVER FIRST** (`resolve_tier_seats`, `resolve_agent_seat`).
+  A seat is {label, fb, params}: the model (a server's "<name> · <tag>" or a
+  local one) and `fb`, what answers in its place before its first word.
+  The first build seated a server model only where it was the same model
+  as a ladder pick or a bigger one (so a Mac that holds Gemma 4 26B never
+  touched the server); the reviewers called that narrower than Patrick
+  asked, and he ruled (his words above: "it prioritizes those over the ones
+  that are on their local device"; "if the server has any more suitable
+  models, it should run those"): for each seat in Fast, Thinking and Pro the
+  server's best suitable model, meaning role-ok, placement "gpu", fitting a
+  card whose size the gateway REPORTED, the per-server switch on and the
+  server answering, is used BEFORE any local model. The seats the server
+  can't fill (Thinking wants three and the server has two) are the tier's
+  local picks in their normal order. A server model with the same Ollama tag
+  as a local pick replaces it (the catalog row's tag against the server's,
+  whole, ":latest" as the bare name; the MLX and the Ollama build of a model
+  are one model here), and its `fb` is that local copy when it is
+  installed, else the mode's first local seat. Among the server's models
+  the ranking stays role-aware, quality and size first, measured speed as
+  the tiebreak. The trade-off, stated plainly: a modest model on the server
+  now outranks a stronger local one (a 14B on the card can be Fast while the
+  Mac holds a 26B), which is what "server first" means; the per-server
+  "Use for Fast, Thinking and Pro" switch is the way back to local-first for
+  anyone who prefers their own models, and Fast with cloud power on still
+  asks the cloud first, as before. The composer chip names the routing
+  ("Fast · Ollama1 gpt-oss:20b", "Thinking · Ollama1 ×3").
 - **The chooser, shared by the modes, the Code lane and funnels**
   (`srv_role_ok`, `srv_rank`). Families come from the tag's own words,
   whole words only ("pro" in "llama-prompt-guard" once seated a
@@ -224,17 +231,32 @@ so here falling back IS allowed.
   and milliseconds (w "server"); the median of the recent calls with 30+
   counted tokens, loads included, is the tokens a second. No new store.
 - **Running.** Fast: the cloud first when cloud power is on (unchanged: the
-  speed ladder), then the server seat, then this Mac's (`server_first_answer`):
-  if the server fails before its first word the page is told to drop what it
-  holds (RESET), the status line says "<name> didn't answer, so <model>
-  answers here", a RUN frame `{w: "local", m: <model>}` makes the badge say
-  "this Mac" (the page used to keep the server's name); after a word there
-  is one answer, cut there and said. Never another server, never a cloud
+  speed ladder), then the server seat, then this Mac's (`server_first_answer`).
+  A seat has a FIRST-WORD DEADLINE (30 s for Fast and a funnel's fast
+  effort, 60 s otherwise; `server_first_deadline`, read by `server_stream`):
+  a pick the person made and "<name> Only" keep the long wait (a model load
+  can take minutes), a seat doesn't, so a slow server is left for this
+  Mac's copy. A failure before the first word marks the server DOWN for a
+  minute (`server_mark_down`; later stages, councils and funnels skip it,
+  its memory pass and place pins aren't asked again, and a check that
+  succeeds clears it), the page is told to drop what it holds (RESET), the
+  status line says "<name> didn't answer, so <model> answers here", a RUN
+  frame `{w: "local", m: <model>}` makes the badge say "this Mac" (the page
+  used to keep the server's name); after a word there is one answer, cut
+  there and said. Fast's SECOND PASS (draft then rewrite, on search and
+  recommendation questions) runs on the same server inside the same
+  deadline; a server that fails during it keeps the first draft, without
+  alarm (a partial rewrite is wiped and the draft shown). A chat whose mode
+  seated a server is titled by that server when it answered, or by none
+  when it fell back (`server_seat_title`); never by a model on this Mac. Never another server, never a cloud
   model it wasn't going to use. Councils (Thinking, Pro, Advanced): server
   drafts run in PARALLEL with this Mac's and the cloud's, one thread per
   server, its models one after another (one card), the same 120 s per model
-  and 240 s for the loop, so a slow server is simply absent; a failed draft
-  is absent (the straggler rule). The compositor: when the merger is a model
+  and 240 s for the loop, each inside the 60 s first-word deadline, so a
+  slow server is simply absent; a failed draft is absent (the straggler
+  rule) and marks its server down. Peer review, reflection and a server
+  merge carry the deadline too, and peer review and reflection on a
+  server's model run within the per-model cap (they were uncapped). The compositor: when the merger is a model
   the server also has and it fits, the merge is written there, this Mac's
   copy behind it (a failed server merge is wiped and this Mac writes it;
   none: the best draft ships); a pen named in Advanced stays as named. The
@@ -269,6 +291,36 @@ so here falling back IS allowed.
   The `engine` the reply records says which model ran ("server:<name> ·
   <tag>", "local:<label>", or the cloud model) for `quality.jsonl` and the
   drill tooling; the verdict's reply now carries it too.
+- **The rules review and the UX review of this branch** (fixed in the same
+  round; the decisions are the coordinator's and Patrick's). "<name> Only"
+  makes NO picture or video (no FLUX, no saved Gemini key, no model asked to
+  word a follow-up prompt: `image_followup(refine=False)`; one line, "<name>
+  Only can't make pictures or videos, and nothing was made", before the
+  benchmark hold) and runs NO agent ("<name> Only can't run the <agent>
+  agent, and nothing was run"; the page turns an Only pick off when an
+  agent is chosen, so the Code lane doesn't quietly drop it). A PLAIN
+  explicit server pick keeps 6b334's behaviour (local FLUX or a saved
+  Gemini key; only the prompt goes), chosen on purpose. Cloud Only never
+  contacts the server (no refresh before it, none for Research or Remote,
+  which run their own flows). The funnel's cloud choice is ANDed with the
+  saved `funnel_cloud` on the server, so an omitted field or a page that
+  hadn't read the setting can't turn cloud on against a saved OFF, and the
+  page's load-versus-change race is gone (`fnCloudTouched`; the flag is
+  sent only once the page has read the setting). "<name> Only" never picks
+  a guard, classifier, embedding or picture-reading model, even as the
+  smallest (`srv_role_ok` "all" in both branches), and says in its bubble
+  when its pick is the smallest on a server that doesn't report where its
+  models run. Auto-routing (modes, funnels) requires the gateway to have
+  REPORTED the card's size (`_srv_fits(..., need_vram=True)`); an explicit
+  pick or Only keeps the looser rule. The memory pass and the place-pin pass
+  don't ask a server that failed this turn. UX: a click on a server row a
+  hover just opened keeps the flyout (`flyClick`); a pick in Advanced whose
+  server dropped the model shows greyed as "no longer on <name>", can be
+  unticked, is never sent, and a council of nothing else answers as Fast
+  with a line saying why; funnels refresh the servers before a stage (the
+  same at-most-once-a-minute rule), and `server_funnel_pick` reads no ledger
+  when no server is paired; the funnel box's tooltip has its own words for
+  "no cloud keys saved" and "cloud power is off".
 - Gauntlet: new `== your server first (6b339) ==`, eight in-process and
   node checks (the families and the ranking, the candidates and the switch,
   the seats, the failing seat, the council's parallel drafts and the merge,

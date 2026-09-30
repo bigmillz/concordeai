@@ -3887,22 +3887,21 @@ def _tier_ready(name: str) -> list:
     return ready
 
 
-# YOUR SERVER FIRST (6b339): Fast, Thinking and Pro, and the agents of the
-# Code lane, seat the models of the person's own paired server before this
-# computer's, on the same ladder. A seat is {label, fb, params}: `label` is
-# the model, a server's ("<name> · <tag>") or a local one; `fb` is what
-# answers in its place when the server doesn't, before its first word (the
-# local copy of the same model, else the mode's own best local one, else
-# nothing). Two rules put a server model on the ladder:
-#   * a ladder pick the server also has (its Ollama tag from the catalog,
-#     whole: the MLX and the Ollama build of a model are one model here)
-#     is that copy instead of this computer's;
-#   * a server model the catalog doesn't know takes the seat its size earns
-#     against the ladder's own sizes (before the first seat that is smaller),
-#     if it suits the seat (srv_role_ok) and fits the card whole.
-# Only what server_mode_candidates lets through, so never "gpu+ram", never
-# an unknown placement, never a server the person turned off or one that
-# isn't answering. The count stays: Fast one, Thinking three, Pro all.
+# YOUR SERVER FIRST (6b339): Fast, Thinking and Pro seat the models of the
+# person's own paired server BEFORE this computer's (Patrick: "it
+# prioritizes those over the ones that are on their local device"; "if the
+# server has any more suitable models, it should run those"). A seat is
+# {label, fb, params}: `label` is the model, a server's ("<name> · <tag>")
+# or a local one; `fb` is what answers in its place when the server
+# doesn't, before its first word (this computer's copy of the same model,
+# else the mode's own best local one, else nothing). The server's best
+# suitable models (srv_role_ok, placement "gpu", fitting a card whose size
+# the gateway reported, the per-server switch on, answering) fill the seats,
+# strongest first; what the server can't fill is taken by this computer's
+# own picks in their normal order, skipping a model the server already
+# seated (the same tag). The count stays: Fast one, Thinking three, Pro all.
+# The agents of the Code lane keep their own rule (a server's coder, else the
+# server's copy of their first pick).
 _TIER_ROLE = {"Fast": "fast", "Thinking": "think", "Pro": "all"}
 # the agents that may: the Code lane's prefer a coder; Research and Remote
 # run their own flows on this computer and keep them
@@ -3915,19 +3914,6 @@ def _label_params(label: str):
     """Billions of parameters a catalog row says it has ("26B"), or None."""
     m = re.match(r"(\d+(?:\.\d+)?)B", str((MODEL_INFO.get(label) or {}).get("size") or ""), re.I)
     return float(m.group(1)) if m else None
-
-
-def _seat_insert(seats: list, extra: dict):
-    """extra takes the seat its size earns: before the first seat that is
-    smaller; a size nobody knows goes last."""
-    p = extra.get("params")
-    if p is not None:
-        for i, st in enumerate(seats):
-            sp = st.get("params")
-            if sp is not None and sp < p:
-                seats.insert(i, extra)
-                return
-    seats.append(extra)
 
 
 def resolve_tier_seats(name: str, ctx=None) -> list:
@@ -3946,33 +3932,34 @@ def resolve_tier_seats(name: str, ctx=None) -> list:
     if not cands:
         return [{"label": l, "fb": "", "params": _label_params(l)} for l in ready[:count]]
     speeds = server_speeds(ctx)
-    take_all = t.get("all")
+    # SERVER FIRST (Patrick: "it prioritizes those over the ones that are on
+    # their local device"): the server's best suitable models fill the seats,
+    # strongest first (quality and size, measured speed as the tiebreak);
+    # what the server can't fill is taken by this computer's own picks in
+    # their normal order, skipping a model the server already seated (the
+    # same tag). The per-server switch is the way back to local-first.
     seats = []
-    for l in list(t["picks"]) + [x for x in MERGE_RANK if x not in t["picks"]]:
-        tag = (MODEL_INFO.get(l) or {}).get("ollama")
-        srv = server_copy(tag, cands, speeds) if tag and l not in BLEND_EXCLUDE else None
-        local_ok = l in ready
-        # a blend-in that is too small to add anything stays out, as it does locally
-        if (srv is not None and count > 1 and not take_all and l not in t["picks"]
-                and MODEL_MEM_BYTES.get(l, 0) < BLEND_MIN_MEM):
-            srv = None
-        if srv is not None:
-            seats.append({"label": srv["label"], "fb": l if local_ok else "",
-                          "params": _label_params(l) or srv.get("params")})
-        elif local_ok:
-            seats.append({"label": l, "fb": "", "params": _label_params(l)})
-    known = {_srv_tag_key(i["ollama"]) for i in MODEL_INFO.values() if i.get("ollama")}
-    have = {st["label"] for st in seats}
-    for m in srv_rank([m for m in cands if _srv_tag_key(m["name"]) not in known],
-                      role, "normal", speeds):
-        if m["label"] not in have:
-            have.add(m["label"])
-            _seat_insert(seats, {"label": m["label"], "fb": "", "params": m.get("params")})
-    first_local = next((st["label"] for st in seats if not server_label(st["label"])), "")
+    for m in srv_rank(cands, role, "normal", speeds):
+        if len(seats) >= count:
+            break
+        seats.append({"label": m["label"], "fb": "", "params": m.get("params"),
+                      "tag": _srv_tag_key(m["name"])})
+    taken = {st["tag"] for st in seats}
+    for l in ready:
+        if len(seats) >= count:
+            break
+        if _srv_tag_key((MODEL_INFO.get(l) or {}).get("ollama")) in taken:
+            continue
+        seats.append({"label": l, "fb": "", "params": _label_params(l)})
+    # behind each server seat: this computer's copy of the same model when
+    # it is installed, else the mode's own best local one
+    local_tag = {_srv_tag_key((MODEL_INFO.get(l) or {}).get("ollama")): l for l in ready}
+    first_local = next((st["label"] for st in seats if not server_label(st["label"])),
+                       ready[0] if ready else "")
     for st in seats:
-        if server_label(st["label"]) and not st["fb"]:
-            st["fb"] = first_local
-    return seats[:count]
+        if server_label(st["label"]):
+            st["fb"] = local_tag.get(st.pop("tag", ""), "") or first_local
+    return seats
 
 
 def resolve_agent_seat(name, ctx=None):
@@ -6613,7 +6600,7 @@ def _residual(text: str) -> str:
     return re.sub(r"[\s,.;:!?]+", " ", _FILLER.sub(" ", text or "")).strip()
 
 
-def image_followup(text: str, prev_subject: str):
+def image_followup(text: str, prev_subject: str, refine: bool = True):
     """A new prompt when this message refines the picture just made, else
     None. Liberal by design: after an image, the burden is on a message
     to look like a NEW topic, not on it to look like a refinement.
@@ -6647,7 +6634,9 @@ def image_followup(text: str, prev_subject: str):
     while toks and re.sub(r"[^a-z]", "", toks[0].lower()) in known:
         toks.pop(0)
     rest = " ".join(toks).strip(" ,.")
-    said = _refine_with_model(prev_subject, t)
+    # refine=False: a model of this computer may not be asked ("<name> Only",
+    # 6b339: it makes no picture, so it asks no model to word one)
+    said = _refine_with_model(prev_subject, t) if refine else ""
     if said:
         return said
     if not rest:
@@ -16628,6 +16617,26 @@ _SRV_HOST_RX = re.compile(r"(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z
 _SRV_TOKEN_RX = re.compile(r"[\x21-\x7e]{1,256}")
 _O1_CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _srv_lock = threading.RLock()
+# the first-token deadline of this thread's server calls (6b339); None: the
+# long one (SRV_FIRST_S), for a pick the person made
+_srv_first = threading.local()
+SRV_DOWN_S = 60                 # a server that just failed a mode is skipped this long
+
+
+class server_first_deadline:
+    """with server_first_deadline(30): calls to a server on this thread give
+    up on a first word after 30 seconds (None: the long wait)."""
+
+    def __init__(self, seconds):
+        self.s = seconds
+
+    def __enter__(self):
+        self.prev = getattr(_srv_first, "s", None)
+        _srv_first.s = self.s
+        return self
+
+    def __exit__(self, *a):
+        _srv_first.s = self.prev
 # per server id: the last check (reachable, models, latency) and the
 # offset to the server's clock; a profile's own, emptied at a switch
 _srv_seen = profile_cache("_srv_seen", {})
@@ -17120,13 +17129,18 @@ def server_stream(label: str, messages: list, emit) -> dict:
             # without a byte (review of 6b334: a trickle can't hold the
             # answer open for ever)
             _sk = getattr(conn, "o1_sock", None) or conn.sock
+            # an explicit pick and "<name> Only" wait as long as a model
+            # load takes (minutes); a mode's server seat or a funnel asks
+            # for a short first-token deadline (server_first_deadline), so
+            # a server that is slow to start is left for this Mac's copy
+            _first = getattr(_srv_first, "s", None) or SRV_FIRST_S
             if _sk is not None:
-                _sk.settimeout(SRV_FIRST_S)
+                _sk.settimeout(_first)
             while True:
                 try:
                     line = resp.readline(1 << 22)
                 except (TimeoutError, _socket.timeout):
-                    _w = SRV_IDLE_S if got_any[0] else SRV_FIRST_S
+                    _w = SRV_IDLE_S if got_any[0] else _first
                     raise ServerError("offline", "%s sent nothing for %s, so "
                                       "the answer stopped there." % (
                                           e["name"], "%d minutes" % (_w // 60)
@@ -17310,18 +17324,24 @@ def _srv_weight(m: dict) -> float:
     return p * 6e8 if p else float("inf")
 
 
-def _srv_fits(m: dict, vram) -> bool:
+def _srv_fits(m: dict, vram, need_vram: bool = False) -> bool:
     """Whether model m runs entirely on the card. Its placement must be
     "gpu" (the owner didn't let it spill); but /api/tags' "gpu" is a policy,
     not a measurement: the gateway refuses a GPU-only model that is too
     big (gpu_fit). So when the server says how much memory its card has,
     the weights plus the gateway's own margin (5%, 256 MiB, its 768 MiB
     reserve and a context cache: about 1.25 GiB) must fit in it. A model
-    loaded and 100% on the card fits, whatever its size."""
+    loaded and 100% on the card fits, whatever its size. need_vram: for a
+    model chosen FOR the person (a mode, a funnel; rules review of 6b339) the
+    gateway must have reported the card's size, since "gpu" alone is only
+    the owner's policy; a pick the person made, or "<name> Only", keeps the
+    looser rule."""
     if m.get("placement") != "gpu":
         return False
     if m.get("loaded") and m.get("gpu_pct") == 100:
         return True
+    if need_vram and not vram:
+        return False
     size = m.get("size")
     if vram and isinstance(size, int) and size > 0:
         return size * 1.05 + (5 << 28) <= vram
@@ -17333,8 +17353,12 @@ def server_only_pick(models: list, vram=None):
     server's listed models (_srv_models'), or None when it lists none.
     "fits": the strongest that runs entirely on the card (_srv_fits), by
     parameter size (unknown sizes last, then bytes, then name). "smallest":
-    nothing fits whole, so the smallest listed."""
-    ms = [m for m in models or [] if isinstance(m, dict) and m.get("name")]
+    nothing fits whole, so the smallest listed. Both only among models that
+    may take a general question (srv_role_ok "all", rules review of 6b339):
+    never a guard, a classifier, an embedding or a picture reader, however
+    small."""
+    ms = [m for m in models or [] if isinstance(m, dict) and m.get("name")
+          and srv_role_ok(m["name"], "all")]
     fit = [m for m in ms if _srv_fits(m, vram)]
     if fit:
         return sorted(fit, key=lambda m: (-(_srv_params(m["name"]) or -1.0),
@@ -17352,7 +17376,7 @@ def server_only_state(e) -> dict:
     s = _srv_seen.get(e["id"]) or {}
     n = e["name"]
     out = {"ok": False, "server": n, "model": "", "label": "", "how": "",
-           "why": "", "note": ""}
+           "why": "", "note": "", "placement": ""}
     if not _srv_paired(e):
         out["why"] = "%s isn\u2019t paired with this computer yet." % n
     elif not s.get("at"):
@@ -17363,14 +17387,20 @@ def server_only_state(e) -> dict:
         pick = server_only_pick(s.get("models") or [],
                                 (s.get("gpu") or {}).get("vram_bytes"))
         if pick is None:
-            out["why"] = "%s lists no models." % n
+            out["why"] = ("%s lists no models for general questions." % n
+                          if s.get("models") else "%s lists no models." % n)
         else:
             m, how = pick
-            out.update(ok=True, model=m["name"], how=how, label=n + SERVER_SEP + m["name"])
+            out.update(ok=True, model=m["name"], how=how, label=n + SERVER_SEP + m["name"],
+                       placement=m.get("placement") or "unknown")
     tail = " Nothing runs on this computer or in the cloud."
     out["note"] = (
         ("The strongest model on %s that fits its card, answering alone." % n + tail)
         if out["how"] == "fits" else
+        ("Nothing on %s is known to fit its card whole, and it doesn\u2019t say where its "
+         "models run, so this is its smallest model, alone, and it may use system "
+         "memory." % n + tail)
+        if out["how"] == "smallest" and out.get("placement") == "unknown" else
         ("Nothing on %s fits its card whole, so it is running with what it has: "
          "its smallest model, alone." % n + tail)
         if out["how"] == "smallest" else
@@ -17556,7 +17586,7 @@ def server_mode_candidates(ctx) -> list:
             continue
         vram = (s.get("gpu") or {}).get("vram_bytes")
         for m in s.get("models") or []:
-            if _srv_fits(m, vram):
+            if _srv_fits(m, vram, True):
                 out.append(dict(m, server=e["name"], sid=e["id"],
                                 params=_srv_params(m["name"])))
     return out
@@ -17570,8 +17600,11 @@ def server_funnel_pick(ctx, effort: str = "normal"):
     strongest general model that fits the card whole. A coder, an
     embedding, a picture reader or a guard model never; never a model that
     needs system memory. The same chooser as the modes (srv_rank)."""
-    top = srv_rank(server_mode_candidates(ctx), "funnel",
-                   "fast" if effort == "fast" else "normal", server_speeds(ctx))
+    cands = server_mode_candidates(ctx)
+    if not cands:
+        return None           # no server, no ledger read
+    top = srv_rank(cands, "funnel", "fast" if effort == "fast" else "normal",
+                   server_speeds(ctx))
     return top[0] if top else None
 
 
@@ -17606,16 +17639,71 @@ def server_refresh_modes(ctx, limit: float = 5.0):
             list(pool.map(lambda e: server_check(e, limit), due))
 
 
+def server_mark_down(ctx, name: str, why: str):
+    """A server that just failed a request made for a mode or a funnel is
+    marked down for SRV_DOWN_S (6b339, rules review): later stages and
+    councils skip it instead of paying the wait again, and the memory and
+    place-pin passes of the turn don't ask it again. A check that succeeds
+    replaces the mark (server_check writes a fresh record)."""
+    try:
+        e = next((x for x in _srv_read(ctx) if x["name"] == name), None)
+    except (StoreReadError, NoProfile):
+        return
+    if e is None:
+        return
+    s = _srv_seen.setdefault(e["id"], {})
+    s.update(at=time.time(), reachable=False, auth=False,
+             err=str(why or "%s didn\u2019t answer." % name)[:200], kind="offline")
+
+
+def server_label_down(ctx, label: str) -> bool:
+    """Whether the server of this model label failed lately (marked down, or
+    its last check failed within SRV_DOWN_S)."""
+    name = str(label).split(SERVER_SEP, 1)[0]
+    try:
+        e = next((x for x in _srv_read(ctx) if x["name"] == name), None)
+    except (StoreReadError, NoProfile):
+        return False
+    s = (_srv_seen.get(e["id"]) or {}) if e else {}
+    return bool(s.get("err")) and time.time() - float(s.get("at") or 0) < SRV_DOWN_S
+
+
+def server_seat_title(council: list, seat_fb: dict, res: str, said: bool,
+                      cloud_answered: bool, down):
+    """Who titles the chat after a turn whose council held a mode's server seat
+    (6b339, UX review). None: no ticket (no seat, the cloud answered and its
+    own ticket names the chat, or a single seat nobody asked); "": no title
+    at all (the seat fell back or failed, so the turn needs none, and a model
+    of this Mac must not write one); else the label of the server that
+    answered. `res` is the single seat's result ("server", "fallback",
+    "failed"), `down(label)` whether its server just failed."""
+    if not seat_fb or cloud_answered:
+        return None
+    if len(council) == 1:
+        if not res:
+            return None
+        return council[0] if res == "server" else ""
+    if not said:
+        return ""
+    return next((l for l in council if l in seat_fb and not down(l)), "")
+
+
 def server_first_answer(label: str, fallback: str, messages: list, memit, emit,
-                        status, step) -> bool:
+                        status, step, first_s: float = 60.0, polish=None) -> str:
     """A mode's server seat (6b339): streamed from the server, with `fallback`
     (this computer's copy, or "") behind it. UNLIKE an explicit pick
     (server_answer), which never falls back: a mode means the best
-    available. If the server fails before its first word, the page is told
-    to drop what it holds (RESET) and the fallback answers, the status line
-    saying so and the badge saying "this Mac". Once a word has shown there
-    is one answer, so a failure then is said where the answer stops. Never
-    another server, never a cloud model here."""
+    available. first_s is the first-word deadline (30 s for Fast, 60
+    otherwise: a pick the person made waits for a model load, a seat
+    doesn't); missing it is a failure before the first word. If the server
+    fails before its first word, the server is marked down for a minute, the
+    page is told to drop what it holds (RESET) and the fallback answers, the
+    status line saying so and the badge saying "this Mac". Once a word has
+    shown there is one answer, so a failure then is said where the answer
+    stops. polish(draft) -> messages: Fast's second pass, run on the SAME
+    server with the same deadline; a server that fails during it leaves the
+    first draft, without alarm. Never another server, never a cloud model
+    here. Returns "server", "fallback" or "failed"."""
     name = label.split(SERVER_SEP, 1)[0]
     shown = [False]
 
@@ -17623,14 +17711,39 @@ def server_first_answer(label: str, fallback: str, messages: list, memit, emit,
         if chunk and not isinstance(chunk, Ctl) and str(chunk).strip():
             shown[0] = True
         memit(chunk)
+    why = ""
     try:
         step("draft", "Writing the answer", "run", label)
         status("asking " + name)
         emit(Ctl(NUL + "RUN:" + json.dumps({"r": [label], "w": "server",
                                             "s": name}) + NUL))
-        _stream_guarded(label, messages, _m, status, None,
-                        "kept the part before it wandered")
-        return True
+        draft = ""
+        if polish is not None:
+            # TWO PASS, like Fast on this Mac: a silent draft, then the
+            # rewrite streamed; both on the server
+            status("%s is thinking it through" % label)
+            parts = []
+            with server_first_deadline(first_s):
+                run_model(label, messages, parts.append)
+            draft = strip_think("".join(parts))
+        if draft and not _looks_degenerate(draft):
+            step("draft", "Drafted the answer", "done", "%d chars" % len(draft))
+            step("polish", "Sharpening it", "run", "")
+            status("%s is sharpening the answer" % label)
+            try:
+                with server_first_deadline(first_s):
+                    _stream_guarded(label, polish(draft), _m, status, draft,
+                                    "showing the first draft")
+            except ServerError:
+                # the draft stands, and nothing alarming is said
+                if shown[0]:
+                    emit(Ctl(NUL + "RESET" + NUL))
+                memit(draft)
+            return "server"
+        with server_first_deadline(first_s):
+            _stream_guarded(label, messages, _m, status, None,
+                            "kept the part before it wandered")
+        return "server"
     except ServerError as se:
         why = str(se)
     except StoreReadError:
@@ -17639,12 +17752,16 @@ def server_first_answer(label: str, fallback: str, messages: list, memit, emit,
         raise
     except Exception as exc:
         why = "%s couldn\u2019t answer (%s)." % (name, type(exc).__name__)
+    try:
+        server_mark_down(bound_ctx(), name, why)
+    except NoProfile:
+        pass
     if shown[0]:
         emit(AppText("\n\n\u26a0\ufe0f " + why))
-        return False
+        return "failed"
     if not fallback:
         emit(AppText("\u26a0\ufe0f " + why))
-        return False
+        return "failed"
     status("%s didn\u2019t answer, so %s answers here" % (name, fallback))
     emit(Ctl(NUL + "RESET" + NUL))
     emit(Ctl(NUL + "RUN:" + json.dumps({"r": [fallback], "w": "local",
@@ -17652,7 +17769,7 @@ def server_first_answer(label: str, fallback: str, messages: list, memit, emit,
     step("draft", "Writing the answer", "run", fallback)
     _stream_guarded(fallback, messages, memit, status, None,
                     "kept the part before it wandered")
-    return True
+    return "fallback"
 
 
 # ---- what the pane does
@@ -19919,7 +20036,7 @@ def run_council(labels: list, messages: list, emit, status,
                 reflect: bool = False, peer: bool = False,
                 cloud_only: bool = False,
                 bench_allow=None, comp: str = "",
-                hurry=None) -> None:
+                hurry=None, srv_first_s=None) -> None:
     """Ask each selected model in turn, then stream a merged answer.
 
     Sequential on purpose: only one MLX engine can be resident at a time
@@ -20069,6 +20186,29 @@ def run_council(labels: list, messages: list, emit, status,
     # exactly how a failed cloud voice is treated.
     LOCAL_CAP = 120.0            # any single model
     LOCAL_BUDGET = 240.0         # the local loop end to end
+
+    def _capped(label, fn):
+        """A step of the council that isn't a draft (peer review, reflection)
+        on a server's model runs within the per-model cap and with the
+        mode's first-word deadline (6b339); a model of this computer runs
+        as it always did."""
+        if not server_label(label):
+            return fn()
+        box = []
+
+        def _go():
+            try:
+                with server_first_deadline(srv_first_s):
+                    fn()
+            except BaseException as _ex:      # noqa: BLE001 — re-raised below
+                box.append(_ex)
+        _ct = ctx_thread(target=_go, daemon=True)
+        _ct.start()
+        _ct.join(timeout=LOCAL_CAP)
+        if _ct.is_alive():
+            raise TimeoutError("%s was too slow" % label)
+        if box:
+            raise box[0]
     _local_deadline = time.time() + LOCAL_BUDGET
 
     # THE SERVERS DRAFT BESIDE THIS COMPUTER (6b339, per Patrick: server
@@ -20117,8 +20257,11 @@ def run_council(labels: list, messages: list, emit, status,
 
         def _draft_local(_lbl=label, _c=_collect, _e=_err):
             try:
-                run_model(_lbl, messages, _c,
-                          thinking=(reflect and _lbl.startswith("Qwen")))
+                # a mode's server seat gives up on a first word early
+                with server_first_deadline(srv_first_s if server_label(_lbl)
+                                           else None):
+                    run_model(_lbl, messages, _c,
+                              thinking=(reflect and _lbl.startswith("Qwen")))
             except _DraftAbandoned:
                 pass
             except Exception as exc:      # noqa: BLE001 — recorded below
@@ -20139,12 +20282,17 @@ def run_council(labels: list, messages: list, emit, status,
             # whatever it streamed if that is already a usable answer.
             _stop.set()
             _partial = strip_think("".join(parts))
+            if on_server:
+                server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0],
+                                 "a server draft was too slow")
             took_part(label, _partial if len(_partial) > 200
                       else "(no answer — too slow)")
             return
         if _err:
             if type(_err[0]).__name__ == "ServerError":
                 _srv_errs.append(str(_err[0]))     # said if none answers
+                server_mark_down(bound_ctx(), label.split(SERVER_SEP, 1)[0],
+                                 str(_err[0]))
             took_part(label, f"(no answer — {type(_err[0]).__name__})")
             return
         # the merger gets answers, never the reasoning that produced them
@@ -20219,11 +20367,12 @@ def run_council(labels: list, messages: list, emit, status,
             status(f"peer review: {label} rewriting · {i} of {len(good)}")
             parts = []
             try:
-                run_model(label, [messages[0],
-                                  {"role": "user",
-                                   "content": PEER_INSTRUCTION
-                                   + "QUESTION: " + question0
-                                   + "\n\n" + block}], parts.append)
+                _capped(label, lambda _l=label, _p=parts: run_model(
+                    _l, [messages[0],
+                         {"role": "user",
+                          "content": PEER_INSTRUCTION
+                          + "QUESTION: " + question0
+                          + "\n\n" + block}], _p.append))
             except Exception:
                 continue
             text = strip_think("".join(parts))
@@ -20308,7 +20457,7 @@ def run_council(labels: list, messages: list, emit, status,
         status(f"{merger} is double-checking the drafts")
         try:
             parts = []
-            run_model(merger, [
+            _capped(merger, lambda: run_model(merger, [
                 messages[0],
                 {"role": "user", "content":
                  "You are reviewing draft answers before a final version "
@@ -20316,7 +20465,7 @@ def run_council(labels: list, messages: list, emit, status,
                  "factual claims that look wrong or contradict each other, "
                  "missing angles a good answer needs, and filler to drop. "
                  "At most 6 bullet points, no praise, no rewrite.\n\n"
-                 f"QUESTION: {question}\n\n{body}"}], parts.append)
+                 f"QUESTION: {question}\n\n{body}"}], parts.append))
             notes = strip_think("".join(parts)).strip()[:1200]
         except Exception:
             notes = ""
@@ -20419,8 +20568,10 @@ def run_council(labels: list, messages: list, emit, status,
             return
     run_mark(compositor=merger)
     try:
-        _stream_guarded(merger, synth, emit, status, good[0][1],
-                        "showing the best single answer")
+        with server_first_deadline(srv_first_s if server_label(merger)
+                                   else None):
+            _stream_guarded(merger, synth, emit, status, good[0][1],
+                            "showing the best single answer")
     except Exception:
         try:
             emit(Ctl(NUL + "RESET" + NUL))
@@ -22646,7 +22797,12 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
     # the stage, not the retry.
     use_cloud = bool(cloud) and cloud_allowed()
     try:
+        # a recovered server is used and a dead one skipped: asked again when
+        # its last check is over a minute old, 5 s at most (6b339)
+        server_refresh_modes(bound_ctx())
         srv = server_funnel_pick(bound_ctx(), effort)
+    except (StaleProfile, BrokenPipeError, ConnectionResetError):
+        raise
     except Exception:
         srv = None
     # THE LADDER, not the single active provider (6b261, measured):
@@ -22670,12 +22826,16 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
     if not raw and srv:
         parts = []
         try:
-            run_model(srv["label"], msgs, parts.append)
+            with server_first_deadline(30 if effort == "fast" else 60):
+                run_model(srv["label"], msgs, parts.append)
             raw = strip_think("".join(parts))
             if raw:
                 engine = "server:%s \u00b7 %s" % (srv["server"], srv["name"])
-        except Exception:
+        except (StaleProfile, BrokenPipeError, ConnectionResetError):
+            raise
+        except Exception as exc:
             raw = ""      # a server that fails is skipped: this Mac next
+            server_mark_down(bound_ctx(), srv["server"], str(exc))
     if not raw and label:
         parts = []
         try:
@@ -24854,7 +25014,18 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # "Include cloud models" (6b339): read at every stage, so an open
             # funnel respects a change at the next one; ticked unless the
             # page says otherwise, and never without cloud power and a key
-            use_cloud = d.get("cloud") is not False and cloud_allowed()
+            # the saved choice counts too (rules review of 6b339): a request
+            # that omits the field, or a page that hadn't read the setting,
+            # can't turn cloud on against a saved OFF
+            try:
+                _saved_cloud = (user_prefs(self.ctx).get("funnel_cloud", True)
+                                is not False)
+            except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                raise
+            except Exception:
+                _saved_cloud = False
+            use_cloud = (d.get("cloud") is not False and _saved_cloud
+                         and cloud_allowed())
             stage = len(picks) + 1
             # FUNNEL TURNS ARE SAVED HERE (0b 5.5, gap G4; 6b322): the goal
             # or the latest pick when the request arrives, the summary
@@ -24956,18 +25127,27 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # then the person's server (6b339), the strongest general
                     # model that fits its card, same chooser as the stages
                     try:
+                        server_refresh_modes(self.ctx)
                         _sp = server_funnel_pick(self.ctx, "normal")
+                    except (StaleProfile, BrokenPipeError,
+                            ConnectionResetError):
+                        raise
                     except Exception:
                         _sp = None
                     if _sp:
                         try:
                             _sparts = []
-                            run_model(_sp["label"], msgs, _sparts.append)
+                            with server_first_deadline(60):
+                                run_model(_sp["label"], msgs, _sparts.append)
                             out = strip_think("".join(_sparts))
                             if out:
                                 _eng = "server:%s \u00b7 %s" % (_sp["server"], _sp["name"])
-                        except Exception:
+                        except (StaleProfile, BrokenPipeError,
+                                ConnectionResetError):
+                            raise
+                        except Exception as _exc:
                             out = ""
+                            server_mark_down(self.ctx, _sp["server"], str(_exc))
                 if not out:
                     # ANY strong cached model beats none (6b260): the
                     # old three-label ladder meant a Mac without those
@@ -25530,11 +25710,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # council is a placeholder label and `_so_fail` says why: no other
         # model ever answers in its place.
         _so_c0, _so_fail = "", ""
-        # a mode's server seats -> what answers in their place (6b339)
+        # a mode's server seats -> what answers in their place (6b339), and
+        # how the turn's one seat went ("server", "fallback", "failed")
         _seat_fb = {}
+        _seat_res = [""]
         if tier in TIERS:
             try:
-                server_refresh_modes(self.ctx)
+                # Cloud Only never contacts the server (6b339, rules review)
+                if not cloud_only:
+                    server_refresh_modes(self.ctx)
             except (StaleProfile, BrokenPipeError, ConnectionResetError):
                 raise
             except Exception:
@@ -25661,8 +25845,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 if _ovr and not _residual(_pclean):
                     _fu = _prev
                 else:
-                    _fu = (image_followup(_pclean, _prev) if _pclean
-                           else None) or (_prev if _ovr else None)
+                    _fu = (image_followup(_pclean, _prev,
+                                          refine=not srv_only_tier(tier))
+                           if _pclean else None) or (_prev if _ovr else None)
                 if _fu:
                     if _prev_img:
                         img_subject = _fu
@@ -25682,6 +25867,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # a selected AGENT owns the request: its best installed model, its
         # specialist system prompt; Research routes to the research flow
         agent_name = req_json.get("agent") or ""
+        if agent_name and srv_only_tier(tier):
+            # "<name> Only" runs its one model and nothing else (6b339,
+            # per the rules review): an agent is refused, never run here or
+            # in the cloud. The page turns the pick off when an agent is
+            # chosen, so this is the door for a stale or hand-made request
+            _so_fail = ("%s Only can\u2019t run the %s agent, and nothing "
+                        "was run." % (_so_c0.split(SERVER_SEP, 1)[0]
+                                      or "Your server", agent_name[:40]))
+            agent_name = ""
         ag_system, ag_research, ag_remote = "", False, False
         # NO AUTO WEB SEARCH ON THE AGENT LANES (6b309): search snippets
         # were pasted into the Remote agent's task, where a web page could
@@ -25692,7 +25886,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             auto_web = False
         if agent_name and not req_json.get("images"):
             try:
-                server_refresh_modes(self.ctx)
+                # only the agents that may use a server ask it (Research and
+                # Remote run their own flows, Cloud Only never asks, 6b339)
+                if agent_name in _AGENT_ROLE and not cloud_only:
+                    server_refresh_modes(self.ctx)
             except (StaleProfile, BrokenPipeError, ConnectionResetError):
                 raise
             except Exception:
@@ -26627,6 +26824,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # MAKING A PICTURE, A VIDEO OR A FILE USES THIS COMPUTER (review of
         # 6b334): a chat on your own server that took no hold takes it
         # now, and while a benchmark runs it gets the benchmark's line
+        if _srv_only and (img_subject or vid_subject):
+            # "<name> Only" makes no picture or video (6b339): not on this
+            # computer, not with a cloud key, and no model is asked to word
+            # one. A plain server pick keeps 6b334's behaviour, on purpose.
+            emit(AppText("\u26a0\ufe0f %s Only can\u2019t make pictures or "
+                         "videos, and nothing was made."
+                         % (_so_c0.split(SERVER_SEP, 1)[0] or "Your server")))
+            hb_stop.set()
+            return
         if (img_subject or vid_subject or export_req) and not self._bench_held:
             if not bench_hold():
                 emit(AppText(BENCH_BUSY))
@@ -26643,7 +26849,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 ext = blks[0][0] if blks else "md"
             ttl = next((b[2] for b in x_blocks(src) if b[0] == "h"), "") \
                 or (make_title(src[:600])
-                    if len(src) > 200 and not (_srv_only or _srv_lbl) else "")
+                    if len(src) > 200
+                    and not (_srv_only or _srv_lbl or _seat_fb) else "")
             step("export", "Writing the file", "run",
                  EXPORT_KIND.get(ext, ("", ext))[1])
             status("writing the %s" % EXPORT_KIND.get(ext, ("", ext))[1])
@@ -26965,7 +27172,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             reflect=(tier == "Thinking"),
                             peer=(tier == "Pro"),
                             bench_allow=req_cloud, comp=req_comp,
-                            hurry=hurry_ev)
+                            hurry=hurry_ev,
+                            srv_first_s=(60.0 if _seat_fb else None))
             else:
                 lbl = route_label or model_name
                 # cloud is a pref, not a tier (Best retired in 5.3).
@@ -27025,9 +27233,25 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     status("cloud power unavailable — running locally")
                 if lbl in _seat_fb:
                     # a mode's server seat (6b339): asked first, this
-                    # computer's copy behind it until the first word
-                    server_first_answer(lbl, _seat_fb[lbl], full_messages,
-                                        memit, emit, status, step)
+                    # computer's copy behind it until the first word; Fast
+                    # gets the same second pass as on this computer, run on
+                    # the server. A first word within 30 s (Fast) or 60 s
+                    _pol = (user_prefs(user_base).get("polish", True)
+                            and not images and (not query or bookish)
+                            and _is_substantive(prompt))
+
+                    def _revise(_d):
+                        _sq = (full_messages[-1]["content"][:5000]
+                               if (query or docs) else prompt)
+                        return [full_messages[0],
+                                {"role": "user", "content":
+                                 REVISE_INSTRUCTION + "QUESTION: " + _sq
+                                 + "\n\nFIRST DRAFT:\n" + _d[:6000]}]
+                    _seat_res[0] = server_first_answer(
+                        lbl, _seat_fb[lbl], full_messages, memit, emit,
+                        status, step,
+                        first_s=30.0 if tier == "Fast" else 60.0,
+                        polish=_revise if _pol else None)
                     hb_stop.set()
                     return
                 _run_lbl([lbl])
@@ -27159,6 +27383,16 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 _srv_only_chats[(user_base.name, _title_cid)] = (
                     _srv_lbl if _model_said[0] and not _so_fail else "",
                     time.time())
+            elif _seat_fb and _title_cid and not _gone:
+                # a mode's server seat (6b339, UX review): the chat is titled
+                # by the server that answered, or by none when it fell back
+                # (a failed turn needs no title); never by a model on this Mac
+                _seat_t = server_seat_title(
+                    council, _seat_fb, _seat_res[0], _model_said[0],
+                    bool(_ans_conf), lambda l: server_label_down(user_base, l))
+                if _seat_t is not None:
+                    _srv_only_chats[(user_base.name, _title_cid)] = (
+                        _seat_t, time.time())
             if _ans_conf and not _gone:
                 # the badge under the answer says "cloud", whatever the
                 # line-up said up front (a picture Claude read, 6b308);
@@ -27207,7 +27441,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             pass
                     elif (query and sent[0] > 120 and _model_said[0]
                             and (placey or bookish) and not images
-                            and (_ans_conf or not cloud_only)):
+                            and (_ans_conf or not cloud_only)
+                            and not (server_label(route_label or model_name)
+                                     and server_label_down(
+                                         user_base, route_label or model_name))):
                         step("places", "Finding the places", "run", "")
                         ans = "".join(answer_buf)[-2400:]
                         _pin_ask = [
@@ -27316,9 +27553,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # (and none for a server pick that got no answer, 6b339: it only
             # asked the server again, a second and third request for one
             # failed turn)
+            _ml = route_label or (council[0] if council else "")
             if (plain and len(plain) > 12 and (_ans_conf or not cloud_only)
                     and not _gone and not _so_fail
-                    and not (_srv_lbl and not _model_said[0])):
+                    and not (_srv_lbl and not _model_said[0])
+                    and not (server_label(_ml)
+                             and server_label_down(user_base, _ml))):
                 ctx_thread(
                     target=_extract_memory,
                     args=(route_label or (council[0] if council else ""),
@@ -32616,6 +32856,9 @@ let agent="";           // declared early: setTier reads it (TDZ!)
 // modes with nothing behind them right now — Cloud Only with no working
 // key. Declared here for the same TDZ reason: setTier reads it at boot.
 let tierOff={};
+// what /api/tiers last said each mode resolves to: the chip shows a server
+// seat (6b339)
+let tierInfo={};
 // the saved mode comes from prefs.json (applyPrefs, 6b324)
 let tier="Fast";
 // quiet: the boot's own call, which saves nothing
@@ -32789,7 +33032,14 @@ function advServerRows(sel){
   const gs=srvList.filter(s=>s.paired);
   return gs.map(s=>{
     const ms=s.models||[];
+    // a pick the server has since dropped: greyed, "no longer on <name>", and
+    // still tickable so it can be taken out (6b339, UX review)
+    const ghosts=sel.local.filter(l=>advGhost(l)&&l.indexOf(s.name+SRV_SEP)===0).map(l=>
+      '<label class="advrow off"><input type="checkbox" data-l="'+esc(l)+'" checked>'
+      +'<span class="an"><b>'+esc(l)+'</b><span class="au">no longer on '+esc(s.name)
+      +'</span></span></label>').join("");
     return '<div class="advgrp"><b>'+esc(s.name)+'</b> <i>\u00b7 your server</i></div>'
+      +ghosts
       +(ms.length?ms.map(m=>'<label class="advrow"><input type="checkbox" data-l="'
         +esc(m.label)+'"'+(sel.local.indexOf(m.label)>=0?" checked":"")+'>'
         +'<span class="an"><b>'+esc(m.label)+'</b><span class="au">'
@@ -32807,11 +33057,20 @@ function advCompList(pv,ready){
     .concat((ready||[]).filter(m=>/^Gemma/.test(m.label)&&m.label.indexOf(SRV_SEP)<0)
       .map(m=>[m.label,m.label+" · local, private"]));
 }
+// a pick whose server is paired and listing, and does not list it: it is gone
+// from there. A server that is off or lists nothing isn't judged.
+function advGhost(l){
+  const s=srvList.find(x=>x.paired&&l.indexOf(x.name+SRV_SEP)===0);
+  return !!s&&(s.models||[]).length>0&&!(s.status||{}).err
+    &&!(s.models||[]).some(m=>m.label===l);
+}
+// what a send carries: the council without its ghosts
+function advSendList(){return ((adv&&adv.local)||[]).filter(l=>!advGhost(l));}
 // picks of a server that is paired but not listing (off right now) stay in
 // the council when the dialog is saved; only its removal drops them
 function advKept(prev,shown){
   return (prev||[]).filter(l=>shown.indexOf(l)<0&&l.indexOf(SRV_SEP)>=0
-    &&srvList.some(s=>s.paired&&l.indexOf(s.name+SRV_SEP)===0));
+    &&!advGhost(l)&&srvList.some(s=>s.paired&&l.indexOf(s.name+SRV_SEP)===0));
 }
 // a server that is gone takes its picks out of the hand-picked council,
 // never swapped for another model; with none left the council goes and
@@ -32974,7 +33233,9 @@ function openEngMenu(){
     if(el.dataset.sv){
       el.addEventListener("click",ev=>{
         ev.stopPropagation();hideTierPop();
-        if(engSubId===el.dataset.sv&&!engSub.hidden)closeEngSub();
+        const a=flyClick(engSubId,engSub.hidden,engSubByHover,el.dataset.sv);
+        if(a==="close")closeEngSub();
+        else if(a==="pin")engSubByHover=false;   // a hover opened it; the click keeps it
         else openEngSub(el.dataset.sv,false,false);
       });
       el.addEventListener("mouseenter",()=>{
@@ -33052,7 +33313,7 @@ advChip();     // a custom council survives the restart (6b248)
 async function paintTierAvail(){
   let info={};
   try{info=await(await api("/api/tiers")).json();}catch(e){return;}
-  tierOff={};
+  tierOff={};tierInfo=info;
   Object.keys(info).forEach(n=>{if(info[n].available===false)tierOff[n]=1;});
   document.querySelectorAll("#engmenu .engrow,#engsub .engrow").forEach(el=>{
     if(el.dataset.t)el.classList.toggle("off",!!tierOff[el.dataset.t]);});
@@ -33061,6 +33322,7 @@ async function paintTierAvail(){
   // (a server mode that is only off stays: it goes when its server is removed)
   if(tierOff[tier]&&!isSrvMode(tier))setTier("Fast");
   if(typeof fnCloudLoad==="function")fnCloudLoad();
+  if(typeof paintModels==="function")paintModels();     // the chip names the seat
 }
 paintTierAvail();
 
@@ -33118,8 +33380,13 @@ function paintAgents(){
 function setAgent(name,guess){
   agent=name;
   // the CODE tab reopens on whichever specialist was used last
-  prefSet(!guess&&(name==="Coding"||name==="Workspace")
-    ?{agent:name,codeagent:name}:{agent:name});
+  const po=!guess&&(name==="Coding"||name==="Workspace")
+    ?{agent:name,codeagent:name}:{agent:name};
+  // "<name> Only" runs its one model and no agent (6b339): choosing an agent
+  // turns the pick off, so the Code lane doesn't quietly drop it
+  if(name&&isSrvMode(tier)){tier="Fast";po.tier="Fast";}
+  prefSet(po);
+  if(name&&typeof paintModels==="function")paintModels();
   paintAgents();
   if(typeof wsRefresh==="function")wsRefresh();
   if(typeof remoteRefresh==="function")remoteRefresh();
@@ -34495,6 +34762,17 @@ async function send(){
   let srvWho="";         // the server that answered, if one did (6b334)
   lastModels="";
 
+  // a hand-picked council loses the picks its server has dropped; a council of
+  // nothing else answers as Fast, and says why (6b339, UX review)
+  const advList=advOn&&adv?advSendList():[];
+  const advGhostOnly=!!(advOn&&adv&&!advList.length&&(adv.local||[]).length);
+  const advUse=!!(advOn&&adv)&&!advGhostOnly;
+  if(advGhostOnly){
+    const g=adv.local[0],gs=srvList.find(x=>g.indexOf(x.name+SRV_SEP)===0);
+    body.insertAdjacentHTML("beforebegin",'<div class="ghostnote" style="font-size:11px;'
+      +'color:var(--faint);margin-bottom:6px">Your hand-picked models are no longer on '
+      +esc(gs?gs.name:"your server")+", so Fast answered.</div>");
+  }
   try{
     // a Try again or Edit & resend rewinds the saved chat: the server
     // does it with the question, once no benchmark can refuse it (6b331)
@@ -34504,12 +34782,13 @@ async function send(){
     const resp=await api("/api/chat",{
       method:"POST",headers:{"Content-Type":"application/json"},
       signal:abortCtl.signal,
-      body:JSON.stringify(Object.assign(advOn&&adv
+      body:JSON.stringify(Object.assign(advUse
         // the custom council (6b248): hand-picked minds, hand-picked pen
-        ?{model:"",models:adv.local||[],tier:"",messages:askCtx(myMessages),
+        ?{model:"",models:advList,tier:"",messages:askCtx(myMessages),
           auto_web:autoWeb,images:sentImages,docs:sentDocs,agent,
           cloud:adv.cloud||[],compositor:adv.comp||""}
-        :{model,models:council,tier,messages:askCtx(myMessages),
+        :{model:advGhostOnly?"":model,models:advGhostOnly?[]:council,
+          tier:advGhostOnly?"Fast":tier,messages:askCtx(myMessages),
           auto_web:autoWeb,images:sentImages,docs:sentDocs,agent,
           // the Remote agent (6b249) carries the autonomy throttle
           autonomy:agent==="Remote"?autonomy:undefined},turn)),
@@ -35856,7 +36135,7 @@ async function fnStep(pick){
     d=await(await api("/api/funnel",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify(Object.assign({},fnState,{chat_id:fid,
-        cloud:fnCloudOn,
+        cloud:fnCloudLoaded?fnCloudOn:undefined,
         after_len:fn,after_hash:chatHash(messages,fn)}))})).json();
   }catch(e){d={err:"couldn\u2019t reach the engine"};}
   // adopted only while the page still has the chat: one deleted or
@@ -35971,23 +36250,29 @@ $("#fn-go").addEventListener("click",()=>{
 /* "Include cloud models" (6b339): remembered like the effort, sent with
    every stage, greyed and unticked-looking while there is no cloud to
    include (no key saved, or cloud power off); the saved choice is kept */
-let fnCloudOn=true;
+let fnCloudOn=true,fnCloudLoaded=false,fnCloudTouched=false;
 function fnCloudPaint(cs){
   const cb=$("#fn-cloud"),row=$("#fn-cloud-row");if(!cb||!row)return;
   const ok=!!(cs&&cs.configured&&cs.turbo);
   cb.disabled=!ok;row.classList.toggle("off",!ok);
   cb.checked=ok&&fnCloudOn;
+  // each reason in its own words: no key, or a key with cloud power off
   row.title=ok?"Cloud models go first; unticked, your server and this Mac answer"
-    :"no cloud keys saved";
+    :!(cs&&cs.configured)?"no cloud keys saved"
+    :"cloud power is off (Settings \u203a Cloud power)";
 }
+// what the page holds wins once the person has touched the box: a late answer
+// from /api/prefs (this runs again when a key is saved) can't flip it back
 async function fnCloudLoad(){
   try{
     const pr=await(await api("/api/prefs")).json();
-    fnCloudOn=pr.funnel_cloud!==false;
+    if(!fnCloudTouched)fnCloudOn=pr.funnel_cloud!==false;
+    fnCloudLoaded=true;
     fnCloudPaint(await(await api("/api/cloud")).json());
   }catch(e){}
 }
 $("#fn-cloud").addEventListener("change",()=>{
+  fnCloudTouched=true;
   fnCloudOn=$("#fn-cloud").checked;
   api("/api/prefs",{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({funnel_cloud:fnCloudOn})}).catch(()=>{});
@@ -37782,6 +38067,13 @@ function whereBadge(lm,who){
   const base=cloud?"cloud":(rest.length||!names.length)?"this Mac":"";
   return [base].concat(names).filter(Boolean).join(" + ");
 }
+// what a click on a server's row does to its flyout (6b339, UX review): open
+// it, close it, or keep the one a hover opened (the click that follows a
+// hover used to close it)
+function flyClick(curId,hidden,byHover,id){
+  if(curId!==id||hidden)return "open";
+  return byHover?"pin":"close";
+}
 // where a flyout goes (6b337): beside the menu, to its right or, with no room
 // there, to its left; its top at its row; inside the window on every edge,
 // and capped to it so a long list scrolls (as the menu itself does, 6b336).
@@ -37857,7 +38149,13 @@ function srvModeOf(t){
   return isSrvMode(t)?srvList.find(s=>s.paired&&"srv:"+s.id===t)||null:null;}
 // what the composer chip says: the model the mode resolved to
 function tierShown(t){
-  if(!isSrvMode(t))return t;
+  if(!isSrvMode(t)){
+    // Fast, Thinking or Pro routed to a server says so: "Fast · Ollama1 gpt-oss:20b"
+    const sv=((tierInfo[t]||{}).models||[]).filter(m=>m.indexOf(SRV_SEP)>=0);
+    if(!sv.length)return t;
+    const nm=[...new Set(sv.map(m=>m.slice(0,m.indexOf(SRV_SEP))))].join(" + ");
+    return t==="Fast"?t+" \u00b7 "+sv[0].replace(SRV_SEP," "):t+" \u00b7 "+nm+(sv.length>1?" \u00d7"+sv.length:"");
+  }
   const s=srvModeOf(t);
   return !s?"Your server":s.only&&s.only.ok?s.only.label:s.name+" Only";
 }
@@ -37880,6 +38178,7 @@ function srvModeGone(){
 // the servers changed: greyed rows, the chip's model, a vanished server
 function srvModesRefresh(){
   srvSyncOff();srvModeGone();advPrune();
+  if(typeof paintTierAvail==="function")paintTierAvail();   // a seat may have moved
   if(isSrvMode(tier))paintModels();
 }
 function paintEngMenuServers(){
