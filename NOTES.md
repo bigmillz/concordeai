@@ -567,9 +567,10 @@ provider comes later and follows `ollama1/PROTOCOL.md`. How to run it is in
     windows; saved with CSRF and checked strictly server-side), imported and
     exported as JSON, or set with `sudo ollama1-power set-schedule
     FILE.json`.
-- Tested on the Mac: 199 unit tests (incl. shellcheck, the polkit rule in
+- Tested on the Mac: 354 unit tests (incl. shellcheck, the polkit rule in
   node, the setup disk steps against fake mdadm/blkid/lsblk, the guide's
-  file and config references). All 75 mutants are caught
+  file and config references, fake Ollama registry and smart plugs). All
+  142 mutants are caught
   (`tests/mutate.py`). On the desktop (as pmiller, no
   sudo): the suite under bash 5.3, `setup.sh --plan`, and (second commit)
   the user-mode trial and the dashboard at 120x40 and 80x25.

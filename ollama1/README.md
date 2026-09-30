@@ -730,7 +730,7 @@ The firewall is set so it can't cut the Pi off:
 ```bash
 cd ollama1/tests
 python3 -m unittest discover -s .      # ~20 s; stub Ollama, fake Access certs, all on 127.0.0.1
-python3 mutate.py                      # ~7 min; breaks each of 57 protections on purpose, expects a failing test
+python3 mutate.py                      # ~20 min; breaks each of 142 protections on purpose, expects a failing test
 python3 gen_vectors.py                 # regenerates PROTOCOL.md's test vectors
 ```
 
@@ -753,4 +753,9 @@ Ed25519 (the desktop uses PyNaCl). They cover:
 - the Cloudflare helper against a fake Cloudflare API: reruns change
   nothing, no duplicate DNS records, and the API token is never written
   anywhere;
-- that the repo holds no personal data.
+- the model library sync: nothing on the allow-list is ever deleted, and a
+  sync does exactly its preview;
+- power and prices: DST, holidays, weekends, windows past midnight, season
+  changes, minute-boundary splits, gaps as unknown, the RAPL wrap, the four
+  plug types (fake plugs), LAN-only plugs;
+- that the repo holds no personal data and no utility's schedule.
