@@ -149,6 +149,143 @@ another:
   header with its title across it, or a generated picture whose address
   doesn't say so.
 
+## 6b339 — your server first in Fast, Thinking and Pro
+Patrick (2026-09-30): "if I pick thinking, then, or at least under funnel,
+it's not using my server at all. So make sure that if a user picks fast,
+thinking, or pro, that the models that are on their server, it prioritizes
+those over the ones that are on their local device." Then, of funnels: "in
+funnel mode, between the effort levels, it's only using my Mac apparently
+and not using the server. So it should intelligently, again, if the models
+it's using are available on the server, go to those first as they're
+presumably faster. And if the server has any more suitable models, it
+should run those. Be intelligent, be smart." And: "keep cloud first in
+funnels, But under the effort selection between fast and normal, add a
+checkbox, include cloud models. And if that's turned on, it'll use or
+prioritize the cloud models. If that's turned off, then it just goes to
+server models first, followed by local models."
+
+Nothing resolved to the server before: `resolve_tier`, the agents and the
+funnel's hardcoded label all looked at this computer only (6b334 kept a
+server out of every mode on purpose; an explicit pick and "<name> Only"
+keep their no-fallback rule unchanged). A MODE means "the best available",
+so here falling back IS allowed.
+- **What may be used unasked** (`server_mode_candidates`): a paired server
+  of the active profile that the person hasn't turned off (Settings ›
+  Your servers › "Use for Fast, Thinking and Pro", on by default, saved
+  with the server in servers.json, `POST /api/servers/prefer`), that
+  answered its last check, and models whose placement is "gpu" AND that
+  fit the card (`_srv_fits`, 6b337: the gateway's `placement` is the
+  owner's policy, not a measurement). Never "gpu+ram" (the desktop's CPU
+  is unstable under that load, see the RAM test notes), never an unknown
+  placement. Before a mode resolves, a server last checked over a minute
+  ago is asked again, 5 s at most, side by side (`server_refresh_modes`);
+  one found down less than a minute ago is left alone, so a server that is
+  off costs one wait a minute, not one a question.
+- **The ladder** (`resolve_tier_seats`, `resolve_agent_seat`). A seat is
+  {label, fb, params}: the model (a server's "<name> · <tag>" or a local
+  one) and `fb`, what answers in its place before its first word. Two
+  rules put a server model on the ladder. (1) A ladder pick the server
+  also has is the server's copy: the catalog row's Ollama tag (`MODEL_INFO
+  [label]["ollama"]`) against the server's listed tags, whole, ":latest" as
+  the bare name; the MLX and the Ollama build of a model are one model
+  here, so "GPT-OSS 20B" matches `gpt-oss:20b` whichever engine this Mac
+  runs it on. Its fb is the local copy when it is installed. (2) A server
+  model the catalog doesn't know takes the seat its parameter size earns
+  against the ladder's own sizes (before the first seat that is smaller),
+  if it suits the seat. Its fb is the mode's first local seat. The counts
+  stay: Fast one, Thinking three, Pro every model that fits (the council's
+  12). Interpretation, stated plainly: per-pick substitution and ranking by
+  size, as the brief says, so a STRONGER local pick still outranks a weaker
+  server model; the server wins wherever it has the same model and where
+  its model is the stronger. If Patrick wants "any server model first",
+  it is one line (partition the seats), at the cost of a 3B on the server
+  beating a local 26B.
+- **The chooser, shared by the modes, the Code lane and funnels**
+  (`srv_role_ok`, `srv_rank`). Families come from the tag's own words,
+  whole words only ("pro" in "llama-prompt-guard" once seated a
+  classifier on every council): words are the tag's `[a-z0-9]+` runs and
+  their letter stems ("guard3" is a guard, "qwen2.5vl" a picture reader).
+  coder: coder, code, codellama, codegemma, codestral, starcoder(2),
+  devstral, codeqwen, deepcoder, opencoder. embedding: embed(ding(s)), bge,
+  gte, e5, nomic, minilm, mxbai, rerank(er), sentence. picture reader:
+  llava, bakllava, moondream, vision, minicpm, pixtral, paligemma,
+  internvl, smolvlm, vl. guard: guard, guardian, shieldgemma, safeguard,
+  classifier, moderation. reasoning distill: r1, qwq, magistral, reasoning,
+  reasoner, thinking. Rules: a coder, an embedding, a picture reader or a
+  guard model never takes a general seat (the Code lane takes a coder
+  first, and any general model after one); a reasoning distill takes
+  Thinking and Pro but not Fast and not a funnel (a stage must come back as
+  strict JSON without seconds of hidden thinking). "normal" wants the
+  strongest (parameter size, unknown sizes last, then measured speed);
+  "fast" wants a quick, competent instruction model: 7-15B, the faster
+  measured one first then the larger; below the band the larger, above it
+  the smaller. MEASURED SPEED (`server_speeds`): the usage ledger this app
+  already keeps has each server call under its label with output tokens
+  and milliseconds (w "server"); the median of the recent calls with 30+
+  counted tokens, loads included, is the tokens a second. No new store.
+- **Running.** Fast: the cloud first when cloud power is on (unchanged: the
+  speed ladder), then the server seat, then this Mac's (`server_first_answer`):
+  if the server fails before its first word the page is told to drop what it
+  holds (RESET), the status line says "<name> didn't answer, so <model>
+  answers here", a RUN frame `{w: "local", m: <model>}` makes the badge say
+  "this Mac" (the page used to keep the server's name); after a word there
+  is one answer, cut there and said. Never another server, never a cloud
+  model it wasn't going to use. Councils (Thinking, Pro, Advanced): server
+  drafts run in PARALLEL with this Mac's and the cloud's, one thread per
+  server, its models one after another (one card), the same 120 s per model
+  and 240 s for the loop, so a slow server is simply absent; a failed draft
+  is absent (the straggler rule). The compositor: when the merger is a model
+  the server also has and it fits, the merge is written there, this Mac's
+  copy behind it (a failed server merge is wiped and this Mac writes it;
+  none: the best draft ships); a pen named in Advanced stays as named. The
+  memory pass goes to the answering model; titles follow the old rules. A
+  picture in a mode still goes to the vision ladder (a server seat never
+  reads it). The pre-warm is skipped for a server seat (route `(None,
+  None)`), so the Mac's engine isn't loaded for an answer the server gives.
+- **Covered:** Chat's Fast, Thinking and Pro; the Code lane's agents
+  (Coding and Workspace prefer a server coder, else the server's copy of
+  their first pick) and the other agents that answer through the ordinary
+  path; funnels' stages, retry and verdict; `/api/tiers` (the bubble lists
+  a server's models with "· your server"). **Not covered, on purpose:**
+  the Research agent (its writer must be a local engine it can search
+  with) and the Remote agent's driver (per-turn fallback over SSH isn't
+  designed); titles, exports and the image refiner (old rules).
+- **Funnels** (`funnel_stage`, the verdict in `/api/funnel`). Order: cloud
+  (the effort's ladder, exactly as 6b308, only when the box is ticked AND
+  cloud power is on with a key), then the server (`server_funnel_pick`,
+  the same chooser: "fast" the quick 7-15B instruction model, "normal" the
+  strongest general model that fits the card whole; for the verdict always
+  "normal"), then this Mac's own ladder. "Include cloud models" sits
+  directly under the Fast / Normal radios, ticked by default (today's
+  behaviour), saved like the effort (`funnel_cloud`, a synced setting with
+  a True/False check, remembered by the page), sent with EVERY stage so an
+  open funnel respects a change at the next one. Unticked: NO cloud call
+  anywhere in a funnel: not the stage, not the retry on the work ladder
+  (replaced by one walk onto this Mac when the server's stage failed the
+  gate), not the verdict, not the audit (cloud-only by design). The web
+  image search for option pictures isn't a model and stays. With no cloud
+  key, or cloud power off, the box is greyed, unticked-looking and says
+  "no cloud keys saved"; the saved choice is kept for when keys return.
+  The `engine` the reply records says which model ran ("server:<name> ·
+  <tag>", "local:<label>", or the cloud model) for `quality.jsonl` and the
+  drill tooling; the verdict's reply now carries it too.
+- Gauntlet: new `== your server first (6b339) ==`, eight in-process and
+  node checks (the families and the ranking, the candidates and the switch,
+  the seats, the failing seat, the council's parallel drafts and the merge,
+  the funnel's order, the box, the pins), 56 mutations each caught, and
+  one live check on the real gateway (Cloud Only never seats a server
+  model, Pro does while the switch is on and none with it off). Adapted: the
+  6b337 live check "no tier lists a server model" says it of Cloud Only; the
+  servers' public keys gain `prefer`; `server_check`'s deadline is read at
+  call time. A live chat in Fast/Thinking/Pro isn't run against the real
+  gateway: a mode also seats models installed on the machine running the
+  gauntlet, so it would load real engines.
+- Not verified here: a real GPU's measured speed (the ledger path is tested
+  with canned records), WKWebView (the box and the page functions run in
+  node; nothing was looked at on screen), a funnel against a real server
+  (the stage and verdict run against stand-ins), and the parallel drafts'
+  timing on a loaded machine (asserted with generous margins).
+
 ## 6b338 — dictation hotkey
 Patrick (2026-09-30): "Similar to Claude's add a hotkey for Apple D or
 Command D for the speech to text. And if you hold it, you can release it
@@ -232,6 +369,7 @@ changes. Driven with synthetic KeyboardEvents in a page served from a
 plain file server with `api` stubbed (Blink, not WKWebView, so
 unverified there: real Cmd keyup delivery, `blur` on the window and
 under the real microphone prompt, Ctrl+D under WebView2).
+
 
 ## 6b337 — <server> Only: one model on your own server
 Patrick (2026-09-30), at the engine menu: "Under the cloud models only, can

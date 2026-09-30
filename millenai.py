@@ -3837,6 +3837,15 @@ def resolve_tier(name: str) -> list:
     t = TIERS.get(name)
     if not t:
         return []
+    return _tier_ready(name)[:t["count"]]
+
+
+def _tier_ready(name: str) -> list:
+    """What resolve_tier chooses from on THIS computer, strongest first and
+    not yet cut to the tier's count."""
+    t = TIERS.get(name)
+    if not t:
+        return []
     if t.get("cloud_only"):
         return []       # by definition: no local model may take part
     pulled = ollama_pulled_tags() or set()
@@ -3875,7 +3884,126 @@ def resolve_tier(name: str) -> list:
                   and MODEL_MEM_BYTES.get(l, 0) <= budget]
     if not ready:  # nothing at all from the tier — fall back to anything
         ready = [l for l in MERGE_RANK if usable(l)]
-    return ready[:t["count"]]
+    return ready
+
+
+# YOUR SERVER FIRST (6b339): Fast, Thinking and Pro, and the agents of the
+# Code lane, seat the models of the person's own paired server before this
+# computer's, on the same ladder. A seat is {label, fb, params}: `label` is
+# the model, a server's ("<name> · <tag>") or a local one; `fb` is what
+# answers in its place when the server doesn't, before its first word (the
+# local copy of the same model, else the mode's own best local one, else
+# nothing). Two rules put a server model on the ladder:
+#   * a ladder pick the server also has (its Ollama tag from the catalog,
+#     whole: the MLX and the Ollama build of a model are one model here)
+#     is that copy instead of this computer's;
+#   * a server model the catalog doesn't know takes the seat its size earns
+#     against the ladder's own sizes (before the first seat that is smaller),
+#     if it suits the seat (srv_role_ok) and fits the card whole.
+# Only what server_mode_candidates lets through, so never "gpu+ram", never
+# an unknown placement, never a server the person turned off or one that
+# isn't answering. The count stays: Fast one, Thinking three, Pro all.
+_TIER_ROLE = {"Fast": "fast", "Thinking": "think", "Pro": "all"}
+# the agents that may: the Code lane's prefer a coder; Research and Remote
+# run their own flows on this computer and keep them
+_AGENT_ROLE = {"Coding": "code", "Workspace": "code", "Math & Logic": "think",
+               "Writing": "all", "Resumes": "all", "Hermes": "fast",
+               "Mnemosyne": "fast"}
+
+
+def _label_params(label: str):
+    """Billions of parameters a catalog row says it has ("26B"), or None."""
+    m = re.match(r"(\d+(?:\.\d+)?)B", str((MODEL_INFO.get(label) or {}).get("size") or ""), re.I)
+    return float(m.group(1)) if m else None
+
+
+def _seat_insert(seats: list, extra: dict):
+    """extra takes the seat its size earns: before the first seat that is
+    smaller; a size nobody knows goes last."""
+    p = extra.get("params")
+    if p is not None:
+        for i, st in enumerate(seats):
+            sp = st.get("params")
+            if sp is not None and sp < p:
+                seats.insert(i, extra)
+                return
+    seats.append(extra)
+
+
+def resolve_tier_seats(name: str, ctx=None) -> list:
+    """resolve_tier, with ctx's own servers seated first (see above)."""
+    t = TIERS.get(name)
+    if not t or t.get("cloud_only"):
+        return []
+    ready, count = _tier_ready(name), t["count"]
+    role = _TIER_ROLE.get(name)
+    cands = []
+    if role and ctx is not None:
+        try:
+            cands = [m for m in server_mode_candidates(ctx) if srv_role_ok(m["name"], role)]
+        except Exception:
+            cands = []
+    if not cands:
+        return [{"label": l, "fb": "", "params": _label_params(l)} for l in ready[:count]]
+    speeds = server_speeds(ctx)
+    take_all = t.get("all")
+    seats = []
+    for l in list(t["picks"]) + [x for x in MERGE_RANK if x not in t["picks"]]:
+        tag = (MODEL_INFO.get(l) or {}).get("ollama")
+        srv = server_copy(tag, cands, speeds) if tag and l not in BLEND_EXCLUDE else None
+        local_ok = l in ready
+        # a blend-in that is too small to add anything stays out, as it does locally
+        if (srv is not None and count > 1 and not take_all and l not in t["picks"]
+                and MODEL_MEM_BYTES.get(l, 0) < BLEND_MIN_MEM):
+            srv = None
+        if srv is not None:
+            seats.append({"label": srv["label"], "fb": l if local_ok else "",
+                          "params": _label_params(l) or srv.get("params")})
+        elif local_ok:
+            seats.append({"label": l, "fb": "", "params": _label_params(l)})
+    known = {_srv_tag_key(i["ollama"]) for i in MODEL_INFO.values() if i.get("ollama")}
+    have = {st["label"] for st in seats}
+    for m in srv_rank([m for m in cands if _srv_tag_key(m["name"]) not in known],
+                      role, "normal", speeds):
+        if m["label"] not in have:
+            have.add(m["label"])
+            _seat_insert(seats, {"label": m["label"], "fb": "", "params": m.get("params")})
+    first_local = next((st["label"] for st in seats if not server_label(st["label"])), "")
+    for st in seats:
+        if server_label(st["label"]) and not st["fb"]:
+            st["fb"] = first_local
+    return seats[:count]
+
+
+def resolve_agent_seat(name, ctx=None):
+    """(label, agent, fb): resolve_agent, with ctx's server first for the
+    agents that may (above). A coding agent takes a server's coder before
+    anything; any agent takes the server's copy of its first usable pick."""
+    label, a = resolve_agent(name)
+    role = _AGENT_ROLE.get(name)
+    if not a or not role or ctx is None:
+        return label, a, ""
+    try:
+        cands = [m for m in server_mode_candidates(ctx) if srv_role_ok(m["name"], role)]
+    except Exception:
+        cands = []
+    if not cands:
+        return label, a, ""
+    speeds = server_speeds(ctx)
+    if role == "code":
+        top = srv_rank(cands, "code", "normal", speeds)[:1]
+        if top and _srv_flags(top[0]["name"])["coder"]:
+            return top[0]["label"], a, label or ""
+    pulled = ollama_pulled_tags() or set()
+    for l in a["picks"]:
+        tag = (MODEL_INFO.get(l) or {}).get("ollama")
+        srv = server_copy(tag, cands, speeds) if tag else None
+        local_ok = (l in MODEL_ROUTES and model_cached(l, pulled) and model_fits_memory(l))
+        if srv is not None:
+            return srv["label"], a, l if local_ok else (label or "")
+        if local_ok:
+            break
+    return label, a, ""
 
 
 # First run downloads the AUTOSELECTED set: for each tier, the single best
@@ -9178,7 +9306,8 @@ def ctx_timer(interval, fn, args=(), ctx=None):
 # prefs.json, as before; an account keeps SYNCED_SETTINGS in personal.json
 # and PROFILE_LOCAL in local.json, and reads MACHINE from prefs.json.
 SYNCED_SETTINGS = frozenset((
-    "user_name", "persona", "length", "home_area", "funnel_effort", "polish"))
+    "user_name", "persona", "length", "home_area", "funnel_effort",
+    "funnel_cloud", "polish"))
 PROFILE_LOCAL = frozenset((
     "turbo", "tier", "model", "council", "agent", "codeagent", "adv", "advon",
     "remote_autonomy", "workspace", "veo_day", "veo_count", "veo_daily_cap",
@@ -9206,6 +9335,9 @@ SYNCED_ALLOWED = {
     "home_area": ("text", 200),
     "length": ("one of", (1, 2, 3, 4, 5)),
     "funnel_effort": ("one of", ("fast", "normal")),
+    # "Include cloud models" (6b339): it can only keep the cloud OUT of a
+    # funnel; cloud power and a key still decide whether any is asked
+    "funnel_cloud": ("one of", (True, False)),
     "polish": ("one of", (True, False)),
 }
 
@@ -16610,7 +16742,7 @@ def o1_pair_proof(key: bytes, device_id: str, pub: str, nonce: str) -> bytes:
 
 # ---- the profile's servers.json
 _SRV_PLAIN = ("id", "name", "url", "device_id", "public_key", "device_name",
-              "paired_at", "added_at", "models")
+              "paired_at", "added_at", "models", "prefer")
 _SRV_SECRET = ("access_id", "access_secret", "seed")
 
 
@@ -17274,6 +17406,248 @@ def server_only_resolve(sid: str, ctx):
     return st["label"], e["name"], st["why"]
 
 
+# ---- your server first (6b339)
+# Patrick (2026-09-30): "if I pick thinking, then, or at least under funnel,
+# it's not using my server at all. So make sure that if a user picks fast,
+# thinking, or pro, that the models that are on their server, it
+# prioritizes those over the ones that are on their local device." And of
+# funnels: "if the models it's using are available on the server, go to
+# those first as they're presumably faster. And if the server has any
+# more suitable models, it should run those. Be intelligent, be smart."
+# The modes are "the best available", not "my server", so a server that
+# doesn't answer is skipped and the local copy answers (an explicit pick
+# and "<name> Only" still never fall back). What may be used without being
+# asked is narrow: a paired server the person hasn't turned off ("Use for
+# Fast, Thinking and Pro", on by default), answering on its last check,
+# and models whose placement is "gpu" and that fit the card (_srv_fits):
+# never "gpu+ram" (the desktop's CPU is unstable under that load) and never
+# a model whose placement is unknown.
+#
+# ONE CHOOSER, shared by the tiers, the Code lane and funnels: which of a
+# server's models suits a seat (srv_role_ok) and which suits it best
+# (srv_rank). The family rules are read from the tag's own words, whole
+# words only ("pro" in "llama-prompt-guard" once seated a classifier on
+# every council): a coder, an embedding, a picture reader or a guard model
+# never takes a general seat; a reasoning distill takes Thinking and Pro
+# but not Fast, and not a funnel, whose stage must come back as strict
+# JSON without seconds of hidden thinking; the Code lane prefers a coder.
+_SRV_WORD = re.compile(r"[a-z0-9]+")
+_SRV_STEM = re.compile(r"[a-z]+")            # "guard3" is a guard, "qwen2.5vl" a picture reader
+_SRV_FAMILY = {
+    "coder": frozenset(("coder", "code", "codellama", "codegemma", "codestral", "starcoder",
+                        "starcoder2", "devstral", "codeqwen", "deepcoder", "opencoder")),
+    "embed": frozenset(("embed", "embedding", "embeddings", "bge", "gte", "e5", "nomic",
+                        "minilm", "mxbai", "rerank", "reranker", "sentence")),
+    "vision": frozenset(("llava", "bakllava", "moondream", "vision", "minicpm", "pixtral",
+                         "paligemma", "internvl", "smolvlm", "vl")),
+    "guard": frozenset(("guard", "guardian", "shieldgemma", "safeguard", "classifier",
+                        "moderation")),
+    "reason": frozenset(("r1", "qwq", "magistral", "reasoning", "reasoner", "thinking")),
+}
+
+def _srv_flags(name: str) -> dict:
+    """Which families a model's tag says it belongs to, by whole words."""
+    low = str(name or "").lower()
+    words = set(_SRV_WORD.findall(low)) | set(_SRV_STEM.findall(low))
+    return {k: bool(words & v) for k, v in _SRV_FAMILY.items()}
+
+
+def srv_role_ok(name: str, role: str) -> bool:
+    """Whether a model may take a seat. role: "fast" (the Fast mode),
+    "think" (Thinking), "all" (Pro), "funnel" (a funnel's stages and
+    verdict), "code" (the Code lane)."""
+    f = _srv_flags(name)
+    if f["embed"] or f["vision"] or f["guard"]:
+        return False
+    if role == "code":
+        return True
+    if f["coder"]:
+        return False
+    if f["reason"] and role in ("fast", "funnel"):
+        return False
+    return True
+
+
+_srv_speed_cache = profile_cache("_srv_speed", {})     # profile name -> (time, {label: tokens/s})
+
+
+def server_speeds(ctx) -> dict:
+    """Measured tokens a second per server model label, from the usage
+    ledger this app already keeps (each call is a record under the model's
+    label with its output tokens and milliseconds, marked "server"): the
+    median of the recent calls that sent 30 tokens or more, counts the
+    engine sent (not estimates). A load before the first token is in it,
+    which is honest: it is what the person waits. None for a model not
+    heard from. Asked again after two minutes."""
+    hit = _srv_speed_cache.get(ctx.name)
+    if hit and time.time() - hit[0] < 120:
+        return hit[1]
+    by = {}
+    try:
+        for r in usage_read(ctx):
+            o, d = r.get("o"), r.get("d")
+            if (r.get("w") == "server" and not r.get("x") and not r.get("s")
+                    and isinstance(o, (int, float)) and isinstance(d, (int, float))
+                    and o >= 30 and d > 0):
+                by.setdefault(str(r.get("m") or ""), []).append(o / (d / 1000.0))
+    except Exception:
+        by = {}
+    out = {}
+    for m, xs in by.items():
+        xs = sorted(xs[-50:])
+        out[m] = xs[len(xs) // 2]
+    _srv_speed_cache[ctx.name] = (time.time(), out)
+    return out
+
+
+def srv_rank(cands: list, role: str, effort: str = "normal", speeds=None) -> list:
+    """cands (from server_mode_candidates) that suit role, best first.
+    "normal" wants the strongest model (parameter size, then measured
+    speed). "fast" wants a quick, competent instruction model: 7 to 15
+    billion parameters, the faster measured one first, then the larger;
+    below that band the larger, above it the smaller, unknown sizes last.
+    The Code lane puts a coder first."""
+    speeds = speeds or {}
+    ok = [m for m in cands if srv_role_ok(m["name"], role)]
+
+    def key(m):
+        p, sp = m.get("params"), speeds.get(m["label"])
+        lead = 0 if role != "code" or _srv_flags(m["name"])["coder"] else 1
+        if effort == "fast":
+            if p is None:
+                k = (3, 0, 0)
+            elif 7 <= p <= 15:
+                k = (0, 0 if sp else 1, -(sp or 0.0), -p)
+            elif p < 7:
+                k = (1, -p, 0)
+            else:
+                k = (2, p, 0)
+            return (lead,) + k + (m["label"],)
+        return (lead, p is None, -(p or 0.0), -(sp or 0.0), m["label"])
+    return sorted(ok, key=key)
+
+
+def _srv_tag_key(tag: str) -> str:
+    t = str(tag or "").strip().lower()
+    return t[:-len(":latest")] if t.endswith(":latest") else t
+
+
+def server_mode_candidates(ctx) -> list:
+    """The models of ctx's servers the modes may use unasked (see above):
+    each a _srv_models row plus server, sid and params. Only ctx's own
+    servers, from their last check."""
+    out = []
+    try:
+        entries = _srv_read(ctx)
+    except (StoreReadError, NoProfile):
+        return out
+    for e in entries:
+        if not _srv_paired(e) or e.get("prefer") is False:
+            continue
+        s = _srv_seen.get(e["id"]) or {}
+        if not s.get("at") or s.get("err") or not s.get("reachable") or not s.get("auth"):
+            continue
+        vram = (s.get("gpu") or {}).get("vram_bytes")
+        for m in s.get("models") or []:
+            if _srv_fits(m, vram):
+                out.append(dict(m, server=e["name"], sid=e["id"],
+                                params=_srv_params(m["name"])))
+    return out
+
+
+def server_funnel_pick(ctx, effort: str = "normal"):
+    """The server model a funnel's stage or verdict runs on (6b339), or
+    None when no server of ctx qualifies. "fast" wants a quick, competent
+    instruction model that answers strict JSON without hidden thinking
+    (7-15B, the faster measured one, no reasoning distill); "normal" the
+    strongest general model that fits the card whole. A coder, an
+    embedding, a picture reader or a guard model never; never a model that
+    needs system memory. The same chooser as the modes (srv_rank)."""
+    top = srv_rank(server_mode_candidates(ctx), "funnel",
+                   "fast" if effort == "fast" else "normal", server_speeds(ctx))
+    return top[0] if top else None
+
+
+def server_copy(tag: str, cands: list, speeds=None):
+    """The server's copy of the model whose Ollama tag is `tag`, or None:
+    an exact tag match ("gpt-oss:20b"; ":latest" is the bare name), so the
+    MLX and Ollama builds of a catalog model are the same model here. More
+    than one server has it: the faster measured, else the first."""
+    k = _srv_tag_key(tag)
+    hits = [m for m in cands if _srv_tag_key(m["name"]) == k]
+    if not hits:
+        return None
+    speeds = speeds or {}
+    return max(hits, key=lambda m: speeds.get(m["label"]) or 0.0) if speeds else hits[0]
+
+
+def server_refresh_modes(ctx, limit: float = 5.0):
+    """Before a mode resolves: servers that opted in and were last checked
+    over a minute ago (or never) are asked again, side by side, each
+    within `limit` seconds. A server that was found down less than a
+    minute ago is left alone, so a server that is off costs one wait a
+    minute, not one a question."""
+    try:
+        due = [e for e in _srv_read(ctx)
+               if _srv_paired(e) and e.get("prefer") is not False
+               and time.time() - float((_srv_seen.get(e["id"]) or {}).get("at") or 0)
+               >= SRV_ONLY_FRESH_S and cai_crypto.available()]
+    except (StoreReadError, NoProfile):
+        return
+    if due:
+        with ctx_executor(min(4, len(due))) as pool:
+            list(pool.map(lambda e: server_check(e, limit), due))
+
+
+def server_first_answer(label: str, fallback: str, messages: list, memit, emit,
+                        status, step) -> bool:
+    """A mode's server seat (6b339): streamed from the server, with `fallback`
+    (this computer's copy, or "") behind it. UNLIKE an explicit pick
+    (server_answer), which never falls back: a mode means the best
+    available. If the server fails before its first word, the page is told
+    to drop what it holds (RESET) and the fallback answers, the status line
+    saying so and the badge saying "this Mac". Once a word has shown there
+    is one answer, so a failure then is said where the answer stops. Never
+    another server, never a cloud model here."""
+    name = label.split(SERVER_SEP, 1)[0]
+    shown = [False]
+
+    def _m(chunk):
+        if chunk and not isinstance(chunk, Ctl) and str(chunk).strip():
+            shown[0] = True
+        memit(chunk)
+    try:
+        step("draft", "Writing the answer", "run", label)
+        status("asking " + name)
+        emit(Ctl(NUL + "RUN:" + json.dumps({"r": [label], "w": "server",
+                                            "s": name}) + NUL))
+        _stream_guarded(label, messages, _m, status, None,
+                        "kept the part before it wandered")
+        return True
+    except ServerError as se:
+        why = str(se)
+    except StoreReadError:
+        why = "Couldn\u2019t read your servers."
+    except (StaleProfile, BrokenPipeError, ConnectionResetError):
+        raise
+    except Exception as exc:
+        why = "%s couldn\u2019t answer (%s)." % (name, type(exc).__name__)
+    if shown[0]:
+        emit(AppText("\n\n\u26a0\ufe0f " + why))
+        return False
+    if not fallback:
+        emit(AppText("\u26a0\ufe0f " + why))
+        return False
+    status("%s didn\u2019t answer, so %s answers here" % (name, fallback))
+    emit(Ctl(NUL + "RESET" + NUL))
+    emit(Ctl(NUL + "RUN:" + json.dumps({"r": [fallback], "w": "local",
+                                        "m": fallback}) + NUL))
+    step("draft", "Writing the answer", "run", fallback)
+    _stream_guarded(fallback, messages, memit, status, None,
+                    "kept the part before it wandered")
+    return True
+
+
 # ---- what the pane does
 def _srv_models(e, js: dict, ps=None) -> list:
     """The server's chat models for the picker: name, label, where it runs
@@ -17305,7 +17679,7 @@ def _srv_models(e, js: dict, ps=None) -> list:
     return sorted(out, key=lambda x: x["name"])
 
 
-def server_check(e) -> dict:
+def server_check(e, limit=None) -> dict:
     """Test the connection: whoami (signed when paired; unsigned it proves
     the address and the Access token), then the models, what's loaded and
     Ollama's version, within SRV_CHECK_S in all. Remembered for the pane
@@ -17320,21 +17694,22 @@ def server_check(e) -> dict:
         ev.wait(SRV_CHECK_S * 2 + 5)
         return _srv_seen.get(e["id"]) or {}
     try:
-        return _srv_check(e)
+        return _srv_check(e, limit)
     finally:
         with _srv_lock:
             _srv_busy.pop(e["id"], None)
         ev.set()
 
 
-def _srv_check(e) -> dict:
-    end = time.monotonic() + SRV_CHECK_S
+def _srv_check(e, limit=None) -> dict:
+    limit = SRV_CHECK_S if limit is None else limit     # the deadline is read now
+    end = time.monotonic() + limit
 
     def left():
         t = end - time.monotonic()
         if t <= 0:
             raise ServerError("offline", "%s took more than %d seconds to "
-                              "answer a check." % (e["name"], SRV_CHECK_S))
+                              "answer a check." % (e["name"], limit))
         return t
     seen = {"at": time.time(), "reachable": False, "auth": False,
             "latency_ms": None, "models": [], "version": "", "err": "",
@@ -17427,6 +17802,8 @@ def _srv_public(e) -> dict:
                                              "kind")},
             "gpu": s.get("gpu"),
             "only": server_only_state(e),
+            # "Use for Fast, Thinking and Pro" (6b339): on unless turned off
+            "prefer": e.get("prefer") is not False,
             "models": list(s.get("models") or [])}
 
 
@@ -17485,6 +17862,25 @@ def server_set_access(ctx, sid: str, d: dict) -> dict:
         e["access_id"], e["access_secret"] = _Secret(aid), _Secret(asec)
         return {"ok": True}
     return _srv_update(ctx, fn)
+
+
+def server_set_prefer(ctx, sid: str, on) -> dict:
+    """Use this server's models first in Fast, Thinking and Pro (6b339):
+    kept with the server in the profile's servers.json."""
+    if not isinstance(on, bool):
+        return {"err": "Say on or off."}
+
+    def fn(entries):
+        e = _srv_find(entries, sid)
+        if e is None:
+            return {"err": SRV_GONE}
+        e["prefer"] = on
+        return {"ok": True}
+    out = _srv_update(ctx, fn)
+    if out.get("ok"):
+        e = _srv_find(_srv_read(ctx), sid)
+        out["server"] = _srv_public(e) if e else None
+    return out
 
 
 def server_remove(ctx, sid: str) -> dict:
@@ -19668,21 +20064,34 @@ def run_council(labels: list, messages: list, emit, status,
     LOCAL_BUDGET = 240.0         # the local loop end to end
     _local_deadline = time.time() + LOCAL_BUDGET
 
-    for i, label in enumerate(labels, 1):
+    # THE SERVERS DRAFT BESIDE THIS COMPUTER (6b339, per Patrick: server
+    # models first). A server is another machine, so its models draft
+    # while this computer's loop and the cloud's threads run: one thread
+    # per server, its models one after another because it has one card,
+    # the same per-model cap and whole-loop budget, so a slow server is
+    # simply absent. This computer's own engines stay sequential as above.
+    _started = [0]
+
+    def _draft_one(i, label, deadline, on_server=False):
+        """One model's draft. i counts within its own loop: the first
+        model of each loop always commits."""
         # free RAM drops as each engine loads — re-check before committing
-        if i > 1 and not model_fits_memory(label):
+        if i > 1 and not on_server and not model_fits_memory(label):
             took_part(label, "(no answer — low memory)")
-            continue
-        _left = _local_deadline - time.time()
+            return
+        _left = deadline - time.time()
         if i > 1 and _left < 15:
             took_part(label, "(no answer — out of time)")
-            continue
+            return
         # the first model always gets to commit — a hurry with zero
         # drafts would otherwise starve the run into the RuntimeError
         if i > 1 and _hurried() and _have_draft():
             took_part(label, "(no answer — hurried)")
-            continue
-        status(f"asking {label} · {i} of {len(labels)}")
+            return
+        with _run_lock:
+            _started[0] += 1
+            _nth = _started[0]
+        status(f"asking {label} · {_nth} of {len(labels)}")
         parts = []
         _err = []
         _stop = threading.Event()
@@ -19725,24 +20134,43 @@ def run_council(labels: list, messages: list, emit, status,
             _partial = strip_think("".join(parts))
             took_part(label, _partial if len(_partial) > 200
                       else "(no answer — too slow)")
-            continue
+            return
         if _err:
             if type(_err[0]).__name__ == "ServerError":
                 _srv_errs.append(str(_err[0]))     # said if none answers
             took_part(label, f"(no answer — {type(_err[0]).__name__})")
-            continue
+            return
         # the merger gets answers, never the reasoning that produced them
         text = strip_think("".join(parts))
         if _looks_degenerate(text):
             # a runaway repetition loop would poison the merge prompt
             took_part(label, "(no answer — degenerate output)")
-            continue
+            return
         if text:
             took_part(label, text)
         else:
             # an engine that returns NOTHING is left out of the blend, but
             # recorded — the contributor count must never lie
             took_part(label, "(no answer — empty)")
+
+    _groups = {}
+    for _l in labels:
+        if server_label(_l):
+            _groups.setdefault(_l.split(SERVER_SEP, 1)[0], []).append(_l)
+    _own = [_l for _l in labels if not server_label(_l)]
+
+    def _run_group(_g):
+        for _j, _lbl in enumerate(_g, 1):
+            _draft_one(_j, _lbl, _local_deadline, True)
+    _gthreads = []
+    for _g in _groups.values():
+        _gt = ctx_thread(target=_run_group, args=(_g,), daemon=True)
+        _gt.start()
+        _gthreads.append(_gt)
+    for i, label in enumerate(_own, 1):
+        _draft_one(i, label, _local_deadline)
+    for _gt in _gthreads:
+        _gt.join(timeout=max(1.0, _local_deadline - time.time() + 20))
 
     # ONE shared deadline, not 75s EACH: joining N threads with a 75s
     # timeout apiece could hold the answer for 75*N seconds if several
@@ -19819,6 +20247,21 @@ def run_council(labels: list, messages: list, emit, status,
     if comp in MODEL_ROUTES and model_cached(comp) \
             and model_fits_memory(comp):
         merger = comp
+    # THE COMPOSITOR ON THE SERVER (6b339): when the merger is a model the
+    # person's server also has and fits its card, it writes the merge
+    # there, this computer's copy behind it. A pen the person named in
+    # Advanced stays as named.
+    _merge_fb = ""
+    if merger in MODEL_ROUTES and comp not in MODEL_ROUTES:
+        try:
+            _sc = server_copy((MODEL_INFO.get(merger) or {}).get("ollama"),
+                              server_mode_candidates(bound_ctx()),
+                              server_speeds(bound_ctx()))
+        except Exception:
+            _sc = None
+        if _sc is not None:
+            _merge_fb, merger = (merger if model_cached(merger)
+                                 and model_fits_memory(merger) else ""), _sc["label"]
 
     # feed the merger only the strongest few answers, each truncated:
     # an unbounded merge prompt overflows small models' context and sends
@@ -19974,9 +20417,19 @@ def run_council(labels: list, messages: list, emit, status,
     except Exception:
         try:
             emit(Ctl(NUL + "RESET" + NUL))
-            emit(good[0][1])
+            if _merge_fb:
+                # the server didn't write it: this computer's copy does
+                run_mark(compositor=_merge_fb)
+                _stream_guarded(_merge_fb, synth, emit, status, good[0][1],
+                                "showing the best single answer")
+            else:
+                emit(good[0][1])
         except Exception:
-            pass
+            try:
+                emit(Ctl(NUL + "RESET" + NUL))
+                emit(good[0][1])
+            except Exception:
+                pass
 
 
 RESEARCH_PLAN = (
@@ -22127,7 +22580,7 @@ def _stage_ok(data, asked, opts) -> bool:
 
 
 def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
-                 asked=None, effort="normal"):
+                 asked=None, effort="normal", cloud=True):
     """One stage: a question plus `opts` options, as structured data.
 
     `asked` is every question already put to the user. Without it the
@@ -22176,6 +22629,19 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
             {"role": "user", "content": ask}]
     raw = ""
     engine = ""
+    # THE ORDER (6b339, per Patrick: "keep cloud first in funnels, But under
+    # the effort selection ... add a checkbox, include cloud models. And if
+    # that's turned on, it'll use or prioritize the cloud models. If that's
+    # turned off, then it just goes to server models first, followed by
+    # local models."): cloud when the box is ticked AND cloud power is on,
+    # then the person's server (the same chooser as the modes), then this
+    # Mac. With the box unticked NO cloud model is asked here at all: not
+    # the stage, not the retry.
+    use_cloud = bool(cloud) and cloud_allowed()
+    try:
+        srv = server_funnel_pick(bound_ctx(), effort)
+    except Exception:
+        srv = None
     # THE LADDER, not the single active provider (6b261, measured):
     # cycle 2's funnels all ran while Groq — the "active" conf — was
     # quota-resting, so every stage silently fell to a 4-bit local
@@ -22186,7 +22652,7 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
     # model (Haiku first), 1-2 s a stage; Normal: the work model (Opus
     # 5.5 at medium). Either way a stage that fails the gate below gets
     # one more pass on the work model.
-    if cloud_allowed():
+    if use_cloud:
         for _conf in (fast_cloud_ladder(utility=True) if effort == "fast"
                       else work_ladder("work")):
             raw = cloud_text(_conf, msgs, timeout=60 if effort == "fast"
@@ -22194,6 +22660,15 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
             if raw:
                 engine = str(_conf.get("model") or "cloud")
                 break
+    if not raw and srv:
+        parts = []
+        try:
+            run_model(srv["label"], msgs, parts.append)
+            raw = strip_think("".join(parts))
+            if raw:
+                engine = "server:%s \u00b7 %s" % (srv["server"], srv["name"])
+        except Exception:
+            raw = ""      # a server that fails is skipped: this Mac next
     if not raw and label:
         parts = []
         try:
@@ -22219,7 +22694,7 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
     # covers both, and a failure earns exactly one more walk up the
     # ladder before we accept defeat.
     if ((not out or not _stage_ok(data, asked, opts))
-            and cloud_allowed()):
+            and use_cloud):
         out = []
         for _conf in work_ladder("work"):
             raw2 = cloud_text(_conf, msgs, timeout=120)
@@ -22240,6 +22715,28 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
                 engine = str(_conf.get("model") or "cloud") + ":retry"
                 data = d2
                 break
+    elif (not out or not _stage_ok(data, asked, opts)) and \
+            engine.startswith("server:") and label:
+        # no cloud rung (unticked, off or none) and the server's stage
+        # failed the gate: one more walk, onto this Mac (6b339)
+        parts = []
+        try:
+            run_model(label, msgs, parts.append)
+            raw3 = strip_think("".join(parts))
+        except Exception:
+            raw3 = ""
+        m3 = re.search(r"\{[\s\S]*\}", raw3 or "")
+        try:
+            d3 = json.loads(m3.group(0)) if m3 else {}
+        except Exception:
+            d3 = {}
+        if _stage_ok(d3, asked, opts):
+            out = [{"label": str(o["label"])[:90],
+                    "why": str(o.get("why", ""))[:160]}
+                   for o in (d3.get("options") or [])[:opts]
+                   if isinstance(o, dict) and o.get("label")]
+            if out:
+                engine, data = "local:" + label + ":retry", d3
     if want_img and out:
         # all of the stage's pictures at once, one each, never the same
         # one twice (6b340); a card left without one asks again itself
@@ -23451,7 +23948,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     out[name] = {"desc": t["desc"], "models": bench,
                                  "skipped": [], "available": bool(bench)}
                     continue
-                chosen = resolve_tier(name)
+                try:
+                    chosen = [x["label"] for x in resolve_tier_seats(name, self.ctx)]
+                except (StoreReadError, NoProfile):
+                    chosen = resolve_tier(name)
                 # installed models this tier can't use right now
                 skipped = [l for l in MODEL_INFO
                            if SUPPORTED.get(l) and model_cached(l, pulled)
@@ -23848,7 +24348,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             sid, op = str(d.get("id") or ""), self.path[len("/api/servers/"):]
             if op == "add":
                 out = server_add(self.ctx, d)
-            elif op not in ("pair", "test", "access", "remove"):
+            elif op not in ("pair", "test", "access", "remove", "prefer"):
                 self.send_error(404)
                 return
             elif not _SRV_ID_RX.fullmatch(sid):
@@ -23859,6 +24359,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 out = server_set_access(self.ctx, sid, d)
             elif op == "remove":
                 out = server_remove(self.ctx, sid)
+            elif op == "prefer":
+                out = server_set_prefer(self.ctx, sid, d.get("on"))
             else:
                 _se = _srv_find(_srv_read(self.ctx), sid)
                 out = {"err": SRV_GONE}
@@ -24342,6 +24844,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             want_img = bool(d.get("images"))
             asked = [str(x)[:160] for x in (d.get("asked") or [])][:20]
             effort = "fast" if d.get("effort") == "fast" else "normal"
+            # "Include cloud models" (6b339): read at every stage, so an open
+            # funnel respects a change at the next one; ticked unless the
+            # page says otherwise, and never without cloud power and a key
+            use_cloud = d.get("cloud") is not False and cloud_allowed()
             stage = len(picks) + 1
             # FUNNEL TURNS ARE SAVED HERE (0b 5.5, gap G4; 6b322): the goal
             # or the latest pick when the request arrives, the summary
@@ -24430,13 +24936,31 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          % (goal, reqs or "none", "; ".join(picks),
                             "; ".join(asked) or "not recorded")}]
                 out = ""
+                _eng = ""
                 # the verdict is a draft the audit below checks, so it
                 # writes at the work effort; the audit is the final word
-                if cloud_allowed():
+                if use_cloud:
                     for _conf in work_ladder("work"):
                         out = cloud_text(_conf, msgs, timeout=120)
                         if out:
+                            _eng = str(_conf.get("model") or "cloud")
                             break
+                if not out:
+                    # then the person's server (6b339), the strongest general
+                    # model that fits its card, same chooser as the stages
+                    try:
+                        _sp = server_funnel_pick(self.ctx, "normal")
+                    except Exception:
+                        _sp = None
+                    if _sp:
+                        try:
+                            _sparts = []
+                            run_model(_sp["label"], msgs, _sparts.append)
+                            out = strip_think("".join(_sparts))
+                            if out:
+                                _eng = "server:%s \u00b7 %s" % (_sp["server"], _sp["name"])
+                        except Exception:
+                            out = ""
                 if not out:
                     # ANY strong cached model beats none (6b260): the
                     # old three-label ladder meant a Mac without those
@@ -24451,6 +24975,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         try:
                             run_model(lbl, msgs, parts.append)
                             out = strip_think("".join(parts))
+                            if out:
+                                _eng = "local:" + lbl
                         except Exception:
                             out = ""
                 # THE VERIFY PASS (6b271, judged three cycles running:
@@ -24461,7 +24987,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # requirement and rewrites what fails. Cloud only —
                 # a 4-bit local auditor would rubber-stamp.
                 try:
-                  if out and cloud_allowed():
+                  if out and use_cloud:
                     _audit = [
                         {"role": "system", "content":
                          "You audit a recommendation against what the "
@@ -24534,7 +25060,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # (6b260, per Patrick) — if no model can weigh in, say
                 # so honestly and point at the fix
                 _fsend({"done": True, "stage": total,
-                                 "total": total,
+                                 "total": total, "engine": _eng,
                                  "summary": out or (
                                      "I couldn't reach a model to weigh "
                                      "these, so no recommendation yet — "
@@ -24545,7 +25071,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                      "finish the funnel again.")})
                 return
             st = funnel_stage(goal, reqs, opts, stage, total, picks,
-                              want_img, asked, effort=effort)
+                              want_img, asked, effort=effort,
+                              cloud=use_cloud)
             _fsend({"done": False, "stage": stage,
                              "total": total, "q": st["q"],
                              "options": st["options"],
@@ -24996,8 +25523,18 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # council is a placeholder label and `_so_fail` says why: no other
         # model ever answers in its place.
         _so_c0, _so_fail = "", ""
+        # a mode's server seats -> what answers in their place (6b339)
+        _seat_fb = {}
         if tier in TIERS:
-            council = resolve_tier(tier)
+            try:
+                server_refresh_modes(self.ctx)
+            except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                raise
+            except Exception:
+                pass
+            _seats = resolve_tier_seats(tier, self.ctx)
+            council = [x["label"] for x in _seats]
+            _seat_fb = {x["label"]: x["fb"] for x in _seats if server_label(x["label"])}
         elif srv_only_tier(tier):
             try:
                 _so_lbl, _so_name, _so_why = server_only_resolve(
@@ -25147,7 +25684,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 and not str(prompt).lower().startswith("/search")):
             auto_web = False
         if agent_name and not req_json.get("images"):
-            ag_label, ag = resolve_agent(agent_name)
+            try:
+                server_refresh_modes(self.ctx)
+            except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                raise
+            except Exception:
+                pass
+            ag_label, ag, _ag_fb = resolve_agent_seat(agent_name, self.ctx)
             if ag:
                 ag_research = bool(ag.get("research"))
                 ag_remote = bool(ag.get("remote"))
@@ -25159,6 +25702,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 if ag_label:
                     council = [ag_label]
                     model_name = ag_label
+                    _seat_fb = ({ag_label: _ag_fb} if server_label(ag_label)
+                                else {})
                     tier = "Research" if ag_research else ""
         # the Remote agent (6b249) resolves its own driver — even with no
         # local model installed, a cloud key can drive it — so it must
@@ -25206,6 +25751,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             vm["images"] = b64s
             vm["image_urls"] = images     # media types, for the cloud (6b308)
             messages = messages[:-1] + [vm] if messages else [vm]
+            if _seat_fb:
+                # a mode's server seat doesn't read it (6b339): the vision
+                # takeover below does, as it always did
+                council, model_name, _seat_fb = (
+                    ["Qwen 3.5 Vision 9B"], "Qwen 3.5 Vision 9B", {})
             # a picture sent to your own server's model stays on that
             # server (review of 6b334): server_answer finds its reader
             if not (len(council) == 1 and not cloud_only
@@ -25227,6 +25777,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             _so_fail = ""
         _srv_lbl = (council[0] if len(council) == 1 and not cloud_only
                     and server_label(council[0]) else "")
+        # a mode's own server seat is not an explicit pick (6b339): it may
+        # fall back to this computer's copy, and Fast asks the cloud first
+        _srv_seat = bool(_srv_lbl) and _srv_lbl in _seat_fb
+        if _srv_seat:
+            _srv_lbl = ""
         if _srv_lbl:
             route, route_label = (None, None), _srv_lbl
         elif server_label(model_name):
@@ -26461,6 +27016,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             hb_stop.set()
                             return
                     status("cloud power unavailable — running locally")
+                if lbl in _seat_fb:
+                    # a mode's server seat (6b339): asked first, this
+                    # computer's copy behind it until the first word
+                    server_first_answer(lbl, _seat_fb[lbl], full_messages,
+                                        memit, emit, status, step)
+                    hb_stop.set()
+                    return
                 _run_lbl([lbl])
                 # searched answers were EXCLUDED from the polish pass, so
                 # every live-data reply was a single take — that's where
@@ -28245,6 +28807,12 @@ body.resizing{cursor:col-resize;user-select:none}
   color:var(--dim);padding:6px 0;border-radius:6px;
   transition:background .15s,color .15s}
 .fseg label:hover span{color:var(--text)}
+/* "Include cloud models" under the effort pair (6b339) */
+#funnel-wrap .fchk{display:flex;align-items:center;gap:7px;margin:0;
+  font:12px var(--sans);color:var(--dim);cursor:pointer}
+#funnel-wrap .fchk input{width:auto;height:auto;padding:0;border:0;
+  background:none;-webkit-appearance:checkbox;appearance:auto;flex:none}
+#funnel-wrap .fchk.off{opacity:.45;cursor:default}
 .fseg input:checked+span{background:rgba(255,255,255,.12);color:var(--text)}
 .fseg input:focus-visible+span{outline:1px solid rgba(255,255,255,.35)}
 .fstage{margin:0 0 14px}
@@ -30370,6 +30938,9 @@ body.gen #chip-model{color:var(--accent)}
 .srv .about-btn.slim,#srv-add .about-btn.slim{width:auto;flex:none}
 .srv-hint{font-size:11px;color:var(--faint);margin-top:5px;line-height:1.45}
 .srv-acts{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+.srv-pref{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:11.5px;
+  color:var(--dim);cursor:pointer}
+.srv-pref input{margin:0;flex:none}
 .srv-msg,#srv-note{font-size:11px;color:var(--faint);margin-top:6px;
   line-height:1.45}
 .srv-msg:empty,#srv-note:empty{display:none}
@@ -30931,11 +31502,15 @@ body.gen #chip-model{color:var(--accent)}
     </div>
     <!-- 6b308, per Patrick: "two radio buttons where the user can click
          either fast or normal for effort" -->
-    <div class="fq">Effort<i class="hint" title="With cloud power on — Fast: each question in a second or two on a quick model. Normal: a stronger model, a few seconds per question. The final recommendation is checked by the strongest model either way. With it off, this Mac answers every step.">i</i></div>
+    <div class="fq">Effort<i class="hint" title="Fast: each question on a quick model, in a second or two. Normal: a stronger model, a few seconds per question. With cloud models included (and cloud power on) they go first, and the final recommendation is checked by the strongest one. Without them, your server answers first, then this Mac.">i</i></div>
     <div id="fn-effort" class="fseg" role="radiogroup" aria-label="Effort">
       <label><input type="radio" name="fn-eff" value="fast"><span>Fast</span></label>
       <label><input type="radio" name="fn-eff" value="normal" checked><span>Normal</span></label>
     </div>
+    <!-- 6b339, per Patrick: "under the effort selection between fast and
+         normal, add a checkbox, include cloud models" -->
+    <label id="fn-cloud-row" class="fchk"><input type="checkbox" id="fn-cloud"
+      checked><span>Include cloud models</span></label>
     <button class="about-btn slim" id="fn-go">Start funnel</button>
   </div>
   <div id="code-wrap" hidden>
@@ -32081,7 +32656,8 @@ async function showTierPop(el,name){
   }else
   tierPop.innerHTML="<b>"+esc(name)+"</b>"+
     (list.length
-      ? list.map(m=>'<div class="mline">'+esc(m)+'</div>').join("")+
+      ? list.map(m=>'<div class="mline">'+esc(m)
+          +(m.indexOf(SRV_SEP)>=0?' <i>\u00b7 your server</i>':"")+'</div>').join("")+
         bench.map(m=>'<div class="mline mcloud">'+esc(m)
           +' <i>· cloud</i></div>').join("")+
         (cloudOn
@@ -32468,6 +33044,7 @@ async function paintTierAvail(){
   // leave the composer pointing at something that cannot answer
   // (a server mode that is only off stays: it goes when its server is removed)
   if(tierOff[tier]&&!isSrvMode(tier))setTier("Fast");
+  if(typeof fnCloudLoad==="function")fnCloudLoad();
 }
 paintTierAvail();
 
@@ -34008,6 +34585,7 @@ async function send(){
                   if(d.w==="cloud"&&!/cloud/.test(lastModels))
                     lastModels=(lastModels+" cloud").trim();
                   if(d.w==="server")srvWho=String(d.s||"");
+                  else if(d.w==="local"){srvWho="";if(d.m)lastModels=String(d.m);}
                   if(d.c!==undefined)setWho("Compositor: "+d.c);
                   else if(d.r)setWho(d.r.length
                     ?"Running\u2026 "+d.r.join(", "):"Running\u2026");
@@ -35262,6 +35840,7 @@ async function fnStep(pick){
     d=await(await api("/api/funnel",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify(Object.assign({},fnState,{chat_id:fid,
+        cloud:fnCloudOn,
         after_len:fn,after_hash:chatHash(messages,fn)}))})).json();
   }catch(e){d={err:"couldn\u2019t reach the engine"};}
   // adopted only while the page still has the chat: one deleted or
@@ -35373,6 +35952,31 @@ $("#fn-go").addEventListener("click",()=>{
   fnStep();
 });
 
+/* "Include cloud models" (6b339): remembered like the effort, sent with
+   every stage, greyed and unticked-looking while there is no cloud to
+   include (no key saved, or cloud power off); the saved choice is kept */
+let fnCloudOn=true;
+function fnCloudPaint(cs){
+  const cb=$("#fn-cloud"),row=$("#fn-cloud-row");if(!cb||!row)return;
+  const ok=!!(cs&&cs.configured&&cs.turbo);
+  cb.disabled=!ok;row.classList.toggle("off",!ok);
+  cb.checked=ok&&fnCloudOn;
+  row.title=ok?"Cloud models go first; unticked, your server and this Mac answer"
+    :"no cloud keys saved";
+}
+async function fnCloudLoad(){
+  try{
+    const pr=await(await api("/api/prefs")).json();
+    fnCloudOn=pr.funnel_cloud!==false;
+    fnCloudPaint(await(await api("/api/cloud")).json());
+  }catch(e){}
+}
+$("#fn-cloud").addEventListener("change",()=>{
+  fnCloudOn=$("#fn-cloud").checked;
+  api("/api/prefs",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({funnel_cloud:fnCloudOn})}).catch(()=>{});
+});
+fnCloudLoad();
 /* the funnel effort is remembered (6b308) */
 (async()=>{try{
   const pr=await(await api("/api/prefs")).json();
@@ -36991,6 +37595,9 @@ function srvCard(s){
     +(s.paired&&ms?'<div class="srv-ms">'+ms+'</div>'
       :s.paired&&st.at&&!st.err?'<div class="srv-ms"><div class="srv-m">'
         +'no chat models installed</div></div>':"")
+    // "Use for Fast, Thinking and Pro" (6b339): on unless turned off
+    +(s.paired?'<label class="srv-pref"><input type="checkbox" data-a="prefer"'
+      +(s.prefer!==false?" checked":"")+'><span>Use for Fast, Thinking and Pro</span></label>':"")
     +(pairing?'<div class="srv-pair"><input class="srv-code" data-k="code" maxlength="20" '
         +'placeholder="XXXX-XXXX-XXXX" aria-label="Pairing code" '
         +'autocomplete="off" spellcheck="false" autocapitalize="characters">'
@@ -37058,6 +37665,16 @@ function srvPut(s){
   const i=srvList.findIndex(x=>x.id===s.id);
   if(i>=0)srvList[i]=s;else srvList.push(s);
 }
+$("#srv-list").addEventListener("change",async ev=>{
+  const c=ev.target.closest('input[data-a="prefer"]');if(!c)return;
+  const id=c.closest(".srv").dataset.id;
+  let d={};
+  try{d=await srvPost("prefer",{id:id,on:c.checked});}
+  catch(e){d={err:"Couldn\u2019t reach the app. Try again."};}
+  if(d.server)srvPut(d.server);
+  paintServers();
+  if(d.err)srvMsg(id,d.err);
+});
 $("#srv-list").addEventListener("keydown",ev=>{
   if(ev.key!=="Enter"||!ev.target.classList.contains("srv-code"))return;
   const b=ev.target.closest(".srv").querySelector('button[data-a="pair"]');
