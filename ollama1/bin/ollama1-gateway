@@ -52,6 +52,7 @@ from o1common import (Paths, load_config, ram_models, read_json, safe_label,  # 
 from o1jwt import AccessVerifier, JWTError  # noqa: E402
 import o1ollama  # noqa: E402
 from o1pair import DeviceStore, read_public, spool_request, wait_result  # noqa: E402
+import o1gpu  # noqa: E402
 import o1stats  # noqa: E402
 
 VERSION = "1"
@@ -279,6 +280,7 @@ class Gateway:
         self.last_device = None   # whose request last ran on the GPU (see switch_device)
         self.meminfo = o1stats.meminfo
         self.oom_kills = o1stats.ollama_oom_kills
+        self.gpu_info = o1gpu.detect()   # vendor, name, vram_bytes: detected once
         self._allow_key = object()
         self._ram = set()
         self.tags = {}
@@ -753,6 +755,10 @@ def make_handler(gw, lan=False):
         def route(self, method, route, body, dev_id, dev, t0):
             if any(route.startswith(p) for p in NEVER):
                 raise GatewayError(404, "not_found", "not available through the gateway")
+            if method == "GET" and route == "/v1/info":
+                g = gw.gpu_info or {}
+                return self.send_json(200, {"gpu": {"vendor": g.get("vendor"), "name": g.get("name"),
+                                                    "vram_bytes": g.get("vram_bytes")}})
             if method == "GET" and route == "/v1/whoami":
                 return self.send_json(200, {"device_id": dev_id, "name": dev["name"],
                                             "server_time": int(gw.clock())})

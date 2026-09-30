@@ -436,6 +436,20 @@ provider comes later and follows `ollama1/PROTOCOL.md`. How to run it is in
   - Unverified: systemd-cryptsetup attaching a regular file (it sets up a
     loop device), and the `LLAMA_ARG_*` behaviour on 0.35.x.
   - Suite: 226 tests; the repack rule has two new mutants.
+- **`GET /v1/info`** (for the app's servers branch): `{"gpu": {"vendor",
+  "name", "vram_bytes"}}` and nothing else. It is signed and for paired
+  devices only.
+  - `lib/o1gpu.py` detects it once when the gateway starts:
+    - amdgpu sysfs for VRAM;
+    - the name from `product_name`, then a small (device, revision) table
+      (0x73bf rev c0 is the RX 6900 XT, which pci.ids can't separate from
+      the 6800/6800 XT), then pci.ids (subsystem name, else the bracketed
+      marketing name);
+    - otherwise nvidia-smi, otherwise Intel i915/xe sysfs (VRAM only for
+      discrete Arc).
+  - The request is the third PROTOCOL vector.
+  - Also fixed: the ±61 s skew tests could round to 60 s and pass (the
+    one-off flake seen earlier); they use 62 now.
 - Tested on the Mac: 199 unit tests (incl. shellcheck, the polkit rule in
   node, the setup disk steps against fake mdadm/blkid/lsblk, the guide's
   file and config references). All 75 mutants are caught

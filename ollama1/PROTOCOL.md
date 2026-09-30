@@ -171,6 +171,7 @@ Ollama's own API shapes, minus anything that changes state on the desktop:
 | Call | Notes |
 |---|---|
 | `GET /v1/whoami` | `{"device_id", "name", "server_time"}`: a cheap "am I paired" check |
+| `GET /v1/info` | `{"gpu": {"vendor", "name", "vram_bytes"}}`, see below |
 | `GET /api/tags` | Installed local models. Ollama cloud models are never listed. Each has `placement` and `gpu_pct` (below) |
 | `GET /api/ps` | Loaded models, with `size`, `size_vram`, `placement` and `gpu_pct` |
 | `GET /api/version` | `{"version"}` |
@@ -178,6 +179,21 @@ Ollama's own API shapes, minus anything that changes state on the desktop:
 | `POST /api/chat` | Streams NDJSON by default, as Ollama does |
 | `POST /api/generate` | The same |
 | `POST /api/embed`, `POST /api/embeddings` | Whole JSON answers |
+
+`GET /v1/info` says which GPU the server has, and nothing else about its
+hardware. It is detected once, when the gateway starts:
+
+```json
+{"gpu": {"vendor": "amd", "name": "Radeon RX 6900 XT", "vram_bytes": 17163091968}}
+```
+
+- `vendor`: `"amd"`, `"nvidia"`, `"intel"` or `null` (no GPU found).
+- `name`: a plain card name, or `null` if the server can't tell.
+- `vram_bytes`: an integer, or `null` if unknown (e.g. an integrated Intel
+  GPU).
+
+All three keys are always there. The signed request is the third entry in
+the test vectors below.
 
 Anything else is a 404: `pull`, `delete`, `create`, `copy`, `push` and `blobs`
 are never reachable from outside. Models are managed at the desktop only.
@@ -293,6 +309,21 @@ as JSON escapes.
         "X-O1-Timestamp": "1790000030",
         "X-O1-Nonce": "n0nce-0000000000000001",
         "X-O1-Signature": "-8x2n5tYGxbmc6TAQmsPGASjru0Be7hR6AEJsuF70sXhkXT60PECqckwoIBQ9JCrHZpYYMeXJUDSb4kiVgwYDw"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/v1/info",
+      "body_utf8": "",
+      "timestamp": 1790000060,
+      "nonce": "n0nce-0000000000000002",
+      "body_sha256_hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "canonical_utf8": "ollama1-req-v1\nGET\n/v1/info\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n1790000060\nn0nce-0000000000000002\n56475aa75463474c",
+      "headers": {
+        "X-O1-Device": "56475aa75463474c",
+        "X-O1-Timestamp": "1790000060",
+        "X-O1-Nonce": "n0nce-0000000000000002",
+        "X-O1-Signature": "9FRnVU3bslBOhaVD_B20ugookQzoD_GXUBkbyZHtCEftTT2tEQxVCJldivSJwcyIdQ1XQoznGYChv9BuTZYyBQ"
       }
     }
   ],

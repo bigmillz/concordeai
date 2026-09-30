@@ -142,6 +142,12 @@ MUTANTS = [
     ("repack: mmap forced off with repacking off", "bin/ollama1-gateway",
      '        if ram and not self.cfg.get("ollama_no_repack"):\n            # With repacking on',
      '        if ram:\n            # With repacking on', ["test_gateway"]),
+    ("info: every detected field served", "bin/ollama1-gateway",
+     '                return self.send_json(200, {"gpu": {"vendor": g.get("vendor"), "name": g.get("name"),\n'
+     '                                                    "vram_bytes": g.get("vram_bytes")}})',
+     '                return self.send_json(200, {"gpu": dict(g)})', ["test_gateway"]),
+    ("info: revision table ignored", "lib/o1gpu.py", "        name = AMD_BY_REVISION.get(key)", "        name = None",
+     ["test_gpu"]),
     ("setup: no mkfs after a crash before it", "lib/setuplib.sh",
      "    run mkfs.ext4 -F -q -L o1data", "    true && : mkfs.ext4 -F -q -L o1data", ["test_setuplib"]),
     ("setup: array mkfs without setup's marker", "lib/setuplib.sh",

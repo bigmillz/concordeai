@@ -27,6 +27,7 @@ def vectors():
          b'{"model":"qwen3:8b","messages":[{"role":"user","content":"hello"}],"stream":true}',
          1790000000, U.b64u(bytes(range(16)))),
         ("GET", "/api/tags", b"", 1790000030, "n0nce-0000000000000001"),
+        ("GET", "/v1/info", b"", 1790000060, "n0nce-0000000000000002"),
     ):
         canon = canonical_request(method, path, body_hash(body), ts, nonce, dev)
         reqs.append({

@@ -201,14 +201,14 @@ class TestSignatures(unittest.TestCase):
         self.assertEqual(json.loads(data)["code"], "replay")
 
     def test_skew_too_old(self):
-        st, data, _ = call("GET", "/api/tags", ts=int(time.time()) - 61)
+        st, data, _ = call("GET", "/api/tags", ts=int(time.time()) - 62)  # 61 can round to 60 s
         self.assertEqual(st, 401)
         body = json.loads(data)
         self.assertEqual(body["code"], "clock_skew")
         self.assertIn("server_time", body)
 
     def test_skew_too_new(self):
-        st, _, _ = call("GET", "/api/tags", ts=int(time.time()) + 61)
+        st, _, _ = call("GET", "/api/tags", ts=int(time.time()) + 62)  # 61 can round to 60 s
         self.assertEqual(st, 401)
 
     def test_skew_inside_window(self):
@@ -218,6 +218,33 @@ class TestSignatures(unittest.TestCase):
     def test_signed_before_start_refused(self):
         st, _, _ = call("GET", "/api/tags", ts=G["gw"].verifier.start_time - 1)
         self.assertEqual(st, 401)
+
+    def test_info_gpu_only(self):
+        gw = G["gw"]
+        saved = gw.gpu_info
+        gw.gpu_info = {"vendor": "amd", "name": "Radeon RX 6900 XT", "vram_bytes": 17163091968,
+                       "serial": "NOT-REPORTED", "pci": "0000:2d:00.0"}
+        try:
+            st, data, _ = call("GET", "/v1/info")
+        finally:
+            gw.gpu_info = saved
+        self.assertEqual(st, 200)
+        self.assertEqual(json.loads(data), {"gpu": {"vendor": "amd", "name": "Radeon RX 6900 XT",
+                                                    "vram_bytes": 17163091968}})
+        self.assertEqual(call("GET", "/v1/info", dev=False)[0], 401)          # signed only
+        self.assertEqual(call("GET", "/v1/info", dev=U.Device())[0], 403)     # paired only
+
+    def test_info_detected_once(self):
+        mod = G["mod"]
+        calls = []
+        real = mod.o1gpu.detect
+        mod.o1gpu.detect = lambda: calls.append(1) or {"vendor": None, "name": None, "vram_bytes": None}
+        try:
+            for _ in range(3):
+                call("GET", "/v1/info")
+        finally:
+            mod.o1gpu.detect = real
+        self.assertEqual(calls, [])       # the value from start-up is served
 
     def test_whoami(self):
         st, data, _ = call("GET", "/v1/whoami")
