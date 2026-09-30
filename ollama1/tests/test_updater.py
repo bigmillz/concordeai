@@ -95,10 +95,10 @@ class TestUpdater(unittest.TestCase):
         self.assertEqual(self.run_updater(), 0)
         self.assertEqual(self.current(), "v0.1.0")
 
-    def run_updater(self):
+    def run_updater(self, *extra):
         env = dict(os.environ, OLLAMA1_PREFIX=U.PREFIX)
         r = subprocess.run([sys.executable, os.path.join(U.BIN, "ollama1-update-ollama"),
-                            "--no-restart", "--api", "http://127.0.0.1:%d/release" % self.rel.port],
+                            "--no-restart", "--api", "http://127.0.0.1:%d/release" % self.rel.port] + list(extra),
                            env=env, capture_output=True, text=True, timeout=60)
         self.out = r.stdout + r.stderr
         return r.returncode
@@ -166,6 +166,13 @@ class TestUpdater(unittest.TestCase):
         self.rel.publish("v0.2.0", files)
         self.assertEqual(self.run_updater(), 1)
         self.assertEqual(self.current(), "v0.1.0")
+
+    def test_no_rocm_for_nvidia_or_cpu(self):
+        files = good_files("0.2.0")
+        del files["ollama-linux-amd64-rocm.tgz"]
+        self.rel.publish("v0.2.0", files)
+        self.assertEqual(self.run_updater("--no-rocm"), 0, self.out)
+        self.assertEqual(self.current(), "v0.2.0")
 
     def test_odd_tag_refused(self):
         self.rel.publish("../v9", good_files("9"))

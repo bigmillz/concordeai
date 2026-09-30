@@ -145,6 +145,35 @@ class TestRepo(unittest.TestCase):
         self.assertEqual(lines, [])
 
 
+class TestGuide(unittest.TestCase):
+    """docs/your-own-server.md: what it names exists, its config keys are
+    real, and it carries nothing of Patrick's machine."""
+
+    def guide(self):
+        return open(os.path.join(REPO, "docs", "your-own-server.md"), encoding="utf-8").read()
+
+    def test_named_files_exist(self):
+        g = self.guide()
+        for unit in set(re.findall(r"\b(ollama1?-?[a-z-]*\.(?:service|timer|path))\b", g)):
+            self.assertTrue(os.path.exists(os.path.join(U.KIT, "systemd", unit)), unit)
+        for f in set(re.findall(r"ollama1/config/([A-Za-z0-9_.-]+)", g)):
+            self.assertTrue(os.path.exists(os.path.join(U.KIT, "config", f)), f)
+        for b in set(re.findall(r"/usr/local/lib/ollama1/bin/([a-z0-9-]+)", g)):
+            self.assertTrue(os.path.exists(os.path.join(U.BIN, b)), b)
+
+    def test_config_keys_are_real(self):
+        from o1common import DEFAULTS
+        import json as _json
+        for block in re.findall(r"```json\n(.*?)```", self.guide(), re.S):
+            for k in _json.loads(block):
+                self.assertIn(k, DEFAULTS, k)
+
+    def test_nothing_of_patricks(self):
+        g = self.guide()
+        for needle in ("pmiller", "192.168.86.", "ZR127", "ZR11Z", "S6B0N", "flyconcordefly"):
+            self.assertNotIn(needle, g)
+
+
 class TestUnits(unittest.TestCase):
     def unit(self, name):
         return open(os.path.join(U.KIT, "systemd", name)).read()

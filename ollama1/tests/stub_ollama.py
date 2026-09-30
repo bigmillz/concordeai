@@ -27,6 +27,12 @@ DEFAULT_MODELS = {
     "huge:70b": {"size": 20 * GIB, "info": llama_info(layers=80, emb=8192, heads=64)},
     # the estimate says it fits, but Ollama puts part of it on the CPU
     "sneaky:14b": {"size": 9 * GIB, "info": llama_info(layers=40, emb=5120, heads=40), "spill": True},
+    # a mixture-of-experts giant: fits only with system RAM (gpt-oss:120b-like)
+    "moe:120b": {"size": 60 * GIB, "share": 0.25,
+                 "info": {"general.architecture": "gptoss", "gptoss.block_count": 36,
+                          "gptoss.embedding_length": 2880, "gptoss.attention.head_count": 64,
+                          "gptoss.attention.head_count_kv": 8, "gptoss.attention.key_length": 64,
+                          "gptoss.attention.value_length": 64, "gptoss.context_length": 131072}},
     "embed:small": {"size": GIB // 2, "info": {"general.architecture": "bert",
                                                "bert.block_count": 12, "bert.embedding_length": 768,
                                                "bert.attention.head_count": 12},
@@ -103,7 +109,7 @@ class Stub:
                     stub.loaded.pop(name, None)
                     return self.js(200, {"model": name, "done": True, "done_reason": "unload"})
                 ctx = (body.get("options") or {}).get("num_ctx", 4096)
-                share = 0.6 if m.get("spill") else 1.0
+                share = m.get("share", 0.6 if m.get("spill") else 1.0)
                 stub.loaded[name] = {"name": name, "model": name, "size": m["size"],
                                      "size_vram": int(m["size"] * share), "context_length": ctx,
                                      "expires_at": "2026-09-29T23:00:00Z"}

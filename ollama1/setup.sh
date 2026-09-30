@@ -797,6 +797,7 @@ vals = [c["tunnel_id"], c["access_team_domain"].split(".")[0], c["gateway_aud"],
 assert all(re.match(r"^[A-Za-z0-9-]+$", v) for v in vals), "unexpected characters in the Cloudflare settings"
 print(*vals)')
     sed -e "s/@TUNNEL_ID@/$TID/" -e "s/@TEAM_NAME@/$TEAM/g" -e "s/@GATEWAY_AUD@/$GAUD/" -e "s/@ADMIN_AUD@/$AAUD/" \
+        -e "s/@GW_HOST@/$GW_HOST/" -e "s/@ADMIN_HOST@/$ADMIN_HOST/" \
       "$KIT/config/cloudflared.yml.in" >/etc/ollama1/cloudflared.yml
     chown root:cloudflared /etc/ollama1/cloudflared.yml; chmod 0640 /etc/ollama1/cloudflared.yml
     ok "tunnel $TID; credential root-only in /etc/cloudflared/ollama1.json"

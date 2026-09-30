@@ -115,9 +115,9 @@ def frame(st, now=None):
             share = (int(m.get("size_vram") or 0) / size) if size else 0
             L.append(("%s%-28s %9s  %s GPU  ctx %s" % ("LOADED     " if i == 0 else " " * 11,
                                                        m.get("name", "?"), fmt_bytes(size),
-                                                       "100%" if share >= 1 else "%d%%" % (share * 100),
+                                                       "100%" if share >= 1 else "%d%% (rest in RAM)" % (share * 100),
                                                        m.get("context_length") or "?"),
-                      "" if share >= 1 else "bad"))
+                      "" if share >= 1 or m.get("ram_allowed") else "bad"))
     else:
         L.append(("LOADED     no model in memory", ""))
     if vt:

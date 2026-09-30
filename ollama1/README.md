@@ -31,7 +31,8 @@ Radeon RX 6900 XT and nothing else.
   with a terminal that still asks for your Linux password.
 
 The request-signing and pairing rules the app follows are in
-[PROTOCOL.md](PROTOCOL.md).
+[PROTOCOL.md](PROTOCOL.md). For running a server like this on your own
+Linux machine, see [docs/your-own-server.md](../docs/your-own-server.md).
 
 ## What goes where
 
@@ -346,6 +347,34 @@ around a little from time to time.
   The panel can't pull anything that isn't on the list. On the desktop,
   `sudo ollama list` shows what's installed. Ollama only answers root and
   the kit's services.
+
+  **Models that may use system memory.** Every model runs entirely on the
+  GPU unless its line in the allow-list ends in `ram`:
+
+  ```
+  qwen3:14b
+  gemma4:26b      ram
+  qwen3.6:35b     ram
+  gpt-oss:120b    ram
+  ```
+
+  - A `ram` model loads whatever doesn't fit in the 16 GB of VRAM into the
+    desktop's 64 GB of RAM. Mixture-of-experts models are the ones worth
+    doing this for: only a few experts work on each token, so they stay
+    usable.
+  - Expect a few to low tens of tokens per second, against 50 to 100+ for a
+    model that fits in VRAM. The app shows these models as `gpu+ram`.
+  - The gateway lets a `ram` model load only if VRAM plus the free RAM,
+    less 6 GB kept for the system, holds its weights and context. If it
+    wasn't asked for a context size, it tries 8192, then 4096, then 2048.
+    gpt-oss:120b (about 61 GB) fits at 8192.
+  - It never lets one push the machine into swap. Ollama can't use swap at
+    all (`MemorySwapMax=0`), and a load that makes anything else swap is
+    unloaded and refused.
+  - A `ram` model runs alone: other models are unloaded before it loads,
+    and it is unloaded before a GPU-only model runs.
+  - The only flag is `ram`. A line with any other word after the name is
+    ignored entirely, and the panel shows it with the reason.
 - **Dashboard:** it's on the monitor, and `ollama1-top` shows it over SSH
   (`q` quits). It shows the following, and never a prompt or an answer:
   - tokens per second (now, 1 h, 24 h) and requests;

@@ -26,6 +26,10 @@ success.
   Access then adds `Cf-Access-Jwt-Assertion` on its way to the desktop,
   and the gateway checks that JWT (signature against the team's certs,
   issuer, AUD tag, expiry, and the service token's client id).
+- A server set up without Cloudflare (`"access": "none"`, reached through
+  an SSH tunnel; see `docs/your-own-server.md`) takes the same requests
+  at the tunnel's local end, e.g. `http://127.0.0.1:8431`, without the two
+  Access headers. Everything else here is the same, signatures included.
 - Bodies are JSON (`Content-Type: application/json`) with a
   `Content-Length`. Chunked request bodies are refused (411). Signed calls
   may send up to 32 MiB, `/v1/pair` up to 8 KiB (413 otherwise). The body
@@ -161,8 +165,8 @@ Ollama's own API shapes, minus anything that changes state on the desktop:
 | Call | Notes |
 |---|---|
 | `GET /v1/whoami` | `{"device_id", "name", "server_time"}`: a cheap "am I paired" check |
-| `GET /api/tags` | Installed local models. Ollama cloud models are never listed |
-| `GET /api/ps` | Loaded models, with `size` and `size_vram` |
+| `GET /api/tags` | Installed local models. Ollama cloud models are never listed. Each has `placement` and `gpu_pct` (below) |
+| `GET /api/ps` | Loaded models, with `size`, `size_vram`, `placement` and `gpu_pct` |
 | `GET /api/version` | `{"version"}` |
 | `POST /api/show` | `{"model"}` → Ollama's model description |
 | `POST /api/chat` | Streams NDJSON by default, as Ollama does |
@@ -195,15 +199,32 @@ Request shaping (so every request stands alone and stays on the GPU):
   seconds) when you switch devices. `prompt_eval_count` and
   `prompt_eval_duration` stay in the answers.
 
-GPU only:
+GPU only, unless the desktop's owner allows a model system memory:
 
+- Every model runs entirely in VRAM, except models the owner marked `ram`
+  in the desktop's allow-list (mixture-of-experts models such as
+  gpt-oss:120b). Those may load partly into system memory, and run slower.
+- `placement` tells the app which kind a model is, so it can label the
+  slow ones:
+  - in `/api/tags`: `"gpu"` (GPU only) or `"gpu+ram"` (may use system
+    memory); `gpu_pct` is the share in VRAM while it is loaded, else `null`;
+  - in `/api/ps`: the actual placement, `"gpu"` when 100% is in VRAM, else
+    `"gpu+ram"`, and `gpu_pct` from 0 to 100.
 - Before loading, the gateway estimates weights + KV cache for the
-  requested `num_ctx` + a margin. If that exceeds the card's VRAM (16 GB,
-  less a reserve), the answer is **507** `gpu_fit`, with `need_bytes`
-  and `budget_bytes`. Try a smaller `num_ctx` or a smaller model.
-- After loading, `/api/ps` must show the model 100% in VRAM. If any of
-  it landed on the CPU, the gateway unloads it and answers `gpu_spill`
-  (507 for non-streamed calls).
+  requested `num_ctx` + a margin. It checks that against the card's VRAM
+  less a reserve (16 GB here); for a `gpu+ram` model, against VRAM plus the
+  free system memory less 6 GB for the system. If it doesn't fit, the
+  answer is **507** `gpu_fit`, with `need_bytes` and `budget_bytes`. Try
+  a smaller `num_ctx` or a smaller model. For a `gpu+ram` model sent
+  without `options.num_ctx`, the gateway first tries 4096, then 2048.
+- After loading, a GPU-only model must show 100% in VRAM in `/api/ps`. If
+  any of it landed on the CPU, the gateway unloads it and answers
+  `gpu_spill` (507 for non-streamed calls).
+- A `gpu+ram` model is unloaded and refused with `ram_pressure` (507) if
+  loading it pushed the desktop into swap or left under 1 GiB free.
+- A `gpu+ram` model loads alone: the desktop unloads other models first,
+  and unloads it before a GPU-only model runs. Expect a reload when you
+  switch between them.
 
 One job runs on the GPU at a time; up to 8 more wait in a queue. When
 the queue is full: **503** `busy`.
@@ -212,7 +233,7 @@ Streaming (`stream` true, the default for chat and generate): once the
 request passes auth, validation and the fit estimate, the gateway sends
 `200` with `Content-Type: application/x-ndjson` and then waits its turn and
 loads the model. A failure after that point arrives as one last NDJSON
-line: `{"error": "...", "code": "gpu_spill" | "busy" | "ollama", "done": true}`.
+line: `{"error": "...", "code": "gpu_spill" | "ram_pressure" | "busy" | "ollama", "done": true}`.
 The app must treat a line with `error` as the end of the answer.
 Prefer streaming: Cloudflare ends a non-streamed request whose answer
 takes longer than 100 s.

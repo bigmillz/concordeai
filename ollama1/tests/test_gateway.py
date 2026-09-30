@@ -695,6 +695,175 @@ class TestDeviceSwitch(unittest.TestCase):
         self.assertEqual(U.ndjson(data)[-1]["code"], "busy")
 
 
+class TestAllowListParsing(unittest.TestCase):
+    def parse(self, text):
+        from o1common import parse_allow_list
+        path = os.path.join(U.PREFIX, "etc/ollama1/parse-test.allow")
+        with open(path, "w") as f:
+            f.write(text)
+        try:
+            return parse_allow_list(path)
+        finally:
+            os.unlink(path)
+
+    def test_plain_and_ram(self):
+        entries, errors = self.parse("# models\nqwen3:14b\ngpt-oss:120b   ram   # the big one\n\n")
+        self.assertEqual(errors, [])
+        self.assertEqual(entries, [{"name": "qwen3:14b", "ram": False}, {"name": "gpt-oss:120b", "ram": True}])
+
+    def test_strict(self):
+        entries, errors = self.parse("a:1b fast\nb:1b RAM\nc:1b ram ram\n../x ram\nd:1b\nd:1b ram\ne:1b\n")
+        self.assertEqual([e["name"] for e in entries], ["d:1b", "e:1b"])
+        self.assertEqual([e["line"] for e in errors], [1, 2, 3, 4, 6])
+        self.assertIn("unknown flag 'fast'", errors[0]["reason"])
+        self.assertEqual(errors[5 - 1]["reason"], "listed twice")
+
+    def test_names_still_read(self):
+        from o1common import read_allow_list
+        path = os.path.join(U.PREFIX, "etc/ollama1/parse-test.allow")
+        with open(path, "w") as f:
+            f.write("x:1b\ny:2b ram\nz:3b turbo\n")
+        try:
+            self.assertEqual(read_allow_list(path), ["x:1b", "y:2b"])
+        finally:
+            os.unlink(path)
+
+
+class TestRamModels(unittest.TestCase):
+    """Models marked 'ram' may use system memory; every other model stays
+    GPU only."""
+    GIB = 1 << 30
+
+    def setUp(self):
+        from o1common import Paths as P
+        self.allow = P.allow
+        with open(self.allow, "w") as f:
+            f.write("moe:120b   ram\nsmall:8b\nsneaky:14b\n")
+        self.gw = G["gw"]
+        self.mem = {"MemTotal": 62 * self.GIB, "MemAvailable": 58 * self.GIB,
+                    "SwapTotal": 8 * self.GIB, "SwapFree": 8 * self.GIB}
+        self.swap_after = None
+        self.calls = 0
+
+        def fake_meminfo():
+            self.calls += 1
+            m = dict(self.mem)
+            if self.swap_after is not None and "moe:120b" in G["stub"].loaded:
+                m["SwapFree"] = self.swap_after   # swap used once the model is in memory
+            return m
+        self.gw.meminfo = fake_meminfo
+        self.gw.stats.loaded = []
+        G["stub"].loaded.clear()
+
+    def tearDown(self):
+        import o1stats
+        self.gw.meminfo = o1stats.meminfo
+        os.unlink(self.allow)
+        G["stub"].loaded.clear()
+
+    def chat(self, model, **extra):
+        obj = {"model": model, "messages": [{"role": "user", "content": "x"}], "stream": False}
+        obj.update(extra)
+        return call("POST", "/api/chat", obj)
+
+    def test_ram_model_may_use_system_memory(self):
+        st, data, _ = self.chat("moe:120b")
+        self.assertEqual(st, 200, data)
+        st, data, _ = call("GET", "/api/ps")
+        ps = {m["name"]: m for m in json.loads(data)["models"]}
+        self.assertEqual((ps["moe:120b"]["placement"], ps["moe:120b"]["gpu_pct"]), ("gpu+ram", 25))
+        st, data, _ = call("GET", "/api/tags")
+        tags = {m["name"]: m for m in json.loads(data)["models"]}
+        self.assertEqual(tags["moe:120b"]["placement"], "gpu+ram")
+        self.assertEqual(tags["moe:120b"]["gpu_pct"], 25)
+        self.assertEqual(tags["small:8b"]["placement"], "gpu")
+        self.assertIsNone(tags["small:8b"]["gpu_pct"])
+
+    def test_plain_model_still_refused_on_spill(self):
+        st, data, _ = self.chat("sneaky:14b")   # on the allow-list, but without 'ram'
+        self.assertEqual(st, 507)
+        self.assertEqual(json.loads(data)["code"], "gpu_spill")
+
+    def test_ram_model_that_does_not_fit_even_with_ram(self):
+        self.mem["MemAvailable"] = 30 * self.GIB
+        st, data, _ = self.chat("moe:120b")
+        self.assertEqual(st, 507)
+        self.assertEqual(json.loads(data)["code"], "gpu_fit")
+        self.assertNotIn("moe:120b", G["stub"].loaded)
+
+    def test_margin_is_at_least_6_gib(self):
+        old = self.gw.cfg.get("ram_margin_gib")
+        self.gw.cfg["ram_margin_gib"] = 0
+        try:
+            vram = 16 * self.GIB - (768 << 20)
+            self.assertEqual(self.gw.budget(True), vram + 58 * self.GIB - 6 * self.GIB)
+        finally:
+            self.gw.cfg["ram_margin_gib"] = old
+        self.assertEqual(self.gw.budget(False), 16 * self.GIB - (768 << 20))
+
+    def test_swap_refusal(self):
+        self.swap_after = 7 * self.GIB          # loading pushed 1 GiB into swap
+        st, data, _ = self.chat("moe:120b")
+        self.assertEqual(st, 507)
+        self.assertEqual(json.loads(data)["code"], "ram_pressure")
+        self.assertNotIn("moe:120b", G["stub"].loaded)
+
+    def test_context_steps_down_to_fit(self):
+        import o1ollama
+        from stub_ollama import DEFAULT_MODELS
+        m = DEFAULT_MODELS["moe:120b"]
+        need8, _ = o1ollama.fit_estimate(m["size"], m["info"], 8192)
+        need4, _ = o1ollama.fit_estimate(m["size"], m["info"], 4096)
+        vram = 16 * self.GIB - (768 << 20)
+        self.mem["MemAvailable"] = (need8 + need4) // 2 - vram + 6 * self.GIB   # 8192 doesn't fit, 4096 does
+        n = len(G["stub"].calls)
+        st, data, _ = self.chat("moe:120b")
+        self.assertEqual(st, 200, data)
+        sent = [c[2] for c in G["stub"].calls[n:] if c[1] == "/api/chat"][-1]
+        self.assertEqual(sent["options"]["num_ctx"], 4096)
+        st, data, _ = self.chat("moe:120b", options={"num_ctx": 8192})   # asked for: no step-down
+        self.assertEqual(st, 507)
+
+    def test_a_ram_model_loads_alone(self):
+        self.chat("small:8b")
+        self.assertIn("small:8b", G["stub"].loaded)
+        n = len(G["stub"].calls)
+        st, _, _ = self.chat("moe:120b")
+        self.assertEqual(st, 200)
+        unl = [c[2]["model"] for c in G["stub"].calls[n:] if (c[2] or {}).get("keep_alive") == 0]
+        self.assertEqual(unl, ["small:8b"])
+        n = len(G["stub"].calls)
+        st, _, _ = self.chat("small:8b")        # and the reverse
+        self.assertEqual(st, 200)
+        unl = [c[2]["model"] for c in G["stub"].calls[n:] if (c[2] or {}).get("keep_alive") == 0]
+        self.assertEqual(unl, ["moe:120b"])
+
+    def test_gpu_only_models_may_share(self):
+        self.chat("small:8b")
+        n = len(G["stub"].calls)
+        st, _, _ = call("POST", "/api/embed", {"model": "embed:small", "input": "x"})
+        self.assertEqual(st, 200)
+        self.assertEqual([c for c in G["stub"].calls[n:] if (c[2] or {}).get("keep_alive") == 0], [])
+
+
+class TestAccessNone(unittest.TestCase):
+    def test_ssh_tunnel_mode(self):
+        gw, mod = G["gw"], G["mod"]
+        gw.cfg["access"] = "none"
+        try:
+            gw.check_access({"Host": "127.0.0.1:8431"}, False, "127.0.0.1")   # no JWT needed
+            st, _, _ = call("GET", "/v1/whoami", jwt_token=None, headers={"Host": "127.0.0.1:8431"})
+            self.assertEqual(st, 200)
+            st, _, _ = call("GET", "/v1/whoami", jwt_token=None, dev=False)     # signatures still needed
+            self.assertEqual(st, 401)
+            with self.assertRaises(mod.GatewayError):
+                gw.check_access({}, True, "192.168.86.20")                       # LAN mode still off
+        finally:
+            gw.cfg["access"] = "cloudflare"
+        with self.assertRaises(mod.GatewayError):
+            gw.check_access({"Host": "127.0.0.1:8431"}, False, "127.0.0.1")
+
+
 class TestLanMode(unittest.TestCase):
     """The LAN listener skips the Access JWT only when LAN mode is on and
     the caller is on the home network."""

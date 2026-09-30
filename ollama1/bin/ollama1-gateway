@@ -46,7 +46,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..
 
 import o1crypto  # noqa: E402
 from o1auth import AuthError, PAIR_MIN_INTERVAL, RequestVerifier, SKEW, parse_pair_request  # noqa: E402
-from o1common import Paths, load_config, read_json, safe_label, valid_model_name, write_json_atomic  # noqa: E402
+from o1common import (Paths, load_config, ram_models, read_json, safe_label,  # noqa: E402
+                       valid_model_name, write_json_atomic)
 from o1jwt import AccessVerifier, JWTError  # noqa: E402
 import o1ollama  # noqa: E402
 from o1pair import DeviceStore, read_public, spool_request, wait_result  # noqa: E402
@@ -275,6 +276,9 @@ class Gateway:
         self.pair = {"last_try": 0.0}
         self.inflight = threading.BoundedSemaphore(int(cfg.get("max_inflight") or 16))
         self.last_device = None   # whose request last ran on the GPU (see switch_device)
+        self.meminfo = o1stats.meminfo
+        self._allow_key = object()
+        self._ram = set()
         self.tags = {}
         self.tags_at = 0.0
         self.info = {}
@@ -291,6 +295,8 @@ class Gateway:
             except ValueError:
                 raise GatewayError(403, "access", "not from the home network")
             return
+        if self.cfg.get("access") == "none":
+            return  # no Cloudflare in front (e.g. an SSH tunnel); signatures still required
         host = (headers.get("Host") or "").split(":")[0].lower()
         if host != self.cfg["hostname_gateway"].lower():
             raise GatewayError(403, "access", "wrong host")
@@ -343,19 +349,98 @@ class Gateway:
         v = int(self.cfg.get("vram_total_bytes") or 0)
         return v or o1stats.gpu_vram_total()
 
-    def fit_check(self, name, entry, n_ctx):
-        info = self.model_info(name, entry)
-        need, kv = o1ollama.fit_estimate(int(entry.get("size") or 0), info["model_info"], n_ctx)
+    def is_ram_model(self, name):
+        """True if the allow-list marks this model 'ram': it may load partly
+        into system memory. Everything else is GPU only."""
+        try:
+            st = os.stat(Paths.allow)
+            key = (st.st_mtime_ns, st.st_size, st.st_ino)
+        except OSError:
+            key = None
+        if key != self._allow_key:
+            self._ram = ram_models()
+            self._allow_key = key
+        return any(o1ollama.same_model(n, name) for n in self._ram)
+
+    def budget(self, ram):
+        """Bytes a model may take: VRAM less the reserve; for 'ram' models
+        plus the system RAM available now (and what loaded models hold in
+        RAM, since they are unloaded first), less a margin for the OS."""
         total = self.vram_total()
-        if not total:
-            return  # no VRAM figure: the /api/ps check after loading still applies
-        budget = total - int(self.cfg["vram_reserve_mib"]) * (1 << 20)
-        if need > budget:
-            raise GatewayError(
-                507, "gpu_fit",
-                "model does not fit in VRAM at num_ctx %d: needs about %.1f GiB, %.1f GiB available"
-                % (n_ctx, need / 2**30, budget / 2**30),
-                need_bytes=need, budget_bytes=budget)
+        vram = max(0, total - int(self.cfg["vram_reserve_mib"]) * (1 << 20)) if total else 0
+        if not ram:
+            return vram or None
+        avail = int(self.meminfo().get("MemAvailable", 0))
+        for m in self.stats.loaded:
+            avail += max(0, int(m.get("size") or 0) - int(m.get("size_vram") or 0))
+        margin = max(6, int(self.cfg.get("ram_margin_gib") or 6)) << 30
+        return max(0, vram + avail - margin)
+
+    def fit_check(self, name, entry, n_ctx, ram=False, explicit=True):
+        """Refuses a model that can't fit; returns the num_ctx to use. A
+        'ram' model without an explicit num_ctx steps down to 4096, then
+        2048, before it is refused."""
+        info = self.model_info(name, entry)
+        budget = self.budget(ram)
+        if budget is None:
+            return n_ctx  # no VRAM figure: the /api/ps check after loading still applies
+        tries = [n_ctx]
+        if ram and not explicit:
+            tries += [c for c in (4096, 2048) if c < n_ctx]
+        for c in tries:
+            need, kv = o1ollama.fit_estimate(int(entry.get("size") or 0), info["model_info"], c)
+            if need <= budget:
+                return c
+        where = "VRAM plus free system memory" if ram else "VRAM"
+        raise GatewayError(
+            507, "gpu_fit",
+            "model does not fit in %s at num_ctx %d: needs about %.1f GiB, %.1f GiB available"
+            % (where, tries[-1], need / 2**30, budget / 2**30),
+            need_bytes=need, budget_bytes=budget)
+
+    def placement(self, m):
+        size = int(m.get("size") or 0)
+        pct = int(100 * int(m.get("size_vram") or 0) / size) if size else 0
+        return {"placement": "gpu" if pct >= 100 else "gpu+ram", "gpu_pct": min(pct, 100)}
+
+    def make_room(self, name, ram):
+        """A 'ram' model loads alone; a GPU-only model never shares the
+        machine with a 'ram' model. Unloads what's in the way and confirms
+        it through /api/ps, or refuses (503)."""
+        try:
+            loaded = self.loaded_names()
+        except (OSError, ValueError):
+            raise GatewayError(503, "busy", "Ollama is not answering; try again")
+        victims = [n for n in loaded if not o1ollama.same_model(n, name)
+                   and (ram or self.is_ram_model(n))]
+        if not victims:
+            return
+        for v in victims:
+            self.unload(v)
+        try:
+            left = self.loaded_names()
+        except (OSError, ValueError):
+            left = victims
+        if any(o1ollama.same_model(v, n) for v in victims for n in left):
+            raise GatewayError(503, "busy", "the desktop could not unload another model first; try again")
+        log("make-room", model=",".join(victims))
+
+    def check_placement(self, name, ram, before):
+        """After loading: a GPU-only model must be 100% in VRAM; a 'ram'
+        model may share, but loading it must not have pushed anything into
+        swap or left the machine without memory."""
+        if not ram:
+            return self.ensure_on_gpu(name)
+        share = self.gpu_share(name)
+        if share is None:
+            raise GatewayError(502, "ollama", "model did not load")
+        after = self.meminfo()
+        swapped = int(before.get("SwapFree", 0)) - int(after.get("SwapFree", 0))
+        if swapped > (512 << 20) or int(after.get("MemAvailable", 1 << 40)) < (1 << 30):
+            self.unload(name)
+            log("ram-pressure", model=name, gpu_pct=int(share * 100))
+            raise GatewayError(507, "ram_pressure",
+                               "loading the model would push the desktop into swap; it was unloaded")
 
     def gpu_share(self, name):
         st, data = o1ollama.call(self.base, "GET", "/api/ps", timeout=10)
@@ -436,7 +521,7 @@ class Gateway:
                                "Ollama refused to load the model: %s" % safe_label(msg or st, 200))
 
     # -- request shaping ------------------------------------------------
-    def shape(self, kind, obj, model_name, entry):
+    def shape(self, kind, obj, model_name, entry, ram=False):
         if not isinstance(obj, dict):
             raise GatewayError(400, "bad_request", "body must be a JSON object")
         out = {k: v for k, v in obj.items() if k in FIELDS[kind]}
@@ -447,14 +532,15 @@ class Gateway:
         if kind in ("chat", "generate"):
             info = self.model_info(model_name, entry)
             cmax = o1ollama.context_max(info["model_info"]) or int(self.cfg["num_ctx_max"])
-            want = opts.get("num_ctx", self.cfg["num_ctx_default"])
+            default = self.cfg["num_ctx_default_ram"] if ram else self.cfg["num_ctx_default"]
+            want = opts.get("num_ctx", default)
             if not isinstance(want, int) or isinstance(want, bool):
                 raise GatewayError(400, "bad_request", "options.num_ctx must be an integer")
             n_ctx = max(512, min(want, cmax, int(self.cfg["num_ctx_max"])))
             clean["num_ctx"] = n_ctx
             out["stream"] = obj.get("stream", True) is not False
         out["options"] = clean
-        return out, n_ctx
+        return out, n_ctx, "num_ctx" in opts
 
 
 def make_handler(gw, lan=False):
@@ -602,15 +688,22 @@ def make_handler(gw, lan=False):
                 return self.send_json(200, {"device_id": dev_id, "name": dev["name"],
                                             "server_time": int(gw.clock())})
             if method == "GET" and route == "/api/tags":
-                models = [{k: m.get(k) for k in ("name", "model", "size", "digest", "details",
-                                                 "modified_at")}
-                          for m in gw.refresh_tags(force=True).values()]
+                st, data = o1ollama.call(gw.base, "GET", "/api/ps", timeout=10)
+                running = (data or {}).get("models", []) or [] if st == 200 else []
+                models = []
+                for m in gw.refresh_tags(force=True).values():
+                    item = {k: m.get(k) for k in ("name", "model", "size", "digest", "details", "modified_at")}
+                    item["placement"] = "gpu+ram" if gw.is_ram_model(m["name"]) else "gpu"
+                    item["gpu_pct"] = next((gw.placement(r)["gpu_pct"] for r in running
+                                            if o1ollama.same_model(r.get("name") or r.get("model"), m["name"])), None)
+                    models.append(item)
                 return self.send_json(200, {"models": models})
             if method == "GET" and route == "/api/ps":
                 st, data = o1ollama.call(gw.base, "GET", "/api/ps", timeout=10)
                 keep = ("name", "model", "size", "size_vram", "context_length", "expires_at",
                         "details", "digest")
-                models = [{k: m.get(k) for k in keep} for m in (data or {}).get("models", []) or []]
+                models = [dict({k: m.get(k) for k in keep}, **gw.placement(m))
+                          for m in (data or {}).get("models", []) or []]
                 return self.send_json(200, {"models": models})
             if method == "GET" and route == "/api/version":
                 st, data = o1ollama.call(gw.base, "GET", "/api/version", timeout=10)
@@ -637,8 +730,12 @@ def make_handler(gw, lan=False):
 
         def model_job(self, kind, obj, dev_id, dev, t0):
             name, entry = gw.local_model(obj.get("model"))
-            fwd, n_ctx = gw.shape(kind, obj, name, entry)
-            gw.fit_check(name, entry, n_ctx or 2048)
+            ram = gw.is_ram_model(name)
+            fwd, n_ctx, explicit = gw.shape(kind, obj, name, entry, ram)
+            fitted = gw.fit_check(name, entry, n_ctx or 2048, ram, explicit)
+            if n_ctx:
+                n_ctx = fitted
+                fwd["options"]["num_ctx"] = n_ctx
             streaming = bool(fwd.get("stream")) and kind in ("chat", "generate")
             rec = {"t": int(gw.clock()), "device": dev["name"], "model": name, "kind": kind,
                    "status": 200, "ms": 0, "tokens": 0, "prompt_tokens": 0}
@@ -657,15 +754,17 @@ def make_handler(gw, lan=False):
                 if got == "timeout":
                     raise GatewayError(503, "busy", "waited too long in the queue")
                 gw.switch_device(dev_id)
+                gw.make_room(name, ram)
+                before = gw.meminfo() if ram else {}
                 if kind in ("chat", "generate"):
                     gw.warm_load(name, n_ctx)
-                    gw.ensure_on_gpu(name)
+                    gw.check_placement(name, ram, before)
                     if streaming:
                         self.relay_stream(kind, fwd, rec)
                     else:
-                        self.relay_whole(kind, fwd, rec, check_after=False)
+                        self.relay_whole(kind, fwd, rec, check_after=None)
                 else:
-                    self.relay_whole(kind, fwd, rec, check_after=True)
+                    self.relay_whole(kind, fwd, rec, check_after=(ram, before))
             except GatewayError as e:
                 rec["status"], rec["code"] = e.status, e.code
                 if headers_sent:
@@ -762,7 +861,7 @@ def make_handler(gw, lan=False):
                 raise GatewayError(st if st >= 400 else 502, "ollama",
                                    "Ollama: %s" % safe_label(msg or st, 200))
             if check_after:
-                gw.ensure_on_gpu(fwd["model"])
+                gw.check_placement(fwd["model"], check_after[0], check_after[1])
             rec["tokens"] = int(data.get("eval_count") or 0)
             rec["prompt_tokens"] = int(data.get("prompt_eval_count") or 0)
             if data.get("eval_count"):
@@ -781,7 +880,8 @@ def stats_loop(gw, stop):
             try:
                 st, data = o1ollama.call(gw.base, "GET", "/api/ps", timeout=5)
                 gw.stats.loaded = [
-                    {k: m.get(k) for k in ("name", "size", "size_vram", "context_length", "expires_at")}
+                    dict({k: m.get(k) for k in ("name", "size", "size_vram", "context_length", "expires_at")},
+                         ram_allowed=gw.is_ram_model(m.get("name") or ""), **gw.placement(m))
                     for m in (data or {}).get("models", []) or []] if st == 200 else []
                 if not gw.stats.ollama_version or n % 300 == 0:
                     st, v = o1ollama.call(gw.base, "GET", "/api/version", timeout=5)

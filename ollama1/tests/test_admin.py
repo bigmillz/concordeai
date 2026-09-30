@@ -172,6 +172,20 @@ class TestActions(unittest.TestCase):
         finally:
             os.unlink(Paths.allow)
 
+    def test_allow_list_errors_and_ram_flag_shown(self):
+        with open(Paths.allow, "w") as f:
+            f.write("small:8b ram\nhuge:70b turbo\n")
+        try:
+            st, data, _ = get("/api/models")
+            m = json.loads(data)
+            self.assertEqual([(a["name"], a["ram"]) for a in m["allow"]], [("small:8b", True)])
+            self.assertEqual(m["allow_errors"][0]["line"], 2)
+            self.assertIn("turbo", m["allow_errors"][0]["reason"])
+            # a refused line can't be pulled either
+            self.assertEqual(post({"action": "pull", "arg": name_hash("huge:70b")})[0], 403)
+        finally:
+            os.unlink(Paths.allow)
+
     def test_empty_allow_list_pulls_nothing(self):
         self.assertEqual(post({"action": "pull", "arg": name_hash("small:8b")})[0], 403)
 

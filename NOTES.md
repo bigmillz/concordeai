@@ -203,9 +203,44 @@ provider comes later and follows `ollama1/PROTOCOL.md`. How to run it is in
       makes the next run rotate it if it was never shown.
     - Only CNAMEs pointing at a tunnel, or made by the helper, are changed.
     - Redirects are never followed.
-- Tested on the Mac: 182 unit tests (incl. shellcheck, the polkit rule in
-  node, the setup disk steps against fake mdadm/blkid/lsblk). All 67
-  mutants are caught (`tests/mutate.py`). On the desktop (as pmiller, no
+- **Models that may use system memory (after 6857fee).** Patrick wants
+  gemma4:26b, qwen3.6:35b and gpt-oss:120b (about 61 GB) allowed into the
+  64 GB of RAM; every other model stays GPU only.
+  - A flag after the name in `models.allow` (`gpt-oss:120b  ram`). The
+    parser is strict: an unknown or repeated flag, a bad name or a
+    duplicate makes the line ignored, and the panel lists it with the
+    reason. Plain lines stay GPU only.
+  - Fit budget for `ram` models: VRAM less 768 MiB, plus MemAvailable (and
+    what loaded models hold in RAM, since they are unloaded first), less
+    `ram_margin_gib` (never under 6). Without an explicit num_ctx the
+    context steps 8192 → 4096 → 2048 to fit; gpt-oss:120b fits at 8192
+    with an idle machine.
+  - After the load, the "100% GPU" refusal is skipped for `ram` models
+    only. Instead the model is unloaded and `ram_pressure` returned if
+    SwapFree fell by more than 512 MiB or MemAvailable is under 1 GiB.
+    `MemorySwapMax=0` still keeps Ollama itself out of swap.
+  - A `ram` model loads alone (the gateway unloads the others and confirms
+    through /api/ps, else 503), and it is unloaded before a GPU-only model
+    runs. `OLLAMA_MAX_LOADED_MODELS=2` stays for GPU-only pairs such as a
+    chat model plus an embedder.
+  - `/api/tags` and `/api/ps` carry `placement` (`gpu`/`gpu+ram`) and
+    `gpu_pct`. The dashboard and panel show the GPU share, with "rest in
+    RAM" for flagged models.
+- **For other people's servers** (`docs/your-own-server.md`, the public
+  guide):
+  - `"access": "none"` lets an SSH tunnel be the way in, without Cloudflare
+    (signatures still required);
+  - `ollama_rocm` / `--no-rocm` for NVIDIA or CPU boxes, and an
+    `nvidia-smi` VRAM fallback;
+  - `cf_zone` and templated hostnames, so the Cloudflare helper isn't tied
+    to flyconcordefly.com.
+
+  setup.sh stays Patrick's machine only; the guide says so and gives manual
+  steps until the app's "Add a server".
+- Tested on the Mac: 199 unit tests (incl. shellcheck, the polkit rule in
+  node, the setup disk steps against fake mdadm/blkid/lsblk, the guide's
+  file and config references). All 75 mutants are caught
+  (`tests/mutate.py`). On the desktop (as pmiller, no
   sudo): the suite under bash 5.3, `setup.sh --plan`, and (second commit)
   the user-mode trial and the dashboard at 120x40 and 80x25.
 

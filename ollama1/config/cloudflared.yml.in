@@ -5,7 +5,7 @@ tunnel: @TUNNEL_ID@
 metrics: 127.0.0.1:8439
 no-autoupdate: true
 ingress:
-  - hostname: ollama1.flyconcordefly.com
+  - hostname: @GW_HOST@
     service: http://127.0.0.1:8431
     originRequest:
       connectTimeout: 10s
@@ -13,7 +13,7 @@ ingress:
         required: true
         teamName: @TEAM_NAME@
         audTag: ["@GATEWAY_AUD@"]
-  - hostname: ollama1-admin.flyconcordefly.com
+  - hostname: @ADMIN_HOST@
     service: http://127.0.0.1:8432
     originRequest:
       connectTimeout: 10s

@@ -39,9 +39,26 @@ def gpu_card():
     return None
 
 
+_nv_cache = {"t": 0, "v": 0}
+
+
 def gpu_vram_total():
+    """Total VRAM in bytes: amdgpu sysfs, else nvidia-smi, else 0."""
     dev = gpu_card()
-    return (_int(dev + "/mem_info_vram_total") or 0) if dev else 0
+    if dev:
+        return _int(dev + "/mem_info_vram_total") or 0
+    if time.time() - _nv_cache["t"] < 300:
+        return _nv_cache["v"]
+    v = 0
+    try:
+        r = subprocess.run(["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
+                           capture_output=True, text=True, timeout=5)
+        if r.returncode == 0 and r.stdout.strip():
+            v = int(r.stdout.split()[0]) << 20
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+    _nv_cache.update(t=time.time(), v=v)
+    return v
 
 
 def gpu():
@@ -110,6 +127,19 @@ def memory():
             pass
     total, avail = info.get("MemTotal", 0), info.get("MemAvailable", 0)
     return {"total": total, "used": total - avail, "available": avail}
+
+
+def meminfo():
+    """Bytes: MemTotal, MemAvailable, SwapTotal, SwapFree."""
+    info = {}
+    for line in (_read(PROC + "/meminfo", "") or "").splitlines():
+        k, _, v = line.partition(":")
+        if k in ("MemTotal", "MemAvailable", "SwapTotal", "SwapFree"):
+            try:
+                info[k] = int(v.split()[0]) * 1024
+            except (ValueError, IndexError):
+                pass
+    return info
 
 
 def loadavg():

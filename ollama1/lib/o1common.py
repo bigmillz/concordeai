@@ -60,6 +60,11 @@ DEFAULTS = {
     "service_token_client_id": "",   # optional: pin the one service token
     "tunnel_id": "",                 # the ollama1 tunnel (not secret; its credential is separate)
     "lan_mode": False,
+    # "cloudflare": the loopback listener needs a Cloudflare Access JWT.
+    # "none": it doesn't (an SSH tunnel is the way in); signatures still do.
+    "access": "cloudflare",
+    "cf_zone": "flyconcordefly.com", # the Cloudflare zone the two hostnames live in
+    "ollama_rocm": True,             # install Ollama's ROCm component (AMD GPUs)
     "lan_bind": "192.168.86.10",     # br0 (setup.sh writes the real one)
     "lan_cidr": "192.168.86.0/24",
     "gateway_port": 8431,
@@ -68,6 +73,8 @@ DEFAULTS = {
     "tunnel_metrics_port": 8439,
     "ollama_url": "http://127.0.0.1:11434",
     "num_ctx_default": 8192,
+    "num_ctx_default_ram": 8192,     # 'ram' models: stepped down to 4096/2048 if needed to fit
+    "ram_margin_gib": 6,             # system RAM kept free for the OS and services (at least 6)
     "num_ctx_max": 131072,
     "vram_reserve_mib": 768,
     "vram_total_bytes": 0,           # 0 = read from amdgpu sysfs
@@ -147,19 +154,60 @@ def valid_model_name(name):
     return isinstance(name, str) and bool(MODEL_RE.match(name)) and ".." not in name
 
 
-def read_allow_list(path=None):
-    """The root-owned allow-list: one model name per line, # comments.
-    Starts empty; only Patrick adds lines."""
-    out = []
+ALLOW_FLAGS = {
+    # May use system memory: the model can load partly into RAM when it
+    # doesn't fit in VRAM (for mixture-of-experts models, e.g. gpt-oss:120b).
+    "ram",
+}
+
+
+def parse_allow_list(path=None):
+    """The root-owned allow-list, parsed strictly. One model per line,
+    optionally followed by flags, # starts a comment:
+
+        qwen3:14b
+        gpt-oss:120b   ram
+
+    Returns (entries, errors). entries: [{"name", "ram"}]; errors:
+    [{"line", "text", "reason"}]. A line with any problem is left out
+    entirely (so a typo can never widen what a model may do)."""
+    entries, errors, seen = [], [], set()
     try:
         with open(path or Paths.allow, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.split("#", 1)[0].strip()
-                if line and valid_model_name(line) and line not in out:
-                    out.append(line)
-    except OSError:
-        pass
-    return out
+            lines = f.read().splitlines()
+    except (OSError, UnicodeDecodeError):
+        return entries, errors
+    for no, raw in enumerate(lines, 1):
+        text = raw.split("#", 1)[0].strip()
+        if not text:
+            continue
+        parts = text.split()
+        name, flags = parts[0], parts[1:]
+        reason = None
+        if not valid_model_name(name):
+            reason = "not a model name"
+        elif any(fl not in ALLOW_FLAGS for fl in flags):
+            reason = "unknown flag %r (the only flag is 'ram')" % next(fl for fl in flags if fl not in ALLOW_FLAGS)
+        elif len(set(flags)) != len(flags):
+            reason = "a flag is repeated"
+        elif name in seen:
+            reason = "listed twice"
+        if reason:
+            errors.append({"line": no, "text": safe_label(raw.strip(), 120), "reason": reason})
+            continue
+        seen.add(name)
+        entries.append({"name": name, "ram": "ram" in flags})
+    return entries, errors
+
+
+def read_allow_list(path=None):
+    """Names on the allow-list (valid lines only)."""
+    return [e["name"] for e in parse_allow_list(path)[0]]
+
+
+def ram_models(path=None):
+    """Names allowed to use system memory (flag 'ram')."""
+    return {e["name"] for e in parse_allow_list(path)[0] if e["ram"]}
 
 
 def name_hash(name):

@@ -13,13 +13,14 @@ Create Token > Create Custom Token, with a 1-day TTL:
   Account  Access: Apps and Policies                            Edit
   Account  Access: Service Tokens                               Edit
   Account  Access: Organizations, Identity Providers, and Groups Read
-  Zone     DNS    Edit   (Specific zone: flyconcordefly.com)
-  Zone     Zone   Read   (Specific zone: flyconcordefly.com)
+  Zone     DNS    Edit   (Specific zone: your zone, flyconcordefly.com here)
+  Zone     Zone   Read   (Specific zone: the same)
 Delete it in the dashboard afterwards.
 
 What it does (each step finds what exists and reuses it, so reruns change
 nothing that is already right):
-  1. finds the zone flyconcordefly.com and the account that owns it
+  1. finds the zone (cf_zone in config.json, flyconcordefly.com here) and
+     the account that owns it
   2. finds the Zero Trust team domain (needs a one-time dashboard visit if
      the account has no Zero Trust organization yet; it says which click)
   3. tunnel "ollama1": a LOCALLY-MANAGED tunnel (config_src "local"), so its
@@ -56,7 +57,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..
 from o1common import Paths, load_config, read_json, write_json_atomic  # noqa: E402
 
 API = "https://api.cloudflare.com/client/v4"
-ZONE = "flyconcordefly.com"
 TUNNEL = "ollama1"
 TOKEN_NAME = "ollama1-app"
 POL_ADMIN = "ollama1 admin - Patrick only"
@@ -336,11 +336,15 @@ def main():
     del token
     rotate = True if a.rotate_service_token else (False if a.no_prompt else None)
     try:
-        zones = cf.call("GET", "/zones" + q(name=ZONE)) or []
+        zone = (cfg.get("cf_zone") or "").strip().lower()
+        for h in (cfg["hostname_gateway"], cfg["hostname_admin"]):
+            if not h.lower().endswith("." + zone):
+                raise Stop("%s is not in the zone %s (hostname_* and cf_zone in config.json)" % (h, zone))
+        zones = cf.call("GET", "/zones" + q(name=zone)) or []
         if not zones:
-            raise Stop("the token can't see the zone %s (Zone > Zone: Read on that zone)" % ZONE)
+            raise Stop("the token can't see the zone %s (Zone > Zone: Read on that zone)" % zone)
         zone_id, acct = zones[0]["id"], zones[0]["account"]["id"]
-        say("zone %s, account %s" % (ZONE, zones[0]["account"].get("name", "")))
+        say("zone %s, account %s" % (zone, zones[0]["account"].get("name", "")))
         org = cf.call("GET", "/accounts/%s/access/organizations" % acct, ok404=True)
         team = (org or {}).get("auth_domain")
         if not team:

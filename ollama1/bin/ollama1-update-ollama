@@ -3,8 +3,9 @@
 verified. Runs as root (weekly timer, the panel's "apply updates", setup).
 
 1. Reads the latest release from api.github.com/repos/ollama/ollama.
-2. Downloads ollama-linux-amd64 and its ROCm component (.tar.zst, or .tgz
-   on older releases) and the release's sha256sum.txt.
+2. Downloads ollama-linux-amd64 and (for AMD GPUs; --no-rocm or
+   ollama_rocm=false in config.json skips it) its ROCm component (.tar.zst,
+   or .tgz on older releases) and the release's sha256sum.txt.
 3. Each file's SHA-256 must equal sha256sum.txt's line for it, and the
    digest GitHub reports for the asset when it reports one. Any mismatch,
    missing line or failed download: stop, keep the current version.
@@ -27,7 +28,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
 
-from o1common import Paths, write_json_atomic  # noqa: E402
+from o1common import Paths, load_config, write_json_atomic  # noqa: E402
 
 API = "https://api.github.com/repos/ollama/ollama/releases/latest"
 BASE = "ollama-linux-amd64"
@@ -81,12 +82,12 @@ def parse_sums(text):
     return sums
 
 
-def pick_assets(release):
+def pick_assets(release, rocm=True):
     assets = {a["name"]: a for a in release.get("assets", []) if isinstance(a, dict)}
     if "sha256sum.txt" not in assets:
         raise Refused("release has no sha256sum.txt")
     chosen = []
-    for part in PARTS:
+    for part in PARTS if rocm else PARTS[:1]:
         for ext in (".tar.zst", ".tgz"):
             if part + ext in assets:
                 chosen.append(assets[part + ext])
@@ -154,6 +155,8 @@ def main():
     ap = argparse.ArgumentParser(description="Install or update Ollama, verified.")
     ap.add_argument("--check", action="store_true", help="only report whether an update exists")
     ap.add_argument("--force", action="store_true", help="reinstall even if current")
+    ap.add_argument("--no-rocm", action="store_true",
+                    help="skip the ROCm component (NVIDIA or no GPU); also set by ollama_rocm=false in config.json")
     ap.add_argument("--no-restart", action="store_true", help=argparse.SUPPRESS)
     ap.add_argument("--api", default=API, help=argparse.SUPPRESS)
     a = ap.parse_args()
@@ -177,7 +180,8 @@ def main():
         if cur == tag and not a.force:
             status("current", tag)
             return 0
-        sums_asset, parts = pick_assets(release)
+        rocm = not a.no_rocm and bool(load_config(Paths.config).get("ollama_rocm", True))
+        sums_asset, parts = pick_assets(release, rocm)
         sums = parse_sums(fetch(sums_asset["browser_download_url"]).decode("utf-8", "replace"))
         cache = os.path.join(Paths.state, "download")
         shutil.rmtree(cache, ignore_errors=True)
