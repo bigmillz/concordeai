@@ -9,6 +9,83 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b340 — funnel pictures: three across, and always one
+Patrick (2026-09-30), with a screenshot of a picture funnel's stage of
+six: "For the funnel using images as well, if we can, let's make the
+images a little bit bigger. So maybe in this screenshot, it would be
+three across. And also if an image isn't returned for any of them, then
+keep trying to fetch one because it's kind of useless without them."
+
+The screenshot had four faults. Each card's picture came from ONE text
+search and the first og:image of its top three pages, one card after
+another:
+- FOUR ACROSS, 82 px tall. `.fopts` was `auto-fit, minmax(150px, 1fr)`.
+  A picture stage now caps at three a row (`.fopts.pics`, each column at
+  least a third of the row less 1 px, never under 180 px unless the row
+  is narrower) and four options go 2x2 (`.n4`), not three and one. It
+  drops to two, then one, as the window narrows. The picture sits in a
+  16:10 box (`.fimg`, `object-fit:cover`), so it grows with the card and
+  a late one doesn't move anything. Text stages keep the old grid.
+  Measured in the browser pane (Blink) on the served page, six options:
+  3+3 at 1400, 1100, 940 and 700 px windows (no sidebar at 700),
+  2+2+2 at 800, 560 and 420, one a row at 360; four options 2+2
+  down to 420. Nothing wider than the row, no gap at its right edge, and
+  a card 237x199 before and after its picture arrived (1320 px). Not
+  checked in WKWebView.
+- TWO CARDS WITH NO PICTURE. The stage still sends what it found, and a
+  card without a picture breathes in place (the 6b253 look, not a
+  shimmer) and asks `POST /api/funnel/image {goal, label, exclude}` for
+  one: five tries, 1.5 s doubling to a 12 s cap (`fnImgWait`), then a
+  quiet tile of the same size. A picture that won't load in the page (a
+  hotlink 403 or 404) is caught on the way down (`error` doesn't bubble)
+  and replaced the same way, with the failed URL excluded. A new stage, a
+  pick, leaving the funnel or the card leaving the page stops all of it.
+  If the app has no search package, the route says so and the tile shows
+  at once. The stock stage every model failed to write (6b274: "Lowest
+  cost", "Best quality") gets no pictures, as before.
+- TWO CARDS WITH THE SAME PHOTO. Each stage's cards share one set of
+  claimed pictures. Two URLs are the same picture if the address matches
+  without its query, or the file name does (a re-hosted copy, or
+  WordPress's -800x533 size of it). The ask-again route excludes every
+  picture already on the stage.
+- AN ADVERT INSTEAD OF A PHOTO. It's a real image search now (`ddgs`'s
+  images, Bing first; its DuckDuckGo images answered nothing here), with
+  the label in the goal's context (the goal's telling words), then the
+  label alone, then the label plus "photo". The og:image of a page about
+  it is the last resort. Every candidate is vetted: https only; no SVG,
+  GIF, ICO or BMP; nothing under 400x240; no strip wider than 2.6:1 or
+  taller than 1:2; no logo, icon, banner, sprite, badge, clip art,
+  vector, chart, diagram, screenshot, generated picture (ChatGPT,
+  DALL-E, Midjourney), sponsor, advert, promo, coupon or /ad/ in the
+  address; no logo, banner or advert in the title; nothing from the
+  stock libraries (their previews are watermarked), Facebook, Instagram
+  or TikTok (they refuse a picture loaded elsewhere), YouTube covers or
+  Scribd pages. Then a title that names the option comes first, then a
+  landscape shape, then a photo format (a PNG is usually a graphic).
+- The whole stage searches at once, within 9 s (the old way was one card
+  after another, up to about 10 s each). Live, six cards took 1.1 s.
+  Results are kept for 5 minutes when found, so an ask-again walks on
+  down the same list.
+- Privacy is as before: only the goal and the option's label go out, to
+  the search the funnel already used. The page loads each picture
+  straight from its https URL, as before, now with
+  `referrerpolicy="no-referrer"` like the answers' photos.
+- Saved chats: a funnel saves its goal, each "question → pick" and the
+  summary (6b322), never the option cards, so a picture arriving late
+  changes nothing saved. A reloaded funnel shows those lines, as before.
+- Gauntlet: the section exec'd alone on a stand-in search (the filters,
+  the queries and their order, the og:image fallback, no two alike,
+  exclude, side by side, the budget), the retry loop run in node on a
+  stand-in page and clock (the waits, five then a tile, a failed load
+  replaced, a duplicate refused, stopping with the stage, the funnel or
+  the card), pins for the grid, the box and the wiring, and 31 mutations,
+  each caught. Live: the route refuses without the launch key or the
+  token.
+- Left as it is: relevance is only as good as the search. An abstract
+  label ("Academic Hub") can still get a loosely related photo, a blog
+  header with its title across it, or a generated picture whose address
+  doesn't say so.
+
 ## 6b338 — dictation hotkey
 Patrick (2026-09-30): "Similar to Claude's add a hotkey for Apple D or
 Command D for the speech to text. And if you hold it, you can release it

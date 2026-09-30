@@ -22060,8 +22060,10 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
                 data = d2
                 break
     if want_img and out:
-        for o in out:
-            o["img"] = _funnel_image("%s %s" % (goal, o["label"]))
+        # all of the stage's pictures at once, one each, never the same
+        # one twice (6b340); a card left without one asks again itself
+        for o, img in zip(out, funnel_images(goal, [o["label"] for o in out])):
+            o["img"] = img
     if not out:
         # every rung failed the gate: a plain, always-answerable
         # narrowing question beats a dead end (6b274)
@@ -22079,19 +22081,230 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
             "options": out}
 
 
-def _funnel_image(query: str) -> str:
-    """One representative photo for an option, harvested from the web."""
+# ==== funnel images: begin ====
+# FUNNEL PICTURES (6b340, per Patrick: "let's make the images a little
+# bit bigger ... if an image isn't returned for any of them, then keep
+# trying to fetch one because it's kind of useless without them"). His
+# stage of six had two cards with no picture, two with the same aerial
+# photo and one with a travel site's advert banner, because each card
+# took the first og:image of the top three pages of ONE text search. Now
+# it's an image search, three queries deep, every candidate vetted, one
+# picture per card, the whole stage at once. Only the goal and the
+# option's label go out, as before; the page loads the picture straight
+# from its https URL, as before.
+_FIMG_BACKENDS = ("bing", "auto")      # duckduckgo's images answered none
+_FIMG_BUDGET = 9.0                     # the whole stage's pictures, in s
+_FIMG_MIN = (400, 240)                 # smaller is a thumbnail or an icon
+# page furniture, adverts, drawings, charts and screenshots, by the
+# words in the address (the first live run's "Suburban Edge" was a
+# Screenshot-2025-04-22.png; two more were ChatGPT-Image-… pictures,
+# and the funnel's pictures are real ones, never generated: 6b228)...
+_FIMG_BAD = re.compile(
+    r"(logo|icons?(?![a-z])|(?<![a-z])ico(?![a-z])|favicon|sprite|"
+    r"avatar|badge|banner|button|emoji|placeholder|clip-?art|vector|"
+    r"infographic|charts?(?![a-z])|diagram|screen-?shot|chatgpt|dall-?e|"
+    r"midjourney|sponsor|advert|promos?(?![a-z])|promotion|coupon|"
+    r"(?<![a-z0-9])ads?(?![a-z0-9]))", re.I)
+# ...or the title the search gave it
+_FIMG_BAD_TITLE = re.compile(
+    r"(logo|icons?(?![a-z])|banner|clip ?art|vector|infographic|"
+    r"charts?(?![a-z])|diagram|screenshot|advert|sponsored|"
+    r"promos?(?![a-z])|coupon)", re.I)
+# words of a goal that say nothing about what a picture shows
+_FIMG_STOP = frozenset(
+    "a an and are best buy can choose do does for get good how i in is it "
+    "me my new of on or pick should the to we what where which who why "
+    "will with you your".split())
+# stock libraries serve their previews watermarked, social sites refuse
+# a picture loaded from anywhere else, and a video's or a document's
+# cover is mostly its title in big letters
+_FIMG_BAD_HOST = re.compile(
+    r"(^|\.)(shutterstock|istockphoto|gettyimages|dreamstime|alamy|123rf|"
+    r"depositphotos|vecteezy|freepik|ftcdn|envatousercontent|fbsbx|"
+    r"instagram|cdninstagram|tiktokcdn|ytimg|scribdassets)\.", re.I)
+_fimg_cache = {}                       # query -> (when, rows found)
+_fimg_cache_lock = threading.Lock()
+
+
+def _fimg_keys(url: str) -> set:
+    """What makes two picture URLs the same picture: the address without
+    its query, and a long file name alone (a re-hosted copy, or
+    WordPress's -800x533 size of it)."""
+    p = urllib.parse.urlsplit(str(url))
+    host = (p.hostname or "").lower()
+    host = host[4:] if host.startswith("www.") else host
+    path = urllib.parse.unquote(p.path).lower().rstrip("/")
+    keys = {host + path}
+    stem = re.sub(r"[-_]\d{2,4}x\d{2,4}$", "",
+                  path.rsplit("/", 1)[-1].rsplit(".", 1)[0])
+    if len(stem) >= 12:
+        keys.add("f:" + stem)
+    return keys
+
+
+def _fimg_ok(row) -> str:
+    """The row's picture URL when it can be a card's photo, else ""."""
+    u = str(row.get("image") or "").strip()
+    if not u.startswith("https://") or len(u) > 400:
+        return ""        # https only (6b310), and nothing absurd
+    p = urllib.parse.urlsplit(u)
+    path = urllib.parse.unquote(p.path).lower()
+    if (re.search(r"\.(svg|gif|ico|bmp)$", path)
+            or _FIMG_BAD_HOST.search(p.hostname or "")
+            or _FIMG_BAD.search(path)
+            or _FIMG_BAD_TITLE.search(str(row.get("title") or ""))):
+        return ""
     try:
-        hits = _ddg_text(query, 3)
+        w, h = int(row.get("width") or 0), int(row.get("height") or 0)
+    except (TypeError, ValueError):
+        w = h = 0
+    if w and h and (w < _FIMG_MIN[0] or h < _FIMG_MIN[1]
+                    or not 0.5 <= w / h <= 2.6):
+        return ""        # a thumbnail, or a strip: a banner or a tower
+    return u
+
+
+def _fimg_rank(rows, label: str = "") -> list:
+    """The vetted URLs, best first: a title that names the option (its
+    words, by their first five letters, so "Historic" is "Historical"),
+    then a landscape shape, then a photo format (a PNG is usually a
+    graphic); otherwise in the search's own order."""
+    words = {w[:5] for w in re.findall(r"[a-z0-9]{3,}", str(label).lower())}
+    scored = []
+    for i, r in enumerate(rows or []):
+        u = _fimg_ok(r) if isinstance(r, dict) else ""
+        if not u:
+            continue
+        try:
+            ratio = int(r.get("width") or 0) / int(r.get("height") or 0)
+        except (TypeError, ValueError, ZeroDivisionError):
+            ratio = 0
+        tw = {w[:5] for w in re.findall(r"[a-z0-9]{3,}",
+                                        str(r.get("title") or "").lower())}
+        named = bool(words) and len(words & tw) * 2 >= len(words)
+        png = urllib.parse.urlsplit(u).path.lower().endswith(".png")
+        scored.append((-(2 * named + (1.2 <= ratio <= 2.2) + (not png)),
+                       i, u))
+    return [u for _s, _i, u in sorted(scored)]
+
+
+def _fimg_queries(goal: str, label: str) -> list:
+    """The label in the goal's context (its telling words), then the
+    label alone, then the label as a photo: each a wider net."""
+    lab = " ".join(str(label).split())[:90]
+    g = " ".join([w for w in re.findall(r"[\w'-]+", str(goal))
+                  if w.lower() not in _FIMG_STOP][:6])[:60]
+    out = []
+    for q in (lab + " " + g if g else lab, lab, lab + " photo"):
+        if lab and q not in out:
+            out.append(q)
+    return out
+
+
+def _ddg_images(query: str, limit: int = 25) -> list:
+    """Image hits (image, title, width, height, url), trying each
+    backend until one answers. Never raises."""
+    proxy = _search_proxy() if IS_WIN else None
+    for backend in _FIMG_BACKENDS:
+        try:
+            rows = (DDGS(proxy=proxy) if proxy else DDGS()).images(
+                query, max_results=limit, backend=backend)
+            if rows:
+                return rows
+        except Exception:
+            continue
+    return []
+
+
+def _fimg_search(query: str) -> list:
+    """_ddg_images, remembered for 5 minutes when it found something, so
+    a card asking again walks on down the same list."""
+    now = time.time()
+    with _fimg_cache_lock:
+        hit = _fimg_cache.get(query)
+        if hit and now - hit[0] < _RESULTS_TTL:
+            return hit[1]
+    rows = _ddg_images(query)
+    if rows:
+        with _fimg_cache_lock:
+            if len(_fimg_cache) > 60:
+                _fimg_cache.clear()
+            _fimg_cache[query] = (now, rows)
+    return rows
+
+
+def funnel_image(goal: str, label: str, taken=None, lock=None,
+                 deadline=None) -> str:
+    """One vetted photo for a funnel option, or "". `taken` holds the
+    keys of every picture already spoken for (the stage's other cards,
+    and any the page says failed to load); the one returned is claimed
+    in it under `lock`, so options searched side by side never share."""
+    if not HAS_SEARCH or not str(label).strip():
+        return ""
+    taken = set() if taken is None else taken
+    lock = lock or threading.Lock()
+
+    def claim(urls):
+        with lock:
+            for u in urls:
+                ks = _fimg_keys(u)
+                if not ks & taken:
+                    taken.update(ks)
+                    return u
+        return ""
+
+    def late():
+        return deadline is not None and time.monotonic() > deadline
+    qs = _fimg_queries(goal, label)
+    for q in qs:
+        if late():
+            return ""
+        u = claim(_fimg_rank(_fimg_search(q), label))
+        if u:
+            return u
+    # the last resort, and the old way: a picture from a page about it
+    # (og:image, then the page's own photos), vetted the same
+    if late():
+        return ""
+    try:
+        hits = _ddg_text(qs[0], 3)
         urls = [h.get("href") or h.get("url") for h in hits if h]
         meta = []          # _page_text appends og:image URLs as strings
         _fetch_pages([u for u in urls if u][:3], cap=200, meta=meta)
-        for img in meta:
-            if isinstance(img, str) and img.startswith("https://"):
-                return img
+        return claim(_fimg_rank([{"image": m} for m in meta
+                                 if isinstance(m, str)], label))
     except Exception:
-        pass
-    return ""
+        return ""
+
+
+def funnel_images(goal: str, labels: list, budget: float = _FIMG_BUDGET,
+                  exclude=()) -> list:
+    """A picture for each label, searched side by side within `budget`
+    seconds ("" where none came in time), no two the same and none of
+    `exclude`. Today's stage searched one card after another."""
+    out = [""] * len(labels)
+    taken = set()
+    for u in exclude or ():
+        taken.update(_fimg_keys(u))
+    lock = threading.Lock()
+    deadline = time.monotonic() + budget
+
+    def one(i, lab):
+        try:
+            img = funnel_image(goal, lab, taken, lock, deadline)
+            with lock:
+                out[i] = img
+        except Exception:
+            pass
+    threads = [ctx_thread(target=one, args=(i, lab), daemon=True)
+               for i, lab in enumerate(labels)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=max(0.0, deadline - time.monotonic()))
+    with lock:
+        return list(out)
+# ==== funnel images: end ====
 
 
 
@@ -23766,6 +23979,32 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 except Exception:
                     ok = False
             self._send_json({"ok": ok})
+            return
+        if self.path == "/api/funnel/image":
+            # ONE MORE PICTURE (6b340): for a card the stage sent without
+            # one, or whose picture wouldn't load in the page. Only the
+            # goal and the option's label go out, as the stage's own
+            # search sends; `exclude` is every picture already on the
+            # stage and each one that failed
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                d = json.loads(self.rfile.read(n)) if n else {}
+            except (ValueError, json.JSONDecodeError):
+                d = {}
+            d = d if isinstance(d, dict) else {}
+            label = str(d.get("label", "")).strip()[:90]
+            if not label:
+                self._send_json({"img": "", "err": "no option named"})
+                return
+            if not HAS_SEARCH:
+                # nothing to ask: the page stops trying at once
+                self._send_json({"img": "", "none": True})
+                return
+            ex = [str(u)[:400] for u in (d.get("exclude") or [])
+                  if isinstance(u, str)][:40]
+            self._send_json({"img": funnel_images(
+                str(d.get("goal", "")).strip()[:300], [label],
+                budget=12.0, exclude=ex)[0]})
             return
         if self.path == "/api/funnel":
             n = int(self.headers.get("Content-Length", 0) or 0)
@@ -27654,8 +27893,29 @@ body.resizing{cursor:col-resize;user-select:none}
 .fopt:hover{border-color:rgba(255,255,255,.34);background:rgba(30,33,40,.9)}
 .fopt b{display:block;font-size:13.5px;margin-bottom:3px}
 .fopt span{font-size:11.5px;color:var(--faint);line-height:1.45}
-.fopt img{width:100%;height:82px;object-fit:cover;border-radius:8px;
-  margin-bottom:8px;display:block}
+/* A STAGE OF PICTURES (6b340, per Patrick: "let's make the images a
+   little bit bigger. So maybe in this screenshot, it would be three
+   across"): at most three cards a row, two when there are exactly four
+   (2x2, not three and an orphan), then two and one as the window
+   narrows. Each column is at least a third (or a half) of the row less
+   1px, so no more fit, and never under 180px unless the row itself is
+   narrower. The picture keeps 16:10 whatever arrives, so a late one
+   doesn't move the card. */
+.fopts.pics{--fc:3;grid-template-columns:repeat(auto-fit,minmax(min(100%,
+  max(180px,calc((100% - (var(--fc) - 1) * 9px) / var(--fc) - 1px))),1fr))}
+.fopts.pics.n4{--fc:2}
+.fimg{aspect-ratio:16/10;margin-bottom:9px;border-radius:8px;
+  overflow:hidden;background:rgba(255,255,255,.05)}
+.fimg img{width:100%;height:100%;object-fit:cover;display:block}
+/* still coming: it breathes in place, as progress does here (6b253) */
+.fimg.wait{animation:fimgBreathe 2.4s ease-in-out infinite}
+@keyframes fimgBreathe{
+  0%,100%{background-color:rgba(255,255,255,.04)}
+  50%    {background-color:rgba(255,255,255,.11)}
+}
+/* the tries ran out: a quiet tile holds the space */
+.fimg.none{background:rgba(255,255,255,.035)}
+@media (prefers-reduced-motion:reduce){.fimg.wait{animation:none}}
 .fpath{font-family:var(--mono);font-size:10px;color:var(--faint);
   letter-spacing:.06em;margin-bottom:8px}
 .agent{
@@ -34394,8 +34654,75 @@ $("#ws-set").addEventListener("click",async()=>{
 // path and asks the server for the next stage. Every funnel is a chat
 // in the "funnel" lane, so it lands in history like anything else.
 let fnState=null,fnAnswer=null;
+/* EVERY CARD GETS ITS PICTURE (6b340, per Patrick: "keep trying to
+   fetch one because it's kind of useless without them"). A card the
+   stage sent without one breathes and asks the server again; so does a
+   card whose picture won't load (a hotlink 403 or 404), for one that
+   isn't it or any other on the stage. Five tries, 1.5 s apart doubling
+   to a 12 s cap; after that a quiet tile. A new stage, a pick, or
+   leaving the funnel stops them all. */
+const FN_IMG_TRIES=5,FN_IMG_BASE=1500,FN_IMG_CAP=12000;
+let fnImgGen=0,fnImgAb=null;
+// the wait before try n (0 = the first), or -1 once they're spent
+function fnImgWait(n){
+  return n>=FN_IMG_TRIES?-1:Math.min(FN_IMG_CAP,FN_IMG_BASE*Math.pow(2,n));
+}
+function fnImgStop(){fnImgGen++;if(fnImgAb){fnImgAb.abort();fnImgAb=null;}}
+function fnImgBox(u){
+  // https only, as every remote picture here (6b310); no referrer, as
+  // the answer's photos, so a hotlink check sees no local address
+  return '<div class="fimg wait">'+(/^https:\/\//.test(u||"")
+    ?'<img src="'+esc(u)+'" alt="" referrerpolicy="no-referrer">':"")+'</div>';
+}
+function fnImgKeep(b,opts,st){
+  fnImgStop();
+  const gen=fnImgGen,ab=fnImgAb=new AbortController(),failed=[];
+  const live=el=>gen===fnImgGen&&fnState===st&&el.isConnected;
+  const onStage=()=>[...b.querySelectorAll(".fimg img")]
+    .map(i=>i.getAttribute("src")).concat(failed);
+  const again=el=>{
+    const box=el.querySelector(".fimg"),n=+(el.dataset.tries||0);
+    const w=fnImgWait(n);
+    if(w<0){box.className="fimg none";return;}
+    el.dataset.tries=n+1;box.className="fimg wait";
+    setTimeout(async()=>{
+      if(!live(el))return;
+      let r={};
+      try{
+        r=await(await api("/api/funnel/image",{method:"POST",signal:ab.signal,
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({goal:st.goal,label:(opts[+el.dataset.i]||{}).label||"",
+            exclude:onStage()})})).json();
+      }catch(e){}
+      if(!live(el))return;
+      const u=String(r.img||"");
+      if(r.none){box.className="fimg none";return;}
+      if(/^https:\/\//.test(u)&&!onStage().includes(u))
+        box.innerHTML='<img src="'+esc(u)+'" alt="" referrerpolicy="no-referrer">';
+      else again(el);
+    },w);
+  };
+  // load and error don't bubble: caught on the way down, for every
+  // picture this stage will ever show
+  b.addEventListener("load",e=>{
+    const f=e.target.closest&&e.target.closest(".fimg");
+    if(f&&e.target.tagName==="IMG")f.className="fimg";
+  },true);
+  b.addEventListener("error",e=>{
+    if(e.target.tagName!=="IMG"||!live(b))return;
+    const el=e.target.closest(".fopt");
+    failed.push(e.target.getAttribute("src"));e.target.remove();
+    if(el)again(el);
+  },true);
+  b.querySelectorAll(".fopt").forEach(el=>{
+    const im=el.querySelector(".fimg img");
+    if(!im)again(el);
+    else if(im.complete&&im.naturalWidth)im.parentNode.className="fimg";
+  });
+}
 async function fnStep(pick){
   fnAnswer=null;                    // a new stage voids the old answer path
+  fnImgStop();                      // ...and the old stage's pictures
   const box=document.createElement("div");
   box.className="msg ai";
   box.innerHTML='<div class="who">Funnel</div><div class="body">'
@@ -34462,16 +34789,22 @@ async function fnStep(pick){
       +'</div>'+renderMD(d.summary||"");
     fnState=null;fnAnswer=null;return;
   }
+  // a picture stage, unless every model failed and the stage is the
+  // stock "what matters most?" (6b274): no photo of "Lowest cost"
+  const pics=!!fnState.images&&!/fallback$/.test(d.engine||""),
+    nop=(d.options||[]).length;
   b.innerHTML='<div class="fstage"><div class="fpath">stage '+d.stage
     +' of '+d.total+(fnState.picks.length?' \u00b7 '
       +esc(fnState.picks.join(" \u2192 ")):"")+'</div>'
     +'<div class="fsq">'+esc(d.q)+'</div>'
-    +'<div class="fopts">'+(d.options||[]).map((o,i)=>
+    +'<div class="fopts'+(pics?' pics'+(nop===4?' n4':''):'')+'">'
+    +(d.options||[]).map((o,i)=>
       '<button class="fopt" data-i="'+i+'">'
-      +(/^https:\/\//.test(o.img||"")?'<img src="'+esc(o.img)+'" alt="" loading="lazy">':"")
+      +(pics?fnImgBox(o.img):"")
       +'<b>'+esc(o.label)+'</b>'
       +(o.why?'<span>'+esc(o.why)+'</span>':"")
       +'</button>').join("")+'</div></div>';
+  if(pics)fnImgKeep(b,d.options||[],fnState);
   // a typed answer and a clicked card are the SAME thing (6b257, per
   // Patrick: the cards are suggestions, not a menu \u2014 free text must
   // not dead-end the funnel). Both paths land here; the composer's

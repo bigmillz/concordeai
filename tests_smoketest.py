@@ -18947,6 +18947,424 @@ check("dictation hotkey: every dialog veil in the page hides by the hidden attri
 # ==== 6b338 dictation hotkey: end ====
 
 
+# ==== 6b340 funnel pictures: begin ====
+print("== funnel pictures (6b340) ==")
+# Patrick (2026-09-30): "let's make the images a little bit bigger. So
+# maybe in this screenshot, it would be three across. And also if an
+# image isn't returned for any of them, then keep trying to fetch one".
+# His stage of six: four across, two cards with no picture, two with the
+# same photo, one an advert banner. In process: the funnel images section
+# exec'd alone on a stand-in search (no network), the page's retry loop
+# run in node on a stand-in DOM and clock, and the page's rules pinned;
+# every mutation below caught. Live: the new route behind the gate.
+import threading as _t340
+
+
+def _fi_ns(src, images=None, text=None, pages=None, has=True, calls=None):
+    """The funnel images section of src, alone, on a stand-in search:
+    `images(q)` gives image rows, `text(q)` page hits, `pages(urls)` the
+    og:image URLs those pages would give. No network."""
+    calls = [] if calls is None else calls
+
+    class _D:
+        def __init__(self, proxy=None):
+            pass
+
+        def images(self, q, max_results=25, backend=None):
+            calls.append(("img", q))
+            return (images or (lambda q: []))(q)
+
+    def _txt(q, n):
+        calls.append(("txt", q))
+        return (text or (lambda q: []))(q)
+
+    def _fp(urls, cap=0, meta=None):
+        calls.append(("pages", tuple(urls)))
+        meta.extend((pages or (lambda u: []))(urls))
+        return []
+    ns = {"re": re, "time": time, "threading": _t340, "urllib": urllib,
+          "DDGS": _D, "IS_WIN": False, "HAS_SEARCH": has, "_RESULTS_TTL": 300.0,
+          "_search_proxy": lambda: None, "_ddg_text": _txt, "_fetch_pages": _fp,
+          "ctx_thread": lambda target, args=(), daemon=True: _t340.Thread(
+              target=target, args=args, daemon=daemon)}
+    sec = src[src.index("# ==== funnel images: begin ===="):
+              src.index("# ==== funnel images: end ====")]
+    exec(sec, ns)
+    return ns, calls
+
+
+def _fi_row(u, w=1200, h=800, t="A photo"):
+    return {"image": u, "width": str(w), "height": str(h), "title": t}
+
+
+def _fic_filter(src):
+    """Logos, icons, SVGs, adverts, stock previews, thumbnails and strips
+    are refused; a plain photo passes; the best comes first."""
+    ns, _c = _fi_ns(src)
+    ok_ = ns["_fimg_ok"]
+    bad = {"logo": _fi_row("https://x.com/img/site-logo-2x.jpg"),
+           "icon": _fi_row("https://x.com/a/icons/city.png"),
+           "ico": _fi_row("https://x.com/images/ico-metro.jpg"),
+           "svg": _fi_row("https://x.com/a/city.svg"),
+           "gif": _fi_row("https://x.com/a/city.gif"),
+           "ad": _fi_row("https://x.com/ads/travel-buddy.jpg"),
+           "advert": _fi_row("https://x.com/a/advertisement-top.jpg"),
+           "banner": _fi_row("https://x.com/a/community-banner.jpg"),
+           "screenshot": _fi_row("https://x.com/u/Screenshot-2025-04-22.png"),
+           "chart": _fi_row("https://x.com/u/city-chart.jpg"),
+           "generated": _fi_row("https://x.com/u/ChatGPT-Image-May.jpeg"),
+           "stock": _fi_row("https://image.shutterstock.com/a/city.jpg"),
+           "social": _fi_row("https://lookaside.fbsbx.com/a/city.jpg"),
+           "video cover": _fi_row("https://i.ytimg.com/vi/x/maxresdefault.jpg"),
+           "http": _fi_row("http://x.com/a/city.jpg"),
+           "tiny": _fi_row("https://x.com/a/city.jpg", 200, 150),
+           "strip": _fi_row("https://x.com/a/city.jpg", 1600, 300),
+           "tower": _fi_row("https://x.com/a/city.jpg", 300, 1600),
+           "logo title": _fi_row("https://x.com/a/p.jpg", t="Travel Buddy Community Logo"),
+           "sponsored title": _fi_row("https://x.com/a/p.jpg", t="Sponsored: book now"),
+           "empty": {"image": ""}}
+    good = {"photo": _fi_row("https://x.com/wp-content/uploads/2024/05/old-town.jpg"),
+            "iconic": _fi_row("https://x.com/a/iconic-skyline.jpg"),
+            "unknown size": {"image": "https://x.com/a/harbour.webp"},
+            "loads": _fi_row("https://x.com/downloads/roads/old-town.jpg")}
+    r_bad = {k: ok_(v) for k, v in bad.items()}
+    r_good = {k: ok_(v) for k, v in good.items()}
+    rank = ns["_fimg_rank"]([
+        _fi_row("https://x.com/1-tall.jpg", 800, 1200, "Historic center"),
+        _fi_row("https://x.com/2-graphic.png", 1600, 900, "Historic center"),
+        _fi_row("https://x.com/3-wide.jpg", 1600, 900, "Harbour at dusk"),
+        _fi_row("https://x.com/4-named.jpg", 1600, 900, "The Historical Center at noon"),
+        _fi_row("https://x.com/5-logo.jpg", 1600, 900, "Historic Center logo")],
+        "Historical Center")
+    keys = ns["_fimg_keys"]
+    same = (keys("https://www.x.com/wp/a-long-file-name-here-800x533.jpg?w=1")
+            & keys("https://x.com/wp/a-long-file-name-here.jpg"))
+    rehost = keys("https://a.com/p/old-town-square-dusk.jpg") & keys("https://b.org/q/old-town-square-dusk.jpg")
+    apart = keys("https://a.com/p/1.jpg") & keys("https://a.com/p/2.jpg")
+    ok = (not any(r_bad.values()) and all(r_good.values())
+          # named first (a landscape JPEG ahead of a portrait one or a
+          # PNG), the logo gone, the unnamed one last
+          and rank == ["https://x.com/4-named.jpg", "https://x.com/1-tall.jpg",
+                       "https://x.com/2-graphic.png", "https://x.com/3-wide.jpg"]
+          and bool(same) and bool(rehost) and not apart)
+    return ok, [{k: v for k, v in r_bad.items() if v}, {k: v for k, v in r_good.items() if not v},
+                rank, bool(same), bool(rehost), apart]
+
+
+def _fic_queries(src):
+    """The label in the goal's context, then alone, then as a photo, then
+    a page's own picture; nothing searched without search; only the goal
+    and the label go out."""
+    ns, _c = _fi_ns(src)
+    qs = ns["_fimg_queries"]("Where should I move for a new job?", "Historical Center")
+    qs1 = ns["_fimg_queries"]("", "Harbour")
+    # the first two queries find nothing usable, the third does
+    rows = {qs[0]: [], qs[1]: [_fi_row("https://x.com/logo.jpg")],
+            qs[2]: [_fi_row("https://x.com/old-town.jpg")]}
+    ns2, c2 = _fi_ns(src, images=lambda q: rows.get(q, []))
+    got2 = ns2["funnel_image"]("Where should I move for a new job?", "Historical Center")
+    # no image search answers: a page's own picture, vetted the same
+    ns3, c3 = _fi_ns(src, text=lambda q: [{"href": "https://p.com/1"}, {"href": "https://p.com/2"}],
+                     pages=lambda u: ["https://p.com/site-logo.jpg", "https://p.com/square.jpg"])
+    got3 = ns3["funnel_image"]("a goal", "Old Town")
+    ns4, c4 = _fi_ns(src, images=lambda q: [_fi_row("https://x.com/a.jpg")], has=False)
+    got4 = ns4["funnel_image"]("g", "Old Town")
+    got5 = ns2["funnel_image"]("g", "   ")
+    ok = (qs == ["Historical Center move job", "Historical Center", "Historical Center photo"]
+          and qs1 == ["Harbour", "Harbour photo"]
+          # (a search that finds nothing tries the next backend too)
+          and got2 == "https://x.com/old-town.jpg"
+          and c2 == [("img", qs[0]), ("img", qs[0]), ("img", qs[1]), ("img", qs[2])]
+          and got3 == "https://p.com/square.jpg"
+          and [c[0] for c in c3] == ["img"] * 6 + ["txt", "pages"]
+          and c3[6] == ("txt", "Old Town goal")
+          and got4 == "" and c4 == [] and got5 == "")
+    return ok, [qs, qs1, got2, c2, got3, c3, got4, c4]
+
+
+def _fic_unique(src):
+    """No two cards share a picture (nor a resized or re-hosted copy of
+    one); `exclude` is honoured; the stage's cards search side by side,
+    within the budget."""
+    same = [_fi_row("https://a.com/p/old-town-square-dusk.jpg"),
+            _fi_row("https://a.com/p/old-town-square-dusk.jpg?w=2"),
+            _fi_row("https://a.com/p/old-town-square-dusk-800x533.jpg"),
+            _fi_row("https://b.org/q/old-town-square-dusk.jpg"),
+            _fi_row("https://a.com/p/b.jpg"), _fi_row("https://a.com/p/c.jpg"),
+            _fi_row("https://a.com/p/d.jpg")]
+    ns, _c = _fi_ns(src, images=lambda q: list(same))
+    got = ns["funnel_images"]("g", ["One", "Two", "Three", "Four"])
+    ks = [ns["_fimg_keys"](u) for u in got]
+    distinct = all(not (ks[i] & ks[j]) for i in range(4) for j in range(i + 1, 4))
+    ex = ns["funnel_images"]("g", ["One"], exclude=["https://a.com/p/old-town-square-dusk.jpg",
+                                                    "https://a.com/p/b.jpg"])
+    # parallel: six cards, each search 0.4 s, done well inside 6 x 0.4
+    def _slow(q):
+        time.sleep(0.4)
+        return [_fi_row("https://s.com/%s.jpg" % re.sub(r"\W", "", q))]
+    ns2, _c2 = _fi_ns(src, images=_slow)
+    t0 = time.monotonic()
+    got2 = ns2["funnel_images"]("g", ["L%d" % i for i in range(6)])
+    t2 = time.monotonic() - t0
+    # the budget: searches that hang are given up on, never waited out
+    ns3, _c3 = _fi_ns(src, images=lambda q: time.sleep(2.5) or [_fi_row("https://h.com/x.jpg")])
+    t0 = time.monotonic()
+    got3 = ns3["funnel_images"]("g", ["A", "B"], budget=0.5)
+    t3 = time.monotonic() - t0
+    ok = (all(got) and distinct and len(set(got)) == 4
+          and ex[0] and "old-town-square-dusk" not in ex[0] and ex[0] != "https://a.com/p/b.jpg"
+          and all(got2) and len(set(got2)) == 6 and t2 < 1.5
+          and got3 == ["", ""] and t3 < 1.2)
+    return ok, [got, ex, got2, round(t2, 2), got3, round(t3, 2)]
+
+
+def _fic_server(src):
+    """The stage takes its pictures from funnel_images, all at once; the
+    route that asks again reads only the goal, the label and exclude."""
+    fs = src[src.index("def funnel_stage("):src.index("# ==== funnel images: begin ====")]
+    rt = src[src.index('        if self.path == "/api/funnel/image":'):
+             src.index('        if self.path == "/api/funnel":')]
+    ok = ('        for o, img in zip(out, funnel_images(goal, [o["label"] for o in out])):\n'
+          '            o["img"] = img\n' in fs
+          and "_funnel_image(" not in src
+          and 'label = str(d.get("label", "")).strip()[:90]' in rt
+          and 'ex = [str(u)[:400] for u in (d.get("exclude") or [])\n                  if isinstance(u, str)][:40]' in rt
+          and 'str(d.get("goal", "")).strip()[:300], [label],' in rt
+          and 'self._send_json({"img": "", "none": True})' in rt
+          and sorted(set(re.findall(r'd\.get\("(\w+)"', rt))) == ["exclude", "goal", "label"])
+    return ok, rt[:200]
+
+
+def _fic_page(src):
+    """The page's rules: three across at most, 2x2 for four, a fixed
+    16:10 box, a breathing wait and a quiet tile, the stage wired to
+    the retry loop, which a new stage stops."""
+    fs = src[src.index("async function fnStep(pick){"):src.index('$("#fn-go").addEventListener')]
+    ok = (".fopts.pics{--fc:3;grid-template-columns:repeat(auto-fit,minmax(min(100%,\n"
+          "  max(180px,calc((100% - (var(--fc) - 1) * 9px) / var(--fc) - 1px))),1fr))}" in src
+          and ".fopts.pics.n4{--fc:2}" in src
+          and ".fimg{aspect-ratio:16/10;margin-bottom:9px;border-radius:8px;\n  overflow:hidden;" in src
+          and ".fimg img{width:100%;height:100%;object-fit:cover;display:block}" in src
+          and ".fimg.wait{animation:fimgBreathe 2.4s ease-in-out infinite}" in src
+          and ".fimg.none{background:" in src
+          and ".fopt img{" not in src
+          and "  fnImgStop();                      // ...and the old stage's pictures\n" in fs
+          and fs.index("fnImgStop();") < fs.index("await(await api(\"/api/funnel\"")
+          and "  const pics=!!fnState.images&&!/fallback$/.test(d.engine||\"\"),\n"
+              "    nop=(d.options||[]).length;\n" in fs
+          and "+'<div class=\"fopts'+(pics?' pics'+(nop===4?' n4':''):'')+'\">'" in fs
+          and "      +(pics?fnImgBox(o.img):\"\")\n" in fs
+          and "  if(pics)fnImgKeep(b,d.options||[],fnState);\n" in fs
+          and 'referrerpolicy="no-referrer"' in src[src.index("function fnImgBox(u){"):
+                                                   src.index("function fnImgKeep(")])
+    return ok, fs[:120]
+
+
+_FI_NODE = r'''
+let now=0,q=[],calls=[],reply=()=>({img:""});
+setTimeout=(f,w)=>{q.push([now+w,f]);};
+async function run(until){
+  for(;;){q.sort((a,b)=>a[0]-b[0]);
+    if(!q.length||q[0][0]>until)break;
+    const [t,f]=q.shift();now=t;await f();}
+  now=Math.max(now,until);
+}
+function esc(s){return String(s);}
+async function api(u,o){
+  const b=JSON.parse(o.body);calls.push({t:now,label:b.label,exclude:b.exclude,goal:b.goal});
+  const r=reply(b,calls.length);return{json:async()=>r};
+}
+var fnState=null;
+class Img{constructor(src,box){this.tagName="IMG";this.src=src;this.parentNode=box;
+  this.complete=false;this.naturalWidth=0;}
+  getAttribute(k){return k==="src"?this.src:null;}
+  closest(s){return s===".fimg"?this.parentNode:s===".fopt"?this.parentNode.card:null;}
+  remove(){if(this.parentNode.img===this)this.parentNode.img=null;}}
+class Box{constructor(card,src){this.card=card;this.className="fimg wait";
+  this.img=src?new Img(src,this):null;}
+  set innerHTML(h){const m=/src="([^"]+)"/.exec(h);this.img=m?new Img(m[1],this):null;}}
+class Card{constructor(i,src){this.dataset={i:String(i)};this.isConnected=true;
+  this.box=new Box(this,src);}
+  querySelector(s){return s===".fimg"?this.box:s===".fimg img"?this.box.img:null;}}
+function stage(srcs){
+  const b={cards:srcs.map((s,i)=>new Card(i,s)),ls:{},isConnected:true,
+    querySelectorAll(s){return s===".fopt"?this.cards
+      :s===".fimg img"?this.cards.map(c=>c.box.img).filter(Boolean):[];},
+    addEventListener(t,f){this.ls[t]=f;}};
+  return b;
+}
+const opts=n=>Array.from({length:n},(_,i)=>({label:"L"+i}));
+const out={};
+(async()=>{
+  out.waits=[0,1,2,3,4,5,6,9].map(fnImgWait);
+  // 1. a card without a picture: five tries, backing off, then a quiet tile
+  fnState={goal:"G"};let b=stage(["https://p/a.jpg",""]);
+  fnImgKeep(b,opts(2),fnState);await run(60000);
+  out.miss={times:calls.map(c=>c.t),labels:[...new Set(calls.map(c=>c.label))],
+    goal:calls[0]&&calls[0].goal,ex:calls[0]&&calls[0].exclude,
+    cls:b.cards.map(c=>c.box.className)};
+  b.ls.load({target:b.cards[0].box.img});out.loaded=b.cards[0].box.className;
+  // 2. an answer lands in the card
+  calls=[];q=[];now=0;reply=()=>({img:"https://p/b.jpg"});
+  fnState={goal:"G"};b=stage(["https://p/a.jpg",""]);
+  fnImgKeep(b,opts(2),fnState);await run(60000);
+  out.got={n:calls.length,src:b.cards[1].box.img&&b.cards[1].box.img.src};
+  // 3. a picture that won't load: another, never it or the other card's
+  calls=[];q=[];now=0;reply=()=>({img:"https://p/c.jpg"});
+  fnState={goal:"G"};b=stage(["https://p/a.jpg","https://p/b.jpg"]);
+  fnImgKeep(b,opts(2),fnState);
+  b.ls.error({target:b.cards[0].box.img});await run(60000);
+  out.err={n:calls.length,label:calls[0]&&calls[0].label,ex:calls[0]&&calls[0].exclude,
+    src:b.cards[0].box.img&&b.cards[0].box.img.src};
+  // 4. a reply that is already on the stage is asked about again
+  calls=[];q=[];now=0;reply=(bd,n)=>({img:n<2?"https://p/a.jpg":"https://p/z.jpg"});
+  fnState={goal:"G"};b=stage(["https://p/a.jpg",""]);
+  fnImgKeep(b,opts(2),fnState);await run(60000);
+  out.dup={n:calls.length,src:b.cards[1].box.img&&b.cards[1].box.img.src};
+  // 5. nothing to search with: one ask, then the tile
+  calls=[];q=[];now=0;reply=()=>({img:"",none:true});
+  fnState={goal:"G"};b=stage([""]);
+  fnImgKeep(b,opts(1),fnState);await run(60000);
+  out.none={n:calls.length,cls:b.cards[0].box.className};
+  // 6. the stage moves on, the funnel is left, the card is gone: no more asks
+  const stops={};
+  for(const how of ["stage","leave","gone"]){
+    calls=[];q=[];now=0;reply=()=>({img:""});
+    fnState={goal:"G"};b=stage([""]);
+    fnImgKeep(b,opts(1),fnState);await run(1600);
+    const first=calls.length;
+    if(how==="stage")fnImgStop();
+    if(how==="leave")fnState=null;
+    if(how==="gone")b.cards[0].isConnected=false;
+    await run(60000);stops[how]=[first,calls.length];
+  }
+  out.stops=stops;
+  console.log(JSON.stringify(out));
+})();
+'''
+
+
+def _fic_node(src):
+    """The page's retry loop itself, in node: its waits, its cap, what it
+    sends, and when it stops."""
+    js = src[src.index("const FN_IMG_TRIES="):src.index("async function fnStep(pick){")]
+    o = _node_json(js + _FI_NODE, "fimg340.js")
+    m, g, e, d, n, st = o["miss"], o["got"], o["err"], o["dup"], o["none"], o["stops"]
+    ok = (o["waits"] == [1500, 3000, 6000, 12000, 12000, -1, -1, -1]
+          and m["times"] == [1500, 4500, 10500, 22500, 34500] and m["labels"] == ["L1"]
+          and m["goal"] == "G" and m["ex"] == ["https://p/a.jpg"]
+          and m["cls"] == ["fimg wait", "fimg none"] and o["loaded"] == "fimg"
+          and g == {"n": 1, "src": "https://p/b.jpg"}
+          and e["n"] == 1 and e["label"] == "L0" and e["src"] == "https://p/c.jpg"
+          and sorted(e["ex"]) == ["https://p/a.jpg", "https://p/b.jpg"]
+          and d == {"n": 2, "src": "https://p/z.jpg"}
+          and n == {"n": 1, "cls": "fimg none"}
+          and st == {"stage": [1, 1], "leave": [1, 1], "gone": [1, 1]})
+    return ok, o
+
+
+_FI_CHECKS = [("funnel pictures: logos, icons, SVGs, adverts, stock previews, thumbnails and "
+               "strips refused; named, landscape photos first; resized and re-hosted copies "
+               "are the same picture", _fic_filter),
+              ("funnel pictures: the label in the goal's context, then alone, then as a photo, "
+               "then a page's own picture; nothing without search", _fic_queries),
+              ("funnel pictures: never the same picture twice on a stage, exclude honoured, "
+               "all cards at once within the budget", _fic_unique),
+              ("funnel pictures: the stage uses them; the ask-again route reads only the goal, "
+               "the label and exclude", _fic_server),
+              ("funnel pictures: three across at most, 2x2 for four, a fixed 16:10 box, "
+               "wired to the retry loop that a new stage stops", _fic_page),
+              ("funnel pictures: the retry loop in node (backoff 1.5-12 s, five tries then a "
+               "tile, a failed load replaced, a duplicate refused, stops with the stage)",
+               _fic_node)]
+
+
+def _fi_run(src):
+    out = []
+    for name, fn in _FI_CHECKS:
+        try:
+            ok, det = fn(src)
+        except Exception as e_:
+            ok, det = False, "raised %r" % e_
+        out.append((name, bool(ok), det))
+    return out
+
+
+for _n340, _o340, _d340 in _fi_run(_MILLENAI_SRC):
+    check(_n340, _o340, "%r" % (_d340,))
+
+_FI_MUT = [
+    ("logos let through", '    r"(logo|icons?(?![a-z])|(?<![a-z])ico(?![a-z])|favicon|sprite|"',
+     '    r"(icons?(?![a-z])|(?<![a-z])ico(?![a-z])|favicon|sprite|"'),
+    ("SVGs let through", 'r"\\.(svg|gif|ico|bmp)$"', 'r"\\.(gif|ico|bmp)$"'),
+    ("ad paths let through", '    r"(?<![a-z0-9])ads?(?![a-z0-9]))", re.I)', '    r"(?!x)x)", re.I)'),
+    ("stock previews let through", 'r"(^|\\.)(shutterstock|', 'r"(^|\\.)(shutterstockx|'),
+    ("thumbnails let through", "    if w and h and (w < _FIMG_MIN[0] or h < _FIMG_MIN[1]",
+     "    if w and h and (False or h < 0"),
+    ("banner strips let through", "                    or not 0.5 <= w / h <= 2.6):", "                    ):"),
+    ("the same picture twice", "                if not ks & taken:", "                if True:"),
+    ("a resized copy counted apart", '    stem = re.sub(r"[-_]\\d{2,4}x\\d{2,4}$", "",', '    stem = re.sub(r"$^", "",'),
+    ("no fallback queries", '    for q in (lab + " " + g if g else lab, lab, lab + " photo"):',
+     '    for q in (lab + " " + g if g else lab,):'),
+    ("no og:image last resort", "        hits = _ddg_text(qs[0], 3)", "        hits = []"),
+    ("landscape not preferred", "        scored.append((-(2 * named + (1.2 <= ratio <= 2.2) + (not png)),",
+     "        scored.append((-(2 * named + (not png)),"),
+    ("the cards one after another",
+     "    for t in threads:\n        t.start()\n    for t in threads:\n"
+     "        t.join(timeout=max(0.0, deadline - time.monotonic()))",
+     "    for t in threads:\n        t.start()\n        t.join()"),
+    ("no budget", "    deadline = time.monotonic() + budget", "    deadline = time.monotonic() + 60"),
+    ("exclude ignored", "    for u in exclude or ():\n        taken.update(_fimg_keys(u))",
+     "    for u in ():\n        taken.update(_fimg_keys(u))"),
+    ("searching without search", "    if not HAS_SEARCH or not str(label).strip():", "    if not str(label).strip():"),
+    ("the stage without pictures", '        for o, img in zip(out, funnel_images(goal, [o["label"] for o in out])):',
+     '        for o, img in zip(out, [""] * len(out)):'),
+    ("four across", ".fopts.pics{--fc:3;", ".fopts.pics{--fc:4;"),
+    ("four as three and one", ".fopts.pics.n4{--fc:2}", ".fopts.pics.n4{--fc:3}"),
+    ("the old 82px picture", ".fimg{aspect-ratio:16/10;", ".fimg{height:82px;"),
+    ("trying forever", "  return n>=FN_IMG_TRIES?-1:", "  return false?-1:"),
+    ("no backoff", "FN_IMG_BASE*Math.pow(2,n)", "FN_IMG_BASE"),
+    ("no cap on the wait", "Math.min(FN_IMG_CAP,FN_IMG_BASE", "Math.max(FN_IMG_CAP,FN_IMG_BASE"),
+    ("a failed load not replaced", '    failed.push(e.target.getAttribute("src"));e.target.remove();\n    if(el)again(el);',
+     '    e.target.remove();'),
+    ("the stage's pictures not excluded", "            exclude:onStage()})", "            exclude:[]})"),
+    ("retries outliving the stage", "  const live=el=>gen===fnImgGen&&fnState===st&&el.isConnected;",
+     "  const live=el=>el.isConnected;"),
+    ("a new stage not stopping the old", "  fnImgStop();                      // ...and the old stage's pictures\n", ""),
+    ("a duplicate shown", "if(/^https:\\/\\//.test(u)&&!onStage().includes(u))", "if(/^https:\\/\\//.test(u))"),
+    ("asking on with no search", '      if(r.none){box.className="fimg none";return;}\n', ""),
+    ("the retry loop not wired", "  if(pics)fnImgKeep(b,d.options||[],fnState);\n", ""),
+    ("four not marked", "(pics?' pics'+(nop===4?' n4':''):'')", "(pics?' pics':'')"),
+    ("pictures sought for the stock stage", "  const pics=!!fnState.images&&!/fallback$/.test(d.engine||\"\"),",
+     "  const pics=!!fnState.images,"),
+]
+_fim = []
+for _d340, _o340, _n340 in _FI_MUT:
+    if _MILLENAI_SRC.count(_o340) != 1:
+        _fim.append((_d340, "anchor missing"))
+        continue
+    _res340 = _fi_run(_MILLENAI_SRC.replace(_o340, _n340, 1))
+    _fim.append((_d340, [n for n, o, _x in _res340 if not o][:1] or "MISSED"))
+check("funnel pictures: %d mutations, each caught by a check above" % len(_FI_MUT),
+      all(isinstance(v, list) for _d, v in _fim), "%r" % [x for x in _fim if not isinstance(x[1], list)])
+
+# live: the ask-again route is behind the gate like every /api route (the
+# launch key and the token), and an empty label is answered without a
+# search, so the gauntlet never reaches the network here
+_fg0 = req("/api/funnel/image", "POST", {"goal": "g", "label": "x"}, cookie=False)[0]
+_fg1 = req("/api/funnel/image", "POST", {"goal": "g", "label": "x"}, token=False)[0]
+_fg2 = req("/api/funnel/image", "POST", {"goal": "g", "label": "x"}, token="A" * 43)[0]
+_fg3 = req("/api/funnel/image", "POST", {"goal": "g", "label": " "})
+_fg4 = req("/api/funnel/image", "POST", b"[1]", headers={"Content-Type": "application/json"})
+check("funnel pictures (live): the ask-again route needs the launch key and the token",
+      _fg0 == 403 and _fg1 == 403 and _fg2 == 403 and _fg3[0] == 200
+      and json.loads(_fg3[2]) == {"img": "", "err": "no option named"}
+      and _fg4[0] == 200 and json.loads(_fg4[2]).get("img") == ""
+      and ".fopts.pics.n4{--fc:2}" in page and "function fnImgKeep(b,opts,st){" in page,
+      "%r" % [_fg0, _fg1, _fg2, _fg3, _fg4])
+# ==== 6b340 funnel pictures: end ====
+
+
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
