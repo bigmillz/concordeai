@@ -110,6 +110,11 @@ class Stats:
         self.auth_fail = {}
         self.devices = {}      # id -> {"name", "last_seen", "active"}
         self.recent = deque(maxlen=200)
+        # for the dashboard: counts, times and model names only
+        self.errors = {}                     # error code -> count
+        self.events = deque(maxlen=30)       # {"t", "kind", "model"}
+        self.ttft = deque(maxlen=20)         # ms from request to first token
+        self.prompt = deque(maxlen=20)       # (prompt tokens, prompt eval ns)
         self.loaded = []
         self.ollama_version = ""
         self._load_counters()
@@ -169,9 +174,24 @@ class Stats:
             if record.get("status", 200) >= 400:
                 self.totals["errors"] += 1
                 self._bucket()[4] += 1
+                code = str(record.get("code") or "other")
+                self.errors[code] = self.errors.get(code, 0) + 1
             if record.get("code") == "gpu_fit" or record.get("code") == "gpu_spill":
                 self.totals["refused_gpu"] += 1
             self.recent.append(record)
+
+    def event(self, kind, model):
+        with self.lock:
+            self.events.append({"t": int(self.clock()), "kind": kind, "model": safe_label(model, 64)})
+
+    def first_token(self, ms):
+        with self.lock:
+            self.ttft.append(int(ms))
+
+    def prompt_done(self, count, ns):
+        if count and ns:
+            with self.lock:
+                self.prompt.append((int(count), int(ns)))
 
     def token(self, n=1):
         now = self.clock()
@@ -218,6 +238,11 @@ class Stats:
                 "recent": list(self.recent)[-50:],
                 "loaded": list(self.loaded),
                 "ollama_version": self.ollama_version,
+                "errors": dict(self.errors),
+                "events": list(self.events),
+                "ttft_ms": int(sum(self.ttft) / len(self.ttft)) if self.ttft else None,
+                "prompt_tps": round(sum(c for c, _ in self.prompt) / (sum(n for _, n in self.prompt) / 1e9), 1)
+                if self.prompt else None,
             }
 
     def counters(self):
@@ -427,6 +452,7 @@ class Gateway:
             need, kv = o1ollama.fit_estimate(int(entry.get("size") or 0), info["model_info"], c, ram)
             if need <= budget:
                 return c
+        self.stats.event("refused: gpu_fit", name)
         where = ("free system memory (the whole model, since weight repacking is on)" if host_only
                  else "VRAM plus free system memory" if ram else "VRAM")
         raise GatewayError(
@@ -459,7 +485,7 @@ class Gateway:
         if not victims:
             return
         for v in victims:
-            self.unload(v)
+            self.unload(v, "unload: make room")
         try:
             left = self.loaded_names()
         except (OSError, ValueError):
@@ -473,6 +499,7 @@ class Gateway:
         after = self.oom_kills() if before is not None else None
         if before is not None and after is not None and after > before:
             log("ram-oom", reason="ollama_memory_limit")
+            self.stats.event("refused: ram_oom", "")
             raise GatewayError(507, "ram_oom",
                                "the model did not fit in memory: Ollama's memory limit stopped the load "
                                "(the desktop itself is fine); try a smaller num_ctx or model")
@@ -489,6 +516,7 @@ class Gateway:
         after = self.meminfo()
         swapped = int(before.get("SwapFree", 0)) - int(after.get("SwapFree", 0))
         if swapped > (512 << 20) or int(after.get("MemAvailable", 1 << 40)) < (1 << 30):
+            self.stats.event("refused: ram_pressure", name)
             self.unload(name)
             log("ram-pressure", model=name, gpu_pct=int(share * 100))
             raise GatewayError(507, "ram_pressure",
@@ -508,7 +536,8 @@ class Gateway:
                 return (vram / size) if size else 0.0
         return None
 
-    def unload(self, name):
+    def unload(self, name, why="unload"):
+        self.stats.event(why, name)
         for path, body in (("/api/generate", {"model": name, "keep_alive": 0}),
                            ("/api/embed", {"model": name, "input": [], "keep_alive": 0})):
             try:
@@ -544,7 +573,7 @@ class Gateway:
             try:
                 names = self.loaded_names()
                 for name in names:
-                    self.unload(name)
+                    self.unload(name, "unload: device switch")
                 if not self.loaded_names():
                     cleared = True
                     break
@@ -562,6 +591,7 @@ class Gateway:
         if share is None:
             raise GatewayError(502, "ollama", "model did not load")
         if share < 1.0:
+            self.stats.event("refused: gpu_spill", name)
             self.unload(name)
             log("gpu-spill", model=name, gpu_pct=int(share * 100))
             raise GatewayError(
@@ -569,6 +599,7 @@ class Gateway:
                 "model did not fit entirely in VRAM (%d%% on GPU); it was unloaded" % int(share * 100))
 
     def warm_load(self, name, n_ctx, ram=False):
+        was_loaded = any(o1ollama.same_model(m.get("name"), name) for m in self.stats.loaded)
         opts = {"num_ctx": n_ctx}
         if ram and not self.cfg.get("ollama_no_repack"):
             opts["use_mmap"] = False   # see shape()
@@ -582,6 +613,8 @@ class Gateway:
             msg = (data or {}).get("error") if isinstance(data, dict) else None
             raise GatewayError(400 if st < 500 else 502, "ollama",
                                "Ollama refused to load the model: %s" % safe_label(msg or st, 200))
+        if not was_loaded:
+            self.stats.event("load", name)
 
     # -- request shaping ------------------------------------------------
     def shape(self, kind, obj, model_name, entry, ram=False):
@@ -840,7 +873,7 @@ def make_handler(gw, lan=False):
                         raise
                     gw.check_placement(name, ram, before)
                     if streaming:
-                        self.relay_stream(kind, fwd, rec)
+                        self.relay_stream(kind, fwd, rec, t0)
                     else:
                         self.relay_whole(kind, fwd, rec, check_after=None)
                 else:
@@ -899,7 +932,7 @@ def make_handler(gw, lan=False):
                 pass
             self.close_connection = True
 
-        def relay_stream(self, kind, fwd, rec):
+        def relay_stream(self, kind, fwd, rec, t0=None):
             conn = o1ollama.connect(gw.base, timeout=600)
 
             def upstream_line(r):
@@ -933,11 +966,15 @@ def make_handler(gw, lan=False):
                         continue
                     piece = (obj.get("message") or {}).get("content") if kind == "chat" else obj.get("response")
                     if piece:
+                        if t0 is not None:
+                            gw.stats.first_token((time.monotonic() - t0) * 1000)
+                            t0 = None
                         gw.stats.token()
                     if obj.get("done"):
                         rec["tokens"] = int(obj.get("eval_count") or 0)
                         rec["prompt_tokens"] = int(obj.get("prompt_eval_count") or 0)
                         gw.stats.eval_done(obj.get("eval_count"), obj.get("eval_duration"))
+                        gw.stats.prompt_done(obj.get("prompt_eval_count"), obj.get("prompt_eval_duration"))
                     if obj.get("error"):
                         rec["status"], rec["code"] = 502, "ollama"
                 self.end_chunks()
@@ -957,6 +994,7 @@ def make_handler(gw, lan=False):
                 gw.check_placement(fwd["model"], check_after[0], check_after[1])
             rec["tokens"] = int(data.get("eval_count") or 0)
             rec["prompt_tokens"] = int(data.get("prompt_eval_count") or 0)
+            gw.stats.prompt_done(data.get("prompt_eval_count"), data.get("prompt_eval_duration"))
             if data.get("eval_count"):
                 gw.stats.eval_done(data.get("eval_count"), data.get("eval_duration"))
             self.send_json(200, data)

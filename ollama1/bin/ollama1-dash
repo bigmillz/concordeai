@@ -1,19 +1,23 @@
 #!/usr/bin/python3
-"""ollama1-dash: the text dashboard.
+"""ollama1-dash: the live dashboard.
 
-  ollama1-dash --console   on the desktop's screen (tty1), as the no-shell
-                           user o1dash; keys do nothing, it can't be quit,
-                           systemd restarts it if it ever exits
-  ollama1-top              the same over SSH; q quits
-  ollama1-top --once       one plain-text frame, then exit
+  ollama1-dash --console        on the desktop's monitor (tty1), as the no-shell
+                                user o1dash; systemd restarts it if it exits.
+                                Keys only change the view: t (5 min / 1 h), p (page)
+  ollama1-top                   the same over SSH; q quits
+  ollama1-top --ascii           plain ASCII (any terminal)
+  ollama1-top --once [--size 120x40]   one text frame, then exit
+  ollama1-dash --set-font TTY   (root, from the unit) pick a console font for the screen
 
-It shows counts, rates, hardware and state. It never shows a prompt or an
-answer: the gateway doesn't keep them, so there is nothing here to show.
-The pairing code appears, large, while a pairing window is open (on the
-console; ollama1-top shows it only when run as root).
+It shows counts, sizes, timings and names: tokens per second, requests,
+the GPU, loaded models and model events, CPU, memory, disks, network,
+health and paired devices, with charts over 5 minutes or an hour. It
+never shows a prompt or an answer: the gateway keeps none, and nothing
+else it reads has any. The pairing code fills the screen while a pairing
+window is open (on the console; ollama1-top shows it only to root).
 """
 import curses
-import datetime
+import locale
 import os
 import signal
 import sys
@@ -21,243 +25,142 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
 
-import o1big  # noqa: E402
-import o1stats  # noqa: E402
-from o1auth import format_code  # noqa: E402
-from o1common import fmt_bytes  # noqa: E402
+import o1dashui  # noqa: E402
+import o1metrics  # noqa: E402
+
+STYLES = {
+    # name: (foreground, background, bold)
+    "header": (curses.COLOR_BLACK, curses.COLOR_CYAN, True),
+    "footer": (curses.COLOR_CYAN, -1, False),
+    "border": (curses.COLOR_BLUE, -1, False),
+    "title": (curses.COLOR_WHITE, -1, True),
+    "text": (-1, -1, False),
+    "dim": (curses.COLOR_CYAN, -1, False),
+    "value": (curses.COLOR_WHITE, -1, True),
+    "ok": (curses.COLOR_GREEN, -1, True),
+    "warn": (curses.COLOR_YELLOW, -1, True),
+    "bad": (curses.COLOR_RED, -1, True),
+    "c_tps": (curses.COLOR_GREEN, -1, True),
+    "c_req": (curses.COLOR_CYAN, -1, True),
+    "c_gpu": (curses.COLOR_MAGENTA, -1, True),
+    "c_mem": (curses.COLOR_BLUE, -1, True),
+    "c_cpu": (curses.COLOR_YELLOW, -1, True),
+    "c_pow": (curses.COLOR_YELLOW, -1, True),
+    "c_io": (curses.COLOR_CYAN, -1, True),
+    "c_io2": (curses.COLOR_MAGENTA, -1, True),
+    "c_net": (curses.COLOR_GREEN, -1, True),
+    "overlay": (curses.COLOR_BLACK, curses.COLOR_WHITE, False),
+    "overlay_code": (curses.COLOR_BLACK, curses.COLOR_WHITE, True),
+}
 
 
-def ago(ts, now):
-    if not ts:
-        return "never"
-    s = int(now - ts)
-    if s < 90:
-        return "%ds ago" % s
-    if s < 5400:
-        return "%dm ago" % (s // 60)
-    if s < 172800:
-        return "%dh ago" % (s // 3600)
-    return "%dd ago" % (s // 86400)
+def pick_glyphs(console, force_ascii):
+    if force_ascii:
+        return "ascii"
+    font = o1metrics.font_state()
+    if console or os.environ.get("TERM", "") == "linux":
+        return font.get("glyphs") or "ascii"
+    enc = (locale.getpreferredencoding(False) or "").lower().replace("-", "")
+    return "braille" if enc == "utf8" else "ascii"
 
 
-def dur(s):
-    if s is None:
-        return "?"
-    d, s = divmod(int(s), 86400)
-    h, s = divmod(s, 3600)
-    m = s // 60
-    return ("%dd %dh" % (d, h)) if d else ("%dh %dm" % (h, m))
-
-
-def pct(a, b):
-    return "%d%%" % round(100.0 * a / b) if b else "?"
-
-
-def frame(st, now=None):
-    """The dashboard as a list of (text, style) lines. Styles: 'h' heading,
-    'ok', 'warn', 'bad', '' plain."""
-    now = now or time.time()
-    L = []
-    gw = st.get("gateway") or {}
-    tun = st.get("tunnel") or {}
-    clock = datetime.datetime.fromtimestamp(now).astimezone().strftime("%a %d %b %H:%M:%S %Z")
-    L.append(("%s   up %s   %s" % (st.get("hostname", "ollama1"), dur(st.get("uptime")), clock), "h"))
-    tstate = ("tunnel connected (%d)" % tun.get("connections", 0)) if tun.get("up") else "tunnel DOWN"
-    gstate = "gateway running" if gw and not gw.get("stale") else "gateway NOT RUNNING"
-    L.append(("%s   %s   Ollama %s" % (tstate, gstate, gw.get("ollama_version") or "?"),
-              "ok" if tun.get("up") and gw and not gw.get("stale") else "bad"))
-    net = st.get("network")
-    if net:
-        ports = "   ".join("%s %s%s" % (pt["name"], "up" if pt["carrier"] else "no link",
-                                        (" %d Mb/s" % pt["speed_mbps"]) if pt.get("speed_mbps") else "")
-                           for pt in net.get("ports", []))
-        L.append(("LAN        %s %s %s%s" % (net["name"], net.get("address") or "no address",
-                                             "up" if net.get("state") == "up" else net.get("state"),
-                                             ("   ports: " + ports) if ports else ""),
-                  "" if net.get("state") == "up" else "bad"))
-    L.append(("", ""))
-    tps = gw.get("tps") or {}
-    L.append(("TOKENS/S   now %-7s 1 h %-7s 24 h %s" % (tps.get("current", 0), tps.get("1h", 0),
-                                                        tps.get("24h", 0)), "h"))
-    L.append(("REQUESTS   active %d   queued %d   today %d   refused (GPU) %d   auth failures %d" % (
-        gw.get("active", 0), gw.get("queued", 0), gw.get("requests_today", 0),
-        (gw.get("totals") or {}).get("refused_gpu", 0),
-        (gw.get("totals") or {}).get("auth_failures", 0)), ""))
-    devs = gw.get("devices") or []
-    if devs:
-        parts = []
-        for d in sorted(devs, key=lambda d: -d.get("last_seen", 0)):
-            s = "%s: %s" % (d.get("name", "?"), "connected" if d.get("connected") else ago(d.get("last_seen"), now))
-            if d.get("active"):
-                s += " (%d active)" % d["active"]
-            parts.append(s)
-        L.append(("DEVICES    " + "   ".join(parts), ""))
-    else:
-        L.append(("DEVICES    none seen since the gateway started", ""))
-    L.append(("", ""))
-    g = st.get("gpu")
-    if g:
-        temps = "  ".join("%s %s°C" % (k, int(v)) for k, v in g.get("temps", {}).items())
-        L.append(("GPU        busy %s%%   VRAM %s / %s   %s" % (
-            g.get("busy_pct", "?"), fmt_bytes(g.get("vram_used")), fmt_bytes(g.get("vram_total")), temps), "h"))
-        L.append(("           power %s W%s   fan %s rpm%s   clock %s MHz" % (
-            g.get("power_w", "?"), (" of %s" % g["power_cap_w"]) if g.get("power_cap_w") else "",
-            g.get("fan_rpm", "?"), (" (%s%%)" % g["fan_pct"]) if g.get("fan_pct") is not None else "",
-            g.get("sclk_mhz") or "?"), ""))
-    else:
-        L.append(("GPU        not found", "bad"))
-    loaded = gw.get("loaded") or []
-    vt = (g or {}).get("vram_total") or 0
-    used = sum(int(m.get("size_vram") or 0) for m in loaded)
-    if loaded:
-        for i, m in enumerate(loaded):
-            size = int(m.get("size") or 0)
-            share = (int(m.get("size_vram") or 0) / size) if size else 0
-            L.append(("%s%-28s %9s  %s GPU  ctx %s" % ("LOADED     " if i == 0 else " " * 11,
-                                                       m.get("name", "?"), fmt_bytes(size),
-                                                       "100%" if share >= 1 else "%d%% (rest in RAM)" % (share * 100),
-                                                       m.get("context_length") or "?"),
-                      "" if share >= 1 or m.get("ram_allowed") else "bad"))
-    else:
-        L.append(("LOADED     no model in memory", ""))
-    if vt:
-        L.append(("           VRAM headroom %s" % fmt_bytes(max(0, vt - ((g or {}).get("vram_used") or used))), ""))
-    L.append(("", ""))
-    mem = st.get("memory") or {}
-    load = st.get("load") or []
-    L.append(("CPU        %s%%   load %s   RAM %s / %s" % (
-        st.get("cpu_pct") if st.get("cpu_pct") is not None else "?",
-        " ".join("%.2f" % x for x in load), fmt_bytes(mem.get("used")), fmt_bytes(mem.get("total"))), ""))
-    dparts = []
-    for d in st.get("disks") or []:
-        if d.get("mounted"):
-            dparts.append("%s %s of %s" % (d["mount"], pct(d["used"], d["total"]), fmt_bytes(d["total"])))
-        else:
-            dparts.append("%s not mounted" % d["mount"])
-    L.append(("DISKS      " + "   ".join(dparts), ""))
-    arrays = st.get("raid") or []
-    if arrays:
-        for a in arrays:
-            s = "%s %s [%s] %s" % (a["name"], a["level"], a["members"], "healthy" if a["healthy"] else "DEGRADED")
-            if a.get("action"):
-                s += "   %s %s%%%s" % (a["action"], a.get("progress"),
-                                        (" (about %s left)" % a["finish"]) if a.get("finish") else "")
-            L.append(("RAID       " + s, "ok" if a["healthy"] else "bad"))
-    else:
-        L.append(("RAID       no array", "warn"))
-    up = st.get("updates") or {}
-    oll = up.get("ollama") or {}
-    L.append(("", ""))
-    last = up.get("last_unattended")
-    L.append(("UPDATES    security updates last ran %s   reboot required: %s" % (
-        datetime.datetime.fromtimestamp(last).strftime("%d %b %H:%M") if last else "never",
-        "YES" + ((" (" + ", ".join(up.get("reboot_pkgs")[:3]) + ")") if up.get("reboot_pkgs") else "")
-        if up.get("reboot_required") else "no"), "warn" if up.get("reboot_required") else ""))
-    sl = up.get("sleep") or {}
-    rc = sl.get("resume_check") or {}
-    L.append(("SLEEP      last sleep %s   last wake %s%s" % (
-        ago(sl.get("last_sleep"), now) if sl.get("last_sleep") else "never",
-        ago(sl.get("last_wake"), now) if sl.get("last_wake") else "never",
-        ("   after waking: " + ("ok" if rc.get("ok") else "PROBLEM")) if rc else ""),
-        "" if rc.get("ok", True) else "bad"))
-    L.append(("           Ollama updater: %s %s %s   next check %s" % (
-        oll.get("result", "not run"), oll.get("version", ""),
-        ago(oll.get("last_run"), now) if oll.get("last_run") else "",
-        up.get("next_ollama_update") or "?"), "bad" if oll.get("result") == "failed" else ""))
-    return L
-
-
-def plain(st):
-    lines = frame(st)
-    w = st.get("pairing")
-    if w:
-        left = int(w["expires_at"] - time.time())
-        lines += [("", ""), ("PAIRING WINDOW OPEN   %d:%02d left" % (left // 60, left % 60), "h")]
-        lines += [("  " + r, "") for r in o1big.render_code(format_code(w["code"]), 100, on="#")]
-    return "\n".join(t for t, _ in lines)
-
-
-def draw(scr, st, console):
-    scr.erase()
-    h, w = scr.getmaxyx()
-    styles = {"h": curses.A_BOLD, "ok": curses.color_pair(1), "warn": curses.color_pair(2) | curses.A_BOLD,
-              "bad": curses.color_pair(3) | curses.A_BOLD, "": curses.A_NORMAL}
-    for i, (text, style) in enumerate(frame(st)):
-        if i >= h - 1:
-            break
-        try:
-            scr.addnstr(i, 1, text, w - 2, styles.get(style, 0))
-        except curses.error:
-            pass
-    win = st.get("pairing")
-    if win:
-        code = format_code(win["code"])
-        rows = o1big.render_code(code, w - 8)
-        left = max(0, int(win["expires_at"] - time.time()))
-        bw = max(max(len(r) for r in rows) + 6, 44)
-        bh = len(rows) + 7
-        y0, x0 = max(0, (h - bh) // 2), max(0, (w - bw) // 2)
-        try:
-            box = curses.newwin(min(bh, h), min(bw, w), y0, x0)
-            box.bkgd(" ", curses.color_pair(4))
-            box.erase()
-            box.box()
-            box.addnstr(1, 2, "PAIRING WINDOW OPEN", bw - 4, curses.A_BOLD | curses.color_pair(4))
-            for i, r in enumerate(rows):
-                box.addnstr(3 + i, 3, r, bw - 6, curses.color_pair(4) | curses.A_BOLD)
-            box.addnstr(bh - 3, 2, "%s   closes in %d:%02d" % (code, left // 60, left % 60), bw - 4,
-                        curses.color_pair(4))
-            box.addnstr(bh - 2, 2, "Type this code in ConcordeAI.", bw - 4, curses.color_pair(4))
-            scr.noutrefresh()
-            box.noutrefresh()
-            curses.doupdate()
-            return
-        except curses.error:
-            pass
-    footer = "ollama1 console, counts only" if console else "q quits"
-    try:
-        scr.addnstr(h - 1, 1, footer, w - 2, curses.A_DIM)
-    except curses.error:
-        pass
-    scr.refresh()
-
-
-def run(scr, console):
-    curses.curs_set(0)
+def setup_colors():
+    attrs = {}
     curses.start_color()
     try:
         curses.use_default_colors()
-        bg = -1
+        default_bg = -1
     except curses.error:
-        bg = curses.COLOR_BLACK
-    curses.init_pair(1, curses.COLOR_GREEN, bg)
-    curses.init_pair(2, curses.COLOR_YELLOW, bg)
-    curses.init_pair(3, curses.COLOR_RED, bg)
-    curses.init_pair(4, curses.COLOR_BLACK, curses.COLOR_WHITE)
+        default_bg = curses.COLOR_BLACK
+    for i, (name, (fg, bg, bold)) in enumerate(STYLES.items(), 1):
+        try:
+            curses.init_pair(i, fg if fg != -1 or default_bg == -1 else curses.COLOR_WHITE,
+                             bg if bg != -1 else default_bg)
+            attrs[name] = curses.color_pair(i) | (curses.A_BOLD if bold else 0)
+        except curses.error:
+            attrs[name] = curses.A_BOLD if bold else 0
+    return attrs
+
+
+def paint(scr, canvas, attrs):
+    """Draw the canvas in runs of one style (few curses calls per row)."""
+    for y in range(canvas.h):
+        row, styles = canvas.chars[y], canvas.styles[y]
+        x = 0
+        while x < canvas.w:
+            st = styles[x]
+            x2 = x + 1
+            while x2 < canvas.w and styles[x2] == st:
+                x2 += 1
+            try:
+                scr.addstr(y, x, "".join(row[x:x2]), attrs.get(st, 0))
+            except curses.error:
+                pass  # the bottom-right cell
+            x = x2
+    scr.noutrefresh()
+    curses.doupdate()
+
+
+def run(scr, console, force_ascii):
+    curses.curs_set(0)
+    attrs = setup_colors()
     if console:
         curses.raw()  # Ctrl+C / Ctrl+Z / Ctrl+\ arrive as plain keys and are ignored
-    scr.timeout(1000)
-    cpu = o1stats.CPU()
-    cpu.sample()
+    scr.timeout(250)
+    glyphs = pick_glyphs(console, force_ascii)
+    sampler = o1metrics.Sampler()
+    range_s, page = 300, 0
+    next_tick = 0.0
+    st = None
     while True:
-        st = o1stats.collect(cpu)
-        st["pairing"] = o1stats.pairing_window()
-        draw(scr, st, console)
+        now = time.time()
+        if now >= next_tick or st is None:
+            st = sampler.tick()
+            if not console and os.geteuid() != 0:
+                st["pairing"] = None
+            next_tick = now + 1.0
+            h, w = scr.getmaxyx()
+            scr.erase()
+            paint(scr, o1dashui.render(st, w, h, glyphs, range_s, page), attrs)
         ch = scr.getch()
-        if not console and ch in (ord("q"), ord("Q"), 27):
+        if ch in (ord("t"), ord("T")):
+            range_s = 3600 if range_s == 300 else 300
+            next_tick = 0
+        elif ch in (ord("p"), ord("P"), ord(" ")):
+            page += 1
+            next_tick = 0
+        elif ch == curses.KEY_RESIZE:
+            next_tick = 0
+        elif not console and ch in (ord("q"), ord("Q"), 27):
             return
 
 
+def once(size, force_ascii):
+    w, h = 120, 40
+    if size:
+        w, h = (int(x) for x in size.lower().split("x"))
+    sampler = o1metrics.Sampler()
+    sampler.tick()
+    time.sleep(1.0)
+    st = sampler.tick()
+    if os.geteuid() != 0:
+        st["pairing"] = None
+    print(o1dashui.render(st, w, h, "ascii" if force_ascii else pick_glyphs(False, False)).text())
+
+
 def main():
-    console = "--console" in sys.argv
-    if "--once" in sys.argv:
-        cpu = o1stats.CPU()
-        cpu.sample()
-        time.sleep(0.5)
-        st = o1stats.collect(cpu)
-        st["pairing"] = o1stats.pairing_window()
-        print(plain(st))
+    args = sys.argv[1:]
+    if "--set-font" in args:
+        import o1font
+        tty = args[args.index("--set-font") + 1] if len(args) > args.index("--set-font") + 1 else "/dev/tty1"
+        print(o1font.set_font(tty))
         return
+    console = "--console" in args
+    force_ascii = "--ascii" in args
+    locale.setlocale(locale.LC_ALL, "")
+    if "--once" in args:
+        size = args[args.index("--size") + 1] if "--size" in args else None
+        return once(size, force_ascii)
     if console:
         for s in (signal.SIGINT, signal.SIGQUIT, signal.SIGTSTP, signal.SIGHUP):
             signal.signal(s, signal.SIG_IGN)
@@ -265,7 +168,7 @@ def main():
         sys.stdout.write("\033[9;0]\033[14;0]")
         sys.stdout.flush()
     os.environ.setdefault("ESCDELAY", "25")
-    curses.wrapper(run, console)
+    curses.wrapper(run, console, force_ascii)
 
 
 if __name__ == "__main__":

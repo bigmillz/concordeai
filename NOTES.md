@@ -470,6 +470,39 @@ provider comes later and follows `ollama1/PROTOCOL.md`. How to run it is in
     logged.
   - The dashboard and panel show the last sleep and wake.
   - Untested on the hardware; Patrick tries it by hand.
+- **The dashboard, btop-style** (`lib/o1metrics.py`, `lib/o1dashui.py`,
+  `lib/o1font.py`, `bin/ollama1-dash`):
+  - `o1metrics.Sampler` ticks once a second. It reads straight from
+    `/proc` (stat per core, meminfo, diskstats whole disks only), `/sys`
+    (amdgpu and hwmon, sclk and mclk, k10temp Tctl, br0 counters, Ollama's
+    cgroup `memory.current`/`max`) and the gateway's counts-only
+    `stats.json`. It keeps an hour at 1 s. Slow things run every 10-60 s:
+    the tunnel `/ready`, and cloudflared `/metrics` for
+    `quic_client_smoothed_rtt`.
+  - The gateway adds, still counts only: errors by code, the last 30 model
+    events (`load` / `unload[: device switch | make room]` /
+    `refused: gpu_fit|gpu_spill|ram_pressure|ram_oom`, name and time), mean
+    TTFT over the last 20 streams, and prompt tokens/s.
+  - `o1dashui.render(state, w, h, glyphs, range, page)` is pure and returns
+    a Canvas, so tests render it at any size.
+    - Charts are 2x4 braille dots per cell, or eighth blocks, or
+      ` .:-=+*#`; bars use eighth blocks.
+    - Layout: 3 columns at 180x44 and up, 2 pages from 100x28, 3 pages
+      below that.
+    - The pairing code fills the screen, up to 6x wide and 2x tall.
+    - The renderer holds no key that could carry content (tested: no
+      "prompt", "messages", "content", "response" or "recent").
+  - Console font: `ExecStartPre=-+ollama1-dash --set-font /dev/tty1`.
+    - It parses the PSF1/PSF2 fonts in `/usr/share/consolefonts` (unicode
+      tables), keeps those with ASCII plus blocks and box lines (braille
+      preferred), and picks the size closest to 220 columns for the
+      framebuffer's pixels.
+    - It runs `setfont -C` and records the glyph mode in
+      `/run/ollama1/dash-font.json`; with nothing suitable, it falls back
+      to ASCII.
+    - Which fonts Ubuntu's console-setup ships with braille is unknown: the
+      picker adapts.
+  - Render cost on the Mac: about 1-2 ms for 240x67.
 - Tested on the Mac: 199 unit tests (incl. shellcheck, the polkit rule in
   node, the setup disk steps against fake mdadm/blkid/lsblk, the guide's
   file and config references). All 75 mutants are caught

@@ -445,16 +445,44 @@ around a little from time to time.
     - It does not let Ollama swap: only the test's `swap` configuration
       does, for the length of the test.
     - Undo: `sudo ./setup.sh --remove-encrypted-swap`.
-- **Dashboard:** it's on the monitor, and `ollama1-top` shows it over SSH
-  (`q` quits). It shows the following, and never a prompt or an answer:
-  - tokens per second (now, 1 h, 24 h) and requests;
-  - devices;
-  - GPU busy %, VRAM, temperatures, power and fan;
-  - loaded models;
-  - CPU, RAM, disks and RAID;
-  - the LAN (`br0` and the Pi's port);
-  - the tunnel;
-  - updates.
+- **Dashboard:** it fills the desktop's monitor (tty1), and `ollama1-top` shows
+  it over SSH (`q` quits, `--ascii` for plain terminals, `--once` for one
+  text frame). It updates every second, and its charts cover the last 5
+  minutes, or an hour after pressing `t`.
+  - **Tokens:** a live chart of tokens per second, with now, 1 h, 24 h and
+    the peak; prompt tokens/s and the recent time to first token.
+  - **Requests:** active, queued, today and per minute (chart); errors by
+    kind (busy, fit, spill, ram, oom, Ollama, auth).
+  - **Loaded models:** GPU share, VRAM and system memory, time until
+    unload; "rest in RAM" for `ram` models.
+  - **Model events:** the last loads, unloads (device switch, make room)
+    and refusals, as model names and times only.
+  - **GPU:** busy %, VRAM, power against its cap (three charts); edge,
+    junction and memory temperatures, fan, sclk and mclk.
+  - **CPU:** a bar per thread (32 on the 5950X), package temperature, load,
+    and a total chart.
+  - **Memory:** RAM (chart), swap, and Ollama's memory against its cap.
+  - **Disks:** free space on /, /srv/models and /srv/data; read and write
+    throughput (chart); RAID state with resync % and time left.
+  - **Network:** br0's address and throughput in and out (chart), the
+    tunnel and its round-trip time, and each port's link (the Pi's
+    included).
+  - **Health:** uptime, updates, reboot needed, the next Ollama check, the
+    last sleep and wake. **Paired devices:** connected now, or last seen.
+  - While a pairing window is open, the code fills the whole screen.
+
+  How it looks and works:
+  - It picks its layout by size: three columns on a monitor, two pages
+    around 120 columns, three pages at 80x25 (`p` flips).
+  - Before it starts on tty1, it chooses a console font for the screen from
+    those installed: about 200-240 columns, and the most of its glyphs the
+    font has. It draws charts with braille dots or block characters, or in
+    ASCII if the font has neither.
+  - Keys only change the view (`t`, `p`). On tty1 nothing quits it or opens
+    a shell.
+  - It never shows a prompt or an answer: only counts, sizes, times and
+    names.
+  - A frame takes a few milliseconds.
 - **Admin panel:** `https://ollama1-admin.flyconcordefly.com`. Access asks
   for your email and a one-time code. The panel has:
   - the same figures, plus 1 h / 24 h graphs;

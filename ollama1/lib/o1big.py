@@ -48,13 +48,18 @@ def render(text, on="█", off=" ", scale=2):
     return rows
 
 
-def render_code(code, width, on="█"):
-    """The pairing code (XXXX-XXXX-XXXX) as large as the width allows: one
-    line at double width, one line at single width, or one group per line."""
-    for scale in (2, 1):
+def render_code(code, width, on="\u2588", height=None):
+    """The pairing code (XXXX-XXXX-XXXX) as large as the space allows: one
+    line, as wide and tall as fits (up to 6x), else one group per line."""
+    for scale in (6, 5, 4, 3, 2, 1):
         rows = render(code, on=on, scale=scale)
-        if len(rows[0]) <= width:
-            return rows
+        tall = max(1, scale // 2)
+        if len(rows[0]) <= width and (height is None or 5 * tall <= height):
+            # console cells are about twice as tall as wide: on a big screen
+            # make the letters taller too, as far as the height allows
+            while height and tall < scale and 5 * tall * 2 <= height:
+                tall *= 2
+            return [r for r in rows for _ in range(tall)]
     out = []
     for i, group in enumerate(code.split("-")):
         if i:
