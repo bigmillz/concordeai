@@ -84,6 +84,23 @@ class TestRamModelTool(unittest.TestCase):
             r = subprocess.run([sc, path], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stdout)
 
+    def test_wrapper_passes_no_empty_argument_to_tmux(self):
+        """Run with no arguments, the wrapper once handed the Python script an
+        empty one ('unrecognized arguments:') because printf '%q ' with no
+        arguments prints ''. Runs the real quoted_args() from the script."""
+        src = open(os.path.join(U.TOOLS, "ram-model-test.sh")).read()
+        m = re.search(r"^quoted_args\(\) \{\n.*?^\}\n", src, re.S | re.M)
+        self.assertTrue(m, "quoted_args() not found")
+        script = m.group(0) + (
+            'out=$(quoted_args); [ -z "$out" ] || { echo "none: [$out]"; exit 1; }\n'
+            'eval "set -- $(quoted_args --configs "a b" --ctx 4096)"\n'
+            '[ "$#" -eq 4 ] && [ "$2" = "a b" ] && [ "$4" = 4096 ] || { echo "args: $#"; exit 1; }\n'
+            'eval "set -- $(quoted_args)"; [ "$#" -eq 0 ] || { echo "empty: $#"; exit 1; }\n')
+        r = subprocess.run(["bash", "-c", script], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn('$(quoted_args "$@")', src)
+        self.assertNotIn("$(printf '%q ' \"$@\")", src)
+
     def test_safety_lines(self):
         src = open(os.path.join(U.TOOLS, "ram_model_test.py")).read()
         self.assertIn('raise RuntimeError("the memory cap didn\'t take; not loading")', src)

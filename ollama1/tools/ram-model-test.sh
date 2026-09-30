@@ -21,6 +21,13 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG=/var/log/ollama1-ram-test.log
+# The arguments, quoted to be pasted into the command tmux runs. With none,
+# printf '%q ' would still print '' (an empty argument), which the Python
+# script then refuses ("unrecognized arguments:"), so it's only used when
+# there are some.
+quoted_args() {
+  if [ "$#" -gt 0 ]; then printf ' %q' "$@"; fi
+}
 case "${1:-}" in -h|--help) exec python3 "$HERE/ram_model_test.py" --help ;; esac
 [ "$(id -u)" -eq 0 ] || { echo "Run it with sudo."; exit 1; }
 { command -v python3 && command -v systemctl; } >/dev/null || { echo "needs python3 and systemd"; exit 1; }
@@ -30,7 +37,7 @@ case "${1:-}" in -h|--help) exec python3 "$HERE/ram_model_test.py" --help ;; esa
 if [ -z "${TMUX:-}" ] && [ "${O1_NO_TMUX:-}" != 1 ] && [ -t 0 ] && command -v tmux >/dev/null; then
   echo "Starting in tmux (session ollama1-ramtest). If the connection drops: sudo tmux attach -t ollama1-ramtest"
   exec tmux new-session -A -s ollama1-ramtest \
-    "O1_NO_TMUX=1 bash '$HERE/ram-model-test.sh' $(printf '%q ' "$@"); echo; read -r -p 'Finished. Press Enter to close. ' _"
+    "O1_NO_TMUX=1 bash '$HERE/ram-model-test.sh'$(quoted_args "$@"); echo; read -r -p 'Finished. Press Enter to close. ' _"
 fi
 [ -n "${TMUX:-}" ] || [ "${O1_NO_TMUX:-}" = 1 ] || echo "Note: tmux isn't available; if this SSH session drops, the test stops (and cleans up)."
 touch "$LOG"; chmod 600 "$LOG"
