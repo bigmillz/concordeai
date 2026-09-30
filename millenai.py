@@ -22064,6 +22064,8 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
         # one twice (6b340); a card left without one asks again itself
         for o, img in zip(out, funnel_images(goal, [o["label"] for o in out])):
             o["img"] = img
+            if _fimg_blocked(goal, o["label"]):
+                o["img_none"] = True       # the page doesn't ask again
     if not out:
         # every rung failed the gate: a plain, always-answerable
         # narrowing question beats a dead end (6b274)
@@ -22092,24 +22094,47 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
 # picture per card, the whole stage at once. Only the goal and the
 # option's label go out, as before; the page loads the picture straight
 # from its https URL, as before.
-_FIMG_BACKENDS = ("bing", "auto")      # duckduckgo's images answered none
+# ADULT PICTURES NEVER REACH A CARD (review of 6b340). ddgs's Bing image
+# engine never sends its safesearch setting (checked live: "nude" gave 35
+# results, 0 with Bing's own adlt=strict), and ddgs's automatic choice may
+# pick it, so the search is only ever the two engines that enforce it:
+# Bing with adlt=strict added, and DuckDuckGo images with safesearch
+# "on". If neither answers, the card has no picture; nothing falls back
+# to an unfiltered search, and so the old last resort (the og:image of a
+# page a text search found; every text engine that honours safesearch
+# was down) is gone too. A second guard is ours (_FIMG_ADULT): a short
+# list of plain words and known hosts refused in a picture's address,
+# title and host, and no search at all when the goal or the option names
+# one. A filter can miss, so this is a limit, not a promise.
 _FIMG_BUDGET = 9.0                     # the whole stage's pictures, in s
 _FIMG_MIN = (400, 240)                 # smaller is a thumbnail or an icon
 # page furniture, adverts, drawings, charts and screenshots, by the
 # words in the address (the first live run's "Suburban Edge" was a
 # Screenshot-2025-04-22.png; two more were ChatGPT-Image-… pictures,
 # and the funnel's pictures are real ones, never generated: 6b228)...
+# (whole words only: "catalogo", "silicon" and "bannerman" are places)
 _FIMG_BAD = re.compile(
-    r"(logo|icons?(?![a-z])|(?<![a-z])ico(?![a-z])|favicon|sprite|"
-    r"avatar|badge|banner|button|emoji|placeholder|clip-?art|vector|"
-    r"infographic|charts?(?![a-z])|diagram|screen-?shot|chatgpt|dall-?e|"
-    r"midjourney|sponsor|advert|promos?(?![a-z])|promotion|coupon|"
-    r"(?<![a-z0-9])ads?(?![a-z0-9]))", re.I)
+    r"(?<![a-z])(?:logos?|icons?|ico|favicons?|sprites?|avatars?|badges?|"
+    r"banners?|buttons?|emojis?|placeholders?|clip-?art|vectors?|"
+    r"infographics?|charts?|diagrams?|screen-?shots?|chatgpt|dall-?e|"
+    r"midjourney|sponsors?|sponsored|adverts?|advertisements?|promos?|"
+    r"promotions?|coupons?|ads?)(?![a-z])", re.I)
 # ...or the title the search gave it
 _FIMG_BAD_TITLE = re.compile(
-    r"(logo|icons?(?![a-z])|banner|clip ?art|vector|infographic|"
-    r"charts?(?![a-z])|diagram|screenshot|advert|sponsored|"
-    r"promos?(?![a-z])|coupon)", re.I)
+    r"(?<![a-z])(?:logos?|icons?|banners?|clip ?art|vectors?|"
+    r"infographics?|charts?|diagrams?|screenshots?|adverts?|"
+    r"advertisements?|sponsored|promos?|promotions?|coupons?)(?![a-z])",
+    re.I)
+# the second guard against adult pictures: plain words, whole words only
+# ("Sussex" and "Essex" are places), and the sites that are only that
+_FIMG_ADULT = re.compile(
+    r"(?<![a-z0-9])(?:nudes?|nudity|naked|nsfw|porn\w*|xxx|erotic\w*|"
+    r"sexy?|sexual|lingerie|topless|fetish|hentai|escorts?|onlyfans)"
+    r"(?![a-z0-9])", re.I)
+_FIMG_ADULT_HOST = re.compile(
+    r"(^|\.)(?:pornhub|xvideos|xnxx|xhamster|redtube|youporn|spankbang|"
+    r"eporner|chaturbate|stripchat|bongacams|livejasmin|fansly|erome|"
+    r"rule34|e621)\.", re.I)
 # words of a goal that say nothing about what a picture shows
 _FIMG_STOP = frozenset(
     "a an and are best buy can choose do does for get good how i in is it "
@@ -22149,10 +22174,14 @@ def _fimg_ok(row) -> str:
         return ""        # https only (6b310), and nothing absurd
     p = urllib.parse.urlsplit(img)
     path = urllib.parse.unquote(p.path).lower()
+    host, title = p.hostname or "", str(row.get("title") or "")
     if (re.search(r"\.(svg|gif|ico|bmp)$", path)
-            or _FIMG_BAD_HOST.search(p.hostname or "")
+            or _FIMG_BAD_HOST.search(host)
             or _FIMG_BAD.search(path)
-            or _FIMG_BAD_TITLE.search(str(row.get("title") or ""))):
+            or _FIMG_BAD_TITLE.search(title)
+            or _FIMG_ADULT_HOST.search(host)
+            or _FIMG_ADULT.search(host + " " + title + " " + path + " "
+                                  + urllib.parse.unquote(p.query))):
         return ""
     try:
         w, h = int(row.get("width") or 0), int(row.get("height") or 0)
@@ -22201,30 +22230,68 @@ def _fimg_queries(goal: str, label: str) -> list:
     return out
 
 
+def _fimg_bing(query: str, limit: int, proxy=None) -> list:
+    """Bing's image search with its adult filter at strict: ddgs's
+    engine class, asked for adlt=strict in the request it builds."""
+    from ddgs.engines.bing_images import BingImages
+
+    class _Strict(BingImages):
+        def build_payload(self, *a, **k):
+            p = super().build_payload(*a, **k)
+            p["adlt"] = "strict"
+            return p
+    rows = _Strict(proxy=proxy, timeout=8).search(
+        query, safesearch="on", max_results=limit) or []
+    return [{k: getattr(r, k, "") for k in
+             ("image", "title", "width", "height", "url")} for r in rows]
+
+
 def _ddg_images(query: str, limit: int = 25) -> list:
-    """Image hits (image, title, width, height, url), trying each
-    backend until one answers. Never raises."""
+    """Image hits (image, title, width, height, url) from a safe-search
+    engine, the first that answers. Never raises."""
     proxy = _search_proxy() if IS_WIN else None
-    for backend in _FIMG_BACKENDS:
-        try:
-            rows = (DDGS(proxy=proxy) if proxy else DDGS()).images(
-                query, max_results=limit, backend=backend)
-            if rows:
-                return rows
-        except Exception:
-            continue
-    return []
+    try:
+        rows = _fimg_bing(query, limit, proxy)
+        if rows:
+            return rows
+    except Exception:
+        pass
+    try:
+        return (DDGS(proxy=proxy) if proxy else DDGS()).images(
+            query, max_results=limit, backend="duckduckgo",
+            safesearch="on") or []
+    except Exception:
+        return []
 
 
-def _fimg_search(query: str) -> list:
+def _fimg_blocked(goal: str, label: str) -> bool:
+    """True when the goal or the option names something adult: no
+    picture is sought for it, and the page is told to stop asking."""
+    return bool(_FIMG_ADULT.search(str(goal) + " " + str(label)))
+
+
+# AT MOST TWO PICTURE SEARCHES AT ONCE (review of 6b340): six cards
+# asking again together, each up to four searches, could trip the search
+# engines' rate limits and starve the chat's own web search
+_fimg_sem = threading.BoundedSemaphore(2)
+
+
+def _fimg_search(query: str, deadline=None) -> list:
     """_ddg_images, remembered for 5 minutes when it found something, so
-    a card asking again walks on down the same list."""
+    a card asking again walks on down the same list. Waits its turn, but
+    not past the deadline."""
     now = time.time()
     with _fimg_cache_lock:
         hit = _fimg_cache.get(query)
         if hit and now - hit[0] < _RESULTS_TTL:
             return hit[1]
-    rows = _ddg_images(query)
+    wait = 5.0 if deadline is None else max(0.0, deadline - time.monotonic())
+    if not _fimg_sem.acquire(timeout=wait):
+        return []
+    try:
+        rows = _ddg_images(query)
+    finally:
+        _fimg_sem.release()
     if rows:
         with _fimg_cache_lock:
             if len(_fimg_cache) > 60:
@@ -22239,7 +22306,7 @@ def funnel_image(goal: str, label: str, taken=None, lock=None,
     keys of every picture already spoken for (the stage's other cards,
     and any the page says failed to load); the one returned is claimed
     in it under `lock`, so options searched side by side never share."""
-    if not HAS_SEARCH or not str(label).strip():
+    if not HAS_SEARCH or not str(label).strip() or _fimg_blocked(goal, label):
         return ""
     taken = set() if taken is None else taken
     lock = lock or threading.Lock()
@@ -22259,22 +22326,10 @@ def funnel_image(goal: str, label: str, taken=None, lock=None,
     for q in qs:
         if late():
             return ""
-        u = claim(_fimg_rank(_fimg_search(q), label))
+        u = claim(_fimg_rank(_fimg_search(q, deadline), label))
         if u:
             return u
-    # the last resort, and the old way: a picture from a page about it
-    # (og:image, then the page's own photos), vetted the same
-    if late():
-        return ""
-    try:
-        hits = _ddg_text(qs[0], 3)
-        urls = [h.get("href") or h.get("url") for h in hits if h]
-        meta = []          # _page_text appends og:image URLs as strings
-        _fetch_pages([u for u in urls if u][:3], cap=200, meta=meta)
-        return claim(_fimg_rank([{"image": m} for m in meta
-                                 if isinstance(m, str)], label))
-    except Exception:
-        return ""
+    return ""
 
 
 def funnel_images(goal: str, labels: list, budget: float = _FIMG_BUDGET,
@@ -23996,15 +24051,16 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if not label:
                 self._send_json({"img": "", "err": "no option named"})
                 return
-            if not HAS_SEARCH:
-                # nothing to ask: the page stops trying at once
+            goal = str(d.get("goal", "")).strip()[:300]
+            if not HAS_SEARCH or _fimg_blocked(goal, label):
+                # nothing to ask, or nothing to show: the page stops
+                # trying at once
                 self._send_json({"img": "", "none": True})
                 return
             ex = [str(u)[:400] for u in (d.get("exclude") or [])
                   if isinstance(u, str)][:40]
             self._send_json({"img": funnel_images(
-                str(d.get("goal", "")).strip()[:300], [label],
-                budget=12.0, exclude=ex)[0]})
+                goal, [label], budget=12.0, exclude=ex)[0]})
             return
         if self.path == "/api/funnel":
             n = int(self.headers.get("Content-Length", 0) or 0)
@@ -27904,6 +27960,9 @@ body.resizing{cursor:col-resize;user-select:none}
 .fopts.pics{--fc:3;grid-template-columns:repeat(auto-fit,minmax(min(100%,
   max(180px,calc((100% - (var(--fc) - 1) * 9px) / var(--fc) - 1px))),1fr))}
 .fopts.pics.n4{--fc:2}
+/* two options would each take half the row, and the picture with it:
+   they stay a card's width in a full row, left-aligned */
+.fopts.pics.n2{max-width:489px}
 .fimg{aspect-ratio:16/10;margin-bottom:9px;border-radius:8px;
   overflow:hidden;background:rgba(255,255,255,.05)}
 .fimg img{width:100%;height:100%;object-fit:cover;display:block}
@@ -34663,6 +34722,8 @@ let fnState=null,fnAnswer=null;
    leaving the funnel stops them all. */
 const FN_IMG_TRIES=5,FN_IMG_BASE=1500,FN_IMG_CAP=12000;
 let fnImgGen=0,fnImgAb=null;
+// the first ask of each card is spread over 2 s, so six don't land at once
+let fnImgJitter=()=>Math.floor(Math.random()*2000);
 // the wait before try n (0 = the first), or -1 once they're spent
 function fnImgWait(n){
   return n>=FN_IMG_TRIES?-1:Math.min(FN_IMG_CAP,FN_IMG_BASE*Math.pow(2,n));
@@ -34700,7 +34761,7 @@ function fnImgKeep(b,opts,st){
       if(/^https:\/\//.test(u)&&!onStage().includes(u))
         box.innerHTML='<img src="'+esc(u)+'" alt="" referrerpolicy="no-referrer">';
       else again(el);
-    },w);
+    },w+(n===0?fnImgJitter():0));
   };
   // load and error don't bubble: caught on the way down, for every
   // picture this stage will ever show
@@ -34716,8 +34777,11 @@ function fnImgKeep(b,opts,st){
   },true);
   b.querySelectorAll(".fopt").forEach(el=>{
     const im=el.querySelector(".fimg img");
-    if(!im)again(el);
-    else if(im.complete&&im.naturalWidth)im.parentNode.className="fimg";
+    if(!im){
+      // adult words in the goal or the option: no picture, and no asking
+      if((opts[+el.dataset.i]||{}).img_none)el.querySelector(".fimg").className="fimg none";
+      else again(el);
+    }else if(im.complete&&im.naturalWidth)im.parentNode.className="fimg";
   });
 }
 async function fnStep(pick){
@@ -34797,7 +34861,7 @@ async function fnStep(pick){
     +' of '+d.total+(fnState.picks.length?' \u00b7 '
       +esc(fnState.picks.join(" \u2192 ")):"")+'</div>'
     +'<div class="fsq">'+esc(d.q)+'</div>'
-    +'<div class="fopts'+(pics?' pics'+(nop===4?' n4':''):'')+'">'
+    +'<div class="fopts'+(pics?' pics'+(nop===4?' n4':nop===2?' n2':''):'')+'">'
     +(d.options||[]).map((o,i)=>
       '<button class="fopt" data-i="'+i+'">'
       +(pics?fnImgBox(o.img):"")

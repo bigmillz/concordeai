@@ -23,7 +23,10 @@ another:
   A picture stage now caps at three a row (`.fopts.pics`, each column at
   least a third of the row less 1 px, never under 180 px unless the row
   is narrower) and four options go 2x2 (`.n4`), not three and one. It
-  drops to two, then one, as the window narrows. The picture sits in a
+  drops to two, then one, as the window narrows. Two options (`.n2`) stay
+  a card's width (the stage is 489 px at most, left-aligned) instead of
+  taking half the row each: 240 px cards at 1400, 700 and 560 px
+  windows, filling the row only at 420 px, stacked at 360. The picture sits in a
   16:10 box (`.fimg`, `object-fit:cover`), so it grows with the card and
   a late one doesn't move anything. Text stages keep the old grid.
   Measured in the browser pane (Blink) on the served page, six options:
@@ -49,23 +52,49 @@ another:
   WordPress's -800x533 size of it). The ask-again route excludes every
   picture already on the stage.
 - AN ADVERT INSTEAD OF A PHOTO. It's a real image search now (`ddgs`'s
-  images, Bing first; its DuckDuckGo images answered nothing here), with
-  the label in the goal's context (the goal's telling words), then the
-  label alone, then the label plus "photo". The og:image of a page about
-  it is the last resort. Every candidate is vetted: https only; no SVG,
+  images, Bing first, then DuckDuckGo's), with the label in the goal's
+  context (the goal's telling words), then the label alone, then the
+  label plus "photo". Every candidate is vetted: https only; no SVG,
   GIF, ICO or BMP; nothing under 400x240; no strip wider than 2.6:1 or
   taller than 1:2; no logo, icon, banner, sprite, badge, clip art,
   vector, chart, diagram, screenshot, generated picture (ChatGPT,
   DALL-E, Midjourney), sponsor, advert, promo, coupon or /ad/ in the
-  address; no logo, banner or advert in the title; nothing from the
+  address; no logo, banner or advert in the title (whole words only, so
+  "catalogo", "analogous", "honey-badger", "bannerman-castle",
+  "buttonwood" and "Silicon Valley at dusk" pass); nothing from the
   stock libraries (their previews are watermarked), Facebook, Instagram
   or TikTok (they refuse a picture loaded elsewhere), YouTube covers or
   Scribd pages. Then a title that names the option comes first, then a
   landscape shape, then a photo format (a PNG is usually a graphic).
 - The whole stage searches at once, within 9 s (the old way was one card
-  after another, up to about 10 s each). Live, six cards took 1.1 s.
-  Results are kept for 5 minutes when found, so an ask-again walks on
-  down the same list.
+  after another, up to about 10 s each), but never more than two
+  searches in flight (a semaphore on the search itself, which waits its
+  turn no longer than the stage's or the route's budget), so six cards
+  asking again can't trip the search engines' rate limits or starve the
+  chat's own web search. Each card's first ask-again is also spread over
+  0-2 s. Live, six cards took about 1 s. Results are kept for 5 minutes
+  when found, so an ask-again walks on down the same list.
+- ADULT PICTURES (review of 6b340, which found the first version had no
+  safe search at all). ddgs 9.14.4's Bing images engine ignores its
+  `safesearch` argument (its payload has no `adlt`; checked live: "nude"
+  returned 35 results through ddgs and none with `adlt=strict` added),
+  and ddgs's automatic backend may pick it. Every ddgs text engine that
+  honours the argument (Brave, Mojeek, Startpage, Google) answered
+  nothing from here, and Bing's and DuckDuckGo's text engines ignore
+  it, so the old last resort (the og:image of a page a text search found)
+  is gone. The image search is now only Bing through a subclass of
+  ddgs's own engine class that adds `adlt=strict` to its request
+  (`_fimg_bing`; ddgs offers no supported switch for it), then
+  DuckDuckGo's images with `safesearch="on"`. If neither answers, the
+  card has no picture. Then a guard of ours: a short list of plain
+  words and known adult sites (`_FIMG_ADULT`, `_FIMG_ADULT_HOST`),
+  whole words only ("Sussex" and "Essex" pass), refused in a
+  picture's address, query, title and host; and no search at all, and no
+  asking again (the stage marks the card `img_none`, the route answers
+  `none`), when the goal or the option names one. Known limit: this
+  is a filter, not a promise. Bing's strict setting and a word list both
+  miss things, and the DuckDuckGo leg is only as good as its own setting.
+  The search only ever sees the goal and the label.
 - Privacy is as before: only the goal and the option's label go out, to
   the search the funnel already used. The page loads each picture
   straight from its https URL, as before, now with
@@ -78,9 +107,12 @@ another:
   exclude, side by side, the budget), the retry loop run in node on a
   stand-in page and clock (the waits, five then a tile, a failed load
   replaced, a duplicate refused, stopping with the stage, the funnel or
-  the card), pins for the grid, the box and the wiring, and 31 mutations,
-  each caught. Live: the route refuses without the launch key or the
-  token.
+  the card, the jitter, an adult card), pins for the grid, the box and
+  the wiring, the safe-search engines and their settings, the word and
+  host lists (with the examples above), no search for an adult label
+  (counted on a stubbed search), the two-search cap with a slow stub, and
+  54 mutations, each caught. Live: the route refuses without the launch
+  key or the token, and answers an adult label with no search.
 - Left as it is: relevance is only as good as the search. An abstract
   label ("Academic Hub") can still get a loosely related photo, a blog
   header with its title across it, or a generated picture whose address
