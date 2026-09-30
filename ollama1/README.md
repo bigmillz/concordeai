@@ -597,7 +597,7 @@ around a little from time to time.
 
 The panel's **Power and cost** card shows what the desktop draws now (with
 an hour's chart), the energy and cost over the last hour, 24 hours, 7 days
-and 30 days, a 30-day projection, and the electricity cost per 1,000 tokens.
+and 30 days, a 30-day projection, and the electricity cost per million tokens.
 The console dashboard's Health panel has a one-line version. A root
 sampler, `ollama1-power.service`, takes a reading every 10 seconds.
 
@@ -711,7 +711,7 @@ minute's tier, so a window that starts at 19:00 splits the costs at 19:00
 exactly. The table splits kWh and cost by tier, and the badge says what
 applies now ("on-peak until 21:00"). The 30-day projection takes the
 average power in each hour of the week over the last 28 days, and prices
-each future minute at its tier. Cost per 1,000 tokens is all the
+each future minute at its tier. Cost per million tokens (shown in whole cents) is all the
 electricity over the last 30 days divided by the tokens generated then, so
 idle time is included.
 
