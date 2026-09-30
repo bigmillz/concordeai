@@ -618,12 +618,38 @@ fi
 # ---- 11. Ollama ------------------------------------------------------------------
 step "Ollama (verified download, ROCm build)"
 run systemctl enable --now ollama1-nft.service
+# Ollama's memory cap: all RAM but 8 GiB (MemoryHigh 2 GiB below that), from
+# /proc/meminfo. A load too big for the machine is stopped inside Ollama's
+# cgroup instead of freezing the desktop (it happened once, with mmap).
+mem_total=$(awk '/^MemTotal:/{print $2 * 1024; exit}' /proc/meminfo)
+[ "${mem_total:-0}" -gt $((16 << 30)) ] || die "couldn't read MemTotal from /proc/meminfo (or it is under 16 GiB)"
+mem_max=$((mem_total - (8 << 30)))
+mem_high=$((mem_max - (2 << 30)))
+install -d -m 0755 /etc/systemd/system/ollama.service.d
+printf '# ollama1 setup.sh: RAM %s bytes, less 8 GiB\n[Service]\nMemoryMax=%s\nMemoryHigh=%s\nMemorySwapMax=0\n' \
+  "$mem_total" "$mem_max" "$mem_high" >/etc/systemd/system/ollama.service.d/10-ollama1-memory.conf
+cfg_set_num() { # key integer
+  python3 - "$1" "$2" <<'PY'
+import json, os, sys
+p = "/etc/ollama1/config.json"
+c = json.load(open(p))
+c[sys.argv[1]] = int(sys.argv[2])
+fd = os.open(p + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+with os.fdopen(fd, "w") as f: json.dump(c, f, indent=1, sort_keys=True)
+os.replace(p + ".tmp", p)
+PY
+}
+cfg_set_num ollama_memory_max_bytes "$mem_max"
+systemctl daemon-reload
+ok "Ollama's memory cap: MemoryMax $((mem_max >> 30)) GiB, MemoryHigh $((mem_high >> 30)) GiB, no swap"
 if ! "$LIBDIR/bin/ollama1-update-ollama" --no-restart; then
   [ -L /opt/ollama/current ] || die "could not install Ollama (see above); nothing is running yet. Run setup.sh again."
   note "the update check failed; keeping the installed version"
 fi
 run systemctl enable ollama.service
 run systemctl restart ollama.service
+[ "$(systemctl show -p MemoryMax --value ollama.service)" = "$mem_max" ] \
+  || die "ollama.service did not take its memory cap (systemctl show -p MemoryMax ollama.service)"
 for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:11434/api/version >/dev/null 2>&1 && break; sleep 1; done
 curl -fsS http://127.0.0.1:11434/api/version >/dev/null || die "Ollama did not start: journalctl -u ollama"
 gpuline=$(journalctl -u ollama -b --no-pager -o cat 2>/dev/null | grep -i 'inference compute' | tail -n1 || true)

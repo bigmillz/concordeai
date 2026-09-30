@@ -791,15 +791,90 @@ class TestRamModels(unittest.TestCase):
         self.assertEqual(json.loads(data)["code"], "gpu_fit")
         self.assertNotIn("moe:120b", G["stub"].loaded)
 
-    def test_margin_is_at_least_6_gib(self):
+    def test_margin_is_8_gib_or_12_percent(self):
+        vram = 16 * self.GIB - (768 << 20)
         old = self.gw.cfg.get("ram_margin_gib")
         self.gw.cfg["ram_margin_gib"] = 0
         try:
-            vram = 16 * self.GIB - (768 << 20)
-            self.assertEqual(self.gw.budget(True), vram + 58 * self.GIB - 6 * self.GIB)
+            self.assertEqual(self.gw.budget(True), vram + 58 * self.GIB - 8 * self.GIB)   # 12% of 62 < 8
+            self.mem["MemTotal"] = 128 * self.GIB
+            self.assertEqual(self.gw.budget(True), vram + 58 * self.GIB - int(128 * self.GIB * 0.12))
         finally:
             self.gw.cfg["ram_margin_gib"] = old
-        self.assertEqual(self.gw.budget(False), 16 * self.GIB - (768 << 20))
+        self.assertEqual(self.gw.budget(False), vram)
+
+    def test_ollama_memory_max_caps_the_budget(self):
+        vram = 16 * self.GIB - (768 << 20)
+        self.gw.cfg["ollama_memory_max_bytes"] = 40 * self.GIB
+        try:
+            self.assertEqual(self.gw.budget(True), vram + 39 * self.GIB)
+        finally:
+            self.gw.cfg["ollama_memory_max_bytes"] = 0
+
+    def test_resident_size_counts_compute_buffers(self):
+        import o1ollama
+        from stub_ollama import DEFAULT_MODELS
+        m = DEFAULT_MODELS["moe:120b"]
+        gpu, _ = o1ollama.fit_estimate(m["size"], m["info"], 4096)
+        ram, _ = o1ollama.fit_estimate(m["size"], m["info"], 4096, ram=True)
+        self.assertEqual(ram - gpu, (5 << 29) - (256 << 20))
+
+    def test_mmap_off_for_ram_models_only(self):
+        n = len(G["stub"].calls)
+        self.assertEqual(self.chat("moe:120b")[0], 200)
+        sent = [c[2] for c in G["stub"].calls[n:] if c[1] in ("/api/generate", "/api/chat")]
+        self.assertTrue(sent)
+        for body in sent:
+            self.assertIs(body["options"]["use_mmap"], False, body)     # the warm load and the chat
+        n = len(G["stub"].calls)
+        self.assertEqual(self.chat("small:8b", options={"use_mmap": False})[0], 200)
+        for c in G["stub"].calls[n:]:
+            if c[1] in ("/api/generate", "/api/chat") and c[2].get("model") == "small:8b":
+                self.assertNotIn("use_mmap", c[2].get("options", {}))
+
+    def test_oom_during_load_is_a_clean_error(self):
+        kills = {"n": 3}
+        self.gw.oom_kills = lambda: kills["n"]
+        mod = G["mod"]
+        real = mod.o1ollama.call
+
+        def dying(base, method, path, obj=None, timeout=30):
+            if path == "/api/generate" and (obj or {}).get("prompt") == "":
+                kills["n"] += 1                                   # the memory limit struck
+                raise ConnectionResetError("runner killed")
+            return real(base, method, path, obj, timeout)
+        mod.o1ollama.call = dying
+        try:
+            st, data, _ = self.chat("moe:120b")
+            self.assertEqual(st, 507)
+            self.assertEqual(json.loads(data)["code"], "ram_oom")
+            st, data, _ = call("POST", "/api/chat", {"model": "moe:120b", "stream": True,
+                                                     "messages": [{"role": "user", "content": "x"}]})
+            self.assertEqual(st, 200)
+            self.assertEqual(U.ndjson(data)[-1]["code"], "ram_oom")
+        finally:
+            mod.o1ollama.call = real
+            import o1stats
+            self.gw.oom_kills = o1stats.ollama_oom_kills
+
+    def test_ollama_dying_without_oom_is_still_clean(self):
+        self.gw.oom_kills = lambda: 0
+        mod = G["mod"]
+        real = mod.o1ollama.call
+
+        def dying(base, method, path, obj=None, timeout=30):
+            if path == "/api/generate" and (obj or {}).get("prompt") == "":
+                raise ConnectionResetError("gone")
+            return real(base, method, path, obj, timeout)
+        mod.o1ollama.call = dying
+        try:
+            st, data, _ = self.chat("moe:120b")
+        finally:
+            mod.o1ollama.call = real
+            import o1stats
+            self.gw.oom_kills = o1stats.ollama_oom_kills
+        self.assertEqual(st, 502)
+        self.assertEqual(json.loads(data)["code"], "ollama")
 
     def test_swap_refusal(self):
         self.swap_after = 7 * self.GIB          # loading pushed 1 GiB into swap
@@ -812,10 +887,10 @@ class TestRamModels(unittest.TestCase):
         import o1ollama
         from stub_ollama import DEFAULT_MODELS
         m = DEFAULT_MODELS["moe:120b"]
-        need8, _ = o1ollama.fit_estimate(m["size"], m["info"], 8192)
-        need4, _ = o1ollama.fit_estimate(m["size"], m["info"], 4096)
+        need8, _ = o1ollama.fit_estimate(m["size"], m["info"], 8192, ram=True)
+        need4, _ = o1ollama.fit_estimate(m["size"], m["info"], 4096, ram=True)
         vram = 16 * self.GIB - (768 << 20)
-        self.mem["MemAvailable"] = (need8 + need4) // 2 - vram + 6 * self.GIB   # 8192 doesn't fit, 4096 does
+        self.mem["MemAvailable"] = (need8 + need4) // 2 - vram + 8 * self.GIB   # 8192 doesn't fit, 4096 does
         n = len(G["stub"].calls)
         st, data, _ = self.chat("moe:120b")
         self.assertEqual(st, 200, data)

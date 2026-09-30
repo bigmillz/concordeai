@@ -28,7 +28,7 @@ DEFAULT_MODELS = {
     # the estimate says it fits, but Ollama puts part of it on the CPU
     "sneaky:14b": {"size": 9 * GIB, "info": llama_info(layers=40, emb=5120, heads=40), "spill": True},
     # a mixture-of-experts giant: fits only with system RAM (gpt-oss:120b-like)
-    "moe:120b": {"size": 60 * GIB, "share": 0.25,
+    "moe:120b": {"size": 56 * GIB, "share": 0.25,
                  "info": {"general.architecture": "gptoss", "gptoss.block_count": 36,
                           "gptoss.embedding_length": 2880, "gptoss.attention.head_count": 64,
                           "gptoss.attention.head_count_kv": 8, "gptoss.attention.key_length": 64,

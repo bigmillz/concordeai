@@ -218,14 +218,17 @@ GPU only, unless the desktop's owner allows a model system memory:
     `"gpu+ram"`, and `gpu_pct` from 0 to 100.
 - Before loading, the gateway estimates weights + KV cache for the
   requested `num_ctx` + a margin. It checks that against the card's VRAM
-  less a reserve (16 GB here); for a `gpu+ram` model, against VRAM plus the
-  free system memory less 6 GB for the system. If it doesn't fit, the
+  less a reserve (16 GB here). A `gpu+ram` model is counted with 2.5 GiB of
+  compute buffers, against VRAM plus the free system memory less the larger
+  of 8 GiB and 12% of RAM, and under Ollama's own memory cap. If it doesn't fit, the
   answer is **507** `gpu_fit`, with `need_bytes` and `budget_bytes`. Try
   a smaller `num_ctx` or a smaller model. For a `gpu+ram` model sent
   without `options.num_ctx`, the gateway first tries 4096, then 2048.
 - After loading, a GPU-only model must show 100% in VRAM in `/api/ps`. If
   any of it landed on the CPU, the gateway unloads it and answers
   `gpu_spill` (507 for non-streamed calls).
+- If the load itself runs out of Ollama's memory cap, the kernel stops it
+  inside Ollama (the desktop stays up) and the answer is `ram_oom` (507).
 - A `gpu+ram` model is unloaded and refused with `ram_pressure` (507) if
   loading it pushed the desktop into swap or left under 1 GiB free.
 - A `gpu+ram` model loads alone: the desktop unloads other models first,
@@ -239,7 +242,7 @@ Streaming (`stream` true, the default for chat and generate): once the
 request passes auth, validation and the fit estimate, the gateway sends
 `200` with `Content-Type: application/x-ndjson` and then waits its turn and
 loads the model. A failure after that point arrives as one last NDJSON
-line: `{"error": "...", "code": "gpu_spill" | "ram_pressure" | "busy" | "ollama", "done": true}`.
+line: `{"error": "...", "code": "gpu_spill" | "ram_pressure" | "ram_oom" | "busy" | "ollama", "done": true}`.
 The app must treat a line with `error` as the end of the answer.
 Prefer streaming: Cloudflare ends a non-streamed request whose answer
 takes longer than 100 s.

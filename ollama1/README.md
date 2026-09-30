@@ -364,17 +364,50 @@ around a little from time to time.
     usable.
   - Expect a few to low tens of tokens per second, against 50 to 100+ for a
     model that fits in VRAM. The app shows these models as `gpu+ram`.
-  - The gateway lets a `ram` model load only if VRAM plus the free RAM,
-    less 6 GB kept for the system, holds its weights and context. If it
-    wasn't asked for a context size, it tries 8192, then 4096, then 2048.
-    gpt-oss:120b (about 61 GB) fits at 8192.
-  - It never lets one push the machine into swap. Ollama can't use swap at
-    all (`MemorySwapMax=0`), and a load that makes anything else swap is
-    unloaded and refused.
+  - The gateway lets a `ram` model load only if its whole resident size
+    fits. That size is its weights, the KV cache for the context, and 2.5 GiB
+    of compute buffers. It must fit in VRAM plus the free RAM, less the
+    larger of 8 GiB and 12% of RAM, and under Ollama's memory cap. If the
+    app didn't ask for a context size, it tries 8192, then 4096, then 2048.
+    Otherwise it refuses with the numbers (`gpu_fit`) instead of trying.
+  - Such models are read into memory, not mmap'd (`use_mmap: false`, which
+    Ollama turns into llama-server `--load-mode none`). With mmap and no cap,
+    loading gpt-oss:120b once froze the whole desktop.
+  - Ollama has a hard memory cap: all RAM but 8 GiB (`MemoryMax`, with
+    `MemoryHigh` 2 GiB below). setup.sh works it out from `/proc/meminfo`
+    and writes it to `ollama.service.d/10-ollama1-memory.conf`.
+    - A load that doesn't fit ends in Ollama's own cgroup: the kernel kills
+      the runner, Ollama carries on (`OOMPolicy=continue`), and the app gets
+      `ram_oom`. The desktop stays up.
+    - Ollama can't use swap at all (`MemorySwapMax=0`). A load that makes
+      anything else swap is unloaded and refused (`ram_pressure`).
+  - **gpt-oss:120b is experimental on a 64 GB machine.**
+    - The estimate puts it within about 1 GiB of the limit either way,
+      depending on its exact file size. At 4096 it needs about 66.6 GiB if
+      the file is about 61 GiB (the gateway refuses it), or about 62.4 GiB
+      if it is 61 GB (it fits).
+    - Before relying on it, run the controlled test at the desktop (below).
+      The smaller mixture-of-experts models (gemma4:26b, qwen3.6:35b) are
+      well inside the limits.
   - A `ram` model runs alone: other models are unloaded before it loads,
     and it is unloaded before a GPU-only model runs.
   - The only flag is `ram`. A line with any other word after the name is
     ignored entirely, and the panel shows it with the reason.
+  - **The controlled test** for a big `ram` model, run at the desktop:
+
+    ```bash
+    sudo bash ~/concordeai/ollama1/tools/ram-model-test.sh gpt-oss:120b 4096
+    ```
+
+    - It shows the gateway's estimate and verdict and asks for `yes`. Then
+      it caps Ollama's memory for this boot and unloads everything.
+    - It loads the model with mmap off, logs memory once a second, and kills
+      Ollama as a last resort if the machine gets under 1.5 GiB free.
+    - It reports one of three things:
+      - loaded, with the GPU/RAM split and tokens per second;
+      - stopped by Ollama's memory limit, with the desktop fine;
+      - stopped by the watchdog.
+    - Then it unloads the model. The log is `/var/log/ollama1-ram-test.log`.
 - **Dashboard:** it's on the monitor, and `ollama1-top` shows it over SSH
   (`q` quits). It shows the following, and never a prompt or an answer:
   - tokens per second (now, 1 h, 24 h) and requests;

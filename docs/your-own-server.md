@@ -38,7 +38,7 @@ It is for people comfortable with a Linux shell. The pieces are in
 | OS | Ubuntu 24.04 or newer, or Debian 12 or newer. x86_64, systemd |
 | Python | 3.11 or newer, with `python3-nacl` |
 | GPU | NVIDIA with its driver installed (`nvidia-smi` works); or AMD with a card ROCm supports (for example RX 6800/6900, RX 7000, RX 9000 series); or none (see below) |
-| Memory | enough RAM for the models you mark `ram`, plus 6 GB for the system |
+| Memory | enough RAM for the models you mark `ram`, plus 8 GiB (or 12%) for the system |
 | Disk | room for the models: 5–20 GB each for most, 60+ GB for the largest |
 | Access | an account with sudo, and SSH to the machine |
 
@@ -227,8 +227,18 @@ qwen3:14b
 gpt-oss:120b    ram
 ```
 
-- A `ram` model may use VRAM plus the RAM that is free, less 6 GB kept for
-  the system. gpt-oss:120b, about 61 GB, wants a 16 GB GPU and 64 GB of RAM.
+- A `ram` model may use VRAM plus the RAM that is free, less the larger of
+  8 GiB and 12% of RAM. It is counted at its full resident size: weights,
+  context cache and 2.5 GiB of compute buffers. gpt-oss:120b is right at
+  the edge of a 16 GB GPU with 64 GB of RAM; treat that as experimental.
+- `ram` models are loaded with mmap off (`use_mmap: false`). Give Ollama a
+  hard memory cap so a load that doesn't fit can't take the machine down.
+  Add `/etc/systemd/system/ollama.service.d/10-memory.conf` with
+  `[Service]`, then `MemoryMax=` your RAM less 8 GiB, `MemoryHigh=` 2 GiB
+  below that, and `MemorySwapMax=0`. Put the same `MemoryMax` in bytes in
+  `config.json` as `"ollama_memory_max_bytes"`.
+- Try a big one once with `sudo bash ollama1/tools/ram-model-test.sh <model> 4096`
+  before relying on it: it caps Ollama, loads with a watchdog, and reports.
 - It is refused if loading it would push the machine into swap. Ollama is
   not allowed swap at all.
 - It runs alone: other models are unloaded first.
@@ -327,6 +337,7 @@ first: pairing is refused on this listener.
 | `gpu_fit` | the model is too big for the VRAM at that context; the error carries the numbers |
 | `gpu_spill` | Ollama put part of a GPU-only model on the CPU; use a smaller model or context, or mark an MoE model `ram` |
 | `ram_pressure` | not enough free RAM for that `ram` model; close other programs or pick a smaller one |
+| `ram_oom` | the load ran out of Ollama's memory cap and was stopped (the machine is fine); use a smaller context or model |
 | Every model refused | Ollama didn't find the GPU: `journalctl -u ollama \| grep -i -E "inference compute\|cuda\|rocm"` |
 | `ollama list` says connection refused | expected without sudo: the port guard lets only root and the services reach Ollama |
 | Pairing says no window | `sudo ollama1-pair` must be running at the server (5 minutes) |

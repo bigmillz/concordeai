@@ -96,11 +96,16 @@ def context_max(model_info):
     return int(v) if isinstance(v, int) and v > 0 else None
 
 
-def fit_estimate(weights_bytes, model_info, n_ctx):
-    """Bytes of VRAM the model needs: weights, KV cache, and a margin for
-    the compute graph (5% of weights + 256 MiB)."""
+RAM_COMPUTE_BYTES = 5 << 29   # 2.5 GiB: compute buffers on both the GPU and the CPU side
+
+
+def fit_estimate(weights_bytes, model_info, n_ctx, ram=False):
+    """Bytes the model needs resident: weights, KV cache, and a margin for
+    the compute graph (5% of weights + 256 MiB). A model split between GPU
+    and system memory ('ram') has compute buffers on both sides, so it is
+    counted with 2.5 GiB instead of 256 MiB."""
     kv = kv_cache_bytes(model_info, n_ctx)
-    need = int(weights_bytes) + int(weights_bytes * 0.05) + (256 << 20)
+    need = int(weights_bytes) + int(weights_bytes * 0.05) + (RAM_COMPUTE_BYTES if ram else (256 << 20))
     if kv is not None:
         need += kv
     return need, kv

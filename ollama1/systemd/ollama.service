@@ -37,6 +37,15 @@ RestartSec=3
 # Nothing a request carried may reach the disk: no core dumps, no swap.
 LimitCORE=0
 MemorySwapMax=0
+# A hard memory cap (MemoryMax, MemoryHigh) comes from setup.sh as a drop-in,
+# ollama.service.d/10-ollama1-memory.conf: RAM minus 8 GiB, so a load too
+# big for the machine ends in Ollama's own cgroup (its runner is a child of
+# "ollama serve", so it is inside the same cap) instead of freezing the
+# desktop, as loading gpt-oss:120b with mmap once did. If the OOM killer
+# stops a runner, "ollama serve" keeps going and reports the failed load;
+# the gateway answers ram_oom. If "ollama serve" itself dies, Restart=always
+# brings it back.
+OOMPolicy=continue
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes

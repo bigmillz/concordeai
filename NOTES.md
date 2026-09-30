@@ -349,6 +349,53 @@ provider comes later and follows `ollama1/PROTOCOL.md`. How to run it is in
   - The gateway gets `OOMScoreAdjust=-500`.
   - probe_none_pair.py and probe_ram.py are now tests, with mutants.
   - Suite: 205 tests; 80 mutants, all caught.
+- **gpt-oss:120b froze the desktop** when it was run straight into Ollama
+  (`sudo ollama run`, no gateway). The journal stops mid-load, after
+  `load_mode = mmap` and llama.cpp's "tensor overrides to CPU are used with
+  mmap enabled", with no OOM or GPU message. The likely cause: the CPU half
+  (about 45 GiB) sat in mmap'd page cache, with no memory cap, so the
+  kernel thrashed on reclaim instead of killing anything. Changes:
+  - A hard cap on `ollama.service`: `MemoryMax` = MemTotal − 8 GiB,
+    `MemoryHigh` 2 GiB below, from `/proc/meminfo`, in a drop-in written by
+    setup.sh and checked after the restart. `MemorySwapMax=0` stays.
+    - The runner is a child of `ollama serve`, so it is inside the same
+      cgroup; the test script lists the cgroup's processes to show it.
+    - `OOMPolicy=continue`: the kernel kills the runner and `serve` keeps
+      going.
+    - The gateway reads `oom_kill` from the cgroup's `memory.events` and
+      answers `ram_oom` if a load was stopped.
+    - Ollama failures (connection reset mid-load or mid-stream) are no
+      longer taken for the client leaving: the gateway answers 502 `ollama`,
+      or an error line when streaming.
+  - `ram` models go with `options.use_mmap: false`, both in the gateway's
+    warm load and in the request. In Ollama v0.34.4's `llm/llama_server.go`,
+    `appendLoadModeArgs` turns that into llama-server `--load-mode none`
+    (the flag the warning asked for). `needsReload` compares UseMMap, so both
+    requests must agree, and they do. There is no OLLAMA_* env for it, and
+    setting it per request keeps GPU-only models on mmap (fine for them).
+    Unverified on 0.35.x, which is on the desktop; the test script checks the
+    journal for the mmap warning and for `--load-mode none`.
+  - A stricter fit for `ram` models: 2.5 GiB of compute buffers instead of
+    256 MiB, a margin of max(8 GiB, 12% of RAM), and the RAM part must also
+    fit under Ollama's MemoryMax less 1 GiB (`ollama_memory_max_bytes`,
+    written by setup).
+    - On this machine (60.7 GiB RAM, about 58.5 GiB free, 16 GiB VRAM) the
+      budget is about 65.7 GiB.
+    - gpt-oss:120b at 4096 needs about 66.6 GiB if its file is 61 GiB (the
+      gateway refuses it, clearly) or 62.4 GiB if it is 61 GB (it fits).
+      Either way it is within about 1 GiB of the limit. The README calls it
+      experimental on 64 GB machines.
+  - `tools/ram-model-test.sh` is the controlled live test Patrick runs with
+    sudo:
+    - it shows the gateway's verdict and asks for yes;
+    - it sets the cap with `systemctl set-property --runtime` (and won't
+      load unless it took);
+    - it unloads everything, loads with `use_mmap: false`, logs memory
+      every second, and kills Ollama if the host drops under 1.5 GiB free;
+    - it reports loaded (split, tok/s, peak) / stopped by the limit /
+      stopped by the watchdog, then unloads.
+  - Suite: 215 tests; 86 mutants, all caught. The gateway gets `OOMScoreAdjust=-500` (the previous commit). Its
+    verdict code is tested against the stub; the rest is static-checked.
 - Tested on the Mac: 199 unit tests (incl. shellcheck, the polkit rule in
   node, the setup disk steps against fake mdadm/blkid/lsblk, the guide's
   file and config references). All 75 mutants are caught

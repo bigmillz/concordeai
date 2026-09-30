@@ -278,6 +278,7 @@ class Gateway:
         self.inflight = threading.BoundedSemaphore(int(cfg.get("max_inflight") or 16))
         self.last_device = None   # whose request last ran on the GPU (see switch_device)
         self.meminfo = o1stats.meminfo
+        self.oom_kills = o1stats.ollama_oom_kills
         self._allow_key = object()
         self._ram = set()
         self.tags = {}
@@ -385,11 +386,18 @@ class Gateway:
         vram = max(0, total - int(self.cfg["vram_reserve_mib"]) * (1 << 20)) if total else 0
         if not ram:
             return vram or None
-        avail = int(self.meminfo().get("MemAvailable", 0))
+        mi = self.meminfo()
+        avail = int(mi.get("MemAvailable", 0))
         for m in self.stats.loaded:
             avail += max(0, int(m.get("size") or 0) - int(m.get("size_vram") or 0))
-        margin = max(6, int(self.cfg.get("ram_margin_gib") or 6)) << 30
-        return max(0, vram + avail - margin)
+        margin = max(8 << 30, int(mi.get("MemTotal", 0) * 0.12), int(self.cfg.get("ram_margin_gib") or 8) << 30)
+        ram_part = avail - margin
+        cap = int(self.cfg.get("ollama_memory_max_bytes") or 0)
+        if cap:
+            # Ollama's own MemoryMax (set by setup.sh): the part in system
+            # memory must fit under it, with 1 GiB for Ollama itself.
+            ram_part = min(ram_part, cap - (1 << 30))
+        return max(0, vram + max(0, ram_part))
 
     def fit_check(self, name, entry, n_ctx, ram=False, explicit=True):
         """Refuses a model that can't fit; returns the num_ctx to use. A
@@ -403,7 +411,7 @@ class Gateway:
         if ram and not explicit:
             tries += [c for c in (4096, 2048) if c < n_ctx]
         for c in tries:
-            need, kv = o1ollama.fit_estimate(int(entry.get("size") or 0), info["model_info"], c)
+            need, kv = o1ollama.fit_estimate(int(entry.get("size") or 0), info["model_info"], c, ram)
             if need <= budget:
                 return c
         where = "VRAM plus free system memory" if ram else "VRAM"
@@ -446,6 +454,15 @@ class Gateway:
             raise GatewayError(503, "busy", "the desktop could not unload another model first; try again")
         log("make-room", model=",".join(victims))
 
+    def check_oom(self, before):
+        """If Ollama's memory limit stopped the load, say so plainly."""
+        after = self.oom_kills() if before is not None else None
+        if before is not None and after is not None and after > before:
+            log("ram-oom", reason="ollama_memory_limit")
+            raise GatewayError(507, "ram_oom",
+                               "the model did not fit in memory: Ollama's memory limit stopped the load "
+                               "(the desktop itself is fine); try a smaller num_ctx or model")
+
     def check_placement(self, name, ram, before):
         """After loading: a GPU-only model must be 100% in VRAM; a 'ram'
         model may share, but loading it must not have pushed anything into
@@ -464,7 +481,10 @@ class Gateway:
                                "loading the model would push the desktop into swap; it was unloaded")
 
     def gpu_share(self, name):
-        st, data = o1ollama.call(self.base, "GET", "/api/ps", timeout=10)
+        try:
+            st, data = o1ollama.call(self.base, "GET", "/api/ps", timeout=10)
+        except OSError:
+            raise GatewayError(502, "ollama", "Ollama is not answering")
         if st != 200 or not isinstance(data, dict):
             raise GatewayError(502, "ollama", "Ollama is not answering")
         for m in data.get("models", []) or []:
@@ -534,10 +554,16 @@ class Gateway:
                 507, "gpu_spill",
                 "model did not fit entirely in VRAM (%d%% on GPU); it was unloaded" % int(share * 100))
 
-    def warm_load(self, name, n_ctx):
-        st, data = o1ollama.call(self.base, "POST", "/api/generate",
-                                 {"model": name, "prompt": "", "stream": False,
-                                  "options": {"num_ctx": n_ctx}}, timeout=600)
+    def warm_load(self, name, n_ctx, ram=False):
+        opts = {"num_ctx": n_ctx}
+        if ram:
+            opts["use_mmap"] = False   # see shape()
+        try:
+            st, data = o1ollama.call(self.base, "POST", "/api/generate",
+                                     {"model": name, "prompt": "", "stream": False,
+                                      "options": opts}, timeout=900)
+        except OSError:
+            raise GatewayError(502, "ollama", "Ollama stopped while loading the model")
         if st != 200:
             msg = (data or {}).get("error") if isinstance(data, dict) else None
             raise GatewayError(400 if st < 500 else 502, "ollama",
@@ -562,6 +588,13 @@ class Gateway:
             n_ctx = max(512, min(want, cmax, int(self.cfg["num_ctx_max"])))
             clean["num_ctx"] = n_ctx
             out["stream"] = obj.get("stream", True) is not False
+        if ram:
+            # A model split between GPU and system memory is read into
+            # memory Ollama allocates, not mmap'd: with mmap, the CPU part
+            # sits in page cache that the kernel can't account to Ollama's
+            # limit in time, and loading gpt-oss:120b froze the desktop.
+            # Ollama turns use_mmap=false into llama-server --load-mode none.
+            clean["use_mmap"] = False
         out["options"] = clean
         return out, n_ctx, "num_ctx" in opts
 
@@ -779,8 +812,13 @@ def make_handler(gw, lan=False):
                 gw.switch_device(dev_id)
                 gw.make_room(name, ram)
                 before = gw.meminfo() if ram else {}
+                oom_before = gw.oom_kills() if ram else None
                 if kind in ("chat", "generate"):
-                    gw.warm_load(name, n_ctx)
+                    try:
+                        gw.warm_load(name, n_ctx, ram)
+                    except GatewayError:
+                        gw.check_oom(oom_before)
+                        raise
                     gw.check_placement(name, ram, before)
                     if streaming:
                         self.relay_stream(kind, fwd, rec)
@@ -844,10 +882,20 @@ def make_handler(gw, lan=False):
 
         def relay_stream(self, kind, fwd, rec):
             conn = o1ollama.connect(gw.base, timeout=600)
+
+            def upstream_line(r):
+                # Ollama's side failing is not the client going away.
+                try:
+                    return r.readline(16 << 20)
+                except OSError:
+                    raise GatewayError(502, "ollama", "Ollama stopped answering")
             try:
-                conn.request("POST", "/api/" + kind, body=json.dumps(fwd).encode("utf-8"),
-                             headers={"Content-Type": "application/json"})
-                r = conn.getresponse()
+                try:
+                    conn.request("POST", "/api/" + kind, body=json.dumps(fwd).encode("utf-8"),
+                                 headers={"Content-Type": "application/json"})
+                    r = conn.getresponse()
+                except OSError:
+                    raise GatewayError(502, "ollama", "Ollama stopped answering")
                 if r.status != 200:
                     data = r.read(1 << 20)
                     try:
@@ -856,7 +904,7 @@ def make_handler(gw, lan=False):
                         msg = ""
                     raise GatewayError(r.status, "ollama", "Ollama: %s" % safe_label(msg or r.status, 200))
                 while True:
-                    line = r.readline(16 << 20)
+                    line = upstream_line(r)
                     if not line:
                         break
                     self.chunk(line)
@@ -878,7 +926,10 @@ def make_handler(gw, lan=False):
                 conn.close()
 
         def relay_whole(self, kind, fwd, rec, check_after):
-            st, data = o1ollama.call(gw.base, "POST", "/api/" + kind, fwd, timeout=600)
+            try:
+                st, data = o1ollama.call(gw.base, "POST", "/api/" + kind, fwd, timeout=600)
+            except OSError:
+                raise GatewayError(502, "ollama", "Ollama stopped answering")
             if st != 200 or not isinstance(data, dict):
                 msg = data.get("error") if isinstance(data, dict) else ""
                 raise GatewayError(st if st >= 400 else 502, "ollama",

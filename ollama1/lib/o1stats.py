@@ -142,6 +142,20 @@ def meminfo():
     return info
 
 
+def ollama_oom_kills(unit="ollama.service"):
+    """How many times the kernel's OOM killer has struck inside Ollama's
+    cgroup (its MemoryMax); None if that can't be read."""
+    path = SYS + "/fs/cgroup/system.slice/%s/memory.events" % unit
+    for line in (_read(path, "") or "").splitlines():
+        k, _, v = line.partition(" ")
+        if k == "oom_kill":
+            try:
+                return int(v)
+            except ValueError:
+                return None
+    return None
+
+
 def loadavg():
     try:
         return [float(x) for x in (_read(PROC + "/loadavg", "") or "").split()[:3]]
