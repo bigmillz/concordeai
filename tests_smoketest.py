@@ -18983,6 +18983,7 @@ def _fi_ns(src, images=None, text=None, pages=None, has=True, calls=None):
         meta.extend((pages or (lambda u: []))(urls))
         return []
     ns = {"re": re, "time": time, "threading": _t340, "urllib": urllib,
+          "profile_cache": lambda name, obj: obj,
           "DDGS": _D, "IS_WIN": False, "HAS_SEARCH": has, "_RESULTS_TTL": 300.0,
           "_search_proxy": lambda: None, "_ddg_text": _txt, "_fetch_pages": _fp,
           "ctx_thread": lambda target, args=(), daemon=True: _t340.Thread(

@@ -22122,7 +22122,7 @@ _FIMG_BAD_HOST = re.compile(
     r"(^|\.)(shutterstock|istockphoto|gettyimages|dreamstime|alamy|123rf|"
     r"depositphotos|vecteezy|freepik|ftcdn|envatousercontent|fbsbx|"
     r"instagram|cdninstagram|tiktokcdn|ytimg|scribdassets)\.", re.I)
-_fimg_cache = {}                       # query -> (when, rows found)
+_fimg_cache = profile_cache("_fimg_cache", {})   # query -> (when, rows)
 _fimg_cache_lock = threading.Lock()
 
 
@@ -22144,10 +22144,10 @@ def _fimg_keys(url: str) -> set:
 
 def _fimg_ok(row) -> str:
     """The row's picture URL when it can be a card's photo, else ""."""
-    u = str(row.get("image") or "").strip()
-    if not u.startswith("https://") or len(u) > 400:
+    img = str(row.get("image") or "").strip()
+    if not img.startswith("https://") or len(img) > 400:
         return ""        # https only (6b310), and nothing absurd
-    p = urllib.parse.urlsplit(u)
+    p = urllib.parse.urlsplit(img)
     path = urllib.parse.unquote(p.path).lower()
     if (re.search(r"\.(svg|gif|ico|bmp)$", path)
             or _FIMG_BAD_HOST.search(p.hostname or "")
@@ -22161,7 +22161,7 @@ def _fimg_ok(row) -> str:
     if w and h and (w < _FIMG_MIN[0] or h < _FIMG_MIN[1]
                     or not 0.5 <= w / h <= 2.6):
         return ""        # a thumbnail, or a strip: a banner or a tower
-    return u
+    return img
 
 
 def _fimg_rank(rows, label: str = "") -> list:
