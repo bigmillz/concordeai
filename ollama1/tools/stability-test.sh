@@ -3,7 +3,8 @@
 #
 # The desktop once reset itself with a fatal CPU hardware error ("Machine
 # Check") while loading a big model, so this runs the loads that found it,
-# one phase at a time, and keeps a record that survives a crash:
+# all at once by default (or one phase at a time), and keeps a record that
+# survives a crash:
 #
 #   cpu      every core, floating-point maths, results checked
 #   memory   about 60% of the free memory, written and read back, checked
@@ -11,9 +12,9 @@
 #            nonstop (Ollama), which loads its compute and its memory both
 #   all      all three at once (the combination that crashed it)
 #
-#   sudo bash stability-test.sh                 four phases, 5 minutes each
-#   sudo bash stability-test.sh --minutes 15    longer phases (a real soak)
-#   sudo bash stability-test.sh --phases cpu,memory
+#   sudo bash stability-test.sh                 all three at once, 10 minutes
+#   sudo bash stability-test.sh --minutes 30    a longer soak
+#   sudo bash stability-test.sh --phases cpu,memory,gpu,all   each alone first, then all at once
 #   sudo bash stability-test.sh --model gemma4:12b   the model for the gpu load
 #   bash stability-test.sh status               the last run, and any hardware
 #                                               errors logged since this boot
@@ -37,9 +38,9 @@ TICK=${O1_STABILITY_TICK:-5}
 CPU_ABORT_C=95
 GPU_ABORT_C=105
 MODEL=gemma4:12b
-MINUTES=5
+MINUTES=10
 SECS_OVERRIDE=""
-PHASES=cpu,memory,gpu,all
+PHASES=all
 
 usage() { awk 'NR > 1 && /^#/ {sub(/^# ?/, ""); print; next} NR > 1 {exit}' "$0"; }
 say() { printf '%s\n' "$*" | tee -a "$LOG"; }

@@ -318,6 +318,17 @@ class TestStabilityTest(unittest.TestCase):
         self.assertRegex(src, r'num_ctx\\":8192,\\"num_predict\\":8\}')    # read a lot, say little
         self.assertRegex(src, r'num_ctx\\":8192,\\"num_predict\\":500\}')  # say a lot
 
+    def test_the_default_is_everything_at_once(self):
+        """No options: one phase, 'all' (CPU, memory and GPU together), not the
+        four separate ones."""
+        code, out = self.run_script("--seconds", "3")
+        self.assertEqual(code, 0, out)
+        rec = self.record()
+        self.assertIn("result all OK", rec)
+        for other in ("result cpu", "result memory", "result gpu"):
+            self.assertNotIn(other, rec)
+        self.assertIn("phases all, 10 min each", out)
+
     def test_a_gpu_phase_with_no_answers_fails(self):
         code, out = self.run_script("--phases", "gpu", "--seconds", "3", env={"FAKE_NO_ANSWER": "1"})
         self.assertEqual(code, 1, out)
