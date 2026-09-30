@@ -56,6 +56,7 @@ import o1gpu  # noqa: E402
 import o1stats  # noqa: E402
 
 VERSION = "1"
+GPU_RECHECK_S = 15      # how often a missing card is looked for again (Gateway.gpu)
 
 # Top-level fields and options passed on to Ollama. Anything else is dropped.
 # Options that change how a model loads (num_gpu, main_gpu, low_vram,
@@ -305,7 +306,8 @@ class Gateway:
         self.last_device = None   # whose request last ran on the GPU (see switch_device)
         self.meminfo = o1stats.meminfo
         self.oom_kills = o1stats.ollama_oom_kills
-        self.gpu_info = o1gpu.detect()   # vendor, name, vram_bytes: detected once
+        self.gpu_info = o1gpu.detect()   # vendor, name, vram_bytes (see gpu())
+        self.gpu_at = time.monotonic()
         self._allow_key = object()
         self._ram = set()
         self.tags = {}
@@ -314,6 +316,17 @@ class Gateway:
         self.lan_net = ipaddress.ip_network(cfg["lan_cidr"], strict=False)
 
     # -- Access ---------------------------------------------------------
+
+    def gpu(self):
+        """The card: detected when the gateway starts, and kept once one is
+        found. At boot the gateway can start a moment before the graphics
+        driver has finished (seen: 2 s), which once left it saying "no card"
+        until the next restart, so while none is found it looks again, at
+        most every GPU_RECHECK_S seconds."""
+        if not (self.gpu_info or {}).get("vendor") and time.monotonic() - self.gpu_at >= GPU_RECHECK_S:
+            self.gpu_at = time.monotonic()
+            self.gpu_info = o1gpu.detect()
+        return self.gpu_info
     def check_access(self, headers, lan, client_ip, method="GET"):
         if lan:
             if not self.cfg.get("lan_mode"):
@@ -791,7 +804,7 @@ def make_handler(gw, lan=False):
             if any(route.startswith(p) for p in NEVER):
                 raise GatewayError(404, "not_found", "not available through the gateway")
             if method == "GET" and route == "/v1/info":
-                g = gw.gpu_info or {}
+                g = gw.gpu() or {}
                 return self.send_json(200, {"gpu": {"vendor": g.get("vendor"), "name": g.get("name"),
                                                     "vram_bytes": g.get("vram_bytes")}})
             if method == "GET" and route == "/v1/whoami":

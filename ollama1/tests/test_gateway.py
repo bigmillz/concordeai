@@ -234,17 +234,49 @@ class TestSignatures(unittest.TestCase):
         self.assertEqual(call("GET", "/v1/info", dev=False)[0], 401)          # signed only
         self.assertEqual(call("GET", "/v1/info", dev=U.Device())[0], 403)     # paired only
 
-    def test_info_detected_once(self):
-        mod = G["mod"]
+    def test_info_found_card_detected_once(self):
+        mod, gw = G["mod"], G["gw"]
         calls = []
-        real = mod.o1gpu.detect
+        real, saved, saved_at = mod.o1gpu.detect, gw.gpu_info, gw.gpu_at
+        gw.gpu_info = {"vendor": "amd", "name": "Radeon RX 6900 XT", "vram_bytes": 17163091968}
+        gw.gpu_at = time.monotonic() - 3600          # however long ago it was found
         mod.o1gpu.detect = lambda: calls.append(1) or {"vendor": None, "name": None, "vram_bytes": None}
         try:
             for _ in range(3):
-                call("GET", "/v1/info")
+                st, data, _ = call("GET", "/v1/info")
         finally:
-            mod.o1gpu.detect = real
-        self.assertEqual(calls, [])       # the value from start-up is served
+            mod.o1gpu.detect, gw.gpu_info, gw.gpu_at = real, saved, saved_at
+        self.assertEqual(calls, [])       # the card found at start-up is served, not looked for again
+        self.assertEqual(json.loads(data)["gpu"]["vendor"], "amd")
+
+    def test_info_looks_again_until_a_card_is_found(self):
+        """The gateway can start a moment before the graphics driver has
+        finished at boot (it did, by 2 s, and then said "no card" until it
+        was restarted). While none is found it looks again, but not on every
+        request; once found it stops."""
+        mod, gw = G["mod"], G["gw"]
+        none = {"vendor": None, "name": None, "vram_bytes": None}
+        card = {"vendor": "amd", "name": "Radeon RX 6900 XT", "vram_bytes": 17163091968}
+        answers, calls = [none, card], []
+        real, saved, saved_at = mod.o1gpu.detect, gw.gpu_info, gw.gpu_at
+        mod.o1gpu.detect = lambda: calls.append(1) or answers[min(len(calls), 2) - 1]
+        gw.gpu_info, gw.gpu_at = none, time.monotonic()          # started with no card, just now
+        try:
+            self.assertIsNone(json.loads(call("GET", "/v1/info")[1])["gpu"]["vendor"])
+            self.assertEqual(calls, [])                          # too soon to look again
+            gw.gpu_at = time.monotonic() - (mod.GPU_RECHECK_S + 1)
+            self.assertIsNone(json.loads(call("GET", "/v1/info")[1])["gpu"]["vendor"])
+            self.assertEqual(len(calls), 1)                      # looked: still none
+            self.assertIsNone(json.loads(call("GET", "/v1/info")[1])["gpu"]["vendor"])
+            self.assertEqual(len(calls), 1)                      # not on every request
+            gw.gpu_at = time.monotonic() - (mod.GPU_RECHECK_S + 1)
+            self.assertEqual(json.loads(call("GET", "/v1/info")[1])["gpu"]["vendor"], "amd")
+            self.assertEqual(len(calls), 2)                      # found
+            gw.gpu_at = time.monotonic() - 3600
+            self.assertEqual(json.loads(call("GET", "/v1/info")[1])["gpu"]["name"], "Radeon RX 6900 XT")
+            self.assertEqual(len(calls), 2)                      # and kept
+        finally:
+            mod.o1gpu.detect, gw.gpu_info, gw.gpu_at = real, saved, saved_at
 
     def test_whoami(self):
         st, data, _ = call("GET", "/v1/whoami")
