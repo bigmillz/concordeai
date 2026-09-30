@@ -396,6 +396,46 @@ provider comes later and follows `ollama1/PROTOCOL.md`. How to run it is in
       stopped by the watchdog, then unloads.
   - Suite: 215 tests; 86 mutants, all caught. The gateway gets `OOMScoreAdjust=-500` (the previous commit). Its
     verdict code is tested against the stub; the rest is static-checked.
+- **Second try: OOM-killed, the host survived.** Patrick ran it again, now
+  with the cap from the unit. The kernel OOM-killed llama-server at about
+  62 GB anon-rss; ollama.service logged `oom-kill` and restarted. Ollama's
+  own estimate said "Host 4772 MiB ... no changes needed" and missed a
+  **CPU_REPACK 58092 MiB** buffer: llama.cpp repacked nearly the whole model
+  into anonymous CPU memory and put little on the GPU.
+  - Knobs, from Ollama v0.34.4's `llm/llama_server.go` and llama.cpp's
+    `common/arg.cpp`:
+    - Ollama passes its environment to llama-server, so `LLAMA_ARG_*`
+      variables on ollama.service reach it: `LLAMA_ARG_REPACK=false`
+      (`--no-repack`), `LLAMA_ARG_N_GPU_LAYERS=all`,
+      `LLAMA_ARG_N_CPU_MOE=N`, `LLAMA_ARG_FIT=off`.
+    - Requests only have `use_mmap` (becomes `--load-mode none`) and
+      `num_gpu` (becomes `-ngl`).
+    - There is no OLLAMA_* variable or request option for repacking.
+  - The gateway now counts a `ram` model against system memory alone
+    (VRAM ignored) unless `ollama_no_repack` is true. Only then does
+    VRAM+RAM count, and mmap stay on (file-backed, evictable). With the
+    default, gpt-oss:120b is refused with a clear message.
+  - `tools/ram-model-test.sh` (Python in `ram_model_test.py`) measures
+    configurations, each under a runtime drop-in cap with an Ollama
+    restart:
+    - `norepack`: repack off, mmap on, automatic placement;
+    - `norepack-moe`: all layers on the GPU but the experts of the first N;
+    - `swap`: defaults plus the encrypted swap, if on;
+    - optional `gateway`: today's request, expected to OOM.
+
+    It records load, split, buffers, peaks, min free, TTFT and tok/s, then
+    restores Ollama.
+  - Encrypted swap is opt-in and undoable: `setup.sh --encrypted-swap 32G`
+    and `--remove-encrypted-swap` (`tools/encrypted-swap.sh`). It is plain
+    dm-crypt over `/swap-ollama1.img` with a random key each boot, via
+    `/etc/crypttab` (`/dev/urandom swap,cipher=aes-xts-plain64,size=256`),
+    and replaces the plain `/swap.img`.
+    - It does not lift Ollama's `MemorySwapMax=0`; only the test's `swap`
+      configuration does, and the gateway still refuses a load that swaps.
+    - Both choices wait for the numbers.
+  - Unverified: systemd-cryptsetup attaching a regular file (it sets up a
+    loop device), and the `LLAMA_ARG_*` behaviour on 0.35.x.
+  - Suite: 226 tests; the repack rule has two new mutants.
 - Tested on the Mac: 199 unit tests (incl. shellcheck, the polkit rule in
   node, the setup disk steps against fake mdadm/blkid/lsblk, the guide's
   file and config references). All 75 mutants are caught

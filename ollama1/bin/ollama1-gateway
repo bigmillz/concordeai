@@ -378,14 +378,17 @@ class Gateway:
             self._allow_key = key
         return any(o1ollama.same_model(n, name) for n in self._ram)
 
-    def budget(self, ram):
+    def budget(self, ram, host_only=False):
         """Bytes a model may take: VRAM less the reserve; for 'ram' models
         plus the system RAM available now (and what loaded models hold in
-        RAM, since they are unloaded first), less a margin for the OS."""
+        RAM, since they are unloaded first), less a margin for the OS.
+        host_only: the system-memory part alone."""
         total = self.vram_total()
         vram = max(0, total - int(self.cfg["vram_reserve_mib"]) * (1 << 20)) if total else 0
         if not ram:
             return vram or None
+        if host_only:
+            vram = 0
         mi = self.meminfo()
         avail = int(mi.get("MemAvailable", 0))
         for m in self.stats.loaded:
@@ -404,7 +407,15 @@ class Gateway:
         'ram' model without an explicit num_ctx steps down to 4096, then
         2048, before it is refused."""
         info = self.model_info(name, entry)
-        budget = self.budget(ram)
+        # With llama.cpp's CPU weight repacking on (Ollama's default), the
+        # CPU copy of the weights is an anonymous buffer whose size Ollama
+        # doesn't predict: on the desktop gpt-oss:120b got a 58 GiB
+        # CPU_REPACK buffer and almost nothing on the GPU. So a 'ram' model
+        # must then fit in system memory on its own, as if nothing went to
+        # the GPU. Only with repacking off (ollama_no_repack, which needs
+        # LLAMA_ARG_REPACK=false in ollama.service) does VRAM count too.
+        host_only = ram and not self.cfg.get("ollama_no_repack")
+        budget = self.budget(ram, host_only)
         if budget is None:
             return n_ctx  # no VRAM figure: the /api/ps check after loading still applies
         tries = [n_ctx]
@@ -414,7 +425,8 @@ class Gateway:
             need, kv = o1ollama.fit_estimate(int(entry.get("size") or 0), info["model_info"], c, ram)
             if need <= budget:
                 return c
-        where = "VRAM plus free system memory" if ram else "VRAM"
+        where = ("free system memory (the whole model, since weight repacking is on)" if host_only
+                 else "VRAM plus free system memory" if ram else "VRAM")
         raise GatewayError(
             507, "gpu_fit",
             "model does not fit in %s at num_ctx %d: needs about %.1f GiB, %.1f GiB available"
@@ -556,7 +568,7 @@ class Gateway:
 
     def warm_load(self, name, n_ctx, ram=False):
         opts = {"num_ctx": n_ctx}
-        if ram:
+        if ram and not self.cfg.get("ollama_no_repack"):
             opts["use_mmap"] = False   # see shape()
         try:
             st, data = o1ollama.call(self.base, "POST", "/api/generate",
@@ -588,12 +600,13 @@ class Gateway:
             n_ctx = max(512, min(want, cmax, int(self.cfg["num_ctx_max"])))
             clean["num_ctx"] = n_ctx
             out["stream"] = obj.get("stream", True) is not False
-        if ram:
-            # A model split between GPU and system memory is read into
-            # memory Ollama allocates, not mmap'd: with mmap, the CPU part
-            # sits in page cache that the kernel can't account to Ollama's
-            # limit in time, and loading gpt-oss:120b froze the desktop.
-            # Ollama turns use_mmap=false into llama-server --load-mode none.
+        if ram and not self.cfg.get("ollama_no_repack"):
+            # With repacking on, the CPU weights are copied into anonymous
+            # memory anyway; read them straight in (Ollama turns
+            # use_mmap=false into llama-server --load-mode none) rather
+            # than mmap'ing the file as well. With repacking off, mmap stays
+            # on: the CPU weights are then file-backed page cache, which the
+            # kernel can evict under Ollama's MemoryMax instead of killing.
             clean["use_mmap"] = False
         out["options"] = clean
         return out, n_ctx, "num_ctx" in opts

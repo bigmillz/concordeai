@@ -753,11 +753,15 @@ class TestRamModels(unittest.TestCase):
             return m
         self.gw.meminfo = fake_meminfo
         self.gw.stats.loaded = []
+        # most of these tests run with repacking off, where VRAM counts too;
+        # the repack-on rules have their own tests below
+        self.gw.cfg["ollama_no_repack"] = True
         G["stub"].loaded.clear()
 
     def tearDown(self):
         import o1stats
         self.gw.meminfo = o1stats.meminfo
+        self.gw.cfg["ollama_no_repack"] = False
         os.unlink(self.allow)
         G["stub"].loaded.clear()
 
@@ -819,13 +823,44 @@ class TestRamModels(unittest.TestCase):
         ram, _ = o1ollama.fit_estimate(m["size"], m["info"], 4096, ram=True)
         self.assertEqual(ram - gpu, (5 << 29) - (256 << 20))
 
-    def test_mmap_off_for_ram_models_only(self):
+    def test_repack_on_counts_the_whole_model_in_ram(self):
+        """Repacking on (the default): the model must fit in system memory
+        alone. moe:120b (56 GiB) doesn't, although VRAM plus RAM would."""
+        self.gw.cfg["ollama_no_repack"] = False
+        st, data, _ = self.chat("moe:120b")
+        self.assertEqual(st, 507)
+        body = json.loads(data)
+        self.assertEqual(body["code"], "gpu_fit")
+        self.assertIn("whole model", body["error"])
+        self.assertNotIn("moe:120b", G["stub"].loaded)
+        vram = 16 * self.GIB - (768 << 20)
+        self.assertEqual(self.gw.budget(True, host_only=True) + vram, self.gw.budget(True))
+
+    def test_repack_on_reads_ram_models_without_mmap(self):
+        self.gw.cfg["ollama_no_repack"] = False
+        with open(self.allow, "w") as f:
+            f.write("small:8b ram\n")
+        n = len(G["stub"].calls)
+        self.assertEqual(self.chat("small:8b")[0], 200)
+        sent = [c[2] for c in G["stub"].calls[n:] if c[1] in ("/api/generate", "/api/chat")]
+        self.assertTrue(sent)
+        for body in sent:
+            self.assertIs(body["options"]["use_mmap"], False, body)     # the warm load and the chat
+
+    def test_repack_off_keeps_mmap(self):
         n = len(G["stub"].calls)
         self.assertEqual(self.chat("moe:120b")[0], 200)
         sent = [c[2] for c in G["stub"].calls[n:] if c[1] in ("/api/generate", "/api/chat")]
         self.assertTrue(sent)
         for body in sent:
-            self.assertIs(body["options"]["use_mmap"], False, body)     # the warm load and the chat
+            self.assertNotIn("use_mmap", body["options"], body)
+
+    def test_mmap_off_for_ram_models_only(self):
+        self.gw.cfg["ollama_no_repack"] = False
+        with open(self.allow, "w") as f:
+            f.write("small:8b ram\n")
+        with open(self.allow, "w") as f:
+            f.write("moe:120b ram\nsmall:8b\n")
         n = len(G["stub"].calls)
         self.assertEqual(self.chat("small:8b", options={"use_mmap": False})[0], 200)
         for c in G["stub"].calls[n:]:
@@ -1016,11 +1051,13 @@ class TestMakeRoomSpilled(unittest.TestCase):
         mem = {"MemTotal": 62 << 30, "MemAvailable": 58 << 30, "SwapTotal": 8 << 30, "SwapFree": 8 << 30}
         G["gw"].meminfo = lambda: dict(mem)
         G["gw"].stats.loaded = []
+        G["gw"].cfg["ollama_no_repack"] = True
         G["stub"].loaded.clear()
 
     def tearDown(self):
         import o1stats
         G["gw"].meminfo = o1stats.meminfo
+        G["gw"].cfg["ollama_no_repack"] = False
         if os.path.exists(self.allow):
             os.unlink(self.allow)
         G["stub"].loaded.clear()

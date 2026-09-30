@@ -76,6 +76,9 @@ DEFAULTS = {
     "num_ctx_default_ram": 8192,     # 'ram' models: stepped down to 4096/2048 if needed to fit
     "ram_margin_gib": 8,             # RAM kept free for the OS: at least 8 GiB or 12% of RAM
     "ollama_memory_max_bytes": 0,    # ollama.service's MemoryMax (setup.sh writes it); 0 = unknown
+    # True only when ollama.service runs llama-server with LLAMA_ARG_REPACK=false
+    # (see tools/ram-model-test.sh); until then a 'ram' model must fit in RAM alone.
+    "ollama_no_repack": False,
     "num_ctx_max": 131072,
     "vram_reserve_mib": 768,
     "vram_total_bytes": 0,           # 0 = read from amdgpu sysfs

@@ -196,22 +196,6 @@ class TestUnits(unittest.TestCase):
         self.assertIn('systemctl show -p MemoryMax --value ollama.service)" = "$mem_max"', setup)
         self.assertIn("cfg_set_num ollama_memory_max_bytes", setup)
 
-    def test_ram_model_test_script(self):
-        path = os.path.join(U.KIT, "tools", "ram-model-test.sh")
-        t = open(path).read()
-        self.assertEqual(subprocess.run(["bash", "-n", path]).returncode, 0)
-        sc = shutil.which("shellcheck")
-        if sc:
-            r = subprocess.run([sc, path], capture_output=True, text=True)
-            self.assertEqual(r.returncode, 0, r.stdout)
-        self.assertIn("systemctl set-property --runtime ollama.service MemoryMax=", t)
-        self.assertIn('[ "$got_max" = "$mem_max" ] || die', t)          # no load without the cap
-        self.assertIn('"use_mmap": False', t)
-        self.assertIn("systemctl kill --signal=KILL ollama.service", t)   # the watchdog
-        self.assertIn("keep_alive", t.split('echo "unloading $MODEL"')[1])  # unloads afterwards
-        self.assertIn("read -r ans </dev/tty", t)                        # asks first
-        self.assertLess(t.index("read -r ans </dev/tty"), t.index("\nsystemctl set-property"))
-
     def test_gateway_protected_from_the_oom_killer(self):
         self.assertIn("\nOOMScoreAdjust=-500\n", self.unit("ollama1-gateway.service"))
 

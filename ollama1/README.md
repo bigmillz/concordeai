@@ -366,48 +366,85 @@ around a little from time to time.
     model that fits in VRAM. The app shows these models as `gpu+ram`.
   - The gateway lets a `ram` model load only if its whole resident size
     fits. That size is its weights, the KV cache for the context, and 2.5 GiB
-    of compute buffers. It must fit in VRAM plus the free RAM, less the
-    larger of 8 GiB and 12% of RAM, and under Ollama's memory cap. If the
+    of compute buffers. The room it has is the free RAM, less the larger of
+    8 GiB and 12% of RAM, and it must stay under Ollama's memory cap. If the
     app didn't ask for a context size, it tries 8192, then 4096, then 2048.
     Otherwise it refuses with the numbers (`gpu_fit`) instead of trying.
-  - Such models are read into memory, not mmap'd (`use_mmap: false`, which
-    Ollama turns into llama-server `--load-mode none`). With mmap and no cap,
-    loading gpt-oss:120b once froze the whole desktop.
+  - **Repacking decides whether VRAM counts.** By default llama.cpp repacks
+    the weights it keeps on the CPU into a new anonymous buffer
+    (`CPU_REPACK`) whose size Ollama doesn't predict. On the desktop,
+    gpt-oss:120b got a 58 GiB `CPU_REPACK` buffer and almost nothing on the
+    GPU, and the kernel OOM-killed it at about 62 GB. So while repacking is
+    on (the default), the gateway counts the whole model against system
+    memory alone and ignores VRAM.
+    - VRAM counts too only when repacking is off. That takes both
+      `LLAMA_ARG_REPACK=false` in ollama.service and `"ollama_no_repack":
+      true` in config.json, and it is not the default until the test below
+      has shown the numbers.
+    - With repacking on, `ram` models are read without mmap
+      (`use_mmap: false`, llama-server `--load-mode none`). With it off,
+      mmap stays on: the CPU weights are then file-backed page cache, which
+      the kernel can evict under the cap.
   - Ollama has a hard memory cap: all RAM but 8 GiB (`MemoryMax`, with
     `MemoryHigh` 2 GiB below). setup.sh works it out from `/proc/meminfo`
     and writes it to `ollama.service.d/10-ollama1-memory.conf`.
     - A load that doesn't fit ends in Ollama's own cgroup: the kernel kills
       the runner, Ollama carries on (`OOMPolicy=continue`), and the app gets
-      `ram_oom`. The desktop stays up.
-    - Ollama can't use swap at all (`MemorySwapMax=0`). A load that makes
-      anything else swap is unloaded and refused (`ram_pressure`).
-  - **gpt-oss:120b is experimental on a 64 GB machine.**
-    - The estimate puts it within about 1 GiB of the limit either way,
-      depending on its exact file size. At 4096 it needs about 66.6 GiB if
-      the file is about 61 GiB (the gateway refuses it), or about 62.4 GiB
-      if it is 61 GB (it fits).
-    - Before relying on it, run the controlled test at the desktop (below).
-      The smaller mixture-of-experts models (gemma4:26b, qwen3.6:35b) are
-      well inside the limits.
+      `ram_oom`. The desktop stays up; that is what happened on the second
+      try.
+    - Ollama can't use swap (`MemorySwapMax=0`). A load that makes anything
+      else swap is unloaded and refused (`ram_pressure`).
+  - **gpt-oss:120b is experimental on a 64 GB machine.** With repacking on,
+    the gateway refuses it: about 61 GiB can't fit in the roughly 50 GiB of
+    system memory it may use. Whether it can run with repacking off, or with
+    encrypted swap, is what the controlled test measures. The smaller
+    mixture-of-experts models (gemma4:26b, qwen3.6:35b) are well inside the
+    limits.
   - A `ram` model runs alone: other models are unloaded before it loads,
     and it is unloaded before a GPU-only model runs.
   - The only flag is `ram`. A line with any other word after the name is
     ignored entirely, and the panel shows it with the reason.
-  - **The controlled test** for a big `ram` model, run at the desktop:
+  - **The controlled test**, run at the desktop:
 
     ```bash
-    sudo bash ~/concordeai/ollama1/tools/ram-model-test.sh gpt-oss:120b 4096
+    sudo bash ~/concordeai/ollama1/tools/ram-model-test.sh
     ```
 
-    - It shows the gateway's estimate and verdict and asks for `yes`. Then
-      it caps Ollama's memory for this boot and unloads everything.
-    - It loads the model with mmap off, logs memory once a second, and kills
-      Ollama as a last resort if the machine gets under 1.5 GiB free.
-    - It reports one of three things:
-      - loaded, with the GPU/RAM split and tokens per second;
-      - stopped by Ollama's memory limit, with the desktop fine;
-      - stopped by the watchdog.
-    - Then it unloads the model. The log is `/var/log/ollama1-ram-test.log`.
+    It measures gpt-oss:120b at num_ctx 4096 in each configuration. Each
+    runs under a runtime memory cap (RAM less 8 GiB), with a watchdog that
+    kills Ollama if the machine drops under 1.5 GiB free. Worst case: an
+    Ollama restart. At the end Ollama goes back to its normal settings.
+
+    | Configuration | What changes | Question it answers |
+    |---|---|---|
+    | `norepack` | `LLAMA_ARG_REPACK=false`, mmap on, llama.cpp places the layers | do file-backed weights fit under the cap, and how fast is it? |
+    | `norepack-moe` | the same, plus every layer on the GPU except the experts of the first N (`--ncmoe`, default 29 of 36), automatic placement off | how much faster with the GPU full? |
+    | `swap` | Ollama's defaults, but Ollama may use the encrypted swap (needs `--encrypted-swap`; skipped otherwise) | does swap carry the repack buffer, and at what speed? |
+
+    For each configuration it records:
+    - whether the model loaded, was OOM-killed, or was stopped by the
+      watchdog;
+    - the GPU / system-memory split, and the buffers llama.cpp reported;
+    - peak Ollama memory and swap, and the lowest free memory on the
+      machine;
+    - load time, time to first token, and tokens/s.
+
+    Options: `--model`, `--ctx`, `--ncmoe`, and `--configs norepack,gateway`
+    (`gateway` = what the gateway sends today; it is expected to hit the
+    cap). Results: the terminal, `/var/log/ollama1-ram-test.log` and
+    `/var/log/ollama1-ram-test.json`.
+  - **Encrypted swap (opt-in, undoable):**
+    `sudo ./setup.sh --encrypted-swap 32G`.
+    - It makes `/swap-ollama1.img`, opened at every boot as plain dm-crypt
+      with a new random key (`/etc/crypttab`: `/dev/urandom
+      swap,cipher=aes-xts-plain64,size=256`).
+    - The key lives only in kernel memory, so after a reboot nothing written
+      there can be read.
+    - It replaces the plain, unencrypted `/swap.img`, which is switched off
+      and kept on disk.
+    - It does not let Ollama swap: only the test's `swap` configuration
+      does, for the length of the test.
+    - Undo: `sudo ./setup.sh --remove-encrypted-swap`.
 - **Dashboard:** it's on the monitor, and `ollama1-top` shows it over SSH
   (`q` quits). It shows the following, and never a prompt or an answer:
   - tokens per second (now, 1 h, 24 h) and requests;

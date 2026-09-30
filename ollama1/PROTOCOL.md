@@ -219,8 +219,10 @@ GPU only, unless the desktop's owner allows a model system memory:
 - Before loading, the gateway estimates weights + KV cache for the
   requested `num_ctx` + a margin. It checks that against the card's VRAM
   less a reserve (16 GB here). A `gpu+ram` model is counted with 2.5 GiB of
-  compute buffers, against VRAM plus the free system memory less the larger
-  of 8 GiB and 12% of RAM, and under Ollama's own memory cap. If it doesn't fit, the
+  compute buffers, against the free system memory less the larger of 8 GiB
+  and 12% of RAM, under Ollama's own memory cap. VRAM counts too only when
+  the desktop has turned llama.cpp's weight repacking off, because the
+  repacked CPU copy can be as big as the whole model. If it doesn't fit, the
   answer is **507** `gpu_fit`, with `need_bytes` and `budget_bytes`. Try
   a smaller `num_ctx` or a smaller model. For a `gpu+ram` model sent
   without `options.num_ctx`, the gateway first tries 4096, then 2048.

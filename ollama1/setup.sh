@@ -7,6 +7,9 @@
 #   sudo ./setup.sh --remove-setup-key also take claude-setup@concordeai out of
 #                                    ~pmiller/.ssh/authorized_keys (your own key stays)
 #   sudo ./setup.sh --no-tmux        don't wrap the run in a tmux session
+#   sudo ./setup.sh --encrypted-swap 32G   opt in: encrypted swap (random key each boot),
+#                                    replacing the plain /swap.img; nothing else runs
+#   sudo ./setup.sh --remove-encrypted-swap  undo that
 #   ./setup.sh --plan                show what it would do; changes nothing
 #
 # It runs itself inside tmux (session "ollama1-setup"), so a dropped SSH
@@ -47,13 +50,20 @@ PLAN_ONLY=0
 SKIP_CF=0
 REMOVE_SETUP_KEY=0
 NO_TMUX=0
+SWAP_ACTION=""
+SWAP_SIZE=""
+prev=""
 for a in "$@"; do
+  if [ "$prev" = --encrypted-swap ]; then SWAP_SIZE=$a; prev=""; continue; fi
+  prev=$a
   case "$a" in
+    --encrypted-swap) SWAP_ACTION=on ;;
+    --remove-encrypted-swap) SWAP_ACTION=off ;;
     --plan) PLAN_ONLY=1 ;;
     --skip-cloudflare) SKIP_CF=1 ;;
     --remove-setup-key) REMOVE_SETUP_KEY=1 ;;
     --no-tmux) NO_TMUX=1 ;;
-    -h|--help) sed -n '2,21p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
     *) echo "unknown option: $a"; exit 2 ;;
   esac
 done
@@ -137,6 +147,9 @@ if [ "$PLAN_ONLY" = 1 ]; then
   exit 0
 fi
 [ "$(id -u)" -eq 0 ] || { echo "Run it with sudo:  sudo $0"; exit 1; }
+if [ -n "$SWAP_ACTION" ]; then   # a separate, opt-in, undoable step
+  exec bash "$KIT/tools/encrypted-swap.sh" "$SWAP_ACTION" "$SWAP_SIZE"
+fi
 
 # One setup at a time. The lock is taken before anything else, including
 # the copy of the kit to /var/tmp; fd 9 (and so the lock) survives the
