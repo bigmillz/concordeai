@@ -79,6 +79,22 @@ installed and its engine running.
   most); then "Done ✓ · added N models" plus what was removed, or
   "Couldn't download X (reason)" with a Retry of just those. Run in
   background works as before.
+- URGENT, FOUND IN REVIEW: on the installed build the leftover sweep would
+  have deleted Patrick's finished Ministral 3 14B a day after it landed
+  (it removes an MLX folder the cache check calls unfinished, once nothing
+  in it is under a day old). The stale-index fix is what keeps it; the
+  sweep now also never touches a model whose engine is up (`_resident`),
+  and a test runs his exact layout, two days old, through the real sweep.
+- REVIEW FIXES: only the bytes line is held together (a failure's reason
+  wraps, `overflow-wrap:anywhere` for a path); Ollama's check reads
+  "Finishing: checking the files… · N waiting" and is never a stall
+  (`checking` on /api/setup and /api/setup/busy, dlLeft's hold, the strip
+  says "checking"); a late poll's smaller byte count (under 1% of the
+  total, or within 2 s) is ignored rather than restarting the clock; bytes
+  moving after a stall start a fresh estimate; after a failure "Run in
+  background" reads "Close"; `_shards_complete` requires real files, so a
+  link whose blob never landed fails; the engines list and voice status
+  count bytes once too (`_dir_bytes` has no callers left).
 - GAUNTLET: time left on known timings (warm-up, smoothing, a stall, hours,
   the cap, a gap) in node; the plan on a fake disk, its Remove list equal to
   what the auto-clean pass takes in the same state; the page's own list in

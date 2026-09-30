@@ -5211,7 +5211,8 @@ def _shards_complete(snap_dir: str) -> bool:
     for f in glob.glob(os.path.join(snap_dir, "*.safetensors")):
         m = re.fullmatch(r"(.+)-(\d+)-of-(\d+)\.safetensors",
                          os.path.basename(f))
-        if not m:
+        # a link whose blob never landed is no shard (review of 6b335)
+        if not m or not os.path.isfile(f):
             return False
         series.setdefault((m.group(1), int(m.group(3))), set()).add(
             int(m.group(2)))
@@ -14123,6 +14124,14 @@ def _engine_loading(label: str, job: dict) -> bool:
     return not _port_in_use(MODEL_ROUTES[label][1])
 
 
+def _only_checking(jobs: dict) -> bool:
+    """Every download in flight is Ollama checking its file (6b335): no
+    bytes move, and that isn't a stall."""
+    dl = [j for l, j in jobs.items()
+          if l != ENGINE_ROW and (j or {}).get("status") == "downloading"]
+    return bool(dl) and all(j.get("phase") == "verifying" for j in dl)
+
+
 def setup_busy() -> dict:
     """What the sidebar strip needs, and nothing else (6b304). The strip
     polled the full /api/setup every 4s for the life of the window, even
@@ -14132,13 +14141,14 @@ def setup_busy() -> dict:
     with _setup_lock:
         busy = any(j.get("status") in ("downloading", "queued")
                    for lbl, j in _setup_jobs.items() if lbl != ENGINE_ROW)
+        checking = _only_checking(_setup_jobs)
     if not busy:
         return {"busy": False}
     have, want = _downloaded_bytes(ollama_pulled_tags() or set())
     bps = _dl_speed(have)
     return {"busy": True,
             "updating": _modup.get("state") == "running",
-            "have_b": have, "want_b": want,
+            "have_b": have, "want_b": want, "checking": checking,
             # never 100% while anything still downloads (6b335): the
             # last bytes, or Ollama's check of them, are still to come
             "overall_pct": min(99, round(have / want * 100)) if want else 99,
@@ -14168,7 +14178,7 @@ def setup_status() -> dict:
                     studio_tier(_STUDIO_ROWS[label])["repo"])) // 1_000_000
             elif (MODEL_ROUTES.get(label, ("",))[0] == "mlx"
                     and label in MLX_REPOS):
-                pct = _dir_bytes(_hf_model_dir(MLX_REPOS[label])) // 1_000_000
+                pct = _dir_bytes_real(_hf_model_dir(MLX_REPOS[label])) // 1_000_000
             elif "done_b" in job:
                 # an Ollama pull, by the megabyte too (6b314)
                 pct = (job["done_b"] // 1_000_000, job.get("phase", ""))
@@ -14289,6 +14299,9 @@ def setup_status() -> dict:
         "plan_state": plan_state,
         "have_gb": round(have / 1e9, 1), "want_gb": round(want / 1e9, 1),
         "have_b": have, "want_b": want,
+        "checking": busy and any(m.get("checking") for m in models)
+                    and all(m.get("checking") for m in models
+                            if m["status"] == "downloading"),
         "overall_pct": ((min(99, round(have / want * 100)) if want else 99)
                         if busy else
                         (round(have / want * 100) if want else 100)),
@@ -21937,8 +21950,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 repo = _whisper_repo()
                 est = (1_600_000_000 if repo == WHISPER_REPO
                        else 490_000_000)
-                pct = min(99, round(
-                    _dir_bytes(_hf_model_dir(repo)) / est * 100))
+                pct = min(99, round(     # bytes once (6b335)
+                    _dir_bytes_real(_hf_model_dir(repo)) / est * 100))
             self._send_json({"supported": _voice_supported(),
                              "ready": _voice_supported() and _voice_ready(),
                              "downloading": job.get("status") == "downloading",
@@ -22096,7 +22109,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # the growing cache directory instead (ollama streams pct)
                 if MODEL_ROUTES.get(label, ("",))[0] == "mlx":
                     est = MLX_EST_BYTES.get(label) or 1
-                    grown = _dir_bytes(_hf_model_dir(MLX_REPOS[label]))
+                    # bytes once, not blobs + snapshot links (6b335)
+                    grown = _dir_bytes_real(_hf_model_dir(MLX_REPOS[label]))
                     pct = min(99, round(grown / est * 100))
                 st["pct"] = pct
 
@@ -28363,7 +28377,7 @@ body.gen #chip-model{color:var(--accent)}
 #up-detail,#new-detail{font-size:11.5px;color:var(--faint);margin:10px 0 4px;line-height:1.5}
 #about-sub{font-size:11.5px;color:var(--faint);margin-top:10px;line-height:1.5}
 #new-pct{font-family:var(--mono);font-size:11px;color:var(--dim);
-  margin:8px 0 2px;text-wrap:balance}
+  margin:8px 0 2px;text-wrap:balance;overflow-wrap:anywhere}
 #new-pct[hidden]{display:none}
 #new-bar{margin-top:16px}
 #new-list{margin:16px 0 2px;text-align:left}
@@ -34216,19 +34230,29 @@ const TICK='<svg class="tick" viewBox="0 0 24 24" aria-label="installed">'
    agree), never the last poll's burst. Nothing until 3 s or 1% of it
    has been seen, nothing while the bytes stand still, and after 15 s
    of that it says it's waiting. A gap of 30 s between looks, or bytes
-   going backwards, is a new download: the clock starts again. Long
+   going back a real way, is a new download: the clock starts again. A
+   small step back is only two pollers answering out of order, and is
+   ignored; so are the bytes that restart a stall, which start a fresh
+   estimate (review of 6b335). hold: Ollama checking a finished file,
+   which is neither progress nor a stall, so it says nothing. Long
    downloads read in hours (6b314: "about 1300 min" says nothing). */
-function dlLeft(key,have,want,now){
+function dlLeft(key,have,want,now,hold){
   const cs=dlLeft.c||(dlLeft.c={});
   now=now==null?Date.now():now;have=+have;want=+want;
   if(!(want>0)||!(have>=0))return "";
-  const c=cs[key];
-  if(!c||have<c.b||now-c.t>30000){
-    cs[key]={t0:now,b0:have,t:now,b:have,moved:now,r:0,w:0};
-    return "";
+  const c=cs[key],fresh=()=>{
+    cs[key]={t0:now,b0:have,t:now,b:have,moved:now,r:0,w:0};return "";};
+  if(!c||now-c.t>30000)return fresh();
+  let late=false;
+  if(have<c.b){
+    if(c.b-have>=want*0.01&&now-c.t>=2000)return fresh();
+    late=true;have=c.b;                 // a late answer: nothing new
+  }else if(have>c.b&&now-c.moved>5000){
+    return fresh();                     // moving again after a stall
   }
+  if(hold){c.t=now;c.moved=now;return "";}
   const dt=(now-c.t)/1000;
-  if(dt>0){
+  if(dt>0&&!late){
     const a=1-Math.exp(-dt/10);          // tau 10 s
     c.r+=a*((have-c.b)/dt-c.r);c.w+=a*(1-c.w);
     if(have>c.b)c.moved=now;
@@ -34263,7 +34287,7 @@ function renderSetup(st){
     '<span>'+(anyDl?pct+'%':(setupAllReady?'complete':'not started'))+'</span></div>'+
     (anyDl?'<div class="big-speed">'+
       (st.speed_mbs>0?st.speed_mbs+' MB/s':'starting\u2026')+
-      dlTail(dlLeft("batch",st.have_b,st.want_b))+'</div>'
+      dlTail(dlLeft("batch",st.have_b,st.want_b,null,st.checking))+'</div>'
       +'<div class="big-now">'+nowLine(st)+'</div>':'');
 
   // WHILE DOWNLOADING (first run or updates): one bar, bandwidth,
@@ -34592,14 +34616,15 @@ async function dlStripTick(){
       // what is happening on the left, how fast and how long on the
       // right: the time left is the part that must never be clipped
       const lbl=dlStrip.querySelector(".dllbl");
-      const left=dlLeft("batch",st.have_b,st.want_b),
+      const left=dlLeft("batch",st.have_b,st.want_b,null,st.checking),
             wait=left.startsWith("waiting");
       lbl.firstChild.textContent=wait?left:
         (st.updating?"updating":"downloading")
         +" \u00b7 "+(st.overall_pct||0)+"%";
       // (6b335) the time left, in the words every bar uses, takes the
       // speed's place: both side by side outgrew the sidebar
-      lbl.lastChild.textContent=wait?(st.overall_pct||0)+"%":left||(
+      lbl.lastChild.textContent=wait?(st.overall_pct||0)+"%"
+        :st.checking?"checking":left||(
         st.speed_mbs>0?(st.speed_mbs>=10?Math.round(st.speed_mbs)
           :st.speed_mbs)+" MB/s":"");
     }
@@ -35384,12 +35409,15 @@ function offerProgress(started,s){
   const loading=st.filter(m=>m.status==="ready"&&m.loading);
   const names=ms=>ms.map(m=>m.label).join(", ");
   if(going.length){
-    // Ollama hashes the whole file after the last byte (6b317)
-    if(going.every(m=>m.checking))
-      return {line:"Finishing: checking the files\u2026",end:""};
+    // Ollama hashes the whole file after the last byte (6b317): when
+    // that is all that's moving, say so; the rest wait their turn
+    const dl=going.filter(m=>m.status==="downloading"),q=going.length-dl.length;
+    if(dl.length&&dl.every(m=>m.checking))
+      return {line:"Finishing: checking the files\u2026"
+        +(q?" \u00b7 "+q+" waiting":""),end:""};
     return {line:s.have_gb+" / "+s.want_gb+" GB \u00b7 "+(s.overall_pct||0)+"%"
       +(s.speed_mbs?" \u00b7 "+s.speed_mbs+" MB/s":"")
-      +dlTail(dlLeft("batch",s.have_b,s.want_b)),end:""};
+      +dlTail(dlLeft("batch",s.have_b,s.want_b,null,s.checking)),bytes:true,end:""};
   }
   if(loading.length)return {line:"Loading "+names(loading)+"\u2026",end:""};
   if(failed.length)return {line:"Couldn\u2019t download "+failed.map(m=>
@@ -35397,6 +35425,12 @@ function offerProgress(started,s){
     end:"failed",retry:failed.map(m=>m.label)};
   const n=st.length;
   return {line:"Done \u2713 \u00b7 added "+n+" model"+(n>1?"s":""),end:"done"};
+}
+// the bytes line wraps between its parts, never inside one; the others
+// (a model's name, a failure's reason) wrap like any sentence
+function offerLine(pr){
+  return pr.bytes?pr.line.split(" \u00b7 ").map(x=>x.replace(/ /g,"\u00a0"))
+    .join("\u00a0\u00b7 "):pr.line;
 }
 function offerSum(p){
   const a=p.after_gb;
@@ -35450,7 +35484,7 @@ async function announceModels(){
     // it already says what will change
     get.textContent="Update model library";
     $("#new-bg").hidden=true;$("#new-skip").hidden=false;
-    $("#new-retry").hidden=true;
+    $("#new-bg").textContent="Run in background";$("#new-retry").hidden=true;
     $("#new-off").hidden=!!fresh.length;
     veil.hidden=false;
     let poll=null;
@@ -35504,19 +35538,19 @@ async function announceModels(){
           const s=await(await api("/api/setup")).json();
           $("#new-bar").firstChild.style.width=(s.overall_pct||0)+"%";
           const pr=offerProgress(started,s);
-          // a long line wraps between its parts, never inside one
-          note.textContent=(pr.end==="done"?pr.line+tail:pr.line)
-            .split(" \u00b7 ").map(x=>x.replace(/ /g,"\u00a0")).join("\u00a0\u00b7 ");
+          note.textContent=offerLine(pr)+(pr.end==="done"?tail:"");
           if(!pr.end)return;
           stopPoll();
           if(pr.end==="done"){
             setTimeout(()=>{veil.hidden=true;},kept.length?4000:1600);
             return;
           }
-          // a failure is said plainly, with a retry of just those
-          retry.hidden=false;
+          // a failure is said plainly, with a retry of just those, and
+          // the card closes rather than "runs in background" (review)
+          retry.hidden=false;$("#new-bg").textContent="Close";
           retry.onclick=async()=>{
             retry.hidden=true;note.textContent="starting\u2026";
+            $("#new-bg").textContent="Run in background";
             try{await api("/api/model/download",{method:"POST",
               headers:{"Content-Type":"application/json"},
               body:JSON.stringify({labels:pr.retry})});}catch(e){}
@@ -35741,7 +35775,7 @@ function studioHTML(key,st){
     const ls=lastSetup||{},sp=ls.speed_mbs||0;
     h+='<div class="stprog"><div class="stbar"><i style="width:'+st.pct+'%"></i></div>'
       +'<div class="stnums"><span>'+st.pct+'%</span><span>'
-      +(sp?sp+" MB/s":"starting\u2026")+dlTail(dlLeft("batch",ls.have_b,ls.want_b))
+      +(sp?sp+" MB/s":"starting\u2026")+dlTail(dlLeft("batch",ls.have_b,ls.want_b,null,ls.checking))
       +'</span></div></div>';
   }
   h+='<div class="stacts">';
@@ -35905,7 +35939,7 @@ function manageTick(){
       $("#manage-note").textContent="downloading \u2014 "+st.have_gb+" of "
         +st.want_gb+" GB \u00b7 "+st.overall_pct+"%"
         +(st.speed_mbs>0?" \u00b7 "+st.speed_mbs+" MB/s":"")
-        +dlTail(dlLeft("batch",st.have_b,st.want_b))
+        +dlTail(dlLeft("batch",st.have_b,st.want_b,null,st.checking))
         +(st.now&&st.now.length?" \u2014 "+st.now.map(m=>m.label+" "+dlPct(m)).join(", "):"")
         +(st.queued_n?" \u00b7 "+st.queued_n+" waiting":"");
       manageTick();
@@ -37048,14 +37082,18 @@ def _sweep_leftovers() -> int:
                 if j.get("status") in ("downloading", "queued")}
     # 1. MLX models that never completed. A retired one will never be
     #    resumed; a current one gets a day in case its download resumes.
-    todo = [(repo, LEFTOVER_GRACE) for lbl, repo in MLX_REPOS.items()
+    todo = [(lbl, repo, LEFTOVER_GRACE) for lbl, repo in MLX_REPOS.items()
             if repo and lbl not in live]
-    todo += [(r[0], 1800.0) for r in RETIRED_MODELS.values() if r[0]]
-    for repo, grace in todo:
+    todo += [(lbl, r[0], 1800.0) for lbl, r in RETIRED_MODELS.items()
+             if r[0]]
+    for lbl, repo, grace in todo:
         try:
             d = _hf_model_dir(repo)
+            # never a model whose engine is up, here or in a sibling
+            # (6b335): it is plainly usable, whatever the files say
             if (os.path.isdir(d) and not mlx_model_cached(repo)
-                    and not _fresh_under(d, grace)):
+                    and not _fresh_under(d, grace)
+                    and not _resident(lbl)):
                 freed += _rm_hf_repo(repo)
         except Exception:
             pass

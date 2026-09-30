@@ -4055,10 +4055,11 @@ _sw = dict(_LH, app_dir=lambda: _app, PORT=9897,
            STUDIOS={"image": {"row": "img", "venv": _venv, "tiers": [{"repo": "studio/Img-4B"}]}},
            _studio_engine_ok=lambda k: False, _studio_bytes_forget=lambda k: None,
            _setup_lock=threading.RLock(), _setup_jobs={}, MODEL_ROUTES={},
-           _port_in_use=lambda p: False, _sweep_hf_carcasses=lambda: 0)
+           _port_in_use=lambda p: False, _sweep_hf_carcasses=lambda: 0,
+           _mlx_procs={})
 _exec_names(_sw, {"LEFTOVER_GRACE", "_fresh_under", "_hf_has_weights", "_rm_hf_repo",
                   "_sweep_leftovers", "STUDIO_FAIL_MARK", "_dir_bytes_real",
-                  "_ollama_models_dir"})
+                  "_ollama_models_dir", "_resident"})
 _env0 = os.environ.get("OLLAMA_MODELS")
 os.environ["OLLAMA_MODELS"] = _ol
 try:
@@ -4555,7 +4556,7 @@ check("giant installs ask twice; long downloads read in hours",
       and "(m.giant?'\" data-giant=\"1':'')" in page
       # (6b335) the one time-left helper, hours for long downloads; its
       # own checks are in the time-left block below
-      and 'function dlLeft(key,have,want,now){' in page
+      and 'function dlLeft(key,have,want,now,hold){' in page
       and 'return "about "+h+" h"+(r?" "+r+" min":"")+" left";' in page
       and all('"%s":"' % g in page for g in ("GLM 5.3", "DeepSeek V3.2 671B",
                                              "DeepSeek V3.1 671B", "Qwen 3 Coder 480B")))
@@ -4579,7 +4580,7 @@ def _node_json(js, name, stdin=None):
     return json.loads(_r.stdout)
 
 
-_ETA_JS = (_jsfn(_MILLENAI_SRC, "function dlLeft(key,have,want,now){")
+_ETA_JS = (_jsfn(_MILLENAI_SRC, "function dlLeft(key,have,want,now,hold){")
            + _jsfn(_MILLENAI_SRC, "function dlLeftIn(s){")
            + _MILLENAI_SRC[_MILLENAI_SRC.index("function dlTail(t){"):
                            _MILLENAI_SRC.index("\n", _MILLENAI_SRC.index("function dlTail(t){")) + 1])
@@ -4600,7 +4601,18 @@ b=0;for(t=0;t<=10;t+=2){dlLeft("st",b,1e9,t*1000);b+=1e7;}
 b-=1e7;t-=2;
 o.stall=[dlLeft("st",b,1e9,t*1000+4000),dlLeft("st",b,1e9,t*1000+6000),
          dlLeft("st",b,1e9,t*1000+14000),dlLeft("st",b,1e9,t*1000+16000),
-         dlLeft("st",b+1e7,1e9,t*1000+18000)];
+         dlLeft("st",b+1e7,1e9,t*1000+18000),dlLeft("st",b+2e7,1e9,t*1000+20000),
+         dlLeft("st",b+4e7,1e9,t*1000+22000)];
+// two pollers out of order: a small step back is ignored, the clock
+// keeps its estimate; a real step back starts again
+b=0;for(t=0;t<=10;t+=2){dlLeft("oo",b,1e9,t*1000);b+=1e7;}
+b-=1e7;t-=2;
+o.late=[dlLeft("oo",b-5e6,1e9,t*1000+300),dlLeft("oo",b+1e7,1e9,t*1000+2000),
+        dlLeft("oo",b-3e8,1e9,t*1000+5000)];
+// Ollama checking its file: 20 s with no bytes says nothing, never a stall
+b=0;for(t=0;t<=10;t+=2){dlLeft("ck",b,1e9,t*1000);b+=1e7;}
+b-=1e7;t-=2;
+o.hold=[4,8,12,16,20].map(x=>dlLeft("ck",b,1e9,t*1000+x*1000,true));
 // hours, an exact hour, under a minute, the 72-hour cap
 const run=(k,rate,want,secs)=>{let r="";for(let s=0;s<=secs;s+=2)
   r=dlLeft(k,s*rate,want,s*1000);return r;};
@@ -4608,9 +4620,9 @@ o.hm=run("h1",1e6,5e9+1e7,10);
 o.h=run("h2",1e6,3.6e9+1e7,10);
 o.under=run("u",1e6,4e7,10);
 o.cap=run("c",1e3,1e12,10);
-// a 40 s gap between looks, or bytes going backwards: a new download
+// a 40 s gap between looks: a new download (bytes going back a real
+// way are in the late-answer case below)
 o.gap=dlLeft("h1",2e7,5e9+1e7,50000);
-o.back=dlLeft("h2",0,3.6e9+1e7,12000);
 o.tail=[dlTail("about 6 min left"),dlTail("")];
 process.stdout.write(JSON.stringify(o));''', "eta.js")
 except Exception as _e:
@@ -4625,14 +4637,21 @@ check("time left: a 10 s moving average, not the last poll's burst (node)",
       bool(_bm_min and _st_min) and int(_st_min.group(1)) == 16
       # the burst alone would say 2 min; smoothed, it moves only part way
       and 4 <= int(_bm_min.group(1)) < 16, "%r" % _eta)
-check("time left: quiet during a stall, waiting after 15 s, back when it moves (node)",
+check("time left: quiet during a stall, waiting after 15 s, a fresh estimate once it moves (node)",
       _eta.get("stall", [""])[0].startswith("about")
       and _eta["stall"][1:4] == ["", "", "waiting for the download to resume"]
-      and _eta["stall"][4].startswith("about"), "%r" % _eta)
+      and _eta["stall"][4] == "" and _eta["stall"][5].startswith("about")
+      and _eta["stall"][6].startswith("about"),
+      "%r" % _eta)
+check("time left: a late poll's older bytes are ignored; Ollama's check is never a stall (node)",
+      _eta.get("late", [""])[0].startswith("about") and _eta["late"][1].startswith("about")
+      and _eta["late"][2] == "" and _eta.get("hold") == ["", "", "", "", ""]
+      and '"checking": checking,' in _MILLENAI_SRC
+      and "def _only_checking(jobs: dict) -> bool:" in _MILLENAI_SRC, "%r" % _eta)
 check("time left: hours and minutes, an hour, under a minute, 72 h at most (node)",
       _eta.get("hm") == "about 1 h 23 min left" and _eta.get("h") == "about 1 h left"
       and _eta.get("under") == "under a minute left" and _eta.get("cap") == "about 72 h left"
-      and _eta.get("gap") == "" and _eta.get("back") == ""
+      and _eta.get("gap") == ""
       and _eta.get("tail") == [" · about 6 min left", ""], "%r" % _eta)
 # every bar asks the one helper, and nothing reads the server's old
 # eta_min or the old formatter any more
@@ -4641,7 +4660,11 @@ check("time left: the setup panel, strip, studio cards, Manage, Update models an
       and "dlEta" not in page and "eta_min" not in page
       and '"have_b": have, "want_b": want,' in _MILLENAI_SRC
       and "have_b=have, want_b=want," in _MILLENAI_SRC
-      and 'const left=dlLeft("batch",st.have_b,st.want_b),' in page)
+      and 'const left=dlLeft("batch",st.have_b,st.want_b,null,st.checking),' in page
+      and page.count(",null,st.checking)") == 3 and ",null,ls.checking)" in page
+      and ",null,s.checking)" in page
+      # bytes counted once wherever a download is measured (review)
+      and "_dir_bytes(_hf_model_dir" not in _MILLENAI_SRC)
 
 # 2. THE DETAILS BOX: the server's plan, the page's list and what the
 # button does are the same thing. Run for real on a fake disk; each
@@ -4950,8 +4973,78 @@ _mcr = [_mc["mlx_model_cached"](r) for r in (
     _snap("mid", _two, _two, incomplete=True),
     _snap("single", None, ["model.safetensors"]),
     _snap("odd", _four, ["weights.safetensors"]))]
-check("a finished model with a stale shard index reads installed; a gap never does",
-      _mcr == [True, False, False, True, False, True, False], "%r" % _mcr)
+_snap("broken", _four, _two[:1])
+os.symlink(os.path.join(_hfd, "broken", "blobs", "never-landed"),
+           os.path.join(_hfd, "broken", "snapshots", "abc", _two[1]))
+_mcr.append(_mc["mlx_model_cached"]("broken"))
+check("a finished model with a stale shard index reads installed; a gap or a broken link never does",
+      _mcr == [True, False, False, True, False, True, False, False], "%r" % _mcr)
+# THE SWEEP KEEPS IT (review of 6b335). Patrick's installed build would
+# have deleted his finished Ministral 3 14B a day after it landed: the
+# leftover sweep removes an MLX folder the cache check calls unfinished.
+# His exact layout, a day and more old, through the real sweep and the
+# real cache check: kept. A folder that really is unfinished goes, unless
+# its engine is up.
+_pl = _tf0.mkdtemp()
+_plhub, _plol, _plapp = (os.path.join(_pl, x) for x in ("hub", "ollama", "app"))
+for _d in (_plhub, os.path.join(_plol, "blobs"), _plapp):
+    os.makedirs(_d)
+_MIN = "mlx-community/Ministral-3-14B-Instruct-2512-4bit"
+
+
+def _hfrepo(repo, files, index=None, age=2 * 86400):
+    d = os.path.join(_plhub, "models--" + repo.replace("/", "--"))
+    sd = os.path.join(d, "snapshots", "95b6f345")
+    os.makedirs(sd, exist_ok=True)
+    os.makedirs(os.path.join(d, "blobs"), exist_ok=True)
+    body = dict((f, "x") for f in files)
+    if index is not None:
+        body["model.safetensors.index.json"] = json.dumps(
+            {"weight_map": {"w%d" % i: p for i, p in enumerate(index)}})
+    for i, (f, txt) in enumerate(sorted(body.items())):
+        blob = os.path.join(d, "blobs", "b%02d" % i)
+        open(blob, "w").write(txt)
+        os.symlink(os.path.join("..", "..", "blobs", "b%02d" % i), os.path.join(sd, f))
+    t0 = time.time() - age
+    for root, dirs, fs in os.walk(d):
+        for n in dirs + fs:
+            os.utime(os.path.join(root, n), (t0, t0), follow_symlinks=False)
+    os.utime(d, (t0, t0))
+    return d
+
+
+_pl_min = _hfrepo(_MIN, ["config.json"] + _two, index=_four)
+_pl_run = _hfrepo("mlx-community/Run-9B", ["config.json"])
+_pl_dead = _hfrepo("mlx-community/Dead-9B", ["config.json"])
+_ps = dict(_LH, app_dir=lambda: _plapp, PORT=9901, STUDIOS={},
+           _hf_model_dir=lambda repo: os.path.join(_plhub, "models--" + repo.replace("/", "--")),
+           MLX_REPOS={"Ministral 3 14B": _MIN, "Run 9B": "mlx-community/Run-9B",
+                      "Dead 9B": "mlx-community/Dead-9B"},
+           MODEL_ROUTES={"Ministral 3 14B": ("mlx", 8932), "Run 9B": ("mlx", 8950),
+                         "Dead 9B": ("mlx", 8952)},
+           RETIRED_MODELS={}, _setup_lock=threading.RLock(), _setup_jobs={},
+           _port_in_use=lambda p: p == 8950, _sweep_hf_carcasses=lambda: 0,
+           _mlx_procs={}, _studio_engine_ok=lambda k: False,
+           _studio_bytes_forget=lambda k: None)
+_exec_names(_ps, {"LEFTOVER_GRACE", "_fresh_under", "_hf_has_weights", "_rm_hf_repo",
+                  "_sweep_leftovers", "STUDIO_FAIL_MARK", "_dir_bytes_real",
+                  "_ollama_models_dir", "_resident", "mlx_model_cached",
+                  "_shards_complete"})
+_env1 = os.environ.get("OLLAMA_MODELS")
+os.environ["OLLAMA_MODELS"] = _plol
+try:
+    _pl_cached = _ps["mlx_model_cached"](_MIN)
+    _ps["_sweep_leftovers"]()
+finally:
+    if _env1 is None:
+        os.environ.pop("OLLAMA_MODELS", None)
+    else:
+        os.environ["OLLAMA_MODELS"] = _env1
+_pl_after = [os.path.isdir(x) for x in (_pl_min, _pl_run, _pl_dead)]
+check("the leftover sweep keeps Patrick's Ministral (stale index, two-day-old files) and any model whose engine is up",
+      _pl_cached and _pl_after == [True, True, False]
+      and len(os.listdir(os.path.join(_pl_min, "snapshots", "95b6f345"))) == 4
+      and "and not _resident(lbl)):" in _MILLENAI_SRC, "%r %r" % (_pl_cached, _pl_after))
 # the bar: a finished job counts in full; an MLX download counts its
 # bytes once, and a bigger one than the catalog says grows the total
 _db2 = {"_setup_lock": threading.RLock(), "_STUDIO_ROWS": {},
@@ -5005,7 +5098,8 @@ check("loading: while the new model's engine starts, and no longer than it shoul
 # its reason and a retry. Patrick's case is the last: the model ready,
 # the bar at 0, nothing busy. The card ended there, not never.
 try:
-    _lc = _node_json(_ETA_JS + _jsfn(_MILLENAI_SRC, "function offerProgress(started,s){") + r'''
+    _lc = _node_json(_ETA_JS + _jsfn(_MILLENAI_SRC, "function offerProgress(started,s){")
+                    + _jsfn(_MILLENAI_SRC, "function offerLine(pr){") + r'''
 const S=["Ministral 3 14B","Llama 3.2 1B"],G=1e9;
 const snap=(a,b,have,extra)=>Object.assign({models:[
   Object.assign({label:S[0]},a),Object.assign({label:S[1]},b)],
@@ -5025,9 +5119,12 @@ out.push(offerProgress(S,snap({status:"downloading",pct:40},{status:"error",note
 out.push(offerProgress(["Ministral 3 14B"],{models:[{label:"Ministral 3 14B",status:"ready"}],
   have_b:0,want_b:8.5*G,have_gb:0,want_gb:8.5,overall_pct:0,busy:false}));
 out.push(offerProgress(["Gone 1B"],{models:[]}));
-process.stdout.write(JSON.stringify(out));''', "lifecycle.js")
+out.push(offerProgress(S,snap({status:"queued"},{status:"downloading",pct:100,checking:true},1.3*G)));
+const lines={bytes:offerLine({line:"2 / 38 GB \u00b7 5% \u00b7 about 25 min left",bytes:true}),
+  fail:offerLine(out[6])};
+process.stdout.write(JSON.stringify(out.concat([lines])));''', "lifecycle.js")
 except Exception as _e:
-    _lc = [{"err": str(_e)}] * 10
+    _lc = [{"err": str(_e)}] * 12
 _lcl = [x.get("line", "") for x in _lc]
 _lce = [x.get("end") for x in _lc]
 check("the card's lifecycle: queued, downloading with the time left for all, finishing, loading, done (node)",
@@ -5041,8 +5138,22 @@ check("the card's lifecycle: queued, downloading with the time left for all, fin
 check("the card's lifecycle: a failure says which and why, with a retry, once the rest is done (node)",
       _lce[6] == "failed" and _lc[6].get("retry") == ["Ministral 3 14B"]
       and _lcl[6] == "Couldn’t download Ministral 3 14B (stalled — press Retry)"
-      and _lce[7] == "" and _lce[9] == "failed" and _lcl[9] == "Couldn’t download Gone 1B (stopped)",
+      and _lce[7] == "" and _lce[9] == "failed" and _lcl[9] == "Couldn\u2019t download Gone 1B (stopped)"
+      # after a failure the card closes; it doesn't "run in background"
+      and 'retry.hidden=false;$("#new-bg").textContent="Close";' in page
+      and '$("#new-bg").textContent="Run in background";$("#new-retry").hidden=true;' in page,
       "%r" % _lc)
+check("the card's lifecycle: Ollama's check reads as finishing, with the rest waiting (node)",
+      _lcl[10] == "Finishing: checking the files\u2026 \u00b7 1 waiting" and _lce[10] == "",
+      "%r" % _lc[10:])
+# only the bytes line is held together; a failure's reason wraps like a
+# sentence, and a word longer than the card breaks rather than clips
+check("the card's line: the bytes line wraps between parts, a failure wraps anywhere (node)",
+      isinstance(_lc[-1], dict)
+      and _lc[-1].get("bytes") == "2\u00a0/\u00a038\u00a0GB\u00a0\u00b7 5%\u00a0\u00b7 about\u00a025\u00a0min\u00a0left"
+      and _lc[-1].get("fail") == _lcl[6] and "\u00a0" not in _lc[-1].get("fail", "\u00a0")
+      and "margin:8px 0 2px;text-wrap:balance;overflow-wrap:anywhere}" in page
+      and 'note.textContent=offerLine(pr)+(pr.end==="done"?tail:"");' in page, "%r" % _lc[-1])
 check("the card's lifecycle: a model ready with the bar at 0 ends the card (Patrick's stuck card)",
       _lce[8] == "done" and _lcl[8] == "Done ✓ · added 1 model"
       and "(!s.busy&&(s.overall_pct||0)>=100)" not in page
