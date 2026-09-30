@@ -18621,6 +18621,152 @@ _o1proc.kill()
 # ---- end 6b334
 # ==== 6b334 your own servers: end ====
 
+# ==== 6b338 dictation hotkey: begin ====
+# 6b338, per Patrick: "add a hotkey for Apple D or Command D for the speech
+# to text. And if you hold it, you can release it and it'll stop. But if you
+# immediately release it, then it'll stay on that mode until you press
+# Command D again". The key logic is dictKey, pure, run here in node on
+# timelines; each scenario is then run against mutated copies of it, and
+# each mutation must break the scenario it is aimed at.
+_DK_A = _MILLENAI_SRC.index("const DICT_HOLD_MS=300;")
+_DK_JS = ("const IS_PC=false;\n" + _MILLENAI_SRC[_DK_A:_MILLENAI_SRC.index(
+    "\n}\n", _MILLENAI_SRC.index("function dictKey(ev,now){")) + 3])
+_DK_SCEN = r'''
+const D=(n,o)=>Object.assign({type:"down"},o||{}), U={type:"up"}, AW={type:"away"}, EN={type:"end"};
+const run=(steps)=>{dictKey(EN,0);return steps.map(([ev,t])=>dictKey(ev,t));};
+const eq=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const o={};
+// hold past the threshold: start, repeats ignored, release stops
+o.hold=eq(run([[D(),0],[D(0,{repeat:true}),40],[D(0,{repeat:true}),200],[U,500]]),["start","","","stop"]);
+// a release at 299 ms is a tap, at 300 ms a hold
+o.edge=eq(run([[D(),0],[U,299],[D(),900]]),["start","","stop"])
+     &&eq(run([[D(),0],[U,300]]),["start","stop"]);
+// a quick tap leaves it on; the second press stops; its keyup and its
+// repeats are ignored; a third press starts again
+o.tap=eq(run([[D(),0],[U,120],[D(),5000],[D(0,{repeat:true}),5050],[U,5100],[D(),6000]]),
+         ["start","","stop","","","start"]);
+// a tap, then the mic button ends it (the page sends "end"): the next
+// press starts, it does not stop
+o.tapmic=eq(run([[D(),0],[U,100],[EN,500],[D(),900]]),["start","","","start"])
+       &&(dictKey(EN,0),dictSt.mode==="");
+// the mic button started it: the hotkey stops it
+o.button=eq(run([[D(0,{rec:true}),0],[U,50]]),["stop",""]);
+// the modifier let go first is an "up" like any other
+o.modfirst=eq(run([[D(),0],[U,600],[U,650]]),["start","stop",""])
+         &&eq(run([[D(),0],[U,90],[U,120]]),["start","",""]);
+// a press in a dialog is ignored, and leaves nothing behind
+o.modal=eq(run([[D(0,{modal:true}),0],[U,50],[D(),100]]),["","","start"]);
+// the window loses focus: held or toggled, it stops; idle, nothing
+o.blur=eq(run([[D(),0],[AW,100],[U,200]]),["start","stop",""])
+     &&eq(run([[D(),0],[U,50],[AW,1000],[AW,1001]]),["start","","stop",""])
+     &&eq(run([[AW,0]]),[""]);
+// a keyup with nothing held is nothing; a lost keyup: the next press stops
+o.stray=eq(run([[U,5000]]),[""])&&eq(run([[D(),0],[D(),3000]]),["start","stop"]);
+process.stdout.write(JSON.stringify(o));'''
+
+
+def _dk_run(js):
+    try:
+        return _node_json(js + _DK_SCEN, "dictkey.js")
+    except Exception as _e:
+        return {"err": str(_e)}
+
+
+_DK_BASE = _dk_run(_DK_JS)
+_DK_NAMES = ["hold", "edge", "tap", "tapmic", "button", "modfirst", "modal", "blur", "stray"]
+check("dictation hotkey: hold then release; repeats ignored; 300 ms is the line (node)",
+      _DK_BASE.get("hold") is True and _DK_BASE.get("edge") is True and "const DICT_HOLD_MS=300;" in _MILLENAI_SRC,
+      "%r" % _DK_BASE)
+check("dictation hotkey: a quick tap stays on, the second press stops, its keyup is ignored, "
+      "the mic button ends it cleanly (node)",
+      _DK_BASE.get("tap") is True and _DK_BASE.get("tapmic") is True, "%r" % _DK_BASE)
+check("dictation hotkey: the hotkey stops a recording the mic button started; the modifier "
+      "released first counts as the release (node)",
+      _DK_BASE.get("button") is True and _DK_BASE.get("modfirst") is True, "%r" % _DK_BASE)
+check("dictation hotkey: a press in a dialog is ignored; losing focus stops; strays do nothing (node)",
+      _DK_BASE.get("modal") is True and _DK_BASE.get("blur") is True and _DK_BASE.get("stray") is True,
+      "%r" % _DK_BASE)
+# every mutation must break the scenario it aims at
+_DK_MUT = [
+    ("tap", "now-s.t>=DICT_HOLD_MS", "true"),                 # every release stops
+    ("edge", "now-s.t>=DICT_HOLD_MS", "now-s.t>DICT_HOLD_MS"),
+    ("hold", "now-s.t>=DICT_HOLD_MS", "false"),               # no release ever stops
+    ("tap", 's.mode="toggle";return "";', 's.mode="";return "";'),
+    ("hold", "if(ev.repeat||ev.modal)return \"\";", "if(ev.modal)return \"\";"),
+    ("tap", "if(ev.repeat||ev.modal)return \"\";", "if(ev.modal)return \"\";"),
+    ("modal", "if(ev.repeat||ev.modal)return \"\";", "if(ev.repeat)return \"\";"),
+    ("stray", 'if(s.mode!=="hold")return "";', "if(false)return \"\";"),
+    ("blur", 'if(!s.mode)return "";\n    s.mode="";s.t=0;return "stop";', 'return "";'),
+    ("blur", 'if(!s.mode)return "";', 'if(false)return "";'),
+    ("button", 'if(ev.rec)return "stop";', ""),
+    ("tapmic", 'if(ev.type==="end"){s.mode="";s.t=0;return "";}', 'if(ev.type==="end")return "";'),
+    ("stray", 'if(s.mode){s.mode="";s.t=0;return "stop";}', ""),
+]
+_dk_bad = []
+for _nm, _a, _b in _DK_MUT:
+    if _DK_JS.count(_a) != 1:
+        _dk_bad.append("anchor %r x%d" % (_a[:30], _DK_JS.count(_a)))
+        continue
+    _mr = _dk_run(_DK_JS.replace(_a, _b))
+    if _mr.get(_nm) is not False:
+        _dk_bad.append("%s survived %r" % (_nm, _a[:30]))
+check("dictation hotkey: every mutation of the state machine breaks the scenario aimed at it (node)",
+      not _dk_bad and _DK_BASE.get("err") is None and all(_DK_BASE.get(n_) is True for n_ in _DK_NAMES),
+      "%r %r" % (_dk_bad, _DK_BASE))
+
+
+# the page's wiring of it, as source pins (run on real text, then on
+# mutated copies that must each fail)
+def _dk_pins(src):
+    _p = {}
+    _p["mac"] = ('const mod=IS_PC?(e.ctrlKey&&!e.metaKey):(e.metaKey&&!e.ctrlKey);'
+                 '\n  if(!mod||e.altKey||e.shiftKey)return;' in src)
+    _p["key"] = 'if(e.code!=="KeyD"&&String(e.key).toLowerCase()!=="d")return;' in src
+    _p["prevent"] = ("if(!modal)e.preventDefault();\n"
+                     "  dictAct(dictKey({type:\"down\",repeat:e.repeat,modal,rec:recording},Date.now()));\n},true);" in src)
+    _p["keyup"] = ('e.key!==(IS_PC?"Control":"Meta"))return;\n  dictAct(dictKey({type:"up"},Date.now()));\n},true);' in src)
+    _p["blur"] = ('addEventListener("blur",()=>dictAct(dictKey({type:"away"},Date.now())));' in src
+                  and "if(document.hidden)dictAct(dictKey({type:\"away\"},Date.now()));" in src)
+    _p["modal"] = ("""[...document.querySelectorAll('[id$="-veil"]')].some(v=>!v.hidden)""" in src
+                   and '(z&&z.classList.contains("on"))' in src and "(p&&!p.hidden)" in src)
+    _p["tip"] = ('micBtn.title="Dictate \\u2014 speak your message. Hold "+DICT_KEY\n'
+                 '  +" to talk and let go to finish, or tap it to keep listening";' in src
+                 and 'const DICT_KEY=IS_PC?"Ctrl+D":"\\u2318D";' in src)
+    _p["hold_ph"] = '"listening\\u2026 release to finish"' in src
+    _p["toggle_ph"] = '"listening\\u2026 press "+DICT_KEY+" (or tap the mic) to finish"' in src
+    _p["path"] = ("if(!(await ensureVoice())){dictKey({type:\"end\"},0);return;}\n    try{await startRec();}" in src
+                  and 'body:JSON.stringify({stop:true})});   // barge-in' in src
+                  and 'input.placeholder=dictPrompt();\n}' in src
+                  and 'dictKey({type:"end"},0);             // however it ended' in src)
+    _p["btn"] = ('micBtn.addEventListener("click",()=>{\n  if(recording){stopRec();return;}\n  dictStart();\n});' in src)
+    return _p
+
+
+_DKP = _dk_pins(_MILLENAI_SRC)
+_DKP_PAGE = _dk_pins(page)
+check("dictation hotkey: the handler, the tooltip, the placeholders and the existing voice path "
+      "are in the source and in the served page",
+      all(_DKP.values()) and all(_DKP_PAGE.values()), "%r %r" % (_DKP, _DKP_PAGE))
+_dkp_bad = []
+for _k, _a in [("mac", "e.metaKey&&!e.ctrlKey"), ("key", 'e.code!=="KeyD"'), ("prevent", "if(!modal)e.preventDefault();"),
+               ("keyup", 'e.key!==(IS_PC?"Control":"Meta")'), ("blur", "document.hidden"),
+               ("modal", '[id$="-veil"]'), ("tip", "Hold \"+DICT_KEY"), ("hold_ph", "release to finish"),
+               ("toggle_ph", "(or tap the mic) to finish"), ("path", "await ensureVoice()"),
+               ("btn", "  dictStart();\n});")]:
+    if _MILLENAI_SRC.count(_a) < 1:
+        _dkp_bad.append("anchor " + _a)
+        continue
+    if _dk_pins(_MILLENAI_SRC.replace(_a, _a[:2] + "_" + _a[2:])).get(_k) is not False:
+        _dkp_bad.append("pin %s survived" % _k)
+check("dictation hotkey: each source pin fails when its line is changed", not _dkp_bad, "%r" % _dkp_bad)
+# every dialog veil hides by the hidden attribute, which is what the hotkey's
+# modal test reads: a new veil that didn't would need a line in dictModal
+_veils = re.findall(r'<div id="([a-z0-9-]+-veil)"([^>]*)>', _MILLENAI_SRC)
+check("dictation hotkey: every dialog veil in the page hides by the hidden attribute (what dictModal reads)",
+      len(_veils) >= 10 and all(" hidden" in (" " + _a2) for _n2, _a2 in _veils),
+      "%r" % [_n2 for _n2, _a2 in _veils if " hidden" not in (" " + _a2)])
+# ==== 6b338 dictation hotkey: end ====
+
 
 print()
 passed = sum(1 for _n, o, _d in RESULTS if o)

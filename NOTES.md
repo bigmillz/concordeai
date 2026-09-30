@@ -9,6 +9,65 @@ Current: repo `bigmillz/concordeai` — version and build live in
 
 ---
 
+## 6b338 — dictation hotkey
+Patrick (2026-09-30): "Similar to Claude's add a hotkey for Apple D or
+Command D for the speech to text. And if you hold it, you can release it
+and it'll stop. But if you immediately release it, then it'll stay on
+that mode until you press Command D again or whatever the Windows
+equivalent is."
+
+Command+D on a Mac, Ctrl+D on a PC (`IS_PC`). Hold it and let go: it
+stops and transcribes. Tap it: dictation stays on until the hotkey (or
+the mic button) is pressed again. It runs the existing path, the one the
+mic button runs: `/api/speak {stop:true}`, `ensureVoice()`, `startRec`,
+`stopRec`, `/api/transcribe`, `voiceChat`. A press while the engine is
+not ready shows the same placeholders and doesn't record.
+
+- **The line is `DICT_HOLD_MS = 300`.** Released at 299 ms is a tap, at
+  300 ms a hold.
+- **`dictKey(ev, now)`** is the whole decision, pure ("start" / "stop" /
+  ""), with `dictSt = {mode, t}` (`""` idle, `"hold"`, `"toggle"`). The
+  DOM glue (keydown/keyup in the capture phase, `blur`,
+  `visibilitychange`) only maps events onto it, so node runs it.
+- **Edge cases.** Repeat keydowns (holding D) are ignored. The keyup of
+  the second press lands on idle and is ignored. The hotkey also stops a
+  recording the mic button began (`ev.rec`). A mic-button stop resets
+  the state (`stopRec` sends "end"), as does a failed start (engine not
+  ready, mic blocked). Only exactly Cmd (Mac) or Ctrl (PC) counts: no
+  Shift/Alt, and Ctrl+D on a Mac is left alone. A lost keyup: the next
+  non-repeat press stops. A quick tap and second tap while the mic is
+  still starting (first-time permission prompt): the stop is held in
+  `dictPend` and runs when the start finishes; a second start while one
+  is in flight is that stop too (`dictStarting`).
+- **Modifier released first.** WebKit does not deliver the D keyup while
+  Command is down, so the Command (Ctrl on a PC) keyup also counts as the
+  release. The hold time is then measured to that keyup.
+- **Dialogs.** The hotkey is ignored, and not `preventDefault`ed, while
+  the palette, the ZITO board or any `[id$="-veil"]` (Settings, Advanced,
+  Server tasks, update, first-run, wizard, and the rest) is shown. A
+  gauntlet check asserts every veil in the page hides with the `hidden`
+  attribute, which is what `dictModal` reads. The account window is its
+  own native window, so the main page loses focus there (see below).
+- **Focus.** Window `blur` or the page hiding stops and transcribes a
+  recording the hotkey started (hold or toggled). A recording begun with
+  the mic button is left as it was.
+- **Native menu.** Nothing in the Cocoa setup binds Cmd+D. The app passes
+  no `menu=` to pywebview, which builds the default menu (pywebview
+  6.2.1, the installed one): About, Hide (Cmd+H), Hide Others, Quit
+  (Cmd+Q), Edit (Cmd+X/C/V/A), View (Ctrl+Cmd+F). `millenai.py` has no
+  `keyEquivalent`. The page's handler calls `preventDefault` anyway.
+- **Placeholder.** Hold: "listening… release to finish". Toggled, or
+  started with the button: "listening… press ⌘D (or tap the mic) to
+  finish" (Ctrl+D on a PC). The mic tooltip names the hotkey.
+
+Tests: the state machine in node on timelines, then 13 mutations of it
+that each must break the scenario aimed at them; source pins on the
+handler, tooltip, placeholders and path, each shown to fail when its line
+changes. Driven with synthetic KeyboardEvents in a page served from a
+plain file server with `api` stubbed (Blink, not WKWebView, so
+unverified there: real Cmd keyup delivery, `blur` on the window, Ctrl+D
+under WebView2).
+
 ## 6b336 — the engine menu fits the window
 Patrick (2026-09-30), with a screenshot of the engine menu listing
 twelve of his server's models: "This box doesn't fit on the screen. Can
