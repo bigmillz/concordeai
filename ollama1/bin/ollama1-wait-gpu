@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# ollama1-wait-gpu: hold Ollama's start until the graphics card's compute
+# driver is ready. Run by ollama.service (ExecStartPre).
+#
+# Ollama looks for GPUs once, when it starts. Started a moment before the
+# driver had finished (seen after a reboot: 16:10:09 against the driver's
+# 16:10:11), it found none, and ran every model on the CPU until the next
+# restart while the card sat idle.
+#
+# Display-class PCI devices from AMD or NVIDIA: none means nothing to wait for.
+# AMD: a KFD node with a real gfx target, and /dev/kfd. NVIDIA: nvidia-smi
+# answers. After OLLAMA1_GPU_WAIT_S seconds (default 90) it gives up and lets
+# Ollama start anyway (the gateway then refuses models the CPU would run).
+set -u
+SYS=${OLLAMA1_SYS:-/sys}
+DEV=${OLLAMA1_DEV:-/dev}
+LIMIT=${OLLAMA1_GPU_WAIT_S:-90}
+[[ "$LIMIT" =~ ^[0-9]{1,4}$ ]] || LIMIT=90
+
+want_amd=0
+want_nvidia=0
+for d in "$SYS"/bus/pci/devices/*; do
+  [ -r "$d/class" ] || continue
+  case "$(cat "$d/class" 2>/dev/null)" in 0x03*) ;; *) continue ;; esac     # display controllers
+  case "$(cat "$d/vendor" 2>/dev/null)" in
+    0x1002) want_amd=1 ;;
+    0x10de) want_nvidia=1 ;;
+  esac
+done
+[ "$want_amd" -eq 1 ] || [ "$want_nvidia" -eq 1 ] || exit 0
+
+amd_ready() {
+  [ -e "$DEV/kfd" ] || return 1
+  local p v
+  for p in "$SYS"/class/kfd/kfd/topology/nodes/*/properties; do
+    [ -r "$p" ] || continue
+    v=$(awk '/^gfx_target_version/ {print $2}' "$p" 2>/dev/null)
+    [ "${v:-0}" != 0 ] && return 0
+  done
+  return 1
+}
+nvidia_ready() { command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; }
+ready() {
+  if [ "$want_amd" -eq 1 ] && ! amd_ready; then return 1; fi
+  if [ "$want_nvidia" -eq 1 ] && ! nvidia_ready; then return 1; fi
+  return 0
+}
+
+start=$SECONDS
+while ! ready; do
+  if [ $((SECONDS - start)) -ge "$LIMIT" ]; then
+    echo "ollama1-wait-gpu: the graphics card wasn't ready after $LIMIT s; starting Ollama anyway"
+    exit 0
+  fi
+  sleep 1
+done
+echo "ollama1-wait-gpu: the graphics card is ready after $((SECONDS - start)) s"

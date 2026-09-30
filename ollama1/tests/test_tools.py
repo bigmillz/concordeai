@@ -8,6 +8,8 @@ import re
 import shutil
 import subprocess
 import tempfile
+import threading
+import time
 import unittest
 
 import o1test_util as U
@@ -109,6 +111,117 @@ class TestRamModelTool(unittest.TestCase):
         self.assertIn("restore()", src.split("finally:")[-1])                # always back to normal
         self.assertIn('DROPIN_DIR = "/run/systemd/system/ollama.service.d"', src)   # runtime only
         self.assertLess(src.index('tty.readline().strip() != "yes"'), src.index("results.append(measure("))
+
+
+class TestWaitGpu(unittest.TestCase):
+    """bin/ollama1-wait-gpu: Ollama looks for GPUs once, at start. After a
+    reboot it started two seconds before the driver was ready, found none,
+    and ran everything on the CPU. The script holds the start until the card
+    is ready (fake /sys and /dev trees here)."""
+    SCRIPT = os.path.join(U.KIT, "bin", "ollama1-wait-gpu")
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="o1wait-")
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        self.sys = os.path.join(self.dir, "sys")
+        self.dev = os.path.join(self.dir, "dev")
+        os.makedirs(self.dev)
+        self.props = os.path.join(self.sys, "class/kfd/kfd/topology/nodes/1/properties")
+
+    def pci(self, name, klass, vendor):
+        d = os.path.join(self.sys, "bus/pci/devices", name)
+        os.makedirs(d, exist_ok=True)
+        for f, v in (("class", klass), ("vendor", vendor)):
+            with open(os.path.join(d, f), "w") as fh:
+                fh.write(v + "\n")
+
+    def kfd(self, gfx):
+        os.makedirs(os.path.dirname(self.props), exist_ok=True)
+        with open(self.props, "w") as f:
+            f.write("cpu_cores_count 0\ngfx_target_version %d\n" % gfx)
+
+    def run_script(self, wait=3, env=None):
+        e = dict(os.environ, OLLAMA1_SYS=self.sys, OLLAMA1_DEV=self.dev, OLLAMA1_GPU_WAIT_S=str(wait))
+        e.update(env or {})
+        t0 = time.time()
+        r = subprocess.run(["bash", self.SCRIPT], capture_output=True, text=True, timeout=60, env=e)
+        return r.returncode, r.stdout + r.stderr, time.time() - t0
+
+    def test_syntax(self):
+        self.assertEqual(subprocess.run(["bash", "-n", self.SCRIPT]).returncode, 0)
+        sc = shutil.which("shellcheck")
+        if sc:
+            r = subprocess.run([sc, self.SCRIPT], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_no_gpu_means_no_wait(self):
+        self.pci("0000:00:14.0", "0x0c0330", "0x8086")           # a USB controller, and an Intel one
+        code, out, took = self.run_script(wait=30)
+        self.assertEqual((code, out), (0, ""))
+        self.assertLess(took, 5)
+
+    def test_a_ready_amd_card_passes_at_once(self):
+        self.pci("0000:2f:00.0", "0x030000", "0x1002")
+        self.kfd(100300)
+        open(os.path.join(self.dev, "kfd"), "w").close()
+        code, out, took = self.run_script(wait=30)
+        self.assertEqual(code, 0)
+        self.assertIn("ready after 0 s", out)
+        self.assertLess(took, 5)
+
+    def test_it_waits_until_the_driver_is_ready(self):
+        self.pci("0000:2f:00.0", "0x030000", "0x1002")
+        self.kfd(0)                                              # the node exists but has no gfx target yet
+        open(os.path.join(self.dev, "kfd"), "w").close()
+        threading.Timer(2.0, lambda: self.kfd(100300)).start()
+        code, out, took = self.run_script(wait=30)
+        self.assertEqual(code, 0)
+        self.assertIn("is ready after", out)
+        self.assertGreaterEqual(took, 1.5)                      # it really waited
+        self.assertLess(took, 20)
+
+    def test_no_kfd_device_yet_is_not_ready(self):
+        self.pci("0000:2f:00.0", "0x030000", "0x1002")
+        self.kfd(100300)                                         # the node is there, /dev/kfd is not
+        code, out, took = self.run_script(wait=2)
+        self.assertEqual(code, 0)
+        self.assertIn("wasn't ready after 2 s", out)
+
+    def test_it_gives_up_and_lets_ollama_start(self):
+        self.pci("0000:2f:00.0", "0x030000", "0x1002")
+        code, out, took = self.run_script(wait=2)
+        self.assertEqual(code, 0)                               # never blocks the start for good
+        self.assertIn("starting Ollama anyway", out)
+        self.assertGreaterEqual(took, 1.5)
+
+    def test_nvidia_waits_for_nvidia_smi(self):
+        self.pci("0000:01:00.0", "0x030000", "0x10de")
+        fake = os.path.join(self.dir, "bin")
+        os.makedirs(fake)
+        smi = os.path.join(fake, "nvidia-smi")
+        with open(smi, "w") as f:
+            f.write("#!/bin/sh\nexit 1\n")
+        os.chmod(smi, 0o755)
+        env = {"PATH": fake + os.pathsep + os.environ["PATH"]}
+        self.assertIn("starting Ollama anyway", self.run_script(wait=2, env=env)[1])
+        with open(smi, "w") as f:
+            f.write("#!/bin/sh\necho GPU 0\nexit 0\n")
+        self.assertIn("is ready after", self.run_script(wait=2, env=env)[1])
+
+    def test_a_bad_limit_falls_back(self):
+        self.pci("0000:2f:00.0", "0x030000", "0x1002")
+        self.kfd(100300)
+        open(os.path.join(self.dev, "kfd"), "w").close()
+        self.assertEqual(self.run_script(env={"OLLAMA1_GPU_WAIT_S": "soon"})[0], 0)
+
+    def test_the_unit_runs_it_before_ollama_and_allows_the_time(self):
+        with open(os.path.join(U.KIT, "systemd", "ollama.service")) as f:
+            unit = f.read()
+        self.assertIn("ExecStartPre=/usr/local/lib/ollama1/bin/ollama1-wait-gpu", unit)
+        self.assertLess(unit.index("ExecStartPre="), unit.index("ExecStart=/opt/ollama/current/bin/ollama serve"))
+        m = re.search(r"^TimeoutStartSec=(\d+)$", unit, re.M)
+        self.assertTrue(m)
+        self.assertGreater(int(m.group(1)), 90 + 30)             # the wait's default limit, and room to start
 
 
 class TestStabilityTest(unittest.TestCase):
