@@ -3119,7 +3119,7 @@ _nsleep = []
 _z, _b, _l = _eng_world(cur="0.34.4", staged=None)
 _eng_file(os.path.join(_b + ".old", "ollama"), "0.28.1")
 open(_z["_SWAP_TRIAL"], "w").write("0.34.4")
-_z["_apply_staged_engine"]()                              # unproven: back to 0.28.1
+_z["_prove_engine"](_FP(_b, 1, alive=False), 1, 5)       # it died: back to 0.28.1
 _rr["R1 back"] = (_bv(_b), _z["_update_note"]().get("bad"))
 def _dl_as(ver):
     def _dl(dest, row=None, sha256=None):
@@ -3182,14 +3182,29 @@ _src_apply = _MILLENAI_SRC[_MILLENAI_SRC.index("def _apply_staged_engine("):
                            _MILLENAI_SRC.index("def _drop_trial(")]
 _rr["R5 order"] = (_src_apply.index('with open(_SWAP_TRIAL, "w"')
                    < _src_apply.index("os.replace(_MANAGED_BIN_DIR, old)"))
-# a leftover trial while our Ollama from before still answers with that
-# version: proven, not rolled back; another version answering: rolled back
+# L1 (after d153c0b): quit mid-proof; the next start rolls back but notes
+# nothing, and the same release is fetched and tried again
+_z, _b, _l = _eng_world(); _z["_apply_staged_engine"]()
+_z["_apply_staged_engine"]()                              # the next start
+_z["_download_ollama_binary"] = _dl_as("0.34.4")
+_l["latest"] = (0, 34, 4)
+_rr["L1 quit"] = (_bv(_b), _z["_update_note"]().get("bad"), _z["_stage_engine_update"](),
+                  os.path.exists(_z["_STAGED_OK"]))
+# L2: another account's Ollama answering with the trial's version on the
+# port the swap sees proves nothing; the next start still rolls back
 _z, _b, _l = _eng_world(); _z["_apply_staged_engine"]()
 _l["ver_at"] = (0, 34, 4); _z["_apply_staged_engine"]()
-_rr["answers first"] = (_bv(_b), os.path.exists(_b + ".old"), os.path.exists(_z["_SWAP_TRIAL"]))
-_z, _b, _l = _eng_world(); _z["_apply_staged_engine"]()
-_l["ver_at"] = (0, 1, 0); _z["_apply_staged_engine"]()
-_rr["other answers"] = _bv(_b)
+_rr["L2 foreign"] = (_bv(_b), os.path.exists(_z["_SWAP_TRIAL"]))
+# ...while OUR serve from before, on our port, answering with it, does
+def _l2_spawn(ver_at):
+    z, b, log = _eng_world(); z["_apply_staged_engine"]()
+    z.update(_port_in_use=lambda p: True, _listener_is_mine=lambda p: True,
+             _engine_version_at=lambda p: ver_at if p == 23456 else ())
+    z["OLLAMA_PORT"][0] = 23456
+    _exec_names(z, {"_prove_if_serving", "_spawn_ollama_serve"})
+    return z["_spawn_ollama_serve"](), _bv(b), os.path.exists(b + ".old"), os.path.exists(z["_SWAP_TRIAL"])
+_rr["L2 ours"] = _l2_spawn((0, 34, 4))
+_rr["L2 ours, other version"] = _l2_spawn((0, 28, 1))
 check("a failed engine: never fetched again, always something running, one proof, trial first",
       _rr["R1 back"] == ("0.28.1", [0, 34, 4])
       and _rr["R1 same day"] == ("bad", []) and _rr["R1 next day"] == ("bad", [])
@@ -3201,8 +3216,11 @@ check("a failed engine: never fetched again, always something running, one proof
       and _rr["R3 answers"] == (False, "0.34.4")
       and _rr["R4"] == (False, "0.34.4", False, 1, [0, 34, 4])
       and _rr["R5"] == ("0.28.1", True, False) and _rr["R5 order"]
-      and _rr["answers first"] == ("0.34.4", False, False)
-      and _rr["other answers"] == "0.28.1",
+      and _rr["L1 quit"] == ("0.28.1", None, "staging", True)
+      and _rr["L2 foreign"] == ("0.28.1", False)
+      and _rr["L2 ours"] == (True, "0.34.4", False, False)
+      and _rr["L2 ours, other version"] == (True, "0.34.4", True, True)
+      and "_engine_version_at(OLLAMA_PORT[0])" not in _MILLENAI_SRC,
       "%r" % _rr)
 # THE FETCH (review of the port): its own lock, never the install lock;
 # marked ready only when it runs and is new enough; each outcome says so

@@ -5353,6 +5353,8 @@ def _spawn_ollama_serve() -> bool:
     if _port_in_use(port):
         mine = _listener_is_mine(port)
         if mine is True:
+            if os.path.exists(_SWAP_TRIAL):
+                _prove_if_serving(port)
             return True
         if mine is None:
             return False             # can't tell: never spawn a duplicate
@@ -13150,16 +13152,19 @@ def _trial_proven():
     shutil.rmtree(_MANAGED_BIN_DIR + ".old", ignore_errors=True)
 
 
-def _rollback_engine() -> str:
+def _rollback_engine(failed: bool = False) -> str:
     """Put back the engine a swap replaced (the caller holds _SWAP_LOCK).
-    The one that didn't start here is noted as bad, so it is never
-    fetched again, only a newer one (re-review of the port). Windows can
+    `failed`: _prove_engine saw it die or stay silent, so it is noted as
+    bad and never fetched again, only a newer one (re-review of the
+    port). A start-time roll-back of a trial the app never finished
+    proving (a quit, a crash, a power cut) notes nothing: the release may
+    be good, and the swap is tried again (L1, after d153c0b). Windows can
     hold the folder for a moment after its runner is stopped: the renames
     are tried five times, a second apart (re-review, R2). Returns "back",
     "held" (still refused: the trial stays for the next start) or "none"
     (no old engine to put back: the trial goes)."""
     old = _MANAGED_BIN_DIR + ".old"
-    bad = _trial_version()
+    bad = _trial_version() if failed else ()
     if bad:
         _update_note_set(bad=bad)
     if not _engine_exe(old):
@@ -13203,7 +13208,7 @@ def _apply_staged_engine():
     another copy of the app runs, and on an ARM64 PC only an ARM64 engine
     goes in. The old engine stays in bin.old until the new one has
     answered once (_prove_engine); one never seen answering is put back
-    at the next start, unless it is answering right now (re-review)."""
+    at the next start (and tried again; nothing is noted as bad)."""
     if not _SWAP_LOCK.acquire(blocking=False):
         return
     try:
@@ -13219,11 +13224,7 @@ def _apply_staged_engine():
             except OSError:
                 pass
         if os.path.exists(_SWAP_TRIAL) and _managed_serve() is None:
-            tv = _trial_version()
-            if tv and _engine_version_at(OLLAMA_PORT[0]) == tv:
-                _trial_proven()      # ours from before, and it answers
-            else:
-                _rollback_engine()   # it never answered: the old one back
+            _rollback_engine()       # never seen answering: the old one back
             return
         if not os.path.exists(_SWAP_TRIAL) and os.path.exists(old):
             shutil.rmtree(old, ignore_errors=True)    # a proven swap's
@@ -13268,6 +13269,22 @@ def _apply_staged_engine():
                 pass
         finally:
             _STAGE_LOCK.release()
+    finally:
+        _SWAP_LOCK.release()
+
+
+def _prove_if_serving(port: int):
+    """An Ollama of THIS user's already serves on our port while a trial
+    stands (our serve from before a crash of the app, still running): if
+    it reports the trial's version, the swap is proven (L2, after
+    d153c0b: the first cut asked OLLAMA_PORT at the swap, where our own
+    engine never is, and could take another account's for proof)."""
+    if not _SWAP_LOCK.acquire(blocking=False):
+        return
+    try:
+        tv = _trial_version()
+        if tv and _engine_version_at(port) == tv:
+            _trial_proven()
     finally:
         _SWAP_LOCK.release()
 
@@ -13334,7 +13351,7 @@ def _prove_engine(proc, port: int, wait: float = 90.0):
             or _managed_serve() is not None):
         return False                 # another serve of ours has it: leave it
     with _SWAP_LOCK:
-        _rollback_engine()
+        _rollback_engine(failed=True)
     _spawn_ollama_serve()            # the old engine, or the one in place
     return False
 

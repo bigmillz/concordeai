@@ -6165,7 +6165,8 @@ hardware. Built, then reviewed (5 reviewers, 2 skeptics per finding:
     there is no swap.
   - A leftover trial while our Ollama from before still answers: if it
     reports the trial's version, the swap counts as proven, not rolled
-    back.
+    back. (Moved in the follow-up below: the first cut asked the wrong
+    port.)
   - Gauntlet: one more check (each case above: the same day, the next
     day and a GitHub that can't be asked refetch nothing past `bad`, a
     newer release is fetched; the held folder; the reviewer's race; no
@@ -6173,6 +6174,24 @@ hardware. Built, then reviewed (5 reviewers, 2 skeptics per finding:
     and the last case, all caught; the earlier list rerun on this code:
     77 of 78 caught (six re-aimed at the
     changed code), the one missed the equivalent MLX-rows case above.
+- FOLLOW-UPS AFTER d153c0b (shipped to main; the re-review's two lows):
+  - L1: a quit, crash or power cut between the swap and the new
+    engine's first answer marked a GOOD release as bad at the next start
+    (the roll-back recorded it). `bad` is now recorded only by
+    `_prove_engine`, when it saw the engine die or stay silent 90 s
+    (`_rollback_engine(failed=True)`). A start-time roll-back of an
+    unfinished trial just rolls back, and the same release is fetched and
+    tried again.
+  - L2: the "leftover trial, and it answers" case asked OLLAMA_PORT at the
+    swap, where our own engine never is (the swap runs only when no serve
+    of ours is up), so it could only ever take ANOTHER account's Ollama
+    for proof. It moved to `_spawn_ollama_serve`'s early return: when
+    the Ollama on our port is this user's (`_listener_is_mine`) and
+    reports the trial's version, the swap is proven (`_prove_if_serving`).
+  - Gauntlet: the rollback check gained "quit mid-proof: not marked bad,
+    fetched again", another account's Ollama proving nothing, and our
+    serve proving it (or not, with another version). 7 mutations, all
+    caught.
   - Not verified here: Windows itself (the registry and
     CM_Locate_DevNodeW run on fakes; in Patrick's ARM VM the Snapdragon's
     Adreno should read as no card, since it is neither AMD nor Intel), a
