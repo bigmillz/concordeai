@@ -222,6 +222,11 @@ kit is 6b333). This is the app side, against `ollama1/PROTOCOL.md`.
     picture asked for during a benchmark, a council of server models
     down, and the whole live run under a server named
     "Pat’s Desk – デスク" (X-Models checked on the wire).
+  - Gauntlet after rebasing onto a050b4f: 562/562. Two older pins
+    followed the vision-download line; two live checks were loosened
+    only where main's ollama1 kit changed (the gateway now sends
+    `placement` and the stub lists more models; the memory pass after
+    a picture chat goes to the same server model).
   - Not verified: `docs/your-own-server.md` doesn't exist in the repo
     yet (the link will 404 until it does); the chip against the real
     gateway (canned `gpu` here).

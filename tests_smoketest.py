@@ -4003,7 +4003,8 @@ check("pictures go in each provider's own format; plain turns stay plain",
 check("per-task wiring: lanes, vision first, refusals, titles/memory/pins, funnels, remote",
       '_fl = work_ladder("code")' in _MILLENAI_SRC
       and "if images and _vis_cloud and _cloud_vision():" in _MILLENAI_SRC
-      and "and not _vis_cloud and not _vis_local:" in _MILLENAI_SRC
+      # (6b334) and not for a pick of your own server's model
+      and "and not _vis_cloud and not _vis_local\n                and not _srv_lbl):" in _MILLENAI_SRC
       and "def _walk_ladder() -> bool:" in _MILLENAI_SRC
       and "kwargs={\"conf\": _ans_conf, \"cloud_only\": cloud_only}" in _MILLENAI_SRC
       and "make_title(txt, conf=_conf)" in _MILLENAI_SRC
@@ -4111,7 +4112,8 @@ check("per-task review fixes: titles per request, badge, sweeps",
       and "_last_cloud.pop((self.ctx.name, _title_cid), None)" in _MILLENAI_SRC
       and 'json.dumps({"w": "cloud"})' in _MILLENAI_SRC
       and 'd.w==="cloud"' in page
-      and "if images and not cloud_only and not _vis_cloud and not _vis_local:" in _MILLENAI_SRC
+      and ("if (images and not cloud_only and not _vis_cloud and not _vis_local\n"
+           "                and not _srv_lbl):") in _MILLENAI_SRC
       and "if not quiet:        # a title that merely mentions billing" in _MILLENAI_SRC
       and "repos.update(r[0] for r in RETIRED_MODELS.values() if r[0])" in _MILLENAI_SRC
       and "elif not cloud_only:\n                                run_model(small" in _MILLENAI_SRC
@@ -18425,10 +18427,13 @@ check("servers (live): pairing through the real gateway: no window and a wrong c
       and _sp1[1].get("err", "").startswith("That code is wrong. 4 more tries")
       and _sp2[1].get("ok") is True and _sp2[1]["server"]["paired"] is True
       and _sp2[1]["server"]["status"].get("auth") is True
-      and [x["label"] for x in _sp2[1]["server"]["models"]] == [
-          _SVN + " · huge:70b", _SVN + " · small:8b", _SVN + " · sneaky:14b"]
-      and _srow34.get("models") == ["huge:70b", "small:8b", "sneaky:14b"]
-      and all(x["placement"] == "unknown" for x in _sp2[1]["server"]["models"])
+      # the stub's models as the gateway lists them (no embeddings), and
+      # where each runs as the gateway says (6b333's placement)
+      and {_SVN + " · huge:70b", _SVN + " · small:8b", _SVN + " · sneaky:14b"}
+      <= {x["label"] for x in _sp2[1]["server"]["models"]}
+      and _srow34.get("models") == [x["name"] for x in _sp2[1]["server"]["models"]]
+      and not [x for x in _sp2[1]["server"]["models"] if "embed" in x["name"]]
+      and all(x["placement"] in ("gpu", "gpu+ram", "unknown") for x in _sp2[1]["server"]["models"])
       and [d_["id"] for d_ in _devs34] == [_srow34.get("device_id")]
       and _st34.S_IMODE(os.stat(_sfile34).st_mode) == 0o600,
       "%r" % [_sp0, _sp1, _sp2, _devs34])
@@ -18511,16 +18516,20 @@ _o1("/next", {"path": "/api/show", "status": 200,
               "body": {"capabilities": ["completion", "vision"], "model_info": {}}})
 _nst = len(_o1("/stub")["calls"])
 _scV1 = _svchat(text="what is in picture 334", images=_PIC34)
-_stV1 = [c for c in _o1("/stub")["calls"][_nst:] if c[1] == "/api/chat"]
+_stV1 = [c for c in _o1("/stub")["calls"][_nst:] if c[1] == "/api/chat"
+         # the chats with the picture, not the memory pass after each
+         and (c[2].get("messages") or [{}])[-1].get("images")]
 _scV2 = _svchat(label=_SVN + " \u00b7 huge:70b", text="and in this one 334", images=_PIC34)
-_stV2 = [c for c in _o1("/stub")["calls"][_nst:] if c[1] == "/api/chat"]
+_stV2 = [c for c in _o1("/stub")["calls"][_nst:] if c[1] == "/api/chat"
+         # the chats with the picture, not the memory pass after each
+         and (c[2].get("messages") or [{}])[-1].get("images")]
 _svq("/api/prefs", "POST", {"turbo": False})
 check("servers (live): a picture for a server pick goes to that server's reader, cloud power on, "
       "and nothing else reads it",
-      "ANSWER-ture 334" in _scV1[1] and "vision engine" not in _scV1[1] + _scV2[1]
+      "ANSWER- picture 334" in _scV1[1] and "vision engine" not in _scV1[1] + _scV2[1]
       and _stV1 and _stV1[0][2]["model"] == "small:8b"
       and _stV1[0][2]["messages"][-1].get("images") == ["iVBORw0KGgoAAAANSUhEUg=="]
-      and "ANSWER-s one 334" in _scV2[1] and len(_stV2) == 2 and _stV2[1][2]["model"] == "small:8b"
+      and "ANSWER-this one 334" in _scV2[1] and len(_stV2) == 2 and _stV2[1][2]["model"] == "small:8b"
       and ("RUN", json.dumps({"r": [_SVL], "w": "server", "s": _SVL})) in _scV2[2],
       "%r" % [_scV1[1][:160], _scV2[1][:160], [c[2].get("model") for c in _stV2], _scV2[2][-3:]])
 # the pairing lost at the server: "pair again"
