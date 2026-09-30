@@ -60,7 +60,7 @@ for a in "$@"; do
   if [ "$prev" = --encrypted-swap ]; then SWAP_SIZE=$a; prev=""; continue; fi
   if [ "$prev" = --vg-reserve ]; then
     [[ "$a" =~ ^[0-9]+G$ ]] || { echo "--vg-reserve takes a size in GiB, like 64G"; exit 2; }
-    VG_RESERVE_GIB=${a%G}; prev=""; continue
+    VG_RESERVE_GIB=$((10#${a%G})); prev=""; continue   # 10#: "08G" is decimal, not octal
   fi
   prev=$a
   case "$a" in
