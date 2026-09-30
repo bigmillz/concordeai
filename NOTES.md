@@ -23,34 +23,57 @@ mic button runs: `/api/speak {stop:true}`, `ensureVoice()`, `startRec`,
 `stopRec`, `/api/transcribe`, `voiceChat`. A press while the engine is
 not ready shows the same placeholders and doesn't record.
 
-- **The line is `DICT_HOLD_MS = 300`.** Released at 299 ms is a tap, at
-  300 ms a hold.
 - **`dictKey(ev, now)`** is the whole decision, pure ("start" / "stop" /
-  ""), with `dictSt = {mode, t}` (`""` idle, `"hold"`, `"toggle"`). The
-  DOM glue (keydown/keyup in the capture phase, `blur`,
-  `visibilitychange`) only maps events onto it, so node runs it.
-- **Edge cases.** Repeat keydowns (holding D) are ignored. The keyup of
-  the second press lands on idle and is ignored. The hotkey also stops a
-  recording the mic button began (`ev.rec`). A mic-button stop resets
-  the state (`stopRec` sends "end"), as does a failed start (engine not
-  ready, mic blocked). Only exactly Cmd (Mac) or Ctrl (PC) counts: no
-  Shift/Alt, and Ctrl+D on a Mac is left alone. A lost keyup: the next
-  non-repeat press stops. A quick tap and second tap while the mic is
-  still starting (first-time permission prompt): the stop is held in
-  `dictPend` and runs when the start finishes; a second start while one
-  is in flight is that stop too (`dictStarting`).
-- **Modifier released first.** WebKit does not deliver the D keyup while
-  Command is down, so the Command (Ctrl on a PC) keyup also counts as the
-  release. The hold time is then measured to that keyup.
-- **Dialogs.** The hotkey is ignored, and not `preventDefault`ed, while
-  the palette, the ZITO board or any `[id$="-veil"]` (Settings, Advanced,
-  Server tasks, update, first-run, wizard, and the rest) is shown. A
-  gauntlet check asserts every veil in the page hides with the `hidden`
-  attribute, which is what `dictModal` reads. The account window is its
-  own native window, so the main page loses focus there (see below).
-- **Focus.** Window `blur` or the page hiding stops and transcribes a
-  recording the hotkey started (hold or toggled). A recording begun with
-  the mic button is left as it was.
+  ""), with `dictSt = {mode, t, rep}` (`mode`: `""` idle, `"hold"`,
+  `"toggle"`). The DOM glue (keydown/keyup in the capture phase, `blur`,
+  `visibilitychange`) only maps events onto it, so node runs it. The
+  glue (`dictStart`, `dictAct`, `stopRec`) runs in node too, on stubs.
+- **Tap or hold.** On the D keyup, released at 300 ms or later is a hold
+  (`DICT_HOLD_MS`). WebKit withholds the D keyup while Command is down
+  and people let go of Command last, so the release often comes as the
+  Command (Ctrl) keyup, which gets `DICT_HOLD_MOD_MS = 500`: a real
+  push-to-talk hold lasts seconds, so the slack costs nothing. Repeat
+  keydowns seen before the release make it a hold whatever the time.
+  And a "hold" with under `DICT_MIN_HOLD_S = 0.4` s of audio was a tap
+  after all: it stays on as a toggle rather than stopping.
+- **Slips.** A stop with under `DICT_MIN_CLIP_S = 0.3` s of audio, from
+  any path (hotkey, mic button, blur), is dropped in `stopRec` without
+  calling `/api/transcribe`, so near-silence is never transcribed and
+  never sent in voice chat. The placeholder says "didn't catch anything".
+- **Edge cases.** Repeat keydowns start and stop nothing. The keyup of
+  the second press lands on idle and is ignored. The hotkey stops a
+  recording the mic button began (`ev.rec`), and the mic button stops
+  one the hotkey began; `stopRec` sends "end", however it ended. Only
+  exactly Cmd (Mac) or Ctrl (PC) counts: no Shift/Alt, and Ctrl+D on a
+  Mac is left alone. A lost keyup: the next non-repeat press stops. A
+  tap and a second tap while the mic is still starting: the stop waits
+  in `dictPend` and runs when the start finishes.
+- **Failed starts reset it.** Not ready, no microphone, blocked, or
+  `api()` throwing (the server gone, a 409 profile change): every
+  failed path sends "end" and clears `dictPend`, so the next press
+  starts instead of stopping nothing (review of 6b338).
+- **Which key.** `dictIsD(key, code)`: D by what the key types, any
+  case. The physical `KeyD` counts only when `key` is not a single Latin
+  letter (a Cyrillic layout), so on macOS Dvorak Command+E, which sits
+  on QWERTY's D, doesn't fire it (review of 6b338).
+- **Dialogs.** No START while the palette, the ZITO board or any
+  `[id$="-veil"]` (Settings, Advanced, Server tasks, update, first-run,
+  wizard, and the rest) is shown, and that press isn't
+  `preventDefault`ed. But a press in a dialog still STOPS a recording
+  and is consumed: the palette covers the mic button, and the first
+  version left the mic on there (review of 6b338). A gauntlet check
+  asserts every veil hides with the `hidden` attribute, which is what
+  `dictModal` reads. The account window is its own native window, so
+  the main page loses focus there (see below).
+- **Focus.** Window `blur` or the page hiding stops and transcribes any
+  recording that has started, the hotkey's or the mic button's: an open
+  microphone in a background app is the worse failure (decided in the
+  review, as the conservative default; Patrick hadn't answered). But
+  while a start is in flight (`dictStarting`) nothing stops: that blur
+  is macOS's first-use microphone prompt, and stopping lost the
+  recording the moment Allow was clicked. A hold caught that way turns
+  into a toggle, finished with the hotkey or the mic, and the
+  placeholder says so.
 - **Native menu.** Nothing in the Cocoa setup binds Cmd+D. The app passes
   no `menu=` to pywebview, which builds the default menu (pywebview
   6.2.1, the installed one): About, Hide (Cmd+H), Hide Others, Quit
@@ -60,13 +83,15 @@ not ready shows the same placeholders and doesn't record.
   started with the button: "listening… press ⌘D (or tap the mic) to
   finish" (Ctrl+D on a PC). The mic tooltip names the hotkey.
 
-Tests: the state machine in node on timelines, then 13 mutations of it
-that each must break the scenario aimed at them; source pins on the
-handler, tooltip, placeholders and path, each shown to fail when its line
+Tests: the state machine in node on timelines (18 scenarios), the glue
+in node on stubs (9: the failed starts, the prompt's blur, mic-button
+blur, tap-tap mid-start, slips, a short hold), then 29 mutations, each of
+which must break the scenario aimed at it. Source pins on the handler,
+tooltip, placeholders and path are each shown to fail when their line
 changes. Driven with synthetic KeyboardEvents in a page served from a
 plain file server with `api` stubbed (Blink, not WKWebView, so
-unverified there: real Cmd keyup delivery, `blur` on the window, Ctrl+D
-under WebView2).
+unverified there: real Cmd keyup delivery, `blur` on the window and
+under the real microphone prompt, Ctrl+D under WebView2).
 
 ## 6b336 — the engine menu fits the window
 Patrick (2026-09-30), with a screenshot of the engine menu listing

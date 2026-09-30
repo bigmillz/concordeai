@@ -35443,6 +35443,76 @@ async function ensureVoice(){
   return false;
 }
 
+/* DICTATION HOTKEY (6b338, per Patrick: "Similar to Claude's add a hotkey
+   for Apple D or Command D for the speech to text. And if you hold it, you
+   can release it and it'll stop. But if you immediately release it, then
+   it'll stay on that mode until you press Command D again or whatever the
+   Windows equivalent is."). Command+D on a Mac, Ctrl+D on a PC. dictKey is
+   the whole decision, pure: an event and a time in, "start", "stop" or ""
+   out, so node runs it without a page. The glue after stopRec maps the DOM
+   onto it and runs the existing path (ensureVoice, startRec, stopRec), the
+   one the mic button runs. mode: "" idle, "hold" the key is down,
+   "toggle" it was tapped and dictation stays on.
+   - down: a press stops whatever is on (a hotkey session, or a recording
+     the mic button began, ev.rec), even with a dialog open: the palette
+     covers the mic button. Only a START is refused in a dialog. Repeat
+     keydowns (holding D auto-repeats them) start nothing, but mark a hold.
+   - up: the D keyup, or the Command (Ctrl on a PC) keyup (ev.mod). WebKit
+     withholds the D keyup while Command is down and people let go of
+     Command last, so that release gets the longer DICT_HOLD_MOD_MS. It is
+     a hold past the threshold, or once repeats were seen, and a hold
+     stops, unless less than DICT_MIN_HOLD_S of audio came in (ev.secs):
+     then it was a tap after all and dictation stays on. The keyup of the
+     second press lands on idle and is ignored.
+   - away: the window lost focus or hid. A recording stops, however it
+     began: an open microphone in an unfocused app is the worse outcome.
+     But while a start is in flight (ev.starting) nothing stops: that blur
+     is macOS's microphone prompt, and a hold becomes a toggle, finished
+     with the hotkey or the mic.
+   - end: the recording ended some other way (the mic button, a failed
+     start), so the state resets. */
+const DICT_HOLD_MS=300;          // D keyup: released later than this is a hold
+const DICT_HOLD_MOD_MS=500;      // Command/Ctrl keyup: the same, with slack
+const DICT_MIN_HOLD_S=0.4;       // a "hold" with less audio than this was a tap
+const DICT_MIN_CLIP_S=0.3;       // less than this is never transcribed
+const DICT_KEY=IS_PC?"Ctrl+D":"\u2318D";
+const dictSt={mode:"",t:0,rep:false};
+// the D key by what it types: Dvorak's Command+E sits where QWERTY's D
+// is, so the physical code counts only for a non-Latin key (Cyrillic)
+function dictIsD(key,code){
+  const k=String(key||"");
+  if(/^[a-z]$/i.test(k))return k.toLowerCase()==="d";
+  return code==="KeyD";
+}
+function dictKey(ev,now){
+  const s=dictSt;
+  const idle=()=>{s.mode="";s.t=0;s.rep=false;};
+  if(ev.type==="end"){idle();return "";}
+  if(ev.type==="away"){
+    if(ev.starting){if(s.mode==="hold")s.mode="toggle";return "";}
+    idle();return ev.rec?"stop":"";
+  }
+  if(ev.type==="up"){
+    if(s.mode!=="hold")return "";
+    const held=s.rep||now-s.t>=(ev.mod?DICT_HOLD_MOD_MS:DICT_HOLD_MS);
+    if(held&&(ev.secs||0)>=DICT_MIN_HOLD_S){idle();return "stop";}
+    s.mode="toggle";s.rep=false;return "";
+  }
+  if(ev.repeat){if(s.mode==="hold")s.rep=true;return "";}
+  if(s.mode){idle();return "stop";}
+  if(ev.rec)return "stop";              // the mic button started it
+  if(ev.modal)return "";                // no start from inside a dialog
+  s.mode="hold";s.t=now;s.rep=false;return "start";
+}
+function dictPrompt(){
+  return dictSt.mode==="hold"?"listening\u2026 release to finish"
+    :"listening\u2026 press "+DICT_KEY+" (or tap the mic) to finish";
+}
+function audioSecs(bufs,sr){
+  let n=0;for(const c of bufs)n+=c.length;
+  return sr?n/sr:0;
+}
+
 async function startRec(){
   recStream=await navigator.mediaDevices.getUserMedia({audio:true});
   recCtx=new (window.AudioContext||window.webkitAudioContext)();
@@ -35461,6 +35531,10 @@ async function stopRec(){
   try{recProc.disconnect();recSrc.disconnect();}catch(e){}
   recStream.getTracks().forEach(t=>t.stop());
   const sr=recCtx.sampleRate;recCtx.close();
+  // under DICT_MIN_CLIP_S is a slip, not speech: never transcribed, and
+  // never sent in voice chat (6b338)
+  if(audioSecs(recBuf,sr)<DICT_MIN_CLIP_S){
+    recBuf=[];input.placeholder="didn\u2019t catch anything";return;}
   input.placeholder="transcribing\u2026";
   try{
     const wav=wavEncode(recBuf,sr);recBuf=[];
@@ -35475,49 +35549,8 @@ async function stopRec(){
   }catch(e){input.placeholder="couldn\u2019t transcribe \u2014 try again";}
 }
 
-/* DICTATION HOTKEY (6b338, per Patrick: "Similar to Claude's add a hotkey
-   for Apple D or Command D for the speech to text. And if you hold it, you
-   can release it and it'll stop. But if you immediately release it, then
-   it'll stay on that mode until you press Command D again or whatever the
-   Windows equivalent is."). Command+D on a Mac, Ctrl+D on a PC. dictKey is
-   the whole decision, pure: an event and a time in, "start", "stop" or ""
-   out, so node runs it without a page. The glue below maps the DOM onto it
-   and runs the existing path (ensureVoice, startRec, stopRec), the one the
-   mic button runs. mode: "" idle, "hold" the key is down, "toggle" it was
-   tapped and dictation stays on. Held past DICT_HOLD_MS, the release is
-   the stop; a quicker release leaves it on, and the next press stops it.
-   The keyup of that second press lands on idle and is ignored, so are
-   repeat keydowns (holding D auto-repeats them). A recording the mic
-   button began is stopped by the hotkey too (ev.rec). On a Mac, WebKit
-   does not send the D keyup while Command is down, so the Command keyup
-   counts as the release too (the glue maps both to "up"). away: the
-   window lost focus or hid, so a hotkey session stops: an open microphone
-   in an unfocused app is the worse outcome. end: the recording ended some
-   other way (the mic button, a failed start), so the state resets. */
-const DICT_HOLD_MS=300;
-const DICT_KEY=IS_PC?"Ctrl+D":"\u2318D";
-const dictSt={mode:"",t:0};
-function dictKey(ev,now){
-  const s=dictSt;
-  if(ev.type==="end"){s.mode="";s.t=0;return "";}
-  if(ev.type==="away"){
-    if(!s.mode)return "";
-    s.mode="";s.t=0;return "stop";
-  }
-  if(ev.type==="up"){
-    if(s.mode!=="hold")return "";
-    if(now-s.t>=DICT_HOLD_MS){s.mode="";s.t=0;return "stop";}
-    s.mode="toggle";return "";
-  }
-  if(ev.repeat||ev.modal)return "";     // a press in a dialog is not ours
-  if(s.mode){s.mode="";s.t=0;return "stop";}
-  if(ev.rec)return "stop";              // the mic button started it
-  s.mode="hold";s.t=now;return "start";
-}
-function dictPrompt(){
-  return dictSt.mode==="hold"?"listening\u2026 release to finish"
-    :"listening\u2026 press "+DICT_KEY+" (or tap the mic) to finish";
-}
+// the hotkey's glue (6b338): the DOM onto dictKey, and dictKey onto the
+// mic button's own path
 micBtn.title="Dictate \u2014 speak your message. Hold "+DICT_KEY
   +" to talk and let go to finish, or tap it to keep listening";
 // Settings, Advanced, the palette, the first-run and update dialogs, the
@@ -35527,29 +35560,35 @@ function dictModal(){
   return !!((p&&!p.hidden)||(z&&z.classList.contains("on"))
     ||[...document.querySelectorAll('[id$="-veil"]')].some(v=>!v.hidden));
 }
+function recSecs(){return recording&&recCtx?audioSecs(recBuf,recCtx.sampleRate):0;}
 let dictStarting=false,dictPend=false;
 async function dictStart(){
   if(dictStarting){dictPend=true;dictKey({type:"end"},0);return;}  // a second ask is a stop
   dictStarting=true;dictPend=false;
+  let on=false;
   try{
     api("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({stop:true})});   // barge-in: stop any reply audio
-    if(!(await ensureVoice())){dictKey({type:"end"},0);return;}
-    try{await startRec();}
-    catch(e){
-      dictKey({type:"end"},0);
-      input.placeholder=e&&e.name==="NotFoundError"
-      ?"no microphone found"
-      :IS_PC?"microphone blocked \u2014 allow it in Settings \u25b8 Privacy & security \u25b8 Microphone"
-      :"microphone blocked \u2014 allow it in System Settings \u25b8 Privacy";
-      return;}
-  }finally{dictStarting=false;}
+      body:JSON.stringify({stop:true})}).catch(()=>{});   // barge-in: stop any reply audio
+    if(await ensureVoice()){
+      try{await startRec();on=true;}
+      catch(e){
+        try{recStream&&recStream.getTracks().forEach(t=>t.stop());}catch(_){}
+        input.placeholder=e&&e.name==="NotFoundError"
+        ?"no microphone found"
+        :IS_PC?"microphone blocked \u2014 allow it in Settings \u25b8 Privacy & security \u25b8 Microphone"
+        :"microphone blocked \u2014 allow it in System Settings \u25b8 Privacy";}
+    }
+  }catch(e){input.placeholder="couldn\u2019t reach the voice engine \u2014 try again";}
+  finally{dictStarting=false;}
+  // every failed start (not ready, no mic, the server gone) resets the
+  // hotkey, so the next press starts rather than stopping nothing
+  if(!on){dictPend=false;dictKey({type:"end"},0);return;}
   // a stop that came while the start was in flight (a quick tap and tap)
   if(dictPend){dictPend=false;stopRec();}
 }
 function dictAct(a){
   if(a==="start")dictStart();
-  else if(a==="stop"){if(recording)stopRec();else dictPend=true;}
+  else if(a==="stop"){if(recording)stopRec();else if(dictStarting)dictPend=true;}
   else if(recording)input.placeholder=dictPrompt();   // hold became toggle
 }
 micBtn.addEventListener("click",()=>{
@@ -35559,19 +35598,22 @@ micBtn.addEventListener("click",()=>{
 document.addEventListener("keydown",e=>{
   const mod=IS_PC?(e.ctrlKey&&!e.metaKey):(e.metaKey&&!e.ctrlKey);
   if(!mod||e.altKey||e.shiftKey)return;
-  if(e.code!=="KeyD"&&String(e.key).toLowerCase()!=="d")return;
+  if(!dictIsD(e.key,e.code))return;
   const modal=dictModal();
-  if(!modal)e.preventDefault();
-  dictAct(dictKey({type:"down",repeat:e.repeat,modal,rec:recording},Date.now()));
+  const a=dictKey({type:"down",repeat:e.repeat,modal,rec:recording},Date.now());
+  if(!modal||a==="stop")e.preventDefault();   // a stop is ours even in a dialog
+  dictAct(a);
 },true);
 document.addEventListener("keyup",e=>{
-  if(e.code!=="KeyD"&&String(e.key).toLowerCase()!=="d"
-     &&e.key!==(IS_PC?"Control":"Meta"))return;
-  dictAct(dictKey({type:"up"},Date.now()));
+  const modUp=e.key===(IS_PC?"Control":"Meta");
+  if(!modUp&&!dictIsD(e.key,e.code))return;
+  dictAct(dictKey({type:"up",mod:modUp,secs:recSecs()},Date.now()));
 },true);
-addEventListener("blur",()=>dictAct(dictKey({type:"away"},Date.now())));
-document.addEventListener("visibilitychange",()=>{
-  if(document.hidden)dictAct(dictKey({type:"away"},Date.now()));});
+function dictAway(){
+  dictAct(dictKey({type:"away",starting:dictStarting,rec:recording},Date.now()));
+}
+addEventListener("blur",dictAway);
+document.addEventListener("visibilitychange",()=>{if(document.hidden)dictAway();});
 
 input.focus();
 
