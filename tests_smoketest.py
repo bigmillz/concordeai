@@ -8793,6 +8793,9 @@ function advChip(){}
 function paintAutonomy(){}
 function paintModels(){}
 function setAgent(n){agent=n;}
+function isSrvMode(){return false;}
+function srvModeGone(){}
+function advPrune(){}
 """ % (json.dumps(INST.base), json.dumps(INST.headers)) + _sbseg + r"""
 storeBoot().then(async()=>{if(run.after)prefSet(run.after);await prefQ;
   console.log(JSON.stringify({ls:Object.fromEntries(store),tier,adv,advOn,autonomy,council,reloaded,calls}));});
@@ -8875,6 +8878,7 @@ let adv=null,advOn=false,autonomy="auto",tierOff={},agent="",uiMode="ai",council
     council=["Llama 3.2 3B"],tier="Fast";
 function paintAgents(){} function paintModels(){} function advChip(){} function paintAutonomy(){}
 function modeShow(w){uiMode=w;}
+function isSrvMode(){return false;}function srvModeGone(){}function advPrune(){}
 """ + _sbseg + _jsfn(page, "function setTier(name,quiet){") + _jsfn(page, "function switchLane(m){")
              + _jsfn(page, "function setAgent(name,guess){") + r"""
 const boot=storeBoot();
@@ -15273,6 +15277,9 @@ function advChip(){}
 function paintAutonomy(){}
 function paintModels(){}
 function setAgent(n){agent=n;}
+function isSrvMode(){return false;}
+function srvModeGone(){}
+function advPrune(){}
 """ + _pg9 + r"""
 storeBoot().then(()=>console.log(JSON.stringify({ls:Object.fromEntries(store),tier,calls})));
 """)
@@ -15542,6 +15549,7 @@ const PROFILE=run.profile;const store=new Map(Object.entries(run.ls));const sets
 globalThis.localStorage={getItem:k=>store.has(k)?store.get(k):null,
   setItem:(k,v)=>{sets.push(k);store.set(k,String(v));}};
 const $=()=>({textContent:""}),$$=()=>[];let tier="";
+function tierLabel(){return tier||model;}
 """ + _pmseg9 + r"""
 paintModels();console.log(JSON.stringify({model,council,sets}));
 """)
@@ -17232,7 +17240,7 @@ def _svc_secrets(src):
                     and secret not in views and "id34.access" not in views
                     and set(ns["_srv_public"](e)) == {"id", "name", "url", "host", "access", "paired",
                                                      "paired_at", "device_name", "device_id",
-                                                     "status", "models", "gpu"})
+                                                     "status", "models", "gpu", "only"})
     out["entry repr"] = seed not in repr(e) and secret not in repr(e)
     out["error text"] = all(secret not in str(ns["_srv_fail"](e, st, {"error": "x"}))
                             for st in (403, 401, 500, 530))
@@ -17583,14 +17591,15 @@ def _svc_page(src):
           + "reachable:false,err:'Studio didn\\u2019t answer.',kind:'offline'},models:[]},"
           + "{id:'c9d0e1f2',name:'Lost',host:'l.example.com',paired:true,status:{at:1,reachable:true,"
           + "err:'pairing lost',kind:'auth'},models:[]}];"
-          + "srvList[0].access=true;"
+          + "srvList[0].access=true;srvList[0].only={ok:true,label:'Desktop \\u00b7 gpt-oss:20b'};"
+          + "srvList[2].only={ok:false};"
           + "process.stdout.write(JSON.stringify([srvCard(srvList[0]),srvCard(srvList[1]),"
           + "srvCard(srvList[2]),srvMenuRows(),[whereBadge('Desktop \\u00b7 gpt-oss:20b',''),"
           + "whereBadge('Llama 3.2 3B, Desktop \\u00b7 qwen3:14b',''),"
           + "whereBadge('Llama 3.2 3B, Groq 120B, Desktop \\u00b7 x:1b',''),"
           + "whereBadge('cloud box \\u00b7 x:1b',''),whereBadge('Llama 3.2 3B',''),"
           + "whereBadge('Desktop \\u00b7 x:1b cloud',''),"
-          + "whereBadge('Desktop \\u00b7 x:1b','Desktop \\u00b7 llava:7b')]]));")
+          + "whereBadge('Desktop \\u00b7 x:1b','Desktop \\u00b7 llava:7b')],srvSubRows(srvList[0]),srvSubRows(srvList[2])]));")
     open(os.path.join(_si_dir, "srv34.js"), "w").write(js)
     try:
         o = json.loads(subprocess.run(["node", os.path.join(_si_dir, "srv34.js")],
@@ -17605,11 +17614,17 @@ def _svc_page(src):
         "card unpaired": 'class="srv warn"' in o[1] and 'class="srv-code"' in o[1]
         and "Open a pairing window at the server, then type the code its screen shows." in o[1] and "Not paired · Studio didn’t answer." in o[1],
         "card lost": 'class="srv bad"' in o[2],
-        "menu": o[3].count('" data-s="') == 3
-        and '<span class="enm">Lost</span><span class="edsc">not answering</span>' in o[3] and 'data-s="Desktop · qwen3:14b"' in o[3]
-        and "yours · card + memory, slower" in o[3] and o[3].count(">your server<") == 2
-        and 'class="engrow srvrow on" data-s="Desktop · gpt-oss:120b"' in o[3]
-        and "not in the cloud" in o[3] and "Studio" not in o[3],
+        # (6b337) ONE row per paired server in the menu; its models are in the flyout it opens
+        "menu": o[3].count('data-sv="') == 2 and "data-s=" not in o[3] and "Studio" not in o[3]
+        and '<span class="enm">Desktop</span><span class="edsc">your server · 3 models</span>' in o[3]
+        and '<span class="enm">Lost</span><span class="edsc">your server · not answering</span>' in o[3]
+        and 'class="engrow srvmenu on" data-sv="a1b2c3d4"' in o[3],
+        "flyout": o[5].startswith('<div class="engrow srvmode') and "Desktop Only</span>" in o[5]
+        and o[5].count('data-s="') == 3 and 'data-s="Desktop · qwen3:14b"' in o[5]
+        and "yours · card + memory, slower" in o[5] and o[5].count(">your server<") == 2
+        and 'class="engrow srvrow on" data-s="Desktop · gpt-oss:120b"' in o[5]
+        and "not in the cloud" in o[5]
+        and 'data-none="1"><span class="edsc">not answering</span>' in o[6],
         # the badge: the server by name; a server's model or name never
         # reads as the cloud; a council names its servers beside "this Mac"
         "badge": o[4] == ["Desktop", "this Mac + Desktop", "cloud + Desktop", "cloud box",
@@ -18091,6 +18106,827 @@ for _d34, _o34, _nw34 in _SV_MUT:
 check("servers: %d mutations of the servers code, each caught by a check above" % len(_SV_MUT),
       all(isinstance(v, list) for _d, v in _svm), "%r" % [x for x in _svm if not isinstance(x[1], list)])
 
+# ---- <server> Only (6b337)
+print("== <server> Only (6b337) ==")
+# Patrick (2026-09-30): "Under the cloud models only, can we add a Olama one
+# only or whatever the server name is in a user's case?", then "Why are we
+# doing a three model council? ... single makes more sense." A mode per
+# paired server, below Cloud Only: ONE model, the strongest on that server
+# that fits its card; nothing on this computer or in the cloud. In
+# process: the servers section exec'd alone, the page's functions in node
+# and the handler's source pinned; 40 mutations each caught. Live: the
+# real gateway, below.
+
+
+def _so_model(name, pl="gpu", size=0, server="Desktop"):
+    return {"name": name, "label": server + " · " + name, "placement": pl,
+            "gpu_pct": None, "loaded": False, "size": size}
+
+
+def _so_seen(ns, e, models, **kw):
+    s = {"at": time.time(), "reachable": True, "auth": True, "latency_ms": 5,
+         "models": models, "version": "0.1", "err": "", "kind": ""}
+    s.update(kw)
+    ns["_srv_seen"][e["id"]] = s
+    return s
+
+
+def _soc_pick(src):
+    """Which model it is: the strongest that fits the card whole."""
+    ns, ctx, d = _sv_ns(src)
+    M = _so_model
+    pk = lambda ms: (lambda r: (r[0]["name"], r[1]) if r else None)(ns["server_only_pick"](ms))
+    pkv = lambda ms, v: (lambda r: (r[0]["name"], r[1]) if r else None)(ns["server_only_pick"](ms, v))
+    GIB = 1 << 30
+    par = ns["_srv_params"]
+    got = {
+        "strongest that fits": pk([M("qwen3:14b"), M("gpt-oss:20b"), M("gemma3:9b"),
+                                   M("gemma3:27b", "gpu+ram"), M("llama3.3:70b", "unknown")])
+        == ("gpt-oss:20b", "fits"),
+        # by size, not by name or by the order listed
+        "by size": pk([M("aa:9b"), M("zz:30b"), M("mm:14b")]) == ("zz:30b", "fits")
+        and pk([M("zz:30b"), M("aa:9b")]) == ("zz:30b", "fits"),
+        "a fitting one beats a bigger spill": pk([M("big:70b", "gpu+ram"), M("mid:14b")])
+        == ("mid:14b", "fits"),
+        # (per Patrick) gpu+ram and unknown are never auto-picked while one fits
+        "no spill": pk([M("x:120b", "gpu+ram"), M("y:3b")]) == ("y:3b", "fits"),
+        "no unknown": pk([M("x:120b", "unknown"), M("y:3b")]) == ("y:3b", "fits"),
+        "unknown size last": pk([M("mystery:latest"), M("tiny:1b")]) == ("tiny:1b", "fits")
+        and pk([M("a:latest", size=5), M("b:latest", size=9)]) == ("b:latest", "fits"),
+        # nothing fits whole: the smallest listed, so the mode isn't dead
+        "smallest": pk([M("a:70b", "gpu+ram", 40), M("b:7b", "unknown", 4), M("c:3b", "gpu+ram", 2)])
+        == ("c:3b", "smallest")
+        and pk([M("a:70b", "gpu+ram"), M("b:7b", "unknown")]) == ("b:7b", "smallest")
+        and pk([M("only:latest", "unknown")]) == ("only:latest", "smallest"),
+        "none": pk([]) is None and pk(None) is None,
+        # /api/tags' "gpu" is the owner's policy, not a measurement: with the card's size
+        # known, the weights plus the gateway's margin must fit in it
+        "too big for the card": pkv([M("huge:70b", size=20 * GIB), M("mid:14b", size=9 * GIB)], 16 * GIB)
+        == ("mid:14b", "fits")
+        and pkv([M("gpt-oss:20b", size=int(13.8e9)), M("qwen3:14b", size=9 * GIB)], 16 * GIB)
+        == ("gpt-oss:20b", "fits"),
+        "card size unknown: the placement is all there is": pkv([M("huge:70b", size=20 * GIB)], None)
+        == ("huge:70b", "fits"),
+        "whole on the card already": pkv([dict(M("x:70b", size=40 * GIB), loaded=True, gpu_pct=100)],
+                                         16 * GIB) == ("x:70b", "fits")
+        and pkv([dict(M("x:70b", size=40 * GIB), loaded=True, gpu_pct=60)], 16 * GIB)
+        == ("x:70b", "smallest"),
+        "nothing fits the card: the smallest": pkv([M("a:70b", size=40 * GIB), M("b:30b", size=20 * GIB)],
+                                                   16 * GIB) == ("b:30b", "smallest"),
+        # the tag's size: b, m, NxMb, an e-prefix; none when it doesn't say
+        "params": [par(n) for n in ("gpt-oss:20b", "mixtral:8x7b", "smollm2:135m", "llama3.2:latest",
+                                    "hf.co/x/Llama-3.2-3B-Instruct-GGUF:Q4_K_M", "qwen3:30b-a3b",
+                                    "gemma3n:e4b", "qwen2.5:0.5b", "llama3.2:3b-instruct-q4_K_M")]
+        == [20.0, 56.0, 0.135, None, 3.0, 30.0, 4.0, 0.5, 3.0],
+    }
+    # embedding models and cloud tags never reach the pick
+    js = {"models": [{"name": "nomic-embed-text:335m", "placement": "gpu"},
+                     {"name": "gpt-oss:120b-cloud", "placement": "gpu"},
+                     {"name": "ok:8b", "placement": "gpu"}, {"name": "bge-embed:1b", "placement": "gpu"}]}
+    got["embeddings out"] = pk(ns["_srv_models"]({"name": "Desktop"}, js)) == ("ok:8b", "fits")
+    return all(got.values()), got
+
+
+def _soc_state(src):
+    """What a mode reads: its model, why it is off, its bubble; the tiers
+    rows, only paired servers, and another profile sees none."""
+    ns, ctx, d = _sv_ns(src)
+    _sv_paired(ns, ctx, name="Pat’s Lab")
+    e = ns["_srv_read"](ctx)[0]
+    M = lambda n, pl="gpu", sz=0: _so_model(n, pl, sz, "Pat’s Lab")
+    st = lambda: ns["server_only_state"](ns["_srv_read"](ctx)[0])
+    got = {}
+    # right after pairing the stand-in lists one model of unknown placement
+    s0 = st()
+    got["paired, placement unknown: the smallest"] = (
+        s0["ok"] and s0["how"] == "smallest" and s0["label"] == "Pat’s Lab · small:8b"
+        and "running with what it has" in s0["note"] and "fits its card whole" in s0["note"])
+    _so_seen(ns, e, [M("qwen3:14b"), M("gpt-oss:20b"), M("big:70b", "gpu+ram")])
+    s1 = st()
+    got["fits"] = (s1["ok"] and s1["how"] == "fits" and s1["model"] == "gpt-oss:20b"
+                   and s1["label"] == "Pat’s Lab · gpt-oss:20b"
+                   and s1["note"] == "The strongest model on Pat’s Lab that fits its card, answering "
+                                     "alone. Nothing runs on this computer or in the cloud.")
+    # the card's size, when the gateway says it, rules out what can't fit it
+    _so_seen(ns, e, [M("qwen3:14b", sz=9 << 30), M("huge:70b", sz=20 << 30)],
+             gpu={"vendor": "amd", "name": "Card", "vram_bytes": 16 << 30})
+    got["card size"] = st()["model"] == "qwen3:14b" and st()["how"] == "fits"
+    # a bigger model pulled: the mode follows it the next time it is read
+    _so_seen(ns, e, [M("qwen3:14b"), M("gpt-oss:20b"), M("qwen3:32b")])
+    got["follows a pull"] = st()["model"] == "qwen3:32b"
+    # off, with the reason in the server's name
+    off = {}
+    for k, kw in (("err", {"err": "Pat’s Lab didn’t answer.", "reachable": False}),
+                  ("unreachable", {"reachable": False}), ("no auth", {"auth": False}),
+                  ("no models", {"models": []})):
+        _so_seen(ns, e, kw.get("models", [M("a:8b")]),
+                 **{k_: v_ for k_, v_ in kw.items() if k_ != "models"})
+        off[k] = st()
+    got["off"] = (not any(o["ok"] for o in off.values())
+                  and off["err"]["why"] == "Pat’s Lab didn’t answer."
+                  and off["unreachable"]["why"] == "Pat’s Lab isn’t answering."
+                  and off["no models"]["why"] == "Pat’s Lab lists no models."
+                  and all("When Pat’s Lab answers" in o["note"] for o in off.values())
+                  and all(not o["label"] and not o["model"] for o in off.values()))
+    ns["_srv_seen"].pop(e["id"], None)
+    got["never checked"] = (not st()["ok"] and "hasn’t been checked yet" in st()["why"])
+    # an unpaired server has no mode; a paired one has one row
+    _sv_fake(ns, [_sv_unsigned])
+    un = ns["server_add"](ctx, {"url": "https://lab2.example.com", "name": "Lab2"})
+    _so_seen(ns, e, [M("a:8b")])
+    ue = [x for x in ns["_srv_read"](ctx) if x["id"] == un["id"]][0]
+    _so_seen(ns, ue, [M("a:8b")])          # even a server that answered: not paired, no mode
+    su = ns["server_only_state"](ue)
+    got["unpaired"] = (not su["ok"] and su["why"] == "Lab2 isn\u2019t paired with this computer yet.")
+    rows = ns["server_only_tiers"](ctx)
+    got["rows"] = (list(rows) == ["srv:" + e["id"]] and rows["srv:" + e["id"]]["available"] is True
+                   and rows["srv:" + e["id"]]["models"] == ["Pat’s Lab · a:8b"]
+                   and rows["srv:" + e["id"]]["desc"] == "strongest that fits its card"
+                   and rows["srv:" + e["id"]]["server"] == "Pat’s Lab"
+                   and "srv:" + un["id"] not in rows)
+    _so_seen(ns, e, [], reachable=False, err="down")
+    r2 = ns["server_only_tiers"](ctx)["srv:" + e["id"]]
+    got["row off"] = (r2["available"] is False and r2["models"] == [] and r2["why"] == "down")
+    # the page's list carries it, and no secret
+    _so_seen(ns, e, [M("a:8b")])
+    pub = ns["_srv_public"](ns["_srv_read"](ctx)[0])
+    got["public"] = (pub["only"]["ok"] and pub["only"]["label"] == "Pat’s Lab · a:8b"
+                     and "seed" not in json.dumps(pub) and "SECRET34" not in json.dumps(pub))
+    # never a hard-coded server: the copy is the user's own name
+    blob = json.dumps([rows, pub["only"], s1, s0], ensure_ascii=False)
+    got["no hard-coded name"] = "ollama1" not in blob.lower() and "Desktop" not in blob
+    # another profile sees none of it
+    dB = os.path.join(d, "accounts", "b" * 32)
+    os.makedirs(dB)
+    B = ns["ProfileCtx"]("test", dB, "b" * 32)
+    got["profile B"] = ns["server_only_tiers"](B) == {}
+    return all(got.values()), got
+
+
+def _soc_resolve(src):
+    """What a chat resolves the mode to: the last check when fresh, else a
+    new one; only this profile's servers; never another server."""
+    ns, ctx, d = _sv_ns(src)
+    _sv_paired(ns, ctx, name="Desktop")
+    _sv_paired(ns, ctx, name="Laptop", url="https://laptop.example.com")
+    e = [x for x in ns["_srv_read"](ctx) if x["name"] == "Desktop"][0]
+    M = _so_model
+    calls = []
+    box = {"next": [M("a:8b"), M("b:14b")], "fail": ""}
+
+    def check_(ent):
+        calls.append(ent["id"])
+        if box["fail"]:
+            return _so_seen(ns, ent, [], reachable=False, err=box["fail"])
+        return _so_seen(ns, ent, box["next"])
+    ns["server_check"] = check_
+    sid = e["id"]
+    got = {}
+    _so_seen(ns, e, [M("a:8b")])
+    r = ns["server_only_resolve"](sid, ctx)
+    got["fresh: no new check"] = r == ("Desktop · a:8b", "Desktop", "") and calls == []
+    # a bigger model arrived since: an old check is repeated and the mode follows it
+    _so_seen(ns, e, [M("a:8b")], at=time.time() - 3600)
+    r = ns["server_only_resolve"](sid, ctx)
+    got["stale: checked again, follows"] = r[0] == "Desktop · b:14b" and calls == [sid]
+    # a check that found it down: nothing to run on, and the reason
+    box["fail"] = "Desktop didn’t answer."
+    _so_seen(ns, e, [M("a:8b")], at=time.time() - 3600)
+    r = ns["server_only_resolve"](sid, ctx)
+    got["down"] = r == ("", "Desktop", "Desktop didn’t answer.")
+    box["fail"] = ""
+    # an id that isn't there, with a server that is: gone, never that server
+    r = ns["server_only_resolve"]("deadbeef", ctx)
+    got["gone"] = r[0] == "" and r[2] == ns["SRV_GONE"] and r[1] == ""
+    # a second server that is fine doesn't stand in for the first
+    ent2 = [x for x in ns["_srv_read"](ctx) if x["name"] == "Laptop"][0]
+    _so_seen(ns, ent2, [_so_model("laptop:70b", server="Laptop")])
+    box["fail"] = "Desktop didn’t answer."
+    _so_seen(ns, e, [M("a:8b")], at=time.time() - 3600)
+    r = ns["server_only_resolve"](sid, ctx)
+    got["never another server"] = r[0] == "" and "Laptop" not in json.dumps(r)
+    # profile B: A's id is gone there, and no check goes out
+    dB = os.path.join(d, "accounts", "b" * 32)
+    os.makedirs(dB)
+    B = ns["ProfileCtx"]("test", dB, "b" * 32)
+    n0 = len(calls)
+    rb = ns["server_only_resolve"](sid, B)
+    got["profile B"] = rb[0] == "" and rb[2] == ns["SRV_GONE"] and len(calls) == n0
+    # the tier string
+    got["tier strings"] = (ns["srv_only_id"]("srv:a1b2c3d4") == "a1b2c3d4"
+                           and ns["srv_only_id"]("srv:zz") == "" and ns["srv_only_id"]("Fast") == ""
+                           and ns["srv_only_id"](None) == ""
+                           and ns["srv_only_tier"]("srv:zz") and ns["srv_only_tier"]("srv:a1b2c3d4")
+                           and not ns["srv_only_tier"]("Cloud Only") and not ns["srv_only_tier"]("")
+                           and not ns["srv_only_tier"](None))
+    # a chat in this mode takes no benchmark hold, whatever else it carries
+    sor = lambda r_: ns["server_only_request"](r_, ctx)
+    got["hold"] = (sor({"tier": "srv:" + sid, "model": "Llama 3.2 3B", "models": ["Llama 3.2 3B"]})
+                   and sor({"tier": "srv:zz"}) and sor({"tier": "srv:" + sid, "images": ["x"]})
+                   and not sor({"tier": "srv:" + sid, "agent": "Coding"})
+                   and not sor({"tier": "Fast", "models": ["Desktop · a:8b"]})
+                   and not sor({"tier": "Cloud Only"}))
+    return all(got.values()), got
+
+
+def _soc_answer(src):
+    """A failure is said plainly; nothing local or cloud, no other model:
+    no pick, a server dying partway, a title."""
+    ns, ctx, d = _sv_ns(src)
+    _sv_paired(ns, ctx, name="Desktop")
+    e = ns["_srv_read"](ctx)[0]
+    got = {}
+    L = "Desktop · small:8b"
+
+    def run(label, refuse="", script=None):
+        said = []
+        sent = _sv_fake(ns, script or [])
+        ns["_RAN"].clear()
+        ns["server_answer"](label, [{"role": "user", "content": "hi"}], said.append, said.append,
+                            [].append, lambda *a: None, refuse=refuse)
+        return "".join(x for x in said if not isinstance(x, ns["Ctl"])), sent
+    # nothing to run on: said, and nothing is sent anywhere
+    t, sent = run("Desktop · unavailable", refuse="Desktop lists no models.")
+    got["refused"] = (t == "⚠️ Desktop lists no models. Nothing was sent anywhere else."
+                      and sent == [] and not ns["_RAN"])
+    t, sent = run("Desktop · unavailable", refuse="Desktop didn’t answer. Nothing was sent anywhere else.")
+    got["refused, said once"] = (t == "⚠️ Desktop didn’t answer. Nothing was sent anywhere else.")
+    # the placeholder is a server label and no server model: no vision takeover, no local warm-up
+    got["placeholder"] = (ns["server_label"]("Desktop · unavailable")
+                          and ns["server_pick"]("Desktop · unavailable", ctx)[0] is None)
+    # the server dying partway: what came is kept, the failure said, no other model
+    _so_seen(ns, e, [_so_model("small:8b")])
+    t, sent = run(L, script=[_SvResp(200, lines=[
+        {"message": {"content": "Hel"}, "done": False},
+        {"error": "out of memory", "code": "gpu_spill"}])])
+    got["dies partway"] = (t.startswith("Hel") and "⚠️" in t and "couldn’t keep small:8b" in t
+                           and [r["path"] for r in sent] == ["/api/chat"] and not ns["_RAN"])
+    t, sent = run(L, script=[_SvResp(200, lines=[{"message": {"content": "Hel"}, "done": False}])])
+    got["stops partway"] = (t.startswith("Hel") and "stopped answering partway through" in t
+                            and [r["path"] for r in sent] == ["/api/chat"] and not ns["_RAN"])
+    # a picture: the same server's reader, or a plain refusal (6b334's rules, through the mode's label)
+    pic = [{"role": "user", "content": "what is this", "images": ["aGk="]}]
+    said = []
+    _sv_fake(ns, [_SvResp(200, {"capabilities": ["completion"]})])
+    ns["_srv_seen"][e["id"]]["caps"] = {}
+    ns["_srv_seen"][e["id"]]["models"] = [_so_model("small:8b")]
+    ns["server_answer"](L, pic, said.append, said.append, [].append, lambda *a: None)
+    got["picture: a plain refusal"] = ("".join(x for x in said if not isinstance(x, ns["Ctl"]))
+                                       == "⚠️ Desktop has no model that reads pictures. "
+                                          "Nothing was sent anywhere else.")
+    # the title: the mode's server or nowhere; never a local engine or a cloud one
+    ms = src[src.index("def make_title(text: str, conf=None, server=None)"):]
+    ms = ms[:ms.index("\n\n\n")]
+    hit = []
+
+    def poison(*a, **k):
+        hit.append(a)
+        raise AssertionError("a local or cloud model was asked")
+    ns2 = {"TITLE_PROMPT": "NAME IT: ", "_clean_title": lambda s: " ".join(s.split())[:40],
+           "server_stream": ns["server_stream"], "_ticket_conf": poison, "cloud_role_model": poison,
+           "cloud_text": poison, "ollama_pulled_tags": poison, "run_model": poison,
+           "model_cached": poison, "model_fits_memory": poison, "slow_giant": poison,
+           "MODEL_ROUTES": {"Llama 3.2 3B": ("mlx", 1)}, "MODEL_MEM_BYTES": {}, "_engine_up": poison,
+           "strip_think": poison, "strip_special": poison, "_looks_degenerate": poison, "re": re}
+    exec(ms, ns2)
+    s = _sv_fake(ns, [_SvResp(200, lines=[{"message": {"content": "Lighthouse history"}, "done": True}])])
+    t1 = ns2["make_title"]("tell me about lighthouses", server=L)
+    sent_body = json.loads(s[0]["body"]) if s else {}
+    got["title: the server's model"] = (t1 == "Lighthouse history" and sent_body.get("model") == "small:8b"
+                                        and sent_body["messages"][-1]["content"].startswith("NAME IT: tell me")
+                                        and not hit)
+    _sv_fake(ns, [_SvResp(503, {"code": "busy"})])
+    t2 = ns2["make_title"]("tell me about lighthouses", server=L)
+    sv = _sv_fake(ns, [])
+    t3 = ns2["make_title"]("tell me about lighthouses", server="")
+    got["title: down or none is no title"] = t2 == "" and t3 == "" and not hit and sv == []
+    return all(got.values()), got
+
+
+def _soc_pins(src):
+    """Where the mode meets /api/chat, the title, the tiers: pinned."""
+    ch = src[src.index('        if self.path != "/api/chat":'):]
+    br = ch[ch.index("        elif srv_only_tier(tier):"):ch.index('            council = [m for m in req_json.get("models", [])')]
+    search = ch[ch.index("        bookish = False\n        placey = False"):ch.index("        full_messages = [dated_system] + messages")]
+    tit = src[src.index('        if self.path == "/api/title":'):]
+    tit = tit[:tit.index('        if self.path == "/api/open-logs":')]
+    got = {
+        "resolved from this profile's servers": "server_only_resolve(\n                    srv_only_id(tier), self.ctx)" in br
+        and ch.index("        elif srv_only_tier(tier):") < ch.index('council = [m for m in req_json.get("models", [])'),
+        # the council IS the one label (or the placeholder): no tier's line-up beside it
+        "one model, no council": "            council = [_so_c0]\n            model_name = _so_c0" in br
+        and not re.search(r"resolve_tier|run_council|cloud|MODEL_ROUTES|ensure_mlx|run_model|TIERS|MERGE_RANK", br),
+        "a placeholder, never another model": '_so_c0 = _so_lbl or ((_so_name or "Your server") + SERVER_SEP\n'
+                                              '                                 + "unavailable")' in br,
+        "an agent takes it over": "        _srv_only = bool(_so_c0) and council == [_so_c0]\n"
+                                  "        if not _srv_only:\n            _so_fail = \"\"" in ch,
+        "the one-server-model path": "        _srv_lbl = (council[0] if len(council) == 1 and not cloud_only\n"
+                                     "                    and server_label(council[0]) else \"\")" in ch
+        and "server_answer(_srv_lbl, full_messages, memit, emit, status,\n"
+            "                              step, refuse=_so_fail)" in ch
+        and ch.index("            elif _srv_lbl:\n                server_answer(_srv_lbl,")
+        < ch.index("            elif len(council) > 1:") < ch.index("_fl = gate_ladder(_fl, req_cloud)"),
+        # no local rescue for a server pick
+        "no local rescue": "            if not sent[0] and not cloud_only and not _srv_lbl:" in ch,
+        # memory pass: the same server's model, and none after a refusal
+        "memory pass": "                    and not _gone and not _so_fail):\n                ctx_thread(\n"
+                       "                    target=_extract_memory,\n"
+                       "                    args=(route_label or (council[0] if council else \"\"),"
+        in ch,
+        "export title": "                    if len(src) > 200 and not _srv_only else \"\")" in ch,
+        "title ticket": "            if _srv_only and _title_cid and not _gone:\n"
+                        "                _srv_only_chats[(user_base.name, _title_cid)] = (\n"
+                        "                    \"\" if _so_fail else _srv_lbl, time.time())" in ch
+        and "        _srv_only_chats.pop((self.ctx.name, _title_cid), None)   # 6b337" in ch,
+        "title by the server": tit.index("make_title(txt, server=_so[0])") < tit.index("make_title(txt, conf=_conf)")
+        and "_so = (_srv_only_chats.get((self.ctx.name, _tcid))" in tit,
+        "tiers rows": "                out.update(server_only_tiers(self.ctx))" in src,
+        "no benchmark hold": '    if srv_only_tier(req.get("tier")) and not req.get("agent"):' in src,
+        # web search behaves as in every mode: the mode isn't named anywhere in it
+        "search untouched": "_srv_only" not in search and "_so_" not in search and "srv_only" not in search,
+        "profile's own": '_srv_only_chats = profile_cache("_srv_only_chats", {})' in src,
+        "tier persists": '"turbo", "tier", "model", "council",' in src
+        and "    if k in (\"tier\", \"agent\", \"codeagent\"):\n        return isinstance(v, str) and len(v) <= 60" in src,
+        # Cloud Only stays the last of the tiers, so the rows sit right under it
+        "under Cloud Only": '        "cloud_only": True,\n    },\n}\n' in src,
+        "tiers carried by prefs": "function isSrvMode(t){return typeof t===\"string\"&&t.indexOf(\"srv:\")===0;}" in src,
+    }
+    return all(got.values()), got
+
+
+def _so_node(name, js):
+    open(os.path.join(_si_dir, name), "w").write(js)
+    r_ = subprocess.run(["node", os.path.join(_si_dir, name)], capture_output=True, text=True, timeout=30)
+    try:
+        return json.loads(r_.stdout)
+    except ValueError:
+        raise RuntimeError("node said: " + " | ".join(l_ for l_ in r_.stderr.splitlines() if "Error" in l_)[:400])
+
+
+_SO_PRE = ('const SRV_SEP=" \\u00b7 ";'
+           'let tier="Fast",advOn=false,agent="",council=["x"],model="Llama",tierOff={},srvLoaded=true;'
+           "const calls=[];function setTier(n){calls.push('setTier:'+n);tier=n;}"
+           "function prefSet(o){calls.push('pref:'+JSON.stringify(o));}"
+           "function paintModels(){calls.push('paint');}function advChip(){calls.push('chip');}"
+           "function advPrune(){}")
+
+
+def _soc_page(src):
+    """The mode's chip, greying and fall back to Fast: node."""
+    i0 = src.index("function esc(s){")
+    js = (src[i0:src.index(";}\n", i0) + 3] + _SO_PRE
+          + src[src.index("function isSrvMode(t){"):src.index("function paintEngMenuServers(){")]
+          + "let srvList=[{id:'a1b2c3d4',name:'Desk <b>&\"',paired:true,only:{ok:true,"
+          + "label:'Desk <b>&\" \\u00b7 gpt-oss:20b',model:'gpt-oss:20b'}},"
+          + "{id:'b1b2c3d4',name:'Lab',paired:true,only:{ok:false,why:'Lab lists no models.'}},"
+          + "{id:'c1b2c3d4',name:'New',paired:false,only:{ok:false}}];"
+          + "const out={};tier='srv:a1b2c3d4';"
+          + "out.shown=[tierShown('srv:a1b2c3d4'),tierShown('srv:b1b2c3d4'),"
+          + "tierShown('srv:zzzzzzzz'),tierShown('Fast'),tierShown('')];out.label=tierLabel();"
+          + "tierOff={'srv:old':1,Fast:0};srvSyncOff();out.off=Object.keys(tierOff).sort();"
+          + "out.is=[isSrvMode('srv:x'),isSrvMode('Fast'),isSrvMode(''),isSrvMode(null)];"
+          # still there (on, or merely off): nothing happens
+          + "calls.length=0;tier='srv:a1b2c3d4';srvModeGone();tier='srv:b1b2c3d4';srvModeGone();"
+          + "out.kept=calls.slice();"
+          # removed: back to Fast
+          + "calls.length=0;tier='srv:zzzzzzzz';srvModeGone();out.gone=calls.slice();out.goneTier=tier;"
+          # removed while an agent drives: Fast is kept without leaving the agent
+          + "calls.length=0;tier='srv:zzzzzzzz';agent='Coding';srvModeGone();out.goneAgent=calls.slice();agent='';"
+          # the servers aren't known yet: nothing is decided
+          + "calls.length=0;srvLoaded=false;tier='srv:zzzzzzzz';srvModeGone();out.early=calls.slice();srvLoaded=true;"
+          # a refresh: greyed, the chip, a vanished server
+          + "calls.length=0;tier='srv:b1b2c3d4';srvList[1].only={ok:true,label:'Lab \\u00b7 x:8b',model:'x:8b'};"
+          + "srvModesRefresh();out.refresh=[calls.slice(),Object.keys(tierOff).sort(),tierLabel()];"
+          + "process.stdout.write(JSON.stringify(out));")
+    try:
+        o = _so_node("so37.js", js)
+    except Exception as e_:
+        return False, "node: %r" % e_
+    got = {
+        "chip": o["shown"] == ['Desk <b>&" · gpt-oss:20b', "Lab Only", "Your server", "Fast", ""]
+        and o["label"] == 'Desk <b>&" · gpt-oss:20b',
+        "greyed": o["off"] == ["Fast", "srv:b1b2c3d4"],
+        "is": o["is"] == [True, False, False, False],
+        # only a server that is gone sends it back to Fast; one that is off stays
+        "kept": o["kept"] == [],
+        "fast": o["gone"] == ["setTier:Fast"] and o["goneTier"] == "Fast",
+        "fast with an agent": o["goneAgent"] == ['pref:{"tier":"Fast"}', "paint"],
+        "early": o["early"] == [],
+        "refresh": o["refresh"] == [["paint"], ["Fast"], "Lab · x:8b"],
+        "chip paints": '  $("#chip-model").textContent=tierLabel();' in src,
+        # a saved mode survives a start whose server is off; only its removal drops it
+        "prefs": '    if(tierOff[t]&&!isSrvMode(t))t="Fast";' in src
+        and "  srvModeGone();advPrune();\n  advChip();paintAutonomy();" in src
+        and '  if(tierOff[tier]&&!isSrvMode(tier))setTier("Fast");\n}\npaintTierAvail();' in src,
+        "repaint": "    srvLoaded=true;\n" in src
+        and "  srvModesRefresh();\n  paintServers();\n  paintEngMenuServers();" in src
+        and "  srvModesRefresh();\n  paintServers();paintSrvChips();" in src,
+        # the hover bubble says why, and what it would run; it stays inside the window
+        "bubble": "  if(isSrvMode(name)){\n    tierPop.innerHTML=\"<b>\"+esc((info.server||\"Your server\")+\" Only\")+\"</b>\"" in src
+        and src.index("  if(isSrvMode(name)){\n    tierPop.innerHTML") < src.index("  if(info.available===false||(info.available!==undefined&&!list.length")
+        and "        ?'<div class=\"mline\">'+esc(info.why||\"not answering\")+'</div>'" in src
+        and "    +'<span class=\"note\">'+esc(info.note||\"\")+'</span>';" in src
+        and "  const pl=r.right+10+pw>innerWidth-8?Math.max(8,r.left-10-pw):r.right+10;" in src,
+        "style": "/* \"<server> Only\" rows (6b337): a mode's row, with a roomier description */\n"
+                 ".engrow.srvmode .edsc{max-width:190px}" in src,
+        # the wording the row and the bubble carry is the server's (tested above), once
+        "desc once": src.count('SRV_ONLY_DESC = "strongest that fits its card"') == 1
+        and src.count('<span class="edsc">strongest that fits its card</span>') == 1,
+    }
+    return all(got.values()), [got, o]
+
+
+def _soc_menu(src):
+    """The engine menu (6b337): one row per paired server under Cloud Only, its
+    flyout ("<name> Only" first, then its models), placed inside the window."""
+    i0 = src.index("function esc(s){")
+    js = (src[i0:src.index(";}\n", i0) + 3] + _SO_PRE
+          + src[src.index("function srvWhere(m){"):src.index("function srvStatus(s){")]
+          + src[src.index("function flyPlace("):src.index("function paintEngMenuServers(){")]
+          + "const GBM=(n,p)=>({name:n,label:'Desk <b>&\" \\u00b7 '+n,placement:p||'gpu'});"
+          + "let srvList=[{id:'a1b2c3d4',name:'Desk <b>&\"',paired:true,status:{at:1,reachable:true},"
+          + "models:[GBM('gpt-oss:20b'),GBM('qwen3:14b'),GBM('big:70b','gpu+ram')],"
+          + "only:{ok:true,label:'x',model:'gpt-oss:20b'}},"
+          + "{id:'b1b2c3d4',name:'Lab',paired:true,status:{at:1,err:'Lab didn\\u2019t answer.'},models:[],"
+          + "only:{ok:false}},"
+          + "{id:'c1b2c3d4',name:'Quiet',paired:true,status:{at:1,reachable:true},models:[],only:{ok:false}},"
+          + "{id:'d1b2c3d4',name:'New',paired:false,models:[],only:{ok:false}}];"
+          + "const out={};"
+          + "out.plain=srvMenuRows();"
+          + "tier='srv:a1b2c3d4';out.onMode=srvMenuRows();out.subMode=srvSubRows(srvList[0]);"
+          + "tier='';council=['Desk <b>&\" \\u00b7 qwen3:14b'];out.onModel=srvMenuRows();out.subModel=srvSubRows(srvList[0]);"
+          + "advOn=true;out.advOn=srvMenuRows();out.subAdv=srvSubRows(srvList[0]);advOn=false;"
+          + "out.subErr=srvSubRows(srvList[1]);out.subNone=srvSubRows(srvList[2]);"
+          + "const M=(l,r)=>({left:l,right:r});"
+          + "out.fly=[flyPlace(M(100,350),{top:200},260,300,1200,800),"      # to the right
+          + "flyPlace(M(800,1050),{top:200},260,300,1200,800),"               # no room: to the left
+          + "flyPlace(M(100,350),{top:200},260,2000,1200,800),"               # too tall: capped
+          + "flyPlace(M(100,350),{top:700},260,300,1200,800),"                # its row near the bottom
+          + "flyPlace(M(100,350),{top:-40},260,300,1200,800),"                # its row above the window
+          + "flyPlace(M(100,350),{top:200},300,300,500,800),"                 # neither side: clamped
+          + "flyPlace(M(0,250),{top:200},260,300,300,100)];"                  # a tiny window
+          + "process.stdout.write(JSON.stringify(out));")
+    try:
+        o = _so_node("so37m.js", js)
+    except Exception as e_:
+        return False, "node: %r" % e_
+    plain, sub = o["plain"], o["subMode"]
+    fly = o["fly"]
+    inside = all(f["left"] >= 10 and f["top"] >= 10 for f in fly)
+    got = {
+        # ONE row per paired server, its own name escaped, a chevron, no model rows in the menu
+        "one row each": plain.count('class="engrow srvmenu') == 3 and plain.count("data-sv=") == 3
+        and "d1b2c3d4" not in plain and "data-s=" not in plain and "data-t=" not in plain
+        and "<b>&" not in plain and "Desk &lt;b&gt;&amp;" in plain and plain.count("›</span>") == 3
+        and plain.count("\U0001f5a5️") == 3,
+        "desc": 'class="edsc">your server · 3 models</span>' in plain
+        and 'class="edsc">your server · not answering</span>' in plain
+        and 'class="edsc">your server · no models listed</span>' in plain,
+        # the row says where the selection is
+        "on": 'class="engrow srvmenu on" data-sv="a1b2c3d4"' in o["onMode"] and "srvmenu on" in o["onModel"]
+        and "srvmenu on" not in o["plain"] and "srvmenu on" not in o["advOn"],
+        # the flyout: "<name> Only" first, then each model with where it runs
+        "flyout": sub.startswith('<div class="engrow srvmode')
+        and sub.count('data-t="srv:a1b2c3d4"') == 1
+        and '<span class="enm">Desk &lt;b&gt;&amp;' in sub and '<span class="enm">Desk <b>' not in sub
+        and sub.index(" Only</span>") < sub.index('class="engdiv"') < sub.index("data-s=")
+        and sub.count('data-s="') == 3 and '<span class="enm">gpt-oss:20b</span>' in sub
+        and 'data-s="Desk <b>&amp;' not in sub and "yours · card + memory, slower" in sub
+        and sub.count(">your server<") == 2 and "not in the cloud" in sub
+        and 'class="engrow srvmode on" data-t="srv:a1b2c3d4"' in sub
+        and "srvrow on" not in sub,
+        "flyout marks a model": 'class="engrow srvrow on" data-s=' in o["subModel"]
+        and "srvmode on" not in o["subModel"] and "srvrow on" not in o["subAdv"]
+        and "srvmode on" not in o["subAdv"],
+        # a server that doesn't answer, or lists none, keeps its treatment; its Only item is greyed
+        "no models": 'class="engrow srvmode off" data-t="srv:b1b2c3d4"' in o["subErr"]
+        and 'data-none="1"><span class="edsc">not answering</span>' in o["subErr"]
+        and 'data-none="1"><span class="edsc">no models listed</span>' in o["subNone"]
+        and "data-s=" not in o["subErr"] + o["subNone"],
+        # placed beside the menu, inside the window, capped when long
+        "to the right": fly[0] == {"left": 354, "top": 200, "maxH": 0},
+        "to the left": fly[1] == {"left": 536, "top": 200, "maxH": 0},
+        "capped": fly[2]["maxH"] == 780 and fly[2]["top"] == 10,
+        "bottom": fly[3]["top"] == 490, "top edge": fly[4]["top"] == 10,
+        "clamped": fly[5]["left"] == 190 and inside,
+        "tiny window": fly[6] == {"left": 30, "top": 10, "maxH": 120},
+    }
+    return all(got.values()), [got, o]
+
+
+def _soc_flyout(src):
+    """The flyout's wiring (6b337, per Patrick): opens on a click, and after a short
+    hover; Esc, a click elsewhere and every pick close it; it fits the window,
+    scrolls, keeps its scroll across a repaint and follows its row."""
+    js = ("let engSubId='a1',engSubTimer=0,engSubByHover=true;const log=[];"
+          "const engSub={hidden:false};const engMenu={hidden:false,querySelectorAll:()=>[]};"
+          "function hideTierPop(){log.push('pop');}"
+          + src[src.index("function closeEngSub(){"):src.index("function placeEngSub(){")]
+          + "const out={};"
+          # Escape: the flyout first, then the menu, then nothing
+          + "out.e1=engMenuEsc();out.s1=[engSub.hidden,engMenu.hidden,engSubId];"
+          + "out.e2=engMenuEsc();out.s2=[engSub.hidden,engMenu.hidden];"
+          + "out.e3=engMenuEsc();"
+          # closing the menu closes the flyout
+          + "engSub.hidden=false;engMenu.hidden=false;engSubId='a1';closeEngMenus();"
+          + "out.s3=[engSub.hidden,engMenu.hidden,engSubId];"
+          + "process.stdout.write(JSON.stringify(out));")
+    try:
+        o = _so_node("so37f.js", js)
+    except Exception as e_:
+        return False, "node: %r" % e_
+    got = {
+        "escape": o["e1"] is True and o["s1"] == [True, False, ""] and o["e2"] is True
+        and o["s2"] == [True, True] and o["e3"] is False,
+        "closes together": o["s3"] == [True, True, ""],
+        # a click opens it, a second click closes it; hovering opens it after a pause
+        "click": "        if(engSubId===el.dataset.sv&&!engSub.hidden)closeEngSub();\n"
+                 "        else openEngSub(el.dataset.sv,false,false);" in src,
+        "hover": "        engSubTimer=setTimeout(()=>{\n          if(!engMenu.hidden)openEngSub(el.dataset.sv,false,true);},300);" in src
+        and "      el.addEventListener(\"mouseleave\",()=>clearTimeout(engSubTimer));" in src
+        and "      clearTimeout(engSubTimer);if(engSubByHover)closeEngSub();});" in src,
+        # a pick closes both menus
+        "picks": "        ev.stopPropagation();pickServerModel(el.dataset.s);closeEngMenus();});" in src
+        and "      setTier(el.dataset.t);hideTierPop();closeEngMenus();\n    });\n  });\n  // a repaint" in src
+        and "        hideTierPop();closeEngMenus();openAdv();return;" in src
+        and "      if(tierOff[el.dataset.t]){showTierPop(el,el.dataset.t);return;}\n      setTier(el.dataset.t);hideTierPop();closeEngMenus();\n    });\n  });\n}" in src,
+        # Esc and an outside click
+        "esc wired": "    if(engMenuEsc()){e.preventDefault();return;}\n    if(generating&&abortCtl)" in src,
+        "outside": "  if(em&&!e.target.closest(\"#engmenu\")&&!e.target.closest(\"#engsub\")\n"
+                   "     &&!e.target.closest(\"#model-chip\"))closeEngMenus();" in src
+        and "  }else closeEngMenus();\n});\n// a resize refits" in src,
+        # a repaint keeps it open, where it was scrolled; it follows its row
+        "repaint": "  if(engSubId)openEngSub(engSubId,true,engSubByHover);\n  else engSub.hidden=true;\n}\n$(\"#model-chip\")" in src
+        and "  const keep=keepScroll&&!engSub.hidden?engSub.scrollTop:-1;" in src
+        and "  if(keep>=0)engSub.scrollTop=keep;" in src
+        and "  engSub.style.maxHeight=\"\";\n  const f=flyPlace(engMenu.getBoundingClientRect(),row.getBoundingClientRect()," in src
+        and "  if(f.maxH)engSub.style.maxHeight=f.maxH+\"px\";" in src
+        and 'engMenu.addEventListener("scroll",placeEngSub,{passive:true});' in src
+        and 'engSub.addEventListener("scroll",()=>hideTierPop(),{passive:true});' in src,
+        "menu repaint": '  document.querySelectorAll("#engmenu .engrow,#engsub .engrow").forEach(el=>{\n'
+                        '    if(el.dataset.t)el.classList.toggle("off",!!tierOff[el.dataset.t]);});' in src,
+        # the rows sit under Cloud Only and above Advanced; the server's own rows are not in the menu any more
+        "order": "  }).join(\"\")\n  // one row per paired server, under Cloud Only: its \"Only\" mode and its\n"
+                 "  // models open in a flyout beside it (6b337)\n  +srvMenuRows()\n  // ADVANCED (6b248"
+        in src
+        and src.index("  +srvMenuRows()\n  // ADVANCED (6b248")
+        < src.index("  +'<div class=\"engdiv\"></div>'\n  +'<div class=\"engrow'+(advOn?\" on\":\"\")+'\" data-t=\"__adv__\">'")
+        and "  // your own servers' models (6b334)\n  +srvMenuRows();" not in src
+        and "  srvSyncOff();\n  engMenu.innerHTML=Object.keys(TIER_META).map(n=>{" in src,
+        "css": "#engsub{position:fixed;z-index:61;min-width:250px;max-width:360px;" in src
+        and "  overflow-y:auto;overscroll-behavior:contain}\n#engsub[hidden]{display:none}" in src
+        and ".engrow.srvmenu .echev{" in src and ".engrow.srvmenu.open{" in src,
+    }
+    return all(got.values()), [got, o]
+
+
+def _soc_adv(src):
+    """Advanced (6b337, per Patrick: "they should appear under advanced where you can
+    select exactly which models and council you want"): each server's models
+    grouped under its name; never a compositor; picks kept while the server is
+    there and dropped when it is gone."""
+    i0 = src.index("function esc(s){")
+    js = (src[i0:src.index(";}\n", i0) + 3] + _SO_PRE
+          + "let adv=null;"
+          + src[src.index("const ADV_CLOUD={"):src.index("const ADV_WHY={")]
+          + src[src.index("function srvWhere(m){"):src.index("function srvStatus(s){")]
+          + src[src.index("function advServerRows(sel){"):src.index("function advWhy(){")]
+          + "const GBM=(s,n,p)=>({name:n,label:s+' \\u00b7 '+n,placement:p||'gpu'});"
+          + "let srvList=[{id:'a1b2c3d4',name:'Desk <b>',paired:true,status:{at:1},"
+          + "models:[GBM('Desk <b>','qwen3:14b'),GBM('Desk <b>','big:70b','gpu+ram')]},"
+          + "{id:'b1b2c3d4',name:'Lab',paired:true,status:{at:1,err:'x'},models:[]},"
+          + "{id:'c1b2c3d4',name:'Quiet',paired:true,status:{at:1},models:[]},"
+          + "{id:'d1b2c3d4',name:'New',paired:false,models:[GBM('New','z:1b')]}];"
+          + "const out={};"
+          + "out.rows=advServerRows({local:['Desk <b> \\u00b7 qwen3:14b','Llama 3.2 3B']});"
+          + "out.none=(srvList.length,(()=>{const k=srvList;srvList=[];const r=advServerRows({local:[]});srvList=k;return r;})());"
+          + "out.comps=advCompList({gemini:{status:'ok'},groq:{status:'fail'}},"
+          + "[{label:'Gemma 4 26B'},{label:'Llama 3.2 3B'},{label:'Gemma Box \\u00b7 x:8b'}]);"
+          + "out.kept=advKept(['Desk <b> \\u00b7 qwen3:14b','Lab \\u00b7 gone:1b','Old \\u00b7 x:8b','Llama 3.2 3B'],"
+          + "['Desk <b> \\u00b7 qwen3:14b']);"
+          # a server is removed: its picks go, the rest stay and are saved
+          + "calls.length=0;adv={local:['Llama 3.2 3B','Old \\u00b7 x:8b','Desk <b> \\u00b7 qwen3:14b'],cloud:[],comp:''};advOn=true;"
+          + "advPrune();out.p1=[adv.local,calls.slice(),advOn];"
+          # nothing of the council is left: it goes, and the mode is Fast
+          + "calls.length=0;adv={local:['Old \\u00b7 x:8b','Gone \\u00b7 y:8b'],cloud:[],comp:''};advOn=true;"
+          + "advPrune();out.p2=[adv,calls.slice(),advOn];"
+          # all there: nothing is written
+          + "calls.length=0;adv={local:['Llama 3.2 3B','Lab \\u00b7 any:1b'],cloud:[],comp:''};advPrune();out.p3=calls.slice();"
+          # the servers aren't known yet: nothing is decided
+          + "calls.length=0;srvLoaded=false;adv={local:['Old \\u00b7 x:8b'],cloud:[],comp:''};advPrune();out.p4=calls.slice();"
+          + "process.stdout.write(JSON.stringify(out));")
+    try:
+        o = _so_node("so37a.js", js)
+    except Exception as e_:
+        return False, "node: %r" % e_
+    rows = o["rows"]
+    got = {
+        # grouped under each paired server's name, labelled with it, the pick ticked
+        "groups": rows.count('class="advgrp"') == 3 and rows.count("· your server</i></div>") == 3
+        and "<b>Desk &lt;b&gt;</b>" in rows and "<b>Lab</b>" in rows and "<b>Quiet</b>" in rows
+        and "New" not in rows and "z:1b" not in rows,
+        "rows": rows.count('<input type="checkbox" data-l="') == 2
+        and 'data-l="Desk &lt;b&gt; · qwen3:14b" checked>' in rows
+        and 'data-l="Desk &lt;b&gt; · big:70b">' in rows and "card + memory, slower" in rows
+        and "<b>Desk &lt;b&gt; · qwen3:14b</b>" in rows and 'data-l="Llama' not in rows,
+        "treatment": '<p class="advp">not answering right now</p>' in rows
+        and '<p class="advp">no models listed</p>' in rows
+        and "draft one after another on that server, never here or in the cloud" in rows
+        and "can’t be one of them" in rows and o["none"] == "",
+        # a server's model is never a compositor, whatever it is called
+        "never a compositor": [c[0] for c in o["comps"]] == ["", "gemini", "Gemma 4 26B"]
+        and all("· x:8b" not in c[1] for c in o["comps"]),
+        "kept": o["kept"] == ["Lab · gone:1b"],
+        "pruned": o["p1"][0] == ["Llama 3.2 3B", "Desk <b> · qwen3:14b"] and len(o["p1"][1]) == 1
+        and o["p1"][1][0].startswith('pref:{"adv":') and "Old" not in o["p1"][1][0] and o["p1"][2] is True,
+        "emptied": o["p2"][0] is None and o["p2"][2] is False
+        and o["p2"][1] == ['pref:{"adv":null,"advon":false}', "setTier:Fast", "chip"],
+        "untouched": o["p3"] == [] and o["p4"] == [],
+        # the save keeps what is not listed right now; the dialog is built from the groups
+        "wired": "    +advServerRows(sel))\n    ||'<p class=\"advp\">no local models installed yet</p>';" in src
+        and "  const comps=advCompList(pv,ready);" in src
+        and '  const shown=[...document.querySelectorAll("#adv-local input")].map(i=>i.dataset.l);\n'
+            '  const local=[...document.querySelectorAll("#adv-local input:checked")]\n'
+            "    .map(i=>i.dataset.l).concat(advKept(adv&&adv.local,shown));" in src
+        and "  srvSyncOff();srvModeGone();advPrune();" in src
+        and "  srvModeGone();advPrune();\n  advChip();paintAutonomy();" in src
+        and "#adv-card .advgrp{" in src
+        # (server side) no server compositor, and the council's own server picks are checked at the door
+        and '        if server_label(req_comp):\n' in src
+        and "                       or server_pick(m, self.ctx)[0] is not None]" in src
+        and '"turbo", "tier", "model", "council", "agent", "codeagent", "adv", "advon",' in src,
+    }
+    return all(got.values()), [got, o]
+
+
+_SO_CHECKS = [
+    ("server only: the strongest model that fits the card whole, by the tag's size; a spill or an "
+     "unknown placement never picked for you; the smallest when none fits", _soc_pick),
+    ("server only: what a mode reads (model, why off, bubble), one row per paired server, none in another "
+     "profile, no hard-coded name", _soc_state),
+    ("server only: a chat resolves it from this profile's own servers, repeats an old check, and never "
+     "uses another server", _soc_resolve),
+    ("server only: a refusal, a server dying partway, a picture and a title are said or skipped, never "
+     "covered by a local or cloud model", _soc_answer),
+    ("server only: where it meets /api/chat, the title, the tiers and the benchmark (pinned)", _soc_pins),
+    ("server only: the chip, the greying and the fall back to Fast (node)", _soc_page),
+    ("engine menu: ONE row per paired server under Cloud Only, its flyout (\"<name> Only\" first, then "
+     "its models), placed inside the window (node)", _soc_menu),
+    ("engine menu: the flyout opens on a click and after a hover, Esc, an outside click and every pick "
+     "close it, a repaint keeps it and its scroll", _soc_flyout),
+    ("Advanced: each server's models grouped under its name, never a compositor, kept while the server is "
+     "there and dropped when it is gone (node)", _soc_adv),
+]
+
+
+def _so_run(src):
+    out = []
+    for name, fn in _SO_CHECKS:
+        try:
+            ok, det = fn(src)
+        except Exception as e_:
+            ok, det = False, "raised %r" % e_
+        out.append((name, bool(ok), det))
+    return out
+
+
+for _n37, _o37, _d37 in _so_run(_MILLENAI_SRC):
+    check(_n37, _o37, "%r" % (_d37,))
+
+_SO_MUT = [
+    ("picked by name", '        return sorted(fit, key=lambda m: (-(_srv_params(m["name"]) or -1.0),\n'
+     '                                          -(m.get("size") or 0), m["name"]))[0], "fits"',
+     '        return sorted(fit, key=lambda m: m["name"])[0], "fits"'),
+    ("a spill model auto-picked", '    if m.get("placement") != "gpu":\n        return False\n',
+     '    if m.get("placement") not in ("gpu", "gpu+ram"):\n        return False\n'),
+    ("an unknown placement auto-picked", '    if m.get("placement") != "gpu":\n        return False\n',
+     '    if m.get("placement") == "gpu+ram":\n        return False\n'),
+    ("unknown sizes first", '-(_srv_params(m["name"]) or -1.0)', '-(_srv_params(m["name"]) or 1e9)'),
+    ("the card's size ignored", '    if vram and isinstance(size, int) and size > 0:\n        return size * 1.05 + (5 << 28) <= vram\n',
+     ''),
+    ("a model whole on the card doubted", '    if m.get("loaded") and m.get("gpu_pct") == 100:\n        return True\n', ''),
+    ("the card's size not passed on", '                                (s.get("gpu") or {}).get("vram_bytes"))', '                                None)'),
+    ("the largest when none fits", '        return min(ms, key=lambda m: (_srv_weight(m), m["name"])), "smallest"',
+     '        return max(ms, key=lambda m: (_srv_weight(m), m["name"])), "smallest"'),
+    ("a dead mode when none fits", '    if ms:\n        return min(ms,', '    if False:\n        return min(ms,'),
+    ("mixtral read as 7b", '(int(m.group(1)) if m.group(1) else 1)', '1'),
+    ("m read as b", '            return v / 1000.0 if m.group(3).lower() == "m" else v', '            return v'),
+    ("the tag's size not read", '    for part in (tag, name):', '    for part in ():'),
+    ("available without a check", '    elif s.get("err") or not s.get("reachable") or not s.get("auth"):\n        out["why"]',
+     '    elif False:\n        out["why"]'),
+    ("available before any check", '    elif not s.get("at"):\n        out["why"] = "%s hasn\\u2019t been checked yet." % n',
+     '    elif False:\n        out["why"] = "%s hasn\\u2019t been checked yet." % n'),
+    ("an unpaired server offered", '    if not _srv_paired(e):\n        out["why"] = "%s isn\\u2019t paired with this computer yet." % n',
+     '    if False:\n        out["why"] = "%s isn\\u2019t paired with this computer yet." % n'),
+    ("a row for an unpaired server", '        if _srv_paired(e):\n            st = server_only_state(e)\n            out[SRV_ONLY_PREFIX',
+     '        if True:\n            st = server_only_state(e)\n            out[SRV_ONLY_PREFIX'),
+    ("a row always available", 'skipped=[], available=st["ok"])', 'skipped=[], available=True)'),
+    ("an old check believed for ever", '                and time.time() - float(s.get("at") or 0) < SRV_ONLY_FRESH_S):',
+     '                and True):'),
+    ("another profile's servers", '        e = _srv_find(_srv_read(ctx), sid)\n    except (StoreReadError, NoProfile):\n        return "", "", "Couldn',
+     '        e = _srv_find(_srv_read(bound_ctx()), sid)\n    except (StoreReadError, NoProfile):\n        return "", "", "Couldn'),
+    ("another server stands in", '    if e is None:\n        return "", "", SRV_GONE\n    if _srv_paired(e):\n        if not cai_crypto',
+     '    e = e or (_srv_read(ctx) or [None])[0]\n    if e is None:\n        return "", "", SRV_GONE\n    if _srv_paired(e):\n        if not cai_crypto'),
+    ("the note without the promise", 'tail = " Nothing runs on this computer or in the cloud."', 'tail = ""'),
+    ("the fall-back not said", '"Nothing on %s fits its card whole, so it is running with what it has: "',
+     '"Nothing on %s fits its card whole: "'),
+    ("a mode that takes the hold", '    if srv_only_tier(req.get("tier")) and not req.get("agent"):',
+     '    if False:'),
+    ("a refusal not said", '    if refuse:\n        emit(AppText(', '    if False:\n        emit(AppText('),
+    ("a council beside the server's model", '            council = [_so_c0]\n            model_name = _so_c0',
+     '            council = [_so_c0] + resolve_tier("Fast")\n            model_name = _so_c0'),
+    ("the placeholder is a local model", '_so_c0 = _so_lbl or ((_so_name or "Your server") + SERVER_SEP\n'
+     '                                 + "unavailable")', '_so_c0 = _so_lbl or model_name'),
+    ("an agent keeps the mode's refusal", '        _srv_only = bool(_so_c0) and council == [_so_c0]',
+     '        _srv_only = bool(_so_c0)'),
+    ("the refusal not handed on", 'step, refuse=_so_fail)', 'step)'),
+    ("a local rescue for a server pick", '            if not sent[0] and not cloud_only and not _srv_lbl:',
+     '            if not sent[0] and not cloud_only:'),
+    ("a memory pass after a refusal", '                    and not _gone and not _so_fail):', '                    and not _gone):'),
+    ("a title by a local model", 'make_title(txt, server=_so[0])', 'make_title(txt, conf=_conf)'),
+    ("no title ticket", '            if _srv_only and _title_cid and not _gone:', '            if False:'),
+    ("a title that falls to a local model", '            return _clean_title("".join(parts))\n        except Exception:\n            return ""',
+     '            return _clean_title("".join(parts))\n        except Exception:\n            pass'),
+    ("an export titled by a local model", 'if len(src) > 200 and not _srv_only else ""', 'if len(src) > 200 else ""'),
+    ("no tiers row", 'out.update(server_only_tiers(self.ctx))', 'pass'),
+    ("web search touched", '        bookish = False\n        placey = False\n',
+     '        bookish = False\n        placey = _srv_only and False\n'),
+    ("the ticket in no profile", '_srv_only_chats = profile_cache("_srv_only_chats", {})', '_srv_only_chats = {}'),
+    ("a row for an unpaired server on the page", '  return srvList.filter(s=>s.paired).map(s=>{\n    const ms=s.models||[],t="srv:"+s.id;',
+     '  return srvList.map(s=>{\n    const ms=s.models||[],t="srv:"+s.id;'),
+    ("a row never greyed", "    +(s.only&&s.only.ok?\"\":\" off\")+'\" data-t=\"'+esc(t)+'\">'", "    +\"\"+'\" data-t=\"'+esc(t)+'\">'"),
+    ("a server's name not escaped", "+'<span class=\"enm\">'+esc(s.name)+' Only</span>'",
+     "+'<span class=\"enm\">'+s.name+' Only</span>'"),
+    ("the mode not going back to Fast", '  if(agent){tier="Fast";prefSet({tier:"Fast"});paintModels();}\n  else setTier("Fast");',
+     '  if(agent){}\n  else{}'),
+    ("an off server dropped", 'if(!srvLoaded||!isSrvMode(tier)||srvModeOf(tier))return;',
+     'if(!srvLoaded||!isSrvMode(tier)||(srvModeOf(tier)&&srvModeOf(tier).only.ok))return;'),
+    ("the chip not naming the model", 'return !s?"Your server":s.only&&s.only.ok?s.only.label:s.name+" Only";',
+     'return !s?"Your server":s.name+" Only";'),
+    ("the rows not in the menu", '  +srvMenuRows()\n  // ADVANCED (6b248', '  // ADVANCED (6b248'),
+    ("a server mode dropped while off", '  if(tierOff[tier]&&!isSrvMode(tier))setTier("Fast");\n}\npaintTierAvail();',
+     '  if(tierOff[tier])setTier("Fast");\n}\npaintTierAvail();'),
+    ("the bubble of a mode that says no key", '  if(isSrvMode(name)){\n    tierPop.innerHTML', '  if(false){\n    tierPop.innerHTML'),
+    ("the greyed rows not held", '    tierOff["srv:"+s.id]=1;});', '    });'),
+    ("the servers not repainted with the menu", '  srvModesRefresh();\n  paintServers();\n  paintEngMenuServers();',
+     '  paintServers();\n  paintEngMenuServers();'),
+    # the flyout (6b337)
+    ("the flyout outliving its menu", "function closeEngMenus(){engMenu.hidden=true;closeEngSub();}",
+     "function closeEngMenus(){engMenu.hidden=true;}"),
+    ("Escape closing everything at once", "  if(!engSub.hidden){closeEngSub();return true;}",
+     "  if(!engSub.hidden){closeEngMenus();return true;}"),
+    ("no click to open the flyout", "        else openEngSub(el.dataset.sv,false,false);", "        else{}"),
+    ("a repaint closing the flyout", "  if(engSubId)openEngSub(engSubId,true,engSubByHover);\n  else engSub.hidden=true;",
+     "  engSub.hidden=true;"),
+    ("the flyout's scroll lost on a repaint", "  const keep=keepScroll&&!engSub.hidden?engSub.scrollTop:-1;",
+     "  const keep=-1;"),
+    ("a flyout never on the left", "  let left=roomR>=w||roomR>=roomL?mr.right+GAP:mr.left-GAP-w;",
+     "  let left=mr.right+GAP;"),
+    ("a flyout off the window's edge", "  left=Math.max(EDGE,Math.min(left,iw-w-EDGE));", "  left=left;"),
+    ("a flyout taller than the window", "maxH:h>maxH?Math.floor(maxH):0};", "maxH:0};"),
+    ("a flyout's top off the window", "  const top=Math.max(EDGE,Math.min(rr.top,ih-EDGE-hh));", "  const top=rr.top;"),
+    ("an outside click leaving the flyout", '     &&!e.target.closest("#model-chip"))closeEngMenus();',
+     '     &&!e.target.closest("#model-chip"))engMenu.hidden=true;'),
+    ("Escape not wired", "    if(engMenuEsc()){e.preventDefault();return;}\n", ""),
+    ("a pick leaving the menu open", "        ev.stopPropagation();pickServerModel(el.dataset.s);closeEngMenus();});",
+     "        ev.stopPropagation();pickServerModel(el.dataset.s);});"),
+    ("no chevron on a server's row", "      +'<span class=\"echev\">\\u203a</span></div>';", "      +'</div>';"),
+    ("the Only item not first", "  return only+'<div class=\"engdiv\"></div>'+ms.map(m=>'<div class=\"engrow srvrow'",
+     "  return '<div class=\"engdiv\"></div>'+only+ms.map(m=>'<div class=\"engrow srvrow'"),
+    ("no treatment for a server with no models", "  if(!ms.length)\n    return only+", "  if(false)\n    return only+"),
+    ("a server's name not escaped in its row", "      +'<span class=\"enm\">'+esc(s.name)+'</span>'\n      +'<span class=\"edsc\">'+esc(ms.length?",
+     "      +'<span class=\"enm\">'+s.name+'</span>'\n      +'<span class=\"edsc\">'+esc(ms.length?"),
+    ("the bubble off the window", "  const pl=r.right+10+pw>innerWidth-8?Math.max(8,r.left-10-pw):r.right+10;",
+     "  const pl=r.right+10;"),
+    # Advanced (6b337)
+    ("a server's models not grouped", "'<div class=\"advgrp\"><b>'", "'<div class=\"advrow\"><b>'"),
+    ("an unpaired server's models in Advanced", "  const gs=srvList.filter(s=>s.paired);\n  return gs.map(s=>{",
+     "  const gs=srvList;\n  return gs.map(s=>{"),
+    ("a server's model offered as compositor", "m=>/^Gemma/.test(m.label)&&m.label.indexOf(SRV_SEP)<0)",
+     "m=>/^Gemma/.test(m.label))"),
+    ("the picks of an off server dropped at save", "  return (prev||[]).filter(l=>shown.indexOf(l)<0",
+     "  return [].filter(l=>shown.indexOf(l)<0"),
+    ("a removed server's picks kept", "  const keep=adv.local.filter(l=>l.indexOf(SRV_SEP)<0\n    ||srvList.some(s=>s.paired&&l.indexOf(s.name+SRV_SEP)===0));",
+     "  const keep=adv.local.filter(l=>true);"),
+    ("an emptied council left on", '  adv=null;prefSet({adv:null,advon:false});\n  if(advOn){advOn=false;setTier("Fast");}',
+     '  adv=null;prefSet({adv:null,advon:false});'),
+    ("a council pruned before the servers are known", "  if(!srvLoaded||!adv||!Array.isArray(adv.local))return;",
+     "  if(!adv||!Array.isArray(adv.local))return;"),
+    ("a pruned council not saved", "  if(keep.length){adv=Object.assign({},adv,{local:keep});prefSet({adv:adv});return;}",
+     "  if(keep.length){adv=Object.assign({},adv,{local:keep});return;}"),
+    ("a server compositor passed on", "        if server_label(req_comp):\n            # run_council has no server compositor",
+     "        if False:\n            # run_council has no server compositor"),
+]
+_som37 = []
+for _d37, _o37, _nw37 in _SO_MUT:
+    if _MILLENAI_SRC.count(_o37) < 1:
+        _som37.append((_d37, "anchor missing"))
+        continue
+    _r37 = _so_run(_MILLENAI_SRC.replace(_o37, _nw37, 1))
+    _som37.append((_d37, [n for n, o, _x in _r37 if not o][:1] or "MISSED"))
+check("server only: %d mutations of the mode's code, each caught by a check above" % len(_SO_MUT),
+      all(isinstance(v, list) for _d, v in _som37), "%r" % [x for x in _som37 if not isinstance(x[1], list)])
+
 # ---- live: the real gateway, a stand-in for Access, a copy of its own
 _O1_HARNESS_SRC = r'''"""The gauntlet's ollama1 (6b334): the REAL gateway (ollama1/bin/ollama1-gateway)
 on its stub Ollama, behind a stand-in for Cloudflare Access, all on 127.0.0.1.
@@ -18128,6 +18964,11 @@ loader = importlib.machinery.SourceFileLoader("o1gateway", os.path.join(KIT, "bi
 spec = importlib.util.spec_from_loader("o1gateway", loader)
 GW = importlib.util.module_from_spec(spec)
 loader.exec_module(GW)
+
+# a card for /v1/info to name (6b337): the real detect() finds none on a build machine
+GW.o1gpu.detect = lambda: {"vendor": "amd", "name": "Test Card", "vram_bytes": 16 << 30}
+DROPPED = {}
+CLONED = []
 
 KEY = U.RSAKey("kid-1")
 JWKS = U.FakeJWKS([KEY])
@@ -18307,6 +19148,25 @@ class Ctl(BaseHTTPRequestHandler):
         if p == "/up":
             front_up()
             return self.reply({"ok": True})
+        if p == "/drop":
+            with STUB.lock:
+                DROPPED[d["name"]] = STUB.models.pop(d["name"], None)
+            return self.reply({"ok": True})
+        if p == "/clone":
+            with STUB.lock:
+                STUB.models[d["name"]] = dict(STUB.models[d["from"]])
+                CLONED.append(d["name"])
+            return self.reply({"ok": True})
+        if p == "/restore":
+            with STUB.lock:
+                for k, v in list(DROPPED.items()):
+                    if v is not None:
+                        STUB.models[k] = v
+                DROPPED.clear()
+                for k in CLONED:
+                    STUB.models.pop(k, None)
+                CLONED.clear()
+            return self.reply({"ok": True})
         if p == "/delay":
             STUB.delay = float(d.get("s") or 0)
             return self.reply({"ok": True})
@@ -18385,13 +19245,15 @@ _SVLJ = json.dumps(_SVL)[1:-1]           # as it reads inside a frame's JSON
 _SVH = {}                                # the last chat's headers
 
 
-def _svchat(label=_SVL, text="hello server", tier="", models=None, images=None):
+def _svchat(label=_SVL, text="hello server", tier="", models=None, images=None, chat_id=""):
     body = {"model": label if not tier and models is None else "",
             "models": [label] if models is None else models,
             "tier": tier, "auto_web": False,
             "messages": [{"role": "user", "content": text}]}
     if images:
         body["images"] = images
+    if chat_id:
+        body["chat_id"] = chat_id
     r_ = urllib.request.Request(_SV.base + "/api/chat", data=json.dumps(body).encode(),
                                 headers=dict(_SV.headers, **{"Content-Type": "application/json"}),
                                 method="POST")
@@ -18496,9 +19358,13 @@ check("servers (live): busy and a model that doesn't fit are said; a replay refu
 _nlog34 = len(_o1("/log")["log"])
 _sc5 = _svchat(tier="Cloud Only", models=[_SVL])
 _tiers34 = _svq("/api/tiers")[1]
+# (6b337) the modes "<server> Only" are rows of their own ("srv:<id>"); no TIER
+# ever lists a server model, which is what this pins
 check("servers (live): Cloud Only and the tiers never seat a server model",
       len([r for r in _o1("/log")["log"][_nlog34:] if r["path"] == "/api/chat"]) == 0
-      and _SVN not in json.dumps(_tiers34, ensure_ascii=False)
+      and _SVN not in json.dumps({k_: v_ for k_, v_ in _tiers34.items() if not k_.startswith("srv:")},
+                                 ensure_ascii=False)
+      and [k_ for k_ in _tiers34 if k_.startswith("srv:")] == ["srv:" + _sid34]
       and "ANSWER" not in _sc5[1], "%r" % [_sc5[1][:200], _tiers34])
 # a benchmark running here doesn't turn a server chat away
 _bs34 = _svq("/api/bench/start", "POST", {})
@@ -18555,11 +19421,140 @@ check("servers (live): a device removed at the server (401/403) says the pairing
 _code34b = _o1("/open", {})["code"]
 _sp3 = _svq("/api/servers/pair", "POST", {"id": _sid34, "code": _code34b})
 _sc8 = _svchat(text="paired again 334")
+# ---- <server> Only (6b337), live: the real gateway's own list and placement
+_svq("/api/prefs", "POST", {"turbo": True})
+_so_l = (_svq("/api/servers")[1].get("servers") or [{}])[0]
+_so_ms = _so_l.get("models") or []
+_so_vram = ((_so_l.get("gpu") or {}).get("vram_bytes")) or 0
+
+
+def _so_expect(ms, vram):
+    """Written here, not the app's: of the models the owner left GPU-only and
+    that fit the card with the gateway's margin, the largest by the tag's
+    size; else the smallest listed."""
+    def par(n):
+        m_ = re.search(r"(\d+(?:\.\d+)?)b", n.split(":")[-1])
+        return float(m_.group(1)) if m_ else -1.0
+    fit = [m for m in ms if m["placement"] == "gpu"
+           and (not vram or (m.get("size") or 0) * 1.05 + 1.25 * (1 << 30) <= vram)]
+    if fit:
+        return max(fit, key=lambda m: (par(m["name"]), m.get("size") or 0))["name"]
+    return min(ms, key=lambda m: (m.get("size") or 1 << 60, m["name"]))["name"]
+
+
+_so_want = _so_expect(_so_ms, _so_vram) if _so_ms else ""
+_so_tier = "srv:" + _sid34
+_so_t = _svq("/api/tiers")[1].get(_so_tier) or {}
+_so_dry = "Nothing runs on this computer or in the cloud."
+check("server only (live): the real gateway's models and card give one row, the strongest that fits the "
+      "card, named by the user's own server name, in /api/tiers and the servers list",
+      bool(_so_ms) and _so_want and _so_vram == 16 << 30 and _so_l["only"]["ok"]
+      and _so_l["only"]["model"] == _so_want and _so_l["only"]["how"] == "fits"
+      and _so_l["only"]["label"] == _SVN + " · " + _so_want
+      and _so_t.get("available") is True and _so_t.get("models") == [_SVN + " · " + _so_want]
+      and _so_t.get("server") == _SVN and _so_t.get("desc") == "strongest that fits its card"
+      and _so_dry in _so_t.get("note", "") and "ollama1" not in json.dumps(_so_t).lower()
+      # the owner left every stub model GPU-only, so the card's size is what rules out the big ones
+      and {m["name"] for m in _so_ms if m["placement"] == "gpu"} >= {"small:8b", "huge:70b", "sneaky:14b"}
+      and _so_want == "sneaky:14b",
+      "%r" % [_so_want, _so_vram, [(m["name"], m["placement"], m.get("size")) for m in _so_ms],
+              _so_l.get("only"), _so_t])
+# the mode is kept like a tier: prefs, and (below) a restart
+_svq("/api/prefs", "POST", {"tier": _so_tier})
+_so_pr = _svq("/api/prefs")[1].get("tier")
+# the pick spills into memory when loaded (the stub's "sneaky"): said plainly, nothing else answers
+_nso = len(_o1("/stub")["calls"])
+_scX = _svchat(text="spill me please 337", tier=_so_tier, models=["Llama 3.2 3B"])
+time.sleep(1.5)
+_stX = [c for c in _o1("/stub")["calls"][_nso:] if c[1] == "/api/chat"]
+check("server only (live): the server refusing its own pick is said plainly, and nothing local, cloud or "
+      "of another model answers in its place",
+      _so_pr == _so_tier and _scX[1].strip().startswith("⚠️") and _so_want in _scX[1]
+      and "ANSWER" not in _scX[1] and "stopped responding" not in _scX[1]
+      and "retrying on" not in json.dumps(_scX[2]) and {c[2]["model"] for c in _stX} <= {_so_want},
+      "%r" % [_scX[1][:200], [c[2]["model"] for c in _stX]])
+# drop the model that spills, and check the server again: the mode follows it to the next one
+_o1("/drop", {"name": "sneaky:14b"})
+_svq("/api/servers/test", "POST", {"id": _sid34})
+_so_l2 = (_svq("/api/servers")[1].get("servers") or [{}])[0]
+_so_want = _so_expect(_so_l2.get("models") or [], _so_vram)
+_so_lab = _SVN + " · " + _so_want
+# a chat in the mode, with Use cloud power ON and the page's council naming a local model
+_nso = len(_o1("/stub")["calls"])
+_nlo = len(_o1("/log")["log"])
+_scS = _svchat(text="tell me about lighthouses 337", tier=_so_tier, models=["Llama 3.2 3B"])
+time.sleep(2.5)            # the memory pass runs after the answer
+_stS = [c for c in _o1("/stub")["calls"][_nso:] if c[1] == "/api/chat"]
+_lgS = [r for r in _o1("/log")["log"][_nlo:] if r["path"] == "/api/chat"]
+check("server only (live): a pulled or dropped model moves the pick; a chat streams ONE model of the server, "
+      "signed, cloud power on, nothing local in its place; the memory pass goes to the same model",
+      _so_want == "small:8b" and _so_l2["only"]["model"] == _so_want
+      and _scS[0] == 200 and "ANSWER-" in _scS[1] and "⚠" not in _scS[1]
+      and _stS and {c[2]["model"] for c in _stS} == {_so_want}
+      and _stS[0][2]["messages"][-1]["content"] == "tell me about lighthouses 337"
+      and ("RUN", json.dumps({"r": [_so_lab], "w": "server", "s": _SVN})) in _scS[2]
+      and urllib.parse.unquote(_SVH.get("X-Models", "")) == _so_lab
+      and "retrying on" not in json.dumps(_scS[2]) and "stopped responding" not in _scS[1]
+      and _lgS and all(r["access"] and "X-O1-Signature" in r["headers"] for r in _lgS),
+      "%r" % [_so_want, _scS[0], _scS[1][:120], _scS[2][-3:], [(c[2]["model"]) for c in _stS]])
+# the chat's title goes to the same server's model, never a local one
+_cidS = "c" + os.urandom(6).hex()
+_scT = _svchat(text="what is a lighthouse for 337", tier=_so_tier, models=["Llama 3.2 3B"], chat_id=_cidS)
+_cidH = _SVH.get("X-Chat-Id") or _cidS
+time.sleep(2.5)
+_nso2 = len(_o1("/stub")["calls"])
+_tt = _svq("/api/title", "POST", {"text": "what is a lighthouse for 337", "chat_id": _cidH})
+_stT = [c for c in _o1("/stub")["calls"][_nso2:] if c[1] == "/api/chat"]
+check("server only (live): the chat's title is written by the same server's model",
+      _tt[0] == 200 and isinstance(_tt[1].get("title"), str)
+      and len(_stT) == 1 and _stT[0][2]["model"] == _so_want
+      and _stT[0][2]["messages"][-1]["content"].startswith("Summarise what this message is about"),
+      "%r" % [_tt, [(c[2]["model"], str(c[2]["messages"][-1]["content"])[:40]) for c in _stT]])
+# a picture: the picked model if it reads pictures, else another on the same server
+_o1("/next", {"path": "/api/show", "status": 200, "body": {"capabilities": ["completion", "vision"]}})
+_nso3 = len(_o1("/stub")["calls"])
+_scI = _svchat(text="what is in picture srv only 337", tier=_so_tier, models=["Llama 3.2 3B"], images=_PIC34)
+_stI = [c for c in _o1("/stub")["calls"][_nso3:] if c[1] == "/api/chat"
+        and (c[2].get("messages") or [{}])[-1].get("images")]
+check("server only (live): a picture goes to a model of the same server, cloud power on, and nowhere else",
+      "ANSWER-" in _scI[1] and "vision engine" not in _scI[1] and _stI
+      and _stI[0][2]["model"] in [m["name"] for m in (_so_l2.get("models") or [])]
+      and _stI[0][2]["messages"][-1].get("images") == ["iVBORw0KGgoAAAANSUhEUg=="],
+      "%r" % [_scI[1][:160], [c[2]["model"] for c in _stI]])
+# Advanced (6b337): a hand-picked council of the server's models drafts in turn on that server. The second
+# model spills when it loads (the stub's "sneaky"), so its draft is absent and the first is the answer,
+# with no merge (a merge could be this machine's own Gemma, which is the council's rule, not the server's);
+# a pick that isn't listed any more is dropped and never swapped for another model
+_o1("/restore", {})
+_svq("/api/servers/test", "POST", {"id": _sid34})
+_nso4 = len(_o1("/stub")["calls"])
+_nlA = len(_o1("/log")["log"])
+_scA = _svchat(models=[_SVL, _SVN + " \u00b7 sneaky:14b", _SVN + " \u00b7 gone:1b"],
+               text="compare lighthouses and beacons 337")
+time.sleep(2.5)
+_stA = [c[2]["model"] for c in _o1("/stub")["calls"][_nso4:] if c[1] == "/api/chat"]
+# the gateway's own log: what the app sent, in order (the second model is refused before it reaches Ollama)
+_lgA = [json.loads(r["body"])["model"] for r in _o1("/log")["log"][_nlA:] if r["path"] == "/api/chat"]
+_drafts = [json.loads(f[1]) for f in _scA[2] if f[0] == "DRAFT"]
+check("server only (live, Advanced): a council of two of the server's models drafts one after another on "
+      "that server, a draft that fails is absent, a pick that isn't listed is dropped, and nothing runs "
+      "anywhere else",
+      _scA[0] == 200 and "ANSWER-" in _scA[1] and "\u26a0" not in _scA[1]
+      and _lgA[:2] == ["small:8b", "sneaky:14b"] and set(_lgA) <= {"small:8b", "sneaky:14b"}
+      and _stA[:1] == ["small:8b"] and "gone:1b" not in _stA + _lgA and [d_["m"] for d_ in _drafts] == [_SVL, _SVN + " \u00b7 sneaky:14b"]
+      and _drafts[1]["t"].startswith("(no answer") and not _drafts[0]["t"].startswith("(no answer")
+      and "retrying on" not in json.dumps(_scA[2]),
+      "%r" % [_scA[1][:160], _stA, _drafts])
+_svq("/api/prefs", "POST", {"turbo": False})
 # offline, with Use cloud power on: said, and nothing else answers
 _svq("/api/prefs", "POST", {"turbo": True})
 _o1("/down", {})
 _sc9 = _svchat(text="anyone there")
 _st9 = _svq("/api/servers/test", "POST", {"id": _sid34})[1].get("server") or {}
+_nlO = len(_o1("/log")["log"])
+_scO = _svchat(text="anyone there srv only 337", tier=_so_tier, models=["Llama 3.2 3B"])
+_soO = _svq("/api/tiers")[1].get(_so_tier) or {}
+_svO = (_svq("/api/servers")[1].get("servers") or [{}])[0].get("only") or {}
 # (review) a council of this server's models only: their reason, and no
 # local model tried in their place
 _scC = _svchat(models=[_SVL, _SVN + " \u00b7 sneaky:14b"], text="council down")
@@ -18573,6 +19568,15 @@ check("servers (live): pair again works; offline is said, with cloud power on, a
       and all(_SVLJ in f[1] for f in _sc9[2] if f[0] == "RUN")
       and _st9.get("status", {}).get("kind") == "offline" and _st9["status"]["reachable"] is False,
       "%r" % [_sp3, _sc8[1][:80], _sc9, _st9.get("status")])
+check("server only (live): the server off: the row is off with the reason, the chat says so plainly and "
+      "no local, cloud or other model answers",
+      _scO[1].strip() == _sc9[1].strip() and _scO[1].startswith("\u26a0\ufe0f " + _SVN)
+      and "Nothing was sent anywhere else" in _scO[1] and "ANSWER" not in _scO[1]
+      and "stopped responding" not in _scO[1] and "retrying on" not in json.dumps(_scO[2])
+      and _soO.get("available") is False and _soO.get("models") == [] and _soO.get("why")
+      and _svO.get("ok") is False and _svO.get("why") == _soO.get("why")
+      and all(r["path"] != "/api/chat" for r in _o1("/log")["log"][_nlO:]),
+      "%r" % [_scO[1], _soO, _svO])
 check("servers (live): a council of server models that none answers says why, and no other model answers",
       _scC[1].strip() == ("⚠️ None of the picked models answered. %s didn’t answer. It may be off, "
                           "asleep or offline. Nothing was sent anywhere else." % _SVN)
@@ -18584,6 +19588,8 @@ _svq("/api/test/profile", "POST", {"op": "switch", "to": _pB34})
 _vB34 = _svq("/api/servers")[1]
 _nlogB = len(_o1("/log")["log"])
 _scB = _svchat(text="from B")
+_scBo = _svchat(text="from B srv only", tier=_so_tier, models=["Llama 3.2 3B"])
+_tiB = _svq("/api/tiers")[1]
 _tB34 = _svq("/api/servers/test", "POST", {"id": _sid34})[1]
 _rmB34 = _svq("/api/servers/remove", "POST", {"id": _sid34})[1]
 _svq("/api/test/profile", "POST", {"op": "switch", "to": "local"})
@@ -18597,6 +19603,12 @@ check("servers (live): a server added in one profile is invisible and unusable i
       and [s_["id"] for s_ in _vA34.get("servers") or []] == [_sid34]
       and _vA34["servers"][0]["paired"] is True,
       "%r" % [_vB34, _scB[1], _tB34, _rmB34, _vA34])
+check("server only (live): profile B has no row for A's server, and A's mode says the server is gone "
+      "there without a request leaving",
+      _scBo[1].strip() == "\u26a0\ufe0f That server isn\u2019t in Settings \u203a Your servers any more. "
+                          "Pick another model. Nothing was sent anywhere else."
+      and not [k_ for k_ in _tiB if k_.startswith("srv:")] and len(_o1("/log")["log"]) == _nlogB,
+      "%r" % [_scBo[1], list(_tiB)])
 # the Access secret and the device key: in servers.json only
 _rowA = json.load(open(_sfile34))["servers"][0]
 _seed34 = _rowA.get("seed", "")
@@ -18616,6 +19628,16 @@ _rm34 = _svq("/api/servers/remove", "POST", {"id": _sid34})
 check("servers (live): after a restart the server is still paired; removing it deletes its key",
       _vR34[0].get("paired") is True and _rm34[1] == {"ok": True} and _svq("/api/servers")[1].get("servers") == []
       and _seed34 not in open(_sfile34).read(), "%r" % [_vR34, _rm34])
+_scG = _svchat(text="after removal srv only 337", tier=_so_tier, models=["Llama 3.2 3B"])
+_tiG = _svq("/api/tiers")[1]
+_prG = _svq("/api/prefs")[1].get("tier")
+check("server only (live): a restart keeps the mode; with its server removed the row is gone and a chat "
+      "says so, never answering from another model",
+      _prG == _so_tier and not [k_ for k_ in _tiG if k_.startswith("srv:")]
+      and _scG[1].strip() == "\u26a0\ufe0f That server isn\u2019t in Settings \u203a Your servers any "
+                             "more. Pick another model. Nothing was sent anywhere else."
+      and "ANSWER" not in _scG[1],
+      "%r" % [_prG, _scG[1], list(_tiG)])
 _SV.stop()
 _o1proc.kill()
 # ---- end 6b334

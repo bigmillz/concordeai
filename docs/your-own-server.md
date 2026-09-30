@@ -195,6 +195,27 @@ remove paired devices, use `sudo ollama1-pair --list` and
 proves it knows it, and the server proves it back. The details are in
 [PROTOCOL.md](../ollama1/PROTOCOL.md).
 
+## Using it from the app
+
+Once a server is paired, the engine menu has one row with its name, under
+Cloud Only. It opens a menu beside it with `<name> Only` first and then
+each of the server's models. `<name> Only` answers with one model: the
+strongest one that fits entirely on the server's graphics card, judged by
+the size in its tag (`20b` beats `14b`) and checked against the card's
+memory when the server reports it. A model marked `ram` (card plus memory,
+slower) is never picked for you; pick it by hand from the list. If no
+model fits on the card whole, the mode uses the server's smallest model,
+and its hover note says so. When you pull a bigger model that fits, the
+mode follows it. Nothing runs on the computer or in the cloud, and if the
+server is off or fails partway, the app says so rather than answering
+from anywhere else. The item is greyed while the server doesn't answer,
+and if you remove the server the mode goes back to Fast.
+
+Under Advanced, the server's models are listed under its name and can be
+ticked into a hand-picked council. They draft one after another on the
+server. They can't be the compositor, which is always on the computer or
+in the cloud.
+
 ## Choosing models
 
 Nothing is installed at first. Put the models you want in

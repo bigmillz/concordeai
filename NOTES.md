@@ -233,6 +233,160 @@ plain file server with `api` stubbed (Blink, not WKWebView, so
 unverified there: real Cmd keyup delivery, `blur` on the window and
 under the real microphone prompt, Ctrl+D under WebView2).
 
+## 6b337 — <server> Only: one model on your own server
+Patrick (2026-09-30), at the engine menu: "Under the cloud models only, can
+we add a Olama one only or whatever the server name is in a user's case?"
+A mode per paired server: "<name> Only", a 🖥️, "strongest that fits its
+card", the name the person gave the server (escaped; nothing in the app
+says "ollama1"). It lives in the server's flyout, below (see "The menu").
+
+It was first built as a council of up to three of the server's models,
+the strongest writing the answer. Patrick: "Why are we doing a three model
+council? … single makes more sense." He is right: one card runs the drafts
+one after another with a model load between each, so three models are slow
+and buy little. So it is ONE model, streamed like a single server pick:
+no drafts, no compositor, no reflection, no peer review.
+- **Which model.** The strongest the server lists whose placement is
+  "gpu" (fits entirely on its card) and that really does, ranked by the
+  parameter size in its tag (`20b` > `14b` > `9b`; `8x7b` is 56, `135m` is
+  0.135, `e4b` is 4; a tag that says nothing, `:latest`, ranks last, then
+  bytes, then name). "Really does": the gateway's `placement` in
+  `/api/tags` is the OWNER'S POLICY (GPU-only unless the allow-list says
+  `ram`), not a measurement, and a GPU-only model too big for the card is
+  refused at load (`gpu_fit`; the first live run picked a 56 GiB model on
+  a 16 GiB card). So when the server says how much memory its card has
+  (`/v1/info`), the weights plus the gateway's margin (5%, 256 MiB, its
+  768 MiB reserve and a context cache: 1.05 x size + 1.25 GiB) must fit
+  in it; a model loaded and 100% on the card fits whatever its size; with
+  no figure, the placement is all there is (`_srv_fits`). Embedding models
+  and Ollama cloud tags are already out of the list (`_srv_models`). A
+  model with placement "gpu+ram" (card + memory,
+  slower) or "unknown" (a gateway that doesn't say) is NEVER picked for
+  you while one fits whole; the person can still pick one by hand from the
+  model rows below. Only when none fits whole is it the server's single
+  SMALLEST listed model (bytes, else the tag's size), so the mode isn't
+  dead; the hover bubble then says it is running with what it has.
+  `server_only_pick`, `_srv_params`.
+- **It follows the server.** The pick is computed from the last check
+  (`server_only_state`), so it is re-evaluated whenever a check lands: the
+  menu repaints (`paintEngMenuServers`), the chip changes, and a bigger
+  model pulled to the server becomes the pick. A chat uses the last check
+  when it is under a minute old and answered, else checks again first
+  (`server_only_resolve`).
+- **The tier is `srv:<server id>`.** It is saved like any tier (prefs,
+  PROFILE_LOCAL, so a restart keeps it). `/api/tiers` has a row per paired
+  server under that key (`available`, `models`, `server`, `model`, `how`,
+  `why`, `note`), `/api/servers` has the same as `only`, and the page
+  greys the row through the same `tierOff` the tiers use. Hover says
+  why it is off ("<name> didn't answer…", "<name> lists no models.") or
+  which model it runs, and "Nothing runs on this computer or in the
+  cloud." The composer chip shows what it resolved to ("<name> · gpt-oss:20b").
+- **Removed server.** The mode goes back to Fast, as a mode with nothing
+  behind it does (`srvModeGone`, only once the list of servers is known),
+  never to another server. A server that is merely OFF keeps the mode
+  selected and greyed (a hiccup must not rewrite the person's choice); a
+  chat then says so. A stale request for a server that is gone says
+  "That server isn't in Settings › Your servers any more."
+- **The hard rules, each pinned with a mutation.**
+  - Nothing runs on this Mac or in the cloud. `/api/chat` resolves `srv:`
+    to ONE label (or a placeholder "<name> · unavailable" when there is
+    nothing to run on, with the reason in `_so_fail`) and the council is
+    exactly that, so the existing single-server branch answers: no pre-warm
+    (route is `(None, None)`), no tier line-up, no cloud ladder, no
+    council, no compositor. The branch text has no `resolve_tier`,
+    `run_council`, cloud or engine names. An agent that takes the council
+    over ends the mode for that request.
+  - A failure is said by `server_answer` and nothing answers in its
+    place: the handler's local rescue is now off for any server pick
+    (`not _srv_lbl`), which also closes it for 6b334's single pick.
+    Nothing to run on is said too ("<reason> Nothing was sent anywhere
+    else."), via `server_answer(refuse=…)`.
+  - Background calls go to the same server or are skipped. The memory pass
+    goes to the same server model (skipped after a refusal). The chat's
+    title is written by the same server's model (`make_title(server=…)`,
+    through a per-chat ticket, `_srv_only_chats`, like the cloud's) or not
+    at all, never a local engine. An export's title is skipped. A place
+    pin pass already goes to the answering model.
+  - Pictures follow 6b334: the picked model if `/api/show` says it reads
+    pictures, else another on the same server, else "<name> has no model
+    that reads pictures". Making a picture or video, or a file, takes the
+    benchmark hold as it does for a server pick.
+  - Profiles never mix: the mode is resolved from the request's own
+    profile's `servers.json`; another profile's id is "gone" there and no
+    request leaves; `/api/tiers` lists only that profile's servers; the
+    ticket store is a `profile_cache`.
+  - Web search is untouched: the app does the lookup and only the results
+    text reaches the server (the search section doesn't mention the mode).
+  - A chat in the mode takes no benchmark hold (`server_only_request`):
+    it uses none of this computer's engines.
+- **Design choices the spec left open** (each the one most like Cloud Only
+  and 6b334): the tier key is the server's id, not its name, so renaming a
+  server or two servers with similar names can't cross; a server that
+  has never been checked is greyed until its first check lands (a second
+  or two after the app opens); "smallest" ranks by bytes first because the
+  tag's size can't be read from every name; the image refiner
+  (`_refine_with_model`) still uses an already-running local engine for a
+  picture's prompt, as it does for a server pick today.
+- **The menu** (Patrick, same day: "let's at least put all the your
+  server models, in my case, Olama One, under one menu that they can
+  break out into. Instead of having them pile under all the other like
+  fast thinking pro cloud only, let's just have the server name ... and
+  then that splits into a new menu where you can select which one.").
+  Under Cloud Only there is ONE row per paired server: its name, "your
+  server · N models" and a chevron. Clicking it opens a flyout beside it
+  (`#engsub`): "<name> Only" first, then each of that server's models
+  with its where-tag ("yours · card + memory, slower"), the chosen one
+  marked. A click opens it (hover flyouts are fragile in WKWebView; a
+  hover opens it after 300 ms as well, and a flyout a hover opened goes
+  when the pointer moves on to another row); a second click, Esc (the
+  flyout first, then the menu, before anything else reads Escape) and a
+  click elsewhere close it; every pick closes both menus. It goes to the
+  right of the menu, or to the left when there's no room, its top at its
+  row, inside the window on every edge and capped to it so a long list
+  scrolls (`flyPlace`, pure and tested in node; the same rules as 6b336);
+  a repaint (`paintEngMenuServers`) keeps it open and where it was
+  scrolled, and it follows its row when the menu scrolls. A server that
+  isn't answering or lists none keeps its "not answering" / "no models
+  listed" line in the flyout and a greyed "<name> Only". The hover bubble
+  keeps to the window (to the left of its row when the right has no room).
+- **Advanced** (Patrick: "they should appear under advanced where you can
+  select exactly which models and council you want."). Each paired
+  server's models sit in the hand-pick dialog under the server's name,
+  labelled with it; a note says they draft one after another on that
+  server. They are council members only: `run_council` has no server
+  compositor (a label there would read as a cloud provider id), so the
+  compositor list never holds one and a server label sent as the
+  compositor is ignored. Mixed councils follow 6b334's rules: a server's
+  models draft in turn on that server, a failed draft is absent, nothing
+  falls back to local or cloud, the council is checked against this
+  profile's own servers at the door (a removed server's label, or a
+  model it no longer lists, is dropped, never swapped), and the merge is
+  this Mac's or the cloud's as it always was. The council persists in
+  prefs (`adv`); picks of a server that is paired but off at the moment
+  stay when the dialog is saved; when a server is removed its picks go
+  from the page's council (`advPrune`), and with none left the council
+  goes and the mode is Fast.
+- Gauntlet: new `== <server> Only (6b337) ==`, nine in-process and node
+  checks (the pick and the card's size, the state and rows, resolving,
+  the failure paths and the title, the handler's pins, the chip and
+  greying, the menu and its flyout, the flyout's wiring, Advanced), 74
+  mutations each caught, and ten live checks on the real gateway with a
+  card for it to name (its own list, placement and size, a pick the server
+  refuses said plainly, a model dropped and the mode following, a signed
+  chat with cloud power on and a local model named in the request, its
+  title and memory pass on the same model, a picture, an Advanced council
+  of two server models with one draft absent, the server off, profile B,
+  a restart and a removal). Adapted, not loosened: "no tier lists a server
+  model" excludes the `srv:` rows, which are modes of their own; the
+  servers' public keys gain `only`; the page's node stand-ins gain the
+  functions `applyPrefs` now calls; the old flat model rows of the 6b334
+  page check became the flyout's.
+- Not verified here: a real GPU's placement for a real model (the
+  gateway's own list is used with the stub Ollama), WKWebView and
+  WebView2 (the page functions run in node; nothing was looked at on
+  screen, so the flyout's look, its hover timing and its place beside the
+  menu are unseen), web search with the mode on (pinned, not run live).
+
 ## 6b336 — the engine menu fits the window
 Patrick (2026-09-30), with a screenshot of the engine menu listing
 twelve of his server's models: "This box doesn't fit on the screen. Can

@@ -5558,11 +5558,24 @@ def _clean_title(raw: str) -> str:
         else ""
 
 
-def make_title(text: str, conf=None) -> str:
+def make_title(text: str, conf=None, server=None) -> str:
     """Name a chat with a small model — reusing whatever engine is already
     loaded, so it costs almost nothing. A chat the cloud answered is
     named by that provider's quick model instead (6b308): a keys-only
-    user finally gets titles, and nothing new leaves the Mac."""
+    user finally gets titles, and nothing new leaves the Mac. A chat
+    "<server> Only" answered (6b337) is named by that server's model:
+    `server` is its label, or "" for no title; never a local engine."""
+    if server is not None:
+        if not server:
+            return ""
+        try:
+            parts = []
+            server_stream(server, [{"role": "user",
+                                    "content": TITLE_PROMPT + text[:600]}],
+                          parts.append)
+            return _clean_title("".join(parts))
+        except Exception:
+            return ""
     # `conf` is a ticket (6b326): the key is re-read now, and a provider
     # removed or re-keyed since the answer gets no call
     conf = _ticket_conf(conf) if conf else None
@@ -16674,6 +16687,10 @@ def server_only_request(req: dict, ctx) -> bool:
     agent; a picture goes to the same server. It never touches this
     computer's engines, so a benchmark running here doesn't turn it away
     (6b334); making a picture, a video or a file takes the hold later."""
+    if srv_only_tier(req.get("tier")) and not req.get("agent"):
+        # "<server> Only" (6b337): one model on that server, or a line
+        # saying there isn't one; this computer's engines are not asked
+        return True
     if req.get("tier") or req.get("agent"):
         return False
     picks = [m for m in (req.get("models") or []) if isinstance(m, str)]
@@ -17050,13 +17067,19 @@ def server_vision(label: str) -> str:
     return ""
 
 
-def server_answer(label: str, messages: list, memit, emit, status, step):
+def server_answer(label: str, messages: list, memit, emit, status, step,
+                  refuse: str = ""):
     """A chat on one server model (the /api/chat branch): streamed and
     guarded like a local model, and a failure said in one line. A picture
     goes to that server only: to the model picked when it reads pictures,
-    else to one on the same server that does, else it is said."""
+    else to one on the same server that does, else it is said. `refuse`
+    is "<name> Only" (6b337) finding nothing to run on: said, nothing sent."""
     name = label.split(SERVER_SEP, 1)[0]
     said = [False]
+    if refuse:
+        emit(AppText("\u26a0\ufe0f " + refuse + ("" if "Nothing was sent" in refuse
+                                                 else " Nothing was sent anywhere else.")))
+        return
 
     def _m(chunk):
         if chunk and not isinstance(chunk, Ctl):
@@ -17092,6 +17115,163 @@ def server_answer(label: str, messages: list, memit, emit, status, step):
         emit(AppText(("\n\n" if said[0] else "") + "\u26a0\ufe0f %s couldn\u2019t "
                      "answer (%s). Nothing was sent anywhere else."
                      % (name, type(exc).__name__)))
+
+
+# ---- "<server> Only" (6b337)
+# Patrick (2026-09-30), at the engine menu: "Under the cloud models only,
+# can we add a Olama one only or whatever the server name is in a user's
+# case?" A mode per paired server, below Cloud Only: the tier is
+# "srv:<server id>". Then, of a three-model council: "Why are we doing a
+# three model council? ... single makes more sense." A card runs drafts
+# one after another with a model load between each, so it is ONE model:
+# the strongest on that server that fits entirely on its card (placement
+# "gpu"), by the parameter size in its tag. A model that spills into
+# memory ("gpu+ram") or whose placement is unknown is never picked for
+# you; only when none fits whole is it the server's smallest model, so
+# the mode isn't dead. It streams like a single server pick: no
+# compositor, no reflection, no peer review, and nothing on this computer
+# or in the cloud, now or as a fallback.
+SRV_ONLY_PREFIX = "srv:"
+SRV_ONLY_DESC = "strongest that fits its card"
+SRV_ONLY_FRESH_S = 60           # a check older than this is repeated for a chat
+_SRV_ONLY_RX = re.compile(r"srv:([0-9a-f]{8})")
+_SRV_PARAMS_RX = re.compile(r"(?<![\w.])e?(?:(\d+)x)?(\d+(?:\.\d+)?)([bm])(?![a-z0-9])", re.I)
+# (profile, chat id) -> (label or "", time): the chat's last answer was
+# "<server> Only", so its title goes to that server or nowhere
+_srv_only_chats = profile_cache("_srv_only_chats", {})
+
+
+def srv_only_tier(tier) -> bool:
+    return isinstance(tier, str) and tier.startswith(SRV_ONLY_PREFIX)
+
+
+def srv_only_id(tier) -> str:
+    m = _SRV_ONLY_RX.fullmatch(tier) if isinstance(tier, str) else None
+    return m.group(1) if m else ""
+
+
+def _srv_params(name: str):
+    """Billions of parameters from a tag ("gpt-oss:20b" 20, "mixtral:8x7b"
+    56, "smollm2:135m" 0.135), looking at the tag first; None when it
+    doesn't say ("llama3.2:latest")."""
+    tag = name.rsplit(":", 1)[-1] if ":" in name else ""
+    for part in (tag, name):
+        m = _SRV_PARAMS_RX.search(part)
+        if m:
+            v = float(m.group(2)) * (int(m.group(1)) if m.group(1) else 1)
+            return v / 1000.0 if m.group(3).lower() == "m" else v
+    return None
+
+
+def _srv_weight(m: dict) -> float:
+    """What a model weighs, for the smallest: its bytes, else its tag."""
+    if isinstance(m.get("size"), int) and m["size"] > 0:
+        return float(m["size"])
+    p = _srv_params(str(m.get("name") or ""))
+    return p * 6e8 if p else float("inf")
+
+
+def _srv_fits(m: dict, vram) -> bool:
+    """Whether model m runs entirely on the card. Its placement must be
+    "gpu" (the owner didn't let it spill); but /api/tags' "gpu" is a policy,
+    not a measurement: the gateway refuses a GPU-only model that is too
+    big (gpu_fit). So when the server says how much memory its card has,
+    the weights plus the gateway's own margin (5%, 256 MiB, its 768 MiB
+    reserve and a context cache: about 1.25 GiB) must fit in it. A model
+    loaded and 100% on the card fits, whatever its size."""
+    if m.get("placement") != "gpu":
+        return False
+    if m.get("loaded") and m.get("gpu_pct") == 100:
+        return True
+    size = m.get("size")
+    if vram and isinstance(size, int) and size > 0:
+        return size * 1.05 + (5 << 28) <= vram
+    return True
+
+
+def server_only_pick(models: list, vram=None):
+    """(model dict, "fits" | "smallest") for "<server> Only" out of a
+    server's listed models (_srv_models'), or None when it lists none.
+    "fits": the strongest that runs entirely on the card (_srv_fits), by
+    parameter size (unknown sizes last, then bytes, then name). "smallest":
+    nothing fits whole, so the smallest listed."""
+    ms = [m for m in models or [] if isinstance(m, dict) and m.get("name")]
+    fit = [m for m in ms if _srv_fits(m, vram)]
+    if fit:
+        return sorted(fit, key=lambda m: (-(_srv_params(m["name"]) or -1.0),
+                                          -(m.get("size") or 0), m["name"]))[0], "fits"
+    if ms:
+        return min(ms, key=lambda m: (_srv_weight(m), m["name"])), "smallest"
+    return None
+
+
+def server_only_state(e) -> dict:
+    """What "<server> Only" would run on server e right now, from its last
+    check: ok, the model and its label, how it was chosen, why not, and
+    the bubble's note. The last check only: the menu repaints from it
+    whenever a check lands."""
+    s = _srv_seen.get(e["id"]) or {}
+    n = e["name"]
+    out = {"ok": False, "server": n, "model": "", "label": "", "how": "",
+           "why": "", "note": ""}
+    if not _srv_paired(e):
+        out["why"] = "%s isn\u2019t paired with this computer yet." % n
+    elif not s.get("at"):
+        out["why"] = "%s hasn\u2019t been checked yet." % n
+    elif s.get("err") or not s.get("reachable") or not s.get("auth"):
+        out["why"] = s.get("err") or "%s isn\u2019t answering." % n
+    else:
+        pick = server_only_pick(s.get("models") or [],
+                                (s.get("gpu") or {}).get("vram_bytes"))
+        if pick is None:
+            out["why"] = "%s lists no models." % n
+        else:
+            m, how = pick
+            out.update(ok=True, model=m["name"], how=how, label=n + SERVER_SEP + m["name"])
+    tail = " Nothing runs on this computer or in the cloud."
+    out["note"] = (
+        ("The strongest model on %s that fits its card, answering alone." % n + tail)
+        if out["how"] == "fits" else
+        ("Nothing on %s fits its card whole, so it is running with what it has: "
+         "its smallest model, alone." % n + tail)
+        if out["how"] == "smallest" else
+        ("When %s answers, this runs its strongest model that fits its card, "
+         "alone." % n + tail))
+    return out
+
+
+def server_only_tiers(ctx) -> dict:
+    """/api/tiers' rows for the modes: one per paired server."""
+    out = {}
+    for e in _srv_read(ctx):
+        if _srv_paired(e):
+            st = server_only_state(e)
+            out[SRV_ONLY_PREFIX + e["id"]] = dict(
+                st, desc=SRV_ONLY_DESC, models=[st["label"]] if st["ok"] else [],
+                skipped=[], available=st["ok"])
+    return out
+
+
+def server_only_resolve(sid: str, ctx):
+    """(label, server name, why not) for tier "srv:<sid>" in ctx, for a
+    chat: the last check when it is under a minute old and answered, else
+    a new one. Only ctx's own servers are looked at, so another profile's
+    id is "gone". The label is '' when there is nothing to run on."""
+    try:
+        e = _srv_find(_srv_read(ctx), sid)
+    except (StoreReadError, NoProfile):
+        return "", "", "Couldn\u2019t read your servers."
+    if e is None:
+        return "", "", SRV_GONE
+    if _srv_paired(e):
+        if not cai_crypto.available():
+            return "", e["name"], SRV_NO_CRYPTO
+        s = _srv_seen.get(e["id"]) or {}
+        if not (s.get("models") and s.get("reachable") and not s.get("err")
+                and time.time() - float(s.get("at") or 0) < SRV_ONLY_FRESH_S):
+            server_check(e)
+    st = server_only_state(e)
+    return st["label"], e["name"], st["why"]
 
 
 # ---- what the pane does
@@ -17246,6 +17426,7 @@ def _srv_public(e) -> dict:
                                              "latency_ms", "version", "err",
                                              "kind")},
             "gpu": s.get("gpu"),
+            "only": server_only_state(e),
             "models": list(s.get("models") or [])}
 
 
@@ -23284,6 +23465,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     _fl = fast_cloud_ladder()
                     if _fl:
                         out[name]["fastcloud"] = _fl[0].get("name", "")
+            # "<server> Only" (6b337): one row per paired server, from its
+            # last check; greyed on the page while it can't answer
+            try:
+                out.update(server_only_tiers(self.ctx))
+            except (StoreReadError, NoProfile):
+                pass
             self._send_json(out)
         elif self.path == "/api/prefs":
             self._send_json(prefs_view(self.ctx))
@@ -24466,6 +24653,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                    if _tcid else None)
             _conf = (_lc[0] if _lc and time.time() - _lc[1] < 300
                      and cloud_allowed() else None)
+            # a chat "<server> Only" just answered is named by that
+            # server's model or not at all (6b337): never a local one
+            _so = (_srv_only_chats.get((self.ctx.name, _tcid))
+                   if _tcid else None)
+            if _so and time.time() - _so[1] < 300:
+                self._send_json({"title": make_title(txt, server=_so[0])
+                                 if txt else ""})
+                return
             self._send_json({"title": make_title(txt, conf=_conf)
                              if txt else ""})
             return
@@ -24766,9 +24961,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # second chat could be titled by another chat's provider
         _title_cid = str((self._turn or {}).get("id") or "")
         _last_cloud.pop((self.ctx.name, _title_cid), None)
+        _srv_only_chats.pop((self.ctx.name, _title_cid), None)   # 6b337
         for _k in [k for k, v in list(_last_cloud.items())
                    if time.time() - v[1] > 300]:
             _last_cloud.pop(_k, None)
+        for _k in [k for k, v in list(_srv_only_chats.items())
+                   if time.time() - v[1] > 300]:
+            _srv_only_chats.pop(_k, None)
         if tier == "Smart":
             tier = "Fast"   # merged tiers (1.20) — old clients still send Smart
         if tier == "Best":
@@ -24785,8 +24984,35 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         else:
             req_cloud = None
         req_comp = str(req_json.get("compositor") or "")[:40]
+        if server_label(req_comp):
+            # run_council has no server compositor (6b337): a server's model
+            # drafts, and the merge is this computer's or the cloud's
+            req_comp = ""
+        # "<SERVER> ONLY" (6b337, per Patrick: "Under the cloud models only,
+        # can we add a Olama one only or whatever the server name is in a
+        # user's case?"; "single makes more sense"): tier "srv:<id>" is ONE
+        # model of that server, the strongest that fits its card, found
+        # from this profile's own servers. With nothing to run on, the
+        # council is a placeholder label and `_so_fail` says why: no other
+        # model ever answers in its place.
+        _so_c0, _so_fail = "", ""
         if tier in TIERS:
             council = resolve_tier(tier)
+        elif srv_only_tier(tier):
+            try:
+                _so_lbl, _so_name, _so_why = server_only_resolve(
+                    srv_only_id(tier), self.ctx)
+            except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                raise
+            except Exception:
+                _so_lbl, _so_name, _so_why = "", "", (
+                    "Couldn\u2019t check your servers.")
+            _so_c0 = _so_lbl or ((_so_name or "Your server") + SERVER_SEP
+                                 + "unavailable")
+            _so_fail = "" if _so_lbl else (
+                _so_why or "That server can\u2019t answer right now.")
+            council = [_so_c0]
+            model_name = _so_c0
         else:
             council = [m for m in req_json.get("models", [])
                        if (m in MODEL_ROUTES and SUPPORTED.get(m))
@@ -24995,6 +25221,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # cloud power says, and a failure is said, never covered by a
         # local or cloud model. A label of a server removed since lands
         # here too, and says so.
+        # still "<server> Only" only if nothing (an agent) took the council
+        _srv_only = bool(_so_c0) and council == [_so_c0]
+        if not _srv_only:
+            _so_fail = ""
         _srv_lbl = (council[0] if len(council) == 1 and not cloud_only
                     and server_label(council[0]) else "")
         if _srv_lbl:
@@ -25850,7 +26080,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 blks = x_code_blocks(src)
                 ext = blks[0][0] if blks else "md"
             ttl = next((b[2] for b in x_blocks(src) if b[0] == "h"), "") \
-                or (make_title(src[:600]) if len(src) > 200 else "")
+                or (make_title(src[:600])
+                    if len(src) > 200 and not _srv_only else "")
             step("export", "Writing the file", "run",
                  EXPORT_KIND.get(ext, ("", ext))[1])
             status("writing the %s" % EXPORT_KIND.get(ext, ("", ext))[1])
@@ -26166,7 +26397,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 run_research(council, full_messages, memit, status)
             elif _srv_lbl:
                 server_answer(_srv_lbl, full_messages, memit, emit, status,
-                              step)
+                              step, refuse=_so_fail)
             elif len(council) > 1:
                 run_council(council, full_messages, memit, status,
                             reflect=(tier == "Thinking"),
@@ -26313,11 +26544,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 emit("\n" + offline_hint(kind, exc))
             except (BrokenPipeError, ConnectionResetError):
                 pass
-            if not sent[0] and not cloud_only:
+            if not sent[0] and not cloud_only and not _srv_lbl:
                 # every path stayed silent (engine died mid-answer, a
                 # provider returned nothing). Try the smallest brain on
                 # disk before admitting defeat. Cloud Only opts out: a
-                # local rescue is exactly what the user ruled out.
+                # local rescue is exactly what the user ruled out. So does
+                # a pick of your own server, "<server> Only" included
+                # (6b337): its failure is said, never covered.
                 try:
                     pulled = ollama_pulled_tags() or set()
                     alt = next((l for l in reversed(MERGE_RANK)
@@ -26347,6 +26580,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if _ans_conf and _title_cid and not _gone:
                 _last_cloud[(user_base.name, _title_cid)] = (
                     _ans_conf, time.time())
+            # "<server> Only" (6b337): the chat's title goes to that
+            # server's model, or to none when there was nothing to run on
+            if _srv_only and _title_cid and not _gone:
+                _srv_only_chats[(user_base.name, _title_cid)] = (
+                    "" if _so_fail else _srv_lbl, time.time())
             if _ans_conf and not _gone:
                 # the badge under the answer says "cloud", whatever the
                 # line-up said up front (a picture Claude read, 6b308);
@@ -26502,7 +26740,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # memory too and the words reach no second company (6b308); a
             # local answer stays local, and Cloud Only never runs locally
             if (plain and len(plain) > 12 and (_ans_conf or not cloud_only)
-                    and not _gone):
+                    and not _gone and not _so_fail):
                 ctx_thread(
                     target=_extract_memory,
                     args=(route_label or (council[0] if council else ""),
@@ -30088,6 +30326,23 @@ body.gen #chip-model{color:var(--accent)}
 .engrow.srvrow .enm{font-weight:500}
 .engrow.srvrow .edsc{max-width:190px}
 .engrow.srvrow.off{cursor:default}
+/* "<server> Only" rows (6b337): a mode's row, with a roomier description */
+.engrow.srvmode .edsc{max-width:190px}
+/* a server's row in the engine menu opens a flyout beside it (6b337) */
+.engrow.srvmenu .edsc{max-width:150px}
+.engrow.srvmenu .echev{flex:none;color:var(--faint);margin-left:2px;font-size:15px;line-height:1}
+.engrow.srvmenu.open{background:rgba(255,255,255,.07);color:var(--text)}
+#engsub{position:fixed;z-index:61;min-width:250px;max-width:360px;
+  background:rgba(6,7,10,.92);border:1px solid rgba(255,255,255,.12);
+  -webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px);
+  border-radius:14px;padding:6px;
+  box-shadow:0 18px 50px -20px rgba(0,0,0,.9);
+  overflow-y:auto;overscroll-behavior:contain}
+#engsub[hidden]{display:none}
+/* the hand-pick dialog: a server's models, grouped under its name (6b337) */
+#adv-card .advgrp{margin:12px 0 2px;font-size:12px;color:var(--dim)}
+#adv-card .advgrp b{color:var(--text);font-weight:600}
+#adv-card .advgrp i{color:var(--faint)}
 /* Settings › Your servers (6b334): one card per server, the add form */
 #srv-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
 .srv{padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.045);
@@ -31627,7 +31882,7 @@ function applyPrefs(){
     let t=typeof P.tier==="string"?P.tier:"Fast";
     if(t==="Smart"||t==="Best")t="Fast";   // merged (1.20) and retired (5.3)
     if(t==="Power")t="Pro";                // Pro absorbed Power (5.3)
-    if(tierOff[t])t="Fast";
+    if(tierOff[t]&&!isSrvMode(t))t="Fast";   // a server mode stays while it is off (6b337)
     tier=t;
   }
   if(!prefMine.has("remote_autonomy")
@@ -31639,6 +31894,7 @@ function applyPrefs(){
     paintModels();
     if(typeof paintAgents==="function")paintAgents();
   }
+  srvModeGone();advPrune();
   advChip();paintAutonomy();
   // the Code tab took "Coding" while it waited: the saved one now
   if(codeGuess&&uiMode==="code"&&agent==="Coding"
@@ -31667,7 +31923,7 @@ let lastModels="";  // line-up the backend actually used
 // Settings › Your servers (6b334): this profile's servers as
 // /api/servers says (no token, no key), when they were last checked,
 // a Remove clicked once, a Pair again opened
-let srvList=[],srvAt=0;
+let srvList=[],srvAt=0,srvLoaded=false;
 // a card's line and its open Access form survive a repaint (review)
 const srvArmed={},srvPairOpen={},srvMsgs={},srvTokOpen={};
 const SRV_SEP=" \u00b7 ";
@@ -31696,7 +31952,7 @@ function paintModels(){
     el.classList.toggle("active",manual&&el.dataset.model===council[0]);
     const old=el.querySelector(".rank"); if(old)old.remove();
   });
-  $("#chip-model").textContent=tier||model;
+  $("#chip-model").textContent=tierLabel();
 }
 function selectModel(name){
   if(!name)return;  // rows without a model (Power Mode) don't select
@@ -31798,6 +32054,14 @@ async function showTierPop(el,name){
   }catch(e){}
   const list=(info.models||[]);
   const bench=(cloudOn&&list.length>1)?(ci.bench||[]):[];
+  // "<server> Only" (6b337): the one model it runs, or why it can't
+  if(isSrvMode(name)){
+    tierPop.innerHTML="<b>"+esc((info.server||"Your server")+" Only")+"</b>"
+      +(info.available===false
+        ?'<div class="mline">'+esc(info.why||"not answering")+'</div>'
+        :'<div class="mline">'+esc(info.model||"")+'</div>')
+      +'<span class="note">'+esc(info.note||"")+'</span>';
+  }else
   // Cloud Only owns its bubble: its line-up IS the key bench, and with no
   // key the bubble has to say what to do rather than list nothing
   if(info.available===false||(info.available!==undefined&&!list.length
@@ -31832,7 +32096,10 @@ async function showTierPop(el,name){
         esc(info.skipped.join(", "))+'</span>' : "");
   const r=el.getBoundingClientRect();
   tierPop.hidden=false;
-  tierPop.style.left=Math.round(r.right+10)+"px";
+  // to the right of its row, or to its left when the window is out of room
+  const pw=tierPop.offsetWidth;
+  const pl=r.right+10+pw>innerWidth-8?Math.max(8,r.left-10-pw):r.right+10;
+  tierPop.style.left=Math.round(pl)+"px";
   tierPop.style.top=Math.round(r.top-4)+"px";
 }
 function hideTierPop(){tierPop.hidden=true;}
@@ -31888,21 +32155,15 @@ async function openAdv(){
     (await api("/api/cloud")).json()]);}catch(e){}
   const ready=(st.models||[]).filter(m=>m.status==="ready"
     &&m.label.indexOf("Vision")<0);   // LLaVA routes itself on images
-  // your own servers' models join only when ticked here (6b334)
-  const srvPicks=[];
-  srvList.filter(s=>s.paired).forEach(s=>(s.models||[]).forEach(m=>
-    srvPicks.push({label:m.label,use:"your server"+(srvWhere(m)?" \u00b7 "+srvWhere(m):"")})));
+  // your own servers' models join only when ticked here (6b334), grouped
+  // under each server's name (6b337)
   $("#adv-local").innerHTML=(ready.map(m=>
     '<label class="advrow"><input type="checkbox" data-l="'
     +esc(m.label)+'"'+(sel.local.indexOf(m.label)>=0?" checked":"")+'>'
     +'<span class="an"><b>'+esc(m.label)+'</b>'
     +'<span class="au">'+esc(ADV_USE[m.label]||"capable generalist")
     +'</span></span></label>').join("")
-    +srvPicks.map(m=>
-    '<label class="advrow"><input type="checkbox" data-l="'
-    +esc(m.label)+'"'+(sel.local.indexOf(m.label)>=0?" checked":"")+'>'
-    +'<span class="an"><b>'+esc(m.label)+'</b>'
-    +'<span class="au">'+esc(m.use)+'</span></span></label>').join(""))
+    +advServerRows(sel))
     ||'<p class="advp">no local models installed yet</p>';
   const pv=(cs||{}).providers||{};
   $("#adv-cloud").innerHTML=Object.keys(ADV_CLOUD).map(id=>{
@@ -31920,16 +32181,58 @@ async function openAdv(){
     $("#adv-cloud").insertAdjacentHTML("afterbegin",'<p class="advp" id="adv-cloud-off">'
       +"Cloud power is off, so these and a cloud compositor sit out. Turn it on "
       +"in Settings \u203a Cloud power.</p>");
-  // compositor: automatic, each keyed cloud, and the local Gemmas
-  const comps=[['',"Automatic (recommended)"]]
-    .concat(Object.keys(ADV_CLOUD).filter(id=>(pv[id]||{}).status==="ok")
-      .map(id=>[id,ADV_CLOUD[id][0]+" · cloud"]))
-    .concat(ready.filter(m=>/^Gemma/.test(m.label))
-      .map(m=>[m.label,m.label+" · local, private"]));
+  // compositor: automatic, each keyed cloud, and the local Gemmas. Never a
+  // server's model: run_council has no server compositor (6b337)
+  const comps=advCompList(pv,ready);
   $("#adv-comp").innerHTML=comps.map(([v,t])=>
     '<option value="'+esc(v)+'"'+(sel.comp===v?" selected":"")+'>'
     +esc(t)+'</option>').join("");
   advWhy();
+}
+// the hand-pick dialog's rows for your own servers (6b337, per Patrick:
+// "they should appear under advanced where you can select exactly which
+// models and council you want"): each paired server's models, grouped
+// under its name, labelled with it. They draft in turn on that server.
+function advServerRows(sel){
+  const gs=srvList.filter(s=>s.paired);
+  return gs.map(s=>{
+    const ms=s.models||[];
+    return '<div class="advgrp"><b>'+esc(s.name)+'</b> <i>\u00b7 your server</i></div>'
+      +(ms.length?ms.map(m=>'<label class="advrow"><input type="checkbox" data-l="'
+        +esc(m.label)+'"'+(sel.local.indexOf(m.label)>=0?" checked":"")+'>'
+        +'<span class="an"><b>'+esc(m.label)+'</b><span class="au">'
+        +esc("your server"+(srvWhere(m)?" \u00b7 "+srvWhere(m):""))+'</span></span></label>').join("")
+        :'<p class="advp">'+((s.status||{}).err?"not answering right now":"no models listed")+'</p>');
+  }).join("")+(gs.length?'<p class="advp">A server\u2019s models draft one after another on '
+    +'that server, never here or in the cloud. The compositor below writes the '
+    +'final answer and can\u2019t be one of them.</p>':"");
+}
+// the compositor's choices: Automatic, each working cloud, the local Gemmas
+function advCompList(pv,ready){
+  return [['',"Automatic (recommended)"]]
+    .concat(Object.keys(ADV_CLOUD).filter(id=>(pv[id]||{}).status==="ok")
+      .map(id=>[id,ADV_CLOUD[id][0]+" · cloud"]))
+    .concat((ready||[]).filter(m=>/^Gemma/.test(m.label)&&m.label.indexOf(SRV_SEP)<0)
+      .map(m=>[m.label,m.label+" · local, private"]));
+}
+// picks of a server that is paired but not listing (off right now) stay in
+// the council when the dialog is saved; only its removal drops them
+function advKept(prev,shown){
+  return (prev||[]).filter(l=>shown.indexOf(l)<0&&l.indexOf(SRV_SEP)>=0
+    &&srvList.some(s=>s.paired&&l.indexOf(s.name+SRV_SEP)===0));
+}
+// a server that is gone takes its picks out of the hand-picked council,
+// never swapped for another model; with none left the council goes and
+// the mode is Fast
+function advPrune(){
+  if(!srvLoaded||!adv||!Array.isArray(adv.local))return;
+  const keep=adv.local.filter(l=>l.indexOf(SRV_SEP)<0
+    ||srvList.some(s=>s.paired&&l.indexOf(s.name+SRV_SEP)===0));
+  if(keep.length===adv.local.length)return;
+  if(keep.length){adv=Object.assign({},adv,{local:keep});prefSet({adv:adv});return;}
+  adv=null;prefSet({adv:null,advon:false});
+  if(advOn){advOn=false;setTier("Fast");}
+  advChip();
 }
 function advWhy(){
   const v=$("#adv-comp").value;
@@ -31942,8 +32245,9 @@ $("#adv-cancel").addEventListener("click",()=>{$("#adv-veil").hidden=true;});
 $("#adv-veil").addEventListener("click",e=>{
   if(e.target.id==="adv-veil")$("#adv-veil").hidden=true;});
 $("#adv-save").addEventListener("click",()=>{
+  const shown=[...document.querySelectorAll("#adv-local input")].map(i=>i.dataset.l);
   const local=[...document.querySelectorAll("#adv-local input:checked")]
-    .map(i=>i.dataset.l);
+    .map(i=>i.dataset.l).concat(advKept(adv&&adv.local,shown));
   const cloud=[...document.querySelectorAll("#adv-cloud input:checked")]
     .map(i=>i.dataset.c);
   if(!local.length){
@@ -31968,8 +32272,76 @@ const engMenu=document.createElement("div");
 engMenu.id="engmenu";engMenu.hidden=true;
 document.body.appendChild(engMenu);
 engMenu.addEventListener("scroll",()=>hideTierPop(),{passive:true});   // its bubble would float off its row
+// YOUR SERVERS IN ONE ROW (6b337, per Patrick: "let's at least put all the
+// your server models ... under one menu that they can break out into.
+// Instead of having them pile under all the other like fast thinking pro
+// cloud only, let's just have the server name ... and then that splits
+// into a new menu where you can select which one."): a row per paired
+// server under Cloud Only opens a flyout beside it, "<name> Only" first,
+// then that server's models. It opens on a click, which works in every
+// webview, and after a short hover; Esc or a click elsewhere closes it.
+const engSub=document.createElement("div");
+engSub.id="engsub";engSub.hidden=true;
+document.body.appendChild(engSub);
+let engSubId="",engSubTimer=0,engSubByHover=false;   // whose flyout is open, and how it opened
+engMenu.addEventListener("scroll",placeEngSub,{passive:true});
+engSub.addEventListener("scroll",()=>hideTierPop(),{passive:true});
+function closeEngSub(){
+  clearTimeout(engSubTimer);engSubTimer=0;engSubId="";engSubByHover=false;
+  engSub.hidden=true;hideTierPop();
+  engMenu.querySelectorAll(".engrow.srvmenu.open").forEach(e=>e.classList.remove("open"));
+}
+function closeEngMenus(){engMenu.hidden=true;closeEngSub();}
+// Escape: the flyout first, then the menu; true when it closed something
+function engMenuEsc(){
+  if(!engSub.hidden){closeEngSub();return true;}
+  if(!engMenu.hidden){closeEngMenus();hideTierPop();return true;}
+  return false;
+}
+function placeEngSub(){
+  if(engSub.hidden)return;
+  const row=engMenu.querySelector('.engrow.srvmenu[data-sv="'+engSubId+'"]');
+  if(!row){closeEngSub();return;}
+  engSub.style.maxHeight="";
+  const f=flyPlace(engMenu.getBoundingClientRect(),row.getBoundingClientRect(),
+    engSub.offsetWidth,engSub.offsetHeight,innerWidth,innerHeight);
+  if(f.maxH)engSub.style.maxHeight=f.maxH+"px";
+  engSub.style.left=f.left+"px";engSub.style.top=f.top+"px";
+}
+// keepScroll: a repaint keeps the list where it was (as the menu does, 6b336)
+function openEngSub(id,keepScroll,byHover){
+  const s=srvList.find(x=>x.paired&&x.id===id);
+  const row=engMenu.querySelector('.engrow.srvmenu[data-sv="'+id+'"]');
+  if(!s||!row||engMenu.hidden){closeEngSub();return;}
+  const keep=keepScroll&&!engSub.hidden?engSub.scrollTop:-1;
+  engSubId=id;engSubByHover=!!byHover;
+  engSub.innerHTML=srvSubRows(s);
+  engMenu.querySelectorAll(".engrow.srvmenu").forEach(e=>e.classList.toggle("open",e===row));
+  engSub.hidden=false;
+  placeEngSub();
+  if(keep>=0)engSub.scrollTop=keep;
+  else{const on=engSub.querySelector(".engrow.on");
+    if(on&&engSub.scrollHeight>engSub.clientHeight)on.scrollIntoView({block:"nearest"});}
+  engSub.querySelectorAll(".engrow").forEach(el=>{
+    if(el.dataset.none)return;
+    if(el.dataset.s){
+      el.addEventListener("click",ev=>{
+        ev.stopPropagation();pickServerModel(el.dataset.s);closeEngMenus();});
+      return;
+    }
+    // "<name> Only": its bubble says why it is off, and what it would run
+    el.addEventListener("mouseenter",()=>showTierPop(el,el.dataset.t));
+    el.addEventListener("mouseleave",hideTierPop);
+    el.addEventListener("click",ev=>{
+      ev.stopPropagation();
+      if(tierOff[el.dataset.t]){showTierPop(el,el.dataset.t);return;}
+      setTier(el.dataset.t);hideTierPop();closeEngMenus();
+    });
+  });
+}
 function openEngMenu(){
   const keep=engMenu.hidden?-1:engMenu.scrollTop;   // a repaint keeps the scroll
+  srvSyncOff();
   engMenu.innerHTML=Object.keys(TIER_META).map(n=>{
     const m=TIER_META[n];
     return '<div class="engrow'+(tier===n&&!advOn?" on":"")
@@ -31978,14 +32350,15 @@ function openEngMenu(){
       +'<span class="enm">'+esc(n)+'</span>'
       +'<span class="edsc">'+esc(m.desc)+'</span></div>';
   }).join("")
+  // one row per paired server, under Cloud Only: its "Only" mode and its
+  // models open in a flyout beside it (6b337)
+  +srvMenuRows()
   // ADVANCED (6b248, per Patrick): hand-pick the council + compositor,
   // set apart from the modes by a thin rule
   +'<div class="engdiv"></div>'
   +'<div class="engrow'+(advOn?" on":"")+'" data-t="__adv__">'
   +'<span class="eico">⚙️</span><span class="enm">Advanced</span>'
-  +'<span class="edsc">hand-pick models &amp; compositor</span></div>'
-  // your own servers' models (6b334)
-  +srvMenuRows();
+  +'<span class="edsc">hand-pick models &amp; compositor</span></div>';
   engMenu.hidden=false;
   // fit the window (6b336): open on the side with room; when neither
   // side holds the whole list, take the roomier one and scroll
@@ -32006,11 +32379,25 @@ function openEngMenu(){
     if(on&&h>room)on.scrollIntoView({block:"nearest"});}
   engMenu.querySelectorAll(".engrow").forEach(el=>{
     if(el.dataset.none)return;
-    if(el.dataset.s){
+    if(el.dataset.sv){
       el.addEventListener("click",ev=>{
-        ev.stopPropagation();pickServerModel(el.dataset.s);engMenu.hidden=true;});
+        ev.stopPropagation();hideTierPop();
+        if(engSubId===el.dataset.sv&&!engSub.hidden)closeEngSub();
+        else openEngSub(el.dataset.sv,false,false);
+      });
+      el.addEventListener("mouseenter",()=>{
+        clearTimeout(engSubTimer);
+        if(engSubId===el.dataset.sv&&!engSub.hidden)return;
+        engSubTimer=setTimeout(()=>{
+          if(!engMenu.hidden)openEngSub(el.dataset.sv,false,true);},300);
+      });
+      el.addEventListener("mouseleave",()=>clearTimeout(engSubTimer));
       return;
     }
+    // a flyout a hover opened goes when the pointer moves on to another
+    // row; one a click opened stays until it is closed
+    el.addEventListener("mouseenter",()=>{
+      clearTimeout(engSubTimer);if(engSubByHover)closeEngSub();});
     if(el.dataset.t!=="__adv__"){
       el.addEventListener("mouseenter",()=>showTierPop(el,el.dataset.t));
       el.addEventListener("mouseleave",hideTierPop);
@@ -32018,14 +32405,17 @@ function openEngMenu(){
     el.addEventListener("click",ev=>{
       ev.stopPropagation();
       if(el.dataset.t==="__adv__"){
-        hideTierPop();engMenu.hidden=true;openAdv();return;
+        hideTierPop();closeEngMenus();openAdv();return;
       }
       // an unavailable mode keeps the menu open and leaves its bubble
       // up — the bubble is where the fix is written
       if(tierOff[el.dataset.t]){showTierPop(el,el.dataset.t);return;}
-      setTier(el.dataset.t);hideTierPop();engMenu.hidden=true;
+      setTier(el.dataset.t);hideTierPop();closeEngMenus();
     });
   });
+  // a repaint (a server's list refreshing) keeps its flyout open
+  if(engSubId)openEngSub(engSubId,true,engSubByHover);
+  else engSub.hidden=true;
 }
 $("#model-chip").addEventListener("click",ev=>{
   ev.stopPropagation();hideTierPop();
@@ -32034,15 +32424,15 @@ $("#model-chip").addEventListener("click",ev=>{
     // a server's model list older than a minute is checked again (6b334)
     if(srvList.some(s=>s.paired)&&Date.now()-srvAt>60000){
       srvAt=Date.now();loadServers(true);}
-  }else engMenu.hidden=true;
+  }else closeEngMenus();
 });
 // a resize refits an open menu to the new window
 addEventListener("resize",()=>{if(!engMenu.hidden){hideTierPop();openEngMenu();}});
 document.addEventListener("click",e=>{
   hideTierPop();
   const em=document.getElementById("engmenu");
-  if(em&&!e.target.closest("#engmenu")&&!e.target.closest("#model-chip"))
-    em.hidden=true;
+  if(em&&!e.target.closest("#engmenu")&&!e.target.closest("#engsub")
+     &&!e.target.closest("#model-chip"))closeEngMenus();
 });
 setTier(tier,true);
 advChip();     // a custom council survives the restart (6b248)
@@ -32072,12 +32462,12 @@ async function paintTierAvail(){
   try{info=await(await api("/api/tiers")).json();}catch(e){return;}
   tierOff={};
   Object.keys(info).forEach(n=>{if(info[n].available===false)tierOff[n]=1;});
-  const em=document.getElementById("engmenu");
-  if(em)em.querySelectorAll(".engrow").forEach(el=>
-    el.classList.toggle("off",!!tierOff[el.dataset.t]));
+  document.querySelectorAll("#engmenu .engrow,#engsub .engrow").forEach(el=>{
+    if(el.dataset.t)el.classList.toggle("off",!!tierOff[el.dataset.t]);});
   // the saved mode may have lost its keys since the last launch — never
   // leave the composer pointing at something that cannot answer
-  if(tierOff[tier])setTier("Fast");
+  // (a server mode that is only off stays: it goes when its server is removed)
+  if(tierOff[tier]&&!isSrvMode(tier))setTier("Fast");
 }
 paintTierAvail();
 
@@ -35108,6 +35498,7 @@ document.addEventListener("keydown",e=>{
     // the ZITO board owns Escape while it is up: terminal first, then it
     if(window.zitoEsc&&window.zitoEsc()){e.preventDefault();return;}
     if(!palette.hidden){palClose();return;}
+    if(engMenuEsc()){e.preventDefault();return;}
     if(generating&&abortCtl){e.preventDefault();abortCtl.abort();return;}
     // close whatever modal is open, outermost last
     for(const sel of ["#new-veil","#update-veil","#about-veil",
@@ -36646,8 +37037,10 @@ async function loadServers(refresh){
   try{
     const d=await(await api("/api/servers"+(refresh?"?refresh=1":""))).json();
     srvList=Array.isArray(d.servers)?d.servers:[];
+    srvLoaded=true;
     if(refresh)srvAt=Date.now();
   }catch(e){return;}
+  srvModesRefresh();
   paintServers();
   paintEngMenuServers();
   paintSrvChips();
@@ -36719,6 +37112,7 @@ $("#srv-list").addEventListener("click",async ev=>{
     if(!tier&&council.some(l=>l.indexOf(s.name+SRV_SEP)===0))setTier("Fast");
   }
   if(d.server){srvPut(d.server);if(a==="pair")delete srvPairOpen[id];}
+  srvModesRefresh();
   paintServers();paintSrvChips();
   srvMsg(id,d.err||(a==="pair"&&d.ok?"Paired.":""));
   paintEngMenuServers();
@@ -36755,26 +37149,53 @@ function whereBadge(lm,who){
   const base=cloud?"cloud":(rest.length||!names.length)?"this Mac":"";
   return [base].concat(names).filter(Boolean).join(" + ");
 }
-// the engine menu's rows: each paired server's models, marked as yours
+// where a flyout goes (6b337): beside the menu, to its right or, with no room
+// there, to its left; its top at its row; inside the window on every edge,
+// and capped to it so a long list scrolls (as the menu itself does, 6b336).
+// mr, rr: the menu's and the row's boxes; w, h: the flyout's size
+function flyPlace(mr,rr,w,h,iw,ih){
+  const EDGE=10,GAP=4,maxH=Math.max(120,ih-2*EDGE),hh=Math.min(h,maxH);
+  const roomR=iw-mr.right-GAP-EDGE,roomL=mr.left-GAP-EDGE;
+  let left=roomR>=w||roomR>=roomL?mr.right+GAP:mr.left-GAP-w;
+  left=Math.max(EDGE,Math.min(left,iw-w-EDGE));
+  const top=Math.max(EDGE,Math.min(rr.top,ih-EDGE-hh));
+  return {left:Math.round(left),top:Math.round(top),maxH:h>maxH?Math.floor(maxH):0};
+}
+// the engine menu's server rows (6b337): ONE per paired server, its own
+// name, how many models it lists and a chevron; the models and "<name>
+// Only" are in the flyout it opens (srvSubRows)
 function srvMenuRows(){
-  const rows=[];
-  srvList.filter(s=>s.paired).forEach(s=>{
-    const ms=s.models||[];
-    if(!ms.length){
-      rows.push('<div class="engrow srvrow off" data-none="1"><span class="eico">'
-        +'\ud83d\udda5\ufe0f</span><span class="enm">'+esc(s.name)+'</span>'
-        +'<span class="edsc">'+((s.status||{}).err?"not answering":"no models listed")
-        +'</span></div>');
-      return;
-    }
-    ms.forEach(m=>rows.push('<div class="engrow srvrow'
-      +(!tier&&!advOn&&!agent&&council[0]===m.label?" on":"")
-      +'" data-s="'+esc(m.label)+'" title="Runs on your server '+esc(s.name)
-      +', not in the cloud"><span class="eico">\ud83d\udda5\ufe0f</span>'
-      +'<span class="enm">'+esc(m.label)+'</span><span class="edsc">'
-      +esc(srvWhere(m)?"yours \u00b7 "+srvWhere(m):"your server")+'</span></div>'));
-  });
-  return rows.length?'<div class="engdiv"></div>'+rows.join(""):"";
+  return srvList.filter(s=>s.paired).map(s=>{
+    const ms=s.models||[],t="srv:"+s.id;
+    const here=!advOn&&(tier===t||(!tier&&!agent&&ms.some(m=>m.label===council[0])));
+    return '<div class="engrow srvmenu'+(here?" on":"")+'" data-sv="'+esc(s.id)+'">'
+      +'<span class="eico">\ud83d\udda5\ufe0f</span>'
+      +'<span class="enm">'+esc(s.name)+'</span>'
+      +'<span class="edsc">'+esc(ms.length?"your server \u00b7 "+ms.length+" model"
+        +(ms.length===1?"":"s"):(s.status||{}).err?"your server \u00b7 not answering"
+        :"your server \u00b7 no models listed")+'</span>'
+      +'<span class="echev">\u203a</span></div>';
+  }).join("");
+}
+// a server's flyout: "<name> Only" first, then each of its models with
+// where it runs; a server that doesn't answer or lists none says so
+function srvSubRows(s){
+  const ms=s.models||[],t="srv:"+s.id;
+  const only='<div class="engrow srvmode'+(tier===t&&!advOn?" on":"")
+    +(s.only&&s.only.ok?"":" off")+'" data-t="'+esc(t)+'">'
+    +'<span class="eico">\ud83d\udda5\ufe0f</span>'
+    +'<span class="enm">'+esc(s.name)+' Only</span>'
+    +'<span class="edsc">strongest that fits its card</span></div>';
+  if(!ms.length)
+    return only+'<div class="engdiv"></div><div class="engrow srvrow off" data-none="1">'
+      +'<span class="edsc">'+((s.status||{}).err?"not answering":"no models listed")
+      +'</span></div>';
+  return only+'<div class="engdiv"></div>'+ms.map(m=>'<div class="engrow srvrow'
+    +(!tier&&!advOn&&!agent&&council[0]===m.label?" on":"")
+    +'" data-s="'+esc(m.label)+'" title="Runs on your server '+esc(s.name)
+    +', not in the cloud"><span class="eico">\ud83d\udda5\ufe0f</span>'
+    +'<span class="enm">'+esc(m.name)+'</span><span class="edsc">'
+    +esc(srvWhere(m)?"yours \u00b7 "+srvWhere(m):"your server")+'</span></div>').join("");
 }
 // the composer's server chips (6b334): "● AMD", "● NVIDIA", "● INTEL"
 // for each paired server whose card its gateway names; dimmed while it
@@ -36792,6 +37213,41 @@ function srvChipsHtml(list){
 function paintSrvChips(){
   const box=document.getElementById("srv-chips");
   if(box)box.innerHTML=srvChipsHtml(srvList);
+}
+// "<server> Only" (6b337, per Patrick: "Under the cloud models only, can we
+// add a Olama one only or whatever the server name is in a user's case?"):
+// tier "srv:<id>", one model of that server, the strongest that fits its
+// card. The server says which (the `only` of /api/servers); the page only
+// draws it: a row per paired server, greyed while it can't answer
+function isSrvMode(t){return typeof t==="string"&&t.indexOf("srv:")===0;}
+function srvModeOf(t){
+  return isSrvMode(t)?srvList.find(s=>s.paired&&"srv:"+s.id===t)||null:null;}
+// what the composer chip says: the model the mode resolved to
+function tierShown(t){
+  if(!isSrvMode(t))return t;
+  const s=srvModeOf(t);
+  return !s?"Your server":s.only&&s.only.ok?s.only.label:s.name+" Only";
+}
+function tierLabel(){return tierShown(tier)||model;}
+// the modes that can't answer are the ones tierOff holds (setTier, the
+// menu's click and paintTierAvail read it)
+function srvSyncOff(){
+  Object.keys(tierOff).forEach(k=>{if(isSrvMode(k))delete tierOff[k];});
+  srvList.filter(s=>s.paired&&!(s.only&&s.only.ok)).forEach(s=>{
+    tierOff["srv:"+s.id]=1;});
+}
+// a mode whose server was removed (or unpaired) goes back to Fast, as a
+// mode with nothing behind it does; never to another server. Only once
+// the servers are known, and never because the server is merely off
+function srvModeGone(){
+  if(!srvLoaded||!isSrvMode(tier)||srvModeOf(tier))return;
+  if(agent){tier="Fast";prefSet({tier:"Fast"});paintModels();}
+  else setTier("Fast");
+}
+// the servers changed: greyed rows, the chip's model, a vanished server
+function srvModesRefresh(){
+  srvSyncOff();srvModeGone();advPrune();
+  if(isSrvMode(tier))paintModels();
 }
 function paintEngMenuServers(){
   const em=document.getElementById("engmenu");
@@ -38678,7 +39134,7 @@ async function zBuild(){
   const TICK=[["link",navigator.onLine?"stable":"offline",
       navigator.onLine?"--n3":"--n5"],
     ["spokes",spokes.length+"/"+(names.length+keys.length),"--zi"],
-    ["latency",lat+"ms","--n6"],["tier",(tier||model).toLowerCase(),"--n4"],
+    ["latency",lat+"ms","--n6"],["tier",tierLabel().toLowerCase(),"--n4"],
     ["cloud",keys.length+" key"+(keys.length===1?"":"s"),
       keys.length?"--n2":"--zf"],
     ["memory",(st.mem_pct!=null?Math.round(st.mem_pct)+"%":"n/a"),"--zb"],
@@ -38691,7 +39147,7 @@ async function zBuild(){
     +(ver?' \u00b7 '+esc(ver):"")+'</div>';
 
   /* left rail — real subsystem state, one line each */
-  const ROSTER=[["orchestrator",(tier||"manual").toLowerCase(),"--zb"],
+  const ROSTER=[["orchestrator",(tierShown(tier)||"manual").toLowerCase(),"--zb"],
     ["spokes",spokes.length+" live","--n3"],["retriever","web \u00b7 on","--n6"],
     ["compositor",ladder.toLowerCase(),"--n5"],
     ["memory",facts+" fact"+(facts===1?"":"s"),"--n7"],
@@ -38938,7 +39394,7 @@ async function zTransmit(){
     zDbg("[dispatch] "+(line?line.split(",").length:1)+" model"
       +(line&&line.split(",").length!==1?"s":"")+" \u00b7 "
       +(resp.headers.get("X-Web-Search")==="1"?"web on":"no web")
-      +" \u00b7 "+(tier||model));
+      +" \u00b7 "+tierLabel());
     if(line)zDbg("[lineup] "+line);
     $("#z-fl").textContent="streaming";
     const rd=resp.body.getReader(),dec=new TextDecoder();
@@ -38964,7 +39420,7 @@ async function zTransmit(){
     zDbg("[done]   ~"+Math.round(ans.length/4)+" tok \u00b7 "
       +Math.round(window.__zRate)+" tok/s end-to-end \u00b7 "+el()+" wall");
     const nd=Object.keys(seen).filter(k=>k.slice(0,2)==="d|").length;
-    const who=esc(comp||last||(tier||model));
+    const who=esc(comp||last||tierLabel());
     zLine("m","VERDICT \u00b7 "+(nd?nd+" drafts \u00b7 composite "+who
       :"single spoke \u00b7 "+who)+" \u00b7 "+el());
     zDbg("[audit]  rival ui: pending. this build: "+zPts.length
